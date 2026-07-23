@@ -1,0 +1,269 @@
+<title>Running Coach — Evidence Coverage</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #eef1f1; --surface: #ffffff; --surface-2: #f6f8f8; --line: #dbe1e0;
+  --ink: #14201b; --ink-soft: #4c5b55; --ink-faint: #7a877f;
+  --accent: #0e8c7f; --accent-ink: #ffffff;
+  --built: #4b9e2f; --partial: #d98a2a; --missing: #8894b0; --danger: #c0442e;
+  --shadow: 0 1px 2px rgba(20,32,27,.06), 0 8px 24px rgba(20,32,27,.06);
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1512; --surface: #151e1b; --surface-2: #1b2622; --line: #26332e;
+    --ink: #e7eeea; --ink-soft: #a9b7b0; --ink-faint: #74847c;
+    --accent: #2bb3a3; --accent-ink: #06231f;
+    --built: #6bbf46; --partial: #eb9748; --missing: #8d99b6; --danger: #e8765c;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #eef1f1; --surface: #ffffff; --surface-2: #f6f8f8; --line: #dbe1e0;
+  --ink: #14201b; --ink-soft: #4c5b55; --ink-faint: #7a877f;
+  --accent: #0e8c7f; --accent-ink: #ffffff;
+  --built: #4b9e2f; --partial: #d98a2a; --missing: #8894b0; --danger: #c0442e;
+  --shadow: 0 1px 2px rgba(20,32,27,.06), 0 8px 24px rgba(20,32,27,.06);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0d1512; --surface: #151e1b; --surface-2: #1b2622; --line: #26332e;
+  --ink: #e7eeea; --ink-soft: #a9b7b0; --ink-faint: #74847c;
+  --accent: #2bb3a3; --accent-ink: #06231f;
+  --built: #6bbf46; --partial: #eb9748; --missing: #8d99b6; --danger: #e8765c;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1080px; margin: 0 auto; padding: clamp(20px, 4vw, 44px) clamp(16px, 4vw, 32px) 72px; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.eyebrow { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); font-weight: 600; }
+a { color: var(--accent); }
+
+header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 20px; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.mark { width: 34px; height: 34px; border-radius: 9px; flex: none; background: linear-gradient(145deg, var(--built), var(--accent) 55%, var(--partial)); box-shadow: var(--shadow); }
+.brand h1 { font-size: 15px; margin: 0; font-weight: 650; letter-spacing: -.01em; }
+.brand p { margin: 0; font-size: 12.5px; color: var(--ink-faint); }
+.theme-toggle { border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft); border-radius: 999px; padding: 7px 14px; font: inherit; font-size: 12.5px; cursor: pointer; }
+.theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+.hero { margin-top: 26px; }
+.hero h2 { font-size: clamp(26px, 4.6vw, 40px); letter-spacing: -.02em; margin: 8px 0 6px; text-wrap: balance; line-height: 1.06; max-width: 20ch; }
+.hero p { margin: 0; color: var(--ink-soft); font-size: 15px; max-width: 66ch; }
+
+.tiles { margin-top: 22px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 16px 14px; box-shadow: var(--shadow); position: relative; overflow: hidden; }
+.tile::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--c, var(--accent)); }
+.tile .n { font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
+.tile .k { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+.tile .of { color: var(--ink-faint); font-size: 12px; }
+
+.legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 24px 0 10px; font-size: 12.5px; color: var(--ink-soft); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.legend i { width: 11px; height: 11px; border-radius: 3px; }
+
+.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 15px 17px; box-shadow: var(--shadow); display: flex; gap: 13px; }
+.card .stripe { width: 4px; border-radius: 3px; background: var(--c); flex: none; }
+.card .body { flex: 1; min-width: 0; }
+.card .top { display: flex; align-items: baseline; gap: 9px; }
+.card .idx { font-family: var(--mono); font-size: 12px; color: var(--ink-faint); }
+.card h3 { margin: 0; font-size: 15px; letter-spacing: -.01em; flex: 1; }
+.chip { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 2px 8px; border-radius: 999px; color: #fff; background: var(--c); white-space: nowrap; }
+.safety { font-size: 10.5px; font-weight: 700; color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--line)); border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+.card p { margin: 8px 0 0; font-size: 12.8px; color: var(--ink-soft); }
+.card p b { color: var(--ink); font-weight: 600; }
+
+section { margin-top: 40px; }
+.sec-head h2 { margin: 0 0 4px; font-size: 20px; letter-spacing: -.01em; }
+.sec-head p { margin: 0 0 16px; font-size: 13px; color: var(--ink-faint); max-width: 70ch; }
+
+.phases { display: grid; gap: 12px; }
+.phase { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 16px 18px; display: grid; grid-template-columns: 46px 1fr; gap: 16px; align-items: start; }
+.phase .badge { width: 46px; height: 46px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; background: var(--c, var(--accent)); }
+.phase .badge .num { font-size: 19px; font-weight: 700; line-height: 1; }
+.phase .badge small { font-size: 8.5px; text-transform: uppercase; letter-spacing: .07em; opacity: .9; }
+.phase h3 { margin: 0 0 2px; font-size: 15.5px; letter-spacing: -.01em; }
+.phase .meta { font-size: 11.5px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .05em; }
+.phase p { margin: 8px 0 0; font-size: 13px; color: var(--ink-soft); }
+.phase .refs { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+.ref { font-family: var(--mono); font-size: 11px; color: var(--ink-soft); background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; }
+.ref.safety { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, var(--line)); font-weight: 600; }
+.phase.later { opacity: .92; }
+.phase.later .badge { background: var(--missing); }
+
+.principles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.pr { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; box-shadow: var(--shadow); }
+.pr h4 { margin: 0 0 5px; font-size: 14px; letter-spacing: -.01em; }
+.pr p { margin: 0; font-size: 12.8px; color: var(--ink-soft); }
+
+.flow { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 18px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.flow .step { display: inline-flex; align-items: center; gap: 8px; font-size: 12.8px; }
+.flow .step .d { width: 20px; height: 20px; border-radius: 50%; background: var(--surface-2); border: 1px solid var(--line); display: inline-flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 11px; color: var(--accent); font-weight: 600; }
+.flow .arrow { color: var(--ink-faint); }
+.flow .step.emph .d { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+
+footer { margin-top: 40px; font-size: 12px; color: var(--ink-faint); text-align: center; }
+
+@media (max-width: 820px) {
+  .tiles { grid-template-columns: repeat(2, 1fr); }
+  .grid { grid-template-columns: 1fr; }
+  .principles { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="mark" aria-hidden="true"></div>
+      <div>
+        <h1>Running Coach</h1>
+        <p>Evidence coverage · brief → engine</p>
+      </div>
+    </div>
+    <button class="theme-toggle" id="themeToggle" type="button">Toggle theme</button>
+  </header>
+
+  <div class="hero">
+    <div class="eyebrow">Gap analysis · research brief, 24 Jul 2026</div>
+    <h2>What the engine covers, and what it doesn't — yet</h2>
+    <p>The research brief describes a 17-domain "living evidence system." Today's engine is a deep,
+    faithful build of about a third of it. This maps every domain to what's on <span class="num">main</span>,
+    flags the safety-critical gaps, and lays out the order to close them.</p>
+  </div>
+
+  <div class="tiles">
+    <div class="tile" style="--c:var(--built)"><div class="n num" style="color:var(--built)">3</div><div class="k">Built</div><div class="of num">of 17 domains</div></div>
+    <div class="tile" style="--c:var(--partial)"><div class="n num" style="color:var(--partial)">4</div><div class="k">Partial</div><div class="of num">meaningful gaps</div></div>
+    <div class="tile" style="--c:var(--missing)"><div class="n num" style="color:var(--missing)">10</div><div class="k">Missing</div><div class="of num">not yet started</div></div>
+    <div class="tile" style="--c:var(--danger)"><div class="n num" style="color:var(--danger)">3</div><div class="k">Safety-critical</div><div class="of num">must precede launch</div></div>
+  </div>
+
+  <div class="legend">
+    <span><i style="background:var(--built)"></i> Built</span>
+    <span><i style="background:var(--partial)"></i> Partial</span>
+    <span><i style="background:var(--missing)"></i> Missing</span>
+    <span><i style="background:var(--danger)"></i> Safety-critical</span>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <section>
+    <div class="sec-head">
+      <h2>Suggested build sequence</h2>
+      <p>You chose all four focus areas — so this is the whole map, ordered. Safety leads because the brief
+      insists the app must screen and refer before it does anything else; then the physiology core everything
+      leans on; then readiness &amp; load; then athlete populations. The rest are later slices or scope decisions.</p>
+    </div>
+    <div class="phases" id="phases"></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Cross-cutting principles</h2>
+      <p>Three things the brief demands everywhere — not a single domain, but a property every recommendation should carry.</p>
+    </div>
+    <div class="principles">
+      <div class="pr"><h4>Show uncertainty</h4><p>Confidence ranges, not false precision — "estimated VO₂max 52–56", never "54.3". Label evidence strong / uncertain / absent.</p></div>
+      <div class="pr"><h4>Tag provenance</h4><p>Every recommendation carries its evidence: population studied, sex, training level, age, event, evidence quality.</p></div>
+      <div class="pr"><h4>Refer, never diagnose</h4><p>Educate, screen, and route to a qualified professional. The app must never claim to be a doctor, physio or dietitian.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>The central product principle</h2>
+      <p>The brief's own summary of what a credible companion does. The engine already lives the first steps; the last two are the weakest today.</p>
+    </div>
+    <div class="flow" id="flow"></div>
+  </section>
+
+  <footer>
+    Derived from the supplied research brief. Status reflects the current engine on <span class="num">main</span>. Not medical advice.
+  </footer>
+</div>
+
+<script>
+const DOMAINS = [
+  { i: 2, name: "Volume, intensity & distribution", s: "built", t: "Pyramidal default / polarized option, interval design (favours 3–5 min), long runs, recovery weeks, taper 41–60%. Deliberately refuses to force “80/20”." },
+  { i: 3, name: "Strength, power & conditioning", s: "built", t: "Heavy loading, single-leg, calf/soleus, hip & hamstring, trunk, plyometrics, maintenance phase — close to the brief's list." },
+  { i: 4, name: "Mobility, flexibility & warm-ups", s: "built", t: "Dynamic warm-ups + targeted mobility. Correctly doesn't sell stretching as a performance driver." },
+  { i: 1, name: "Physiology & performance determinants", s: "partial", t: "<b>Have:</b> pace prediction (Riegel) + HR zones. <b>Missing:</b> separate estimates for aerobic capacity, threshold / critical speed, economy, durability — with confidence ranges. The brief says don't reduce fitness to one score." },
+  { i: 5, name: "Training load, injury risk & return-to-running", s: "partial", t: "<b>Have:</b> injury triage (incl. bone-stress) + load proxy. <b>Missing:</b> the “single run >10% longer than 30-day longest” spike flag, next-morning pain model, return-to-running progression, post-illness." },
+  { i: 9, name: "Psychology, behaviour & adherence", s: "partial", t: "<b>Have:</b> non-punitive missed sessions, “why this session matters”, RPE. <b>Missing:</b> process goals, reflection, habit support, compulsive-exercise protection." },
+  { i: 11, name: "Beginners, elite & athlete classification", s: "partial", t: "<b>Have:</b> 3 experience levels. <b>Missing:</b> the six-tier McKay framework and per-recommendation evidence tagging." },
+  { i: 6, name: "Biomechanics, form & footwear", s: "missing", t: "No cadence / form / footwear tracking against a personal baseline. (Brief: compare to self, don't impose “180 spm”.)" },
+  { i: 7, name: "Nutrition, fuelling & energy availability", s: "missing", safety: true, t: "No fuelling prompts, carb / hydration targets, gut training, or <b>RED-S screening</b>. Brief warns this is where an app becomes a health hazard." },
+  { i: 8, name: "Sleep, recovery & readiness", s: "missing", t: "No multi-factor readiness model (sleep, RHR, HRV, soreness, mood, stress). One poor HRV reading must not cancel a session." },
+  { i: 10, name: "Women & female-athlete health", s: "missing", safety: true, t: "No menstrual-symptom tracking, pregnancy / postpartum return, menopause, pelvic floor, iron, RED-S. Missing periods should <b>prompt a health check</b>." },
+  { i: 12, name: "Masters runners & ageing", s: "missing", t: "No age input at all — can't preserve intensity or adjust recovery for older athletes. Don't just slow everyone down." },
+  { i: 13, name: "Young athletes", s: "missing", t: "Age-appropriate training, safeguarding, consent, growth. Also a <b>scope / legal decision</b>, not just a feature." },
+  { i: 14, name: "Para-athletes & inclusive design", s: "missing", t: "Demos are keyboard / theme accessible, but no wheelchair / handcycle options or impairment-aware metrics." },
+  { i: 15, name: "Heat, cold, altitude & environment", s: "missing", t: "No effort-based pace adjustment for heat, wind, altitude, air quality or surface." },
+  { i: 16, name: "Wearables, monitoring & data validity", s: "missing", t: "Estimates are point values. Brief wants confidence ranges plus source device, reliability and known limitations on every metric." },
+  { i: 17, name: "Medical safety & professional boundaries", s: "missing", safety: true, t: "No red-flag escalation (chest pain, syncope, bone pain, ED concerns, mental health). Must <b>educate, screen and refer</b> — never diagnose." },
+];
+const LABEL = { built: "Built", partial: "Partial", missing: "Missing" };
+const VAR = { built: "var(--built)", partial: "var(--partial)", missing: "var(--missing)" };
+
+document.getElementById("grid").innerHTML = DOMAINS.map((d) => {
+  const c = d.safety ? "var(--danger)" : VAR[d.s];
+  return '<div class="card" style="--c:' + c + '">' +
+    '<div class="stripe"></div><div class="body"><div class="top">' +
+    '<span class="idx">' + String(d.i).padStart(2, "0") + '</span>' +
+    '<h3>' + d.name + '</h3>' +
+    (d.safety ? '<span class="safety">⚠ Safety</span>' : '') +
+    '<span class="chip" style="background:' + VAR[d.s] + '">' + LABEL[d.s] + '</span>' +
+    '</div><p>' + d.t + '</p></div></div>';
+}).join("");
+
+const PHASES = [
+  { n: 1, tag: "Now", c: "var(--danger)", title: "Safety guardrails", meta: "Domains 17 · 7 · 10 — screen & refer",
+    text: "The must-haves before real users touch a plan. A screen-and-refer layer: medical red-flag escalation, RED-S / energy-availability screening, and female-health prompts (missing periods → health check). Nothing diagnoses; everything routes to a professional.",
+    refs: [["#17 Medical escalation", 1], ["#7 RED-S / fuelling", 1], ["#10 Female health", 1]] },
+  { n: 2, tag: "Next", c: "var(--accent)", title: "Deepen the physiology core", meta: "Domains 1 · 16 — estimates with confidence",
+    text: "Replace the single Riegel proxy with separate, evolving estimates — aerobic capacity, threshold / critical speed, economy, durability — each shown as a confidence range with its evidence tag. This is the foundation the adaptive loops read from.",
+    refs: [["#1 Determinants", 0], ["#16 Data validity", 0]] },
+  { n: 3, tag: "Then", c: "var(--built)", title: "Readiness & load monitoring", meta: "Domains 8 · 5 — observe the response",
+    text: "A multi-factor readiness model (sleep, RHR, HRV trend, soreness, mood, stress) feeding conservative adjustments, plus the injury load-spike flag (>10% longest-run) and a return-to-running progression. Turns the plan from static to responsive.",
+    refs: [["#8 Readiness", 0], ["#5 Load & return", 0]] },
+  { n: 4, tag: "Later", c: "var(--partial)", title: "Broaden athlete populations", meta: "Domains 11 · 12 — right advice per person",
+    text: "The six-tier McKay classification, age-aware adaptation for masters (preserve intensity, adjust recovery), and per-recommendation evidence tags so lab findings on trained young men don't quietly become universal advice.",
+    refs: [["#11 Classification", 0], ["#12 Masters", 0]] },
+];
+const LATER = {
+  n: "···", tag: "Decide", title: "Scope & later slices",
+  meta: "Domains 6 · 9* · 13 · 14 · 15",
+  text: "Biomechanics & footwear (#6), the rest of psychology/adherence (#9), environment adjustment (#15), and — as deliberate product/legal decisions — young athletes (#13) and para-athletes (#14). Worth choosing intentionally, not building by default.",
+  refs: [["#13 Youth — scope call", 1], ["#14 Para — scope call", 1], ["#6 Biomechanics", 0], ["#15 Environment", 0]],
+};
+
+document.getElementById("phases").innerHTML = PHASES.map((p) =>
+  '<div class="phase" style="--c:' + p.c + '">' +
+    '<div class="badge"><span class="num">' + p.n + '</span><small>' + p.tag + '</small></div>' +
+    '<div><h3>' + p.title + '</h3><div class="meta">' + p.meta + '</div><p>' + p.text + '</p>' +
+    '<div class="refs">' + p.refs.map((r) => '<span class="ref' + (r[1] ? ' safety' : '') + '">' + r[0] + '</span>').join("") + '</div></div>' +
+  '</div>'
+).join("") +
+  '<div class="phase later"><div class="badge"><span class="num" style="font-size:15px">' + LATER.n + '</span><small>' + LATER.tag + '</small></div>' +
+  '<div><h3>' + LATER.title + '</h3><div class="meta">' + LATER.meta + '</div><p>' + LATER.text + '</p>' +
+  '<div class="refs">' + LATER.refs.map((r) => '<span class="ref' + (r[1] ? ' safety' : '') + '">' + r[0] + '</span>').join("") + '</div></div></div>';
+
+const FLOW = ["Establish context", "Prescribe a start", "Observe response", "Adapt conservatively", "Explain reasoning", "Identify uncertainty", "Refer when needed", "Update as research changes"];
+document.getElementById("flow").innerHTML = FLOW.map((s, i) => {
+  const emph = i >= 5 ? " emph" : "";
+  return '<span class="step' + emph + '"><span class="d">' + (i + 1) + '</span>' + s + '</span>' +
+    (i < FLOW.length - 1 ? '<span class="arrow">→</span>' : '');
+}).join("");
+
+document.getElementById("themeToggle").addEventListener("click", () => {
+  const cur = document.documentElement.getAttribute("data-theme");
+  const next = cur === "dark" ? "light" : cur === "light" ? "dark" : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark");
+  document.documentElement.setAttribute("data-theme", next);
+});
+</script>

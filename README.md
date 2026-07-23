@@ -19,6 +19,53 @@ node --test          # run the full test suite
 node demo/generate.ts # print a plan for the example goal (HM sub-1:30, returning runner)
 ```
 
+## Demo
+
+`demo/generate.ts` drives the whole engine end-to-end for one example athlete — a returning runner
+targeting a sub-1:30 half marathon — and prints the result to the terminal. Nothing to install; it
+runs on Node's built-in TypeScript execution.
+
+```bash
+node demo/generate.ts
+# or, via the package script:
+npm run demo
+```
+
+It walks through four things in order:
+
+1. **Week-by-week summary** — the full periodized block (base → build → peak → taper), showing each
+   week's phase, deload flag, number of quality sessions, long-run duration and approximate distance.
+2. **Week detail** — a couple of representative weeks expanded session-by-session, each with its RPE
+   target and computed pace range (threshold, VO₂, easy, long run, plus strength/mobility).
+3. **Adaptation** — feeds in "two missed sessions in a row" and shows the gentle re-entry adjustment
+   (a hard session swapped for easy, volume trimmed, missed work deliberately *not* added back).
+4. **Achievements** — detects personal bests from an example 10K run (fastest 1k/mile/5k/10k, longest
+   run).
+
+Abridged output:
+
+```
+━━ WEEK-BY-WEEK SUMMARY ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Wk  Start        Phase   Deload  Quality  LongRun  ~Distance
+ 1  2027-04-19  base               1       46′    39.9 km
+ ...
+15  2027-07-26  peak               2       99′    57.3 km
+19  2027-08-23  taper              1       77′    42.4 km
+20  2027-08-30  taper              1       61′    39.8 km
+
+━━ ADAPTATION — TWO MISSED SESSIONS IN A ROW ━━━━━━━━━━━━━━━━━
+Triggered: true
+  • Replaced "4 × 4′ hard / 3′ easy" with an easy run to ease back in after missed sessions.
+Volume 50.0km → 41.0km  (missed work is NOT crammed back in)
+
+━━ ACHIEVEMENTS — PBs FROM A 10K RUN ━━━━━━━━━━━━━━━━━━━━━━━━━
+  🏅 fastest-5k: 20:00
+  🏅 fastest-10k: 40:00
+  🏅 longest-run: 10.0km
+```
+
+To try a different scenario, edit the goal/athlete inputs at the top of `demo/generate.ts` and re-run.
+
 ## What's inside
 
 ```

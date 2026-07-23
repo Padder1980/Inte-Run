@@ -68,3 +68,11 @@ export {
   type AchievementResult,
   detectAchievements,
 } from "./progress/achievements.ts";
+
+// View models (presentation-agnostic summaries for any UI)
+export {
+  buildPlanSummary,
+  type PlanSummary,
+  type WeekView,
+  type SessionView,
+} from "./view/plan-summary.ts";

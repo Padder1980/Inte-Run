@@ -66,19 +66,24 @@ Volume 50.0km → 41.0km  (missed work is NOT crammed back in)
 
 To try a different scenario, edit the goal/athlete inputs at the top of `demo/generate.ts` and re-run.
 
-## Visual preview
+## Interactive preview
 
 For a look at the plan as a *product* rather than terminal text, `web/index.html` is a self-contained
-page that renders a generated plan: the goal and feasibility verdict, a weekly-volume chart coloured by
-training phase, and a click-through week-by-week breakdown with per-session pace and RPE targets.
+page with an input form: enter a goal and current fitness and it renders a plan — the feasibility
+verdict, a weekly-volume chart coloured by training phase, and a click-through week-by-week breakdown
+with per-session pace and RPE targets.
+
+Because the engine is pure TypeScript with no runtime dependencies, [esbuild](https://esbuild.github.io/)
+bundles it (via `web/entry.ts`) into the page so **the real engine runs client-side** — whatever you
+type produces a genuine plan, computed in the browser with nothing leaving your device.
 
 ```bash
-node web/build.ts   # regenerate web/index.html from the engine, then open it in a browser
+npm install        # first time only — pulls in esbuild (a dev dependency)
+node web/build.ts  # bundle the engine + regenerate web/index.html, then open it in a browser
 ```
 
-`web/build.ts` runs the engine for the example athlete and bakes the result into a single static HTML
-file (no server, no dependencies). Edit the same goal/athlete inputs at the top of `web/build.ts` to
-preview a different plan.
+The reusable view model lives in `src/view/plan-summary.ts` (`buildPlanSummary(athlete, goal)`), so the
+same shaping feeds this page today and any native screen later.
 
 ## What's inside
 

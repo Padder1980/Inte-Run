@@ -10,10 +10,12 @@
   "scripts": {
     "test": "node --test",
     "demo": "node demo/generate.ts",
+    "web": "node web/build.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",
+    "esbuild": "^0.28.1",
     "typescript": "^5.6.0"
   },
   "license": "UNLICENSED"

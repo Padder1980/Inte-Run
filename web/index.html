@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Running Coach — Plan Preview</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #eef1f1;
+  --surface: #ffffff;
+  --surface-2: #f6f8f8;
+  --line: #dbe1e0;
+  --ink: #14201b;
+  --ink-soft: #4c5b55;
+  --ink-faint: #7a877f;
+  --accent: #0e8c7f;
+  --accent-ink: #ffffff;
+  --base: #2b9eb3;
+  --build: #5fa83c;
+  --peak: #e0863a;
+  --taper: #7a6fd0;
+  --eff-easy: #3fa47a;
+  --eff-moderate: #d99a2b;
+  --eff-hard: #d65b36;
+  --eff-none: #9aa8a1;
+  --shadow: 0 1px 2px rgba(20, 32, 27, .06), 0 8px 24px rgba(20, 32, 27, .06);
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1512;
+    --surface: #151e1b;
+    --surface-2: #1b2622;
+    --line: #26332e;
+    --ink: #e7eeea;
+    --ink-soft: #a9b7b0;
+    --ink-faint: #74847c;
+    --accent: #2bb3a3;
+    --accent-ink: #06231f;
+    --base: #3ab0c4;
+    --build: #74bd52;
+    --peak: #eb9748;
+    --taper: #9184e0;
+    --eff-easy: #4cb98a;
+    --eff-moderate: #e6ac3e;
+    --eff-hard: #e56f49;
+    --eff-none: #6f7d76;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 30px rgba(0, 0, 0, .35);
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #eef1f1; --surface: #ffffff; --surface-2: #f6f8f8; --line: #dbe1e0;
+  --ink: #14201b; --ink-soft: #4c5b55; --ink-faint: #7a877f;
+  --accent: #0e8c7f; --accent-ink: #ffffff;
+  --base: #2b9eb3; --build: #5fa83c; --peak: #e0863a; --taper: #7a6fd0;
+  --eff-easy: #3fa47a; --eff-moderate: #d99a2b; --eff-hard: #d65b36; --eff-none: #9aa8a1;
+  --shadow: 0 1px 2px rgba(20,32,27,.06), 0 8px 24px rgba(20,32,27,.06);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0d1512; --surface: #151e1b; --surface-2: #1b2622; --line: #26332e;
+  --ink: #e7eeea; --ink-soft: #a9b7b0; --ink-faint: #74847c;
+  --accent: #2bb3a3; --accent-ink: #06231f;
+  --base: #3ab0c4; --build: #74bd52; --peak: #eb9748; --taper: #9184e0;
+  --eff-easy: #4cb98a; --eff-moderate: #e6ac3e; --eff-hard: #e56f49; --eff-none: #6f7d76;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1040px; margin: 0 auto; padding: clamp(20px, 4vw, 48px) clamp(16px, 4vw, 32px) 64px; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.eyebrow {
+  font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-faint); font-weight: 600;
+}
+
+/* Header */
+header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 20px; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.mark {
+  width: 34px; height: 34px; border-radius: 9px; flex: none;
+  background: linear-gradient(145deg, var(--base), var(--accent) 55%, var(--peak));
+  box-shadow: var(--shadow);
+}
+.brand h1 { font-size: 15px; margin: 0; font-weight: 650; letter-spacing: -.01em; }
+.brand p { margin: 0; font-size: 12.5px; color: var(--ink-faint); }
+.theme-toggle {
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft);
+  border-radius: 999px; padding: 7px 14px; font: inherit; font-size: 12.5px; cursor: pointer;
+}
+.theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Goal hero */
+.goal {
+  margin-top: 24px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 16px; box-shadow: var(--shadow); padding: clamp(20px, 3vw, 30px);
+  display: grid; grid-template-columns: 1.4fr 1fr; gap: 28px; align-items: center;
+}
+.goal-main h2 { margin: 6px 0 4px; font-size: clamp(26px, 4.5vw, 38px); letter-spacing: -.02em; text-wrap: balance; line-height: 1.08; }
+.goal-main .when { color: var(--ink-soft); font-size: 14px; }
+.goal-main .who { color: var(--ink-faint); font-size: 12.5px; margin-top: 10px; }
+.verdict {
+  display: flex; flex-direction: column; gap: 10px; padding-left: 28px; border-left: 1px solid var(--line);
+}
+.pill {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 13px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent); text-transform: capitalize;
+}
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.verdict-rows { display: grid; gap: 7px; font-size: 13px; }
+.verdict-rows div { display: flex; justify-content: space-between; gap: 12px; color: var(--ink-soft); }
+.verdict-rows b { color: var(--ink); font-weight: 600; }
+
+/* Stat strip */
+.stats {
+  margin-top: 14px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px;
+}
+.stat {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 13px 14px;
+}
+.stat .k { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
+.stat .v { font-size: 20px; margin-top: 3px; letter-spacing: -.01em; }
+.stat .v small { font-size: 12px; color: var(--ink-faint); font-family: var(--sans); }
+
+/* Section */
+section { margin-top: 40px; }
+.sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 6px; }
+.sec-head h3 { margin: 0; font-size: 17px; letter-spacing: -.01em; }
+.sec-head p { margin: 0; font-size: 12.5px; color: var(--ink-faint); }
+
+/* Phase ribbon + volume chart */
+.chart-card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 20px clamp(14px, 2.5vw, 22px) 16px; }
+.ribbon { display: flex; gap: 3px; margin-bottom: 12px; }
+.ribbon span {
+  font-size: 11px; font-weight: 600; color: #fff; padding: 4px 8px; border-radius: 6px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .02em;
+}
+.chart {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; align-items: end; gap: clamp(2px, .5vw, 6px);
+  height: 168px; padding-top: 6px;
+}
+.bar-btn {
+  display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch;
+  gap: 5px; height: 100%; background: none; border: 0; padding: 0; cursor: pointer; font: inherit;
+  border-radius: 7px 7px 0 0;
+}
+.bar {
+  width: 100%; border-radius: 5px 5px 2px 2px; min-height: 4px;
+  background: var(--phase); transition: filter .15s, transform .15s;
+  position: relative;
+}
+.bar-btn:hover .bar { filter: brightness(1.08); }
+.bar-btn[aria-pressed="true"] .bar { outline: 2px solid var(--ink); outline-offset: 2px; }
+.bar.deload { background-image: repeating-linear-gradient(135deg, transparent, transparent 4px, rgba(255,255,255,.35) 4px, rgba(255,255,255,.35) 7px); }
+.bar-lab { font-size: 9.5px; color: var(--ink-faint); text-align: center; font-family: var(--mono); }
+.bar-btn[aria-pressed="true"] .bar-lab { color: var(--ink); font-weight: 700; }
+.chart-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; flex-wrap: wrap; gap: 10px; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: var(--ink-soft); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.legend .dl { background: var(--surface-2); border: 1px solid var(--line); background-image: repeating-linear-gradient(135deg, transparent, transparent 3px, var(--ink-faint) 3px, var(--ink-faint) 5px); }
+.axis-note { font-size: 11.5px; color: var(--ink-faint); }
+
+/* Week detail */
+.detail { margin-top: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
+.detail-head {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 18px clamp(16px, 2.5vw, 24px);
+  border-bottom: 1px solid var(--line); background: var(--surface-2);
+}
+.wk-badge {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 52px; height: 52px; border-radius: 12px; flex: none; color: #fff; background: var(--phase);
+}
+.wk-badge .num { font-size: 20px; font-weight: 700; line-height: 1; }
+.wk-badge small { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; opacity: .9; }
+.detail-head .meta { flex: 1 1 240px; }
+.detail-head .meta h4 { margin: 0 0 3px; font-size: 15.5px; letter-spacing: -.01em; }
+.detail-head .meta .tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 7px; }
+.tag { font-size: 11px; padding: 3px 9px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); color: var(--ink-soft); }
+.tag.phase { color: #fff; background: var(--phase); border-color: transparent; text-transform: capitalize; }
+.tag.deload { color: var(--peak); border-color: color-mix(in srgb, var(--peak) 45%, var(--line)); }
+.detail-head .wk-stats { display: flex; gap: 22px; text-align: right; }
+.detail-head .wk-stats div .k { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-faint); }
+.detail-head .wk-stats div .v { font-size: 17px; }
+
+.days { display: grid; gap: 0; }
+.day-row { display: grid; grid-template-columns: 54px 1fr; gap: 4px; padding: 0 clamp(16px, 2.5vw, 24px); border-bottom: 1px solid var(--line); }
+.day-row:last-child { border-bottom: 0; }
+.day-name { padding: 14px 0; font-size: 12px; font-weight: 650; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .05em; }
+.day-sessions { display: flex; flex-direction: column; }
+.sess { display: flex; align-items: flex-start; gap: 12px; padding: 13px 0; border-top: 1px dashed var(--line); }
+.sess:first-child { border-top: 0; }
+.dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; flex: none; background: var(--eff-none); }
+.dot.easy { background: var(--eff-easy); }
+.dot.moderate { background: var(--eff-moderate); }
+.dot.hard { background: var(--eff-hard); }
+.sess-body { flex: 1; min-width: 0; }
+.sess-title { font-size: 14px; font-weight: 550; letter-spacing: -.005em; }
+.sess-title .opt { font-size: 11px; color: var(--ink-faint); font-weight: 500; }
+.sess-meta { display: flex; flex-wrap: wrap; gap: 6px 8px; margin-top: 5px; font-size: 12px; color: var(--ink-soft); }
+.chip { font-family: var(--mono); font-variant-numeric: tabular-nums; background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; }
+.chip.pace { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+.chip.rpe { color: var(--eff-hard); border-color: color-mix(in srgb, var(--eff-hard) 30%, var(--line)); }
+.rest .sess-title { color: var(--ink-faint); }
+
+/* Notes */
+.notes { margin-top: 16px; display: grid; gap: 10px; }
+.note { display: flex; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; font-size: 13.5px; color: var(--ink-soft); }
+.note::before { content: ""; width: 3px; border-radius: 2px; background: var(--accent); flex: none; }
+footer { margin-top: 32px; font-size: 12px; color: var(--ink-faint); text-align: center; }
+footer a { color: var(--accent); }
+
+@media (max-width: 760px) {
+  .goal { grid-template-columns: 1fr; gap: 18px; }
+  .verdict { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); padding-top: 18px; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .ribbon span { font-size: 0; padding: 4px; }
+  .detail-head .wk-stats { text-align: left; }
+  .bar-lab { font-size: 0; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="mark" aria-hidden="true"></div>
+      <div>
+        <h1>Running Coach</h1>
+        <p>Plan preview · generated by the engine</p>
+      </div>
+    </div>
+    <button class="theme-toggle" id="themeToggle" type="button">Toggle theme</button>
+  </header>
+
+  <div class="goal" id="goal"></div>
+  <div class="stats" id="stats"></div>
+
+  <section>
+    <div class="sec-head">
+      <h3>Training block</h3>
+      <p>Bar height = weekly running volume · colour = phase · hatched = deload</p>
+    </div>
+    <div class="chart-card">
+      <div class="ribbon" id="ribbon"></div>
+      <div class="chart" id="chart" role="group" aria-label="Weekly volume — select a week"></div>
+      <div class="chart-foot">
+        <div class="legend" id="legend"></div>
+        <div class="axis-note num" id="peakNote"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h3>Week detail</h3>
+      <p>Select any week above</p>
+    </div>
+    <div class="detail" id="detail"></div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h3>Coaching notes</h3></div>
+    <div class="notes" id="notes"></div>
+  </section>
+
+  <footer>
+    Evidence-based training engine · example athlete, deterministic output · generated <span id="genAt" class="num"></span>.
+    Not affiliated with any commercial running app.
+  </footer>
+</div>
+
+<script>
+const DATA = {"goal":{"race":"Half marathon","target":"1:30:00","raceDate":"5 Sep 2027","startDate":"23 Jul 2026"},"athlete":{"summary":"Returning from injury · 21:00 5k current · 5 days/week · strength on"},"feasibility":{"verdict":"achievable","currentPredicted":"1:36:36","required":6.8,"projected":30.9},"summary":{"structuredWeeks":20,"totalWeeks":58,"model":"pyramidal","peakKm":57.3,"totalQuality":25},"paces":{"goal":"4:13–4:19/km","threshold":"4:24–4:37/km","easy":"5:44–6:19/km"},"weeks":[{"index":1,"start":"19 Apr","startFull":"19 Apr 2027","phase":"base","isDeload":false,"focus":"Rebuild easy consistency + long run","distanceKm":39.9,"quality":1,"longRunMin":46,"sessions":[{"day":"Mon","type":"easy","title":"40′ easy run","effort":"easy","durMin":40,"distKm":6.6,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Tue","type":"threshold","title":"4 × 6′ threshold / 90″ jog","effort":"moderate","durMin":54,"distKm":10.2,"pace":"4:24–4:37/km","rpe":"6–7","optional":false},{"day":"Tue","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Wed","type":"strides","title":"45′ easy + strides","effort":"easy","durMin":47,"distKm":8,"pace":"3:47–3:59/km","rpe":"2–3","optional":false},{"day":"Wed","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Thu","type":"rest","title":"Rest","effort":"none","durMin":0,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Fri","type":"easy","title":"45′ easy run","effort":"easy","durMin":45,"distKm":7.5,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Sat","type":"mobility","title":"Mobility (15′)","effort":"none","durMin":15,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Sun","type":"long","title":"46′ long run","effort":"easy","durMin":46,"distKm":7.6,"pace":"5:44–6:19/km","rpe":"2–3","optional":false}]},{"index":2,"start":"26 Apr","startFull":"26 Apr 2027","phase":"base","isDeload":false,"focus":"Rebuild easy consistency + long run","distanceKm":40.1,"quality":1,"longRunMin":50,"sessions":[{"day":"Mon","type":"easy","title":"40′ easy run","effort":"easy","durMin":40,"distKm":6.6,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Tue","type":"threshold","title":"25′ continuous tempo","effort":"moderate","durMin":50,"distKm":9.7,"pace":"4:24–4:37/km","rpe":"6–7","optional":false},{"day":"Tue","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Wed","type":"strides","title":"45′ easy + strides","effort":"easy","durMin":47,"distKm":8,"pace":"3:47–3:59/km","rpe":"2–3","optional":false},{"day":"Wed","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Thu","type":"rest","title":"Rest","effort":"none","durMin":0,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Fri","type":"easy","title":"45′ easy run","effort":"easy","durMin":45,"distKm":7.5,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Sat","type":"mobility","title":"Mobility (15′)","effort":"none","durMin":15,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Sun","type":"long","title":"50′ long run","effort":"easy","durMin":50,"distKm":8.3,"pace":"5:44–6:19/km","rpe":"2–3","optional":false}]},{"index":3,"start":"3 May","startFull":"3 May 2027","phase":"base","isDeload":false,"focus":"Rebuild easy consistency + long run","distanceKm":44.2,"quality":1,"longRunMin":54,"sessions":[{"day":"Mon","type":"easy","title":"40′ easy run","effort":"easy","durMin":40,"distKm":6.6,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Tue","type":"threshold","title":"5 × 1 mile cruise / 90″ jog","effort":"moderate","durMin":67,"distKm":13.2,"pace":"4:24–4:37/km","rpe":"6–7","optional":false},{"day":"Tue","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Wed","type":"strides","title":"45′ easy + strides","effort":"easy","durMin":47,"distKm":8,"pace":"3:47–3:59/km","rpe":"2–3","optional":false},{"day":"Wed","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Thu","type":"rest","title":"Rest","effort":"none","durMin":0,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Fri","type":"easy","title":"45′ easy run","effort":"easy","durMin":45,"distKm":7.5,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Sat","type":"mobility","title":"Mobility (15′)","effort":"none","durMin":15,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Sun","type":"long","title":"54′ long run","effort":"easy","durMin":54,"distKm":9,"pace":"5:44–6:19/km","rpe":"2–3","optional":false}]},{"index":4,"start":"10 May","startFull":"10 May 2027","phase":"base","isDeload":true,"focus":"Deload — recover and absorb training","distanceKm":34.7,"quality":1,"longRunMin":43,"sessions":[{"day":"Mon","type":"easy","title":"35′ easy run","effort":"easy","durMin":35,"distKm":5.8,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Tue","type":"threshold","title":"3 × 8′ threshold / 2′ jog","effort":"moderate","durMin":53,"distKm":10.1,"pace":"4:24–4:37/km","rpe":"6–7","optional":false},{"day":"Tue","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Wed","type":"easy","title":"35′ easy run","effort":"easy","durMin":35,"distKm":5.8,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Thu","type":"rest","title":"Rest","effort":"none","durMin":0,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Fri","type":"easy","title":"35′ easy run","effort":"easy","durMin":35,"distKm":5.8,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Sat","type":"mobility","title":"Mobility (15′)","effort":"none","durMin":15,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Sun","type":"long","title":"43′ long run","effort":"easy","durMin":43,"distKm":7.1,"pace":"5:44–6:19/km","rpe":"2–3","optional":false}]},{"index":5,"start":"17 May","startFull":"17 May 2027","phase":"base","isDeload":false,"focus":"Rebuild easy consistency + long run","distanceKm":42.4,"quality":1,"longRunMin":61,"sessions":[{"day":"Mon","type":"easy","title":"40′ easy run","effort":"easy","durMin":40,"distKm":6.6,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Tue","type":"threshold","title":"4 × 6′ threshold / 90″ jog","effort":"moderate","durMin":54,"distKm":10.2,"pace":"4:24–4:37/km","rpe":"6–7","optional":false},{"day":"Tue","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Wed","type":"strides","title":"45′ easy + strides","effort":"easy","durMin":47,"distKm":8,"pace":"3:47–3:59/km","rpe":"2–3","optional":false},{"day":"Wed","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Thu","type":"rest","title":"Rest","effort":"none","durMin":0,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Fri","type":"easy","title":"45′ easy run","effort":"easy","durMin":45,"distKm":7.5,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Sat","type":"mobility","title":"Mobility (15′)","effort":"none","durMin":15,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Sun","type":"long","title":"61′ long run","effort":"easy","durMin":61,"distKm":10.1,"pace":"5:44–6:19/km","rpe":"2–3","optional":false}]},{"index":6,"start":"24 May","startFull":"24 May 2027","phase":"base","isDeload":false,"focus":"Rebuild easy consistency + long run","distanceKm":40.9,"quality":1,"longRunMin":65,"sessions":[{"day":"Mon","type":"easy","title":"40′ easy run","effort":"easy","durMin":40,"distKm":6.6,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Tue","type":"vo2","title":"10 × 1′ hard / 1′ easy (introductory)","effort":"hard","durMin":44,"distKm":8.1,"pace":"4:01–4:14/km","rpe":"8–9","optional":false},{"day":"Tue","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Wed","type":"strides","title":"45′ easy + strides","effort":"easy","durMin":47,"distKm":8,"pace":"3:47–3:59/km","rpe":"2–3","optional":false},{"day":"Wed","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Thu","type":"rest","title":"Rest","effort":"none","durMin":0,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Fri","type":"easy","title":"45′ easy run","effort":"easy","durMin":45,"distKm":7.5,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Sat","type":"mobility","title":"Mobility (15′)","effort":"none","durMin":15,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Sun","type":"long","title":"65′ long run","effort":"easy","durMin":65,"distKm":10.8,"pace":"5:44–6:19/km","rpe":"2–3","optional":false}]},{"index":7,"start":"31 May","startFull":"31 May 2027","phase":"base","isDeload":false,"focus":"Rebuild easy consistency + long run","distanceKm":46.7,"quality":1,"longRunMin":69,"sessions":[{"day":"Mon","type":"easy","title":"40′ easy run","effort":"easy","durMin":40,"distKm":6.6,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Tue","type":"threshold","title":"5 × 1 mile cruise / 90″ jog","effort":"moderate","durMin":67,"distKm":13.2,"pace":"4:24–4:37/km","rpe":"6–7","optional":false},{"day":"Tue","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Wed","type":"strides","title":"45′ easy + strides","effort":"easy","durMin":47,"distKm":8,"pace":"3:47–3:59/km","rpe":"2–3","optional":false},{"day":"Wed","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Thu","type":"rest","title":"Rest","effort":"none","durMin":0,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Fri","type":"easy","title":"45′ easy run","effort":"easy","durMin":45,"distKm":7.5,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Sat","type":"mobility","title":"Mobility (15′)","effort":"none","durMin":15,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Sun","type":"long","title":"69′ long run","effort":"easy","durMin":69,"distKm":11.5,"pace":"5:44–6:19/km","rpe":"2–3","optional":false}]},{"index":8,"start":"7 Jun","startFull":"7 Jun 2027","phase":"base","isDeload":true,"focus":"Deload — recover and absorb training","distanceKm":34.5,"quality":1,"longRunMin":54,"sessions":[{"day":"Mon","type":"easy","title":"35′ easy run","effort":"easy","durMin":35,"distKm":5.8,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Tue","type":"vo2","title":"10 × 1′ hard / 1′ easy (introductory)","effort":"hard","durMin":44,"distKm":8.1,"pace":"4:01–4:14/km","rpe":"8–9","optional":false},{"day":"Tue","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Wed","type":"easy","title":"35′ easy run","effort":"easy","durMin":35,"distKm":5.8,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Thu","type":"rest","title":"Rest","effort":"none","durMin":0,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Fri","type":"easy","title":"35′ easy run","effort":"easy","durMin":35,"distKm":5.8,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Sat","type":"mobility","title":"Mobility (15′)","effort":"none","durMin":15,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Sun","type":"long","title":"54′ long run","effort":"easy","durMin":54,"distKm":9,"pace":"5:44–6:19/km","rpe":"2–3","optional":false}]},{"index":9,"start":"14 Jun","startFull":"14 Jun 2027","phase":"base","isDeload":false,"focus":"Rebuild easy consistency + long run","distanceKm":44.9,"quality":1,"longRunMin":76,"sessions":[{"day":"Mon","type":"easy","title":"40′ easy run","effort":"easy","durMin":40,"distKm":6.6,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Tue","type":"threshold","title":"4 × 6′ threshold / 90″ jog","effort":"moderate","durMin":54,"distKm":10.2,"pace":"4:24–4:37/km","rpe":"6–7","optional":false},{"day":"Tue","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Wed","type":"strides","title":"45′ easy + strides","effort":"easy","durMin":47,"distKm":8,"pace":"3:47–3:59/km","rpe":"2–3","optional":false},{"day":"Wed","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Thu","type":"rest","title":"Rest","effort":"none","durMin":0,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Fri","type":"easy","title":"45′ easy run","effort":"easy","durMin":45,"distKm":7.5,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Sat","type":"mobility","title":"Mobility (15′)","effort":"none","durMin":15,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Sun","type":"long","title":"76′ long run","effort":"easy","durMin":76,"distKm":12.6,"pace":"5:44–6:19/km","rpe":"2–3","optional":false}]},{"index":10,"start":"21 Jun","startFull":"21 Jun 2027","phase":"build","isDeload":false,"focus":"Build threshold and VO2, extend the long run","distanceKm":46.5,"quality":1,"longRunMin":80,"sessions":[{"day":"Mon","type":"easy","title":"40′ easy run","effort":"easy","durMin":40,"distKm":6.6,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Tue","type":"vo2","title":"6 × 800m / 2′ easy","effort":"hard","durMin":55,"distKm":10.6,"pace":"4:01–4:14/km","rpe":"8–9","optional":false},{"day":"Tue","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Wed","type":"strides","title":"45′ easy + strides","effort":"easy","durMin":47,"distKm":8,"pace":"3:47–3:59/km","rpe":"2–3","optional":false},{"day":"Wed","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Thu","type":"rest","title":"Rest","effort":"none","durMin":0,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Fri","type":"easy","title":"45′ easy run","effort":"easy","durMin":45,"distKm":7.5,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Sat","type":"mobility","title":"Mobility (15′)","effort":"none","durMin":15,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Sun","type":"long","title":"80′ long run","effort":"easy","durMin":80,"distKm":13.8,"pace":"5:44–6:19/km","rpe":"2–3","optional":false}]},{"index":11,"start":"28 Jun","startFull":"28 Jun 2027","phase":"build","isDeload":false,"focus":"Build threshold and VO2, extend the long run","distanceKm":49.8,"quality":1,"longRunMin":84,"sessions":[{"day":"Mon","type":"easy","title":"40′ easy run","effort":"easy","durMin":40,"distKm":6.6,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Tue","type":"threshold","title":"5 × 1 mile cruise / 90″ jog","effort":"moderate","durMin":67,"distKm":13.2,"pace":"4:24–4:37/km","rpe":"6–7","optional":false},{"day":"Tue","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Wed","type":"strides","title":"45′ easy + strides","effort":"easy","durMin":47,"distKm":8,"pace":"3:47–3:59/km","rpe":"2–3","optional":false},{"day":"Wed","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Thu","type":"rest","title":"Rest","effort":"none","durMin":0,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Fri","type":"easy","title":"45′ easy run","effort":"easy","durMin":45,"distKm":7.5,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Sat","type":"mobility","title":"Mobility (15′)","effort":"none","durMin":15,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Sun","type":"long","title":"84′ long run","effort":"easy","durMin":84,"distKm":14.5,"pace":"5:44–6:19/km","rpe":"2–3","optional":false}]},{"index":12,"start":"5 Jul","startFull":"5 Jul 2027","phase":"build","isDeload":true,"focus":"Deload — recover and absorb training","distanceKm":37.9,"quality":1,"longRunMin":66,"sessions":[{"day":"Mon","type":"easy","title":"35′ easy run","effort":"easy","durMin":35,"distKm":5.8,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Tue","type":"vo2","title":"5 × 3′ hard / 2′ easy","effort":"hard","durMin":48,"distKm":9.1,"pace":"4:01–4:14/km","rpe":"8–9","optional":false},{"day":"Tue","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Wed","type":"easy","title":"35′ easy run","effort":"easy","durMin":35,"distKm":5.8,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Thu","type":"rest","title":"Rest","effort":"none","durMin":0,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Fri","type":"easy","title":"35′ easy run","effort":"easy","durMin":35,"distKm":5.8,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Sat","type":"mobility","title":"Mobility (15′)","effort":"none","durMin":15,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Sun","type":"long","title":"66′ long run","effort":"easy","durMin":66,"distKm":11.4,"pace":"5:44–6:19/km","rpe":"2–3","optional":false}]},{"index":13,"start":"12 Jul","startFull":"12 Jul 2027","phase":"build","isDeload":false,"focus":"Build threshold and VO2, extend the long run","distanceKm":50,"quality":2,"longRunMin":91,"sessions":[{"day":"Mon","type":"mobility","title":"Mobility (15′)","effort":"none","durMin":15,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Tue","type":"threshold","title":"4 × 6′ threshold / 90″ jog","effort":"moderate","durMin":54,"distKm":10.2,"pace":"4:24–4:37/km","rpe":"6–7","optional":false},{"day":"Tue","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Wed","type":"strides","title":"45′ easy + strides","effort":"easy","durMin":47,"distKm":8,"pace":"3:47–3:59/km","rpe":"2–3","optional":false},{"day":"Wed","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Thu","type":"vo2","title":"4 × 4′ hard / 3′ easy","effort":"hard","durMin":50,"distKm":9.5,"pace":"4:01–4:14/km","rpe":"8–9","optional":false},{"day":"Fri","type":"easy","title":"40′ easy run","effort":"easy","durMin":40,"distKm":6.6,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Sat","type":"rest","title":"Rest","effort":"none","durMin":0,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Sun","type":"long","title":"91′ long run","effort":"easy","durMin":91,"distKm":15.7,"pace":"5:44–6:19/km","rpe":"2–3","optional":false}]},{"index":14,"start":"19 Jul","startFull":"19 Jul 2027","phase":"build","isDeload":false,"focus":"Build threshold and VO2, extend the long run","distanceKm":51.3,"quality":2,"longRunMin":95,"sessions":[{"day":"Mon","type":"mobility","title":"Mobility (15′)","effort":"none","durMin":15,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Tue","type":"threshold","title":"25′ continuous tempo","effort":"moderate","durMin":50,"distKm":9.7,"pace":"4:24–4:37/km","rpe":"6–7","optional":false},{"day":"Tue","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Wed","type":"strides","title":"45′ easy + strides","effort":"easy","durMin":47,"distKm":8,"pace":"3:47–3:59/km","rpe":"2–3","optional":false},{"day":"Wed","type":"strength","title":"Strength (heavy)","effort":"moderate","durMin":45,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Thu","type":"vo2","title":"6 × 800m / 2′ easy","effort":"hard","durMin":55,"distKm":10.6,"pace":"4:01–4:14/km","rpe":"8–9","optional":false},{"day":"Fri","type":"easy","title":"40′ easy run","effort":"easy","durMin":40,"distKm":6.6,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Sat","type":"rest","title":"Rest","effort":"none","durMin":0,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Sun","type":"long","title":"95′ long run","effort":"easy","durMin":95,"distKm":16.4,"pace":"5:44–6:19/km","rpe":"2–3","optional":false}]},{"index":15,"start":"26 Jul","startFull":"26 Jul 2027","phase":"peak","isDeload":false,"focus":"Race-specific sharpening","distanceKm":57.3,"quality":2,"longRunMin":99,"sessions":[{"day":"Mon","type":"mobility","title":"Mobility (15′)","effort":"none","durMin":15,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Tue","type":"race-specific","title":"3 × 10′ at goal race pace / 2′ jog","effort":"moderate","durMin":59,"distKm":11.8,"pace":"4:13–4:19/km","rpe":"4–5","optional":false},{"day":"Tue","type":"strength","title":"Strength (maintenance)","effort":"moderate","durMin":30,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Wed","type":"easy","title":"45′ easy run","effort":"easy","durMin":45,"distKm":7.5,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Thu","type":"threshold","title":"5 × 1 mile cruise / 90″ jog","effort":"moderate","durMin":67,"distKm":13.2,"pace":"4:24–4:37/km","rpe":"6–7","optional":false},{"day":"Fri","type":"easy","title":"40′ easy run","effort":"easy","durMin":40,"distKm":6.6,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Sat","type":"rest","title":"Rest","effort":"none","durMin":0,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Sun","type":"long","title":"99′ long run","effort":"easy","durMin":99,"distKm":18.1,"pace":"5:44–6:19/km","rpe":"2–3","optional":false}]},{"index":16,"start":"2 Aug","startFull":"2 Aug 2027","phase":"peak","isDeload":true,"focus":"Deload — recover and absorb training","distanceKm":43.4,"quality":1,"longRunMin":77,"sessions":[{"day":"Mon","type":"easy","title":"35′ easy run","effort":"easy","durMin":35,"distKm":5.8,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Tue","type":"race-specific","title":"3 × 10′ at goal race pace / 2′ jog","effort":"moderate","durMin":59,"distKm":11.8,"pace":"4:13–4:19/km","rpe":"4–5","optional":false},{"day":"Tue","type":"strength","title":"Strength (maintenance)","effort":"moderate","durMin":30,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Wed","type":"easy","title":"35′ easy run","effort":"easy","durMin":35,"distKm":5.8,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Thu","type":"rest","title":"Rest","effort":"none","durMin":0,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Fri","type":"easy","title":"35′ easy run","effort":"easy","durMin":35,"distKm":5.8,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Sat","type":"mobility","title":"Mobility (15′)","effort":"none","durMin":15,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Sun","type":"long","title":"77′ long run","effort":"easy","durMin":77,"distKm":14.1,"pace":"5:44–6:19/km","rpe":"2–3","optional":false}]},{"index":17,"start":"9 Aug","startFull":"9 Aug 2027","phase":"peak","isDeload":false,"focus":"Race-specific sharpening","distanceKm":55.6,"quality":2,"longRunMin":106,"sessions":[{"day":"Mon","type":"mobility","title":"Mobility (15′)","effort":"none","durMin":15,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Tue","type":"race-specific","title":"3 × 10′ at goal race pace / 2′ jog","effort":"moderate","durMin":59,"distKm":11.8,"pace":"4:13–4:19/km","rpe":"4–5","optional":false},{"day":"Tue","type":"strength","title":"Strength (maintenance)","effort":"moderate","durMin":30,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Wed","type":"easy","title":"45′ easy run","effort":"easy","durMin":45,"distKm":7.5,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Thu","type":"threshold","title":"4 × 6′ threshold / 90″ jog","effort":"moderate","durMin":54,"distKm":10.2,"pace":"4:24–4:37/km","rpe":"6–7","optional":false},{"day":"Fri","type":"easy","title":"40′ easy run","effort":"easy","durMin":40,"distKm":6.6,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Sat","type":"rest","title":"Rest","effort":"none","durMin":0,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Sun","type":"long","title":"106′ long run","effort":"easy","durMin":106,"distKm":19.4,"pace":"5:44–6:19/km","rpe":"2–3","optional":false}]},{"index":18,"start":"16 Aug","startFull":"16 Aug 2027","phase":"peak","isDeload":false,"focus":"Race-specific sharpening","distanceKm":55.8,"quality":2,"longRunMin":110,"sessions":[{"day":"Mon","type":"mobility","title":"Mobility (15′)","effort":"none","durMin":15,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Tue","type":"race-specific","title":"3 × 10′ at goal race pace / 2′ jog","effort":"moderate","durMin":59,"distKm":11.8,"pace":"4:13–4:19/km","rpe":"4–5","optional":false},{"day":"Tue","type":"strength","title":"Strength (maintenance)","effort":"moderate","durMin":30,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Wed","type":"easy","title":"45′ easy run","effort":"easy","durMin":45,"distKm":7.5,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Thu","type":"threshold","title":"25′ continuous tempo","effort":"moderate","durMin":50,"distKm":9.7,"pace":"4:24–4:37/km","rpe":"6–7","optional":false},{"day":"Fri","type":"easy","title":"40′ easy run","effort":"easy","durMin":40,"distKm":6.6,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Sat","type":"rest","title":"Rest","effort":"none","durMin":0,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Sun","type":"long","title":"110′ long run","effort":"easy","durMin":110,"distKm":20.2,"pace":"5:44–6:19/km","rpe":"2–3","optional":false}]},{"index":19,"start":"23 Aug","startFull":"23 Aug 2027","phase":"taper","isDeload":false,"focus":"Taper — cut volume, keep intensity","distanceKm":42.4,"quality":1,"longRunMin":77,"sessions":[{"day":"Mon","type":"easy","title":"40′ easy run","effort":"easy","durMin":40,"distKm":6.6,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Tue","type":"vo2","title":"10 × 1′ hard / 1′ easy (introductory)","effort":"hard","durMin":44,"distKm":8.1,"pace":"4:01–4:14/km","rpe":"8–9","optional":false},{"day":"Tue","type":"strength","title":"Strength (maintenance)","effort":"moderate","durMin":30,"distKm":null,"pace":null,"rpe":"6–7","optional":false},{"day":"Wed","type":"easy","title":"45′ easy run","effort":"easy","durMin":45,"distKm":7.5,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Thu","type":"rest","title":"Rest","effort":"none","durMin":0,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Fri","type":"easy","title":"45′ easy run","effort":"easy","durMin":45,"distKm":7.5,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Sat","type":"mobility","title":"Mobility (15′)","effort":"none","durMin":15,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Sun","type":"long","title":"77′ long run","effort":"easy","durMin":77,"distKm":12.8,"pace":"5:44–6:19/km","rpe":"2–3","optional":false}]},{"index":20,"start":"30 Aug","startFull":"30 Aug 2027","phase":"taper","isDeload":false,"focus":"Taper — cut volume, keep intensity","distanceKm":39.8,"quality":1,"longRunMin":61,"sessions":[{"day":"Mon","type":"easy","title":"40′ easy run","effort":"easy","durMin":40,"distKm":6.6,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Tue","type":"vo2","title":"10 × 1′ hard / 1′ easy (introductory)","effort":"hard","durMin":44,"distKm":8.1,"pace":"4:01–4:14/km","rpe":"8–9","optional":false},{"day":"Wed","type":"easy","title":"45′ easy run","effort":"easy","durMin":45,"distKm":7.5,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Thu","type":"rest","title":"Rest","effort":"none","durMin":0,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Fri","type":"easy","title":"45′ easy run","effort":"easy","durMin":45,"distKm":7.5,"pace":"5:44–6:19/km","rpe":"2–3","optional":false},{"day":"Sat","type":"mobility","title":"Mobility (15′)","effort":"none","durMin":15,"distKm":null,"pace":null,"rpe":null,"optional":false},{"day":"Sun","type":"long","title":"61′ long run","effort":"easy","durMin":61,"distKm":10.1,"pace":"5:44–6:19/km","rpe":"2–3","optional":false}]}],"defaultWeekIndex":13,"notes":["You have ~38 weeks before the structured plan begins (2027-04-19). Use them to build easy-running consistency and a weekly long run — consistency is the biggest driver of improvement.","Intensity distribution: pyramidal — mostly easy running, a moderate amount of threshold, a little VO2. Individual response matters more than an exact split.","Returning from injury: the early weeks stay deliberately conservative (single quality session, gentle long-run progression). Add the second quality session only once weekly running and the long run feel stable.","Strength: 2×/week through base and build (heavy, low volume), easing to 1× maintenance near the race. Plyometrics only once faster running is tolerated without a delayed reaction.","Flexibility: warmups are dynamic (easy jog, drills, strides). Static stretching is optional and targeted — it does not improve running economy."],"generatedAt":"23 Jul 2026"};
+const PHASE_COLORS = { base: "var(--base)", build: "var(--build)", peak: "var(--peak)", taper: "var(--taper)" };
+const $ = (id) => document.getElementById(id);
+
+function renderGoal() {
+  const g = DATA.goal, f = DATA.feasibility;
+  $("goal").innerHTML =
+    '<div class="goal-main">' +
+      '<div class="eyebrow">Goal race</div>' +
+      '<h2>' + g.race + ' · <span class="num">' + g.target + '</span></h2>' +
+      '<div class="when">' + g.raceDate + ' — a ' + DATA.summary.totalWeeks + '-week horizon from ' + g.startDate + '</div>' +
+      '<div class="who">' + DATA.athlete.summary + '</div>' +
+    '</div>' +
+    '<div class="verdict">' +
+      '<span class="pill">' + f.verdict + '</span>' +
+      '<div class="verdict-rows">' +
+        '<div>Current predicted <b class="num">' + f.currentPredicted + '</b></div>' +
+        '<div>Improvement needed <b class="num">' + f.required + '%</b></div>' +
+        '<div>Model projects <b class="num">' + f.projected + '%</b> achievable</div>' +
+      '</div>' +
+    '</div>';
+}
+
+function renderStats() {
+  const s = DATA.summary, p = DATA.paces;
+  const cells = [
+    { k: "Structured", v: s.structuredWeeks, u: "wks" },
+    { k: "Peak volume", v: s.peakKm, u: "km/wk" },
+    { k: "Quality total", v: s.totalQuality, u: "sessions" },
+    { k: "Intensity", v: s.model, u: "" },
+    { k: "Goal pace", v: p.goal, u: "" },
+    { k: "Easy pace", v: p.easy, u: "" },
+  ];
+  $("stats").innerHTML = cells.map((c) =>
+    '<div class="stat"><div class="k">' + c.k + '</div>' +
+    '<div class="v num">' + c.v + (c.u ? ' <small>' + c.u + '</small>' : '') + '</div></div>'
+  ).join("");
+}
+
+function renderRibbon() {
+  const runs = [];
+  for (const w of DATA.weeks) {
+    const last = runs[runs.length - 1];
+    if (last && last.phase === w.phase) last.count++;
+    else runs.push({ phase: w.phase, count: 1 });
+  }
+  $("ribbon").innerHTML = runs.map((r) =>
+    '<span style="flex:' + r.count + ';background:' + PHASE_COLORS[r.phase] + '">' +
+    r.phase.charAt(0).toUpperCase() + r.phase.slice(1) + '</span>'
+  ).join("");
+}
+
+function renderChart() {
+  const peak = DATA.summary.peakKm;
+  $("chart").innerHTML = DATA.weeks.map((w) => {
+    const h = Math.max(6, Math.round((w.distanceKm / peak) * 100));
+    return '<button class="bar-btn" type="button" role="button" data-wk="' + w.index +
+      '" aria-pressed="false" aria-label="Week ' + w.index + ', ' + w.phase +
+      (w.isDeload ? ', deload' : '') + ', ' + w.distanceKm + ' kilometres">' +
+      '<div class="bar' + (w.isDeload ? ' deload' : '') + '" style="height:' + h + '%;--phase:' + PHASE_COLORS[w.phase] + '"></div>' +
+      '<div class="bar-lab">' + w.index + '</div>' +
+      '</button>';
+  }).join("");
+  $("chart").querySelectorAll(".bar-btn").forEach((b) =>
+    b.addEventListener("click", () => selectWeek(Number(b.dataset.wk)))
+  );
+  $("peakNote").textContent = "peak " + peak + " km/wk";
+  $("legend").innerHTML =
+    ["base", "build", "peak", "taper"].map((ph) =>
+      '<span><i style="background:' + PHASE_COLORS[ph] + '"></i>' + ph.charAt(0).toUpperCase() + ph.slice(1) + '</span>'
+    ).join("") + '<span><i class="dl"></i>Deload</span>';
+}
+
+function renderDetail(w) {
+  const phaseColor = PHASE_COLORS[w.phase];
+  const byDay = {};
+  for (const s of w.sessions) (byDay[s.day] = byDay[s.day] || []).push(s);
+  const order = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const rows = order.filter((d) => byDay[d]).map((d) => {
+    const items = byDay[d].map((s) => {
+      const meta = [];
+      meta.push('<span class="chip">' + s.durMin + '′' + (s.distKm ? ' · ' + s.distKm + ' km' : '') + '</span>');
+      if (s.pace) meta.push('<span class="chip pace">' + s.pace + '</span>');
+      if (s.rpe) meta.push('<span class="chip rpe">RPE ' + s.rpe + '</span>');
+      const isRest = s.type === "rest";
+      return '<div class="sess' + (isRest ? ' rest' : '') + '">' +
+        '<span class="dot ' + s.effort + '"></span>' +
+        '<div class="sess-body"><div class="sess-title">' + s.title +
+        (s.optional ? ' <span class="opt">(optional)</span>' : '') + '</div>' +
+        (isRest ? '' : '<div class="sess-meta">' + meta.join('') + '</div>') +
+        '</div></div>';
+    }).join("");
+    return '<div class="day-row"><div class="day-name">' + d + '</div><div class="day-sessions">' + items + '</div></div>';
+  }).join("");
+
+  $("detail").style.setProperty("--phase", phaseColor);
+  $("detail").innerHTML =
+    '<div class="detail-head" style="--phase:' + phaseColor + '">' +
+      '<div class="wk-badge" style="--phase:' + phaseColor + '"><span class="num">' + w.index + '</span><small>week</small></div>' +
+      '<div class="meta"><h4>' + w.focus + '</h4>' +
+        '<div class="eyebrow">Starts ' + w.startFull + '</div>' +
+        '<div class="tags"><span class="tag phase" style="--phase:' + phaseColor + '">' + w.phase + '</span>' +
+        (w.isDeload ? '<span class="tag deload">Deload week</span>' : '') +
+        '<span class="tag">' + w.quality + ' quality</span></div>' +
+      '</div>' +
+      '<div class="wk-stats">' +
+        '<div><div class="k">Volume</div><div class="v num">' + w.distanceKm + '<small> km</small></div></div>' +
+        '<div><div class="k">Long run</div><div class="v num">' + w.longRunMin + '′</div></div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="days">' + rows + '</div>';
+}
+
+function selectWeek(index) {
+  const w = DATA.weeks.find((x) => x.index === index);
+  if (!w) return;
+  document.querySelectorAll(".bar-btn").forEach((b) =>
+    b.setAttribute("aria-pressed", Number(b.dataset.wk) === index ? "true" : "false")
+  );
+  renderDetail(w);
+}
+
+function renderNotes() {
+  $("notes").innerHTML = DATA.notes.map((n) => '<div class="note"><span>' + n + '</span></div>').join("");
+}
+
+// Theme toggle (stamps data-theme so the viewer's choice overrides OS preference).
+$("themeToggle").addEventListener("click", () => {
+  const cur = document.documentElement.getAttribute("data-theme");
+  const next = cur === "dark" ? "light" : cur === "light" ? "dark"
+    : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark");
+  document.documentElement.setAttribute("data-theme", next);
+});
+
+renderGoal();
+renderStats();
+renderRibbon();
+renderChart();
+renderNotes();
+$("genAt").textContent = DATA.generatedAt;
+selectWeek(DATA.defaultWeekIndex);
+</script>
+</body>
+</html>

@@ -66,6 +66,20 @@ Volume 50.0km → 41.0km  (missed work is NOT crammed back in)
 
 To try a different scenario, edit the goal/athlete inputs at the top of `demo/generate.ts` and re-run.
 
+## Visual preview
+
+For a look at the plan as a *product* rather than terminal text, `web/index.html` is a self-contained
+page that renders a generated plan: the goal and feasibility verdict, a weekly-volume chart coloured by
+training phase, and a click-through week-by-week breakdown with per-session pace and RPE targets.
+
+```bash
+node web/build.ts   # regenerate web/index.html from the engine, then open it in a browser
+```
+
+`web/build.ts` runs the engine for the example athlete and bakes the result into a single static HTML
+file (no server, no dependencies). Edit the same goal/athlete inputs at the top of `web/build.ts` to
+preview a different plan.
+
 ## What's inside
 
 ```

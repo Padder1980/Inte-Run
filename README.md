@@ -85,6 +85,19 @@ node web/build.ts  # bundle the engine + regenerate web/index.html, then open it
 The reusable view model lives in `src/view/plan-summary.ts` (`buildPlanSummary(athlete, goal)`), so the
 same shaping feeds this page today and any native screen later.
 
+## Live session
+
+`web/live.html` is the "during the run" screen. Pick a session, press Start, and a simulated runner
+executes it while the **real** `LiveSession` state machine (`src/live/session-runtime.ts`) drives the
+experience: it steps through warmup → reps → recoveries → cooldown, tracks progress against each step's
+time/distance target, judges pace against the target band, and emits the coaching cues shown in the log.
+Pause/resume excludes stopped time; the runner is fake but the runtime, cues and pace judgements are the
+engine. Built by `web/live.ts` (or `npm run web`, which builds both pages).
+
+The runtime owns no clock and touches no device — the caller feeds it timestamped telemetry
+(`{ atMs, distanceMeters, heartRateBpm?, paceSecPerKm? }`), so the same code runs behind a simulated
+run here, a real GPS/HR feed in a native app, or a unit test.
+
 ## What's inside
 
 ```
@@ -102,6 +115,8 @@ src/
                injury.ts                      — injury report → pause / reduce / monitor
                rpe-feedback.ts                — RPE trend → ease / hold / progress
   progress/    achievements.ts                — PB detection (fastest 1k/mile/5k/10k/HM/M, longest run)
+  live/        session-runtime.ts             — live-session state machine (start/pause/stop, pace cues)
+  view/        plan-summary.ts                — presentation-agnostic plan view model
   index.ts                                   — public API
 ```
 
@@ -162,8 +177,10 @@ pace tables or third-party plan content are reproduced.**
 
 ## Roadmap (proposed next slices)
 
-1. Thin web/PWA demo rendering a generated plan (see the brain end-to-end in a browser).
-2. Live-session state machine (start/pause/stop, pace/HR cues) as a logic layer.
+1. ~~Thin web demo rendering a generated plan~~ — done (`web/index.html`, an interactive plan builder
+   running the engine client-side).
+2. ~~Live-session state machine (start/pause/stop, pace/HR cues) as a logic layer~~ — done
+   (`src/live/session-runtime.ts`, with the `web/live.html` run screen).
 3. Native shell decision (RN/Expo vs native) + watch/Health/BLE/voice/music integration.
 4. Persistence/backend + auth; wire the adaptive loops to real activity data.
 

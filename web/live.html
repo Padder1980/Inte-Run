@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Running Coach — Plan Builder</title>
+<title>Running Coach — Live Session</title>
 <style>
+
 :root {
   color-scheme: light dark;
   --bg: #eef1f1; --surface: #ffffff; --surface-2: #f6f8f8; --line: #dbe1e0;
   --ink: #14201b; --ink-soft: #4c5b55; --ink-faint: #7a877f;
   --accent: #0e8c7f; --accent-ink: #ffffff;
   --base: #2b9eb3; --build: #5fa83c; --peak: #e0863a; --taper: #7a6fd0;
-  --eff-easy: #3fa47a; --eff-moderate: #d99a2b; --eff-hard: #d65b36; --eff-none: #9aa8a1;
-  --danger: #c0442e;
+  --on: #3fa47a; --fast: #d99a2b; --slow: #d65b36;
   --shadow: 0 1px 2px rgba(20,32,27,.06), 0 8px 24px rgba(20,32,27,.06);
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace;
   --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -23,8 +23,7 @@
     --ink: #e7eeea; --ink-soft: #a9b7b0; --ink-faint: #74847c;
     --accent: #2bb3a3; --accent-ink: #06231f;
     --base: #3ab0c4; --build: #74bd52; --peak: #eb9748; --taper: #9184e0;
-    --eff-easy: #4cb98a; --eff-moderate: #e6ac3e; --eff-hard: #e56f49; --eff-none: #6f7d76;
-    --danger: #e8765c;
+    --on: #4cb98a; --fast: #e6ac3e; --slow: #e56f49;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
   }
 }
@@ -34,8 +33,7 @@
   --ink: #14201b; --ink-soft: #4c5b55; --ink-faint: #7a877f;
   --accent: #0e8c7f; --accent-ink: #ffffff;
   --base: #2b9eb3; --build: #5fa83c; --peak: #e0863a; --taper: #7a6fd0;
-  --eff-easy: #3fa47a; --eff-moderate: #d99a2b; --eff-hard: #d65b36; --eff-none: #9aa8a1;
-  --danger: #c0442e;
+  --on: #3fa47a; --fast: #d99a2b; --slow: #d65b36;
   --shadow: 0 1px 2px rgba(20,32,27,.06), 0 8px 24px rgba(20,32,27,.06);
 }
 :root[data-theme="dark"] {
@@ -44,16 +42,14 @@
   --ink: #e7eeea; --ink-soft: #a9b7b0; --ink-faint: #74847c;
   --accent: #2bb3a3; --accent-ink: #06231f;
   --base: #3ab0c4; --build: #74bd52; --peak: #eb9748; --taper: #9184e0;
-  --eff-easy: #4cb98a; --eff-moderate: #e6ac3e; --eff-hard: #e56f49; --eff-none: #6f7d76;
-  --danger: #e8765c;
+  --on: #4cb98a; --fast: #e6ac3e; --slow: #e56f49;
   --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.5; -webkit-font-smoothing: antialiased; }
-.wrap { max-width: 1040px; margin: 0 auto; padding: clamp(20px, 4vw, 44px) clamp(16px, 4vw, 32px) 64px; }
+.wrap { max-width: 940px; margin: 0 auto; padding: clamp(20px, 4vw, 44px) clamp(16px, 4vw, 32px) 64px; }
 .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .eyebrow { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); font-weight: 600; }
-
 header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 20px; }
 .brand { display: flex; align-items: center; gap: 12px; }
 .mark { width: 34px; height: 34px; border-radius: 9px; flex: none; background: linear-gradient(145deg, var(--base), var(--accent) 55%, var(--peak)); box-shadow: var(--shadow); }
@@ -62,120 +58,56 @@ header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content:
 .theme-toggle { border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft); border-radius: 999px; padding: 7px 14px; font: inherit; font-size: 12.5px; cursor: pointer; }
 .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
 
-/* Form */
-.builder { margin-top: 24px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: clamp(18px, 2.5vw, 26px); }
-.builder .eyebrow { margin-bottom: 14px; }
-.grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px 16px; }
-.field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.field.col2 { grid-column: span 2; }
-.field label { font-size: 11.5px; font-weight: 600; color: var(--ink-soft); letter-spacing: .01em; }
-.field label .hint { color: var(--ink-faint); font-weight: 400; }
-input, select { font: inherit; font-size: 13.5px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px; width: 100%; }
-input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
-input[type="date"] { font-family: var(--mono); }
-.time-in { font-family: var(--mono); font-variant-numeric: tabular-nums; }
-.toggles { display: flex; gap: 20px; align-items: center; grid-column: 1 / -1; flex-wrap: wrap; }
-.toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-soft); cursor: pointer; }
-.toggle input { width: auto; accent-color: var(--accent); }
-.builder-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 18px; flex-wrap: wrap; }
-.build-btn { font: inherit; font-size: 14px; font-weight: 600; color: var(--accent-ink); background: var(--accent); border: 0; border-radius: 10px; padding: 11px 22px; cursor: pointer; }
-.build-btn:hover { filter: brightness(1.06); }
-.build-btn:active { transform: translateY(1px); }
-.hint-line { font-size: 12px; color: var(--ink-faint); }
-.error { display: none; margin-top: 14px; padding: 11px 14px; border-radius: 10px; font-size: 13px; background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent); }
-.error.show { display: block; }
+.controls { margin-top: 24px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 18px clamp(16px,2.5vw,22px); display: flex; flex-wrap: wrap; gap: 14px 18px; align-items: end; }
+.controls .field { display: flex; flex-direction: column; gap: 5px; }
+.controls label { font-size: 11.5px; font-weight: 600; color: var(--ink-soft); }
+select { font: inherit; font-size: 13.5px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px; }
+select#session { min-width: 260px; }
+select:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+.btns { display: flex; gap: 8px; margin-left: auto; }
+button.op { font: inherit; font-size: 13.5px; font-weight: 600; border-radius: 10px; padding: 10px 18px; cursor: pointer; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); }
+button.op.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+button.op:hover { filter: brightness(1.05); }
+button.op:disabled { opacity: .45; cursor: not-allowed; filter: none; }
 
-/* Result */
-#result { transition: opacity .18s; }
-.goal { margin-top: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: clamp(20px, 3vw, 30px); display: grid; grid-template-columns: 1.4fr 1fr; gap: 28px; align-items: center; }
-.goal-main h2 { margin: 6px 0 4px; font-size: clamp(24px, 4vw, 34px); letter-spacing: -.02em; text-wrap: balance; line-height: 1.08; }
-.goal-main .when { color: var(--ink-soft); font-size: 14px; }
-.goal-main .who { color: var(--ink-faint); font-size: 12.5px; margin-top: 10px; }
-.verdict { display: flex; flex-direction: column; gap: 10px; padding-left: 28px; border-left: 1px solid var(--line); }
-.pill { align-self: flex-start; display: inline-flex; align-items: center; gap: 7px; padding: 6px 13px; border-radius: 999px; font-size: 12.5px; font-weight: 600; background: color-mix(in srgb, var(--pill-c, var(--accent)) 15%, transparent); color: var(--pill-c, var(--accent)); text-transform: capitalize; }
-.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--pill-c, var(--accent)); }
-.verdict-rows { display: grid; gap: 7px; font-size: 13px; }
-.verdict-rows div { display: flex; justify-content: space-between; gap: 12px; color: var(--ink-soft); }
-.verdict-rows b { color: var(--ink); font-weight: 600; }
+.screen { margin-top: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }
+.hero { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 1px; background: var(--line); }
+.hero > div { background: var(--surface); padding: 20px clamp(16px,2.5vw,24px); }
+.hero .k { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
+.hero .big { font-size: clamp(34px, 7vw, 52px); font-weight: 700; letter-spacing: -.02em; line-height: 1.02; margin-top: 4px; }
+.hero .sub { font-size: 12.5px; color: var(--ink-faint); margin-top: 4px; }
+.pace-val.on { color: var(--on); } .pace-val.fast { color: var(--fast); } .pace-val.slow { color: var(--slow); } .pace-val.none { color: var(--ink); }
 
-.stats { margin-top: 14px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
-.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 13px 14px; }
-.stat .k { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
-.stat .v { font-size: 20px; margin-top: 3px; letter-spacing: -.01em; }
-.stat .v small { font-size: 12px; color: var(--ink-faint); font-family: var(--sans); }
+.stepcard { padding: 18px clamp(16px,2.5vw,24px); border-top: 1px solid var(--line); }
+.stepcard .top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.kindtag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #fff; background: var(--k, var(--base)); border-radius: 6px; padding: 3px 8px; }
+.stepcard h3 { margin: 0; font-size: 16px; letter-spacing: -.01em; flex: 1 1 auto; min-width: 0; }
+.stepcard .target { font-size: 12.5px; color: var(--ink-soft); }
+.stepcard .rep { font-size: 12px; color: var(--ink-faint); }
+.pbar { height: 10px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; margin-top: 12px; }
+.pbar > i { display: block; height: 100%; width: 0; background: var(--k, var(--accent)); transition: width .2s linear; }
+.stepmeta { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-faint); margin-top: 6px; }
 
-section { margin-top: 34px; }
-.sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 6px; }
-.sec-head h3 { margin: 0; font-size: 17px; letter-spacing: -.01em; }
-.sec-head p { margin: 0; font-size: 12.5px; color: var(--ink-faint); }
+.segwrap { padding: 0 clamp(16px,2.5vw,24px) 18px; }
+.seglabel { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); margin: 4px 0 8px; }
+.segs { display: flex; gap: 2px; height: 16px; }
+.seg { position: relative; background: var(--track); border-radius: 3px; overflow: hidden; min-width: 2px; }
+.seg > i { position: absolute; inset: 0; width: 0; background: var(--fillc); }
 
-.chart-card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 20px clamp(14px, 2.5vw, 22px) 16px; }
-.ribbon { display: flex; gap: 3px; margin-bottom: 12px; }
-.ribbon span { font-size: 11px; font-weight: 600; color: #fff; padding: 4px 8px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .02em; }
-.chart { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; align-items: end; gap: clamp(2px, .5vw, 6px); height: 168px; padding-top: 6px; }
-.bar-btn { display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; gap: 5px; height: 100%; background: none; border: 0; padding: 0; cursor: pointer; font: inherit; border-radius: 7px 7px 0 0; }
-.bar { width: 100%; border-radius: 5px 5px 2px 2px; min-height: 4px; background: var(--phase); transition: filter .15s; }
-.bar-btn:hover .bar { filter: brightness(1.08); }
-.bar-btn[aria-pressed="true"] .bar { outline: 2px solid var(--ink); outline-offset: 2px; }
-.bar.deload { background-image: repeating-linear-gradient(135deg, transparent, transparent 4px, rgba(255,255,255,.35) 4px, rgba(255,255,255,.35) 7px); }
-.bar-lab { font-size: 9.5px; color: var(--ink-faint); text-align: center; font-family: var(--mono); }
-.bar-btn[aria-pressed="true"] .bar-lab { color: var(--ink); font-weight: 700; }
-.chart-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; flex-wrap: wrap; gap: 10px; }
-.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: var(--ink-soft); }
-.legend span { display: inline-flex; align-items: center; gap: 6px; }
-.legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
-.legend .dl { background-image: repeating-linear-gradient(135deg, transparent, transparent 3px, var(--ink-faint) 3px, var(--ink-faint) 5px); border: 1px solid var(--line); }
-.axis-note { font-size: 11.5px; color: var(--ink-faint); }
-
-.detail { margin-top: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
-.detail-head { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 18px clamp(16px, 2.5vw, 24px); border-bottom: 1px solid var(--line); background: var(--surface-2); }
-.wk-badge { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 12px; flex: none; color: #fff; background: var(--phase); }
-.wk-badge .num { font-size: 20px; font-weight: 700; line-height: 1; }
-.wk-badge small { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; opacity: .9; }
-.detail-head .meta { flex: 1 1 240px; }
-.detail-head .meta h4 { margin: 0 0 3px; font-size: 15.5px; letter-spacing: -.01em; }
-.detail-head .meta .tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 7px; }
-.tag { font-size: 11px; padding: 3px 9px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); color: var(--ink-soft); }
-.tag.phase { color: #fff; background: var(--phase); border-color: transparent; text-transform: capitalize; }
-.tag.deload { color: var(--peak); border-color: color-mix(in srgb, var(--peak) 45%, var(--line)); }
-.detail-head .wk-stats { display: flex; gap: 22px; text-align: right; }
-.detail-head .wk-stats div .k { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-faint); }
-.detail-head .wk-stats div .v { font-size: 17px; }
-.days { display: grid; }
-.day-row { display: grid; grid-template-columns: 54px 1fr; gap: 4px; padding: 0 clamp(16px, 2.5vw, 24px); border-bottom: 1px solid var(--line); }
-.day-row:last-child { border-bottom: 0; }
-.day-name { padding: 14px 0; font-size: 12px; font-weight: 650; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .05em; }
-.day-sessions { display: flex; flex-direction: column; }
-.sess { display: flex; align-items: flex-start; gap: 12px; padding: 13px 0; border-top: 1px dashed var(--line); }
-.sess:first-child { border-top: 0; }
-.dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; flex: none; background: var(--eff-none); }
-.dot.easy { background: var(--eff-easy); }
-.dot.moderate { background: var(--eff-moderate); }
-.dot.hard { background: var(--eff-hard); }
-.sess-body { flex: 1; min-width: 0; }
-.sess-title { font-size: 14px; font-weight: 550; letter-spacing: -.005em; }
-.sess-title .opt { font-size: 11px; color: var(--ink-faint); font-weight: 500; }
-.sess-meta { display: flex; flex-wrap: wrap; gap: 6px 8px; margin-top: 5px; font-size: 12px; color: var(--ink-soft); }
-.chip { font-family: var(--mono); font-variant-numeric: tabular-nums; background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; }
-.chip.pace { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
-.chip.rpe { color: var(--eff-hard); border-color: color-mix(in srgb, var(--eff-hard) 30%, var(--line)); }
-.rest .sess-title { color: var(--ink-faint); }
-
-.notes { margin-top: 16px; display: grid; gap: 10px; }
-.note { display: flex; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; font-size: 13.5px; color: var(--ink-soft); }
-.note::before { content: ""; width: 3px; border-radius: 2px; background: var(--accent); flex: none; }
-footer { margin-top: 32px; font-size: 12px; color: var(--ink-faint); text-align: center; }
+.cues { border-top: 1px solid var(--line); }
+.cues .hd { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); padding: 14px clamp(16px,2.5vw,24px) 6px; }
+.cuelog { max-height: 220px; overflow-y: auto; padding: 0 clamp(16px,2.5vw,24px) 16px; display: flex; flex-direction: column; gap: 8px; }
+.cue { display: flex; gap: 10px; align-items: baseline; font-size: 13px; }
+.cue .t { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 11.5px; color: var(--ink-faint); flex: none; width: 44px; }
+.cue .m { color: var(--ink); }
+.cue.dim .m { color: var(--ink-soft); }
+.cue .badge { width: 7px; height: 7px; border-radius: 50%; margin-top: 5px; flex: none; background: var(--ink-faint); }
+.cue.pace-fast .badge { background: var(--fast); } .cue.pace-slow .badge { background: var(--slow); } .cue.pace-on .badge { background: var(--on); }
+.cue.step .badge { background: var(--accent); } .cue.start .badge, .cue.done .badge { background: var(--build); }
+.empty { color: var(--ink-faint); font-size: 13px; padding: 4px 0 14px; }
+footer { margin-top: 24px; font-size: 12px; color: var(--ink-faint); text-align: center; }
 footer a { color: var(--accent); }
-
-@media (max-width: 820px) { .grid { grid-template-columns: repeat(2, 1fr); } .field.col2 { grid-column: span 1; } }
-@media (max-width: 760px) {
-  .goal { grid-template-columns: 1fr; gap: 18px; }
-  .verdict { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); padding-top: 18px; }
-  .stats { grid-template-columns: repeat(2, 1fr); }
-  .ribbon span { font-size: 0; padding: 4px; }
-  .detail-head .wk-stats { text-align: left; }
-  .bar-lab { font-size: 0; }
-}
+@media (max-width: 680px) { .hero { grid-template-columns: 1fr 1fr; } .hero .timer { grid-column: 1 / -1; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
 </style>
@@ -186,287 +118,274 @@ footer a { color: var(--accent); }
     <div class="brand">
       <div class="mark" aria-hidden="true"></div>
       <div>
-        <h1>Running Coach</h1>
-        <p>Plan builder · the engine runs live in your browser</p>
+        <h1>Running Coach — Live</h1>
+        <p>During-the-run engine · a simulated runner drives the real state machine</p>
       </div>
     </div>
     <button class="theme-toggle" id="themeToggle" type="button">Toggle theme</button>
   </header>
 
-  <form class="builder" id="builder" novalidate>
-    <div class="eyebrow">Your goal &amp; current fitness</div>
-    <div class="grid">
-      <div class="field">
-        <label for="distance">Race</label>
-        <select id="distance">
-          <option value="1mile">1 mile</option>
-          <option value="5k">5K</option>
-          <option value="10k">10K</option>
-          <option value="half" selected>Half marathon</option>
-          <option value="marathon">Marathon</option>
-        </select>
+  <div class="controls">
+    <div class="field">
+      <label for="session">Session</label>
+      <select id="session"></select>
+    </div>
+    <div class="field">
+      <label for="speed">Sim speed</label>
+      <select id="speed">
+        <option value="1">Real time (1×)</option>
+        <option value="8">8×</option>
+        <option value="20" selected>20×</option>
+        <option value="60">60×</option>
+      </select>
+    </div>
+    <div class="btns">
+      <button class="op primary" id="startBtn" type="button">Start</button>
+      <button class="op" id="pauseBtn" type="button" disabled>Pause</button>
+      <button class="op" id="stopBtn" type="button" disabled>Stop</button>
+    </div>
+  </div>
+
+  <div class="screen">
+    <div class="hero">
+      <div class="timer">
+        <div class="k">Elapsed</div>
+        <div class="big num" id="elapsed">0:00</div>
+        <div class="sub"><span class="num" id="distance">0.00</span> km · <span id="status">ready</span></div>
       </div>
-      <div class="field">
-        <label for="target">Target time <span class="hint">h:mm:ss</span></label>
-        <input id="target" class="time-in" value="1:30:00" inputmode="numeric" autocomplete="off">
+      <div>
+        <div class="k">Current pace</div>
+        <div class="big num pace-val none" id="pace">—</div>
+        <div class="sub">avg <span class="num" id="avgpace">—</span></div>
       </div>
-      <div class="field">
-        <label for="raceDate">Race date</label>
-        <input id="raceDate" type="date" value="2027-09-05">
-      </div>
-      <div class="field">
-        <label for="startDate">Start from</label>
-        <input id="startDate" type="date" value="2026-07-23">
-      </div>
-      <div class="field">
-        <label for="recentDist">Recent effort</label>
-        <select id="recentDist">
-          <option value="1609.344">1 mile</option>
-          <option value="5000" selected>5K</option>
-          <option value="10000">10K</option>
-          <option value="21097.5">Half marathon</option>
-          <option value="42195">Marathon</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="recentTime">…in a time of <span class="hint">h:mm:ss</span></label>
-        <input id="recentTime" class="time-in" value="21:00" inputmode="numeric" autocomplete="off">
-      </div>
-      <div class="field">
-        <label for="days">Days / week</label>
-        <select id="days">
-          <option>3</option><option>4</option><option selected>5</option><option>6</option><option>7</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="experience">Experience</label>
-        <select id="experience">
-          <option value="beginner">Beginner</option>
-          <option value="recreational">Recreational</option>
-          <option value="competitive" selected>Competitive</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="maxHr">Max HR <span class="hint">optional</span></label>
-        <input id="maxHr" type="number" min="120" max="230" value="190" inputmode="numeric">
-      </div>
-      <div class="field">
-        <label for="restingHr">Resting HR <span class="hint">optional</span></label>
-        <input id="restingHr" type="number" min="30" max="100" value="48" inputmode="numeric">
-      </div>
-      <div class="toggles">
-        <label class="toggle"><input type="checkbox" id="strength" checked> Include strength &amp; conditioning</label>
-        <label class="toggle"><input type="checkbox" id="returning" checked> Returning from injury / lay-off</label>
+      <div>
+        <div class="k">Heart rate</div>
+        <div class="big num" id="hr">—</div>
+        <div class="sub">bpm</div>
       </div>
     </div>
-    <div class="builder-foot">
-      <button class="build-btn" type="submit">Build my plan</button>
-      <div class="hint-line">Nothing leaves your device — the whole engine runs here.</div>
+
+    <div class="stepcard">
+      <div class="top">
+        <span class="kindtag" id="kindtag" style="--k:var(--base)">—</span>
+        <h3 id="steptitle">Pick a session and press Start</h3>
+        <span class="rep num" id="rep"></span>
+      </div>
+      <div class="target" id="target"></div>
+      <div class="pbar"><i id="stepfill" style="--k:var(--base)"></i></div>
+      <div class="stepmeta"><span id="stepelapsed">0:00</span><span id="stepcount"></span></div>
     </div>
-    <div class="error" id="error" role="alert"></div>
-  </form>
 
-  <div id="result">
-    <div class="goal" id="goal"></div>
-    <div class="stats" id="stats"></div>
+    <div class="segwrap">
+      <div class="seglabel">Whole session</div>
+      <div class="segs" id="segs"></div>
+    </div>
 
-    <section>
-      <div class="sec-head">
-        <h3>Training block</h3>
-        <p>Bar height = weekly volume · colour = phase · hatched = deload</p>
-      </div>
-      <div class="chart-card">
-        <div class="ribbon" id="ribbon"></div>
-        <div class="chart" id="chart" role="group" aria-label="Weekly volume — select a week"></div>
-        <div class="chart-foot">
-          <div class="legend" id="legend"></div>
-          <div class="axis-note num" id="peakNote"></div>
-        </div>
-      </div>
-    </section>
-
-    <section>
-      <div class="sec-head"><h3>Week detail</h3><p>Select any week above</p></div>
-      <div class="detail" id="detail"></div>
-    </section>
-
-    <section>
-      <div class="sec-head"><h3>Coaching notes</h3></div>
-      <div class="notes" id="notes"></div>
-    </section>
+    <div class="cues">
+      <div class="hd">Cues</div>
+      <div class="cuelog" id="cuelog"><div class="empty">Coaching cues will appear here as you run.</div></div>
+    </div>
   </div>
 
   <footer>
-    Evidence-based training engine · deterministic, computed client-side · <span id="genAt" class="num"></span>.
-    Not affiliated with any commercial running app.
+    The runner is simulated; the runtime, cues and pace judgements are the real engine. Deterministic core, computed client-side.
   </footer>
 </div>
 
 <script>"use strict";var RC=(()=>{var K=Object.defineProperty;var ke=Object.getOwnPropertyDescriptor;var ve=Object.getOwnPropertyNames;var Re=Object.prototype.hasOwnProperty;var xe=(e,t,n)=>t in e?K(e,t,{enumerable:!0,configurable:!0,writable:!0,value:n}):e[t]=n;var De=(e,t)=>{for(var n in t)K(e,n,{get:t[n],enumerable:!0})},Te=(e,t,n,r)=>{if(t&&typeof t=="object"||typeof t=="function")for(let s of ve(t))!Re.call(e,s)&&s!==n&&K(e,s,{get:()=>t[s],enumerable:!(r=ke(t,s))||r.enumerable});return e};var Ee=e=>Te(K({},"__esModule",{value:!0}),e);var m=(e,t,n)=>xe(e,typeof t!="symbol"?t+"":t,n);var pt={};De(pt,{LiveSession:()=>L,buildPlanSummary:()=>Se,generatePlan:()=>O,parseDuration:()=>X});function J(e){return e.returningFromInjury?"pyramidal":e.experience==="competitive"?"polarized":"pyramidal"}var E={"1mile":1609.344,"5k":5e3,"10k":1e4,half:21097.5,marathon:42195};function X(e){let t=e.trim().split(":");if(t.length===0||t.length>3)throw new Error(`Invalid duration: "${e}"`);let n=t.map(s=>{let a=Number(s);if(!Number.isFinite(a)||a<0)throw new Error(`Invalid duration segment: "${s}"`);return a}),r=0;for(let s of n)r=r*60+s;return r}function h(e,t=!1){let n=Math.max(0,Math.round(e)),r=Math.floor(n/3600),s=Math.floor(n%3600/60),a=n%60,i=o=>String(o).padStart(2,"0");return r>0||t?`${r}:${i(s)}:${i(a)}`:`${s}:${i(a)}`}function ee(e,t="km"){let n=t==="km"?e:Ae(e);return`${h(n)}/${t}`}function Ae(e){return e*(1609.344/1e3)}function G(e,t){if(t<=0)throw new Error("distance must be positive");return e/(t/1e3)}function z(e,t){return e*(t/1e3)}function te(e,t){if(e<=0)throw new Error("pace must be positive");return t/e*1e3}function v(e){return e/1e3}var We=1.06;function ne(e,t,n){if(e<=0||t<=0||n<=0)throw new Error("riegelPredict requires positive inputs");return t*(n/e)**We}function U(e,t){return ne(e.distanceMeters,e.timeSeconds,E[t])}function Ke(e){let t=Object.keys(E),n={};for(let r of t)n[r]=U(e,r);return n}function I(e,t){return G(ne(e.distanceMeters,e.timeSeconds,t),t)}function D(e,t,n){return{minSecPerKm:Math.round(e-t),maxSecPerKm:Math.round(e+n)}}function re(e,t){let n=I(e,15e3),r=I(e,3e3),s=I(e,5e3),a=I(e,E["1mile"]),i=D(n+92,17,18),o=D(n+35,10,10),c=D(n,5,8),d={minSecPerKm:Math.round(r-3),maxSecPerKm:Math.round(s+2)},S=D(a,8,4),l;if(t){let y=G(t.targetTimeSeconds,E[t.distance]);l=D(y,3,3)}else l=D(n+8,4,4);return{easy:i,steady:o,threshold:c,vo2:d,rep:S,goalRace:l,predictedRaceTimes:Ke(e)}}function Ie(e,t){let n=[{zone:1,label:"Recovery",lo:.5,hi:.6},{zone:2,label:"Easy / aerobic",lo:.6,hi:.7},{zone:3,label:"Steady / tempo",lo:.7,hi:.8},{zone:4,label:"Threshold",lo:.8,hi:.9},{zone:5,label:"VO2 / max",lo:.9,hi:1}],r=s=>t&&t>0?Math.round(t+s*(e-t)):Math.round(s*e);return n.map(s=>({zone:s.zone,label:s.label,minBpm:r(s.lo),maxBpm:r(s.hi)}))}function se(e,t){return t.maxHr?{...e,hrZones:Ie(t.maxHr,t.restingHr)}:e}var Ce={"1mile":{weeks:1,volumeMultiplierByWeek:[.6],notes:["Short, sharp taper \u2014 keep speed, cut volume ~40%."]},"5k":{weeks:1,volumeMultiplierByWeek:[.6],notes:["~5\u20138 day taper; retain VO2 touches at low volume."]},"10k":{weeks:1,volumeMultiplierByWeek:[.6],notes:["~5\u20138 day taper; keep some threshold/VO2 intensity."]},half:{weeks:2,volumeMultiplierByWeek:[.7,.55],notes:["~7\u201314 day taper; hold threshold intensity while volume falls ~30% then ~45%."]},marathon:{weeks:3,volumeMultiplierByWeek:[.8,.65,.5],notes:["~14\u201321 day taper; progressively cut volume to ~50% of peak, keep marathon-pace touches."]}};function C(e){return Ce[e]}function R(){return new Date().toISOString().slice(0,10)}function _(e){let[t,n,r]=e.split("-").map(Number);if(!t||!n||!r)throw new Error(`Invalid ISO date: "${e}"`);return Date.UTC(t,n-1,r)}function Y(e,t){let n=_(e)+t*864e5;return new Date(n).toISOString().slice(0,10)}function _e(e,t){return Math.round((_(t)-_(e))/864e5)}function w(e,t){return Math.floor(_e(e,t)/7)}function ae(e){return(new Date(_(e)).getUTCDay()+6)%7}var we={"1mile":12,"5k":16,"10k":18,half:20,marathon:24},$e=4;function ie(e,t){return Math.max($e,Math.min(e,we[t]))}function oe(e,t,n){let r=Math.min(C(t).weeks,Math.max(1,e-3)),s=e-r,a;s>=8?a=Math.min(4,Math.round(s*.2)):s>=4?a=1:a=0;let i=s-a,c=Math.max(1,Math.round(i*(n?.62:.5))),d=Math.max(0,i-c);return[...$("base",c),...$("build",d),...$("peak",a),...$("taper",r)].map((l,y)=>{let p=y+1,f=l!=="taper"&&p%4===0;return{phase:l,isDeload:f}})}function $(e,t){return Array.from({length:Math.max(0,t)},()=>e)}var g={easy:{min:2,max:3},steady:{min:4,max:5},threshold:{min:6,max:7},vo2:{min:8,max:9},rep:{min:8,max:9}};function de(e){return(e.minSecPerKm+e.maxSecPerKm)/2}function Fe(e){return e.distanceMeters?e.distanceMeters:e.durationSeconds&&e.targetPaceSecPerKm?te(de(e.targetPaceSecPerKm),e.durationSeconds):0}function Be(e){return e.durationSeconds?e.durationSeconds:e.distanceMeters&&e.targetPaceSecPerKm?z(de(e.targetPaceSecPerKm),e.distanceMeters):0}function M(e,t,n,r,s,a){let i=Math.round(s.reduce((c,d)=>c+Be(d),0)),o=Math.round(s.reduce((c,d)=>c+Fe(d),0));return{type:e,title:t,description:n,intensity:r,estimatedDurationSeconds:i,estimatedDistanceMeters:o>0?o:void 0,steps:s,targetRpe:a}}function H(e,t,n){return{kind:"warmup",label:n?"Easy jog, dynamic leg swings/drills, then 4\u20136 progressive strides":"Easy jog and dynamic mobility (leg swings, ankle/calf activation)",durationSeconds:t*60,targetPaceSecPerKm:e.easy,targetRpe:g.easy}}function Z(e,t){return{kind:"cooldown",label:"Easy jog to finish",durationSeconds:t*60,targetPaceSecPerKm:e.easy,targetRpe:g.easy}}function le(e,t,n=!1){let r=[{kind:"steady",label:"Conversational easy running (below the first threshold)",durationSeconds:t*60,targetPaceSecPerKm:e.easy,targetRpe:g.easy}];return n&&r.push({kind:"rep",label:"6 \xD7 20s relaxed strides, full recovery",durationSeconds:120,targetPaceSecPerKm:e.rep,targetRpe:g.rep,repeatCount:6}),M(n?"strides":"easy",n?`${t}\u2032 easy + strides`:`${t}\u2032 easy run`,"Foundation aerobic running. Easy means easy \u2014 it should feel conversational.","easy",r,g.easy)}function F(e,t,n={}){let r=[],s=t-(n.steadyFinishMin??0)-(n.raceBlockMin??0);r.push({kind:"steady",label:"Easy aerobic running \u2014 build durability",durationSeconds:Math.max(0,s)*60,targetPaceSecPerKm:e.easy,targetRpe:g.easy});let a="Long run develops durability: holding economy and mechanics under accumulated fatigue.";return n.raceBlockMin&&n.racePace&&(r.push({kind:"steady",label:"Race-specific block at goal effort (run while already fatigued)",durationSeconds:n.raceBlockMin*60,targetPaceSecPerKm:n.racePace,targetRpe:g.steady}),a+=" Includes a race-specific block late in the run."),n.steadyFinishMin&&(r.push({kind:"steady",label:"Steady progressive finish",durationSeconds:n.steadyFinishMin*60,targetPaceSecPerKm:e.steady,targetRpe:g.steady}),a+=" Finishes steady, not as a race."),M("long",`${t}\u2032 long run`,a,"easy",r,g.easy)}var ce=[{title:"3 \xD7 8\u2032 threshold / 2\u2032 jog",build:e=>P(3,{durationSeconds:480,pace:e.threshold},{durationSeconds:120,pace:e.easy})},{title:"4 \xD7 6\u2032 threshold / 90\u2033 jog",build:e=>P(4,{durationSeconds:360,pace:e.threshold},{durationSeconds:90,pace:e.easy})},{title:"25\u2032 continuous tempo",build:e=>[{kind:"steady",label:"Continuous controlled tempo",durationSeconds:1500,targetPaceSecPerKm:e.threshold,targetRpe:g.threshold}]},{title:"5 \xD7 1 mile cruise / 90\u2033 jog",build:e=>P(5,{distanceMeters:1609.344,pace:e.threshold},{durationSeconds:90,pace:e.easy})}];function A(e,t){let n=ce[t%ce.length],r=[H(e,15,!0),...n.build(e),Z(e,10)];return M("threshold",n.title,"Controlled but demanding (RPE 6\u20137). You should finish knowing you could do one more rep.","moderate",r,g.threshold)}var ue=[{title:"5 \xD7 3\u2032 hard / 2\u2032 easy",build:e=>P(5,{durationSeconds:180,pace:e.vo2},{durationSeconds:120,pace:e.easy})},{title:"4 \xD7 4\u2032 hard / 3\u2032 easy",build:e=>P(4,{durationSeconds:240,pace:e.vo2},{durationSeconds:180,pace:e.easy})},{title:"6 \xD7 800m / 2\u2032 easy",build:e=>P(6,{distanceMeters:800,pace:e.vo2},{durationSeconds:120,pace:e.easy})},{title:"10 \xD7 1\u2032 hard / 1\u2032 easy (introductory)",build:e=>P(10,{durationSeconds:60,pace:e.vo2},{durationSeconds:60,pace:e.easy})}];function T(e,t){let n=ue[t%ue.length],r=[H(e,15,!0),...n.build(e),Z(e,10)];return M("vo2",n.title,"Accumulate ~12\u201320\u2032 of quality hard running (RPE 8\u20139). Purpose is quality work, not winning rep one.","hard",r,g.vo2)}function me(e){let t=[H(e,15,!0),...P(3,{durationSeconds:600,pace:e.goalRace},{durationSeconds:120,pace:e.easy}),Z(e,10)];return M("race-specific","3 \xD7 10\u2032 at goal race pace / 2\u2032 jog","Rehearse goal race pace and rhythm. Controlled, repeatable, race-like.","moderate",t,g.steady)}function pe(e,t){let n=!t&&(e==="build"||e==="peak"),r=t?"1\u20132 sets \xD7 4\u20136 reps (maintenance)":n?"2\u20134 sets \xD7 3\u20136 reps, heavy but controlled (~80%+ 1RM)":"2\u20133 sets \xD7 6\u20138 reps, technique focus",s=["Squat / trap-bar deadlift / leg press","Split squat or rear-foot-elevated split squat","Romanian deadlift (hip hinge)","Straight-knee calf raise","Bent-knee (soleus) calf raise","Step-ups / single-leg work","Trunk anti-rotation / anti-extension"],a=n?["Pogo hops / ankle stiffness bounces (2\u20133 \xD7 8\u201310, low volume)","Box or hurdle jumps, full recovery (2\u20133 \xD7 3\u20135, quality over fatigue)"]:[],i=[...s,...a],o=n?" Finish with low-volume plyometrics for reactive strength; stop if a session leaves a delayed reaction.":"",c=t?30:45;return M("strength",t?"Strength (maintenance)":"Strength (heavy)",`${r}. ${i.join("; ")}. Keep total volume low \u2014 running already supplies fatigue.${o}`,"none",[{kind:"steady",label:"Runner-focused resistance session",durationSeconds:c*60,targetRpe:g.threshold}])}function he(){return M("mobility","Mobility (15\u2032)","Dynamic mobility and any sport-specific range work. Static stretching only for a specific restriction \u2014 it does not improve economy.","none",[{kind:"steady",label:"Dynamic mobility",durationSeconds:900}])}function ye(){return M("rest","Rest","Rest or gentle recovery activity. Recovery is part of the programme.","none",[])}function P(e,t,n){let r=[],s=t.distanceMeters?`${Math.round(t.distanceMeters)}m rep`:`${Math.round((t.durationSeconds??0)/60*10)/10}\u2032 rep`;for(let a=1;a<=e;a++)r.push({kind:"rep",label:s,durationSeconds:t.durationSeconds,distanceMeters:t.distanceMeters,targetPaceSecPerKm:t.pace,repeatIndex:a,repeatCount:e}),a<e&&r.push({kind:"recovery",label:"Easy jog recovery",durationSeconds:n.durationSeconds,distanceMeters:n.distanceMeters,targetPaceSecPerKm:n.pace});return r}var Oe={"1mile":55,"5k":70,"10k":85,half:110,marathon:150},je=6,B=1,Ne=3,fe=[2,4,0,5];function O(e,t,n={}){let r=n.startDateIso??t.startDateIso??R(),s=Math.max(0,w(r,t.raceDateIso)),a=ie(s,t.distance),i=e.returningFromInjury??!1,o=n.intensityModel??J(e),c=se(re(e.recent,t),e),d=He(oe(a,t.distance,i)),S=Y(t.raceDateIso,-ae(t.raceDateIso)),l=Oe[t.distance],y=Math.round(l*(i?.42:.55)),p=d.filter(x=>x.phase!=="taper").length,f=C(t.distance),k=d.map((x,u)=>{let b=u+1,q=Y(S,-(a-b)*7),V=Ye(x,b,p,y,l,f.volumeMultiplierByWeek);return Le(b,q,x,{athlete:e,goal:t,paces:c,returning:i,longMin:V})});return{goal:t,athlete:e,createdAtIso:R(),intensityModel:o,paces:c,totalWeeks:s,weeks:k,notes:Qe(e,t,s,a,o,k)}}function Le(e,t,n,r){let s=Math.min(6,Math.max(3,r.athlete.daysPerWeek)),a=Ve(n,s,r.returning),i=Math.max(0,s-a-1),o=[],c=[];o.push(ze(n.phase,r)),c.push(je);let d=Ge(n,e,a,r),S=a>=2?[B,Ne]:[B];d.forEach((u,b)=>{o.push(u),c.push(S[b])});let l=fe.slice(0,i);l.forEach((u,b)=>{let q=b===0&&(n.phase==="base"||n.phase==="build")&&!n.isDeload,V=n.isDeload?35:b===l.length-1?40:45;o.push(le(r.paces,V,q)),c.push(u)}),Ue(n,r,o,c);let y=new Set(c),p=[2,4,0,5,3,1].find(u=>!y.has(u));if(p!==void 0){let u=he();o.push(u),c.push(p),y.add(p)}for(let u=0;u<7;u++)y.has(u)||(o.push(ye()),c.push(u),y.add(u));let f=qe(o,c,e),k=f.reduce((u,b)=>u+(b.estimatedDistanceMeters??0),0),x=f.filter(u=>u.type==="threshold"||u.type==="vo2"||u.type==="race-specific").length;return{index:e,startDateIso:t,phase:n.phase,isDeload:n.isDeload,focus:Ze(n,r),sessions:f,plannedDistanceMeters:Math.round(k),qualitySessionCount:x}}function qe(e,t,n){return e.map((r,s)=>({...r,id:`w${n}-d${t[s]}-${r.type}`,dayOfWeek:t[s],source:"generated"})).sort((r,s)=>r.dayOfWeek-s.dayOfWeek)}function Ve(e,t,n){if(t<4||e.isDeload)return 1;switch(e.phase){case"base":return 1;case"build":return n&&e.ordinalInPhase<=Math.ceil(e.phaseTotal/2)?1:2;case"peak":return 2;case"taper":return 1}}function Ge(e,t,n,r){let s=r.paces,a=r.goal.distance==="5k"||r.goal.distance==="10k"||r.goal.distance==="1mile",i=[];if(e.phase==="taper")return i.push(T(s,3)),i.slice(0,n);if(e.phase==="peak")return i.push(me(s)),i.push(a?T(s,t):A(s,t)),i.slice(0,n);if(e.phase==="build")return n>=2?(i.push(A(s,t)),i.push(T(s,t))):i.push(t%2===0?T(s,t):A(s,t)),i.slice(0,n);let o=e.ordinalInPhase>Math.ceil(e.phaseTotal/2);return i.push(o&&t%2===0?T(s,3):A(s,t)),i.slice(0,n)}function ze(e,t){let n=t.longMin;return e==="peak"?F(t.paces,n,{raceBlockMin:Math.min(30,Math.round(n*.25)),racePace:t.paces.goalRace}):e==="build"?F(t.paces,n,{steadyFinishMin:Math.min(20,Math.round(n*.2))}):F(t.paces,n)}function Ue(e,t,n,r){if(!t.athlete.includeStrength)return;let s;e.phase==="taper"?s=e.ordinalInPhase===1?1:0:e.phase==="peak"||e.isDeload?s=1:s=2;let a=e.phase==="peak"||e.phase==="taper",i=[B,fe[0]];for(let o=0;o<s;o++)n.push(pe(e.phase,a)),r.push(i[o]??B)}function Ye(e,t,n,r,s,a){if(e.phase==="taper"){let c=t-n-1,d=a[c]??.55;return Math.round(s*d)}let i=n<=1?1:(t-1)/(n-1),o=r+i*(s-r);return e.isDeload&&(o*=.75),Math.round(o)}function He(e){let t={base:0,build:0,peak:0,taper:0};for(let r of e)t[r.phase]++;let n={base:0,build:0,peak:0,taper:0};return e.map(r=>(n[r.phase]++,{...r,ordinalInPhase:n[r.phase],phaseTotal:t[r.phase]}))}function Ze(e,t){if(e.isDeload)return"Deload \u2014 recover and absorb training";switch(e.phase){case"base":return t.returning?"Rebuild easy consistency + long run":"Aerobic base + one quality session";case"build":return"Build threshold and VO2, extend the long run";case"peak":return"Race-specific sharpening";case"taper":return"Taper \u2014 cut volume, keep intensity"}}function Qe(e,t,n,r,s,a){let i=[],o=n-r;if(o>1){let c=a[0]?.startDateIso??t.startDateIso??"";i.push(`You have ~${o} weeks before the structured plan begins (${c}). Use them to build easy-running consistency and a weekly long run \u2014 consistency is the biggest driver of improvement.`)}return i.push(s==="pyramidal"?"Intensity distribution: pyramidal \u2014 mostly easy running, a moderate amount of threshold, a little VO2. Individual response matters more than an exact split.":"Intensity distribution: polarized \u2014 mostly easy plus a focused dose of hard work, minimal middle-ground moderate running."),e.returningFromInjury&&i.push("Returning from injury: the early weeks stay deliberately conservative (single quality session, gentle long-run progression). Add the second quality session only once weekly running and the long run feel stable."),i.push(e.includeStrength?"Strength: 2\xD7/week through base and build (heavy, low volume), easing to 1\xD7 maintenance near the race. Plyometrics only once faster running is tolerated without a delayed reaction.":"Strength is off. The research supports heavy strength 2\xD7/week for economy and durability \u2014 consider enabling it."),i.push("Flexibility: warmups are dynamic (easy jog, drills, strides). Static stretching is optional and targeted \u2014 it does not improve running economy."),i}var Je={beginner:.25,recreational:.15,competitive:.08},Xe=.35,et=18;function ge(e,t,n){let r=n??t.startDateIso??R(),s=Math.max(0,w(r,t.raceDateIso)),a=U(e.recent,t.distance),i=t.targetTimeSeconds,o=(a-i)/a*100,c=e.returningFromInjury?Xe:Je[e.experience],d=1-Math.exp(-s/et),S=Math.min(1.1,.8+.06*Math.max(0,e.daysPerWeek-3)),l=c*d*S*100,y=Math.round(a*(1-l/100)),p=[];p.push(`Current fitness predicts ${h(a)} for the ${t.distance}; target is ${h(i)}.`);let f,k;return o<=0?(f="comfortable",p.push("The goal is at or above current predicted fitness \u2014 the plan can push further.")):o<=l*.6?(f="achievable",p.push(`Needs a ${o.toFixed(1)}% improvement; ~${l.toFixed(1)}% is realistic in ${s} weeks.`)):o<=l?(f="ambitious",p.push(`Needs ${o.toFixed(1)}% vs a realistic ceiling near ${l.toFixed(1)}% \u2014 attainable but with little margin. Consistency and injury-free training are essential.`)):(f="unrealistic",k=y,p.push(`Needs ${o.toFixed(1)}% but only ~${l.toFixed(1)}% is realistic here. A target near ${h(y)} fits the time available; extending the race date would raise the ceiling.`)),s<6&&f!=="comfortable"&&p.push("Fewer than 6 weeks remain \u2014 limited time to build fitness safely."),e.returningFromInjury&&p.push("Returning from injury: fitness may return before joints/tendons are ready \u2014 early weeks stay conservative."),{verdict:f,currentPredictedSeconds:Math.round(a),goalSeconds:i,requiredImprovementPct:Number(o.toFixed(2)),projectedAchievablePct:Number(l.toFixed(2)),projectedAchievableSeconds:y,weeksAvailable:s,rationale:p,suggestedTargetSeconds:k}}var tt=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],nt=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],rt={"1mile":"1 mile","5k":"5K","10k":"10K",half:"Half marathon",marathon:"Marathon"};function W(e,t=!0){let[n,r,s]=e.split("-").map(Number),a=`${s} ${nt[(r??1)-1]}`;return t?`${a} ${n}`:a}function Q(e){return Math.round(v(e)*10)/10}function j(e){return`${h(e.minSecPerKm)}\u2013${h(e.maxSecPerKm)}/km`}function st(e){let t=e.steps.filter(r=>r.targetPaceSecPerKm);if(t.length===0)return null;let n=t.find(r=>r.kind==="rep")??t.find(r=>r.kind==="steady")??t[0];return j(n.targetPaceSecPerKm)}function at(e){let t=e.targetRpe;if(!t){let n=e.steps.filter(r=>r.targetRpe);n.length>0&&(t={min:Math.min(...n.map(r=>r.targetRpe.min)),max:Math.max(...n.map(r=>r.targetRpe.max))})}return t?`${t.min}\u2013${t.max}`:null}function it(e){return e.type==="rest"||e.type==="mobility"?"none":e.type==="strength"||e.type==="cross-training"?"moderate":e.intensity==="hard"?"hard":e.intensity==="moderate"?"moderate":"easy"}function ot(e){let t=[...e.sessions].sort((r,s)=>r.dayOfWeek-s.dayOfWeek),n=t.find(r=>r.type==="long");return{index:e.index,start:W(e.startDateIso,!1),startFull:W(e.startDateIso),phase:e.phase,isDeload:e.isDeload,focus:e.focus,distanceKm:Q(e.plannedDistanceMeters),quality:e.qualitySessionCount,longRunMin:n?Math.round(n.estimatedDurationSeconds/60):0,sessions:t.map(r=>({day:tt[r.dayOfWeek]??"?",type:r.type,title:r.title,effort:it(r),durMin:Math.round(r.estimatedDurationSeconds/60),distKm:r.estimatedDistanceMeters?Q(r.estimatedDistanceMeters):null,pace:st(r),rpe:at(r),optional:r.optional??!1}))}}function ct(e){let t=Q(e.recent.distanceMeters),n=[e.experience.charAt(0).toUpperCase()+e.experience.slice(1),`${t} km in ${h(e.recent.timeSeconds)}`,`${e.daysPerWeek} days/week`,`strength ${e.includeStrength?"on":"off"}`];return e.returningFromInjury&&n.push("returning from injury"),n.join(" \xB7 ")}function Se(e,t){let n=O(e,t),r=ge(e,t),s=n.weeks.map(ot),a=Math.max(...s.map(c=>c.distanceKm),0),i=s.reduce((c,d)=>c+d.quality,0),o=s.find(c=>c.phase==="build"&&c.quality>=2)?.index??s[0]?.index??1;return{goal:{race:rt[t.distance]??t.distance,target:h(t.targetTimeSeconds),raceDate:W(t.raceDateIso),startDate:W(t.startDateIso??R())},athlete:{summary:ct(e)},feasibility:{verdict:r.verdict,currentPredicted:h(r.currentPredictedSeconds),required:Math.round(r.requiredImprovementPct*10)/10,projected:Math.round(r.projectedAchievablePct*10)/10},summary:{structuredWeeks:n.weeks.length,totalWeeks:n.totalWeeks,model:n.intensityModel,peakKm:a,totalQuality:i},paces:{goal:j(n.paces.goalRace),threshold:j(n.paces.threshold),easy:j(n.paces.easy)},weeks:s,defaultWeekIndex:o,notes:n.notes,generatedAt:W(n.createdAtIso.slice(0,10))}}var be=6;function N(e){return e.distanceMeters!=null&&e.durationSeconds==null}function ut(e){return e.durationSeconds!=null?e.durationSeconds:e.distanceMeters!=null&&e.targetPaceSecPerKm?(e.targetPaceSecPerKm.minSecPerKm+e.targetPaceSecPerKm.maxSecPerKm)/2*v(e.distanceMeters):0}function Pe(e,t){let n=e[t];return{index:t,total:e.length,kind:n.kind,label:n.label,repeatIndex:n.repeatIndex,repeatCount:n.repeatCount,gate:N(n)?"distance":"time",targetSeconds:n.durationSeconds,targetMeters:n.distanceMeters,targetPace:n.targetPaceSecPerKm}}function dt(e){return e.kind==="rep"||e.targetRpe!=null&&e.targetRpe.min>=6}function Me(e,t){return t?e<t.minSecPerKm-be?"fast":e>t.maxSecPerKm+be?"slow":"on":"none"}function lt(e){return e.repeatIndex&&e.repeatCount?` (${e.repeatIndex}/${e.repeatCount})`:""}function mt(e){let t=[];return N(e)?t.push(`${Math.round(e.distanceMeters)}m`):e.durationSeconds&&t.push(h(e.durationSeconds)),e.targetPaceSecPerKm&&t.push(`${h(e.targetPaceSecPerKm.minSecPerKm)}\u2013${ee(e.targetPaceSecPerKm.maxSecPerKm)}`),t.join(" \xB7 ")}var L=class{constructor(t){m(this,"steps");m(this,"plannedSeconds");m(this,"status","idle");m(this,"stepIndex",0);m(this,"accruedActiveMs",0);m(this,"segmentStartMs",null);m(this,"stepBaselineActiveMs",0);m(this,"stepBaselineDistanceM",0);m(this,"distanceM",0);m(this,"heartRateBpm");m(this,"lastPaceSampleActiveMs",0);m(this,"lastPaceSampleDistanceM",0);m(this,"currentPace");m(this,"stepPaceStatus","none");m(this,"lastCue");m(this,"session");this.session=t,this.steps=t.steps,this.plannedSeconds=t.estimatedDurationSeconds||this.steps.reduce((n,r)=>n+ut(r),0)}activeMsAt(t){return this.accruedActiveMs+(this.segmentStartMs!=null?t-this.segmentStartMs:0)}record(t){return this.lastCue=t,t}start(t){if(this.status!=="idle")return[];this.status="active",this.segmentStartMs=t,this.stepBaselineActiveMs=0,this.stepBaselineDistanceM=0,this.lastPaceSampleActiveMs=0;let n=[this.record({kind:"session-start",atMs:t,message:`Session started \u2014 ${this.session.title}.`})];return this.steps.length>0&&n.push(this.stepStartCue(t)),n}pause(t){return this.status!=="active"?[]:(this.accruedActiveMs=this.activeMsAt(t),this.segmentStartMs=null,this.status="paused",[this.record({kind:"paused",atMs:t,message:"Paused."})])}resume(t){return this.status!=="paused"?[]:(this.segmentStartMs=t,this.status="active",[this.record({kind:"resumed",atMs:t,message:"Resumed."})])}stop(t){return this.status==="completed"||this.status==="idle"?[]:(this.accruedActiveMs=this.activeMsAt(t),this.segmentStartMs=null,this.status="completed",[this.record({kind:"session-complete",atMs:t,message:"Session ended."})])}update(t){if(this.status!=="active")return[];this.distanceM=t.distanceMeters,t.heartRateBpm!=null&&(this.heartRateBpm=t.heartRateBpm);let n=this.activeMsAt(t.atMs),r=[];for(;this.stepIndex<this.steps.length;){let a=this.steps[this.stepIndex],i=(n-this.stepBaselineActiveMs)/1e3,o=this.distanceM-this.stepBaselineDistanceM;if(!(N(a)?o>=(a.distanceMeters??0):i>=(a.durationSeconds??0)))break;if(this.stepIndex++,this.stepBaselineActiveMs=n,this.stepBaselineDistanceM=this.distanceM,this.stepPaceStatus="none",this.stepIndex<this.steps.length)r.push(this.stepStartCue(t.atMs));else return this.status="completed",r.push(this.record({kind:"session-complete",atMs:t.atMs,message:`Done \u2014 ${h(n/1e3)} \xB7 ${Math.round(v(this.distanceM)*10)/10} km. Nice work.`})),r}this.currentPace=t.paceSecPerKm??this.rollingPace(n),this.lastPaceSampleActiveMs=n,this.lastPaceSampleDistanceM=this.distanceM;let s=this.steps[this.stepIndex];if(s&&this.currentPace!=null){let a=Me(this.currentPace,s.targetPaceSecPerKm);if(a!=="none"&&a!==this.stepPaceStatus){this.stepPaceStatus=a;let i=this.paceMessage(s,a);i&&r.push(this.record({kind:"pace",atMs:t.atMs,paceStatus:a,message:i}))}}return r}rollingPace(t){let n=(t-this.lastPaceSampleActiveMs)/1e3,r=this.distanceM-this.lastPaceSampleDistanceM;return n<=0||r<=0?this.currentPace:n/v(r)}stepStartCue(t){let n=this.steps[this.stepIndex],r=n.label+lt(n),s=mt(n);return this.record({kind:"step-start",atMs:t,stepIndex:this.stepIndex,message:s?`${r} \u2014 ${s}`:r})}paceMessage(t,n){let r=dt(t);return n==="on"?"On target.":n==="fast"?r?"Quick \u2014 keep it controlled and repeatable.":"Ease back \u2014 you're ahead of easy pace.":r?"Pick it up to reach target pace.":null}snapshot(t){let n=t!=null?this.activeMsAt(t):this.accruedActiveMs,r=n/1e3,s=this.stepIndex<this.steps.length?this.steps[this.stepIndex]:void 0,a=s?Pe(this.steps,this.stepIndex):void 0,i=0,o=0;if(s){i=(n-this.stepBaselineActiveMs)/1e3;let S=this.distanceM-this.stepBaselineDistanceM;N(s)?o=s.distanceMeters?Math.min(1,S/s.distanceMeters):0:o=s.durationSeconds?Math.min(1,i/s.durationSeconds):0}let c=this.distanceM>0?r/v(this.distanceM):void 0,d=s&&this.currentPace!=null?Me(this.currentPace,s.targetPaceSecPerKm):"none";return{status:this.status,step:a,stepElapsedSeconds:i,stepProgress:o,elapsedSeconds:r,distanceMeters:this.distanceM,overallProgress:this.plannedSeconds>0?Math.min(1,r/this.plannedSeconds):0,currentPaceSecPerKm:this.currentPace,averagePaceSecPerKm:c,paceStatus:d,heartRateBpm:this.heartRateBpm,lastCue:this.lastCue}}getStatus(){return this.status}plan(){return this.steps.map((t,n)=>Pe(this.steps,n))}};return Ee(pt);})();
 </script>
 <script>
-const PHASE_COLORS = { base: "var(--base)", build: "var(--build)", peak: "var(--peak)", taper: "var(--taper)" };
-const VERDICT_COLORS = { comfortable: "var(--eff-easy)", achievable: "var(--accent)", ambitious: "var(--peak)", unrealistic: "var(--danger)" };
-const DAY_ORDER = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const $ = (id) => document.getElementById(id);
-let DATA = null;
+const KIND_COLOR = { warmup: "var(--base)", cooldown: "var(--base)", steady: "var(--base)", recovery: "var(--taper)", rep: "var(--peak)" };
 
-function renderGoal() {
-  const g = DATA.goal, f = DATA.feasibility;
-  const pc = VERDICT_COLORS[f.verdict] || "var(--accent)";
-  $("goal").innerHTML =
-    '<div class="goal-main">' +
-      '<div class="eyebrow">Goal race</div>' +
-      '<h2>' + g.race + ' · <span class="num">' + g.target + '</span></h2>' +
-      '<div class="when">' + g.raceDate + ' — a ' + DATA.summary.totalWeeks + '-week horizon from ' + g.startDate + '</div>' +
-      '<div class="who">' + DATA.athlete.summary + '</div>' +
-    '</div>' +
-    '<div class="verdict">' +
-      '<span class="pill" style="--pill-c:' + pc + '">' + f.verdict + '</span>' +
-      '<div class="verdict-rows">' +
-        '<div>Current predicted <b class="num">' + f.currentPredicted + '</b></div>' +
-        '<div>Improvement needed <b class="num">' + f.required + '%</b></div>' +
-        '<div>Model projects <b class="num">' + f.projected + '%</b> achievable</div>' +
-      '</div>' +
-    '</div>';
-}
+const ATHLETE = { daysPerWeek: 5, recent: { distanceMeters: 5000, timeSeconds: 1260 }, experience: "competitive", includeStrength: true, returningFromInjury: false, maxHr: 190, restingHr: 48 };
+const GOAL = { distance: "half", targetTimeSeconds: 5400, raceDateIso: "2027-09-05", startDateIso: "2026-07-23" };
 
-function renderStats() {
-  const s = DATA.summary, p = DATA.paces;
-  const cells = [
-    { k: "Structured", v: s.structuredWeeks, u: "wks" },
-    { k: "Peak volume", v: s.peakKm, u: "km/wk" },
-    { k: "Quality total", v: s.totalQuality, u: "sessions" },
-    { k: "Intensity", v: s.model, u: "" },
-    { k: "Goal pace", v: p.goal, u: "" },
-    { k: "Easy pace", v: p.easy, u: "" },
-  ];
-  $("stats").innerHTML = cells.map((c) =>
-    '<div class="stat"><div class="k">' + c.k + '</div><div class="v num">' + c.v + (c.u ? ' <small>' + c.u + '</small>' : '') + '</div></div>'
-  ).join("");
-}
-
-function renderRibbon() {
-  const runs = [];
-  for (const w of DATA.weeks) {
-    const last = runs[runs.length - 1];
-    if (last && last.phase === w.phase) last.count++;
-    else runs.push({ phase: w.phase, count: 1 });
+// Collect distinct runnable sessions from a generated plan.
+const SESSIONS = [];
+(function () {
+  const seen = new Set();
+  const plan = RC.generatePlan(ATHLETE, GOAL);
+  const skip = new Set(["rest", "mobility", "strength", "cross-training"]);
+  for (const w of plan.weeks) for (const s of w.sessions) {
+    if (skip.has(s.type) || s.steps.length === 0 || seen.has(s.title)) continue;
+    seen.add(s.title); SESSIONS.push(s);
   }
-  $("ribbon").innerHTML = runs.map((r) =>
-    '<span style="flex:' + r.count + ';background:' + PHASE_COLORS[r.phase] + '">' + r.phase.charAt(0).toUpperCase() + r.phase.slice(1) + '</span>'
-  ).join("");
+  SESSIONS.sort((a, b) => b.steps.filter((x) => x.kind === "rep").length - a.steps.filter((x) => x.kind === "rep").length);
+})();
+
+function fmtTime(sec) {
+  sec = Math.max(0, Math.round(sec));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  const p = (n) => String(n).padStart(2, "0");
+  return h > 0 ? h + ":" + p(m) + ":" + p(s) : m + ":" + p(s);
+}
+function fmtPace(secPerKm) {
+  if (!secPerKm || !isFinite(secPerKm)) return "—";
+  const s = Math.round(secPerKm);
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0") + "/km";
+}
+function segSeconds(v) {
+  if (v.targetSeconds) return v.targetSeconds;
+  if (v.targetMeters && v.targetPace) return ((v.targetPace.minSecPerKm + v.targetPace.maxSecPerKm) / 2) * v.targetMeters / 1000;
+  return 30;
+}
+function hrTarget(step) {
+  if (!step) return 110;
+  if (step.kind === "rep") return 178;
+  if (step.kind === "warmup" || step.kind === "cooldown") return 132;
+  if (step.kind === "recovery") return 150;
+  return 152;
 }
 
-function renderChart() {
-  const peak = DATA.summary.peakKm || 1;
-  $("chart").innerHTML = DATA.weeks.map((w) => {
-    const h = Math.max(6, Math.round((w.distanceKm / peak) * 100));
-    return '<button class="bar-btn" type="button" data-wk="' + w.index + '" aria-pressed="false" aria-label="Week ' + w.index + ', ' + w.phase + (w.isDeload ? ', deload' : '') + ', ' + w.distanceKm + ' kilometres">' +
-      '<div class="bar' + (w.isDeload ? ' deload' : '') + '" style="height:' + h + '%;--phase:' + PHASE_COLORS[w.phase] + '"></div>' +
-      '<div class="bar-lab">' + w.index + '</div></button>';
+let live = null, timer = null, vms = 0, dist = 0, hr = 110, speed = 20, quirk = 0, lastStepIdx = -1;
+
+function populate() {
+  $("session").innerHTML = SESSIONS.map((s, i) => '<option value="' + i + '">' + s.title + '</option>').join("");
+}
+
+function buildSegments() {
+  const plan = live.plan();
+  const total = plan.reduce((a, v) => a + segSeconds(v), 0) || 1;
+  $("segs").innerHTML = plan.map((v) => {
+    const c = KIND_COLOR[v.kind] || "var(--base)";
+    const track = v.kind === "rep" ? "color-mix(in srgb, var(--peak) 22%, var(--surface-2))" : "var(--surface-2)";
+    return '<div class="seg" style="flex:' + segSeconds(v).toFixed(1) + ';--track:' + track + ';--fillc:' + c + '"><i></i></div>';
   }).join("");
-  $("chart").querySelectorAll(".bar-btn").forEach((b) => b.addEventListener("click", () => selectWeek(Number(b.dataset.wk))));
-  $("peakNote").textContent = "peak " + DATA.summary.peakKm + " km/wk";
-  $("legend").innerHTML = ["base", "build", "peak", "taper"].map((ph) =>
-    '<span><i style="background:' + PHASE_COLORS[ph] + '"></i>' + ph.charAt(0).toUpperCase() + ph.slice(1) + '</span>'
-  ).join("") + '<span><i class="dl"></i>Deload</span>';
 }
 
-function renderDetail(w) {
-  const phaseColor = PHASE_COLORS[w.phase];
-  const byDay = {};
-  for (const s of w.sessions) (byDay[s.day] = byDay[s.day] || []).push(s);
-  const rows = DAY_ORDER.filter((d) => byDay[d]).map((d) => {
-    const items = byDay[d].map((s) => {
-      const meta = ['<span class="chip">' + s.durMin + '′' + (s.distKm ? ' · ' + s.distKm + ' km' : '') + '</span>'];
-      if (s.pace) meta.push('<span class="chip pace">' + s.pace + '</span>');
-      if (s.rpe) meta.push('<span class="chip rpe">RPE ' + s.rpe + '</span>');
-      const isRest = s.type === "rest";
-      return '<div class="sess' + (isRest ? ' rest' : '') + '"><span class="dot ' + s.effort + '"></span>' +
-        '<div class="sess-body"><div class="sess-title">' + s.title + (s.optional ? ' <span class="opt">(optional)</span>' : '') + '</div>' +
-        (isRest ? '' : '<div class="sess-meta">' + meta.join('') + '</div>') + '</div></div>';
-    }).join("");
-    return '<div class="day-row"><div class="day-name">' + d + '</div><div class="day-sessions">' + items + '</div></div>';
-  }).join("");
-  $("detail").innerHTML =
-    '<div class="detail-head" style="--phase:' + phaseColor + '">' +
-      '<div class="wk-badge" style="--phase:' + phaseColor + '"><span class="num">' + w.index + '</span><small>week</small></div>' +
-      '<div class="meta"><h4>' + w.focus + '</h4><div class="eyebrow">Starts ' + w.startFull + '</div>' +
-        '<div class="tags"><span class="tag phase" style="--phase:' + phaseColor + '">' + w.phase + '</span>' +
-        (w.isDeload ? '<span class="tag deload">Deload week</span>' : '') + '<span class="tag">' + w.quality + ' quality</span></div></div>' +
-      '<div class="wk-stats"><div><div class="k">Volume</div><div class="v num">' + w.distanceKm + '<small> km</small></div></div>' +
-        '<div><div class="k">Long run</div><div class="v num">' + w.longRunMin + '′</div></div></div>' +
-    '</div><div class="days">' + rows + '</div>';
+function selectSession(i) {
+  stopLoop();
+  live = new RC.LiveSession(SESSIONS[i]);
+  vms = 0; dist = 0; hr = 110; quirk = 0; lastStepIdx = -1;
+  $("cuelog").innerHTML = '<div class="empty">Coaching cues will appear here as you run.</div>';
+  buildSegments();
+  render(live.snapshot(0));
+  setButtons("idle");
 }
 
-function selectWeek(index) {
-  const w = DATA.weeks.find((x) => x.index === index);
-  if (!w) return;
-  document.querySelectorAll(".bar-btn").forEach((b) => b.setAttribute("aria-pressed", Number(b.dataset.wk) === index ? "true" : "false"));
-  renderDetail(w);
+function paceForStep(step) {
+  const band = step && step.targetPace;
+  const mid = band ? (band.minSecPerKm + band.maxSecPerKm) / 2 : 360;
+  quirk += (Math.random() - 0.5) * 0.03; quirk *= 0.9;
+  if (Math.random() < 0.04) quirk += (Math.random() - 0.5) * 0.28;
+  return Math.max(120, mid * (1 + quirk));
 }
 
-function renderNotes() {
-  $("notes").innerHTML = DATA.notes.map((n) => '<div class="note"><span>' + n + '</span></div>').join("");
+function tick() {
+  const dt = 0.2 * speed; // virtual seconds per 200ms real
+  vms += dt * 1000;
+  const pre = live.snapshot(vms);
+  if (pre.step && pre.step.index !== lastStepIdx) { quirk = 0; lastStepIdx = pre.step.index; }
+  const pace = paceForStep(pre.step);
+  dist += (1000 / pace) * dt;
+  hr += (hrTarget(pre.step) - hr) * 0.05 + (Math.random() - 0.5) * 1.6;
+  hr = Math.max(95, Math.min(ATHLETE.maxHr, hr));
+  const cues = live.update({ atMs: vms, distanceMeters: dist, heartRateBpm: Math.round(hr) });
+  cues.forEach(logCue);
+  render(live.snapshot(vms));
+  if (live.getStatus() === "completed") { stopLoop(); setButtons("done"); }
 }
 
-function readInputs() {
-  const distance = $("distance").value;
-  const targetTimeSeconds = RC.parseDuration($("target").value);
-  const raceDateIso = $("raceDate").value;
-  const startDateIso = $("startDate").value || undefined;
-  if (!raceDateIso) throw new Error("Pick a race date.");
-  const recentTimeSeconds = RC.parseDuration($("recentTime").value);
-  const athlete = {
-    daysPerWeek: Number($("days").value),
-    recent: { distanceMeters: Number($("recentDist").value), timeSeconds: recentTimeSeconds },
-    experience: $("experience").value,
-    includeStrength: $("strength").checked,
-    returningFromInjury: $("returning").checked,
-  };
-  const maxHr = Number($("maxHr").value), restingHr = Number($("restingHr").value);
-  if (maxHr > 0) athlete.maxHr = maxHr;
-  if (restingHr > 0) athlete.restingHr = restingHr;
-  const goal = { distance, targetTimeSeconds, raceDateIso, startDateIso };
-  return { athlete, goal };
+function startLoop() { if (!timer) timer = setInterval(tick, 200); }
+function stopLoop() { if (timer) { clearInterval(timer); timer = null; } }
+
+function logCue(cue) {
+  const log = $("cuelog");
+  const empty = log.querySelector(".empty");
+  if (empty) empty.remove();
+  const cls = cue.kind === "pace" ? "pace-" + cue.paceStatus
+    : cue.kind === "step-start" ? "step"
+    : cue.kind === "session-start" ? "start"
+    : cue.kind === "session-complete" ? "done" : "dim";
+  const dim = cue.kind === "paused" || cue.kind === "resumed" ? " dim" : "";
+  const el = document.createElement("div");
+  el.className = "cue " + cls + dim;
+  el.innerHTML = '<span class="badge"></span><span class="t">' + fmtTime(cue.atMs / 1000) + '</span><span class="m">' + cue.message + '</span>';
+  log.insertBefore(el, log.firstChild);
 }
 
-function build() {
-  const err = $("error");
-  let inputs;
-  try {
-    inputs = readInputs();
-  } catch (e) {
-    err.textContent = "Check your times — use m:ss or h:mm:ss (e.g. 1:30:00). " + (e && e.message ? "(" + e.message + ")" : "");
-    err.classList.add("show");
-    return;
+function render(s) {
+  $("elapsed").textContent = fmtTime(s.elapsedSeconds);
+  $("distance").textContent = (s.distanceMeters / 1000).toFixed(2);
+  $("status").textContent = s.status;
+  const pv = $("pace");
+  pv.textContent = s.currentPaceSecPerKm ? fmtPace(s.currentPaceSecPerKm) : "—";
+  pv.className = "big num pace-val " + (s.paceStatus || "none");
+  $("avgpace").textContent = s.averagePaceSecPerKm ? fmtPace(s.averagePaceSecPerKm) : "—";
+  $("hr").textContent = s.heartRateBpm ? s.heartRateBpm : "—";
+
+  const step = s.step;
+  if (step) {
+    const c = KIND_COLOR[step.kind] || "var(--base)";
+    $("kindtag").textContent = step.kind;
+    $("kindtag").style.setProperty("--k", c);
+    $("steptitle").textContent = step.label;
+    $("rep").textContent = step.repeatIndex && step.repeatCount ? step.repeatIndex + " / " + step.repeatCount : "";
+    const tgt = [];
+    if (step.gate === "distance" && step.targetMeters) tgt.push(Math.round(step.targetMeters) + " m");
+    else if (step.targetSeconds) tgt.push(fmtTime(step.targetSeconds));
+    if (step.targetPace) tgt.push("target " + fmtPace(step.targetPace.minSecPerKm) + "–" + fmtPace(step.targetPace.maxSecPerKm));
+    $("target").textContent = tgt.join(" · ");
+    const fill = $("stepfill");
+    fill.style.width = Math.round(s.stepProgress * 100) + "%";
+    fill.style.setProperty("--k", c);
+    $("stepelapsed").textContent = fmtTime(s.stepElapsedSeconds);
+    $("stepcount").textContent = "Step " + (step.index + 1) + " of " + step.total;
+  } else {
+    $("kindtag").textContent = s.status === "completed" ? "done" : "—";
+    $("steptitle").textContent = s.status === "completed" ? "Session complete" : "Pick a session and press Start";
+    $("rep").textContent = ""; $("target").textContent = ""; $("stepcount").textContent = "";
+    $("stepfill").style.width = s.status === "completed" ? "100%" : "0%";
   }
-  try {
-    DATA = RC.buildPlanSummary(inputs.athlete, inputs.goal);
-  } catch (e) {
-    err.textContent = "That goal can't be planned yet: " + (e && e.message ? e.message : "try a race date further out, or a different target.");
-    err.classList.add("show");
-    return;
+
+  // Segment fills.
+  const segs = $("segs").children;
+  const idx = step ? step.index : (s.status === "completed" ? segs.length : 0);
+  for (let i = 0; i < segs.length; i++) {
+    const fill = segs[i].firstChild;
+    fill.style.width = i < idx ? "100%" : i === idx ? Math.round(s.stepProgress * 100) + "%" : "0%";
   }
-  err.classList.remove("show");
-  renderGoal();
-  renderStats();
-  renderRibbon();
-  renderChart();
-  renderNotes();
-  $("genAt").textContent = DATA.generatedAt;
-  selectWeek(DATA.defaultWeekIndex);
 }
 
-$("builder").addEventListener("submit", (e) => { e.preventDefault(); build(); });
+function setButtons(state) {
+  const start = $("startBtn"), pause = $("pauseBtn"), stop = $("stopBtn"), sel = $("session"), spd = $("speed");
+  if (state === "idle" || state === "done") {
+    start.disabled = false; start.textContent = "Start"; pause.disabled = true; pause.textContent = "Pause"; stop.disabled = true; sel.disabled = false; spd.disabled = false;
+  } else if (state === "active") {
+    start.disabled = true; pause.disabled = false; pause.textContent = "Pause"; stop.disabled = false; sel.disabled = true; spd.disabled = false;
+  } else if (state === "paused") {
+    pause.textContent = "Resume"; stop.disabled = false;
+  }
+}
+
+$("startBtn").addEventListener("click", () => {
+  if (!live || live.getStatus() !== "idle") selectSession(Number($("session").value));
+  live.start(vms).forEach(logCue);
+  render(live.snapshot(vms));
+  setButtons("active");
+  startLoop();
+});
+$("pauseBtn").addEventListener("click", () => {
+  if (!live) return;
+  if (live.getStatus() === "active") { live.pause(vms).forEach(logCue); stopLoop(); setButtons("paused"); }
+  else if (live.getStatus() === "paused") { live.resume(vms).forEach(logCue); startLoop(); setButtons("active"); }
+  render(live.snapshot(vms));
+});
+$("stopBtn").addEventListener("click", () => {
+  if (!live) return;
+  live.stop(vms).forEach(logCue); stopLoop(); render(live.snapshot(vms)); setButtons("done");
+});
+$("session").addEventListener("change", () => selectSession(Number($("session").value)));
+$("speed").addEventListener("change", () => { speed = Number($("speed").value); });
 $("themeToggle").addEventListener("click", () => {
   const cur = document.documentElement.getAttribute("data-theme");
   const next = cur === "dark" ? "light" : cur === "light" ? "dark" : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark");
   document.documentElement.setAttribute("data-theme", next);
 });
 
-build();
+populate();
+selectSession(0);
 </script>
 </body>
 </html>

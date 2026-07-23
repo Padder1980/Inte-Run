@@ -10,7 +10,7 @@
   "scripts": {
     "test": "node --test",
     "demo": "node demo/generate.ts",
-    "web": "node web/build.ts",
+    "web": "node web/build.ts && node web/live.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

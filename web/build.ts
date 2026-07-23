@@ -9,21 +9,10 @@
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import * as esbuild from "esbuild";
+import { bundleEngine } from "./bundle.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
-
-const bundle = await esbuild.build({
-  entryPoints: [join(here, "entry.ts")],
-  bundle: true,
-  format: "iife",
-  globalName: "RC",
-  minify: true,
-  write: false,
-  target: "es2020",
-  legalComments: "none",
-});
-const bundleJs = bundle.outputFiles[0]!.text;
+const bundleJs = await bundleEngine();
 
 const html = `<!doctype html>
 <html lang="en">

@@ -76,3 +76,15 @@ export {
   type WeekView,
   type SessionView,
 } from "./view/plan-summary.ts";
+
+// Live session runtime (start/pause/stop, pace cues — the "during the run" logic layer)
+export {
+  LiveSession,
+  type Telemetry,
+  type Cue,
+  type CueKind,
+  type LiveStatus,
+  type LiveSnapshot,
+  type PaceStatus,
+  type StepView,
+} from "./live/session-runtime.ts";

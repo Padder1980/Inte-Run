@@ -327,11 +327,24 @@ export function strengthSession(phase: Phase, maintenance: boolean): SessionCont
     "Step-ups / single-leg work",
     "Trunk anti-rotation / anti-extension",
   ];
+  // Plyometric/power work is added only in build and peak — the brief limits plyometrics to once
+  // faster running is tolerated without a delayed reaction, which is the build/peak stimulus. Base
+  // keeps a technique focus and maintenance stays low-volume near the race.
+  const plyometrics = heavy
+    ? [
+        "Pogo hops / ankle stiffness bounces (2–3 × 8–10, low volume)",
+        "Box or hurdle jumps, full recovery (2–3 × 3–5, quality over fatigue)",
+      ]
+    : [];
+  const allExercises = [...exercises, ...plyometrics];
+  const plyoNote = heavy
+    ? " Finish with low-volume plyometrics for reactive strength; stop if a session leaves a delayed reaction."
+    : "";
   const minutes = maintenance ? 30 : 45;
   return assemble(
     "strength",
     maintenance ? "Strength (maintenance)" : "Strength (heavy)",
-    `${setsReps}. ${exercises.join("; ")}. Keep total volume low — running already supplies fatigue.`,
+    `${setsReps}. ${allExercises.join("; ")}. Keep total volume low — running already supplies fatigue.${plyoNote}`,
     "none",
     [
       {

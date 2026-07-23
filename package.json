@@ -12,5 +12,9 @@
     "demo": "node demo/generate.ts",
     "typecheck": "tsc --noEmit"
   },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "typescript": "^5.6.0"
+  },
   "license": "UNLICENSED"
 }

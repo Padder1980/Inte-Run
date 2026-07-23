@@ -139,9 +139,9 @@ footer { margin-top: 40px; font-size: 12px; color: var(--ink-faint); text-align:
 
   <div class="tiles">
     <div class="tile" style="--c:var(--built)"><div class="n num" style="color:var(--built)">3</div><div class="k">Built</div><div class="of num">of 17 domains</div></div>
-    <div class="tile" style="--c:var(--partial)"><div class="n num" style="color:var(--partial)">4</div><div class="k">Partial</div><div class="of num">meaningful gaps</div></div>
-    <div class="tile" style="--c:var(--missing)"><div class="n num" style="color:var(--missing)">10</div><div class="k">Missing</div><div class="of num">not yet started</div></div>
-    <div class="tile" style="--c:var(--danger)"><div class="n num" style="color:var(--danger)">3</div><div class="k">Safety-critical</div><div class="of num">must precede launch</div></div>
+    <div class="tile" style="--c:var(--partial)"><div class="n num" style="color:var(--partial)">7</div><div class="k">Partial</div><div class="of num">meaningful gaps</div></div>
+    <div class="tile" style="--c:var(--missing)"><div class="n num" style="color:var(--missing)">7</div><div class="k">Missing</div><div class="of num">not yet started</div></div>
+    <div class="tile" style="--c:var(--built)"><div class="n num" style="color:var(--built)">✓</div><div class="k">Phase 1 shipped</div><div class="of num">safety screens live</div></div>
   </div>
 
   <div class="legend">
@@ -198,15 +198,15 @@ const DOMAINS = [
   { i: 9, name: "Psychology, behaviour & adherence", s: "partial", t: "<b>Have:</b> non-punitive missed sessions, “why this session matters”, RPE. <b>Missing:</b> process goals, reflection, habit support, compulsive-exercise protection." },
   { i: 11, name: "Beginners, elite & athlete classification", s: "partial", t: "<b>Have:</b> 3 experience levels. <b>Missing:</b> the six-tier McKay framework and per-recommendation evidence tagging." },
   { i: 6, name: "Biomechanics, form & footwear", s: "missing", t: "No cadence / form / footwear tracking against a personal baseline. (Brief: compare to self, don't impose “180 spm”.)" },
-  { i: 7, name: "Nutrition, fuelling & energy availability", s: "missing", safety: true, t: "No fuelling prompts, carb / hydration targets, gut training, or <b>RED-S screening</b>. Brief warns this is where an app becomes a health hazard." },
+  { i: 7, name: "Nutrition, fuelling & energy availability", s: "partial", safety: true, t: "<b>Shipped (Phase 1):</b> RED-S / energy-availability screening + referral, never a weight-loss target. <b>Still missing:</b> fuelling prompts, carb / hydration targets, gut training." },
   { i: 8, name: "Sleep, recovery & readiness", s: "missing", t: "No multi-factor readiness model (sleep, RHR, HRV, soreness, mood, stress). One poor HRV reading must not cancel a session." },
-  { i: 10, name: "Women & female-athlete health", s: "missing", safety: true, t: "No menstrual-symptom tracking, pregnancy / postpartum return, menopause, pelvic floor, iron, RED-S. Missing periods should <b>prompt a health check</b>." },
+  { i: 10, name: "Women & female-athlete health", s: "partial", safety: true, t: "<b>Shipped (Phase 1):</b> amenorrhoea / postpartum / pelvic-floor / iron prompts — symptom-informed, all referring on, never cycle-syncing. <b>Still missing:</b> pregnancy & menopause programming, FAIR injury specifics." },
   { i: 12, name: "Masters runners & ageing", s: "missing", t: "No age input at all — can't preserve intensity or adjust recovery for older athletes. Don't just slow everyone down." },
   { i: 13, name: "Young athletes", s: "missing", t: "Age-appropriate training, safeguarding, consent, growth. Also a <b>scope / legal decision</b>, not just a feature." },
   { i: 14, name: "Para-athletes & inclusive design", s: "missing", t: "Demos are keyboard / theme accessible, but no wheelchair / handcycle options or impairment-aware metrics." },
   { i: 15, name: "Heat, cold, altitude & environment", s: "missing", t: "No effort-based pace adjustment for heat, wind, altitude, air quality or surface." },
   { i: 16, name: "Wearables, monitoring & data validity", s: "missing", t: "Estimates are point values. Brief wants confidence ranges plus source device, reliability and known limitations on every metric." },
-  { i: 17, name: "Medical safety & professional boundaries", s: "missing", safety: true, t: "No red-flag escalation (chest pain, syncope, bone pain, ED concerns, mental health). Must <b>educate, screen and refer</b> — never diagnose." },
+  { i: 17, name: "Medical safety & professional boundaries", s: "partial", safety: true, t: "<b>Shipped (Phase 1):</b> red-flag escalation screener — emergency / urgent / refer, compassionate crisis routing, never a diagnosis. <b>Still missing:</b> illness-return, deeper triage, wiring into the plan & live flows." },
 ];
 const LABEL = { built: "Built", partial: "Partial", missing: "Missing" };
 const VAR = { built: "var(--built)", partial: "var(--partial)", missing: "var(--missing)" };
@@ -223,8 +223,8 @@ document.getElementById("grid").innerHTML = DOMAINS.map((d) => {
 }).join("");
 
 const PHASES = [
-  { n: 1, tag: "Now", c: "var(--danger)", title: "Safety guardrails", meta: "Domains 17 · 7 · 10 — screen & refer",
-    text: "The must-haves before real users touch a plan. A screen-and-refer layer: medical red-flag escalation, RED-S / energy-availability screening, and female-health prompts (missing periods → health check). Nothing diagnoses; everything routes to a professional.",
+  { n: "✓", tag: "Shipped", c: "var(--built)", title: "Safety guardrails", meta: "Domains 17 · 7 · 10 — screen & refer",
+    text: "DONE. A screen-and-refer layer now lives in the engine (src/safety/) and UI (safety.html): medical red-flag escalation, RED-S / energy-availability screening, and female-health prompts (missing periods → health check). Nothing diagnoses; everything routes to a professional. 14 tests.",
     refs: [["#17 Medical escalation", 1], ["#7 RED-S / fuelling", 1], ["#10 Female health", 1]] },
   { n: 2, tag: "Next", c: "var(--accent)", title: "Deepen the physiology core", meta: "Domains 1 · 16 — estimates with confidence",
     text: "Replace the single Riegel proxy with separate, evolving estimates — aerobic capacity, threshold / critical speed, economy, durability — each shown as a confidence range with its evidence tag. This is the foundation the adaptive loops read from.",

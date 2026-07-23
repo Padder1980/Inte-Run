@@ -88,3 +88,37 @@ export {
   type PaceStatus,
   type StepView,
 } from "./live/session-runtime.ts";
+
+// Safety layer — screen, educate and refer. Never diagnoses.
+export {
+  type Professional,
+  PROFESSIONAL_LABEL,
+  type Urgency,
+  URGENCY_RANK,
+  maxUrgency,
+  NOT_A_DIAGNOSIS,
+} from "./safety/common.ts";
+export {
+  screenRedFlags,
+  type RedFlag,
+  type FlagCategory,
+  type FlagAssessment,
+  type EscalationResult,
+} from "./safety/escalation.ts";
+export {
+  screenRedS,
+  estimateEnergyAvailability,
+  type RedSIndicator,
+  type RedSRisk,
+  type RedSResult,
+  type EnergyAvailabilityBand,
+  type EnergyAvailabilityEstimate,
+} from "./safety/red-s.ts";
+export {
+  assessFemaleHealth,
+  type MenstrualStatus,
+  type FemaleSymptom,
+  type FemaleHealthInput,
+  type HealthPrompt,
+  type FemaleHealthResult,
+} from "./safety/female-health.ts";

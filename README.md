@@ -116,9 +116,28 @@ src/
                rpe-feedback.ts                — RPE trend → ease / hold / progress
   progress/    achievements.ts                — PB detection (fastest 1k/mile/5k/10k/HM/M, longest run)
   live/        session-runtime.ts             — live-session state machine (start/pause/stop, pace cues)
+  safety/      escalation.ts                  — medical red-flag screener → emergency/urgent/refer
+               red-s.ts                       — RED-S / energy-availability screen + EA estimate
+               female-health.ts               — female-athlete health prompts (symptom-informed)
   view/        plan-summary.ts                — presentation-agnostic plan view model
   index.ts                                   — public API
 ```
+
+## Safety layer — screen, educate, refer (never diagnose)
+
+The brief is emphatic that a running companion must *screen and refer*, never diagnose. `src/safety/`
+is that guardrail, surfaced in `web/safety.html`:
+
+- **`escalation.ts`** — a medical red-flag screener. Reported symptoms map to an urgency
+  (emergency / urgent / see-a-professional) with calm next steps and who to contact; self-harm
+  routes compassionately to crisis support. It never names a condition.
+- **`red-s.ts`** — a RED-S / low-energy-availability screen (IOC 2023). Elevated results always refer
+  on to a sports dietitian; guidance is about *fuelling enough*, never eating less. An optional
+  energy-availability estimate is framed as education, not a target.
+- **`female-health.ts`** — symptom-informed prompts (amenorrhoea, postpartum return, pelvic floor,
+  iron), explicitly **not** calendar-based cycle-syncing. Missing periods trigger a health prompt.
+
+Every result carries a "not a diagnosis" line and points to a qualified human.
 
 ## Evidence grounding
 

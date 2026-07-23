@@ -8,3 +8,7 @@ export { parseDuration } from "../src/domain/units.ts";
 export { generatePlan } from "../src/plan/generate-plan.ts";
 export { LiveSession } from "../src/live/session-runtime.ts";
 export type { Telemetry, Cue, LiveSnapshot, StepView } from "../src/live/session-runtime.ts";
+export { PROFESSIONAL_LABEL } from "../src/safety/common.ts";
+export { screenRedFlags } from "../src/safety/escalation.ts";
+export { screenRedS, estimateEnergyAvailability } from "../src/safety/red-s.ts";
+export { assessFemaleHealth } from "../src/safety/female-health.ts";

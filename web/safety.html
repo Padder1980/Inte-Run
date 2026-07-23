@@ -3,16 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Running Coach — Live Session</title>
+<title>Running Coach — Safety &amp; Wellbeing</title>
 <style>
-
 :root {
   color-scheme: light dark;
   --bg: #eef1f1; --surface: #ffffff; --surface-2: #f6f8f8; --line: #dbe1e0;
   --ink: #14201b; --ink-soft: #4c5b55; --ink-faint: #7a877f;
   --accent: #0e8c7f; --accent-ink: #ffffff;
-  --base: #2b9eb3; --build: #5fa83c; --peak: #e0863a; --taper: #7a6fd0;
-  --on: #3fa47a; --fast: #d99a2b; --slow: #d65b36;
+  --calm: #3fa47a; --pro: #d98a2a; --urgent: #d65b36; --emergency: #c0392b;
   --shadow: 0 1px 2px rgba(20,32,27,.06), 0 8px 24px rgba(20,32,27,.06);
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace;
   --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -22,8 +20,7 @@
     --bg: #0d1512; --surface: #151e1b; --surface-2: #1b2622; --line: #26332e;
     --ink: #e7eeea; --ink-soft: #a9b7b0; --ink-faint: #74847c;
     --accent: #2bb3a3; --accent-ink: #06231f;
-    --base: #3ab0c4; --build: #74bd52; --peak: #eb9748; --taper: #9184e0;
-    --on: #4cb98a; --fast: #e6ac3e; --slow: #e56f49;
+    --calm: #4cb98a; --pro: #eb9748; --urgent: #e56f49; --emergency: #e05745;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
   }
 }
@@ -32,8 +29,7 @@
   --bg: #eef1f1; --surface: #ffffff; --surface-2: #f6f8f8; --line: #dbe1e0;
   --ink: #14201b; --ink-soft: #4c5b55; --ink-faint: #7a877f;
   --accent: #0e8c7f; --accent-ink: #ffffff;
-  --base: #2b9eb3; --build: #5fa83c; --peak: #e0863a; --taper: #7a6fd0;
-  --on: #3fa47a; --fast: #d99a2b; --slow: #d65b36;
+  --calm: #3fa47a; --pro: #d98a2a; --urgent: #d65b36; --emergency: #c0392b;
   --shadow: 0 1px 2px rgba(20,32,27,.06), 0 8px 24px rgba(20,32,27,.06);
 }
 :root[data-theme="dark"] {
@@ -41,73 +37,61 @@
   --bg: #0d1512; --surface: #151e1b; --surface-2: #1b2622; --line: #26332e;
   --ink: #e7eeea; --ink-soft: #a9b7b0; --ink-faint: #74847c;
   --accent: #2bb3a3; --accent-ink: #06231f;
-  --base: #3ab0c4; --build: #74bd52; --peak: #eb9748; --taper: #9184e0;
-  --on: #4cb98a; --fast: #e6ac3e; --slow: #e56f49;
+  --calm: #4cb98a; --pro: #eb9748; --urgent: #e56f49; --emergency: #e05745;
   --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.5; -webkit-font-smoothing: antialiased; }
-.wrap { max-width: 940px; margin: 0 auto; padding: clamp(20px, 4vw, 44px) clamp(16px, 4vw, 32px) 64px; }
-.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.wrap { max-width: 780px; margin: 0 auto; padding: clamp(20px, 4vw, 44px) clamp(16px, 4vw, 32px) 72px; }
 .eyebrow { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); font-weight: 600; }
+a { color: var(--accent); }
 header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 20px; }
 .brand { display: flex; align-items: center; gap: 12px; }
-.mark { width: 34px; height: 34px; border-radius: 9px; flex: none; background: linear-gradient(145deg, var(--base), var(--accent) 55%, var(--peak)); box-shadow: var(--shadow); }
+.mark { width: 34px; height: 34px; border-radius: 9px; flex: none; background: linear-gradient(145deg, var(--calm), var(--accent) 55%, var(--pro)); box-shadow: var(--shadow); }
 .brand h1 { font-size: 15px; margin: 0; font-weight: 650; letter-spacing: -.01em; }
 .brand p { margin: 0; font-size: 12.5px; color: var(--ink-faint); }
 .theme-toggle { border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft); border-radius: 999px; padding: 7px 14px; font: inherit; font-size: 12.5px; cursor: pointer; }
 .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
 
-.controls { margin-top: 24px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 18px clamp(16px,2.5vw,22px); display: flex; flex-wrap: wrap; gap: 14px 18px; align-items: end; }
-.controls .field { display: flex; flex-direction: column; gap: 5px; }
-.controls label { font-size: 11.5px; font-weight: 600; color: var(--ink-soft); }
-select { font: inherit; font-size: 13.5px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px; }
-select#session { min-width: 260px; }
-select:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
-.btns { display: flex; gap: 8px; margin-left: auto; }
-button.op { font: inherit; font-size: 13.5px; font-weight: 600; border-radius: 10px; padding: 10px 18px; cursor: pointer; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); }
-button.op.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
-button.op:hover { filter: brightness(1.05); }
-button.op:disabled { opacity: .45; cursor: not-allowed; filter: none; }
+.lede { margin-top: 24px; }
+.lede h2 { font-size: clamp(23px, 4vw, 32px); letter-spacing: -.02em; margin: 6px 0 8px; text-wrap: balance; }
+.lede p { margin: 0; color: var(--ink-soft); font-size: 14.5px; max-width: 62ch; }
+.promise { margin-top: 16px; display: flex; gap: 12px; background: color-mix(in srgb, var(--emergency) 8%, var(--surface)); border: 1px solid color-mix(in srgb, var(--emergency) 30%, var(--line)); border-radius: 12px; padding: 13px 15px; font-size: 13.5px; color: var(--ink); }
+.promise b { color: var(--emergency); }
 
-.screen { margin-top: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }
-.hero { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 1px; background: var(--line); }
-.hero > div { background: var(--surface); padding: 20px clamp(16px,2.5vw,24px); }
-.hero .k { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
-.hero .big { font-size: clamp(34px, 7vw, 52px); font-weight: 700; letter-spacing: -.02em; line-height: 1.02; margin-top: 4px; }
-.hero .sub { font-size: 12.5px; color: var(--ink-faint); margin-top: 4px; }
-.pace-val.on { color: var(--on); } .pace-val.fast { color: var(--fast); } .pace-val.slow { color: var(--slow); } .pace-val.none { color: var(--ink); }
+.card { margin-top: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 20px clamp(16px,2.5vw,24px); }
+.card > h3 { margin: 0 0 3px; font-size: 17px; letter-spacing: -.01em; }
+.card > .hint { margin: 0 0 14px; font-size: 12.5px; color: var(--ink-faint); }
+.subhead { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); font-weight: 600; margin: 14px 0 8px; }
+.opts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
+.opt { display: flex; gap: 9px; align-items: flex-start; font-size: 13.5px; color: var(--ink-soft); cursor: pointer; padding: 5px 0; }
+.opt input { margin-top: 3px; accent-color: var(--accent); flex: none; }
+label.field { display: block; margin-top: 6px; }
+label.field span { display: block; font-size: 11.5px; font-weight: 600; color: var(--ink-soft); margin-bottom: 5px; }
+select, input[type="number"] { font: inherit; font-size: 13.5px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px; width: 100%; }
+select:focus, input:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
-.stepcard { padding: 18px clamp(16px,2.5vw,24px); border-top: 1px solid var(--line); }
-.stepcard .top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.kindtag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #fff; background: var(--k, var(--base)); border-radius: 6px; padding: 3px 8px; }
-.stepcard h3 { margin: 0; font-size: 16px; letter-spacing: -.01em; flex: 1 1 auto; min-width: 0; }
-.stepcard .target { font-size: 12.5px; color: var(--ink-soft); }
-.stepcard .rep { font-size: 12px; color: var(--ink-faint); }
-.pbar { height: 10px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; margin-top: 12px; }
-.pbar > i { display: block; height: 100%; width: 0; background: var(--k, var(--accent)); transition: width .2s linear; }
-.stepmeta { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-faint); margin-top: 6px; }
-
-.segwrap { padding: 0 clamp(16px,2.5vw,24px) 18px; }
-.seglabel { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); margin: 4px 0 8px; }
-.segs { display: flex; gap: 2px; height: 16px; }
-.seg { position: relative; background: var(--track); border-radius: 3px; overflow: hidden; min-width: 2px; }
-.seg > i { position: absolute; inset: 0; width: 0; background: var(--fillc); }
-
-.cues { border-top: 1px solid var(--line); }
-.cues .hd { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); padding: 14px clamp(16px,2.5vw,24px) 6px; }
-.cuelog { max-height: 220px; overflow-y: auto; padding: 0 clamp(16px,2.5vw,24px) 16px; display: flex; flex-direction: column; gap: 8px; }
-.cue { display: flex; gap: 10px; align-items: baseline; font-size: 13px; }
-.cue .t { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 11.5px; color: var(--ink-faint); flex: none; width: 44px; }
-.cue .m { color: var(--ink); }
-.cue.dim .m { color: var(--ink-soft); }
-.cue .badge { width: 7px; height: 7px; border-radius: 50%; margin-top: 5px; flex: none; background: var(--ink-faint); }
-.cue.pace-fast .badge { background: var(--fast); } .cue.pace-slow .badge { background: var(--slow); } .cue.pace-on .badge { background: var(--on); }
-.cue.step .badge { background: var(--accent); } .cue.start .badge, .cue.done .badge { background: var(--build); }
-.empty { color: var(--ink-faint); font-size: 13px; padding: 4px 0 14px; }
-footer { margin-top: 24px; font-size: 12px; color: var(--ink-faint); text-align: center; }
-footer a { color: var(--accent); }
-@media (max-width: 680px) { .hero { grid-template-columns: 1fr 1fr; } .hero .timer { grid-column: 1 / -1; } }
+.result { margin-top: 16px; border-radius: 12px; border: 1px solid var(--line); overflow: hidden; display: none; }
+.result.show { display: block; }
+.banner { padding: 13px 16px; font-weight: 600; font-size: 14px; color: #fff; background: var(--bc, var(--calm)); display: flex; gap: 9px; align-items: center; }
+.banner .dot { width: 9px; height: 9px; border-radius: 50%; background: #fff; opacity: .9; flex: none; }
+.result .items { padding: 4px 16px 6px; background: var(--surface); }
+.item { padding: 12px 0; border-top: 1px solid var(--line); }
+.item:first-child { border-top: 0; }
+.item .t { font-size: 13.5px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+.item .u { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; padding: 1px 7px; border-radius: 999px; color: #fff; background: var(--uc, var(--pro)); }
+.item .g { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
+.item .refer { font-size: 12.5px; color: var(--ink); margin-top: 6px; }
+.item .refer b { color: var(--accent); font-weight: 600; }
+.disclaimer { padding: 11px 16px; background: var(--surface-2); font-size: 12px; color: var(--ink-faint); border-top: 1px solid var(--line); }
+.ea-toggle { margin-top: 14px; font-size: 13px; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; }
+.ea { margin-top: 12px; padding: 14px; border: 1px dashed var(--line); border-radius: 12px; display: none; }
+.ea.show { display: block; }
+.ea .out { margin-top: 12px; font-size: 13.5px; }
+.ea .out .band { font-weight: 700; text-transform: capitalize; }
+footer { margin-top: 28px; font-size: 12px; color: var(--ink-faint); text-align: center; }
+@media (max-width: 620px) { .opts, .row2 { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
 </style>
@@ -118,274 +102,208 @@ footer a { color: var(--accent); }
     <div class="brand">
       <div class="mark" aria-hidden="true"></div>
       <div>
-        <h1>Running Coach — Live</h1>
-        <p>During-the-run engine · a simulated runner drives the real state machine</p>
+        <h1>Running Coach</h1>
+        <p>Safety &amp; wellbeing · screens run in your browser</p>
       </div>
     </div>
     <button class="theme-toggle" id="themeToggle" type="button">Toggle theme</button>
   </header>
 
-  <div class="controls">
-    <div class="field">
-      <label for="session">Session</label>
-      <select id="session"></select>
+  <div class="lede">
+    <div class="eyebrow">Screen · educate · refer</div>
+    <h2>A quick check-in — never a diagnosis</h2>
+    <p>These screens flag things worth acting on and point you to the right person. They can't diagnose
+    anything, and they're not a substitute for a professional who can actually assess you.</p>
+    <div class="promise"><span><b>In an emergency</b>, don't use an app — call your local emergency number straight away.</span></div>
+  </div>
+
+  <div class="card">
+    <h3>How are you feeling right now?</h3>
+    <p class="hint">Tick anything you're experiencing. This checks whether you should stop and seek help.</p>
+    <div class="subhead">Physical symptoms</div>
+    <div class="opts" id="flags-physical"></div>
+    <div class="subhead">Wellbeing</div>
+    <div class="opts" id="flags-wellbeing"></div>
+    <div class="result" id="flags-result"></div>
+  </div>
+
+  <div class="card">
+    <h3>Fuelling &amp; energy (RED-S)</h3>
+    <p class="hint">Under-fuelling harms health and performance. Tick anything that sounds like you — this is about getting enough, never about eating less.</p>
+    <div class="opts" id="reds-opts"></div>
+    <div class="result" id="reds-result"></div>
+    <button class="ea-toggle" id="eaToggle" type="button">Optional: estimate energy availability ▸</button>
+    <div class="ea" id="ea">
+      <p class="hint" style="margin:0 0 10px">A rough teaching estimate: (daily intake − exercise energy) ÷ fat-free mass. Hard to measure precisely — never use it as a target to eat less.</p>
+      <div class="row2">
+        <label class="field"><span>Daily intake (kcal)</span><input type="number" id="eaIntake" value="2400" min="0"></label>
+        <label class="field"><span>Exercise energy (kcal)</span><input type="number" id="eaExercise" value="700" min="0"></label>
+      </div>
+      <label class="field" style="margin-top:12px"><span>Fat-free mass (kg)</span><input type="number" id="eaFfm" value="52" min="1"></label>
+      <div class="out" id="eaOut"></div>
     </div>
-    <div class="field">
-      <label for="speed">Sim speed</label>
-      <select id="speed">
-        <option value="1">Real time (1×)</option>
-        <option value="8">8×</option>
-        <option value="20" selected>20×</option>
-        <option value="60">60×</option>
+  </div>
+
+  <div class="card">
+    <h3>Female-athlete health</h3>
+    <p class="hint">Symptom-informed, not calendar-based. Nothing here changes your training by cycle phase — it just surfaces what's worth a conversation.</p>
+    <label class="field"><span>Menstrual status</span>
+      <select id="fhStatus">
+        <option value="regular">Regular periods</option>
+        <option value="irregular">Irregular periods</option>
+        <option value="absent-3m-plus">No period for 3+ months</option>
+        <option value="hormonal-contraception">On hormonal contraception</option>
+        <option value="pregnant">Pregnant</option>
+        <option value="postpartum">Postpartum (after birth)</option>
+        <option value="perimenopause">Perimenopause</option>
+        <option value="menopause">Menopause</option>
+        <option value="prefer-not-to-say">Prefer not to say</option>
       </select>
-    </div>
-    <div class="btns">
-      <button class="op primary" id="startBtn" type="button">Start</button>
-      <button class="op" id="pauseBtn" type="button" disabled>Pause</button>
-      <button class="op" id="stopBtn" type="button" disabled>Stop</button>
-    </div>
+    </label>
+    <label class="field" id="fhMonthsWrap" style="display:none"><span>Months since last period</span><input type="number" id="fhMonths" value="1" min="0" max="60"></label>
+    <label class="field" id="fhWeeksWrap" style="display:none"><span>Weeks since birth</span><input type="number" id="fhWeeks" value="8" min="0" max="200"></label>
+    <div class="subhead">Any of these?</div>
+    <div class="opts" id="fh-opts"></div>
+    <div class="result" id="fh-result"></div>
   </div>
 
-  <div class="screen">
-    <div class="hero">
-      <div class="timer">
-        <div class="k">Elapsed</div>
-        <div class="big num" id="elapsed">0:00</div>
-        <div class="sub"><span class="num" id="distance">0.00</span> km · <span id="status">ready</span></div>
-      </div>
-      <div>
-        <div class="k">Current pace</div>
-        <div class="big num pace-val none" id="pace">—</div>
-        <div class="sub">avg <span class="num" id="avgpace">—</span></div>
-      </div>
-      <div>
-        <div class="k">Heart rate</div>
-        <div class="big num" id="hr">—</div>
-        <div class="sub">bpm</div>
-      </div>
-    </div>
-
-    <div class="stepcard">
-      <div class="top">
-        <span class="kindtag" id="kindtag" style="--k:var(--base)">—</span>
-        <h3 id="steptitle">Pick a session and press Start</h3>
-        <span class="rep num" id="rep"></span>
-      </div>
-      <div class="target" id="target"></div>
-      <div class="pbar"><i id="stepfill" style="--k:var(--base)"></i></div>
-      <div class="stepmeta"><span id="stepelapsed">0:00</span><span id="stepcount"></span></div>
-    </div>
-
-    <div class="segwrap">
-      <div class="seglabel">Whole session</div>
-      <div class="segs" id="segs"></div>
-    </div>
-
-    <div class="cues">
-      <div class="hd">Cues</div>
-      <div class="cuelog" id="cuelog"><div class="empty">Coaching cues will appear here as you run.</div></div>
-    </div>
-  </div>
-
-  <footer>
-    The runner is simulated; the runtime, cues and pace judgements are the real engine. Deterministic core, computed client-side.
-  </footer>
+  <footer>Screens compute on your device. Guidance only — not medical advice, and never a diagnosis.</footer>
 </div>
 
 <script>"use strict";var RC=(()=>{var C=Object.defineProperty;var Ie=Object.getOwnPropertyDescriptor;var Ke=Object.getOwnPropertyNames;var Ce=Object.prototype.hasOwnProperty;var We=(e,t,n)=>t in e?C(e,t,{enumerable:!0,configurable:!0,writable:!0,value:n}):e[t]=n;var Fe=(e,t)=>{for(var n in t)C(e,n,{get:t[n],enumerable:!0})},_e=(e,t,n,r)=>{if(t&&typeof t=="object"||typeof t=="function")for(let s of Ke(t))!Ce.call(e,s)&&s!==n&&C(e,s,{get:()=>t[s],enumerable:!(r=Ie(t,s))||r.enumerable});return e};var $e=e=>_e(C({},"__esModule",{value:!0}),e);var p=(e,t,n)=>We(e,typeof t!="symbol"?t+"":t,n);var Rt={};Fe(Rt,{LiveSession:()=>G,PROFESSIONAL_LABEL:()=>Re,assessFemaleHealth:()=>Te,buildPlanSummary:()=>Pe,estimateEnergyAvailability:()=>Ee,generatePlan:()=>L,parseDuration:()=>te,screenRedFlags:()=>De,screenRedS:()=>we});function ee(e){return e.returningFromInjury?"pyramidal":e.experience==="competitive"?"polarized":"pyramidal"}var T={"1mile":1609.344,"5k":5e3,"10k":1e4,half:21097.5,marathon:42195};function te(e){let t=e.trim().split(":");if(t.length===0||t.length>3)throw new Error(`Invalid duration: "${e}"`);let n=t.map(s=>{let a=Number(s);if(!Number.isFinite(a)||a<0)throw new Error(`Invalid duration segment: "${s}"`);return a}),r=0;for(let s of n)r=r*60+s;return r}function h(e,t=!1){let n=Math.max(0,Math.round(e)),r=Math.floor(n/3600),s=Math.floor(n%3600/60),a=n%60,i=o=>String(o).padStart(2,"0");return r>0||t?`${r}:${i(s)}:${i(a)}`:`${s}:${i(a)}`}function ne(e,t="km"){let n=t==="km"?e:Be(e);return`${h(n)}/${t}`}function Be(e){return e*(1609.344/1e3)}function H(e,t){if(t<=0)throw new Error("distance must be positive");return e/(t/1e3)}function Y(e,t){return e*(t/1e3)}function re(e,t){if(e<=0)throw new Error("pace must be positive");return t/e*1e3}function R(e){return e/1e3}var Ne=1.06;function se(e,t,n){if(e<=0||t<=0||n<=0)throw new Error("riegelPredict requires positive inputs");return t*(n/e)**Ne}function z(e,t){return se(e.distanceMeters,e.timeSeconds,T[t])}function Oe(e){let t=Object.keys(T),n={};for(let r of t)n[r]=z(e,r);return n}function W(e,t){return H(se(e.distanceMeters,e.timeSeconds,t),t)}function A(e,t,n){return{minSecPerKm:Math.round(e-t),maxSecPerKm:Math.round(e+n)}}function ae(e,t){let n=W(e,15e3),r=W(e,3e3),s=W(e,5e3),a=W(e,T["1mile"]),i=A(n+92,17,18),o=A(n+35,10,10),c=A(n,5,8),l={minSecPerKm:Math.round(r-3),maxSecPerKm:Math.round(s+2)},b=A(a,8,4),d;if(t){let g=H(t.targetTimeSeconds,T[t.distance]);d=A(g,3,3)}else d=A(n+8,4,4);return{easy:i,steady:o,threshold:c,vo2:l,rep:b,goalRace:d,predictedRaceTimes:Oe(e)}}function Le(e,t){let n=[{zone:1,label:"Recovery",lo:.5,hi:.6},{zone:2,label:"Easy / aerobic",lo:.6,hi:.7},{zone:3,label:"Steady / tempo",lo:.7,hi:.8},{zone:4,label:"Threshold",lo:.8,hi:.9},{zone:5,label:"VO2 / max",lo:.9,hi:1}],r=s=>t&&t>0?Math.round(t+s*(e-t)):Math.round(s*e);return n.map(s=>({zone:s.zone,label:s.label,minBpm:r(s.lo),maxBpm:r(s.hi)}))}function ie(e,t){return t.maxHr?{...e,hrZones:Le(t.maxHr,t.restingHr)}:e}var qe={"1mile":{weeks:1,volumeMultiplierByWeek:[.6],notes:["Short, sharp taper \u2014 keep speed, cut volume ~40%."]},"5k":{weeks:1,volumeMultiplierByWeek:[.6],notes:["~5\u20138 day taper; retain VO2 touches at low volume."]},"10k":{weeks:1,volumeMultiplierByWeek:[.6],notes:["~5\u20138 day taper; keep some threshold/VO2 intensity."]},half:{weeks:2,volumeMultiplierByWeek:[.7,.55],notes:["~7\u201314 day taper; hold threshold intensity while volume falls ~30% then ~45%."]},marathon:{weeks:3,volumeMultiplierByWeek:[.8,.65,.5],notes:["~14\u201321 day taper; progressively cut volume to ~50% of peak, keep marathon-pace touches."]}};function F(e){return qe[e]}function x(){return new Date().toISOString().slice(0,10)}function _(e){let[t,n,r]=e.split("-").map(Number);if(!t||!n||!r)throw new Error(`Invalid ISO date: "${e}"`);return Date.UTC(t,n-1,r)}function Z(e,t){let n=_(e)+t*864e5;return new Date(n).toISOString().slice(0,10)}function je(e,t){return Math.round((_(t)-_(e))/864e5)}function $(e,t){return Math.floor(je(e,t)/7)}function oe(e){return(new Date(_(e)).getUTCDay()+6)%7}var Ge={"1mile":12,"5k":16,"10k":18,half:20,marathon:24},Ue=4;function ce(e,t){return Math.max(Ue,Math.min(e,Ge[t]))}function ue(e,t,n){let r=Math.min(F(t).weeks,Math.max(1,e-3)),s=e-r,a;s>=8?a=Math.min(4,Math.round(s*.2)):s>=4?a=1:a=0;let i=s-a,c=Math.max(1,Math.round(i*(n?.62:.5))),l=Math.max(0,i-c);return[...B("base",c),...B("build",l),...B("peak",a),...B("taper",r)].map((d,g)=>{let m=g+1,y=d!=="taper"&&m%4===0;return{phase:d,isDeload:y}})}function B(e,t){return Array.from({length:Math.max(0,t)},()=>e)}var f={easy:{min:2,max:3},steady:{min:4,max:5},threshold:{min:6,max:7},vo2:{min:8,max:9},rep:{min:8,max:9}};function pe(e){return(e.minSecPerKm+e.maxSecPerKm)/2}function Ve(e){return e.distanceMeters?e.distanceMeters:e.durationSeconds&&e.targetPaceSecPerKm?re(pe(e.targetPaceSecPerKm),e.durationSeconds):0}function He(e){return e.durationSeconds?e.durationSeconds:e.distanceMeters&&e.targetPaceSecPerKm?Y(pe(e.targetPaceSecPerKm),e.distanceMeters):0}function k(e,t,n,r,s,a){let i=Math.round(s.reduce((c,l)=>c+He(l),0)),o=Math.round(s.reduce((c,l)=>c+Ve(l),0));return{type:e,title:t,description:n,intensity:r,estimatedDurationSeconds:i,estimatedDistanceMeters:o>0?o:void 0,steps:s,targetRpe:a}}function Q(e,t,n){return{kind:"warmup",label:n?"Easy jog, dynamic leg swings/drills, then 4\u20136 progressive strides":"Easy jog and dynamic mobility (leg swings, ankle/calf activation)",durationSeconds:t*60,targetPaceSecPerKm:e.easy,targetRpe:f.easy}}function J(e,t){return{kind:"cooldown",label:"Easy jog to finish",durationSeconds:t*60,targetPaceSecPerKm:e.easy,targetRpe:f.easy}}function me(e,t,n=!1){let r=[{kind:"steady",label:"Conversational easy running (below the first threshold)",durationSeconds:t*60,targetPaceSecPerKm:e.easy,targetRpe:f.easy}];return n&&r.push({kind:"rep",label:"6 \xD7 20s relaxed strides, full recovery",durationSeconds:120,targetPaceSecPerKm:e.rep,targetRpe:f.rep,repeatCount:6}),k(n?"strides":"easy",n?`${t}\u2032 easy + strides`:`${t}\u2032 easy run`,"Foundation aerobic running. Easy means easy \u2014 it should feel conversational.","easy",r,f.easy)}function N(e,t,n={}){let r=[],s=t-(n.steadyFinishMin??0)-(n.raceBlockMin??0);r.push({kind:"steady",label:"Easy aerobic running \u2014 build durability",durationSeconds:Math.max(0,s)*60,targetPaceSecPerKm:e.easy,targetRpe:f.easy});let a="Long run develops durability: holding economy and mechanics under accumulated fatigue.";return n.raceBlockMin&&n.racePace&&(r.push({kind:"steady",label:"Race-specific block at goal effort (run while already fatigued)",durationSeconds:n.raceBlockMin*60,targetPaceSecPerKm:n.racePace,targetRpe:f.steady}),a+=" Includes a race-specific block late in the run."),n.steadyFinishMin&&(r.push({kind:"steady",label:"Steady progressive finish",durationSeconds:n.steadyFinishMin*60,targetPaceSecPerKm:e.steady,targetRpe:f.steady}),a+=" Finishes steady, not as a race."),k("long",`${t}\u2032 long run`,a,"easy",r,f.easy)}var le=[{title:"3 \xD7 8\u2032 threshold / 2\u2032 jog",build:e=>P(3,{durationSeconds:480,pace:e.threshold},{durationSeconds:120,pace:e.easy})},{title:"4 \xD7 6\u2032 threshold / 90\u2033 jog",build:e=>P(4,{durationSeconds:360,pace:e.threshold},{durationSeconds:90,pace:e.easy})},{title:"25\u2032 continuous tempo",build:e=>[{kind:"steady",label:"Continuous controlled tempo",durationSeconds:1500,targetPaceSecPerKm:e.threshold,targetRpe:f.threshold}]},{title:"5 \xD7 1 mile cruise / 90\u2033 jog",build:e=>P(5,{distanceMeters:1609.344,pace:e.threshold},{durationSeconds:90,pace:e.easy})}];function I(e,t){let n=le[t%le.length],r=[Q(e,15,!0),...n.build(e),J(e,10)];return k("threshold",n.title,"Controlled but demanding (RPE 6\u20137). You should finish knowing you could do one more rep.","moderate",r,f.threshold)}var de=[{title:"5 \xD7 3\u2032 hard / 2\u2032 easy",build:e=>P(5,{durationSeconds:180,pace:e.vo2},{durationSeconds:120,pace:e.easy})},{title:"4 \xD7 4\u2032 hard / 3\u2032 easy",build:e=>P(4,{durationSeconds:240,pace:e.vo2},{durationSeconds:180,pace:e.easy})},{title:"6 \xD7 800m / 2\u2032 easy",build:e=>P(6,{distanceMeters:800,pace:e.vo2},{durationSeconds:120,pace:e.easy})},{title:"10 \xD7 1\u2032 hard / 1\u2032 easy (introductory)",build:e=>P(10,{durationSeconds:60,pace:e.vo2},{durationSeconds:60,pace:e.easy})}];function w(e,t){let n=de[t%de.length],r=[Q(e,15,!0),...n.build(e),J(e,10)];return k("vo2",n.title,"Accumulate ~12\u201320\u2032 of quality hard running (RPE 8\u20139). Purpose is quality work, not winning rep one.","hard",r,f.vo2)}function he(e){let t=[Q(e,15,!0),...P(3,{durationSeconds:600,pace:e.goalRace},{durationSeconds:120,pace:e.easy}),J(e,10)];return k("race-specific","3 \xD7 10\u2032 at goal race pace / 2\u2032 jog","Rehearse goal race pace and rhythm. Controlled, repeatable, race-like.","moderate",t,f.steady)}function ge(e,t){let n=!t&&(e==="build"||e==="peak"),r=t?"1\u20132 sets \xD7 4\u20136 reps (maintenance)":n?"2\u20134 sets \xD7 3\u20136 reps, heavy but controlled (~80%+ 1RM)":"2\u20133 sets \xD7 6\u20138 reps, technique focus",s=["Squat / trap-bar deadlift / leg press","Split squat or rear-foot-elevated split squat","Romanian deadlift (hip hinge)","Straight-knee calf raise","Bent-knee (soleus) calf raise","Step-ups / single-leg work","Trunk anti-rotation / anti-extension"],a=n?["Pogo hops / ankle stiffness bounces (2\u20133 \xD7 8\u201310, low volume)","Box or hurdle jumps, full recovery (2\u20133 \xD7 3\u20135, quality over fatigue)"]:[],i=[...s,...a],o=n?" Finish with low-volume plyometrics for reactive strength; stop if a session leaves a delayed reaction.":"",c=t?30:45;return k("strength",t?"Strength (maintenance)":"Strength (heavy)",`${r}. ${i.join("; ")}. Keep total volume low \u2014 running already supplies fatigue.${o}`,"none",[{kind:"steady",label:"Runner-focused resistance session",durationSeconds:c*60,targetRpe:f.threshold}])}function ye(){return k("mobility","Mobility (15\u2032)","Dynamic mobility and any sport-specific range work. Static stretching only for a specific restriction \u2014 it does not improve economy.","none",[{kind:"steady",label:"Dynamic mobility",durationSeconds:900}])}function fe(){return k("rest","Rest","Rest or gentle recovery activity. Recovery is part of the programme.","none",[])}function P(e,t,n){let r=[],s=t.distanceMeters?`${Math.round(t.distanceMeters)}m rep`:`${Math.round((t.durationSeconds??0)/60*10)/10}\u2032 rep`;for(let a=1;a<=e;a++)r.push({kind:"rep",label:s,durationSeconds:t.durationSeconds,distanceMeters:t.distanceMeters,targetPaceSecPerKm:t.pace,repeatIndex:a,repeatCount:e}),a<e&&r.push({kind:"recovery",label:"Easy jog recovery",durationSeconds:n.durationSeconds,distanceMeters:n.distanceMeters,targetPaceSecPerKm:n.pace});return r}var Ye={"1mile":55,"5k":70,"10k":85,half:110,marathon:150},ze=6,O=1,Ze=3,be=[2,4,0,5];function L(e,t,n={}){let r=n.startDateIso??t.startDateIso??x(),s=Math.max(0,$(r,t.raceDateIso)),a=ce(s,t.distance),i=e.returningFromInjury??!1,o=n.intensityModel??ee(e),c=ie(ae(e.recent,t),e),l=st(ue(a,t.distance,i)),b=Z(t.raceDateIso,-oe(t.raceDateIso)),d=Ye[t.distance],g=Math.round(d*(i?.42:.55)),m=l.filter(D=>D.phase!=="taper").length,y=F(t.distance),v=l.map((D,u)=>{let S=u+1,U=Z(b,-(a-S)*7),V=rt(D,S,m,g,d,y.volumeMultiplierByWeek);return Qe(S,U,D,{athlete:e,goal:t,paces:c,returning:i,longMin:V})});return{goal:t,athlete:e,createdAtIso:x(),intensityModel:o,paces:c,totalWeeks:s,weeks:v,notes:it(e,t,s,a,o,v)}}function Qe(e,t,n,r){let s=Math.min(6,Math.max(3,r.athlete.daysPerWeek)),a=Xe(n,s,r.returning),i=Math.max(0,s-a-1),o=[],c=[];o.push(tt(n.phase,r)),c.push(ze);let l=et(n,e,a,r),b=a>=2?[O,Ze]:[O];l.forEach((u,S)=>{o.push(u),c.push(b[S])});let d=be.slice(0,i);d.forEach((u,S)=>{let U=S===0&&(n.phase==="base"||n.phase==="build")&&!n.isDeload,V=n.isDeload?35:S===d.length-1?40:45;o.push(me(r.paces,V,U)),c.push(u)}),nt(n,r,o,c);let g=new Set(c),m=[2,4,0,5,3,1].find(u=>!g.has(u));if(m!==void 0){let u=ye();o.push(u),c.push(m),g.add(m)}for(let u=0;u<7;u++)g.has(u)||(o.push(fe()),c.push(u),g.add(u));let y=Je(o,c,e),v=y.reduce((u,S)=>u+(S.estimatedDistanceMeters??0),0),D=y.filter(u=>u.type==="threshold"||u.type==="vo2"||u.type==="race-specific").length;return{index:e,startDateIso:t,phase:n.phase,isDeload:n.isDeload,focus:at(n,r),sessions:y,plannedDistanceMeters:Math.round(v),qualitySessionCount:D}}function Je(e,t,n){return e.map((r,s)=>({...r,id:`w${n}-d${t[s]}-${r.type}`,dayOfWeek:t[s],source:"generated"})).sort((r,s)=>r.dayOfWeek-s.dayOfWeek)}function Xe(e,t,n){if(t<4||e.isDeload)return 1;switch(e.phase){case"base":return 1;case"build":return n&&e.ordinalInPhase<=Math.ceil(e.phaseTotal/2)?1:2;case"peak":return 2;case"taper":return 1}}function et(e,t,n,r){let s=r.paces,a=r.goal.distance==="5k"||r.goal.distance==="10k"||r.goal.distance==="1mile",i=[];if(e.phase==="taper")return i.push(w(s,3)),i.slice(0,n);if(e.phase==="peak")return i.push(he(s)),i.push(a?w(s,t):I(s,t)),i.slice(0,n);if(e.phase==="build")return n>=2?(i.push(I(s,t)),i.push(w(s,t))):i.push(t%2===0?w(s,t):I(s,t)),i.slice(0,n);let o=e.ordinalInPhase>Math.ceil(e.phaseTotal/2);return i.push(o&&t%2===0?w(s,3):I(s,t)),i.slice(0,n)}function tt(e,t){let n=t.longMin;return e==="peak"?N(t.paces,n,{raceBlockMin:Math.min(30,Math.round(n*.25)),racePace:t.paces.goalRace}):e==="build"?N(t.paces,n,{steadyFinishMin:Math.min(20,Math.round(n*.2))}):N(t.paces,n)}function nt(e,t,n,r){if(!t.athlete.includeStrength)return;let s;e.phase==="taper"?s=e.ordinalInPhase===1?1:0:e.phase==="peak"||e.isDeload?s=1:s=2;let a=e.phase==="peak"||e.phase==="taper",i=[O,be[0]];for(let o=0;o<s;o++)n.push(ge(e.phase,a)),r.push(i[o]??O)}function rt(e,t,n,r,s,a){if(e.phase==="taper"){let c=t-n-1,l=a[c]??.55;return Math.round(s*l)}let i=n<=1?1:(t-1)/(n-1),o=r+i*(s-r);return e.isDeload&&(o*=.75),Math.round(o)}function st(e){let t={base:0,build:0,peak:0,taper:0};for(let r of e)t[r.phase]++;let n={base:0,build:0,peak:0,taper:0};return e.map(r=>(n[r.phase]++,{...r,ordinalInPhase:n[r.phase],phaseTotal:t[r.phase]}))}function at(e,t){if(e.isDeload)return"Deload \u2014 recover and absorb training";switch(e.phase){case"base":return t.returning?"Rebuild easy consistency + long run":"Aerobic base + one quality session";case"build":return"Build threshold and VO2, extend the long run";case"peak":return"Race-specific sharpening";case"taper":return"Taper \u2014 cut volume, keep intensity"}}function it(e,t,n,r,s,a){let i=[],o=n-r;if(o>1){let c=a[0]?.startDateIso??t.startDateIso??"";i.push(`You have ~${o} weeks before the structured plan begins (${c}). Use them to build easy-running consistency and a weekly long run \u2014 consistency is the biggest driver of improvement.`)}return i.push(s==="pyramidal"?"Intensity distribution: pyramidal \u2014 mostly easy running, a moderate amount of threshold, a little VO2. Individual response matters more than an exact split.":"Intensity distribution: polarized \u2014 mostly easy plus a focused dose of hard work, minimal middle-ground moderate running."),e.returningFromInjury&&i.push("Returning from injury: the early weeks stay deliberately conservative (single quality session, gentle long-run progression). Add the second quality session only once weekly running and the long run feel stable."),i.push(e.includeStrength?"Strength: 2\xD7/week through base and build (heavy, low volume), easing to 1\xD7 maintenance near the race. Plyometrics only once faster running is tolerated without a delayed reaction.":"Strength is off. The research supports heavy strength 2\xD7/week for economy and durability \u2014 consider enabling it."),i.push("Flexibility: warmups are dynamic (easy jog, drills, strides). Static stretching is optional and targeted \u2014 it does not improve running economy."),i}var ot={beginner:.25,recreational:.15,competitive:.08},ct=.35,ut=18;function Se(e,t,n){let r=n??t.startDateIso??x(),s=Math.max(0,$(r,t.raceDateIso)),a=z(e.recent,t.distance),i=t.targetTimeSeconds,o=(a-i)/a*100,c=e.returningFromInjury?ct:ot[e.experience],l=1-Math.exp(-s/ut),b=Math.min(1.1,.8+.06*Math.max(0,e.daysPerWeek-3)),d=c*l*b*100,g=Math.round(a*(1-d/100)),m=[];m.push(`Current fitness predicts ${h(a)} for the ${t.distance}; target is ${h(i)}.`);let y,v;return o<=0?(y="comfortable",m.push("The goal is at or above current predicted fitness \u2014 the plan can push further.")):o<=d*.6?(y="achievable",m.push(`Needs a ${o.toFixed(1)}% improvement; ~${d.toFixed(1)}% is realistic in ${s} weeks.`)):o<=d?(y="ambitious",m.push(`Needs ${o.toFixed(1)}% vs a realistic ceiling near ${d.toFixed(1)}% \u2014 attainable but with little margin. Consistency and injury-free training are essential.`)):(y="unrealistic",v=g,m.push(`Needs ${o.toFixed(1)}% but only ~${d.toFixed(1)}% is realistic here. A target near ${h(g)} fits the time available; extending the race date would raise the ceiling.`)),s<6&&y!=="comfortable"&&m.push("Fewer than 6 weeks remain \u2014 limited time to build fitness safely."),e.returningFromInjury&&m.push("Returning from injury: fitness may return before joints/tendons are ready \u2014 early weeks stay conservative."),{verdict:y,currentPredictedSeconds:Math.round(a),goalSeconds:i,requiredImprovementPct:Number(o.toFixed(2)),projectedAchievablePct:Number(d.toFixed(2)),projectedAchievableSeconds:g,weeksAvailable:s,rationale:m,suggestedTargetSeconds:v}}var lt=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],dt=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],pt={"1mile":"1 mile","5k":"5K","10k":"10K",half:"Half marathon",marathon:"Marathon"};function K(e,t=!0){let[n,r,s]=e.split("-").map(Number),a=`${s} ${dt[(r??1)-1]}`;return t?`${a} ${n}`:a}function X(e){return Math.round(R(e)*10)/10}function q(e){return`${h(e.minSecPerKm)}\u2013${h(e.maxSecPerKm)}/km`}function mt(e){let t=e.steps.filter(r=>r.targetPaceSecPerKm);if(t.length===0)return null;let n=t.find(r=>r.kind==="rep")??t.find(r=>r.kind==="steady")??t[0];return q(n.targetPaceSecPerKm)}function ht(e){let t=e.targetRpe;if(!t){let n=e.steps.filter(r=>r.targetRpe);n.length>0&&(t={min:Math.min(...n.map(r=>r.targetRpe.min)),max:Math.max(...n.map(r=>r.targetRpe.max))})}return t?`${t.min}\u2013${t.max}`:null}function gt(e){return e.type==="rest"||e.type==="mobility"?"none":e.type==="strength"||e.type==="cross-training"?"moderate":e.intensity==="hard"?"hard":e.intensity==="moderate"?"moderate":"easy"}function yt(e){let t=[...e.sessions].sort((r,s)=>r.dayOfWeek-s.dayOfWeek),n=t.find(r=>r.type==="long");return{index:e.index,start:K(e.startDateIso,!1),startFull:K(e.startDateIso),phase:e.phase,isDeload:e.isDeload,focus:e.focus,distanceKm:X(e.plannedDistanceMeters),quality:e.qualitySessionCount,longRunMin:n?Math.round(n.estimatedDurationSeconds/60):0,sessions:t.map(r=>({day:lt[r.dayOfWeek]??"?",type:r.type,title:r.title,effort:gt(r),durMin:Math.round(r.estimatedDurationSeconds/60),distKm:r.estimatedDistanceMeters?X(r.estimatedDistanceMeters):null,pace:mt(r),rpe:ht(r),optional:r.optional??!1}))}}function ft(e){let t=X(e.recent.distanceMeters),n=[e.experience.charAt(0).toUpperCase()+e.experience.slice(1),`${t} km in ${h(e.recent.timeSeconds)}`,`${e.daysPerWeek} days/week`,`strength ${e.includeStrength?"on":"off"}`];return e.returningFromInjury&&n.push("returning from injury"),n.join(" \xB7 ")}function Pe(e,t){let n=L(e,t),r=Se(e,t),s=n.weeks.map(yt),a=Math.max(...s.map(c=>c.distanceKm),0),i=s.reduce((c,l)=>c+l.quality,0),o=s.find(c=>c.phase==="build"&&c.quality>=2)?.index??s[0]?.index??1;return{goal:{race:pt[t.distance]??t.distance,target:h(t.targetTimeSeconds),raceDate:K(t.raceDateIso),startDate:K(t.startDateIso??x())},athlete:{summary:ft(e)},feasibility:{verdict:r.verdict,currentPredicted:h(r.currentPredictedSeconds),required:Math.round(r.requiredImprovementPct*10)/10,projected:Math.round(r.projectedAchievablePct*10)/10},summary:{structuredWeeks:n.weeks.length,totalWeeks:n.totalWeeks,model:n.intensityModel,peakKm:a,totalQuality:i},paces:{goal:q(n.paces.goalRace),threshold:q(n.paces.threshold),easy:q(n.paces.easy)},weeks:s,defaultWeekIndex:o,notes:n.notes,generatedAt:K(n.createdAtIso.slice(0,10))}}var ke=6;function j(e){return e.distanceMeters!=null&&e.durationSeconds==null}function bt(e){return e.durationSeconds!=null?e.durationSeconds:e.distanceMeters!=null&&e.targetPaceSecPerKm?(e.targetPaceSecPerKm.minSecPerKm+e.targetPaceSecPerKm.maxSecPerKm)/2*R(e.distanceMeters):0}function Me(e,t){let n=e[t];return{index:t,total:e.length,kind:n.kind,label:n.label,repeatIndex:n.repeatIndex,repeatCount:n.repeatCount,gate:j(n)?"distance":"time",targetSeconds:n.durationSeconds,targetMeters:n.distanceMeters,targetPace:n.targetPaceSecPerKm}}function St(e){return e.kind==="rep"||e.targetRpe!=null&&e.targetRpe.min>=6}function ve(e,t){return t?e<t.minSecPerKm-ke?"fast":e>t.maxSecPerKm+ke?"slow":"on":"none"}function Pt(e){return e.repeatIndex&&e.repeatCount?` (${e.repeatIndex}/${e.repeatCount})`:""}function kt(e){let t=[];return j(e)?t.push(`${Math.round(e.distanceMeters)}m`):e.durationSeconds&&t.push(h(e.durationSeconds)),e.targetPaceSecPerKm&&t.push(`${h(e.targetPaceSecPerKm.minSecPerKm)}\u2013${ne(e.targetPaceSecPerKm.maxSecPerKm)}`),t.join(" \xB7 ")}var G=class{constructor(t){p(this,"steps");p(this,"plannedSeconds");p(this,"status","idle");p(this,"stepIndex",0);p(this,"accruedActiveMs",0);p(this,"segmentStartMs",null);p(this,"stepBaselineActiveMs",0);p(this,"stepBaselineDistanceM",0);p(this,"distanceM",0);p(this,"heartRateBpm");p(this,"lastPaceSampleActiveMs",0);p(this,"lastPaceSampleDistanceM",0);p(this,"currentPace");p(this,"stepPaceStatus","none");p(this,"lastCue");p(this,"session");this.session=t,this.steps=t.steps,this.plannedSeconds=t.estimatedDurationSeconds||this.steps.reduce((n,r)=>n+bt(r),0)}activeMsAt(t){return this.accruedActiveMs+(this.segmentStartMs!=null?t-this.segmentStartMs:0)}record(t){return this.lastCue=t,t}start(t){if(this.status!=="idle")return[];this.status="active",this.segmentStartMs=t,this.stepBaselineActiveMs=0,this.stepBaselineDistanceM=0,this.lastPaceSampleActiveMs=0;let n=[this.record({kind:"session-start",atMs:t,message:`Session started \u2014 ${this.session.title}.`})];return this.steps.length>0&&n.push(this.stepStartCue(t)),n}pause(t){return this.status!=="active"?[]:(this.accruedActiveMs=this.activeMsAt(t),this.segmentStartMs=null,this.status="paused",[this.record({kind:"paused",atMs:t,message:"Paused."})])}resume(t){return this.status!=="paused"?[]:(this.segmentStartMs=t,this.status="active",[this.record({kind:"resumed",atMs:t,message:"Resumed."})])}stop(t){return this.status==="completed"||this.status==="idle"?[]:(this.accruedActiveMs=this.activeMsAt(t),this.segmentStartMs=null,this.status="completed",[this.record({kind:"session-complete",atMs:t,message:"Session ended."})])}update(t){if(this.status!=="active")return[];this.distanceM=t.distanceMeters,t.heartRateBpm!=null&&(this.heartRateBpm=t.heartRateBpm);let n=this.activeMsAt(t.atMs),r=[];for(;this.stepIndex<this.steps.length;){let a=this.steps[this.stepIndex],i=(n-this.stepBaselineActiveMs)/1e3,o=this.distanceM-this.stepBaselineDistanceM;if(!(j(a)?o>=(a.distanceMeters??0):i>=(a.durationSeconds??0)))break;if(this.stepIndex++,this.stepBaselineActiveMs=n,this.stepBaselineDistanceM=this.distanceM,this.stepPaceStatus="none",this.stepIndex<this.steps.length)r.push(this.stepStartCue(t.atMs));else return this.status="completed",r.push(this.record({kind:"session-complete",atMs:t.atMs,message:`Done \u2014 ${h(n/1e3)} \xB7 ${Math.round(R(this.distanceM)*10)/10} km. Nice work.`})),r}this.currentPace=t.paceSecPerKm??this.rollingPace(n),this.lastPaceSampleActiveMs=n,this.lastPaceSampleDistanceM=this.distanceM;let s=this.steps[this.stepIndex];if(s&&this.currentPace!=null){let a=ve(this.currentPace,s.targetPaceSecPerKm);if(a!=="none"&&a!==this.stepPaceStatus){this.stepPaceStatus=a;let i=this.paceMessage(s,a);i&&r.push(this.record({kind:"pace",atMs:t.atMs,paceStatus:a,message:i}))}}return r}rollingPace(t){let n=(t-this.lastPaceSampleActiveMs)/1e3,r=this.distanceM-this.lastPaceSampleDistanceM;return n<=0||r<=0?this.currentPace:n/R(r)}stepStartCue(t){let n=this.steps[this.stepIndex],r=n.label+Pt(n),s=kt(n);return this.record({kind:"step-start",atMs:t,stepIndex:this.stepIndex,message:s?`${r} \u2014 ${s}`:r})}paceMessage(t,n){let r=St(t);return n==="on"?"On target.":n==="fast"?r?"Quick \u2014 keep it controlled and repeatable.":"Ease back \u2014 you're ahead of easy pace.":r?"Pick it up to reach target pace.":null}snapshot(t){let n=t!=null?this.activeMsAt(t):this.accruedActiveMs,r=n/1e3,s=this.stepIndex<this.steps.length?this.steps[this.stepIndex]:void 0,a=s?Me(this.steps,this.stepIndex):void 0,i=0,o=0;if(s){i=(n-this.stepBaselineActiveMs)/1e3;let b=this.distanceM-this.stepBaselineDistanceM;j(s)?o=s.distanceMeters?Math.min(1,b/s.distanceMeters):0:o=s.durationSeconds?Math.min(1,i/s.durationSeconds):0}let c=this.distanceM>0?r/R(this.distanceM):void 0,l=s&&this.currentPace!=null?ve(this.currentPace,s.targetPaceSecPerKm):"none";return{status:this.status,step:a,stepElapsedSeconds:i,stepProgress:o,elapsedSeconds:r,distanceMeters:this.distanceM,overallProgress:this.plannedSeconds>0?Math.min(1,r/this.plannedSeconds):0,currentPaceSecPerKm:this.currentPace,averagePaceSecPerKm:c,paceStatus:l,heartRateBpm:this.heartRateBpm,lastCue:this.lastCue}}getStatus(){return this.status}plan(){return this.steps.map((t,n)=>Me(this.steps,n))}};var Re={"emergency-services":"emergency services","crisis-support":"an urgent crisis-support line",gp:"a GP","sports-physician":"a sports-medicine doctor",physiotherapist:"a physiotherapist","pelvic-health-physio":"a pelvic-health physiotherapist","sports-dietitian":"a registered sports dietitian",psychologist:"a psychologist or your GP",gynaecologist:"a sports-medicine doctor or gynaecologist"},M={none:0,monitor:1,professional:2,urgent:3,emergency:4};function xe(e,t){return M[e]>=M[t]?e:t}var E="This is general guidance, not a diagnosis. Only a qualified professional can assess you properly.";var Mt={"chest-pain":{category:"cardiac",urgency:"emergency",label:"Chest pain or pressure",guidance:"Stop now and call emergency services. Chest pain or pressure during exercise needs urgent assessment.",refer:["emergency-services"]},"collapse-or-fainting":{category:"cardiac",urgency:"emergency",label:"Fainting or collapse",guidance:"Stop and seek emergency care. Fainting or collapse during or after running should be checked urgently.",refer:["emergency-services"]},"severe-breathlessness":{category:"respiratory",urgency:"emergency",label:"Severe or sudden breathlessness",guidance:"Stop and seek emergency care if breathlessness is severe, sudden, or out of proportion to your effort.",refer:["emergency-services"]},neurological:{category:"neurological",urgency:"emergency",label:"Neurological symptoms",guidance:"Stop and seek emergency care for sudden confusion, severe headache, weakness, or trouble seeing or speaking.",refer:["emergency-services"]},"heat-illness":{category:"heat",urgency:"emergency",label:"Signs of heat illness",guidance:"Stop, cool down, and seek emergency care for confusion, stopping sweating, or feeling faint in the heat.",refer:["emergency-services"]},"self-harm-thoughts":{category:"psychological",urgency:"emergency",label:"Thoughts of self-harm",guidance:"You deserve support right now \u2014 please contact an urgent crisis line or emergency services. You do not have to manage this alone.",refer:["crisis-support","emergency-services"]},palpitations:{category:"cardiac",urgency:"urgent",label:"Palpitations",guidance:"Arrange a prompt medical review of your heart rhythm, especially if palpitations come with dizziness or breathlessness.",refer:["sports-physician","gp"]},"bone-pain":{category:"musculoskeletal",urgency:"urgent",label:"Focal bone pain",guidance:"Stop impact running and arrange prompt assessment. Pinpoint bone pain or tenderness, or pain at night, can signal a bone stress injury.",refer:["sports-physician","physiotherapist"]},"rapidly-worsening-pain":{category:"musculoskeletal",urgency:"urgent",label:"Rapidly worsening pain",guidance:"Pause running and arrange prompt assessment \u2014 pain that is escalating quickly should be looked at before you train again.",refer:["physiotherapist","sports-physician"]},"eating-disorder-concern":{category:"psychological",urgency:"professional",label:"Concerns about eating",guidance:"Reaching out is a strong first step. A GP, sports-medicine doctor, dietitian and psychologist can support you together \u2014 this is common and treatable.",refer:["gp","sports-dietitian","psychologist"]},"menstrual-disruption":{category:"hormonal",urgency:"professional",label:"Persistent menstrual disruption",guidance:"Arrange a review \u2014 missing or irregular periods can affect bone and hormonal health and are worth investigating, not pushing through.",refer:["sports-physician","gynaecologist"]},"mental-health-concern":{category:"psychological",urgency:"professional",label:"Mental-health concerns",guidance:"Talking to someone helps. A GP or psychologist can support you \u2014 training should not come before your wellbeing.",refer:["psychologist","gp"]}},vt={emergency:"Stop and seek emergency help now.",urgent:"Stop running and get a prompt medical review.",professional:"Please reach out to a qualified professional soon.",monitor:"Nothing urgent flagged \u2014 keep an eye on how you feel.",none:"No red flags reported."};function De(e){let n=[...new Set(e)].map(a=>{let i=Mt[a];return{flag:a,category:i.category,urgency:i.urgency,label:i.label,guidance:i.guidance,refer:i.refer}});n.sort((a,i)=>M[i.urgency]-M[a.urgency]);let r=n.reduce((a,i)=>xe(a,i.urgency),"none"),s=[...new Set(n.flatMap(a=>a.refer))];return{urgency:n.length===0?"none":r,headline:vt[n.length===0?"none":r],flags:n,refer:s,disclaimer:E}}var Ae=new Set(["unintentional-weight-loss","restrictive-or-skipped-meals","menstrual-disruption","bone-stress-history"]);function we(e){let t=[...new Set(e)],n=t.filter(o=>Ae.has(o)).length,r=t.reduce((o,c)=>o+(Ae.has(c)?2:1),0),s;n>=2||r>=5?s="high":n>=1||r>=2?s="moderate":s="low";let a=s!=="low",i=[];return a?(i.push("Fuelling enough \u2014 especially carbohydrate \u2014 around training is the priority; under-eating is not a shortcut to performance."),i.push("Under-eating is not the answer here \u2014 if anything you likely need more fuel, guided by a professional."),(t.includes("bone-stress-history")||t.includes("menstrual-disruption"))&&i.push("Bone and hormonal health can be affected by low energy availability \u2014 worth raising explicitly at your review.")):i.push("Keep fuelling consistently around training and re-check if things change."),{risk:s,urgency:s==="high"||s==="moderate"?"professional":"monitor",score:r,strongCount:n,message:s==="high"?"Several signs point to possible low energy availability. Please arrange a review soon.":s==="moderate"?"Some signs suggest your fuelling may be worth reviewing with a professional.":"No strong signs of low energy availability from what you reported.",guidance:i,refer:a?["sports-dietitian","sports-physician"]:[],disclaimer:E}}function Ee(e){if(e.fatFreeMassKg<=0)throw new Error("fat-free mass must be positive");let t=(e.intakeKcal-e.exerciseEnergyKcal)/e.fatFreeMassKg,n=Math.round(t*10)/10,r=t<30?"low":t<45?"reduced":"adequate";return{eaKcalPerKgFfm:n,band:r,note:r==="low"?"Below ~30 kcal/kg FFM/day is commonly considered low. This is an estimate \u2014 please review fuelling with a sports dietitian rather than eating less.":r==="reduced"?"Around 30\u201345 kcal/kg FFM/day. An estimate only; keep fuelling consistent, especially on hard days.":"Around 45+ kcal/kg FFM/day is generally adequate. This is a rough estimate, not a precise measurement."}}function Te(e){let t=[],n=new Set(e.symptoms??[]),r=!1;return e.status==="absent-3m-plus"||e.status==="irregular"&&(e.monthsSinceLastPeriod??0)>=3?(r=!0,t.push({topic:"Missing or infrequent periods",urgency:"professional",message:"Periods stopping or becoming infrequent is a health signal worth reviewing \u2014 it can be linked to low energy availability and bone health, not a sign you're training well.",refer:["sports-physician","gynaecologist"]})):e.status==="irregular"&&t.push({topic:"Irregular periods",urgency:"monitor",message:"Tracking your symptoms over the coming months is more useful than changing training by calendar phase. Raise it at a review if it persists.",refer:["gp"]}),e.status==="pregnant"&&t.push({topic:"Running in pregnancy",urgency:"professional",message:"Running can be fine in pregnancy when you've been cleared, but guidance is individual \u2014 please plan it with your maternity team rather than a generic plan.",refer:["gp","physiotherapist"]}),e.status==="postpartum"&&((e.postpartumWeeks??0)<12?t.push({topic:"Return to running after birth",urgency:"professional",message:"Consensus guidance suggests holding off on impact running until around 12 weeks and after a pelvic-floor assessment. Walking and strengthening first protects your recovery.",refer:["pelvic-health-physio","gp"]}):t.push({topic:"Return to running after birth",urgency:"monitor",message:"A pelvic-floor assessment before returning to impact is worth it even past 12 weeks. Build back gradually and stop if you notice leaking or heaviness.",refer:["pelvic-health-physio"]})),(e.status==="perimenopause"||e.status==="menopause")&&t.push({topic:"Menopause considerations",urgency:"monitor",message:"This is a time to protect intensity, heavy strength and bone health rather than only running slower. Raise troublesome symptoms with a clinician.",refer:["gp"]}),n.has("pelvic-floor")&&t.push({topic:"Pelvic-floor symptoms",urgency:"professional",message:"Leaking, heaviness or a dragging sensation is common and treatable \u2014 a pelvic-health physiotherapist can help, and it's not something to just run through.",refer:["pelvic-health-physio"]}),(n.has("iron-fatigue")||n.has("heavy-bleeding"))&&t.push({topic:"Iron and heavy bleeding",urgency:"professional",message:"Persistent tiredness or breathlessness with heavy periods is worth an iron / ferritin check \u2014 low iron is common in runners and very treatable.",refer:["gp"]}),{urgency:t.reduce((i,o)=>M[o.urgency]>M[i]?o.urgency:i,"none"),prompts:t,suggestRedSScreen:r,disclaimer:E}}return $e(Rt);})();
 </script>
 <script>
 const $ = (id) => document.getElementById(id);
-const KIND_COLOR = { warmup: "var(--base)", cooldown: "var(--base)", steady: "var(--base)", recovery: "var(--taper)", rep: "var(--peak)" };
+const PROF = RC.PROFESSIONAL_LABEL;
 
-const ATHLETE = { daysPerWeek: 5, recent: { distanceMeters: 5000, timeSeconds: 1260 }, experience: "competitive", includeStrength: true, returningFromInjury: false, maxHr: 190, restingHr: 48 };
-const GOAL = { distance: "half", targetTimeSeconds: 5400, raceDateIso: "2027-09-05", startDateIso: "2026-07-23" };
+const FLAGS_PHYSICAL = {
+  "chest-pain": "Chest pain or pressure",
+  "collapse-or-fainting": "Fainting or collapse",
+  "severe-breathlessness": "Severe or sudden breathlessness",
+  "neurological": "Sudden confusion, severe headache, weakness, or vision/speech trouble",
+  "heat-illness": "Feeling faint or confused in heat, or stopped sweating",
+  "palpitations": "Palpitations or an irregular heartbeat",
+  "bone-pain": "Pinpoint bone pain or tenderness (or pain at night)",
+  "rapidly-worsening-pain": "Pain that is worsening quickly",
+};
+const FLAGS_WELLBEING = {
+  "eating-disorder-concern": "Worries about my eating",
+  "menstrual-disruption": "Periods have stopped or are very irregular",
+  "mental-health-concern": "Struggling with my mental health",
+  "self-harm-thoughts": "Thoughts of harming myself",
+};
+const REDS = {
+  "unintentional-weight-loss": "Losing weight without meaning to",
+  "restrictive-or-skipped-meals": "Skipping meals or restricting food",
+  "preoccupation-with-food-or-weight": "Preoccupied with food or weight",
+  "menstrual-disruption": "Periods stopped or irregular",
+  "low-libido": "Low libido",
+  "recurrent-illness": "Getting ill often",
+  "bone-stress-history": "A history of bone stress injury",
+  "poor-recovery": "Recovering poorly between sessions",
+  "low-mood-or-irritability": "Low mood or irritability",
+  "always-feeling-cold": "Always feeling cold",
+  "gi-discomfort": "Frequent gut discomfort",
+  "persistent-fatigue": "Persistent fatigue",
+};
+const FH_SYMPTOMS = {
+  "pelvic-floor": "Leaking, heaviness or dragging (pelvic floor)",
+  "heavy-bleeding": "Very heavy periods",
+  "iron-fatigue": "Tired or breathless (possible low iron)",
+  "hot-flushes-or-sleep": "Hot flushes or disrupted sleep",
+  "painful-periods": "Painful periods",
+};
+const URG_COLOR = { emergency: "var(--emergency)", urgent: "var(--urgent)", professional: "var(--pro)", monitor: "var(--calm)", none: "var(--calm)" };
+const URG_LABEL = { emergency: "Emergency", urgent: "Urgent", professional: "See someone", monitor: "Monitor", none: "OK" };
 
-// Collect distinct runnable sessions from a generated plan.
-const SESSIONS = [];
-(function () {
-  const seen = new Set();
-  const plan = RC.generatePlan(ATHLETE, GOAL);
-  const skip = new Set(["rest", "mobility", "strength", "cross-training"]);
-  for (const w of plan.weeks) for (const s of w.sessions) {
-    if (skip.has(s.type) || s.steps.length === 0 || seen.has(s.title)) continue;
-    seen.add(s.title); SESSIONS.push(s);
-  }
-  SESSIONS.sort((a, b) => b.steps.filter((x) => x.kind === "rep").length - a.steps.filter((x) => x.kind === "rep").length);
-})();
-
-function fmtTime(sec) {
-  sec = Math.max(0, Math.round(sec));
-  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
-  const p = (n) => String(n).padStart(2, "0");
-  return h > 0 ? h + ":" + p(m) + ":" + p(s) : m + ":" + p(s);
+function checks(container, map) {
+  container.innerHTML = Object.entries(map).map(([k, v]) =>
+    '<label class="opt"><input type="checkbox" value="' + k + '"><span>' + v + '</span></label>'
+  ).join("");
 }
-function fmtPace(secPerKm) {
-  if (!secPerKm || !isFinite(secPerKm)) return "—";
-  const s = Math.round(secPerKm);
-  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0") + "/km";
+function selected(container) {
+  return [...container.querySelectorAll("input:checked")].map((el) => el.value);
 }
-function segSeconds(v) {
-  if (v.targetSeconds) return v.targetSeconds;
-  if (v.targetMeters && v.targetPace) return ((v.targetPace.minSecPerKm + v.targetPace.maxSecPerKm) / 2) * v.targetMeters / 1000;
-  return 30;
+function referLine(refer) {
+  if (!refer || refer.length === 0) return "";
+  const names = refer.map((r) => PROF[r] || r);
+  const joined = names.length > 1 ? names.slice(0, -1).join(", ") + " or " + names[names.length - 1] : names[0];
+  return '<div class="refer">Talk to <b>' + joined + '</b>.</div>';
 }
-function hrTarget(step) {
-  if (!step) return 110;
-  if (step.kind === "rep") return 178;
-  if (step.kind === "warmup" || step.kind === "cooldown") return 132;
-  if (step.kind === "recovery") return 150;
-  return 152;
-}
-
-let live = null, timer = null, vms = 0, dist = 0, hr = 110, speed = 20, quirk = 0, lastStepIdx = -1;
-
-function populate() {
-  $("session").innerHTML = SESSIONS.map((s, i) => '<option value="' + i + '">' + s.title + '</option>').join("");
-}
-
-function buildSegments() {
-  const plan = live.plan();
-  const total = plan.reduce((a, v) => a + segSeconds(v), 0) || 1;
-  $("segs").innerHTML = plan.map((v) => {
-    const c = KIND_COLOR[v.kind] || "var(--base)";
-    const track = v.kind === "rep" ? "color-mix(in srgb, var(--peak) 22%, var(--surface-2))" : "var(--surface-2)";
-    return '<div class="seg" style="flex:' + segSeconds(v).toFixed(1) + ';--track:' + track + ';--fillc:' + c + '"><i></i></div>';
-  }).join("");
-}
-
-function selectSession(i) {
-  stopLoop();
-  live = new RC.LiveSession(SESSIONS[i]);
-  vms = 0; dist = 0; hr = 110; quirk = 0; lastStepIdx = -1;
-  $("cuelog").innerHTML = '<div class="empty">Coaching cues will appear here as you run.</div>';
-  buildSegments();
-  render(live.snapshot(0));
-  setButtons("idle");
-}
-
-function paceForStep(step) {
-  const band = step && step.targetPace;
-  const mid = band ? (band.minSecPerKm + band.maxSecPerKm) / 2 : 360;
-  quirk += (Math.random() - 0.5) * 0.03; quirk *= 0.9;
-  if (Math.random() < 0.04) quirk += (Math.random() - 0.5) * 0.28;
-  return Math.max(120, mid * (1 + quirk));
+function renderResult(el, urgency, headline, items, disclaimer) {
+  el.classList.add("show");
+  el.innerHTML =
+    '<div class="banner" style="--bc:' + URG_COLOR[urgency] + '"><span class="dot"></span>' + headline + '</div>' +
+    (items.length ? '<div class="items">' + items.map((it) =>
+      '<div class="item"><div class="t">' + it.title +
+      (it.urgency ? '<span class="u" style="--uc:' + URG_COLOR[it.urgency] + '">' + URG_LABEL[it.urgency] + '</span>' : '') +
+      '</div><div class="g">' + it.guidance + '</div>' + referLine(it.refer) + '</div>'
+    ).join("") + '</div>' : '') +
+    '<div class="disclaimer">' + disclaimer + '</div>';
 }
 
-function tick() {
-  const dt = 0.2 * speed; // virtual seconds per 200ms real
-  vms += dt * 1000;
-  const pre = live.snapshot(vms);
-  if (pre.step && pre.step.index !== lastStepIdx) { quirk = 0; lastStepIdx = pre.step.index; }
-  const pace = paceForStep(pre.step);
-  dist += (1000 / pace) * dt;
-  hr += (hrTarget(pre.step) - hr) * 0.05 + (Math.random() - 0.5) * 1.6;
-  hr = Math.max(95, Math.min(ATHLETE.maxHr, hr));
-  const cues = live.update({ atMs: vms, distanceMeters: dist, heartRateBpm: Math.round(hr) });
-  cues.forEach(logCue);
-  render(live.snapshot(vms));
-  if (live.getStatus() === "completed") { stopLoop(); setButtons("done"); }
+// Red flags
+function runFlags() {
+  const picks = [...selected($("flags-physical")), ...selected($("flags-wellbeing"))];
+  const el = $("flags-result");
+  if (picks.length === 0) { el.classList.remove("show"); return; }
+  const r = RC.screenRedFlags(picks);
+  renderResult(el, r.urgency, r.headline, r.flags.map((f) => ({ title: f.label, urgency: f.urgency, guidance: f.guidance, refer: f.refer })), r.disclaimer);
+}
+// RED-S
+function runReds() {
+  const picks = selected($("reds-opts"));
+  const el = $("reds-result");
+  const r = RC.screenRedS(picks);
+  const items = [{ title: r.message, urgency: r.urgency === "monitor" ? "monitor" : "professional", guidance: r.guidance.join(" "), refer: r.refer }];
+  renderResult(el, r.risk === "low" ? "monitor" : "professional", "Risk: " + r.risk + (r.risk === "low" ? " — nothing strong flagged" : " — worth a review"), items, r.disclaimer);
+}
+function runEa() {
+  const intake = Number($("eaIntake").value), exercise = Number($("eaExercise").value), ffm = Number($("eaFfm").value);
+  const out = $("eaOut");
+  if (!(ffm > 0)) { out.textContent = "Enter your fat-free mass to estimate."; return; }
+  const e = RC.estimateEnergyAvailability({ intakeKcal: intake, exerciseEnergyKcal: exercise, fatFreeMassKg: ffm });
+  const c = e.band === "low" ? "var(--urgent)" : e.band === "reduced" ? "var(--pro)" : "var(--calm)";
+  out.innerHTML = 'Estimated <b class="num">' + e.eaKcalPerKgFfm + '</b> kcal/kg FFM/day — <span class="band" style="color:' + c + '">' + e.band + '</span>.<div class="g" style="color:var(--ink-soft);margin-top:6px;font-size:12.5px">' + e.note + '</div>';
+}
+// Female health
+function runFh() {
+  const status = $("fhStatus").value;
+  const input = { status, symptoms: selected($("fh-opts")) };
+  if (status === "irregular") input.monthsSinceLastPeriod = Number($("fhMonths").value);
+  if (status === "postpartum") input.postpartumWeeks = Number($("fhWeeks").value);
+  const r = RC.assessFemaleHealth(input);
+  const el = $("fh-result");
+  if (r.prompts.length === 0) { renderResult(el, "none", "Nothing flagged — keep tracking how you feel.", [], r.disclaimer); return; }
+  const items = r.prompts.map((p) => ({ title: p.topic, urgency: p.urgency, guidance: p.message, refer: p.refer }));
+  const extra = r.suggestRedSScreen ? [{ title: "Worth also checking fuelling", urgency: "monitor", guidance: "Missing periods can link to low energy availability — the RED-S screen above is worth a look too.", refer: [] }] : [];
+  renderResult(el, r.urgency, r.urgency === "professional" ? "Worth a conversation with a professional." : "A couple of things to keep an eye on.", items.concat(extra), r.disclaimer);
 }
 
-function startLoop() { if (!timer) timer = setInterval(tick, 200); }
-function stopLoop() { if (timer) { clearInterval(timer); timer = null; } }
+checks($("flags-physical"), FLAGS_PHYSICAL);
+checks($("flags-wellbeing"), FLAGS_WELLBEING);
+checks($("reds-opts"), REDS);
+checks($("fh-opts"), FH_SYMPTOMS);
 
-function logCue(cue) {
-  const log = $("cuelog");
-  const empty = log.querySelector(".empty");
-  if (empty) empty.remove();
-  const cls = cue.kind === "pace" ? "pace-" + cue.paceStatus
-    : cue.kind === "step-start" ? "step"
-    : cue.kind === "session-start" ? "start"
-    : cue.kind === "session-complete" ? "done" : "dim";
-  const dim = cue.kind === "paused" || cue.kind === "resumed" ? " dim" : "";
-  const el = document.createElement("div");
-  el.className = "cue " + cls + dim;
-  el.innerHTML = '<span class="badge"></span><span class="t">' + fmtTime(cue.atMs / 1000) + '</span><span class="m">' + cue.message + '</span>';
-  log.insertBefore(el, log.firstChild);
-}
-
-function render(s) {
-  $("elapsed").textContent = fmtTime(s.elapsedSeconds);
-  $("distance").textContent = (s.distanceMeters / 1000).toFixed(2);
-  $("status").textContent = s.status;
-  const pv = $("pace");
-  pv.textContent = s.currentPaceSecPerKm ? fmtPace(s.currentPaceSecPerKm) : "—";
-  pv.className = "big num pace-val " + (s.paceStatus || "none");
-  $("avgpace").textContent = s.averagePaceSecPerKm ? fmtPace(s.averagePaceSecPerKm) : "—";
-  $("hr").textContent = s.heartRateBpm ? s.heartRateBpm : "—";
-
-  const step = s.step;
-  if (step) {
-    const c = KIND_COLOR[step.kind] || "var(--base)";
-    $("kindtag").textContent = step.kind;
-    $("kindtag").style.setProperty("--k", c);
-    $("steptitle").textContent = step.label;
-    $("rep").textContent = step.repeatIndex && step.repeatCount ? step.repeatIndex + " / " + step.repeatCount : "";
-    const tgt = [];
-    if (step.gate === "distance" && step.targetMeters) tgt.push(Math.round(step.targetMeters) + " m");
-    else if (step.targetSeconds) tgt.push(fmtTime(step.targetSeconds));
-    if (step.targetPace) tgt.push("target " + fmtPace(step.targetPace.minSecPerKm) + "–" + fmtPace(step.targetPace.maxSecPerKm));
-    $("target").textContent = tgt.join(" · ");
-    const fill = $("stepfill");
-    fill.style.width = Math.round(s.stepProgress * 100) + "%";
-    fill.style.setProperty("--k", c);
-    $("stepelapsed").textContent = fmtTime(s.stepElapsedSeconds);
-    $("stepcount").textContent = "Step " + (step.index + 1) + " of " + step.total;
-  } else {
-    $("kindtag").textContent = s.status === "completed" ? "done" : "—";
-    $("steptitle").textContent = s.status === "completed" ? "Session complete" : "Pick a session and press Start";
-    $("rep").textContent = ""; $("target").textContent = ""; $("stepcount").textContent = "";
-    $("stepfill").style.width = s.status === "completed" ? "100%" : "0%";
-  }
-
-  // Segment fills.
-  const segs = $("segs").children;
-  const idx = step ? step.index : (s.status === "completed" ? segs.length : 0);
-  for (let i = 0; i < segs.length; i++) {
-    const fill = segs[i].firstChild;
-    fill.style.width = i < idx ? "100%" : i === idx ? Math.round(s.stepProgress * 100) + "%" : "0%";
-  }
-}
-
-function setButtons(state) {
-  const start = $("startBtn"), pause = $("pauseBtn"), stop = $("stopBtn"), sel = $("session"), spd = $("speed");
-  if (state === "idle" || state === "done") {
-    start.disabled = false; start.textContent = "Start"; pause.disabled = true; pause.textContent = "Pause"; stop.disabled = true; sel.disabled = false; spd.disabled = false;
-  } else if (state === "active") {
-    start.disabled = true; pause.disabled = false; pause.textContent = "Pause"; stop.disabled = false; sel.disabled = true; spd.disabled = false;
-  } else if (state === "paused") {
-    pause.textContent = "Resume"; stop.disabled = false;
-  }
-}
-
-$("startBtn").addEventListener("click", () => {
-  if (!live || live.getStatus() !== "idle") selectSession(Number($("session").value));
-  live.start(vms).forEach(logCue);
-  render(live.snapshot(vms));
-  setButtons("active");
-  startLoop();
+$("flags-physical").addEventListener("change", runFlags);
+$("flags-wellbeing").addEventListener("change", runFlags);
+$("reds-opts").addEventListener("change", runReds);
+$("eaToggle").addEventListener("click", () => { $("ea").classList.toggle("show"); if ($("ea").classList.contains("show")) runEa(); });
+["eaIntake", "eaExercise", "eaFfm"].forEach((id) => $(id).addEventListener("input", runEa));
+$("fhStatus").addEventListener("change", () => {
+  $("fhMonthsWrap").style.display = $("fhStatus").value === "irregular" ? "block" : "none";
+  $("fhWeeksWrap").style.display = $("fhStatus").value === "postpartum" ? "block" : "none";
+  runFh();
 });
-$("pauseBtn").addEventListener("click", () => {
-  if (!live) return;
-  if (live.getStatus() === "active") { live.pause(vms).forEach(logCue); stopLoop(); setButtons("paused"); }
-  else if (live.getStatus() === "paused") { live.resume(vms).forEach(logCue); startLoop(); setButtons("active"); }
-  render(live.snapshot(vms));
-});
-$("stopBtn").addEventListener("click", () => {
-  if (!live) return;
-  live.stop(vms).forEach(logCue); stopLoop(); render(live.snapshot(vms)); setButtons("done");
-});
-$("session").addEventListener("change", () => selectSession(Number($("session").value)));
-$("speed").addEventListener("change", () => { speed = Number($("speed").value); });
+["fhMonths", "fhWeeks"].forEach((id) => $(id).addEventListener("input", runFh));
+$("fh-opts").addEventListener("change", runFh);
 $("themeToggle").addEventListener("click", () => {
   const cur = document.documentElement.getAttribute("data-theme");
   const next = cur === "dark" ? "light" : cur === "light" ? "dark" : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark");
   document.documentElement.setAttribute("data-theme", next);
 });
 
-populate();
-selectSession(0);
+runReds();
 </script>
 </body>
 </html>

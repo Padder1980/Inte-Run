@@ -1,0 +1,16 @@
+{
+  "name": "running-coach",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Evidence-based running training-plan engine (portable core). Turns a goal + current fitness into a periodized plan grounded in current endurance-training research.",
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "scripts": {
+    "test": "node --test",
+    "demo": "node demo/generate.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "UNLICENSED"
+}

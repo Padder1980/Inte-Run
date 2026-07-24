@@ -108,6 +108,25 @@ export {
   type StepView,
 } from "./live/session-runtime.ts";
 
+// Readiness — a multi-factor "how are you today?" check (no single metric decides the day).
+export {
+  assessReadiness,
+  type ReadinessBand,
+  type ReadinessInput,
+  type ReadinessResult,
+} from "./readiness/readiness.ts";
+
+// Training-load guardrails — injury-risk signals (long-run spike, weekly jump, return to running).
+export {
+  assessLongRunSpike,
+  assessWeeklyJump,
+  returnToRunningPlan,
+  type LongRunSpike,
+  type WeeklyJump,
+  type ReturnToRunning,
+  type ReturnStage,
+} from "./adapt/load-guardrails.ts";
+
 // Safety layer — screen, educate and refer. Never diagnoses.
 export {
   type Professional,

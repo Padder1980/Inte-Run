@@ -98,6 +98,19 @@ The runtime owns no clock and touches no device — the caller feeds it timestam
 (`{ atMs, distanceMeters, heartRateBpm?, paceSecPerKm? }`), so the same code runs behind a simulated
 run here, a real GPS/HR feed in a native app, or a unit test.
 
+## Readiness & load — should you train today?
+
+`web/today.html` is a plain-English daily check-in (§8, §5):
+
+- **`readiness.ts`** — a **multi-factor** read on today: sleep, soreness, energy, life stress,
+  motivation, and optionally resting HR / HRV / yesterday's effort → *train / ease / rest*. Two rules
+  from the brief are baked in: **no single metric decides the day** (one poor HRV reading can never
+  cancel a session on its own), and it's **non-punitive** — illness always means rest, and backing off
+  is framed as training well, never failure.
+- **`load-guardrails.ts`** — the evidence-based **long-run spike** signal (a run >~10% longer than your
+  longest of the past 30 days, framed as a signal not a rule), a weekly-jump check, and a graded
+  **return-to-running** progression that refers bone/joint injuries to a professional first.
+
 ## What's inside
 
 ```
@@ -117,6 +130,8 @@ src/
   adapt/       missed-sessions.ts             — two-misses-in-a-row → gentle re-entry
                injury.ts                      — injury report → pause / reduce / monitor
                rpe-feedback.ts                — RPE trend → ease / hold / progress
+               load-guardrails.ts             — long-run spike signal, weekly jump, return-to-running
+  readiness/   readiness.ts                   — multi-factor daily readiness (no single metric decides)
   progress/    achievements.ts                — PB detection (fastest 1k/mile/5k/10k/HM/M, longest run)
   live/        session-runtime.ts             — live-session state machine (start/pause/stop, pace cues)
   safety/      escalation.ts                  — medical red-flag screener → emergency/urgent/refer
@@ -221,7 +236,8 @@ pace tables or third-party plan content are reproduced.**
 3. Evidence-coverage build (against the research brief's 17 domains — see `docs/coverage.html`):
    - ~~Phase 1 — safety guardrails~~ (medical escalation, RED-S, female health) — done, `src/safety/`.
    - ~~Phase 2 — physiology core~~ (critical speed + multi-dimensional estimates with confidence) — done, `src/science/`.
-   - Phase 3 — readiness & load monitoring · Phase 4 — athlete populations.
+   - ~~Phase 3 — readiness & load monitoring~~ (daily readiness + injury load-spike + return-to-running) — done, `src/readiness/`, `src/adapt/load-guardrails.ts`.
+   - Phase 4 — athlete populations (six-tier classification, masters/ageing, evidence tags).
 4. Native shell decision (RN/Expo vs native) + watch/Health/BLE/voice/music integration.
 5. Persistence/backend + auth; wire the adaptive loops to real activity data.
 

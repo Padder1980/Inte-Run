@@ -139,9 +139,9 @@ footer { margin-top: 40px; font-size: 12px; color: var(--ink-faint); text-align:
 
   <div class="tiles">
     <div class="tile" style="--c:var(--built)"><div class="n num" style="color:var(--built)">3</div><div class="k">Built</div><div class="of num">of 17 domains</div></div>
-    <div class="tile" style="--c:var(--partial)"><div class="n num" style="color:var(--partial)">8</div><div class="k">Partial</div><div class="of num">meaningful gaps</div></div>
-    <div class="tile" style="--c:var(--missing)"><div class="n num" style="color:var(--missing)">6</div><div class="k">Missing</div><div class="of num">not yet started</div></div>
-    <div class="tile" style="--c:var(--built)"><div class="n num" style="color:var(--built)">✓✓</div><div class="k">Phases 1–2 shipped</div><div class="of num">safety + physiology</div></div>
+    <div class="tile" style="--c:var(--partial)"><div class="n num" style="color:var(--partial)">9</div><div class="k">Partial</div><div class="of num">meaningful gaps</div></div>
+    <div class="tile" style="--c:var(--missing)"><div class="n num" style="color:var(--missing)">5</div><div class="k">Missing</div><div class="of num">not yet started</div></div>
+    <div class="tile" style="--c:var(--built)"><div class="n num" style="color:var(--built)">✓✓✓</div><div class="k">Phases 1–3 shipped</div><div class="of num">safety · physiology · readiness</div></div>
   </div>
 
   <div class="legend">
@@ -194,12 +194,12 @@ const DOMAINS = [
   { i: 3, name: "Strength, power & conditioning", s: "built", t: "Heavy loading, single-leg, calf/soleus, hip & hamstring, trunk, plyometrics, maintenance phase — close to the brief's list." },
   { i: 4, name: "Mobility, flexibility & warm-ups", s: "built", t: "Dynamic warm-ups + targeted mobility. Correctly doesn't sell stretching as a performance driver." },
   { i: 1, name: "Physiology & performance determinants", s: "partial", t: "<b>Shipped (Phase 2):</b> a multi-dimensional fitness profile in plain English — a trainable pace plus endurance and durability, each a confidence range; training tolerance emerges over time. <b>Still missing:</b> wiring it into plan generation, richer determinants over time." },
-  { i: 5, name: "Training load, injury risk & return-to-running", s: "partial", t: "<b>Have:</b> injury triage (incl. bone-stress) + load proxy. <b>Missing:</b> the “single run >10% longer than 30-day longest” spike flag, next-morning pain model, return-to-running progression, post-illness." },
+  { i: 5, name: "Training load, injury risk & return-to-running", s: "partial", t: "<b>Have:</b> injury triage (incl. bone-stress). <b>Shipped (Phase 3):</b> the “single run >10% longer than 30-day longest” spike signal, a weekly-jump check, and a graded return-to-running progression that refers on for bone/joint injuries. <b>Still missing:</b> next-morning pain model, post-illness." },
   { i: 9, name: "Psychology, behaviour & adherence", s: "partial", t: "<b>Have:</b> non-punitive missed sessions, “why this session matters”, RPE. <b>Missing:</b> process goals, reflection, habit support, compulsive-exercise protection." },
   { i: 11, name: "Beginners, elite & athlete classification", s: "partial", t: "<b>Have:</b> 3 experience levels. <b>Missing:</b> the six-tier McKay framework and per-recommendation evidence tagging." },
   { i: 6, name: "Biomechanics, form & footwear", s: "missing", t: "No cadence / form / footwear tracking against a personal baseline. (Brief: compare to self, don't impose “180 spm”.)" },
   { i: 7, name: "Nutrition, fuelling & energy availability", s: "partial", safety: true, t: "<b>Shipped (Phase 1):</b> RED-S / energy-availability screening + referral, never a weight-loss target. <b>Still missing:</b> fuelling prompts, carb / hydration targets, gut training." },
-  { i: 8, name: "Sleep, recovery & readiness", s: "missing", t: "No multi-factor readiness model (sleep, RHR, HRV, soreness, mood, stress). One poor HRV reading must not cancel a session." },
+  { i: 8, name: "Sleep, recovery & readiness", s: "partial", t: "<b>Shipped (Phase 3):</b> a plain-English multi-factor readiness check (sleep, soreness, energy, stress, motivation, optional RHR/HRV) → train / ease / rest, non-punitive. HRV alone can never cancel a session; illness always means rest. <b>Still missing:</b> trend tracking over time, performance-decline signal." },
   { i: 10, name: "Women & female-athlete health", s: "partial", safety: true, t: "<b>Shipped (Phase 1):</b> amenorrhoea / postpartum / pelvic-floor / iron prompts — symptom-informed, all referring on, never cycle-syncing. <b>Still missing:</b> pregnancy & menopause programming, FAIR injury specifics." },
   { i: 12, name: "Masters runners & ageing", s: "missing", t: "No age input at all — can't preserve intensity or adjust recovery for older athletes. Don't just slow everyone down." },
   { i: 13, name: "Young athletes", s: "missing", t: "Age-appropriate training, safeguarding, consent, growth. Also a <b>scope / legal decision</b>, not just a feature." },
@@ -229,10 +229,10 @@ const PHASES = [
   { n: "✓", tag: "Shipped", c: "var(--built)", title: "Deepen the physiology core", meta: "Domains 1 · 16 — estimates with confidence",
     text: "DONE. A plain-English fitness profile (src/science/fitness-profile.ts + fitness.html): a trainable “strong steady pace”, an endurance read and durability — each a confidence range with the numbers behind an optional “show the science” toggle. Critical speed fitted from field efforts underneath.",
     refs: [["#1 Determinants", 0], ["#16 Data validity", 0]] },
-  { n: 3, tag: "Next", c: "var(--accent)", title: "Readiness & load monitoring", meta: "Domains 8 · 5 — observe the response",
-    text: "A multi-factor readiness model (sleep, RHR, HRV trend, soreness, mood, stress) feeding conservative adjustments, plus the injury load-spike flag (>10% longest-run) and a return-to-running progression. Turns the plan from static to responsive.",
+  { n: "✓", tag: "Shipped", c: "var(--built)", title: "Readiness & load monitoring", meta: "Domains 8 · 5 — observe the response",
+    text: "DONE. A plain-English daily check-in (src/readiness/ + today.html): sleep, soreness, energy, stress, motivation → train / ease / rest, with no single metric (HRV included) deciding the day, and illness always meaning rest. Plus the injury load-spike signal (>10% longest-run), a weekly-jump check and a graded return-to-running progression.",
     refs: [["#8 Readiness", 0], ["#5 Load & return", 0]] },
-  { n: 4, tag: "Later", c: "var(--partial)", title: "Broaden athlete populations", meta: "Domains 11 · 12 — right advice per person",
+  { n: 4, tag: "Next", c: "var(--accent)", title: "Broaden athlete populations", meta: "Domains 11 · 12 — right advice per person",
     text: "The six-tier McKay classification, age-aware adaptation for masters (preserve intensity, adjust recovery), and per-recommendation evidence tags so lab findings on trained young men don't quietly become universal advice.",
     refs: [["#11 Classification", 0], ["#12 Masters", 0]] },
 ];

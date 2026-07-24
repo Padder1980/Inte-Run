@@ -14,3 +14,5 @@ export { screenRedS, estimateEnergyAvailability } from "../src/safety/red-s.ts";
 export { assessFemaleHealth } from "../src/safety/female-health.ts";
 export { buildFitnessProfile } from "../src/science/fitness-profile.ts";
 export { rangeText } from "../src/science/estimate.ts";
+export { assessReadiness } from "../src/readiness/readiness.ts";
+export { assessLongRunSpike, returnToRunningPlan } from "../src/adapt/load-guardrails.ts";

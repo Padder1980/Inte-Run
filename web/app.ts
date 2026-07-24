@@ -445,10 +445,13 @@ select.sel { font: inherit; font-size: 13.5px; color: var(--ink); background: va
 /* Live session */
 .live-hero { background: linear-gradient(150deg, color-mix(in srgb, var(--accent) 14%, var(--surface)), var(--surface)); }
 .live-title { font-size: 18px; font-weight: 700; letter-spacing: -.01em; margin: 4px 0 12px; }
-.live-metrics { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 10px; }
+.live-metrics { display: grid; grid-template-columns: 1.15fr 1fr; gap: 10px; }
 .live-metrics .lk { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); }
 .live-metrics .lv { font-size: 30px; font-weight: 750; letter-spacing: -.02em; margin-top: 2px; }
-.live-metrics .lv small { font-size: 13px; color: var(--ink-faint); font-weight: 500; }
+.live-metrics .lv small, .live-paces .lv small { font-size: 12px; color: var(--ink-faint); font-weight: 500; }
+.live-paces { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--line); }
+.live-paces .lk { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); }
+.live-paces .lv { font-size: 23px; font-weight: 750; letter-spacing: -.02em; margin-top: 2px; }
 .lv.on { color: var(--eff-easy); } .lv.fast { color: var(--eff-moderate); } .lv.slow { color: var(--eff-hard); }
 .live-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0; }
 .live-controls .primary { margin: 0; grid-column: 1 / -1; }
@@ -1620,8 +1623,11 @@ function viewLive() {
   return '<button class="backbtn" id="liveBack">‹ Today</button>' +
     '<div class="card live-hero"><div class="eyebrow">Live session · <span id="gpsBadge">' + gpsStatusText() + '</span></div><div class="live-title">' + s.title + '</div>' +
     '<div class="live-metrics"><div><div class="lk">Elapsed</div><div class="lv num" id="lElapsed">0:00</div></div>' +
-    '<div><div class="lk">Distance</div><div class="lv num" id="lDist">0.00<small> km</small></div></div>' +
-    '<div><div class="lk">Pace</div><div class="lv num none" id="lPace">—</div></div></div></div>' +
+    '<div><div class="lk">Distance</div><div class="lv num" id="lDist">0.00<small> km</small></div></div></div>' +
+    '<div class="live-paces">' +
+    '<div><div class="lk">Current</div><div class="lv num none" id="lPace">—</div></div>' +
+    '<div><div class="lk">Average</div><div class="lv num" id="lAvg">—</div></div>' +
+    '<div><div class="lk">Lap</div><div class="lv num" id="lLap">—</div></div></div></div>' +
     '<div class="card lstep" id="lStepCard"><div class="cnt">Press start when you\\'re ready.</div></div>' +
     '<div class="live-controls"><button class="primary" id="lStart">' + ICON.play + ' Start</button><button class="ctrl" id="lPause" disabled>Pause</button><button class="ctrl" id="lFinish" disabled>Finish</button></div>' +
     '<div class="card"><div class="subhead" style="margin-top:0">Coaching cues</div><div class="cuelog" id="lCues"><div style="color:var(--ink-faint);font-size:13px">Cues will appear as you run.</div></div></div>';
@@ -1637,7 +1643,10 @@ function liveCue(cue) {
 function liveUpdate(snap) {
   $("lElapsed").textContent = fmtPace(snap.elapsedSeconds);
   $("lDist").innerHTML = (snap.distanceMeters / 1000).toFixed(2) + '<small> km</small>';
-  const pv = $("lPace"); pv.textContent = snap.currentPaceSecPerKm ? fmtPace(snap.currentPaceSecPerKm) : "—"; pv.className = "lv num " + (snap.paceStatus || "none");
+  const paceHtml = (p) => p ? fmtPace(p) + '<small> /km</small>' : "—";
+  const pv = $("lPace"); pv.innerHTML = paceHtml(snap.currentPaceSecPerKm); pv.className = "lv num " + (snap.paceStatus || "none");
+  const av = $("lAvg"); if (av) av.innerHTML = paceHtml(snap.averagePaceSecPerKm);
+  const lp = $("lLap"); if (lp) lp.innerHTML = paceHtml(snap.lapPaceSecPerKm);
   const step = snap.step, card = $("lStepCard");
   if (step) {
     const c = KIND_COLOR[step.kind] || "var(--base)";

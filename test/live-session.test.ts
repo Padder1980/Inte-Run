@@ -83,6 +83,23 @@ test("pause excludes wall-clock time from active elapsed", () => {
   assert.equal(snap.status, "active");
 });
 
+test("lap pace reflects the current section only and resets at each step boundary", () => {
+  const steps: WorkoutStep[] = [
+    { kind: "warmup", label: "Warm up", durationSeconds: 60, targetPaceSecPerKm: EASY },
+    { kind: "steady", label: "Tempo", durationSeconds: 60, targetPaceSecPerKm: THRESH },
+  ];
+  const live = new LiveSession(makeSession(steps));
+  live.start(0);
+  // Section 1: 60s at 360 s/km (slow). Section 2: 60s at 240 s/km (fast).
+  const a = run(live, { startMs: 0, seconds: 60, startDist: 0, paceSecPerKm: 360 });
+  const b = run(live, { startMs: a.endMs, seconds: 59, startDist: a.endDist, paceSecPerKm: 240 });
+  const snap = live.snapshot(b.endMs);
+  // Lap = section 2's pace (~240), well apart from the whole-session average (~300).
+  assert.ok(Math.abs(snap.lapPaceSecPerKm! - 240) < 12, `lap was ${snap.lapPaceSecPerKm}`);
+  assert.ok(Math.abs(snap.averagePaceSecPerKm! - 300) < 12, `avg was ${snap.averagePaceSecPerKm}`);
+  assert.ok(snap.lapPaceSecPerKm! < snap.averagePaceSecPerKm! - 30);
+});
+
 test("distance-gated step completes on distance, not time", () => {
   const steps: WorkoutStep[] = [
     { kind: "rep", label: "1 mile cruise", distanceMeters: 1609.344, targetPaceSecPerKm: THRESH },

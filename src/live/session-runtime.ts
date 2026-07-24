@@ -65,6 +65,8 @@ export type LiveSnapshot = {
   overallProgress: number; // 0..1 against the planned session duration
   currentPaceSecPerKm?: number;
   averagePaceSecPerKm?: number;
+  /** Average pace over the current section (workout step) only — resets at each step boundary. */
+  lapPaceSecPerKm?: number;
   paceStatus: PaceStatus;
   heartRateBpm?: number;
   lastCue?: Cue;
@@ -319,6 +321,9 @@ export class LiveSession {
 
     const averagePace =
       this.distanceM > 0 ? elapsedSeconds / metresToKm(this.distanceM) : undefined;
+    const lapDistanceM = this.distanceM - this.stepBaselineDistanceM;
+    const lapPace =
+      lapDistanceM > 0 ? stepElapsedSeconds / metresToKm(lapDistanceM) : undefined;
     const paceStatus = step && this.currentPace != null
       ? paceVsBand(this.currentPace, step.targetPaceSecPerKm)
       : "none";
@@ -333,6 +338,7 @@ export class LiveSession {
       overallProgress: this.plannedSeconds > 0 ? Math.min(1, elapsedSeconds / this.plannedSeconds) : 0,
       currentPaceSecPerKm: this.currentPace,
       averagePaceSecPerKm: averagePace,
+      lapPaceSecPerKm: lapPace,
       paceStatus,
       heartRateBpm: this.heartRateBpm,
       lastCue: this.lastCue,

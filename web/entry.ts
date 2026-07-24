@@ -12,3 +12,5 @@ export { PROFESSIONAL_LABEL } from "../src/safety/common.ts";
 export { screenRedFlags } from "../src/safety/escalation.ts";
 export { screenRedS, estimateEnergyAvailability } from "../src/safety/red-s.ts";
 export { assessFemaleHealth } from "../src/safety/female-health.ts";
+export { buildFitnessProfile } from "../src/science/fitness-profile.ts";
+export { rangeText } from "../src/science/estimate.ts";

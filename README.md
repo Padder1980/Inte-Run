@@ -107,6 +107,9 @@ src/
                intensity-distribution.ts     — pyramidal (default) / polarized targets + validator
                taper.ts                       — distance-specific taper
                training-load.ts               — session/weekly load proxy for adaptation
+               estimate.ts                    — the uncertainty+provenance primitive (confidence ranges)
+               critical-speed.ts              — critical speed & D' fitted from field efforts
+               fitness-profile.ts             — multi-dimensional fitness estimates (not one score)
   plan/        feasibility.ts                 — is the goal realistic in the time available?
                periodization.ts               — weeks → base/build/peak/taper + deloads
                session-templates.ts           — the evidence-based session library
@@ -138,6 +141,20 @@ is that guardrail, surfaced in `web/safety.html`:
   iron), explicitly **not** calendar-based cycle-syncing. Missing periods trigger a health prompt.
 
 Every result carries a "not a diagnosis" line and points to a qualified human.
+
+## Fitness profile — many dimensions, each with its uncertainty
+
+The brief insists fitness is *not* one score, and that every physiological number carries its
+uncertainty and provenance (§1, §16). `web/fitness.html` surfaces `buildFitnessProfile(input)`:
+
+- **`critical-speed.ts`** — fits critical speed and D′ from two or more field efforts
+  (`d = CS·t + D′`), the one determinant the brief highlights as estimable without a lab.
+- **`estimate.ts`** — the `Estimate` primitive: a value **with a range**, a confidence level
+  (`none` / `low` / `moderate` / `high`), the method it was derived by, and its limitations. VO₂max is
+  shown as "54–58", never "54.3".
+- **`fitness-profile.ts`** — separate estimates for aerobic capacity, threshold / critical speed,
+  speed reserve and durability; economy and training tolerance are honestly left blank until the data
+  exists, rather than invented.
 
 ## Evidence grounding
 
@@ -200,8 +217,12 @@ pace tables or third-party plan content are reproduced.**
    running the engine client-side).
 2. ~~Live-session state machine (start/pause/stop, pace/HR cues) as a logic layer~~ — done
    (`src/live/session-runtime.ts`, with the `web/live.html` run screen).
-3. Native shell decision (RN/Expo vs native) + watch/Health/BLE/voice/music integration.
-4. Persistence/backend + auth; wire the adaptive loops to real activity data.
+3. Evidence-coverage build (against the research brief's 17 domains — see `docs/coverage.html`):
+   - ~~Phase 1 — safety guardrails~~ (medical escalation, RED-S, female health) — done, `src/safety/`.
+   - ~~Phase 2 — physiology core~~ (critical speed + multi-dimensional estimates with confidence) — done, `src/science/`.
+   - Phase 3 — readiness & load monitoring · Phase 4 — athlete populations.
+4. Native shell decision (RN/Expo vs native) + watch/Health/BLE/voice/music integration.
+5. Persistence/backend + auth; wire the adaptive loops to real activity data.
 
 ## Licensing
 

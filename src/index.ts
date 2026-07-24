@@ -36,6 +36,25 @@ export {
 } from "./science/intensity-distribution.ts";
 export { type TaperPlan, taperFor, taperVolumeReductionPct } from "./science/taper.ts";
 export { rollingLoad, sessionLoad, weekLoad } from "./science/training-load.ts";
+export {
+  type Confidence,
+  type Estimate,
+  rangeText,
+  rangeAround,
+  unknownEstimate,
+} from "./science/estimate.ts";
+export {
+  type Effort,
+  type CriticalSpeedModel,
+  fitCriticalSpeed,
+  predictTimeFromModel,
+  predictDistanceFromModel,
+} from "./science/critical-speed.ts";
+export {
+  type FitnessInput,
+  type FitnessProfile,
+  buildFitnessProfile,
+} from "./science/fitness-profile.ts";
 
 // Planning
 export { assessFeasibility } from "./plan/feasibility.ts";

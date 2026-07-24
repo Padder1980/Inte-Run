@@ -240,10 +240,19 @@ function scienceBlock(e) {
 
 function build() {
   const err = $("error");
-  let efforts;
-  try {
-    efforts = effortRows.map((e) => ({ distanceMeters: Number(e.dist), timeSeconds: RC.parseDuration(e.time) }));
-  } catch (e) { err.textContent = "Check your times — use m:ss (e.g. 25:00)."; err.classList.add("show"); return; }
+  // Require min:sec (or h:mm:ss), and a sensible pace for the distance — so a bare "24" (read as 24
+  // seconds) can't silently drive a nonsense profile.
+  const timeOk = (s) => /^\\d{1,2}:[0-5]\\d$/.test(s) || /^\\d{1,2}:[0-5]\\d:[0-5]\\d$/.test(s);
+  const efforts = [];
+  for (const e of effortRows) {
+    const dist = Number(e.dist);
+    const t = e.time.trim();
+    if (!timeOk(t)) { err.textContent = "Enter each time as minutes:seconds, e.g. 25:00."; err.classList.add("show"); return; }
+    const secs = RC.parseDuration(t);
+    const pace = secs / (dist / 1000);
+    if (pace < 120 || pace > 720) { err.textContent = "That time looks off for the distance — please double-check it."; err.classList.add("show"); return; }
+    efforts.push({ distanceMeters: dist, timeSeconds: secs });
+  }
   err.classList.remove("show");
 
   const input = { efforts };

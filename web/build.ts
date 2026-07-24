@@ -427,12 +427,21 @@ function renderNotes() {
 }
 
 function readInputs() {
+  // Times must be entered as m:ss or h:mm:ss — a bare number would be read as seconds and mislead
+  // the plan (e.g. "90" → 90 seconds, not 1:30:00).
+  const mmss = (s) => /^\\d{1,2}:[0-5]\\d$/.test(s) || /^\\d{1,2}:[0-5]\\d:[0-5]\\d$/.test(s);
   const distance = $("distance").value;
-  const targetTimeSeconds = RC.parseDuration($("target").value);
+  const targetRaw = $("target").value.trim();
+  if (!mmss(targetRaw)) throw new Error("Enter your target time as h:mm:ss or m:ss, e.g. 1:30:00.");
+  const targetTimeSeconds = RC.parseDuration(targetRaw);
   const raceDateIso = $("raceDate").value;
   const startDateIso = $("startDate").value || undefined;
   if (!raceDateIso) throw new Error("Pick a race date.");
-  const recentTimeSeconds = RC.parseDuration($("recentTime").value);
+  const recentRaw = $("recentTime").value.trim();
+  if (!mmss(recentRaw)) throw new Error("Enter your recent time as m:ss, e.g. 21:00.");
+  const recentTimeSeconds = RC.parseDuration(recentRaw);
+  const recentPace = recentTimeSeconds / (Number($("recentDist").value) / 1000);
+  if (recentPace < 120 || recentPace > 720) throw new Error("That recent time looks off for the distance — please check it.");
   const athlete = {
     daysPerWeek: Number($("days").value),
     recent: { distanceMeters: Number($("recentDist").value), timeSeconds: recentTimeSeconds },
@@ -453,7 +462,7 @@ function build() {
   try {
     inputs = readInputs();
   } catch (e) {
-    err.textContent = "Check your times — use m:ss or h:mm:ss (e.g. 1:30:00). " + (e && e.message ? "(" + e.message + ")" : "");
+    err.textContent = (e && e.message) ? e.message : "Please check your entries.";
     err.classList.add("show");
     return;
   }

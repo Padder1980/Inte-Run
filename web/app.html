@@ -184,6 +184,31 @@ select.sel { font: inherit; font-size: 13.5px; color: var(--ink); background: va
 .setup-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; background: color-mix(in srgb, var(--accent) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); border-radius: 14px; padding: 13px 15px; margin-bottom: 14px; cursor: pointer; font: inherit; color: var(--ink); }
 .setup-banner b { font-size: 13.5px; } .setup-banner .sb-sub { font-size: 12px; color: var(--ink-soft); margin-top: 2px; } .setup-banner span { color: var(--accent); font-weight: 600; font-size: 13px; white-space: nowrap; }
 
+/* Live session */
+.live-hero { background: linear-gradient(150deg, color-mix(in srgb, var(--accent) 14%, var(--surface)), var(--surface)); }
+.live-title { font-size: 18px; font-weight: 700; letter-spacing: -.01em; margin: 4px 0 12px; }
+.live-metrics { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 10px; }
+.live-metrics .lk { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); }
+.live-metrics .lv { font-size: 30px; font-weight: 750; letter-spacing: -.02em; margin-top: 2px; }
+.live-metrics .lv small { font-size: 13px; color: var(--ink-faint); font-weight: 500; }
+.lv.on { color: var(--eff-easy); } .lv.fast { color: var(--eff-moderate); } .lv.slow { color: var(--eff-hard); }
+.live-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0; }
+.live-controls .primary { margin: 0; grid-column: 1 / -1; }
+.ctrl { font: inherit; font-size: 14px; font-weight: 600; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; cursor: pointer; }
+.ctrl:disabled { opacity: .45; cursor: not-allowed; }
+.lstep .kt { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #fff; background: var(--kc, var(--base)); border-radius: 6px; padding: 2px 8px; }
+.lstep h4 { margin: 8px 0 2px; font-size: 15px; }
+.lstep .tgt { font-size: 12.5px; color: var(--ink-soft); }
+.lpbar { height: 9px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; margin-top: 10px; }
+.lpbar > i { display: block; height: 100%; width: 0; background: var(--kc, var(--accent)); }
+.lstep .cnt { font-size: 12px; color: var(--ink-faint); margin-top: 6px; }
+.cuelog { max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 7px; }
+.cue { display: flex; gap: 9px; align-items: baseline; font-size: 13px; }
+.cue .ct { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); width: 40px; flex: none; }
+.cue .badge { width: 7px; height: 7px; border-radius: 50%; margin-top: 5px; flex: none; background: var(--ink-faint); }
+.cue.pace-fast .badge { background: var(--eff-moderate); } .cue.pace-slow .badge { background: var(--eff-hard); } .cue.pace-on .badge { background: var(--eff-easy); }
+.cue.step .badge { background: var(--accent); } .cue.start .badge, .cue.done .badge { background: var(--build); }
+
 /* Bottom nav */
 .bottomnav { position: sticky; bottom: 0; z-index: 20; display: grid; grid-template-columns: repeat(5,1fr); background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(10px); border-top: 1px solid var(--line); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); }
 .navbtn { display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: 0; padding: 6px 0; cursor: pointer; color: var(--ink-faint); font: inherit; }
@@ -253,17 +278,18 @@ function applyProfile(pf) {
   const ath = { daysPerWeek: pf.daysPerWeek, recent: { distanceMeters: pf.recentDistM, timeSeconds: pf.recentTimeS }, experience, includeStrength: pf.strength, returningFromInjury: pf.returning };
   const goal = { distance: pf.goalDist, targetTimeSeconds: pf.targetS, raceDateIso: pf.raceDate, startDateIso: todayIso() };
   const plan = RC.buildPlanSummary(ath, goal); // may throw
+  const raw = RC.generatePlan(ath, goal); // raw sessions with steps, for the live runtime
   const fitness = RC.buildFitnessProfile({ efforts: [{ distanceMeters: pf.recentDistM, timeSeconds: pf.recentTimeS }] });
   const masters = RC.assessMasters({ age: pf.age, sex: pf.sex || undefined });
-  return { ath, goal, plan, fitness, classification: cls, masters };
+  return { ath, goal, plan, raw, fitness, classification: cls, masters };
 }
 
 let profile = loadProfile() || Object.assign({}, DEFAULT_PROFILE);
-let PLAN, FITNESS, CLASS, MASTERS;
-function recompute() { const r = applyProfile(profile); PLAN = r.plan; FITNESS = r.fitness; CLASS = r.classification; MASTERS = r.masters; }
+let PLAN, RAW, FITNESS, CLASS, MASTERS;
+function recompute() { const r = applyProfile(profile); PLAN = r.plan; RAW = r.raw; FITNESS = r.fitness; CLASS = r.classification; MASTERS = r.masters; }
 try { recompute(); } catch (e) { profile = Object.assign({}, DEFAULT_PROFILE); recompute(); }
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: [] };
 
 // ---- helpers --------------------------------------------------------------
 function fmtPace(s) { s = Math.round(s); return Math.floor(s/60) + ":" + String(s%60).padStart(2,"0"); }
@@ -289,13 +315,19 @@ function renderReadiness() {
     '<div class="body">' + reasons + '<div class="reassure">' + r.reassurance + '</div></div></div>' +
     '<div class="watch"><span class="wl">From your watch</span><span class="c" style="font-size:12px;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:3px 9px">Slept ' + watch.sleepHours + ' h</span><span class="c" style="font-size:12px;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:3px 9px">Resting HR normal</span></div>';
 }
+function effortOf(s) { if (s.type === "rest" || s.type === "mobility") return "none"; if (s.type === "strength" || s.type === "cross-training") return "moderate"; if (s.intensity === "hard") return "hard"; if (s.intensity === "moderate") return "moderate"; return "easy"; }
+function paceOf(s) { const w = s.steps.filter((st) => st.targetPaceSecPerKm); if (!w.length) return null; const p = w.find((st) => st.kind === "rep") || w.find((st) => st.kind === "steady") || w[0]; return fmtPace(p.targetPaceSecPerKm.minSecPerKm) + "–" + fmtPace(p.targetPaceSecPerKm.maxSecPerKm) + "/km"; }
+function rpeOf(s) { let band = s.targetRpe; if (!band) { const w = s.steps.filter((st) => st.targetRpe); if (w.length) band = { min: Math.min.apply(null, w.map((x) => x.targetRpe.min)), max: Math.max.apply(null, w.map((x) => x.targetRpe.max)) }; } return band ? band.min + "–" + band.max : null; }
+function rawToday() { const ss = RAW.weeks[0].sessions.slice().sort((a, b) => a.dayOfWeek - b.dayOfWeek); return ss.find((s) => s.estimatedDistanceMeters) || ss[0]; }
 function todayWorkout() {
-  const wk = PLAN.weeks[0];
-  const s = wk.sessions.find((x) => x.type !== "rest" && x.type !== "mobility") || wk.sessions[0];
-  const meta = ['<span class="chip">' + s.durMin + "′" + (s.distKm ? " · " + s.distKm + " km" : "") + "</span>"];
-  if (s.pace) meta.push('<span class="chip pace">' + s.pace + "</span>");
-  if (s.rpe) meta.push('<span class="chip rpe">RPE ' + s.rpe + "</span>");
-  return { s, html: '<div class="wk-card" style="--c:var(--eff-' + s.effort + ')"><div class="b"><div class="t">' + s.title + '</div><div class="sub">Today · ' + s.day + '</div><div class="meta">' + meta.join("") + '</div></div><div class="checkbox"></div></div>' };
+  const s = rawToday();
+  const durMin = Math.round(s.estimatedDurationSeconds / 60);
+  const distKm = s.estimatedDistanceMeters ? Math.round(s.estimatedDistanceMeters / 100) / 10 : null;
+  const pace = paceOf(s), rpe = rpeOf(s), eff = effortOf(s);
+  const meta = ['<span class="chip">' + durMin + "′" + (distKm ? " · " + distKm + " km" : "") + "</span>"];
+  if (pace) meta.push('<span class="chip pace">' + pace + "</span>");
+  if (rpe) meta.push('<span class="chip rpe">RPE ' + rpe + "</span>");
+  return { s, html: '<div class="wk-card" style="--c:var(--eff-' + eff + ')"><div class="b"><div class="t">' + s.title + '</div><div class="sub">Today · ' + DAY_ORDER[s.dayOfWeek] + '</div><div class="meta">' + meta.join("") + '</div></div><div class="checkbox"></div></div>' };
 }
 function viewToday() {
   const today = 3; // Thu
@@ -309,7 +341,7 @@ function viewToday() {
   const banner = profile.personalized ? "" : '<button class="setup-banner" id="setupBanner"><div><b>You\'re viewing an example plan</b><div class="sb-sub">Tell us about you and your goal to make it yours.</div></div><span>Set up →</span></button>';
   return banner + '<div class="weekstrip">' + strip + '</div>' +
     '<h2 class="sec">Today\'s workout</h2><div class="card">' + w.html + '</div>' +
-    '<a class="primary" href="' + LIVE_URL + '" target="_blank" rel="noopener">' + ICON.play + ' Start session</a>' +
+    '<button class="primary" id="startSession">' + ICON.play + ' Start session</button>' +
     '<h2 class="sec">How you\'re doing</h2>' +
     '<div class="card"><div class="ctx"><span class="lab">Today\'s plan</span><div class="seg" data-seg="dayType"><button data-v="quality"' + (state.dayType==="quality"?' class="on"':'') + '>Quality</button><button data-v="easy"' + (state.dayType==="easy"?' class="on"':'') + '>Easy</button></div></div>' +
     '<div id="readySlot">' + renderReadiness() + '</div>' +
@@ -358,7 +390,7 @@ const SAMPLE_ACTS = [
 function viewActivities() {
   const tabs = '<div class="subtabs"><button data-at="workouts"' + (state.actTab==="workouts"?' class="on"':'') + '>Workouts</button><button data-at="performance"' + (state.actTab==="performance"?' class="on"':'') + '>Performance</button></div>';
   if (state.actTab === "workouts") {
-    const list = SAMPLE_ACTS.map((a) => '<div class="card" style="margin-bottom:10px"><div class="act"><div class="b"><div class="t">' + a.t + '</div><div class="d">' + a.d + '</div><div class="m"><div><b class="num">' + a.dist + '</b><span>Distance</span></div><div><b class="num">' + a.time + '</b><span>Time</span></div><div><b class="num">' + a.pace + '</b><span>Avg pace</span></div></div></div></div></div>').join("");
+    const list = state.logged.concat(SAMPLE_ACTS).map((a) =>'<div class="card" style="margin-bottom:10px"><div class="act"><div class="b"><div class="t">' + a.t + '</div><div class="d">' + a.d + '</div><div class="m"><div><b class="num">' + a.dist + '</b><span>Distance</span></div><div><b class="num">' + a.time + '</b><span>Time</span></div><div><b class="num">' + a.pace + '</b><span>Avg pace</span></div></div></div></div></div>').join("");
     return tabs + '<div style="font-size:12.5px;color:var(--ink-faint);margin:0 2px 12px">Your recent runs</div>' + list;
   }
   return tabs + viewPerformance();
@@ -486,9 +518,75 @@ function refreshTypePreview() {
   } catch (e) {}
 }
 
+// ============ LIVE SESSION (in-app) ========================================
+const KIND_COLOR = { warmup: "var(--base)", cooldown: "var(--base)", steady: "var(--base)", recovery: "var(--taper)", rep: "var(--peak)" };
+let LIVE = null;
+function startSession() {
+  const s = rawToday();
+  LIVE = { session: s, rt: new RC.LiveSession(s), vms: 0, dist: 0, hr: 105, timer: null, speed: 20, lastStep: -1, quirk: 0, done: false };
+  state.screen = "live"; render();
+}
+function viewLive() {
+  const s = LIVE.session;
+  return '<button class="backbtn" id="liveBack">‹ Today</button>' +
+    '<div class="card live-hero"><div class="eyebrow">Live session · sim ' + LIVE.speed + '×</div><div class="live-title">' + s.title + '</div>' +
+    '<div class="live-metrics"><div><div class="lk">Elapsed</div><div class="lv num" id="lElapsed">0:00</div></div>' +
+    '<div><div class="lk">Distance</div><div class="lv num" id="lDist">0.00<small> km</small></div></div>' +
+    '<div><div class="lk">Pace</div><div class="lv num none" id="lPace">—</div></div></div></div>' +
+    '<div class="card lstep" id="lStepCard"><div class="cnt">Press start when you\'re ready.</div></div>' +
+    '<div class="live-controls"><button class="primary" id="lStart">' + ICON.play + ' Start</button><button class="ctrl" id="lPause" disabled>Pause</button><button class="ctrl" id="lFinish" disabled>Finish</button></div>' +
+    '<div class="card"><div class="subhead" style="margin-top:0">Coaching cues</div><div class="cuelog" id="lCues"><div style="color:var(--ink-faint);font-size:13px">Cues will appear as you run.</div></div></div>';
+}
+function livePace(step) { const band = step && step.targetPace; const mid = band ? (band.minSecPerKm + band.maxSecPerKm) / 2 : 360; LIVE.quirk += (Math.random() - 0.5) * 0.03; LIVE.quirk *= 0.9; if (Math.random() < 0.04) LIVE.quirk += (Math.random() - 0.5) * 0.28; return Math.max(120, mid * (1 + LIVE.quirk)); }
+function liveHr(step) { if (!step) return 105; if (step.kind === "rep") return 176; if (step.kind === "warmup" || step.kind === "cooldown") return 130; if (step.kind === "recovery") return 148; return 150; }
+function liveCue(cue) {
+  const log = $("lCues"); if (!log) return; const empty = log.firstChild; if (empty && empty.style) empty.remove();
+  const cls = cue.kind === "pace" ? "pace-" + cue.paceStatus : cue.kind === "step-start" ? "step" : cue.kind === "session-start" ? "start" : cue.kind === "session-complete" ? "done" : "";
+  const e = el('<div class="cue ' + cls + '"><span class="badge"></span><span class="ct">' + fmtPace(cue.atMs / 1000) + '</span><span>' + cue.message + '</span></div>');
+  log.insertBefore(e, log.firstChild);
+}
+function liveUpdate(snap) {
+  $("lElapsed").textContent = fmtPace(snap.elapsedSeconds);
+  $("lDist").innerHTML = (snap.distanceMeters / 1000).toFixed(2) + '<small> km</small>';
+  const pv = $("lPace"); pv.textContent = snap.currentPaceSecPerKm ? fmtPace(snap.currentPaceSecPerKm) : "—"; pv.className = "lv num " + (snap.paceStatus || "none");
+  const step = snap.step, card = $("lStepCard");
+  if (step) {
+    const c = KIND_COLOR[step.kind] || "var(--base)";
+    const tgt = [];
+    if (step.gate === "distance" && step.targetMeters) tgt.push(Math.round(step.targetMeters) + " m");
+    else if (step.targetSeconds) tgt.push(fmtPace(step.targetSeconds));
+    if (step.targetPace) tgt.push("target " + fmtPace(step.targetPace.minSecPerKm) + "–" + fmtPace(step.targetPace.maxSecPerKm));
+    card.innerHTML = '<span class="kt" style="--kc:' + c + '">' + step.kind + (step.repeatIndex ? ' ' + step.repeatIndex + '/' + step.repeatCount : '') + '</span><h4>' + step.label + '</h4><div class="tgt">' + tgt.join(" · ") + '</div><div class="lpbar" style="--kc:' + c + '"><i style="width:' + Math.round(snap.stepProgress * 100) + '%"></i></div><div class="cnt">Step ' + (step.index + 1) + ' of ' + step.total + '</div>';
+  } else if (snap.status === "completed") {
+    card.innerHTML = '<span class="kt" style="--kc:var(--build)">done</span><h4>Session complete</h4><div class="tgt">Nice work.</div>';
+  }
+}
+function liveTick() {
+  const dt = 0.2 * LIVE.speed; LIVE.vms += dt * 1000;
+  const pre = LIVE.rt.snapshot(LIVE.vms);
+  if (pre.step && pre.step.index !== LIVE.lastStep) { LIVE.quirk = 0; LIVE.lastStep = pre.step.index; }
+  const pace = livePace(pre.step); LIVE.dist += (1000 / pace) * dt;
+  LIVE.hr += (liveHr(pre.step) - LIVE.hr) * 0.05 + (Math.random() - 0.5) * 1.5; LIVE.hr = Math.max(95, Math.min(190, LIVE.hr));
+  LIVE.rt.update({ atMs: LIVE.vms, distanceMeters: LIVE.dist, heartRateBpm: Math.round(LIVE.hr) }).forEach(liveCue);
+  liveUpdate(LIVE.rt.snapshot(LIVE.vms));
+  if (LIVE.rt.getStatus() === "completed") { stopLive(); liveFinish(true); }
+}
+function startLoop() { if (!LIVE.timer) LIVE.timer = setInterval(liveTick, 200); }
+function stopLive() { if (LIVE && LIVE.timer) { clearInterval(LIVE.timer); LIVE.timer = null; } }
+function liveFinish(complete) {
+  if (LIVE.done) return; LIVE.done = true; stopLive();
+  if (!complete) LIVE.rt.stop(LIVE.vms).forEach(liveCue);
+  const snap = LIVE.rt.snapshot(LIVE.vms);
+  const km = snap.distanceMeters / 1000;
+  if (km > 0.05) state.logged.unshift({ t: LIVE.session.title, d: "Today", dist: km.toFixed(2) + " km", time: fmtPace(snap.elapsedSeconds), pace: (snap.averagePaceSecPerKm ? fmtPace(snap.averagePaceSecPerKm) : "—") + " /km" });
+  const st = $("lStart"), pa = $("lPause"), fi = $("lFinish");
+  if (st) { st.style.display = "none"; }
+  if (pa) pa.disabled = true;
+  if (fi) { fi.textContent = "Done"; fi.disabled = false; fi.onclick = () => { state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); }; }
+}
+
 // ---- Router ---------------------------------------------------------------
 const TITLES = { today: "Today", plan: "Your Plan", activities: "Activities", community: "Community", support: "Support" };
-const LIVE_URL = "https://claude.ai/code/artifact/8313d634-7614-416d-b013-f0ce18d86499";
 function render() {
   const v = $("view");
   if (state.screen === "setup") {
@@ -499,6 +597,13 @@ function render() {
     document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
     wire();
     refreshTypePreview();
+    return;
+  }
+  if (state.screen === "live") {
+    $("topTitle").textContent = "Session";
+    v.innerHTML = viewLive(); v.scrollTop = 0;
+    document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
+    wire();
     return;
   }
   $("topTitle").textContent = state.support ? "Support" : TITLES[state.tab];
@@ -535,14 +640,24 @@ function wire() {
   const save = $("saveProfile"); if (save) save.onclick = () => {
     let pf; try { pf = draftFromForm(); } catch (e) { const er = $("setupErr"); er.style.display = "block"; er.textContent = e.message; return; }
     let out; try { out = applyProfile(pf); } catch (e) { const er = $("setupErr"); er.style.display = "block"; er.textContent = "That goal can't be planned yet — try a race date further out."; return; }
-    profile = pf; PLAN = out.plan; FITNESS = out.fitness; CLASS = out.classification; MASTERS = out.masters; state.planWeek = PLAN.defaultWeekIndex; saveProfileStore();
+    profile = pf; PLAN = out.plan; RAW = out.raw; FITNESS = out.fitness; CLASS = out.classification; MASTERS = out.masters; state.planWeek = PLAN.defaultWeekIndex; saveProfileStore();
     state.screen = null; state.tab = "plan"; render();
   };
   const cancel = $("cancelSetup"); if (cancel) cancel.onclick = () => { state.screen = null; state.tab = "today"; render(); };
+  // Live session wiring
+  const startBtn = $("startSession"); if (startBtn) startBtn.onclick = startSession;
+  const lb = $("liveBack"); if (lb) lb.onclick = () => { stopLive(); state.screen = null; state.tab = "today"; render(); };
+  const lStart = $("lStart"); if (lStart) lStart.onclick = () => { LIVE.rt.start(LIVE.vms).forEach(liveCue); startLoop(); lStart.style.display = "none"; $("lPause").disabled = false; $("lFinish").disabled = false; };
+  const lPause = $("lPause"); if (lPause) lPause.onclick = () => {
+    const st = LIVE.rt.getStatus();
+    if (st === "active") { LIVE.rt.pause(LIVE.vms).forEach(liveCue); stopLive(); lPause.textContent = "Resume"; }
+    else if (st === "paused") { LIVE.rt.resume(LIVE.vms).forEach(liveCue); startLoop(); lPause.textContent = "Pause"; }
+  };
+  const lFinish = $("lFinish"); if (lFinish && !LIVE.done) lFinish.onclick = () => liveFinish(false);
 }
 function buildNav() {
   $("nav").innerHTML = ["today","plan","activities","community","support"].map((t) => '<button class="navbtn' + (t===state.tab?" on":"") + '" data-tab="' + t + '">' + ICON[t] + '<span class="nl">' + TITLES[t].replace("Your ","") + '</span></button>').join("");
-  document.querySelectorAll(".navbtn").forEach((b) => b.onclick = () => { state.screen = null; state.tab = b.dataset.tab; if (b.dataset.tab !== "support") state.support = null; render(); });
+  document.querySelectorAll(".navbtn").forEach((b) => b.onclick = () => { stopLive(); state.screen = null; state.tab = b.dataset.tab; if (b.dataset.tab !== "support") state.support = null; render(); });
 }
 $("profileBtn").innerHTML = ICON.person; $("bellBtn").innerHTML = ICON.bell; $("themeBtn").innerHTML = ICON.theme;
 $("themeBtn").onclick = () => { const cur = document.documentElement.getAttribute("data-theme"); document.documentElement.setAttribute("data-theme", cur === "dark" ? "light" : cur === "light" ? "dark" : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark")); };

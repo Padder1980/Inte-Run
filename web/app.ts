@@ -27,7 +27,7 @@ const html = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Running Coach</title>
+<title>InteRun — The Intelligent Training Companion</title>
 <style>
 :root {
   color-scheme: light dark;

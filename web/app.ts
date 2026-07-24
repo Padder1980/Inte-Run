@@ -151,13 +151,15 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .ex { display: flex; gap: 14px; align-items: center; }
 .ex-anim { width: 92px; height: 100px; flex: none; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
 .exfig { width: 100%; height: 100%; display: block; }
-.exfig line, .exfig circle { stroke: var(--accent); stroke-width: 4.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
-.exfig circle { fill: var(--accent); stroke: none; }
+.exfig .limb { stroke: var(--ink-soft); stroke-width: 11; fill: none; stroke-linecap: round; }
+.exfig .torso { stroke: var(--ink-soft); stroke-width: 22; fill: none; stroke-linecap: round; }
+.exfig .head { fill: var(--ink-soft); stroke: none; }
+.exfig .back { opacity: .5; }
 .exfig .grd { stroke: var(--line); stroke-width: 2.5; }
-.exfig .p0 { animation: exposeA 1.9s ease-in-out infinite; }
-.exfig .p1 { animation: exposeB 1.9s ease-in-out infinite; }
-@keyframes exposeA { 0% { opacity: 1; } 45% { opacity: 0; } 55% { opacity: 0; } 100% { opacity: 1; } }
-@keyframes exposeB { 0% { opacity: 0; } 45% { opacity: 1; } 55% { opacity: 1; } 100% { opacity: 0; } }
+.exfig .p0 { animation: exposeA 2s ease-in-out infinite; }
+.exfig .p1 { animation: exposeB 2s ease-in-out infinite; }
+@keyframes exposeA { 0%,40% { opacity: 1; } 50%,90% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes exposeB { 0%,40% { opacity: 0; } 50%,90% { opacity: 1; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .exfig .p0, .exfig .p1 { animation: none; } .exfig .p1 { opacity: .4; } }
 .ex-main { flex: 1; min-width: 0; }
 .ex-name { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
@@ -170,6 +172,21 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .ex-x { text-align: center; color: var(--ink-faint); font-size: 13px; }
 .set-in { font: inherit; font-size: 14px; text-align: center; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 9px; padding: 8px 6px; width: 100%; }
 .set-in:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+/* Strength history / progress */
+.sh-card { margin-bottom: 12px; }
+.sh-head { display: flex; align-items: center; gap: 12px; }
+.sh-anim { width: 62px; height: 68px; }
+.sh-main { flex: 1; min-width: 0; }
+.sh-name { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+.sh-mus { font-size: 12px; color: var(--ink-soft); margin-top: 1px; }
+.sh-best { font-size: 12px; color: var(--ink-faint); margin-top: 5px; } .sh-best b { color: var(--accent); font-weight: 700; }
+.sh-spark { display: flex; align-items: flex-end; gap: 3px; height: 40px; width: 74px; flex: none; }
+.sh-spark i { flex: 1; background: color-mix(in srgb, var(--accent) 55%, var(--surface-2)); border-radius: 2px 2px 0 0; }
+.sh-spark i:last-child { background: var(--accent); }
+.sh-rows { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
+.sh-row { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; font-size: 12.5px; }
+.sh-wk { color: var(--ink-faint); font-weight: 600; flex: none; }
+.sh-sets { font-family: var(--mono); color: var(--ink-soft); text-align: right; }
 
 .view { flex: 1; overflow-y: auto; padding: 16px 16px 96px; }
 .eyebrow { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); font-weight: 600; }
@@ -745,13 +762,16 @@ function structureRows(steps) {
   return rows;
 }
 // ---- Exercise demo animations (original, CSS cross-fade between two poses) --
-function figSeg(a, b) { return '<line x1="' + a[0] + '" y1="' + a[1] + '" x2="' + b[0] + '" y2="' + b[1] + '"/>'; }
+function figSeg(a, b, cls) { return '<line class="' + cls + '" x1="' + a[0] + '" y1="' + a[1] + '" x2="' + b[0] + '" y2="' + b[1] + '"/>'; }
+// A filled "mannequin": thick capsule limbs, a solid torso and a round head — not a thin stick figure.
 function fig(j) {
-  const neck = [j.head[0], j.head[1] + 7];
-  let s = '<circle cx="' + j.head[0] + '" cy="' + j.head[1] + '" r="7"/>';
-  s += figSeg(neck, j.hip) + figSeg(j.hip, j.knee) + figSeg(j.knee, j.ankle) + figSeg(neck, j.el) + figSeg(j.el, j.ha);
-  if (j.knee2) s += figSeg(j.hip, j.knee2) + figSeg(j.knee2, j.ankle2);
-  if (j.el2) s += figSeg(neck, j.el2) + figSeg(j.el2, j.ha2);
+  const neck = [j.head[0], j.head[1] + 8];
+  let s = figSeg(neck, j.hip, "torso");
+  // Far-side (back) arm/leg first, slightly faded, for a sense of depth.
+  if (j.knee2) s += figSeg(j.hip, j.knee2, "limb back") + figSeg(j.knee2, j.ankle2, "limb back");
+  if (j.el2) s += figSeg(neck, j.el2, "limb back") + figSeg(j.el2, j.ha2, "limb back");
+  s += figSeg(j.hip, j.knee, "limb") + figSeg(j.knee, j.ankle, "limb") + figSeg(neck, j.el, "limb") + figSeg(j.el, j.ha, "limb");
+  s += '<circle class="head" cx="' + j.head[0] + '" cy="' + j.head[1] + '" r="9"/>';
   return s;
 }
 const _S = { head: [60, 26], hip: [60, 80], knee: [60, 102], ankle: [60, 124], el: [49, 56], ha: [46, 76] };
@@ -932,12 +952,65 @@ const SAMPLE_ACTS = [
   { t: "Easy Run", d: "14 Jul · 14:58", dist: "4.58 km", time: "25:36", pace: "5:35 /km" },
 ];
 function viewActivities() {
-  const tabs = '<div class="subtabs"><button data-at="workouts"' + (state.actTab==="workouts"?' class="on"':'') + '>Workouts</button><button data-at="performance"' + (state.actTab==="performance"?' class="on"':'') + '>Performance</button></div>';
+  const t = (k, lab) => '<button data-at="' + k + '"' + (state.actTab === k ? ' class="on"' : '') + '>' + lab + '</button>';
+  const tabs = '<div class="subtabs">' + t("workouts", "Runs") + t("strength", "Strength") + t("performance", "Performance") + '</div>';
   if (state.actTab === "workouts") {
     const list = state.logged.concat(SAMPLE_ACTS).map((a) =>'<div class="card" style="margin-bottom:10px"><div class="act"><div class="b"><div class="t">' + a.t + '</div><div class="d">' + a.d + '</div><div class="m"><div><b class="num">' + a.dist + '</b><span>Distance</span></div><div><b class="num">' + a.time + '</b><span>Time</span></div><div><b class="num">' + a.pace + '</b><span>Avg pace</span></div></div></div></div></div>').join("");
     return tabs + '<div style="font-size:12.5px;color:var(--ink-faint);margin:0 2px 12px">Your recent runs</div>' + list;
   }
+  if (state.actTab === "strength") return tabs + viewStrengthHistory();
   return tabs + viewPerformance();
+}
+// Aggregate all logged strength sets by exercise, in plan order (week = a session instance).
+function strengthHistory() {
+  const slog = loadSlog();
+  const groups = {};
+  for (const key in slog) {
+    const parts = key.split("|");
+    const g = parts[0] + "|" + parts[1];
+    (groups[g] = groups[g] || {})[parts[2]] = slog[key];
+  }
+  const byEx = {};
+  for (const g in groups) {
+    const gp = g.split("|");
+    const sessId = gp[0], exIdx = Number(gp[1]);
+    const wk = Number((sessId.match(/^w(\\d+)/) || [])[1]);
+    const raw = RAW.weeks[wk - 1] && RAW.weeks[wk - 1].sessions.find((s) => s.id === sessId);
+    const ex = raw && raw.exercises && raw.exercises[exIdx];
+    if (!ex) continue;
+    const sets = Object.keys(groups[g]).sort((a, b) => a - b).map((i) => groups[g][i]).filter((s) => s.w || s.r);
+    if (!sets.length) continue;
+    (byEx[ex.name] = byEx[ex.name] || { name: ex.name, primary: ex.primary, pattern: ex.pattern, instances: [] }).instances.push({ week: wk, sets });
+  }
+  for (const n in byEx) byEx[n].instances.sort((a, b) => a.week - b.week);
+  return byEx;
+}
+function topWeight(sets) { return sets.reduce((m, s) => Math.max(m, parseFloat(s.w) || 0), 0); }
+function viewStrengthHistory() {
+  const hist = strengthHistory();
+  const names = Object.keys(hist);
+  if (!names.length) {
+    return '<div class="empty-state"><div class="ic">' + ICON.dumbbell + '</div><h3>No strength logged yet</h3><p>Open a strength session, tap an exercise and record your weights and reps. Your progress on each lift will build up here.</p></div>';
+  }
+  // Sort by most recently logged.
+  names.sort((a, b) => hist[b].instances[hist[b].instances.length - 1].week - hist[a].instances[hist[a].instances.length - 1].week);
+  const cards = names.map((n) => {
+    const ex = hist[n];
+    const best = ex.instances.reduce((m, ins) => Math.max(m, topWeight(ins.sets)), 0);
+    const tops = ex.instances.map((ins) => topWeight(ins.sets));
+    const peak = Math.max(...tops, 1);
+    const spark = tops.map((w) => '<i style="height:' + Math.max(8, Math.round((w / peak) * 100)) + '%"></i>').join("");
+    const rows = ex.instances.slice().reverse().slice(0, 4).map((ins) => {
+      const sets = ins.sets.map((s) => (s.w || "—") + (s.w ? "kg" : "") + (s.r ? " × " + s.r : "")).join("  ·  ");
+      return '<div class="sh-row"><span class="sh-wk">Week ' + ins.week + '</span><span class="sh-sets">' + sets + '</span></div>';
+    }).join("");
+    return '<div class="card sh-card"><div class="sh-head"><div class="ex-anim sh-anim">' + exAnim(ex.pattern) + '</div>' +
+      '<div class="sh-main"><div class="sh-name">' + esc(ex.name) + '</div><div class="sh-mus">' + esc(ex.primary) + '</div>' +
+      '<div class="sh-best">Best <b>' + (best ? best + " kg" : "—") + '</b> · ' + ex.instances.length + ' session' + (ex.instances.length > 1 ? "s" : "") + '</div></div>' +
+      (tops.some((w) => w > 0) ? '<div class="sh-spark">' + spark + '</div>' : '') + '</div>' +
+      '<div class="sh-rows">' + rows + '</div></div>';
+  }).join("");
+  return '<div style="font-size:12.5px;color:var(--ink-faint);margin:0 2px 12px">Your logged lifts — weight & reps over time.</div>' + cards;
 }
 function dimLevel(vo2) { return vo2 < 40 ? 1 : vo2 < 50 ? 2 : vo2 < 60 ? 3 : 4; }
 function viewPerformance() {

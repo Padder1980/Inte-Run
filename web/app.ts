@@ -136,6 +136,14 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .sd-lab { font-size: 14px; font-weight: 600; margin-top: 2px; letter-spacing: -.01em; }
 .sd-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .sd-rec { font-size: 12px; color: var(--ink-faint); margin-top: 4px; }
+.sd-move { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 16px; }
+.sd-move-h { font-size: 13px; font-weight: 700; letter-spacing: -.01em; }
+.sd-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 10px; }
+.sd-day { font: inherit; font-size: 12px; font-weight: 600; color: var(--ink-soft); background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%); border: 1px solid var(--line); border-radius: 10px; padding: 9px 0; cursor: pointer; box-shadow: 0 1px 2px rgba(20,32,27,.05); }
+.sd-day:active { transform: translateY(1px); }
+.sd-day.on { background: var(--ink); color: var(--surface); border-color: transparent; }
+.sd-day:disabled { cursor: default; }
+.sd-move-n { font-size: 11.5px; color: var(--ink-faint); margin-top: 8px; }
 .tap { cursor: pointer; } .sess.tap:active, .wk-card.tap:active { opacity: .65; }
 
 .view { flex: 1; overflow-y: auto; padding: 16px 16px 96px; }
@@ -512,13 +520,29 @@ let PLAN, RAW, FITNESS, CLASS, MASTERS;
 function recompute() { const r = applyProfile(profile); PLAN = r.plan; RAW = r.raw; FITNESS = r.fitness; CLASS = r.classification; MASTERS = r.masters; }
 try { recompute(); } catch (e) { profile = Object.assign({}, DEFAULT_PROFILE); recompute(); }
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: [], weather: "hot", trialPending: false, trialSaved: null, done: {} };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: [], weather: "hot", trialPending: false, trialSaved: null, done: {}, dayOverride: {} };
+// Effective day index for a session, honouring any user reschedule. Works for raw sessions
+// (dayOfWeek) and summary sessions (dayIndex), keyed by the shared session id.
+function effDay(s) { const o = state.dayOverride[s.id]; return o != null ? o : (s.dayOfWeek != null ? s.dayOfWeek : s.dayIndex); }
+const PRIMARY_TYPES = { easy: 1, long: 1, recovery: 1, threshold: 1, vo2: 1, strides: 1, "race-specific": 1 };
+// Move a session to a target day; if a run already sits there, the two swap days.
+function moveSession(week, sess, target) {
+  const cur = effDay(sess);
+  if (target === cur) return;
+  const wk = RAW.weeks[week - 1]; if (!wk) return;
+  if (PRIMARY_TYPES[sess.type]) {
+    const occ = wk.sessions.find((s) => s.id !== sess.id && PRIMARY_TYPES[s.type] && effDay(s) === target);
+    if (occ) state.dayOverride[occ.id] = cur;
+  }
+  state.dayOverride[sess.id] = target;
+}
 const TODAY_DOW = 3; // simulated "today" = Thursday, matching the week strip
 function doneKey(wIdx, s) { return wIdx + "|" + s.day + "|" + s.title; }
 // Seed a realistic completed state for the demo: week-1 sessions earlier in the week than "today"
 // count as done, so the calendar and Today reflect progress the way a mid-week user would see it.
 function seedDone() {
   state.done = {};
+  state.dayOverride = {}; // a fresh plan clears any reschedules (session ids change)
   const wk = PLAN.weeks[0]; if (!wk) return;
   wk.sessions.forEach((s) => { if (DAY_ORDER.indexOf(s.day) < TODAY_DOW && s.type !== "rest") state.done[doneKey(wk.index, s)] = true; });
 }
@@ -568,8 +592,8 @@ function viewToday() {
   const today = 3; // Thu
   const strip = DAY_ORDER.map((d, i) => {
     const wk = PLAN.weeks[0];
-    const has = wk.sessions.some((s) => s.day === d && s.type !== "rest");
-    const eff = (wk.sessions.find((s) => s.day === d && s.type !== "rest") || {}).effort;
+    const has = wk.sessions.some((s) => s.type !== "rest" && effDay(s) === i);
+    const eff = (wk.sessions.find((s) => s.type !== "rest" && effDay(s) === i) || {}).effort;
     return '<div class="d' + (i === today ? " today" : "") + '"><div class="dn">' + d + '</div><div class="dd">' + (20 + i) + '</div>' + (has ? '<div class="dot" style="background:var(--eff-' + (eff || "easy") + ')"></div>' : "<div class=\\"dot\\" style=\\"background:transparent\\"></div>") + '</div>';
   }).join("");
   if (state.trialPending) {
@@ -629,7 +653,7 @@ function calSessionRow(wIdx, s) {
   if (s.durMin) bits.push(s.durMin + "m");
   return '<div class="cal-sess' + (done ? " done" : "") + '">' +
     '<span class="cal-bar" style="background:var(--eff-' + s.effort + ')"></span>' +
-    '<button class="cal-open" data-open="1" data-oweek="' + wIdx + '" data-oday="' + s.day + '" data-otitle="' + encodeURIComponent(s.title) + '"><span class="cal-t">' + s.title + '</span><span class="cal-sub">' + bits.join(" • ") + '</span></button>' +
+    '<button class="cal-open" data-open="1" data-oweek="' + wIdx + '" data-oid="' + s.id + '"><span class="cal-t">' + s.title + '</span><span class="cal-sub">' + bits.join(" • ") + '</span></button>' +
     '<button class="cal-check" data-done="' + key + '" aria-label="Mark done">' + (done ? ICON.check : "") + '</button></div>';
 }
 function viewCalendar() {
@@ -641,7 +665,7 @@ function viewCalendar() {
     const rows = DAY_ORDER.map((dn, i) => {
       const dt = isoAdd(w.startIso, i);
       const isToday = dt.toISOString().slice(0, 10) === todayIsoStr;
-      const daySessions = w.sessions.filter((s) => s.day === dn && s.type !== "rest");
+      const daySessions = w.sessions.filter((s) => s.type !== "rest" && effDay(s) === i);
       const cells = daySessions.length ? daySessions.map((s) => calSessionRow(w.index, s)).join("") : '<div class="cal-empty">Rest</div>';
       return '<div class="cal-day' + (isToday ? " is-today" : "") + '"><div class="cal-dcol"><div class="cal-dn">' + dn.toUpperCase() + '</div><div class="cal-dd">' + dt.getUTCDate() + '</div></div><div class="cal-scol">' + cells + '</div></div>';
     }).join("");
@@ -658,6 +682,10 @@ function rawSession(wIdx, dayName, title) {
   const w = RAW.weeks[wIdx - 1]; if (!w) return null;
   const dow = DAY_ORDER.indexOf(dayName);
   return w.sessions.find((s) => s.dayOfWeek === dow && s.title === title) || w.sessions.find((s) => s.title === title) || null;
+}
+function rawSessionById(wIdx, id) {
+  const w = RAW.weeks[wIdx - 1]; if (!w) return null;
+  return w.sessions.find((s) => s.id === id) || null;
 }
 function fmtSec(s) { s = Math.round(s); if (s < 60) return s + "″"; const m = Math.floor(s / 60), x = s % 60; return x ? m + "′" + String(x).padStart(2, "0") + "″" : m + "′"; }
 function workLabel(st) { if (st.distanceMeters) return Math.round(st.distanceMeters) + " m"; if (st.durationSeconds) return fmtSec(st.durationSeconds); return st.label; }
@@ -691,7 +719,8 @@ function structureRows(steps) {
   }
   return rows;
 }
-function sessionSheetHtml(sess) {
+let SHEET_CTX = null;
+function sessionSheetHtml(sess, week) {
   const sc = "var(--eff-" + effortOf(sess) + ")";
   const dur = Math.round(sess.estimatedDurationSeconds / 60);
   const dist = sess.estimatedDistanceMeters ? (Math.round(sess.estimatedDistanceMeters / 100) / 10) + " km" : null;
@@ -699,11 +728,17 @@ function sessionSheetHtml(sess) {
   if (sess.targetRpe) chips.push('<span class="chip rpe">RPE ' + sess.targetRpe.min + "–" + sess.targetRpe.max + "</span>");
   const rows = structureRows(sess.steps).map((r) =>
     '<div class="sd-step"><div class="sd-dot" style="background:' + (r.muted ? "var(--ink-faint)" : sc) + '"></div><div><div class="sd-tag">' + r.tag + '</div><div class="sd-lab">' + r.lab + '</div>' + (r.chips ? '<div class="sd-meta">' + r.chips + '</div>' : "") + (r.rec ? '<div class="sd-rec">' + r.rec + '</div>' : "") + '</div></div>').join("");
+  // Reschedule row — pick any day; a run already there swaps with this one.
+  const cur = effDay(sess);
+  const dayPicker = DAY_ORDER.map((dn, i) => '<button class="sd-day' + (i === cur ? " on" : "") + '" data-moveto="' + i + '"' + (i === cur ? " disabled" : "") + '>' + dn + '</button>').join("");
+  const moveBlock = sess.type === "rest" ? "" :
+    '<div class="sd-move"><div class="sd-move-h">Move to another day</div><div class="sd-days">' + dayPicker + '</div><div class="sd-move-n">Pick a day. If a run is already there, the two will swap.</div></div>';
   return '<div class="sd-type" style="--sc:' + sc + '">' + (SESSION_LABEL[sess.type] || sess.type) + '</div>' +
     '<div class="sd-title">' + esc(sess.title) + '</div>' +
     '<div class="sd-chips">' + chips.join("") + '</div>' +
     '<div class="sd-desc">' + esc(sess.description) + '</div>' +
-    (rows ? '<div class="sd-steps">' + rows + '</div>' : "");
+    (rows ? '<div class="sd-steps">' + rows + '</div>' : "") +
+    moveBlock;
 }
 function ensureSheet() {
   if ($("sheetOv")) return;
@@ -712,11 +747,29 @@ function ensureSheet() {
   $("sheetClose").onclick = closeSheet;
   $("sheetOv").onclick = (e) => { if (e.target === $("sheetOv")) closeSheet(); };
 }
-function openSessionSheet(sess) { if (!sess) return; ensureSheet(); $("sheetBody").innerHTML = sessionSheetHtml(sess); $("sheetOv").classList.add("on"); }
+function wireSheet() {
+  document.querySelectorAll("[data-moveto]").forEach((b) => b.onclick = () => {
+    if (!SHEET_CTX) return;
+    moveSession(SHEET_CTX.week, SHEET_CTX.sess, Number(b.dataset.moveto));
+    closeSheet();
+    render();
+  });
+}
+function openSessionSheet(sess, week) {
+  if (!sess) return;
+  ensureSheet();
+  SHEET_CTX = { sess, week: week || state.planWeek || 1 };
+  $("sheetBody").innerHTML = sessionSheetHtml(sess, SHEET_CTX.week);
+  wireSheet();
+  $("sheetOv").classList.add("on");
+}
 function closeSheet() { const o = $("sheetOv"); if (o) o.classList.remove("on"); }
-// Wire every element carrying data-open to open its session detail.
+// Wire every element carrying data-open to open its session detail (keyed by stable session id).
 function wireSessionTaps() {
-  document.querySelectorAll("[data-open]").forEach((b) => b.onclick = () => openSessionSheet(rawSession(Number(b.dataset.oweek), b.dataset.oday, decodeURIComponent(b.dataset.otitle))));
+  document.querySelectorAll("[data-open]").forEach((b) => b.onclick = () => {
+    const wk = Number(b.dataset.oweek);
+    openSessionSheet(rawSessionById(wk, b.dataset.oid), wk);
+  });
 }
 
 // ============ PLAN =========================================================
@@ -745,16 +798,21 @@ function viewPlan() {
 }
 function weekDetail() {
   const w = PLAN.weeks.find((x) => x.index === state.planWeek) || PLAN.weeks[0];
-  const byDay = {}; w.sessions.forEach((s) => (byDay[s.day] = byDay[s.day] || []).push(s));
-  const rows = DAY_ORDER.filter((d) => byDay[d]).map((d) => {
-    const items = byDay[d].map((s) => {
-      const meta = ['<span class="chip">' + s.durMin + "′" + (s.distKm ? " · " + s.distKm + "km" : "") + "</span>"];
-      if (s.pace) meta.push('<span class="chip pace">' + s.pace + "</span>");
-      const tap = s.type !== "rest";
-      const attrs = tap ? ' class="sess tap" data-open="1" data-oweek="' + w.index + '" data-oday="' + s.day + '" data-otitle="' + encodeURIComponent(s.title) + '"' : ' class="sess"';
-      return '<div' + attrs + '><span class="dot ' + s.effort + '"></span><div><div class="st">' + s.title + '</div>' + (s.type==="rest"?"":'<div class="sm">' + meta.join("") + '</div>') + '</div></div>';
-    }).join("");
-    return '<div class="day-row"><div class="day-nm">' + d + '</div><div>' + items + '</div></div>';
+  const byDay = {};
+  w.sessions.filter((s) => s.type !== "rest").forEach((s) => { const d = effDay(s); (byDay[d] = byDay[d] || []).push(s); });
+  const rows = DAY_ORDER.map((dn, di) => {
+    const list = byDay[di];
+    let inner;
+    if (!list || !list.length) {
+      inner = '<div class="sess"><span class="dot none"></span><div><div class="st" style="color:var(--ink-faint);font-weight:550">Rest</div></div></div>';
+    } else {
+      inner = list.map((s) => {
+        const meta = ['<span class="chip">' + s.durMin + "′" + (s.distKm ? " · " + s.distKm + "km" : "") + "</span>"];
+        if (s.pace) meta.push('<span class="chip pace">' + s.pace + "</span>");
+        return '<div class="sess tap" data-open="1" data-oweek="' + w.index + '" data-oid="' + s.id + '"><span class="dot ' + s.effort + '"></span><div><div class="st">' + s.title + '</div><div class="sm">' + meta.join("") + '</div></div></div>';
+      }).join("");
+    }
+    return '<div class="day-row"><div class="day-nm">' + dn + '</div><div>' + inner + '</div></div>';
   }).join("");
   return '<div style="font-weight:650;font-size:15px;margin-bottom:2px">Week ' + w.index + ' · ' + w.phase + (w.isDeload?" · deload":"") + '</div><div style="font-size:12.5px;color:var(--ink-faint);margin-bottom:8px">' + w.focus + '</div>' + rows;
 }
@@ -1307,7 +1365,7 @@ function wire() {
   const cancel = $("cancelSetup"); if (cancel) cancel.onclick = () => { state.screen = null; state.tab = "today"; render(); };
   // Session detail taps (Plan, calendar, Today)
   wireSessionTaps();
-  const todayCard = $("todayCard"); if (todayCard) todayCard.onclick = () => openSessionSheet(rawToday());
+  const todayCard = $("todayCard"); if (todayCard) todayCard.onclick = () => openSessionSheet(rawToday(), 1);
   // Training-calendar wiring
   const calBack = $("calBack"); if (calBack) calBack.onclick = () => { state.screen = null; render(); };
   document.querySelectorAll("[data-done]").forEach((b) => b.onclick = () => { const k = b.dataset.done; state.done[k] = !state.done[k]; render(); });

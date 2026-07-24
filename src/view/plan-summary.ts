@@ -10,7 +10,9 @@ import { isoToday } from "../plan/dates.ts";
 import { formatDuration, metresToKm } from "../domain/units.ts";
 
 export type SessionView = {
+  id: string;
   day: string;
+  dayIndex: number;
   type: Session["type"];
   title: string;
   effort: "easy" | "moderate" | "hard" | "none";
@@ -133,7 +135,9 @@ function weekView(w: PlannedWeek): WeekView {
     quality: w.qualitySessionCount,
     longRunMin: longRun ? Math.round(longRun.estimatedDurationSeconds / 60) : 0,
     sessions: sessions.map((s) => ({
+      id: s.id,
       day: DAY_NAMES[s.dayOfWeek] ?? "?",
+      dayIndex: s.dayOfWeek,
       type: s.type,
       title: s.title,
       effort: effort(s),

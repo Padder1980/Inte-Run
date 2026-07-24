@@ -29,6 +29,7 @@ import {
   contExplore,
   contPickups,
   contProgression,
+  easyHillStrides,
   easyRun,
   generalStrengthSession,
   longRun,
@@ -177,12 +178,12 @@ function buildWeek(
     dayOf.push(qualityDays[qi]!);
   });
 
-  // Easy runs — one carries strides during base/build.
+  // Easy runs — rotate flavours (plain, strides, hill sprints, explore) so easy days stay fresh.
   const easyDays = EASY_DAY_POOL.slice(0, easyCount);
+  const canStride = (wp.phase === "base" || wp.phase === "build") && !wp.isDeload;
   easyDays.forEach((d, ei) => {
-    const withStrides = ei === 0 && (wp.phase === "base" || wp.phase === "build") && !wp.isDeload;
     const minutes = wp.isDeload ? 35 : ei === easyDays.length - 1 ? 40 : 45;
-    sessions.push(easyRun(ctx.paces, minutes, withStrides));
+    sessions.push(easyVariant(ctx.paces, minutes, index + ei, canStride));
     dayOf.push(d);
   });
 
@@ -413,6 +414,15 @@ function qualityContentsFor(
   const lateBase = wp.ordinalInPhase > Math.ceil(wp.phaseTotal / 2);
   out.push(lateBase && weekIndex % 2 === 0 ? vo2Session(p, weekIndex) : thresholdSession(p, weekIndex));
   return out.slice(0, count);
+}
+
+// Rotate easy-run flavours for non-beginners. All stay genuinely easy; strides/hill sprints only in
+// base/build (neuromuscular work, near-zero aerobic cost), explore/plain anytime.
+function easyVariant(paces: TrainingPaces, minutes: number, idx: number, canStride: boolean): SessionContent {
+  const pool: ((p: TrainingPaces, m: number) => SessionContent)[] = canStride
+    ? [(p, m) => easyRun(p, m, false), (p, m) => easyRun(p, m, true), (p, m) => easyHillStrides(p, m), (p, m) => contExplore(p, m)]
+    : [(p, m) => easyRun(p, m, false), (p, m) => contExplore(p, m)];
+  return pool[idx % pool.length]!(paces, minutes);
 }
 
 function longRunFor(phase: Phase, ctx: WeekContext): SessionContent {

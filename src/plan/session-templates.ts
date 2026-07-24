@@ -263,6 +263,22 @@ export function contExplore(p: TrainingPaces, min: number): SessionContent {
   );
 }
 
+// Easy run finished with short, sharp uphill sprints — big neuromuscular benefit, minimal fatigue.
+export function easyHillStrides(paces: TrainingPaces, minutes: number): SessionContent {
+  const steps: WorkoutStep[] = [
+    { kind: "steady", label: "Easy, conversational running", durationSeconds: minutes * 60, targetPaceSecPerKm: paces.easy, targetRpe: RPE.easy },
+    { kind: "rep", label: "6 × 10″ hill sprints — short and powerful, full walk-back recovery", durationSeconds: 6 * 10, targetRpe: { min: 7, max: 8 }, repeatCount: 6 },
+  ];
+  return assemble(
+    "strides",
+    `${minutes}′ easy + hill sprints`,
+    "Easy running plus a handful of short, sharp uphill sprints at the end — big power and economy benefit for very little fatigue. Full recovery between; these are about quality, not burn.",
+    "easy",
+    steps,
+    RPE.easy,
+  );
+}
+
 export function recoveryRun(paces: TrainingPaces, minutes: number): SessionContent {
   return assemble(
     "recovery",

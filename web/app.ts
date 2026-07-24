@@ -76,6 +76,22 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 @keyframes splashpop { from { opacity: 0; transform: scale(.7) translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes splashfade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .splash-mark, .splash-name, .splash-tag { animation: none; } }
+/* First-run welcome */
+.welcome { position: fixed; inset: 0; z-index: 90; background: radial-gradient(120% 90% at 50% 0%, #0c2b28 0%, #000 62%); display: none; align-items: center; justify-content: center; padding: 32px; text-align: center; opacity: 1; transition: opacity .5s ease; }
+.welcome.on { display: flex; }
+.welcome.hide { opacity: 0; pointer-events: none; }
+.welcome-inner { max-width: 360px; }
+.welcome-mark svg { width: 82px; height: 82px; filter: drop-shadow(0 8px 26px rgba(22,183,164,.4)); animation: splashpop .7s cubic-bezier(.2,.9,.3,1.1) both; }
+.welcome-h { font-size: 30px; font-weight: 800; letter-spacing: -.02em; color: #fff; margin: 20px 0 18px; animation: welIn .6s ease .15s both; }
+.welcome-h span { color: #16b7a4; }
+.welcome-msg { font-size: 16px; line-height: 1.5; color: #cfd6d3; margin: 0 0 12px; opacity: 0; }
+.welcome-msg.m1 { animation: welIn .55s ease .55s both; }
+.welcome-msg.m2 { animation: welIn .55s ease 1.15s both; }
+.welcome-msg.m3 { color: #fff; font-weight: 600; animation: welIn .55s ease 1.85s both; }
+.welcome-cta { margin-top: 22px; font: inherit; font-size: 16px; font-weight: 700; color: var(--accent-ink); background: linear-gradient(180deg, #1cc4b0 0%, #0e8c7f 60%, #0b6f65 100%); border: 0; border-radius: 14px; padding: 15px 30px; cursor: pointer; box-shadow: 0 1px 0 rgba(255,255,255,.25) inset, 0 10px 26px -8px rgba(22,183,164,.6); opacity: 0; animation: welIn .55s ease 2.5s both; }
+.welcome-cta:active { transform: translateY(1px); }
+@keyframes welIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .welcome-mark svg, .welcome-h, .welcome-msg, .welcome-cta { animation-duration: .01s !important; animation-delay: 0s !important; } }
 /* Training calendar */
 .cal-wrap { display: flex; flex-direction: column; gap: 16px; }
 .cal-week { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
@@ -101,6 +117,26 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .cal-check { width: 24px; height: 24px; border-radius: 50%; flex: none; border: 1.5px solid var(--line); display: flex; align-items: center; justify-content: center; color: #fff; }
 .cal-sess.done .cal-check { background: var(--ink); border-color: var(--ink); }
 .cal-check svg { width: 15px; height: 15px; }
+.cal-open { flex: 1; min-width: 0; text-align: left; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; padding: 0; }
+.cal-check { cursor: pointer; }
+/* Session detail sheet */
+.sheet-ov { position: fixed; inset: 0; z-index: 70; display: none; align-items: flex-end; justify-content: center; background: color-mix(in srgb, var(--ink) 52%, transparent); backdrop-filter: blur(3px); }
+.sheet-ov.on { display: flex; }
+.sheet { position: relative; width: 100%; max-width: 440px; max-height: 88vh; overflow-y: auto; background: var(--surface); border-radius: 22px 22px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,.25); padding: 22px 18px calc(26px + env(safe-area-inset-bottom)); animation: sheetUp .28s cubic-bezier(.2,.8,.3,1) both; }
+@keyframes sheetUp { from { transform: translateY(28px); opacity: .5; } to { transform: none; opacity: 1; } }
+.sheet-x { position: absolute; top: 14px; right: 14px; display: flex; align-items: center; justify-content: center; background: var(--surface-2); border: 1px solid var(--line); border-radius: 50%; width: 30px; height: 30px; font-size: 14px; color: var(--ink-soft); cursor: pointer; }
+.sd-type { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--sc, var(--accent)); }
+.sd-title { font-size: 20px; font-weight: 750; letter-spacing: -.01em; margin: 4px 44px 10px 0; }
+.sd-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.sd-desc { font-size: 13.5px; line-height: 1.55; color: var(--ink-soft); margin-bottom: 4px; }
+.sd-steps { margin-top: 12px; }
+.sd-step { display: grid; grid-template-columns: 12px 1fr; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.sd-dot { width: 11px; height: 11px; border-radius: 50%; margin-top: 4px; }
+.sd-tag { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-faint); }
+.sd-lab { font-size: 14px; font-weight: 600; margin-top: 2px; letter-spacing: -.01em; }
+.sd-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.sd-rec { font-size: 12px; color: var(--ink-faint); margin-top: 4px; }
+.tap { cursor: pointer; } .sess.tap:active, .wk-card.tap:active { opacity: .65; }
 
 .view { flex: 1; overflow-y: auto; padding: 16px 16px 96px; }
 .eyebrow { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); font-weight: 600; }
@@ -352,6 +388,16 @@ select.sel { font: inherit; font-size: 13.5px; color: var(--ink); background: va
   <div class="splash-name">Inte<span>Run</span></div>
   <div class="splash-tag">The Intelligent Training Companion</div>
 </div>
+<div class="welcome" id="welcome">
+  <div class="welcome-inner">
+    <div class="welcome-mark">${BRAND_MARK}</div>
+    <h1 class="welcome-h">Welcome to <span>InteRun</span></h1>
+    <p class="welcome-msg m1">Your intelligent training companion.</p>
+    <p class="welcome-msg m2">From your very first 5K to a marathon PB — a plan built around you.</p>
+    <p class="welcome-msg m3">Let’s start with a few quick questions.</p>
+    <button class="welcome-cta" id="welcomeGo">Get started →</button>
+  </div>
+</div>
 <div class="app">
   <div class="topbar">
     <div class="tb-left">
@@ -459,7 +505,9 @@ function applyProfile(pf) {
   return { ath, goal, plan, raw, fitness, classification: cls, masters };
 }
 
-let profile = loadProfile() || Object.assign({}, DEFAULT_PROFILE);
+const storedProfile = loadProfile();
+const FIRST_RUN = !storedProfile;
+let profile = storedProfile || Object.assign({}, DEFAULT_PROFILE);
 let PLAN, RAW, FITNESS, CLASS, MASTERS;
 function recompute() { const r = applyProfile(profile); PLAN = r.plan; RAW = r.raw; FITNESS = r.fitness; CLASS = r.classification; MASTERS = r.masters; }
 try { recompute(); } catch (e) { profile = Object.assign({}, DEFAULT_PROFILE); recompute(); }
@@ -514,7 +562,7 @@ function todayWorkout() {
   const meta = ['<span class="chip">' + durMin + "′" + (distKm ? " · " + distKm + " km" : "") + "</span>"];
   if (pace) meta.push('<span class="chip pace">' + pace + "</span>");
   if (rpe) meta.push('<span class="chip rpe">RPE ' + rpe + "</span>");
-  return { s, html: '<div class="wk-card" style="--c:var(--eff-' + eff + ')"><div class="b"><div class="t">' + s.title + '</div><div class="sub">Today · ' + DAY_ORDER[s.dayOfWeek] + '</div><div class="meta">' + meta.join("") + '</div></div><div class="checkbox"></div></div>' };
+  return { s, html: '<div class="wk-card tap" id="todayCard" style="--c:var(--eff-' + eff + ')"><div class="b"><div class="t">' + s.title + '</div><div class="sub">Today · ' + DAY_ORDER[s.dayOfWeek] + ' · tap for details</div><div class="meta">' + meta.join("") + '</div></div><div class="checkbox"></div></div>' };
 }
 function viewToday() {
   const today = 3; // Thu
@@ -579,10 +627,10 @@ function calSessionRow(wIdx, s) {
   const bits = [];
   if (s.distKm) bits.push(s.distKm + " km");
   if (s.durMin) bits.push(s.durMin + "m");
-  return '<button class="cal-sess' + (done ? " done" : "") + '" data-done="' + key + '">' +
+  return '<div class="cal-sess' + (done ? " done" : "") + '">' +
     '<span class="cal-bar" style="background:var(--eff-' + s.effort + ')"></span>' +
-    '<span class="cal-body"><span class="cal-t">' + s.title + '</span><span class="cal-sub">' + bits.join(" • ") + '</span></span>' +
-    '<span class="cal-check">' + (done ? ICON.check : "") + '</span></button>';
+    '<button class="cal-open" data-open="1" data-oweek="' + wIdx + '" data-oday="' + s.day + '" data-otitle="' + encodeURIComponent(s.title) + '"><span class="cal-t">' + s.title + '</span><span class="cal-sub">' + bits.join(" • ") + '</span></button>' +
+    '<button class="cal-check" data-done="' + key + '" aria-label="Mark done">' + (done ? ICON.check : "") + '</button></div>';
 }
 function viewCalendar() {
   const back = '<button class="backbtn" id="calBack">‹ Back</button>';
@@ -601,6 +649,74 @@ function viewCalendar() {
     return '<div class="cal-week"><div class="cal-whead"><div class="cal-wtitle">' + dmon(isoAdd(w.startIso, 0)) + ' – ' + dmon(isoAdd(w.startIso, 6)) + ' <span class="cal-badge">WEEK ' + w.index + '</span></div><div class="cal-wtot">Total: <b>' + total + '</b></div></div>' + rows + '</div>';
   }).join("");
   return back + '<div class="cal-wrap">' + weeks + '</div>';
+}
+
+// ============ SESSION DETAIL SHEET =========================================
+// Tap any session (Today, Plan week detail, or the training calendar) to see its full breakdown.
+const SESSION_LABEL = { easy: "Easy run", long: "Long run", recovery: "Recovery", threshold: "Threshold", vo2: "Intervals", strides: "Easy + strides", "race-specific": "Race pace", strength: "Strength", mobility: "Mobility", "cross-training": "Cross-training", rest: "Rest" };
+function rawSession(wIdx, dayName, title) {
+  const w = RAW.weeks[wIdx - 1]; if (!w) return null;
+  const dow = DAY_ORDER.indexOf(dayName);
+  return w.sessions.find((s) => s.dayOfWeek === dow && s.title === title) || w.sessions.find((s) => s.title === title) || null;
+}
+function fmtSec(s) { s = Math.round(s); if (s < 60) return s + "″"; const m = Math.floor(s / 60), x = s % 60; return x ? m + "′" + String(x).padStart(2, "0") + "″" : m + "′"; }
+function workLabel(st) { if (st.distanceMeters) return Math.round(st.distanceMeters) + " m"; if (st.durationSeconds) return fmtSec(st.durationSeconds); return st.label; }
+function stepChips(st) {
+  const b = [];
+  if (st.targetPaceSecPerKm) b.push('<span class="chip pace">' + fmtPace(st.targetPaceSecPerKm.minSecPerKm) + "–" + fmtPace(st.targetPaceSecPerKm.maxSecPerKm) + "/km</span>");
+  if (st.targetRpe) b.push('<span class="chip rpe">RPE ' + st.targetRpe.min + "–" + st.targetRpe.max + "</span>");
+  return b.join("");
+}
+function structureRows(steps) {
+  const rows = []; let i = 0;
+  while (i < steps.length) {
+    const st = steps[i];
+    if (st.kind === "rep") {
+      let j = i; const reps = [], recs = [];
+      while (j < steps.length && (steps[j].kind === "rep" || steps[j].kind === "recovery")) { (steps[j].kind === "rep" ? reps : recs).push(steps[j]); j++; }
+      const uniform = reps.every((r) => r.durationSeconds === reps[0].durationSeconds && r.distanceMeters === reps[0].distanceMeters);
+      let lab;
+      if (reps.length === 1) lab = esc(reps[0].label);
+      else if (uniform) lab = reps.length + " × " + workLabel(reps[0]);
+      else lab = reps.map(workLabel).join(" · ");
+      const rec = recs[0];
+      const recLine = rec ? "with " + workLabel(rec) + " " + (String(rec.label).toLowerCase().includes("walk") ? "walk" : "easy jog") + " between" : "";
+      rows.push({ tag: "Work", lab, chips: stepChips(reps[0]), rec: recLine, muted: false });
+      i = j;
+    } else {
+      const tag = st.kind === "warmup" ? "Warm-up" : st.kind === "cooldown" ? "Cool-down" : "Steady";
+      rows.push({ tag, lab: esc(st.label), chips: stepChips(st), rec: "", muted: st.kind === "warmup" || st.kind === "cooldown" });
+      i++;
+    }
+  }
+  return rows;
+}
+function sessionSheetHtml(sess) {
+  const sc = "var(--eff-" + effortOf(sess) + ")";
+  const dur = Math.round(sess.estimatedDurationSeconds / 60);
+  const dist = sess.estimatedDistanceMeters ? (Math.round(sess.estimatedDistanceMeters / 100) / 10) + " km" : null;
+  const chips = ['<span class="chip">' + dur + "′" + (dist ? " · " + dist : "") + "</span>"];
+  if (sess.targetRpe) chips.push('<span class="chip rpe">RPE ' + sess.targetRpe.min + "–" + sess.targetRpe.max + "</span>");
+  const rows = structureRows(sess.steps).map((r) =>
+    '<div class="sd-step"><div class="sd-dot" style="background:' + (r.muted ? "var(--ink-faint)" : sc) + '"></div><div><div class="sd-tag">' + r.tag + '</div><div class="sd-lab">' + r.lab + '</div>' + (r.chips ? '<div class="sd-meta">' + r.chips + '</div>' : "") + (r.rec ? '<div class="sd-rec">' + r.rec + '</div>' : "") + '</div></div>').join("");
+  return '<div class="sd-type" style="--sc:' + sc + '">' + (SESSION_LABEL[sess.type] || sess.type) + '</div>' +
+    '<div class="sd-title">' + esc(sess.title) + '</div>' +
+    '<div class="sd-chips">' + chips.join("") + '</div>' +
+    '<div class="sd-desc">' + esc(sess.description) + '</div>' +
+    (rows ? '<div class="sd-steps">' + rows + '</div>' : "");
+}
+function ensureSheet() {
+  if ($("sheetOv")) return;
+  const node = el('<div class="sheet-ov" id="sheetOv"><div class="sheet"><button class="sheet-x" id="sheetClose" aria-label="Close">✕</button><div class="sheet-body" id="sheetBody"></div></div></div>');
+  document.querySelector(".app").appendChild(node);
+  $("sheetClose").onclick = closeSheet;
+  $("sheetOv").onclick = (e) => { if (e.target === $("sheetOv")) closeSheet(); };
+}
+function openSessionSheet(sess) { if (!sess) return; ensureSheet(); $("sheetBody").innerHTML = sessionSheetHtml(sess); $("sheetOv").classList.add("on"); }
+function closeSheet() { const o = $("sheetOv"); if (o) o.classList.remove("on"); }
+// Wire every element carrying data-open to open its session detail.
+function wireSessionTaps() {
+  document.querySelectorAll("[data-open]").forEach((b) => b.onclick = () => openSessionSheet(rawSession(Number(b.dataset.oweek), b.dataset.oday, decodeURIComponent(b.dataset.otitle))));
 }
 
 // ============ PLAN =========================================================
@@ -634,7 +750,9 @@ function weekDetail() {
     const items = byDay[d].map((s) => {
       const meta = ['<span class="chip">' + s.durMin + "′" + (s.distKm ? " · " + s.distKm + "km" : "") + "</span>"];
       if (s.pace) meta.push('<span class="chip pace">' + s.pace + "</span>");
-      return '<div class="sess"><span class="dot ' + s.effort + '"></span><div><div class="st">' + s.title + '</div>' + (s.type==="rest"?"":'<div class="sm">' + meta.join("") + '</div>') + '</div></div>';
+      const tap = s.type !== "rest";
+      const attrs = tap ? ' class="sess tap" data-open="1" data-oweek="' + w.index + '" data-oday="' + s.day + '" data-otitle="' + encodeURIComponent(s.title) + '"' : ' class="sess"';
+      return '<div' + attrs + '><span class="dot ' + s.effort + '"></span><div><div class="st">' + s.title + '</div>' + (s.type==="rest"?"":'<div class="sm">' + meta.join("") + '</div>') + '</div></div>';
     }).join("");
     return '<div class="day-row"><div class="day-nm">' + d + '</div><div>' + items + '</div></div>';
   }).join("");
@@ -1151,7 +1269,7 @@ function wire() {
     if (f === "dayType") { state.dayType = v; render(); return; }
     state.subj[f] = v; seg.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); $("readySlot").innerHTML = renderReadiness();
   }));
-  document.querySelectorAll("[data-wk]").forEach((b) => b.onclick = () => { state.planWeek = Number(b.dataset.wk); document.querySelectorAll("[data-wk]").forEach((x) => x.setAttribute("aria-pressed", x === b)); $("weekDetail").innerHTML = weekDetail(); });
+  document.querySelectorAll("[data-wk]").forEach((b) => b.onclick = () => { state.planWeek = Number(b.dataset.wk); document.querySelectorAll("[data-wk]").forEach((x) => x.setAttribute("aria-pressed", x === b)); $("weekDetail").innerHTML = weekDetail(); wireSessionTaps(); });
   document.querySelectorAll("[data-at]").forEach((b) => b.onclick = () => { state.actTab = b.dataset.at; render(); });
   document.querySelectorAll("[data-hub]").forEach((b) => b.onclick = () => { state.support = b.dataset.hub; render(); });
   const back = $("supBack"); if (back) back.onclick = () => { state.support = null; render(); };
@@ -1187,6 +1305,9 @@ function wire() {
     state.screen = null; state.tab = "plan"; render();
   };
   const cancel = $("cancelSetup"); if (cancel) cancel.onclick = () => { state.screen = null; state.tab = "today"; render(); };
+  // Session detail taps (Plan, calendar, Today)
+  wireSessionTaps();
+  const todayCard = $("todayCard"); if (todayCard) todayCard.onclick = () => openSessionSheet(rawToday());
   // Training-calendar wiring
   const calBack = $("calBack"); if (calBack) calBack.onclick = () => { state.screen = null; render(); };
   document.querySelectorAll("[data-done]").forEach((b) => b.onclick = () => { const k = b.dataset.done; state.done[k] = !state.done[k]; render(); });
@@ -1215,12 +1336,23 @@ $("calBtn").onclick = () => { stopTrialRun(); state.screen = "calendar"; render(
 seedDone();
 buildNav();
 render();
-// Dismiss the launch splash after a beat (or immediately if the user taps it).
+// Launch flow: brief brand splash, then either the first-run welcome (which leads into setup) or,
+// for a returning user, straight to Today.
 (function () {
   const sp = $("splash"); if (!sp) return;
-  const hide = () => { sp.classList.add("hide"); setTimeout(() => sp.remove(), 600); };
-  sp.addEventListener("click", hide);
-  setTimeout(hide, 1900);
+  const removeSplash = () => { sp.classList.add("hide"); setTimeout(() => sp.remove(), 600); };
+  if (FIRST_RUN) {
+    setTimeout(() => {
+      removeSplash();
+      const wel = $("welcome"); if (!wel) return;
+      wel.classList.add("on");
+      const go = () => { wel.classList.add("hide"); setTimeout(() => wel.remove(), 500); state.screen = "setup"; render(); };
+      const btn = $("welcomeGo"); if (btn) btn.onclick = go;
+    }, 1300);
+  } else {
+    sp.addEventListener("click", removeSplash);
+    setTimeout(removeSplash, 1900);
+  }
 })();
 </script>
 </body>

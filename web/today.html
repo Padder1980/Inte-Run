@@ -60,35 +60,49 @@ header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content:
 .card { margin-top: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 20px clamp(16px,2.5vw,24px); }
 .card > h3 { margin: 0 0 3px; font-size: 17px; letter-spacing: -.01em; }
 .card > .hint { margin: 0 0 14px; font-size: 12.5px; color: var(--ink-faint); }
-.q { margin: 14px 0; }
-.q > label { display: block; font-size: 13px; font-weight: 600; color: var(--ink-soft); margin-bottom: 7px; }
+
+.context { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.ctx-lab { font-size: 12px; color: var(--ink-faint); font-weight: 600; }
 .seg { display: flex; flex-wrap: wrap; gap: 6px; }
 .seg button { font: inherit; font-size: 13px; color: var(--ink-soft); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; cursor: pointer; }
+.seg.small button { font-size: 12.5px; padding: 6px 12px; }
 .seg button:hover { border-color: var(--accent); }
 .seg button.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
-.rowin { display: flex; align-items: center; gap: 10px; }
-.rowin input[type="number"] { font: inherit; font-size: 14px; font-family: var(--mono); color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; width: 90px; }
-.rowin input:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
-.rowin .u { font-size: 13px; color: var(--ink-faint); }
-details.more { margin-top: 8px; }
+
+.status { margin-top: 14px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.status .band { padding: 16px 18px; color: #fff; background: var(--bc); }
+.status .band .h { font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
+.status .band .rec { font-size: 13.5px; margin-top: 3px; opacity: .96; }
+.meter { height: 8px; background: rgba(255,255,255,.3); border-radius: 5px; overflow: hidden; margin-top: 12px; }
+.meter > i { display: block; height: 100%; background: #fff; border-radius: 5px; transition: width .25s; }
+.status .body { padding: 13px 18px; background: var(--surface); }
+.chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.chip { font-size: 12px; color: var(--ink-soft); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; }
+.reassure { font-size: 13px; color: var(--ink-soft); font-style: italic; margin-top: 10px; }
+
+.watch { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; margin-top: 14px; }
+.watch .wl { font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-faint); font-weight: 600; margin-right: 2px; }
+.watch .wc { font-size: 12px; color: var(--ink-soft); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; }
+
+.easy-note { margin-top: 14px; border-left: 4px solid var(--ready); background: var(--surface-2); border-radius: 0 10px 10px 0; padding: 13px 15px; }
+.easy-note .m { font-size: 14.5px; font-weight: 600; }
+.easy-note .n2 { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
+.easy-note.caution { border-color: var(--ease); }
+
+details.more { margin-top: 14px; }
 details.more > summary { font-size: 13px; color: var(--accent); cursor: pointer; list-style: none; }
 details.more > summary::-webkit-details-marker { display: none; }
 details.more > summary::before { content: "▸ "; }
 details.more[open] > summary::before { content: "▾ "; }
-
-.readout { margin-top: 18px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
-.readout .band { padding: 16px 18px; color: #fff; background: var(--bc); }
-.readout .band .h { font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
-.readout .band .rec { font-size: 13.5px; margin-top: 3px; opacity: .96; }
-.meter { height: 8px; background: rgba(255,255,255,.3); border-radius: 5px; overflow: hidden; margin-top: 12px; }
-.meter > i { display: block; height: 100%; background: #fff; border-radius: 5px; transition: width .25s; }
-.readout .body { padding: 14px 18px; background: var(--surface); }
-.chips { display: flex; flex-wrap: wrap; gap: 7px; }
-.chip { font-size: 12px; color: var(--ink-soft); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; }
-.reassure { font-size: 13px; color: var(--ink-soft); font-style: italic; margin-top: 12px; }
+.q { margin: 14px 0 0; }
+.q > label { display: block; font-size: 13px; font-weight: 600; color: var(--ink-soft); margin-bottom: 7px; }
+.rowin { display: flex; align-items: center; gap: 10px; }
+.rowin input[type="number"] { font: inherit; font-size: 14px; font-family: var(--mono); color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; width: 90px; }
+.rowin input:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+.rowin .u { font-size: 13px; color: var(--ink-faint); }
 
 .load-inputs { display: flex; flex-wrap: wrap; gap: 16px; }
-.load-inputs .rowin { flex-direction: column; align-items: flex-start; gap: 5px; }
+.load-inputs .col { display: flex; flex-direction: column; gap: 5px; }
 .load-inputs label { font-size: 12px; font-weight: 600; color: var(--ink-soft); }
 .result-line { margin-top: 16px; border-left: 4px solid var(--rc, var(--ready)); background: var(--surface-2); border-radius: 0 10px 10px 0; padding: 12px 14px; }
 .result-line .m { font-size: 14px; font-weight: 600; }
@@ -109,50 +123,44 @@ footer { margin-top: 28px; font-size: 12px; color: var(--ink-faint); text-align:
       <div class="mark" aria-hidden="true"></div>
       <div>
         <h1>Running Coach</h1>
-        <p>Today · a quick, kind check-in</p>
+        <p>Today · at a glance</p>
       </div>
     </div>
     <button class="theme-toggle" id="themeToggle" type="button">Toggle theme</button>
   </header>
 
   <div class="lede">
-    <div class="eyebrow">How are you today?</div>
-    <h2>Should you train today — and how hard?</h2>
-    <p>A few taps and we'll suggest whether to go for it, take it easy, or rest. No single thing decides
-    it, and backing off when you need to is part of training well — never a failure.</p>
+    <div class="eyebrow">No forms to fill in</div>
+    <h2>Your day, at a glance</h2>
+    <p>We work this out from your watch and recent training — you don't fill anything in. Before a hard
+    session we show a quick readiness read; on easy days we leave you to it. Tap only if something feels off.</p>
   </div>
 
   <div class="card">
-    <h3>Your check-in</h3>
-    <p class="hint">Answer what you can — skip anything you're not sure about.</p>
-
-    <div class="q">
-      <label>How many hours did you sleep?</label>
-      <div class="rowin"><input type="number" id="sleepHours" step="0.5" min="0" max="14" value="7.5"><span class="u">hours</span></div>
+    <div class="context">
+      <span class="ctx-lab">Today's plan</span>
+      <div class="seg small" data-field="dayType" data-opts="quality:Threshold intervals (hard)|easy:Easy 40′ run"></div>
     </div>
-    <div class="q"><label>How well did you sleep?</label><div class="seg" data-field="sleepQuality" data-opts="good:Good|ok:OK|poor:Poor"></div></div>
-    <div class="q"><label>How do your legs feel?</label><div class="seg" data-field="soreness" data-opts="none:Fine|mild:A bit stiff|moderate:Sore|high:Very sore"></div></div>
-    <div class="q"><label>Energy today?</label><div class="seg" data-field="energy" data-opts="good:Good|ok:OK|low:Low"></div></div>
-    <div class="q"><label>Life stress?</label><div class="seg" data-field="stress" data-opts="low:Low|normal:Normal|high:High"></div></div>
-    <div class="q"><label>Feeling like running?</label><div class="seg" data-field="motivation" data-opts="high:Keen|ok:OK|low:Not really"></div></div>
-    <div class="q"><label>Feeling ill at all?</label><div class="seg" data-field="illness" data-opts="none:No|slight:A little|unwell:Unwell"></div></div>
-
-    <details class="more">
-      <summary>Add wearable data (optional)</summary>
-      <div class="q" style="margin-top:14px"><label>Resting heart rate vs your normal</label><div class="rowin"><input type="number" id="rhr" step="1" min="0" max="40" value="0"><span class="u">bpm above normal</span></div></div>
-      <div class="q"><label>HRV vs your baseline <span style="color:var(--ink-faint);font-weight:400">(never decides the day on its own)</span></label><div class="seg" data-field="hrvStatus" data-opts="normal:Normal|low:Low|high:High"></div></div>
-      <div class="q"><label>How hard was yesterday? <span style="color:var(--ink-faint);font-weight:400">(1–10)</span></label><div class="rowin"><input type="number" id="rpe" step="1" min="0" max="10" value="0"></div></div>
+    <p class="hint" id="ctxHint">Switch the planned session to see when a check-in appears.</p>
+    <div id="readout"></div>
+    <div class="watch" id="watchRow"></div>
+    <details class="more" id="feelWrap">
+      <summary>Something feel different? Tell us (optional)</summary>
+      <p class="hint" style="margin:10px 0 0">Your watch can't feel your legs or your stress — only you can. Adjust anything and the read updates.</p>
+      <div class="q"><label>How do your legs feel?</label><div class="seg" data-field="soreness" data-opts="none:Fine|mild:A bit stiff|moderate:Sore|high:Very sore"></div></div>
+      <div class="q"><label>Energy today?</label><div class="seg" data-field="energy" data-opts="good:Good|ok:OK|low:Low"></div></div>
+      <div class="q"><label>Life stress?</label><div class="seg" data-field="stress" data-opts="low:Low|normal:Normal|high:High"></div></div>
+      <div class="q"><label>Feeling like running?</label><div class="seg" data-field="motivation" data-opts="high:Keen|ok:OK|low:Not really"></div></div>
+      <div class="q"><label>Feeling ill at all?</label><div class="seg" data-field="illness" data-opts="none:No|slight:A little|unwell:Unwell"></div></div>
     </details>
-
-    <div class="readout" id="readout"></div>
   </div>
 
   <div class="card">
     <h3>Planning a longer run?</h3>
-    <p class="hint">Big jumps in one go are linked to more injuries. Pop in the numbers for a quick sense-check.</p>
+    <p class="hint">An occasional sense-check — not something you do every day. Big single jumps are linked to more injuries.</p>
     <div class="load-inputs">
-      <div class="rowin"><label for="planned">Run you're planning</label><div class="rowin"><input type="number" id="planned" step="0.5" min="0" value="20"><span class="u">km</span></div></div>
-      <div class="rowin"><label for="longest">Longest run in the last month</label><div class="rowin"><input type="number" id="longest" step="0.5" min="0" value="15"><span class="u">km</span></div></div>
+      <div class="col"><label for="planned">Run you're planning</label><div class="rowin"><input type="number" id="planned" step="0.5" min="0" value="20"><span class="u">km</span></div></div>
+      <div class="col"><label for="longest">Longest run in the last month</label><div class="rowin"><input type="number" id="longest" step="0.5" min="0" value="15"><span class="u">km</span></div></div>
     </div>
     <div id="loadResult"></div>
   </div>
@@ -175,9 +183,13 @@ footer { margin-top: 28px; font-size: 12px; color: var(--ink-faint); text-align:
 const $ = (id) => document.getElementById(id);
 const BAND_COLOR = { ready: "var(--ready)", steady: "var(--steady)", ease: "var(--ease)", rest: "var(--rest)" };
 
+// What the app already knows from the watch / recent training — no user input needed.
+const watch = { sleepHours: 7.5, restingHrDelta: 0, hrvStatus: "normal", yesterdayLabel: "Yesterday: easy 5 km" };
+
 const state = {
-  sleepQuality: "good", soreness: "none", energy: "good", stress: "low", motivation: "high",
-  illness: "none", hrvStatus: "normal", painFree: "yes", boneJoint: "no",
+  dayType: "quality",
+  soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none",
+  painFree: "yes", boneJoint: "no",
 };
 
 function initSegs() {
@@ -191,38 +203,65 @@ function initSegs() {
     seg.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
       state[field] = b.dataset.v;
       seg.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
-      onChange(field);
+      if (["painFree", "boneJoint"].includes(field)) runReturn();
+      else runReadiness();
     }));
   });
 }
 
-function onChange(field) {
-  if (["painFree", "boneJoint"].includes(field)) return runReturn();
-  runReadiness();
+function readinessInput() {
+  const input = {
+    sleepHours: watch.sleepHours, restingHrDelta: watch.restingHrDelta,
+    soreness: state.soreness, energy: state.energy, stress: state.stress,
+    motivation: state.motivation, illness: state.illness,
+  };
+  if (watch.hrvStatus !== "normal") input.hrvStatus = watch.hrvStatus;
+  return input;
+}
+
+function watchChips() {
+  return '<span class="wl">From your watch</span>' +
+    '<span class="wc">Slept ' + watch.sleepHours + ' h</span>' +
+    '<span class="wc">Resting HR normal</span>' +
+    '<span class="wc">HRV normal</span>' +
+    '<span class="wc">' + watch.yesterdayLabel + '</span>';
 }
 
 function runReadiness() {
-  const input = {
-    sleepHours: Number($("sleepHours").value) || undefined,
-    sleepQuality: state.sleepQuality, soreness: state.soreness, energy: state.energy,
-    stress: state.stress, motivation: state.motivation, illness: state.illness,
-  };
-  const rhr = Number($("rhr").value); if (rhr > 0) input.restingHrDelta = rhr;
-  if (state.hrvStatus !== "normal") input.hrvStatus = state.hrvStatus;
-  const rpe = Number($("rpe").value); if (rpe > 0) input.yesterdayRpe = rpe;
+  const r = RC.assessReadiness(readinessInput());
+  const easy = state.dayType === "easy";
+  $("ctxHint").textContent = easy
+    ? "It's an easy day — go by feel. We save the readiness read for hard sessions."
+    : "Today has a quality session, so here's a quick readiness read before you go.";
 
-  const r = RC.assessReadiness(input);
-  const c = BAND_COLOR[r.band];
-  $("readout").innerHTML =
-    '<div class="band" style="--bc:' + c + '">' +
-      '<div class="h">' + r.headline + '</div>' +
-      '<div class="rec">' + r.recommendation + '</div>' +
-      '<div class="meter"><i style="width:' + r.score + '%"></i></div>' +
-    '</div>' +
-    '<div class="body">' +
-      '<div class="chips">' + r.reasons.map((x) => '<span class="chip">' + x + '</span>').join("") + '</div>' +
-      '<div class="reassure">' + r.reassurance + '</div>' +
-    '</div>';
+  if (easy) {
+    const flagged = r.band === "rest" || r.band === "ease";
+    $("readout").innerHTML =
+      '<div class="easy-note' + (flagged ? " caution" : "") + '">' +
+        '<div class="m">' + (flagged ? "Easy run planned — but take it gently today." : "Easy run today — just go by feel.") + '</div>' +
+        '<div class="n2">' + (flagged
+          ? "You flagged " + r.reasons[0].toLowerCase() + ". If you're not feeling it, resting or a short walk is completely fine."
+          : "Nothing to fill in — we only run a proper check-in before hard sessions. Enjoy it.") + '</div>' +
+      '</div>';
+  } else {
+    const c = BAND_COLOR[r.band];
+    const showReasons = r.band !== "ready";
+    $("readout").innerHTML =
+      '<div class="status">' +
+        '<div class="band" style="--bc:' + c + '">' +
+          '<div class="h">' + r.headline + '</div>' +
+          '<div class="rec">' + r.recommendation + '</div>' +
+          '<div class="meter"><i style="width:' + r.score + '%"></i></div>' +
+        '</div>' +
+        '<div class="body">' +
+          (showReasons ? '<div class="chips">' + r.reasons.map((x) => '<span class="chip">' + x + '</span>').join("") + '</div>' : "") +
+          '<div class="reassure">' + r.reassurance + '</div>' +
+        '</div>' +
+      '</div>';
+  }
+  $("watchRow").innerHTML = easy ? "" : watchChips();
+  $("watchRow").style.display = easy ? "none" : "flex";
+  $("feelWrap").style.display = easy ? "none" : "block";
 }
 
 function runLoad() {
@@ -236,13 +275,10 @@ function runReturn() {
   const r = RC.returnToRunningPlan({ weeksOff: Number($("weeksOff").value), painFreeWalking: state.painFree === "yes", boneOrJointInjury: state.boneJoint === "yes" });
   const c = r.seeProfessionalFirst ? "var(--ease)" : "var(--ready)";
   let html = '<div class="result-line" style="--rc:' + c + '"><div class="m">' + r.message + '</div><div class="n2">' + r.note + '</div></div>';
-  if (r.stages.length) {
-    html += '<ol class="stages">' + r.stages.map((s) => '<li><span><b>' + s.label + '</b> — ' + s.detail + '</span></li>').join("") + '</ol>';
-  }
+  if (r.stages.length) html += '<ol class="stages">' + r.stages.map((s) => '<li><span><b>' + s.label + '</b> — ' + s.detail + '</span></li>').join("") + '</ol>';
   $("returnResult").innerHTML = html;
 }
 
-["sleepHours", "rhr", "rpe"].forEach((id) => $(id).addEventListener("input", runReadiness));
 ["planned", "longest"].forEach((id) => $(id).addEventListener("input", runLoad));
 $("weeksOff").addEventListener("input", runReturn);
 $("themeToggle").addEventListener("click", () => {

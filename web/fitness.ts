@@ -164,7 +164,6 @@ footer { margin-top: 28px; font-size: 12px; color: var(--ink-faint); text-align:
     <details class="more">
       <summary>Add more detail (optional)</summary>
       <div class="inner">
-        <label class="field"><span>Top sprint speed <span style="color:var(--ink-faint);font-weight:400">km/h, if you know it</span></span><input type="number" id="sprint" step="0.5" min="0" placeholder="e.g. 30"></label>
         <label class="field"><span>Slow-down on a long run <span style="color:var(--ink-faint);font-weight:400">%, if you know it</span></span><input type="number" id="decoupling" step="0.5" min="0" placeholder="e.g. 5"></label>
       </div>
     </details>
@@ -248,7 +247,6 @@ function build() {
   err.classList.remove("show");
 
   const input = { efforts };
-  const kmh = Number($("sprint").value); if (kmh > 0) input.maxSprintSpeedMps = kmh / 3.6;
   const dec = Number($("decoupling").value); if (dec > 0) input.longRunDecouplingPct = dec;
 
   let p;
@@ -280,16 +278,6 @@ function build() {
     conf: confSay(a.confidence), sci: scienceBlock(a),
   });
 
-  // Top-end speed.
-  const s = p.speedReserve;
-  cards.push({
-    c: "var(--mid)", title: "Top-end speed", plain: "Your sharpness and finishing kick.",
-    readHtml: s.confidence === "none"
-      ? '<div class="read q">Add your sprint speed to see this</div>'
-      : '<div class="read" style="--rc:var(--mid)">You\\'ve got a finishing gear</div>',
-    conf: s.confidence === "none" ? "" : confSay(s.confidence), sci: scienceBlock(s),
-  });
-
   // Strength when tired (durability).
   const d = p.durability;
   let dRead;
@@ -300,13 +288,6 @@ function build() {
     c: d.confidence === "none" ? "var(--muted)" : (d.value <= 5 ? "var(--strong)" : "var(--soft)"),
     title: "Strength when tired", plain: "How well you hold your pace late in long runs.",
     readHtml: dRead, conf: d.confidence === "none" ? "" : confSay(d.confidence), sci: scienceBlock(d),
-  });
-
-  // Efficiency (economy) — honestly not measurable here.
-  cards.push({
-    c: "var(--muted)", title: "Running efficiency", plain: "How smoothly you use energy as you run.",
-    readHtml: '<div class="read q">Needs special kit to measure — and you don\\'t need it to train well</div>',
-    conf: "", sci: scienceBlock(p.economy), q: true,
   });
 
   // How much you can handle (training tolerance).

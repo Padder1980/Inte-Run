@@ -152,9 +152,10 @@ uncertainty and provenance (§1, §16). `web/fitness.html` surfaces `buildFitnes
 - **`estimate.ts`** — the `Estimate` primitive: a value **with a range**, a confidence level
   (`none` / `low` / `moderate` / `high`), the method it was derived by, and its limitations. VO₂max is
   shown as "54–58", never "54.3".
-- **`fitness-profile.ts`** — separate estimates for aerobic capacity, threshold / critical speed,
-  speed reserve and durability; economy and training tolerance are honestly left blank until the data
-  exists, rather than invented.
+- **`fitness-profile.ts`** — separate estimates for aerobic capacity, threshold / critical speed and
+  durability; training tolerance is honestly left blank until it emerges from logged runs, rather than
+  invented. The page presents these in plain English (a trainable pace, an endurance meter), with the
+  numbers and methods behind an optional "Show the science" toggle.
 
 ## Evidence grounding
 

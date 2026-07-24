@@ -17,8 +17,6 @@ import {
 export type FitnessInput = {
   /** One or more recent time trials / races. Two+ of differing duration unlock critical speed. */
   efforts: Effort[];
-  /** A recent maximal short sprint speed (m/s), e.g. from a flying 40 m — enables speed reserve. */
-  maxSprintSpeedMps?: number;
   /** Pace/HR decoupling (%) over a recent long run — enables a durability read. */
   longRunDecouplingPct?: number;
 };
@@ -27,9 +25,7 @@ export type FitnessProfile = {
   criticalSpeed?: CriticalSpeedModel;
   aerobicCapacity: Estimate;
   thresholdSpeed: Estimate;
-  speedReserve: Estimate;
   durability: Estimate;
-  economy: Estimate;
   trainingTolerance: Estimate;
   summary: string;
 };
@@ -116,30 +112,6 @@ export function buildFitnessProfile(input: FitnessInput): FitnessProfile {
     limitations: "A practical threshold estimate; your true threshold shifts with training and conditions.",
   };
 
-  // --- Speed reserve (anaerobic speed reserve) ---
-  let speedReserve: Estimate;
-  if (input.maxSprintSpeedMps && input.maxSprintSpeedMps > v) {
-    const asr = input.maxSprintSpeedMps - v;
-    speedReserve = {
-      metric: "Speed reserve",
-      value: Math.round(asr * 100) / 100,
-      low: Math.round((asr - 0.3) * 100) / 100,
-      high: Math.round((asr + 0.3) * 100) / 100,
-      unit: "m/s above vVO₂max",
-      confidence: "low",
-      method: "Max sprint speed minus velocity at VO₂max",
-      evidence: "Your reported maximal short-sprint speed.",
-      limitations: "From a single sprint; a bigger reserve favours faster finishing and short intervals.",
-    };
-  } else {
-    speedReserve = unknownEstimate(
-      "Speed reserve",
-      "m/s above vVO₂max",
-      "Max sprint speed minus velocity at VO₂max",
-      "Add a maximal short sprint (e.g. a flying 40 m) to estimate this.",
-    );
-  }
-
   // --- Durability ---
   let durability: Estimate;
   if (input.longRunDecouplingPct != null) {
@@ -164,14 +136,6 @@ export function buildFitnessProfile(input: FitnessInput): FitnessProfile {
     );
   }
 
-  // --- Economy: not estimable from times alone. Say so. ---
-  const economy = unknownEstimate(
-    "Running economy",
-    "ml/kg/km",
-    "Requires lab metabolic testing or running-power data",
-    "Can't be estimated from race times — it needs a lab or a running-power meter. The evidence here is simply absent for now.",
-  );
-
   // --- Training tolerance: emerges from logged history, not a one-off input. ---
   const trainingTolerance = unknownEstimate(
     "Training tolerance",
@@ -180,19 +144,17 @@ export function buildFitnessProfile(input: FitnessInput): FitnessProfile {
     "Builds up as you log training — a single snapshot can't capture how you absorb load.",
   );
 
-  const estimated = [aerobicCapacity, thresholdSpeed, speedReserve, durability, economy, trainingTolerance]
+  const estimated = [aerobicCapacity, thresholdSpeed, durability, trainingTolerance]
     .filter((e) => e.confidence !== "none").length;
   const summary =
-    `${estimated} of 6 dimensions estimated from what you've entered` +
+    `${estimated} of 4 dimensions estimated from what you've entered` +
     (haveModel ? ", including a critical-speed model." : ". Add a second effort of a different duration to unlock critical speed.");
 
   return {
     criticalSpeed: model,
     aerobicCapacity,
     thresholdSpeed,
-    speedReserve,
     durability,
-    economy,
     trainingTolerance,
     summary,
   };

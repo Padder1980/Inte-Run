@@ -59,7 +59,7 @@ test("never reduces fitness to one score — separate estimates are returned", (
       { distanceMeters: 5000, timeSeconds: 1170 },
     ],
   });
-  for (const e of [p.aerobicCapacity, p.thresholdSpeed, p.speedReserve, p.durability, p.economy, p.trainingTolerance]) {
+  for (const e of [p.aerobicCapacity, p.thresholdSpeed, p.durability, p.trainingTolerance]) {
     assert.ok(e.metric && e.unit && e.method, "each estimate carries provenance");
   }
 });
@@ -86,22 +86,18 @@ test("two efforts raise aerobic confidence and attach a critical-speed model", (
   assert.ok(two.criticalSpeed && two.criticalSpeed.criticalSpeedMps > 0);
 });
 
-test("economy and training tolerance are honestly 'none' without the right data", () => {
+test("training tolerance is honestly 'none' without logged history", () => {
   const p = buildFitnessProfile({ efforts: [{ distanceMeters: 5000, timeSeconds: 1170 }] });
-  assert.equal(p.economy.confidence, "none");
-  assert.equal(p.economy.value, undefined);
   assert.equal(p.trainingTolerance.confidence, "none");
+  assert.equal(p.trainingTolerance.value, undefined);
 });
 
-test("speed reserve and durability unlock only when their data is supplied", () => {
+test("durability unlocks only when long-run drift is supplied", () => {
   const bare = buildFitnessProfile({ efforts: [{ distanceMeters: 5000, timeSeconds: 1170 }] });
-  assert.equal(bare.speedReserve.confidence, "none");
   assert.equal(bare.durability.confidence, "none");
   const rich = buildFitnessProfile({
     efforts: [{ distanceMeters: 5000, timeSeconds: 1170 }],
-    maxSprintSpeedMps: 9.0,
     longRunDecouplingPct: 4.2,
   });
-  assert.equal(rich.speedReserve.confidence, "low");
   assert.equal(rich.durability.confidence, "low");
 });

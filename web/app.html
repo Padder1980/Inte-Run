@@ -103,6 +103,8 @@ details.more > summary::before { content: "▸ "; } details.more[open] > summary
 /* Plan */
 .plan-head .goal { font-size: 20px; font-weight: 750; letter-spacing: -.02em; }
 .plan-head .when { font-size: 12.5px; color: var(--ink-faint); margin-top: 2px; }
+.plan-note { margin-top: 12px; background: var(--surface-2); border: 1px solid var(--line); border-left: 4px solid var(--base); border-radius: 0 10px 10px 0; padding: 11px 14px; font-size: 12.5px; color: var(--ink-soft); }
+.plan-note b { color: var(--ink); font-weight: 650; }
 .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 999px; background: color-mix(in srgb, var(--pc, var(--accent)) 15%, transparent); color: var(--pc, var(--accent)); margin-top: 10px; }
 .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--pc, var(--accent)); }
 .statrow { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 14px; }
@@ -401,9 +403,12 @@ function viewPlan() {
     const h = Math.max(6, Math.round(w.distanceKm / peak * 100));
     return '<button class="bar-btn" data-wk="' + w.index + '" aria-pressed="' + (w.index===state.planWeek) + '"><div class="bar' + (w.isDeload?" deload":"") + '" style="height:' + h + '%;--phase:' + PHASE[w.phase] + '"></div><div class="bl">' + w.index + '</div></button>';
   }).join("");
-  return '<div class="card plan-head"><div class="eyebrow">Your plan</div><div class="goal">' + g.race + ' · ' + g.target + '</div><div class="when">' + g.raceDate + ' · ' + s.totalWeeks + '-week plan</div>' +
+  const lead = s.totalWeeks - s.structuredWeeks;
+  const note = lead >= 2 ? '<div class="plan-note">Your race is <b>' + s.totalWeeks + ' weeks</b> away — this is your <b>' + s.structuredWeeks + '-week</b> structured build. Until it begins, keep running easy and consistent to bank the base.</div>' : "";
+  return '<div class="card plan-head"><div class="eyebrow">Your plan</div><div class="goal">' + g.race + ' · ' + g.target + '</div><div class="when">' + g.raceDate + ' · ' + s.structuredWeeks + '-week plan</div>' +
     '<span class="pill" style="--pc:' + (PLAN.feasibility.verdict==="achievable"?"var(--accent)":"var(--peak)") + '">' + PLAN.feasibility.verdict + '</span>' +
     '<div class="statrow"><div class="stat"><div class="k">Weeks</div><div class="v num">' + s.structuredWeeks + '</div></div><div class="stat"><div class="k">Peak/wk</div><div class="v num">' + s.peakKm + ' km</div></div><div class="stat"><div class="k">Goal pace</div><div class="v num">' + PLAN.paces.goal.replace("/km","") + '</div></div></div></div>' +
+    note +
     '<h2 class="sec">Training block</h2><div class="card"><div class="chart" id="chart">' + bars + '</div></div>' +
     '<h2 class="sec">Week detail</h2><div class="card" id="weekDetail">' + weekDetail() + '</div>';
 }

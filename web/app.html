@@ -228,6 +228,19 @@ select.sel { font: inherit; font-size: 13.5px; color: var(--ink); background: va
 .live-controls .primary { margin: 0; grid-column: 1 / -1; }
 .ctrl { font: inherit; font-size: 14px; font-weight: 600; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; cursor: pointer; }
 .ctrl:disabled { opacity: .45; cursor: not-allowed; }
+.mini-btn { margin-top: 8px; display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--accent); background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; cursor: pointer; }
+.trial-ov { position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; padding: 20px; background: color-mix(in srgb, var(--ink) 55%, transparent); backdrop-filter: blur(4px); }
+.trial-ov.on { display: flex; }
+.trial-panel { position: relative; width: 100%; max-width: 380px; background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 28px 22px 20px; box-shadow: var(--shadow); text-align: center; }
+.trial-x { position: absolute; top: 12px; right: 14px; line-height: 1; background: none; border: 0; font-size: 17px; color: var(--ink-faint); cursor: pointer; }
+.trial-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.trial-clock { font-family: var(--mono); font-size: 52px; font-weight: 700; letter-spacing: -.02em; margin: 8px 0 6px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.trial-msg { font-size: 13.5px; color: var(--ink-soft); line-height: 1.5; min-height: 44px; }
+.trial-msg b { color: var(--ink); }
+.trial-controls { display: grid; grid-template-columns: 1fr; gap: 8px; margin: 16px 0 4px; }
+.trial-controls.two { grid-template-columns: 1fr 1fr; }
+.trial-controls .primary { margin: 0; }
+.trial-foot { font-size: 11.5px; color: var(--ink-faint); line-height: 1.45; margin-top: 10px; border-top: 1px solid var(--line); padding-top: 10px; }
 .lstep .kt { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #fff; background: var(--kc, var(--base)); border-radius: 6px; padding: 2px 8px; }
 .lstep h4 { margin: 8px 0 2px; font-size: 15px; }
 .lstep .tgt { font-size: 12.5px; color: var(--ink-soft); }
@@ -312,19 +325,22 @@ function futureIso(days) { const d = new Date(); d.setDate(d.getDate() + days); 
 function fmtTimeFull(s) { s = Math.round(s); const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), x = s%60; const p = (n) => String(n).padStart(2,"0"); return h>0 ? h+":"+p(m)+":"+p(x) : m+":"+p(x); }
 
 // An example runner to start from — until you make it yours.
-const DEFAULT_PROFILE = { goalDist: "half", targetS: 6300, raceDate: futureIso(245), recentDistM: 5000, recentTimeS: 1500, oneKmS: 255, daysPerWeek: 5, yearsRunning: 3, weeklyVolumeKm: 30, age: 38, sex: "", strength: true, returning: false, personalized: false };
+const DEFAULT_PROFILE = { goalDist: "half", targetS: 6300, raceDate: futureIso(245), recentDistM: 5000, recentTimeS: 1500, noRecent: false, oneKmS: 255, daysPerWeek: 5, yearsRunning: 3, weeklyVolumeKm: 30, age: 38, sex: "", strength: true, returning: false, personalized: false };
 
 function loadProfile() { try { const s = localStorage.getItem("rc_profile_v1"); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 function saveProfileStore() { try { localStorage.setItem("rc_profile_v1", JSON.stringify(profile)); } catch (e) {} }
 
 // Turn a profile into engine outputs. Throws if the goal can't be planned (e.g. race too soon).
 function applyProfile(pf) {
-  const cls = RC.classifyRunner({ runsPerWeek: pf.daysPerWeek, yearsRunning: pf.yearsRunning, weeklyVolumeKm: pf.weeklyVolumeKm || undefined, recent5kSeconds: pf.recentDistM === 5000 ? pf.recentTimeS : undefined, sex: pf.sex || undefined });
+  // A brand-new runner has no recent effort. We still need an anchor to build a starter plan, so
+  // draftFromForm seeds a gentle beginner baseline and flags noRecent — we then treat them as a
+  // beginner outright and don't feed the fabricated time into runner classification.
+  const cls = RC.classifyRunner({ runsPerWeek: pf.daysPerWeek, yearsRunning: pf.yearsRunning, weeklyVolumeKm: pf.weeklyVolumeKm || undefined, recent5kSeconds: (!pf.noRecent && pf.recentDistM === 5000) ? pf.recentTimeS : undefined, sex: pf.sex || undefined });
   // Map the runner tier to the plan/feasibility experience bucket. Only genuinely highly-trained
   // runners (tier 4) get the "competitive" ceiling — a trained-but-recreational runner (tier 3) still
   // has meaningful improvement headroom, so mapping them to "competitive" made sensible goals read
   // as unrealistic.
-  const experience = cls.tier <= 1 ? "beginner" : cls.tier <= 3 ? "recreational" : "competitive";
+  const experience = pf.noRecent ? "beginner" : (cls.tier <= 1 ? "beginner" : cls.tier <= 3 ? "recreational" : "competitive");
   const ath = { daysPerWeek: pf.daysPerWeek, recent: { distanceMeters: pf.recentDistM, timeSeconds: pf.recentTimeS }, experience, includeStrength: pf.strength, returningFromInjury: pf.returning };
   if (pf.oneKmS > 0) ath.oneKmTrialSeconds = pf.oneKmS;
   const goal = { distance: pf.goalDist, targetTimeSeconds: pf.targetS, raceDateIso: pf.raceDate, startDateIso: todayIso() };
@@ -439,9 +455,11 @@ function viewPlan() {
   }).join("");
   const lead = s.totalWeeks - s.structuredWeeks;
   const note = lead >= 2 ? '<div class="plan-note">Your race is <b>' + s.totalWeeks + ' weeks</b> away — this is your <b>' + s.structuredWeeks + '-week</b> structured build. Until it begins, keep running easy and consistent to bank the base.</div>' : "";
+  const starterNote = profile.noRecent ? '<div class="plan-note" style="border-left-color:var(--accent)">Built from a <b>beginner baseline</b> since you haven\'t logged a run yet. Log a few runs (or record a 1 km trial) and your paces and goal check sharpen up automatically.</div>' : "";
   return '<div class="card plan-head"><div class="eyebrow">Your plan</div><div class="goal">' + g.race + ' · ' + g.target + '</div><div class="when">' + g.raceDate + ' · ' + s.structuredWeeks + '-week plan</div>' +
     '<span class="pill" style="--pc:' + (PLAN.feasibility.verdict==="achievable"?"var(--accent)":"var(--peak)") + '">' + PLAN.feasibility.verdict + '</span>' +
     '<div class="statrow"><div class="stat"><div class="k">Weeks</div><div class="v num">' + s.structuredWeeks + '</div></div><div class="stat"><div class="k">Peak/wk</div><div class="v num">' + s.peakKm + ' km</div></div><div class="stat"><div class="k">Goal pace</div><div class="v num">' + PLAN.paces.goal.replace("/km","") + '</div></div></div></div>' +
+    starterNote +
     note +
     '<h2 class="sec">Training block</h2><div class="card"><div class="chart" id="chart">' + bars + '</div></div>' +
     '<h2 class="sec">Week detail</h2><div class="card" id="weekDetail">' + weekDetail() + '</div>';
@@ -571,8 +589,8 @@ function viewSetup() {
     '<div class="q"><label>Race date</label><input class="sel num" id="s_date" type="date" value="' + p.raceDate + '"></div></div>' +
     '<div class="card" style="margin-top:12px"><div class="subhead" style="margin-top:0">About you</div>' +
     '<div class="q"><label>A recent run — distance</label><select class="sel" id="s_recdist">' + opt(REC_OPTS, p.recentDistM) + '</select></div>' +
-    '<div class="q"><label>…in a time of <span style="color:var(--ink-faint);font-weight:400">just type the numbers</span></label><input class="sel num" id="s_rectime" value="' + fmtTimeFull(p.recentTimeS) + '" inputmode="numeric"></div>' +
-    '<div class="q"><label>1 km time-trial <span style="color:var(--ink-faint);font-weight:400">max effort, optional — sets VO₂ paces</span></label><input class="sel num" id="s_1km" value="' + (p.oneKmS ? fmtTimeFull(p.oneKmS) : "") + '" placeholder="e.g. 4:00" inputmode="numeric"><div class="mas-hint" id="masHint"></div></div>' +
+    '<div class="q"><label>…in a time of <span style="color:var(--ink-faint);font-weight:400">leave blank if you\'re new to running</span></label><input class="sel num" id="s_rectime" value="' + (p.noRecent ? "" : fmtTimeFull(p.recentTimeS)) + '" placeholder="new to running? leave blank" inputmode="numeric"></div>' +
+    '<div class="q"><label>1 km time-trial <span style="color:var(--ink-faint);font-weight:400">max effort, optional — sets VO₂ paces</span></label><input class="sel num" id="s_1km" value="' + (p.oneKmS ? fmtTimeFull(p.oneKmS) : "") + '" placeholder="e.g. 4:00" inputmode="numeric"><div class="mas-hint" id="masHint"></div><button class="mini-btn" id="s_1km_rec" type="button">⏱ Haven\'t done one? Record it now</button></div>' +
     '<div class="q"><label>Runs per week</label>' + seg("days", [["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]], p.daysPerWeek) + '</div>' +
     '<div class="q"><label>Years running</label>' + seg("years", [["0.5","<1"],["2","1–3"],["5","3–8"],["10","8+"]], p.yearsRunning) + '</div>' +
     '<div class="q"><label>Age</label><input class="sel num" id="s_age" type="number" min="12" max="95" value="' + p.age + '" style="max-width:110px"></div>' +
@@ -589,12 +607,19 @@ function draftFromForm() {
   const mmss = (s) => /^\d{1,2}:[0-5]\d$/.test(s) || /^\d{1,2}:[0-5]\d:[0-5]\d$/.test(s);
   const targetRaw = $("s_target").value.trim();
   if (!mmss(targetRaw)) throw new Error("Enter your target time as h:mm:ss or m:ss, e.g. 1:45:00.");
+  // Recent run is optional: someone just starting out has no time to give. When blank we flag
+  // noRecent and seed a gentle beginner baseline (5 km at ~7:00/km) so a starter plan can be built.
   const recRaw = $("s_rectime").value.trim();
-  if (!mmss(recRaw)) throw new Error("Enter your recent run time as m:ss, e.g. 25:00.");
-  const recentDistM = Number($("s_recdist").value);
-  const recentTimeS = RC.parseDuration(recRaw);
-  const pace = recentTimeS / (recentDistM / 1000);
-  if (pace < 120 || pace > 720) throw new Error("That recent run time looks off for the distance — please check it.");
+  let noRecent = false, recentDistM, recentTimeS;
+  if (!recRaw) {
+    noRecent = true; recentDistM = 5000; recentTimeS = 2100;
+  } else {
+    if (!mmss(recRaw)) throw new Error("Enter your recent run time as m:ss (or leave it blank if you're new to running).");
+    recentDistM = Number($("s_recdist").value);
+    recentTimeS = RC.parseDuration(recRaw);
+    const pace = recentTimeS / (recentDistM / 1000);
+    if (pace < 120 || pace > 720) throw new Error("That recent run time looks off for the distance — please check it.");
+  }
   const raceDate = $("s_date").value;
   if (!raceDate) throw new Error("Pick your race date.");
   if (raceDate <= todayIso()) throw new Error("Your race date needs to be in the future.");
@@ -608,7 +633,7 @@ function draftFromForm() {
   }
   return {
     goalDist: $("s_dist").value, targetS: RC.parseDuration(targetRaw), raceDate,
-    recentDistM, recentTimeS, oneKmS, daysPerWeek: Number(draft.days), yearsRunning: Number(draft.years),
+    recentDistM, recentTimeS, noRecent, oneKmS, daysPerWeek: Number(draft.days), yearsRunning: Number(draft.years),
     weeklyVolumeKm: profile.weeklyVolumeKm, age: Number($("s_age").value) || 35, sex: $("s_sex").value,
     strength: draft.strength === "1", returning: draft.returning === "1", personalized: true,
   };
@@ -623,6 +648,64 @@ function refreshMasHint() {
   const m = RC.computeMas(s);
   el.innerHTML = "MAS <b>" + m.masMps.toFixed(2) + " m/s</b> · " + fmtPace(m.masPaceSecPerKm) + "/km — sets your VO₂ paces.";
 }
+
+// ---- 1 km time-trial recorder --------------------------------------------
+// Lets a runner who hasn't done a 1 km test record one now: a live stopwatch whose result drops
+// straight into the 1 km field. The overlay lives outside #view so the setup form keeps its values.
+let TRIAL = null;
+function fmtClock(ms) { const t = ms / 1000; const m = Math.floor(t / 60); const s = Math.floor(t % 60); const d = Math.floor((t * 10) % 10); return m + ":" + String(s).padStart(2, "0") + "." + d; }
+function trialTick() { if (!TRIAL || !TRIAL.running) return; $("trialClock").textContent = fmtClock(performance.now() - TRIAL.start); TRIAL.raf = requestAnimationFrame(trialTick); }
+function ensureTrial() {
+  if ($("trialOv")) return;
+  const html = '<div class="trial-ov" id="trialOv"><div class="trial-panel">' +
+    '<button class="trial-x" id="trialClose" aria-label="Close">✕</button>' +
+    '<div class="trial-eyebrow">1 km time trial</div>' +
+    '<div class="trial-clock num" id="trialClock">0:00.0</div>' +
+    '<div class="trial-msg" id="trialMsg"></div>' +
+    '<div class="trial-controls" id="trialCtrls"></div>' +
+    '<div class="trial-foot">On a phone with GPS the full app auto-detects your 1 km and stops for you. Here you time it yourself — 2½ laps of a 400 m track is 1 km.</div>' +
+    '</div></div>';
+  document.querySelector(".app").appendChild(el(html));
+  $("trialClose").onclick = closeTrial;
+  $("trialOv").onclick = (e) => { if (e.target === $("trialOv")) closeTrial(); };
+}
+function openTrial() { ensureTrial(); TRIAL = { running: false, start: 0, secs: 0, raf: null }; trialReady(); $("trialOv").classList.add("on"); }
+function closeTrial() { if (TRIAL && TRIAL.raf) cancelAnimationFrame(TRIAL.raf); if ($("trialOv")) $("trialOv").classList.remove("on"); TRIAL = null; }
+function trialReady() {
+  $("trialClock").textContent = "0:00.0";
+  $("trialMsg").innerHTML = "Warm up first. Press <b>Start</b> and run 1 km as hard as you can hold — tap <b>Finish</b> the moment you complete it.";
+  const c = $("trialCtrls"); c.className = "trial-controls"; c.innerHTML = '<button class="primary" id="trialStart">Start</button>';
+  $("trialStart").onclick = trialStart;
+}
+function trialStart() {
+  TRIAL.running = true; TRIAL.start = performance.now(); TRIAL.raf = requestAnimationFrame(trialTick);
+  $("trialMsg").innerHTML = "<b>Go!</b> Hold your hardest sustainable effort. Tap <b>Finish</b> at exactly 1 km.";
+  const c = $("trialCtrls"); c.className = "trial-controls two";
+  c.innerHTML = '<button class="ctrl" id="trialCancel">Cancel</button><button class="primary" id="trialFinish">Finish</button>';
+  $("trialCancel").onclick = trialResetReady; $("trialFinish").onclick = trialFinish;
+}
+function trialResetReady() { if (TRIAL.raf) cancelAnimationFrame(TRIAL.raf); TRIAL.running = false; trialReady(); }
+function trialFinish() {
+  if (TRIAL.raf) cancelAnimationFrame(TRIAL.raf);
+  TRIAL.running = false;
+  const secs = Math.round((performance.now() - TRIAL.start) / 1000);
+  TRIAL.secs = secs;
+  $("trialClock").textContent = fmtTimeFull(secs);
+  const c = $("trialCtrls"); c.className = "trial-controls two";
+  if (secs >= 150 && secs <= 480) {
+    const m = RC.computeMas(secs);
+    $("trialMsg").innerHTML = "That's <b>" + fmtTimeFull(secs) + "</b> for 1 km — MAS <b>" + m.masMps.toFixed(2) + " m/s</b>. This will set your VO₂/interval paces.";
+    c.innerHTML = '<button class="ctrl" id="trialRedo">Redo</button><button class="primary" id="trialUse">Use this time</button>';
+    $("trialUse").onclick = trialUse;
+  } else {
+    $("trialMsg").innerHTML = secs < 150
+      ? "That's under 2:30 — too fast for a full 1 km, so it can't set MAS. Check the distance and try again."
+      : "That's over 8:00 — for MAS we need a hard 1 km effort. Have a rest and try again.";
+    c.className = "trial-controls"; c.innerHTML = '<button class="primary" id="trialRedo">Try again</button>';
+  }
+  const redo = $("trialRedo"); if (redo) redo.onclick = trialResetReady;
+}
+function trialUse() { const inp = $("s_1km"); if (inp) { inp.value = fmtTimeFull(TRIAL.secs); refreshMasHint(); } closeTrial(); }
 function refreshTypePreview() {
   try {
     const cls = RC.classifyRunner({ runsPerWeek: Number(draft.days), yearsRunning: Number(draft.years), sex: $("s_sex") ? ($("s_sex").value || undefined) : undefined });
@@ -753,6 +836,7 @@ function wire() {
   bindTimeInput($("s_target")); bindTimeInput($("s_rectime"));
   const km1 = $("s_1km");
   if (km1) { bindTimeInput(km1); km1.addEventListener("input", refreshMasHint); refreshMasHint(); }
+  const km1rec = $("s_1km_rec"); if (km1rec) km1rec.onclick = openTrial;
   const setupBanner = $("setupBanner"); if (setupBanner) setupBanner.onclick = () => { state.screen = "setup"; render(); };
   const wxSeg = document.querySelector("[data-weatherseg]"); if (wxSeg) wxSeg.querySelectorAll("button").forEach((b) => b.onclick = () => { state.weather = b.dataset.weather; render(); });
   const save = $("saveProfile"); if (save) save.onclick = () => {

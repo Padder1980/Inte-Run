@@ -190,31 +190,27 @@ export function longRun(
   return assemble("long", `${minutes}′ long run`, description, "easy", steps, RPE.easy);
 }
 
-// ---- Threshold ------------------------------------------------------------
+// ---- Threshold (incl. tempo, cruise, fartlek) -----------------------------
 
-type ThresholdFormat = { title: string; build: (p: TrainingPaces) => WorkoutStep[] };
+type QualityFormat = { title: string; desc?: string; build: (p: TrainingPaces) => WorkoutStep[] };
 
-const THRESHOLD_FORMATS: ThresholdFormat[] = [
+const THRESHOLD_DESC =
+  "Controlled but demanding (RPE 6–7). You should finish knowing you could do one more rep.";
+
+const THRESHOLD_FORMATS: QualityFormat[] = [
   {
     title: "3 × 8′ threshold / 2′ jog",
     build: (p) =>
-      reps(
-        3,
-        { durationSeconds: 8 * 60, pace: p.threshold },
-        { durationSeconds: 2 * 60, pace: p.easy },
-      ),
+      reps(3, { durationSeconds: 8 * 60, pace: p.threshold }, { durationSeconds: 2 * 60, pace: p.easy }),
   },
   {
     title: "4 × 6′ threshold / 90″ jog",
     build: (p) =>
-      reps(
-        4,
-        { durationSeconds: 6 * 60, pace: p.threshold },
-        { durationSeconds: 90, pace: p.easy },
-      ),
+      reps(4, { durationSeconds: 6 * 60, pace: p.threshold }, { durationSeconds: 90, pace: p.easy }),
   },
   {
     title: "25′ continuous tempo",
+    desc: "One controlled, continuous tempo effort (RPE 6–7) — comfortably hard, steady rhythm start to finish.",
     build: (p) => [
       {
         kind: "steady",
@@ -228,30 +224,98 @@ const THRESHOLD_FORMATS: ThresholdFormat[] = [
   {
     title: "5 × 1 mile cruise / 90″ jog",
     build: (p) =>
-      reps(
-        5,
-        { distanceMeters: 1609.344, pace: p.threshold },
-        { durationSeconds: 90, pace: p.easy },
-      ),
+      reps(5, { distanceMeters: 1609.344, pace: p.threshold }, { durationSeconds: 90, pace: p.easy }),
+  },
+  {
+    title: "2 × 15′ threshold / 3′ float",
+    desc: "Two long threshold blocks (RPE 6–7) with an easy float between — builds the ability to hold effort.",
+    build: (p) =>
+      reps(2, { durationSeconds: 15 * 60, pace: p.threshold }, { durationSeconds: 3 * 60, pace: p.steady }),
+  },
+  {
+    title: "6 × 1 km cruise / 60″ jog",
+    build: (p) =>
+      reps(6, { distanceMeters: 1000, pace: p.threshold }, { durationSeconds: 60, pace: p.easy }),
+  },
+  {
+    title: "Threshold fartlek: 6 × 3′ brisk / 2′ easy",
+    desc: "Fartlek — run the brisk blocks by feel at a controlled-hard effort (RPE 6–7), easy in between. Keep it playful and rolling; the clock is a guide, not a cage.",
+    build: (p) =>
+      reps(6, { durationSeconds: 3 * 60, pace: p.threshold }, { durationSeconds: 2 * 60, pace: p.easy }),
+  },
+  {
+    title: "Progression tempo: 10′ steady → 10′ threshold",
+    desc: "Start steady and lift into threshold for the second half — a controlled progression, finishing strong but never sprinting.",
+    build: (p) => [
+      { kind: "steady", label: "Steady build", durationSeconds: 10 * 60, targetPaceSecPerKm: p.steady, targetRpe: RPE.steady },
+      { kind: "steady", label: "Lift to threshold", durationSeconds: 10 * 60, targetPaceSecPerKm: p.threshold, targetRpe: RPE.threshold },
+    ],
   },
 ];
 
 export function thresholdSession(paces: TrainingPaces, variant: number): SessionContent {
   const fmt = THRESHOLD_FORMATS[variant % THRESHOLD_FORMATS.length]!;
   const steps = [warmup(paces, 15, true), ...fmt.build(paces), cooldown(paces, 10)];
-  return assemble(
-    "threshold",
-    fmt.title,
-    "Controlled but demanding (RPE 6–7). You should finish knowing you could do one more rep.",
-    "moderate",
-    steps,
-    RPE.threshold,
-  );
+  return assemble("threshold", fmt.title, fmt.desc ?? THRESHOLD_DESC, "moderate", steps, RPE.threshold);
 }
 
-// ---- VO2 / high-intensity intervals --------------------------------------
+// ---- VO2 / high-intensity (incl. hills, pyramids, fartlek) -----------------
 
-const VO2_FORMATS: ThresholdFormat[] = [
+const VO2_DESC =
+  "Accumulate ~12–20′ of quality hard running (RPE 8–9). Purpose is quality work, not winning rep one.";
+
+// A pyramid: rep length ramps up then back down, with equal easy recoveries.
+function pyramid(p: TrainingPaces): WorkoutStep[] {
+  const durs = [60, 120, 180, 120, 60];
+  const steps: WorkoutStep[] = [];
+  durs.forEach((d, i) => {
+    steps.push({
+      kind: "rep",
+      label: `${Math.round((d / 60) * 10) / 10}′ hard`,
+      durationSeconds: d,
+      targetPaceSecPerKm: p.vo2,
+      targetRpe: RPE.vo2,
+      repeatIndex: i + 1,
+      repeatCount: durs.length,
+    });
+    if (i < durs.length - 1) {
+      steps.push({ kind: "recovery", label: "Equal easy jog", durationSeconds: d, targetPaceSecPerKm: p.easy });
+    }
+  });
+  return steps;
+}
+
+// Hill reps — effort-based (no flat pace target); pace on a hill is meaningless, RPE is the guide.
+function hillReps(count: number, workSec: number): WorkoutStep[] {
+  const steps: WorkoutStep[] = [];
+  for (let i = 1; i <= count; i++) {
+    steps.push({
+      kind: "rep",
+      label: `${workSec}″ uphill — strong, tall, driving`,
+      durationSeconds: workSec,
+      targetRpe: RPE.vo2,
+      repeatIndex: i,
+      repeatCount: count,
+    });
+    if (i < count) steps.push({ kind: "recovery", label: "Jog/walk down to recover", durationSeconds: workSec + 30 });
+  }
+  return steps;
+}
+
+// Mona fartlek: descending hard surges (90/60/30/15s) with equal floats, run twice through.
+function monaFartlek(p: TrainingPaces): WorkoutStep[] {
+  const set = [90, 60, 30, 15];
+  const steps: WorkoutStep[] = [];
+  for (let r = 0; r < 2; r++) {
+    for (const d of set) {
+      steps.push({ kind: "rep", label: `${d}″ hard`, durationSeconds: d, targetPaceSecPerKm: p.vo2, targetRpe: RPE.vo2 });
+      steps.push({ kind: "recovery", label: `${d}″ float (not a full rest)`, durationSeconds: d, targetPaceSecPerKm: p.steady });
+    }
+  }
+  return steps;
+}
+
+const VO2_FORMATS: QualityFormat[] = [
   {
     title: "5 × 3′ hard / 2′ easy",
     build: (p) =>
@@ -268,23 +332,41 @@ const VO2_FORMATS: ThresholdFormat[] = [
       reps(6, { distanceMeters: 800, pace: p.vo2 }, { durationSeconds: 2 * 60, pace: p.easy }),
   },
   {
-    title: "10 × 1′ hard / 1′ easy (introductory)",
+    title: "10 × 1′ hard / 1′ easy",
     build: (p) =>
       reps(10, { durationSeconds: 60, pace: p.vo2 }, { durationSeconds: 60, pace: p.easy }),
+  },
+  {
+    title: "12 × 400m / 60″ jog",
+    build: (p) =>
+      reps(12, { distanceMeters: 400, pace: p.vo2 }, { durationSeconds: 60, pace: p.easy }),
+  },
+  {
+    title: "5 × 1000m / 90″ jog",
+    build: (p) =>
+      reps(5, { distanceMeters: 1000, pace: p.vo2 }, { durationSeconds: 90, pace: p.easy }),
+  },
+  {
+    title: "VO₂ pyramid: 1–2–3–2–1′ / equal easy",
+    desc: "A pyramid — ramp rep length up then back down, equal easy recovery. Same hard effort (RPE 8–9) throughout; it plays with rhythm and keeps the mind engaged.",
+    build: (p) => pyramid(p),
+  },
+  {
+    title: "Hill reps: 8 × 60″ uphill / jog down",
+    desc: "Find a moderate hill. Drive up strong and tall for 60″ at a hard effort (RPE 8–9), jog down to recover. Hills build power and economy with less impact — go by effort, not pace.",
+    build: () => hillReps(8, 60),
+  },
+  {
+    title: "Mona fartlek: 2 × (90/60/30/15″ hard, equal float)",
+    desc: "The classic Mona fartlek — descending hard surges with equal-length floats (not full rest). Continuous and rhythmic, hard by feel. A fun, varied way to hit VO₂.",
+    build: (p) => monaFartlek(p),
   },
 ];
 
 export function vo2Session(paces: TrainingPaces, variant: number): SessionContent {
   const fmt = VO2_FORMATS[variant % VO2_FORMATS.length]!;
   const steps = [warmup(paces, 15, true), ...fmt.build(paces), cooldown(paces, 10)];
-  return assemble(
-    "vo2",
-    fmt.title,
-    "Accumulate ~12–20′ of quality hard running (RPE 8–9). Purpose is quality work, not winning rep one.",
-    "hard",
-    steps,
-    RPE.vo2,
-  );
+  return assemble("vo2", fmt.title, fmt.desc ?? VO2_DESC, "hard", steps, RPE.vo2);
 }
 
 // ---- Race-specific --------------------------------------------------------

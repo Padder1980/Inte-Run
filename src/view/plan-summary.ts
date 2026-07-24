@@ -83,15 +83,13 @@ function paceRange(r: { minSecPerKm: number; maxSecPerKm: number }): string {
   return `${formatDuration(r.minSecPerKm)}–${formatDuration(r.maxSecPerKm)}/km`;
 }
 
-/** A representative pace range for a session, pulled from whichever work step carries one. */
+/** A representative pace range for a session, from a work step — never the warm-up/cool-down. Returns
+ *  null for effort-based work (e.g. hill reps), so the UI shows RPE instead of a misleading pace. */
 function paceLabel(s: Session): string | null {
-  const withPace = s.steps.filter((st) => st.targetPaceSecPerKm);
-  if (withPace.length === 0) return null;
   const pick =
-    withPace.find((st) => st.kind === "rep") ??
-    withPace.find((st) => st.kind === "steady") ??
-    withPace[0]!;
-  return paceRange(pick.targetPaceSecPerKm!);
+    s.steps.find((st) => st.kind === "rep" && st.targetPaceSecPerKm) ??
+    s.steps.find((st) => st.kind === "steady" && st.targetPaceSecPerKm);
+  return pick ? paceRange(pick.targetPaceSecPerKm!) : null;
 }
 
 function rpeLabel(s: Session): string | null {

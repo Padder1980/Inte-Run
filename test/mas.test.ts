@@ -52,11 +52,12 @@ const goal: Goal = { distance: "10k", targetTimeSeconds: 2400, raceDateIso: "202
 test("a 1km trial anchors the plan's VO2 interval pace to MAS", () => {
   const withMas = generatePlan({ ...athlete, oneKmTrialSeconds: 210 }, goal); // 3:30 1km
   const expected = masVo2Range(computeMas(210).masMps);
+  // Pick a VO2 session with a paced rep (hill reps are effort-based and carry no pace).
   const vo2 = withMas.weeks
     .flatMap((w) => w.sessions)
-    .find((s) => s.type === "vo2");
-  assert.ok(vo2, "plan should contain a VO2 session");
-  const repPace = vo2.steps.find((st) => st.kind === "rep")!.targetPaceSecPerKm!;
+    .find((s) => s.type === "vo2" && s.steps.some((st) => st.kind === "rep" && st.targetPaceSecPerKm));
+  assert.ok(vo2, "plan should contain a paced VO2 session");
+  const repPace = vo2.steps.find((st) => st.kind === "rep" && st.targetPaceSecPerKm)!.targetPaceSecPerKm!;
   assert.equal(repPace.minSecPerKm, expected.minSecPerKm);
   assert.equal(repPace.maxSecPerKm, expected.maxSecPerKm);
   assert.ok(withMas.notes.some((n) => /MAS/.test(n)));

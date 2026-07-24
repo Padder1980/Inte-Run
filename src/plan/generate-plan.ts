@@ -276,9 +276,9 @@ function qualityContentsFor(
     }
     return out.slice(0, count);
   }
-  // base: threshold-led; introduce VO2 flavour only in the latter part of base.
+  // base: threshold-led (tempo/cruise/fartlek rotate); introduce VO2 flavour only in the latter part.
   const lateBase = wp.ordinalInPhase > Math.ceil(wp.phaseTotal / 2);
-  out.push(lateBase && weekIndex % 2 === 0 ? vo2Session(p, 3) : thresholdSession(p, weekIndex));
+  out.push(lateBase && weekIndex % 2 === 0 ? vo2Session(p, weekIndex) : thresholdSession(p, weekIndex));
   return out.slice(0, count);
 }
 
@@ -406,6 +406,9 @@ function buildNotes(
     athlete.includeStrength
       ? "Strength: 2×/week through base and build (heavy, low volume), easing to 1× maintenance near the race. Plyometrics only once faster running is tolerated without a delayed reaction."
       : "Strength is off. The research supports heavy strength 2×/week for economy and durability — consider enabling it.",
+  );
+  notes.push(
+    "Variety: quality sessions rotate across formats — tempo, cruise intervals, threshold and Mona fartlek, VO₂ intervals, pyramids and hill reps — so the stimulus stays fresh week to week while the training intent stays the same.",
   );
   notes.push(
     "Flexibility: warmups are dynamic (easy jog, drills, strides). Static stretching is optional and targeted — it does not improve running economy.",

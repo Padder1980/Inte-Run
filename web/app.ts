@@ -193,6 +193,21 @@ select.sel { font: inherit; font-size: 13.5px; color: var(--ink); background: va
 .promise b { color: var(--rest); }
 .guide-body { font-size: 13.5px; color: var(--ink-soft); } .guide-body p { margin: 0 0 10px; }
 
+/* Weather card */
+.wx { border-left: 4px solid var(--wc); }
+.wx-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.wx-sum { font-size: 12.5px; color: var(--ink-faint); font-weight: 600; }
+.wx-head { font-size: 15px; font-weight: 650; letter-spacing: -.01em; margin-top: 3px; }
+.wx-badge { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #fff; background: var(--wc); border-radius: 999px; padding: 3px 9px; white-space: nowrap; flex: none; }
+.wx-penrow { margin-top: 8px; }
+.wx-pen { font-family: var(--mono); font-size: 12px; color: var(--eff-hard); background: color-mix(in srgb, var(--eff-hard) 10%, transparent); border: 1px solid color-mix(in srgb, var(--eff-hard) 30%, var(--line)); border-radius: 6px; padding: 2px 8px; }
+.wx-points { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 7px; }
+.wx-points li { display: grid; grid-template-columns: 15px 1fr; gap: 8px; font-size: 13px; color: var(--ink-soft); }
+.wx-points li::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--wc); margin-top: 6px; }
+.wx-foot { margin-top: 11px; } .wx-note { font-size: 11px; color: var(--ink-faint); font-style: italic; }
+.wx-seg { margin-top: 10px; }
+.wx-seg button { font-size: 12px; padding: 5px 10px; }
+
 /* Setup banner */
 .setup-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; background: color-mix(in srgb, var(--accent) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); border-radius: 14px; padding: 13px 15px; margin-bottom: 14px; cursor: pointer; font: inherit; color: var(--ink); }
 .setup-banner b { font-size: 13.5px; } .setup-banner .sb-sub { font-size: 12px; color: var(--ink-soft); margin-top: 2px; } .setup-banner span { color: var(--accent); font-weight: 600; font-size: 13px; white-space: nowrap; }
@@ -301,7 +316,7 @@ let PLAN, RAW, FITNESS, CLASS, MASTERS;
 function recompute() { const r = applyProfile(profile); PLAN = r.plan; RAW = r.raw; FITNESS = r.fitness; CLASS = r.classification; MASTERS = r.masters; }
 try { recompute(); } catch (e) { profile = Object.assign({}, DEFAULT_PROFILE); recompute(); }
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: [] };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: [], weather: "hot" };
 
 // ---- helpers --------------------------------------------------------------
 function fmtPace(s) { s = Math.round(s); return Math.floor(s/60) + ":" + String(s%60).padStart(2,"0"); }
@@ -330,7 +345,10 @@ function renderReadiness() {
 function effortOf(s) { if (s.type === "rest" || s.type === "mobility") return "none"; if (s.type === "strength" || s.type === "cross-training") return "moderate"; if (s.intensity === "hard") return "hard"; if (s.intensity === "moderate") return "moderate"; return "easy"; }
 function paceOf(s) { const w = s.steps.filter((st) => st.targetPaceSecPerKm); if (!w.length) return null; const p = w.find((st) => st.kind === "rep") || w.find((st) => st.kind === "steady") || w[0]; return fmtPace(p.targetPaceSecPerKm.minSecPerKm) + "–" + fmtPace(p.targetPaceSecPerKm.maxSecPerKm) + "/km"; }
 function rpeOf(s) { let band = s.targetRpe; if (!band) { const w = s.steps.filter((st) => st.targetRpe); if (w.length) band = { min: Math.min.apply(null, w.map((x) => x.targetRpe.min)), max: Math.max.apply(null, w.map((x) => x.targetRpe.max)) }; } return band ? band.min + "–" + band.max : null; }
-function rawToday() { const ss = RAW.weeks[0].sessions.slice().sort((a, b) => a.dayOfWeek - b.dayOfWeek); return ss.find((s) => s.estimatedDistanceMeters) || ss[0]; }
+function rawToday() {
+  const ss = RAW.weeks[0].sessions.slice().sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+  return ss.find((s) => s.type === "threshold" || s.type === "vo2" || s.type === "race-specific") || ss.find((s) => s.estimatedDistanceMeters) || ss[0];
+}
 function todayWorkout() {
   const s = rawToday();
   const durMin = Math.round(s.estimatedDurationSeconds / 60);
@@ -353,11 +371,33 @@ function viewToday() {
   const banner = profile.personalized ? "" : '<button class="setup-banner" id="setupBanner"><div><b>You\\'re viewing an example plan</b><div class="sb-sub">Tell us about you and your goal to make it yours.</div></div><span>Set up →</span></button>';
   return banner + '<div class="weekstrip">' + strip + '</div>' +
     '<h2 class="sec">Today\\'s workout</h2><div class="card">' + w.html + '</div>' +
+    weatherCard(w.s) +
     '<button class="primary" id="startSession">' + ICON.play + ' Start session</button>' +
     '<h2 class="sec">How you\\'re doing</h2>' +
     '<div class="card"><div class="ctx"><span class="lab">Today\\'s plan</span><div class="seg" data-seg="dayType"><button data-v="quality"' + (state.dayType==="quality"?' class="on"':'') + '>Quality</button><button data-v="easy"' + (state.dayType==="easy"?' class="on"':'') + '>Easy</button></div></div>' +
     '<div id="readySlot">' + renderReadiness() + '</div>' +
     (state.dayType === "quality" ? feelExpander() : "") + '</div>';
+}
+const WEATHER_PRESETS = {
+  mild: { label: "Mild", tempC: 12, humidityPct: 55, windKph: 8 },
+  warm: { label: "Warm", tempC: 22, humidityPct: 60, windKph: 10 },
+  hot: { label: "Hot & humid", tempC: 30, humidityPct: 75, windKph: 8 },
+  windy: { label: "Windy", tempC: 14, humidityPct: 55, windKph: 42 },
+  cold: { label: "Cold", tempC: 1, humidityPct: 70, windKph: 16 },
+};
+const SEV_COLOR = { none: "var(--ready)", mild: "var(--steady)", moderate: "var(--ease)", high: "var(--eff-hard)", severe: "var(--rest)" };
+function weatherCard(session) {
+  const pre = WEATHER_PRESETS[state.weather];
+  const imp = RC.assessConditions({ tempC: pre.tempC, humidityPct: pre.humidityPct, windKph: pre.windKph, sessionType: session.type });
+  const c = SEV_COLOR[imp.severity];
+  const presetBtns = Object.keys(WEATHER_PRESETS).map((k) => '<button data-weather="' + k + '"' + (k === state.weather ? ' class="on"' : '') + '>' + WEATHER_PRESETS[k].label + '</button>').join("");
+  const pen = imp.pacePenaltySecPerKm ? '<span class="wx-pen">≈ +' + imp.pacePenaltySecPerKm + 's/km at the same effort</span>' : "";
+  return '<h2 class="sec">Conditions</h2><div class="card wx" style="--wc:' + c + '">' +
+    '<div class="wx-top"><div><div class="wx-sum">' + imp.summary + '</div><div class="wx-head">' + imp.headline + '</div></div>' + (imp.effortBased ? '<span class="wx-badge">Run by effort</span>' : '') + '</div>' +
+    (pen ? '<div class="wx-penrow">' + pen + '</div>' : '') +
+    '<ul class="wx-points">' + imp.points.map((p) => '<li>' + p + '</li>').join("") + '</ul>' +
+    '<div class="wx-foot"><span class="wx-note">Sample conditions — the live app reads your local forecast.</span></div>' +
+    '<div class="seg wx-seg" data-weatherseg="1">' + presetBtns + '</div></div>';
 }
 function feelExpander() {
   const segs = [["soreness","Legs",[["none","Fine"],["mild","Stiff"],["moderate","Sore"],["high","Very sore"]]],["energy","Energy",[["good","Good"],["ok","OK"],["low","Low"]]],["stress","Stress",[["low","Low"],["normal","Normal"],["high","High"]]],["illness","Feeling ill?",[["none","No"],["slight","A little"],["unwell","Unwell"]]]];
@@ -649,6 +689,7 @@ function wire() {
   }));
   ["s_age","s_sex"].forEach((id) => { const e = $(id); if (e) e.oninput = e.onchange = refreshTypePreview; });
   const setupBanner = $("setupBanner"); if (setupBanner) setupBanner.onclick = () => { state.screen = "setup"; render(); };
+  const wxSeg = document.querySelector("[data-weatherseg]"); if (wxSeg) wxSeg.querySelectorAll("button").forEach((b) => b.onclick = () => { state.weather = b.dataset.weather; render(); });
   const save = $("saveProfile"); if (save) save.onclick = () => {
     let pf; try { pf = draftFromForm(); } catch (e) { const er = $("setupErr"); er.style.display = "block"; er.textContent = e.message; return; }
     let out; try { out = applyProfile(pf); } catch (e) { const er = $("setupErr"); er.style.display = "block"; er.textContent = "That goal can't be planned yet — try a race date further out."; return; }

@@ -139,8 +139,8 @@ footer { margin-top: 40px; font-size: 12px; color: var(--ink-faint); text-align:
 
   <div class="tiles">
     <div class="tile" style="--c:var(--built)"><div class="n num" style="color:var(--built)">3</div><div class="k">Built</div><div class="of num">of 17 domains</div></div>
-    <div class="tile" style="--c:var(--partial)"><div class="n num" style="color:var(--partial)">10</div><div class="k">Partial</div><div class="of num">meaningful gaps</div></div>
-    <div class="tile" style="--c:var(--missing)"><div class="n num" style="color:var(--missing)">4</div><div class="k">Missing</div><div class="of num">not yet started</div></div>
+    <div class="tile" style="--c:var(--partial)"><div class="n num" style="color:var(--partial)">11</div><div class="k">Partial</div><div class="of num">meaningful gaps</div></div>
+    <div class="tile" style="--c:var(--missing)"><div class="n num" style="color:var(--missing)">3</div><div class="k">Missing</div><div class="of num">not yet started</div></div>
     <div class="tile" style="--c:var(--built)"><div class="n num" style="color:var(--built)">✓⁴</div><div class="k">Phases 1–4 shipped</div><div class="of num">the evidence build, done</div></div>
   </div>
 
@@ -204,7 +204,7 @@ const DOMAINS = [
   { i: 12, name: "Masters runners & ageing", s: "partial", t: "<b>Shipped (Phase 4):</b> age-aware guidance that preserves intensity (never “just slow down”), adds recovery room, heavy strength, protein and bone-health prompts, and points women from midlife to the wellbeing check. <b>Still missing:</b> wiring recovery spacing into plan generation." },
   { i: 13, name: "Young athletes", s: "missing", t: "Age-appropriate training, safeguarding, consent, growth. Also a <b>scope / legal decision</b>, not just a feature." },
   { i: 14, name: "Para-athletes & inclusive design", s: "missing", t: "Demos are keyboard / theme accessible, but no wheelchair / handcycle options or impairment-aware metrics." },
-  { i: 15, name: "Heat, cold, altitude & environment", s: "missing", t: "No effort-based pace adjustment for heat, wind, altitude, air quality or surface." },
+  { i: 15, name: "Heat, cold, altitude & environment", s: "partial", t: "<b>Shipped:</b> weather-aware Today — heat, humidity and wind turn into session-specific guidance (threshold / intervals run by effort not pace, with a pace penalty), plus cold warm-up advice. <b>Still missing:</b> altitude, air quality, acclimatisation, and a live local-forecast feed (needs a real deployment or a weather connector)." },
   { i: 16, name: "Wearables, monitoring & data validity", s: "partial", t: "<b>Shipped (Phase 2):</b> the Estimate primitive — every physiology metric now carries a confidence level, method, and limitations, shown as a range not a point value. <b>Still missing:</b> per-device reliability metadata, applied across all app metrics." },
   { i: 17, name: "Medical safety & professional boundaries", s: "partial", safety: true, t: "<b>Shipped (Phase 1):</b> red-flag escalation screener — emergency / urgent / refer, compassionate crisis routing, never a diagnosis. <b>Still missing:</b> illness-return, deeper triage, wiring into the plan & live flows." },
 ];

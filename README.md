@@ -149,6 +149,7 @@ src/
   athlete/     classification.ts              — plain runner type on the six-tier McKay framework
                masters.ts                     — age-aware guidance (preserve intensity, add recovery)
                evidence-tag.ts                — how well a tip's evidence applies to *this* runner
+  environment/ weather.ts                     — heat/wind/cold → effort-based guidance for today's run
   progress/    achievements.ts                — PB detection (fastest 1k/mile/5k/10k/HM/M, longest run)
   live/        session-runtime.ts             — live-session state machine (start/pause/stop, pace cues)
   safety/      escalation.ts                  — medical red-flag screener → emergency/urgent/refer

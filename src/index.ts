@@ -127,6 +127,14 @@ export {
   type ReturnStage,
 } from "./adapt/load-guardrails.ts";
 
+// Environment — weather's effect on today's run (effort-based pacing in heat/wind).
+export {
+  assessConditions,
+  type Conditions,
+  type Severity,
+  type WeatherImpact,
+} from "./environment/weather.ts";
+
 // Athlete populations — classification, age-aware guidance, and evidence tagging.
 export {
   classifyRunner,

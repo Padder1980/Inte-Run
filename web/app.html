@@ -371,7 +371,7 @@ let PLAN, RAW, FITNESS, CLASS, MASTERS;
 function recompute() { const r = applyProfile(profile); PLAN = r.plan; RAW = r.raw; FITNESS = r.fitness; CLASS = r.classification; MASTERS = r.masters; }
 try { recompute(); } catch (e) { profile = Object.assign({}, DEFAULT_PROFILE); recompute(); }
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: [], weather: "hot" };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: [], weather: "hot", trialPending: false, trialSaved: null };
 
 // ---- helpers --------------------------------------------------------------
 function fmtPace(s) { s = Math.round(s); return Math.floor(s/60) + ":" + String(s%60).padStart(2,"0"); }
@@ -422,6 +422,13 @@ function viewToday() {
     const eff = (wk.sessions.find((s) => s.day === d && s.type !== "rest") || {}).effort;
     return '<div class="d' + (i === today ? " today" : "") + '"><div class="dn">' + d + '</div><div class="dd">' + (20 + i) + '</div>' + (has ? '<div class="dot" style="background:var(--eff-' + (eff || "easy") + ')"></div>' : "<div class=\"dot\" style=\"background:transparent\"></div>") + '</div>';
   }).join("");
+  if (state.trialPending) {
+    return '<div class="weekstrip">' + strip + '</div>' +
+      '<h2 class="sec">Today\'s workout</h2><div class="card">' + trialTodayCard() + '</div>' +
+      '<div class="plan-note" style="border-left-color:var(--accent)">We\'ve added a <b>1 km time trial</b> to today. Warm up as guided — only the 1 km itself is timed, and its time goes straight to your profile.</div>' +
+      '<button class="primary" id="startTrial">' + ICON.play + ' Start time trial</button>' +
+      '<button class="primary" id="cancelTrial" style="background:var(--surface-2);color:var(--ink-soft);margin-top:8px">Not today — back to my plan</button>';
+  }
   const w = todayWorkout();
   const banner = profile.personalized ? "" : '<button class="setup-banner" id="setupBanner"><div><b>You\'re viewing an example plan</b><div class="sb-sub">Tell us about you and your goal to make it yours.</div></div><span>Set up →</span></button>';
   return banner + '<div class="weekstrip">' + strip + '</div>' +
@@ -601,7 +608,8 @@ function opt(list, val) { return list.map((o) => '<option value="' + o[0] + '"' 
 function seg(name, opts, val) { return '<div class="seg" data-set="' + name + '">' + opts.map((o) => '<button data-v="' + o[0] + '"' + (String(o[0]) === String(val) ? ' class="on"' : '') + '>' + o[1] + '</button>').join("") + '</div>'; }
 function viewSetup() {
   const p = profile;
-  return '<div class="eyebrow" style="margin:2px 2px 10px">' + (p.personalized ? "Your profile" : "Let's make this yours") + '</div>' +
+  const savedMsg = state.trialSaved ? '<div class="plan-note" style="border-left-color:var(--accent);margin:2px 2px 12px">✓ 1 km time trial saved: <b>' + state.trialSaved + '</b>. Your VO₂/interval paces are now anchored to it.</div>' : "";
+  return savedMsg + '<div class="eyebrow" style="margin:2px 2px 10px">' + (p.personalized ? "Your profile" : "Let's make this yours") + '</div>' +
     '<div class="card"><div class="subhead" style="margin-top:0">Your goal</div>' +
     '<div class="q"><label>Race</label><select class="sel" id="s_dist">' + opt(DIST_OPTS, p.goalDist) + '</select></div>' +
     '<div class="q"><label>Target time <span style="color:var(--ink-faint);font-weight:400">just type the numbers</span></label><input class="sel num" id="s_target" value="' + fmtTimeFull(p.targetS) + '" inputmode="numeric"></div>' +
@@ -670,63 +678,100 @@ function refreshMasHint() {
   el.innerHTML = "MAS <b>" + m.masMps.toFixed(2) + " m/s</b> · " + fmtPace(m.masPaceSecPerKm) + "/km — sets your VO₂ paces.";
 }
 
-// ---- 1 km time-trial recorder --------------------------------------------
-// Lets a runner who hasn't done a 1 km test record one now: a live stopwatch whose result drops
-// straight into the 1 km field. The overlay lives outside #view so the setup form keeps its values.
-let TRIAL = null;
+// ---- 1 km time-trial session ---------------------------------------------
+// Recording a 1 km trial isn't a bare stopwatch — it's a proper session on Today: a guided warm-up,
+// then the timed 1 km. Only the 1 km itself is measured, and on completion its time flows back to the
+// About-you 1 km field (and re-anchors the plan's paces). In the live app GPS auto-stops at 1 km;
+// here the runner taps Finish.
 function fmtClock(ms) { const t = ms / 1000; const m = Math.floor(t / 60); const s = Math.floor(t % 60); const d = Math.floor((t * 10) % 10); return m + ":" + String(s).padStart(2, "0") + "." + d; }
-function trialTick() { if (!TRIAL || !TRIAL.running) return; $("trialClock").textContent = fmtClock(performance.now() - TRIAL.start); TRIAL.raf = requestAnimationFrame(trialTick); }
-function ensureTrial() {
-  if ($("trialOv")) return;
-  const html = '<div class="trial-ov" id="trialOv"><div class="trial-panel">' +
-    '<button class="trial-x" id="trialClose" aria-label="Close">✕</button>' +
-    '<div class="trial-eyebrow">1 km time trial</div>' +
-    '<div class="trial-clock num" id="trialClock">0:00.0</div>' +
-    '<div class="trial-msg" id="trialMsg"></div>' +
-    '<div class="trial-controls" id="trialCtrls"></div>' +
-    '<div class="trial-foot">On a phone with GPS the full app auto-detects your 1 km and stops for you. Here you time it yourself — 2½ laps of a 400 m track is 1 km.</div>' +
-    '</div></div>';
-  document.querySelector(".app").appendChild(el(html));
-  $("trialClose").onclick = closeTrial;
-  $("trialOv").onclick = (e) => { if (e.target === $("trialOv")) closeTrial(); };
+const TRIAL_PARTS = [
+  ["easy", "Warm-up", "~10 min easy jog + 3 × 20s strides to open the legs"],
+  ["hard", "1 km time trial", "Max effort — hold the fastest pace you can for the full 1 km"],
+  ["easy", "Cool-down", "5–10 min easy jog to recover"],
+];
+// Send the runner from the setup form into a trial session that's been added to Today.
+function startTrialFlow() { state.trialPending = true; state.screen = null; state.tab = "today"; render(); }
+function trialTodayCard() {
+  const rows = TRIAL_PARTS.map((p) => '<div class="sess"><span class="dot ' + p[0] + '"></span><div><div class="st">' + p[1] + '</div><div class="sm" style="color:var(--ink-soft)">' + p[2] + '</div></div></div>').join("");
+  return '<div class="wk-card" style="--c:var(--eff-hard)"><div class="b"><div class="t">1 km time trial</div><div class="sub">Added to today · warm-up included</div><div style="margin-top:10px;display:flex;flex-direction:column;gap:10px">' + rows + '</div></div></div>';
 }
-function openTrial() { ensureTrial(); TRIAL = { running: false, start: 0, secs: 0, raf: null }; trialReady(); $("trialOv").classList.add("on"); }
-function closeTrial() { if (TRIAL && TRIAL.raf) cancelAnimationFrame(TRIAL.raf); if ($("trialOv")) $("trialOv").classList.remove("on"); TRIAL = null; }
-function trialReady() {
-  $("trialClock").textContent = "0:00.0";
-  $("trialMsg").innerHTML = "Warm up first. Press <b>Start</b> and run 1 km as hard as you can hold — tap <b>Finish</b> the moment you complete it.";
-  const c = $("trialCtrls"); c.className = "trial-controls"; c.innerHTML = '<button class="primary" id="trialStart">Start</button>';
-  $("trialStart").onclick = trialStart;
+let TRIALRUN = null;
+function beginTrialRun() { TRIALRUN = { phase: "warmup", wStart: performance.now(), start: 0, secs: 0, raf: null }; state.screen = "trialrun"; render(); }
+function stopTrialRun() { if (TRIALRUN && TRIALRUN.raf) { cancelAnimationFrame(TRIALRUN.raf); TRIALRUN.raf = null; } }
+function trialRunTick() {
+  const cl = $("twClock"); if (!TRIALRUN || !cl) return;
+  if (TRIALRUN.phase === "warmup") cl.textContent = fmtPace((performance.now() - TRIALRUN.wStart) / 1000);
+  else if (TRIALRUN.phase === "run") cl.textContent = fmtClock(performance.now() - TRIALRUN.start);
+  else return;
+  TRIALRUN.raf = requestAnimationFrame(trialRunTick);
 }
-function trialStart() {
-  TRIAL.running = true; TRIAL.start = performance.now(); TRIAL.raf = requestAnimationFrame(trialTick);
-  $("trialMsg").innerHTML = "<b>Go!</b> Hold your hardest sustainable effort. Tap <b>Finish</b> at exactly 1 km.";
-  const c = $("trialCtrls"); c.className = "trial-controls two";
-  c.innerHTML = '<button class="ctrl" id="trialCancel">Cancel</button><button class="primary" id="trialFinish">Finish</button>';
-  $("trialCancel").onclick = trialResetReady; $("trialFinish").onclick = trialFinish;
-}
-function trialResetReady() { if (TRIAL.raf) cancelAnimationFrame(TRIAL.raf); TRIAL.running = false; trialReady(); }
-function trialFinish() {
-  if (TRIAL.raf) cancelAnimationFrame(TRIAL.raf);
-  TRIAL.running = false;
-  const secs = Math.round((performance.now() - TRIAL.start) / 1000);
-  TRIAL.secs = secs;
-  $("trialClock").textContent = fmtTimeFull(secs);
-  const c = $("trialCtrls"); c.className = "trial-controls two";
-  if (secs >= 150 && secs <= 480) {
-    const m = RC.computeMas(secs);
-    $("trialMsg").innerHTML = "That's <b>" + fmtTimeFull(secs) + "</b> for 1 km — MAS <b>" + m.masMps.toFixed(2) + " m/s</b>. This will set your VO₂/interval paces.";
-    c.innerHTML = '<button class="ctrl" id="trialRedo">Redo</button><button class="primary" id="trialUse">Use this time</button>';
-    $("trialUse").onclick = trialUse;
-  } else {
-    $("trialMsg").innerHTML = secs < 150
-      ? "That's under 2:30 — too fast for a full 1 km, so it can't set MAS. Check the distance and try again."
-      : "That's over 8:00 — for MAS we need a hard 1 km effort. Have a rest and try again.";
-    c.className = "trial-controls"; c.innerHTML = '<button class="primary" id="trialRedo">Try again</button>';
+function viewTrialRun() {
+  const p = TRIALRUN.phase;
+  const back = '<button class="backbtn" id="trBack">‹ Today</button>';
+  if (p === "warmup") {
+    return back +
+      '<div class="card live-hero"><div class="eyebrow">1 km time trial · step 1 of 2</div><div class="live-title">Warm up first</div>' +
+      '<div class="live-metrics" style="grid-template-columns:1fr"><div><div class="lk">Warm-up time</div><div class="lv num" id="twClock">0:00</div></div></div></div>' +
+      '<div class="card"><div class="subhead" style="margin-top:0">Do this before the effort</div><div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">' +
+      '<div class="sess"><span class="dot easy"></span><div><div class="st">Easy jog ~10 min</div><div class="sm" style="color:var(--ink-soft)">Raise your heart rate gradually — conversational pace.</div></div></div>' +
+      '<div class="sess"><span class="dot moderate"></span><div><div class="st">3 × 20s strides</div><div class="sm" style="color:var(--ink-soft)">Build to fast and smooth, full recovery between each.</div></div></div>' +
+      '<div class="sess"><span class="dot hard"></span><div><div class="st">Catch your breath</div><div class="sm" style="color:var(--ink-soft)">Then start the 1 km when you feel ready.</div></div></div></div></div>' +
+      '<div class="trial-controls"><button class="primary" id="twGo">' + ICON.play + ' Start the 1 km</button></div>' +
+      '<div class="trial-foot" style="border:0;text-align:center">Only the 1 km itself is timed and saved to your profile.</div>';
   }
-  const redo = $("trialRedo"); if (redo) redo.onclick = trialResetReady;
+  if (p === "run") {
+    return back +
+      '<div class="card live-hero" style="border-color:var(--peak)"><div class="eyebrow" style="color:var(--peak)">1 km time trial · max effort</div>' +
+      '<div class="trial-clock num" id="twClock" style="margin:14px 0 6px">0:00.0</div>' +
+      '<div style="color:var(--ink-soft);font-size:13.5px">Run 1 km as hard as you can hold. Tap <b>Finish</b> the instant you complete it.</div></div>' +
+      '<div class="trial-controls"><button class="primary" id="twFinish" style="background:var(--peak)">Finish — 1 km done</button></div>' +
+      '<div class="trial-foot" style="border:0;text-align:center">On a phone with GPS the full app stops automatically at 1 km.</div>';
+  }
+  const secs = TRIALRUN.secs, inRange = secs >= 150 && secs <= 480;
+  const mas = inRange ? RC.computeMas(secs) : null;
+  return back +
+    '<div class="card live-hero"><div class="eyebrow">1 km time trial · done</div>' +
+    '<div class="trial-clock num" style="margin:14px 0 8px">' + fmtTimeFull(secs) + '</div>' +
+    (inRange
+      ? '<div style="color:var(--ink-soft);font-size:13.5px">MAS <b>' + mas.masMps.toFixed(2) + ' m/s</b> · ' + fmtPace(mas.masPaceSecPerKm) + '/km. Saving this sets your VO₂/interval paces.</div>'
+      : '<div style="color:var(--ease);font-size:13.5px">' + (secs < 150 ? "That's under 2:30 — too fast for a full 1 km. Give it another go." : "That's over 8:00 — for MAS we need a hard 1 km effort. Have a rest and try again.") + '</div>') +
+    '</div>' +
+    (inRange
+      ? '<div class="trial-controls two"><button class="ctrl" id="twRedo">Redo</button><button class="primary" id="twSave">Save to my profile</button></div>'
+      : '<div class="trial-controls"><button class="primary" id="twRedo">Try again</button></div>');
 }
-function trialUse() { const inp = $("s_1km"); if (inp) { inp.value = fmtTimeFull(TRIAL.secs); refreshMasHint(); } closeTrial(); }
+function wireTrialRun() {
+  const back = $("trBack"); if (back) back.onclick = () => { stopTrialRun(); TRIALRUN = null; state.screen = null; state.tab = "today"; render(); };
+  if (TRIALRUN.phase === "warmup") {
+    TRIALRUN.raf = requestAnimationFrame(trialRunTick);
+    const go = $("twGo"); if (go) go.onclick = () => { stopTrialRun(); TRIALRUN.phase = "run"; TRIALRUN.start = performance.now(); render(); };
+  } else if (TRIALRUN.phase === "run") {
+    TRIALRUN.raf = requestAnimationFrame(trialRunTick);
+    const fin = $("twFinish"); if (fin) fin.onclick = () => { stopTrialRun(); TRIALRUN.secs = Math.round((performance.now() - TRIALRUN.start) / 1000); TRIALRUN.phase = "done"; render(); };
+  } else {
+    const redo = $("twRedo"); if (redo) redo.onclick = () => { TRIALRUN.phase = "warmup"; TRIALRUN.wStart = performance.now(); render(); };
+    const save = $("twSave"); if (save) save.onclick = trialSaveResult;
+  }
+}
+// Write just the 1 km time back to the profile's About-you field, re-anchor the plan, and land the
+// runner on About you so they see it recorded.
+function trialSaveResult() {
+  profile.oneKmS = TRIALRUN.secs;
+  profile.personalized = true;
+  try { const out = applyProfile(profile); PLAN = out.plan; RAW = out.raw; FITNESS = out.fitness; CLASS = out.classification; MASTERS = out.masters; state.planWeek = PLAN.defaultWeekIndex; } catch (e) {}
+  saveProfileStore();
+  state.trialSaved = fmtTimeFull(TRIALRUN.secs);
+  state.trialPending = false; TRIALRUN = null;
+  state.screen = "setup"; render();
+}
+// Show/hide the 5 km time field to match the chosen fitness source, and relabel recent vs predicted.
+function syncFitSrc() {
+  const v = draft.fitsrc || "recent";
+  const wrap = $("fitTimeWrap"), beg = $("fitBegNote"), main = document.querySelector("#fitTimeLbl .lblmain");
+  if (wrap) wrap.style.display = v === "beginner" ? "none" : "";
+  if (beg) beg.style.display = v === "beginner" ? "" : "none";
+  if (main) main.textContent = v === "predicted" ? "Your predicted 5 km time" : "Your recent 5 km time";
+}
 // Show/hide the 5 km time field to match the chosen fitness source, and relabel recent vs predicted.
 function syncFitSrc() {
   const v = draft.fitsrc || "recent";
@@ -823,6 +868,7 @@ function render() {
     document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
     wire();
     refreshTypePreview();
+    state.trialSaved = null;
     return;
   }
   if (state.screen === "live") {
@@ -830,6 +876,13 @@ function render() {
     v.innerHTML = viewLive(); v.scrollTop = 0;
     document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
     wire();
+    return;
+  }
+  if (state.screen === "trialrun") {
+    $("topTitle").textContent = "1 km time trial";
+    v.innerHTML = viewTrialRun(); v.scrollTop = 0;
+    document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
+    wireTrialRun();
     return;
   }
   $("topTitle").textContent = state.support ? "Support" : TITLES[state.tab];
@@ -867,7 +920,7 @@ function wire() {
   bindTimeInput($("s_target")); bindTimeInput($("s_rectime"));
   const km1 = $("s_1km");
   if (km1) { bindTimeInput(km1); km1.addEventListener("input", refreshMasHint); refreshMasHint(); }
-  const km1rec = $("s_1km_rec"); if (km1rec) km1rec.onclick = openTrial;
+  const km1rec = $("s_1km_rec"); if (km1rec) km1rec.onclick = startTrialFlow;
   if (document.querySelector('[data-set="fitsrc"]')) syncFitSrc();
   const setupBanner = $("setupBanner"); if (setupBanner) setupBanner.onclick = () => { state.screen = "setup"; render(); };
   const wxSeg = document.querySelector("[data-weatherseg]"); if (wxSeg) wxSeg.querySelectorAll("button").forEach((b) => b.onclick = () => { state.weather = b.dataset.weather; render(); });
@@ -878,6 +931,9 @@ function wire() {
     state.screen = null; state.tab = "plan"; render();
   };
   const cancel = $("cancelSetup"); if (cancel) cancel.onclick = () => { state.screen = null; state.tab = "today"; render(); };
+  // 1 km time-trial session wiring
+  const startTrial = $("startTrial"); if (startTrial) startTrial.onclick = beginTrialRun;
+  const cancelTrial = $("cancelTrial"); if (cancelTrial) cancelTrial.onclick = () => { state.trialPending = false; render(); };
   // Live session wiring
   const startBtn = $("startSession"); if (startBtn) startBtn.onclick = startSession;
   const lb = $("liveBack"); if (lb) lb.onclick = () => { stopLive(); state.screen = null; state.tab = "today"; render(); };
@@ -891,11 +947,11 @@ function wire() {
 }
 function buildNav() {
   $("nav").innerHTML = ["today","plan","activities","community","support"].map((t) => '<button class="navbtn' + (t===state.tab?" on":"") + '" data-tab="' + t + '">' + ICON[t] + '<span class="nl">' + TITLES[t].replace("Your ","") + '</span></button>').join("");
-  document.querySelectorAll(".navbtn").forEach((b) => b.onclick = () => { stopLive(); state.screen = null; state.tab = b.dataset.tab; if (b.dataset.tab !== "support") state.support = null; render(); });
+  document.querySelectorAll(".navbtn").forEach((b) => b.onclick = () => { stopLive(); stopTrialRun(); TRIALRUN = null; state.screen = null; state.tab = b.dataset.tab; if (b.dataset.tab !== "support") state.support = null; render(); });
 }
 $("profileBtn").innerHTML = ICON.person; $("bellBtn").innerHTML = ICON.bell; $("themeBtn").innerHTML = ICON.theme;
 $("themeBtn").onclick = () => { const cur = document.documentElement.getAttribute("data-theme"); document.documentElement.setAttribute("data-theme", cur === "dark" ? "light" : cur === "light" ? "dark" : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark")); };
-$("profileBtn").onclick = () => { state.screen = "setup"; render(); };
+$("profileBtn").onclick = () => { stopTrialRun(); state.screen = "setup"; render(); };
 buildNav();
 render();
 </script>

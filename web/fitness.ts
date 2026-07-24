@@ -191,6 +191,7 @@ footer { margin-top: 28px; font-size: 12px; color: var(--ink-faint); text-align:
 <script>${bundleJs}</script>
 <script>
 const $ = (id) => document.getElementById(id);
+function fmtDigitsToTime(raw) { const d = String(raw).replace(/\\D/g, "").slice(0, 6); if (!d) return ""; if (d.length <= 2) return d; const ss = d.slice(-2), rest = d.slice(0, -2); return rest.length <= 2 ? rest + ":" + ss : rest.slice(0, -2) + ":" + rest.slice(-2) + ":" + ss; }
 const DISTANCES = [["1500","1500 m"],["1609.344","1 mile"],["3000","3 km"],["5000","5 km (parkrun)"],["10000","10 km"],["21097.5","Half marathon"]];
 
 let effortRows = [
@@ -203,12 +204,15 @@ function renderEfforts() {
       '<label class="field"><span>How far</span><select data-i="' + i + '" data-k="dist">' +
         DISTANCES.map(([v, l]) => '<option value="' + v + '"' + (v === e.dist ? " selected" : "") + '>' + l + '</option>').join("") +
       '</select></label>' +
-      '<label class="field"><span>Your time (m:ss)</span><input class="time" data-i="' + i + '" data-k="time" value="' + e.time + '" inputmode="numeric"></label>' +
+      '<label class="field"><span>Your time <span style="color:var(--ink-faint);font-weight:400">just the numbers</span></span><input class="time" data-i="' + i + '" data-k="time" value="' + e.time + '" inputmode="numeric"></label>' +
       (effortRows.length > 1 ? '<button class="rm" data-rm="' + i + '" type="button" title="Remove">×</button>' : '<span></span>') +
     '</div>'
   ).join("");
   $("efforts").querySelectorAll("select,input").forEach((el) =>
     el.addEventListener("change", () => { effortRows[+el.dataset.i][el.dataset.k] = el.value; })
+  );
+  $("efforts").querySelectorAll("input.time").forEach((el) =>
+    el.addEventListener("input", () => { const f = fmtDigitsToTime(el.value); el.value = f; try { el.setSelectionRange(f.length, f.length); } catch (e) {} effortRows[+el.dataset.i].time = f; })
   );
   $("efforts").querySelectorAll("[data-rm]").forEach((b) =>
     b.addEventListener("click", () => { effortRows.splice(+b.dataset.rm, 1); renderEfforts(); })

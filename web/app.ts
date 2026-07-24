@@ -268,6 +268,20 @@ select.sel { font: inherit; font-size: 13.5px; color: var(--ink); background: va
 <script>${bundleJs}</script>
 <script>
 const $ = (id) => document.getElementById(id);
+// Time inputs: the user types only digits and the colons appear automatically (e.g. 13000 → 1:30:00).
+function fmtDigitsToTime(raw) {
+  const d = String(raw).replace(/\\D/g, "").slice(0, 6);
+  if (!d) return "";
+  if (d.length <= 2) return d;
+  const ss = d.slice(-2), rest = d.slice(0, -2);
+  return rest.length <= 2 ? rest + ":" + ss : rest.slice(0, -2) + ":" + rest.slice(-2) + ":" + ss;
+}
+function bindTimeInput(el) {
+  if (!el || el._tbound) return;
+  el._tbound = true;
+  el.setAttribute("inputmode", "numeric");
+  el.addEventListener("input", () => { const f = fmtDigitsToTime(el.value); el.value = f; try { el.setSelectionRange(f.length, f.length); } catch (e) {} });
+}
 const ICON = {
   today: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>',
   plan: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h4"/></svg>',
@@ -532,11 +546,11 @@ function viewSetup() {
   return '<div class="eyebrow" style="margin:2px 2px 10px">' + (p.personalized ? "Your profile" : "Let's make this yours") + '</div>' +
     '<div class="card"><div class="subhead" style="margin-top:0">Your goal</div>' +
     '<div class="q"><label>Race</label><select class="sel" id="s_dist">' + opt(DIST_OPTS, p.goalDist) + '</select></div>' +
-    '<div class="q"><label>Target time <span style="color:var(--ink-faint);font-weight:400">h:mm:ss</span></label><input class="sel num" id="s_target" value="' + fmtTimeFull(p.targetS) + '" inputmode="numeric"></div>' +
+    '<div class="q"><label>Target time <span style="color:var(--ink-faint);font-weight:400">just type the numbers</span></label><input class="sel num" id="s_target" value="' + fmtTimeFull(p.targetS) + '" inputmode="numeric"></div>' +
     '<div class="q"><label>Race date</label><input class="sel num" id="s_date" type="date" value="' + p.raceDate + '"></div></div>' +
     '<div class="card" style="margin-top:12px"><div class="subhead" style="margin-top:0">About you</div>' +
     '<div class="q"><label>A recent run — distance</label><select class="sel" id="s_recdist">' + opt(REC_OPTS, p.recentDistM) + '</select></div>' +
-    '<div class="q"><label>…in a time of <span style="color:var(--ink-faint);font-weight:400">m:ss</span></label><input class="sel num" id="s_rectime" value="' + fmtTimeFull(p.recentTimeS) + '" inputmode="numeric"></div>' +
+    '<div class="q"><label>…in a time of <span style="color:var(--ink-faint);font-weight:400">just type the numbers</span></label><input class="sel num" id="s_rectime" value="' + fmtTimeFull(p.recentTimeS) + '" inputmode="numeric"></div>' +
     '<div class="q"><label>Runs per week</label>' + seg("days", [["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]], p.daysPerWeek) + '</div>' +
     '<div class="q"><label>Years running</label>' + seg("years", [["0.5","<1"],["2","1–3"],["5","3–8"],["10","8+"]], p.yearsRunning) + '</div>' +
     '<div class="q"><label>Age</label><input class="sel num" id="s_age" type="number" min="12" max="95" value="' + p.age + '" style="max-width:110px"></div>' +
@@ -697,6 +711,7 @@ function wire() {
     draft[s.dataset.set] = b.dataset.v; s.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); refreshTypePreview();
   }));
   ["s_age","s_sex"].forEach((id) => { const e = $(id); if (e) e.oninput = e.onchange = refreshTypePreview; });
+  bindTimeInput($("s_target")); bindTimeInput($("s_rectime"));
   const setupBanner = $("setupBanner"); if (setupBanner) setupBanner.onclick = () => { state.screen = "setup"; render(); };
   const wxSeg = document.querySelector("[data-weatherseg]"); if (wxSeg) wxSeg.querySelectorAll("button").forEach((b) => b.onclick = () => { state.weather = b.dataset.weather; render(); });
   const save = $("saveProfile"); if (save) save.onclick = () => {

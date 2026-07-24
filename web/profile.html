@@ -126,7 +126,7 @@ footer { margin-top: 28px; font-size: 12px; color: var(--ink-faint); text-align:
       <div class="field"><label>Runs per week</label><input type="number" id="rpw" min="0" max="14" value="4"></div>
       <div class="field"><label>Years running</label><input type="number" id="years" min="0" max="60" step="0.5" value="4"></div>
       <div class="field"><label>Weekly distance <span class="hintx">km, optional</span></label><input type="number" id="vol" min="0" step="1" value="35"></div>
-      <div class="field"><label>Recent 5k <span class="hintx">min:sec, optional</span></label><input class="time" id="fivek" placeholder="e.g. 24:00" inputmode="numeric" autocomplete="off"><div class="err" id="fivekErr"></div></div>
+      <div class="field"><label>Recent 5k <span class="hintx">just the numbers, optional</span></label><input class="time" id="fivek" placeholder="e.g. 2400" inputmode="numeric" autocomplete="off"><div class="err" id="fivekErr"></div></div>
       <div class="field"><label>Age</label><input type="number" id="age" min="10" max="99" value="52"></div>
       <div class="field"><label>Sex <span class="hintx">helps tailor advice</span></label>
         <select id="sex"><option value="">Prefer not to say</option><option value="female" selected>Female</option><option value="male">Male</option></select>
@@ -160,6 +160,8 @@ footer { margin-top: 28px; font-size: 12px; color: var(--ink-faint); text-align:
 </script>
 <script>
 const $ = (id) => document.getElementById(id);
+function fmtDigitsToTime(raw) { const d = String(raw).replace(/\D/g, "").slice(0, 6); if (!d) return ""; if (d.length <= 2) return d; const ss = d.slice(-2), rest = d.slice(0, -2); return rest.length <= 2 ? rest + ":" + ss : rest.slice(0, -2) + ":" + rest.slice(-2) + ":" + ss; }
+(function () { const el = $("fivek"); if (el) el.addEventListener("input", () => { const f = fmtDigitsToTime(el.value); el.value = f; try { el.setSelectionRange(f.length, f.length); } catch (e) {} build(); }); })();
 const BADGE = { "applies-well": ["well", "Applies well"], "general-guide": ["guide", "General guide"], "limited": ["limited", "General guide"] };
 
 // A few real recommendations from the brief, tagged by who they were studied in.
@@ -232,7 +234,7 @@ function renderTips() {
   }).join("");
 }
 
-["rpw", "years", "vol", "fivek", "age"].forEach((id) => $(id).addEventListener("input", build));
+["rpw", "years", "vol", "age"].forEach((id) => $(id).addEventListener("input", build));
 $("sex").addEventListener("change", build);
 $("sciToggle").addEventListener("change", (e) => document.body.classList.toggle("showsci", e.target.checked));
 $("themeToggle").addEventListener("click", () => {

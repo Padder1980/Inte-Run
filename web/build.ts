@@ -324,6 +324,9 @@ const PHASE_COLORS = { base: "var(--base)", build: "var(--build)", peak: "var(--
 const VERDICT_COLORS = { comfortable: "var(--eff-easy)", achievable: "var(--accent)", ambitious: "var(--peak)", unrealistic: "var(--danger)" };
 const DAY_ORDER = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const $ = (id) => document.getElementById(id);
+function fmtDigitsToTime(raw) { const d = String(raw).replace(/\\D/g, "").slice(0, 6); if (!d) return ""; if (d.length <= 2) return d; const ss = d.slice(-2), rest = d.slice(0, -2); return rest.length <= 2 ? rest + ":" + ss : rest.slice(0, -2) + ":" + rest.slice(-2) + ":" + ss; }
+function bindTimeInput(el) { if (!el) return; el.addEventListener("input", () => { const f = fmtDigitsToTime(el.value); el.value = f; try { el.setSelectionRange(f.length, f.length); } catch (e) {} }); }
+bindTimeInput($("target")); bindTimeInput($("recentTime"));
 let DATA = null;
 
 function renderGoal() {

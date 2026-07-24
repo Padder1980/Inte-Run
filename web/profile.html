@@ -68,6 +68,8 @@ header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content:
 input, select { font: inherit; font-size: 13.5px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px; width: 100%; }
 input[type="number"], input.time { font-family: var(--mono); }
 input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+.err { font-size: 11.5px; color: var(--limited); min-height: 0; }
+.err:empty { display: none; }
 
 .type { margin-top: 4px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .type .big { font-size: clamp(24px, 4.5vw, 32px); font-weight: 750; letter-spacing: -.02em; }
@@ -124,7 +126,7 @@ footer { margin-top: 28px; font-size: 12px; color: var(--ink-faint); text-align:
       <div class="field"><label>Runs per week</label><input type="number" id="rpw" min="0" max="14" value="4"></div>
       <div class="field"><label>Years running</label><input type="number" id="years" min="0" max="60" step="0.5" value="4"></div>
       <div class="field"><label>Weekly distance <span class="hintx">km, optional</span></label><input type="number" id="vol" min="0" step="1" value="35"></div>
-      <div class="field"><label>Recent 5k <span class="hintx">m:ss, optional</span></label><input class="time" id="fivek" placeholder="e.g. 24:00"></div>
+      <div class="field"><label>Recent 5k <span class="hintx">min:sec, optional</span></label><input class="time" id="fivek" placeholder="e.g. 24:00" inputmode="numeric" autocomplete="off"><div class="err" id="fivekErr"></div></div>
       <div class="field"><label>Age</label><input type="number" id="age" min="10" max="99" value="52"></div>
       <div class="field"><label>Sex <span class="hintx">helps tailor advice</span></label>
         <select id="sex"><option value="">Prefer not to say</option><option value="female" selected>Female</option><option value="male">Male</option></select>
@@ -183,8 +185,21 @@ function build() {
   };
   const vol = Number($("vol").value); if (vol > 0) input.weeklyVolumeKm = vol;
   const sex = $("sex").value; if (sex) input.sex = sex;
+
+  // Recent 5k must be entered as minutes:seconds. A bare number like "24" would be read as 24
+  // *seconds* and wrongly flag you as elite — so require m:ss and a plausible range, or ignore it.
   const t = $("fivek").value.trim();
-  if (t) { try { input.recent5kSeconds = RC.parseDuration(t); } catch (e) {} }
+  const errEl = $("fivekErr");
+  errEl.textContent = "";
+  if (t) {
+    if (!/^\d{1,2}:[0-5]\d$/.test(t)) {
+      errEl.textContent = "Enter your 5k as minutes:seconds, e.g. 24:00.";
+    } else {
+      const secs = RC.parseDuration(t);
+      if (secs < 12 * 60 || secs > 60 * 60) errEl.textContent = "That 5k time looks off — most are between 12:00 and 60:00.";
+      else input.recent5kSeconds = secs;
+    }
+  }
 
   current = RC.classifyRunner(input);
   renderType(current);

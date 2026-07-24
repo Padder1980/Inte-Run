@@ -303,7 +303,11 @@ function saveProfileStore() { try { localStorage.setItem("rc_profile_v1", JSON.s
 // Turn a profile into engine outputs. Throws if the goal can't be planned (e.g. race too soon).
 function applyProfile(pf) {
   const cls = RC.classifyRunner({ runsPerWeek: pf.daysPerWeek, yearsRunning: pf.yearsRunning, weeklyVolumeKm: pf.weeklyVolumeKm || undefined, recent5kSeconds: pf.recentDistM === 5000 ? pf.recentTimeS : undefined, sex: pf.sex || undefined });
-  const experience = cls.tier <= 1 ? "beginner" : cls.tier === 2 ? "recreational" : "competitive";
+  // Map the runner tier to the plan/feasibility experience bucket. Only genuinely highly-trained
+  // runners (tier 4) get the "competitive" ceiling — a trained-but-recreational runner (tier 3) still
+  // has meaningful improvement headroom, so mapping them to "competitive" made sensible goals read
+  // as unrealistic.
+  const experience = cls.tier <= 1 ? "beginner" : cls.tier <= 3 ? "recreational" : "competitive";
   const ath = { daysPerWeek: pf.daysPerWeek, recent: { distanceMeters: pf.recentDistM, timeSeconds: pf.recentTimeS }, experience, includeStrength: pf.strength, returningFromInjury: pf.returning };
   const goal = { distance: pf.goalDist, targetTimeSeconds: pf.targetS, raceDateIso: pf.raceDate, startDateIso: todayIso() };
   const plan = RC.buildPlanSummary(ath, goal); // may throw

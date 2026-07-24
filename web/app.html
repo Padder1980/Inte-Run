@@ -608,11 +608,13 @@ function draftFromForm() {
   const targetRaw = $("s_target").value.trim();
   if (!mmss(targetRaw)) throw new Error("Enter your target time as h:mm:ss or m:ss, e.g. 1:45:00.");
   // Recent run is optional: someone just starting out has no time to give. When blank we flag
-  // noRecent and seed a gentle beginner baseline (5 km at ~7:00/km) so a starter plan can be built.
+  // noRecent and seed a true-beginner baseline — a 45:00 5 km (~9:00/km, run/walk pace) — so a
+  // gentle starter plan can be built. This yields easy paces around 11:00/km, and sharpens up as
+  // soon as the runner logs a real effort or records a 1 km trial.
   const recRaw = $("s_rectime").value.trim();
   let noRecent = false, recentDistM, recentTimeS;
   if (!recRaw) {
-    noRecent = true; recentDistM = 5000; recentTimeS = 2100;
+    noRecent = true; recentDistM = 5000; recentTimeS = 2700;
   } else {
     if (!mmss(recRaw)) throw new Error("Enter your recent run time as m:ss (or leave it blank if you're new to running).");
     recentDistM = Number($("s_recdist").value);

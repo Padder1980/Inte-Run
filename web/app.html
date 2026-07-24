@@ -204,11 +204,19 @@ h2.sec:first-child { margin-top: 4px; }
 .hw-go { font-size: 12.5px; font-weight: 650; opacity: .95; margin-top: 14px; display: flex; align-items: center; gap: 4px; }
 .hw-go span { font-size: 16px; }
 .hw-glow { position: absolute; right: -46px; top: -46px; width: 170px; height: 170px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.26), transparent 68%); pointer-events: none; }
-/* Start session — premium CTA with a pulsing outline */
-.start-btn { position: relative; margin-top: 16px; z-index: 0; }
-.start-btn::after { content: ""; position: absolute; inset: 0; border-radius: 14px; pointer-events: none; z-index: -1; animation: ctaPulse 2.2s cubic-bezier(.3,.7,.4,1) infinite; }
-@keyframes ctaPulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); } 70% { box-shadow: 0 0 0 13px color-mix(in srgb, var(--accent) 0%, transparent); } 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); } }
-@media (prefers-reduced-motion: reduce) { .start-btn::after { animation: none; } }
+/* Start session — premium CTA with a "marching" gradient outline (accent ⇄ white flowing round) */
+@property --ma { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+.start-btn { position: relative; margin-top: 16px; isolation: isolate; }
+.start-btn::before {
+  content: ""; position: absolute; inset: -3px; border-radius: 17px; padding: 3px; z-index: -1; pointer-events: none;
+  background: conic-gradient(from var(--ma), var(--accent) 0deg, #ffffff 60deg, color-mix(in srgb, var(--accent) 45%, #fff) 120deg, var(--accent) 180deg, #ffffff 240deg, color-mix(in srgb, var(--accent) 45%, #fff) 300deg, var(--accent) 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 55%, transparent));
+  animation: maSpin 2.8s linear infinite;
+}
+@keyframes maSpin { to { --ma: 360deg; } }
+@media (prefers-reduced-motion: reduce) { .start-btn::before { animation: none; } }
 /* Today's two summary squares */
 .tsq-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
 .tsq { position: relative; text-align: left; background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%); border: 1px solid var(--line); border-radius: 18px; padding: 15px 15px 16px; cursor: pointer; font: inherit; color: inherit; box-shadow: var(--shadow); transition: transform .12s ease, box-shadow .12s ease; }

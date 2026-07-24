@@ -337,28 +337,43 @@ function futureIso(days) { const d = new Date(); d.setDate(d.getDate() + days); 
 function fmtTimeFull(s) { s = Math.round(s); const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), x = s%60; const p = (n) => String(n).padStart(2,"0"); return h>0 ? h+":"+p(m)+":"+p(x) : m+":"+p(x); }
 
 // An example runner to start from — until you make it yours.
-const DEFAULT_PROFILE = { goalDist: "half", targetS: 6300, raceDate: futureIso(245), recentDistM: 5000, recentTimeS: 1500, noRecent: false, oneKmS: 255, daysPerWeek: 5, yearsRunning: 3, weeklyVolumeKm: 30, age: 38, sex: "", strength: true, returning: false, personalized: false };
+const DEFAULT_PROFILE = { goalDist: "half", targetS: 6300, raceDate: futureIso(245), fitSrc: "recent", recentDistM: 5000, recentTimeS: 1500, noRecent: false, oneKmS: 255, daysPerWeek: 5, yearsRunning: 3, weeklyVolumeKm: 30, age: 38, sex: "", strength: true, returning: false, personalized: false };
 
 function loadProfile() { try { const s = localStorage.getItem("rc_profile_v1"); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 function saveProfileStore() { try { localStorage.setItem("rc_profile_v1", JSON.stringify(profile)); } catch (e) {} }
 
 // Turn a profile into engine outputs. Throws if the goal can't be planned (e.g. race too soon).
 function applyProfile(pf) {
-  // A brand-new runner has no recent effort. We still need an anchor to build a starter plan, so
-  // draftFromForm seeds a gentle beginner baseline and flags noRecent — we then treat them as a
-  // beginner outright and don't feed the fabricated time into runner classification.
-  const cls = RC.classifyRunner({ runsPerWeek: pf.daysPerWeek, yearsRunning: pf.yearsRunning, weeklyVolumeKm: pf.weeklyVolumeKm || undefined, recent5kSeconds: (!pf.noRecent && pf.recentDistM === 5000) ? pf.recentTimeS : undefined, sex: pf.sex || undefined });
+  // Fitness can be given three ways (fitSrc): a couch-to-5k beginner (no time — we seed a gentle
+  // baseline and flag noRecent), a recent 5 km, or a predicted 5 km. A brand-new beginner isn't fed
+  // into runner classification since the baseline time is assumed, not run.
+  const cls = RC.classifyRunner({ runsPerWeek: pf.daysPerWeek, yearsRunning: pf.yearsRunning, weeklyVolumeKm: pf.weeklyVolumeKm || undefined, recent5kSeconds: pf.noRecent ? undefined : pf.recentTimeS, sex: pf.sex || undefined });
   // Map the runner tier to the plan/feasibility experience bucket. Only genuinely highly-trained
   // runners (tier 4) get the "competitive" ceiling — a trained-but-recreational runner (tier 3) still
   // has meaningful improvement headroom, so mapping them to "competitive" made sensible goals read
   // as unrealistic.
   const experience = pf.noRecent ? "beginner" : (cls.tier <= 1 ? "beginner" : cls.tier <= 3 ? "recreational" : "competitive");
-  const ath = { daysPerWeek: pf.daysPerWeek, recent: { distanceMeters: pf.recentDistM, timeSeconds: pf.recentTimeS }, experience, includeStrength: pf.strength, returningFromInjury: pf.returning };
+  // The plan is built off the strongest current-fitness signal. When a 1 km trial is given and it
+  // projects a faster 5 km than the 5 km source, it anchors the whole plan — every pace derives from
+  // it — not just the VO₂ interval band. oneKmTrialSeconds is still passed so the VO₂ paces stay
+  // precisely MAS-anchored and feasibility stays consistent.
+  let recent = { distanceMeters: 5000, timeSeconds: pf.recentTimeS };
+  if (pf.oneKmS > 0) {
+    const proj5k = Math.round(RC.riegelPredict(1000, pf.oneKmS, 5000));
+    if (proj5k < recent.timeSeconds) recent = { distanceMeters: 5000, timeSeconds: proj5k };
+  }
+  const ath = { daysPerWeek: pf.daysPerWeek, recent, experience, includeStrength: pf.strength, returningFromInjury: pf.returning };
   if (pf.oneKmS > 0) ath.oneKmTrialSeconds = pf.oneKmS;
   const goal = { distance: pf.goalDist, targetTimeSeconds: pf.targetS, raceDateIso: pf.raceDate, startDateIso: todayIso() };
   const plan = RC.buildPlanSummary(ath, goal); // may throw
   const raw = RC.generatePlan(ath, goal); // raw sessions with steps, for the live runtime
-  const fitness = RC.buildFitnessProfile({ efforts: [{ distanceMeters: pf.recentDistM, timeSeconds: pf.recentTimeS }] });
+  // Fitness profile is built from real efforts only (the entered 5 km and/or the 1 km trial); a pure
+  // beginner falls back to the seeded baseline so the page still has something to show.
+  const efforts = [];
+  if (!pf.noRecent) efforts.push({ distanceMeters: 5000, timeSeconds: pf.recentTimeS });
+  if (pf.oneKmS > 0) efforts.push({ distanceMeters: 1000, timeSeconds: pf.oneKmS });
+  if (efforts.length === 0) efforts.push({ distanceMeters: 5000, timeSeconds: pf.recentTimeS });
+  const fitness = RC.buildFitnessProfile({ efforts });
   const masters = RC.assessMasters({ age: pf.age, sex: pf.sex || undefined });
   return { ath, goal, plan, raw, fitness, classification: cls, masters };
 }
@@ -467,7 +482,11 @@ function viewPlan() {
   }).join("");
   const lead = s.totalWeeks - s.structuredWeeks;
   const note = lead >= 2 ? '<div class="plan-note">Your race is <b>' + s.totalWeeks + ' weeks</b> away — this is your <b>' + s.structuredWeeks + '-week</b> structured build. Until it begins, keep running easy and consistent to bank the base.</div>' : "";
-  const starterNote = profile.noRecent ? '<div class="plan-note" style="border-left-color:var(--accent)">Built from a <b>beginner baseline</b> since you haven\\'t logged a run yet. Log a few runs (or record a 1 km trial) and your paces and goal check sharpen up automatically.</div>' : "";
+  let srcMsg = "";
+  if (profile.fitSrc === "beginner" || profile.noRecent) srcMsg = "Built from a <b>couch-to-5k beginner</b> baseline. It sharpens automatically once you log a run or record a 1 km trial.";
+  else if (profile.fitSrc === "predicted") srcMsg = "Based on your <b>predicted 5 km</b> time — log a real run and it\\'ll re-tune to your actual fitness.";
+  if (profile.oneKmS > 0) srcMsg = (srcMsg ? srcMsg + " " : "") + "Your paces are anchored to your <b>1 km trial</b>.";
+  const starterNote = srcMsg ? '<div class="plan-note" style="border-left-color:var(--accent)">' + srcMsg + '</div>' : "";
   return '<div class="card plan-head"><div class="eyebrow">Your plan</div><div class="goal">' + g.race + ' · ' + g.target + '</div><div class="when">' + g.raceDate + ' · ' + s.structuredWeeks + '-week plan</div>' +
     '<span class="pill" style="--pc:' + (PLAN.feasibility.verdict==="achievable"?"var(--accent)":"var(--peak)") + '">' + PLAN.feasibility.verdict + '</span>' +
     '<div class="statrow"><div class="stat"><div class="k">Weeks</div><div class="v num">' + s.structuredWeeks + '</div></div><div class="stat"><div class="k">Peak/wk</div><div class="v num">' + s.peakKm + ' km</div></div><div class="stat"><div class="k">Goal pace</div><div class="v num">' + PLAN.paces.goal.replace("/km","") + '</div></div></div></div>' +
@@ -600,8 +619,9 @@ function viewSetup() {
     '<div class="q"><label>Target time <span style="color:var(--ink-faint);font-weight:400">just type the numbers</span></label><input class="sel num" id="s_target" value="' + fmtTimeFull(p.targetS) + '" inputmode="numeric"></div>' +
     '<div class="q"><label>Race date</label><input class="sel num" id="s_date" type="date" value="' + p.raceDate + '"></div></div>' +
     '<div class="card" style="margin-top:12px"><div class="subhead" style="margin-top:0">About you</div>' +
-    '<div class="q"><label>A recent run — distance</label><select class="sel" id="s_recdist">' + opt(REC_OPTS, p.recentDistM) + '</select></div>' +
-    '<div class="q"><label>…in a time of <span style="color:var(--ink-faint);font-weight:400">leave blank if you\\'re new to running</span></label><input class="sel num" id="s_rectime" value="' + (p.noRecent ? "" : fmtTimeFull(p.recentTimeS)) + '" placeholder="new to running? leave blank" inputmode="numeric"></div>' +
+    '<div class="q"><label>Your current fitness</label>' + seg("fitsrc", [["beginner","True beginner"],["recent","Recent 5 km"],["predicted","Predicted 5 km"]], p.fitSrc || "recent") + '</div>' +
+    '<div class="q" id="fitTimeWrap"' + (p.fitSrc === "beginner" ? ' style="display:none"' : '') + '><label id="fitTimeLbl"><span class="lblmain">' + (p.fitSrc === "predicted" ? "Your predicted 5 km time" : "Your recent 5 km time") + '</span> <span style="color:var(--ink-faint);font-weight:400">just type the numbers</span></label><input class="sel num" id="s_rectime" value="' + (p.noRecent ? "" : fmtTimeFull(p.recentTimeS)) + '" placeholder="e.g. 25:00" inputmode="numeric"></div>' +
+    '<div class="q" id="fitBegNote"' + (p.fitSrc === "beginner" ? '' : ' style="display:none"') + '><div class="mas-hint">New to running? We\\'ll start you gently with a couch-to-5k base and build from there.</div></div>' +
     '<div class="q"><label>1 km time-trial <span style="color:var(--ink-faint);font-weight:400">max effort, optional — sets VO₂ paces</span></label><input class="sel num" id="s_1km" value="' + (p.oneKmS ? fmtTimeFull(p.oneKmS) : "") + '" placeholder="e.g. 4:00" inputmode="numeric"><div class="mas-hint" id="masHint"></div><button class="mini-btn" id="s_1km_rec" type="button">⏱ Haven\\'t done one? Record it now</button></div>' +
     '<div class="q"><label>Runs per week</label>' + seg("days", [["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]], p.daysPerWeek) + '</div>' +
     '<div class="q"><label>Years running</label>' + seg("years", [["0.5","<1"],["2","1–3"],["5","3–8"],["10","8+"]], p.yearsRunning) + '</div>' +
@@ -619,20 +639,19 @@ function draftFromForm() {
   const mmss = (s) => /^\\d{1,2}:[0-5]\\d$/.test(s) || /^\\d{1,2}:[0-5]\\d:[0-5]\\d$/.test(s);
   const targetRaw = $("s_target").value.trim();
   if (!mmss(targetRaw)) throw new Error("Enter your target time as h:mm:ss or m:ss, e.g. 1:45:00.");
-  // Recent run is optional: someone just starting out has no time to give. When blank we flag
-  // noRecent and seed a true-beginner baseline — a 45:00 5 km (~9:00/km, run/walk pace) — so a
-  // gentle starter plan can be built. This yields easy paces around 11:00/km, and sharpens up as
-  // soon as the runner logs a real effort or records a 1 km trial.
-  const recRaw = $("s_rectime").value.trim();
-  let noRecent = false, recentDistM, recentTimeS;
-  if (!recRaw) {
-    noRecent = true; recentDistM = 5000; recentTimeS = 2700;
+  // Current fitness comes one of three ways (fitSrc). A true beginner gives no time, so we seed a
+  // couch-to-5k baseline — a 45:00 5 km (~9:00/km run/walk pace, easy paces ~11:00/km) — and flag
+  // noRecent. Recent and predicted both take a 5 km time; they differ only in framing.
+  const fitSrc = draft.fitsrc || "recent";
+  let noRecent = false, recentDistM = 5000, recentTimeS;
+  if (fitSrc === "beginner") {
+    noRecent = true; recentTimeS = 2700;
   } else {
-    if (!mmss(recRaw)) throw new Error("Enter your recent run time as m:ss (or leave it blank if you're new to running).");
-    recentDistM = Number($("s_recdist").value);
+    const recRaw = $("s_rectime").value.trim();
+    if (!mmss(recRaw)) throw new Error(fitSrc === "predicted" ? "Enter your predicted 5 km time as m:ss, e.g. 28:00." : "Enter your recent 5 km time as m:ss, e.g. 25:00.");
     recentTimeS = RC.parseDuration(recRaw);
-    const pace = recentTimeS / (recentDistM / 1000);
-    if (pace < 120 || pace > 720) throw new Error("That recent run time looks off for the distance — please check it.");
+    const pace = recentTimeS / 5; // seconds per km over 5 km
+    if (pace < 120 || pace > 720) throw new Error("That 5 km time looks off — please check it (m:ss).");
   }
   const raceDate = $("s_date").value;
   if (!raceDate) throw new Error("Pick your race date.");
@@ -647,7 +666,7 @@ function draftFromForm() {
   }
   return {
     goalDist: $("s_dist").value, targetS: RC.parseDuration(targetRaw), raceDate,
-    recentDistM, recentTimeS, noRecent, oneKmS, daysPerWeek: Number(draft.days), yearsRunning: Number(draft.years),
+    fitSrc, recentDistM, recentTimeS, noRecent, oneKmS, daysPerWeek: Number(draft.days), yearsRunning: Number(draft.years),
     weeklyVolumeKm: profile.weeklyVolumeKm, age: Number($("s_age").value) || 35, sex: $("s_sex").value,
     strength: draft.strength === "1", returning: draft.returning === "1", personalized: true,
   };
@@ -720,6 +739,14 @@ function trialFinish() {
   const redo = $("trialRedo"); if (redo) redo.onclick = trialResetReady;
 }
 function trialUse() { const inp = $("s_1km"); if (inp) { inp.value = fmtTimeFull(TRIAL.secs); refreshMasHint(); } closeTrial(); }
+// Show/hide the 5 km time field to match the chosen fitness source, and relabel recent vs predicted.
+function syncFitSrc() {
+  const v = draft.fitsrc || "recent";
+  const wrap = $("fitTimeWrap"), beg = $("fitBegNote"), main = document.querySelector("#fitTimeLbl .lblmain");
+  if (wrap) wrap.style.display = v === "beginner" ? "none" : "";
+  if (beg) beg.style.display = v === "beginner" ? "" : "none";
+  if (main) main.textContent = v === "predicted" ? "Your predicted 5 km time" : "Your recent 5 km time";
+}
 function refreshTypePreview() {
   try {
     const cls = RC.classifyRunner({ runsPerWeek: Number(draft.days), yearsRunning: Number(draft.years), sex: $("s_sex") ? ($("s_sex").value || undefined) : undefined });
@@ -802,7 +829,7 @@ function render() {
   const v = $("view");
   if (state.screen === "setup") {
     $("topTitle").textContent = "Your profile";
-    draft = { days: profile.daysPerWeek, years: profile.yearsRunning, strength: profile.strength ? "1" : "0", returning: profile.returning ? "1" : "0" };
+    draft = { days: profile.daysPerWeek, years: profile.yearsRunning, strength: profile.strength ? "1" : "0", returning: profile.returning ? "1" : "0", fitsrc: profile.fitSrc || (profile.noRecent ? "beginner" : "recent") };
     v.innerHTML = viewSetup();
     v.scrollTop = 0;
     document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
@@ -844,13 +871,16 @@ function wire() {
   if ($("redsRes")) runReds();
   // Setup screen wiring
   document.querySelectorAll("[data-set]").forEach((s) => s.querySelectorAll("button").forEach((b) => b.onclick = () => {
-    draft[s.dataset.set] = b.dataset.v; s.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); refreshTypePreview();
+    draft[s.dataset.set] = b.dataset.v; s.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+    if (s.dataset.set === "fitsrc") syncFitSrc();
+    refreshTypePreview();
   }));
   ["s_age","s_sex"].forEach((id) => { const e = $(id); if (e) e.oninput = e.onchange = refreshTypePreview; });
   bindTimeInput($("s_target")); bindTimeInput($("s_rectime"));
   const km1 = $("s_1km");
   if (km1) { bindTimeInput(km1); km1.addEventListener("input", refreshMasHint); refreshMasHint(); }
   const km1rec = $("s_1km_rec"); if (km1rec) km1rec.onclick = openTrial;
+  if (document.querySelector('[data-set="fitsrc"]')) syncFitSrc();
   const setupBanner = $("setupBanner"); if (setupBanner) setupBanner.onclick = () => { state.screen = "setup"; render(); };
   const wxSeg = document.querySelector("[data-weatherseg]"); if (wxSeg) wxSeg.querySelectorAll("button").forEach((b) => b.onclick = () => { state.weather = b.dataset.weather; render(); });
   const save = $("saveProfile"); if (save) save.onclick = () => {

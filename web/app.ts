@@ -62,7 +62,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .app { max-width: 440px; min-height: 100dvh; margin: 0 auto; background: var(--bg); display: flex; flex-direction: column; position: relative; box-shadow: 0 0 60px rgba(0,0,0,.06); }
 .topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
 .topbar .title { font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
-.iconbtn { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.iconbtn { position: relative; overflow: hidden; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft); display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .iconbtn svg { width: 18px; height: 18px; }
 .tb-left, .tb-right { display: flex; gap: 8px; }
 /* Splash / launch screen */
@@ -142,7 +142,7 @@ h2.sec:first-child { margin-top: 4px; }
 .seg button:active { transform: translateY(1px); }
 .seg button.on { background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, #fff) 0%, var(--accent) 60%, color-mix(in srgb, var(--accent) 84%, #000) 100%); color: var(--accent-ink); border-color: transparent; font-weight: 650; box-shadow: 0 1px 0 rgba(255,255,255,.28) inset, 0 4px 12px -3px color-mix(in srgb, var(--accent) 55%, transparent); }
 /* Avatar */
-.iconbtn img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.iconbtn img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 .avatar-row { display: flex; align-items: center; gap: 15px; margin-top: 4px; }
 .avatar-pic { width: 76px; height: 76px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; overflow: hidden; background: linear-gradient(150deg, color-mix(in srgb, var(--accent) 24%, var(--surface)), var(--surface)); border: 1px solid var(--line); box-shadow: 0 6px 16px -7px rgba(20,32,27,.35), 0 1px 0 rgba(255,255,255,.5) inset; color: var(--accent); font-weight: 750; font-size: 27px; letter-spacing: -.02em; cursor: pointer; }
 .avatar-pic img { width: 100%; height: 100%; object-fit: cover; }
@@ -742,6 +742,7 @@ function runFh() { const status = $("fhStatus").value; const r = RC.assessFemale
 const DIST_OPTS = [["5k","5 km"],["10k","10 km"],["half","Half marathon"],["marathon","Marathon"]];
 const REC_OPTS = [["1609.344","1 mile"],["5000","5 km"],["10000","10 km"],["21097.5","Half marathon"]];
 function opt(list, val) { return list.map((o) => '<option value="' + o[0] + '"' + (String(o[0]) === String(val) ? " selected" : "") + '>' + o[1] + '</option>').join(""); }
+function ageOpts(sel) { let o = ""; for (let a = 12; a <= 90; a++) o += '<option value="' + a + '"' + (a === Number(sel) ? " selected" : "") + '>' + a + '</option>'; return o; }
 function seg(name, opts, val) { return '<div class="seg" data-set="' + name + '">' + opts.map((o) => '<button data-v="' + o[0] + '"' + (String(o[0]) === String(val) ? ' class="on"' : '') + '>' + o[1] + '</button>').join("") + '</div>'; }
 // ---- Name & profile picture ----------------------------------------------
 function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
@@ -794,7 +795,7 @@ function viewSetup() {
     '<div class="card" id="goalCard" style="margin-top:12px">' + goalCardInner(p.status || "regular", { dist: p.goalDist, date: p.raceDate, target: fmtTimeFull(p.targetS) }) + '</div>' +
     '<div class="card" style="margin-top:12px"><div class="subhead" style="margin-top:0">A few details</div>' +
     '<div class="q"><label>How many days a week will you run? <span style="color:var(--ink-faint);font-weight:400">we\\'ll shape the plan around this</span></label>' + seg("days", [["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]], p.daysPerWeek) + '</div>' +
-    '<div class="q"><label>Age</label><input class="sel num" id="s_age" type="number" min="12" max="95" value="' + p.age + '" style="max-width:110px"></div>' +
+    '<div class="q"><label>Age</label><select class="sel" id="s_age" style="max-width:130px">' + ageOpts(p.age) + '</select></div>' +
     '<div class="q"><label>Sex <span style="color:var(--ink-faint);font-weight:400">helps tailor advice</span></label><select class="sel" id="s_sex"><option value=""' + (!p.sex?" selected":"") + '>Prefer not to say</option><option value="female"' + (p.sex==="female"?" selected":"") + '>Female</option><option value="male"' + (p.sex==="male"?" selected":"") + '>Male</option></select></div>' +
     '<div class="q"><label>Include strength &amp; conditioning?</label>' + seg("strength", [["1","Yes"],["0","No"]], p.strength?"1":"0") + '</div>' +
     '<div class="q"><label>Returning from injury / a break?</label>' + seg("returning", [["0","No"],["1","Yes"]], p.returning?"1":"0") + '</div></div>' +

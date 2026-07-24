@@ -134,38 +134,133 @@ function clock(sec: number): string {
   return `${Math.floor(sec / 60)}′${sec % 60 ? String(sec % 60).padStart(2, "0") + "″" : ""}`;
 }
 
-/** A couch-to-5k run–walk session: brisk-walk warm-up, cycles of easy run / walk, easy-walk to finish.
- *  Runs are by feel (RPE), not pace — the point is time on feet and building the habit. */
-export function walkRunSession(
+export type BeginnerSpec = { runSec: number; walkSec: number; targetRunMin: number };
+
+const r15 = (s: number) => Math.max(30, Math.round(s / 15) * 15);
+const clampN = (n: number, a: number, b: number) => Math.max(a, Math.min(b, n));
+
+// Build a run–walk session from a list of run-block durations (walks between). Runs are easy by feel.
+function assembleRunWalk(
   paces: TrainingPaces,
-  runSec: number,
+  runBlocks: number[],
   walkSec: number,
-  cycles: number,
-  opts: { long?: boolean } = {},
+  title: string,
+  desc: string,
+  extra: WorkoutStep[] = [],
 ): SessionContent {
   const steps: WorkoutStep[] = [
     { kind: "warmup", label: "Brisk walk to warm up", durationSeconds: 5 * 60, targetRpe: { min: 1, max: 2 } },
   ];
-  for (let i = 1; i <= cycles; i++) {
+  runBlocks.forEach((rs, i) => {
     steps.push({
       kind: "rep",
-      label: `Run ${clock(runSec)} — easy, conversational`,
-      durationSeconds: runSec,
+      label: `Run ${clock(rs)} — easy, conversational`,
+      durationSeconds: rs,
       targetPaceSecPerKm: paces.easy,
       targetRpe: { min: 3, max: 4 },
-      repeatIndex: i,
-      repeatCount: cycles,
+      repeatIndex: i + 1,
+      repeatCount: runBlocks.length,
     });
-    if (i < cycles) {
-      steps.push({ kind: "recovery", label: `Walk ${clock(walkSec)} — catch your breath`, durationSeconds: walkSec, targetRpe: { min: 1, max: 2 } });
+    if (i < runBlocks.length - 1) {
+      steps.push({ kind: "recovery", label: `Walk ${clock(walkSec)} — recover`, durationSeconds: walkSec, targetRpe: { min: 1, max: 2 } });
     }
-  }
+  });
+  steps.push(...extra);
   steps.push({ kind: "cooldown", label: "Easy walk to finish", durationSeconds: 3 * 60, targetRpe: { min: 1, max: 2 } });
-  const title = `Run–walk · ${cycles} × (${clock(runSec)} run / ${clock(walkSec)} walk)`;
-  const desc = opts.long
-    ? "Your longest, easiest session of the week. Keep the runs relaxed — walk breaks are part of the plan, not a failure. Finishing comfortably is the win."
-    : "Alternate easy running and walking. Run at a comfortable, chatty effort; if the runs feel hard, slow them right down. Building the habit matters more than speed.";
   return assemble("easy", title, desc, "easy", steps, { min: 2, max: 4 });
+}
+
+// ---- Beginner run–walk flavours (rotate for variety) ----------------------
+
+export function rwSteady(p: TrainingPaces, s: BeginnerSpec): SessionContent {
+  const cycles = clampN(Math.round((s.targetRunMin * 60) / s.runSec), 4, 10);
+  return assembleRunWalk(
+    p,
+    Array(cycles).fill(s.runSec),
+    s.walkSec,
+    `Run–walk · ${cycles} × (${clock(s.runSec)} run / ${clock(s.walkSec)} walk)`,
+    "Alternate easy running and walking. Run at a comfortable, chatty effort — walk breaks are part of the plan, not a failure.",
+  );
+}
+
+export function rwLadder(p: TrainingPaces, s: BeginnerSpec): SessionContent {
+  let shape = [0.5, 0.75, 1, 1.3, 1, 0.75, 0.5].map((m) => r15(s.runSec * m));
+  const k = (s.targetRunMin * 60) / shape.reduce((a, c) => a + c, 0);
+  shape = shape.map((x) => r15(x * k));
+  return assembleRunWalk(
+    p,
+    shape,
+    s.walkSec,
+    "Run–walk ladder — build up, then back down",
+    "A ladder: the run blocks grow to a peak in the middle, then ease back down. It keeps your mind busy and gently stretches your limit. Walk whenever you need.",
+  );
+}
+
+export function rwExplore(p: TrainingPaces, s: BeginnerSpec): SessionContent {
+  const block = r15(s.runSec * 1.6);
+  const cycles = clampN(Math.round((s.targetRunMin * 60) / block), 3, 6);
+  return assembleRunWalk(
+    p,
+    Array(cycles).fill(block),
+    s.walkSec + 15,
+    "Explore run–walk — by feel",
+    "Forget the stopwatch: run easy to a landmark — a tree, a bench, a lamppost — then walk to the next and repeat. Pick a route you enjoy; keep the effort easy and chatty.",
+  );
+}
+
+export function rwBuildup(p: TrainingPaces, s: BeginnerSpec): SessionContent {
+  const n = clampN(Math.round((s.targetRunMin * 60) / s.runSec), 4, 8);
+  const blocks: number[] = [];
+  for (let i = 0; i < n; i++) blocks.push(r15(s.runSec * (0.6 + 0.8 * (n <= 1 ? 1 : i / (n - 1)))));
+  return assembleRunWalk(
+    p,
+    blocks,
+    s.walkSec,
+    "Build-up run–walk — finish stronger",
+    "Start with the shortest runs and let them grow through the session. You'll finish feeling like you had more to give — the best way to end a run.",
+  );
+}
+
+export function rwLong(p: TrainingPaces, s: BeginnerSpec): SessionContent {
+  const block = r15(s.runSec * 1.4);
+  const cycles = clampN(Math.round((s.targetRunMin * 60) / block), 4, 8);
+  return assembleRunWalk(
+    p,
+    Array(cycles).fill(block),
+    s.walkSec,
+    `Long run–walk · ${cycles} × (${clock(block)} run / ${clock(s.walkSec)} walk)`,
+    "Your longest, easiest session of the week. Keep the runs relaxed — finishing comfortably is the whole goal.",
+  );
+}
+
+// ---- Beginner continuous flavours (for those who can already jog) ----------
+
+export function contPickups(p: TrainingPaces, min: number): SessionContent {
+  const steps: WorkoutStep[] = [
+    { kind: "steady", label: "Easy, conversational running", durationSeconds: min * 60, targetPaceSecPerKm: p.easy, targetRpe: RPE.easy },
+    { kind: "rep", label: "4 × 15″ relaxed pickups (smooth, not a sprint), walk/jog to recover", durationSeconds: 4 * 15, targetPaceSecPerKm: p.steady, targetRpe: { min: 4, max: 5 }, repeatCount: 4 },
+  ];
+  return assemble("easy", `${min}′ easy + gentle pickups`, "Easy running with a few short, relaxed pickups near the end to wake the legs up — smooth and controlled, never a sprint.", "easy", steps, RPE.easy);
+}
+
+export function contProgression(p: TrainingPaces, min: number): SessionContent {
+  const easyMin = Math.max(5, min - 5);
+  const steps: WorkoutStep[] = [
+    { kind: "steady", label: "Easy, conversational", durationSeconds: easyMin * 60, targetPaceSecPerKm: p.easy, targetRpe: RPE.easy },
+    { kind: "steady", label: "Lift to a comfortable steady effort", durationSeconds: 5 * 60, targetPaceSecPerKm: p.steady, targetRpe: RPE.steady },
+  ];
+  return assemble("easy", `${min}′ easy → steady finish`, "Run easy, then lift to a comfortable steady effort for the last 5 minutes. Still controlled — you should be able to talk in short sentences.", "easy", steps, RPE.easy);
+}
+
+export function contExplore(p: TrainingPaces, min: number): SessionContent {
+  return assemble(
+    "easy",
+    `${min}′ explore run — by feel`,
+    "Run a route you enjoy at an easy, chatty effort. No pace targets — just time on feet and fresh scenery. Walk a little if you need to.",
+    "easy",
+    [{ kind: "steady", label: "Easy running by feel", durationSeconds: min * 60, targetPaceSecPerKm: p.easy, targetRpe: RPE.easy }],
+    RPE.easy,
+  );
 }
 
 export function recoveryRun(paces: TrainingPaces, minutes: number): SessionContent {
@@ -435,20 +530,21 @@ export function raceSpecificSession(paces: TrainingPaces): SessionContent {
 
 // ---- Strength / mobility / cross-training / rest --------------------------
 
-// General, beginner-friendly strength & mobility — bodyweight, no gym or heavy load required.
-export function generalStrengthSession(): SessionContent {
-  const exercises = [
-    "Bodyweight squats or sit-to-stands",
-    "Reverse lunges (hold a wall for balance)",
-    "Glute bridges",
-    "Calf raises (both legs, then single)",
-    "A short plank + side planks",
-    "Gentle single-leg balance holds",
-  ];
+// General, beginner-friendly strength & mobility — bodyweight, no gym or heavy load required. Themed
+// variants rotate so it never feels like the same routine twice.
+const STRENGTH_THEMES: { title: string; ex: string[] }[] = [
+  { title: "Strength & mobility · legs", ex: ["Bodyweight squats or sit-to-stands", "Reverse lunges (hold a wall)", "Glute bridges", "Calf raises — both legs, then single"] },
+  { title: "Strength & mobility · core & balance", ex: ["Front plank + side planks", "Dead bugs", "Single-leg balance holds", "Bird-dogs"] },
+  { title: "Strength & mobility · activation", ex: ["Glute-bridge marches", "Clamshells", "Standing calf/ankle raises", "Hip airplanes (hold support)"] },
+  { title: "Strength & mobility · full body", ex: ["Squats", "Step-ups onto a low step", "Push-ups (incline is fine)", "Glute bridges", "Plank"] },
+];
+
+export function generalStrengthSession(theme = 0): SessionContent {
+  const t = STRENGTH_THEMES[theme % STRENGTH_THEMES.length]!;
   return assemble(
     "strength",
-    "Strength & mobility (20′)",
-    `A gentle, no-equipment routine to build the strength that protects you from injury: ${exercises.join("; ")}. 1–2 easy sets each, stop well before failure. This is support work, not a workout to survive.`,
+    `${t.title} (20′)`,
+    `A gentle, no-equipment routine to build the strength that protects you from injury: ${t.ex.join("; ")}. 1–2 easy sets each, stop well before failure. This is support work, not a workout to survive.`,
     "none",
     [{ kind: "steady", label: "Bodyweight strength & mobility", durationSeconds: 20 * 60, targetRpe: { min: 2, max: 4 } }],
   );
@@ -500,11 +596,18 @@ export function strengthSession(phase: Phase, maintenance: boolean): SessionCont
   );
 }
 
-export function mobilitySession(): SessionContent {
+const MOBILITY_THEMES: { title: string; d: string }[] = [
+  { title: "Mobility flow (15′)", d: "A flowing dynamic mobility routine — hips, ankles and upper back. Move slowly and breathe." },
+  { title: "Hips & ankles (15′)", d: "Targeted mobility for the two areas runners need most — hip openers and ankle/calf range." },
+  { title: "Foam roll & reset (15′)", d: "Gentle foam rolling and easy stretches for any tight spot. A nice reset between runs." },
+];
+
+export function mobilitySession(theme = 0): SessionContent {
+  const t = MOBILITY_THEMES[theme % MOBILITY_THEMES.length]!;
   return assemble(
     "mobility",
-    "Mobility (15′)",
-    "Dynamic mobility and any sport-specific range work. Static stretching only for a specific restriction — it does not improve economy.",
+    t.title,
+    `${t.d} Static stretching only for a specific restriction — it does not improve economy.`,
     "none",
     [{ kind: "steady", label: "Dynamic mobility", durationSeconds: 15 * 60 }],
   );

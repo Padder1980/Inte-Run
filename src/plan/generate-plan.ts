@@ -26,17 +26,24 @@ import { taperFor } from "../science/taper.ts";
 import { addDays, dayOfWeekMondayZero, isoToday, weeksBetween } from "./dates.ts";
 import { type WeekPlan, phaseSchedule, structuredWeekCount } from "./periodization.ts";
 import {
+  contExplore,
+  contPickups,
+  contProgression,
   easyRun,
   generalStrengthSession,
   longRun,
   mobilitySession,
   raceSpecificSession,
   restDay,
+  rwBuildup,
+  rwExplore,
+  rwLadder,
+  rwLong,
+  rwSteady,
   type SessionContent,
   strengthSession,
   thresholdSession,
   vo2Session,
-  walkRunSession,
 } from "./session-templates.ts";
 
 export type GenerateOptions = {
@@ -236,26 +243,38 @@ const lerp = (a: number, b: number, f: number) => a + (b - a) * Math.max(0, Math
 const BEGINNER_EASY_DAYS = [1, 3, 5]; // Tue, Thu, Sat — always a rest day between runs
 const BEGINNER_STRENGTH_DAYS = [0, 4]; // Mon, Fri
 
+// Rotating pools of beginner session flavours — every run day of the week draws a different one so a
+// plan never repeats the same session two days (or two weeks) running.
+const RW_FLAVOURS = [rwSteady, rwLadder, rwExplore, rwBuildup];
+const CONT_FLAVOURS = [
+  (p: TrainingPaces, m: number) => easyRun(p, m, false),
+  contPickups,
+  contProgression,
+  contExplore,
+];
+
 // One beginner running session — a run–walk progression, or short continuous easy running for those
 // who can already jog. `f` is 0→1 across the plan; runs lengthen and (for run–walk) walks shrink.
+// `flavour` selects which format so sessions vary; the weekly long run uses its own long format.
 function beginnerRun(
   paces: TrainingPaces,
   f: number,
   long: boolean,
   runWalk: boolean,
   ease: boolean,
+  flavour: number,
 ): SessionContent {
   if (runWalk) {
     const runSec = Math.round(lerp(60, 300, f) / 15) * 15; // 1′ → 5′ run
     const walkSec = Math.max(30, Math.round(lerp(90, 45, f) / 15) * 15); // 90″ → 45″ walk
     let targetRunMin = lerp(10, 26, f) + (long ? 4 : 0);
     if (ease) targetRunMin *= 0.7;
-    const cycles = Math.max(4, Math.min(10, Math.round((targetRunMin * 60) / runSec)));
-    return walkRunSession(paces, runSec, walkSec, cycles, { long });
+    const spec = { runSec, walkSec, targetRunMin };
+    return long ? rwLong(paces, spec) : RW_FLAVOURS[flavour % RW_FLAVOURS.length]!(paces, spec);
   }
   let minutes = Math.round(lerp(22, 38, f)) + (long ? 8 : 0);
   if (ease) minutes = Math.round(minutes * 0.75);
-  return long ? longRun(paces, minutes) : easyRun(paces, minutes, false);
+  return long ? longRun(paces, minutes) : CONT_FLAVOURS[flavour % CONT_FLAVOURS.length]!(paces, minutes);
 }
 
 function beginnerFocus(wp: AnnotatedWeek, runWalk: boolean): string {
@@ -282,32 +301,32 @@ function buildBeginnerWeek(
   const dayOf: number[] = [];
 
   // The weekly long, gentle session (Sunday).
-  sessions.push(beginnerRun(ctx.paces, f, true, runWalk, ease));
+  sessions.push(beginnerRun(ctx.paces, f, true, runWalk, ease, 0));
   dayOf.push(DAY_LONG);
 
-  // Other easy run–walk days, spaced with rest between.
+  // Other easy days — each draws a different flavour, and the set rotates every week.
   const easyDays = BEGINNER_EASY_DAYS.slice(0, runningDays - 1);
-  easyDays.forEach((d) => {
-    sessions.push(beginnerRun(ctx.paces, f, false, runWalk, ease));
+  easyDays.forEach((d, ei) => {
+    sessions.push(beginnerRun(ctx.paces, f, false, runWalk, ease, index + ei));
     dayOf.push(d);
   });
 
-  // General, gentle strength (no heavy lifting for a brand-new runner).
+  // General, gentle strength (no heavy lifting for a brand-new runner) — themed variants rotate.
   if (ctx.athlete.includeStrength) {
     const strengthCount = ctx.athlete.daysPerWeek >= 4 && !ease ? 2 : 1;
-    BEGINNER_STRENGTH_DAYS.slice(0, strengthCount).forEach((d) => {
+    BEGINNER_STRENGTH_DAYS.slice(0, strengthCount).forEach((d, si) => {
       if (!dayOf.includes(d)) {
-        sessions.push(generalStrengthSession());
+        sessions.push(generalStrengthSession(index + si));
         dayOf.push(d);
       }
     });
   }
 
-  // Optional mobility on a free day.
+  // Optional mobility on a free day — theme rotates by week.
   const used = new Set(dayOf);
   const mobDay = [2, 4, 0, 5, 3, 1].find((d) => !used.has(d));
   if (mobDay !== undefined) {
-    sessions.push(mobilitySession());
+    sessions.push(mobilitySession(index));
     dayOf.push(mobDay);
     used.add(mobDay);
   }

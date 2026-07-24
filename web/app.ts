@@ -324,7 +324,7 @@ function futureIso(days) { const d = new Date(); d.setDate(d.getDate() + days); 
 function fmtTimeFull(s) { s = Math.round(s); const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), x = s%60; const p = (n) => String(n).padStart(2,"0"); return h>0 ? h+":"+p(m)+":"+p(x) : m+":"+p(x); }
 
 // An example runner to start from — until you make it yours.
-const DEFAULT_PROFILE = { goalDist: "half", targetS: 6300, raceDate: futureIso(245), recentDistM: 5000, recentTimeS: 1500, twoKmS: 550, daysPerWeek: 5, yearsRunning: 3, weeklyVolumeKm: 30, age: 38, sex: "", strength: true, returning: false, personalized: false };
+const DEFAULT_PROFILE = { goalDist: "half", targetS: 6300, raceDate: futureIso(245), recentDistM: 5000, recentTimeS: 1500, oneKmS: 255, daysPerWeek: 5, yearsRunning: 3, weeklyVolumeKm: 30, age: 38, sex: "", strength: true, returning: false, personalized: false };
 
 function loadProfile() { try { const s = localStorage.getItem("rc_profile_v1"); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 function saveProfileStore() { try { localStorage.setItem("rc_profile_v1", JSON.stringify(profile)); } catch (e) {} }
@@ -338,6 +338,7 @@ function applyProfile(pf) {
   // as unrealistic.
   const experience = cls.tier <= 1 ? "beginner" : cls.tier <= 3 ? "recreational" : "competitive";
   const ath = { daysPerWeek: pf.daysPerWeek, recent: { distanceMeters: pf.recentDistM, timeSeconds: pf.recentTimeS }, experience, includeStrength: pf.strength, returningFromInjury: pf.returning };
+  if (pf.oneKmS > 0) ath.oneKmTrialSeconds = pf.oneKmS;
   const goal = { distance: pf.goalDist, targetTimeSeconds: pf.targetS, raceDateIso: pf.raceDate, startDateIso: todayIso() };
   const plan = RC.buildPlanSummary(ath, goal); // may throw
   const raw = RC.generatePlan(ath, goal); // raw sessions with steps, for the live runtime
@@ -497,10 +498,10 @@ function viewPerformance() {
     masCard();
 }
 function masCard() {
-  if (!profile.twoKmS) {
-    return '<h2 class="sec">Maximal Aerobic Speed</h2><div class="card"><div class="plain" style="font-size:13px;color:var(--ink-soft)">Add a <b>2 km max-effort time trial</b> in your profile and we\\'ll work out your MAS — a clean anchor for interval paces.</div></div>';
+  if (!profile.oneKmS) {
+    return '<h2 class="sec">Maximal Aerobic Speed</h2><div class="card"><div class="plain" style="font-size:13px;color:var(--ink-soft)">Add a <b>1 km max-effort time trial</b> in your profile and we\\'ll work out your MAS — and use it to set your VO₂/interval paces.</div></div>';
   }
-  const m = RC.computeMas(profile.twoKmS);
+  const m = RC.computeMas(profile.oneKmS);
   const rows = m.zones.map((z) => {
     const wr = z.workSeconds ? z.workSeconds + "s / " + z.restSeconds + "s" + (z.repDistanceMeters ? " · ~" + z.repDistanceMeters + " m" : "") : "2–5 min reps";
     return '<div class="mas-zone"><div class="mz-top"><span class="mz-lab">' + z.label + '</span><span class="mz-pct num">' + z.pct + '%</span></div>' +
@@ -508,9 +509,9 @@ function masCard() {
       '<div class="mz-why">' + z.purpose + '</div></div>';
   }).join("");
   return '<h2 class="sec">Maximal Aerobic Speed (MAS)</h2>' +
-    '<div class="card"><div class="mas-head"><div><div class="mas-big num">' + m.masMps.toFixed(2) + ' <small>m/s</small></div><div class="plain">from your ' + fmtPace(m.twoKmSeconds) + ' 2 km · pace ' + fmtPace(m.masPaceSecPerKm) + '/km</div></div></div>' +
+    '<div class="card"><div class="mas-head"><div><div class="mas-big num">' + m.masMps.toFixed(2) + ' <small>m/s</small></div><div class="plain">from your ' + fmtPace(m.oneKmSeconds) + ' 1 km · pace ' + fmtPace(m.masPaceSecPerKm) + '/km</div></div></div>' +
     '<div class="mas-zones">' + rows + '</div>' +
-    '<div class="plain" style="font-size:11.5px;color:var(--ink-faint);margin-top:10px">Interval targets as % of MAS — the standard coaching benchmarks.</div></div>';
+    '<div class="plain" style="font-size:11.5px;color:var(--ink-faint);margin-top:10px">Your plan\\'s VO₂/interval paces are set from this. Interval targets shown as % of MAS.</div></div>';
 }
 
 // ============ COMMUNITY ====================================================
@@ -583,7 +584,7 @@ function viewSetup() {
     '<div class="card" style="margin-top:12px"><div class="subhead" style="margin-top:0">About you</div>' +
     '<div class="q"><label>A recent run — distance</label><select class="sel" id="s_recdist">' + opt(REC_OPTS, p.recentDistM) + '</select></div>' +
     '<div class="q"><label>…in a time of <span style="color:var(--ink-faint);font-weight:400">just type the numbers</span></label><input class="sel num" id="s_rectime" value="' + fmtTimeFull(p.recentTimeS) + '" inputmode="numeric"></div>' +
-    '<div class="q"><label>2 km time-trial <span style="color:var(--ink-faint);font-weight:400">max effort, optional — for MAS</span></label><input class="sel num" id="s_2km" value="' + (p.twoKmS ? fmtTimeFull(p.twoKmS) : "") + '" placeholder="e.g. 9:10" inputmode="numeric"><div class="mas-hint" id="masHint"></div></div>' +
+    '<div class="q"><label>1 km time-trial <span style="color:var(--ink-faint);font-weight:400">max effort, optional — sets VO₂ paces</span></label><input class="sel num" id="s_1km" value="' + (p.oneKmS ? fmtTimeFull(p.oneKmS) : "") + '" placeholder="e.g. 4:00" inputmode="numeric"><div class="mas-hint" id="masHint"></div></div>' +
     '<div class="q"><label>Runs per week</label>' + seg("days", [["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]], p.daysPerWeek) + '</div>' +
     '<div class="q"><label>Years running</label>' + seg("years", [["0.5","<1"],["2","1–3"],["5","3–8"],["10","8+"]], p.yearsRunning) + '</div>' +
     '<div class="q"><label>Age</label><input class="sel num" id="s_age" type="number" min="12" max="95" value="' + p.age + '" style="max-width:110px"></div>' +
@@ -609,17 +610,17 @@ function draftFromForm() {
   const raceDate = $("s_date").value;
   if (!raceDate) throw new Error("Pick your race date.");
   if (raceDate <= todayIso()) throw new Error("Your race date needs to be in the future.");
-  // Optional 2 km time trial for MAS. Ignore anything implausible (2 km is ~5–20 min).
-  let twoKmS = 0;
-  const twoKmRaw = $("s_2km").value.trim();
-  if (twoKmRaw) {
-    if (!mmss(twoKmRaw)) throw new Error("Enter your 2 km time as minutes:seconds, e.g. 9:10.");
-    const s = RC.parseDuration(twoKmRaw);
-    if (s >= 5 * 60 && s <= 20 * 60) twoKmS = s;
+  // Optional 1 km time trial for MAS. Ignore anything implausible (1 km is ~2:30–8:00).
+  let oneKmS = 0;
+  const oneKmRaw = $("s_1km").value.trim();
+  if (oneKmRaw) {
+    if (!mmss(oneKmRaw)) throw new Error("Enter your 1 km time as minutes:seconds, e.g. 4:00.");
+    const s = RC.parseDuration(oneKmRaw);
+    if (s >= 150 && s <= 480) oneKmS = s;
   }
   return {
     goalDist: $("s_dist").value, targetS: RC.parseDuration(targetRaw), raceDate,
-    recentDistM, recentTimeS, twoKmS, daysPerWeek: Number(draft.days), yearsRunning: Number(draft.years),
+    recentDistM, recentTimeS, oneKmS, daysPerWeek: Number(draft.days), yearsRunning: Number(draft.years),
     weeklyVolumeKm: profile.weeklyVolumeKm, age: Number($("s_age").value) || 35, sex: $("s_sex").value,
     strength: draft.strength === "1", returning: draft.returning === "1", personalized: true,
   };
@@ -627,12 +628,12 @@ function draftFromForm() {
 let draft = {};
 function refreshMasHint() {
   const el = $("masHint"); if (!el) return;
-  const raw = ($("s_2km").value || "").trim();
+  const raw = ($("s_1km").value || "").trim();
   if (!/^\\d{1,2}:[0-5]\\d$/.test(raw)) { el.textContent = ""; return; }
   const s = RC.parseDuration(raw);
-  if (s < 5 * 60 || s > 20 * 60) { el.textContent = ""; return; }
+  if (s < 150 || s > 480) { el.textContent = ""; return; }
   const m = RC.computeMas(s);
-  el.innerHTML = "MAS <b>" + m.masMps.toFixed(2) + " m/s</b> · " + fmtPace(m.masPaceSecPerKm) + "/km — sets your interval paces.";
+  el.innerHTML = "MAS <b>" + m.masMps.toFixed(2) + " m/s</b> · " + fmtPace(m.masPaceSecPerKm) + "/km — sets your VO₂ paces.";
 }
 function refreshTypePreview() {
   try {
@@ -762,8 +763,8 @@ function wire() {
   }));
   ["s_age","s_sex"].forEach((id) => { const e = $(id); if (e) e.oninput = e.onchange = refreshTypePreview; });
   bindTimeInput($("s_target")); bindTimeInput($("s_rectime"));
-  const km2 = $("s_2km");
-  if (km2) { bindTimeInput(km2); km2.addEventListener("input", refreshMasHint); refreshMasHint(); }
+  const km1 = $("s_1km");
+  if (km1) { bindTimeInput(km1); km1.addEventListener("input", refreshMasHint); refreshMasHint(); }
   const setupBanner = $("setupBanner"); if (setupBanner) setupBanner.onclick = () => { state.screen = "setup"; render(); };
   const wxSeg = document.querySelector("[data-weatherseg]"); if (wxSeg) wxSeg.querySelectorAll("button").forEach((b) => b.onclick = () => { state.weather = b.dataset.weather; render(); });
   const save = $("saveProfile"); if (save) save.onclick = () => {

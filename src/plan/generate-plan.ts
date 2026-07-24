@@ -20,6 +20,7 @@ import type {
   TrainingPaces,
 } from "../domain/types.ts";
 import { chooseModel } from "../science/intensity-distribution.ts";
+import { computeMas, masVo2Range } from "../science/mas.ts";
 import { deriveTrainingPaces, withHrZones } from "../science/paces.ts";
 import { taperFor } from "../science/taper.ts";
 import { addDays, dayOfWeekMondayZero, isoToday, weeksBetween } from "./dates.ts";
@@ -77,6 +78,11 @@ export function generatePlan(
   const returning = athlete.returningFromInjury ?? false;
   const model = options.intensityModel ?? chooseModel(athlete);
   const paces = withHrZones(deriveTrainingPaces(athlete.recent, goal), athlete);
+  // If the athlete has done a 1 km time trial, anchor VO₂/interval pace to their MAS — a direct,
+  // test-based target rather than one projected from their race pace.
+  if (athlete.oneKmTrialSeconds && athlete.oneKmTrialSeconds > 0) {
+    paces.vo2 = masVo2Range(computeMas(athlete.oneKmTrialSeconds).masMps);
+  }
   const schedule = annotate(phaseSchedule(structuredWeeks, goal.distance, returning));
 
   const raceMonday = addDays(goal.raceDateIso, -dayOfWeekMondayZero(goal.raceDateIso));
@@ -386,6 +392,11 @@ function buildNotes(
       ? "Intensity distribution: pyramidal — mostly easy running, a moderate amount of threshold, a little VO2. Individual response matters more than an exact split."
       : "Intensity distribution: polarized — mostly easy plus a focused dose of hard work, minimal middle-ground moderate running.",
   );
+  if (athlete.oneKmTrialSeconds && athlete.oneKmTrialSeconds > 0) {
+    notes.push(
+      "VO₂/interval paces are anchored to your 1 km time-trial (MAS) — a direct, test-based target you can re-test to track progress.",
+    );
+  }
   if (athlete.returningFromInjury) {
     notes.push(
       "Returning from injury: the early weeks stay deliberately conservative (single quality session, gentle long-run progression). Add the second quality session only once weekly running and the long run feel stable.",

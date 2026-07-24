@@ -1,10 +1,12 @@
-// Maximal Aerobic Speed (MAS) from a 2 km max-effort time trial. Widely used by running and
-// field-sport coaches: it's a simple field test (measured route + stopwatch) that stresses the
-// aerobic system without multi-day recovery cost, and gives a clean anchor for interval pacing.
+// Maximal Aerobic Speed (MAS) from a 1 km max-effort time trial. Widely used by running and
+// field-sport coaches: a simple field test (measured route + stopwatch) that gives a clean anchor
+// for interval pacing. A 1 km all-out is run at roughly the velocity that elicits VO₂max, so:
 //
-//   MAS (m/s) = 2000 / (2 km time in seconds)
+//   MAS (m/s) = 1000 / (1 km time in seconds)
 //
 // Interval targets are set as percentages of MAS, each driving a different adaptation.
+
+import type { PaceRange } from "../domain/types.ts";
 
 export type MasZone = {
   key: string;
@@ -21,7 +23,7 @@ export type MasZone = {
 };
 
 export type MasResult = {
-  twoKmSeconds: number;
+  oneKmSeconds: number;
   masMps: number;
   masPaceSecPerKm: number;
   zones: MasZone[];
@@ -29,10 +31,10 @@ export type MasResult = {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-export function computeMas(twoKmSeconds: number): MasResult {
-  if (twoKmSeconds <= 0) throw new Error("2 km time must be positive");
-  const masMps = 2000 / twoKmSeconds;
-  const masPaceSecPerKm = 1000 / masMps; // equals twoKmSeconds / 2
+export function computeMas(oneKmSeconds: number): MasResult {
+  if (oneKmSeconds <= 0) throw new Error("1 km time must be positive");
+  const masMps = 1000 / oneKmSeconds;
+  const masPaceSecPerKm = 1000 / masMps; // equals oneKmSeconds
 
   const zone = (
     key: string,
@@ -58,7 +60,7 @@ export function computeMas(twoKmSeconds: number): MasResult {
 
   const zones: MasZone[] = [
     zone("long", "Long intervals", 1.0, undefined, undefined,
-      "Your 2 km pace. Hold 2–5 min reps to build maximal aerobic capacity."),
+      "Your 1 km pace. Hold 2–5 min reps to build maximal aerobic capacity."),
     zone("eurofit", "Eurofit 15/15", 1.2, 15, 15,
       "15s hard / 15s rest — boosts VO₂max with little lactate build-up."),
     zone("tabata", "Tabata 20/10", 1.3, 20, 10,
@@ -66,9 +68,16 @@ export function computeMas(twoKmSeconds: number): MasResult {
   ];
 
   return {
-    twoKmSeconds,
+    oneKmSeconds,
     masMps: round2(masMps),
     masPaceSecPerKm: Math.round(masPaceSecPerKm),
     zones,
   };
+}
+
+/** VO₂/interval training pace band from MAS: reps of 3–5 min sit around 94–100% MAS. */
+export function masVo2Range(masMps: number): PaceRange {
+  const fast = 1000 / masMps; // pace at 100% MAS
+  const slow = 1000 / (masMps * 0.94); // pace at 94% MAS
+  return { minSecPerKm: Math.round(fast), maxSecPerKm: Math.round(slow) };
 }

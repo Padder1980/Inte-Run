@@ -28,6 +28,8 @@ export type Athlete = {
   weeklyVolumeKmCurrent?: number;
   maxHr?: number;
   restingHr?: number;
+  /** Optional 1 km max-effort time-trial (seconds) — anchors MAS-based VO₂/interval paces. */
+  oneKmTrialSeconds?: number;
   unit?: UnitSystem;
 };
 

@@ -7,7 +7,8 @@
 //  - a long run every week, progressing in duration (durability), backing off on deload/taper
 //  - hard days never back-to-back
 //  - strength 2×/week through base/build, easing to 1× near the race (when enabled)
-//  - long lead time beyond the structured cap becomes a flexible base-building note, not busywork
+//  - the plan spans the whole runway: surplus time extends a progressive base (opening with a
+//    pure-aerobic foundation block), while build/peak/taper stay concentrated near the race
 
 import type {
   Athlete,
@@ -221,8 +222,12 @@ function qualitySessionsThisWeek(
   if (runningDays < 4) return 1; // low frequency → protect easy volume, one quality
   if (wp.isDeload) return 1;
   switch (wp.phase) {
-    case "base":
-      return 1;
+    case "base": {
+      // A long base opens with a pure-aerobic foundation block — consistency and volume before any
+      // quality — then settles into one quality session. Short bases carry the single quality throughout.
+      const foundationWeeks = wp.phaseTotal >= 8 ? Math.round(wp.phaseTotal * 0.3) : 0;
+      return wp.ordinalInPhase <= foundationWeeks ? 0 : 1;
+    }
     case "build":
       // Returning athletes add the second quality only in the second half of the build.
       if (returning && wp.ordinalInPhase <= Math.ceil(wp.phaseTotal / 2)) return 1;
@@ -342,10 +347,15 @@ function annotate(schedule: WeekPlan[]): AnnotatedWeek[] {
 function weekFocus(wp: AnnotatedWeek, ctx: WeekContext): string {
   if (wp.isDeload) return "Deload — recover and absorb training";
   switch (wp.phase) {
-    case "base":
+    case "base": {
+      const foundationWeeks = wp.phaseTotal >= 8 ? Math.round(wp.phaseTotal * 0.3) : 0;
+      if (wp.ordinalInPhase <= foundationWeeks) {
+        return "Foundation — easy consistency, weekly long run, general strength";
+      }
       return ctx.returning
-        ? "Rebuild easy consistency + long run"
+        ? "Aerobic base — rebuild consistency + one quality session"
         : "Aerobic base + one quality session";
+    }
     case "build":
       return "Build threshold and VO2, extend the long run";
     case "peak":

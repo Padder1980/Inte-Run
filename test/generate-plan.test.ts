@@ -36,10 +36,20 @@ test("phases appear in order base → build → peak → taper", () => {
   assert.equal(plan.weeks.at(-1)!.phase, "taper");
 });
 
-test("structured length is capped and the last week holds the race week", () => {
-  assert.ok(plan.weeks.length <= 20, "half-marathon plan capped at 20 structured weeks");
+test("structured length is bounded and the last week holds the race week", () => {
+  assert.ok(plan.weeks.length <= 40, "half-marathon plan bounded at 40 structured weeks");
   // race 2027-09-05 (Sun) → race-week Monday is 2027-08-30
   assert.equal(plan.weeks.at(-1)!.startDateIso, "2027-08-30");
+});
+
+test("a long runway maps to a full-length plan, not a short capped block", () => {
+  // ~58 weeks out → a substantial plan (well beyond the old 20-week cap), spanning the runway.
+  assert.ok(plan.weeks.length >= 30, `expected a long plan, got ${plan.weeks.length}`);
+  // The bulk of the extra time is aerobic base, not stretched-out specific work.
+  const base = plan.weeks.filter((w) => w.phase === "base").length;
+  const build = plan.weeks.filter((w) => w.phase === "build").length;
+  assert.ok(base > build, "surplus time should extend the base, not the build");
+  assert.ok(build <= 10, "the specific build stays concentrated");
 });
 
 test("every week has exactly one long run", () => {
@@ -69,9 +79,15 @@ test("no two hard sessions land on adjacent days", () => {
   }
 });
 
-test("returning athlete starts base with a single quality session", () => {
-  const firstBase = plan.weeks.find((w) => w.phase === "base" && !w.isDeload)!;
-  assert.equal(firstBase.qualitySessionCount, 1);
+test("a long base opens with a pure-aerobic foundation, then one quality — never two", () => {
+  // The very first week is a foundation week: easy running, no quality yet.
+  assert.equal(plan.weeks[0]!.qualitySessionCount, 0);
+  // No base week ever carries two quality sessions (the intensity comes in the build).
+  for (const w of plan.weeks.filter((w) => w.phase === "base")) {
+    assert.ok(w.qualitySessionCount <= 1, `base week ${w.index} has >1 quality`);
+  }
+  // But quality does appear later in the base.
+  assert.ok(plan.weeks.some((w) => w.phase === "base" && w.qualitySessionCount === 1));
 });
 
 test("the long run progresses then backs off into the taper", () => {

@@ -443,7 +443,7 @@ function applyProfile(pf) {
     const proj5k = Math.round(RC.riegelPredict(1000, pf.oneKmS, 5000));
     if (proj5k < recent.timeSeconds) recent = { distanceMeters: 5000, timeSeconds: proj5k };
   }
-  const ath = { daysPerWeek: pf.daysPerWeek, recent, experience, includeStrength: pf.strength, returningFromInjury: pf.returning };
+  const ath = { daysPerWeek: pf.daysPerWeek, recent, experience, includeStrength: pf.strength, returningFromInjury: pf.returning, runWalk: pf.status === "new" };
   if (pf.oneKmS > 0) ath.oneKmTrialSeconds = pf.oneKmS;
   const goal = { distance: pf.goalDist, targetTimeSeconds: pf.targetS, raceDateIso: pf.raceDate, startDateIso: todayIso() };
   const plan = RC.buildPlanSummary(ath, goal); // may throw
@@ -500,7 +500,7 @@ function renderReadiness() {
     '<div class="watch"><span class="wl">From your watch</span><span class="c" style="font-size:12px;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:3px 9px">Slept ' + watch.sleepHours + ' h</span><span class="c" style="font-size:12px;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:3px 9px">Resting HR normal</span></div>';
 }
 function effortOf(s) { if (s.type === "rest" || s.type === "mobility") return "none"; if (s.type === "strength" || s.type === "cross-training") return "moderate"; if (s.intensity === "hard") return "hard"; if (s.intensity === "moderate") return "moderate"; return "easy"; }
-function paceOf(s) { const p = s.steps.find((st) => st.kind === "rep" && st.targetPaceSecPerKm) || s.steps.find((st) => st.kind === "steady" && st.targetPaceSecPerKm); if (!p) return null; return fmtPace(p.targetPaceSecPerKm.minSecPerKm) + "–" + fmtPace(p.targetPaceSecPerKm.maxSecPerKm) + "/km"; }
+function paceOf(s) { const rep = s.steps.find((st) => st.kind === "rep" && st.targetPaceSecPerKm); const steady = s.steps.find((st) => st.kind === "steady" && st.targetPaceSecPerKm); const quality = s.type === "threshold" || s.type === "vo2" || s.type === "race-specific"; const p = quality ? (rep || steady) : (steady || rep); if (!p) return null; return fmtPace(p.targetPaceSecPerKm.minSecPerKm) + "–" + fmtPace(p.targetPaceSecPerKm.maxSecPerKm) + "/km"; }
 function rpeOf(s) { let band = s.targetRpe; if (!band) { const w = s.steps.filter((st) => st.targetRpe); if (w.length) band = { min: Math.min.apply(null, w.map((x) => x.targetRpe.min)), max: Math.max.apply(null, w.map((x) => x.targetRpe.max)) }; } return band ? band.min + "–" + band.max : null; }
 function rawToday() {
   const ss = RAW.weeks[0].sessions.slice().sort((a, b) => a.dayOfWeek - b.dayOfWeek);

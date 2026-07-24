@@ -126,6 +126,48 @@ export function easyRun(
   );
 }
 
+// ---- Beginner run–walk ----------------------------------------------------
+
+function clock(sec: number): string {
+  if (sec % 60 === 0) return `${sec / 60}′`;
+  if (sec < 60) return `${sec}″`;
+  return `${Math.floor(sec / 60)}′${sec % 60 ? String(sec % 60).padStart(2, "0") + "″" : ""}`;
+}
+
+/** A couch-to-5k run–walk session: brisk-walk warm-up, cycles of easy run / walk, easy-walk to finish.
+ *  Runs are by feel (RPE), not pace — the point is time on feet and building the habit. */
+export function walkRunSession(
+  paces: TrainingPaces,
+  runSec: number,
+  walkSec: number,
+  cycles: number,
+  opts: { long?: boolean } = {},
+): SessionContent {
+  const steps: WorkoutStep[] = [
+    { kind: "warmup", label: "Brisk walk to warm up", durationSeconds: 5 * 60, targetRpe: { min: 1, max: 2 } },
+  ];
+  for (let i = 1; i <= cycles; i++) {
+    steps.push({
+      kind: "rep",
+      label: `Run ${clock(runSec)} — easy, conversational`,
+      durationSeconds: runSec,
+      targetPaceSecPerKm: paces.easy,
+      targetRpe: { min: 3, max: 4 },
+      repeatIndex: i,
+      repeatCount: cycles,
+    });
+    if (i < cycles) {
+      steps.push({ kind: "recovery", label: `Walk ${clock(walkSec)} — catch your breath`, durationSeconds: walkSec, targetRpe: { min: 1, max: 2 } });
+    }
+  }
+  steps.push({ kind: "cooldown", label: "Easy walk to finish", durationSeconds: 3 * 60, targetRpe: { min: 1, max: 2 } });
+  const title = `Run–walk · ${cycles} × (${clock(runSec)} run / ${clock(walkSec)} walk)`;
+  const desc = opts.long
+    ? "Your longest, easiest session of the week. Keep the runs relaxed — walk breaks are part of the plan, not a failure. Finishing comfortably is the win."
+    : "Alternate easy running and walking. Run at a comfortable, chatty effort; if the runs feel hard, slow them right down. Building the habit matters more than speed.";
+  return assemble("easy", title, desc, "easy", steps, { min: 2, max: 4 });
+}
+
 export function recoveryRun(paces: TrainingPaces, minutes: number): SessionContent {
   return assemble(
     "recovery",
@@ -392,6 +434,25 @@ export function raceSpecificSession(paces: TrainingPaces): SessionContent {
 }
 
 // ---- Strength / mobility / cross-training / rest --------------------------
+
+// General, beginner-friendly strength & mobility — bodyweight, no gym or heavy load required.
+export function generalStrengthSession(): SessionContent {
+  const exercises = [
+    "Bodyweight squats or sit-to-stands",
+    "Reverse lunges (hold a wall for balance)",
+    "Glute bridges",
+    "Calf raises (both legs, then single)",
+    "A short plank + side planks",
+    "Gentle single-leg balance holds",
+  ];
+  return assemble(
+    "strength",
+    "Strength & mobility (20′)",
+    `A gentle, no-equipment routine to build the strength that protects you from injury: ${exercises.join("; ")}. 1–2 easy sets each, stop well before failure. This is support work, not a workout to survive.`,
+    "none",
+    [{ kind: "steady", label: "Bodyweight strength & mobility", durationSeconds: 20 * 60, targetRpe: { min: 2, max: 4 } }],
+  );
+}
 
 export function strengthSession(phase: Phase, maintenance: boolean): SessionContent {
   const heavy = !maintenance && (phase === "build" || phase === "peak");

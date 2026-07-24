@@ -27,6 +27,7 @@ import { addDays, dayOfWeekMondayZero, isoToday, weeksBetween } from "./dates.ts
 import { type WeekPlan, phaseSchedule, structuredWeekCount } from "./periodization.ts";
 import {
   easyRun,
+  generalStrengthSession,
   longRun,
   mobilitySession,
   raceSpecificSession,
@@ -35,6 +36,7 @@ import {
   strengthSession,
   thresholdSession,
   vo2Session,
+  walkRunSession,
 } from "./session-templates.ts";
 
 export type GenerateOptions = {
@@ -91,9 +93,17 @@ export function generatePlan(
   const nonTaperCount = schedule.filter((s) => s.phase !== "taper").length;
   const taper = taperFor(goal.distance);
 
+  // Complete beginners get a gentler, purpose-built progression (run–walk or short easy running,
+  // general strength, no intervals) rather than the standard threshold/VO2 structure.
+  const beginner = athlete.experience === "beginner";
+  const runWalk = athlete.runWalk ?? false;
+
   const weeks: PlannedWeek[] = schedule.map((wp, i) => {
     const weekIndex = i + 1;
     const startDateIso = addDays(raceMonday, -(structuredWeeks - weekIndex) * 7);
+    if (beginner) {
+      return buildBeginnerWeek(weekIndex, startDateIso, wp, { athlete, goal, paces, returning, longMin: 0 }, structuredWeeks, runWalk);
+    }
     const longMin = longRunMinutes(
       wp,
       weekIndex,
@@ -218,6 +228,110 @@ function finalize(contents: SessionContent[], dayOf: number[], weekIndex: number
       source: "generated" as const,
     }))
     .sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+}
+
+// ---- beginner assembly ----------------------------------------------------
+
+const lerp = (a: number, b: number, f: number) => a + (b - a) * Math.max(0, Math.min(1, f));
+const BEGINNER_EASY_DAYS = [1, 3, 5]; // Tue, Thu, Sat — always a rest day between runs
+const BEGINNER_STRENGTH_DAYS = [0, 4]; // Mon, Fri
+
+// One beginner running session — a run–walk progression, or short continuous easy running for those
+// who can already jog. `f` is 0→1 across the plan; runs lengthen and (for run–walk) walks shrink.
+function beginnerRun(
+  paces: TrainingPaces,
+  f: number,
+  long: boolean,
+  runWalk: boolean,
+  ease: boolean,
+): SessionContent {
+  if (runWalk) {
+    const runSec = Math.round(lerp(60, 300, f) / 15) * 15; // 1′ → 5′ run
+    const walkSec = Math.max(30, Math.round(lerp(90, 45, f) / 15) * 15); // 90″ → 45″ walk
+    let targetRunMin = lerp(10, 26, f) + (long ? 4 : 0);
+    if (ease) targetRunMin *= 0.7;
+    const cycles = Math.max(4, Math.min(10, Math.round((targetRunMin * 60) / runSec)));
+    return walkRunSession(paces, runSec, walkSec, cycles, { long });
+  }
+  let minutes = Math.round(lerp(22, 38, f)) + (long ? 8 : 0);
+  if (ease) minutes = Math.round(minutes * 0.75);
+  return long ? longRun(paces, minutes) : easyRun(paces, minutes, false);
+}
+
+function beginnerFocus(wp: AnnotatedWeek, runWalk: boolean): string {
+  if (wp.isDeload) return "Easy week — let your body adapt and come back stronger";
+  if (wp.phase === "taper") return "Ease down — stay fresh for your goal";
+  return runWalk
+    ? "Run–walk foundation — build the habit and let running feel easy"
+    : "Easy aerobic base — steady, comfortable running you can chat through";
+}
+
+function buildBeginnerWeek(
+  index: number,
+  startDateIso: string,
+  wp: AnnotatedWeek,
+  ctx: WeekContext,
+  structuredWeeks: number,
+  runWalk: boolean,
+): PlannedWeek {
+  const f = structuredWeeks <= 1 ? 0.5 : (index - 1) / (structuredWeeks - 1);
+  const ease = wp.isDeload || wp.phase === "taper";
+  const runningDays = Math.min(runWalk ? 3 : 4, Math.max(2, ctx.athlete.daysPerWeek));
+
+  const sessions: SessionContent[] = [];
+  const dayOf: number[] = [];
+
+  // The weekly long, gentle session (Sunday).
+  sessions.push(beginnerRun(ctx.paces, f, true, runWalk, ease));
+  dayOf.push(DAY_LONG);
+
+  // Other easy run–walk days, spaced with rest between.
+  const easyDays = BEGINNER_EASY_DAYS.slice(0, runningDays - 1);
+  easyDays.forEach((d) => {
+    sessions.push(beginnerRun(ctx.paces, f, false, runWalk, ease));
+    dayOf.push(d);
+  });
+
+  // General, gentle strength (no heavy lifting for a brand-new runner).
+  if (ctx.athlete.includeStrength) {
+    const strengthCount = ctx.athlete.daysPerWeek >= 4 && !ease ? 2 : 1;
+    BEGINNER_STRENGTH_DAYS.slice(0, strengthCount).forEach((d) => {
+      if (!dayOf.includes(d)) {
+        sessions.push(generalStrengthSession());
+        dayOf.push(d);
+      }
+    });
+  }
+
+  // Optional mobility on a free day.
+  const used = new Set(dayOf);
+  const mobDay = [2, 4, 0, 5, 3, 1].find((d) => !used.has(d));
+  if (mobDay !== undefined) {
+    sessions.push(mobilitySession());
+    dayOf.push(mobDay);
+    used.add(mobDay);
+  }
+
+  for (let d = 0; d < 7; d++) {
+    if (!used.has(d)) {
+      sessions.push(restDay());
+      dayOf.push(d);
+      used.add(d);
+    }
+  }
+
+  const finalized = finalize(sessions, dayOf, index);
+  const plannedDistanceMeters = finalized.reduce((m, s) => m + (s.estimatedDistanceMeters ?? 0), 0);
+  return {
+    index,
+    startDateIso,
+    phase: wp.phase,
+    isDeload: wp.isDeload,
+    focus: beginnerFocus(wp, runWalk),
+    sessions: finalized,
+    plannedDistanceMeters: Math.round(plannedDistanceMeters),
+    qualitySessionCount: 0,
+  };
 }
 
 function qualitySessionsThisWeek(

@@ -83,12 +83,15 @@ function paceRange(r: { minSecPerKm: number; maxSecPerKm: number }): string {
   return `${formatDuration(r.minSecPerKm)}–${formatDuration(r.maxSecPerKm)}/km`;
 }
 
-/** A representative pace range for a session, from a work step — never the warm-up/cool-down. Returns
- *  null for effort-based work (e.g. hill reps), so the UI shows RPE instead of a misleading pace. */
+/** A representative pace range for a session, from a work step — never the warm-up/cool-down. For
+ *  interval sessions that's the rep pace; otherwise it's the steady/easy pace (so an easy+strides run
+ *  shows its easy pace, not the fast strides). Returns null for effort-based work (e.g. hill reps),
+ *  so the UI shows RPE instead of a misleading pace. */
 function paceLabel(s: Session): string | null {
-  const pick =
-    s.steps.find((st) => st.kind === "rep" && st.targetPaceSecPerKm) ??
-    s.steps.find((st) => st.kind === "steady" && st.targetPaceSecPerKm);
+  const rep = s.steps.find((st) => st.kind === "rep" && st.targetPaceSecPerKm);
+  const steady = s.steps.find((st) => st.kind === "steady" && st.targetPaceSecPerKm);
+  const quality = s.type === "threshold" || s.type === "vo2" || s.type === "race-specific";
+  const pick = quality ? (rep ?? steady) : (steady ?? rep);
   return pick ? paceRange(pick.targetPaceSecPerKm!) : null;
 }
 

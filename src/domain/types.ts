@@ -25,6 +25,9 @@ export type Athlete = {
   includeStrength: boolean;
   /** When true the plan starts conservatively (single quality session, gentle volume ramp). */
   returningFromInjury?: boolean;
+  /** Couch-to-5k starter: runs become run–walk intervals and the whole plan stays very gentle
+   *  (3 run days, short durations, general strength, no strides or hard intervals). */
+  runWalk?: boolean;
   weeklyVolumeKmCurrent?: number;
   maxHr?: number;
   restingHr?: number;

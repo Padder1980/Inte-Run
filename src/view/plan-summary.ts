@@ -25,6 +25,7 @@ export type WeekView = {
   index: number;
   start: string;
   startFull: string;
+  startIso: string;
   phase: PlannedWeek["phase"];
   isDeload: boolean;
   focus: string;
@@ -123,6 +124,7 @@ function weekView(w: PlannedWeek): WeekView {
     index: w.index,
     start: humanDate(w.startDateIso, false),
     startFull: humanDate(w.startDateIso),
+    startIso: w.startDateIso,
     phase: w.phase,
     isDeload: w.isDeload,
     focus: w.focus,

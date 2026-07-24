@@ -11,6 +11,17 @@ import { bundleEngine } from "./bundle.ts";
 const here = dirname(fileURLToPath(import.meta.url));
 const bundleJs = await bundleEngine();
 
+// InteRun brand mark — an original glyph: a teal badge holding a forward-striding runner (head dot +
+// two motion bars leaning into the run). Not derived from any other app's logo.
+const BRAND_MARK = `<svg viewBox="0 0 120 120" width="104" height="104" role="img" aria-label="InteRun">
+  <defs><linearGradient id="brandg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#16b7a4"/><stop offset="1" stop-color="#0a6f64"/></linearGradient></defs>
+  <rect x="8" y="8" width="104" height="104" rx="30" fill="url(#brandg)"/>
+  <circle cx="82" cy="37" r="11" fill="#fff"/>
+  <path d="M35 88 L57 45 L71 45 L49 88 Z" fill="#fff"/>
+  <path d="M57 88 L79 45 L93 45 L71 88 Z" fill="#fff" opacity=".62"/>
+</svg>`;
+
 const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -54,6 +65,42 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .iconbtn { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft); display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .iconbtn svg { width: 18px; height: 18px; }
 .tb-left, .tb-right { display: flex; gap: 8px; }
+/* Splash / launch screen */
+.splash { position: fixed; inset: 0; z-index: 100; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; opacity: 1; transition: opacity .55s ease; }
+.splash.hide { opacity: 0; pointer-events: none; }
+.splash-mark { animation: splashpop .7s cubic-bezier(.2,.9,.3,1.1) both; }
+.splash-mark svg { width: 104px; height: 104px; filter: drop-shadow(0 8px 26px rgba(22,183,164,.35)); }
+.splash-name { font-size: 34px; font-weight: 800; letter-spacing: -.02em; color: #fff; animation: splashfade .6s ease .18s both; }
+.splash-name span { color: #16b7a4; }
+.splash-tag { font-size: 13.5px; font-weight: 500; letter-spacing: .01em; color: #9aa3a0; animation: splashfade .6s ease .34s both; }
+@keyframes splashpop { from { opacity: 0; transform: scale(.7) translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes splashfade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .splash-mark, .splash-name, .splash-tag { animation: none; } }
+/* Training calendar */
+.cal-wrap { display: flex; flex-direction: column; gap: 16px; }
+.cal-week { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
+.cal-whead { padding: 15px 16px 13px; border-bottom: 1px solid var(--line); }
+.cal-wtitle { font-size: 15.5px; font-weight: 700; letter-spacing: -.01em; display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.cal-badge { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; color: #fff; background: var(--ink); border-radius: 999px; padding: 3px 9px; }
+.cal-wtot { font-size: 12.5px; color: var(--ink-soft); margin-top: 4px; }
+.cal-wtot b { color: var(--ink); font-weight: 650; }
+.cal-day { display: grid; grid-template-columns: 52px 1fr; gap: 10px; padding: 10px 16px; border-top: 1px solid var(--line); align-items: center; }
+.cal-day:first-child { border-top: 0; }
+.cal-dcol { text-align: left; }
+.cal-dn { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; color: var(--ink-faint); }
+.cal-dd { font-size: 19px; font-weight: 700; color: var(--ink-soft); letter-spacing: -.01em; }
+.cal-day.is-today .cal-dd { color: #fff; background: var(--ink); width: 30px; height: 30px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+.cal-scol { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.cal-empty { font-size: 13px; color: var(--ink-faint); }
+.cal-sess { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px; padding: 9px 11px; cursor: pointer; font: inherit; color: inherit; }
+.cal-sess.done { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 25%, var(--line)); }
+.cal-bar { width: 4px; align-self: stretch; border-radius: 3px; flex: none; }
+.cal-body { flex: 1; min-width: 0; }
+.cal-t { display: block; font-size: 13.5px; font-weight: 650; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-sub { display: block; font-size: 12px; color: var(--ink-soft); margin-top: 1px; }
+.cal-check { width: 24px; height: 24px; border-radius: 50%; flex: none; border: 1.5px solid var(--line); display: flex; align-items: center; justify-content: center; color: #fff; }
+.cal-sess.done .cal-check { background: var(--ink); border-color: var(--ink); }
+.cal-check svg { width: 15px; height: 15px; }
 
 .view { flex: 1; overflow-y: auto; padding: 16px 16px 96px; }
 .eyebrow { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); font-weight: 600; }
@@ -278,6 +325,11 @@ select.sel { font: inherit; font-size: 13.5px; color: var(--ink); background: va
 </style>
 </head>
 <body>
+<div class="splash" id="splash">
+  <div class="splash-mark">${BRAND_MARK}</div>
+  <div class="splash-name">Inte<span>Run</span></div>
+  <div class="splash-tag">The Intelligent Training Companion</div>
+</div>
 <div class="app">
   <div class="topbar">
     <div class="tb-left">
@@ -286,6 +338,7 @@ select.sel { font: inherit; font-size: 13.5px; color: var(--ink); background: va
     </div>
     <div class="title" id="topTitle">Today</div>
     <div class="tb-right">
+      <button class="iconbtn" id="calBtn" title="Training calendar" aria-label="Training calendar"></button>
       <button class="iconbtn" id="themeBtn" title="Theme" aria-label="Toggle theme"></button>
     </div>
   </div>
@@ -325,10 +378,16 @@ const ICON = {
   dumbbell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9v6M7 7v10M17 7v10M20 9v6M7 12h10"/></svg>',
   book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a2 2 0 0 1 2 2v14H7a2 2 0 0 0-2 2z"/><path d="M5 4v16"/></svg>',
   play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
+  cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/><circle cx="8" cy="14" r=".6" fill="currentColor"/><circle cx="12" cy="14" r=".6" fill="currentColor"/><circle cx="16" cy="14" r=".6" fill="currentColor"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>',
 };
 const PHASE = { base: "var(--base)", build: "var(--build)", peak: "var(--peak)", taper: "var(--taper)" };
 const BAND = { ready: "var(--ready)", steady: "var(--steady)", ease: "var(--ease)", rest: "var(--rest)" };
 const DAY_ORDER = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+// Add whole days to a yyyy-mm-dd string without timezone drift.
+function isoAdd(iso, days) { const p = String(iso).split("-").map(Number); const dt = new Date(Date.UTC(p[0], (p[1]||1)-1, p[2]||1)); dt.setUTCDate(dt.getUTCDate() + days); return dt; }
+function dmon(dt) { return dt.getUTCDate() + " " + MONTHS[dt.getUTCMonth()]; }
 
 // ---- Your profile drives everything ---------------------------------------
 const watch = { sleepHours: 7.5, restingHrDelta: 0, hrvStatus: "normal" };
@@ -383,7 +442,16 @@ let PLAN, RAW, FITNESS, CLASS, MASTERS;
 function recompute() { const r = applyProfile(profile); PLAN = r.plan; RAW = r.raw; FITNESS = r.fitness; CLASS = r.classification; MASTERS = r.masters; }
 try { recompute(); } catch (e) { profile = Object.assign({}, DEFAULT_PROFILE); recompute(); }
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: [], weather: "hot", trialPending: false, trialSaved: null };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: [], weather: "hot", trialPending: false, trialSaved: null, done: {} };
+const TODAY_DOW = 3; // simulated "today" = Thursday, matching the week strip
+function doneKey(wIdx, s) { return wIdx + "|" + s.day + "|" + s.title; }
+// Seed a realistic completed state for the demo: week-1 sessions earlier in the week than "today"
+// count as done, so the calendar and Today reflect progress the way a mid-week user would see it.
+function seedDone() {
+  state.done = {};
+  const wk = PLAN.weeks[0]; if (!wk) return;
+  wk.sessions.forEach((s) => { if (DAY_ORDER.indexOf(s.day) < TODAY_DOW && s.type !== "rest") state.done[doneKey(wk.index, s)] = true; });
+}
 
 // ---- helpers --------------------------------------------------------------
 function fmtPace(s) { s = Math.round(s); return Math.floor(s/60) + ":" + String(s%60).padStart(2,"0"); }
@@ -477,6 +545,39 @@ function feelExpander() {
   const segs = [["soreness","Legs",[["none","Fine"],["mild","Stiff"],["moderate","Sore"],["high","Very sore"]]],["energy","Energy",[["good","Good"],["ok","OK"],["low","Low"]]],["stress","Stress",[["low","Low"],["normal","Normal"],["high","High"]]],["illness","Feeling ill?",[["none","No"],["slight","A little"],["unwell","Unwell"]]]];
   const body = segs.map((g) => '<div class="q"><label>' + g[1] + '</label><div class="seg" data-seg="' + g[0] + '">' + g[2].map((o) => '<button data-v="' + o[0] + '"' + (state.subj[g[0]]===o[0]?' class="on"':'') + '>' + o[1] + '</button>').join("") + '</div></div>').join("");
   return '<details class="more"><summary>Something feel different? Tell us</summary>' + body + '</details>';
+}
+
+// ============ TRAINING CALENDAR ============================================
+// A full plan-at-a-glance in calendar form: every week, every day, with completed sessions ticked.
+// Tapping a session toggles its completion; the week's total shows completed / planned distance.
+function calSessionRow(wIdx, s) {
+  const key = doneKey(wIdx, s);
+  const done = !!state.done[key];
+  const bits = [];
+  if (s.distKm) bits.push(s.distKm + " km");
+  if (s.durMin) bits.push(s.durMin + "m");
+  return '<button class="cal-sess' + (done ? " done" : "") + '" data-done="' + key + '">' +
+    '<span class="cal-bar" style="background:var(--eff-' + s.effort + ')"></span>' +
+    '<span class="cal-body"><span class="cal-t">' + s.title + '</span><span class="cal-sub">' + bits.join(" • ") + '</span></span>' +
+    '<span class="cal-check">' + (done ? ICON.check : "") + '</span></button>';
+}
+function viewCalendar() {
+  const back = '<button class="backbtn" id="calBack">‹ Back</button>';
+  const todayIsoStr = todayIso();
+  const weeks = PLAN.weeks.map((w) => {
+    let doneKm = 0;
+    w.sessions.forEach((s) => { if (state.done[doneKey(w.index, s)] && s.distKm) doneKm += s.distKm; });
+    const rows = DAY_ORDER.map((dn, i) => {
+      const dt = isoAdd(w.startIso, i);
+      const isToday = dt.toISOString().slice(0, 10) === todayIsoStr;
+      const daySessions = w.sessions.filter((s) => s.day === dn && s.type !== "rest");
+      const cells = daySessions.length ? daySessions.map((s) => calSessionRow(w.index, s)).join("") : '<div class="cal-empty">Rest</div>';
+      return '<div class="cal-day' + (isToday ? " is-today" : "") + '"><div class="cal-dcol"><div class="cal-dn">' + dn.toUpperCase() + '</div><div class="cal-dd">' + dt.getUTCDate() + '</div></div><div class="cal-scol">' + cells + '</div></div>';
+    }).join("");
+    const total = (doneKm > 0 ? doneKm.toFixed(1) + " km / " : "") + w.distanceKm.toFixed(1) + " km";
+    return '<div class="cal-week"><div class="cal-whead"><div class="cal-wtitle">' + dmon(isoAdd(w.startIso, 0)) + ' – ' + dmon(isoAdd(w.startIso, 6)) + ' <span class="cal-badge">WEEK ' + w.index + '</span></div><div class="cal-wtot">Total: <b>' + total + '</b></div></div>' + rows + '</div>';
+  }).join("");
+  return back + '<div class="cal-wrap">' + weeks + '</div>';
 }
 
 // ============ PLAN =========================================================
@@ -784,14 +885,6 @@ function syncFitSrc() {
   if (beg) beg.style.display = v === "beginner" ? "" : "none";
   if (main) main.textContent = v === "predicted" ? "Your predicted 5 km time" : "Your recent 5 km time";
 }
-// Show/hide the 5 km time field to match the chosen fitness source, and relabel recent vs predicted.
-function syncFitSrc() {
-  const v = draft.fitsrc || "recent";
-  const wrap = $("fitTimeWrap"), beg = $("fitBegNote"), main = document.querySelector("#fitTimeLbl .lblmain");
-  if (wrap) wrap.style.display = v === "beginner" ? "none" : "";
-  if (beg) beg.style.display = v === "beginner" ? "" : "none";
-  if (main) main.textContent = v === "predicted" ? "Your predicted 5 km time" : "Your recent 5 km time";
-}
 function refreshTypePreview() {
   try {
     const cls = RC.classifyRunner({ runsPerWeek: Number(draft.days), yearsRunning: Number(draft.years), sex: $("s_sex") ? ($("s_sex").value || undefined) : undefined });
@@ -862,6 +955,9 @@ function liveFinish(complete) {
   const snap = LIVE.rt.snapshot(LIVE.vms);
   const km = snap.distanceMeters / 1000;
   if (km > 0.05) state.logged.unshift({ t: LIVE.session.title, d: "Today", dist: km.toFixed(2) + " km", time: fmtPace(snap.elapsedSeconds), pace: (snap.averagePaceSecPerKm ? fmtPace(snap.averagePaceSecPerKm) : "—") + " /km" });
+  // Reflect the completed session in the training calendar.
+  const wk0 = PLAN.weeks[0]; const dn = DAY_ORDER[LIVE.session.dayOfWeek];
+  if (complete && wk0) { const m = wk0.sessions.find((s) => s.day === dn && s.title === LIVE.session.title); if (m) state.done[doneKey(wk0.index, m)] = true; }
   const st = $("lStart"), pa = $("lPause"), fi = $("lFinish");
   if (st) { st.style.display = "none"; }
   if (pa) pa.disabled = true;
@@ -895,6 +991,13 @@ function render() {
     v.innerHTML = viewTrialRun(); v.scrollTop = 0;
     document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
     wireTrialRun();
+    return;
+  }
+  if (state.screen === "calendar") {
+    $("topTitle").textContent = "Training calendar";
+    v.innerHTML = viewCalendar(); v.scrollTop = 0;
+    document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
+    wire();
     return;
   }
   $("topTitle").textContent = state.support ? "Support" : TITLES[state.tab];
@@ -939,10 +1042,13 @@ function wire() {
   const save = $("saveProfile"); if (save) save.onclick = () => {
     let pf; try { pf = draftFromForm(); } catch (e) { const er = $("setupErr"); er.style.display = "block"; er.textContent = e.message; return; }
     let out; try { out = applyProfile(pf); } catch (e) { const er = $("setupErr"); er.style.display = "block"; er.textContent = "That goal can't be planned yet — try a race date further out."; return; }
-    profile = pf; PLAN = out.plan; RAW = out.raw; FITNESS = out.fitness; CLASS = out.classification; MASTERS = out.masters; state.planWeek = PLAN.defaultWeekIndex; saveProfileStore();
+    profile = pf; PLAN = out.plan; RAW = out.raw; FITNESS = out.fitness; CLASS = out.classification; MASTERS = out.masters; state.planWeek = PLAN.defaultWeekIndex; seedDone(); saveProfileStore();
     state.screen = null; state.tab = "plan"; render();
   };
   const cancel = $("cancelSetup"); if (cancel) cancel.onclick = () => { state.screen = null; state.tab = "today"; render(); };
+  // Training-calendar wiring
+  const calBack = $("calBack"); if (calBack) calBack.onclick = () => { state.screen = null; render(); };
+  document.querySelectorAll("[data-done]").forEach((b) => b.onclick = () => { const k = b.dataset.done; state.done[k] = !state.done[k]; render(); });
   // 1 km time-trial session wiring
   const startTrial = $("startTrial"); if (startTrial) startTrial.onclick = beginTrialRun;
   const cancelTrial = $("cancelTrial"); if (cancelTrial) cancelTrial.onclick = () => { state.trialPending = false; render(); };
@@ -961,11 +1067,20 @@ function buildNav() {
   $("nav").innerHTML = ["today","plan","activities","community","support"].map((t) => '<button class="navbtn' + (t===state.tab?" on":"") + '" data-tab="' + t + '">' + ICON[t] + '<span class="nl">' + TITLES[t].replace("Your ","") + '</span></button>').join("");
   document.querySelectorAll(".navbtn").forEach((b) => b.onclick = () => { stopLive(); stopTrialRun(); TRIALRUN = null; state.screen = null; state.tab = b.dataset.tab; if (b.dataset.tab !== "support") state.support = null; render(); });
 }
-$("profileBtn").innerHTML = ICON.person; $("bellBtn").innerHTML = ICON.bell; $("themeBtn").innerHTML = ICON.theme;
+$("profileBtn").innerHTML = ICON.person; $("bellBtn").innerHTML = ICON.bell; $("themeBtn").innerHTML = ICON.theme; $("calBtn").innerHTML = ICON.cal;
 $("themeBtn").onclick = () => { const cur = document.documentElement.getAttribute("data-theme"); document.documentElement.setAttribute("data-theme", cur === "dark" ? "light" : cur === "light" ? "dark" : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark")); };
 $("profileBtn").onclick = () => { stopTrialRun(); state.screen = "setup"; render(); };
+$("calBtn").onclick = () => { stopTrialRun(); state.screen = "calendar"; render(); };
+seedDone();
 buildNav();
 render();
+// Dismiss the launch splash after a beat (or immediately if the user taps it).
+(function () {
+  const sp = $("splash"); if (!sp) return;
+  const hide = () => { sp.classList.add("hide"); setTimeout(() => sp.remove(), 600); };
+  sp.addEventListener("click", hide);
+  setTimeout(hide, 1900);
+})();
 </script>
 </body>
 </html>

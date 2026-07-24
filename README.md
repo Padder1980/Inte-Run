@@ -111,6 +111,20 @@ run here, a real GPS/HR feed in a native app, or a unit test.
   longest of the past 30 days, framed as a signal not a rule), a weekly-jump check, and a graded
   **return-to-running** progression that refers bone/joint injuries to a professional first.
 
+## Your profile — advice that fits you
+
+`web/profile.html` tailors training to the person, and is honest about it (§11, §12):
+
+- **`classification.ts`** — a plain "runner type" (recreational / trained / highly trained) backed by
+  the six-tier McKay framework, which sets how gently or ambitiously plans progress. Elite/world-class
+  tiers are acknowledged but not self-assignable — those need competitive standard.
+- **`masters.ts`** — age-aware guidance that **preserves intensity** (never "just slow down"), adds
+  recovery room, heavy strength, protein and bone-health prompts, and points women from midlife to the
+  wellbeing check.
+- **`evidence-tag.ts`** — the honesty feature: each recommendation carries who it was studied in, and
+  `applicability()` says in plain words how well it transfers to *you*. Advice studied in "trained young
+  men" is flagged a "general guide" for a masters woman — never hidden, just annotated.
+
 ## What's inside
 
 ```
@@ -132,6 +146,9 @@ src/
                rpe-feedback.ts                — RPE trend → ease / hold / progress
                load-guardrails.ts             — long-run spike signal, weekly jump, return-to-running
   readiness/   readiness.ts                   — multi-factor daily readiness (no single metric decides)
+  athlete/     classification.ts              — plain runner type on the six-tier McKay framework
+               masters.ts                     — age-aware guidance (preserve intensity, add recovery)
+               evidence-tag.ts                — how well a tip's evidence applies to *this* runner
   progress/    achievements.ts                — PB detection (fastest 1k/mile/5k/10k/HM/M, longest run)
   live/        session-runtime.ts             — live-session state machine (start/pause/stop, pace cues)
   safety/      escalation.ts                  — medical red-flag screener → emergency/urgent/refer
@@ -237,7 +254,9 @@ pace tables or third-party plan content are reproduced.**
    - ~~Phase 1 — safety guardrails~~ (medical escalation, RED-S, female health) — done, `src/safety/`.
    - ~~Phase 2 — physiology core~~ (critical speed + multi-dimensional estimates with confidence) — done, `src/science/`.
    - ~~Phase 3 — readiness & load monitoring~~ (daily readiness + injury load-spike + return-to-running) — done, `src/readiness/`, `src/adapt/load-guardrails.ts`.
-   - Phase 4 — athlete populations (six-tier classification, masters/ageing, evidence tags).
+   - ~~Phase 4 — athlete populations~~ (six-tier classification, masters/ageing, evidence tags) — done, `src/athlete/`.
+   - Remaining coverage: biomechanics/footwear (#6), environment (#15), the rest of psychology (#9),
+     and the deliberate scope decisions — youth (#13) and para-athletes (#14).
 4. Native shell decision (RN/Expo vs native) + watch/Health/BLE/voice/music integration.
 5. Persistence/backend + auth; wire the adaptive loops to real activity data.
 

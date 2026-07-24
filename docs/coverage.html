@@ -139,9 +139,9 @@ footer { margin-top: 40px; font-size: 12px; color: var(--ink-faint); text-align:
 
   <div class="tiles">
     <div class="tile" style="--c:var(--built)"><div class="n num" style="color:var(--built)">3</div><div class="k">Built</div><div class="of num">of 17 domains</div></div>
-    <div class="tile" style="--c:var(--partial)"><div class="n num" style="color:var(--partial)">9</div><div class="k">Partial</div><div class="of num">meaningful gaps</div></div>
-    <div class="tile" style="--c:var(--missing)"><div class="n num" style="color:var(--missing)">5</div><div class="k">Missing</div><div class="of num">not yet started</div></div>
-    <div class="tile" style="--c:var(--built)"><div class="n num" style="color:var(--built)">✓✓✓</div><div class="k">Phases 1–3 shipped</div><div class="of num">safety · physiology · readiness</div></div>
+    <div class="tile" style="--c:var(--partial)"><div class="n num" style="color:var(--partial)">10</div><div class="k">Partial</div><div class="of num">meaningful gaps</div></div>
+    <div class="tile" style="--c:var(--missing)"><div class="n num" style="color:var(--missing)">4</div><div class="k">Missing</div><div class="of num">not yet started</div></div>
+    <div class="tile" style="--c:var(--built)"><div class="n num" style="color:var(--built)">✓⁴</div><div class="k">Phases 1–4 shipped</div><div class="of num">the evidence build, done</div></div>
   </div>
 
   <div class="legend">
@@ -156,9 +156,9 @@ footer { margin-top: 40px; font-size: 12px; color: var(--ink-faint); text-align:
   <section>
     <div class="sec-head">
       <h2>Suggested build sequence</h2>
-      <p>You chose all four focus areas — so this is the whole map, ordered. Safety leads because the brief
-      insists the app must screen and refer before it does anything else; then the physiology core everything
-      leans on; then readiness &amp; load; then athlete populations. The rest are later slices or scope decisions.</p>
+      <p>All four focus areas are now shipped, in the order the brief implies: safety first (screen &amp; refer
+      before anything else), then the physiology core everything leans on, then readiness &amp; load, then
+      athlete populations. What remains below are later slices and deliberate scope decisions.</p>
     </div>
     <div class="phases" id="phases"></div>
   </section>
@@ -196,12 +196,12 @@ const DOMAINS = [
   { i: 1, name: "Physiology & performance determinants", s: "partial", t: "<b>Shipped (Phase 2):</b> a multi-dimensional fitness profile in plain English — a trainable pace plus endurance and durability, each a confidence range; training tolerance emerges over time. <b>Still missing:</b> wiring it into plan generation, richer determinants over time." },
   { i: 5, name: "Training load, injury risk & return-to-running", s: "partial", t: "<b>Have:</b> injury triage (incl. bone-stress). <b>Shipped (Phase 3):</b> the “single run >10% longer than 30-day longest” spike signal, a weekly-jump check, and a graded return-to-running progression that refers on for bone/joint injuries. <b>Still missing:</b> next-morning pain model, post-illness." },
   { i: 9, name: "Psychology, behaviour & adherence", s: "partial", t: "<b>Have:</b> non-punitive missed sessions, “why this session matters”, RPE. <b>Missing:</b> process goals, reflection, habit support, compulsive-exercise protection." },
-  { i: 11, name: "Beginners, elite & athlete classification", s: "partial", t: "<b>Have:</b> 3 experience levels. <b>Missing:</b> the six-tier McKay framework and per-recommendation evidence tagging." },
+  { i: 11, name: "Beginners, elite & athlete classification", s: "partial", t: "<b>Shipped (Phase 4):</b> a plain-English runner type backed by the six-tier McKay framework, plus per-recommendation evidence tagging that flags — honestly — when a tip wasn't studied on people like you. <b>Still missing:</b> wiring the tier into plan generation; tagging every recommendation." },
   { i: 6, name: "Biomechanics, form & footwear", s: "missing", t: "No cadence / form / footwear tracking against a personal baseline. (Brief: compare to self, don't impose “180 spm”.)" },
   { i: 7, name: "Nutrition, fuelling & energy availability", s: "partial", safety: true, t: "<b>Shipped (Phase 1):</b> RED-S / energy-availability screening + referral, never a weight-loss target. <b>Still missing:</b> fuelling prompts, carb / hydration targets, gut training." },
   { i: 8, name: "Sleep, recovery & readiness", s: "partial", t: "<b>Shipped (Phase 3):</b> a plain-English multi-factor readiness check (sleep, soreness, energy, stress, motivation, optional RHR/HRV) → train / ease / rest, non-punitive. HRV alone can never cancel a session; illness always means rest. <b>Still missing:</b> trend tracking over time, performance-decline signal." },
   { i: 10, name: "Women & female-athlete health", s: "partial", safety: true, t: "<b>Shipped (Phase 1):</b> amenorrhoea / postpartum / pelvic-floor / iron prompts — symptom-informed, all referring on, never cycle-syncing. <b>Still missing:</b> pregnancy & menopause programming, FAIR injury specifics." },
-  { i: 12, name: "Masters runners & ageing", s: "missing", t: "No age input at all — can't preserve intensity or adjust recovery for older athletes. Don't just slow everyone down." },
+  { i: 12, name: "Masters runners & ageing", s: "partial", t: "<b>Shipped (Phase 4):</b> age-aware guidance that preserves intensity (never “just slow down”), adds recovery room, heavy strength, protein and bone-health prompts, and points women from midlife to the wellbeing check. <b>Still missing:</b> wiring recovery spacing into plan generation." },
   { i: 13, name: "Young athletes", s: "missing", t: "Age-appropriate training, safeguarding, consent, growth. Also a <b>scope / legal decision</b>, not just a feature." },
   { i: 14, name: "Para-athletes & inclusive design", s: "missing", t: "Demos are keyboard / theme accessible, but no wheelchair / handcycle options or impairment-aware metrics." },
   { i: 15, name: "Heat, cold, altitude & environment", s: "missing", t: "No effort-based pace adjustment for heat, wind, altitude, air quality or surface." },
@@ -232,8 +232,8 @@ const PHASES = [
   { n: "✓", tag: "Shipped", c: "var(--built)", title: "Readiness & load monitoring", meta: "Domains 8 · 5 — observe the response",
     text: "DONE. A plain-English daily check-in (src/readiness/ + today.html): sleep, soreness, energy, stress, motivation → train / ease / rest, with no single metric (HRV included) deciding the day, and illness always meaning rest. Plus the injury load-spike signal (>10% longest-run), a weekly-jump check and a graded return-to-running progression.",
     refs: [["#8 Readiness", 0], ["#5 Load & return", 0]] },
-  { n: 4, tag: "Next", c: "var(--accent)", title: "Broaden athlete populations", meta: "Domains 11 · 12 — right advice per person",
-    text: "The six-tier McKay classification, age-aware adaptation for masters (preserve intensity, adjust recovery), and per-recommendation evidence tags so lab findings on trained young men don't quietly become universal advice.",
+  { n: "✓", tag: "Shipped", c: "var(--built)", title: "Broaden athlete populations", meta: "Domains 11 · 12 — right advice per person",
+    text: "DONE. A plain runner type on the six-tier McKay framework (src/athlete/ + profile.html), age-aware masters guidance that preserves intensity, and evidence tagging that flags — in plain words — when a tip wasn't studied on people like you, so lab findings on trained young men don't quietly become universal advice.",
     refs: [["#11 Classification", 0], ["#12 Masters", 0]] },
 ];
 const LATER = {

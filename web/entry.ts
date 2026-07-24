@@ -16,3 +16,6 @@ export { buildFitnessProfile } from "../src/science/fitness-profile.ts";
 export { rangeText } from "../src/science/estimate.ts";
 export { assessReadiness } from "../src/readiness/readiness.ts";
 export { assessLongRunSpike, returnToRunningPlan } from "../src/adapt/load-guardrails.ts";
+export { classifyRunner } from "../src/athlete/classification.ts";
+export { assessMasters } from "../src/athlete/masters.ts";
+export { applicability } from "../src/athlete/evidence-tag.ts";

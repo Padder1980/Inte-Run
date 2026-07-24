@@ -127,6 +127,29 @@ export {
   type ReturnStage,
 } from "./adapt/load-guardrails.ts";
 
+// Athlete populations — classification, age-aware guidance, and evidence tagging.
+export {
+  classifyRunner,
+  type RunnerTier,
+  type ClassificationInput,
+  type Classification,
+} from "./athlete/classification.ts";
+export {
+  assessMasters,
+  type AgeBand,
+  type MastersInput,
+  type MastersGuidance,
+} from "./athlete/masters.ts";
+export {
+  applicability,
+  type EvidenceQuality,
+  type EvidenceSex,
+  type EvidenceTag,
+  type Athlete,
+  type ApplicabilityLevel,
+  type Applicability,
+} from "./athlete/evidence-tag.ts";
+
 // Safety layer — screen, educate and refer. Never diagnoses.
 export {
   type Professional,

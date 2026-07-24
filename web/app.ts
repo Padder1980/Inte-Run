@@ -211,12 +211,12 @@ h2.sec:first-child { margin-top: 4px; }
     linear-gradient(152deg, color-mix(in srgb, var(--c, var(--accent)) 96%, #fff) 0%, color-mix(in srgb, var(--c, var(--accent)) 80%, #000) 52%, color-mix(in srgb, var(--c, var(--accent)) 58%, #000) 100%);
   border: 1px solid rgba(255,255,255,.16);
   box-shadow:
-    0 1.5px 0 rgba(255,255,255,.32) inset,
-    0 -26px 40px -26px rgba(0,0,0,.5) inset,
-    0 24px 44px -14px color-mix(in srgb, var(--c, var(--accent)) 58%, transparent),
-    0 8px 18px -8px rgba(20,32,27,.32);
+    0 1.5px 0 rgba(255,255,255,.30) inset,
+    0 -22px 34px -26px rgba(0,0,0,.42) inset,
+    0 6px 16px -10px color-mix(in srgb, var(--c, var(--accent)) 40%, transparent),
+    0 2px 5px -3px rgba(20,32,27,.14);
   cursor: pointer; transition: transform .14s ease, box-shadow .14s ease; }
-.hero-wk:active { transform: translateY(1px) scale(.994); box-shadow: 0 1.5px 0 rgba(255,255,255,.28) inset, 0 -22px 34px -24px rgba(0,0,0,.5) inset, 0 12px 26px -12px color-mix(in srgb, var(--c, var(--accent)) 55%, transparent); }
+.hero-wk:active { transform: translateY(1px) scale(.994); box-shadow: 0 1.5px 0 rgba(255,255,255,.26) inset, 0 -20px 30px -24px rgba(0,0,0,.42) inset, 0 4px 10px -8px color-mix(in srgb, var(--c, var(--accent)) 38%, transparent); }
 .hero-wk.rest { background: linear-gradient(145deg, var(--surface) 0%, var(--surface-2) 100%); color: var(--ink); border: 1px solid var(--line); box-shadow: var(--shadow); cursor: default; }
 .hw-eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .85; }
 .hero-wk.rest .hw-eyebrow { color: var(--ink-faint); opacity: 1; }
@@ -230,7 +230,7 @@ h2.sec:first-child { margin-top: 4px; }
 .hw-glow { position: absolute; right: -46px; top: -46px; width: 170px; height: 170px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.26), transparent 68%); pointer-events: none; }
 /* Start session — premium CTA with a "marching" gradient outline (accent ⇄ white flowing round) */
 @property --ma { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
-.start-btn { position: relative; margin-top: 16px; isolation: isolate; }
+.start-btn { position: relative; margin-top: 26px; isolation: isolate; }
 .start-btn::before {
   content: ""; position: absolute; inset: -3px; border-radius: 17px; padding: 3px; z-index: -1; pointer-events: none;
   background: conic-gradient(from var(--ma), var(--accent) 0deg, #ffffff 60deg, color-mix(in srgb, var(--accent) 45%, #fff) 120deg, var(--accent) 180deg, #ffffff 240deg, color-mix(in srgb, var(--accent) 45%, #fff) 300deg, var(--accent) 360deg);
@@ -242,7 +242,7 @@ h2.sec:first-child { margin-top: 4px; }
 @keyframes maSpin { to { --ma: 360deg; } }
 @media (prefers-reduced-motion: reduce) { .start-btn::before { animation: none; } }
 /* Today's two summary squares */
-.tsq-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+.tsq-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 22px; }
 .tsq { position: relative; text-align: left; background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%); border: 1px solid var(--line); border-radius: 18px; padding: 15px 15px 16px; cursor: pointer; font: inherit; color: inherit; box-shadow: var(--shadow); transition: transform .12s ease, box-shadow .12s ease; }
 .tsq:active { transform: translateY(1px); }
 .tsq-ic { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #fff; background: linear-gradient(160deg, color-mix(in srgb, var(--sqc, var(--accent)) 92%, #fff), var(--sqc, var(--accent))); box-shadow: 0 5px 12px -5px var(--sqc, var(--accent)); margin-bottom: 12px; }

@@ -28,6 +28,16 @@ const html = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>InteRun — The Intelligent Training Companion</title>
+<meta name="description" content="InteRun — evidence-based running coach with live GPS sessions and voice coaching.">
+<meta name="theme-color" content="#0e8c7f" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a100e" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="InteRun">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <style>
 :root {
   color-scheme: light dark;
@@ -570,6 +580,10 @@ const DEFAULT_PROFILE = { name: "", avatar: "", status: "regular", goalDist: "ha
 
 function loadProfile() { try { const s = localStorage.getItem("rc_profile_v1"); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 function saveProfileStore() { try { localStorage.setItem("rc_profile_v1", JSON.stringify(profile)); } catch (e) {} }
+// Completed runs recorded in-app (from a live GPS or simulated session) — persisted so they
+// survive a reload and show up in Activities alongside the sample history.
+function loadRuns() { try { return JSON.parse(localStorage.getItem("interun_runs") || "[]"); } catch (e) { return []; } }
+function saveRuns() { try { localStorage.setItem("interun_runs", JSON.stringify(state.logged.slice(0, 50))); } catch (e) {} }
 
 // Turn a profile into engine outputs. Throws if the goal can't be planned (e.g. race too soon).
 function applyProfile(pf) {
@@ -614,7 +628,7 @@ let PLAN, RAW, FITNESS, CLASS, MASTERS;
 function recompute() { const r = applyProfile(profile); PLAN = r.plan; RAW = r.raw; FITNESS = r.fitness; CLASS = r.classification; MASTERS = r.masters; }
 try { recompute(); } catch (e) { profile = Object.assign({}, DEFAULT_PROFILE); recompute(); }
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: [], weather: "hot", trialPending: false, trialSaved: null, done: {}, dayOverride: {}, selDay: 4 };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: loadRuns(), weather: "hot", trialPending: false, trialSaved: null, done: {}, dayOverride: {}, selDay: 4 };
 // Effective day index for a session, honouring any user reschedule. Works for raw sessions
 // (dayOfWeek) and summary sessions (dayIndex), keyed by the shared session id.
 function effDay(s) { const o = state.dayOverride[s.id]; return o != null ? o : (s.dayOfWeek != null ? s.dayOfWeek : s.dayIndex); }
@@ -1508,15 +1522,103 @@ function refreshTypePreview() {
 // ============ LIVE SESSION (in-app) ========================================
 const KIND_COLOR = { warmup: "var(--base)", cooldown: "var(--base)", steady: "var(--base)", recovery: "var(--taper)", rep: "var(--peak)" };
 let LIVE = null;
+const GPS_AVAILABLE = typeof navigator !== "undefined" && "geolocation" in navigator;
 function startSession() {
   const s = rawToday();
-  LIVE = { session: s, rt: new RC.LiveSession(s), vms: 0, dist: 0, hr: 105, timer: null, speed: 20, lastStep: -1, quirk: 0, done: false };
+  LIVE = { session: s, rt: new RC.LiveSession(s), mode: null, acquiring: false, gpsErr: null,
+    startMs: 0, pausedMs: 0, pauseStart: 0, vms: 0, dist: 0, hr: 105, paceHint: null,
+    timer: null, ui: null, watchId: null, wakeLock: null, lastLat: null, lastLon: null, acc: null,
+    speed: 20, lastStep: -1, quirk: 0, done: false };
   state.screen = "live"; render();
+}
+// Great-circle distance between two lat/lon points, in metres.
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371000, toR = Math.PI / 180;
+  const dLat = (lat2 - lat1) * toR, dLon = (lon2 - lon1) * toR;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * toR) * Math.cos(lat2 * toR) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+// Real elapsed session time (ms), excluding any paused stretches.
+function liveElapsedMs() {
+  const base = Date.now() - LIVE.startMs - LIVE.pausedMs;
+  return LIVE.pauseStart ? base - (Date.now() - LIVE.pauseStart) : base;
+}
+// The runtime clock: virtual for the simulator, wall-clock for a real GPS run.
+function liveNowMs() { return LIVE.mode === "sim" ? LIVE.vms : liveElapsedMs(); }
+// Keep the screen awake during a run where the platform supports it.
+function requestWakeLock() {
+  try { if (navigator.wakeLock && navigator.wakeLock.request) navigator.wakeLock.request("screen").then((w) => { if (LIVE) LIVE.wakeLock = w; }).catch(() => {}); } catch (e) {}
+}
+function releaseWakeLock() { try { if (LIVE && LIVE.wakeLock) { LIVE.wakeLock.release(); LIVE.wakeLock = null; } } catch (e) {} }
+// Begin a session: try real GPS first, fall back to the simulator when geolocation is
+// unavailable or denied (e.g. inside the Claude artifact sandbox), so the demo always works.
+function beginLive() {
+  const st = $("lStart"); if (st) st.style.display = "none";
+  const pa = $("lPause"); if (pa) pa.disabled = false;
+  const fi = $("lFinish"); if (fi) fi.disabled = false;
+  if (GPS_AVAILABLE) {
+    LIVE.acquiring = true; renderLiveNow();
+    navigator.geolocation.getCurrentPosition(
+      (pos) => startGps(pos),
+      (err) => { LIVE.gpsErr = err && err.message; startSim(); },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
+  } else { startSim(); }
+}
+function startGps(pos) {
+  if (!LIVE || LIVE.done) return;
+  LIVE.acquiring = false; LIVE.mode = "gps"; LIVE.startMs = Date.now();
+  LIVE.lastLat = pos.coords.latitude; LIVE.lastLon = pos.coords.longitude; LIVE.acc = pos.coords.accuracy;
+  requestWakeLock();
+  LIVE.rt.start(0).forEach(liveCue);
+  LIVE.watchId = navigator.geolocation.watchPosition(onGpsPos, () => {}, { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
+  if (!LIVE.ui) LIVE.ui = setInterval(gpsUiTick, 250);
+  renderLiveNow();
+}
+function startSim() {
+  if (!LIVE || LIVE.done) return;
+  LIVE.acquiring = false; LIVE.mode = "sim";
+  LIVE.rt.start(LIVE.vms).forEach(liveCue);
+  startLoop();
+  renderLiveNow();
+}
+// A new GPS fix: accumulate real distance (accuracy-gated, with a jitter/teleport filter) and
+// capture the device's own speed as a pace hint. Time and cue advancement happen in gpsUiTick.
+function onGpsPos(pos) {
+  if (!LIVE || LIVE.mode !== "gps") return;
+  const c = pos.coords; LIVE.acc = c.accuracy;
+  const good = c.accuracy == null || c.accuracy <= 40;
+  if (good && LIVE.rt.getStatus() === "active" && LIVE.lastLat != null) {
+    const d = haversine(LIVE.lastLat, LIVE.lastLon, c.latitude, c.longitude);
+    if (d > 1 && d < 80) LIVE.dist += d;
+  }
+  if (good) { LIVE.lastLat = c.latitude; LIVE.lastLon = c.longitude; }
+  LIVE.paceHint = (c.speed != null && c.speed > 0.35) ? 1000 / c.speed : null;
+}
+function gpsUiTick() {
+  if (!LIVE || LIVE.mode !== "gps") return;
+  if (LIVE.rt.getStatus() === "active") {
+    const t = { atMs: liveElapsedMs(), distanceMeters: LIVE.dist };
+    if (LIVE.paceHint) t.paceSecPerKm = LIVE.paceHint;
+    LIVE.rt.update(t).forEach(liveCue);
+  }
+  renderLiveNow();
+  if (LIVE.rt.getStatus() === "completed") { stopLive(); liveFinish(true); }
+}
+function gpsStatusText() {
+  if (LIVE.acquiring) return "Acquiring GPS…";
+  if (LIVE.mode === "sim") return LIVE.gpsErr ? "Simulated (no GPS)" : "Simulated";
+  if (LIVE.mode === "gps") return LIVE.acc != null ? "GPS · ±" + Math.round(LIVE.acc) + " m" : "GPS";
+  return "Ready";
+}
+function renderLiveNow() {
+  if (!LIVE) return;
+  liveUpdate(LIVE.rt.snapshot(liveNowMs()));
+  const badge = $("gpsBadge"); if (badge) badge.textContent = gpsStatusText();
 }
 function viewLive() {
   const s = LIVE.session;
   return '<button class="backbtn" id="liveBack">‹ Today</button>' +
-    '<div class="card live-hero"><div class="eyebrow">Live session · sim ' + LIVE.speed + '×</div><div class="live-title">' + s.title + '</div>' +
+    '<div class="card live-hero"><div class="eyebrow">Live session · <span id="gpsBadge">' + gpsStatusText() + '</span></div><div class="live-title">' + s.title + '</div>' +
     '<div class="live-metrics"><div><div class="lk">Elapsed</div><div class="lv num" id="lElapsed">0:00</div></div>' +
     '<div><div class="lk">Distance</div><div class="lv num" id="lDist">0.00<small> km</small></div></div>' +
     '<div><div class="lk">Pace</div><div class="lv num none" id="lPace">—</div></div></div></div>' +
@@ -1559,13 +1661,20 @@ function liveTick() {
   if (LIVE.rt.getStatus() === "completed") { stopLive(); liveFinish(true); }
 }
 function startLoop() { if (!LIVE.timer) LIVE.timer = setInterval(liveTick, 200); }
-function stopLive() { if (LIVE && LIVE.timer) { clearInterval(LIVE.timer); LIVE.timer = null; } }
+function stopLive() {
+  if (!LIVE) return;
+  if (LIVE.timer) { clearInterval(LIVE.timer); LIVE.timer = null; }
+  if (LIVE.ui) { clearInterval(LIVE.ui); LIVE.ui = null; }
+  if (LIVE.watchId != null && GPS_AVAILABLE) { navigator.geolocation.clearWatch(LIVE.watchId); LIVE.watchId = null; }
+  releaseWakeLock();
+}
 function liveFinish(complete) {
   if (LIVE.done) return; LIVE.done = true; stopLive();
-  if (!complete) LIVE.rt.stop(LIVE.vms).forEach(liveCue);
-  const snap = LIVE.rt.snapshot(LIVE.vms);
+  const now = liveNowMs();
+  if (!complete) LIVE.rt.stop(now).forEach(liveCue);
+  const snap = LIVE.rt.snapshot(now);
   const km = snap.distanceMeters / 1000;
-  if (km > 0.05) state.logged.unshift({ t: LIVE.session.title, d: "Today", dist: km.toFixed(2) + " km", time: fmtPace(snap.elapsedSeconds), pace: (snap.averagePaceSecPerKm ? fmtPace(snap.averagePaceSecPerKm) : "—") + " /km" });
+  if (km > 0.05) { state.logged.unshift({ t: LIVE.session.title, d: "Today", dist: km.toFixed(2) + " km", time: fmtPace(snap.elapsedSeconds), pace: (snap.averagePaceSecPerKm ? fmtPace(snap.averagePaceSecPerKm) : "—") + " /km" }); saveRuns(); }
   // Reflect the completed session in the training calendar.
   const wk0 = PLAN.weeks[0]; const dn = DAY_ORDER[LIVE.session.dayOfWeek];
   if (complete && wk0) { const m = wk0.sessions.find((s) => s.day === dn && s.title === LIVE.session.title); if (m) state.done[doneKey(wk0.index, m)] = true; }
@@ -1679,11 +1788,18 @@ function wire() {
   // Live session wiring
   const startBtn = $("startSession"); if (startBtn) startBtn.onclick = startSession;
   const lb = $("liveBack"); if (lb) lb.onclick = () => { stopLive(); state.screen = null; state.tab = "today"; render(); };
-  const lStart = $("lStart"); if (lStart) lStart.onclick = () => { LIVE.rt.start(LIVE.vms).forEach(liveCue); startLoop(); lStart.style.display = "none"; $("lPause").disabled = false; $("lFinish").disabled = false; };
+  const lStart = $("lStart"); if (lStart) lStart.onclick = beginLive;
   const lPause = $("lPause"); if (lPause) lPause.onclick = () => {
     const st = LIVE.rt.getStatus();
-    if (st === "active") { LIVE.rt.pause(LIVE.vms).forEach(liveCue); stopLive(); lPause.textContent = "Resume"; }
-    else if (st === "paused") { LIVE.rt.resume(LIVE.vms).forEach(liveCue); startLoop(); lPause.textContent = "Pause"; }
+    if (st === "active") {
+      LIVE.rt.pause(liveNowMs()).forEach(liveCue);
+      if (LIVE.mode === "gps") { LIVE.pauseStart = Date.now(); } else { stopLive(); }
+      lPause.textContent = "Resume";
+    } else if (st === "paused") {
+      if (LIVE.mode === "gps") { LIVE.pausedMs += Date.now() - LIVE.pauseStart; LIVE.pauseStart = 0; LIVE.lastLat = null; LIVE.rt.resume(liveNowMs()).forEach(liveCue); if (!LIVE.ui) LIVE.ui = setInterval(gpsUiTick, 250); }
+      else { LIVE.rt.resume(LIVE.vms).forEach(liveCue); startLoop(); }
+      lPause.textContent = "Pause";
+    }
   };
   const lFinish = $("lFinish"); if (lFinish && !LIVE.done) lFinish.onclick = () => liveFinish(false);
 }
@@ -1716,6 +1832,13 @@ render();
     setTimeout(removeSplash, 1900);
   }
 })();
+// Register the service worker only where it actually exists (the GitHub Pages PWA build). We probe
+// first so the standalone artifact — which has no sw.js — stays silent instead of logging an error.
+if ("serviceWorker" in navigator) {
+  addEventListener("load", () => {
+    fetch("sw.js", { method: "HEAD" }).then((r) => { if (r.ok) navigator.serviceWorker.register("sw.js").catch(() => {}); }).catch(() => {});
+  });
+}
 </script>
 </body>
 </html>
@@ -1724,3 +1847,48 @@ render();
 const outPath = join(here, "app.html");
 writeFileSync(outPath, html, "utf8");
 console.log(`Wrote ${outPath} (${(html.length / 1024).toFixed(1)} KB)`);
+
+// ---- Installable PWA build (GitHub Pages) --------------------------------
+// The same self-contained shell, plus a web manifest and a service worker, written to /docs so it
+// can be served over HTTPS at https://<user>.github.io/<repo>/ — the origin real GPS + voice need.
+const docsDir = join(here, "..", "docs");
+writeFileSync(join(docsDir, "index.html"), html, "utf8");
+
+const manifest = {
+  name: "InteRun — The Intelligent Training Companion",
+  short_name: "InteRun",
+  description: "Evidence-based running coach with live GPS sessions and voice coaching.",
+  start_url: ".",
+  scope: ".",
+  display: "standalone",
+  orientation: "portrait",
+  background_color: "#0a100e",
+  theme_color: "#0e8c7f",
+  categories: ["health", "fitness", "sports"],
+  icons: [
+    { src: "icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+    { src: "icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+    { src: "icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+  ],
+};
+writeFileSync(join(docsDir, "manifest.webmanifest"), JSON.stringify(manifest, null, 2), "utf8");
+
+// Cache name is tied to the shell size so every deploy invalidates the old cache; navigation is
+// network-first (updates reach the user) while assets are cache-first (fast + offline-capable).
+const cacheName = `interun-${html.length}`;
+const sw = `const CACHE = ${JSON.stringify(cacheName)};
+const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png", "./apple-touch-icon.png"];
+self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting())); });
+self.addEventListener("activate", (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
+self.addEventListener("fetch", (e) => {
+  const req = e.request;
+  if (req.method !== "GET") return;
+  if (req.mode === "navigate") {
+    e.respondWith(fetch(req).then((res) => { const c = res.clone(); caches.open(CACHE).then((k) => k.put("./index.html", c)).catch(() => {}); return res; }).catch(() => caches.match("./index.html")));
+    return;
+  }
+  e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => { const c = res.clone(); caches.open(CACHE).then((k) => k.put(req, c)).catch(() => {}); return res; })));
+});
+`;
+writeFileSync(join(docsDir, "sw.js"), sw, "utf8");
+console.log(`Wrote PWA to ${docsDir} (index.html, manifest.webmanifest, sw.js)`);

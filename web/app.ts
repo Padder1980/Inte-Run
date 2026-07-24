@@ -128,16 +128,29 @@ h2.sec:first-child { margin-top: 4px; }
 .chip.pace { color: var(--accent); } .chip.rpe { color: var(--eff-hard); }
 .checkbox { width: 24px; height: 24px; border-radius: 7px; border: 2px solid var(--line); flex: none; }
 
-.primary { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 16px; font: inherit; font-size: 15px; font-weight: 650; color: var(--accent-ink); background: var(--accent); border: 0; border-radius: 14px; padding: 14px; cursor: pointer; text-decoration: none; }
+.primary { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 16px; font: inherit; font-size: 15px; font-weight: 650; color: var(--accent-ink); background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 86%, #fff) 0%, var(--accent) 55%, color-mix(in srgb, var(--accent) 82%, #000) 100%); border: 0; border-radius: 14px; padding: 14px; cursor: pointer; text-decoration: none; box-shadow: 0 1px 0 rgba(255,255,255,.25) inset, 0 6px 16px -4px color-mix(in srgb, var(--accent) 55%, transparent), 0 2px 5px rgba(20,32,27,.16); transition: transform .12s ease, box-shadow .12s ease, filter .12s ease; }
+.primary:hover { filter: brightness(1.03); }
+.primary:active { transform: translateY(1px); box-shadow: 0 1px 0 rgba(255,255,255,.2) inset, 0 3px 9px -4px color-mix(in srgb, var(--accent) 50%, transparent); }
 .primary:hover { filter: brightness(1.06); }
 .primary svg { width: 18px; height: 18px; }
 
 /* Readiness (Today) */
 .ctx { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 .ctx .lab { font-size: 12px; color: var(--ink-faint); font-weight: 600; }
-.seg { display: inline-flex; gap: 5px; flex-wrap: wrap; }
-.seg button { font: inherit; font-size: 12.5px; color: var(--ink-soft); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
-.seg button.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
+.seg { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.seg button { font: inherit; font-size: 12.5px; font-weight: 550; color: var(--ink-soft); background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%); border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; cursor: pointer; box-shadow: 0 1px 0 rgba(255,255,255,.5) inset, 0 1px 2px rgba(20,32,27,.06); transition: transform .12s ease, box-shadow .12s ease, background .12s ease, color .12s ease; }
+.seg button:active { transform: translateY(1px); }
+.seg button.on { background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, #fff) 0%, var(--accent) 60%, color-mix(in srgb, var(--accent) 84%, #000) 100%); color: var(--accent-ink); border-color: transparent; font-weight: 650; box-shadow: 0 1px 0 rgba(255,255,255,.28) inset, 0 4px 12px -3px color-mix(in srgb, var(--accent) 55%, transparent); }
+/* Avatar */
+.iconbtn img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.avatar-row { display: flex; align-items: center; gap: 15px; margin-top: 4px; }
+.avatar-pic { width: 76px; height: 76px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; overflow: hidden; background: linear-gradient(150deg, color-mix(in srgb, var(--accent) 24%, var(--surface)), var(--surface)); border: 1px solid var(--line); box-shadow: 0 6px 16px -7px rgba(20,32,27,.35), 0 1px 0 rgba(255,255,255,.5) inset; color: var(--accent); font-weight: 750; font-size: 27px; letter-spacing: -.02em; cursor: pointer; }
+.avatar-pic img { width: 100%; height: 100%; object-fit: cover; }
+.avatar-pic svg { width: 38px; height: 38px; color: var(--accent); }
+.avatar-cta { display: inline-flex; align-items: center; gap: 7px; font: inherit; font-size: 13px; font-weight: 600; color: var(--accent); background: var(--surface); border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); border-radius: 11px; padding: 9px 14px; cursor: pointer; box-shadow: 0 1px 2px rgba(20,32,27,.06); }
+.avatar-cta:active { transform: translateY(1px); }
+.avatar-hint { font-size: 11.5px; color: var(--ink-faint); margin-top: 6px; }
+.greeting { font-size: 15px; color: var(--ink-soft); margin: 0 2px 12px; } .greeting b { color: var(--ink); font-weight: 700; }
 .status { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); }
 .status .band { padding: 15px 16px; color: #fff; background: var(--bc); }
 .status .band .h { font-size: 18px; font-weight: 700; }
@@ -396,7 +409,7 @@ function futureIso(days) { const d = new Date(); d.setDate(d.getDate() + days); 
 function fmtTimeFull(s) { s = Math.round(s); const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), x = s%60; const p = (n) => String(n).padStart(2,"0"); return h>0 ? h+":"+p(m)+":"+p(x) : m+":"+p(x); }
 
 // An example runner to start from — until you make it yours.
-const DEFAULT_PROFILE = { goalDist: "half", targetS: 6300, raceDate: futureIso(245), fitSrc: "recent", recentDistM: 5000, recentTimeS: 1500, noRecent: false, oneKmS: 255, daysPerWeek: 5, yearsRunning: 3, weeklyVolumeKm: 30, age: 38, sex: "", strength: true, returning: false, personalized: false };
+const DEFAULT_PROFILE = { name: "", avatar: "", goalDist: "half", targetS: 6300, raceDate: futureIso(245), fitSrc: "recent", recentDistM: 5000, recentTimeS: 1500, noRecent: false, oneKmS: 255, daysPerWeek: 5, yearsRunning: 3, weeklyVolumeKm: 30, age: 38, sex: "", strength: true, returning: false, personalized: false };
 
 function loadProfile() { try { const s = localStorage.getItem("rc_profile_v1"); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 function saveProfileStore() { try { localStorage.setItem("rc_profile_v1", JSON.stringify(profile)); } catch (e) {} }
@@ -511,7 +524,8 @@ function viewToday() {
   }
   const w = todayWorkout();
   const banner = profile.personalized ? "" : '<button class="setup-banner" id="setupBanner"><div><b>You\\'re viewing an example plan</b><div class="sb-sub">Tell us about you and your goal to make it yours.</div></div><span>Set up →</span></button>';
-  return banner + '<div class="weekstrip">' + strip + '</div>' +
+  const greeting = profile.name ? '<div class="greeting">Hi, <b>' + esc(profile.name) + '</b> \\uD83D\\uDC4B</div>' : "";
+  return banner + greeting + '<div class="weekstrip">' + strip + '</div>' +
     '<h2 class="sec">Today\\'s workout</h2><div class="card">' + w.html + '</div>' +
     weatherCard(w.s) +
     '<button class="primary" id="startSession">' + ICON.play + ' Start session</button>' +
@@ -719,11 +733,47 @@ const DIST_OPTS = [["5k","5 km"],["10k","10 km"],["half","Half marathon"],["mara
 const REC_OPTS = [["1609.344","1 mile"],["5000","5 km"],["10000","10 km"],["21097.5","Half marathon"]];
 function opt(list, val) { return list.map((o) => '<option value="' + o[0] + '"' + (String(o[0]) === String(val) ? " selected" : "") + '>' + o[1] + '</option>').join(""); }
 function seg(name, opts, val) { return '<div class="seg" data-set="' + name + '">' + opts.map((o) => '<button data-v="' + o[0] + '"' + (String(o[0]) === String(val) ? ' class="on"' : '') + '>' + o[1] + '</button>').join("") + '</div>'; }
+// ---- Name & profile picture ----------------------------------------------
+function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function initials(name) { const parts = (name || "").trim().split(/\\s+/).filter(Boolean); if (!parts.length) return ""; return (parts[0].charAt(0) + (parts.length > 1 ? parts[parts.length - 1].charAt(0) : "")).toUpperCase(); }
+function avatarInner(p) { if (p.avatar) return '<img src="' + p.avatar + '" alt="">'; const init = initials(p.name); return init || ICON.person; }
+// Paint the top-bar profile button from the current profile: photo, else initials, else the person icon.
+function renderAvatar() {
+  const b = $("profileBtn"); if (!b) return;
+  b.innerHTML = profile.avatar ? '<img src="' + profile.avatar + '" alt="Profile">'
+    : (initials(profile.name) ? '<span style="font-size:13px;font-weight:700;color:var(--accent)">' + initials(profile.name) + '</span>' : ICON.person);
+}
+// Downscale a chosen image to a square 256px JPEG data URL (keeps localStorage small) and drop it in.
+function processAvatarFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const size = 256, c = document.createElement("canvas"); c.width = size; c.height = size;
+      const ctx = c.getContext("2d");
+      const s = Math.min(img.width, img.height), sx = (img.width - s) / 2, sy = (img.height - s) / 2;
+      ctx.drawImage(img, sx, sy, s, s, 0, 0, size, size);
+      const url = c.toDataURL("image/jpeg", 0.85);
+      draft.avatar = url; profile.avatar = url;
+      const pic = $("avatarPic"); if (pic) pic.innerHTML = '<img src="' + url + '" alt="">';
+      const btn = $("avatarBtn"); if (btn) btn.textContent = "Change photo";
+      renderAvatar();
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
 function viewSetup() {
   const p = profile;
   const savedMsg = state.trialSaved ? '<div class="plan-note" style="border-left-color:var(--accent);margin:2px 2px 12px">✓ 1 km time trial saved: <b>' + state.trialSaved + '</b>. Your VO₂/interval paces are now anchored to it.</div>' : "";
-  return savedMsg + '<div class="eyebrow" style="margin:2px 2px 10px">' + (p.personalized ? "Your profile" : "Let's make this yours") + '</div>' +
-    '<div class="card"><div class="subhead" style="margin-top:0">Your goal</div>' +
+  return savedMsg + '<div class="eyebrow" style="margin:2px 2px 10px">' + (p.name ? p.name + "\\u2019s profile" : (p.personalized ? "Your profile" : "Let\\'s make this yours")) + '</div>' +
+    '<div class="card"><div class="subhead" style="margin-top:0">You</div>' +
+    '<div class="avatar-row"><div class="avatar-pic" id="avatarPic">' + avatarInner(p) + '</div>' +
+    '<div><button class="avatar-cta" id="avatarBtn" type="button">' + (p.avatar ? "Change photo" : "\\uD83D\\uDCF7 Add photo") + '</button><div class="avatar-hint">A profile picture shows in your top-bar icon.</div></div></div>' +
+    '<input type="file" id="s_avatar_file" accept="image/*" style="display:none">' +
+    '<div class="q" style="margin-top:15px"><label>Your name</label><input class="sel" id="s_name" value="' + (p.name || "").replace(/"/g, "&quot;") + '" placeholder="What should we call you?" autocomplete="name"></div></div>' +
+    '<div class="card" style="margin-top:12px"><div class="subhead" style="margin-top:0">Your goal</div>' +
     '<div class="q"><label>Race</label><select class="sel" id="s_dist">' + opt(DIST_OPTS, p.goalDist) + '</select></div>' +
     '<div class="q"><label>Target time <span style="color:var(--ink-faint);font-weight:400">just type the numbers</span></label><input class="sel num" id="s_target" value="' + fmtTimeFull(p.targetS) + '" inputmode="numeric"></div>' +
     '<div class="q"><label>Race date</label><input class="sel num" id="s_date" type="date" value="' + p.raceDate + '"></div></div>' +
@@ -732,8 +782,7 @@ function viewSetup() {
     '<div class="q" id="fitTimeWrap"' + (p.fitSrc === "beginner" ? ' style="display:none"' : '') + '><label id="fitTimeLbl"><span class="lblmain">' + (p.fitSrc === "predicted" ? "Your predicted 5 km time" : "Your recent 5 km time") + '</span> <span style="color:var(--ink-faint);font-weight:400">just type the numbers</span></label><input class="sel num" id="s_rectime" value="' + (p.noRecent ? "" : fmtTimeFull(p.recentTimeS)) + '" placeholder="e.g. 25:00" inputmode="numeric"></div>' +
     '<div class="q" id="fitBegNote"' + (p.fitSrc === "beginner" ? '' : ' style="display:none"') + '><div class="mas-hint">New to running? We\\'ll start you gently with a couch-to-5k base and build from there.</div></div>' +
     '<div class="q"><label>1 km time-trial <span style="color:var(--ink-faint);font-weight:400">max effort, optional — sets VO₂ paces</span></label><input class="sel num" id="s_1km" value="' + (p.oneKmS ? fmtTimeFull(p.oneKmS) : "") + '" placeholder="e.g. 4:00" inputmode="numeric"><div class="mas-hint" id="masHint"></div><button class="mini-btn" id="s_1km_rec" type="button">⏱ Haven\\'t done one? Record it now</button></div>' +
-    '<div class="q"><label>Runs per week</label>' + seg("days", [["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]], p.daysPerWeek) + '</div>' +
-    '<div class="q"><label>Years running</label>' + seg("years", [["0.5","<1"],["2","1–3"],["5","3–8"],["10","8+"]], p.yearsRunning) + '</div>' +
+    '<div class="q"><label>How many days a week will you run? <span style="color:var(--ink-faint);font-weight:400">we\\'ll shape the plan around this</span></label>' + seg("days", [["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]], p.daysPerWeek) + '</div>' +
     '<div class="q"><label>Age</label><input class="sel num" id="s_age" type="number" min="12" max="95" value="' + p.age + '" style="max-width:110px"></div>' +
     '<div class="q"><label>Sex <span style="color:var(--ink-faint);font-weight:400">helps tailor advice</span></label><select class="sel" id="s_sex"><option value=""' + (!p.sex?" selected":"") + '>Prefer not to say</option><option value="female"' + (p.sex==="female"?" selected":"") + '>Female</option><option value="male"' + (p.sex==="male"?" selected":"") + '>Male</option></select></div>' +
     '<div class="q"><label>Include strength &amp; conditioning?</label>' + seg("strength", [["1","Yes"],["0","No"]], p.strength?"1":"0") + '</div>' +
@@ -774,8 +823,10 @@ function draftFromForm() {
     if (s >= 150 && s <= 480) oneKmS = s;
   }
   return {
+    name: ($("s_name") ? $("s_name").value : "").trim().slice(0, 40),
+    avatar: draft.avatar != null ? draft.avatar : (profile.avatar || ""),
     goalDist: $("s_dist").value, targetS: RC.parseDuration(targetRaw), raceDate,
-    fitSrc, recentDistM, recentTimeS, noRecent, oneKmS, daysPerWeek: Number(draft.days), yearsRunning: Number(draft.years),
+    fitSrc, recentDistM, recentTimeS, noRecent, oneKmS, daysPerWeek: Number(draft.days), yearsRunning: profile.yearsRunning || 3,
     weeklyVolumeKm: profile.weeklyVolumeKm, age: Number($("s_age").value) || 35, sex: $("s_sex").value,
     strength: draft.strength === "1", returning: draft.returning === "1", personalized: true,
   };
@@ -887,7 +938,7 @@ function syncFitSrc() {
 }
 function refreshTypePreview() {
   try {
-    const cls = RC.classifyRunner({ runsPerWeek: Number(draft.days), yearsRunning: Number(draft.years), sex: $("s_sex") ? ($("s_sex").value || undefined) : undefined });
+    const cls = RC.classifyRunner({ runsPerWeek: Number(draft.days), yearsRunning: profile.yearsRunning || 3, sex: $("s_sex") ? ($("s_sex").value || undefined) : undefined });
     const m = RC.assessMasters({ age: Number(($("s_age") || {}).value) || 35, sex: $("s_sex") ? ($("s_sex").value || undefined) : undefined });
     const tp = $("typePreview"); if (!tp) return;
     tp.innerHTML = '<div class="eyebrow" style="margin:0 0 4px">Your runner type</div><div style="font-size:17px;font-weight:700;letter-spacing:-.01em">' + cls.label + '</div><div style="font-size:12.5px;color:var(--ink-soft);margin-top:4px">' + cls.meaning + '</div>' + (m.isMasters ? '<div style="font-size:12.5px;color:var(--ink-faint);margin-top:8px;border-top:1px solid var(--line);padding-top:8px">' + m.headline + '</div>' : '');
@@ -970,7 +1021,7 @@ function render() {
   const v = $("view");
   if (state.screen === "setup") {
     $("topTitle").textContent = "Your profile";
-    draft = { days: profile.daysPerWeek, years: profile.yearsRunning, strength: profile.strength ? "1" : "0", returning: profile.returning ? "1" : "0", fitsrc: profile.fitSrc || (profile.noRecent ? "beginner" : "recent") };
+    draft = { days: profile.daysPerWeek, strength: profile.strength ? "1" : "0", returning: profile.returning ? "1" : "0", fitsrc: profile.fitSrc || (profile.noRecent ? "beginner" : "recent"), avatar: profile.avatar || "" };
     v.innerHTML = viewSetup();
     v.scrollTop = 0;
     document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
@@ -1037,12 +1088,17 @@ function wire() {
   if (km1) { bindTimeInput(km1); km1.addEventListener("input", refreshMasHint); refreshMasHint(); }
   const km1rec = $("s_1km_rec"); if (km1rec) km1rec.onclick = startTrialFlow;
   if (document.querySelector('[data-set="fitsrc"]')) syncFitSrc();
+  // Avatar upload
+  const avatarFile = $("s_avatar_file");
+  const avatarBtn = $("avatarBtn"); if (avatarBtn && avatarFile) avatarBtn.onclick = () => avatarFile.click();
+  const avatarPic = $("avatarPic"); if (avatarPic && avatarFile) avatarPic.onclick = () => avatarFile.click();
+  if (avatarFile) avatarFile.onchange = () => processAvatarFile(avatarFile.files && avatarFile.files[0]);
   const setupBanner = $("setupBanner"); if (setupBanner) setupBanner.onclick = () => { state.screen = "setup"; render(); };
   const wxSeg = document.querySelector("[data-weatherseg]"); if (wxSeg) wxSeg.querySelectorAll("button").forEach((b) => b.onclick = () => { state.weather = b.dataset.weather; render(); });
   const save = $("saveProfile"); if (save) save.onclick = () => {
     let pf; try { pf = draftFromForm(); } catch (e) { const er = $("setupErr"); er.style.display = "block"; er.textContent = e.message; return; }
     let out; try { out = applyProfile(pf); } catch (e) { const er = $("setupErr"); er.style.display = "block"; er.textContent = "That goal can't be planned yet — try a race date further out."; return; }
-    profile = pf; PLAN = out.plan; RAW = out.raw; FITNESS = out.fitness; CLASS = out.classification; MASTERS = out.masters; state.planWeek = PLAN.defaultWeekIndex; seedDone(); saveProfileStore();
+    profile = pf; PLAN = out.plan; RAW = out.raw; FITNESS = out.fitness; CLASS = out.classification; MASTERS = out.masters; state.planWeek = PLAN.defaultWeekIndex; seedDone(); saveProfileStore(); renderAvatar();
     state.screen = null; state.tab = "plan"; render();
   };
   const cancel = $("cancelSetup"); if (cancel) cancel.onclick = () => { state.screen = null; state.tab = "today"; render(); };
@@ -1067,7 +1123,7 @@ function buildNav() {
   $("nav").innerHTML = ["today","plan","activities","community","support"].map((t) => '<button class="navbtn' + (t===state.tab?" on":"") + '" data-tab="' + t + '">' + ICON[t] + '<span class="nl">' + TITLES[t].replace("Your ","") + '</span></button>').join("");
   document.querySelectorAll(".navbtn").forEach((b) => b.onclick = () => { stopLive(); stopTrialRun(); TRIALRUN = null; state.screen = null; state.tab = b.dataset.tab; if (b.dataset.tab !== "support") state.support = null; render(); });
 }
-$("profileBtn").innerHTML = ICON.person; $("bellBtn").innerHTML = ICON.bell; $("themeBtn").innerHTML = ICON.theme; $("calBtn").innerHTML = ICON.cal;
+$("bellBtn").innerHTML = ICON.bell; $("themeBtn").innerHTML = ICON.theme; $("calBtn").innerHTML = ICON.cal; renderAvatar();
 $("themeBtn").onclick = () => { const cur = document.documentElement.getAttribute("data-theme"); document.documentElement.setAttribute("data-theme", cur === "dark" ? "light" : cur === "light" ? "dark" : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark")); };
 $("profileBtn").onclick = () => { stopTrialRun(); state.screen = "setup"; render(); };
 $("calBtn").onclick = () => { stopTrialRun(); state.screen = "calendar"; render(); };

@@ -767,18 +767,16 @@ function viewSetup() {
     '<div><button class="avatar-cta" id="avatarBtn" type="button">' + (p.avatar ? "Change photo" : "\uD83D\uDCF7 Add photo") + '</button><div class="avatar-hint">A profile picture shows in your top-bar icon.</div></div></div>' +
     '<input type="file" id="s_avatar_file" accept="image/*" style="display:none">' +
     '<div class="q" style="margin-top:15px"><label>Your name</label><input class="sel" id="s_name" value="' + (p.name || "").replace(/"/g, "&quot;") + '" placeholder="What should we call you?" autocomplete="name"></div></div>' +
-    '<div class="card" style="margin-top:12px"><div class="subhead" style="margin-top:0">Your goal</div>' +
-    '<div class="q"><label>Race</label><select class="sel" id="s_dist">' + opt(DIST_OPTS, p.goalDist) + '</select></div>' +
-    '<div class="q"><label>Target time <span style="color:var(--ink-faint);font-weight:400">just type the numbers</span></label><input class="sel num" id="s_target" value="' + fmtTimeFull(p.targetS) + '" inputmode="numeric"></div>' +
-    '<div class="q"><label>Race date</label><input class="sel num" id="s_date" type="date" value="' + p.raceDate + '"></div></div>' +
-    '<div class="card" style="margin-top:12px"><div class="subhead" style="margin-top:0">About you</div>' +
+    '<div class="card" style="margin-top:12px"><div class="subhead" style="margin-top:0">Your running</div>' +
     '<div class="q"><label>What\u2019s your current running status? <span style="color:var(--ink-faint);font-weight:400">this shapes what we ask next</span></label>' + statusCards(p.status || "regular") + '</div>' +
     '<div class="q" id="statusBegNote"' + (isBeginnerStatus(p.status) ? '' : ' style="display:none"') + '><div class="mas-hint"></div></div>' +
     '<div id="statusRunnerBlock"' + (isBeginnerStatus(p.status) ? ' style="display:none"' : '') + '>' +
     '<div class="q"><label>Your 5 km time — a recent result or an estimate?</label>' + seg("fitsrc", [["recent","Recent"],["predicted","Predicted"]], p.fitSrc === "predicted" ? "predicted" : "recent") + '</div>' +
     '<div class="q" id="fitTimeWrap"><label id="fitTimeLbl"><span class="lblmain">' + (p.fitSrc === "predicted" ? "Your predicted 5 km time" : "Your recent 5 km time") + '</span> <span style="color:var(--ink-faint);font-weight:400">just type the numbers</span></label><input class="sel num" id="s_rectime" value="' + (p.noRecent ? "" : fmtTimeFull(p.recentTimeS)) + '" placeholder="e.g. 25:00" inputmode="numeric"></div>' +
     '<div class="q"><label>1 km time-trial <span style="color:var(--ink-faint);font-weight:400">max effort, optional — sharpens your VO₂ paces</span></label><input class="sel num" id="s_1km" value="' + (p.oneKmS ? fmtTimeFull(p.oneKmS) : "") + '" placeholder="e.g. 4:00" inputmode="numeric"><div class="mas-hint" id="masHint"></div><button class="mini-btn" id="s_1km_rec" type="button">⏱ Haven\'t done one? Record it now</button></div>' +
-    '</div>' +
+    '</div></div>' +
+    '<div class="card" id="goalCard" style="margin-top:12px">' + goalCardInner(p.status || "regular", { dist: p.goalDist, date: p.raceDate, target: fmtTimeFull(p.targetS) }) + '</div>' +
+    '<div class="card" style="margin-top:12px"><div class="subhead" style="margin-top:0">A few details</div>' +
     '<div class="q"><label>How many days a week will you run? <span style="color:var(--ink-faint);font-weight:400">we\'ll shape the plan around this</span></label>' + seg("days", [["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]], p.daysPerWeek) + '</div>' +
     '<div class="q"><label>Age</label><input class="sel num" id="s_age" type="number" min="12" max="95" value="' + p.age + '" style="max-width:110px"></div>' +
     '<div class="q"><label>Sex <span style="color:var(--ink-faint);font-weight:400">helps tailor advice</span></label><select class="sel" id="s_sex"><option value=""' + (!p.sex?" selected":"") + '>Prefer not to say</option><option value="female"' + (p.sex==="female"?" selected":"") + '>Female</option><option value="male"' + (p.sex==="male"?" selected":"") + '>Male</option></select></div>' +
@@ -791,8 +789,6 @@ function viewSetup() {
 // Draft profile from the setup form's current values (may throw on bad times).
 function draftFromForm() {
   const mmss = (s) => /^\d{1,2}:[0-5]\d$/.test(s) || /^\d{1,2}:[0-5]\d:[0-5]\d$/.test(s);
-  const targetRaw = $("s_target").value.trim();
-  if (!mmss(targetRaw)) throw new Error("Enter your target time as h:mm:ss or m:ss, e.g. 1:45:00.");
   // The running status gates the rest. Beginners (new / building) give no times — we seed a gentle
   // baseline and flag noRecent. Runners (regular / competitive) give a recent or predicted 5 km, and
   // may optionally add a 1 km trial to sharpen their VO₂ paces.
@@ -815,14 +811,26 @@ function draftFromForm() {
       if (s >= 150 && s <= 480) oneKmS = s;
     }
   }
+  // Goal adapts to the status: runners set a target time; beginners work towards *completing* the
+  // distance, so we derive a realistic finish time from their current ability (no time to enter).
+  const goalCfg = GOAL_BY_STATUS[status] || GOAL_BY_STATUS.regular;
+  const goalDist = $("s_dist") ? $("s_dist").value : profile.goalDist;
+  let targetS;
+  if (goalCfg.time) {
+    const targetRaw = $("s_target").value.trim();
+    if (!mmss(targetRaw)) throw new Error("Enter your target time as h:mm:ss or m:ss, e.g. 1:45:00.");
+    targetS = RC.parseDuration(targetRaw);
+  } else {
+    targetS = Math.round(RC.riegelPredict(5000, recentTimeS, DIST_M[goalDist] || 5000));
+  }
   const raceDate = $("s_date").value;
-  if (!raceDate) throw new Error("Pick your race date.");
-  if (raceDate <= todayIso()) throw new Error("Your race date needs to be in the future.");
+  if (!raceDate) throw new Error("Pick your " + (goalCfg.time ? "race" : "target") + " date.");
+  if (raceDate <= todayIso()) throw new Error("Your " + (goalCfg.time ? "race" : "target") + " date needs to be in the future.");
   return {
     name: ($("s_name") ? $("s_name").value : "").trim().slice(0, 40),
     avatar: draft.avatar != null ? draft.avatar : (profile.avatar || ""),
     status,
-    goalDist: $("s_dist").value, targetS: RC.parseDuration(targetRaw), raceDate,
+    goalDist, targetS, raceDate,
     fitSrc, recentDistM, recentTimeS, noRecent, oneKmS, daysPerWeek: Number(draft.days), yearsRunning: profile.yearsRunning || 3,
     weeklyVolumeKm: profile.weeklyVolumeKm, age: Number($("s_age").value) || 35, sex: $("s_sex").value,
     strength: draft.strength === "1", returning: draft.returning === "1", personalized: true,
@@ -933,6 +941,31 @@ const STATUS_OPTS = [
   ["competitive", "Competitive", "High weekly mileage \u2014 I race and chase time goals."],
 ];
 function isBeginnerStatus(st) { return st === "new" || st === "building"; }
+// The goal question adapts to the status: beginners work towards *completing* a shorter distance (no
+// time pressure — we derive a realistic finish target); runners set a time goal over any distance.
+const DIST_M = { "5k": 5000, "10k": 10000, half: 21097.5, marathon: 42195 };
+const RACE_LABEL = { "5k": "5 km", "10k": "10 km", half: "Half marathon", marathon: "Marathon" };
+const FINISH_LABEL = { "5k": "Run a 5K non-stop", "10k": "Complete a 10K", half: "Complete a half marathon", marathon: "Complete a marathon" };
+const GOAL_BY_STATUS = {
+  new: { dists: ["5k", "10k"], time: false, q: "What are you working towards?" },
+  building: { dists: ["5k", "10k", "half"], time: false, q: "What are you working towards?" },
+  regular: { dists: ["5k", "10k", "half", "marathon"], time: true, q: "Your race" },
+  competitive: { dists: ["5k", "10k", "half", "marathon"], time: true, q: "Your race" },
+};
+function goalCardInner(status, cur) {
+  const cfg = GOAL_BY_STATUS[status] || GOAL_BY_STATUS.regular;
+  let dist = cur.dist; if (cfg.dists.indexOf(dist) < 0) dist = cfg.dists[0];
+  const opts = cfg.dists.map((k) => '<option value="' + k + '"' + (k === dist ? " selected" : "") + '>' + (cfg.time ? RACE_LABEL[k] : FINISH_LABEL[k]) + '</option>').join("");
+  let h = '<div class="subhead" style="margin-top:0">Your goal</div>' +
+    '<div class="q"><label>' + cfg.q + '</label><select class="sel" id="s_dist">' + opts + '</select></div>';
+  if (cfg.time) {
+    h += '<div class="q"><label>Target time <span style="color:var(--ink-faint);font-weight:400">just type the numbers</span></label><input class="sel num" id="s_target" value="' + cur.target + '" inputmode="numeric"></div>';
+  } else {
+    h += '<div class="q"><div class="mas-hint">No time pressure \u2014 we\u2019ll build you up to comfortably finish it. You can set a time goal once you\u2019re there.</div></div>';
+  }
+  h += '<div class="q"><label>' + (cfg.time ? "Race date" : "Target date") + '</label><input class="sel num" id="s_date" type="date" value="' + cur.date + '"></div>';
+  return h;
+}
 function statusCards(sel) {
   return '<div class="statuscards" data-set="status">' + STATUS_OPTS.map((o) =>
     '<button type="button" data-v="' + o[0] + '" class="statuscard' + (o[0] === sel ? " on" : "") + '"><div class="sc-t">' + o[1] + '</div><div class="sc-d">' + o[2] + '</div></button>').join("") + '</div>';
@@ -951,6 +984,17 @@ function syncStatus() {
       : "Great — we\u2019ll grow your consistency and learn your paces as you run. No times to enter.";
   }
   if (!beginner) syncFitSrc();
+  // Rebuild the goal card so its distance options and time field match the status.
+  const gc = $("goalCard");
+  if (gc) {
+    const cur = {
+      dist: $("s_dist") ? $("s_dist").value : profile.goalDist,
+      date: $("s_date") ? $("s_date").value : profile.raceDate,
+      target: $("s_target") ? $("s_target").value : fmtTimeFull(profile.targetS),
+    };
+    gc.innerHTML = goalCardInner(st, cur);
+    bindTimeInput($("s_target"));
+  }
 }
 // Show/hide the 5 km time field to match the chosen fitness source, and relabel recent vs predicted.
 function syncFitSrc() {

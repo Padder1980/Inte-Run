@@ -204,9 +204,19 @@ h2.sec:first-child { margin-top: 4px; }
 .weekstrip .d.sel { background: linear-gradient(180deg, color-mix(in srgb, var(--ink) 92%, #000) 0%, var(--ink) 100%); color: var(--surface); box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--ink) 55%, transparent); }
 .weekstrip .d.sel .dn { color: color-mix(in srgb, var(--surface) 72%, transparent); }
 .weekstrip .d .dot { width: 6px; height: 6px; border-radius: 50%; margin: 5px auto 0; }
-/* Today hero workout */
-.hero-wk { position: relative; overflow: hidden; border-radius: 20px; padding: 20px 20px 18px; color: #fff; background: linear-gradient(145deg, color-mix(in srgb, var(--c, var(--accent)) 92%, #000) 0%, color-mix(in srgb, var(--c, var(--accent)) 78%, #000) 55%, color-mix(in srgb, var(--c, var(--accent)) 60%, #000) 100%); box-shadow: 0 14px 30px -12px color-mix(in srgb, var(--c, var(--accent)) 60%, transparent), 0 2px 6px rgba(20,32,27,.14); cursor: pointer; transition: transform .12s ease; }
-.hero-wk:active { transform: scale(.99); }
+/* Today hero workout — a raised, glossy 3D "plate" */
+.hero-wk { position: relative; overflow: hidden; border-radius: 22px; padding: 22px 22px 20px; color: #fff;
+  background:
+    radial-gradient(130% 80% at 12% -10%, rgba(255,255,255,.22), transparent 52%),
+    linear-gradient(152deg, color-mix(in srgb, var(--c, var(--accent)) 96%, #fff) 0%, color-mix(in srgb, var(--c, var(--accent)) 80%, #000) 52%, color-mix(in srgb, var(--c, var(--accent)) 58%, #000) 100%);
+  border: 1px solid rgba(255,255,255,.16);
+  box-shadow:
+    0 1.5px 0 rgba(255,255,255,.32) inset,
+    0 -26px 40px -26px rgba(0,0,0,.5) inset,
+    0 24px 44px -14px color-mix(in srgb, var(--c, var(--accent)) 58%, transparent),
+    0 8px 18px -8px rgba(20,32,27,.32);
+  cursor: pointer; transition: transform .14s ease, box-shadow .14s ease; }
+.hero-wk:active { transform: translateY(1px) scale(.994); box-shadow: 0 1.5px 0 rgba(255,255,255,.28) inset, 0 -22px 34px -24px rgba(0,0,0,.5) inset, 0 12px 26px -12px color-mix(in srgb, var(--c, var(--accent)) 55%, transparent); }
 .hero-wk.rest { background: linear-gradient(145deg, var(--surface) 0%, var(--surface-2) 100%); color: var(--ink); border: 1px solid var(--line); box-shadow: var(--shadow); cursor: default; }
 .hw-eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .85; }
 .hero-wk.rest .hw-eyebrow { color: var(--ink-faint); opacity: 1; }
@@ -217,8 +227,12 @@ h2.sec:first-child { margin-top: 4px; }
 .hw-also { font-size: 12.5px; opacity: .9; margin-top: 10px; }
 .hw-go { font-size: 12.5px; font-weight: 650; opacity: .95; margin-top: 14px; display: flex; align-items: center; gap: 4px; }
 .hw-go span { font-size: 16px; }
-.hw-glow { position: absolute; right: -40px; top: -40px; width: 150px; height: 150px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.22), transparent 70%); pointer-events: none; }
-.start-btn { margin-top: 14px; }
+.hw-glow { position: absolute; right: -46px; top: -46px; width: 170px; height: 170px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.26), transparent 68%); pointer-events: none; }
+/* Start session — premium CTA with a pulsing outline */
+.start-btn { position: relative; margin-top: 16px; z-index: 0; }
+.start-btn::after { content: ""; position: absolute; inset: 0; border-radius: 14px; pointer-events: none; z-index: -1; animation: ctaPulse 2.2s cubic-bezier(.3,.7,.4,1) infinite; }
+@keyframes ctaPulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); } 70% { box-shadow: 0 0 0 13px color-mix(in srgb, var(--accent) 0%, transparent); } 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .start-btn::after { animation: none; } }
 /* Today's two summary squares */
 .tsq-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
 .tsq { position: relative; text-align: left; background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%); border: 1px solid var(--line); border-radius: 18px; padding: 15px 15px 16px; cursor: pointer; font: inherit; color: inherit; box-shadow: var(--shadow); transition: transform .12s ease, box-shadow .12s ease; }

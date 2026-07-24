@@ -34,15 +34,20 @@ export type FitnessProfile = {
   summary: string;
 };
 
+/** The athlete's fastest effort by average velocity — the best basis for short-duration projections. */
+function fastestEffort(input: FitnessInput): Effort {
+  return input.efforts.reduce((best, e) =>
+    e.distanceMeters / e.timeSeconds > best.distanceMeters / best.timeSeconds ? e : best,
+  );
+}
+
 /**
  * Velocity (m/s) sustainable for ~6 min — a practical proxy for velocity at VO₂max. Derived by
  * Riegel-projecting the athlete's *fastest* effort to a 6-minute effort. We deliberately do NOT
  * extrapolate the critical-speed line down to 6 min: with closely-spaced efforts that overshoots.
  */
 function vAtVo2max(input: FitnessInput): number {
-  const fastest = input.efforts.reduce((best, e) =>
-    e.distanceMeters / e.timeSeconds > best.distanceMeters / best.timeSeconds ? e : best,
-  );
+  const fastest = fastestEffort(input);
   return solveDistanceForTime(fastest.distanceMeters, fastest.timeSeconds, 360) / 360;
 }
 
@@ -88,38 +93,28 @@ export function buildFitnessProfile(input: FitnessInput): FitnessProfile {
     limitations: "Field/smartwatch VO₂max is less valid in highly trained runners — read the range, not the midpoint.",
   };
 
-  // --- Threshold / critical speed ---
-  let thresholdSpeed: Estimate;
-  if (haveModel) {
-    const pace = model!.csPaceSecPerKm;
-    thresholdSpeed = {
-      metric: "Threshold / critical speed",
-      value: pace,
-      low: Math.round(pace * 0.98),
-      high: Math.round(pace * 1.02),
-      unit: "s/km",
-      confidence: model!.confidence,
-      method: `Critical-speed model from ${model!.nEfforts} efforts (R²=${model!.rSquared})`,
-      evidence: "Slope of distance vs time across your efforts.",
-      limitations: model!.limitations ?? "CS sits near, but not exactly at, your lactate/ventilatory threshold.",
-    };
-  } else {
-    // Single-effort proxy: pace sustainable for a ~40-minute effort, via Riegel — a rough threshold stand-in.
-    const e = input.efforts[0]!;
-    const d40 = solveDistanceForTime(e.distanceMeters, e.timeSeconds, 2400);
-    const paceThresh = Math.round(2400 / (d40 / 1000));
-    thresholdSpeed = {
-      metric: "Threshold / critical speed",
-      value: paceThresh,
-      low: Math.round(paceThresh * 0.97),
-      high: Math.round(paceThresh * 1.03),
-      unit: "s/km",
-      confidence: "low",
-      method: "Riegel projection from a single effort (no critical-speed model yet)",
-      evidence: "One recent effort.",
-      limitations: "Add a second effort of a different duration to compute true critical speed.",
-    };
-  }
+  // --- Threshold / "strong steady pace" ---
+  // Pace sustainable for ~60 min (a practical threshold proxy), Riegel-projected from the fastest
+  // effort. We deliberately do NOT use the critical-speed slope for this headline pace: with two
+  // long efforts it underestimates and produces a pace slower than the runner's 10k, which is wrong.
+  // The critical-speed model is still computed and surfaced as science detail.
+  const fastest = fastestEffort(input);
+  const d60 = solveDistanceForTime(fastest.distanceMeters, fastest.timeSeconds, 3600);
+  const paceThresh = Math.round(3600 / (d60 / 1000));
+  const threshConf = input.efforts.length >= 2 ? "moderate" : "low";
+  const thresholdSpeed: Estimate = {
+    metric: "Threshold / critical speed",
+    value: paceThresh,
+    low: Math.round(paceThresh * 0.98),
+    high: Math.round(paceThresh * 1.02),
+    unit: "s/km",
+    confidence: threshConf,
+    method: haveModel
+      ? `Pace sustainable ~60 min (Riegel), alongside a ${model!.nEfforts}-effort critical-speed model`
+      : "Pace sustainable ~60 min (Riegel projection)",
+    evidence: "Your recent efforts.",
+    limitations: "A practical threshold estimate; your true threshold shifts with training and conditions.",
+  };
 
   // --- Speed reserve (anaerobic speed reserve) ---
   let speedReserve: Estimate;

@@ -103,6 +103,19 @@ export type WorkoutStep = {
   repeatCount?: number;
 };
 
+/** A single strength exercise with its prescription — enables per-exercise, per-set logging. */
+export type StrengthExercise = {
+  name: string;
+  primary: string;
+  secondary: string[];
+  sets: number;
+  /** Reps or hold, e.g. "3–6", "8–12", "30–45s". */
+  reps: string;
+  /** Movement family the UI uses to pick a demonstration animation. */
+  pattern: string;
+  cue: string;
+};
+
 export type Session = {
   id: string;
   /** 0 = Monday … 6 = Sunday. */
@@ -116,6 +129,8 @@ export type Session = {
   steps: WorkoutStep[];
   targetRpe?: RpeBand;
   optional?: boolean;
+  /** Present on strength sessions: the exercises to perform, for a full breakdown and logging. */
+  exercises?: StrengthExercise[];
   source: "generated" | "manual";
 };
 

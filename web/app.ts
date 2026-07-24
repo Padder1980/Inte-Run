@@ -145,6 +145,31 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .sd-day:disabled { cursor: default; }
 .sd-move-n { font-size: 11.5px; color: var(--ink-faint); margin-top: 8px; }
 .tap { cursor: pointer; } .sess.tap:active, .wk-card.tap:active { opacity: .65; }
+/* Strength exercise breakdown */
+.ex-list { margin-top: 8px; }
+.ex-list > :not(:first-child).ex { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 16px; }
+.ex { display: flex; gap: 14px; align-items: center; }
+.ex-anim { width: 92px; height: 100px; flex: none; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.exfig { width: 100%; height: 100%; display: block; }
+.exfig line, .exfig circle { stroke: var(--accent); stroke-width: 4.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.exfig circle { fill: var(--accent); stroke: none; }
+.exfig .grd { stroke: var(--line); stroke-width: 2.5; }
+.exfig .p0 { animation: exposeA 1.9s ease-in-out infinite; }
+.exfig .p1 { animation: exposeB 1.9s ease-in-out infinite; }
+@keyframes exposeA { 0% { opacity: 1; } 45% { opacity: 0; } 55% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes exposeB { 0% { opacity: 0; } 45% { opacity: 1; } 55% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .exfig .p0, .exfig .p1 { animation: none; } .exfig .p1 { opacity: .4; } }
+.ex-main { flex: 1; min-width: 0; }
+.ex-name { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+.ex-mus { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; } .ex-mus b { color: var(--ink); font-weight: 650; } .ex-sec { color: var(--ink-faint); }
+.ex-presc { display: inline-block; font-family: var(--mono); font-size: 12px; color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--line)); border-radius: 7px; padding: 2px 8px; margin-top: 8px; }
+.ex-cue { font-size: 12.5px; line-height: 1.5; color: var(--ink-soft); margin-top: 10px; }
+.ex-log { display: flex; flex-direction: column; gap: 7px; margin-top: 12px; }
+.ex-set { display: grid; grid-template-columns: 54px 1fr 14px 1fr; gap: 8px; align-items: center; }
+.setn { font-size: 12px; font-weight: 650; color: var(--ink-faint); }
+.ex-x { text-align: center; color: var(--ink-faint); font-size: 13px; }
+.set-in { font: inherit; font-size: 14px; text-align: center; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 9px; padding: 8px 6px; width: 100%; }
+.set-in:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
 
 .view { flex: 1; overflow-y: auto; padding: 16px 16px 96px; }
 .eyebrow { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); font-weight: 600; }
@@ -719,6 +744,82 @@ function structureRows(steps) {
   }
   return rows;
 }
+// ---- Exercise demo animations (original, CSS cross-fade between two poses) --
+function figSeg(a, b) { return '<line x1="' + a[0] + '" y1="' + a[1] + '" x2="' + b[0] + '" y2="' + b[1] + '"/>'; }
+function fig(j) {
+  const neck = [j.head[0], j.head[1] + 7];
+  let s = '<circle cx="' + j.head[0] + '" cy="' + j.head[1] + '" r="7"/>';
+  s += figSeg(neck, j.hip) + figSeg(j.hip, j.knee) + figSeg(j.knee, j.ankle) + figSeg(neck, j.el) + figSeg(j.el, j.ha);
+  if (j.knee2) s += figSeg(j.hip, j.knee2) + figSeg(j.knee2, j.ankle2);
+  if (j.el2) s += figSeg(neck, j.el2) + figSeg(j.el2, j.ha2);
+  return s;
+}
+const _S = { head: [60, 26], hip: [60, 80], knee: [60, 102], ankle: [60, 124], el: [49, 56], ha: [46, 76] };
+const POSES = {
+  squat: [_S, { head: [60, 40], hip: [48, 88], knee: [74, 104], ankle: [60, 124], el: [74, 64], ha: [86, 66] }],
+  hinge: [_S, { head: [98, 58], hip: [62, 76], knee: [62, 101], ankle: [64, 124], el: [94, 74], ha: [94, 96] }],
+  lunge: [
+    { head: [60, 26], hip: [60, 80], knee: [60, 102], ankle: [60, 124], el: [49, 56], ha: [46, 76], knee2: [60, 102], ankle2: [60, 124] },
+    { head: [58, 44], hip: [58, 86], knee: [80, 106], ankle: [90, 124], el: [49, 72], ha: [45, 88], knee2: [42, 110], ankle2: [26, 122] },
+  ],
+  calf: [_S, { head: [60, 18], hip: [60, 72], knee: [60, 94], ankle: [60, 116], el: [49, 48], ha: [46, 68] }],
+  push: [
+    { head: [28, 64], hip: [74, 82], knee: [96, 88], ankle: [112, 92], el: [32, 92], ha: [32, 106] },
+    { head: [28, 76], hip: [74, 90], knee: [96, 94], ankle: [112, 96], el: [24, 94], ha: [32, 106] },
+  ],
+  plank: [
+    { head: [28, 64], hip: [74, 82], knee: [96, 88], ankle: [112, 92], el: [32, 92], ha: [32, 106] },
+    { head: [28, 66], hip: [74, 84], knee: [96, 90], ankle: [112, 94], el: [32, 93], ha: [32, 107] },
+  ],
+  jump: [
+    { head: [60, 44], hip: [52, 86], knee: [74, 104], ankle: [60, 124], el: [70, 64], ha: [80, 58] },
+    { head: [60, 16], hip: [60, 58], knee: [58, 78], ankle: [60, 98], el: [48, 32], ha: [42, 20] },
+  ],
+  balance: [
+    { head: [60, 26], hip: [60, 80], knee: [60, 102], ankle: [60, 124], el: [47, 54], ha: [41, 68], knee2: [76, 94], ankle2: [86, 108] },
+    { head: [62, 26], hip: [62, 80], knee: [62, 102], ankle: [62, 124], el: [51, 54], ha: [47, 68], knee2: [80, 96], ankle2: [92, 110] },
+  ],
+  bridge: [
+    { head: [26, 104], hip: [72, 104], knee: [92, 94], ankle: [100, 112], el: [30, 110], ha: [40, 112] },
+    { head: [26, 104], hip: [72, 86], knee: [92, 94], ankle: [100, 112], el: [30, 110], ha: [40, 112] },
+  ],
+  core: [
+    { head: [34, 72], hip: [82, 76], knee: [96, 98], ankle: [108, 100], el: [38, 92], ha: [38, 104] },
+    { head: [32, 66], hip: [82, 74], knee: [98, 60], ankle: [114, 52], el: [24, 58], ha: [10, 50] },
+  ],
+};
+function exAnim(pattern) {
+  const p = POSES[pattern] || POSES.squat;
+  return '<svg class="exfig" viewBox="0 0 120 132" aria-hidden="true"><line class="grd" x1="12" y1="125" x2="108" y2="125"/><g class="p0">' + fig(p[0]) + '</g><g class="p1">' + fig(p[1]) + '</g></svg>';
+}
+// ---- Strength logging (weights & reps, saved locally) ----------------------
+function loadSlog() { try { return JSON.parse(localStorage.getItem("interun_slog") || "{}"); } catch (e) { return {}; } }
+function slogSet(key, field, val) {
+  const s = loadSlog();
+  s[key] = s[key] || {};
+  if (val === "") delete s[key][field]; else s[key][field] = val;
+  if (!Object.keys(s[key]).length) delete s[key];
+  localStorage.setItem("interun_slog", JSON.stringify(s));
+}
+function exerciseBlock(sessId, ei, e) {
+  const log = loadSlog();
+  const setRows = [];
+  for (let i = 0; i < e.sets; i++) {
+    const key = sessId + "|" + ei + "|" + i;
+    const rec = log[key] || {};
+    setRows.push('<div class="ex-set"><span class="setn">Set ' + (i + 1) + '</span>' +
+      '<input class="set-in" inputmode="decimal" placeholder="kg" data-slog="' + key + '" data-f="w" value="' + (rec.w || "") + '">' +
+      '<span class="ex-x">×</span>' +
+      '<input class="set-in" inputmode="numeric" placeholder="reps" data-slog="' + key + '" data-f="r" value="' + (rec.r || "") + '"></div>');
+  }
+  const sec = e.secondary && e.secondary.length ? ' <span class="ex-sec">· ' + e.secondary.map(esc).join(", ") + '</span>' : "";
+  return '<div class="ex"><div class="ex-anim">' + exAnim(e.pattern) + '</div>' +
+    '<div class="ex-main"><div class="ex-name">' + esc(e.name) + '</div>' +
+    '<div class="ex-mus"><b>' + esc(e.primary) + '</b>' + sec + '</div>' +
+    '<div class="ex-presc">' + e.sets + ' × ' + esc(e.reps) + '</div></div></div>' +
+    '<div class="ex-cue">' + esc(e.cue) + '</div>' +
+    '<div class="ex-log">' + setRows.join("") + '</div>';
+}
 let SHEET_CTX = null;
 function sessionSheetHtml(sess, week) {
   const sc = "var(--eff-" + effortOf(sess) + ")";
@@ -726,8 +827,14 @@ function sessionSheetHtml(sess, week) {
   const dist = sess.estimatedDistanceMeters ? (Math.round(sess.estimatedDistanceMeters / 100) / 10) + " km" : null;
   const chips = ['<span class="chip">' + dur + "′" + (dist ? " · " + dist : "") + "</span>"];
   if (sess.targetRpe) chips.push('<span class="chip rpe">RPE ' + sess.targetRpe.min + "–" + sess.targetRpe.max + "</span>");
-  const rows = structureRows(sess.steps).map((r) =>
-    '<div class="sd-step"><div class="sd-dot" style="background:' + (r.muted ? "var(--ink-faint)" : sc) + '"></div><div><div class="sd-tag">' + r.tag + '</div><div class="sd-lab">' + r.lab + '</div>' + (r.chips ? '<div class="sd-meta">' + r.chips + '</div>' : "") + (r.rec ? '<div class="sd-rec">' + r.rec + '</div>' : "") + '</div></div>').join("");
+  let body;
+  if (sess.exercises && sess.exercises.length) {
+    body = '<div class="ex-list">' + sess.exercises.map((e, ei) => exerciseBlock(sess.id, ei, e)).join("") + '</div>';
+  } else {
+    const rows = structureRows(sess.steps).map((r) =>
+      '<div class="sd-step"><div class="sd-dot" style="background:' + (r.muted ? "var(--ink-faint)" : sc) + '"></div><div><div class="sd-tag">' + r.tag + '</div><div class="sd-lab">' + r.lab + '</div>' + (r.chips ? '<div class="sd-meta">' + r.chips + '</div>' : "") + (r.rec ? '<div class="sd-rec">' + r.rec + '</div>' : "") + '</div></div>').join("");
+    body = rows ? '<div class="sd-steps">' + rows + '</div>' : "";
+  }
   // Reschedule row — pick any day; a run already there swaps with this one.
   const cur = effDay(sess);
   const dayPicker = DAY_ORDER.map((dn, i) => '<button class="sd-day' + (i === cur ? " on" : "") + '" data-moveto="' + i + '"' + (i === cur ? " disabled" : "") + '>' + dn + '</button>').join("");
@@ -737,7 +844,7 @@ function sessionSheetHtml(sess, week) {
     '<div class="sd-title">' + esc(sess.title) + '</div>' +
     '<div class="sd-chips">' + chips.join("") + '</div>' +
     '<div class="sd-desc">' + esc(sess.description) + '</div>' +
-    (rows ? '<div class="sd-steps">' + rows + '</div>' : "") +
+    body +
     moveBlock;
 }
 function ensureSheet() {
@@ -754,6 +861,7 @@ function wireSheet() {
     closeSheet();
     render();
   });
+  document.querySelectorAll("#sheetBody [data-slog]").forEach((inp) => inp.oninput = () => slogSet(inp.dataset.slog, inp.dataset.f, inp.value.trim()));
 }
 function openSessionSheet(sess, week) {
   if (!sess) return;

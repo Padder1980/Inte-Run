@@ -13,6 +13,7 @@ import type {
   RpeBand,
   Session,
   SessionType,
+  StrengthExercise,
   TrainingPaces,
   WorkoutStep,
 } from "../domain/types.ts";
@@ -546,70 +547,83 @@ export function raceSpecificSession(paces: TrainingPaces): SessionContent {
 
 // ---- Strength / mobility / cross-training / rest --------------------------
 
-// General, beginner-friendly strength & mobility — bodyweight, no gym or heavy load required. Themed
-// variants rotate so it never feels like the same routine twice.
-const STRENGTH_THEMES: { title: string; ex: string[] }[] = [
-  { title: "Strength & mobility · legs", ex: ["Bodyweight squats or sit-to-stands", "Reverse lunges (hold a wall)", "Glute bridges", "Calf raises — both legs, then single"] },
-  { title: "Strength & mobility · core & balance", ex: ["Front plank + side planks", "Dead bugs", "Single-leg balance holds", "Bird-dogs"] },
-  { title: "Strength & mobility · activation", ex: ["Glute-bridge marches", "Clamshells", "Standing calf/ankle raises", "Hip airplanes (hold support)"] },
-  { title: "Strength & mobility · full body", ex: ["Squats", "Step-ups onto a low step", "Push-ups (incline is fine)", "Glute bridges", "Plank"] },
+// Exercise catalog: name, target muscles, movement pattern (for the demo animation) and a form cue.
+type ExDef = { name: string; primary: string; secondary: string[]; pattern: string; cue: string };
+const EX: Record<string, ExDef> = {
+  squat: { name: "Goblet / bodyweight squat", primary: "Quads", secondary: ["Glutes", "Core"], pattern: "squat", cue: "Sit your hips back and down, knees tracking over your toes, chest tall. Drive up through your heels." },
+  stepUp: { name: "Step-up", primary: "Quads", secondary: ["Glutes"], pattern: "squat", cue: "Drive through the top foot to stand tall, then lower with control. Start with a low step." },
+  splitSquat: { name: "Split squat", primary: "Quads", secondary: ["Glutes"], pattern: "lunge", cue: "Feet split front-to-back. Lower straight down, front knee over the foot; push back up." },
+  lunge: { name: "Reverse lunge", primary: "Quads", secondary: ["Glutes", "Core"], pattern: "lunge", cue: "Step back and lower the back knee toward the floor; push through the front heel to return." },
+  rdl: { name: "Romanian deadlift", primary: "Hamstrings", secondary: ["Glutes", "Lower back"], pattern: "hinge", cue: "Soft knees, push your hips back with a flat back until you feel the hamstrings, then stand tall." },
+  gluteBridge: { name: "Glute bridge", primary: "Glutes", secondary: ["Hamstrings"], pattern: "bridge", cue: "Drive your hips up by squeezing your glutes, pause at the top, lower slowly." },
+  clamshell: { name: "Clamshell", primary: "Glutes", secondary: ["Hips"], pattern: "bridge", cue: "On your side, knees bent, lift the top knee while keeping your feet together and hips still." },
+  calf: { name: "Calf raise", primary: "Calves", secondary: [], pattern: "calf", cue: "Rise onto the balls of your feet, pause at the top, lower slowly under control." },
+  soleus: { name: "Bent-knee calf raise", primary: "Soleus", secondary: ["Calves"], pattern: "calf", cue: "Same as a calf raise but with knees slightly bent, to reach the deeper soleus muscle." },
+  plank: { name: "Plank + side plank", primary: "Core", secondary: ["Shoulders"], pattern: "plank", cue: "Straight line from head to heels. Brace your abs and glutes; don't let the hips sag." },
+  deadbug: { name: "Dead bug", primary: "Core", secondary: [], pattern: "core", cue: "On your back, slowly lower an opposite arm and leg while keeping your lower back pressed down." },
+  birddog: { name: "Bird-dog", primary: "Core", secondary: ["Glutes"], pattern: "core", cue: "On hands and knees, extend an opposite arm and leg, stay level, then switch sides." },
+  balance: { name: "Single-leg balance", primary: "Ankles", secondary: ["Core"], pattern: "balance", cue: "Stand tall on one leg and stay steady. Progress by closing your eyes or standing on something soft." },
+  pushup: { name: "Push-up (incline if needed)", primary: "Chest", secondary: ["Triceps", "Core"], pattern: "push", cue: "Hands under shoulders, body in a straight line. Lower with control, then press away." },
+  pogo: { name: "Pogo hops", primary: "Calves", secondary: [], pattern: "jump", cue: "Small, springy hops off the balls of your feet — stiff ankles, minimal time on the ground." },
+  boxjump: { name: "Box / hurdle jump", primary: "Quads", secondary: ["Glutes", "Calves"], pattern: "jump", cue: "Explode up, land soft and quiet with bent knees. Full recovery between jumps — quality over fatigue." },
+};
+
+function mkEx(key: string, sets: number, reps: string): StrengthExercise {
+  const d = EX[key]!;
+  return { name: d.name, primary: d.primary, secondary: d.secondary, pattern: d.pattern, cue: d.cue, sets, reps };
+}
+
+const STRENGTH_THEMES: { title: string; keys: string[] }[] = [
+  { title: "Strength & mobility · legs", keys: ["squat", "lunge", "gluteBridge", "calf"] },
+  { title: "Strength & mobility · core & balance", keys: ["plank", "deadbug", "balance", "birddog"] },
+  { title: "Strength & mobility · activation", keys: ["gluteBridge", "clamshell", "calf", "balance"] },
+  { title: "Strength & mobility · full body", keys: ["squat", "stepUp", "pushup", "gluteBridge", "plank"] },
 ];
+// Beginner rep prescriptions (default 8–12 reps at 2 easy sets).
+const BEGINNER_REPS: Record<string, string> = { plank: "20–40s hold", balance: "30s each leg", deadbug: "8 each side", birddog: "8 each side", clamshell: "12 each side", calf: "12–15", gluteBridge: "10–12" };
 
 export function generalStrengthSession(theme = 0): SessionContent {
   const t = STRENGTH_THEMES[theme % STRENGTH_THEMES.length]!;
-  return assemble(
+  const exercises = t.keys.map((k) => mkEx(k, 2, BEGINNER_REPS[k] ?? "8–12"));
+  const content = assemble(
     "strength",
     `${t.title} (20′)`,
-    `A gentle, no-equipment routine to build the strength that protects you from injury: ${t.ex.join("; ")}. 1–2 easy sets each, stop well before failure. This is support work, not a workout to survive.`,
+    "A gentle, no-equipment routine to build the strength that protects you from injury. 1–2 easy sets each, stopping well before failure — this is support work, not a workout to survive. Tap an exercise below for how to do it.",
     "none",
     [{ kind: "steady", label: "Bodyweight strength & mobility", durationSeconds: 20 * 60, targetRpe: { min: 2, max: 4 } }],
   );
+  return { ...content, exercises };
 }
 
 export function strengthSession(phase: Phase, maintenance: boolean): SessionContent {
   const heavy = !maintenance && (phase === "build" || phase === "peak");
-  const setsReps = maintenance
-    ? "1–2 sets × 4–6 reps (maintenance)"
-    : heavy
-      ? "2–4 sets × 3–6 reps, heavy but controlled (~80%+ 1RM)"
-      : "2–3 sets × 6–8 reps, technique focus";
+  const sets = maintenance ? 2 : heavy ? 3 : 2;
+  const reps = maintenance ? "4–6" : heavy ? "3–6 (heavy)" : "6–8";
   const exercises = [
-    "Squat / trap-bar deadlift / leg press",
-    "Split squat or rear-foot-elevated split squat",
-    "Romanian deadlift (hip hinge)",
-    "Straight-knee calf raise",
-    "Bent-knee (soleus) calf raise",
-    "Step-ups / single-leg work",
-    "Trunk anti-rotation / anti-extension",
+    mkEx("squat", sets, reps),
+    mkEx("splitSquat", sets, reps),
+    mkEx("rdl", sets, reps),
+    mkEx("calf", sets, "8–12"),
+    mkEx("soleus", sets, "8–12"),
+    mkEx("stepUp", sets, reps),
+    mkEx("plank", Math.max(1, sets - 1), "30–45s hold"),
   ];
-  // Plyometric/power work is added only in build and peak — the brief limits plyometrics to once
-  // faster running is tolerated without a delayed reaction, which is the build/peak stimulus. Base
-  // keeps a technique focus and maintenance stays low-volume near the race.
-  const plyometrics = heavy
-    ? [
-        "Pogo hops / ankle stiffness bounces (2–3 × 8–10, low volume)",
-        "Box or hurdle jumps, full recovery (2–3 × 3–5, quality over fatigue)",
-      ]
-    : [];
-  const allExercises = [...exercises, ...plyometrics];
-  const plyoNote = heavy
-    ? " Finish with low-volume plyometrics for reactive strength; stop if a session leaves a delayed reaction."
-    : "";
+  // Plyometrics only in build/peak — added once faster running is tolerated without a delayed reaction.
+  if (heavy) { exercises.push(mkEx("pogo", 2, "8–10"), mkEx("boxjump", 2, "3–5")); }
   const minutes = maintenance ? 30 : 45;
-  return assemble(
+  const desc = maintenance
+    ? "Maintenance strength near your race — keep the movements, drop the volume. Tap an exercise for how to do it and to log your weights."
+    : heavy
+      ? "Heavy but controlled (~80%+ 1RM), low reps — the best-evidenced way to build economy and durability. Keep total volume low; running already supplies fatigue. Tap an exercise for how to do it and to log your weights."
+      : "Technique-focused strength to build a base. Moderate load, clean form. Tap an exercise for how to do it and to log your weights.";
+  const content = assemble(
     "strength",
-    maintenance ? "Strength (maintenance)" : "Strength (heavy)",
-    `${setsReps}. ${allExercises.join("; ")}. Keep total volume low — running already supplies fatigue.${plyoNote}`,
+    maintenance ? "Strength (maintenance)" : heavy ? "Strength (heavy)" : "Strength (technique)",
+    desc,
     "none",
-    [
-      {
-        kind: "steady",
-        label: "Runner-focused resistance session",
-        durationSeconds: minutes * 60,
-        targetRpe: RPE.threshold,
-      },
-    ],
+    [{ kind: "steady", label: "Runner-focused resistance session", durationSeconds: minutes * 60, targetRpe: RPE.threshold }],
   );
+  return { ...content, exercises };
 }
 
 const MOBILITY_THEMES: { title: string; d: string }[] = [

@@ -55,6 +55,11 @@ export {
   type FitnessProfile,
   buildFitnessProfile,
 } from "./science/fitness-profile.ts";
+export {
+  computeMas,
+  type MasResult,
+  type MasZone,
+} from "./science/mas.ts";
 
 // Planning
 export { assessFeasibility } from "./plan/feasibility.ts";

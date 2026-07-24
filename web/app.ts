@@ -210,6 +210,21 @@ select.sel { font: inherit; font-size: 13.5px; color: var(--ink); background: va
 .wx-seg { margin-top: 10px; }
 .wx-seg button { font-size: 12px; padding: 5px 10px; }
 
+/* MAS */
+.mas-hint { font-size: 12px; color: var(--ink-soft); margin-top: 6px; }
+.mas-hint b { color: var(--accent); }
+.mas-head { display: flex; align-items: baseline; gap: 12px; }
+.mas-big { font-size: 30px; font-weight: 750; letter-spacing: -.02em; color: var(--accent); }
+.mas-big small { font-size: 14px; color: var(--ink-faint); font-weight: 500; }
+.mas-zones { display: grid; gap: 10px; margin-top: 14px; }
+.mas-zone { border-left: 3px solid var(--accent); background: var(--surface-2); border-radius: 0 10px 10px 0; padding: 10px 13px; }
+.mz-top { display: flex; align-items: baseline; justify-content: space-between; }
+.mz-lab { font-size: 13.5px; font-weight: 650; }
+.mz-pct { font-size: 12.5px; color: var(--accent); font-weight: 700; }
+.mz-pace { font-size: 15px; font-weight: 650; margin-top: 3px; }
+.mz-wr { font-size: 12px; color: var(--ink-faint); font-weight: 400; font-family: var(--sans); }
+.mz-why { font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
+
 /* Setup banner */
 .setup-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; background: color-mix(in srgb, var(--accent) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); border-radius: 14px; padding: 13px 15px; margin-bottom: 14px; cursor: pointer; font: inherit; color: var(--ink); }
 .setup-banner b { font-size: 13.5px; } .setup-banner .sb-sub { font-size: 12px; color: var(--ink-soft); margin-top: 2px; } .setup-banner span { color: var(--accent); font-weight: 600; font-size: 13px; white-space: nowrap; }
@@ -309,7 +324,7 @@ function futureIso(days) { const d = new Date(); d.setDate(d.getDate() + days); 
 function fmtTimeFull(s) { s = Math.round(s); const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), x = s%60; const p = (n) => String(n).padStart(2,"0"); return h>0 ? h+":"+p(m)+":"+p(x) : m+":"+p(x); }
 
 // An example runner to start from — until you make it yours.
-const DEFAULT_PROFILE = { goalDist: "half", targetS: 6300, raceDate: futureIso(245), recentDistM: 5000, recentTimeS: 1500, daysPerWeek: 5, yearsRunning: 3, weeklyVolumeKm: 30, age: 38, sex: "", strength: true, returning: false, personalized: false };
+const DEFAULT_PROFILE = { goalDist: "half", targetS: 6300, raceDate: futureIso(245), recentDistM: 5000, recentTimeS: 1500, twoKmS: 550, daysPerWeek: 5, yearsRunning: 3, weeklyVolumeKm: 30, age: 38, sex: "", strength: true, returning: false, personalized: false };
 
 function loadProfile() { try { const s = localStorage.getItem("rc_profile_v1"); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 function saveProfileStore() { try { localStorage.setItem("rc_profile_v1", JSON.stringify(profile)); } catch (e) {} }
@@ -478,7 +493,24 @@ function viewPerformance() {
   const dRead = d.confidence === "none" ? '<div class="read q">We\\'ll learn this from your long runs</div>' : '<div class="read">Holds pace well</div>';
   return '<div class="card hero-pace"><div class="lab">Your strong, steady pace</div><div class="p num">' + fmtPace(t.value) + ' <small>/km</small></div><div class="s">The pace you can hold for a long, hard effort.</div></div>' +
     '<div class="card dim-card" style="margin-top:10px"><div class="lab">Endurance base</div><div class="plain">How big your aerobic engine is.</div><div class="read" style="--rc:var(--build)">' + words[lvl] + '</div><div class="dmeter">' + meter + '</div></div>' +
-    '<div class="card dim-card" style="margin-top:10px"><div class="lab">Strength when tired</div><div class="plain">How well you hold pace late in long runs.</div>' + dRead + '</div>';
+    '<div class="card dim-card" style="margin-top:10px"><div class="lab">Strength when tired</div><div class="plain">How well you hold pace late in long runs.</div>' + dRead + '</div>' +
+    masCard();
+}
+function masCard() {
+  if (!profile.twoKmS) {
+    return '<h2 class="sec">Maximal Aerobic Speed</h2><div class="card"><div class="plain" style="font-size:13px;color:var(--ink-soft)">Add a <b>2 km max-effort time trial</b> in your profile and we\\'ll work out your MAS — a clean anchor for interval paces.</div></div>';
+  }
+  const m = RC.computeMas(profile.twoKmS);
+  const rows = m.zones.map((z) => {
+    const wr = z.workSeconds ? z.workSeconds + "s / " + z.restSeconds + "s" + (z.repDistanceMeters ? " · ~" + z.repDistanceMeters + " m" : "") : "2–5 min reps";
+    return '<div class="mas-zone"><div class="mz-top"><span class="mz-lab">' + z.label + '</span><span class="mz-pct num">' + z.pct + '%</span></div>' +
+      '<div class="mz-pace num">' + fmtPace(z.paceSecPerKm) + '/km <span class="mz-wr">· ' + wr + '</span></div>' +
+      '<div class="mz-why">' + z.purpose + '</div></div>';
+  }).join("");
+  return '<h2 class="sec">Maximal Aerobic Speed (MAS)</h2>' +
+    '<div class="card"><div class="mas-head"><div><div class="mas-big num">' + m.masMps.toFixed(2) + ' <small>m/s</small></div><div class="plain">from your ' + fmtPace(m.twoKmSeconds) + ' 2 km · pace ' + fmtPace(m.masPaceSecPerKm) + '/km</div></div></div>' +
+    '<div class="mas-zones">' + rows + '</div>' +
+    '<div class="plain" style="font-size:11.5px;color:var(--ink-faint);margin-top:10px">Interval targets as % of MAS — the standard coaching benchmarks.</div></div>';
 }
 
 // ============ COMMUNITY ====================================================
@@ -551,6 +583,7 @@ function viewSetup() {
     '<div class="card" style="margin-top:12px"><div class="subhead" style="margin-top:0">About you</div>' +
     '<div class="q"><label>A recent run — distance</label><select class="sel" id="s_recdist">' + opt(REC_OPTS, p.recentDistM) + '</select></div>' +
     '<div class="q"><label>…in a time of <span style="color:var(--ink-faint);font-weight:400">just type the numbers</span></label><input class="sel num" id="s_rectime" value="' + fmtTimeFull(p.recentTimeS) + '" inputmode="numeric"></div>' +
+    '<div class="q"><label>2 km time-trial <span style="color:var(--ink-faint);font-weight:400">max effort, optional — for MAS</span></label><input class="sel num" id="s_2km" value="' + (p.twoKmS ? fmtTimeFull(p.twoKmS) : "") + '" placeholder="e.g. 9:10" inputmode="numeric"><div class="mas-hint" id="masHint"></div></div>' +
     '<div class="q"><label>Runs per week</label>' + seg("days", [["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]], p.daysPerWeek) + '</div>' +
     '<div class="q"><label>Years running</label>' + seg("years", [["0.5","<1"],["2","1–3"],["5","3–8"],["10","8+"]], p.yearsRunning) + '</div>' +
     '<div class="q"><label>Age</label><input class="sel num" id="s_age" type="number" min="12" max="95" value="' + p.age + '" style="max-width:110px"></div>' +
@@ -576,14 +609,31 @@ function draftFromForm() {
   const raceDate = $("s_date").value;
   if (!raceDate) throw new Error("Pick your race date.");
   if (raceDate <= todayIso()) throw new Error("Your race date needs to be in the future.");
+  // Optional 2 km time trial for MAS. Ignore anything implausible (2 km is ~5–20 min).
+  let twoKmS = 0;
+  const twoKmRaw = $("s_2km").value.trim();
+  if (twoKmRaw) {
+    if (!mmss(twoKmRaw)) throw new Error("Enter your 2 km time as minutes:seconds, e.g. 9:10.");
+    const s = RC.parseDuration(twoKmRaw);
+    if (s >= 5 * 60 && s <= 20 * 60) twoKmS = s;
+  }
   return {
     goalDist: $("s_dist").value, targetS: RC.parseDuration(targetRaw), raceDate,
-    recentDistM, recentTimeS, daysPerWeek: Number(draft.days), yearsRunning: Number(draft.years),
+    recentDistM, recentTimeS, twoKmS, daysPerWeek: Number(draft.days), yearsRunning: Number(draft.years),
     weeklyVolumeKm: profile.weeklyVolumeKm, age: Number($("s_age").value) || 35, sex: $("s_sex").value,
     strength: draft.strength === "1", returning: draft.returning === "1", personalized: true,
   };
 }
 let draft = {};
+function refreshMasHint() {
+  const el = $("masHint"); if (!el) return;
+  const raw = ($("s_2km").value || "").trim();
+  if (!/^\\d{1,2}:[0-5]\\d$/.test(raw)) { el.textContent = ""; return; }
+  const s = RC.parseDuration(raw);
+  if (s < 5 * 60 || s > 20 * 60) { el.textContent = ""; return; }
+  const m = RC.computeMas(s);
+  el.innerHTML = "MAS <b>" + m.masMps.toFixed(2) + " m/s</b> · " + fmtPace(m.masPaceSecPerKm) + "/km — sets your interval paces.";
+}
 function refreshTypePreview() {
   try {
     const cls = RC.classifyRunner({ runsPerWeek: Number(draft.days), yearsRunning: Number(draft.years), sex: $("s_sex") ? ($("s_sex").value || undefined) : undefined });
@@ -712,6 +762,8 @@ function wire() {
   }));
   ["s_age","s_sex"].forEach((id) => { const e = $(id); if (e) e.oninput = e.onchange = refreshTypePreview; });
   bindTimeInput($("s_target")); bindTimeInput($("s_rectime"));
+  const km2 = $("s_2km");
+  if (km2) { bindTimeInput(km2); km2.addEventListener("input", refreshMasHint); refreshMasHint(); }
   const setupBanner = $("setupBanner"); if (setupBanner) setupBanner.onclick = () => { state.screen = "setup"; render(); };
   const wxSeg = document.querySelector("[data-weatherseg]"); if (wxSeg) wxSeg.querySelectorAll("button").forEach((b) => b.onclick = () => { state.weather = b.dataset.weather; render(); });
   const save = $("saveProfile"); if (save) save.onclick = () => {

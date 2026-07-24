@@ -9,7 +9,8 @@
 
 import type { Athlete, FeasibilityAssessment, FeasibilityVerdict, Goal } from "../domain/types.ts";
 import { formatDuration } from "../domain/units.ts";
-import { predictRaceTime } from "../science/paces.ts";
+import { predictRaceTime, riegelPredict } from "../science/paces.ts";
+import { RACE_DISTANCES_M } from "../domain/units.ts";
 import { isoToday, weeksBetween } from "./dates.ts";
 
 /** Ceiling on achievable improvement (fraction) by background, before the time factor is applied. */
@@ -33,7 +34,18 @@ export function assessFeasibility(
   const start = startDateIso ?? goal.startDateIso ?? isoToday();
   const weeksAvailable = Math.max(0, weeksBetween(start, goal.raceDateIso));
 
-  const currentPredicted = predictRaceTime(athlete.recent, goal.distance);
+  // Current-fitness read from the recent effort, plus the 1 km trial when present. A fresh all-out
+  // 1 km is genuine evidence, so we take whichever prediction is faster (best current form). The
+  // recent effort stays in play so a short 1 km can't over-flatter a long-distance goal on its own.
+  const predictedFromRecent = predictRaceTime(athlete.recent, goal.distance);
+  const trialSeconds = athlete.oneKmTrialSeconds && athlete.oneKmTrialSeconds > 0
+    ? athlete.oneKmTrialSeconds
+    : undefined;
+  const predictedFromTrial = trialSeconds
+    ? riegelPredict(1000, trialSeconds, RACE_DISTANCES_M[goal.distance])
+    : undefined;
+  const trialIsStronger = predictedFromTrial !== undefined && predictedFromTrial < predictedFromRecent;
+  const currentPredicted = trialIsStronger ? predictedFromTrial! : predictedFromRecent;
   const goalSeconds = goal.targetTimeSeconds;
   const requiredImprovementPct = ((currentPredicted - goalSeconds) / currentPredicted) * 100;
 
@@ -52,6 +64,13 @@ export function assessFeasibility(
   rationale.push(
     `Current fitness predicts ${formatDuration(currentPredicted)} for the ${goal.distance}; target is ${formatDuration(goalSeconds)}.`,
   );
+  if (predictedFromTrial !== undefined) {
+    rationale.push(
+      trialIsStronger
+        ? `Your 1 km trial projects a faster ${formatDuration(predictedFromTrial)} than your recent effort (${formatDuration(predictedFromRecent)}), so it sets the current-fitness read.`
+        : `Your 1 km trial projects ${formatDuration(predictedFromTrial)}; your recent effort (${formatDuration(predictedFromRecent)}) is the stronger read, so it stands.`,
+    );
+  }
 
   let verdict: FeasibilityVerdict;
   let suggestedTargetSeconds: number | undefined;

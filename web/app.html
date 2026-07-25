@@ -1639,7 +1639,7 @@ function cueSpeech(cue) {
 function startSession() {
   const s = rawToday();
   LIVE = { session: s, rt: new RC.LiveSession(s), mode: null, acquiring: false, gpsErr: null,
-    startMs: 0, pausedMs: 0, pauseStart: 0, vms: 0, dist: 0, hr: 105, paceHint: null,
+    startMs: 0, pausedMs: 0, pauseStart: 0, vms: 0, dist: 0, hr: 105, devSpeed: null, curPace: null, win: [],
     timer: null, ui: null, watchId: null, wakeLock: null, lastLat: null, lastLon: null, acc: null,
     speed: 20, lastStep: -1, quirk: 0, started: false, done: false, completedFull: false, summary: null, kmDone: 0, lastKmMs: 0 };
   state.screen = "live"; render();
@@ -1682,9 +1682,10 @@ function releaseWakeLock() { try { if (LIVE && LIVE.wakeLock) { LIVE.wakeLock.re
 // unavailable or denied (e.g. inside the Claude artifact sandbox), so the demo always works.
 function beginLive() {
   LIVE.started = true;
-  // Speak inside the tap gesture — a short phrase reliably unlocks TTS on iOS for later cues.
-  if (VOICE_AVAILABLE && VOICE_ON) { try { window.speechSynthesis.cancel(); } catch (e) {} }
-  speak("Let's go.");
+  // Speak inside the tap gesture — this unlocks TTS on iOS (which blocks audio until a
+  // user-initiated utterance) so the later async cues can play. Load voices first so the very
+  // first utterance isn't dropped for want of a voice.
+  if (VOICE_AVAILABLE && VOICE_ON) { loadVoices(); speak("Let's go."); }
   render(); // re-render to lock the screen (hide nav + back) now the run is starting
   if (GPS_AVAILABLE) {
     LIVE.acquiring = true; renderLiveNow();
@@ -1711,24 +1712,42 @@ function startSim() {
   startLoop();
   renderLiveNow();
 }
-// A new GPS fix: accumulate real distance (accuracy-gated, with a jitter/teleport filter) and
-// capture the device's own speed as a pace hint. Time and cue advancement happen in gpsUiTick.
+// A new GPS fix: accrue real distance only for genuine movement. GPS at a standstill jitters by a
+// few metres per fix, and haversine is always positive, so without gating that phantom motion piles
+// up. We require the device to report movement (or, when it gives no speed, a step past a noise
+// floor scaled to the fix's own accuracy) before adding distance.
 function onGpsPos(pos) {
   if (!LIVE || LIVE.mode !== "gps") return;
   const c = pos.coords; LIVE.acc = c.accuracy;
-  const good = c.accuracy == null || c.accuracy <= 40;
-  if (good && LIVE.rt.getStatus() === "active" && LIVE.lastLat != null) {
+  const good = c.accuracy == null || c.accuracy <= 35;
+  LIVE.devSpeed = (c.speed != null && isFinite(c.speed) && c.speed >= 0) ? c.speed : null;
+  const movingByDevice = LIVE.devSpeed == null || LIVE.devSpeed > 0.7; // <0.7 m/s ≈ standing
+  if (good && movingByDevice && LIVE.rt.getStatus() === "active" && LIVE.lastLat != null) {
     const d = haversine(LIVE.lastLat, LIVE.lastLon, c.latitude, c.longitude);
-    if (d > 1 && d < 80) LIVE.dist += d;
+    const floor = Math.max(2.5, (c.accuracy || 8) * 0.5);
+    if (d > floor && d < 80) LIVE.dist += d;
   }
   if (good) { LIVE.lastLat = c.latitude; LIVE.lastLon = c.longitude; }
-  LIVE.paceHint = (c.speed != null && c.speed > 0.35) ? 1000 / c.speed : null;
+}
+// Current pace: trust the device's own speed when it's a real running speed; otherwise derive it
+// from distance covered over a trailing ~12s window. When neither shows meaningful movement we
+// report null → the UI shows "—" instead of a frozen or absurd number.
+function currentGpsPace(atMs) {
+  if (LIVE.devSpeed != null && LIVE.devSpeed > 0.7) return 1000 / LIVE.devSpeed;
+  const w0 = LIVE.win[0];
+  if (w0) { const dM = LIVE.dist - w0.d, dS = (atMs - w0.t) / 1000; if (dM > 8 && dS > 2) return dS / (dM / 1000); }
+  return null;
 }
 function gpsUiTick() {
   if (!LIVE || LIVE.mode !== "gps") return;
+  const at = liveElapsedMs();
+  LIVE.win.push({ t: at, d: LIVE.dist });
+  while (LIVE.win.length > 1 && at - LIVE.win[0].t > 12000) LIVE.win.shift();
+  let cur = currentGpsPace(at); if (cur && cur > 1200) cur = null; // slower than 20:00/km ⇒ stopped
+  LIVE.curPace = cur;
   if (LIVE.rt.getStatus() === "active") {
-    const t = { atMs: liveElapsedMs(), distanceMeters: LIVE.dist };
-    if (LIVE.paceHint) t.paceSecPerKm = LIVE.paceHint;
+    const t = { atMs: at, distanceMeters: LIVE.dist };
+    if (cur) t.paceSecPerKm = cur;
     LIVE.rt.update(t).forEach(liveCue);
     checkSplits();
   }
@@ -1792,8 +1811,13 @@ function liveCue(cue) {
 function liveUpdate(snap) {
   $("lElapsed").textContent = fmtPace(snap.elapsedSeconds);
   $("lDist").innerHTML = (snap.distanceMeters / 1000).toFixed(2) + '<small> km</small>';
-  const paceHtml = (p) => p ? fmtPace(p) + '<small> /km</small>' : "—";
-  const pv = $("lPace"); pv.innerHTML = paceHtml(snap.currentPaceSecPerKm); pv.className = "lv num " + (snap.paceStatus || "none");
+  // Hide implausible paces (>20:00/km): those only appear when barely moving and read as nonsense.
+  const clamp = (p) => (p && p > 0 && p <= 1200) ? p : null;
+  const paceHtml = (p) => { const v = clamp(p); return v ? fmtPace(v) + '<small> /km</small>' : "—"; };
+  // On a real GPS run use our movement-aware current pace (falls to "—" when stopped); the simulator
+  // has no such artefacts so its snapshot pace is fine.
+  const cur = clamp(LIVE && LIVE.mode === "gps" ? LIVE.curPace : snap.currentPaceSecPerKm);
+  const pv = $("lPace"); pv.innerHTML = cur ? fmtPace(cur) + '<small> /km</small>' : "—"; pv.className = "lv num " + (cur ? (snap.paceStatus || "none") : "none");
   const av = $("lAvg"); if (av) av.innerHTML = paceHtml(snap.averagePaceSecPerKm);
   const lp = $("lLap"); if (lp) lp.innerHTML = paceHtml(snap.lapPaceSecPerKm);
   const step = snap.step, card = $("lStepCard");
@@ -1968,7 +1992,7 @@ function wire() {
       if (LIVE.mode === "gps") { LIVE.pauseStart = Date.now(); } else { stopLive(); }
       lPause.textContent = "Resume";
     } else if (st === "paused") {
-      if (LIVE.mode === "gps") { LIVE.pausedMs += Date.now() - LIVE.pauseStart; LIVE.pauseStart = 0; LIVE.lastLat = null; LIVE.rt.resume(liveNowMs()).forEach(liveCue); if (!LIVE.ui) LIVE.ui = setInterval(gpsUiTick, 250); }
+      if (LIVE.mode === "gps") { LIVE.pausedMs += Date.now() - LIVE.pauseStart; LIVE.pauseStart = 0; LIVE.lastLat = null; LIVE.win = []; LIVE.devSpeed = null; LIVE.curPace = null; LIVE.rt.resume(liveNowMs()).forEach(liveCue); if (!LIVE.ui) LIVE.ui = setInterval(gpsUiTick, 250); }
       else { LIVE.rt.resume(LIVE.vms).forEach(liveCue); startLoop(); }
       lPause.textContent = "Pause";
     }

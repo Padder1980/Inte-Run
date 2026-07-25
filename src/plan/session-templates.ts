@@ -93,34 +93,68 @@ function cooldown(paces: TrainingPaces, minutes: number): WorkoutStep {
   };
 }
 
+// A softer opening/closing for easy & long runs — same easy pace as the run itself, just a labelled
+// "ease in" and "ease down" so every session shares a warm-up → main → cool-down shape (which also
+// gives the live session and voice coaching a consistent start and finish).
+function easeIn(paces: TrainingPaces, minutes: number): WorkoutStep {
+  return {
+    kind: "warmup",
+    label: "Ease in — start gently and let the pace come to you",
+    durationSeconds: minutes * 60,
+    targetPaceSecPerKm: paces.easy,
+    targetRpe: RPE.easy,
+  };
+}
+function easeDown(paces: TrainingPaces, minutes: number): WorkoutStep {
+  return {
+    kind: "cooldown",
+    label: "Ease down — relax the pace and let your breathing settle",
+    durationSeconds: minutes * 60,
+    targetPaceSecPerKm: paces.easy,
+    targetRpe: RPE.easy,
+  };
+}
+/** Split a continuous run's minutes into ease-in / main / ease-down blocks. Runs under 10′ are left
+ *  as a single block (too short to frame meaningfully). `buildMiddle` fills the main portion. */
+function framedRun(
+  paces: TrainingPaces,
+  totalMin: number,
+  buildMiddle: (midMin: number) => WorkoutStep[],
+): WorkoutStep[] {
+  if (totalMin < 10) return buildMiddle(totalMin);
+  const warm = Math.min(6, Math.max(3, Math.round(totalMin * 0.14)));
+  const cool = Math.min(4, Math.max(2, Math.round(totalMin * 0.1)));
+  return [easeIn(paces, warm), ...buildMiddle(Math.max(1, totalMin - warm - cool)), easeDown(paces, cool)];
+}
+
 export function easyRun(
   paces: TrainingPaces,
   minutes: number,
   withStrides = false,
 ): SessionContent {
-  const steps: WorkoutStep[] = [
+  const strides: WorkoutStep = {
+    kind: "rep",
+    label: "6 × 20s relaxed strides, full recovery",
+    durationSeconds: 6 * 20,
+    targetPaceSecPerKm: paces.rep,
+    targetRpe: RPE.rep,
+    repeatCount: 6,
+  };
+  const steps = framedRun(paces, minutes, (mid) => [
     {
       kind: "steady",
       label: "Conversational easy running (below the first threshold)",
-      durationSeconds: minutes * 60,
+      durationSeconds: mid * 60,
       targetPaceSecPerKm: paces.easy,
       targetRpe: RPE.easy,
     },
-  ];
-  if (withStrides) {
-    steps.push({
-      kind: "rep",
-      label: "6 × 20s relaxed strides, full recovery",
-      durationSeconds: 6 * 20,
-      targetPaceSecPerKm: paces.rep,
-      targetRpe: RPE.rep,
-      repeatCount: 6,
-    });
-  }
+    // Relaxed strides come after the easy portion, before the ease-down jog to finish.
+    ...(withStrides ? [strides] : []),
+  ]);
   return assemble(
     withStrides ? "strides" : "easy",
     withStrides ? `${minutes}′ easy + strides` : `${minutes}′ easy run`,
-    "Foundation aerobic running. Easy means easy — it should feel conversational.",
+    "Foundation aerobic running. Ease in, settle into a conversational rhythm, then ease down to finish.",
     "easy",
     steps,
     RPE.easy,
@@ -237,43 +271,51 @@ export function rwLong(p: TrainingPaces, s: BeginnerSpec): SessionContent {
 // ---- Beginner continuous flavours (for those who can already jog) ----------
 
 export function contPickups(p: TrainingPaces, min: number): SessionContent {
-  const steps: WorkoutStep[] = [
-    { kind: "steady", label: "Easy, conversational running", durationSeconds: min * 60, targetPaceSecPerKm: p.easy, targetRpe: RPE.easy },
-    { kind: "rep", label: "4 × 15″ relaxed pickups (smooth, not a sprint), walk/jog to recover", durationSeconds: 4 * 15, targetPaceSecPerKm: p.steady, targetRpe: { min: 4, max: 5 }, repeatCount: 4 },
-  ];
-  return assemble("easy", `${min}′ easy + gentle pickups`, "Easy running with a few short, relaxed pickups near the end to wake the legs up — smooth and controlled, never a sprint.", "easy", steps, RPE.easy);
+  const pickups: WorkoutStep = { kind: "rep", label: "4 × 15″ relaxed pickups (smooth, not a sprint), walk/jog to recover", durationSeconds: 4 * 15, targetPaceSecPerKm: p.steady, targetRpe: { min: 4, max: 5 }, repeatCount: 4 };
+  const steps = framedRun(p, min, (mid) => [
+    { kind: "steady", label: "Easy, conversational running", durationSeconds: mid * 60, targetPaceSecPerKm: p.easy, targetRpe: RPE.easy },
+    pickups,
+  ]);
+  return assemble("easy", `${min}′ easy + gentle pickups`, "Easy running with a few short, relaxed pickups to wake the legs up — smooth and controlled, never a sprint — then ease down to finish.", "easy", steps, RPE.easy);
 }
 
 export function contProgression(p: TrainingPaces, min: number): SessionContent {
-  const easyMin = Math.max(5, min - 5);
-  const steps: WorkoutStep[] = [
-    { kind: "steady", label: "Easy, conversational", durationSeconds: easyMin * 60, targetPaceSecPerKm: p.easy, targetRpe: RPE.easy },
-    { kind: "steady", label: "Lift to a comfortable steady effort", durationSeconds: 5 * 60, targetPaceSecPerKm: p.steady, targetRpe: RPE.steady },
-  ];
-  return assemble("easy", `${min}′ easy → steady finish`, "Run easy, then lift to a comfortable steady effort for the last 5 minutes. Still controlled — you should be able to talk in short sentences.", "easy", steps, RPE.easy);
+  const steps = framedRun(p, min, (mid) => {
+    const steady = Math.min(5, Math.max(1, mid - 1));
+    const easy = Math.max(1, mid - steady);
+    return [
+      { kind: "steady", label: "Easy, conversational", durationSeconds: easy * 60, targetPaceSecPerKm: p.easy, targetRpe: RPE.easy },
+      { kind: "steady", label: "Lift to a comfortable steady effort", durationSeconds: steady * 60, targetPaceSecPerKm: p.steady, targetRpe: RPE.steady },
+    ];
+  });
+  return assemble("easy", `${min}′ easy → steady finish`, "Ease in, run easy, then lift to a comfortable steady effort before easing down. Still controlled — you should be able to talk in short sentences.", "easy", steps, RPE.easy);
 }
 
 export function contExplore(p: TrainingPaces, min: number): SessionContent {
+  const steps = framedRun(p, min, (mid) => [
+    { kind: "steady", label: "Easy running by feel", durationSeconds: mid * 60, targetPaceSecPerKm: p.easy, targetRpe: RPE.easy },
+  ]);
   return assemble(
     "easy",
     `${min}′ explore run — by feel`,
-    "Run a route you enjoy at an easy, chatty effort. No pace targets — just time on feet and fresh scenery. Walk a little if you need to.",
+    "Run a route you enjoy at an easy, chatty effort. Ease in, explore by feel, then ease down — just time on feet and fresh scenery.",
     "easy",
-    [{ kind: "steady", label: "Easy running by feel", durationSeconds: min * 60, targetPaceSecPerKm: p.easy, targetRpe: RPE.easy }],
+    steps,
     RPE.easy,
   );
 }
 
 // Easy run finished with short, sharp uphill sprints — big neuromuscular benefit, minimal fatigue.
 export function easyHillStrides(paces: TrainingPaces, minutes: number): SessionContent {
-  const steps: WorkoutStep[] = [
-    { kind: "steady", label: "Easy, conversational running", durationSeconds: minutes * 60, targetPaceSecPerKm: paces.easy, targetRpe: RPE.easy },
-    { kind: "rep", label: "6 × 10″ hill sprints — short and powerful, full walk-back recovery", durationSeconds: 6 * 10, targetRpe: { min: 7, max: 8 }, repeatCount: 6 },
-  ];
+  const hills: WorkoutStep = { kind: "rep", label: "6 × 10″ hill sprints — short and powerful, full walk-back recovery", durationSeconds: 6 * 10, targetRpe: { min: 7, max: 8 }, repeatCount: 6 };
+  const steps = framedRun(paces, minutes, (mid) => [
+    { kind: "steady", label: "Easy, conversational running", durationSeconds: mid * 60, targetPaceSecPerKm: paces.easy, targetRpe: RPE.easy },
+    hills,
+  ]);
   return assemble(
     "strides",
     `${minutes}′ easy + hill sprints`,
-    "Easy running plus a handful of short, sharp uphill sprints at the end — big power and economy benefit for very little fatigue. Full recovery between; these are about quality, not burn.",
+    "Easy running plus a handful of short, sharp uphill sprints — big power and economy benefit for very little fatigue — then ease down to finish. Full recovery between; quality, not burn.",
     "easy",
     steps,
     RPE.easy,
@@ -310,17 +352,22 @@ export function longRun(
   minutes: number,
   opts: LongRunOptions = {},
 ): SessionContent {
-  const steps: WorkoutStep[] = [];
-  const easyMin = minutes - (opts.steadyFinishMin ?? 0) - (opts.raceBlockMin ?? 0);
-  steps.push({
-    kind: "steady",
-    label: "Easy aerobic running — build durability",
-    durationSeconds: Math.max(0, easyMin) * 60,
-    targetPaceSecPerKm: paces.easy,
-    targetRpe: RPE.easy,
-  });
+  const finishMin = (opts.steadyFinishMin ?? 0) + (opts.raceBlockMin ?? 0);
+  const warm = Math.min(8, Math.max(4, Math.round(minutes * 0.1)));
+  const cool = Math.min(6, Math.max(3, Math.round(minutes * 0.08)));
+  const mainEasy = Math.max(1, minutes - finishMin - warm - cool);
+  const steps: WorkoutStep[] = [
+    easeIn(paces, warm),
+    {
+      kind: "steady",
+      label: "Easy aerobic running — build durability",
+      durationSeconds: mainEasy * 60,
+      targetPaceSecPerKm: paces.easy,
+      targetRpe: RPE.easy,
+    },
+  ];
   let description =
-    "Long run develops durability: holding economy and mechanics under accumulated fatigue.";
+    "Long run develops durability: holding economy and mechanics under accumulated fatigue. Ease in, hold an easy rhythm, then ease down to finish.";
   if (opts.raceBlockMin && opts.racePace) {
     steps.push({
       kind: "steady",
@@ -341,6 +388,7 @@ export function longRun(
     });
     description += " Finishes steady, not as a race.";
   }
+  steps.push(easeDown(paces, cool));
   return assemble("long", `${minutes}′ long run`, description, "easy", steps, RPE.easy);
 }
 

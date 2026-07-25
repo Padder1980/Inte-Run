@@ -3,13 +3,27 @@
 // identity; the tab structure follows a familiar running-app layout. One engine bundle drives it all,
 // client-side. Regenerate with:  node web/app.ts   (or: npm run web)
 
-import { writeFileSync } from "node:fs";
+import { writeFileSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { bundleEngine } from "./bundle.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const bundleJs = await bundleEngine();
+
+// Exercise demonstration animations (looping WebP, 512×512, teal muscle highlights in the brand
+// family). Read from assets/ and inlined as data URIs so the app stays a single self-contained,
+// offline-capable file. Keyed by slug; the strength UI looks these up via each exercise's `anim`.
+const EX_ANIM_SLUGS = [
+  "goblet-squat", "step-up", "split-squat-dumbbell", "reverse-lunge", "romanian-deadlift-dumbbell",
+  "glute-bridge", "clamshell", "standing-calf-raise", "single-leg-standing-calf-raise", "plank",
+  "dead-bug", "bird-dog", "push-up", "box-jump",
+];
+const animDir = join(here, "..", "assets", "exercise-animations");
+const exAnimData: Record<string, string> = {};
+for (const slug of EX_ANIM_SLUGS) {
+  exAnimData[slug] = "data:image/webp;base64," + readFileSync(join(animDir, slug + ".webp")).toString("base64");
+}
 
 // InteRun brand mark — an original glyph: a teal badge holding a forward-striding runner (head dot +
 // two motion bars leaning into the run). Not derived from any other app's logo.
@@ -194,6 +208,10 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .ex-list > :not(:first-child).ex { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 16px; }
 .ex { display: flex; gap: 14px; align-items: center; }
 .ex-anim { width: 92px; height: 100px; flex: none; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+/* Looping WebP demonstration: the source art is on white, so keep a white backdrop in both themes
+   and contain (never crop) the square asset per the animation pack's guidance. */
+.ex-anim:has(.ex-webp) { background: #fff; }
+.ex-webp { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center; background: #fff; }
 .exfig { width: 100%; height: 100%; display: block; }
 .exfig .limb { stroke: var(--ink-soft); stroke-width: 11; fill: none; stroke-linecap: round; }
 .exfig .torso { stroke: var(--ink-soft); stroke-width: 22; fill: none; stroke-linecap: round; }
@@ -944,6 +962,7 @@ function bindTimeInput(el) {
   el.addEventListener("input", () => { const f = fmtDigitsToTime(el.value); el.value = f; try { el.setSelectionRange(f.length, f.length); } catch (e) {} });
 }
 const BRAND_SVG = ${JSON.stringify(BRAND_MARK)};
+const EX_ANIM = ${JSON.stringify(exAnimData)};
 const ICON = {
   gauge: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19a8 8 0 1 1 16 0"/><path d="M13.4 12.6 18 8"/><circle cx="12" cy="19" r="1.4" fill="currentColor" stroke="none"/></svg>',
   guide: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/><circle cx="12" cy="8" r=".6" fill="currentColor"/></svg>',
@@ -1418,6 +1437,13 @@ function exAnim(pattern) {
   const p = POSES[pattern] || POSES.squat;
   return '<svg class="exfig" viewBox="0 0 120 132" aria-hidden="true"><line class="grd" x1="12" y1="125" x2="108" y2="125"/><g class="p0">' + fig(p[0]) + '</g><g class="p1">' + fig(p[1]) + '</g></svg>';
 }
+// The exercise demonstration: a looping WebP animation when one exists for this exercise, otherwise
+// the schematic two-pose figure. Takes the exercise object so it can read its animation slug.
+function exVisual(e) {
+  const src = e && e.anim && EX_ANIM[e.anim];
+  if (src) return '<img class="ex-webp" src="' + src + '" alt="' + esc(e.name || "") + ' demonstration" loading="lazy" draggable="false">';
+  return exAnim(e && e.pattern);
+}
 // ---- Strength logging (weights & reps, saved locally) ----------------------
 function loadSlog() { try { return JSON.parse(localStorage.getItem("interun_slog") || "{}"); } catch (e) { return {}; } }
 function slogSet(key, field, val) {
@@ -1439,7 +1465,7 @@ function exerciseBlock(sessId, ei, e) {
       '<input class="set-in" inputmode="numeric" placeholder="reps" data-slog="' + key + '" data-f="r" value="' + (rec.r || "") + '"></div>');
   }
   const sec = e.secondary && e.secondary.length ? ' <span class="ex-sec">· ' + e.secondary.map(esc).join(", ") + '</span>' : "";
-  return '<div class="ex"><div class="ex-anim">' + exAnim(e.pattern) + '</div>' +
+  return '<div class="ex"><div class="ex-anim">' + exVisual(e) + '</div>' +
     '<div class="ex-main"><div class="ex-name">' + esc(e.name) + '</div>' +
     '<div class="ex-mus"><b>' + esc(e.primary) + '</b>' + sec + '</div>' +
     '<div class="ex-presc">' + e.sets + ' × ' + esc(e.reps) + '</div></div></div>' +
@@ -1597,7 +1623,7 @@ function strengthHistory() {
     if (!ex) continue;
     const sets = Object.keys(groups[g]).sort((a, b) => a - b).map((i) => groups[g][i]).filter((s) => s.w || s.r);
     if (!sets.length) continue;
-    (byEx[ex.name] = byEx[ex.name] || { name: ex.name, primary: ex.primary, pattern: ex.pattern, instances: [] }).instances.push({ week: wk, sets });
+    (byEx[ex.name] = byEx[ex.name] || { name: ex.name, primary: ex.primary, pattern: ex.pattern, anim: ex.anim, instances: [] }).instances.push({ week: wk, sets });
   }
   for (const n in byEx) byEx[n].instances.sort((a, b) => a.week - b.week);
   return byEx;
@@ -1621,7 +1647,7 @@ function viewStrengthHistory() {
       const sets = ins.sets.map((s) => (s.w || "—") + (s.w ? "kg" : "") + (s.r ? " × " + s.r : "")).join("  ·  ");
       return '<div class="sh-row"><span class="sh-wk">Week ' + ins.week + '</span><span class="sh-sets">' + sets + '</span></div>';
     }).join("");
-    return '<div class="card sh-card"><div class="sh-head"><div class="ex-anim sh-anim">' + exAnim(ex.pattern) + '</div>' +
+    return '<div class="card sh-card"><div class="sh-head"><div class="ex-anim sh-anim">' + exVisual(ex) + '</div>' +
       '<div class="sh-main"><div class="sh-name">' + esc(ex.name) + '</div><div class="sh-mus">' + esc(ex.primary) + '</div>' +
       '<div class="sh-best">Best <b>' + (best ? best + " kg" : "—") + '</b> · ' + ex.instances.length + ' session' + (ex.instances.length > 1 ? "s" : "") + '</div></div>' +
       (tops.some((w) => w > 0) ? '<div class="sh-spark">' + spark + '</div>' : '') + '</div>' +

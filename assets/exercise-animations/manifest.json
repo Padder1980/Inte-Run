@@ -1,0 +1,135 @@
+{
+  "collection": "InteRun Exercise Animations",
+  "version": 2,
+  "canvas": {
+    "width": 512,
+    "height": 512,
+    "background": "#ffffff",
+    "loop": true,
+    "safeInsetPx": 46,
+    "fit": "contain"
+  },
+  "timing": {
+    "loopDurationMs": 3200,
+    "keyFrameDurationMs": 400,
+    "motion": "pingPongWithEndpointHold"
+  },
+  "muscleHighlight": {
+    "primary": "#0e8c7f",
+    "highlight": "#2bb3a3"
+  },
+  "exercises": [
+    {
+      "name": "Goblet Squat",
+      "slug": "goblet-squat",
+      "webp": "webp/goblet-squat.webp",
+      "gif": "gif/goblet-squat.gif",
+      "spriteSheet": "sprite-sheets/goblet-squat.png"
+    },
+    {
+      "name": "Step Up",
+      "slug": "step-up",
+      "webp": "webp/step-up.webp",
+      "gif": "gif/step-up.gif",
+      "spriteSheet": "sprite-sheets/step-up.png"
+    },
+    {
+      "name": "Split Squat (Dumbbell)",
+      "slug": "split-squat-dumbbell",
+      "webp": "webp/split-squat-dumbbell.webp",
+      "gif": "gif/split-squat-dumbbell.gif",
+      "spriteSheet": "sprite-sheets/split-squat-dumbbell.png"
+    },
+    {
+      "name": "Reverse Lunge",
+      "slug": "reverse-lunge",
+      "webp": "webp/reverse-lunge.webp",
+      "gif": "gif/reverse-lunge.gif",
+      "spriteSheet": "sprite-sheets/reverse-lunge.png"
+    },
+    {
+      "name": "Romanian Deadlift (Dumbbell)",
+      "slug": "romanian-deadlift-dumbbell",
+      "webp": "webp/romanian-deadlift-dumbbell.webp",
+      "gif": "gif/romanian-deadlift-dumbbell.gif",
+      "spriteSheet": "sprite-sheets/romanian-deadlift-dumbbell.png"
+    },
+    {
+      "name": "Glute Bridge",
+      "slug": "glute-bridge",
+      "webp": "webp/glute-bridge.webp",
+      "gif": "gif/glute-bridge.gif",
+      "spriteSheet": "sprite-sheets/glute-bridge.png"
+    },
+    {
+      "name": "Clamshell",
+      "slug": "clamshell",
+      "webp": "webp/clamshell.webp",
+      "gif": "gif/clamshell.gif",
+      "spriteSheet": "sprite-sheets/clamshell.png"
+    },
+    {
+      "name": "Standing Calf Raise",
+      "slug": "standing-calf-raise",
+      "webp": "webp/standing-calf-raise.webp",
+      "gif": "gif/standing-calf-raise.gif",
+      "spriteSheet": "sprite-sheets/standing-calf-raise.png"
+    },
+    {
+      "name": "Single Leg Standing Calf Raise",
+      "slug": "single-leg-standing-calf-raise",
+      "webp": "webp/single-leg-standing-calf-raise.webp",
+      "gif": "gif/single-leg-standing-calf-raise.gif",
+      "spriteSheet": "sprite-sheets/single-leg-standing-calf-raise.png"
+    },
+    {
+      "name": "Plank",
+      "slug": "plank",
+      "webp": "webp/plank.webp",
+      "gif": "gif/plank.gif",
+      "spriteSheet": "sprite-sheets/plank.png"
+    },
+    {
+      "name": "Side Plank",
+      "slug": "side-plank",
+      "webp": "webp/side-plank.webp",
+      "gif": "gif/side-plank.gif",
+      "spriteSheet": "sprite-sheets/side-plank.png"
+    },
+    {
+      "name": "Dead Bug",
+      "slug": "dead-bug",
+      "webp": "webp/dead-bug.webp",
+      "gif": "gif/dead-bug.gif",
+      "spriteSheet": "sprite-sheets/dead-bug.png"
+    },
+    {
+      "name": "Bird Dog",
+      "slug": "bird-dog",
+      "webp": "webp/bird-dog.webp",
+      "gif": "gif/bird-dog.gif",
+      "spriteSheet": "sprite-sheets/bird-dog.png"
+    },
+    {
+      "name": "Push Up",
+      "slug": "push-up",
+      "webp": "webp/push-up.webp",
+      "gif": "gif/push-up.gif",
+      "spriteSheet": "sprite-sheets/push-up.png"
+    },
+    {
+      "name": "Incline Push Up",
+      "slug": "incline-push-up",
+      "webp": "webp/incline-push-up.webp",
+      "gif": "gif/incline-push-up.gif",
+      "spriteSheet": "sprite-sheets/incline-push-up.png"
+    },
+    {
+      "name": "Box Jump",
+      "slug": "box-jump",
+      "webp": "webp/box-jump.webp",
+      "gif": "gif/box-jump.gif",
+      "spriteSheet": "sprite-sheets/box-jump.png"
+    }
+  ]
+}

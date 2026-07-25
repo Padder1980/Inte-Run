@@ -114,8 +114,11 @@ export type StrengthExercise = {
   sets: number;
   /** Reps or hold, e.g. "3–6", "8–12", "30–45s". */
   reps: string;
-  /** Movement family the UI uses to pick a demonstration animation. */
+  /** Movement family the UI uses to pick a schematic demonstration figure. */
   pattern: string;
+  /** Slug of a looping demonstration animation (assets/exercise-animations/<slug>.webp),
+   *  inlined into the app at build time. Absent for exercises without a bespoke animation. */
+  anim?: string;
   cue: string;
 };
 

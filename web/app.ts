@@ -1857,7 +1857,7 @@ function startSession() {
     startMs: 0, pausedMs: 0, pauseStart: 0, vms: 0, dist: 0, hr: 105, devSpeed: null, curPace: null, win: [],
     timer: null, ui: null, watchId: null, wakeLock: null, lastLat: null, lastLon: null, acc: null,
     speed: 20, lastStep: -1, quirk: 0, started: false, done: false, completedFull: false, summary: null, kmDone: 0, lastKmMs: 0,
-    route: [], splits: [], routeDist: 0, simLat: 0, simLng: 0, simHead: Math.random() * 6.28 };
+    route: [], splits: [], routeDist: 0, simLat: 0, simLng: 0, simHead: Math.random() * 6.28, elevGain: 0, lastAlt: null };
   state.screen = "live"; render();
 }
 // True while a session is under way (started, not yet finished) — the app locks onto the live
@@ -1944,7 +1944,14 @@ function onGpsPos(pos) {
   if (good && movingByDevice && LIVE.rt.getStatus() === "active" && LIVE.lastLat != null) {
     const d = haversine(LIVE.lastLat, LIVE.lastLon, c.latitude, c.longitude);
     const floor = Math.max(2.5, (c.accuracy || 8) * 0.5);
-    if (d > floor && d < 80) { LIVE.dist += d; LIVE.route.push({ lat: c.latitude, lng: c.longitude }); }
+    if (d > floor && d < 80) {
+      LIVE.dist += d; LIVE.route.push({ lat: c.latitude, lng: c.longitude });
+      // Accumulate elevation gain from the device's altitude, when it reports one (often it doesn't).
+      if (c.altitude != null && isFinite(c.altitude)) {
+        if (LIVE.lastAlt != null && c.altitude - LIVE.lastAlt > 0.6) LIVE.elevGain += c.altitude - LIVE.lastAlt;
+        LIVE.lastAlt = c.altitude;
+      }
+    }
   }
   if (good) { LIVE.lastLat = c.latitude; LIVE.lastLon = c.longitude; }
 }
@@ -2054,79 +2061,183 @@ function runOverviewHtml(run) {
 // The run whose overview is on screen right now (completion screen or Activities detail).
 function currentOverviewRun() {
   if (state.screen === "runview") return state.logged[state.viewRunIdx];
-  if (LIVE && LIVE.summary) { const sm = LIVE.summary; return { t: LIVE.session.title, d: runDateLabel(), dist: sm.distKm + " km", time: sm.time, pace: (sm.pace || "—") + " /km", route: sm.route, splits: sm.splits }; }
+  if (LIVE && LIVE.summary) { const sm = LIVE.summary; return { t: LIVE.session.title, d: runDateLabel(), dist: sm.distKm + " km", time: sm.time, pace: (sm.pace || "—") + " /km", route: sm.route, splits: sm.splits, elevGain: sm.elevGain || 0, type: sm.type }; }
   return null;
 }
-function drawRouteOnCanvas(g, route, x, y, w, h) {
-  if (!route || route.length < 2) {
-    g.fillStyle = "rgba(255,255,255,.45)"; g.textAlign = "center"; g.font = "500 30px -apple-system, system-ui, sans-serif";
-    g.fillText("No route recorded", x + w / 2, y + h / 2); g.textAlign = "left"; return;
-  }
-  const lats = route.map((p) => p.lat), lngs = route.map((p) => p.lng);
-  const minLa = Math.min(...lats), maxLa = Math.max(...lats), minLo = Math.min(...lngs), maxLo = Math.max(...lngs);
-  const cx = Math.cos((minLa + maxLa) / 2 * Math.PI / 180) || 1, pad = 70;
-  const spanLo = Math.max(1e-9, (maxLo - minLo) * cx), spanLa = Math.max(1e-9, maxLa - minLa);
-  const scale = Math.min((w - 2 * pad) / spanLo, (h - 2 * pad) / spanLa);
-  const ox = x + (w - spanLo * scale) / 2, oy = y + (h - spanLa * scale) / 2;
-  const XY = (p) => [ox + (p.lng - minLo) * cx * scale, oy + (maxLa - p.lat) * scale];
-  g.lineJoin = "round"; g.lineCap = "round";
-  g.beginPath(); route.forEach((p, i) => { const q = XY(p); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); });
-  g.strokeStyle = "#16b7a4"; g.lineWidth = 16; g.globalAlpha = .55; g.stroke(); g.globalAlpha = 1;
-  g.setLineDash([26, 26]); g.strokeStyle = "#ffffff"; g.lineWidth = 9; g.stroke(); g.setLineDash([]);
-  const s = XY(route[0]), e = XY(route[route.length - 1]);
-  g.fillStyle = "#16b7a4"; g.beginPath(); g.arc(s[0], s[1], 17, 0, 7); g.fill(); g.lineWidth = 6; g.strokeStyle = "#fff"; g.stroke();
-  g.fillStyle = "#fff"; g.beginPath(); g.arc(e[0], e[1], 17, 0, 7); g.fill(); g.lineWidth = 7; g.strokeStyle = "#16b7a4"; g.stroke();
+const FF = "-apple-system, system-ui, Roboto, Arial, sans-serif";
+const TEAL = "#38ffbe", TEALW = "#16b7a4";
+const SHARE_INSIGHT = {
+  easy: "Easy effort. Aerobic fitness building exactly as planned.",
+  recovery: "Gentle shakeout done. Recovery is where you adapt and grow.",
+  long: "Time on feet banked. Endurance and durability are growing.",
+  steady: "Strong steady effort. Aerobic power building nicely.",
+  threshold: "Threshold work done. Your sustainable pace is climbing.",
+  vo2: "Hard intervals in the bag. Top-end fitness is sharpening.",
+  "race-specific": "Race-pace rehearsed. You're sharpening for the day.",
+  strides: "Easy miles plus fast strides — economy and pop building.",
+};
+function rr(g, x, y, w, h, r) {
+  if (g.roundRect) { g.beginPath(); g.roundRect(x, y, w, h, r); return; }
+  g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
 }
-// Draw the InteRun badge glyph directly on the canvas (reliable — no SVG-image rasterisation needed).
+// Letter-spaced text (canvas has no native tracking we can rely on cross-browser). Returns width.
+function lsText(g, text, x, y, sp, align) {
+  let total = 0; for (const ch of text) total += g.measureText(ch).width + sp; total -= sp;
+  let cx = align === "center" ? x - total / 2 : align === "right" ? x - total : x;
+  const prev = g.textAlign; g.textAlign = "left";
+  for (const ch of text) { g.fillText(ch, cx, y); cx += g.measureText(ch).width + sp; }
+  g.textAlign = prev; return total;
+}
+function wrapLines(g, text, maxW) {
+  const words = text.split(" "), lines = []; let line = "";
+  for (const w of words) { const t = line ? line + " " + w : w; if (g.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; }
+  if (line) lines.push(line); return lines;
+}
 function drawBrandBadge(g, x, y, size) {
   g.save(); g.translate(x, y); g.scale(size / 120, size / 120);
-  const grad = g.createLinearGradient(8, 8, 112, 112); grad.addColorStop(0, "#16b7a4"); grad.addColorStop(1, "#0a6f64");
-  g.fillStyle = grad;
-  if (g.roundRect) { g.beginPath(); g.roundRect(8, 8, 104, 104, 30); g.fill(); } else g.fillRect(8, 8, 104, 104);
+  g.save(); rr(g, 8, 8, 104, 104, 30); g.shadowColor = "rgba(22,183,164,.55)"; g.shadowBlur = 26; g.shadowOffsetY = 8;
+  const grad = g.createLinearGradient(8, 8, 112, 112); grad.addColorStop(0, "#1cc7b2"); grad.addColorStop(1, "#0a6f64");
+  g.fillStyle = grad; g.fill(); g.restore();
+  const gloss = g.createLinearGradient(0, 8, 0, 70); gloss.addColorStop(0, "rgba(255,255,255,.22)"); gloss.addColorStop(1, "rgba(255,255,255,0)");
+  g.save(); rr(g, 8, 8, 104, 104, 30); g.clip(); g.fillStyle = gloss; g.fillRect(8, 8, 104, 62); g.restore();
   g.fillStyle = "#fff"; g.beginPath(); g.arc(82, 37, 11, 0, 7); g.fill();
   g.beginPath(); g.moveTo(35, 88); g.lineTo(57, 45); g.lineTo(71, 45); g.lineTo(49, 88); g.closePath(); g.fill();
   g.globalAlpha = .62; g.beginPath(); g.moveTo(57, 88); g.lineTo(79, 45); g.lineTo(93, 45); g.lineTo(71, 88); g.closePath(); g.fill(); g.globalAlpha = 1;
   g.restore();
 }
+// Neon glowing route in the reference style: soft glow + bright core gradient, target-ring markers.
+function drawRouteGlow(g, route, x, y, w, h) {
+  if (!route || route.length < 2) {
+    g.fillStyle = "rgba(200,255,240,.4)"; g.textAlign = "center"; g.font = "500 30px " + FF;
+    g.fillText("No route recorded for this run", x + w / 2, y + h / 2); g.textAlign = "left"; return;
+  }
+  const lats = route.map((p) => p.lat), lngs = route.map((p) => p.lng);
+  const minLa = Math.min(...lats), maxLa = Math.max(...lats), minLo = Math.min(...lngs), maxLo = Math.max(...lngs);
+  const cxf = Math.cos((minLa + maxLa) / 2 * Math.PI / 180) || 1, pad = 96;
+  const spanLo = Math.max(1e-9, (maxLo - minLo) * cxf), spanLa = Math.max(1e-9, maxLa - minLa);
+  const scale = Math.min((w - 2 * pad) / spanLo, (h - 2 * pad) / spanLa);
+  const ox = x + (w - spanLo * scale) / 2, oy = y + (h - spanLa * scale) / 2;
+  const P = route.map((p) => [ox + (p.lng - minLo) * cxf * scale, oy + (maxLa - p.lat) * scale]);
+  const grad = g.createLinearGradient(0, y, 0, y + h); grad.addColorStop(0, "#3dffb0"); grad.addColorStop(1, "#a7ffd8");
+  g.lineJoin = "round"; g.lineCap = "round";
+  const trace = () => { g.beginPath(); P.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); };
+  g.save(); g.shadowColor = "rgba(45,255,170,.9)"; g.shadowBlur = 36;
+  trace(); g.strokeStyle = grad; g.lineWidth = 11; g.stroke(); g.shadowBlur = 22; g.stroke(); g.restore();
+  trace(); g.strokeStyle = "#eafff5"; g.lineWidth = 4.5; g.stroke();
+  const s = P[0], e = P[P.length - 1];
+  g.strokeStyle = "rgba(56,255,190,.45)"; g.lineWidth = 3;
+  g.beginPath(); g.arc(s[0], s[1], 24, 0, 7); g.stroke();
+  g.globalAlpha = .5; g.beginPath(); g.arc(s[0], s[1], 38, 0, 7); g.stroke(); g.globalAlpha = 1;
+  g.save(); g.shadowColor = "rgba(45,255,170,.9)"; g.shadowBlur = 18; g.fillStyle = "#2effb0"; g.beginPath(); g.arc(s[0], s[1], 12, 0, 7); g.fill(); g.restore();
+  g.fillStyle = "#06181a"; g.beginPath(); g.arc(s[0], s[1], 5.5, 0, 7); g.fill();
+  g.save(); g.shadowColor = "rgba(45,255,170,.9)"; g.shadowBlur = 20; g.fillStyle = "#6bffca"; g.beginPath(); g.arc(e[0], e[1], 14, 0, 7); g.fill(); g.restore();
+  g.lineWidth = 5; g.strokeStyle = "#fff"; g.beginPath(); g.arc(e[0], e[1], 14, 0, 7); g.stroke();
+  const chip = (px, py, txt) => {
+    g.font = "700 22px " + FF; const tw = g.measureText(txt).width, cw = tw + 34, ch = 42;
+    let cxp = Math.max(x + 14, Math.min(px - cw / 2, x + w - cw - 14));
+    let cyp = Math.max(y + 14, Math.min(py, y + h - ch - 14));
+    rr(g, cxp, cyp, cw, ch, 11); g.fillStyle = "rgba(6,22,20,.82)"; g.fill(); g.lineWidth = 2; g.strokeStyle = "rgba(56,255,190,.55)"; g.stroke();
+    g.fillStyle = "#c9fff0"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(txt, cxp + cw / 2, cyp + ch / 2 + 1); g.textAlign = "left"; g.textBaseline = "alphabetic";
+  };
+  chip(s[0], s[1] - 66, "START"); chip(e[0], e[1] - 66, "FINISH");
+}
+function drawStatIcon(g, kind, cx, cy) {
+  g.strokeStyle = TEAL; g.fillStyle = TEAL; g.lineWidth = 3; g.lineCap = "round"; g.lineJoin = "round";
+  if (kind === 0) { // distance / route
+    g.beginPath(); g.arc(cx - 9, cy - 7, 5, 0, 7); g.stroke();
+    g.beginPath(); g.moveTo(cx - 9, cy - 2); g.quadraticCurveTo(cx + 16, cy - 6, cx + 7, cy + 11); g.stroke();
+    g.beginPath(); g.arc(cx + 7, cy + 11, 3.5, 0, 7); g.fill();
+  } else if (kind === 1) { // clock
+    g.beginPath(); g.arc(cx, cy, 13, 0, 7); g.stroke();
+    g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx, cy - 8); g.moveTo(cx, cy); g.lineTo(cx + 6, cy + 3); g.stroke();
+  } else { // speedometer
+    g.beginPath(); g.arc(cx, cy + 4, 13, Math.PI * 1.12, Math.PI * 1.88); g.stroke();
+    g.beginPath(); g.moveTo(cx, cy + 4); g.lineTo(cx + 9, cy - 6); g.stroke();
+    g.beginPath(); g.arc(cx, cy + 4, 2.6, 0, 7); g.fill();
+  }
+}
+function drawInsightIcon(g, cx, cy, r) {
+  g.strokeStyle = TEAL; g.fillStyle = TEAL; g.lineWidth = 2.5;
+  g.beginPath(); g.arc(cx, cy, r, 0, 7); g.stroke();
+  const n = [[0, -r * 0.5], [-r * 0.42, r * 0.18], [r * 0.42, r * 0.18], [0, r * 0.02]];
+  g.beginPath();
+  g.moveTo(cx + n[1][0], cy + n[1][1]); g.lineTo(cx + n[3][0], cy + n[3][1]); g.lineTo(cx + n[0][0], cy + n[0][1]);
+  g.moveTo(cx + n[3][0], cy + n[3][1]); g.lineTo(cx + n[2][0], cy + n[2][1]); g.stroke();
+  n.forEach((p) => { g.beginPath(); g.arc(cx + p[0], cy + p[1], 3, 0, 7); g.fill(); });
+}
 function buildShareCanvas(run) {
-  const W = 1080, H = 1350, c = document.createElement("canvas"); c.width = W; c.height = H;
+  const W = 1080, H = 1620, c = document.createElement("canvas"); c.width = W; c.height = H;
   const g = c.getContext("2d");
-  const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, "#0e3f39"); bg.addColorStop(1, "#06181a");
-  g.fillStyle = bg; g.fillRect(0, 0, W, H);
-  const glow = g.createRadialGradient(W / 2, 120, 40, W / 2, 120, 700); glow.addColorStop(0, "rgba(22,183,164,.28)"); glow.addColorStop(1, "rgba(22,183,164,0)");
-  g.fillStyle = glow; g.fillRect(0, 0, W, 700);
-  // Header: logo badge + wordmark + tagline
-  drawBrandBadge(g, 66, 60, 128);
-  g.textAlign = "left"; g.textBaseline = "alphabetic";
-  g.font = "800 66px -apple-system, system-ui, 'Segoe UI', Roboto, sans-serif";
-  g.fillStyle = "#fff"; g.fillText("Inte", 214, 150);
-  const w1 = g.measureText("Inte").width;
-  g.fillStyle = "#16b7a4"; g.fillText("Run", 214 + w1, 150);
-  g.fillStyle = "rgba(255,255,255,.5)"; g.font = "500 27px -apple-system, system-ui, sans-serif";
-  g.fillText("The Intelligent Training Companion", 216, 188);
-  // Run title + date (centred)
-  g.textAlign = "center";
-  g.fillStyle = "#fff"; g.font = "700 46px -apple-system, system-ui, sans-serif"; g.fillText(run.t || "My run", W / 2, 296);
-  g.fillStyle = "rgba(255,255,255,.55)"; g.font = "500 30px -apple-system, system-ui, sans-serif"; g.fillText(run.d || "", W / 2, 344);
-  g.textAlign = "left";
+  // Background: near-black with green tint + corner glows
+  g.fillStyle = "#04100d"; g.fillRect(0, 0, W, H);
+  const glowAt = (gx, gy, rad, a) => { const rg = g.createRadialGradient(gx, gy, 0, gx, gy, rad); rg.addColorStop(0, "rgba(30,180,150," + a + ")"); rg.addColorStop(1, "rgba(30,180,150,0)"); g.fillStyle = rg; g.fillRect(0, 0, W, H); };
+  glowAt(180, 200, 620, .18); glowAt(W - 150, 260, 560, .12); glowAt(W / 2, H - 120, 720, .08);
+  // Panel frame
+  rr(g, 20, 20, W - 40, H - 40, 46); g.fillStyle = "rgba(255,255,255,.015)"; g.fill(); g.lineWidth = 2; g.strokeStyle = "rgba(56,255,190,.22)"; g.stroke();
+  g.textBaseline = "alphabetic"; g.textAlign = "left";
+  // Header
+  drawBrandBadge(g, 56, 92, 116);
+  g.font = "800 62px " + FF; g.fillStyle = "#fff"; g.fillText("Inte", 196, 178);
+  const iw = g.measureText("Inte").width; g.fillStyle = TEAL; g.fillText("Run", 196 + iw, 178);
+  g.fillStyle = "rgba(160,200,190,.65)"; g.font = "600 20px " + FF; lsText(g, "THE INTELLIGENT TRAINING COMPANION", 198, 210, 2.5, "left");
+  g.fillStyle = TEAL; g.font = "600 26px " + FF; g.textAlign = "right"; g.fillText("#RunWithInteRun", W - 56, 150); g.textAlign = "left";
+  // Title (auto-fit one line) + accent underline
+  const title = (run.t || "My run").toUpperCase(); let ts = 90; g.font = "800 " + ts + "px " + FF;
+  while (g.measureText(title).width > W - 130 && ts > 44) { ts -= 2; g.font = "800 " + ts + "px " + FF; }
+  g.fillStyle = "#fff"; g.fillText(title, 56, 322);
+  rr(g, 58, 348, 96, 7, 4); g.fillStyle = TEAL; g.fill();
+  // Date (grey + teal time)
+  g.font = "600 28px " + FF; const dparts = (run.d || "").toUpperCase().split("·");
+  g.fillStyle = "rgba(190,215,205,.7)"; g.fillText(dparts[0].trim(), 58, 410);
+  if (dparts[1]) { const dw = g.measureText(dparts[0].trim() + "  ").width; g.fillStyle = TEAL; g.fillText("· " + dparts[1].trim(), 58 + dw, 410); }
   // Map panel
-  const mx = 60, my = 384, mw = W - 120, mh = 560;
-  g.fillStyle = "rgba(255,255,255,.05)"; if (g.roundRect) { g.beginPath(); g.roundRect(mx, my, mw, mh, 28); g.fill(); } else g.fillRect(mx, my, mw, mh);
-  drawRouteOnCanvas(g, run.route, mx, my, mw, mh);
-  // Stats row
-  const cols = [W * 0.2, W * 0.5, W * 0.8], vals = [run.dist, run.time, run.pace], labs = ["DISTANCE", "TIME", "AVG PACE"];
-  const sy = 1070;
-  cols.forEach((cxp, i) => {
-    g.textAlign = "center";
-    g.fillStyle = "#fff"; g.font = "800 74px -apple-system, system-ui, sans-serif"; g.fillText(vals[i], cxp, sy);
-    g.fillStyle = "rgba(255,255,255,.5)"; g.font = "700 25px -apple-system, system-ui, sans-serif"; g.fillText(labs[i], cxp, sy + 44);
+  const mx = 48, my = 452, mw = W - 96, mh = 576;
+  rr(g, mx, my, mw, mh, 30); g.fillStyle = "#0a1714"; g.fill();
+  g.save(); rr(g, mx, my, mw, mh, 30); g.clip();
+  g.strokeStyle = "rgba(120,160,150,.06)"; g.lineWidth = 2;
+  for (let i = 0; i < 9; i++) { const yy = my + (i + .5) * mh / 9; g.beginPath(); g.moveTo(mx, yy + Math.sin(i * 1.3) * 14); g.lineTo(mx + mw, yy + Math.cos(i) * 14); g.stroke(); }
+  for (let i = 0; i < 6; i++) { const xx = mx + (i + .5) * mw / 6; g.beginPath(); g.moveTo(xx, my); g.lineTo(xx + (i % 2 ? 26 : -26), my + mh); g.stroke(); }
+  drawRouteGlow(g, run.route, mx, my, mw, mh);
+  g.restore();
+  rr(g, mx, my, mw, mh, 30); g.lineWidth = 1.5; g.strokeStyle = "rgba(56,255,190,.2)"; g.stroke();
+  // corner metric: real elevation gain if we have it, else fastest split
+  let corner = null;
+  if (run.elevGain && run.elevGain >= 1) corner = { k: "ELEVATION GAIN", v: "+" + run.elevGain + "m" };
+  else if (run.splits && run.splits.length) corner = { k: "FASTEST KM", v: fmtPace(Math.min.apply(null, run.splits.map((s) => s.sec))) };
+  if (corner) {
+    g.textAlign = "right"; g.fillStyle = "#eafff5"; g.font = "800 34px " + FF; g.fillText(corner.v, mx + mw - 34, my + mh - 56);
+    g.fillStyle = "rgba(190,215,205,.6)"; g.font = "600 19px " + FF; lsText(g, corner.k, mx + mw - 34, my + mh - 28, 1.5, "right"); g.textAlign = "left";
+  }
+  // Stat cards
+  const dParts = (run.dist || "0 km").split(" "), pParts = (run.pace || "— /km").split(" ");
+  const stats = [
+    { icon: 0, label: "DISTANCE", val: dParts[0], unit: (dParts[1] || "km").toUpperCase() },
+    { icon: 1, label: "DURATION", val: run.time || "0:00", unit: "MIN" },
+    { icon: 2, label: "AVG PACE", val: pParts[0], unit: (pParts[1] || "/km").toUpperCase() },
+  ];
+  const sy = 1064, sh = 236, gap = 22, sw = (mw - 2 * gap) / 3;
+  stats.forEach((st, i) => {
+    const sxp = mx + i * (sw + gap);
+    rr(g, sxp, sy, sw, sh, 24); g.fillStyle = "rgba(255,255,255,.03)"; g.fill(); g.lineWidth = 1.5; g.strokeStyle = "rgba(56,255,190,.16)"; g.stroke();
+    drawStatIcon(g, st.icon, sxp + 42, sy + 52);
+    g.fillStyle = "rgba(180,210,200,.75)"; g.font = "700 20px " + FF; lsText(g, st.label, sxp + 74, sy + 60, 1.5, "left");
+    g.strokeStyle = "rgba(56,255,190,.18)"; g.lineWidth = 1.5; g.beginPath(); g.moveTo(sxp + 30, sy + 84); g.lineTo(sxp + sw - 30, sy + 84); g.stroke();
+    g.fillStyle = "#fff"; g.font = "800 72px " + FF; g.fillText(st.val, sxp + 32, sy + 170);
+    g.fillStyle = TEAL; g.font = "700 28px " + FF; g.fillText(st.unit, sxp + 32, sy + 208);
   });
-  // Caption
-  g.textAlign = "left"; g.font = "600 40px -apple-system, system-ui, sans-serif";
-  const a = "I completed a run with ", bw = "InteRun";
-  const wa = g.measureText(a).width, wb = g.measureText(bw).width, sx = (W - wa - wb) / 2;
-  g.fillStyle = "rgba(255,255,255,.9)"; g.fillText(a, sx, 1258);
-  g.fillStyle = "#16b7a4"; g.fillText(bw, sx + wa, 1258);
+  // Insight card
+  const iy = 1330, ih = 178;
+  rr(g, mx, iy, mw, ih, 24); g.fillStyle = "rgba(255,255,255,.03)"; g.fill(); g.lineWidth = 1.5; g.strokeStyle = "rgba(56,255,190,.18)"; g.stroke();
+  drawInsightIcon(g, mx + 92, iy + ih / 2, 40);
+  g.fillStyle = TEAL; g.font = "700 22px " + FF; lsText(g, "INTERUN INSIGHT", mx + 168, iy + 56, 2, "left");
+  const insight = SHARE_INSIGHT[run.type] || SHARE_INSIGHT.easy;
+  g.fillStyle = "#eef7f3"; g.font = "600 36px " + FF;
+  const lines = wrapLines(g, insight, mw - 168 - 90).slice(0, 2);
+  lines.forEach((ln, i) => g.fillText(ln, mx + 168, iy + 100 + i * 46));
+  g.fillStyle = "rgba(56,255,190,.22)"; g.font = "800 150px Georgia, " + FF; g.fillText("\\u201D", mx + mw - 96, iy + 120);
+  // Footer
+  drawBrandBadge(g, 56, H - 96, 52);
+  g.fillStyle = TEAL; g.font = "700 24px " + FF; lsText(g, "CREATE   |   LEARN   |   REPEAT", W / 2 + 40, H - 58, 4, "center");
   return c;
 }
 function canvasToPngFile(canvas, name) {
@@ -2238,7 +2349,7 @@ function liveFinish(complete) {
   if (!complete) LIVE.rt.stop(now).forEach(liveCue);
   const snap = LIVE.rt.snapshot(now);
   const km = snap.distanceMeters / 1000;
-  LIVE.summary = { distKm: km.toFixed(2), time: fmtPace(snap.elapsedSeconds), pace: snap.averagePaceSecPerKm ? fmtPace(snap.averagePaceSecPerKm) : "—", avgPaceSec: snap.averagePaceSecPerKm || 0, sec: Math.round(snap.elapsedSeconds), route: downsampleRoute(LIVE.route), splits: LIVE.splits.slice(), saved: false, meaningful: km > 0.05 };
+  LIVE.summary = { distKm: km.toFixed(2), time: fmtPace(snap.elapsedSeconds), pace: snap.averagePaceSecPerKm ? fmtPace(snap.averagePaceSecPerKm) : "—", avgPaceSec: snap.averagePaceSecPerKm || 0, sec: Math.round(snap.elapsedSeconds), route: downsampleRoute(LIVE.route), splits: LIVE.splits.slice(), elevGain: Math.round(LIVE.elevGain), type: LIVE.session.type, saved: false, meaningful: km > 0.05 };
   // Clear, unmissable end — spoken celebration plus a completion screen the user must act on.
   speak(complete ? "Well done" + nameTail() + ". Session complete." : "Session ended" + nameTail() + ".");
   render();
@@ -2252,7 +2363,7 @@ function saveLiveSession() {
   const sm = LIVE.summary; if (!sm || sm.saved) return;
   if (sm.meaningful) {
     state.logged.unshift({ t: LIVE.session.title, d: runDateLabel(), dist: sm.distKm + " km", time: sm.time, pace: sm.pace + " /km",
-      distKm: Number(sm.distKm), sec: sm.sec, avgPaceSec: Math.round(sm.avgPaceSec), route: sm.route, splits: sm.splits });
+      distKm: Number(sm.distKm), sec: sm.sec, avgPaceSec: Math.round(sm.avgPaceSec), route: sm.route, splits: sm.splits, elevGain: sm.elevGain || 0, type: sm.type });
     saveRuns();
   }
   const wk0 = PLAN.weeks[0]; const dn = DAY_ORDER[LIVE.session.dayOfWeek];

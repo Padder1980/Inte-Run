@@ -376,6 +376,11 @@ select.sel { font: inherit; font-size: 13.5px; color: var(--ink); background: va
 /* Setup / profile form — premium, obvious inputs */
 input.sel { font: inherit; font-size: 15px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px; padding: 12px 13px; width: 100%; transition: border-color .15s ease, box-shadow .15s ease, background .15s ease; }
 input.sel::placeholder { color: var(--ink-faint); }
+/* Date inputs: iOS/WebKit centre the value and float the picker oddly — force left alignment and a
+   consistent height so they match the text fields and selects. */
+input.sel[type="date"] { -webkit-appearance: none; appearance: none; text-align: left; min-height: 47px; box-sizing: border-box; display: flex; align-items: center; }
+input.sel[type="date"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
+input.sel[type="date"]::-webkit-calendar-picker-indicator { margin-left: auto; opacity: .55; cursor: pointer; }
 input.sel:focus, select.sel:focus { outline: none; border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent); }
 select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: pointer; }
 .setup-intro { margin: 2px 2px 14px; }
@@ -1427,7 +1432,7 @@ function viewSetup() {
   const secDetails =
     '<div class="q" style="margin-top:0"><label>How many days a week will you run? <span class="q-hint">we\u2019ll shape the plan around this</span></label>' + seg("days", [["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]], p.daysPerWeek) + '</div>' +
     '<div class="q"><label>Which day suits your long run? <span class="q-hint">we\u2019ll build the week around it</span></label><select class="sel" id="s_longday" style="max-width:200px">' + dayOpts(p.longRunDay) + '</select></div>' +
-    '<div class="q"><label>When do you want to start? <span class="q-hint">a mid-week start gives a shorter first week</span></label><input class="sel num" id="s_startdate" type="date" value="' + (p.startDateIso || todayIso()) + '" min="' + todayIso() + '"></div>' +
+    '<div class="q"><label>When do you want to start? <span class="q-hint">a mid-week start gives a shorter first week</span></label><input class="sel" id="s_startdate" type="date" value="' + (p.startDateIso || todayIso()) + '" min="' + todayIso() + '"></div>' +
     '<div class="q"><label>Age</label><select class="sel" id="s_age" style="max-width:140px">' + ageOpts(p.age) + '</select></div>' +
     '<div class="q"><label>Sex <span class="q-hint">helps tailor advice</span></label><select class="sel" id="s_sex" style="max-width:200px"><option value=""' + (!p.sex?" selected":"") + '>Prefer not to say</option><option value="female"' + (p.sex==="female"?" selected":"") + '>Female</option><option value="male"' + (p.sex==="male"?" selected":"") + '>Male</option></select></div>' +
     '<div class="q"><label>Include strength &amp; conditioning?</label>' + seg("strength", [["1","Yes"],["0","No"]], p.strength?"1":"0") + '</div>' +
@@ -1638,7 +1643,7 @@ function goalCardInner(status, cur) {
   } else {
     h += '<div class="q"><div class="mas-hint">No time pressure \u2014 we\u2019ll build you up to comfortably finish it. You can set a time goal once you\u2019re there.</div></div>';
   }
-  h += '<div class="q"><label>' + (cfg.time ? "Race date" : "Target date") + '</label><input class="sel num" id="s_date" type="date" value="' + cur.date + '"></div>';
+  h += '<div class="q"><label>' + (cfg.time ? "Race date" : "Target date") + '</label><input class="sel" id="s_date" type="date" value="' + cur.date + '"></div>';
   return h;
 }
 function statusCards(sel) {

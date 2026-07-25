@@ -1619,6 +1619,9 @@ function speak(text) {
   } catch (e) {}
 }
 function stopSpeech() { try { if (VOICE_AVAILABLE) window.speechSynthesis.cancel(); } catch (e) {} }
+// The runner's first name (from their profile) for personalised coaching, or "" if not set.
+function firstName() { const n = (profile.name || "").trim(); return n ? n.split(" ")[0] : ""; }
+function nameTail() { const n = firstName(); return n ? ", " + n : ""; }
 // Natural spoken form of a duration, e.g. 330 -> "5 minutes 30 seconds".
 function spokenDuration(sec) {
   const m = Math.floor(sec / 60), s = Math.round(sec % 60);
@@ -1656,7 +1659,9 @@ function checkSplits() {
   const now = liveNowMs();
   const splitSec = (now - LIVE.lastKmMs) / 1000;
   LIVE.lastKmMs = now;
-  speak("Kilometre " + km + ". " + spokenDuration(splitSec) + " for that split.");
+  // Drop the runner's name into the cheer on alternate kilometres — personal without wearing thin.
+  const cheer = firstName() && km % 2 === 0 ? "Nice work, " + firstName() + ". " : "";
+  speak(cheer + "Kilometre " + km + ". " + spokenDuration(splitSec) + " for that split.");
   liveCue({ kind: "split", atMs: now, message: km + " km · " + fmtPace(splitSec) + " /km split" });
 }
 // Great-circle distance between two lat/lon points, in metres.
@@ -1685,7 +1690,7 @@ function beginLive() {
   // Speak inside the tap gesture — this unlocks TTS on iOS (which blocks audio until a
   // user-initiated utterance) so the later async cues can play. Load voices first so the very
   // first utterance isn't dropped for want of a voice.
-  if (VOICE_AVAILABLE && VOICE_ON) { loadVoices(); speak("Let's go."); }
+  if (VOICE_AVAILABLE && VOICE_ON) { loadVoices(); speak("Let's go" + nameTail() + "."); }
   render(); // re-render to lock the screen (hide nav + back) now the run is starting
   if (GPS_AVAILABLE) {
     LIVE.acquiring = true; renderLiveNow();
@@ -1860,7 +1865,7 @@ function liveFinish(complete) {
   const km = snap.distanceMeters / 1000;
   LIVE.summary = { distKm: km.toFixed(2), time: fmtPace(snap.elapsedSeconds), pace: snap.averagePaceSecPerKm ? fmtPace(snap.averagePaceSecPerKm) : "—", saved: false, meaningful: km > 0.05 };
   // Clear, unmissable end — spoken celebration plus a completion screen the user must act on.
-  speak(complete ? "Well done. Session complete." : "Session ended.");
+  speak(complete ? "Well done" + nameTail() + ". Session complete." : "Session ended" + nameTail() + ".");
   render();
 }
 // Persist the just-finished run to Activities + tick it off in the training calendar.

@@ -102,6 +102,40 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .welcome-cta:active { transform: translateY(1px); }
 @keyframes welIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .welcome-mark svg, .welcome-h, .welcome-msg, .welcome-cta { animation-duration: .01s !important; animation-delay: 0s !important; } }
+/* Welcome-back (returning user): personalised greeting + rotating quote */
+.welcome.wb { opacity: 0; transition: opacity .45s ease; } .welcome.wb.on { opacity: 1; } .welcome.wb.hide { opacity: 0; }
+.welcome.wb .welcome-h { margin: 18px 0 14px; animation: none; }
+.wb-quote { font-size: 18px; line-height: 1.5; font-style: italic; color: #eef3f1; margin: 0 8px; }
+.wb-by { font-size: 13px; color: #9aa3a0; margin: 12px 0 0; }
+.wb-cta { animation: none; opacity: 1; margin-top: 26px; }
+/* Session guide overlay (interactive walkthrough of the session shorthand) */
+.guide-ov { position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center; padding: 22px; background: color-mix(in srgb, var(--ink) 72%, transparent); backdrop-filter: blur(5px); opacity: 0; transition: opacity .25s ease; }
+.guide-ov.on { display: flex; opacity: 1; }
+.guide-card { width: 100%; max-width: 380px; background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 22px 20px 18px; box-shadow: 0 24px 60px -18px rgba(0,0,0,.5); }
+.guide-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--accent); }
+.guide-title { font-size: 25px; font-weight: 750; letter-spacing: -.01em; margin: 12px 0 4px; line-height: 1.3; display: flex; flex-wrap: wrap; gap: 4px 2px; align-items: baseline; }
+.guide-title .gt-sep { color: var(--ink-faint); }
+.guide-title .gtok { padding: 1px 5px; border-radius: 7px; transition: opacity .25s ease, background .25s ease, color .25s ease, transform .25s ease; }
+.guide-title .gtok.dim { opacity: .28; }
+.guide-title .gtok.on { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); font-weight: 800; transform: scale(1.06); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
+.guide-cap { min-height: 84px; margin-top: 14px; }
+.guide-cap-h { font-size: 15px; font-weight: 750; }
+.guide-cap-b { font-size: 13.5px; color: var(--ink-soft); margin-top: 4px; line-height: 1.5; }
+.guide-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; }
+.guide-dots { display: flex; gap: 6px; }
+.guide-dots .gd { width: 6px; height: 6px; border-radius: 50%; background: var(--line); transition: background .2s, transform .2s; }
+.guide-dots .gd.on { background: var(--accent); transform: scale(1.25); }
+.guide-btns { display: flex; align-items: center; gap: 6px; }
+.guide-skip { font: inherit; font-size: 13px; font-weight: 600; color: var(--ink-faint); background: none; border: 0; padding: 9px 10px; cursor: pointer; }
+.guide-next { font: inherit; font-size: 14px; font-weight: 650; color: var(--accent-ink); background: var(--accent); border: 0; border-radius: 11px; padding: 10px 20px; cursor: pointer; }
+.guide-next:active { transform: translateY(1px); }
+/* Support · Understanding my sessions */
+.ex-chip { display: inline-block; font-size: 17px; font-weight: 700; letter-spacing: -.01em; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px; padding: 9px 14px; margin-top: 12px; }
+.leg-row { display: flex; align-items: center; gap: 13px; padding: 9px 0; border-top: 1px solid var(--line); } .leg-row:first-of-type { border-top: 0; }
+.leg-sym { flex: none; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 19px; font-weight: 700; color: var(--accent); background: color-mix(in srgb, var(--accent) 11%, var(--surface)); border-radius: 10px; }
+.leg-name { font-size: 14px; font-weight: 650; } .leg-eg { font-size: 12.5px; color: var(--ink-faint); margin-top: 1px; }
+.gloss { display: flex; flex-direction: column; gap: 10px; }
+.gloss-row b { font-size: 13.5px; } .gloss-row span { display: block; font-size: 12.5px; color: var(--ink-soft); margin-top: 1px; }
 /* Training calendar */
 .cal-wrap { display: flex; flex-direction: column; gap: 16px; }
 .cal-week { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
@@ -604,8 +638,10 @@ function bindTimeInput(el) {
   el.setAttribute("inputmode", "numeric");
   el.addEventListener("input", () => { const f = fmtDigitsToTime(el.value); el.value = f; try { el.setSelectionRange(f.length, f.length); } catch (e) {} });
 }
+const BRAND_SVG = ${JSON.stringify(BRAND_MARK)};
 const ICON = {
   gauge: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19a8 8 0 1 1 16 0"/><path d="M13.4 12.6 18 8"/><circle cx="12" cy="19" r="1.4" fill="currentColor" stroke="none"/></svg>',
+  guide: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/><circle cx="12" cy="8" r=".6" fill="currentColor"/></svg>',
   trendUp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>',
   trendDown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l6 6 4-4 8 8"/><path d="M17 17h4v-4"/></svg>',
   timer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4"/><circle cx="12" cy="14" r="8"/><path d="M12 14V10"/></svg>',
@@ -1311,6 +1347,7 @@ function viewCommunity() {
 
 // ============ SUPPORT ======================================================
 const SUPPORT_HUB = [
+  { id: "understand", ic: "guide", c: "var(--accent)", t: "Understanding my sessions", d: "What the numbers in a session mean — with a walkthrough.", interactive: false },
   { id: "redflags", ic: "heart", c: "var(--rest)", t: "Injury & symptoms", d: "A quick check for anything that needs attention now.", interactive: true },
   { id: "reds", ic: "fuel", c: "var(--peak)", t: "Fuelling & energy", d: "Are you getting enough? A gentle RED-S check.", interactive: true },
   { id: "female", ic: "flower", c: "var(--taper)", t: "Women's health", d: "Symptom-informed prompts — periods, postpartum, more.", interactive: true },
@@ -1324,6 +1361,7 @@ function viewSupport() {
 }
 function supportDetail(id) {
   const back = '<button class="backbtn" id="supBack">‹ Support</button>';
+  if (id === "understand") return back + understandView();
   if (id === "redflags") return back + redflagsView();
   if (id === "reds") return back + redsView();
   if (id === "female") return back + femaleView();
@@ -1336,6 +1374,27 @@ const REDS_OPTS = { "unintentional-weight-loss":"Losing weight unintentionally",
 const PROF = RC.PROFESSIONAL_LABEL;
 function referLine(refer) { if (!refer || !refer.length) return ""; const n = refer.map((r) => PROF[r] || r); const j = n.length>1 ? n.slice(0,-1).join(", ") + " or " + n[n.length-1] : n[0]; return '<div class="rf">Talk to ' + j + '.</div>'; }
 function checks(map, name) { return Object.entries(map).map(([k,v]) => '<label class="opt"><input type="checkbox" data-chk="' + name + '" value="' + k + '"><span>' + v + '</span></label>').join(""); }
+// Reference version of the session guide — a legend, a replay of the interactive walkthrough, and a
+// plain-English glossary of every effort level. Users can return here any time.
+function understandView() {
+  const legend = [
+    ["\\u2032", "minutes", "e.g. 8\\u2032 = 8 minutes"],
+    ["\\u2033", "seconds", "e.g. 90\\u2033 = 90 seconds"],
+    ["\\u00D7", "repeat", "e.g. 4 \\u00D7 = do it four times"],
+    ["/", "then recover", "work / recovery, e.g. 8\\u2032 / 2\\u2032"],
+    ["m", "metres", "e.g. 800m = 800 metres"],
+  ].map((r) => '<div class="leg-row"><span class="leg-sym">' + r[0] + '</span><div><div class="leg-name">' + r[1] + '</div><div class="leg-eg">' + r[2] + '</div></div></div>').join("");
+  const efforts = [
+    ["Easy", EFFORT_HINT.easy], ["Steady", EFFORT_HINT.steady], ["Threshold / tempo / cruise", EFFORT_HINT.threshold],
+    ["VO\\u2082 / hard intervals", EFFORT_HINT.vo2], ["Long run", EFFORT_HINT.long], ["Strides / pickups", EFFORT_HINT.strides], ["Recovery / jog", EFFORT_HINT.recovery],
+  ].map((r) => '<div class="gloss-row"><b>' + r[0] + '</b><span>' + r[1] + '</span></div>').join("");
+  return '<h2 class="sec" style="margin-top:0">Understanding my sessions</h2>' +
+    '<div class="card"><div class="guide-body"><p>Every session is written in a short, consistent shorthand. Read it left to right: <b>how many</b> \\u00D7 <b>how long/far</b> at an <b>effort</b>, then the <b>recovery</b>.</p></div>' +
+    '<div class="ex-chip">' + esc(GUIDE_EXAMPLE) + '</div>' +
+    '<button class="mini-btn" id="guideReplay" style="margin-top:12px">' + ICON.guide + ' Walk me through an example</button></div>' +
+    '<div class="card" style="margin-top:12px"><div class="subhead" style="margin-top:0">The symbols</div>' + legend + '</div>' +
+    '<div class="card" style="margin-top:12px"><div class="subhead" style="margin-top:0">The effort levels</div><div class="gloss">' + efforts + '</div></div>';
+}
 function redflagsView() {
   return '<div class="promise"><span><b>In an emergency</b>, don\\'t use an app — call your local emergency number.</span></div>' +
     '<h2 class="sec" style="margin-top:0">How are you feeling?</h2><div class="card"><div class="subhead">Physical</div><div class="opts">' + checks(FLAGS_PHYS,"rf") + '</div><div class="subhead">Wellbeing</div><div class="opts">' + checks(FLAGS_WELL,"rf") + '</div><div class="result" id="rfRes"></div></div>';
@@ -2041,6 +2100,192 @@ function fitSuggestBanner() {
     '<div class="fb-actions"><button class="fb-yes" id="fitApply">Update my paces</button><button class="fb-no" id="fitDismiss">Not now</button></div></div></div>';
 }
 
+// ---- Welcome-back message + motivational quotes ---------------------------
+const QUOTES = [
+  ["The miracle isn\\u2019t that I finished. The miracle is that I had the courage to start.", "John Bingham"],
+  ["Run when you can, walk if you have to, crawl if you must; just never give up.", "Dean Karnazes"],
+  ["It\\u2019s you against the little voice that wants you to quit.", "George Sheehan"],
+  ["The body achieves what the mind believes.", ""],
+  ["Don\\u2019t dream of winning, train for it.", "Mo Farah"],
+  ["We are what we repeatedly do. Excellence, then, is not an act, but a habit.", "Aristotle"],
+  ["The will to win means nothing without the will to prepare.", "Juma Ikangaa"],
+  ["It never gets easier, you just get stronger.", ""],
+  ["Consistency beats intensity. Just show up.", ""],
+  ["Start where you are. Use what you have. Do what you can.", "Arthur Ashe"],
+  ["Success is the sum of small efforts, repeated day in and day out.", "Robert Collier"],
+  ["Run the mile you\\u2019re in.", ""],
+  ["Slow runs make fast runners.", ""],
+  ["The magic is in the miles.", ""],
+  ["Fall in love with the process and the results will come.", ""],
+  ["One run can change your day. Many runs can change your life.", "Benjamin Cheever"],
+  ["Motivation gets you going, but discipline keeps you growing.", "John Maxwell"],
+  ["The pain of discipline weighs ounces; the pain of regret weighs tons.", ""],
+  ["Your only limit is the one you set yourself.", ""],
+  ["Every mile is a gift you give yourself.", ""],
+  ["Somewhere someone is training when you are not.", "Tom Fleming"],
+  ["Believe you\\u2019re strong enough to accomplish everything you want to do.", "John Bingham"],
+  ["Discipline is choosing between what you want now and what you want most.", ""],
+  ["The reason we race isn\\u2019t so much to beat each other, but to be with each other.", "Christopher McDougall"],
+  ["Small steps, every day.", ""],
+  ["A run begins the moment you forget you\\u2019re running.", ""],
+  ["If you want to be the best runner you can be, start now.", "Priscilla Welch"],
+  ["It always seems impossible until it\\u2019s done.", "Nelson Mandela"],
+  ["Take care of the miles, and the miles will take care of you.", ""],
+  ["The only bad run is the one that didn\\u2019t happen.", ""],
+];
+function randomQuote() { return QUOTES[Math.floor(Math.random() * QUOTES.length)]; }
+function welcomeBackName() { const n = firstName(); return n ? "Welcome back, " + esc(n) : "Welcome back"; }
+// A brief personalised welcome shown on each return to the app, with a rotating motivational quote.
+function showWelcomeBack() {
+  const q = randomQuote();
+  const ov = el('<div class="welcome wb" id="welcomeback"><div class="welcome-inner">' +
+    '<div class="welcome-mark">' + BRAND_SVG + '</div>' +
+    '<h1 class="welcome-h">' + welcomeBackName() + ' \\uD83D\\uDC4B</h1>' +
+    '<p class="wb-quote">\\u201C' + esc(q[0]) + '\\u201D</p>' +
+    (q[1] ? '<p class="wb-by">\\u2014 ' + esc(q[1]) + '</p>' : '') +
+    '<button class="welcome-cta wb-cta" id="wbGo">Let\\u2019s go \\u2192</button>' +
+    '</div></div>');
+  document.body.appendChild(ov);
+  requestAnimationFrame(() => ov.classList.add("on"));
+  let gone = false;
+  const dismiss = () => { if (gone) return; gone = true; ov.classList.add("hide"); setTimeout(() => { ov.remove(); if (state.tab === "today" && !state.screen) maybeAutoGuide(); }, 500); };
+  const go = $("wbGo"); if (go) go.onclick = dismiss;
+  ov.addEventListener("click", (e) => { if (e.target === ov) dismiss(); });
+  setTimeout(dismiss, 4200);
+}
+
+// ---- "Understanding your sessions" interactive guide ----------------------
+const EFFORT_HINT = {
+  easy: "comfortable and conversational — you could chat the whole way.",
+  steady: "moderate — a bit quicker than easy, still controlled.",
+  threshold: "comfortably hard — around your one-hour race effort.",
+  tempo: "controlled and comfortably hard, a steady rhythm.",
+  cruise: "threshold effort, broken into repeats.",
+  fartlek: "playful bursts of harder running by feel.",
+  vo2: "hard — around your 5K race pace.",
+  hard: "hard — around your 5K race pace.",
+  jog: "very easy jogging to recover.",
+  recovery: "very easy — just turning the legs over.",
+  long: "easy and relaxed, building endurance.",
+  strides: "relaxed, controlled fast running — never a sprint.",
+  pickups: "short, smooth lifts in pace — never a sprint.",
+  float: "an easy, rolling recovery (not a full stop).",
+  walk: "walking to recover — part of the plan, not a failure.",
+  run: "running at the effort noted.",
+};
+// Parse a session title into display tokens; mark the ones worth explaining and build their steps.
+function parseGuide(title) {
+  // Merge distance phrases ("1 mile", "1 km") so they read as one token.
+  const merged = [];
+  const words = title.split(/\\s+/);
+  for (let i = 0; i < words.length; i++) {
+    if (/^\\d+(?:\\.\\d+)?$/.test(words[i]) && /^(miles?|km|k)$/i.test(words[i + 1] || "")) { merged.push(words[i] + " " + words[i + 1]); i++; }
+    else merged.push(words[i]);
+  }
+  const hasReps = merged.some((w) => /^\\d+$/.test(w)) && merged.includes("\\u00D7");
+  let rec = false, usedEffort = false;
+  const tokens = [];
+  merged.forEach((w) => {
+    if (w === "/") { rec = true; tokens.push({ text: w, plain: true }); return; }
+    if (w === "\\u00D7") { tokens.push({ text: w, plain: true }); return; }
+    let step = null;
+    if (/^\\d+$/.test(w) && hasReps && !rec) {
+      step = { label: "How many", body: "Repeat the main effort this many times \\u2014 here, " + w + (Number(w) === 1 ? " rep." : " reps.") };
+    } else if (/^\\d+[\\u2032]$/.test(w)) { // minutes, e.g. 8'
+      const mins = w.replace("\\u2032", "");
+      step = rec
+        ? { label: "Recovery", body: "Easy recovery between efforts \\u2014 " + mins + " minute" + (mins === "1" ? "" : "s") + " of gentle jogging." }
+        : hasReps
+          ? { label: "Each effort", body: "How long each effort lasts \\u2014 " + mins + " minute" + (mins === "1" ? "" : "s") + ". (\\u2032 means minutes, \\u2033 means seconds.)" }
+          : { label: "Duration", body: "How long to run for \\u2014 " + mins + " minutes at the effort shown. (\\u2032 means minutes.)" };
+    } else if (/^\\d+[\\u2033]$/.test(w)) { // seconds, e.g. 90"
+      const secs = w.replace("\\u2033", "");
+      step = rec
+        ? { label: "Recovery", body: "A short easy recovery \\u2014 " + secs + " seconds. (\\u2033 means seconds.)" }
+        : { label: "Each effort", body: "A short, sharp effort \\u2014 " + secs + " seconds. (\\u2033 means seconds.)" };
+    } else if (/^\\d+(?:\\.\\d+)?\\s?(?:miles?|km|m)$/i.test(w)) { // distance, e.g. 800m, 1 mile
+      step = rec
+        ? { label: "Recovery", body: "Recover over " + w + " of easy jogging." }
+        : { label: "Each effort", body: "How far each effort covers \\u2014 " + w + "." };
+    } else {
+      const key = w.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const hintKey = EFFORT_HINT[key] ? key : (key.startsWith("vo") ? "vo2" : null);
+      if (hintKey && !usedEffort && !rec) {
+        usedEffort = true;
+        step = { label: "The effort", body: "The pace or effort for the work \\u2014 \\u201C" + w + "\\u201D: " + EFFORT_HINT[hintKey] };
+      }
+    }
+    tokens.push({ text: w, step });
+  });
+  return tokens;
+}
+// Count of explainable tokens — used to decide whether today's title is rich enough to teach from.
+function guideStepCount(title) { return parseGuide(title).filter((t) => t.step).length; }
+const GUIDE_EXAMPLE = "4 \\u00D7 8\\u2032 threshold / 90\\u2033 jog";
+let GUIDE = null;
+function ensureGuideOv() {
+  if ($("guideOv")) return;
+  const ov = el('<div class="guide-ov" id="guideOv"><div class="guide-card">' +
+    '<div class="guide-eyebrow" id="guideEyebrow">Understanding your sessions</div>' +
+    '<div class="guide-title" id="guideTitle"></div>' +
+    '<div class="guide-cap"><div class="guide-cap-h" id="guideCapH"></div><div class="guide-cap-b" id="guideCapB"></div></div>' +
+    '<div class="guide-foot"><div class="guide-dots" id="guideDots"></div><div class="guide-btns"><button class="guide-skip" id="guideSkip">Skip</button><button class="guide-next" id="guideNext">Next</button></div></div>' +
+    '</div></div>');
+  document.body.appendChild(ov);
+  $("guideNext").onclick = guideNext;
+  $("guideSkip").onclick = closeGuide;
+  ov.addEventListener("click", (e) => { if (e.target === ov) closeGuide(); });
+}
+// steps = [intro, ...token steps, outro]; each token step points at the token index to illuminate.
+function openSessionGuide(title, opts) {
+  opts = opts || {};
+  ensureGuideOv();
+  const tokens = parseGuide(title);
+  const steps = [{ intro: true }];
+  tokens.forEach((t, i) => { if (t.step) steps.push({ ti: i, label: t.step.label, body: t.step.body }); });
+  steps.push({ outro: true });
+  GUIDE = { title, tokens, steps, i: 0, onClose: opts.onClose, fromSupport: !!opts.fromSupport };
+  renderGuide();
+  const ov = $("guideOv"); ov.classList.add("on");
+}
+function guideTitleHtml(activeTi) {
+  return GUIDE.tokens.map((t, i) => {
+    if (t.plain) return '<span class="gt-sep">' + esc(t.text) + '</span>';
+    const on = activeTi === i;
+    const dim = activeTi != null && !on;
+    return '<span class="gtok' + (on ? " on" : "") + (dim ? " dim" : "") + '">' + esc(t.text) + '</span>';
+  }).join(" ");
+}
+function renderGuide() {
+  const st = GUIDE.steps[GUIDE.i];
+  const activeTi = st && st.ti != null ? st.ti : null;
+  $("guideTitle").innerHTML = guideTitleHtml(activeTi);
+  const h = $("guideCapH"), b = $("guideCapB");
+  if (st.intro) { h.textContent = "Let\\u2019s decode your sessions"; b.textContent = "Every session is written in a simple shorthand. Let\\u2019s go through what the numbers mean, one at a time."; }
+  else if (st.outro) { h.textContent = "That\\u2019s the shorthand!"; b.textContent = "You\\u2019ll see this on every session. You can revisit it any time in Support \\u2192 Understanding my sessions."; }
+  else { h.textContent = st.label; b.textContent = st.body; }
+  $("guideNext").textContent = GUIDE.i >= GUIDE.steps.length - 1 ? "Got it" : "Next";
+  $("guideSkip").style.visibility = GUIDE.i >= GUIDE.steps.length - 1 ? "hidden" : "visible";
+  $("guideDots").innerHTML = GUIDE.steps.map((_, i) => '<span class="gd' + (i === GUIDE.i ? " on" : "") + '"></span>').join("");
+}
+function guideNext() { if (GUIDE.i >= GUIDE.steps.length - 1) return closeGuide(); GUIDE.i++; renderGuide(); }
+function closeGuide() {
+  const ov = $("guideOv"); if (ov) ov.classList.remove("on");
+  try { localStorage.setItem("interun_guide_seen", "1"); } catch (e) {}
+  const cb = GUIDE && GUIDE.onClose; GUIDE = null; if (cb) cb();
+}
+function guideSeen() { try { return localStorage.getItem("interun_guide_seen") === "1"; } catch (e) { return false; } }
+// Auto-run the guide the first time a personalised user opens Today (using today's session if it's
+// rich enough to teach from, otherwise a clear worked example).
+function maybeAutoGuide() {
+  if (guideSeen() || !profile.personalized || GUIDE) return;
+  // Hold off while the splash / welcome-back overlays are still up — it fires when they clear.
+  if ($("splash") || $("welcomeback")) return;
+  const s = selectedSession();
+  const title = s && guideStepCount(s.title) >= 2 ? s.title : GUIDE_EXAMPLE;
+  setTimeout(() => { if (!guideSeen() && !GUIDE && state.tab === "today" && !state.screen && !$("welcomeback")) openSessionGuide(title, {}); }, 550);
+}
+
 // ---- Router ---------------------------------------------------------------
 const TITLES = { today: "Today", plan: "Your Plan", activities: "Activities", community: "Community", support: "Support" };
 function render() {
@@ -2081,7 +2326,7 @@ function render() {
     return;
   }
   $("topTitle").textContent = state.support ? "Support" : TITLES[state.tab];
-  if (state.tab === "today") { fetchWeather(); v.innerHTML = viewToday(); }
+  if (state.tab === "today") { fetchWeather(); v.innerHTML = viewToday(); maybeAutoGuide(); }
   else if (state.tab === "plan") v.innerHTML = viewPlan();
   else if (state.tab === "activities") v.innerHTML = viewActivities();
   else if (state.tab === "community") v.innerHTML = viewCommunity();
@@ -2099,6 +2344,7 @@ function wire() {
   document.querySelectorAll("[data-wk]").forEach((b) => b.onclick = () => { state.planWeek = Number(b.dataset.wk); document.querySelectorAll("[data-wk]").forEach((x) => x.setAttribute("aria-pressed", x === b)); $("weekDetail").innerHTML = weekDetail(); wireSessionTaps(); });
   document.querySelectorAll("[data-at]").forEach((b) => b.onclick = () => { state.actTab = b.dataset.at; render(); });
   document.querySelectorAll("[data-hub]").forEach((b) => b.onclick = () => { state.support = b.dataset.hub; render(); });
+  const guideReplay = $("guideReplay"); if (guideReplay) guideReplay.onclick = () => openSessionGuide(GUIDE_EXAMPLE, { fromSupport: true });
   const back = $("supBack"); if (back) back.onclick = () => { state.support = null; render(); };
   document.querySelectorAll('[data-chk="rf"]').forEach((c) => c.onchange = runRf);
   document.querySelectorAll('[data-chk="reds"]').forEach((c) => c.onchange = runReds);
@@ -2199,8 +2445,11 @@ render();
       const btn = $("welcomeGo"); if (btn) btn.onclick = go;
     }, 1300);
   } else {
-    sp.addEventListener("click", removeSplash);
-    setTimeout(removeSplash, 1900);
+    // Returning user: brand splash → a brief personalised welcome with a rotating quote → Today.
+    let started = false;
+    const go = () => { if (started) return; started = true; removeSplash(); showWelcomeBack(); };
+    sp.addEventListener("click", go);
+    setTimeout(go, 1600);
   }
 })();
 // Register the service worker only where it actually exists (the GitHub Pages PWA build). We probe

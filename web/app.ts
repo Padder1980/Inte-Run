@@ -464,8 +464,21 @@ select.sel { font: inherit; font-size: 13.5px; color: var(--ink); background: va
 .lv.on { color: var(--eff-easy); } .lv.fast { color: var(--eff-moderate); } .lv.slow { color: var(--eff-hard); }
 .live-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0; }
 .live-controls .primary { margin: 0; grid-column: 1 / -1; }
+.live-controls.two { grid-template-columns: 1fr 1fr; }
+.live-controls.two .primary { grid-column: auto; }
 .ctrl { font: inherit; font-size: 14px; font-weight: 600; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; cursor: pointer; }
 .ctrl:disabled { opacity: .45; cursor: not-allowed; }
+.ctrl.danger { color: var(--rest); border-color: color-mix(in srgb, var(--rest) 40%, var(--line)); }
+/* Session-complete screen */
+.done-hero { text-align: center; background: linear-gradient(150deg, color-mix(in srgb, var(--ready) 16%, var(--surface)), var(--surface)); }
+.dn-badge { width: 54px; height: 54px; margin: 2px auto 10px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--ready); color: #fff; box-shadow: 0 6px 18px color-mix(in srgb, var(--ready) 40%, transparent); }
+.dn-badge svg { width: 28px; height: 28px; }
+.dn-h { font-size: 24px; font-weight: 800; letter-spacing: -.02em; }
+.dn-sub { font-size: 13px; color: var(--ink-soft); margin-top: 3px; }
+.dn-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.dn-stat .dn-v { font-size: 22px; font-weight: 750; letter-spacing: -.02em; }
+.dn-stat .dn-v small { font-size: 12px; color: var(--ink-faint); font-weight: 500; }
+.dn-stat .dn-k { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); margin-top: 2px; }
 .mini-btn { margin-top: 8px; display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--accent); background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; cursor: pointer; }
 .trial-ov { position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; padding: 20px; background: color-mix(in srgb, var(--ink) 55%, transparent); backdrop-filter: blur(4px); }
 .trial-ov.on { display: flex; }
@@ -1595,10 +1608,24 @@ let LIVE = null;
 const GPS_AVAILABLE = typeof navigator !== "undefined" && "geolocation" in navigator;
 const VOICE_AVAILABLE = typeof window !== "undefined" && "speechSynthesis" in window;
 let VOICE_ON = (() => { try { return localStorage.getItem("interun_voice") !== "0"; } catch (e) { return true; } })();
+// Voices load asynchronously in most browsers — cache them and refresh on the change event.
+let VOICES = [];
+function loadVoices() { try { VOICES = window.speechSynthesis.getVoices() || []; } catch (e) { VOICES = []; } }
+if (VOICE_AVAILABLE) { loadVoices(); try { window.speechSynthesis.addEventListener("voiceschanged", loadVoices); } catch (e) {} }
+function pickVoice() {
+  if (!VOICES.length) loadVoices();
+  return VOICES.find((v) => /en[-_]GB/i.test(v.lang)) || VOICES.find((v) => /^en/i.test(v.lang)) || VOICES[0] || null;
+}
 // Speak a phrase aloud during a run. Best-effort: unsupported browsers / muted state are no-ops.
 function speak(text) {
   if (!VOICE_ON || !VOICE_AVAILABLE || !text) return;
-  try { const u = new SpeechSynthesisUtterance(text); u.rate = 1.03; u.pitch = 1; u.lang = "en-GB"; u.volume = 1; window.speechSynthesis.speak(u); } catch (e) {}
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    const v = pickVoice(); if (v) { u.voice = v; u.lang = v.lang; } else u.lang = "en-GB";
+    u.rate = 1.03; u.pitch = 1; u.volume = 1;
+    window.speechSynthesis.resume(); // iOS can leave the queue paused between utterances
+    window.speechSynthesis.speak(u);
+  } catch (e) {}
 }
 function stopSpeech() { try { if (VOICE_AVAILABLE) window.speechSynthesis.cancel(); } catch (e) {} }
 // Natural spoken form of a duration, e.g. 330 -> "5 minutes 30 seconds".
@@ -1614,17 +1641,21 @@ function cueSpeech(cue) {
   if (cue.kind === "pace") return cue.message.split(" — ").join(", ").split("—").join(", ").split("/km").join(" per kilometre");
   if (cue.kind === "paused") return "Paused.";
   if (cue.kind === "resumed") return "Resumed.";
-  if (cue.kind === "session-complete") return "Session complete. Great work.";
-  return null; // session-start is spoken on the Start gesture (below) to unlock speech on iOS
+  // session-start and session-complete are spoken explicitly (gesture / finish handler) to avoid
+  // doubling and to guarantee the celebratory line lands.
+  return null;
 }
 function startSession() {
   const s = rawToday();
   LIVE = { session: s, rt: new RC.LiveSession(s), mode: null, acquiring: false, gpsErr: null,
     startMs: 0, pausedMs: 0, pauseStart: 0, vms: 0, dist: 0, hr: 105, paceHint: null,
     timer: null, ui: null, watchId: null, wakeLock: null, lastLat: null, lastLon: null, acc: null,
-    speed: 20, lastStep: -1, quirk: 0, done: false, kmDone: 0, lastKmMs: 0 };
+    speed: 20, lastStep: -1, quirk: 0, started: false, done: false, completedFull: false, summary: null, kmDone: 0, lastKmMs: 0 };
   state.screen = "live"; render();
 }
+// True while a session is under way (started, not yet finished) — the app locks onto the live
+// screen during this window so a stray tap can't abandon the run.
+function liveRunning() { return !!(LIVE && LIVE.started && !LIVE.done); }
 // Announce a fresh whole-kilometre split (spoken + logged) as the runner crosses it.
 function checkSplits() {
   if (!LIVE || LIVE.mode == null) return;
@@ -1659,11 +1690,11 @@ function releaseWakeLock() { try { if (LIVE && LIVE.wakeLock) { LIVE.wakeLock.re
 // Begin a session: try real GPS first, fall back to the simulator when geolocation is
 // unavailable or denied (e.g. inside the Claude artifact sandbox), so the demo always works.
 function beginLive() {
-  const st = $("lStart"); if (st) st.style.display = "none";
-  const pa = $("lPause"); if (pa) pa.disabled = false;
-  const fi = $("lFinish"); if (fi) fi.disabled = false;
-  // Speak inside the tap gesture — announces the start and unlocks TTS on iOS for later cues.
-  speak("Let's go. " + LIVE.session.title.split("·")[0] + ".");
+  LIVE.started = true;
+  // Speak inside the tap gesture — a short phrase reliably unlocks TTS on iOS for later cues.
+  if (VOICE_AVAILABLE && VOICE_ON) { try { window.speechSynthesis.cancel(); } catch (e) {} }
+  speak("Let's go.");
+  render(); // re-render to lock the screen (hide nav + back) now the run is starting
   if (GPS_AVAILABLE) {
     LIVE.acquiring = true; renderLiveNow();
     navigator.geolocation.getCurrentPosition(
@@ -1725,8 +1756,13 @@ function renderLiveNow() {
   const badge = $("gpsBadge"); if (badge) badge.textContent = gpsStatusText();
 }
 function viewLive() {
+  if (LIVE.done) return viewLiveComplete();
   const s = LIVE.session;
-  return '<button class="backbtn" id="liveBack">‹ Today</button>' +
+  const running = LIVE.started;
+  const controls = running
+    ? '<div class="live-controls two"><button class="ctrl" id="lPause">Pause</button><button class="ctrl danger" id="lFinish">End session</button></div>'
+    : '<div class="live-controls"><button class="primary" id="lStart">' + ICON.play + ' Start</button></div>';
+  return (running ? '' : '<button class="backbtn" id="liveBack">‹ Today</button>') +
     '<div class="card live-hero"><div class="live-hero-top"><div class="eyebrow">Live session · <span id="gpsBadge">' + gpsStatusText() + '</span></div>' +
     (VOICE_AVAILABLE ? '<button class="voice-btn' + (VOICE_ON ? ' on' : '') + '" id="lVoice" aria-label="Toggle voice coaching">' + (VOICE_ON ? ICON.vox : ICON.voxOff) + '</button>' : '') +
     '</div><div class="live-title">' + s.title + '</div>' +
@@ -1737,8 +1773,21 @@ function viewLive() {
     '<div><div class="lk">Average</div><div class="lv num" id="lAvg">—</div></div>' +
     '<div><div class="lk">Lap</div><div class="lv num" id="lLap">—</div></div></div></div>' +
     '<div class="card lstep" id="lStepCard"><div class="cnt">Press start when you\\'re ready.</div></div>' +
-    '<div class="live-controls"><button class="primary" id="lStart">' + ICON.play + ' Start</button><button class="ctrl" id="lPause" disabled>Pause</button><button class="ctrl" id="lFinish" disabled>Finish</button></div>' +
+    controls +
     '<div class="card"><div class="subhead" style="margin-top:0">Coaching cues</div><div class="cuelog" id="lCues"><div style="color:var(--ink-faint);font-size:13px">Cues will appear as you run.</div></div></div>';
+}
+function viewLiveComplete() {
+  const sm = LIVE.summary || { distKm: "0.00", time: "0:00", pace: "—", saved: false };
+  const stat = (k, v) => '<div class="dn-stat"><div class="dn-v num">' + v + '</div><div class="dn-k">' + k + '</div></div>';
+  const controls = sm.saved
+    ? '<div class="live-controls"><button class="primary" id="lDone">' + ICON.check + ' View in Activities</button></div>'
+    : '<div class="live-controls two"><button class="ctrl" id="lDiscard">Discard</button><button class="primary" id="lSave">' + ICON.check + ' Save session</button></div>';
+  return '<div class="card live-hero done-hero"><div class="dn-badge">' + ICON.check + '</div>' +
+    '<div class="dn-h">' + (LIVE.completedFull ? "Well done!" : "Session ended") + '</div>' +
+    '<div class="dn-sub">' + (LIVE.completedFull ? "You completed " : "You logged ") + esc(LIVE.session.title) + (sm.saved ? " · saved" : "") + '</div>' +
+    '<div class="dn-stats">' + stat("Distance", sm.distKm + '<small> km</small>') + stat("Time", sm.time) + stat("Avg pace", sm.pace + '<small> /km</small>') + '</div></div>' +
+    controls +
+    '<div class="card"><div class="subhead" style="margin-top:0">Coaching cues</div><div class="cuelog" id="lCues"></div></div>';
 }
 function livePace(step) { const band = step && step.targetPace; const mid = band ? (band.minSecPerKm + band.maxSecPerKm) / 2 : 360; LIVE.quirk += (Math.random() - 0.5) * 0.03; LIVE.quirk *= 0.9; if (Math.random() < 0.04) LIVE.quirk += (Math.random() - 0.5) * 0.28; return Math.max(120, mid * (1 + LIVE.quirk)); }
 function liveHr(step) { if (!step) return 105; if (step.kind === "rep") return 176; if (step.kind === "warmup" || step.kind === "cooldown") return 130; if (step.kind === "recovery") return 148; return 150; }
@@ -1788,25 +1837,33 @@ function stopLive() {
   releaseWakeLock();
 }
 function liveFinish(complete) {
-  if (LIVE.done) return; LIVE.done = true; stopLive();
+  if (LIVE.done) return;
+  LIVE.done = true; LIVE.completedFull = !!complete; stopLive();
   const now = liveNowMs();
   if (!complete) LIVE.rt.stop(now).forEach(liveCue);
   const snap = LIVE.rt.snapshot(now);
   const km = snap.distanceMeters / 1000;
-  if (km > 0.05) { state.logged.unshift({ t: LIVE.session.title, d: "Today", dist: km.toFixed(2) + " km", time: fmtPace(snap.elapsedSeconds), pace: (snap.averagePaceSecPerKm ? fmtPace(snap.averagePaceSecPerKm) : "—") + " /km" }); saveRuns(); }
-  // Reflect the completed session in the training calendar.
+  LIVE.summary = { distKm: km.toFixed(2), time: fmtPace(snap.elapsedSeconds), pace: snap.averagePaceSecPerKm ? fmtPace(snap.averagePaceSecPerKm) : "—", saved: false, meaningful: km > 0.05 };
+  // Clear, unmissable end — spoken celebration plus a completion screen the user must act on.
+  speak(complete ? "Well done. Session complete." : "Session ended.");
+  render();
+}
+// Persist the just-finished run to Activities + tick it off in the training calendar.
+function saveLiveSession() {
+  const sm = LIVE.summary; if (!sm || sm.saved) return;
+  if (sm.meaningful) { state.logged.unshift({ t: LIVE.session.title, d: "Today", dist: sm.distKm + " km", time: sm.time, pace: sm.pace + " /km" }); saveRuns(); }
   const wk0 = PLAN.weeks[0]; const dn = DAY_ORDER[LIVE.session.dayOfWeek];
-  if (complete && wk0) { const m = wk0.sessions.find((s) => s.day === dn && s.title === LIVE.session.title); if (m) state.done[doneKey(wk0.index, m)] = true; }
-  const st = $("lStart"), pa = $("lPause"), fi = $("lFinish");
-  if (st) { st.style.display = "none"; }
-  if (pa) pa.disabled = true;
-  if (fi) { fi.textContent = "Done"; fi.disabled = false; fi.onclick = () => { state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); }; }
+  if (LIVE.completedFull && wk0) { const m = wk0.sessions.find((s) => s.day === dn && s.title === LIVE.session.title); if (m) state.done[doneKey(wk0.index, m)] = true; }
+  sm.saved = true;
 }
 
 // ---- Router ---------------------------------------------------------------
 const TITLES = { today: "Today", plan: "Your Plan", activities: "Activities", community: "Community", support: "Support" };
 function render() {
   const v = $("view");
+  // Lock onto the live screen while a run is under way: hide the bottom nav so a stray tap can't
+  // abandon it. Every other screen shows the nav.
+  const nav = $("nav"); if (nav) nav.style.display = liveRunning() ? "none" : "";
   if (state.screen === "setup") {
     $("topTitle").textContent = "Your profile";
     draft = { days: profile.daysPerWeek, strength: profile.strength ? "1" : "0", returning: profile.returning ? "1" : "0", status: profile.status || (profile.noRecent ? "new" : "regular"), fitsrc: (profile.fitSrc === "predicted" ? "predicted" : "recent"), avatar: profile.avatar || "" };
@@ -1926,6 +1983,10 @@ function wire() {
     }
   };
   const lFinish = $("lFinish"); if (lFinish && !LIVE.done) lFinish.onclick = () => liveFinish(false);
+  // Completion screen: save the run to Activities, discard it, or move on to Activities.
+  const lSave = $("lSave"); if (lSave) lSave.onclick = () => { saveLiveSession(); render(); };
+  const lDiscard = $("lDiscard"); if (lDiscard) lDiscard.onclick = () => { stopSpeech(); LIVE = null; state.screen = null; state.tab = "today"; render(); };
+  const lDone = $("lDone"); if (lDone) lDone.onclick = () => { stopSpeech(); LIVE = null; state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); };
 }
 function buildNav() {
   $("nav").innerHTML = ["today","plan","activities","community","support"].map((t) => '<button class="navbtn' + (t===state.tab?" on":"") + '" data-tab="' + t + '">' + ICON[t] + '<span class="nl">' + TITLES[t].replace("Your ","") + '</span></button>').join("");
@@ -1933,8 +1994,8 @@ function buildNav() {
 }
 $("bellBtn").innerHTML = ICON.bell; $("themeBtn").innerHTML = ICON.theme; $("calBtn").innerHTML = ICON.cal; renderAvatar();
 $("themeBtn").onclick = () => { const cur = document.documentElement.getAttribute("data-theme"); document.documentElement.setAttribute("data-theme", cur === "dark" ? "light" : cur === "light" ? "dark" : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark")); };
-$("profileBtn").onclick = () => { stopTrialRun(); state.screen = "setup"; render(); };
-$("calBtn").onclick = () => { stopTrialRun(); state.screen = "calendar"; render(); };
+$("profileBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); state.screen = "setup"; render(); };
+$("calBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); state.screen = "calendar"; render(); };
 seedDone();
 buildNav();
 render();

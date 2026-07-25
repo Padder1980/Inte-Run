@@ -469,6 +469,18 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
 /* Setup banner */
 .setup-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; background: color-mix(in srgb, var(--accent) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); border-radius: 14px; padding: 13px 15px; margin-bottom: 14px; cursor: pointer; font: inherit; color: var(--ink); }
 .setup-banner b { font-size: 13.5px; } .setup-banner .sb-sub { font-size: 12px; color: var(--ink-soft); margin-top: 2px; } .setup-banner span { color: var(--accent); font-weight: 600; font-size: 13px; white-space: nowrap; }
+/* Adaptive fitness-suggestion banner (after a run implies changed fitness) */
+.fit-banner { display: flex; gap: 12px; width: 100%; border-radius: 14px; padding: 14px; margin-bottom: 14px; border: 1px solid; }
+.fit-banner.up { background: linear-gradient(158deg, color-mix(in srgb, var(--ready) 14%, var(--surface)), var(--surface) 72%); border-color: color-mix(in srgb, var(--ready) 34%, var(--line)); }
+.fit-banner.down { background: linear-gradient(158deg, color-mix(in srgb, var(--ease) 14%, var(--surface)), var(--surface) 72%); border-color: color-mix(in srgb, var(--ease) 34%, var(--line)); }
+.fit-banner .fb-ic { flex: none; width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #fff; }
+.fit-banner.up .fb-ic { background: var(--ready); } .fit-banner.down .fb-ic { background: var(--ease); }
+.fit-banner .fb-ic svg { width: 20px; height: 20px; }
+.fit-banner .fb-h { font-size: 14.5px; font-weight: 750; letter-spacing: -.01em; }
+.fit-banner .fb-b { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; line-height: 1.45; }
+.fit-banner .fb-actions { display: flex; gap: 8px; margin-top: 11px; }
+.fit-banner .fb-yes { font: inherit; font-size: 13px; font-weight: 650; color: var(--accent-ink); background: var(--accent); border: 0; border-radius: 10px; padding: 9px 15px; cursor: pointer; }
+.fit-banner .fb-no { font: inherit; font-size: 13px; font-weight: 600; color: var(--ink-soft); background: transparent; border: 1px solid var(--line); border-radius: 10px; padding: 9px 15px; cursor: pointer; }
 
 /* Live session */
 .live-hero { background: linear-gradient(150deg, color-mix(in srgb, var(--accent) 14%, var(--surface)), var(--surface)); }
@@ -590,6 +602,8 @@ function bindTimeInput(el) {
 }
 const ICON = {
   gauge: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19a8 8 0 1 1 16 0"/><path d="M13.4 12.6 18 8"/><circle cx="12" cy="19" r="1.4" fill="currentColor" stroke="none"/></svg>',
+  trendUp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>',
+  trendDown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l6 6 4-4 8 8"/><path d="M17 17h4v-4"/></svg>',
   timer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4"/><circle cx="12" cy="14" r="8"/><path d="M12 14V10"/></svg>',
   today: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>',
   plan: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h4"/></svg>',
@@ -630,7 +644,7 @@ function futureIso(days) { const d = new Date(); d.setDate(d.getDate() + days); 
 function fmtTimeFull(s) { s = Math.round(s); const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), x = s%60; const p = (n) => String(n).padStart(2,"0"); return h>0 ? h+":"+p(m)+":"+p(x) : m+":"+p(x); }
 
 // An example runner to start from — until you make it yours.
-const DEFAULT_PROFILE = { name: "", avatar: "", status: "regular", goalDist: "half", targetS: 6300, raceDate: futureIso(245), fitSrc: "recent", recentDistM: 5000, recentTimeS: 1500, noRecent: false, easyPaceS: 0, oneKmS: 255, daysPerWeek: 5, yearsRunning: 3, weeklyVolumeKm: 30, age: 38, sex: "", strength: true, returning: false, personalized: false };
+const DEFAULT_PROFILE = { name: "", avatar: "", status: "regular", goalDist: "half", targetS: 6300, raceDate: futureIso(245), startDateIso: "", longRunDay: 6, fitSrc: "recent", recentDistM: 5000, recentTimeS: 1500, noRecent: false, easyPaceS: 0, oneKmS: 255, daysPerWeek: 5, yearsRunning: 3, weeklyVolumeKm: 30, age: 38, sex: "", strength: true, returning: false, personalized: false };
 
 function loadProfile() { try { const s = localStorage.getItem("rc_profile_v1"); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 function saveProfileStore() { try { localStorage.setItem("rc_profile_v1", JSON.stringify(profile)); } catch (e) {} }
@@ -663,9 +677,10 @@ function applyProfile(pf) {
     const proj5k = Math.round(RC.riegelPredict(1000, pf.oneKmS, 5000));
     if (proj5k < recent.timeSeconds) recent = { distanceMeters: 5000, timeSeconds: proj5k };
   }
-  const ath = { daysPerWeek: pf.daysPerWeek, recent, experience, includeStrength: pf.strength, returningFromInjury: pf.returning, runWalk: pf.status === "new" };
+  const ath = { daysPerWeek: pf.daysPerWeek, recent, experience, includeStrength: pf.strength, returningFromInjury: pf.returning, runWalk: pf.status === "new", longRunDay: pf.longRunDay != null ? pf.longRunDay : 6 };
   if (pf.oneKmS > 0) ath.oneKmTrialSeconds = pf.oneKmS;
-  const goal = { distance: pf.goalDist, targetTimeSeconds: pf.targetS, raceDateIso: pf.raceDate, startDateIso: todayIso() };
+  const startDateIso = (pf.startDateIso && pf.startDateIso >= todayIso()) ? pf.startDateIso : todayIso();
+  const goal = { distance: pf.goalDist, targetTimeSeconds: pf.targetS, raceDateIso: pf.raceDate, startDateIso };
   const plan = RC.buildPlanSummary(ath, goal); // may throw
   const raw = RC.generatePlan(ath, goal); // raw sessions with steps, for the live runtime
   // Fitness profile is built from real efforts only (the entered 5 km and/or the 1 km trial); a pure
@@ -686,7 +701,7 @@ let PLAN, RAW, FITNESS, CLASS, MASTERS;
 function recompute() { const r = applyProfile(profile); PLAN = r.plan; RAW = r.raw; FITNESS = r.fitness; CLASS = r.classification; MASTERS = r.masters; }
 try { recompute(); } catch (e) { profile = Object.assign({}, DEFAULT_PROFILE); recompute(); }
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: loadRuns(), weather: "hot", wx: null, trialPending: false, trialSaved: null, done: {}, dayOverride: {}, selDay: 4 };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), trialPending: false, trialSaved: null, done: {}, dayOverride: {}, selDay: 4 };
 // Effective day index for a session, honouring any user reschedule. Works for raw sessions
 // (dayOfWeek) and summary sessions (dayIndex), keyed by the shared session id.
 function effDay(s) { const o = state.dayOverride[s.id]; return o != null ? o : (s.dayOfWeek != null ? s.dayOfWeek : s.dayIndex); }
@@ -794,7 +809,7 @@ function viewToday() {
   let cta = "";
   if (sess && PRIMARY_TYPES[sess.type]) cta = '<button class="primary start-btn" id="startSession">' + ICON.play + ' Start session</button>';
   else if (sess) cta = '<button class="primary start-btn" id="viewSession">' + ICON.play + ' View session</button>';
-  return banner + greeting + weekStrip() +
+  return banner + fitSuggestBanner() + greeting + weekStrip() +
     heroWorkout() +
     cta +
     '<div class="tsq-row">' + conditionsSquare(sess) + feelSquare() + '</div>';
@@ -1345,6 +1360,8 @@ const DIST_OPTS = [["5k","5 km"],["10k","10 km"],["half","Half marathon"],["mara
 const REC_OPTS = [["1609.344","1 mile"],["5000","5 km"],["10000","10 km"],["21097.5","Half marathon"]];
 function opt(list, val) { return list.map((o) => '<option value="' + o[0] + '"' + (String(o[0]) === String(val) ? " selected" : "") + '>' + o[1] + '</option>').join(""); }
 function ageOpts(sel) { let o = ""; for (let a = 12; a <= 90; a++) o += '<option value="' + a + '"' + (a === Number(sel) ? " selected" : "") + '>' + a + '</option>'; return o; }
+const DAY_NAMES_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+function dayOpts(sel) { const s = sel != null ? Number(sel) : 6; return DAY_NAMES_FULL.map((d, i) => '<option value="' + i + '"' + (i === s ? " selected" : "") + '>' + d + '</option>').join(""); }
 function seg(name, opts, val) { return '<div class="seg" data-set="' + name + '">' + opts.map((o) => '<button data-v="' + o[0] + '"' + (String(o[0]) === String(val) ? ' class="on"' : '') + '>' + o[1] + '</button>').join("") + '</div>'; }
 // ---- Name & profile picture ----------------------------------------------
 function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
@@ -1418,6 +1435,8 @@ function viewSetup() {
   // 4 · A few details
   const secDetails =
     '<div class="q" style="margin-top:0"><label>How many days a week will you run? <span class="q-hint">we\\u2019ll shape the plan around this</span></label>' + seg("days", [["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]], p.daysPerWeek) + '</div>' +
+    '<div class="q"><label>Which day suits your long run? <span class="q-hint">we\\u2019ll build the week around it</span></label><select class="sel" id="s_longday" style="max-width:200px">' + dayOpts(p.longRunDay) + '</select></div>' +
+    '<div class="q"><label>When do you want to start? <span class="q-hint">a mid-week start gives a shorter first week</span></label><input class="sel num" id="s_startdate" type="date" value="' + (p.startDateIso || todayIso()) + '" min="' + todayIso() + '"></div>' +
     '<div class="q"><label>Age</label><select class="sel" id="s_age" style="max-width:140px">' + ageOpts(p.age) + '</select></div>' +
     '<div class="q"><label>Sex <span class="q-hint">helps tailor advice</span></label><select class="sel" id="s_sex" style="max-width:200px"><option value=""' + (!p.sex?" selected":"") + '>Prefer not to say</option><option value="female"' + (p.sex==="female"?" selected":"") + '>Female</option><option value="male"' + (p.sex==="male"?" selected":"") + '>Male</option></select></div>' +
     '<div class="q"><label>Include strength &amp; conditioning?</label>' + seg("strength", [["1","Yes"],["0","No"]], p.strength?"1":"0") + '</div>' +
@@ -1488,11 +1507,15 @@ function draftFromForm() {
   const raceDate = $("s_date").value;
   if (!raceDate) throw new Error("Pick your " + (goalCfg.time ? "race" : "target") + " date.");
   if (raceDate <= todayIso()) throw new Error("Your " + (goalCfg.time ? "race" : "target") + " date needs to be in the future.");
+  const longRunDay = $("s_longday") ? Number($("s_longday").value) : (profile.longRunDay != null ? profile.longRunDay : 6);
+  let startDateIso = $("s_startdate") ? $("s_startdate").value : (profile.startDateIso || "");
+  if (startDateIso && startDateIso < todayIso()) startDateIso = todayIso();
+  if (startDateIso && startDateIso >= raceDate) throw new Error("Your start date needs to be before your race date.");
   return {
     name: ($("s_name") ? $("s_name").value : "").trim().slice(0, 40),
     avatar: draft.avatar != null ? draft.avatar : (profile.avatar || ""),
     status,
-    goalDist, targetS, raceDate,
+    goalDist, targetS, raceDate, startDateIso, longRunDay,
     fitSrc, recentDistM, recentTimeS, noRecent, easyPaceS, oneKmS, daysPerWeek: Number(draft.days), yearsRunning: profile.yearsRunning || 3,
     weeklyVolumeKm: profile.weeklyVolumeKm, age: Number($("s_age").value) || 35, sex: $("s_sex").value,
     strength: draft.strength === "1", returning: draft.returning === "1", personalized: true,
@@ -1944,7 +1967,7 @@ function liveFinish(complete) {
   if (!complete) LIVE.rt.stop(now).forEach(liveCue);
   const snap = LIVE.rt.snapshot(now);
   const km = snap.distanceMeters / 1000;
-  LIVE.summary = { distKm: km.toFixed(2), time: fmtPace(snap.elapsedSeconds), pace: snap.averagePaceSecPerKm ? fmtPace(snap.averagePaceSecPerKm) : "—", saved: false, meaningful: km > 0.05 };
+  LIVE.summary = { distKm: km.toFixed(2), time: fmtPace(snap.elapsedSeconds), pace: snap.averagePaceSecPerKm ? fmtPace(snap.averagePaceSecPerKm) : "—", avgPaceSec: snap.averagePaceSecPerKm || 0, saved: false, meaningful: km > 0.05 };
   // Clear, unmissable end — spoken celebration plus a completion screen the user must act on.
   speak(complete ? "Well done" + nameTail() + ". Session complete." : "Session ended" + nameTail() + ".");
   render();
@@ -1956,6 +1979,62 @@ function saveLiveSession() {
   const wk0 = PLAN.weeks[0]; const dn = DAY_ORDER[LIVE.session.dayOfWeek];
   if (LIVE.completedFull && wk0) { const m = wk0.sessions.find((s) => s.day === dn && s.title === LIVE.session.title); if (m) state.done[doneKey(wk0.index, m)] = true; }
   sm.saved = true;
+  assessFitnessFromRun(LIVE.session.type, sm.avgPaceSec, Number(sm.distKm));
+}
+// ---- Adaptive re-estimation: does the completed run imply a different fitness than the plan? -----
+function loadFitSuggest() { try { return JSON.parse(localStorage.getItem("interun_fitsuggest") || "null"); } catch (e) { return null; } }
+function saveFitSuggest() { try { state.fitSuggest ? localStorage.setItem("interun_fitsuggest", JSON.stringify(state.fitSuggest)) : localStorage.removeItem("interun_fitsuggest"); } catch (e) {} }
+// Back out a 5 km-equivalent from a continuous run's average pace, per effort type. Interval/strides
+// sessions average across recoveries so their mean pace isn't comparable — those return null.
+function impliedRecentFromRun(type, avgPaceSec) {
+  if (!avgPaceSec || avgPaceSec <= 0) return null;
+  let thr; // implied threshold pace (s/km)
+  if (type === "easy" || type === "long" || type === "recovery") thr = avgPaceSec - 92; // easy ≈ threshold+92
+  else if (type === "steady") thr = avgPaceSec - 35; // steady ≈ threshold+35
+  else if (type === "threshold" || type === "race-specific") thr = avgPaceSec; // continuous ≈ threshold
+  else return null;
+  if (thr < 120) return null; // implausibly fast
+  return Math.round(thr * 4.6822); // threshold pace → 5 km-equivalent (inverse of the pace model)
+}
+function assessFitnessFromRun(type, avgPaceSec, distKm) {
+  if (!distKm || distKm < 2) return; // too short to trust
+  const implied = impliedRecentFromRun(type, avgPaceSec);
+  if (!implied) return;
+  const cur = profile.recentTimeS;
+  if (!cur) return;
+  const dev = (cur - implied) / cur; // >0 ⇒ run implies FASTER (fitter); <0 ⇒ slower
+  const easyType = type === "easy" || type === "long" || type === "recovery";
+  // Easy runs vary most and are often run slower than capable: only trust the "fitter" direction,
+  // and demand a clearer margin. Deliberately-paced steady/threshold work triggers either way.
+  let dir = null;
+  if (dev > (easyType ? 0.08 : 0.06)) dir = "better";
+  else if (dev < -0.06 && !easyType) dir = "lower";
+  if (!dir) return;
+  state.fitSuggest = { dir, implied, from: cur, at: todayIso(), sessTitle: LIVE.session.title };
+  saveFitSuggest();
+}
+// Apply the suggestion: re-anchor fitness to the run's implied 5 km and rebuild the plan.
+function applyFitSuggest() {
+  const fs = state.fitSuggest; if (!fs) return;
+  profile.recentTimeS = fs.implied; profile.noRecent = false;
+  if (profile.status === "new") profile.status = "building"; // a real run means they're past couch-to-5k
+  try { recompute(); } catch (e) {}
+  state.planWeek = PLAN.defaultWeekIndex; seedDone(); saveProfileStore();
+  state.fitSuggest = null; saveFitSuggest();
+  render();
+}
+function dismissFitSuggest() { state.fitSuggest = null; saveFitSuggest(); render(); }
+function fitSuggestBanner() {
+  const fs = state.fitSuggest; if (!fs) return "";
+  const faster = fs.dir === "better";
+  const impliedPace = fmtPace(fs.implied / 5);
+  const head = faster ? "You\\u2019re running stronger than your plan assumes" : "That run was tougher than your plan expects";
+  const body = faster
+    ? "Your last run implies about a " + fmtTimeFull(fs.implied) + " 5K (was " + fmtTimeFull(fs.from) + "). Update your paces so every session matches your current fitness?"
+    : "Your last run implies about a " + fmtTimeFull(fs.implied) + " 5K (was " + fmtTimeFull(fs.from) + "). Ease your paces to match how you\\u2019re running right now?";
+  return '<div class="fit-banner ' + (faster ? "up" : "down") + '"><div class="fb-ic">' + (faster ? ICON.trendUp : ICON.trendDown) + '</div>' +
+    '<div class="fb-main"><div class="fb-h">' + head + '</div><div class="fb-b">' + body + '</div>' +
+    '<div class="fb-actions"><button class="fb-yes" id="fitApply">Update my paces</button><button class="fb-no" id="fitDismiss">Not now</button></div></div></div>';
 }
 
 // ---- Router ---------------------------------------------------------------
@@ -2055,6 +2134,8 @@ function wire() {
   document.querySelectorAll("[data-day]").forEach((b) => b.onclick = () => { state.selDay = Number(b.dataset.day); render(); });
   const condSq = $("condSq"); if (condSq) condSq.onclick = openWeatherSheet;
   const feelSq = $("feelSq"); if (feelSq) feelSq.onclick = openFeelSheet;
+  const fitApply = $("fitApply"); if (fitApply) fitApply.onclick = applyFitSuggest;
+  const fitDismiss = $("fitDismiss"); if (fitDismiss) fitDismiss.onclick = dismissFitSuggest;
   const viewSession = $("viewSession"); if (viewSession) viewSession.onclick = () => openSessionSheet(selectedSession(), 1);
   // Training-calendar wiring
   const calBack = $("calBack"); if (calBack) calBack.onclick = () => { state.screen = null; render(); };

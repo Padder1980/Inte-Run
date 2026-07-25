@@ -23,7 +23,7 @@ import { chooseModel } from "../science/intensity-distribution.ts";
 import { computeMas, masVo2Range } from "../science/mas.ts";
 import { deriveTrainingPaces, withHrZones } from "../science/paces.ts";
 import { taperFor } from "../science/taper.ts";
-import { addDays, dayOfWeekMondayZero, isoToday, weeksBetween } from "./dates.ts";
+import { addDays, dayOfWeekMondayZero, daysBetween, isoToday, weeksBetween } from "./dates.ts";
 import { type WeekPlan, phaseSchedule, structuredWeekCount } from "./periodization.ts";
 import {
   contExplore,
@@ -60,12 +60,18 @@ const PEAK_LONG_MIN: Record<Goal["distance"], number> = {
   marathon: 150,
 };
 
-// Day-of-week slots (0 = Mon … 6 = Sun). Hard days (Tue/Thu) are separated by an easy day and never
-// sit next to the Sunday long run.
-const DAY_LONG = 6;
-const DAY_QUALITY_1 = 1;
-const DAY_QUALITY_2 = 3;
-const EASY_DAY_POOL = [2, 4, 0, 5];
+// Day-of-week scheduling (0 = Mon … 6 = Sun) is expressed RELATIVE to the long run, then rotated to
+// whatever long-run day the athlete prefers. The offsets below reproduce the proven Sunday-long
+// layout (quality Tue/Thu, easy Wed/Fri/Mon/Sat); because every spacing rule — hard days separated,
+// hard days never adjacent to the long run — is rotation-invariant, the same rotation honours any
+// chosen long-run day while preserving those rules.
+const QUALITY_REL = [2, 4]; // days after the long run
+const EASY_REL = [3, 5, 1, 6];
+const MOB_PREF_REL = [3, 5, 1, 6, 4, 2]; // preferred order for the mobility / free day
+const BEG_EASY_REL = [2, 4, 6]; // beginner easy days — a rest day always sits between runs
+const BEG_STRENGTH_REL = [1, 5];
+const dayRel = (longDay: number, rel: number) => (longDay + rel) % 7;
+const longRunDayOf = (a: Athlete) => ((a.longRunDay ?? 6) % 7 + 7) % 7;
 
 export function generatePlan(
   athlete: Athlete,
@@ -82,7 +88,11 @@ export function generatePlan(
   notes: string[];
 } {
   const startIso = options.startDateIso ?? goal.startDateIso ?? isoToday();
-  const totalWeeks = Math.max(0, weeksBetween(startIso, goal.raceDateIso));
+  const raceMonday = addDays(goal.raceDateIso, -dayOfWeekMondayZero(goal.raceDateIso));
+  // Count calendar weeks inclusive of the start week and the race week, so week 1 aligns to the
+  // Monday of the athlete's start week (its earlier days are trimmed later for a mid-week start).
+  const startWeekMonday = addDays(startIso, -dayOfWeekMondayZero(startIso));
+  const totalWeeks = Math.max(0, weeksBetween(startWeekMonday, raceMonday) + 1);
   const structuredWeeks = structuredWeekCount(totalWeeks, goal.distance);
 
   const returning = athlete.returningFromInjury ?? false;
@@ -95,7 +105,6 @@ export function generatePlan(
   }
   const schedule = annotate(phaseSchedule(structuredWeeks, goal.distance, returning));
 
-  const raceMonday = addDays(goal.raceDateIso, -dayOfWeekMondayZero(goal.raceDateIso));
   const peakLong = PEAK_LONG_MIN[goal.distance];
   const startLong = Math.round(peakLong * (returning ? 0.42 : 0.55));
   const nonTaperCount = schedule.filter((s) => s.phase !== "taper").length;
@@ -128,6 +137,10 @@ export function generatePlan(
       longMin,
     });
   });
+
+  // If the athlete starts mid-week, make week 1 pro-rata: drop the sessions that fall before the
+  // start day; full Monday–Sunday weeks follow.
+  applyPartialFirstWeek(weeks, startIso);
 
   return {
     goal,
@@ -162,24 +175,25 @@ function buildWeek(
   const runningDays = Math.min(6, Math.max(3, ctx.athlete.daysPerWeek));
   const qualityCount = qualitySessionsThisWeek(wp, runningDays, ctx.returning);
   const easyCount = Math.max(0, runningDays - qualityCount - 1); // minus the long run
+  const longDay = longRunDayOf(ctx.athlete);
 
   const sessions: SessionContent[] = [];
   const dayOf: number[] = [];
 
-  // Long run (Sunday).
+  // Long run (on the athlete's chosen day).
   sessions.push(longRunFor(wp.phase, ctx));
-  dayOf.push(DAY_LONG);
+  dayOf.push(longDay);
 
-  // Quality sessions.
+  // Quality sessions — placed relative to the long run so spacing rules hold on any long-run day.
   const qualityContents = qualityContentsFor(wp, index, qualityCount, ctx);
-  const qualityDays = qualityCount >= 2 ? [DAY_QUALITY_1, DAY_QUALITY_2] : [DAY_QUALITY_1];
+  const qualityDays = QUALITY_REL.map((r) => dayRel(longDay, r));
   qualityContents.forEach((c, qi) => {
     sessions.push(c);
     dayOf.push(qualityDays[qi]!);
   });
 
   // Easy runs — rotate flavours (plain, strides, hill sprints, explore) so easy days stay fresh.
-  const easyDays = EASY_DAY_POOL.slice(0, easyCount);
+  const easyDays = EASY_REL.map((r) => dayRel(longDay, r)).slice(0, easyCount);
   const canStride = (wp.phase === "base" || wp.phase === "build") && !wp.isDeload;
   easyDays.forEach((d, ei) => {
     const minutes = wp.isDeload ? 35 : ei === easyDays.length - 1 ? 40 : 45;
@@ -192,7 +206,7 @@ function buildWeek(
 
   // Optional mobility on the first free day.
   const used = new Set(dayOf);
-  const freeDay = [2, 4, 0, 5, 3, 1].find((d) => !used.has(d));
+  const freeDay = MOB_PREF_REL.map((r) => dayRel(longDay, r)).find((d) => !used.has(d));
   if (freeDay !== undefined) {
     const mob = mobilitySession();
     sessions.push(mob);
@@ -227,6 +241,27 @@ function buildWeek(
   };
 }
 
+const DAY_LABEL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+/** Trim week 1 to a pro-rata partial week when the plan starts mid-week (full weeks follow). */
+function applyPartialFirstWeek(weeks: PlannedWeek[], startIso: string): void {
+  const w0 = weeks[0];
+  if (!w0) return;
+  // Week starts are always Mondays; `off` is the start day's position within week 1 (0 = Monday).
+  const off = daysBetween(w0.startDateIso, startIso);
+  if (off <= 0 || off > 6) return; // starts on the Monday, or a lead-in gap precedes week 1
+  const startDOW = dayOfWeekMondayZero(startIso);
+  w0.sessions = w0.sessions.filter((s) => s.dayOfWeek >= startDOW);
+  w0.startDateIso = startIso;
+  w0.plannedDistanceMeters = Math.round(
+    w0.sessions.reduce((m, s) => m + (s.estimatedDistanceMeters ?? 0), 0),
+  );
+  w0.qualitySessionCount = w0.sessions.filter(
+    (s) => s.type === "threshold" || s.type === "vo2" || s.type === "race-specific",
+  ).length;
+  w0.focus = `Partial first week — picking up from ${DAY_LABEL[startDOW]}. Full weeks begin Monday.`;
+}
+
 function finalize(contents: SessionContent[], dayOf: number[], weekIndex: number): Session[] {
   return contents
     .map((c, i) => ({
@@ -241,8 +276,6 @@ function finalize(contents: SessionContent[], dayOf: number[], weekIndex: number
 // ---- beginner assembly ----------------------------------------------------
 
 const lerp = (a: number, b: number, f: number) => a + (b - a) * Math.max(0, Math.min(1, f));
-const BEGINNER_EASY_DAYS = [1, 3, 5]; // Tue, Thu, Sat — always a rest day between runs
-const BEGINNER_STRENGTH_DAYS = [0, 4]; // Mon, Fri
 
 // Rotating pools of beginner session flavours — every run day of the week draws a different one so a
 // plan never repeats the same session two days (or two weeks) running.
@@ -297,16 +330,17 @@ function buildBeginnerWeek(
   const f = structuredWeeks <= 1 ? 0.5 : (index - 1) / (structuredWeeks - 1);
   const ease = wp.isDeload || wp.phase === "taper";
   const runningDays = Math.min(runWalk ? 3 : 4, Math.max(2, ctx.athlete.daysPerWeek));
+  const longDay = longRunDayOf(ctx.athlete);
 
   const sessions: SessionContent[] = [];
   const dayOf: number[] = [];
 
-  // The weekly long, gentle session (Sunday).
+  // The weekly long, gentle session (on the athlete's chosen long-run day).
   sessions.push(beginnerRun(ctx.paces, f, true, runWalk, ease, 0));
-  dayOf.push(DAY_LONG);
+  dayOf.push(longDay);
 
   // Other easy days — each draws a different flavour, and the set rotates every week.
-  const easyDays = BEGINNER_EASY_DAYS.slice(0, runningDays - 1);
+  const easyDays = BEG_EASY_REL.map((r) => dayRel(longDay, r)).slice(0, runningDays - 1);
   easyDays.forEach((d, ei) => {
     sessions.push(beginnerRun(ctx.paces, f, false, runWalk, ease, index + ei));
     dayOf.push(d);
@@ -315,7 +349,7 @@ function buildBeginnerWeek(
   // General, gentle strength (no heavy lifting for a brand-new runner) — themed variants rotate.
   if (ctx.athlete.includeStrength) {
     const strengthCount = ctx.athlete.daysPerWeek >= 4 && !ease ? 2 : 1;
-    BEGINNER_STRENGTH_DAYS.slice(0, strengthCount).forEach((d, si) => {
+    BEG_STRENGTH_REL.map((r) => dayRel(longDay, r)).slice(0, strengthCount).forEach((d, si) => {
       if (!dayOf.includes(d)) {
         sessions.push(generalStrengthSession(index + si));
         dayOf.push(d);
@@ -325,7 +359,7 @@ function buildBeginnerWeek(
 
   // Optional mobility on a free day — theme rotates by week.
   const used = new Set(dayOf);
-  const mobDay = [2, 4, 0, 5, 3, 1].find((d) => !used.has(d));
+  const mobDay = MOB_PREF_REL.map((r) => dayRel(longDay, r)).find((d) => !used.has(d));
   if (mobDay !== undefined) {
     sessions.push(mobilitySession(index));
     dayOf.push(mobDay);
@@ -453,10 +487,12 @@ function addStrength(
   else count = 2; // base, build
 
   const maintenance = wp.phase === "peak" || wp.phase === "taper";
-  const strengthDays = [DAY_QUALITY_1, EASY_DAY_POOL[0]!]; // pair with a quality day and an easy day
+  const longDay = longRunDayOf(ctx.athlete);
+  // Pair strength with a quality day and an easy day (so lifting doesn't fall on the long run day).
+  const strengthDays = [dayRel(longDay, QUALITY_REL[0]!), dayRel(longDay, EASY_REL[0]!)];
   for (let i = 0; i < count; i++) {
     sessions.push(strengthSession(wp.phase, maintenance));
-    dayOf.push(strengthDays[i] ?? DAY_QUALITY_1);
+    dayOf.push(strengthDays[i] ?? strengthDays[0]!);
   }
 }
 

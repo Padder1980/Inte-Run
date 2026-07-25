@@ -33,6 +33,9 @@ export type Athlete = {
   restingHr?: number;
   /** Optional 1 km max-effort time-trial (seconds) — anchors MAS-based VO₂/interval paces. */
   oneKmTrialSeconds?: number;
+  /** Preferred day for the weekly long run (0 = Monday … 6 = Sunday). The rest of the week's
+   *  sessions are scheduled around it. Defaults to Sunday (6) when unset. */
+  longRunDay?: number;
   unit?: UnitSystem;
 };
 

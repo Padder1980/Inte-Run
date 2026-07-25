@@ -759,6 +759,139 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
   #view:has(#saveProfile) .avatar-row { align-items: flex-start; }
   #view:has(#saveProfile) .avatar-pic { width: 76px; height: 76px; }
 }
+
+/* =========================================================
+   TODAY — premium visual refinement (design collab)
+   Scoped to the Today screen via #view:has(.hero-wk); token-driven
+   so light and dark both adapt. Keeps the marching-ants start button
+   (base .start-btn::before still supplies content/animation).
+   ========================================================= */
+#view:has(.hero-wk) {
+  --today-tint: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  --today-edge: color-mix(in srgb, var(--accent) 22%, var(--line));
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 30%),
+    var(--bg);
+}
+#view:has(.hero-wk) .greeting {
+  margin: 2px 2px 14px; color: var(--ink-soft); font-size: 20px; font-weight: 520; letter-spacing: -0.025em; line-height: 1.2;
+}
+#view:has(.hero-wk) .greeting b { color: var(--ink); font-weight: 760; }
+#view:has(.hero-wk) .weekstrip,
+#view:has(#startTrial) .weekstrip {
+  gap: 3px; margin: 0 0 16px; padding: 6px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow);
+}
+#view:has(.hero-wk) .weekstrip .d,
+#view:has(#startTrial) .weekstrip .d {
+  min-width: 0; min-height: 54px; padding: 7px 0 6px;
+  background: transparent; border: 1px solid transparent; border-radius: 12px;
+  transition: color 140ms ease, background 140ms ease, border-color 140ms ease, transform 120ms ease;
+}
+#view:has(.hero-wk) .weekstrip .d .dn,
+#view:has(#startTrial) .weekstrip .d .dn { color: var(--ink-faint); font-size: 9.5px; font-weight: 680; letter-spacing: 0.07em; }
+#view:has(.hero-wk) .weekstrip .d .dd,
+#view:has(#startTrial) .weekstrip .d .dd { margin-top: 2px; color: var(--ink); font-family: var(--mono); font-size: 14px; font-weight: 680; }
+#view:has(.hero-wk) .weekstrip .d.today:not(.sel),
+#view:has(#startTrial) .weekstrip .d.today:not(.sel) { background: var(--today-tint, var(--surface-2)); border-color: var(--today-edge, var(--line)); }
+#view:has(.hero-wk) .weekstrip .d.sel,
+#view:has(#startTrial) .weekstrip .d.sel {
+  color: var(--accent-ink); background: var(--accent); border-color: var(--accent);
+  box-shadow: 0 8px 18px -12px color-mix(in srgb, var(--accent) 80%, transparent);
+}
+#view:has(.hero-wk) .weekstrip .d.sel .dn,
+#view:has(#startTrial) .weekstrip .d.sel .dn { color: color-mix(in srgb, var(--accent-ink) 72%, transparent); }
+#view:has(.hero-wk) .weekstrip .d.sel .dd,
+#view:has(#startTrial) .weekstrip .d.sel .dd { color: var(--accent-ink); }
+#view:has(.hero-wk) .weekstrip .d .dot,
+#view:has(#startTrial) .weekstrip .d .dot { width: 5px; height: 5px; margin-top: 4px; }
+#view:has(.hero-wk) .hero-wk {
+  position: relative; padding: 22px 20px 20px; color: var(--ink);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--c, var(--accent)) 13%, var(--surface)), var(--surface) 64%);
+  border: 1px solid color-mix(in srgb, var(--c, var(--accent)) 26%, var(--line)); border-radius: 22px;
+  box-shadow: var(--shadow), inset 3px 0 0 var(--c, var(--accent)), inset 0 1px 0 color-mix(in srgb, var(--ink) 4%, transparent);
+}
+#view:has(.hero-wk) .hero-wk:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--ink) 8%, transparent), inset 3px 0 0 var(--c, var(--accent));
+}
+#view:has(.hero-wk) .hero-wk.rest {
+  --c: var(--ink-faint); color: var(--ink);
+  background: linear-gradient(145deg, var(--surface), var(--surface-2)); border-color: var(--line);
+}
+#view:has(.hero-wk) .hw-eyebrow {
+  position: relative; z-index: 1; color: var(--c, var(--accent)); font-size: 10.5px; font-weight: 760; letter-spacing: 0.085em; opacity: 1;
+}
+#view:has(.hero-wk) .hero-wk.rest .hw-eyebrow { color: var(--ink-faint); }
+#view:has(.hero-wk) .hw-title {
+  position: relative; z-index: 1; max-width: 14ch; margin: 7px 0 16px;
+  color: var(--ink); font-size: 27px; font-weight: 790; letter-spacing: -0.04em; line-height: 1.04;
+}
+#view:has(.hero-wk) .hw-sub { position: relative; z-index: 1; max-width: 31ch; color: var(--ink-soft); line-height: 1.5; }
+#view:has(.hero-wk) .hw-chips { position: relative; z-index: 1; gap: 7px; }
+#view:has(.hero-wk) .hw-chip {
+  padding: 5px 9px; color: var(--ink);
+  background: color-mix(in srgb, var(--c, var(--accent)) 10%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--c, var(--accent)) 22%, var(--line));
+  border-radius: 9px; font-size: 11.5px; font-weight: 650;
+}
+#view:has(.hero-wk) .hw-also { position: relative; z-index: 1; color: var(--ink-soft); opacity: 1; }
+#view:has(.hero-wk) .hw-go { position: relative; z-index: 1; margin-top: 17px; color: var(--accent); font-size: 12.5px; font-weight: 720; opacity: 1; }
+#view:has(.hero-wk) .hw-go span { transition: transform 140ms ease; }
+#view:has(.hero-wk) .hero-wk:hover .hw-go span { transform: translateX(2px); }
+#view:has(.hero-wk) .hw-glow {
+  right: -55px; top: -60px; width: 190px; height: 190px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--c, var(--accent)) 18%, transparent), transparent 69%);
+}
+#view:has(.hero-wk) .start-btn {
+  min-height: 54px; margin-top: 17px; padding: 15px 18px; color: var(--accent-ink); background: var(--accent);
+  border: 1px solid var(--accent); border-radius: 16px;
+  box-shadow: 0 10px 24px -15px color-mix(in srgb, var(--accent) 85%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--accent-ink) 24%, transparent);
+  font-size: 15px; font-weight: 740;
+}
+#view:has(.hero-wk) .start-btn::before {
+  inset: -3px; border-radius: 19px;
+  background: conic-gradient(from var(--ma),
+    var(--accent) 0deg, color-mix(in srgb, var(--accent-ink) 82%, var(--accent)) 60deg,
+    var(--accent) 120deg, color-mix(in srgb, var(--accent-ink) 82%, var(--accent)) 180deg,
+    var(--accent) 240deg, color-mix(in srgb, var(--accent-ink) 82%, var(--accent)) 300deg, var(--accent) 360deg);
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 48%, transparent));
+}
+#view:has(.hero-wk) .tsq-row { gap: 10px; margin-top: 18px; }
+#view:has(.hero-wk) .tsq {
+  min-width: 0; padding: 15px; color: var(--ink);
+  background: linear-gradient(155deg, color-mix(in srgb, var(--sqc, var(--accent)) 7%, var(--surface)), var(--surface) 68%);
+  border-color: color-mix(in srgb, var(--sqc, var(--accent)) 17%, var(--line)); border-radius: 16px;
+  box-shadow: var(--shadow), inset 0 1px 0 color-mix(in srgb, var(--ink) 3%, transparent);
+}
+#view:has(.hero-wk) .tsq:active { transform: translateY(1px); }
+#view:has(.hero-wk) .tsq-ic {
+  width: 36px; height: 36px; margin-bottom: 13px; color: var(--sqc, var(--accent));
+  background: color-mix(in srgb, var(--sqc, var(--accent)) 12%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--sqc, var(--accent)) 24%, var(--line)); border-radius: 11px; box-shadow: none;
+}
+#view:has(.hero-wk) .tsq-ic svg { width: 19px; height: 19px; }
+#view:has(.hero-wk) .tsq-k { color: var(--ink-faint); font-size: 10px; font-weight: 720; letter-spacing: 0.075em; }
+#view:has(.hero-wk) .tsq-v { margin-top: 4px; color: var(--ink); font-size: 15px; font-weight: 730; letter-spacing: -0.02em; line-height: 1.25; }
+#view:has(.hero-wk) .tsq-sub { margin-top: 5px; color: var(--ink-soft); font-size: 11.5px; line-height: 1.35; }
+#view:has(.hero-wk) .setup-banner {
+  padding: 14px 15px; background: linear-gradient(145deg, var(--today-tint), var(--surface));
+  border-color: var(--today-edge); border-radius: 16px; box-shadow: var(--shadow);
+}
+#view:has(.hero-wk) .setup-banner span { color: var(--accent); font-weight: 700; }
+#view:has(.hero-wk) .fit-banner { padding: 15px; border-radius: 16px; box-shadow: var(--shadow); }
+#view:has(.hero-wk) .fit-banner .fb-ic { width: 36px; height: 36px; border-radius: 11px; }
+#view:has(.hero-wk) .fit-banner .fb-h { color: var(--ink); font-size: 14px; font-weight: 730; }
+#view:has(.hero-wk) .fit-banner .fb-actions { flex-wrap: wrap; }
+#view:has(.hero-wk) .fit-banner .fb-yes,
+#view:has(.hero-wk) .fit-banner .fb-no { min-height: 39px; border-radius: 10px; }
+@media (max-width: 360px) {
+  #view:has(.hero-wk) .hero-wk { padding: 20px 18px 19px; }
+  #view:has(.hero-wk) .hw-title { font-size: 24px; }
+  #view:has(.hero-wk) .tsq { padding: 13px; }
+  #view:has(.hero-wk) .tsq-v { font-size: 14px; }
+}
 </style>
 </head>
 <body>

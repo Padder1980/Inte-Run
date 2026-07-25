@@ -422,6 +422,11 @@ select.sel { font: inherit; font-size: 13.5px; color: var(--ink); background: va
 .wx-foot { margin-top: 11px; } .wx-note { font-size: 11px; color: var(--ink-faint); font-style: italic; }
 .wx-seg { margin-top: 10px; }
 .wx-seg button { font-size: 12px; padding: 5px 10px; }
+.wx-src { font-size: 12px; color: var(--ink-faint); margin: 6px 0 2px; display: flex; align-items: center; gap: 7px; }
+.wx-src.live { color: var(--ink-soft); font-weight: 600; }
+.wx-src .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ready); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ready) 22%, transparent); animation: wxPulse 2s ease-in-out infinite; }
+@keyframes wxPulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
+.wx-loc { font: inherit; font-size: 12px; font-weight: 600; color: var(--accent); background: none; border: none; padding: 0; cursor: pointer; text-decoration: underline; }
 
 /* MAS */
 .mas-hint { font-size: 12px; color: var(--ink-soft); margin-top: 6px; }
@@ -445,6 +450,10 @@ select.sel { font: inherit; font-size: 13.5px; color: var(--ink); background: va
 /* Live session */
 .live-hero { background: linear-gradient(150deg, color-mix(in srgb, var(--accent) 14%, var(--surface)), var(--surface)); }
 .live-title { font-size: 18px; font-weight: 700; letter-spacing: -.01em; margin: 4px 0 12px; }
+.live-hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.voice-btn { flex: none; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-faint); cursor: pointer; }
+.voice-btn svg { width: 18px; height: 18px; }
+.voice-btn.on { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
 .live-metrics { display: grid; grid-template-columns: 1.15fr 1fr; gap: 10px; }
 .live-metrics .lk { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); }
 .live-metrics .lv { font-size: 30px; font-weight: 750; letter-spacing: -.02em; margin-top: 2px; }
@@ -482,6 +491,7 @@ select.sel { font: inherit; font-size: 13.5px; color: var(--ink); background: va
 .cue .badge { width: 7px; height: 7px; border-radius: 50%; margin-top: 5px; flex: none; background: var(--ink-faint); }
 .cue.pace-fast .badge { background: var(--eff-moderate); } .cue.pace-slow .badge { background: var(--eff-hard); } .cue.pace-on .badge { background: var(--eff-easy); }
 .cue.step .badge { background: var(--accent); } .cue.start .badge, .cue.done .badge { background: var(--build); }
+.cue.split .badge { background: var(--peak); } .cue.split { font-weight: 650; }
 
 /* Bottom nav */
 .bottomnav { position: sticky; bottom: 0; z-index: 20; display: grid; grid-template-columns: repeat(5,1fr); background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(10px); border-top: 1px solid var(--line); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); }
@@ -563,6 +573,9 @@ const ICON = {
   wxCloud: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4 4 0 0 1 .5-8 5.5 5.5 0 0 1 10.5 1.5A3.5 3.5 0 0 1 17.5 18z"/></svg>',
   wxWind: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9h11a2.5 2.5 0 1 0-2.5-2.5M3 14h15a2.5 2.5 0 1 1-2.5 2.5M3 12h6"/></svg>',
   wxSnow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9M12 6l-2.5 2M12 6l2.5 2M12 18l-2.5-2M12 18l2.5-2"/></svg>',
+  wxRain: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 15a4 4 0 0 1 .5-8 5.5 5.5 0 0 1 10.5 1.5A3.5 3.5 0 0 1 17.5 15z"/><path d="M8 19l-1 2M12 19l-1 2M16 19l-1 2"/></svg>',
+  vox: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 8.5a4 4 0 0 1 0 7M18.6 6a7 7 0 0 1 0 12"/></svg>',
+  voxOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M22 9l-6 6M16 9l6 6"/></svg>',
 };
 const PHASE = { base: "var(--base)", build: "var(--build)", peak: "var(--peak)", taper: "var(--taper)" };
 const BAND = { ready: "var(--ready)", steady: "var(--steady)", ease: "var(--ease)", rest: "var(--rest)" };
@@ -631,7 +644,7 @@ let PLAN, RAW, FITNESS, CLASS, MASTERS;
 function recompute() { const r = applyProfile(profile); PLAN = r.plan; RAW = r.raw; FITNESS = r.fitness; CLASS = r.classification; MASTERS = r.masters; }
 try { recompute(); } catch (e) { profile = Object.assign({}, DEFAULT_PROFILE); recompute(); }
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: loadRuns(), weather: "hot", trialPending: false, trialSaved: null, done: {}, dayOverride: {}, selDay: 4 };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: loadRuns(), weather: "hot", wx: null, trialPending: false, trialSaved: null, done: {}, dayOverride: {}, selDay: 4 };
 // Effective day index for a session, honouring any user reschedule. Works for raw sessions
 // (dayOfWeek) and summary sessions (dayIndex), keyed by the shared session id.
 function effDay(s) { const o = state.dayOverride[s.id]; return o != null ? o : (s.dayOfWeek != null ? s.dayOfWeek : s.dayIndex); }
@@ -753,20 +766,67 @@ const WEATHER_PRESETS = {
 };
 const SEV_COLOR = { none: "var(--ready)", mild: "var(--steady)", moderate: "var(--ease)", high: "var(--eff-hard)", severe: "var(--rest)" };
 const WX_ICON = { mild: "wxCloud", warm: "wxSun", hot: "wxSun", windy: "wxWind", cold: "wxSnow" };
+// The conditions in force: a live local forecast once we've fetched one, otherwise the selected
+// sample preset. Normalised to a common shape so the square, sheet and assessment share it.
+function activeWeather() {
+  if (state.wx) return state.wx;
+  const p = WEATHER_PRESETS[state.weather];
+  return { tempC: p.tempC, humidityPct: p.humidityPct, windKph: p.windKph, label: p.label, iconKey: WX_ICON[state.weather], live: false };
+}
 function currentConditions(session) {
-  const pre = WEATHER_PRESETS[state.weather];
-  return RC.assessConditions({ tempC: pre.tempC, humidityPct: pre.humidityPct, windKph: pre.windKph, sessionType: (session && session.type) || "easy" });
+  const w = activeWeather();
+  return RC.assessConditions({ tempC: w.tempC, humidityPct: w.humidityPct, windKph: w.windKph, sessionType: (session && session.type) || "easy" });
+}
+// ---- Live local weather (Open-Meteo, no key, CORS-friendly) ----------------
+// Blocked inside the Claude artifact sandbox (external fetch), where it silently falls back to the
+// sample presets; works on the deployed PWA. Maps WMO weather codes to our labels and icons.
+function wmoLabel(code) {
+  if (code === 0) return "Clear";
+  if (code <= 2) return "Partly cloudy";
+  if (code === 3) return "Overcast";
+  if (code === 45 || code === 48) return "Fog";
+  if (code >= 51 && code <= 57) return "Drizzle";
+  if (code >= 61 && code <= 67) return "Rain";
+  if (code >= 71 && code <= 77) return "Snow";
+  if (code >= 80 && code <= 82) return "Showers";
+  if (code >= 85 && code <= 86) return "Snow showers";
+  if (code >= 95) return "Thunderstorm";
+  return "Cloudy";
+}
+function wmoIcon(code, windKph) {
+  if ((code >= 71 && code <= 77) || (code >= 85 && code <= 86)) return "wxSnow";
+  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95) return "wxRain";
+  if (windKph >= 30) return "wxWind";
+  if (code === 0 || code === 1) return "wxSun";
+  return "wxCloud";
+}
+let WX_FETCHING = false;
+function fetchWeather(force) {
+  if (WX_FETCHING || (state.wx && !force)) return;
+  if (!(typeof navigator !== "undefined" && "geolocation" in navigator)) return;
+  WX_FETCHING = true;
+  navigator.geolocation.getCurrentPosition((pos) => {
+    const la = pos.coords.latitude.toFixed(3), lo = pos.coords.longitude.toFixed(3);
+    const url = "https://api.open-meteo.com/v1/forecast?latitude=" + la + "&longitude=" + lo + "&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&wind_speed_unit=kmh&timezone=auto";
+    fetch(url).then((r) => r.ok ? r.json() : Promise.reject(r.status)).then((d) => {
+      const c = d && d.current; if (!c) throw new Error("no data");
+      state.wx = { tempC: Math.round(c.temperature_2m), humidityPct: Math.round(c.relative_humidity_2m), windKph: Math.round(c.wind_speed_10m), code: c.weather_code, label: wmoLabel(c.weather_code), iconKey: wmoIcon(c.weather_code, c.wind_speed_10m), live: true, at: Date.now() };
+      WX_FETCHING = false;
+      if (WX_SHEET_OPEN) { $("sheetBody").innerHTML = weatherSheetHtml(); wireWeatherSheet(); }
+      else if (state.tab === "today" && !state.screen) render();
+    }).catch(() => { WX_FETCHING = false; });
+  }, () => { WX_FETCHING = false; }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 });
 }
 // ---- Today's two summary squares ------------------------------------------
 function conditionsSquare(session) {
-  const pre = WEATHER_PRESETS[state.weather];
+  const w = activeWeather();
   const imp = currentConditions(session);
   const c = SEV_COLOR[imp.severity];
   const sub = imp.effortBased ? "Run by effort today" : imp.pacePenaltySecPerKm ? "≈ +" + imp.pacePenaltySecPerKm + "s/km" : "Good to run";
   return '<button class="tsq" id="condSq" style="--sqc:' + c + '">' +
-    '<div class="tsq-ic">' + ICON[WX_ICON[state.weather]] + '</div>' +
-    '<div class="tsq-k">Conditions</div>' +
-    '<div class="tsq-v">' + pre.tempC + '° · ' + pre.label + '</div>' +
+    '<div class="tsq-ic">' + ICON[w.iconKey] + '</div>' +
+    '<div class="tsq-k">Conditions' + (w.live ? ' · live' : '') + '</div>' +
+    '<div class="tsq-v">' + w.tempC + '° · ' + w.label + '</div>' +
     '<div class="tsq-sub">' + sub + '</div></button>';
 }
 function feelSquare() {
@@ -781,20 +841,27 @@ function feelSquare() {
 // ---- Detail sheets for conditions & readiness -----------------------------
 function weatherSheetHtml() {
   const sess = selectedSession();
-  const pre = WEATHER_PRESETS[state.weather];
+  const w = activeWeather();
   const imp = currentConditions(sess);
   const c = SEV_COLOR[imp.severity];
   const pen = imp.pacePenaltySecPerKm ? '<span class="chip rpe">≈ +' + imp.pacePenaltySecPerKm + 's/km at the same effort</span>' : "";
-  const presetBtns = Object.keys(WEATHER_PRESETS).map((k) => '<button data-weather="' + k + '"' + (k === state.weather ? ' class="on"' : '') + '>' + WEATHER_PRESETS[k].label + '</button>').join("");
-  return '<div class="sd-type" style="--sc:' + c + '">Conditions</div>' +
-    '<div class="sd-title">' + pre.tempC + '° · ' + imp.summary + '</div>' +
+  const presetBtns = Object.keys(WEATHER_PRESETS).map((k) => '<button data-weather="' + k + '"' + (!state.wx && k === state.weather ? ' class="on"' : '') + '>' + WEATHER_PRESETS[k].label + '</button>').join("");
+  const source = w.live
+    ? '<div class="wx-src live"><span class="dot"></span>Live forecast · ' + w.windKph + ' km/h wind · ' + w.humidityPct + '% humidity</div>'
+    : (WX_FETCHING ? '<div class="wx-src">Reading your local forecast…</div>' : '<div class="wx-src">Sample conditions · <button class="wx-loc" id="wxUseLoc">Use my location</button></div>');
+  return '<div class="sd-type" style="--sc:' + c + '">Conditions' + (w.live ? ' · live' : '') + '</div>' +
+    '<div class="sd-title">' + w.tempC + '° · ' + imp.summary + '</div>' +
+    source +
     '<div class="sd-chips"><span class="chip">' + esc(imp.headline) + '</span>' + (imp.effortBased ? '<span class="chip rpe">Run by effort</span>' : '') + pen + '</div>' +
     '<ul class="wx-points" style="margin:8px 0 4px">' + imp.points.map((p) => '<li>' + p + '</li>').join("") + '</ul>' +
-    '<div class="sd-move"><div class="sd-move-h">Try other conditions</div><div class="seg wx-seg" data-wxseg="1" style="margin-top:10px">' + presetBtns + '</div><div class="sd-move-n">Sample conditions — the live app reads your local forecast.</div></div>';
+    '<div class="sd-move"><div class="sd-move-h">' + (w.live ? 'Preview other conditions' : 'Try other conditions') + '</div><div class="seg wx-seg" data-wxseg="1" style="margin-top:10px">' + presetBtns + '</div><div class="sd-move-n">' + (w.live ? 'Tap a preset to preview how a session would feel in different weather.' : 'Sample conditions — allow location to read your local forecast.') + '</div></div>';
 }
-function openWeatherSheet() { ensureSheet(); SHEET_CTX = null; $("sheetBody").innerHTML = weatherSheetHtml(); wireWeatherSheet(); $("sheetOv").classList.add("on"); }
+let WX_SHEET_OPEN = false;
+function openWeatherSheet() { ensureSheet(); SHEET_CTX = null; WX_SHEET_OPEN = true; fetchWeather(); $("sheetBody").innerHTML = weatherSheetHtml(); wireWeatherSheet(); $("sheetOv").classList.add("on"); }
 function wireWeatherSheet() {
-  document.querySelectorAll('#sheetBody [data-wxseg] button').forEach((b) => b.onclick = () => { state.weather = b.dataset.weather; $("sheetBody").innerHTML = weatherSheetHtml(); wireWeatherSheet(); render(); });
+  // Selecting a preset drops any live forecast and previews that sample instead.
+  document.querySelectorAll('#sheetBody [data-wxseg] button').forEach((b) => b.onclick = () => { state.wx = null; state.weather = b.dataset.weather; $("sheetBody").innerHTML = weatherSheetHtml(); wireWeatherSheet(); render(); });
+  const useLoc = $("wxUseLoc"); if (useLoc) useLoc.onclick = () => { fetchWeather(true); $("sheetBody").innerHTML = weatherSheetHtml(); wireWeatherSheet(); };
 }
 function feelSheetHtml() {
   const r = RC.assessReadiness(readinessInput());
@@ -1027,7 +1094,7 @@ function openSessionSheet(sess, week) {
   wireSheet();
   $("sheetOv").classList.add("on");
 }
-function closeSheet() { const o = $("sheetOv"); if (o) o.classList.remove("on"); }
+function closeSheet() { const o = $("sheetOv"); if (o) o.classList.remove("on"); WX_SHEET_OPEN = false; }
 // Wire every element carrying data-open to open its session detail (keyed by stable session id).
 function wireSessionTaps() {
   document.querySelectorAll("[data-open]").forEach((b) => b.onclick = () => {
@@ -1526,13 +1593,49 @@ function refreshTypePreview() {
 const KIND_COLOR = { warmup: "var(--base)", cooldown: "var(--base)", steady: "var(--base)", recovery: "var(--taper)", rep: "var(--peak)" };
 let LIVE = null;
 const GPS_AVAILABLE = typeof navigator !== "undefined" && "geolocation" in navigator;
+const VOICE_AVAILABLE = typeof window !== "undefined" && "speechSynthesis" in window;
+let VOICE_ON = (() => { try { return localStorage.getItem("interun_voice") !== "0"; } catch (e) { return true; } })();
+// Speak a phrase aloud during a run. Best-effort: unsupported browsers / muted state are no-ops.
+function speak(text) {
+  if (!VOICE_ON || !VOICE_AVAILABLE || !text) return;
+  try { const u = new SpeechSynthesisUtterance(text); u.rate = 1.03; u.pitch = 1; u.lang = "en-GB"; u.volume = 1; window.speechSynthesis.speak(u); } catch (e) {}
+}
+function stopSpeech() { try { if (VOICE_AVAILABLE) window.speechSynthesis.cancel(); } catch (e) {} }
+// Natural spoken form of a duration, e.g. 330 -> "5 minutes 30 seconds".
+function spokenDuration(sec) {
+  const m = Math.floor(sec / 60), s = Math.round(sec % 60);
+  const mm = m > 0 ? m + " minute" + (m === 1 ? "" : "s") : "";
+  const ss = s > 0 ? s + " second" + (s === 1 ? "" : "s") : "";
+  return (mm + (mm && ss ? " " : "") + ss) || "0 seconds";
+}
+// The phrase to announce for a coaching cue — curated per kind so the numbers read cleanly aloud.
+function cueSpeech(cue) {
+  if (cue.kind === "step-start") return cue.message.split(" — ")[0].split("(").join("").split(")").join("").split("/").join(" of ") + ".";
+  if (cue.kind === "pace") return cue.message.split(" — ").join(", ").split("—").join(", ").split("/km").join(" per kilometre");
+  if (cue.kind === "paused") return "Paused.";
+  if (cue.kind === "resumed") return "Resumed.";
+  if (cue.kind === "session-complete") return "Session complete. Great work.";
+  return null; // session-start is spoken on the Start gesture (below) to unlock speech on iOS
+}
 function startSession() {
   const s = rawToday();
   LIVE = { session: s, rt: new RC.LiveSession(s), mode: null, acquiring: false, gpsErr: null,
     startMs: 0, pausedMs: 0, pauseStart: 0, vms: 0, dist: 0, hr: 105, paceHint: null,
     timer: null, ui: null, watchId: null, wakeLock: null, lastLat: null, lastLon: null, acc: null,
-    speed: 20, lastStep: -1, quirk: 0, done: false };
+    speed: 20, lastStep: -1, quirk: 0, done: false, kmDone: 0, lastKmMs: 0 };
   state.screen = "live"; render();
+}
+// Announce a fresh whole-kilometre split (spoken + logged) as the runner crosses it.
+function checkSplits() {
+  if (!LIVE || LIVE.mode == null) return;
+  const km = Math.floor(LIVE.dist / 1000);
+  if (km <= LIVE.kmDone) return;
+  LIVE.kmDone = km;
+  const now = liveNowMs();
+  const splitSec = (now - LIVE.lastKmMs) / 1000;
+  LIVE.lastKmMs = now;
+  speak("Kilometre " + km + ". " + spokenDuration(splitSec) + " for that split.");
+  liveCue({ kind: "split", atMs: now, message: km + " km · " + fmtPace(splitSec) + " /km split" });
 }
 // Great-circle distance between two lat/lon points, in metres.
 function haversine(lat1, lon1, lat2, lon2) {
@@ -1559,6 +1662,8 @@ function beginLive() {
   const st = $("lStart"); if (st) st.style.display = "none";
   const pa = $("lPause"); if (pa) pa.disabled = false;
   const fi = $("lFinish"); if (fi) fi.disabled = false;
+  // Speak inside the tap gesture — announces the start and unlocks TTS on iOS for later cues.
+  speak("Let's go. " + LIVE.session.title.split("·")[0] + ".");
   if (GPS_AVAILABLE) {
     LIVE.acquiring = true; renderLiveNow();
     navigator.geolocation.getCurrentPosition(
@@ -1603,6 +1708,7 @@ function gpsUiTick() {
     const t = { atMs: liveElapsedMs(), distanceMeters: LIVE.dist };
     if (LIVE.paceHint) t.paceSecPerKm = LIVE.paceHint;
     LIVE.rt.update(t).forEach(liveCue);
+    checkSplits();
   }
   renderLiveNow();
   if (LIVE.rt.getStatus() === "completed") { stopLive(); liveFinish(true); }
@@ -1621,7 +1727,9 @@ function renderLiveNow() {
 function viewLive() {
   const s = LIVE.session;
   return '<button class="backbtn" id="liveBack">‹ Today</button>' +
-    '<div class="card live-hero"><div class="eyebrow">Live session · <span id="gpsBadge">' + gpsStatusText() + '</span></div><div class="live-title">' + s.title + '</div>' +
+    '<div class="card live-hero"><div class="live-hero-top"><div class="eyebrow">Live session · <span id="gpsBadge">' + gpsStatusText() + '</span></div>' +
+    (VOICE_AVAILABLE ? '<button class="voice-btn' + (VOICE_ON ? ' on' : '') + '" id="lVoice" aria-label="Toggle voice coaching">' + (VOICE_ON ? ICON.vox : ICON.voxOff) + '</button>' : '') +
+    '</div><div class="live-title">' + s.title + '</div>' +
     '<div class="live-metrics"><div><div class="lk">Elapsed</div><div class="lv num" id="lElapsed">0:00</div></div>' +
     '<div><div class="lk">Distance</div><div class="lv num" id="lDist">0.00<small> km</small></div></div></div>' +
     '<div class="live-paces">' +
@@ -1635,8 +1743,9 @@ function viewLive() {
 function livePace(step) { const band = step && step.targetPace; const mid = band ? (band.minSecPerKm + band.maxSecPerKm) / 2 : 360; LIVE.quirk += (Math.random() - 0.5) * 0.03; LIVE.quirk *= 0.9; if (Math.random() < 0.04) LIVE.quirk += (Math.random() - 0.5) * 0.28; return Math.max(120, mid * (1 + LIVE.quirk)); }
 function liveHr(step) { if (!step) return 105; if (step.kind === "rep") return 176; if (step.kind === "warmup" || step.kind === "cooldown") return 130; if (step.kind === "recovery") return 148; return 150; }
 function liveCue(cue) {
+  speak(cueSpeech(cue));
   const log = $("lCues"); if (!log) return; const empty = log.firstChild; if (empty && empty.style) empty.remove();
-  const cls = cue.kind === "pace" ? "pace-" + cue.paceStatus : cue.kind === "step-start" ? "step" : cue.kind === "session-start" ? "start" : cue.kind === "session-complete" ? "done" : "";
+  const cls = cue.kind === "pace" ? "pace-" + cue.paceStatus : cue.kind === "step-start" ? "step" : cue.kind === "session-start" ? "start" : cue.kind === "session-complete" ? "done" : cue.kind === "split" ? "split" : "";
   const e = el('<div class="cue ' + cls + '"><span class="badge"></span><span class="ct">' + fmtPace(cue.atMs / 1000) + '</span><span>' + cue.message + '</span></div>');
   log.insertBefore(e, log.firstChild);
 }
@@ -1666,6 +1775,7 @@ function liveTick() {
   const pace = livePace(pre.step); LIVE.dist += (1000 / pace) * dt;
   LIVE.hr += (liveHr(pre.step) - LIVE.hr) * 0.05 + (Math.random() - 0.5) * 1.5; LIVE.hr = Math.max(95, Math.min(190, LIVE.hr));
   LIVE.rt.update({ atMs: LIVE.vms, distanceMeters: LIVE.dist, heartRateBpm: Math.round(LIVE.hr) }).forEach(liveCue);
+  checkSplits();
   liveUpdate(LIVE.rt.snapshot(LIVE.vms));
   if (LIVE.rt.getStatus() === "completed") { stopLive(); liveFinish(true); }
 }
@@ -1730,7 +1840,7 @@ function render() {
     return;
   }
   $("topTitle").textContent = state.support ? "Support" : TITLES[state.tab];
-  if (state.tab === "today") v.innerHTML = viewToday();
+  if (state.tab === "today") { fetchWeather(); v.innerHTML = viewToday(); }
   else if (state.tab === "plan") v.innerHTML = viewPlan();
   else if (state.tab === "activities") v.innerHTML = viewActivities();
   else if (state.tab === "community") v.innerHTML = viewCommunity();
@@ -1796,8 +1906,13 @@ function wire() {
   const cancelTrial = $("cancelTrial"); if (cancelTrial) cancelTrial.onclick = () => { state.trialPending = false; render(); };
   // Live session wiring
   const startBtn = $("startSession"); if (startBtn) startBtn.onclick = startSession;
-  const lb = $("liveBack"); if (lb) lb.onclick = () => { stopLive(); state.screen = null; state.tab = "today"; render(); };
+  const lb = $("liveBack"); if (lb) lb.onclick = () => { stopLive(); stopSpeech(); state.screen = null; state.tab = "today"; render(); };
   const lStart = $("lStart"); if (lStart) lStart.onclick = beginLive;
+  const lVoice = $("lVoice"); if (lVoice) lVoice.onclick = () => {
+    VOICE_ON = !VOICE_ON; try { localStorage.setItem("interun_voice", VOICE_ON ? "1" : "0"); } catch (e) {}
+    if (!VOICE_ON) stopSpeech(); else speak("Voice on.");
+    lVoice.classList.toggle("on", VOICE_ON); lVoice.innerHTML = VOICE_ON ? ICON.vox : ICON.voxOff;
+  };
   const lPause = $("lPause"); if (lPause) lPause.onclick = () => {
     const st = LIVE.rt.getStatus();
     if (st === "active") {
@@ -1814,7 +1929,7 @@ function wire() {
 }
 function buildNav() {
   $("nav").innerHTML = ["today","plan","activities","community","support"].map((t) => '<button class="navbtn' + (t===state.tab?" on":"") + '" data-tab="' + t + '">' + ICON[t] + '<span class="nl">' + TITLES[t].replace("Your ","") + '</span></button>').join("");
-  document.querySelectorAll(".navbtn").forEach((b) => b.onclick = () => { stopLive(); stopTrialRun(); TRIALRUN = null; state.screen = null; state.tab = b.dataset.tab; if (b.dataset.tab !== "support") state.support = null; render(); });
+  document.querySelectorAll(".navbtn").forEach((b) => b.onclick = () => { stopLive(); stopSpeech(); stopTrialRun(); TRIALRUN = null; state.screen = null; state.tab = b.dataset.tab; if (b.dataset.tab !== "support") state.support = null; render(); });
 }
 $("bellBtn").innerHTML = ICON.bell; $("themeBtn").innerHTML = ICON.theme; $("calBtn").innerHTML = ICON.cal; renderAvatar();
 $("themeBtn").onclick = () => { const cur = document.documentElement.getAttribute("data-theme"); document.documentElement.setAttribute("data-theme", cur === "dark" ? "light" : cur === "light" ? "dark" : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark")); };
@@ -1843,7 +1958,7 @@ render();
 })();
 // Register the service worker only where it actually exists (the GitHub Pages PWA build). We probe
 // first so the standalone artifact — which has no sw.js — stays silent instead of logging an error.
-if ("serviceWorker" in navigator) {
+if ("serviceWorker" in navigator && (location.protocol === "https:" || location.protocol === "http:")) {
   addEventListener("load", () => {
     fetch("sw.js", { method: "HEAD" }).then((r) => { if (r.ok) navigator.serviceWorker.register("sw.js").catch(() => {}); }).catch(() => {});
   });

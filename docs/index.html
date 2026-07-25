@@ -537,6 +537,12 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
 .ov-mapov .rt-base { stroke-width: 9; opacity: .55; } .ov-mapov .rt-ants { stroke-width: 5; stroke-dasharray: 15 17; }
 .ov-mapov .rt-start, .ov-mapov .rt-end { stroke-width: 4; }
 .ov-attr { position: absolute; left: 10px; bottom: 7px; font-size: 10px; color: rgba(255,255,255,.45); text-shadow: 0 1px 2px rgba(0,0,0,.5); pointer-events: none; }
+/* Light (Voyager) overview map: give the route a dark casing so the bright-green line reads on streets */
+.ov-light .ov-mapov .rt-base { stroke: #062e25; opacity: .92; stroke-width: 12.5; }
+.ov-light .ov-mapov .rt-ants { stroke: #17c98f; stroke-width: 6.5; filter: drop-shadow(0 1px 2px rgba(3,20,16,.45)); }
+.ov-light .ov-mapov .rt-start { fill: #17c98f; stroke: #fff; stroke-width: 4.5; }
+.ov-light .ov-mapov .rt-end { fill: #fff; stroke: #062e25; stroke-width: 5; }
+.ov-light .ov-attr { color: rgba(20,44,36,.62); text-shadow: 0 1px 1px rgba(255,255,255,.7); }
 .routemap { display: block; width: 100%; height: auto; }
 .rt-base { fill: none; stroke: var(--accent); stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; opacity: .5; }
 .rt-ants { fill: none; stroke: #fff; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 9 11; filter: drop-shadow(0 0 3px color-mix(in srgb, var(--accent) 70%, transparent)); animation: rtMarch 1s linear infinite; }
@@ -2046,20 +2052,20 @@ const OVMAP_W = 700, OVMAP_H = 420;
 // (offline / sandbox), the marching-ants fallback already in the container stays.
 function buildOverviewMap(container, route) {
   if (!container || !route || route.length < 2) return;
-  loadRouteMap(route, OVMAP_W, OVMAP_H).then((md) => {
+  loadRouteMap(route, OVMAP_W, OVMAP_H, "rastertiles/voyager").then((md) => {
     if (!container.isConnected) return;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const cv = document.createElement("canvas"); cv.width = OVMAP_W * dpr; cv.height = OVMAP_H * dpr;
     cv.className = "ov-mapcv";
     const g = cv.getContext("2d"); g.scale(dpr, dpr);
-    g.fillStyle = "#0a1714"; g.fillRect(0, 0, OVMAP_W, OVMAP_H);
+    g.fillStyle = "#eef1ee"; g.fillRect(0, 0, OVMAP_W, OVMAP_H);
     md.tiles.forEach((t) => { try { g.drawImage(t.img, t.dx, t.dy, MAP_TILE, MAP_TILE); } catch (e) {} });
-    g.fillStyle = "rgba(6,20,17,.28)"; g.fillRect(0, 0, OVMAP_W, OVMAP_H); // gentle dim for route contrast
     const overlay = routeMapSvg(route, md.proj, OVMAP_W, OVMAP_H);
+    container.classList.add("ov-light");
     container.innerHTML = "";
     container.appendChild(cv);
     container.appendChild(el('<div class="ov-mapov">' + overlay + '</div>'));
-    container.appendChild(el('<div class="ov-attr">© OpenStreetMap © CARTO</div>'));
+    container.appendChild(el('<div class="ov-attr">© OpenStreetMap contributors © CARTO</div>'));
   }).catch(() => {});
 }
 function splitsHtml(splits) {
@@ -2210,13 +2216,13 @@ function loadTileImage(url) {
 // Load CORS-enabled dark basemap tiles (CARTO/OpenStreetMap) covering the route, plus a projection
 // so the route aligns with the streets. Rejects on any failure (offline / sandbox / CORS) so the
 // caller can fall back to the grid map.
-function loadRouteMap(route, pw, ph) {
-  pw = pw || MAP_W; ph = ph || MAP_H;
+function loadRouteMap(route, pw, ph, style) {
+  pw = pw || MAP_W; ph = ph || MAP_H; style = style || "dark_all";
   return new Promise((resolve, reject) => {
     if (!route || route.length < 2) return reject(new Error("no route"));
     const lats = route.map((p) => p.lat), lngs = route.map((p) => p.lng);
     const minLa = Math.min(...lats), maxLa = Math.max(...lats), minLo = Math.min(...lngs), maxLo = Math.max(...lngs);
-    const pad = Math.min(90, pw * 0.14); let z = 18;
+    const pad = Math.min(64, pw * 0.1); let z = 18;
     for (; z >= 3; z--) { if (mercX(maxLo, z) - mercX(minLo, z) <= pw - 2 * pad && mercY(minLa, z) - mercY(maxLa, z) <= ph - 2 * pad) break; }
     const originX = mercX((minLo + maxLo) / 2, z) - pw / 2, originY = mercY((minLa + maxLa) / 2, z) - ph / 2;
     const n = Math.pow(2, z), specs = [];
@@ -2224,7 +2230,7 @@ function loadRouteMap(route, pw, ph) {
       for (let ty = Math.floor(originY / MAP_TILE); ty <= Math.floor((originY + ph) / MAP_TILE); ty++) {
         if (ty < 0 || ty >= n) continue;
         const wx = ((tx % n) + n) % n, sub = ["a", "b", "c"][((tx % 3) + 3) % 3];
-        specs.push({ url: "https://" + sub + ".basemaps.cartocdn.com/dark_all/" + z + "/" + wx + "/" + ty + "@2x.png", dx: tx * MAP_TILE - originX, dy: ty * MAP_TILE - originY });
+        specs.push({ url: "https://" + sub + ".basemaps.cartocdn.com/" + style + "/" + z + "/" + wx + "/" + ty + "@2x.png", dx: tx * MAP_TILE - originX, dy: ty * MAP_TILE - originY });
       }
     if (!specs.length || specs.length > 40) return reject(new Error("tile count"));
     Promise.all(specs.map((s) => loadTileImage(s.url).then((img) => ({ img, dx: s.dx, dy: s.dy }))))

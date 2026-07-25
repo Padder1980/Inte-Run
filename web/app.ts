@@ -583,6 +583,8 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
 .runcard .act { display: flex; align-items: center; padding: 13px 15px; }
 .runcard .rc-arr { margin-left: auto; color: var(--ink-faint); font-size: 20px; }
 .rd-head { margin: 2px 2px 12px; } .rd-head .rd-t { font-size: 20px; font-weight: 750; letter-spacing: -.02em; } .rd-head .rd-d { font-size: 12.5px; color: var(--ink-faint); margin-top: 2px; }
+.share-btn { background: var(--surface); color: var(--accent); border: 1.5px solid color-mix(in srgb, var(--accent) 45%, var(--line)); box-shadow: 0 1px 2px rgba(20,32,27,.05); }
+.share-btn svg { width: 19px; height: 19px; }
 .mini-btn { margin-top: 8px; display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--accent); background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; cursor: pointer; }
 .trial-ov { position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; padding: 20px; background: color-mix(in srgb, var(--ink) 55%, transparent); backdrop-filter: blur(4px); }
 .trial-ov.on { display: flex; }
@@ -673,6 +675,7 @@ const BRAND_SVG = ${JSON.stringify(BRAND_MARK)};
 const ICON = {
   gauge: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19a8 8 0 1 1 16 0"/><path d="M13.4 12.6 18 8"/><circle cx="12" cy="19" r="1.4" fill="currentColor" stroke="none"/></svg>',
   guide: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/><circle cx="12" cy="8" r=".6" fill="currentColor"/></svg>',
+  share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.5 15.4 6.5M8.6 13.5l6.8 4"/></svg>',
   trendUp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>',
   trendDown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l6 6 4-4 8 8"/><path d="M17 17h4v-4"/></svg>',
   timer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4"/><circle cx="12" cy="14" r="8"/><path d="M12 14V10"/></svg>',
@@ -2039,12 +2042,117 @@ function splitsHtml(splits) {
   }).join("");
   return '<div class="card"><div class="subhead" style="margin-top:0">Kilometre splits</div>' + rows + '</div>';
 }
-// Shared overview: route map + key stats + splits. Used by the completion screen and Activities.
+// Shared overview: route map + key stats + splits + share. Used by the completion screen and Activities.
 function runOverviewHtml(run) {
   const stat = (k, v) => '<div class="ov-stat"><div class="ov-v num">' + v + '</div><div class="ov-k">' + k + '</div></div>';
   return '<div class="card ov-map-card"><div class="ov-map">' + routeMapSvg(run.route) + '</div>' +
     '<div class="ov-stats">' + stat("Distance", run.dist) + stat("Time", run.time) + stat("Avg pace", run.pace) + '</div></div>' +
-    splitsHtml(run.splits);
+    splitsHtml(run.splits) +
+    '<button class="primary share-btn" id="shareRun">' + ICON.share + ' Share my run</button>';
+}
+// ---- Shareable branded run card -------------------------------------------
+// The run whose overview is on screen right now (completion screen or Activities detail).
+function currentOverviewRun() {
+  if (state.screen === "runview") return state.logged[state.viewRunIdx];
+  if (LIVE && LIVE.summary) { const sm = LIVE.summary; return { t: LIVE.session.title, d: runDateLabel(), dist: sm.distKm + " km", time: sm.time, pace: (sm.pace || "—") + " /km", route: sm.route, splits: sm.splits }; }
+  return null;
+}
+function drawRouteOnCanvas(g, route, x, y, w, h) {
+  if (!route || route.length < 2) {
+    g.fillStyle = "rgba(255,255,255,.45)"; g.textAlign = "center"; g.font = "500 30px -apple-system, system-ui, sans-serif";
+    g.fillText("No route recorded", x + w / 2, y + h / 2); g.textAlign = "left"; return;
+  }
+  const lats = route.map((p) => p.lat), lngs = route.map((p) => p.lng);
+  const minLa = Math.min(...lats), maxLa = Math.max(...lats), minLo = Math.min(...lngs), maxLo = Math.max(...lngs);
+  const cx = Math.cos((minLa + maxLa) / 2 * Math.PI / 180) || 1, pad = 70;
+  const spanLo = Math.max(1e-9, (maxLo - minLo) * cx), spanLa = Math.max(1e-9, maxLa - minLa);
+  const scale = Math.min((w - 2 * pad) / spanLo, (h - 2 * pad) / spanLa);
+  const ox = x + (w - spanLo * scale) / 2, oy = y + (h - spanLa * scale) / 2;
+  const XY = (p) => [ox + (p.lng - minLo) * cx * scale, oy + (maxLa - p.lat) * scale];
+  g.lineJoin = "round"; g.lineCap = "round";
+  g.beginPath(); route.forEach((p, i) => { const q = XY(p); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); });
+  g.strokeStyle = "#16b7a4"; g.lineWidth = 16; g.globalAlpha = .55; g.stroke(); g.globalAlpha = 1;
+  g.setLineDash([26, 26]); g.strokeStyle = "#ffffff"; g.lineWidth = 9; g.stroke(); g.setLineDash([]);
+  const s = XY(route[0]), e = XY(route[route.length - 1]);
+  g.fillStyle = "#16b7a4"; g.beginPath(); g.arc(s[0], s[1], 17, 0, 7); g.fill(); g.lineWidth = 6; g.strokeStyle = "#fff"; g.stroke();
+  g.fillStyle = "#fff"; g.beginPath(); g.arc(e[0], e[1], 17, 0, 7); g.fill(); g.lineWidth = 7; g.strokeStyle = "#16b7a4"; g.stroke();
+}
+// Draw the InteRun badge glyph directly on the canvas (reliable — no SVG-image rasterisation needed).
+function drawBrandBadge(g, x, y, size) {
+  g.save(); g.translate(x, y); g.scale(size / 120, size / 120);
+  const grad = g.createLinearGradient(8, 8, 112, 112); grad.addColorStop(0, "#16b7a4"); grad.addColorStop(1, "#0a6f64");
+  g.fillStyle = grad;
+  if (g.roundRect) { g.beginPath(); g.roundRect(8, 8, 104, 104, 30); g.fill(); } else g.fillRect(8, 8, 104, 104);
+  g.fillStyle = "#fff"; g.beginPath(); g.arc(82, 37, 11, 0, 7); g.fill();
+  g.beginPath(); g.moveTo(35, 88); g.lineTo(57, 45); g.lineTo(71, 45); g.lineTo(49, 88); g.closePath(); g.fill();
+  g.globalAlpha = .62; g.beginPath(); g.moveTo(57, 88); g.lineTo(79, 45); g.lineTo(93, 45); g.lineTo(71, 88); g.closePath(); g.fill(); g.globalAlpha = 1;
+  g.restore();
+}
+function buildShareCanvas(run) {
+  const W = 1080, H = 1350, c = document.createElement("canvas"); c.width = W; c.height = H;
+  const g = c.getContext("2d");
+  const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, "#0e3f39"); bg.addColorStop(1, "#06181a");
+  g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  const glow = g.createRadialGradient(W / 2, 120, 40, W / 2, 120, 700); glow.addColorStop(0, "rgba(22,183,164,.28)"); glow.addColorStop(1, "rgba(22,183,164,0)");
+  g.fillStyle = glow; g.fillRect(0, 0, W, 700);
+  // Header: logo badge + wordmark + tagline
+  drawBrandBadge(g, 66, 60, 128);
+  g.textAlign = "left"; g.textBaseline = "alphabetic";
+  g.font = "800 66px -apple-system, system-ui, 'Segoe UI', Roboto, sans-serif";
+  g.fillStyle = "#fff"; g.fillText("Inte", 214, 150);
+  const w1 = g.measureText("Inte").width;
+  g.fillStyle = "#16b7a4"; g.fillText("Run", 214 + w1, 150);
+  g.fillStyle = "rgba(255,255,255,.5)"; g.font = "500 27px -apple-system, system-ui, sans-serif";
+  g.fillText("The Intelligent Training Companion", 216, 188);
+  // Run title + date (centred)
+  g.textAlign = "center";
+  g.fillStyle = "#fff"; g.font = "700 46px -apple-system, system-ui, sans-serif"; g.fillText(run.t || "My run", W / 2, 296);
+  g.fillStyle = "rgba(255,255,255,.55)"; g.font = "500 30px -apple-system, system-ui, sans-serif"; g.fillText(run.d || "", W / 2, 344);
+  g.textAlign = "left";
+  // Map panel
+  const mx = 60, my = 384, mw = W - 120, mh = 560;
+  g.fillStyle = "rgba(255,255,255,.05)"; if (g.roundRect) { g.beginPath(); g.roundRect(mx, my, mw, mh, 28); g.fill(); } else g.fillRect(mx, my, mw, mh);
+  drawRouteOnCanvas(g, run.route, mx, my, mw, mh);
+  // Stats row
+  const cols = [W * 0.2, W * 0.5, W * 0.8], vals = [run.dist, run.time, run.pace], labs = ["DISTANCE", "TIME", "AVG PACE"];
+  const sy = 1070;
+  cols.forEach((cxp, i) => {
+    g.textAlign = "center";
+    g.fillStyle = "#fff"; g.font = "800 74px -apple-system, system-ui, sans-serif"; g.fillText(vals[i], cxp, sy);
+    g.fillStyle = "rgba(255,255,255,.5)"; g.font = "700 25px -apple-system, system-ui, sans-serif"; g.fillText(labs[i], cxp, sy + 44);
+  });
+  // Caption
+  g.textAlign = "left"; g.font = "600 40px -apple-system, system-ui, sans-serif";
+  const a = "I completed a run with ", bw = "InteRun";
+  const wa = g.measureText(a).width, wb = g.measureText(bw).width, sx = (W - wa - wb) / 2;
+  g.fillStyle = "rgba(255,255,255,.9)"; g.fillText(a, sx, 1258);
+  g.fillStyle = "#16b7a4"; g.fillText(bw, sx + wa, 1258);
+  return c;
+}
+function canvasToPngFile(canvas, name) {
+  const dataUrl = canvas.toDataURL("image/png");
+  const b64 = dataUrl.split(",")[1], bin = atob(b64), arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new File([arr], name, { type: "image/png" });
+}
+function shareCaption(run) { return "I completed a run with InteRun \\uD83C\\uDFC3 \\u2014 " + run.dist + " in " + run.time + "."; }
+function doShareRun() {
+  const run = currentOverviewRun(); if (!run) return;
+  let file; try { file = canvasToPngFile(buildShareCanvas(run), "interun-run.png"); } catch (e) { file = null; }
+  const caption = shareCaption(run);
+  const canShareFile = file && navigator.canShare && navigator.canShare({ files: [file] });
+  if (canShareFile) {
+    navigator.share({ files: [file], text: caption, title: "InteRun" }).catch(() => {});
+  } else if (navigator.share) {
+    navigator.share({ text: caption, title: "InteRun" }).catch(() => downloadShareCard(file, run));
+  } else {
+    downloadShareCard(file, run);
+  }
+}
+function downloadShareCard(file, run) {
+  if (!file) { try { file = canvasToPngFile(buildShareCanvas(run), "interun-run.png"); } catch (e) { return; } }
+  const url = URL.createObjectURL(file); const a = document.createElement("a"); a.href = url; a.download = "interun-run.png";
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function viewLiveComplete() {
   const sm = LIVE.summary || { distKm: "0.00", time: "0:00", pace: "—", saved: false, route: [], splits: [] };
@@ -2459,6 +2567,7 @@ function wire() {
   document.querySelectorAll("[data-at]").forEach((b) => b.onclick = () => { state.actTab = b.dataset.at; render(); });
   document.querySelectorAll("[data-runidx]").forEach((b) => b.onclick = () => { state.viewRunIdx = Number(b.dataset.runidx); state.screen = "runview"; render(); });
   const runBack = $("runBack"); if (runBack) runBack.onclick = () => { state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); };
+  const shareRun = $("shareRun"); if (shareRun) shareRun.onclick = doShareRun;
   document.querySelectorAll("[data-hub]").forEach((b) => b.onclick = () => { state.support = b.dataset.hub; render(); });
   const guideReplay = $("guideReplay"); if (guideReplay) guideReplay.onclick = () => openSessionGuide(GUIDE_EXAMPLE, { fromSupport: true });
   const back = $("supBack"); if (back) back.onclick = () => { state.support = null; render(); };

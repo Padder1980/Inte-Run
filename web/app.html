@@ -376,11 +376,10 @@ select.sel { font: inherit; font-size: 13.5px; color: var(--ink); background: va
 /* Setup / profile form — premium, obvious inputs */
 input.sel { font: inherit; font-size: 15px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px; padding: 12px 13px; width: 100%; transition: border-color .15s ease, box-shadow .15s ease, background .15s ease; }
 input.sel::placeholder { color: var(--ink-faint); }
-/* Date inputs: iOS/WebKit centre the value and float the picker oddly — force left alignment and a
-   consistent height so they match the text fields and selects. */
-input.sel[type="date"] { -webkit-appearance: none; appearance: none; text-align: left; min-height: 47px; box-sizing: border-box; display: flex; align-items: center; }
-input.sel[type="date"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
-input.sel[type="date"]::-webkit-calendar-picker-indicator { margin-left: auto; opacity: .55; cursor: pointer; }
+/* Date inputs: iOS centres the value. Left-align it (and its WebKit value element) and constrain the
+   width so it reads like the constrained selects (Age, Sex) — no flex/min-height, which broke iOS. */
+input.sel[type="date"] { text-align: left; max-width: 230px; }
+input.sel[type="date"]::-webkit-date-and-time-value { text-align: left; }
 input.sel:focus, select.sel:focus { outline: none; border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent); }
 select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: pointer; }
 .setup-intro { margin: 2px 2px 14px; }

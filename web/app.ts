@@ -397,6 +397,29 @@ details.more > summary::before { content: "▸ "; } details.more[open] > summary
 .opt input { margin-top: 3px; accent-color: var(--accent); flex: none; }
 .subhead { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-faint); font-weight: 600; margin: 12px 0 6px; }
 select.sel { font: inherit; font-size: 13.5px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px; width: 100%; }
+/* Setup / profile form — premium, obvious inputs */
+input.sel { font: inherit; font-size: 15px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px; padding: 12px 13px; width: 100%; transition: border-color .15s ease, box-shadow .15s ease, background .15s ease; }
+input.sel::placeholder { color: var(--ink-faint); }
+input.sel:focus, select.sel:focus { outline: none; border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent); }
+select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: pointer; }
+.setup-intro { margin: 2px 2px 14px; }
+.setup-intro h2 { font-size: 22px; font-weight: 800; letter-spacing: -.02em; margin: 0; }
+.setup-intro p { font-size: 13.5px; color: var(--ink-soft); margin: 5px 0 0; }
+.sec-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+.sec-num { width: 28px; height: 28px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 750; color: var(--accent-ink); background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 86%, #fff), var(--accent)); box-shadow: 0 3px 8px -3px color-mix(in srgb, var(--accent) 55%, transparent); margin-top: 1px; }
+.sec-title { font-size: 17px; font-weight: 750; letter-spacing: -.01em; line-height: 1.2; }
+.sec-sub { font-size: 12.5px; color: var(--ink-faint); margin-top: 2px; }
+/* Actionable callout for optional-but-valuable inputs (easy pace, 1 km trial) */
+.callout { margin-top: 13px; border-radius: 14px; padding: 14px; background: linear-gradient(158deg, color-mix(in srgb, var(--accent) 9%, var(--surface)), var(--surface) 70%); border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line)); }
+.callout-h { display: flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 700; letter-spacing: -.01em; }
+.callout-h .ic { color: var(--accent); display: inline-flex; } .callout-h .ic svg { width: 19px; height: 19px; }
+.callout-badge { margin-left: auto; font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); border-radius: 999px; padding: 3px 8px; }
+.callout p { font-size: 12.5px; color: var(--ink-soft); margin: 7px 0 11px; line-height: 1.45; }
+.callout .mas-hint { margin-top: 9px; }
+.callout .mini-btn { margin-top: 10px; }
+.q-hint { font-size: 12px; color: var(--ink-faint); font-weight: 400; }
+.setup-card { padding: 17px; }
+.setup-foot { text-align: center; font-size: 12px; color: var(--ink-faint); margin: 14px 0 4px; }
 .result { margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: none; }
 .result.show { display: block; }
 .result .rb { padding: 12px 14px; color: #fff; background: var(--rbc); font-weight: 600; font-size: 14px; }
@@ -566,6 +589,8 @@ function bindTimeInput(el) {
   el.addEventListener("input", () => { const f = fmtDigitsToTime(el.value); el.value = f; try { el.setSelectionRange(f.length, f.length); } catch (e) {} });
 }
 const ICON = {
+  gauge: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19a8 8 0 1 1 16 0"/><path d="M13.4 12.6 18 8"/><circle cx="12" cy="19" r="1.4" fill="currentColor" stroke="none"/></svg>',
+  timer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4"/><circle cx="12" cy="14" r="8"/><path d="M12 14V10"/></svg>',
   today: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>',
   plan: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h4"/></svg>',
   activities: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>',
@@ -1352,36 +1377,61 @@ function processAvatarFile(file) {
   };
   reader.readAsDataURL(file);
 }
+// A numbered section card — the numbered badge + title makes each step obvious and the page premium.
+function setupSection(num, title, sub, body) {
+  return '<div class="card setup-card" style="margin-top:12px"><div class="sec-head"><div class="sec-num">' + num + '</div>' +
+    '<div><div class="sec-title">' + title + '</div>' + (sub ? '<div class="sec-sub">' + sub + '</div>' : '') + '</div></div>' + body + '</div>';
+}
 function viewSetup() {
   const p = profile;
   const savedMsg = state.trialSaved ? '<div class="plan-note" style="border-left-color:var(--accent);margin:2px 2px 12px">✓ 1 km time trial saved: <b>' + state.trialSaved + '</b>. Your VO₂/interval paces are now anchored to it.</div>' : "";
-  return savedMsg + '<div class="eyebrow" style="margin:2px 2px 10px">' + (p.name ? p.name + "\\u2019s profile" : (p.personalized ? "Your profile" : "Let\\'s make this yours")) + '</div>' +
-    '<div class="card"><div class="subhead" style="margin-top:0">You</div>' +
+  const intro = '<div class="setup-intro"><h2>' + (p.personalized ? (p.name ? p.name + "\\u2019s profile" : "Your profile") : "Let\\u2019s build your plan") + '</h2><p>' + (p.personalized ? "Update anything below and we\\u2019ll rebuild your plan." : "A few quick questions — this shapes every pace and session.") + '</p></div>';
+
+  // 1 · You
+  const secYou =
     '<div class="avatar-row"><div class="avatar-pic" id="avatarPic">' + avatarInner(p) + '</div>' +
-    '<div><button class="avatar-cta" id="avatarBtn" type="button">' + (p.avatar ? "Change photo" : "\\uD83D\\uDCF7 Add photo") + '</button><div class="avatar-hint">A profile picture shows in your top-bar icon.</div></div></div>' +
+    '<div><button class="avatar-cta" id="avatarBtn" type="button">' + (p.avatar ? "Change photo" : "\\uD83D\\uDCF7 Add photo") + '</button><div class="avatar-hint">Shows in your top-bar icon.</div></div></div>' +
     '<input type="file" id="s_avatar_file" accept="image/*" style="display:none">' +
-    '<div class="q" style="margin-top:15px"><label>Your name</label><input class="sel" id="s_name" value="' + (p.name || "").replace(/"/g, "&quot;") + '" placeholder="What should we call you?" autocomplete="name"></div></div>' +
-    '<div class="card" style="margin-top:12px"><div class="subhead" style="margin-top:0">Your running</div>' +
-    '<div class="q"><label>What\\u2019s your current running status? <span style="color:var(--ink-faint);font-weight:400">this shapes what we ask next</span></label>' + statusCards(p.status || "regular") + '</div>' +
-    '<div class="q" id="statusBegNote"' + (isBeginnerStatus(p.status) ? '' : ' style="display:none"') + '><div class="mas-hint"></div></div>' +
+    '<div class="q" style="margin-top:16px"><label>Your name</label><input class="sel" id="s_name" value="' + (p.name || "").replace(/"/g, "&quot;") + '" placeholder="What should we call you?" autocomplete="name"></div>';
+
+  // 2 · Your running (status gates the fitness inputs)
+  const secRunning =
+    '<div class="q" style="margin-top:0"><label>What\\u2019s your current running status?</label>' + statusCards(p.status || "regular") + '</div>' +
+    '<div class="q" id="statusBegNote"' + (p.status === "new" ? '' : ' style="display:none"') + '><div class="mas-hint"></div></div>' +
     // Fitness ≠ frequency: a "building the habit" runner can be genuinely fit but just not running
-    // often. Let them calibrate their real easy pace so we don't seed a too-slow baseline.
-    '<div class="q" id="buildingCalib"' + (p.status === "building" ? "" : ' style="display:none"') + '><label><span class="lblmain">Your comfortable easy pace</span> <span style="color:var(--ink-faint);font-weight:400">optional — min:ss per km, so we set your paces right</span></label><input class="sel num" id="s_easypace" value="' + (p.easyPaceS ? fmtTimeFull(p.easyPaceS) : "") + '" placeholder="e.g. 6:00" inputmode="numeric"><div class="mas-hint">Know a rough pace you can chat at? Enter it and every pace scales to your fitness. Not sure — leave it blank and we\\'ll start gently and learn as you run.</div></div>' +
+    // often. This callout makes the optional pace calibration obvious and inviting to fill in.
+    '<div id="buildingCalib" class="callout"' + (p.status === "building" ? "" : ' style="display:none"') + '>' +
+    '<div class="callout-h"><span class="ic">' + ICON.gauge + '</span>Set your easy pace<span class="callout-badge">optional</span></div>' +
+    '<p>Already fairly fit? Enter a pace you can comfortably <b>chat at</b> and every training pace scales to you. Leave it blank and we\\u2019ll start gently and learn as you run.</p>' +
+    '<input class="sel num" id="s_easypace" value="' + (p.easyPaceS ? fmtTimeFull(p.easyPaceS) : "") + '" placeholder="e.g. 6:00 / km" inputmode="numeric"></div>' +
     '<div id="statusRunnerBlock"' + (isBeginnerStatus(p.status) ? ' style="display:none"' : '') + '>' +
     '<div class="q"><label>Your 5 km time — a recent result or an estimate?</label>' + seg("fitsrc", [["recent","Recent"],["predicted","Predicted"]], p.fitSrc === "predicted" ? "predicted" : "recent") + '</div>' +
-    '<div class="q" id="fitTimeWrap"><label id="fitTimeLbl"><span class="lblmain">' + (p.fitSrc === "predicted" ? "Your predicted 5 km time" : "Your recent 5 km time") + '</span> <span style="color:var(--ink-faint);font-weight:400">just type the numbers</span></label><input class="sel num" id="s_rectime" value="' + (p.noRecent ? "" : fmtTimeFull(p.recentTimeS)) + '" placeholder="e.g. 25:00" inputmode="numeric"></div>' +
-    '<div class="q"><label>1 km time-trial <span style="color:var(--ink-faint);font-weight:400">max effort, optional — sharpens your VO₂ paces</span></label><input class="sel num" id="s_1km" value="' + (p.oneKmS ? fmtTimeFull(p.oneKmS) : "") + '" placeholder="e.g. 4:00" inputmode="numeric"><div class="mas-hint" id="masHint"></div><button class="mini-btn" id="s_1km_rec" type="button">⏱ Haven\\'t done one? Record it now</button></div>' +
-    '</div></div>' +
-    '<div class="card" id="goalCard" style="margin-top:12px">' + goalCardInner(p.status || "regular", { dist: p.goalDist, date: p.raceDate, target: fmtTimeFull(p.targetS) }) + '</div>' +
-    '<div class="card" style="margin-top:12px"><div class="subhead" style="margin-top:0">A few details</div>' +
-    '<div class="q"><label>How many days a week will you run? <span style="color:var(--ink-faint);font-weight:400">we\\'ll shape the plan around this</span></label>' + seg("days", [["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]], p.daysPerWeek) + '</div>' +
-    '<div class="q"><label>Age</label><select class="sel" id="s_age" style="max-width:130px">' + ageOpts(p.age) + '</select></div>' +
-    '<div class="q"><label>Sex <span style="color:var(--ink-faint);font-weight:400">helps tailor advice</span></label><select class="sel" id="s_sex"><option value=""' + (!p.sex?" selected":"") + '>Prefer not to say</option><option value="female"' + (p.sex==="female"?" selected":"") + '>Female</option><option value="male"' + (p.sex==="male"?" selected":"") + '>Male</option></select></div>' +
+    '<div class="q" id="fitTimeWrap"><label id="fitTimeLbl"><span class="lblmain">' + (p.fitSrc === "predicted" ? "Your predicted 5 km time" : "Your recent 5 km time") + '</span> <span class="q-hint">just type the numbers</span></label><input class="sel num" id="s_rectime" value="' + (p.noRecent ? "" : fmtTimeFull(p.recentTimeS)) + '" placeholder="e.g. 25:00" inputmode="numeric"></div>' +
+    '<div class="callout"><div class="callout-h"><span class="ic">' + ICON.timer + '</span>1 km time-trial<span class="callout-badge">optional</span></div>' +
+    '<p>A max-effort 1 km sharpens your VO₂ and interval paces — a direct, re-testable measure of fitness.</p>' +
+    '<input class="sel num" id="s_1km" value="' + (p.oneKmS ? fmtTimeFull(p.oneKmS) : "") + '" placeholder="e.g. 4:00" inputmode="numeric"><div class="mas-hint" id="masHint"></div><button class="mini-btn" id="s_1km_rec" type="button">⏱ Haven\\'t done one? Record it now</button></div>' +
+    '</div>';
+
+  // 3 · Your goal (goalCardInner supplies its own inner markup; keep the id for syncStatus)
+  const secGoal = goalCardInner(p.status || "regular", { dist: p.goalDist, date: p.raceDate, target: fmtTimeFull(p.targetS) });
+
+  // 4 · A few details
+  const secDetails =
+    '<div class="q" style="margin-top:0"><label>How many days a week will you run? <span class="q-hint">we\\u2019ll shape the plan around this</span></label>' + seg("days", [["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]], p.daysPerWeek) + '</div>' +
+    '<div class="q"><label>Age</label><select class="sel" id="s_age" style="max-width:140px">' + ageOpts(p.age) + '</select></div>' +
+    '<div class="q"><label>Sex <span class="q-hint">helps tailor advice</span></label><select class="sel" id="s_sex" style="max-width:200px"><option value=""' + (!p.sex?" selected":"") + '>Prefer not to say</option><option value="female"' + (p.sex==="female"?" selected":"") + '>Female</option><option value="male"' + (p.sex==="male"?" selected":"") + '>Male</option></select></div>' +
     '<div class="q"><label>Include strength &amp; conditioning?</label>' + seg("strength", [["1","Yes"],["0","No"]], p.strength?"1":"0") + '</div>' +
-    '<div class="q"><label>Returning from injury / a break?</label>' + seg("returning", [["0","No"],["1","Yes"]], p.returning?"1":"0") + '</div></div>' +
-    '<div class="err" id="setupErr" style="display:none;color:var(--ease);font-size:13px;margin:12px 2px 0"></div>' +
+    '<div class="q"><label>Returning from injury or a long break?</label>' + seg("returning", [["0","No"],["1","Yes"]], p.returning?"1":"0") + '</div>';
+
+  return savedMsg + intro +
+    setupSection(1, "You", "A photo and what to call you", secYou) +
+    setupSection(2, "Your running", "So we pitch your paces just right", secRunning) +
+    '<div class="card setup-card" id="goalCard" style="margin-top:12px"><div class="sec-head"><div class="sec-num">3</div><div><div class="sec-title">Your goal</div><div class="sec-sub">What you\\u2019re working towards</div></div></div><div id="goalBody">' + secGoal + '</div></div>' +
+    setupSection(4, "A few details", "The finishing touches to your plan", secDetails) +
+    '<div class="err" id="setupErr" style="display:none;color:var(--rest);font-size:13px;margin:14px 2px 0;font-weight:600"></div>' +
     '<button class="primary" id="saveProfile">' + (p.personalized ? "Update my plan" : "Build my plan") + '</button>' +
-    (p.personalized ? '<button class="primary" id="cancelSetup" style="background:var(--surface-2);color:var(--ink-soft)">Cancel</button>' : "");
+    (p.personalized ? '<button class="primary" id="cancelSetup" style="background:var(--surface-2);color:var(--ink-soft);box-shadow:none;margin-top:8px">Cancel</button>' : '') +
+    '<div class="setup-foot">You can change any of this later.</div>';
 }
 // Draft profile from the setup form's current values (may throw on bad times).
 function draftFromForm() {
@@ -1568,10 +1618,9 @@ function goalCardInner(status, cur) {
   const cfg = GOAL_BY_STATUS[status] || GOAL_BY_STATUS.regular;
   let dist = cur.dist; if (cfg.dists.indexOf(dist) < 0) dist = cfg.dists[0];
   const opts = cfg.dists.map((k) => '<option value="' + k + '"' + (k === dist ? " selected" : "") + '>' + (cfg.time ? RACE_LABEL[k] : FINISH_LABEL[k]) + '</option>').join("");
-  let h = '<div class="subhead" style="margin-top:0">Your goal</div>' +
-    '<div class="q"><label>' + cfg.q + '</label><select class="sel" id="s_dist">' + opts + '</select></div>';
+  let h = '<div class="q" style="margin-top:0"><label>' + cfg.q + '</label><select class="sel" id="s_dist">' + opts + '</select></div>';
   if (cfg.time) {
-    h += '<div class="q"><label>Target time <span style="color:var(--ink-faint);font-weight:400">just type the numbers</span></label><input class="sel num" id="s_target" value="' + cur.target + '" inputmode="numeric"></div>';
+    h += '<div class="q"><label>Target time <span class="q-hint">just type the numbers</span></label><input class="sel num" id="s_target" value="' + cur.target + '" inputmode="numeric"></div>';
   } else {
     h += '<div class="q"><div class="mas-hint">No time pressure \\u2014 we\\u2019ll build you up to comfortably finish it. You can set a time goal once you\\u2019re there.</div></div>';
   }
@@ -1589,23 +1638,23 @@ function syncStatus() {
   const rb = $("statusRunnerBlock"), bn = $("statusBegNote");
   if (rb) rb.style.display = beginner ? "none" : "";
   if (bn) {
-    bn.style.display = beginner ? "" : "none";
+    // The "new" runner gets a reassuring note; "building" gets the easy-pace callout instead.
+    bn.style.display = st === "new" ? "" : "none";
     const note = bn.querySelector(".mas-hint");
-    if (note) note.textContent = st === "new"
-      ? "Perfect — we\\u2019ll start with walk\\u2013run intervals and build your base gently."
-      : "Great — a gentle plan to grow your consistency. If you\\u2019re already fairly fit, set your easy pace below so we don\\u2019t hold you back.";
+    if (note && st === "new") note.textContent = "Perfect — we\\u2019ll start with walk\\u2013run intervals and build your base gently.";
   }
   const bc = $("buildingCalib"); if (bc) bc.style.display = st === "building" ? "" : "none";
   if (!beginner) syncFitSrc();
-  // Rebuild the goal card so its distance options and time field match the status.
-  const gc = $("goalCard");
-  if (gc) {
+  // Rebuild the goal card body so its distance options and time field match the status (the numbered
+  // section header stays put outside #goalBody).
+  const gb = $("goalBody");
+  if (gb) {
     const cur = {
       dist: $("s_dist") ? $("s_dist").value : profile.goalDist,
       date: $("s_date") ? $("s_date").value : profile.raceDate,
       target: $("s_target") ? $("s_target").value : fmtTimeFull(profile.targetS),
     };
-    gc.innerHTML = goalCardInner(st, cur);
+    gb.innerHTML = goalCardInner(st, cur);
     bindTimeInput($("s_target"));
   }
 }

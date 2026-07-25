@@ -2097,18 +2097,24 @@ function drawBrandBadge(g, x, y, size) {
   g.restore();
 }
 // Neon glowing route in the reference style: soft glow + bright core gradient, target-ring markers.
-function drawRouteGlow(g, route, x, y, w, h) {
+// proj (optional) maps a lat/lng to panel pixels so the line aligns with a real map underneath;
+// without it we fit the route to the panel with a simple equirectangular projection.
+function drawRouteGlow(g, route, x, y, w, h, proj) {
   if (!route || route.length < 2) {
     g.fillStyle = "rgba(200,255,240,.4)"; g.textAlign = "center"; g.font = "500 30px " + FF;
     g.fillText("No route recorded for this run", x + w / 2, y + h / 2); g.textAlign = "left"; return;
   }
-  const lats = route.map((p) => p.lat), lngs = route.map((p) => p.lng);
-  const minLa = Math.min(...lats), maxLa = Math.max(...lats), minLo = Math.min(...lngs), maxLo = Math.max(...lngs);
-  const cxf = Math.cos((minLa + maxLa) / 2 * Math.PI / 180) || 1, pad = 96;
-  const spanLo = Math.max(1e-9, (maxLo - minLo) * cxf), spanLa = Math.max(1e-9, maxLa - minLa);
-  const scale = Math.min((w - 2 * pad) / spanLo, (h - 2 * pad) / spanLa);
-  const ox = x + (w - spanLo * scale) / 2, oy = y + (h - spanLa * scale) / 2;
-  const P = route.map((p) => [ox + (p.lng - minLo) * cxf * scale, oy + (maxLa - p.lat) * scale]);
+  let P;
+  if (proj) { P = route.map(proj); }
+  else {
+    const lats = route.map((p) => p.lat), lngs = route.map((p) => p.lng);
+    const minLa = Math.min(...lats), maxLa = Math.max(...lats), minLo = Math.min(...lngs), maxLo = Math.max(...lngs);
+    const cxf = Math.cos((minLa + maxLa) / 2 * Math.PI / 180) || 1, pad = 96;
+    const spanLo = Math.max(1e-9, (maxLo - minLo) * cxf), spanLa = Math.max(1e-9, maxLa - minLa);
+    const scale = Math.min((w - 2 * pad) / spanLo, (h - 2 * pad) / spanLa);
+    const ox = x + (w - spanLo * scale) / 2, oy = y + (h - spanLa * scale) / 2;
+    P = route.map((p) => [ox + (p.lng - minLo) * cxf * scale, oy + (maxLa - p.lat) * scale]);
+  }
   const grad = g.createLinearGradient(0, y, 0, y + h); grad.addColorStop(0, "#3dffb0"); grad.addColorStop(1, "#a7ffd8");
   g.lineJoin = "round"; g.lineCap = "round";
   const trace = () => { g.beginPath(); P.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); };
@@ -2156,42 +2162,58 @@ function drawInsightIcon(g, cx, cy, r) {
   g.moveTo(cx + n[3][0], cy + n[3][1]); g.lineTo(cx + n[2][0], cy + n[2][1]); g.stroke();
   n.forEach((p) => { g.beginPath(); g.arc(cx + p[0], cy + p[1], 3, 0, 7); g.fill(); });
 }
-function buildShareCanvas(run) {
-  const W = 1080, H = 1620, c = document.createElement("canvas"); c.width = W; c.height = H;
-  const g = c.getContext("2d");
-  // Background: near-black with green tint + corner glows
-  g.fillStyle = "#04100d"; g.fillRect(0, 0, W, H);
-  const glowAt = (gx, gy, rad, a) => { const rg = g.createRadialGradient(gx, gy, 0, gx, gy, rad); rg.addColorStop(0, "rgba(30,180,150," + a + ")"); rg.addColorStop(1, "rgba(30,180,150,0)"); g.fillStyle = rg; g.fillRect(0, 0, W, H); };
-  glowAt(180, 200, 620, .18); glowAt(W - 150, 260, 560, .12); glowAt(W / 2, H - 120, 720, .08);
-  // Panel frame
-  rr(g, 20, 20, W - 40, H - 40, 46); g.fillStyle = "rgba(255,255,255,.015)"; g.fill(); g.lineWidth = 2; g.strokeStyle = "rgba(56,255,190,.22)"; g.stroke();
-  g.textBaseline = "alphabetic"; g.textAlign = "left";
-  // Header
-  drawBrandBadge(g, 56, 92, 116);
-  g.font = "800 62px " + FF; g.fillStyle = "#fff"; g.fillText("Inte", 196, 178);
-  const iw = g.measureText("Inte").width; g.fillStyle = TEAL; g.fillText("Run", 196 + iw, 178);
-  g.fillStyle = "rgba(160,200,190,.65)"; g.font = "600 20px " + FF; lsText(g, "THE INTELLIGENT TRAINING COMPANION", 198, 210, 2.5, "left");
-  g.fillStyle = TEAL; g.font = "600 26px " + FF; g.textAlign = "right"; g.fillText("#RunWithInteRun", W - 56, 150); g.textAlign = "left";
-  // Title (auto-fit one line) + accent underline
-  const title = (run.t || "My run").toUpperCase(); let ts = 90; g.font = "800 " + ts + "px " + FF;
-  while (g.measureText(title).width > W - 130 && ts > 44) { ts -= 2; g.font = "800 " + ts + "px " + FF; }
-  g.fillStyle = "#fff"; g.fillText(title, 56, 322);
-  rr(g, 58, 348, 96, 7, 4); g.fillStyle = TEAL; g.fill();
-  // Date (grey + teal time)
-  g.font = "600 28px " + FF; const dparts = (run.d || "").toUpperCase().split("·");
-  g.fillStyle = "rgba(190,215,205,.7)"; g.fillText(dparts[0].trim(), 58, 410);
-  if (dparts[1]) { const dw = g.measureText(dparts[0].trim() + "  ").width; g.fillStyle = TEAL; g.fillText("· " + dparts[1].trim(), 58 + dw, 410); }
-  // Map panel
-  const mx = 48, my = 452, mw = W - 96, mh = 576;
+// ---- Real map tiles (Web Mercator) for the share card ----------------------
+const MAP_TILE = 256, MAP_W = 984, MAP_H = 576;
+function mercX(lng, z) { return (lng + 180) / 360 * MAP_TILE * Math.pow(2, z); }
+function mercY(lat, z) { const s = Math.sin(lat * Math.PI / 180); return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * MAP_TILE * Math.pow(2, z); }
+function loadTileImage(url) {
+  return new Promise((res, rej) => {
+    const img = new Image(); img.crossOrigin = "anonymous";
+    const to = setTimeout(() => rej(new Error("timeout")), 6000);
+    img.onload = () => { clearTimeout(to); res(img); };
+    img.onerror = () => { clearTimeout(to); rej(new Error("err")); };
+    img.src = url;
+  });
+}
+// Load CORS-enabled dark basemap tiles (CARTO/OpenStreetMap) covering the route, plus a projection
+// so the route aligns with the streets. Rejects on any failure (offline / sandbox / CORS) so the
+// caller can fall back to the grid map.
+function loadRouteMap(route) {
+  return new Promise((resolve, reject) => {
+    if (!route || route.length < 2) return reject(new Error("no route"));
+    const lats = route.map((p) => p.lat), lngs = route.map((p) => p.lng);
+    const minLa = Math.min(...lats), maxLa = Math.max(...lats), minLo = Math.min(...lngs), maxLo = Math.max(...lngs);
+    const pad = 90; let z = 18;
+    for (; z >= 3; z--) { if (mercX(maxLo, z) - mercX(minLo, z) <= MAP_W - 2 * pad && mercY(minLa, z) - mercY(maxLa, z) <= MAP_H - 2 * pad) break; }
+    const originX = mercX((minLo + maxLo) / 2, z) - MAP_W / 2, originY = mercY((minLa + maxLa) / 2, z) - MAP_H / 2;
+    const n = Math.pow(2, z), specs = [];
+    for (let tx = Math.floor(originX / MAP_TILE); tx <= Math.floor((originX + MAP_W) / MAP_TILE); tx++)
+      for (let ty = Math.floor(originY / MAP_TILE); ty <= Math.floor((originY + MAP_W) / MAP_TILE) && ty <= Math.floor((originY + MAP_H) / MAP_TILE); ty++) {
+        if (ty < 0 || ty >= n) continue;
+        const wx = ((tx % n) + n) % n, sub = ["a", "b", "c"][((tx % 3) + 3) % 3];
+        specs.push({ url: "https://" + sub + ".basemaps.cartocdn.com/dark_all/" + z + "/" + wx + "/" + ty + "@2x.png", dx: tx * MAP_TILE - originX, dy: ty * MAP_TILE - originY });
+      }
+    if (!specs.length || specs.length > 40) return reject(new Error("tile count"));
+    Promise.all(specs.map((s) => loadTileImage(s.url).then((img) => ({ img, dx: s.dx, dy: s.dy }))))
+      .then((tiles) => resolve({ tiles, proj: (p) => [mercX(p.lng, z) - originX, mercY(p.lat, z) - originY] }))
+      .catch(reject);
+  });
+}
+function drawMapPanel(g, run, mx, my, mw, mh, mapData) {
   rr(g, mx, my, mw, mh, 30); g.fillStyle = "#0a1714"; g.fill();
   g.save(); rr(g, mx, my, mw, mh, 30); g.clip();
-  g.strokeStyle = "rgba(120,160,150,.06)"; g.lineWidth = 2;
-  for (let i = 0; i < 9; i++) { const yy = my + (i + .5) * mh / 9; g.beginPath(); g.moveTo(mx, yy + Math.sin(i * 1.3) * 14); g.lineTo(mx + mw, yy + Math.cos(i) * 14); g.stroke(); }
-  for (let i = 0; i < 6; i++) { const xx = mx + (i + .5) * mw / 6; g.beginPath(); g.moveTo(xx, my); g.lineTo(xx + (i % 2 ? 26 : -26), my + mh); g.stroke(); }
-  drawRouteGlow(g, run.route, mx, my, mw, mh);
+  if (mapData) {
+    mapData.tiles.forEach((t) => { try { g.drawImage(t.img, mx + t.dx, my + t.dy, MAP_TILE, MAP_TILE); } catch (e) {} });
+    g.fillStyle = "rgba(4,16,13,.4)"; g.fillRect(mx, my, mw, mh); // dim map for route contrast
+    drawRouteGlow(g, run.route, mx, my, mw, mh, (p) => { const q = mapData.proj(p); return [mx + q[0], my + q[1]]; });
+  } else {
+    g.strokeStyle = "rgba(120,160,150,.06)"; g.lineWidth = 2;
+    for (let i = 0; i < 9; i++) { const yy = my + (i + .5) * mh / 9; g.beginPath(); g.moveTo(mx, yy + Math.sin(i * 1.3) * 14); g.lineTo(mx + mw, yy + Math.cos(i) * 14); g.stroke(); }
+    for (let i = 0; i < 6; i++) { const xx = mx + (i + .5) * mw / 6; g.beginPath(); g.moveTo(xx, my); g.lineTo(xx + (i % 2 ? 26 : -26), my + mh); g.stroke(); }
+    drawRouteGlow(g, run.route, mx, my, mw, mh, null);
+  }
   g.restore();
-  rr(g, mx, my, mw, mh, 30); g.lineWidth = 1.5; g.strokeStyle = "rgba(56,255,190,.2)"; g.stroke();
-  // corner metric: real elevation gain if we have it, else fastest split
+  rr(g, mx, my, mw, mh, 30); g.lineWidth = 2; g.strokeStyle = "rgba(61,255,176,.5)"; g.stroke();
   let corner = null;
   if (run.elevGain && run.elevGain >= 1) corner = { k: "ELEVATION GAIN", v: "+" + run.elevGain + "m" };
   else if (run.splits && run.splits.length) corner = { k: "FASTEST KM", v: fmtPace(Math.min.apply(null, run.splits.map((s) => s.sec))) };
@@ -2199,38 +2221,62 @@ function buildShareCanvas(run) {
     g.textAlign = "right"; g.fillStyle = "#eafff5"; g.font = "800 34px " + FF; g.fillText(corner.v, mx + mw - 34, my + mh - 56);
     g.fillStyle = "rgba(190,215,205,.6)"; g.font = "600 19px " + FF; lsText(g, corner.k, mx + mw - 34, my + mh - 28, 1.5, "right"); g.textAlign = "left";
   }
+  if (mapData) { g.textAlign = "left"; g.fillStyle = "rgba(200,220,210,.32)"; g.font = "500 15px " + FF; g.fillText("© OpenStreetMap © CARTO", mx + 22, my + mh - 20); }
+}
+// Draw the whole card; mapData (optional) puts the route over a real map instead of the grid.
+function buildShareCanvasCore(run, mapData) {
+  const W = 1080, H = 1556, c = document.createElement("canvas"); c.width = W; c.height = H;
+  const g = c.getContext("2d");
+  g.fillStyle = "#04100d"; g.fillRect(0, 0, W, H);
+  const glowAt = (gx, gy, rad, a) => { const rg = g.createRadialGradient(gx, gy, 0, gx, gy, rad); rg.addColorStop(0, "rgba(30,180,150," + a + ")"); rg.addColorStop(1, "rgba(30,180,150,0)"); g.fillStyle = rg; g.fillRect(0, 0, W, H); };
+  glowAt(180, 200, 620, .18); glowAt(W - 150, 260, 560, .12); glowAt(W / 2, H - 120, 720, .08);
+  // Panel frame — bright green neon piping with a soft glow
+  g.save(); rr(g, 20, 20, W - 40, H - 40, 46); g.fillStyle = "rgba(255,255,255,.015)"; g.fill();
+  g.shadowColor = "rgba(61,255,176,.5)"; g.shadowBlur = 12; g.lineWidth = 2.5; g.strokeStyle = "rgba(72,255,184,.7)"; g.stroke(); g.restore();
+  g.textBaseline = "alphabetic"; g.textAlign = "left";
+  drawBrandBadge(g, 56, 92, 116);
+  g.font = "800 62px " + FF; g.fillStyle = "#fff"; g.fillText("Inte", 196, 178);
+  const iw = g.measureText("Inte").width; g.fillStyle = TEAL; g.fillText("Run", 196 + iw, 178);
+  g.fillStyle = "rgba(160,200,190,.65)"; g.font = "600 20px " + FF; lsText(g, "THE INTELLIGENT TRAINING COMPANION", 198, 210, 2.5, "left");
+  g.fillStyle = TEAL; g.font = "600 26px " + FF; g.textAlign = "right"; g.fillText("#RunWithInteRun", W - 56, 150); g.textAlign = "left";
+  const title = (run.t || "My run").toUpperCase(); let ts = 90; g.font = "800 " + ts + "px " + FF;
+  while (g.measureText(title).width > W - 130 && ts > 44) { ts -= 2; g.font = "800 " + ts + "px " + FF; }
+  g.fillStyle = "#fff"; g.fillText(title, 56, 322);
+  rr(g, 58, 348, 96, 7, 4); g.fillStyle = TEAL; g.fill();
+  g.font = "600 28px " + FF; const dparts = (run.d || "").toUpperCase().split("·");
+  g.fillStyle = "rgba(190,215,205,.7)"; g.fillText(dparts[0].trim(), 58, 410);
+  if (dparts[1]) { const dw = g.measureText(dparts[0].trim() + "  ").width; g.fillStyle = TEAL; g.fillText("· " + dparts[1].trim(), 58 + dw, 410); }
+  drawMapPanel(g, run, 48, 452, MAP_W, MAP_H, mapData);
   // Stat cards
-  const dParts = (run.dist || "0 km").split(" "), pParts = (run.pace || "— /km").split(" ");
+  const mx = 48, dParts = (run.dist || "0 km").split(" "), pParts = (run.pace || "— /km").split(" ");
   const stats = [
     { icon: 0, label: "DISTANCE", val: dParts[0], unit: (dParts[1] || "km").toUpperCase() },
     { icon: 1, label: "DURATION", val: run.time || "0:00", unit: "MIN" },
     { icon: 2, label: "AVG PACE", val: pParts[0], unit: (pParts[1] || "/km").toUpperCase() },
   ];
-  const sy = 1064, sh = 236, gap = 22, sw = (mw - 2 * gap) / 3;
+  const sy = 1064, sh = 236, gap = 22, sw = (MAP_W - 2 * gap) / 3;
   stats.forEach((st, i) => {
     const sxp = mx + i * (sw + gap);
-    rr(g, sxp, sy, sw, sh, 24); g.fillStyle = "rgba(255,255,255,.03)"; g.fill(); g.lineWidth = 1.5; g.strokeStyle = "rgba(56,255,190,.16)"; g.stroke();
+    rr(g, sxp, sy, sw, sh, 24); g.fillStyle = "rgba(255,255,255,.03)"; g.fill(); g.lineWidth = 1.5; g.strokeStyle = "rgba(61,255,176,.4)"; g.stroke();
     drawStatIcon(g, st.icon, sxp + 42, sy + 52);
     g.fillStyle = "rgba(180,210,200,.75)"; g.font = "700 20px " + FF; lsText(g, st.label, sxp + 74, sy + 60, 1.5, "left");
-    g.strokeStyle = "rgba(56,255,190,.18)"; g.lineWidth = 1.5; g.beginPath(); g.moveTo(sxp + 30, sy + 84); g.lineTo(sxp + sw - 30, sy + 84); g.stroke();
+    g.strokeStyle = "rgba(61,255,176,.3)"; g.lineWidth = 1.5; g.beginPath(); g.moveTo(sxp + 30, sy + 84); g.lineTo(sxp + sw - 30, sy + 84); g.stroke();
     g.fillStyle = "#fff"; g.font = "800 72px " + FF; g.fillText(st.val, sxp + 32, sy + 170);
     g.fillStyle = TEAL; g.font = "700 28px " + FF; g.fillText(st.unit, sxp + 32, sy + 208);
   });
   // Insight card
   const iy = 1330, ih = 178;
-  rr(g, mx, iy, mw, ih, 24); g.fillStyle = "rgba(255,255,255,.03)"; g.fill(); g.lineWidth = 1.5; g.strokeStyle = "rgba(56,255,190,.18)"; g.stroke();
+  rr(g, mx, iy, MAP_W, ih, 24); g.fillStyle = "rgba(255,255,255,.03)"; g.fill(); g.lineWidth = 1.5; g.strokeStyle = "rgba(61,255,176,.42)"; g.stroke();
   drawInsightIcon(g, mx + 92, iy + ih / 2, 40);
   g.fillStyle = TEAL; g.font = "700 22px " + FF; lsText(g, "INTERUN INSIGHT", mx + 168, iy + 56, 2, "left");
   const insight = SHARE_INSIGHT[run.type] || SHARE_INSIGHT.easy;
   g.fillStyle = "#eef7f3"; g.font = "600 36px " + FF;
-  const lines = wrapLines(g, insight, mw - 168 - 90).slice(0, 2);
-  lines.forEach((ln, i) => g.fillText(ln, mx + 168, iy + 100 + i * 46));
-  g.fillStyle = "rgba(56,255,190,.22)"; g.font = "800 150px Georgia, " + FF; g.fillText("\u201D", mx + mw - 96, iy + 120);
-  // Footer
-  drawBrandBadge(g, 56, H - 96, 52);
-  g.fillStyle = TEAL; g.font = "700 24px " + FF; lsText(g, "CREATE   |   LEARN   |   REPEAT", W / 2 + 40, H - 58, 4, "center");
+  wrapLines(g, insight, MAP_W - 168 - 90).slice(0, 2).forEach((ln, i) => g.fillText(ln, mx + 168, iy + 100 + i * 46));
+  g.fillStyle = "rgba(61,255,176,.24)"; g.font = "800 150px Georgia, " + FF; g.fillText("\u201D", mx + MAP_W - 96, iy + 120);
   return c;
 }
+function buildShareCanvasSync(run) { return buildShareCanvasCore(run, null); }
+function buildShareCanvasWithMap(run) { return loadRouteMap(run.route).then((md) => buildShareCanvasCore(run, md)); }
 function canvasToPngFile(canvas, name) {
   const dataUrl = canvas.toDataURL("image/png");
   const b64 = dataUrl.split(",")[1], bin = atob(b64), arr = new Uint8Array(bin.length);
@@ -2238,9 +2284,21 @@ function canvasToPngFile(canvas, name) {
   return new File([arr], name, { type: "image/png" });
 }
 function shareCaption(run) { return "I completed a run with InteRun \uD83C\uDFC3 \u2014 " + run.dist + " in " + run.time + "."; }
+// Identity of a run for share-cache purposes.
+function shareKey(run) { return (run.t || "") + "|" + (run.d || "") + "|" + (run.dist || "") + "|" + ((run.route && run.route.length) || 0); }
+let SHARE = { key: null, file: null };
+// Pre-build the (map) card when the overview appears, so the tap can share it synchronously (iOS).
+function prepareShareCard(run) {
+  if (!run) return; const key = shareKey(run);
+  if (SHARE.key === key && SHARE.file) return;
+  SHARE = { key: null, file: null };
+  buildShareCanvasWithMap(run).then((canvas) => { try { SHARE = { key, file: canvasToPngFile(canvas, "interun-run.png") }; } catch (e) {} }).catch(() => {});
+}
 function doShareRun() {
   const run = currentOverviewRun(); if (!run) return;
-  let file; try { file = canvasToPngFile(buildShareCanvas(run), "interun-run.png"); } catch (e) { file = null; }
+  // Use the pre-built card with the real map if it's ready; otherwise build the instant grid card.
+  let file = (SHARE.key === shareKey(run) && SHARE.file) ? SHARE.file : null;
+  if (!file) { try { file = canvasToPngFile(buildShareCanvasSync(run), "interun-run.png"); } catch (e) { file = null; } }
   const caption = shareCaption(run);
   const canShareFile = file && navigator.canShare && navigator.canShare({ files: [file] });
   if (canShareFile) {
@@ -2252,7 +2310,7 @@ function doShareRun() {
   }
 }
 function downloadShareCard(file, run) {
-  if (!file) { try { file = canvasToPngFile(buildShareCanvas(run), "interun-run.png"); } catch (e) { return; } }
+  if (!file) { try { file = canvasToPngFile(buildShareCanvasSync(run), "interun-run.png"); } catch (e) { return; } }
   const url = URL.createObjectURL(file); const a = document.createElement("a"); a.href = url; a.download = "interun-run.png";
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -2669,7 +2727,7 @@ function wire() {
   document.querySelectorAll("[data-at]").forEach((b) => b.onclick = () => { state.actTab = b.dataset.at; render(); });
   document.querySelectorAll("[data-runidx]").forEach((b) => b.onclick = () => { state.viewRunIdx = Number(b.dataset.runidx); state.screen = "runview"; render(); });
   const runBack = $("runBack"); if (runBack) runBack.onclick = () => { state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); };
-  const shareRun = $("shareRun"); if (shareRun) shareRun.onclick = doShareRun;
+  const shareRun = $("shareRun"); if (shareRun) { shareRun.onclick = doShareRun; prepareShareCard(currentOverviewRun()); }
   document.querySelectorAll("[data-hub]").forEach((b) => b.onclick = () => { state.support = b.dataset.hub; render(); });
   const guideReplay = $("guideReplay"); if (guideReplay) guideReplay.onclick = () => openSessionGuide(GUIDE_EXAMPLE, { fromSupport: true });
   const back = $("supBack"); if (back) back.onclick = () => { state.support = null; render(); };

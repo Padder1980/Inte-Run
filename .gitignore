@@ -1,6 +1,14 @@
 node_modules/
 dist/
 coverage/
+# Voice-coach dev tooling: keep the generation scripts, never commit the Python
+# venv, the downloaded Kokoro model, or generated audition audio.
+voice-dev/venv/
+voice-dev/models/
+voice-dev/audition/
+# The served coach audio lives in docs/voices (committed). web/voices is the local
+# generation source that the build mirrors to docs — regenerate it, don't commit it.
+web/voices/
 *.tsbuildinfo
 .DS_Store
 # Verification marker (this project's own gate signal; not source)

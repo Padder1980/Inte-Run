@@ -113,6 +113,27 @@ export {
   type StepView,
 } from "./live/session-runtime.ts";
 
+// Spoken coaching — the single prompt catalogue + pure, testable selection logic.
+export {
+  COACHES,
+  COACH_IDS,
+  DEFAULT_COACH,
+  PROMPTS,
+  promptsFor,
+  newPromptHistory,
+  canPlay,
+  selectPrompt,
+  markPlayed,
+  shouldInterrupt,
+  allPromptIds,
+  type CoachId,
+  type Coach,
+  type PromptTrigger,
+  type PromptDef,
+  type PromptHistory,
+  type PromptIntensity,
+} from "./live/coach-prompts.ts";
+
 // Readiness — a multi-factor "how are you today?" check (no single metric decides the day).
 export {
   assessReadiness,

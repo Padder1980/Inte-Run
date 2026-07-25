@@ -1,0 +1,237 @@
+{
+  "version": 1,
+  "coaches": [
+    {
+      "id": "guide",
+      "name": "The Guide",
+      "voice": "bf_emma"
+    },
+    {
+      "id": "pacer",
+      "name": "The Pacer",
+      "voice": "bm_george"
+    },
+    {
+      "id": "motivator",
+      "name": "The Motivator",
+      "voice": "bf_isabella"
+    },
+    {
+      "id": "technician",
+      "name": "The Technician",
+      "voice": "bm_lewis"
+    }
+  ],
+  "prompts": [
+    {
+      "id": "prep_1",
+      "text": "Welcome to Inter-run. Let's make today's session count.",
+      "trigger": "session-prep"
+    },
+    {
+      "id": "prep_2",
+      "text": "Good to have you here. Take a breath, and let's begin when you're ready.",
+      "trigger": "session-prep"
+    },
+    {
+      "id": "warmup_1",
+      "text": "Let's warm up. Start easy and let your body wake up gradually.",
+      "trigger": "warmup-start"
+    },
+    {
+      "id": "warmup_2",
+      "text": "Ease in gently. Loose shoulders, relaxed breathing, no rush.",
+      "trigger": "warmup-start"
+    },
+    {
+      "id": "start_1",
+      "text": "Here we go. Settle into your rhythm.",
+      "trigger": "session-start"
+    },
+    {
+      "id": "start_2",
+      "text": "Let's get to work. Find a pace you can hold.",
+      "trigger": "session-start"
+    },
+    {
+      "id": "easy_1",
+      "text": "Nice and easy. This pace should feel comfortable and conversational.",
+      "trigger": "easy-settle"
+    },
+    {
+      "id": "easy_2",
+      "text": "Relax and enjoy this one. Effort stays gentle throughout.",
+      "trigger": "easy-settle"
+    },
+    {
+      "id": "easy_3",
+      "text": "Keep it light. If you can chat, you're right where you should be.",
+      "trigger": "easy-settle"
+    },
+    {
+      "id": "long_1",
+      "text": "This is your long run. Patience early pays off late — settle in.",
+      "trigger": "long-run-settle"
+    },
+    {
+      "id": "long_2",
+      "text": "Steady does it. Sip fluids, stay relaxed, and let the miles build.",
+      "trigger": "long-run-settle"
+    },
+    {
+      "id": "tempo_1",
+      "text": "Lifting to tempo now. Strong and controlled — comfortably hard.",
+      "trigger": "tempo-start"
+    },
+    {
+      "id": "threshold_1",
+      "text": "Hold this effort. Smooth, steady, right on the edge of comfortable.",
+      "trigger": "threshold-hold"
+    },
+    {
+      "id": "threshold_2",
+      "text": "Stay composed. Same effort, same rhythm — keep it repeatable.",
+      "trigger": "threshold-hold"
+    },
+    {
+      "id": "interval_start_1",
+      "text": "Next rep coming up. Get ready.",
+      "trigger": "interval-start"
+    },
+    {
+      "id": "interval_work_1",
+      "text": "This is the work. Strong arms, tall posture, keep driving.",
+      "trigger": "interval-work"
+    },
+    {
+      "id": "interval_work_2",
+      "text": "Hold your pace. You've got more than you think.",
+      "trigger": "interval-work"
+    },
+    {
+      "id": "recovery_1",
+      "text": "Recover now. Ease right down and catch your breath.",
+      "trigger": "recovery-start"
+    },
+    {
+      "id": "recovery_2",
+      "text": "Good rep. Jog easy and let the heart rate come back.",
+      "trigger": "recovery-start"
+    },
+    {
+      "id": "hill_1",
+      "text": "Up the hill. Shorten your stride, drive your arms, keep the effort steady.",
+      "trigger": "hill-start"
+    },
+    {
+      "id": "hill_2",
+      "text": "Attack the climb. Eyes up, strong and powerful.",
+      "trigger": "hill-start"
+    },
+    {
+      "id": "strength_1",
+      "text": "Strength time. Move with control, quality over quantity, and stop before failure.",
+      "trigger": "strength-start"
+    },
+    {
+      "id": "strength_2",
+      "text": "Let's build durability. Brace your core and keep every rep clean.",
+      "trigger": "strength-start"
+    },
+    {
+      "id": "technique_1",
+      "text": "Quick check: relax your shoulders and let your hands stay soft.",
+      "trigger": "technique"
+    },
+    {
+      "id": "technique_2",
+      "text": "Light, quick steps. Let your feet land underneath you.",
+      "trigger": "technique"
+    },
+    {
+      "id": "technique_3",
+      "text": "Tall through the spine, eyes on the horizon. Run relaxed.",
+      "trigger": "technique"
+    },
+    {
+      "id": "halfway_1",
+      "text": "You're halfway through. Hold your form and keep working.",
+      "trigger": "halfway"
+    },
+    {
+      "id": "halfway_2",
+      "text": "Halfway done, and looking strong. Stay with it.",
+      "trigger": "halfway"
+    },
+    {
+      "id": "milestone_1",
+      "text": "Another kilometre done. Strong and steady.",
+      "trigger": "milestone-distance"
+    },
+    {
+      "id": "milestone_2",
+      "text": "That's another one behind you. Keep rolling.",
+      "trigger": "milestone-distance"
+    },
+    {
+      "id": "milestone_3",
+      "text": "Ticking them off nicely. Same rhythm, keep going.",
+      "trigger": "milestone-distance"
+    },
+    {
+      "id": "final_1",
+      "text": "Last effort now. Empty the tank — you're nearly there.",
+      "trigger": "final-effort"
+    },
+    {
+      "id": "final_2",
+      "text": "This is the finish. Everything you've got, all the way through the line.",
+      "trigger": "final-effort"
+    },
+    {
+      "id": "cooldown_1",
+      "text": "Ease down now. Let your pace and your breathing settle.",
+      "trigger": "cooldown-start"
+    },
+    {
+      "id": "cooldown_2",
+      "text": "Cool-down time. Relax, slow it right down, and enjoy the finish.",
+      "trigger": "cooldown-start"
+    },
+    {
+      "id": "complete_1",
+      "text": "Session complete. Excellent work today. Recover well.",
+      "trigger": "session-complete"
+    },
+    {
+      "id": "complete_2",
+      "text": "That's it — done and dusted. Really strong session. Be proud.",
+      "trigger": "session-complete"
+    },
+    {
+      "id": "paused_1",
+      "text": "Paused. Take your time.",
+      "trigger": "paused"
+    },
+    {
+      "id": "resumed_1",
+      "text": "And we're back. Pick up where you left off.",
+      "trigger": "resumed"
+    },
+    {
+      "id": "ended_early_1",
+      "text": "Session ended. Every step still counts — well done for getting out.",
+      "trigger": "ended-early"
+    },
+    {
+      "id": "safety_1",
+      "text": "Easy — your effort's been very high for a while. Back it off and check in with how you feel.",
+      "trigger": "safety-effort"
+    },
+    {
+      "id": "safety_2",
+      "text": "Let's be sensible. Ease down, breathe, and only push on if you feel good.",
+      "trigger": "safety-effort"
+    }
+  ]
+}

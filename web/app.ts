@@ -3,7 +3,7 @@
 // identity; the tab structure follows a familiar running-app layout. One engine bundle drives it all,
 // client-side. Regenerate with:  node web/app.ts   (or: npm run web)
 
-import { writeFileSync, readFileSync } from "node:fs";
+import { writeFileSync, readFileSync, existsSync, cpSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { bundleEngine } from "./bundle.ts";
@@ -337,6 +337,22 @@ h2.sec:first-child { margin-top: 4px; }
 .seg button { font: inherit; font-size: 12.5px; font-weight: 550; color: var(--ink-soft); background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%); border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; cursor: pointer; box-shadow: 0 1px 0 rgba(255,255,255,.5) inset, 0 1px 2px rgba(20,32,27,.06); transition: transform .12s ease, box-shadow .12s ease, background .12s ease, color .12s ease; }
 .seg button:active { transform: translateY(1px); }
 .seg button.on { background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, #fff) 0%, var(--accent) 60%, color-mix(in srgb, var(--accent) 84%, #000) 100%); color: var(--accent-ink); border-color: transparent; font-weight: 650; box-shadow: 0 1px 0 rgba(255,255,255,.28) inset, 0 4px 12px -3px color-mix(in srgb, var(--accent) 55%, transparent); }
+/* Voice coach picker */
+.coachcards { display: flex; flex-direction: column; gap: 9px; }
+.coachcard { text-align: left; width: 100%; background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%); border: 1px solid var(--line); border-radius: 14px; padding: 13px 14px; cursor: pointer; box-shadow: 0 1px 2px rgba(20,32,27,.05); transition: border-color .12s ease, box-shadow .12s ease, background .12s ease; }
+.coachcard.on { border-color: transparent; background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 12%, var(--surface)), color-mix(in srgb, var(--accent) 5%, var(--surface))); box-shadow: 0 5px 16px -7px color-mix(in srgb, var(--accent) 55%, transparent), 0 0 0 1.5px var(--accent) inset; }
+.cc-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.cc-name { font-size: 15px; font-weight: 750; letter-spacing: -.01em; }
+.coachcard.on .cc-name { color: var(--accent); }
+.cc-preview { flex: none; display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+.cc-preview svg { width: 12px; height: 12px; }
+.cc-preview:active { transform: translateY(1px); }
+.cc-tag { font-size: 12px; font-weight: 600; color: var(--ink-soft); margin-top: 3px; }
+.cc-desc { font-size: 12.5px; color: var(--ink-faint); margin-top: 4px; line-height: 1.45; }
+.vol { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 30%, var(--surface-2)); outline: none; }
+.vol::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); box-shadow: 0 2px 6px -1px color-mix(in srgb, var(--accent) 60%, transparent); cursor: pointer; }
+.vol::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); cursor: pointer; }
+.coach-note { font-size: 11.5px; color: var(--ink-faint); line-height: 1.5; margin-top: 4px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
 /* Avatar */
 .iconbtn img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 .avatar-row { display: flex; align-items: center; gap: 15px; margin-top: 4px; }
@@ -1950,6 +1966,27 @@ function setupSection(num, title, sub, body) {
   return '<div class="card setup-card" style="margin-top:12px"><div class="sec-head"><div class="sec-num">' + num + '</div>' +
     '<div><div class="sec-title">' + title + '</div>' + (sub ? '<div class="sec-sub">' + sub + '</div>' : '') + '</div></div>' + body + '</div>';
 }
+// The voice-coach settings block (lives in the profile/settings screen). Reads/writes COACH.cfg live —
+// independent of the plan save — so changes take effect immediately.
+function coachSettingsHtml() {
+  const c = COACH.cfg, on = !!c.enabled;
+  const cards = RC.COACH_IDS.map((id) => {
+    const co = RC.COACHES[id], sel = c.coach === id;
+    return '<div class="coachcard' + (sel ? " on" : "") + '" data-coach="' + id + '" role="button" tabindex="0">' +
+      '<div class="cc-top"><div class="cc-name">' + co.name + '</div>' +
+      '<span class="cc-preview" data-preview="' + id + '" role="button" tabindex="0">' + ICON.play + ' Preview</span></div>' +
+      '<div class="cc-tag">' + co.tagline + '</div><div class="cc-desc">' + co.description + '</div></div>';
+  }).join("");
+  return '<div class="q" style="margin-top:0"><label>Spoken coaching <span class="q-hint">a voice coaches you through live sessions</span></label>' +
+      seg("coach_on", [["1", "On"], ["0", "Off"]], on ? "1" : "0") + '</div>' +
+    '<div id="coachOpts"' + (on ? "" : ' style="display:none"') + '>' +
+      '<div class="q"><label>Your coach</label><div class="coachcards">' + cards + '</div></div>' +
+      '<div class="q"><label>Coaching volume</label><input type="range" class="vol" id="coach_vol" min="0" max="100" step="5" value="' + Math.round((c.volume ?? 0.9) * 100) + '" aria-label="Coaching volume"></div>' +
+      '<div class="q"><label>How much talking? <span class="q-hint">how chatty your coach is</span></label>' +
+        seg("coach_freq", [["minimal", "Minimal"], ["normal", "Balanced"], ["chatty", "Chatty"]], c.frequency || "normal") + '</div>' +
+      '<div class="coach-note">Your chosen coach downloads once (about 1 MB) so it works offline after that. Prompts play while the screen is on and the app is open; like other web apps, audio is limited when the phone is locked or the app is in the background.</div>' +
+    '</div>';
+}
 function viewSetup() {
   const p = profile;
   const savedMsg = state.trialSaved ? '<div class="plan-note" style="border-left-color:var(--accent);margin:2px 2px 12px">✓ 1 km time trial saved: <b>' + state.trialSaved + '</b>. Your VO₂/interval paces are now anchored to it.</div>' : "";
@@ -1998,6 +2035,7 @@ function viewSetup() {
     setupSection(2, "Your running", "So we pitch your paces just right", secRunning) +
     '<div class="card setup-card" id="goalCard" style="margin-top:12px"><div class="sec-head"><div class="sec-num">3</div><div><div class="sec-title">Your goal</div><div class="sec-sub">What you\\u2019re working towards</div></div></div><div id="goalBody">' + secGoal + '</div></div>' +
     setupSection(4, "A few details", "The finishing touches to your plan", secDetails) +
+    setupSection(5, "Voice coaching", "Your spoken running coach", coachSettingsHtml()) +
     '<div class="err" id="setupErr" style="display:none;color:var(--rest);font-size:13px;margin:14px 2px 0;font-weight:600"></div>' +
     '<button class="primary" id="saveProfile">' + (p.personalized ? "Update my plan" : "Build my plan") + '</button>' +
     (p.personalized ? '<button class="primary" id="cancelSetup" style="background:var(--surface-2);color:var(--ink-soft);box-shadow:none;margin-top:8px">Cancel</button>' : '') +
@@ -2294,6 +2332,176 @@ function cueSpeech(cue) {
   // doubling and to guarantee the celebratory line lands.
   return null;
 }
+
+// ===========================================================================
+// Spoken coaching controller — plays pre-generated Kokoro voice clips (one per
+// prompt, per coach) at the right session events. Single reused <audio>
+// element; a small priority queue prevents overlap; missing/failed audio falls
+// back to the device speech engine so coaching degrades gracefully (e.g. inside
+// the sandboxed artifact where the clip files aren't served). See
+// src/live/coach-prompts.ts for the catalogue and selection logic.
+// ===========================================================================
+const COACH_STORE = "interun_coach";
+function loadCoachCfg() {
+  try { const j = JSON.parse(localStorage.getItem(COACH_STORE) || "null"); if (j && j.coach) return j; } catch (e) {}
+  // Migrate the old boolean voice flag into the richer config on first run.
+  let enabled = true; try { enabled = localStorage.getItem("interun_voice") !== "0"; } catch (e) {}
+  return { enabled: enabled, coach: RC.DEFAULT_COACH, volume: 0.9, frequency: "normal" };
+}
+const COACH = {
+  cfg: loadCoachCfg(),
+  manifest: null, ready: false, byKey: {},
+  audio: null, current: null, queue: [], unlocked: false,
+  history: RC.newPromptHistory(), halfwayDone: false, finalDone: false,
+  settleDone: false, lastTechAt: -999, highEffortSince: 0,
+};
+function coachEnabled() { return !!(COACH.cfg && COACH.cfg.enabled); }
+function saveCoachCfg() { try { localStorage.setItem(COACH_STORE, JSON.stringify(COACH.cfg)); } catch (e) {} }
+function coachAudioEl() {
+  if (!COACH.audio) { COACH.audio = new Audio(); COACH.audio.preload = "auto";
+    COACH.audio.addEventListener("ended", coachOnEnded); COACH.audio.addEventListener("error", coachFail); }
+  return COACH.audio;
+}
+// Load the clip manifest once. Absent (artifact / not yet deployed) => fallback mode, never an error.
+function coachLoadManifest() {
+  if (COACH.manifest || COACH.ready) return Promise.resolve();
+  return fetch("voices/manifest.json").then((r) => r.ok ? r.json() : null).then((m) => {
+    COACH.manifest = m; COACH.ready = true;
+    if (m && m.clips) m.clips.forEach((c) => { COACH.byKey[c.coach + "/" + c.id] = c; });
+  }).catch(() => { COACH.ready = true; });
+}
+function coachClip(promptId) { return COACH.byKey[COACH.cfg.coach + "/" + promptId] || null; }
+// Unlock audio inside a user gesture (iOS blocks playback until then).
+function coachUnlock() {
+  if (COACH.unlocked) return; const a = coachAudioEl();
+  try { a.muted = true; a.src = "data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCA"; const p = a.play();
+    if (p && p.then) p.then(() => { a.pause(); a.muted = false; COACH.unlocked = true; }).catch(() => { a.muted = false; }); else { COACH.unlocked = true; a.muted = false; } } catch (e) {}
+}
+// Warm the browser/SW cache for the selected coach's clips at the start of a session.
+function coachPreload() {
+  if (!coachEnabled() || !COACH.manifest) return;
+  const clips = COACH.manifest.clips.filter((c) => c.coach === COACH.cfg.coach);
+  clips.slice(0, 60).forEach((c) => { try { fetch(c.file).catch(() => {}); } catch (e) {} });
+}
+function coachFrequencyAllows(prompt) {
+  const f = COACH.cfg.frequency || "normal";
+  if (f === "minimal") return prompt.priority >= 40;          // structure + key moments only
+  return true;                                                 // normal / chatty: everything (repeat limits still apply)
+}
+// Central entry point: fire the best prompt for a trigger, honouring priority, interruption and repeats.
+function coachTrigger(trigger, sessionType, nowSec) {
+  if (!coachEnabled()) return;
+  const p = RC.selectPrompt(trigger, sessionType, nowSec, COACH.history);
+  if (!p || !coachFrequencyAllows(p)) return;
+  if (COACH.current && !RC.shouldInterrupt(p, COACH.current)) {
+    if (COACH.queue.length < 3 && p.priority >= 40) COACH.queue.push(p); // queue only things worth hearing
+    return;
+  }
+  RC.markPlayed(p, nowSec, COACH.history);
+  coachPlay(p);
+}
+function coachPlay(prompt) {
+  COACH.current = prompt;
+  const clip = coachClip(prompt.id), a = coachAudioEl();
+  if (clip) {
+    try { a.src = clip.file; a.volume = Math.max(0, Math.min(1, COACH.cfg.volume)); a.currentTime = 0;
+      const pr = a.play(); if (pr && pr.catch) pr.catch(coachFail); return; } catch (e) {}
+  }
+  coachFail(); // no clip entry — degrade to speech (current is set)
+}
+// Single, idempotent failure handler for a missing clip / failed file / blocked play. Speaks the
+// current prompt's text with the device engine so coaching still degrades gracefully (e.g. inside the
+// sandboxed artifact, or before the coach has downloaded), then advances the queue. Guarded so a
+// play() rejection and an "error" event for the same clip never double-speak.
+function coachFail() {
+  const p = COACH.current; COACH.current = null;
+  if (p && VOICE_AVAILABLE && coachEnabled()) speak(p.text);
+  coachDequeue();
+}
+function coachOnEnded() { COACH.current = null; coachDequeue(); }
+function coachDequeue() {
+  const next = COACH.queue.shift();
+  if (next) { COACH.current = next; coachPlay(next); }
+}
+function coachStop() {
+  COACH.queue = []; COACH.current = null;
+  try { if (COACH.audio) { COACH.audio.pause(); } } catch (e) {}
+  stopSpeech();
+}
+function coachResetSession() {
+  COACH.history = RC.newPromptHistory(); COACH.halfwayDone = false; COACH.finalDone = false;
+  COACH.settleDone = false; COACH.lastTechAt = -999; COACH.highEffortSince = 0; coachStop();
+}
+// Map a live step's kind + the session type to the right trigger when a step begins.
+function coachStepTrigger(stepKind, sessionType) {
+  if (stepKind === "warmup") return "warmup-start";
+  if (stepKind === "cooldown") return "cooldown-start";
+  if (stepKind === "recovery") return "recovery-start";
+  if (stepKind === "rep") return "interval-start";
+  if (stepKind === "steady") {
+    if (sessionType === "threshold" || sessionType === "race-specific") return "tempo-start";
+    if (sessionType === "long") return "long-run-settle";
+    return "easy-settle";
+  }
+  return null;
+}
+// Ambient / milestone checker, called each UI tick with a fresh snapshot.
+function coachTick(snap) {
+  if (!coachEnabled() || !LIVE || !LIVE.started || LIVE.done) return;
+  const t = LIVE.session.type, nowSec = (LIVE.mode === "sim" ? LIVE.vms : liveElapsedMs()) / 1000;
+  const target = (LIVE.session.estimatedDurationSeconds || 0);
+  // Halfway (by planned duration, once).
+  if (!COACH.halfwayDone && target > 120 && snap.elapsedSeconds >= target * 0.5) {
+    COACH.halfwayDone = true; coachTrigger("halfway", t, nowSec);
+  }
+  // Final effort — entering the last step (unless it's a cool-down), once.
+  if (!COACH.finalDone && snap.step && snap.step.total > 1 && snap.step.index === snap.step.total - 1 && snap.step.kind !== "cooldown") {
+    COACH.finalDone = true; coachTrigger("final-effort", t, nowSec);
+  }
+  // Periodic technique cue on relaxed running (frequency-gated by selection + repeat window).
+  if ((t === "easy" || t === "long" || t === "recovery") && nowSec - COACH.lastTechAt > 240 && snap.elapsedSeconds > 120) {
+    COACH.lastTechAt = nowSec; coachTrigger("technique", t, nowSec);
+  }
+  // Safety: sustained very high effort, only where we actually have heart-rate data + a max.
+  const hr = snap.heartRateBpm || (LIVE.mode === "sim" ? Math.round(LIVE.hr) : null);
+  const maxHr = profile.maxHr || (profile.age ? 208 - 0.7 * profile.age : 0);
+  if (hr && maxHr && hr > maxHr * 0.92) {
+    if (!COACH.highEffortSince) COACH.highEffortSince = nowSec;
+    else if (nowSec - COACH.highEffortSince > 75) { COACH.highEffortSince = nowSec + 240; coachTrigger("safety-effort", t, nowSec); }
+  } else COACH.highEffortSince = 0;
+}
+// Play a one-off preview of a coach (used by the settings screen). Falls back to device speech.
+function coachPreview(coachId) {
+  coachUnlock();
+  const sample = "prep_1";
+  const clip = COACH.byKey[coachId + "/" + sample] || COACH.byKey[coachId + "/start_1"];
+  const a = coachAudioEl();
+  if (clip) { try { a.src = clip.file; a.volume = Math.max(0, Math.min(1, COACH.cfg.volume)); a.play().catch(() => { if (VOICE_AVAILABLE) speak("Welcome to Inter-run. Let's make today's session count."); }); return; } catch (e) {} }
+  if (VOICE_AVAILABLE) speak("Welcome to Inter-run. Let's make today's session count.");
+}
+// Wire the settings-screen coach controls: coach cards, per-coach preview, and volume.
+function wireCoachSettings() {
+  coachLoadManifest();
+  document.querySelectorAll("[data-coach]").forEach((el) => {
+    const pick = () => {
+      COACH.cfg.coach = el.dataset.coach; saveCoachCfg();
+      document.querySelectorAll("[data-coach]").forEach((x) => x.classList.toggle("on", x === el));
+      coachUnlock(); coachLoadManifest().then(coachPreload);
+    };
+    el.onclick = (e) => { if (e.target.closest("[data-preview]")) return; pick(); };
+    el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } };
+  });
+  document.querySelectorAll("[data-preview]").forEach((el) => {
+    const go = (e) => { if (e) e.stopPropagation(); coachUnlock(); coachLoadManifest().then(() => coachPreview(el.dataset.preview)); };
+    el.onclick = go;
+    el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(e); } };
+  });
+  const vol = $("coach_vol");
+  if (vol) vol.oninput = () => {
+    COACH.cfg.volume = Math.max(0, Math.min(1, Number(vol.value) / 100)); saveCoachCfg();
+    if (COACH.audio) COACH.audio.volume = COACH.cfg.volume;
+  };
+}
 function startSession() {
   const s = rawToday();
   LIVE = { session: s, rt: new RC.LiveSession(s), mode: null, acquiring: false, gpsErr: null,
@@ -2316,9 +2524,8 @@ function checkSplits() {
   const splitSec = (now - LIVE.lastKmMs) / 1000;
   LIVE.lastKmMs = now;
   LIVE.splits.push({ km, sec: splitSec });
-  // Drop the runner's name into the cheer on alternate kilometres — personal without wearing thin.
-  const cheer = firstName() && km % 2 === 0 ? "Nice work, " + firstName() + ". " : "";
-  speak(cheer + "Kilometre " + km + ". " + spokenDuration(splitSec) + " for that split.");
+  // The coach speaks a milestone line (routed from this split cue); the exact split time stays in the
+  // on-screen log and overview, so the audio stays concise rather than reading numbers aloud each km.
   liveCue({ kind: "split", atMs: now, message: km + " km · " + fmtPace(splitSec) + " /km split" });
 }
 // Great-circle distance between two lat/lon points, in metres.
@@ -2344,10 +2551,14 @@ function releaseWakeLock() { try { if (LIVE && LIVE.wakeLock) { LIVE.wakeLock.re
 // unavailable or denied (e.g. inside the Claude artifact sandbox), so the demo always works.
 function beginLive() {
   LIVE.started = true;
-  // Speak inside the tap gesture — this unlocks TTS on iOS (which blocks audio until a
-  // user-initiated utterance) so the later async cues can play. Load voices first so the very
-  // first utterance isn't dropped for want of a voice.
-  if (VOICE_AVAILABLE && VOICE_ON) { loadVoices(); speak("Let's go" + nameTail() + "."); }
+  // Prime audio inside the tap gesture — iOS blocks playback until a user-initiated one. Unlock the
+  // coach's <audio> element and the speech engine (fallback) here, then greet through the chosen coach.
+  if (VOICE_AVAILABLE) loadVoices();
+  coachResetSession();
+  if (coachEnabled()) {
+    coachUnlock();
+    coachLoadManifest().then(() => { coachPreload(); coachTrigger("session-prep", LIVE.session.type, 0); });
+  }
   render(); // re-render to lock the screen (hide nav + back) now the run is starting
   if (GPS_AVAILABLE) {
     LIVE.acquiring = true; renderLiveNow();
@@ -2443,7 +2654,7 @@ function viewLive() {
     : '<div class="live-controls"><button class="primary" id="lStart">' + ICON.play + ' Start</button></div>';
   return (running ? '' : '<button class="backbtn" id="liveBack">‹ Today</button>') +
     '<div class="card live-hero"><div class="live-hero-top"><div class="eyebrow">Live session · <span id="gpsBadge">' + gpsStatusText() + '</span></div>' +
-    (VOICE_AVAILABLE ? '<button class="voice-btn' + (VOICE_ON ? ' on' : '') + '" id="lVoice" aria-label="Toggle voice coaching">' + (VOICE_ON ? ICON.vox : ICON.voxOff) + '</button>' : '') +
+    '<button class="voice-btn' + (coachEnabled() ? ' on' : '') + '" id="lVoice" aria-label="Toggle voice coaching">' + (coachEnabled() ? ICON.vox : ICON.voxOff) + '</button>' +
     '</div><div class="live-title">' + s.title + '</div>' +
     '<div class="live-metrics"><div><div class="lk">Elapsed</div><div class="lv num" id="lElapsed">0:00</div></div>' +
     '<div><div class="lk">Distance</div><div class="lv num" id="lDist">0.00<small> km</small></div></div></div>' +
@@ -2808,8 +3019,24 @@ function viewLiveComplete() {
 }
 function livePace(step) { const band = step && step.targetPace; const mid = band ? (band.minSecPerKm + band.maxSecPerKm) / 2 : 360; LIVE.quirk += (Math.random() - 0.5) * 0.03; LIVE.quirk *= 0.9; if (Math.random() < 0.04) LIVE.quirk += (Math.random() - 0.5) * 0.28; return Math.max(120, mid * (1 + LIVE.quirk)); }
 function liveHr(step) { if (!step) return 105; if (step.kind === "rep") return 176; if (step.kind === "warmup" || step.kind === "cooldown") return 130; if (step.kind === "recovery") return 148; return 150; }
+// Route a live event to the chosen coach's spoken prompt (audio), then log it visually below.
+function coachRouteCue(cue) {
+  if (!coachEnabled() || !LIVE) return;
+  const type = LIVE.session.type, nowSec = liveNowMs() / 1000;
+  if (cue.kind === "step-start") {
+    const snap = LIVE.rt.snapshot(liveNowMs());
+    if (snap.step) {
+      let trig = coachStepTrigger(snap.step.kind, type);
+      if (snap.step.kind === "rep" && /hill/i.test(LIVE.session.title || "")) trig = "hill-start";
+      if (trig) coachTrigger(trig, type, nowSec);
+    }
+  } else if (cue.kind === "split") coachTrigger("milestone-distance", type, nowSec);
+  else if (cue.kind === "paused") coachTrigger("paused", type, nowSec);
+  else if (cue.kind === "resumed") coachTrigger("resumed", type, nowSec);
+  // session-start / session-complete are fired explicitly at begin / finish to avoid doubling.
+}
 function liveCue(cue) {
-  speak(cueSpeech(cue));
+  coachRouteCue(cue);
   const log = $("lCues"); if (!log) return; const empty = log.firstChild; if (empty && empty.style) empty.remove();
   const cls = cue.kind === "pace" ? "pace-" + cue.paceStatus : cue.kind === "step-start" ? "step" : cue.kind === "session-start" ? "start" : cue.kind === "session-complete" ? "done" : cue.kind === "split" ? "split" : "";
   const e = el('<div class="cue ' + cls + '"><span class="badge"></span><span class="ct">' + fmtPace(cue.atMs / 1000) + '</span><span>' + cue.message + '</span></div>');
@@ -2838,6 +3065,7 @@ function liveUpdate(snap) {
   } else if (snap.status === "completed") {
     card.innerHTML = '<span class="kt" style="--kc:var(--build)">done</span><h4>Session complete</h4><div class="tgt">Nice work.</div>';
   }
+  coachTick(snap);
 }
 function liveTick() {
   const dt = 0.2 * LIVE.speed; LIVE.vms += dt * 1000;
@@ -2878,8 +3106,10 @@ function liveFinish(complete) {
   const snap = LIVE.rt.snapshot(now);
   const km = snap.distanceMeters / 1000;
   LIVE.summary = { distKm: km.toFixed(2), time: fmtPace(snap.elapsedSeconds), pace: snap.averagePaceSecPerKm ? fmtPace(snap.averagePaceSecPerKm) : "—", avgPaceSec: snap.averagePaceSecPerKm || 0, sec: Math.round(snap.elapsedSeconds), route: downsampleRoute(LIVE.route), splits: LIVE.splits.slice(), elevGain: Math.round(LIVE.elevGain), type: LIVE.session.type, saved: false, meaningful: km > 0.05 };
-  // Clear, unmissable end — spoken celebration plus a completion screen the user must act on.
-  speak(complete ? "Well done" + nameTail() + ". Session complete." : "Session ended" + nameTail() + ".");
+  // Clear, unmissable end — the chosen coach speaks the closing line (falling back to the device voice
+  // if the clip is unavailable) plus a completion screen the user must act on.
+  if (coachEnabled()) coachTrigger(complete ? "session-complete" : "ended-early", LIVE.session.type, now / 1000);
+  else speak(complete ? "Well done" + nameTail() + ". Session complete." : "Session ended" + nameTail() + ".");
   render();
 }
 function runDateLabel() {
@@ -3221,8 +3451,15 @@ function wire() {
     draft[s.dataset.set] = b.dataset.v; s.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
     if (s.dataset.set === "status") syncStatus();
     if (s.dataset.set === "fitsrc") syncFitSrc();
+    if (s.dataset.set === "coach_on") {
+      COACH.cfg.enabled = b.dataset.v === "1"; saveCoachCfg();
+      const o = $("coachOpts"); if (o) o.style.display = COACH.cfg.enabled ? "" : "none";
+      if (COACH.cfg.enabled) { coachUnlock(); coachLoadManifest(); } else coachStop();
+    }
+    if (s.dataset.set === "coach_freq") { COACH.cfg.frequency = b.dataset.v; saveCoachCfg(); }
     refreshTypePreview();
   }));
+  wireCoachSettings();
   ["s_age","s_sex"].forEach((id) => { const e = $(id); if (e) e.oninput = e.onchange = refreshTypePreview; });
   bindTimeInput($("s_target")); bindTimeInput($("s_rectime")); bindTimeInput($("s_easypace"));
   const km1 = $("s_1km");
@@ -3260,12 +3497,12 @@ function wire() {
   const cancelTrial = $("cancelTrial"); if (cancelTrial) cancelTrial.onclick = () => { state.trialPending = false; render(); };
   // Live session wiring
   const startBtn = $("startSession"); if (startBtn) startBtn.onclick = startSession;
-  const lb = $("liveBack"); if (lb) lb.onclick = () => { stopLive(); stopSpeech(); state.screen = null; state.tab = "today"; render(); };
+  const lb = $("liveBack"); if (lb) lb.onclick = () => { coachStop(); stopLive(); stopSpeech(); state.screen = null; state.tab = "today"; render(); };
   const lStart = $("lStart"); if (lStart) lStart.onclick = beginLive;
   const lVoice = $("lVoice"); if (lVoice) lVoice.onclick = () => {
-    VOICE_ON = !VOICE_ON; try { localStorage.setItem("interun_voice", VOICE_ON ? "1" : "0"); } catch (e) {}
-    if (!VOICE_ON) stopSpeech(); else speak("Voice on.");
-    lVoice.classList.toggle("on", VOICE_ON); lVoice.innerHTML = VOICE_ON ? ICON.vox : ICON.voxOff;
+    COACH.cfg.enabled = !COACH.cfg.enabled; saveCoachCfg();
+    if (!COACH.cfg.enabled) coachStop(); else { coachUnlock(); coachLoadManifest(); }
+    lVoice.classList.toggle("on", coachEnabled()); lVoice.innerHTML = coachEnabled() ? ICON.vox : ICON.voxOff;
   };
   const lPause = $("lPause"); if (lPause) lPause.onclick = () => {
     const st = LIVE.rt.getStatus();
@@ -3282,12 +3519,12 @@ function wire() {
   const lFinish = $("lFinish"); if (lFinish && !LIVE.done) lFinish.onclick = () => liveFinish(false);
   // Completion screen: save the run to Activities, discard it, or move on to Activities.
   const lSave = $("lSave"); if (lSave) lSave.onclick = () => { saveLiveSession(); render(); };
-  const lDiscard = $("lDiscard"); if (lDiscard) lDiscard.onclick = () => { stopSpeech(); LIVE = null; state.screen = null; state.tab = "today"; render(); };
-  const lDone = $("lDone"); if (lDone) lDone.onclick = () => { stopSpeech(); LIVE = null; state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); };
+  const lDiscard = $("lDiscard"); if (lDiscard) lDiscard.onclick = () => { coachStop(); stopSpeech(); LIVE = null; state.screen = null; state.tab = "today"; render(); };
+  const lDone = $("lDone"); if (lDone) lDone.onclick = () => { coachStop(); stopSpeech(); LIVE = null; state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); };
 }
 function buildNav() {
   $("nav").innerHTML = ["today","plan","activities","community","support"].map((t) => '<button class="navbtn' + (t===state.tab?" on":"") + '" data-tab="' + t + '">' + ICON[t] + '<span class="nl">' + TITLES[t].replace("Your ","") + '</span></button>').join("");
-  document.querySelectorAll(".navbtn").forEach((b) => b.onclick = () => { stopLive(); stopSpeech(); stopTrialRun(); TRIALRUN = null; state.screen = null; state.tab = b.dataset.tab; if (b.dataset.tab !== "support") state.support = null; render(); });
+  document.querySelectorAll(".navbtn").forEach((b) => b.onclick = () => { coachStop(); stopLive(); stopSpeech(); stopTrialRun(); TRIALRUN = null; state.screen = null; state.tab = b.dataset.tab; if (b.dataset.tab !== "support") state.support = null; render(); });
 }
 $("bellBtn").innerHTML = ICON.bell; $("themeBtn").innerHTML = ICON.theme; $("calBtn").innerHTML = ICON.cal; renderAvatar();
 $("themeBtn").onclick = () => { const cur = document.documentElement.getAttribute("data-theme"); document.documentElement.setAttribute("data-theme", cur === "dark" ? "light" : cur === "light" ? "dark" : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark")); };
@@ -3377,3 +3614,13 @@ self.addEventListener("fetch", (e) => {
 `;
 writeFileSync(join(docsDir, "sw.js"), sw, "utf8");
 console.log(`Wrote PWA to ${docsDir} (index.html, manifest.webmanifest, sw.js)`);
+
+// Mirror the generated coach audio (web/voices -> docs/voices) so GitHub Pages serves it. The service
+// worker caches these on demand — only the coach the runner selects is downloaded, never all four.
+const voicesSrc = join(here, "voices");
+if (existsSync(voicesSrc)) {
+  cpSync(voicesSrc, join(docsDir, "voices"), { recursive: true });
+  console.log("Mirrored coach audio to docs/voices");
+} else {
+  console.log("No web/voices yet — run: node voice-dev/dump-catalogue.ts && voice-dev/venv/bin/python voice-dev/generate.py");
+}

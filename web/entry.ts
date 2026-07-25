@@ -8,6 +8,12 @@ export { parseDuration } from "../src/domain/units.ts";
 export { generatePlan } from "../src/plan/generate-plan.ts";
 export { LiveSession } from "../src/live/session-runtime.ts";
 export type { Telemetry, Cue, LiveSnapshot, StepView } from "../src/live/session-runtime.ts";
+// Spoken-coaching catalogue + selection (drives the app's audio controller).
+export {
+  COACHES, COACH_IDS, DEFAULT_COACH, PROMPTS,
+  selectPrompt, newPromptHistory, markPlayed, shouldInterrupt, promptsFor, canPlay,
+} from "../src/live/coach-prompts.ts";
+export type { CoachId, Coach, PromptTrigger, PromptDef, PromptHistory } from "../src/live/coach-prompts.ts";
 export { PROFESSIONAL_LABEL } from "../src/safety/common.ts";
 export { screenRedFlags } from "../src/safety/escalation.ts";
 export { screenRedS, estimateEnergyAvailability } from "../src/safety/red-s.ts";

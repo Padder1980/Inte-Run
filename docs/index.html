@@ -596,7 +596,7 @@ function futureIso(days) { const d = new Date(); d.setDate(d.getDate() + days); 
 function fmtTimeFull(s) { s = Math.round(s); const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), x = s%60; const p = (n) => String(n).padStart(2,"0"); return h>0 ? h+":"+p(m)+":"+p(x) : m+":"+p(x); }
 
 // An example runner to start from — until you make it yours.
-const DEFAULT_PROFILE = { name: "", avatar: "", status: "regular", goalDist: "half", targetS: 6300, raceDate: futureIso(245), fitSrc: "recent", recentDistM: 5000, recentTimeS: 1500, noRecent: false, oneKmS: 255, daysPerWeek: 5, yearsRunning: 3, weeklyVolumeKm: 30, age: 38, sex: "", strength: true, returning: false, personalized: false };
+const DEFAULT_PROFILE = { name: "", avatar: "", status: "regular", goalDist: "half", targetS: 6300, raceDate: futureIso(245), fitSrc: "recent", recentDistM: 5000, recentTimeS: 1500, noRecent: false, easyPaceS: 0, oneKmS: 255, daysPerWeek: 5, yearsRunning: 3, weeklyVolumeKm: 30, age: 38, sex: "", strength: true, returning: false, personalized: false };
 
 function loadProfile() { try { const s = localStorage.getItem("rc_profile_v1"); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 function saveProfileStore() { try { localStorage.setItem("rc_profile_v1", JSON.stringify(profile)); } catch (e) {} }
@@ -615,7 +615,11 @@ function applyProfile(pf) {
   // cleanly to the plan/feasibility improvement ceiling. (Older profiles without a status fall back to
   // the noRecent flag.)
   const expByStatus = { new: "beginner", building: "beginner", regular: "recreational", competitive: "competitive" };
-  const experience = expByStatus[pf.status] || (pf.noRecent ? "beginner" : "recreational");
+  let experience = expByStatus[pf.status] || (pf.noRecent ? "beginner" : "recreational");
+  // A "building" runner who calibrated a genuinely capable easy pace (≈ sub-33:00 5 km-equivalent) is
+  // fit, just infrequent — give them the proper structured plan at their real paces rather than the
+  // couch-to-5k build. The "returning from a break" toggle keeps the early weeks conservative.
+  if (pf.status === "building" && !pf.noRecent && pf.recentTimeS < 1980) experience = "recreational";
   // The plan is built off the strongest current-fitness signal. When a 1 km trial is given and it
   // projects a faster 5 km than the 5 km source, it anchors the whole plan — every pace derives from
   // it — not just the VO₂ interval band. oneKmTrialSeconds is still passed so the VO₂ paces stay
@@ -1351,6 +1355,9 @@ function viewSetup() {
     '<div class="card" style="margin-top:12px"><div class="subhead" style="margin-top:0">Your running</div>' +
     '<div class="q"><label>What\u2019s your current running status? <span style="color:var(--ink-faint);font-weight:400">this shapes what we ask next</span></label>' + statusCards(p.status || "regular") + '</div>' +
     '<div class="q" id="statusBegNote"' + (isBeginnerStatus(p.status) ? '' : ' style="display:none"') + '><div class="mas-hint"></div></div>' +
+    // Fitness ≠ frequency: a "building the habit" runner can be genuinely fit but just not running
+    // often. Let them calibrate their real easy pace so we don't seed a too-slow baseline.
+    '<div class="q" id="buildingCalib"' + (p.status === "building" ? "" : ' style="display:none"') + '><label><span class="lblmain">Your comfortable easy pace</span> <span style="color:var(--ink-faint);font-weight:400">optional — min:ss per km, so we set your paces right</span></label><input class="sel num" id="s_easypace" value="' + (p.easyPaceS ? fmtTimeFull(p.easyPaceS) : "") + '" placeholder="e.g. 6:00" inputmode="numeric"><div class="mas-hint">Know a rough pace you can chat at? Enter it and every pace scales to your fitness. Not sure — leave it blank and we\'ll start gently and learn as you run.</div></div>' +
     '<div id="statusRunnerBlock"' + (isBeginnerStatus(p.status) ? ' style="display:none"' : '') + '>' +
     '<div class="q"><label>Your 5 km time — a recent result or an estimate?</label>' + seg("fitsrc", [["recent","Recent"],["predicted","Predicted"]], p.fitSrc === "predicted" ? "predicted" : "recent") + '</div>' +
     '<div class="q" id="fitTimeWrap"><label id="fitTimeLbl"><span class="lblmain">' + (p.fitSrc === "predicted" ? "Your predicted 5 km time" : "Your recent 5 km time") + '</span> <span style="color:var(--ink-faint);font-weight:400">just type the numbers</span></label><input class="sel num" id="s_rectime" value="' + (p.noRecent ? "" : fmtTimeFull(p.recentTimeS)) + '" placeholder="e.g. 25:00" inputmode="numeric"></div>' +
@@ -1375,9 +1382,24 @@ function draftFromForm() {
   // may optionally add a 1 km trial to sharpen their VO₂ paces.
   const status = draft.status || "regular";
   const beginner = isBeginnerStatus(status);
-  let fitSrc = "beginner", noRecent = true, recentDistM = 5000, recentTimeS, oneKmS = 0;
+  let fitSrc = "beginner", noRecent = true, recentDistM = 5000, recentTimeS, oneKmS = 0, easyPaceS = 0;
   if (beginner) {
     recentTimeS = status === "new" ? 2700 : 2250; // couch-to-5k vs a jogger building consistency
+    // A "building" runner can optionally give their easy pace. Fitness ≠ frequency: someone fit but
+    // not currently running regularly shouldn't be lumped with the unfit. We back out a 5 km-equivalent
+    // from the easy pace (easy bands sit ~92 s/km above threshold; threshold ≈ Riegel-predicted 15 km
+    // pace) so every training pace scales to their real ability.
+    if (status === "building") {
+      const epRaw = ($("s_easypace") ? $("s_easypace").value : "").trim();
+      if (epRaw) {
+        if (!mmss(epRaw)) throw new Error("Enter your easy pace as minutes:seconds per km, e.g. 6:00.");
+        const ep = RC.parseDuration(epRaw);
+        if (ep < 210 || ep > 720) throw new Error("That easy pace looks off — enter minutes:seconds per km (e.g. 6:00).");
+        easyPaceS = ep;
+        recentTimeS = Math.max(600, Math.round((ep - 92) * 4.6822));
+        noRecent = false;
+      }
+    }
   } else {
     fitSrc = draft.fitsrc || "recent"; noRecent = false;
     const recRaw = $("s_rectime").value.trim();
@@ -1412,7 +1434,7 @@ function draftFromForm() {
     avatar: draft.avatar != null ? draft.avatar : (profile.avatar || ""),
     status,
     goalDist, targetS, raceDate,
-    fitSrc, recentDistM, recentTimeS, noRecent, oneKmS, daysPerWeek: Number(draft.days), yearsRunning: profile.yearsRunning || 3,
+    fitSrc, recentDistM, recentTimeS, noRecent, easyPaceS, oneKmS, daysPerWeek: Number(draft.days), yearsRunning: profile.yearsRunning || 3,
     weeklyVolumeKm: profile.weeklyVolumeKm, age: Number($("s_age").value) || 35, sex: $("s_sex").value,
     strength: draft.strength === "1", returning: draft.returning === "1", personalized: true,
   };
@@ -1561,9 +1583,10 @@ function syncStatus() {
     bn.style.display = beginner ? "" : "none";
     const note = bn.querySelector(".mas-hint");
     if (note) note.textContent = st === "new"
-      ? "Perfect — we\u2019ll start with walk\u2013run intervals and build your base gently. No times to enter."
-      : "Great — we\u2019ll grow your consistency and learn your paces as you run. No times to enter.";
+      ? "Perfect — we\u2019ll start with walk\u2013run intervals and build your base gently."
+      : "Great — a gentle plan to grow your consistency. If you\u2019re already fairly fit, set your easy pace below so we don\u2019t hold you back.";
   }
+  const bc = $("buildingCalib"); if (bc) bc.style.display = st === "building" ? "" : "none";
   if (!beginner) syncFitSrc();
   // Rebuild the goal card so its distance options and time field match the status.
   const gc = $("goalCard");
@@ -1949,7 +1972,7 @@ function wire() {
     refreshTypePreview();
   }));
   ["s_age","s_sex"].forEach((id) => { const e = $(id); if (e) e.oninput = e.onchange = refreshTypePreview; });
-  bindTimeInput($("s_target")); bindTimeInput($("s_rectime"));
+  bindTimeInput($("s_target")); bindTimeInput($("s_rectime")); bindTimeInput($("s_easypace"));
   const km1 = $("s_1km");
   if (km1) { bindTimeInput(km1); km1.addEventListener("input", refreshMasHint); refreshMasHint(); }
   const km1rec = $("s_1km_rec"); if (km1rec) km1rec.onclick = startTrialFlow;

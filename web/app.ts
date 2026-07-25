@@ -552,6 +552,37 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
 .dn-stat .dn-v { font-size: 22px; font-weight: 750; letter-spacing: -.02em; }
 .dn-stat .dn-v small { font-size: 12px; color: var(--ink-faint); font-weight: 500; }
 .dn-stat .dn-k { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); margin-top: 2px; }
+/* Run overview: route map (brand-colour marching-ants line) + stats + splits */
+.ov-map-card { padding: 0; overflow: hidden; }
+.ov-map { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 8%, var(--surface-2)), var(--surface-2)); }
+.routemap { display: block; width: 100%; height: auto; }
+.rt-base { fill: none; stroke: var(--accent); stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; opacity: .5; }
+.rt-ants { fill: none; stroke: #fff; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 9 11; filter: drop-shadow(0 0 3px color-mix(in srgb, var(--accent) 70%, transparent)); animation: rtMarch 1s linear infinite; }
+@keyframes rtMarch { to { stroke-dashoffset: -20; } }
+.rt-start { fill: var(--accent); stroke: #fff; stroke-width: 2.5; }
+.rt-end { fill: #fff; stroke: var(--accent); stroke-width: 3.5; }
+@media (prefers-reduced-motion: reduce) { .rt-ants { animation: none; } }
+.rt-none { padding: 26px 16px; text-align: center; font-size: 13px; color: var(--ink-faint); }
+.ov-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 14px 16px; border-top: 1px solid var(--line); }
+.ov-stat .ov-v { font-size: 21px; font-weight: 750; letter-spacing: -.02em; }
+.ov-stat .ov-k { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); margin-top: 2px; }
+.sp-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+.sp-k { flex: none; width: 46px; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
+.sp-bar { flex: 1; height: 9px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+.sp-bar i { display: block; height: 100%; border-radius: 999px; background: color-mix(in srgb, var(--accent) 55%, var(--base)); }
+.sp-v { flex: none; width: 52px; text-align: right; font-size: 12.5px; font-weight: 600; }
+/* Activities: empty state + tappable run cards */
+.empty-acts { text-align: center; padding: 40px 24px; }
+.empty-acts .ea-ic { width: 54px; height: 54px; margin: 0 auto 14px; border-radius: 16px; display: flex; align-items: center; justify-content: center; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
+.empty-acts .ea-ic svg { width: 28px; height: 28px; }
+.empty-acts .ea-h { font-size: 17px; font-weight: 750; }
+.empty-acts .ea-b { font-size: 13.5px; color: var(--ink-soft); margin-top: 6px; line-height: 1.5; max-width: 300px; margin-left: auto; margin-right: auto; }
+.runcard { display: block; width: 100%; text-align: left; padding: 0; overflow: hidden; margin-bottom: 10px; cursor: pointer; font: inherit; color: inherit; }
+.rc-map { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 8%, var(--surface-2)), var(--surface-2)); border-bottom: 1px solid var(--line); }
+.rc-map .routemap { max-height: 150px; }
+.runcard .act { display: flex; align-items: center; padding: 13px 15px; }
+.runcard .rc-arr { margin-left: auto; color: var(--ink-faint); font-size: 20px; }
+.rd-head { margin: 2px 2px 12px; } .rd-head .rd-t { font-size: 20px; font-weight: 750; letter-spacing: -.02em; } .rd-head .rd-d { font-size: 12.5px; color: var(--ink-faint); margin-top: 2px; }
 .mini-btn { margin-top: 8px; display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--accent); background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; cursor: pointer; }
 .trial-ov { position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; padding: 20px; background: color-mix(in srgb, var(--ink) 55%, transparent); backdrop-filter: blur(4px); }
 .trial-ov.on { display: flex; }
@@ -1246,20 +1277,31 @@ function weekDetail() {
 }
 
 // ============ ACTIVITIES ===================================================
-const SAMPLE_ACTS = [
-  { t: "Easy Run", d: "23 Jul · 16:31", dist: "5.01 km", time: "28:00", pace: "5:35 /km" },
-  { t: "Easy Run", d: "21 Jul · 17:08", dist: "5.54 km", time: "31:30", pace: "5:41 /km" },
-  { t: "Easy Run", d: "14 Jul · 14:58", dist: "4.58 km", time: "25:36", pace: "5:35 /km" },
-];
 function viewActivities() {
   const t = (k, lab) => '<button data-at="' + k + '"' + (state.actTab === k ? ' class="on"' : '') + '>' + lab + '</button>';
   const tabs = '<div class="subtabs">' + t("workouts", "Runs") + t("strength", "Strength") + t("performance", "Performance") + '</div>';
   if (state.actTab === "workouts") {
-    const list = state.logged.concat(SAMPLE_ACTS).map((a) =>'<div class="card" style="margin-bottom:10px"><div class="act"><div class="b"><div class="t">' + a.t + '</div><div class="d">' + a.d + '</div><div class="m"><div><b class="num">' + a.dist + '</b><span>Distance</span></div><div><b class="num">' + a.time + '</b><span>Time</span></div><div><b class="num">' + a.pace + '</b><span>Avg pace</span></div></div></div></div></div>').join("");
+    // Only real, completed runs — no fabricated history. Blank until the user runs a session.
+    if (!state.logged.length) {
+      return tabs + '<div class="empty-acts"><div class="ea-ic">' + ICON.today + '</div><div class="ea-h">No runs yet</div><div class="ea-b">Start a session from the <b>Today</b> tab. Once you finish, your runs — with route maps and splits — will appear here.</div></div>';
+    }
+    const list = state.logged.map((a, i) => {
+      const hasRoute = a.route && a.route.length >= 2;
+      return '<button class="card runcard" data-runidx="' + i + '">' + (hasRoute ? '<div class="rc-map">' + routeMapSvg(a.route) + '</div>' : '') +
+        '<div class="act"><div class="b"><div class="t">' + esc(a.t) + '</div><div class="d">' + esc(a.d || "") + '</div>' +
+        '<div class="m"><div><b class="num">' + a.dist + '</b><span>Distance</span></div><div><b class="num">' + a.time + '</b><span>Time</span></div><div><b class="num">' + a.pace + '</b><span>Avg pace</span></div></div></div><div class="rc-arr">›</div></div></button>';
+    }).join("");
     return tabs + '<div style="font-size:12.5px;color:var(--ink-faint);margin:0 2px 12px">Your recent runs</div>' + list;
   }
   if (state.actTab === "strength") return tabs + viewStrengthHistory();
   return tabs + viewPerformance();
+}
+function viewRunDetail() {
+  const run = state.logged[state.viewRunIdx];
+  if (!run) return '<button class="backbtn" id="runBack">‹ Activities</button><div class="card">Run not found.</div>';
+  return '<button class="backbtn" id="runBack">‹ Activities</button>' +
+    '<div class="rd-head"><div class="rd-t">' + esc(run.t) + '</div><div class="rd-d">' + esc(run.d || "") + '</div></div>' +
+    runOverviewHtml(run);
 }
 // Aggregate all logged strength sets by exercise, in plan order (week = a session instance).
 function strengthHistory() {
@@ -1811,7 +1853,8 @@ function startSession() {
   LIVE = { session: s, rt: new RC.LiveSession(s), mode: null, acquiring: false, gpsErr: null,
     startMs: 0, pausedMs: 0, pauseStart: 0, vms: 0, dist: 0, hr: 105, devSpeed: null, curPace: null, win: [],
     timer: null, ui: null, watchId: null, wakeLock: null, lastLat: null, lastLon: null, acc: null,
-    speed: 20, lastStep: -1, quirk: 0, started: false, done: false, completedFull: false, summary: null, kmDone: 0, lastKmMs: 0 };
+    speed: 20, lastStep: -1, quirk: 0, started: false, done: false, completedFull: false, summary: null, kmDone: 0, lastKmMs: 0,
+    route: [], splits: [], routeDist: 0, simLat: 0, simLng: 0, simHead: Math.random() * 6.28 };
   state.screen = "live"; render();
 }
 // True while a session is under way (started, not yet finished) — the app locks onto the live
@@ -1826,6 +1869,7 @@ function checkSplits() {
   const now = liveNowMs();
   const splitSec = (now - LIVE.lastKmMs) / 1000;
   LIVE.lastKmMs = now;
+  LIVE.splits.push({ km, sec: splitSec });
   // Drop the runner's name into the cheer on alternate kilometres — personal without wearing thin.
   const cheer = firstName() && km % 2 === 0 ? "Nice work, " + firstName() + ". " : "";
   speak(cheer + "Kilometre " + km + ". " + spokenDuration(splitSec) + " for that split.");
@@ -1897,7 +1941,7 @@ function onGpsPos(pos) {
   if (good && movingByDevice && LIVE.rt.getStatus() === "active" && LIVE.lastLat != null) {
     const d = haversine(LIVE.lastLat, LIVE.lastLon, c.latitude, c.longitude);
     const floor = Math.max(2.5, (c.accuracy || 8) * 0.5);
-    if (d > floor && d < 80) LIVE.dist += d;
+    if (d > floor && d < 80) { LIVE.dist += d; LIVE.route.push({ lat: c.latitude, lng: c.longitude }); }
   }
   if (good) { LIVE.lastLat = c.latitude; LIVE.lastLon = c.longitude; }
 }
@@ -1958,16 +2002,60 @@ function viewLive() {
     controls +
     '<div class="card"><div class="subhead" style="margin-top:0">Coaching cues</div><div class="cuelog" id="lCues"><div style="color:var(--ink-faint);font-size:13px">Cues will appear as you run.</div></div></div>';
 }
+// Trim a GPS/simulated track to at most ~150 evenly-spaced points for compact storage + a clean map.
+function downsampleRoute(route, max) {
+  max = max || 150;
+  if (!route || route.length <= max) return route ? route.slice() : [];
+  const out = []; const step = (route.length - 1) / (max - 1);
+  for (let i = 0; i < max; i++) out.push(route[Math.round(i * step)]);
+  return out;
+}
+// Draw the recorded route as an SVG, in brand colours, with a marching-ants animated line (an accent
+// base plus flowing white dashes) — echoing the Start button. Scales lng by cos(lat) for true shape.
+function routeMapSvg(route) {
+  if (!route || route.length < 2) return '<div class="rt-none">No route was recorded for this run.</div>';
+  const lats = route.map((p) => p.lat), lngs = route.map((p) => p.lng);
+  const minLa = Math.min(...lats), maxLa = Math.max(...lats), minLo = Math.min(...lngs), maxLo = Math.max(...lngs);
+  const cx = Math.cos((minLa + maxLa) / 2 * Math.PI / 180) || 1;
+  const W = 320, H = 200, pad = 20;
+  const spanLo = Math.max(1e-9, (maxLo - minLo) * cx), spanLa = Math.max(1e-9, maxLa - minLa);
+  const scale = Math.min((W - 2 * pad) / spanLo, (H - 2 * pad) / spanLa);
+  const ox = (W - spanLo * scale) / 2, oy = (H - spanLa * scale) / 2;
+  const xy = (p) => [ox + (p.lng - minLo) * cx * scale, oy + (maxLa - p.lat) * scale];
+  const d = route.map((p, i) => (i ? "L" : "M") + xy(p).map((n) => n.toFixed(1)).join(" ")).join(" ");
+  const s = xy(route[0]), e = xy(route[route.length - 1]);
+  return '<svg class="routemap" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet">' +
+    '<path class="rt-base" d="' + d + '"/><path class="rt-ants" d="' + d + '"/>' +
+    '<circle class="rt-start" cx="' + s[0].toFixed(1) + '" cy="' + s[1].toFixed(1) + '" r="5.5"/>' +
+    '<circle class="rt-end" cx="' + e[0].toFixed(1) + '" cy="' + e[1].toFixed(1) + '" r="5.5"/></svg>';
+}
+function splitsHtml(splits) {
+  if (!splits || !splits.length) return "";
+  const secs = splits.map((s) => s.sec), max = Math.max(...secs), min = Math.min(...secs);
+  const rows = splits.map((s) => {
+    const w = 34 + 66 * (max === min ? 1 : (max - s.sec) / (max - min)); // faster km ⇒ longer bar
+    const fast = s.sec === min && splits.length > 1;
+    return '<div class="sp-row"><span class="sp-k">' + s.km + ' km</span><div class="sp-bar"><i style="width:' + w.toFixed(0) + '%' + (fast ? ";background:var(--accent)" : "") + '"></i></div><span class="sp-v num">' + fmtPace(s.sec) + '</span></div>';
+  }).join("");
+  return '<div class="card"><div class="subhead" style="margin-top:0">Kilometre splits</div>' + rows + '</div>';
+}
+// Shared overview: route map + key stats + splits. Used by the completion screen and Activities.
+function runOverviewHtml(run) {
+  const stat = (k, v) => '<div class="ov-stat"><div class="ov-v num">' + v + '</div><div class="ov-k">' + k + '</div></div>';
+  return '<div class="card ov-map-card"><div class="ov-map">' + routeMapSvg(run.route) + '</div>' +
+    '<div class="ov-stats">' + stat("Distance", run.dist) + stat("Time", run.time) + stat("Avg pace", run.pace) + '</div></div>' +
+    splitsHtml(run.splits);
+}
 function viewLiveComplete() {
-  const sm = LIVE.summary || { distKm: "0.00", time: "0:00", pace: "—", saved: false };
-  const stat = (k, v) => '<div class="dn-stat"><div class="dn-v num">' + v + '</div><div class="dn-k">' + k + '</div></div>';
+  const sm = LIVE.summary || { distKm: "0.00", time: "0:00", pace: "—", saved: false, route: [], splits: [] };
+  const run = { dist: sm.distKm + " km", time: sm.time, pace: (sm.pace || "—") + " /km", route: sm.route, splits: sm.splits };
   const controls = sm.saved
     ? '<div class="live-controls"><button class="primary" id="lDone">' + ICON.check + ' View in Activities</button></div>'
     : '<div class="live-controls two"><button class="ctrl" id="lDiscard">Discard</button><button class="primary" id="lSave">' + ICON.check + ' Save session</button></div>';
   return '<div class="card live-hero done-hero"><div class="dn-badge">' + ICON.check + '</div>' +
     '<div class="dn-h">' + (LIVE.completedFull ? "Well done!" : "Session ended") + '</div>' +
-    '<div class="dn-sub">' + (LIVE.completedFull ? "You completed " : "You logged ") + esc(LIVE.session.title) + (sm.saved ? " · saved" : "") + '</div>' +
-    '<div class="dn-stats">' + stat("Distance", sm.distKm + '<small> km</small>') + stat("Time", sm.time) + stat("Avg pace", sm.pace + '<small> /km</small>') + '</div></div>' +
+    '<div class="dn-sub">' + (LIVE.completedFull ? "You completed " : "You logged ") + esc(LIVE.session.title) + (sm.saved ? " · saved" : "") + '</div></div>' +
+    runOverviewHtml(run) +
     controls +
     '<div class="card"><div class="subhead" style="margin-top:0">Coaching cues</div><div class="cuelog" id="lCues"></div></div>';
 }
@@ -2009,11 +2097,23 @@ function liveTick() {
   const pre = LIVE.rt.snapshot(LIVE.vms);
   if (pre.step && pre.step.index !== LIVE.lastStep) { LIVE.quirk = 0; LIVE.lastStep = pre.step.index; }
   const pace = livePace(pre.step); LIVE.dist += (1000 / pace) * dt;
+  simRouteStep();
   LIVE.hr += (liveHr(pre.step) - LIVE.hr) * 0.05 + (Math.random() - 0.5) * 1.5; LIVE.hr = Math.max(95, Math.min(190, LIVE.hr));
   LIVE.rt.update({ atMs: LIVE.vms, distanceMeters: LIVE.dist, heartRateBpm: Math.round(LIVE.hr) }).forEach(liveCue);
   checkSplits();
   liveUpdate(LIVE.rt.snapshot(LIVE.vms));
   if (LIVE.rt.getStatus() === "completed") { stopLive(); liveFinish(true); }
+}
+// Synthesize a plausible wandering GPS track for the simulator, so the demo/artifact still shows a
+// route map. Advances a heading with gentle random turns, one point roughly every 40 m.
+function simRouteStep() {
+  if (!LIVE.simLat) { LIVE.simLat = 51.5074; LIVE.simLng = -0.1278; }
+  if (LIVE.dist - LIVE.routeDist < 40) return;
+  const seg = LIVE.dist - LIVE.routeDist; LIVE.routeDist = LIVE.dist;
+  LIVE.simHead += (Math.random() - 0.5) * 0.7;
+  LIVE.simLat += seg * Math.cos(LIVE.simHead) / 111320;
+  LIVE.simLng += seg * Math.sin(LIVE.simHead) / (111320 * Math.cos(LIVE.simLat * Math.PI / 180));
+  LIVE.route.push({ lat: LIVE.simLat, lng: LIVE.simLng });
 }
 function startLoop() { if (!LIVE.timer) LIVE.timer = setInterval(liveTick, 200); }
 function stopLive() {
@@ -2030,15 +2130,23 @@ function liveFinish(complete) {
   if (!complete) LIVE.rt.stop(now).forEach(liveCue);
   const snap = LIVE.rt.snapshot(now);
   const km = snap.distanceMeters / 1000;
-  LIVE.summary = { distKm: km.toFixed(2), time: fmtPace(snap.elapsedSeconds), pace: snap.averagePaceSecPerKm ? fmtPace(snap.averagePaceSecPerKm) : "—", avgPaceSec: snap.averagePaceSecPerKm || 0, saved: false, meaningful: km > 0.05 };
+  LIVE.summary = { distKm: km.toFixed(2), time: fmtPace(snap.elapsedSeconds), pace: snap.averagePaceSecPerKm ? fmtPace(snap.averagePaceSecPerKm) : "—", avgPaceSec: snap.averagePaceSecPerKm || 0, sec: Math.round(snap.elapsedSeconds), route: downsampleRoute(LIVE.route), splits: LIVE.splits.slice(), saved: false, meaningful: km > 0.05 };
   // Clear, unmissable end — spoken celebration plus a completion screen the user must act on.
   speak(complete ? "Well done" + nameTail() + ". Session complete." : "Session ended" + nameTail() + ".");
   render();
 }
+function runDateLabel() {
+  const d = new Date(), M = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return d.getDate() + " " + M[d.getMonth()] + " · " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+}
 // Persist the just-finished run to Activities + tick it off in the training calendar.
 function saveLiveSession() {
   const sm = LIVE.summary; if (!sm || sm.saved) return;
-  if (sm.meaningful) { state.logged.unshift({ t: LIVE.session.title, d: "Today", dist: sm.distKm + " km", time: sm.time, pace: sm.pace + " /km" }); saveRuns(); }
+  if (sm.meaningful) {
+    state.logged.unshift({ t: LIVE.session.title, d: runDateLabel(), dist: sm.distKm + " km", time: sm.time, pace: sm.pace + " /km",
+      distKm: Number(sm.distKm), sec: sm.sec, avgPaceSec: Math.round(sm.avgPaceSec), route: sm.route, splits: sm.splits });
+    saveRuns();
+  }
   const wk0 = PLAN.weeks[0]; const dn = DAY_ORDER[LIVE.session.dayOfWeek];
   if (LIVE.completedFull && wk0) { const m = wk0.sessions.find((s) => s.day === dn && s.title === LIVE.session.title); if (m) state.done[doneKey(wk0.index, m)] = true; }
   sm.saved = true;
@@ -2149,9 +2257,8 @@ function showWelcomeBack() {
   requestAnimationFrame(() => ov.classList.add("on"));
   let gone = false;
   const dismiss = () => { if (gone) return; gone = true; ov.classList.add("hide"); setTimeout(() => { ov.remove(); if (state.tab === "today" && !state.screen) maybeAutoGuide(); }, 500); };
+  // Stays up until the user taps "Let's go" — no auto-dismiss, no tap-away.
   const go = $("wbGo"); if (go) go.onclick = dismiss;
-  ov.addEventListener("click", (e) => { if (e.target === ov) dismiss(); });
-  setTimeout(dismiss, 4200);
 }
 
 // ---- "Understanding your sessions" interactive guide ----------------------
@@ -2325,6 +2432,13 @@ function render() {
     wire();
     return;
   }
+  if (state.screen === "runview") {
+    $("topTitle").textContent = "Run";
+    v.innerHTML = viewRunDetail(); v.scrollTop = 0;
+    document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
+    wire();
+    return;
+  }
   $("topTitle").textContent = state.support ? "Support" : TITLES[state.tab];
   if (state.tab === "today") { fetchWeather(); v.innerHTML = viewToday(); maybeAutoGuide(); }
   else if (state.tab === "plan") v.innerHTML = viewPlan();
@@ -2343,6 +2457,8 @@ function wire() {
   }));
   document.querySelectorAll("[data-wk]").forEach((b) => b.onclick = () => { state.planWeek = Number(b.dataset.wk); document.querySelectorAll("[data-wk]").forEach((x) => x.setAttribute("aria-pressed", x === b)); $("weekDetail").innerHTML = weekDetail(); wireSessionTaps(); });
   document.querySelectorAll("[data-at]").forEach((b) => b.onclick = () => { state.actTab = b.dataset.at; render(); });
+  document.querySelectorAll("[data-runidx]").forEach((b) => b.onclick = () => { state.viewRunIdx = Number(b.dataset.runidx); state.screen = "runview"; render(); });
+  const runBack = $("runBack"); if (runBack) runBack.onclick = () => { state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); };
   document.querySelectorAll("[data-hub]").forEach((b) => b.onclick = () => { state.support = b.dataset.hub; render(); });
   const guideReplay = $("guideReplay"); if (guideReplay) guideReplay.onclick = () => openSessionGuide(GUIDE_EXAMPLE, { fromSupport: true });
   const back = $("supBack"); if (back) back.onclick = () => { state.support = null; render(); };

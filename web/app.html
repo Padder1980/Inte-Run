@@ -530,7 +530,13 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
 .dn-stat .dn-k { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); margin-top: 2px; }
 /* Run overview: route map (brand-colour marching-ants line) + stats + splits */
 .ov-map-card { padding: 0; overflow: hidden; }
-.ov-map { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 8%, var(--surface-2)), var(--surface-2)); }
+.ov-map { position: relative; background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 8%, var(--surface-2)), var(--surface-2)); }
+.ov-mapcv { display: block; width: 100%; height: auto; }
+.ov-mapov { position: absolute; inset: 0; }
+.ov-mapov .routemap { width: 100%; height: 100%; }
+.ov-mapov .rt-base { stroke-width: 9; opacity: .55; } .ov-mapov .rt-ants { stroke-width: 5; stroke-dasharray: 15 17; }
+.ov-mapov .rt-start, .ov-mapov .rt-end { stroke-width: 4; }
+.ov-attr { position: absolute; left: 10px; bottom: 7px; font-size: 10px; color: rgba(255,255,255,.45); text-shadow: 0 1px 2px rgba(0,0,0,.5); pointer-events: none; }
 .routemap { display: block; width: 100%; height: auto; }
 .rt-base { fill: none; stroke: var(--accent); stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; opacity: .5; }
 .rt-ants { fill: none; stroke: #fff; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 9 11; filter: drop-shadow(0 0 3px color-mix(in srgb, var(--accent) 70%, transparent)); animation: rtMarch 1s linear infinite; }
@@ -2013,22 +2019,48 @@ function downsampleRoute(route, max) {
 }
 // Draw the recorded route as an SVG, in brand colours, with a marching-ants animated line (an accent
 // base plus flowing white dashes) — echoing the Start button. Scales lng by cos(lat) for true shape.
-function routeMapSvg(route) {
+function routeMapSvg(route, proj, vbW, vbH) {
   if (!route || route.length < 2) return '<div class="rt-none">No route was recorded for this run.</div>';
-  const lats = route.map((p) => p.lat), lngs = route.map((p) => p.lng);
-  const minLa = Math.min(...lats), maxLa = Math.max(...lats), minLo = Math.min(...lngs), maxLo = Math.max(...lngs);
-  const cx = Math.cos((minLa + maxLa) / 2 * Math.PI / 180) || 1;
-  const W = 320, H = 200, pad = 20;
-  const spanLo = Math.max(1e-9, (maxLo - minLo) * cx), spanLa = Math.max(1e-9, maxLa - minLa);
-  const scale = Math.min((W - 2 * pad) / spanLo, (H - 2 * pad) / spanLa);
-  const ox = (W - spanLo * scale) / 2, oy = (H - spanLa * scale) / 2;
-  const xy = (p) => [ox + (p.lng - minLo) * cx * scale, oy + (maxLa - p.lat) * scale];
+  let xy, W, H, r;
+  if (proj) { W = vbW; H = vbH; xy = (p) => proj(p); r = 9; }
+  else {
+    const lats = route.map((p) => p.lat), lngs = route.map((p) => p.lng);
+    const minLa = Math.min(...lats), maxLa = Math.max(...lats), minLo = Math.min(...lngs), maxLo = Math.max(...lngs);
+    const cx = Math.cos((minLa + maxLa) / 2 * Math.PI / 180) || 1;
+    W = 320; H = 200; const pad = 20;
+    const spanLo = Math.max(1e-9, (maxLo - minLo) * cx), spanLa = Math.max(1e-9, maxLa - minLa);
+    const scale = Math.min((W - 2 * pad) / spanLo, (H - 2 * pad) / spanLa);
+    const ox = (W - spanLo * scale) / 2, oy = (H - spanLa * scale) / 2;
+    xy = (p) => [ox + (p.lng - minLo) * cx * scale, oy + (maxLa - p.lat) * scale]; r = 5.5;
+  }
   const d = route.map((p, i) => (i ? "L" : "M") + xy(p).map((n) => n.toFixed(1)).join(" ")).join(" ");
   const s = xy(route[0]), e = xy(route[route.length - 1]);
-  return '<svg class="routemap" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet">' +
+  return '<svg class="routemap" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
     '<path class="rt-base" d="' + d + '"/><path class="rt-ants" d="' + d + '"/>' +
-    '<circle class="rt-start" cx="' + s[0].toFixed(1) + '" cy="' + s[1].toFixed(1) + '" r="5.5"/>' +
-    '<circle class="rt-end" cx="' + e[0].toFixed(1) + '" cy="' + e[1].toFixed(1) + '" r="5.5"/></svg>';
+    '<circle class="rt-start" cx="' + s[0].toFixed(1) + '" cy="' + s[1].toFixed(1) + '" r="' + r + '"/>' +
+    '<circle class="rt-end" cx="' + e[0].toFixed(1) + '" cy="' + e[1].toFixed(1) + '" r="' + r + '"/></svg>';
+}
+// Overview map size (CSS px) — canvas backing store is DPR-scaled for crispness.
+const OVMAP_W = 700, OVMAP_H = 420;
+// Enhance an .ov-map container with a real street map behind the route (async). If tiles can't load
+// (offline / sandbox), the marching-ants fallback already in the container stays.
+function buildOverviewMap(container, route) {
+  if (!container || !route || route.length < 2) return;
+  loadRouteMap(route, OVMAP_W, OVMAP_H).then((md) => {
+    if (!container.isConnected) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const cv = document.createElement("canvas"); cv.width = OVMAP_W * dpr; cv.height = OVMAP_H * dpr;
+    cv.className = "ov-mapcv";
+    const g = cv.getContext("2d"); g.scale(dpr, dpr);
+    g.fillStyle = "#0a1714"; g.fillRect(0, 0, OVMAP_W, OVMAP_H);
+    md.tiles.forEach((t) => { try { g.drawImage(t.img, t.dx, t.dy, MAP_TILE, MAP_TILE); } catch (e) {} });
+    g.fillStyle = "rgba(6,20,17,.28)"; g.fillRect(0, 0, OVMAP_W, OVMAP_H); // gentle dim for route contrast
+    const overlay = routeMapSvg(route, md.proj, OVMAP_W, OVMAP_H);
+    container.innerHTML = "";
+    container.appendChild(cv);
+    container.appendChild(el('<div class="ov-mapov">' + overlay + '</div>'));
+    container.appendChild(el('<div class="ov-attr">© OpenStreetMap © CARTO</div>'));
+  }).catch(() => {});
 }
 function splitsHtml(splits) {
   if (!splits || !splits.length) return "";
@@ -2043,7 +2075,7 @@ function splitsHtml(splits) {
 // Shared overview: route map + key stats + splits + share. Used by the completion screen and Activities.
 function runOverviewHtml(run) {
   const stat = (k, v) => '<div class="ov-stat"><div class="ov-v num">' + v + '</div><div class="ov-k">' + k + '</div></div>';
-  return '<div class="card ov-map-card"><div class="ov-map">' + routeMapSvg(run.route) + '</div>' +
+  return '<div class="card ov-map-card"><div class="ov-map" id="ovMap">' + routeMapSvg(run.route) + '</div>' +
     '<div class="ov-stats">' + stat("Distance", run.dist) + stat("Time", run.time) + stat("Avg pace", run.pace) + '</div></div>' +
     splitsHtml(run.splits) +
     '<button class="primary share-btn" id="shareRun">' + ICON.share + ' Share my run</button>';
@@ -2178,17 +2210,18 @@ function loadTileImage(url) {
 // Load CORS-enabled dark basemap tiles (CARTO/OpenStreetMap) covering the route, plus a projection
 // so the route aligns with the streets. Rejects on any failure (offline / sandbox / CORS) so the
 // caller can fall back to the grid map.
-function loadRouteMap(route) {
+function loadRouteMap(route, pw, ph) {
+  pw = pw || MAP_W; ph = ph || MAP_H;
   return new Promise((resolve, reject) => {
     if (!route || route.length < 2) return reject(new Error("no route"));
     const lats = route.map((p) => p.lat), lngs = route.map((p) => p.lng);
     const minLa = Math.min(...lats), maxLa = Math.max(...lats), minLo = Math.min(...lngs), maxLo = Math.max(...lngs);
-    const pad = 90; let z = 18;
-    for (; z >= 3; z--) { if (mercX(maxLo, z) - mercX(minLo, z) <= MAP_W - 2 * pad && mercY(minLa, z) - mercY(maxLa, z) <= MAP_H - 2 * pad) break; }
-    const originX = mercX((minLo + maxLo) / 2, z) - MAP_W / 2, originY = mercY((minLa + maxLa) / 2, z) - MAP_H / 2;
+    const pad = Math.min(90, pw * 0.14); let z = 18;
+    for (; z >= 3; z--) { if (mercX(maxLo, z) - mercX(minLo, z) <= pw - 2 * pad && mercY(minLa, z) - mercY(maxLa, z) <= ph - 2 * pad) break; }
+    const originX = mercX((minLo + maxLo) / 2, z) - pw / 2, originY = mercY((minLa + maxLa) / 2, z) - ph / 2;
     const n = Math.pow(2, z), specs = [];
-    for (let tx = Math.floor(originX / MAP_TILE); tx <= Math.floor((originX + MAP_W) / MAP_TILE); tx++)
-      for (let ty = Math.floor(originY / MAP_TILE); ty <= Math.floor((originY + MAP_W) / MAP_TILE) && ty <= Math.floor((originY + MAP_H) / MAP_TILE); ty++) {
+    for (let tx = Math.floor(originX / MAP_TILE); tx <= Math.floor((originX + pw) / MAP_TILE); tx++)
+      for (let ty = Math.floor(originY / MAP_TILE); ty <= Math.floor((originY + ph) / MAP_TILE); ty++) {
         if (ty < 0 || ty >= n) continue;
         const wx = ((tx % n) + n) % n, sub = ["a", "b", "c"][((tx % 3) + 3) % 3];
         specs.push({ url: "https://" + sub + ".basemaps.cartocdn.com/dark_all/" + z + "/" + wx + "/" + ty + "@2x.png", dx: tx * MAP_TILE - originX, dy: ty * MAP_TILE - originY });
@@ -2276,7 +2309,7 @@ function buildShareCanvasCore(run, mapData) {
   return c;
 }
 function buildShareCanvasSync(run) { return buildShareCanvasCore(run, null); }
-function buildShareCanvasWithMap(run) { return loadRouteMap(run.route).then((md) => buildShareCanvasCore(run, md)); }
+function buildShareCanvasWithMap(run) { return loadRouteMap(run.route, MAP_W, MAP_H).then((md) => buildShareCanvasCore(run, md)); }
 function canvasToPngFile(canvas, name) {
   const dataUrl = canvas.toDataURL("image/png");
   const b64 = dataUrl.split(",")[1], bin = atob(b64), arr = new Uint8Array(bin.length);
@@ -2728,6 +2761,7 @@ function wire() {
   document.querySelectorAll("[data-runidx]").forEach((b) => b.onclick = () => { state.viewRunIdx = Number(b.dataset.runidx); state.screen = "runview"; render(); });
   const runBack = $("runBack"); if (runBack) runBack.onclick = () => { state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); };
   const shareRun = $("shareRun"); if (shareRun) { shareRun.onclick = doShareRun; prepareShareCard(currentOverviewRun()); }
+  const ovMap = $("ovMap"); if (ovMap) { const r = currentOverviewRun(); if (r) buildOverviewMap(ovMap, r.route); }
   document.querySelectorAll("[data-hub]").forEach((b) => b.onclick = () => { state.support = b.dataset.hub; render(); });
   const guideReplay = $("guideReplay"); if (guideReplay) guideReplay.onclick = () => openSessionGuide(GUIDE_EXAMPLE, { fromSupport: true });
   const back = $("supBack"); if (back) back.onclick = () => { state.support = null; render(); };

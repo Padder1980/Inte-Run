@@ -958,6 +958,12 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
 }
 #view:has(.plan-head) .bar-btn[aria-pressed="true"] .bl { color: var(--accent-ink); background: var(--accent); font-weight: 760; }
 #view:has(.plan-head) .bar-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* Phase legend so the chart is read by label, not colour alone; a faint rule marks each phase start */
+#view:has(.plan-head) .phase-legend { display: flex; flex-wrap: wrap; gap: 7px 14px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+#view:has(.plan-head) .phase-key { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 650; color: var(--ink-soft); }
+#view:has(.plan-head) .phase-key i { width: 10px; height: 10px; border-radius: 3px; background: var(--phase); flex: none; }
+#view:has(.plan-head) .bar-btn.phase-start { position: relative; }
+#view:has(.plan-head) .bar-btn.phase-start:not(:first-child)::before { content: ""; position: absolute; left: -3px; top: 6px; bottom: 26px; width: 1px; background: color-mix(in srgb, var(--ink) 12%, transparent); }
 #view:has(.plan-head) #weekDetail {
   padding: 18px;
   background: linear-gradient(165deg, var(--surface), color-mix(in srgb, var(--surface-2) 30%, var(--surface)));
@@ -1643,9 +1649,18 @@ function wireSessionTaps() {
 function viewPlan() {
   const g = PLAN.goal, s = PLAN.summary;
   const peak = s.peakKm || 1;
-  const bars = PLAN.weeks.map((w) => {
+  // Chart legend + bars: label each phase (Base/Build/Peak/Taper) so the chart isn't read by colour
+  // alone, mark where each phase starts, and give every bar an accessible label.
+  const phaseNames = { base: "Base", build: "Build", peak: "Peak", taper: "Taper" };
+  const phaseSeq = ["base", "build", "peak", "taper"];
+  const phasesInPlan = phaseSeq.filter((ph) => PLAN.weeks.some((w) => w.phase === ph));
+  const phaseLegend = phasesInPlan.map((ph) =>
+    '<span class="phase-key" style="--phase:' + PHASE[ph] + '"><i aria-hidden="true"></i>' + phaseNames[ph] + '</span>').join("");
+  const bars = PLAN.weeks.map((w, i) => {
+    const phaseStart = i === 0 || PLAN.weeks[i - 1].phase !== w.phase;
     const h = Math.max(6, Math.round(w.distanceKm / peak * 100));
-    return '<button class="bar-btn" data-wk="' + w.index + '" aria-pressed="' + (w.index===state.planWeek) + '"><div class="bar' + (w.isDeload?" deload":"") + '" style="height:' + h + '%;--phase:' + PHASE[w.phase] + '"></div><div class="bl">' + w.index + '</div></button>';
+    const aria = "Week " + w.index + ", " + phaseNames[w.phase] + " phase" + (w.isDeload ? ", deload week" : "") + ", " + w.distanceKm.toFixed(1) + " kilometres";
+    return '<button class="bar-btn' + (phaseStart ? " phase-start" : "") + '" data-phase="' + w.phase + '" data-wk="' + w.index + '" aria-label="' + aria + '" aria-pressed="' + (w.index===state.planWeek) + '"><div class="bar' + (w.isDeload?" deload":"") + '" style="height:' + h + '%;--phase:' + PHASE[w.phase] + '"></div><div class="bl">' + w.index + '</div></button>';
   }).join("");
   const lead = s.totalWeeks - s.structuredWeeks;
   const note = lead >= 2 ? '<div class="plan-note">Your race is <b>' + s.totalWeeks + ' weeks</b> away — this is your <b>' + s.structuredWeeks + '-week</b> structured build. Until it begins, keep running easy and consistent to bank the base.</div>' : "";
@@ -1660,7 +1675,7 @@ function viewPlan() {
     '<div class="statrow"><div class="stat"><div class="k">Weeks</div><div class="v num">' + s.structuredWeeks + '</div></div><div class="stat"><div class="k">Peak/wk</div><div class="v num">' + s.peakKm + ' km</div></div><div class="stat"><div class="k">Goal pace</div><div class="v num">' + PLAN.paces.goal.replace("/km","") + '</div></div></div></div>' +
     starterNote +
     note +
-    '<h2 class="sec">Training block</h2><div class="card"><div class="chart" id="chart">' + bars + '</div></div>' +
+    '<h2 class="sec">Training block</h2><div class="card"><div class="chart" id="chart">' + bars + '</div><div class="phase-legend">' + phaseLegend + '</div></div>' +
     '<h2 class="sec">Week detail</h2><div class="card" id="weekDetail">' + weekDetail() + '</div>';
 }
 function weekDetail() {

@@ -121,9 +121,17 @@ and the logo holds still through the handoff (no app bleed-through, no black→t
 screen all elements fade in together, with a slower 1.1s splash reveal and longer holds (2.0s first-run,
 2.2s returning). See the `.splash` / `.welcome` CSS + the launch IIFE near the end of `web/app.ts`.
 
-Known/optional next: the app still runs its "Today" on a fixed simulated day rather than the real
-calendar date (offered, not yet done); lock-screen/background audio is limited (pure PWA, no native
-wrapper).
+Also: a **scrollable week band on Today** (swipe through the plan, no arrows; label/hero/overview follow
+the settled week) with an **"Upcoming this week" overview** under the squares (sessions only, no rest
+days; current week shows today onward); **session reminders** (top-bar bell → sheet with in-app
+notifications + reminder time, and an **Add-to-Calendar `.ics`** export — the reliable day-of alert
+since a backend-less PWA can't push in the background; SW handles `notificationclick`); and **Today is
+now wired to the real calendar date** — `computeToday()` finds today's week+day, and
+`normalizeWeekStarts()` snaps each week to its Monday so dates/labels/`.ics` all line up (the old
+partial-first-week could be a mid-week `startIso`).
+
+Known/optional next: lock-screen/background audio is limited (pure PWA, no native wrapper); true
+background reminders would need a push server (calendar export is the current cross-platform answer).
 
 ---
 

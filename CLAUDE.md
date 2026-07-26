@@ -176,6 +176,13 @@ works offline. An optional Claude backend can be dropped in later without touchi
 that holds the API key server-side — it can never live in this public page). Any remote failure
 falls back to the on-device answer, so Alfie always replies.
 
+**Auto pace calibration:** a "building the habit" runner who leaves their easy pace blank is asked
+once on save whether to add it. If they decline, `profile.autoPace` is set, the plan starts gentle,
+and the **first real continuous run** sets their paces automatically (`maybeAutoPaceCalibrate` in
+`web/app.ts`) — it rescales the whole plan and raises a banner on Today explaining what happened.
+It also suppresses the ordinary fitness-re-estimation prompt for that run so there's one message,
+not two.
+
 **Apple Watch:** see `WATCH.md` — a scoping/decision document, nothing built. Key facts: a watchOS
 app cannot pair with a PWA (it needs a native iOS app), Xcode isn't installed on the owner's Mac,
 and the `src/` engine is dependency-free TS with 122 tests that would serve as the port spec.

@@ -1556,7 +1556,7 @@ function computeToday() {
 }
 computeToday();
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), trialPending: false, trialSaved: null, done: {}, dayOverride: {}, selDay: TODAY_DOW, selWeek: CURRENT_WEEK };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trialPending: false, trialSaved: null, done: {}, dayOverride: {}, selDay: TODAY_DOW, selWeek: CURRENT_WEEK };
 // Effective day index for a session, honouring any user reschedule. Works for raw sessions
 // (dayOfWeek) and summary sessions (dayIndex), keyed by the shared session id.
 function effDay(s) { const o = state.dayOverride[s.id]; return o != null ? o : (s.dayOfWeek != null ? s.dayOfWeek : s.dayIndex); }
@@ -1717,7 +1717,7 @@ function viewToday() {
   let cta = "";
   if (sess && onToday && PRIMARY_TYPES[sess.type]) cta = '<button class="primary start-btn" id="startSession">' + ICON.play + ' Start session</button>';
   else if (sess) cta = '<button class="primary start-btn" id="viewSession">' + ICON.play + ' View session</button>';
-  return banner + fitSuggestBanner() + greeting + weekStrip() +
+  return banner + autoPaceBanner() + fitSuggestBanner() + greeting + weekStrip() +
     heroWorkout() +
     cta +
     '<div class="tsq-row">' + conditionsSquare(sess) + feelSquare() + '</div>' +
@@ -3273,6 +3273,8 @@ function draftFromForm() {
     status,
     goalDist, targetS, raceDate, startDateIso, longRunDay,
     fitSrc, recentDistM, recentTimeS, noRecent, easyPaceS, oneKmS, daysPerWeek: Number(draft.days), yearsRunning: profile.yearsRunning || 3,
+    // "Building the habit" with no easy pace given: calibrate from their first run instead.
+    autoPace: status === "building" && !easyPaceS,
     weeklyVolumeKm: profile.weeklyVolumeKm, age: Number($("s_age").value) || 35, sex: $("s_sex").value,
     strength: draft.strength === "1", returning: draft.returning === "1", personalized: true,
   };
@@ -4294,7 +4296,7 @@ function saveLiveSession() {
   const wk0 = PLAN.weeks[0]; const dn = DAY_ORDER[LIVE.session.dayOfWeek];
   if (LIVE.completedFull && wk0) { const m = wk0.sessions.find((s) => s.day === dn && s.title === LIVE.session.title); if (m) state.done[doneKey(wk0.index, m)] = true; }
   sm.saved = true;
-  assessFitnessFromRun(LIVE.session.type, sm.avgPaceSec, Number(sm.distKm));
+  if (!maybeAutoPaceCalibrate(LIVE.session.type, sm.avgPaceSec, Number(sm.distKm))) assessFitnessFromRun(LIVE.session.type, sm.avgPaceSec, Number(sm.distKm));
 }
 // ---- Adaptive re-estimation: does the completed run imply a different fitness than the plan? -----
 function loadFitSuggest() { try { return JSON.parse(localStorage.getItem("interun_fitsuggest") || "null"); } catch (e) { return null; } }
@@ -4339,6 +4341,61 @@ function applyFitSuggest() {
   render();
 }
 function dismissFitSuggest() { state.fitSuggest = null; saveFitSuggest(); render(); }
+// ---- Auto pace calibration ("building the habit" runners who left their easy pace blank) --------
+// They're asked once, on save, whether they want to add a pace. If they'd rather not, the plan starts
+// gently and the FIRST real continuous run sets their paces — no action needed from them — after
+// which they get told it happened.
+function needsPacePrompt() {
+  const el = $("s_easypace");
+  return draft.status === "building" && !!el && !el.value.trim();
+}
+function openPacePrompt(onSkip) {
+  ensureSheet(); SHEET_CTX = null;
+  $("sheetBody").innerHTML =
+    '<div class="sd-type" style="--sc:var(--accent)">Easy pace</div>' +
+    '<div class="sd-title">Add your easy pace?</div>' +
+    '<div class="sd-desc">You\\u2019ve left it blank. If you know a pace you can comfortably hold a conversation at, adding it now scales every session to your real ability from day one.</div>' +
+    '<div class="sd-desc" style="margin-top:8px">Happy to leave it? That\\u2019s fine \\u2014 we\\u2019ll start you gently and set your paces automatically from your first run.</div>' +
+    '<button class="primary" id="paceAdd" style="width:100%;margin-top:14px">Add it now</button>' +
+    '<button class="rm-nothanks" id="paceSkip">No \\u2014 work it out from my first run</button>';
+  $("paceAdd").onclick = () => { closeSheet(); const el = $("s_easypace"); if (el) { el.scrollIntoView({ block: "center" }); el.focus(); } };
+  $("paceSkip").onclick = () => { closeSheet(); onSkip(); };
+  $("sheetOv").classList.add("on");
+}
+function loadPaceNotice() { try { return JSON.parse(localStorage.getItem("interun_pacenotice") || "null"); } catch (e) { return null; } }
+function savePaceNotice() { try { state.paceNotice ? localStorage.setItem("interun_pacenotice", JSON.stringify(state.paceNotice)) : localStorage.removeItem("interun_pacenotice"); } catch (e) {} }
+function dismissPaceNotice() { state.paceNotice = null; savePaceNotice(); render(); }
+// Set the athlete's paces from a completed run. Returns true if it calibrated, so the caller can
+// skip the ordinary "you're running stronger than your plan assumes" prompt — one message, not two.
+function maybeAutoPaceCalibrate(type, avgPaceSec, distKm) {
+  if (!profile.autoPace) return false;
+  const cont = type === "easy" || type === "long" || type === "recovery" || type === "steady";
+  if (!cont) return false;                                        // intervals average across recoveries
+  if (!distKm || distKm < 1.5) return false;                      // too short to characterise a pace
+  if (!avgPaceSec || avgPaceSec < 210 || avgPaceSec > 900) return false; // implausible: wait for a better run
+  const implied = impliedRecentFromRun(type, avgPaceSec);
+  if (!implied) return false;
+  const from = profile.recentTimeS;
+  // Normalise a steady effort back to an easy pace so the stored figure means the same thing.
+  const easy = Math.round(type === "steady" ? avgPaceSec + 57 : avgPaceSec);
+  profile.easyPaceS = easy; profile.recentTimeS = implied; profile.noRecent = false; profile.autoPace = false;
+  try { recompute(); } catch (e) { return false; }
+  computeToday(); state.planWeek = PLAN.defaultWeekIndex; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; seedDone();
+  // seedDone() rebuilt the completed map — re-tick the run they just finished.
+  const wk = curWeek(), dn = DAY_ORDER[LIVE.session.dayOfWeek];
+  if (LIVE.completedFull && wk) { const m = wk.sessions.find((s) => s.day === dn && s.title === LIVE.session.title); if (m) state.done[doneKey(wk.index, m)] = true; }
+  saveProfileStore();
+  state.paceNotice = { easy: easy, implied: implied, from: from, at: todayIso(), sess: LIVE.session.title };
+  savePaceNotice();
+  return true;
+}
+function autoPaceBanner() {
+  const a = state.paceNotice; if (!a) return "";
+  return '<div class="fit-banner up"><div class="fb-ic">' + ICON.gauge + '</div>' +
+    '<div class="fb-main"><div class="fb-h">Your paces are set \\u2014 from your first run</div>' +
+    '<div class="fb-b">You left your easy pace blank, so we took it from your <b>' + esc(a.sess) + '</b>: <b>' + fmtPace(a.easy) + '/km</b>. Every session from here \\u2014 easy, long and quality \\u2014 has been rescaled to that. Change it any time in your profile.</div>' +
+    '<div class="fb-actions"><button class="fb-yes" id="apOk">Got it</button><button class="fb-no" id="apEdit">Adjust it</button></div></div></div>';
+}
 function fitSuggestBanner() {
   const fs = state.fitSuggest; if (!fs) return "";
   const faster = fs.dir === "better";
@@ -4658,11 +4715,16 @@ function wire() {
   const setupBanner = $("setupBanner"); if (setupBanner) setupBanner.onclick = () => { state.screen = "setup"; render(); };
   const wxSeg = document.querySelector("[data-weatherseg]"); if (wxSeg) wxSeg.querySelectorAll("button").forEach((b) => b.onclick = () => { state.weather = b.dataset.weather; render(); });
   const save = $("saveProfile"); if (save) save.onclick = () => {
+    // Blank easy pace on a "building" profile: ask once before saving.
+    if (needsPacePrompt()) { openPacePrompt(doSaveProfile); return; }
+    doSaveProfile();
+  };
+  function doSaveProfile() {
     let pf; try { pf = draftFromForm(); } catch (e) { const er = $("setupErr"); er.style.display = "block"; er.textContent = e.message; return; }
     let out; try { out = applyProfile(pf); } catch (e) { const er = $("setupErr"); er.style.display = "block"; er.textContent = "That goal can't be planned yet — try a race date further out."; return; }
     profile = pf; PLAN = out.plan; RAW = out.raw; FITNESS = out.fitness; CLASS = out.classification; MASTERS = out.masters; computeToday(); state.planWeek = PLAN.defaultWeekIndex; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; seedDone(); saveProfileStore(); renderAvatar();
     state.screen = null; state.tab = "plan"; render();
-  };
+  }
   const cancel = $("cancelSetup"); if (cancel) cancel.onclick = () => { state.screen = null; state.tab = "today"; render(); };
   // Session detail taps (Plan, calendar, Today)
   wireSessionTaps();
@@ -4685,6 +4747,8 @@ function wire() {
   }
   const condSq = $("condSq"); if (condSq) condSq.onclick = openWeatherSheet;
   const feelSq = $("feelSq"); if (feelSq) feelSq.onclick = openFeelSheet;
+  const apOk = $("apOk"); if (apOk) apOk.onclick = dismissPaceNotice;
+  const apEdit = $("apEdit"); if (apEdit) apEdit.onclick = () => { dismissPaceNotice(); state.screen = "setup"; render(); };
   const fitApply = $("fitApply"); if (fitApply) fitApply.onclick = applyFitSuggest;
   const fitDismiss = $("fitDismiss"); if (fitDismiss) fitDismiss.onclick = dismissFitSuggest;
   const viewSession = $("viewSession"); if (viewSession) viewSession.onclick = () => openSessionSheet(selectedSession(), curWeekNo());

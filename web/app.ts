@@ -2952,16 +2952,18 @@ function cropPaint() {
   el.style.height = (CROP.img.height * CROP.k) + "px";
   el.style.transform = "translate(" + CROP.x + "px," + CROP.y + "px)";
 }
-// Re-scale about the centre of the stage so zooming keeps the framed subject put.
-function cropZoomTo(zoom) {
+// Re-scale about an anchor point (stage coords) so whatever is under that point stays under it —
+// the pinch midpoint for a gesture, the stage centre for the slider.
+function cropZoomAbout(zoom, ax, ay) {
   const z = Math.max(1, Math.min(4, zoom));
-  const kNew = CROP.base * z, c = CROP.V / 2;
-  CROP.x = c - (c - CROP.x) * (kNew / CROP.k);
-  CROP.y = c - (c - CROP.y) * (kNew / CROP.k);
+  const kNew = CROP.base * z;
+  CROP.x = ax - (ax - CROP.x) * (kNew / CROP.k);
+  CROP.y = ay - (ay - CROP.y) * (kNew / CROP.k);
   CROP.k = kNew; CROP.zoom = z;
   cropClamp(); cropPaint();
   const sl = $("cropZoom"); if (sl && Number(sl.value) !== Math.round(z * 100)) sl.value = String(Math.round(z * 100));
 }
+function cropZoomTo(zoom) { cropZoomAbout(zoom, CROP.V / 2, CROP.V / 2); }
 function openCropSheet(img) {
   ensureSheet(); SHEET_CTX = null;
   $("sheetBody").innerHTML =
@@ -2984,34 +2986,70 @@ function openCropSheet(img) {
   el.src = img.src;
   CROP.x = (V - img.width * base) / 2; CROP.y = (V - img.height * base) / 2;
   cropClamp(); cropPaint();
-  // Drag + pinch. Pointer events cover mouse and touch; two pointers pinch-zoom.
+  // ---- Gestures: one finger drags, two fingers pinch-zoom ----
+  // Client coords -> stage coords (the box the image is positioned in).
+  const toStage = (cx, cy) => { const r = stage.getBoundingClientRect(); return { x: cx - r.left - stage.clientLeft, y: cy - r.top - stage.clientTop }; };
   const pts = new Map();
   let startDist = 0, startZoom = 1, lastX = 0, lastY = 0;
+  let safariGesture = false; // Safari drives pinch through its own gesture* events (see below)
+  const beginPinch = () => {
+    const a = Array.from(pts.values());
+    startDist = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) || 1;
+    startZoom = CROP.zoom;
+  };
   stage.onpointerdown = (e) => {
-    stage.setPointerCapture(e.pointerId);
+    if (pts.size >= 2) return;
+    try { stage.setPointerCapture(e.pointerId); } catch (err) {}
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pts.size === 1) { lastX = e.clientX; lastY = e.clientY; }
-    else if (pts.size === 2) {
-      const a = [].slice.call(pts.values());
-      startDist = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) || 1;
-      startZoom = CROP.zoom;
-    }
+    else beginPinch();
   };
   stage.onpointermove = (e) => {
-    if (!pts.has(e.pointerId)) return;
+    if (!pts.has(e.pointerId) || safariGesture) return;
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pts.size >= 2) {
-      const a = [].slice.call(pts.values());
+      const a = Array.from(pts.values());
       const d = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) || 1;
-      cropZoomTo(startZoom * (d / startDist));
+      // Anchor the zoom on the midpoint between the fingers so the pinch feels attached to the photo.
+      const mid = toStage((a[0].x + a[1].x) / 2, (a[0].y + a[1].y) / 2);
+      cropZoomAbout(startZoom * (d / startDist), mid.x, mid.y);
       return;
     }
     CROP.x += e.clientX - lastX; CROP.y += e.clientY - lastY;
     lastX = e.clientX; lastY = e.clientY;
     cropClamp(); cropPaint();
   };
-  const up = (e) => { pts.delete(e.pointerId); if (pts.size < 2) startDist = 0; };
+  const up = (e) => {
+    pts.delete(e.pointerId);
+    try { stage.releasePointerCapture(e.pointerId); } catch (err) {}
+    if (pts.size === 1) {
+      // Lifting one finger of a pinch: re-seat the drag origin on the finger still down, otherwise
+      // the next move applies a huge stale delta and the photo jumps.
+      const rem = Array.from(pts.values())[0];
+      lastX = rem.x; lastY = rem.y;
+    }
+    if (pts.size < 2) startDist = 0;
+  };
   stage.onpointerup = up; stage.onpointercancel = up;
+  // Safari (iOS + macOS) fires non-standard gesture* events for a two-finger pinch and will zoom the
+  // PAGE unless they're prevented — touch-action:none does not stop it. Preventing them keeps the
+  // gesture ours, and e.scale is the most reliable pinch signal on iOS, so drive the zoom from it.
+  stage.addEventListener("gesturestart", (e) => {
+    e.preventDefault(); safariGesture = true; startZoom = CROP.zoom;
+  }, { passive: false });
+  stage.addEventListener("gesturechange", (e) => {
+    e.preventDefault();
+    const mid = toStage(e.clientX, e.clientY);
+    cropZoomAbout(startZoom * (e.scale || 1), mid.x, mid.y);
+  }, { passive: false });
+  const endGesture = (e) => { e.preventDefault(); safariGesture = false; pts.clear(); startDist = 0; };
+  stage.addEventListener("gestureend", endGesture, { passive: false });
+  // Trackpad pinch arrives as ctrl+wheel; a plain wheel zooms too, both anchored on the cursor.
+  stage.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const at = toStage(e.clientX, e.clientY);
+    cropZoomAbout(CROP.zoom * (1 - (e.deltaY * (e.ctrlKey ? 0.01 : 0.0022))), at.x, at.y);
+  }, { passive: false });
   const sl = $("cropZoom"); if (sl) sl.oninput = () => cropZoomTo(Number(sl.value) / 100);
   $("cropCancel").onclick = () => { CROP = null; closeSheet(); };
   $("cropSave").onclick = saveCrop;

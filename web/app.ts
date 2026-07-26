@@ -1280,12 +1280,13 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
 .rm-nothanks { display: block; width: 100%; margin-top: 12px; padding: 11px; font: inherit; font-size: 13.5px; font-weight: 600; color: var(--ink-soft); background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
 .rm-addtime { display: block; width: 100%; margin-top: 10px; padding: 10px; font: inherit; font-size: 13px; font-weight: 600; color: var(--accent); background: none; border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 11px; cursor: pointer; }
 .rm-x { width: 30px; height: 30px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-faint); font-size: 13px; cursor: pointer; }
-/* Calendar chooser */
-.rm-calgrid { display: flex; flex-direction: column; gap: 8px; }
-.rm-cal { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; text-align: left; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 13px; font: inherit; color: inherit; cursor: pointer; }
-.rm-cal:active { transform: scale(.99); }
-.rm-cal b { font-size: 14.5px; font-weight: 650; color: var(--ink); }
-.rm-cal span { font-size: 12px; color: var(--ink-faint); }
+/* Calendar export: primary add, share fallback, and the computer-only import note */
+.rm-alt { display: block; width: 100%; margin-top: 8px; padding: 11px; font: inherit; font-size: 13px; font-weight: 600; color: var(--accent); background: none; border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 12px; cursor: pointer; }
+.rm-desk { margin-top: 14px; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 13px; font-size: 12.5px; line-height: 1.55; color: var(--ink-soft); }
+.rm-desk b { color: var(--ink); font-weight: 650; }
+.rm-links { display: flex; flex-direction: column; gap: 7px; margin-top: 10px; }
+.rm-links button { width: 100%; text-align: left; padding: 10px 12px; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--accent); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.rm-links button:active { transform: scale(.99); }
 /* Add-a-session builder steppers */
 .bld-step { display: flex; align-items: center; gap: 12px; }
 .bld-btn { width: 34px; height: 34px; border-radius: 11px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); font-size: 17px; line-height: 1; cursor: pointer; }
@@ -1895,6 +1896,12 @@ function downloadIcs() {
     setTimeout(() => { try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch (e) {} }, 1500);
   } catch (e) { try { window.open("data:text/calendar;charset=utf-8," + encodeURIComponent(ics)); } catch (e2) {} }
 }
+function isPhone() { try { return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent)); } catch (e) { return false; } }
+function icsFile() { return new File([buildSessionsIcs()], "interun-sessions.ics", { type: "text/calendar" }); }
+function canShareFiles() { try { return !!(navigator.canShare && navigator.canShare({ files: [icsFile()] })); } catch (e) { return false; } }
+// Hand the .ics to the OS share sheet — the practical way to email it to yourself or send it to a
+// computer, where Google/Outlook can actually import it.
+function shareIcs() { try { navigator.share({ files: [icsFile()], title: "InteRun sessions" }).catch(() => {}); } catch (e) { downloadIcs(); } }
 // ---- Reminders sheet (opened from the top-bar bell) ----
 function remindersSheetHtml() {
   const perm = notifPerm(), supported = notifSupported(), on = REMIND.enabled && perm === "granted";
@@ -1916,12 +1923,12 @@ function remindersSheetHtml() {
     noThanks +
     '<div class="sd-desc" style="margin-top:10px;font-size:12.5px;color:var(--ink-faint)">A web app can only notify reliably while it\\u2019s open (or added to your Home Screen). For an alert that reaches you with InteRun closed, add your sessions to your calendar below \\u2014 it works on any phone.</div>' +
     '<div class="sd-move" style="margin-top:14px"><div class="sd-move-h">Add sessions to your calendar</div>' +
-    '<div class="sd-desc" style="margin:2px 0 10px">Which calendar should your sessions go to? You\\u2019ll sign in to that account on its own site \\u2014 InteRun never sees your password \\u2014 then import the downloaded file.</div>' +
-    '<div class="rm-calgrid">' +
-    '<button class="rm-cal" data-cal="device"><b>\\uD83D\\uDCF1 This device</b><span>Apple / phone calendar \\u2014 opens directly</span></button>' +
-    '<button class="rm-cal" data-cal="google"><b>Google Calendar</b><span>Gmail / Google account</span></button>' +
-    '<button class="rm-cal" data-cal="outlook"><b>Outlook</b><span>Outlook / Hotmail / work account</span></button>' +
-    '</div><div class="sd-move-n" id="rmCalNote"></div></div>' +
+    '<div class="sd-desc" style="margin:2px 0 10px">Adds every planned session. Your phone asks <b>which calendar</b> to put them in, so choose the account you want there \\u2014 Google, iCloud or Outlook. InteRun never sees your password.</div>' +
+    '<button class="primary" id="rmIcs" style="width:100%">' + ICON.cal + ' Add to my calendar</button>' +
+    (canShareFiles() ? '<button class="rm-alt" id="rmShare">Send the file somewhere else \\u2014 email it, or AirDrop it to a computer</button>' : "") +
+    '<div class="sd-move-n" id="rmCalNote"></div>' +
+    '<div class="rm-desk"><b>Using Google Calendar or Outlook?</b> Their phone apps <b>can\\u2019t</b> import a calendar file \\u2014 that only works on a computer. Easiest on a phone: tap <b>Add to my calendar</b> above and pick your Google/Outlook account when your phone asks. To import on a computer instead:' +
+    '<div class="rm-links"><button data-cal="google">Google Calendar \\u2192 Settings \\u2192 Import</button><button data-cal="outlook">Outlook \\u2192 Add calendar \\u2192 Upload from file</button></div></div></div>' +
     (supported && perm === "granted" ? '<button class="rm-test" id="rmTest">Send a test notification</button>' : "");
 }
 function openRemindersSheet() { ensureSheet(); SHEET_CTX = null; $("sheetBody").innerHTML = remindersSheetHtml(); wireRemindersSheet(); $("sheetOv").classList.add("on"); }
@@ -1942,21 +1949,26 @@ function wireRemindersSheet() {
   const t2add = $("rmTime2Add"); if (t2add) t2add.onclick = () => { REMIND.time2 = "17:00"; commit(); };
   const t2 = $("rmTime2"); if (t2) t2.onchange = () => { REMIND.time2 = t2.value || null; saveReminders(); initReminders(); };
   const t2rm = $("rmTime2Rm"); if (t2rm) t2rm.onclick = () => { REMIND.time2 = null; commit(); };
-  // Calendar chooser: every option downloads the same .ics; Google/Outlook also open that service's
-  // import page in a new tab, where the user signs in to whichever email account they want.
-  document.querySelectorAll('#sheetBody [data-cal]').forEach((b) => b.onclick = () => {
-    const kind = b.dataset.cal;
+  const ics = $("rmIcs"); if (ics) ics.onclick = () => {
     downloadIcs();
-    const noteEl = $("rmCalNote");
-    if (kind === "google") {
-      try { window.open("https://calendar.google.com/calendar/u/0/r/settings/export", "_blank"); } catch (e) {}
-      if (noteEl) noteEl.textContent = "File downloaded. On the Google page that opened, sign in to the account you want, then use Import to add interun-sessions.ics.";
-    } else if (kind === "outlook") {
-      try { window.open("https://outlook.live.com/calendar/0/addcalendar", "_blank"); } catch (e) {}
-      if (noteEl) noteEl.textContent = "File downloaded. On the Outlook page that opened, sign in to the account you want, then choose Upload from file and add interun-sessions.ics.";
-    } else {
-      if (noteEl) noteEl.textContent = "File downloaded \\u2014 open interun-sessions.ics and your phone\\u2019s calendar will offer to add the sessions (it will ask which account/calendar to use).";
+    const n = $("rmCalNote");
+    if (n) n.textContent = isPhone()
+      ? "Saved as interun-sessions.ics. Open it (Downloads, or the banner your browser just showed) and your phone\\u2019s calendar will offer to add every session \\u2014 that\\u2019s where you choose which account/calendar they go into."
+      : "Downloaded interun-sessions.ics \\u2014 open it to add the sessions to this computer\\u2019s calendar, or import it into Google/Outlook below.";
+  };
+  const share = $("rmShare"); if (share) share.onclick = shareIcs;
+  // Google/Outlook import is a COMPUTER-only feature — their phone apps can't import a calendar
+  // file. On a phone, say so plainly instead of opening a page that can't do the job.
+  document.querySelectorAll('#sheetBody [data-cal]').forEach((b) => b.onclick = () => {
+    const kind = b.dataset.cal, name = kind === "google" ? "Google Calendar" : "Outlook";
+    const n = $("rmCalNote");
+    if (isPhone()) {
+      if (n) n.textContent = name + " can only import a calendar file on a computer \\u2014 its phone app has no import. Either tap \\u201cAdd to my calendar\\u201d above and pick your " + (kind === "google" ? "Google" : "Outlook") + " account when your phone asks, or send the file to your computer and import it there.";
+      return;
     }
+    downloadIcs();
+    try { window.open(kind === "google" ? "https://calendar.google.com/calendar/u/0/r/settings/export" : "https://outlook.live.com/calendar/0/addcalendar", "_blank"); } catch (e) {}
+    if (n) n.textContent = "Downloaded interun-sessions.ics. In the " + name + " tab that opened, sign in to the account you want and upload that file.";
   });
   const test = $("rmTest"); if (test) test.onclick = () => { const q = randomQuote(); showNotif("InteRun test reminder", { body: "This is how your session reminders will look.\\n\\u201C" + q[0] + "\\u201D" + (q[1] ? " \\u2014 " + q[1] : ""), tag: "interun-test", icon: "./icon-192.png", data: { url: "./" } }); };
 }

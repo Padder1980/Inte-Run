@@ -136,10 +136,11 @@ with start + remove; `startSession(sess)` now takes an optional specific session
 live step/distance preview; `buildCustomSession` clones paces from the plan's representative). The
 **reminders** grew: the bell **pulses** until the user decides (`.rm-attn`, `REMIND.decided`; a "No
 thanks" button records opt-out), an optional **second reminder time** later in the day (per-slot
-once-daily firing in `interun_reminded_on`), notifications carry a **motivational quote**, and "Add
-to calendar" is a **chooser** (This device / Google / Outlook — downloads the .ics and opens that
-service's import page so the user signs in to whichever email account they want; the app never
-handles the password).
+once-daily firing in `interun_reminded_on`), notifications carry a **motivational quote**, and **"Add
+to calendar"** exports the .ics so the phone's own calendar adds the sessions — that sheet is where
+the user picks the account. Note: **Google/Outlook can only import an .ics on a computer** (their
+phone apps have no import at all), so those are labelled computer-only and don't navigate on a phone;
+there's a share-sheet option to send the file to a computer. The app never handles a password.
 
 Known/optional next: lock-screen/background audio is limited (pure PWA, no native wrapper); true
 background reminders would need a push server (calendar export is the current cross-platform answer).

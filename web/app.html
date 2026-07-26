@@ -2436,7 +2436,7 @@ function sessionSheetHtml(sess, week) {
   const moveBlock = sess.type === "rest" ? "" :
     '<div class="sd-move"><div class="sd-move-h">Move to another day</div><div class="sd-days">' + dayPicker + '</div><div class="sd-move-n">Pick a day. If a run is already there, the two will swap.</div></div>';
   const startBtn = PRIMARY_TYPES[sess.type] ? '<button class="primary sd-start" id="sdStart">' + ICON.play + ' Start session</button>' : "";
-  const addLink = '<button class="sd-addlink" id="sdAdd">＋ Add a different session to today</button>';
+  const addLink = '<button class="sd-addlink" id="sdAdd">\uFF0B Add a different session ' + dayPhraseIso(isoAdd(weekByNo(week).startIso, effDay(sess)).toISOString().slice(0, 10)) + '</button>';
   return '<div class="sd-type" style="--sc:' + sc + '">' + (SESSION_LABEL[sess.type] || sess.type) + '</div>' +
     '<div class="sd-title">' + esc(sess.title) + '</div>' +
     '<div class="sd-chips">' + chips.join("") + '</div>' +
@@ -2462,7 +2462,7 @@ function wireSheet() {
   });
   document.querySelectorAll("#sheetBody [data-slog]").forEach((inp) => inp.oninput = () => slogSet(inp.dataset.slog, inp.dataset.f, inp.value.trim()));
   const sdStart = $("sdStart"); if (sdStart && SHEET_CTX && SHEET_CTX.sess) sdStart.onclick = () => { closeSheet(); startSession(SHEET_CTX.sess); };
-  const sdAdd = $("sdAdd"); if (sdAdd) sdAdd.onclick = openAddSessionSheet;
+  const sdAdd = $("sdAdd"); if (sdAdd) sdAdd.onclick = () => { const iso = sheetSessionIso(); closeSheet(); openAddSessionSheet(iso); };
 }
 function openSessionSheet(sess, week) {
   if (!sess) return;
@@ -2517,9 +2517,29 @@ function loadExtra() { try { const a = JSON.parse(localStorage.getItem("interun_
 let EXTRA = loadExtra();
 let EXTRA_SEQ = 0;
 function saveExtra() { try { localStorage.setItem("interun_extra_v1", JSON.stringify(EXTRA)); } catch (e) {} }
-function addExtra(params) { EXTRA.push({ id: "x" + (EXTRA_SEQ++) + "-" + (new Date().getTime()), type: params.type, durMin: params.durMin || null, reps: params.reps || null, date: todayIso() }); saveExtra(); }
+// Sessions are added to the day you're LOOKING AT, not blindly to today: the selected day on Today,
+// or the day of the session whose sheet you opened (which may be weeks away, on Plan or the calendar).
+let ADD_TARGET = null;
+function addTargetIso() { return ADD_TARGET || todayIso(); }
+function selectedDayIso() { return isoAdd(curWeek().startIso, state.selDay).toISOString().slice(0, 10); }
+function weekByNo(n) { return PLAN.weeks.find((w) => w.index === n) || curWeek(); }
+// The real date of the session currently open in the detail sheet.
+function sheetSessionIso() {
+  if (!SHEET_CTX || !SHEET_CTX.sess) return todayIso();
+  return isoAdd(weekByNo(SHEET_CTX.week).startIso, effDay(SHEET_CTX.sess)).toISOString().slice(0, 10);
+}
+function dayLabelIso(iso) {
+  const t = todayIso();
+  if (iso === t) return "today";
+  if (iso === isoAdd(t, 1).toISOString().slice(0, 10)) return "tomorrow";
+  const d = isoAdd(iso, 0);
+  return DAY_ORDER[(d.getUTCDay() + 6) % 7] + " " + dmon(d);
+}
+// "today" / "tomorrow" read fine bare; a date needs a preposition.
+function dayPhraseIso(iso) { const l = dayLabelIso(iso); return (l === "today" || l === "tomorrow") ? l : "on " + l; }
+function addExtra(params) { EXTRA.push({ id: "x" + (EXTRA_SEQ++) + "-" + (new Date().getTime()), type: params.type, durMin: params.durMin || null, reps: params.reps || null, date: addTargetIso() }); saveExtra(); }
 function removeExtra(id) { EXTRA = EXTRA.filter((e) => e.id !== id); saveExtra(); }
-function extrasToday() { const t = todayIso(); return EXTRA.filter((e) => e.date === t); }
+function extrasOn(iso) { return EXTRA.filter((e) => e.date === iso); }
 function isQualityType(t) { return t === "threshold" || t === "vo2" || t === "race-specific"; }
 // A step's planned seconds: its duration, or — for distance-based reps like 6 x 800m — the time its
 // distance takes at the middle of its target pace band.
@@ -2587,7 +2607,7 @@ function buildCustomSession(e) {
   });
   const mins = Math.round(total / 60);
   return Object.assign({}, rep, {
-    id: e.id, dayOfWeek: TODAY_DOW, source: "manual",
+    id: e.id, dayOfWeek: e.date ? (isoAdd(e.date, 0).getUTCDay() + 6) % 7 : TODAY_DOW, source: "manual",
     title: mins + "\u2032 " + (SESSION_LABEL[e.type] || e.type).toLowerCase() + (usesReps && e.reps ? " \u2014 " + e.reps + " reps" : "") + " (custom)",
     estimatedDurationSeconds: total, estimatedDistanceMeters: dist ? Math.round(dist) : rep.estimatedDistanceMeters,
     steps: steps.length ? steps : rep.steps,
@@ -2596,7 +2616,8 @@ function buildCustomSession(e) {
 function extraSession(e) { return e ? buildCustomSession(e) : null; }
 // The "Added today" card + the "Add a session today" button, shown on Today under the summary squares.
 function addedTodayBlock() {
-  const list = extrasToday();
+  const iso = selectedDayIso();
+  const list = extrasOn(iso);
   const rows = list.map((e) => {
     const s = extraSession(e); if (!s) return "";
     const dur = Math.round(s.estimatedDurationSeconds / 60);
@@ -2606,8 +2627,9 @@ function addedTodayBlock() {
       '<button class="add-go" data-addstart="' + e.id + '" aria-label="Start">' + ICON.play + '</button>' +
       '<button class="add-rm" data-addrm="' + e.id + '" aria-label="Remove">✕</button></div>';
   }).join("");
-  const card = list.length ? '<h2 class="sec">Added today</h2><div class="card add-card">' + rows + '</div>' : "";
-  return card + '<button class="add-btn" id="addSess">＋ Add a session today</button>';
+  const lab = dayLabelIso(iso);
+  const card = list.length ? '<h2 class="sec">Added ' + (lab === "today" ? "today" : "for " + lab) + '</h2><div class="card add-card">' + rows + '</div>' : "";
+  return card + '<button class="add-btn" id="addSess">\uFF0B Add a session ' + dayPhraseIso(iso) + '</button>';
 }
 // The add-a-session sheet is a two-step builder: pick a type, then shape it (duration for continuous
 // runs, number of reps for quality sessions) with a live time/distance estimate before adding.
@@ -2623,7 +2645,7 @@ function addSessionSheetHtml() {
         '<span class="pick-meta num">' + dur + '′' + dist + '</span></button>';
     }).join("");
     return '<div class="sd-type" style="--sc:var(--accent)">Add a session</div>' +
-      '<div class="sd-title">Add a session to today</div>' +
+      '<div class="sd-title">Add a session to ' + dayLabelIso(addTargetIso()) + '</div>' +
       '<div class="sd-desc" style="margin-bottom:12px">Pick a session type, then build it the way you want it.</div>' +
       '<div class="pick-list">' + items + '</div>';
   }
@@ -2645,7 +2667,7 @@ function addSessionSheetHtml() {
     '<button class="primary" id="bldAdd" style="width:100%;margin-top:14px">\uFF0B Add to today</button>' +
     '<button class="rm-test" id="bldBack">\u2039 Choose a different type</button>';
 }
-function openAddSessionSheet() { BUILDER = null; ensureSheet(); SHEET_CTX = null; $("sheetBody").innerHTML = addSessionSheetHtml(); wireAddSessionSheet(); $("sheetOv").classList.add("on"); }
+function openAddSessionSheet(iso) { ADD_TARGET = iso || todayIso(); BUILDER = null; ensureSheet(); SHEET_CTX = null; $("sheetBody").innerHTML = addSessionSheetHtml(); wireAddSessionSheet(); $("sheetOv").classList.add("on"); }
 function wireAddSessionSheet() {
   const rerender = () => { $("sheetBody").innerHTML = addSessionSheetHtml(); wireAddSessionSheet(); };
   document.querySelectorAll('#sheetBody [data-pick]').forEach((b) => b.onclick = () => {
@@ -4628,7 +4650,7 @@ function wire() {
   const fitDismiss = $("fitDismiss"); if (fitDismiss) fitDismiss.onclick = dismissFitSuggest;
   const viewSession = $("viewSession"); if (viewSession) viewSession.onclick = () => openSessionSheet(selectedSession(), curWeekNo());
   // Add-a-session: open the picker, start or remove an added session, or tap it to view its detail.
-  const addSess = $("addSess"); if (addSess) addSess.onclick = openAddSessionSheet;
+  const addSess = $("addSess"); if (addSess) addSess.onclick = () => openAddSessionSheet(selectedDayIso());
   document.querySelectorAll("[data-addstart]").forEach((b) => b.onclick = () => { const s = extraSession(EXTRA.find((x) => x.id === b.dataset.addstart)); if (s) startSession(s); });
   document.querySelectorAll("[data-addrm]").forEach((b) => b.onclick = () => { removeExtra(b.dataset.addrm); render(); });
   document.querySelectorAll("[data-addopen]").forEach((b) => b.onclick = () => { const s = extraSession(EXTRA.find((x) => x.id === b.dataset.addopen)); if (s) openSessionSheet(s, curWeekNo()); });

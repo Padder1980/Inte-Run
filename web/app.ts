@@ -1189,41 +1189,49 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
   #view:has(.subtabs) .hero-pace .p { font-size: 37px; }
 }
 
-/* Bottom navigation — floating dock (global, shared across the app) */
+/* Bottom navigation — refined full-width app bar (global), with a live Today date icon */
 .bottomnav {
-  position: sticky; bottom: 0; z-index: 20; gap: 2px;
-  margin: 0 10px calc(8px + env(safe-area-inset-bottom)); padding: 6px 5px;
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-  border: 1px solid color-mix(in srgb, var(--line) 82%, var(--accent)); border-radius: 22px;
-  box-shadow: 0 16px 32px -20px color-mix(in srgb, var(--ink) 48%, transparent), 0 5px 14px -10px color-mix(in srgb, var(--ink) 28%, transparent), inset 0 1px 0 color-mix(in srgb, var(--ink) 4%, transparent);
-  backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%);
+  position: sticky; bottom: 0; z-index: 20;
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0;
+  width: 100%; margin: 0; padding: 5px 8px calc(5px + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  border: 0; border-top: 1px solid color-mix(in srgb, var(--line) 88%, var(--accent)); border-radius: 0;
+  box-shadow: 0 -12px 28px -26px color-mix(in srgb, var(--ink) 45%, transparent);
+  backdrop-filter: blur(20px) saturate(150%); -webkit-backdrop-filter: blur(20px) saturate(150%);
 }
 .navbtn {
-  position: relative; isolation: isolate; min-width: 0; min-height: 54px; gap: 4px; padding: 5px 1px 4px;
-  color: var(--ink-faint); border-radius: 16px; transition: color 150ms ease, transform 120ms ease;
+  position: relative; min-width: 0; min-height: 53px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  padding: 6px 2px 5px; color: var(--ink-faint); background: transparent; border: 0; border-radius: 10px;
+  font: inherit; cursor: pointer; transition: color 150ms ease, transform 120ms ease;
 }
 .navbtn::before {
-  content: ""; position: absolute; z-index: -1; top: 2px; left: 50%; width: 43px; height: 32px;
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2)); border: 1px solid transparent; border-radius: 12px;
-  opacity: 0; transform: translateX(-50%) scale(0.86);
-  transition: opacity 150ms ease, transform 150ms ease, border-color 150ms ease, background 150ms ease;
+  content: ""; position: absolute; top: -5px; left: 50%; width: 24px; height: 2px;
+  background: var(--accent); border-radius: 0 0 999px 999px; opacity: 0;
+  transform: translateX(-50%) scaleX(0.45); transition: opacity 150ms ease, transform 150ms ease;
 }
-.navbtn svg { position: relative; width: 21px; height: 21px; transition: transform 150ms ease; }
-.navbtn .nl { overflow: hidden; max-width: 100%; font-size: 9.5px; font-weight: 620; letter-spacing: -0.01em; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.navbtn.on::before { opacity: 1; transform: translateX(-50%) scaleX(1); }
+.navbtn svg { width: 22px; height: 22px; flex: none; stroke-width: 1.9; transition: transform 150ms ease; }
+/* Dynamic Today calendar icon (drawn with borders + pseudo-elements; number is today's date) */
+.nav-date {
+  position: relative; width: 22px; height: 21px; flex: none;
+  display: flex; align-items: flex-end; justify-content: center; padding-bottom: 3px;
+  color: currentColor; border: 1.8px solid currentColor; border-radius: 5px;
+}
+.nav-date::before { content: ""; position: absolute; top: 5px; left: 0; right: 0; height: 1.5px; background: currentColor; }
+.nav-date::after { content: ""; position: absolute; top: -3px; left: 5px; width: 2px; height: 5px; background: currentColor; border-radius: 999px; box-shadow: 8px 0 0 currentColor; }
+.nav-date-day { position: relative; font-size: 8.5px; font-weight: 780; letter-spacing: -0.06em; line-height: 1; }
+.navbtn .nl { overflow: hidden; max-width: 100%; color: currentColor; font-size: 10px; font-weight: 620; letter-spacing: -0.012em; line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
 .navbtn.on { color: var(--accent); }
-.navbtn.on::before {
-  opacity: 1; background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 16%, var(--surface)), color-mix(in srgb, var(--accent) 7%, var(--surface-2)));
-  border-color: color-mix(in srgb, var(--accent) 25%, var(--line)); transform: translateX(-50%) scale(1);
-}
 .navbtn.on svg { transform: translateY(-1px); }
-.navbtn.on .nl { color: var(--accent); font-weight: 730; }
-.navbtn:active { transform: translateY(1px); }
-.navbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.navbtn.on .nl { font-weight: 750; }
+.navbtn:active { transform: scale(0.97); }
+.navbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 @media (max-width: 360px) {
-  .bottomnav { margin-inline: 7px; padding-inline: 3px; }
-  .navbtn { min-height: 52px; }
-  .navbtn::before { width: 39px; }
-  .navbtn .nl { font-size: 8.5px; }
+  .bottomnav { padding-inline: 4px; }
+  .navbtn { min-height: 51px; padding-inline: 1px; }
+  .navbtn .nl { font-size: 9px; }
+  .navbtn svg, .nav-date { width: 21px; }
 }
 @media (prefers-reduced-motion: reduce) {
   #view:has(.subtabs) .subtabs button, #view:has(.subtabs) .runcard, .navbtn, .navbtn::before, .navbtn svg { transition: none; }
@@ -3538,6 +3546,16 @@ function maybeAutoGuide() {
 
 // ---- Router ---------------------------------------------------------------
 const TITLES = { today: "Today", plan: "Your Plan", activities: "Activities", community: "Community", support: "Support" };
+// The Today tab shows a live calendar glyph with today's date (drawn in CSS; number injected here).
+function todayNavIcon() {
+  return '<span class="nav-date" aria-hidden="true"><span class="nav-date-day num">' + new Date().getDate() + '</span></span>';
+}
+function refreshTodayNavDate() {
+  const day = document.querySelector(".nav-date-day");
+  if (day) day.textContent = String(new Date().getDate());
+}
+// Keep the date current if the app is left open across midnight and brought back to the foreground.
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshTodayNavDate(); });
 function render() {
   const v = $("view");
   // Lock onto the live screen while a run is under way: hide the bottom nav so a stray tap can't
@@ -3689,7 +3707,7 @@ function wire() {
   const lDone = $("lDone"); if (lDone) lDone.onclick = () => { coachStop(); stopSpeech(); LIVE = null; state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); };
 }
 function buildNav() {
-  $("nav").innerHTML = ["today","plan","activities","community","support"].map((t) => '<button class="navbtn' + (t===state.tab?" on":"") + '" data-tab="' + t + '">' + ICON[t] + '<span class="nl">' + TITLES[t].replace("Your ","") + '</span></button>').join("");
+  $("nav").innerHTML = ["today","plan","activities","community","support"].map((t) => '<button type="button" class="navbtn' + (t===state.tab?" on":"") + '" data-tab="' + t + '">' + (t === "today" ? todayNavIcon() : ICON[t]) + '<span class="nl">' + TITLES[t].replace("Your ","") + '</span></button>').join("");
   document.querySelectorAll(".navbtn").forEach((b) => b.onclick = () => { coachStop(); stopLive(); stopSpeech(); stopTrialRun(); TRIALRUN = null; state.screen = null; state.tab = b.dataset.tab; if (b.dataset.tab !== "support") state.support = null; render(); });
 }
 $("bellBtn").innerHTML = ICON.bell; $("themeBtn").innerHTML = ICON.theme; $("calBtn").innerHTML = ICON.cal; renderAvatar();

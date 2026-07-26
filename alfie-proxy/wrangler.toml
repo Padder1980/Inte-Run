@@ -1,0 +1,8 @@
+name = "alfie-proxy"
+main = "src/worker.ts"
+compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Secrets are NOT set here — never commit a key. Set them with:
+#   npx wrangler secret put ANTHROPIC_API_KEY
+#   npx wrangler secret put ALLOWED_ORIGINS      # e.g. https://padder1980.github.io

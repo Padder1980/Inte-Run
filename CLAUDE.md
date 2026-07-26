@@ -44,7 +44,25 @@ The runtime JS sits inside the outer template literal, so:
   literal and breaks the build (symptom: `Expected a semicolon`). If the build errors after an edit,
   grep for a stray `` ` `` or `${`.
 - Escape regex backslashes: write `\\d`, not `\d`; unicode as `\\uXXXX`.
+- **Escape quotes inside runtime strings as `\\"`, not `\"`.** `\"` collapses to a bare `"` in the
+  emitted JS and silently breaks it (`"<ul class="x">"`). Prefer single-quoted runtime strings when
+  the HTML contains double quotes.
 - No literal `${...}` inside runtime strings.
+
+**`node web/app.ts` does NOT syntax-check the emitted runtime JS** — it only builds the outer
+template literal, so a broken runtime string produces a file that builds fine and then dies silently
+in the browser (blank app, no console error). After any runtime-JS edit, check the generated script:
+
+```bash
+python3 -c "
+import re,subprocess
+h=open('web/app.html',encoding='utf8').read()
+for i,b in enumerate(re.findall(r'<script>(.*?)</script>', h, re.S)):
+    open(f'/tmp/blk{i}.js','w',encoding='utf8').write(b)
+    r=subprocess.run(['node','--check',f'/tmp/blk{i}.js'],capture_output=True,text=True)
+    print(f'block {i}:', 'OK' if r.returncode==0 else r.stderr[:400])
+"
+```
 
 ## Commands
 
@@ -141,6 +159,21 @@ to calendar"** exports the .ics so the phone's own calendar adds the sessions �
 the user picks the account. Note: **Google/Outlook can only import an .ics on a computer** (their
 phone apps have no import at all), so those are labelled computer-only and don't navigate on a phone;
 there's a share-sheet option to send the file to a computer. The app never handles a password.
+
+Also: a **profile-photo crop editor** (drag / pinch / slider over a circular mask, saves a 256px
+square), and **Ask Alfie** — the in-app coach assistant, reachable from the top-bar bubble icon and
+the top of Support. Alfie answers **on-device**: it reads the user's real plan (next session, paces,
+phase, race countdown, week summary) plus a curated running-knowledge base, and routes any red-flag
+symptom straight to the engine's `screenRedFlags` escalation rather than coaching it (self-harm,
+chest pain, stress fracture, RED-S, etc. — verified against a set of phrasings). No key, no network,
+works offline. An optional Claude backend can be dropped in later without touching the UI: set
+`localStorage interun_alfie_v1 = {"proxy":"<url>"}` and deploy `alfie-proxy/` (a Cloudflare Worker
+that holds the API key server-side — it can never live in this public page). Any remote failure
+falls back to the on-device answer, so Alfie always replies.
+
+**Apple Watch:** see `WATCH.md` — a scoping/decision document, nothing built. Key facts: a watchOS
+app cannot pair with a PWA (it needs a native iOS app), Xcode isn't installed on the owner's Mac,
+and the `src/` engine is dependency-free TS with 122 tests that would serve as the port spec.
 
 Known/optional next: lock-screen/background audio is limited (pure PWA, no native wrapper); true
 background reminders would need a push server (calendar export is the current cross-platform answer).

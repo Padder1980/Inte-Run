@@ -1287,6 +1287,47 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
 .rm-links { display: flex; flex-direction: column; gap: 7px; margin-top: 10px; }
 .rm-links button { width: 100%; text-align: left; padding: 10px 12px; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--accent); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
 .rm-links button:active { transform: scale(.99); }
+/* Ask Alfie — chat screen */
+.iconbtn#alfieBtn { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.alf-head { display: flex; align-items: center; gap: 12px; margin: 2px 0 12px; }
+.alf-hero { width: 44px; height: 44px; flex: 0 0 auto; border-radius: 14px; display: flex; align-items: center; justify-content: center; color: var(--accent-ink); background: linear-gradient(150deg, color-mix(in srgb, var(--accent) 88%, #fff), var(--accent)); box-shadow: 0 8px 18px -10px color-mix(in srgb, var(--accent) 80%, transparent); }
+.alf-hero svg { width: 24px; height: 24px; }
+.alf-name { font-size: 18px; font-weight: 760; letter-spacing: -.02em; color: var(--ink); }
+.alf-sub { font-size: 12.5px; color: var(--ink-faint); }
+.alf-log { display: flex; flex-direction: column; gap: 12px; min-height: 180px; max-height: 52vh; overflow-y: auto; padding: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+.alf-row { display: flex; align-items: flex-start; gap: 9px; }
+.alf-row.you { justify-content: flex-end; }
+.alf-av { width: 26px; height: 26px; flex: 0 0 auto; margin-top: 2px; border-radius: 9px; display: flex; align-items: center; justify-content: center; color: var(--accent-ink); background: var(--accent); }
+.alf-av svg { width: 15px; height: 15px; }
+.alf-msg { max-width: 84%; font-size: 14px; line-height: 1.55; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 10px 13px; }
+.alf-msg.you { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); border-bottom-right-radius: 5px; }
+.alf-msg p { margin: 0 0 8px; } .alf-msg p:last-child { margin-bottom: 0; }
+.alf-msg b { font-weight: 680; }
+.alf-ul { margin: 6px 0 8px; padding-left: 18px; } .alf-ul li { margin-bottom: 5px; }
+.alf-dim { color: var(--ink-faint); font-size: 12.5px; }
+.alf-flag { color: var(--rest); font-size: 15px; margin-bottom: 6px; }
+.alf-typing { display: flex; gap: 4px; align-items: center; padding: 13px; }
+.alf-typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-faint); animation: alfdot 1.1s infinite; }
+.alf-typing i:nth-child(2) { animation-delay: .15s; } .alf-typing i:nth-child(3) { animation-delay: .3s; }
+@keyframes alfdot { 0%, 60%, 100% { opacity: .25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+.alf-chips { display: flex; flex-wrap: wrap; gap: 7px; margin: 12px 0; }
+.alf-chip { font: inherit; font-size: 12.5px; font-weight: 550; color: var(--accent); background: var(--surface); border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); border-radius: 999px; padding: 7px 12px; cursor: pointer; }
+.alf-chip:active { transform: scale(.97); }
+.alf-input { display: flex; gap: 8px; align-items: center; }
+.alf-input input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 15px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 13px; padding: 12px 14px; }
+.alf-input input:focus { outline: none; border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.alf-input button { width: 44px; height: 44px; flex: 0 0 auto; border-radius: 13px; border: 0; background: var(--accent); color: var(--accent-ink); font-size: 19px; font-weight: 700; cursor: pointer; }
+.alf-input button:active { transform: scale(.94); }
+@media (prefers-reduced-motion: reduce) { .alf-typing i { animation: none; } }
+/* Avatar crop editor: square stage, circular mask, zoom slider */
+.crop-stage { position: relative; width: 100%; aspect-ratio: 1; max-width: 300px; margin: 0 auto; overflow: hidden; border-radius: 16px; background: var(--surface-2); border: 1px solid var(--line); touch-action: none; cursor: grab; user-select: none; }
+.crop-stage:active { cursor: grabbing; }
+.crop-img { position: absolute; top: 0; left: 0; transform-origin: 0 0; max-width: none; pointer-events: none; -webkit-user-drag: none; }
+.crop-mask { position: absolute; inset: 0; pointer-events: none; border-radius: 16px; box-shadow: inset 0 0 0 9999px color-mix(in srgb, var(--bg) 62%, transparent); -webkit-mask: radial-gradient(circle at 50% 50%, transparent 49.5%, #000 50%); mask: radial-gradient(circle at 50% 50%, transparent 49.5%, #000 50%); }
+.crop-mask::after { content: ""; position: absolute; inset: 0; border-radius: 50%; box-shadow: inset 0 0 0 2px color-mix(in srgb, #fff 70%, transparent); }
+.crop-tools { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+.crop-tools .crop-ic { font-size: 15px; color: var(--ink-faint); }
+.crop-tools input[type="range"] { flex: 1 1 auto; accent-color: var(--accent); }
 /* Add-a-session builder steppers */
 .bld-step { display: flex; align-items: center; gap: 12px; }
 .bld-btn { width: 34px; height: 34px; border-radius: 11px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); font-size: 17px; line-height: 1; cursor: pointer; }
@@ -1345,6 +1386,7 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
     </div>
     <div class="title" id="topTitle">Today</div>
     <div class="tb-right">
+      <button class="iconbtn" id="alfieBtn" title="Ask Alfie" aria-label="Ask Alfie"></button>
       <button class="iconbtn" id="calBtn" title="Training calendar" aria-label="Training calendar"></button>
       <button class="iconbtn" id="themeBtn" title="Theme" aria-label="Toggle theme"></button>
     </div>
@@ -1386,6 +1428,8 @@ const ICON = {
   support: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5c3-1 6-1 8 1 2-2 5-2 8-1v13c-3-1-6-1-8 1-2-2-5-2-8-1z"/><path d="M12 7v12"/></svg>',
   person: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>',
   bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>',
+  // Alfie: a speech bubble with a spark — the in-app coach assistant.
+  alfie: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5a2.5 2.5 0 0 1-2.5 2.5H9l-4 3.5V6.5A2.5 2.5 0 0 1 7.5 4h10A2.5 2.5 0 0 1 20 6.5z"/><path d="M12.6 7.4l.85 2.15 2.15.85-2.15.85-.85 2.15-.85-2.15L9.6 10.4l2.15-.85z" fill="currentColor" stroke-width="1"/></svg>',
   theme: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A8 8 0 1 1 11.2 3a6.5 6.5 0 0 0 9.8 9.8z"/></svg>',
   heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.5-9.5-9A5 5 0 0 1 12 6a5 5 0 0 1 9.5 5c-2.5 4.5-9.5 9-9.5 9z"/></svg>',
   fuel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s5 5 5 9a5 5 0 0 1-10 0c0-4 5-9 5-9z"/></svg>',
@@ -1973,6 +2017,261 @@ function wireRemindersSheet() {
   const test = $("rmTest"); if (test) test.onclick = () => { const q = randomQuote(); showNotif("InteRun test reminder", { body: "This is how your session reminders will look.\\n\\u201C" + q[0] + "\\u201D" + (q[1] ? " \\u2014 " + q[1] : ""), tag: "interun-test", icon: "./icon-192.png", data: { url: "./" } }); };
 }
 
+// ============ ASK ALFIE ====================================================
+// Alfie is the in-app coach assistant. It answers from the user's OWN plan data plus a curated
+// running-knowledge base, entirely on-device — no network, no key, works offline. A remote brain can
+// be plugged in later (see alfieRemote below): the UI, the plan-context layer and the safety routing
+// are shared, so switching backends changes nothing the user sees.
+const ALFIE_GREETING = "Hi, I\\u2019m Alfie \\u2014 your running coach in the app. Ask me anything about your plan, your paces, or running in general.";
+const ALFIE_CHIPS = ["What\\u2019s my next session?", "How\\u2019s my week looking?", "What pace should I run easy?", "Should I run if I\\u2019m sore?", "What is a threshold run?", "How far away is my race?"];
+function alfieCfg() { try { return JSON.parse(localStorage.getItem("interun_alfie_v1") || "null") || { proxy: "" }; } catch (e) { return { proxy: "" }; } }
+function alfieSaveCfg(c) { try { localStorage.setItem("interun_alfie_v1", JSON.stringify(c)); } catch (e) {} }
+let ALFIE_MSGS = [];
+function alfieLoadMsgs() { try { const a = JSON.parse(localStorage.getItem("interun_alfie_msgs") || "[]"); return Array.isArray(a) ? a.slice(-30) : []; } catch (e) { return []; } }
+function alfieSaveMsgs() { try { localStorage.setItem("interun_alfie_msgs", JSON.stringify(ALFIE_MSGS.slice(-30))); } catch (e) {} }
+// ---- Facts drawn from the user's real plan --------------------------------
+function alfieSessionLine(s) {
+  const bits = [];
+  if (s.durMin) bits.push(s.durMin + " min");
+  if (s.distKm) bits.push(s.distKm + " km");
+  if (s.pace) bits.push(s.pace);
+  return "<b>" + esc(s.title) + "</b>" + (bits.length ? " \\u2014 " + bits.join(" \\u00b7 ") : "");
+}
+// The next session dated today or later, with how many days away it is.
+function alfieNextSession() {
+  const today = todayIso();
+  for (let wi = 0; wi < PLAN.weeks.length; wi++) {
+    const wk = PLAN.weeks[wi];
+    for (let d = 0; d < 7; d++) {
+      const iso = isoAdd(wk.startIso, d).toISOString().slice(0, 10);
+      if (iso < today) continue;
+      const list = wk.sessions.filter((s) => s.type !== "rest" && effDay(s) === d).sort((a, b) => (PRIMARY_TYPES[b.type] || 0) - (PRIMARY_TYPES[a.type] || 0));
+      if (list.length) return { iso: iso, days: Math.round((isoAdd(iso, 0) - isoAdd(today, 0)) / 86400000), week: wk, list: list };
+    }
+  }
+  return null;
+}
+function alfieRaceFacts() {
+  const g = PLAN.goal || {};
+  let away = null;
+  try { const rd = profile.raceDate; if (rd) away = Math.round((isoAdd(rd, 0) - isoAdd(todayIso(), 0)) / 86400000); } catch (e) {}
+  return { race: g.race || "your race", target: g.target || null, date: g.raceDate || null, daysAway: away, weeksAway: away != null ? Math.max(0, Math.round(away / 7)) : null };
+}
+// ---- Safety routing --------------------------------------------------------
+// Symptom phrases that must go to the engine's escalation screen rather than to a coaching answer.
+const ALFIE_FLAGS = [
+  // Matching is substring-based, so use stems that survive inflection ("end" + "ing my life").
+  ["self-harm-thoughts", ["suicid", "kill myself", "killing myself", "end my life", "ending my life", "end it all", "ending it all", "take my own life", "taking my own life", "self harm", "self-harm", "harm myself", "hurting myself", "want to die", "wish i was dead", "better off dead", "no point living", "not worth living", "don't want to be here", "dont want to be here"]],
+  ["chest-pain", ["chest pain", "chest tight", "pain in my chest", "chest pressure", "tight chest"]],
+  ["collapse-or-fainting", ["faint", "passed out", "blacked out", "collapse"]],
+  ["palpitations", ["palpitation", "heart racing", "irregular heartbeat", "heart flutter", "skipped beat"]],
+  ["severe-breathlessness", ["can't breathe", "cant breathe", "can not breathe", "gasping", "severe breathless", "struggling to breathe"]],
+  ["heat-illness", ["heat stroke", "heatstroke", "heat exhaustion", "stopped sweating", "overheated"]],
+  ["neurological", ["numbness", "tingling", "confused", "severe headache", "vision went", "slurred"]],
+  ["bone-pain", ["stress fracture", "bone pain", "pinpoint pain", "sharp shin"]],
+  ["rapidly-worsening-pain", ["getting worse", "worsening pain", "pain is worse", "much worse"]],
+  ["eating-disorder-concern", ["eating disorder", "not eating", "purge", "purging", "binge", "starving myself", "anorexi", "bulimi"]],
+  ["menstrual-disruption", ["amenorrh", "periods stopped", "periods have stopped", "period stopped", "period has stopped", "missed periods", "missed my period", "missing periods", "no period", "lost my period", "haven't had a period", "havent had a period", "irregular periods"]],
+  ["mental-health-concern", ["depress", "really anxious", "mental health", "hopeless", "can't cope", "cant cope"]],
+];
+function alfieRedFlags(q) {
+  const hits = [];
+  ALFIE_FLAGS.forEach((f) => { if (f[1].some((w) => q.indexOf(w) !== -1)) hits.push(f[0]); });
+  return hits;
+}
+function alfieSafetyAnswer(flags) {
+  let r; try { r = RC.screenRedFlags(flags); } catch (e) { return null; }
+  const refer = (r.refer || []).map((p) => (RC.PROFESSIONAL_LABEL && RC.PROFESSIONAL_LABEL[p]) || p);
+  const points = (r.flags || []).map((f) => "<li>" + esc(f.guidance) + "</li>").join("");
+  return '<div class="alf-flag"><b>' + esc(r.headline) + "</b></div>" +
+    (points ? "<ul class=\\"alf-ul\\">" + points + "</ul>" : "") +
+    (refer.length ? "<p>Who to speak to: <b>" + esc(refer.join(", ")) + "</b>.</p>" : "") +
+    "<p class=\\"alf-dim\\">" + esc(r.disclaimer || "") + "</p>" +
+    '<p class="alf-dim">You can also open <b>Support \\u2192 When to stop and seek help</b> in the app.</p>';
+}
+// ---- The on-device knowledge base -----------------------------------------
+// Each intent: keywords to match, and a function returning the answer HTML. Ordered — first match
+// wins, so put the specific ones first.
+function alfieIntents() {
+  const p = (PLAN.paces || {});
+  const wk = curWeek();
+  return [
+    { k: ["sore", "should i run", "tired", "fatigued", "heavy legs", "rest day today", "skip"], a: () => {
+      let r; try { r = RC.assessReadiness(readinessInput()); } catch (e) { r = null; }
+      return "<p>Honest answer: <b>soreness that eases as you warm up is usually fine</b>. Pain that sharpens, changes your gait, or sits in one specific spot is not \\u2014 back off and get it looked at.</p>" +
+        (r ? "<p>From your latest check-in, InteRun rates you <b>" + esc(r.headline) + "</b>. " + esc(r.recommendation) + "</p>" : "") +
+        "<p>A good rule: if you\\u2019re unsure, run the <b>easy</b> version. Swapping a hard session for an easy one costs you almost nothing; training through a real injury costs weeks.</p>" +
+        "<p class=\\"alf-dim\\">Tap \\u201cHow you feel\\u201d on Today to update your check-in.</p>";
+    } },
+    { k: ["heat", "hot", "humid", "warm weather"], a: () => {
+      let imp; try { imp = currentConditions(selectedSession()); } catch (e) { imp = null; }
+      return "<p>Heat makes the same pace cost more \\u2014 that\\u2019s physiology, not weakness. <b>Run by effort</b> and let the pace be whatever it is.</p>" +
+        (imp ? "<p>Right now InteRun rates conditions as <b>" + esc(imp.headline) + "</b>." + (imp.pacePenaltySecPerKm ? " Expect around <b>+" + imp.pacePenaltySecPerKm + "s/km</b> at the same effort." : "") + "</p>" : "") +
+        "<p>Go earlier or later in the day, take fluid with sodium, and give yourself 10\\u201314 days to acclimatise.</p>";
+    } },
+    { k: ["cold", "winter", "ice", "dark"], a: () => "<p>Cold running is mostly a kit problem: layer up, cover extremities, and be seen \\u2014 lights and reflective gear.</p><p>Warm up a bit longer than usual, and on ice shorten your stride and slow down. A missed session beats a fall.</p>" },
+    { k: ["injur", "hurt", "pain", "niggle", "ache"], a: () => "<p>The line worth holding: <b>discomfort that fades as you warm up</b> is usually fine to run through. <b>Pain that sharpens, changes how you move, or is in one pinpoint spot</b> is not.</p><p>Swelling, night pain, or pain that\\u2019s getting worse week to week all mean stop and get assessed.</p><p>Taking three days off early is almost always cheaper than taking six weeks off later.</p><p class=\\"alf-dim\\">Support \\u2192 \\u201cWhen to stop and seek help\\u201d has a proper symptom checker.</p>" },
+    { k: ["next session", "next run", "what's next", "whats next", "next workout"], a: () => {
+      const n = alfieNextSession();
+      if (!n) return "<p>There\\u2019s nothing left scheduled in your plan \\u2014 nice work getting through it.</p>";
+      const when = n.days === 0 ? "Today" : n.days === 1 ? "Tomorrow" : "In " + n.days + " days (" + dmon(isoAdd(n.iso, 0)) + ")";
+      return "<p><b>" + when + "</b></p><ul class=\\"alf-ul\\">" + n.list.map((s) => "<li>" + alfieSessionLine(s) + "</li>").join("") + "</ul>" +
+        "<p class=\\"alf-dim\\">Open Today to see the full breakdown, or start it from the session card.</p>";
+    } },
+    { k: ["today", "session today", "run today", "training today"], a: () => {
+      const list = sessionsForIso(todayIso());
+      if (!list.length) return "<p>Today is a <b>rest day</b> \\u2014 recovery is part of the plan. Easy walking, mobility or a stretch is plenty.</p>";
+      return "<p>Today you\\u2019ve got:</p><ul class=\\"alf-ul\\">" + list.map((s) => "<li>" + alfieSessionLine(s) + "</li>").join("") + "</ul>";
+    } },
+    { k: ["tomorrow"], a: () => {
+      const iso = isoAdd(todayIso(), 1).toISOString().slice(0, 10);
+      const list = sessionsForIso(iso);
+      if (!list.length) return "<p>Tomorrow (" + dmon(isoAdd(iso, 0)) + ") is a <b>rest day</b>.</p>";
+      return "<p>Tomorrow (" + dmon(isoAdd(iso, 0)) + "):</p><ul class=\\"alf-ul\\">" + list.map((s) => "<li>" + alfieSessionLine(s) + "</li>").join("") + "</ul>";
+    } },
+    { k: ["this week", "my week", "week looking", "week look", "weekly"], a: () => {
+      const done = wk.sessions.filter((s) => s.type !== "rest" && state.done[doneKey(wk.index, s)]).length;
+      const total = wk.sessions.filter((s) => s.type !== "rest").length;
+      return "<p><b>Week " + wk.index + "</b> \\u2014 " + esc(String(wk.phase || "")) + (wk.isDeload ? " (deload)" : "") + ", " + wk.distanceKm.toFixed(1) + " km planned across " + total + " sessions. You\\u2019ve ticked off " + done + ".</p>" +
+        (wk.focus ? "<p>Focus this week: " + esc(wk.focus) + "</p>" : "") +
+        "<p class=\\"alf-dim\\">The Today screen shows what\\u2019s still to come this week.</p>";
+    } },
+    { k: ["deload", "easier week", "why is this week", "recovery week"], a: () => {
+      return "<p>A <b>deload</b> is a deliberately lighter week \\u2014 usually a ~20\\u201330% drop in volume.</p>" +
+        "<p>Fitness isn\\u2019t built by the training itself, it\\u2019s built while you <i>absorb</i> it. Backing off lets the previous weeks land, drops accumulated fatigue, and keeps injury risk down.</p>" +
+        "<p>" + (wk.isDeload ? "You\\u2019re in a deload right now (week " + wk.index + ") \\u2014 keep the easy runs genuinely easy." : "This week (week " + wk.index + ") isn\\u2019t a deload \\u2014 your plan schedules them periodically.") + "</p>";
+    } },
+    { k: ["phase", "base", "build phase", "peak", "taper"], a: () => {
+      return "<p>Your plan moves through phases, and you\\u2019re currently in <b>" + esc(String(wk.phase || "base")) + "</b> (week " + wk.index + ").</p>" +
+        "<ul class=\\"alf-ul\\"><li><b>Base</b> \\u2014 build aerobic engine and durability, mostly easy running.</li>" +
+        "<li><b>Build</b> \\u2014 add quality: threshold and intervals sharpen your speed at aerobic cost.</li>" +
+        "<li><b>Peak</b> \\u2014 the hardest, most race-specific work.</li>" +
+        "<li><b>Taper</b> \\u2014 volume drops, intensity stays: you arrive fresh, not flat.</li></ul>";
+    } },
+    { k: ["pace", "how fast", "what speed", "how quick"], a: () => {
+      const rows = [];
+      if (p.easy) rows.push("<li><b>Easy</b> " + esc(p.easy) + " \\u2014 conversational. Most of your running.</li>");
+      if (p.threshold) rows.push("<li><b>Threshold</b> " + esc(p.threshold) + " \\u2014 comfortably hard, about an hour-race effort.</li>");
+      if (p.goal) rows.push("<li><b>Goal race pace</b> " + esc(p.goal) + "</li>");
+      return "<p>These come from your current fitness, so they\\u2019re yours, not a generic table:</p><ul class=\\"alf-ul\\">" + rows.join("") + "</ul>" +
+        "<p>If a pace feels wrong on the day, run by <b>effort</b> \\u2014 heat, hills, wind and fatigue all move the number.</p>";
+    } },
+    { k: ["race", "goal", "how long until", "how far away", "race day", "countdown"], a: () => {
+      const f = alfieRaceFacts();
+      const when = f.daysAway == null ? "" : f.daysAway < 0 ? " \\u2014 that date has passed." : f.daysAway === 0 ? " \\u2014 that\\u2019s <b>today</b>." : " \\u2014 <b>" + f.daysAway + " days</b> away (about " + f.weeksAway + " weeks).";
+      return "<p>You\\u2019re training for <b>" + esc(f.race) + "</b>" + (f.target ? " with a target of <b>" + esc(f.target) + "</b>" : "") + (f.date ? ", on " + esc(f.date) : "") + when + "</p>" +
+        "<p class=\\"alf-dim\\">The Plan tab shows the whole block and how the weeks build.</p>";
+    } },
+    { k: ["easy run", "what is easy", "easy pace mean", "conversational"], a: () => "<p>An <b>easy run</b> is the backbone of the plan \\u2014 most of your weekly running should be here.</p><p>It should feel genuinely comfortable: you could hold a conversation" + (p.easy ? ", around " + esc(p.easy) : "") + ". If you\\u2019re breathing hard, you\\u2019re going too fast.</p><p>Running easy is what lets you run <i>often</i>, and frequency is what builds the aerobic engine. Most runners\\u2019 easy days are too fast and their hard days too soft.</p>" },
+    { k: ["threshold", "tempo", "comfortably hard"], a: () => "<p><b>Threshold</b> (or tempo) running sits right at the effort you could hold for about an hour \\u2014 \\u201ccomfortably hard\\u201d" + (p.threshold ? ", around " + esc(p.threshold) : "") + ".</p><p>It trains your body to clear lactate as fast as it produces it, which raises the pace you can sustain before things fall apart. It\\u2019s the single most valuable session type for most distance runners.</p><p>Done right you finish thinking you could have gone a bit longer \\u2014 not wrecked.</p>" },
+    { k: ["interval", "vo2", "reps", "track session", "speed work"], a: () => "<p><b>Intervals</b> are short, hard efforts with recovery between \\u2014 typically 3\\u20135 minutes at close to your fastest sustainable effort.</p><p>They push your VO\\u2082 max: the ceiling on how much oxygen you can use. That ceiling makes every slower pace feel easier.</p><p>They cost a lot of recovery, which is why the plan uses them sparingly and surrounds them with easy days.</p>" },
+    { k: ["long run", "why long"], a: () => "<p>The <b>long run</b> builds durability \\u2014 holding form and economy when you\\u2019re tired.</p><p>Run it easy. The value is in the time on your feet, not the pace. Going too hard on a long run mostly buys you fatigue that damages the rest of the week.</p><p>Fuel it if it\\u2019s over ~75 minutes.</p>" },
+    { k: ["strides", "hill sprint"], a: () => "<p><b>Strides</b> are short accelerations \\u2014 around 20 seconds \\u2014 run relaxed and fast, with full recovery.</p><p>They\\u2019re not a workout; they\\u2019re maintenance for your top-end mechanics. They keep you feeling springy without adding meaningful fatigue.</p>" },
+    { k: ["recovery run", "what is recovery"], a: () => "<p>A <b>recovery run</b> is deliberately very easy and short \\u2014 slower than your normal easy pace.</p><p>Its job is to move blood through tired legs, not to build fitness. If it feels like effort, walk some of it or take the day off entirely.</p>" },
+    { k: ["strength", "gym", "weights", "lifting"], a: () => "<p>Heavy <b>strength training</b> twice a week is one of the best-evidenced things a runner can do \\u2014 it improves running economy and cuts injury risk, and it won\\u2019t make you bulky at these volumes.</p><p>Think squats, single-leg work, calf raises and hip strength. Low reps, challenging load. Put it on a quality day or after an easy run, not the day before a hard session.</p>" },
+    { k: ["fuel", "nutrition", "eat", "gel", "carb"], a: () => "<p>Under ~75 minutes you generally don\\u2019t need fuel mid-run.</p><p>Beyond that, aim for roughly <b>30\\u201360 g of carbohydrate per hour</b>, and practise it in training \\u2014 your gut adapts, and race day is a terrible time to experiment.</p><p>Day to day, the bigger lever is simply <b>eating enough</b>. Under-fuelling is the most common reason training stops working.</p>" },
+    { k: ["hydrat", "drink", "water", "electrolyte"], a: () => "<p>Drink to thirst \\u2014 it\\u2019s a better guide than a fixed schedule for most runners.</p><p>In heat or on runs over an hour, add <b>sodium</b> (a sports drink or electrolyte tab), not just water. Over-drinking plain water on long efforts is genuinely dangerous.</p>" },
+    { k: ["sleep", "recover", "rest"], a: () => "<p><b>Sleep is the most powerful recovery tool you have</b> \\u2014 more than any supplement, gadget or protocol.</p><p>Consistent 7\\u20139 hours does more for your training than an extra session would. When life squeezes your sleep, that\\u2019s the week to take the easy option in training, not the hard one.</p>" },
+    { k: ["taper", "before the race", "race week"], a: () => "<p><b>Tapering</b> means cutting volume while keeping some intensity \\u2014 typically over the final 1\\u20133 weeks depending on the distance.</p><p>You keep the sharpness and shed the fatigue. Feeling twitchy, heavy-legged or doubtful during a taper is completely normal \\u2014 resist the urge to \\u201ctest\\u201d your fitness.</p>" },
+    { k: ["missed", "behind", "skipped a", "fell off", "catch up"], a: () => "<p>Missing sessions is normal and it doesn\\u2019t undo your training.</p><p><b>Don\\u2019t try to make them up.</b> Cramming two hard sessions together is how a missed week turns into an injured month. Just rejoin the plan where it is today.</p><p>If you\\u2019ve missed more than a couple of weeks, ease back in \\u2014 drop the intensity for a few runs before picking the plan back up.</p>" },
+    { k: ["shoe", "trainers", "footwear", "carbon plate"], a: () => "<p>The best shoe is the one that feels right on your foot \\u2014 comfort predicts injury risk better than any category or claim.</p><p>Rotating two pairs is a reasonable habit. Replace them when the midsole feels dead rather than at a fixed mileage.</p>" },
+    { k: ["cadence", "form", "technique", "footstrike", "posture"], a: () => "<p>Don\\u2019t overhaul your <b>form</b> \\u2014 it\\u2019s largely self-optimising, and forced changes usually just move the load somewhere less prepared for it.</p><p>The things worth cueing: run tall, stay relaxed, and avoid heavy over-striding out in front of you. If your cadence is very low, nudging it up slightly can shorten your stride naturally.</p><p>Strength work changes form more reliably than thinking about form does.</p>" },
+    { k: ["cross train", "cycling", "swim", "elliptical"], a: () => "<p><b>Cross-training</b> is excellent when you can\\u2019t run \\u2014 cycling, swimming and the elliptical keep the aerobic engine going with far less impact.</p><p>It isn\\u2019t a like-for-like replacement for running specificity, but during injury or heavy weeks it protects most of your fitness.</p>" },
+    { k: ["warm up", "warmup", "cool down", "stretch"], a: () => "<p><b>Warm up</b> before quality: easy jogging, then some dynamic movement, then a few strides. It matters much more before intervals than before an easy run.</p><p><b>Cool down</b> with a few easy minutes. Long static stretching after running is largely optional \\u2014 do it if you enjoy it.</p>" },
+    { k: ["how am i doing", "progress", "improving", "getting fitter"], a: () => {
+      const runs = (state.logged || []).length;
+      return "<p>" + (runs ? "You\\u2019ve logged <b>" + runs + "</b> run" + (runs === 1 ? "" : "s") + " in the app so far." : "You haven\\u2019t logged a run in the app yet \\u2014 once you do, Performance will start showing trends.") + "</p>" +
+        "<p>The honest signals of progress are: the same pace at a lower effort, easier recovery between sessions, and consistency over months. Week-to-week fluctuations are mostly noise.</p>" +
+        "<p class=\\"alf-dim\\">Activities \\u2192 Performance shows your trends and bests.</p>";
+    } },
+    { k: ["who are you", "what are you", "what can you", "help me with", "alfie"], a: () => "<p>I\\u2019m <b>Alfie</b>, built into InteRun. I can see your plan, so I can answer things like:</p><ul class=\\"alf-ul\\"><li>What\\u2019s my next session, and how should it feel?</li><li>What pace should I run this at?</li><li>Why is this week easier?</li><li>Should I run if I\\u2019m sore or it\\u2019s hot?</li><li>General running, training and fitness questions.</li></ul><p>I\\u2019m not a doctor \\u2014 for pain or health symptoms I\\u2019ll point you to proper help.</p>" },
+  ];
+}
+function alfieLocalAnswer(question) {
+  // Normalise curly apostrophes to straight so phrase lists only need one spelling.
+  const q = " " + String(question || "").toLowerCase().split("\\u2019").join("'").trim() + " ";
+  const flags = alfieRedFlags(q);
+  if (flags.length) { const s = alfieSafetyAnswer(flags); if (s) return s; }
+  const intents = alfieIntents();
+  for (let i = 0; i < intents.length; i++) {
+    if (intents[i].k.some((w) => q.indexOf(w) !== -1)) return intents[i].a();
+  }
+  return "<p>I\\u2019m not sure I\\u2019ve got a good answer for that one yet.</p>" +
+    "<p>I\\u2019m strongest on <b>your plan</b> (next session, paces, why a week looks the way it does) and the <b>fundamentals</b> \\u2014 easy running, threshold, intervals, long runs, strength, fuelling, heat, sleep, tapering and niggles.</p>" +
+    "<p class=\\"alf-dim\\">Try rephrasing, or tap one of the suggestions.</p>";
+}
+// ---- Optional remote brain -------------------------------------------------
+// If a proxy URL is configured, questions go there instead. The proxy holds the API key server-side
+// (never in this public page) and talks to Claude; see alfie-proxy/ in the repo. Same UI either way,
+// and any failure falls back to the on-device answer so Alfie always replies.
+function alfiePlanContext() {
+  const f = alfieRaceFacts(), wk = curWeek(), p = PLAN.paces || {};
+  const today = sessionsForIso(todayIso()).map((s) => s.title + (s.durMin ? " (" + s.durMin + " min)" : "")).join("; ") || "rest day";
+  return {
+    goal: f.race, target: f.target, raceDate: f.date, daysToRace: f.daysAway,
+    week: wk.index, phase: wk.phase, deload: !!wk.isDeload, weekKm: wk.distanceKm,
+    paces: { easy: p.easy || null, threshold: p.threshold || null, goal: p.goal || null },
+    today: today, experience: profile.status || null, daysPerWeek: profile.daysPerWeek || null,
+  };
+}
+function alfieRemote(question) {
+  const cfg = alfieCfg();
+  if (!cfg.proxy) return Promise.reject(new Error("no proxy"));
+  return fetch(cfg.proxy, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ question: question, context: alfiePlanContext(), history: ALFIE_MSGS.slice(-8) }),
+  }).then((r) => r.ok ? r.json() : Promise.reject(new Error("http " + r.status))).then((d) => {
+    if (!d || !d.answer) throw new Error("bad reply");
+    return "<p>" + esc(d.answer).split("\\n\\n").join("</p><p>").split("\\n").join("<br>") + "</p>";
+  });
+}
+// ---- UI --------------------------------------------------------------------
+function alfieBubble(m) {
+  if (m.role === "user") return '<div class="alf-row you"><div class="alf-msg you">' + esc(m.text) + "</div></div>";
+  return '<div class="alf-row"><div class="alf-av">' + ICON.alfie + '</div><div class="alf-msg">' + m.html + "</div></div>";
+}
+function alfieRenderLog() {
+  const log = $("alfieLog"); if (!log) return;
+  const intro = '<div class="alf-row"><div class="alf-av">' + ICON.alfie + '</div><div class="alf-msg">' + ALFIE_GREETING + "</div></div>";
+  log.innerHTML = intro + ALFIE_MSGS.map(alfieBubble).join("") + (ALFIE_THINKING ? '<div class="alf-row"><div class="alf-av">' + ICON.alfie + '</div><div class="alf-msg alf-typing"><i></i><i></i><i></i></div></div>' : "");
+  log.scrollTop = log.scrollHeight;
+}
+let ALFIE_THINKING = false;
+function alfieAsk(text) {
+  const t = String(text || "").trim(); if (!t || ALFIE_THINKING) return;
+  ALFIE_MSGS.push({ role: "user", text: t });
+  ALFIE_THINKING = true; alfieRenderLog();
+  const finish = (html) => {
+    ALFIE_THINKING = false;
+    ALFIE_MSGS.push({ role: "alfie", html: html });
+    alfieSaveMsgs(); alfieRenderLog();
+  };
+  const local = () => { try { return alfieLocalAnswer(t); } catch (e) { return "<p>Something went wrong finding that answer \\u2014 try asking a different way.</p>"; } };
+  if (alfieCfg().proxy) {
+    alfieRemote(t).then(finish).catch(() => setTimeout(() => finish(local()), 120));
+  } else {
+    setTimeout(() => finish(local()), 260); // a beat, so it reads as a reply rather than a jump
+  }
+}
+function viewAlfie() {
+  const chips = ALFIE_CHIPS.map((c) => '<button class="alf-chip" data-alfq="' + esc(c) + '">' + c + "</button>").join("");
+  return '<button class="backbtn" id="alfBack">\\u2039 Back</button>' +
+    '<div class="alf-head"><div class="alf-hero">' + ICON.alfie + '</div><div><div class="alf-name">Ask Alfie</div><div class="alf-sub">Your coach \\u2014 knows your plan</div></div></div>' +
+    '<div class="alf-log" id="alfieLog"></div>' +
+    '<div class="alf-chips">' + chips + "</div>" +
+    '<div class="alf-input"><input id="alfieIn" placeholder="Ask about your plan or running\\u2026" autocomplete="off"><button id="alfieSend" aria-label="Send">\\u2191</button></div>';
+}
+function wireAlfie() {
+  alfieRenderLog();
+  const back = $("alfBack"); if (back) back.onclick = () => { state.screen = null; render(); };
+  const input = $("alfieIn"), send = $("alfieSend");
+  const go = () => { if (!input) return; const v = input.value; input.value = ""; alfieAsk(v); };
+  if (send) send.onclick = go;
+  if (input) input.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); go(); } };
+  document.querySelectorAll("[data-alfq]").forEach((b) => b.onclick = () => alfieAsk(b.dataset.alfq));
+}
+function openAlfie() { if (liveRunning()) return; stopTrialRun(); state.screen = "alfie"; render(); }
+
 // ============ TRAINING CALENDAR ============================================
 // A full plan-at-a-glance in calendar form: every week, every day, with completed sessions ticked.
 // Tapping a session toggles its completion; the week's total shows completed / planned distance.
@@ -2533,6 +2832,7 @@ function viewCommunity() {
 
 // ============ SUPPORT ======================================================
 const SUPPORT_HUB = [
+  { id: "alfie", ic: "alfie", c: "var(--accent)", t: "Ask Alfie", d: "Your coach — questions about your plan, or running in general.", interactive: false },
   { id: "understand", ic: "guide", c: "var(--accent)", t: "Understanding my sessions", d: "What the numbers in a session mean — with a walkthrough.", interactive: false },
   { id: "redflags", ic: "heart", c: "var(--rest)", t: "Injury & symptoms", d: "A quick check for anything that needs attention now.", interactive: true },
   { id: "reds", ic: "fuel", c: "var(--peak)", t: "Fuelling & energy", d: "Are you getting enough? A gentle RED-S check.", interactive: true },
@@ -2622,26 +2922,106 @@ function renderAvatar() {
   b.innerHTML = profile.avatar ? '<img src="' + profile.avatar + '" alt="Profile">'
     : (initials(profile.name) ? '<span style="font-size:13px;font-weight:700;color:var(--accent)">' + initials(profile.name) + '</span>' : ICON.person);
 }
-// Downscale a chosen image to a square 256px JPEG data URL (keeps localStorage small) and drop it in.
+// Load a chosen image and hand it to the crop editor so the user frames it themselves.
 function processAvatarFile(file) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
     const img = new Image();
-    img.onload = () => {
-      const size = 256, c = document.createElement("canvas"); c.width = size; c.height = size;
-      const ctx = c.getContext("2d");
-      const s = Math.min(img.width, img.height), sx = (img.width - s) / 2, sy = (img.height - s) / 2;
-      ctx.drawImage(img, sx, sy, s, s, 0, 0, size, size);
-      const url = c.toDataURL("image/jpeg", 0.85);
-      draft.avatar = url; profile.avatar = url;
-      const pic = $("avatarPic"); if (pic) pic.innerHTML = '<img src="' + url + '" alt="">';
-      const btn = $("avatarBtn"); if (btn) btn.textContent = "Change photo";
-      renderAvatar();
-    };
+    img.onload = () => openCropSheet(img);
     img.src = reader.result;
   };
   reader.readAsDataURL(file);
+}
+// ---- Avatar crop editor -----------------------------------------------------
+// A square stage with a circular mask: drag to reposition, pinch or use the slider to zoom. The
+// visible circle is what gets saved. CROP.x/y are the image's top-left offset inside the stage, in
+// CSS px; CROP.k is the pixels-per-image-pixel scale actually applied.
+let CROP = null;
+function cropClamp() {
+  const dw = CROP.img.width * CROP.k, dh = CROP.img.height * CROP.k;
+  CROP.x = Math.min(0, Math.max(CROP.V - dw, CROP.x));
+  CROP.y = Math.min(0, Math.max(CROP.V - dh, CROP.y));
+}
+function cropPaint() {
+  const el = $("cropImg"); if (!el) return;
+  el.style.width = (CROP.img.width * CROP.k) + "px";
+  el.style.height = (CROP.img.height * CROP.k) + "px";
+  el.style.transform = "translate(" + CROP.x + "px," + CROP.y + "px)";
+}
+// Re-scale about the centre of the stage so zooming keeps the framed subject put.
+function cropZoomTo(zoom) {
+  const z = Math.max(1, Math.min(4, zoom));
+  const kNew = CROP.base * z, c = CROP.V / 2;
+  CROP.x = c - (c - CROP.x) * (kNew / CROP.k);
+  CROP.y = c - (c - CROP.y) * (kNew / CROP.k);
+  CROP.k = kNew; CROP.zoom = z;
+  cropClamp(); cropPaint();
+  const sl = $("cropZoom"); if (sl && Number(sl.value) !== Math.round(z * 100)) sl.value = String(Math.round(z * 100));
+}
+function openCropSheet(img) {
+  ensureSheet(); SHEET_CTX = null;
+  $("sheetBody").innerHTML =
+    '<div class="sd-type" style="--sc:var(--accent)">Profile photo</div>' +
+    '<div class="sd-title">Frame your photo</div>' +
+    '<div class="sd-desc" style="margin-bottom:12px">Drag to move, pinch or use the slider to zoom. The circle is what people see.</div>' +
+    '<div class="crop-stage" id="cropStage"><img class="crop-img" id="cropImg" alt=""><div class="crop-mask"></div></div>' +
+    '<div class="crop-tools"><span class="crop-ic">\\uD83D\\uDD0D\\uFE0E</span><input type="range" id="cropZoom" min="100" max="400" value="100"></div>' +
+    '<button class="primary" id="cropSave" style="width:100%;margin-top:14px">Use this photo</button>' +
+    '<button class="rm-test" id="cropCancel">Cancel</button>';
+  const stage = $("cropStage"), el = $("cropImg");
+  const V = stage.getBoundingClientRect().width || 260;
+  const base = V / Math.min(img.width, img.height);
+  CROP = { img: img, V: V, base: base, k: base, zoom: 1, x: 0, y: 0 };
+  el.src = img.src;
+  CROP.x = (V - img.width * base) / 2; CROP.y = (V - img.height * base) / 2;
+  cropClamp(); cropPaint();
+  // Drag + pinch. Pointer events cover mouse and touch; two pointers pinch-zoom.
+  const pts = new Map();
+  let startDist = 0, startZoom = 1, lastX = 0, lastY = 0;
+  stage.onpointerdown = (e) => {
+    stage.setPointerCapture(e.pointerId);
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 1) { lastX = e.clientX; lastY = e.clientY; }
+    else if (pts.size === 2) {
+      const a = [].slice.call(pts.values());
+      startDist = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) || 1;
+      startZoom = CROP.zoom;
+    }
+  };
+  stage.onpointermove = (e) => {
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size >= 2) {
+      const a = [].slice.call(pts.values());
+      const d = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) || 1;
+      cropZoomTo(startZoom * (d / startDist));
+      return;
+    }
+    CROP.x += e.clientX - lastX; CROP.y += e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    cropClamp(); cropPaint();
+  };
+  const up = (e) => { pts.delete(e.pointerId); if (pts.size < 2) startDist = 0; };
+  stage.onpointerup = up; stage.onpointercancel = up;
+  const sl = $("cropZoom"); if (sl) sl.oninput = () => cropZoomTo(Number(sl.value) / 100);
+  $("cropCancel").onclick = () => { CROP = null; closeSheet(); };
+  $("cropSave").onclick = saveCrop;
+  $("sheetOv").classList.add("on");
+}
+// Render just the framed circle to a square 256px JPEG (keeps localStorage small).
+function saveCrop() {
+  if (!CROP) return;
+  const out = 256, c = document.createElement("canvas"); c.width = out; c.height = out;
+  const ctx = c.getContext("2d");
+  const sx = -CROP.x / CROP.k, sy = -CROP.y / CROP.k, s = CROP.V / CROP.k;
+  ctx.drawImage(CROP.img, sx, sy, s, s, 0, 0, out, out);
+  const url = c.toDataURL("image/jpeg", 0.85);
+  draft.avatar = url; profile.avatar = url;
+  const pic = $("avatarPic"); if (pic) pic.innerHTML = '<img src="' + url + '" alt="">';
+  const btn = $("avatarBtn"); if (btn) btn.textContent = "Change photo";
+  renderAvatar();
+  CROP = null; closeSheet();
 }
 // A numbered section card — the numbered badge + title makes each step obvious and the page premium.
 function setupSection(num, title, sub, body) {
@@ -4101,6 +4481,13 @@ function render() {
     wire();
     return;
   }
+  if (state.screen === "alfie") {
+    $("topTitle").textContent = "Ask Alfie";
+    v.innerHTML = viewAlfie(); v.scrollTop = 0;
+    document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
+    wire(); wireAlfie();
+    return;
+  }
   if (state.screen === "runview") {
     $("topTitle").textContent = "Run";
     v.innerHTML = viewRunDetail(); v.scrollTop = 0;
@@ -4130,7 +4517,7 @@ function wire() {
   const runBack = $("runBack"); if (runBack) runBack.onclick = () => { state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); };
   const shareRun = $("shareRun"); if (shareRun) { shareRun.onclick = doShareRun; prepareShareCard(currentOverviewRun()); }
   const ovMap = $("ovMap"); if (ovMap) { const r = currentOverviewRun(); if (r) buildOverviewMap(ovMap, r.route); }
-  document.querySelectorAll("[data-hub]").forEach((b) => b.onclick = () => { state.support = b.dataset.hub; render(); });
+  document.querySelectorAll("[data-hub]").forEach((b) => b.onclick = () => { if (b.dataset.hub === "alfie") { openAlfie(); return; } state.support = b.dataset.hub; render(); });
   const guideReplay = $("guideReplay"); if (guideReplay) guideReplay.onclick = () => openSessionGuide(GUIDE_EXAMPLE, { fromSupport: true });
   const back = $("supBack"); if (back) back.onclick = () => { state.support = null; render(); };
   document.querySelectorAll('[data-chk="rf"]').forEach((c) => c.onchange = runRf);
@@ -4238,7 +4625,9 @@ function buildNav() {
   $("nav").innerHTML = ["today","plan","activities","community","support"].map((t) => '<button type="button" class="navbtn' + (t===state.tab?" on":"") + '" data-tab="' + t + '">' + (t === "today" ? todayNavIcon() : ICON[t]) + '<span class="nl">' + TITLES[t].replace("Your ","") + '</span></button>').join("");
   document.querySelectorAll(".navbtn").forEach((b) => b.onclick = () => { coachStop(); stopLive(); stopSpeech(); stopTrialRun(); TRIALRUN = null; state.screen = null; state.tab = b.dataset.tab; if (b.dataset.tab !== "support") state.support = null; if (b.dataset.tab === "today") { state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; } render(); });
 }
-$("bellBtn").innerHTML = ICON.bell; $("themeBtn").innerHTML = ICON.theme; $("calBtn").innerHTML = ICON.cal; renderAvatar();
+$("bellBtn").innerHTML = ICON.bell; $("themeBtn").innerHTML = ICON.theme; $("calBtn").innerHTML = ICON.cal; $("alfieBtn").innerHTML = ICON.alfie; renderAvatar();
+$("alfieBtn").onclick = openAlfie;
+ALFIE_MSGS = alfieLoadMsgs();
 $("themeBtn").onclick = () => { const cur = document.documentElement.getAttribute("data-theme"); document.documentElement.setAttribute("data-theme", cur === "dark" ? "light" : cur === "light" ? "dark" : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark")); };
 $("profileBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); state.screen = "setup"; render(); };
 $("calBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); state.screen = "calendar"; render(); };

@@ -1,0 +1,16 @@
+{
+  "name": "alfie-proxy",
+  "private": true,
+  "type": "module",
+  "description": "Optional Cloudflare Worker that lets Ask Alfie use Claude, keeping the API key off the public page.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.70.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

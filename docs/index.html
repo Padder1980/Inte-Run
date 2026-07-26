@@ -1206,6 +1206,19 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
 @media (prefers-reduced-motion: reduce) {
   #view:has(.subtabs) .subtabs button, #view:has(.subtabs) .runcard, .navbtn, .navbtn::before, .navbtn svg { transition: none; }
 }
+/* Today — scrollable week band (above the day strip) + weekly overview (below the squares) */
+.wk-head { display: flex; justify-content: center; margin: 2px 2px 10px; }
+.wk-label { text-align: center; line-height: 1.15; }
+.wk-label b { display: block; font-size: 13.5px; font-weight: 750; color: var(--ink); letter-spacing: -.01em; }
+.wk-label span { font-size: 11.5px; color: var(--ink-faint); }
+/* The band reuses .weekstrip's card look but scrolls horizontally, one full-width week per snap page.
+   Horizontal padding lives on the pages (not the scroll container) so each page fills the viewport
+   exactly — otherwise the next week peeks in and the snap looks off. */
+#view #weekband { display: flex; grid-template-columns: none; gap: 0; padding: 6px 0; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+#view #weekband::-webkit-scrollbar { display: none; }
+.wkpage { flex: 0 0 100%; box-sizing: border-box; padding: 0 6px; scroll-snap-align: start; display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; }
+.cal-week.ovw { margin-top: 4px; }
+.cal-week.ovw .cal-day.is-sel { box-shadow: inset 3px 0 0 var(--accent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
 </style>
 </head>
 <body>
@@ -1377,7 +1390,7 @@ let PLAN, RAW, FITNESS, CLASS, MASTERS;
 function recompute() { const r = applyProfile(profile); PLAN = r.plan; RAW = r.raw; FITNESS = r.fitness; CLASS = r.classification; MASTERS = r.masters; }
 try { recompute(); } catch (e) { profile = Object.assign({}, DEFAULT_PROFILE); recompute(); }
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), trialPending: false, trialSaved: null, done: {}, dayOverride: {}, selDay: 4 };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), trialPending: false, trialSaved: null, done: {}, dayOverride: {}, selDay: 4, selWeek: 0 };
 // Effective day index for a session, honouring any user reschedule. Works for raw sessions
 // (dayOfWeek) and summary sessions (dayIndex), keyed by the shared session id.
 function effDay(s) { const o = state.dayOverride[s.id]; return o != null ? o : (s.dayOfWeek != null ? s.dayOfWeek : s.dayIndex); }
@@ -1431,9 +1444,16 @@ function renderReadiness() {
 function effortOf(s) { if (s.type === "rest" || s.type === "mobility") return "none"; if (s.type === "strength" || s.type === "cross-training") return "moderate"; if (s.intensity === "hard") return "hard"; if (s.intensity === "moderate") return "moderate"; return "easy"; }
 function paceOf(s) { const rep = s.steps.find((st) => st.kind === "rep" && st.targetPaceSecPerKm); const steady = s.steps.find((st) => st.kind === "steady" && st.targetPaceSecPerKm); const quality = s.type === "threshold" || s.type === "vo2" || s.type === "race-specific"; const p = quality ? (rep || steady) : (steady || rep); if (!p) return null; return fmtPace(p.targetPaceSecPerKm.minSecPerKm) + "–" + fmtPace(p.targetPaceSecPerKm.maxSecPerKm) + "/km"; }
 function rpeOf(s) { let band = s.targetRpe; if (!band) { const w = s.steps.filter((st) => st.targetRpe); if (w.length) band = { min: Math.min.apply(null, w.map((x) => x.targetRpe.min)), max: Math.max.apply(null, w.map((x) => x.targetRpe.max)) }; } return band ? band.min + "–" + band.max : null; }
-// Sessions on the selected day (week 1), honouring reschedules; primary run first.
+// The week the top calendar strip is currently showing. selWeek is a 0-based array index into
+// PLAN/RAW.weeks; week 0 is the current ("this") week. Clamped so a regenerated (shorter) plan
+// can't leave us pointing off the end.
+function curWeekIdx() { return Math.max(0, Math.min(state.selWeek, PLAN.weeks.length - 1)); }
+function curWeek() { return PLAN.weeks[curWeekIdx()]; }
+function curWeekNo() { return curWeek().index; } // 1-based week number, for done keys / data-oweek
+function isCurrentWeek() { return curWeekIdx() === 0; }
+// Sessions on the selected day of the selected week, honouring reschedules; primary run first.
 function sessionsOnSelectedDay() {
-  return RAW.weeks[0].sessions.filter((s) => s.type !== "rest" && effDay(s) === state.selDay)
+  return RAW.weeks[curWeekIdx()].sessions.filter((s) => s.type !== "rest" && effDay(s) === state.selDay)
     .sort((a, b) => (PRIMARY_TYPES[b.type] || 0) - (PRIMARY_TYPES[a.type] || 0));
 }
 function selectedSession() { return sessionsOnSelectedDay()[0] || null; }
@@ -1442,7 +1462,8 @@ function rawToday() { return selectedSession() || RAW.weeks[0].sessions.find((s)
 // The striking hero card for the selected day's main session.
 function heroWorkout() {
   const day = state.selDay;
-  const eyebrow = day === TODAY_DOW ? "Today’s workout" : DAY_ORDER[day] + " " + (20 + day);
+  const isToday = isCurrentWeek() && day === TODAY_DOW;
+  const eyebrow = isToday ? "Today’s workout" : DAY_ORDER[day] + " " + dmon(isoAdd(curWeek().startIso, day));
   const list = sessionsOnSelectedDay();
   const s = list[0];
   if (!s) {
@@ -1455,21 +1476,63 @@ function heroWorkout() {
   if (pace) chips.push('<span class="hw-chip">' + pace + "</span>");
   if (rpe) chips.push('<span class="hw-chip">RPE ' + rpe + "</span>");
   const extra = list.length > 1 ? '<div class="hw-also">＋ also ' + esc(list.slice(1).map((x) => SESSION_LABEL[x.type] || x.type).join(", ").toLowerCase()) + '</div>' : "";
-  return '<div class="hero-wk tap" id="todayCard" style="--c:var(--eff-' + eff + ')" data-open="1" data-oweek="1" data-oid="' + s.id + '">' +
+  return '<div class="hero-wk tap" id="todayCard" style="--c:var(--eff-' + eff + ')" data-open="1" data-oweek="' + curWeekNo() + '" data-oid="' + s.id + '">' +
     '<div class="hw-eyebrow">' + eyebrow + '</div>' +
     '<div class="hw-title">' + esc(s.title) + '</div>' +
     '<div class="hw-chips">' + chips.join("") + '</div>' + extra +
     '<div class="hw-go">View full session <span>›</span></div>' +
     '<div class="hw-glow"></div></div>';
 }
+// The top calendar: a centred week label over a horizontally-scrollable band. Each week is a full-
+// width snap page of 7 days; scroll/swipe the band to move through the plan (no arrows). The label,
+// hero and overview follow whichever week the band settles on (wired in wire()).
+let wbandScrollT = null;
+function wkLabelInner(wi) {
+  const w = Math.max(0, Math.min(wi, PLAN.weeks.length - 1));
+  const wk = PLAN.weeks[w];
+  const range = dmon(isoAdd(wk.startIso, 0)) + " – " + dmon(isoAdd(wk.startIso, 6));
+  return '<b>' + (w === 0 ? "This week" : "Week " + wk.index) + '</b><span>' + range + '</span>';
+}
 function weekStrip() {
-  return '<div class="weekstrip">' + DAY_ORDER.map((d, i) => {
-    const wk = PLAN.weeks[0];
-    const has = wk.sessions.some((s) => s.type !== "rest" && effDay(s) === i);
-    const eff = (wk.sessions.find((s) => s.type !== "rest" && effDay(s) === i) || {}).effort;
-    const cls = "d" + (i === state.selDay ? " sel" : "") + (i === TODAY_DOW ? " today" : "");
-    return '<button class="' + cls + '" data-day="' + i + '"><div class="dn">' + d + '</div><div class="dd">' + (20 + i) + '</div>' + (has ? '<div class="dot" style="background:var(--eff-' + (eff || "easy") + ')"></div>' : '<div class="dot" style="background:transparent"></div>') + '</button>';
-  }).join("") + '</div>';
+  const pages = PLAN.weeks.map((wk, wi) => {
+    const cur = wi === 0;
+    const days = DAY_ORDER.map((d, i) => {
+      const dt = isoAdd(wk.startIso, i);
+      const has = wk.sessions.some((s) => s.type !== "rest" && effDay(s) === i);
+      const eff = (wk.sessions.find((s) => s.type !== "rest" && effDay(s) === i) || {}).effort;
+      const cls = "d" + (i === state.selDay ? " sel" : "") + (cur && i === TODAY_DOW ? " today" : "");
+      return '<button class="' + cls + '" data-week="' + wi + '" data-day="' + i + '"><div class="dn">' + d + '</div><div class="dd">' + dt.getUTCDate() + '</div>' + (has ? '<div class="dot" style="background:var(--eff-' + (eff || "easy") + ')"></div>' : '<div class="dot" style="background:transparent"></div>') + '</button>';
+    }).join("");
+    return '<div class="wkpage">' + days + '</div>';
+  }).join("");
+  return '<div class="wk-head"><div class="wk-label" id="wkLabel">' + wkLabelInner(curWeekIdx()) + '</div></div>' +
+    '<div class="weekstrip" id="weekband">' + pages + '</div>';
+}
+// The weekly overview shown on Today, under the summary squares: the selected week's UPCOMING
+// sessions — rest days are omitted, and on the current week only today-onward is shown. Tap a session
+// to open its detail; tap its check to toggle done. Reflects whichever week the band is scrolled to.
+function weeklyOverview() {
+  const wk = curWeek();
+  const cur = isCurrentWeek();
+  const days = [];
+  DAY_ORDER.forEach((dn, i) => {
+    if (cur && i < TODAY_DOW) return;                                   // past days aren't "upcoming"
+    const ds = wk.sessions.filter((s) => s.type !== "rest" && effDay(s) === i); // drop rest days
+    if (ds.length) days.push({ i: i, dn: dn, ds: ds });
+  });
+  let n = 0, km = 0;
+  days.forEach((g) => g.ds.forEach((s) => { n++; if (s.distKm) km += s.distKm; }));
+  const rows = days.map((g) => {
+    const dt = isoAdd(wk.startIso, g.i);
+    const cls = "cal-day" + (cur && g.i === TODAY_DOW ? " is-today" : "") + (g.i === state.selDay ? " is-sel" : "");
+    const cells = g.ds.map((s) => calSessionRow(wk.index, s)).join("");
+    return '<div class="' + cls + '"><div class="cal-dcol"><div class="cal-dn">' + g.dn.toUpperCase() + '</div><div class="cal-dd">' + dt.getUTCDate() + '</div></div><div class="cal-scol">' + cells + '</div></div>';
+  }).join("");
+  const phase = wk.phase ? '<span class="cal-badge">' + esc(String(wk.phase).toUpperCase()) + (wk.isDeload ? " · DELOAD" : "") + '</span>' : "";
+  const summary = n ? (n + (n === 1 ? " session" : " sessions") + (km > 0 ? " · " + km.toFixed(1) + " km" : "")) : "";
+  const head = '<div class="cal-whead"><div class="cal-wtitle">' + (cur ? "This week" : "Week " + wk.index) + " " + phase + '</div><div class="cal-wtot">' + summary + '</div></div>';
+  const body = rows || '<div class="cal-empty" style="padding:14px 16px">Nothing left this week — recover well.</div>';
+  return '<h2 class="sec">' + (cur ? "Upcoming this week" : "Week " + wk.index) + '</h2><div class="cal-week ovw">' + head + body + '</div>';
 }
 function viewToday() {
   if (state.trialPending) {
@@ -1482,13 +1545,15 @@ function viewToday() {
   const sess = selectedSession();
   const banner = profile.personalized ? "" : '<button class="setup-banner" id="setupBanner"><div><b>You\'re viewing an example plan</b><div class="sb-sub">Tell us about you and your goal to make it yours.</div></div><span>Set up →</span></button>';
   const greeting = profile.name ? '<div class="greeting">Hi, <b>' + esc(profile.name) + '</b> \uD83D\uDC4B</div>' : "";
+  const onToday = isCurrentWeek() && state.selDay === TODAY_DOW;
   let cta = "";
-  if (sess && PRIMARY_TYPES[sess.type]) cta = '<button class="primary start-btn" id="startSession">' + ICON.play + ' Start session</button>';
+  if (sess && onToday && PRIMARY_TYPES[sess.type]) cta = '<button class="primary start-btn" id="startSession">' + ICON.play + ' Start session</button>';
   else if (sess) cta = '<button class="primary start-btn" id="viewSession">' + ICON.play + ' View session</button>';
   return banner + fitSuggestBanner() + greeting + weekStrip() +
     heroWorkout() +
     cta +
-    '<div class="tsq-row">' + conditionsSquare(sess) + feelSquare() + '</div>';
+    '<div class="tsq-row">' + conditionsSquare(sess) + feelSquare() + '</div>' +
+    weeklyOverview();
 }
 const WEATHER_PRESETS = {
   mild: { label: "Mild", tempC: 12, humidityPct: 55, windKph: 8 },
@@ -3326,7 +3391,7 @@ function applyFitSuggest() {
   profile.recentTimeS = fs.implied; profile.noRecent = false;
   if (profile.status === "new") profile.status = "building"; // a real run means they're past couch-to-5k
   try { recompute(); } catch (e) {}
-  state.planWeek = PLAN.defaultWeekIndex; seedDone(); saveProfileStore();
+  state.planWeek = PLAN.defaultWeekIndex; state.selWeek = 0; state.selDay = TODAY_DOW; seedDone(); saveProfileStore();
   state.fitSuggest = null; saveFitSuggest();
   render();
 }
@@ -3645,19 +3710,34 @@ function wire() {
   const save = $("saveProfile"); if (save) save.onclick = () => {
     let pf; try { pf = draftFromForm(); } catch (e) { const er = $("setupErr"); er.style.display = "block"; er.textContent = e.message; return; }
     let out; try { out = applyProfile(pf); } catch (e) { const er = $("setupErr"); er.style.display = "block"; er.textContent = "That goal can't be planned yet — try a race date further out."; return; }
-    profile = pf; PLAN = out.plan; RAW = out.raw; FITNESS = out.fitness; CLASS = out.classification; MASTERS = out.masters; state.planWeek = PLAN.defaultWeekIndex; seedDone(); saveProfileStore(); renderAvatar();
+    profile = pf; PLAN = out.plan; RAW = out.raw; FITNESS = out.fitness; CLASS = out.classification; MASTERS = out.masters; state.planWeek = PLAN.defaultWeekIndex; state.selWeek = 0; state.selDay = TODAY_DOW; seedDone(); saveProfileStore(); renderAvatar();
     state.screen = null; state.tab = "plan"; render();
   };
   const cancel = $("cancelSetup"); if (cancel) cancel.onclick = () => { state.screen = null; state.tab = "today"; render(); };
   // Session detail taps (Plan, calendar, Today)
   wireSessionTaps();
   // Today: clickable dates, conditions & feel squares, view-session
-  document.querySelectorAll("[data-day]").forEach((b) => b.onclick = () => { state.selDay = Number(b.dataset.day); render(); });
+  // Tapping a date selects that day (and its week); the hero + overview follow.
+  document.querySelectorAll("[data-day]").forEach((b) => b.onclick = () => { if (b.dataset.week != null) state.selWeek = Number(b.dataset.week); state.selDay = Number(b.dataset.day); render(); });
+  // The week band scrolls horizontally, one week per snap page. Position it at the selected week, keep
+  // the label live while scrolling, and re-render once it settles on a new week.
+  const band = $("weekband");
+  if (band) {
+    const pageW = () => (band.firstElementChild ? band.firstElementChild.getBoundingClientRect().width : band.clientWidth) || 1;
+    band.scrollLeft = curWeekIdx() * pageW();
+    band.dataset.shown = String(curWeekIdx());
+    band.onscroll = () => {
+      const w = Math.max(0, Math.min(PLAN.weeks.length - 1, Math.round(band.scrollLeft / pageW())));
+      const lab = $("wkLabel"); if (lab && band.dataset.shown !== String(w)) { lab.innerHTML = wkLabelInner(w); band.dataset.shown = String(w); }
+      clearTimeout(wbandScrollT);
+      wbandScrollT = setTimeout(() => { if (w !== state.selWeek) { state.selWeek = w; render(); } }, 110);
+    };
+  }
   const condSq = $("condSq"); if (condSq) condSq.onclick = openWeatherSheet;
   const feelSq = $("feelSq"); if (feelSq) feelSq.onclick = openFeelSheet;
   const fitApply = $("fitApply"); if (fitApply) fitApply.onclick = applyFitSuggest;
   const fitDismiss = $("fitDismiss"); if (fitDismiss) fitDismiss.onclick = dismissFitSuggest;
-  const viewSession = $("viewSession"); if (viewSession) viewSession.onclick = () => openSessionSheet(selectedSession(), 1);
+  const viewSession = $("viewSession"); if (viewSession) viewSession.onclick = () => openSessionSheet(selectedSession(), curWeekNo());
   // Training-calendar wiring
   const calBack = $("calBack"); if (calBack) calBack.onclick = () => { state.screen = null; render(); };
   document.querySelectorAll("[data-done]").forEach((b) => b.onclick = () => { const k = b.dataset.done; state.done[k] = !state.done[k]; render(); });
@@ -3693,7 +3773,7 @@ function wire() {
 }
 function buildNav() {
   $("nav").innerHTML = ["today","plan","activities","community","support"].map((t) => '<button type="button" class="navbtn' + (t===state.tab?" on":"") + '" data-tab="' + t + '">' + (t === "today" ? todayNavIcon() : ICON[t]) + '<span class="nl">' + TITLES[t].replace("Your ","") + '</span></button>').join("");
-  document.querySelectorAll(".navbtn").forEach((b) => b.onclick = () => { coachStop(); stopLive(); stopSpeech(); stopTrialRun(); TRIALRUN = null; state.screen = null; state.tab = b.dataset.tab; if (b.dataset.tab !== "support") state.support = null; render(); });
+  document.querySelectorAll(".navbtn").forEach((b) => b.onclick = () => { coachStop(); stopLive(); stopSpeech(); stopTrialRun(); TRIALRUN = null; state.screen = null; state.tab = b.dataset.tab; if (b.dataset.tab !== "support") state.support = null; if (b.dataset.tab === "today") { state.selWeek = 0; state.selDay = TODAY_DOW; } render(); });
 }
 $("bellBtn").innerHTML = ICON.bell; $("themeBtn").innerHTML = ICON.theme; $("calBtn").innerHTML = ICON.cal; renderAvatar();
 $("themeBtn").onclick = () => { const cur = document.documentElement.getAttribute("data-theme"); document.documentElement.setAttribute("data-theme", cur === "dark" ? "light" : cur === "light" ? "dark" : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark")); };

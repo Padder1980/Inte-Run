@@ -1423,10 +1423,36 @@ const storedProfile = loadProfile();
 const FIRST_RUN = !storedProfile;
 let profile = storedProfile || Object.assign({}, DEFAULT_PROFILE);
 let PLAN, RAW, FITNESS, CLASS, MASTERS;
-function recompute() { const r = applyProfile(profile); PLAN = r.plan; RAW = r.raw; FITNESS = r.fitness; CLASS = r.classification; MASTERS = r.masters; }
+function recompute() { const r = applyProfile(profile); PLAN = r.plan; RAW = r.raw; FITNESS = r.fitness; CLASS = r.classification; MASTERS = r.masters; normalizeWeekStarts(); }
+// Weeks display on a Monday–Sunday grid, and day indices are Monday-based (0 = Mon). applyProfile can
+// move the first (partial) week's start to a mid-week date; snap each week's start back to its Monday
+// so isoAdd(startIso, dayIndex) — used by the strip, overview, calendar and .ics — always lands on the
+// correct real date. A no-op for the already-Monday full weeks.
+function normalizeWeekStarts() {
+  if (!PLAN || !PLAN.weeks) return;
+  PLAN.weeks.forEach((wk) => {
+    const dow = (isoAdd(wk.startIso, 0).getUTCDay() + 6) % 7;
+    if (dow) wk.startIso = isoAdd(wk.startIso, -dow).toISOString().slice(0, 10);
+  });
+}
 try { recompute(); } catch (e) { profile = Object.assign({}, DEFAULT_PROFILE); recompute(); }
+// Locate the real calendar date within the plan: the week (array index) and day-of-week index today
+// falls on. TODAY_IN_PLAN is false when today is before the plan starts or after it ends — then the
+// view defaults to the nearest end and no "today" marker is shown. Recomputed on every (re)plan.
+let CURRENT_WEEK = 0, TODAY_DOW = 0, TODAY_IN_PLAN = false;
+function computeToday() {
+  const iso = todayIso();
+  CURRENT_WEEK = 0; TODAY_DOW = 0; TODAY_IN_PLAN = false;
+  for (let wi = 0; wi < PLAN.weeks.length; wi++) {
+    for (let i = 0; i < 7; i++) {
+      if (isoAdd(PLAN.weeks[wi].startIso, i).toISOString().slice(0, 10) === iso) { CURRENT_WEEK = wi; TODAY_DOW = i; TODAY_IN_PLAN = true; return; }
+    }
+  }
+  if (PLAN.weeks.length && iso > isoAdd(PLAN.weeks[PLAN.weeks.length - 1].startIso, 6).toISOString().slice(0, 10)) CURRENT_WEEK = PLAN.weeks.length - 1;
+}
+computeToday();
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), trialPending: false, trialSaved: null, done: {}, dayOverride: {}, selDay: 4, selWeek: 0 };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), trialPending: false, trialSaved: null, done: {}, dayOverride: {}, selDay: TODAY_DOW, selWeek: CURRENT_WEEK };
 // Effective day index for a session, honouring any user reschedule. Works for raw sessions
 // (dayOfWeek) and summary sessions (dayIndex), keyed by the shared session id.
 function effDay(s) { const o = state.dayOverride[s.id]; return o != null ? o : (s.dayOfWeek != null ? s.dayOfWeek : s.dayIndex); }
@@ -1442,15 +1468,17 @@ function moveSession(week, sess, target) {
   }
   state.dayOverride[sess.id] = target;
 }
-const TODAY_DOW = 4; // simulated "today" = Friday (a run day), matching the week strip
 function doneKey(wIdx, s) { return wIdx + "|" + s.day + "|" + s.title; }
-// Seed a realistic completed state for the demo: week-1 sessions earlier in the week than "today"
-// count as done, so the calendar and Today reflect progress the way a mid-week user would see it.
+// Mark every session dated before the real today as done, so the calendar and Today reflect progress
+// up to now. (When the plan starts today, nothing is marked — a fresh start.)
 function seedDone() {
   state.done = {};
   state.dayOverride = {}; // a fresh plan clears any reschedules (session ids change)
-  const wk = PLAN.weeks[0]; if (!wk) return;
-  wk.sessions.forEach((s) => { if (DAY_ORDER.indexOf(s.day) < TODAY_DOW && s.type !== "rest") state.done[doneKey(wk.index, s)] = true; });
+  const today = todayIso();
+  PLAN.weeks.forEach((wk) => wk.sessions.forEach((s) => {
+    if (s.type === "rest") return;
+    if (isoAdd(wk.startIso, effDay(s)).toISOString().slice(0, 10) < today) state.done[doneKey(wk.index, s)] = true;
+  }));
 }
 
 // ---- helpers --------------------------------------------------------------
@@ -1486,7 +1514,7 @@ function rpeOf(s) { let band = s.targetRpe; if (!band) { const w = s.steps.filte
 function curWeekIdx() { return Math.max(0, Math.min(state.selWeek, PLAN.weeks.length - 1)); }
 function curWeek() { return PLAN.weeks[curWeekIdx()]; }
 function curWeekNo() { return curWeek().index; } // 1-based week number, for done keys / data-oweek
-function isCurrentWeek() { return curWeekIdx() === 0; }
+function isCurrentWeek() { return curWeekIdx() === CURRENT_WEEK; }
 // Sessions on the selected day of the selected week, honouring reschedules; primary run first.
 function sessionsOnSelectedDay() {
   return RAW.weeks[curWeekIdx()].sessions.filter((s) => s.type !== "rest" && effDay(s) === state.selDay)
@@ -1498,7 +1526,7 @@ function rawToday() { return selectedSession() || RAW.weeks[0].sessions.find((s)
 // The striking hero card for the selected day's main session.
 function heroWorkout() {
   const day = state.selDay;
-  const isToday = isCurrentWeek() && day === TODAY_DOW;
+  const isToday = TODAY_IN_PLAN && isCurrentWeek() && day === TODAY_DOW;
   const eyebrow = isToday ? "Today’s workout" : DAY_ORDER[day] + " " + dmon(isoAdd(curWeek().startIso, day));
   const list = sessionsOnSelectedDay();
   const s = list[0];
@@ -1527,16 +1555,16 @@ function wkLabelInner(wi) {
   const w = Math.max(0, Math.min(wi, PLAN.weeks.length - 1));
   const wk = PLAN.weeks[w];
   const range = dmon(isoAdd(wk.startIso, 0)) + " – " + dmon(isoAdd(wk.startIso, 6));
-  return '<b>' + (w === 0 ? "This week" : "Week " + wk.index) + '</b><span>' + range + '</span>';
+  return '<b>' + (w === CURRENT_WEEK ? "This week" : "Week " + wk.index) + '</b><span>' + range + '</span>';
 }
 function weekStrip() {
   const pages = PLAN.weeks.map((wk, wi) => {
-    const cur = wi === 0;
+    const cur = wi === CURRENT_WEEK;
     const days = DAY_ORDER.map((d, i) => {
       const dt = isoAdd(wk.startIso, i);
       const has = wk.sessions.some((s) => s.type !== "rest" && effDay(s) === i);
       const eff = (wk.sessions.find((s) => s.type !== "rest" && effDay(s) === i) || {}).effort;
-      const cls = "d" + (i === state.selDay ? " sel" : "") + (cur && i === TODAY_DOW ? " today" : "");
+      const cls = "d" + (i === state.selDay ? " sel" : "") + (cur && TODAY_IN_PLAN && i === TODAY_DOW ? " today" : "");
       return '<button class="' + cls + '" data-week="' + wi + '" data-day="' + i + '"><div class="dn">' + d + '</div><div class="dd">' + dt.getUTCDate() + '</div>' + (has ? '<div class="dot" style="background:var(--eff-' + (eff || "easy") + ')"></div>' : '<div class="dot" style="background:transparent"></div>') + '</button>';
     }).join("");
     return '<div class="wkpage">' + days + '</div>';
@@ -1552,7 +1580,7 @@ function weeklyOverview() {
   const cur = isCurrentWeek();
   const days = [];
   DAY_ORDER.forEach((dn, i) => {
-    if (cur && i < TODAY_DOW) return;                                   // past days aren't "upcoming"
+    if (cur && TODAY_IN_PLAN && i < TODAY_DOW) return;                  // past days aren't "upcoming"
     const ds = wk.sessions.filter((s) => s.type !== "rest" && effDay(s) === i); // drop rest days
     if (ds.length) days.push({ i: i, dn: dn, ds: ds });
   });
@@ -1560,7 +1588,7 @@ function weeklyOverview() {
   days.forEach((g) => g.ds.forEach((s) => { n++; if (s.distKm) km += s.distKm; }));
   const rows = days.map((g) => {
     const dt = isoAdd(wk.startIso, g.i);
-    const cls = "cal-day" + (cur && g.i === TODAY_DOW ? " is-today" : "") + (g.i === state.selDay ? " is-sel" : "");
+    const cls = "cal-day" + (cur && TODAY_IN_PLAN && g.i === TODAY_DOW ? " is-today" : "") + (g.i === state.selDay ? " is-sel" : "");
     const cells = g.ds.map((s) => calSessionRow(wk.index, s)).join("");
     return '<div class="' + cls + '"><div class="cal-dcol"><div class="cal-dn">' + g.dn.toUpperCase() + '</div><div class="cal-dd">' + dt.getUTCDate() + '</div></div><div class="cal-scol">' + cells + '</div></div>';
   }).join("");
@@ -1581,7 +1609,7 @@ function viewToday() {
   const sess = selectedSession();
   const banner = profile.personalized ? "" : '<button class="setup-banner" id="setupBanner"><div><b>You\\'re viewing an example plan</b><div class="sb-sub">Tell us about you and your goal to make it yours.</div></div><span>Set up →</span></button>';
   const greeting = profile.name ? '<div class="greeting">Hi, <b>' + esc(profile.name) + '</b> \\uD83D\\uDC4B</div>' : "";
-  const onToday = isCurrentWeek() && state.selDay === TODAY_DOW;
+  const onToday = TODAY_IN_PLAN && isCurrentWeek() && state.selDay === TODAY_DOW;
   let cta = "";
   if (sess && onToday && PRIMARY_TYPES[sess.type]) cta = '<button class="primary start-btn" id="startSession">' + ICON.play + ' Start session</button>';
   else if (sess) cta = '<button class="primary start-btn" id="viewSession">' + ICON.play + ' View session</button>';
@@ -3545,7 +3573,7 @@ function applyFitSuggest() {
   profile.recentTimeS = fs.implied; profile.noRecent = false;
   if (profile.status === "new") profile.status = "building"; // a real run means they're past couch-to-5k
   try { recompute(); } catch (e) {}
-  state.planWeek = PLAN.defaultWeekIndex; state.selWeek = 0; state.selDay = TODAY_DOW; seedDone(); saveProfileStore();
+  computeToday(); state.planWeek = PLAN.defaultWeekIndex; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; seedDone(); saveProfileStore();
   state.fitSuggest = null; saveFitSuggest();
   render();
 }
@@ -3864,7 +3892,7 @@ function wire() {
   const save = $("saveProfile"); if (save) save.onclick = () => {
     let pf; try { pf = draftFromForm(); } catch (e) { const er = $("setupErr"); er.style.display = "block"; er.textContent = e.message; return; }
     let out; try { out = applyProfile(pf); } catch (e) { const er = $("setupErr"); er.style.display = "block"; er.textContent = "That goal can't be planned yet — try a race date further out."; return; }
-    profile = pf; PLAN = out.plan; RAW = out.raw; FITNESS = out.fitness; CLASS = out.classification; MASTERS = out.masters; state.planWeek = PLAN.defaultWeekIndex; state.selWeek = 0; state.selDay = TODAY_DOW; seedDone(); saveProfileStore(); renderAvatar();
+    profile = pf; PLAN = out.plan; RAW = out.raw; FITNESS = out.fitness; CLASS = out.classification; MASTERS = out.masters; computeToday(); state.planWeek = PLAN.defaultWeekIndex; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; seedDone(); saveProfileStore(); renderAvatar();
     state.screen = null; state.tab = "plan"; render();
   };
   const cancel = $("cancelSetup"); if (cancel) cancel.onclick = () => { state.screen = null; state.tab = "today"; render(); };
@@ -3927,7 +3955,7 @@ function wire() {
 }
 function buildNav() {
   $("nav").innerHTML = ["today","plan","activities","community","support"].map((t) => '<button type="button" class="navbtn' + (t===state.tab?" on":"") + '" data-tab="' + t + '">' + (t === "today" ? todayNavIcon() : ICON[t]) + '<span class="nl">' + TITLES[t].replace("Your ","") + '</span></button>').join("");
-  document.querySelectorAll(".navbtn").forEach((b) => b.onclick = () => { coachStop(); stopLive(); stopSpeech(); stopTrialRun(); TRIALRUN = null; state.screen = null; state.tab = b.dataset.tab; if (b.dataset.tab !== "support") state.support = null; if (b.dataset.tab === "today") { state.selWeek = 0; state.selDay = TODAY_DOW; } render(); });
+  document.querySelectorAll(".navbtn").forEach((b) => b.onclick = () => { coachStop(); stopLive(); stopSpeech(); stopTrialRun(); TRIALRUN = null; state.screen = null; state.tab = b.dataset.tab; if (b.dataset.tab !== "support") state.support = null; if (b.dataset.tab === "today") { state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; } render(); });
 }
 $("bellBtn").innerHTML = ICON.bell; $("themeBtn").innerHTML = ICON.theme; $("calBtn").innerHTML = ICON.cal; renderAvatar();
 $("themeBtn").onclick = () => { const cur = document.documentElement.getAttribute("data-theme"); document.documentElement.setAttribute("data-theme", cur === "dark" ? "light" : cur === "light" ? "dark" : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark")); };

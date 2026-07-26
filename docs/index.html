@@ -2484,10 +2484,32 @@ function wireSessionTaps() {
 // ---- Add-a-session: pick a runnable session from a list and put it on today's date ----------------
 // A small library of the runnable session types in the current plan (one representative each), a
 // per-date store of sessions the user has added, and the picker sheet + "Added today" card.
+// Session types the user can add. Whatever their plan actually contains, plus the easy family —
+// a beginner run-walk plan is built entirely from "easy" sessions, so without this the picker
+// offered exactly one choice. The extras are cloned from the user's OWN base session, so a
+// run-walk beginner gets a longer/shorter run-walk rather than a continuous run they can't yet do.
+// Quality types (threshold, intervals, race pace) are deliberately NOT invented — if the plan
+// hasn't introduced them yet, the runner isn't ready for them.
+const ADD_ALWAYS = {
+  recovery: { scale: 0.6, title: "Recovery run", desc: "Shorter and gentler than your usual easy session \u2014 for the day after something hard." },
+  easy: { scale: 1, title: "Easy run", desc: "Your everyday session at conversational effort." },
+  long: { scale: 1.6, title: "Long run", desc: "A longer version of your easy session \u2014 durability comes from time on your feet." },
+};
 function sessionLibrary() {
   const order = ["easy", "recovery", "long", "strides", "threshold", "vo2", "race-specific"];
   const byType = {};
   RAW.weeks.forEach((wk) => wk.sessions.forEach((s) => { if (PRIMARY_TYPES[s.type] && !byType[s.type]) byType[s.type] = s; }));
+  const base = byType.easy || byType.long || byType.recovery;
+  if (base) Object.keys(ADD_ALWAYS).forEach((t) => {
+    if (byType[t]) return;
+    const cfg = ADD_ALWAYS[t];
+    const mins = Math.max(15, Math.round(base.estimatedDurationSeconds / 60 * cfg.scale / 5) * 5);
+    byType[t] = Object.assign({}, base, {
+      type: t, title: cfg.title, description: cfg.desc,
+      estimatedDurationSeconds: mins * 60,
+      estimatedDistanceMeters: base.estimatedDistanceMeters ? Math.round(base.estimatedDistanceMeters * cfg.scale) : undefined,
+    });
+  });
   return order.filter((t) => byType[t]).map((t) => byType[t]);
 }
 function extraRep(type) { return sessionLibrary().find((s) => s.type === type) || null; }

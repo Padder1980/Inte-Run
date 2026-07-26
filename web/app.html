@@ -1293,6 +1293,14 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
 .crop-tools { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
 .crop-tools .crop-ic { font-size: 15px; color: var(--ink-faint); }
 .crop-tools input[type="range"] { flex: 1 1 auto; accent-color: var(--accent); }
+/* Rest days are tappable to add a session — dashed so they read as an empty slot, not a card */
+.rest-add { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; font: inherit; cursor: pointer; padding: 9px 10px; background: none; border: 1px dashed var(--line); border-radius: 11px; color: var(--ink-faint); transition: border-color 140ms ease, color 140ms ease; }
+.rest-add .st { color: var(--ink-faint); font-size: 13.5px; font-weight: 550; }
+.rest-add .rest-plus { margin-left: auto; font-size: 11.5px; font-weight: 650; color: var(--accent); opacity: .85; }
+.rest-add:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.rest-add:active { transform: translateY(1px); }
+.rest-add.cal { justify-content: flex-start; gap: 8px; font-size: 13px; padding: 7px 10px; }
+#view:has(.plan-head) .rest-add { border-style: dashed; }
 /* Add-a-session builder steppers */
 .bld-step { display: flex; align-items: center; gap: 12px; }
 .bld-btn { width: 34px; height: 34px; border-radius: 11px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); font-size: 17px; line-height: 1; cursor: pointer; }
@@ -2276,7 +2284,10 @@ function viewCalendar() {
       const dt = isoAdd(w.startIso, i);
       const isToday = dt.toISOString().slice(0, 10) === todayIsoStr;
       const daySessions = w.sessions.filter((s) => s.type !== "rest" && effDay(s) === i);
-      const cells = daySessions.length ? daySessions.map((s) => calSessionRow(w.index, s)).join("") : '<div class="cal-empty">Rest</div>';
+      const disoStr = dt.toISOString().slice(0, 10);
+      const cells = daySessions.length ? daySessions.map((s) => calSessionRow(w.index, s)).join("")
+        : (disoStr < todayIsoStr ? '<div class="cal-empty">Rest</div>'
+          : '<button class="cal-empty rest-add cal" data-addday="' + disoStr + '">Rest<span class="rest-plus">\uFF0B Add</span></button>');
       return '<div class="cal-day' + (isToday ? " is-today" : "") + '"><div class="cal-dcol"><div class="cal-dn">' + dn.toUpperCase() + '</div><div class="cal-dd">' + dt.getUTCDate() + '</div></div><div class="cal-scol">' + cells + '</div></div>';
     }).join("");
     const total = (doneKm > 0 ? doneKm.toFixed(1) + " km / " : "") + w.distanceKm.toFixed(1) + " km";
@@ -2730,7 +2741,12 @@ function weekDetail() {
     const list = byDay[di];
     let inner;
     if (!list || !list.length) {
-      inner = '<div class="sess"><span class="dot none"></span><div><div class="st" style="color:var(--ink-faint);font-weight:550">Rest</div></div></div>';
+      // A rest day is a legitimate place to add a session, so make the row itself the way in
+      // (there was previously no route to the add flow for a rest day). Past days can't take one.
+      const riso = isoAdd(w.startIso, di).toISOString().slice(0, 10);
+      inner = riso < todayIso()
+        ? '<div class="sess"><span class="dot none"></span><div><div class="st" style="color:var(--ink-faint);font-weight:550">Rest</div></div></div>'
+        : '<button class="sess rest-add" data-addday="' + riso + '"><span class="dot none"></span><div><div class="st">Rest</div></div><span class="rest-plus">\uFF0B Add</span></button>';
     } else {
       inner = list.map((s) => {
         const meta = ['<span class="chip">' + s.durMin + "′" + (s.distKm ? " · " + s.distKm + "km" : "") + "</span>"];
@@ -4651,6 +4667,8 @@ function wire() {
   const viewSession = $("viewSession"); if (viewSession) viewSession.onclick = () => openSessionSheet(selectedSession(), curWeekNo());
   // Add-a-session: open the picker, start or remove an added session, or tap it to view its detail.
   const addSess = $("addSess"); if (addSess) addSess.onclick = () => openAddSessionSheet(selectedDayIso());
+  // Tapping a rest day (Plan week detail or the training calendar) adds a session to that day.
+  document.querySelectorAll("[data-addday]").forEach((b) => b.onclick = () => openAddSessionSheet(b.dataset.addday));
   document.querySelectorAll("[data-addstart]").forEach((b) => b.onclick = () => { const s = extraSession(EXTRA.find((x) => x.id === b.dataset.addstart)); if (s) startSession(s); });
   document.querySelectorAll("[data-addrm]").forEach((b) => b.onclick = () => { removeExtra(b.dataset.addrm); render(); });
   document.querySelectorAll("[data-addopen]").forEach((b) => b.onclick = () => { const s = extraSession(EXTRA.find((x) => x.id === b.dataset.addopen)); if (s) openSessionSheet(s, curWeekNo()); });

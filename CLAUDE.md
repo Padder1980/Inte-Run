@@ -131,7 +131,15 @@ now wired to the real calendar date** — `computeToday()` finds today's week+da
 partial-first-week could be a mid-week `startIso`). And on Today you can **start any session you open**
 (a "Start session" button in the detail sheet) or **add a session of your choice to today** — a picker
 of the plan's runnable session types adds it to an "Added today" card (persisted, auto-clears next day)
-with start + remove; `startSession(sess)` now takes an optional specific session.
+with start + remove; `startSession(sess)` now takes an optional specific session. The add flow is a
+**two-step builder** (pick a type → duration stepper for continuous runs, reps stepper for quality,
+live step/distance preview; `buildCustomSession` clones paces from the plan's representative). The
+**reminders** grew: the bell **pulses** until the user decides (`.rm-attn`, `REMIND.decided`; a "No
+thanks" button records opt-out), an optional **second reminder time** later in the day (per-slot
+once-daily firing in `interun_reminded_on`), notifications carry a **motivational quote**, and "Add
+to calendar" is a **chooser** (This device / Google / Outlook — downloads the .ics and opens that
+service's import page so the user signs in to whichever email account they want; the app never
+handles the password).
 
 Known/optional next: lock-screen/background audio is limited (pure PWA, no native wrapper); true
 background reminders would need a push server (calendar export is the current cross-platform answer).

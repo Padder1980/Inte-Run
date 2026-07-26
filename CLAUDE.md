@@ -128,7 +128,10 @@ notifications + reminder time, and an **Add-to-Calendar `.ics`** export — the 
 since a backend-less PWA can't push in the background; SW handles `notificationclick`); and **Today is
 now wired to the real calendar date** — `computeToday()` finds today's week+day, and
 `normalizeWeekStarts()` snaps each week to its Monday so dates/labels/`.ics` all line up (the old
-partial-first-week could be a mid-week `startIso`).
+partial-first-week could be a mid-week `startIso`). And on Today you can **start any session you open**
+(a "Start session" button in the detail sheet) or **add a session of your choice to today** — a picker
+of the plan's runnable session types adds it to an "Added today" card (persisted, auto-clears next day)
+with start + remove; `startSession(sess)` now takes an optional specific session.
 
 Known/optional next: lock-screen/background audio is limited (pure PWA, no native wrapper); true
 background reminders would need a push server (calendar export is the current cross-platform answer).

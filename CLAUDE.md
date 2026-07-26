@@ -127,6 +127,36 @@ wrapper).
 
 ---
 
+## Operating this repo remotely (phone / browser)
+
+You can drive Claude Code on InteRun from your phone or a browser. Two routes:
+
+- **Remote Control** — *turnkey; the session runs on your Mac, you steer it from anywhere.*
+  In this repo directory: run `claude` once to accept the workspace-trust prompt and `/login` (a
+  claude.ai Pro/Max account — API keys are **not** supported). Then start it with, in order of
+  preference:
+  - `claude remote-control --name "InteRun"` — server mode; prints a session URL, press **space** for a QR code.
+  - `claude --remote-control "InteRun"` — a normal interactive session you can also drive remotely.
+  - `/remote-control InteRun` — turn on Remote Control from inside a running session.
+
+  Connect from the **Claude app → Code** (scan the QR) or **claude.ai/code** (the session shows a
+  green dot). Steer, review diffs, approve tool calls, all from the phone. Enable push with `/config`.
+  Caveats: your **Mac must stay awake with that process running**, and a network outage longer than
+  ~10 min ends the session (just re-run it). Docs: https://code.claude.com/docs/en/remote-control
+
+- **Claude Code on the web** — *cloud; your Mac can be off.* Kick a task off at **claude.ai/code**,
+  pick this repo + a branch; it runs in an Anthropic cloud VM and opens a branch/PR you review from
+  the phone. Give the environment a setup step that runs `npm ci`. Caveats for us: the cloud VM has
+  **no Kokoro / espeak-ng**, so it can't regenerate voices (commit `docs/voices/*` from the Mac
+  first), and **real GPS + voice only work on the deployed Pages site on a real phone** — never in the
+  sandbox. Docs: https://code.claude.com/docs/en/claude-code-on-the-web
+
+Two-account note: each account has its **own** session list at claude.ai/code; switch accounts with
+`/login`. Both accounts can push to the same `main` — no conflict, just separate session lists. As
+ever, only work from one account at a time so two sessions never edit at once.
+
+---
+
 ## For the human — message to paste when you switch accounts
 
 Copy this into the first message of a new session on either account (fill in the last line):

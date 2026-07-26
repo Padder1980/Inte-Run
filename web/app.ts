@@ -1270,6 +1270,27 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
 .rm-knob { position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .15s ease; }
 .rm-switch.on .rm-knob { transform: translateX(18px); }
 .rm-test { display: block; width: 100%; margin-top: 14px; font: inherit; font-size: 13.5px; color: var(--ink-soft); background: none; border: 0; text-decoration: underline; cursor: pointer; }
+/* Bell pulses until the user makes a reminders choice */
+.iconbtn.rm-attn { animation: bellpulse 2.2s ease-in-out infinite; }
+@keyframes bellpulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); }
+  50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 0%, transparent); color: var(--accent); }
+}
+@media (prefers-reduced-motion: reduce) { .iconbtn.rm-attn { animation: none; color: var(--accent); } }
+.rm-nothanks { display: block; width: 100%; margin-top: 12px; padding: 11px; font: inherit; font-size: 13.5px; font-weight: 600; color: var(--ink-soft); background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
+.rm-addtime { display: block; width: 100%; margin-top: 10px; padding: 10px; font: inherit; font-size: 13px; font-weight: 600; color: var(--accent); background: none; border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 11px; cursor: pointer; }
+.rm-x { width: 30px; height: 30px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-faint); font-size: 13px; cursor: pointer; }
+/* Calendar chooser */
+.rm-calgrid { display: flex; flex-direction: column; gap: 8px; }
+.rm-cal { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; text-align: left; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 13px; font: inherit; color: inherit; cursor: pointer; }
+.rm-cal:active { transform: scale(.99); }
+.rm-cal b { font-size: 14.5px; font-weight: 650; color: var(--ink); }
+.rm-cal span { font-size: 12px; color: var(--ink-faint); }
+/* Add-a-session builder steppers */
+.bld-step { display: flex; align-items: center; gap: 12px; }
+.bld-btn { width: 34px; height: 34px; border-radius: 11px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); font-size: 17px; line-height: 1; cursor: pointer; }
+.bld-btn:active { transform: scale(.92); }
+.bld-val { min-width: 44px; text-align: center; font-size: 17px; font-weight: 700; color: var(--ink); }
 /* Session detail: start button + add-a-different-session link */
 .sd-start { width: 100%; margin: 12px 0 6px; }
 .sd-addlink { display: block; width: 100%; margin-top: 16px; padding: 11px; font: inherit; font-size: 13.5px; font-weight: 600; color: var(--accent); background: none; border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 12px; cursor: pointer; }
@@ -1781,14 +1802,21 @@ function wireFeelSheet() {
 // Remind the user of a session on the day they have one. Two mechanisms, because a backend-less PWA
 // can't push in the background: in-app notifications (reliable while open / when added to the Home
 // Screen) and a calendar export (a native reminder on any phone, even with the app closed).
-function loadReminders() { try { const o = JSON.parse(localStorage.getItem("interun_reminders_v1") || "null"); return { enabled: !!(o && o.enabled), time: (o && o.time) || "07:30" }; } catch (e) { return { enabled: false, time: "07:30" }; } }
+// decided: the user has made a reminders choice (on, or explicitly "no thanks") — until then the
+// top-bar bell pulses to draw attention. time2: an optional second reminder later in the day.
+function loadReminders() { try { const o = JSON.parse(localStorage.getItem("interun_reminders_v1") || "null"); return { enabled: !!(o && o.enabled), time: (o && o.time) || "07:30", time2: (o && o.time2) || null, decided: !!(o && (o.decided || o.enabled)) }; } catch (e) { return { enabled: false, time: "07:30", time2: null, decided: false }; } }
 let REMIND = loadReminders();
 function saveReminders() { try { localStorage.setItem("interun_reminders_v1", JSON.stringify(REMIND)); } catch (e) {} }
-function remindedOn() { try { return localStorage.getItem("interun_reminded_on") || ""; } catch (e) { return ""; } }
-function setRemindedOn(d) { try { localStorage.setItem("interun_reminded_on", d); } catch (e) {} }
+// Which reminder slots have fired today: { d: "YYYY-MM-DD", a: bool, b: bool }.
+function firedToday() { try { const o = JSON.parse(localStorage.getItem("interun_reminded_on") || "null"); return (o && o.d === todayIso()) ? o : { d: todayIso(), a: false, b: false }; } catch (e) { return { d: todayIso(), a: false, b: false }; } }
+function markFired(slot) { const o = firedToday(); o[slot] = true; try { localStorage.setItem("interun_reminded_on", JSON.stringify(o)); } catch (e) {} }
 function notifSupported() { return typeof Notification !== "undefined"; }
 function notifPerm() { return notifSupported() ? Notification.permission : "unsupported"; }
-function updateBell() { const b = $("bellBtn"); if (b) b.classList.toggle("rm-on", REMIND.enabled && notifPerm() === "granted"); }
+function updateBell() {
+  const b = $("bellBtn"); if (!b) return;
+  b.classList.toggle("rm-on", REMIND.enabled && notifPerm() === "granted");
+  b.classList.toggle("rm-attn", !REMIND.decided); // pulse until the user makes a choice
+}
 function showNotif(title, opts) {
   try { new Notification(title, opts); return; } catch (e) {}
   try { if (navigator.serviceWorker) navigator.serviceWorker.ready.then((r) => r.showNotification(title, opts)).catch(() => {}); } catch (e) {}
@@ -1805,29 +1833,37 @@ function sessionsForIso(iso) {
   return [];
 }
 function hmMinutes(t) { const p = String(t || "07:30").split(":"); return (Number(p[0]) || 0) * 60 + (Number(p[1]) || 0); }
-// Fire today's reminder if there's a session today and we haven't already notified today.
-function notifyToday() {
+// Fire one reminder slot ("a" = main time, "b" = the later second reminder) if there's a session
+// today and that slot hasn't fired yet. The body carries a motivational quote.
+function notifyToday(slot) {
   if (!REMIND.enabled || notifPerm() !== "granted") return;
   const today = todayIso();
-  if (remindedOn() === today) return;
+  if (firedToday()[slot]) return;
   const list = sessionsForIso(today);
   if (!list.length) return;
   const s = list[0], bits = [];
   if (s.durMin) bits.push(s.durMin + " min");
   if (s.distKm) bits.push(s.distKm + " km");
   const more = list.length > 1 ? " (+" + (list.length - 1) + " more)" : "";
-  setRemindedOn(today);
-  showNotif("Today: " + s.title + more, { body: (bits.length ? bits.join(" \\u00b7 ") + " \\u00b7 " : "") + "Tap to open InteRun.", tag: "interun-session-" + today, icon: "./icon-192.png", badge: "./icon-192.png", data: { url: "./" } });
+  const q = randomQuote();
+  const quote = "\\u201C" + q[0] + "\\u201D" + (q[1] ? " \\u2014 " + q[1] : "");
+  markFired(slot);
+  showNotif("Today: " + s.title + more, { body: (bits.length ? bits.join(" \\u00b7 ") + "\\n" : "") + quote, tag: "interun-session-" + today + "-" + slot, icon: "./icon-192.png", badge: "./icon-192.png", data: { url: "./" } });
 }
-let REMIND_TIMER = null;
-// On open: fire now if past the reminder time, else arm a same-day timer (only fires while the app is
-// open — a website can't wake itself in the background without a server).
+let REMIND_TIMERS = [];
+// On open: for each configured reminder time, fire now if past due, else arm a same-day timer (only
+// fires while the app is open — a website can't wake itself in the background without a server).
 function initReminders() {
-  clearTimeout(REMIND_TIMER);
+  REMIND_TIMERS.forEach(clearTimeout); REMIND_TIMERS = [];
   if (!REMIND.enabled || notifPerm() !== "granted") return;
-  const now = new Date(), nowMin = now.getHours() * 60 + now.getMinutes(), due = hmMinutes(REMIND.time);
-  if (nowMin >= due) { notifyToday(); return; }
-  if (sessionsForIso(todayIso()).length) REMIND_TIMER = setTimeout(notifyToday, (due - nowMin) * 60000 + 2000);
+  if (!sessionsForIso(todayIso()).length) return;
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+  const slots = [["a", REMIND.time]]; if (REMIND.time2) slots.push(["b", REMIND.time2]);
+  slots.forEach((sl) => {
+    const due = hmMinutes(sl[1]);
+    if (nowMin >= due) notifyToday(sl[0]);
+    else REMIND_TIMERS.push(setTimeout(() => notifyToday(sl[0]), (due - nowMin) * 60000 + 2000));
+  });
 }
 // ---- Calendar (.ics) export: every planned session on its real date, with a morning alarm ----
 function pad2(n) { return (n < 10 ? "0" : "") + n; }
@@ -1866,15 +1902,26 @@ function remindersSheetHtml() {
     ? "Your browser can\\u2019t show notifications here \\u2014 add InteRun to your Home Screen, or just use the calendar below."
     : perm === "denied" ? "Notifications are blocked for this site in your settings \\u2014 allow them there, then switch this on." : "";
   const toggle = '<button class="rm-switch' + (on ? " on" : "") + '" id="rmToggle" role="switch" aria-checked="' + (on ? "true" : "false") + '" aria-label="Toggle session reminders"><span class="rm-knob"></span></button>';
+  // Second reminder later in the day: an add link until set, then a time row with a remove.
+  const second = !on ? "" : (REMIND.time2
+    ? '<div class="rm-row"><label for="rmTime2">Second reminder</label><span style="display:flex;align-items:center;gap:8px"><input type="time" id="rmTime2" value="' + REMIND.time2 + '"><button class="rm-x" id="rmTime2Rm" aria-label="Remove second reminder">\\u2715</button></span></div>'
+    : '<button class="rm-addtime" id="rmTime2Add">\\uFF0B Add a second reminder later in the day</button>');
+  const noThanks = REMIND.decided ? "" : '<button class="rm-nothanks" id="rmNo">\\uD83D\\uDD15 No thanks \\u2014 I don\\u2019t want reminders</button>';
   return '<div class="sd-type" style="--sc:var(--accent)">Session reminders</div>' +
     '<div class="sd-title">Get reminded on session days</div>' +
-    '<div class="rm-row"><div><b>In-app notifications</b><div class="sd-desc" style="margin:2px 0 0">A nudge on the days you have a session.</div></div>' + toggle + '</div>' +
+    '<div class="rm-row"><div><b>In-app notifications</b><div class="sd-desc" style="margin:2px 0 0">A nudge \\u2014 with a motivational quote \\u2014 on the days you have a session.</div></div>' + toggle + '</div>' +
     '<div class="rm-row"><label for="rmTime">Reminder time</label><input type="time" id="rmTime" value="' + REMIND.time + '"' + (on ? "" : " disabled") + '></div>' +
+    second +
     (note ? '<div class="sd-desc" style="margin-top:8px">' + note + '</div>' : "") +
+    noThanks +
     '<div class="sd-desc" style="margin-top:10px;font-size:12.5px;color:var(--ink-faint)">A web app can only notify reliably while it\\u2019s open (or added to your Home Screen). For an alert that reaches you with InteRun closed, add your sessions to your calendar below \\u2014 it works on any phone.</div>' +
     '<div class="sd-move" style="margin-top:14px"><div class="sd-move-h">Add sessions to your calendar</div>' +
-    '<div class="sd-desc" style="margin:2px 0 10px">Puts every planned session in your phone\\u2019s calendar with a reminder at your chosen time \\u2014 a native alert on the day, even if InteRun is closed.</div>' +
-    '<button class="primary" id="rmIcs" style="width:100%">' + ICON.cal + ' Add to calendar</button></div>' +
+    '<div class="sd-desc" style="margin:2px 0 10px">Which calendar should your sessions go to? You\\u2019ll sign in to that account on its own site \\u2014 InteRun never sees your password \\u2014 then import the downloaded file.</div>' +
+    '<div class="rm-calgrid">' +
+    '<button class="rm-cal" data-cal="device"><b>\\uD83D\\uDCF1 This device</b><span>Apple / phone calendar \\u2014 opens directly</span></button>' +
+    '<button class="rm-cal" data-cal="google"><b>Google Calendar</b><span>Gmail / Google account</span></button>' +
+    '<button class="rm-cal" data-cal="outlook"><b>Outlook</b><span>Outlook / Hotmail / work account</span></button>' +
+    '</div><div class="sd-move-n" id="rmCalNote"></div></div>' +
     (supported && perm === "granted" ? '<button class="rm-test" id="rmTest">Send a test notification</button>' : "");
 }
 function openRemindersSheet() { ensureSheet(); SHEET_CTX = null; $("sheetBody").innerHTML = remindersSheetHtml(); wireRemindersSheet(); $("sheetOv").classList.add("on"); }
@@ -1883,16 +1930,35 @@ function wireRemindersSheet() {
   const commit = () => { saveReminders(); initReminders(); updateBell(); rerender(); };
   const tog = $("rmToggle");
   if (tog) tog.onclick = () => {
-    if (REMIND.enabled) { REMIND.enabled = false; commit(); return; }
+    if (REMIND.enabled) { REMIND.enabled = false; REMIND.decided = true; commit(); return; }
     if (!notifSupported()) { rerender(); return; }
     const p = notifPerm();
-    if (p === "granted") { REMIND.enabled = true; commit(); }
+    if (p === "granted") { REMIND.enabled = true; REMIND.decided = true; commit(); }
     else if (p === "denied") { rerender(); }
-    else { Notification.requestPermission().then((res) => { REMIND.enabled = (res === "granted"); commit(); }); }
+    else { Notification.requestPermission().then((res) => { REMIND.enabled = (res === "granted"); if (res !== "default") REMIND.decided = true; commit(); }); }
   };
+  const no = $("rmNo"); if (no) no.onclick = () => { REMIND.enabled = false; REMIND.decided = true; commit(); };
   const time = $("rmTime"); if (time) time.onchange = () => { REMIND.time = time.value || "07:30"; saveReminders(); initReminders(); };
-  const ics = $("rmIcs"); if (ics) ics.onclick = downloadIcs;
-  const test = $("rmTest"); if (test) test.onclick = () => showNotif("InteRun test reminder", { body: "This is how your session reminders will look.", tag: "interun-test", icon: "./icon-192.png", data: { url: "./" } });
+  const t2add = $("rmTime2Add"); if (t2add) t2add.onclick = () => { REMIND.time2 = "17:00"; commit(); };
+  const t2 = $("rmTime2"); if (t2) t2.onchange = () => { REMIND.time2 = t2.value || null; saveReminders(); initReminders(); };
+  const t2rm = $("rmTime2Rm"); if (t2rm) t2rm.onclick = () => { REMIND.time2 = null; commit(); };
+  // Calendar chooser: every option downloads the same .ics; Google/Outlook also open that service's
+  // import page in a new tab, where the user signs in to whichever email account they want.
+  document.querySelectorAll('#sheetBody [data-cal]').forEach((b) => b.onclick = () => {
+    const kind = b.dataset.cal;
+    downloadIcs();
+    const noteEl = $("rmCalNote");
+    if (kind === "google") {
+      try { window.open("https://calendar.google.com/calendar/u/0/r/settings/export", "_blank"); } catch (e) {}
+      if (noteEl) noteEl.textContent = "File downloaded. On the Google page that opened, sign in to the account you want, then use Import to add interun-sessions.ics.";
+    } else if (kind === "outlook") {
+      try { window.open("https://outlook.live.com/calendar/0/addcalendar", "_blank"); } catch (e) {}
+      if (noteEl) noteEl.textContent = "File downloaded. On the Outlook page that opened, sign in to the account you want, then choose Upload from file and add interun-sessions.ics.";
+    } else {
+      if (noteEl) noteEl.textContent = "File downloaded \\u2014 open interun-sessions.ics and your phone\\u2019s calendar will offer to add the sessions (it will ask which account/calendar to use).";
+    }
+  });
+  const test = $("rmTest"); if (test) test.onclick = () => { const q = randomQuote(); showNotif("InteRun test reminder", { body: "This is how your session reminders will look.\\n\\u201C" + q[0] + "\\u201D" + (q[1] ? " \\u2014 " + q[1] : ""), tag: "interun-test", icon: "./icon-192.png", data: { url: "./" } }); };
 }
 
 // ============ TRAINING CALENDAR ============================================
@@ -2138,40 +2204,154 @@ function loadExtra() { try { const a = JSON.parse(localStorage.getItem("interun_
 let EXTRA = loadExtra();
 let EXTRA_SEQ = 0;
 function saveExtra() { try { localStorage.setItem("interun_extra_v1", JSON.stringify(EXTRA)); } catch (e) {} }
-function addExtra(type) { EXTRA.push({ id: "x" + (EXTRA_SEQ++) + "-" + (new Date().getTime()), type: type, date: todayIso() }); saveExtra(); }
+function addExtra(params) { EXTRA.push({ id: "x" + (EXTRA_SEQ++) + "-" + (new Date().getTime()), type: params.type, durMin: params.durMin || null, reps: params.reps || null, date: todayIso() }); saveExtra(); }
 function removeExtra(id) { EXTRA = EXTRA.filter((e) => e.id !== id); saveExtra(); }
 function extrasToday() { const t = todayIso(); return EXTRA.filter((e) => e.date === t); }
+function isQualityType(t) { return t === "threshold" || t === "vo2" || t === "race-specific"; }
+// A step's planned seconds: its duration, or — for distance-based reps like 6 x 800m — the time its
+// distance takes at the middle of its target pace band.
+function stepSecs(st) {
+  if (st.durationSeconds) return st.durationSeconds;
+  if (st.distanceMeters && st.targetPaceSecPerKm) return Math.round(st.distanceMeters / 1000 * (st.targetPaceSecPerKm.minSecPerKm + st.targetPaceSecPerKm.maxSecPerKm) / 2);
+  return 0;
+}
+// Whether the builder shapes this pick by rep count (interval-style quality with real rep steps) or
+// by duration (everything else, incl. steady-only quality variants like a continuous tempo).
+function builderUsesReps(type) { const rep = extraRep(type); return isQualityType(type) && !!(rep && rep.steps.some((st) => st.kind === "rep")); }
+// Build the user's custom session from stored params, cloning step paces/RPEs from the plan's
+// representative of that type so targets stay personal.
+// - Interval-style quality: the chosen number of work reps, recoveries between.
+// - Continuous sessions: keep the representative's full structure (warm-up, strides, cool-down...)
+//   and scale only the steady body to hit the chosen duration.
+// - Run-walk sessions (rep/recovery cycles, no steady body): repeat the cycle to fill the time —
+//   never merge a beginner's walk breaks away.
+function buildCustomSession(e) {
+  const rep = extraRep(e.type); if (!rep) return null;
+  if (!e.durMin && !e.reps) return rep; // plain pick — use the plan's session as-is
+  const wu = rep.steps.find((st) => st.kind === "warmup");
+  const cd = rep.steps.find((st) => st.kind === "cooldown");
+  const steps = [];
+  let total = 0;
+  const push = (st) => { steps.push(st); total += stepSecs(st); };
+  const usesReps = builderUsesReps(e.type);
+  if (usesReps && e.reps) {
+    const work = rep.steps.find((st) => st.kind === "rep");
+    const rec = rep.steps.find((st) => st.kind === "recovery");
+    if (wu) push(Object.assign({}, wu));
+    for (let i = 1; i <= e.reps; i++) {
+      push(Object.assign({}, work, { repeatIndex: i, repeatCount: e.reps }));
+      if (rec && i < e.reps) push(Object.assign({}, rec, { repeatIndex: i, repeatCount: e.reps }));
+    }
+    if (cd) push(Object.assign({}, cd));
+  } else {
+    const wanted = (e.durMin || Math.round(rep.estimatedDurationSeconds / 60)) * 60;
+    const steadySecs = rep.steps.reduce((s, st) => s + (st.kind === "steady" ? (st.durationSeconds || 0) : 0), 0);
+    if (steadySecs > 0) {
+      // Scale the steady body; keep warm-up, strides/pickups and cool-down exactly as designed.
+      const fixedSecs = rep.steps.reduce((s, st) => s + (st.kind === "steady" ? 0 : stepSecs(st)), 0);
+      const scale = Math.max(300, wanted - fixedSecs) / steadySecs;
+      rep.steps.forEach((st) => push(st.kind === "steady" ? Object.assign({}, st, { durationSeconds: Math.max(60, Math.round((st.durationSeconds || 0) * scale)) }) : Object.assign({}, st)));
+    } else {
+      // Run-walk style: repeat the run/walk cycle to fill the chosen time.
+      const run = rep.steps.find((st) => st.kind === "rep");
+      const walk = rep.steps.find((st) => st.kind === "recovery");
+      const cyc = (run ? stepSecs(run) || 60 : 0) + (walk ? stepSecs(walk) || 60 : 0);
+      const budget = wanted - (wu ? stepSecs(wu) : 0) - (cd ? stepSecs(cd) : 0);
+      const n = Math.max(1, Math.round(cyc > 0 ? budget / cyc : 1));
+      if (wu) push(Object.assign({}, wu));
+      for (let i = 1; i <= n; i++) {
+        if (run) push(Object.assign({}, run, { repeatIndex: i, repeatCount: n }));
+        if (walk && (i < n || !cd)) push(Object.assign({}, walk, { repeatIndex: i, repeatCount: n }));
+      }
+      if (cd) push(Object.assign({}, cd));
+    }
+  }
+  // Estimated distance: distance-based steps count directly; timed steps via their mid pace.
+  let dist = 0;
+  steps.forEach((st) => {
+    if (st.distanceMeters) dist += st.distanceMeters;
+    else if (st.durationSeconds && st.targetPaceSecPerKm) dist += st.durationSeconds / ((st.targetPaceSecPerKm.minSecPerKm + st.targetPaceSecPerKm.maxSecPerKm) / 2) * 1000;
+  });
+  const mins = Math.round(total / 60);
+  return Object.assign({}, rep, {
+    id: e.id, dayOfWeek: TODAY_DOW, source: "manual",
+    title: mins + "\\u2032 " + (SESSION_LABEL[e.type] || e.type).toLowerCase() + (usesReps && e.reps ? " \\u2014 " + e.reps + " reps" : "") + " (custom)",
+    estimatedDurationSeconds: total, estimatedDistanceMeters: dist ? Math.round(dist) : rep.estimatedDistanceMeters,
+    steps: steps.length ? steps : rep.steps,
+  });
+}
+function extraSession(e) { return e ? buildCustomSession(e) : null; }
 // The "Added today" card + the "Add a session today" button, shown on Today under the summary squares.
 function addedTodayBlock() {
   const list = extrasToday();
   const rows = list.map((e) => {
-    const s = extraRep(e.type); if (!s) return "";
+    const s = extraSession(e); if (!s) return "";
     const dur = Math.round(s.estimatedDurationSeconds / 60);
     const dist = s.estimatedDistanceMeters ? " · " + (Math.round(s.estimatedDistanceMeters / 100) / 10) + " km" : "";
     return '<div class="add-row"><span class="dot ' + effortOf(s) + '"></span>' +
-      '<button class="add-open" data-addopen="' + e.id + '"><span class="st">' + esc(SESSION_LABEL[e.type] || e.type) + '</span><span class="sm">' + dur + '′' + dist + '</span></button>' +
+      '<button class="add-open" data-addopen="' + e.id + '"><span class="st">' + esc(s.title) + '</span><span class="sm">' + dur + '′' + dist + '</span></button>' +
       '<button class="add-go" data-addstart="' + e.id + '" aria-label="Start">' + ICON.play + '</button>' +
       '<button class="add-rm" data-addrm="' + e.id + '" aria-label="Remove">✕</button></div>';
   }).join("");
   const card = list.length ? '<h2 class="sec">Added today</h2><div class="card add-card">' + rows + '</div>' : "";
   return card + '<button class="add-btn" id="addSess">＋ Add a session today</button>';
 }
+// The add-a-session sheet is a two-step builder: pick a type, then shape it (duration for continuous
+// runs, number of reps for quality sessions) with a live time/distance estimate before adding.
+let BUILDER = null; // { type, durMin, reps }
+function repCountOf(s) { const r = s.steps.filter((st) => st.kind === "rep"); return r.length ? (r[0].repeatCount || r.length) : 0; }
 function addSessionSheetHtml() {
-  const items = sessionLibrary().map((s) => {
-    const dur = Math.round(s.estimatedDurationSeconds / 60);
-    const dist = s.estimatedDistanceMeters ? " · " + (Math.round(s.estimatedDistanceMeters / 100) / 10) + " km" : "";
-    return '<button class="pick-row" data-pick="' + s.type + '"><span class="dot ' + effortOf(s) + '"></span>' +
-      '<span class="pick-body"><span class="st">' + esc(SESSION_LABEL[s.type] || s.type) + '</span><span class="sm">' + esc(s.description || "") + '</span></span>' +
-      '<span class="pick-meta num">' + dur + '′' + dist + '</span></button>';
-  }).join("");
-  return '<div class="sd-type" style="--sc:var(--accent)">Add a session</div>' +
-    '<div class="sd-title">Add a session to today</div>' +
-    '<div class="sd-desc" style="margin-bottom:12px">Pick a session to put on today\\u2019s date \\u2014 start it now or whenever you\\u2019re ready.</div>' +
-    '<div class="pick-list">' + items + '</div>';
+  if (!BUILDER) {
+    const items = sessionLibrary().map((s) => {
+      const dur = Math.round(s.estimatedDurationSeconds / 60);
+      const dist = s.estimatedDistanceMeters ? " · " + (Math.round(s.estimatedDistanceMeters / 100) / 10) + " km" : "";
+      return '<button class="pick-row" data-pick="' + s.type + '"><span class="dot ' + effortOf(s) + '"></span>' +
+        '<span class="pick-body"><span class="st">' + esc(SESSION_LABEL[s.type] || s.type) + '</span><span class="sm">' + esc(s.description || "") + '</span></span>' +
+        '<span class="pick-meta num">' + dur + '′' + dist + '</span></button>';
+    }).join("");
+    return '<div class="sd-type" style="--sc:var(--accent)">Add a session</div>' +
+      '<div class="sd-title">Add a session to today</div>' +
+      '<div class="sd-desc" style="margin-bottom:12px">Pick a session type, then build it the way you want it.</div>' +
+      '<div class="pick-list">' + items + '</div>';
+  }
+  // Builder step — live preview from the current params.
+  const preview = buildCustomSession(Object.assign({ id: "preview" }, BUILDER));
+  const dur = Math.round(preview.estimatedDurationSeconds / 60);
+  const dist = preview.estimatedDistanceMeters ? (Math.round(preview.estimatedDistanceMeters / 100) / 10) + " km" : null;
+  const quality = builderUsesReps(BUILDER.type);
+  const stepper = quality
+    ? '<div class="rm-row"><label>Reps</label><span class="bld-step"><button class="bld-btn" data-bld="reps-">\\u2212</button><span class="bld-val num">' + BUILDER.reps + '</span><button class="bld-btn" data-bld="reps+">\\uFF0B</button></span></div>'
+    : '<div class="rm-row"><label>Duration</label><span class="bld-step"><button class="bld-btn" data-bld="dur-">\\u2212</button><span class="bld-val num">' + BUILDER.durMin + '\\u2032</span><button class="bld-btn" data-bld="dur+">\\uFF0B</button></span></div>';
+  const rows = structureRows(preview.steps).map((r) =>
+    '<div class="sd-step"><div class="sd-dot" style="background:var(--eff-' + effortOf(preview) + ')"></div><div><div class="sd-tag">' + r.tag + '</div><div class="sd-lab">' + r.lab + '</div>' + (r.chips ? '<div class="sd-meta">' + r.chips + '</div>' : "") + '</div></div>').join("");
+  return '<div class="sd-type" style="--sc:var(--eff-' + effortOf(preview) + ')">' + (SESSION_LABEL[BUILDER.type] || BUILDER.type) + '</div>' +
+    '<div class="sd-title">Build your session</div>' +
+    '<div class="sd-chips"><span class="chip">' + dur + '\\u2032' + (dist ? " · " + dist : "") + '</span></div>' +
+    stepper +
+    '<div class="sd-steps" style="margin-top:10px">' + rows + '</div>' +
+    '<button class="primary" id="bldAdd" style="width:100%;margin-top:14px">\\uFF0B Add to today</button>' +
+    '<button class="rm-test" id="bldBack">\\u2039 Choose a different type</button>';
 }
-function openAddSessionSheet() { ensureSheet(); SHEET_CTX = null; $("sheetBody").innerHTML = addSessionSheetHtml(); wireAddSessionSheet(); $("sheetOv").classList.add("on"); }
+function openAddSessionSheet() { BUILDER = null; ensureSheet(); SHEET_CTX = null; $("sheetBody").innerHTML = addSessionSheetHtml(); wireAddSessionSheet(); $("sheetOv").classList.add("on"); }
 function wireAddSessionSheet() {
-  document.querySelectorAll('#sheetBody [data-pick]').forEach((b) => b.onclick = () => { addExtra(b.dataset.pick); closeSheet(); render(); });
+  const rerender = () => { $("sheetBody").innerHTML = addSessionSheetHtml(); wireAddSessionSheet(); };
+  document.querySelectorAll('#sheetBody [data-pick]').forEach((b) => b.onclick = () => {
+    const rep = extraRep(b.dataset.pick);
+    // reps only applies to interval-style quality picks; everything else shapes by duration
+    BUILDER = { type: b.dataset.pick, durMin: Math.max(15, Math.round(rep.estimatedDurationSeconds / 60 / 5) * 5 || 45), reps: builderUsesReps(b.dataset.pick) ? Math.min(12, Math.max(2, repCountOf(rep) || 5)) : null };
+    rerender();
+  });
+  document.querySelectorAll('#sheetBody [data-bld]').forEach((b) => b.onclick = () => {
+    if (!BUILDER) return;
+    const k = b.dataset.bld;
+    if (k === "dur-") BUILDER.durMin = Math.max(15, BUILDER.durMin - 5);
+    if (k === "dur+") BUILDER.durMin = Math.min(180, BUILDER.durMin + 5);
+    if (k === "reps-") BUILDER.reps = Math.max(2, BUILDER.reps - 1);
+    if (k === "reps+") BUILDER.reps = Math.min(12, BUILDER.reps + 1);
+    rerender();
+  });
+  const back = $("bldBack"); if (back) back.onclick = () => { BUILDER = null; rerender(); };
+  const add = $("bldAdd"); if (add) add.onclick = () => { addExtra(BUILDER); BUILDER = null; closeSheet(); render(); };
 }
 
 // ============ PLAN =========================================================
@@ -4006,9 +4186,9 @@ function wire() {
   const viewSession = $("viewSession"); if (viewSession) viewSession.onclick = () => openSessionSheet(selectedSession(), curWeekNo());
   // Add-a-session: open the picker, start or remove an added session, or tap it to view its detail.
   const addSess = $("addSess"); if (addSess) addSess.onclick = openAddSessionSheet;
-  document.querySelectorAll("[data-addstart]").forEach((b) => b.onclick = () => { const e = EXTRA.find((x) => x.id === b.dataset.addstart); const s = e && extraRep(e.type); if (s) startSession(s); });
+  document.querySelectorAll("[data-addstart]").forEach((b) => b.onclick = () => { const s = extraSession(EXTRA.find((x) => x.id === b.dataset.addstart)); if (s) startSession(s); });
   document.querySelectorAll("[data-addrm]").forEach((b) => b.onclick = () => { removeExtra(b.dataset.addrm); render(); });
-  document.querySelectorAll("[data-addopen]").forEach((b) => b.onclick = () => { const e = EXTRA.find((x) => x.id === b.dataset.addopen); const s = e && extraRep(e.type); if (s) openSessionSheet(s, curWeekNo()); });
+  document.querySelectorAll("[data-addopen]").forEach((b) => b.onclick = () => { const s = extraSession(EXTRA.find((x) => x.id === b.dataset.addopen)); if (s) openSessionSheet(s, curWeekNo()); });
   // Training-calendar wiring
   const calBack = $("calBack"); if (calBack) calBack.onclick = () => { state.screen = null; render(); };
   document.querySelectorAll("[data-done]").forEach((b) => b.onclick = () => { const k = b.dataset.done; state.done[k] = !state.done[k]; render(); });

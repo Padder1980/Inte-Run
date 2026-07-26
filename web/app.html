@@ -51,39 +51,47 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .iconbtn { position: relative; overflow: hidden; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft); display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .iconbtn svg { width: 18px; height: 18px; }
 .tb-left, .tb-right { display: flex; gap: 8px; }
-/* Splash / launch screen */
-.splash { position: fixed; inset: 0; z-index: 100; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; opacity: 1; transition: opacity .55s ease; }
+/* Splash / launch screen — shared launch geometry.
+   The splash and the welcome use the SAME top-anchored layout and the SAME 96px
+   brand mark, so the logo occupies an identical screen rectangle in both. As the
+   splash fades out and the welcome fades in at the same instant, the two identical
+   logos overlap exactly — the brand mark appears to hold perfectly still while only
+   the text and background crossfade around it (a continuous-logo transition). */
+.splash, .welcome { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: clamp(84px, 24vh, 176px) 32px 40px; text-align: center; background: radial-gradient(125% 90% at 50% 0%, #0c2b28 0%, #06110f 56%, #000 100%); }
+.splash { z-index: 100; gap: 20px; opacity: 1; transition: opacity .55s ease; }
 .splash.hide { opacity: 0; pointer-events: none; }
-.splash-mark { animation: splashpop .7s cubic-bezier(.2,.9,.3,1.1) both; }
-.splash-mark svg { width: 104px; height: 104px; filter: drop-shadow(0 8px 26px rgba(22,183,164,.35)); }
-.splash-name { font-size: 34px; font-weight: 800; letter-spacing: -.02em; color: #fff; animation: splashfade .6s ease .18s both; }
+/* Mark + name + tagline all fade in together (same 0 delay), a touch slower, as one unit. */
+.splash-mark { animation: splashfade 1.1s ease both; }
+.splash-mark svg, .welcome-mark svg { display: block; margin: 0 auto; width: 96px; height: 96px; filter: drop-shadow(0 8px 26px rgba(22,183,164,.38)); }
+.splash-name { font-size: 34px; font-weight: 800; letter-spacing: -.02em; color: #fff; animation: splashfade 1.1s ease both; }
 .splash-name span { color: #16b7a4; }
-.splash-tag { font-size: 13.5px; font-weight: 500; letter-spacing: .01em; color: #9aa3a0; animation: splashfade .6s ease .34s both; }
-@keyframes splashpop { from { opacity: 0; transform: scale(.7) translateY(8px); } to { opacity: 1; transform: none; } }
+.splash-tag { font-size: 13.5px; font-weight: 500; letter-spacing: .01em; color: #9aa3a0; animation: splashfade 1.1s ease both; }
 @keyframes splashfade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .splash-mark, .splash-name, .splash-tag { animation: none; } }
-/* First-run welcome */
-.welcome { position: fixed; inset: 0; z-index: 90; background: radial-gradient(120% 90% at 50% 0%, #0c2b28 0%, #000 62%); display: none; align-items: center; justify-content: center; padding: 32px; text-align: center; opacity: 1; transition: opacity .5s ease; }
+/* First-run welcome — mounts fully opaque directly UNDER the splash (same bg, same
+   logo, same spot). Only the splash fades out on top, dissolving to reveal this; the
+   logo holds still and the app never bleeds through. Copy arrives via welIn. */
+.welcome { z-index: 90; display: none; opacity: 1; transition: opacity .5s ease; }
 .welcome.on { display: flex; }
 .welcome.hide { opacity: 0; pointer-events: none; }
 .welcome-inner { max-width: 360px; }
-.welcome-mark svg { width: 82px; height: 82px; filter: drop-shadow(0 8px 26px rgba(22,183,164,.4)); animation: splashpop .7s cubic-bezier(.2,.9,.3,1.1) both; }
-.welcome-h { font-size: 30px; font-weight: 800; letter-spacing: -.02em; color: #fff; margin: 20px 0 18px; animation: welIn .6s ease .15s both; }
+/* Welcome copy — heading, all three lines, and the CTA fade in together (same .5s delay
+   so the splash label clears first), a touch slower, as one unit. */
+.welcome-h { font-size: 30px; font-weight: 800; letter-spacing: -.02em; color: #fff; margin: 20px 0 18px; animation: welIn .65s ease .5s both; }
 .welcome-h span { color: #16b7a4; }
 .welcome-msg { font-size: 16px; line-height: 1.5; color: #cfd6d3; margin: 0 0 12px; opacity: 0; }
-.welcome-msg.m1 { animation: welIn .55s ease .55s both; }
-.welcome-msg.m2 { animation: welIn .55s ease 1.15s both; }
-.welcome-msg.m3 { color: #fff; font-weight: 600; animation: welIn .55s ease 1.85s both; }
-.welcome-cta { margin-top: 22px; font: inherit; font-size: 16px; font-weight: 700; color: var(--accent-ink); background: linear-gradient(180deg, #1cc4b0 0%, #0e8c7f 60%, #0b6f65 100%); border: 0; border-radius: 14px; padding: 15px 30px; cursor: pointer; box-shadow: 0 1px 0 rgba(255,255,255,.25) inset, 0 10px 26px -8px rgba(22,183,164,.6); opacity: 0; animation: welIn .55s ease 2.5s both; }
+.welcome-msg.m1 { animation: welIn .65s ease .5s both; }
+.welcome-msg.m2 { animation: welIn .65s ease .5s both; }
+.welcome-msg.m3 { color: #fff; font-weight: 600; animation: welIn .65s ease .5s both; }
+.welcome-cta { margin-top: 22px; font: inherit; font-size: 16px; font-weight: 700; color: var(--accent-ink); background: linear-gradient(180deg, #1cc4b0 0%, #0e8c7f 60%, #0b6f65 100%); border: 0; border-radius: 14px; padding: 15px 30px; cursor: pointer; box-shadow: 0 1px 0 rgba(255,255,255,.25) inset, 0 10px 26px -8px rgba(22,183,164,.6); opacity: 0; animation: welIn .65s ease .5s both; }
 .welcome-cta:active { transform: translateY(1px); }
 @keyframes welIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .welcome-mark svg, .welcome-h, .welcome-msg, .welcome-cta { animation-duration: .01s !important; animation-delay: 0s !important; } }
-/* Welcome-back (returning user): personalised greeting + rotating quote */
-.welcome.wb { opacity: 0; transition: opacity .45s ease; } .welcome.wb.on { opacity: 1; } .welcome.wb.hide { opacity: 0; }
-.welcome.wb .welcome-h { margin: 18px 0 14px; animation: none; }
-.wb-quote { font-size: 18px; line-height: 1.5; font-style: italic; color: #eef3f1; margin: 0 8px; }
-.wb-by { font-size: 13px; color: #9aa3a0; margin: 12px 0 0; }
-.wb-cta { animation: none; opacity: 1; margin-top: 26px; }
+@media (prefers-reduced-motion: reduce) { .splash-mark, .splash-name, .splash-tag, .welcome-h, .welcome-msg, .welcome-cta, .wb-quote, .wb-by { animation: none !important; } .welcome-msg, .welcome-cta, .wb-quote, .wb-by { opacity: 1; } }
+/* Welcome-back (returning user): personalised greeting + rotating quote — same
+   continuous-logo entrance (opaque under the fading splash); only the copy differs. */
+.welcome.wb .welcome-h { margin: 18px 0 14px; }
+.wb-quote { font-size: 18px; line-height: 1.5; font-style: italic; color: #eef3f1; margin: 0 8px; animation: welIn .65s ease .5s both; }
+.wb-by { font-size: 13px; color: #9aa3a0; margin: 12px 0 0; animation: welIn .65s ease .5s both; }
+.wb-cta { margin-top: 26px; animation: welIn .65s ease .5s both; }
 /* Session guide overlay (interactive walkthrough of the session shorthand) */
 .guide-ov { position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center; padding: 22px; background: color-mix(in srgb, var(--ink) 72%, transparent); backdrop-filter: blur(5px); opacity: 0; transition: opacity .25s ease; }
 .guide-ov.on { display: flex; opacity: 1; }
@@ -3382,7 +3390,7 @@ function showWelcomeBack() {
     '<button class="welcome-cta wb-cta" id="wbGo">Let\u2019s go \u2192</button>' +
     '</div></div>');
   document.body.appendChild(ov);
-  requestAnimationFrame(() => ov.classList.add("on"));
+  ov.classList.add("on");   // opaque, directly under the fading splash — the logo holds; copy welIns
   let gone = false;
   const dismiss = () => { if (gone) return; gone = true; ov.classList.add("hide"); setTimeout(() => { ov.remove(); if (state.tab === "today" && !state.screen) maybeAutoGuide(); }, 500); };
   // Stays up until the user taps "Let's go" — no auto-dismiss, no tap-away.
@@ -3703,16 +3711,16 @@ render();
     setTimeout(() => {
       removeSplash();
       const wel = $("welcome"); if (!wel) return;
-      wel.classList.add("on");
+      wel.classList.add("on");   // opaque, directly under the fading splash; its copy arrives via welIn
       const go = () => { wel.classList.add("hide"); setTimeout(() => wel.remove(), 500); state.screen = "setup"; render(); };
       const btn = $("welcomeGo"); if (btn) btn.onclick = go;
-    }, 1300);
+    }, 2000);
   } else {
     // Returning user: brand splash → a brief personalised welcome with a rotating quote → Today.
     let started = false;
     const go = () => { if (started) return; started = true; removeSplash(); showWelcomeBack(); };
     sp.addEventListener("click", go);
-    setTimeout(go, 1600);
+    setTimeout(go, 2200);
   }
 })();
 // Register the service worker only where it actually exists (the GitHub Pages PWA build). We probe

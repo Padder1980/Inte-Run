@@ -1232,6 +1232,33 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
 .rm-knob { position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .15s ease; }
 .rm-switch.on .rm-knob { transform: translateX(18px); }
 .rm-test { display: block; width: 100%; margin-top: 14px; font: inherit; font-size: 13.5px; color: var(--ink-soft); background: none; border: 0; text-decoration: underline; cursor: pointer; }
+/* Session detail: start button + add-a-different-session link */
+.sd-start { width: 100%; margin: 12px 0 6px; }
+.sd-addlink { display: block; width: 100%; margin-top: 16px; padding: 11px; font: inherit; font-size: 13.5px; font-weight: 600; color: var(--accent); background: none; border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 12px; cursor: pointer; }
+.sd-addlink:active { transform: scale(.99); }
+/* Add-a-session on Today: button + "Added today" card */
+.add-btn { display: block; width: 100%; margin: 2px 0 8px; padding: 13px; font: inherit; font-size: 14px; font-weight: 650; color: var(--accent); background: var(--surface); border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 14px; cursor: pointer; }
+.add-btn:active { transform: scale(.99); }
+.add-card { padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+.add-row { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 11px; }
+.add-row .dot { flex: 0 0 auto; }
+.add-open { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; text-align: left; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; padding: 2px 0; }
+.add-open .st { font-size: 14.5px; font-weight: 650; color: var(--ink); }
+.add-open .sm { font-size: 12px; color: var(--ink-faint); }
+.add-go, .add-rm { flex: 0 0 auto; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); cursor: pointer; }
+.add-go { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+.add-go svg { width: 16px; height: 16px; }
+.add-rm { color: var(--ink-faint); font-size: 15px; line-height: 1; }
+.add-go:active, .add-rm:active { transform: scale(.92); }
+/* Add-a-session picker (sheet) */
+.pick-list { display: flex; flex-direction: column; gap: 8px; }
+.pick-row { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; padding: 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 13px; font: inherit; color: inherit; cursor: pointer; transition: border-color .12s ease; }
+.pick-row:active { transform: scale(.99); }
+.pick-row .dot { flex: 0 0 auto; }
+.pick-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pick-body .st { font-size: 15px; font-weight: 650; color: var(--ink); }
+.pick-body .sm { font-size: 12px; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-meta { flex: 0 0 auto; font-size: 12.5px; color: var(--ink-faint); }
 </style>
 </head>
 <body>
@@ -1594,6 +1621,7 @@ function viewToday() {
     heroWorkout() +
     cta +
     '<div class="tsq-row">' + conditionsSquare(sess) + feelSquare() + '</div>' +
+    addedTodayBlock() +
     weeklyOverview();
 }
 const WEATHER_PRESETS = {
@@ -2027,12 +2055,16 @@ function sessionSheetHtml(sess, week) {
   const dayPicker = DAY_ORDER.map((dn, i) => '<button class="sd-day' + (i === cur ? " on" : "") + '" data-moveto="' + i + '"' + (i === cur ? " disabled" : "") + '>' + dn + '</button>').join("");
   const moveBlock = sess.type === "rest" ? "" :
     '<div class="sd-move"><div class="sd-move-h">Move to another day</div><div class="sd-days">' + dayPicker + '</div><div class="sd-move-n">Pick a day. If a run is already there, the two will swap.</div></div>';
+  const startBtn = PRIMARY_TYPES[sess.type] ? '<button class="primary sd-start" id="sdStart">' + ICON.play + ' Start session</button>' : "";
+  const addLink = '<button class="sd-addlink" id="sdAdd">＋ Add a different session to today</button>';
   return '<div class="sd-type" style="--sc:' + sc + '">' + (SESSION_LABEL[sess.type] || sess.type) + '</div>' +
     '<div class="sd-title">' + esc(sess.title) + '</div>' +
     '<div class="sd-chips">' + chips.join("") + '</div>' +
+    startBtn +
     '<div class="sd-desc">' + esc(sess.description) + '</div>' +
     body +
-    moveBlock;
+    moveBlock +
+    addLink;
 }
 function ensureSheet() {
   if ($("sheetOv")) return;
@@ -2049,6 +2081,8 @@ function wireSheet() {
     render();
   });
   document.querySelectorAll("#sheetBody [data-slog]").forEach((inp) => inp.oninput = () => slogSet(inp.dataset.slog, inp.dataset.f, inp.value.trim()));
+  const sdStart = $("sdStart"); if (sdStart && SHEET_CTX && SHEET_CTX.sess) sdStart.onclick = () => { closeSheet(); startSession(SHEET_CTX.sess); };
+  const sdAdd = $("sdAdd"); if (sdAdd) sdAdd.onclick = openAddSessionSheet;
 }
 function openSessionSheet(sess, week) {
   if (!sess) return;
@@ -2065,6 +2099,56 @@ function wireSessionTaps() {
     const wk = Number(b.dataset.oweek);
     openSessionSheet(rawSessionById(wk, b.dataset.oid), wk);
   });
+}
+
+// ---- Add-a-session: pick a runnable session from a list and put it on today's date ----------------
+// A small library of the runnable session types in the current plan (one representative each), a
+// per-date store of sessions the user has added, and the picker sheet + "Added today" card.
+function sessionLibrary() {
+  const order = ["easy", "recovery", "long", "strides", "threshold", "vo2", "race-specific"];
+  const byType = {};
+  RAW.weeks.forEach((wk) => wk.sessions.forEach((s) => { if (PRIMARY_TYPES[s.type] && !byType[s.type]) byType[s.type] = s; }));
+  return order.filter((t) => byType[t]).map((t) => byType[t]);
+}
+function extraRep(type) { return sessionLibrary().find((s) => s.type === type) || null; }
+function loadExtra() { try { const a = JSON.parse(localStorage.getItem("interun_extra_v1") || "[]"); const t = todayIso(); return Array.isArray(a) ? a.filter((e) => e && e.date >= t) : []; } catch (e) { return []; } }
+let EXTRA = loadExtra();
+let EXTRA_SEQ = 0;
+function saveExtra() { try { localStorage.setItem("interun_extra_v1", JSON.stringify(EXTRA)); } catch (e) {} }
+function addExtra(type) { EXTRA.push({ id: "x" + (EXTRA_SEQ++) + "-" + (new Date().getTime()), type: type, date: todayIso() }); saveExtra(); }
+function removeExtra(id) { EXTRA = EXTRA.filter((e) => e.id !== id); saveExtra(); }
+function extrasToday() { const t = todayIso(); return EXTRA.filter((e) => e.date === t); }
+// The "Added today" card + the "Add a session today" button, shown on Today under the summary squares.
+function addedTodayBlock() {
+  const list = extrasToday();
+  const rows = list.map((e) => {
+    const s = extraRep(e.type); if (!s) return "";
+    const dur = Math.round(s.estimatedDurationSeconds / 60);
+    const dist = s.estimatedDistanceMeters ? " · " + (Math.round(s.estimatedDistanceMeters / 100) / 10) + " km" : "";
+    return '<div class="add-row"><span class="dot ' + effortOf(s) + '"></span>' +
+      '<button class="add-open" data-addopen="' + e.id + '"><span class="st">' + esc(SESSION_LABEL[e.type] || e.type) + '</span><span class="sm">' + dur + '′' + dist + '</span></button>' +
+      '<button class="add-go" data-addstart="' + e.id + '" aria-label="Start">' + ICON.play + '</button>' +
+      '<button class="add-rm" data-addrm="' + e.id + '" aria-label="Remove">✕</button></div>';
+  }).join("");
+  const card = list.length ? '<h2 class="sec">Added today</h2><div class="card add-card">' + rows + '</div>' : "";
+  return card + '<button class="add-btn" id="addSess">＋ Add a session today</button>';
+}
+function addSessionSheetHtml() {
+  const items = sessionLibrary().map((s) => {
+    const dur = Math.round(s.estimatedDurationSeconds / 60);
+    const dist = s.estimatedDistanceMeters ? " · " + (Math.round(s.estimatedDistanceMeters / 100) / 10) + " km" : "";
+    return '<button class="pick-row" data-pick="' + s.type + '"><span class="dot ' + effortOf(s) + '"></span>' +
+      '<span class="pick-body"><span class="st">' + esc(SESSION_LABEL[s.type] || s.type) + '</span><span class="sm">' + esc(s.description || "") + '</span></span>' +
+      '<span class="pick-meta num">' + dur + '′' + dist + '</span></button>';
+  }).join("");
+  return '<div class="sd-type" style="--sc:var(--accent)">Add a session</div>' +
+    '<div class="sd-title">Add a session to today</div>' +
+    '<div class="sd-desc" style="margin-bottom:12px">Pick a session to put on today\u2019s date \u2014 start it now or whenever you\u2019re ready.</div>' +
+    '<div class="pick-list">' + items + '</div>';
+}
+function openAddSessionSheet() { ensureSheet(); SHEET_CTX = null; $("sheetBody").innerHTML = addSessionSheetHtml(); wireAddSessionSheet(); $("sheetOv").classList.add("on"); }
+function wireAddSessionSheet() {
+  document.querySelectorAll('#sheetBody [data-pick]').forEach((b) => b.onclick = () => { addExtra(b.dataset.pick); closeSheet(); render(); });
 }
 
 // ============ PLAN =========================================================
@@ -2885,8 +2969,8 @@ function wireCoachSettings() {
     if (COACH.audio) COACH.audio.volume = COACH.cfg.volume;
   };
 }
-function startSession() {
-  const s = rawToday();
+function startSession(sess) {
+  const s = (sess && sess.steps) ? sess : rawToday();
   LIVE = { session: s, rt: new RC.LiveSession(s), mode: null, acquiring: false, gpsErr: null,
     startMs: 0, pausedMs: 0, pauseStart: 0, vms: 0, dist: 0, hr: 105, devSpeed: null, curPace: null, win: [],
     timer: null, ui: null, watchId: null, wakeLock: null, lastLat: null, lastLon: null, acc: null,
@@ -3897,6 +3981,11 @@ function wire() {
   const fitApply = $("fitApply"); if (fitApply) fitApply.onclick = applyFitSuggest;
   const fitDismiss = $("fitDismiss"); if (fitDismiss) fitDismiss.onclick = dismissFitSuggest;
   const viewSession = $("viewSession"); if (viewSession) viewSession.onclick = () => openSessionSheet(selectedSession(), curWeekNo());
+  // Add-a-session: open the picker, start or remove an added session, or tap it to view its detail.
+  const addSess = $("addSess"); if (addSess) addSess.onclick = openAddSessionSheet;
+  document.querySelectorAll("[data-addstart]").forEach((b) => b.onclick = () => { const e = EXTRA.find((x) => x.id === b.dataset.addstart); const s = e && extraRep(e.type); if (s) startSession(s); });
+  document.querySelectorAll("[data-addrm]").forEach((b) => b.onclick = () => { removeExtra(b.dataset.addrm); render(); });
+  document.querySelectorAll("[data-addopen]").forEach((b) => b.onclick = () => { const e = EXTRA.find((x) => x.id === b.dataset.addopen); const s = e && extraRep(e.type); if (s) openSessionSheet(s, curWeekNo()); });
   // Training-calendar wiring
   const calBack = $("calBack"); if (calBack) calBack.onclick = () => { state.screen = null; render(); };
   document.querySelectorAll("[data-done]").forEach((b) => b.onclick = () => { const k = b.dataset.done; state.done[k] = !state.done[k]; render(); });

@@ -122,6 +122,11 @@ Dismiss the welcome with `#wbGo`; a profile is seeded via `localStorage rc_profi
 - **Don't change the workout engine's logic** (the `src/` engine + its tests) for a visual task. Add
   focused tests for any new logic.
 - Verify before shipping: build + typecheck + tests + light/dark screenshots.
+- **Never measure a DOM element inside a bottom sheet before the sheet is shown** — it measures 0,
+  and a fallback constant silently poisons every calculation downstream (this caused the avatar
+  cropper to save an off-centre crop). Add `.on` first, then read `clientWidth` (content box), not
+  `getBoundingClientRect()` (includes the border). For anything geometric, verify with a marker: put
+  a known pixel at a known place, run it through, and assert where it lands.
 - Keep the app a single self-contained file with **no external network assets** (everything inlined or,
   for audio, served from `docs/voices/` and cached by the service worker).
 

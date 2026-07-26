@@ -1323,7 +1323,10 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
 .crop-stage { position: relative; width: 100%; aspect-ratio: 1; max-width: 300px; margin: 0 auto; overflow: hidden; border-radius: 16px; background: var(--surface-2); border: 1px solid var(--line); touch-action: none; cursor: grab; user-select: none; }
 .crop-stage:active { cursor: grabbing; }
 .crop-img { position: absolute; top: 0; left: 0; transform-origin: 0 0; max-width: none; pointer-events: none; -webkit-user-drag: none; }
-.crop-mask { position: absolute; inset: 0; pointer-events: none; border-radius: 16px; box-shadow: inset 0 0 0 9999px color-mix(in srgb, var(--bg) 62%, transparent); -webkit-mask: radial-gradient(circle at 50% 50%, transparent 49.5%, #000 50%); mask: radial-gradient(circle at 50% 50%, transparent 49.5%, #000 50%); }
+/* closest-side is load-bearing: the default (farthest-corner) makes 100% the distance to the CORNER,
+   so the clear disc came out ~0.70x the stage while the ring below sits at the inscribed circle —
+   two different circles. closest-side puts 100% at half the side, matching the ring and the saved crop. */
+.crop-mask { position: absolute; inset: 0; pointer-events: none; border-radius: 16px; box-shadow: inset 0 0 0 9999px color-mix(in srgb, var(--bg) 62%, transparent); -webkit-mask: radial-gradient(circle closest-side at 50% 50%, transparent 99%, #000 100%); mask: radial-gradient(circle closest-side at 50% 50%, transparent 99%, #000 100%); }
 .crop-mask::after { content: ""; position: absolute; inset: 0; border-radius: 50%; box-shadow: inset 0 0 0 2px color-mix(in srgb, #fff 70%, transparent); }
 .crop-tools { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
 .crop-tools .crop-ic { font-size: 15px; color: var(--ink-faint); }
@@ -2969,8 +2972,13 @@ function openCropSheet(img) {
     '<div class="crop-tools"><span class="crop-ic">\\uD83D\\uDD0D\\uFE0E</span><input type="range" id="cropZoom" min="100" max="400" value="100"></div>' +
     '<button class="primary" id="cropSave" style="width:100%;margin-top:14px">Use this photo</button>' +
     '<button class="rm-test" id="cropCancel">Cancel</button>';
+  // Show the sheet BEFORE measuring: while it's hidden the stage measures 0, and a wrong V silently
+  // offsets every later calculation (the saved crop ends up off-centre from the circle you framed).
+  // clientWidth is the content box — the containing block for the absolutely-positioned image — so
+  // it excludes the 1px border that getBoundingClientRect() would include.
+  $("sheetOv").classList.add("on");
   const stage = $("cropStage"), el = $("cropImg");
-  const V = stage.getBoundingClientRect().width || 260;
+  const V = stage.clientWidth || Math.round(stage.getBoundingClientRect().width) || 260;
   const base = V / Math.min(img.width, img.height);
   CROP = { img: img, V: V, base: base, k: base, zoom: 1, x: 0, y: 0 };
   el.src = img.src;
@@ -3007,7 +3015,6 @@ function openCropSheet(img) {
   const sl = $("cropZoom"); if (sl) sl.oninput = () => cropZoomTo(Number(sl.value) / 100);
   $("cropCancel").onclick = () => { CROP = null; closeSheet(); };
   $("cropSave").onclick = saveCrop;
-  $("sheetOv").classList.add("on");
 }
 // Render just the framed circle to a square 256px JPEG (keeps localStorage small).
 function saveCrop() {

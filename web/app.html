@@ -1219,6 +1219,19 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
 .wkpage { flex: 0 0 100%; box-sizing: border-box; padding: 0 6px; scroll-snap-align: start; display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; }
 .cal-week.ovw { margin-top: 4px; }
 .cal-week.ovw .cal-day.is-sel { box-shadow: inset 3px 0 0 var(--accent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
+/* Session reminders sheet */
+.iconbtn.rm-on { color: var(--accent); }
+.rm-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 0; border-top: 1px solid var(--line); }
+.rm-row:first-of-type { border-top: 0; padding-top: 4px; }
+.rm-row label { font-size: 14px; font-weight: 600; color: var(--ink); }
+.rm-row b { font-size: 14px; font-weight: 650; color: var(--ink); }
+.rm-row input[type="time"] { font: inherit; font-size: 15px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; }
+.rm-row input[type="time"]:disabled { opacity: .5; }
+.rm-switch { position: relative; width: 46px; height: 28px; flex: 0 0 auto; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2); cursor: pointer; padding: 0; transition: background .15s ease, border-color .15s ease; }
+.rm-switch.on { background: var(--accent); border-color: var(--accent); }
+.rm-knob { position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .15s ease; }
+.rm-switch.on .rm-knob { transform: translateX(18px); }
+.rm-test { display: block; width: 100%; margin-top: 14px; font: inherit; font-size: 13.5px; color: var(--ink-soft); background: none; border: 0; text-decoration: underline; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -1683,6 +1696,124 @@ function wireFeelSheet() {
     if (f === "dayType") state.dayType = b.dataset.v; else state.subj[f] = b.dataset.v;
     $("sheetBody").innerHTML = feelSheetHtml(); wireFeelSheet(); render();
   }));
+}
+
+// ---- Session reminders + calendar export ----------------------------------
+// Remind the user of a session on the day they have one. Two mechanisms, because a backend-less PWA
+// can't push in the background: in-app notifications (reliable while open / when added to the Home
+// Screen) and a calendar export (a native reminder on any phone, even with the app closed).
+function loadReminders() { try { const o = JSON.parse(localStorage.getItem("interun_reminders_v1") || "null"); return { enabled: !!(o && o.enabled), time: (o && o.time) || "07:30" }; } catch (e) { return { enabled: false, time: "07:30" }; } }
+let REMIND = loadReminders();
+function saveReminders() { try { localStorage.setItem("interun_reminders_v1", JSON.stringify(REMIND)); } catch (e) {} }
+function remindedOn() { try { return localStorage.getItem("interun_reminded_on") || ""; } catch (e) { return ""; } }
+function setRemindedOn(d) { try { localStorage.setItem("interun_reminded_on", d); } catch (e) {} }
+function notifSupported() { return typeof Notification !== "undefined"; }
+function notifPerm() { return notifSupported() ? Notification.permission : "unsupported"; }
+function updateBell() { const b = $("bellBtn"); if (b) b.classList.toggle("rm-on", REMIND.enabled && notifPerm() === "granted"); }
+function showNotif(title, opts) {
+  try { new Notification(title, opts); return; } catch (e) {}
+  try { if (navigator.serviceWorker) navigator.serviceWorker.ready.then((r) => r.showNotification(title, opts)).catch(() => {}); } catch (e) {}
+}
+// Plan sessions that fall on a given real (YYYY-MM-DD) date, primary run first.
+function sessionsForIso(iso) {
+  for (let wi = 0; wi < PLAN.weeks.length; wi++) {
+    const wk = PLAN.weeks[wi];
+    for (let i = 0; i < 7; i++) {
+      if (isoAdd(wk.startIso, i).toISOString().slice(0, 10) !== iso) continue;
+      return wk.sessions.filter((s) => s.type !== "rest" && effDay(s) === i).sort((a, b) => (PRIMARY_TYPES[b.type] || 0) - (PRIMARY_TYPES[a.type] || 0));
+    }
+  }
+  return [];
+}
+function hmMinutes(t) { const p = String(t || "07:30").split(":"); return (Number(p[0]) || 0) * 60 + (Number(p[1]) || 0); }
+// Fire today's reminder if there's a session today and we haven't already notified today.
+function notifyToday() {
+  if (!REMIND.enabled || notifPerm() !== "granted") return;
+  const today = todayIso();
+  if (remindedOn() === today) return;
+  const list = sessionsForIso(today);
+  if (!list.length) return;
+  const s = list[0], bits = [];
+  if (s.durMin) bits.push(s.durMin + " min");
+  if (s.distKm) bits.push(s.distKm + " km");
+  const more = list.length > 1 ? " (+" + (list.length - 1) + " more)" : "";
+  setRemindedOn(today);
+  showNotif("Today: " + s.title + more, { body: (bits.length ? bits.join(" \u00b7 ") + " \u00b7 " : "") + "Tap to open InteRun.", tag: "interun-session-" + today, icon: "./icon-192.png", badge: "./icon-192.png", data: { url: "./" } });
+}
+let REMIND_TIMER = null;
+// On open: fire now if past the reminder time, else arm a same-day timer (only fires while the app is
+// open — a website can't wake itself in the background without a server).
+function initReminders() {
+  clearTimeout(REMIND_TIMER);
+  if (!REMIND.enabled || notifPerm() !== "granted") return;
+  const now = new Date(), nowMin = now.getHours() * 60 + now.getMinutes(), due = hmMinutes(REMIND.time);
+  if (nowMin >= due) { notifyToday(); return; }
+  if (sessionsForIso(todayIso()).length) REMIND_TIMER = setTimeout(notifyToday, (due - nowMin) * 60000 + 2000);
+}
+// ---- Calendar (.ics) export: every planned session on its real date, with a morning alarm ----
+function pad2(n) { return (n < 10 ? "0" : "") + n; }
+function icsDate(dt) { return "" + dt.getUTCFullYear() + pad2(dt.getUTCMonth() + 1) + pad2(dt.getUTCDate()); }
+function icsStamp() { const d = new Date(); return "" + d.getUTCFullYear() + pad2(d.getUTCMonth() + 1) + pad2(d.getUTCDate()) + "T" + pad2(d.getUTCHours()) + pad2(d.getUTCMinutes()) + pad2(d.getUTCSeconds()) + "Z"; }
+function icsTrigger() { const m = hmMinutes(REMIND.time), h = Math.floor(m / 60), mm = m % 60; return "PT" + (h > 0 ? h + "H" : "") + (mm > 0 || h === 0 ? mm + "M" : ""); }
+function icsEsc(s) { return String(s == null ? "" : s).split(";").join("\\;").split(",").join("\\,"); }
+function buildSessionsIcs() {
+  const stamp = icsStamp(), trig = icsTrigger();
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//InteRun//Training//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:InteRun sessions"];
+  PLAN.weeks.forEach((wk) => {
+    wk.sessions.filter((s) => s.type !== "rest").forEach((s) => {
+      const dt = isoAdd(wk.startIso, effDay(s)), bits = [];
+      if (s.durMin) bits.push(s.durMin + " min");
+      if (s.distKm) bits.push(s.distKm + " km");
+      if (s.pace) bits.push(s.pace);
+      lines.push("BEGIN:VEVENT", "UID:interun-" + wk.index + "-" + (s.id || (icsDate(dt) + "-" + s.type)) + "@interun.app", "DTSTAMP:" + stamp, "DTSTART;VALUE=DATE:" + icsDate(dt), "SUMMARY:" + icsEsc("InteRun \u2014 " + s.title), "DESCRIPTION:" + icsEsc(bits.join(" \u00b7 ") || "Training session"), "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(s.title), "TRIGGER;RELATED=START:" + trig, "END:VALARM", "END:VEVENT");
+    });
+  });
+  lines.push("END:VCALENDAR");
+  return lines.join("\r\n") + "\r\n";
+}
+function downloadIcs() {
+  const ics = buildSessionsIcs();
+  try {
+    const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar;charset=utf-8" }));
+    const a = document.createElement("a"); a.href = url; a.download = "interun-sessions.ics";
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch (e) {} }, 1500);
+  } catch (e) { try { window.open("data:text/calendar;charset=utf-8," + encodeURIComponent(ics)); } catch (e2) {} }
+}
+// ---- Reminders sheet (opened from the top-bar bell) ----
+function remindersSheetHtml() {
+  const perm = notifPerm(), supported = notifSupported(), on = REMIND.enabled && perm === "granted";
+  const note = !supported
+    ? "Your browser can\u2019t show notifications here \u2014 add InteRun to your Home Screen, or just use the calendar below."
+    : perm === "denied" ? "Notifications are blocked for this site in your settings \u2014 allow them there, then switch this on." : "";
+  const toggle = '<button class="rm-switch' + (on ? " on" : "") + '" id="rmToggle" role="switch" aria-checked="' + (on ? "true" : "false") + '" aria-label="Toggle session reminders"><span class="rm-knob"></span></button>';
+  return '<div class="sd-type" style="--sc:var(--accent)">Session reminders</div>' +
+    '<div class="sd-title">Get reminded on session days</div>' +
+    '<div class="rm-row"><div><b>In-app notifications</b><div class="sd-desc" style="margin:2px 0 0">A nudge on the days you have a session.</div></div>' + toggle + '</div>' +
+    '<div class="rm-row"><label for="rmTime">Reminder time</label><input type="time" id="rmTime" value="' + REMIND.time + '"' + (on ? "" : " disabled") + '></div>' +
+    (note ? '<div class="sd-desc" style="margin-top:8px">' + note + '</div>' : "") +
+    '<div class="sd-desc" style="margin-top:10px;font-size:12.5px;color:var(--ink-faint)">A web app can only notify reliably while it\u2019s open (or added to your Home Screen). For an alert that reaches you with InteRun closed, add your sessions to your calendar below \u2014 it works on any phone.</div>' +
+    '<div class="sd-move" style="margin-top:14px"><div class="sd-move-h">Add sessions to your calendar</div>' +
+    '<div class="sd-desc" style="margin:2px 0 10px">Puts every planned session in your phone\u2019s calendar with a reminder at your chosen time \u2014 a native alert on the day, even if InteRun is closed.</div>' +
+    '<button class="primary" id="rmIcs" style="width:100%">' + ICON.cal + ' Add to calendar</button></div>' +
+    (supported && perm === "granted" ? '<button class="rm-test" id="rmTest">Send a test notification</button>' : "");
+}
+function openRemindersSheet() { ensureSheet(); SHEET_CTX = null; $("sheetBody").innerHTML = remindersSheetHtml(); wireRemindersSheet(); $("sheetOv").classList.add("on"); }
+function wireRemindersSheet() {
+  const rerender = () => { $("sheetBody").innerHTML = remindersSheetHtml(); wireRemindersSheet(); };
+  const commit = () => { saveReminders(); initReminders(); updateBell(); rerender(); };
+  const tog = $("rmToggle");
+  if (tog) tog.onclick = () => {
+    if (REMIND.enabled) { REMIND.enabled = false; commit(); return; }
+    if (!notifSupported()) { rerender(); return; }
+    const p = notifPerm();
+    if (p === "granted") { REMIND.enabled = true; commit(); }
+    else if (p === "denied") { rerender(); }
+    else { Notification.requestPermission().then((res) => { REMIND.enabled = (res === "granted"); commit(); }); }
+  };
+  const time = $("rmTime"); if (time) time.onchange = () => { REMIND.time = time.value || "07:30"; saveReminders(); initReminders(); };
+  const ics = $("rmIcs"); if (ics) ics.onclick = downloadIcs;
+  const test = $("rmTest"); if (test) test.onclick = () => showNotif("InteRun test reminder", { body: "This is how your session reminders will look.", tag: "interun-test", icon: "./icon-192.png", data: { url: "./" } });
 }
 
 // ============ TRAINING CALENDAR ============================================
@@ -3779,9 +3910,11 @@ $("bellBtn").innerHTML = ICON.bell; $("themeBtn").innerHTML = ICON.theme; $("cal
 $("themeBtn").onclick = () => { const cur = document.documentElement.getAttribute("data-theme"); document.documentElement.setAttribute("data-theme", cur === "dark" ? "light" : cur === "light" ? "dark" : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark")); };
 $("profileBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); state.screen = "setup"; render(); };
 $("calBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); state.screen = "calendar"; render(); };
+$("bellBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); openRemindersSheet(); };
 seedDone();
 buildNav();
 render();
+try { updateBell(); initReminders(); } catch (e) {}
 // Launch flow: brief brand splash, then either the first-run welcome (which leads into setup) or,
 // for a returning user, straight to Today.
 (function () {

@@ -1062,6 +1062,172 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
   #view:has(.plan-head) .bar-btn,
   #view:has(.plan-head) .sess.tap { transition: none; }
 }
+
+/* =========================================================
+   ACTIVITIES — premium visual refinement (design collab)
+   Scoped to the Activities screen via #view:has(.subtabs); token-driven.
+   ========================================================= */
+#view:has(.subtabs) {
+  --activity-tint: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  --activity-edge: color-mix(in srgb, var(--accent) 23%, var(--line));
+  background: radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 30%), var(--bg);
+}
+#view:has(.subtabs) .subtabs {
+  position: sticky; top: 0; z-index: 8; gap: 4px; margin: 0 0 18px; padding: 4px;
+  background: color-mix(in srgb, var(--surface-2) 90%, transparent);
+  border-color: color-mix(in srgb, var(--line) 86%, var(--accent)); border-radius: 15px;
+  box-shadow: 0 8px 22px -18px color-mix(in srgb, var(--ink) 35%, transparent), inset 0 1px 0 color-mix(in srgb, var(--ink) 4%, transparent);
+  backdrop-filter: blur(18px) saturate(150%); -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
+#view:has(.subtabs) .subtabs button {
+  position: relative; min-height: 40px; padding: 9px 7px; color: var(--ink-faint); border-radius: 11px;
+  font-size: 12.5px; font-weight: 680; letter-spacing: -0.005em;
+  transition: color 150ms ease, background 150ms ease, box-shadow 150ms ease, transform 120ms ease;
+}
+#view:has(.subtabs) .subtabs button.on {
+  color: var(--accent); background: linear-gradient(160deg, var(--surface), color-mix(in srgb, var(--accent) 6%, var(--surface)));
+  box-shadow: 0 6px 15px -11px color-mix(in srgb, var(--ink) 38%, transparent), inset 0 -2px 0 var(--accent), inset 0 1px 0 color-mix(in srgb, var(--ink) 4%, transparent);
+  font-weight: 740;
+}
+#view:has(.subtabs) .subtabs button:active { transform: scale(0.98); }
+#view:has(.subtabs) .subtabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+#view:has(.subtabs) .subtabs + div[style] {
+  margin: 0 3px 11px !important; color: var(--ink-faint) !important;
+  font-size: 10.5px !important; font-weight: 720; letter-spacing: 0.075em; text-transform: uppercase;
+}
+#view:has(.subtabs) .runcard {
+  position: relative; margin-bottom: 13px;
+  background: linear-gradient(165deg, var(--surface), color-mix(in srgb, var(--surface-2) 38%, var(--surface)));
+  border-color: color-mix(in srgb, var(--line) 84%, var(--accent)); border-radius: 20px;
+  box-shadow: var(--shadow), inset 0 1px 0 color-mix(in srgb, var(--ink) 3%, transparent);
+  transition: border-color 150ms ease, box-shadow 150ms ease, transform 120ms ease;
+}
+#view:has(.subtabs) .runcard:hover { border-color: var(--activity-edge); box-shadow: var(--shadow), 0 12px 25px -21px color-mix(in srgb, var(--accent) 48%, transparent); }
+#view:has(.subtabs) .runcard:active { transform: translateY(1px); }
+#view:has(.subtabs) .rc-map {
+  position: relative; overflow: hidden; height: 138px;
+  background: radial-gradient(circle at 25% 15%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 38%), var(--surface-2);
+  border-bottom-color: color-mix(in srgb, var(--line) 84%, var(--accent));
+}
+#view:has(.subtabs) .rc-map::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 -16px 24px -24px color-mix(in srgb, var(--ink) 40%, transparent); pointer-events: none; }
+#view:has(.subtabs) .rc-map .routemap { display: block; width: 100%; height: 100%; max-height: none; }
+#view:has(.subtabs) .runcard .act { gap: 13px; padding: 16px 16px 17px 18px; }
+#view:has(.subtabs) .runcard .act::before { top: 17px; bottom: 17px; left: 0; width: 3px; background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 40%, var(--build))); border-radius: 0 999px 999px 0; }
+#view:has(.subtabs) .act .b { min-width: 0; }
+#view:has(.subtabs) .act .t { color: var(--ink); font-size: 16px; font-weight: 740; letter-spacing: -0.02em; line-height: 1.3; }
+#view:has(.subtabs) .act .d { margin-top: 3px; color: var(--ink-faint); font-size: 11.5px; line-height: 1.35; }
+#view:has(.subtabs) .act .m { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--line); }
+#view:has(.subtabs) .act .m > div { min-width: 0; padding: 0 9px; }
+#view:has(.subtabs) .act .m > div:first-child { padding-left: 0; }
+#view:has(.subtabs) .act .m > div:not(:first-child) { border-left: 1px solid var(--line); }
+#view:has(.subtabs) .act .m b { overflow: hidden; color: var(--ink); font-size: 14px; font-weight: 720; letter-spacing: -0.025em; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+#view:has(.subtabs) .act .m span { display: block; margin-top: 3px; color: var(--ink-faint); font-size: 9px; font-weight: 680; letter-spacing: 0.055em; line-height: 1.2; text-transform: uppercase; }
+#view:has(.subtabs) .runcard .rc-arr {
+  width: 30px; height: 30px; margin-left: auto; flex: none; display: flex; align-items: center; justify-content: center;
+  color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--surface-2));
+  border: 1px solid var(--activity-edge); border-radius: 10px; font-size: 19px; line-height: 1;
+}
+#view:has(.subtabs) .empty-acts, #view:has(.subtabs) .empty-state {
+  position: relative; overflow: hidden; padding: 48px 25px;
+  background: linear-gradient(155deg, var(--activity-tint), var(--surface) 68%);
+  border: 1px solid var(--activity-edge); border-radius: 22px; box-shadow: var(--shadow), inset 3px 0 0 var(--accent);
+}
+#view:has(.subtabs) .empty-acts::after, #view:has(.subtabs) .empty-state::after { content: ""; position: absolute; top: -60px; right: -60px; width: 160px; height: 160px; background: radial-gradient(circle, color-mix(in srgb, var(--accent) 12%, transparent), transparent 68%); pointer-events: none; }
+#view:has(.subtabs) .empty-acts .ea-ic, #view:has(.subtabs) .empty-state .ic {
+  width: 58px; height: 58px; margin-bottom: 16px; color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 11%, var(--surface)); border: 1px solid var(--activity-edge); border-radius: 17px;
+  box-shadow: 0 9px 18px -15px color-mix(in srgb, var(--accent) 65%, transparent);
+}
+#view:has(.subtabs) .empty-acts .ea-h, #view:has(.subtabs) .empty-state h3 { color: var(--ink); font-size: 18px; font-weight: 760; letter-spacing: -0.025em; }
+#view:has(.subtabs) .empty-acts .ea-b, #view:has(.subtabs) .empty-state p { color: var(--ink-soft); line-height: 1.55; }
+#view:has(.subtabs) .sh-card {
+  margin-bottom: 12px; padding: 16px;
+  background: linear-gradient(165deg, var(--surface), color-mix(in srgb, var(--surface-2) 35%, var(--surface)));
+  border-color: color-mix(in srgb, var(--line) 84%, var(--accent)); border-radius: 18px;
+  box-shadow: var(--shadow), inset 0 1px 0 color-mix(in srgb, var(--ink) 3%, transparent);
+}
+#view:has(.subtabs) .sh-head { gap: 13px; }
+#view:has(.subtabs) .sh-anim { width: 64px; height: 70px; border-color: var(--activity-edge); border-radius: 13px; }
+#view:has(.subtabs) .sh-name { color: var(--ink); font-size: 15.5px; font-weight: 730; letter-spacing: -0.018em; }
+#view:has(.subtabs) .sh-mus { margin-top: 2px; color: var(--ink-soft); }
+#view:has(.subtabs) .sh-best { margin-top: 6px; }
+#view:has(.subtabs) .sh-best b { color: var(--accent); font-weight: 740; }
+#view:has(.subtabs) .sh-spark { height: 45px; padding: 7px 6px 5px; background: color-mix(in srgb, var(--accent) 6%, var(--surface-2)); border: 1px solid var(--line); border-radius: 10px; }
+#view:has(.subtabs) .sh-spark i { background: color-mix(in srgb, var(--accent) 45%, var(--surface-2)); }
+#view:has(.subtabs) .sh-spark i:last-child { background: var(--accent); }
+#view:has(.subtabs) .sh-rows { margin-top: 14px; padding-top: 9px; }
+#view:has(.subtabs) .sh-row { padding: 6px 0; }
+#view:has(.subtabs) .sh-wk { color: var(--ink-faint); font-size: 11px; }
+#view:has(.subtabs) .sh-sets { color: var(--ink-soft); font-size: 11.5px; }
+#view:has(.subtabs) .hero-pace {
+  position: relative; overflow: hidden; padding: 22px 20px;
+  background: linear-gradient(145deg, var(--activity-tint), var(--surface) 70%);
+  border-color: var(--activity-edge); border-radius: 22px; box-shadow: var(--shadow), inset 3px 0 0 var(--accent);
+}
+#view:has(.subtabs) .hero-pace .lab { color: var(--ink-soft); font-size: 11px; font-weight: 700; letter-spacing: 0.055em; text-transform: uppercase; }
+#view:has(.subtabs) .hero-pace .p { margin: 8px 0 4px; color: var(--ink); font-size: 42px; font-weight: 780; letter-spacing: -0.045em; line-height: 1; }
+#view:has(.subtabs) .hero-pace .p small { color: var(--ink-faint); font-size: 14px; }
+#view:has(.subtabs) .hero-pace .s { max-width: 30ch; margin-top: 8px; color: var(--ink-soft); line-height: 1.45; }
+#view:has(.subtabs) .dim-card {
+  padding: 17px; background: linear-gradient(165deg, var(--surface), color-mix(in srgb, var(--surface-2) 32%, var(--surface)));
+  border-color: color-mix(in srgb, var(--line) 86%, var(--accent)); border-radius: 17px; box-shadow: var(--shadow);
+}
+#view:has(.subtabs) .dim-card .lab { color: var(--ink); font-size: 14px; font-weight: 720; }
+#view:has(.subtabs) .dim-card .read { color: var(--rc, var(--accent)); font-weight: 700; }
+#view:has(.subtabs) .dmeter { gap: 5px; margin-top: 12px; }
+#view:has(.subtabs) .dmeter i { height: 6px; border: 0; border-radius: 999px; }
+#view:has(.subtabs) h2.sec { position: relative; margin: 24px 2px 10px; padding-left: 12px; color: var(--ink); font-size: 15px; font-weight: 730; }
+#view:has(.subtabs) h2.sec::before { content: ""; position: absolute; top: 50%; left: 0; width: 4px; height: 16px; background: var(--accent); border-radius: 999px; transform: translateY(-50%); }
+#view:has(.subtabs) .mas-zone { padding: 11px 13px; background: color-mix(in srgb, var(--accent) 5%, var(--surface-2)); border-left-color: var(--accent); border-radius: 0 11px 11px 0; }
+@media (max-width: 360px) {
+  #view:has(.subtabs) .subtabs button { padding-inline: 4px; font-size: 11.5px; }
+  #view:has(.subtabs) .rc-map { height: 124px; }
+  #view:has(.subtabs) .runcard .act { padding-inline: 15px 12px; }
+  #view:has(.subtabs) .act .m > div { padding-inline: 6px; }
+  #view:has(.subtabs) .act .m b { font-size: 12.5px; }
+  #view:has(.subtabs) .sh-spark { width: 58px; }
+  #view:has(.subtabs) .hero-pace .p { font-size: 37px; }
+}
+
+/* Bottom navigation — floating dock (global, shared across the app) */
+.bottomnav {
+  position: sticky; bottom: 0; z-index: 20; gap: 2px;
+  margin: 0 10px calc(8px + env(safe-area-inset-bottom)); padding: 6px 5px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, var(--accent)); border-radius: 22px;
+  box-shadow: 0 16px 32px -20px color-mix(in srgb, var(--ink) 48%, transparent), 0 5px 14px -10px color-mix(in srgb, var(--ink) 28%, transparent), inset 0 1px 0 color-mix(in srgb, var(--ink) 4%, transparent);
+  backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%);
+}
+.navbtn {
+  position: relative; isolation: isolate; min-width: 0; min-height: 54px; gap: 4px; padding: 5px 1px 4px;
+  color: var(--ink-faint); border-radius: 16px; transition: color 150ms ease, transform 120ms ease;
+}
+.navbtn::before {
+  content: ""; position: absolute; z-index: -1; top: 2px; left: 50%; width: 43px; height: 32px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2)); border: 1px solid transparent; border-radius: 12px;
+  opacity: 0; transform: translateX(-50%) scale(0.86);
+  transition: opacity 150ms ease, transform 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+.navbtn svg { position: relative; width: 21px; height: 21px; transition: transform 150ms ease; }
+.navbtn .nl { overflow: hidden; max-width: 100%; font-size: 9.5px; font-weight: 620; letter-spacing: -0.01em; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.navbtn.on { color: var(--accent); }
+.navbtn.on::before {
+  opacity: 1; background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 16%, var(--surface)), color-mix(in srgb, var(--accent) 7%, var(--surface-2)));
+  border-color: color-mix(in srgb, var(--accent) 25%, var(--line)); transform: translateX(-50%) scale(1);
+}
+.navbtn.on svg { transform: translateY(-1px); }
+.navbtn.on .nl { color: var(--accent); font-weight: 730; }
+.navbtn:active { transform: translateY(1px); }
+.navbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+@media (max-width: 360px) {
+  .bottomnav { margin-inline: 7px; padding-inline: 3px; }
+  .navbtn { min-height: 52px; }
+  .navbtn::before { width: 39px; }
+  .navbtn .nl { font-size: 8.5px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #view:has(.subtabs) .subtabs button, #view:has(.subtabs) .runcard, .navbtn, .navbtn::before, .navbtn svg { transition: none; }
+}
 </style>
 </head>
 <body>

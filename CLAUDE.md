@@ -114,7 +114,12 @@ long-run day, pro-rata first week), warm-up/cool-down framing, fitness re-estima
 welcome-back + quotes, first-run session guide, Support "understanding my sessions", real-runs-only
 Activities, post-run overview with a real street map, branded share card, animated strength-exercise
 demos (WebP), **spoken coaching with four Kokoro voices**, and design refinements to Profile, Today,
-Plan (+ chart legend), Activities, and the bottom nav (full-width app bar with a live Today date icon).
+Plan (+ chart legend), Activities, and the bottom nav (full-width app bar with a live Today date icon),
+plus a **continuous-logo launch transition**: the splash and the first-run welcome / welcome-back share
+one top-anchored 96px brand mark and background, so the splash simply dissolves over an opaque welcome
+and the logo holds still through the handoff (no app bleed-through, no black→teal jump); within each
+screen all elements fade in together, with a slower 1.1s splash reveal and longer holds (2.0s first-run,
+2.2s returning). See the `.splash` / `.welcome` CSS + the launch IIFE near the end of `web/app.ts`.
 
 Known/optional next: the app still runs its "Today" on a fixed simulated day rather than the real
 calendar date (offered, not yet done); lock-screen/background audio is limited (pure PWA, no native

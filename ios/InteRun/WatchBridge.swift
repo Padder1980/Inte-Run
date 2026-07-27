@@ -138,6 +138,7 @@ extension WatchBridge: WKScriptMessageHandler {
             // which the watch must be able to tell apart from "we have not synced yet".
             var payload: [String: Any] = ["at": Date().timeIntervalSince1970]
             if let s = body["session"] as? [String: Any] { payload["session"] = s }
+            if let n = body["name"] as? String, !n.isEmpty { payload["name"] = n }
             push(payload)
         case "ready":
             // The page has finished booting and can accept runs now.

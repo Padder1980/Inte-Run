@@ -2138,6 +2138,9 @@ function syncWatch() {
   clearTimeout(WATCH_SYNC_T);
   WATCH_SYNC_T = setTimeout(() => {
     const payload = { action: "sync" };
+    // First name only: the watch has room for "Well done, Adam", not a full name.
+    const first = String(profile.name || "").trim().split(/\s+/)[0];
+    if (first) payload.name = first;
     const s = watchPayloadForToday();
     if (s) payload.session = s;
     try { window.webkit.messageHandlers.interunWatch.postMessage(payload); } catch (e) {}

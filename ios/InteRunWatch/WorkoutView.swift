@@ -8,6 +8,7 @@ import WatchKit
 /// away precisely so a stray touch mid-stride cannot end your run.
 struct WorkoutView: View {
     @ObservedObject var workout: WorkoutManager
+    @EnvironmentObject private var store: SessionStore
     @Environment(\.dismiss) private var dismiss
     // Stable integer tags: a conditionally-included page makes SwiftUI's selection unreliable, and
     // landing on the wrong page mid-run is exactly the wrong first impression.
@@ -23,7 +24,7 @@ struct WorkoutView: View {
                 if askingEffort {
                     EffortView(workout: workout) { dismiss() }
                 } else {
-                    SummaryView(workout: workout) { askingEffort = true }
+                    SummaryView(workout: workout, name: store.runnerName) { askingEffort = true }
                 }
             default:
                 TabView(selection: $page) {
@@ -49,9 +50,9 @@ struct WorkoutView: View {
                     Text(workout.elapsedText)
                         .font(.system(size: 21, weight: .semibold, design: .rounded))
                         .monospacedDigit()
-                        .foregroundStyle(workout.phase == .paused ? .orange : Color.accentColor)
+                        .foregroundStyle(workout.phase == .paused ? Brand.ease : Brand.accent)
                     if workout.phase == .paused {
-                        Text("PAUSED").font(.system(size: 10, weight: .bold)).foregroundStyle(.orange)
+                        Text("PAUSED").font(.system(size: 10, weight: .bold)).foregroundStyle(Brand.ease)
                     }
                 }
 
@@ -63,10 +64,10 @@ struct WorkoutView: View {
                         Text(left.value)
                             .font(.system(size: 26, weight: .semibold, design: .rounded))
                             .monospacedDigit()
-                            .foregroundStyle(.green)
+                            .foregroundStyle(Brand.accent)
                         Text(left.unit)
                             .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.green)
+                            .foregroundStyle(Brand.accent)
                     }
                 }
 
@@ -76,7 +77,7 @@ struct WorkoutView: View {
                 }
 
                 HStack(spacing: 4) {
-                    Image(systemName: "heart.fill").foregroundStyle(.red).font(.system(size: 10))
+                    Image(systemName: "heart.fill").foregroundStyle(Brand.rest).font(.system(size: 10))
                     Text(workout.heartRate > 0 ? "\(Int(workout.heartRate))" : "--")
                         .font(.system(size: 16, weight: .medium)).monospacedDigit()
                     Text("BPM").font(.system(size: 9)).foregroundStyle(.secondary)
@@ -91,7 +92,7 @@ struct WorkoutView: View {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             Capsule().fill(Color.gray.opacity(0.3))
-                            Capsule().fill(Color.green)
+                            Capsule().fill(Brand.accent)
                                 .frame(width: max(2, geo.size.width * p))
                         }
                     }
@@ -127,7 +128,7 @@ struct WorkoutView: View {
         ScrollView {
             VStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.title3).foregroundStyle(.orange)
+                    .font(.title3).foregroundStyle(Brand.ease)
                 Text(message).font(.caption)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -157,7 +158,7 @@ struct ControlsView: View {
                             Text("End").font(.system(size: 10))
                         }.frame(maxWidth: .infinity)
                     }
-                    .tint(.red)
+                    .tint(Brand.rest)
 
                     Button {
                         if workout.phase == .paused { workout.resume() } else { workout.pause() }
@@ -169,7 +170,7 @@ struct ControlsView: View {
                             Text(workout.phase == .paused ? "Resume" : "Pause").font(.system(size: 10))
                         }.frame(maxWidth: .infinity)
                     }
-                    .tint(workout.phase == .paused ? .green : .orange)
+                    .tint(workout.phase == .paused ? Brand.accent : Brand.ease)
                 }
 
                 Button {
@@ -217,14 +218,14 @@ struct SessionStepsView: View {
                 if let step = workout.currentStep {
                     Text(step.label)
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Brand.accent)
                         .fixedSize(horizontal: false, vertical: true)
 
                     if let goal = step.goalText {
                         Text(goal).font(.system(size: 11)).foregroundStyle(.secondary)
                     }
                     if let p = step.progress(elapsed: workout.stepElapsed, metresDone: workout.stepMetres) {
-                        ProgressView(value: p).tint(.green)
+                        ProgressView(value: p).tint(Brand.accent)
                     }
                     if let lo = step.paceLow, let hi = step.paceHigh {
                         Text("Target \(WorkoutManager.pace(Double(lo)))–\(WorkoutManager.pace(Double(hi)))/km")
@@ -251,50 +252,81 @@ struct SessionStepsView: View {
 
 struct SummaryView: View {
     @ObservedObject var workout: WorkoutManager
+    /// The runner's first name, carried over from the phone.
+    var name: String?
     var onNext: () -> Void
 
+    /// The first thing you see after a run should be a person talking to you, not a table.
+    private var congratulation: String {
+        name.map { "Well done, \($0)" } ?? "Well done"
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(spacing: 6) {
-                Text(workout.plan?.title ?? "Run")
-                    .font(.system(size: 13, weight: .semibold))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
+        ZStack {
+            Brand.backdrop
+            ScrollView {
+                VStack(spacing: 5) {
+                    Text(congratulation)
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(Brand.accent)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("You smashed it")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Brand.ink)
 
-                if workout.route.count > 1 {
-                    RouteMapView(points: workout.route)
-                        .frame(height: 70)
-                        .padding(.vertical, 2)
-                }
+                    Text(workout.plan?.title ?? "Run")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Brand.inkFaint)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 1)
 
-                Text(String(format: "%.2fKM", workout.distanceKm))
-                    .font(.system(size: 30, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
+                    if workout.route.count > 1 {
+                        RouteMapView(points: workout.route, tint: Brand.mark)
+                            .frame(height: 62)
+                            .padding(.vertical, 2)
+                    }
 
-                HStack(alignment: .top) {
-                    stat("TIME", workout.elapsedText)
-                    Spacer()
-                    stat("AVG. PACE", workout.avgPaceText + "/KM")
-                }
-                if workout.avgHeartRate > 0 {
-                    stat("AVG. HR", "\(Int(workout.avgHeartRate)) bpm")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                    Text(String(format: "%.2fKM", workout.distanceKm))
+                        .font(.system(size: 28, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(Brand.ink)
 
-                Button(action: onNext) {
-                    Text("Next").frame(maxWidth: .infinity)
+                    HStack(alignment: .top) {
+                        stat("TIME", workout.elapsedText)
+                        Spacer()
+                        stat("AVG. PACE", workout.avgPaceText + "/KM")
+                    }
+                    if workout.avgHeartRate > 0 {
+                        stat("AVG. HR", "\(Int(workout.avgHeartRate)) bpm")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    Button(action: onNext) {
+                        Text("Next")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Brand.accentInk)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule().fill(LinearGradient(colors: [Brand.mark, Brand.markDeep],
+                                                              startPoint: .topLeading, endPoint: .bottomTrailing))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 6)
                 }
-                .buttonStyle(.borderedProminent)
-                .padding(.top, 4)
             }
         }
     }
 
     private func stat(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(label).font(.system(size: 9)).foregroundStyle(.secondary)
+            Text(label).font(.system(size: 9)).foregroundStyle(Brand.inkFaint)
             Text(value).font(.system(size: 15, weight: .medium)).monospacedDigit()
+                .foregroundStyle(Brand.ink)
         }
     }
 }

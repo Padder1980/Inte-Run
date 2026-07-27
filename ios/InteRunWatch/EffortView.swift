@@ -31,16 +31,25 @@ struct EffortView: View {
     }
 
     var body: some View {
+        ZStack {
+            Brand.backdrop
+            content
+        }
+    }
+
+    private var content: some View {
         ScrollView {
             VStack(spacing: 6) {
                 Text("How hard did that feel?")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Brand.inkSoft)
                     .multilineTextAlignment(.center)
 
+                // Coloured by the app's own effort scale, so the number carries meaning before
+                // you have read the word underneath it.
                 Text("\(value)")
                     .font(.system(size: 44, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Brand.effort(value))
                     // The crown is the natural way to pick a number on a watch — no tiny targets.
                     .focusable()
                     .digitalCrownRotation(
@@ -50,16 +59,17 @@ struct EffortView: View {
 
                 Text(Self.labels[value])
                     .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Brand.ink)
                     .multilineTextAlignment(.center)
 
                 if let intended {
                     Text("Planned: \(intended)")
-                        .font(.caption2).foregroundStyle(.secondary)
+                        .font(.system(size: 11)).foregroundStyle(Brand.inkFaint)
                 }
                 if let againstPlan {
                     Text(againstPlan)
-                        .font(.caption2)
-                        .foregroundStyle(againstPlan == "As planned" ? .green : .orange)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(againstPlan == "As planned" ? Brand.accent : Brand.ease)
                 }
 
                 Button {
@@ -67,16 +77,26 @@ struct EffortView: View {
                     workout.sendHome()
                     onDone()
                 } label: {
-                    Text("Save").frame(maxWidth: .infinity)
+                    Text("Save")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Brand.accentInk)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule().fill(LinearGradient(colors: [Brand.mark, Brand.markDeep],
+                                                          startPoint: .topLeading, endPoint: .bottomTrailing))
+                        )
                 }
-                .buttonStyle(.borderedProminent)
-                .padding(.top, 4)
+                .buttonStyle(.plain)
+                .padding(.top, 6)
 
                 Button("Skip") {
                     workout.sendHome()
                     onDone()
                 }
-                .font(.caption2)
+                .font(.system(size: 11))
+                .foregroundStyle(Brand.inkFaint)
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, 2)
         }

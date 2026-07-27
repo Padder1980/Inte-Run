@@ -71,12 +71,15 @@ struct PlannedSession: Codable, Equatable {
 @MainActor
 final class SessionStore: NSObject, ObservableObject {
     @Published var session: PlannedSession?
+    /// The runner's first name, so the watch can speak to a person rather than a device.
+    @Published var runnerName: String?
     @Published var reachable = false
     /// True once we have heard from the phone at all, so the UI can tell "nothing today" apart
     /// from "we have not synced yet" — two very different things to show someone.
     @Published var hasSynced = false
 
     private static let cacheKey = "interun_watch_session"
+    private static let nameKey = "interun_watch_name"
 
     override init() {
         super.init()
@@ -87,6 +90,7 @@ final class SessionStore: NSObject, ObservableObject {
     }
 
     private func restore() {
+        runnerName = UserDefaults.standard.string(forKey: Self.nameKey)
         guard let data = UserDefaults.standard.data(forKey: Self.cacheKey),
               let cached = try? JSONDecoder().decode(PlannedSession.self, from: data) else { return }
         session = cached
@@ -94,6 +98,10 @@ final class SessionStore: NSObject, ObservableObject {
     }
 
     fileprivate func apply(_ context: [String: Any]) {
+        if let n = context["name"] as? String, !n.isEmpty {
+            runnerName = n
+            UserDefaults.standard.set(n, forKey: Self.nameKey)
+        }
         guard let raw = context["session"] else {
             // An explicit empty payload means "nothing planned today" — not a failure to sync.
             session = nil

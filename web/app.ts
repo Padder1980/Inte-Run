@@ -1414,6 +1414,26 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
 .rpe-chip:active { transform: scale(.94); }
 .rpe-chip.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); box-shadow: 0 4px 12px -6px color-mix(in srgb, var(--accent) 80%, transparent); }
 .rpe-note { margin-top: 8px; font-size: 12px; color: var(--ink-faint); }
+/* Connected apps & devices */
+.cn-sec { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); margin: 14px 0 8px; }
+.cn-sec:first-child { margin-top: 0; }
+.cn-row { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; background: var(--surface-2); border: 1px solid var(--line); border-radius: 13px; padding: 11px 12px; margin-bottom: 8px; font: inherit; color: inherit; }
+button.cn-row { cursor: pointer; }
+.cn-ic { flex: 0 0 34px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: color-mix(in srgb, var(--accent) 12%, var(--surface)); color: var(--accent); }
+.cn-ic svg { width: 17px; height: 17px; }
+.cn-b { flex: 1; min-width: 0; }
+.cn-n { font-size: 14px; font-weight: 650; }
+.cn-d { font-size: 11.5px; color: var(--ink-soft); line-height: 1.4; margin-top: 1px; }
+.cn-badge { flex: 0 0 auto; font-size: 10.5px; font-weight: 700; padding: 4px 8px; border-radius: 999px; }
+.cn-badge.ok { background: color-mix(in srgb, var(--accent) 16%, var(--surface)); color: var(--accent); }
+.cn-badge.soon { background: var(--surface); color: var(--ink-faint); border: 1px solid var(--line); }
+.cn-row .arr { color: var(--ink-faint); font-size: 17px; }
+/* Dragging a session to another day in the Training calendar */
+.cal-sess, .cal-open { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.cal-lifted { opacity: .35; }
+.cal-ghost { position: fixed; z-index: 300; margin: 0; pointer-events: none; background: var(--surface); border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); box-shadow: 0 16px 34px -14px rgba(4,26,22,.5); transform: scale(1.04) rotate(1.4deg); }
+.cal-day.cal-target { background: color-mix(in srgb, var(--accent) 11%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 12px; }
+body.cal-dragging { overscroll-behavior: none; cursor: grabbing; }
 /* Post-run debrief: the coach's read of the session, not just its numbers. */
 .debrief { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 8%, var(--surface)), var(--surface) 62%); border-color: color-mix(in srgb, var(--accent) 24%, var(--line)); }
 .db-head { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: var(--ink); }
@@ -1549,6 +1569,7 @@ const ICON = {
   gauge: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19a8 8 0 1 1 16 0"/><path d="M13.4 12.6 18 8"/><circle cx="12" cy="19" r="1.4" fill="currentColor" stroke="none"/></svg>',
   guide: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/><circle cx="12" cy="8" r=".6" fill="currentColor"/></svg>',
   share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.5 15.4 6.5M8.6 13.5l6.8 4"/></svg>',
+  devices: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="5" width="10" height="14" rx="3.5"/><path d="M10 2.5h4M10 21.5h4"/></svg>',
   trendUp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>',
   trendDown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l6 6 4-4 8 8"/><path d="M17 17h4v-4"/></svg>',
   timer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4"/><circle cx="12" cy="14" r="8"/><path d="M12 14V10"/></svg>',
@@ -1676,9 +1697,11 @@ function computeToday() {
 }
 computeToday();
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: {}, selDay: TODAY_DOW, selWeek: CURRENT_WEEK };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK };
 // Effective day index for a session, honouring any user reschedule. Works for raw sessions
 // (dayOfWeek) and summary sessions (dayIndex), keyed by the shared session id.
+function loadDayOverride() { try { return JSON.parse(localStorage.getItem("interun_dayov_v1") || "{}") || {}; } catch (e) { return {}; } }
+function saveDayOverride() { try { Object.keys(state.dayOverride).length ? localStorage.setItem("interun_dayov_v1", JSON.stringify(state.dayOverride)) : localStorage.removeItem("interun_dayov_v1"); } catch (e) {} }
 function effDay(s) { const o = state.dayOverride[s.id]; return o != null ? o : (s.dayOfWeek != null ? s.dayOfWeek : s.dayIndex); }
 const PRIMARY_TYPES = { easy: 1, long: 1, recovery: 1, threshold: 1, vo2: 1, strides: 1, "race-specific": 1 };
 // Move a session to a target day; if a run already sits there, the two swap days.
@@ -1691,13 +1714,24 @@ function moveSession(week, sess, target) {
     if (occ) state.dayOverride[occ.id] = cur;
   }
   state.dayOverride[sess.id] = target;
+  saveDayOverride();
+  // A moved session changes "what am I doing today" - the watch and reminders must follow.
+  try { syncWatch(); } catch (e) {}
+  try { syncNativeReminders(); } catch (e) {}
 }
 function doneKey(wIdx, s) { return wIdx + "|" + s.day + "|" + s.title; }
 // Mark every session dated before the real today as done, so the calendar and Today reflect progress
 // up to now. (When the plan starts today, nothing is marked — a fresh start.)
 function seedDone() {
   state.done = {};
-  state.dayOverride = {}; // a fresh plan clears any reschedules (session ids change)
+  // Reschedules survive a reload - the plan is rebuilt every boot, but its session ids are
+  // deterministic, so a same-shape rebuild keeps them. Only overrides whose session no longer
+  // exists (a genuinely different plan) are dropped.
+  const liveIds = {};
+  PLAN.weeks.forEach((wk) => wk.sessions.forEach((s) => { liveIds[s.id] = 1; }));
+  let ovChanged = false;
+  Object.keys(state.dayOverride).forEach((k) => { if (!liveIds[k]) { delete state.dayOverride[k]; ovChanged = true; } });
+  if (ovChanged) saveDayOverride();
   const today = todayIso();
   PLAN.weeks.forEach((wk) => wk.sessions.forEach((s) => {
     if (s.type === "rest") return;
@@ -2133,7 +2167,11 @@ function syncNativeReminders() {
 const NATIVE_WATCH = (function () {
   try { return !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.interunWatch); } catch (e) { return false; }
 })();
-window.__interunWatch = { status: function () {} };
+let WATCH_STATUS = null; // { paired, installed } - reported by the native bridge on request
+window.__interunWatch = { status: function (paired, installed) {
+  WATCH_STATUS = { paired: !!paired, installed: !!installed };
+  if (state.tab === "support" && state.support === "connect") render();
+} };
 function watchPayloadForToday() {
   const iso = todayIso();
   const list = rawSessionsForIso(iso);
@@ -2629,6 +2667,98 @@ function calSessionRow(wIdx, s) {
     '<button class="cal-open" data-open="1" data-oweek="' + wIdx + '" data-oid="' + s.id + '"><span class="cal-t">' + s.title + '</span><span class="cal-sub">' + bits.join(" • ") + '</span></button>' +
     '<button class="cal-check" data-done="' + key + '" aria-label="Mark done">' + (done ? ICON.check : "") + '</button></div>';
 }
+// ---- Drag a session to another day -------------------------------------------------------------
+// Press and hold a session card in the Training calendar, then drag it onto another day of the SAME
+// week. Under the hood this is moveSession(), the same engine path the sheet buttons use - so the
+// swap rule, persistence, watch sync and reminders all come for free. Cross-week moves are refused:
+// weeks are training structures, not arbitrary buckets, and dragging a long run into another week
+// silently rewrites the plan in ways the engine should decide, not a thumb.
+let DRAG = null;
+let CAL_DRAGGED = false;
+function wireCalendarDrag() {
+  document.querySelectorAll(".cal-open").forEach((btn) => {
+    if (btn.dataset.dragwired) return;
+    btn.dataset.dragwired = "1";
+    btn.addEventListener("pointerdown", (ev) => {
+      if (DRAG || ev.button) return;
+      const x0 = ev.clientX, y0 = ev.clientY, pid = ev.pointerId;
+      const t = setTimeout(() => { cleanup(); startSessDrag(x0, y0, pid, btn); }, 320);
+      // Moving before the hold fires means the finger is scrolling, not lifting a card.
+      const onMove = (e) => { if (Math.abs(e.clientX - x0) > 9 || Math.abs(e.clientY - y0) > 9) cleanup(); };
+      const cleanup = () => { clearTimeout(t); btn.removeEventListener("pointermove", onMove); btn.removeEventListener("pointerup", cleanup); btn.removeEventListener("pointercancel", cleanup); };
+      btn.addEventListener("pointermove", onMove);
+      btn.addEventListener("pointerup", cleanup);
+      btn.addEventListener("pointercancel", cleanup);
+    });
+  });
+}
+function startSessDrag(x, y, pointerId, btn) {
+  const wk = Number(btn.dataset.oweek);
+  const week = PLAN.weeks[wk - 1];
+  const sess = week && week.sessions.find((ss) => ss.id === btn.dataset.oid);
+  const card = btn.closest(".cal-sess");
+  if (!sess || !card) return;
+  const r = card.getBoundingClientRect();
+  const ghost = card.cloneNode(true);
+  ghost.classList.add("cal-ghost");
+  ghost.style.width = r.width + "px";
+  document.body.appendChild(ghost);
+  DRAG = { wk: wk, sess: sess, card: card, ghost: ghost, dx: x - r.left, dy: y - r.top, target: null, targetEl: null };
+  card.classList.add("cal-lifted");
+  document.body.classList.add("cal-dragging");
+  moveGhost(x, y);
+  try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) {}
+  window.addEventListener("pointermove", calDragMove, { passive: false });
+  window.addEventListener("pointerup", calDragEnd);
+  window.addEventListener("pointercancel", calDragCancel);
+  window.addEventListener("touchmove", calDragBlockScroll, { passive: false });
+}
+function moveGhost(x, y) {
+  DRAG.ghost.style.left = (x - DRAG.dx) + "px";
+  DRAG.ghost.style.top = (y - DRAG.dy) + "px";
+}
+function calDragBlockScroll(e) { if (DRAG) e.preventDefault(); }
+function calDragMove(e) {
+  if (!DRAG) return;
+  e.preventDefault();
+  moveGhost(e.clientX, e.clientY);
+  DRAG.ghost.style.display = "none";
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  DRAG.ghost.style.display = "";
+  const day = under && under.closest ? under.closest(".cal-day") : null;
+  const ok = day && Number(day.dataset.w) === DRAG.wk;
+  if (DRAG.targetEl && DRAG.targetEl !== day) DRAG.targetEl.classList.remove("cal-target");
+  if (ok) {
+    day.classList.add("cal-target");
+    DRAG.targetEl = day; DRAG.target = Number(day.dataset.di);
+  } else {
+    DRAG.targetEl = null; DRAG.target = null;
+  }
+}
+function calDragTeardown() {
+  window.removeEventListener("pointermove", calDragMove);
+  window.removeEventListener("pointerup", calDragEnd);
+  window.removeEventListener("pointercancel", calDragCancel);
+  window.removeEventListener("touchmove", calDragBlockScroll);
+  if (DRAG) {
+    if (DRAG.targetEl) DRAG.targetEl.classList.remove("cal-target");
+    if (DRAG.ghost) DRAG.ghost.remove();
+    if (DRAG.card) DRAG.card.classList.remove("cal-lifted");
+  }
+  document.body.classList.remove("cal-dragging");
+}
+function calDragEnd() {
+  if (!DRAG) return;
+  const d = DRAG;
+  calDragTeardown();
+  DRAG = null;
+  CAL_DRAGGED = true; // swallow the click that follows this pointerup
+  if (d.target != null && d.target !== effDay(d.sess)) {
+    moveSession(d.wk, d.sess, d.target);
+    render();
+  }
+}
+function calDragCancel() { calDragTeardown(); DRAG = null; CAL_DRAGGED = true; }
 function viewCalendar() {
   const back = '<button class="backbtn" id="calBack">‹ Back</button>';
   const todayIsoStr = todayIso();
@@ -2643,7 +2773,7 @@ function viewCalendar() {
       const cells = daySessions.length ? daySessions.map((s) => calSessionRow(w.index, s)).join("")
         : (disoStr < todayIsoStr ? '<div class="cal-empty">Rest</div>'
           : '<button class="cal-empty rest-add cal" data-addday="' + disoStr + '">Rest<span class="rest-plus">\\uFF0B Add</span></button>');
-      return '<div class="cal-day' + (isToday ? " is-today" : "") + '"><div class="cal-dcol"><div class="cal-dn">' + dn.toUpperCase() + '</div><div class="cal-dd">' + dt.getUTCDate() + '</div></div><div class="cal-scol">' + cells + '</div></div>';
+      return '<div class="cal-day' + (isToday ? " is-today" : "") + '" data-w="' + w.index + '" data-di="' + i + '"><div class="cal-dcol"><div class="cal-dn">' + dn.toUpperCase() + '</div><div class="cal-dd">' + dt.getUTCDate() + '</div></div><div class="cal-scol">' + cells + '</div></div>';
     }).join("");
     const total = (doneKm > 0 ? doneKm.toFixed(1) + " km / " : "") + w.distanceKm.toFixed(1) + " km";
     return '<div class="cal-week"><div class="cal-whead"><div class="cal-wtitle">' + dmon(isoAdd(w.startIso, 0)) + ' – ' + dmon(isoAdd(w.startIso, 6)) + ' <span class="cal-badge">WEEK ' + w.index + '</span></div><div class="cal-wtot">Total: <b>' + total + '</b></div></div>' + rows + '</div>';
@@ -2873,6 +3003,7 @@ function closeSheet() { const o = $("sheetOv"); if (o) o.classList.remove("on");
 // Wire every element carrying data-open to open its session detail (keyed by stable session id).
 function wireSessionTaps() {
   document.querySelectorAll("[data-open]").forEach((b) => b.onclick = () => {
+    if (CAL_DRAGGED) { CAL_DRAGGED = false; return; } // that tap was a drag, not an open
     const wk = Number(b.dataset.oweek);
     openSessionSheet(rawSessionById(wk, b.dataset.oid), wk);
   });
@@ -3272,6 +3403,7 @@ const SUPPORT_HUB = [
   { id: "female", ic: "flower", c: "var(--taper)", t: "Women's health", d: "Symptom-informed prompts — periods, postpartum, more.", interactive: true },
   { id: "strength", ic: "dumbbell", c: "var(--build)", t: "Strength & mobility", d: "Why strength matters, and how to fit it in.", interactive: false },
   { id: "guides", ic: "book", c: "var(--accent)", t: "Training guides", d: "Plain-English answers grounded in the research.", interactive: false },
+  { id: "connect", ic: "devices", c: "var(--base)", t: "Connected apps & devices", d: "Your watch, health apps and calendars.", interactive: false },
   { id: "data", ic: "share", c: "var(--steady)", t: "Your data", d: "Back it up, or move it to another device.", interactive: false },
 ];
 function viewSupport() {
@@ -3286,6 +3418,7 @@ function supportDetail(id) {
   if (id === "reds") return back + redsView();
   if (id === "female") return back + femaleView();
   if (id === "strength") return back + strengthView();
+  if (id === "connect") return back + connectView();
   if (id === "data") return back + dataView();
   return back + guidesView();
 }
@@ -3550,6 +3683,47 @@ function confirmRestore(obj) {
     location.reload();
   };
   $("sheetOv").classList.add("on");
+}
+// ---- Connected apps & devices -------------------------------------------------------------------
+// The honest version of the screen every big fitness app has. Three kinds of row: things that are
+// genuinely working (watch, Health-via-watch, calendars), things that need the runner to act, and
+// things that are planned - clearly labelled as such, because a toggle that does nothing is a lie.
+function connectView() {
+  const native = inNativeApp();
+  const row = (ic, name, note, badge, badgeCls, act) =>
+    '<' + (act ? 'button data-cn="' + act + '"' : 'div') + ' class="cn-row">' +
+    '<div class="cn-ic">' + ic + '</div>' +
+    '<div class="cn-b"><div class="cn-n">' + name + '</div><div class="cn-d">' + note + '</div></div>' +
+    '<span class="cn-badge ' + badgeCls + '">' + badge + '</span>' +
+    (act ? '<span class="arr">\u203a</span>' : '') +
+    '</' + (act ? 'button' : 'div') + '>';
+
+  let watchNote, watchBadge, watchCls;
+  if (!native) { watchNote = "Pairs through the InteRun iPhone app."; watchBadge = "Needs the app"; watchCls = "soon"; }
+  else if (!WATCH_STATUS) { watchNote = "Checking with your phone\u2026"; watchBadge = "\u2026"; watchCls = "soon"; }
+  else if (WATCH_STATUS.installed) { watchNote = "Today\u2019s session syncs to your wrist; finished runs come back to the Logbook."; watchBadge = "Connected"; watchCls = "ok"; }
+  else if (WATCH_STATUS.paired) { watchNote = "Watch paired \u2014 install InteRun from the Watch app on your iPhone."; watchBadge = "Not installed"; watchCls = "soon"; }
+  else { watchNote = "No Apple Watch is paired with this iPhone."; watchBadge = "No watch"; watchCls = "soon"; }
+
+  return '<div class="card">' +
+    '<div class="cn-sec">Watches</div>' +
+    row(ICON.devices, "Apple Watch", watchNote, watchBadge, watchCls, null) +
+    row(ICON.devices, "Garmin, Coros & others", "On the road map \u2014 arrives with the App Store release.", "Planned", "soon", null) +
+    '<div class="cn-sec">Apps</div>' +
+    row(ICON.heart, "Apple Health", native
+      ? "Watch runs save to Health automatically and count towards your rings."
+      : "Works with the InteRun iPhone app \u2014 watch runs save to Health.", native ? "Automatic" : "Needs the app", native ? "ok" : "soon", null) +
+    row(ICON.share, "Strava", "On the road map \u2014 needs InteRun\u2019s server, which arrives with the App Store release.", "Planned", "soon", null) +
+    '<div class="cn-sec">Calendars</div>' +
+    row(ICON.plan, "Apple, Google & Outlook", "Put every planned session in your calendar, with a morning alert.", "Ready", "ok", "cal") +
+    '</div>' +
+    '<div class="card"><div class="subhead" style="margin-top:0">Why so few toggles?</div>' +
+    '<div class="bk-md">InteRun runs entirely on your devices \u2014 there\u2019s no InteRun server for other apps to talk to yet. The connections above are the ones that genuinely work today; the planned ones are listed so you know they\u2019re coming, not to look busy.</div></div>';
+}
+function wireConnectView() {
+  if (!document.querySelector(".cn-row")) return;
+  if (NATIVE_WATCH && !WATCH_STATUS) { try { window.webkit.messageHandlers.interunWatch.postMessage({ action: "status" }); } catch (e) {} }
+  document.querySelectorAll('[data-cn="cal"]').forEach((b) => b.onclick = openRemindersSheet);
 }
 function dataView() {
   const cur = backupSummary(collectBackup().data);
@@ -5706,6 +5880,7 @@ function wire() {
   const guideReplay = $("guideReplay"); if (guideReplay) guideReplay.onclick = () => openSessionGuide(GUIDE_EXAMPLE, { fromSupport: true });
   wireDataView();
   const back = $("supBack"); if (back) back.onclick = () => { state.support = null; render(); };
+  wireConnectView();
   document.querySelectorAll('[data-chk="rf"]').forEach((c) => c.onchange = runRf);
   document.querySelectorAll('[data-chk="reds"]').forEach((c) => c.onchange = runReds);
   document.querySelectorAll('[data-chk="fh"]').forEach((c) => c.onchange = runFh);
@@ -5788,6 +5963,7 @@ function wire() {
   document.querySelectorAll("[data-addopen]").forEach((b) => b.onclick = () => { const s = extraSession(EXTRA.find((x) => x.id === b.dataset.addopen)); if (s) openSessionSheet(s, curWeekNo()); });
   // Training-calendar wiring
   const calBack = $("calBack"); if (calBack) calBack.onclick = () => { state.screen = null; render(); };
+  if (state.screen === "calendar") wireCalendarDrag();
   document.querySelectorAll("[data-done]").forEach((b) => b.onclick = () => { const k = b.dataset.done; state.done[k] = !state.done[k]; render(); });
   // 1 km time-trial session wiring
   const startTrial = $("startTrial"); if (startTrial) startTrial.onclick = beginTrialRun;

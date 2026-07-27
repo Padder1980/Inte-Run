@@ -2097,7 +2097,11 @@ function buildReminderSchedule() {
   const nowMs = Date.now();
   for (let day = 0; day < 90 && out.length < NATIVE_NOTIFY_CAP; day++) {
     const iso = isoAdd(todayIso(), day).toISOString().slice(0, 10);
-    const list = sessionsForIso(iso);
+    let list = sessionsForIso(iso);
+    if (!list.length) {
+      const ex = EXTRA.filter((x) => x.date === iso);
+      if (ex.length) { try { const b = buildCustomSession(ex[ex.length - 1]); if (b) list = [{ title: b.title, durMin: b.estimatedDurationSeconds ? Math.round(b.estimatedDurationSeconds / 60) : null, distKm: b.estimatedDistanceMeters ? Math.round(b.estimatedDistanceMeters / 100) / 10 : null }]; } catch (e) {} }
+    }
     if (!list.length) continue;
     const s = list[0], bits = [];
     if (s.durMin) bits.push(s.durMin + " min");
@@ -2145,8 +2149,14 @@ window.__interunWatch = { status: function () {} };
 function watchPayloadForToday() {
   const iso = todayIso();
   const list = rawSessionsForIso(iso);
-  if (!list.length) return null;
-  const s = list[0];
+  // The plan may say rest while the runner has added their own session for today ("Added today").
+  // The wrist must show what the runner intends to do, not only what the plan prescribed.
+  let s = list[0];
+  if (!s) {
+    const extras = EXTRA.filter((e) => e.date === iso);
+    if (extras.length) { try { s = buildCustomSession(extras[extras.length - 1]); } catch (e) { s = null; } }
+  }
+  if (!s) return null;
   const band = plannedPaceBandOf(s);
   const rband = plannedRpeBandOf(s);
   const out = { title: s.title, type: s.type || "easy", dateIso: iso };
@@ -2220,7 +2230,7 @@ function syncWatch() {
   if (!NATIVE_WATCH) return;
   clearTimeout(WATCH_SYNC_T);
   WATCH_SYNC_T = setTimeout(() => {
-    const payload = { action: "sync" };
+    const payload = { action: "sync", dateIso: todayIso() };
     // First name only: the watch has room for "Well done, Adam", not a full name.
     const first = String(profile.name || "").trim().split(/\\s+/)[0];
     if (first) payload.name = first;
@@ -2932,8 +2942,14 @@ function dayLabelIso(iso) {
 }
 // "today" / "tomorrow" read fine bare; a date needs a preposition.
 function dayPhraseIso(iso) { const l = dayLabelIso(iso); return (l === "today" || l === "tomorrow") ? l : "on " + l; }
-function addExtra(params) { EXTRA.push({ id: "x" + (EXTRA_SEQ++) + "-" + (new Date().getTime()), type: params.type, durMin: params.durMin || null, reps: params.reps || null, date: addTargetIso() }); saveExtra(); }
-function removeExtra(id) { EXTRA = EXTRA.filter((e) => e.id !== id); saveExtra(); }
+function addExtra(params) {
+  EXTRA.push({ id: "x" + (EXTRA_SEQ++) + "-" + (new Date().getTime()), type: params.type, durMin: params.durMin || null, reps: params.reps || null, date: addTargetIso() });
+  saveExtra();
+  // The watch and the reminder schedule both describe "what am I doing today" - keep them true.
+  try { syncWatch(); } catch (e) {}
+  try { syncNativeReminders(); } catch (e) {}
+}
+function removeExtra(id) { EXTRA = EXTRA.filter((e) => e.id !== id); saveExtra(); try { syncWatch(); } catch (e) {} try { syncNativeReminders(); } catch (e) {} }
 function extrasOn(iso) { return EXTRA.filter((e) => e.date === iso); }
 function isQualityType(t) { return t === "threshold" || t === "vo2" || t === "race-specific"; }
 // A step's planned seconds: its duration, or — for distance-based reps like 6 x 800m — the time its

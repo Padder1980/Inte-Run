@@ -78,8 +78,23 @@ final class SessionStore: NSObject, ObservableObject {
     /// from "we have not synced yet" — two very different things to show someone.
     @Published var hasSynced = false
 
+    /// The local date the last context described, so yesterday's session is never shown as today's.
+    @Published var contextIso: String?
+
     private static let cacheKey = "interun_watch_session"
     private static let nameKey = "interun_watch_name"
+    private static let isoKey = "interun_watch_iso"
+
+    static func localTodayIso() -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.timeZone = .current
+        return f.string(from: Date())
+    }
+
+    /// True while the stored context still describes today. A context without a date (older phone
+    /// build) is trusted, so the two sides can be updated independently.
+    var isCurrent: Bool { contextIso == nil || contextIso == Self.localTodayIso() }
 
     override init() {
         super.init()
@@ -91,6 +106,7 @@ final class SessionStore: NSObject, ObservableObject {
 
     private func restore() {
         runnerName = UserDefaults.standard.string(forKey: Self.nameKey)
+        contextIso = UserDefaults.standard.string(forKey: Self.isoKey)
         guard let data = UserDefaults.standard.data(forKey: Self.cacheKey),
               let cached = try? JSONDecoder().decode(PlannedSession.self, from: data) else { return }
         session = cached
@@ -98,6 +114,10 @@ final class SessionStore: NSObject, ObservableObject {
     }
 
     fileprivate func apply(_ context: [String: Any]) {
+        if let iso = context["dateIso"] as? String, !iso.isEmpty {
+            contextIso = iso
+            UserDefaults.standard.set(iso, forKey: Self.isoKey)
+        }
         if let n = context["name"] as? String, !n.isEmpty {
             runnerName = n
             UserDefaults.standard.set(n, forKey: Self.nameKey)

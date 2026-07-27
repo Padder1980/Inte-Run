@@ -17,9 +17,12 @@ struct TodayView: View {
                 Brand.backdrop
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
-                        if let s = store.session {
+                        // A context from a previous day is worse than none: showing yesterday's
+                        // session (or yesterday's rest) as today's would quietly mislead. Fall back
+                        // to the waiting state, whose advice - open the phone app - is the fix.
+                        if store.isCurrent, let s = store.session {
                             session(s)
-                        } else if store.hasSynced {
+                        } else if store.isCurrent, store.hasSynced {
                             restDay
                         } else {
                             waiting

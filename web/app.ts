@@ -17,7 +17,7 @@ const bundleJs = await bundleEngine();
 const EX_ANIM_SLUGS = [
   "goblet-squat", "step-up", "split-squat-dumbbell", "reverse-lunge", "romanian-deadlift-dumbbell",
   "glute-bridge", "clamshell", "standing-calf-raise", "single-leg-standing-calf-raise", "plank",
-  "dead-bug", "bird-dog", "push-up", "box-jump", "side-plank", "incline-push-up",
+  "dead-bug", "bird-dog", "push-up", "box-jump", "side-plank", "incline-push-up", "pogo-hops",
 ];
 const animDir = join(here, "..", "assets", "exercise-animations");
 const exAnimData: Record<string, string> = {};
@@ -3037,6 +3037,7 @@ const STRENGTH_LIB = [
   ] },
   { g: "Plyometric", why: "Trains tendon stiffness and elastic return — cheap speed. Introduce these only once you're running comfortably.", items: [
     { s: "box-jump", n: "Box jump", m: "Whole chain", c: "Land soft and quiet, knees tracking out. Step down — don't jump down." },
+    { s: "pogo-hops", n: "Pogo hops", m: "Calves, Achilles", c: "Small, springy hops off the balls of your feet — stiff ankles, minimal ground contact." },
   ] },
 ];
 function exCard(it) {

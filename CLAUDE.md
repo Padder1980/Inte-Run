@@ -190,6 +190,19 @@ plan to the App Store / watches / adaptive coach / community, installable to the
 The service worker caches it for offline (`./roadmap/*` in ASSETS) and the offline navigation
 fallback now serves the requested cached page before falling back to the app shell.
 
+**Post-run debrief:** every finished run (phone or watch) opens with a coach's read of it, not just
+its numbers — because InteRun knows what the session was *supposed* to be. `runAnalysis()` judges each
+kilometre against the prescribed band (`run.pband`), `paceChartSvg()` draws that band behind the pace
+line, `splitsVsTargetHtml()` shows "on target" / "14s fast" per km, and `debriefParagraphs()` writes
+2–4 sentences from what actually happened (in band / negative split / faded / effort vs intended /
+climbing). Deliberately not gushing: praise that arrives whatever you did is worth nothing, so a bad
+session gets an honest read and a pointer to the flags system. Shown by `runOverviewHtml()`, so the
+finish screen and the logbook share it. Note **`splitsHtml()` is superseded** and unreferenced.
+
+The Activities tab is now **Logbook** (`TITLES.activities`), which covers runs, strength and progress
+rather than only runs. MAS was removed from Performance — it is a reference for setting interval
+paces, not a measure of progress; `masCard()` is kept but unused.
+
 **Adaptive flags + RPE (Road Map phase 4, shipped):** the app now asks *"How hard did that feel, 1–10?"*
 after every run and watches for two signals over **2+ consecutive sessions** — pace consistently
 outside the prescribed band, and reported effort consistently outside the intended RPE band. Detection

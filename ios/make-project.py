@@ -101,8 +101,10 @@ WATCH_COMMON = {
     # watchOS 26.5 device may prefer and then reject ("integrity could not be verified"), while the
     # arm64_32 slice it would happily run sits unused. arm64_32 is the long-established watchOS
     # architecture that every Apple Watch runs, and it honours the real deployment target.
-    "ARCHS": "arm64_32",
-    "EXCLUDED_ARCHS": "arm64",
+    # Scoped to the DEVICE sdk only: the watch simulator on Apple Silicon is arm64, so excluding it
+    # unconditionally breaks every simulator build.
+    '"ARCHS[sdk=watchos*]"': '"arm64_32"',
+    '"EXCLUDED_ARCHS[sdk=watchos*]"': '"arm64"',
     "SDKROOT": "watchos",
     "SKIP_INSTALL": "YES",
     "SWIFT_EMIT_LOC_STRINGS": "YES",

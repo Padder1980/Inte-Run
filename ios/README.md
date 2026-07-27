@@ -319,6 +319,31 @@ both signals and produced real coaching — *"Your last 2 sessions came in about
 their target pace. You rated your last 2 sessions about 3 points harder than they were meant to
 feel."* — with the engine correctly diagnosing overcooked easy days rather than proposing new paces.
 
+## ⚠️ Three copies of the app exist
+
+This catches people out, so it is worth being explicit. The same UI exists in three places and they
+update by completely different routes:
+
+| Copy | Updates when | Automatic? |
+|---|---|---|
+| **GitHub Pages** (`padder1980.github.io/Inte-Run`) | `git push` to `main` | Yes, within a minute |
+| **A Home Screen PWA** | It re-fetches from Pages | Mostly — the service worker is network-first for the page, but iOS holds the old copy until the app is fully quit. Close it from the app switcher and reopen, twice if needed. Pages also sets `max-age=600`. |
+| **The native app** (simulator or device) | **Only when Xcode rebuilds it** | **No.** `docs/` is copied into the app bundle by the "Embed web app" build phase. The app never downloads anything, so a web change cannot reach it without a rebuild + reinstall. |
+
+**Support › Your data › This version** shows which copy you are looking at and when it was built —
+check that first whenever a change seems to be missing.
+
+To bring a simulator up to date:
+
+```bash
+node web/app.ts && DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+  xcodebuild -project ios/InteRun.xcodeproj -scheme InteRun -configuration Debug \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=27.0' build
+xcrun simctl install <udid> <DerivedData>/Build/Products/Debug-iphonesimulator/InteRun.app
+```
+
+Or just press **Run** in Xcode, which does all of it.
+
 ## Known gaps
 
 These are real, deliberate, and not yet done:

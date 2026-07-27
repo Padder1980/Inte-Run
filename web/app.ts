@@ -47,6 +47,11 @@ const BRAND_MARK = `<svg viewBox="0 0 120 120" width="104" height="104" role="im
   <path d="M57 88 L79 45 L93 45 L71 88 Z" fill="#fff" opacity=".62"/>
 </svg>`;
 
+// Build stamp. Three copies of this app can exist at once - GitHub Pages, a Home Screen PWA holding
+// a cached version of it, and the copy baked into the native app bundle at build time. Without a
+// visible stamp there is no way to tell which one you are looking at, which makes "my change hasn't
+// appeared" impossible to diagnose.
+const BUILD_STAMP = new Date().toISOString().slice(0, 16).replace("T", " ");
 const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -1533,6 +1538,7 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
 
 <script>${bundleJs}</script>
 <script>
+const BUILD = ${JSON.stringify(BUILD_STAMP)};
 const $ = (id) => document.getElementById(id);
 // Time inputs: the user types only digits and the colons appear automatically (e.g. 13000 → 1:30:00).
 function fmtDigitsToTime(raw) {
@@ -3553,6 +3559,12 @@ function dataView() {
     '<input type="file" id="bkFile" accept="application/json,.json" style="display:none">' +
     '<div class="bk-msg" id="dataMsg"></div>' +
     '</div>' +
+    '<div class="card"><div class="subhead" style="margin-top:0">This version</div>' +
+    '<div class="bk-box"><div class="bk-val">' + (inNativeApp() ? "iPhone app" : "Web") + '</div>' +
+    '<div class="bk-lab" style="margin-top:4px">Built ' + BUILD + ' UTC</div></div>' +
+    '<div class="bk-md" style="margin-top:8px">' + (inNativeApp()
+      ? "The app carries its own copy of InteRun, built when the app was built \u2014 it doesn\u2019t update over the internet. A newer web version won\u2019t appear here until the app itself is rebuilt."
+      : "Added to your Home Screen? It caches a copy. If an update seems missing, close it fully (swipe it away from the app switcher) and reopen \u2014 twice if needed.") + '</div></div>' +
     '<div class="card">' + move + '</div>' +
     '<div class="card"><div class="subhead" style="margin-top:0">What a backup holds</div>' +
     '<div class="bk-md">Your profile and goal, your plan, every logged run with its route and splits, your coach and reminder choices, and anything you\\u2019ve told Alfie. It\\u2019s a plain file on your device \\u2014 nothing is uploaded anywhere, because InteRun has no server to upload it to.</div></div>';

@@ -190,6 +190,11 @@ plan to the App Store / watches / adaptive coach / community, installable to the
 The service worker caches it for offline (`./roadmap/*` in ASSETS) and the offline navigation
 fallback now serves the requested cached page before falling back to the app shell.
 
+⚠️ **Three copies of the app exist and update differently** — GitHub Pages (on push), a Home Screen
+PWA (re-fetches, but iOS holds the old copy until fully quit), and the native app (**only** on an
+Xcode rebuild, since `docs/` is baked into the bundle). "My change hasn't appeared" is almost always
+this. **Support › Your data › This version** now shows which copy is running and its build stamp.
+
 **Post-run debrief:** every finished run (phone or watch) opens with a coach's read of it, not just
 its numbers — because InteRun knows what the session was *supposed* to be. `runAnalysis()` judges each
 kilometre against the prescribed band (`run.pband`), `paceChartSvg()` draws that band behind the pace

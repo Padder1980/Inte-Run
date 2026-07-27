@@ -243,18 +243,25 @@ existing web UI, so there is still **one UI to design** (`web/app.ts`). Decided 
 
 ### Toolchain on this Mac (verified 2026-07-27)
 
-- Xcode **27.0 beta** at `/Applications/Xcode-beta.app`. There is **no release Xcode**, and
-  **App Store Connect will not accept builds from a beta Xcode** — release Xcode is needed to submit.
-- `xcode-select` still points at CommandLineTools, and changing it needs the owner's password. Not a
-  blocker: **`export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer` works without
-  sudo** and is how Claude builds here.
+- **Two Xcodes are installed.** Use the release one to ship:
+  - `/Applications/Xcode.app` — **26.6 release**. The only one App Store Connect accepts builds from.
+  - `/Applications/Xcode-beta.app` — **27.0 beta**. Fine for development, **cannot submit**.
+- `xcode-select` points at the release Xcode, but **its licence must be accepted once**
+  (`sudo xcodebuild -license accept`, needs the owner's password). Until it is, every `xcrun`-shimmed
+  tool refuses to run — **including `git`**, which is a confusing way to discover the problem.
+- Claude can always sidestep a wrong/unaccepted active toolchain without sudo:
+  **`export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`**.
 - Build + inspect:
   ```bash
   node web/app.ts && DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
     xcodebuild -project ios/InteRun.xcodeproj -scheme InteRun -sdk iphonesimulator build
   ```
-- Simulator runtimes ship **separately from Xcode**: watchOS 27 was bundled, iOS was **not** and had
-  to be fetched with `xcodebuild -downloadPlatform iOS`.
+- Simulator runtimes ship **separately from Xcode** and neither Xcode bundles one. watchOS 27 (3.6 GB)
+  is installed; **iOS is not** — it is an 8 GB download whose install step needs root, so
+  `xcodebuild -downloadPlatform iOS` exits 0 without installing anything when run unprivileged.
+  Get it with `sudo xcodebuild -downloadPlatform iOS`, or Xcode → Settings → Components.
+- ⚠️ Installing an Xcode **silently repoints `xcode-select` system-wide**. If shell tools suddenly
+  start failing with a licence error, that is why.
 
 **Apple Watch:** see `WATCH.md` — a scoping/decision document, nothing built. Key facts: a watchOS
 app cannot pair with a PWA (it needs a native iOS app), Xcode isn't installed on the owner's Mac,

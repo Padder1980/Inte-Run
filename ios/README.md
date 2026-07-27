@@ -67,14 +67,16 @@ into `make-project.py` first, or you will lose them.
 
 ## Setup, once
 
-1. Point the toolchain at Xcode and accept the licence (needs your password):
-   ```bash
-   sudo xcode-select -s /Applications/Xcode-beta.app/Contents/Developer
-   ```
+1. Accept the Xcode licence — needed once per installed Xcode, and until it is done every
+   `xcrun`-shimmed tool (including `git`) fails with a licence error:
    ```bash
    sudo xcodebuild -license accept
    ```
-2. Xcode → **Settings → Components** → download the **iOS** and **watchOS** simulator runtimes.
+2. Install the iOS simulator runtime (8 GB; the install step needs root, which is why an
+   unprivileged `xcodebuild -downloadPlatform iOS` exits 0 having done nothing):
+   ```bash
+   sudo xcodebuild -downloadPlatform iOS
+   ```
 3. Open `ios/InteRun.xcodeproj`, select the **InteRun** target → **Signing & Capabilities**, and set
    your team. The bundle ID is `com.interun.app` — change it if you want a different one, and
    register the same value in App Store Connect.
@@ -99,5 +101,6 @@ These are real, deliberate, and not yet done:
 - **No data migration from the PWA.** A runner who has been using the Home Screen PWA has their
   history in Safari's storage for `padder1980.github.io`; the app starts empty. An export/import
   needs building before asking anyone to switch.
-- **Beta Xcode cannot submit.** App Store Connect rejects builds from a beta Xcode. Fine for
-  development; install release Xcode before submitting.
+- **Build with release Xcode to submit.** `/Applications/Xcode.app` is 26.6 (release, can submit);
+  `/Applications/Xcode-beta.app` is 27.0 beta (development only — App Store Connect rejects its
+  builds).

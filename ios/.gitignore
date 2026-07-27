@@ -6,3 +6,6 @@ xcuserdata/
 *.xcworkspace/xcuserdata/
 InteRun.xcodeproj/project.xcworkspace/xcuserdata/
 InteRun.xcodeproj/xcuserdata/
+
+# Your Apple Developer Team ID - personal to you, not the project
+team.txt

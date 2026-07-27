@@ -77,9 +77,31 @@ into `make-project.py` first, or you will lose them.
    ```bash
    sudo xcodebuild -downloadPlatform iOS
    ```
-3. Open `ios/InteRun.xcodeproj`, select the **InteRun** target → **Signing & Capabilities**, and set
-   your team. The bundle ID is `com.interun.app` — change it if you want a different one, and
-   register the same value in App Store Connect.
+3. **Sign in to Xcode** — Xcode → Settings → Accounts → **+** → Apple ID, using the account that
+   holds your Developer Program membership. Xcode creates the signing certificate for you. Without
+   this there are no signing identities at all and a device build cannot start.
+4. **Record your Team ID** so it survives project regeneration (`make-project.py` overwrites the
+   project, so a Team set through Xcode's UI would be lost):
+   ```bash
+   echo YOURTEAMID > ios/team.txt
+   ```
+   `team.txt` is gitignored. `DEVELOPMENT_TEAM=…` in the environment works too. With neither set the
+   project stays simulator-only, which is a perfectly good state to be in.
+
+⚠️ **Decide the bundle ID before you put real data in.** `localStorage` lives in the app's data
+container, which is keyed to the **bundle identifier** — so changing `com.interun.app` later gives
+the app a fresh, empty container and orphans the runner's profile, plan and history. (The
+`interun://app` origin matters too, but the container is keyed to the bundle ID.) It must also be
+globally unique across the App Store.
+
+## Running on a real iPhone
+
+Plug the phone in, unlock it, and trust the Mac. Pick it as the run destination in Xcode and press
+**Run** — that rebuilds `docs/`, embeds it, and installs. On the first install, approve the developer
+certificate on the phone: **Settings › General › VPN & Device Management**.
+
+The watch app installs alongside it via the Watch app on the phone. HealthKit needs the capability
+on your App ID; automatic signing normally adds it.
 
 ## Building
 

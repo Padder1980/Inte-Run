@@ -52,6 +52,25 @@ ID = {name: "1A%022X" % (i + 1) for i, name in enumerate([
 ])}
 
 BUNDLE_ID = "com.interun.app"
+
+# Your Apple Developer Team ID, needed to build onto a real iPhone or Watch.
+#
+# Read from the environment or from ios/team.txt (gitignored) rather than typed in here, because
+# this script OVERWRITES the project file: a Team set through Xcode's UI would be silently lost the
+# next time anyone regenerates. Put it in one of those two places and it survives.
+#
+#   echo ABCDE12345 > ios/team.txt
+#
+# Find it in Xcode > Settings > Accounts > (your account) > the Team ID column, or at
+# developer.apple.com > Membership. Leave unset to keep simulator-only builds working.
+def _team():
+    env = os.environ.get("DEVELOPMENT_TEAM", "").strip()
+    if env:
+        return env
+    f = pathlib.Path(__file__).resolve().parent / "team.txt"
+    return f.read_text(encoding="utf-8").strip() if f.exists() else ""
+
+DEVELOPMENT_TEAM = _team()
 DEPLOYMENT_TARGET = "17.0"
 
 WATCH_BUNDLE_ID = BUNDLE_ID + ".watchkitapp"
@@ -134,6 +153,9 @@ TARGET_COMMON = {
     "SWIFT_EMIT_LOC_STRINGS": "YES",
     "TARGETED_DEVICE_FAMILY": "1",
 }
+if DEVELOPMENT_TEAM:
+    TARGET_COMMON["DEVELOPMENT_TEAM"] = DEVELOPMENT_TEAM
+    WATCH_COMMON["DEVELOPMENT_TEAM"] = DEVELOPMENT_TEAM
 
 
 def settings_block(d, indent="\t\t\t\t"):

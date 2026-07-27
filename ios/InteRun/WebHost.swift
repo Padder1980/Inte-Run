@@ -29,6 +29,10 @@ struct WebHost: UIViewRepresentable {
         context.coordinator.location = location
         config.userContentController.add(location, name: LocationService.messageName)
 
+        let watch = WatchBridge(webView: webView)
+        context.coordinator.watch = watch
+        config.userContentController.add(watch, name: WatchBridge.messageName)
+
         let notifications = NotificationService(webView: webView)
         context.coordinator.notifications = notifications
         config.userContentController.add(notifications, name: NotificationService.messageName)
@@ -68,6 +72,8 @@ struct WebHost: UIViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         /// Where the in-flight `<a download>` is being written. See `Downloads.swift`.
         var pendingDownload: URL?
+        /// Owns the WCSession delegate for the lifetime of the web view.
+        var watch: WatchBridge?
         /// Owns the notification centre delegate, which the centre only holds weakly.
         var notifications: NotificationService?
         /// Owns the CLLocationManager for the lifetime of the web view. See `LocationService.swift`.

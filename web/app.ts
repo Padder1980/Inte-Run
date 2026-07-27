@@ -1610,7 +1610,7 @@ const storedProfile = loadProfile();
 const FIRST_RUN = !storedProfile;
 let profile = storedProfile || Object.assign({}, DEFAULT_PROFILE);
 let PLAN, RAW, FITNESS, CLASS, MASTERS;
-function recompute() { const r = applyProfile(profile); PLAN = r.plan; RAW = r.raw; FITNESS = r.fitness; CLASS = r.classification; MASTERS = r.masters; normalizeWeekStarts(); try { syncNativeReminders(); } catch (e) {} }
+function recompute() { const r = applyProfile(profile); PLAN = r.plan; RAW = r.raw; FITNESS = r.fitness; CLASS = r.classification; MASTERS = r.masters; normalizeWeekStarts(); try { syncNativeReminders(); } catch (e) {} try { syncWatch(); } catch (e) {} }
 // Weeks display on a Monday–Sunday grid, and day indices are Monday-based (0 = Mon). applyProfile can
 // move the first (partial) week's start to a mid-week date; snap each week's start back to its Monday
 // so isoAdd(startIso, dayIndex) — used by the strip, overview, calendar and .ics — always lands on the
@@ -2068,6 +2068,38 @@ function syncNativeReminders() {
     if (NATIVE_PERM !== "granted" || !REMIND.enabled) { nativeNotify("clear"); return; }
     nativeNotify("schedule", { items: buildReminderSchedule() });
   }, 400);
+}
+// ---- Apple Watch handover -----------------------------------------------------------------
+// The watch cannot read the plan: it lives in this localStorage, and watchOS has no JavaScriptCore
+// to run the engine either. So the page extracts just today's session and the native shell relays
+// it over WatchConnectivity. Absent "session" means a rest day, which the watch shows differently
+// from "not synced yet".
+const NATIVE_WATCH = (function () {
+  try { return !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.interunWatch); } catch (e) { return false; }
+})();
+window.__interunWatch = { status: function () {} };
+function watchPayloadForToday() {
+  const iso = todayIso();
+  const list = sessionsForIso(iso);
+  if (!list.length) return null;
+  const s = list[0];
+  const band = plannedPaceBandOf(s);
+  const out = { title: s.title, type: s.type || "easy", dateIso: iso };
+  if (s.durMin) out.durationMin = Math.round(s.durMin);
+  if (s.distKm) out.distanceKm = Number(s.distKm);
+  if (band) { out.paceLow = Math.round(band.minSecPerKm); out.paceHigh = Math.round(band.maxSecPerKm); }
+  return out;
+}
+let WATCH_SYNC_T = null;
+function syncWatch() {
+  if (!NATIVE_WATCH) return;
+  clearTimeout(WATCH_SYNC_T);
+  WATCH_SYNC_T = setTimeout(() => {
+    const payload = { action: "sync" };
+    const s = watchPayloadForToday();
+    if (s) payload.session = s;
+    try { window.webkit.messageHandlers.interunWatch.postMessage(payload); } catch (e) {}
+  }, 500);
 }
 let REMIND_TIMERS = [];
 // On open: for each configured reminder time, fire now if past due, else arm a same-day timer (only
@@ -5492,7 +5524,7 @@ $("bellBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); openRe
 seedDone();
 buildNav();
 render();
-try { if (NATIVE_NOTIFY) nativeNotify("status"); updateBell(); initReminders(); } catch (e) {}
+try { if (NATIVE_NOTIFY) nativeNotify("status"); updateBell(); initReminders(); syncWatch(); } catch (e) {}
 // Launch flow: brief brand splash, then either the first-run welcome (which leads into setup) or,
 // for a returning user, straight to Today.
 (function () {

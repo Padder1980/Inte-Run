@@ -1,6 +1,11 @@
 # WATCH.md — Apple Watch companion: scoping and decision document
 
-**Status: decided, not yet built. Phase 0 is done; Phase 1 is the next build.**
+**Status: Phase 1 is BUILT and runs. See `ios/InteRunWatch/`.**
+
+The watch app exists: it receives today's session from the phone over WatchConnectivity and runs a
+live workout on the wrist — timer, GPS distance, live pace and heart rate from an `HKWorkoutSession`.
+Verified on a paired simulator (screenshots and numbers in `ios/README.md`). What is *not* yet done
+is the engine port, step-by-step prompts, coach audio, and sending the finished run back to the plan.
 
 **Decisions taken 2026-07-27 (with the owner):**
 - **Option B confirmed** — native iOS app + watch app. The iOS app exists now (see `ios/` and the
@@ -108,9 +113,9 @@ Each phase is independently useful, so it can stop at any point without waste.
 
 - ~~**Phase 0 — decide.**~~ ✅ Done 2026-07-27: option B, hybrid iOS shell, iPhone first. The PWA
   stays live on GitHub Pages and remains the design surface.
-- **Phase 1 — spike. ← NEXT.** A watchOS app that plays a *hard-coded* session: timer, steps,
+- ~~**Phase 1 — spike.**~~ ✅ **DONE.** A watchOS app that plays a *hard-coded* session: timer, steps,
   GPS distance, HR. Proves the hard part (live session on the wrist) before porting anything.
-- **Phase 2 — engine on device.** Port (or JavaScriptCore-bridge) `session-runtime` + `paces` +
+- **Phase 2 — engine on device. ← NEXT.** Port (or JavaScriptCore-bridge) `session-runtime` + `paces` +
   the safety modules. Port their tests alongside; they must pass against the same fixtures.
 - **Phase 3 — iOS app.** Setup/profile/plan on the phone, WatchConnectivity sync to the watch.
 - **Phase 4 — polish.** Complication, auto-logging back to the plan, coach audio, readiness.

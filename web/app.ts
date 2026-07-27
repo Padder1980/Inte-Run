@@ -2186,8 +2186,12 @@ function ingestWatchRun(run) {
   if ((state.logged || []).some((r) => r.id === run.id)) return "already logged"; // deliveries can repeat
   const sec = Math.max(0, Math.round(Number(run.sec) || 0));
   const distKm = Math.max(0, Number(run.distKm) || 0);
-  if (distKm < 0.05 || sec < 30) return "too short to log";
-  const avgPaceSec = distKm > 0 ? Math.round(sec / distKm) : 0;
+  // A deliberate workout can have almost no GPS distance - a treadmill run, or anything indoors.
+  // Duration is the honest signal of intent; the distance floor only exists to drop accidental
+  // starts. Requiring BOTH short-time and short-distance keeps 30-minute treadmill efforts while
+  // still binning the 20-second pocket start.
+  if (sec < 30 || (distKm < 0.05 && sec < 120)) return "too short to log";
+  const avgPaceSec = distKm >= 0.05 ? Math.round(sec / distKm) : 0;
   // Match it to the plan by date, so pband/rband are the ones it was actually judged against.
   const iso = run.dateIso || todayIso();
   const planned = sessionsForIso(iso)[0] || null;   // summary: used to tick the plan
@@ -2195,7 +2199,7 @@ function ingestWatchRun(run) {
   const title = run.title || (prescribed && prescribed.title) || (planned && planned.title) || "Run";
   state.logged.unshift({
     id: run.id, t: title, d: dayLabelIso(iso), dist: distKm.toFixed(2) + " km",
-    time: fmtPace(sec), pace: fmtPace(avgPaceSec) + " /km",
+    time: fmtPace(sec), pace: avgPaceSec ? fmtPace(avgPaceSec) + " /km" : "\u2014",
     distKm: Number(distKm.toFixed(2)), sec: sec, avgPaceSec: avgPaceSec,
     route: Array.isArray(run.route) ? run.route : [], splits: Array.isArray(run.splits) ? run.splits : [],
     elevGain: Math.round(Number(run.elevGain) || 0),

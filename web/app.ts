@@ -3,7 +3,7 @@
 // identity; the tab structure follows a familiar running-app layout. One engine bundle drives it all,
 // client-side. Regenerate with:  node web/app.ts   (or: npm run web)
 
-import { writeFileSync, readFileSync, existsSync, cpSync } from "node:fs";
+import { writeFileSync, readFileSync, existsSync, cpSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { bundleEngine } from "./bundle.ts";
@@ -14,12 +14,15 @@ const bundleJs = await bundleEngine();
 // Exercise demonstration animations (looping WebP, 512×512, teal muscle highlights in the brand
 // family). Read from assets/ and inlined as data URIs so the app stays a single self-contained,
 // offline-capable file. Keyed by slug; the strength UI looks these up via each exercise's `anim`.
-const EX_ANIM_SLUGS = [
-  "goblet-squat", "step-up", "split-squat-dumbbell", "reverse-lunge", "romanian-deadlift-dumbbell",
-  "glute-bridge", "clamshell", "standing-calf-raise", "single-leg-standing-calf-raise", "plank",
-  "dead-bug", "bird-dog", "push-up", "box-jump", "side-plank", "incline-push-up", "pogo-hops",
-];
+// Auto-discovered, not a hardcoded list: drop a new <slug>.webp into assets/exercise-animations/,
+// run `python3 tools/make-stills.py` for its thumbnail, rebuild, and it's live. Anything referenced
+// by an exercise's `anim` that hasn't been produced yet simply falls back to the schematic figure,
+// so a slug can be wired up before its artwork exists.
 const animDir = join(here, "..", "assets", "exercise-animations");
+const EX_ANIM_SLUGS = readdirSync(animDir)
+  .filter((f) => f.endsWith(".webp"))
+  .map((f) => f.slice(0, -5))
+  .sort();
 const exAnimData: Record<string, string> = {};
 for (const slug of EX_ANIM_SLUGS) {
   exAnimData[slug] = "data:image/webp;base64," + readFileSync(join(animDir, slug + ".webp")).toString("base64");
@@ -3035,6 +3038,10 @@ const STRENGTH_LIB = [
     { s: "push-up", n: "Push-up", m: "Chest, triceps", c: "Body in one line, elbows at about 45 degrees — not flared straight out." },
     { s: "incline-push-up", n: "Incline push-up", m: "Chest, triceps", c: "Hands raised makes it easier. Work down to a lower surface as you get stronger." },
   ] },
+  { g: "Balance", why: "Running is a series of single-leg landings. Steadying one leg trains the ankle and hip stabilisers that keep you tracking straight.", items: [
+    // Pre-wired: exCard renders nothing until single-leg-balance.webp exists, then this appears.
+    { s: "single-leg-balance", n: "Single-leg balance", m: "Ankles, glute medius", c: "Stand tall on one leg and stay steady. Progress by closing your eyes or standing on something soft." },
+  ] },
   { g: "Plyometric", why: "Trains tendon stiffness and elastic return — cheap speed. Introduce these only once you're running comfortably.", items: [
     { s: "box-jump", n: "Box jump", m: "Whole chain", c: "Land soft and quiet, knees tracking out. Step down — don't jump down." },
     { s: "pogo-hops", n: "Pogo hops", m: "Calves, Achilles", c: "Small, springy hops off the balls of your feet — stiff ankles, minimal ground contact." },
@@ -3049,9 +3056,14 @@ function exCard(it) {
     '<span class="excard-c">' + esc(it.c) + '</span></span></button>';
 }
 function strengthView() {
-  const groups = STRENGTH_LIB.map((g) =>
-    '<div class="lib-g"><div class="lib-gh"><h3>' + esc(g.g) + '</h3><p>' + esc(g.why) + '</p></div>' +
-    '<div class="lib-grid">' + g.items.map(exCard).join("") + '</div></div>').join("");
+  // Skip a group whose artwork doesn't exist yet — exCard returns "" for a missing asset, and a
+  // heading with no cards under it looks broken.
+  const groups = STRENGTH_LIB.map((g) => {
+    const cards = g.items.map(exCard).join("");
+    if (!cards) return "";
+    return '<div class="lib-g"><div class="lib-gh"><h3>' + esc(g.g) + '</h3><p>' + esc(g.why) + '</p></div>' +
+      '<div class="lib-grid">' + cards + '</div></div>';
+  }).join("");
   return '<div class="lib-hero"><div class="lib-eyebrow">Strength &amp; mobility</div>' +
     '<h2 class="lib-title">Two sessions a week is enough</h2>' +
     '<p class="lib-lead">Heavy strength training is one of the best-evidenced ways to improve running economy and cut injury risk \\u2014 and at these volumes it won\\u2019t make you bulky or leave you too sore to run.</p></div>' +

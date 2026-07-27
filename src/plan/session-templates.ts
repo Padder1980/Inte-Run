@@ -612,7 +612,9 @@ const EX: Record<string, ExDef> = {
   plank: { name: "Plank + side plank", primary: "Core", secondary: ["Shoulders"], pattern: "plank", anim: "plank", cue: "Straight line from head to heels. Brace your abs and glutes; don't let the hips sag." },
   deadbug: { name: "Dead bug", primary: "Core", secondary: [], pattern: "core", anim: "dead-bug", cue: "On your back, slowly lower an opposite arm and leg while keeping your lower back pressed down." },
   birddog: { name: "Bird-dog", primary: "Core", secondary: ["Glutes"], pattern: "core", anim: "bird-dog", cue: "On hands and knees, extend an opposite arm and leg, stay level, then switch sides." },
-  balance: { name: "Single-leg balance", primary: "Ankles", secondary: ["Core"], pattern: "balance", cue: "Stand tall on one leg and stay steady. Progress by closing your eyes or standing on something soft." },
+  // anim is pre-wired: the artwork doesn't exist yet, so this falls back to the schematic figure and
+  // activates automatically once assets/exercise-animations/single-leg-balance.webp is added.
+  balance: { name: "Single-leg balance", primary: "Ankles", secondary: ["Core"], pattern: "balance", anim: "single-leg-balance", cue: "Stand tall on one leg and stay steady. Progress by closing your eyes or standing on something soft." },
   pushup: { name: "Push-up (incline if needed)", primary: "Chest", secondary: ["Triceps", "Core"], pattern: "push", anim: "push-up", cue: "Hands under shoulders, body in a straight line. Lower with control, then press away." },
   pogo: { name: "Pogo hops", primary: "Calves", secondary: [], pattern: "jump", anim: "pogo-hops", cue: "Small, springy hops off the balls of your feet — stiff ankles, minimal time on the ground." },
   boxjump: { name: "Box / hurdle jump", primary: "Quads", secondary: ["Glutes", "Calves"], pattern: "jump", anim: "box-jump", cue: "Explode up, land soft and quiet with bent knees. Full recovery between jumps — quality over fatigue." },

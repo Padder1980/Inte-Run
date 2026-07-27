@@ -61,13 +61,28 @@ shows the still in lists and plays the animation when tapped. Re-run it after ad
 
 ## Still needed
 
-- **Single-leg balance** — no asset. It needs an *unsupported* single-leg stance, and nothing in the
-  pack contains one: the single-leg calf raise has a wall and a step with both hands on the wall, and
-  the step-up's top position has both feet on the box. It cannot be composited from what exists
-  without misrepresenting the exercise, so it currently falls back to the schematic figure. To add
-  it, produce a `single-leg-balance.webp` to the spec above (512 × 512, white background, teal
-  `#0e8c7f`/`#2bb3a3` highlighting on the glute medius and calf/ankle stabilisers), then run
-  `tools/make-stills.py`, add the slug to `EX_ANIM_SLUGS` in `web/app.ts`, and set
-  `anim: "single-leg-balance"` on the `balance` entry in `src/plan/session-templates.ts`.
+- **Single-leg balance** (`single-leg-balance.webp`) — the one exercise with no artwork. Nothing in
+  the pack can stand in for it: the single-leg calf raise has a wall and a step with both hands on the
+  wall, and the step-up's top position has both feet on the box. Compositing either would show a foot
+  resting on an invisible surface, which teaches the exercise wrongly, so it falls back to the
+  schematic figure.
+
+  **Spec for the new file** — same as the pack above, plus:
+
+  | | |
+  |---|---|
+  | Canvas | 512 × 512, white, 46 px safe inset, `object-fit: contain` |
+  | Pose | Upright, standing on one leg, other knee lifted to about hip height, shin hanging down, arms free at the sides or slightly out for balance |
+  | Must NOT include | A wall, a box, a step, a chair, or any hand support — the whole point is that it is unsupported |
+  | Motion | A slow, subtle sway (the micro-corrections balancing actually involves), not a big movement. ~3.2 s ping-pong matches the pack |
+  | Highlight teal | Glute medius (side of the hip) on the standing leg, plus the calf/ankle stabilisers — `#0e8c7f` / `#2bb3a3` |
+
+  **Adding it is now drop-in — no code changes needed.** The build auto-discovers animations, and the
+  slug is already wired to the exercise and the library card, so both activate the moment the file
+  exists:
+
+  1. Save it as `assets/exercise-animations/single-leg-balance.webp`
+  2. `python3 tools/make-stills.py`
+  3. `node web/app.ts` — then commit and push
 
 These are AI-assisted anatomical illustrations. A qualified strength and conditioning or clinical professional should review them before they are used as definitive exercise-prescription guidance.

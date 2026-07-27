@@ -1,0 +1,8 @@
+# Xcode build products and per-user state
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcworkspace/xcuserdata/
+InteRun.xcodeproj/project.xcworkspace/xcuserdata/
+InteRun.xcodeproj/xcuserdata/

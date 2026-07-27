@@ -1,6 +1,14 @@
 # WATCH.md — Apple Watch companion: scoping and decision document
 
-**Status: not started. This is a decision document, not a plan of record.**
+**Status: decided, not yet built. Phase 0 is done; Phase 1 is the next build.**
+
+**Decisions taken 2026-07-27 (with the owner):**
+- **Option B confirmed** — native iOS app + watch app. The iOS app exists now (see `ios/` and the
+  native-app section of `CLAUDE.md`); it is a **hybrid** shell running the existing web UI.
+- **iPhone first, watch second.** The phone app is the thing the watch pairs with.
+- **The owner has a real Apple Watch**, so GPS and heart rate can be validated on hardware.
+- Xcode **27.0 beta** is installed and the **watchOS 27 simulator runtime is already available**
+  (it shipped bundled; iOS had to be downloaded separately). The old blocker below is cleared.
 
 You said the watch is "crucial eventually". This file exists so that when we start, we start from a
 real understanding of what's involved — and so any future Claude session (on either account) picks
@@ -52,10 +60,20 @@ implementation on the same inputs.
 | `readiness/`, `adapt/`, `athlete/`, `progress/` | ~800 | Yes | Pure logic |
 | `view/plan-summary.ts` | 206 | Partly | Presentation shaping; the watch will want its own |
 
-**Alternative to porting:** keep the engine in TypeScript and run it on-device via JavaScriptCore
-(built into iOS/watchOS). Saves the port and keeps one source of truth, at the cost of a JS bridge
-and slower cold start. Worth prototyping before committing to a full Swift rewrite — a plan is
-generated once, not per frame, so the performance argument for native is weak.
+**Alternative to porting — ruled out for the watch (verified 2026-07-27).** The idea was to keep the
+engine in TypeScript and run it on-device via JavaScriptCore. Checking the installed SDKs directly:
+
+```
+Platforms/iPhoneOS.platform/…/System/Library/Frameworks/JavaScriptCore.framework   ✅ present
+Platforms/WatchOS.platform/…/System/Library/Frameworks/JavaScriptCore.framework    ❌ absent
+```
+
+**JavaScriptCore does not exist on watchOS.** So the bridge is available on iPhone but impossible on
+the watch — the watch needs real Swift. The saving grace is that it needs only what it uses
+(`session-runtime` + `paces`, roughly 950 lines), not all 5,200, and the 143 existing tests are the
+executable spec that proves the port is faithful.
+
+On iPhone the question is moot anyway: the hybrid shell runs the engine inside the web view.
 
 ## 4. What the watch should actually do
 
@@ -78,9 +96,9 @@ on a bigger screen.
 
 | Item | Detail |
 |---|---|
-| **Xcode** | Not installed on this Mac (Command Line Tools only — no `xcodebuild`, no watchOS simulators). Several GB from the App Store; needs your password. **This is the current blocker.** |
-| **Apple Developer Program** | ~£79/year. Required to run on a real Apple Watch and to ship. The simulator works without it. |
-| **A real Apple Watch** | Simulators cannot produce real GPS or heart rate. Final validation must be on hardware, outdoors. |
+| **Xcode** | ✅ Done — 27.0 **beta** at `/Applications/Xcode-beta.app`, watchOS 27 simulators present. Note a beta Xcode **cannot submit to App Store Connect**; release Xcode is needed to ship. |
+| **Apple Developer Program** | ✅ Joined (2026-07-27). |
+| **A real Apple Watch** | ✅ The owner has one. Simulators cannot produce real GPS or heart rate, so final validation happens on it, outdoors. |
 | **App Store review** | Days to weeks for the first submission. Health-adjacent apps get more scrutiny — the safety/escalation behaviour must be defensible. |
 | **Two codebases** | The PWA and the native app would both exist. Decide early whether the web app stays the primary product or becomes a marketing/demo surface. |
 
@@ -88,8 +106,9 @@ on a bigger screen.
 
 Each phase is independently useful, so it can stop at any point without waste.
 
-- **Phase 0 — decide.** Confirm option B, and whether the PWA remains the primary product.
-- **Phase 1 — spike (needs Xcode).** A watchOS app that plays a *hard-coded* session: timer, steps,
+- ~~**Phase 0 — decide.**~~ ✅ Done 2026-07-27: option B, hybrid iOS shell, iPhone first. The PWA
+  stays live on GitHub Pages and remains the design surface.
+- **Phase 1 — spike. ← NEXT.** A watchOS app that plays a *hard-coded* session: timer, steps,
   GPS distance, HR. Proves the hard part (live session on the wrist) before porting anything.
 - **Phase 2 — engine on device.** Port (or JavaScriptCore-bridge) `session-runtime` + `paces` +
   the safety modules. Port their tests alongside; they must pass against the same fixtures.
@@ -109,8 +128,8 @@ Nothing on the watch itself — but two things de-risk it:
 
 ## Open questions for the owner
 
-1. Does the **PWA stay the product**, with the watch as a companion — or does the native app become
-   the product and the PWA the shop window?
-2. Are you willing to run the **Apple Developer Program** (~£79/yr) and the App Store review cycle?
-3. Is the first watch milestone **"run a session on my wrist"** (Phase 1), or would a plan-viewing
-   complication land sooner and be worth more day to day?
+1. ~~Does the PWA stay the product?~~ ✅ The PWA stays live and remains the design surface; the
+   native app wraps it. Still open longer term: which one is marketed as *the* product.
+2. ~~Apple Developer Program?~~ ✅ Joined.
+3. **Still open:** is the first watch milestone *"run a session on my wrist"* (Phase 1), or would a
+   plan-viewing complication land sooner and be worth more day to day?

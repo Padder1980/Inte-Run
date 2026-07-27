@@ -1,0 +1,86 @@
+import SwiftUI
+import WebKit
+
+/// Hosts the InteRun web app full-bleed. The page already handles its own safe-area insets
+/// (`env(safe-area-inset-*)`) and its own light/dark theming, so the native side deliberately does
+/// as little as possible: no chrome, no insets, no colour scheme forcing.
+struct WebHost: UIViewRepresentable {
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIView(context: Context) -> WKWebView {
+        let config = WKWebViewConfiguration()
+        config.websiteDataStore = .default() // persistent: the app's whole database is localStorage
+        config.allowsInlineMediaPlayback = true
+        config.mediaTypesRequiringUserActionForPlayback = [] // coach audio is our own content
+
+        if let root = BundleSchemeHandler.webRoot {
+            config.setURLSchemeHandler(BundleSchemeHandler(root: root),
+                                       forURLScheme: BundleSchemeHandler.scheme)
+        }
+
+        let webView = WKWebView(frame: .zero, configuration: config)
+        webView.navigationDelegate = context.coordinator
+        webView.uiDelegate = context.coordinator
+        webView.allowsBackForwardNavigationGestures = false
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
+        webView.scrollView.bounces = false
+        webView.scrollView.showsVerticalScrollIndicator = false
+
+        // Match the splash so there is no white flash between the launch screen and the page.
+        let launch = UIColor(named: "LaunchBackground") ?? .black
+        webView.isOpaque = false
+        webView.backgroundColor = launch
+        webView.scrollView.backgroundColor = launch
+
+        guard BundleSchemeHandler.webRoot != nil else {
+            webView.loadHTMLString(Self.missingBundleNotice, baseURL: nil)
+            return webView
+        }
+        webView.load(URLRequest(url: BundleSchemeHandler.startURL))
+        return webView
+    }
+
+    func updateUIView(_ webView: WKWebView, context: Context) {}
+
+    /// Shown only if the "Embed web app" build phase did not run — a build problem, not a user one,
+    /// so it says exactly what is wrong rather than failing to a blank screen.
+    private static let missingBundleNotice = """
+    <html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+    <body style="font:15px -apple-system;background:#06110f;color:#e6efec;padding:32px">
+    <h2 style="color:#16b7a4">Web bundle missing</h2>
+    <p>No <code>web/</code> folder in the app bundle. The &ldquo;Embed web app&rdquo; build phase
+    copies <code>docs/</code> into the app &mdash; check it ran, and that <code>docs/index.html</code>
+    exists (rebuild it with <code>node web/app.ts</code>).</p>
+    </body></html>
+    """
+
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+        /// Keep the app an app: anything genuinely off-site opens in Safari rather than turning
+        /// this window into an unbranded browser with no way back.
+        func webView(_ webView: WKWebView,
+                     decidePolicyFor navigationAction: WKNavigationAction,
+                     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            guard let url = navigationAction.request.url else { return decisionHandler(.allow) }
+
+            if url.scheme == BundleSchemeHandler.scheme || url.scheme == "about" {
+                return decisionHandler(.allow)
+            }
+            if navigationAction.navigationType == .linkActivated || navigationAction.targetFrame == nil {
+                if UIApplication.shared.canOpenURL(url) { UIApplication.shared.open(url) }
+                return decisionHandler(.cancel)
+            }
+            // Data/blob URLs are used in-page (share cards, the .ics export) — let them through.
+            decisionHandler(url.scheme == "data" || url.scheme == "blob" ? .allow : .cancel)
+        }
+
+        /// `target="_blank"` has nowhere to go in a single-window app; send it to Safari instead.
+        func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                     for navigationAction: WKNavigationAction,
+                     windowFeatures: WKWindowFeatures) -> WKWebView? {
+            if let url = navigationAction.request.url, UIApplication.shared.canOpenURL(url) {
+                UIApplication.shared.open(url)
+            }
+            return nil
+        }
+    }
+}

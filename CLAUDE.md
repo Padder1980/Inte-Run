@@ -219,6 +219,43 @@ Design rules baked in, each of which cost a real bug when it was missing — don
 - **RPE stays answerable after Save** — the picker writes through to the logged run. Gating it on
   `!saved` starved the whole signal for anyone who taps Save first.
 
+## The native app (`ios/`) — started 2026-07-27
+
+InteRun is now **also a native iPhone app**, built as a **hybrid**: a thin Swift shell that runs the
+existing web UI, so there is still **one UI to design** (`web/app.ts`). Decided with the owner on
+2026-07-27, along with: iPhone first, then the Watch; the owner **has** a real Apple Watch to test on.
+
+- **`docs/` stays the single source of truth.** An "Embed web app" build phase rsyncs it into the
+  bundle every build (minus `roadmap/`, `walkthrough.html`, `coverage.html`). Nothing is duplicated
+  into git. **Run `node web/app.ts` before building in Xcode.**
+- **The page is served over `interun://app/…`**, not `file://` — WKWebView blocks `fetch()` on file
+  URLs and the app fetches `voices/manifest.json`. `BundleSchemeHandler` also implements HTTP range
+  requests, without which `<audio>` will not play the coach MP3s.
+  ⚠️ **The origin is load-bearing:** `localStorage` (the app's entire database) is keyed to
+  `interun://app`. Changing the scheme or host would orphan every user's data. Never change it.
+- The service-worker registration in `app.ts` is already gated on `location.protocol` being http(s),
+  so it skips silently under the custom scheme. **No web-side changes were needed at all.**
+- `ios/InteRun.xcodeproj` is **generated** by `python3 ios/make-project.py` (so the build-phase shell
+  script can be written as real shell and escaped correctly). Regenerating **overwrites** it — mirror
+  any Xcode-UI build-setting changes back into that script first. `ios/InteRun/` is a synchronized
+  folder group, so new Swift files need no project edit.
+- Full detail, including the known gaps, is in **`ios/README.md`** — read it before touching `ios/`.
+
+### Toolchain on this Mac (verified 2026-07-27)
+
+- Xcode **27.0 beta** at `/Applications/Xcode-beta.app`. There is **no release Xcode**, and
+  **App Store Connect will not accept builds from a beta Xcode** — release Xcode is needed to submit.
+- `xcode-select` still points at CommandLineTools, and changing it needs the owner's password. Not a
+  blocker: **`export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer` works without
+  sudo** and is how Claude builds here.
+- Build + inspect:
+  ```bash
+  node web/app.ts && DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+    xcodebuild -project ios/InteRun.xcodeproj -scheme InteRun -sdk iphonesimulator build
+  ```
+- Simulator runtimes ship **separately from Xcode**: watchOS 27 was bundled, iOS was **not** and had
+  to be fetched with `xcodebuild -downloadPlatform iOS`.
+
 **Apple Watch:** see `WATCH.md` — a scoping/decision document, nothing built. Key facts: a watchOS
 app cannot pair with a PWA (it needs a native iOS app), Xcode isn't installed on the owner's Mac,
 and the `src/` engine is dependency-free TS with 143 tests that would serve as the port spec.

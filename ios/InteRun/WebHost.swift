@@ -55,6 +55,10 @@ struct WebHost: UIViewRepresentable {
     """
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            if SelfCheck.isEnabled { SelfCheck.run(on: webView) }
+        }
+
         /// Keep the app an app: anything genuinely off-site opens in Safari rather than turning
         /// this window into an unbranded browser with no way back.
         func webView(_ webView: WKWebView,

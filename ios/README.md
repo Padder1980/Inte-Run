@@ -87,6 +87,42 @@ into `make-project.py` first, or you will lose them.
 xcodebuild -project ios/InteRun.xcodeproj -scheme InteRun -sdk iphonesimulator -configuration Debug build
 ```
 
+## Smoke test
+
+The hybrid shell rests on four things that are invisible from the outside — a broken one shows up as
+an app that merely *looks* fine. `SelfCheck.swift` proves them headlessly:
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+  xcrun simctl launch <udid> com.interun.app -InteRunSelfCheck YES
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+  xcrun simctl spawn <udid> log show --last 20s --style compact \
+  --predicate 'subsystem == "com.interun.app"' | grep -o 'RESULT.*'
+```
+
+Last run (iPhone 17 Pro, iOS 27.0) — all green:
+
+```json
+{ "origin": "interun://app", "localStorageWrites": true, "priorValue": "1785139778002",
+  "fetchStatus": 200, "coaches": ["guide","pacer","motivator","technician"], "clipCount": 168,
+  "range": { "status": 206, "contentRange": "bytes 0-99/25248", "bytes": 100, "ok": true },
+  "audio": { "ok": true, "duration": 3.14 }, "engineLoaded": true, "appBooted": true }
+```
+
+`priorValue` is the persistence proof: it is written on one launch and read on the **next**, which is
+the only honest way to show `localStorage` survives to disk under the custom scheme. A value read
+back within the same session proves nothing.
+
+## Simulator notes
+
+- The iOS **27** runtime only works with **Xcode 27 beta**. Release Xcode 26.6 reports
+  *"Found no destinations"* against it — fine, because submission archives for a device and needs
+  no simulator runtime at all. Use the beta for simulator work, release for shipping.
+- Boot, install, launch:
+  ```bash
+  xcrun simctl boot <udid> && xcrun simctl install <udid> path/to/InteRun.app && xcrun simctl launch <udid> com.interun.app
+  ```
+
 ## Known gaps
 
 These are real, deliberate, and not yet done:

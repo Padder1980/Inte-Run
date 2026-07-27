@@ -281,6 +281,36 @@ back to plain "Well done" rather than an awkward blank.
 
 Deliberately **not** on the watch: plan setup, history, Support. Those want a bigger screen.
 
+### ⚠️ Current blocker: the watch app cannot install on the owner's real watch (2026-07-27)
+
+**State: parked, deliberately.** The owner's iPhone 16 Pro Max runs **iOS 27 beta**; his Watch
+Ultra runs **watchOS 26.5 release**. That combination is a dead end for development installs:
+
+- iOS 27 forces **Xcode 27 beta** (release Xcode 26.6 cannot deploy to the phone at all), so the
+  watch app is compiled against the **watchOS 27 beta SDK**.
+- The release watch refuses the beta-built binary with *"integrity could not be verified"*, and the
+  Mac↔watch developer channel never opens — so the watch's **Developer Mode toggle never appears**
+  (Settings → Privacy & Security), even after restarting both devices. Chicken and egg.
+
+Three real defects were found and fixed during the chase, and **stay fixed** — each independently
+caused or would cause this same install failure:
+1. `ENABLE_DEBUG_DYLIB = NO` — Xcode 16+ Debug builds otherwise ship `<target>.debug.dylib` +
+   `__preview.dylib`, which a real watch rejects with the same integrity error.
+2. `WATCH_DEPLOYMENT_TARGET = 10.0` — it was 26.0, above many real watches.
+3. Device builds ship **arm64_32 only** — the new arm64 slice is clamped to minos 26.0 by the
+   beta toolchain regardless of the deployment target.
+
+Everything else was verified good: deep signature valid, profile contains the watch UDID +
+HealthKit, versions matched, build numbers now bumped per install so staleness is checkable
+(`xcrun devicectl device info apps --device <udid> | grep -i interun`).
+
+**The unblock is time, not code.** When iOS 27 + watchOS 27 ship publicly (typically September):
+1. Update the watch, use release Xcode, press ▶ — no code changes expected.
+2. iPhone → Watch app → InteRun → Install (Developer Mode on the watch may need enabling then).
+3. **First thing to test:** the never-yet-proven hop — run a session on the wrist, end it, rate the
+   effort, and confirm it lands in the phone's Logbook (`watch bridge activated: state=2` and
+   `__interunWatchRun` in the logs are the diagnostics).
+
 ### If the watch app will not install
 
 The symptom is silence: the phone app installs fine, the Watch app on the phone never offers

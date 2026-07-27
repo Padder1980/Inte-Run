@@ -255,6 +255,12 @@ existing web UI, so there is still **one UI to design** (`web/app.ts`). Decided 
   `env(safe-area-inset-*)` resolves to **0**, which silently put the app bar under the Dynamic Island
   and the bottom nav under the home indicator. Because `apple-mobile-web-app-status-bar-style` is
   `black-translucent`, this was already wrong for Home Screen PWA users on notched iPhones.
+- **Session reminders** are scheduled by iOS (`NotificationService.swift`), not by a page timer. The
+  page hands over a *schedule*; the OS fires it with the app closed. Note WKWebView has **no
+  `Notification` API at all**, so before this the feature was inert in the app, not merely unreliable.
+  Two traps: iOS caps pending local notifications at **64** (we cap at 60 and re-sync), and
+  `UNCalendarNotificationTrigger` **matches to the minute** — a time inside the current minute never
+  fires. The reminders-sheet copy adapts to the platform so it never overpromises on the web.
 - Full detail, including the known gaps, is in **`ios/README.md`** — read it before touching `ios/`.
 
 ### Toolchain on this Mac (verified 2026-07-27)
@@ -283,8 +289,9 @@ existing web UI, so there is still **one UI to design** (`web/app.ts`). Decided 
 app cannot pair with a PWA (it needs a native iOS app), Xcode isn't installed on the owner's Mac,
 and the `src/` engine is dependency-free TS with 143 tests that would serve as the port spec.
 
-Known/optional next: lock-screen/background audio is limited (pure PWA, no native wrapper); true
-background reminders would need a push server (calendar export is the current cross-platform answer).
+Known/optional next (**web/PWA only** — the native app solves all three, see the `ios/` section):
+lock-screen/background audio is limited, background GPS stops when the screen locks, and true
+background reminders would need a push server (calendar export is the cross-platform answer there).
 
 ---
 

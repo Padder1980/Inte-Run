@@ -1607,7 +1607,7 @@ const storedProfile = loadProfile();
 const FIRST_RUN = !storedProfile;
 let profile = storedProfile || Object.assign({}, DEFAULT_PROFILE);
 let PLAN, RAW, FITNESS, CLASS, MASTERS;
-function recompute() { const r = applyProfile(profile); PLAN = r.plan; RAW = r.raw; FITNESS = r.fitness; CLASS = r.classification; MASTERS = r.masters; normalizeWeekStarts(); }
+function recompute() { const r = applyProfile(profile); PLAN = r.plan; RAW = r.raw; FITNESS = r.fitness; CLASS = r.classification; MASTERS = r.masters; normalizeWeekStarts(); try { syncNativeReminders(); } catch (e) {} }
 // Weeks display on a Monday–Sunday grid, and day indices are Monday-based (0 = Mon). applyProfile can
 // move the first (partial) week's start to a mid-week date; snap each week's start back to its Monday
 // so isoAdd(startIso, dayIndex) — used by the strip, overview, calendar and .ics — always lands on the
@@ -1946,8 +1946,40 @@ function saveReminders() { try { localStorage.setItem("interun_reminders_v1", JS
 // Which reminder slots have fired today: { d: "YYYY-MM-DD", a: bool, b: bool }.
 function firedToday() { try { const o = JSON.parse(localStorage.getItem("interun_reminded_on") || "null"); return (o && o.d === todayIso()) ? o : { d: todayIso(), a: false, b: false }; } catch (e) { return { d: todayIso(), a: false, b: false }; } }
 function markFired(slot) { const o = firedToday(); o[slot] = true; try { localStorage.setItem("interun_reminded_on", JSON.stringify(o)); } catch (e) {} }
-function notifSupported() { return typeof Notification !== "undefined"; }
-function notifPerm() { return notifSupported() ? Notification.permission : "unsupported"; }
+// ---- Native notifications (the iPhone app) ----------------------------------------------------
+// A website cannot wake itself to remind you: the PWA can only arm a timer that dies with the tab,
+// which is why the calendar export exists. WKWebView has no Notification API at all, so in the app
+// this feature was entirely inert. When the native bridge is there the page hands over a SCHEDULE
+// and iOS fires it whether or not InteRun is running.
+const NATIVE_NOTIFY = (function () {
+  try { return !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.interunNotify); } catch (e) { return false; }
+})();
+let NATIVE_PERM = "default";
+let NOTIFY_ASKED = false;
+let NOTIFY_RERENDER = null; // set while the reminders sheet is open, so an async grant redraws it
+function nativeNotify(action, payload) {
+  try { window.webkit.messageHandlers.interunNotify.postMessage(Object.assign({ action: action }, payload || {})); } catch (e) {}
+}
+window.__interunNotify = {
+  status: function (perm) {
+    NATIVE_PERM = perm;
+    if (NOTIFY_ASKED) {
+      NOTIFY_ASKED = false;
+      REMIND.enabled = (perm === "granted");
+      if (perm !== "default") REMIND.decided = true;
+      saveReminders();
+    }
+    try { updateBell(); } catch (e) {}
+    try { syncNativeReminders(); } catch (e) {}
+    if (NOTIFY_RERENDER) { try { NOTIFY_RERENDER(); } catch (e) {} }
+  },
+  pending: function () {}
+};
+function notifSupported() { return NATIVE_NOTIFY || typeof Notification !== "undefined"; }
+function notifPerm() {
+  if (NATIVE_NOTIFY) return NATIVE_PERM;
+  return typeof Notification !== "undefined" ? Notification.permission : "unsupported";
+}
 function updateBell() {
   const b = $("bellBtn"); if (!b) return;
   b.classList.toggle("rm-on", REMIND.enabled && notifPerm() === "granted");
@@ -1986,11 +2018,60 @@ function notifyToday(slot) {
   markFired(slot);
   showNotif("Today: " + s.title + more, { body: (bits.length ? bits.join(" \\u00b7 ") + "\\n" : "") + quote, tag: "interun-session-" + today + "-" + slot, icon: "./icon-192.png", badge: "./icon-192.png", data: { url: "./" } });
 }
+// Every upcoming session day, at each configured time. Capped because iOS keeps at most 64 pending
+// notifications per app and silently drops the rest; re-synced on launch and on every change, so
+// roughly six weeks ahead is far past any useful horizon.
+const NATIVE_NOTIFY_CAP = 60;
+function buildReminderSchedule() {
+  const out = [];
+  if (!REMIND.enabled) return out;
+  const slots = [["a", REMIND.time]];
+  if (REMIND.time2) slots.push(["b", REMIND.time2]);
+  const nowMs = Date.now();
+  for (let day = 0; day < 90 && out.length < NATIVE_NOTIFY_CAP; day++) {
+    const iso = isoAdd(todayIso(), day).toISOString().slice(0, 10);
+    const list = sessionsForIso(iso);
+    if (!list.length) continue;
+    const s = list[0], bits = [];
+    if (s.durMin) bits.push(s.durMin + " min");
+    if (s.distKm) bits.push(s.distKm + " km");
+    const more = list.length > 1 ? " (+" + (list.length - 1) + " more)" : "";
+    const p = iso.split("-").map(Number);
+    for (let i = 0; i < slots.length && out.length < NATIVE_NOTIFY_CAP; i++) {
+      const mins = hmMinutes(slots[i][1]);
+      // Local time, deliberately: a reminder is set against the clock on the wall, not UTC.
+      const when = new Date(p[0], p[1] - 1, p[2], Math.floor(mins / 60), mins % 60, 0);
+      // A calendar trigger matches to the minute, so any future minute boundary is fine; the
+      // small buffer only guards against the sync debounce landing on the wrong side of it.
+      if (when.getTime() <= nowMs + 5000) continue; // already gone
+      const q = randomQuote();
+      out.push({
+        id: "interun-" + iso + "-" + slots[i][0],
+        y: when.getFullYear(), mo: when.getMonth() + 1, d: when.getDate(),
+        h: when.getHours(), mi: when.getMinutes(),
+        title: "Today: " + s.title + more,
+        body: (bits.length ? bits.join(" \\u00b7 ") + "\\n" : "") + "\\u201C" + q[0] + "\\u201D" + (q[1] ? " \\u2014 " + q[1] : ""),
+      });
+    }
+  }
+  return out;
+}
+let NOTIFY_SYNC_T = null;
+// Debounced, so the plan rebuild and the settings change that follow one another collapse into one.
+function syncNativeReminders() {
+  if (!NATIVE_NOTIFY) return;
+  clearTimeout(NOTIFY_SYNC_T);
+  NOTIFY_SYNC_T = setTimeout(() => {
+    if (NATIVE_PERM !== "granted" || !REMIND.enabled) { nativeNotify("clear"); return; }
+    nativeNotify("schedule", { items: buildReminderSchedule() });
+  }, 400);
+}
 let REMIND_TIMERS = [];
 // On open: for each configured reminder time, fire now if past due, else arm a same-day timer (only
 // fires while the app is open — a website can't wake itself in the background without a server).
 function initReminders() {
   REMIND_TIMERS.forEach(clearTimeout); REMIND_TIMERS = [];
+  if (NATIVE_NOTIFY) { syncNativeReminders(); return; } // the OS holds these, not a page timer
   if (!REMIND.enabled || notifPerm() !== "granted") return;
   if (!sessionsForIso(todayIso()).length) return;
   const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
@@ -2051,12 +2132,16 @@ function remindersSheetHtml() {
   const noThanks = REMIND.decided ? "" : '<button class="rm-nothanks" id="rmNo">\\uD83D\\uDD15 No thanks \\u2014 I don\\u2019t want reminders</button>';
   return '<div class="sd-type" style="--sc:var(--accent)">Session reminders</div>' +
     '<div class="sd-title">Get reminded on session days</div>' +
-    '<div class="rm-row"><div><b>In-app notifications</b><div class="sd-desc" style="margin:2px 0 0">A nudge \\u2014 with a motivational quote \\u2014 on the days you have a session.</div></div>' + toggle + '</div>' +
+    '<div class="rm-row"><div><b>' + (NATIVE_NOTIFY ? 'Session reminders' : 'In-app notifications') + '</b><div class="sd-desc" style="margin:2px 0 0">A nudge \\u2014 with a motivational quote \\u2014 on the days you have a session.</div></div>' + toggle + '</div>' +
     '<div class="rm-row"><label for="rmTime">Reminder time</label><input type="time" id="rmTime" value="' + REMIND.time + '"' + (on ? "" : " disabled") + '></div>' +
     second +
     (note ? '<div class="sd-desc" style="margin-top:8px">' + note + '</div>' : "") +
     noThanks +
-    '<div class="sd-desc" style="margin-top:10px;font-size:12.5px;color:var(--ink-faint)">A web app can only notify reliably while it\\u2019s open (or added to your Home Screen). For an alert that reaches you with InteRun closed, add your sessions to your calendar below \\u2014 it works on any phone.</div>' +
+    // The honest caveat differs by platform: on the web a timer dies with the tab, but in the app
+    // iOS itself holds the schedule. Telling app users their reminders are unreliable would be a lie.
+    '<div class="sd-desc" style="margin-top:10px;font-size:12.5px;color:var(--ink-faint)">' + (NATIVE_NOTIFY
+      ? 'Your phone holds these reminders, so they arrive whether or not InteRun is open. You can also add every session to your calendar below.'
+      : 'A web app can only notify reliably while it\\u2019s open (or added to your Home Screen). For an alert that reaches you with InteRun closed, add your sessions to your calendar below \\u2014 it works on any phone.') + '</div>' +
     '<div class="sd-move" style="margin-top:14px"><div class="sd-move-h">Add sessions to your calendar</div>' +
     '<div class="sd-desc" style="margin:2px 0 10px">Adds every planned session. Your phone asks <b>which calendar</b> to put them in, so choose the account you want there \\u2014 Google, iCloud or Outlook. InteRun never sees your password.</div>' +
     '<button class="primary" id="rmIcs" style="width:100%">' + ICON.cal + ' Add to my calendar</button>' +
@@ -2069,6 +2154,7 @@ function remindersSheetHtml() {
 function openRemindersSheet() { ensureSheet(); SHEET_CTX = null; $("sheetBody").innerHTML = remindersSheetHtml(); wireRemindersSheet(); $("sheetOv").classList.add("on"); }
 function wireRemindersSheet() {
   const rerender = () => { $("sheetBody").innerHTML = remindersSheetHtml(); wireRemindersSheet(); };
+  NOTIFY_RERENDER = () => { if ($("sheetBody") && $("rmToggle")) rerender(); };
   const commit = () => { saveReminders(); initReminders(); updateBell(); rerender(); };
   const tog = $("rmToggle");
   if (tog) tog.onclick = () => {
@@ -2077,6 +2163,7 @@ function wireRemindersSheet() {
     const p = notifPerm();
     if (p === "granted") { REMIND.enabled = true; REMIND.decided = true; commit(); }
     else if (p === "denied") { rerender(); }
+    else if (NATIVE_NOTIFY) { NOTIFY_ASKED = true; nativeNotify("request"); }
     else { Notification.requestPermission().then((res) => { REMIND.enabled = (res === "granted"); if (res !== "default") REMIND.decided = true; commit(); }); }
   };
   const no = $("rmNo"); if (no) no.onclick = () => { REMIND.enabled = false; REMIND.decided = true; commit(); };
@@ -5402,7 +5489,7 @@ $("bellBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); openRe
 seedDone();
 buildNav();
 render();
-try { updateBell(); initReminders(); } catch (e) {}
+try { if (NATIVE_NOTIFY) nativeNotify("status"); updateBell(); initReminders(); } catch (e) {}
 // Launch flow: brief brand splash, then either the first-run welcome (which leads into setup) or,
 // for a returning user, straight to Today.
 (function () {

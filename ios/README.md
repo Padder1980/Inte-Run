@@ -171,6 +171,32 @@ xcrun simctl privacy <udid> grant location com.interun.app
 xcrun simctl location <udid> start --speed=3.3 --interval=1 53.3811,-1.4701 53.4200,-1.4701
 ```
 
+## Session reminders
+
+`NotificationService.swift` makes reminders real. Two things were wrong before: a web timer dies with
+the tab, **and WKWebView has no `Notification` API at all**, so in the app the whole feature was inert
+— the sheet simply declared itself unsupported.
+
+Now the page hands over a *schedule* — every upcoming session day at each configured time, with the
+session title, duration/distance and a motivational quote — and `UNUserNotificationCenter` fires them
+whether or not InteRun is running.
+
+- **iOS keeps at most 64 pending local notifications** and silently drops the rest, so the list is
+  capped at 60 and re-synced (debounced) on launch, on any reminder change, and after any plan
+  rebuild via `recompute()`.
+- The schedule is **replaced wholesale**, not diffed: a stale reminder for a session that no longer
+  exists is worse than a missing one.
+- `willPresent` returns `.banner` so a reminder still shows when the app is open.
+- ⚠️ **`UNCalendarNotificationTrigger` matches to the minute.** A time inside the current minute has
+  a start already in the past and never fires — this cost a confusing "delivered: 0" during testing.
+  The builder only schedules future minute boundaries.
+- The sheet copy adapts: on the web it still says a web app can only notify while open, in the app it
+  says the phone holds them. Telling app users their reminders are unreliable would be a lie.
+
+Verified end to end on the simulator: permission granted, 60 built with unique ids, **60 actually
+pending with the OS**, next fire at the correct local time, and a scheduled notification **delivered**
+(confirmed via `getDeliveredNotifications`, not just registered).
+
 ## Known gaps
 
 These are real, deliberate, and not yet done:
@@ -178,8 +204,6 @@ These are real, deliberate, and not yet done:
 - **Sticky sub-tabs never stick.** `#view` has `overflow: auto`, making it a scroll container that
   never actually scrolls, so `position: sticky` on `.subtabs` is inert — it has never worked, in the
   app or the browser. The offset is now correct for when it is fixed; the overflow is the real bug.
-- **Local notifications.** Session reminders still use the web timer, which dies with the app. A
-  native `UNUserNotificationCenter` bridge is the fix, and would finally make reminders reliable.
 - **Build with release Xcode to submit.** `/Applications/Xcode.app` is 26.6 (release, can submit);
   `/Applications/Xcode-beta.app` is 27.0 beta (development only — App Store Connect rejects its
   builds).

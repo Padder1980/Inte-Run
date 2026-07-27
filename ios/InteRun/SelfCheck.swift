@@ -12,7 +12,8 @@ import os
 ///  3. `fetch()` works, which `file://` would have blocked (the coach manifest needs it);
 ///  4. the engine global `RC` actually loaded;
 ///  5. the native GPS shim replaced `navigator.geolocation` before app code ran;
-///  6. the PWA-to-app migration path is present and its file picker reachable.
+///  6. the PWA-to-app migration path is present and its file picker reachable;
+///  7. the native reminder bridge is present, so reminders are not silently inert.
 ///
 /// Run with `-InteRunSelfCheck YES`; results go to the unified log under the "selfcheck" category.
 /// Nothing here runs in a normal launch.
@@ -96,6 +97,18 @@ enum SelfCheck {
       watchIsNative: typeof navigator.geolocation.watchPosition === 'function'
         && String(navigator.geolocation.watchPosition).indexOf('[native code]') === -1,
     };
+
+    // 7. Native reminders: without the bridge, WKWebView has no Notification API at all and the
+    // whole feature is inert, which is how it silently was before.
+    out.notify = { bridge: NATIVE_NOTIFY, perm: NATIVE_PERM };
+    try {
+      out.notify.builderRuns = Array.isArray(buildReminderSchedule());
+      // The original symptom: with no Notification API the sheet just declared itself unsupported.
+      const sheet = remindersSheetHtml();
+      out.notify.sheetSaysUnsupported = sheet.indexOf('show notifications here') !== -1;
+      out.notify.sheetOffersToggle = sheet.indexOf('rmToggle') !== -1;
+      out.notify.sheetSaysOsHolds = sheet.indexOf('Your phone holds these reminders') !== -1;
+    } catch (e) { out.notify.builderError = String(e); }
 
     // 4. The engine bundle.
     out.engineLoaded = typeof RC !== 'undefined' && typeof RC.generatePlan === 'function';

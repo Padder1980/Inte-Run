@@ -28,6 +28,10 @@ struct WebHost: UIViewRepresentable {
         let location = LocationService(webView: webView)
         context.coordinator.location = location
         config.userContentController.add(location, name: LocationService.messageName)
+
+        let notifications = NotificationService(webView: webView)
+        context.coordinator.notifications = notifications
+        config.userContentController.add(notifications, name: NotificationService.messageName)
         webView.allowsBackForwardNavigationGestures = false
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.scrollView.bounces = false
@@ -64,6 +68,8 @@ struct WebHost: UIViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         /// Where the in-flight `<a download>` is being written. See `Downloads.swift`.
         var pendingDownload: URL?
+        /// Owns the notification centre delegate, which the centre only holds weakly.
+        var notifications: NotificationService?
         /// Owns the CLLocationManager for the lifetime of the web view. See `LocationService.swift`.
         var location: LocationService?
 

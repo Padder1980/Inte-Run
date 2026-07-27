@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Road Map</title>
+<meta name="description" content="The InteRun road map — from web app to the App Store, watches, an intelligent coach and a running community.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="icon" href="../icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Road Map">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#eef1f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a100e" media="(prefers-color-scheme: dark)">
+<style>
+  :root {
+    --bg: #eef1f1; --surface: #ffffff; --surface-2: #f6f8f8; --line: #dbe1e0;
+    --ink: #14201b; --ink-soft: #4c5b55; --ink-faint: #7a877f;
+    --accent: #0e8c7f; --accent-ink: #ffffff;
+    --done: #0e8c7f; --shadow: 0 1px 2px rgba(20,32,27,.05), 0 10px 28px -14px rgba(20,32,27,.16);
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0a100e; --surface: #151e1b; --surface-2: #1b2622; --line: #26332e;
+      --ink: #e7eeea; --ink-soft: #a9b7b0; --ink-faint: #74847c;
+      --accent: #2bb3a3; --accent-ink: #06231f;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 30px -14px rgba(0,0,0,.5); }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; font-family: var(--sans); background: var(--bg); color: var(--ink);
+    line-height: 1.55; padding-bottom: calc(28px + env(safe-area-inset-bottom)); }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 0 16px; }
+
+  header { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line);
+    padding-top: env(safe-area-inset-top); }
+  .head-in { display: flex; align-items: center; gap: 11px; padding: 12px 16px; max-width: 560px; margin: 0 auto; }
+  .head-in svg { width: 40px; height: 40px; flex: none; filter: drop-shadow(0 4px 12px rgba(22,183,164,.35)); }
+  .head-t b { display: block; font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
+  .head-t span { display: block; font-size: 11.5px; color: var(--ink-faint); }
+  .head-pct { margin-left: auto; text-align: right; }
+  .head-pct b { display: block; font-family: var(--mono); font-size: 17px; font-weight: 700; color: var(--accent); }
+  .head-pct span { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint); }
+
+  .hero { margin: 22px 0 6px; }
+  .hero h1 { margin: 0 0 8px; font-size: 27px; font-weight: 800; letter-spacing: -.03em; line-height: 1.12; }
+  .hero p { margin: 0; color: var(--ink-soft); font-size: 14.5px; }
+  .hero .goal { margin-top: 14px; padding: 14px 16px; background: linear-gradient(150deg, color-mix(in srgb, var(--accent) 14%, var(--surface)), var(--surface) 70%);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); border-radius: 16px; box-shadow: var(--shadow); }
+  .hero .goal b { display: block; font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+  .hero .goal div { font-size: 14px; color: var(--ink); line-height: 1.55; }
+
+  .rules { margin: 16px 0 4px; padding: 13px 15px; background: var(--surface-2); border: 1px dashed var(--line); border-radius: 14px; font-size: 13px; color: var(--ink-soft); }
+  .rules b { color: var(--ink); }
+
+  .phase { margin-top: 22px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }
+  .ph-head { display: flex; gap: 12px; align-items: flex-start; padding: 16px 16px 12px; }
+  .ph-num { flex: none; width: 34px; height: 34px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-weight: 700; font-size: 15px; background: color-mix(in srgb, var(--accent) 12%, var(--surface-2)); color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--line)); }
+  .ph-title { min-width: 0; }
+  .ph-title h2 { margin: 1px 0 3px; font-size: 17.5px; font-weight: 760; letter-spacing: -.02em; line-height: 1.25; }
+  .ph-meta { display: flex; flex-wrap: wrap; gap: 5px; }
+  .tag { font-size: 10.5px; font-weight: 650; padding: 3px 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-faint); }
+  .tag.cost { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 30%, var(--line)); }
+  .ph-bar { height: 4px; margin: 0 16px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+  .ph-bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 999px; transition: width .35s ease; }
+  .ph-why { margin: 12px 16px 2px; font-size: 13.5px; color: var(--ink-soft); }
+  .steps { padding: 10px 10px 8px; }
+  .step { display: flex; gap: 11px; align-items: flex-start; width: 100%; text-align: left; font: inherit; color: inherit;
+    background: none; border: 0; padding: 9px 8px; border-radius: 12px; cursor: pointer; }
+  .step:active { background: var(--surface-2); }
+  .box { flex: none; width: 23px; height: 23px; margin-top: 1px; border-radius: 8px; border: 2px solid var(--line); background: var(--surface); position: relative; transition: all .15s ease; }
+  .step.done .box { background: var(--done); border-color: var(--done); }
+  .step.done .box::after { content: ""; position: absolute; left: 6px; top: 2px; width: 5px; height: 10px;
+    border: solid #fff; border-width: 0 2.5px 2.5px 0; transform: rotate(42deg); }
+  .st-b { min-width: 0; }
+  .st-t { display: block; font-size: 14.5px; font-weight: 640; letter-spacing: -.01em; }
+  .st-d { display: block; }
+  .step.done .st-t { color: var(--ink-faint); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--ink-faint) 55%, transparent); }
+  .st-d { margin-top: 2px; font-size: 12.5px; color: var(--ink-soft); }
+  .step.done .st-d { color: var(--ink-faint); }
+  .watch { margin: 6px 16px 16px; padding: 11px 13px; border-radius: 12px; font-size: 12.5px;
+    background: color-mix(in srgb, #d97706 8%, var(--surface-2)); border: 1px solid color-mix(in srgb, #d97706 25%, var(--line)); color: var(--ink-soft); }
+  .watch b { color: var(--ink); }
+
+  .costs { margin-top: 24px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); padding: 16px; }
+  .costs h2 { margin: 0 0 4px; font-size: 16.5px; font-weight: 760; letter-spacing: -.02em; }
+  .costs p { margin: 0 0 12px; font-size: 12.5px; color: var(--ink-faint); }
+  .cost-row { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 13.5px; }
+  .cost-row span { color: var(--ink-soft); }
+  .cost-row b { font-family: var(--mono); font-weight: 650; white-space: nowrap; }
+
+  .foot { margin: 26px 2px 6px; font-size: 12px; color: var(--ink-faint); text-align: center; }
+  .foot b { color: var(--ink-soft); }
+  .reset { display: block; margin: 14px auto 0; font: inherit; font-size: 12px; color: var(--ink-faint);
+    background: none; border: 0; text-decoration: underline; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<header><div class="head-in">
+  <svg viewBox="0 0 120 120" role="img" aria-label="InteRun">
+    <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#16b7a4"/><stop offset="1" stop-color="#0a6f64"/></linearGradient></defs>
+    <rect x="8" y="8" width="104" height="104" rx="30" fill="url(#g)"/>
+    <circle cx="82" cy="37" r="11" fill="#fff"/>
+    <path d="M35 88 L57 45 L71 45 L49 88 Z" fill="#fff"/>
+    <path d="M57 88 L79 45 L93 45 L71 88 Z" fill="#fff" opacity=".62"/>
+  </svg>
+  <div class="head-t"><b>Road Map</b><span>InteRun — from here to the App Store</span></div>
+  <div class="head-pct"><b id="pct">0%</b><span>overall</span></div>
+</div></header>
+
+<div class="wrap">
+
+<div class="hero">
+  <h1>Where you're going, one phase at a time</h1>
+  <p>Each phase is written in plain English and gives you something real at the end of it. Tap a step to tick it off — this page remembers your progress.</p>
+  <div class="goal"><b>The destination</b>
+    <div>InteRun in the App Store · full Apple Watch and Garmin support · a coach that notices when your running says the plan should change, and asks before changing it · a community that matches you with runners of similar ability nearby.</div>
+  </div>
+</div>
+
+<div class="rules"><b>Three rules for the whole journey:</b> finish one phase before starting the next · ship small and often rather than big and rarely · anything involving other people's data or safety is never the corner to cut.</div>
+
+<!-- ═══════════ PHASE 0 ═══════════ -->
+<section class="phase" data-phase="p0">
+  <div class="ph-head"><div class="ph-num">0</div><div class="ph-title">
+    <h2>Where you are today</h2>
+    <div class="ph-meta"><span class="tag">Done — this is your foundation</span></div>
+  </div></div>
+  <div class="ph-bar"><i></i></div>
+  <p class="ph-why">You're not starting from zero. There's already a working app people can use on their phones from the web, and everything below builds on it.</p>
+  <div class="steps">
+    <button class="step" data-id="p0-live"><span class="box"></span><span class="st-b"><span class="st-t">A live running-coach app</span><span class="st-d">Builds a personalised plan from a goal and current fitness, week by week.</span></span></button>
+    <button class="step" data-id="p0-gps"><span class="box"></span><span class="st-b"><span class="st-t">Live GPS runs with a spoken coach</span><span class="st-d">Four voices, real-time pace and distance, post-run summary with a map.</span></span></button>
+    <button class="step" data-id="p0-adapt"><span class="box"></span><span class="st-b"><span class="st-t">The first version of the intelligent coach</span><span class="st-d">It already notices when runs imply you're fitter or more tired than the plan assumes, and asks before adjusting. It can also set a beginner's paces from their first run.</span></span></button>
+    <button class="step" data-id="p0-extras"><span class="box"></span><span class="st-b"><span class="st-t">Reminders, Ask Alfie, strength library</span><span class="st-d">Session reminders with calendar export, an in-app coach assistant, and an exercise library with demonstrations.</span></span></button>
+  </div>
+</section>
+
+<!-- ═══════════ PHASE 1 ═══════════ -->
+<section class="phase" data-phase="p1">
+  <div class="ph-head"><div class="ph-num">1</div><div class="ph-title">
+    <h2>Get set up to build real iPhone apps</h2>
+    <div class="ph-meta"><span class="tag">≈ 1–2 weeks</span><span class="tag cost">£79 / year</span></div>
+  </div></div>
+  <div class="ph-bar"><i></i></div>
+  <p class="ph-why">A web app can't go in the App Store or talk properly to watches. To get there, InteRun needs to become a "native" app — one built with Apple's own tools. This phase is just getting those tools ready.</p>
+  <div class="steps">
+    <button class="step" data-id="p1-xcode"><span class="box"></span><span class="st-b"><span class="st-t">Install Xcode on your Mac</span><span class="st-d">Apple's free app-building tool, from the Mac App Store. It's a big download — start it before bed.</span></span></button>
+    <button class="step" data-id="p1-dev"><span class="box"></span><span class="st-b"><span class="st-t">Join the Apple Developer Program</span><span class="st-d">£79 a year. This is what lets you put apps on real phones and into the App Store. Sign up at developer.apple.com with your personal Apple ID.</span></span></button>
+    <button class="step" data-id="p1-identity"><span class="box"></span><span class="st-b"><span class="st-t">Gather the app's identity</span><span class="st-d">Name (InteRun), the icon, a one-line description, and 4–6 screenshots. Most of this already exists.</span></span></button>
+    <button class="step" data-id="p1-scope"><span class="box"></span><span class="st-b"><span class="st-t">Agree the version-1 rule</span><span class="st-d">The first App Store version does what the web app does today — nothing new. New features come as updates. This is the single best defence against never launching.</span></span></button>
+  </div>
+  <div class="watch"><b>Watch out:</b> Xcode needs a reasonably up-to-date Mac with plenty of free disk space (think 50 GB+ free). Check that before paying for anything.</div>
+</section>
+
+<!-- ═══════════ PHASE 2 ═══════════ -->
+<section class="phase" data-phase="p2">
+  <div class="ph-head"><div class="ph-num">2</div><div class="ph-title">
+    <h2>InteRun in the App Store</h2>
+    <div class="ph-meta"><span class="tag">≈ 2–4 months</span><span class="tag">The big one</span></div>
+  </div></div>
+  <div class="ph-bar"><i></i></div>
+  <p class="ph-why">Rebuild the app as a real iPhone app. It's less scary than it sounds: the training brain — the part that builds plans and adapts them — is already written as pure logic with 122 automatic checks, and moves across largely as-is. What gets rebuilt is the screens.</p>
+  <div class="steps">
+    <button class="step" data-id="p2-shell"><span class="box"></span><span class="st-b"><span class="st-t">Build the iPhone version of the screens</span><span class="st-d">Today, Plan, Activities, Support — same design, same features, built with Apple's tools so it feels properly native.</span></span></button>
+    <button class="step" data-id="p2-brain"><span class="box"></span><span class="st-b"><span class="st-t">Move the training brain across</span><span class="st-d">The plan-building and coaching logic comes over with its 122 checks used to prove the new version behaves identically to the old one.</span></span></button>
+    <button class="step" data-id="p2-gps"><span class="box"></span><span class="st-b"><span class="st-t">Proper background running</span><span class="st-d">The killer upgrade a native app unlocks: GPS keeps tracking with the screen locked, the voice coach keeps talking, and a live view sits on your lock screen.</span></span></button>
+    <button class="step" data-id="p2-data"><span class="box"></span><span class="st-b"><span class="st-t">Keep everything on the phone for now</span><span class="st-d">No accounts, no sign-in in version 1. Simpler to build, simpler to explain, and the strongest possible privacy story for launch.</span></span></button>
+    <button class="step" data-id="p2-test"><span class="box"></span><span class="st-b"><span class="st-t">Test with real people via TestFlight</span><span class="st-d">Apple's free tool for sharing pre-release versions. You, then 5–10 runners you trust. Fix what they trip over.</span></span></button>
+    <button class="step" data-id="p2-legal"><span class="box"></span><span class="st-b"><span class="st-t">Write the privacy policy and terms</span><span class="st-d">Required by Apple. Version 1's is short and honest: "your data stays on your phone." Plain English beats legalese.</span></span></button>
+    <button class="step" data-id="p2-submit"><span class="box"></span><span class="st-b"><span class="st-t">Submit to Apple and pass review</span><span class="st-d">Apple checks every app by hand — usually 1–3 days per attempt. Expect at least one rejection with a fix-and-resubmit. That's normal, not failure.</span></span></button>
+    <button class="step" data-id="p2-launch"><span class="box"></span><span class="st-b"><span class="st-t">🎉 Launch version 1</span><span class="st-d">InteRun is in the App Store. Everything after this ships as an update to a live app.</span></span></button>
+  </div>
+  <div class="watch"><b>Watch out:</b> health-adjacent apps get extra scrutiny in review. The app's careful "this is not medical advice" behaviour — which it already has — needs to survive the move.</div>
+</section>
+
+<!-- ═══════════ PHASE 3 ═══════════ -->
+<section class="phase" data-phase="p3">
+  <div class="ph-head"><div class="ph-num">3</div><div class="ph-title">
+    <h2>Apple Watch</h2>
+    <div class="ph-meta"><span class="tag">≈ 1–3 months</span><span class="tag">Ships as an update</span></div>
+  </div></div>
+  <div class="ph-bar"><i></i></div>
+  <p class="ph-why">The watch is where a running app earns its keep: leave the phone at home, run the session from your wrist, and gain heart-rate — a signal the app has never had before.</p>
+  <div class="steps">
+    <button class="step" data-id="p3-app"><span class="box"></span><span class="st-b"><span class="st-t">Watch app that runs the session</span><span class="st-d">Start, pause and finish from the wrist. Live pace, distance, elapsed time and step-by-step prompts ("2 minutes at threshold").</span></span></button>
+    <button class="step" data-id="p3-hr"><span class="box"></span><span class="st-b"><span class="st-t">Bring heart-rate into the picture</span><span class="st-d">Recorded every run and shown in summaries. Later it feeds the intelligent coach — effort without asking.</span></span></button>
+    <button class="step" data-id="p3-standalone"><span class="box"></span><span class="st-b"><span class="st-t">Phone-free running</span><span class="st-d">The watch's own GPS records the run and syncs it back to the phone when you return.</span></span></button>
+    <button class="step" data-id="p3-face"><span class="box"></span><span class="st-b"><span class="st-t">Today's session on the watch face</span><span class="st-d">Glance at your wrist in the morning and know what's on. Quietly the most-used feature.</span></span></button>
+    <button class="step" data-id="p3-ship"><span class="box"></span><span class="st-b"><span class="st-t">Ship it</span><span class="st-d">Same TestFlight-then-review routine as version 1, now with the watch involved in testing.</span></span></button>
+  </div>
+  <div class="watch"><b>Watch out:</b> you'll need a real Apple Watch to test on — simulators can't produce genuine GPS or heart-rate. Budget for one if you don't own one.</div>
+</section>
+
+<!-- ═══════════ PHASE 4 ═══════════ -->
+<section class="phase" data-phase="p4">
+  <div class="ph-head"><div class="ph-num">4</div><div class="ph-title">
+    <h2>The intelligent coach</h2>
+    <div class="ph-meta"><span class="tag">≈ 1–2 months</span><span class="tag">Can start now, in the web app</span></div>
+  </div></div>
+  <div class="ph-bar"><i></i></div>
+  <p class="ph-why">This is the flags system you described — and it doesn't have to wait for the App Store, because it's pure training logic. Version 1 already exists: the app re-estimates fitness from your runs and asks before changing anything. This phase completes it.</p>
+  <div class="steps">
+    <button class="step" data-id="p4-rpe"><span class="box"></span><span class="st-b"><span class="st-t">Ask one question after every run</span><span class="st-d">"How hard did that feel, 1–10?" One tap. That number is the effort signal the flags need.</span></span></button>
+    <button class="step" data-id="p4-flags"><span class="box"></span><span class="st-b"><span class="st-t">Define the flags, exactly as you set out</span><span class="st-d">Pace consistently faster or slower than prescribed for 2+ sessions in a row · reported effort higher or lower than the session intended for 2+ sessions in a row.</span></span></button>
+    <button class="step" data-id="p4-suggest"><span class="box"></span><span class="st-b"><span class="st-t">Suggest, never impose</span><span class="st-d">When a flag trips, the app explains in plain words what it noticed and what it proposes. You accept or decline — the plan never changes silently.</span></span></button>
+    <button class="step" data-id="p4-why"><span class="box"></span><span class="st-b"><span class="st-t">Always show the "why"</span><span class="st-d">Every suggestion carries its evidence: "your last three easy runs averaged 15 seconds per km faster than planned." Trust is the feature.</span></span></button>
+    <button class="step" data-id="p4-tune"><span class="box"></span><span class="st-b"><span class="st-t">Tune it on real runners</span><span class="st-d">Run it quietly for a few weeks with testers. Too many prompts is as bad as none — adjust the thresholds until suggestions feel rare and right.</span></span></button>
+  </div>
+  <div class="watch"><b>Watch out:</b> the temptation is to add ten more flags. Two done brilliantly beats ten done half-well — more can come later once these have earned trust.</div>
+</section>
+
+<!-- ═══════════ PHASE 5 ═══════════ -->
+<section class="phase" data-phase="p5">
+  <div class="ph-head"><div class="ph-num">5</div><div class="ph-title">
+    <h2>Garmin watches</h2>
+    <div class="ph-meta"><span class="tag">≈ 2–4 months</span><span class="tag cost">Server ≈ £10–50 / month</span></div>
+  </div></div>
+  <div class="ph-bar"><i></i></div>
+  <p class="ph-why">Garmin is a different world from Apple: their watches talk to Garmin's own system, and Garmin's system talks to yours. That means two firsts — asking Garmin's permission, and running a small server (a computer on the internet that receives run data for the app).</p>
+  <div class="steps">
+    <button class="step" data-id="p5-apply"><span class="box"></span><span class="st-b"><span class="st-t">Apply to Garmin's developer programme</span><span class="st-d">Free, but they review and approve applications — apply early, as the wait is out of your hands. This unlocks the official connection to Garmin watches.</span></span></button>
+    <button class="step" data-id="p5-server"><span class="box"></span><span class="st-b"><span class="st-t">Stand up the app's first server + accounts</span><span class="st-d">Garmin delivers run data to a server, not to a phone — so this is the moment InteRun needs sign-in (use "Sign in with Apple") and a modest monthly hosting bill.</span></span></button>
+    <button class="step" data-id="p5-in"><span class="box"></span><span class="st-b"><span class="st-t">Runs flow in automatically</span><span class="st-d">Finish a run on the Garmin, and it appears in InteRun — ticked off, paces analysed, flags checked — without touching your phone.</span></span></button>
+    <button class="step" data-id="p5-out"><span class="box"></span><span class="st-b"><span class="st-t">Sessions flow out to the watch</span><span class="st-d">Today's session is sent to the Garmin as a structured workout, so the watch itself guides the intervals and target paces.</span></span></button>
+    <button class="step" data-id="p5-later"><span class="box"></span><span class="st-b"><span class="st-t">(Optional, later) An InteRun app on the Garmin itself</span><span class="st-d">Garmin watches can run small apps of their own. Worth it only if the workout-sync above leaves gaps.</span></span></button>
+  </div>
+  <div class="watch"><b>Watch out:</b> once a server holds people's run data, you've taken on real responsibility — backups, security, and UK data-protection rules. Small and boring is the right shape for this server.</div>
+</section>
+
+<!-- ═══════════ PHASE 6 ═══════════ -->
+<section class="phase" data-phase="p6">
+  <div class="ph-head"><div class="ph-num">6</div><div class="ph-title">
+    <h2>Community — find runners like you</h2>
+    <div class="ph-meta"><span class="tag">≈ 3–6 months</span><span class="tag">The most sensitive build</span></div>
+  </div></div>
+  <div class="ph-bar"><i></i></div>
+  <p class="ph-why">Matching people of similar ability nearby so they can meet and run together. Technically it builds on Phase 5's accounts and server. But the real work here is safety — this is the one feature where a mistake can hurt someone in the real world, so safety features ship first, not last.</p>
+  <div class="steps">
+    <button class="step" data-id="p6-profile"><span class="box"></span><span class="st-b"><span class="st-t">Runner profiles — built from truth</span><span class="st-d">Ability comes from real logged runs, not self-declared bravado. Rough area only — the app never shows anyone's exact location or home.</span></span></button>
+    <button class="step" data-id="p6-match"><span class="box"></span><span class="st-b"><span class="st-t">The match list, with your filters</span><span class="st-d">Nearby runners of similar ability, filterable by distance you'll travel, pace band, and the days you run. Everyone is invisible until they opt in.</span></span></button>
+    <button class="step" data-id="p6-connect"><span class="box"></span><span class="st-b"><span class="st-t">Connect, chat, arrange a run</span><span class="st-d">Ask to connect · they accept · private chat opens · you arrange a meet-up. No unsolicited messages, ever.</span></span></button>
+    <button class="step" data-id="p6-safety"><span class="box"></span><span class="st-b"><span class="st-t">The safety layer — before launch, not after</span><span class="st-d">Block and report with real consequences · first-meeting guidance (public place, daylight, tell someone) · a decision on minimum age (18+, or 16+ with tighter rules) · you personally review every report at first.</span></span></button>
+    <button class="step" data-id="p6-legal"><span class="box"></span><span class="st-b"><span class="st-t">Data protection, properly</span><span class="st-d">UK GDPR: a plain-English privacy page, delete-my-account that genuinely deletes, and collecting the minimum. Get this checked by someone qualified before launch.</span></span></button>
+    <button class="step" data-id="p6-pilot"><span class="box"></span><span class="st-b"><span class="st-t">Pilot tiny, then widen</span><span class="st-d">One town or one running club first. Watch how strangers actually use it, fix what's uncomfortable, then open the doors gradually.</span></span></button>
+  </div>
+  <div class="watch"><b>Watch out:</b> this is the phase where "just ship it" is the wrong instinct. A community feature launched without moderation and reporting doesn't just fail — it can genuinely harm someone. Slow is right here.</div>
+</section>
+
+<!-- ═══════════ PHASE 7 ═══════════ -->
+<section class="phase" data-phase="p7">
+  <div class="ph-head"><div class="ph-num">7</div><div class="ph-title">
+    <h2>Keeping it alive</h2>
+    <div class="ph-meta"><span class="tag">Ongoing</span></div>
+  </div></div>
+  <div class="ph-bar"><i></i></div>
+  <p class="ph-why">A live app is a rhythm, not a finish line. This phase never completes — and that's the point.</p>
+  <div class="steps">
+    <button class="step" data-id="p7-rhythm"><span class="box"></span><span class="st-b"><span class="st-t">A simple monthly rhythm</span><span class="st-d">Read feedback and reviews · fix what's broken · ship one improvement. Small and steady keeps the app healthy and the reviews kind.</span></span></button>
+    <button class="step" data-id="p7-money"><span class="box"></span><span class="st-b"><span class="st-t">Decide the money question</span><span class="st-d">Free, one-off price, or subscription. No rush before launch — but decide before the server bills of Phases 5–6 arrive. Apple takes 15% for small developers.</span></span></button>
+    <button class="step" data-id="p7-listen"><span class="box"></span><span class="st-b"><span class="st-t">Let real runners steer the order</span><span class="st-d">This map is the route, not a contract. If your runners are begging for Garmin before the Watch, swap the phases — they're built to be reordered.</span></span></button>
+  </div>
+</section>
+
+<!-- ═══════════ COSTS ═══════════ -->
+<div class="costs">
+  <h2>What it all costs</h2>
+  <p>The honest running total — no surprises later.</p>
+  <div class="cost-row"><span>Apple Developer Program</span><b>£79 / year</b></div>
+  <div class="cost-row"><span>Xcode, TestFlight, App Store listing</span><b>Free</b></div>
+  <div class="cost-row"><span>Garmin developer programme</span><b>Free (approval needed)</b></div>
+  <div class="cost-row"><span>Server &amp; accounts (from Phase 5)</span><b>≈ £10–50 / month</b></div>
+  <div class="cost-row"><span>An Apple Watch to test on (if needed)</span><b>One-off</b></div>
+  <div class="cost-row"><span>Rough journey at a steady solo pace</span><b>≈ 12–24 months</b></div>
+</div>
+
+<p class="foot">Add this page to your Home Screen: open it in Safari → <b>Share</b> → <b>Add to Home Screen</b>.<br>It installs with the InteRun logo, named <b>Road Map</b>, and remembers everything you tick.</p>
+<button class="reset" id="reset">Reset all progress</button>
+
+</div>
+
+<script>
+(function () {
+  var KEY = "interun_roadmap_v1";
+  var state = {};
+  try { state = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { state = {}; }
+  // Phase 0 reflects reality: pre-ticked on first visit.
+  if (!localStorage.getItem(KEY)) {
+    ["p0-live", "p0-gps", "p0-adapt", "p0-extras"].forEach(function (id) { state[id] = true; });
+  }
+  var steps = Array.prototype.slice.call(document.querySelectorAll(".step"));
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  function paint() {
+    steps.forEach(function (s) { s.classList.toggle("done", !!state[s.dataset.id]); });
+    var total = 0, done = 0;
+    document.querySelectorAll(".phase").forEach(function (ph) {
+      var ss = ph.querySelectorAll(".step"), d = 0;
+      ss.forEach(function (s) { if (state[s.dataset.id]) d++; });
+      total += ss.length; done += d;
+      var bar = ph.querySelector(".ph-bar i");
+      if (bar) bar.style.width = (ss.length ? Math.round(d / ss.length * 100) : 0) + "%";
+    });
+    var pct = total ? Math.round(done / total * 100) : 0;
+    document.getElementById("pct").textContent = pct + "%";
+  }
+  steps.forEach(function (s) {
+    s.addEventListener("click", function () {
+      state[s.dataset.id] = !state[s.dataset.id];
+      save(); paint();
+    });
+  });
+  document.getElementById("reset").addEventListener("click", function () {
+    if (!confirm("Untick everything and start the map fresh?")) return;
+    state = {}; save(); paint();
+  });
+  paint();
+})();
+</script>
+</body>
+</html>

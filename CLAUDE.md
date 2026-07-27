@@ -333,10 +333,12 @@ Traps that cost real time — don't reintroduce them:
   target, so the watch app builds against the iOS SDK and fails in `actool` with a misleading app-icon
   error. Use `-destination`. Also: watchOS wants the classic multi-size icon set, not iOS's single 1024.
 
-⚠️ **Watch install is PARKED until iOS 27/watchOS 27 go public** — owner's phone is on iOS 27 beta
-(forces beta Xcode/SDK) and his watch on 26.5 release, which rejects beta-built installs and never
-shows its Developer Mode toggle. Not a code problem; the full diagnosis and September unblock
-checklist live in `ios/README.md`. The watch app itself is complete and proven on the simulator.
+✅ **The watch app runs on the owner's real Watch Ultra (2026-07-27, evening).** The install wall
+broke when the watch updated to **watchOS 26.6**, which surfaced Developer Mode (Settings → Privacy &
+Security) — enabling it let the beta-built app install and launch. The earlier fixes (no debug
+dylibs, arm64_32-only, watchOS 10 minimum) were all still necessary. Remaining to verify on hardware:
+the finished-run hop back to the phone's Logbook. Note the native phone app starts on the example
+plan — the owner's real plan lives in the PWA until restored via Support › Your data.
 
 **Apple Watch scoping:** see `WATCH.md` — a scoping/decision document, nothing built. Key facts: a watchOS
 app cannot pair with a PWA (it needs a native iOS app), Xcode isn't installed on the owner's Mac,

@@ -281,7 +281,11 @@ back to plain "Well done" rather than an awkward blank.
 
 Deliberately **not** on the watch: plan setup, history, Support. Those want a bigger screen.
 
-### ⚠️ Current blocker: the watch app cannot install on the owner's real watch (2026-07-27)
+### ✅ RESOLVED that evening: watchOS 26.6 surfaced Developer Mode and the install succeeded
+
+Kept for the diagnostic trail — every fix below was real and still required:
+
+### ~~Current blocker~~ the watch app cannot install on the owner's real watch (2026-07-27)
 
 **State: parked, deliberately.** The owner's iPhone 16 Pro Max runs **iOS 27 beta**; his Watch
 Ultra runs **watchOS 26.5 release**. That combination is a dead end for development installs:

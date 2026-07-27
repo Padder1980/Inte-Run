@@ -84,7 +84,7 @@ WATCH_COMMON = {
     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
     "CODE_SIGN_ENTITLEMENTS": '"InteRunWatch.entitlements"',
     "CODE_SIGN_STYLE": "Automatic",
-    "CURRENT_PROJECT_VERSION": "2",
+    "CURRENT_PROJECT_VERSION": "3",
     "GENERATE_INFOPLIST_FILE": "NO",
     "INFOPLIST_FILE": '"InteRunWatch-Info.plist"',
     "MARKETING_VERSION": "1.0",
@@ -96,6 +96,13 @@ WATCH_COMMON = {
     # be verified" - even though the signature verifies perfectly on the Mac. Costs only in-app
     # previews for the watch target, which is a trivial price for being installable.
     "ENABLE_DEBUG_DYLIB": "NO",
+    # ⚠️ arm64_32 only. watchOS 26 introduced a 64-bit arm64 slice, and Xcode clamps that slice to
+    # minos 26.0 no matter what the deployment target says — so a fat binary carries a slice a
+    # watchOS 26.5 device may prefer and then reject ("integrity could not be verified"), while the
+    # arm64_32 slice it would happily run sits unused. arm64_32 is the long-established watchOS
+    # architecture that every Apple Watch runs, and it honours the real deployment target.
+    "ARCHS": "arm64_32",
+    "EXCLUDED_ARCHS": "arm64",
     "SDKROOT": "watchos",
     "SKIP_INSTALL": "YES",
     "SWIFT_EMIT_LOC_STRINGS": "YES",
@@ -148,7 +155,7 @@ TARGET_COMMON = {
     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
     "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "AccentColor",
     "CODE_SIGN_STYLE": "Automatic",
-    "CURRENT_PROJECT_VERSION": "2",
+    "CURRENT_PROJECT_VERSION": "3",
     "ENABLE_PREVIEWS": "YES",
     "GENERATE_INFOPLIST_FILE": "NO",
     "INFOPLIST_FILE": '"InteRun-Info.plist"',

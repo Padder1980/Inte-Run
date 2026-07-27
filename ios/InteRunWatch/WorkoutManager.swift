@@ -182,14 +182,21 @@ final class WorkoutManager: NSObject, ObservableObject {
         ticker?.invalidate(); ticker = nil
         locations.stopUpdatingLocation()
         guard let s = session, let b = builder else { phase = .ended; return }
+        // Read the route builder HERE, while still on the main actor. HealthKit runs these
+        // completion handlers on a background queue, so reaching for main-actor state inside them
+        // is a real data race — and an error outright under the Swift 6 language mode.
+        let rb = routeBuilder
         let now = Date()
         s.end()
         b.endCollection(withEnd: now) { [weak self] _, _ in
             b.finishWorkout { workout, _ in
-                if let workout, let rb = self?.routeBuilder {
+                if let workout, let rb {
                     rb.finishRoute(with: workout, metadata: nil) { _, _ in }
                 }
-                Task { @MainActor in self?.phase = .ended }
+                // Bind self once, so the Task captures a constant rather than a mutable capture -
+                // the class is @MainActor and therefore Sendable, so holding it here is safe.
+                guard let self else { return }
+                Task { @MainActor in self.phase = .ended }
             }
         }
     }
@@ -352,7 +359,9 @@ extension WorkoutManager: CLLocationManagerDelegate {
                     (last.coordinate.longitude * 100000).rounded() / 100000,
                 ])
             }
-            routeBuilder?.insertRouteData(usable) { _, _ in }
+            if let rb = routeBuilder {
+                Task { try? await rb.insertRouteData(usable) }
+            }
         }
     }
 }

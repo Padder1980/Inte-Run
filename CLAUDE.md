@@ -96,6 +96,12 @@ npm run web            # builds all the standalone pages too
   in-app controller is the `COACH` object in `web/app.ts` (single reused `<audio>`, priority queue,
   iOS unlock in the start-tap, on-demand caching of only the selected coach, graceful fallback to the
   device voice if a clip is missing).
+- **ElevenLabs is the preferred generator** (owner subscribed 2026-07-27): `voice-dev/generate-elevenlabs.py`
+  reads the same `prompts.json`, casts coaches from the account's voices into the committed
+  `voice-dev/elevenlabs-voices.json`, and writes the same `web/voices/` + manifest. The API key lives
+  ONLY in gitignored `voice-dev/elevenlabs-key.txt` (or `ELEVENLABS_API_KEY`) — it must never be
+  committed or shipped; the app stays a static player of pre-generated MP3s. Kokoro remains the
+  free fallback below.
 - **Generation is dev-only and never ships.** Tools live in `voice-dev/` (the Python venv and the
   Kokoro ONNX model are gitignored — regenerate them if absent). Regenerate audio with:
   `node voice-dev/dump-catalogue.ts && voice-dev/venv/bin/python voice-dev/generate.py`.

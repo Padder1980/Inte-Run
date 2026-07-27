@@ -13,3 +13,8 @@ web/voices/
 .DS_Store
 # Verification marker (this project's own gate signal; not source)
 .verify-ok
+
+# ElevenLabs: the key is a secret and stays on this machine; the venv and auditions are artefacts.
+voice-dev/elevenlabs-key.txt
+voice-dev/venv-el/
+voice-dev/audition-el-*.mp3

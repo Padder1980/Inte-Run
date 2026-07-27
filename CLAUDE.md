@@ -246,6 +246,15 @@ existing web UI, so there is still **one UI to design** (`web/app.ts`). Decided 
   are discovered at runtime by prefix (`interun_`, `rc_`), so a key added later still travels — do
   not replace that with a hardcoded list. `Downloads.swift` gives `<a download>` a real
   `WKDownloadDelegate`, which also fixes the calendar `.ics` export (it silently did nothing before).
+- **Background GPS** works by *replacing* `navigator.geolocation` with a `CLLocationManager`-backed
+  shim injected at document start (`GeolocationShim.swift` + `LocationService.swift`), so `web/app.ts`
+  is untouched and still behaves normally in a browser. Fixes are **buffered and replayed in order** —
+  iOS can suspend the web content process even while the app lives on the location background mode,
+  and distance accumulates incrementally, so a replayed backlog gives the same total.
+- ⚠️ **`viewport-fit=cover` is required** in the meta viewport. Without it every
+  `env(safe-area-inset-*)` resolves to **0**, which silently put the app bar under the Dynamic Island
+  and the bottom nav under the home indicator. Because `apple-mobile-web-app-status-bar-style` is
+  `black-translucent`, this was already wrong for Home Screen PWA users on notched iPhones.
 - Full detail, including the known gaps, is in **`ios/README.md`** — read it before touching `ios/`.
 
 ### Toolchain on this Mac (verified 2026-07-27)

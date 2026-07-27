@@ -18,9 +18,16 @@ struct WebHost: UIViewRepresentable {
                                        forURLScheme: BundleSchemeHandler.scheme)
         }
 
+        // Native GPS, injected before any app code runs so the web UI never knows the difference.
+        config.userContentController.addUserScript(GeolocationShim.userScript)
+
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
+
+        let location = LocationService(webView: webView)
+        context.coordinator.location = location
+        config.userContentController.add(location, name: LocationService.messageName)
         webView.allowsBackForwardNavigationGestures = false
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.scrollView.bounces = false
@@ -57,6 +64,8 @@ struct WebHost: UIViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         /// Where the in-flight `<a download>` is being written. See `Downloads.swift`.
         var pendingDownload: URL?
+        /// Owns the CLLocationManager for the lifetime of the web view. See `LocationService.swift`.
+        var location: LocationService?
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             if SelfCheck.isEnabled { SelfCheck.run(on: webView) }

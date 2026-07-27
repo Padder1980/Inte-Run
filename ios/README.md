@@ -143,13 +143,41 @@ nothing before): the file becomes a real `WKDownload` and is handed to the share
 Restoring **replaces** rather than merges — merging two histories would create duplicate runs nobody
 could untangle. The confirm sheet shows both sides and offers to export the current device first.
 
+## Background GPS
+
+`LocationService.swift` + `GeolocationShim.swift` keep a run tracking with the phone locked or
+pocketed — the headline reason to be native at all, since WKWebView's own `navigator.geolocation`
+stops the instant the app leaves the foreground.
+
+Rather than change the web UI, the shim **replaces `navigator.geolocation`** with one backed by
+`CLLocationManager`, injected at document start. `web/app.ts` keeps calling the ordinary Web API and
+behaves identically in a browser — the shim only installs itself when the native handler exists.
+
+Beyond survival, the native manager gives `activityType = .fitness` and `bestForNavigation`
+accuracy. `allowsBackgroundLocationUpdates` is claimed **only while a watch is active**, and
+`pausesLocationUpdatesAutomatically` is off (iOS otherwise decides a runner has stopped and quietly
+pauses for good).
+
+**Fixes are buffered and replayed in order.** iOS may suspend the web content process even while the
+app keeps running on the location background mode. Distance is accumulated incrementally from
+consecutive fixes, so replaying a backlog yields the same total as receiving them live.
+
+Verified on the simulator with a moving location (`simctl location start`), backgrounding the app
+behind Settings mid-run: **35 fixes over 36 s with a maximum gap of 3 s**, across a 16 s window
+where InteRun was not frontmost. Had background tracking failed there would be a 16 s hole.
+
+```bash
+xcrun simctl privacy <udid> grant location com.interun.app
+xcrun simctl location <udid> start --speed=3.3 --interval=1 53.3811,-1.4701 53.4200,-1.4701
+```
+
 ## Known gaps
 
 These are real, deliberate, and not yet done:
 
-- **Background GPS.** `UIBackgroundModes: location` is declared, but nothing yet holds a
-  `CLLocationManager` with `allowsBackgroundLocationUpdates`, so tracking still stops when the
-  screen locks. The declaration alone is not enough.
+- **Sticky sub-tabs never stick.** `#view` has `overflow: auto`, making it a scroll container that
+  never actually scrolls, so `position: sticky` on `.subtabs` is inert — it has never worked, in the
+  app or the browser. The offset is now correct for when it is fixed; the overflow is the real bug.
 - **Local notifications.** Session reminders still use the web timer, which dies with the app. A
   native `UNUserNotificationCenter` bridge is the fix, and would finally make reminders reliable.
 - **Build with release Xcode to submit.** `/Applications/Xcode.app` is 26.6 (release, can submit);

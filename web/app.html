@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>InteRun — The Intelligent Training Companion</title>
 <meta name="description" content="InteRun — evidence-based running coach with live GPS sessions and voice coaching.">
 <meta name="theme-color" content="#0e8c7f" media="(prefers-color-scheme: light)">
@@ -46,7 +46,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
 .app { max-width: 440px; min-height: 100dvh; margin: 0 auto; background: var(--bg); display: flex; flex-direction: column; position: relative; box-shadow: 0 0 60px rgba(0,0,0,.06); }
-.topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+.topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: calc(14px + env(safe-area-inset-top)) 16px 14px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
 .topbar .title { font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
 .iconbtn { position: relative; overflow: hidden; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft); display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .iconbtn svg { width: 18px; height: 18px; }
@@ -1043,7 +1043,7 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
   background: radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 30%), var(--bg);
 }
 #view:has(.subtabs) .subtabs {
-  position: sticky; top: 0; z-index: 8; gap: 4px; margin: 0 0 18px; padding: 4px;
+  position: sticky; top: calc(env(safe-area-inset-top) + 65px); z-index: 8; gap: 4px; margin: 0 0 18px; padding: 4px;
   background: color-mix(in srgb, var(--surface-2) 90%, transparent);
   border-color: color-mix(in srgb, var(--line) 86%, var(--accent)); border-radius: 15px;
   box-shadow: 0 8px 22px -18px color-mix(in srgb, var(--ink) 35%, transparent), inset 0 1px 0 color-mix(in srgb, var(--ink) 4%, transparent);

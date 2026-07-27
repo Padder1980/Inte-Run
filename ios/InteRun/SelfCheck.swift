@@ -10,7 +10,9 @@ import os
 ///  1. the page is served from the expected origin (`localStorage` is keyed to it);
 ///  2. `localStorage` writes **and survives a relaunch** — it is the app's entire database;
 ///  3. `fetch()` works, which `file://` would have blocked (the coach manifest needs it);
-///  4. the engine global `RC` actually loaded.
+///  4. the engine global `RC` actually loaded;
+///  5. the native GPS shim replaced `navigator.geolocation` before app code ran;
+///  6. the PWA-to-app migration path is present and its file picker reachable.
 ///
 /// Run with `-InteRunSelfCheck YES`; results go to the unified log under the "selfcheck" category.
 /// Nothing here runs in a normal launch.
@@ -86,11 +88,20 @@ enum SelfCheck {
       }
     } catch (e) { out.audioError = String(e); }
 
+    // 5. Native GPS: the shim must have replaced navigator.geolocation before app code ran, or
+    // tracking silently reverts to the web view's own, which dies the moment the phone locks.
+    out.geo = {
+      shimInstalled: !!window.__interunGeo,
+      handlerPresent: !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.interunGeo),
+      watchIsNative: typeof navigator.geolocation.watchPosition === 'function'
+        && String(navigator.geolocation.watchPosition).indexOf('[native code]') === -1,
+    };
+
     // 4. The engine bundle.
     out.engineLoaded = typeof RC !== 'undefined' && typeof RC.generatePlan === 'function';
     out.appBooted = !!document.getElementById('view');
 
-    // 5. The migration path in and out of this app: a backup must round-trip through the same
+    // 6. The migration path in and out of this app: a backup must round-trip through the same
     // code the runner will use, and the file picker must exist for restore to be reachable.
     try {
       const bk = collectBackup();
@@ -112,7 +123,12 @@ enum SelfCheck {
             webView.callAsyncJavaScript(script, in: nil, in: .page) { result in
                 switch result {
                 case let .success(value):
-                    logger.notice("RESULT \(String(describing: value), privacy: .public)")
+                    // os_log truncates around 1 KB, which silently cut results short. Write the
+                    // whole thing to the container and log only where to find it.
+                    let text = (value as? String) ?? String(describing: value)
+                    let url = URL.documentsDirectory.appendingPathComponent("selfcheck.json")
+                    try? text.write(to: url, atomically: true, encoding: .utf8)
+                    logger.notice("RESULT written to \(url.path, privacy: .public) (\(text.count) chars)")
                 case let .failure(error):
                     logger.error("FAILED \(error.localizedDescription, privacy: .public)")
                 }

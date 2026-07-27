@@ -1389,6 +1389,13 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
 .exlb-in img { display: block; width: 100%; aspect-ratio: 1; object-fit: contain; background: #fff; }
 .exlb-cap { padding: 12px 16px 15px; font-size: 15px; font-weight: 700; color: #14201b; text-align: center; border-top: 1px solid #e6ebe9; }
 .exlb-x { position: absolute; top: 10px; right: 10px; z-index: 2; width: 32px; height: 32px; border-radius: 50%; border: 0; background: rgba(255,255,255,.92); color: #14201b; font-size: 14px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+/* Post-run RPE ask */
+.rpe-ask { margin-bottom: 12px; }
+.rpe-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.rpe-chip { font: inherit; font-family: var(--mono); font-size: 15px; font-weight: 650; padding: 12px 0; text-align: center; color: var(--ink-soft); background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; cursor: pointer; transition: all .12s ease; }
+.rpe-chip:active { transform: scale(.94); }
+.rpe-chip.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); box-shadow: 0 4px 12px -6px color-mix(in srgb, var(--accent) 80%, transparent); }
+.rpe-note { margin-top: 8px; font-size: 12px; color: var(--ink-faint); }
 /* Rest days are tappable to add a session — dashed so they read as an empty slot, not a card */
 .rest-add { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; font: inherit; cursor: pointer; padding: 9px 10px; background: none; border: 1px dashed var(--line); border-radius: 11px; color: var(--ink-faint); transition: border-color 140ms ease, color 140ms ease; }
 .rest-add .st { color: var(--ink-faint); font-size: 13.5px; font-weight: 550; }
@@ -1615,7 +1622,7 @@ function computeToday() {
 }
 computeToday();
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trialPending: false, trialSaved: null, done: {}, dayOverride: {}, selDay: TODAY_DOW, selWeek: CURRENT_WEEK };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: {}, selDay: TODAY_DOW, selWeek: CURRENT_WEEK };
 // Effective day index for a session, honouring any user reschedule. Works for raw sessions
 // (dayOfWeek) and summary sessions (dayIndex), keyed by the shared session id.
 function effDay(s) { const o = state.dayOverride[s.id]; return o != null ? o : (s.dayOfWeek != null ? s.dayOfWeek : s.dayIndex); }
@@ -1776,7 +1783,7 @@ function viewToday() {
   let cta = "";
   if (sess && onToday && PRIMARY_TYPES[sess.type]) cta = '<button class="primary start-btn" id="startSession">' + ICON.play + ' Start session</button>';
   else if (sess) cta = '<button class="primary start-btn" id="viewSession">' + ICON.play + ' View session</button>';
-  return banner + autoPaceBanner() + fitSuggestBanner() + greeting + weekStrip() +
+  return banner + autoPaceBanner() + trainFlagBanner() + fitSuggestBanner() + greeting + weekStrip() +
     heroWorkout() +
     cta +
     '<div class="tsq-row">' + conditionsSquare(sess) + feelSquare() + '</div>' +
@@ -4406,6 +4413,20 @@ function downloadShareCard(file, run) {
   const url = URL.createObjectURL(file); const a = document.createElement("a"); a.href = url; a.download = "interun-run.png";
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+// The one question the intelligent coach needs after every run: how hard did that feel?
+function rpeAskHtml(sm) {
+  const band = plannedRpeBandOf(LIVE.session);
+  const chips = [];
+  for (let i = 1; i <= 10; i++) {
+    chips.push('<button class="rpe-chip' + (sm.rpe === i ? " on" : "") + '" data-rpe="' + i + '">' + i + '</button>');
+  }
+  const picked = sm.rpe
+    ? (band ? (sm.rpe > band.max ? "Harder than planned \\u2014 noted." : sm.rpe < band.min ? "Easier than planned \\u2014 noted." : "Right where it should be.") : "Noted.")
+    : "1 = very easy \\u00b7 10 = flat out" + (band ? " \\u00b7 planned: " + band.min + "\\u2013" + band.max : "");
+  return '<div class="card rpe-ask"><div class="subhead" style="margin-top:0">How hard did that feel?</div>' +
+    '<div class="rpe-row">' + chips.join("") + '</div>' +
+    '<div class="rpe-note">' + picked + '</div></div>';
+}
 function viewLiveComplete() {
   const sm = LIVE.summary || { distKm: "0.00", time: "0:00", pace: "—", saved: false, route: [], splits: [] };
   const run = { dist: sm.distKm + " km", time: sm.time, pace: (sm.pace || "—") + " /km", route: sm.route, splits: sm.splits };
@@ -4415,6 +4436,7 @@ function viewLiveComplete() {
   return '<div class="card live-hero done-hero"><div class="dn-badge">' + ICON.check + '</div>' +
     '<div class="dn-h">' + (LIVE.completedFull ? "Well done!" : "Session ended") + '</div>' +
     '<div class="dn-sub">' + (LIVE.completedFull ? "You completed " : "You logged ") + esc(LIVE.session.title) + (sm.saved ? " · saved" : "") + '</div></div>' +
+    (sm.meaningful ? rpeAskHtml(sm) : "") +
     runOverviewHtml(run) +
     controls +
     '<div class="card"><div class="subhead" style="margin-top:0">Coaching cues</div><div class="cuelog" id="lCues"></div></div>';
@@ -4519,17 +4541,41 @@ function runDateLabel() {
   return d.getDate() + " " + M[d.getMonth()] + " · " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
 }
 // Persist the just-finished run to Activities + tick it off in the training calendar.
+// The plan's prescription for a session's main work, numerically — what the flags compare against.
+// Continuous runs: the steady block's pace band. Quality: the rep band. Null when nothing is prescribed.
+function plannedPaceBandOf(sess) {
+  if (!sess || !sess.steps) return null;
+  const cont = sess.type === "easy" || sess.type === "long" || sess.type === "recovery" || sess.type === "steady";
+  const pick = cont
+    ? sess.steps.find((st) => st.kind === "steady" && st.targetPaceSecPerKm)
+    : sess.steps.find((st) => st.kind === "rep" && st.targetPaceSecPerKm) || sess.steps.find((st) => st.kind === "steady" && st.targetPaceSecPerKm);
+  return pick ? { minSecPerKm: pick.targetPaceSecPerKm.minSecPerKm, maxSecPerKm: pick.targetPaceSecPerKm.maxSecPerKm } : null;
+}
+// The session's intended effort band, numerically (session-level band, else the span of its steps').
+function plannedRpeBandOf(sess) {
+  if (!sess) return null;
+  if (sess.targetRpe) return { min: sess.targetRpe.min, max: sess.targetRpe.max };
+  const w = (sess.steps || []).filter((st) => st.targetRpe && st.kind !== "warmup" && st.kind !== "cooldown");
+  if (!w.length) return null;
+  return { min: Math.min.apply(null, w.map((st) => st.targetRpe.min)), max: Math.max.apply(null, w.map((st) => st.targetRpe.max)) };
+}
 function saveLiveSession() {
   const sm = LIVE.summary; if (!sm || sm.saved) return;
   if (sm.meaningful) {
-    state.logged.unshift({ t: LIVE.session.title, d: runDateLabel(), dist: sm.distKm + " km", time: sm.time, pace: sm.pace + " /km",
-      distKm: Number(sm.distKm), sec: sm.sec, avgPaceSec: Math.round(sm.avgPaceSec), route: sm.route, splits: sm.splits, elevGain: sm.elevGain || 0, type: sm.type });
+    state.logged.unshift({ id: "run-" + new Date().getTime(), t: LIVE.session.title, d: runDateLabel(), dist: sm.distKm + " km", time: sm.time, pace: sm.pace + " /km",
+      distKm: Number(sm.distKm), sec: sm.sec, avgPaceSec: Math.round(sm.avgPaceSec), route: sm.route, splits: sm.splits, elevGain: sm.elevGain || 0, type: sm.type,
+      // What the plan asked for + how it felt — the flags system's evidence.
+      rpe: sm.rpe || null, pband: plannedPaceBandOf(LIVE.session), rband: plannedRpeBandOf(LIVE.session), anchor: profile.recentTimeS });
+    sm.runId = state.logged[0].id;
     saveRuns();
   }
   const wk0 = PLAN.weeks[0]; const dn = DAY_ORDER[LIVE.session.dayOfWeek];
   if (LIVE.completedFull && wk0) { const m = wk0.sessions.find((s) => s.day === dn && s.title === LIVE.session.title); if (m) state.done[doneKey(wk0.index, m)] = true; }
   sm.saved = true;
-  if (!maybeAutoPaceCalibrate(LIVE.session.type, sm.avgPaceSec, Number(sm.distKm))) assessFitnessFromRun(LIVE.session.type, sm.avgPaceSec, Number(sm.distKm));
+  // Adaptive checks, most specific first: first-run calibration → multi-run flags → single-run hint.
+  if (!maybeAutoPaceCalibrate(LIVE.session.type, sm.avgPaceSec, Number(sm.distKm))) {
+    if (!maybeTrainingFlags()) assessFitnessFromRun(LIVE.session.type, sm.avgPaceSec, Number(sm.distKm));
+  }
 }
 // ---- Adaptive re-estimation: does the completed run imply a different fitness than the plan? -----
 function loadFitSuggest() { try { return JSON.parse(localStorage.getItem("interun_fitsuggest") || "null"); } catch (e) { return null; } }
@@ -4566,10 +4612,11 @@ function assessFitnessFromRun(type, avgPaceSec, distKm) {
 // Apply the suggestion: re-anchor fitness to the run's implied 5 km and rebuild the plan.
 function applyFitSuggest() {
   const fs = state.fitSuggest; if (!fs) return;
+  const ticks = todayTicks();
   profile.recentTimeS = fs.implied; profile.noRecent = false;
   if (profile.status === "new") profile.status = "building"; // a real run means they're past couch-to-5k
   try { recompute(); } catch (e) {}
-  computeToday(); state.planWeek = PLAN.defaultWeekIndex; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; seedDone(); saveProfileStore();
+  computeToday(); state.planWeek = PLAN.defaultWeekIndex; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; seedDone(); restoreTicks(ticks); saveProfileStore();
   state.fitSuggest = null; saveFitSuggest();
   render();
 }
@@ -4628,6 +4675,128 @@ function autoPaceBanner() {
     '<div class="fb-main"><div class="fb-h">Your paces are set \\u2014 from your first run</div>' +
     '<div class="fb-b">You left your easy pace blank, so we took it from your <b>' + esc(a.sess) + '</b>: <b>' + fmtPace(a.easy) + '/km</b>. Every session from here \\u2014 easy, long and quality \\u2014 has been rescaled to that. Change it any time in your profile.</div>' +
     '<div class="fb-actions"><button class="fb-yes" id="apOk">Got it</button><button class="fb-no" id="apEdit">Adjust it</button></div></div></div>';
+}
+// ---- Training flags: the multi-run "intelligent coach" ---------------------------------------
+// After each saved run, the engine looks for 2+ consecutive sessions consistently outside their
+// prescription — by pace (vs the prescribed band) or by reported effort (vs the intended RPE) — and
+// proposes a change WITH its evidence. Accepting re-anchors the plan; declining mutes that flag kind
+// until a new run adds fresh evidence. The plan never changes silently.
+function loadTrainFlag() { try { return JSON.parse(localStorage.getItem("interun_trainflag") || "null"); } catch (e) { return null; } }
+function saveTrainFlag() { try { state.trainFlag ? localStorage.setItem("interun_trainflag", JSON.stringify(state.trainFlag)) : localStorage.removeItem("interun_trainflag"); } catch (e) {} }
+function flagMutes() { try { return JSON.parse(localStorage.getItem("interun_flagmute") || "{}") || {}; } catch (e) { return {}; } }
+// Each flag kind is muted at its OWN newest evidence run — the two kinds can rest on different runs,
+// and muting them under one shared id would let a just-declined banner re-raise with nothing new.
+function muteFlag(flags) { const m = flagMutes(); flags.forEach((f) => { m[f.kind] = f.ids[0]; }); try { localStorage.setItem("interun_flagmute", JSON.stringify(m)); } catch (e) {} }
+function clearTrainFlag() { if (!state.trainFlag) return false; state.trainFlag = null; saveTrainFlag(); return false; }
+// Build the engine's observation list from the logged runs (newest first — state.logged is unshifted).
+// Each run remembers the anchor it was judged against, and the walk STOPS at the first run from an
+// older anchor: once the plan is re-anchored, deviations the change already accounts for are history,
+// not evidence. Without this a single run after a re-anchor could reopen the same conversation.
+function flagObservations() {
+  const out = [];
+  const runs = state.logged || [];
+  for (let i = 0; i < runs.length && out.length < 12; i++) {
+    const r = runs[i];
+    if (r.anchor && r.anchor !== profile.recentTimeS) break;
+    out.push({
+      id: r.id || r.t + "|" + r.d, type: r.type || "easy", distKm: Number(r.distKm) || 0,
+      avgPaceSecPerKm: r.avgPaceSec || null,
+      plannedPaceSecPerKm: r.pband || null,
+      reportedRpe: r.rpe || null,
+      plannedRpe: r.rband || null,
+      implied5kSeconds: r.avgPaceSec ? impliedRecentFromRun(r.type, r.avgPaceSec) : null,
+    });
+  }
+  return out;
+}
+// Run the flags check. Returns true when a banner was raised (so the single-run hint stays quiet).
+// Every path that doesn't raise clears any pending flag: a banner must never outlive its evidence.
+function maybeTrainingFlags() {
+  if (!profile.recentTimeS) return clearTrainFlag();
+  // Only speak when the plan is anchored to something the runner actually gave us. A beginner still
+  // on a seeded starting time gets calibrated first — quoting them a 5K time they never ran, and
+  // then having auto-calibration overwrite whatever they agreed to, would be worse than silence.
+  if (profile.autoPace || profile.noRecent) return clearTrainFlag();
+  let res; try { res = RC.assessTrainingFlags(flagObservations(), { currentRecent5kSeconds: profile.recentTimeS }); } catch (e) { return clearTrainFlag(); }
+  if (!res || !res.suggestion || !res.flags.length) return clearTrainFlag();
+  const flags = res.flags.map((f) => ({ kind: f.kind, n: f.runs.length, dev: f.meanDeviation, ids: f.runs.map((r) => r.id) }));
+  const mutes = flagMutes();
+  // Declined before, and no new evidence since: stay quiet.
+  if (flags.every((f) => mutes[f.kind] === f.ids[0])) return clearTrainFlag();
+  state.trainFlag = { kinds: flags.map((f) => f.kind), flags: flags, suggestion: res.suggestion, at: todayIso() };
+  saveTrainFlag();
+  // One voice at a time — the multi-run evidence supersedes the single-run hint and the first-run
+  // calibration notice, both of which would otherwise stack on Today saying overlapping things.
+  state.fitSuggest = null; saveFitSuggest();
+  state.paceNotice = null; savePaceNotice();
+  return true;
+}
+// The evidence, in plain words — every suggestion must carry its "why".
+function flagEvidenceLine(f) {
+  const runsWord = f.n + " " + (f.n === 1 ? "session" : "sessions");
+  if (f.kind === "pace-fast") return "Your last " + runsWord + " came in about <b>" + f.dev + "s/km faster</b> than their target pace.";
+  if (f.kind === "pace-slow") return "Your last " + runsWord + " came in about <b>" + f.dev + "s/km slower</b> than their target pace.";
+  if (f.kind === "rpe-high") return "You rated your last " + runsWord + " about <b>" + f.dev + " point" + (f.dev === 1 ? "" : "s") + " harder</b> than they were meant to feel.";
+  return "You rated your last " + runsWord + " about <b>" + f.dev + " point" + (f.dev === 1 ? "" : "s") + " easier</b> than they were meant to feel.";
+}
+function trainFlagBanner() {
+  const tf = state.trainFlag; if (!tf) return "";
+  const evidence = tf.flags.map(flagEvidenceLine).join(" ");
+  if (tf.suggestion.action === "advice-easy-days") {
+    return '<div class="fit-banner up"><div class="fb-ic">' + ICON.gauge + '</div>' +
+      '<div class="fb-main"><div class="fb-h">Your easy days are creeping too fast</div>' +
+      '<div class="fb-b">' + evidence + ' Running quicker than planned <i>and</i> finding it harder is the classic sign of overcooked easy days. The fix isn\\u2019t new paces \\u2014 it\\u2019s running the easy sessions at their easy pace.</div>' +
+      '<div class="fb-actions"><button class="fb-yes" id="tfOk">Got it</button></div></div></div>';
+  }
+  const s = tf.suggestion;
+  const faster = s.direction === "faster";
+  const head = faster ? "Your runs say the plan can be quicker" : "Your runs say the plan should ease off";
+  const ask = faster
+    ? "Update your paces around a <b>" + fmtTimeFull(s.proposedRecent5kSeconds) + "</b> 5K (currently " + fmtTimeFull(profile.recentTimeS) + ")?"
+    : "Ease your paces around a <b>" + fmtTimeFull(s.proposedRecent5kSeconds) + "</b> 5K (currently " + fmtTimeFull(profile.recentTimeS) + ")?";
+  return '<div class="fit-banner ' + (faster ? "up" : "down") + '"><div class="fb-ic">' + (faster ? ICON.trendUp : ICON.trendDown) + '</div>' +
+    '<div class="fb-main"><div class="fb-h">' + head + '</div>' +
+    '<div class="fb-b">' + evidence + " " + ask + '</div>' +
+    '<div class="fb-actions"><button class="fb-yes" id="tfApply">Adjust my plan</button><button class="fb-no" id="tfDismiss">Not now</button></div></div></div>';
+}
+// seedDone() rebuilds the completed map from dates alone, so it drops anything ticked TODAY — the
+// session the runner has just finished. Capture those ticks before the plan is rebuilt, restore after.
+function todayTicks() {
+  const today = todayIso(); const days = [];
+  PLAN.weeks.forEach((wk) => wk.sessions.forEach((s) => {
+    if (s.type === "rest" || !state.done[doneKey(wk.index, s)]) return;
+    if (isoAdd(wk.startIso, effDay(s)).toISOString().slice(0, 10) === today) days.push(s.day);
+  }));
+  return days;
+}
+function restoreTicks(days) {
+  if (!days || !days.length) return;
+  const today = todayIso();
+  PLAN.weeks.forEach((wk) => wk.sessions.forEach((s) => {
+    if (s.type === "rest" || days.indexOf(s.day) < 0) return;
+    if (isoAdd(wk.startIso, effDay(s)).toISOString().slice(0, 10) === today) state.done[doneKey(wk.index, s)] = true;
+  }));
+}
+function applyTrainFlag() {
+  const tf = state.trainFlag; if (!tf || !tf.suggestion || tf.suggestion.action !== "anchor") return;
+  const ticks = todayTicks();
+  const to = tf.suggestion.proposedRecent5kSeconds;
+  // A 1 km trial, if they did one, still anchors the sharper paces (applyProfile takes whichever
+  // implies the faster 5K). Move it by the same proportion, or the accepted change is a no-op.
+  if (profile.oneKmS > 0 && profile.recentTimeS > 0) profile.oneKmS = Math.round(profile.oneKmS * (to / profile.recentTimeS));
+  profile.recentTimeS = to; profile.noRecent = false; profile.autoPace = false;
+  if (profile.status === "new") profile.status = "building";
+  try { recompute(); } catch (e) {}
+  computeToday(); state.planWeek = PLAN.defaultWeekIndex; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
+  seedDone(); restoreTicks(ticks); saveProfileStore();
+  state.trainFlag = null; saveTrainFlag();
+  render();
+}
+function dismissTrainFlag() {
+  const tf = state.trainFlag; if (!tf) return;
+  muteFlag(tf.flags);
+  state.trainFlag = null; saveTrainFlag();
+  render();
 }
 function fitSuggestBanner() {
   const fs = state.fitSuggest; if (!fs) return "";
@@ -4986,6 +5155,9 @@ function wire() {
   const feelSq = $("feelSq"); if (feelSq) feelSq.onclick = openFeelSheet;
   const apOk = $("apOk"); if (apOk) apOk.onclick = dismissPaceNotice;
   const apEdit = $("apEdit"); if (apEdit) apEdit.onclick = () => { dismissPaceNotice(); state.screen = "setup"; render(); };
+  const tfApply = $("tfApply"); if (tfApply) tfApply.onclick = applyTrainFlag;
+  const tfDismiss = $("tfDismiss"); if (tfDismiss) tfDismiss.onclick = dismissTrainFlag;
+  const tfOk = $("tfOk"); if (tfOk) tfOk.onclick = dismissTrainFlag;
   const fitApply = $("fitApply"); if (fitApply) fitApply.onclick = applyFitSuggest;
   const fitDismiss = $("fitDismiss"); if (fitDismiss) fitDismiss.onclick = dismissFitSuggest;
   const viewSession = $("viewSession"); if (viewSession) viewSession.onclick = () => openSessionSheet(selectedSession(), curWeekNo());
@@ -5025,6 +5197,17 @@ function wire() {
   };
   const lFinish = $("lFinish"); if (lFinish && !LIVE.done) lFinish.onclick = () => liveFinish(false);
   // Completion screen: save the run to Activities, discard it, or move on to Activities.
+  document.querySelectorAll("[data-rpe]").forEach((c) => c.onclick = () => {
+    const sm = LIVE && LIVE.summary; if (!sm) return;
+    sm.rpe = Number(c.dataset.rpe);
+    // Rating after saving is fine — write it through to the logged run and re-read the flags, so a
+    // runner who taps Save first isn't locked out of the question the whole feature depends on.
+    if (sm.saved) {
+      const lg = (state.logged || []).find((r) => r.id === sm.runId);
+      if (lg) { lg.rpe = sm.rpe; saveRuns(); maybeTrainingFlags(); }
+    }
+    render();
+  });
   const lSave = $("lSave"); if (lSave) lSave.onclick = () => { saveLiveSession(); render(); };
   const lDiscard = $("lDiscard"); if (lDiscard) lDiscard.onclick = () => { coachStop(); stopSpeech(); LIVE = null; state.screen = null; state.tab = "today"; render(); };
   const lDone = $("lDone"); if (lDone) lDone.onclick = () => { coachStop(); stopSpeech(); LIVE = null; state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); };

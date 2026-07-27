@@ -69,7 +69,7 @@ for i,b in enumerate(re.findall(r'<script>(.*?)</script>', h, re.S)):
 ```bash
 node web/app.ts        # build web/app.html + docs/* (run after ANY edit to web/app.ts)
 npx tsc --noEmit       # typecheck (must be clean)
-node --test            # test suite (currently 122 passing)
+node --test            # test suite (currently 143 passing)
 npm run web            # builds all the standalone pages too
 ```
 
@@ -190,9 +190,38 @@ plan to the App Store / watches / adaptive coach / community, installable to the
 The service worker caches it for offline (`./roadmap/*` in ASSETS) and the offline navigation
 fallback now serves the requested cached page before falling back to the app shell.
 
+**Adaptive flags + RPE (Road Map phase 4, shipped):** the app now asks *"How hard did that feel, 1–10?"*
+after every run and watches for two signals over **2+ consecutive sessions** — pace consistently
+outside the prescribed band, and reported effort consistently outside the intended RPE band. Detection
+lives in the engine (`src/adapt/training-flags.ts`, 21 tests, exported via `web/entry.ts` as
+`RC.assessTrainingFlags`); the app never changes a plan silently — it raises a Today banner carrying its
+evidence ("your last 2 sessions came in about 24s/km faster than their target pace") and the runner
+taps *Adjust my plan* or *Not now*.
+
+Design rules baked in, each of which cost a real bug when it was missing — don't unpick them:
+- **Direction sanity.** A suggestion is dropped unless the proposal genuinely lies on the side the
+  evidence points to. Clamps (±15%, and an absolute 600–3600s) can otherwise invert it, so a very slow
+  runner got an "ease off" that made every pace *faster*.
+- **Anchor stamping.** Each logged run stores the `anchor` (`recentTimeS`) it was judged against, plus
+  its `pband`/`rband`/`rpe`. `flagObservations()` stops at the first run from an older anchor — once the
+  plan is re-anchored, deviations it already accounts for are history, not evidence.
+- **Per-kind muting.** The pace and RPE flags can rest on *different* newest runs (the engine skips
+  non-qualifying runs rather than breaking a streak), so each kind is muted at its own evidence id in
+  `interun_flagmute`. One shared id let a just-declined banner re-raise with nothing new.
+- **One voice.** Raising a flag clears `fitSuggest` and `paceNotice`; every non-raising path clears any
+  pending flag, so a banner never outlives its evidence.
+- **Seeded anchors stay quiet.** Gated on `!profile.autoPace && !profile.noRecent` — quoting a beginner
+  a 5K time they never ran (and then having auto-calibration overwrite what they agreed to) is worse
+  than silence.
+- **Accepting must stick.** `applyTrainFlag` scales `oneKmS` with the anchor (`applyProfile` takes
+  whichever implies the faster 5K, so an un-scaled trial silently cancelled the change) and restores
+  today's ticks around `seedDone()` via `todayTicks()`/`restoreTicks()`.
+- **RPE stays answerable after Save** — the picker writes through to the logged run. Gating it on
+  `!saved` starved the whole signal for anyone who taps Save first.
+
 **Apple Watch:** see `WATCH.md` — a scoping/decision document, nothing built. Key facts: a watchOS
 app cannot pair with a PWA (it needs a native iOS app), Xcode isn't installed on the owner's Mac,
-and the `src/` engine is dependency-free TS with 122 tests that would serve as the port spec.
+and the `src/` engine is dependency-free TS with 143 tests that would serve as the port spec.
 
 Known/optional next: lock-screen/background audio is limited (pure PWA, no native wrapper); true
 background reminders would need a push server (calendar export is the current cross-platform answer).

@@ -24,6 +24,8 @@ export { riegelPredict } from "../src/science/paces.ts";
 export { rangeText } from "../src/science/estimate.ts";
 export { assessReadiness } from "../src/readiness/readiness.ts";
 export { assessLongRunSpike, returnToRunningPlan } from "../src/adapt/load-guardrails.ts";
+export { assessTrainingFlags } from "../src/adapt/training-flags.ts";
+export type { RunObservation, TrainingFlag, TrainingFlagsResult } from "../src/adapt/training-flags.ts";
 export { assessConditions } from "../src/environment/weather.ts";
 export { classifyRunner } from "../src/athlete/classification.ts";
 export { assessMasters } from "../src/athlete/masters.ts";

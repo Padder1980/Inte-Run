@@ -616,21 +616,18 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
 .ov-mapcv { display: block; width: 100%; height: auto; }
 .ov-mapov { position: absolute; inset: 0; }
 .ov-mapov .routemap { width: 100%; height: 100%; }
-.ov-mapov .rt-base { stroke-width: 9; opacity: .55; } .ov-mapov .rt-ants { stroke-width: 5; stroke-dasharray: 15 17; }
+.ov-mapov .rt-line { stroke-width: 6; }
 .ov-mapov .rt-start, .ov-mapov .rt-end { stroke-width: 4; }
 .ov-attr { position: absolute; left: 10px; bottom: 7px; font-size: 10px; color: rgba(255,255,255,.45); text-shadow: 0 1px 2px rgba(0,0,0,.5); pointer-events: none; }
 /* Light (Voyager) overview map: give the route a dark casing so the bright-green line reads on streets */
-.ov-light .ov-mapov .rt-base { stroke: #062e25; opacity: .92; stroke-width: 12.5; }
-.ov-light .ov-mapov .rt-ants { stroke: url(#rtchrome); stroke-width: 7; filter: drop-shadow(0 1px 2px rgba(3,20,16,.45)); }
-.ov-light .ov-mapov .rt-shine { stroke: rgba(255,255,255,.7); stroke-width: 2; }
+.ov-light .ov-mapov .rt-line { stroke-width: 7; }
 .ov-light .ov-mapov .rt-start { fill: #17c98f; stroke: #fff; stroke-width: 4.5; }
 .ov-light .ov-mapov .rt-end { fill: #fff; stroke: #062e25; stroke-width: 5; }
 .ov-light .ov-attr { color: rgba(20,44,36,.62); text-shadow: 0 1px 1px rgba(255,255,255,.7); }
 .routemap { display: block; width: 100%; height: auto; }
-/* Chrome-teal route: deep casing under a metallic gradient body with a glossy spine. */
-.rt-base { fill: none; stroke: #06423b; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; opacity: .9; }
-.rt-ants { fill: none; stroke: url(#rtchrome); stroke-width: 4.4; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 2px rgba(4,26,22,.5)); }
-.rt-shine { fill: none; stroke: rgba(255,255,255,.55); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+/* The route: one colour, the brand teal. A soft shadow keeps it legible on pale streets without
+   being a second colour. */
+.rt-line { fill: none; stroke: #16b7a4; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 2px rgba(4,26,22,.45)); }
 .rt-start { fill: var(--accent); stroke: #fff; stroke-width: 2.5; }
 .rt-end { fill: #fff; stroke: var(--accent); stroke-width: 3.5; }
 .rt-none { padding: 26px 16px; text-align: center; font-size: 13px; color: var(--ink-faint); }
@@ -4545,10 +4542,7 @@ function routeMapSvg(route, proj, vbW, vbH) {
   const d = route.map((p, i) => (i ? "L" : "M") + xy(p).map((n) => n.toFixed(1)).join(" ")).join(" ");
   const s = xy(route[0]), e = xy(route[route.length - 1]);
   return '<svg class="routemap" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
-    '<defs><linearGradient id="rtchrome" x1="0" y1="0" x2="1" y2="1">' +
-    '<stop offset="0" stop-color="#a9f2e6"/><stop offset="0.35" stop-color="#16b7a4"/>' +
-    '<stop offset="0.7" stop-color="#0a6f64"/><stop offset="1" stop-color="#7ee8d8"/></linearGradient></defs>' +
-    '<path class="rt-base" d="' + d + '"/><path class="rt-ants" d="' + d + '"/><path class="rt-shine" d="' + d + '"/>' +
+    '<path class="rt-line" d="' + d + '"/>' +
     '<circle class="rt-start" cx="' + s[0].toFixed(1) + '" cy="' + s[1].toFixed(1) + '" r="' + r + '"/>' +
     '<circle class="rt-end" cx="' + e[0].toFixed(1) + '" cy="' + e[1].toFixed(1) + '" r="' + r + '"/></svg>';
 }
@@ -4665,7 +4659,7 @@ function paceChartSvg(a) {
 function splitsVsTargetHtml(a) {
   if (!a.n) return "";
   const rows = a.rows.map((r) => {
-    const w = 30 + 70 * (a.slowest === a.fastest ? 1 : (a.slowest - r.sec) / (a.slowest - r.fastest || 1));
+    const w = 30 + 70 * (a.slowest === a.fastest ? 1 : (a.slowest - r.sec) / ((a.slowest - a.fastest) || 1));
     const cls = r.verdict === "in" ? "in" : r.verdict === "none" ? "" : "out";
     const tag = r.verdict === "in" ? "on target"
       : r.verdict === "fast" ? Math.abs(r.delta) + "s fast"

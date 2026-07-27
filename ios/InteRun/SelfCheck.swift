@@ -23,7 +23,7 @@ enum SelfCheck {
 
     /// Written on the first checked launch, looked for on the next one — the only honest way to
     /// prove persistence, since a value read back within the same session proves nothing about disk.
-    private static let persistKey = "interun_selfcheck_persist"
+    private static let persistKey = "_selfcheck_persist"  // leading _ keeps it OUT of user backups
 
     // `callAsyncJavaScript` wraps this as the BODY of an async function — so it is top-level
     // `await` and `return`, not an IIFE. Wrapping it in one returns a discarded promise (`nil`).
@@ -89,6 +89,19 @@ enum SelfCheck {
     // 4. The engine bundle.
     out.engineLoaded = typeof RC !== 'undefined' && typeof RC.generatePlan === 'function';
     out.appBooted = !!document.getElementById('view');
+
+    // 5. The migration path in and out of this app: a backup must round-trip through the same
+    // code the runner will use, and the file picker must exist for restore to be reachable.
+    try {
+      const bk = collectBackup();
+      out.backup = { format: bk.format, keys: Object.keys(bk.data).length };
+      out.backupValidates = validateBackup(bk) === '' || validateBackup(bk);
+      out.canShareFiles = canShareBackup();
+      const probe = document.createElement('input');
+      probe.type = 'file';
+      out.filePickerSupported = probe.type === 'file';
+      out.downloadAttrSupported = 'download' in document.createElement('a');
+    } catch (e) { out.backupError = String(e); }
 
     return JSON.stringify(out);
     """

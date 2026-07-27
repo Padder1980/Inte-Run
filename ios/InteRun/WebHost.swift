@@ -55,8 +55,19 @@ struct WebHost: UIViewRepresentable {
     """
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+        /// Where the in-flight `<a download>` is being written. See `Downloads.swift`.
+        var pendingDownload: URL?
+
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             if SelfCheck.isEnabled { SelfCheck.run(on: webView) }
+        }
+
+        func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
+            download.delegate = self
+        }
+
+        func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
+            download.delegate = self
         }
 
         /// Keep the app an app: anything genuinely off-site opens in Safari rather than turning
@@ -64,6 +75,10 @@ struct WebHost: UIViewRepresentable {
         func webView(_ webView: WKWebView,
                      decidePolicyFor navigationAction: WKNavigationAction,
                      decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            // A `download` attribute (the backup + the .ics export) becomes a real file, not a
+            // navigation. Without this the tap silently does nothing.
+            if navigationAction.shouldPerformDownload { return decisionHandler(.download) }
+
             guard let url = navigationAction.request.url else { return decisionHandler(.allow) }
 
             if url.scheme == BundleSchemeHandler.scheme || url.scheme == "about" {

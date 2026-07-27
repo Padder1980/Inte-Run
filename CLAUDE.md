@@ -239,6 +239,13 @@ existing web UI, so there is still **one UI to design** (`web/app.ts`). Decided 
   script can be written as real shell and escaped correctly). Regenerating **overwrites** it — mirror
   any Xcode-UI build-setting changes back into that script first. `ios/InteRun/` is a synchronized
   folder group, so new Swift files need no project edit.
+- **Moving data in from the PWA** is built and lives in the web layer (`dataView()`, Support › Your
+  data), so one screen serves both sides: export in the browser, restore in the app. The two origins
+  are separate sandboxes — nothing crosses automatically and no native code can reach in and take it.
+  Restoring **replaces** rather than merges (merging two histories would duplicate runs). Backup keys
+  are discovered at runtime by prefix (`interun_`, `rc_`), so a key added later still travels — do
+  not replace that with a hardcoded list. `Downloads.swift` gives `<a download>` a real
+  `WKDownloadDelegate`, which also fixes the calendar `.ics` export (it silently did nothing before).
 - Full detail, including the known gaps, is in **`ios/README.md`** — read it before touching `ios/`.
 
 ### Toolchain on this Mac (verified 2026-07-27)

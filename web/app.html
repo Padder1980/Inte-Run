@@ -1340,6 +1340,20 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
 .exlb-in img { display: block; width: 100%; aspect-ratio: 1; object-fit: contain; background: #fff; }
 .exlb-cap { padding: 12px 16px 15px; font-size: 15px; font-weight: 700; color: #14201b; text-align: center; border-top: 1px solid #e6ebe9; }
 .exlb-x { position: absolute; top: 10px; right: 10px; z-index: 2; width: 32px; height: 32px; border-radius: 50%; border: 0; background: rgba(255,255,255,.92); color: #14201b; font-size: 14px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+/* Your data: backup + restore */
+.bk-box { margin-top: 10px; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; }
+.bk-box.warn { border-color: color-mix(in srgb, var(--rest) 45%, var(--line)); background: color-mix(in srgb, var(--rest) 7%, var(--surface-2)); }
+.bk-lab { font-size: 11.5px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-faint); }
+.bk-box .bk-lab + .bk-val { margin-top: 5px; }
+.bk-val { font-size: 14.5px; font-weight: 600; color: var(--ink); }
+.bk-move { }
+.bk-mh { font-size: 15px; font-weight: 700; color: var(--ink); margin-bottom: 6px; }
+.bk-md { font-size: 13.5px; line-height: 1.55; color: var(--ink-soft); }
+.bk-msg { display: none; margin-top: 10px; padding: 10px 12px; font-size: 13px; line-height: 1.5; color: var(--ink); background: color-mix(in srgb, var(--rest) 10%, var(--surface-2)); border: 1px solid color-mix(in srgb, var(--rest) 40%, var(--line)); border-radius: 10px; }
+.bk-btn2 { display: block; width: 100%; margin-top: 9px; padding: 13px 16px; font: inherit; font-size: 15px; font-weight: 600;
+  color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; cursor: pointer; transition: all .12s ease; }
+.bk-btn2:active { transform: scale(.985); background: var(--surface-3, var(--surface-2)); }
+#bkExport svg { width: 17px; height: 17px; vertical-align: -3px; margin-right: 2px; }
 /* Post-run RPE ask */
 .rpe-ask { margin-bottom: 12px; }
 .rpe-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
@@ -2965,6 +2979,7 @@ const SUPPORT_HUB = [
   { id: "female", ic: "flower", c: "var(--taper)", t: "Women's health", d: "Symptom-informed prompts — periods, postpartum, more.", interactive: true },
   { id: "strength", ic: "dumbbell", c: "var(--build)", t: "Strength & mobility", d: "Why strength matters, and how to fit it in.", interactive: false },
   { id: "guides", ic: "book", c: "var(--accent)", t: "Training guides", d: "Plain-English answers grounded in the research.", interactive: false },
+  { id: "data", ic: "share", c: "var(--steady)", t: "Your data", d: "Back it up, or move it to another device.", interactive: false },
 ];
 function viewSupport() {
   if (state.support) return supportDetail(state.support);
@@ -2978,6 +2993,7 @@ function supportDetail(id) {
   if (id === "reds") return back + redsView();
   if (id === "female") return back + femaleView();
   if (id === "strength") return back + strengthView();
+  if (id === "data") return back + dataView();
   return back + guidesView();
 }
 // ---- Strength & mobility library -------------------------------------------
@@ -3110,6 +3126,165 @@ const GUIDES = [
     "<b>This app is not a diagnosis.</b> Support \u2192 <i>Injury &amp; symptoms</i> has a proper symptom checker, and a physiotherapist or GP beats any app when something hurts.",
   ] },
 ];
+// ---- Your data: backup, restore, and moving between devices -----------------------------------
+// Everything InteRun knows about a runner lives in this browser's localStorage, keyed to one origin.
+// The iPhone app is a DIFFERENT origin (interun://app) and Safari's storage is sandboxed away from
+// it, so nothing crosses automatically and no amount of native code can reach in and take it. The
+// runner has to carry a file across: export on the old device, restore on the new one. The same
+// screen doubles as an ordinary backup, which is worth having regardless.
+const BACKUP_FORMAT = "interun-backup";
+const BACKUP_PREFIXES = ["interun_", "rc_"];
+// Keys are discovered at runtime rather than listed, so a key added in a later version still
+// travels without anyone remembering to update a list here.
+function backupKeys() {
+  const out = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && BACKUP_PREFIXES.some((p) => k.indexOf(p) === 0)) out.push(k);
+    }
+  } catch (e) {}
+  return out.sort();
+}
+function collectBackup() {
+  const data = {};
+  backupKeys().forEach((k) => { const v = localStorage.getItem(k); if (v !== null) data[k] = v; });
+  return { format: BACKUP_FORMAT, version: 1, exportedAt: new Date().toISOString(), from: location.origin, data: data };
+}
+function inNativeApp() { try { return location.protocol.indexOf("interun") === 0; } catch (e) { return false; } }
+// Describe a backup the way a person would: whose it is, how much is in it, how old it is.
+function backupSummary(data) {
+  const s = { keys: 0, runs: 0, name: "", goal: "", hasPlan: false };
+  if (!data) return s;
+  s.keys = Object.keys(data).length;
+  try {
+    const p = JSON.parse(data["rc_profile_v1"] || "null");
+    if (p) { s.name = p.name || ""; s.goal = RACE_LABEL[p.goalDist] || ""; s.hasPlan = true; }
+  } catch (e) {}
+  try { const r = JSON.parse(data["interun_runs"] || "null"); if (Array.isArray(r)) s.runs = r.length; } catch (e) {}
+  return s;
+}
+function summaryLine(s) {
+  const bits = [];
+  if (s.name) bits.push(esc(s.name) + "\u2019s profile");
+  if (s.goal) bits.push(esc(s.goal) + " plan");
+  bits.push(s.runs + " logged " + (s.runs === 1 ? "run" : "runs"));
+  return bits.join(" \u00b7 ");
+}
+// Validate the WHOLE file before touching storage, so a bad file can never leave it half-replaced.
+function validateBackup(obj) {
+  if (!obj || typeof obj !== "object" || obj.format !== BACKUP_FORMAT) return "That doesn\u2019t look like an InteRun backup.";
+  if (!obj.data || typeof obj.data !== "object") return "That backup has no data in it.";
+  const keys = Object.keys(obj.data);
+  if (!keys.length) return "That backup is empty.";
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    if (!BACKUP_PREFIXES.some((p) => k.indexOf(p) === 0)) return "That backup contains something unexpected, so it hasn\u2019t been used.";
+    if (typeof obj.data[k] !== "string") return "That backup looks damaged.";
+  }
+  if (!obj.data["rc_profile_v1"]) return "That backup has no profile in it, so there\u2019d be no plan to restore.";
+  return "";
+}
+function applyBackup(obj) {
+  const bad = validateBackup(obj);
+  if (bad) return bad;
+  try {
+    backupKeys().forEach((k) => localStorage.removeItem(k));
+    Object.keys(obj.data).forEach((k) => localStorage.setItem(k, obj.data[k]));
+  } catch (e) { return "Couldn\u2019t save the backup \u2014 this device may be out of storage."; }
+  return "";
+}
+function backupFilename() { return "interun-backup-" + todayIso() + ".json"; }
+function backupFile() { return new File([JSON.stringify(collectBackup())], backupFilename(), { type: "application/json" }); }
+function canShareBackup() { try { return !!(navigator.canShare && navigator.canShare({ files: [backupFile()] })); } catch (e) { return false; } }
+// On a phone the share sheet is the useful path: it reaches AirDrop, Files, Mail and the app itself.
+// Everywhere else, fall back to an ordinary download.
+function exportBackup() {
+  if (canShareBackup()) {
+    try { navigator.share({ files: [backupFile()], title: "InteRun backup" }).catch(() => {}); return; } catch (e) {}
+  }
+  try {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(collectBackup())], { type: "application/json" }));
+    const a = document.createElement("a"); a.href = url; a.download = backupFilename();
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch (e) {} }, 1500);
+  } catch (e) { toastData("Couldn\u2019t create the file on this device."); }
+}
+function toastData(msg) {
+  const el = $("dataMsg");
+  if (el) { el.innerHTML = msg; el.style.display = "block"; }
+}
+// Read the chosen file, then ALWAYS confirm before replacing anything. Restoring is destructive:
+// it replaces what is on this device, and silently merging two histories would create duplicate
+// runs that no one could untangle afterwards.
+function handleBackupFile(file) {
+  if (!file) return;
+  const rd = new FileReader();
+  rd.onerror = () => toastData("Couldn\u2019t read that file.");
+  rd.onload = () => {
+    let obj = null;
+    try { obj = JSON.parse(String(rd.result)); } catch (e) { toastData("That file isn\u2019t readable as a backup."); return; }
+    const bad = validateBackup(obj);
+    if (bad) { toastData(bad); return; }
+    confirmRestore(obj);
+  };
+  rd.readAsText(file);
+}
+function confirmRestore(obj) {
+  const incoming = backupSummary(obj.data);
+  const current = backupSummary(collectBackup().data);
+  const when = obj.exportedAt ? String(obj.exportedAt).slice(0, 10) : "";
+  const replacing = current.hasPlan || current.runs > 0;
+  ensureSheet(); SHEET_CTX = null;
+  $("sheetBody").innerHTML =
+    '<div class="sd-type" style="--sc:var(--steady)">Restore</div>' +
+    '<div class="sd-title">' + (replacing ? "Replace everything on this device?" : "Restore this backup?") + '</div>' +
+    '<div class="bk-box"><div class="bk-lab">From the backup' + (when ? " \u00b7 " + when : "") + '</div><div class="bk-val">' + summaryLine(incoming) + '</div></div>' +
+    (replacing
+      ? '<div class="bk-box warn"><div class="bk-lab">Already on this device \u2014 will be replaced</div><div class="bk-val">' + summaryLine(current) + '</div></div>' +
+        '<div class="sd-desc" style="margin-top:10px">Restoring replaces what is here rather than merging \u2014 merging two histories would create duplicate runs. Export what is on this device first if you want to keep it.</div>' +
+        '<button class="bk-btn2" id="bkSaveFirst">Export this device\u2019s data first</button>'
+      : '<div class="sd-desc" style="margin-top:10px">There\u2019s nothing on this device yet, so nothing will be lost.</div>') +
+    '<button class="primary" id="bkGo" style="width:100%;margin-top:12px">' + (replacing ? "Replace with the backup" : "Restore") + '</button>' +
+    '<button class="rm-nothanks" id="bkCancel">Cancel</button>';
+  const saveFirst = $("bkSaveFirst"); if (saveFirst) saveFirst.onclick = exportBackup;
+  $("bkCancel").onclick = closeSheet;
+  $("bkGo").onclick = () => {
+    const err = applyBackup(obj);
+    if (err) { closeSheet(); toastData(err); return; }
+    // Reload rather than re-render: every module reads its slice of storage once at boot, so a
+    // reload is the only way to be certain nothing stale survives the swap.
+    location.reload();
+  };
+  $("sheetOv").classList.add("on");
+}
+function dataView() {
+  const cur = backupSummary(collectBackup().data);
+  const bytes = JSON.stringify(collectBackup()).length;
+  const size = bytes > 1024 ? Math.round(bytes / 1024) + " KB" : bytes + " bytes";
+  const move = inNativeApp()
+    ? '<div class="bk-move"><div class="bk-mh">Moving over from the web version?</div><div class="bk-md">Open InteRun in your browser, go to <b>Support \u203a Your data</b>, and export a backup. Send it to this phone \u2014 AirDrop, Files or email all work \u2014 then tap <b>Restore</b> below and pick the file.</div></div>'
+    : '<div class="bk-move"><div class="bk-mh">Moving to the iPhone app?</div><div class="bk-md">Your runs don\u2019t travel automatically \u2014 the app is a separate place on your phone and can\u2019t reach into your browser\u2019s storage. Export a backup here, then open the app and go to <b>Support \u203a Your data \u203a Restore</b>.</div></div>';
+  return '<div class="card">' +
+    '<div class="subhead" style="margin-top:0">On this device</div>' +
+    '<div class="bk-box"><div class="bk-val">' + summaryLine(cur) + '</div><div class="bk-lab" style="margin-top:4px">' + cur.keys + " items \u00b7 " + size + '</div></div>' +
+    '<button class="primary" id="bkExport" style="width:100%;margin-top:14px">' + ICON.share + " " + (canShareBackup() ? "Export a backup" : "Download a backup") + '</button>' +
+    '<button class="bk-btn2" id="bkImport">Restore from a backup</button>' +
+    '<input type="file" id="bkFile" accept="application/json,.json" style="display:none">' +
+    '<div class="bk-msg" id="dataMsg"></div>' +
+    '</div>' +
+    '<div class="card">' + move + '</div>' +
+    '<div class="card"><div class="subhead" style="margin-top:0">What a backup holds</div>' +
+    '<div class="bk-md">Your profile and goal, your plan, every logged run with its route and splits, your coach and reminder choices, and anything you\u2019ve told Alfie. It\u2019s a plain file on your device \u2014 nothing is uploaded anywhere, because InteRun has no server to upload it to.</div></div>';
+}
+function wireDataView() {
+  const ex = $("bkExport"); if (ex) ex.onclick = exportBackup;
+  const im = $("bkImport"), f = $("bkFile");
+  if (im && f) {
+    im.onclick = () => { f.value = ""; f.click(); };
+    f.onchange = () => handleBackupFile(f.files && f.files[0]);
+  }
+}
 function guidesView() {
   const cards = GUIDES.map((g, i) =>
     '<div class="gd" data-gd="' + i + '"><button class="gd-h"><span class="gd-t">' + g.t + '</span>' +
@@ -5053,6 +5228,7 @@ function wire() {
   document.querySelectorAll("[data-gd]").forEach((g) => { const h = g.querySelector(".gd-h"); if (h) h.onclick = () => g.classList.toggle("on"); });
   const gAlfie = $("guidesAlfie"); if (gAlfie) gAlfie.onclick = openAlfie;
   const guideReplay = $("guideReplay"); if (guideReplay) guideReplay.onclick = () => openSessionGuide(GUIDE_EXAMPLE, { fromSupport: true });
+  wireDataView();
   const back = $("supBack"); if (back) back.onclick = () => { state.support = null; render(); };
   document.querySelectorAll('[data-chk="rf"]').forEach((c) => c.onchange = runRf);
   document.querySelectorAll('[data-chk="reds"]').forEach((c) => c.onchange = runReds);

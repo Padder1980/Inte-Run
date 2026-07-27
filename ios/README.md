@@ -123,20 +123,35 @@ back within the same session proves nothing.
   xcrun simctl boot <udid> && xcrun simctl install <udid> path/to/InteRun.app && xcrun simctl launch <udid> com.interun.app
   ```
 
+## Moving a runner's data in from the PWA
+
+Safari's storage for `padder1980.github.io` and this app's storage for `interun://app` are separate
+origins in separate sandboxes. **Nothing crosses automatically, and no native code can reach in and
+take it** — the runner has to carry a file across. That path is now built, and it lives in the web
+layer (`dataView()` in `web/app.ts`), so the same screen serves both sides:
+
+1. In the browser: **Support › Your data › Export a backup** → the iOS share sheet → AirDrop/Files.
+2. In the app: **Support › Your data › Restore from a backup** → pick the file → confirm.
+
+Verified in the app: `navigator.share` with files works in WKWebView (`canShareFiles: true`), so
+export uses the native share sheet; `<input type="file">` opens the document picker, so restore is
+reachable; and a full export → wipe → restore cycle inside the web view came back byte-identical.
+
+`Downloads.swift` handles the `<a download>` fallback (and the calendar `.ics`, which silently did
+nothing before): the file becomes a real `WKDownload` and is handed to the share sheet.
+
+Restoring **replaces** rather than merges — merging two histories would create duplicate runs nobody
+could untangle. The confirm sheet shows both sides and offers to export the current device first.
+
 ## Known gaps
 
 These are real, deliberate, and not yet done:
 
-- **Blob downloads.** The calendar `.ics` export uses a blob + `download` attribute. WKWebView needs
-  a `WKDownloadDelegate` for that; without one the button does nothing. Needs wiring.
 - **Background GPS.** `UIBackgroundModes: location` is declared, but nothing yet holds a
   `CLLocationManager` with `allowsBackgroundLocationUpdates`, so tracking still stops when the
   screen locks. The declaration alone is not enough.
 - **Local notifications.** Session reminders still use the web timer, which dies with the app. A
   native `UNUserNotificationCenter` bridge is the fix, and would finally make reminders reliable.
-- **No data migration from the PWA.** A runner who has been using the Home Screen PWA has their
-  history in Safari's storage for `padder1980.github.io`; the app starts empty. An export/import
-  needs building before asking anyone to switch.
 - **Build with release Xcode to submit.** `/Applications/Xcode.app` is 26.6 (release, can submit);
   `/Applications/Xcode-beta.app` is 27.0 beta (development only — App Store Connect rejects its
   builds).

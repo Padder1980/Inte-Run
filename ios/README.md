@@ -281,6 +281,21 @@ back to plain "Well done" rather than an awkward blank.
 
 Deliberately **not** on the watch: plan setup, history, Support. Those want a bigger screen.
 
+### If the watch app will not install
+
+The symptom is silence: the phone app installs fine, the Watch app on the phone never offers
+InteRun (or fails), and the only clue is the phone log saying
+`WCErrorCodeWatchAppNotInstalled`. Things to check, in order of how often they are the cause:
+
+1. **The watch's own watchOS version against `WATCH_DEPLOYMENT_TARGET`.** A minimum higher than the
+   watch's OS fails with no useful error anywhere. This is why the target is **10.0** rather than the
+   newest available — people update the phone and leave the watch behind.
+2. **Watch apps do not install from Xcode.** They go through the phone: iPhone → **Watch** app →
+   scroll to **Available Apps** → **Install**. Xcode's Run only installs the phone half.
+3. Watch locked, off the charger, low battery, or short of storage — all fail quietly.
+4. It is genuinely slow and flaky over the phone bridge. Several minutes is normal; a watch restart
+   often unsticks it.
+
 ### Traps this cost
 
 - ⚠️ **`allowsBackgroundLocationUpdates` must never be set on watchOS.** CoreLocation asserts and

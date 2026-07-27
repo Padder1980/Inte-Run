@@ -74,8 +74,11 @@ DEVELOPMENT_TEAM = _team()
 DEPLOYMENT_TARGET = "17.0"
 
 WATCH_BUNDLE_ID = BUNDLE_ID + ".watchkitapp"
-# 26.0 so the app runs on both installed runtimes (26.5 and 27.0).
-WATCH_DEPLOYMENT_TARGET = "26.0"
+# 10.0, not the newest available. A watch app whose minimum is higher than the watch's actual
+# watchOS silently fails to install, with no useful error anywhere - and people routinely update the
+# phone while leaving the watch behind. 10.0 covers Series 4 and later and costs nothing: everything
+# this app uses (HKWorkoutSession, NowPlayingView, NavigationStack, water lock) exists there.
+WATCH_DEPLOYMENT_TARGET = "10.0"
 
 WATCH_COMMON = {
     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",

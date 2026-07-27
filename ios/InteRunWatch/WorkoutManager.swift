@@ -30,7 +30,7 @@ final class WorkoutManager: NSObject, ObservableObject {
     /// The session being run, if the phone sent one. Nil means a free run.
     var plan: PlannedSession?
     private var hrSamples: [Double] = []
-    private var routePoints: [[Double]] = []
+    private(set) var routePoints: [[Double]] = []
     private var splits: [Int] = []
     private var lastSplitMetre = 0.0
     private var lastSplitElapsed: TimeInterval = 0
@@ -269,6 +269,45 @@ final class WorkoutManager: NSObject, ObservableObject {
     // MARK: - Derived
 
     var distanceKm: Double { distanceMetres / 1000 }
+
+    /// Average pace over the whole run so far — steadier than the instantaneous figure, and the one
+    /// that actually tells you how the session is going.
+    var avgPaceSecPerKm: Double? {
+        guard distanceMetres > 50, elapsed > 10 else { return nil }
+        return elapsed / (distanceMetres / 1000)
+    }
+    var avgPaceText: String { Self.pace(avgPaceSecPerKm) }
+
+    /// How far through the whole session, by distance if it has one, else by time. Nil when the
+    /// session sets no overall goal (a "run by feel" has nothing to fill up).
+    var sessionProgress: Double? {
+        if let km = plan?.distanceKm, km > 0 { return min(1, distanceKm / km) }
+        if let mins = plan?.durationMin, mins > 0 { return min(1, elapsed / (Double(mins) * 60)) }
+        return nil
+    }
+
+    /// Distance left in the current step — the number a runner actually wants mid-rep.
+    var stepRemaining: (value: String, unit: String)? {
+        guard let step = currentStep else { return nil }
+        if let m = step.metres, m > 0 {
+            let left = max(0, Double(m) - stepMetres)
+            return left >= 1000 ? (String(format: "%.2f", left / 1000), "KM TO GO")
+                                : (String(format: "%.0f", left), "M TO GO")
+        }
+        if let sec = step.seconds, sec > 0 {
+            let left = max(0, Int(Double(sec) - stepElapsed))
+            return (String(format: "%d:%02d", left / 60, left % 60), "TO GO")
+        }
+        return nil
+    }
+
+    static func pace(_ p: Double?) -> String {
+        guard let p, p.isFinite, p > 0, p < 3600 else { return "--:--" }
+        return String(format: "%d:%02d", Int(p) / 60, Int(p) % 60)
+    }
+
+    /// The route so far, for drawing.
+    var route: [[Double]] { routePoints }
 
     var paceText: String {
         guard let p = paceSecPerKm, p.isFinite, p > 0, p < 3600 else { return "--:--" }

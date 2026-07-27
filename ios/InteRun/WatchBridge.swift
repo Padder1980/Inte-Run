@@ -20,9 +20,51 @@ final class WatchBridge: NSObject {
     init(webView: WKWebView?) {
         self.webView = webView
         super.init()
-        guard WCSession.isSupported() else { return }
+        guard WCSession.isSupported() else { SelfCheck.logger.notice("watch bridge: WatchConnectivity unsupported"); return }
         WCSession.default.delegate = self
         WCSession.default.activate()
+    }
+
+    /// Runs finished on the wrist, waiting to be handed to the page.
+    ///
+    /// The phone app is usually closed when a run ends, so these arrive by `transferUserInfo`
+    /// (queued and guaranteed, unlike `sendMessage` which needs both apps live) and are held on
+    /// disk until the web view is up and has told us it is ready to receive them.
+    private static let pendingKey = "interun_pending_watch_runs"
+
+    private var pendingRuns: [[String: Any]] {
+        get { (UserDefaults.standard.array(forKey: Self.pendingKey) as? [[String: Any]]) ?? [] }
+        set { UserDefaults.standard.set(newValue, forKey: Self.pendingKey) }
+    }
+
+    /// Hand every queued run to the page, dropping only the ones it confirms it has taken. A run
+    /// that fails to land stays queued rather than evaporating.
+    func drainPendingRuns() {
+        let runs = pendingRuns
+        guard !runs.isEmpty, let webView else { return }
+        var remaining = runs
+        let group = DispatchGroup()
+
+        for run in runs {
+            guard let data = try? JSONSerialization.data(withJSONObject: run),
+                  let json = String(data: data, encoding: .utf8) else {
+                remaining.removeAll { NSDictionary(dictionary: $0).isEqual(to: run) }
+                continue
+            }
+            let safe = json
+                .replacingOccurrences(of: "\u{2028}", with: "\\u2028")
+                .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
+            group.enter()
+            webView.evaluateJavaScript("window.__interunWatchRun && window.__interunWatchRun(\(safe));") { result, _ in
+                // "" means logged; "already logged" means a duplicate delivery. Both are done with.
+                let outcome = (result as? String) ?? "no handler"
+                if outcome.isEmpty || outcome == "already logged" || outcome == "too short to log" {
+                    remaining.removeAll { NSDictionary(dictionary: $0).isEqual(to: run) }
+                }
+                group.leave()
+            }
+        }
+        group.notify(queue: .main) { [weak self] in self?.pendingRuns = remaining }
     }
 
     private func push(_ payload: [String: Any]) {
@@ -45,9 +87,39 @@ final class WatchBridge: NSObject {
 
 extension WatchBridge: WCSessionDelegate {
     func session(_ session: WCSession, activationDidCompleteWith state: WCSessionActivationState, error: Error?) {
+        SelfCheck.logger.notice("watch bridge activated: state=\(state.rawValue) paired=\(session.isPaired) installed=\(session.isWatchAppInstalled)")
         if state == .activated, let pending = lastPayload {
             lastPayload = nil
             push(pending)
+        }
+    }
+
+    /// A finished run arriving from the wrist. Queued rather than applied immediately: the page may
+    /// not exist yet, and losing someone's run because the app happened to be closed is unforgivable.
+    /// The immediate path, used when the phone is reachable. Same handling as the queued one; the
+    /// run id makes a double delivery a no-op.
+    func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+        SelfCheck.logger.notice("watch run arrived (message)")
+        acceptRun(from: message)
+    }
+
+    /// NOTE: no default value on `userInfo`. Xcode's autocomplete offers `= [:]`, which changes the
+    /// Swift signature so it no longer satisfies the @objc protocol requirement — the delegate then
+    /// silently never fires and runs vanish with no error anywhere.
+    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any]) {
+        SelfCheck.logger.notice("watch run arrived (queued transfer)")
+        acceptRun(from: userInfo)
+    }
+
+    private func acceptRun(from payload: [String: Any]) {
+        guard let run = payload["run"] as? [String: Any] else { return }
+        DispatchQueue.main.async {
+            var queue = self.pendingRuns
+            let id = run["id"] as? String
+            if let id, queue.contains(where: { ($0["id"] as? String) == id }) { return }
+            queue.append(run)
+            self.pendingRuns = queue
+            self.drainPendingRuns()
         }
     }
 
@@ -67,6 +139,9 @@ extension WatchBridge: WKScriptMessageHandler {
             var payload: [String: Any] = ["at": Date().timeIntervalSince1970]
             if let s = body["session"] as? [String: Any] { payload["session"] = s }
             push(payload)
+        case "ready":
+            // The page has finished booting and can accept runs now.
+            drainPendingRuns()
         case "status":
             let paired: Bool
             let installed: Bool

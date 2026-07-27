@@ -2003,6 +2003,21 @@ function sessionsForIso(iso) {
   }
   return [];
 }
+// The RAW (engine) sessions for a real date. PLAN.weeks are display summaries and carry no steps
+// or pace bands at all, so anything prescribing work has to come from here.
+function rawSessionsForIso(iso) {
+  for (let wi = 0; wi < PLAN.weeks.length; wi++) {
+    const wk = PLAN.weeks[wi];
+    for (let i = 0; i < 7; i++) {
+      if (isoAdd(wk.startIso, i).toISOString().slice(0, 10) !== iso) continue;
+      const raw = RAW.weeks[wi];
+      if (!raw) return [];
+      return raw.sessions.filter((s) => s.type !== "rest" && effDay(s) === i)
+        .sort((a, b) => (PRIMARY_TYPES[b.type] || 0) - (PRIMARY_TYPES[a.type] || 0));
+    }
+  }
+  return [];
+}
 function hmMinutes(t) { const p = String(t || "07:30").split(":"); return (Number(p[0]) || 0) * 60 + (Number(p[1]) || 0); }
 // Fire one reminder slot ("a" = main time, "b" = the later second reminder) if there's a session
 // today and that slot hasn't fired yet. The body carries a motivational quote.
@@ -2080,16 +2095,77 @@ const NATIVE_WATCH = (function () {
 window.__interunWatch = { status: function () {} };
 function watchPayloadForToday() {
   const iso = todayIso();
-  const list = sessionsForIso(iso);
+  const list = rawSessionsForIso(iso);
   if (!list.length) return null;
   const s = list[0];
   const band = plannedPaceBandOf(s);
+  const rband = plannedRpeBandOf(s);
   const out = { title: s.title, type: s.type || "easy", dateIso: iso };
-  if (s.durMin) out.durationMin = Math.round(s.durMin);
-  if (s.distKm) out.distanceKm = Number(s.distKm);
+  if (s.estimatedDurationSeconds) out.durationMin = Math.round(s.estimatedDurationSeconds / 60);
+  if (s.estimatedDistanceMeters) out.distanceKm = Math.round(s.estimatedDistanceMeters / 100) / 10;
   if (band) { out.paceLow = Math.round(band.minSecPerKm); out.paceHigh = Math.round(band.maxSecPerKm); }
+  if (rband) { out.rpeMin = rband.min; out.rpeMax = rband.max; }
+  // The full structure, so the wrist can guide the session step by step rather than just time it.
+  out.steps = (s.steps || []).map((st) => {
+    const o = { label: st.label || "", kind: st.kind || "steady" };
+    if (st.durationSeconds) o.seconds = Math.round(st.durationSeconds);
+    if (st.distanceMeters) o.metres = Math.round(st.distanceMeters);
+    if (st.targetPaceSecPerKm) {
+      o.paceLow = Math.round(st.targetPaceSecPerKm.minSecPerKm);
+      o.paceHigh = Math.round(st.targetPaceSecPerKm.maxSecPerKm);
+    }
+    if (st.repeatIndex) { o.repIndex = st.repeatIndex; o.repCount = st.repeatCount || 0; }
+    return o;
+  });
   return out;
 }
+// A run finished on the wrist, arriving back through the native bridge. It is logged exactly as a
+// phone-tracked run would be - same shape, same stamps - so the adaptive engine cannot tell the
+// difference and the plan learns from it either way.
+function ingestWatchRun(run) {
+  if (!run || !run.id) return "no run";
+  if ((state.logged || []).some((r) => r.id === run.id)) return "already logged"; // deliveries can repeat
+  const sec = Math.max(0, Math.round(Number(run.sec) || 0));
+  const distKm = Math.max(0, Number(run.distKm) || 0);
+  if (distKm < 0.05 || sec < 30) return "too short to log";
+  const avgPaceSec = distKm > 0 ? Math.round(sec / distKm) : 0;
+  // Match it to the plan by date, so pband/rband are the ones it was actually judged against.
+  const iso = run.dateIso || todayIso();
+  const planned = sessionsForIso(iso)[0] || null;   // summary: used to tick the plan
+  const prescribed = rawSessionsForIso(iso)[0] || null; // engine: carries the bands the flags need
+  const title = run.title || (prescribed && prescribed.title) || (planned && planned.title) || "Run";
+  state.logged.unshift({
+    id: run.id, t: title, d: dayLabelIso(iso), dist: distKm.toFixed(2) + " km",
+    time: fmtPace(sec), pace: fmtPace(avgPaceSec) + " /km",
+    distKm: Number(distKm.toFixed(2)), sec: sec, avgPaceSec: avgPaceSec,
+    route: Array.isArray(run.route) ? run.route : [], splits: Array.isArray(run.splits) ? run.splits : [],
+    elevGain: Math.round(Number(run.elevGain) || 0),
+    type: run.type || (prescribed && prescribed.type) || (planned && planned.type) || "easy",
+    rpe: (run.rpe >= 1 && run.rpe <= 10) ? Math.round(run.rpe) : null,
+    pband: prescribed ? plannedPaceBandOf(prescribed) : null,
+    rband: prescribed ? plannedRpeBandOf(prescribed) : null,
+    anchor: profile.recentTimeS,
+    avgHr: run.avgHr ? Math.round(run.avgHr) : null,
+    source: "watch",
+  });
+  saveRuns();
+  // Tick it off the plan, the same as finishing it on the phone would.
+  if (planned) {
+    const wk = PLAN.weeks.find((w) => w.sessions.indexOf(planned) >= 0);
+    if (wk) state.done[doneKey(wk.index, planned)] = true;
+  }
+  // And run the same adaptive checks, so a wrist run can raise a flag like any other.
+  const wctx = { title: title, session: planned, completedFull: true, dayOfWeek: null };
+  if (!maybeAutoPaceCalibrate(state.logged[0].type, avgPaceSec, distKm, wctx)) {
+    if (!maybeTrainingFlags()) assessFitnessFromRun(state.logged[0].type, avgPaceSec, distKm, wctx);
+  }
+  render();
+  return "";
+}
+window.__interunWatchRun = function (json) {
+  try { return ingestWatchRun(typeof json === "string" ? JSON.parse(json) : json); }
+  catch (e) { return String(e); }
+};
 let WATCH_SYNC_T = null;
 function syncWatch() {
   if (!NATIVE_WATCH) return;
@@ -4870,8 +4946,9 @@ function saveLiveSession() {
   if (LIVE.completedFull && wk0) { const m = wk0.sessions.find((s) => s.day === dn && s.title === LIVE.session.title); if (m) state.done[doneKey(wk0.index, m)] = true; }
   sm.saved = true;
   // Adaptive checks, most specific first: first-run calibration → multi-run flags → single-run hint.
-  if (!maybeAutoPaceCalibrate(LIVE.session.type, sm.avgPaceSec, Number(sm.distKm))) {
-    if (!maybeTrainingFlags()) assessFitnessFromRun(LIVE.session.type, sm.avgPaceSec, Number(sm.distKm));
+  const ctx = { title: LIVE.session.title, session: null, completedFull: !!LIVE.completedFull, dayOfWeek: LIVE.session.dayOfWeek };
+  if (!maybeAutoPaceCalibrate(LIVE.session.type, sm.avgPaceSec, Number(sm.distKm), ctx)) {
+    if (!maybeTrainingFlags()) assessFitnessFromRun(LIVE.session.type, sm.avgPaceSec, Number(sm.distKm), ctx);
   }
 }
 // ---- Adaptive re-estimation: does the completed run imply a different fitness than the plan? -----
@@ -4889,7 +4966,8 @@ function impliedRecentFromRun(type, avgPaceSec) {
   if (thr < 120) return null; // implausibly fast
   return Math.round(thr * 4.6822); // threshold pace → 5 km-equivalent (inverse of the pace model)
 }
-function assessFitnessFromRun(type, avgPaceSec, distKm) {
+function assessFitnessFromRun(type, avgPaceSec, distKm, ctx) {
+  const c = runCtx(ctx);
   if (!distKm || distKm < 2) return; // too short to trust
   const implied = impliedRecentFromRun(type, avgPaceSec);
   if (!implied) return;
@@ -4903,7 +4981,7 @@ function assessFitnessFromRun(type, avgPaceSec, distKm) {
   if (dev > (easyType ? 0.08 : 0.06)) dir = "better";
   else if (dev < -0.06 && !easyType) dir = "lower";
   if (!dir) return;
-  state.fitSuggest = { dir, implied, from: cur, at: todayIso(), sessTitle: LIVE.session.title };
+  state.fitSuggest = { dir, implied, from: cur, at: todayIso(), sessTitle: c.title };
   saveFitSuggest();
 }
 // Apply the suggestion: re-anchor fitness to the run's implied 5 km and rebuild the plan.
@@ -4944,7 +5022,25 @@ function savePaceNotice() { try { state.paceNotice ? localStorage.setItem("inter
 function dismissPaceNotice() { state.paceNotice = null; savePaceNotice(); render(); }
 // Set the athlete's paces from a completed run. Returns true if it calibrated, so the caller can
 // skip the ordinary "you're running stronger than your plan assumes" prompt — one message, not two.
-function maybeAutoPaceCalibrate(type, avgPaceSec, distKm) {
+// Describes the run currently being assessed. Defaults to the live session, but a run finished on
+// the watch has no LIVE at all - dereferencing it there was a crash.
+function runCtx(ctx) {
+  if (ctx) return ctx;
+  if (LIVE && LIVE.session) {
+    return { title: LIVE.session.title, session: null, completedFull: !!LIVE.completedFull, dayOfWeek: LIVE.session.dayOfWeek };
+  }
+  return { title: "your last run", session: null, completedFull: false, dayOfWeek: null };
+}
+function ctxSession(c) {
+  const wk = curWeek();
+  if (!wk) return null;
+  if (c.session && wk.sessions.indexOf(c.session) >= 0) return c.session;
+  if (c.dayOfWeek == null) return null;
+  const dn = DAY_ORDER[c.dayOfWeek];
+  return wk.sessions.find((s) => s.day === dn && s.title === c.title) || null;
+}
+function maybeAutoPaceCalibrate(type, avgPaceSec, distKm, ctx) {
+  const c = runCtx(ctx);
   if (!profile.autoPace) return false;
   const cont = type === "easy" || type === "long" || type === "recovery" || type === "steady";
   if (!cont) return false;                                        // intervals average across recoveries
@@ -4959,10 +5055,10 @@ function maybeAutoPaceCalibrate(type, avgPaceSec, distKm) {
   try { recompute(); } catch (e) { return false; }
   computeToday(); state.planWeek = PLAN.defaultWeekIndex; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; seedDone();
   // seedDone() rebuilt the completed map — re-tick the run they just finished.
-  const wk = curWeek(), dn = DAY_ORDER[LIVE.session.dayOfWeek];
-  if (LIVE.completedFull && wk) { const m = wk.sessions.find((s) => s.day === dn && s.title === LIVE.session.title); if (m) state.done[doneKey(wk.index, m)] = true; }
+  const wk = curWeek();
+  if (c.completedFull && wk) { const m = ctxSession(c); if (m) state.done[doneKey(wk.index, m)] = true; }
   saveProfileStore();
-  state.paceNotice = { easy: easy, implied: implied, from: from, at: todayIso(), sess: LIVE.session.title };
+  state.paceNotice = { easy: easy, implied: implied, from: from, at: todayIso(), sess: c.title };
   savePaceNotice();
   return true;
 }
@@ -5525,6 +5621,9 @@ seedDone();
 buildNav();
 render();
 try { if (NATIVE_NOTIFY) nativeNotify("status"); updateBell(); initReminders(); syncWatch(); } catch (e) {}
+// Tell the native side the page can accept runs now, so anything the watch logged while the phone
+// app was closed gets handed over rather than sitting in a queue forever.
+try { if (NATIVE_WATCH) window.webkit.messageHandlers.interunWatch.postMessage({ action: "ready" }); } catch (e) {}
 // Launch flow: brief brand splash, then either the first-run welcome (which leads into setup) or,
 // for a returning user, straight to Today.
 (function () {

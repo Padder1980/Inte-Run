@@ -248,15 +248,46 @@ handover arrives on the wrist, and a workout shows a running timer, accumulating
 heart rate from HealthKit, and a pace of **5:03/km** against a simulated 3.3 m/s — which is exactly
 right (1000 ÷ 3.3 = 303 s).
 
+## Closing the loop: a wrist run becomes a logged run
+
+A run finished on the watch is sent home and logged **exactly as a phone-tracked run would be** —
+same shape, same stamps — so the adaptive engine cannot tell the difference and the plan learns from
+it either way.
+
+```
+watch  →  sendMessage (instant, when the phone is to hand)   →  WatchBridge  →  queue on disk
+       →  transferUserInfo (durable, survives a closed app)  ↗                      ↓
+                                                        page says "ready" → __interunWatchRun()
+                                                                                     ↓
+                                     logged with pband / rband / anchor → the flags engine
+```
+
+Two send paths on purpose: `sendMessage` lands instantly when the phone is nearby, `transferUserInfo`
+is the backstop queued by the OS for when it is not. The phone de-duplicates on the run id, so a
+double delivery is a no-op, and runs stay queued on disk until the page **confirms** it took them —
+a run that fails to land is never silently dropped.
+
+⚠️ **`PLAN.weeks` carries no steps or pace bands** — it is a display summary. The prescription lives
+in `RAW.weeks` (`rawSessionsForIso()`). Reading the wrong one is silent: you get a session with no
+targets, a watch with nothing to coach against, and flags with no evidence.
+
+Verified in the browser end to end: two wrist runs rated 6 against an intended band of 2–3 raised
+both signals and produced real coaching — *"Your last 2 sessions came in about 26s/km faster than
+their target pace. You rated your last 2 sessions about 3 points harder than they were meant to
+feel."* — with the engine correctly diagnosing overcooked easy days rather than proposing new paces.
+
 ## Known gaps
 
 These are real, deliberate, and not yet done:
 
-- **The watch cannot log its run back to the plan yet.** A finished workout goes to Health, but the
-  phone's plan does not learn about it. Closing that loop needs the reverse WatchConnectivity path
-  plus a write into the web layer's `localStorage`.
-- **No step-by-step prompts or coach audio on the wrist.** That needs the engine's `session-runtime`
-  ported to Swift — watchOS has no JavaScriptCore, so the TS engine cannot run there.
+- ⚠️ **The watch→phone hop is unverified on real hardware.** Both ends are provably correct in the
+  simulator — the watch reports `transferring=1, companion=1, reachable=1`, and the phone bridge
+  reports `activated, paired=1, installed=1` — but the delivery itself never completes between two
+  simulators. `simctl` also warns "App database is out of sync", because installing the watch app
+  directly is not the normal pairing path. **Test this on the real watch before trusting it.**
+- **No coach audio on the wrist.** Step *prompts* now work (the step list comes over from the plan),
+  but spoken coaching needs the engine's `session-runtime` ported to Swift — watchOS has no
+  JavaScriptCore, so the TS engine cannot run there.
 - **Sticky sub-tabs never stick.** `#view` has `overflow: auto`, making it a scroll container that
   never actually scrolls, so `position: sticky` on `.subtabs` is inert — it has never worked, in the
   app or the browser. The offset is now correct for when it is fixed; the overflow is the real bug.

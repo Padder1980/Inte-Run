@@ -27,7 +27,12 @@ struct TodayView: View {
                                 .foregroundStyle(Color.accentColor)
                         }
 
+                        if let steps = s.steps, steps.count > 1 {
+                            Text("\(steps.count) steps").font(.caption2).foregroundStyle(.secondary)
+                        }
+
                         Button {
+                            workout.plan = s   // the target band and step list come from the plan
                             running = true
                             workout.start()
                         } label: {

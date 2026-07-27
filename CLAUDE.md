@@ -292,7 +292,18 @@ receives **today's session** from the phone over WatchConnectivity (`WatchBridge
 `watchPayloadForToday()` in `web/app.ts`, so the page still owns what the watch is told) and runs a
 live workout: timer, GPS distance, live pace, heart rate from an `HKWorkoutSession`.
 
-Two traps that cost real time — don't reintroduce them:
+**Closing the loop:** a finished wrist run is sent home (`sendMessage` when reachable, plus a durable
+`transferUserInfo`), queued on disk until the page confirms it took it, then logged by
+`ingestWatchRun()` in exactly the same shape as a phone run — so the flags engine treats it
+identically. ⚠️ **`PLAN.weeks` has no steps or pace bands** (it is a display summary); the
+prescription lives in `RAW.weeks`, via `rawSessionsForIso()`. Reading the wrong one fails silently.
+
+Traps that cost real time — don't reintroduce them:
+- ⚠️ **Never give a `WCSessionDelegate` method a default argument.** Xcode autocompletes
+  `didReceiveUserInfo userInfo: [String: Any] = [:]`, which changes the Swift signature so it no
+  longer satisfies the @objc requirement — the delegate then silently never fires.
+- ⚠️ **`maybeAutoPaceCalibrate` / `assessFitnessFromRun` must not assume `LIVE` exists.** A watch run
+  is assessed with no live session on the phone at all; they take a `ctx` for that reason.
 - ⚠️ **Never set `allowsBackgroundLocationUpdates` on watchOS.** CoreLocation asserts and kills the
   app, even with `location` in `WKBackgroundModes`. The running `HKWorkoutSession` is what keeps the
   app and GPS alive there; the property is an iOS concept.

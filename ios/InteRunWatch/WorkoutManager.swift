@@ -1,6 +1,8 @@
 import Foundation
 import HealthKit
 import CoreLocation
+import WatchKit
+import WatchConnectivity
 
 /// The live run on the wrist — the thing a PWA fundamentally cannot do.
 ///
@@ -17,6 +19,60 @@ final class WorkoutManager: NSObject, ObservableObject {
     @Published private(set) var heartRate: Double = 0
     /// Smoothed from recent GPS, in seconds per km. Nil until moving.
     @Published private(set) var paceSecPerKm: Double?
+    @Published private(set) var stepIndex = 0
+    /// Where the current step began, so its own progress is measured from there.
+    @Published private(set) var stepStartElapsed: TimeInterval = 0
+    @Published private(set) var stepStartMetres: Double = 0
+    @Published private(set) var avgHeartRate: Double = 0
+    /// Filled in when the run ends, ready to be sent home.
+    @Published var reportedRpe: Int?
+
+    /// The session being run, if the phone sent one. Nil means a free run.
+    var plan: PlannedSession?
+    private var hrSamples: [Double] = []
+    private var routePoints: [[Double]] = []
+    private var splits: [Int] = []
+    private var lastSplitMetre = 0.0
+    private var lastSplitElapsed: TimeInterval = 0
+    private let runId = "watch-" + UUID().uuidString
+
+    var steps: [PlannedStep] { plan?.steps ?? [] }
+    var currentStep: PlannedStep? { stepIndex < steps.count ? steps[stepIndex] : nil }
+
+    /// Distance covered inside the current step.
+    var stepMetres: Double { max(0, distanceMetres - stepStartMetres) }
+    var stepElapsed: TimeInterval { max(0, elapsed - stepStartElapsed) }
+
+    /// The pace band for right now: the current step's if it has one, else the session's.
+    var targetBand: (low: Int, high: Int)? {
+        if let st = currentStep, let lo = st.paceLow, let hi = st.paceHigh { return (lo, hi) }
+        if let p = plan, let lo = p.paceLow, let hi = p.paceHigh { return (lo, hi) }
+        return nil
+    }
+
+    /// Where the runner actually is against the plan's band. This is the part Apple cannot do:
+    /// the target is not something typed in beforehand, it is what the plan prescribed for today.
+    enum PaceVerdict: Equatable { case noTarget, noSignal, tooFast, good, tooSlow }
+
+    var paceVerdict: PaceVerdict {
+        guard let band = targetBand else { return .noTarget }
+        guard let p = paceSecPerKm, p.isFinite, p > 0 else { return .noSignal }
+        // A few seconds either side is noise, not a coaching moment.
+        let slack = 5.0
+        if p < Double(band.low) - slack { return .tooFast }
+        if p > Double(band.high) + slack { return .tooSlow }
+        return .good
+    }
+
+    var verdictText: String {
+        switch paceVerdict {
+        case .noTarget: return "RUN BY FEEL"
+        case .noSignal: return "FINDING GPS"
+        case .tooFast: return "EASE OFF"
+        case .good: return "GOOD PACE"
+        case .tooSlow: return "PICK IT UP"
+        }
+    }
 
     private let healthStore = HKHealthStore()
     private var session: HKWorkoutSession?
@@ -102,6 +158,7 @@ final class WorkoutManager: NSObject, ObservableObject {
                 Task { @MainActor in
                     guard let self, let started = self.startedAt, self.phase == .running else { return }
                     self.elapsed = Date().timeIntervalSince(started)
+                    self.advanceStepIfDue()
                 }
             }
         } catch {
@@ -135,6 +192,78 @@ final class WorkoutManager: NSObject, ObservableObject {
                 Task { @MainActor in self?.phase = .ended }
             }
         }
+    }
+
+    /// Move to the next step when the current one is complete. A wrist tap marks the change, since
+    /// the runner is not looking at the screen — that is the whole point of it being on a wrist.
+    private func advanceStepIfDue() {
+        guard let step = currentStep else { return }
+        guard let p = step.progress(elapsed: stepElapsed, metresDone: stepMetres), p >= 1 else { return }
+        guard stepIndex + 1 < steps.count else { return }
+        stepIndex += 1
+        stepStartElapsed = elapsed
+        stepStartMetres = distanceMetres
+        WKInterfaceDevice.current().play(.notification)
+    }
+
+    /// Skip forward manually — recoveries especially never line up exactly with real terrain.
+    func nextStep() {
+        guard stepIndex + 1 < steps.count else { return }
+        stepIndex += 1
+        stepStartElapsed = elapsed
+        stepStartMetres = distanceMetres
+        WKInterfaceDevice.current().play(.click)
+    }
+
+    private func recordSplits() {
+        while distanceMetres - lastSplitMetre >= 1000 {
+            lastSplitMetre += 1000
+            let at = elapsed * (lastSplitMetre / max(distanceMetres, 1))
+            splits.append(Int((at - lastSplitElapsed).rounded()))
+            lastSplitElapsed = at
+        }
+    }
+
+    /// The finished run, in the shape the phone's plan already understands.
+    func summaryPayload() -> [String: Any] {
+        var out: [String: Any] = [
+            "id": runId,
+            "sec": Int(elapsed.rounded()),
+            "distKm": (distanceMetres / 1000),
+            "route": routePoints,
+            "splits": splits,
+            "source": "watch",
+        ]
+        if let p = plan {
+            out["title"] = p.title
+            out["type"] = p.type
+            out["dateIso"] = p.dateIso
+        }
+        if let rpe = reportedRpe { out["rpe"] = rpe }
+        if avgHeartRate > 0 { out["avgHr"] = avgHeartRate }
+        return out
+    }
+
+    /// Hand it to the phone. `transferUserInfo` queues and is guaranteed, which matters because the
+    /// phone app is almost always closed when a run ends.
+    func sendHome() {
+        guard WCSession.isSupported() else { return }
+        let session = WCSession.default
+        if session.activationState != .activated { session.activate() }
+        let payload: [String: Any] = ["run": summaryPayload()]
+        // Two paths on purpose. sendMessage lands instantly when the phone is to hand, which is the
+        // common case (it is in a pocket, not another county). transferUserInfo is the durable
+        // backstop: queued by the OS and delivered whenever the phone next comes up. The phone
+        // de-duplicates on the run id, so arriving twice is harmless.
+        if session.isReachable {
+            session.sendMessage(payload, replyHandler: nil) { err in
+                NSLog("INTERUN sendMessage failed: %@", err.localizedDescription)
+            }
+        }
+        let t = session.transferUserInfo(payload)
+        NSLog("InteRun: run sent home (reachable=%d queued=%d)",
+              session.isReachable ? 1 : 0, session.outstandingUserInfoTransfers.count)
+        _ = t
     }
 
     // MARK: - Derived
@@ -176,6 +305,14 @@ extension WorkoutManager: CLLocationManagerDelegate {
             if let speed = usable.last?.speed, speed > 0.5 {
                 paceSecPerKm = 1000 / speed
             }
+            recordSplits()
+            // Downsampled: a route is for drawing a map, not for storing every fix.
+            if let last = usable.last, routePoints.count < 600 {
+                routePoints.append([
+                    (last.coordinate.latitude * 100000).rounded() / 100000,
+                    (last.coordinate.longitude * 100000).rounded() / 100000,
+                ])
+            }
             routeBuilder?.insertRouteData(usable) { _, _ in }
         }
     }
@@ -206,7 +343,11 @@ extension WorkoutManager: HKLiveWorkoutBuilderDelegate {
             if quantityType == HKQuantityType(.heartRate) {
                 let bpm = HKUnit.count().unitDivided(by: .minute())
                 let value = stats.mostRecentQuantity()?.doubleValue(for: bpm) ?? 0
-                Task { @MainActor in self.heartRate = value }
+                let mean = stats.averageQuantity()?.doubleValue(for: bpm) ?? 0
+                Task { @MainActor in
+                    self.heartRate = value
+                    if mean > 0 { self.avgHeartRate = mean }
+                }
             }
         }
     }

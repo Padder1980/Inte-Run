@@ -7,6 +7,37 @@ import WatchConnectivity
 /// So the phone extracts just today's session and pushes it across with `updateApplicationContext`,
 /// which is latest-value-wins and gets delivered even if the watch app is not running — exactly the
 /// semantics for "what am I doing today".
+/// One block of the session, as the plan prescribes it — this is what makes the wrist a coach
+/// rather than a stopwatch. Apple's Workout app can hold a target you typed in; this holds the
+/// target your plan worked out for you.
+struct PlannedStep: Codable, Equatable, Identifiable {
+    var label: String
+    var kind: String
+    var seconds: Int?
+    var metres: Int?
+    var paceLow: Int?
+    var paceHigh: Int?
+    var repIndex: Int?
+    var repCount: Int?
+
+    var id: String { "\(label)|\(kind)|\(seconds ?? 0)|\(metres ?? 0)|\(repIndex ?? 0)" }
+
+    /// How far through this step we are, 0...1, or nil for a step with no defined end.
+    func progress(elapsed: TimeInterval, metresDone: Double) -> Double? {
+        if let s = seconds, s > 0 { return min(1, elapsed / Double(s)) }
+        if let m = metres, m > 0 { return min(1, metresDone / Double(m)) }
+        return nil
+    }
+
+    var goalText: String? {
+        if let m = metres, m > 0 {
+            return m >= 1000 ? String(format: "%.1f km", Double(m) / 1000) : "\(m) m"
+        }
+        if let s = seconds, s > 0 { return s >= 60 ? "\(s / 60) min" : "\(s) s" }
+        return nil
+    }
+}
+
 struct PlannedSession: Codable, Equatable {
     var title: String
     var type: String
@@ -16,6 +47,9 @@ struct PlannedSession: Codable, Equatable {
     /// Prescribed pace band for the main work, seconds per km.
     var paceLow: Int?
     var paceHigh: Int?
+    var rpeMin: Int?
+    var rpeMax: Int?
+    var steps: [PlannedStep]?
 
     var paceText: String? {
         guard let lo = paceLow, let hi = paceHigh else { return nil }

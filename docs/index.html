@@ -1043,7 +1043,10 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
   background: radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 30%), var(--bg);
 }
 #view:has(.subtabs) .subtabs {
-  position: sticky; top: calc(env(safe-area-inset-top) + 65px); z-index: 8; gap: 4px; margin: 0 0 18px; padding: 4px;
+  /* Offset is measured from #view's own box (it has overflow-y:auto, so it is the sticky
+     scrollport) and #view already starts below the app bar - so this must be 0. Anything else
+     pushes the tabs down over the content, which is exactly what a safe-area offset here did. */
+  position: sticky; top: 0; z-index: 8; gap: 4px; margin: 0 0 18px; padding: 4px;
   background: color-mix(in srgb, var(--surface-2) 90%, transparent);
   border-color: color-mix(in srgb, var(--line) 86%, var(--accent)); border-radius: 15px;
   box-shadow: 0 8px 22px -18px color-mix(in srgb, var(--ink) 35%, transparent), inset 0 1px 0 color-mix(in srgb, var(--ink) 4%, transparent);

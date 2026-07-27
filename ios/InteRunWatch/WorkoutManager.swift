@@ -82,6 +82,8 @@ final class WorkoutManager: NSObject, ObservableObject {
     private var startedAt: Date?
     private var ticker: Timer?
     private var lastLocation: CLLocation?
+    /// Spoken cues; created when the run starts so the audio session is claimed no earlier.
+    private var voice: WorkoutVoice?
 
     override init() {
         super.init()
@@ -144,6 +146,12 @@ final class WorkoutManager: NSObject, ObservableObject {
             b.beginCollection(withStart: now) { _, _ in }
             startedAt = now
             phase = .running
+            voice = WorkoutVoice()
+            if let first = currentStep {
+                voice?.announceStep(label: "Let\u{2019}s go. " + first.label, paceLow: first.paceLow, paceHigh: first.paceHigh)
+            } else {
+                voice?.say("Let\u{2019}s go. Run by feel.")
+            }
 
             locations.requestWhenInUseAuthorization()
             // Safe now: an active workout session makes the app backgroundable. Claimed only for
@@ -159,6 +167,11 @@ final class WorkoutManager: NSObject, ObservableObject {
                     guard let self, let started = self.startedAt, self.phase == .running else { return }
                     self.elapsed = Date().timeIntervalSince(started)
                     self.advanceStepIfDue()
+                    switch self.paceVerdict {
+                    case .tooFast: self.voice?.paceCue("fast")
+                    case .tooSlow: self.voice?.paceCue("slow")
+                    default: self.voice?.paceCue("ok")
+                    }
                 }
             }
         } catch {
@@ -170,15 +183,18 @@ final class WorkoutManager: NSObject, ObservableObject {
         guard phase == .running else { return }
         session?.pause()
         phase = .paused
+        voice?.say("Paused.")
     }
 
     func resume() {
         guard phase == .paused else { return }
         session?.resume()
         phase = .running
+        voice?.say("Back to it.")
     }
 
     func end() {
+        voice?.say("Session complete. Nice work.")
         ticker?.invalidate(); ticker = nil
         locations.stopUpdatingLocation()
         guard let s = session, let b = builder else { phase = .ended; return }
@@ -211,6 +227,7 @@ final class WorkoutManager: NSObject, ObservableObject {
         stepStartElapsed = elapsed
         stepStartMetres = distanceMetres
         WKInterfaceDevice.current().play(.notification)
+        if let st = currentStep { voice?.announceStep(label: st.label, paceLow: st.paceLow, paceHigh: st.paceHigh) }
     }
 
     /// Skip forward manually — recoveries especially never line up exactly with real terrain.
@@ -218,6 +235,7 @@ final class WorkoutManager: NSObject, ObservableObject {
         guard stepIndex + 1 < steps.count else { return }
         stepIndex += 1
         stepStartElapsed = elapsed
+        if let st = currentStep { voice?.announceStep(label: st.label, paceLow: st.paceLow, paceHigh: st.paceHigh) }
         stepStartMetres = distanceMetres
         WKInterfaceDevice.current().play(.click)
     }

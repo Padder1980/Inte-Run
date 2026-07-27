@@ -33,6 +33,8 @@ struct WebHost: UIViewRepresentable {
         context.coordinator.watch = watch
         config.userContentController.add(watch, name: WatchBridge.messageName)
 
+        config.userContentController.add(HapticService(), name: HapticService.messageName)
+
         let notifications = NotificationService(webView: webView)
         context.coordinator.notifications = notifications
         config.userContentController.add(notifications, name: NotificationService.messageName)

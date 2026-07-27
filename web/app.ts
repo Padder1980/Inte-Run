@@ -2167,6 +2167,14 @@ function syncNativeReminders() {
 const NATIVE_WATCH = (function () {
   try { return !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.interunWatch); } catch (e) { return false; }
 })();
+// Haptics: WKWebView has no navigator.vibrate, so the app's shell plays the real generators.
+const NATIVE_HAPTIC = (function () {
+  try { return !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.interunHaptic); } catch (e) { return false; }
+})();
+function haptic(kind) {
+  if (NATIVE_HAPTIC) { try { window.webkit.messageHandlers.interunHaptic.postMessage({ kind: kind }); } catch (e) {} return; }
+  try { if (navigator.vibrate) navigator.vibrate(kind === "success" ? [12, 40, 12] : kind === "lift" ? 16 : 8); } catch (e) {}
+}
 let WATCH_STATUS = null; // { paired, installed } - reported by the native bridge on request
 window.__interunWatch = { status: function (paired, installed) {
   WATCH_STATUS = { paired: !!paired, installed: !!installed };
@@ -2707,7 +2715,7 @@ function startSessDrag(x, y, pointerId, btn) {
   card.classList.add("cal-lifted");
   document.body.classList.add("cal-dragging");
   moveGhost(x, y);
-  try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) {}
+  haptic("lift");
   window.addEventListener("pointermove", calDragMove, { passive: false });
   window.addEventListener("pointerup", calDragEnd);
   window.addEventListener("pointercancel", calDragCancel);
@@ -2729,8 +2737,10 @@ function calDragMove(e) {
   const ok = day && Number(day.dataset.w) === DRAG.wk;
   if (DRAG.targetEl && DRAG.targetEl !== day) DRAG.targetEl.classList.remove("cal-target");
   if (ok) {
+    const di = Number(day.dataset.di);
+    if (DRAG.target !== di) haptic("tick"); // a new day under the finger
     day.classList.add("cal-target");
-    DRAG.targetEl = day; DRAG.target = Number(day.dataset.di);
+    DRAG.targetEl = day; DRAG.target = di;
   } else {
     DRAG.targetEl = null; DRAG.target = null;
   }
@@ -2755,6 +2765,7 @@ function calDragEnd() {
   CAL_DRAGGED = true; // swallow the click that follows this pointerup
   if (d.target != null && d.target !== effDay(d.sess)) {
     moveSession(d.wk, d.sess, d.target);
+    haptic("success");
     render();
   }
 }

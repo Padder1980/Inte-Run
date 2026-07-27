@@ -336,8 +336,9 @@ Traps that cost real time — don't reintroduce them:
 ✅ **The watch app runs on the owner's real Watch Ultra (2026-07-27, evening).** The install wall
 broke when the watch updated to **watchOS 26.6**, which surfaced Developer Mode (Settings → Privacy &
 Security) — enabling it let the beta-built app install and launch. The earlier fixes (no debug
-dylibs, arm64_32-only, watchOS 10 minimum) were all still necessary. Remaining to verify on hardware:
-the finished-run hop back to the phone's Logbook. Note the native phone app starts on the example
+dylibs, arm64_32-only, watchOS 10 minimum) were all still necessary. **The full loop was
+proven on hardware the same evening** — a watch run landed in the phone's Logbook (after fixing the
+ingest gate that dropped distance-less runs: treadmill efforts now count by duration). Note the native phone app starts on the example
 plan — the owner's real plan lives in the PWA until restored via Support › Your data.
 
 **Apple Watch scoping:** see `WATCH.md` — a scoping/decision document, nothing built. Key facts: a watchOS

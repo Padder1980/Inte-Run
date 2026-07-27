@@ -339,6 +339,12 @@ extension WorkoutManager: CLLocationManagerDelegate {
             guard !usable.isEmpty else { return }
 
             for loc in usable {
+                // The device's own motion signal beats position deltas: indoors, GPS drifts a
+                // metre or two constantly while you stand still, and summing those wobbles
+                // fabricates distance (this showed up as 168m for a lap of the living room).
+                // Speed < 0.5 m/s with a valid reading means "not moving" - skip the step but
+                // keep the fix, so movement resuming does not create one giant jump.
+                if loc.speed >= 0, loc.speed < 0.5 { lastLocation = loc; continue }
                 if let previous = lastLocation {
                     let step = loc.distance(from: previous)
                     // Reject GPS jitter while standing still, and impossible jumps.

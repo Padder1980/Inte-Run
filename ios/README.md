@@ -287,6 +287,12 @@ The symptom is silence: the phone app installs fine, the Watch app on the phone 
 InteRun (or fails), and the only clue is the phone log saying
 `WCErrorCodeWatchAppNotInstalled`. Things to check, in order of how often they are the cause:
 
+0. **"This app cannot be installed because its integrity could not be verified"** on the watch.
+   This is `ENABLE_DEBUG_DYLIB`. Xcode 16+ builds Debug with a separate `<target>.debug.dylib` and
+   `__preview.dylib` beside the binary, for SwiftUI Previews — and a real Apple Watch rejects a
+   bundle shaped like that, **even though `codesign --verify --deep --strict` passes on the Mac**.
+   The watch target sets `ENABLE_DEBUG_DYLIB = NO`; if the dylibs ever reappear in
+   `InteRun.app/Watch/InteRunWatch.app`, that setting has been lost.
 1. **The watch's own watchOS version against `WATCH_DEPLOYMENT_TARGET`.** A minimum higher than the
    watch's OS fails with no useful error anywhere. This is why the target is **10.0** rather than the
    newest available — people update the phone and leave the watch behind.

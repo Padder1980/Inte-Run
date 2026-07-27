@@ -317,6 +317,10 @@ identically. ⚠️ **`PLAN.weeks` has no steps or pace bands** (it is a display
 prescription lives in `RAW.weeks`, via `rawSessionsForIso()`. Reading the wrong one fails silently.
 
 Traps that cost real time — don't reintroduce them:
+- ⚠️ **`ENABLE_DEBUG_DYLIB = NO` on the watch target is load-bearing.** Xcode 16+ builds Debug with
+  `<target>.debug.dylib` + `__preview.dylib` beside the binary; a real Apple Watch then refuses the
+  install with *"its integrity could not be verified"* — while `codesign --verify --deep --strict`
+  passes cleanly on the Mac, so nothing looks wrong locally. Simulators never show it.
 - ⚠️ **Never give a `WCSessionDelegate` method a default argument.** Xcode autocompletes
   `didReceiveUserInfo userInfo: [String: Any] = [:]`, which changes the Swift signature so it no
   longer satisfies the @objc requirement — the delegate then silently never fires.

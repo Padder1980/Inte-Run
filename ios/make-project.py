@@ -90,6 +90,12 @@ WATCH_COMMON = {
     "MARKETING_VERSION": "1.0",
     "PRODUCT_BUNDLE_IDENTIFIER": WATCH_BUNDLE_ID,
     "PRODUCT_NAME": '"$(TARGET_NAME)"',
+    # ⚠️ Without this the watch app ships with InteRunWatch.debug.dylib and __preview.dylib
+    # alongside its binary (Xcode 16+ builds Debug that way for SwiftUI Previews), and a real Apple
+    # Watch refuses the install with "This app cannot be installed because its integrity could not
+    # be verified" - even though the signature verifies perfectly on the Mac. Costs only in-app
+    # previews for the watch target, which is a trivial price for being installable.
+    "ENABLE_DEBUG_DYLIB": "NO",
     "SDKROOT": "watchos",
     "SKIP_INSTALL": "YES",
     "SWIFT_EMIT_LOC_STRINGS": "YES",

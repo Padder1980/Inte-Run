@@ -221,7 +221,34 @@ extension WatchBridge: WCSessionDelegate {
            let json = String(data: data, encoding: .utf8) {
             webView.evaluateJavaScript("window.__interunWatchLive && window.__interunWatchLive(\(json));")
         }
+        // The Live Activity is the real answer to "open the phone on the live screen": iOS will not
+        // let the watch foreground this app, but it will show a card that tracks the run and opens
+        // straight onto it. Started from the background, which the WatchConnectivity wake permits.
+        Task { @MainActor in self.driveLiveActivity(live, ended: ended) }
         if !ended { offerToFollowAlong(live) }
+    }
+
+    @MainActor
+    private func driveLiveActivity(_ live: [String: Any], ended: Bool) {
+        let state = RunActivityAttributes.ContentState(
+            elapsedSeconds: (live["sec"] as? Int) ?? 0,
+            distanceKm: (live["distKm"] as? Double) ?? 0,
+            paceSecPerKm: live["paceSec"] as? Int,
+            heartRate: live["hr"] as? Int,
+            step: live["step"] as? String,
+            paused: (live["state"] as? String) == "paused",
+            onWatch: true,
+        )
+        if ended {
+            LiveActivityService.shared.end(state)
+        } else {
+            LiveActivityService.shared.start(
+                runId: (live["id"] as? String) ?? "watch",
+                title: (live["title"] as? String) ?? "Run",
+                type: (live["type"] as? String) ?? "easy",
+                state: state,
+            )
+        }
     }
 
     /// ⚠️ A watchOS app CANNOT bring the iPhone app to the foreground. There is no API for it —
@@ -287,6 +314,30 @@ extension WatchBridge: WKScriptMessageHandler {
         guard let body = message.body as? [String: Any],
               let action = body["action"] as? String else { return }
         switch action {
+        case "liveActivity":
+            // The phone's OWN run driving the same card the wrist drives. Marked onWatch: false so
+            // the card says which device is recording.
+            let ended = (body["state"] as? String) == "ended"
+            let state = RunActivityAttributes.ContentState(
+                elapsedSeconds: (body["sec"] as? Int) ?? 0,
+                distanceKm: (body["distKm"] as? Double) ?? 0,
+                paceSecPerKm: body["paceSec"] as? Int,
+                heartRate: body["hr"] as? Int,
+                step: body["step"] as? String,
+                paused: (body["paused"] as? Bool) ?? false,
+                onWatch: false,
+            )
+            Task { @MainActor in
+                if ended { LiveActivityService.shared.end(state) }
+                else {
+                    LiveActivityService.shared.start(
+                        runId: (body["id"] as? String) ?? "phone",
+                        title: (body["title"] as? String) ?? "Run",
+                        type: (body["type"] as? String) ?? "easy",
+                        state: state,
+                    )
+                }
+            }
         case "sync":
             // `session` is deliberately allowed to be absent: that is how the page says "rest day",
             // which the watch must be able to tell apart from "we have not synced yet".

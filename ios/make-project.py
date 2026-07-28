@@ -49,6 +49,14 @@ ID = {name: "1A%022X" % (i + 1) for i, name in enumerate([
     "wTarget", "wProduct", "wSyncGroup", "wSourcesPhase", "wFrameworksPhase", "wResourcesPhase",
     "wConfigList", "wDebug", "wRelease", "wInfoPlistRef",
     "embedWatchPhase", "wBuildFile", "wDependency", "wProxy",
+    # The widget extension, which exists solely to render the run's Live Activity. A Live Activity
+    # cannot be drawn by the app itself — WidgetKit requires an extension — so this target is a
+    # requirement of the feature, not a convenience.
+    "xTarget", "xProduct", "xSyncGroup", "xSourcesPhase", "xFrameworksPhase", "xResourcesPhase",
+    "xConfigList", "xDebug", "xRelease", "xInfoPlistRef",
+    "embedExtPhase", "xBuildFile", "xDependency", "xProxy",
+    # Shared between the app and the extension: the Live Activity's attributes must be one file.
+    "sharedSyncGroup",
 ])}
 
 BUNDLE_ID = "com.interun.app"
@@ -84,7 +92,7 @@ WATCH_COMMON = {
     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
     "CODE_SIGN_ENTITLEMENTS": '"InteRunWatch.entitlements"',
     "CODE_SIGN_STYLE": "Automatic",
-    "CURRENT_PROJECT_VERSION": "23",
+    "CURRENT_PROJECT_VERSION": "24",
     "GENERATE_INFOPLIST_FILE": "NO",
     "INFOPLIST_FILE": '"InteRunWatch-Info.plist"',
     "MARKETING_VERSION": "1.0",
@@ -111,6 +119,28 @@ WATCH_COMMON = {
     "SWIFT_VERSION": "5.0",
     "TARGETED_DEVICE_FAMILY": "4",
     "WATCHOS_DEPLOYMENT_TARGET": WATCH_DEPLOYMENT_TARGET,
+}
+
+WIDGET_BUNDLE_ID = BUNDLE_ID + ".widgets"
+
+WIDGET_COMMON = {
+    "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "AccentColor",
+    "CODE_SIGN_STYLE": "Automatic",
+    "CURRENT_PROJECT_VERSION": "24",
+    "GENERATE_INFOPLIST_FILE": "NO",
+    "INFOPLIST_FILE": '"InteRunWidgets-Info.plist"',
+    # ⚠️ An app extension's version MUST match the app's, or the build fails validation at install.
+    "MARKETING_VERSION": "1.0",
+    "PRODUCT_BUNDLE_IDENTIFIER": WIDGET_BUNDLE_ID,
+    "PRODUCT_NAME": '"$(TARGET_NAME)"',
+    "SKIP_INSTALL": "YES",
+    "SWIFT_EMIT_LOC_STRINGS": "YES",
+    "SWIFT_VERSION": "5.0",
+    "TARGETED_DEVICE_FAMILY": "1",
+    "IPHONEOS_DEPLOYMENT_TARGET": DEPLOYMENT_TARGET,
+    "LD_RUNPATH_SEARCH_PATHS": '("$(inherited)", "@executable_path/Frameworks", "@executable_path/../../Frameworks")',
+    # Same reason as the watch target: debug dylibs beside an extension binary break installs.
+    "ENABLE_DEBUG_DYLIB": "NO",
 }
 
 PROJECT_COMMON = {
@@ -157,7 +187,7 @@ TARGET_COMMON = {
     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
     "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "AccentColor",
     "CODE_SIGN_STYLE": "Automatic",
-    "CURRENT_PROJECT_VERSION": "23",
+    "CURRENT_PROJECT_VERSION": "24",
     "ENABLE_PREVIEWS": "YES",
     "GENERATE_INFOPLIST_FILE": "NO",
     "CODE_SIGN_ENTITLEMENTS": '"InteRun.entitlements"',
@@ -175,6 +205,7 @@ TARGET_COMMON = {
 if DEVELOPMENT_TEAM:
     TARGET_COMMON["DEVELOPMENT_TEAM"] = DEVELOPMENT_TEAM
     WATCH_COMMON["DEVELOPMENT_TEAM"] = DEVELOPMENT_TEAM
+    WIDGET_COMMON["DEVELOPMENT_TEAM"] = DEVELOPMENT_TEAM
 
 
 def settings_block(d, indent="\t\t\t\t"):
@@ -211,6 +242,10 @@ def main():
              "includeInIndex = 0; path = InteRunWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };\n" % ID["wProduct"])
     p.append("\t\t%s /* InteRunWatch-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; "
              'path = "InteRunWatch-Info.plist"; sourceTree = "<group>"; };\n' % ID["wInfoPlistRef"])
+    p.append("\t\t%s /* InteRunWidgets.appex */ = {isa = PBXFileReference; explicitFileType = \"wrapper.app-extension\"; "
+             "includeInIndex = 0; path = InteRunWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };\n" % ID["xProduct"])
+    p.append("\t\t%s /* InteRunWidgets-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; "
+             'path = "InteRunWidgets-Info.plist"; sourceTree = "<group>"; };\n' % ID["xInfoPlistRef"])
     p.append("/* End PBXFileReference section */\n\n")
 
     # The watch app is embedded into the iOS app under Watch/, which is how the OS finds and
@@ -218,6 +253,9 @@ def main():
     p.append("/* Begin PBXBuildFile section */\n")
     p.append("\t\t%s /* InteRunWatch.app in Embed Watch App */ = {isa = PBXBuildFile; fileRef = %s /* InteRunWatch.app */; "
              "settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };\n" % (ID["wBuildFile"], ID["wProduct"]))
+    p.append("\t\t%s /* InteRunWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; "
+             "fileRef = %s /* InteRunWidgets.appex */; "
+             "settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };\n" % (ID["xBuildFile"], ID["xProduct"]))
     p.append("/* End PBXBuildFile section */\n\n")
 
     p.append("/* Begin PBXFileSystemSynchronizedRootGroup section */\n")
@@ -225,6 +263,12 @@ def main():
              '\t\t\tpath = InteRun;\n\t\t\tsourceTree = "<group>";\n\t\t};\n' % ID["syncGroup"])
     p.append("\t\t%s /* InteRunWatch */ = {\n\t\t\tisa = PBXFileSystemSynchronizedRootGroup;\n"
              '\t\t\tpath = InteRunWatch;\n\t\t\tsourceTree = "<group>";\n\t\t};\n' % ID["wSyncGroup"])
+    p.append("\t\t%s /* InteRunWidgets */ = {\n\t\t\tisa = PBXFileSystemSynchronizedRootGroup;\n"
+             '\t\t\tpath = InteRunWidgets;\n\t\t\tsourceTree = "<group>";\n\t\t};\n' % ID["xSyncGroup"])
+    # Belongs to BOTH the app and the extension: the Live Activity's attributes have to be the same
+    # type on each side, and a copied file is a bug waiting to happen.
+    p.append("\t\t%s /* InteRunShared */ = {\n\t\t\tisa = PBXFileSystemSynchronizedRootGroup;\n"
+             '\t\t\tpath = InteRunShared;\n\t\t\tsourceTree = "<group>";\n\t\t};\n' % ID["sharedSyncGroup"])
     p.append("/* End PBXFileSystemSynchronizedRootGroup section */\n\n")
 
     p.append("/* Begin PBXFrameworksBuildPhase section */\n")
@@ -234,6 +278,9 @@ def main():
     p.append("\t\t%s /* Frameworks */ = {\n\t\t\tisa = PBXFrameworksBuildPhase;\n"
              "\t\t\tbuildActionMask = 2147483647;\n\t\t\tfiles = (\n\t\t\t);\n"
              "\t\t\trunOnlyForDeploymentPostprocessing = 0;\n\t\t};\n" % ID["wFrameworksPhase"])
+    p.append("\t\t%s /* Frameworks */ = {\n\t\t\tisa = PBXFrameworksBuildPhase;\n"
+             "\t\t\tbuildActionMask = 2147483647;\n\t\t\tfiles = (\n\t\t\t);\n"
+             "\t\t\trunOnlyForDeploymentPostprocessing = 0;\n\t\t};\n" % ID["xFrameworksPhase"])
     p.append("/* End PBXFrameworksBuildPhase section */\n\n")
 
     p.append("/* Begin PBXCopyFilesBuildPhase section */\n")
@@ -246,19 +293,33 @@ def main():
              '\t\t\tname = "Embed Watch App";\n'
              "\t\t\trunOnlyForDeploymentPostprocessing = 0;\n\t\t};\n"
              % (ID["embedWatchPhase"], ID["wBuildFile"]))
+    p.append("\t\t%s /* Embed Foundation Extensions */ = {\n"
+             "\t\t\tisa = PBXCopyFilesBuildPhase;\n"
+             "\t\t\tbuildActionMask = 2147483647;\n"
+             '\t\t\tdstPath = "";\n'
+             "\t\t\tdstSubfolderSpec = 13;\n"
+             "\t\t\tfiles = (\n\t\t\t\t%s /* InteRunWidgets.appex in Embed Foundation Extensions */,\n\t\t\t);\n"
+             '\t\t\tname = "Embed Foundation Extensions";\n'
+             "\t\t\trunOnlyForDeploymentPostprocessing = 0;\n\t\t};\n"
+             % (ID["embedExtPhase"], ID["xBuildFile"]))
     p.append("/* End PBXCopyFilesBuildPhase section */\n\n")
 
     p.append("/* Begin PBXGroup section */\n")
     p.append("\t\t%s = {\n\t\t\tisa = PBXGroup;\n\t\t\tchildren = (\n"
              "\t\t\t\t%s /* InteRun */,\n\t\t\t\t%s /* InteRunWatch */,\n"
+             "\t\t\t\t%s /* InteRunWidgets */,\n\t\t\t\t%s /* InteRunShared */,\n"
              "\t\t\t\t%s /* InteRun-Info.plist */,\n\t\t\t\t%s /* InteRunWatch-Info.plist */,\n"
+             "\t\t\t\t%s /* InteRunWidgets-Info.plist */,\n"
              "\t\t\t\t%s /* Products */,\n"
              '\t\t\t);\n\t\t\tsourceTree = "<group>";\n\t\t};\n'
-             % (ID["rootGroup"], ID["syncGroup"], ID["wSyncGroup"], ID["infoPlistRef"],
-                ID["wInfoPlistRef"], ID["productsGroup"]))
+             % (ID["rootGroup"], ID["syncGroup"], ID["wSyncGroup"], ID["xSyncGroup"],
+                ID["sharedSyncGroup"], ID["infoPlistRef"], ID["wInfoPlistRef"],
+                ID["xInfoPlistRef"], ID["productsGroup"]))
     p.append("\t\t%s /* Products */ = {\n\t\t\tisa = PBXGroup;\n\t\t\tchildren = (\n"
-             "\t\t\t\t%s /* InteRun.app */,\n\t\t\t\t%s /* InteRunWatch.app */,\n\t\t\t);\n\t\t\tname = Products;\n"
-             '\t\t\tsourceTree = "<group>";\n\t\t};\n' % (ID["productsGroup"], ID["product"], ID["wProduct"]))
+             "\t\t\t\t%s /* InteRun.app */,\n\t\t\t\t%s /* InteRunWatch.app */,\n"
+             "\t\t\t\t%s /* InteRunWidgets.appex */,\n\t\t\t);\n\t\t\tname = Products;\n"
+             '\t\t\tsourceTree = "<group>";\n\t\t};\n'
+             % (ID["productsGroup"], ID["product"], ID["wProduct"], ID["xProduct"]))
     p.append("/* End PBXGroup section */\n\n")
 
     p.append("/* Begin PBXNativeTarget section */\n")
@@ -271,18 +332,22 @@ def main():
              "\t\t\t\t%s /* Resources */,\n"
              "\t\t\t\t%s /* Embed web app */,\n"
              "\t\t\t\t%s /* Embed Watch App */,\n"
+             "\t\t\t\t%s /* Embed Foundation Extensions */,\n"
              "\t\t\t);\n"
              "\t\t\tbuildRules = (\n\t\t\t);\n"
-             "\t\t\tdependencies = (\n\t\t\t\t%s /* PBXTargetDependency */,\n\t\t\t);\n"
-             "\t\t\tfileSystemSynchronizedGroups = (\n\t\t\t\t%s /* InteRun */,\n\t\t\t);\n"
+             "\t\t\tdependencies = (\n\t\t\t\t%s /* PBXTargetDependency */,\n"
+             "\t\t\t\t%s /* PBXTargetDependency */,\n\t\t\t);\n"
+             "\t\t\tfileSystemSynchronizedGroups = (\n\t\t\t\t%s /* InteRun */,\n"
+             "\t\t\t\t%s /* InteRunShared */,\n\t\t\t);\n"
              "\t\t\tname = InteRun;\n"
              "\t\t\tproductName = InteRun;\n"
              "\t\t\tproductReference = %s /* InteRun.app */;\n"
              '\t\t\tproductType = "com.apple.product-type.application";\n'
              "\t\t};\n" % (ID["target"], ID["targetConfigList"], ID["sourcesPhase"],
                            ID["frameworksPhase"], ID["resourcesPhase"], ID["embedPhase"],
-                           ID["embedWatchPhase"], ID["wDependency"],
-                           ID["syncGroup"], ID["product"]))
+                           ID["embedWatchPhase"], ID["embedExtPhase"],
+                           ID["wDependency"], ID["xDependency"],
+                           ID["syncGroup"], ID["sharedSyncGroup"], ID["product"]))
     p.append("\t\t%s /* InteRunWatch */ = {\n"
              "\t\t\tisa = PBXNativeTarget;\n"
              "\t\t\tbuildConfigurationList = %s /* Build configuration list for PBXNativeTarget \"InteRunWatch\" */;\n"
@@ -296,12 +361,30 @@ def main():
              '\t\t\tproductType = "com.apple.product-type.application";\n'
              "\t\t};\n" % (ID["wTarget"], ID["wConfigList"], ID["wSourcesPhase"],
                            ID["wFrameworksPhase"], ID["wResourcesPhase"], ID["wSyncGroup"], ID["wProduct"]))
+    p.append("\t\t%s /* InteRunWidgets */ = {\n"
+             "\t\t\tisa = PBXNativeTarget;\n"
+             "\t\t\tbuildConfigurationList = %s /* Build configuration list for PBXNativeTarget \"InteRunWidgets\" */;\n"
+             "\t\t\tbuildPhases = (\n\t\t\t\t%s /* Sources */,\n\t\t\t\t%s /* Frameworks */,\n\t\t\t\t%s /* Resources */,\n\t\t\t);\n"
+             "\t\t\tbuildRules = (\n\t\t\t);\n"
+             "\t\t\tdependencies = (\n\t\t\t);\n"
+             "\t\t\tfileSystemSynchronizedGroups = (\n\t\t\t\t%s /* InteRunWidgets */,\n"
+             "\t\t\t\t%s /* InteRunShared */,\n\t\t\t);\n"
+             "\t\t\tname = InteRunWidgets;\n"
+             "\t\t\tproductName = InteRunWidgets;\n"
+             "\t\t\tproductReference = %s /* InteRunWidgets.appex */;\n"
+             '\t\t\tproductType = "com.apple.product-type.app-extension";\n'
+             "\t\t};\n" % (ID["xTarget"], ID["xConfigList"], ID["xSourcesPhase"],
+                           ID["xFrameworksPhase"], ID["xResourcesPhase"],
+                           ID["xSyncGroup"], ID["sharedSyncGroup"], ID["xProduct"]))
     p.append("/* End PBXNativeTarget section */\n\n")
 
     p.append("/* Begin PBXTargetDependency section */\n")
     p.append("\t\t%s /* PBXTargetDependency */ = {\n\t\t\tisa = PBXTargetDependency;\n"
              "\t\t\ttarget = %s /* InteRunWatch */;\n\t\t\ttargetProxy = %s /* PBXContainerItemProxy */;\n\t\t};\n"
              % (ID["wDependency"], ID["wTarget"], ID["wProxy"]))
+    p.append("\t\t%s /* PBXTargetDependency */ = {\n\t\t\tisa = PBXTargetDependency;\n"
+             "\t\t\ttarget = %s /* InteRunWidgets */;\n\t\t\ttargetProxy = %s /* PBXContainerItemProxy */;\n\t\t};\n"
+             % (ID["xDependency"], ID["xTarget"], ID["xProxy"]))
     p.append("/* End PBXTargetDependency section */\n\n")
 
     p.append("/* Begin PBXContainerItemProxy section */\n")
@@ -309,6 +392,10 @@ def main():
              "\t\t\tcontainerPortal = %s /* Project object */;\n\t\t\tproxyType = 1;\n"
              "\t\t\tremoteGlobalIDString = %s;\n\t\t\tremoteInfo = InteRunWatch;\n\t\t};\n"
              % (ID["wProxy"], ID["project"], ID["wTarget"]))
+    p.append("\t\t%s /* PBXContainerItemProxy */ = {\n\t\t\tisa = PBXContainerItemProxy;\n"
+             "\t\t\tcontainerPortal = %s /* Project object */;\n\t\t\tproxyType = 1;\n"
+             "\t\t\tremoteGlobalIDString = %s;\n\t\t\tremoteInfo = InteRunWidgets;\n\t\t};\n"
+             % (ID["xProxy"], ID["project"], ID["xTarget"]))
     p.append("/* End PBXContainerItemProxy section */\n\n")
 
     p.append("/* Begin PBXProject section */\n")
@@ -332,9 +419,10 @@ def main():
              "\t\t\tproductRefGroup = %s /* Products */;\n"
              '\t\t\tprojectDirPath = "";\n'
              '\t\t\tprojectRoot = "";\n'
-             "\t\t\ttargets = (\n\t\t\t\t%s /* InteRun */,\n\t\t\t\t%s /* InteRunWatch */,\n\t\t\t);\n"
+             "\t\t\ttargets = (\n\t\t\t\t%s /* InteRun */,\n\t\t\t\t%s /* InteRunWatch */,\n"
+             "\t\t\t\t%s /* InteRunWidgets */,\n\t\t\t);\n"
              "\t\t};\n" % (ID["project"], ID["target"], ID["projConfigList"], ID["rootGroup"],
-                           ID["productsGroup"], ID["target"], ID["wTarget"]))
+                           ID["productsGroup"], ID["target"], ID["wTarget"], ID["xTarget"]))
     p.append("/* End PBXProject section */\n\n")
 
     p.append("/* Begin PBXResourcesBuildPhase section */\n")
@@ -344,6 +432,9 @@ def main():
     p.append("\t\t%s /* Resources */ = {\n\t\t\tisa = PBXResourcesBuildPhase;\n"
              "\t\t\tbuildActionMask = 2147483647;\n\t\t\tfiles = (\n\t\t\t);\n"
              "\t\t\trunOnlyForDeploymentPostprocessing = 0;\n\t\t};\n" % ID["wResourcesPhase"])
+    p.append("\t\t%s /* Resources */ = {\n\t\t\tisa = PBXResourcesBuildPhase;\n"
+             "\t\t\tbuildActionMask = 2147483647;\n\t\t\tfiles = (\n\t\t\t);\n"
+             "\t\t\trunOnlyForDeploymentPostprocessing = 0;\n\t\t};\n" % ID["xResourcesPhase"])
     p.append("/* End PBXResourcesBuildPhase section */\n\n")
 
     p.append("/* Begin PBXShellScriptBuildPhase section */\n")
@@ -370,6 +461,9 @@ def main():
     p.append("\t\t%s /* Sources */ = {\n\t\t\tisa = PBXSourcesBuildPhase;\n"
              "\t\t\tbuildActionMask = 2147483647;\n\t\t\tfiles = (\n\t\t\t);\n"
              "\t\t\trunOnlyForDeploymentPostprocessing = 0;\n\t\t};\n" % ID["wSourcesPhase"])
+    p.append("\t\t%s /* Sources */ = {\n\t\t\tisa = PBXSourcesBuildPhase;\n"
+             "\t\t\tbuildActionMask = 2147483647;\n\t\t\tfiles = (\n\t\t\t);\n"
+             "\t\t\trunOnlyForDeploymentPostprocessing = 0;\n\t\t};\n" % ID["xSourcesPhase"])
     p.append("/* End PBXSourcesBuildPhase section */\n\n")
 
     p.append("/* Begin XCBuildConfiguration section */\n")
@@ -381,6 +475,8 @@ def main():
     p.append(build_config(ID["targetRelease"], "Release", TARGET_COMMON))
     p.append(build_config(ID["wDebug"], "Debug", WATCH_COMMON))
     p.append(build_config(ID["wRelease"], "Release", WATCH_COMMON))
+    p.append(build_config(ID["xDebug"], "Debug", WIDGET_COMMON))
+    p.append(build_config(ID["xRelease"], "Release", WIDGET_COMMON))
     p.append("/* End XCBuildConfiguration section */\n\n")
 
     p.append("/* Begin XCConfigurationList section */\n")
@@ -388,6 +484,7 @@ def main():
         (ID["projConfigList"], 'PBXProject "InteRun"', ID["projDebug"], ID["projRelease"]),
         (ID["targetConfigList"], 'PBXNativeTarget "InteRun"', ID["targetDebug"], ID["targetRelease"]),
         (ID["wConfigList"], 'PBXNativeTarget "InteRunWatch"', ID["wDebug"], ID["wRelease"]),
+        (ID["xConfigList"], 'PBXNativeTarget "InteRunWidgets"', ID["xDebug"], ID["xRelease"]),
     ):
         p.append("\t\t%s /* Build configuration list for %s */ = {\n"
                  "\t\t\tisa = XCConfigurationList;\n"

@@ -15,6 +15,9 @@ struct InteRunApp: App {
         // Bring the watch bridge up now, not when the web view happens to be built. iOS can wake
         // this app in the background purely to answer the watch, and at that point there is no page.
         _ = WatchBridge.shared
+        // A card left over from a crash or a force-quit mid-run would otherwise sit there looking
+        // live with nothing able to update or dismiss it.
+        Task { @MainActor in LiveActivityService.shared.reattach() }
     }
 
     @Environment(\.scenePhase) private var scenePhase

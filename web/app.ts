@@ -6031,8 +6031,45 @@ function liveTick() {
   LIVE.hr += (liveHr(pre.step) - LIVE.hr) * 0.05 + (Math.random() - 0.5) * 1.5; LIVE.hr = Math.max(95, Math.min(190, LIVE.hr));
   LIVE.rt.update({ atMs: LIVE.vms, distanceMeters: LIVE.dist, heartRateBpm: Math.round(LIVE.hr) }).forEach(liveCue);
   checkSplits();
-  liveUpdate(LIVE.rt.snapshot(LIVE.vms));
+  const snap = LIVE.rt.snapshot(LIVE.vms);
+  liveUpdate(snap);
+  pushLiveActivity(snap);
   if (LIVE.rt.getStatus() === "completed") { stopLive(); liveFinish(true); }
+}
+// The phone's own run, mirrored onto the lock screen and the Dynamic Island. Same card the wrist
+// drives, so a run looks the same whichever device is recording it. Throttled to roughly every two
+// seconds: the native side throttles again, and ActivityKit coalesces anyway.
+let LIVE_ACT_AT = 0;
+function pushLiveActivity(snap, force) {
+  if (!NATIVE_WATCH || !LIVE || LIVE.done) return;
+  const now = Date.now();
+  if (!force && now - LIVE_ACT_AT < 2000) return;
+  LIVE_ACT_AT = now;
+  const step = snap && snap.step;
+  try {
+    window.webkit.messageHandlers.interunWatch.postMessage({
+      action: "liveActivity",
+      id: LIVE.actId || (LIVE.actId = "phone-" + now),
+      title: (LIVE.session && LIVE.session.title) || "Run",
+      type: (LIVE.session && LIVE.session.type) || "easy",
+      sec: Math.round((snap && snap.elapsedSeconds) || 0),
+      distKm: (LIVE.dist || 0) / 1000,
+      paceSec: Math.round((snap && snap.currentPaceSecPerKm) || 0) || undefined,
+      hr: Math.round(LIVE.hr || 0) || undefined,
+      step: step && step.label ? step.label : undefined,
+      paused: !!LIVE.paused,
+      state: "running",
+    });
+  } catch (e) {}
+}
+function endLiveActivity() {
+  if (!NATIVE_WATCH) return;
+  try {
+    window.webkit.messageHandlers.interunWatch.postMessage({
+      action: "liveActivity", state: "ended",
+      id: (LIVE && LIVE.actId) || "phone", sec: 0, distKm: 0,
+    });
+  } catch (e) {}
 }
 // Synthesize a plausible wandering GPS track for the simulator, so the demo/artifact still shows a
 // route map. Advances a heading with gentle random turns, one point roughly every 40 m.
@@ -6048,6 +6085,7 @@ function simRouteStep() {
 function startLoop() { if (!LIVE.timer) LIVE.timer = setInterval(liveTick, 200); }
 function stopLive() {
   if (!LIVE) return;
+  endLiveActivity();
   if (LIVE.timer) { clearInterval(LIVE.timer); LIVE.timer = null; }
   if (LIVE.ui) { clearInterval(LIVE.ui); LIVE.ui = null; }
   if (LIVE.watchId != null && GPS_AVAILABLE) { navigator.geolocation.clearWatch(LIVE.watchId); LIVE.watchId = null; }

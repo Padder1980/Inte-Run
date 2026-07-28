@@ -544,6 +544,19 @@ off an array gives `undefined`, so every coordinate became `NaN` and the map dre
 instead of failing loudly. `normalizeRoute()` converts at ingest and `migrateRunRoutes()` repairs
 runs already saved in the wrong shape. Anything crossing that bridge needs its shape checked.
 
+**Live Activities (shipped 2026-07-28)** — the lock-screen / Dynamic Island card, and the real
+answer to "open the phone on the live screen". `ios/InteRunWidgets/` is a **third target**, a widget
+extension, because WidgetKit is the only thing that can render a Live Activity — the app cannot draw
+one itself. `ios/InteRunShared/RunActivityAttributes.swift` is a member of BOTH the app and the
+extension (a `PBXFileSystemSynchronizedRootGroup` listed in two targets' `fileSystemSynchronizedGroups`),
+because the two sides must agree on the type exactly and a copied file would drift.
+`LiveActivityService` starts/updates/ends it; watch runs drive it from `WatchBridge.forwardLive`,
+phone runs from `pushLiveActivity()` in `web/app.ts` via a `liveActivity` bridge action. Tapping the
+card opens the app and `replayLiveOnActivate()` lands it on the live screen.
+⚠️ Needs `NSSupportsLiveActivities` in `InteRun-Info.plist`, and an extension's Info.plist MUST carry
+`CFBundleIdentifier` — without it the build fails with "Embedded binary's bundle identifier is not
+prefixed with the parent app's", which names the wrong problem entirely.
+
 ⚠️ **A watchOS app cannot bring the iPhone app to the foreground.** There is no API: `sendMessage`
 wakes the containing app in the BACKGROUND only, and `startWatchApp` runs phone→watch. So "start on
 the watch and the phone opens itself" is not buildable however it is wired. What ships instead is

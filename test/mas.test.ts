@@ -49,10 +49,11 @@ const athlete: Athlete = {
 };
 const goal: Goal = { distance: "10k", targetTimeSeconds: 2400, raceDateIso: "2027-03-28", startDateIso: "2026-07-24" };
 
-test("a 1km trial anchors the plan's VO2 interval pace to MAS", () => {
-  const withMas = generatePlan({ ...athlete, oneKmTrialSeconds: 210 }, goal); // 3:30 1km
-  const expected = masVo2Range(computeMas(210).masMps);
-  // Pick a VO2 session with a paced rep (hill reps are effort-based and carry no pace).
+// A trial consistent with the athlete's 5 km is used exactly as given.
+test("a consistent 1km trial anchors the plan's VO2 interval pace to MAS, untouched", () => {
+  // 4:00 for 1 km alongside a 21:00 5 km — a normal, credible pairing.
+  const withMas = generatePlan({ ...athlete, oneKmTrialSeconds: 240 }, goal);
+  const expected = masVo2Range(computeMas(240).masMps);
   const vo2 = withMas.weeks
     .flatMap((w) => w.sessions)
     .find((s) => s.type === "vo2" && s.steps.some((st) => st.kind === "rep" && st.targetPaceSecPerKm));
@@ -61,6 +62,29 @@ test("a 1km trial anchors the plan's VO2 interval pace to MAS", () => {
   assert.equal(repPace.minSecPerKm, expected.minSecPerKm);
   assert.equal(repPace.maxSecPerKm, expected.maxSecPerKm);
   assert.ok(withMas.notes.some((n) => /MAS/.test(n)));
+});
+
+// ...but it may never produce a ladder in the wrong order.
+test("a trial inconsistent with the 5 km is reconciled, not obeyed", () => {
+  // The two failure directions. A brilliant 1 km next to a modest 5 km would put "VO2" faster than
+  // rep pace; a poor one would put it slower than threshold, so the intervals would be easier than
+  // the tempo runs. Measured before this guard existed: 27 of 63 realistic pairings broke.
+  for (const trial of [150, 180, 210, 300, 360, 420]) {
+    const plan = generatePlan({ ...athlete, oneKmTrialSeconds: trial }, goal);
+    const p = plan.paces;
+    assert.ok(
+      p.vo2.minSecPerKm > p.rep.minSecPerKm,
+      `1km ${trial}s: VO2 ${p.vo2.minSecPerKm} is not slower than rep pace ${p.rep.minSecPerKm}`,
+    );
+    assert.ok(
+      p.vo2.minSecPerKm < p.cv.minSecPerKm,
+      `1km ${trial}s: VO2 ${p.vo2.minSecPerKm} is not faster than CV ${p.cv.minSecPerKm}`,
+    );
+    assert.ok(
+      p.vo2.maxSecPerKm < p.threshold.minSecPerKm,
+      `1km ${trial}s: VO2 band overlaps threshold — intervals easier than tempo`,
+    );
+  }
 });
 
 test("without a 1km trial, VO2 pace comes from the usual derivation (unchanged)", () => {

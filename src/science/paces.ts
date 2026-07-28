@@ -55,6 +55,48 @@ function band(center: number, minusFast: number, plusSlow: number): PaceRange {
 }
 
 /**
+ * A band expressed as a multiple of threshold pace.
+ *
+ * The aerobic gears used to be fixed second-per-kilometre offsets from threshold (+92 for easy, +35
+ * for steady, and so on). That does not describe how the gears really spread: the same +92 s/km is
+ * a 50% slowdown for a 14-minute 5 km runner and a 16% slowdown for a 45-minute one. Measured
+ * against Daniels' tables the honest figure for easy is about 1.22–1.30× threshold at every level.
+ *
+ * The practical consequence of getting it wrong ran in both directions: fast runners were told to
+ * jog absurdly slowly, and beginners — the people who most need permission to go easy — were given
+ * an "easy" pace only 16% off their threshold, which is not easy at all.
+ */
+/**
+ * The aerobic gears as multiples of threshold pace.
+ *
+ * Exported because the app also needs to run this model BACKWARDS — given the average pace of an
+ * easy run, what threshold pace (and so what 5 km) does it imply? That inverse used to be written
+ * out longhand as `avgPace - 92`, which silently became wrong the moment the forward model stopped
+ * being additive: a 16:00 5 km runner completing their easy run exactly on target was inferred to
+ * be a 13:14 runner, and a 40:00 runner a 43:51 one. Both wrong by enough to trigger a spurious
+ * "your fitness has changed" prompt. One table, both directions.
+ */
+export const PACE_RATIOS = {
+  easy: { fast: 1.22, slow: 1.33 },
+  aerobic: { fast: 1.13, slow: 1.2 },
+  steady: { fast: 1.06, slow: 1.12 },
+  tempo: { fast: 1.025, slow: 1.05 },
+} as const;
+
+/** The mid-band multiple for a gear — the factor to divide by when inverting. */
+export function paceRatioMid(gear: keyof typeof PACE_RATIOS): number {
+  const r = PACE_RATIOS[gear];
+  return (r.fast + r.slow) / 2;
+}
+
+function ratioBand(thresholdPace: number, fast: number, slow: number): PaceRange {
+  return {
+    minSecPerKm: Math.round(thresholdPace * fast),
+    maxSecPerKm: Math.round(thresholdPace * slow),
+  };
+}
+
+/**
  * Derive training paces from a recent performance.
  *
  * Anchors (all from the athlete's own Riegel-predicted paces):
@@ -62,8 +104,8 @@ function band(center: number, minusFast: number, plusSlow: number): PaceRange {
  *    (a robust critical-speed proxy across abilities), RPE 6–7.
  *  - VO2 ≈ 3–5 km race pace, RPE 8–9.
  *  - rep/strides ≈ around mile pace.
- *  - easy ≈ threshold + ~75–110 s/km (conversational, RPE 2–3).
- *  - steady/"marathon" ≈ threshold + ~25–45 s/km.
+ *  - the aerobic gears are MULTIPLES of threshold, not fixed offsets: easy 1.22–1.33×, moderate
+ *    1.13–1.20×, steady 1.06–1.12×, true tempo 1.025–1.05×. See PACE_RATIOS for why.
  */
 export function deriveTrainingPaces(recent: RecentPerformance, goal?: Goal): TrainingPaces {
   const thresholdPace = predictedPaceFor(recent, 15000);
@@ -73,12 +115,13 @@ export function deriveTrainingPaces(recent: RecentPerformance, goal?: Goal): Tra
 
   const pace8k = predictedPaceFor(recent, 8000);
 
-  const easy = band(thresholdPace + 92, 17, 18); // ~ +75..+110 s/km
-  // "Moderate" — between easy and steady, which otherwise leave a ~30 s/km hole no session can use.
-  const aerobic = band(thresholdPace + 60, 10, 10);
-  const steady = band(thresholdPace + 35, 10, 10); // ~ +25..+45 s/km
+  // Ratios to threshold, constant across the ability range (see ratioBand).
+  const easy = ratioBand(thresholdPace, PACE_RATIOS.easy.fast, PACE_RATIOS.easy.slow);
+  // "Moderate" — between easy and steady, which otherwise leave a hole no session can target.
+  const aerobic = ratioBand(thresholdPace, PACE_RATIOS.aerobic.fast, PACE_RATIOS.aerobic.slow);
+  const steady = ratioBand(thresholdPace, PACE_RATIOS.steady.fast, PACE_RATIOS.steady.slow);
   // True tempo — a shade under threshold, holdable for the best part of an hour.
-  const tempo = band(thresholdPace + 18, 6, 7);
+  const tempo = ratioBand(thresholdPace, PACE_RATIOS.tempo.fast, PACE_RATIOS.tempo.slow);
   const threshold = band(thresholdPace, 5, 8);
   // Critical velocity — the pace sustainable for roughly half an hour, which for a trained runner
   // is close to 8 km pace. It sits midway between threshold and VO2 rather than hugging threshold,
@@ -110,6 +153,33 @@ export function deriveTrainingPaces(recent: RecentPerformance, goal?: Goal): Tra
     goalRace,
     predictedRaceTimes: predictAllRaceTimes(recent),
   };
+}
+
+/**
+ * Fold a MAS-derived VO2 band into an existing set of paces without breaking the ladder.
+ *
+ * A 1 km time trial is the sharpest input the app has for interval pace, so it is worth using — but
+ * it is a single hard effort and it can be poor: mispaced, into a headwind, on a bad day. The old
+ * code replaced `paces.vo2` outright, so a runner with an 18:00 5 km who trialled 4:15 was handed
+ * VO2 "intervals" at 4:15–4:31/km, SLOWER than their own threshold of 3:46–3:59. Measured across
+ * realistic (5 km, 1 km) pairs, 27 of 63 produced a ladder in the wrong order.
+ *
+ * VO2 pace must stay strictly between rep pace and critical velocity. The trial moves it inside
+ * that corridor; it cannot move it out.
+ */
+export function reconcileVo2(paces: TrainingPaces, masVo2: PaceRange): PaceRange {
+  const floor = paces.rep.minSecPerKm + 1;        // never faster than rep pace
+  const ceil = paces.cv.minSecPerKm - 1;          // its fast edge stays quicker than CV
+  const tail = paces.threshold.minSecPerKm - 1;   // its slow edge stays quicker than threshold
+  if (ceil <= floor) return paces.vo2;            // no room — the race-derived band stands
+
+  const width = Math.max(6, masVo2.maxSecPerKm - masVo2.minSecPerKm);
+  const min = Math.min(Math.max(masVo2.minSecPerKm, floor), ceil);
+  const out = { minSecPerKm: Math.round(min), maxSecPerKm: Math.round(Math.min(min + width, tail)) };
+  // A trial can sharpen the interval pace or leave it alone. It must never BLUNT it: if the effort
+  // was poor enough that reconciling it lands slower than the athlete's own race times already
+  // imply, the race is the better evidence and the derived band stands.
+  return out.minSecPerKm >= paces.vo2.minSecPerKm ? paces.vo2 : out;
 }
 
 /**

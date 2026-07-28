@@ -283,6 +283,74 @@ test("effort-only steps (hills) carry an effort band and no pace", () => {
   }
 });
 
+test("EVERY week honours the intensity model, across the whole product", () => {
+  // This used to fail. Two causes, both fixed:
+  //  1. computeDistribution charged a quality session's whole duration to one bucket, so a 55'
+  //     threshold session counted 55' of "moderate" when 30' of it is warm-up, jog recoveries and
+  //     cool-down. Accounting is per-step now.
+  //  2. Four runs a week cannot carry two quality sessions outside the peak block — it leaves one
+  //     easy run and the long run to hold up the whole aerobic base.
+  // Measured before: 61 of 2816 weeks under the floor. After: none.
+  const TARGET: Record<string, number> = { "5k": 1200, "10k": 2500, half: 5400, marathon: 11400 };
+  let checked = 0;
+  for (const dist of ["5k", "10k", "half", "marathon"] as RaceDistanceKey[]) {
+    for (const days of [3, 4, 5, 6]) {
+      for (const experience of ["recreational", "competitive"] as const) {
+        for (const weeks of [12, 20, 28]) {
+          const ath: Athlete = { ...competitive, daysPerWeek: days, experience };
+          const plan = generatePlan(ath, { ...goalFor(dist, weeks), targetTimeSeconds: TARGET[dist]! });
+          for (const w of plan.weeks) {
+            const d = computeDistribution(w.sessions);
+            if (d.totalSeconds === 0) continue;
+            checked++;
+            assert.ok(
+              honoursModel(d, plan.intensityModel),
+              `${dist} ${days}d ${experience} ${weeks}wk week ${w.index} (${w.phase}): ` +
+              `${(d.easy * 100).toFixed(1)}% easy breaks ${plan.intensityModel}`,
+            );
+          }
+        }
+      }
+    }
+  }
+  assert.ok(checked > 1500, `only ${checked} weeks checked`);
+});
+
+test("a quality session's warm-up and recoveries count as easy running", () => {
+  // The accounting change, asserted directly: a threshold session is far from uniformly moderate.
+  const plan = generatePlan(competitive, goalFor("half", 20));
+  const thr = plan.weeks.flatMap((w) => w.sessions).find((s) => s.type === "threshold")!;
+  const d = computeDistribution([thr]);
+  assert.ok(d.easy > 0.25, `a threshold session counted only ${(d.easy * 100).toFixed(0)}% easy running`);
+  assert.ok(d.moderate > 0.2, `a threshold session counted only ${(d.moderate * 100).toFixed(0)}% moderate`);
+  // And the total is preserved — the split must not invent or lose training time.
+  assert.ok(
+    Math.abs(d.totalSeconds - thr.estimatedDurationSeconds) < 2,
+    `split total ${d.totalSeconds} vs session ${thr.estimatedDurationSeconds}`,
+  );
+});
+
+test("no session dwarfs the race it prepares for", () => {
+  // "2 × 5 km at goal race pace" is a fine half-marathon session and an absurd 5 km one — ten
+  // kilometres at race effort for a five-kilometre race. Race-pace volume is gated on event length.
+  const TARGET: Record<string, number> = { "5k": 1200, "10k": 2500, half: 5400, marathon: 11400 };
+  const MAX_RATIO: Record<string, number> = { "5k": 4.5, "10k": 2.5, half: 1.5, marathon: 1.0 };
+  for (const dist of ["5k", "10k", "half", "marathon"] as RaceDistanceKey[]) {
+    for (const weeks of [14, 22, 30]) {
+      const plan = generatePlan(competitive, { ...goalFor(dist, weeks), targetTimeSeconds: TARGET[dist]! });
+      for (const s of plan.weeks.flatMap((w) => w.sessions)) {
+        if (!["threshold", "vo2", "race-specific"].includes(s.type)) continue;
+        const ratio = s.estimatedDurationSeconds / TARGET[dist]!;
+        assert.ok(
+          ratio <= MAX_RATIO[dist]!,
+          `${dist}: "${s.title}" is ${Math.round(s.estimatedDurationSeconds / 60)}′, ` +
+          `${ratio.toFixed(1)}× a ${Math.round(TARGET[dist]! / 60)}′ race`,
+        );
+      }
+    }
+  }
+});
+
 test("adding a moderate gear does not shift the intensity distribution", () => {
   // moderateRun is deliberately bucketed "easy". Re-bucketing it as "moderate" would drop a build
   // week's easy fraction by several points and the plan would read as mis-periodised when it is not.

@@ -7,7 +7,7 @@
 // polarized is offered for competitive athletes, and validation uses a tolerance band rather than a
 // hard target.
 
-import type { Athlete, IntensityBucket, IntensityModel, Session } from "../domain/types.ts";
+import type { Athlete, IntensityBucket, IntensityModel, Session, WorkoutStep } from "../domain/types.ts";
 
 export type DistributionTarget = { easy: number; moderate: number; hard: number };
 
@@ -36,6 +36,42 @@ export function countsTowardTid(session: Session): boolean {
 
 export type Distribution = { easy: number; moderate: number; hard: number; totalSeconds: number };
 
+/**
+ * Which bucket a single step's running time belongs in.
+ *
+ * A quality session is not uniformly hard: a 55-minute threshold session is a 15-minute easy
+ * warm-up, half an hour of work interleaved with easy jog recoveries, and a 10-minute easy
+ * cool-down. Charging the whole 55 minutes to "moderate" overstates the week's intensity by a wide
+ * margin — enough, measured, to put a five-day build week under the pyramidal easy floor purely as
+ * an accounting artefact. Warm-ups, cool-downs and recoveries are easy running and are counted as
+ * such; only the work itself carries the session's intensity.
+ */
+function stepBucket(step: WorkoutStep, sessionIntensity: Exclude<IntensityBucket, "none">) {
+  if (step.kind === "warmup" || step.kind === "cooldown" || step.kind === "recovery") return "easy";
+  // Kind alone is not enough. The jog between two blocks of a compound session is written as a
+  // "steady" step (deliberately — it is what stops the detail sheet merging the blocks into one
+  // row), so bucketing purely by kind charged easy running to the quality bucket. Effort is the
+  // honest signal: anything prescribed at RPE 3 or below is easy running, whatever it is called.
+  if (step.targetRpe && step.targetRpe.max <= 3) return "easy";
+  return sessionIntensity;
+}
+
+/** A short effort with no pace target is run flat out; ~4 m/s is a fair figure for a hill sprint. */
+const EFFORT_ONLY_MPS = 4;
+
+function stepSeconds(step: WorkoutStep): number {
+  if (step.durationSeconds) return step.durationSeconds;
+  if (step.distanceMeters && step.targetPaceSecPerKm) {
+    const mid = (step.targetPaceSecPerKm.minSecPerKm + step.targetPaceSecPerKm.maxSecPerKm) / 2;
+    return (step.distanceMeters / 1000) * mid;
+  }
+  // Effort-only work given in metres — a hill sprint. It carries no pace ON PURPOSE (pace up a hill
+  // is a function of the gradient), but returning 0 made it vanish from the accounting entirely, so
+  // a maximal hill session reported as 100% easy. An estimate is far better than a silent zero.
+  if (step.distanceMeters) return step.distanceMeters / EFFORT_ONLY_MPS;
+  return 0;
+}
+
 /** Distribution of running time across intensity buckets for a set of sessions. */
 export function computeDistribution(sessions: Session[]): Distribution {
   const totals: Record<Exclude<IntensityBucket, "none">, number> = {
@@ -46,6 +82,16 @@ export function computeDistribution(sessions: Session[]): Distribution {
   for (const s of sessions) {
     if (!countsTowardTid(s)) continue;
     if (s.intensity === "none") continue;
+    const steps = s.steps ?? [];
+    // Step-level accounting when the session has a structure; whole-session otherwise (a plain easy
+    // run built without steps is uniformly easy anyway, so the two agree).
+    const counted = steps.reduce((n, st) => n + stepSeconds(st), 0);
+    if (steps.length > 0 && counted > 0) {
+      // Scale to the session's own estimate so rounding in the step maths cannot invent or lose time.
+      const scale = s.estimatedDurationSeconds / counted;
+      for (const st of steps) totals[stepBucket(st, s.intensity)] += stepSeconds(st) * scale;
+      continue;
+    }
     totals[s.intensity] += s.estimatedDurationSeconds;
   }
   const totalSeconds = totals.easy + totals.moderate + totals.hard;

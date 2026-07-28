@@ -21,7 +21,7 @@ import type {
 } from "../domain/types.ts";
 import { chooseModel } from "../science/intensity-distribution.ts";
 import { computeMas, masVo2Range } from "../science/mas.ts";
-import { deriveTrainingPaces, withHrZones } from "../science/paces.ts";
+import { deriveTrainingPaces, reconcileVo2, withHrZones } from "../science/paces.ts";
 import { taperFor } from "../science/taper.ts";
 import { addDays, dayOfWeekMondayZero, daysBetween, isoToday, weeksBetween } from "./dates.ts";
 import { type WeekPlan, phaseSchedule, structuredWeekCount } from "./periodization.ts";
@@ -109,7 +109,9 @@ export function generatePlan(
   // If the athlete has done a 1 km time trial, anchor VO₂/interval pace to their MAS — a direct,
   // test-based target rather than one projected from their race pace.
   if (athlete.oneKmTrialSeconds && athlete.oneKmTrialSeconds > 0) {
-    paces.vo2 = masVo2Range(computeMas(athlete.oneKmTrialSeconds).masMps);
+    // Reconciled, not replaced: a poor trial must not hand someone "intervals" slower than their
+    // own threshold pace. See reconcileVo2.
+    paces.vo2 = reconcileVo2(paces, masVo2Range(computeMas(athlete.oneKmTrialSeconds).masMps));
   }
   const schedule = annotate(phaseSchedule(structuredWeeks, goal.distance, returning));
 
@@ -406,6 +408,20 @@ function qualitySessionsThisWeek(
 ): number {
   if (runningDays < 4) return 1; // low frequency → protect easy volume, one quality
   if (wp.isDeload) return 1;
+  // ⚠️ The four-day cap below is a CEILING applied to the phase's own answer, not a short-circuit
+  // before it. Returning 1 up here overrode the base phase's pure-aerobic foundation block, which
+  // deliberately returns 0 — so a beginner's first weeks gained a quality session they should not
+  // have had.
+  const byPhase = qualityByPhase(wp, returning);
+  // Four runs a week cannot support two quality sessions: it leaves one easy run and the long run
+  // to carry all the aerobic volume, and the week's easy fraction collapses towards half — far
+  // under any pyramidal or polarized target. Such weeks get their second quality session only in
+  // the peak block, where a short, sharp overload is the intent and the taper follows.
+  if (runningDays === 4 && wp.phase !== "peak") return Math.min(byPhase, 1);
+  return byPhase;
+}
+
+function qualityByPhase(wp: AnnotatedWeek, returning: boolean): number {
   switch (wp.phase) {
     case "base": {
       // A long base opens with a pure-aerobic foundation block — consistency and volume before any
@@ -447,8 +463,10 @@ function qualityContentsFor(
   // actually build, every format gets used rather than the same prefix every time.
   const DISTANCE_SEED: Record<Goal["distance"], number> = { "1mile": 0, "5k": 2, "10k": 5, half: 8, marathon: 11 };
   const rot = wp.ordinalInPhase + wp.phaseTotal + ctx.athlete.daysPerWeek + DISTANCE_SEED[ctx.goal.distance];
+  const EVENT_KM: Record<Goal["distance"], number> = { "1mile": 1.609, "5k": 5, "10k": 10, half: 21.0975, marathon: 42.195 };
   const fctx: FormatCtx = {
     phase: wp.phase,
+    eventKm: EVENT_KM[ctx.goal.distance],
     isDeload: wp.isDeload,
     competitive: ctx.athlete.experience === "competitive",
     returning: ctx.returning,

@@ -32,12 +32,26 @@ test("training paces are physiologically ordered: rep < vo2 < threshold < steady
   assert.ok(p.steady.maxSecPerKm < p.easy.minSecPerKm, "steady faster than easy");
 });
 
-test("easy pace sits roughly 75–110 s/km slower than threshold", () => {
-  const p = deriveTrainingPaces(fiveKin20);
-  const thresholdMid = (p.threshold.minSecPerKm + p.threshold.maxSecPerKm) / 2;
-  const easyMid = (p.easy.minSecPerKm + p.easy.maxSecPerKm) / 2;
-  const delta = easyMid - thresholdMid;
-  assert.ok(delta >= 70 && delta <= 115, `easy-threshold delta was ${delta} s/km`);
+test("easy sits ~1.22–1.33× threshold at EVERY ability, not a fixed s/km offset", () => {
+  // The gears are proportional to threshold rather than a constant offset. A fixed +92 s/km is a
+  // 50% slowdown for a 14-minute 5 km runner and only 16% for a 45-minute one, so fast runners were
+  // told to jog absurdly slowly while beginners got an "easy" pace barely easier than their tempo.
+  // Daniels' tables put the real figure near 1.25× across the whole range.
+  for (const t of [14 * 60, 18 * 60, 22 * 60, 30 * 60, 45 * 60]) {
+    const p = deriveTrainingPaces({ distanceMeters: 5000, timeSeconds: t });
+    const mid = (r: { minSecPerKm: number; maxSecPerKm: number }) => (r.minSecPerKm + r.maxSecPerKm) / 2;
+    const ratio = mid(p.easy) / mid(p.threshold);
+    assert.ok(ratio > 1.2 && ratio < 1.34, `5k ${t}s: easy/threshold ratio was ${ratio.toFixed(2)}`);
+    // And the absolute gap must grow with the runner's pace, which is the whole point.
+    const delta = mid(p.easy) - mid(p.threshold);
+    assert.ok(delta > 40 && delta < 200, `5k ${t}s: easy-threshold delta ${Math.round(delta)} s/km`);
+  }
+  // Explicitly: a slower runner gets a BIGGER absolute slowdown than a faster one.
+  const fast = deriveTrainingPaces({ distanceMeters: 5000, timeSeconds: 16 * 60 });
+  const slow = deriveTrainingPaces({ distanceMeters: 5000, timeSeconds: 35 * 60 });
+  const gap = (p: typeof fast) => (p.easy.minSecPerKm + p.easy.maxSecPerKm) / 2 -
+    (p.threshold.minSecPerKm + p.threshold.maxSecPerKm) / 2;
+  assert.ok(gap(slow) > gap(fast) * 1.5, "the easy gap should scale with ability");
 });
 
 test("goal pace is honoured when a goal is supplied", () => {

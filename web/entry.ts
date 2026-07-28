@@ -23,7 +23,7 @@ export { screenRedS, estimateEnergyAvailability } from "../src/safety/red-s.ts";
 export { assessFemaleHealth } from "../src/safety/female-health.ts";
 export { buildFitnessProfile } from "../src/science/fitness-profile.ts";
 export { computeMas } from "../src/science/mas.ts";
-export { riegelPredict } from "../src/science/paces.ts";
+export { riegelPredict, PACE_RATIOS, paceRatioMid, reconcileVo2 } from "../src/science/paces.ts";
 export { rangeText } from "../src/science/estimate.ts";
 export { assessReadiness } from "../src/readiness/readiness.ts";
 export { assessLongRunSpike, returnToRunningPlan } from "../src/adapt/load-guardrails.ts";

@@ -282,6 +282,54 @@ Design rules baked in, each of which cost a real bug when it was missing — don
 - **RPE stays answerable after Save** — the picker writes through to the logged run. Gating it on
   `!saved` starved the whole signal for anyone who taps Save first.
 
+## The pace model (reworked 2026-07-28) — read before touching `src/science/paces.ts`
+
+**The gears are MULTIPLES of threshold pace, not fixed offsets.** `PACE_RATIOS` in
+`src/science/paces.ts` is the single source of truth: easy 1.22–1.33×, moderate 1.13–1.20×, steady
+1.06–1.12×, true tempo 1.025–1.05×. cv/vo2/rep/goalRace come from race predictions and already scale.
+
+Why: the old model used constant offsets (+92 s/km for easy, +35 for steady). A constant +92 is a
+50% slowdown for a 14-minute 5 km runner and 16% for a 45-minute one, so easy/threshold drifted from
+1.50 to 1.16 across the range where Daniels' tables sit near 1.22–1.30 throughout. Fast runners were
+told to jog absurdly slowly; beginners — who most need permission to go easy — got an "easy" pace
+barely easier than their tempo.
+
+⚠️ **Anything that inverts the model must use `paceRatioMid()`, never a hardcoded number.**
+`impliedRecentFromRun` subtracted 92, which silently became wrong: a 16:00 5 km runner completing an
+easy run exactly on target was read as a **13:14** runner, a 40:00 one as **43:51**. Round-trip error
+is now ≤2 s. The same constant was in the "enter your easy pace" seed for building runners.
+
+⚠️ **A 1 km trial may sharpen VO2 pace; it may never break the ladder.** `reconcileVo2()` clamps the
+MAS band into the corridor between rep pace and CV, and refuses to *blunt* it below what the race
+times already imply. Before this, 27 of 63 realistic (5 km, 1 km) pairings produced an inverted
+ladder — an 18:00 5 km runner who trialled 4:15 got "intervals" at 4:15–4:31/km, slower than their
+own threshold. The web layer separately re-anchors the whole plan when the trial projects a *faster*
+5 km (`buildFromProfile`), so the clamp is the safety net for a *poor* trial.
+
+⚠️ **`PACE_MODEL_VERSION` in `web/app.ts` must be bumped whenever the derivation changes.** Logged
+runs are stamped with it, and `flagObservations()` stops its walk at a mismatch. Without this, a
+model change re-anchors every band while leaving `recentTimeS` untouched, so the flags engine reads
+a change in the *prescription* as a change in the *runner*: measured, a banner fired for 16 of 36
+one-minute ability buckets from a habit the app itself had prescribed, and the worst case told a
+40:00 runner "the plan can be quicker — 36:07". Same trap as anchor stamping, different trigger.
+
+**Intensity distribution is per-STEP, not per-session.** `computeDistribution` used to charge a
+55-minute threshold session's whole duration to "moderate" when 30 minutes of it is warm-up, jog
+recoveries and cool-down — enough to push five-day build weeks under the pyramidal floor as a pure
+accounting artefact. Buckets by kind AND by effort: anything at RPE ≤3 is easy running whatever it
+is called (the `setBreak` jog between compound blocks is a `steady` step, so kind alone missed it).
+Effort-only hill sprints have no pace by design, so they are counted at a nominal 4 m/s — returning
+zero made a maximal hill session compute as 100% easy.
+
+**Result: 0 of 2816 generated weeks fall under the easy floor** (was 61). Also: a 4-day week gets one
+quality session outside peak — ⚠️ applied as a CEILING via `Math.min`, *after* the phase decides, or
+it overrides the base phase's deliberate zero-quality foundation block.
+
+Known and NOT fixed: an unrealistic goal (a 30:00 5 km runner targeting 20:00) yields a goal pace
+faster than the athlete's own mile pace, so race-pace sessions are unrunnable. `assessFeasibility`
+already returns "unrealistic" with a suggested target, so the runner is warned — but the sessions
+themselves are not clamped. That is a product decision, not a bug fix.
+
 ## The session library (rebuilt 2026-07-28 from a real coached block)
 
 The owner supplied his own coach's Google Sheet — a full GNR block for a sub-1:20 half runner — and

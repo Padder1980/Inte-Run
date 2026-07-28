@@ -2380,6 +2380,7 @@ function ingestWatchRun(run) {
     pband: prescribed ? plannedPaceBandOf(prescribed) : null,
     rband: prescribed ? plannedRpeBandOf(prescribed) : null,
     anchor: profile.recentTimeS,
+    pmodel: PACE_MODEL_VERSION,
     avgHr: run.avgHr ? Math.round(run.avgHr) : null,
     source: "watch",
   });
@@ -4375,7 +4376,7 @@ function draftFromForm() {
         const ep = RC.parseDuration(epRaw);
         if (ep < 210 || ep > 720) throw new Error("That easy pace looks off — enter minutes:seconds per km (e.g. 6:00).");
         easyPaceS = ep;
-        recentTimeS = Math.max(600, Math.round((ep - 92) * 4.6822));
+        recentTimeS = Math.max(600, Math.round((ep / RC.paceRatioMid("easy")) * 4.6822));
         noRecent = false;
       }
     }
@@ -5885,7 +5886,8 @@ function saveLiveSession() {
     state.logged.unshift({ id: "run-" + new Date().getTime(), t: LIVE.session.title, d: runDateLabel(), dist: sm.distKm + " km", time: sm.time, pace: sm.pace + " /km",
       distKm: Number(sm.distKm), sec: sm.sec, avgPaceSec: Math.round(sm.avgPaceSec), route: sm.route, splits: sm.splits, elevGain: sm.elevGain || 0, type: sm.type,
       // What the plan asked for + how it felt — the flags system's evidence.
-      rpe: sm.rpe || null, pband: plannedPaceBandOf(LIVE.session), rband: plannedRpeBandOf(LIVE.session), anchor: profile.recentTimeS });
+      rpe: sm.rpe || null, pband: plannedPaceBandOf(LIVE.session), rband: plannedRpeBandOf(LIVE.session),
+      anchor: profile.recentTimeS, pmodel: PACE_MODEL_VERSION });
     sm.runId = state.logged[0].id;
     saveRuns();
   }
@@ -5906,8 +5908,13 @@ function saveFitSuggest() { try { state.fitSuggest ? localStorage.setItem("inter
 function impliedRecentFromRun(type, avgPaceSec) {
   if (!avgPaceSec || avgPaceSec <= 0) return null;
   let thr; // implied threshold pace (s/km)
-  if (type === "easy" || type === "long" || type === "recovery") thr = avgPaceSec - 92; // easy ≈ threshold+92
-  else if (type === "steady") thr = avgPaceSec - 35; // steady ≈ threshold+35
+  // The gears are MULTIPLES of threshold pace, so the inverse is a division. This used to subtract
+  // a fixed 92 s/km, which was the right inverse of the old additive model and badly wrong for the
+  // current one: a 16:00 5 km runner completing an easy run exactly on target was read as a 13:14
+  // runner, a 40:00 one as 43:51 — both far enough out to raise a false "your fitness has changed".
+  // RC.paceRatioMid is the same table the forward model uses, so the two cannot drift apart.
+  if (type === "easy" || type === "long" || type === "recovery") thr = avgPaceSec / RC.paceRatioMid("easy");
+  else if (type === "steady") thr = avgPaceSec / RC.paceRatioMid("steady");
   else if (type === "threshold" || type === "race-specific") thr = avgPaceSec; // continuous ≈ threshold
   else return null;
   if (thr < 120) return null; // implausibly fast
@@ -6032,12 +6039,24 @@ function clearTrainFlag() { if (!state.trainFlag) return false; state.trainFlag 
 // Each run remembers the anchor it was judged against, and the walk STOPS at the first run from an
 // older anchor: once the plan is re-anchored, deviations the change already accounts for are history,
 // not evidence. Without this a single run after a re-anchor could reopen the same conversation.
+// Version of the pace model a run's band was stamped under. Bump this whenever the DERIVATION of
+// the training paces changes, even though the athlete has not.
+//
+// The flags engine treats a deviation from the prescribed band as evidence about the RUNNER. That
+// is only true while the prescription holds still. When the pace model itself moves, every band
+// moves with it, and a runner who has changed nothing suddenly reads as too fast or too slow -
+// measured on the ratio-band change, a banner fired for 16 of 36 one-minute ability buckets from a
+// habit the app itself had prescribed. It is the same trap the anchor stamp already guards against
+// (see CLAUDE.md), except a model change does not touch recentTimeS, so the anchor misses it.
+const PACE_MODEL_VERSION = 2;
 function flagObservations() {
   const out = [];
   const runs = state.logged || [];
   for (let i = 0; i < runs.length && out.length < 12; i++) {
     const r = runs[i];
     if (r.anchor && r.anchor !== profile.recentTimeS) break;
+    // Runs judged under an older pace model are history, not evidence.
+    if ((r.pmodel || 1) !== PACE_MODEL_VERSION) break;
     out.push({
       id: r.id || r.t + "|" + r.d, type: r.type || "easy", distKm: Number(r.distKm) || 0,
       avgPaceSecPerKm: r.avgPaceSec || null,

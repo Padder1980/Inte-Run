@@ -24,6 +24,15 @@ struct TodayView: View {
         workout.start()
     }
 
+    /// "Inte" white, "Run" in the brand teal — the same wordmark the phone's splash draws
+    /// (#fff + #16b7a4, which is Brand.mark).
+    private var wordmark: some View {
+        (Text("Inte").foregroundStyle(.white) + Text("Run").foregroundStyle(Brand.mark))
+            .font(.system(size: 22, weight: .heavy, design: .rounded))
+            .kerning(-0.4)
+            .padding(.bottom, 2)
+    }
+
     /// Start something with no plan behind it. Always available.
     private var freeRun: some View {
         Button {
@@ -113,6 +122,7 @@ struct TodayView: View {
                 Brand.backdrop
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
+                        wordmark
                         // A context from a previous day is worse than none: showing yesterday's
                         // session (or yesterday's rest) as today's would quietly mislead. Fall back
                         // to the waiting state, whose advice - open the phone app - is the fix.
@@ -138,7 +148,11 @@ struct TodayView: View {
                     .padding(.horizontal, 2)
                 }
             }
-            .navigationTitle("InteRun")
+            // The wordmark is drawn in the content (see `wordmark`) rather than set as the
+            // navigation title. Handing watchOS a two-tone Text does keep the colours, but it also
+            // re-lays the bar out — the mark shrinks and shifts under the clock. In the content it
+            // sits where the phone's splash puts it, at the size it should be.
+            .navigationTitle("")
             .onAppear { store.requestSync() }
             .navigationDestination(isPresented: $running) {
                 WorkoutView(workout: workout)

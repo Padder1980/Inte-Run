@@ -47,7 +47,10 @@ final class WorkoutManager: NSObject, ObservableObject {
     private var splits: [Int] = []
     private var lastSplitMetre = 0.0
     private var lastSplitElapsed: TimeInterval = 0
-    private let runId = "watch-" + UUID().uuidString
+    /// ⚠️ A var, and reset for every run. As a `let` it was reused across runs in the same app
+    /// session, and the phone dedupes ingest on this id — so a second run was silently dropped as
+    /// "already logged", with nothing anywhere to say why.
+    private var runId = "watch-" + UUID().uuidString
 
     var steps: [PlannedStep] { plan?.steps ?? [] }
 
@@ -128,6 +131,40 @@ final class WorkoutManager: NSObject, ObservableObject {
     }
 
     // MARK: - Lifecycle
+
+    /// Wipe every trace of the previous run.
+    ///
+    /// ⚠️ The manager outlives a run — it is a @StateObject on TodayView — so without this a second
+    /// run inherits the first one's distance, splits, route, step position and, worst of all, its
+    /// id. It also never leaves `.ended`, which is why starting a run from the phone opened the
+    /// watch straight onto the finish screen: `startCountingDown` refuses unless the phase is idle.
+    func reset() {
+        countdownTimer?.invalidate(); countdownTimer = nil
+        countdown = nil
+        phase = .idle
+        elapsed = 0
+        distanceMetres = 0
+        heartRate = 0
+        avgHeartRate = 0
+        activeCalories = 0
+        paceSecPerKm = nil
+        stepIndex = 0
+        stepStartElapsed = 0
+        stepStartMetres = 0
+        reportedRpe = nil
+        hrSamples = []
+        routePoints = []
+        splits = []
+        lastSplitMetre = 0
+        lastSplitElapsed = 0
+        lastLocation = nil
+        startedAt = nil
+        session = nil
+        builder = nil
+        routeBuilder = nil
+        voice = nil
+        runId = "watch-" + UUID().uuidString
+    }
 
     /// Begin, after a three-second count if the runner has left it on. Each beat taps the wrist, so
     /// it works with the screen down and the phone already in a pocket.

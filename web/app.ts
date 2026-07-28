@@ -5202,7 +5202,11 @@ function startWhereHtml(sess) {
   return '<div class="sheet-h">Where shall we record this?</div>' +
     '<div class="sheet-sub">' + esc((sess && sess.title) || "Your session") + '</div>' +
     '<div class="sw-list">' + watchRow +
-      row("phone", ICON.phone, "This iPhone", "GPS, pace and route recorded here. Keep the phone with you.") +
+      row("phone", ICON.phone,
+        watchAvailable() ? "Start here, record on my watch" : "This iPhone",
+        watchAvailable()
+          ? "Your watch does the recording \u2014 better GPS and heart rate \u2014 and you follow along, pause and finish from this screen."
+          : "GPS, pace and route recorded here. Keep the phone with you.") +
       row("treadmill", ICON.treadmill, "Treadmill", "Indoors, timed by the clock. Add the distance from the machine when you finish.") +
     '</div>';
 }
@@ -5211,16 +5215,18 @@ function wireStartWhere() {
     const where = b.dataset.startwhere, sess = START_CTX;
     closeSheet();
     if (where === "watch") return startOnWatch(sess);
+    // ⚠️ "This iPhone" with a watch on your wrist still records ON THE WATCH. Better sensors, heart
+    // rate, and it survives the phone being pocketed — and crucially it is ONE recorder, so the run
+    // is logged once. What the choice really picks is where you want to look and press, and both
+    // devices can now do all of it: the phone's live screen pauses, resumes and finishes the run.
+    // Only a treadmill run, or a runner with no watch, is recorded by the phone itself.
+    if (where !== "treadmill" && watchAvailable()) return startOnWatch(sess, { fromPhone: true });
     startSession(sess, { indoor: where === "treadmill" });
-    // Bring the wrist along. It shows the run; it does NOT record one — two recorders would put the
-    // same outing in the Logbook twice. A treadmill run has nothing for GPS to add, so it still
-    // wakes the watch, which is where a glance is easiest.
-    startWatchCompanion(sess);
   });
 }
 // Hand the run to the wrist. The watch app is launched by HealthKit on the native side; from then
 // on the watch owns the run and this phone shows the live mirror it already knows how to draw.
-function startOnWatch(sess) {
+function startOnWatch(sess, opts) {
   if (!NATIVE_WATCH) return startSession(sess);
   try {
     // The session travels so the native side can raise the Live Activity here and now. This tap is
@@ -5231,7 +5237,9 @@ function startOnWatch(sess) {
       title: (sess && sess.title) || "Run",
       type: (sess && sess.type) || "easy",
     });
-    toast("Opening InteRun on your watch\u2026");
+    toast((opts && opts.fromPhone)
+      ? "Recording on your watch \u2014 follow along here"
+      : "Opening InteRun on your watch\u2026");
   } catch (e) { startSession(sess); }
 }
 window.__interunWatchStart = function (ok, reason) {

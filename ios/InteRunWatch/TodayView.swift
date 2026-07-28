@@ -25,6 +25,8 @@ struct TodayView: View {
         workout.coachLines = store.coachLines
         // The phone can finish, pause and resume a wrist run: someone holding their phone should not
         // have to find their watch to stop. Cleared when the run ends so a late command does nothing.
+        // Every run starts from a clean manager — see WorkoutManager.reset().
+        workout.reset()
         store.onStopRequested = { [weak workout] in workout?.end() }
         store.onPauseRequested = { [weak workout] in workout?.pause() }
         store.onResumeRequested = { [weak workout] in workout?.resume() }

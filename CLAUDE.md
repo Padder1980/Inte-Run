@@ -553,6 +553,20 @@ because the two sides must agree on the type exactly and a copied file would dri
 `LiveActivityService` starts/updates/ends it; watch runs drive it from `WatchBridge.forwardLive`,
 phone runs from `pushLiveActivity()` in `web/app.ts` via a `liveActivity` bridge action. Tapping the
 card opens the app and `replayLiveOnActivate()` lands it on the live screen.
+**When a watch is present, the WATCH records — whichever device you started from.** Better sensors,
+heart rate, and it survives the phone going in a pocket; crucially it is ONE recorder, so the run is
+logged once. The start sheet's choice is really "where do you want to look and press", and both
+devices can now do everything. Only a treadmill run, or a runner with no watch, is recorded by the
+phone. ⚠️ The old `CompanionView` display-only path is superseded and unused — do not revive it as a
+second recorder.
+
+⚠️ **`WorkoutManager` outlives a run (it is a `@StateObject`), so `reset()` on every start is
+load-bearing.** Without it a second run inherits the first one's distance, splits, route and step
+position — and its `runId`, which the phone dedupes ingest on, so **the second run of an app session
+was silently dropped as "already logged"**. It also never left `.ended`, which is why starting from
+the phone opened the watch straight onto the finish screen: `startCountingDown` refuses unless the
+phase is idle.
+
 **The two devices control each other (2026-07-28).** The phone's full-screen wrist view carries
 **Pause/Resume and Finish** — `watchCommand()` → `WatchBridge` `watchCommand` → the watch's
 `didReceiveMessage` → `store.onStopRequested` etc., set for the life of a run in `TodayView.begin`.

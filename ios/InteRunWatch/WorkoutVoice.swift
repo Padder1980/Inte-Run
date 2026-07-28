@@ -83,13 +83,15 @@ final class WorkoutVoice {
 
     /// Pace nudges speak only when the verdict has held for a few seconds AND the last nudge was
     /// a while ago — a coach who nags every stride gets muted in week one.
-    func paceCue(_ verdict: String) {
+    func paceCue(_ verdict: String, via manager: WorkoutManager? = nil) {
         guard verdict == "fast" || verdict == "slow" else { lastVerdict = verdict; verdictSince = nil; return }
         if verdict != lastVerdict { lastVerdict = verdict; verdictSince = Date(); return }
         guard let since = verdictSince,
               Date().timeIntervalSince(since) > 6,
               Date().timeIntervalSince(lastPaceCue) > 45 else { return }
         lastPaceCue = Date()
+        let trigger = verdict == "fast" ? "pace-ahead" : "pace-behind"
+        if manager?.speakOnPhone(trigger) == true { return }   // the phone said it, in the real voice
         say(verdict == "fast" ? line("paceAhead", "Ease off a touch.")
                               : line("paceBehind", "Pick it up a little."))
     }

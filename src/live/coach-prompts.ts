@@ -89,7 +89,8 @@ export type PromptTrigger =
   | "why-inspire"         // invoke the runner's "who inspires you" answer
   | "why-reason"          // invoke the runner's "why do you run" answer
   | "why-goal"            // invoke the runner's "why this goal" answer
-  | "why-anchor";         // invoke the runner's "who keeps you going" answer
+  | "why-anchor"          // invoke the runner's "who keeps you going" answer
+  | "countdown";          // the three beats before the clock starts
 
 /** The words a given coach actually says for a prompt. */
 export function promptTextFor(p: PromptDef, coach: CoachId): string {
@@ -224,6 +225,18 @@ export const PROMPTS: PromptDef[] = [
     variants: { guide: "That goal of yours has a reason behind it. This is you earning it.", pacer: "The goal means something. This stretch is where it's paid for.", motivator: "That time goal? You chose it for a reason. Chase it down!", technician: "Your goal was chosen deliberately. Run this stretch deliberately." } },
   { id: "why_anchor_1", trigger: "why-anchor", text: "It's tough. So think of what keeps you going \u2014 and let it.", priority: P_KEY, interrupt: false, minRepeatSec: ONESHOT, sessionTypes: "all",
     variants: { guide: "It's tough. So think of what keeps you going \u2014 and let it.", pacer: "Hard patch. Anchor to your reason and hold the pace.", motivator: "This is the tough bit \u2014 and you know exactly who you're doing it for.", technician: "When it's tough, your anchor is a tool. Use it now." } },
+
+  // — The count-in ------------------------------------------------------------
+  // Separate beats rather than one clip, so the app can place each on its own second and the run
+  // starts exactly on "go". Words, never numerals — the catalogue forbids digits because a
+  // pre-generated clip can never say a number that varies, and these are played by id.
+  // No per-coach variants, deliberately: a coach counting to three says "three". What differs is
+  // the VOICE — four recorded actors — and inventing four wordings for one syllable would be
+  // difference for its own sake.
+  { id: "count_3", trigger: "countdown", text: "Three.", priority: P_CRITICAL, interrupt: true, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "count_2", trigger: "countdown", text: "Two.", priority: P_CRITICAL, interrupt: true, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "count_1", trigger: "countdown", text: "One.", priority: P_CRITICAL, interrupt: true, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "count_go", trigger: "countdown", text: "Go.", priority: P_CRITICAL, interrupt: true, minRepeatSec: 0, sessionTypes: "all" },
 
   // — Distance / time milestones --------------------------------------------
   { id: "milestone_1", trigger: "milestone-distance", text: "Another kilometre done. Strong and steady.", priority: P_INFO, interrupt: false, minRepeatSec: 30, sessionTypes: "all" },

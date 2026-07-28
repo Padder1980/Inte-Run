@@ -629,6 +629,23 @@ not in front, and `replayLiveOnActivate()` (driven by `scenePhase`) hands the pa
 tick the instant the app becomes active, so it lands on the live screen rather than showing Today
 for two seconds first.
 
+**⚠️ ALL coach audio comes out of the PHONE, including during a wrist run.** The phone has the four
+recorded voices and an `audio` background mode that keeps them playing from a pocket; the watch only
+has the system synthesiser, which sounds like a computer beside them. So the **watch decides WHEN a
+cue is due** (it owns the pace data and the hold/quiet windows) and **the phone decides what it
+sounds like**: `WorkoutManager.speakOnPhone(trigger)` → `WatchBridge.forwardCue` →
+`window.__interunWatchCue` → `coachTrigger`. `WorkoutVoice` on the wrist is now only the fallback for
+when the phone is out of range. The ONE exception is the step announcement, which carries the
+runner's own pace numbers and so can never be a recorded clip.
+
+**The count-in (2026-07-28):** three beats, `count_3/2/1/go` clips played by id at one-second
+intervals — not one clip, so "go" lands exactly on the start rather than drifting with clip length.
+`runCountIn()` shows the full-screen overlay and speaks; a watch-initiated count calls
+`speakCountIn()` instead, voice only, because the runner is looking at their wrist. ⚠️ The countdown
+prompts deliberately have **no per-coach variants** — a coach counting to three says "three", and the
+difference is the voice. ⚠️ `renderCountIn` must not name its local `el`: that shadows the global
+`el()` helper and the overlay silently never appears.
+
 **The chosen coach reaches the wrist (2026-07-28)** — as an identity, not as audio. The phone sends
 `coach` + `coachLines` (that coach's own wordings, pulled from the same catalogue it plays);
 `CoachVoice.swift` maps each coach to a matched system voice, rate and pitch, and `WorkoutVoice`

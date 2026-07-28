@@ -1650,6 +1650,17 @@ input, select, textarea { font-size: 16px; }
 .wl-btn svg { width: 15px; height: 15px; vertical-align: -2px; margin-right: 4px; }
 .wl-btn:active { transform: scale(.98); }
 .wl-stop { background: linear-gradient(150deg, #d94b3a, #b8302a); border-color: transparent; color: #fff; }
+/* The count-in. Full-bleed and unmissable: it exists so the runner can look away from the phone,
+   so it has to be readable from arm's length in a pocket-fumbling second. */
+.countin { position: fixed; inset: 0; z-index: 120; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px; background: rgba(6, 17, 15, .92);
+  backdrop-filter: blur(6px); }
+.ci-n { font-size: 30vh; font-weight: 800; letter-spacing: -.05em; line-height: 1; color: var(--accent);
+  text-shadow: 0 18px 60px rgba(22, 183, 164, .35); }
+.ci-s { font-size: 15px; font-weight: 600; color: #cfd6d3; max-width: 78%; text-align: center; }
+.countin.beat .ci-n { animation: ciBeat .45s cubic-bezier(.22, 1, .36, 1) both; }
+@keyframes ciBeat { from { opacity: 0; transform: scale(.72); } to { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .countin.beat .ci-n { animation: none; } }
 </style>
 </head>
 <body>
@@ -2565,6 +2576,81 @@ function startWatchCompanion(sess) {
     });
   } catch (e) {}
 }
+// ---- The count-in ---------------------------------------------------------------------------------
+// Three beats, spoken in the coach's own recorded voice and shown full-screen, so there is time to
+// pocket the phone before the clock starts. Each beat is its own clip, placed on its own second, so
+// "go" lands exactly when the run begins rather than drifting with clip length.
+let COUNTIN = null;
+function runCountIn(onGo) {
+  clearCountIn();
+  COUNTIN = { n: 3, timer: null };
+  const beat = () => {
+    if (!COUNTIN) return;
+    renderCountIn();
+    const id = COUNTIN.n === 3 ? "count_3" : COUNTIN.n === 2 ? "count_2" : COUNTIN.n === 1 ? "count_1" : "count_go";
+    coachSayId(id);
+    haptic(COUNTIN.n === 0 ? "success" : "tap");
+    if (COUNTIN.n === 0) { clearCountIn(); onGo(); return; }
+    COUNTIN.n -= 1;
+    COUNTIN.timer = setTimeout(beat, 1000);
+  };
+  coachUnlock();
+  coachLoadManifest().then(beat);
+}
+function clearCountIn() {
+  if (COUNTIN && COUNTIN.timer) clearTimeout(COUNTIN.timer);
+  COUNTIN = null;
+  const box = $("countIn"); if (box) box.remove();
+}
+function renderCountIn() {
+  // NOT named el: that shadows the global el() helper and the overlay silently never appears.
+  let box = $("countIn");
+  if (!box) {
+    box = el('<div class="countin" id="countIn"><div class="ci-n num"></div><div class="ci-s"></div></div>');
+    document.querySelector(".app").appendChild(box);
+  }
+  box.querySelector(".ci-n").textContent = COUNTIN.n === 0 ? "GO" : String(COUNTIN.n);
+  box.querySelector(".ci-s").textContent = (LIVE && LIVE.session && LIVE.session.title) || "";
+  box.classList.remove("beat"); void box.offsetWidth; box.classList.add("beat");
+}
+// Play one clip by id, outside the trigger machinery — the countdown is a fixed sequence, not a
+// choice between prompts.
+function coachSayId(id) {
+  if (!coachEnabled()) return;
+  const clip = coachClip(id);
+  if (!clip) return;
+  try {
+    const a = coachAudioEl();
+    a.src = clip.file; a.volume = Math.max(0, Math.min(1, COACH.cfg.volume)); a.currentTime = 0;
+    const pr = a.play(); if (pr && pr.catch) pr.catch(() => {});
+  } catch (e) {}
+}
+// Just the voice, no overlay — for when the WATCH is counting and owns the screen.
+function speakCountIn() {
+  const ids = ["count_3", "count_2", "count_1", "count_go"];
+  ids.forEach((id, i) => setTimeout(() => coachSayId(id), i * 1000));
+}
+// A cue the WATCH decided was due, spoken here in the chosen coach's recorded voice.
+//
+// The wrist owns the timing — it has the pace data and the hold/quiet windows — and the phone owns
+// the sound, because the phone has the four recorded coaches and an audio background mode that
+// keeps them playing from a pocket. The watch's own synthesiser is the fallback for when the phone
+// is out of range, not the default.
+window.__interunWatchCue = function (trigger, text) {
+  if (!trigger) return;
+  if (!coachEnabled()) return;
+  // The wrist is counting in; say the numbers here, where the real voices are. No visual — the
+  // runner is looking at their watch, and a full-screen count on a phone they are pocketing would
+  // be in the way.
+  if (trigger === "countdown") { coachUnlock(); coachLoadManifest().then(() => speakCountIn()); return; }
+  coachLoadManifest().then(() => {
+    const type = (WATCH_LIVE && WATCH_LIVE.type) || "easy";
+    const at = Math.round(((WATCH_LIVE && WATCH_LIVE.sec) || 0));
+    coachTrigger(trigger, type, at);
+    // A cue with no clip for this coach still gets said, rather than swallowed.
+    if (text && !COACH.current && VOICE_AVAILABLE) speak(text);
+  });
+};
 // Commands travel phone -> watch over the same bridge the ticks come back on.
 function watchCommand(cmd) {
   if (!NATIVE_WATCH) return;
@@ -5222,6 +5308,9 @@ function wireStartWhere() {
     // Only a treadmill run, or a runner with no watch, is recorded by the phone itself.
     if (where !== "treadmill" && watchAvailable()) return startOnWatch(sess, { fromPhone: true });
     startSession(sess, { indoor: where === "treadmill" });
+    // Already on the live screen by now; count in, then begin. The runner does not have to find a
+    // second Start button — they pressed start, so the run starts.
+    runCountIn(beginLive);
   });
 }
 // Hand the run to the wrist. The watch app is launched by HealthKit on the native side; from then
@@ -6172,6 +6261,7 @@ function simRouteStep() {
 function startLoop() { if (!LIVE.timer) LIVE.timer = setInterval(liveTick, 200); }
 function stopLive() {
   if (!LIVE) return;
+  clearCountIn();
   endLiveActivity();
   if (LIVE.timer) { clearInterval(LIVE.timer); LIVE.timer = null; }
   if (LIVE.ui) { clearInterval(LIVE.ui); LIVE.ui = null; }
@@ -6918,7 +7008,7 @@ function wire() {
     if (liveRunning()) { state.screen = null; state.tab = "today"; render(); return; }
     coachStop(); stopLive(); stopSpeech(); state.screen = null; state.tab = "today"; render();
   };
-  const lStart = $("lStart"); if (lStart) lStart.onclick = beginLive;
+  const lStart = $("lStart"); if (lStart) lStart.onclick = () => runCountIn(beginLive);
   const lVoice = $("lVoice"); if (lVoice) lVoice.onclick = () => {
     COACH.cfg.enabled = !COACH.cfg.enabled; saveCoachCfg();
     if (!COACH.cfg.enabled) coachStop(); else { coachUnlock(); coachLoadManifest(); }

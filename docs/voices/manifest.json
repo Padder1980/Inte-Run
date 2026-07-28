@@ -6,25 +6,25 @@
    "id": "guide",
    "name": "The Guide",
    "voice": "Holly",
-   "bytes": 2900578
+   "bytes": 2926211
   },
   {
    "id": "pacer",
    "name": "The Pacer",
    "voice": "Philip",
-   "bytes": 1946476
+   "bytes": 1969238
   },
   {
    "id": "motivator",
    "name": "The Motivator",
    "voice": "Hope",
-   "bytes": 1914445
+   "bytes": 1935688
   },
   {
    "id": "technician",
    "name": "The Technician",
    "voice": "Lucy",
-   "bytes": 1939962
+   "bytes": 1961262
   }
  ],
  "clips": [
@@ -457,6 +457,46 @@
    "duration": 4.36,
    "bytes": 49900,
    "hash": "d26568af77a72ca7"
+  },
+  {
+   "id": "count_3",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "countdown",
+   "file": "voices/guide/count_3.mp3",
+   "duration": 0.43,
+   "bytes": 5738,
+   "hash": "a3ac9a625365b576"
+  },
+  {
+   "id": "count_2",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "countdown",
+   "file": "voices/guide/count_2.mp3",
+   "duration": 0.58,
+   "bytes": 7301,
+   "hash": "f34b788b5ad2ec21"
+  },
+  {
+   "id": "count_1",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "countdown",
+   "file": "voices/guide/count_1.mp3",
+   "duration": 0.42,
+   "bytes": 6545,
+   "hash": "8fc1f6e6a284290b"
+  },
+  {
+   "id": "count_go",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "countdown",
+   "file": "voices/guide/count_go.mp3",
+   "duration": 0.43,
+   "bytes": 6049,
+   "hash": "4802281273d6520b"
   },
   {
    "id": "milestone_1",
@@ -1029,6 +1069,46 @@
    "hash": "26a4dff5efe2e998"
   },
   {
+   "id": "count_3",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "countdown",
+   "file": "voices/pacer/count_3.mp3",
+   "duration": 0.5,
+   "bytes": 7485,
+   "hash": "3c45ba8be872a223"
+  },
+  {
+   "id": "count_2",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "countdown",
+   "file": "voices/pacer/count_2.mp3",
+   "duration": 0.48,
+   "bytes": 5709,
+   "hash": "2f3ad4894152dbd9"
+  },
+  {
+   "id": "count_1",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "countdown",
+   "file": "voices/pacer/count_1.mp3",
+   "duration": 0.3,
+   "bytes": 5058,
+   "hash": "ab084304a1a983da"
+  },
+  {
+   "id": "count_go",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "countdown",
+   "file": "voices/pacer/count_go.mp3",
+   "duration": 0.38,
+   "bytes": 4510,
+   "hash": "d36a05c6dd1dbee3"
+  },
+  {
    "id": "milestone_1",
    "coach": "pacer",
    "voice": "Philip",
@@ -1597,6 +1677,46 @@
    "duration": 3.63,
    "bytes": 40382,
    "hash": "1725aec5f2b0345e"
+  },
+  {
+   "id": "count_3",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "countdown",
+   "file": "voices/motivator/count_3.mp3",
+   "duration": 0.44,
+   "bytes": 5683,
+   "hash": "1f9d50bd3e5748c9"
+  },
+  {
+   "id": "count_2",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "countdown",
+   "file": "voices/motivator/count_2.mp3",
+   "duration": 0.46,
+   "bytes": 5916,
+   "hash": "c765812f70865039"
+  },
+  {
+   "id": "count_1",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "countdown",
+   "file": "voices/motivator/count_1.mp3",
+   "duration": 0.37,
+   "bytes": 4769,
+   "hash": "ed967202d987fcdd"
+  },
+  {
+   "id": "count_go",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "countdown",
+   "file": "voices/motivator/count_go.mp3",
+   "duration": 0.39,
+   "bytes": 4875,
+   "hash": "3e0f7de936e5118c"
   },
   {
    "id": "milestone_1",
@@ -2169,6 +2289,46 @@
    "hash": "aadf3057bb0af3ae"
   },
   {
+   "id": "count_3",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "countdown",
+   "file": "voices/technician/count_3.mp3",
+   "duration": 0.47,
+   "bytes": 5685,
+   "hash": "03029bb08e0e4118"
+  },
+  {
+   "id": "count_2",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "countdown",
+   "file": "voices/technician/count_2.mp3",
+   "duration": 0.51,
+   "bytes": 6362,
+   "hash": "86eac0b89429adce"
+  },
+  {
+   "id": "count_1",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "countdown",
+   "file": "voices/technician/count_1.mp3",
+   "duration": 0.32,
+   "bytes": 4378,
+   "hash": "2ce05af2317384c5"
+  },
+  {
+   "id": "count_go",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "countdown",
+   "file": "voices/technician/count_go.mp3",
+   "duration": 0.38,
+   "bytes": 4875,
+   "hash": "2087bad4b1f5b83f"
+  },
+  {
    "id": "milestone_1",
    "coach": "technician",
    "voice": "Lucy",
@@ -2309,5 +2469,5 @@
    "hash": "28e0f2ff3d175d70"
   }
  ],
- "totalBytes": 8701461
+ "totalBytes": 8792399
 }

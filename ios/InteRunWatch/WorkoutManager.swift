@@ -173,6 +173,10 @@ final class WorkoutManager: NSObject, ObservableObject {
         guard countdown == nil, phase == .idle else { return }
         countdown = 3
         WKInterfaceDevice.current().play(.start)
+        // The phone says the numbers, in the coach's recorded voice. If it is out of range the
+        // wrist is silent rather than robotic — the haptics still carry the beat, which is what
+        // matters when you are looking at your phone or your shoes.
+        _ = speakOnPhone("countdown")
         countdownTimer?.invalidate()
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] t in
             Task { @MainActor in
@@ -267,6 +271,8 @@ final class WorkoutManager: NSObject, ObservableObject {
             voice = WatchSettings.shared.voiceCues ? WorkoutVoice() : nil
             voice?.loadCoach(coach, lines: coachLines)
             voice?.loadWhy(why, person: whyPerson)
+            // The step announcement carries the runner's own pace numbers, so no recorded clip can
+            // ever say it — this one stays on the wrist's synthesiser by necessity, and only this one.
             if let first = currentStep {
                 voice?.announceStep(label: "Let\u{2019}s go. " + first.label, paceLow: first.paceLow, paceHigh: first.paceHigh)
             } else {
@@ -289,10 +295,12 @@ final class WorkoutManager: NSObject, ObservableObject {
                     guard let self, let started = self.startedAt, self.phase == .running else { return }
                     self.elapsed = Date().timeIntervalSince(started)
                     self.advanceStepIfDue()
+                    // The wrist still decides WHEN — it owns the pace data and the hold/quiet
+                    // windows — but the phone says it, in the coach's own recorded voice.
                     switch self.paceVerdict {
-                    case .tooFast: self.voice?.paceCue("fast")
-                    case .tooSlow: self.voice?.paceCue("slow")
-                    default: self.voice?.paceCue("ok")
+                    case .tooFast: self.voice?.paceCue("fast", via: self)
+                    case .tooSlow: self.voice?.paceCue("slow", via: self)
+                    default: self.voice?.paceCue("ok", via: self)
                     }
                     let target = self.targetSeconds
                     self.voice?.whyMoment(elapsed: self.elapsed, target: target, hard: self.isHardSession)
@@ -310,7 +318,7 @@ final class WorkoutManager: NSObject, ObservableObject {
         guard phase == .running else { return }
         session?.pause()
         phase = .paused
-        voice?.sayPaused()
+        if !speakOnPhone("paused") { voice?.sayPaused() }
         sendLiveTick(force: true)
     }
 
@@ -318,12 +326,12 @@ final class WorkoutManager: NSObject, ObservableObject {
         guard phase == .paused else { return }
         session?.resume()
         phase = .running
-        voice?.sayResumed()
+        if !speakOnPhone("resumed") { voice?.sayResumed() }
         sendLiveTick(force: true)
     }
 
     func end() {
-        voice?.sayComplete()
+        if !speakOnPhone("session-complete") { voice?.sayComplete() }
         // Drop the phone's mirror now; the recorded run follows by its own durable path. The phase
         // is deliberately NOT set here — HealthKit teardown below owns that transition.
         sendLiveTick(force: true, stateOverride: "ended")
@@ -400,6 +408,23 @@ final class WorkoutManager: NSObject, ObservableObject {
         if let rpe = reportedRpe { out["rpe"] = rpe }
         if avgHeartRate > 0 { out["avgHr"] = avgHeartRate }
         return out
+    }
+
+    /// Ask the PHONE to speak a cue.
+    ///
+    /// ⚠️ The phone owns the voice. It has the four recorded coaches and an `audio` background mode
+    /// that keeps them playing from a pocket; the wrist only has the system synthesiser, which
+    /// sounds like a computer next to them. So the watch decides WHEN a cue is due and the phone
+    /// decides what it sounds like. `WorkoutVoice` is now only the fallback for when the phone is
+    /// out of range.
+    func speakOnPhone(_ trigger: String, text: String? = nil) -> Bool {
+        guard WCSession.isSupported() else { return false }
+        let s = WCSession.default
+        guard s.activationState == .activated, s.isReachable else { return false }
+        var msg: [String: Any] = ["cue": trigger]
+        if let text { msg["text"] = text }
+        s.sendMessage(msg, replyHandler: nil, errorHandler: { _ in })
+        return true
     }
 
     /// A snapshot of the run in progress, sent to the phone every couple of seconds while it is

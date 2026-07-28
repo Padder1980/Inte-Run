@@ -497,6 +497,50 @@
       }
     },
     {
+      "id": "count_3",
+      "text": "Three.",
+      "trigger": "countdown",
+      "byCoach": {
+        "guide": "Three.",
+        "pacer": "Three.",
+        "motivator": "Three.",
+        "technician": "Three."
+      }
+    },
+    {
+      "id": "count_2",
+      "text": "Two.",
+      "trigger": "countdown",
+      "byCoach": {
+        "guide": "Two.",
+        "pacer": "Two.",
+        "motivator": "Two.",
+        "technician": "Two."
+      }
+    },
+    {
+      "id": "count_1",
+      "text": "One.",
+      "trigger": "countdown",
+      "byCoach": {
+        "guide": "One.",
+        "pacer": "One.",
+        "motivator": "One.",
+        "technician": "One."
+      }
+    },
+    {
+      "id": "count_go",
+      "text": "Go.",
+      "trigger": "countdown",
+      "byCoach": {
+        "guide": "Go.",
+        "pacer": "Go.",
+        "motivator": "Go.",
+        "technician": "Go."
+      }
+    },
+    {
       "id": "milestone_1",
       "text": "Another kilometre done. Strong and steady.",
       "trigger": "milestone-distance",

@@ -161,6 +161,13 @@ extension WatchBridge: WCSessionDelegate {
 
     /// Everything the watch can send that is not a sync request.
     private func route(_ message: [String: Any]) {
+        // The wrist asking the phone to speak. It decides WHEN; we decide what it sounds like, which
+        // is the whole point — the recorded coaches live here, not on the watch.
+        if let cue = message["cue"] as? String {
+            let text = (message["text"] as? String) ?? ""
+            DispatchQueue.main.async { self.forwardCue(cue, text: text) }
+            return
+        }
         // Live ticks from a run happening on the wrist right now. These are transient by design:
         // if the phone is asleep they are simply missed, and the next tick two seconds later
         // catches up. Nothing about the recorded run depends on them.
@@ -235,6 +242,13 @@ extension WatchBridge: WCSessionDelegate {
             webView.evaluateJavaScript(
                 "window.__interunWatchStart && window.__interunWatchStart(\(ok), \"\(msg)\");")
         }
+    }
+
+    private func forwardCue(_ trigger: String, text: String) {
+        guard let webView else { return }
+        let safe = { (v: String) in v.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") }
+        webView.evaluateJavaScript(
+            "window.__interunWatchCue && window.__interunWatchCue(\"\(safe(trigger))\", \"\(safe(text))\");")
     }
 
     private func forwardLive(_ live: [String: Any]) {

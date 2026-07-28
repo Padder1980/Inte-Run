@@ -6,9 +6,25 @@ import SwiftUI
 /// does something — see WatchSettings.
 struct SettingsView: View {
     @ObservedObject private var settings = WatchSettings.shared
+    @EnvironmentObject private var store: SessionStore
 
     var body: some View {
         List {
+            Section {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(CoachVoice.character(for: store.coach).name)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Brand.accent)
+                    Text(store.coach == nil
+                         ? "Voice coaching is off on your iPhone."
+                         : "Chosen on your iPhone. Your watch speaks their lines in a matched voice — the recorded coach cannot say your pace numbers, so out here it is synthesised.")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Brand.inkFaint)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } header: {
+                Text("YOUR COACH")
+            }
             Section {
                 NavigationLink { MetricsEditor() } label: {
                     VStack(alignment: .leading, spacing: 3) {

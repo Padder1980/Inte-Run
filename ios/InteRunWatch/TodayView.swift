@@ -20,6 +20,8 @@ struct TodayView: View {
         workout.plan = s   // nil is a free run: no targets, no steps, just the clock and the GPS
         workout.why = store.why          // the runner's own reasons, for the hard stretch
         workout.whyPerson = store.whyPerson
+        workout.coach = store.coach      // the same coach they chose on the phone
+        workout.coachLines = store.coachLines
         running = true
         workout.start()
     }
@@ -90,7 +92,7 @@ struct TodayView: View {
 
     private var settingsLink: some View {
         NavigationLink {
-            SettingsView()
+            SettingsView().environmentObject(store)
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "gearshape.fill").font(.system(size: 12))

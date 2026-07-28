@@ -544,9 +544,17 @@ off an array gives `undefined`, so every coordinate became `NaN` and the map dre
 instead of failing loudly. `normalizeRoute()` converts at ingest and `migrateRunRoutes()` repairs
 runs already saved in the wrong shape. Anything crossing that bridge needs its shape checked.
 
+**The chosen coach reaches the wrist (2026-07-28)** — as an identity, not as audio. The phone sends
+`coach` + `coachLines` (that coach's own wordings, pulled from the same catalogue it plays);
+`CoachVoice.swift` maps each coach to a matched system voice, rate and pitch, and `WorkoutVoice`
+speaks their lines. ⚠️ **The recorded clips can never work on the watch**: its most frequent cue is
+the step announcement, which carries the runner's own pace numbers — and no pre-generated clip may
+contain a digit. Clips for the fixed lines plus synthesis for the rest would swap timbre several
+times a kilometre. Synthesising everything is the coherent choice, not a shortcut.
+
 ⚠️ **`WatchBridge`'s `sync` case forwards a key list, not cherry-picked fields.** It previously copied
 only `session` + `name`, which silently dropped `why`/`whyName` — a page-side addition appeared to
-work everywhere except on the wrist. Add new keys to that list.
+work everywhere except on the wrist. Add new keys to that list — `upcoming` was added to the payload and NOT to the list, so the week silently never reached the watch until it was spotted a day later.
 
 **Where to record (shipped 2026-07-28):** tapping Start asks *Apple Watch / this iPhone / treadmill*
 (`openStartWhereSheet`). The watch option calls `HKHealthStore.startWatchApp(with:)` — the only API

@@ -2322,6 +2322,28 @@ function pickWhy() {
   if (!answered.length) return null;
   return answered[Math.floor(Math.random() * answered.length)];
 }
+// The lines the wrist speaks, in the chosen coach's own words. Pulled from the same catalogue the
+// phone plays, so the two devices never disagree about what a coach sounds like.
+function coachLinesForWatch(coach) {
+  const pick = (trigger, fallback) => {
+    try {
+      const list = RC.promptsFor(trigger, "easy");
+      if (!list || !list.length) return fallback;
+      return RC.promptTextFor(list[Math.floor(Math.random() * list.length)], coach) || fallback;
+    } catch (e) { return fallback; }
+  };
+  return {
+    paceBehind: pick("pace-behind", "Pick it up a little."),
+    paceAhead: pick("pace-ahead", "Ease off a touch."),
+    paceOn: pick("pace-on", "That's it — right on target."),
+    keepGoing: pick("keep-going", "Stay with it. This is the part that counts."),
+    start: pick("session-start", "Here we go."),
+    paused: pick("paused", "Paused."),
+    resumed: pick("resumed", "And we're back."),
+    complete: pick("session-complete", "Session complete. Well done."),
+    finalEffort: pick("final-effort", "Last effort now."),
+  };
+}
 // ---- Apple Watch handover -----------------------------------------------------------------
 // The watch cannot read the plan: it lives in this localStorage, and watchOS has no JavaScriptCore
 // to run the engine either. So the page extracts just today's session and the native shell relays
@@ -2578,6 +2600,17 @@ function syncWatch() {
     // person - it is the one place the name is always speakable.
     const person = whyName();
     if (person) payload.whyName = person.slice(0, 24);
+    // Which coach, and their own wordings for the handful of lines the wrist speaks.
+    //
+    // The watch cannot play the recorded clips: its most frequent cue is the step announcement, and
+    // that carries the runner's own pace numbers — which no pre-generated clip can ever say (the
+    // catalogue forbids digits for exactly this reason). Half-recorded, half-synthesised would
+    // alternate timbre mid-run. So the wrist synthesises everything, and what travels is the
+    // coach's IDENTITY and WORDS, so the runner hears the coach they chose saying the coach's lines.
+    if (COACH.cfg && COACH.cfg.enabled) {
+      payload.coach = COACH.cfg.coach;
+      payload.coachLines = coachLinesForWatch(COACH.cfg.coach);
+    }
     const s = watchPayloadForToday();
     if (s) payload.session = s;
     // The week ahead travels too. Without it the watch can only ever run today's session, and only

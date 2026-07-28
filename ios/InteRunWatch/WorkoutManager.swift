@@ -34,6 +34,9 @@ final class WorkoutManager: NSObject, ObservableObject {
     /// The runner's own reasons, handed over by the phone. Spoken once, deep into a hard run.
     var why: [String: String] = [:]
     var whyPerson: String?
+    /// The coach picked on the phone, and their wordings, so the wrist sounds like the same coach.
+    var coach: String?
+    var coachLines: [String: String] = [:]
     private var hrSamples: [Double] = []
     private(set) var routePoints: [[Double]] = []
     private var splits: [Int] = []
@@ -174,6 +177,7 @@ final class WorkoutManager: NSObject, ObservableObject {
             startedAt = now
             phase = .running
             voice = WatchSettings.shared.voiceCues ? WorkoutVoice() : nil
+            voice?.loadCoach(coach, lines: coachLines)
             voice?.loadWhy(why, person: whyPerson)
             if let first = currentStep {
                 voice?.announceStep(label: "Let\u{2019}s go. " + first.label, paceLow: first.paceLow, paceHigh: first.paceHigh)
@@ -218,7 +222,7 @@ final class WorkoutManager: NSObject, ObservableObject {
         guard phase == .running else { return }
         session?.pause()
         phase = .paused
-        voice?.say("Paused.")
+        voice?.sayPaused()
         sendLiveTick(force: true)
     }
 
@@ -226,12 +230,12 @@ final class WorkoutManager: NSObject, ObservableObject {
         guard phase == .paused else { return }
         session?.resume()
         phase = .running
-        voice?.say("Back to it.")
+        voice?.sayResumed()
         sendLiveTick(force: true)
     }
 
     func end() {
-        voice?.say("Session complete. Nice work.")
+        voice?.sayComplete()
         // Drop the phone's mirror now; the recorded run follows by its own durable path. The phase
         // is deliberately NOT set here — HealthKit teardown below owns that transition.
         sendLiveTick(force: true, stateOverride: "ended")

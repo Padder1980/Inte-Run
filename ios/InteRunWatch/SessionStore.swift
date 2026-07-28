@@ -76,6 +76,10 @@ final class SessionStore: NSObject, ObservableObject {
     /// their watch, and "open the app on your phone first" is not a running app, it is a chore.
     @Published var upcoming: [PlannedSession] = []
 
+    /// Which coach the runner picked on the phone, and that coach's own wordings.
+    @Published var coach: String?
+    @Published var coachLines: [String: String] = [:]
+
     /// The runner's first name, so the watch can speak to a person rather than a device.
     @Published var runnerName: String?
     /// The runner's own answers to "why are you doing this" — spoken back at the hardest point of a
@@ -95,6 +99,8 @@ final class SessionStore: NSObject, ObservableObject {
     private static let cacheKey = "interun_watch_session"
     private static let nameKey = "interun_watch_name"
     private static let upcomingKey = "interun_watch_upcoming"
+    private static let coachKey = "interun_watch_coach"
+    private static let coachLinesKey = "interun_watch_coach_lines"
     private static let whyKey = "interun_watch_why"
     private static let whyPersonKey = "interun_watch_why_person"
     private static let isoKey = "interun_watch_iso"
@@ -155,6 +161,8 @@ final class SessionStore: NSObject, ObservableObject {
            let list = try? JSONDecoder().decode([PlannedSession].self, from: up) {
             upcoming = list
         }
+        coach = UserDefaults.standard.string(forKey: Self.coachKey)
+        coachLines = UserDefaults.standard.dictionary(forKey: Self.coachLinesKey) as? [String: String] ?? [:]
         why = UserDefaults.standard.dictionary(forKey: Self.whyKey) as? [String: String] ?? [:]
         whyPerson = UserDefaults.standard.string(forKey: Self.whyPersonKey)
         contextIso = UserDefaults.standard.string(forKey: Self.isoKey)
@@ -181,6 +189,12 @@ final class SessionStore: NSObject, ObservableObject {
             upcoming = list
             UserDefaults.standard.set(data, forKey: Self.upcomingKey)
         }
+        // Absent means voice coaching is switched off on the phone, so these are cleared rather
+        // than left behind — the wrist must not keep speaking as a coach the runner has turned off.
+        coach = context["coach"] as? String
+        UserDefaults.standard.set(coach, forKey: Self.coachKey)
+        coachLines = (context["coachLines"] as? [String: String]) ?? [:]
+        UserDefaults.standard.set(coachLines, forKey: Self.coachLinesKey)
         why = (context["why"] as? [String: String])?.filter { !$0.value.isEmpty } ?? [:]
         UserDefaults.standard.set(why, forKey: Self.whyKey)
         whyPerson = (context["whyName"] as? String).flatMap { $0.isEmpty ? nil : $0 }

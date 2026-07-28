@@ -1,14 +1,16 @@
 import AVFoundation
 import Foundation
 
-/// Spoken cues on the wrist — the system voice reading the session's own steps, pace verdicts, and,
-/// deep into a hard run, the runner's own reasons for being out there.
+/// Spoken cues on the wrist: the session's own steps, pace verdicts, and — deep into a hard run —
+/// the runner's own reasons for being out there.
 ///
-/// The four ElevenLabs coaches stay a phone feature: choosing the right clip lives in the TS
-/// engine's catalogue logic, and watchOS has no JavaScriptCore to run it. But live synthesis buys
-/// the wrist something the phone cannot have — it can say ANY name aloud, with no recorded pack,
-/// so "you're doing this for Alfie" works here for every runner rather than only for the one whose
-/// pack was generated.
+/// It speaks as the coach chosen on the phone. Not the recorded clips (see CoachVoice for why that
+/// cannot work out here) but the coach's identity: a matched voice, their pace of speech, and their
+/// actual wordings pulled from the same catalogue the phone plays.
+///
+/// Live synthesis also buys the wrist something the phone cannot have — it can say ANY name aloud,
+/// with no recorded pack, so "you're doing this for Alfie" works here for every runner rather than
+/// only for the one whose pack was generated.
 ///
 /// Audio routes to AirPods when connected, otherwise the watch speaker. `.duckOthers` lowers music
 /// under a cue rather than stopping it.
@@ -22,6 +24,10 @@ final class WorkoutVoice {
     /// The runner's answers, and the person behind them. Set once at the start of a session.
     private var why: [String: String] = [:]
     private var person: String?
+    /// The coach chosen on the phone, and that coach's own wordings. See CoachVoice for why the
+    /// wrist synthesises rather than playing the recorded clips.
+    private var coach: String?
+    private var lines: [String: String] = [:]
     private var whySpoken = false
     private var lastKeepGoing = Date.distantPast
 
@@ -35,6 +41,20 @@ final class WorkoutVoice {
         session.activate(options: []) { _, _ in }
     }
 
+    /// Adopt the coach the runner picked on the phone: their voice, their pace of speech, and their
+    /// words. Called once when a run starts.
+    func loadCoach(_ id: String?, lines: [String: String]) {
+        coach = id
+        self.lines = lines
+    }
+
+    /// A coach's own wording for a moment, or the plain fallback when the phone has not sent one
+    /// (voice coaching off, or an older phone build).
+    private func line(_ key: String, _ fallback: String) -> String {
+        let v = lines[key]?.trimmingCharacters(in: .whitespaces)
+        return (v?.isEmpty == false) ? v! : fallback
+    }
+
     func loadWhy(_ answers: [String: String], person: String?) {
         why = answers.filter { !$0.value.trimmingCharacters(in: .whitespaces).isEmpty }
         let p = (person ?? "").trimmingCharacters(in: .whitespaces)
@@ -43,10 +63,14 @@ final class WorkoutVoice {
 
     func say(_ text: String) {
         guard !text.isEmpty else { return }
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.rate = 0.5
-        synth.speak(utterance)
+        synth.speak(CoachVoice.utterance(text, coach: coach))
     }
+
+    // The fixed moments, in the chosen coach's words.
+    func sayStart() { say(line("start", "Here we go.")) }
+    func sayPaused() { say(line("paused", "Paused.")) }
+    func sayResumed() { say(line("resumed", "And we're back.")) }
+    func sayComplete() { say(line("complete", "Session complete. Well done.")) }
 
     /// A step announcement: what to do, and the pace it wants.
     func announceStep(label: String, paceLow: Int?, paceHigh: Int?) {
@@ -66,7 +90,8 @@ final class WorkoutVoice {
               Date().timeIntervalSince(since) > 6,
               Date().timeIntervalSince(lastPaceCue) > 45 else { return }
         lastPaceCue = Date()
-        say(verdict == "fast" ? "Ease off a touch." : "Pick it up a little.")
+        say(verdict == "fast" ? line("paceAhead", "Ease off a touch.")
+                              : line("paceBehind", "Pick it up a little."))
     }
 
     /// The why moment: once per run, late on, in a session long enough for it to mean something.
@@ -104,9 +129,7 @@ final class WorkoutVoice {
         if let p = person, Bool.random() {
             say("Nearly there. Finish this one for \(p).")
         } else {
-            say(["Stay with it. This is the part that counts.",
-                 "Hold this. You're closer than it feels.",
-                 "Keep going. Strong to the end."].randomElement()!)
+            say(line("keepGoing", "Stay with it. This is the part that counts."))
         }
     }
 }

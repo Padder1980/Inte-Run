@@ -1017,7 +1017,11 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
      chart scroll rather than squeezing 32 bars into 340px or clipping them off the edge. */
   grid-auto-columns: minmax(16px, 1fr);
   overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch;
-  scrollbar-width: none; padding-bottom: 2px;
+  scrollbar-width: none;
+  /* The selected bar is marked with a 2px outline at a 2px offset, and the week-number pill is
+     wider than a narrow column. Without inline padding the scroller clips both on week 1, which
+     read as the first bar not fitting. Height grows to match so the outline clears the top too. */
+  padding: 4px 7px 2px; height: 144px;
 }
 #view:has(.plan-head) .chart::-webkit-scrollbar { display: none; }
 #view:has(.plan-head) .bar-btn { gap: 7px; border-radius: 8px; transition: transform 140ms ease; }
@@ -1517,6 +1521,24 @@ body.cal-dragging { overscroll-behavior: none; cursor: grabbing; }
 .pick-body .st { font-size: 15px; font-weight: 650; color: var(--ink); }
 .pick-body .sm { font-size: 12px; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pick-meta { flex: 0 0 auto; font-size: 12.5px; color: var(--ink-faint); }
+/* ---- A run happening on the Apple Watch, mirrored on Today ----------------------------------
+   Deliberately reads as a status card, not a control: there is nothing to press, because the
+   watch owns the run. The pulsing dot is the only motion, and it stops when the run is paused. */
+.wl-card { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 12%, var(--surface)), var(--surface) 62%); border-color: color-mix(in srgb, var(--accent) 34%, var(--line)); }
+.wl-head { display: flex; align-items: center; gap: 8px; font-size: 11.5px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.wl-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; animation: wlPulse 1.6s ease-in-out infinite; }
+.wl-paused .wl-dot { animation: none; background: var(--ease); }
+.wl-paused .wl-head { color: var(--ease); }
+@keyframes wlPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.8); } }
+@media (prefers-reduced-motion: reduce) { .wl-dot { animation: none; } }
+.wl-title { margin-top: 8px; font-size: 16px; font-weight: 760; letter-spacing: -.02em; color: var(--ink); }
+.wl-step { font-weight: 600; color: var(--ink-soft); }
+.wl-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+.wl-v { font-size: 21px; font-weight: 700; letter-spacing: -.03em; color: var(--ink); }
+.wl-k { margin-top: 2px; font-size: 9.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-faint); }
+.wl-sub { margin-top: 10px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line)); }
+.wl-sub .wl-v { font-size: 15px; font-weight: 650; color: var(--ink-soft); }
+.wl-foot { margin-top: 12px; font-size: 11.5px; line-height: 1.45; color: var(--ink-faint); }
 </style>
 </head>
 <body>
@@ -1872,14 +1894,18 @@ function viewToday() {
       '<button class="primary" id="startTrial">' + ICON.play + ' Start time trial</button>' +
       '<button class="primary" id="cancelTrial" style="background:var(--surface-2);color:var(--ink-soft);margin-top:8px">Not today — back to my plan</button>';
   }
+  // A run under way on the wrist is the most important thing on this screen; the CTA to start
+  // another one is hidden while it lasts, because starting a second recorder is never what is meant.
+  const mirror = watchLiveCard();
   const sess = selectedSession();
   const banner = profile.personalized ? "" : '<button class="setup-banner" id="setupBanner"><div><b>You\\'re viewing an example plan</b><div class="sb-sub">Tell us about you and your goal to make it yours.</div></div><span>Set up →</span></button>';
   const greeting = profile.name ? '<div class="greeting">Hi, <b>' + esc(profile.name) + '</b> \\uD83D\\uDC4B</div>' : "";
   const onToday = TODAY_IN_PLAN && isCurrentWeek() && state.selDay === TODAY_DOW;
   let cta = "";
-  if (sess && onToday && PRIMARY_TYPES[sess.type]) cta = '<button class="primary start-btn" id="startSession">' + ICON.play + ' Start session</button>';
+  if (mirror) cta = "";
+  else if (sess && onToday && PRIMARY_TYPES[sess.type]) cta = '<button class="primary start-btn" id="startSession">' + ICON.play + ' Start session</button>';
   else if (sess) cta = '<button class="primary start-btn" id="viewSession">' + ICON.play + ' View session</button>';
-  return banner + autoPaceBanner() + trainFlagBanner() + fitSuggestBanner() + greeting + weekStrip() +
+  return mirror + banner + autoPaceBanner() + trainFlagBanner() + fitSuggestBanner() + greeting + weekStrip() +
     heroWorkout() +
     cta +
     '<div class="tsq-row">' + conditionsSquare(sess) + feelSquare() + '</div>' +
@@ -2247,6 +2273,33 @@ function watchPayloadForToday() {
 // A run finished on the wrist, arriving back through the native bridge. It is logged exactly as a
 // phone-tracked run would be - same shape, same stamps - so the adaptive engine cannot tell the
 // difference and the plan learns from it either way.
+// The watch sends a route as [[lat, lng], ...] because that is what CoreLocation gives it; the page
+// has always stored [{lat, lng}, ...]. Reading p.lat off an array yields undefined, so every
+// coordinate became NaN and the map drew an empty box rather than failing loudly. Normalised here,
+// at the boundary, so exactly one shape exists everywhere downstream.
+function normalizeRoute(route) {
+  if (!Array.isArray(route)) return [];
+  const out = [];
+  for (const p of route) {
+    let la, lo;
+    if (Array.isArray(p)) { la = Number(p[0]); lo = Number(p[1]); }
+    else if (p && typeof p === "object") { la = Number(p.lat); lo = Number(p.lng); }
+    else continue;
+    if (isFinite(la) && isFinite(lo) && (la !== 0 || lo !== 0)) out.push({ lat: la, lng: lo });
+  }
+  return out;
+}
+// Runs logged before the fix hold the wrong shape on disk. Convert them once at boot rather than
+// tolerating two shapes at every read site forever.
+function migrateRunRoutes() {
+  let changed = false;
+  (state.logged || []).forEach((r) => {
+    if (r && Array.isArray(r.route) && r.route.length && Array.isArray(r.route[0])) {
+      r.route = normalizeRoute(r.route); changed = true;
+    }
+  });
+  if (changed) saveRuns();
+}
 function ingestWatchRun(run) {
   if (!run || !run.id) return "no run";
   if ((state.logged || []).some((r) => r.id === run.id)) return "already logged"; // deliveries can repeat
@@ -2267,7 +2320,7 @@ function ingestWatchRun(run) {
     id: run.id, t: title, d: dayLabelIso(iso), dist: distKm.toFixed(2) + " km",
     time: fmtPace(sec), pace: avgPaceSec ? fmtPace(avgPaceSec) + " /km" : "\u2014",
     distKm: Number(distKm.toFixed(2)), sec: sec, avgPaceSec: avgPaceSec,
-    route: Array.isArray(run.route) ? run.route : [], splits: Array.isArray(run.splits) ? run.splits : [],
+    route: normalizeRoute(run.route), splits: Array.isArray(run.splits) ? run.splits : [],
     elevGain: Math.round(Number(run.elevGain) || 0),
     type: run.type || (prescribed && prescribed.type) || (planned && planned.type) || "easy",
     rpe: (run.rpe >= 1 && run.rpe <= 10) ? Math.round(run.rpe) : null,
@@ -2290,6 +2343,54 @@ function ingestWatchRun(run) {
   }
   render();
   return "";
+}
+// ---- A run happening on the wrist, mirrored here -------------------------------------------------
+// The watch is the recorder: it owns the GPS, the distance and the saved run. The phone deliberately
+// does NOT start its own session alongside it -- two recorders would double-count and produce two
+// runs in the logbook for one outing. What it does instead is show the run as it happens, so the
+// phone is not a dead screen in your pocket while your wrist is working.
+let WATCH_LIVE = null;      // { id, state, sec, distKm, paceSec, avgPaceSec, lapPaceSec, hr, step, title }
+let WATCH_LIVE_T = null;    // stale-timer: a mirror that stops updating must not look live
+function watchLiveActive() { return !!(WATCH_LIVE && (WATCH_LIVE.state === "running" || WATCH_LIVE.state === "paused")); }
+window.__interunWatchLive = function (live) {
+  if (!live || !live.id) return;
+  // A run in progress on the phone always wins: whatever the wrist is doing, it must never redraw
+  // the screen someone is running with.
+  if (liveRunning()) return;
+  const wasActive = watchLiveActive();
+  WATCH_LIVE = (live.state === "ended") ? null : live;
+  clearTimeout(WATCH_LIVE_T);
+  if (WATCH_LIVE) {
+    // Ticks arrive about every two seconds and only while the phone is reachable. If they stop --
+    // the phone went out of range, the watch app was killed -- drop the mirror rather than leaving
+    // a frozen set of numbers that looks like a live run.
+    WATCH_LIVE_T = setTimeout(() => { WATCH_LIVE = null; if (state.tab === "today" && !state.screen) render(); }, 45000);
+  }
+  if (state.tab === "today" && !state.screen && (wasActive || watchLiveActive())) render();
+};
+// The mirror card. Numbers only, plus a plain statement of where the run is being recorded -- a
+// runner glancing at their phone should never have to wonder which device is the real one.
+function watchLiveCard() {
+  if (!watchLiveActive()) return "";
+  const L = WATCH_LIVE;
+  const paused = L.state === "paused";
+  const pace = (v) => (v > 0 ? fmtPace(v) : "\u2014");
+  const stat = (k, v) => '<div class="wl-stat"><div class="wl-v num">' + v + '</div><div class="wl-k">' + k + '</div></div>';
+  return '<div class="card wl-card' + (paused ? " wl-paused" : "") + '">' +
+    '<div class="wl-head"><span class="wl-dot"></span>' +
+    (paused ? "Paused on your Apple Watch" : "Running on your Apple Watch") + '</div>' +
+    '<div class="wl-title">' + esc(L.title || "Run") + (L.step ? ' \u00b7 <span class="wl-step">' + esc(L.step) + '</span>' : "") + '</div>' +
+    '<div class="wl-stats">' +
+      stat("Time", fmtPace(Math.max(0, Math.round(L.sec || 0)))) +
+      stat("Distance", (Number(L.distKm) || 0).toFixed(2) + " km") +
+      stat("Pace", pace(L.paceSec)) +
+    '</div>' +
+    '<div class="wl-stats wl-sub">' +
+      stat("Lap", pace(L.lapPaceSec)) +
+      stat("Average", pace(L.avgPaceSec)) +
+      stat("Heart", L.hr ? L.hr + " bpm" : "\u2014") +
+    '</div>' +
+    '<div class="wl-foot">Your watch is recording this run. It will appear in your Logbook when you finish.</div></div>';
 }
 window.__interunWatchRun = function (json) {
   try { return ingestWatchRun(typeof json === "string" ? JSON.parse(json) : json); }
@@ -6227,6 +6328,7 @@ $("themeBtn").onclick = () => { const cur = document.documentElement.getAttribut
 $("profileBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); state.screen = "setup"; render(); };
 $("calBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); state.screen = "calendar"; render(); };
 $("bellBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); openRemindersSheet(); };
+migrateRunRoutes();
 seedDone();
 buildNav();
 render();

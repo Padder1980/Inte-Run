@@ -99,8 +99,22 @@ extension WatchBridge: WCSessionDelegate {
     /// The immediate path, used when the phone is reachable. Same handling as the queued one; the
     /// run id makes a double delivery a no-op.
     func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+        // Live ticks from a run happening on the wrist right now. These are transient by design:
+        // if the phone is asleep they are simply missed, and the next tick two seconds later
+        // catches up. Nothing about the recorded run depends on them.
+        if let live = message["live"] as? [String: Any] {
+            DispatchQueue.main.async { self.forwardLive(live) }
+            return
+        }
         SelfCheck.logger.notice("watch run arrived (message)")
         acceptRun(from: message)
+    }
+
+    private func forwardLive(_ live: [String: Any]) {
+        guard let webView,
+              let data = try? JSONSerialization.data(withJSONObject: live),
+              let json = String(data: data, encoding: .utf8) else { return }
+        webView.evaluateJavaScript("window.__interunWatchLive && window.__interunWatchLive(\(json));")
     }
 
     /// NOTE: no default value on `userInfo`. Xcode's autocomplete offers `= [:]`, which changes the
@@ -136,9 +150,13 @@ extension WatchBridge: WKScriptMessageHandler {
         case "sync":
             // `session` is deliberately allowed to be absent: that is how the page says "rest day",
             // which the watch must be able to tell apart from "we have not synced yet".
+            // Forward by key list rather than cherry-picking: a field added on the page side must
+            // not need a matching edit here to travel. Absent keys are meaningful (a cleared "why",
+            // a rest day), so they are simply left out and the watch treats that as "none".
             var payload: [String: Any] = ["at": Date().timeIntervalSince1970]
-            if let s = body["session"] as? [String: Any] { payload["session"] = s }
-            if let n = body["name"] as? String, !n.isEmpty { payload["name"] = n }
+            for key in ["session", "name", "why", "whyName", "dateIso"] where body[key] != nil {
+                payload[key] = body[key]
+            }
             push(payload)
         case "ready":
             // The page has finished booting and can accept runs now.

@@ -381,6 +381,27 @@ Traps that cost real time — don't reintroduce them:
   target, so the watch app builds against the iOS SDK and fails in `actool` with a misleading app-icon
   error. Use `-destination`. Also: watchOS wants the classic multi-size icon set, not iOS's single 1024.
 
+**Live mirroring (shipped 2026-07-28):** starting a run on the wrist now shows it on the phone.
+`sendLiveTick()` posts a snapshot every 2s over `sendMessage` while reachable; `WatchBridge` relays it
+to `window.__interunWatchLive()` and `watchLiveCard()` renders it at the top of Today. ⚠️ **The phone
+must never start its own session alongside it** — two recorders double-count and log the outing twice.
+The mirror is read-only, hides the "Start session" CTA while it lasts, and self-clears after 45s of
+silence so a frozen set of numbers can't masquerade as a live run.
+
+⚠️ **The watch sends a route as `[[lat,lng],…]`; the page stores `[{lat,lng},…]`.** Reading `p.lat`
+off an array gives `undefined`, so every coordinate became `NaN` and the map drew an empty box
+instead of failing loudly. `normalizeRoute()` converts at ingest and `migrateRunRoutes()` repairs
+runs already saved in the wrong shape. Anything crossing that bridge needs its shape checked.
+
+⚠️ **`WatchBridge`'s `sync` case forwards a key list, not cherry-picked fields.** It previously copied
+only `session` + `name`, which silently dropped `why`/`whyName` — a page-side addition appeared to
+work everywhere except on the wrist. Add new keys to that list.
+
+**Watch screens are five pages:** Controls ← Metrics → Pace → Session → Music. Metrics holds five
+numbers only (time, distance, current/lap/average pace); the pace band moved to its own full-size
+page (`PaceView.swift`) because at running cadence a chart squeezed above the numbers is unreadable
+and makes the numbers harder to read too.
+
 ✅ **The watch app runs on the owner's real Watch Ultra (2026-07-27, evening).** The install wall
 broke when the watch updated to **watchOS 26.6**, which surfaced Developer Mode (Settings → Privacy &
 Security) — enabling it let the beta-built app install and launch. The earlier fixes (no debug

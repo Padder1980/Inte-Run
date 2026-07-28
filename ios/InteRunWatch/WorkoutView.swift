@@ -1,11 +1,16 @@
 import SwiftUI
 import WatchKit
 
-/// The live run, as four swipeable pages — the arrangement a runner's thumb already knows from
-/// Apple's Workout app: **Controls ← Metrics → Session → Music**.
+/// The live run, as five swipeable pages — the arrangement a runner's thumb already knows from
+/// Apple's Workout app: **Controls ← Metrics → Pace → Session → Music**.
 ///
 /// Metrics is the landing page because it is the one you glance at; the controls live one swipe
 /// away precisely so a stray touch mid-stride cannot end your run.
+///
+/// Metrics holds five numbers and nothing else. An earlier version stacked the pace band, heart
+/// rate, a progress bar and a total on the same page, and at running cadence it read as a wall —
+/// you cannot parse a chart while your head is bouncing. The band is genuinely useful, so it gets
+/// its own page at full size rather than being squeezed in above the numbers.
 struct WorkoutView: View {
     @ObservedObject var workout: WorkoutManager
     @EnvironmentObject private var store: SessionStore
@@ -30,10 +35,11 @@ struct WorkoutView: View {
                 TabView(selection: $page) {
                     ControlsView(workout: workout, backToMetrics: { page = 1 }).tag(0)
                     metrics.tag(1)
-                    SessionStepsView(workout: workout).tag(2)
+                    PaceView(workout: workout).tag(2)
+                    SessionStepsView(workout: workout).tag(3)
                     // The system's own Now Playing, so it controls whatever is actually playing —
                     // Music, a podcast, Spotify — rather than only something we own.
-                    NowPlayingView().tag(3)
+                    NowPlayingView().tag(4)
                 }
                 .tabViewStyle(.page)
             }
@@ -44,84 +50,65 @@ struct WorkoutView: View {
     // MARK: - Metrics
 
     private var metrics: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(workout.elapsedText)
-                        .font(.system(size: 21, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(workout.phase == .paused ? Brand.ease : Brand.accent)
-                    if workout.phase == .paused {
-                        Text("PAUSED").font(.system(size: 10, weight: .bold)).foregroundStyle(Brand.ease)
-                    }
-                }
-
-                // What is left of the step you are in — the number you actually want mid-rep.
-                // The step's NAME lives on the session page; putting it here pushed everything
-                // else off the screen, which defeats the point of a glanceable page.
-                if let left = workout.stepRemaining {
-                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+        VStack(alignment: .leading, spacing: 0) {
+            // Elapsed, and how much of the current step is left — the two clock figures, together.
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(workout.elapsedText)
+                    .font(.system(size: 34, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                    .foregroundStyle(workout.phase == .paused ? Brand.ease : Brand.accent)
+                if workout.phase == .paused {
+                    Text("PAUSED").font(.system(size: 10, weight: .bold)).foregroundStyle(Brand.ease)
+                } else if let left = workout.stepRemaining {
+                    Spacer(minLength: 0)
+                    VStack(alignment: .trailing, spacing: -2) {
                         Text(left.value)
-                            .font(.system(size: 26, weight: .semibold, design: .rounded))
+                            .font(.system(size: 15, weight: .semibold, design: .rounded))
                             .monospacedDigit()
-                            .foregroundStyle(Brand.accent)
-                        Text(left.unit)
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(Brand.accent)
+                        Text(left.unit).font(.system(size: 8, weight: .bold)).foregroundStyle(.secondary)
                     }
                 }
-
-                if let band = workout.targetBand {
-                    PaceBandView(low: band.low, high: band.high,
-                                 current: workout.paceSecPerKm, verdict: workout.paceVerdict)
-                }
-
-                HStack(spacing: 4) {
-                    Image(systemName: "heart.fill").foregroundStyle(Brand.rest).font(.system(size: 10))
-                    Text(workout.heartRate > 0 ? "\(Int(workout.heartRate))" : "--")
-                        .font(.system(size: 16, weight: .medium)).monospacedDigit()
-                    Text("BPM").font(.system(size: 9)).foregroundStyle(.secondary)
-                }
-
-                row(workout.paceText, "CUR PACE")
-                row(workout.avgPaceText, "AVG PACE")
-
-                // Drawn rather than a ProgressView: on watchOS the tint colours the whole track, so
-                // a 1%-complete run looked finished.
-                if let p = workout.sessionProgress {
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Capsule().fill(Color.gray.opacity(0.3))
-                            Capsule().fill(Brand.accent)
-                                .frame(width: max(2, geo.size.width * p))
-                        }
-                    }
-                    .frame(height: 4)
-                }
-                Text("TOTAL DIST: " + distanceText)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(.bottom, 10)   // clear of the page dots
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.trailing, 4)   // keep the band's right-hand label clear of the scroll bar
+            .padding(.bottom, 2)
+
+            metric(distanceText, "DISTANCE", size: 27, tint: Brand.ink)
+            metric(workout.paceText, "CUR PACE", size: 25, tint: Brand.ink, unit: "/KM")
+            metric(workout.lapPaceText, "LAP \(workout.lapNumber)", size: 25, tint: Brand.ink, unit: "/KM")
+            metric(workout.avgPaceText, "AVG PACE", size: 25, tint: Brand.ink, unit: "/KM")
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.bottom, 10)   // clear of the page dots
+    }
+
+    /// One number, its unit and its label on a single line: value left, label right. Reading down
+    /// the left edge gives you the figures; the labels are there for the glance that needs them.
+    private func metric(_ value: String, _ label: String, size: CGFloat, tint: Color, unit: String? = nil) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 3) {
+            Text(value)
+                .font(.system(size: size, weight: .medium, design: .rounded))
+                .monospacedDigit()
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
+                .foregroundStyle(tint)
+            if let unit {
+                Text(unit).font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 4)
+            Text(label)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(.secondary)
         }
     }
 
     /// Metres while they are still small enough to be meaningful, kilometres after that.
     private var distanceText: String {
         workout.distanceMetres < 1000
-            ? String(format: "%.0fM", workout.distanceMetres)
-            : String(format: "%.2fKM", workout.distanceKm)
-    }
-
-    private func row(_ value: String, _ label: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 4) {
-            Text(value).font(.system(size: 19, weight: .medium)).monospacedDigit()
-            Text("/KM").font(.system(size: 10)).foregroundStyle(.secondary)
-            Spacer()
-            Text(label).font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
-        }
+            ? String(format: "%.0f M", workout.distanceMetres)
+            : String(format: "%.2f KM", workout.distanceKm)
     }
 
     private func failure(_ message: String) -> some View {

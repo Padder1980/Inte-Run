@@ -173,6 +173,8 @@ final class WorkoutManager: NSObject, ObservableObject {
                 voice?.say("Let\u{2019}s go. Run by feel.")
             }
 
+            sendLiveTick(force: true)   // the phone shows the run the moment the wrist starts it
+
             locations.requestWhenInUseAuthorization()
             // Safe now: an active workout session makes the app backgroundable. Claimed only for
             // the duration of the run, and released in end().
@@ -195,6 +197,7 @@ final class WorkoutManager: NSObject, ObservableObject {
                     let target = self.targetSeconds
                     self.voice?.whyMoment(elapsed: self.elapsed, target: target, hard: self.isHardSession)
                     self.voice?.keepGoing(elapsed: self.elapsed, target: target, hard: self.isHardSession)
+                    self.sendLiveTick()
                 }
             }
         } catch {
@@ -207,6 +210,7 @@ final class WorkoutManager: NSObject, ObservableObject {
         session?.pause()
         phase = .paused
         voice?.say("Paused.")
+        sendLiveTick(force: true)
     }
 
     func resume() {
@@ -214,10 +218,14 @@ final class WorkoutManager: NSObject, ObservableObject {
         session?.resume()
         phase = .running
         voice?.say("Back to it.")
+        sendLiveTick(force: true)
     }
 
     func end() {
         voice?.say("Session complete. Nice work.")
+        // Drop the phone's mirror now; the recorded run follows by its own durable path. The phase
+        // is deliberately NOT set here — HealthKit teardown below owns that transition.
+        sendLiveTick(force: true, stateOverride: "ended")
         ticker?.invalidate(); ticker = nil
         locations.stopUpdatingLocation()
         guard let s = session, let b = builder else { phase = .ended; return }
@@ -292,6 +300,41 @@ final class WorkoutManager: NSObject, ObservableObject {
         return out
     }
 
+    /// A snapshot of the run in progress, sent to the phone every couple of seconds while it is
+    /// reachable. Deliberately fire-and-forget: the wrist is the recorder and owes the phone
+    /// nothing, so a phone in a pocket with the screen off just misses ticks and catches up on the
+    /// next one. Nothing here feeds the saved run.
+    private var lastLiveSend = Date.distantPast
+    func sendLiveTick(force: Bool = false, stateOverride: String? = nil) {
+        guard WCSession.isSupported() else { return }
+        let session = WCSession.default
+        guard session.activationState == .activated, session.isReachable else { return }
+        guard force || Date().timeIntervalSince(lastLiveSend) >= 2 else { return }
+        lastLiveSend = Date()
+        var live: [String: Any] = [
+            "id": runId,
+            "state": stateOverride ?? phaseName,
+            "sec": Int(elapsed.rounded()),
+            "distKm": distanceKm,
+        ]
+        if let p = paceSecPerKm, p.isFinite, p > 0 { live["paceSec"] = Int(p.rounded()) }
+        if let a = avgPaceSecPerKm { live["avgPaceSec"] = Int(a.rounded()) }
+        if let l = lapPaceSecPerKm { live["lapPaceSec"] = Int(l.rounded()) }
+        if heartRate > 0 { live["hr"] = Int(heartRate) }
+        if let st = currentStep { live["step"] = st.label }
+        if let plan { live["title"] = plan.title; live["type"] = plan.type }
+        session.sendMessage(["live": live], replyHandler: nil, errorHandler: { _ in })
+    }
+
+    private var phaseName: String {
+        switch phase {
+        case .running: return "running"
+        case .paused: return "paused"
+        case .ended: return "ended"
+        default: return "idle"
+        }
+    }
+
     /// Hand it to the phone. `transferUserInfo` queues and is guaranteed, which matters because the
     /// phone app is almost always closed when a run ends.
     func sendHome() {
@@ -325,6 +368,19 @@ final class WorkoutManager: NSObject, ObservableObject {
         return elapsed / (distanceMetres / 1000)
     }
     var avgPaceText: String { Self.pace(avgPaceSecPerKm) }
+
+    /// Pace over the kilometre you are in right now. Average pace hides a fade because it is
+    /// dragged by everything already banked; the lap is what tells you how this km is going.
+    /// Nil until enough of the lap has been covered for the figure to mean anything.
+    var lapPaceSecPerKm: Double? {
+        let lapMetres = distanceMetres - lastSplitMetre
+        let lapElapsed = elapsed - lastSplitElapsed
+        guard lapMetres > 60, lapElapsed > 8 else { return nil }
+        return lapElapsed / (lapMetres / 1000)
+    }
+    var lapPaceText: String { Self.pace(lapPaceSecPerKm) }
+    /// Which lap is in progress, one-based, for the label.
+    var lapNumber: Int { Int(lastSplitMetre / 1000) + 1 }
 
     /// How far through the whole session, by distance if it has one, else by time. Nil when the
     /// session sets no overall goal (a "run by feel" has nothing to fill up).

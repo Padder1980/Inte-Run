@@ -1573,7 +1573,9 @@ button.sw-row:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--
 /* ---- The live-session pill -------------------------------------------------------------------
    Sits just above the bottom nav on every screen but the run itself. A bare dot (the pattern most
    apps use) makes you guess; the words remove the guess, and the clock proves it is really live. */
-.live-pill { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 68px); z-index: 60;
+/* Sits just under the app bar, not above the nav: the top is where you look when you come back to
+   the app, and down at the bottom it competed with the tab bar for the same glance. */
+.live-pill { position: fixed; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 68px); z-index: 60;
   display: flex; align-items: center; gap: 9px; padding: 9px 15px 9px 13px; border: 0; border-radius: 999px; cursor: pointer;
   font: inherit; color: #fff; background: linear-gradient(150deg, #d94b3a, #b8302a);
   box-shadow: 0 10px 26px -10px rgba(190, 45, 40, .8), 0 2px 6px rgba(0, 0, 0, .22);
@@ -1586,7 +1588,7 @@ button.sw-row:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--
 .live-pill.paused .lp-dot { animation: none; opacity: .8; }
 .live-pill.on-watch { background: linear-gradient(150deg, #1aa593, #0d7466); box-shadow: 0 10px 26px -10px rgba(13, 116, 102, .75), 0 2px 6px rgba(0, 0, 0, .22); }
 @keyframes lpBlink { 0%, 45% { opacity: 1; } 65%, 100% { opacity: .18; } }
-@keyframes lpIn { from { opacity: 0; transform: translateX(-50%) translateY(10px) scale(.94); } to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); } }
+@keyframes lpIn { from { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(.94); } to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); } }
 @media (prefers-reduced-motion: reduce) { .lp-dot { animation: none; } .live-pill { animation: none; } }
 
 /* ---- Toast ----------------------------------------------------------------------------------- */
@@ -1602,7 +1604,7 @@ button.sw-row:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--
 .tm-unit { font-size: 13px; font-weight: 650; color: var(--ink-soft); margin-left: -4px; }
 .tm-note { margin-top: 9px; font-size: 12px; line-height: 1.45; color: var(--ink-faint); }
 /* The pill floats, so the scroll area needs room beneath it or it sits on top of the last card. */
-body.has-live-pill #view { padding-bottom: 62px; }
+body.has-live-pill #view { padding-top: 46px; }
 /* An app should not zoom. touch-action: manipulation removes the double-tap-to-zoom delay and the
    zoom itself; pinch is blocked in JS (see the gesture guard) because iOS ignores both
    user-scalable=no and touch-action for pinch. The avatar cropper opts back in. */

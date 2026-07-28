@@ -1,6 +1,8 @@
 import Foundation
 import HealthKit
 import WatchConnectivity
+import UIKit
+import UserNotifications
 import WebKit
 
 /// Carries today's session from the web app to the watch.
@@ -37,6 +39,12 @@ final class WatchBridge: NSObject {
     /// Held separately from the persisted copy: a payload that arrived before activation still has
     /// to be sent once the session comes up.
     private var awaitingActivation: [String: Any]?
+
+    /// The most recent live tick, so the page can be dropped straight onto the live screen the
+    /// moment the app becomes active — rather than showing Today for two seconds and then jumping.
+    private var lastLive: [String: Any]?
+    private var lastLiveAt = Date.distantPast
+    private var notifiedRun: String?
 
     private override init() {
         super.init()
@@ -203,10 +211,50 @@ extension WatchBridge: WCSessionDelegate {
     }
 
     private func forwardLive(_ live: [String: Any]) {
-        guard let webView,
-              let data = try? JSONSerialization.data(withJSONObject: live),
-              let json = String(data: data, encoding: .utf8) else { return }
-        webView.evaluateJavaScript("window.__interunWatchLive && window.__interunWatchLive(\(json));")
+        let ended = (live["state"] as? String) == "ended"
+        lastLive = ended ? nil : live
+        lastLiveAt = Date()
+        if ended { notifiedRun = nil }
+
+        if let webView,
+           let data = try? JSONSerialization.data(withJSONObject: live),
+           let json = String(data: data, encoding: .utf8) {
+            webView.evaluateJavaScript("window.__interunWatchLive && window.__interunWatchLive(\(json));")
+        }
+        if !ended { offerToFollowAlong(live) }
+    }
+
+    /// ⚠️ A watchOS app CANNOT bring the iPhone app to the foreground. There is no API for it —
+    /// `sendMessage` wakes this app in the BACKGROUND only, and `startWatchApp` runs the other way.
+    /// Apple does not permit the reverse, so "start on the watch and the phone opens itself" is not
+    /// buildable however it is wired.
+    ///
+    /// What is buildable is one tap. When a run starts on the wrist and this app is not in front, a
+    /// notification offers to follow along; tapping it opens the app, and `replayLiveOnActivate`
+    /// puts it straight on the live screen. Sent once per run, because a nag every two seconds
+    /// while someone runs would be intolerable.
+    private func offerToFollowAlong(_ live: [String: Any]) {
+        guard let id = live["id"] as? String, notifiedRun != id else { return }
+        DispatchQueue.main.async {
+            guard UIApplication.shared.applicationState != .active else { return }
+            self.notifiedRun = id
+            let content = UNMutableNotificationContent()
+            content.title = (live["title"] as? String) ?? "Run started"
+            content.body = "Running on your Apple Watch — tap to follow along here."
+            content.sound = nil          // the wrist already buzzed; a chime mid-stride is noise
+            content.interruptionLevel = .passive
+            content.userInfo = ["interunWatchLive": true]
+            let req = UNNotificationRequest(identifier: "interun-watch-live-\(id)",
+                                            content: content, trigger: nil)
+            UNUserNotificationCenter.current().add(req)
+        }
+    }
+
+    /// Called when the app comes to the front. If the wrist is still running, hand the page the last
+    /// tick immediately so it lands on the live screen rather than on Today.
+    func replayLiveOnActivate() {
+        guard let live = lastLive, Date().timeIntervalSince(lastLiveAt) < 45 else { return }
+        forwardLive(live)
     }
 
     /// NOTE: no default value on `userInfo`. Xcode's autocomplete offers `= [:]`, which changes the

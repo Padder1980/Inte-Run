@@ -544,6 +544,14 @@ off an array gives `undefined`, so every coordinate became `NaN` and the map dre
 instead of failing loudly. `normalizeRoute()` converts at ingest and `migrateRunRoutes()` repairs
 runs already saved in the wrong shape. Anything crossing that bridge needs its shape checked.
 
+⚠️ **A watchOS app cannot bring the iPhone app to the foreground.** There is no API: `sendMessage`
+wakes the containing app in the BACKGROUND only, and `startWatchApp` runs phone→watch. So "start on
+the watch and the phone opens itself" is not buildable however it is wired. What ships instead is
+one tap — `offerToFollowAlong()` posts a passive notification when a wrist run starts and the app is
+not in front, and `replayLiveOnActivate()` (driven by `scenePhase`) hands the page the last live
+tick the instant the app becomes active, so it lands on the live screen rather than showing Today
+for two seconds first.
+
 **The chosen coach reaches the wrist (2026-07-28)** — as an identity, not as audio. The phone sends
 `coach` + `coachLines` (that coach's own wordings, pulled from the same catalogue it plays);
 `CoachVoice.swift` maps each coach to a matched system voice, rate and pitch, and `WorkoutVoice`
@@ -570,7 +578,10 @@ distance into the logbook. The distance is asked for at the end from the machine
 (`treadmillDistanceHtml` / `applyTreadmillDistance`), which recomputes pace and edits the logged run
 in place rather than adding a second copy. Splits are deliberately not synthesised.
 
-⚠️ **A run no longer locks the app to the live screen.** The nav stays visible and `liveBack`
+⚠️ The **live pill** sits under the app bar, not above the nav — the top is where you look when you
+come back to the app, and at the bottom it competed with the tab bar for the same glance.
+
+**A run no longer locks the app to the live screen.** The nav stays visible and `liveBack`
 navigates instead of calling `stopLive()`. The protection is now the **live pill** (`syncLivePill`):
 a flashing dot + "Live session" + a ticking clock, red for a phone run and teal for a watch one, one
 tap back. Because ticks keep firing off-screen, `renderLiveNow()` returns early when `#lElapsed` is

@@ -17,12 +17,19 @@ struct InteRunApp: App {
         _ = WatchBridge.shared
     }
 
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some Scene {
         WindowGroup {
             WebHost()
                 .ignoresSafeArea()
                 .background(Color("LaunchBackground"))
                 .statusBarHidden(false)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Coming back to the app while the wrist is mid-run should land on the live screen, not
+            // on Today two seconds before jumping there.
+            if phase == .active { WatchBridge.shared.replayLiveOnActivate() }
         }
     }
 }

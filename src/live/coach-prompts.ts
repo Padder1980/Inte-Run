@@ -81,7 +81,20 @@ export type PromptTrigger =
   | "paused"              // runner paused
   | "resumed"             // runner resumed
   | "ended-early"         // runner ended before the plan finished
-  | "safety-effort";      // sustained excessive effort warning (data-driven)
+  | "safety-effort"       // sustained excessive effort warning (data-driven)
+  | "pace-behind"         // consistently slower than the step's band (gentle lift)
+  | "pace-ahead"          // consistently faster than the step's band (protect the plan)
+  | "pace-on"             // back on target after a correction (affirm once, then quiet)
+  | "keep-going"          // grind-moment encouragement, late in hard or long work
+  | "why-inspire"         // invoke the runner's "who inspires you" answer
+  | "why-reason"          // invoke the runner's "why do you run" answer
+  | "why-goal"            // invoke the runner's "why this goal" answer
+  | "why-anchor";         // invoke the runner's "who keeps you going" answer
+
+/** The words a given coach actually says for a prompt. */
+export function promptTextFor(p: PromptDef, coach: CoachId): string {
+  return (p.variants && p.variants[coach]) || p.text;
+}
 
 // ---- Prompt definitions ----------------------------------------------------
 
@@ -101,6 +114,9 @@ export type PromptDef = {
   minRepeatSec: number;
   /** Session types this applies to, or "all". */
   sessionTypes: SessionType[] | "all";
+  /** Per-coach wordings. Absent coaches fall back to `text`. Personality lives here: the same
+   *  moment gets Holly's kindness, Philip's economy, Hope's fire and Lucy's mechanics. */
+  variants?: Partial<Record<CoachId, string>>;
   /** Optional tag for future per-intensity selection. */
   intensity?: PromptIntensity;
 };
@@ -165,6 +181,49 @@ export const PROMPTS: PromptDef[] = [
   // — Halfway ----------------------------------------------------------------
   { id: "halfway_1", trigger: "halfway", text: "You're halfway through. Hold your form and keep working.", priority: P_KEY, interrupt: false, minRepeatSec: ONESHOT, sessionTypes: "all" },
   { id: "halfway_2", trigger: "halfway", text: "Halfway done, and looking strong. Stay with it.", priority: P_KEY, interrupt: false, minRepeatSec: ONESHOT, sessionTypes: "all" },
+
+  // — Pace against the prescribed band ---------------------------------------
+  // No numbers anywhere: these are pre-generated clips, so a coach can never say "eight seconds
+  // down". Everything is phrased relatively, which also keeps them true on any device.
+  { id: "pace_behind_1", trigger: "pace-behind", text: "You've drifted a little under pace. Gently find that rhythm again.", priority: P_INFO, interrupt: false, minRepeatSec: 90, sessionTypes: "all",
+    variants: { guide: "You've drifted a little soft. Gently find that rhythm again.", pacer: "You're a shade down on target. Lift the rhythm, not the strain.", motivator: "You've got more than this \u2014 let's go find it.", technician: "Pace is down. Lift your cadence a notch and stand tall." } },
+  { id: "pace_behind_2", trigger: "pace-behind", text: "A touch under pace. No panic \u2014 just ease back into it.", priority: P_INFO, interrupt: false, minRepeatSec: 90, sessionTypes: "all",
+    variants: { guide: "A touch under pace. No panic \u2014 just lean back into it.", pacer: "Pace has slipped. Quicker feet, same effort.", motivator: "Wake it up! Quick feet, big heart.", technician: "Losing time. Shorten the stride, quicken the rhythm." } },
+  { id: "pace_behind_3", trigger: "pace-behind", text: "Come back to target. Smooth and steady does it.", priority: P_INFO, interrupt: false, minRepeatSec: 90, sessionTypes: "all",
+    variants: { guide: "Come back to me. Smooth and steady does it.", pacer: "Below the band. Build back gradually over the next minute.", motivator: "This is where it's won. Pick it up with me.", technician: "Check in: eyes up, arms driving. Now build the pace back." } },
+
+  { id: "pace_ahead_1", trigger: "pace-ahead", text: "Easy now \u2014 you're quicker than we need. Save it for later.", priority: P_INFO, interrupt: false, minRepeatSec: 90, sessionTypes: "all",
+    variants: { guide: "Easy now \u2014 you're quicker than we need. Save it for later.", pacer: "Above target. Ease back \u2014 the plan needs this pace, not that one.", motivator: "Whoa, speedster! Bank that fire \u2014 you'll want it at the end.", technician: "Running hot. Drop the effort a notch \u2014 same form, less force." } },
+  { id: "pace_ahead_2", trigger: "pace-ahead", text: "Ahead of pace. Breathe, soften, let it come back.", priority: P_INFO, interrupt: false, minRepeatSec: 90, sessionTypes: "all",
+    variants: { guide: "Ahead of pace. Breathe, soften, let it come back.", pacer: "Too quick. Settle down to the band and hold.", motivator: "Too hot too soon. Cool it a touch and finish like a hero instead.", technician: "Over pace. Relax the shoulders, shorten the push, let it slow." } },
+  { id: "pace_ahead_3", trigger: "pace-ahead", text: "Lovely energy, but ease off. Patience wins today.", priority: P_INFO, interrupt: false, minRepeatSec: 90, sessionTypes: "all",
+    variants: { guide: "I love the energy, but ease off. Patience wins today.", pacer: "You're over-pacing. Trim it back and lock in.", motivator: "Save the fireworks! Ease down, we'll light them later.", technician: "Faster than prescribed. Control is the skill here \u2014 dial it back." } },
+
+  { id: "pace_on_1", trigger: "pace-on", text: "That's it. Right where you should be.", priority: P_AMBIENT, interrupt: false, minRepeatSec: 240, sessionTypes: "all",
+    variants: { guide: "That's it. Right where you should be.", pacer: "On target. Lock this in.", motivator: "Yes! This is your pace \u2014 own it.", technician: "On pace, and the form matches. Keep it exactly like this." } },
+  { id: "pace_on_2", trigger: "pace-on", text: "Back on target. Hold this and relax into it.", priority: P_AMBIENT, interrupt: false, minRepeatSec: 240, sessionTypes: "all",
+    variants: { guide: "Lovely. Hold this and relax into it.", pacer: "Bang on pace. Hold steady.", motivator: "Dialled in. You look unstoppable.", technician: "Textbook. Same cadence, same effort." } },
+
+  // — Keep going: the grind, wherever it bites --------------------------------
+  { id: "keep_going_1", trigger: "keep-going", text: "I know it's hard. You've been harder. Keep going.", priority: P_KEY, interrupt: false, minRepeatSec: 300, sessionTypes: "all",
+    variants: { guide: "I know it's hard. You've been harder. Keep going.", pacer: "Hold the rhythm. The rhythm carries you.", motivator: "Don't you dare stop now \u2014 this is the good part!", technician: "When it hurts, run taller. Posture first, the rest follows." } },
+  { id: "keep_going_2", trigger: "keep-going", text: "One step, then the next. That's all it ever is.", priority: P_KEY, interrupt: false, minRepeatSec: 300, sessionTypes: "all",
+    variants: { guide: "One step, then the next. That's all it ever is.", pacer: "Nothing changes. Same pace, same breath, keep moving.", motivator: "Tough is temporary. You are not. Go!", technician: "Reset: shoulders down, breathe long, drive the arms." } },
+  { id: "keep_going_3", trigger: "keep-going", text: "Stay with it. This part passes \u2014 you don't stop.", priority: P_KEY, interrupt: false, minRepeatSec: 300, sessionTypes: "all",
+    variants: { guide: "Stay with me. This part passes \u2014 you don't stop.", pacer: "This is where pace is made. Stay on it.", motivator: "Every stride right now is building the runner you want to be.", technician: "Fatigue is form's enemy. Beat it with technique." } },
+
+  // — The runner's own reasons ------------------------------------------------
+  // Fired at most once per run, deep into long or hard work. The coach frames it; the runner's own
+  // words appear on screen (phone) or are spoken after it (watch, which has live text-to-speech).
+  // Rarity is the point: a "why" that plays every run becomes wallpaper.
+  { id: "why_inspire_1", trigger: "why-inspire", text: "Think of the person who inspires you. Run this part with them.", priority: P_KEY, interrupt: false, minRepeatSec: ONESHOT, sessionTypes: "all",
+    variants: { guide: "Think of the person who inspires you. Run this part with them.", pacer: "Your inspiration didn't quit here. Neither do you.", motivator: "Picture who inspires you \u2014 now show them what you've got!", technician: "Recall who inspires you. Match their standard for one kilometre." } },
+  { id: "why_reason_1", trigger: "why-reason", text: "Remember why you started. It's still true, right now.", priority: P_KEY, interrupt: false, minRepeatSec: ONESHOT, sessionTypes: "all",
+    variants: { guide: "Remember why you started. It's still true, right now.", pacer: "You had a reason to start running. Hold it for the next minute.", motivator: "Your why is bigger than this hill. Prove it!", technician: "Reconnect with your reason. Purpose steadies pace." } },
+  { id: "why_goal_1", trigger: "why-goal", text: "That goal of yours has a reason behind it. This is you earning it.", priority: P_KEY, interrupt: false, minRepeatSec: ONESHOT, sessionTypes: "all",
+    variants: { guide: "That goal of yours has a reason behind it. This is you earning it.", pacer: "The goal means something. This stretch is where it's paid for.", motivator: "That time goal? You chose it for a reason. Chase it down!", technician: "Your goal was chosen deliberately. Run this stretch deliberately." } },
+  { id: "why_anchor_1", trigger: "why-anchor", text: "It's tough. So think of what keeps you going \u2014 and let it.", priority: P_KEY, interrupt: false, minRepeatSec: ONESHOT, sessionTypes: "all",
+    variants: { guide: "It's tough. So think of what keeps you going \u2014 and let it.", pacer: "Hard patch. Anchor to your reason and hold the pace.", motivator: "This is the tough bit \u2014 and you know exactly who you're doing it for.", technician: "When it's tough, your anchor is a tool. Use it now." } },
 
   // — Distance / time milestones --------------------------------------------
   { id: "milestone_1", trigger: "milestone-distance", text: "Another kilometre done. Strong and steady.", priority: P_INFO, interrupt: false, minRepeatSec: 30, sessionTypes: "all" },
@@ -256,4 +315,47 @@ export function shouldInterrupt(incoming: PromptDef, current: PromptDef | null):
 /** All prompt ids (used by the generation pipeline and the manifest). */
 export function allPromptIds(): string[] {
   return PROMPTS.map((p) => p.id);
+}
+
+// ---- Personal prompts (the runner's person, by name) ------------------------
+//
+// Pre-generated audio cannot contain an arbitrary name, so the shared catalogue above stays
+// name-free and works for everyone. These lines are the optional upgrade: the same why-moments
+// with a {name} slot, generated into a PERSONAL pack for one specific name and never shipped
+// publicly. When a pack for the runner's person exists the coach says the name out loud; when it
+// doesn't, the shared line plays and the runner's own written words appear on screen instead.
+//
+// Ids are distinct stems so a personal clip can never collide with a shared one.
+
+/** Prompts whose text carries a `{name}` slot. Expand with `personalPrompts(name)`. */
+export const PERSONAL_PROMPT_TEMPLATES: PromptDef[] = [
+  { id: "why_name_inspire_1", trigger: "why-inspire", text: "Think of {name}. Run this part with them.", priority: P_KEY, interrupt: false, minRepeatSec: ONESHOT, sessionTypes: "all",
+    variants: { guide: "Think of {name}. Run this part with them.", pacer: "{name} is the reason. Hold the pace.", motivator: "Picture {name} — now show them what you've got!", technician: "Recall {name}. Match that standard for one kilometre." } },
+  { id: "why_name_anchor_1", trigger: "why-anchor", text: "It's tough. So think of {name}, and let that carry you.", priority: P_KEY, interrupt: false, minRepeatSec: ONESHOT, sessionTypes: "all",
+    variants: { guide: "It's tough. So think of {name}, and let that carry you.", pacer: "Hard patch. Anchor to {name} and hold on.", motivator: "This is the tough bit — and you're doing it for {name}!", technician: "When it's tough, {name} is your anchor. Use it now." } },
+  { id: "why_name_anchor_2", trigger: "why-anchor", text: "{name} would want you to finish this properly. So finish it properly.", priority: P_KEY, interrupt: false, minRepeatSec: ONESHOT, sessionTypes: "all",
+    variants: { guide: "{name} would want you to finish this properly. So finish it properly.", pacer: "Finish this one the way {name} would want it finished.", motivator: "Do it for {name} — all the way to the line!", technician: "Finish to standard. That is what {name} sees." } },
+  { id: "why_name_goal_1", trigger: "why-goal", text: "That goal has {name} behind it. This is you earning it.", priority: P_KEY, interrupt: false, minRepeatSec: ONESHOT, sessionTypes: "all",
+    variants: { guide: "That goal has {name} behind it. This is you earning it.", pacer: "The goal, and {name}. Both worth this next stretch.", motivator: "That time goal is for {name} — go and take it!", technician: "Goal chosen for {name}. Run this stretch deliberately." } },
+  { id: "why_name_final_1", trigger: "final-effort", text: "Last effort. Run this one home for {name}.", priority: P_KEY, interrupt: false, minRepeatSec: ONESHOT, sessionTypes: "all", intensity: "high",
+    variants: { guide: "Last effort. Run this one home for {name}.", pacer: "Final stretch. This one's for {name}.", motivator: "Everything you've got — for {name}!", technician: "Final effort. Hold form, and bring it home for {name}." } },
+];
+
+/** The personal prompts with a real name substituted in. Empty for a blank name. */
+export function personalPrompts(name: string): PromptDef[] {
+  const n = name.trim();
+  if (!n) return [];
+  const put = (s: string) => s.split("{name}").join(n);
+  return PERSONAL_PROMPT_TEMPLATES.map((p) => ({
+    ...p,
+    text: put(p.text),
+    variants: p.variants
+      ? (Object.fromEntries(Object.entries(p.variants).map(([c, t]) => [c, put(t as string)])) as PromptDef["variants"])
+      : undefined,
+  }));
+}
+
+/** Folder/manifest key for a person's pack — lowercase, safe, and stable. */
+export function personalPackSlug(name: string): string {
+  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24);
 }

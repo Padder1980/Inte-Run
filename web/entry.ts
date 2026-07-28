@@ -12,6 +12,9 @@ export type { Telemetry, Cue, LiveSnapshot, StepView } from "../src/live/session
 export {
   COACHES, COACH_IDS, DEFAULT_COACH, PROMPTS,
   selectPrompt, newPromptHistory, markPlayed, shouldInterrupt, promptsFor, canPlay,
+  PERSONAL_PROMPT_TEMPLATES,
+  personalPrompts,
+  personalPackSlug,
 } from "../src/live/coach-prompts.ts";
 export type { CoachId, Coach, PromptTrigger, PromptDef, PromptHistory } from "../src/live/coach-prompts.ts";
 export { PROFESSIONAL_LABEL } from "../src/safety/common.ts";

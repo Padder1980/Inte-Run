@@ -102,6 +102,45 @@ npm run web            # builds all the standalone pages too
   ONLY in gitignored `voice-dev/elevenlabs-key.txt` (or `ELEVENLABS_API_KEY`) — it must never be
   committed or shipped; the app stays a static player of pre-generated MP3s. Kokoro remains the
   free fallback below.
+### Pace cues and "your why" (shipped 2026-07-28)
+
+Beyond the structural cues, the coach now reacts to **how the run is actually going** and to **why the
+runner is out there at all**.
+
+- **Pace cues** (`pace-behind` / `pace-ahead` / `pace-on`) and **`keep-going`** are per-coach lines in
+  the same catalogue. `coachPaceTick()` in `web/app.ts` speaks only when a verdict has **held for 20s**
+  and the last cue was **100s+ ago** — a coach who reacts to every wobble gets muted in week one.
+  `pace-on` fires only after a correction, so it affirms rather than chatters.
+- **The four "why" questions** (who inspires you / why you run / why this goal / what keeps you going)
+  are asked in **plan setup section 6** and editable in **Support › Your why** — one markup builder
+  (`whyRowsHtml`) and one wiring path (`wireWhyInputs`) behind both. Stored in `interun_why_v1`.
+- `coachWhyTick()` fires **once per run**, at **70% through** (66% for hard sessions) and only when the
+  session is **15 min+**. The coach frames the moment; the runner's **own words appear on screen**
+  (`whyLiveHtml()`). Rarity is the design: a why that plays every run becomes wallpaper.
+- **Per-coach wordings** live in `variants` on `PromptDef`, resolved by `promptTextFor(p, coach)`.
+  Catalogue is now **57 prompts × 4 coaches = 228 clips**.
+
+⚠️ **No prompt text may contain a digit.** Clips are pre-generated, so a number can never be spoken
+correctly. `test/coach-variants.test.ts` asserts this across every coach.
+
+### Personal voice packs (a coach saying a real person's name)
+
+Pre-generated audio cannot contain an arbitrary name, so this is a **two-tier** design:
+
+- The **shared catalogue stays name-free** and ships publicly — it works for everyone.
+- A **personal pack** is generated for ONE name from `PERSONAL_PROMPT_TEMPLATES` (`{name}` slots) with
+  `voice-dev/generate-elevenlabs.py --personal "Alfie"`, into `web/voices-personal/<slug>/`, mirrored
+  to `docs/voices-personal/` by the build. **Both paths are gitignored** — a person's name and their
+  audio must never reach the public repo or GitHub Pages. The owner's pack ("Alfie", 20 clips) is
+  baked into his own build only.
+- At runtime `coachLoadPersonal()` fetches `voices-personal/<slug>/manifest.json`; a **404 is the
+  normal case**, not an error. `coachPersonalPrompts()` only offers a personal line when its clip
+  actually exists, so a name-bearing line can never fall through to the robot voice mid-run.
+- ⚠️ Every personal trigger must also exist in the shared catalogue — the test asserts it — otherwise
+  a runner without a pack gets silence instead of the name-free fallback.
+- **The watch needs no pack at all**: it synthesises speech live, so it can say any name. The phone
+  sends `whyName` in the watch payload and `WorkoutVoice.frame()` puts it in the sentence.
+
 - **Generation is dev-only and never ships.** Tools live in `voice-dev/` (the Python venv and the
   Kokoro ONNX model are gitignored — regenerate them if absent). Regenerate audio with:
   `node voice-dev/dump-catalogue.ts && voice-dev/venv/bin/python voice-dev/generate.py`.
@@ -332,6 +371,9 @@ Traps that cost real time — don't reintroduce them:
   longer satisfies the @objc requirement — the delegate then silently never fires.
 - ⚠️ **`maybeAutoPaceCalibrate` / `assessFitnessFromRun` must not assume `LIVE` exists.** A watch run
   is assessed with no live session on the phone at all; they take a `ctx` for that reason.
+- ⚠️ **`AVAudioSession.setActive(true)` does nothing useful on watchOS.** It returns without error
+  and the speaker stays silent — the wrist needs **`activate(options:)`**, which claims the route
+  (speaker, or AirPods when connected). This was why the watch produced no spoken cues at all.
 - ⚠️ **Never set `allowsBackgroundLocationUpdates` on watchOS.** CoreLocation asserts and kills the
   app, even with `location` in `WKBackgroundModes`. The running `HKWorkoutSession` is what keeps the
   app and GPS alive there; the property is an iOS concept.

@@ -29,6 +29,9 @@ final class WorkoutManager: NSObject, ObservableObject {
 
     /// The session being run, if the phone sent one. Nil means a free run.
     var plan: PlannedSession?
+    /// The runner's own reasons, handed over by the phone. Spoken once, deep into a hard run.
+    var why: [String: String] = [:]
+    var whyPerson: String?
     private var hrSamples: [Double] = []
     private(set) var routePoints: [[Double]] = []
     private var splits: [Int] = []
@@ -37,6 +40,22 @@ final class WorkoutManager: NSObject, ObservableObject {
     private let runId = "watch-" + UUID().uuidString
 
     var steps: [PlannedStep] { plan?.steps ?? [] }
+
+    /// How long today's session is meant to take. Distance-only plans are converted through the
+    /// target pace so the why-moment lands at the same point in either kind of session.
+    var targetSeconds: TimeInterval {
+        if let mins = plan?.durationMin, mins > 0 { return Double(mins) * 60 }
+        if let km = plan?.distanceKm, km > 0, let band = targetBand {
+            return km * Double(band.low + band.high) / 2
+        }
+        return 0
+    }
+
+    /// Sessions where the closing stretch is genuinely a grind, so encouragement is earned rather
+    /// than automatic. Mirrors the phone's list.
+    var isHardSession: Bool {
+        ["threshold", "vo2max", "vo2", "intervals", "long", "tempo", "race"].contains(plan?.type ?? "")
+    }
     var currentStep: PlannedStep? { stepIndex < steps.count ? steps[stepIndex] : nil }
 
     /// Distance covered inside the current step.
@@ -147,6 +166,7 @@ final class WorkoutManager: NSObject, ObservableObject {
             startedAt = now
             phase = .running
             voice = WorkoutVoice()
+            voice?.loadWhy(why, person: whyPerson)
             if let first = currentStep {
                 voice?.announceStep(label: "Let\u{2019}s go. " + first.label, paceLow: first.paceLow, paceHigh: first.paceHigh)
             } else {
@@ -172,6 +192,9 @@ final class WorkoutManager: NSObject, ObservableObject {
                     case .tooSlow: self.voice?.paceCue("slow")
                     default: self.voice?.paceCue("ok")
                     }
+                    let target = self.targetSeconds
+                    self.voice?.whyMoment(elapsed: self.elapsed, target: target, hard: self.isHardSession)
+                    self.voice?.keepGoing(elapsed: self.elapsed, target: target, hard: self.isHardSession)
                 }
             }
         } catch {

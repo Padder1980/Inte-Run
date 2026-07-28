@@ -77,6 +77,8 @@ struct TodayView: View {
 
             Button {
                 workout.plan = s   // the target band and step list come from the plan
+                workout.why = store.why          // the runner's own reasons, for the hard stretch
+                workout.whyPerson = store.whyPerson
                 running = true
                 workout.start()
             } label: {

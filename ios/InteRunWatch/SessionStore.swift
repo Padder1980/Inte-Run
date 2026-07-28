@@ -73,6 +73,12 @@ final class SessionStore: NSObject, ObservableObject {
     @Published var session: PlannedSession?
     /// The runner's first name, so the watch can speak to a person rather than a device.
     @Published var runnerName: String?
+    /// The runner's own answers to "why are you doing this" — spoken back at the hardest point of a
+    /// long run. Keyed by question ("inspire", "reason", "goal", "anchor").
+    @Published var why: [String: String] = [:]
+    /// The person behind it all, if they named one. The phone can only say this aloud when a voice
+    /// pack was recorded for the name; the watch synthesises speech live, so it always can.
+    @Published var whyPerson: String?
     @Published var reachable = false
     /// True once we have heard from the phone at all, so the UI can tell "nothing today" apart
     /// from "we have not synced yet" — two very different things to show someone.
@@ -83,6 +89,8 @@ final class SessionStore: NSObject, ObservableObject {
 
     private static let cacheKey = "interun_watch_session"
     private static let nameKey = "interun_watch_name"
+    private static let whyKey = "interun_watch_why"
+    private static let whyPersonKey = "interun_watch_why_person"
     private static let isoKey = "interun_watch_iso"
 
     static func localTodayIso() -> String {
@@ -106,6 +114,8 @@ final class SessionStore: NSObject, ObservableObject {
 
     private func restore() {
         runnerName = UserDefaults.standard.string(forKey: Self.nameKey)
+        why = UserDefaults.standard.dictionary(forKey: Self.whyKey) as? [String: String] ?? [:]
+        whyPerson = UserDefaults.standard.string(forKey: Self.whyPersonKey)
         contextIso = UserDefaults.standard.string(forKey: Self.isoKey)
         guard let data = UserDefaults.standard.data(forKey: Self.cacheKey),
               let cached = try? JSONDecoder().decode(PlannedSession.self, from: data) else { return }
@@ -122,6 +132,12 @@ final class SessionStore: NSObject, ObservableObject {
             runnerName = n
             UserDefaults.standard.set(n, forKey: Self.nameKey)
         }
+        // Absent keys mean "the runner cleared these", so both are written every sync rather than
+        // only when present — otherwise a deleted answer would live on the wrist forever.
+        why = (context["why"] as? [String: String])?.filter { !$0.value.isEmpty } ?? [:]
+        UserDefaults.standard.set(why, forKey: Self.whyKey)
+        whyPerson = (context["whyName"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        UserDefaults.standard.set(whyPerson, forKey: Self.whyPersonKey)
         guard let raw = context["session"] else {
             // An explicit empty payload means "nothing planned today" — not a failure to sync.
             session = nil

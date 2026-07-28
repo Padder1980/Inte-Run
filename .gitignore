@@ -18,3 +18,9 @@ web/voices/
 voice-dev/elevenlabs-key.txt
 voice-dev/venv-el/
 voice-dev/audition-el-*.mp3
+
+# Personal voice packs: clips in which a coach speaks a real person's name. These are generated for
+# one runner, baked into their own build, and must never reach the public repo or GitHub Pages.
+web/voices-personal/
+docs/voices-personal/
+voice-dev/personal.json

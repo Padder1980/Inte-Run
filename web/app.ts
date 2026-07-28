@@ -1414,6 +1414,14 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
 .rpe-chip:active { transform: scale(.94); }
 .rpe-chip.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); box-shadow: 0 4px 12px -6px color-mix(in srgb, var(--accent) 80%, transparent); }
 .rpe-note { margin-top: 8px; font-size: 12px; color: var(--ink-faint); }
+/* Your why */
+.why-live { background: linear-gradient(160deg, color-mix(in srgb, var(--rest) 10%, var(--surface)), var(--surface) 60%); border-color: color-mix(in srgb, var(--rest) 26%, var(--line)); }
+.why-k { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-faint); }
+.why-v { font-size: 17px; font-weight: 650; line-height: 1.4; margin-top: 5px; color: var(--ink); }
+.why-row { margin-top: 14px; }
+.why-q { display: block; font-size: 13.5px; font-weight: 600; margin-bottom: 6px; }
+.why-hint { font-size: 11.5px; color: var(--ink-faint); margin-top: 5px; }
+.why-count { font-size: 11.5px; color: var(--ink-faint); margin-top: 14px; }
 /* Connected apps & devices */
 .cn-sec { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); margin: 14px 0 8px; }
 .cn-sec:first-child { margin-top: 0; }
@@ -2159,6 +2167,30 @@ function syncNativeReminders() {
     nativeNotify("schedule", { items: buildReminderSchedule() });
   }, 400);
 }
+// ---- Your why: the reasons behind the running ---------------------------------------------------
+// Four questions asked once at setup, answered in the runner's own words, kept on this device. The
+// coach can't SAY them - the clips are pre-generated - so the voice invokes the reason and the
+// screen shows what they actually wrote. On the watch, whose voice is live text-to-speech, their
+// words are spoken aloud. Every question is optional; a blank answer simply never fires.
+const WHY_QUESTIONS = [
+  { k: "inspire", trigger: "why-inspire", q: "Who inspires you?", ph: "A person, a runner, someone you love\u2026", hint: "We\u2019ll bring them to mind when a run gets hard." },
+  { k: "reason", trigger: "why-reason", q: "What\u2019s your motivation for wanting to run?", ph: "Health, headspace, proving something\u2026", hint: "The reason you laced up in the first place." },
+  { k: "goal", trigger: "why-goal", q: "Why did you choose the time goal you\u2019ve set?", ph: "What makes that number matter?", hint: "A goal with a reason behind it is far easier to chase." },
+  { k: "anchor", trigger: "why-anchor", q: "When things get tough, who or what keeps you going?", ph: "Your anchor when it hurts\u2026", hint: "This is the one we\u2019ll reach for at the hardest moment." },
+];
+function loadWhy() { try { return JSON.parse(localStorage.getItem("interun_why_v1") || "{}") || {}; } catch (e) { return {}; } }
+function saveWhy() { try { Object.keys(WHY).some((k) => WHY[k]) ? localStorage.setItem("interun_why_v1", JSON.stringify(WHY)) : localStorage.removeItem("interun_why_v1"); } catch (e) {} }
+let WHY = loadWhy();
+function whyAnswered() { return WHY_QUESTIONS.filter((q) => (WHY[q.k] || "").trim()); }
+/** The person the runner named, if any. Their name is only ever spoken from a pack made for it. */
+function whyName() { return String((WHY && WHY.name) || "").trim(); }
+/// Pick a "why" moment for this run: one of the answered questions, chosen at random so a runner
+/// who answered all four doesn't hear the same one every time.
+function pickWhy() {
+  const answered = whyAnswered();
+  if (!answered.length) return null;
+  return answered[Math.floor(Math.random() * answered.length)];
+}
 // ---- Apple Watch handover -----------------------------------------------------------------
 // The watch cannot read the plan: it lives in this localStorage, and watchOS has no JavaScriptCore
 // to run the engine either. So the page extracts just today's session and the native shell relays
@@ -2272,6 +2304,16 @@ function syncWatch() {
     // First name only: the watch has room for "Well done, Adam", not a full name.
     const first = String(profile.name || "").trim().split(/\\s+/)[0];
     if (first) payload.name = first;
+    // The watch speaks with live text-to-speech, so unlike the phone it CAN say these words aloud.
+    const answered = whyAnswered();
+    if (answered.length) {
+      payload.why = {};
+      answered.forEach((q) => { payload.why[q.k] = WHY[q.k].trim().slice(0, 120); });
+    }
+    // A live voice can say any name, so the wrist needs no recorded pack to name the runner's
+    // person - it is the one place the name is always speakable.
+    const person = whyName();
+    if (person) payload.whyName = person.slice(0, 24);
     const s = watchPayloadForToday();
     if (s) payload.session = s;
     try { window.webkit.messageHandlers.interunWatch.postMessage(payload); } catch (e) {}
@@ -3414,6 +3456,7 @@ const SUPPORT_HUB = [
   { id: "female", ic: "flower", c: "var(--taper)", t: "Women's health", d: "Symptom-informed prompts — periods, postpartum, more.", interactive: true },
   { id: "strength", ic: "dumbbell", c: "var(--build)", t: "Strength & mobility", d: "Why strength matters, and how to fit it in.", interactive: false },
   { id: "guides", ic: "book", c: "var(--accent)", t: "Training guides", d: "Plain-English answers grounded in the research.", interactive: false },
+  { id: "why", ic: "heart", c: "var(--rest)", t: "Your why", d: "The reasons behind the running \u2014 for the hard miles.", interactive: false },
   { id: "connect", ic: "devices", c: "var(--base)", t: "Connected apps & devices", d: "Your watch, health apps and calendars.", interactive: false },
   { id: "data", ic: "share", c: "var(--steady)", t: "Your data", d: "Back it up, or move it to another device.", interactive: false },
 ];
@@ -3429,6 +3472,7 @@ function supportDetail(id) {
   if (id === "reds") return back + redsView();
   if (id === "female") return back + femaleView();
   if (id === "strength") return back + strengthView();
+  if (id === "why") return back + whyView();
   if (id === "connect") return back + connectView();
   if (id === "data") return back + dataView();
   return back + guidesView();
@@ -3695,6 +3739,65 @@ function confirmRestore(obj) {
   };
   $("sheetOv").classList.add("on");
 }
+// The live card that appears the moment a "why" cue plays. The coach's clip is pre-generated and
+// cannot contain the runner's words, so the voice frames the moment and this shows what they wrote.
+function whyLiveHtml() {
+  const w = COACH.whyShown;
+  if (!w || !w.text) return "";
+  const q = WHY_QUESTIONS.find((x) => x.k === w.k);
+  return '<div class="card why-live"><div class="why-k">' + esc(q ? q.q : "Your why") + '</div>' +
+    '<div class="why-v">' + esc(w.text) + '</div></div>';
+}
+// Support > Your why: read and edit the answers any time. Setup asks them once; people change.
+// The four questions plus the optional name. Rendered identically in plan setup and in Support, so
+// there is one place to change the wording and one wiring path (wireWhyInputs) behind both.
+function whyRowsHtml(idPrefix) {
+  const rows = WHY_QUESTIONS.map((q) => {
+    const v = WHY[q.k] || "";
+    return '<div class="why-row"><label class="why-q" for="' + idPrefix + q.k + '">' + q.q + '</label>' +
+      '<input class="sel" id="' + idPrefix + q.k + '" data-why="' + q.k + '" value="' + esc(v) + '" placeholder="' + q.ph + '" maxlength="120">' +
+      '<div class="why-hint">' + q.hint + '</div></div>';
+  }).join("");
+  const nm = whyName();
+  const spoken = !!(COACH.personal && nm);
+  return rows + '<div class="why-row"><label class="why-q" for="' + idPrefix + 'name">Is there one person behind all this?</label>' +
+    '<input class="sel" id="' + idPrefix + 'name" data-whyname="1" value="' + esc(nm) + '" placeholder="Their first name\u2026" maxlength="24">' +
+    '<div class="why-hint">' + (spoken
+      ? 'Your coach can say <b>' + esc(COACH.personal.name || nm) + '</b> out loud \u2014 this build has their voice pack.'
+      : nm
+        ? 'We\u2019ll put their name on screen at the hard moments. Saying a name aloud needs a voice pack recorded for it, and this build has none for ' + esc(nm) + ' \u2014 so the coach uses the name-free line.'
+        : 'Optional. Used at the hardest point of a long run, and nowhere else.') + '</div></div>';
+}
+function whyView() {
+  const rows = whyRowsHtml("why_");
+  const n = whyAnswered().length;
+  const nm = whyName();
+  return '<div class="card"><div class="subhead" style="margin-top:0">Your why</div>' +
+    '<div class="bk-md">On a long or hard run, when it starts to bite, your coach will bring one of these back to you. Answer as many or as few as you like \u2014 blanks are simply never used.</div>' +
+    rows +
+    '<div class="why-count">' + (n ? n + " of " + WHY_QUESTIONS.length + " answered" : "Nothing answered yet") + '</div></div>' +
+    '<div class="card"><div class="subhead" style="margin-top:0">Where these go</div>' +
+    '<div class="bk-md">Nowhere. They live on this device with the rest of your data, travel in your backups, and are never uploaded \u2014 InteRun has no server. On your watch they can be read aloud; on the phone your coach invokes them and the words appear on screen.</div></div>';
+}
+function wireWhyInputs(onNameChange) {
+  document.querySelectorAll("[data-why]").forEach((el) => {
+    el.onchange = () => {
+      WHY[el.dataset.why] = el.value.trim();
+      saveWhy();
+      try { syncWatch(); } catch (e) {}   // the wrist can speak them, so keep it current
+    };
+  });
+  const nameEl = document.querySelector("[data-whyname]");
+  if (nameEl) nameEl.onchange = () => {
+    WHY.name = nameEl.value.trim();
+    saveWhy();
+    try { syncWatch(); } catch (e) {}
+    // A different name means a different pack, so re-check and repaint: the hint below the field
+    // tells the runner whether their coach can actually say it.
+    coachLoadPersonal().then(() => { if (onNameChange) onNameChange(); });
+  };
+}
+function wireWhyView() { wireWhyInputs(() => { if (state.tab === "support" && state.support === "why") render(); }); }
 // ---- Connected apps & devices -------------------------------------------------------------------
 // The honest version of the screen every big fitness app has. Three kinds of row: things that are
 // genuinely working (watch, Health-via-watch, calendars), things that need the runner to act, and
@@ -4068,6 +4171,9 @@ function viewSetup() {
     '<div class="card setup-card" id="goalCard" style="margin-top:12px"><div class="sec-head"><div class="sec-num">3</div><div><div class="sec-title">Your goal</div><div class="sec-sub">What you\\u2019re working towards</div></div></div><div id="goalBody">' + secGoal + '</div></div>' +
     setupSection(4, "A few details", "The finishing touches to your plan", secDetails) +
     setupSection(5, "Voice coaching", "Your spoken running coach", coachSettingsHtml()) +
+    setupSection(6, "Your why", "The reasons behind the plan",
+      '<div class="bk-md" style="margin:0 0 14px">Training gets hard long before race day. Tell us what this is really for, and deep into a long run \u2014 when it starts to bite \u2014 your coach will bring it back to you in your own words. Every one of these is optional; blanks are simply never used.</div>' +
+      whyRowsHtml("su_why_")) +
     '<div class="err" id="setupErr" style="display:none;color:var(--rest);font-size:13px;margin:14px 2px 0;font-weight:600"></div>' +
     '<button class="primary" id="saveProfile">' + (p.personalized ? "Update my plan" : "Build my plan") + '</button>' +
     (p.personalized ? '<button class="primary" id="cancelSetup" style="background:var(--surface-2);color:var(--ink-soft);box-shadow:none;margin-top:8px">Cancel</button>' : '') +
@@ -4388,6 +4494,9 @@ const COACH = {
   audio: null, current: null, queue: [], unlocked: false,
   history: RC.newPromptHistory(), halfwayDone: false, finalDone: false,
   settleDone: false, lastTechAt: -999, highEffortSince: 0,
+  paceSince: 0, paceWas: "", lastPaceCueAt: -999, paceCorrectionPending: false,
+  whyDone: false, whyShown: null, lastKeepGoingAt: -999,
+  personal: null, personalTried: "",
 };
 function coachEnabled() { return !!(COACH.cfg && COACH.cfg.enabled); }
 function saveCoachCfg() { try { localStorage.setItem(COACH_STORE, JSON.stringify(COACH.cfg)); } catch (e) {} }
@@ -4398,13 +4507,42 @@ function coachAudioEl() {
 }
 // Load the clip manifest once. Absent (artifact / not yet deployed) => fallback mode, never an error.
 function coachLoadManifest() {
-  if (COACH.manifest || COACH.ready) return Promise.resolve();
-  return fetch("voices/manifest.json").then((r) => r.ok ? r.json() : null).then((m) => {
-    COACH.manifest = m; COACH.ready = true;
-    if (m && m.clips) m.clips.forEach((c) => { COACH.byKey[c.coach + "/" + c.id] = c; });
-  }).catch(() => { COACH.ready = true; });
+  // The personal pack rides along on every call: it is cheap (guarded on the name it last tried)
+  // and it must be in place before any why-moment fires, whichever entry point warmed the coach.
+  const shared = (COACH.manifest || COACH.ready) ? Promise.resolve()
+    : fetch("voices/manifest.json").then((r) => r.ok ? r.json() : null).then((m) => {
+        COACH.manifest = m; COACH.ready = true;
+        if (m && m.clips) m.clips.forEach((c) => { COACH.byKey[c.coach + "/" + c.id] = c; });
+      }).catch(() => { COACH.ready = true; });
+  return Promise.all([shared, coachLoadPersonal()]).then(() => {});
 }
-function coachClip(promptId) { return COACH.byKey[COACH.cfg.coach + "/" + promptId] || null; }
+function coachClip(promptId) {
+  if (COACH.personal) { const pc = COACH.personal.byKey[COACH.cfg.coach + "/" + promptId]; if (pc) return pc; }
+  return COACH.byKey[COACH.cfg.coach + "/" + promptId] || null;
+}
+// A personal pack is audio in which the coaches say a real person's name. It is generated for one
+// runner and baked into their own build, so it is simply absent for everyone else -- a 404 here is
+// the normal case, not an error, and the shared name-free line plays instead.
+function coachLoadPersonal() {
+  const slug = RC.personalPackSlug(String((WHY && WHY.name) || ""));
+  if (COACH.personalTried === slug) return Promise.resolve();
+  COACH.personalTried = slug; COACH.personal = null;
+  if (!slug) return Promise.resolve();
+  return fetch("voices-personal/" + slug + "/manifest.json").then((r) => r.ok ? r.json() : null).then((m) => {
+    if (!m || !m.clips || !m.clips.length) return;
+    const byKey = {}; m.clips.forEach((c) => { byKey[c.coach + "/" + c.id] = c; });
+    COACH.personal = { name: m.name || "", slug: slug, byKey: byKey, clips: m.clips };
+  }).catch(() => {});
+}
+// The name-bearing prompts this build can actually SPEAK for the chosen coach. Selection must be
+// gated on the audio existing: a personal line with no clip would fall through to the device voice
+// mid-run, which sounds like a fault rather than a flourish.
+function coachPersonalPrompts(trigger) {
+  if (!COACH.personal) return [];
+  const name = (WHY && WHY.name || "").trim(); if (!name) return [];
+  return RC.personalPrompts(name).filter((p) => p.trigger === trigger &&
+    COACH.personal.byKey[COACH.cfg.coach + "/" + p.id]);
+}
 // Unlock audio inside a user gesture (iOS blocks playback until then).
 function coachUnlock() {
   if (COACH.unlocked) return; const a = coachAudioEl();
@@ -4416,6 +4554,8 @@ function coachPreload() {
   if (!coachEnabled() || !COACH.manifest) return;
   const clips = COACH.manifest.clips.filter((c) => c.coach === COACH.cfg.coach);
   clips.slice(0, 60).forEach((c) => { try { fetch(c.file).catch(() => {}); } catch (e) {} });
+  if (COACH.personal) COACH.personal.clips.filter((c) => c.coach === COACH.cfg.coach)
+    .forEach((c) => { try { fetch(c.file).catch(() => {}); } catch (e) {} });
 }
 function coachFrequencyAllows(prompt) {
   const f = COACH.cfg.frequency || "normal";
@@ -4425,7 +4565,11 @@ function coachFrequencyAllows(prompt) {
 // Central entry point: fire the best prompt for a trigger, honouring priority, interruption and repeats.
 function coachTrigger(trigger, sessionType, nowSec) {
   if (!coachEnabled()) return;
-  const p = RC.selectPrompt(trigger, sessionType, nowSec, COACH.history);
+  // Hearing your person's actual name beats any generic line, so a personal clip wins when one
+  // exists for this moment. Falls straight through to the shared catalogue when it does not.
+  const personal = coachPersonalPrompts(trigger).filter((x) => RC.canPlay(x, nowSec, COACH.history));
+  let p = personal.length ? personal[Math.floor(Math.random() * personal.length)] : null;
+  if (!p) p = RC.selectPrompt(trigger, sessionType, nowSec, COACH.history);
   if (!p || !coachFrequencyAllows(p)) return;
   if (COACH.current && !RC.shouldInterrupt(p, COACH.current)) {
     if (COACH.queue.length < 3 && p.priority >= 40) COACH.queue.push(p); // queue only things worth hearing
@@ -4464,6 +4608,8 @@ function coachStop() {
 }
 function coachResetSession() {
   COACH.history = RC.newPromptHistory(); COACH.halfwayDone = false; COACH.finalDone = false;
+  COACH.paceSince = 0; COACH.paceWas = ""; COACH.lastPaceCueAt = -999; COACH.paceCorrectionPending = false;
+  COACH.whyDone = false; COACH.whyShown = null; COACH.lastKeepGoingAt = -999;
   COACH.settleDone = false; COACH.lastTechAt = -999; COACH.highEffortSince = 0; coachStop();
 }
 // Map a live step's kind + the session type to the right trigger when a step begins.
@@ -4479,10 +4625,52 @@ function coachStepTrigger(stepKind, sessionType) {
   }
   return null;
 }
+// Pace against the prescribed band, spoken only when the runner has genuinely settled off target.
+// The engine gives us paceStatus every tick; a verdict must HOLD before anything is said, because
+// GPS wobbles and one slow stride up a kerb are not coaching moments.
+const PACE_HOLD_SEC = 20;      // how long a verdict must persist before the coach reacts
+const PACE_QUIET_SEC = 100;    // minimum gap between pace cues of any kind
+function coachPaceTick(snap, type, nowSec) {
+  const st = snap && snap.paceStatus;
+  if (!st || st === "none") { COACH.paceSince = 0; COACH.paceWas = ""; return; }
+  if (st !== COACH.paceWas) { COACH.paceWas = st; COACH.paceSince = nowSec; return; }
+  if (nowSec - COACH.paceSince < PACE_HOLD_SEC) return;
+  if (nowSec - COACH.lastPaceCueAt < PACE_QUIET_SEC) return;
+  // "On pace" is only worth saying as a RECOVERY - after we asked for a correction and got it.
+  if (st === "on" && !COACH.paceCorrectionPending) return;
+  COACH.lastPaceCueAt = nowSec;
+  COACH.paceCorrectionPending = (st !== "on");
+  coachTrigger(st === "fast" ? "pace-ahead" : st === "slow" ? "pace-behind" : "pace-on", type, nowSec);
+}
+// The runner's own reason, at most once per run, and only where it earns its place: deep into a
+// long run, or entering the closing third of a hard session. Rarity is the whole point.
+function coachWhyTick(snap, type, nowSec) {
+  if (COACH.whyDone) return;
+  const target = LIVE.session.estimatedDurationSeconds || 0;
+  if (!target || target < 900) return;                 // not for short sessions
+  const through = snap.elapsedSeconds / target;
+  const hard = type === "threshold" || type === "vo2" || type === "race-specific";
+  if (through < (hard ? 0.66 : 0.7)) return;
+  const q = pickWhy();
+  if (!q) { COACH.whyDone = true; return; }            // nothing answered: never ask again
+  COACH.whyDone = true;
+  COACH.whyShown = { k: q.k, text: WHY[q.k].trim(), at: nowSec };
+  coachTrigger(q.trigger, type, nowSec);
+  // Showing the card must never be able to silence the coach: the cue matters more than the paint.
+  try { renderLiveNow(); } catch (e) {}
+}
+// A grind cue for the closing stretch of the hardest work, independent of pace.
+function coachKeepGoing(type, nowSec) {
+  if (nowSec - COACH.lastKeepGoingAt < 300) return;
+  COACH.lastKeepGoingAt = nowSec;
+  coachTrigger("keep-going", type, nowSec);
+}
 // Ambient / milestone checker, called each UI tick with a fresh snapshot.
 function coachTick(snap) {
   if (!coachEnabled() || !LIVE || !LIVE.started || LIVE.done) return;
   const t = LIVE.session.type, nowSec = (LIVE.mode === "sim" ? LIVE.vms : liveElapsedMs()) / 1000;
+  coachPaceTick(snap, t, nowSec);
+  coachWhyTick(snap, t, nowSec);
   const target = (LIVE.session.estimatedDurationSeconds || 0);
   // Halfway (by planned duration, once).
   if (!COACH.halfwayDone && target > 120 && snap.elapsedSeconds >= target * 0.5) {
@@ -4491,6 +4679,8 @@ function coachTick(snap) {
   // Final effort — entering the last step (unless it's a cool-down), once.
   if (!COACH.finalDone && snap.step && snap.step.total > 1 && snap.step.index === snap.step.total - 1 && snap.step.kind !== "cooldown") {
     COACH.finalDone = true; coachTrigger("final-effort", t, nowSec);
+  } else if (target > 0 && snap.elapsedSeconds >= target * 0.8 && (t === "threshold" || t === "vo2" || t === "long")) {
+    coachKeepGoing(t, nowSec);
   }
   // Periodic technique cue on relaxed running (frequency-gated by selection + repeat window).
   if ((t === "easy" || t === "long" || t === "recovery") && nowSec - COACH.lastTechAt > 240 && snap.elapsedSeconds > 120) {
@@ -4698,6 +4888,7 @@ function viewLive() {
     '<div><div class="lk">Lap</div><div class="lv num" id="lLap">—</div></div></div></div>' +
     '<div class="card lstep" id="lStepCard"><div class="cnt">Press start when you\\'re ready.</div></div>' +
     controls +
+    whyLiveHtml() +
     '<div class="card"><div class="subhead" style="margin-top:0">Coaching cues</div><div class="cuelog" id="lCues"><div style="color:var(--ink-faint);font-size:13px">Cues will appear as you run.</div></div></div>';
 }
 // Trim a GPS/simulated track to at most ~150 evenly-spaced points for compact storage + a clean map.
@@ -5822,6 +6013,7 @@ function render() {
     v.scrollTop = 0;
     document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
     wire();
+    wireWhyInputs(() => { if (state.screen === "setup") render(); });
     refreshTypePreview();
     state.trialSaved = null;
     return;
@@ -5892,6 +6084,7 @@ function wire() {
   wireDataView();
   const back = $("supBack"); if (back) back.onclick = () => { state.support = null; render(); };
   wireConnectView();
+  wireWhyView();
   document.querySelectorAll('[data-chk="rf"]').forEach((c) => c.onchange = runRf);
   document.querySelectorAll('[data-chk="reds"]').forEach((c) => c.onchange = runReds);
   document.querySelectorAll('[data-chk="fh"]').forEach((c) => c.onchange = runFh);
@@ -6139,5 +6332,13 @@ if (existsSync(voicesSrc)) {
   cpSync(voicesSrc, join(docsDir, "voices"), { recursive: true });
   console.log("Mirrored coach audio to docs/voices");
 } else {
-  console.log("No web/voices yet — run: node voice-dev/dump-catalogue.ts && voice-dev/venv/bin/python voice-dev/generate.py");
+  console.log("No web/voices yet \u2014 run: node voice-dev/dump-catalogue.ts && voice-dev/venv/bin/python voice-dev/generate.py");
+}
+// Personal packs (a coach speaking a real person's name) are generated for one runner and are
+// gitignored on both sides, so this only ever copies what exists on this machine. Absent everywhere
+// else, which is exactly right: the app falls back to the shared, name-free lines.
+const personalSrc = join(here, "voices-personal");
+if (existsSync(personalSrc)) {
+  cpSync(personalSrc, join(docsDir, "voices-personal"), { recursive: true });
+  console.log("Mirrored personal voice pack to docs/voices-personal (local only, gitignored)");
 }

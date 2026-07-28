@@ -36,6 +36,7 @@ ROOT = os.path.dirname(HERE)
 OUT_ROOT = os.path.join(ROOT, "web", "voices")
 MANIFEST = os.path.join(OUT_ROOT, "manifest.json")
 PROMPTS = os.path.join(HERE, "prompts.json")
+PERSONAL_ROOT = os.path.join(ROOT, "web", "voices-personal")
 CASTING = os.path.join(HERE, "elevenlabs-voices.json")
 KEY_FILE = os.path.join(HERE, "elevenlabs-key.txt")
 
@@ -155,6 +156,9 @@ def main() -> None:
     ap.add_argument("--audition", metavar="TEXT")
     ap.add_argument("--coach", choices=list(CASTING_PREFS))
     ap.add_argument("--force", action="store_true", help="regenerate even when the hash matches")
+    ap.add_argument("--personal", metavar="NAME",
+                    help="generate the private pack in which the coaches say this person's name "
+                         "(written to web/voices-personal/<slug>/ — gitignored, never published)")
     args = ap.parse_args()
 
     if args.list_voices:
@@ -171,6 +175,10 @@ def main() -> None:
         return
 
     data = json.load(open(PROMPTS, encoding="utf-8"))
+
+    if args.personal:
+        return generate_personal(args, data, casting)
+
     old = {}
     if os.path.exists(MANIFEST):
         for c in json.load(open(MANIFEST, encoding="utf-8")).get("clips", []):
@@ -181,18 +189,19 @@ def main() -> None:
     for c in coaches:
         vid = casting[c["id"]]["voice_id"]
         for p in data["prompts"]:
-            h = clip_hash(p["text"], "el:" + vid, VERSION)
+            text = (p.get("byCoach") or {}).get(c["id"], p["text"])
+            h = clip_hash(text, "el:" + vid, VERSION)
             if args.force or old.get((c["id"], p["id"])) != h:
-                todo.append((c, p, vid, h))
-    chars = sum(len(p["text"]) for _, p, _, _ in todo)
+                todo.append((c, p, vid, h, text))
+    chars = sum(len(t) for _, _, _, _, t in todo)
     print(f"{len(todo)} clips to generate ({chars} characters). Voices: "
           + ", ".join(f'{c["id"]}={casting[c["id"]]["name"]}' for c in coaches))
 
     clips, done = [], 0
-    for c, p, vid, h in todo:
+    for c, p, vid, h, text in todo:
         cdir = os.path.join(OUT_ROOT, c["id"])
         os.makedirs(cdir, exist_ok=True)
-        out = polish_and_write(tts(vid, p["text"]), os.path.join(cdir, p["id"]))
+        out = polish_and_write(tts(vid, text), os.path.join(cdir, p["id"]))
         done += 1
         print(f'  [{done}/{len(todo)}] {c["id"]}/{p["id"]}')
 
@@ -213,13 +222,88 @@ def main() -> None:
                 "id": p["id"], "coach": c["id"], "voice": casting[c["id"]]["name"],
                 "trigger": p["trigger"], "file": f"voices/{c['id']}/{p['id']}.mp3",
                 "duration": round(info.frames / info.samplerate, 2), "bytes": size,
-                "hash": clip_hash(p["text"], "el:" + vid, VERSION),
+                "hash": clip_hash((p.get("byCoach") or {}).get(c["id"], p["text"]), "el:" + vid, VERSION),
             })
         manifest["coaches"].append({"id": c["id"], "name": c["name"], "voice": casting[c["id"]]["name"], "bytes": coach_bytes})
         manifest["totalBytes"] += coach_bytes
     json.dump(manifest, open(MANIFEST, "w", encoding="utf-8"), indent=1)
     print(f'Manifest: {len(manifest["clips"])} clips, {manifest["totalBytes"] / 1e6:.1f} MB. '
           "Now run: node web/app.ts  (mirrors web/voices -> docs/voices)")
+
+
+def slug(name: str) -> str:
+    """Mirror personalPackSlug() in src/live/coach-prompts.ts — the app looks the pack up by this."""
+    out = "".join(ch if ch.isalnum() else "-" for ch in name.strip().lower())
+    while "--" in out:
+        out = out.replace("--", "-")
+    return out.strip("-")[:24]
+
+
+def generate_personal(args, data: dict, casting: dict) -> None:
+    """The private pack: the same why-moments with a real name in them.
+
+    Kept entirely separate from web/voices — different folder, own manifest, gitignored. The app
+    treats it as a bonus: any clip that is missing simply falls back to the shared, name-free line,
+    so a runner without a pack loses nothing.
+    """
+    name = args.personal.strip()
+    key = slug(name)
+    if not key:
+        sys.exit(f'"{name}" has no usable letters or digits — pick a name the app can key a folder on.')
+    templates = data.get("personal") or []
+    if not templates:
+        sys.exit("No personal templates in prompts.json — run: node voice-dev/dump-catalogue.ts")
+
+    root = os.path.join(PERSONAL_ROOT, key)
+    manifest_path = os.path.join(root, "manifest.json")
+    old = {}
+    if os.path.exists(manifest_path):
+        for c in json.load(open(manifest_path, encoding="utf-8")).get("clips", []):
+            old[(c["coach"], c["id"])] = c.get("hash")
+
+    coaches = [c for c in data["coaches"] if not args.coach or c["id"] == args.coach]
+    todo = []
+    for c in coaches:
+        vid = casting[c["id"]]["voice_id"]
+        for p in templates:
+            text = ((p.get("byCoach") or {}).get(c["id"], p["text"])).replace("{name}", name)
+            h = clip_hash(text, "el:" + vid, VERSION)
+            if args.force or old.get((c["id"], p["id"])) != h:
+                todo.append((c, p, vid, h, text))
+    chars = sum(len(t) for _, _, _, _, t in todo)
+    print(f'Personal pack "{name}" -> voices-personal/{key}/  '
+          f"{len(todo)} clips to generate ({chars} characters)")
+
+    done = 0
+    for c, p, vid, h, text in todo:
+        cdir = os.path.join(root, c["id"])
+        os.makedirs(cdir, exist_ok=True)
+        polish_and_write(tts(vid, text), os.path.join(cdir, p["id"]))
+        done += 1
+        print(f'  [{done}/{len(todo)}] {c["id"]}/{p["id"]}  "{text}"')
+
+    import soundfile as sf
+    manifest = {"version": VERSION, "name": name, "slug": key, "sampleRate": SAMPLE_RATE, "clips": [], "totalBytes": 0}
+    for c in data["coaches"]:
+        vid = casting[c["id"]]["voice_id"]
+        for p in templates:
+            f = os.path.join(root, c["id"], p["id"] + ".mp3")
+            if not os.path.exists(f):
+                continue
+            info = sf.info(f)
+            size = os.path.getsize(f)
+            text = ((p.get("byCoach") or {}).get(c["id"], p["text"])).replace("{name}", name)
+            manifest["clips"].append({
+                "id": p["id"], "coach": c["id"], "trigger": p["trigger"],
+                "file": f"voices-personal/{key}/{c['id']}/{p['id']}.mp3",
+                "duration": round(info.frames / info.samplerate, 2), "bytes": size,
+                "hash": clip_hash(text, "el:" + vid, VERSION),
+            })
+            manifest["totalBytes"] += size
+    os.makedirs(root, exist_ok=True)
+    json.dump(manifest, open(manifest_path, "w", encoding="utf-8"), indent=1)
+    print(f'Manifest: {len(manifest["clips"])} clips, {manifest["totalBytes"] / 1e6:.2f} MB. '
+          "Now run: node web/app.ts  (mirrors it into your local docs/ only — it is gitignored)")
 
 
 if __name__ == "__main__":

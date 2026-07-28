@@ -26,212 +26,686 @@
     {
       "id": "prep_1",
       "text": "Welcome to Inter-run. Let's make today's session count.",
-      "trigger": "session-prep"
+      "trigger": "session-prep",
+      "byCoach": {
+        "guide": "Welcome to Inter-run. Let's make today's session count.",
+        "pacer": "Welcome to Inter-run. Let's make today's session count.",
+        "motivator": "Welcome to Inter-run. Let's make today's session count.",
+        "technician": "Welcome to Inter-run. Let's make today's session count."
+      }
     },
     {
       "id": "prep_2",
       "text": "Good to have you here. Take a breath, and let's begin when you're ready.",
-      "trigger": "session-prep"
+      "trigger": "session-prep",
+      "byCoach": {
+        "guide": "Good to have you here. Take a breath, and let's begin when you're ready.",
+        "pacer": "Good to have you here. Take a breath, and let's begin when you're ready.",
+        "motivator": "Good to have you here. Take a breath, and let's begin when you're ready.",
+        "technician": "Good to have you here. Take a breath, and let's begin when you're ready."
+      }
     },
     {
       "id": "warmup_1",
       "text": "Let's warm up. Start easy and let your body wake up gradually.",
-      "trigger": "warmup-start"
+      "trigger": "warmup-start",
+      "byCoach": {
+        "guide": "Let's warm up. Start easy and let your body wake up gradually.",
+        "pacer": "Let's warm up. Start easy and let your body wake up gradually.",
+        "motivator": "Let's warm up. Start easy and let your body wake up gradually.",
+        "technician": "Let's warm up. Start easy and let your body wake up gradually."
+      }
     },
     {
       "id": "warmup_2",
       "text": "Ease in gently. Loose shoulders, relaxed breathing, no rush.",
-      "trigger": "warmup-start"
+      "trigger": "warmup-start",
+      "byCoach": {
+        "guide": "Ease in gently. Loose shoulders, relaxed breathing, no rush.",
+        "pacer": "Ease in gently. Loose shoulders, relaxed breathing, no rush.",
+        "motivator": "Ease in gently. Loose shoulders, relaxed breathing, no rush.",
+        "technician": "Ease in gently. Loose shoulders, relaxed breathing, no rush."
+      }
     },
     {
       "id": "start_1",
       "text": "Here we go. Settle into your rhythm.",
-      "trigger": "session-start"
+      "trigger": "session-start",
+      "byCoach": {
+        "guide": "Here we go. Settle into your rhythm.",
+        "pacer": "Here we go. Settle into your rhythm.",
+        "motivator": "Here we go. Settle into your rhythm.",
+        "technician": "Here we go. Settle into your rhythm."
+      }
     },
     {
       "id": "start_2",
       "text": "Let's get to work. Find a pace you can hold.",
-      "trigger": "session-start"
+      "trigger": "session-start",
+      "byCoach": {
+        "guide": "Let's get to work. Find a pace you can hold.",
+        "pacer": "Let's get to work. Find a pace you can hold.",
+        "motivator": "Let's get to work. Find a pace you can hold.",
+        "technician": "Let's get to work. Find a pace you can hold."
+      }
     },
     {
       "id": "easy_1",
       "text": "Nice and easy. This pace should feel comfortable and conversational.",
-      "trigger": "easy-settle"
+      "trigger": "easy-settle",
+      "byCoach": {
+        "guide": "Nice and easy. This pace should feel comfortable and conversational.",
+        "pacer": "Nice and easy. This pace should feel comfortable and conversational.",
+        "motivator": "Nice and easy. This pace should feel comfortable and conversational.",
+        "technician": "Nice and easy. This pace should feel comfortable and conversational."
+      }
     },
     {
       "id": "easy_2",
       "text": "Relax and enjoy this one. Effort stays gentle throughout.",
-      "trigger": "easy-settle"
+      "trigger": "easy-settle",
+      "byCoach": {
+        "guide": "Relax and enjoy this one. Effort stays gentle throughout.",
+        "pacer": "Relax and enjoy this one. Effort stays gentle throughout.",
+        "motivator": "Relax and enjoy this one. Effort stays gentle throughout.",
+        "technician": "Relax and enjoy this one. Effort stays gentle throughout."
+      }
     },
     {
       "id": "easy_3",
       "text": "Keep it light. If you can chat, you're right where you should be.",
-      "trigger": "easy-settle"
+      "trigger": "easy-settle",
+      "byCoach": {
+        "guide": "Keep it light. If you can chat, you're right where you should be.",
+        "pacer": "Keep it light. If you can chat, you're right where you should be.",
+        "motivator": "Keep it light. If you can chat, you're right where you should be.",
+        "technician": "Keep it light. If you can chat, you're right where you should be."
+      }
     },
     {
       "id": "long_1",
       "text": "This is your long run. Patience early pays off late — settle in.",
-      "trigger": "long-run-settle"
+      "trigger": "long-run-settle",
+      "byCoach": {
+        "guide": "This is your long run. Patience early pays off late — settle in.",
+        "pacer": "This is your long run. Patience early pays off late — settle in.",
+        "motivator": "This is your long run. Patience early pays off late — settle in.",
+        "technician": "This is your long run. Patience early pays off late — settle in."
+      }
     },
     {
       "id": "long_2",
       "text": "Steady does it. Sip fluids, stay relaxed, and let the miles build.",
-      "trigger": "long-run-settle"
+      "trigger": "long-run-settle",
+      "byCoach": {
+        "guide": "Steady does it. Sip fluids, stay relaxed, and let the miles build.",
+        "pacer": "Steady does it. Sip fluids, stay relaxed, and let the miles build.",
+        "motivator": "Steady does it. Sip fluids, stay relaxed, and let the miles build.",
+        "technician": "Steady does it. Sip fluids, stay relaxed, and let the miles build."
+      }
     },
     {
       "id": "tempo_1",
       "text": "Lifting to tempo now. Strong and controlled — comfortably hard.",
-      "trigger": "tempo-start"
+      "trigger": "tempo-start",
+      "byCoach": {
+        "guide": "Lifting to tempo now. Strong and controlled — comfortably hard.",
+        "pacer": "Lifting to tempo now. Strong and controlled — comfortably hard.",
+        "motivator": "Lifting to tempo now. Strong and controlled — comfortably hard.",
+        "technician": "Lifting to tempo now. Strong and controlled — comfortably hard."
+      }
     },
     {
       "id": "threshold_1",
       "text": "Hold this effort. Smooth, steady, right on the edge of comfortable.",
-      "trigger": "threshold-hold"
+      "trigger": "threshold-hold",
+      "byCoach": {
+        "guide": "Hold this effort. Smooth, steady, right on the edge of comfortable.",
+        "pacer": "Hold this effort. Smooth, steady, right on the edge of comfortable.",
+        "motivator": "Hold this effort. Smooth, steady, right on the edge of comfortable.",
+        "technician": "Hold this effort. Smooth, steady, right on the edge of comfortable."
+      }
     },
     {
       "id": "threshold_2",
       "text": "Stay composed. Same effort, same rhythm — keep it repeatable.",
-      "trigger": "threshold-hold"
+      "trigger": "threshold-hold",
+      "byCoach": {
+        "guide": "Stay composed. Same effort, same rhythm — keep it repeatable.",
+        "pacer": "Stay composed. Same effort, same rhythm — keep it repeatable.",
+        "motivator": "Stay composed. Same effort, same rhythm — keep it repeatable.",
+        "technician": "Stay composed. Same effort, same rhythm — keep it repeatable."
+      }
     },
     {
       "id": "interval_start_1",
       "text": "Next rep coming up. Get ready.",
-      "trigger": "interval-start"
+      "trigger": "interval-start",
+      "byCoach": {
+        "guide": "Next rep coming up. Get ready.",
+        "pacer": "Next rep coming up. Get ready.",
+        "motivator": "Next rep coming up. Get ready.",
+        "technician": "Next rep coming up. Get ready."
+      }
     },
     {
       "id": "interval_work_1",
       "text": "This is the work. Strong arms, tall posture, keep driving.",
-      "trigger": "interval-work"
+      "trigger": "interval-work",
+      "byCoach": {
+        "guide": "This is the work. Strong arms, tall posture, keep driving.",
+        "pacer": "This is the work. Strong arms, tall posture, keep driving.",
+        "motivator": "This is the work. Strong arms, tall posture, keep driving.",
+        "technician": "This is the work. Strong arms, tall posture, keep driving."
+      }
     },
     {
       "id": "interval_work_2",
       "text": "Hold your pace. You've got more than you think.",
-      "trigger": "interval-work"
+      "trigger": "interval-work",
+      "byCoach": {
+        "guide": "Hold your pace. You've got more than you think.",
+        "pacer": "Hold your pace. You've got more than you think.",
+        "motivator": "Hold your pace. You've got more than you think.",
+        "technician": "Hold your pace. You've got more than you think."
+      }
     },
     {
       "id": "recovery_1",
       "text": "Recover now. Ease right down and catch your breath.",
-      "trigger": "recovery-start"
+      "trigger": "recovery-start",
+      "byCoach": {
+        "guide": "Recover now. Ease right down and catch your breath.",
+        "pacer": "Recover now. Ease right down and catch your breath.",
+        "motivator": "Recover now. Ease right down and catch your breath.",
+        "technician": "Recover now. Ease right down and catch your breath."
+      }
     },
     {
       "id": "recovery_2",
       "text": "Good rep. Jog easy and let the heart rate come back.",
-      "trigger": "recovery-start"
+      "trigger": "recovery-start",
+      "byCoach": {
+        "guide": "Good rep. Jog easy and let the heart rate come back.",
+        "pacer": "Good rep. Jog easy and let the heart rate come back.",
+        "motivator": "Good rep. Jog easy and let the heart rate come back.",
+        "technician": "Good rep. Jog easy and let the heart rate come back."
+      }
     },
     {
       "id": "hill_1",
       "text": "Up the hill. Shorten your stride, drive your arms, keep the effort steady.",
-      "trigger": "hill-start"
+      "trigger": "hill-start",
+      "byCoach": {
+        "guide": "Up the hill. Shorten your stride, drive your arms, keep the effort steady.",
+        "pacer": "Up the hill. Shorten your stride, drive your arms, keep the effort steady.",
+        "motivator": "Up the hill. Shorten your stride, drive your arms, keep the effort steady.",
+        "technician": "Up the hill. Shorten your stride, drive your arms, keep the effort steady."
+      }
     },
     {
       "id": "hill_2",
       "text": "Attack the climb. Eyes up, strong and powerful.",
-      "trigger": "hill-start"
+      "trigger": "hill-start",
+      "byCoach": {
+        "guide": "Attack the climb. Eyes up, strong and powerful.",
+        "pacer": "Attack the climb. Eyes up, strong and powerful.",
+        "motivator": "Attack the climb. Eyes up, strong and powerful.",
+        "technician": "Attack the climb. Eyes up, strong and powerful."
+      }
     },
     {
       "id": "strength_1",
       "text": "Strength time. Move with control, quality over quantity, and stop before failure.",
-      "trigger": "strength-start"
+      "trigger": "strength-start",
+      "byCoach": {
+        "guide": "Strength time. Move with control, quality over quantity, and stop before failure.",
+        "pacer": "Strength time. Move with control, quality over quantity, and stop before failure.",
+        "motivator": "Strength time. Move with control, quality over quantity, and stop before failure.",
+        "technician": "Strength time. Move with control, quality over quantity, and stop before failure."
+      }
     },
     {
       "id": "strength_2",
       "text": "Let's build durability. Brace your core and keep every rep clean.",
-      "trigger": "strength-start"
+      "trigger": "strength-start",
+      "byCoach": {
+        "guide": "Let's build durability. Brace your core and keep every rep clean.",
+        "pacer": "Let's build durability. Brace your core and keep every rep clean.",
+        "motivator": "Let's build durability. Brace your core and keep every rep clean.",
+        "technician": "Let's build durability. Brace your core and keep every rep clean."
+      }
     },
     {
       "id": "technique_1",
       "text": "Quick check: relax your shoulders and let your hands stay soft.",
-      "trigger": "technique"
+      "trigger": "technique",
+      "byCoach": {
+        "guide": "Quick check: relax your shoulders and let your hands stay soft.",
+        "pacer": "Quick check: relax your shoulders and let your hands stay soft.",
+        "motivator": "Quick check: relax your shoulders and let your hands stay soft.",
+        "technician": "Quick check: relax your shoulders and let your hands stay soft."
+      }
     },
     {
       "id": "technique_2",
       "text": "Light, quick steps. Let your feet land underneath you.",
-      "trigger": "technique"
+      "trigger": "technique",
+      "byCoach": {
+        "guide": "Light, quick steps. Let your feet land underneath you.",
+        "pacer": "Light, quick steps. Let your feet land underneath you.",
+        "motivator": "Light, quick steps. Let your feet land underneath you.",
+        "technician": "Light, quick steps. Let your feet land underneath you."
+      }
     },
     {
       "id": "technique_3",
       "text": "Tall through the spine, eyes on the horizon. Run relaxed.",
-      "trigger": "technique"
+      "trigger": "technique",
+      "byCoach": {
+        "guide": "Tall through the spine, eyes on the horizon. Run relaxed.",
+        "pacer": "Tall through the spine, eyes on the horizon. Run relaxed.",
+        "motivator": "Tall through the spine, eyes on the horizon. Run relaxed.",
+        "technician": "Tall through the spine, eyes on the horizon. Run relaxed."
+      }
     },
     {
       "id": "halfway_1",
       "text": "You're halfway through. Hold your form and keep working.",
-      "trigger": "halfway"
+      "trigger": "halfway",
+      "byCoach": {
+        "guide": "You're halfway through. Hold your form and keep working.",
+        "pacer": "You're halfway through. Hold your form and keep working.",
+        "motivator": "You're halfway through. Hold your form and keep working.",
+        "technician": "You're halfway through. Hold your form and keep working."
+      }
     },
     {
       "id": "halfway_2",
       "text": "Halfway done, and looking strong. Stay with it.",
-      "trigger": "halfway"
+      "trigger": "halfway",
+      "byCoach": {
+        "guide": "Halfway done, and looking strong. Stay with it.",
+        "pacer": "Halfway done, and looking strong. Stay with it.",
+        "motivator": "Halfway done, and looking strong. Stay with it.",
+        "technician": "Halfway done, and looking strong. Stay with it."
+      }
+    },
+    {
+      "id": "pace_behind_1",
+      "text": "You've drifted a little under pace. Gently find that rhythm again.",
+      "trigger": "pace-behind",
+      "byCoach": {
+        "guide": "You've drifted a little soft. Gently find that rhythm again.",
+        "pacer": "You're a shade down on target. Lift the rhythm, not the strain.",
+        "motivator": "You've got more than this — let's go find it.",
+        "technician": "Pace is down. Lift your cadence a notch and stand tall."
+      }
+    },
+    {
+      "id": "pace_behind_2",
+      "text": "A touch under pace. No panic — just ease back into it.",
+      "trigger": "pace-behind",
+      "byCoach": {
+        "guide": "A touch under pace. No panic — just lean back into it.",
+        "pacer": "Pace has slipped. Quicker feet, same effort.",
+        "motivator": "Wake it up! Quick feet, big heart.",
+        "technician": "Losing time. Shorten the stride, quicken the rhythm."
+      }
+    },
+    {
+      "id": "pace_behind_3",
+      "text": "Come back to target. Smooth and steady does it.",
+      "trigger": "pace-behind",
+      "byCoach": {
+        "guide": "Come back to me. Smooth and steady does it.",
+        "pacer": "Below the band. Build back gradually over the next minute.",
+        "motivator": "This is where it's won. Pick it up with me.",
+        "technician": "Check in: eyes up, arms driving. Now build the pace back."
+      }
+    },
+    {
+      "id": "pace_ahead_1",
+      "text": "Easy now — you're quicker than we need. Save it for later.",
+      "trigger": "pace-ahead",
+      "byCoach": {
+        "guide": "Easy now — you're quicker than we need. Save it for later.",
+        "pacer": "Above target. Ease back — the plan needs this pace, not that one.",
+        "motivator": "Whoa, speedster! Bank that fire — you'll want it at the end.",
+        "technician": "Running hot. Drop the effort a notch — same form, less force."
+      }
+    },
+    {
+      "id": "pace_ahead_2",
+      "text": "Ahead of pace. Breathe, soften, let it come back.",
+      "trigger": "pace-ahead",
+      "byCoach": {
+        "guide": "Ahead of pace. Breathe, soften, let it come back.",
+        "pacer": "Too quick. Settle down to the band and hold.",
+        "motivator": "Too hot too soon. Cool it a touch and finish like a hero instead.",
+        "technician": "Over pace. Relax the shoulders, shorten the push, let it slow."
+      }
+    },
+    {
+      "id": "pace_ahead_3",
+      "text": "Lovely energy, but ease off. Patience wins today.",
+      "trigger": "pace-ahead",
+      "byCoach": {
+        "guide": "I love the energy, but ease off. Patience wins today.",
+        "pacer": "You're over-pacing. Trim it back and lock in.",
+        "motivator": "Save the fireworks! Ease down, we'll light them later.",
+        "technician": "Faster than prescribed. Control is the skill here — dial it back."
+      }
+    },
+    {
+      "id": "pace_on_1",
+      "text": "That's it. Right where you should be.",
+      "trigger": "pace-on",
+      "byCoach": {
+        "guide": "That's it. Right where you should be.",
+        "pacer": "On target. Lock this in.",
+        "motivator": "Yes! This is your pace — own it.",
+        "technician": "On pace, and the form matches. Keep it exactly like this."
+      }
+    },
+    {
+      "id": "pace_on_2",
+      "text": "Back on target. Hold this and relax into it.",
+      "trigger": "pace-on",
+      "byCoach": {
+        "guide": "Lovely. Hold this and relax into it.",
+        "pacer": "Bang on pace. Hold steady.",
+        "motivator": "Dialled in. You look unstoppable.",
+        "technician": "Textbook. Same cadence, same effort."
+      }
+    },
+    {
+      "id": "keep_going_1",
+      "text": "I know it's hard. You've been harder. Keep going.",
+      "trigger": "keep-going",
+      "byCoach": {
+        "guide": "I know it's hard. You've been harder. Keep going.",
+        "pacer": "Hold the rhythm. The rhythm carries you.",
+        "motivator": "Don't you dare stop now — this is the good part!",
+        "technician": "When it hurts, run taller. Posture first, the rest follows."
+      }
+    },
+    {
+      "id": "keep_going_2",
+      "text": "One step, then the next. That's all it ever is.",
+      "trigger": "keep-going",
+      "byCoach": {
+        "guide": "One step, then the next. That's all it ever is.",
+        "pacer": "Nothing changes. Same pace, same breath, keep moving.",
+        "motivator": "Tough is temporary. You are not. Go!",
+        "technician": "Reset: shoulders down, breathe long, drive the arms."
+      }
+    },
+    {
+      "id": "keep_going_3",
+      "text": "Stay with it. This part passes — you don't stop.",
+      "trigger": "keep-going",
+      "byCoach": {
+        "guide": "Stay with me. This part passes — you don't stop.",
+        "pacer": "This is where pace is made. Stay on it.",
+        "motivator": "Every stride right now is building the runner you want to be.",
+        "technician": "Fatigue is form's enemy. Beat it with technique."
+      }
+    },
+    {
+      "id": "why_inspire_1",
+      "text": "Think of the person who inspires you. Run this part with them.",
+      "trigger": "why-inspire",
+      "byCoach": {
+        "guide": "Think of the person who inspires you. Run this part with them.",
+        "pacer": "Your inspiration didn't quit here. Neither do you.",
+        "motivator": "Picture who inspires you — now show them what you've got!",
+        "technician": "Recall who inspires you. Match their standard for one kilometre."
+      }
+    },
+    {
+      "id": "why_reason_1",
+      "text": "Remember why you started. It's still true, right now.",
+      "trigger": "why-reason",
+      "byCoach": {
+        "guide": "Remember why you started. It's still true, right now.",
+        "pacer": "You had a reason to start running. Hold it for the next minute.",
+        "motivator": "Your why is bigger than this hill. Prove it!",
+        "technician": "Reconnect with your reason. Purpose steadies pace."
+      }
+    },
+    {
+      "id": "why_goal_1",
+      "text": "That goal of yours has a reason behind it. This is you earning it.",
+      "trigger": "why-goal",
+      "byCoach": {
+        "guide": "That goal of yours has a reason behind it. This is you earning it.",
+        "pacer": "The goal means something. This stretch is where it's paid for.",
+        "motivator": "That time goal? You chose it for a reason. Chase it down!",
+        "technician": "Your goal was chosen deliberately. Run this stretch deliberately."
+      }
+    },
+    {
+      "id": "why_anchor_1",
+      "text": "It's tough. So think of what keeps you going — and let it.",
+      "trigger": "why-anchor",
+      "byCoach": {
+        "guide": "It's tough. So think of what keeps you going — and let it.",
+        "pacer": "Hard patch. Anchor to your reason and hold the pace.",
+        "motivator": "This is the tough bit — and you know exactly who you're doing it for.",
+        "technician": "When it's tough, your anchor is a tool. Use it now."
+      }
     },
     {
       "id": "milestone_1",
       "text": "Another kilometre done. Strong and steady.",
-      "trigger": "milestone-distance"
+      "trigger": "milestone-distance",
+      "byCoach": {
+        "guide": "Another kilometre done. Strong and steady.",
+        "pacer": "Another kilometre done. Strong and steady.",
+        "motivator": "Another kilometre done. Strong and steady.",
+        "technician": "Another kilometre done. Strong and steady."
+      }
     },
     {
       "id": "milestone_2",
       "text": "That's another one behind you. Keep rolling.",
-      "trigger": "milestone-distance"
+      "trigger": "milestone-distance",
+      "byCoach": {
+        "guide": "That's another one behind you. Keep rolling.",
+        "pacer": "That's another one behind you. Keep rolling.",
+        "motivator": "That's another one behind you. Keep rolling.",
+        "technician": "That's another one behind you. Keep rolling."
+      }
     },
     {
       "id": "milestone_3",
       "text": "Ticking them off nicely. Same rhythm, keep going.",
-      "trigger": "milestone-distance"
+      "trigger": "milestone-distance",
+      "byCoach": {
+        "guide": "Ticking them off nicely. Same rhythm, keep going.",
+        "pacer": "Ticking them off nicely. Same rhythm, keep going.",
+        "motivator": "Ticking them off nicely. Same rhythm, keep going.",
+        "technician": "Ticking them off nicely. Same rhythm, keep going."
+      }
     },
     {
       "id": "final_1",
       "text": "Last effort now. Empty the tank — you're nearly there.",
-      "trigger": "final-effort"
+      "trigger": "final-effort",
+      "byCoach": {
+        "guide": "Last effort now. Empty the tank — you're nearly there.",
+        "pacer": "Last effort now. Empty the tank — you're nearly there.",
+        "motivator": "Last effort now. Empty the tank — you're nearly there.",
+        "technician": "Last effort now. Empty the tank — you're nearly there."
+      }
     },
     {
       "id": "final_2",
       "text": "This is the finish. Everything you've got, all the way through the line.",
-      "trigger": "final-effort"
+      "trigger": "final-effort",
+      "byCoach": {
+        "guide": "This is the finish. Everything you've got, all the way through the line.",
+        "pacer": "This is the finish. Everything you've got, all the way through the line.",
+        "motivator": "This is the finish. Everything you've got, all the way through the line.",
+        "technician": "This is the finish. Everything you've got, all the way through the line."
+      }
     },
     {
       "id": "cooldown_1",
       "text": "Ease down now. Let your pace and your breathing settle.",
-      "trigger": "cooldown-start"
+      "trigger": "cooldown-start",
+      "byCoach": {
+        "guide": "Ease down now. Let your pace and your breathing settle.",
+        "pacer": "Ease down now. Let your pace and your breathing settle.",
+        "motivator": "Ease down now. Let your pace and your breathing settle.",
+        "technician": "Ease down now. Let your pace and your breathing settle."
+      }
     },
     {
       "id": "cooldown_2",
       "text": "Cool-down time. Relax, slow it right down, and enjoy the finish.",
-      "trigger": "cooldown-start"
+      "trigger": "cooldown-start",
+      "byCoach": {
+        "guide": "Cool-down time. Relax, slow it right down, and enjoy the finish.",
+        "pacer": "Cool-down time. Relax, slow it right down, and enjoy the finish.",
+        "motivator": "Cool-down time. Relax, slow it right down, and enjoy the finish.",
+        "technician": "Cool-down time. Relax, slow it right down, and enjoy the finish."
+      }
     },
     {
       "id": "complete_1",
       "text": "Session complete. Excellent work today. Recover well.",
-      "trigger": "session-complete"
+      "trigger": "session-complete",
+      "byCoach": {
+        "guide": "Session complete. Excellent work today. Recover well.",
+        "pacer": "Session complete. Excellent work today. Recover well.",
+        "motivator": "Session complete. Excellent work today. Recover well.",
+        "technician": "Session complete. Excellent work today. Recover well."
+      }
     },
     {
       "id": "complete_2",
       "text": "That's it — done and dusted. Really strong session. Be proud.",
-      "trigger": "session-complete"
+      "trigger": "session-complete",
+      "byCoach": {
+        "guide": "That's it — done and dusted. Really strong session. Be proud.",
+        "pacer": "That's it — done and dusted. Really strong session. Be proud.",
+        "motivator": "That's it — done and dusted. Really strong session. Be proud.",
+        "technician": "That's it — done and dusted. Really strong session. Be proud."
+      }
     },
     {
       "id": "paused_1",
       "text": "Paused. Take your time.",
-      "trigger": "paused"
+      "trigger": "paused",
+      "byCoach": {
+        "guide": "Paused. Take your time.",
+        "pacer": "Paused. Take your time.",
+        "motivator": "Paused. Take your time.",
+        "technician": "Paused. Take your time."
+      }
     },
     {
       "id": "resumed_1",
       "text": "And we're back. Pick up where you left off.",
-      "trigger": "resumed"
+      "trigger": "resumed",
+      "byCoach": {
+        "guide": "And we're back. Pick up where you left off.",
+        "pacer": "And we're back. Pick up where you left off.",
+        "motivator": "And we're back. Pick up where you left off.",
+        "technician": "And we're back. Pick up where you left off."
+      }
     },
     {
       "id": "ended_early_1",
       "text": "Session ended. Every step still counts — well done for getting out.",
-      "trigger": "ended-early"
+      "trigger": "ended-early",
+      "byCoach": {
+        "guide": "Session ended. Every step still counts — well done for getting out.",
+        "pacer": "Session ended. Every step still counts — well done for getting out.",
+        "motivator": "Session ended. Every step still counts — well done for getting out.",
+        "technician": "Session ended. Every step still counts — well done for getting out."
+      }
     },
     {
       "id": "safety_1",
       "text": "Easy — your effort's been very high for a while. Back it off and check in with how you feel.",
-      "trigger": "safety-effort"
+      "trigger": "safety-effort",
+      "byCoach": {
+        "guide": "Easy — your effort's been very high for a while. Back it off and check in with how you feel.",
+        "pacer": "Easy — your effort's been very high for a while. Back it off and check in with how you feel.",
+        "motivator": "Easy — your effort's been very high for a while. Back it off and check in with how you feel.",
+        "technician": "Easy — your effort's been very high for a while. Back it off and check in with how you feel."
+      }
     },
     {
       "id": "safety_2",
       "text": "Let's be sensible. Ease down, breathe, and only push on if you feel good.",
-      "trigger": "safety-effort"
+      "trigger": "safety-effort",
+      "byCoach": {
+        "guide": "Let's be sensible. Ease down, breathe, and only push on if you feel good.",
+        "pacer": "Let's be sensible. Ease down, breathe, and only push on if you feel good.",
+        "motivator": "Let's be sensible. Ease down, breathe, and only push on if you feel good.",
+        "technician": "Let's be sensible. Ease down, breathe, and only push on if you feel good."
+      }
+    }
+  ],
+  "personal": [
+    {
+      "id": "why_name_inspire_1",
+      "text": "Think of {name}. Run this part with them.",
+      "trigger": "why-inspire",
+      "byCoach": {
+        "guide": "Think of {name}. Run this part with them.",
+        "pacer": "{name} is the reason. Hold the pace.",
+        "motivator": "Picture {name} — now show them what you've got!",
+        "technician": "Recall {name}. Match that standard for one kilometre."
+      }
+    },
+    {
+      "id": "why_name_anchor_1",
+      "text": "It's tough. So think of {name}, and let that carry you.",
+      "trigger": "why-anchor",
+      "byCoach": {
+        "guide": "It's tough. So think of {name}, and let that carry you.",
+        "pacer": "Hard patch. Anchor to {name} and hold on.",
+        "motivator": "This is the tough bit — and you're doing it for {name}!",
+        "technician": "When it's tough, {name} is your anchor. Use it now."
+      }
+    },
+    {
+      "id": "why_name_anchor_2",
+      "text": "{name} would want you to finish this properly. So finish it properly.",
+      "trigger": "why-anchor",
+      "byCoach": {
+        "guide": "{name} would want you to finish this properly. So finish it properly.",
+        "pacer": "Finish this one the way {name} would want it finished.",
+        "motivator": "Do it for {name} — all the way to the line!",
+        "technician": "Finish to standard. That is what {name} sees."
+      }
+    },
+    {
+      "id": "why_name_goal_1",
+      "text": "That goal has {name} behind it. This is you earning it.",
+      "trigger": "why-goal",
+      "byCoach": {
+        "guide": "That goal has {name} behind it. This is you earning it.",
+        "pacer": "The goal, and {name}. Both worth this next stretch.",
+        "motivator": "That time goal is for {name} — go and take it!",
+        "technician": "Goal chosen for {name}. Run this stretch deliberately."
+      }
+    },
+    {
+      "id": "why_name_final_1",
+      "text": "Last effort. Run this one home for {name}.",
+      "trigger": "final-effort",
+      "byCoach": {
+        "guide": "Last effort. Run this one home for {name}.",
+        "pacer": "Final stretch. This one's for {name}.",
+        "motivator": "Everything you've got — for {name}!",
+        "technician": "Final effort. Hold form, and bring it home for {name}."
+      }
     }
   ]
 }

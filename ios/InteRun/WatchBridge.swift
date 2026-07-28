@@ -179,13 +179,23 @@ extension WatchBridge: WCSessionDelegate {
     /// phone. It needs HealthKit authorisation first, which is why the request is inline rather
     /// than at launch: asking for health permissions before someone has expressed any interest in
     /// the watch is exactly the prompt everyone declines.
-    private func startWatchWorkout(title: String, type: String) {
+    /// One place that talks to the wrist, so reachability is checked once.
+    private func sendToWatch(_ payload: [String: Any]) {
+        guard WCSession.isSupported() else { return }
+        let s = WCSession.default
+        guard s.activationState == .activated, s.isReachable else { return }
+        s.sendMessage(payload, replyHandler: nil, errorHandler: { _ in })
+    }
+
+    private func startWatchWorkout(title: String, type: String, companion: Bool = false) {
         // ⚠️ The Live Activity is raised HERE, and it has to be. This tap happens with the app on
         // screen, and the foreground is the only place iOS permits `Activity.request` — a wrist run
         // never gets another one. Every watch tick after this updates the card, which the background
         // IS allowed to do. Raised before requestAuthorization below, because that callback can run
         // long after the runner has pocketed the phone.
         Task { @MainActor in
+            // A companion launch means the PHONE is recording and already owns the card.
+            guard !companion else { return }
             LiveActivityService.shared.start(
                 runId: "watch-pending", title: title, type: type,
                 state: .init(elapsedSeconds: 0, distanceKm: 0, paceSecPerKm: nil, heartRate: nil,
@@ -242,8 +252,14 @@ extension WatchBridge: WCSessionDelegate {
         // because a WatchConnectivity wake is a background context. The card is raised when the
         // runner taps "Apple Watch" in the start sheet (startWatchWorkout), which is a foreground
         // moment; a run begun entirely on the wrist gets the follow-along notification instead.
-        Task { @MainActor in self.driveLiveActivity(live, ended: ended) }
-        if !ended { offerToFollowAlong(live) }
+        Task { @MainActor in
+            self.driveLiveActivity(live, ended: ended)
+            // The notification is a FALLBACK, not a companion. Now that the Live Activity works it
+            // says the same thing twice, so it only fires when there is no card — which still
+            // happens if the runner has Live Activities switched off, or the mirrored launch was
+            // missed. Checked after driveLiveActivity, on the same actor, so isRunning is settled.
+            if !ended, !LiveActivityService.shared.isRunning { self.offerToFollowAlong(live) }
+        }
     }
 
     @MainActor
@@ -278,9 +294,10 @@ extension WatchBridge: WCSessionDelegate {
     /// notification offers to follow along; tapping it opens the app, and `replayLiveOnActivate`
     /// puts it straight on the live screen. Sent once per run, because a nag every two seconds
     /// while someone runs would be intolerable.
+    @MainActor
     private func offerToFollowAlong(_ live: [String: Any]) {
         guard let id = live["id"] as? String, notifiedRun != id else { return }
-        DispatchQueue.main.async {
+        do {
             guard UIApplication.shared.applicationState != .active else { return }
             self.notifiedRun = id
             let content = UNMutableNotificationContent()
@@ -354,6 +371,31 @@ extension WatchBridge: WKScriptMessageHandler {
                         type: (body["type"] as? String) ?? "easy",
                         state: state,
                     )
+                }
+            }
+        case "startCompanion":
+            // Launch the watch to WATCH. HealthKit's startWatchApp is the only way to wake it from
+            // here; the watch decides what to do with the launch, and companionOnly tells it to
+            // display rather than record.
+            sendToWatch(["command": "companionStart"])
+            startWatchWorkout(title: (body["title"] as? String) ?? "Run",
+                              type: (body["type"] as? String) ?? "easy",
+                              companion: true)
+        case "companionTick":
+            var live: [String: Any] = [:]
+            for k in ["sec", "distKm", "paceSec"] { if let v = body[k] { live[k] = v } }
+            live["title"] = body["title"] as? String ?? "Run"
+            sendToWatch(["phoneLive": live])
+        case "endCompanion":
+            sendToWatch(["command": "companionEnd"])
+        case "watchCommand":
+            // Straight through to the wrist. Fire-and-forget: if the watch is unreachable the run
+            // simply carries on there, which is the safe failure — a run must never be ended by a
+            // message that only half-arrived.
+            if let cmd = body["command"] as? String, WCSession.isSupported() {
+                let s = WCSession.default
+                if s.activationState == .activated, s.isReachable {
+                    s.sendMessage(["command": cmd], replyHandler: nil, errorHandler: { _ in })
                 }
             }
         case "sync":

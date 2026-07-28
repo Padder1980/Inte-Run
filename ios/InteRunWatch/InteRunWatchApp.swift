@@ -24,8 +24,14 @@ struct InteRunWatchApp: App {
 final class LaunchRequest: ObservableObject {
     static let shared = LaunchRequest()
     @Published var pending = false
+    /// True when the phone is recording and the watch was launched only to show it. ⚠️ A companion
+    /// must NOT start a workout of its own: two recorders double-count and log the outing twice,
+    /// which is the one failure this whole design exists to avoid.
+    @Published var companionOnly = false
     func request() { pending = true }
+    func requestCompanion() { companionOnly = true }
     func consume() { pending = false }
+    func endCompanion() { companionOnly = false }
 }
 
 /// The delegate exists solely for `handle(_ workoutConfiguration:)`.

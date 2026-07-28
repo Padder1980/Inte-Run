@@ -9,6 +9,7 @@ import SwiftUI
 struct TodayView: View {
     /// True when the phone launched this app specifically to begin a run.
     var autoStart: Bool = false
+    @ObservedObject private var launch = LaunchRequest.shared
 
     @EnvironmentObject private var store: SessionStore
     @StateObject private var workout = WorkoutManager()
@@ -22,6 +23,11 @@ struct TodayView: View {
         workout.whyPerson = store.whyPerson
         workout.coach = store.coach      // the same coach they chose on the phone
         workout.coachLines = store.coachLines
+        // The phone can finish, pause and resume a wrist run: someone holding their phone should not
+        // have to find their watch to stop. Cleared when the run ends so a late command does nothing.
+        store.onStopRequested = { [weak workout] in workout?.end() }
+        store.onPauseRequested = { [weak workout] in workout?.pause() }
+        store.onResumeRequested = { [weak workout] in workout?.resume() }
         running = true
         workout.startCountingDown()
     }
@@ -128,7 +134,10 @@ struct TodayView: View {
                         // A context from a previous day is worse than none: showing yesterday's
                         // session (or yesterday's rest) as today's would quietly mislead. Fall back
                         // to the waiting state, whose advice - open the phone app - is the fix.
-                        if store.isCurrent, let s = store.session {
+                        if launch.companionOnly {
+                            // The phone is recording; the wrist is only watching.
+                            CompanionView().environmentObject(store)
+                        } else if store.isCurrent, let s = store.session {
                             session(s)
                         } else if let s = store.todayFromCache {
                             // The context is stale but the cached week still covers today. Better a

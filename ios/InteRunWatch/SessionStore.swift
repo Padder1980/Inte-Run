@@ -112,6 +112,16 @@ final class SessionStore: NSObject, ObservableObject {
         return f.string(from: Date())
     }
 
+    /// The phone's own run, while the watch is only watching. Nil when the phone is not recording.
+    @Published var phoneLive: [String: Double]?
+    @Published var phoneLiveTitle: String?
+
+    /// Set by whatever is running the workout, so a phone command reaches it. Nil when nothing is
+    /// running, which makes a stray command a no-op rather than a crash.
+    var onStopRequested: (() -> Void)?
+    var onPauseRequested: (() -> Void)?
+    var onResumeRequested: (() -> Void)?
+
     /// Today's session taken from the cached week, for when the context itself has gone stale.
     var todayFromCache: PlannedSession? {
         upcoming.first { $0.dateIso == Self.localTodayIso() }
@@ -232,6 +242,28 @@ extension SessionStore: WCSessionDelegate {
 
     nonisolated func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
         Task { @MainActor in self.apply(applicationContext) }
+    }
+
+    /// Commands from the phone. Only one so far, and it is the one that matters: finish the run.
+    /// Someone who has their phone out should not have to find their watch to stop.
+    nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+        if let live = message["phoneLive"] as? [String: Any] {
+            let nums = live.compactMapValues { $0 as? Double }
+            let title = live["title"] as? String
+            Task { @MainActor in self.phoneLive = nums; self.phoneLiveTitle = title }
+            return
+        }
+        guard let action = message["command"] as? String else { return }
+        Task { @MainActor in
+            switch action {
+            case "companionStart": LaunchRequest.shared.requestCompanion()
+            case "companionEnd": LaunchRequest.shared.endCompanion()
+            case "stop": self.onStopRequested?()
+            case "pause": self.onPauseRequested?()
+            case "resume": self.onResumeRequested?()
+            default: break
+            }
+        }
     }
 
     nonisolated func sessionReachabilityDidChange(_ session: WCSession) {

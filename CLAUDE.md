@@ -553,6 +553,16 @@ because the two sides must agree on the type exactly and a copied file would dri
 `LiveActivityService` starts/updates/ends it; watch runs drive it from `WatchBridge.forwardLive`,
 phone runs from `pushLiveActivity()` in `web/app.ts` via a `liveActivity` bridge action. Tapping the
 card opens the app and `replayLiveOnActivate()` lands it on the live screen.
+**The two devices control each other (2026-07-28).** The phone's full-screen wrist view carries
+**Pause/Resume and Finish** — `watchCommand()` → `WatchBridge` `watchCommand` → the watch's
+`didReceiveMessage` → `store.onStopRequested` etc., set for the life of a run in `TodayView.begin`.
+Finish confirms first; a mis-tap cannot be undone. And starting on **This iPhone** wakes the watch as
+a **display only** (`CompanionView`, `LaunchRequest.companionOnly`) fed by `companionTick`.
+⚠️ **The companion starts NO workout session.** Two recorders double-count and log the outing twice.
+That also means no wrist heart rate on a phone-recorded run — HR needs an `HKWorkoutSession`, which
+is the very thing being avoided. Making that safe is deliberate work, not a toggle.
+⚠️ A companion launch must not raise a second Live Activity — the phone run already owns the card.
+
 ⚠️ **A wrist-started run DOES get a Live Activity — via HealthKit workout mirroring, not
 WatchConnectivity.** `HKHealthStore.h` on `workoutSessionMirroringStartHandler`, verbatim: *"If your
 app is not active when a mirrored session starts, it will be launched in the background and given a

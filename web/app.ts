@@ -1642,6 +1642,14 @@ input, select, textarea { font-size: 16px; }
 .wf-k { margin-top: 4px; font-size: 10px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); }
 .wf-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 20px; padding-top: 16px; border-top: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line)); }
 .wf-sv { font-size: 22px; font-weight: 700; letter-spacing: -.03em; color: var(--ink); }
+/* Controls for a run the WATCH owns. Deliberately below the numbers, not beside them: the numbers
+   are what you came for, and Finish is not something to graze with a thumb mid-stride. */
+.wl-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0 4px; }
+.wl-btn { padding: 14px 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface);
+  color: var(--ink); font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+.wl-btn svg { width: 15px; height: 15px; vertical-align: -2px; margin-right: 4px; }
+.wl-btn:active { transform: scale(.98); }
+.wl-stop { background: linear-gradient(150deg, #d94b3a, #b8302a); border-color: transparent; color: #fff; }
 </style>
 </head>
 <body>
@@ -2533,6 +2541,35 @@ window.__interunWatchLive = function (live) {
 // Set when the runner deliberately backs out of the full-screen wrist view, so the next tick does
 // not drag them straight back into it.
 let WATCH_LIVE_LEFT = false;
+// A confirm, as a sheet rather than a browser dialog: window.confirm looks like a web page and is
+// blocked outright in some standalone contexts.
+function confirmSheet(title, body, confirmLabel, onConfirm) {
+  ensureSheet(); SHEET_CTX = null;
+  $("sheetBody").innerHTML =
+    '<div class="sheet-h">' + esc(title) + '</div>' +
+    '<div class="bk-md" style="margin-bottom:16px">' + esc(body) + '</div>' +
+    '<button class="primary" id="cfYes" style="background:linear-gradient(150deg,#d94b3a,#b8302a)">' + esc(confirmLabel) + '</button>' +
+    '<button class="primary" id="cfNo" style="background:var(--surface-2);color:var(--ink-soft);box-shadow:none;margin-top:8px">Cancel</button>';
+  $("sheetOv").classList.add("on");
+  $("cfNo").onclick = closeSheet;
+  $("cfYes").onclick = () => { closeSheet(); onConfirm(); };
+}
+// Wake the watch to WATCH the run — display only, no second recorder. Silent if there is no watch.
+function startWatchCompanion(sess) {
+  if (!NATIVE_WATCH || !watchAvailable()) return;
+  try {
+    window.webkit.messageHandlers.interunWatch.postMessage({
+      action: "startCompanion",
+      title: (sess && sess.title) || (LIVE && LIVE.session && LIVE.session.title) || "Run",
+      type: (sess && sess.type) || "easy",
+    });
+  } catch (e) {}
+}
+// Commands travel phone -> watch over the same bridge the ticks come back on.
+function watchCommand(cmd) {
+  if (!NATIVE_WATCH) return;
+  try { window.webkit.messageHandlers.interunWatch.postMessage({ action: "watchCommand", command: cmd }); } catch (e) {}
+}
 // The full-screen view of a run happening on the wrist. Same information as the card, given the
 // room it deserves, and still read-only: the watch owns the run, so there is nothing to press here
 // except the way back.
@@ -2553,7 +2590,11 @@ function viewWatchLive() {
     '<div class="wf-grid">' + small("Current", pace(L.paceSec)) + small("Lap", pace(L.lapPaceSec)) +
       small("Average", pace(L.avgPaceSec)) + small("Heart", L.hr ? L.hr + " bpm" : "\u2014") + '</div>' +
     '</div>' +
-    '<div class="card"><div class="bk-md">Your watch is recording this run \u2014 pause, lap and finish from your wrist. It will appear in your Logbook the moment you finish.</div></div>';
+    '<div class="wl-controls">' +
+      '<button class="wl-btn" id="wlPause">' + (paused ? ICON.play + " Resume" : "\u2016 Pause") + '</button>' +
+      '<button class="wl-btn wl-stop" id="wlStop">Finish run</button>' +
+    '</div>' +
+    '<div class="card"><div class="bk-md">Your watch is recording this run. These control it from here \u2014 the run itself, and everything it logs, stays on your wrist.</div></div>';
 }
 // The mirror card. Numbers only, plus a plain statement of where the run is being recorded -- a
 // runner glancing at their phone should never have to wonder which device is the real one.
@@ -5171,6 +5212,10 @@ function wireStartWhere() {
     closeSheet();
     if (where === "watch") return startOnWatch(sess);
     startSession(sess, { indoor: where === "treadmill" });
+    // Bring the wrist along. It shows the run; it does NOT record one — two recorders would put the
+    // same outing in the Logbook twice. A treadmill run has nothing for GPS to add, so it still
+    // wakes the watch, which is where a glance is easiest.
+    startWatchCompanion(sess);
   });
 }
 // Hand the run to the wrist. The watch app is launched by HealthKit on the native side; from then
@@ -6064,6 +6109,7 @@ function pushLiveActivity(snap, force) {
   const now = Date.now();
   if (!force && now - LIVE_ACT_AT < 2000) return;
   LIVE_ACT_AT = now;
+  pushToCompanion(snap);
   const step = snap && snap.step;
   try {
     window.webkit.messageHandlers.interunWatch.postMessage({
@@ -6081,8 +6127,22 @@ function pushLiveActivity(snap, force) {
     });
   } catch (e) {}
 }
+// The same numbers, to a watch that is only watching.
+function pushToCompanion(snap) {
+  if (!NATIVE_WATCH) return;
+  try {
+    window.webkit.messageHandlers.interunWatch.postMessage({
+      action: "companionTick",
+      title: (LIVE && LIVE.session && LIVE.session.title) || "Run",
+      sec: Math.round((snap && snap.elapsedSeconds) || 0),
+      distKm: (LIVE.dist || 0) / 1000,
+      paceSec: Math.round((snap && snap.currentPaceSecPerKm) || 0) || 0,
+    });
+  } catch (e) {}
+}
 function endLiveActivity() {
   if (!NATIVE_WATCH) return;
+  try { window.webkit.messageHandlers.interunWatch.postMessage({ action: "endCompanion" }); } catch (e) {}
   try {
     window.webkit.messageHandlers.interunWatch.postMessage({
       action: "liveActivity", state: "ended",
@@ -6833,6 +6893,17 @@ function wire() {
   // Live session wiring
   const startBtn = $("startSession"); if (startBtn) startBtn.onclick = () => openStartWhereSheet(null);
   const wlb = $("wlBack"); if (wlb) wlb.onclick = () => { WATCH_LIVE_LEFT = true; state.screen = null; state.tab = "today"; render(); };
+  const wlp = $("wlPause"); if (wlp) wlp.onclick = () => {
+    const paused = !!(WATCH_LIVE && WATCH_LIVE.state === "paused");
+    watchCommand(paused ? "resume" : "pause"); haptic("tap");
+  };
+  const wls = $("wlStop"); if (wls) wls.onclick = () => {
+    // Finishing is the one irreversible control here, so it asks. A mis-tap while jogging with the
+    // phone in hand would end a session that cannot be resumed.
+    confirmSheet("Finish this run?", "Your watch will stop recording and the run will be saved to your Logbook.", "Finish run", () => {
+      watchCommand("stop"); haptic("success");
+    });
+  };
   const lb = $("liveBack"); if (lb) lb.onclick = () => {
     // Mid-run this is navigation, not abandonment: the session keeps running and the live pill is
     // the way back. Only a session that never started is torn down here.

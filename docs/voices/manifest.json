@@ -1,1713 +1,1713 @@
 {
-  "version": 1,
-  "sampleRate": 24000,
-  "coaches": [
-    {
-      "id": "guide",
-      "name": "The Guide",
-      "voice": "bf_emma",
-      "bytes": 1057368
-    },
-    {
-      "id": "pacer",
-      "name": "The Pacer",
-      "voice": "bm_george",
-      "bytes": 1140216
-    },
-    {
-      "id": "motivator",
-      "name": "The Motivator",
-      "voice": "bf_isabella",
-      "bytes": 1128408
-    },
-    {
-      "id": "technician",
-      "name": "The Technician",
-      "voice": "bm_lewis",
-      "bytes": 1250784
-    }
-  ],
-  "clips": [
-    {
-      "id": "complete_1",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "session-complete",
-      "file": "voices/guide/complete_1.mp3",
-      "duration": 3.14,
-      "bytes": 25248,
-      "hash": "fbb6f1d33ef8f94b"
-    },
-    {
-      "id": "complete_2",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "session-complete",
-      "file": "voices/guide/complete_2.mp3",
-      "duration": 3.48,
-      "bytes": 27624,
-      "hash": "a61ee6bb1089aa5f"
-    },
-    {
-      "id": "cooldown_1",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "cooldown-start",
-      "file": "voices/guide/cooldown_1.mp3",
-      "duration": 2.88,
-      "bytes": 22752,
-      "hash": "d4027ddee0726c36"
-    },
-    {
-      "id": "cooldown_2",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "cooldown-start",
-      "file": "voices/guide/cooldown_2.mp3",
-      "duration": 3.73,
-      "bytes": 29088,
-      "hash": "fc1d743475fcc1ea"
-    },
-    {
-      "id": "easy_1",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "easy-settle",
-      "file": "voices/guide/easy_1.mp3",
-      "duration": 3.73,
-      "bytes": 30024,
-      "hash": "d50b5533d5d66a7e"
-    },
-    {
-      "id": "easy_2",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "easy-settle",
-      "file": "voices/guide/easy_2.mp3",
-      "duration": 3.55,
-      "bytes": 27816,
-      "hash": "b3da1c46e853f581"
-    },
-    {
-      "id": "easy_3",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "easy-settle",
-      "file": "voices/guide/easy_3.mp3",
-      "duration": 2.85,
-      "bytes": 24144,
-      "hash": "fc74e7d672c8d8b5"
-    },
-    {
-      "id": "ended_early_1",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "ended-early",
-      "file": "voices/guide/ended_early_1.mp3",
-      "duration": 3.79,
-      "bytes": 30360,
-      "hash": "a24f1c1de24e2bf2"
-    },
-    {
-      "id": "final_1",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "final-effort",
-      "file": "voices/guide/final_1.mp3",
-      "duration": 2.8,
-      "bytes": 22488,
-      "hash": "7ce6e3ed6c782852"
-    },
-    {
-      "id": "final_2",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "final-effort",
-      "file": "voices/guide/final_2.mp3",
-      "duration": 3.44,
-      "bytes": 26280,
-      "hash": "468abad7f70a5153"
-    },
-    {
-      "id": "halfway_1",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "halfway",
-      "file": "voices/guide/halfway_1.mp3",
-      "duration": 2.82,
-      "bytes": 22320,
-      "hash": "96a87aa9d77fafec"
-    },
-    {
-      "id": "halfway_2",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "halfway",
-      "file": "voices/guide/halfway_2.mp3",
-      "duration": 2.63,
-      "bytes": 21576,
-      "hash": "80efbc9e79dec6e1"
-    },
-    {
-      "id": "hill_1",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "hill-start",
-      "file": "voices/guide/hill_1.mp3",
-      "duration": 3.61,
-      "bytes": 30120,
-      "hash": "43bfb4d9eb7700ad"
-    },
-    {
-      "id": "hill_2",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "hill-start",
-      "file": "voices/guide/hill_2.mp3",
-      "duration": 2.48,
-      "bytes": 21096,
-      "hash": "84a5062a17e81247"
-    },
-    {
-      "id": "interval_start_1",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "interval-start",
-      "file": "voices/guide/interval_start_1.mp3",
-      "duration": 1.88,
-      "bytes": 15816,
-      "hash": "412d174bb929ec02"
-    },
-    {
-      "id": "interval_work_1",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "interval-work",
-      "file": "voices/guide/interval_work_1.mp3",
-      "duration": 3.15,
-      "bytes": 25416,
-      "hash": "60382787dd47edb5"
-    },
-    {
-      "id": "interval_work_2",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "interval-work",
-      "file": "voices/guide/interval_work_2.mp3",
-      "duration": 2.16,
-      "bytes": 17520,
-      "hash": "3acbcb3f00bc496e"
-    },
-    {
-      "id": "long_1",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "long-run-settle",
-      "file": "voices/guide/long_1.mp3",
-      "duration": 3.59,
-      "bytes": 27576,
-      "hash": "a94774bc08160cdb"
-    },
-    {
-      "id": "long_2",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "long-run-settle",
-      "file": "voices/guide/long_2.mp3",
-      "duration": 3.67,
-      "bytes": 30240,
-      "hash": "302011e7b9d62e45"
-    },
-    {
-      "id": "milestone_1",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "milestone-distance",
-      "file": "voices/guide/milestone_1.mp3",
-      "duration": 2.45,
-      "bytes": 20064,
-      "hash": "8dc3a532144bc410"
-    },
-    {
-      "id": "milestone_2",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "milestone-distance",
-      "file": "voices/guide/milestone_2.mp3",
-      "duration": 2.45,
-      "bytes": 19392,
-      "hash": "39b1d6b965fd43f8"
-    },
-    {
-      "id": "milestone_3",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "milestone-distance",
-      "file": "voices/guide/milestone_3.mp3",
-      "duration": 2.74,
-      "bytes": 21720,
-      "hash": "1ff36b6ffea82f20"
-    },
-    {
-      "id": "paused_1",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "paused",
-      "file": "voices/guide/paused_1.mp3",
-      "duration": 1.52,
-      "bytes": 12120,
-      "hash": "e4d2000489573948"
-    },
-    {
-      "id": "prep_1",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "session-prep",
-      "file": "voices/guide/prep_1.mp3",
-      "duration": 3.18,
-      "bytes": 25536,
-      "hash": "878a97f71c3d7c2a"
-    },
-    {
-      "id": "prep_2",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "session-prep",
-      "file": "voices/guide/prep_2.mp3",
-      "duration": 3.43,
-      "bytes": 26688,
-      "hash": "84fc71aa866e08be"
-    },
-    {
-      "id": "recovery_1",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "recovery-start",
-      "file": "voices/guide/recovery_1.mp3",
-      "duration": 2.68,
-      "bytes": 21792,
-      "hash": "70baa58929eecd6d"
-    },
-    {
-      "id": "recovery_2",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "recovery-start",
-      "file": "voices/guide/recovery_2.mp3",
-      "duration": 2.85,
-      "bytes": 24624,
-      "hash": "58ecd7fad7c0dd67"
-    },
-    {
-      "id": "resumed_1",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "resumed",
-      "file": "voices/guide/resumed_1.mp3",
-      "duration": 1.97,
-      "bytes": 16728,
-      "hash": "558621342b466697"
-    },
-    {
-      "id": "safety_1",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "safety-effort",
-      "file": "voices/guide/safety_1.mp3",
-      "duration": 4.6,
-      "bytes": 34320,
-      "hash": "832a51c3973c5b63"
-    },
-    {
-      "id": "safety_2",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "safety-effort",
-      "file": "voices/guide/safety_2.mp3",
-      "duration": 4.11,
-      "bytes": 32520,
-      "hash": "a4ea1a68d28c971f"
-    },
-    {
-      "id": "start_1",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "session-start",
-      "file": "voices/guide/start_1.mp3",
-      "duration": 1.97,
-      "bytes": 15792,
-      "hash": "76ce60579b314b48"
-    },
-    {
-      "id": "start_2",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "session-start",
-      "file": "voices/guide/start_2.mp3",
-      "duration": 2.5,
-      "bytes": 20568,
-      "hash": "ebfe504e1b0cd192"
-    },
-    {
-      "id": "strength_1",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "strength-start",
-      "file": "voices/guide/strength_1.mp3",
-      "duration": 4.6,
-      "bytes": 35736,
-      "hash": "7507827ddca8223d"
-    },
-    {
-      "id": "strength_2",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "strength-start",
-      "file": "voices/guide/strength_2.mp3",
-      "duration": 3.8,
-      "bytes": 30600,
-      "hash": "76bbb4815563328b"
-    },
-    {
-      "id": "technique_1",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "technique",
-      "file": "voices/guide/technique_1.mp3",
-      "duration": 3.09,
-      "bytes": 26088,
-      "hash": "35a2193f17abe83f"
-    },
-    {
-      "id": "technique_2",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "technique",
-      "file": "voices/guide/technique_2.mp3",
-      "duration": 2.77,
-      "bytes": 23880,
-      "hash": "30179b9a49d13ab4"
-    },
-    {
-      "id": "technique_3",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "technique",
-      "file": "voices/guide/technique_3.mp3",
-      "duration": 3.41,
-      "bytes": 26592,
-      "hash": "1867a9e7ee42d30a"
-    },
-    {
-      "id": "tempo_1",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "tempo-start",
-      "file": "voices/guide/tempo_1.mp3",
-      "duration": 3.66,
-      "bytes": 29520,
-      "hash": "f2d5969fad2fca86"
-    },
-    {
-      "id": "threshold_1",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "threshold-hold",
-      "file": "voices/guide/threshold_1.mp3",
-      "duration": 3.63,
-      "bytes": 28872,
-      "hash": "077746d44cb42fc8"
-    },
-    {
-      "id": "threshold_2",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "threshold-hold",
-      "file": "voices/guide/threshold_2.mp3",
-      "duration": 3.55,
-      "bytes": 28416,
-      "hash": "323dd0c1a034fa56"
-    },
-    {
-      "id": "warmup_1",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "warmup-start",
-      "file": "voices/guide/warmup_1.mp3",
-      "duration": 3.39,
-      "bytes": 29328,
-      "hash": "22412249acd82e25"
-    },
-    {
-      "id": "warmup_2",
-      "coach": "guide",
-      "voice": "bf_emma",
-      "trigger": "warmup-start",
-      "file": "voices/guide/warmup_2.mp3",
-      "duration": 3.68,
-      "bytes": 28968,
-      "hash": "844b22741d0bd05a"
-    },
-    {
-      "id": "complete_1",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "session-complete",
-      "file": "voices/motivator/complete_1.mp3",
-      "duration": 3.22,
-      "bytes": 27096,
-      "hash": "61653a90bd8b5ac7"
-    },
-    {
-      "id": "complete_2",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "session-complete",
-      "file": "voices/motivator/complete_2.mp3",
-      "duration": 3.61,
-      "bytes": 29904,
-      "hash": "f378dd305b9557b2"
-    },
-    {
-      "id": "cooldown_1",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "cooldown-start",
-      "file": "voices/motivator/cooldown_1.mp3",
-      "duration": 2.99,
-      "bytes": 24648,
-      "hash": "f062d6056de653f1"
-    },
-    {
-      "id": "cooldown_2",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "cooldown-start",
-      "file": "voices/motivator/cooldown_2.mp3",
-      "duration": 3.75,
-      "bytes": 30432,
-      "hash": "78736049d658068a"
-    },
-    {
-      "id": "easy_1",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "easy-settle",
-      "file": "voices/motivator/easy_1.mp3",
-      "duration": 3.75,
-      "bytes": 30648,
-      "hash": "196142aa0eee7ccb"
-    },
-    {
-      "id": "easy_2",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "easy-settle",
-      "file": "voices/motivator/easy_2.mp3",
-      "duration": 3.6,
-      "bytes": 29736,
-      "hash": "2c37a5d27677bcfb"
-    },
-    {
-      "id": "easy_3",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "easy-settle",
-      "file": "voices/motivator/easy_3.mp3",
-      "duration": 2.82,
-      "bytes": 23400,
-      "hash": "ebf2ff1b607f63c3"
-    },
-    {
-      "id": "ended_early_1",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "ended-early",
-      "file": "voices/motivator/ended_early_1.mp3",
-      "duration": 3.92,
-      "bytes": 32880,
-      "hash": "0a6771c5e8934057"
-    },
-    {
-      "id": "final_1",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "final-effort",
-      "file": "voices/motivator/final_1.mp3",
-      "duration": 3.01,
-      "bytes": 25320,
-      "hash": "20f06cd14431c636"
-    },
-    {
-      "id": "final_2",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "final-effort",
-      "file": "voices/motivator/final_2.mp3",
-      "duration": 3.58,
-      "bytes": 29712,
-      "hash": "3debc6a96669f559"
-    },
-    {
-      "id": "halfway_1",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "halfway",
-      "file": "voices/motivator/halfway_1.mp3",
-      "duration": 2.93,
-      "bytes": 23712,
-      "hash": "302a9529dad82257"
-    },
-    {
-      "id": "halfway_2",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "halfway",
-      "file": "voices/motivator/halfway_2.mp3",
-      "duration": 2.71,
-      "bytes": 23904,
-      "hash": "8ec6d66e2d5f4d69"
-    },
-    {
-      "id": "hill_1",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "hill-start",
-      "file": "voices/motivator/hill_1.mp3",
-      "duration": 3.65,
-      "bytes": 31704,
-      "hash": "b1c6f29282753ca5"
-    },
-    {
-      "id": "hill_2",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "hill-start",
-      "file": "voices/motivator/hill_2.mp3",
-      "duration": 2.82,
-      "bytes": 23616,
-      "hash": "a6939ebb6605cf26"
-    },
-    {
-      "id": "interval_start_1",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "interval-start",
-      "file": "voices/motivator/interval_start_1.mp3",
-      "duration": 2.09,
-      "bytes": 18744,
-      "hash": "6bf15e49d1c36d5a"
-    },
-    {
-      "id": "interval_work_1",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "interval-work",
-      "file": "voices/motivator/interval_work_1.mp3",
-      "duration": 3.28,
-      "bytes": 28536,
-      "hash": "22c774b72d36f018"
-    },
-    {
-      "id": "interval_work_2",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "interval-work",
-      "file": "voices/motivator/interval_work_2.mp3",
-      "duration": 2.26,
-      "bytes": 19320,
-      "hash": "2617b228fbeb9739"
-    },
-    {
-      "id": "long_1",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "long-run-settle",
-      "file": "voices/motivator/long_1.mp3",
-      "duration": 3.61,
-      "bytes": 29088,
-      "hash": "ed2ea08206997979"
-    },
-    {
-      "id": "long_2",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "long-run-settle",
-      "file": "voices/motivator/long_2.mp3",
-      "duration": 3.7,
-      "bytes": 31536,
-      "hash": "aa77eba9ad0e15c3"
-    },
-    {
-      "id": "milestone_1",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "milestone-distance",
-      "file": "voices/motivator/milestone_1.mp3",
-      "duration": 2.64,
-      "bytes": 22080,
-      "hash": "9de42506662db4ff"
-    },
-    {
-      "id": "milestone_2",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "milestone-distance",
-      "file": "voices/motivator/milestone_2.mp3",
-      "duration": 2.54,
-      "bytes": 20664,
-      "hash": "94a7820853939ce2"
-    },
-    {
-      "id": "milestone_3",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "milestone-distance",
-      "file": "voices/motivator/milestone_3.mp3",
-      "duration": 2.79,
-      "bytes": 22656,
-      "hash": "e79cb4c78b852f11"
-    },
-    {
-      "id": "paused_1",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "paused",
-      "file": "voices/motivator/paused_1.mp3",
-      "duration": 1.56,
-      "bytes": 13152,
-      "hash": "cda7ce263c0ddb0b"
-    },
-    {
-      "id": "prep_1",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "session-prep",
-      "file": "voices/motivator/prep_1.mp3",
-      "duration": 3.19,
-      "bytes": 26112,
-      "hash": "7fd7b7f6a3f0c496"
-    },
-    {
-      "id": "prep_2",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "session-prep",
-      "file": "voices/motivator/prep_2.mp3",
-      "duration": 3.55,
-      "bytes": 27720,
-      "hash": "1d16b5cb6ac48285"
-    },
-    {
-      "id": "recovery_1",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "recovery-start",
-      "file": "voices/motivator/recovery_1.mp3",
-      "duration": 2.83,
-      "bytes": 23136,
-      "hash": "b224b0063436b640"
-    },
-    {
-      "id": "recovery_2",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "recovery-start",
-      "file": "voices/motivator/recovery_2.mp3",
-      "duration": 2.96,
-      "bytes": 25440,
-      "hash": "80af4795cfa1f69d"
-    },
-    {
-      "id": "resumed_1",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "resumed",
-      "file": "voices/motivator/resumed_1.mp3",
-      "duration": 2.05,
-      "bytes": 17280,
-      "hash": "42eb06d2e31e7831"
-    },
-    {
-      "id": "safety_1",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "safety-effort",
-      "file": "voices/motivator/safety_1.mp3",
-      "duration": 4.65,
-      "bytes": 36552,
-      "hash": "70a0d9efcdb7e64f"
-    },
-    {
-      "id": "safety_2",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "safety-effort",
-      "file": "voices/motivator/safety_2.mp3",
-      "duration": 4.15,
-      "bytes": 33192,
-      "hash": "1cf35f7334deee5a"
-    },
-    {
-      "id": "start_1",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "session-start",
-      "file": "voices/motivator/start_1.mp3",
-      "duration": 2.07,
-      "bytes": 17808,
-      "hash": "4129b51597c9a52e"
-    },
-    {
-      "id": "start_2",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "session-start",
-      "file": "voices/motivator/start_2.mp3",
-      "duration": 2.65,
-      "bytes": 23040,
-      "hash": "b4ed854abffe9c61"
-    },
-    {
-      "id": "strength_1",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "strength-start",
-      "file": "voices/motivator/strength_1.mp3",
-      "duration": 4.78,
-      "bytes": 38784,
-      "hash": "2884b9b5373c536b"
-    },
-    {
-      "id": "strength_2",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "strength-start",
-      "file": "voices/motivator/strength_2.mp3",
-      "duration": 3.79,
-      "bytes": 30216,
-      "hash": "0e864d70e40e7663"
-    },
-    {
-      "id": "technique_1",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "technique",
-      "file": "voices/motivator/technique_1.mp3",
-      "duration": 3.29,
-      "bytes": 28440,
-      "hash": "9d6842796c4e14e9"
-    },
-    {
-      "id": "technique_2",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "technique",
-      "file": "voices/motivator/technique_2.mp3",
-      "duration": 3.0,
-      "bytes": 25584,
-      "hash": "9e4d34afadbaa7a1"
-    },
-    {
-      "id": "technique_3",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "technique",
-      "file": "voices/motivator/technique_3.mp3",
-      "duration": 3.46,
-      "bytes": 28440,
-      "hash": "4aa30abc34988529"
-    },
-    {
-      "id": "tempo_1",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "tempo-start",
-      "file": "voices/motivator/tempo_1.mp3",
-      "duration": 3.74,
-      "bytes": 30840,
-      "hash": "9414f73a9d3eedd1"
-    },
-    {
-      "id": "threshold_1",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "threshold-hold",
-      "file": "voices/motivator/threshold_1.mp3",
-      "duration": 3.73,
-      "bytes": 31752,
-      "hash": "f3c098a347f2fd6b"
-    },
-    {
-      "id": "threshold_2",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "threshold-hold",
-      "file": "voices/motivator/threshold_2.mp3",
-      "duration": 3.65,
-      "bytes": 30768,
-      "hash": "5280468b200c7dbe"
-    },
-    {
-      "id": "warmup_1",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "warmup-start",
-      "file": "voices/motivator/warmup_1.mp3",
-      "duration": 3.43,
-      "bytes": 30360,
-      "hash": "50edf2e303f3b3ca"
-    },
-    {
-      "id": "warmup_2",
-      "coach": "motivator",
-      "voice": "bf_isabella",
-      "trigger": "warmup-start",
-      "file": "voices/motivator/warmup_2.mp3",
-      "duration": 3.8,
-      "bytes": 30456,
-      "hash": "91e13f95a7b71e79"
-    },
-    {
-      "id": "complete_1",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "session-complete",
-      "file": "voices/pacer/complete_1.mp3",
-      "duration": 3.63,
-      "bytes": 26304,
-      "hash": "b70a4b46190115a3"
-    },
-    {
-      "id": "complete_2",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "session-complete",
-      "file": "voices/pacer/complete_2.mp3",
-      "duration": 4.2,
-      "bytes": 30120,
-      "hash": "26b54b1bbc5f6427"
-    },
-    {
-      "id": "cooldown_1",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "cooldown-start",
-      "file": "voices/pacer/cooldown_1.mp3",
-      "duration": 3.58,
-      "bytes": 26184,
-      "hash": "816305b1a77df094"
-    },
-    {
-      "id": "cooldown_2",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "cooldown-start",
-      "file": "voices/pacer/cooldown_2.mp3",
-      "duration": 4.58,
-      "bytes": 31848,
-      "hash": "908505883a33c592"
-    },
-    {
-      "id": "easy_1",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "easy-settle",
-      "file": "voices/pacer/easy_1.mp3",
-      "duration": 4.32,
-      "bytes": 30120,
-      "hash": "baccbbf5c672856b"
-    },
-    {
-      "id": "easy_2",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "easy-settle",
-      "file": "voices/pacer/easy_2.mp3",
-      "duration": 4.1,
-      "bytes": 29904,
-      "hash": "7d973245cb598458"
-    },
-    {
-      "id": "easy_3",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "easy-settle",
-      "file": "voices/pacer/easy_3.mp3",
-      "duration": 3.67,
-      "bytes": 26880,
-      "hash": "ec82466d84486016"
-    },
-    {
-      "id": "ended_early_1",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "ended-early",
-      "file": "voices/pacer/ended_early_1.mp3",
-      "duration": 4.25,
-      "bytes": 31416,
-      "hash": "6666539428d61064"
-    },
-    {
-      "id": "final_1",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "final-effort",
-      "file": "voices/pacer/final_1.mp3",
-      "duration": 3.36,
-      "bytes": 24432,
-      "hash": "3965c172fafd11f5"
-    },
-    {
-      "id": "final_2",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "final-effort",
-      "file": "voices/pacer/final_2.mp3",
-      "duration": 4.36,
-      "bytes": 29976,
-      "hash": "dbd2ef1b35ffbc15"
-    },
-    {
-      "id": "halfway_1",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "halfway",
-      "file": "voices/pacer/halfway_1.mp3",
-      "duration": 3.27,
-      "bytes": 24432,
-      "hash": "76ddebdc752378fa"
-    },
-    {
-      "id": "halfway_2",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "halfway",
-      "file": "voices/pacer/halfway_2.mp3",
-      "duration": 3.25,
-      "bytes": 24432,
-      "hash": "1270b009a3c00451"
-    },
-    {
-      "id": "hill_1",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "hill-start",
-      "file": "voices/pacer/hill_1.mp3",
-      "duration": 4.56,
-      "bytes": 32160,
-      "hash": "c68fe06df5ef7ea4"
-    },
-    {
-      "id": "hill_2",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "hill-start",
-      "file": "voices/pacer/hill_2.mp3",
-      "duration": 3.28,
-      "bytes": 23448,
-      "hash": "778c8480eebe9b6b"
-    },
-    {
-      "id": "interval_start_1",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "interval-start",
-      "file": "voices/pacer/interval_start_1.mp3",
-      "duration": 2.27,
-      "bytes": 17136,
-      "hash": "442032fb6f95380e"
-    },
-    {
-      "id": "interval_work_1",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "interval-work",
-      "file": "voices/pacer/interval_work_1.mp3",
-      "duration": 3.9,
-      "bytes": 28224,
-      "hash": "f8e5b3c9194682c0"
-    },
-    {
-      "id": "interval_work_2",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "interval-work",
-      "file": "voices/pacer/interval_work_2.mp3",
-      "duration": 2.8,
-      "bytes": 20112,
-      "hash": "cc12464ed308a104"
-    },
-    {
-      "id": "long_1",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "long-run-settle",
-      "file": "voices/pacer/long_1.mp3",
-      "duration": 4.11,
-      "bytes": 30072,
-      "hash": "abac862910f71d2a"
-    },
-    {
-      "id": "long_2",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "long-run-settle",
-      "file": "voices/pacer/long_2.mp3",
-      "duration": 4.5,
-      "bytes": 33768,
-      "hash": "258c6c168c1f883a"
-    },
-    {
-      "id": "milestone_1",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "milestone-distance",
-      "file": "voices/pacer/milestone_1.mp3",
-      "duration": 3.11,
-      "bytes": 23376,
-      "hash": "6aa6a9b5a2f6b2ea"
-    },
-    {
-      "id": "milestone_2",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "milestone-distance",
-      "file": "voices/pacer/milestone_2.mp3",
-      "duration": 2.73,
-      "bytes": 19128,
-      "hash": "ee120da0425e0208"
-    },
-    {
-      "id": "milestone_3",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "milestone-distance",
-      "file": "voices/pacer/milestone_3.mp3",
-      "duration": 3.3,
-      "bytes": 22632,
-      "hash": "793320f458ace55a"
-    },
-    {
-      "id": "paused_1",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "paused",
-      "file": "voices/pacer/paused_1.mp3",
-      "duration": 1.7,
-      "bytes": 12816,
-      "hash": "2fc17849bd5f11cd"
-    },
-    {
-      "id": "prep_1",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "session-prep",
-      "file": "voices/pacer/prep_1.mp3",
-      "duration": 3.57,
-      "bytes": 26304,
-      "hash": "3aa17989bd3c1110"
-    },
-    {
-      "id": "prep_2",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "session-prep",
-      "file": "voices/pacer/prep_2.mp3",
-      "duration": 4.05,
-      "bytes": 28512,
-      "hash": "5d5f42fec88a470a"
-    },
-    {
-      "id": "recovery_1",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "recovery-start",
-      "file": "voices/pacer/recovery_1.mp3",
-      "duration": 3.17,
-      "bytes": 22008,
-      "hash": "a1531f19c3b3d0b6"
-    },
-    {
-      "id": "recovery_2",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "recovery-start",
-      "file": "voices/pacer/recovery_2.mp3",
-      "duration": 3.54,
-      "bytes": 27168,
-      "hash": "a79a7de3ca7a105c"
-    },
-    {
-      "id": "resumed_1",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "resumed",
-      "file": "voices/pacer/resumed_1.mp3",
-      "duration": 2.42,
-      "bytes": 17208,
-      "hash": "590017a874a6aa4d"
-    },
-    {
-      "id": "safety_1",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "safety-effort",
-      "file": "voices/pacer/safety_1.mp3",
-      "duration": 5.73,
-      "bytes": 39192,
-      "hash": "b1a03f479974da7e"
-    },
-    {
-      "id": "safety_2",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "safety-effort",
-      "file": "voices/pacer/safety_2.mp3",
-      "duration": 4.97,
-      "bytes": 35040,
-      "hash": "d77b871544eae1e4"
-    },
-    {
-      "id": "start_1",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "session-start",
-      "file": "voices/pacer/start_1.mp3",
-      "duration": 2.5,
-      "bytes": 18288,
-      "hash": "675c4d003faf9a62"
-    },
-    {
-      "id": "start_2",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "session-start",
-      "file": "voices/pacer/start_2.mp3",
-      "duration": 2.9,
-      "bytes": 21216,
-      "hash": "b57e0d5e1f9f7a72"
-    },
-    {
-      "id": "strength_1",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "strength-start",
-      "file": "voices/pacer/strength_1.mp3",
-      "duration": 5.53,
-      "bytes": 39312,
-      "hash": "65b50f064c1a4079"
-    },
-    {
-      "id": "strength_2",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "strength-start",
-      "file": "voices/pacer/strength_2.mp3",
-      "duration": 4.4,
-      "bytes": 31728,
-      "hash": "024ed5f85fbe4d16"
-    },
-    {
-      "id": "technique_1",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "technique",
-      "file": "voices/pacer/technique_1.mp3",
-      "duration": 3.93,
-      "bytes": 27984,
-      "hash": "479dc7a321bf5cb8"
-    },
-    {
-      "id": "technique_2",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "technique",
-      "file": "voices/pacer/technique_2.mp3",
-      "duration": 3.25,
-      "bytes": 24336,
-      "hash": "024a6f5b16ae7bdb"
-    },
-    {
-      "id": "technique_3",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "technique",
-      "file": "voices/pacer/technique_3.mp3",
-      "duration": 4.13,
-      "bytes": 28104,
-      "hash": "b5320ab37e0081b3"
-    },
-    {
-      "id": "tempo_1",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "tempo-start",
-      "file": "voices/pacer/tempo_1.mp3",
-      "duration": 4.35,
-      "bytes": 32424,
-      "hash": "ce2b068c4881c830"
-    },
-    {
-      "id": "threshold_1",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "threshold-hold",
-      "file": "voices/pacer/threshold_1.mp3",
-      "duration": 4.28,
-      "bytes": 31752,
-      "hash": "e7cf517a09c601cc"
-    },
-    {
-      "id": "threshold_2",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "threshold-hold",
-      "file": "voices/pacer/threshold_2.mp3",
-      "duration": 4.32,
-      "bytes": 30912,
-      "hash": "840063f1c1868983"
-    },
-    {
-      "id": "warmup_1",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "warmup-start",
-      "file": "voices/pacer/warmup_1.mp3",
-      "duration": 4.13,
-      "bytes": 31080,
-      "hash": "7b372a0b60dfd98c"
-    },
-    {
-      "id": "warmup_2",
-      "coach": "pacer",
-      "voice": "bm_george",
-      "trigger": "warmup-start",
-      "file": "voices/pacer/warmup_2.mp3",
-      "duration": 4.05,
-      "bytes": 28728,
-      "hash": "2cde3b4378295f57"
-    },
-    {
-      "id": "complete_1",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "session-complete",
-      "file": "voices/technician/complete_1.mp3",
-      "duration": 3.64,
-      "bytes": 29592,
-      "hash": "5187af0817db413e"
-    },
-    {
-      "id": "complete_2",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "session-complete",
-      "file": "voices/technician/complete_2.mp3",
-      "duration": 4.14,
-      "bytes": 32208,
-      "hash": "8f3d4c36f069587c"
-    },
-    {
-      "id": "cooldown_1",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "cooldown-start",
-      "file": "voices/technician/cooldown_1.mp3",
-      "duration": 3.53,
-      "bytes": 27840,
-      "hash": "56f9508246201eac"
-    },
-    {
-      "id": "cooldown_2",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "cooldown-start",
-      "file": "voices/technician/cooldown_2.mp3",
-      "duration": 4.5,
-      "bytes": 35688,
-      "hash": "61c7dd52fd64f529"
-    },
-    {
-      "id": "easy_1",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "easy-settle",
-      "file": "voices/technician/easy_1.mp3",
-      "duration": 4.31,
-      "bytes": 32544,
-      "hash": "a486aea40cb55cfd"
-    },
-    {
-      "id": "easy_2",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "easy-settle",
-      "file": "voices/technician/easy_2.mp3",
-      "duration": 3.84,
-      "bytes": 30696,
-      "hash": "4be724825871546b"
-    },
-    {
-      "id": "easy_3",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "easy-settle",
-      "file": "voices/technician/easy_3.mp3",
-      "duration": 3.54,
-      "bytes": 28584,
-      "hash": "03b0efda1e637195"
-    },
-    {
-      "id": "ended_early_1",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "ended-early",
-      "file": "voices/technician/ended_early_1.mp3",
-      "duration": 4.34,
-      "bytes": 35208,
-      "hash": "9a7502913c17b7c0"
-    },
-    {
-      "id": "final_1",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "final-effort",
-      "file": "voices/technician/final_1.mp3",
-      "duration": 3.33,
-      "bytes": 27000,
-      "hash": "9187ed7a58426e6a"
-    },
-    {
-      "id": "final_2",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "final-effort",
-      "file": "voices/technician/final_2.mp3",
-      "duration": 4.35,
-      "bytes": 33672,
-      "hash": "bdc6a5cb3b7cb70d"
-    },
-    {
-      "id": "halfway_1",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "halfway",
-      "file": "voices/technician/halfway_1.mp3",
-      "duration": 3.15,
-      "bytes": 24792,
-      "hash": "1fa8f9ac96e72634"
-    },
-    {
-      "id": "halfway_2",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "halfway",
-      "file": "voices/technician/halfway_2.mp3",
-      "duration": 2.99,
-      "bytes": 24456,
-      "hash": "fe9be1ba9af47baf"
-    },
-    {
-      "id": "hill_1",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "hill-start",
-      "file": "voices/technician/hill_1.mp3",
-      "duration": 4.48,
-      "bytes": 38712,
-      "hash": "d5686eb69e9e4a7a"
-    },
-    {
-      "id": "hill_2",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "hill-start",
-      "file": "voices/technician/hill_2.mp3",
-      "duration": 3.13,
-      "bytes": 25416,
-      "hash": "3542e6eaf4663567"
-    },
-    {
-      "id": "interval_start_1",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "interval-start",
-      "file": "voices/technician/interval_start_1.mp3",
-      "duration": 2.17,
-      "bytes": 18720,
-      "hash": "d3311e767f49cda2"
-    },
-    {
-      "id": "interval_work_1",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "interval-work",
-      "file": "voices/technician/interval_work_1.mp3",
-      "duration": 3.96,
-      "bytes": 31248,
-      "hash": "840ce14307f5e900"
-    },
-    {
-      "id": "interval_work_2",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "interval-work",
-      "file": "voices/technician/interval_work_2.mp3",
-      "duration": 2.62,
-      "bytes": 22848,
-      "hash": "17d9c1503d57be14"
-    },
-    {
-      "id": "long_1",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "long-run-settle",
-      "file": "voices/technician/long_1.mp3",
-      "duration": 4.24,
-      "bytes": 34008,
-      "hash": "711302a112aa577e"
-    },
-    {
-      "id": "long_2",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "long-run-settle",
-      "file": "voices/technician/long_2.mp3",
-      "duration": 4.53,
-      "bytes": 37896,
-      "hash": "6216fa210df46a24"
-    },
-    {
-      "id": "milestone_1",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "milestone-distance",
-      "file": "voices/technician/milestone_1.mp3",
-      "duration": 2.82,
-      "bytes": 22800,
-      "hash": "cdf03d1664469e19"
-    },
-    {
-      "id": "milestone_2",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "milestone-distance",
-      "file": "voices/technician/milestone_2.mp3",
-      "duration": 2.67,
-      "bytes": 21888,
-      "hash": "d31026afe75642ce"
-    },
-    {
-      "id": "milestone_3",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "milestone-distance",
-      "file": "voices/technician/milestone_3.mp3",
-      "duration": 3.09,
-      "bytes": 25272,
-      "hash": "5c4d0b704e370e64"
-    },
-    {
-      "id": "paused_1",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "paused",
-      "file": "voices/technician/paused_1.mp3",
-      "duration": 1.49,
-      "bytes": 13464,
-      "hash": "e482d952841289aa"
-    },
-    {
-      "id": "prep_1",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "session-prep",
-      "file": "voices/technician/prep_1.mp3",
-      "duration": 3.44,
-      "bytes": 27456,
-      "hash": "2942771e4d0e2f99"
-    },
-    {
-      "id": "prep_2",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "session-prep",
-      "file": "voices/technician/prep_2.mp3",
-      "duration": 3.89,
-      "bytes": 31536,
-      "hash": "84fc02a5e7bbba6e"
-    },
-    {
-      "id": "recovery_1",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "recovery-start",
-      "file": "voices/technician/recovery_1.mp3",
-      "duration": 3.16,
-      "bytes": 25104,
-      "hash": "48b09bf08baa6319"
-    },
-    {
-      "id": "recovery_2",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "recovery-start",
-      "file": "voices/technician/recovery_2.mp3",
-      "duration": 3.48,
-      "bytes": 28128,
-      "hash": "787d551ed1294202"
-    },
-    {
-      "id": "resumed_1",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "resumed",
-      "file": "voices/technician/resumed_1.mp3",
-      "duration": 2.32,
-      "bytes": 20328,
-      "hash": "8f776712fbb5591b"
-    },
-    {
-      "id": "safety_1",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "safety-effort",
-      "file": "voices/technician/safety_1.mp3",
-      "duration": 5.51,
-      "bytes": 47016,
-      "hash": "f09bd169022db093"
-    },
-    {
-      "id": "safety_2",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "safety-effort",
-      "file": "voices/technician/safety_2.mp3",
-      "duration": 4.75,
-      "bytes": 37392,
-      "hash": "41c1c6e6830f4ee5"
-    },
-    {
-      "id": "start_1",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "session-start",
-      "file": "voices/technician/start_1.mp3",
-      "duration": 2.43,
-      "bytes": 19680,
-      "hash": "a9f1a14cb2901e7c"
-    },
-    {
-      "id": "start_2",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "session-start",
-      "file": "voices/technician/start_2.mp3",
-      "duration": 2.79,
-      "bytes": 22584,
-      "hash": "8980c4a804192ff7"
-    },
-    {
-      "id": "strength_1",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "strength-start",
-      "file": "voices/technician/strength_1.mp3",
-      "duration": 5.59,
-      "bytes": 46056,
-      "hash": "e430708473a6c67b"
-    },
-    {
-      "id": "strength_2",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "strength-start",
-      "file": "voices/technician/strength_2.mp3",
-      "duration": 4.39,
-      "bytes": 34920,
-      "hash": "25c2b0a90a9f71e1"
-    },
-    {
-      "id": "technique_1",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "technique",
-      "file": "voices/technician/technique_1.mp3",
-      "duration": 3.98,
-      "bytes": 30120,
-      "hash": "7d366621960687c4"
-    },
-    {
-      "id": "technique_2",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "technique",
-      "file": "voices/technician/technique_2.mp3",
-      "duration": 3.28,
-      "bytes": 26352,
-      "hash": "e10ee4b821a3235a"
-    },
-    {
-      "id": "technique_3",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "technique",
-      "file": "voices/technician/technique_3.mp3",
-      "duration": 4.09,
-      "bytes": 33984,
-      "hash": "918fe14c3873a48f"
-    },
-    {
-      "id": "tempo_1",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "tempo-start",
-      "file": "voices/technician/tempo_1.mp3",
-      "duration": 4.33,
-      "bytes": 34176,
-      "hash": "909b2268242aa7e3"
-    },
-    {
-      "id": "threshold_1",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "threshold-hold",
-      "file": "voices/technician/threshold_1.mp3",
-      "duration": 4.33,
-      "bytes": 36048,
-      "hash": "06b2723c8ae87ce6"
-    },
-    {
-      "id": "threshold_2",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "threshold-hold",
-      "file": "voices/technician/threshold_2.mp3",
-      "duration": 4.23,
-      "bytes": 32256,
-      "hash": "e1cc20d459b0f79c"
-    },
-    {
-      "id": "warmup_1",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "warmup-start",
-      "file": "voices/technician/warmup_1.mp3",
-      "duration": 4.11,
-      "bytes": 32136,
-      "hash": "1d976422a70bb068"
-    },
-    {
-      "id": "warmup_2",
-      "coach": "technician",
-      "voice": "bm_lewis",
-      "trigger": "warmup-start",
-      "file": "voices/technician/warmup_2.mp3",
-      "duration": 4.0,
-      "bytes": 30960,
-      "hash": "f7312722c8f04dc9"
-    }
-  ],
-  "totalBytes": 4576776
+ "version": 10,
+ "sampleRate": 44100,
+ "coaches": [
+  {
+   "id": "guide",
+   "name": "The Guide",
+   "voice": "Holly",
+   "bytes": 2181254
+  },
+  {
+   "id": "pacer",
+   "name": "The Pacer",
+   "voice": "Philip",
+   "bytes": 1513936
+  },
+  {
+   "id": "motivator",
+   "name": "The Motivator",
+   "voice": "Hope",
+   "bytes": 1472181
+  },
+  {
+   "id": "technician",
+   "name": "The Technician",
+   "voice": "Lucy",
+   "bytes": 1414442
+  }
+ ],
+ "clips": [
+  {
+   "id": "prep_1",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "session-prep",
+   "file": "voices/guide/prep_1.mp3",
+   "duration": 3.65,
+   "bytes": 42708,
+   "hash": "93846b8dcbae3ab9"
+  },
+  {
+   "id": "prep_2",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "session-prep",
+   "file": "voices/guide/prep_2.mp3",
+   "duration": 4.34,
+   "bytes": 49800,
+   "hash": "08e46d83b4744c9f"
+  },
+  {
+   "id": "warmup_1",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "warmup-start",
+   "file": "voices/guide/warmup_1.mp3",
+   "duration": 5.51,
+   "bytes": 60905,
+   "hash": "41a43e9b104f1b1a"
+  },
+  {
+   "id": "warmup_2",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "warmup-start",
+   "file": "voices/guide/warmup_2.mp3",
+   "duration": 5.84,
+   "bytes": 62654,
+   "hash": "65da5f09b4840a9b"
+  },
+  {
+   "id": "start_1",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "session-start",
+   "file": "voices/guide/start_1.mp3",
+   "duration": 2.68,
+   "bytes": 30716,
+   "hash": "bf54ca3bc72a7a0d"
+  },
+  {
+   "id": "start_2",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "session-start",
+   "file": "voices/guide/start_2.mp3",
+   "duration": 3.32,
+   "bytes": 38904,
+   "hash": "f1a564accb15bbe1"
+  },
+  {
+   "id": "easy_1",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "easy-settle",
+   "file": "voices/guide/easy_1.mp3",
+   "duration": 4.93,
+   "bytes": 57969,
+   "hash": "1d5ff83d36ef4508"
+  },
+  {
+   "id": "easy_2",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "easy-settle",
+   "file": "voices/guide/easy_2.mp3",
+   "duration": 4.66,
+   "bytes": 54445,
+   "hash": "18b1463ba59d7e13"
+  },
+  {
+   "id": "easy_3",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "easy-settle",
+   "file": "voices/guide/easy_3.mp3",
+   "duration": 4.24,
+   "bytes": 46987,
+   "hash": "94532d13aaa3befd"
+  },
+  {
+   "id": "long_1",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "long-run-settle",
+   "file": "voices/guide/long_1.mp3",
+   "duration": 5.14,
+   "bytes": 57314,
+   "hash": "faae61c712f13d13"
+  },
+  {
+   "id": "long_2",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "long-run-settle",
+   "file": "voices/guide/long_2.mp3",
+   "duration": 6.92,
+   "bytes": 77034,
+   "hash": "96584c0f3ef8ac32"
+  },
+  {
+   "id": "tempo_1",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "tempo-start",
+   "file": "voices/guide/tempo_1.mp3",
+   "duration": 5.37,
+   "bytes": 62451,
+   "hash": "3b7c88a4f5165eed"
+  },
+  {
+   "id": "threshold_1",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "threshold-hold",
+   "file": "voices/guide/threshold_1.mp3",
+   "duration": 6.24,
+   "bytes": 68597,
+   "hash": "05aca21c8bfb6fc9"
+  },
+  {
+   "id": "threshold_2",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "threshold-hold",
+   "file": "voices/guide/threshold_2.mp3",
+   "duration": 5.32,
+   "bytes": 60533,
+   "hash": "f9e1d1bcc2f0e13c"
+  },
+  {
+   "id": "interval_start_1",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "interval-start",
+   "file": "voices/guide/interval_start_1.mp3",
+   "duration": 2.09,
+   "bytes": 24875,
+   "hash": "75905b5acf760ceb"
+  },
+  {
+   "id": "interval_work_1",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "interval-work",
+   "file": "voices/guide/interval_work_1.mp3",
+   "duration": 4.39,
+   "bytes": 52462,
+   "hash": "8bd0f35f7d3921c5"
+  },
+  {
+   "id": "interval_work_2",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "interval-work",
+   "file": "voices/guide/interval_work_2.mp3",
+   "duration": 3.08,
+   "bytes": 34608,
+   "hash": "f87c47449f3b2d75"
+  },
+  {
+   "id": "recovery_1",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "recovery-start",
+   "file": "voices/guide/recovery_1.mp3",
+   "duration": 3.39,
+   "bytes": 42742,
+   "hash": "c9ca6172909701b4"
+  },
+  {
+   "id": "recovery_2",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "recovery-start",
+   "file": "voices/guide/recovery_2.mp3",
+   "duration": 3.99,
+   "bytes": 46724,
+   "hash": "cfb8ba734d89aee2"
+  },
+  {
+   "id": "hill_1",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "hill-start",
+   "file": "voices/guide/hill_1.mp3",
+   "duration": 6.73,
+   "bytes": 77198,
+   "hash": "cf348d89ace1df43"
+  },
+  {
+   "id": "hill_2",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "hill-start",
+   "file": "voices/guide/hill_2.mp3",
+   "duration": 3.72,
+   "bytes": 44123,
+   "hash": "7f8d5b63b8bfb3c8"
+  },
+  {
+   "id": "strength_1",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "strength-start",
+   "file": "voices/guide/strength_1.mp3",
+   "duration": 6.83,
+   "bytes": 78119,
+   "hash": "6a02d61ab047a487"
+  },
+  {
+   "id": "strength_2",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "strength-start",
+   "file": "voices/guide/strength_2.mp3",
+   "duration": 5.44,
+   "bytes": 61431,
+   "hash": "d6952f415218d454"
+  },
+  {
+   "id": "technique_1",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "technique",
+   "file": "voices/guide/technique_1.mp3",
+   "duration": 4.64,
+   "bytes": 57032,
+   "hash": "42370da134e6c1d1"
+  },
+  {
+   "id": "technique_2",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "technique",
+   "file": "voices/guide/technique_2.mp3",
+   "duration": 4.17,
+   "bytes": 46719,
+   "hash": "03568f4848a477f5"
+  },
+  {
+   "id": "technique_3",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "technique",
+   "file": "voices/guide/technique_3.mp3",
+   "duration": 4.6,
+   "bytes": 52676,
+   "hash": "9867461eea9fc38e"
+  },
+  {
+   "id": "halfway_1",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "halfway",
+   "file": "voices/guide/halfway_1.mp3",
+   "duration": 3.87,
+   "bytes": 43443,
+   "hash": "86fc5cd11e41a74e"
+  },
+  {
+   "id": "halfway_2",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "halfway",
+   "file": "voices/guide/halfway_2.mp3",
+   "duration": 3.59,
+   "bytes": 41401,
+   "hash": "b130be36613cde9a"
+  },
+  {
+   "id": "milestone_1",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "milestone-distance",
+   "file": "voices/guide/milestone_1.mp3",
+   "duration": 2.81,
+   "bytes": 33707,
+   "hash": "eebf33821635e225"
+  },
+  {
+   "id": "milestone_2",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "milestone-distance",
+   "file": "voices/guide/milestone_2.mp3",
+   "duration": 2.51,
+   "bytes": 29518,
+   "hash": "626489040a0507ae"
+  },
+  {
+   "id": "milestone_3",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "milestone-distance",
+   "file": "voices/guide/milestone_3.mp3",
+   "duration": 3.96,
+   "bytes": 46594,
+   "hash": "5609c434f33c440e"
+  },
+  {
+   "id": "final_1",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "final-effort",
+   "file": "voices/guide/final_1.mp3",
+   "duration": 4.28,
+   "bytes": 47754,
+   "hash": "2a213ea7e54fa294"
+  },
+  {
+   "id": "final_2",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "final-effort",
+   "file": "voices/guide/final_2.mp3",
+   "duration": 4.5,
+   "bytes": 51792,
+   "hash": "b40e95e8f7210cef"
+  },
+  {
+   "id": "cooldown_1",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "cooldown-start",
+   "file": "voices/guide/cooldown_1.mp3",
+   "duration": 3.77,
+   "bytes": 44535,
+   "hash": "52f6e38822288150"
+  },
+  {
+   "id": "cooldown_2",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "cooldown-start",
+   "file": "voices/guide/cooldown_2.mp3",
+   "duration": 5.35,
+   "bytes": 70774,
+   "hash": "ecd2fd8818f32e02"
+  },
+  {
+   "id": "complete_1",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "session-complete",
+   "file": "voices/guide/complete_1.mp3",
+   "duration": 4.5,
+   "bytes": 50216,
+   "hash": "2ffff53de174cce7"
+  },
+  {
+   "id": "complete_2",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "session-complete",
+   "file": "voices/guide/complete_2.mp3",
+   "duration": 5.81,
+   "bytes": 67267,
+   "hash": "6135a6b999ccfd79"
+  },
+  {
+   "id": "paused_1",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "paused",
+   "file": "voices/guide/paused_1.mp3",
+   "duration": 2.23,
+   "bytes": 25871,
+   "hash": "a36b4f1af0e7f0e3"
+  },
+  {
+   "id": "resumed_1",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "resumed",
+   "file": "voices/guide/resumed_1.mp3",
+   "duration": 2.47,
+   "bytes": 31997,
+   "hash": "9107ce1f6e19bd84"
+  },
+  {
+   "id": "ended_early_1",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "ended-early",
+   "file": "voices/guide/ended_early_1.mp3",
+   "duration": 5.48,
+   "bytes": 61535,
+   "hash": "91d9106ac92db5fa"
+  },
+  {
+   "id": "safety_1",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "safety-effort",
+   "file": "voices/guide/safety_1.mp3",
+   "duration": 6.21,
+   "bytes": 70594,
+   "hash": "426ae910f7914cff"
+  },
+  {
+   "id": "safety_2",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "safety-effort",
+   "file": "voices/guide/safety_2.mp3",
+   "duration": 6.29,
+   "bytes": 74530,
+   "hash": "2aa4d94c9a86baf4"
+  },
+  {
+   "id": "prep_1",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "session-prep",
+   "file": "voices/pacer/prep_1.mp3",
+   "duration": 2.69,
+   "bytes": 34242,
+   "hash": "48697dd78bf52d97"
+  },
+  {
+   "id": "prep_2",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "session-prep",
+   "file": "voices/pacer/prep_2.mp3",
+   "duration": 3.08,
+   "bytes": 35853,
+   "hash": "e067c5317753564a"
+  },
+  {
+   "id": "warmup_1",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "warmup-start",
+   "file": "voices/pacer/warmup_1.mp3",
+   "duration": 3.3,
+   "bytes": 39186,
+   "hash": "472b92aed0dd099c"
+  },
+  {
+   "id": "warmup_2",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "warmup-start",
+   "file": "voices/pacer/warmup_2.mp3",
+   "duration": 3.57,
+   "bytes": 41460,
+   "hash": "bb86bfcb5925953e"
+  },
+  {
+   "id": "start_1",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "session-start",
+   "file": "voices/pacer/start_1.mp3",
+   "duration": 1.87,
+   "bytes": 23315,
+   "hash": "7ef8833ef623ec30"
+  },
+  {
+   "id": "start_2",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "session-start",
+   "file": "voices/pacer/start_2.mp3",
+   "duration": 2.04,
+   "bytes": 25162,
+   "hash": "d21052b2c5067fb3"
+  },
+  {
+   "id": "easy_1",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "easy-settle",
+   "file": "voices/pacer/easy_1.mp3",
+   "duration": 3.48,
+   "bytes": 41636,
+   "hash": "397d8a9bfba210ed"
+  },
+  {
+   "id": "easy_2",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "easy-settle",
+   "file": "voices/pacer/easy_2.mp3",
+   "duration": 3.13,
+   "bytes": 38231,
+   "hash": "7599046e731fdf11"
+  },
+  {
+   "id": "easy_3",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "easy-settle",
+   "file": "voices/pacer/easy_3.mp3",
+   "duration": 3.06,
+   "bytes": 37339,
+   "hash": "c2951f093e0edb40"
+  },
+  {
+   "id": "long_1",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "long-run-settle",
+   "file": "voices/pacer/long_1.mp3",
+   "duration": 3.31,
+   "bytes": 39741,
+   "hash": "bf731ad5826684b3"
+  },
+  {
+   "id": "long_2",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "long-run-settle",
+   "file": "voices/pacer/long_2.mp3",
+   "duration": 4.38,
+   "bytes": 50112,
+   "hash": "3ce5a88e94a9e2fe"
+  },
+  {
+   "id": "tempo_1",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "tempo-start",
+   "file": "voices/pacer/tempo_1.mp3",
+   "duration": 3.63,
+   "bytes": 43021,
+   "hash": "962ffa1b67f05c0c"
+  },
+  {
+   "id": "threshold_1",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "threshold-hold",
+   "file": "voices/pacer/threshold_1.mp3",
+   "duration": 3.9,
+   "bytes": 46616,
+   "hash": "2fd30de1ae0495e6"
+  },
+  {
+   "id": "threshold_2",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "threshold-hold",
+   "file": "voices/pacer/threshold_2.mp3",
+   "duration": 3.7,
+   "bytes": 39915,
+   "hash": "f3f495ec88c1c47a"
+  },
+  {
+   "id": "interval_start_1",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "interval-start",
+   "file": "voices/pacer/interval_start_1.mp3",
+   "duration": 1.58,
+   "bytes": 19582,
+   "hash": "0b86a22d6798001b"
+  },
+  {
+   "id": "interval_work_1",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "interval-work",
+   "file": "voices/pacer/interval_work_1.mp3",
+   "duration": 2.94,
+   "bytes": 34944,
+   "hash": "61117039d25a0e06"
+  },
+  {
+   "id": "interval_work_2",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "interval-work",
+   "file": "voices/pacer/interval_work_2.mp3",
+   "duration": 2.25,
+   "bytes": 25323,
+   "hash": "94c8fefd840a1ee8"
+  },
+  {
+   "id": "recovery_1",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "recovery-start",
+   "file": "voices/pacer/recovery_1.mp3",
+   "duration": 2.41,
+   "bytes": 28656,
+   "hash": "208c34865623cda9"
+  },
+  {
+   "id": "recovery_2",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "recovery-start",
+   "file": "voices/pacer/recovery_2.mp3",
+   "duration": 2.47,
+   "bytes": 33353,
+   "hash": "6b27f71018319024"
+  },
+  {
+   "id": "hill_1",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "hill-start",
+   "file": "voices/pacer/hill_1.mp3",
+   "duration": 4.36,
+   "bytes": 47529,
+   "hash": "7c7f6f9d200af612"
+  },
+  {
+   "id": "hill_2",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "hill-start",
+   "file": "voices/pacer/hill_2.mp3",
+   "duration": 2.42,
+   "bytes": 28057,
+   "hash": "8b41c62d6e7650ca"
+  },
+  {
+   "id": "strength_1",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "strength-start",
+   "file": "voices/pacer/strength_1.mp3",
+   "duration": 4.77,
+   "bytes": 53052,
+   "hash": "70c3d889812dd3e0"
+  },
+  {
+   "id": "strength_2",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "strength-start",
+   "file": "voices/pacer/strength_2.mp3",
+   "duration": 4.23,
+   "bytes": 47737,
+   "hash": "a16e4f7838b29556"
+  },
+  {
+   "id": "technique_1",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "technique",
+   "file": "voices/pacer/technique_1.mp3",
+   "duration": 3.05,
+   "bytes": 37374,
+   "hash": "70efb499618010ea"
+  },
+  {
+   "id": "technique_2",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "technique",
+   "file": "voices/pacer/technique_2.mp3",
+   "duration": 2.97,
+   "bytes": 35173,
+   "hash": "01638ee9c19def7a"
+  },
+  {
+   "id": "technique_3",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "technique",
+   "file": "voices/pacer/technique_3.mp3",
+   "duration": 3.49,
+   "bytes": 41381,
+   "hash": "512368da27f1014a"
+  },
+  {
+   "id": "halfway_1",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "halfway",
+   "file": "voices/pacer/halfway_1.mp3",
+   "duration": 2.85,
+   "bytes": 31737,
+   "hash": "835d807eec58ef6e"
+  },
+  {
+   "id": "halfway_2",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "halfway",
+   "file": "voices/pacer/halfway_2.mp3",
+   "duration": 2.67,
+   "bytes": 31526,
+   "hash": "728a5a1ea7a3bd2e"
+  },
+  {
+   "id": "milestone_1",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "milestone-distance",
+   "file": "voices/pacer/milestone_1.mp3",
+   "duration": 2.22,
+   "bytes": 27743,
+   "hash": "06808c0b2055d022"
+  },
+  {
+   "id": "milestone_2",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "milestone-distance",
+   "file": "voices/pacer/milestone_2.mp3",
+   "duration": 1.79,
+   "bytes": 23576,
+   "hash": "7c0c215a4ecc9a85"
+  },
+  {
+   "id": "milestone_3",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "milestone-distance",
+   "file": "voices/pacer/milestone_3.mp3",
+   "duration": 2.55,
+   "bytes": 29542,
+   "hash": "b54b5db9e2d767f5"
+  },
+  {
+   "id": "final_1",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "final-effort",
+   "file": "voices/pacer/final_1.mp3",
+   "duration": 2.87,
+   "bytes": 31493,
+   "hash": "1fd74363045c00c6"
+  },
+  {
+   "id": "final_2",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "final-effort",
+   "file": "voices/pacer/final_2.mp3",
+   "duration": 3.46,
+   "bytes": 42428,
+   "hash": "62a9d1be330e8dc1"
+  },
+  {
+   "id": "cooldown_1",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "cooldown-start",
+   "file": "voices/pacer/cooldown_1.mp3",
+   "duration": 2.57,
+   "bytes": 30095,
+   "hash": "9b057d3dda21aeb7"
+  },
+  {
+   "id": "cooldown_2",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "cooldown-start",
+   "file": "voices/pacer/cooldown_2.mp3",
+   "duration": 3.49,
+   "bytes": 39195,
+   "hash": "345adf4a07d8b411"
+  },
+  {
+   "id": "complete_1",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "session-complete",
+   "file": "voices/pacer/complete_1.mp3",
+   "duration": 2.92,
+   "bytes": 37444,
+   "hash": "fc92f7d6e7fc396f"
+  },
+  {
+   "id": "complete_2",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "session-complete",
+   "file": "voices/pacer/complete_2.mp3",
+   "duration": 3.21,
+   "bytes": 36976,
+   "hash": "7469b0be748eec8d"
+  },
+  {
+   "id": "paused_1",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "paused",
+   "file": "voices/pacer/paused_1.mp3",
+   "duration": 1.34,
+   "bytes": 15878,
+   "hash": "45bb4f103021e7fd"
+  },
+  {
+   "id": "resumed_1",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "resumed",
+   "file": "voices/pacer/resumed_1.mp3",
+   "duration": 2.06,
+   "bytes": 23389,
+   "hash": "7a504d460d014c58"
+  },
+  {
+   "id": "ended_early_1",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "ended-early",
+   "file": "voices/pacer/ended_early_1.mp3",
+   "duration": 4.01,
+   "bytes": 48864,
+   "hash": "d93fa4a034896e7d"
+  },
+  {
+   "id": "safety_1",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "safety-effort",
+   "file": "voices/pacer/safety_1.mp3",
+   "duration": 4.18,
+   "bytes": 48400,
+   "hash": "e8d455f69c3b35de"
+  },
+  {
+   "id": "safety_2",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "safety-effort",
+   "file": "voices/pacer/safety_2.mp3",
+   "duration": 4.23,
+   "bytes": 47660,
+   "hash": "ce5225c5517205eb"
+  },
+  {
+   "id": "prep_1",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "session-prep",
+   "file": "voices/motivator/prep_1.mp3",
+   "duration": 2.65,
+   "bytes": 30818,
+   "hash": "df4bbd4b702f43fb"
+  },
+  {
+   "id": "prep_2",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "session-prep",
+   "file": "voices/motivator/prep_2.mp3",
+   "duration": 3.54,
+   "bytes": 36656,
+   "hash": "283e284397741a10"
+  },
+  {
+   "id": "warmup_1",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "warmup-start",
+   "file": "voices/motivator/warmup_1.mp3",
+   "duration": 3.24,
+   "bytes": 36080,
+   "hash": "84e60aa77c2eb236"
+  },
+  {
+   "id": "warmup_2",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "warmup-start",
+   "file": "voices/motivator/warmup_2.mp3",
+   "duration": 4.12,
+   "bytes": 45251,
+   "hash": "818c0538c1fbeabf"
+  },
+  {
+   "id": "start_1",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "session-start",
+   "file": "voices/motivator/start_1.mp3",
+   "duration": 1.98,
+   "bytes": 21556,
+   "hash": "89622c48294d110b"
+  },
+  {
+   "id": "start_2",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "session-start",
+   "file": "voices/motivator/start_2.mp3",
+   "duration": 2.42,
+   "bytes": 25986,
+   "hash": "57cf69f7541aa908"
+  },
+  {
+   "id": "easy_1",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "easy-settle",
+   "file": "voices/motivator/easy_1.mp3",
+   "duration": 3.61,
+   "bytes": 40521,
+   "hash": "524a6d0b04b41c65"
+  },
+  {
+   "id": "easy_2",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "easy-settle",
+   "file": "voices/motivator/easy_2.mp3",
+   "duration": 3.02,
+   "bytes": 35875,
+   "hash": "34430b09d6672db9"
+  },
+  {
+   "id": "easy_3",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "easy-settle",
+   "file": "voices/motivator/easy_3.mp3",
+   "duration": 2.9,
+   "bytes": 32065,
+   "hash": "6938439108b2bfc3"
+  },
+  {
+   "id": "long_1",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "long-run-settle",
+   "file": "voices/motivator/long_1.mp3",
+   "duration": 3.67,
+   "bytes": 37645,
+   "hash": "8b1a2925b1f42338"
+  },
+  {
+   "id": "long_2",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "long-run-settle",
+   "file": "voices/motivator/long_2.mp3",
+   "duration": 4.08,
+   "bytes": 48226,
+   "hash": "472a3879f6494a75"
+  },
+  {
+   "id": "tempo_1",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "tempo-start",
+   "file": "voices/motivator/tempo_1.mp3",
+   "duration": 3.73,
+   "bytes": 40774,
+   "hash": "bbb993e8f8f554f1"
+  },
+  {
+   "id": "threshold_1",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "threshold-hold",
+   "file": "voices/motivator/threshold_1.mp3",
+   "duration": 3.44,
+   "bytes": 39313,
+   "hash": "489f3287d7b7f777"
+  },
+  {
+   "id": "threshold_2",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "threshold-hold",
+   "file": "voices/motivator/threshold_2.mp3",
+   "duration": 3.9,
+   "bytes": 43846,
+   "hash": "ec7d0362faf45cab"
+  },
+  {
+   "id": "interval_start_1",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "interval-start",
+   "file": "voices/motivator/interval_start_1.mp3",
+   "duration": 1.61,
+   "bytes": 18797,
+   "hash": "f5bc8fa19d185bdb"
+  },
+  {
+   "id": "interval_work_1",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "interval-work",
+   "file": "voices/motivator/interval_work_1.mp3",
+   "duration": 3.41,
+   "bytes": 38112,
+   "hash": "fd61275d7fab1651"
+  },
+  {
+   "id": "interval_work_2",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "interval-work",
+   "file": "voices/motivator/interval_work_2.mp3",
+   "duration": 2.21,
+   "bytes": 24796,
+   "hash": "0316f6fc8dcc2d01"
+  },
+  {
+   "id": "recovery_1",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "recovery-start",
+   "file": "voices/motivator/recovery_1.mp3",
+   "duration": 2.48,
+   "bytes": 27615,
+   "hash": "d9149e0df67ab8ad"
+  },
+  {
+   "id": "recovery_2",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "recovery-start",
+   "file": "voices/motivator/recovery_2.mp3",
+   "duration": 2.89,
+   "bytes": 31278,
+   "hash": "8c59d9c9a5383c15"
+  },
+  {
+   "id": "hill_1",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "hill-start",
+   "file": "voices/motivator/hill_1.mp3",
+   "duration": 4.12,
+   "bytes": 44971,
+   "hash": "149deeaf0d11d165"
+  },
+  {
+   "id": "hill_2",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "hill-start",
+   "file": "voices/motivator/hill_2.mp3",
+   "duration": 2.83,
+   "bytes": 31183,
+   "hash": "f8d418b3dccf94a8"
+  },
+  {
+   "id": "strength_1",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "strength-start",
+   "file": "voices/motivator/strength_1.mp3",
+   "duration": 4.63,
+   "bytes": 50708,
+   "hash": "77c6e29ce7b5be90"
+  },
+  {
+   "id": "strength_2",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "strength-start",
+   "file": "voices/motivator/strength_2.mp3",
+   "duration": 3.57,
+   "bytes": 38792,
+   "hash": "88894f40d52645be"
+  },
+  {
+   "id": "technique_1",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "technique",
+   "file": "voices/motivator/technique_1.mp3",
+   "duration": 3.41,
+   "bytes": 40701,
+   "hash": "930d6449af5f37eb"
+  },
+  {
+   "id": "technique_2",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "technique",
+   "file": "voices/motivator/technique_2.mp3",
+   "duration": 2.95,
+   "bytes": 33787,
+   "hash": "75fb537c8df4568b"
+  },
+  {
+   "id": "technique_3",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "technique",
+   "file": "voices/motivator/technique_3.mp3",
+   "duration": 3.4,
+   "bytes": 37877,
+   "hash": "10ff72394c637320"
+  },
+  {
+   "id": "halfway_1",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "halfway",
+   "file": "voices/motivator/halfway_1.mp3",
+   "duration": 2.79,
+   "bytes": 29773,
+   "hash": "61aeeaee91f76fa7"
+  },
+  {
+   "id": "halfway_2",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "halfway",
+   "file": "voices/motivator/halfway_2.mp3",
+   "duration": 2.74,
+   "bytes": 30239,
+   "hash": "9b332a12b434c40a"
+  },
+  {
+   "id": "milestone_1",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "milestone-distance",
+   "file": "voices/motivator/milestone_1.mp3",
+   "duration": 2.33,
+   "bytes": 26771,
+   "hash": "91407b16340ea8f5"
+  },
+  {
+   "id": "milestone_2",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "milestone-distance",
+   "file": "voices/motivator/milestone_2.mp3",
+   "duration": 2.11,
+   "bytes": 23130,
+   "hash": "2a316a2c53d8bd8c"
+  },
+  {
+   "id": "milestone_3",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "milestone-distance",
+   "file": "voices/motivator/milestone_3.mp3",
+   "duration": 2.54,
+   "bytes": 29251,
+   "hash": "18a75914679373af"
+  },
+  {
+   "id": "final_1",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "final-effort",
+   "file": "voices/motivator/final_1.mp3",
+   "duration": 2.98,
+   "bytes": 34025,
+   "hash": "10a26c2111dbad31"
+  },
+  {
+   "id": "final_2",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "final-effort",
+   "file": "voices/motivator/final_2.mp3",
+   "duration": 3.68,
+   "bytes": 38215,
+   "hash": "97d63a7d04863814"
+  },
+  {
+   "id": "cooldown_1",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "cooldown-start",
+   "file": "voices/motivator/cooldown_1.mp3",
+   "duration": 2.93,
+   "bytes": 32920,
+   "hash": "29b20450b0b09cd6"
+  },
+  {
+   "id": "cooldown_2",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "cooldown-start",
+   "file": "voices/motivator/cooldown_2.mp3",
+   "duration": 3.74,
+   "bytes": 42652,
+   "hash": "1bf4e1eceb23cb5e"
+  },
+  {
+   "id": "complete_1",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "session-complete",
+   "file": "voices/motivator/complete_1.mp3",
+   "duration": 3.33,
+   "bytes": 34639,
+   "hash": "687dde02c3fdb1a6"
+  },
+  {
+   "id": "complete_2",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "session-complete",
+   "file": "voices/motivator/complete_2.mp3",
+   "duration": 3.72,
+   "bytes": 38839,
+   "hash": "61e5354c7e5960bc"
+  },
+  {
+   "id": "paused_1",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "paused",
+   "file": "voices/motivator/paused_1.mp3",
+   "duration": 1.32,
+   "bytes": 14572,
+   "hash": "351b0dc2b522ccab"
+  },
+  {
+   "id": "resumed_1",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "resumed",
+   "file": "voices/motivator/resumed_1.mp3",
+   "duration": 2.14,
+   "bytes": 23825,
+   "hash": "32ca4cd09b5cfcce"
+  },
+  {
+   "id": "ended_early_1",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "ended-early",
+   "file": "voices/motivator/ended_early_1.mp3",
+   "duration": 3.81,
+   "bytes": 43091,
+   "hash": "2e5505d4786b41f1"
+  },
+  {
+   "id": "safety_1",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "safety-effort",
+   "file": "voices/motivator/safety_1.mp3",
+   "duration": 4.87,
+   "bytes": 50894,
+   "hash": "59338a5a81e8d788"
+  },
+  {
+   "id": "safety_2",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "safety-effort",
+   "file": "voices/motivator/safety_2.mp3",
+   "duration": 4.29,
+   "bytes": 46116,
+   "hash": "1c6af2f30f7343c4"
+  },
+  {
+   "id": "prep_1",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "session-prep",
+   "file": "voices/technician/prep_1.mp3",
+   "duration": 2.98,
+   "bytes": 33608,
+   "hash": "09b258d8c8ff79fb"
+  },
+  {
+   "id": "prep_2",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "session-prep",
+   "file": "voices/technician/prep_2.mp3",
+   "duration": 3.24,
+   "bytes": 35880,
+   "hash": "90ffd129480ccc08"
+  },
+  {
+   "id": "warmup_1",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "warmup-start",
+   "file": "voices/technician/warmup_1.mp3",
+   "duration": 3.24,
+   "bytes": 37341,
+   "hash": "68623b8218717aac"
+  },
+  {
+   "id": "warmup_2",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "warmup-start",
+   "file": "voices/technician/warmup_2.mp3",
+   "duration": 3.28,
+   "bytes": 36189,
+   "hash": "6689f73ef1f28d4c"
+  },
+  {
+   "id": "start_1",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "session-start",
+   "file": "voices/technician/start_1.mp3",
+   "duration": 2.0,
+   "bytes": 21848,
+   "hash": "49552c1a568e2cbe"
+  },
+  {
+   "id": "start_2",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "session-start",
+   "file": "voices/technician/start_2.mp3",
+   "duration": 2.23,
+   "bytes": 25836,
+   "hash": "99b603de7d89ab10"
+  },
+  {
+   "id": "easy_1",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "easy-settle",
+   "file": "voices/technician/easy_1.mp3",
+   "duration": 3.22,
+   "bytes": 36083,
+   "hash": "7a6962ff8d771d8f"
+  },
+  {
+   "id": "easy_2",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "easy-settle",
+   "file": "voices/technician/easy_2.mp3",
+   "duration": 3.28,
+   "bytes": 36632,
+   "hash": "7651d6142ac4f346"
+  },
+  {
+   "id": "easy_3",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "easy-settle",
+   "file": "voices/technician/easy_3.mp3",
+   "duration": 2.97,
+   "bytes": 31051,
+   "hash": "2cafaf71c787a0d5"
+  },
+  {
+   "id": "long_1",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "long-run-settle",
+   "file": "voices/technician/long_1.mp3",
+   "duration": 3.69,
+   "bytes": 39891,
+   "hash": "5caac0db502fd1f9"
+  },
+  {
+   "id": "long_2",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "long-run-settle",
+   "file": "voices/technician/long_2.mp3",
+   "duration": 3.73,
+   "bytes": 41185,
+   "hash": "10413722ef8c7992"
+  },
+  {
+   "id": "tempo_1",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "tempo-start",
+   "file": "voices/technician/tempo_1.mp3",
+   "duration": 3.57,
+   "bytes": 38976,
+   "hash": "cf3cb2e991e4b173"
+  },
+  {
+   "id": "threshold_1",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "threshold-hold",
+   "file": "voices/technician/threshold_1.mp3",
+   "duration": 3.44,
+   "bytes": 38798,
+   "hash": "4177d29bbd719be7"
+  },
+  {
+   "id": "threshold_2",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "threshold-hold",
+   "file": "voices/technician/threshold_2.mp3",
+   "duration": 3.5,
+   "bytes": 37250,
+   "hash": "b990a30620bb251d"
+  },
+  {
+   "id": "interval_start_1",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "interval-start",
+   "file": "voices/technician/interval_start_1.mp3",
+   "duration": 1.57,
+   "bytes": 18667,
+   "hash": "e4ee5c408a6b616b"
+  },
+  {
+   "id": "interval_work_1",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "interval-work",
+   "file": "voices/technician/interval_work_1.mp3",
+   "duration": 3.36,
+   "bytes": 38147,
+   "hash": "25a9dce0b600e874"
+  },
+  {
+   "id": "interval_work_2",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "interval-work",
+   "file": "voices/technician/interval_work_2.mp3",
+   "duration": 2.35,
+   "bytes": 24378,
+   "hash": "ac285d81c9051339"
+  },
+  {
+   "id": "recovery_1",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "recovery-start",
+   "file": "voices/technician/recovery_1.mp3",
+   "duration": 2.53,
+   "bytes": 27534,
+   "hash": "d3ab52fc2f4dfdb9"
+  },
+  {
+   "id": "recovery_2",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "recovery-start",
+   "file": "voices/technician/recovery_2.mp3",
+   "duration": 2.82,
+   "bytes": 30584,
+   "hash": "3616384f898e7e84"
+  },
+  {
+   "id": "hill_1",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "hill-start",
+   "file": "voices/technician/hill_1.mp3",
+   "duration": 3.97,
+   "bytes": 42288,
+   "hash": "1dc041f82a6e1daa"
+  },
+  {
+   "id": "hill_2",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "hill-start",
+   "file": "voices/technician/hill_2.mp3",
+   "duration": 2.69,
+   "bytes": 30608,
+   "hash": "0d99044425f1882a"
+  },
+  {
+   "id": "strength_1",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "strength-start",
+   "file": "voices/technician/strength_1.mp3",
+   "duration": 4.56,
+   "bytes": 49611,
+   "hash": "7096bc8d5f1683e1"
+  },
+  {
+   "id": "strength_2",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "strength-start",
+   "file": "voices/technician/strength_2.mp3",
+   "duration": 3.65,
+   "bytes": 40173,
+   "hash": "39a83a87bc0119f6"
+  },
+  {
+   "id": "technique_1",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "technique",
+   "file": "voices/technician/technique_1.mp3",
+   "duration": 3.43,
+   "bytes": 37801,
+   "hash": "9167e184fe8559e4"
+  },
+  {
+   "id": "technique_2",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "technique",
+   "file": "voices/technician/technique_2.mp3",
+   "duration": 2.94,
+   "bytes": 31339,
+   "hash": "7541b92272bc8f5a"
+  },
+  {
+   "id": "technique_3",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "technique",
+   "file": "voices/technician/technique_3.mp3",
+   "duration": 3.34,
+   "bytes": 35590,
+   "hash": "30733ac24e3c5ba6"
+  },
+  {
+   "id": "halfway_1",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "halfway",
+   "file": "voices/technician/halfway_1.mp3",
+   "duration": 2.8,
+   "bytes": 30013,
+   "hash": "99a7f930a8215501"
+  },
+  {
+   "id": "halfway_2",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "halfway",
+   "file": "voices/technician/halfway_2.mp3",
+   "duration": 2.55,
+   "bytes": 28360,
+   "hash": "a68d75160c7146c7"
+  },
+  {
+   "id": "milestone_1",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "milestone-distance",
+   "file": "voices/technician/milestone_1.mp3",
+   "duration": 2.13,
+   "bytes": 24798,
+   "hash": "0e48a6b64ad6c506"
+  },
+  {
+   "id": "milestone_2",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "milestone-distance",
+   "file": "voices/technician/milestone_2.mp3",
+   "duration": 2.03,
+   "bytes": 22530,
+   "hash": "e4ea4693582adbcb"
+  },
+  {
+   "id": "milestone_3",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "milestone-distance",
+   "file": "voices/technician/milestone_3.mp3",
+   "duration": 2.79,
+   "bytes": 29357,
+   "hash": "2acc594339ab53d3"
+  },
+  {
+   "id": "final_1",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "final-effort",
+   "file": "voices/technician/final_1.mp3",
+   "duration": 2.95,
+   "bytes": 32012,
+   "hash": "b9796028e13659d7"
+  },
+  {
+   "id": "final_2",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "final-effort",
+   "file": "voices/technician/final_2.mp3",
+   "duration": 3.41,
+   "bytes": 36455,
+   "hash": "67f7a8a8c9cc50ec"
+  },
+  {
+   "id": "cooldown_1",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "cooldown-start",
+   "file": "voices/technician/cooldown_1.mp3",
+   "duration": 2.8,
+   "bytes": 31755,
+   "hash": "5cdcade1fea8aa46"
+  },
+  {
+   "id": "cooldown_2",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "cooldown-start",
+   "file": "voices/technician/cooldown_2.mp3",
+   "duration": 3.55,
+   "bytes": 39112,
+   "hash": "7f7ec350c9a8b9d9"
+  },
+  {
+   "id": "complete_1",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "session-complete",
+   "file": "voices/technician/complete_1.mp3",
+   "duration": 3.06,
+   "bytes": 33653,
+   "hash": "051be5945605ecf2"
+  },
+  {
+   "id": "complete_2",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "session-complete",
+   "file": "voices/technician/complete_2.mp3",
+   "duration": 3.6,
+   "bytes": 37693,
+   "hash": "3a3d877bb692d526"
+  },
+  {
+   "id": "paused_1",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "paused",
+   "file": "voices/technician/paused_1.mp3",
+   "duration": 1.43,
+   "bytes": 16003,
+   "hash": "b6fb34534ee82f07"
+  },
+  {
+   "id": "resumed_1",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "resumed",
+   "file": "voices/technician/resumed_1.mp3",
+   "duration": 2.08,
+   "bytes": 21769,
+   "hash": "618b67b2ff4b7319"
+  },
+  {
+   "id": "ended_early_1",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "ended-early",
+   "file": "voices/technician/ended_early_1.mp3",
+   "duration": 4.01,
+   "bytes": 42328,
+   "hash": "1ae33580f671ab73"
+  },
+  {
+   "id": "safety_1",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "safety-effort",
+   "file": "voices/technician/safety_1.mp3",
+   "duration": 4.63,
+   "bytes": 47118,
+   "hash": "dc26b757d1ba2081"
+  },
+  {
+   "id": "safety_2",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "safety-effort",
+   "file": "voices/technician/safety_2.mp3",
+   "duration": 4.08,
+   "bytes": 44198,
+   "hash": "28e0f2ff3d175d70"
+  }
+ ],
+ "totalBytes": 6581813
 }

@@ -18,20 +18,29 @@ struct TodayView: View {
     /// Hand the plan to the workout and go. One path, so a run started from the phone and a run
     /// started on the wrist are the same run with the same targets and the same reasons.
     private func begin(_ s: PlannedSession?) {
+        beginNow(s, count: true)
+    }
+
+    /// The one place a run starts on this watch.
+    ///
+    /// `count` is false when the PHONE has already counted the runner in — two independent
+    /// three-second counts is how the two clocks ended up a second apart.
+    private func beginNow(_ s: PlannedSession?, count: Bool = false) {
+        // Reset FIRST: the manager outlives a run, and a stale phase or a reused run id silently
+        // breaks the next one. See WorkoutManager.reset().
+        workout.reset()
         workout.plan = s   // nil is a free run: no targets, no steps, just the clock and the GPS
         workout.why = store.why          // the runner's own reasons, for the hard stretch
         workout.whyPerson = store.whyPerson
         workout.coach = store.coach      // the same coach they chose on the phone
         workout.coachLines = store.coachLines
         // The phone can finish, pause and resume a wrist run: someone holding their phone should not
-        // have to find their watch to stop. Cleared when the run ends so a late command does nothing.
-        // Every run starts from a clean manager — see WorkoutManager.reset().
-        workout.reset()
+        // have to find their watch to stop.
         store.onStopRequested = { [weak workout] in workout?.end() }
         store.onPauseRequested = { [weak workout] in workout?.pause() }
         store.onResumeRequested = { [weak workout] in workout?.resume() }
         running = true
-        workout.startCountingDown()
+        if count { workout.startCountingDown() } else { workout.start() }
     }
 
     /// "Inte" white, "Run" in the brand teal — the same wordmark the phone's splash draws
@@ -174,10 +183,21 @@ struct TodayView: View {
             // Launched from the phone's "record on my watch": begin without a second tap. Gated on
             // a session actually being synced, because starting a run the watch knows nothing about
             // would lose the pace targets and the step list -- the whole reason to use this app.
+            // ⚠️ Launched by the phone means WAIT, not start.
+            //
+            // The phone is counting the runner in and will say when. Starting here as well produced
+            // two independent three-second counts and two clocks a second apart. And it used to
+            // begin `store.session` — today's CACHED session — so starting anything else on the
+            // phone quietly ran the wrong workout on the wrist.
             .onChange(of: autoStart, initial: true) { _, want in
-                guard want, !running, store.isCurrent, let s = store.session else { return }
-                LaunchRequest.shared.consume()
-                begin(s)
+                guard want, !running else { return }
+                store.onStartNow = {
+                    guard !running else { return }
+                    LaunchRequest.shared.consume()
+                    let s = store.pendingSession ?? store.session ?? store.todayFromCache
+                    store.pendingSession = nil
+                    beginNow(s)          // no count: the phone has already done it
+                }
             }
             // The context can land a moment after the launch, so try again when it does.
             .onChange(of: store.session) { _, s in

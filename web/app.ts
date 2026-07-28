@@ -2581,9 +2581,9 @@ function startWatchCompanion(sess) {
 // pocket the phone before the clock starts. Each beat is its own clip, placed on its own second, so
 // "go" lands exactly when the run begins rather than drifting with clip length.
 let COUNTIN = null;
-function runCountIn(onGo) {
+function runCountIn(onGo, title) {
   clearCountIn();
-  COUNTIN = { n: 3, timer: null };
+  COUNTIN = { n: 3, timer: null, title: title || "" };
   const beat = () => {
     if (!COUNTIN) return;
     renderCountIn();
@@ -2610,7 +2610,8 @@ function renderCountIn() {
     document.querySelector(".app").appendChild(box);
   }
   box.querySelector(".ci-n").textContent = COUNTIN.n === 0 ? "GO" : String(COUNTIN.n);
-  box.querySelector(".ci-s").textContent = (LIVE && LIVE.session && LIVE.session.title) || "";
+  box.querySelector(".ci-s").textContent =
+    (LIVE && LIVE.session && LIVE.session.title) || COUNTIN.title || "";
   box.classList.remove("beat"); void box.offsetWidth; box.classList.add("beat");
 }
 // Play one clip by id, outside the trigger machinery — the countdown is a fixed sequence, not a
@@ -2646,6 +2647,9 @@ window.__interunWatchCue = function (trigger, text) {
   coachLoadManifest().then(() => {
     const type = (WATCH_LIVE && WATCH_LIVE.type) || "easy";
     const at = Math.round(((WATCH_LIVE && WATCH_LIVE.sec) || 0));
+    // "step" is not a catalogue trigger — it is the one line no clip can ever say, because it
+    // carries the runner's own pace numbers. Speak it directly.
+    if (trigger === "step") { if (text && VOICE_AVAILABLE) speak(text); return; }
     coachTrigger(trigger, type, at);
     // A cue with no clip for this coach still gets said, rather than swallowed.
     if (text && !COACH.current && VOICE_AVAILABLE) speak(text);
@@ -5321,14 +5325,24 @@ function startOnWatch(sess, opts) {
     // The session travels so the native side can raise the Live Activity here and now. This tap is
     // the one foreground moment in a wrist-started run, and iOS only permits Activity.request from
     // the foreground — see LiveActivityService.
+    // ⚠️ The SESSION travels, not just its name. The watch used to begin whatever its own cache
+    // said today was, so starting anything else — an added session, another day's — silently ran
+    // the wrong workout on the wrist.
+    const payload = watchSessionPayload(sess || rawToday(), todayIso());
     window.webkit.messageHandlers.interunWatch.postMessage({
       action: "startWorkout",
-      title: (sess && sess.title) || "Run",
-      type: (sess && sess.type) || "easy",
+      title: (payload && payload.title) || "Run",
+      type: (payload && payload.type) || "easy",
+      session: payload || undefined,
     });
     toast((opts && opts.fromPhone)
       ? "Recording on your watch \u2014 follow along here"
       : "Opening InteRun on your watch\u2026");
+    // One count, one start. The phone counts in — it has the voices — and only on "go" does the
+    // watch begin. Two independent three-second counts is how the clocks ended up a second apart.
+    LIVE = null;
+    state.screen = "watchlive"; WATCH_LIVE_LEFT = false; render();
+    runCountIn(() => watchCommand("startNow"), (sess && sess.title) || "Run");
   } catch (e) { startSession(sess); }
 }
 window.__interunWatchStart = function (ok, reason) {

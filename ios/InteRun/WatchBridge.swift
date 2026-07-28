@@ -427,6 +427,11 @@ extension WatchBridge: WKScriptMessageHandler {
             // The page has finished booting and can accept runs now.
             drainPendingRuns()
         case "startWorkout":
+            // Push the session across FIRST, so the wrist knows what it is about to run before it
+            // is told to run it.
+            if let sess = body["session"] as? [String: Any] {
+                sendToWatch(["pendingSession": sess])
+            }
             startWatchWorkout(title: (body["title"] as? String) ?? "Run",
                               type: (body["type"] as? String) ?? "easy")
         case "status":

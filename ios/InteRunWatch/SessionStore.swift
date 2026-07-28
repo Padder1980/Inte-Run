@@ -112,6 +112,11 @@ final class SessionStore: NSObject, ObservableObject {
         return f.string(from: Date())
     }
 
+    /// The session the phone has told us to get ready for. Nil once it has been consumed.
+    @Published var pendingSession: PlannedSession?
+    /// Fired when the phone's count-in reaches go.
+    var onStartNow: (() -> Void)?
+
     /// The phone's own run, while the watch is only watching. Nil when the phone is not recording.
     @Published var phoneLive: [String: Double]?
     @Published var phoneLiveTitle: String?
@@ -247,6 +252,14 @@ extension SessionStore: WCSessionDelegate {
     /// Commands from the phone. Only one so far, and it is the one that matters: finish the run.
     /// Someone who has their phone out should not have to find their watch to stop.
     nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+        // The exact session the phone is starting. Held, not run, until "startNow" arrives — the
+        // phone counts us in and owns the moment the clock starts, so both devices agree on it.
+        if let raw = message["pendingSession"],
+           let data = try? JSONSerialization.data(withJSONObject: raw),
+           let decoded = try? JSONDecoder().decode(PlannedSession.self, from: data) {
+            Task { @MainActor in self.pendingSession = decoded }
+            return
+        }
         if let live = message["phoneLive"] as? [String: Any] {
             let nums = live.compactMapValues { $0 as? Double }
             let title = live["title"] as? String
@@ -256,6 +269,7 @@ extension SessionStore: WCSessionDelegate {
         guard let action = message["command"] as? String else { return }
         Task { @MainActor in
             switch action {
+            case "startNow": self.onStartNow?()
             case "companionStart": LaunchRequest.shared.requestCompanion()
             case "companionEnd": LaunchRequest.shared.endCompanion()
             case "stop": self.onStopRequested?()

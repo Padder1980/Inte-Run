@@ -274,9 +274,9 @@ final class WorkoutManager: NSObject, ObservableObject {
             // The step announcement carries the runner's own pace numbers, so no recorded clip can
             // ever say it — this one stays on the wrist's synthesiser by necessity, and only this one.
             if let first = currentStep {
-                voice?.announceStep(label: "Let\u{2019}s go. " + first.label, paceLow: first.paceLow, paceHigh: first.paceHigh)
+                voice?.announceStep(label: "Let\u{2019}s go. " + first.label, paceLow: first.paceLow, paceHigh: first.paceHigh, via: self)
             } else {
-                voice?.say("Let\u{2019}s go. Run by feel.")
+                if !speakOnPhone("session-start", text: "Let\u{2019}s go. Run by feel.") { voice?.say("Let\u{2019}s go. Run by feel.") }
             }
 
             sendLiveTick(force: true)   // the phone shows the run the moment the wrist starts it
@@ -367,7 +367,7 @@ final class WorkoutManager: NSObject, ObservableObject {
         stepStartElapsed = elapsed
         stepStartMetres = distanceMetres
         WKInterfaceDevice.current().play(.notification)
-        if let st = currentStep { voice?.announceStep(label: st.label, paceLow: st.paceLow, paceHigh: st.paceHigh) }
+        if let st = currentStep { voice?.announceStep(label: st.label, paceLow: st.paceLow, paceHigh: st.paceHigh, via: self) }
     }
 
     /// Skip forward manually — recoveries especially never line up exactly with real terrain.
@@ -375,7 +375,7 @@ final class WorkoutManager: NSObject, ObservableObject {
         guard stepIndex + 1 < steps.count else { return }
         stepIndex += 1
         stepStartElapsed = elapsed
-        if let st = currentStep { voice?.announceStep(label: st.label, paceLow: st.paceLow, paceHigh: st.paceHigh) }
+        if let st = currentStep { voice?.announceStep(label: st.label, paceLow: st.paceLow, paceHigh: st.paceHigh, via: self) }
         stepStartMetres = distanceMetres
         WKInterfaceDevice.current().play(.click)
     }

@@ -638,6 +638,13 @@ sounds like**: `WorkoutManager.speakOnPhone(trigger)` → `WatchBridge.forwardCu
 when the phone is out of range. The ONE exception is the step announcement, which carries the
 runner's own pace numbers and so can never be a recorded clip.
 
+⚠️ **The phone sends the SESSION, and owns the count.** Starting on the phone posts the full
+`watchSessionPayload` as `pendingSession`; the watch HOLDS it and waits. The phone counts in, and
+only on "go" sends `startNow`, at which point the watch begins with no count of its own. Three bugs
+came from not doing this: the watch ran `store.session` (today's CACHED session) so starting anything
+else quietly ran the wrong workout on the wrist; the robot then described that wrong session; and two
+independent three-second counts left the clocks a second apart.
+
 **The count-in (2026-07-28):** three beats, `count_3/2/1/go` clips played by id at one-second
 intervals — not one clip, so "go" lands exactly on the start rather than drifting with clip length.
 `runCountIn()` shows the full-screen overlay and speaks; a watch-initiated count calls

@@ -73,11 +73,15 @@ final class WorkoutVoice {
     func sayComplete() { say(line("complete", "Session complete. Well done.")) }
 
     /// A step announcement: what to do, and the pace it wants.
-    func announceStep(label: String, paceLow: Int?, paceHigh: Int?) {
+    func announceStep(label: String, paceLow: Int?, paceHigh: Int?, via manager: WorkoutManager? = nil) {
         var text = label
         if let lo = paceLow, let hi = paceHigh {
             text += ". Target \(WorkoutManager.pace(Double(lo))) to \(WorkoutManager.pace(Double(hi))) per kilometre."
         }
+        // No clip can say a pace, so this line is synthesised wherever it is spoken — but it should
+        // still come out of the PHONE, so a run has one voice coming from one place rather than the
+        // coach in a pocket and a robot on the wrist.
+        if manager?.speakOnPhone("step", text: text) == true { return }
         say(text)
     }
 

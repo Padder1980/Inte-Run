@@ -438,20 +438,31 @@ extension WorkoutManager: CLLocationManagerDelegate {
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locs: [CLLocation]) {
         Task { @MainActor in
             guard phase == .running else { return }
-            let usable = locs.filter { $0.horizontalAccuracy > 0 && $0.horizontalAccuracy < 50 }
+            // 25 m, not 50: a fix that vague is a circle the size of a house, and differencing
+            // two of them produces "movement" out of nothing.
+            let usable = locs.filter { $0.horizontalAccuracy > 0 && $0.horizontalAccuracy < 25 }
             guard !usable.isEmpty else { return }
 
+            var movedThisBatch = false
             for loc in usable {
-                // The device's own motion signal beats position deltas: indoors, GPS drifts a
-                // metre or two constantly while you stand still, and summing those wobbles
-                // fabricates distance (this showed up as 168m for a lap of the living room).
-                // Speed < 0.5 m/s with a valid reading means "not moving" - skip the step but
-                // keep the fix, so movement resuming does not create one giant jump.
-                if loc.speed >= 0, loc.speed < 0.5 { lastLocation = loc; continue }
+                // ⚠️ CoreLocation reports speed = -1 when it cannot work one out, which is the
+                // normal case indoors and in the first seconds of a run. The old guard tested
+                // `loc.speed >= 0` FIRST, so an unknown speed skipped the not-moving check
+                // altogether and fell straight through to summing position deltas — which is
+                // precisely when those deltas are pure drift. Sitting still produced 0.2 km and a
+                // map of a route nobody ran.
+                if loc.speed >= 0 {
+                    if loc.speed < 0.5 { lastLocation = loc; continue }   // known, and stationary
+                } else if lastLocation != nil {
+                    // Unknown speed: the step has to prove itself against the fix's own noise
+                    // floor before it counts. A 15 m-accurate fix can wander 15 m with the watch
+                    // on a table, so a 3 m "step" is evidence of nothing.
+                    let noise = max(4.0, loc.horizontalAccuracy * 0.75)
+                    if loc.distance(from: lastLocation!) < noise { lastLocation = loc; continue }
+                }
                 if let previous = lastLocation {
                     let step = loc.distance(from: previous)
-                    // Reject GPS jitter while standing still, and impossible jumps.
-                    if step > 1.0 && step < 80 { distanceMetres += step }
+                    if step > 1.0 && step < 80 { distanceMetres += step; movedThisBatch = true }
                 }
                 lastLocation = loc
             }
@@ -461,8 +472,10 @@ extension WorkoutManager: CLLocationManagerDelegate {
                 paceSecPerKm = 1000 / speed
             }
             recordSplits()
-            // Downsampled: a route is for drawing a map, not for storing every fix.
-            if let last = usable.last, routePoints.count < 600 {
+            // Downsampled, and only when the runner actually moved. Recording a point per fix
+            // regardless drew a map out of standing-still drift — the numbers said 0.02 km and the
+            // map still showed a wandering line, which is worse than showing nothing.
+            if movedThisBatch, let last = usable.last, routePoints.count < 600 {
                 routePoints.append([
                     (last.coordinate.latitude * 100000).rounded() / 100000,
                     (last.coordinate.longitude * 100000).rounded() / 100000,

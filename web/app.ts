@@ -498,16 +498,16 @@ details.more > summary::before { content: "▸ "; } details.more[open] > summary
 .opt { display: flex; gap: 9px; align-items: flex-start; font-size: 13px; color: var(--ink-soft); cursor: pointer; padding: 5px 0; }
 .opt input { margin-top: 3px; accent-color: var(--accent); flex: none; }
 .subhead { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-faint); font-weight: 600; margin: 12px 0 6px; }
-select.sel { font: inherit; font-size: 13.5px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px; width: 100%; }
+select.sel { font: inherit; font-size: 16px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px; width: 100%; }
 /* Setup / profile form — premium, obvious inputs */
-input.sel { font: inherit; font-size: 15px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px; padding: 12px 13px; width: 100%; transition: border-color .15s ease, box-shadow .15s ease, background .15s ease; }
+input.sel { font: inherit; font-size: 16px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px; padding: 12px 13px; width: 100%; transition: border-color .15s ease, box-shadow .15s ease, background .15s ease; }
 input.sel::placeholder { color: var(--ink-faint); }
 /* Date inputs: iOS centres the value. Left-align it (and its WebKit value element) and constrain the
    width so it reads like the constrained selects (Age, Sex) — no flex/min-height, which broke iOS. */
 input.sel[type="date"] { text-align: left; max-width: 230px; }
 input.sel[type="date"]::-webkit-date-and-time-value { text-align: left; }
 input.sel:focus, select.sel:focus { outline: none; border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent); }
-select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: pointer; }
+select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: pointer; }
 .setup-intro { margin: 2px 2px 14px; }
 .setup-intro h2 { font-size: 22px; font-weight: 800; letter-spacing: -.02em; margin: 0; }
 .setup-intro p { font-size: 13.5px; color: var(--ink-soft); margin: 5px 0 0; }
@@ -1292,7 +1292,7 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
 .rm-row:first-of-type { border-top: 0; padding-top: 4px; }
 .rm-row label { font-size: 14px; font-weight: 600; color: var(--ink); }
 .rm-row b { font-size: 14px; font-weight: 650; color: var(--ink); }
-.rm-row input[type="time"] { font: inherit; font-size: 15px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; }
+.rm-row input[type="time"] { font: inherit; font-size: 16px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; }
 .rm-row input[type="time"]:disabled { opacity: .5; }
 .rm-switch { position: relative; width: 46px; height: 28px; flex: 0 0 auto; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2); cursor: pointer; padding: 0; transition: background .15s ease, border-color .15s ease; }
 .rm-switch.on { background: var(--accent); border-color: var(--accent); }
@@ -1343,7 +1343,7 @@ select.sel { font-size: 15px; border-radius: 11px; padding: 12px 13px; cursor: p
 .alf-chip { font: inherit; font-size: 12.5px; font-weight: 550; color: var(--accent); background: var(--surface); border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); border-radius: 999px; padding: 7px 12px; cursor: pointer; }
 .alf-chip:active { transform: scale(.97); }
 .alf-input { display: flex; gap: 8px; align-items: center; }
-.alf-input input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 15px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 13px; padding: 12px 14px; }
+.alf-input input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 16px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 13px; padding: 12px 14px; }
 .alf-input input:focus { outline: none; border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
 .alf-input button { width: 44px; height: 44px; flex: 0 0 auto; border-radius: 13px; border: 0; background: var(--accent); color: var(--accent-ink); font-size: 19px; font-weight: 700; cursor: pointer; }
 .alf-input button:active { transform: scale(.94); }
@@ -1604,6 +1604,38 @@ body.has-live-pill #view { padding-bottom: 62px; }
    user-scalable=no and touch-action for pinch. The avatar cropper opts back in. */
 html, body { touch-action: manipulation; }
 .crop-stage { touch-action: none; }
+/* ⚠️ 16px is a hard floor for anything you can type into. iOS auto-zooms the page when a field with
+   a computed font-size under 16px takes focus, and because pinch is disabled the runner cannot zoom
+   back out — the whole app stays scaled, with the top bar and bottom nav pushed off screen, on every
+   screen after it. Do not shrink these to make a form look tighter; use padding. */
+input, select, textarea { font-size: 16px; }
+/* ---- Swipe-to-delete a logged run --------------------------------------------------------------
+   The row slides to reveal the action rather than committing on the swipe itself: a run is real
+   data, and a list this long gets swiped by accident while scrolling. */
+.swipe { position: relative; overflow: hidden; border-radius: 16px; margin-bottom: 10px; }
+.swipe-face { position: relative; z-index: 1; margin-bottom: 0 !important; touch-action: pan-y;
+  transition: transform .22s cubic-bezier(.22,1,.36,1); will-change: transform; }
+.swipe-del { position: absolute; top: 0; right: 0; bottom: 0; width: 88px; z-index: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  border: 0; border-radius: 0 16px 16px 0; cursor: pointer;
+  background: linear-gradient(150deg, #d94b3a, #b8302a); color: #fff; font: inherit; }
+.swipe-del svg { width: 20px; height: 20px; }
+.swipe-del span { font-size: 11px; font-weight: 700; letter-spacing: .02em; }
+.swipe.open .swipe-face { box-shadow: -8px 0 18px -12px rgba(0,0,0,.4); }
+
+.undo-toast { display: flex; align-items: center; gap: 14px; }
+.undo-toast button { border: 0; background: none; color: var(--accent); font: inherit; font-weight: 750;
+  font-size: 13px; cursor: pointer; padding: 0; }
+/* ---- A wrist run, full screen on the phone ----------------------------------------------------- */
+.wf-card { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 14%, var(--surface)), var(--surface) 64%); border-color: color-mix(in srgb, var(--accent) 34%, var(--line)); }
+.wf-title { margin-top: 10px; font-size: 19px; font-weight: 780; letter-spacing: -.025em; color: var(--ink); }
+.wf-step { margin-top: 3px; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.wf-hero { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
+.wf-v { font-size: 38px; font-weight: 760; letter-spacing: -.04em; color: var(--ink); line-height: 1.05; }
+.wf-v small { font-size: 16px; font-weight: 650; letter-spacing: -.01em; color: var(--ink-soft); }
+.wf-k { margin-top: 4px; font-size: 10px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); }
+.wf-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 20px; padding-top: 16px; border-top: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line)); }
+.wf-sv { font-size: 22px; font-weight: 700; letter-spacing: -.03em; color: var(--ink); }
 </style>
 </head>
 <body>
@@ -1661,6 +1693,7 @@ const BRAND_SVG = ${JSON.stringify(BRAND_MARK)};
 const EX_ANIM = ${JSON.stringify(exAnimData)};
 const EX_STILL = ${JSON.stringify(exStillData)};
 const ICON = {
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9.5 7V5.4A1.4 1.4 0 0 1 10.9 4h2.2a1.4 1.4 0 0 1 1.4 1.4V7"/><path d="M6.4 7l.8 12.1A1.9 1.9 0 0 0 9.1 21h5.8a1.9 1.9 0 0 0 1.9-1.9L17.6 7"/><path d="M10.5 11v6M13.5 11v6"/></svg>',
   watch: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="3.4"/><path d="M9 6 8.6 3.2A1 1 0 0 1 9.6 2h4.8a1 1 0 0 1 1 1.2L15 6M9 18l-.4 2.8a1 1 0 0 0 1 1.2h4.8a1 1 0 0 0 1-1.2L15 18"/><path d="M12 9.6V12l1.7 1.1"/></svg>',
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.4 5.4h3.2"/><circle cx="12" cy="18.2" r=".7" fill="currentColor" stroke="none"/></svg>',
   treadmill: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2.6 19.4h13.6a3 3 0 0 0 3-3V4.6"/><path d="M2.6 19.4 4 15.2h10.4"/><path d="M19.2 4.6h2.2"/><circle cx="10.4" cy="4.6" r="1.5"/><path d="m7.2 12.4 2-1.6-.6-3 2.2 1.6 1.8-.4"/><path d="m8.6 7.8-1.4.9M10.6 9.4l1 3"/></svg>',
@@ -1795,7 +1828,7 @@ function computeToday() {
 }
 computeToday();
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "performance", support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "workouts", support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK };
 // Effective day index for a session, honouring any user reschedule. Works for raw sessions
 // (dayOfWeek) and summary sessions (dayIndex), keyed by the shared session id.
 function loadDayOverride() { try { return JSON.parse(localStorage.getItem("interun_dayov_v1") || "{}") || {}; } catch (e) { return {}; } }
@@ -2433,10 +2466,46 @@ window.__interunWatchLive = function (live) {
     // Ticks arrive about every two seconds and only while the phone is reachable. If they stop --
     // the phone went out of range, the watch app was killed -- drop the mirror rather than leaving
     // a frozen set of numbers that looks like a live run.
-    WATCH_LIVE_T = setTimeout(() => { WATCH_LIVE = null; if (state.tab === "today" && !state.screen) render(); }, 45000);
+    WATCH_LIVE_T = setTimeout(() => {
+      WATCH_LIVE = null;
+      if (state.screen === "watchlive") state.screen = null;
+      render();
+    }, 45000);
   }
-  if (state.tab === "today" && !state.screen && (wasActive || watchLiveActive())) render();
+  // A run starting on the wrist takes the whole screen, the same as one started here would. A card
+  // tucked above the week strip is not what someone wants to see when they have just pressed start.
+  // They can back out with the arrow, and the live pill brings them straight back.
+  if (!wasActive && watchLiveActive() && !WATCH_LIVE_LEFT) {
+    state.screen = "watchlive"; render(); return;
+  }
+  if (!watchLiveActive() && state.screen === "watchlive") { state.screen = null; WATCH_LIVE_LEFT = false; render(); return; }
+  if (state.screen === "watchlive" || (state.tab === "today" && !state.screen && (wasActive || watchLiveActive()))) render();
 };
+// Set when the runner deliberately backs out of the full-screen wrist view, so the next tick does
+// not drag them straight back into it.
+let WATCH_LIVE_LEFT = false;
+// The full-screen view of a run happening on the wrist. Same information as the card, given the
+// room it deserves, and still read-only: the watch owns the run, so there is nothing to press here
+// except the way back.
+function viewWatchLive() {
+  if (!watchLiveActive()) return '<div class="card"><div class="bk-md">That run has finished.</div></div>';
+  const L = WATCH_LIVE;
+  const paused = L.state === "paused";
+  const pace = (v) => (v > 0 ? fmtPace(v) : "\u2014");
+  const big = (k, v, sub) => '<div class="wf-big"><div class="wf-v num">' + v + (sub ? '<small>' + sub + '</small>' : "") + '</div><div class="wf-k">' + k + '</div></div>';
+  const small = (k, v) => '<div class="wf-s"><div class="wf-sv num">' + v + '</div><div class="wf-k">' + k + '</div></div>';
+  return '<button class="backbtn" id="wlBack">\u2039 Back</button>' +
+    '<div class="card wf-card' + (paused ? " wl-paused" : "") + '">' +
+    '<div class="wl-head"><span class="wl-dot"></span>' + (paused ? "Paused on your Apple Watch" : "Running on your Apple Watch") + '</div>' +
+    '<div class="wf-title">' + esc(L.title || "Run") + '</div>' +
+    (L.step ? '<div class="wf-step">' + esc(L.step) + '</div>' : "") +
+    '<div class="wf-hero">' + big("Elapsed", fmtPace(Math.max(0, Math.round(L.sec || 0)))) +
+      big("Distance", (Number(L.distKm) || 0).toFixed(2), " km") + '</div>' +
+    '<div class="wf-grid">' + small("Current", pace(L.paceSec)) + small("Lap", pace(L.lapPaceSec)) +
+      small("Average", pace(L.avgPaceSec)) + small("Heart", L.hr ? L.hr + " bpm" : "\u2014") + '</div>' +
+    '</div>' +
+    '<div class="card"><div class="bk-md">Your watch is recording this run \u2014 pause, lap and finish from your wrist. It will appear in your Logbook the moment you finish.</div></div>';
+}
 // The mirror card. Numbers only, plus a plain statement of where the run is being recorded -- a
 // runner glancing at their phone should never have to wonder which device is the real one.
 function watchLiveCard() {
@@ -3514,6 +3583,74 @@ function weekDetail() {
   return '<div style="font-weight:650;font-size:15px;margin-bottom:2px">Week ' + w.index + ' · ' + w.phase + (w.isDeload?" · deload":"") + '</div><div style="font-size:12.5px;color:var(--ink-faint);margin-bottom:8px">' + w.focus + '</div>' + rows;
 }
 
+// ---- Swipe a row to reveal Delete ---------------------------------------------------------------
+// Deliberately a reveal, not a swipe-to-destroy: a run is real data and the runner may have swiped
+// by accident scrolling a long list. The delete still confirms, and still offers an undo.
+const SWIPE = { el: null, x0: 0, y0: 0, dx: 0, moved: false, id: null };
+const SWIPE_W = 88;
+function closeSwipes() {
+  document.querySelectorAll(".swipe.open").forEach((n) => { n.classList.remove("open"); const f = n.querySelector(".swipe-face"); if (f) f.style.transform = ""; });
+}
+function wireSwipes() {
+  document.querySelectorAll("[data-swipe]").forEach((row) => {
+    const face = row.querySelector(".swipe-face");
+    if (!face) return;
+    face.addEventListener("pointerdown", (e) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      SWIPE.el = row; SWIPE.x0 = e.clientX; SWIPE.y0 = e.clientY; SWIPE.dx = 0; SWIPE.moved = false;
+    });
+    face.addEventListener("pointermove", (e) => {
+      if (SWIPE.el !== row) return;
+      const dx = e.clientX - SWIPE.x0, dy = e.clientY - SWIPE.y0;
+      // Vertical wins: the list scrolls, and a scroll must never start peeling rows open.
+      if (!SWIPE.moved && Math.abs(dy) > Math.abs(dx)) { SWIPE.el = null; return; }
+      if (Math.abs(dx) < 6) return;
+      SWIPE.moved = true;
+      SWIPE.dx = Math.max(-SWIPE_W - 20, Math.min(0, dx));
+      face.style.transform = "translateX(" + SWIPE.dx + "px)";
+    });
+    const end = () => {
+      if (SWIPE.el !== row) return;
+      const open = SWIPE.dx < -SWIPE_W / 2;
+      closeSwipes();
+      if (open) { row.classList.add("open"); face.style.transform = "translateX(-" + SWIPE_W + "px)"; }
+      else face.style.transform = "";
+      SWIPE.el = null;
+      setTimeout(() => { SWIPE.moved = false; }, 0);
+    };
+    face.addEventListener("pointerup", end);
+    face.addEventListener("pointercancel", end);
+    face.addEventListener("pointerleave", (e) => { if (SWIPE.el === row && e.buttons === 0) end(); });
+  });
+}
+// Remove a run, with a real undo. Deleting also has to unpick what the run implied: its tick on the
+// plan and any flag it was evidence for, or the app keeps reasoning from a run that no longer exists.
+let UNDO_RUN = null;
+function deleteRun(idx) {
+  const run = state.logged[idx];
+  if (!run) return;
+  UNDO_RUN = { run: run, idx: idx };
+  state.logged.splice(idx, 1);
+  saveRuns();
+  clearTrainFlag();
+  render();
+  toastUndo("Run deleted", () => {
+    if (!UNDO_RUN) return;
+    state.logged.splice(Math.min(UNDO_RUN.idx, state.logged.length), 0, UNDO_RUN.run);
+    saveRuns(); UNDO_RUN = null; render();
+  });
+}
+let UNDO_T = null;
+function toastUndo(msg, undo) {
+  let t = $("undoToast");
+  if (!t) { t = el('<div class="app-toast undo-toast" id="undoToast" role="status"><span id="undoMsg"></span><button id="undoBtn">Undo</button></div>'); document.querySelector(".app").appendChild(t); }
+  $("undoMsg").textContent = msg;
+  $("undoBtn").onclick = () => { clearTimeout(UNDO_T); t.classList.remove("on"); undo(); };
+  t.classList.add("on");
+  clearTimeout(UNDO_T);
+  UNDO_T = setTimeout(() => { t.classList.remove("on"); UNDO_RUN = null; }, 6000);
+}
+
 // ============ ACTIVITIES ===================================================
 function viewActivities() {
   const t = (k, lab) => '<button data-at="' + k + '"' + (state.actTab === k ? ' class="on"' : '') + '>' + lab + '</button>';
@@ -3523,10 +3660,13 @@ function viewActivities() {
     if (!state.logged.length) {
       return tabs + '<div class="empty-acts"><div class="ea-ic">' + ICON.today + '</div><div class="ea-h">No runs yet</div><div class="ea-b">Start a session from the <b>Today</b> tab. Once you finish, your runs — with route maps and splits — will appear here.</div></div>';
     }
+    // Each row rides in a swipe track with a delete action revealed behind it.
     const list = state.logged.map((a, i) => {
-      return '<button class="card runcard" data-runidx="' + i + '">' +
+      return '<div class="swipe" data-swipe="' + i + '">' +
+        '<button class="swipe-del" data-delrun="' + i + '" aria-label="Delete this run">' + ICON.trash + '<span>Delete</span></button>' +
+        '<button class="card runcard swipe-face" data-runidx="' + i + '">' +
         '<div class="act"><div class="b"><div class="t">' + esc(a.t) + '</div><div class="d">' + esc(a.d || "") + '</div>' +
-        '<div class="m"><div><b class="num">' + a.dist + '</b><span>Distance</span></div><div><b class="num">' + a.time + '</b><span>Time</span></div><div><b class="num">' + a.pace + '</b><span>Avg pace</span></div></div></div><div class="rc-arr">›</div></div></button>';
+        '<div class="m"><div><b class="num">' + a.dist + '</b><span>Distance</span></div><div><b class="num">' + a.time + '</b><span>Time</span></div><div><b class="num">' + a.pace + '</b><span>Avg pace</span></div></div></div><div class="rc-arr">›</div></div></button></div>';
     }).join("");
     return tabs + '<div style="font-size:12.5px;color:var(--ink-faint);margin:0 2px 12px">Your recent runs</div>' + list;
   }
@@ -5155,7 +5295,7 @@ function livePillState() {
     return { where: "phone", label: LIVE.pauseStart ? "Paused" : "Live session",
              time: fmtPace(Math.max(0, Math.round(liveNowMs() / 1000))), paused: !!LIVE.pauseStart };
   }
-  if (watchLiveActive() && state.screen !== "live") {
+  if (watchLiveActive() && state.screen !== "live" && state.screen !== "watchlive") {
     return { where: "watch", label: WATCH_LIVE.state === "paused" ? "Paused on watch" : "Live on watch",
              time: fmtPace(Math.max(0, Math.round(WATCH_LIVE.sec || 0))), paused: WATCH_LIVE.state === "paused" };
   }
@@ -5185,8 +5325,8 @@ function syncLivePill() {
   // The clock keeps moving whether or not this screen re-renders, so the pill ticks on its own.
   LIVE_PILL_T = setInterval(paint, 1000);
   pill.onclick = () => {
-    // A watch run has no phone screen to return to; Today is where its mirror lives.
-    if (livePillState().where === "watch") { state.tab = "today"; state.screen = null; }
+    // Back into whichever run is live — the wrist run now has a full screen of its own.
+    if (livePillState().where === "watch") { WATCH_LIVE_LEFT = false; state.screen = "watchlive"; }
     else state.screen = "live";
     render();
   };
@@ -6401,6 +6541,13 @@ function render() {
     state.trialSaved = null;
     return;
   }
+  if (state.screen === "watchlive") {
+    $("topTitle").textContent = "Session";
+    v.innerHTML = viewWatchLive(); v.scrollTop = 0;
+    document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
+    wire();
+    return;
+  }
   if (state.screen === "live") {
     $("topTitle").textContent = "Session";
     v.innerHTML = viewLive(); v.scrollTop = 0;
@@ -6454,7 +6601,14 @@ function wire() {
   }));
   document.querySelectorAll("[data-wk]").forEach((b) => b.onclick = () => { state.planWeek = Number(b.dataset.wk); document.querySelectorAll("[data-wk]").forEach((x) => x.setAttribute("aria-pressed", x === b)); $("weekDetail").innerHTML = weekDetail(); wireSessionTaps(); });
   document.querySelectorAll("[data-at]").forEach((b) => b.onclick = () => { state.actTab = b.dataset.at; render(); });
-  document.querySelectorAll("[data-runidx]").forEach((b) => b.onclick = () => { state.viewRunIdx = Number(b.dataset.runidx); state.screen = "runview"; render(); });
+  document.querySelectorAll("[data-runidx]").forEach((b) => b.onclick = () => {
+    // A swipe that ends in a tap should not also open the run.
+    if (b.closest(".swipe") && b.closest(".swipe").classList.contains("open")) { closeSwipes(); return; }
+    if (SWIPE.moved) return;
+    state.viewRunIdx = Number(b.dataset.runidx); state.screen = "runview"; render();
+  });
+  document.querySelectorAll("[data-delrun]").forEach((b) => b.onclick = (e) => { e.stopPropagation(); deleteRun(Number(b.dataset.delrun)); });
+  wireSwipes();
   const runBack = $("runBack"); if (runBack) runBack.onclick = () => { state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); };
   const shareRun = $("shareRun"); if (shareRun) { shareRun.onclick = doShareRun; prepareShareCard(currentOverviewRun()); }
   const ovMap = $("ovMap"); if (ovMap) { const r = currentOverviewRun(); if (r) buildOverviewMap(ovMap, r.route); }
@@ -6557,6 +6711,7 @@ function wire() {
   const cancelTrial = $("cancelTrial"); if (cancelTrial) cancelTrial.onclick = () => { state.trialPending = false; render(); };
   // Live session wiring
   const startBtn = $("startSession"); if (startBtn) startBtn.onclick = () => openStartWhereSheet(null);
+  const wlb = $("wlBack"); if (wlb) wlb.onclick = () => { WATCH_LIVE_LEFT = true; state.screen = null; state.tab = "today"; render(); };
   const lb = $("liveBack"); if (lb) lb.onclick = () => {
     // Mid-run this is navigation, not abandonment: the session keeps running and the live pill is
     // the way back. Only a session that never started is torn down here.
@@ -6625,6 +6780,55 @@ $("calBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); state.s
 $("bellBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); openRemindersSheet(); };
 migrateRunRoutes();
 seedDone();
+// ---- Keeping a focused field above the keyboard ------------------------------------------------
+//
+// The shell owns the viewport and the document cannot scroll, which is what keeps the top bar and
+// bottom nav pinned. The cost is that iOS can no longer scroll a focused input into view the easy
+// way, so it pans the VISUAL viewport instead - and that slides the whole app, bars included, with
+// no way back because pinch is disabled.
+//
+// So we do the job ourselves: when a field takes focus, scroll it inside #view until it sits
+// comfortably above the keyboard. visualViewport reports the space the keyboard leaves; without it
+// (desktop, older engines) the ordinary viewport height is already correct.
+(function () {
+  const FIELD = /^(INPUT|SELECT|TEXTAREA)$/;
+  let pending = null;
+  // The scroller that actually holds this field. Not always #view: the reminders sheet and the
+  // add-session sheet are their own scrollers, and a field in one of those needs the same treatment.
+  function scrollerFor(el) {
+    for (let n = el.parentElement; n && n !== document.body; n = n.parentElement) {
+      const ov = getComputedStyle(n).overflowY;
+      if ((ov === "auto" || ov === "scroll") && n.scrollHeight > n.clientHeight + 1) return n;
+    }
+    return document.getElementById("view");
+  }
+  function keepVisible(el) {
+    if (!el || !el.isConnected) return;
+    const box = scrollerFor(el);
+    if (!box || !box.contains(el)) return;
+    const vv = window.visualViewport;
+    const bottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+    const r = el.getBoundingClientRect();
+    const top = Math.max(box.getBoundingClientRect().top, 0);
+    const margin = 24;
+    // Below the keyboard: bring it up. Behind the top of its container: bring it down.
+    if (r.bottom > bottom - margin) box.scrollTop += r.bottom - (bottom - margin);
+    else if (r.top < top + margin) box.scrollTop -= top + margin - r.top;
+  }
+  document.addEventListener("focusin", (e) => {
+    const el = e.target;
+    if (!el || !FIELD.test(el.tagName || "")) return;
+    pending = el;
+    // The keyboard animates in; measuring before it lands gives the wrong answer.
+    setTimeout(() => keepVisible(el), 60);
+    setTimeout(() => keepVisible(el), 320);
+  });
+  document.addEventListener("focusout", () => { pending = null; });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", () => { if (pending) keepVisible(pending); });
+  }
+})();
+
 // ---- Pinch-to-zoom: an app, not a web page --------------------------------------------------
 // Pinching scaled the whole interface, which immediately breaks the illusion of an app and leaves
 // the fixed app bar and bottom nav sitting at the wrong size over a zoomed page.

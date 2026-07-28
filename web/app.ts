@@ -1589,6 +1589,11 @@ button.sw-row:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--
 .tm-note { margin-top: 9px; font-size: 12px; line-height: 1.45; color: var(--ink-faint); }
 /* The pill floats, so the scroll area needs room beneath it or it sits on top of the last card. */
 body.has-live-pill #view { padding-bottom: 62px; }
+/* An app should not zoom. touch-action: manipulation removes the double-tap-to-zoom delay and the
+   zoom itself; pinch is blocked in JS (see the gesture guard) because iOS ignores both
+   user-scalable=no and touch-action for pinch. The avatar cropper opts back in. */
+html, body { touch-action: manipulation; }
+.crop-stage { touch-action: none; }
 </style>
 </head>
 <body>
@@ -6610,6 +6615,22 @@ $("calBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); state.s
 $("bellBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); openRemindersSheet(); };
 migrateRunRoutes();
 seedDone();
+// ---- Pinch-to-zoom: an app, not a web page --------------------------------------------------
+// Pinching scaled the whole interface, which immediately breaks the illusion of an app and leaves
+// the fixed app bar and bottom nav sitting at the wrong size over a zoomed page.
+//
+// iOS Safari deliberately ignores user-scalable=no in the viewport, and touch-action does not stop
+// a pinch either (the avatar cropper's own comment says so). What DOES work is preventing WebKit's
+// non-standard gesture* events. Double-tap zoom is separate and is handled by touch-action in CSS.
+//
+// The avatar cropper is the one place a pinch is wanted, and it drives its own zoom from these same
+// events - so it is excluded here rather than fighting for them.
+(function () {
+  const wanted = (t) => !!(t && t.closest && t.closest(".crop-stage"));
+  ["gesturestart", "gesturechange", "gestureend"].forEach((n) => {
+    document.addEventListener(n, (e) => { if (!wanted(e.target)) e.preventDefault(); }, { passive: false });
+  });
+})();
 buildNav();
 render();
 try { if (NATIVE_NOTIFY) nativeNotify("status"); updateBell(); initReminders(); syncWatch(); } catch (e) {}

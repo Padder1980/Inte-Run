@@ -407,7 +407,15 @@ existing web UI, so there is still **one UI to design** (`web/app.ts`). Decided 
   is untouched and still behaves normally in a browser. Fixes are **buffered and replayed in order** —
   iOS can suspend the web content process even while the app lives on the location background mode,
   and distance accumulates incrementally, so a replayed backlog gives the same total.
-- ⚠️ **`viewport-fit=cover` is required** in the meta viewport. Without it every
+- ⚠️ **Pinch-to-zoom is deliberately off**, in two places that both matter. iOS Safari ignores
+`user-scalable=no`, and `touch-action` does not stop a pinch either — the only thing that works on
+the web side is preventing WebKit's non-standard `gesture*` events, which a document-level guard near
+`buildNav()` does. `touch-action: manipulation` separately kills double-tap zoom. On the native side
+`WebHost.swift` also disables the scroll view's own `pinchGestureRecognizer`. ⚠️ **The avatar cropper
+is excluded from the guard** (`.crop-stage`) — it drives its own zoom from those same events, and
+breaking it would silently return an off-centre crop rather than an obvious error.
+
+⚠️ **`viewport-fit=cover` is required** in the meta viewport. Without it every
   `env(safe-area-inset-*)` resolves to **0**, which silently put the app bar under the Dynamic Island
   and the bottom nav under the home indicator. Because `apple-mobile-web-app-status-bar-style` is
   `black-translucent`, this was already wrong for Home Screen PWA users on notched iPhones.

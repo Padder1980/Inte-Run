@@ -42,6 +42,16 @@ struct WebHost: UIViewRepresentable {
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.scrollView.bounces = false
         webView.scrollView.showsVerticalScrollIndicator = false
+        // No pinch-to-zoom. Scaling the whole interface breaks the illusion of an app instantly and
+        // leaves the fixed app bar and bottom nav the wrong size over a zoomed page. The page blocks
+        // WebKit's gesture* events too; this stops the scroll view's own recogniser as well.
+        //
+        // The avatar cropper still pinches: it reads pointer events and WebKit's gesture events, not
+        // this recogniser, and it falls back to measuring the distance between two pointers anyway.
+        webView.scrollView.pinchGestureRecognizer?.isEnabled = false
+        webView.scrollView.bouncesZoom = false
+        webView.scrollView.minimumZoomScale = 1
+        webView.scrollView.maximumZoomScale = 1
 
         // Match the splash so there is no white flash between the launch screen and the page.
         let launch = UIColor(named: "LaunchBackground") ?? .black

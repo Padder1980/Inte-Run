@@ -71,9 +71,19 @@ export function deriveTrainingPaces(recent: RecentPerformance, goal?: Goal): Tra
   const pace5k = predictedPaceFor(recent, 5000);
   const paceMile = predictedPaceFor(recent, RACE_DISTANCES_M["1mile"]);
 
+  const pace8k = predictedPaceFor(recent, 8000);
+
   const easy = band(thresholdPace + 92, 17, 18); // ~ +75..+110 s/km
+  // "Moderate" — between easy and steady, which otherwise leave a ~30 s/km hole no session can use.
+  const aerobic = band(thresholdPace + 60, 10, 10);
   const steady = band(thresholdPace + 35, 10, 10); // ~ +25..+45 s/km
+  // True tempo — a shade under threshold, holdable for the best part of an hour.
+  const tempo = band(thresholdPace + 18, 6, 7);
   const threshold = band(thresholdPace, 5, 8);
+  // Critical velocity — the pace sustainable for roughly half an hour, which for a trained runner
+  // is close to 8 km pace. It sits midway between threshold and VO2 rather than hugging threshold,
+  // so a session that contrasts a threshold block with a CV block is a real change of gear.
+  const cv = band(pace8k, 4, 5);
   const vo2: PaceRange = {
     minSecPerKm: Math.round(pace3k - 3),
     maxSecPerKm: Math.round(pace5k + 2),
@@ -90,8 +100,11 @@ export function deriveTrainingPaces(recent: RecentPerformance, goal?: Goal): Tra
 
   return {
     easy,
+    aerobic,
     steady,
+    tempo,
     threshold,
+    cv,
     vo2,
     rep,
     goalRace,

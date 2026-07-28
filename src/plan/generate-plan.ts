@@ -43,9 +43,17 @@ import {
   rwSteady,
   type SessionContent,
   strengthSession,
+  taperSession,
+  moderateRun,
+  easyProgression,
+  recoveryRun,
+  raceIsBig,
+  thresholdIsBig,
   thresholdSession,
+  vo2IsBig,
   vo2Session,
 } from "./session-templates.ts";
+import type { FormatCtx } from "./session-templates.ts";
 
 export type GenerateOptions = {
   intensityModel?: IntensityModel;
@@ -194,7 +202,10 @@ function buildWeek(
 
   // Easy runs — rotate flavours (plain, strides, hill sprints, explore) so easy days stay fresh.
   const easyDays = EASY_REL.map((r) => dayRel(longDay, r)).slice(0, easyCount);
-  const canStride = (wp.phase === "base" || wp.phase === "build") && !wp.isDeload;
+  // Strides and hill sprints are neuromuscular work with near-zero aerobic cost, but hill sprints
+  // in particular are the highest connective-tissue load in the library — tissue adapts more slowly
+  // than the cardiovascular system, so they are withheld from anyone coming back from injury.
+  const canStride = (wp.phase === "base" || wp.phase === "build") && !wp.isDeload && !ctx.returning;
   easyDays.forEach((d, ei) => {
     const minutes = wp.isDeload ? 35 : ei === easyDays.length - 1 ? 40 : 45;
     sessions.push(easyVariant(ctx.paces, minutes, index + ei, canStride));
@@ -423,30 +434,68 @@ function qualityContentsFor(
   const isShortEvent =
     ctx.goal.distance === "5k" || ctx.goal.distance === "10k" || ctx.goal.distance === "1mile";
   const out: SessionContent[] = [];
+  // What this week can safely be given. Filtering the format pool by phase is what makes a large
+  // session library actually reachable: selection is `variant % pool.length`, so one flat pool
+  // longer than the plan leaves formats permanently unused.
+  // Rotate by position WITHIN the phase, offset by a per-plan seed.
+  //
+  // Two problems this solves. Using the raw week index means the pool is walked in steps that skip
+  // residues, so a pool longer than the phase leaves formats permanently unused; walking by
+  // ordinal-in-phase steps through it one at a time instead. And seeding the start point from the
+  // plan's own shape — phase length, training days, and the event being trained for — means two
+  // different plans begin at different points in the pool. Across the range of plans people
+  // actually build, every format gets used rather than the same prefix every time.
+  const DISTANCE_SEED: Record<Goal["distance"], number> = { "1mile": 0, "5k": 2, "10k": 5, half: 8, marathon: 11 };
+  const rot = wp.ordinalInPhase + wp.phaseTotal + ctx.athlete.daysPerWeek + DISTANCE_SEED[ctx.goal.distance];
+  const fctx: FormatCtx = {
+    phase: wp.phase,
+    isDeload: wp.isDeload,
+    competitive: ctx.athlete.experience === "competitive",
+    returning: ctx.returning,
+  };
 
   if (wp.phase === "taper") {
-    // Keep intensity, low volume: a short, sharp session.
-    out.push(vo2Session(p, 3)); // 10 × 1′ — naturally low volume
+    // Keep intensity, low volume: a short, sharp session, chosen BY ID. This used to be
+    // `vo2Session(p, 3)` — a positional index, so inserting any format above it silently changed
+    // the race-week session of every plan ever generated.
+    out.push(taperSession(p));
     return out.slice(0, count);
   }
   if (wp.phase === "peak") {
-    out.push(raceSpecificSession(p));
-    out.push(isShortEvent ? vo2Session(p, weekIndex) : thresholdSession(p, weekIndex));
+    // The race-pace session is the week's centrepiece, so the supporting one steps back — but only
+    // when the centrepiece is itself a big one. Capping it unconditionally made every peak-only big
+    // format unreachable, because a peak week always carries two quality sessions.
+    const sRot = rot + 5;
+    const supportBig = isShortEvent ? vo2IsBig(sRot, fctx) : thresholdIsBig(sRot, fctx);
+    const support = count >= 2 && raceIsBig(rot, fctx) && supportBig ? { ...fctx, avoidBig: true } : fctx;
+    out.push(raceSpecificSession(p, rot, fctx));
+    out.push(isShortEvent ? vo2Session(p, sRot, support) : thresholdSession(p, sRot, support));
     return out.slice(0, count);
   }
   if (wp.phase === "build") {
     if (count >= 2) {
-      out.push(thresholdSession(p, weekIndex));
-      out.push(vo2Session(p, weekIndex));
+      // Offset the two variants. With the same index, a given threshold format is locked to a given
+      // VO2 format for the whole plan whenever the two pools happen to be the same length.
+      // One big session a week is the load; two is how people get hurt.
+      //
+      // The cap applies only when BOTH slots would draw a big format. Capping the VO2 slot whenever
+      // the threshold slot happened to be big made every big VO2 format unreachable: the two share
+      // a rotation index, so "threshold is big" and "which VO2 format" are perfectly correlated.
+      // The two indexes are also offset so a given threshold format is not welded to one VO2 format
+      // for the life of the plan.
+      const vRot = rot + 5;
+      const bothBig = thresholdIsBig(rot, fctx) && vo2IsBig(vRot, fctx);
+      out.push(thresholdSession(p, rot, fctx));
+      out.push(vo2Session(p, vRot, bothBig ? { ...fctx, avoidBig: true } : fctx));
     } else {
       // Alternate the single quality session week to week.
-      out.push(weekIndex % 2 === 0 ? vo2Session(p, weekIndex) : thresholdSession(p, weekIndex));
+      out.push(weekIndex % 2 === 0 ? vo2Session(p, rot, fctx) : thresholdSession(p, rot, fctx));
     }
     return out.slice(0, count);
   }
   // base: threshold-led (tempo/cruise/fartlek rotate); introduce VO2 flavour only in the latter part.
   const lateBase = wp.ordinalInPhase > Math.ceil(wp.phaseTotal / 2);
-  out.push(lateBase && weekIndex % 2 === 0 ? vo2Session(p, weekIndex) : thresholdSession(p, weekIndex));
+  out.push(lateBase && weekIndex % 2 === 0 ? vo2Session(p, rot, fctx) : thresholdSession(p, rot, fctx));
   return out.slice(0, count);
 }
 
@@ -454,8 +503,22 @@ function qualityContentsFor(
 // base/build (neuromuscular work, near-zero aerobic cost), explore/plain anytime.
 function easyVariant(paces: TrainingPaces, minutes: number, idx: number, canStride: boolean): SessionContent {
   const pool: ((p: TrainingPaces, m: number) => SessionContent)[] = canStride
-    ? [(p, m) => easyRun(p, m, false), (p, m) => easyRun(p, m, true), (p, m) => easyHillStrides(p, m), (p, m) => contExplore(p, m)]
-    : [(p, m) => easyRun(p, m, false), (p, m) => contExplore(p, m)];
+    ? [
+        (p, m) => easyRun(p, m, false),
+        (p, m) => easyRun(p, m, true),
+        (p, m) => easyHillStrides(p, m),
+        (p, m) => contExplore(p, m),
+        (p, m) => moderateRun(p, m, false),
+        (p, m) => moderateRun(p, m, true),
+        (p, m) => easyProgression(p, m),
+        (p, m) => recoveryRun(p, m),
+      ]
+    : [
+        (p, m) => easyRun(p, m, false),
+        (p, m) => contExplore(p, m),
+        (p, m) => moderateRun(p, m, false),
+        (p, m) => recoveryRun(p, m),
+      ];
   return pool[idx % pool.length]!(paces, minutes);
 }
 

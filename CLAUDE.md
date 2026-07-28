@@ -282,6 +282,51 @@ Design rules baked in, each of which cost a real bug when it was missing — don
 - **RPE stays answerable after Save** — the picker writes through to the logged run. Gating it on
   `!saved` starved the whole signal for anyone who taps Save first.
 
+## The session library (rebuilt 2026-07-28 from a real coached block)
+
+The owner supplied his own coach's Google Sheet — a full GNR block for a sub-1:20 half runner — and
+asked for that variety in the generator. Two things came out of it.
+
+**The pace ladder has eight gears, not five.** `deriveTrainingPaces` now also derives:
+- **`aerobic`** (threshold + 60 s/km) — the coach's "MOD". Filled a real ~30 s/km hole between easy
+  and steady that no session could previously target.
+- **`tempo`** (threshold + 18) — "true tempo", holdable for close to an hour.
+- **`cv`** (≈ 8 km pace) — critical velocity, between threshold and VO2.
+
+Measured against the coach's own numbers for that athlete these land within a few seconds
+(aerobic 4:45–5:05 vs MOD 4:45–5:00; cv 3:42–3:51 vs CV 3:45–3:50). ⚠️ **CV is derived from 8 km, not
+10 km pace** — 10 km put it only ~7 s/km off threshold, so a session contrasting the two was not a
+gear change at all. `deriveTrainingPaces` is the ONLY construction site, so adding fields is safe.
+
+**The bottleneck was never the number of formats — it was the selector.** Before: 42 quality slots in
+a 36-week plan filled by 18 distinct titles, `10 × 1′` five times, and all four peak weeks byte-
+identical because `raceSpecificSession` took no variant at all. Now 31 distinct, and ~62 formats.
+
+`QualityFormat` carries `id`, `phases`, `load`, `competitiveOnly`, `skipWhenReturning`, and optional
+`rpe`/`intensity`. `selectFormat` filters by context then rotates; filters that would empty the pool
+are dropped rather than throwing. Traps, each of which cost a real debugging cycle:
+- ⚠️ **Never index these arrays by position.** The taper was `vo2Session(p, 3)`, so inserting any
+  format above index 3 silently changed every plan's race-week session. Use `taperSession()` / ids.
+- ⚠️ **Never derive a gate from the rotation index.** Capping "big" sessions by week parity, and
+  later by `thresholdIsBig(rot)` with the same `rot`, each made *every* big format unreachable —
+  the gate and the position were perfectly correlated. The rule is now "cap only when BOTH slots
+  would draw big", with offset indices.
+- The rotation is `ordinalInPhase + phaseTotal + daysPerWeek + distanceSeed` — walking the pool one
+  step at a time, from a per-plan starting point, so different plans use different parts of it.
+- `test/session-library.test.ts` (18 tests) asserts the gear ordering, format hygiene, the safety
+  gates, per-plan variety, and ≥95% library coverage across ~2000 generated plans.
+
+Two bugs fixed alongside, both pre-existing and both made likelier by the new formats:
+- ⚠️ `plannedPaceBandOf` omitted `strides` from its continuous list, so "45′ easy + strides" was
+  judged against the **strides** band (mile pace) — every debrief of it was nonsense. It also now
+  prefers the LONGEST continuous step, not the first, so a geared run is judged by its main block.
+- ⚠️ `WorkoutManager.targetBand` fell back to the session band when a step had none, so on the
+  pace-free hill reps the wrist compared hill pace to the threshold band and said "pick it up".
+
+Known and deliberately not fixed: a handful of five-day build weeks with two quality sessions sit
+just under the pyramidal easy-fraction floor (measured 6 of 35, unchanged by this work). That is a
+periodisation question about two-quality weeks, not a session-library one.
+
 ## The native app (`ios/`) — started 2026-07-27
 
 InteRun is now **also a native iPhone app**, built as a **hybrid**: a thin Swift shell that runs the

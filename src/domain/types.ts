@@ -83,8 +83,18 @@ export type HrZone = {
 
 export type TrainingPaces = {
   easy: PaceRange;
+  /** "Moderate" — quicker than easy, slower than steady. Fills a real ~30 s/km hole between the
+   *  two, and is the gear most coached plans call MOD. Aerobic, still comfortable, RPE 3–4. */
+  aerobic: PaceRange;
   steady: PaceRange;
+  /** "True tempo" — between steady and threshold. Sustainable for close to an hour, and the gear
+   *  long continuous tempo runs actually sit in; threshold is too sharp to hold for 10 km. */
+  tempo: PaceRange;
   threshold: PaceRange;
+  /** Critical velocity — around 10 km pace. Sits between threshold and VO2: faster than a tempo,
+   *  slower than an interval. A session that contrasts threshold and CV blocks (a staple of real
+   *  coaching) cannot be written without both bands. */
+  cv: PaceRange;
   vo2: PaceRange;
   rep: PaceRange;
   goalRace: PaceRange;

@@ -3013,8 +3013,17 @@ function structureRows(steps) {
   while (i < steps.length) {
     const st = steps[i];
     if (st.kind === "rep") {
+      // Collect one block of work, and STOP at a change of pace. A ladder or a compound session
+      // asks for several different paces; merging them into one row shows only the first, which
+      // silently misreports half the session (a 2km @ threshold + 400m @ rep cut-down rendered as
+      // if the whole thing were threshold).
+      const sig = (r) => (r.targetPaceSecPerKm ? r.targetPaceSecPerKm.minSecPerKm + "-" + r.targetPaceSecPerKm.maxSecPerKm : "effort");
+      const blockSig = sig(steps[i]);
       let j = i; const reps = [], recs = [];
-      while (j < steps.length && (steps[j].kind === "rep" || steps[j].kind === "recovery")) { (steps[j].kind === "rep" ? reps : recs).push(steps[j]); j++; }
+      while (j < steps.length && (steps[j].kind === "rep" || steps[j].kind === "recovery")) {
+        if (steps[j].kind === "rep" && sig(steps[j]) !== blockSig) break;
+        (steps[j].kind === "rep" ? reps : recs).push(steps[j]); j++;
+      }
       const uniform = reps.every((r) => r.durationSeconds === reps[0].durationSeconds && r.distanceMeters === reps[0].distanceMeters);
       let lab;
       if (reps.length === 1) lab = esc(reps[0].label);
@@ -5847,10 +5856,19 @@ function runDateLabel() {
 // Continuous runs: the steady block's pace band. Quality: the rep band. Null when nothing is prescribed.
 function plannedPaceBandOf(sess) {
   if (!sess || !sess.steps) return null;
-  const cont = sess.type === "easy" || sess.type === "long" || sess.type === "recovery" || sess.type === "steady";
+  // "strides" belongs with the continuous types. It was missing, so an easy run with six 20-second
+  // strides on the end was judged against the STRIDES band -- mile pace -- and every debrief of it
+  // claimed the runner was two minutes per kilometre too slow.
+  const cont = sess.type === "easy" || sess.type === "long" || sess.type === "recovery" ||
+    sess.type === "steady" || sess.type === "strides";
+  // Among continuous steps prefer the LONGEST, not the first: a geared or progression run opens
+  // with a short easy block that does not describe the run as a whole.
+  const longest = (kind) => (sess.steps || [])
+    .filter((st) => st.kind === kind && st.targetPaceSecPerKm)
+    .sort((a, b) => (b.durationSeconds || 0) - (a.durationSeconds || 0))[0];
   const pick = cont
-    ? sess.steps.find((st) => st.kind === "steady" && st.targetPaceSecPerKm)
-    : sess.steps.find((st) => st.kind === "rep" && st.targetPaceSecPerKm) || sess.steps.find((st) => st.kind === "steady" && st.targetPaceSecPerKm);
+    ? longest("steady")
+    : sess.steps.find((st) => st.kind === "rep" && st.targetPaceSecPerKm) || longest("steady");
   return pick ? { minSecPerKm: pick.targetPaceSecPerKm.minSecPerKm, maxSecPerKm: pick.targetPaceSecPerKm.maxSecPerKm } : null;
 }
 // The session's intended effort band, numerically (session-level band, else the span of its steps').

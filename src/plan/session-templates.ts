@@ -21,13 +21,19 @@ import { distanceForTime, timeForDistance } from "../domain/units.ts";
 
 export type SessionContent = Omit<Session, "id" | "dayOfWeek" | "source">;
 
-const RPE: Record<string, RpeBand> = {
+const RPE = {
   easy: { min: 2, max: 3 },
+  aerobic: { min: 3, max: 4 },
   steady: { min: 4, max: 5 },
+  tempo: { min: 5, max: 6 },
   threshold: { min: 6, max: 7 },
+  cv: { min: 7, max: 8 },
   vo2: { min: 8, max: 9 },
   rep: { min: 8, max: 9 },
-};
+  // Time trials, races and maximal hill sprints. Without this band an honest 10/10 on a parkrun
+  // reads as "much harder than intended" and becomes evidence for easing the whole plan off.
+  maximal: { min: 9, max: 10 },
+} satisfies Record<string, RpeBand>;
 
 function mid(range: PaceRange): number {
   return (range.minSecPerKm + range.maxSecPerKm) / 2;
@@ -155,6 +161,51 @@ export function easyRun(
     withStrides ? "strides" : "easy",
     withStrides ? `${minutes}′ easy + strides` : `${minutes}′ easy run`,
     "Foundation aerobic running. Ease in, settle into a conversational rhythm, then ease down to finish.",
+    "easy",
+    steps,
+    RPE.easy,
+  );
+}
+
+/**
+ * A moderate run — the coach's "MOD".
+ *
+ * An entire gear the plan could not previously reach: quicker than easy, slower than steady, and
+ * the pace most of a club runner's non-quality mileage actually sits at.
+ *
+ * ⚠️ Assembled as intensity "easy", not "moderate". The intensity bucket drives the
+ * training-intensity distribution, and one 45′ run re-bucketed as moderate drops a build week's
+ * easy fraction below the pyramidal floor — the plan then looks mis-periodised when it is not.
+ * `contProgression` already sets this precedent for the same reason.
+ */
+export function moderateRun(paces: TrainingPaces, minutes: number, withStrides = false): SessionContent {
+  const steps = framedRun(paces, minutes, (mid) => [
+    block({ label: "Moderate — quicker than easy, still comfortable", minutes: mid, pace: paces.aerobic, rpe: RPE.aerobic }),
+    ...(withStrides ? strides(5, { distanceMeters: 80, pace: paces.rep }, { durationSeconds: 60, pace: paces.easy }) : []),
+  ]);
+  return assemble(
+    "easy",
+    withStrides ? `${minutes}′ moderate + strides` : `${minutes}′ moderate run`,
+    "A gear up from easy but well short of a workout — steady breathing, controlled, and you should finish feeling you could have kept going.",
+    "easy",
+    steps,
+    RPE.aerobic,
+  );
+}
+
+/** An easy run that lifts to moderate for its last third. The non-beginner progression run. */
+export function easyProgression(paces: TrainingPaces, minutes: number): SessionContent {
+  const steps = framedRun(paces, minutes, (mid) => {
+    const first = Math.max(1, Math.round(mid * 0.6));
+    return gears([
+      { label: "Easy, conversational", minutes: first, pace: paces.easy, rpe: RPE.easy },
+      { label: "Lift to moderate for the last third", minutes: Math.max(1, mid - first), pace: paces.aerobic, rpe: RPE.aerobic },
+    ]);
+  });
+  return assemble(
+    "easy",
+    `${minutes}′ easy → moderate finish`,
+    "Start genuinely easy and lift a gear for the final third. Finishing a run slightly quicker than you started is a habit worth building.",
     "easy",
     steps,
     RPE.easy,
@@ -394,72 +445,224 @@ export function longRun(
 
 // ---- Threshold (incl. tempo, cruise, fartlek) -----------------------------
 
-type QualityFormat = { title: string; desc?: string; build: (p: TrainingPaces) => WorkoutStep[] };
+/**
+ * A quality-session format.
+ *
+ * `id` is the stable handle: positional indexes into these arrays are a trap (the taper used to be
+ * `vo2Session(p, 3)`, so inserting any format above it silently changed every plan's race-week
+ * session). Insert freely — nothing may depend on order.
+ *
+ * `phases` is what makes a big library reachable. Selection is `variant % pool.length`, so a flat
+ * pool longer than the plan's week count leaves formats permanently unused. Filtering by phase
+ * first shrinks each pool to something a 12-week plan can genuinely cycle through, and keeps
+ * peak-only work out of week two.
+ */
+type QualityFormat = {
+  id: string;
+  title: string;
+  desc?: string;
+  build: (p: TrainingPaces) => WorkoutStep[];
+  /** Phases this format belongs in. */
+  phases: Phase[];
+  /** Session-wide effort band, when it differs from the family default (e.g. a maximal time trial). */
+  rpe?: RpeBand;
+  /** Intensity bucket, when it differs from the family default. */
+  intensity?: Session["intensity"];
+  /** "big" formats are held back on deload weeks; "small" are the gentlest in the pool. */
+  load?: "small" | "normal" | "big";
+  /** Only offer to an athlete who has said they train competitively. */
+  competitiveOnly?: boolean;
+  /** High connective-tissue load — withheld from anyone returning from injury. */
+  skipWhenReturning?: boolean;
+};
+
+export type FormatCtx = {
+  phase?: Phase;
+  isDeload?: boolean;
+  competitive?: boolean;
+  returning?: boolean;
+  /** Set when the week already carries another quality session — keeps the biggest formats out. */
+  avoidBig?: boolean;
+};
+
+/**
+ * Pick a format for this week, honouring the context and never returning nothing.
+ *
+ * Filters narrow the pool; if a filter would empty it, that filter is dropped rather than throwing
+ * — a plan must always be generatable, even for a returning beginner in a deload taper week.
+ */
+function selectFormat(pool: QualityFormat[], variant: number, ctx: FormatCtx): QualityFormat {
+  const narrow = (list: QualityFormat[], keep: (f: QualityFormat) => boolean) => {
+    const next = list.filter(keep);
+    return next.length ? next : list;
+  };
+  let list = pool;
+  if (ctx.phase) list = narrow(list, (f) => f.phases.includes(ctx.phase!));
+  if (!ctx.competitive) list = narrow(list, (f) => !f.competitiveOnly);
+  if (ctx.returning) list = narrow(list, (f) => !f.skipWhenReturning);
+  if (ctx.isDeload || ctx.avoidBig) list = narrow(list, (f) => f.load !== "big");
+  // Modulo over a stable, sorted-by-id list so the rotation does not shift when formats are added
+  // in the middle of the array.
+  const ordered = [...list].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const i = ((variant % ordered.length) + ordered.length) % ordered.length;
+  return ordered[i]!;
+}
+
+/** Look a format up by id — for the places that need one specific session, not a rotation. */
+function formatById(pool: QualityFormat[], id: string): QualityFormat {
+  const f = pool.find((x) => x.id === id);
+  if (!f) throw new Error(`unknown session format: ${id}`);
+  return f;
+}
 
 const THRESHOLD_DESC =
   "Controlled but demanding (RPE 6–7). You should finish knowing you could do one more rep.";
 
 const THRESHOLD_FORMATS: QualityFormat[] = [
-  {
-    title: "3 × 8′ threshold / 2′ jog",
-    build: (p) =>
-      reps(3, { durationSeconds: 8 * 60, pace: p.threshold }, { durationSeconds: 2 * 60, pace: p.easy }),
-  },
-  {
-    title: "4 × 6′ threshold / 90″ jog",
-    build: (p) =>
-      reps(4, { durationSeconds: 6 * 60, pace: p.threshold }, { durationSeconds: 90, pace: p.easy }),
-  },
-  {
-    title: "25′ continuous tempo",
+  // — classic interrupted threshold —
+  { id: "thr-3x8", title: "3 × 8′ threshold / 2′ jog", phases: ["base", "build", "peak"],
+    build: (p) => reps(3, { durationSeconds: 8 * 60, pace: p.threshold }, { durationSeconds: 2 * 60, pace: p.easy }) },
+  { id: "thr-4x6", title: "4 × 6′ threshold / 90″ jog", phases: ["base", "build", "peak"],
+    build: (p) => reps(4, { durationSeconds: 6 * 60, pace: p.threshold }, { durationSeconds: 90, pace: p.easy }) },
+  { id: "thr-5x5", title: "5 × 5′ threshold / 90″ jog", phases: ["base", "build", "peak"],
+    build: (p) => reps(5, { durationSeconds: 5 * 60, pace: p.threshold }, { durationSeconds: 90, pace: p.easy }) },
+  { id: "thr-6x8", title: "6 × 8′ threshold / 2′ jog", phases: ["build", "peak"], load: "big", competitiveOnly: true,
+    desc: "Forty-eight minutes of threshold. A big, honest session — hold the same effort on the last rep as the first.",
+    build: (p) => reps(6, { durationSeconds: 8 * 60, pace: p.threshold }, { durationSeconds: 2 * 60, pace: p.easy }) },
+
+  // — continuous tempo —
+  { id: "thr-cont-25", title: "25′ continuous tempo", phases: ["base", "build"], load: "small",
     desc: "One controlled, continuous tempo effort (RPE 6–7) — comfortably hard, steady rhythm start to finish.",
-    build: (p) => [
-      {
-        kind: "steady",
-        label: "Continuous controlled tempo",
-        durationSeconds: 25 * 60,
-        targetPaceSecPerKm: p.threshold,
-        targetRpe: RPE.threshold,
-      },
-    ],
-  },
-  {
-    title: "5 × 1 mile cruise / 90″ jog",
-    build: (p) =>
-      reps(5, { distanceMeters: 1609.344, pace: p.threshold }, { durationSeconds: 90, pace: p.easy }),
-  },
-  {
-    title: "2 × 15′ threshold / 3′ float",
+    build: (p) => [block({ label: "Continuous controlled tempo", minutes: 25, pace: p.threshold, rpe: RPE.threshold })] },
+  { id: "thr-cont-40", title: "40′ continuous tempo", phases: ["build", "peak"], load: "big", competitiveOnly: true,
+    desc: "A long, unbroken tempo. Slightly easier per kilometre than a short one — the challenge is holding rhythm, not speed.",
+    build: (p) => [block({ label: "Long continuous tempo — settle and hold", minutes: 40, pace: p.tempo, rpe: RPE.tempo })] },
+  { id: "thr-tempo-8k", title: "8 km continuous tempo", phases: ["build", "peak"], load: "big",
+    desc: "A true tempo by distance — a shade easier than threshold, held for eight kilometres. Rhythm work for the second half of a race.",
+    build: (p) => [{ kind: "steady", label: "8 km at true tempo — smooth and repeatable", distanceMeters: 8000, targetPaceSecPerKm: p.tempo, targetRpe: RPE.tempo }] },
+  { id: "thr-tempo-10k", title: "10 km continuous tempo", phases: ["build", "peak"], load: "big", competitiveOnly: true,
+    desc: "Ten kilometres of true tempo. The session that makes half-marathon pace feel ordinary.",
+    build: (p) => [{ kind: "steady", label: "10 km at true tempo — patient, even, controlled", distanceMeters: 10000, targetPaceSecPerKm: p.tempo, targetRpe: RPE.tempo }] },
+
+  // — cruise intervals —
+  { id: "thr-5xmile", title: "5 × 1 mile cruise / 90″ jog", phases: ["build", "peak"], load: "big",
+    build: (p) => reps(5, { distanceMeters: 1609.344, pace: p.threshold }, { durationSeconds: 90, pace: p.easy }) },
+  { id: "thr-6x1k", title: "6 × 1 km cruise / 60″ jog", phases: ["base", "build", "peak"],
+    build: (p) => reps(6, { distanceMeters: 1000, pace: p.threshold }, { durationSeconds: 60, pace: p.easy }) },
+  { id: "thr-4x2k", title: "4 × 2 km / 400 m jog", phases: ["build", "peak"], load: "big",
+    desc: "Long cruise reps with a jogged 400 m between. Eight kilometres of quality without the grind of one continuous block.",
+    build: (p) => reps(4, { distanceMeters: 2000, pace: p.threshold }, { distanceMeters: 400, pace: p.easy }) },
+  { id: "thr-3x3k", title: "3 × 3 km / 2′ jog", phases: ["build", "peak"], load: "big", competitiveOnly: true,
+    desc: "Three long reps at threshold. Concentration as much as fitness — the middle kilometre of each is where it is won.",
+    build: (p) => reps(3, { distanceMeters: 3000, pace: p.threshold }, { durationSeconds: 2 * 60, pace: p.easy }) },
+  { id: "thr-2x15", title: "2 × 15′ threshold / 3′ float", phases: ["build", "peak"], load: "big",
     desc: "Two long threshold blocks (RPE 6–7) with an easy float between — builds the ability to hold effort.",
-    build: (p) =>
-      reps(2, { durationSeconds: 15 * 60, pace: p.threshold }, { durationSeconds: 3 * 60, pace: p.steady }),
-  },
-  {
-    title: "6 × 1 km cruise / 60″ jog",
-    build: (p) =>
-      reps(6, { distanceMeters: 1000, pace: p.threshold }, { durationSeconds: 60, pace: p.easy }),
-  },
-  {
-    title: "Threshold fartlek: 6 × 3′ brisk / 2′ easy",
+    build: (p) => reps(2, { durationSeconds: 15 * 60, pace: p.threshold }, { durationSeconds: 3 * 60, pace: p.steady }) },
+  { id: "thr-4x10", title: "4 × 10′ tempo / 2′ walk", phases: ["build", "peak"],
+    desc: "Four ten-minute tempo blocks with a full walking break. The walk is deliberate — it keeps every block honest rather than letting them blur into one.",
+    build: (p) => reps(4, { durationSeconds: 10 * 60, pace: p.tempo }, { durationSeconds: 2 * 60, pace: p.easy }) },
+
+  // — fartlek and progression —
+  { id: "thr-fartlek-6x3", title: "Threshold fartlek: 6 × 3′ brisk / 2′ easy", phases: ["base", "build"],
     desc: "Fartlek — run the brisk blocks by feel at a controlled-hard effort (RPE 6–7), easy in between. Keep it playful and rolling; the clock is a guide, not a cage.",
-    build: (p) =>
-      reps(6, { durationSeconds: 3 * 60, pace: p.threshold }, { durationSeconds: 2 * 60, pace: p.easy }),
-  },
-  {
-    title: "Progression tempo: 10′ steady → 10′ threshold",
+    build: (p) => reps(6, { durationSeconds: 3 * 60, pace: p.threshold }, { durationSeconds: 2 * 60, pace: p.easy }) },
+  { id: "thr-prog-2gear", title: "Progression tempo: 10′ steady → 10′ threshold", phases: ["base", "build"], load: "small",
     desc: "Start steady and lift into threshold for the second half — a controlled progression, finishing strong but never sprinting.",
+    build: (p) => gears([
+      { label: "Steady build", minutes: 10, pace: p.steady, rpe: RPE.steady },
+      { label: "Lift to threshold", minutes: 10, pace: p.threshold, rpe: RPE.threshold },
+    ]) },
+  { id: "thr-prog-70", title: "Progression run: 60′, a gear up every 10′", phases: ["build", "peak"], load: "big", competitiveOnly: true,
+    desc: "Start genuinely easy and lift a gear every ten minutes, finishing at threshold. The discipline is in the first twenty minutes — go too hard early and the last block is impossible.",
+    build: (p) => gears([
+      { label: "Easy — resist the urge to push", minutes: 10, pace: p.easy, rpe: RPE.easy },
+      { label: "Moderate", minutes: 10, pace: p.aerobic, rpe: RPE.aerobic },
+      { label: "Steady", minutes: 10, pace: p.steady, rpe: RPE.steady },
+      { label: "True tempo", minutes: 10, pace: p.tempo, rpe: RPE.tempo },
+      { label: "Threshold", minutes: 10, pace: p.threshold, rpe: RPE.threshold },
+      { label: "Hold threshold to the line", minutes: 10, pace: p.threshold, rpe: RPE.threshold },
+    ]) },
+  { id: "thr-gears-4", title: "Geared run: easy → steady → tempo → easy", phases: ["build", "peak"],
+    desc: "Four gears in one continuous run. Changing pace deliberately mid-run — and settling again afterwards — is a skill a race asks for and a steady run never trains.",
+    build: (p) => gears([
+      { label: "Easy to open up", minutes: 12, pace: p.easy, rpe: RPE.easy },
+      { label: "Lift to steady", minutes: 12, pace: p.steady, rpe: RPE.steady },
+      { label: "Lift to tempo — the hard part", minutes: 14, pace: p.tempo, rpe: RPE.tempo },
+      { label: "Ease back down and finish relaxed", minutes: 10, pace: p.easy, rpe: RPE.easy },
+    ]) },
+
+  // — compound: two different stimuli in one session —
+  { id: "thr-plus-hills", title: "5 × 5′ threshold, then 8 × 30″ hills", phases: ["base", "build"], load: "big",
+    competitiveOnly: true, skipWhenReturning: true,
+    desc: "Threshold first, hills second — the hills land on tired legs, which is the point. Run the hills by effort; pace on a climb means nothing.",
     build: (p) => [
-      { kind: "steady", label: "Steady build", durationSeconds: 10 * 60, targetPaceSecPerKm: p.steady, targetRpe: RPE.steady },
-      { kind: "steady", label: "Lift to threshold", durationSeconds: 10 * 60, targetPaceSecPerKm: p.threshold, targetRpe: RPE.threshold },
-    ],
-  },
+      ...reps(5, { durationSeconds: 5 * 60, pace: p.threshold }, { durationSeconds: 90, pace: p.easy }),
+      setBreak(p, 180, "Easy jog across to your hill"),
+      ...hillReps(8, { seconds: 30 }, { recoverySec: 90, recoveryLabel: "Walk back down", rpe: RPE.maximal }),
+    ] },
+  { id: "thr-plus-cv", title: "2 × 2 km threshold, then 3 × 1 km at CV", phases: ["build", "peak"], load: "big",
+    competitiveOnly: true,
+    desc: "Two gears in one session: controlled threshold first, then a genuine lift to critical velocity. The second block should feel distinctly quicker, not just harder.",
+    build: (p) => [
+      ...reps(2, { distanceMeters: 2000, pace: p.threshold }, { durationSeconds: 2 * 60, pace: p.easy }),
+      setBreak(p, 180),
+      ...reps(3, { distanceMeters: 1000, pace: p.cv }, { durationSeconds: 2 * 60, pace: p.easy }),
+    ] },
+  { id: "thr-sandwich", title: "Tempo sandwich: 3 km tempo, 5 × 3′ CV, 3 km tempo", phases: ["build", "peak"], load: "big",
+    competitiveOnly: true,
+    desc: "Tempo, faster work, then tempo again on tired legs. The closing block is the session — holding rhythm when it has already been taken off you.",
+    build: (p) => [
+      { kind: "steady", label: "3 km at true tempo", distanceMeters: 3000, targetPaceSecPerKm: p.tempo, targetRpe: RPE.tempo },
+      setBreak(p, 120),
+      ...reps(5, { durationSeconds: 3 * 60, pace: p.cv }, { distanceMeters: 200, pace: p.easy }),
+      setBreak(p, 120),
+      { kind: "steady", label: "3 km at true tempo — tired, and that is the point", distanceMeters: 3000, targetPaceSecPerKm: p.tempo, targetRpe: RPE.tempo },
+    ] },
+  { id: "thr-tempo-plus-reps", title: "4 km threshold, then 4 × 1 km at CV", phases: ["build", "peak"], load: "big",
+    competitiveOnly: true,
+    desc: "A solid threshold block to take the edge off, then kilometre reps quicker than it. Classic race-preparation shape.",
+    build: (p) => [
+      { kind: "steady", label: "4 km at threshold", distanceMeters: 4000, targetPaceSecPerKm: p.threshold, targetRpe: RPE.threshold },
+      setBreak(p, 300, "5′ easy jog"),
+      ...reps(4, { distanceMeters: 1000, pace: p.cv }, { durationSeconds: 2 * 60, pace: p.easy }),
+    ] },
+  { id: "thr-2xtempo10", title: "2 × 10′ true tempo / 4′ jog", phases: ["base", "build"], load: "small",
+    desc: "Two honest tempo blocks with a generous jog between. A gentle way into tempo work, or a steadying session in a heavy week.",
+    build: (p) => reps(2, { durationSeconds: 10 * 60, pace: p.tempo }, { durationSeconds: 4 * 60, pace: p.easy }) },
+
+  // — hills as the session —
+  { id: "thr-kenyan-20", title: "20′ Kenyan hills", phases: ["base", "build"],
+    desc: "Twenty minutes of continuous rolling hills — strong and even up, relaxed and controlled down, never stopping. Pace is meaningless here; the hill sets the effort.",
+    build: () => [kenyanHills(20)] },
+  { id: "thr-kenyan-30", title: "30′ Kenyan hills", phases: ["base", "build"], load: "big", competitiveOnly: true,
+    desc: "Half an hour of unbroken undulating running. Enormously effective and much kinder on the legs than the equivalent on the flat.",
+    build: () => [kenyanHills(30)] },
+  { id: "thr-kenyan-tempo", title: "20′ Kenyan hills straight into 5 km tempo", phases: ["build", "peak"], load: "big",
+    competitiveOnly: true, skipWhenReturning: true,
+    desc: "Hills, then straight onto the flat at tempo with no recovery. Brutal and specific — it teaches your legs to find rhythm again after a climb has taken it away.",
+    build: (p) => [
+      kenyanHills(20),
+      { kind: "steady", label: "Straight into 5 km at true tempo — no rest", distanceMeters: 5000, targetPaceSecPerKm: p.tempo, targetRpe: RPE.tempo },
+    ] },
 ];
 
-export function thresholdSession(paces: TrainingPaces, variant: number): SessionContent {
-  const fmt = THRESHOLD_FORMATS[variant % THRESHOLD_FORMATS.length]!;
+export function thresholdSession(paces: TrainingPaces, variant: number, ctx: FormatCtx = {}): SessionContent {
+  const fmt = selectFormat(THRESHOLD_FORMATS, variant, ctx);
   const steps = [warmup(paces, 15, true), ...fmt.build(paces), cooldown(paces, 10)];
-  return assemble("threshold", fmt.title, fmt.desc ?? THRESHOLD_DESC, "moderate", steps, RPE.threshold);
+  return assemble("threshold", fmt.title, fmt.desc ?? THRESHOLD_DESC, fmt.intensity ?? "moderate", steps, fmt.rpe ?? RPE.threshold);
 }
+
+/** Whether the format this variant/context would select is one of the biggest in its pool. */
+export function thresholdIsBig(variant: number, ctx: FormatCtx = {}): boolean {
+  return selectFormat(THRESHOLD_FORMATS, variant, ctx).load === "big";
+}
+export function vo2IsBig(variant: number, ctx: FormatCtx = {}): boolean {
+  return selectFormat(VO2_FORMATS, variant, ctx).load === "big";
+}
+export function raceIsBig(variant: number, ctx: FormatCtx = {}): boolean {
+  return selectFormat(RACE_FORMATS, variant, ctx).load === "big";
+}
+
 
 // ---- VO2 / high-intensity (incl. hills, pyramids, fartlek) -----------------
 
@@ -488,18 +691,32 @@ function pyramid(p: TrainingPaces): WorkoutStep[] {
 }
 
 // Hill reps — effort-based (no flat pace target); pace on a hill is meaningless, RPE is the guide.
-function hillReps(count: number, workSec: number): WorkoutStep[] {
+// Short maximal sprints and longer aerobic hill reps are different sessions, so work can be given
+// in seconds or metres and the effort band is explicit.
+function hillReps(
+  count: number,
+  work: { seconds?: number; metres?: number },
+  opts: { recoverySec?: number; recoveryLabel?: string; rpe?: RpeBand; label?: string } = {},
+): WorkoutStep[] {
   const steps: WorkoutStep[] = [];
+  const what = work.metres ? `${work.metres} m` : `${work.seconds}″`;
   for (let i = 1; i <= count; i++) {
     steps.push({
       kind: "rep",
-      label: `${workSec}″ uphill — strong, tall, driving`,
-      durationSeconds: workSec,
-      targetRpe: RPE.vo2,
+      label: opts.label ?? `${what} uphill — strong, tall, driving`,
+      durationSeconds: work.seconds,
+      distanceMeters: work.metres,
+      targetRpe: opts.rpe ?? RPE.vo2,
       repeatIndex: i,
       repeatCount: count,
     });
-    if (i < count) steps.push({ kind: "recovery", label: "Jog/walk down to recover", durationSeconds: workSec + 30 });
+    if (i < count) {
+      steps.push({
+        kind: "recovery",
+        label: opts.recoveryLabel ?? "Jog/walk down to recover",
+        durationSeconds: opts.recoverySec ?? (work.seconds ?? 30) + 30,
+      });
+    }
   }
   return steps;
 }
@@ -518,80 +735,223 @@ function monaFartlek(p: TrainingPaces): WorkoutStep[] {
 }
 
 const VO2_FORMATS: QualityFormat[] = [
-  {
-    title: "5 × 3′ hard / 2′ easy",
-    build: (p) =>
-      reps(5, { durationSeconds: 3 * 60, pace: p.vo2 }, { durationSeconds: 2 * 60, pace: p.easy }),
-  },
-  {
-    title: "4 × 4′ hard / 3′ easy",
-    build: (p) =>
-      reps(4, { durationSeconds: 4 * 60, pace: p.vo2 }, { durationSeconds: 3 * 60, pace: p.easy }),
-  },
-  {
-    title: "6 × 800m / 2′ easy",
-    build: (p) =>
-      reps(6, { distanceMeters: 800, pace: p.vo2 }, { durationSeconds: 2 * 60, pace: p.easy }),
-  },
-  {
-    title: "10 × 1′ hard / 1′ easy",
-    build: (p) =>
-      reps(10, { durationSeconds: 60, pace: p.vo2 }, { durationSeconds: 60, pace: p.easy }),
-  },
-  {
-    title: "12 × 400m / 60″ jog",
-    build: (p) =>
-      reps(12, { distanceMeters: 400, pace: p.vo2 }, { durationSeconds: 60, pace: p.easy }),
-  },
-  {
-    title: "5 × 1000m / 90″ jog",
-    build: (p) =>
-      reps(5, { distanceMeters: 1000, pace: p.vo2 }, { durationSeconds: 90, pace: p.easy }),
-  },
-  {
-    title: "VO₂ pyramid: 1–2–3–2–1′ / equal easy",
+  // — classic time-based VO2 —
+  { id: "vo2-5x3", title: "5 × 3′ hard / 2′ easy", phases: ["base", "build", "peak"],
+    build: (p) => reps(5, { durationSeconds: 3 * 60, pace: p.vo2 }, { durationSeconds: 2 * 60, pace: p.easy }) },
+  { id: "vo2-4x4", title: "4 × 4′ hard / 3′ easy", phases: ["base", "build", "peak"],
+    build: (p) => reps(4, { durationSeconds: 4 * 60, pace: p.vo2 }, { durationSeconds: 3 * 60, pace: p.easy }) },
+  { id: "vo2-10x1", title: "10 × 1′ hard / 1′ easy", phases: ["base", "build", "peak", "taper"], load: "small",
+    build: (p) => reps(10, { durationSeconds: 60, pace: p.vo2 }, { durationSeconds: 60, pace: p.easy }) },
+  { id: "vo2-6x2", title: "6 × 2′ hard / 90″ jog", phases: ["base", "build", "peak"],
+    build: (p) => reps(6, { durationSeconds: 2 * 60, pace: p.vo2 }, { durationSeconds: 90, pace: p.easy }) },
+
+  // — track-shaped reps —
+  { id: "vo2-6x800", title: "6 × 800 m / 2′ easy", phases: ["build", "peak"],
+    build: (p) => reps(6, { distanceMeters: 800, pace: p.vo2 }, { durationSeconds: 2 * 60, pace: p.easy }) },
+  { id: "vo2-12x400", title: "12 × 400 m / 60″ jog", phases: ["build", "peak"],
+    build: (p) => reps(12, { distanceMeters: 400, pace: p.vo2 }, { durationSeconds: 60, pace: p.easy }) },
+  { id: "vo2-16x400", title: "16 × 400 m / 60″ jog", phases: ["build", "peak"], load: "big", competitiveOnly: true,
+    desc: "Sixteen laps of quality. The trap is running the first six too fast — start at a pace you could hold for all sixteen.",
+    build: (p) => reps(16, { distanceMeters: 400, pace: p.vo2 }, { durationSeconds: 60, pace: p.easy }) },
+  { id: "vo2-10x600", title: "10 × 600 m / 90″ jog", phases: ["build", "peak"], load: "big",
+    desc: "Six kilometres of quality in bite-sized reps — long enough to hurt, short enough to hold form.",
+    build: (p) => reps(10, { distanceMeters: 600, pace: p.vo2 }, { durationSeconds: 90, pace: p.easy }) },
+  { id: "vo2-10x500", title: "10 × 500 m / 100 m jog", phases: ["build", "peak"], competitiveOnly: true,
+    desc: "Short jogged recoveries — barely enough. The incomplete recovery is the stimulus.",
+    build: (p) => reps(10, { distanceMeters: 500, pace: p.vo2 }, { distanceMeters: 100, pace: p.easy }) },
+  { id: "vo2-5x1k", title: "5 × 1000 m / 90″ jog", phases: ["build", "peak"], load: "big",
+    build: (p) => reps(5, { distanceMeters: 1000, pace: p.vo2 }, { durationSeconds: 90, pace: p.easy }) },
+  { id: "vo2-6x1k", title: "6 × 1 km / 200 m jog", phases: ["build", "peak"], load: "big", competitiveOnly: true,
+    desc: "Six kilometre reps off a jogged two hundred. A staple session — repeatable, measurable, and honest about your fitness.",
+    build: (p) => reps(6, { distanceMeters: 1000, pace: p.cv }, { distanceMeters: 200, pace: p.easy }) },
+  { id: "vo2-3xmile", title: "3 × 1 mile / 4′ jog, then 6 × 200 m", phases: ["build", "peak"], load: "big",
+    competitiveOnly: true,
+    desc: "Long reps with generous recovery, then a short sharp finish to remind your legs what quick feels like.",
+    build: (p) => [
+      ...reps(3, { distanceMeters: 1609.344, pace: p.cv }, { durationSeconds: 4 * 60, pace: p.easy }),
+      setBreak(p, 180),
+      ...strides(6, { distanceMeters: 200, pace: p.rep }, { distanceMeters: 200, pace: p.easy }),
+    ] },
+
+  // — ladders, cut-downs and pyramids —
+  { id: "vo2-pyramid", title: "VO₂ pyramid: 1–2–3–2–1′ / equal easy", phases: ["base", "build"],
     desc: "A pyramid — ramp rep length up then back down, equal easy recovery. Same hard effort (RPE 8–9) throughout; it plays with rhythm and keeps the mind engaged.",
-    build: (p) => pyramid(p),
-  },
-  {
-    title: "Hill reps: 8 × 60″ uphill / jog down",
-    desc: "Find a moderate hill. Drive up strong and tall for 60″ at a hard effort (RPE 8–9), jog down to recover. Hills build power and economy with less impact — go by effort, not pace.",
-    build: () => hillReps(8, 60),
-  },
-  {
-    title: "Mona fartlek: 2 × (90/60/30/15″ hard, equal float)",
+    build: (p) => pyramid(p) },
+  { id: "vo2-ladder-km", title: "Ladder: 1–2–3–4–3–2–1 km / equal jog", phases: ["build", "peak"], load: "big",
+    competitiveOnly: true,
+    desc: "Up to four kilometres and back down, with the recovery matching the rep you have just run. The four is the summit — everything after it is run tired, on purpose.",
+    build: (p) => ladder([1, 2, 3, 4, 3, 2, 1].map((km) => ({
+      work: { distanceMeters: km * 1000, pace: km >= 3 ? p.threshold : p.cv },
+      rec: { durationSeconds: km * 60, pace: p.easy },
+    })), (w) => `${(w.distanceMeters ?? 0) / 1000} km`) },
+  { id: "vo2-cutdown", title: "Cut-down: 2 km – 1.6 – 1.2 – 800 – 400 / 2′30 jog", phases: ["build", "peak"], load: "big",
+    competitiveOnly: true,
+    desc: "Each rep shorter and quicker than the last. Start conservatively — the whole session is designed so the 400 is your fastest, not your slowest.",
+    build: (p) => ladder([
+      { work: { distanceMeters: 2000, pace: p.threshold }, rec: { durationSeconds: 150, pace: p.easy } },
+      { work: { distanceMeters: 1600, pace: p.cv }, rec: { durationSeconds: 150, pace: p.easy } },
+      { work: { distanceMeters: 1200, pace: p.cv }, rec: { durationSeconds: 150, pace: p.easy } },
+      { work: { distanceMeters: 800, pace: p.vo2 }, rec: { durationSeconds: 150, pace: p.easy } },
+      { work: { distanceMeters: 400, pace: p.rep } },
+    ]) },
+  { id: "vo2-descend-fartlek", title: "Descending fartlek: 5–4–3–2–1′ / 2′ float", phases: ["base", "build"],
+    desc: "Work descends, the float stays the same — so each rep is a little quicker and a little easier to face than the one before.",
+    build: (p) => ladder([5, 4, 3, 2, 1].map((m) => ({
+      work: { durationSeconds: m * 60, pace: p.vo2 },
+      rec: { durationSeconds: 120, pace: p.aerobic },
+    })), (w) => `${Math.round((w.durationSeconds ?? 0) / 60)}′ hard`) },
+  { id: "vo2-mona", title: "Mona fartlek: 2 × (90/60/30/15″ hard, equal float)", phases: ["base", "build", "peak"],
     desc: "The classic Mona fartlek — descending hard surges with equal-length floats (not full rest). Continuous and rhythmic, hard by feel. A fun, varied way to hit VO₂.",
-    build: (p) => monaFartlek(p),
-  },
+    build: (p) => monaFartlek(p) },
+
+  // — sets and broken reps —
+  { id: "vo2-3x2k1k", title: "3 × (2 km + 1 km)", phases: ["build", "peak"], load: "big", competitiveOnly: true,
+    desc: "Three sets, each a long rep then a shorter, quicker one. The 1 km inside each set is a genuine gear up from the 2 km that preceded it — not just the same pace held longer.",
+    build: (p) => sets(3, () => [
+      ...reps(1, { distanceMeters: 2000, pace: p.tempo }, { durationSeconds: 150, pace: p.easy }),
+      { kind: "recovery", label: "2′30 jog", durationSeconds: 150, targetPaceSecPerKm: p.easy },
+      ...reps(1, { distanceMeters: 1000, pace: p.cv }, { durationSeconds: 0, pace: p.easy }),
+    ], setBreak(p, 240, "4′ easy jog between sets")) },
+  { id: "vo2-broken-km", title: "Broken kilometres: 1 km / 4 × 400 m, twice, then 1 km", phases: ["build", "peak"], load: "big",
+    competitiveOnly: true,
+    desc: "Long and short alternating. The kilometres set the rhythm and the four-hundreds break it — then you have to find it again.",
+    build: (p) => [
+      ...reps(1, { distanceMeters: 1000, pace: p.cv }, { durationSeconds: 120, pace: p.easy }),
+      setBreak(p, 120),
+      ...reps(4, { distanceMeters: 400, pace: p.rep }, { durationSeconds: 60, pace: p.easy }),
+      setBreak(p, 120),
+      ...reps(1, { distanceMeters: 1000, pace: p.cv }, { durationSeconds: 120, pace: p.easy }),
+      setBreak(p, 120),
+      ...reps(4, { distanceMeters: 400, pace: p.rep }, { durationSeconds: 60, pace: p.easy }),
+      setBreak(p, 120),
+      ...reps(1, { distanceMeters: 1000, pace: p.cv }, { durationSeconds: 0, pace: p.easy }),
+    ] },
+  { id: "vo2-mixed-descend", title: "3 × 2 km, 2 × 1 km, 4 × 200 m", phases: ["build", "peak"], load: "big", competitiveOnly: true,
+    desc: "Volume first, speed last. Each block is shorter and quicker than the one before it — a whole race's worth of gears in one session.",
+    build: (p) => [
+      ...reps(3, { distanceMeters: 2000, pace: p.threshold }, { durationSeconds: 120, pace: p.easy }),
+      setBreak(p, 120),
+      ...reps(2, { distanceMeters: 1000, pace: p.cv }, { durationSeconds: 90, pace: p.easy }),
+      setBreak(p, 120),
+      ...strides(4, { distanceMeters: 200, pace: p.rep }, { distanceMeters: 200, pace: p.easy }),
+    ] },
+  { id: "vo2-1k-then-200", title: "5 × 1 km / 90″, then 5 × 200 m", phases: ["build", "peak"], load: "big",
+    desc: "The bulk of the work first, then five fast, relaxed two-hundreds. Finishing quick teaches good form when tired.",
+    build: (p) => [
+      ...reps(5, { distanceMeters: 1000, pace: p.cv }, { durationSeconds: 90, pace: p.easy }),
+      setBreak(p, 180),
+      ...strides(5, { distanceMeters: 200, pace: p.rep }, { durationSeconds: 60, pace: p.easy }),
+    ] },
+  { id: "vo2-1k-then-400", title: "4 × 1 km / 4′, then 16 × 200 m / 30″", phases: ["build", "peak"], load: "big",
+    competitiveOnly: true,
+    desc: "A big session in two halves: full-recovery kilometre reps, then a long grind of short, fast two-hundreds off almost no rest.",
+    build: (p) => [
+      ...reps(4, { distanceMeters: 1000, pace: p.cv }, { durationSeconds: 4 * 60, pace: p.easy }),
+      setBreak(p, 180),
+      ...reps(16, { distanceMeters: 200, pace: p.rep }, { durationSeconds: 30, pace: p.easy }),
+    ] },
+
+  // — continuous alternation, no standing rest —
+  { id: "vo2-20x200", title: "20 × 200 m on / 200 m off — continuous", phases: ["build", "peak"], load: "big",
+    competitiveOnly: true,
+    desc: "Eight kilometres with no standing rest at all — the 'off' is a jog, not a stop. Relentless, and superb preparation for a fast finish.",
+    build: (p) => onOff(20, { distanceMeters: 200, pace: p.rep }, { distanceMeters: 200, pace: p.easy },
+      { on: "200 m on", off: "200 m off — keep running" }) },
+  { id: "vo2-20x60", title: "20 × 60″ on / 60″ off", phases: ["base", "build"],
+    desc: "Twenty minutes of alternating, continuous throughout. Simple, no measuring, and it works anywhere.",
+    build: (p) => onOff(20, { durationSeconds: 60, pace: p.vo2 }, { durationSeconds: 60, pace: p.easy },
+      { on: "60″ on", off: "60″ easy — keep moving" }) },
+  { id: "vo2-alt-400", title: "6 × (400 m fast / 400 m threshold)", phases: ["build", "peak"], load: "big", competitiveOnly: true,
+    desc: "There is no easy running in this one — the 'recovery' four-hundred is at threshold. Lactate clearance at speed.",
+    build: (p) => onOff(6, { distanceMeters: 400, pace: p.vo2 }, { distanceMeters: 400, pace: p.threshold },
+      { on: "400 m fast", off: "400 m at threshold — the 'recovery'" }) },
+
+  // — hills —
+  { id: "vo2-hills-8x60", title: "Hill reps: 8 × 60″ uphill / jog down", phases: ["base", "build"],
+    desc: "Find a moderate hill. Drive up strong and tall for 60″ at a hard effort (RPE 8–9), jog down to recover. Hills build power and economy with less impact — go by effort, not pace.",
+    build: () => hillReps(8, { seconds: 60 }) },
+  { id: "vo2-hills-10x30", title: "10 × 30″ hill sprints, full walk back", phases: ["base", "build"],
+    skipWhenReturning: true,
+    rpe: RPE.maximal,
+    desc: "Not an aerobic session — this is pure power. Thirty seconds up as hard as you can hold good form, then walk all the way back down. Take the full recovery; rushing it turns a strength session into a mediocre interval session.",
+    build: () => hillReps(10, { seconds: 30 }, { recoverySec: 120, recoveryLabel: "Walk back down — full recovery", rpe: RPE.maximal }) },
+  { id: "vo2-hills-10x50m", title: "10 × 50 m hill sprints, walk back", phases: ["base", "build"],
+    skipWhenReturning: true,
+    rpe: RPE.maximal,
+    desc: "Very short, very hard, fully recovered. Fifty metres is over before fatigue arrives — which is exactly why it builds speed rather than endurance.",
+    build: () => hillReps(10, { metres: 50 }, { recoverySec: 90, recoveryLabel: "Walk back down", rpe: RPE.maximal }) },
+  { id: "vo2-1k-plus-hills", title: "5 × 1 km, then 10 × 50 m hill sprints", phases: ["build"], load: "big",
+    competitiveOnly: true, skipWhenReturning: true,
+    desc: "Kilometre reps first, then short maximal hills on legs that already know they have worked. Strength at the end of a session, which is where a race asks for it.",
+    build: (p) => [
+      ...reps(5, { distanceMeters: 1000, pace: p.cv }, { distanceMeters: 200, pace: p.easy }),
+      setBreak(p, 180, "Easy jog across to your hill"),
+      ...hillReps(10, { metres: 50 }, { recoverySec: 90, recoveryLabel: "Walk back down", rpe: RPE.maximal }),
+    ] },
 ];
 
-export function vo2Session(paces: TrainingPaces, variant: number): SessionContent {
-  const fmt = VO2_FORMATS[variant % VO2_FORMATS.length]!;
+export function vo2Session(paces: TrainingPaces, variant: number, ctx: FormatCtx = {}): SessionContent {
+  const fmt = selectFormat(VO2_FORMATS, variant, ctx);
+  const steps = [warmup(paces, 15, true), ...fmt.build(paces), cooldown(paces, 10)];
+  return assemble("vo2", fmt.title, fmt.desc ?? VO2_DESC, fmt.intensity ?? "hard", steps, fmt.rpe ?? RPE.vo2);
+}
+
+/** The taper's sharpener, by id — never by array position. */
+export function taperSession(paces: TrainingPaces): SessionContent {
+  const fmt = formatById(VO2_FORMATS, "vo2-10x1");
   const steps = [warmup(paces, 15, true), ...fmt.build(paces), cooldown(paces, 10)];
   return assemble("vo2", fmt.title, fmt.desc ?? VO2_DESC, "hard", steps, RPE.vo2);
 }
 
 // ---- Race-specific --------------------------------------------------------
 
-export function raceSpecificSession(paces: TrainingPaces): SessionContent {
-  const steps = [
-    warmup(paces, 15, true),
-    ...reps(
-      3,
-      { durationSeconds: 10 * 60, pace: paces.goalRace },
-      { durationSeconds: 2 * 60, pace: paces.easy },
-    ),
-    cooldown(paces, 10),
-  ];
-  return assemble(
-    "race-specific",
-    "3 × 10′ at goal race pace / 2′ jog",
-    "Rehearse goal race pace and rhythm. Controlled, repeatable, race-like.",
-    "moderate",
-    steps,
-    RPE.steady,
-  );
+const RACE_DESC = "Rehearse goal race pace and rhythm. Controlled, repeatable, race-like.";
+
+const RACE_FORMATS: QualityFormat[] = [
+  { id: "race-3x10", title: "3 × 10′ at goal race pace / 2′ jog", phases: ["peak"],
+    build: (p) => reps(3, { durationSeconds: 10 * 60, pace: p.goalRace }, { durationSeconds: 2 * 60, pace: p.easy }) },
+  { id: "race-8x1k", title: "8 × 1 km at goal race pace / 60″ jog", phases: ["peak"], load: "big",
+    desc: "Eight kilometres at goal pace off a minute's jog — short enough recovery that it starts to feel continuous.",
+    build: (p) => reps(8, { distanceMeters: 1000, pace: p.goalRace }, { durationSeconds: 60, pace: p.easy }) },
+  { id: "race-4x2k", title: "4 × 2 km at goal race pace / 90″ jog", phases: ["peak"], load: "big",
+    desc: "Middle-length blocks at goal pace. Long enough to settle into rhythm, short enough to repeat well.",
+    build: (p) => reps(4, { distanceMeters: 2000, pace: p.goalRace }, { durationSeconds: 90, pace: p.easy }) },
+  { id: "race-2x5k", title: "2 × 5 km at goal race pace / 5′ jog", phases: ["peak"], load: "big", competitiveOnly: true,
+    desc: "Two long goal-pace blocks. As close to the real thing as training gets without racing.",
+    build: (p) => reps(2, { distanceMeters: 5000, pace: p.goalRace }, { durationSeconds: 5 * 60, pace: p.easy }) },
+  { id: "race-cutdown", title: "Goal-pace cut-down: 3 km – 2 km – 1 km / 3′ jog", phases: ["peak"],
+    desc: "Goal pace, then a final kilometre quicker than it. Rehearses the finish, not just the rhythm.",
+    build: (p) => ladder([
+      { work: { distanceMeters: 3000, pace: p.goalRace }, rec: { durationSeconds: 180, pace: p.easy } },
+      { work: { distanceMeters: 2000, pace: p.goalRace }, rec: { durationSeconds: 180, pace: p.easy } },
+      { work: { distanceMeters: 1000, pace: p.threshold } },
+    ]) },
+  { id: "race-sandwich", title: "15′ easy → 20′ at goal pace → 10′ threshold", phases: ["peak"], load: "big",
+    desc: "Goal pace, then faster still. Teaches you to lift when you are already at race effort — the last three kilometres of any race.",
+    build: (p) => gears([
+      { label: "Easy to open", minutes: 15, pace: p.easy, rpe: RPE.easy },
+      { label: "Lock into goal race pace", minutes: 20, pace: p.goalRace, rpe: RPE.steady },
+      { label: "Lift to threshold to finish", minutes: 10, pace: p.threshold, rpe: RPE.threshold },
+    ]) },
+  { id: "race-timetrial-5k", title: "5 km time trial — or race a parkrun", phases: ["peak"], load: "big",
+    rpe: RPE.maximal, intensity: "hard", competitiveOnly: true,
+    desc: "Race it properly. A hard, measured 5 km tells you more about your fitness than any session — and InteRun will use the result to re-tune your paces. Warm up well, go out honestly, and finish empty.",
+    build: (p) => [{ kind: "rep", label: "5 km — race it, honest effort start to finish", distanceMeters: 5000, targetPaceSecPerKm: p.vo2, targetRpe: RPE.maximal }] },
+];
+
+/** Every format id, by family — so tests can assert the library's shape without exporting builders. */
+export const QUALITY_FORMAT_IDS = {
+  threshold: THRESHOLD_FORMATS.map((f) => f.id),
+  vo2: VO2_FORMATS.map((f) => f.id),
+  race: RACE_FORMATS.map((f) => f.id),
+};
+
+export function raceSpecificSession(paces: TrainingPaces, variant = 0, ctx: FormatCtx = {}): SessionContent {
+  const fmt = selectFormat(RACE_FORMATS, variant, ctx);
+  const steps = [warmup(paces, 15, true), ...fmt.build(paces), cooldown(paces, 10)];
+  return assemble("race-specific", fmt.title, fmt.desc ?? RACE_DESC, fmt.intensity ?? "moderate", steps, fmt.rpe ?? RPE.steady);
 }
+
 
 // ---- Strength / mobility / cross-training / rest --------------------------
 
@@ -724,7 +1084,169 @@ export function restDay(): SessionContent {
 
 // ---- helpers --------------------------------------------------------------
 
-type RepSpec = { durationSeconds?: number; distanceMeters?: number; pace: PaceRange };
+type RepSpec = { durationSeconds?: number; distanceMeters?: number; pace?: PaceRange };
+
+// ---- structural helpers ----------------------------------------------------
+//
+// Real coached sessions are not all "N x the same thing". They ladder, they alternate, they chain
+// two different stimuli, and they change gear mid-run. Each helper below exists because a session
+// in a real coaching block could not otherwise be written down.
+
+function repLabel(work: RepSpec): string {
+  if (work.distanceMeters) {
+    return work.distanceMeters >= 1000
+      ? `${Math.round(work.distanceMeters / 100) / 10} km`
+      : `${Math.round(work.distanceMeters)} m`;
+  }
+  const m = (work.durationSeconds ?? 0) / 60;
+  return m >= 1 ? `${Math.round(m * 10) / 10}′` : `${work.durationSeconds}″`;
+}
+
+/**
+ * A block separator.
+ *
+ * Two purposes, both load-bearing. Physically it is the jog between two different blocks of a
+ * compound session. Structurally it breaks the run of contiguous rep/recovery steps that the
+ * session-detail sheet collapses into one row — without it, a session with a threshold block and a
+ * CV block renders as a single row showing only the threshold pace, which is a lie.
+ */
+function setBreak(p: TrainingPaces, seconds: number, label = "Easy jog between blocks"): WorkoutStep {
+  return { kind: "steady", label, durationSeconds: seconds, targetPaceSecPerKm: p.easy, targetRpe: RPE.easy };
+}
+
+/** Reps whose length varies: ladders, cut-downs and pyramids. Work and recovery vary independently. */
+function ladder(
+  rungs: Array<{ work: RepSpec; rec?: RepSpec }>,
+  label?: (work: RepSpec, i: number) => string,
+): WorkoutStep[] {
+  const steps: WorkoutStep[] = [];
+  rungs.forEach((rung, i) => {
+    steps.push({
+      kind: "rep",
+      label: label ? label(rung.work, i) : repLabel(rung.work),
+      durationSeconds: rung.work.durationSeconds,
+      distanceMeters: rung.work.distanceMeters,
+      targetPaceSecPerKm: rung.work.pace,
+      repeatIndex: i + 1,
+      repeatCount: rungs.length,
+    });
+    if (rung.rec) {
+      steps.push({
+        kind: "recovery",
+        label: rung.rec.distanceMeters ? `${Math.round(rung.rec.distanceMeters)} m jog` : "Jog recovery",
+        durationSeconds: rung.rec.durationSeconds,
+        distanceMeters: rung.rec.distanceMeters,
+        targetPaceSecPerKm: rung.rec.pace,
+      });
+    }
+  });
+  return steps;
+}
+
+/** A set of mixed reps, repeated N times, with a longer break between sets. */
+function sets(
+  count: number,
+  build: (setIndex: number) => WorkoutStep[],
+  between: WorkoutStep,
+): WorkoutStep[] {
+  const steps: WorkoutStep[] = [];
+  for (let i = 1; i <= count; i++) {
+    // Sets are numbered in the step labels because the flat step list has no nesting: without it,
+    // "rep 2 of 3" appears three times in one session with nothing to tell them apart.
+    steps.push(...build(i).map((st) => (st.kind === "rep" ? { ...st, label: `Set ${i}/${count} — ${st.label}` } : st)));
+    if (i < count) steps.push(between);
+  }
+  return steps;
+}
+
+/** Continuous alternation with no standing rest — the "off" keeps moving. */
+function onOff(count: number, on: RepSpec, off: RepSpec, labels?: { on?: string; off?: string }): WorkoutStep[] {
+  const steps: WorkoutStep[] = [];
+  for (let i = 1; i <= count; i++) {
+    steps.push({
+      kind: "rep",
+      label: labels?.on ?? `${repLabel(on)} on`,
+      durationSeconds: on.durationSeconds,
+      distanceMeters: on.distanceMeters,
+      targetPaceSecPerKm: on.pace,
+      repeatIndex: i,
+      repeatCount: count,
+    });
+    steps.push({
+      kind: "recovery",
+      label: labels?.off ?? `${repLabel(off)} off — keep running`,
+      durationSeconds: off.durationSeconds,
+      distanceMeters: off.distanceMeters,
+      targetPaceSecPerKm: off.pace,
+    });
+  }
+  return steps;
+}
+
+/** One continuous effort, given in minutes. */
+function block(o: { label: string; minutes: number; pace?: PaceRange; rpe: RpeBand }): WorkoutStep {
+  return {
+    kind: "steady",
+    label: o.label,
+    durationSeconds: Math.round(o.minutes * 60),
+    targetPaceSecPerKm: o.pace,
+    targetRpe: o.rpe,
+  };
+}
+
+/** A continuous run that changes gear — progressions and easy→steady→tempo→easy runs. */
+function gears(blocks: Array<{ label: string; minutes: number; pace: PaceRange; rpe: RpeBand }>): WorkoutStep[] {
+  return blocks.map((b) => ({
+    kind: "steady" as const,
+    label: b.label,
+    durationSeconds: Math.round(b.minutes * 60),
+    targetPaceSecPerKm: b.pace,
+    targetRpe: b.rpe,
+  }));
+}
+
+/** Relaxed fast strides, usually tacked on the end of a session. */
+function strides(count: number, work: RepSpec, rec: RepSpec, label?: string): WorkoutStep[] {
+  const steps: WorkoutStep[] = [];
+  for (let i = 1; i <= count; i++) {
+    steps.push({
+      kind: "rep",
+      label: label ?? `${repLabel(work)} stride — fast and relaxed`,
+      durationSeconds: work.durationSeconds,
+      distanceMeters: work.distanceMeters,
+      targetPaceSecPerKm: work.pace,
+      targetRpe: RPE.rep,
+      repeatIndex: i,
+      repeatCount: count,
+    });
+    if (i < count) {
+      steps.push({
+        kind: "recovery",
+        label: "Walk back / easy jog, full recovery",
+        durationSeconds: rec.durationSeconds,
+        distanceMeters: rec.distanceMeters,
+        targetPaceSecPerKm: rec.pace,
+      });
+    }
+  }
+  return steps;
+}
+
+/**
+ * Continuous undulating running — "Kenyan hills".
+ *
+ * Deliberately has no pace target: on rolling ground pace is a function of the gradient, not the
+ * effort, so a band here would have the coach telling you to speed up on every climb. Effort is the
+ * whole instruction.
+ */
+function kenyanHills(minutes: number): WorkoutStep {
+  return {
+    kind: "rep",
+    label: "Rolling hills — strong and even up, relaxed and controlled down, no stopping",
+    durationSeconds: minutes * 60,
+    targetRpe: RPE.threshold,
+  };
+}
 
 function reps(count: number, work: RepSpec, recovery: RepSpec): WorkoutStep[] {
   const steps: WorkoutStep[] = [];

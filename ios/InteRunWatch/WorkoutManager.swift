@@ -64,7 +64,13 @@ final class WorkoutManager: NSObject, ObservableObject {
 
     /// The pace band for right now: the current step's if it has one, else the session's.
     var targetBand: (low: Int, high: Int)? {
-        if let st = currentStep, let lo = st.paceLow, let hi = st.paceHigh { return (lo, hi) }
+        if let st = currentStep {
+            // A step with no band has none deliberately: hills, sprints and walk-backs are effort,
+            // not pace. Falling back to the session band here meant the watch compared hill pace to
+            // the threshold band and said "pick it up a little" while the runner ground uphill.
+            guard let lo = st.paceLow, let hi = st.paceHigh else { return nil }
+            return (lo, hi)
+        }
         if let p = plan, let lo = p.paceLow, let hi = p.paceHigh { return (lo, hi) }
         return nil
     }

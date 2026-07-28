@@ -4233,6 +4233,10 @@ function wireConnectView() {
   if (NATIVE_WATCH && !WATCH_STATUS) { try { window.webkit.messageHandlers.interunWatch.postMessage({ action: "status" }); } catch (e) {} }
   document.querySelectorAll('[data-cn="cal"]').forEach((b) => b.onclick = openRemindersSheet);
 }
+// Reported by the native shell at document start; absent in the browser.
+function liveActivityStatus() {
+  try { return String(window.__interunLiveActivity || "not attempted yet"); } catch (e) { return "unknown"; }
+}
 function dataView() {
   const cur = backupSummary(collectBackup().data);
   const bytes = JSON.stringify(collectBackup()).length;
@@ -4254,6 +4258,10 @@ function dataView() {
     '<div class="bk-md" style="margin-top:8px">' + (inNativeApp()
       ? "The app carries its own copy of InteRun, built when the app was built \u2014 it doesn\u2019t update over the internet. A newer web version won\u2019t appear here until the app itself is rebuilt."
       : "Added to your Home Screen? It caches a copy. If an update seems missing, close it fully (swipe it away from the app switcher) and reopen \u2014 twice if needed.") + '</div></div>' +
+    (inNativeApp() ? '<div class="card"><div class="subhead" style="margin-top:0">Live Activity</div>' +
+      '<div class="bk-box"><div class="bk-val" style="font-size:14px">' + esc(liveActivityStatus()) + '</div>' +
+      '<div class="bk-lab" style="margin-top:4px">Last attempt</div></div>' +
+      '<div class="bk-md" style="margin-top:8px">The lock-screen card that tracks a run. iOS asks permission the first time one is shown \u2014 if this says <b>allowed=false</b>, turn Live Activities on for InteRun in Settings.</div></div>' : "") +
     '<div class="card">' + move + '</div>' +
     '<div class="card"><div class="subhead" style="margin-top:0">What a backup holds</div>' +
     '<div class="bk-md">Your profile and goal, your plan, every logged run with its route and splits, your coach and reminder choices, and anything you\\u2019ve told Alfie. It\\u2019s a plain file on your device \\u2014 nothing is uploaded anywhere, because InteRun has no server to upload it to.</div></div>';

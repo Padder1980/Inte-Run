@@ -553,6 +553,13 @@ because the two sides must agree on the type exactly and a copied file would dri
 `LiveActivityService` starts/updates/ends it; watch runs drive it from `WatchBridge.forwardLive`,
 phone runs from `pushLiveActivity()` in `web/app.ts` via a `liveActivity` bridge action. Tapping the
 card opens the app and `replayLiveOnActivate()` lands it on the live screen.
+⚠️ **Never gate the request on `ActivityAuthorizationInfo().areActivitiesEnabled`.** It is false
+until the runner grants permission, and the grant prompt only appears when an app actually ATTEMPTS
+a request — so guarding on it means the prompt never appears, the permission never becomes true, and
+the card can never show. A deadlock that presents exactly as "it silently does nothing", which is
+what shipped in build 24. Always attempt, and record the outcome: `LiveActivityService.note()`
+writes it where **Support › Your data › Live Activity** shows it, because a missing card looks
+identical whatever the cause.
 ⚠️ Needs `NSSupportsLiveActivities` in `InteRun-Info.plist`, and an extension's Info.plist MUST carry
 `CFBundleIdentifier` — without it the build fails with "Embedded binary's bundle identifier is not
 prefixed with the parent app's", which names the wrong problem entirely.

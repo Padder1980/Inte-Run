@@ -29,7 +29,10 @@ final class LiveActivityService {
 
     /// Begin, or update in place if this run already has a card.
     func start(runId: String, title: String, type: String, state: RunActivityAttributes.ContentState) {
-        guard permitted else { return }
+        // ⚠️ Do NOT gate this on `areActivitiesEnabled`. It is false until the runner grants
+        // permission, and the grant prompt only appears when an app actually ATTEMPTS a request —
+        // so guarding on it means the prompt never appears, the permission never becomes true, and
+        // the feature can never start. A deadlock that looks exactly like "it silently doesn't work".
         if currentRunId == runId, activity != nil { return update(state) }
         endImmediately()
         let attrs = RunActivityAttributes(title: title, sessionType: type)
@@ -41,12 +44,28 @@ final class LiveActivityService {
             )
             currentRunId = runId
             lastUpdate = Date()
+            note("started")
         } catch {
-            // Refused — disabled by the runner, or the system is at its limit. Not worth surfacing:
-            // the run itself is unaffected.
+            // Swallowing this is what made the last attempt undiagnosable. Recorded where the app's
+            // own version screen can show it, because the failure is invisible from the outside:
+            // a missing card looks identical whatever the cause.
             activity = nil
             currentRunId = nil
+            note("failed: \(error.localizedDescription)")
         }
+    }
+
+    /// The last thing that happened, for Support › Your data › This version.
+    private func note(_ what: String) {
+        let enabled = ActivityAuthorizationInfo().areActivitiesEnabled
+        let state = UIApplication.shared.applicationState == .active ? "foreground" : "background"
+        let line = "\(what) · \(state) · allowed=\(enabled)"
+        UserDefaults.standard.set(line, forKey: "interun_live_activity_status")
+        SelfCheck.logger.notice("live activity \(line, privacy: .public)")
+    }
+
+    static var lastStatus: String {
+        UserDefaults.standard.string(forKey: "interun_live_activity_status") ?? "not attempted yet"
     }
 
     /// Push new numbers. Throttled: ticks arrive every two seconds and the system coalesces

@@ -21,6 +21,13 @@ struct WebHost: UIViewRepresentable {
         // Native GPS, injected before any app code runs so the web UI never knows the difference.
         config.userContentController.addUserScript(GeolocationShim.userScript)
 
+        // The Live Activity's last outcome, so Support can show it. A missing card looks identical
+        // whatever the cause, and this is the only way to tell them apart from outside.
+        let status = LiveActivityService.lastStatus.replacingOccurrences(of: "\"", with: "'")
+        config.userContentController.addUserScript(WKUserScript(
+            source: "window.__interunLiveActivity = \"\(status)\";",
+            injectionTime: .atDocumentStart, forMainFrameOnly: true))
+
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator

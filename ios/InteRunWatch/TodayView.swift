@@ -118,6 +118,10 @@ struct TodayView: View {
                         // to the waiting state, whose advice - open the phone app - is the fix.
                         if store.isCurrent, let s = store.session {
                             session(s)
+                        } else if let s = store.todayFromCache {
+                            // The context is stale but the cached week still covers today. Better a
+                            // day-old copy of the right session than a spinner.
+                            session(s)
                         } else if store.isCurrent, store.hasSynced {
                             restDay
                         } else {
@@ -135,6 +139,7 @@ struct TodayView: View {
                 }
             }
             .navigationTitle("InteRun")
+            .onAppear { store.requestSync() }
             .navigationDestination(isPresented: $running) {
                 WorkoutView(workout: workout)
                     .environmentObject(store)

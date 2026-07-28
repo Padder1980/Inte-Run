@@ -474,9 +474,19 @@ breaking it would silently return an off-centre crop rather than an obvious erro
 - ⚠️ Installing an Xcode **silently repoints `xcode-select` system-wide**. If shell tools suddenly
   start failing with a licence error, that is why.
 
+⚠️ **`WatchBridge` is `WatchBridge.shared`, built at app launch — never tie it to the web view.**
+It used to be created in `WebHost.makeUIView`, so the WCSession delegate only existed while the page
+did. A freshly installed watch therefore sat on "Waiting for your plan" until the phone app was
+opened at least once, and a background wake from the watch had nobody to answer it. The bridge now
+persists its last payload to UserDefaults and re-pushes on every activation, and the watch calls
+`requestSync()` (a `sendMessage`, the one channel that makes iOS wake the containing app in the
+BACKGROUND) whenever it has nothing current. The phone answers from cache with no web view running.
+
 **The watch stands alone (2026-07-28).** It caches the WEEK, not just today (`upcoming` in the sync
 payload, `SessionStore.upcomingAhead`), and always offers a **Free run** — ⚠️ requiring the phone app
 to be open before the watch will start a run is a chore at the front door, not a running app.
+The week payload includes TODAY, so `todayFromCache` can show today's session even when the context
+has gone stale — a day-old copy of the right session beats a spinner.
 `SettingsView`/`WatchSettings` let the runner choose which metrics appear on the run screen (max 5,
 ordered, first one largest) plus auto-pause, lap haptics, spoken cues and always-on. ⚠️ Every toggle
 there does something — the same rule as the phone's Connections screen; no "start on motion" until

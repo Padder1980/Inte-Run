@@ -15,11 +15,30 @@ import WebKit
 final class WatchBridge: NSObject {
     static let messageName = "interunWatch"
 
-    private weak var webView: WKWebView?
-    private var lastPayload: [String: Any]?
+    /// ⚠️ App-lifetime, not web-view-lifetime.
+    ///
+    /// This used to be created inside `WebHost.makeUIView`, so the WCSession delegate only existed
+    /// while the page did. Two consequences, both of which the owner hit: a freshly installed watch
+    /// sat on "Waiting for your plan" until the phone app was opened at least once, and a
+    /// background wake from the watch had nobody to answer it. The bridge is now built at launch and
+    /// keeps its own copy of the last payload on disk, so it can answer from cache with no web view
+    /// anywhere in sight.
+    static let shared = WatchBridge()
 
-    init(webView: WKWebView?) {
-        self.webView = webView
+    weak var webView: WKWebView?
+    private static let payloadKey = "interun_watch_last_payload"
+    private var lastPayload: [String: Any]? {
+        get { UserDefaults.standard.dictionary(forKey: Self.payloadKey) }
+        set {
+            if let v = newValue { UserDefaults.standard.set(v, forKey: Self.payloadKey) }
+            else { UserDefaults.standard.removeObject(forKey: Self.payloadKey) }
+        }
+    }
+    /// Held separately from the persisted copy: a payload that arrived before activation still has
+    /// to be sent once the session comes up.
+    private var awaitingActivation: [String: Any]?
+
+    private override init() {
         super.init()
         guard WCSession.isSupported() else { SelfCheck.logger.notice("watch bridge: WatchConnectivity unsupported"); return }
         WCSession.default.delegate = self
@@ -68,18 +87,20 @@ final class WatchBridge: NSObject {
         group.notify(queue: .main) { [weak self] in self?.pendingRuns = remaining }
     }
 
-    private func push(_ payload: [String: Any]) {
+    private func push(_ payload: [String: Any], force: Bool = false) {
         guard WCSession.isSupported() else { return }
         let session = WCSession.default
+        lastPayload = payload   // cached first, so a background wake can answer even if the send fails
         guard session.activationState == .activated else {
-            lastPayload = payload // replay once the session comes up
+            awaitingActivation = payload // replay once the session comes up
             return
         }
-        // An unchanged context is rejected by WatchConnectivity, so only send real changes.
-        if let last = lastPayload, NSDictionary(dictionary: last).isEqual(to: payload) { return }
+        // An unchanged context is rejected by WatchConnectivity, so only send real changes — unless
+        // the watch has explicitly asked, in which case it plainly does not have it.
         do {
-            try session.updateApplicationContext(payload)
-            lastPayload = payload
+            var out = payload
+            if force { out["at"] = Date().timeIntervalSince1970 }
+            try session.updateApplicationContext(out)
         } catch {
             SelfCheck.logger.error("watch context failed: \(error.localizedDescription, privacy: .public)")
         }
@@ -89,17 +110,44 @@ final class WatchBridge: NSObject {
 extension WatchBridge: WCSessionDelegate {
     func session(_ session: WCSession, activationDidCompleteWith state: WCSessionActivationState, error: Error?) {
         SelfCheck.logger.notice("watch bridge activated: state=\(state.rawValue) paired=\(session.isPaired) installed=\(session.isWatchAppInstalled)")
-        if state == .activated, let pending = lastPayload {
-            lastPayload = nil
+        guard state == .activated else { return }
+        if let pending = awaitingActivation {
+            awaitingActivation = nil
             push(pending)
+        } else if let cached = lastPayload {
+            // Re-deliver on every reconnect. Cheap, and it is what rescues a watch that was
+            // installed or reset after the last real sync.
+            push(cached, force: true)
         }
+        drainPendingRuns()
+    }
+
+    /// The watch asking for its plan, which it does when it has nothing current. iOS wakes this app
+    /// in the background to deliver the message, so the reply comes from the persisted cache — the
+    /// web view is almost certainly not running at this point.
+    private func handleSyncRequest(_ reply: @escaping ([String: Any]) -> Void) {
+        let cached = lastPayload ?? [:]
+        reply(cached)
+        if !cached.isEmpty { push(cached, force: true) }
     }
 
     /// A finished run arriving from the wrist. Queued rather than applied immediately: the page may
     /// not exist yet, and losing someone's run because the app happened to be closed is unforgivable.
     /// The immediate path, used when the phone is reachable. Same handling as the queued one; the
     /// run id makes a double delivery a no-op.
+    func session(_ session: WCSession, didReceiveMessage message: [String: Any],
+                 replyHandler: @escaping ([String: Any]) -> Void) {
+        if message["request"] as? String == "sync" { return handleSyncRequest(replyHandler) }
+        replyHandler([:])
+        route(message)
+    }
+
     func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+        route(message)
+    }
+
+    /// Everything the watch can send that is not a sync request.
+    private func route(_ message: [String: Any]) {
         // Live ticks from a run happening on the wrist right now. These are transient by design:
         // if the phone is asleep they are simply missed, and the next tick two seconds later
         // catches up. Nothing about the recorded run depends on them.

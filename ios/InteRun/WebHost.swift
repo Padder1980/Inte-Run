@@ -29,7 +29,9 @@ struct WebHost: UIViewRepresentable {
         context.coordinator.location = location
         config.userContentController.add(location, name: LocationService.messageName)
 
-        let watch = WatchBridge(webView: webView)
+        // The bridge lives for the life of the app, not the web view — see WatchBridge.shared.
+        let watch = WatchBridge.shared
+        watch.webView = webView
         context.coordinator.watch = watch
         config.userContentController.add(watch, name: WatchBridge.messageName)
 

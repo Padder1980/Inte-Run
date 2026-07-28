@@ -2371,7 +2371,9 @@ function watchSessionPayload(s, iso) {
 // The next few runnable sessions, so the wrist can offer a choice when the phone is nowhere near.
 function watchUpcomingPayload(days) {
   const out = [];
-  for (let i = 1; i <= (days || 9) && out.length < 6; i++) {
+  // Starts at 0: today belongs in here as well, so a watch whose context has gone stale can still
+  // find today's session in its cached week instead of showing a spinner.
+  for (let i = 0; i <= (days || 9) && out.length < 7; i++) {
     const iso = futureIso(i);
     const list = rawSessionsForIso(iso).filter((x) => PRIMARY_TYPES[x.type]);
     for (const s of list) {

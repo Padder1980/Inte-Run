@@ -106,6 +106,30 @@ final class SessionStore: NSObject, ObservableObject {
         return f.string(from: Date())
     }
 
+    /// Today's session taken from the cached week, for when the context itself has gone stale.
+    var todayFromCache: PlannedSession? {
+        upcoming.first { $0.dateIso == Self.localTodayIso() }
+    }
+
+    /// Ask the phone for the plan.
+    ///
+    /// `sendMessage` is the one channel that makes iOS wake the containing app in the BACKGROUND,
+    /// which is the whole point: the runner is at the front door and their phone is in a drawer.
+    /// The phone answers from its own persisted cache, so it does not need the web view running.
+    func requestSync() {
+        guard WCSession.isSupported() else { return }
+        let session = WCSession.default
+        guard session.activationState == .activated, session.isCompanionAppInstalled else { return }
+        session.sendMessage(["request": "sync"], replyHandler: { [weak self] reply in
+            guard !reply.isEmpty else { return }
+            Task { @MainActor in self?.apply(reply) }
+        }, errorHandler: { error in
+            // Nothing to do and nothing to say: the watch already offers a free run, and the
+            // context may still arrive on its own later.
+            _ = error
+        })
+    }
+
     /// Sessions still ahead of us, freshest first — yesterday's leftovers are filtered out rather
     /// than offered, since a stale list is worse than a short one.
     var upcomingAhead: [PlannedSession] {
@@ -140,7 +164,7 @@ final class SessionStore: NSObject, ObservableObject {
         hasSynced = true
     }
 
-    fileprivate func apply(_ context: [String: Any]) {
+    func apply(_ context: [String: Any]) {
         if let iso = context["dateIso"] as? String, !iso.isEmpty {
             contextIso = iso
             UserDefaults.standard.set(iso, forKey: Self.isoKey)
@@ -177,11 +201,18 @@ final class SessionStore: NSObject, ObservableObject {
 }
 
 extension SessionStore: WCSessionDelegate {
+    nonisolated func sessionCompanionAppInstalledDidChange(_ session: WCSession) {
+        Task { @MainActor in self.requestSync() }
+    }
+
     nonisolated func session(_ session: WCSession, activationDidCompleteWith state: WCSessionActivationState, error: Error?) {
         let ctx = session.receivedApplicationContext
         Task { @MainActor in
             self.reachable = session.isReachable
             if !ctx.isEmpty { self.apply(ctx) }
+            // Nothing cached and nothing waiting: ask. This is what stops a freshly installed watch
+            // sitting on "Waiting for your plan" until the phone app happens to be opened.
+            if !self.isCurrent || !self.hasSynced { self.requestSync() }
         }
     }
 
@@ -191,6 +222,9 @@ extension SessionStore: WCSessionDelegate {
 
     nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
         let r = session.isReachable
-        Task { @MainActor in self.reachable = r }
+        Task { @MainActor in
+            self.reachable = r
+            if r, !self.isCurrent || !self.hasSynced { self.requestSync() }
+        }
     }
 }

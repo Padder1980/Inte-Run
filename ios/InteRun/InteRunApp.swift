@@ -12,6 +12,9 @@ struct InteRunApp: App {
         try? session.setCategory(.playback, mode: .spokenAudio,
                                  options: [.duckOthers, .mixWithOthers])
         try? session.setActive(true)
+        // Bring the watch bridge up now, not when the web view happens to be built. iOS can wake
+        // this app in the background purely to answer the watch, and at that point there is no page.
+        _ = WatchBridge.shared
     }
 
     var body: some Scene {

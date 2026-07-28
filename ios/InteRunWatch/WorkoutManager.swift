@@ -158,6 +158,13 @@ final class WorkoutManager: NSObject, ObservableObject {
         lastSplitMetre = 0
         lastSplitElapsed = 0
         lastLocation = nil
+        stillSince = nil
+        movingSince = nil
+        autoPaused = false
+        pausedAccum = 0
+        pauseBegan = nil
+        ticker?.invalidate(); ticker = nil
+        lastLiveSend = .distantPast
         startedAt = nil
         session = nil
         builder = nil
@@ -253,21 +260,24 @@ final class WorkoutManager: NSObject, ObservableObject {
 
             let now = Date()
             s.startActivity(with: now)
+            b.beginCollection(withStart: now) { _, _ in }
+            startedAt = now
+            phase = .running
+            // The tick travels FIRST — sendMessage also wakes the phone in the background — so by
+            // the time the mirrored-launch handler runs, the phone usually knows the run's real
+            // title and the lock-screen card is named after the run, not after today's plan.
+            sendLiveTick(force: true)
             // ⚠️ This is what puts a card on a locked iPhone for a wrist-started run. It launches
             // the companion app in the background, and THAT launch carries Apple's one-time
             // permission to start a Live Activity from the background — the WatchConnectivity wake
             // we were using does not. See MirroredWorkoutService on the phone.
-            // Called immediately after startActivity so the phone's ~10-second budget begins as
-            // early as possible. A failure here costs the card, never the run.
+            // A failure here costs the card, never the run.
             s.startMirroringToCompanionDevice { ok, error in
                 if !ok {
                     let why = error?.localizedDescription ?? "unknown"
                     print("workout mirroring did not start: \(why)")
                 }
             }
-            b.beginCollection(withStart: now) { _, _ in }
-            startedAt = now
-            phase = .running
             voice = WatchSettings.shared.voiceCues ? WorkoutVoice() : nil
             voice?.loadCoach(coach, lines: coachLines)
             voice?.loadWhy(why, person: whyPerson)
@@ -278,8 +288,6 @@ final class WorkoutManager: NSObject, ObservableObject {
             } else {
                 if !speakOnPhone("session-start") { voice?.say("Let\u{2019}s go. Run by feel.") }
             }
-
-            sendLiveTick(force: true)   // the phone shows the run the moment the wrist starts it
 
             locations.requestWhenInUseAuthorization()
             // Safe now: an active workout session makes the app backgroundable. Claimed only for
@@ -292,8 +300,20 @@ final class WorkoutManager: NSObject, ObservableObject {
             // The builder's own elapsed time only updates on data arrival; a display needs a tick.
             ticker = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
                 Task { @MainActor in
-                    guard let self, let started = self.startedAt, self.phase == .running else { return }
-                    self.elapsed = Date().timeIntervalSince(started)
+                    guard let self, let started = self.startedAt else { return }
+                    // ⚠️ A paused run still needs the ticker: auto-resume lives in autoPauseTick,
+                    // and the phone's mirror needs ticks or it declares the run dead after 45 s.
+                    // The old guard returned for any non-running phase, so the first auto-pause was
+                    // permanent — the branch that would have resumed could never execute again.
+                    guard self.phase == .running || self.phase == .paused else { return }
+                    if self.phase == .paused {
+                        self.autoPauseTick()
+                        self.sendLiveTick()
+                        return
+                    }
+                    // ⚠️ Minus the paused time. Elapsed was wall-clock since start, so pausing froze
+                    // the display and then SNAPPED FORWARD on resume, counting the whole pause.
+                    self.elapsed = Date().timeIntervalSince(started) - self.pausedAccum
                     self.advanceStepIfDue()
                     // The wrist still decides WHEN — it owns the pace data and the hold/quiet
                     // windows — but the phone says it, in the coach's own recorded voice.
@@ -318,6 +338,7 @@ final class WorkoutManager: NSObject, ObservableObject {
         guard phase == .running else { return }
         session?.pause()
         phase = .paused
+        pauseBegan = Date()
         if !speakOnPhone("paused") { voice?.sayPaused() }
         sendLiveTick(force: true)
     }
@@ -325,6 +346,8 @@ final class WorkoutManager: NSObject, ObservableObject {
     func resume() {
         guard phase == .paused else { return }
         session?.resume()
+        if let began = pauseBegan { pausedAccum += Date().timeIntervalSince(began) }
+        pauseBegan = nil
         phase = .running
         if !speakOnPhone("resumed") { voice?.sayResumed() }
         sendLiveTick(force: true)
@@ -335,6 +358,11 @@ final class WorkoutManager: NSObject, ObservableObject {
         // Drop the phone's mirror now; the recorded run follows by its own durable path. The phase
         // is deliberately NOT set here — HealthKit teardown below owns that transition.
         sendLiveTick(force: true, stateOverride: "ended")
+        // ⚠️ Durable, immediately. sendHome was only wired to the effort screen's buttons, so a run
+        // finished from the phone — or a watch that slept on the summary screen — never reached the
+        // Logbook at all. The effort screen still sends again; that delivery carries the RPE and
+        // the phone updates rather than duplicating.
+        sendHome()
         ticker?.invalidate(); ticker = nil
         locations.stopUpdatingLocation()
         guard let s = session, let b = builder else { phase = .ended; return }
@@ -418,6 +446,9 @@ final class WorkoutManager: NSObject, ObservableObject {
     /// decides what it sounds like. `WorkoutVoice` is now only the fallback for when the phone is
     /// out of range.
     func speakOnPhone(_ trigger: String, text: String? = nil) -> Bool {
+        // ⚠️ Spoken cues OFF must mean off. Returning true — "handled, say nothing" — also stops
+        // every caller's `voice?` fallback from speaking, and survives a future non-nil voice.
+        guard WatchSettings.shared.voiceCues else { return true }
         guard WCSession.isSupported() else { return false }
         let s = WCSession.default
         guard s.activationState == .activated, s.isReachable else { return false }
@@ -449,7 +480,10 @@ final class WorkoutManager: NSObject, ObservableObject {
         if let l = lapPaceSecPerKm { live["lapPaceSec"] = Int(l.rounded()) }
         if heartRate > 0 { live["hr"] = Int(heartRate) }
         if let st = currentStep { live["step"] = st.label }
-        if let plan { live["title"] = plan.title; live["type"] = plan.type }
+        // Always stated, never conditional: the phone names the lock-screen card from this, and a
+        // free run must say "Free run", not inherit today's plan.
+        live["title"] = plan?.title ?? "Free run"
+        live["type"] = plan?.type ?? "easy"
         session.sendMessage(["live": live], replyHandler: nil, errorHandler: { _ in })
     }
 
@@ -461,10 +495,16 @@ final class WorkoutManager: NSObject, ObservableObject {
     private var stillSince: Date?
     private var movingSince: Date?
     private var autoPaused = false
+    /// Time spent paused, subtracted from the wall clock so a pause actually stops the clock.
+    private var pausedAccum: TimeInterval = 0
+    private var pauseBegan: Date?
     private func autoPauseTick() {
         guard WatchSettings.shared.autoPause else { return }
         let moving = (paceSecPerKm.map { $0 < 900 } ?? false)
         if phase == .running {
+            // A run that has not yet acquired GPS is not "stopped" — pausing it during the first
+            // fix would strand a run that never began. Movement has to have existed to be lost.
+            guard distanceMetres > 0 || paceSecPerKm != nil else { stillSince = nil; return }
             if moving { stillSince = nil } else if stillSince == nil { stillSince = Date() }
             if let since = stillSince, Date().timeIntervalSince(since) > 10 {
                 autoPaused = true; stillSince = nil; movingSince = nil
@@ -601,11 +641,19 @@ final class WorkoutManager: NSObject, ObservableObject {
 extension WorkoutManager: CLLocationManagerDelegate {
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locs: [CLLocation]) {
         Task { @MainActor in
-            guard phase == .running else { return }
+            guard phase == .running || phase == .paused else { return }
             // 25 m, not 50: a fix that vague is a circle the size of a house, and differencing
             // two of them produces "movement" out of nothing.
             let usable = locs.filter { $0.horizontalAccuracy > 0 && $0.horizontalAccuracy < 25 }
             guard !usable.isEmpty else { return }
+
+            // Paused: pace only, so auto-resume can SEE the runner set off again. No distance, no
+            // splits, no route — a pause must never bank metres.
+            if phase == .paused {
+                let sp = usable.last?.speed ?? -1
+                paceSecPerKm = sp > 0.5 ? 1000 / sp : nil
+                return
+            }
 
             var movedThisBatch = false
             for loc in usable {
@@ -631,10 +679,12 @@ extension WorkoutManager: CLLocationManagerDelegate {
                 lastLocation = loc
             }
             // Prefer the device's own speed when it reports one; it is far steadier than
-            // differentiating positions.
-            if let speed = usable.last?.speed, speed > 0.5 {
-                paceSecPerKm = 1000 / speed
-            }
+            // differentiating positions. A KNOWN standstill clears the pace — leaving the last
+            // good pace in place made auto-pause blind, because "moving" read stale data forever.
+            let sp = usable.last?.speed ?? -1
+            if sp > 0.5 { paceSecPerKm = 1000 / sp }
+            else if sp >= 0 { paceSecPerKm = nil }
+            else if !movedThisBatch { paceSecPerKm = nil }
             recordSplits()
             // Downsampled, and only when the runner actually moved. Recording a point per fix
             // regardless drew a map out of standing-still drift — the numbers said 0.02 km and the

@@ -42,11 +42,21 @@ final class WatchBridge: NSObject {
 
     /// Held between "start on my watch" and the count-in reaching go.
     private var pendingWatchSession: [String: Any]?
+    /// ⚠️ "startNow" fires three seconds after `startWatchApp`, and the watch app has almost never
+    /// finished launching and activating its WCSession by then — `isReachable` is false and a plain
+    /// send is silently dropped, taking the prescribed session with it. So the go signal stays
+    /// ARMED here and is flushed the moment the watch becomes reachable. Nothing started, nothing
+    /// told the runner: that was the "watch waits forever" failure.
+    private var pendingStartNow = false
+    /// Same delivery problem for the companion launch: the display request must survive the gap.
+    private var pendingCompanionStart = false
+    /// Generation counter for the give-up timer, so an old deadline cannot cancel a new attempt.
+    private var startNowGeneration = 0
 
-    /// Today's session title/type from the last sync, so a mirrored workout can name its card
-    /// without waiting for a live tick it may not get for two seconds.
-    var cachedSessionTitle: String? { (lastPayload?["session"] as? [String: Any])?["title"] as? String }
-    var cachedSessionType: String? { (lastPayload?["session"] as? [String: Any])?["type"] as? String }
+    /// What the wrist says it is RUNNING, from the most recent live tick — not today's plan, which
+    /// is wrong for a free run, an added session or another day's. Stale ticks don't count.
+    var liveRunTitle: String? { Date().timeIntervalSince(lastLiveAt) < 30 ? lastLive?["title"] as? String : nil }
+    var liveRunType: String? { Date().timeIntervalSince(lastLiveAt) < 30 ? lastLive?["type"] as? String : nil }
 
     /// The most recent live tick, so the page can be dropped straight onto the live screen the
     /// moment the app becomes active — rather than showing Today for two seconds and then jumping.
@@ -164,6 +174,13 @@ extension WatchBridge: WCSessionDelegate {
 
     /// Everything the watch can send that is not a sync request.
     private func route(_ message: [String: Any]) {
+        // Heart rate from the wrist while the PHONE records — the companion's whole purpose.
+        if let hr = message["companionHR"] as? Int {
+            DispatchQueue.main.async { [weak self] in
+                self?.webView?.evaluateJavaScript("window.__interunCompanionHR && window.__interunCompanionHR(\(hr));")
+            }
+            return
+        }
         // The wrist asking the phone to speak. It decides WHEN; we decide what it sounds like, which
         // is the whole point — the recorded coaches live here, not on the watch.
         if let cue = message["cue"] as? String {
@@ -232,9 +249,62 @@ extension WatchBridge: WCSessionDelegate {
             config.activityType = .running
             config.locationType = .outdoor
             store.startWatchApp(with: config) { ok, error in
+                if !ok {
+                    // The tap raised a placeholder Live Activity; a launch that failed must take it
+                    // down or a dead card sits on the lock screen forever, surviving relaunches.
+                    Task { @MainActor in LiveActivityService.shared.endIfCurrent("watch-pending") }
+                }
                 self?.reportStart(ok, ok ? nil : (error?.localizedDescription ?? "Couldn’t open InteRun on your watch."))
             }
         }
+    }
+
+    private func armStartNow() {
+        pendingStartNow = true
+        startNowGeneration += 1
+        let gen = startNowGeneration
+        flushStartNow()
+        // If the watch never becomes reachable, say so — a runner staring at "Starting on your
+        // Apple Watch…" deserves an answer, and the stranded placeholder card must come down.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 25) { [weak self] in
+            guard let self, self.pendingStartNow, self.startNowGeneration == gen else { return }
+            self.pendingStartNow = false
+            self.pendingWatchSession = nil
+            Task { @MainActor in LiveActivityService.shared.endIfCurrent("watch-pending") }
+            self.reportStart(false, "Couldn’t reach your watch — open InteRun on it and press start.")
+        }
+    }
+
+    /// Deliver the armed go signal, with the session riding on it. Stays armed on any failure;
+    /// re-run from sessionReachabilityDidChange the moment the watch comes up.
+    private func flushStartNow() {
+        guard pendingStartNow, WCSession.isSupported() else { return }
+        let s = WCSession.default
+        guard s.activationState == .activated, s.isReachable else { return }
+        var msg: [String: Any] = ["command": "startNow"]
+        let sess = pendingWatchSession
+        if let sess { msg["session"] = sess }
+        pendingStartNow = false
+        pendingWatchSession = nil
+        s.sendMessage(msg, replyHandler: nil, errorHandler: { [weak self] _ in
+            // Undelivered: re-arm and let the next reachability change retry. A duplicate on the
+            // watch is harmless — its start guards on !running.
+            DispatchQueue.main.async {
+                self?.pendingStartNow = true
+                self?.pendingWatchSession = sess
+            }
+        })
+    }
+
+    /// Same pattern for the companion request: hold it until the watch can hear.
+    private func flushCompanionStart() {
+        guard pendingCompanionStart, WCSession.isSupported() else { return }
+        let s = WCSession.default
+        guard s.activationState == .activated, s.isReachable else { return }
+        pendingCompanionStart = false
+        s.sendMessage(["command": "companionStart"], replyHandler: nil, errorHandler: { [weak self] _ in
+            DispatchQueue.main.async { self?.pendingCompanionStart = true }
+        })
     }
 
     private func reportStart(_ ok: Bool, _ reason: String?) {
@@ -357,6 +427,15 @@ extension WatchBridge: WCSessionDelegate {
     }
 
     // Required on iOS: the user can unpair one watch and pair another without relaunching.
+    /// ⚠️ No default arguments on WCSessionDelegate methods (they break the @objc signature and the
+    /// delegate silently stops firing — see CLAUDE.md).
+    func sessionReachabilityDidChange(_ session: WCSession) {
+        DispatchQueue.main.async { [weak self] in
+            self?.flushStartNow()
+            self?.flushCompanionStart()
+        }
+    }
+
     func sessionDidBecomeInactive(_ session: WCSession) {}
     func sessionDidDeactivate(_ session: WCSession) { WCSession.default.activate() }
 }
@@ -392,9 +471,10 @@ extension WatchBridge: WKScriptMessageHandler {
             }
         case "startCompanion":
             // Launch the watch to WATCH. HealthKit's startWatchApp is the only way to wake it from
-            // here; the watch decides what to do with the launch, and companionOnly tells it to
-            // display rather than record.
-            sendToWatch(["command": "companionStart"])
+            // here — which also means the watch is NOT yet reachable, so the request is armed and
+            // flushed on reachability rather than sent into the void.
+            pendingCompanionStart = true
+            flushCompanionStart()
             startWatchWorkout(title: (body["title"] as? String) ?? "Run",
                               type: (body["type"] as? String) ?? "easy",
                               companion: true)
@@ -404,19 +484,15 @@ extension WatchBridge: WKScriptMessageHandler {
             live["title"] = body["title"] as? String ?? "Run"
             sendToWatch(["phoneLive": live])
         case "endCompanion":
+            pendingCompanionStart = false   // a run that ended before the watch woke needs nothing
             sendToWatch(["command": "companionEnd"])
         case "watchCommand":
-            // Straight through to the wrist. Fire-and-forget: if the watch is unreachable the run
-            // simply carries on there, which is the safe failure — a run must never be ended by a
-            // message that only half-arrived.
+            // Pause/resume/stop stay fire-and-forget: if the watch is unreachable the run simply
+            // carries on there, which is the safe failure — a run must never be ended by a message
+            // that only half-arrived. "startNow" is different: it MUST arrive, so it arms and
+            // flushes rather than firing blind.
             if let cmd = body["command"] as? String {
-                var msg: [String: Any] = ["command": cmd]
-                // The go signal carries the session, because only now is the watch listening.
-                if cmd == "startNow", let sess = pendingWatchSession {
-                    msg["session"] = sess
-                    pendingWatchSession = nil
-                }
-                sendToWatch(msg)
+                if cmd == "startNow" { armStartNow() } else { sendToWatch(["command": cmd]) }
             }
         case "sync":
             // `session` is deliberately allowed to be absent: that is how the page says "rest day",

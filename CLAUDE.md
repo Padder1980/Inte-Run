@@ -553,12 +553,35 @@ because the two sides must agree on the type exactly and a copied file would dri
 `LiveActivityService` starts/updates/ends it; watch runs drive it from `WatchBridge.forwardLive`,
 phone runs from `pushLiveActivity()` in `web/app.ts` via a `liveActivity` bridge action. Tapping the
 card opens the app and `replayLiveOnActivate()` lands it on the live screen.
-**When a watch is present, the WATCH records — whichever device you started from.** Better sensors,
-heart rate, and it survives the phone going in a pocket; crucially it is ONE recorder, so the run is
-logged once. The start sheet's choice is really "where do you want to look and press", and both
-devices can now do everything. Only a treadmill run, or a runner with no watch, is recorded by the
-phone. ⚠️ The old `CompanionView` display-only path is superseded and unused — do not revive it as a
-second recorder.
+**THE ARCHITECTURE (owner's decision, 2026-07-29): the PHONE records and controls; the WATCH
+supports.** "This iPhone" is the recommended default — GPS, route, coach and controls on the phone —
+and the watch joins as a companion: `CompanionView` shows the phone's live numbers, and
+`CompanionSession` (a sensors-only `HKWorkoutSession` whose workout is **discarded, never finished**)
+streams heart rate to the phone as `companionHR` → `__interunCompanionHR` → `LIVE.watchHr`, which
+feeds the live runtime, the lock-screen card and the logged run's `avgHr`. "My Apple Watch" remains
+the deliberate opt-in for phone-free wrist recording. ⚠️ Still exactly ONE recorder either way.
+
+⚠️ **Nothing can be sent to a watch app that is still LAUNCHING.** `sendMessage` needs
+`isReachable`, and `startWatchApp` has only just begun waking it — so "startNow" (and the companion
+request) are ARMED in `WatchBridge` and flushed from `sessionReachabilityDidChange`, with a 25 s
+give-up that tells the runner and takes the placeholder card down. Firing them blind was the "watch
+waits forever on Today" failure, and it destroyed the prescribed session with it.
+
+⚠️ **Run-lifecycle rules the audit of 2026-07-29 paid for — do not unpick:**
+- A bottom-nav tap during `liveRunning()` must NOT call `stopLive()` (same rule as `liveBack`).
+- `openStartWhereSheet` refuses while a run is live or finished-but-unsaved; the pill shows
+  "Run not saved" and routes back to Save/Discard.
+- GPS failure in the native app falls to the honest timed mode, NEVER `startSim()` — the simulator
+  fabricates distance and a London route the flags engine can't tell from a real run. Sim runs are
+  stamped `sim: true` and skip all adaptive checks.
+- `coachResetSession(true)` fires on every NEW watch run id, or the coach is silent for the second
+  run of an app session (every prompt still inside its repeat window).
+- The wrist's `WorkoutManager` ticker must keep serving `.paused` (auto-resume + mirror ticks live
+  there), `elapsed` subtracts `pausedAccum` (it snapped forward on resume), a KNOWN GPS standstill
+  nils `paceSecPerKm` (stale pace made auto-pause blind), and `reset()` clears the auto-pause fields
+  or run 2 pauses instantly and is dropped as "too short".
+- `end()` calls `sendHome()` — the effort screen's later delivery only updates the RPE
+  (`ingestWatchRun` writes it through instead of binning the duplicate).
 
 ⚠️ **`WorkoutManager` outlives a run (it is a `@StateObject`), so `reset()` on every start is
 load-bearing.** Without it a second run inherits the first one's distance, splits, route and step

@@ -45,15 +45,25 @@ final class MirroredWorkoutService: NSObject {
         mirrored.delegate = self
 
         // First, and before anything that could fail: the ten-second grant is what we came for.
-        let title = WatchBridge.shared.cachedSessionTitle ?? "Run"
-        let type = WatchBridge.shared.cachedSessionType ?? "easy"
-        LiveActivityService.shared.start(
-            runId: "mirrored-\(mirrored.startDate?.timeIntervalSince1970 ?? 0)",
-            title: title, type: type,
-            state: .init(elapsedSeconds: 0, distanceKm: 0, paceSecPerKm: nil, heartRate: nil,
-                         step: nil, paused: false, onWatch: true),
-            allowBackground: true,
-        )
+        // Named after the run the wrist says it is RUNNING (its live tick), never after today's
+        // plan — a free run is not "4 × 6′ threshold". If the tick loses the race the card says
+        // "Run", which is generic but never a lie.
+        let title = WatchBridge.shared.liveRunTitle ?? "Run"
+        let type = WatchBridge.shared.liveRunType ?? "easy"
+        let state = RunActivityAttributes.ContentState(
+            elapsedSeconds: 0, distanceKm: 0, paceSecPerKm: nil, heartRate: nil,
+            step: nil, paused: false, onWatch: true)
+        if LiveActivityService.shared.isRunning {
+            // The tap on the phone already raised the card (correctly titled). Keep it; the ticks
+            // will drive it. Requesting a fresh one here would tear it down and re-request.
+            LiveActivityService.shared.update(state)
+        } else {
+            LiveActivityService.shared.start(
+                runId: "mirrored-\(mirrored.startDate?.timeIntervalSince1970 ?? 0)",
+                title: title, type: type, state: state,
+                allowBackground: true,
+            )
+        }
         SelfCheck.logger.notice("mirrored workout adopted; live activity requested")
     }
 }

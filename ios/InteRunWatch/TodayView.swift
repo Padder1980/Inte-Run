@@ -199,12 +199,11 @@ struct TodayView: View {
                     beginNow(s)          // no count: the phone has already done it
                 }
             }
-            // The context can land a moment after the launch, so try again when it does.
-            .onChange(of: store.session) { _, s in
-                guard autoStart, !running, store.isCurrent, let s else { return }
-                LaunchRequest.shared.consume()
-                begin(s)
-            }
+            // ⚠️ Deliberately NO .onChange(of: store.session) auto-start here. One existed, and it
+            // raced the phone: a context landing after launch began TODAY'S CACHED session with its
+            // own second countdown, while the phone counted the session actually chosen. The
+            // onStartNow closure above resolves the session at go-time; a go that never arrives
+            // leaves the watch honestly on Today with its Start button.
         }
     }
 

@@ -49,7 +49,12 @@ final class LiveActivityService {
             // Already showing something. Adopt it rather than tearing it down — a background tick
             // that ends the card CANNOT recreate it (foreground-only), so destroying a working card
             // out here is permanent. A slightly stale title beats no card.
-            if currentRunId != runId, !isForeground { currentRunId = runId }
+            //
+            // ⚠️ A watch run's id churns through watch-pending → mirrored-… → watch-<uuid> in its
+            // first seconds. Those are all the SAME run, so the one card is handed along rather
+            // than being torn down and re-requested twice.
+            let bothWatch = isWatchRunId(currentRunId) && isWatchRunId(runId)
+            if currentRunId != runId, !isForeground || bothWatch { currentRunId = runId }
             if currentRunId == runId { return update(state) }
             _ = existing
             endImmediately()
@@ -92,6 +97,26 @@ final class LiveActivityService {
     func clearRefusals() { refusedRunIds.removeAll() }
 
     private var isForeground: Bool { UIApplication.shared.applicationState == .active }
+
+    private func isWatchRunId(_ id: String?) -> Bool {
+        guard let id else { return false }
+        return id.hasPrefix("watch") || id.hasPrefix("mirrored")
+    }
+
+    /// End only the card raised on spec for this run id. A failed watch launch must never take a
+    /// phone run's card down with it.
+    func endIfCurrent(_ runId: String) {
+        guard currentRunId == runId else { return }
+        activity = nil
+        currentRunId = nil
+        // Reuse the immediate-teardown path via a local copy: endImmediately() reads `activity`,
+        // which we just cleared, so end the captured one directly.
+        Task { @MainActor in
+            for a in Activity<RunActivityAttributes>.activities where a.attributes.runId == runId {
+                await a.end(nil, dismissalPolicy: .immediate)
+            }
+        }
+    }
 
     /// The last thing that happened, for Support › Your data › This version.
     private func note(_ what: String) {

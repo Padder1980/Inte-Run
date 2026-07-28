@@ -52,9 +52,6 @@ struct SettingsView: View {
                 Toggle(isOn: $settings.voiceCues) {
                     label("Spoken cues", "Step changes, pace nudges and your reasons for running.")
                 }
-                Toggle(isOn: $settings.alwaysOn) {
-                    label("Keep screen on", "Stays lit through the run. Costs battery.")
-                }
             } header: {
                 Text("RUN SETTINGS")
             }

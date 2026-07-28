@@ -6,11 +6,12 @@ import SwiftUI
 /// would put the same outing in the Logbook twice, which is the rule the whole watch design is built
 /// around. What appears here is the phone's own numbers, pushed across every couple of seconds.
 ///
-/// Because there is no workout session there is also no heart rate: HR needs an `HKWorkoutSession`
-/// on the wrist, and starting one here is exactly the double-recording this avoids. If wrist HR
-/// during a phone-recorded run is wanted, that is a deliberate piece of work, not a toggle.
+/// Heart rate comes from CompanionSession — a sensors-only workout session whose workout is
+/// DISCARDED at the end, so the wrist contributes its one irreplaceable signal without ever
+/// becoming a second recorder. The number shows here and streams to the phone's run.
 struct CompanionView: View {
     @EnvironmentObject private var store: SessionStore
+    @ObservedObject private var sensors = CompanionSession.shared
 
     var body: some View {
         ScrollView {
@@ -32,6 +33,7 @@ struct CompanionView: View {
                 stat(elapsedText, "TIME", big: true)
                 stat(distanceText, "DISTANCE")
                 stat(paceText, "PACE", unit: "/KM")
+                stat(sensors.heartRate > 0 ? "\(Int(sensors.heartRate))" : "--", "HEART", unit: "BPM")
 
                 Text("Your phone is recording this run. Finish it there.")
                     .font(.system(size: 10))

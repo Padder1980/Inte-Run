@@ -2028,7 +2028,7 @@ function viewToday() {
   const greeting = profile.name ? '<div class="greeting">Hi, <b>' + esc(profile.name) + '</b> \\uD83D\\uDC4B</div>' : "";
   const onToday = TODAY_IN_PLAN && isCurrentWeek() && state.selDay === TODAY_DOW;
   let cta = "";
-  if (mirror) cta = "";
+  if (mirror || liveRunning()) cta = "";
   else if (sess && onToday && PRIMARY_TYPES[sess.type]) cta = '<button class="primary start-btn" id="startSession">' + ICON.play + ' Start session</button>';
   else if (sess) cta = '<button class="primary start-btn" id="viewSession">' + ICON.play + ' View session</button>';
   return mirror + banner + autoPaceBanner() + trainFlagBanner() + fitSuggestBanner() + greeting + weekStrip() +
@@ -2471,7 +2471,16 @@ function migrateRunRoutes() {
 }
 function ingestWatchRun(run) {
   if (!run || !run.id) return "no run";
-  if ((state.logged || []).some((r) => r.id === run.id)) return "already logged"; // deliveries can repeat
+  const prior = (state.logged || []).find((r) => r.id === run.id);
+  if (prior) {
+    // The run is sent home twice on purpose: once the moment it ends (durable, needs no tap on the
+    // wrist) and again from the effort screen carrying the RPE. The second delivery must write the
+    // RPE through, not be binned as a duplicate — the flags engine starves without it.
+    if (run.rpe >= 1 && run.rpe <= 10 && prior.rpe !== Math.round(run.rpe)) {
+      prior.rpe = Math.round(run.rpe); saveRuns(); maybeTrainingFlags(); render();
+    }
+    return "already logged";
+  }
   const sec = Math.max(0, Math.round(Number(run.sec) || 0));
   const distKm = Math.max(0, Number(run.distKm) || 0);
   // A deliberate workout can have almost no GPS distance - a treadmill run, or anything indoors.
@@ -2486,7 +2495,7 @@ function ingestWatchRun(run) {
   const prescribed = rawSessionsForIso(iso)[0] || null; // engine: carries the bands the flags need
   const title = run.title || (prescribed && prescribed.title) || (planned && planned.title) || "Run";
   state.logged.unshift({
-    id: run.id, t: title, d: dayLabelIso(iso), dist: distKm.toFixed(2) + " km",
+    id: run.id, t: title, d: dayLabelIso(iso > todayIso() ? todayIso() : iso), dist: distKm.toFixed(2) + " km",
     time: fmtPace(sec), pace: avgPaceSec ? fmtPace(avgPaceSec) + " /km" : "\u2014",
     distKm: Number(distKm.toFixed(2)), sec: sec, avgPaceSec: avgPaceSec,
     route: normalizeRoute(run.route), splits: Array.isArray(run.splits) ? run.splits : [],
@@ -2527,6 +2536,12 @@ window.__interunWatchLive = function (live) {
   // A run in progress on the phone always wins: whatever the wrist is doing, it must never redraw
   // the screen someone is running with.
   if (liveRunning()) return;
+  WATCH_LIVE_PENDING = false;   // the wrist is talking; the waiting room is over
+  // ⚠️ A NEW run id is a new session: reset the coach's per-run state (repeat windows, halfway, the
+  // why) or the second run of an app session is completely silent — every prompt still sits inside
+  // its repeat window from the previous run. keepAudio, because the count-in's "go" clip is often
+  // still playing when the first tick lands.
+  if (live.id !== WATCH_LIVE_ID) { WATCH_LIVE_ID = live.id; coachResetSession(true); }
   const wasActive = watchLiveActive();
   WATCH_LIVE = (live.state === "ended") ? null : live;
   clearTimeout(WATCH_LIVE_T);
@@ -2549,6 +2564,10 @@ window.__interunWatchLive = function (live) {
   if (!watchLiveActive() && state.screen === "watchlive") { state.screen = null; WATCH_LIVE_LEFT = false; render(); return; }
   if (state.screen === "watchlive" || (state.tab === "today" && !state.screen && (wasActive || watchLiveActive()))) render();
 };
+// True between "start on my watch" being sent and the first live tick arriving — the waiting room.
+let WATCH_LIVE_PENDING = false;
+// The watch run the coach's per-run state was last reset for.
+let WATCH_LIVE_ID = null;
 // Set when the runner deliberately backs out of the full-screen wrist view, so the next tick does
 // not drag them straight back into it.
 let WATCH_LIVE_LEFT = false;
@@ -2565,6 +2584,14 @@ function confirmSheet(title, body, confirmLabel, onConfirm) {
   $("cfNo").onclick = closeSheet;
   $("cfYes").onclick = () => { closeSheet(); onConfirm(); };
 }
+// Live heart rate from the wrist while the PHONE records. The watch runs a sensors-only workout
+// session — never logged, discarded at the end — purely so its heart-rate hardware streams.
+window.__interunCompanionHR = function (bpm) {
+  bpm = Math.round(Number(bpm) || 0);
+  if (!bpm || bpm < 30 || bpm > 240 || !LIVE || LIVE.done) return;
+  LIVE.watchHr = bpm;
+  LIVE.hrSum = (LIVE.hrSum || 0) + bpm; LIVE.hrN = (LIVE.hrN || 0) + 1;
+};
 // Wake the watch to WATCH the run — display only, no second recorder. Silent if there is no watch.
 function startWatchCompanion(sess) {
   if (!NATIVE_WATCH || !watchAvailable()) return;
@@ -2662,7 +2689,17 @@ function watchCommand(cmd) {
 // room it deserves, and still read-only: the watch owns the run, so there is nothing to press here
 // except the way back.
 function viewWatchLive() {
-  if (!watchLiveActive()) return '<div class="card"><div class="bk-md">That run has finished.</div></div>';
+  // ⚠️ Two different empty states. Before the first tick this screen is a waiting room, and calling
+  // it "finished" — which is what happened when the count-in overlay lifted — reads as the run
+  // having failed. Both carry the back button; the empty state must never be a dead end.
+  if (!watchLiveActive()) {
+    return '<button class="backbtn" id="wlBack">\u2039 Back</button>' +
+      '<div class="card"><div class="bk-md">' +
+      (WATCH_LIVE_PENDING
+        ? 'Starting on your Apple Watch\u2026 it counts you in from your wrist.'
+        : 'That run has finished.') +
+      '</div></div>';
+  }
   const L = WATCH_LIVE;
   const paused = L.state === "paused";
   const pace = (v) => (v > 0 ? fmtPace(v) : "\u2014");
@@ -5137,11 +5174,12 @@ function coachStop() {
   try { if (COACH.audio) { COACH.audio.pause(); } } catch (e) {}
   stopSpeech();
 }
-function coachResetSession() {
+function coachResetSession(keepAudio) {
   COACH.history = RC.newPromptHistory(); COACH.halfwayDone = false; COACH.finalDone = false;
   COACH.paceSince = 0; COACH.paceWas = ""; COACH.lastPaceCueAt = -999; COACH.paceCorrectionPending = false;
   COACH.whyDone = false; COACH.whyShown = null; COACH.lastKeepGoingAt = -999;
-  COACH.settleDone = false; COACH.lastTechAt = -999; COACH.highEffortSince = 0; coachStop();
+  COACH.settleDone = false; COACH.lastTechAt = -999; COACH.highEffortSince = 0;
+  if (!keepAudio) coachStop();
 }
 // Map a live step's kind + the session type to the right trigger when a step begins.
 function coachStepTrigger(stepKind, sessionType) {
@@ -5265,6 +5303,12 @@ function wireCoachSettings() {
 let START_CTX = null;   // the session waiting on a choice
 function watchAvailable() { return !!(WATCH_STATUS && WATCH_STATUS.paired && WATCH_STATUS.installed); }
 function openStartWhereSheet(sess) {
+  // A run is already under way (or finished but not yet saved): starting another would discard it
+  // with no trace. Route back to it instead — Save or Discard is the runner's call, not a side
+  // effect of tapping Start.
+  if (liveRunning() || (LIVE && LIVE.done && LIVE.summary && !LIVE.summary.saved)) {
+    state.screen = "live"; render(); return;
+  }
   START_CTX = sess || null;
   ensureSheet(); SHEET_CTX = null;
   $("sheetBody").innerHTML = startWhereHtml(sess);
@@ -5280,7 +5324,7 @@ function startWhereHtml(sess) {
     '<span class="sw-b"><span class="sw-n">' + name + (badge ? '<span class="sw-badge">' + badge + '</span>' : "") + '</span>' +
     '<span class="sw-d">' + note + '</span></span><span class="arr">\u203a</span></button>';
   const watchRow = watchAvailable()
-    ? row("watch", ICON.watch, "My Apple Watch", "Best accuracy, and your phone can stay at home. Your watch will open on its own.", "recommended")
+    ? row("watch", ICON.watch, "My Apple Watch", "Recorded on your wrist \u2014 your phone can stay at home.")
     : (NATIVE_WATCH
         ? '<div class="sw-row sw-off"><span class="sw-ic">' + ICON.watch + '</span><span class="sw-b"><span class="sw-n">My Apple Watch</span>' +
           '<span class="sw-d">' + (WATCH_STATUS && WATCH_STATUS.paired
@@ -5290,11 +5334,11 @@ function startWhereHtml(sess) {
   return '<div class="sheet-h">Where shall we record this?</div>' +
     '<div class="sheet-sub">' + esc((sess && sess.title) || "Your session") + '</div>' +
     '<div class="sw-list">' + watchRow +
-      row("phone", ICON.phone,
-        watchAvailable() ? "Start here, record on my watch" : "This iPhone",
+      row("phone", ICON.phone, "This iPhone",
         watchAvailable()
-          ? "Your watch does the recording \u2014 better GPS and heart rate \u2014 and you follow along, pause and finish from this screen."
-          : "GPS, pace and route recorded here. Keep the phone with you.") +
+          ? "GPS, pace, route and your coach here \u2014 your watch joins in with live numbers and heart rate."
+          : "GPS, pace and route recorded here. Keep the phone with you.",
+        "recommended") +
       row("treadmill", ICON.treadmill, "Treadmill", "Indoors, timed by the clock. Add the distance from the machine when you finish.") +
     '</div>';
 }
@@ -5303,17 +5347,27 @@ function wireStartWhere() {
     const where = b.dataset.startwhere, sess = START_CTX;
     closeSheet();
     if (where === "watch") return startOnWatch(sess);
-    // ⚠️ "This iPhone" with a watch on your wrist still records ON THE WATCH. Better sensors, heart
-    // rate, and it survives the phone being pocketed — and crucially it is ONE recorder, so the run
-    // is logged once. What the choice really picks is where you want to look and press, and both
-    // devices can now do all of it: the phone's live screen pauses, resumes and finishes the run.
-    // Only a treadmill run, or a runner with no watch, is recorded by the phone itself.
-    if (where !== "treadmill" && watchAvailable()) return startOnWatch(sess, { fromPhone: true });
+    // ⚠️ The PHONE records. This is the owner's stated architecture: the phone controls everything,
+    // and the watch SUPPORTS it — a live display and a heart-rate source, never a second recorder.
+    // "My Apple Watch" above stays as the deliberate opt-in for phone-free wrist recording.
     startSession(sess, { indoor: where === "treadmill" });
+    startWatchCompanion(sess);
     // Already on the live screen by now; count in, then begin. The runner does not have to find a
     // second Start button — they pressed start, so the run starts.
     runCountIn(beginLive);
   });
+}
+// The real date a RAW session sits on, so a run started from another day's card is judged against
+// ITS prescription rather than today's — the pace band travels with the session. An "Added today"
+// custom session is not in RAW, and today is the right answer for it.
+function rawSessionIso(s) {
+  if (!s) return null;
+  for (let wi = 0; wi < RAW.weeks.length; wi++) {
+    if (RAW.weeks[wi].sessions.indexOf(s) < 0) continue;
+    const wk = PLAN.weeks[wi];
+    return wk ? isoAdd(wk.startIso, effDay(s)).toISOString().slice(0, 10) : null;
+  }
+  return null;
 }
 // Hand the run to the wrist. The watch app is launched by HealthKit on the native side; from then
 // on the watch owns the run and this phone shows the live mirror it already knows how to draw.
@@ -5326,7 +5380,8 @@ function startOnWatch(sess, opts) {
     // ⚠️ The SESSION travels, not just its name. The watch used to begin whatever its own cache
     // said today was, so starting anything else — an added session, another day's — silently ran
     // the wrong workout on the wrist.
-    const payload = watchSessionPayload(sess || rawToday(), todayIso());
+    const s = sess || rawToday();
+    const payload = watchSessionPayload(s, rawSessionIso(s) || todayIso());
     window.webkit.messageHandlers.interunWatch.postMessage({
       action: "startWorkout",
       title: (payload && payload.title) || "Run",
@@ -5339,6 +5394,7 @@ function startOnWatch(sess, opts) {
     // One count, one start. The phone counts in — it has the voices — and only on "go" does the
     // watch begin. Two independent three-second counts is how the clocks ended up a second apart.
     LIVE = null;
+    WATCH_LIVE_PENDING = true;
     state.screen = "watchlive"; WATCH_LIVE_LEFT = false; render();
     runCountIn(() => watchCommand("startNow"), (sess && sess.title) || "Run");
   } catch (e) { startSession(sess); }
@@ -5347,7 +5403,11 @@ window.__interunWatchStart = function (ok, reason) {
   // A failure has to say so: silently falling back to the phone would record the run in the wrong
   // place, and the runner would only find out afterwards.
   if (ok) return;
+  WATCH_LIVE_PENDING = false;
+  clearCountIn();
+  if (state.screen === "watchlive" && !watchLiveActive()) { state.screen = null; }
   toast(reason || "Couldn\u2019t start your watch \u2014 open InteRun on it and press start.");
+  render();
 };
 function startSession(sess, opts) {
   const s = (sess && sess.steps) ? sess : rawToday();
@@ -5413,12 +5473,29 @@ function beginLive() {
     LIVE.acquiring = true; renderLiveNow();
     navigator.geolocation.getCurrentPosition(
       (pos) => startGps(pos),
-      (err) => { LIVE.gpsErr = err && err.message; startSim(); },
+      (err) => { LIVE.gpsErr = (err && err.message) || "No GPS"; gpsFallback(); },
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
+    // ⚠️ The native shim ignores the timeout option entirely, so a fix that neither arrives nor
+    // fails (indoors, permission dialog left open) previously left "Acquiring GPS…" up forever.
+    // Enforce it page-side.
+    LIVE.acqT = setTimeout(() => {
+      if (LIVE && LIVE.acquiring && !LIVE.done) { LIVE.gpsErr = "Could not get a GPS fix."; gpsFallback(); }
+    }, 12000);
   } else { startSim(); }
 }
+// Where a run goes when GPS is denied or never arrives.
+// ⚠️ In the real app this must NEVER be the simulator: it invents distance, heart rate and a route
+// through central London, and the Logbook — and the flags engine judging the runner — cannot tell
+// it from a real run. The honest timed mode (the treadmill's) records what is actually known: time.
+// The simulator survives only for the browser demo, where it is the point.
+function gpsFallback() {
+  if (!LIVE || LIVE.done || LIVE.mode) return;
+  clearTimeout(LIVE.acqT);
+  if (inNativeApp()) { LIVE.indoor = true; startIndoor(); } else startSim();
+}
 function startGps(pos) {
-  if (!LIVE || LIVE.done) return;
+  if (!LIVE || LIVE.done || LIVE.mode) return;   // the timeout may already have started timed mode
+  clearTimeout(LIVE.acqT);
   LIVE.acquiring = false; LIVE.mode = "gps"; LIVE.startMs = Date.now();
   LIVE.lastLat = pos.coords.latitude; LIVE.lastLon = pos.coords.longitude; LIVE.acc = pos.coords.accuracy;
   requestWakeLock();
@@ -5442,7 +5519,7 @@ function startIndoor() {
 function indoorUiTick() {
   if (!LIVE || LIVE.mode !== "indoor") return;
   const at = liveElapsedMs();
-  if (LIVE.rt.getStatus() === "active") LIVE.rt.update({ atMs: at, distanceMeters: 0 }).forEach(liveCue);
+  if (LIVE.rt.getStatus() === "active") LIVE.rt.update(LIVE.watchHr ? { atMs: at, distanceMeters: 0, heartRateBpm: LIVE.watchHr } : { atMs: at, distanceMeters: 0 }).forEach(liveCue);
   renderLiveNow();
   // ⚠️ NOT inside renderLiveNow(): that returns early when the live screen is not mounted, which is
   // exactly the backgrounded case where the lock-screen card matters most.
@@ -5499,6 +5576,7 @@ function gpsUiTick() {
   if (LIVE.rt.getStatus() === "active") {
     const t = { atMs: at, distanceMeters: LIVE.dist };
     if (cur) t.paceSecPerKm = cur;
+    if (LIVE.watchHr) t.heartRateBpm = LIVE.watchHr;   // real HR, streamed from the wrist
     LIVE.rt.update(t).forEach(liveCue);
     checkSplits();
   }
@@ -5507,7 +5585,7 @@ function gpsUiTick() {
   if (LIVE.rt.getStatus() === "completed") { stopLive(); liveFinish(true); }
 }
 function gpsStatusText() {
-  if (LIVE.indoor) return "Treadmill · timed";
+  if (LIVE.indoor) return LIVE.gpsErr ? "No GPS · timed" : "Treadmill · timed";
   if (LIVE.acquiring) return "Acquiring GPS…";
   if (LIVE.mode === "sim") return LIVE.gpsErr ? "Simulated (no GPS)" : "Simulated";
   if (LIVE.mode === "gps") return LIVE.acc != null ? "GPS · ±" + Math.round(LIVE.acc) + " m" : "GPS";
@@ -5531,6 +5609,11 @@ function livePillState() {
   if (liveRunning() && state.screen !== "live") {
     return { where: "phone", label: LIVE.pauseStart ? "Paused" : "Live session",
              time: fmtPace(Math.max(0, Math.round(liveNowMs() / 1000))), paused: !!LIVE.pauseStart };
+  }
+  // Finished but not yet saved: keep the pill up as the route back to Save/Discard, so leaving the
+  // completion screen cannot silently discard a run. Discard stays the only way to throw one away.
+  if (LIVE && LIVE.done && LIVE.summary && !LIVE.summary.saved && state.screen !== "live") {
+    return { where: "unsaved", label: "Run not saved", time: LIVE.summary.time, paused: true };
   }
   if (watchLiveActive() && state.screen !== "live" && state.screen !== "watchlive") {
     return { where: "watch", label: WATCH_LIVE.state === "paused" ? "Paused on watch" : "Live on watch",
@@ -6229,7 +6312,9 @@ function pushLiveActivity(snap, force) {
       sec: Math.round((snap && snap.elapsedSeconds) || 0),
       distKm: (LIVE.dist || 0) / 1000,
       paceSec: Math.round((snap && snap.currentPaceSecPerKm) || 0) || undefined,
-      hr: Math.round(LIVE.hr || 0) || undefined,
+      // ⚠️ Real heart rate only. LIVE.hr is the SIMULATOR's invention (it idles at 105), and it was
+      // leaking onto the lock screen for genuine GPS runs.
+      hr: Math.round(LIVE.watchHr || (LIVE.mode === "sim" ? LIVE.hr : 0)) || undefined,
       step: step && step.label ? step.label : undefined,
       paused: !!LIVE.paused,
       state: "running",
@@ -6333,13 +6418,17 @@ function saveLiveSession() {
       distKm: Number(sm.distKm), sec: sm.sec, avgPaceSec: Math.round(sm.avgPaceSec), route: sm.route, splits: sm.splits, elevGain: sm.elevGain || 0, type: sm.type,
       // What the plan asked for + how it felt — the flags system's evidence.
       rpe: sm.rpe || null, pband: plannedPaceBandOf(LIVE.session), rband: plannedRpeBandOf(LIVE.session),
-      anchor: profile.recentTimeS, pmodel: PACE_MODEL_VERSION });
+      anchor: profile.recentTimeS, pmodel: PACE_MODEL_VERSION,
+      avgHr: LIVE.hrN ? Math.round(LIVE.hrSum / LIVE.hrN) : null,
+      sim: LIVE.mode === "sim" || undefined });
     sm.runId = state.logged[0].id;
     saveRuns();
   }
   const wk0 = PLAN.weeks[0]; const dn = DAY_ORDER[LIVE.session.dayOfWeek];
   if (LIVE.completedFull && wk0) { const m = wk0.sessions.find((s) => s.day === dn && s.title === LIVE.session.title); if (m) state.done[doneKey(wk0.index, m)] = true; }
   sm.saved = true;
+  // A simulated run (browser demo) must never steer the plan — its pace is an invention.
+  if (LIVE.mode === "sim") return;
   // Adaptive checks, most specific first: first-run calibration → multi-run flags → single-run hint.
   const ctx = { title: LIVE.session.title, session: null, completedFull: !!LIVE.completedFull, dayOfWeek: LIVE.session.dayOfWeek };
   if (!maybeAutoPaceCalibrate(LIVE.session.type, sm.avgPaceSec, Number(sm.distKm), ctx)) {
@@ -7002,7 +7091,7 @@ function wire() {
   const cancelTrial = $("cancelTrial"); if (cancelTrial) cancelTrial.onclick = () => { state.trialPending = false; render(); };
   // Live session wiring
   const startBtn = $("startSession"); if (startBtn) startBtn.onclick = () => openStartWhereSheet(null);
-  const wlb = $("wlBack"); if (wlb) wlb.onclick = () => { WATCH_LIVE_LEFT = true; state.screen = null; state.tab = "today"; render(); };
+  const wlb = $("wlBack"); if (wlb) wlb.onclick = () => { WATCH_LIVE_LEFT = true; WATCH_LIVE_PENDING = false; state.screen = null; state.tab = "today"; render(); };
   const wlp = $("wlPause"); if (wlp) wlp.onclick = () => {
     const paused = !!(WATCH_LIVE && WATCH_LIVE.state === "paused");
     watchCommand(paused ? "resume" : "pause"); haptic("tap");
@@ -7071,7 +7160,10 @@ function buildNav() {
     if (btn) chartEl.scrollLeft = Math.max(0, btn.offsetLeft - chartEl.clientWidth / 2 + btn.offsetWidth / 2);
   }
   $("nav").innerHTML = ["today","plan","activities","community","support"].map((t) => '<button type="button" class="navbtn' + (t===state.tab?" on":"") + '" data-tab="' + t + '">' + (t === "today" ? todayNavIcon() : ICON[t]) + '<span class="nl">' + TITLES[t].replace("Your ","") + '</span></button>').join("");
-  document.querySelectorAll(".navbtn").forEach((b) => b.onclick = () => { coachStop(); stopLive(); stopSpeech(); stopTrialRun(); TRIALRUN = null; state.screen = null; state.tab = b.dataset.tab; if (b.dataset.tab !== "support") state.support = null; if (b.dataset.tab === "today") { state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; } render(); });
+  // ⚠️ Same rule as liveBack: mid-run a tab tap is NAVIGATION, and the live pill is the way back.
+  // Without the guard this tore down GPS, the coach and the lock-screen card while the pill kept
+  // ticking — the run silently stopped recording and was then logged with a truncated distance.
+  document.querySelectorAll(".navbtn").forEach((b) => b.onclick = () => { if (!liveRunning()) { coachStop(); stopLive(); stopSpeech(); } stopTrialRun(); TRIALRUN = null; state.screen = null; state.tab = b.dataset.tab; if (b.dataset.tab !== "support") state.support = null; if (b.dataset.tab === "today") { state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; } render(); });
 }
 $("bellBtn").innerHTML = ICON.bell; $("themeBtn").innerHTML = ICON.theme; $("calBtn").innerHTML = ICON.cal; $("alfieBtn").innerHTML = ICON.alfie; renderAvatar();
 $("alfieBtn").onclick = openAlfie;

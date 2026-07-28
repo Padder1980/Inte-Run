@@ -115,7 +115,11 @@ final class SessionStore: NSObject, ObservableObject {
     /// The session the phone has told us to get ready for. Nil once it has been consumed.
     @Published var pendingSession: PlannedSession?
     /// Fired when the phone's count-in reaches go.
-    var onStartNow: (() -> Void)?
+    var onStartNow: (() -> Void)? {
+        didSet { if pendingGo, let go = onStartNow { pendingGo = false; go() } }
+    }
+    /// A go that arrived before anyone was listening.
+    private var pendingGo = false
 
     /// The phone's own run, while the watch is only watching. Nil when the phone is not recording.
     @Published var phoneLive: [String: Double]?
@@ -275,9 +279,17 @@ extension SessionStore: WCSessionDelegate {
                    let decoded = try? JSONDecoder().decode(PlannedSession.self, from: data) {
                     self.pendingSession = decoded
                 }
-                self.onStartNow?()
-            case "companionStart": LaunchRequest.shared.requestCompanion()
-            case "companionEnd": LaunchRequest.shared.endCompanion()
+                // The go can beat TodayView installing its handler (both race app launch). Hold it;
+                // the handler fires it on installation instead of it evaporating.
+                if let go = self.onStartNow { go() } else { self.pendingGo = true }
+            case "companionStart":
+                LaunchRequest.shared.requestCompanion()
+                // The sensor switch: continuous heart rate only flows inside a workout session,
+                // so a discard-only one runs for the life of the phone's run.
+                CompanionSession.shared.start()
+            case "companionEnd":
+                LaunchRequest.shared.endCompanion()
+                CompanionSession.shared.stop()
             case "stop": self.onStopRequested?()
             case "pause": self.onPauseRequested?()
             case "resume": self.onResumeRequested?()

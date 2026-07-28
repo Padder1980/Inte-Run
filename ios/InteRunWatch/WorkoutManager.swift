@@ -24,6 +24,8 @@ final class WorkoutManager: NSObject, ObservableObject {
     @Published private(set) var stepStartElapsed: TimeInterval = 0
     @Published private(set) var stepStartMetres: Double = 0
     @Published private(set) var avgHeartRate: Double = 0
+    /// Active energy, for the runners who want it on their run screen.
+    @Published private(set) var activeCalories: Double = 0
     /// Filled in when the run ends, ready to be sent home.
     @Published var reportedRpe: Int?
 
@@ -171,7 +173,7 @@ final class WorkoutManager: NSObject, ObservableObject {
             b.beginCollection(withStart: now) { _, _ in }
             startedAt = now
             phase = .running
-            voice = WorkoutVoice()
+            voice = WatchSettings.shared.voiceCues ? WorkoutVoice() : nil
             voice?.loadWhy(why, person: whyPerson)
             if let first = currentStep {
                 voice?.announceStep(label: "Let\u{2019}s go. " + first.label, paceLow: first.paceLow, paceHigh: first.paceHigh)
@@ -204,6 +206,7 @@ final class WorkoutManager: NSObject, ObservableObject {
                     self.voice?.whyMoment(elapsed: self.elapsed, target: target, hard: self.isHardSession)
                     self.voice?.keepGoing(elapsed: self.elapsed, target: target, hard: self.isHardSession)
                     self.sendLiveTick()
+                    self.autoPauseTick()
                 }
             }
         } catch {
@@ -283,6 +286,7 @@ final class WorkoutManager: NSObject, ObservableObject {
             let at = elapsed * (lastSplitMetre / max(distanceMetres, 1))
             splits.append(Int((at - lastSplitElapsed).rounded()))
             lastSplitElapsed = at
+            if WatchSettings.shared.hapticOnLap { WKInterfaceDevice.current().play(.notification) }
         }
     }
 
@@ -330,6 +334,32 @@ final class WorkoutManager: NSObject, ObservableObject {
         if let st = currentStep { live["step"] = st.label }
         if let plan { live["title"] = plan.title; live["type"] = plan.type }
         session.sendMessage(["live": live], replyHandler: nil, errorHandler: { _ in })
+    }
+
+    /// Pause when the runner stops, resume when they go again.
+    ///
+    /// Deliberately slow on both edges: pausing the instant someone slows for a kerb, or resuming on
+    /// one stray GPS wobble, produces a run full of phantom splits. Ten seconds still, five seconds
+    /// moving.
+    private var stillSince: Date?
+    private var movingSince: Date?
+    private var autoPaused = false
+    private func autoPauseTick() {
+        guard WatchSettings.shared.autoPause else { return }
+        let moving = (paceSecPerKm.map { $0 < 900 } ?? false)
+        if phase == .running {
+            if moving { stillSince = nil } else if stillSince == nil { stillSince = Date() }
+            if let since = stillSince, Date().timeIntervalSince(since) > 10 {
+                autoPaused = true; stillSince = nil; movingSince = nil
+                pause()
+            }
+        } else if phase == .paused, autoPaused {
+            if !moving { movingSince = nil } else if movingSince == nil { movingSince = Date() }
+            if let since = movingSince, Date().timeIntervalSince(since) > 5 {
+                autoPaused = false; movingSince = nil
+                resume()
+            }
+        }
     }
 
     private var phaseName: String {
@@ -414,6 +444,23 @@ final class WorkoutManager: NSObject, ObservableObject {
     static func pace(_ p: Double?) -> String {
         guard let p, p.isFinite, p > 0, p < 3600 else { return "--:--" }
         return String(format: "%d:%02d", Int(p) / 60, Int(p) % 60)
+    }
+
+    /// The current value of any metric the runner can put on their run screen.
+    func value(for m: WatchSettings.Metric) -> (value: String, unit: String?) {
+        switch m {
+        case .elapsed: return (elapsedText, nil)
+        case .distance: return distanceMetres < 1000
+            ? (String(format: "%.0f", distanceMetres), "M")
+            : (String(format: "%.2f", distanceKm), "KM")
+        case .currentPace: return (paceText, "/KM")
+        case .lapPace: return (lapPaceText, "/KM")
+        case .avgPace: return (avgPaceText, "/KM")
+        case .heartRate: return (heartRate > 0 ? String(Int(heartRate)) : "--", "BPM")
+        case .stepRemaining: return stepRemaining.map { ($0.value, $0.unit) } ?? ("--", nil)
+        case .lapNumber: return (String(lapNumber), nil)
+        case .calories: return (activeCalories > 0 ? String(Int(activeCalories)) : "--", "CAL")
+        }
     }
 
     /// The route so far, for drawing.
@@ -518,6 +565,9 @@ extension WorkoutManager: HKLiveWorkoutBuilderDelegate {
                     self.heartRate = value
                     if mean > 0 { self.avgHeartRate = mean }
                 }
+            } else if quantityType == HKQuantityType(.activeEnergyBurned) {
+                let kcal = stats.sumQuantity()?.doubleValue(for: .kilocalorie()) ?? 0
+                Task { @MainActor in self.activeCalories = kcal }
             }
         }
     }

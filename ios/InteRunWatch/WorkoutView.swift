@@ -13,6 +13,7 @@ import WatchKit
 /// its own page at full size rather than being squeezed in above the numbers.
 struct WorkoutView: View {
     @ObservedObject var workout: WorkoutManager
+    @ObservedObject private var settings = WatchSettings.shared
     @EnvironmentObject private var store: SessionStore
     @Environment(\.dismiss) private var dismiss
     // Stable integer tags: a conditionally-included page makes SwiftUI's selection unreliable, and
@@ -51,33 +52,19 @@ struct WorkoutView: View {
 
     private var metrics: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Elapsed, and how much of the current step is left — the two clock figures, together.
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(workout.elapsedText)
-                    .font(.system(size: 34, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .minimumScaleFactor(0.6)
-                    .lineLimit(1)
-                    .foregroundStyle(workout.phase == .paused ? Brand.ease : Brand.accent)
-                if workout.phase == .paused {
-                    Text("PAUSED").font(.system(size: 10, weight: .bold)).foregroundStyle(Brand.ease)
-                } else if let left = workout.stepRemaining {
-                    Spacer(minLength: 0)
-                    VStack(alignment: .trailing, spacing: -2) {
-                        Text(left.value)
-                            .font(.system(size: 15, weight: .semibold, design: .rounded))
-                            .monospacedDigit()
-                        Text(left.unit).font(.system(size: 8, weight: .bold)).foregroundStyle(.secondary)
-                    }
-                }
+            // Paused is a state you must never have to guess at.
+            if workout.phase == .paused {
+                Text("PAUSED")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Brand.ease)
+                    .padding(.bottom, 1)
             }
-            .padding(.bottom, 2)
-
-            metric(distanceText, "DISTANCE", size: 27, tint: Brand.ink)
-            metric(workout.paceText, "CUR PACE", size: 25, tint: Brand.ink, unit: "/KM")
-            metric(workout.lapPaceText, "LAP \(workout.lapNumber)", size: 25, tint: Brand.ink, unit: "/KM")
-            metric(workout.avgPaceText, "AVG PACE", size: 25, tint: Brand.ink, unit: "/KM")
-
+            // Whatever the runner chose in Settings, in their order. The first is the big one.
+            ForEach(Array(settings.metrics.enumerated()), id: \.element) { i, m in
+                let v = workout.value(for: m)
+                metric(v.value, m.caption, size: i == 0 ? 34 : 25, unit: v.unit,
+                       tint: i == 0 ? (workout.phase == .paused ? Brand.ease : Brand.accent) : Brand.ink)
+            }
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -86,7 +73,7 @@ struct WorkoutView: View {
 
     /// One number, its unit and its label on a single line: value left, label right. Reading down
     /// the left edge gives you the figures; the labels are there for the glance that needs them.
-    private func metric(_ value: String, _ label: String, size: CGFloat, tint: Color, unit: String? = nil) -> some View {
+    private func metric(_ value: String, _ label: String, size: CGFloat, unit: String? = nil, tint: Color) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 3) {
             Text(value)
                 .font(.system(size: size, weight: .medium, design: .rounded))

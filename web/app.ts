@@ -56,7 +56,7 @@ const html = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>InteRun — The Intelligent Training Companion</title>
 <meta name="description" content="InteRun — evidence-based running coach with live GPS sessions and voice coaching.">
 <meta name="theme-color" content="#0e8c7f" media="(prefers-color-scheme: light)">
@@ -104,7 +104,11 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.5; -webkit-font-smoothing: antialiased; }
 .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
-.app { max-width: 440px; height: 100dvh; margin: 0 auto; background: var(--bg); display: flex; flex-direction: column; position: relative; box-shadow: 0 0 60px rgba(0,0,0,.06); }
+/* --vvh is the visual viewport's height, set from JS. dvh tracks the LAYOUT viewport, which the
+   iOS keyboard does not change — so with plain 100dvh the shell stayed full-screen with a third of
+   it behind the keyboard, #view had zero scroll room, and the focus handler had nothing to scroll.
+   iOS then panned the visual viewport instead, which is exactly the bars-sliding-away bug. */
+.app { max-width: 440px; height: var(--vvh, 100dvh); margin: 0 auto; background: var(--bg); display: flex; flex-direction: column; position: relative; box-shadow: 0 0 60px rgba(0,0,0,.06); }
 .topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: calc(14px + env(safe-area-inset-top)) 16px 14px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
 .topbar .title { font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
 .iconbtn { position: relative; overflow: hidden; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft); display: flex; align-items: center; justify-content: center; cursor: pointer; }
@@ -116,7 +120,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
    splash fades out and the welcome fades in at the same instant, the two identical
    logos overlap exactly — the brand mark appears to hold perfectly still while only
    the text and background crossfade around it (a continuous-logo transition). */
-.splash, .welcome { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: clamp(84px, 24vh, 176px) 32px 40px; text-align: center; background: radial-gradient(125% 90% at 50% 0%, #0c2b28 0%, #06110f 56%, #000 100%); }
+.splash, .welcome { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: clamp(84px, 24dvh, 176px) 32px 40px; text-align: center; background: radial-gradient(125% 90% at 50% 0%, #0c2b28 0%, #06110f 56%, #000 100%); }
 .splash { z-index: 100; gap: 20px; opacity: 1; transition: opacity .55s ease; }
 .splash.hide { opacity: 0; pointer-events: none; }
 /* Mark + name + tagline all fade in together (same 0 delay), a touch slower, as one unit. */
@@ -209,7 +213,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 /* Session detail sheet */
 .sheet-ov { position: fixed; inset: 0; z-index: 70; display: none; align-items: flex-end; justify-content: center; background: color-mix(in srgb, var(--ink) 52%, transparent); backdrop-filter: blur(3px); }
 .sheet-ov.on { display: flex; }
-.sheet { position: relative; width: 100%; max-width: 440px; max-height: 88vh; overflow-y: auto; background: var(--surface); border-radius: 22px 22px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,.25); padding: 22px 18px calc(26px + env(safe-area-inset-bottom)); animation: sheetUp .28s cubic-bezier(.2,.8,.3,1) both; }
+.sheet { position: relative; width: 100%; max-width: 440px; max-height: 88dvh; overflow-y: auto; background: var(--surface); border-radius: 22px 22px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,.25); padding: 22px 18px calc(26px + env(safe-area-inset-bottom)); animation: sheetUp .28s cubic-bezier(.2,.8,.3,1) both; }
 @keyframes sheetUp { from { transform: translateY(28px); opacity: .5; } to { transform: none; opacity: 1; } }
 .sheet-x { position: absolute; top: 14px; right: 14px; display: flex; align-items: center; justify-content: center; background: var(--surface-2); border: 1px solid var(--line); border-radius: 50%; width: 30px; height: 30px; font-size: 14px; color: var(--ink-soft); cursor: pointer; }
 .sd-type { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--sc, var(--accent)); }
@@ -261,7 +265,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .ex-set { display: grid; grid-template-columns: 54px 1fr 14px 1fr; gap: 8px; align-items: center; }
 .setn { font-size: 12px; font-weight: 650; color: var(--ink-faint); }
 .ex-x { text-align: center; color: var(--ink-faint); font-size: 13px; }
-.set-in { font: inherit; font-size: 14px; text-align: center; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 9px; padding: 8px 6px; width: 100%; }
+.set-in { font: inherit; font-size: 16px; text-align: center; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 9px; padding: 8px 6px; width: 100%; }
 .set-in:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
 /* Strength history / progress */
 .sh-card { margin-bottom: 12px; }
@@ -1323,7 +1327,7 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 .alf-hero svg { width: 24px; height: 24px; }
 .alf-name { font-size: 18px; font-weight: 760; letter-spacing: -.02em; color: var(--ink); }
 .alf-sub { font-size: 12.5px; color: var(--ink-faint); }
-.alf-log { display: flex; flex-direction: column; gap: 12px; min-height: 180px; max-height: 52vh; overflow-y: auto; padding: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+.alf-log { display: flex; flex-direction: column; gap: 12px; min-height: 180px; max-height: 52dvh; overflow-y: auto; padding: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
 .alf-row { display: flex; align-items: flex-start; gap: 9px; }
 .alf-row.you { justify-content: flex-end; }
 .alf-av { width: 26px; height: 26px; flex: 0 0 auto; margin-top: 2px; border-radius: 9px; display: flex; align-items: center; justify-content: center; color: var(--accent-ink); background: var(--accent); }
@@ -2339,16 +2343,10 @@ window.__interunWatch = { status: function (paired, installed) {
   WATCH_STATUS = { paired: !!paired, installed: !!installed };
   if (state.tab === "support" && state.support === "connect") render();
 } };
-function watchPayloadForToday() {
-  const iso = todayIso();
-  const list = rawSessionsForIso(iso);
-  // The plan may say rest while the runner has added their own session for today ("Added today").
-  // The wrist must show what the runner intends to do, not only what the plan prescribed.
-  let s = list[0];
-  if (!s) {
-    const extras = EXTRA.filter((e) => e.date === iso);
-    if (extras.length) { try { s = buildCustomSession(extras[extras.length - 1]); } catch (e) { s = null; } }
-  }
+// One session, in the shape the watch understands. Split out of watchPayloadForToday so the same
+// conversion serves both today's session and the week ahead — the watch needs the week so it can
+// start a run on its own, without the phone app being open.
+function watchSessionPayload(s, iso) {
   if (!s) return null;
   const band = plannedPaceBandOf(s);
   const rband = plannedRpeBandOf(s);
@@ -2357,7 +2355,6 @@ function watchPayloadForToday() {
   if (s.estimatedDistanceMeters) out.distanceKm = Math.round(s.estimatedDistanceMeters / 100) / 10;
   if (band) { out.paceLow = Math.round(band.minSecPerKm); out.paceHigh = Math.round(band.maxSecPerKm); }
   if (rband) { out.rpeMin = rband.min; out.rpeMax = rband.max; }
-  // The full structure, so the wrist can guide the session step by step rather than just time it.
   out.steps = (s.steps || []).map((st) => {
     const o = { label: st.label || "", kind: st.kind || "steady" };
     if (st.durationSeconds) o.seconds = Math.round(st.durationSeconds);
@@ -2370,6 +2367,32 @@ function watchPayloadForToday() {
     return o;
   });
   return out;
+}
+// The next few runnable sessions, so the wrist can offer a choice when the phone is nowhere near.
+function watchUpcomingPayload(days) {
+  const out = [];
+  for (let i = 1; i <= (days || 9) && out.length < 6; i++) {
+    const iso = futureIso(i);
+    const list = rawSessionsForIso(iso).filter((x) => PRIMARY_TYPES[x.type]);
+    for (const s of list) {
+      const p = watchSessionPayload(s, iso);
+      if (p) out.push(p);
+      if (out.length >= 6) break;
+    }
+  }
+  return out;
+}
+function watchPayloadForToday() {
+  const iso = todayIso();
+  const list = rawSessionsForIso(iso);
+  // The plan may say rest while the runner has added their own session for today ("Added today").
+  // The wrist must show what the runner intends to do, not only what the plan prescribed.
+  let s = list[0];
+  if (!s) {
+    const extras = EXTRA.filter((e) => e.date === iso);
+    if (extras.length) { try { s = buildCustomSession(extras[extras.length - 1]); } catch (e) { s = null; } }
+  }
+  return watchSessionPayload(s, iso);
 }
 // A run finished on the wrist, arriving back through the native bridge. It is logged exactly as a
 // phone-tracked run would be - same shape, same stamps - so the adaptive engine cannot tell the
@@ -2555,6 +2578,10 @@ function syncWatch() {
     if (person) payload.whyName = person.slice(0, 24);
     const s = watchPayloadForToday();
     if (s) payload.session = s;
+    // The week ahead travels too. Without it the watch can only ever run today's session, and only
+    // while the phone app happens to be open.
+    const up = watchUpcomingPayload(9);
+    if (up.length) payload.upcoming = up;
     try { window.webkit.messageHandlers.interunWatch.postMessage(payload); } catch (e) {}
   }, 500);
 }
@@ -6780,6 +6807,22 @@ $("calBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); state.s
 $("bellBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); openRemindersSheet(); };
 migrateRunRoutes();
 seedDone();
+// ---- The shell tracks the visible area, keyboard and all -----------------------------------------
+// Without this the app is 100dvh tall with the keyboard covering the bottom third: #view has no
+// scroll room, so nothing can bring a focused field into view and iOS resorts to panning the whole
+// visual viewport — bars and all. Publishing the visual viewport's height as --vvh makes the shell
+// shrink to what is actually visible, which gives the scroller real room and keeps both bars put.
+(function () {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const apply = () => {
+    document.documentElement.style.setProperty("--vvh", Math.round(vv.height) + "px");
+  };
+  vv.addEventListener("resize", apply);
+  vv.addEventListener("scroll", apply);
+  apply();
+})();
+
 // ---- Keeping a focused field above the keyboard ------------------------------------------------
 //
 // The shell owns the viewport and the document cannot scroll, which is what keeps the top bar and

@@ -16,12 +16,95 @@ struct TodayView: View {
 
     /// Hand the plan to the workout and go. One path, so a run started from the phone and a run
     /// started on the wrist are the same run with the same targets and the same reasons.
-    private func begin(_ s: PlannedSession) {
-        workout.plan = s   // the target band and step list come from the plan
+    private func begin(_ s: PlannedSession?) {
+        workout.plan = s   // nil is a free run: no targets, no steps, just the clock and the GPS
         workout.why = store.why          // the runner's own reasons, for the hard stretch
         workout.whyPerson = store.whyPerson
         running = true
         workout.start()
+    }
+
+    /// Start something with no plan behind it. Always available.
+    private var freeRun: some View {
+        Button {
+            begin(nil)
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "figure.run").font(.system(size: 14, weight: .semibold))
+                Text("Free run").font(.system(size: 15, weight: .semibold))
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(Brand.ink)
+            .padding(.vertical, 10).padding(.horizontal, 12)
+            .frame(maxWidth: .infinity)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Brand.surface2))
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 6)
+    }
+
+    /// The rest of the week, so a session can be started early — or caught up — from the wrist.
+    @ViewBuilder private var upcomingList: some View {
+        let ahead = store.upcomingAhead.filter { $0.dateIso != SessionStore.localTodayIso() }
+        if !ahead.isEmpty {
+            Text("COMING UP")
+                .font(.system(size: 10, weight: .bold)).kerning(0.6)
+                .foregroundStyle(Brand.inkFaint)
+                .padding(.top, 10)
+            ForEach(Array(ahead.prefix(5).enumerated()), id: \.offset) { _, s in
+                Button { begin(s) } label: {
+                    HStack(spacing: 9) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Brand.accent).frame(width: 3)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(dayLabel(s.dateIso))
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(Brand.inkFaint)
+                            Text(s.title)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Brand.ink)
+                                .lineLimit(2).multilineTextAlignment(.leading)
+                            if !s.subtitle.isEmpty {
+                                Text(s.subtitle).font(.system(size: 10)).foregroundStyle(Brand.inkSoft)
+                            }
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.vertical, 8).padding(.horizontal, 10)
+                    .frame(maxWidth: .infinity)
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Brand.surface))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var settingsLink: some View {
+        NavigationLink {
+            SettingsView()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "gearshape.fill").font(.system(size: 12))
+                Text("Settings").font(.system(size: 13, weight: .medium))
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right").font(.system(size: 10)).foregroundStyle(Brand.inkFaint)
+            }
+            .foregroundStyle(Brand.inkSoft)
+            .padding(.vertical, 9).padding(.horizontal, 12)
+            .frame(maxWidth: .infinity)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Brand.surface))
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 10)
+        .padding(.bottom, 6)
+    }
+
+    /// "Wed 29 Jul" from an ISO date, without dragging a DateFormatter through every row.
+    private func dayLabel(_ iso: String) -> String {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.timeZone = .current
+        guard let d = f.date(from: iso) else { return iso }
+        let out = DateFormatter(); out.dateFormat = "EEE d MMM"; out.timeZone = .current
+        return out.string(from: d)
     }
 
     var body: some View {
@@ -40,6 +123,12 @@ struct TodayView: View {
                         } else {
                             waiting
                         }
+                        // ⚠️ Always offered, even when nothing has synced. Requiring the phone app
+                        // to be open before the watch will start a run is not a running app, it is
+                        // a chore — and it is exactly the state you are in at the front door.
+                        freeRun
+                        upcomingList
+                        settingsLink
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 2)
@@ -143,9 +232,12 @@ struct TodayView: View {
             Text("Waiting for your plan")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(Brand.ink)
-            Text("Open InteRun on your iPhone.")
+            // Not an instruction any more, just an explanation: a free run is right below this, so
+            // the runner is never actually blocked on the phone.
+            Text("Open InteRun on your iPhone to sync it. You can still run without it.")
                 .font(.system(size: 11))
                 .foregroundStyle(Brand.inkFaint)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

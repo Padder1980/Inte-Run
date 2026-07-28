@@ -71,6 +71,11 @@ struct PlannedSession: Codable, Equatable {
 @MainActor
 final class SessionStore: NSObject, ObservableObject {
     @Published var session: PlannedSession?
+    /// The week ahead, so the wrist can offer a choice of runs on its own. ⚠️ Cached to disk for the
+    /// same reason today's session is: the phone app is usually NOT open when someone taps start on
+    /// their watch, and "open the app on your phone first" is not a running app, it is a chore.
+    @Published var upcoming: [PlannedSession] = []
+
     /// The runner's first name, so the watch can speak to a person rather than a device.
     @Published var runnerName: String?
     /// The runner's own answers to "why are you doing this" — spoken back at the hardest point of a
@@ -89,6 +94,7 @@ final class SessionStore: NSObject, ObservableObject {
 
     private static let cacheKey = "interun_watch_session"
     private static let nameKey = "interun_watch_name"
+    private static let upcomingKey = "interun_watch_upcoming"
     private static let whyKey = "interun_watch_why"
     private static let whyPersonKey = "interun_watch_why_person"
     private static let isoKey = "interun_watch_iso"
@@ -98,6 +104,13 @@ final class SessionStore: NSObject, ObservableObject {
         f.dateFormat = "yyyy-MM-dd"
         f.timeZone = .current
         return f.string(from: Date())
+    }
+
+    /// Sessions still ahead of us, freshest first — yesterday's leftovers are filtered out rather
+    /// than offered, since a stale list is worse than a short one.
+    var upcomingAhead: [PlannedSession] {
+        let today = Self.localTodayIso()
+        return upcoming.filter { $0.dateIso >= today }
     }
 
     /// True while the stored context still describes today. A context without a date (older phone
@@ -114,6 +127,10 @@ final class SessionStore: NSObject, ObservableObject {
 
     private func restore() {
         runnerName = UserDefaults.standard.string(forKey: Self.nameKey)
+        if let up = UserDefaults.standard.data(forKey: Self.upcomingKey),
+           let list = try? JSONDecoder().decode([PlannedSession].self, from: up) {
+            upcoming = list
+        }
         why = UserDefaults.standard.dictionary(forKey: Self.whyKey) as? [String: String] ?? [:]
         whyPerson = UserDefaults.standard.string(forKey: Self.whyPersonKey)
         contextIso = UserDefaults.standard.string(forKey: Self.isoKey)
@@ -134,6 +151,12 @@ final class SessionStore: NSObject, ObservableObject {
         }
         // Absent keys mean "the runner cleared these", so both are written every sync rather than
         // only when present — otherwise a deleted answer would live on the wrist forever.
+        if let raw = context["upcoming"],
+           let data = try? JSONSerialization.data(withJSONObject: raw),
+           let list = try? JSONDecoder().decode([PlannedSession].self, from: data) {
+            upcoming = list
+            UserDefaults.standard.set(data, forKey: Self.upcomingKey)
+        }
         why = (context["why"] as? [String: String])?.filter { !$0.value.isEmpty } ?? [:]
         UserDefaults.standard.set(why, forKey: Self.whyKey)
         whyPerson = (context["whyName"] as? String).flatMap { $0.isEmpty ? nil : $0 }

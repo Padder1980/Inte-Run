@@ -407,7 +407,14 @@ existing web UI, so there is still **one UI to design** (`web/app.ts`). Decided 
   is untouched and still behaves normally in a browser. Fixes are **buffered and replayed in order** —
   iOS can suspend the web content process even while the app lives on the location background mode,
   and distance accumulates incrementally, so a replayed backlog gives the same total.
-- ⚠️ **The app shell owns the viewport; the document must never scroll.** `html, body` are
+- ⚠️ **`.app` is `height: var(--vvh, 100dvh)`, not plain `100dvh`.** `dvh` tracks the LAYOUT viewport,
+which the iOS keyboard does not change — so the shell stayed full-screen with a third of it behind
+the keyboard, `#view` had zero scroll room, and the focus handler had nothing to scroll. iOS then
+panned the visual viewport instead, sliding both bars off screen. A listener publishes
+`visualViewport.height` as `--vvh`. Measured: with a 300px keyboard the shell now shrinks 812→512,
+the nav sits exactly on the visible bottom, and `#view` gains 322px of room where it had 22.
+
+⚠️ **The app shell owns the viewport; the document must never scroll.** `html, body` are
 `overflow: hidden`, `.app` is `height: 100dvh` (not `min-height`), and `.view` carries
 **`min-height: 0`** — that last one is load-bearing. A flex item defaults to `min-height: auto` and
 refuses to shrink below its content, so `flex: 1; overflow-y: auto` silently did nothing: `.view`
@@ -416,6 +423,14 @@ like a CSS bug: an iOS rubber-band drag slid the whole shell so the "sticky" top
 left the screen, and `v.scrollTop = 0` in every render branch was a no-op, so switching tabs left you
 stranded half way down the previous screen. Verify with `#view.scrollHeight - clientHeight > 0` and
 `documentElement.scrollHeight - clientHeight === 0`.
+
+⚠️ **16px is a hard floor for anything focusable, and a blanket rule will NOT save you.**
+`input, select, textarea { font-size: 16px }` has specificity (0,0,1) and loses to any single class,
+so `.set-in` (the strength log's weight/reps boxes) stayed at 14px and reproduced the bug in a
+different screen. iOS auto-zooms on focus below 16px, and since pinch is blocked the runner can
+never zoom back out — the app stays scaled on every screen after it. `test/ios-input-zoom.test.ts`
+now scans the generated CSS for any sub-16px rule whose class appears on a field in the markup;
+grepping for selectors that NAME input/select/textarea is what missed it the first time.
 
 ⚠️ **Pinch-to-zoom is deliberately off**, in two places that both matter. iOS Safari ignores
 `user-scalable=no`, and `touch-action` does not stop a pinch either — the only thing that works on
@@ -458,6 +473,21 @@ breaking it would silently return an off-centre crop rather than an obvious erro
   Get it with `sudo xcodebuild -downloadPlatform iOS`, or Xcode → Settings → Components.
 - ⚠️ Installing an Xcode **silently repoints `xcode-select` system-wide**. If shell tools suddenly
   start failing with a licence error, that is why.
+
+**The watch stands alone (2026-07-28).** It caches the WEEK, not just today (`upcoming` in the sync
+payload, `SessionStore.upcomingAhead`), and always offers a **Free run** — ⚠️ requiring the phone app
+to be open before the watch will start a run is a chore at the front door, not a running app.
+`SettingsView`/`WatchSettings` let the runner choose which metrics appear on the run screen (max 5,
+ordered, first one largest) plus auto-pause, lap haptics, spoken cues and always-on. ⚠️ Every toggle
+there does something — the same rule as the phone's Connections screen; no "start on motion" until
+it is actually built.
+
+⚠️ **`CLLocation.speed` is −1 when unknown**, which is the normal case indoors and in the first
+seconds of a run. A guard written as `if loc.speed >= 0, loc.speed < 0.5` therefore SKIPS the
+not-moving check exactly when it is needed and falls through to summing position deltas — pure
+drift. That is how a watch sitting on a table logged 0.2 km and drew a map. Unknown speed must prove
+itself against the fix's own noise floor, fixes worse than 25 m are dropped, and route points are
+only recorded when the runner actually moved.
 
 ### The Apple Watch app (`ios/InteRunWatch/`) — Phase 1 shipped 2026-07-27
 

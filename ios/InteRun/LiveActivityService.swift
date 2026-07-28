@@ -9,11 +9,16 @@ import UIKit
 /// a live card the moment the wrist starts running, and tapping that card opens the app, which
 /// `replayLiveOnActivate()` then drops straight onto the live session screen.
 ///
-/// ⚠️ **`Activity.request` may only be called while the app is in the FOREGROUND.** True since
-/// iOS 16.1 and unchanged through iOS 27. There is no "legitimate reason to be awake" exemption: a
-/// WatchConnectivity wake, a CoreLocation wake and a background task are all refused alike, with
-/// `ActivityAuthorizationError.visibility`. An earlier version of this file claimed the watch tick
-/// qualified; it does not, and that false premise cost two on-device debugging sessions.
+/// ⚠️ **`Activity.request` normally requires the FOREGROUND**, since iOS 16.1 and unchanged through
+/// iOS 27. A WatchConnectivity wake, a CoreLocation wake and a plain background task are all refused
+/// with `ActivityAuthorizationError.visibility`.
+///
+/// ⚠️ **There is exactly ONE documented exemption, and we use it.** `HKHealthStore.h` says of
+/// `workoutSessionMirroringStartHandler`: "If your app is not active when a mirrored session starts,
+/// it will be launched in the background and given a one-time permission to start a Live Activity
+/// from the background." That is how a run begun on the wrist gets a card on a locked phone — see
+/// MirroredWorkoutService. The difference is not *being* awake, it is *how you were woken*, and
+/// mistaking one for the other cost two on-device debugging sessions.
 ///
 /// `update()` and `end()` from the background ARE permitted. So the shape of the feature is: raise
 /// the card at a foreground moment, then let background ticks drive it.
@@ -34,7 +39,10 @@ final class LiveActivityService {
     var permitted: Bool { ActivityAuthorizationInfo().areActivitiesEnabled }
 
     /// Begin, or update in place if this run already has a card.
-    func start(runId: String, title: String, type: String, state: RunActivityAttributes.ContentState) {
+    /// `allowBackground` is only ever true on the HealthKit mirroring path, which carries Apple's
+    /// one-time grant. Passing it anywhere else just buys a `.visibility` throw.
+    func start(runId: String, title: String, type: String,
+               state: RunActivityAttributes.ContentState, allowBackground: Bool = false) {
         // Not gated on `areActivitiesEnabled`: a stale false read would cost us the card for
         // nothing, and attempting costs nothing when it is genuinely off.
         if let existing = activity {
@@ -48,7 +56,7 @@ final class LiveActivityService {
         }
         // Nothing to show yet, and only the foreground may create one. From the background this is
         // simply not possible; retrying every two seconds for an hour would burn battery to no end.
-        guard isForeground else {
+        guard isForeground || allowBackground else {
             if let id = runId as String?, !refusedRunIds.contains(id) {
                 refusedRunIds.insert(id)
                 note("not started: app is in the background (iOS only allows this in the foreground)")

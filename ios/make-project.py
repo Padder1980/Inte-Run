@@ -92,7 +92,7 @@ WATCH_COMMON = {
     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
     "CODE_SIGN_ENTITLEMENTS": '"InteRunWatch.entitlements"',
     "CODE_SIGN_STYLE": "Automatic",
-    "CURRENT_PROJECT_VERSION": "27",
+    "CURRENT_PROJECT_VERSION": "28",
     "GENERATE_INFOPLIST_FILE": "NO",
     "INFOPLIST_FILE": '"InteRunWatch-Info.plist"',
     "MARKETING_VERSION": "1.0",
@@ -126,7 +126,7 @@ WIDGET_BUNDLE_ID = BUNDLE_ID + ".widgets"
 WIDGET_COMMON = {
     "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "AccentColor",
     "CODE_SIGN_STYLE": "Automatic",
-    "CURRENT_PROJECT_VERSION": "27",
+    "CURRENT_PROJECT_VERSION": "28",
     "GENERATE_INFOPLIST_FILE": "NO",
     "INFOPLIST_FILE": '"InteRunWidgets-Info.plist"',
     # ⚠️ An app extension's version MUST match the app's, or the build fails validation at install.
@@ -187,7 +187,7 @@ TARGET_COMMON = {
     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
     "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "AccentColor",
     "CODE_SIGN_STYLE": "Automatic",
-    "CURRENT_PROJECT_VERSION": "27",
+    "CURRENT_PROJECT_VERSION": "28",
     "ENABLE_PREVIEWS": "YES",
     "GENERATE_INFOPLIST_FILE": "NO",
     "CODE_SIGN_ENTITLEMENTS": '"InteRun.entitlements"',

@@ -40,6 +40,11 @@ final class WatchBridge: NSObject {
     /// to be sent once the session comes up.
     private var awaitingActivation: [String: Any]?
 
+    /// Today's session title/type from the last sync, so a mirrored workout can name its card
+    /// without waiting for a live tick it may not get for two seconds.
+    var cachedSessionTitle: String? { (lastPayload?["session"] as? [String: Any])?["title"] as? String }
+    var cachedSessionType: String? { (lastPayload?["session"] as? [String: Any])?["type"] as? String }
+
     /// The most recent live tick, so the page can be dropped straight onto the live screen the
     /// moment the app becomes active — rather than showing Today for two seconds and then jumping.
     private var lastLive: [String: Any]?

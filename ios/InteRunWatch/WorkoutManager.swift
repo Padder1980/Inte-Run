@@ -212,6 +212,18 @@ final class WorkoutManager: NSObject, ObservableObject {
 
             let now = Date()
             s.startActivity(with: now)
+            // ⚠️ This is what puts a card on a locked iPhone for a wrist-started run. It launches
+            // the companion app in the background, and THAT launch carries Apple's one-time
+            // permission to start a Live Activity from the background — the WatchConnectivity wake
+            // we were using does not. See MirroredWorkoutService on the phone.
+            // Called immediately after startActivity so the phone's ~10-second budget begins as
+            // early as possible. A failure here costs the card, never the run.
+            s.startMirroringToCompanionDevice { ok, error in
+                if !ok {
+                    let why = error?.localizedDescription ?? "unknown"
+                    print("workout mirroring did not start: \(why)")
+                }
+            }
             b.beginCollection(withStart: now) { _, _ in }
             startedAt = now
             phase = .running

@@ -18,6 +18,10 @@ struct InteRunApp: App {
         // A card left over from a crash or a force-quit mid-run would otherwise sit there looking
         // live with nothing able to update or dismiss it.
         Task { @MainActor in LiveActivityService.shared.reattach() }
+        // ⚠️ Must be installed on EVERY launch, promptly — including the background launch HealthKit
+        // performs when a mirrored workout starts. That launch is the only context in which iOS will
+        // let us raise a Live Activity for a run begun on the wrist.
+        MirroredWorkoutService.shared.begin()
     }
 
     @Environment(\.scenePhase) private var scenePhase

@@ -553,7 +553,22 @@ because the two sides must agree on the type exactly and a copied file would dri
 `LiveActivityService` starts/updates/ends it; watch runs drive it from `WatchBridge.forwardLive`,
 phone runs from `pushLiveActivity()` in `web/app.ts` via a `liveActivity` bridge action. Tapping the
 card opens the app and `replayLiveOnActivate()` lands it on the live screen.
-⚠️ **`Activity.request` may ONLY be called with the app in the FOREGROUND** — true since iOS 16.1,
+⚠️ **A wrist-started run DOES get a Live Activity — via HealthKit workout mirroring, not
+WatchConnectivity.** `HKHealthStore.h` on `workoutSessionMirroringStartHandler`, verbatim: *"If your
+app is not active when a mirrored session starts, it will be launched in the background and given a
+one-time permission to start a Live Activity from the background."* That is a documented exemption
+to the foreground rule, and it is the ONLY one. The watch calls
+`startMirroringToCompanionDevice` right after `startActivity` (`WorkoutManager.begin`); the phone
+installs `workoutSessionMirroringStartHandler` at every launch (`MirroredWorkoutService.begin()`,
+called from `InteRunApp.init`) and raises the card first thing in the handler, because the budget is
+about **10 seconds** and the handler arrives on an arbitrary background queue.
+⚠️ The difference is not *being awake*, it is *how you were woken* — a WatchConnectivity wake is
+still refused. Mistaking the two cost two on-device sessions and a wrong "this is impossible without
+a server" conclusion.
+⚠️ **Mirroring does not work in the Simulator at all** (Apple DTS) — it can only be proven on the
+real iPhone + Watch.
+
+⚠️ **`Activity.request` otherwise requires the FOREGROUND** — true since iOS 16.1,
 unchanged through iOS 27, and there is no "legitimate reason to be awake" exemption. A
 WatchConnectivity wake, a CoreLocation wake and a background task are all refused alike with
 `ActivityAuthorizationError.visibility`. `update()` and `end()` from the background ARE permitted.

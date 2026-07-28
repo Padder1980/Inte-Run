@@ -95,11 +95,16 @@ const html = `<!doctype html>
 :root[data-theme="light"] { color-scheme: light; --bg:#eef1f1; --surface:#fff; --surface-2:#f6f8f8; --line:#dbe1e0; --ink:#14201b; --ink-soft:#4c5b55; --ink-faint:#7a877f; --accent:#0e8c7f; --accent-ink:#fff; --base:#2b9eb3; --build:#5fa83c; --peak:#e0863a; --taper:#7a6fd0; --ready:#4b9e2f; --steady:#2b9eb3; --ease:#d98a2a; --rest:#c0442e; --eff-easy:#3fa47a; --eff-moderate:#d99a2b; --eff-hard:#d65b36; --eff-none:#9aa8a1; --shadow:0 1px 2px rgba(20,32,27,.05),0 6px 18px rgba(20,32,27,.06); }
 :root[data-theme="dark"] { color-scheme: dark; --bg:#0a100e; --surface:#151e1b; --surface-2:#1b2622; --line:#26332e; --ink:#e7eeea; --ink-soft:#a9b7b0; --ink-faint:#74847c; --accent:#2bb3a3; --accent-ink:#06231f; --base:#3ab0c4; --build:#74bd52; --peak:#eb9748; --taper:#9184e0; --ready:#6bbf46; --steady:#3ab0c4; --ease:#eb9748; --rest:#e8765c; --eff-easy:#4cb98a; --eff-moderate:#e6ac3e; --eff-hard:#e56f49; --eff-none:#6f7d76; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.4); }
 * { box-sizing: border-box; }
-html, body { height: 100%; }
+/* The app shell owns the viewport; the document itself must never scroll.
+   ⚠️ Without this the page was the scroller, not #view, and two consequences followed: an iOS
+   rubber-band drag slid the whole shell — taking the "sticky" top bar and bottom nav out of view
+   with it — and "v.scrollTop = 0" on every render was a no-op, so switching tabs left you stranded
+   half way down the previous screen. */
+html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.5; -webkit-font-smoothing: antialiased; }
 .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
-.app { max-width: 440px; min-height: 100dvh; margin: 0 auto; background: var(--bg); display: flex; flex-direction: column; position: relative; box-shadow: 0 0 60px rgba(0,0,0,.06); }
+.app { max-width: 440px; height: 100dvh; margin: 0 auto; background: var(--bg); display: flex; flex-direction: column; position: relative; box-shadow: 0 0 60px rgba(0,0,0,.06); }
 .topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: calc(14px + env(safe-area-inset-top)) 16px 14px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
 .topbar .title { font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
 .iconbtn { position: relative; overflow: hidden; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft); display: flex; align-items: center; justify-content: center; cursor: pointer; }
@@ -274,7 +279,12 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .sh-wk { color: var(--ink-faint); font-weight: 600; flex: none; }
 .sh-sets { font-family: var(--mono); color: var(--ink-soft); text-align: right; }
 
-.view { flex: 1; overflow-y: auto; padding: 16px 16px 96px; }
+/* min-height: 0 is load-bearing. A flex item defaults to min-height: auto, which refuses to shrink
+   below its content, so "flex: 1; overflow-y: auto" silently did nothing, .view grew to its full
+   content height, and the document scrolled instead. This is the line that makes #view the scroller.
+   overscroll-behavior: contain stops a rubber-band at either end chaining out to the page. */
+.view { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch; padding: 16px 16px 96px; }
 .eyebrow { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); font-weight: 600; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 16px; }
 h2.sec { font-size: 15px; margin: 22px 2px 10px; letter-spacing: -.01em; }

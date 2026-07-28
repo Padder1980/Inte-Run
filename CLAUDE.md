@@ -407,7 +407,17 @@ existing web UI, so there is still **one UI to design** (`web/app.ts`). Decided 
   is untouched and still behaves normally in a browser. Fixes are **buffered and replayed in order** —
   iOS can suspend the web content process even while the app lives on the location background mode,
   and distance accumulates incrementally, so a replayed backlog gives the same total.
-- ⚠️ **Pinch-to-zoom is deliberately off**, in two places that both matter. iOS Safari ignores
+- ⚠️ **The app shell owns the viewport; the document must never scroll.** `html, body` are
+`overflow: hidden`, `.app` is `height: 100dvh` (not `min-height`), and `.view` carries
+**`min-height: 0`** — that last one is load-bearing. A flex item defaults to `min-height: auto` and
+refuses to shrink below its content, so `flex: 1; overflow-y: auto` silently did nothing: `.view`
+grew to full content height and the PAGE scrolled instead. Two symptoms followed, and neither looked
+like a CSS bug: an iOS rubber-band drag slid the whole shell so the "sticky" top bar and bottom nav
+left the screen, and `v.scrollTop = 0` in every render branch was a no-op, so switching tabs left you
+stranded half way down the previous screen. Verify with `#view.scrollHeight - clientHeight > 0` and
+`documentElement.scrollHeight - clientHeight === 0`.
+
+⚠️ **Pinch-to-zoom is deliberately off**, in two places that both matter. iOS Safari ignores
 `user-scalable=no`, and `touch-action` does not stop a pinch either — the only thing that works on
 the web side is preventing WebKit's non-standard `gesture*` events, which a document-level guard near
 `buildNav()` does. `touch-action: manipulation` separately kills double-tap zoom. On the native side

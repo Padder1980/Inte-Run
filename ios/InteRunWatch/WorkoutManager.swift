@@ -14,6 +14,11 @@ final class WorkoutManager: NSObject, ObservableObject {
     enum Phase: Equatable { case idle, requesting, running, paused, ended, failed(String) }
 
     @Published private(set) var phase: Phase = .idle
+    /// Seconds left before the clock starts, or nil when not counting down. The workout session is
+    /// NOT started until this reaches zero — counting down with the timer already running would
+    /// record three seconds of standing still, which is the whole thing this exists to avoid.
+    @Published private(set) var countdown: Int?
+    private var countdownTimer: Timer?
     @Published private(set) var elapsed: TimeInterval = 0
     @Published private(set) var distanceMetres: Double = 0
     @Published private(set) var heartRate: Double = 0
@@ -123,6 +128,40 @@ final class WorkoutManager: NSObject, ObservableObject {
     }
 
     // MARK: - Lifecycle
+
+    /// Begin, after a three-second count if the runner has left it on. Each beat taps the wrist, so
+    /// it works with the screen down and the phone already in a pocket.
+    func startCountingDown() {
+        guard WatchSettings.shared.countdown else { return start() }
+        guard countdown == nil, phase == .idle else { return }
+        countdown = 3
+        WKInterfaceDevice.current().play(.start)
+        countdownTimer?.invalidate()
+        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] t in
+            Task { @MainActor in
+                guard let self else { t.invalidate(); return }
+                let left = (self.countdown ?? 1) - 1
+                if left > 0 {
+                    self.countdown = left
+                    WKInterfaceDevice.current().play(.click)
+                } else {
+                    t.invalidate()
+                    self.countdownTimer = nil
+                    self.countdown = nil
+                    WKInterfaceDevice.current().play(.success)
+                    self.start()
+                }
+            }
+        }
+    }
+
+    /// Abandon a countdown that has not fired yet — backing out before the clock starts should leave
+    /// no run behind at all.
+    func cancelCountdown() {
+        countdownTimer?.invalidate()
+        countdownTimer = nil
+        countdown = nil
+    }
 
     func start() {
         guard HKHealthStore.isHealthDataAvailable() else {

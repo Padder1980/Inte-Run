@@ -40,6 +40,9 @@ struct SettingsView: View {
             }
 
             Section {
+                Toggle(isOn: $settings.countdown) {
+                    label("Count me in", "Three seconds before the clock starts — time to put your phone away.")
+                }
                 Toggle(isOn: $settings.autoPause) {
                     label("Auto-pause", "Pauses when you stop and picks up when you go again.")
                 }

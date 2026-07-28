@@ -23,6 +23,9 @@ struct WorkoutView: View {
 
     var body: some View {
         Group {
+            if let n = workout.countdown {
+                countdownScreen(n)
+            } else {
             switch workout.phase {
             case let .failed(message):
                 failure(message)
@@ -44,8 +47,39 @@ struct WorkoutView: View {
                 }
                 .tabViewStyle(.page)
             }
+            }
         }
         .navigationBarBackButtonHidden(true)
+    }
+
+    /// Three seconds before the clock starts, so there is time to pocket the phone or reach the
+    /// start line. The wrist taps on every beat, which matters because the runner is usually looking
+    /// at their phone or their shoes rather than at this.
+    private func countdownScreen(_ n: Int) -> some View {
+        VStack(spacing: 6) {
+            Spacer(minLength: 0)
+            Text("\(n)")
+                .font(.system(size: 84, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(Brand.accent)
+                .contentTransition(.numericText(countsDown: true))
+                .animation(.snappy(duration: 0.25), value: n)
+            Text(workout.plan?.title ?? "Free run")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Brand.inkSoft)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+            Spacer(minLength: 0)
+            Button("Cancel") {
+                workout.cancelCountdown()
+                dismiss()
+            }
+            .font(.system(size: 13, weight: .medium))
+            .buttonStyle(.plain)
+            .foregroundStyle(Brand.inkFaint)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.bottom, 6)
     }
 
     // MARK: - Metrics

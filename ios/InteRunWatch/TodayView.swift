@@ -23,7 +23,7 @@ struct TodayView: View {
         workout.coach = store.coach      // the same coach they chose on the phone
         workout.coachLines = store.coachLines
         running = true
-        workout.start()
+        workout.startCountingDown()
     }
 
     /// "Inte" white, "Run" in the brand teal — the same wordmark the phone's splash draws

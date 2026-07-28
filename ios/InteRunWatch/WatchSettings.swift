@@ -55,6 +55,9 @@ final class WatchSettings: ObservableObject {
     @Published var voiceCues: Bool { didSet { save() } }
     /// Keep the screen on for the whole run rather than letting it dim between wrist raises.
     @Published var alwaysOn: Bool { didSet { save() } }
+    /// Count three seconds down before the clock starts, so there is time to pocket the phone or
+    /// get to the start line. Without it a run begun from the phone records you standing still.
+    @Published var countdown: Bool { didSet { save() } }
 
     static let maxMetrics = 5
     static let defaultMetrics: [Metric] = [.elapsed, .distance, .currentPace, .lapPace, .avgPace]
@@ -67,6 +70,7 @@ final class WatchSettings: ObservableObject {
         var hapticOnLap: Bool
         var voiceCues: Bool
         var alwaysOn: Bool
+        var countdown: Bool?
     }
 
     private init() {
@@ -78,12 +82,13 @@ final class WatchSettings: ObservableObject {
         hapticOnLap = stored?.hapticOnLap ?? true
         voiceCues = stored?.voiceCues ?? true
         alwaysOn = stored?.alwaysOn ?? true
+        countdown = stored?.countdown ?? true
         if metrics.isEmpty { metrics = Self.defaultMetrics }
     }
 
     private func save() {
         let s = Stored(metrics: metrics, autoPause: autoPause, hapticOnLap: hapticOnLap,
-                       voiceCues: voiceCues, alwaysOn: alwaysOn)
+                       voiceCues: voiceCues, alwaysOn: alwaysOn, countdown: countdown)
         if let data = try? JSONEncoder().encode(s) { UserDefaults.standard.set(data, forKey: Self.key) }
     }
 

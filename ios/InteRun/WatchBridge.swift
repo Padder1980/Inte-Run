@@ -40,6 +40,9 @@ final class WatchBridge: NSObject {
     /// to be sent once the session comes up.
     private var awaitingActivation: [String: Any]?
 
+    /// Held between "start on my watch" and the count-in reaching go.
+    private var pendingWatchSession: [String: Any]?
+
     /// Today's session title/type from the last sync, so a mirrored workout can name its card
     /// without waiting for a live tick it may not get for two seconds.
     var cachedSessionTitle: String? { (lastPayload?["session"] as? [String: Any])?["title"] as? String }
@@ -406,11 +409,14 @@ extension WatchBridge: WKScriptMessageHandler {
             // Straight through to the wrist. Fire-and-forget: if the watch is unreachable the run
             // simply carries on there, which is the safe failure — a run must never be ended by a
             // message that only half-arrived.
-            if let cmd = body["command"] as? String, WCSession.isSupported() {
-                let s = WCSession.default
-                if s.activationState == .activated, s.isReachable {
-                    s.sendMessage(["command": cmd], replyHandler: nil, errorHandler: { _ in })
+            if let cmd = body["command"] as? String {
+                var msg: [String: Any] = ["command": cmd]
+                // The go signal carries the session, because only now is the watch listening.
+                if cmd == "startNow", let sess = pendingWatchSession {
+                    msg["session"] = sess
+                    pendingWatchSession = nil
                 }
+                sendToWatch(msg)
             }
         case "sync":
             // `session` is deliberately allowed to be absent: that is how the page says "rest day",
@@ -427,11 +433,11 @@ extension WatchBridge: WKScriptMessageHandler {
             // The page has finished booting and can accept runs now.
             drainPendingRuns()
         case "startWorkout":
-            // Push the session across FIRST, so the wrist knows what it is about to run before it
-            // is told to run it.
-            if let sess = body["session"] as? [String: Any] {
-                sendToWatch(["pendingSession": sess])
-            }
+            // ⚠️ Do NOT try to push the session here. sendMessage needs the watch app RUNNING, and
+            // it is not — we are about to launch it. The message was silently dropped and the wrist
+            // fell back to its cached copy of today, so starting any other day ran the wrong run.
+            // The session travels on "startNow" instead, by which time the watch is up.
+            pendingWatchSession = body["session"] as? [String: Any]
             startWatchWorkout(title: (body["title"] as? String) ?? "Run",
                               type: (body["type"] as? String) ?? "easy")
         case "status":

@@ -2647,12 +2647,10 @@ window.__interunWatchCue = function (trigger, text) {
   coachLoadManifest().then(() => {
     const type = (WATCH_LIVE && WATCH_LIVE.type) || "easy";
     const at = Math.round(((WATCH_LIVE && WATCH_LIVE.sec) || 0));
-    // "step" is not a catalogue trigger — it is the one line no clip can ever say, because it
-    // carries the runner's own pace numbers. Speak it directly.
-    if (trigger === "step") { if (text && VOICE_AVAILABLE) speak(text); return; }
     coachTrigger(trigger, type, at);
-    // A cue with no clip for this coach still gets said, rather than swallowed.
-    if (text && !COACH.current && VOICE_AVAILABLE) speak(text);
+    // ⚠️ No synthesised fallback here. Every trigger the wrist sends has clips in the catalogue, and
+    // dropping to the device voice mid-run is exactly the jarring switch this whole change removes.
+    // Silence is better than a robot interrupting the coach.
   });
 };
 // Commands travel phone -> watch over the same bridge the ticks come back on.

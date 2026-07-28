@@ -73,16 +73,25 @@ final class WorkoutVoice {
     func sayComplete() { say(line("complete", "Session complete. Well done.")) }
 
     /// A step announcement: what to do, and the pace it wants.
-    func announceStep(label: String, paceLow: Int?, paceHigh: Int?, via manager: WorkoutManager? = nil) {
-        var text = label
-        if let lo = paceLow, let hi = paceHigh {
-            text += ". Target \(WorkoutManager.pace(Double(lo))) to \(WorkoutManager.pace(Double(hi))) per kilometre."
+    /// A step change, in the coach's real recorded voice.
+    ///
+    /// ⚠️ It does NOT read the label or the pace numbers aloud. Doing so meant synthesising, and a
+    /// robot arriving three seconds after the coach counted you in is worse than saying less — the
+    /// pace band is on both screens anyway. Instead the step's KIND picks a catalogue trigger, and
+    /// the phone plays the real clip for it.
+    func announceStep(kind: String, via manager: WorkoutManager?) {
+        let trigger: String
+        switch kind {
+        case "warmup": trigger = "warmup-start"
+        case "rep": trigger = "interval-start"
+        case "recovery": trigger = "recovery-start"
+        case "cooldown": trigger = "cooldown-start"
+        default: trigger = "easy-settle"
         }
-        // No clip can say a pace, so this line is synthesised wherever it is spoken — but it should
-        // still come out of the PHONE, so a run has one voice coming from one place rather than the
-        // coach in a pocket and a robot on the wrist.
-        if manager?.speakOnPhone("step", text: text) == true { return }
-        say(text)
+        if manager?.speakOnPhone(trigger) == true { return }
+        // Out of range: the wrist says it, and only then does it read the label, because a synthetic
+        // voice with information beats a synthetic voice without.
+        say(line(trigger, kind == "rep" ? "Next effort." : "Next section."))
     }
 
     /// Pace nudges speak only when the verdict has held for a few seconds AND the last nudge was

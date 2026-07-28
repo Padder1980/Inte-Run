@@ -638,6 +638,18 @@ sounds like**: `WorkoutManager.speakOnPhone(trigger)` → `WatchBridge.forwardCu
 when the phone is out of range. The ONE exception is the step announcement, which carries the
 runner's own pace numbers and so can never be a recorded clip.
 
+⚠️ **`sendToWatch` needs the watch app RUNNING (`isReachable`), so nothing can be pushed to it
+before `startWatchApp` launches it.** The session payload was being sent first and silently dropped,
+and the wrist fell back to its cached copy of today — so starting any other day ran the wrong run.
+The session now rides ON the `startNow` command, by which time the watch is up.
+
+⚠️ **Nothing spoken during a run is synthesised any more.** A step change picks a catalogue trigger
+from the step's KIND (`warmup-start` / `interval-start` / `recovery-start` / `cooldown-start`) and
+the phone plays the real clip; it does NOT read the label or the pace numbers, because that meant
+synthesising and a robot arriving three seconds after the coach counted you in is worse than saying
+less — the band is on both screens. `__interunWatchCue` has **no TTS fallback**: silence beats a
+robot interrupting the coach.
+
 ⚠️ **The phone sends the SESSION, and owns the count.** Starting on the phone posts the full
 `watchSessionPayload` as `pendingSession`; the watch HOLDS it and waits. The phone counts in, and
 only on "go" sends `startNow`, at which point the watch begins with no count of its own. Three bugs

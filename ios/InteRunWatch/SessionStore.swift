@@ -269,7 +269,13 @@ extension SessionStore: WCSessionDelegate {
         guard let action = message["command"] as? String else { return }
         Task { @MainActor in
             switch action {
-            case "startNow": self.onStartNow?()
+            case "startNow":
+                if let raw = message["session"],
+                   let data = try? JSONSerialization.data(withJSONObject: raw),
+                   let decoded = try? JSONDecoder().decode(PlannedSession.self, from: data) {
+                    self.pendingSession = decoded
+                }
+                self.onStartNow?()
             case "companionStart": LaunchRequest.shared.requestCompanion()
             case "companionEnd": LaunchRequest.shared.endCompanion()
             case "stop": self.onStopRequested?()

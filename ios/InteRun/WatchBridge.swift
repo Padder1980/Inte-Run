@@ -174,7 +174,19 @@ extension WatchBridge: WCSessionDelegate {
     /// phone. It needs HealthKit authorisation first, which is why the request is inline rather
     /// than at launch: asking for health permissions before someone has expressed any interest in
     /// the watch is exactly the prompt everyone declines.
-    private func startWatchWorkout() {
+    private func startWatchWorkout(title: String, type: String) {
+        // ⚠️ The Live Activity is raised HERE, and it has to be. This tap happens with the app on
+        // screen, and the foreground is the only place iOS permits `Activity.request` — a wrist run
+        // never gets another one. Every watch tick after this updates the card, which the background
+        // IS allowed to do. Raised before requestAuthorization below, because that callback can run
+        // long after the runner has pocketed the phone.
+        Task { @MainActor in
+            LiveActivityService.shared.start(
+                runId: "watch-pending", title: title, type: type,
+                state: .init(elapsedSeconds: 0, distanceKm: 0, paceSecPerKm: nil, heartRate: nil,
+                             step: nil, paused: false, onWatch: true),
+            )
+        }
         guard HKHealthStore.isHealthDataAvailable() else {
             return reportStart(false, "This iPhone can’t talk to HealthKit.")
         }
@@ -221,9 +233,10 @@ extension WatchBridge: WCSessionDelegate {
            let json = String(data: data, encoding: .utf8) {
             webView.evaluateJavaScript("window.__interunWatchLive && window.__interunWatchLive(\(json));")
         }
-        // The Live Activity is the real answer to "open the phone on the live screen": iOS will not
-        // let the watch foreground this app, but it will show a card that tracks the run and opens
-        // straight onto it. Started from the background, which the WatchConnectivity wake permits.
+        // Keep the card in step. ⚠️ This can only ever UPDATE — starting one from here is refused,
+        // because a WatchConnectivity wake is a background context. The card is raised when the
+        // runner taps "Apple Watch" in the start sheet (startWatchWorkout), which is a foreground
+        // moment; a run begun entirely on the wrist gets the follow-along notification instead.
         Task { @MainActor in self.driveLiveActivity(live, ended: ended) }
         if !ended { offerToFollowAlong(live) }
     }
@@ -353,7 +366,8 @@ extension WatchBridge: WKScriptMessageHandler {
             // The page has finished booting and can accept runs now.
             drainPendingRuns()
         case "startWorkout":
-            startWatchWorkout()
+            startWatchWorkout(title: (body["title"] as? String) ?? "Run",
+                              type: (body["type"] as? String) ?? "easy")
         case "status":
             let paired: Bool
             let installed: Bool

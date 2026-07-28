@@ -9,10 +9,16 @@ import UIKit
 /// a live card the moment the wrist starts running, and tapping that card opens the app, which
 /// `replayLiveOnActivate()` then drops straight onto the live session screen.
 ///
-/// ⚠️ Starting one from the background needs iOS 17 and a legitimate reason to be awake. The watch
-/// sending a live tick wakes this app via WatchConnectivity, which qualifies. If the start is
-/// refused (Live Activities switched off for InteRun, or too many already running) every call here
-/// degrades to doing nothing — a run must never depend on its own decoration.
+/// ⚠️ **`Activity.request` may only be called while the app is in the FOREGROUND.** True since
+/// iOS 16.1 and unchanged through iOS 27. There is no "legitimate reason to be awake" exemption: a
+/// WatchConnectivity wake, a CoreLocation wake and a background task are all refused alike, with
+/// `ActivityAuthorizationError.visibility`. An earlier version of this file claimed the watch tick
+/// qualified; it does not, and that false premise cost two on-device debugging sessions.
+///
+/// `update()` and `end()` from the background ARE permitted. So the shape of the feature is: raise
+/// the card at a foreground moment, then let background ticks drive it.
+///
+/// Every failure degrades to doing nothing — a run must never depend on its own decoration.
 @MainActor
 final class LiveActivityService {
     static let shared = LiveActivityService()
@@ -29,13 +35,28 @@ final class LiveActivityService {
 
     /// Begin, or update in place if this run already has a card.
     func start(runId: String, title: String, type: String, state: RunActivityAttributes.ContentState) {
-        // ⚠️ Do NOT gate this on `areActivitiesEnabled`. It is false until the runner grants
-        // permission, and the grant prompt only appears when an app actually ATTEMPTS a request —
-        // so guarding on it means the prompt never appears, the permission never becomes true, and
-        // the feature can never start. A deadlock that looks exactly like "it silently doesn't work".
-        if currentRunId == runId, activity != nil { return update(state) }
-        endImmediately()
-        let attrs = RunActivityAttributes(title: title, sessionType: type)
+        // Not gated on `areActivitiesEnabled`: a stale false read would cost us the card for
+        // nothing, and attempting costs nothing when it is genuinely off.
+        if let existing = activity {
+            // Already showing something. Adopt it rather than tearing it down — a background tick
+            // that ends the card CANNOT recreate it (foreground-only), so destroying a working card
+            // out here is permanent. A slightly stale title beats no card.
+            if currentRunId != runId, !isForeground { currentRunId = runId }
+            if currentRunId == runId { return update(state) }
+            _ = existing
+            endImmediately()
+        }
+        // Nothing to show yet, and only the foreground may create one. From the background this is
+        // simply not possible; retrying every two seconds for an hour would burn battery to no end.
+        guard isForeground else {
+            if let id = runId as String?, !refusedRunIds.contains(id) {
+                refusedRunIds.insert(id)
+                note("not started: app is in the background (iOS only allows this in the foreground)")
+            }
+            return
+        }
+        if refusedRunIds.contains(runId) { refusedRunIds.remove(runId) }
+        let attrs = RunActivityAttributes(title: title, sessionType: type, runId: runId)
         do {
             activity = try Activity.request(
                 attributes: attrs,
@@ -46,14 +67,23 @@ final class LiveActivityService {
             lastUpdate = Date()
             note("started")
         } catch {
-            // Swallowing this is what made the last attempt undiagnosable. Recorded where the app's
-            // own version screen can show it, because the failure is invisible from the outside:
-            // a missing card looks identical whatever the cause.
+            // ⚠️ `localizedDescription` on ActivityAuthorizationError is a generic domain+code string
+            // and names nothing. `String(describing:)` gives the case — "visibility", "denied" — which
+            // is the single word that settles what went wrong.
             activity = nil
             currentRunId = nil
-            note("failed: \(error.localizedDescription)")
+            refusedRunIds.insert(runId)
+            note("failed: \(String(describing: error))")
         }
     }
+
+    /// Refused starts, so a doomed request is not retried on every one of ~1800 ticks in an hour.
+    /// Cleared when the app comes to the front, because that is the only event that can change the
+    /// answer.
+    private var refusedRunIds: Set<String> = []
+    func clearRefusals() { refusedRunIds.removeAll() }
+
+    private var isForeground: Bool { UIApplication.shared.applicationState == .active }
 
     /// The last thing that happened, for Support › Your data › This version.
     private func note(_ what: String) {
@@ -102,6 +132,9 @@ final class LiveActivityService {
         guard activity == nil else { return }
         if let existing = Activity<RunActivityAttributes>.activities.first {
             activity = existing
+            // ⚠️ Without the id, the next tick fails the `currentRunId == runId` check and ends the
+            // card it has just adopted — and cannot recreate it from the background.
+            currentRunId = existing.attributes.runId
         }
     }
 }

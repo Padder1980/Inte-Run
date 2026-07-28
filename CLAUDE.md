@@ -553,6 +553,24 @@ because the two sides must agree on the type exactly and a copied file would dri
 `LiveActivityService` starts/updates/ends it; watch runs drive it from `WatchBridge.forwardLive`,
 phone runs from `pushLiveActivity()` in `web/app.ts` via a `liveActivity` bridge action. Tapping the
 card opens the app and `replayLiveOnActivate()` lands it on the live screen.
+⚠️ **`Activity.request` may ONLY be called with the app in the FOREGROUND** — true since iOS 16.1,
+unchanged through iOS 27, and there is no "legitimate reason to be awake" exemption. A
+WatchConnectivity wake, a CoreLocation wake and a background task are all refused alike with
+`ActivityAuthorizationError.visibility`. `update()` and `end()` from the background ARE permitted.
+So the shape is: **raise the card at a foreground moment, then let background ticks drive it.** For
+InteRun that moment is the runner tapping "Apple Watch" in the start sheet (`startWatchWorkout`).
+**A run begun entirely on the wrist with the phone untouched gets the follow-along notification, not
+a card** — the only sanctioned alternative is APNs push-to-start, which needs `aps-environment`, the
+remote-notification background mode and a real server holding an APNs key. That is a backend for a
+decoration, and the same secrecy constraint that pushed reminders to `.ics` applies.
+⚠️ **`error.localizedDescription` on `ActivityAuthorizationError` names nothing** — it is a generic
+domain+code string. Use `String(describing:)` to get the case ("visibility", "denied"), which is the
+one word that settles a failure.
+⚠️ **`pushLiveActivity()` must be called from `gpsUiTick` and `indoorUiTick`, not just `liveTick`** —
+`liveTick` only runs for SIMULATED runs, so for a week the one path iOS actually permits never asked
+for a card at all. Do not move the call inside `renderLiveNow()`: that returns early when the live
+screen is not mounted, which is exactly the backgrounded case the card exists for.
+
 ⚠️ **Never gate the request on `ActivityAuthorizationInfo().areActivitiesEnabled`.** It is false
 until the runner grants permission, and the grant prompt only appears when an app actually ATTEMPTS
 a request — so guarding on it means the prompt never appears, the permission never becomes true, and

@@ -36,4 +36,7 @@ struct RunActivityAttributes: ActivityAttributes {
     /// Fixed for the life of the activity.
     var title: String
     var sessionType: String
+    /// Which run this card belongs to, so a relaunch can adopt an existing card and keep driving it
+    /// rather than ending it (which, from the background, would be permanent).
+    var runId: String
 }

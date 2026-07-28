@@ -5178,7 +5178,14 @@ function wireStartWhere() {
 function startOnWatch(sess) {
   if (!NATIVE_WATCH) return startSession(sess);
   try {
-    window.webkit.messageHandlers.interunWatch.postMessage({ action: "startWorkout" });
+    // The session travels so the native side can raise the Live Activity here and now. This tap is
+    // the one foreground moment in a wrist-started run, and iOS only permits Activity.request from
+    // the foreground — see LiveActivityService.
+    window.webkit.messageHandlers.interunWatch.postMessage({
+      action: "startWorkout",
+      title: (sess && sess.title) || "Run",
+      type: (sess && sess.type) || "easy",
+    });
     toast("Opening InteRun on your watch\u2026");
   } catch (e) { startSession(sess); }
 }
@@ -5283,6 +5290,9 @@ function indoorUiTick() {
   const at = liveElapsedMs();
   if (LIVE.rt.getStatus() === "active") LIVE.rt.update({ atMs: at, distanceMeters: 0 }).forEach(liveCue);
   renderLiveNow();
+  // ⚠️ NOT inside renderLiveNow(): that returns early when the live screen is not mounted, which is
+  // exactly the backgrounded case where the lock-screen card matters most.
+  pushLiveActivity(LIVE.rt.snapshot(at));
   if (LIVE.rt.getStatus() === "completed") { stopLive(); liveFinish(true); }
 }
 function startSim() {
@@ -5339,6 +5349,7 @@ function gpsUiTick() {
     checkSplits();
   }
   renderLiveNow();
+  pushLiveActivity(LIVE.rt.snapshot(at));
   if (LIVE.rt.getStatus() === "completed") { stopLive(); liveFinish(true); }
 }
 function gpsStatusText() {

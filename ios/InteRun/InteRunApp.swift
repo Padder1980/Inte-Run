@@ -32,7 +32,11 @@ struct InteRunApp: App {
         .onChange(of: scenePhase) { _, phase in
             // Coming back to the app while the wrist is mid-run should land on the live screen, not
             // on Today two seconds before jumping there.
-            if phase == .active { WatchBridge.shared.replayLiveOnActivate() }
+            if phase == .active {
+                // Foregrounding is the only event that can change ActivityKit's answer.
+                Task { @MainActor in LiveActivityService.shared.clearRefusals() }
+                WatchBridge.shared.replayLiveOnActivate()
+            }
         }
     }
 }

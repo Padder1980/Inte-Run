@@ -7,9 +7,22 @@ import SwiftUI
 ///
 /// Dressed in the app's own palette (`Brand`) so the watch and the phone read as one product.
 struct TodayView: View {
+    /// True when the phone launched this app specifically to begin a run.
+    var autoStart: Bool = false
+
     @EnvironmentObject private var store: SessionStore
     @StateObject private var workout = WorkoutManager()
     @State private var running = false
+
+    /// Hand the plan to the workout and go. One path, so a run started from the phone and a run
+    /// started on the wrist are the same run with the same targets and the same reasons.
+    private func begin(_ s: PlannedSession) {
+        workout.plan = s   // the target band and step list come from the plan
+        workout.why = store.why          // the runner's own reasons, for the hard stretch
+        workout.whyPerson = store.whyPerson
+        running = true
+        workout.start()
+    }
 
     var body: some View {
         NavigationStack {
@@ -36,6 +49,20 @@ struct TodayView: View {
             .navigationDestination(isPresented: $running) {
                 WorkoutView(workout: workout)
                     .environmentObject(store)
+            }
+            // Launched from the phone's "record on my watch": begin without a second tap. Gated on
+            // a session actually being synced, because starting a run the watch knows nothing about
+            // would lose the pace targets and the step list -- the whole reason to use this app.
+            .onChange(of: autoStart, initial: true) { _, want in
+                guard want, !running, store.isCurrent, let s = store.session else { return }
+                LaunchRequest.shared.consume()
+                begin(s)
+            }
+            // The context can land a moment after the launch, so try again when it does.
+            .onChange(of: store.session) { _, s in
+                guard autoStart, !running, store.isCurrent, let s else { return }
+                LaunchRequest.shared.consume()
+                begin(s)
             }
         }
     }
@@ -76,11 +103,7 @@ struct TodayView: View {
             }
 
             Button {
-                workout.plan = s   // the target band and step list come from the plan
-                workout.why = store.why          // the runner's own reasons, for the hard stretch
-                workout.whyPerson = store.whyPerson
-                running = true
-                workout.start()
+                begin(s)
             } label: {
                 Label("Start", systemImage: "play.fill")
                     .font(.system(size: 15, weight: .semibold))

@@ -1,4 +1,5 @@
 import Foundation
+import HealthKit
 import WatchConnectivity
 import WebKit
 
@@ -110,6 +111,49 @@ extension WatchBridge: WCSessionDelegate {
         acceptRun(from: message)
     }
 
+    /// Launch the watch app straight into a run.
+    ///
+    /// `sendMessage` cannot do this — it needs the watch app already running — so this goes through
+    /// HealthKit's `startWatchApp(toHandle:)`, the one API that will wake a watchOS app from the
+    /// phone. It needs HealthKit authorisation first, which is why the request is inline rather
+    /// than at launch: asking for health permissions before someone has expressed any interest in
+    /// the watch is exactly the prompt everyone declines.
+    private func startWatchWorkout() {
+        guard HKHealthStore.isHealthDataAvailable() else {
+            return reportStart(false, "This iPhone can’t talk to HealthKit.")
+        }
+        guard WCSession.isSupported(), WCSession.default.isWatchAppInstalled else {
+            return reportStart(false, "InteRun isn’t installed on your Apple Watch yet.")
+        }
+        let store = HKHealthStore()
+        let share: Set<HKSampleType> = [HKObjectType.workoutType()]
+        let read: Set<HKObjectType> = [
+            HKObjectType.workoutType(),
+            HKObjectType.quantityType(forIdentifier: .heartRate)!,
+            HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning)!,
+        ]
+        store.requestAuthorization(toShare: share, read: read) { [weak self] _, _ in
+            // A declined prompt is not a reason to stop: the watch asks for its own permissions,
+            // and the run can still be recorded there.
+            let config = HKWorkoutConfiguration()
+            config.activityType = .running
+            config.locationType = .outdoor
+            store.startWatchApp(with: config) { ok, error in
+                self?.reportStart(ok, ok ? nil : (error?.localizedDescription ?? "Couldn’t open InteRun on your watch."))
+            }
+        }
+    }
+
+    private func reportStart(_ ok: Bool, _ reason: String?) {
+        DispatchQueue.main.async { [weak self] in
+            guard let webView = self?.webView else { return }
+            let msg = (reason ?? "").replacingOccurrences(of: "\\", with: "\\\\")
+                                    .replacingOccurrences(of: "\"", with: "\\\"")
+            webView.evaluateJavaScript(
+                "window.__interunWatchStart && window.__interunWatchStart(\(ok), \"\(msg)\");")
+        }
+    }
+
     private func forwardLive(_ live: [String: Any]) {
         guard let webView,
               let data = try? JSONSerialization.data(withJSONObject: live),
@@ -161,6 +205,8 @@ extension WatchBridge: WKScriptMessageHandler {
         case "ready":
             // The page has finished booting and can accept runs now.
             drainPendingRuns()
+        case "startWorkout":
+            startWatchWorkout()
         case "status":
             let paired: Bool
             let installed: Bool

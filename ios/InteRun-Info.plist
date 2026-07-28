@@ -20,23 +20,23 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
-
-	<!-- Keeps the coach talking and the GPS logging with the screen locked — the two things a
-	     PWA fundamentally cannot do, and the reason this native shell exists. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>NSHealthShareUsageDescription</key>
+	<string>InteRun uses HealthKit only to start a run on your Apple Watch from your phone. Your health data stays on your devices.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>InteRun uses HealthKit only to start a run on your Apple Watch from your phone. Your health data stays on your devices.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>InteRun keeps tracking your run when your phone is locked or in a pocket, so your pace and route stay accurate for the whole session.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>InteRun uses your location to measure pace, distance and your route while a session is running.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>InteRun uses motion data to keep your distance accurate when the GPS signal drops.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
 		<string>location</string>
 	</array>
-
-	<!-- Shown verbatim in the permission prompt, so it explains the trade the runner is making. -->
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>InteRun uses your location to measure pace, distance and your route while a session is running.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>InteRun keeps tracking your run when your phone is locked or in a pocket, so your pace and route stay accurate for the whole session.</string>
-	<key>NSMotionUsageDescription</key>
-	<string>InteRun uses motion data to keep your distance accurate when the GPS signal drops.</string>
-
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>
@@ -54,7 +54,5 @@
 	<string>Automatic</string>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
-	<key>ITSAppUsesNonExemptEncryption</key>
-	<false/>
 </dict>
 </plist>

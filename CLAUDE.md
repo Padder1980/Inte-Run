@@ -397,10 +397,31 @@ runs already saved in the wrong shape. Anything crossing that bridge needs its s
 only `session` + `name`, which silently dropped `why`/`whyName` — a page-side addition appeared to
 work everywhere except on the wrist. Add new keys to that list.
 
+**Where to record (shipped 2026-07-28):** tapping Start asks *Apple Watch / this iPhone / treadmill*
+(`openStartWhereSheet`). The watch option calls `HKHealthStore.startWatchApp(with:)` — the only API
+that can wake a watchOS app from the phone — and the watch's `WKApplicationDelegate.handle(_
+workoutConfiguration:)` sets `LaunchRequest`, which makes `TodayView` begin today's session without a
+second tap. ⚠️ This needs the **HealthKit entitlement on the iOS target** (`ios/InteRun.entitlements`
++ `NSHealth*UsageDescription`); the wildcard provisioning profile cannot carry it, so builds now need
+**`-allowProvisioningUpdates`** once so Xcode registers an explicit App ID.
+
+**Treadmill mode** (`LIVE.indoor` → `startIndoor()` / `indoorUiTick()`) runs a real clock with **no
+GPS and no invented distance** — falling back to `startSim()` would write a fictional route and
+distance into the logbook. The distance is asked for at the end from the machine's own display
+(`treadmillDistanceHtml` / `applyTreadmillDistance`), which recomputes pace and edits the logged run
+in place rather than adding a second copy. Splits are deliberately not synthesised.
+
+⚠️ **A run no longer locks the app to the live screen.** The nav stays visible and `liveBack`
+navigates instead of calling `stopLive()`. The protection is now the **live pill** (`syncLivePill`):
+a flashing dot + "Live session" + a ticking clock, red for a phone run and teal for a watch one, one
+tap back. Because ticks keep firing off-screen, `renderLiveNow()` returns early when `#lElapsed` is
+absent — without that guard every tick threw.
+
 **Watch screens are five pages:** Controls ← Metrics → Pace → Session → Music. Metrics holds five
-numbers only (time, distance, current/lap/average pace); the pace band moved to its own full-size
-page (`PaceView.swift`) because at running cadence a chart squeezed above the numbers is unreadable
-and makes the numbers harder to read too.
+numbers only (time, distance, current/lap/average pace); the pace band and **heart rate** live on
+their own full-size page (`PaceView.swift`), because at running cadence a chart squeezed above the
+numbers is unreadable and makes the numbers harder to read too — and pace and heart rate are the
+pair you read together to know whether an effort is honest.
 
 ✅ **The watch app runs on the owner's real Watch Ultra (2026-07-27, evening).** The install wall
 broke when the watch updated to **watchOS 26.6**, which surfaced Developer Mode (Settings → Privacy &

@@ -1539,6 +1539,56 @@ body.cal-dragging { overscroll-behavior: none; cursor: grabbing; }
 .wl-sub { margin-top: 10px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line)); }
 .wl-sub .wl-v { font-size: 15px; font-weight: 650; color: var(--ink-soft); }
 .wl-foot { margin-top: 12px; font-size: 11.5px; line-height: 1.45; color: var(--ink-faint); }
+/* ---- Where to record this run --------------------------------------------------------------- */
+.sheet-h { font-size: 19px; font-weight: 780; letter-spacing: -.025em; color: var(--ink); }
+.sheet-sub { margin-top: 3px; font-size: 13px; color: var(--ink-soft); }
+.sw-list { display: grid; gap: 9px; margin-top: 16px; }
+.sw-row { display: flex; align-items: center; gap: 13px; width: 100%; text-align: left; padding: 14px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; transition: border-color 140ms ease, transform 140ms ease, background 140ms ease; }
+.sw-row:active { transform: scale(.985); }
+button.sw-row:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
+.sw-row.sw-off { opacity: .55; cursor: default; }
+.sw-ic { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; background: color-mix(in srgb, var(--accent) 12%, var(--surface-2)); color: var(--accent); }
+.sw-ic svg { width: 21px; height: 21px; }
+.sw-off .sw-ic { background: var(--surface-2); color: var(--ink-faint); }
+.sw-b { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.sw-n { display: flex; align-items: center; gap: 7px; font-size: 15px; font-weight: 700; letter-spacing: -.015em; }
+.sw-badge { font-size: 9px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; padding: 2.5px 6px; border-radius: 6px; background: var(--accent); color: var(--accent-ink); }
+.sw-d { font-size: 12px; line-height: 1.4; color: var(--ink-soft); }
+.sw-row .arr { color: var(--ink-faint); font-size: 19px; flex: none; }
+
+/* ---- The live-session pill -------------------------------------------------------------------
+   Sits just above the bottom nav on every screen but the run itself. A bare dot (the pattern most
+   apps use) makes you guess; the words remove the guess, and the clock proves it is really live. */
+.live-pill { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 68px); z-index: 60;
+  display: flex; align-items: center; gap: 9px; padding: 9px 15px 9px 13px; border: 0; border-radius: 999px; cursor: pointer;
+  font: inherit; color: #fff; background: linear-gradient(150deg, #d94b3a, #b8302a);
+  box-shadow: 0 10px 26px -10px rgba(190, 45, 40, .8), 0 2px 6px rgba(0, 0, 0, .22);
+  animation: lpIn .34s cubic-bezier(.22, 1, .36, 1) both; }
+.live-pill:active { transform: translateX(-50%) scale(.97); }
+.lp-dot { width: 9px; height: 9px; border-radius: 50%; background: #fff; flex: none; animation: lpBlink 1.25s ease-in-out infinite; }
+.lp-txt { font-size: 13px; font-weight: 750; letter-spacing: -.01em; }
+.lp-time { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; opacity: .85; padding-left: 9px; border-left: 1px solid rgba(255, 255, 255, .28); }
+.live-pill.paused { background: linear-gradient(150deg, #6b7a74, #4d5a55); box-shadow: 0 10px 24px -12px rgba(0, 0, 0, .6); }
+.live-pill.paused .lp-dot { animation: none; opacity: .8; }
+.live-pill.on-watch { background: linear-gradient(150deg, #1aa593, #0d7466); box-shadow: 0 10px 26px -10px rgba(13, 116, 102, .75), 0 2px 6px rgba(0, 0, 0, .22); }
+@keyframes lpBlink { 0%, 45% { opacity: 1; } 65%, 100% { opacity: .18; } }
+@keyframes lpIn { from { opacity: 0; transform: translateX(-50%) translateY(10px) scale(.94); } to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .lp-dot { animation: none; } .live-pill { animation: none; } }
+
+/* ---- Toast ----------------------------------------------------------------------------------- */
+.app-toast { position: fixed; left: 50%; transform: translateX(-50%) translateY(12px); bottom: calc(env(safe-area-inset-bottom, 0px) + 120px); z-index: 70;
+  max-width: min(88vw, 380px); padding: 11px 16px; border-radius: 13px; font-size: 13px; line-height: 1.4; text-align: center;
+  color: var(--surface); background: color-mix(in srgb, var(--ink) 92%, transparent); box-shadow: 0 12px 30px -12px rgba(0, 0, 0, .55);
+  opacity: 0; pointer-events: none; transition: opacity .22s ease, transform .22s ease; }
+.app-toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+/* ---- Treadmill distance ---------------------------------------------------------------------- */
+.tm-ask { border-color: color-mix(in srgb, var(--accent) 30%, var(--line)); }
+.tm-row { display: flex; align-items: center; gap: 9px; margin-top: 12px; flex-wrap: wrap; }
+.tm-row .sel { max-width: 130px; }
+.tm-unit { font-size: 13px; font-weight: 650; color: var(--ink-soft); margin-left: -4px; }
+.tm-note { margin-top: 9px; font-size: 12px; line-height: 1.45; color: var(--ink-faint); }
+/* The pill floats, so the scroll area needs room beneath it or it sits on top of the last card. */
+body.has-live-pill #view { padding-bottom: 62px; }
 </style>
 </head>
 <body>
@@ -1596,6 +1646,9 @@ const BRAND_SVG = ${JSON.stringify(BRAND_MARK)};
 const EX_ANIM = ${JSON.stringify(exAnimData)};
 const EX_STILL = ${JSON.stringify(exStillData)};
 const ICON = {
+  watch: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="3.4"/><path d="M9 6 8.6 3.2A1 1 0 0 1 9.6 2h4.8a1 1 0 0 1 1 1.2L15 6M9 18l-.4 2.8a1 1 0 0 0 1 1.2h4.8a1 1 0 0 0 1-1.2L15 18"/><path d="M12 9.6V12l1.7 1.1"/></svg>',
+  phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.4 5.4h3.2"/><circle cx="12" cy="18.2" r=".7" fill="currentColor" stroke="none"/></svg>',
+  treadmill: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2.6 19.4h13.6a3 3 0 0 0 3-3V4.6"/><path d="M2.6 19.4 4 15.2h10.4"/><path d="M19.2 4.6h2.2"/><circle cx="10.4" cy="4.6" r="1.5"/><path d="m7.2 12.4 2-1.6-.6-3 2.2 1.6 1.8-.4"/><path d="m8.6 7.8-1.4.9M10.6 9.4l1 3"/></svg>',
   gauge: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19a8 8 0 1 1 16 0"/><path d="M13.4 12.6 18 8"/><circle cx="12" cy="19" r="1.4" fill="currentColor" stroke="none"/></svg>',
   guide: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/><circle cx="12" cy="8" r=".6" fill="currentColor"/></svg>',
   share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.5 15.4 6.5M8.6 13.5l6.8 4"/></svg>',
@@ -3142,7 +3195,7 @@ function wireSheet() {
   });
   document.querySelectorAll("#sheetBody [data-slog]").forEach((inp) => inp.oninput = () => slogSet(inp.dataset.slog, inp.dataset.f, inp.value.trim()));
   wireExDemos();
-  const sdStart = $("sdStart"); if (sdStart && SHEET_CTX && SHEET_CTX.sess) sdStart.onclick = () => { closeSheet(); startSession(SHEET_CTX.sess); };
+  const sdStart = $("sdStart"); if (sdStart && SHEET_CTX && SHEET_CTX.sess) { const ss = SHEET_CTX.sess; sdStart.onclick = () => { closeSheet(); openStartWhereSheet(ss); }; }
   const sdAdd = $("sdAdd"); if (sdAdd) sdAdd.onclick = () => { const iso = sheetSessionIso(); closeSheet(); openAddSessionSheet(iso); };
 }
 function openSessionSheet(sess, week) {
@@ -3791,6 +3844,17 @@ function exportBackup() {
     document.body.appendChild(a); a.click();
     setTimeout(() => { try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch (e) {} }, 1500);
   } catch (e) { toastData("Couldn\\u2019t create the file on this device."); }
+}
+// A brief, non-blocking message. Used where something happened elsewhere (the watch, the OS) and
+// the runner needs telling without a dialog stealing the screen mid-tap.
+let TOAST_T = null;
+function toast(msg) {
+  let t = $("appToast");
+  if (!t) { t = el('<div class="app-toast" id="appToast" role="status" aria-live="polite"></div>'); document.querySelector(".app").appendChild(t); }
+  t.textContent = msg;
+  t.classList.add("on");
+  clearTimeout(TOAST_T);
+  TOAST_T = setTimeout(() => t.classList.remove("on"), 4200);
 }
 function toastData(msg) {
   const el = $("dataMsg");
@@ -4827,13 +4891,74 @@ function wireCoachSettings() {
     if (COACH.audio) COACH.audio.volume = COACH.cfg.volume;
   };
 }
-function startSession(sess) {
+// ---- Where do you want to record this? ---------------------------------------------------------
+// A run can be recorded in three genuinely different places, and the app cannot guess which. The
+// watch is the best recorder when it is on your wrist; the phone is right when it isn't; a treadmill
+// has no GPS at all and pretending otherwise produces a fictional route. Asking once, up front, is
+// honest -- and it is the only moment where the answer is cheap to give.
+let START_CTX = null;   // the session waiting on a choice
+function watchAvailable() { return !!(WATCH_STATUS && WATCH_STATUS.paired && WATCH_STATUS.installed); }
+function openStartWhereSheet(sess) {
+  START_CTX = sess || null;
+  ensureSheet(); SHEET_CTX = null;
+  $("sheetBody").innerHTML = startWhereHtml(sess);
+  wireStartWhere();
+  $("sheetOv").classList.add("on");
+  // The watch's paired/installed state is asked for fresh: it changes without the page knowing.
+  try { if (NATIVE_WATCH) window.webkit.messageHandlers.interunWatch.postMessage({ action: "status" }); } catch (e) {}
+}
+function startWhereHtml(sess) {
+  const row = (id, ic, name, note, badge) =>
+    '<button class="sw-row" data-startwhere="' + id + '">' +
+    '<span class="sw-ic">' + ic + '</span>' +
+    '<span class="sw-b"><span class="sw-n">' + name + (badge ? '<span class="sw-badge">' + badge + '</span>' : "") + '</span>' +
+    '<span class="sw-d">' + note + '</span></span><span class="arr">\u203a</span></button>';
+  const watchRow = watchAvailable()
+    ? row("watch", ICON.watch, "My Apple Watch", "Best accuracy, and your phone can stay at home. Your watch will open on its own.", "recommended")
+    : (NATIVE_WATCH
+        ? '<div class="sw-row sw-off"><span class="sw-ic">' + ICON.watch + '</span><span class="sw-b"><span class="sw-n">My Apple Watch</span>' +
+          '<span class="sw-d">' + (WATCH_STATUS && WATCH_STATUS.paired
+            ? "Paired, but InteRun isn\u2019t installed on it yet \u2014 add it in the Watch app."
+            : "No Apple Watch paired with this iPhone.") + '</span></span></div>'
+        : "");
+  return '<div class="sheet-h">Where shall we record this?</div>' +
+    '<div class="sheet-sub">' + esc((sess && sess.title) || "Your session") + '</div>' +
+    '<div class="sw-list">' + watchRow +
+      row("phone", ICON.phone, "This iPhone", "GPS, pace and route recorded here. Keep the phone with you.") +
+      row("treadmill", ICON.treadmill, "Treadmill", "Indoors, timed by the clock. Add the distance from the machine when you finish.") +
+    '</div>';
+}
+function wireStartWhere() {
+  document.querySelectorAll("[data-startwhere]").forEach((b) => b.onclick = () => {
+    const where = b.dataset.startwhere, sess = START_CTX;
+    closeSheet();
+    if (where === "watch") return startOnWatch(sess);
+    startSession(sess, { indoor: where === "treadmill" });
+  });
+}
+// Hand the run to the wrist. The watch app is launched by HealthKit on the native side; from then
+// on the watch owns the run and this phone shows the live mirror it already knows how to draw.
+function startOnWatch(sess) {
+  if (!NATIVE_WATCH) return startSession(sess);
+  try {
+    window.webkit.messageHandlers.interunWatch.postMessage({ action: "startWorkout" });
+    toast("Opening InteRun on your watch\u2026");
+  } catch (e) { startSession(sess); }
+}
+window.__interunWatchStart = function (ok, reason) {
+  // A failure has to say so: silently falling back to the phone would record the run in the wrong
+  // place, and the runner would only find out afterwards.
+  if (ok) return;
+  toast(reason || "Couldn\u2019t start your watch \u2014 open InteRun on it and press start.");
+};
+function startSession(sess, opts) {
   const s = (sess && sess.steps) ? sess : rawToday();
   LIVE = { session: s, rt: new RC.LiveSession(s), mode: null, acquiring: false, gpsErr: null,
     startMs: 0, pausedMs: 0, pauseStart: 0, vms: 0, dist: 0, hr: 105, devSpeed: null, curPace: null, win: [],
     timer: null, ui: null, watchId: null, wakeLock: null, lastLat: null, lastLon: null, acc: null,
     speed: 20, lastStep: -1, quirk: 0, started: false, done: false, completedFull: false, summary: null, kmDone: 0, lastKmMs: 0,
-    route: [], splits: [], routeDist: 0, simLat: 0, simLng: 0, simHead: Math.random() * 6.28, elevGain: 0, lastAlt: null };
+    route: [], splits: [], routeDist: 0, simLat: 0, simLng: 0, simHead: Math.random() * 6.28, elevGain: 0, lastAlt: null,
+    indoor: !!(opts && opts.indoor) };
   state.screen = "live"; render();
 }
 // True while a session is under way (started, not yet finished) — the app locks onto the live
@@ -4884,7 +5009,8 @@ function beginLive() {
     coachUnlock();
     coachLoadManifest().then(() => { coachPreload(); coachTrigger("session-prep", LIVE.session.type, 0); });
   }
-  render(); // re-render to lock the screen (hide nav + back) now the run is starting
+  render();
+  if (LIVE.indoor) { startIndoor(); return; }
   if (GPS_AVAILABLE) {
     LIVE.acquiring = true; renderLiveNow();
     navigator.geolocation.getCurrentPosition(
@@ -4902,6 +5028,25 @@ function startGps(pos) {
   LIVE.watchId = navigator.geolocation.watchPosition(onGpsPos, () => {}, { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
   if (!LIVE.ui) LIVE.ui = setInterval(gpsUiTick, 250);
   renderLiveNow();
+}
+// A treadmill run: the clock is real, the distance is not knowable here, and we refuse to invent
+// it. Steps still advance on time and the coach still coaches; the distance is asked for at the end
+// from the one thing that does know it -- the machine's own display. Falling back to the simulator
+// (which fabricates movement) would put a fictional distance and route in someone's logbook.
+function startIndoor() {
+  if (!LIVE || LIVE.done) return;
+  LIVE.acquiring = false; LIVE.mode = "indoor"; LIVE.startMs = Date.now();
+  requestWakeLock();
+  LIVE.rt.start(0).forEach(liveCue);
+  if (!LIVE.ui) LIVE.ui = setInterval(indoorUiTick, 250);
+  renderLiveNow();
+}
+function indoorUiTick() {
+  if (!LIVE || LIVE.mode !== "indoor") return;
+  const at = liveElapsedMs();
+  if (LIVE.rt.getStatus() === "active") LIVE.rt.update({ atMs: at, distanceMeters: 0 }).forEach(liveCue);
+  renderLiveNow();
+  if (LIVE.rt.getStatus() === "completed") { stopLive(); liveFinish(true); }
 }
 function startSim() {
   if (!LIVE || LIVE.done) return;
@@ -4960,6 +5105,7 @@ function gpsUiTick() {
   if (LIVE.rt.getStatus() === "completed") { stopLive(); liveFinish(true); }
 }
 function gpsStatusText() {
+  if (LIVE.indoor) return "Treadmill · timed";
   if (LIVE.acquiring) return "Acquiring GPS…";
   if (LIVE.mode === "sim") return LIVE.gpsErr ? "Simulated (no GPS)" : "Simulated";
   if (LIVE.mode === "gps") return LIVE.acc != null ? "GPS · ±" + Math.round(LIVE.acc) + " m" : "GPS";
@@ -4967,8 +5113,58 @@ function gpsStatusText() {
 }
 function renderLiveNow() {
   if (!LIVE) return;
+  // The run keeps going when the runner navigates away, so the ticks keep firing with none of this
+  // markup on screen. liveUpdate() reaches for elements by id, so guard on the screen being mounted
+  // rather than letting every tick throw into the void.
+  if (!$("lElapsed")) return;
   liveUpdate(LIVE.rt.snapshot(liveNowMs()));
   const badge = $("gpsBadge"); if (badge) badge.textContent = gpsStatusText();
+}
+// ---- "Live session" -----------------------------------------------------------------------------
+// Shown on every screen except the live one itself, whenever a run is under way here or on the
+// wrist. Runna marks this with a bare pulsing dot; a dot alone is a puzzle, so this says what it is.
+// It sits above the bottom nav, out of the thumb's way but impossible to miss, and one tap returns.
+let LIVE_PILL_T = null;
+function livePillState() {
+  if (liveRunning() && state.screen !== "live") {
+    return { where: "phone", label: LIVE.pauseStart ? "Paused" : "Live session",
+             time: fmtPace(Math.max(0, Math.round(liveNowMs() / 1000))), paused: !!LIVE.pauseStart };
+  }
+  if (watchLiveActive() && state.screen !== "live") {
+    return { where: "watch", label: WATCH_LIVE.state === "paused" ? "Paused on watch" : "Live on watch",
+             time: fmtPace(Math.max(0, Math.round(WATCH_LIVE.sec || 0))), paused: WATCH_LIVE.state === "paused" };
+  }
+  return null;
+}
+function syncLivePill() {
+  const st = livePillState();
+  let pill = $("livePill");
+  clearInterval(LIVE_PILL_T); LIVE_PILL_T = null;
+  document.body.classList.toggle("has-live-pill", !!st);
+  if (!st) { if (pill) pill.remove(); return; }
+  if (!pill) {
+    pill = el('<button class="live-pill" id="livePill" aria-live="polite">' +
+      '<span class="lp-dot"></span><span class="lp-txt" id="lpTxt"></span>' +
+      '<span class="lp-time num" id="lpTime"></span></button>');
+    document.querySelector(".app").appendChild(pill);
+  }
+  const paint = () => {
+    const cur = livePillState();
+    if (!cur) { syncLivePill(); return; }
+    pill.classList.toggle("paused", cur.paused);
+    pill.classList.toggle("on-watch", cur.where === "watch");
+    $("lpTxt").textContent = cur.label;
+    $("lpTime").textContent = cur.time;
+  };
+  paint();
+  // The clock keeps moving whether or not this screen re-renders, so the pill ticks on its own.
+  LIVE_PILL_T = setInterval(paint, 1000);
+  pill.onclick = () => {
+    // A watch run has no phone screen to return to; Today is where its mirror lives.
+    if (livePillState().where === "watch") { state.tab = "today"; state.screen = null; }
+    else state.screen = "live";
+    render();
+  };
 }
 function viewLive() {
   if (LIVE.done) return viewLiveComplete();
@@ -4977,7 +5173,7 @@ function viewLive() {
   const controls = running
     ? '<div class="live-controls two"><button class="ctrl" id="lPause">Pause</button><button class="ctrl danger" id="lFinish">End session</button></div>'
     : '<div class="live-controls"><button class="primary" id="lStart">' + ICON.play + ' Start</button></div>';
-  return (running ? '' : '<button class="backbtn" id="liveBack">‹ Today</button>') +
+  return '<button class="backbtn" id="liveBack">\u2039 ' + (running ? "Leave this screen" : "Today") + '</button>' +
     '<div class="card live-hero"><div class="live-hero-top"><div class="eyebrow">Live session · <span id="gpsBadge">' + gpsStatusText() + '</span></div>' +
     '<button class="voice-btn' + (coachEnabled() ? ' on' : '') + '" id="lVoice" aria-label="Toggle voice coaching">' + (coachEnabled() ? ICON.vox : ICON.voxOff) + '</button>' +
     '</div><div class="live-title">' + s.title + '</div>' +
@@ -5510,10 +5706,42 @@ function viewLiveComplete() {
   return '<div class="card live-hero done-hero"><div class="dn-badge">' + ICON.check + '</div>' +
     '<div class="dn-h">' + (LIVE.completedFull ? "Well done!" : "Session ended") + '</div>' +
     '<div class="dn-sub">' + (LIVE.completedFull ? "You completed " : "You logged ") + esc(LIVE.session.title) + (sm.saved ? " · saved" : "") + '</div></div>' +
+    (LIVE.indoor ? treadmillDistanceHtml(sm) : "") +
     (sm.meaningful ? rpeAskHtml(sm) : "") +
     runOverviewHtml(run) +
     controls +
     '<div class="card"><div class="subhead" style="margin-top:0">Coaching cues</div><div class="cuelog" id="lCues"></div></div>';
+}
+// The one number a phone cannot know indoors. Asked for plainly rather than estimated: a made-up
+// distance would feed the pace bands, the flags engine and every future plan adjustment.
+function treadmillDistanceHtml(sm) {
+  const set = Number(sm.distKm) > 0;
+  return '<div class="card tm-ask"><div class="subhead" style="margin-top:0">Distance from the treadmill</div>' +
+    '<div class="bk-md">Your phone can\u2019t measure distance indoors, so we haven\u2019t guessed. Type what the machine says and your pace, splits and plan all stay honest.</div>' +
+    '<div class="tm-row"><input class="sel num" id="tmDist" inputmode="decimal" placeholder="e.g. 8.05" value="' + (set ? esc(sm.distKm) : "") + '">' +
+    '<span class="tm-unit">km</span><button class="mini-btn" id="tmSet">' + (set ? "Update" : "Add distance") + '</button></div>' +
+    '<div class="tm-note" id="tmNote">' + (set ? "Pace recalculated from " + esc(sm.distKm) + " km." : "Leave it blank and this is logged by time alone \u2014 which still counts.") + '</div></div>';
+}
+// Applying it recomputes everything derived from distance, so the run is exactly as if it had been
+// measured. Splits are deliberately NOT invented: even pacing is an assumption, not a measurement.
+function applyTreadmillDistance(km) {
+  if (!LIVE || !LIVE.summary) return;
+  const sm = LIVE.summary;
+  sm.distKm = km > 0 ? km.toFixed(2) : "0.00";
+  sm.avgPaceSec = km > 0 ? Math.round(sm.sec / km) : 0;
+  sm.pace = sm.avgPaceSec ? fmtPace(sm.avgPaceSec) : "\u2014";
+  sm.meaningful = km > 0.05 || sm.sec >= 120;
+  LIVE.dist = km * 1000;
+  if (sm.saved) {
+    // Already in the logbook: update it in place rather than logging a second copy.
+    const r = state.logged.find((x) => x.id === sm.runId);
+    if (r) {
+      r.dist = sm.distKm + " km"; r.distKm = Number(sm.distKm); r.avgPaceSec = sm.avgPaceSec;
+      r.pace = sm.avgPaceSec ? fmtPace(sm.avgPaceSec) + " /km" : "\u2014";
+      saveRuns();
+    }
+  }
+  render();
 }
 function livePace(step) { const band = step && step.targetPace; const mid = band ? (band.minSecPerKm + band.maxSecPerKm) / 2 : 360; LIVE.quirk += (Math.random() - 0.5) * 0.03; LIVE.quirk *= 0.9; if (Math.random() < 0.04) LIVE.quirk += (Math.random() - 0.5) * 0.28; return Math.max(120, mid * (1 + LIVE.quirk)); }
 function liveHr(step) { if (!step) return 105; if (step.kind === "rep") return 176; if (step.kind === "warmup" || step.kind === "cooldown") return 130; if (step.kind === "recovery") return 148; return 150; }
@@ -6104,9 +6332,11 @@ function refreshTodayNavDate() {
 document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshTodayNavDate(); });
 function render() {
   const v = $("view");
-  // Lock onto the live screen while a run is under way: hide the bottom nav so a stray tap can't
-  // abandon it. Every other screen shows the nav.
-  const nav = $("nav"); if (nav) nav.style.display = liveRunning() ? "none" : "";
+  // A run under way no longer locks the app. Hiding the nav protected the run from a stray tap, but
+  // it also trapped the runner: checking tomorrow's session mid-cool-down meant ending the run. The
+  // protection now comes from the live pill instead -- leaving is obvious, and so is the way back.
+  const nav = $("nav"); if (nav) nav.style.display = "";
+  syncLivePill();
   if (state.screen === "setup") {
     $("topTitle").textContent = "Your profile";
     draft = { days: profile.daysPerWeek, strength: profile.strength ? "1" : "0", returning: profile.returning ? "1" : "0", status: profile.status || (profile.noRecent ? "new" : "regular"), fitsrc: (profile.fitSrc === "predicted" ? "predicted" : "recent"), avatar: profile.avatar || "" };
@@ -6263,7 +6493,7 @@ function wire() {
   const addSess = $("addSess"); if (addSess) addSess.onclick = () => openAddSessionSheet(selectedDayIso());
   // Tapping a rest day (Plan week detail or the training calendar) adds a session to that day.
   document.querySelectorAll("[data-addday]").forEach((b) => b.onclick = () => openAddSessionSheet(b.dataset.addday));
-  document.querySelectorAll("[data-addstart]").forEach((b) => b.onclick = () => { const s = extraSession(EXTRA.find((x) => x.id === b.dataset.addstart)); if (s) startSession(s); });
+  document.querySelectorAll("[data-addstart]").forEach((b) => b.onclick = () => { const s = extraSession(EXTRA.find((x) => x.id === b.dataset.addstart)); if (s) openStartWhereSheet(s); });
   document.querySelectorAll("[data-addrm]").forEach((b) => b.onclick = () => { removeExtra(b.dataset.addrm); render(); });
   document.querySelectorAll("[data-addopen]").forEach((b) => b.onclick = () => { const s = extraSession(EXTRA.find((x) => x.id === b.dataset.addopen)); if (s) openSessionSheet(s, curWeekNo()); });
   // Training-calendar wiring
@@ -6274,8 +6504,13 @@ function wire() {
   const startTrial = $("startTrial"); if (startTrial) startTrial.onclick = beginTrialRun;
   const cancelTrial = $("cancelTrial"); if (cancelTrial) cancelTrial.onclick = () => { state.trialPending = false; render(); };
   // Live session wiring
-  const startBtn = $("startSession"); if (startBtn) startBtn.onclick = startSession;
-  const lb = $("liveBack"); if (lb) lb.onclick = () => { coachStop(); stopLive(); stopSpeech(); state.screen = null; state.tab = "today"; render(); };
+  const startBtn = $("startSession"); if (startBtn) startBtn.onclick = () => openStartWhereSheet(null);
+  const lb = $("liveBack"); if (lb) lb.onclick = () => {
+    // Mid-run this is navigation, not abandonment: the session keeps running and the live pill is
+    // the way back. Only a session that never started is torn down here.
+    if (liveRunning()) { state.screen = null; state.tab = "today"; render(); return; }
+    coachStop(); stopLive(); stopSpeech(); state.screen = null; state.tab = "today"; render();
+  };
   const lStart = $("lStart"); if (lStart) lStart.onclick = beginLive;
   const lVoice = $("lVoice"); if (lVoice) lVoice.onclick = () => {
     COACH.cfg.enabled = !COACH.cfg.enabled; saveCoachCfg();
@@ -6308,6 +6543,14 @@ function wire() {
     render();
   });
   const lSave = $("lSave"); if (lSave) lSave.onclick = () => { saveLiveSession(); render(); };
+  const tmSet = $("tmSet"); if (tmSet) tmSet.onclick = () => {
+    const raw = ($("tmDist").value || "").trim().replace(",", ".");
+    const km = Number(raw);
+    const note = $("tmNote");
+    if (raw === "") { applyTreadmillDistance(0); return; }
+    if (!isFinite(km) || km <= 0 || km > 200) { if (note) note.textContent = "That doesn\u2019t look like a distance in kilometres \u2014 try something like 8.05."; return; }
+    applyTreadmillDistance(km);
+  };
   const lDiscard = $("lDiscard"); if (lDiscard) lDiscard.onclick = () => { coachStop(); stopSpeech(); LIVE = null; state.screen = null; state.tab = "today"; render(); };
   const lDone = $("lDone"); if (lDone) lDone.onclick = () => { coachStop(); stopSpeech(); LIVE = null; state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); };
 }

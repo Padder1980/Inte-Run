@@ -58,6 +58,39 @@ test("the manifest fallback is a background colour, not the brand colour", () =>
   assert.notEqual(value, accent![1]!.trim().toLowerCase(), "manifest theme_color is the brand accent");
 });
 
+test("--vvh cannot latch at launch, so the nav never floats above a dead strip", () => {
+  // THE bug the owner reported for days, and the one a size threshold alone cannot prevent.
+  //
+  // A Home Screen web app reports visualViewport.height wrong at launch — short, and with no
+  // corrective resize event afterwards. The delta test was meant to reject that, but at launch the
+  // LAYOUT viewport still reads full height while the visual viewport reads short, so the bogus
+  // delta sails straight past any threshold (measured on a 16 Pro Max: ~956 against ~809). --vvh
+  // latched the short value and, with no later resize, the shell stayed short for the entire
+  // session: the bottom nav floating above a dead strip of page background on every screen.
+  //
+  // A keyboard cannot be up unless something focusable is focused, and nothing is focused at launch.
+  // That makes the bad state unreachable rather than merely improbable.
+  assert.match(SOURCE, /const keyboardPossible = \(\) =>/, "no focused-field gate on --vvh");
+  assert.match(
+    SOURCE,
+    /if \(keyboardPossible\(\) && layout - h > 120\)/,
+    "--vvh must require BOTH a focused field and a keyboard-sized delta",
+  );
+  // Both are load-bearing: a field can be focused with no keyboard (programmatic focus, a hardware
+  // keyboard), and the delta is what rejects that.
+  assert.ok(
+    /keyboardPossible\(\) &&/.test(SOURCE) && /layout - h > 120/.test(SOURCE),
+    "neither condition may be dropped",
+  );
+  // And it must be able to CLEAR. A value left behind after the keyboard goes is the same strip.
+  for (const ev of ["focusin", "focusout", "pageshow", "visibilitychange"]) {
+    assert.ok(
+      new RegExp(`addEventListener\\("${ev}"`).test(SOURCE),
+      `--vvh is never re-evaluated on ${ev}, so a stale value can survive`,
+    );
+  }
+});
+
 test("a manual theme change moves the strip too", () => {
   // The two media-query metas cover the SYSTEM scheme only. The app also has its own theme button,
   // which no media query can observe — without a runtime sync the strip keeps the old colour and the

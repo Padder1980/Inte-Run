@@ -7231,22 +7231,46 @@ seedDone();
 (function () {
   const vv = window.visualViewport;
   if (!vv) return;
+  // ⚠️ A KEYBOARD CANNOT BE UP UNLESS SOMETHING FOCUSABLE IS FOCUSED. This is the gate that matters,
+  // and the size delta alone is not a substitute for it.
+  //
+  // A Home Screen web app reports visualViewport.height wrong at launch — short, with no corrective
+  // resize event ever firing afterwards. The delta test below was supposed to reject that, but at
+  // launch the layout viewport still reads full height while the visual viewport reads short, so the
+  // bogus delta SAILS PAST any threshold: measured on a 16 Pro Max, roughly 956 against 809. --vvh
+  // latched that 809 and, with no later resize, the shell stayed 809 tall for the whole session —
+  // the bottom nav floating above a dead strip of page background, on every screen, forever.
+  //
+  // Nothing is focused at launch, so requiring a focused field makes that state unreachable rather
+  // than merely unlikely. Both conditions are still required: a field can be focused without a
+  // keyboard (a programmatic focus, a hardware keyboard), and then the delta is what rejects it.
+  const keyboardPossible = () => {
+    const a = document.activeElement;
+    if (!a || a === document.body || a === document.documentElement) return false;
+    if (a.isContentEditable === true) return true;
+    const tag = (a.tagName || '').toLowerCase();
+    return tag === 'input' || tag === 'textarea' || tag === 'select';
+  };
   const apply = () => {
-    // ⚠️ Only when the visual viewport is meaningfully SMALLER than the layout viewport — i.e. a
-    // keyboard is genuinely up. A Home Screen PWA reports visualViewport.height wrong at launch
-    // (short, and with no corrective resize event ever firing), and trusting it unconditionally
-    // left the whole shell short: the bottom nav floated above a dead strip of page background.
     // The layout viewport never shrinks for the iOS keyboard — that is the original problem this
-    // exists to solve — so the delta IS the keyboard detector. 120px is comfortably below the
-    // smallest keyboard and above any reporting jitter.
+    // exists to solve — so the delta IS the keyboard's size. 120px is comfortably below the smallest
+    // keyboard and above any reporting jitter.
     const layout = document.documentElement.clientHeight || window.innerHeight;
     const h = Math.round(vv.height);
-    if (layout - h > 120) document.documentElement.style.setProperty("--vvh", h + "px");
+    if (keyboardPossible() && layout - h > 120) document.documentElement.style.setProperty("--vvh", h + "px");
     else document.documentElement.style.removeProperty("--vvh");
   };
   vv.addEventListener("resize", apply);
   vv.addEventListener("scroll", apply);
   window.addEventListener("resize", apply);
+  // focusout is what reliably ends it: the blur can beat the viewport resize, and a --vvh left
+  // behind after the keyboard has gone is the same dead strip by another route.
+  document.addEventListener("focusin", apply);
+  document.addEventListener("focusout", () => setTimeout(apply, 0));
+  // A page restored from the back/forward cache, or resumed after iOS suspended it, can come back
+  // with a stale value already on the element.
+  window.addEventListener("pageshow", apply);
+  document.addEventListener("visibilitychange", apply);
   apply();
 })();
 

@@ -20,10 +20,27 @@ runs low on usage. Consequences:
 
 ## What this is
 
-**InteRun — "The Intelligent Training Companion"**: an evidence-based running-coach PWA. It turns a
+**Inte-Run — "The Intelligent Training Companion"**: an evidence-based running-coach PWA. It turns a
 goal + current fitness into a periodised training plan, runs live GPS sessions with spoken coaching,
-logs runs, and shows progress. Original visual identity; brand is written "InteRun" and **spoken
-"inter-run"**.
+logs runs, and shows progress. Original visual identity.
+
+⚠️ **The name is `Inte-Run`, and it means Intelligent Run** — renamed from `InteRun` on 2026-07-29 so
+the two halves read as two words. It is said **"intelligent run"**, near enough. An older version of
+this file claimed it was *spoken "inter-run"*, which was actively wrong: "inter" is the prefix meaning
+*between*, so it made people hear "between runs" — the opposite of the point. Don't reinstate it.
+
+⚠️ **Rename the DISPLAY name only. Never the identifiers.** The rule is capitalisation:
+- `Inte-Run` (was `InteRun`) — prose the user reads. Safe to change.
+- `interun_*` — **31 localStorage keys holding every logged run, the profile and the plan.** Renaming
+  these orphans the user's entire training history. Backups discover keys by this prefix.
+- `interun://app` — the WKWebView origin `localStorage` is filed under. Same consequence.
+- `com.interun.app` — the bundle id. Changing it makes a different app to iOS and the App Store.
+- `InteRunApp` / `InteRunWatchApp` / `InteRunWidgetBundle` and the `ios/InteRun*` paths — Swift
+  identifiers, where a hyphen is a syntax error. `"InteRunSelfCheck"` is a UserDefaults key, not prose.
+
+The visible name lives in `CFBundleDisplayName` in both Info.plists, so the Xcode targets keep their
+old names and the project never needs regenerating. The repo and Pages URL stay `Inte-Run` — they were
+already hyphenated, and changing them would break the Road Map installed on the owner's Home Screen.
 
 ## Architecture (important)
 

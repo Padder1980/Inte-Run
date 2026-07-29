@@ -235,7 +235,7 @@ final class WorkoutManager: NSObject, ObservableObject {
                 guard let self else { return }
                 guard ok else {
                     self.phase = .failed(error?.localizedDescription
-                        ?? "InteRun needs Health access to record your run.")
+                        ?? "Inte-Run needs Health access to record your run.")
                     return
                 }
                 self.begin()

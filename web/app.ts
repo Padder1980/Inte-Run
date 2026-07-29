@@ -36,9 +36,9 @@ for (const slug of EX_ANIM_SLUGS) {
   try { exStillData[slug] = "data:image/webp;base64," + readFileSync(join(stillDir, slug + ".webp")).toString("base64"); } catch { /* still optional */ }
 }
 
-// InteRun brand mark — an original glyph: a teal badge holding a forward-striding runner (head dot +
+// Inte-Run brand mark — an original glyph: a teal badge holding a forward-striding runner (head dot +
 // two motion bars leaning into the run). Not derived from any other app's logo.
-const BRAND_MARK = `<svg viewBox="0 0 120 120" width="104" height="104" role="img" aria-label="InteRun">
+const BRAND_MARK = `<svg viewBox="0 0 120 120" width="104" height="104" role="img" aria-label="Inte-Run">
   <defs><linearGradient id="brandg" x1="0" y1="0" x2="1" y2="1">
     <stop offset="0" stop-color="#16b7a4"/><stop offset="1" stop-color="#0a6f64"/></linearGradient></defs>
   <rect x="8" y="8" width="104" height="104" rx="30" fill="url(#brandg)"/>
@@ -64,8 +64,8 @@ const html = `<!doctype html>
      just below. Every env(safe-area-inset-*) in the CSS is calc(N + env(..., 0px)), so with no
      insets they collapse to exactly the constants this app shipped with. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>InteRun — The Intelligent Training Companion</title>
-<meta name="description" content="InteRun — evidence-based running coach with live GPS sessions and voice coaching.">
+<title>Inte-Run — The Intelligent Training Companion</title>
+<meta name="description" content="Inte-Run — evidence-based running coach with live GPS sessions and voice coaching.">
 <meta name="theme-color" content="#eef1f1" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0a100e" media="(prefers-color-scheme: dark)">
 <meta name="mobile-web-app-capable" content="yes">
@@ -85,7 +85,7 @@ const html = `<!doctype html>
      theme-color still matters for Android/Chrome and in-Safari, so it stays.
      No effect in the native app - WKWebView ignores this meta and supplies real insets. -->
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="InteRun">
+<meta name="apple-mobile-web-app-title" content="Inte-Run">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
@@ -636,6 +636,19 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 .fit-banner .fb-actions { display: flex; gap: 8px; margin-top: 11px; }
 .fit-banner .fb-yes { font: inherit; font-size: 13px; font-weight: 650; color: var(--accent-ink); background: var(--accent); border: 0; border-radius: 10px; padding: 9px 15px; cursor: pointer; }
 .fit-banner .fb-no { font: inherit; font-size: 13px; font-weight: 600; color: var(--ink-soft); background: transparent; border: 1px solid var(--line); border-radius: 10px; padding: 9px 15px; cursor: pointer; }
+
+/* "Your coach is watching" — the calm, everyday face of the adaptive engine. Deliberately quieter
+   than .fit-banner: that shouts because it wants a decision, this only reports. Same left-icon
+   geometry so the two read as one family when they alternate. */
+.cw { display: flex; gap: 12px; width: 100%; align-items: flex-start; border-radius: 14px; padding: 12px 13px; margin-bottom: 14px;
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--line)); }
+.cw .cw-ic { flex: none; width: 28px; height: 28px; border-radius: 9px; display: flex; align-items: center; justify-content: center;
+  color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, transparent); }
+.cw .cw-ic svg { width: 17px; height: 17px; }
+.cw .cw-b { min-width: 0; }
+.cw .cw-h { display: block; font-size: 12.5px; font-weight: 700; letter-spacing: -.01em; color: var(--accent); }
+.cw .cw-d { display: block; font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; line-height: 1.45; }
+.cw .cw-d b { color: var(--ink); font-weight: 680; }
 
 /* Live session */
 .live-hero { background: linear-gradient(150deg, color-mix(in srgb, var(--accent) 14%, var(--surface)), var(--surface)); }
@@ -1717,8 +1730,8 @@ input, select, textarea { font-size: 16px; }
 <div class="welcome" id="welcome">
   <div class="welcome-inner">
     <div class="welcome-mark">${BRAND_MARK}</div>
-    <h1 class="welcome-h">Welcome to <span>InteRun</span></h1>
-    <p class="welcome-msg m1">Your intelligent training companion.</p>
+    <h1 class="welcome-h">Welcome to <span>Inte-Run</span></h1>
+    <p class="welcome-msg m1">Short for <b>Inte</b>lligent <b>Run</b> — it watches how your training is actually going, and adapts.</p>
     <p class="welcome-msg m2">From your very first 5K to a marathon PB — a plan built around you.</p>
     <p class="welcome-msg m3">Let’s start with a few quick questions.</p>
     <button class="welcome-cta" id="welcomeGo">Get started →</button>
@@ -2090,7 +2103,7 @@ function viewToday() {
   if (mirror || liveRunning()) cta = "";
   else if (sess && onToday && PRIMARY_TYPES[sess.type]) cta = '<button class="primary start-btn" id="startSession">' + ICON.play + ' Start session</button>';
   else if (sess) cta = '<button class="primary start-btn" id="viewSession">' + ICON.play + ' View session</button>';
-  return mirror + banner + autoPaceBanner() + trainFlagBanner() + fitSuggestBanner() + greeting + weekStrip() +
+  return mirror + banner + autoPaceBanner() + trainFlagBanner() + fitSuggestBanner() + coachWatchCard() + greeting + weekStrip() +
     heroWorkout() +
     cta +
     '<div class="tsq-row">' + conditionsSquare(sess) + feelSquare() + '</div>' +
@@ -2243,7 +2256,7 @@ function markFired(slot) { const o = firedToday(); o[slot] = true; try { localSt
 // A website cannot wake itself to remind you: the PWA can only arm a timer that dies with the tab,
 // which is why the calendar export exists. WKWebView has no Notification API at all, so in the app
 // this feature was entirely inert. When the native bridge is there the page hands over a SCHEDULE
-// and iOS fires it whether or not InteRun is running.
+// and iOS fires it whether or not Inte-Run is running.
 const NATIVE_NOTIFY = (function () {
   try { return !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.interunNotify); } catch (e) { return false; }
 })();
@@ -2877,14 +2890,14 @@ function icsTrigger() { const m = hmMinutes(REMIND.time), h = Math.floor(m / 60)
 function icsEsc(s) { return String(s == null ? "" : s).split(";").join("\\\\;").split(",").join("\\\\,"); }
 function buildSessionsIcs() {
   const stamp = icsStamp(), trig = icsTrigger();
-  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//InteRun//Training//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:InteRun sessions"];
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Inte-Run//Training//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:Inte-Run sessions"];
   PLAN.weeks.forEach((wk) => {
     wk.sessions.filter((s) => s.type !== "rest").forEach((s) => {
       const dt = isoAdd(wk.startIso, effDay(s)), bits = [];
       if (s.durMin) bits.push(s.durMin + " min");
       if (s.distKm) bits.push(s.distKm + " km");
       if (s.pace) bits.push(s.pace);
-      lines.push("BEGIN:VEVENT", "UID:interun-" + wk.index + "-" + (s.id || (icsDate(dt) + "-" + s.type)) + "@interun.app", "DTSTAMP:" + stamp, "DTSTART;VALUE=DATE:" + icsDate(dt), "SUMMARY:" + icsEsc("InteRun \\u2014 " + s.title), "DESCRIPTION:" + icsEsc(bits.join(" \\u00b7 ") || "Training session"), "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(s.title), "TRIGGER;RELATED=START:" + trig, "END:VALARM", "END:VEVENT");
+      lines.push("BEGIN:VEVENT", "UID:interun-" + wk.index + "-" + (s.id || (icsDate(dt) + "-" + s.type)) + "@interun.app", "DTSTAMP:" + stamp, "DTSTART;VALUE=DATE:" + icsDate(dt), "SUMMARY:" + icsEsc("Inte-Run \\u2014 " + s.title), "DESCRIPTION:" + icsEsc(bits.join(" \\u00b7 ") || "Training session"), "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(s.title), "TRIGGER;RELATED=START:" + trig, "END:VALARM", "END:VEVENT");
     });
   });
   lines.push("END:VCALENDAR");
@@ -2904,12 +2917,12 @@ function icsFile() { return new File([buildSessionsIcs()], "interun-sessions.ics
 function canShareFiles() { try { return !!(navigator.canShare && navigator.canShare({ files: [icsFile()] })); } catch (e) { return false; } }
 // Hand the .ics to the OS share sheet — the practical way to email it to yourself or send it to a
 // computer, where Google/Outlook can actually import it.
-function shareIcs() { try { navigator.share({ files: [icsFile()], title: "InteRun sessions" }).catch(() => {}); } catch (e) { downloadIcs(); } }
+function shareIcs() { try { navigator.share({ files: [icsFile()], title: "Inte-Run sessions" }).catch(() => {}); } catch (e) { downloadIcs(); } }
 // ---- Reminders sheet (opened from the top-bar bell) ----
 function remindersSheetHtml() {
   const perm = notifPerm(), supported = notifSupported(), on = REMIND.enabled && perm === "granted";
   const note = !supported
-    ? "Your browser can\\u2019t show notifications here \\u2014 add InteRun to your Home Screen, or just use the calendar below."
+    ? "Your browser can\\u2019t show notifications here \\u2014 add Inte-Run to your Home Screen, or just use the calendar below."
     : perm === "denied" ? "Notifications are blocked for this site in your settings \\u2014 allow them there, then switch this on." : "";
   const toggle = '<button class="rm-switch' + (on ? " on" : "") + '" id="rmToggle" role="switch" aria-checked="' + (on ? "true" : "false") + '" aria-label="Toggle session reminders"><span class="rm-knob"></span></button>';
   // Second reminder later in the day: an add link until set, then a time row with a remove.
@@ -2927,10 +2940,10 @@ function remindersSheetHtml() {
     // The honest caveat differs by platform: on the web a timer dies with the tab, but in the app
     // iOS itself holds the schedule. Telling app users their reminders are unreliable would be a lie.
     '<div class="sd-desc" style="margin-top:10px;font-size:12.5px;color:var(--ink-faint)">' + (NATIVE_NOTIFY
-      ? 'Your phone holds these reminders, so they arrive whether or not InteRun is open. You can also add every session to your calendar below.'
-      : 'A web app can only notify reliably while it\\u2019s open (or added to your Home Screen). For an alert that reaches you with InteRun closed, add your sessions to your calendar below \\u2014 it works on any phone.') + '</div>' +
+      ? 'Your phone holds these reminders, so they arrive whether or not Inte-Run is open. You can also add every session to your calendar below.'
+      : 'A web app can only notify reliably while it\\u2019s open (or added to your Home Screen). For an alert that reaches you with Inte-Run closed, add your sessions to your calendar below \\u2014 it works on any phone.') + '</div>' +
     '<div class="sd-move" style="margin-top:14px"><div class="sd-move-h">Add sessions to your calendar</div>' +
-    '<div class="sd-desc" style="margin:2px 0 10px">Adds every planned session. Your phone asks <b>which calendar</b> to put them in, so choose the account you want there \\u2014 Google, iCloud or Outlook. InteRun never sees your password.</div>' +
+    '<div class="sd-desc" style="margin:2px 0 10px">Adds every planned session. Your phone asks <b>which calendar</b> to put them in, so choose the account you want there \\u2014 Google, iCloud or Outlook. Inte-Run never sees your password.</div>' +
     '<button class="primary" id="rmIcs" style="width:100%">' + ICON.cal + ' Add to my calendar</button>' +
     (canShareFiles() ? '<button class="rm-alt" id="rmShare">Send the file somewhere else \\u2014 email it, or AirDrop it to a computer</button>' : "") +
     '<div class="sd-move-n" id="rmCalNote"></div>' +
@@ -2979,7 +2992,7 @@ function wireRemindersSheet() {
     try { window.open(kind === "google" ? "https://calendar.google.com/calendar/u/0/r/settings/export" : "https://outlook.live.com/calendar/0/addcalendar", "_blank"); } catch (e) {}
     if (n) n.textContent = "Downloaded interun-sessions.ics. In the " + name + " tab that opened, sign in to the account you want and upload that file.";
   });
-  const test = $("rmTest"); if (test) test.onclick = () => { const q = randomQuote(); showNotif("InteRun test reminder", { body: "This is how your session reminders will look.\\n\\u201C" + q[0] + "\\u201D" + (q[1] ? " \\u2014 " + q[1] : ""), tag: "interun-test", icon: "./icon-192.png", data: { url: "./" } }); };
+  const test = $("rmTest"); if (test) test.onclick = () => { const q = randomQuote(); showNotif("Inte-Run test reminder", { body: "This is how your session reminders will look.\\n\\u201C" + q[0] + "\\u201D" + (q[1] ? " \\u2014 " + q[1] : ""), tag: "interun-test", icon: "./icon-192.png", data: { url: "./" } }); };
 }
 
 // ============ ASK ALFIE ====================================================
@@ -3064,14 +3077,14 @@ function alfieIntents() {
     { k: ["sore", "should i run", "tired", "fatigued", "heavy legs", "rest day today", "skip"], a: () => {
       let r; try { r = RC.assessReadiness(readinessInput()); } catch (e) { r = null; }
       return "<p>Honest answer: <b>soreness that eases as you warm up is usually fine</b>. Pain that sharpens, changes your gait, or sits in one specific spot is not \\u2014 back off and get it looked at.</p>" +
-        (r ? "<p>From your latest check-in, InteRun rates you <b>" + esc(r.headline) + "</b>. " + esc(r.recommendation) + "</p>" : "") +
+        (r ? "<p>From your latest check-in, Inte-Run rates you <b>" + esc(r.headline) + "</b>. " + esc(r.recommendation) + "</p>" : "") +
         "<p>A good rule: if you\\u2019re unsure, run the <b>easy</b> version. Swapping a hard session for an easy one costs you almost nothing; training through a real injury costs weeks.</p>" +
         "<p class=\\"alf-dim\\">Tap \\u201cHow you feel\\u201d on Today to update your check-in.</p>";
     } },
     { k: ["heat", "hot", "humid", "warm weather"], a: () => {
       let imp; try { imp = currentConditions(selectedSession()); } catch (e) { imp = null; }
       return "<p>Heat makes the same pace cost more \\u2014 that\\u2019s physiology, not weakness. <b>Run by effort</b> and let the pace be whatever it is.</p>" +
-        (imp ? "<p>Right now InteRun rates conditions as <b>" + esc(imp.headline) + "</b>." + (imp.pacePenaltySecPerKm ? " Expect around <b>+" + imp.pacePenaltySecPerKm + "s/km</b> at the same effort." : "") + "</p>" : "") +
+        (imp ? "<p>Right now Inte-Run rates conditions as <b>" + esc(imp.headline) + "</b>." + (imp.pacePenaltySecPerKm ? " Expect around <b>+" + imp.pacePenaltySecPerKm + "s/km</b> at the same effort." : "") + "</p>" : "") +
         "<p>Go earlier or later in the day, take fluid with sodium, and give yourself 10\\u201314 days to acclimatise.</p>";
     } },
     { k: ["cold", "winter", "ice", "dark"], a: () => "<p>Cold running is mostly a kit problem: layer up, cover extremities, and be seen \\u2014 lights and reflective gear.</p><p>Warm up a bit longer than usual, and on ice shorten your stride and slow down. A missed session beats a fall.</p>" },
@@ -3149,7 +3162,7 @@ function alfieIntents() {
         "<p>The honest signals of progress are: the same pace at a lower effort, easier recovery between sessions, and consistency over months. Week-to-week fluctuations are mostly noise.</p>" +
         "<p class=\\"alf-dim\\">Activities \\u2192 Performance shows your trends and bests.</p>";
     } },
-    { k: ["who are you", "what are you", "what can you", "help me with", "alfie"], a: () => "<p>I\\u2019m <b>Alfie</b>, built into InteRun. I can see your plan, so I can answer things like:</p><ul class=\\"alf-ul\\"><li>What\\u2019s my next session, and how should it feel?</li><li>What pace should I run this at?</li><li>Why is this week easier?</li><li>Should I run if I\\u2019m sore or it\\u2019s hot?</li><li>General running, training and fitness questions.</li></ul><p>I\\u2019m not a doctor \\u2014 for pain or health symptoms I\\u2019ll point you to proper help.</p>" },
+    { k: ["who are you", "what are you", "what can you", "help me with", "alfie"], a: () => "<p>I\\u2019m <b>Alfie</b>, built into Inte-Run. I can see your plan, so I can answer things like:</p><ul class=\\"alf-ul\\"><li>What\\u2019s my next session, and how should it feel?</li><li>What pace should I run this at?</li><li>Why is this week easier?</li><li>Should I run if I\\u2019m sore or it\\u2019s hot?</li><li>General running, training and fitness questions.</li></ul><p>I\\u2019m not a doctor \\u2014 for pain or health symptoms I\\u2019ll point you to proper help.</p>" },
   ];
 }
 function alfieLocalAnswer(question) {
@@ -4240,7 +4253,7 @@ const GUIDES = [
   ] },
 ];
 // ---- Your data: backup, restore, and moving between devices -----------------------------------
-// Everything InteRun knows about a runner lives in this browser's localStorage, keyed to one origin.
+// Everything Inte-Run knows about a runner lives in this browser's localStorage, keyed to one origin.
 // The iPhone app is a DIFFERENT origin (interun://app) and Safari's storage is sandboxed away from
 // it, so nothing crosses automatically and no amount of native code can reach in and take it. The
 // runner has to carry a file across: export on the old device, restore on the new one. The same
@@ -4286,7 +4299,7 @@ function summaryLine(s) {
 }
 // Validate the WHOLE file before touching storage, so a bad file can never leave it half-replaced.
 function validateBackup(obj) {
-  if (!obj || typeof obj !== "object" || obj.format !== BACKUP_FORMAT) return "That doesn\\u2019t look like an InteRun backup.";
+  if (!obj || typeof obj !== "object" || obj.format !== BACKUP_FORMAT) return "That doesn\\u2019t look like an Inte-Run backup.";
   if (!obj.data || typeof obj.data !== "object") return "That backup has no data in it.";
   const keys = Object.keys(obj.data);
   if (!keys.length) return "That backup is empty.";
@@ -4314,7 +4327,7 @@ function canShareBackup() { try { return !!(navigator.canShare && navigator.canS
 // Everywhere else, fall back to an ordinary download.
 function exportBackup() {
   if (canShareBackup()) {
-    try { navigator.share({ files: [backupFile()], title: "InteRun backup" }).catch(() => {}); return; } catch (e) {}
+    try { navigator.share({ files: [backupFile()], title: "Inte-Run backup" }).catch(() => {}); return; } catch (e) {}
   }
   try {
     const url = URL.createObjectURL(new Blob([JSON.stringify(collectBackup())], { type: "application/json" }));
@@ -4420,7 +4433,7 @@ function whyView() {
     rows +
     '<div class="why-count">' + (n ? n + " of " + WHY_QUESTIONS.length + " answered" : "Nothing answered yet") + '</div></div>' +
     '<div class="card"><div class="subhead" style="margin-top:0">Where these go</div>' +
-    '<div class="bk-md">Nowhere. They live on this device with the rest of your data, travel in your backups, and are never uploaded \u2014 InteRun has no server. On your watch they can be read aloud; on the phone your coach invokes them and the words appear on screen.</div></div>';
+    '<div class="bk-md">Nowhere. They live on this device with the rest of your data, travel in your backups, and are never uploaded \u2014 Inte-Run has no server. On your watch they can be read aloud; on the phone your coach invokes them and the words appear on screen.</div></div>';
 }
 function wireWhyInputs(onNameChange) {
   document.querySelectorAll("[data-why]").forEach((el) => {
@@ -4456,10 +4469,10 @@ function connectView() {
     '</' + (act ? 'button' : 'div') + '>';
 
   let watchNote, watchBadge, watchCls;
-  if (!native) { watchNote = "Pairs through the InteRun iPhone app."; watchBadge = "Needs the app"; watchCls = "soon"; }
+  if (!native) { watchNote = "Pairs through the Inte-Run iPhone app."; watchBadge = "Needs the app"; watchCls = "soon"; }
   else if (!WATCH_STATUS) { watchNote = "Checking with your phone\u2026"; watchBadge = "\u2026"; watchCls = "soon"; }
   else if (WATCH_STATUS.installed) { watchNote = "Today\u2019s session syncs to your wrist; finished runs come back to the Logbook."; watchBadge = "Connected"; watchCls = "ok"; }
-  else if (WATCH_STATUS.paired) { watchNote = "Watch paired \u2014 install InteRun from the Watch app on your iPhone."; watchBadge = "Not installed"; watchCls = "soon"; }
+  else if (WATCH_STATUS.paired) { watchNote = "Watch paired \u2014 install Inte-Run from the Watch app on your iPhone."; watchBadge = "Not installed"; watchCls = "soon"; }
   else { watchNote = "No Apple Watch is paired with this iPhone."; watchBadge = "No watch"; watchCls = "soon"; }
 
   return '<div class="card">' +
@@ -4469,13 +4482,13 @@ function connectView() {
     '<div class="cn-sec">Apps</div>' +
     row(ICON.heart, "Apple Health", native
       ? "Watch runs save to Health automatically and count towards your rings."
-      : "Works with the InteRun iPhone app \u2014 watch runs save to Health.", native ? "Automatic" : "Needs the app", native ? "ok" : "soon", null) +
-    row(ICON.share, "Strava", "On the road map \u2014 needs InteRun\u2019s server, which arrives with the App Store release.", "Planned", "soon", null) +
+      : "Works with the Inte-Run iPhone app \u2014 watch runs save to Health.", native ? "Automatic" : "Needs the app", native ? "ok" : "soon", null) +
+    row(ICON.share, "Strava", "On the road map \u2014 needs Inte-Run\u2019s server, which arrives with the App Store release.", "Planned", "soon", null) +
     '<div class="cn-sec">Calendars</div>' +
     row(ICON.plan, "Apple, Google & Outlook", "Put every planned session in your calendar, with a morning alert.", "Ready", "ok", "cal") +
     '</div>' +
     '<div class="card"><div class="subhead" style="margin-top:0">Why so few toggles?</div>' +
-    '<div class="bk-md">InteRun runs entirely on your devices \u2014 there\u2019s no InteRun server for other apps to talk to yet. The connections above are the ones that genuinely work today; the planned ones are listed so you know they\u2019re coming, not to look busy.</div></div>';
+    '<div class="bk-md">Inte-Run runs entirely on your devices \u2014 there\u2019s no Inte-Run server for other apps to talk to yet. The connections above are the ones that genuinely work today; the planned ones are listed so you know they\u2019re coming, not to look busy.</div></div>';
 }
 function wireConnectView() {
   if (!document.querySelector(".cn-row")) return;
@@ -4565,7 +4578,7 @@ function dataView() {
   const bytes = JSON.stringify(collectBackup()).length;
   const size = bytes > 1024 ? Math.round(bytes / 1024) + " KB" : bytes + " bytes";
   const move = inNativeApp()
-    ? '<div class="bk-move"><div class="bk-mh">Moving over from the web version?</div><div class="bk-md">Open InteRun in your browser, go to <b>Support \\u203a Your data</b>, and export a backup. Send it to this phone \\u2014 AirDrop, Files or email all work \\u2014 then tap <b>Restore</b> below and pick the file.</div></div>'
+    ? '<div class="bk-move"><div class="bk-mh">Moving over from the web version?</div><div class="bk-md">Open Inte-Run in your browser, go to <b>Support \\u203a Your data</b>, and export a backup. Send it to this phone \\u2014 AirDrop, Files or email all work \\u2014 then tap <b>Restore</b> below and pick the file.</div></div>'
     : '<div class="bk-move"><div class="bk-mh">Moving to the iPhone app?</div><div class="bk-md">Your runs don\\u2019t travel automatically \\u2014 the app is a separate place on your phone and can\\u2019t reach into your browser\\u2019s storage. Export a backup here, then open the app and go to <b>Support \\u203a Your data \\u203a Restore</b>.</div></div>';
   return '<div class="card">' +
     '<div class="subhead" style="margin-top:0">On this device</div>' +
@@ -4584,15 +4597,15 @@ function dataView() {
       '<div class="bk-lab num" style="margin-top:3px;font-size:11px;line-height:1.35">' + esc(l) + '</div>'
     ).join("") + '</div>' +
     '<div class="bk-md" style="margin-top:8px">' + (inNativeApp()
-      ? "The app carries its own copy of InteRun, built when the app was built \u2014 it doesn\u2019t update over the internet. A newer web version won\u2019t appear here until the app itself is rebuilt."
+      ? "The app carries its own copy of Inte-Run, built when the app was built \u2014 it doesn\u2019t update over the internet. A newer web version won\u2019t appear here until the app itself is rebuilt."
       : "Added to your Home Screen? It caches a copy. If an update seems missing, close it fully (swipe it away from the app switcher) and reopen \u2014 twice if needed.") + '</div></div>' +
     (inNativeApp() ? '<div class="card"><div class="subhead" style="margin-top:0">Live Activity</div>' +
       '<div class="bk-box"><div class="bk-val" style="font-size:14px">' + esc(liveActivityStatus()) + '</div>' +
       '<div class="bk-lab" style="margin-top:4px">Last attempt</div></div>' +
-      '<div class="bk-md" style="margin-top:8px">The lock-screen card that tracks a run. iOS asks permission the first time one is shown \u2014 if this says <b>allowed=false</b>, turn Live Activities on for InteRun in Settings.</div></div>' : "") +
+      '<div class="bk-md" style="margin-top:8px">The lock-screen card that tracks a run. iOS asks permission the first time one is shown \u2014 if this says <b>allowed=false</b>, turn Live Activities on for Inte-Run in Settings.</div></div>' : "") +
     '<div class="card">' + move + '</div>' +
     '<div class="card"><div class="subhead" style="margin-top:0">What a backup holds</div>' +
-    '<div class="bk-md">Your profile and goal, your plan, every logged run with its route and splits, your coach and reminder choices, and anything you\\u2019ve told Alfie. It\\u2019s a plain file on your device \\u2014 nothing is uploaded anywhere, because InteRun has no server to upload it to.</div></div>';
+    '<div class="bk-md">Your profile and goal, your plan, every logged run with its route and splits, your coach and reminder choices, and anything you\\u2019ve told Alfie. It\\u2019s a plain file on your device \\u2014 nothing is uploaded anywhere, because Inte-Run has no server to upload it to.</div></div>';
 }
 function wireDataView() {
   const ex = $("bkExport"); if (ex) ex.onclick = exportBackup;
@@ -5492,7 +5505,7 @@ function startWhereHtml(sess) {
     : (NATIVE_WATCH
         ? '<div class="sw-row sw-off"><span class="sw-ic">' + ICON.watch + '</span><span class="sw-b"><span class="sw-n">My Apple Watch</span>' +
           '<span class="sw-d">' + (WATCH_STATUS && WATCH_STATUS.paired
-            ? "Paired, but InteRun isn\u2019t installed on it yet \u2014 add it in the Watch app."
+            ? "Paired, but Inte-Run isn\u2019t installed on it yet \u2014 add it in the Watch app."
             : "No Apple Watch paired with this iPhone.") + '</span></span></div>'
         : "");
   return '<div class="sheet-h">Where shall we record this?</div>' +
@@ -5563,7 +5576,7 @@ function startOnWatch(sess, opts) {
     });
     toast((opts && opts.fromPhone)
       ? "Recording on your watch \u2014 follow along here"
-      : "Opening InteRun on your watch\u2026");
+      : "Opening Inte-Run on your watch\u2026");
     // One count, one start. The phone counts in — it has the voices — and only on "go" does the
     // watch begin. Two independent three-second counts is how the clocks ended up a second apart.
     LIVE = null;
@@ -5579,7 +5592,7 @@ window.__interunWatchStart = function (ok, reason) {
   WATCH_LIVE_PENDING = false;
   clearCountIn();
   if (state.screen === "watchlive" && !watchLiveActive()) { state.screen = null; }
-  toast(reason || "Couldn\u2019t start your watch \u2014 open InteRun on it and press start.");
+  toast(reason || "Couldn\u2019t start your watch \u2014 open Inte-Run on it and press start.");
   render();
 };
 function startSession(sess, opts) {
@@ -5914,7 +5927,7 @@ function splitsHtml(splits) {
 // ---- Post-run debrief -------------------------------------------------------------------------
 // What a coach would say if they had been standing at the finish with your plan in their hand.
 //
-// The difference from every other running app's post-run screen is that InteRun knows what the
+// The difference from every other running app's post-run screen is that Inte-Run knows what the
 // session was SUPPOSED to be. So splits are judged against the prescribed band rather than against
 // each other, the pace chart draws that band behind the line, and the write-up can say whether you
 // did the session you were given — not merely how fast you went.
@@ -6265,7 +6278,7 @@ function buildShareCanvasCore(run, mapData) {
   g.font = "800 62px " + FF; g.fillStyle = "#fff"; g.fillText("Inte", 196, 178);
   const iw = g.measureText("Inte").width; g.fillStyle = TEAL; g.fillText("Run", 196 + iw, 178);
   g.fillStyle = "rgba(160,200,190,.65)"; g.font = "600 20px " + FF; lsText(g, "THE INTELLIGENT TRAINING COMPANION", 198, 210, 2.5, "left");
-  g.fillStyle = TEAL; g.font = "600 26px " + FF; g.textAlign = "right"; g.fillText("#RunWithInteRun", W - 56, 150); g.textAlign = "left";
+  g.fillStyle = TEAL; g.font = "600 26px " + FF; g.textAlign = "right"; g.fillText("#RunWithInte-Run", W - 56, 150); g.textAlign = "left";
   const title = (run.t || "My run").toUpperCase(); let ts = 90; g.font = "800 " + ts + "px " + FF;
   while (g.measureText(title).width > W - 130 && ts > 44) { ts -= 2; g.font = "800 " + ts + "px " + FF; }
   g.fillStyle = "#fff"; g.fillText(title, 56, 322);
@@ -6310,7 +6323,7 @@ function canvasToPngFile(canvas, name) {
   for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
   return new File([arr], name, { type: "image/png" });
 }
-function shareCaption(run) { return "I completed a run with InteRun \\uD83C\\uDFC3 \\u2014 " + run.dist + " in " + run.time + "."; }
+function shareCaption(run) { return "I completed a run with Inte-Run \\uD83C\\uDFC3 \\u2014 " + run.dist + " in " + run.time + "."; }
 // Identity of a run for share-cache purposes.
 function shareKey(run) { return (run.t || "") + "|" + (run.d || "") + "|" + (run.dist || "") + "|" + ((run.route && run.route.length) || 0); }
 let SHARE = { key: null, file: null };
@@ -6329,9 +6342,9 @@ function doShareRun() {
   const caption = shareCaption(run);
   const canShareFile = file && navigator.canShare && navigator.canShare({ files: [file] });
   if (canShareFile) {
-    navigator.share({ files: [file], text: caption, title: "InteRun" }).catch(() => {});
+    navigator.share({ files: [file], text: caption, title: "Inte-Run" }).catch(() => {});
   } else if (navigator.share) {
-    navigator.share({ text: caption, title: "InteRun" }).catch(() => downloadShareCard(file, run));
+    navigator.share({ text: caption, title: "Inte-Run" }).catch(() => downloadShareCard(file, run));
   } else {
     downloadShareCard(file, run);
   }
@@ -6805,6 +6818,33 @@ function flagEvidenceLine(f) {
   if (f.kind === "pace-slow") return "Your last " + runsWord + " came in about <b>" + f.dev + "s/km slower</b> than their target pace.";
   if (f.kind === "rpe-high") return "You rated your last " + runsWord + " about <b>" + f.dev + " point" + (f.dev === 1 ? "" : "s") + " harder</b> than they were meant to feel.";
   return "You rated your last " + runsWord + " about <b>" + f.dev + " point" + (f.dev === 1 ? "" : "s") + " easier</b> than they were meant to feel.";
+}
+// The adaptive coach is what the name means, and until now it was INVISIBLE unless it had a warning:
+// a runner had no way to know anything was watching, so the whole point of the app only surfaced when
+// something was wrong. This is its everyday face.
+//
+// ⚠️ It must only ever say things that are TRUE. So it counts the runs the engine would actually weigh
+// — a run only carries evidence if it has a pace to compare against a planned band, or an RPE to
+// compare against a planned band; flagObservations() returns runs the engine then skips. Saying
+// "watching your last 5 runs" when four of them carry nothing would be a lie the runner can't check.
+//
+// ⚠️ One voice, the same rule trainFlagBanner obeys: silent whenever a banner is already speaking.
+// Two things on Today both explaining the coach's thinking is worse than one.
+function coachWatchCard() {
+  if (state.trainFlag || state.fitSuggest || state.paceNotice) return "";
+  let body;
+  if (!profile.recentTimeS || profile.autoPace || profile.noRecent) {
+    // Honest about not judging yet — the plan isn't anchored to anything the runner actually ran.
+    body = "I\\u2019ll set your paces from your first proper run, then start checking every session against them.";
+  } else {
+    const usable = flagObservations().filter((o) =>
+      (o.avgPaceSecPerKm && o.plannedPaceSecPerKm) || (o.reportedRpe && o.plannedRpe));
+    if (!usable.length) body = "Nothing logged against this plan yet. Record a run and I\\u2019ll start checking your pace and effort against what it asked for.";
+    else if (usable.length === 1) body = "Watching <b>1 run</b> so far. I look for the same thing twice before suggesting anything \\u2014 one odd run is just a day.";
+    else body = "Watching your last <b>" + usable.length + " runs</b> \\u2014 pace and effort are both tracking the plan. I\\u2019ll say something the moment they aren\\u2019t.";
+  }
+  return '<div class="cw"><span class="cw-ic">' + ICON.gauge + '</span><span class="cw-b">' +
+    '<span class="cw-h">Your coach is watching</span><span class="cw-d">' + body + '</span></span></div>';
 }
 function trainFlagBanner() {
   const tf = state.trainFlag; if (!tf) return "";
@@ -7560,8 +7600,8 @@ const docsDir = join(here, "..", "docs");
 writeFileSync(join(docsDir, "index.html"), html, "utf8");
 
 const manifest = {
-  name: "InteRun — The Intelligent Training Companion",
-  short_name: "InteRun",
+  name: "Inte-Run — The Intelligent Training Companion",
+  short_name: "Inte-Run",
   description: "Evidence-based running coach with live GPS sessions and voice coaching.",
   start_url: ".",
   scope: ".",

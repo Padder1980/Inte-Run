@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDisplayName</key>
-	<string>InteRun</string>
+	<string>Inte-Run</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -16,25 +16,21 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
-	<key>WKApplication</key>
-	<true/>
-	<key>WKCompanionAppBundleIdentifier</key>
-	<string>com.interun.app</string>
-	<key>WKRunsIndependentlyOfCompanionApp</key>
-	<true/>
-
-	<!-- An HKWorkoutSession is what keeps the app alive with the wrist down and turns the
-	     heart-rate sensor up to workout frequency. Without this the run stops when the screen does. -->
-	<key>WKBackgroundModes</key>
-	<array>
-		<string>workout-processing</string>
-	</array>
-
 	<key>NSHealthShareUsageDescription</key>
 	<string>InteRun reads your heart rate during a run so you can see how hard you are working.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>InteRun saves your runs to Health, so they count towards your Activity rings.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>InteRun uses the watch's GPS to measure your pace, distance and route while you run.</string>
+	<key>WKApplication</key>
+	<true/>
+	<key>WKBackgroundModes</key>
+	<array>
+		<string>workout-processing</string>
+	</array>
+	<key>WKCompanionAppBundleIdentifier</key>
+	<string>com.interun.app</string>
+	<key>WKRunsIndependentlyOfCompanionApp</key>
+	<true/>
 </dict>
 </plist>

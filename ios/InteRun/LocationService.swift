@@ -50,7 +50,7 @@ final class LocationService: NSObject {
             manager.requestWhenInUseAuthorization()
             return
         case .denied, .restricted:
-            report(code: 1, message: "Location access is off for InteRun. Turn it on in Settings to track your run.")
+            report(code: 1, message: "Location access is off for Inte-Run. Turn it on in Settings to track your run.")
             return
         default: break
         }
@@ -127,7 +127,7 @@ extension LocationService: CLLocationManagerDelegate {
         case .denied, .restricted:
             watching = false
             wantsOneShot = false
-            report(code: 1, message: "Location access is off for InteRun. Turn it on in Settings to track your run.")
+            report(code: 1, message: "Location access is off for Inte-Run. Turn it on in Settings to track your run.")
         default: break
         }
     }

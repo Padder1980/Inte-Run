@@ -285,7 +285,7 @@ struct TodayView: View {
                 .foregroundStyle(Brand.ink)
             // Not an instruction any more, just an explanation: a free run is right below this, so
             // the runner is never actually blocked on the phone.
-            Text("Open InteRun on your iPhone to sync it. You can still run without it.")
+            Text("Open Inte-Run on your iPhone to sync it. You can still run without it.")
                 .font(.system(size: 11))
                 .foregroundStyle(Brand.inkFaint)
                 .fixedSize(horizontal: false, vertical: true)

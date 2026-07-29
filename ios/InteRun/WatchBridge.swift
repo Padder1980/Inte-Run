@@ -233,7 +233,7 @@ extension WatchBridge: WCSessionDelegate {
             return reportStart(false, "This iPhone can’t talk to HealthKit.")
         }
         guard WCSession.isSupported(), WCSession.default.isWatchAppInstalled else {
-            return reportStart(false, "InteRun isn’t installed on your Apple Watch yet.")
+            return reportStart(false, "Inte-Run isn’t installed on your Apple Watch yet.")
         }
         let store = HKHealthStore()
         let share: Set<HKSampleType> = [HKObjectType.workoutType()]
@@ -254,7 +254,7 @@ extension WatchBridge: WCSessionDelegate {
                     // down or a dead card sits on the lock screen forever, surviving relaunches.
                     Task { @MainActor in LiveActivityService.shared.endIfCurrent("watch-pending") }
                 }
-                self?.reportStart(ok, ok ? nil : (error?.localizedDescription ?? "Couldn’t open InteRun on your watch."))
+                self?.reportStart(ok, ok ? nil : (error?.localizedDescription ?? "Couldn’t open Inte-Run on your watch."))
             }
         }
     }
@@ -271,7 +271,7 @@ extension WatchBridge: WCSessionDelegate {
             self.pendingStartNow = false
             self.pendingWatchSession = nil
             Task { @MainActor in LiveActivityService.shared.endIfCurrent("watch-pending") }
-            self.reportStart(false, "Couldn’t reach your watch — open InteRun on it and press start.")
+            self.reportStart(false, "Couldn’t reach your watch — open Inte-Run on it and press start.")
         }
     }
 

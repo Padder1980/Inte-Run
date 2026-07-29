@@ -7183,10 +7183,21 @@ seedDone();
   const vv = window.visualViewport;
   if (!vv) return;
   const apply = () => {
-    document.documentElement.style.setProperty("--vvh", Math.round(vv.height) + "px");
+    // ⚠️ Only when the visual viewport is meaningfully SMALLER than the layout viewport — i.e. a
+    // keyboard is genuinely up. A Home Screen PWA reports visualViewport.height wrong at launch
+    // (short, and with no corrective resize event ever firing), and trusting it unconditionally
+    // left the whole shell short: the bottom nav floated above a dead strip of page background.
+    // The layout viewport never shrinks for the iOS keyboard — that is the original problem this
+    // exists to solve — so the delta IS the keyboard detector. 120px is comfortably below the
+    // smallest keyboard and above any reporting jitter.
+    const layout = document.documentElement.clientHeight || window.innerHeight;
+    const h = Math.round(vv.height);
+    if (layout - h > 120) document.documentElement.style.setProperty("--vvh", h + "px");
+    else document.documentElement.style.removeProperty("--vvh");
   };
   vv.addEventListener("resize", apply);
   vv.addEventListener("scroll", apply);
+  window.addEventListener("resize", apply);
   apply();
 })();
 

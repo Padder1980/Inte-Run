@@ -413,6 +413,11 @@ the keyboard, `#view` had zero scroll room, and the focus handler had nothing to
 panned the visual viewport instead, sliding both bars off screen. A listener publishes
 `visualViewport.height` as `--vvh`. Measured: with a 300px keyboard the shell now shrinks 812→512,
 the nav sits exactly on the visible bottom, and `#view` gains 322px of room where it had 22.
+⚠️ `--vvh` is only SET when the visual viewport is >120px smaller than the layout viewport — i.e. a
+keyboard is genuinely up — and removed otherwise. A Home Screen PWA reports `visualViewport.height`
+wrong at launch (short, no corrective resize ever fires), and trusting it unconditionally left the
+whole shell short: nav floating above a dead strip. The layout viewport never shrinks for the iOS
+keyboard, so the delta IS the keyboard detector.
 
 ⚠️ **The app shell owns the viewport; the document must never scroll.** `html, body` are
 `overflow: hidden`, `.app` is `height: 100dvh` (not `min-height`), and `.view` carries

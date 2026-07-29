@@ -81,20 +81,28 @@ test("the launch screen's top stop is --bg, in BOTH themes", () => {
   }
 });
 
-test("the theme is not persisted — and the latched strip depends on that", () => {
-  // ⚠️ LANDMINE. The strip latches the canvas colour at first paint. That is only ever RIGHT because
-  // data-theme is set solely by the theme button and never restored from storage, so every launch
-  // starts on the system scheme and the latched --bg matches what renders.
+test("the remembered theme is applied BEFORE first paint", () => {
+  // ⚠️ The two halves of this are inseparable, and shipping one without the other is a real bug that
+  // reached the owner's phone: his system is light, he prefers dark, and with the theme reset on
+  // every launch the strip latched LIGHT while the app rendered DARK — every single session.
   //
-  // The moment someone adds "remember my theme", a runner whose system is light but who chose dark
-  // will latch the LIGHT --bg and then render dark — a permanent mismatch on every single launch,
-  // which is precisely the bug this whole area was fixed for. The fix at that point is an inline
-  // <head> script that applies data-theme BEFORE first paint. Write it that way from the start.
-  const persists = /(localStorage|getItem)[^\n]{0,80}(theme)/i.test(SOURCE)
-    && /setAttribute\("data-theme"[^\n]{0,120}(getItem|stored|saved)/i.test(SOURCE);
-  assert.ok(!persists,
-    "the theme now persists — apply data-theme in an inline <head> script before first paint, " +
-    "or the status strip latches the system colour while the app renders the stored one");
+  // Persisting alone does not fix it. iOS latches the strip from the canvas at FIRST PAINT, so the
+  // stored theme has to be on documentElement before that — which means an inline script in <head>,
+  // not the main script at the end of <body>.
+  assert.match(SOURCE, /localStorage\.setItem\("interun_theme_v1", next\)/,
+    "the theme button must remember the choice");
+
+  const head = /<head>([\s\S]*?)<\/head>/.exec(SOURCE);
+  assert.ok(head, "no <head> block");
+  assert.match(head![1]!, /<script>[^<]*interun_theme_v1[^<]*setAttribute\('data-theme'/,
+    "the stored theme must be applied by an inline <head> script, before first paint");
+
+  // And it must come before the body, where the main script lives — a script at the end of <body>
+  // runs after the first paint has already latched the strip.
+  const inlineAt = SOURCE.indexOf("interun_theme_v1");
+  const bodyAt = SOURCE.indexOf("<body>");
+  assert.ok(inlineAt > 0 && inlineAt < bodyAt,
+    "the theme restore must precede <body> or the strip latches the system colour");
 });
 
 test("the manifest fallback is a background colour, not the brand colour", () => {
@@ -112,8 +120,10 @@ test("a manual theme change still moves the strip", () => {
   // The media queries see the SYSTEM scheme only; the app's own theme button is invisible to them.
   // iOS will not act on this mid-session, but other browsers do, and it keeps the value honest.
   assert.match(SOURCE, /function syncThemeColor\(\)/, "no runtime theme-color sync");
-  assert.match(SOURCE, /setAttribute\("data-theme"[^;]*\);\s*syncThemeColor\(\);/,
-    "the theme button must re-sync theme-color");
+  const btn = /\$\("themeBtn"\)\.onclick = \(\) => \{([\s\S]*?)\n\};/.exec(SOURCE);
+  assert.ok(btn, "could not find the theme button handler");
+  assert.match(btn![1]!, /setAttribute\("data-theme", next\)/, "the theme button must set data-theme");
+  assert.match(btn![1]!, /syncThemeColor\(\);/, "the theme button must re-sync theme-color");
   assert.match(SOURCE,
     /matchMedia\('\(prefers-color-scheme: dark\)'\)\.addEventListener\('change', syncThemeColor\)/,
     "a system scheme change must re-sync theme-color");

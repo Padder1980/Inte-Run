@@ -476,13 +476,18 @@ pair equal to that scheme's `--bg`, with `syncThemeColor()` collapsing to **one 
 runtime (with several present the browser takes the first that matches, so the pair would outvote the
 live one) and re-running on the theme button, which no media query can see.
 
-⚠️ **LANDMINE: the theme is deliberately NOT persisted.** `data-theme` is set only by the theme button
-and never restored, so every launch starts on the system scheme and the latched strip is right by
-construction. The day someone adds "remember my theme", a runner whose system is light but who chose
-dark will latch the LIGHT `--bg` and render dark — a permanent mismatch on every launch, exactly the
-bug this section exists for. The fix is an inline `<head>` script applying `data-theme` **before first
-paint**; write it that way from the start. There is a test asserting the theme is not persisted, and
-it is there to make whoever adds the feature read this paragraph.
+⚠️ **The theme is remembered, and it MUST be applied before first paint — the two are inseparable.**
+`interun_theme_v1` is written by the theme button and applied by a **tiny inline script in `<head>`**.
+Both halves are load-bearing and shipping either alone is a bug that reached the owner's phone:
+
+- Not persisting it at all meant a runner whose phone is light but who prefers dark had to re-toggle
+  every launch — so the strip latched LIGHT while the app rendered DARK, *every session*.
+- Persisting it but restoring it from the main script (at the end of `<body>`) would be just as
+  broken: the first paint would still use the system scheme, and the strip latches at first paint.
+
+So the restore stays inline, stays in `<head>`, and stays before `<body>`. `test/home-screen-chrome.test.ts`
+asserts all three. The strip still goes stale if the theme is changed **mid-session** — unavoidable
+with a latched value, and it corrects itself on the next launch.
 
 ⚠️ **`--vvh` requires a FOCUSED FIELD, not just a size delta** — this was the dead strip *below* the
 nav, and a threshold alone cannot prevent it. A Home Screen web app reports `visualViewport.height`

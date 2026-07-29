@@ -82,6 +82,13 @@ const html = `<!doctype html>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<!-- ⚠️ MUST run before first paint, and must stay in the HEAD to do so.
+     iOS latches the status-bar strip from the canvas background at first paint and never re-reads it.
+     If the stored theme were applied later - from the main script at the end of body - the first
+     paint would use the SYSTEM scheme, the strip would latch that colour, and a runner whose phone is
+     light but who chose dark would get a light strip above a dark app for the entire session. Which
+     is exactly what happened before this existed. Keep it inline, keep it here, keep it tiny. -->
+<script>try{var t=localStorage.getItem('interun_theme_v1');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 <style>
 :root {
   color-scheme: light dark;
@@ -7293,7 +7300,18 @@ try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change
 syncThemeColor();
 $("alfieBtn").onclick = openAlfie;
 ALFIE_MSGS = alfieLoadMsgs();
-$("themeBtn").onclick = () => { const cur = document.documentElement.getAttribute("data-theme"); document.documentElement.setAttribute("data-theme", cur === "dark" ? "light" : cur === "light" ? "dark" : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark")); syncThemeColor(); };
+// Remembered, because it has to be. iOS latches the strip at first paint, so a theme that resets
+// every launch means a runner who prefers dark on a light phone gets a mismatched strip EVERY
+// session. Persisting it lets the inline head script apply it before the first paint, which is the
+// only moment that can put the strip right. The strip still goes stale if the theme is changed
+// mid-session — that is unavoidable with a latched value, and it corrects itself on the next launch.
+$("themeBtn").onclick = () => {
+  const cur = document.documentElement.getAttribute("data-theme");
+  const next = cur === "dark" ? "light" : cur === "light" ? "dark" : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark");
+  document.documentElement.setAttribute("data-theme", next);
+  try { localStorage.setItem("interun_theme_v1", next); } catch (e) {}
+  syncThemeColor();
+};
 $("profileBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); state.screen = "setup"; render(); };
 $("calBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); state.screen = "calendar"; render(); };
 $("bellBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); openRemindersSheet(); };

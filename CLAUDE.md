@@ -426,17 +426,37 @@ what paints the gap.** `apple-mobile-web-app-status-bar-style: black-translucent
 full screen: measured on the owner's 16 Pro Max, **screen 956 but page 894**, with
 `env(safe-area-inset-top)` **0** and `inset-bottom` still 34 (so `viewport-fit=cover` is working —
 this is not a missing meta tag, and all four metas were already correct). iOS fills those 62pt from
-`theme-color`, which was the brand teal `--accent` sitting above a near-white app.
-**The symptom does not look like a colour bug** — the app appears shunted down behind a coloured
-band, which reads as "the app isn't positioning correctly", and **re-adding the Home Screen icon
-changes nothing** because the fresh install re-reads the same value. Rules now enforced by
-`test/home-screen-chrome.test.ts`:
-- Each `theme-color` meta must equal that scheme's `--bg`, and the manifest's `theme_color` (the
-  pre-paint fallback iOS caches at install) must be the light `--bg`, never `--accent`.
-- The media-query metas see the SYSTEM scheme only. The app's own theme button is invisible to them,
-  so `syncThemeColor()` collapses them to **one un-media'd meta** set from the computed `--bg`, and
-  is called at startup, from the theme button, and on a `prefers-color-scheme` change. With several
-  metas present the browser takes the first that matches, so the pair would outvote the live one.
+`theme-color`. This is **WebKit bug 301994**, not a missing meta tag — all four were already correct,
+and `inset-bottom` still reporting 34 proves `viewport-fit=cover` is honoured.
+**The strip cannot be removed.** No CSS inside the page can fill it: `.splash` is
+`position: fixed; inset: 0` and a direct child of `<body>`, and it still shows bands above and below.
+**The symptom does not look like a colour bug** — the app appears shunted down behind a band, which
+reads as "the app isn't positioning correctly", and **re-adding the Home Screen icon changes nothing**.
+
+So the only fix is to make the strip the same colour as **whatever is on screen underneath it**, which
+moves. Rules enforced by `test/home-screen-chrome.test.ts`:
+- ⚠️ **The static meta and the manifest `theme_color` are the SPLASH colour (`SPLASH_CHROME`), not a
+  theme colour.** The first paint is always the splash, which is hardcoded near-black in BOTH themes.
+  Pinning them to `--bg` fixed the teal band on Today and made launch *worse* — a near-WHITE band
+  above a near-black screen, at the one moment every launch passes through, held until the runner taps
+  (the welcome-back overlay has no auto-dismiss). `SPLASH_CHROME` is asserted equal to the
+  `.splash/.welcome` gradient's top stop so it cannot drift.
+- `syncThemeColor()` keeps **one un-media'd meta** tracking what is actually displayed — with several
+  metas present the browser takes the first that matches, so a media pair outvotes the live one. It
+  runs at startup, from the theme button (which no media query can see), on a `prefers-color-scheme`
+  change, and **at every step of the launch handoff**, which changes the screen twice in three seconds.
+- ⚠️ **`chromeColor()` must check ALL `.splash, .welcome` elements, never `querySelector`.** The
+  first-run `#welcome` sits in the markup permanently at `display:none` and precedes the welcome-back
+  overlay appended at runtime, so the first match is always the hidden one.
+
+⚠️ **`--vvh` requires a FOCUSED FIELD, not just a size delta** — this was the dead strip *below* the
+nav, and a threshold alone cannot prevent it. A Home Screen web app reports `visualViewport.height`
+wrong at launch (short, with no corrective resize ever firing), and at that moment the layout viewport
+still reads full height, so the bogus delta sails past any threshold. `--vvh` latched the short value
+and the shell stayed short for the entire session. A keyboard cannot be up unless something focusable
+is focused, and nothing is focused at launch — so the gate is `keyboardPossible() && layout - h > 120`,
+with both halves load-bearing (a field can be focused with no keyboard). It is re-evaluated on
+`focusin`/`focusout`/`pageshow`/`visibilitychange`, because a value left behind is the same strip.
 
 ⚠️ **The app shell owns the viewport; the document must never scroll.** `html, body` are
 `overflow: hidden`, `.app` is `height: var(--vvh, 100%)` (not `min-height`), and `.view` carries

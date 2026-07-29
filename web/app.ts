@@ -185,6 +185,11 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 /* Welcome copy — heading, all three lines, and the CTA fade in together (same .5s delay
    so the splash label clears first), a touch slower, as one unit. */
 .welcome-h { font-size: 30px; font-weight: 800; letter-spacing: -.02em; color: var(--splash-ink); margin: 20px 0 18px; animation: welIn .65s ease .5s both; }
+/* Same two-tone wordmark as .splash-name, so the name looks identical across the launch handoff:
+   "Inte-" in ink, "Run" in the brand teal. The greeting is dropped to --splash-soft and un-italicised
+   so it recedes — left at full ink it ran straight into "Inte-" in the same colour and the split read
+   as "Welcome to Inte-" then a stray teal word. */
+.welcome-h i { font-style: normal; font-weight: 700; color: var(--splash-soft); }
 .welcome-h span { color: var(--splash-brand); }
 .welcome-msg { font-size: 16px; line-height: 1.5; color: var(--splash-soft); margin: 0 0 12px; opacity: 0; }
 .welcome-msg.m1 { animation: welIn .65s ease .5s both; }
@@ -1724,13 +1729,17 @@ input, select, textarea { font-size: 16px; }
 <body>
 <div class="splash" id="splash">
   <div class="splash-mark">${BRAND_MARK}</div>
-  <div class="splash-name">Inte<span>Run</span></div>
+  <!-- ⚠️ The wordmark is SPLIT so the two halves can be coloured: "Inte-" in ink, "Run" in the brand
+       teal, echoing the mark's two strokes. Because it is split, a search-and-replace for the brand
+       name does NOT match it — the 2026-07-29 rename to Inte-Run missed the hyphen here and the
+       splash kept saying "InteRun". Change the halves, not the whole string. -->
+  <div class="splash-name">Inte-<span>Run</span></div>
   <div class="splash-tag">The Intelligent Training Companion</div>
 </div>
 <div class="welcome" id="welcome">
   <div class="welcome-inner">
     <div class="welcome-mark">${BRAND_MARK}</div>
-    <h1 class="welcome-h">Welcome to <span>Inte-Run</span></h1>
+    <h1 class="welcome-h"><i>Welcome to</i> Inte-<span>Run</span></h1>
     <p class="welcome-msg m1">Short for <b>Inte</b>lligent <b>Run</b> — it watches how your training is actually going, and adapts.</p>
     <p class="welcome-msg m2">From your very first 5K to a marathon PB — a plan built around you.</p>
     <p class="welcome-msg m3">Let’s start with a few quick questions.</p>
@@ -6275,8 +6284,11 @@ function buildShareCanvasCore(run, mapData) {
   g.shadowColor = "rgba(61,255,176,.5)"; g.shadowBlur = 12; g.lineWidth = 2.5; g.strokeStyle = "rgba(72,255,184,.7)"; g.stroke(); g.restore();
   g.textBaseline = "alphabetic"; g.textAlign = "left";
   drawBrandBadge(g, 56, 92, 116);
-  g.font = "800 62px " + FF; g.fillStyle = "#fff"; g.fillText("Inte", 196, 178);
-  const iw = g.measureText("Inte").width; g.fillStyle = TEAL; g.fillText("Run", 196 + iw, 178);
+  // ⚠️ Two-tone wordmark, drawn in two halves so each gets its own colour — and therefore invisible
+  // to a search-and-replace on the brand name. Keep the hyphen on the FIRST half and measure the same
+  // string you drew, or "Run" lands on top of it.
+  g.font = "800 62px " + FF; g.fillStyle = "#fff"; g.fillText("Inte-", 196, 178);
+  const iw = g.measureText("Inte-").width; g.fillStyle = TEAL; g.fillText("Run", 196 + iw, 178);
   g.fillStyle = "rgba(160,200,190,.65)"; g.font = "600 20px " + FF; lsText(g, "THE INTELLIGENT TRAINING COMPANION", 198, 210, 2.5, "left");
   g.fillStyle = TEAL; g.font = "600 26px " + FF; g.textAlign = "right"; g.fillText("#RunWithInte-Run", W - 56, 150); g.textAlign = "left";
   const title = (run.t || "My run").toUpperCase(); let ts = 90; g.font = "800 " + ts + "px " + FF;

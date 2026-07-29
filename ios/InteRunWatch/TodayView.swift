@@ -43,10 +43,12 @@ struct TodayView: View {
         if count { workout.startCountingDown() } else { workout.start() }
     }
 
-    /// "Inte" white, "Run" in the brand teal — the same wordmark the phone's splash draws
+    /// "Inte-" white, "Run" in the brand teal — the same wordmark the phone's splash draws
     /// (#fff + #16b7a4, which is Brand.mark).
+    /// ⚠️ Split into two Texts so each half gets its own colour, which also means a search-and-replace
+    /// on the brand name cannot see it: the 2026-07-29 rename to Inte-Run missed the hyphen here.
     private var wordmark: some View {
-        (Text("Inte").foregroundStyle(.white) + Text("Run").foregroundStyle(Brand.mark))
+        (Text("Inte-").foregroundStyle(.white) + Text("Run").foregroundStyle(Brand.mark))
             .font(.system(size: 22, weight: .heavy, design: .rounded))
             .kerning(-0.4)
             .padding(.bottom, 2)

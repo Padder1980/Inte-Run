@@ -49,6 +49,9 @@
   .hero { margin: 22px 0 6px; }
   .hero h1 { margin: 0 0 8px; font-size: 27px; font-weight: 800; letter-spacing: -.03em; line-height: 1.12; }
   .hero p { margin: 0; color: var(--ink-soft); font-size: 14.5px; }
+  /* Dated "state of play" line. The map is only trustworthy if you can see how fresh it is. */
+  .hero p.upd { margin-top: 10px; padding-left: 11px; border-left: 3px solid var(--accent); font-size: 13.5px; line-height: 1.5; }
+  .hero p.upd b { color: var(--ink); }
   .hero .goal { margin-top: 14px; padding: 14px 16px; background: linear-gradient(150deg, color-mix(in srgb, var(--accent) 14%, var(--surface)), var(--surface) 70%);
     border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); border-radius: 16px; box-shadow: var(--shadow); }
   .hero .goal b { display: block; font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
@@ -120,6 +123,7 @@
 <div class="hero">
   <h1>Where you're going, one phase at a time</h1>
   <p>Each phase is written in plain English and gives you something real at the end of it. Tap a step to tick it off — this page remembers your progress.</p>
+  <p class="upd">Last updated <b>29 July 2026</b> — the iPhone app and the Apple Watch app are both running on real hardware, and the first version of the intelligent coach is live. Two known problems are on the map: the coach going quiet when the phone locks, and the watch screens being hard to read mid-run.</p>
   <div class="goal"><b>The destination</b>
     <div>InteRun in the App Store · full Apple Watch and Garmin support · a coach that notices when your running says the plan should change, and asks before changing it · a community that matches you with runners of similar ability nearby.</div>
   </div>
@@ -171,7 +175,8 @@
   <div class="steps">
     <button class="step" data-id="p2-shell"><span class="box"></span><span class="st-b"><span class="st-t">Build the iPhone version of the screens</span><span class="st-d">Today, Plan, Activities, Support — same design, same features, built with Apple's tools so it feels properly native.</span></span></button>
     <button class="step" data-id="p2-brain"><span class="box"></span><span class="st-b"><span class="st-t">Move the training brain across</span><span class="st-d">The plan-building and coaching logic comes over with its 122 checks used to prove the new version behaves identically to the old one.</span></span></button>
-    <button class="step" data-id="p2-gps"><span class="box"></span><span class="st-b"><span class="st-t">Proper background running</span><span class="st-d">The killer upgrade a native app unlocks: GPS keeps tracking with the screen locked, the voice coach keeps talking, and a live view sits on your lock screen.</span></span></button>
+    <button class="step" data-id="p2-gps"><span class="box"></span><span class="st-b"><span class="st-t">Proper background running</span><span class="st-d">The killer upgrade a native app unlocks: GPS keeps tracking with the screen locked, and a live view sits on your lock screen. Both of these now work.</span></span></button>
+    <button class="step" data-id="p2-audio"><span class="box"></span><span class="st-b"><span class="st-t">The coach keeps talking with the phone locked</span><span class="st-d">Known problem, cause found. The voice goes quiet the moment the screen locks, because the cues are set off from inside the web page and the phone freezes that page to save battery. The fix is to hand the voice to the app itself, so your phone treats it like a music app.</span></span></button>
     <button class="step" data-id="p2-data"><span class="box"></span><span class="st-b"><span class="st-t">Keep everything on the phone for now</span><span class="st-d">No accounts, no sign-in in version 1. Simpler to build, simpler to explain, and the strongest possible privacy story for launch.</span></span></button>
     <button class="step" data-id="p2-test"><span class="box"></span><span class="st-b"><span class="st-t">Test with real people via TestFlight</span><span class="st-d">Apple's free tool for sharing pre-release versions. You, then 5–10 runners you trust. Fix what they trip over.</span></span></button>
     <button class="step" data-id="p2-legal"><span class="box"></span><span class="st-b"><span class="st-t">Write the privacy policy and terms</span><span class="st-d">Required by Apple. Version 1's is short and honest: "your data stays on your phone." Plain English beats legalese.</span></span></button>
@@ -193,6 +198,7 @@
     <button class="step" data-id="p3-app"><span class="box"></span><span class="st-b"><span class="st-t">Watch app that runs the session</span><span class="st-d">Start, pause and finish from the wrist. Live pace, distance, elapsed time and step-by-step prompts ("2 minutes at threshold").</span></span></button>
     <button class="step" data-id="p3-hr"><span class="box"></span><span class="st-b"><span class="st-t">Bring heart-rate into the picture</span><span class="st-d">Recorded every run and shown in summaries. Later it feeds the intelligent coach — effort without asking.</span></span></button>
     <button class="step" data-id="p3-standalone"><span class="box"></span><span class="st-b"><span class="st-t">Phone-free running</span><span class="st-d">The watch's own GPS records the run and syncs it back to the phone when you return.</span></span></button>
+    <button class="step" data-id="p3-legible"><span class="box"></span><span class="st-b"><span class="st-t">Make the watch screens readable at a glance</span><span class="st-d">The screens work but are hard to read while actually running. The redesign: one big number per screen with a small label rather than the other way round, session type shown by a colour down the edge of the card, and settings split into swipeable pages instead of one long list. Keeping InteRun's own look — and keeping the live pace band, which is better than anything else out there.</span></span></button>
     <button class="step" data-id="p3-face"><span class="box"></span><span class="st-b"><span class="st-t">Today's session on the watch face</span><span class="st-d">Glance at your wrist in the morning and know what's on. Quietly the most-used feature.</span></span></button>
     <button class="step" data-id="p3-ship"><span class="box"></span><span class="st-b"><span class="st-t">Ship it</span><span class="st-d">Same TestFlight-then-review routine as version 1, now with the watch involved in testing.</span></span></button>
   </div>
@@ -297,6 +303,25 @@
   }
   var steps = Array.prototype.slice.call(document.querySelectorAll(".step"));
   function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  // ⚠️ Catch-up batches. Progress lives in the owner's browser, so work finished AFTER he last
+  // opened this page stays unticked however true it is — the map then under-reports and stops being
+  // worth trusting. Each batch is applied ONCE and its key recorded in state.__seeded, so editing
+  // this file again can never re-tick something he deliberately unticked. Only list steps that are
+  // genuinely, verifiably done: a wrongly-ticked step is worse than an untidy one.
+  // ADD A NEW DATED BATCH when a milestone lands. Never edit an old one.
+  var seeded = state.__seeded || (state.__seeded = {});
+  var BATCHES = {
+    // The iPhone app, the Watch app and the first intelligent-coach release, all on real hardware.
+    "2026-07-29": ["p1-xcode", "p2-shell", "p2-brain", "p2-data",
+                   "p3-app", "p3-hr", "p3-standalone",
+                   "p4-rpe", "p4-flags", "p4-suggest", "p4-why"]
+  };
+  Object.keys(BATCHES).forEach(function (k) {
+    if (seeded[k]) return;
+    BATCHES[k].forEach(function (id) { state[id] = true; });
+    seeded[k] = true;
+  });
+  save();
   function paint() {
     steps.forEach(function (s) { s.classList.toggle("done", !!state[s.dataset.id]); });
     var total = 0, done = 0;
@@ -318,7 +343,9 @@
   });
   document.getElementById("reset").addEventListener("click", function () {
     if (!confirm("Untick everything and start the map fresh?")) return;
-    state = {}; save(); paint();
+    // Carry the batch markers across, or the catch-up above would re-tick on the spot and Reset
+    // would look broken. The button says untick everything, so it unticks everything.
+    state = { __seeded: seeded }; save(); paint();
   });
   paint();
 })();

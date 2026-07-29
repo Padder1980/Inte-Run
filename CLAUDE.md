@@ -245,6 +245,23 @@ plan to the App Store / watches / adaptive coach / community, installable to the
 The service worker caches it for offline (`./roadmap/*` in ASSETS) and the offline navigation
 fallback now serves the requested cached page before falling back to the app shell.
 
+⚠️ **STANDING INSTRUCTION from the owner (2026-07-29): update the Road Map every time a milestone
+lands.** He uses it to keep track, so a map that lags is worse than no map. When you ship something:
+
+1. Add a **new dated batch** to `BATCHES` in the page's script, listing the step ids now genuinely
+   done. **Never edit an existing batch.** Progress lives in *his browser's* `localStorage`, so work
+   finished after he last opened the page would otherwise stay unticked forever and the map would
+   under-report. Each batch applies once, keyed in `state.__seeded`, so it can never re-tick a step he
+   deliberately unticked — and `#reset` deliberately preserves `__seeded` so Reset means what it says.
+2. Only list steps that are **verifiably** done. A wrongly-ticked step destroys the map's value.
+3. Add a step for any newly-found problem, written in plain English with the cause if known — see
+   `p2-audio` and `p3-legible` for the tone. Don't quietly reword an old step to hide a regression;
+   `p2-gps` was narrowed to GPS + lock screen precisely because the voice half turned out to be broken.
+4. Update the dated `<p class="upd">` "state of play" line in the hero.
+
+⚠️ **Write it for him, not for us.** No jargon: "the phone freezes that page to save battery", not
+"iOS suspends the WKWebView content process". The technical version belongs in this file.
+
 ⚠️ **Three copies of the app exist and update differently** — GitHub Pages (on push), a Home Screen
 PWA (re-fetches, but iOS holds the old copy until fully quit), and the native app (**only** on an
 Xcode rebuild, since `docs/` is baked into the bundle). "My change hasn't appeared" is almost always

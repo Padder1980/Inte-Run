@@ -1869,7 +1869,21 @@ const storedProfile = loadProfile();
 const FIRST_RUN = !storedProfile;
 let profile = storedProfile || Object.assign({}, DEFAULT_PROFILE);
 let PLAN, RAW, FITNESS, CLASS, MASTERS;
-function recompute() { const r = applyProfile(profile); PLAN = r.plan; RAW = r.raw; FITNESS = r.fitness; CLASS = r.classification; MASTERS = r.masters; normalizeWeekStarts(); try { syncNativeReminders(); } catch (e) {} try { syncWatch(); } catch (e) {} }
+// ⚠️ Everything that MUST happen when a freshly generated plan replaces the live one. Never assign
+// PLAN from an applyProfile() result by hand — go through here. Assigning the fields is not enough:
+// applyProfile starts a pro-rata first week on the START DATE, so week 0's startIso is whatever day
+// that is, and normalizeWeekStarts() is what snaps it back to its Monday. Skip that and computeToday()
+// matches today against a mid-week startIso, finds it at day index 0, and day 0 IS Monday everywhere
+// in the UI — so Today shows Monday's session until the app is restarted (a restart re-runs recompute
+// and hides the bug). The reminder schedule and the watch payload also describe the plan, so they get
+// re-sent from the same place or they go stale in exactly the same silent way.
+function adoptPlan(out) {
+  PLAN = out.plan; RAW = out.raw; FITNESS = out.fitness; CLASS = out.classification; MASTERS = out.masters;
+  normalizeWeekStarts();
+  try { syncNativeReminders(); } catch (e) {}
+  try { syncWatch(); } catch (e) {}
+}
+function recompute() { adoptPlan(applyProfile(profile)); }
 // Weeks display on a Monday–Sunday grid, and day indices are Monday-based (0 = Mon). applyProfile can
 // move the first (partial) week's start to a mid-week date; snap each week's start back to its Monday
 // so isoAdd(startIso, dayIndex) — used by the strip, overview, calendar and .ics — always lands on the
@@ -3832,6 +3846,24 @@ function viewPlan() {
     '<h2 class="sec">Training block</h2><div class="card"><div class="chart" id="chart">' + bars + '</div><div class="phase-legend">' + phaseLegend + '</div></div>' +
     '<h2 class="sec">Week detail</h2><div class="card" id="weekDetail">' + weekDetail() + '</div>';
 }
+// The training-block chart scrolls horizontally, so a long plan renders it at week 1 while
+// state.planWeek is usually the CURRENT week — leaving "Week detail" naming a week whose highlighted
+// bar sits off-screen. Bring the selected bar into view. This has to be called from wire(), which runs
+// on every render: it used to live at the top of buildNav(), which runs exactly once at boot, when
+// there is no Plan screen yet and $("chart") is null — so it never actually ran.
+function centerPlanWeek() {
+  const chart = $("chart");
+  // A chart that has not been laid out measures 0, which would compute a bogus offset.
+  if (!chart || !chart.clientWidth || chart.scrollWidth <= chart.clientWidth) return;
+  const btn = chart.querySelector('.bar-btn[aria-pressed="true"]') || chart.querySelector('[data-wk="' + state.planWeek + '"]');
+  if (!btn) return;
+  // Adjust the chart's OWN scrollLeft as a delta from where it is now. scrollIntoView() would walk
+  // every ancestor scrollport and scroll the page down to the chart as well, undoing the scroll-to-top
+  // a render does; and a delta from getBoundingClientRect needs no assumption about which ancestor is
+  // the offsetParent. No scroll-behavior is set on .chart, so this is instant rather than animated.
+  const cr = chart.getBoundingClientRect(), br = btn.getBoundingClientRect();
+  chart.scrollLeft += (br.left - cr.left) - (chart.clientWidth - br.width) / 2;
+}
 function weekDetail() {
   const w = PLAN.weeks.find((x) => x.index === state.planWeek) || PLAN.weeks[0];
   const byDay = {};
@@ -5033,7 +5065,9 @@ function wireTrialRun() {
 function trialSaveResult() {
   profile.oneKmS = TRIALRUN.secs;
   profile.personalized = true;
-  try { const out = applyProfile(profile); PLAN = out.plan; RAW = out.raw; FITNESS = out.fitness; CLASS = out.classification; MASTERS = out.masters; state.planWeek = PLAN.defaultWeekIndex; } catch (e) {}
+  // Re-anchoring moves every week's start, so today has to be relocated in the new plan too — not just
+  // the paces rescaled. Without computeToday() the old week/day indices stay and point at the wrong day.
+  try { adoptPlan(applyProfile(profile)); computeToday(); state.planWeek = PLAN.defaultWeekIndex; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; } catch (e) {}
   saveProfileStore();
   state.trialSaved = fmtTimeFull(TRIALRUN.secs);
   state.trialPending = false; TRIALRUN = null;
@@ -7105,6 +7139,7 @@ function wire() {
     state.subj[f] = v; seg.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); $("readySlot").innerHTML = renderReadiness();
   }));
   document.querySelectorAll("[data-wk]").forEach((b) => b.onclick = () => { state.planWeek = Number(b.dataset.wk); document.querySelectorAll("[data-wk]").forEach((x) => x.setAttribute("aria-pressed", x === b)); $("weekDetail").innerHTML = weekDetail(); wireSessionTaps(); });
+  centerPlanWeek();
   document.querySelectorAll("[data-at]").forEach((b) => b.onclick = () => { state.actTab = b.dataset.at; render(); });
   document.querySelectorAll("[data-runidx]").forEach((b) => b.onclick = () => {
     // A swipe that ends in a tap should not also open the run.
@@ -7167,7 +7202,7 @@ function wire() {
   function doSaveProfile() {
     let pf; try { pf = draftFromForm(); } catch (e) { const er = $("setupErr"); er.style.display = "block"; er.textContent = e.message; return; }
     let out; try { out = applyProfile(pf); } catch (e) { const er = $("setupErr"); er.style.display = "block"; er.textContent = "That goal can't be planned yet — try a race date further out."; return; }
-    profile = pf; PLAN = out.plan; RAW = out.raw; FITNESS = out.fitness; CLASS = out.classification; MASTERS = out.masters; computeToday(); state.planWeek = PLAN.defaultWeekIndex; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; seedDone(); saveProfileStore(); renderAvatar();
+    profile = pf; adoptPlan(out); computeToday(); state.planWeek = PLAN.defaultWeekIndex; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; seedDone(); saveProfileStore(); renderAvatar();
     state.screen = null; state.tab = "plan"; render();
   }
   const cancel = $("cancelSetup"); if (cancel) cancel.onclick = () => { state.screen = null; state.tab = "today"; render(); };
@@ -7278,12 +7313,6 @@ function wire() {
   const lDone = $("lDone"); if (lDone) lDone.onclick = () => { coachStop(); stopSpeech(); LIVE = null; state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); };
 }
 function buildNav() {
-  // The chart scrolls now, so open it where the runner actually is rather than at week 1.
-  const chartEl = $("chart");
-  if (chartEl && chartEl.scrollWidth > chartEl.clientWidth) {
-    const btn = chartEl.querySelector('.bar-btn[aria-pressed="true"]') || chartEl.children[curWeekIdx()];
-    if (btn) chartEl.scrollLeft = Math.max(0, btn.offsetLeft - chartEl.clientWidth / 2 + btn.offsetWidth / 2);
-  }
   $("nav").innerHTML = ["today","plan","activities","community","support"].map((t) => '<button type="button" class="navbtn' + (t===state.tab?" on":"") + '" data-tab="' + t + '">' + (t === "today" ? todayNavIcon() : ICON[t]) + '<span class="nl">' + TITLES[t].replace("Your ","") + '</span></button>').join("");
   // ⚠️ Same rule as liveBack: mid-run a tab tap is NAVIGATION, and the live pill is the way back.
   // Without the guard this tore down GPS, the coach and the lock-screen card while the pill kept

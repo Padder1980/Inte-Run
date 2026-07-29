@@ -86,6 +86,11 @@ const html = `<!doctype html>
   --ready: #4b9e2f; --steady: #2b9eb3; --ease: #d98a2a; --rest: #c0442e;
   --eff-easy: #3fa47a; --eff-moderate: #d99a2b; --eff-hard: #d65b36; --eff-none: #9aa8a1;
   --shadow: 0 1px 2px rgba(20,32,27,.05), 0 6px 18px rgba(20,32,27,.06);
+  /* Launch screen. The status strip iOS paints above a Home Screen web app is locked to --bg
+     for the whole session, so the splash top stop IS --bg - that join is the whole point. */
+  --splash-bg: radial-gradient(125% 90% at 50% 0%, #eef1f1 0%, #e4edeb 52%, #d6e3e0 100%);
+  --splash-ink: #14201b; --splash-soft: #5b6b64; --splash-brand: #0e8c7f;
+  --splash-glow: rgba(14,140,127,.22);
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace;
   --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
@@ -98,10 +103,13 @@ const html = `<!doctype html>
     --ready: #6bbf46; --steady: #3ab0c4; --ease: #eb9748; --rest: #e8765c;
     --eff-easy: #4cb98a; --eff-moderate: #e6ac3e; --eff-hard: #e56f49; --eff-none: #6f7d76;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 22px rgba(0,0,0,.4);
+    --splash-bg: radial-gradient(125% 90% at 50% 0%, #0c2b28 0%, #06110f 56%, #000 100%);
+    --splash-ink: #ffffff; --splash-soft: #9aa3a0; --splash-brand: #16b7a4;
+    --splash-glow: rgba(22,183,164,.38);
   }
 }
-:root[data-theme="light"] { color-scheme: light; --bg:#eef1f1; --surface:#fff; --surface-2:#f6f8f8; --line:#dbe1e0; --ink:#14201b; --ink-soft:#4c5b55; --ink-faint:#7a877f; --accent:#0e8c7f; --accent-ink:#fff; --base:#2b9eb3; --build:#5fa83c; --peak:#e0863a; --taper:#7a6fd0; --ready:#4b9e2f; --steady:#2b9eb3; --ease:#d98a2a; --rest:#c0442e; --eff-easy:#3fa47a; --eff-moderate:#d99a2b; --eff-hard:#d65b36; --eff-none:#9aa8a1; --shadow:0 1px 2px rgba(20,32,27,.05),0 6px 18px rgba(20,32,27,.06); }
-:root[data-theme="dark"] { color-scheme: dark; --bg:#0a100e; --surface:#151e1b; --surface-2:#1b2622; --line:#26332e; --ink:#e7eeea; --ink-soft:#a9b7b0; --ink-faint:#74847c; --accent:#2bb3a3; --accent-ink:#06231f; --base:#3ab0c4; --build:#74bd52; --peak:#eb9748; --taper:#9184e0; --ready:#6bbf46; --steady:#3ab0c4; --ease:#eb9748; --rest:#e8765c; --eff-easy:#4cb98a; --eff-moderate:#e6ac3e; --eff-hard:#e56f49; --eff-none:#6f7d76; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.4); }
+:root[data-theme="light"] { color-scheme: light; --bg:#eef1f1; --surface:#fff; --surface-2:#f6f8f8; --line:#dbe1e0; --ink:#14201b; --ink-soft:#4c5b55; --ink-faint:#7a877f; --accent:#0e8c7f; --accent-ink:#fff; --base:#2b9eb3; --build:#5fa83c; --peak:#e0863a; --taper:#7a6fd0; --ready:#4b9e2f; --steady:#2b9eb3; --ease:#d98a2a; --rest:#c0442e; --eff-easy:#3fa47a; --eff-moderate:#d99a2b; --eff-hard:#d65b36; --eff-none:#9aa8a1; --shadow:0 1px 2px rgba(20,32,27,.05),0 6px 18px rgba(20,32,27,.06);  --splash-bg: radial-gradient(125% 90% at 50% 0%, #eef1f1 0%, #e4edeb 52%, #d6e3e0 100%); --splash-ink:#14201b; --splash-soft:#5b6b64; --splash-brand:#0e8c7f; --splash-glow:rgba(14,140,127,.22); }
+:root[data-theme="dark"] { color-scheme: dark; --bg:#0a100e; --surface:#151e1b; --surface-2:#1b2622; --line:#26332e; --ink:#e7eeea; --ink-soft:#a9b7b0; --ink-faint:#74847c; --accent:#2bb3a3; --accent-ink:#06231f; --base:#3ab0c4; --build:#74bd52; --peak:#eb9748; --taper:#9184e0; --ready:#6bbf46; --steady:#3ab0c4; --ease:#eb9748; --rest:#e8765c; --eff-easy:#4cb98a; --eff-moderate:#e6ac3e; --eff-hard:#e56f49; --eff-none:#6f7d76; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.4);  --splash-bg: radial-gradient(125% 90% at 50% 0%, #0c2b28 0%, #06110f 56%, #000 100%); --splash-ink:#ffffff; --splash-soft:#9aa3a0; --splash-brand:#16b7a4; --splash-glow:rgba(22,183,164,.38); }
 * { box-sizing: border-box; }
 /* The app shell owns the viewport; the document itself must never scroll.
    ⚠️ Without this the page was the scroller, not #view, and two consequences followed: an iOS
@@ -132,15 +140,15 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
    splash fades out and the welcome fades in at the same instant, the two identical
    logos overlap exactly — the brand mark appears to hold perfectly still while only
    the text and background crossfade around it (a continuous-logo transition). */
-.splash, .welcome { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: clamp(84px, 24vh, 176px) 32px 40px; text-align: center; background: radial-gradient(125% 90% at 50% 0%, #0c2b28 0%, #06110f 56%, #000 100%); }
+.splash, .welcome { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: clamp(84px, 24vh, 176px) 32px 40px; text-align: center; background: var(--splash-bg); }
 .splash { z-index: 100; gap: 20px; opacity: 1; transition: opacity .55s ease; }
 .splash.hide { opacity: 0; pointer-events: none; }
 /* Mark + name + tagline all fade in together (same 0 delay), a touch slower, as one unit. */
 .splash-mark { animation: splashfade 1.1s ease both; }
-.splash-mark svg, .welcome-mark svg { display: block; margin: 0 auto; width: 96px; height: 96px; filter: drop-shadow(0 8px 26px rgba(22,183,164,.38)); }
-.splash-name { font-size: 34px; font-weight: 800; letter-spacing: -.02em; color: #fff; animation: splashfade 1.1s ease both; }
-.splash-name span { color: #16b7a4; }
-.splash-tag { font-size: 13.5px; font-weight: 500; letter-spacing: .01em; color: #9aa3a0; animation: splashfade 1.1s ease both; }
+.splash-mark svg, .welcome-mark svg { display: block; margin: 0 auto; width: 96px; height: 96px; filter: drop-shadow(0 8px 26px var(--splash-glow)); }
+.splash-name { font-size: 34px; font-weight: 800; letter-spacing: -.02em; color: var(--splash-ink); animation: splashfade 1.1s ease both; }
+.splash-name span { color: var(--splash-brand); }
+.splash-tag { font-size: 13.5px; font-weight: 500; letter-spacing: .01em; color: var(--splash-soft); animation: splashfade 1.1s ease both; }
 @keyframes splashfade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 /* First-run welcome — mounts fully opaque directly UNDER the splash (same bg, same
    logo, same spot). Only the splash fades out on top, dissolving to reveal this; the
@@ -151,12 +159,12 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .welcome-inner { max-width: 360px; }
 /* Welcome copy — heading, all three lines, and the CTA fade in together (same .5s delay
    so the splash label clears first), a touch slower, as one unit. */
-.welcome-h { font-size: 30px; font-weight: 800; letter-spacing: -.02em; color: #fff; margin: 20px 0 18px; animation: welIn .65s ease .5s both; }
-.welcome-h span { color: #16b7a4; }
-.welcome-msg { font-size: 16px; line-height: 1.5; color: #cfd6d3; margin: 0 0 12px; opacity: 0; }
+.welcome-h { font-size: 30px; font-weight: 800; letter-spacing: -.02em; color: var(--splash-ink); margin: 20px 0 18px; animation: welIn .65s ease .5s both; }
+.welcome-h span { color: var(--splash-brand); }
+.welcome-msg { font-size: 16px; line-height: 1.5; color: var(--splash-soft); margin: 0 0 12px; opacity: 0; }
 .welcome-msg.m1 { animation: welIn .65s ease .5s both; }
 .welcome-msg.m2 { animation: welIn .65s ease .5s both; }
-.welcome-msg.m3 { color: #fff; font-weight: 600; animation: welIn .65s ease .5s both; }
+.welcome-msg.m3 { color: var(--splash-ink); font-weight: 600; animation: welIn .65s ease .5s both; }
 .welcome-cta { margin-top: 22px; font: inherit; font-size: 16px; font-weight: 700; color: var(--accent-ink); background: linear-gradient(180deg, #1cc4b0 0%, #0e8c7f 60%, #0b6f65 100%); border: 0; border-radius: 14px; padding: 15px 30px; cursor: pointer; box-shadow: 0 1px 0 rgba(255,255,255,.25) inset, 0 10px 26px -8px rgba(22,183,164,.6); opacity: 0; animation: welIn .65s ease .5s both; }
 .welcome-cta:active { transform: translateY(1px); }
 @keyframes welIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
@@ -164,8 +172,8 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 /* Welcome-back (returning user): personalised greeting + rotating quote — same
    continuous-logo entrance (opaque under the fading splash); only the copy differs. */
 .welcome.wb .welcome-h { margin: 18px 0 14px; }
-.wb-quote { font-size: 18px; line-height: 1.5; font-style: italic; color: #eef3f1; margin: 0 8px; animation: welIn .65s ease .5s both; }
-.wb-by { font-size: 13px; color: #9aa3a0; margin: 12px 0 0; animation: welIn .65s ease .5s both; }
+.wb-quote { font-size: 18px; line-height: 1.5; font-style: italic; color: var(--splash-ink); margin: 0 8px; animation: welIn .65s ease .5s both; }
+.wb-by { font-size: 13px; color: var(--splash-soft); margin: 12px 0 0; animation: welIn .65s ease .5s both; }
 .wb-cta { margin-top: 26px; animation: welIn .65s ease .5s both; }
 /* Session guide overlay (interactive walkthrough of the session shorthand) */
 .guide-ov { position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center; padding: 22px; background: color-mix(in srgb, var(--ink) 72%, transparent); backdrop-filter: blur(5px); opacity: 0; transition: opacity .25s ease; }

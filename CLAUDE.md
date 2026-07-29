@@ -866,9 +866,39 @@ plan — the owner's real plan lives in the PWA until restored via Support › Y
 app cannot pair with a PWA (it needs a native iOS app), Xcode isn't installed on the owner's Mac,
 and the `src/` engine is dependency-free TS with 143 tests that would serve as the port spec.
 
-Known/optional next (**web/PWA only** — the native app solves all three, see the `ios/` section):
-lock-screen/background audio is limited, background GPS stops when the screen locks, and true
+Known/optional next (**web/PWA only**): background GPS stops when the screen locks, and true
 background reminders would need a push server (calendar export is the cross-platform answer there).
+The native app solves both — see the `ios/` section. It does **not** solve lock-screen audio; that is
+now a confirmed open bug, below.
+
+## OPEN BUGS (confirmed on real hardware, 2026-07-29)
+
+### 1. Coach audio stops when the iPhone screen locks — diagnosed, not fixed
+
+⚠️ **`CLAUDE.md` used to claim going native fixed this. It did not.** The audio *plumbing* is right:
+`InteRunApp.init()` sets an `AVAudioSession` of `.playback`/`.spokenAudio` and activates it, and
+`audio` **is** in `UIBackgroundModes` in `ios/InteRun-Info.plist`. Verified both.
+
+**The real cause is the trigger, not the output.** Coach cues are fired from
+`setInterval(liveTick, 200)` → `coachTick(snap)` inside the WKWebView, and **all** coach audio is an
+`<audio>` element on the page — `grep AVAudioPlayer ios/InteRun/` returns nothing. When the screen
+locks, iOS suspends/throttles the web content process, the interval stops firing, and nothing ever
+asks for the next cue. An audio session only keeps *already-playing* audio alive; it cannot keep JS
+running. (This is the same suspension the `GeolocationShim` already works around by buffering and
+replaying fixes — that shim is direct evidence the web process does get suspended mid-run.)
+
+**Do not "fix" it with a silent looping keep-alive track without thinking about ducking.** The session
+is configured `.duckOthers`, so a permanently-playing silent track risks holding the runner's music
+ducked for the entire run — a worse bug than the one being fixed.
+
+**The proper fix** is a native audio path: hand the cue queue (or the whole schedule) to Swift and let
+`AVAudioPlayer` play `docs/voices/<coach>/<id>.mp3` while backgrounded, so iOS treats it as a media
+app. Only testable by actually running with the phone locked.
+
+### 2. Watch screens are hard to read mid-run — redesign brief captured
+
+Not a defect, a legibility problem. See **`WATCH-REDESIGN.md`** for the full brief, transcribed from
+reference screenshots that no longer exist. Read that file rather than re-deriving it.
 
 ---
 

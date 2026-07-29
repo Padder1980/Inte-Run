@@ -59,8 +59,7 @@ const html = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>InteRun — The Intelligent Training Companion</title>
 <meta name="description" content="InteRun — evidence-based running coach with live GPS sessions and voice coaching.">
-<meta name="theme-color" content="#eef1f1" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0a100e" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#0c2b28">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -4406,25 +4405,58 @@ function wireConnectView() {
 // One line that diagnoses letterboxing from a screenshot: if "page" is short of "screen", iOS is
 // boxing the web app inside system bands and no CSS in this file can reach them — the Home Screen
 // icon carries settings frozen at the moment it was added, and needs removing and re-adding.
-function viewportDiag() {
+// Every number needed to settle where the app actually sits, because the symptom (a band of dead
+// background above or below the app) looks identical whether the LAYOUT VIEWPORT is short \u2014 which no
+// CSS inside the page can fix \u2014 or the SHELL is short inside a correct viewport, which is ours.
+// The fixed-probe line is the one that separates them: a position:fixed inset:0 element always
+// covers the layout viewport exactly, so its height IS the viewport, whatever anything else claims.
+function viewportDiagLines() {
   try {
     const de = document.documentElement;
     const vv = window.visualViewport;
     const standalone = (navigator.standalone === true) || matchMedia("(display-mode: standalone)").matches;
-    return "screen " + screen.width + "\u00d7" + screen.height +
-      " \u00b7 page " + de.clientWidth + "\u00d7" + de.clientHeight +
-      " \u00b7 vv " + (vv ? Math.round(vv.width) + "\u00d7" + Math.round(vv.height) : "\u2014") +
-      " \u00b7 inset-b " + (getComputedStyle(de).getPropertyValue("--sab-probe") || probeSafeArea()) +
-      (standalone ? " \u00b7 standalone" : " \u00b7 browser");
-  } catch (e) { return "diag unavailable"; }
+    const os = navigator.userAgent.match(/OS (\\d+)[._](\\d+)/);
+    const ver = os ? os[1] + "." + os[2] : "?";
+
+    const probe = document.createElement("div");
+    probe.style.cssText = "position:fixed;inset:0;visibility:hidden;pointer-events:none";
+    document.body.appendChild(probe);
+    const pr = probe.getBoundingClientRect();
+    probe.remove();
+
+    const ins = probeInsets();
+    const rect = (sel) => {
+      const n = document.querySelector(sel);
+      if (!n) return sel + " absent";
+      const q = n.getBoundingClientRect();
+      return Math.round(q.top) + ".." + Math.round(q.bottom) + " h" + Math.round(q.height);
+    };
+    const vvh = de.style.getPropertyValue("--vvh") || "unset";
+
+    return [
+      "iOS " + ver + " \u00b7 " + (standalone ? "standalone" : "browser") + " \u00b7 dpr " + (window.devicePixelRatio || 1),
+      "screen " + screen.width + "\u00d7" + screen.height + " \u00b7 page " + de.clientWidth + "\u00d7" + de.clientHeight,
+      "inner " + window.innerWidth + "\u00d7" + window.innerHeight +
+        " \u00b7 vv " + (vv ? Math.round(vv.width) + "\u00d7" + Math.round(vv.height) + " @" + Math.round(vv.offsetTop) : "\u2014"),
+      "insets t" + ins.top + " r" + ins.right + " b" + ins.bottom + " l" + ins.left + " \u00b7 vvh " + vvh,
+      "fixed inset:0 \u2192 " + Math.round(pr.top) + ".." + Math.round(pr.bottom) + " h" + Math.round(pr.height),
+      "app " + rect(".app") + " \u00b7 bar " + rect(".topbar"),
+      "nav " + rect(".bottomnav"),
+    ];
+  } catch (e) { return ["diag unavailable"]; }
 }
-function probeSafeArea() {
-  const el = document.createElement("div");
-  el.style.cssText = "position:fixed;bottom:0;height:env(safe-area-inset-bottom,0px);width:0;visibility:hidden";
-  document.body.appendChild(el);
-  const h = Math.round(el.getBoundingClientRect().height) + "px";
-  el.remove();
-  return h;
+function viewportDiag() { return viewportDiagLines().join(" \u00b7 "); }
+function probeInsets() {
+  const one = (side) => {
+    const el = document.createElement("div");
+    el.style.cssText = "position:fixed;" + side + ":0;visibility:hidden;pointer-events:none;" +
+      "height:env(safe-area-inset-" + side + ",0px);width:env(safe-area-inset-" + side + ",0px)";
+    document.body.appendChild(el);
+    const q = el.getBoundingClientRect();
+    el.remove();
+    return Math.round(side === "top" || side === "bottom" ? q.height : q.width);
+  };
+  return { top: one("top"), right: one("right"), bottom: one("bottom"), left: one("left") };
 }
 // Reported by the native shell at document start; absent in the browser.
 function liveActivityStatus() {
@@ -6780,8 +6812,9 @@ function showWelcomeBack() {
     '</div></div>');
   document.body.appendChild(ov);
   ov.classList.add("on");   // opaque, directly under the fading splash — the logo holds; copy welIns
+  syncThemeColor();         // this overlay is dark and waits for a tap; the strip must be dark too
   let gone = false;
-  const dismiss = () => { if (gone) return; gone = true; ov.classList.add("hide"); setTimeout(() => { ov.remove(); if (state.tab === "today" && !state.screen) maybeAutoGuide(); }, 500); };
+  const dismiss = () => { if (gone) return; gone = true; ov.classList.add("hide"); syncThemeColor(); setTimeout(() => { ov.remove(); syncThemeColor(); if (state.tab === "today" && !state.screen) maybeAutoGuide(); }, 500); };
   // Stays up until the user taps "Let's go" — no auto-dismiss, no tap-away.
   const go = $("wbGo"); if (go) go.onclick = dismiss;
 }
@@ -7201,8 +7234,26 @@ $("bellBtn").innerHTML = ICON.bell; $("themeBtn").innerHTML = ICON.theme; $("cal
 // brand teal sitting above a near-white app — it reads as the app being pushed down behind a band,
 // not as a colour bug. Keep it equal to the background we are actually painting, and keep it in step
 // with a MANUAL theme change, which no media query can see.
+// The dark top of the splash/welcome radial gradient. Those two overlays are hardcoded dark in both
+// themes, so while either is up the strip must be dark too - pinning it to --bg put a near-WHITE
+// band above a near-BLACK screen at the exact moment the app is launched, which is worse than the
+// brand teal it replaced. Keep in step with the .splash/.welcome background.
+const SPLASH_CHROME = '#0c2b28';
+function chromeColor() {
+  // ⚠️ Check them ALL, not the first. The first-run #welcome sits in the markup permanently with
+  // display:none and precedes the welcome-back overlay that gets appended at runtime - so
+  // querySelector finds the hidden one, reads display:none, and the visible overlay is never seen.
+  const overs = document.querySelectorAll('.splash, .welcome');
+  for (let i = 0; i < overs.length; i++) {
+    const cs = getComputedStyle(overs[i]);
+    // .welcome is display:none until .on, and .hide fades it out - once it is on its way out the app
+    // behind it is what the strip should match, so switch early rather than late.
+    if (cs.display !== 'none' && parseFloat(cs.opacity) > 0.5) return SPLASH_CHROME;
+  }
+  return getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+}
 function syncThemeColor() {
-  const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+  const bg = chromeColor();
   if (!bg) return;
   const metas = document.querySelectorAll('meta[name="theme-color"]');
   // Collapse to one un-media'd tag: with several present the browser picks the first that matches,
@@ -7349,19 +7400,23 @@ try { if (NATIVE_WATCH) window.webkit.messageHandlers.interunWatch.postMessage({
 // for a returning user, straight to Today.
 (function () {
   const sp = $("splash"); if (!sp) return;
-  const removeSplash = () => { sp.classList.add("hide"); setTimeout(() => sp.remove(), 600); };
+  // ⚠️ Re-sync the status-bar strip at EVERY step of the handoff. iOS paints those 62pt itself and
+  // cannot be told to stop (WebKit bug 301994), so the only thing that hides it is matching whatever
+  // is on screen — and the launch sequence changes that twice in three seconds.
+  const removeSplash = () => { sp.classList.add("hide"); syncThemeColor(); setTimeout(() => { sp.remove(); syncThemeColor(); }, 600); };
   if (FIRST_RUN) {
     setTimeout(() => {
       removeSplash();
       const wel = $("welcome"); if (!wel) return;
       wel.classList.add("on");   // opaque, directly under the fading splash; its copy arrives via welIn
-      const go = () => { wel.classList.add("hide"); setTimeout(() => wel.remove(), 500); state.screen = "setup"; render(); };
+      syncThemeColor();
+      const go = () => { wel.classList.add("hide"); syncThemeColor(); setTimeout(() => { wel.remove(); syncThemeColor(); }, 500); state.screen = "setup"; render(); };
       const btn = $("welcomeGo"); if (btn) btn.onclick = go;
     }, 2000);
   } else {
     // Returning user: brand splash → a brief personalised welcome with a rotating quote → Today.
     let started = false;
-    const go = () => { if (started) return; started = true; removeSplash(); showWelcomeBack(); };
+    const go = () => { if (started) return; started = true; removeSplash(); showWelcomeBack(); syncThemeColor(); };
     sp.addEventListener("click", go);
     setTimeout(go, 2200);
   }
@@ -7397,10 +7452,11 @@ const manifest = {
   display: "standalone",
   orientation: "portrait",
   background_color: "#0a100e",
-  // Not the brand teal. iOS paints the status-bar strip above a Home Screen web app from this until
-  // the page loads and syncThemeColor() takes over, so a brand colour here shows as a coloured band
-  // above a near-white app. Light --bg, because that is what an install most often opens into.
-  theme_color: "#eef1f1",
+  // iOS paints the 62pt strip above a Home Screen web app from this until the page loads and
+  // syncThemeColor() takes over. The first thing drawn is the SPLASH, which is hardcoded dark in both
+  // themes - so this is the splash colour. A light value here (or the brand teal) puts a bright band
+  // above a near-black screen at the one moment every launch passes through.
+  theme_color: "#0c2b28",
   categories: ["health", "fitness", "sports"],
   icons: [
     { src: "icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },

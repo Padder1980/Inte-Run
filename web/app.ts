@@ -2444,6 +2444,12 @@ let WATCH_STATUS = null; // { paired, installed } - reported by the native bridg
 window.__interunWatch = { status: function (paired, installed) {
   WATCH_STATUS = { paired: !!paired, installed: !!installed };
   if (state.tab === "support" && state.support === "connect") render();
+  // ⚠️ "Where shall we record this?" is drawn BEFORE this answer arrives — openStartWhere asks for a
+  // fresh paired/installed status only after rendering, because it changes without the page knowing.
+  // The answer landing has to redraw that sheet, or "My Apple Watch" stays greyed out against a stale
+  // WATCH_STATUS until the runner closes the sheet and opens it again. That is exactly why it always
+  // worked "the second time": the first attempt's reply had arrived by then.
+  refreshStartWhere();
 } };
 // One session, in the shape the watch understands. Split out of watchPayloadForToday so the same
 // conversion serves both today's session and the week ahead — the watch needs the week so it can
@@ -5499,6 +5505,15 @@ function startWhereHtml(sess) {
         "recommended") +
       row("treadmill", ICON.treadmill, "Treadmill", "Indoors, timed by the clock. Add the distance from the machine when you finish.") +
     '</div>';
+}
+// Redraw the "Where shall we record this?" sheet in place, if that is the sheet currently open. Used
+// when the watch's paired/installed answer arrives after the sheet was already drawn. Identified by
+// .sw-list rather than a flag so it cannot get out of step with whatever else opens a sheet.
+function refreshStartWhere() {
+  const ov = $("sheetOv"), body = $("sheetBody");
+  if (!ov || !body || !ov.classList.contains("on") || !body.querySelector(".sw-list")) return;
+  body.innerHTML = startWhereHtml(START_CTX);
+  wireStartWhere();
 }
 function wireStartWhere() {
   document.querySelectorAll("[data-startwhere]").forEach((b) => b.onclick = () => {

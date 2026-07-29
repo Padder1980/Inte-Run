@@ -4489,6 +4489,17 @@ function viewportDiagLines() {
       "fixed inset:0 \u2192 " + Math.round(pr.top) + ".." + Math.round(pr.bottom) + " h" + Math.round(pr.height),
       "screenY " + (typeof window.screenY === "number" ? window.screenY : "?") +
         " \u00b7 outer " + window.outerWidth + "\u00d7" + window.outerHeight,
+      // \u26a0\ufe0f Plain English, because the state that decides everything here is INVISIBLE. iOS reads
+      // apple-mobile-web-app-status-bar-style ONCE, when the icon is added to the Home Screen, and
+      // never again \u2014 so shipping a change to it does nothing until the icon is re-added, which looks
+      // exactly like the fix having failed. With no viewport-fit=cover the safe-area insets are 0
+      // either way, so they cannot tell the two apart. screenY can: the viewport starts at the top of
+      // the screen under black-translucent, and below the status bar under default.
+      standalone
+        ? (window.screenY === 0
+            ? "launch chrome: EDGE-TO-EDGE (up to date)"
+            : "launch chrome: INSET \u2014 delete and re-add the Home Screen icon")
+        : "launch chrome: n/a in a browser tab",
       "app " + rect(".app") + " \u00b7 bar " + rect(".topbar"),
       "nav " + rect(".bottomnav"),
     ];

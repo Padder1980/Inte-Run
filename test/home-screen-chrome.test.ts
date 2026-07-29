@@ -38,6 +38,27 @@ function splashChrome(): string {
   return m![1]!.trim().toLowerCase();
 }
 
+test("the status bar style is not black-translucent", () => {
+  // MEASURED on the owner's 16 Pro Max, iOS 18.7, from the Home Screen:
+  //   SCREEN 440×956 · PAGE 440×894 · INSETS T62 B34 · FIXED INSET:0 → 0..894 · NAV 796..894
+  //
+  // The layout viewport was 894 tall anchored at 0..894 on a 956 screen, so 62pt of the screen
+  // BOTTOM was dead — while safe-area-inset-top still reported 62, so the top bar padded 62pt for a
+  // status bar that already overlapped it. The app was compensating at the top for space missing at
+  // the bottom, and APP 0..894 / NAV 796..894 show the CSS was doing exactly what it should: the
+  // shell filled the viewport and the nav sat on its bottom edge. The viewport was in the wrong place.
+  //
+  // With default, iOS puts the view BELOW the status bar (62..956) — same height, but it reaches the
+  // bottom edge and inset-top becomes 0, so the top bar stops double-padding.
+  const m = /<meta name="apple-mobile-web-app-status-bar-style" content="([^"]+)">/.exec(SOURCE);
+  assert.ok(m, "no apple-mobile-web-app-status-bar-style meta");
+  assert.notEqual(m![1], "black-translucent",
+    "black-translucent anchors the viewport at the top and strands 62pt at the bottom on iOS 18");
+  // viewport-fit=cover must stay: it is what still gives inset-bottom 34 for the home indicator,
+  // which the bottom nav pads for.
+  assert.match(SOURCE, /<meta name="viewport"[^>]*viewport-fit=cover/, "viewport-fit=cover was dropped");
+});
+
 test("the launch default is the splash colour, not a theme colour", () => {
   // Before any script runs, the strip is painted from the static meta and the installed manifest.
   // What is on screen at that instant is the splash — dark in both themes — so a light or brand

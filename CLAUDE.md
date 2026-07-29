@@ -421,20 +421,39 @@ wrong at launch (short, no corrective resize ever fires), and trusting it uncond
 whole shell short: nav floating above a dead strip. The layout viewport never shrinks for the iOS
 keyboard, so the delta IS the keyboard detector.
 
-⚠️ **iOS 26 no longer lets a Home Screen web app draw under the status bar, and `theme-color` is
-what paints the gap.** `apple-mobile-web-app-status-bar-style: black-translucent` no longer buys the
-full screen: measured on the owner's 16 Pro Max, **screen 956 but page 894**, with
-`env(safe-area-inset-top)` **0** and `inset-bottom` still 34 (so `viewport-fit=cover` is working —
-this is not a missing meta tag, and all four metas were already correct). iOS fills those 62pt from
-`theme-color`. This is **WebKit bug 301994**, not a missing meta tag — all four were already correct,
-and `inset-bottom` still reporting 34 proves `viewport-fit=cover` is honoured.
-**The strip cannot be removed.** No CSS inside the page can fill it: `.splash` is
-`position: fixed; inset: 0` and a direct child of `<body>`, and it still shows bands above and below.
-**The symptom does not look like a colour bug** — the app appears shunted down behind a band, which
-reads as "the app isn't positioning correctly", and **re-adding the Home Screen icon changes nothing**.
+⚠️ **`apple-mobile-web-app-status-bar-style` must be `default`, NOT `black-translucent`.** This was
+the "the Home Screen app isn't positioning correctly" bug, and it took five wrong fixes to find
+because it cannot be seen from a screenshot — the app looked almost right.
 
-So the only fix is to make the strip the same colour as **whatever is on screen underneath it**, which
-moves. Rules enforced by `test/home-screen-chrome.test.ts`:
+**Measured on the owner's 16 Pro Max, iOS 18.7, from the Home Screen** (Support › Your data prints
+all of this):
+```
+SCREEN 440×956 · PAGE 440×894 · INSETS T62 R0 B34 L0 · VVH UNSET
+FIXED INSET:0 → 0..894 H894 · APP 0..894 H894 · NAV 796..894 H98
+```
+With `black-translucent` the layout viewport was 894 tall **anchored at 0..894** on a 956 screen, so
+**62pt of the screen BOTTOM was dead** — while `safe-area-inset-top` still reported **62**, so the top
+bar padded 62pt for a status bar that already overlapped it. The app was compensating at the top for
+space that was missing at the bottom. Note `APP 0..894` and `NAV 796..894`: **the CSS was correct
+throughout** — the shell filled the viewport and the nav sat exactly on its bottom edge. The viewport
+itself was in the wrong place, which is why no amount of CSS work moved it.
+
+With `default`, iOS places the view **below** the status bar (62..956): the same 894 height, but it
+reaches the bottom edge, `inset-top` becomes 0 so the top bar stops double-padding, and the status-bar
+strip is system-painted from `theme-color`. Keep `viewport-fit=cover` — it is what still yields
+`inset-bottom: 34` for the home indicator. **No effect on the native app**: WKWebView ignores this meta
+and supplies real insets.
+
+⚠️ **Diagnose this with numbers, never by eye.** A dead band looks identical whether the viewport is
+short, the viewport is misplaced, or the shell is short inside a correct viewport — three different
+causes needing opposite fixes. The `FIXED INSET:0` line is the discriminator: a `position: fixed;
+inset: 0` element always covers the layout viewport exactly, so its rect **is** the viewport. Chasing
+this from screenshots produced three plausible, confidently-argued, wrong diagnoses in a row (a
+`dvh`-vs-page mismatch, a `theme-color` mismatch, and iOS 26's WebKit bug 301994 — which is real but
+applies to iOS 26, and this phone is on **18.7**; always read the OS version before trusting research).
+
+Because iOS paints that strip from `theme-color`, it must match **whatever is on screen underneath
+it**, which moves. Rules enforced by `test/home-screen-chrome.test.ts`:
 - ⚠️ **The static meta and the manifest `theme_color` are the SPLASH colour (`SPLASH_CHROME`), not a
   theme colour.** The first paint is always the splash, which is hardcoded near-black in BOTH themes.
   Pinning them to `--bg` fixed the teal band on Today and made launch *worse* — a near-WHITE band

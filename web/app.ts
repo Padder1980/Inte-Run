@@ -62,7 +62,15 @@ const html = `<!doctype html>
 <meta name="theme-color" content="#0c2b28">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- ⚠️ NOT black-translucent. Measured on the owner's 16 Pro Max, iOS 18.7, Home Screen:
+     screen 956 but the layout viewport 894, anchored at 0..894 - so 62pt of the screen BOTTOM was
+     dead, while safe-area-inset-top still reported 62 so the app padded its top bar for a status
+     bar that already overlapped it. Compensating at the top for space missing at the bottom.
+     With default, iOS places the view BELOW the status bar (62..956): same 894 height, but it now
+     reaches the bottom edge, inset-top becomes 0 so the top bar stops double-padding, and the
+     status-bar strip is painted from theme-color, which syncThemeColor() already keeps matched.
+     No effect in the native app - WKWebView ignores this meta and supplies real insets. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="InteRun">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">

@@ -56,7 +56,14 @@ const html = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<!-- ⚠️ NO viewport-fit=cover here, and that is deliberate. It was added on 2026-07-27 by a
+     NATIVE-APP commit ("unbury the app bar from the Dynamic Island") which needed real insets
+     in WKWebView - but docs/ is one page serving both, so the Home Screen PWA inherited it,
+     and cover + black-translucent is what gave the PWA a 894-tall viewport anchored at the top
+     with 62pt of the screen stranded below it. The native app adds cover for itself at runtime,
+     just below. Every env(safe-area-inset-*) in the CSS is calc(N + env(..., 0px)), so with no
+     insets they collapse to exactly the constants this app shipped with. -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>InteRun — The Intelligent Training Companion</title>
 <meta name="description" content="InteRun — evidence-based running coach with live GPS sessions and voice coaching.">
 <meta name="theme-color" content="#eef1f1" media="(prefers-color-scheme: light)">
@@ -77,7 +84,7 @@ const html = `<!doctype html>
      the strip is --bg for the whole session, and --splash-bg must start at --bg to match it.
      theme-color still matters for Android/Chrome and in-Safari, so it stays.
      No effect in the native app - WKWebView ignores this meta and supplies real insets. -->
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="InteRun">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -88,7 +95,10 @@ const html = `<!doctype html>
      paint would use the SYSTEM scheme, the strip would latch that colour, and a runner whose phone is
      light but who chose dark would get a light strip above a dark app for the entire session. Which
      is exactly what happened before this existed. Keep it inline, keep it here, keep it tiny. -->
-<script>try{var t=localStorage.getItem('interun_theme_v1');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<script>try{var t=localStorage.getItem('interun_theme_v1');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}
+// The native app is served over interun:// and DOES want viewport-fit=cover - WKWebView needs it
+// for env(safe-area-inset-*) to report anything. The Home Screen PWA must not have it.
+try{if(location.protocol==='interun:'){var v=document.querySelector('meta[name=viewport]');if(v)v.setAttribute('content','width=device-width, initial-scale=1, viewport-fit=cover');}}catch(e){}</script>
 <style>
 :root {
   color-scheme: light dark;

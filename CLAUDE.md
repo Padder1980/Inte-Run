@@ -421,9 +421,24 @@ wrong at launch (short, no corrective resize ever fires), and trusting it uncond
 whole shell short: nav floating above a dead strip. The layout viewport never shrinks for the iOS
 keyboard, so the delta IS the keyboard detector.
 
-⚠️ **`apple-mobile-web-app-status-bar-style` must be `default`, NOT `black-translucent`.** This was
-the "the Home Screen app isn't positioning correctly" bug, and it took five wrong fixes to find
-because it cannot be seen from a screenshot — the app looked almost right.
+⚠️ **THE ROOT CAUSE was `viewport-fit=cover` in the shared page, and it is now native-app-only.**
+This was the "the Home Screen app isn't positioning correctly" bug. It took five wrong fixes and a
+`git log -S` to find, because it cannot be seen from a screenshot — the app looked almost right.
+
+`6abb4d0` (2026-07-27, *"Background GPS, and unbury the app bar from the Dynamic Island"*) is a
+**native-app** commit. Its only chrome change to the shared page was adding `viewport-fit=cover`,
+which WKWebView needs for `env(safe-area-inset-*)` to report anything at all. But `docs/` is **one
+page serving the PWA and the native app**, so the Home Screen PWA inherited it — and
+`cover` + `black-translucent` is what gave the PWA a misplaced viewport.
+
+**So the static meta has no `viewport-fit=cover`, and the native app adds it for itself** in the
+inline `<head>` script, keyed on `location.protocol === 'interun:'`, before first paint. Every
+`env()` use in the CSS is `calc(N + env(..., 0px))`, so with no insets they collapse to exactly the
+constants the app shipped with — verified: `.topbar` padding-top back to `14px`. **The CSS never
+needed changing; only the meta did.**
+
+⚠️ **This is the trap to remember: `docs/` is one page for two platforms.** A change made for the
+native app lands on the PWA too. Check both before shipping anything in the `<head>`.
 
 **Measured on the owner's 16 Pro Max, iOS 18.7, from the Home Screen** (Support › Your data prints
 all of this):

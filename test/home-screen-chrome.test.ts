@@ -19,23 +19,35 @@ function tokenValue(theme: "light" | "dark", name: string): string {
   return v![1]!.trim().toLowerCase();
 }
 
-test("the status bar style is not black-translucent", () => {
-  // MEASURED with black-translucent:
-  //   SCREEN 440×956 · PAGE 440×894 · INSETS T62 B34 · SCREENY 0 · OUTER 440×956
-  // The window was the full screen but the layout viewport was 894 starting at screenY 0, so 62pt of
-  // the BOTTOM was dead — while inset-top reported 62, so the top bar padded for a status bar that
-  // already overlapped it. APP 0..894 and NAV 796..894 show the CSS was right the whole time: the
-  // shell filled the viewport and the nav sat on its bottom edge. The viewport was misplaced.
+test("the PWA gets the original chrome; only the native app opts into viewport-fit=cover", () => {
+  // ⚠️ THE REGRESSION, found by git archaeology after five rounds of treating its symptoms.
   //
-  // ⚠️ iOS SNAPSHOTS THIS META WHEN THE ICON IS ADDED TO THE HOME SCREEN. Changing it did nothing
-  // through five deploys; it only took effect after the icon was deleted and re-added. If this value
-  // is ever changed again, the app must be re-added before the change can be judged.
-  const m = /<meta name="apple-mobile-web-app-status-bar-style" content="([^"]+)">/.exec(SOURCE);
-  assert.ok(m, "no apple-mobile-web-app-status-bar-style meta");
-  assert.notEqual(m![1], "black-translucent",
-    "black-translucent strands 62pt at the bottom of the screen on iOS 18");
-  // viewport-fit=cover must stay: it is what gives inset-bottom 34 for the home indicator.
-  assert.match(SOURCE, /<meta name="viewport"[^>]*viewport-fit=cover/, "viewport-fit=cover was dropped");
+  // 6abb4d0 (2026-07-27, "Background GPS, and unbury the app bar from the Dynamic Island") is a
+  // NATIVE-APP commit. Its only chrome change to the shared page was adding viewport-fit=cover,
+  // which WKWebView needs for env(safe-area-inset-*) to report anything. But docs/ is one page
+  // serving both, so the Home Screen PWA inherited it — and cover + black-translucent gave the PWA
+  // a 894-tall viewport anchored at the top of a 956 screen, stranding 62pt below it:
+  //   SCREEN 440×956 · PAGE 440×894 · INSETS T62 B34 · SCREENY 0 · OUTER 440×956
+  // APP 0..894 and NAV 796..894 show the CSS was correct throughout. The viewport was misplaced.
+  //
+  // Every env() use in the CSS is calc(N + env(..., 0px)), so with no insets they collapse to exactly
+  // the constants the app shipped with before that commit. The CSS needs no change — only the meta.
+  const vp = /<meta name="viewport" content="([^"]+)">/.exec(SOURCE);
+  assert.ok(vp, "no viewport meta");
+  assert.ok(!/viewport-fit=cover/.test(vp![1]!),
+    "viewport-fit=cover is back in the STATIC meta — that is the regression; the native app adds it itself");
+
+  // The native app opts in for itself, before first paint, keyed on its custom scheme.
+  assert.match(SOURCE, /location\.protocol==='interun:'[\s\S]{0,200}viewport-fit=cover/,
+    "the native app must still add viewport-fit=cover — WKWebView needs it for real insets");
+
+  // ⚠️ iOS SNAPSHOTS THE STATUS-BAR STYLE WHEN THE ICON IS ADDED TO THE HOME SCREEN. Changing it did
+  // nothing across five deploys and only took effect once the icon was deleted and re-added. Any
+  // change here must be judged only after a fresh re-add.
+  const sb = /<meta name="apple-mobile-web-app-status-bar-style" content="([^"]+)">/.exec(SOURCE);
+  assert.ok(sb, "no apple-mobile-web-app-status-bar-style meta");
+  assert.equal(sb![1], "black-translucent",
+    "black-translucent is the original, and is what lets the splash reach both screen edges");
 });
 
 test("the strip is the APP background, never the splash colour", () => {

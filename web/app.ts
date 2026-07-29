@@ -4480,7 +4480,11 @@ function dataView() {
     '<div class="card"><div class="subhead" style="margin-top:0">This version</div>' +
     '<div class="bk-box"><div class="bk-val">' + (inNativeApp() ? "iPhone app" : "Web") + '</div>' +
     '<div class="bk-lab" style="margin-top:4px">Built ' + BUILD + ' UTC</div>' +
-    '<div class="bk-lab" style="margin-top:4px">' + esc(viewportDiag()) + '</div></div>' +
+    // One line each, monospace: this has to be legible in a single screenshot, because the symptom
+    // it exists to settle (a band of dead background) looks identical from several different causes.
+    viewportDiagLines().map((l) =>
+      '<div class="bk-lab num" style="margin-top:3px;font-size:11px;line-height:1.35">' + esc(l) + '</div>'
+    ).join("") + '</div>' +
     '<div class="bk-md" style="margin-top:8px">' + (inNativeApp()
       ? "The app carries its own copy of InteRun, built when the app was built \u2014 it doesn\u2019t update over the internet. A newer web version won\u2019t appear here until the app itself is rebuilt."
       : "Added to your Home Screen? It caches a copy. If an update seems missing, close it fully (swipe it away from the app switcher) and reopen \u2014 twice if needed.") + '</div></div>' +

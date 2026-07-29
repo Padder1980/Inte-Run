@@ -84,45 +84,30 @@ struct WorkoutView: View {
 
     // MARK: - Metrics
 
+    /// Layout lives in `MetricsPage`, which takes plain strings — see that file for why. This just
+    /// maps the live workout onto it, still in the runner's own chosen metric order.
     private var metrics: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Paused is a state you must never have to guess at.
-            if workout.phase == .paused {
-                Text("PAUSED")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Brand.ease)
-                    .padding(.bottom, 1)
-            }
-            // Whatever the runner chose in Settings, in their order. The first is the big one.
-            ForEach(Array(settings.metrics.enumerated()), id: \.element) { i, m in
+        MetricsPage(
+            status: workout.phase == .paused ? ("Paused", Brand.ease) : nil,
+            rows: settings.metrics.map { m in
                 let v = workout.value(for: m)
-                metric(v.value, m.caption, size: i == 0 ? 34 : 25, unit: v.unit,
-                       tint: i == 0 ? (workout.phase == .paused ? Brand.ease : Brand.accent) : Brand.ink)
-            }
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.bottom, 10)   // clear of the page dots
+                return MetricsPage.Row(value: v.value, unit: v.unit, label: m.caption)
+            },
+            stepProgress: stepProgress,
+            stepLabel: workout.steps.indices.contains(workout.stepIndex)
+                ? workout.steps[workout.stepIndex].label : nil
+        )
     }
 
-    /// One number, its unit and its label on a single line: value left, label right. Reading down
-    /// the left edge gives you the figures; the labels are there for the glance that needs them.
-    private func metric(_ value: String, _ label: String, size: CGFloat, unit: String? = nil, tint: Color) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 3) {
-            Text(value)
-                .font(.system(size: size, weight: .medium, design: .rounded))
-                .monospacedDigit()
-                .minimumScaleFactor(0.7)
-                .lineLimit(1)
-                .foregroundStyle(tint)
-            if let unit {
-                Text(unit).font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 4)
-            Text(label)
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(.secondary)
-        }
+    /// How far through the current step, via `PlannedStep.progress` rather than a second copy of the
+    /// same arithmetic — it already knows that a step is gated by seconds or by metres, and returns
+    /// nil for one with no defined end (a free run, or "run by feel"). Nil hides the bar entirely,
+    /// which is right: a bar pinned at zero for a whole run looks broken.
+    private var stepProgress: Double? {
+        guard workout.steps.indices.contains(workout.stepIndex) else { return nil }
+        return workout.steps[workout.stepIndex].progress(
+            elapsed: workout.elapsed - workout.stepStartElapsed,
+            metresDone: workout.distanceMetres - workout.stepStartMetres)
     }
 
     /// Metres while they are still small enough to be meaningful, kilometres after that.

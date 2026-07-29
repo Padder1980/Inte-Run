@@ -10,10 +10,25 @@ struct InteRunWatchApp: App {
 
     var body: some Scene {
         WindowGroup {
-            TodayView(autoStart: launch.pending)
-                .environmentObject(store)
-                .onAppear { delegate.launch = launch }
+            #if DEBUG
+            // A run screen can only be reached with a real workout, GPS and a plan, and simctl cannot
+            // tap a watch simulator — so a DEBUG launch argument renders one directly. See WatchPreview.
+            if let scene = WatchPreview.requested {
+                WatchPreview.view(scene)
+                    .background(Brand.bg.ignoresSafeArea())
+            } else {
+                root
+            }
+            #else
+            root
+            #endif
         }
+    }
+
+    private var root: some View {
+        TodayView(autoStart: launch.pending)
+            .environmentObject(store)
+            .onAppear { delegate.launch = launch }
     }
 }
 

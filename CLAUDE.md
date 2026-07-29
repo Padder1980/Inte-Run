@@ -166,6 +166,16 @@ Dismiss the welcome with `#wbGo`; a profile is seeded via `localStorage rc_profi
 - Work on **`main`**; pull before starting.
 - **Don't change the workout engine's logic** (the `src/` engine + its tests) for a visual task. Add
   focused tests for any new logic.
+- ⚠️ **Never assign `PLAN` from an `applyProfile()` result by hand — call `adoptPlan(out)`.** Setting
+  the globals is not the whole job: `normalizeWeekStarts()` snaps each week back to its Monday, and
+  `syncNativeReminders()` + `syncWatch()` re-send a plan the OS and the watch already hold. The Save
+  handler open-coded the assignment and skipped all three, so a fresh plan's pro-rata first week kept
+  its mid-week `startIso`, `computeToday()` matched today at day index **0** — Monday — and Today
+  offered Monday's session until the app was restarted (the restart re-ran `recompute()` and hid it).
+  Meanwhile iOS was still holding reminders for the old schedule. One helper, one call site pattern.
+- ⚠️ **Anything that measures or scrolls a rendered screen belongs in `wire()`, not `buildNav()`.**
+  `buildNav()` runs **once**, at boot, when no screen exists yet — `$("chart")` is `null` there. The
+  plan chart's centre-on-the-selected-week code sat in it for a while and therefore never ran once.
 - Verify before shipping: build + typecheck + tests + light/dark screenshots.
 - **Never measure a DOM element inside a bottom sheet before the sheet is shown** — it measures 0,
   and a fallback constant silently poisons every calculation downstream (this caused the avatar
@@ -551,27 +561,43 @@ breaking it would silently return an off-centre crop rather than an obvious erro
   fires. The reminders-sheet copy adapts to the platform so it never overpromises on the web.
 - Full detail, including the known gaps, is in **`ios/README.md`** — read it before touching `ios/`.
 
-### Toolchain on this Mac (verified 2026-07-27)
+### Toolchain on this Mac (re-verified 2026-07-29 — this section changed, don't work from memory)
 
-- **Two Xcodes are installed.** Use the release one to ship:
-  - `/Applications/Xcode.app` — **26.6 release**. The only one App Store Connect accepts builds from.
-  - `/Applications/Xcode-beta.app` — **27.0 beta**. Fine for development, **cannot submit**.
-- `xcode-select` points at the release Xcode, but **its licence must be accepted once**
-  (`sudo xcodebuild -license accept`, needs the owner's password). Until it is, every `xcrun`-shimmed
-  tool refuses to run — **including `git`**, which is a confusing way to discover the problem.
-- Claude can always sidestep a wrong/unaccepted active toolchain without sudo:
-  **`export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`**.
-- Build + inspect:
+- **Two Xcodes are installed.** Use the release one for everything:
+  - `/Applications/Xcode.app` — **26.6 release**. `xcode-select` points here, and it is the only one
+    App Store Connect accepts builds from.
+  - `/Applications/Xcode-beta.app` — **27.0 beta**. Still on disk but **it has no simulator runtimes
+    any more** (see below), so it cannot run anything. Treat it as inert.
+- **The licence is accepted.** `xcodebuild -version` runs clean — no `sudo xcodebuild -license accept`
+  needed. (It genuinely wasn't accepted on 2026-07-27, and until it is, every `xcrun`-shimmed tool
+  refuses to run **including `git`**, which is a baffling way to meet the problem. If that ever
+  returns, that's why.)
+- ⚠️ **Do NOT `export DEVELOPER_DIR=/Applications/Xcode-beta.app/...`.** That used to be the way round
+  an unaccepted licence, and it is now actively broken: the beta's runtimes were deleted, so a build
+  through it fails with no simulator to target. Just use the default toolchain.
+- Build + inspect — note `-destination`, never `-sdk` (the watch section below explains why `-sdk`
+  breaks this project specifically):
   ```bash
-  node web/app.ts && DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
-    xcodebuild -project ios/InteRun.xcodeproj -scheme InteRun -sdk iphonesimulator build
+  node web/app.ts && xcodebuild -project ios/InteRun.xcodeproj -scheme InteRun \
+    -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
   ```
-- Simulator runtimes ship **separately from Xcode** and neither Xcode bundles one. watchOS 27 (3.6 GB)
-  is installed; **iOS is not** — it is an 8 GB download whose install step needs root, so
-  `xcodebuild -downloadPlatform iOS` exits 0 without installing anything when run unprivileged.
-  Get it with `sudo xcodebuild -downloadPlatform iOS`, or Xcode → Settings → Components.
+- Simulator runtimes ship **separately from Xcode** and neither Xcode bundles one. Installed now:
+  **iOS 26.5 (16 GB)** and **watchOS 26.5 (8.1 GB)**, which are the pair Xcode 26.6 uses. The iOS 27.0
+  and watchOS 27.0 pair was **deleted on 2026-07-29 to reclaim 24 GB** — re-download only if you
+  actually need the beta. They live in `/Library/Developer/CoreSimulator/Volumes`, not in `~`.
+  A runtime install step needs root, so `xcodebuild -downloadPlatform iOS` exits 0 without installing
+  anything when run unprivileged. Use `sudo xcodebuild -downloadPlatform iOS`, or Xcode → Settings →
+  Components.
+- Simulator **devices** were all deleted in the same clear-out and two were recreated: an
+  **iPhone 17 Pro** (iOS 26.5) and an **Apple Watch Series 11 (46mm)** (watchOS 26.5), **paired** —
+  which is what the embedded watch app needs. `xcrun simctl list devices` if in doubt; recreate with
+  `xcrun simctl create` + `xcrun simctl pair`.
 - ⚠️ Installing an Xcode **silently repoints `xcode-select` system-wide**. If shell tools suddenly
   start failing with a licence error, that is why.
+- **Disk:** the project itself is only ~240 MB; the space goes on Xcode caches. `DerivedData`,
+  `~/Library/Developer/Xcode/iOS DeviceSupport` and `xcrun simctl delete all` are all safe to clear
+  and rebuild themselves. Don't move the repo to a network drive to save space — it isn't where the
+  space went, and git and Xcode both misbehave over SMB.
 
 ⚠️ **`WatchBridge` is `WatchBridge.shared`, built at app launch — never tie it to the web view.**
 It used to be created in `WebHost.makeUIView`, so the WCSession delegate only existed while the page

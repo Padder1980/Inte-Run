@@ -59,7 +59,7 @@ const html = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>InteRun — The Intelligent Training Companion</title>
 <meta name="description" content="InteRun — evidence-based running coach with live GPS sessions and voice coaching.">
-<meta name="theme-color" content="#0e8c7f" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#eef1f1" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0a100e" media="(prefers-color-scheme: dark)">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -104,11 +104,15 @@ html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.5; -webkit-font-smoothing: antialiased; }
 .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
-/* --vvh is the visual viewport's height, set from JS. dvh tracks the LAYOUT viewport, which the
-   iOS keyboard does not change — so with plain 100dvh the shell stayed full-screen with a third of
-   it behind the keyboard, #view had zero scroll room, and the focus handler had nothing to scroll.
-   iOS then panned the visual viewport instead, which is exactly the bars-sliding-away bug. */
-.app { max-width: 440px; height: var(--vvh, 100dvh); margin: 0 auto; background: var(--bg); display: flex; flex-direction: column; position: relative; box-shadow: 0 0 60px rgba(0,0,0,.06); }
+/* ⚠️ height: 100% — NOT 100dvh — as the resting height.
+   100% chains html to body to the real layout viewport, so the shell is exactly as tall as the page
+   it is in, whatever that page is. dvh does not: in a Home Screen web app iOS hands the page a
+   viewport SHORTER than the screen (measured on a 16 Pro Max: screen 956, page 894) while dvh
+   still resolved against the larger box — so the shell was 62pt taller than its own page, the
+   sticky bottom nav was pushed past the fold, and a band of background sat where the nav should be.
+   The native app never showed it because there its viewport IS the screen and the two agreed.
+   --vvh still overrides both when a keyboard is up; see the publisher near the launch IIFE. */
+.app { max-width: 440px; height: var(--vvh, 100%); margin: 0 auto; background: var(--bg); display: flex; flex-direction: column; position: relative; box-shadow: 0 0 60px rgba(0,0,0,.06); }
 .topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: calc(14px + env(safe-area-inset-top)) 16px 14px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
 .topbar .title { font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
 .iconbtn { position: relative; overflow: hidden; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft); display: flex; align-items: center; justify-content: center; cursor: pointer; }
@@ -120,7 +124,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
    splash fades out and the welcome fades in at the same instant, the two identical
    logos overlap exactly — the brand mark appears to hold perfectly still while only
    the text and background crossfade around it (a continuous-logo transition). */
-.splash, .welcome { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: clamp(84px, 24dvh, 176px) 32px 40px; text-align: center; background: radial-gradient(125% 90% at 50% 0%, #0c2b28 0%, #06110f 56%, #000 100%); }
+.splash, .welcome { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: clamp(84px, 24vh, 176px) 32px 40px; text-align: center; background: radial-gradient(125% 90% at 50% 0%, #0c2b28 0%, #06110f 56%, #000 100%); }
 .splash { z-index: 100; gap: 20px; opacity: 1; transition: opacity .55s ease; }
 .splash.hide { opacity: 0; pointer-events: none; }
 /* Mark + name + tagline all fade in together (same 0 delay), a touch slower, as one unit. */
@@ -213,7 +217,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 /* Session detail sheet */
 .sheet-ov { position: fixed; inset: 0; z-index: 70; display: none; align-items: flex-end; justify-content: center; background: color-mix(in srgb, var(--ink) 52%, transparent); backdrop-filter: blur(3px); }
 .sheet-ov.on { display: flex; }
-.sheet { position: relative; width: 100%; max-width: 440px; max-height: 88dvh; overflow-y: auto; background: var(--surface); border-radius: 22px 22px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,.25); padding: 22px 18px calc(26px + env(safe-area-inset-bottom)); animation: sheetUp .28s cubic-bezier(.2,.8,.3,1) both; }
+.sheet { position: relative; width: 100%; max-width: 440px; max-height: 88%; overflow-y: auto; background: var(--surface); border-radius: 22px 22px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,.25); padding: 22px 18px calc(26px + env(safe-area-inset-bottom)); animation: sheetUp .28s cubic-bezier(.2,.8,.3,1) both; }
 @keyframes sheetUp { from { transform: translateY(28px); opacity: .5; } to { transform: none; opacity: 1; } }
 .sheet-x { position: absolute; top: 14px; right: 14px; display: flex; align-items: center; justify-content: center; background: var(--surface-2); border: 1px solid var(--line); border-radius: 50%; width: 30px; height: 30px; font-size: 14px; color: var(--ink-soft); cursor: pointer; }
 .sd-type { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--sc, var(--accent)); }
@@ -7190,9 +7194,30 @@ function buildNav() {
   document.querySelectorAll(".navbtn").forEach((b) => b.onclick = () => { if (!liveRunning()) { coachStop(); stopLive(); stopSpeech(); } stopTrialRun(); TRIALRUN = null; state.screen = null; state.tab = b.dataset.tab; if (b.dataset.tab !== "support") state.support = null; if (b.dataset.tab === "today") { state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; } render(); });
 }
 $("bellBtn").innerHTML = ICON.bell; $("themeBtn").innerHTML = ICON.theme; $("calBtn").innerHTML = ICON.cal; $("alfieBtn").innerHTML = ICON.alfie; renderAvatar();
+// The strip above a Home Screen web app is painted by iOS, not by us. Since iOS 26 a standalone
+// web app is no longer given the space under the status bar, so apple-mobile-web-app-status-bar-style
+// black-translucent no longer buys the full screen: measured on a 16 Pro Max, screen 956 but page 894,
+// with safe-area-inset-top 0. The system fills those missing 62pt from theme-color, which was the
+// brand teal sitting above a near-white app — it reads as the app being pushed down behind a band,
+// not as a colour bug. Keep it equal to the background we are actually painting, and keep it in step
+// with a MANUAL theme change, which no media query can see.
+function syncThemeColor() {
+  const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+  if (!bg) return;
+  const metas = document.querySelectorAll('meta[name="theme-color"]');
+  // Collapse to one un-media'd tag: with several present the browser picks the first that matches,
+  // so leaving the media pair in place would let them outvote this one.
+  for (let i = metas.length - 1; i >= 1; i--) metas[i].remove();
+  let m = metas[0];
+  if (!m) { m = document.createElement('meta'); m.setAttribute('name', 'theme-color'); document.head.appendChild(m); }
+  m.removeAttribute('media');
+  m.setAttribute('content', bg);
+}
+try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncThemeColor); } catch (e) {}
+syncThemeColor();
 $("alfieBtn").onclick = openAlfie;
 ALFIE_MSGS = alfieLoadMsgs();
-$("themeBtn").onclick = () => { const cur = document.documentElement.getAttribute("data-theme"); document.documentElement.setAttribute("data-theme", cur === "dark" ? "light" : cur === "light" ? "dark" : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark")); };
+$("themeBtn").onclick = () => { const cur = document.documentElement.getAttribute("data-theme"); document.documentElement.setAttribute("data-theme", cur === "dark" ? "light" : cur === "light" ? "dark" : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark")); syncThemeColor(); };
 $("profileBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); state.screen = "setup"; render(); };
 $("calBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); state.screen = "calendar"; render(); };
 $("bellBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); openRemindersSheet(); };
@@ -7348,7 +7373,10 @@ const manifest = {
   display: "standalone",
   orientation: "portrait",
   background_color: "#0a100e",
-  theme_color: "#0e8c7f",
+  // Not the brand teal. iOS paints the status-bar strip above a Home Screen web app from this until
+  // the page loads and syncThemeColor() takes over, so a brand colour here shows as a coloured band
+  // above a near-white app. Light --bg, because that is what an install most often opens into.
+  theme_color: "#eef1f1",
   categories: ["health", "fitness", "sports"],
   icons: [
     { src: "icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },

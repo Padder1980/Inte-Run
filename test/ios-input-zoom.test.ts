@@ -71,10 +71,20 @@ test("the blanket input rule exists, but is not relied on alone", () => {
   );
 });
 
-test("the shell tracks the visual viewport, so a keyboard leaves scroll room", () => {
-  // With plain 100dvh the shell stays full height behind the keyboard, #view gets zero scroll room,
-  // and iOS pans the visual viewport instead — sliding the top bar and bottom nav off screen.
-  assert.ok(/\.app \{[^}]*height: var\(--vvh, 100dvh\)/.test(STYLE), ".app no longer uses --vvh");
+test("the shell sizes to its own PAGE, and still yields to a keyboard", () => {
+  // Two separate requirements, both learned the hard way.
+  //
+  // 1. The resting height must be 100%, not 100dvh. 100% chains html → body → the real layout
+  //    viewport, so the shell is exactly as tall as the page it is in. dvh does not: a Home Screen
+  //    web app is handed a viewport SHORTER than the screen (measured on a 16 Pro Max: screen 956,
+  //    page 894), dvh resolved against the bigger box, and the sticky bottom nav was pushed past
+  //    the fold with a band of background where it should have been.
+  // 2. --vvh must still override it, or the iOS keyboard covers the bottom third with no scroll
+  //    room and iOS pans the whole viewport instead — bars and all.
+  assert.ok(/\.app \{[^}]*height: var\(--vvh, 100%\)/.test(STYLE),
+    ".app must rest at 100% (its own page) with --vvh as the keyboard override");
+  assert.ok(!/\.app \{[^}]*100dvh/.test(STYLE),
+    ".app must not size on dvh — it measures the screen, not the page it was given");
   assert.ok(/setProperty\("--vvh"/.test(SOURCE), "nothing publishes --vvh from visualViewport");
 });
 

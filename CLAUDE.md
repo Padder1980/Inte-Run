@@ -407,7 +407,9 @@ existing web UI, so there is still **one UI to design** (`web/app.ts`). Decided 
   is untouched and still behaves normally in a browser. Fixes are **buffered and replayed in order** —
   iOS can suspend the web content process even while the app lives on the location background mode,
   and distance accumulates incrementally, so a replayed backlog gives the same total.
-- ⚠️ **`.app` is `height: var(--vvh, 100dvh)`, not plain `100dvh`.** `dvh` tracks the LAYOUT viewport,
+- ⚠️ **`.app` is `height: var(--vvh, 100%)`, not `100dvh`.** `100%` chains html → body → the real
+layout viewport, so the shell is exactly as tall as the page it was given, whatever that page is.
+- ⚠️ **`.app` uses `--vvh` as the keyboard override.** `dvh` tracks the LAYOUT viewport,
 which the iOS keyboard does not change — so the shell stayed full-screen with a third of it behind
 the keyboard, `#view` had zero scroll room, and the focus handler had nothing to scroll. iOS then
 panned the visual viewport instead, sliding both bars off screen. A listener publishes
@@ -419,8 +421,25 @@ wrong at launch (short, no corrective resize ever fires), and trusting it uncond
 whole shell short: nav floating above a dead strip. The layout viewport never shrinks for the iOS
 keyboard, so the delta IS the keyboard detector.
 
+⚠️ **iOS 26 no longer lets a Home Screen web app draw under the status bar, and `theme-color` is
+what paints the gap.** `apple-mobile-web-app-status-bar-style: black-translucent` no longer buys the
+full screen: measured on the owner's 16 Pro Max, **screen 956 but page 894**, with
+`env(safe-area-inset-top)` **0** and `inset-bottom` still 34 (so `viewport-fit=cover` is working —
+this is not a missing meta tag, and all four metas were already correct). iOS fills those 62pt from
+`theme-color`, which was the brand teal `--accent` sitting above a near-white app.
+**The symptom does not look like a colour bug** — the app appears shunted down behind a coloured
+band, which reads as "the app isn't positioning correctly", and **re-adding the Home Screen icon
+changes nothing** because the fresh install re-reads the same value. Rules now enforced by
+`test/home-screen-chrome.test.ts`:
+- Each `theme-color` meta must equal that scheme's `--bg`, and the manifest's `theme_color` (the
+  pre-paint fallback iOS caches at install) must be the light `--bg`, never `--accent`.
+- The media-query metas see the SYSTEM scheme only. The app's own theme button is invisible to them,
+  so `syncThemeColor()` collapses them to **one un-media'd meta** set from the computed `--bg`, and
+  is called at startup, from the theme button, and on a `prefers-color-scheme` change. With several
+  metas present the browser takes the first that matches, so the pair would outvote the live one.
+
 ⚠️ **The app shell owns the viewport; the document must never scroll.** `html, body` are
-`overflow: hidden`, `.app` is `height: 100dvh` (not `min-height`), and `.view` carries
+`overflow: hidden`, `.app` is `height: var(--vvh, 100%)` (not `min-height`), and `.view` carries
 **`min-height: 0`** — that last one is load-bearing. A flex item defaults to `min-height: auto` and
 refuses to shrink below its content, so `flex: 1; overflow-y: auto` silently did nothing: `.view`
 grew to full content height and the PAGE scrolled instead. Two symptoms followed, and neither looked

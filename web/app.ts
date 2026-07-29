@@ -59,7 +59,8 @@ const html = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>InteRun — The Intelligent Training Companion</title>
 <meta name="description" content="InteRun — evidence-based running coach with live GPS sessions and voice coaching.">
-<meta name="theme-color" content="#0c2b28">
+<meta name="theme-color" content="#eef1f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a100e" media="(prefers-color-scheme: dark)">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <!-- ⚠️ NOT black-translucent. Measured on the owner's 16 Pro Max, iOS 18.7, Home Screen:
@@ -7253,22 +7254,11 @@ $("bellBtn").innerHTML = ICON.bell; $("themeBtn").innerHTML = ICON.theme; $("cal
 // brand teal sitting above a near-white app — it reads as the app being pushed down behind a band,
 // not as a colour bug. Keep it equal to the background we are actually painting, and keep it in step
 // with a MANUAL theme change, which no media query can see.
-// The dark top of the splash/welcome radial gradient. Those two overlays are hardcoded dark in both
-// themes, so while either is up the strip must be dark too - pinning it to --bg put a near-WHITE
-// band above a near-BLACK screen at the exact moment the app is launched, which is worse than the
-// brand teal it replaced. Keep in step with the .splash/.welcome background.
-const SPLASH_CHROME = '#0c2b28';
+// ⚠️ ALWAYS the app background — never the splash colour, however wrong the splash looks for its
+// two seconds. MEASURED on iOS 18.7: with status-bar-style "default" the strip is fixed at launch
+// and never re-read. Setting it to the splash colour matched the splash and then left a dark strip
+// above the light app for the WHOLE SESSION. A two-second mismatch beats a permanent one.
 function chromeColor() {
-  // ⚠️ Check them ALL, not the first. The first-run #welcome sits in the markup permanently with
-  // display:none and precedes the welcome-back overlay that gets appended at runtime - so
-  // querySelector finds the hidden one, reads display:none, and the visible overlay is never seen.
-  const overs = document.querySelectorAll('.splash, .welcome');
-  for (let i = 0; i < overs.length; i++) {
-    const cs = getComputedStyle(overs[i]);
-    // .welcome is display:none until .on, and .hide fades it out - once it is on its way out the app
-    // behind it is what the strip should match, so switch early rather than late.
-    if (cs.display !== 'none' && parseFloat(cs.opacity) > 0.5) return SPLASH_CHROME;
-  }
   return getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
 }
 function syncThemeColor() {
@@ -7282,16 +7272,6 @@ function syncThemeColor() {
   if (!m) { m = document.createElement('meta'); m.setAttribute('name', 'theme-color'); document.head.appendChild(m); }
   m.removeAttribute('media');
   m.setAttribute('content', bg);
-  // ⚠️ With apple-mobile-web-app-status-bar-style "default", iOS does NOT appear to use theme-color
-  // for the strip. Measured on iOS 18.7 with the meta set to the dark #0c2b28: the strip still came
-  // out near-WHITE above the near-black splash — the colour of the page background, not the meta.
-  // So set the page background too. Below the splash this is a no-op (body is already --bg and the
-  // .app shell paints over it); while the splash is up it is the only thing that can darken the
-  // strip. Setting both costs nothing and does not depend on which one iOS actually reads.
-  try {
-    document.body.style.backgroundColor = bg;
-    document.documentElement.style.backgroundColor = bg;
-  } catch (e) {}
 }
 try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncThemeColor); } catch (e) {}
 syncThemeColor();
@@ -7489,11 +7469,9 @@ const manifest = {
   display: "standalone",
   orientation: "portrait",
   background_color: "#0a100e",
-  // iOS paints the 62pt strip above a Home Screen web app from this until the page loads and
-  // syncThemeColor() takes over. The first thing drawn is the SPLASH, which is hardcoded dark in both
-  // themes - so this is the splash colour. A light value here (or the brand teal) puts a bright band
-  // above a near-black screen at the one moment every launch passes through.
-  theme_color: "#0c2b28",
+  // Snapshotted by iOS when the icon is added and never re-read, so it cannot follow the theme.
+  // Light --bg is the common case; the per-scheme meta tags cover the rest where iOS honours them.
+  theme_color: "#eef1f1",
   categories: ["health", "fitness", "sports"],
   icons: [
     { src: "icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },

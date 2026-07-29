@@ -7282,6 +7282,16 @@ function syncThemeColor() {
   if (!m) { m = document.createElement('meta'); m.setAttribute('name', 'theme-color'); document.head.appendChild(m); }
   m.removeAttribute('media');
   m.setAttribute('content', bg);
+  // ⚠️ With apple-mobile-web-app-status-bar-style "default", iOS does NOT appear to use theme-color
+  // for the strip. Measured on iOS 18.7 with the meta set to the dark #0c2b28: the strip still came
+  // out near-WHITE above the near-black splash — the colour of the page background, not the meta.
+  // So set the page background too. Below the splash this is a no-op (body is already --bg and the
+  // .app shell paints over it); while the splash is up it is the only thing that can darken the
+  // strip. Setting both costs nothing and does not depend on which one iOS actually reads.
+  try {
+    document.body.style.backgroundColor = bg;
+    document.documentElement.style.backgroundColor = bg;
+  } catch (e) {}
 }
 try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncThemeColor); } catch (e) {}
 syncThemeColor();

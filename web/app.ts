@@ -68,8 +68,14 @@ const html = `<!doctype html>
      dead, while safe-area-inset-top still reported 62 so the app padded its top bar for a status
      bar that already overlapped it. Compensating at the top for space missing at the bottom.
      With default, iOS places the view BELOW the status bar (62..956): same 894 height, but it now
-     reaches the bottom edge, inset-top becomes 0 so the top bar stops double-padding, and the
-     status-bar strip is painted from theme-color, which syncThemeColor() already keeps matched.
+     reaches the bottom edge and inset-top becomes 0, so the top bar stops double-padding.
+     ⚠️ iOS SNAPSHOTS THIS META AT ADD-TO-HOME-SCREEN. Changing it did nothing across five deploys
+     and only took effect once the icon was deleted and re-added. If it ever changes again, the app
+     must be re-added before the change can be judged.
+     ⚠️ The strip iOS paints in those 62pt comes from the CANVAS BACKGROUND (html/body), latched at
+     first paint and never re-read - NOT from theme-color, which was assumed here and is wrong. So
+     the strip is --bg for the whole session, and --splash-bg must start at --bg to match it.
+     theme-color still matters for Android/Chrome and in-Safari, so it stays.
      No effect in the native app - WKWebView ignores this meta and supplies real insets. -->
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="InteRun">
@@ -86,8 +92,10 @@ const html = `<!doctype html>
   --ready: #4b9e2f; --steady: #2b9eb3; --ease: #d98a2a; --rest: #c0442e;
   --eff-easy: #3fa47a; --eff-moderate: #d99a2b; --eff-hard: #d65b36; --eff-none: #9aa8a1;
   --shadow: 0 1px 2px rgba(20,32,27,.05), 0 6px 18px rgba(20,32,27,.06);
-  /* Launch screen. The status strip iOS paints above a Home Screen web app is locked to --bg
-     for the whole session, so the splash top stop IS --bg - that join is the whole point. */
+  /* Launch screen. ⚠️ THE TOP STOP OF --splash-bg MUST EQUAL THAT THEME'S --bg, in BOTH themes.
+     iOS paints the strip above a Home Screen web app from the CANVAS background, latched at
+     first paint, so the strip is --bg all session - and the splash is what sits under it at
+     launch. Any difference is a visible 62pt band. Asserted by home-screen-chrome.test.ts. */
   --splash-bg: radial-gradient(125% 90% at 50% 0%, #eef1f1 0%, #e4edeb 52%, #d6e3e0 100%);
   --splash-ink: #14201b; --splash-soft: #5b6b64; --splash-brand: #0e8c7f;
   --splash-glow: rgba(14,140,127,.22);
@@ -103,13 +111,13 @@ const html = `<!doctype html>
     --ready: #6bbf46; --steady: #3ab0c4; --ease: #eb9748; --rest: #e8765c;
     --eff-easy: #4cb98a; --eff-moderate: #e6ac3e; --eff-hard: #e56f49; --eff-none: #6f7d76;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 22px rgba(0,0,0,.4);
-    --splash-bg: radial-gradient(125% 90% at 50% 0%, #0c2b28 0%, #06110f 56%, #000 100%);
+    --splash-bg: radial-gradient(125% 90% at 50% 0%, #0a100e 0%, #0c2b28 12%, #06110f 56%, #000 100%);
     --splash-ink: #ffffff; --splash-soft: #9aa3a0; --splash-brand: #16b7a4;
     --splash-glow: rgba(22,183,164,.38);
   }
 }
 :root[data-theme="light"] { color-scheme: light; --bg:#eef1f1; --surface:#fff; --surface-2:#f6f8f8; --line:#dbe1e0; --ink:#14201b; --ink-soft:#4c5b55; --ink-faint:#7a877f; --accent:#0e8c7f; --accent-ink:#fff; --base:#2b9eb3; --build:#5fa83c; --peak:#e0863a; --taper:#7a6fd0; --ready:#4b9e2f; --steady:#2b9eb3; --ease:#d98a2a; --rest:#c0442e; --eff-easy:#3fa47a; --eff-moderate:#d99a2b; --eff-hard:#d65b36; --eff-none:#9aa8a1; --shadow:0 1px 2px rgba(20,32,27,.05),0 6px 18px rgba(20,32,27,.06);  --splash-bg: radial-gradient(125% 90% at 50% 0%, #eef1f1 0%, #e4edeb 52%, #d6e3e0 100%); --splash-ink:#14201b; --splash-soft:#5b6b64; --splash-brand:#0e8c7f; --splash-glow:rgba(14,140,127,.22); }
-:root[data-theme="dark"] { color-scheme: dark; --bg:#0a100e; --surface:#151e1b; --surface-2:#1b2622; --line:#26332e; --ink:#e7eeea; --ink-soft:#a9b7b0; --ink-faint:#74847c; --accent:#2bb3a3; --accent-ink:#06231f; --base:#3ab0c4; --build:#74bd52; --peak:#eb9748; --taper:#9184e0; --ready:#6bbf46; --steady:#3ab0c4; --ease:#eb9748; --rest:#e8765c; --eff-easy:#4cb98a; --eff-moderate:#e6ac3e; --eff-hard:#e56f49; --eff-none:#6f7d76; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.4);  --splash-bg: radial-gradient(125% 90% at 50% 0%, #0c2b28 0%, #06110f 56%, #000 100%); --splash-ink:#ffffff; --splash-soft:#9aa3a0; --splash-brand:#16b7a4; --splash-glow:rgba(22,183,164,.38); }
+:root[data-theme="dark"] { color-scheme: dark; --bg:#0a100e; --surface:#151e1b; --surface-2:#1b2622; --line:#26332e; --ink:#e7eeea; --ink-soft:#a9b7b0; --ink-faint:#74847c; --accent:#2bb3a3; --accent-ink:#06231f; --base:#3ab0c4; --build:#74bd52; --peak:#eb9748; --taper:#9184e0; --ready:#6bbf46; --steady:#3ab0c4; --ease:#eb9748; --rest:#e8765c; --eff-easy:#4cb98a; --eff-moderate:#e6ac3e; --eff-hard:#e56f49; --eff-none:#6f7d76; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.4);  --splash-bg: radial-gradient(125% 90% at 50% 0%, #0a100e 0%, #0c2b28 12%, #06110f 56%, #000 100%); --splash-ink:#ffffff; --splash-soft:#9aa3a0; --splash-brand:#16b7a4; --splash-glow:rgba(22,183,164,.38); }
 * { box-sizing: border-box; }
 /* The app shell owns the viewport; the document itself must never scroll.
    ⚠️ Without this the page was the scroller, not #view, and two consequences followed: an iOS

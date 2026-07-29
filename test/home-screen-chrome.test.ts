@@ -60,6 +60,43 @@ test("the strip is the APP background, never the splash colour", () => {
     "chromeColor must not return a splash colour — the strip cannot follow the screen on iOS");
 });
 
+test("the launch screen's top stop is --bg, in BOTH themes", () => {
+  // ⚠️ The invariant that makes the launch seamless, and it must hold per theme.
+  //
+  // VERIFIED mechanism: iOS paints the strip from the document's CANVAS background (the propagated
+  // html/body background-color), read once at first paint and never re-read. Not theme-color — an
+  // unintentional A/B proved it: with the meta held at #0c2b28 in both states, moving only the canvas
+  // moved the strip. So the strip is --bg for the whole session, and the splash is what sits beneath
+  // it at launch. If the splash's top stop is not --bg, that is a visible 62pt band.
+  //
+  // Light shipped exact and dark did not: --bg #0a100e against a #0c2b28 top stop, dL* ~12 — the same
+  // band light had just lost, with a comment claiming otherwise and no test to catch it.
+  for (const theme of ["light", "dark"] as const) {
+    const rule = new RegExp(`:root\\[data-theme="${theme}"\\]\\s*\\{([^}]*)\\}`).exec(SOURCE);
+    assert.ok(rule, `no :root[data-theme="${theme}"] block`);
+    const grad = /--splash-bg:\s*radial-gradient\([^,]+,\s*(#[0-9a-fA-F]{3,8})\s+0%/.exec(rule![1]!);
+    assert.ok(grad, `no --splash-bg first colour stop in the ${theme} tokens`);
+    assert.equal(grad![1]!.trim().toLowerCase(), tokenValue(theme, "bg"),
+      `${theme} splash must start at --bg or iOS paints a band above it`);
+  }
+});
+
+test("the theme is not persisted — and the latched strip depends on that", () => {
+  // ⚠️ LANDMINE. The strip latches the canvas colour at first paint. That is only ever RIGHT because
+  // data-theme is set solely by the theme button and never restored from storage, so every launch
+  // starts on the system scheme and the latched --bg matches what renders.
+  //
+  // The moment someone adds "remember my theme", a runner whose system is light but who chose dark
+  // will latch the LIGHT --bg and then render dark — a permanent mismatch on every single launch,
+  // which is precisely the bug this whole area was fixed for. The fix at that point is an inline
+  // <head> script that applies data-theme BEFORE first paint. Write it that way from the start.
+  const persists = /(localStorage|getItem)[^\n]{0,80}(theme)/i.test(SOURCE)
+    && /setAttribute\("data-theme"[^\n]{0,120}(getItem|stored|saved)/i.test(SOURCE);
+  assert.ok(!persists,
+    "the theme now persists — apply data-theme in an inline <head> script before first paint, " +
+    "or the status strip latches the system colour while the app renders the stored one");
+});
+
 test("the manifest fallback is a background colour, not the brand colour", () => {
   // iOS snapshots this at install and it cannot follow the theme, so it is the light --bg — the
   // common case — with the per-scheme metas covering the rest where iOS honours them.

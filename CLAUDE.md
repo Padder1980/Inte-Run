@@ -452,21 +452,37 @@ this from screenshots produced three plausible, confidently-argued, wrong diagno
 `dvh`-vs-page mismatch, a `theme-color` mismatch, and iOS 26's WebKit bug 301994 — which is real but
 applies to iOS 26, and this phone is on **18.7**; always read the OS version before trusting research).
 
-Because iOS paints that strip from `theme-color`, it must match **whatever is on screen underneath
-it**, which moves. Rules enforced by `test/home-screen-chrome.test.ts`:
-- ⚠️ **The static meta and the manifest `theme_color` are the SPLASH colour (`SPLASH_CHROME`), not a
-  theme colour.** The first paint is always the splash, which is hardcoded near-black in BOTH themes.
-  Pinning them to `--bg` fixed the teal band on Today and made launch *worse* — a near-WHITE band
-  above a near-black screen, at the one moment every launch passes through, held until the runner taps
-  (the welcome-back overlay has no auto-dismiss). `SPLASH_CHROME` is asserted equal to the
-  `.splash/.welcome` gradient's top stop so it cannot drift.
-- `syncThemeColor()` keeps **one un-media'd meta** tracking what is actually displayed — with several
-  metas present the browser takes the first that matches, so a media pair outvotes the live one. It
-  runs at startup, from the theme button (which no media query can see), on a `prefers-color-scheme`
-  change, and **at every step of the launch handoff**, which changes the screen twice in three seconds.
-- ⚠️ **`chromeColor()` must check ALL `.splash, .welcome` elements, never `querySelector`.** The
-  first-run `#welcome` sits in the markup permanently at `display:none` and precedes the welcome-back
-  overlay appended at runtime, so the first match is always the hidden one.
+⚠️ **iOS SNAPSHOTS `apple-mobile-web-app-status-bar-style` AT ADD-TO-HOME-SCREEN.** Changing it did
+nothing across five deploys and only took effect once the icon was deleted and re-added. If it ever
+changes again, **the app must be re-added before the change can be judged** — otherwise you are
+testing the old value and every conclusion drawn is worthless. (Deleting a Home Screen web app
+deletes its `localStorage`; export a backup from Support › Your data first.)
+
+⚠️ **The strip is painted from the CANVAS BACKGROUND (`html`/`body`), latched at first paint, and
+never re-read. NOT from `theme-color`.** Established by an accidental single-variable A/B on the
+device: with the meta held at `#0c2b28` in both states, moving only the canvas moved the strip.
+Two consequences, and both were learned by shipping the wrong thing:
+- ⚠️ **The strip must be `--bg`, never the launch screen's colour.** Colouring it from the splash
+  matched the splash for two seconds and then left a dark strip above the light app *for the whole
+  session* — verified that both the meta and the canvas do switch to `--bg` when the app appears, and
+  iOS ignores it. A brief mismatch beats a permanent one.
+- ⚠️ **So `--splash-bg` must START at that theme's `--bg`, in BOTH themes.** That is what makes the
+  launch seamless, and it is the only lever left. Asserted per-theme by
+  `test/home-screen-chrome.test.ts`; light shipped exact while dark did not (`#0a100e` vs a `#0c2b28`
+  top stop, ΔL\* ≈ 12) with a comment claiming otherwise and no test to catch it.
+
+`theme-color` still matters for Android/Chrome and in-Safari, so it stays — as a per-scheme static
+pair equal to that scheme's `--bg`, with `syncThemeColor()` collapsing to **one un-media'd meta** at
+runtime (with several present the browser takes the first that matches, so the pair would outvote the
+live one) and re-running on the theme button, which no media query can see.
+
+⚠️ **LANDMINE: the theme is deliberately NOT persisted.** `data-theme` is set only by the theme button
+and never restored, so every launch starts on the system scheme and the latched strip is right by
+construction. The day someone adds "remember my theme", a runner whose system is light but who chose
+dark will latch the LIGHT `--bg` and render dark — a permanent mismatch on every launch, exactly the
+bug this section exists for. The fix is an inline `<head>` script applying `data-theme` **before first
+paint**; write it that way from the start. There is a test asserting the theme is not persisted, and
+it is there to make whoever adds the feature read this paragraph.
 
 ⚠️ **`--vvh` requires a FOCUSED FIELD, not just a size delta** — this was the dead strip *below* the
 nav, and a threshold alone cannot prevent it. A Home Screen web app reports `visualViewport.height`

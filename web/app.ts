@@ -4399,6 +4399,29 @@ function wireConnectView() {
   if (NATIVE_WATCH && !WATCH_STATUS) { try { window.webkit.messageHandlers.interunWatch.postMessage({ action: "status" }); } catch (e) {} }
   document.querySelectorAll('[data-cn="cal"]').forEach((b) => b.onclick = openRemindersSheet);
 }
+// One line that diagnoses letterboxing from a screenshot: if "page" is short of "screen", iOS is
+// boxing the web app inside system bands and no CSS in this file can reach them — the Home Screen
+// icon carries settings frozen at the moment it was added, and needs removing and re-adding.
+function viewportDiag() {
+  try {
+    const de = document.documentElement;
+    const vv = window.visualViewport;
+    const standalone = (navigator.standalone === true) || matchMedia("(display-mode: standalone)").matches;
+    return "screen " + screen.width + "\u00d7" + screen.height +
+      " \u00b7 page " + de.clientWidth + "\u00d7" + de.clientHeight +
+      " \u00b7 vv " + (vv ? Math.round(vv.width) + "\u00d7" + Math.round(vv.height) : "\u2014") +
+      " \u00b7 inset-b " + (getComputedStyle(de).getPropertyValue("--sab-probe") || probeSafeArea()) +
+      (standalone ? " \u00b7 standalone" : " \u00b7 browser");
+  } catch (e) { return "diag unavailable"; }
+}
+function probeSafeArea() {
+  const el = document.createElement("div");
+  el.style.cssText = "position:fixed;bottom:0;height:env(safe-area-inset-bottom,0px);width:0;visibility:hidden";
+  document.body.appendChild(el);
+  const h = Math.round(el.getBoundingClientRect().height) + "px";
+  el.remove();
+  return h;
+}
 // Reported by the native shell at document start; absent in the browser.
 function liveActivityStatus() {
   try { return String(window.__interunLiveActivity || "not attempted yet"); } catch (e) { return "unknown"; }
@@ -4420,7 +4443,8 @@ function dataView() {
     '</div>' +
     '<div class="card"><div class="subhead" style="margin-top:0">This version</div>' +
     '<div class="bk-box"><div class="bk-val">' + (inNativeApp() ? "iPhone app" : "Web") + '</div>' +
-    '<div class="bk-lab" style="margin-top:4px">Built ' + BUILD + ' UTC</div></div>' +
+    '<div class="bk-lab" style="margin-top:4px">Built ' + BUILD + ' UTC</div>' +
+    '<div class="bk-lab" style="margin-top:4px">' + esc(viewportDiag()) + '</div></div>' +
     '<div class="bk-md" style="margin-top:8px">' + (inNativeApp()
       ? "The app carries its own copy of InteRun, built when the app was built \u2014 it doesn\u2019t update over the internet. A newer web version won\u2019t appear here until the app itself is rebuilt."
       : "Added to your Home Screen? It caches a copy. If an update seems missing, close it fully (swipe it away from the app switcher) and reopen \u2014 twice if needed.") + '</div></div>' +

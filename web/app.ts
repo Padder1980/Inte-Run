@@ -4447,7 +4447,14 @@ function viewportDiagLines() {
       "inner " + window.innerWidth + "\u00d7" + window.innerHeight +
         " \u00b7 vv " + (vv ? Math.round(vv.width) + "\u00d7" + Math.round(vv.height) + " @" + Math.round(vv.offsetTop) : "\u2014"),
       "insets t" + ins.top + " r" + ins.right + " b" + ins.bottom + " l" + ins.left + " \u00b7 vvh " + vvh,
+      // \u26a0\ufe0f getBoundingClientRect is VIEWPORT-relative, so this always reads 0..height however the
+      // viewport is placed on the screen. It gives the viewport HEIGHT and says nothing about its
+      // POSITION \u2014 and position is the whole question when 62pt is missing. screenY is what locates
+      // it: 0 means the viewport starts at the top of the screen, so the missing height is stranded
+      // at the BOTTOM; 62 means iOS has placed it below the status bar, which is what we want.
       "fixed inset:0 \u2192 " + Math.round(pr.top) + ".." + Math.round(pr.bottom) + " h" + Math.round(pr.height),
+      "screenY " + (typeof window.screenY === "number" ? window.screenY : "?") +
+        " \u00b7 outer " + window.outerWidth + "\u00d7" + window.outerHeight,
       "app " + rect(".app") + " \u00b7 bar " + rect(".topbar"),
       "nav " + rect(".bottomnav"),
     ];

@@ -93,21 +93,9 @@ struct WorkoutView: View {
                 let v = workout.value(for: m)
                 return MetricsPage.Row(value: v.value, unit: v.unit, label: m.caption)
             },
-            stepProgress: stepProgress,
-            stepLabel: workout.steps.indices.contains(workout.stepIndex)
-                ? workout.steps[workout.stepIndex].label : nil
+            stepProgress: workout.stepProgress,
+            stepLabel: workout.currentStep?.label
         )
-    }
-
-    /// How far through the current step, via `PlannedStep.progress` rather than a second copy of the
-    /// same arithmetic — it already knows that a step is gated by seconds or by metres, and returns
-    /// nil for one with no defined end (a free run, or "run by feel"). Nil hides the bar entirely,
-    /// which is right: a bar pinned at zero for a whole run looks broken.
-    private var stepProgress: Double? {
-        guard workout.steps.indices.contains(workout.stepIndex) else { return nil }
-        return workout.steps[workout.stepIndex].progress(
-            elapsed: workout.elapsed - workout.stepStartElapsed,
-            metresDone: workout.distanceMetres - workout.stepStartMetres)
     }
 
     /// Metres while they are still small enough to be meaningful, kilometres after that.

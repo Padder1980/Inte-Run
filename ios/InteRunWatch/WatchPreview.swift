@@ -93,6 +93,49 @@ enum WatchPreview {
                 stepProgress: 0.62,
                 stepLabel: "2 km at 4:55/km")
 
+        // ── The pace page ─────────────────────────────────────────────────────────────────────
+        // The marker/label agreement is GEOMETRY, and CLAUDE.md's rule for geometry is to verify
+        // with a known marker at a known place. These scenes are that: each pins the expected
+        // marker position, so a screenshot either shows it there or the axis is wrong again.
+
+        // The owner's reference values exactly: band 5:30–5:50, running 5:34. Expected: GOOD PACE,
+        // marker inside the zone toward its fast (right) side — fraction (375−334)/70 ≈ 0.59.
+        case "pace-good":
+            PacePage(elapsed: "12:46", hero: ("880", "M TO GO"),
+                     band: (low: 330, high: 350), verdict: .good,
+                     currentSec: 334, currentText: "5:34",
+                     lap: ("5:33", "LAP PACE"), stepProgress: 0.56, totalDist: "2.12 KM")
+
+        // The bug the owner hit on a real run: band 6:15–6:50, crawling at 9:43. Expected:
+        // PICK IT UP with the marker pinned at the LEFT (slow) edge. The old view pinned it at the
+        // fast edge — if this screenshot ever shows the marker on the right, the mirror is back.
+        case "pace-slow":
+            PacePage(elapsed: "0:09", hero: ("14:50", "TO GO"),
+                     band: (low: 375, high: 410), verdict: .tooSlow,
+                     currentSec: 583, currentText: "9:43",
+                     lap: ("--:--", "LAP PACE"), stepProgress: 0.01, totalDist: "1.91 KM")
+
+        // Overcooking a recovery: same band, running 5:20. Expected: EASE OFF, marker pinned RIGHT.
+        case "pace-fast":
+            PacePage(elapsed: "31:12", hero: ("2:04", "TO GO"),
+                     band: (low: 375, high: 410), verdict: .tooFast,
+                     currentSec: 320, currentText: "5:20",
+                     lap: ("5:24", "LAP PACE"), stepProgress: 0.84, totalDist: "6.48 KM")
+
+        // First seconds: a target but no fix yet. No marker, no bubble, verdict says why.
+        case "pace-gps":
+            PacePage(elapsed: "0:04", hero: ("1.00", "KM TO GO"),
+                     band: (low: 330, high: 350), verdict: .noSignal,
+                     currentSec: nil, currentText: "--:--",
+                     lap: ("--:--", "LAP PACE"), stepProgress: 0.0, totalDist: "0 M")
+
+        // A free run: no step, no band, no progress — elapsed takes the hero slot.
+        case "pace-feel":
+            PacePage(elapsed: nil, hero: ("17:31", "ELAPSED"),
+                     band: nil, verdict: .noTarget,
+                     currentSec: nil, currentText: "--:--",
+                     lap: ("5:41", "LAP PACE"), stepProgress: nil, totalDist: "3.08 KM")
+
         default:
             Text("Unknown preview scene: \(scene)").font(.caption)
         }

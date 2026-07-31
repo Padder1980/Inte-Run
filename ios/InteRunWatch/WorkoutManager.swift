@@ -583,6 +583,14 @@ final class WorkoutManager: NSObject, ObservableObject {
         return nil
     }
 
+    /// How far through the current step, 0–1, via `PlannedStep.progress` — nil for a step with no
+    /// defined end (or a free run), so callers hide their bar instead of pinning it at zero.
+    /// Shared by the metrics and pace pages; keep the arithmetic in one place.
+    var stepProgress: Double? {
+        guard let step = currentStep else { return nil }
+        return step.progress(elapsed: stepElapsed, metresDone: stepMetres)
+    }
+
     /// Distance left in the current step — the number a runner actually wants mid-rep.
     var stepRemaining: (value: String, unit: String)? {
         guard let step = currentStep else { return nil }

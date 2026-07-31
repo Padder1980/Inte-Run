@@ -35,7 +35,9 @@ enum WatchPreview {
                 rows: [
                     .init(value: "1.42", unit: "KM", label: "DISTANCE"),
                     .init(value: "4:58", unit: "/KM", label: "CUR PACE"),
-                    .init(value: "162", unit: "BPM", label: "HEART"),
+                    // 162 against a ceiling of 182 is 89% — zone 4, so the heart runs hot (orange).
+                    .init(value: "162", unit: "BPM", label: "HEART",
+                          icon: .init(systemName: "heart.fill", tint: Brand.hrZoneTint(4), badge: "4")),
                     .init(value: "12:04", unit: nil, label: "TIME"),
                 ],
                 stepProgress: 0.62,
@@ -61,7 +63,9 @@ enum WatchPreview {
                 rows: [
                     .init(value: "0", unit: "M", label: "DISTANCE"),
                     .init(value: "--", unit: "/KM", label: "CUR PACE"),
-                    .init(value: "--", unit: "BPM", label: "HEART"),
+                    // No reading yet: the faint no-data heart, which must NOT look like zone 5.
+                    .init(value: "--", unit: "BPM", label: "HEART",
+                          icon: .init(systemName: "heart.fill", tint: Brand.hrZoneTint(nil), badge: nil)),
                     .init(value: "0:03", unit: nil, label: "TIME"),
                 ],
                 stepProgress: 0.0,
@@ -87,11 +91,60 @@ enum WatchPreview {
                     .init(value: "1.42", unit: "KM", label: "DISTANCE"),
                     .init(value: "4:58", unit: "/KM", label: "CUR PACE"),
                     .init(value: "5:12", unit: "/KM", label: "AVG PACE"),
-                    .init(value: "162", unit: "BPM", label: "HEART"),
+                    // An easy-zone heart, so the ramp's cool end is seen somewhere too.
+                    .init(value: "121", unit: "BPM", label: "HEART",
+                          icon: .init(systemName: "heart.fill", tint: Brand.hrZoneTint(2), badge: "2")),
                     .init(value: "12:04", unit: nil, label: "TIME"),
                 ],
                 stepProgress: 0.62,
                 stepLabel: "2 km at 4:55/km")
+
+        // Heart rate as the HERO (the runner can order it first) at maximal effort — the largest
+        // glyph, the hottest colour, and the digit must stay centred at both sizes.
+        case "hr-hero":
+            MetricsPage(
+                status: nil,
+                rows: [
+                    .init(value: "178", unit: "BPM", label: "HEART",
+                          icon: .init(systemName: "heart.fill", tint: Brand.hrZoneTint(5), badge: "5")),
+                    .init(value: "4:12", unit: "/KM", label: "CUR PACE"),
+                    .init(value: "0:58", unit: nil, label: "TO GO"),
+                ],
+                stepProgress: 0.81,
+                stepLabel: "1 km at 4:15/km")
+
+        // ── The steps page ────────────────────────────────────────────────────────────────────
+        // The owner's reference screenshots, near-verbatim: his 7 km progressive long run, mid
+        // first step. Current + upcoming live at the top; the whole session recaps below.
+        case "steps-mid":
+            StepsPage(
+                status: nil,
+                current: ("3.5 km at a conversational pace", nil),
+                upcoming: "1 km at 5:30/km",
+                title: "7km Progressive Long Run",
+                subtitle: "7.0 km · 38 min",
+                steps: ["3.5 km at a conversational pace",
+                        "1 km at 5:30/km",
+                        "1 km at 5:20/km",
+                        "1 km at 5:00/km",
+                        "500 m at a conversational pace"],
+                currentIndex: 0)
+
+        // Deep in the session, paused: done steps faded above, the LAST-step wording in place of
+        // an upcoming one, and the status word up top.
+        case "steps-last":
+            StepsPage(
+                status: ("Paused", Brand.ease),
+                current: ("500 m at a conversational pace", "Target 6:15–6:50/km"),
+                upcoming: nil,
+                title: "7km Progressive Long Run",
+                subtitle: "7.0 km · 38 min",
+                steps: ["3.5 km at a conversational pace",
+                        "1 km at 5:30/km",
+                        "1 km at 5:20/km",
+                        "1 km at 5:00/km",
+                        "500 m at a conversational pace"],
+                currentIndex: 4)
 
         // ── The pace page ─────────────────────────────────────────────────────────────────────
         // The marker/label agreement is GEOMETRY, and CLAUDE.md's rule for geometry is to verify

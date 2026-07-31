@@ -91,7 +91,14 @@ struct WorkoutView: View {
             status: workout.phase == .paused ? ("Paused", Brand.ease) : nil,
             rows: settings.metrics.map { m in
                 let v = workout.value(for: m)
-                return MetricsPage.Row(value: v.value, unit: v.unit, label: m.caption)
+                // The heart-rate row carries a heart tinted by training zone, with the zone digit
+                // inside it. No ceiling from the phone (or no reading yet) → a plain heart, no digit.
+                let icon: MetricsPage.Icon? = m == .heartRate
+                    ? .init(systemName: "heart.fill",
+                            tint: Brand.hrZoneTint(workout.hrZone),
+                            badge: workout.hrZone.map(String.init))
+                    : nil
+                return MetricsPage.Row(value: v.value, unit: v.unit, label: m.caption, icon: icon)
             },
             stepProgress: workout.stepProgress,
             stepLabel: workout.currentStep?.label
@@ -180,51 +187,35 @@ struct ControlsView: View {
 
 // MARK: - The session, step by step
 
+/// Maps the live workout onto `StepsPage` (the owner's reference layout — see that file). A free
+/// run has no steps and keeps its own honest message instead of an empty recap.
 struct SessionStepsView: View {
     @ObservedObject var workout: WorkoutManager
 
     var body: some View {
-        ScrollView {
+        if workout.steps.isEmpty {
             VStack(alignment: .leading, spacing: 6) {
-                if workout.steps.isEmpty {
-                    Text("Run by feel").font(.system(size: 14, weight: .semibold))
-                    Text("This session has no set structure — just settle into a comfortable rhythm.")
-                        .font(.system(size: 11)).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                if !workout.steps.isEmpty {
-                Text("STEP \(workout.stepIndex + 1) OF \(workout.steps.count)")
-                    .font(.system(size: 9, weight: .bold)).foregroundStyle(.secondary)
-
-                if let step = workout.currentStep {
-                    Text(step.label)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Brand.accent)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    if let goal = step.goalText {
-                        Text(goal).font(.system(size: 11)).foregroundStyle(.secondary)
-                    }
-                    if let p = step.progress(elapsed: workout.stepElapsed, metresDone: workout.stepMetres) {
-                        ProgressView(value: p).tint(Brand.accent)
-                    }
-                    if let lo = step.paceLow, let hi = step.paceHigh {
-                        Text("Target \(WorkoutManager.pace(Double(lo)))–\(WorkoutManager.pace(Double(hi)))/km")
-                            .font(.system(size: 10)).foregroundStyle(.secondary)
-                    }
-                }
-
-                if workout.stepIndex + 1 < workout.steps.count {
-                    Divider()
-                    Text("NEXT").font(.system(size: 9, weight: .bold)).foregroundStyle(.secondary)
-                    Text(workout.steps[workout.stepIndex + 1].label)
-                        .font(.system(size: 12))
-                        .lineLimit(3)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                }
+                Text("Run by feel").font(.system(size: 14, weight: .semibold))
+                Text("This session has no set structure — just settle into a comfortable rhythm.")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            StepsPage(
+                status: workout.phase == .paused ? ("Paused", Brand.ease) : nil,
+                current: (workout.currentStep?.label ?? "",
+                          workout.currentStep.flatMap { s in
+                              guard let lo = s.paceLow, let hi = s.paceHigh else { return nil }
+                              return "Target \(WorkoutManager.pace(Double(lo)))–\(WorkoutManager.pace(Double(hi)))/km"
+                          }),
+                upcoming: workout.stepIndex + 1 < workout.steps.count
+                    ? workout.steps[workout.stepIndex + 1].label : nil,
+                title: workout.plan?.title ?? "Session",
+                subtitle: workout.plan?.subtitle ?? "",
+                steps: workout.steps.map(\.label),
+                currentIndex: workout.stepIndex
+            )
         }
     }
 }

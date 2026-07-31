@@ -33,6 +33,24 @@ enum Brand {
     static let effModerate = hex(0xE6AC3E) // --eff-moderate
     static let effHard = hex(0xE56F49)    // --eff-hard
 
+    /// Heart-rate training zones 1–5, as a cool→hot ramp built from the tokens above rather than
+    /// a new palette: Z1 barely working (quiet grey-green), Z2 easy (green), Z3 moderate (amber),
+    /// Z4 threshold (orange), Z5 maximal (coral).
+    /// ⚠️ Nil (no ceiling from the phone, or no reading yet — the first seconds of every run) is
+    /// FAINT, deliberately distinct from every zone. It briefly shipped as `rest`, which made
+    /// "no data" byte-identical to "maximal effort" — a standing-still runner wore a redlining
+    /// heart, and the only tiebreaker was a digit too small to read mid-run.
+    static func hrZoneTint(_ zone: Int?) -> Color {
+        switch zone {
+        case 1: return inkSoft
+        case 2: return effEasy
+        case 3: return effModerate
+        case 4: return ease
+        case 5: return rest
+        default: return inkFaint
+        }
+    }
+
     /// The splash gradient from the web app: radial from the top, teal fading to black.
     /// Reused so the watch feels like the same product rather than a companion someone else wrote.
     static var backdrop: some View {

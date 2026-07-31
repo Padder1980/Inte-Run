@@ -501,7 +501,7 @@ extension WatchBridge: WKScriptMessageHandler {
             // not need a matching edit here to travel. Absent keys are meaningful (a cleared "why",
             // a rest day), so they are simply left out and the watch treats that as "none".
             var payload: [String: Any] = ["at": Date().timeIntervalSince1970]
-            for key in ["session", "name", "why", "whyName", "dateIso", "upcoming", "coach", "coachLines"] where body[key] != nil {
+            for key in ["session", "name", "why", "whyName", "dateIso", "upcoming", "coach", "coachLines", "maxHr"] where body[key] != nil {
                 payload[key] = body[key]
             }
             push(payload)

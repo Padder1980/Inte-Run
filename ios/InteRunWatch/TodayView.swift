@@ -34,6 +34,7 @@ struct TodayView: View {
         workout.whyPerson = store.whyPerson
         workout.coach = store.coach      // the same coach they chose on the phone
         workout.coachLines = store.coachLines
+        workout.maxHr = store.maxHr      // the zone ceiling; nil just means no zone colours
         // The phone can finish, pause and resume a wrist run: someone holding their phone should not
         // have to find their watch to stop.
         store.onStopRequested = { [weak workout] in workout?.end() }

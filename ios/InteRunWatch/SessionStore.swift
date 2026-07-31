@@ -96,6 +96,10 @@ final class SessionStore: NSObject, ObservableObject {
     /// The local date the last context described, so yesterday's session is never shown as today's.
     @Published var contextIso: String?
 
+    /// Estimated max heart rate, sent by the phone (it owns the estimate — 220−age today, a real
+    /// measurement some day). The wrist only uses it to colour the heart by training zone.
+    @Published var maxHr: Int?
+
     private static let cacheKey = "interun_watch_session"
     private static let nameKey = "interun_watch_name"
     private static let upcomingKey = "interun_watch_upcoming"
@@ -104,6 +108,7 @@ final class SessionStore: NSObject, ObservableObject {
     private static let whyKey = "interun_watch_why"
     private static let whyPersonKey = "interun_watch_why_person"
     private static let isoKey = "interun_watch_iso"
+    private static let maxHrKey = "interun_watch_maxhr"
 
     static func localTodayIso() -> String {
         let f = DateFormatter()
@@ -185,6 +190,8 @@ final class SessionStore: NSObject, ObservableObject {
         why = UserDefaults.standard.dictionary(forKey: Self.whyKey) as? [String: String] ?? [:]
         whyPerson = UserDefaults.standard.string(forKey: Self.whyPersonKey)
         contextIso = UserDefaults.standard.string(forKey: Self.isoKey)
+        let storedMax = UserDefaults.standard.integer(forKey: Self.maxHrKey)
+        maxHr = storedMax > 0 ? storedMax : nil
         guard let data = UserDefaults.standard.data(forKey: Self.cacheKey),
               let cached = try? JSONDecoder().decode(PlannedSession.self, from: data) else { return }
         session = cached
@@ -218,6 +225,11 @@ final class SessionStore: NSObject, ObservableObject {
         UserDefaults.standard.set(why, forKey: Self.whyKey)
         whyPerson = (context["whyName"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         UserDefaults.standard.set(whyPerson, forKey: Self.whyPersonKey)
+        // Written every sync like coach/why: an absent key means the phone no longer has an age to
+        // estimate from, and a stale ceiling misclassifying every zone is worse than no zones.
+        maxHr = (context["maxHr"] as? Int).flatMap { $0 > 0 ? $0 : nil }
+        if let m = maxHr { UserDefaults.standard.set(m, forKey: Self.maxHrKey) }
+        else { UserDefaults.standard.removeObject(forKey: Self.maxHrKey) }
         guard let raw = context["session"] else {
             // An explicit empty payload means "nothing planned today" — not a failure to sync.
             session = nil

@@ -2837,6 +2837,19 @@ window.__interunWatchRun = function (json) {
   catch (e) { return String(e); }
 };
 let WATCH_SYNC_T = null;
+// THE app's one max-heart-rate ceiling: a measured profile.maxHr when present (sanity-ranged),
+// else Tanaka's 208 - 0.7*age. Everything that judges effort against a max - the coach's
+// safety-effort cue AND the watch's zone colours - MUST come through here. This function exists
+// because they briefly did not: the watch was sent the folk 220-age while the safety cue used
+// Tanaka, and the two halves of one product disagreed about the same heartbeat (at age 70, a
+// 140bpm rep read as maximal on the wrist and unremarkable to the coach). Zero means "no ceiling
+// known"; callers must treat that as "do not judge", never as a number.
+function maxHrEstimate() {
+  const measured = Number(profile.maxHr) || 0;
+  if (measured >= 120 && measured <= 230) return Math.round(measured);
+  const age = Number(profile.age) || 0;
+  return age >= 10 && age <= 100 ? Math.round(208 - 0.7 * age) : 0;
+}
 function syncWatch() {
   if (!NATIVE_WATCH) return;
   clearTimeout(WATCH_SYNC_T);
@@ -2845,6 +2858,14 @@ function syncWatch() {
     // First name only: the watch has room for "Well done, Adam", not a full name.
     const first = String(profile.name || "").trim().split(/\\s+/)[0];
     if (first) payload.name = first;
+    // The wrist colours the heart by training zone, and zones need a ceiling. maxHrEstimate() is
+    // the SAME ceiling the coach's safety-effort cue judges against - one product, one max-HR
+    // model. It is computed HERE so the page stays the owner of what the watch is told, and it
+    // already honours a measured profile.maxHr over the age estimate.
+    // ⚠️ New payload keys must ALSO be added to WatchBridge's sync key list, or they silently
+    // never arrive (the upcoming field was lost for a day exactly this way).
+    const ceil = maxHrEstimate();
+    if (ceil) payload.maxHr = ceil;
     // The watch speaks with live text-to-speech, so unlike the phone it CAN say these words aloud.
     const answered = whyAnswered();
     if (answered.length) {
@@ -5443,7 +5464,7 @@ function coachTick(snap) {
   }
   // Safety: sustained very high effort, only where we actually have heart-rate data + a max.
   const hr = snap.heartRateBpm || (LIVE.mode === "sim" ? Math.round(LIVE.hr) : null);
-  const maxHr = profile.maxHr || (profile.age ? 208 - 0.7 * profile.age : 0);
+  const maxHr = maxHrEstimate();
   if (hr && maxHr && hr > maxHr * 0.92) {
     if (!COACH.highEffortSince) COACH.highEffortSince = nowSec;
     else if (nowSec - COACH.highEffortSince > 75) { COACH.highEffortSince = nowSec + 240; coachTrigger("safety-effort", t, nowSec); }

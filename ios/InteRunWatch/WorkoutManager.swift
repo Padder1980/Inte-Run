@@ -42,6 +42,9 @@ final class WorkoutManager: NSObject, ObservableObject {
     /// The coach picked on the phone, and their wordings, so the wrist sounds like the same coach.
     var coach: String?
     var coachLines: [String: String] = [:]
+    /// Estimated max heart rate, handed over at start like the fields above. Zones need a ceiling;
+    /// nil means the phone could not estimate one and the heart simply is not zone-coloured.
+    var maxHr: Int?
     private var hrSamples: [Double] = []
     private(set) var routePoints: [[Double]] = []
     private var splits: [Int] = []
@@ -589,6 +592,19 @@ final class WorkoutManager: NSObject, ObservableObject {
     var stepProgress: Double? {
         guard let step = currentStep else { return nil }
         return step.progress(elapsed: stepElapsed, metresDone: stepMetres)
+    }
+
+    /// Which training zone the current heart rate sits in, 1–5 on the standard %-of-max bands
+    /// (<60, 60–70, 70–80, 80–90, ≥90). Nil when there is no ceiling to measure against or no
+    /// reading yet — callers show a plain heart rather than guessing.
+    var hrZone: Int? {
+        guard let m = maxHr, m > 60, heartRate > 0 else { return nil }
+        let pct = heartRate / Double(m)
+        if pct < 0.60 { return 1 }
+        if pct < 0.70 { return 2 }
+        if pct < 0.80 { return 3 }
+        if pct < 0.90 { return 4 }
+        return 5
     }
 
     /// Distance left in the current step — the number a runner actually wants mid-rep.

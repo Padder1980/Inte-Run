@@ -20,7 +20,17 @@ struct MetricsPage: View {
         let value: String
         let unit: String?
         let label: String
+        /// A leading glyph, used by the heart-rate row: a heart tinted by training zone with the
+        /// zone number inside it (the owner's reference does exactly this). Nil for every other row.
+        var icon: Icon?
         var id: String { label + value }
+    }
+
+    struct Icon: Equatable {
+        let systemName: String
+        let tint: Color
+        /// A single character drawn inside the glyph — the zone digit. Nil for a plain glyph.
+        var badge: String?
     }
 
     /// One word, top-left, when the run is not simply running. Nil when it is.
@@ -67,6 +77,7 @@ struct MetricsPage: View {
     private func heroRow(_ r: MetricsPage.Row) -> some View {
         VStack(alignment: .leading, spacing: -2) {
             HStack(alignment: .firstTextBaseline, spacing: 3) {
+                if let ic = r.icon { glyph(ic, size: 22) }
                 Text(r.value)
                     .font(.system(size: 46, weight: .semibold, design: .rounded))
                     .monospacedDigit()
@@ -91,6 +102,7 @@ struct MetricsPage: View {
     /// value rather than across the watch from it.
     private func secondaryRow(_ r: MetricsPage.Row) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 3) {
+            if let ic = r.icon { glyph(ic, size: 14) }
             Text(r.value)
                 .font(.system(size: 24, weight: .medium, design: .rounded))
                 .monospacedDigit()
@@ -110,6 +122,25 @@ struct MetricsPage: View {
             Spacer(minLength: 0)
         }
         .padding(.vertical, 1)
+    }
+
+    /// The row's leading glyph — the zone-tinted heart, with the zone digit inside it. The digit is
+    /// drawn in the page background colour so it reads as cut out of the heart.
+    /// ⚠️ The digit only renders at the hero size: on a secondary row it would be 7pt, which at
+    /// wrist distance is a dark speck, not information. Below the threshold the TINT carries the
+    /// zone alone — which is safe only because every zone's tint is distinct, including nil.
+    private func glyph(_ ic: MetricsPage.Icon, size: CGFloat) -> some View {
+        Image(systemName: ic.systemName)
+            .font(.system(size: size, weight: .bold))
+            .foregroundStyle(ic.tint)
+            .overlay {
+                if let b = ic.badge, size >= 18 {
+                    Text(b)
+                        .font(.system(size: size * 0.5, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Brand.bg)
+                        .offset(y: -size * 0.05)
+                }
+            }
     }
 
     /// How far through the current step, with the step's own words above it. The reference watch app

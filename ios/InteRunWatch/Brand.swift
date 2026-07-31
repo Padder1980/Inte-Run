@@ -33,21 +33,22 @@ enum Brand {
     static let effModerate = hex(0xE6AC3E) // --eff-moderate
     static let effHard = hex(0xE56F49)    // --eff-hard
 
-    /// Heart-rate training zones 1–5, as a cool→hot ramp built from the tokens above rather than
-    /// a new palette: Z1 barely working (quiet grey-green), Z2 easy (green), Z3 moderate (amber),
-    /// Z4 threshold (orange), Z5 maximal (coral).
+    /// Heart-rate training zones, in the conventional zone colours from the owner's reference
+    /// chart — grey, blue, green, gold, red — deliberately NOT brand tokens, because these hues are
+    /// the ones runners already know from every zone chart ever printed. Zone 0 is the chart's
+    /// "REST" band (below 50% of max), a bright neutral that cannot be mistaken for effort.
     /// ⚠️ Nil (no ceiling from the phone, or no reading yet — the first seconds of every run) is
-    /// FAINT, deliberately distinct from every zone. It briefly shipped as `rest`, which made
-    /// "no data" byte-identical to "maximal effort" — a standing-still runner wore a redlining
-    /// heart, and the only tiebreaker was a digit too small to read mid-run.
+    /// FAINT, deliberately distinct from every zone including zone 0. It briefly shipped as the
+    /// zone-5 colour, which made "no data" read as "maximal effort" on a standing-still runner.
     static func hrZoneTint(_ zone: Int?) -> Color {
         switch zone {
-        case 1: return inkSoft
-        case 2: return effEasy
-        case 3: return effModerate
-        case 4: return ease
-        case 5: return rest
-        default: return inkFaint
+        case 0: return hex(0xD3D9D6)   // rest — bright neutral
+        case 1: return hex(0x9099A2)   // 50–60% — grey
+        case 2: return hex(0x2E7CD6)   // 60–70% — blue
+        case 3: return hex(0x18A85B)   // 70–80% — green
+        case 4: return hex(0xF0B41E)   // 80–90% — gold
+        case 5: return hex(0xE0231E)   // 90%+  — red
+        default: return inkFaint       // no data — not an effort statement
         }
     }
 

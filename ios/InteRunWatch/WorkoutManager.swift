@@ -594,12 +594,14 @@ final class WorkoutManager: NSObject, ObservableObject {
         return step.progress(elapsed: stepElapsed, metresDone: stepMetres)
     }
 
-    /// Which training zone the current heart rate sits in, 1–5 on the standard %-of-max bands
-    /// (<60, 60–70, 70–80, 80–90, ≥90). Nil when there is no ceiling to measure against or no
-    /// reading yet — callers show a plain heart rather than guessing.
+    /// Which training zone the current heart rate sits in, on the owner's reference chart's bands:
+    /// zone 0 ("rest") below 50% of max, then 1–5 at 50–60 / 60–70 / 70–80 / 80–90 / 90%+.
+    /// Nil when there is no ceiling to measure against or no reading yet — callers show the faint
+    /// no-data heart rather than guessing.
     var hrZone: Int? {
         guard let m = maxHr, m > 60, heartRate > 0 else { return nil }
         let pct = heartRate / Double(m)
+        if pct < 0.50 { return 0 }
         if pct < 0.60 { return 1 }
         if pct < 0.70 { return 2 }
         if pct < 0.80 { return 3 }

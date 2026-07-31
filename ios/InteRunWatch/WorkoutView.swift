@@ -91,12 +91,10 @@ struct WorkoutView: View {
             status: workout.phase == .paused ? ("Paused", Brand.ease) : nil,
             rows: settings.metrics.map { m in
                 let v = workout.value(for: m)
-                // The heart-rate row carries a heart tinted by training zone, with the zone digit
-                // inside it. No ceiling from the phone (or no reading yet) → a plain heart, no digit.
+                // The heart-rate row carries a heart tinted by training zone — the colour is the
+                // whole message. No ceiling from the phone (or no reading yet) → the faint heart.
                 let icon: MetricsPage.Icon? = m == .heartRate
-                    ? .init(systemName: "heart.fill",
-                            tint: Brand.hrZoneTint(workout.hrZone),
-                            badge: workout.hrZone.map(String.init))
+                    ? .init(systemName: "heart.fill", tint: Brand.hrZoneTint(workout.hrZone))
                     : nil
                 return MetricsPage.Row(value: v.value, unit: v.unit, label: m.caption, icon: icon)
             },

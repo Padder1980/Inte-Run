@@ -90,13 +90,45 @@ const LONG_CEILING_MIN: Record<Goal["distance"], number> = {
 };
 
 /**
+ * How far the peak long run should reach in DISTANCE, per event and ability.
+ *
+ * ⚠️ THE PLAN IS BUILT IN MINUTES, WHICH SILENTLY SHORT-CHANGES SLOWER RUNNERS. Everyone got the same
+ * `PEAK_LONG_MIN`, so the same 110-minute half-marathon long run covered 22.4 km for a 1:25 runner and
+ * **12.8 km for a 2:30 runner** — 61% of the race distance they were about to attempt, and below even
+ * the evidence report's Beginner band. Minutes are the right currency for FATIGUE, which is why the
+ * ceiling below stays in minutes; but the race is a distance, and durability for it is a distance too.
+ *
+ * Numbers are the lower edge of the "Event-specific long-run endpoint references" table in
+ * `Evidence_Based_Running_Training_Prescription_Engine.html`, mapping InteRun's `recreational` to its
+ * Intermediate row and `competitive` to Advanced (5 km 10/14, 10 km 12/16, half 16/20, marathon 24/28).
+ *
+ * ⚠️ THE HALF IS DELIBERATELY ABOVE ITS BAND FLOOR, at 21.5 km rather than 16. Its Intermediate band
+ * is 16–24 km and the report's own evidence note for that row is "Moderate; >21 km associated with
+ * faster performance" — Fokkema et al. 2020, n=997, where a longest run beyond 21 km predicted a
+ * faster half. So exceeding the race distance is the supported target for a half specifically, and it
+ * is what an experienced coach will tell you. It is NOT a universal rule: the same table tops the
+ * marathon out at 28–35 km, well under 42.2 km, and puts a half BEGINNER at 12–18 km — under the race
+ * distance on purpose. Beginners never reach this code anyway (`buildBeginnerWeek` ignores peakLong).
+ *
+ * `LONG_CEILING_MIN` still wins, and that is the safety valve: reaching 21.1 km takes a 2:30 runner
+ * 182 minutes and a 2:45 runner 201, so they are capped rather than sent out for three hours before a
+ * half marathon. They land as close as 145 minutes carries them, which is the honest answer.
+ */
+const LONG_FLOOR_KM: Record<Goal["distance"], { recreational: number; competitive: number }> = {
+  "1mile": { recreational: 8, competitive: 12 },   // not in the report; scaled from the 5 km row
+  "5k": { recreational: 10, competitive: 14 },
+  "10k": { recreational: 12, competitive: 16 },
+  half: { recreational: 21.5, competitive: 22 },
+  marathon: { recreational: 24, competitive: 28 },
+};
+
+/**
  * How far below its natural size a plan may be built. Reached only by someone stating a mileage far
  * under what their goal implies. Below it the per-session floors bind anyway — a 20-minute easy run
  * cannot shrink, and the long run does not shrink at all — so lowering this constant buys nothing
  * (measured at 0.45 / 0.35 / 0.25: identical anchoring, identical worst case).
  */
 const MIN_VOLUME_SCALE = 0.45;
-
 
 /**
  * How many weeks of this plan fall under the intensity model's easy floor?
@@ -244,6 +276,16 @@ export function generatePlan(
   const beginner = athlete.experience === "beginner";
   const runWalk = athlete.runWalk ?? false;
 
+  // The distance floor in MINUTES for this runner: how long their own easy pace takes to cover the
+  // endpoint distance their event and ability call for. Computed once — the paces never change.
+  const longFloorMin = (() => {
+    const band = LONG_FLOOR_KM[goal.distance];
+    if (!band) return 0;
+    const km = athlete.experience === "competitive" ? band.competitive : band.recreational;
+    const easySecPerKm = (paces.easy.minSecPerKm + paces.easy.maxSecPerKm) / 2;
+    return Math.round((km * easySecPerKm) / 60);
+  })();
+
   const buildAll = (vScale: number): PlannedWeek[] => {
     // ⚠️ THE LONG RUN GROWS WITH MILEAGE BUT IS NEVER CUT BY IT — note the `Math.max(1, vScale)`,
     // which makes the scaling deliberately one-way. The long run answers the RACE, not the week: a
@@ -263,7 +305,7 @@ export function generatePlan(
     // anchoring still rises from 66% to 79% of profiles.
     const peakLong = Math.min(
       LONG_CEILING_MIN[goal.distance],
-      Math.round(PEAK_LONG_MIN[goal.distance] * Math.max(1, vScale)),
+      Math.max(longFloorMin, Math.round(PEAK_LONG_MIN[goal.distance] * Math.max(1, vScale))),
     );
     const startLong = Math.round(peakLong * (returning ? 0.42 : 0.55));
     return schedule.map((wp, i) => {

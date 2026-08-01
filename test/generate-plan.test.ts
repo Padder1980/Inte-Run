@@ -369,6 +369,44 @@ test("a smaller stated mileage never shortens the long run", () => {
   assert.ok(longestKm(140) > natural, "a much bigger mileage should still lengthen the long run");
 });
 
+test("a half-marathon block builds past the race distance — and the clock still wins", () => {
+  // ⚠️ The plan is built in MINUTES, so before the distance floor everyone got the same 110-minute
+  // long run and it covered whatever their pace covered: 22.4 km for a 1:25 runner, 12.8 km for a
+  // 2:30 one — 61% of the race they were about to attempt. The evidence report's half-marathon row
+  // is "Moderate; >21 km associated with faster performance" (Fokkema 2020, n=997), so exceeding the
+  // race distance is the supported target for a HALF. It is not universal: that same table stops the
+  // marathon at 28–35 km and a half beginner at 12–18 km, both under their race distance.
+  const halfRunner = (fiveKSec: number, experience: Athlete["experience"]): Athlete => ({
+    daysPerWeek: 5,
+    recent: { distanceMeters: 5000, timeSeconds: fiveKSec },
+    experience,
+    includeStrength: true,
+    returningFromInjury: false,
+    longRunDay: 6,
+  });
+  const longest = (a: Athlete) => {
+    const longs = generatePlan(a, { ...goal, distance: "half", targetTimeSeconds: 6600 }).weeks
+      .flatMap((w) => w.sessions.filter((s) => s.type === "long"));
+    return {
+      km: Math.max(...longs.map((s) => (s.estimatedDistanceMeters ?? 0) / 1000)),
+      min: Math.max(...longs.map((s) => s.estimatedDurationSeconds / 60)),
+    };
+  };
+  // Anyone who can cover it inside the time ceiling should be taken past 21.1 km.
+  for (const fiveK of [1080, 1200, 1400, 1500]) {
+    const { km } = longest(halfRunner(fiveK, "recreational"));
+    assert.ok(km > 21.1, `a ${fiveK}s 5 km runner peaks at ${km.toFixed(1)}km — short of the race distance`);
+  }
+  // ⚠️ And the ceiling is what stops that becoming absurd. Reaching 21.1 km takes a 2:30 half runner
+  // 182 minutes; they get as far as 145 minutes carries them and no further. Time on feet is the
+  // injury currency — a three-hour long run before a HALF is a worse error than a short one.
+  for (const fiveK of [1900, 2100, 2400]) {
+    const { km, min } = longest(halfRunner(fiveK, "recreational"));
+    assert.ok(min <= 145 + 0.5, `a ${fiveK}s 5 km runner is sent out for ${min.toFixed(0)} minutes`);
+    assert.ok(km > 15, `a ${fiveK}s 5 km runner peaks at only ${km.toFixed(1)}km`);
+  }
+});
+
 test("scaling down never buys volume with intensity", () => {
   // ⚠️ WHY THE SCALE-DOWN IS SAFE AT ALL. Quality sessions come from the library at a fixed length,
   // so shrinking a plan shrinks only the easy running around them and the hard fraction climbs by

@@ -503,6 +503,37 @@ a big goal still gets more than they asked for. Lowering the constant does **not
 0.45 / 0.35 / 0.25: identical anchoring, identical worst case); `assessFeasibility` is what should
 answer that mismatch, and today it is volume-blind.
 
+## The long run reaches a DISTANCE, not just a duration (added 2026-08-01)
+
+⚠️ **A minutes-only plan silently short-changes slower runners.** `PEAK_LONG_MIN` gave everyone the
+same 110-minute half-marathon long run, so it covered **22.4 km for a 1:25 runner and 12.8 km for a
+2:30 one** — 61% of the race they were about to attempt, and below even the evidence report's
+*Beginner* band. Minutes are the right currency for FATIGUE, which is why `LONG_CEILING_MIN` stays in
+minutes; but a race is a distance, and durability for it is a distance too.
+
+`LONG_FLOOR_KM` is the lower edge of the report's "Event-specific long-run endpoint references"
+table, with `recreational` → its Intermediate row and `competitive` → Advanced (5 km 10/14,
+10 km 12/16, half 16/20, marathon 24/28). Converted to minutes at the runner's own easy pace, applied
+as a **floor** under `peakLong`, with `LONG_CEILING_MIN` still winning.
+
+⚠️ **The half is deliberately set above its band floor — 21.5 km, not 16.** Its Intermediate band is
+16–24 km and the report's evidence note for that row is *"Moderate; >21 km associated with faster
+performance"* (Fokkema et al. 2020, n=997). So for a HALF, exceeding the race distance is the
+supported target, which is also what an experienced coach will say. ⚠️ **It is not a universal rule** —
+the same table tops the marathon out at 28–35 km for a 42.2 km race, and puts a half *beginner* at
+12–18 km, both deliberately under the race distance. Do not "make it consistent" across events.
+
+⚠️ **The ceiling is the safety valve, and it must keep winning.** Reaching 21.1 km takes a 2:30 half
+runner **182 minutes** and a 2:45 runner **201**. They are capped at 145 instead and land as close as
+that carries them (17.5 km and 15.9 km) — a three-hour long run before a half is a worse error than a
+short one. Measured, runners to about 2:00 now clear the race distance and nobody exceeds the ceiling.
+
+Measured across 17,920 weeks, this improved every axis and worsened none: half longest-long/race
+**mean 0.93 → 1.02, min 0.66 → 0.84**; marathon min 0.42 → 0.49; 10 km min 1.09 → 1.36; weeks under
+the intensity floor **7 → 2**; long-run week-on-week jumps over 1.10× **242 → 224**. Beginner plans are
+byte-identical — `buildBeginnerWeek` never reads `peakLong`, which is the separate open problem of a
+beginner never being taken near their race distance at all.
+
 ## Race day is a session (added 2026-08-01, from elite-coach feedback)
 
 ⚠️ **`"race"` is a SessionType, distinct from `"race-specific"`** (which is a rehearsal in

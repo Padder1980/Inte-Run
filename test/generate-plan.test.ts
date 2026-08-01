@@ -262,27 +262,132 @@ test("the peak week lands near 25% above what the runner already does", () => {
   }
 });
 
-test("the volume model only ever builds a plan UP, never down", () => {
-  // ⚠️ THE CENTRAL INVARIANT, and it is a coaching rule before it is a coding one. buildWeek scales
-  // the easy runs and the long run; the quality sessions come from the library at full prescribed
-  // length and do not move. So a smaller week is not a gentler week — it is the SAME hard sessions
-  // on a thinner aerobic base, which is how runners get hurt, and arithmetically it drove the easy
-  // fraction under the intensity model's floor in 175 of 23040 measured weeks.
+test("week one is anchored to the mileage the runner actually stated", () => {
+  // ⚠️ THE CENTRAL INVARIANT, and it is a coaching rule before it is a coding one. The evidence
+  // spec says it three times: "Never jump an athlete to the bottom of a band", "If current tolerated
+  // volume is below the band, start from current load", "Set week one near the athlete's recent
+  // baseline. Do not jump to band minimum."
   //
-  // So a runner who states LESS than their plan naturally builds gets that plan untouched, and the
-  // mismatch is answered by assessFeasibility's warning rather than by quietly shrinking the block.
-  const natural = generatePlan(runner(undefined), goal);
-  for (const stated of [10, 25, 40, 60, 80]) {
-    const p = generatePlan(runner(stated), goal);
-    assert.ok(peakKm(p) >= peakKm(natural) - 0.01,
-      `stating ${stated}km/wk SHRANK the plan: ${peakKm(natural).toFixed(1)} -> ${peakKm(p).toFixed(1)}km`);
+  // The first cut of the volume model could only build UP, so it set a peak destination and left the
+  // START where it had always been: a half-marathon runner answering 10, 25 or 40 km/week got a
+  // byte-identical plan opening at 35.5 km, and 60% of all non-beginner answers changed nothing at
+  // all. Starting BELOW what they stated is fine and safe — the spec's whole concern is the jump
+  // upward — so this asserts a ceiling, not a band.
+  const week1Km = (p: { weeks: PlannedWeek[] }) => p.weeks[0]!.plannedDistanceMeters / 1000;
+  const paced = (days: number, tenKSec: number, experience: Athlete["experience"], vol: number): Athlete => ({
+    daysPerWeek: days,
+    recent: { distanceMeters: 10000, timeSeconds: tenKSec },
+    experience,
+    includeStrength: true,
+    returningFromInjury: false,
+    weeklyVolumeKmCurrent: vol,
+  });
+  const cases = [
+    [5, 3000, "recreational", 25],
+    [5, 3000, "recreational", 40],
+    [4, 2700, "recreational", 30],
+    [5, 2400, "recreational", 55],
+    [6, 1920, "competitive", 80],
+  ] as const;
+  for (const [days, tenK, experience, stated] of cases) {
+    const w1 = week1Km(generatePlan(paced(days, tenK, experience, stated), goal));
+    assert.ok(w1 <= stated * 1.10,
+      `${stated}km/wk over ${days} days opens at ${w1.toFixed(1)}km — ${(w1 / stated).toFixed(2)}x stated, above the 1.10 guardrail`);
   }
-  // And below the natural size it is a strict no-op, not merely a non-shrink.
-  assert.equal(
-    JSON.stringify(generatePlan(runner(40), goal).weeks),
-    JSON.stringify(natural.weeks),
-    "a stated mileage under the plan's own size must leave it byte-identical",
-  );
+});
+
+test("the stated mileage actually changes the plan, in both directions", () => {
+  // The failure this guards is silence: a question that is asked, stored, and then ignored. Before
+  // week-one anchoring, every stated value at or below the plan's natural size produced the same
+  // bytes as leaving the box empty.
+  const blank = JSON.stringify(generatePlan(runner(undefined), goal).weeks);
+  for (const stated of [25, 45, 120]) {
+    assert.notEqual(JSON.stringify(generatePlan(runner(stated), goal).weeks), blank,
+      `stating ${stated}km/wk produced the same plan as saying nothing`);
+  }
+  assert.ok(peakKm(generatePlan(runner(30), goal)) < peakKm(generatePlan(runner(90), goal)),
+    "a 30km/wk runner should not peak at or above a 90km/wk runner");
+});
+
+test("saying you run MORE never hands you a smaller plan", () => {
+  // ⚠️ MONOTONICITY. The intensity back-off used to take one coarse step toward 1
+  // (`scale + (1 - scale) / 2`), which overshot the entire safe interval — for one measured runner
+  // the smallest safe scale was 0.481 and the step landed on 0.730. Which side of that jump you
+  // landed on was not monotone in the stated mileage, so answering 30 km/week produced a plan 32%
+  // smaller than answering 29, and on the form's own 5 km spinner one click UP shrank the first week
+  // by more than 10% in 20 of 96 configurations. A runner cannot trust a question that punishes them
+  // for a bigger honest answer.
+  // The bar is a CLIFF, not perfect monotonicity: plans are built in whole minutes and the scale
+  // search is discrete, so ±2% wobble between adjacent answers is inherent (the unscaled engine has
+  // it too, at 1%). Measured across 256 configurations x 60 stated values — proper bisection: worst
+  // drop 2%. The single coarse step it replaced: worst drop 19%.
+  const cases = [
+    // ⚠️ THE FIRST TWO ROWS WERE CHOSEN BY SEARCH, not by taste. Restoring the coarse single step
+    // makes them fail (week one drops 17% between stating 21 and 22 km/week, and 13% between 26 and
+    // 27) while the shipped bisection holds them at 0%. My first three hand-picked rows all passed
+    // under the broken version — a test written from intuition about where a bug "should" show up
+    // guards nothing. Slower runners on four days are the ones this bit, because they are where the
+    // intensity check actually binds.
+    ["5k", 4, 2100, "competitive", 4, 1200],
+    ["half", 4, 2100, "competitive", 5, 5400],
+    ["half", 5, 1500, "recreational", 6, 6300],
+    ["marathon", 4, 1800, "recreational", 6, 14400],
+  ] as const;
+  for (const [distance, days, fiveK, experience, longRunDay, target] of cases) {
+    const week1 = (v: number) => generatePlan(
+      { daysPerWeek: days, recent: { distanceMeters: 5000, timeSeconds: fiveK }, experience,
+        includeStrength: true, returningFromInjury: false, longRunDay, weeklyVolumeKmCurrent: v },
+      { ...goal, distance, targetTimeSeconds: target },
+    ).weeks[0]!.plannedDistanceMeters / 1000;
+    let prev = week1(12);
+    for (let v = 13; v <= 70; v++) {
+      const cur = week1(v);
+      assert.ok(cur >= prev * 0.97,
+        `${distance} ${days}d/${fiveK}s: stating ${v}km/wk gives a first week ${(100 * (1 - cur / prev)).toFixed(0)}% ` +
+        `SMALLER than stating ${v - 1}km/wk (${prev.toFixed(1)} -> ${cur.toFixed(1)}km)`);
+      prev = cur;
+    }
+  }
+});
+
+test("a smaller stated mileage never shortens the long run", () => {
+  // ⚠️ vScale reaches only the long run and the easy runs; easy runs stop at 20 minutes and quality
+  // never moves, so once it was allowed to cut the long run EVERY further unit of shrink came out of
+  // that one session. Measured: a marathon runner stating 30 km/week was given a longest run of
+  // 10.3 km against 22.6 km unstated, and a half-marathoner 8.8 km for a 21.1 km race — shorter than
+  // the midweek workout beside it. The long run answers the RACE, not the week, so it grows with a
+  // bigger mileage and is never cut by a smaller one. The intensity guard cannot see this: a shorter
+  // long run removes easy minutes proportionally, so the ratio stays healthy while the plan rots.
+  const longestKm = (v?: number) => Math.max(...generatePlan(runner(v), goal).weeks
+    .flatMap((w) => w.sessions.filter((s) => s.type === "long")
+      .map((s) => (s.estimatedDistanceMeters ?? 0) / 1000)));
+  const natural = longestKm(undefined);
+  for (const stated of [5, 10, 15, 20, 25, 30, 40, 60]) {
+    assert.ok(longestKm(stated) >= natural - 0.05,
+      `stating ${stated}km/wk cut the longest run from ${natural.toFixed(1)} to ${longestKm(stated).toFixed(1)}km`);
+  }
+  assert.ok(longestKm(140) > natural, "a much bigger mileage should still lengthen the long run");
+});
+
+test("scaling down never buys volume with intensity", () => {
+  // ⚠️ WHY THE SCALE-DOWN IS SAFE AT ALL. Quality sessions come from the library at a fixed length,
+  // so shrinking a plan shrinks only the easy running around them and the hard fraction climbs by
+  // arithmetic. That is what made an earlier attempt put 175 of 23040 weeks under the easy floor,
+  // and why the model refused to scale down at all for a day. Two things fix it: fewer key days in a
+  // smaller week, and generatePlan checking the result rather than assuming it. The check is what
+  // makes this hold even if the session library changes underneath it.
+  for (const stated of [10, 15, 20, 25, 30, 40]) {
+    const scaled = generatePlan(runner(stated), goal);
+    const natural = generatePlan(runner(undefined), goal);
+    const worstOf = (p: typeof scaled) => Math.min(...p.weeks
+      .filter((w) => !w.sessions.some((s) => s.type === "race"))
+      .map((w) => computeDistribution(w.sessions))
+      .filter((d) => d.totalSeconds > 0)
+      .map((d) => d.easy));
+    assert.ok(worstOf(scaled) >= Math.min(0.68, worstOf(natural)) - 0.005,
+      `stating ${stated}km/wk drove a week to ${(worstOf(scaled) * 100).toFixed(1)}% easy ` +
+      `(unscaled worst ${(worstOf(natural) * 100).toFixed(1)}%)`);
+  }
 });
 
 test("a runner who does not state their mileage gets the plan unchanged", () => {

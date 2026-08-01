@@ -391,16 +391,71 @@ natural peak depends on days-per-week as well as race distance, and a **single**
 a 50 km/week runner peaking at 81 km (a 62% jump, not the 25% intended). `buildAll(vScale)` is
 rebuilt to a fixed point, ≤5 passes, 3% tolerance.
 
-⚠️ **THE SCALE FLOOR IS 1 — this model may only build a plan UP.** `vScale` reaches exactly two
-places: the long run (`peakLong`) and the easy runs. Quality keeps its full library length, so
-scaling DOWN shrinks the denominator while the hard minutes stay put and the easy fraction falls as
-pure arithmetic — **175 of 23040 measured weeks went under the intensity model's 0.68 easy floor**,
-the invariant the section above records as never breached. Worse as coaching than as accounting: a
-smaller week with the *same* hard sessions is a harder week on a thinner base. One measured case —
-half, 4 days, 25 km stated — produced a peak week at 64% easy whose "long run" was **shorter than the
-workout beside it**. A runner who states less than their plan naturally builds gets it unchanged;
-`assessFeasibility` is what answers the mismatch. Building a genuinely smaller week needs the quality
-sessions to shrink too, which is a periodisation change, not a scale factor.
+⚠️ **IT SCALES DOWN AS WELL AS UP — week one is anchored to the stated mileage.** The first cut set a
+peak destination and left the START where it had always been, so a half-marathon runner answering
+**10, 25 or 40 km/week got a byte-identical plan opening at 35.5 km**, and **60% of all non-beginner
+answers changed nothing at all** while the question on screen promised otherwise. The evidence spec
+(`Evidence_Based_Running_Training_Prescription_Engine.html`, commissioned 2026-08-01) says it three
+times: *"Never jump an athlete to the bottom of a band"*, *"If current tolerated volume is below the
+band, start from current load"*, *"Set week one near the athlete's recent baseline. Do not jump to
+band minimum."* Measured after: **week one is within 1.10× stated in 90% of realistic profiles**
+(was 54%), and starting *below* stated is fine — the spec's whole concern is the jump upward.
+
+⚠️ **THE LONG RUN GROWS WITH MILEAGE BUT IS NEVER CUT BY IT** (`Math.max(1, vScale)` on `peakLong`).
+It answers the RACE, not the week: a runner on 25 km/week still has to build toward a 17 km long run
+before a half, and that progression *is* the plan. Letting `vScale` cut it was measured as
+destructive — because `vScale` reaches only the long run and the easy runs, and the easy runs stop at
+20 minutes while quality never moves, every further unit of shrink came out of the long run alone. A
+marathon runner stating 30 km/week got a longest run of **10.3 km** (22.6 km unstated); a
+half-marathoner **8.8 km** for a 21.1 km race; and in 48 of 144 realistic profiles the "long run"
+ended up **shorter than the midweek workout beside it** — the exact incoherence that made the first
+attempt abandon down-scaling. ⚠️ **The intensity guard cannot catch this**: a shorter long run removes
+easy minutes proportionally, so the *ratio* stays healthy while the structure rots. With the one-way
+rule, long-run size is identical to never scaling down (mean longest-long/race 1.20 either way,
+inversions 14.3% vs 14.4%) and anchoring still rises 66% → 79%.
+
+⚠️ **Validate the plan the runner is GIVEN, transforms and all.** `buildFull` runs
+`applyPartialFirstWeek` + `applyRaceDay` before the check. Both strip *easy* running out of a week
+while leaving its quality session in place, so validating the pre-transform weeks measures a plan
+nobody receives: 969 of 52,920 profiles were delivered a first week under the floor that the check had
+passed. The web layer defaults the start date to **today**, so a partial first week is the normal
+case. Measured over 210,944 weeks: validating the delivered plan gives 3450 under-floor weeks vs 3495
+pre-transform and 3482 unscaled — i.e. better than doing nothing, which the other two orderings are not.
+
+⚠️ **BISECT the back-off; never step.** `scale + (1 - scale) / 2` overshoots the whole safe interval —
+for one measured runner the smallest safe scale was 0.481, the failing fit 0.459, and a single step
+landed on **0.730**, skipping 84% of the usable range. Which side you landed on is not monotone in the
+stated mileage, so **answering 30 km/week produced a 32% smaller plan than answering 29**, and on the
+form's own 5 km spinner one click *up* shrank week one by >10% in 20 of 96 configurations. Worst drop:
+19% stepping, **2% bisecting** (the unscaled engine's own discretisation noise is 1%).
+
+⚠️ **Two things make scaling down safe, and BOTH are load-bearing.** `vScale` reaches only the long
+run (`peakLong`) and the easy runs; quality keeps its full library length, so shrinking a plan
+shrinks the easy running around fixed hard sessions and the hard fraction climbs by pure arithmetic
+(that is what put **175 of 23040 weeks** under the 0.68 easy floor on the first attempt).
+1. **Fewer key days in a smaller week** — `qualitySessionsThisWeek` caps quality at 1 outside peak
+   when `vScale < 0.9`, the same rule as the existing four-day cap but measured in volume. The
+   evidence spec pairs a smaller week with fewer key days for exactly this reason (Intermediate 1–2,
+   Advanced 2).
+2. **`generatePlan` CHECKS the result instead of assuming it** — `intensityProfile` + `noWorse`. A
+   down-scaled plan is accepted only if it adds no week under the floor and drives no week deeper
+   than the unscaled plan's own worst; otherwise the scale walks back toward 1, and failing that the
+   unscaled plan is used. A post-condition survives a future change to the session library. A fixed
+   floor of 1 never guaranteed anything — it only avoided the question.
+
+⚠️ **Three ways of writing that check are wrong, each measured.** Absolute compliance condemns the
+scaled plan for an *inherited* fault (28 of 1792 weeks are already under the floor with **no** stated
+volume — a 3-day 5 km block for a slow runner, worst 54.5% easy) and hands back an unscaled plan that
+breaches just as often. Breach **count** alone lets a shallow breach be swapped for a deep one
+(54.5% → 47.1%). Comparing **minima** (`cand.minEasy >= base.minEasy`) sounds equivalent to a floor
+and is not — every down-scale nudges some comfortable week down a little, so 80% → 75% is rejected
+though both are far above the floor, which turned the fix off for most runners (anchoring fell back
+to 78%). It needs the count **and** a floor of `min(modelFloor, base.minEasy)`.
+
+⚠️ **Only check when scaling DOWN.** Scaling up adds easy running and nothing else, so it cannot
+lower an easy fraction; running the check anyway is actively harmful, because a plan that already
+breached at its natural size gets "corrected" back to that same breaching plan with the runner's
+mileage discarded — measured, 8 breaching configurations became 15.
 
 ⚠️ **The web field is `profile.volKm`, NOT `profile.weeklyVolumeKm`, and that is the whole point.**
 `weeklyVolumeKm: 30` sat in `DEFAULT_PROFILE` from the first commit with **no screen that ever asked
@@ -413,6 +468,13 @@ brand-new key cannot be pre-filled by history, so absent means unanswered and th
 genuinely opt-in. `classifyRunner` now reads `volKm` too (its result, `CLASS`, is assigned and read
 nowhere). Do not "tidy" this back onto one field.
 
+⚠️ **Pick regression cases by SEARCH, not by taste.** The monotonicity test's first three athletes
+were hand-picked and every one of them passed under the broken coarse step. The rows that actually
+discriminate (`5k 4d 35:00 competitive`, `half 4d 35:00 competitive`) were found by sweeping 480
+configurations for one that fails with the old code and holds with the new — slower runners on four
+days, because that is where the intensity check binds. A test written from intuition about where a bug
+"should" appear guards nothing; re-break the fix and watch the test fail before believing it.
+
 ⚠️ **Any new axis must be added to `test/session-library.test.ts`'s intensity sweep.** That sweep is
 the guard for the easy floor, and its athlete did not set `weeklyVolumeKmCurrent` — so the entire new
 dimension was untested and the suite stayed green through the regression above. The sweep now varies
@@ -424,9 +486,22 @@ Beginners are exempt (`experience === "beginner"`, i.e. status *new* and *buildi
 progression is deliberately gentle and volume-independent. `syncStatus()` therefore **hides** the
 question for those statuses — a question whose answer is thrown away is worse than no question.
 
+⚠️ **A pre-existing gap the volume work surfaced but did not cause:** 28 of 1792 measured weeks sit
+under the easy floor with **no stated volume at all** — 3-day and 4-day 5 km blocks for slower
+runners, where one library-length quality session is simply a large share of a small week. Identical
+before and after this change (verified against `git archive HEAD`), so it is not a regression, but
+`test/session-library.test.ts`'s sweep does not see it: that sweep uses a single 18:20 5 km athlete,
+and these cases need a slower one. CLAUDE.md's "0 of 2816 weeks" claim is therefore narrower than it
+sounds — it is true of that sweep, not of the product. Not fixed here; fixing it means shrinking
+quality sessions for slow runners on few days a week, which is a session-library change.
+
 Known and deliberately not fixed: past roughly 130 km/week the per-session caps bind, because that
 mileage cannot be run in six single runs — it needs **doubles**, which the generator cannot schedule.
-An honest 130 beats a fictional 175.
+An honest 130 beats a fictional 175. And below roughly `MIN_VOLUME_SCALE` (0.45) the per-session
+floors bind instead — a 20-minute easy run cannot shrink — so a runner stating a very low mileage for
+a big goal still gets more than they asked for. Lowering the constant does **not** help (measured at
+0.45 / 0.35 / 0.25: identical anchoring, identical worst case); `assessFeasibility` is what should
+answer that mismatch, and today it is volume-blind.
 
 ## Race day is a session (added 2026-08-01, from elite-coach feedback)
 

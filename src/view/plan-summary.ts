@@ -169,8 +169,20 @@ export function buildPlanSummary(athlete: Athlete, goal: Goal): PlanSummary {
   const weeks = plan.weeks.map(weekView);
   const peakKm = Math.max(...weeks.map((w) => w.distanceKm), 0);
   const totalQuality = weeks.reduce((sum, w) => sum + w.quality, 0);
+  // Which week the Plan screen opens on: a representative one, not week 1.
+  //
+  // ⚠️ THE FALLBACK MATTERS AS MUCH AS THE RULE. This looked for a build week with two quality
+  // sessions and fell straight through to `weeks[0]` — which is the PARTIAL first week, often two or
+  // three sessions and the rest rest days. Once a small stated mileage could cap a week at one key
+  // day, no build week reached two and every such runner opened the Plan tab on a stub that reads as
+  // "the app has barely given me anything", at the exact moment they are judging the plan. Step down
+  // through weaker preferences instead of off a cliff.
   const defaultWeekIndex =
-    weeks.find((w) => w.phase === "build" && w.quality >= 2)?.index ?? weeks[0]?.index ?? 1;
+    weeks.find((w) => w.phase === "build" && w.quality >= 2)?.index ??
+    weeks.find((w) => w.phase === "build" && w.quality >= 1)?.index ??
+    weeks.find((w) => w.phase === "build")?.index ??
+    weeks.find((w, i) => i > 0 && w.quality >= 1)?.index ??
+    weeks[1]?.index ?? weeks[0]?.index ?? 1;
 
   return {
     goal: {

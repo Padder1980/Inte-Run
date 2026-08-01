@@ -20,7 +20,13 @@ import type {
   SessionType,
   TrainingPaces,
 } from "../domain/types.ts";
-import { chooseModel } from "../science/intensity-distribution.ts";
+import {
+  TID_TARGETS,
+  TID_TOLERANCE,
+  chooseModel,
+  computeDistribution,
+  honoursModel,
+} from "../science/intensity-distribution.ts";
 import { computeMas, masVo2Range } from "../science/mas.ts";
 import { deriveTrainingPaces, reconcileVo2, withHrZones } from "../science/paces.ts";
 import { taperFor } from "../science/taper.ts";
@@ -82,6 +88,79 @@ const LONG_CEILING_MIN: Record<Goal["distance"], number> = {
   half: 145,
   marathon: 180,
 };
+
+/**
+ * How far below its natural size a plan may be built. Reached only by someone stating a mileage far
+ * under what their goal implies. Below it the per-session floors bind anyway — a 20-minute easy run
+ * cannot shrink, and the long run does not shrink at all — so lowering this constant buys nothing
+ * (measured at 0.45 / 0.35 / 0.25: identical anchoring, identical worst case).
+ */
+const MIN_VOLUME_SCALE = 0.45;
+
+
+/**
+ * How many weeks of this plan fall under the intensity model's easy floor?
+ *
+ * ⚠️ The RACE week is exempt, and only the race week — it contains a maximal effort over the race
+ * distance, so judging it against a training distribution judges the race as if it were a workout.
+ * Same exemption, same reason, as the sweep in test/session-library.test.ts.
+ *
+ * ⚠️ This returns a COUNT, not a yes/no, because the question that matters is comparative. A handful
+ * of configurations (measured: 28 of 1792 weeks, worst 54.5% easy, a 3-day 5 km block for a slow
+ * runner) sit under the floor with NO stated volume at all — so an absolute test would condemn the
+ * scaled plan for a fault it inherited, and hand the runner back an unscaled plan that breaches just
+ * as often. Compare like with like: down-scaling has to be no worse than the plan they would
+ * otherwise have received.
+ */
+function intensityProfile(
+  weeks: PlannedWeek[],
+  model: IntensityModel,
+): { breaches: number; minEasy: number } {
+  let breaches = 0;
+  let minEasy = 1;
+  for (const w of weeks) {
+    if (w.sessions.some((s) => s.type === "race")) continue;
+    const d = computeDistribution(w.sessions);
+    if (d.totalSeconds === 0) continue;
+    if (d.easy < minEasy) minEasy = d.easy;
+    if (!honoursModel(d, model)) breaches++;
+  }
+  return { breaches, minEasy };
+}
+
+/**
+ * The easy fraction no week of a down-scaled plan may fall below.
+ *
+ * Normally the intensity model's own floor. But a handful of configurations already sit under it
+ * before any scaling (measured: 28 of 1792 weeks, worst 54.5% easy — a 3-day 5 km block for a slow
+ * runner, where one library-length quality session is simply a large share of a small week). Holding
+ * a scaled plan to a standard its own unscaled version fails would condemn it for an inherited
+ * fault and hand the runner back a plan that breaches just as often, with their mileage discarded.
+ * So the bar is "no deeper than it already was", and in every healthy plan that IS the model floor.
+ *
+ * ⚠️ It is a FLOOR, not a comparison of minima. Requiring `cand.minEasy >= base.minEasy` sounds
+ * equivalent and is not: every down-scale nudges some comfortable week down a little, so a plan
+ * going from 80% to 75% easy — both far above the floor — would be rejected. Measured, that turned
+ * the fix off for most runners (week-one anchoring fell from 90% back to 78%, and the headline
+ * 25 km/week runner was handed the unchanged 35.5 km week again).
+ */
+function easyFloorFor(model: IntensityModel, base: { minEasy: number }): number {
+  return Math.min(TID_TARGETS[model].easy - TID_TOLERANCE, base.minEasy) - 0.005;
+}
+
+/**
+ * Accept a down-scaled plan only if it is worse than the unscaled one in NEITHER way: no extra weeks
+ * under the model's floor, and no week deeper than the unscaled plan's own worst. Either test alone
+ * has a measured hole — the count alone lets a shallow breach be swapped for a deep one (54.5% easy
+ * became 47.1%), and the depth alone lets the number of breaching weeks drift up (28 became 33).
+ */
+function noWorse(
+  cand: { breaches: number; minEasy: number },
+  base: { breaches: number; minEasy: number },
+  floor: number,
+): boolean {
+  return cand.breaches <= base.breaches && cand.minEasy >= floor;
+}
 
 /**
  * How much to scale the plan's volume for the runner actually in front of it.
@@ -166,9 +245,25 @@ export function generatePlan(
   const runWalk = athlete.runWalk ?? false;
 
   const buildAll = (vScale: number): PlannedWeek[] => {
+    // ⚠️ THE LONG RUN GROWS WITH MILEAGE BUT IS NEVER CUT BY IT — note the `Math.max(1, vScale)`,
+    // which makes the scaling deliberately one-way. The long run answers the RACE, not the week: a
+    // runner doing 25 km/week still has to build toward a 17 km long run before a half marathon, and
+    // that progression IS the plan. What a smaller week should give up is easy filler and hard days.
+    //
+    // Letting vScale cut it was measured as destructive, because vScale reaches only the long run and
+    // the easy runs — the easy runs stop at 20 minutes and quality never moves at all, so past a
+    // modest shrink EVERY further unit came out of the long run alone. A marathon runner stating
+    // 30 km/week got a longest run of 10.3 km (22.6 km unstated); a half-marathoner 8.8 km for a
+    // 21.1 km race; and in 48 of 144 realistic profiles the "long run" ended up SHORTER than a
+    // midweek workout in the same week — precisely the incoherence that made an earlier attempt
+    // abandon down-scaling altogether. The intensity guard below cannot catch any of it: a shorter
+    // long run removes easy minutes proportionally, so the RATIO stays healthy while the structure
+    // falls apart. Measured with this rule, long-run size is identical to not scaling down at all
+    // (mean longest-long/race-distance 1.20 either way; inversions 14.3% vs 14.4%), and week-one
+    // anchoring still rises from 66% to 79% of profiles.
     const peakLong = Math.min(
       LONG_CEILING_MIN[goal.distance],
-      Math.round(PEAK_LONG_MIN[goal.distance] * vScale),
+      Math.round(PEAK_LONG_MIN[goal.distance] * Math.max(1, vScale)),
     );
     const startLong = Math.round(peakLong * (returning ? 0.42 : 0.55));
     return schedule.map((wp, i) => {
@@ -207,38 +302,91 @@ export function generatePlan(
   // schedule yet. Better to hand a high-mileage runner an honest 130 than a fictional 175.
   //
   // Beginners are exempt: their progression is deliberately gentle and volume-independent.
-  let weeks = buildAll(1);
+  //
+  // ⚠️ IT SCALES DOWN AS WELL AS UP, AND THAT IS THE POINT — a plan is only "built on what you
+  // already do" if it starts near what you already do. The evidence spec says so three times over:
+  // "Never jump an athlete to the bottom of a band", "If current tolerated volume is below the band,
+  // start from current load", "Set week one near the athlete's recent baseline. Do not jump to band
+  // minimum." Building UP only, which is what shipped first, meant a half-marathon runner who
+  // answered 10, 25 or 40 km/week got a byte-identical plan opening at 35.5 km — 60% of non-beginner
+  // answers changed nothing at all, while the question on screen promised otherwise.
+  //
+  // Scaling down is what BREAKS the easy-fraction floor if done naively (quality keeps its full
+  // library length while the easy running shrinks around it), so the floor is enforced here by
+  // CONSTRUCTION rather than by a blanket refusal: build the candidate, then check every week
+  // against the intensity model, and walk the scale back toward 1 until it passes. A plan that
+  // cannot be shrunk safely is simply not shrunk. That makes the invariant impossible to lose to a
+  // future change in the session library, which a fixed floor of 1 never guaranteed — it only
+  // avoided the question.
+  // ⚠️ BUILD THE PLAN THE RUNNER ACTUALLY GETS, transforms and all, and judge THAT. The partial
+  // first week and race day are not cosmetic: applyPartialFirstWeek deletes week 1's sessions before
+  // the start day, and applyRaceDay clears race eve — both strip EASY running out of a week while
+  // leaving its quality session in place. Validating the pre-transform weeks (which is what the
+  // first version of this did) measured a plan nobody is ever given: 969 of 52,920 profiles were
+  // delivered a first week under the easy floor that the check had passed, and the web layer
+  // defaults the start date to today, so a partial first week is the normal case, not an edge one.
+  const buildFull = (vScale: number): PlannedWeek[] => {
+    const w = buildAll(vScale);
+    applyPartialFirstWeek(w, startIso);
+    applyRaceDay(w, goal, paces);
+    return w;
+  };
+  // The fixed point is fitted on the FULL weeks only. Race week is a race, and the partial first
+  // week is a fragment; neither describes how big this plan is, and letting either into the peak
+  // measurement makes the fit chase a number the runner never trains at.
+  const fittedPeakKm = (ws: PlannedWeek[]): number => {
+    const full = ws.filter((w, i) => i > 0 && !w.sessions.some((s) => s.type === "race"));
+    return full.length ? Math.max(...full.map((w) => w.plannedDistanceMeters)) / 1000 : 0;
+  };
+
+  const natural = buildFull(1);
+  let weeks = natural;
   if (targetPeakKm && !beginner) {
     let scale = 1;
     for (let pass = 0; pass < 5; pass++) {
-      const peakKm = Math.max(...weeks.map((w) => w.plannedDistanceMeters)) / 1000;
+      const peakKm = fittedPeakKm(weeks);
       if (peakKm <= 0) break;
       const ratio = targetPeakKm / peakKm;
       if (Math.abs(ratio - 1) < 0.03) break;   // within 3% — closer than the input is accurate
-      // ⚠️ THE FLOOR IS 1: this model may only scale a plan UP. buildWeek scales the easy runs and
-      // the long run; the quality sessions come from the library at full prescribed length and do
-      // not move at all. Scaling DOWN therefore shrinks the denominator while the hard minutes stay
-      // put, and the easy fraction falls purely as arithmetic — measured across 23040 weeks, low
-      // stated mileages pushed 175 of them under the intensity model's easy floor (0.68), an
-      // invariant this file's own sweep records as never breached. One case: half, 4 days, 25 km
-      // stated — a peak week at 64% easy, with a "long run" shorter than the workout beside it.
-      // The coach's complaint was that HIGH-mileage runners were under-served, and that is the half
-      // this fixes. Building a genuinely smaller week needs the quality sessions to shrink with it,
-      // which is a periodisation change, not a scale factor. Until then a runner who states less
-      // than the plan asks for gets the plan unchanged plus the existing feasibility warning.
-      // The upper clamp keeps a mistyped mileage from producing an absurd plan; the per-session
-      // ceilings (LONG_CEILING_MIN, and the easy-run bounds in buildWeek) are the real safety net.
-      const next = Math.max(1, Math.min(3, scale * ratio));
+      // Clamped so a mistyped mileage cannot produce an absurd plan. The lower bound is generous
+      // because the per-session floors (a 20-minute easy run, the long-run floor above) bind long
+      // before it does; the upper one matters more, since LONG_CEILING_MIN and the 95-minute easy
+      // cap are what actually stop a fictional 250 km/week plan.
+      const next = Math.max(MIN_VOLUME_SCALE, Math.min(3, scale * ratio));
       if (Math.abs(next - scale) < 0.01) break;   // the caps are binding; further passes are futile
       scale = next;
-      weeks = buildAll(scale);
+      weeks = buildFull(scale);
+    }
+    // ⚠️ THE INTENSITY FLOOR IS A POST-CONDITION, NOT AN ASSUMPTION — but only for scaling DOWN.
+    // Scaling UP adds easy running and nothing else, so it cannot reduce an easy fraction and needs
+    // no check; running one anyway is actively harmful, because a plan that already breached at its
+    // natural size would be "corrected" back to that same breaching plan with the runner's mileage
+    // thrown away (measured: 8 breaching configurations became 15 that way).
+    //
+    // ⚠️ BISECT — do not take one step toward 1. `scale + (1 - scale) / 2` overshoots the entire safe
+    // interval: for one measured runner the smallest safe scale was 0.481, the failing fit was 0.459,
+    // and a single step landed on 0.730 — skipping 84% of the usable range. Because which side of
+    // that jump you land on is not monotone in the stated mileage, answering 30 km/week produced a
+    // 32% SMALLER plan than answering 29, and on the form's own 5 km spinner one click up shrank the
+    // first week by more than 10% in 20 of 96 configurations. A runner who says they run more must
+    // never be handed less; a proper search on [scale, 1] restores that.
+    if (scale < 1) {
+      const base = intensityProfile(natural, model);
+      const floor = easyFloorFor(model, base);
+      const ok = (ws: PlannedWeek[]) => noWorse(intensityProfile(ws, model), base, floor);
+      if (!ok(weeks)) {
+        let lo = scale;            // known bad (or at least unproven)
+        let hi = 1;                // known good: the plan they would otherwise have received
+        let best: PlannedWeek[] | null = null;
+        for (let i = 0; i < 6 && hi - lo > 0.01; i++) {
+          const mid = (lo + hi) / 2;
+          const cand = buildFull(mid);
+          if (ok(cand)) { hi = mid; best = cand; } else { lo = mid; }
+        }
+        weeks = best ?? natural;
+      }
     }
   }
-
-  // If the athlete starts mid-week, make week 1 pro-rata: drop the sessions that fall before the
-  // start day; full Monday–Sunday weeks follow.
-  applyPartialFirstWeek(weeks, startIso);
-  applyRaceDay(weeks, goal, paces);
 
   return {
     goal,
@@ -273,7 +421,7 @@ function buildWeek(
   ctx: WeekContext,
 ): PlannedWeek {
   const runningDays = Math.min(6, Math.max(3, ctx.athlete.daysPerWeek));
-  const qualityCount = qualitySessionsThisWeek(wp, runningDays, ctx.returning);
+  const qualityCount = qualitySessionsThisWeek(wp, runningDays, ctx.returning, ctx.vScale ?? 1);
   const easyCount = Math.max(0, runningDays - qualityCount - 1); // minus the long run
   const longDay = longRunDayOf(ctx.athlete);
 
@@ -387,12 +535,25 @@ function applyRaceDay(weeks: PlannedWeek[], goal: Goal, paces: TrainingPaces): v
     : weeks.length > 1 ? { week: weeks[weeks.length - 2]!, dow: 6 }
     : null;
 
+  // ⚠️ Rule 3 has a POSITIVE half: the day before is "a shakeout at most", not a void. Clearing the
+  // eve to nothing is what the code used to do, and for a Monday race the session being cleared is
+  // the previous week's LONG RUN — so that whole week lost its aerobic backbone and its easy
+  // fraction fell to 66.7%, under the intensity floor, in a week that still held a race-specific
+  // session. A 20-minute jog the day before a goal race is ordinary practice, keeps the week honest,
+  // and is what the rule always claimed to prescribe.
+  let clearedEve = false;
   const kept = last.sessions.filter((s) => {
     if (s.dayOfWeek > raceDow) return false;               // rule 2: nothing after the race
     if (s.dayOfWeek === raceDow) return false;             // rule 1: race day is the race
-    if (eve && eve.week === last && s.dayOfWeek === eve.dow && HARD_BEFORE_RACE.has(s.type)) return false;  // rule 3
+    if (eve && eve.week === last && s.dayOfWeek === eve.dow && HARD_BEFORE_RACE.has(s.type)) {
+      clearedEve = true;                                   // rule 3
+      return false;
+    }
     return true;
   });
+  if (clearedEve && eve && !kept.some((s) => s.dayOfWeek === eve.dow)) {
+    kept.push(shakeoutSession(paces, last.index, eve.dow));
+  }
 
   const race: Session = {
     ...raceDay(paces, goal.distance, label),
@@ -423,11 +584,15 @@ function applyRaceDay(weeks: PlannedWeek[], goal: Goal, paces: TrainingPaces): v
   // rather than dropped, so the week keeps all seven days like every other week in the plan.
   if (eve && eve.week !== last) {
     const w = eve.week;
-    w.sessions = w.sessions.map((s) =>
-      s.dayOfWeek === eve.dow && HARD_BEFORE_RACE.has(s.type)
-        ? { ...restDay(), id: `w${w.index}-d${eve.dow}-rest`, dayOfWeek: eve.dow, source: "generated" as const }
-        : s,
-    );
+    let replaced = false;
+    w.sessions = w.sessions.flatMap((s) => {
+      if (s.dayOfWeek !== eve.dow || !HARD_BEFORE_RACE.has(s.type)) return [s];
+      // The first hard session on the eve becomes the shakeout; any others (strength beside a long
+      // run) simply go, so the day holds one easy jog rather than a jog plus a lift.
+      if (replaced) return [];
+      replaced = true;
+      return [shakeoutSession(paces, w.index, eve.dow)];
+    });
     w.plannedDistanceMeters = Math.round(
       w.sessions.reduce((m, s) => m + (s.estimatedDistanceMeters ?? 0), 0),
     );
@@ -435,6 +600,17 @@ function applyRaceDay(weeks: PlannedWeek[], goal: Goal, paces: TrainingPaces): v
       (s) => s.type === "threshold" || s.type === "vo2" || s.type === "race-specific",
     ).length;
   }
+}
+
+/** The day before a goal race: legs turned over, nothing taken out of them. */
+function shakeoutSession(paces: TrainingPaces, weekIndex: number, dow: number): Session {
+  return {
+    ...easyRun(paces, 20),
+    title: "Pre-race shakeout",
+    id: `w${weekIndex}-d${dow}-shakeout`,
+    dayOfWeek: dow,
+    source: "generated",
+  };
 }
 
 /** Session types that must not sit the day before a goal race. */
@@ -597,9 +773,20 @@ function qualitySessionsThisWeek(
   wp: AnnotatedWeek,
   runningDays: number,
   returning: boolean,
+  vScale = 1,
 ): number {
   if (runningDays < 4) return 1; // low frequency → protect easy volume, one quality
   if (wp.isDeload) return 1;
+  // ⚠️ A SMALL WEEK CANNOT CARRY TWO KEY DAYS — the same rule as the four-day cap below, measured in
+  // volume rather than in days. Quality sessions come from the library at a fixed length whatever the
+  // week around them weighs, so shrinking a plan shrinks only the easy running and the hard fraction
+  // climbs by pure arithmetic. That is what made scaling down unsafe before: a runner who told us
+  // they run 25 km/week got the same two threshold/VO2 sessions as one running 60, on half the base.
+  // The evidence spec pairs a smaller week with FEWER key days for exactly this reason (Intermediate
+  // 1–2, Advanced 2), and this is that lever. Peak weeks keep their second session: a short sharp
+  // overload with the taper behind it is the intent, and volumeScale's own intensity check is what
+  // actually guarantees the floor holds.
+  if (vScale < 0.9 && wp.phase !== "peak") return Math.min(qualityByPhase(wp, returning), 1);
   // ⚠️ The four-day cap below is a CEILING applied to the phase's own answer, not a short-circuit
   // before it. Returning 1 up here overrode the base phase's pure-aerobic foundation block, which
   // deliberately returns 0 — so a beginner's first weeks gained a quality session they should not

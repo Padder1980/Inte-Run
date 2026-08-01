@@ -5076,7 +5076,13 @@ function draftFromForm() {
     fitSrc, recentDistM, recentTimeS, noRecent, easyPaceS, oneKmS, daysPerWeek: Number(draft.days), yearsRunning: profile.yearsRunning || 3,
     // "Building the habit" with no easy pace given: calibrate from their first run instead.
     autoPace: status === "building" && !easyPaceS,
-    volKm: volEl && volEl.value !== "" ? Math.max(0, Math.min(250, Number(volEl.value) || 0)) : 0,
+    // ⚠️ Only count the mileage if the question was actually ON SCREEN. syncStatus() hides it for
+    // the beginner statuses, but hiding is display:none — the input keeps its value, so a number
+    // typed as a "regular" runner was silently re-saved and re-applied after switching to
+    // "building", where the runner can no longer see it, change it or clear it. It used to be
+    // harmless because a stale value could only build the plan UP; now that it can shrink one, an
+    // invisible answer reshaping the plan is a bug the runner cannot even diagnose.
+    volKm: volEl && volEl.value !== "" && !volQHidden() ? Math.max(0, Math.min(250, Number(volEl.value) || 0)) : 0,
     age: Number($("s_age").value) || 35, sex: $("s_sex").value,
     strength: draft.strength === "1", returning: draft.returning === "1", personalized: true,
   };
@@ -5188,6 +5194,9 @@ const STATUS_OPTS = [
   ["competitive", "Competitive", "High weekly mileage \\u2014 I race and chase time goals."],
 ];
 function isBeginnerStatus(st) { return st === "new" || st === "building"; }
+// Is the weekly-mileage question currently hidden? Asked of the DOM rather than recomputed from
+// draft.status, so this can never disagree with what the runner is actually looking at.
+function volQHidden() { const q = $("volQ"); return !q || q.style.display === "none"; }
 // The goal question adapts to the status: beginners work towards *completing* a shorter distance (no
 // time pressure — we derive a realistic finish target); runners set a time goal over any distance.
 const DIST_M = { "5k": 5000, "10k": 10000, half: 21097.5, marathon: 42195 };

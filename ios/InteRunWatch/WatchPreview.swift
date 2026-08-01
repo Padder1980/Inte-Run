@@ -204,6 +204,33 @@ enum WatchPreview {
         case "home-today":    homeScene(0)
         case "home-upcoming": homeScene(1)
 
+        // ── Session detail ────────────────────────────────────────────────────────────────────
+        // One scrollable page ending in Start. The top and the foot cannot be in one screenshot,
+        // so "detail" shows the header and facts and "detail-bottom" anchors at the button.
+        case "detail":
+            NavigationStack {
+                SessionDetailView(session: intervalSession, start: {}, previewInert: true)
+            }
+        case "detail-bottom":
+            NavigationStack {
+                SessionDetailView(session: intervalSession, start: {},
+                                  previewInert: true, previewAnchor: .bottom)
+            }
+        // The other shape of session: an easy day, whose steps are long sentences rather than
+        // rep labels. It used to seed steps: nil to exercise the empty branch — but real sync data
+        // can never produce that (watchSessionPayload always sends an array, and every engine
+        // session has steps), so the screenshot showed "no set structure" for a session that
+        // really lists four, and the actual easy-run detail was never looked at.
+        case "detail-easy":
+            NavigationStack {
+                SessionDetailView(session: easySession, start: {}, previewInert: true)
+            }
+        case "detail-easy-bottom":
+            NavigationStack {
+                SessionDetailView(session: easySession, start: {},
+                                  previewInert: true, previewAnchor: .bottom)
+            }
+
         default:
             Text("Unknown preview scene: \(scene)").font(.caption)
         }
@@ -217,6 +244,62 @@ enum WatchPreview {
         }
     }
 
+    /// A real structured session, shared by the home and detail scenes.
+    ///
+    /// ⚠️ Labels, durations and pace bands are copied from what the ENGINE actually emits for a
+    /// thr-3×8 (src/plan/session-templates.ts), not invented. A seed that writes its own short
+    /// labels ("Warm up easy") makes the screenshots lie about wrapping — the real warm-up is 65
+    /// characters and takes three lines — and a 90″ recovery is what exposed the minute-rounding
+    /// bug. Same principle the type strings already follow further down.
+    @MainActor
+    private static var intervalSession: PlannedSession {
+        PlannedSession(
+            title: "Threshold 3 × 8′", type: "threshold", dateIso: SessionStore.localTodayIso(),
+            durationMin: 52, distanceKm: 8.6, paceLow: 305, paceHigh: 320,
+            rpeMin: 6, rpeMax: 7,
+            steps: [
+                PlannedStep(label: "Easy jog, dynamic leg swings/drills, then 4–6 progressive strides",
+                            kind: "warmup", seconds: 900, metres: nil,
+                            paceLow: 366, paceHigh: 399, repIndex: nil, repCount: nil),
+                PlannedStep(label: "8′ rep", kind: "rep", seconds: 480, metres: nil,
+                            paceLow: 305, paceHigh: 320, repIndex: 1, repCount: 3),
+                PlannedStep(label: "Easy jog recovery", kind: "recovery", seconds: 90, metres: nil,
+                            paceLow: 366, paceHigh: 399, repIndex: nil, repCount: nil),
+                PlannedStep(label: "8′ rep", kind: "rep", seconds: 480, metres: nil,
+                            paceLow: 305, paceHigh: 320, repIndex: 2, repCount: 3),
+                PlannedStep(label: "Easy jog recovery", kind: "recovery", seconds: 90, metres: nil,
+                            paceLow: 366, paceHigh: 399, repIndex: nil, repCount: nil),
+                PlannedStep(label: "8′ rep", kind: "rep", seconds: 480, metres: nil,
+                            paceLow: 305, paceHigh: 320, repIndex: 3, repCount: 3),
+                PlannedStep(label: "Easy jog to finish", kind: "cooldown", seconds: 600, metres: nil,
+                            paceLow: 366, paceHigh: 420, repIndex: nil, repCount: nil),
+            ])
+    }
+
+    /// The easy+strides day as the engine really builds it: framedRun gives ease-in, the
+    /// conversational middle, the strides block, then ease-down — four steps, never nil.
+    @MainActor
+    private static var easySession: PlannedSession {
+        PlannedSession(
+            title: "45′ easy + strides", type: "strides", dateIso: SessionStore.localTodayIso(),
+            durationMin: 47, distanceKm: 7.5, paceLow: 366, paceHigh: 399,
+            rpeMin: 2, rpeMax: 3,
+            steps: [
+                PlannedStep(label: "Ease in — start gently and let the pace come to you",
+                            kind: "warmup", seconds: 360, metres: nil,
+                            paceLow: 366, paceHigh: 399, repIndex: nil, repCount: nil),
+                PlannedStep(label: "Conversational easy running (below the first threshold)",
+                            kind: "steady", seconds: 2100, metres: nil,
+                            paceLow: 366, paceHigh: 399, repIndex: nil, repCount: nil),
+                PlannedStep(label: "6 × 20s relaxed strides, full recovery",
+                            kind: "rep", seconds: 120, metres: nil,
+                            paceLow: 255, paceHigh: 270, repIndex: nil, repCount: 6),
+                PlannedStep(label: "Ease down — relax the pace and let your breathing settle",
+                            kind: "cooldown", seconds: 240, metres: nil,
+                            paceLow: 366, paceHigh: 399, repIndex: nil, repCount: nil),
+            ])
+    }
+
     @MainActor
     private static func homeScene(_ page: Int) -> some View {
         let store = SessionStore()
@@ -224,25 +307,21 @@ enum WatchPreview {
         store.runnerName = "Adam"
         store.contextIso = today
         store.hasSynced = true
-        store.session = PlannedSession(
-            title: "Threshold 3 × 8′", type: "threshold", dateIso: today,
-            durationMin: 52, distanceKm: 8.6, paceLow: 305, paceHigh: 320,
-            rpeMin: 6, rpeMax: 7, steps: nil)
+        store.session = intervalSession
         // Types are the engine's REAL SessionType strings — a seed that invents its own types
         // (the first draft typed an "easy + strides" day as "easy") masks colour-map bugs in the
         // very screenshots meant to catch them.
-        store.upcoming = [
-            store.session!,
-            PlannedSession(title: "45′ easy + strides", type: "strides", dateIso: "2099-01-02",
-                           durationMin: 47, distanceKm: 7.5, paceLow: 366, paceHigh: 399,
-                           rpeMin: 2, rpeMax: 3, steps: nil),
-            PlannedSession(title: "Long run 14 km", type: "long", dateIso: "2099-01-04",
-                           durationMin: 84, distanceKm: 14, paceLow: 350, paceHigh: 380,
-                           rpeMin: 3, rpeMax: 4, steps: nil),
-            PlannedSession(title: "VO2 6 × 3′", type: "vo2", dateIso: "2099-01-06",
-                           durationMin: 48, distanceKm: 8, paceLow: 255, paceHigh: 270,
-                           rpeMin: 8, rpeMax: 9, steps: nil),
-        ]
+        // ⚠️ Steps are never nil in real data — watchSessionPayload always sends the array and
+        // every engine session has steps — so seeding nil here would let a card open onto the
+        // "no detail" branch that a real runner can never reach.
+        var easyAhead = easySession; easyAhead.dateIso = "2099-01-02"
+        var longAhead = easySession
+        longAhead.dateIso = "2099-01-04"; longAhead.title = "Long run 14 km"
+        longAhead.type = "long"; longAhead.durationMin = 84; longAhead.distanceKm = 14
+        var vo2Ahead = intervalSession
+        vo2Ahead.dateIso = "2099-01-06"; vo2Ahead.title = "VO2 6 × 3′"
+        vo2Ahead.type = "vo2"; vo2Ahead.durationMin = 48; vo2Ahead.distanceKm = 8
+        store.upcoming = [store.session!, easyAhead, longAhead, vo2Ahead]
         // previewInert: the buttons render but refuse to start — a preview that can start a
         // workout is a preview that can log a fictional run.
         return TodayView(initialPage: page, previewInert: true).environmentObject(store)

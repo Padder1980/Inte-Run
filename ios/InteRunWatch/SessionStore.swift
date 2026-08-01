@@ -33,7 +33,14 @@ struct PlannedStep: Codable, Equatable, Identifiable {
         if let m = metres, m > 0 {
             return m >= 1000 ? String(format: "%.1f km", Double(m) / 1000) : "\(m) m"
         }
-        if let s = seconds, s > 0 { return s >= 60 ? "\(s / 60) min" : "\(s) s" }
+        if let s = seconds, s > 0 {
+            if s < 60 { return "\(s) s" }
+            // ⚠️ NOT `s / 60` minutes: that is integer division, so a 90″ recovery printed as
+            // "1 min" — a third short, directly beneath a step the plan literally labels 90″, on a
+            // page whose whole job is telling the runner what the session is. The library is full
+            // of 90″ jogs, 2′30 jogs and Mona-fartlek 90/60/30/15s.
+            return s % 60 == 0 ? "\(s / 60) min" : String(format: "%d:%02d", s / 60, s % 60)
+        }
         return nil
     }
 }
@@ -65,6 +72,29 @@ struct PlannedSession: Codable, Equatable {
         if let d = durationMin { bits.append("\(d) min") }
         if let k = distanceKm { bits.append(String(format: "%.1f km", k)) }
         return bits.joined(separator: " · ")
+    }
+
+    /// "Wed 29 Jul" from dateIso. On the session rather than in a view, because the home cards and
+    /// the detail page both need it and two DateFormatters would drift.
+    var dayLabel: String {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.timeZone = .current
+        guard let d = f.date(from: dateIso) else { return dateIso }
+        let out = DateFormatter(); out.dateFormat = "EEE d MMM"; out.timeZone = .current
+        return out.string(from: d)
+    }
+
+    /// How hard the plan says this should feel, as words plus the numbers. RPE is InteRun's own
+    /// signal — it is what the adaptive engine later compares against — so the runner should see
+    /// the intended effort before they start, not only be asked for it afterwards.
+    var effortText: String? {
+        guard let lo = rpeMin, let hi = rpeMax, lo > 0 else { return nil }
+        let word: String
+        switch hi {
+        case ...3: word = "Easy"
+        case 4...6: word = "Moderate"
+        default: word = "Hard"
+        }
+        return lo == hi ? "\(word) · \(lo) of 10" : "\(word) · \(lo)–\(hi) of 10"
     }
 }
 

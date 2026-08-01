@@ -17,6 +17,9 @@ struct SettingsView: View {
     /// three has to be able to LAND on page three.
     var initialPage: Int = 0
     @State private var page = 0
+    /// One-shot, same reason as TodayView's: an onAppear that re-fires would drag the runner back
+    /// to page one whenever this view reappears.
+    @State private var pagePlaced = false
 
     var body: some View {
         TabView(selection: $page) {
@@ -28,7 +31,11 @@ struct SettingsView: View {
         .tabViewStyle(.page)
         .tint(Brand.accent)
         .navigationTitle("Settings")
-        .onAppear { page = initialPage }
+        .onAppear {
+            guard !pagePlaced else { return }
+            pagePlaced = true
+            page = initialPage
+        }
     }
 
     // MARK: - Page 1: the run itself

@@ -22,6 +22,8 @@ struct TodayView: View {
     /// invariant — a review caught the home scenes violating it).
     var previewInert: Bool = false
     @State private var page = 0
+    /// One-shot: initialPage applies on first appearance only. See the onAppear below.
+    @State private var pagePlaced = false
 
     /// Hand the plan to the workout and go. One path, so a run started from the phone and a run
     /// started on the wrist are the same run with the same targets and the same reasons.
@@ -105,13 +107,8 @@ struct TodayView: View {
         .padding(.bottom, 6)
     }
 
-    /// "Wed 29 Jul" from an ISO date, without dragging a DateFormatter through every row.
-    private func dayLabel(_ iso: String) -> String {
-        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.timeZone = .current
-        guard let d = f.date(from: iso) else { return iso }
-        let out = DateFormatter(); out.dateFormat = "EEE d MMM"; out.timeZone = .current
-        return out.string(from: d)
-    }
+    // "Wed 29 Jul" now lives on PlannedSession itself (`dayLabel`), because the home cards and the
+    // detail page both need it and two DateFormatters would eventually disagree.
 
     var body: some View {
         NavigationStack {
@@ -135,7 +132,16 @@ struct TodayView: View {
                         upcomingPage.tag(1)
                     }
                     .tabViewStyle(.page)
-                    .onAppear { page = initialPage }
+                    // ⚠️ ONCE. A NavigationStack pop re-fires the root's onAppear, so a plain
+                    // assignment here snapped the pager back to Today every time the runner backed
+                    // out of a session detail — measured on the simulator: page 1 → push → Back →
+                    // page 0. Reading the week means opening a card, backing out, opening the next,
+                    // so it would have fought the runner on every tap.
+                    .onAppear {
+                        guard !pagePlaced else { return }
+                        pagePlaced = true
+                        page = initialPage
+                    }
                 }
             }
             // The wordmark is drawn in the content (see `wordmark`) rather than set as the
@@ -230,11 +236,18 @@ struct TodayView: View {
                     // No cap: the phone syncs up to seven sessions and the ten-day window exists
                     // precisely so the wrist stands alone — a prefix(5) here silently binned the
                     // last sessions the phone deliberately sent. The page scrolls.
+                    //
+                    // ⚠️ Tapping a card opens its DETAIL, it does not start the run. These cards
+                    // used to begin a workout on a single tap, so a mis-tap while scrolling the
+                    // week started a session — and starting the wrong day's run is not undoable
+                    // once it is in the logbook.
                     ForEach(Array(ahead.enumerated()), id: \.offset) { _, s in
-                        Button { begin(s) } label: {
+                        NavigationLink {
+                            detail(for: s)
+                        } label: {
                             card(bar: typeBar(s.type)) {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(dayLabel(s.dateIso).uppercased())
+                                    Text(s.dayLabel.uppercased())
                                         .font(.system(size: 10, weight: .bold)).kerning(0.4)
                                         .foregroundStyle(Brand.accent)
                                     Text(s.title)
@@ -292,40 +305,61 @@ struct TodayView: View {
         }
     }
 
+    /// The session detail, reached from any card. One page, scrollable, ending in Start.
+    private func detail(for s: PlannedSession) -> some View {
+        SessionDetailView(session: s, start: { begin(s) }, previewInert: previewInert)
+    }
+
     private func session(_ s: PlannedSession) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            if let name = store.runnerName {
-                Text("TODAY, \(name.uppercased())")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(Brand.accent)
-            }
+            // The summary opens the detail; Start below it stays a single tap, because starting
+            // today's run is the thing this app is opened for and it should never cost two.
+            NavigationLink {
+                detail(for: s)
+            } label: {
+                VStack(alignment: .leading, spacing: 6) {
+                    if let name = store.runnerName {
+                        Text("TODAY, \(name.uppercased())")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(Brand.accent)
+                    }
 
-            Text(s.title)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Brand.ink)
-                .fixedSize(horizontal: false, vertical: true)
+                    Text(s.title)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Brand.ink)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
 
-            if !s.subtitle.isEmpty {
-                Text(s.subtitle)
-                    .font(.system(size: 12))
-                    .foregroundStyle(Brand.inkSoft)
-            }
+                    if !s.subtitle.isEmpty {
+                        Text(s.subtitle)
+                            .font(.system(size: 12))
+                            .foregroundStyle(Brand.inkSoft)
+                    }
 
-            if let pace = s.paceText {
-                HStack(spacing: 4) {
-                    Image(systemName: "speedometer").font(.system(size: 10))
-                    Text(pace).font(.system(size: 12, weight: .medium))
+                    HStack(spacing: 6) {
+                        if let pace = s.paceText {
+                            HStack(spacing: 4) {
+                                Image(systemName: "speedometer").font(.system(size: 10))
+                                Text(pace).font(.system(size: 12, weight: .medium))
+                            }
+                            .foregroundStyle(Brand.accent)
+                            .padding(.horizontal, 8).padding(.vertical, 4)
+                            .background(Capsule().fill(Brand.surface2))
+                        }
+                        Spacer(minLength: 0)
+                        // The affordance: this card leads somewhere.
+                        HStack(spacing: 2) {
+                            if let steps = s.steps, steps.count > 1 {
+                                Text("\(steps.count) steps").font(.system(size: 10.5))
+                            }
+                            Image(systemName: "chevron.right").font(.system(size: 9, weight: .semibold))
+                        }
+                        .foregroundStyle(Brand.inkFaint)
+                    }
                 }
-                .foregroundStyle(Brand.accent)
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(Capsule().fill(Brand.surface2))
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-
-            if let steps = s.steps, steps.count > 1 {
-                Text("\(steps.count) steps")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Brand.inkFaint)
-            }
+            .buttonStyle(.plain)
 
             Button {
                 begin(s)

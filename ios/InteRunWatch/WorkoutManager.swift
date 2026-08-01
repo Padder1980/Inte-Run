@@ -284,8 +284,10 @@ final class WorkoutManager: NSObject, ObservableObject {
             voice = WatchSettings.shared.voiceCues ? WorkoutVoice() : nil
             voice?.loadCoach(coach, lines: coachLines)
             voice?.loadWhy(why, person: whyPerson)
-            // The step announcement carries the runner's own pace numbers, so no recorded clip can
-            // ever say it — this one stays on the wrist's synthesiser by necessity, and only this one.
+            // Step announcements carry no numbers: the step's KIND picks a catalogue trigger and
+            // the phone plays the real clip when in range (see announceStep). What DOES stay on the
+            // wrist by necessity is anything recordings can't say — pace corrections with the
+            // runner's numbers (paceCue), and their own words/name (whyMoment, keepGoing).
             if let first = currentStep {
                 voice?.announceStep(kind: first.kind, via: self)
             } else {

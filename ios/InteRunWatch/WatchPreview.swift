@@ -23,7 +23,7 @@ enum WatchPreview {
         return ProcessInfo.processInfo.arguments[i + 1]
     }
 
-    @ViewBuilder
+    @MainActor @ViewBuilder
     static func view(_ scene: String) -> some View {
         switch scene {
         // Mid-interval: the moment the screen has to work hardest. Deliberately awkward values —
@@ -189,8 +189,25 @@ enum WatchPreview {
                      currentSec: nil, currentText: "--:--",
                      lap: ("5:41", "LAP PACE"), stepProgress: nil, totalDist: "3.08 KM")
 
+        // ── Settings ──────────────────────────────────────────────────────────────────────────
+        // Four pages; the scene number picks the page, because a screenshot cannot swipe.
+        // A fresh SessionStore is safe here: it reads its cache and shows whatever coach is stored,
+        // and the preview never starts a workout.
+        case "settings-run":     settingsScene(0)
+        case "settings-alerts":  settingsScene(1)
+        case "settings-audio":   settingsScene(2)
+        case "settings-metrics": settingsScene(3)
+
         default:
             Text("Unknown preview scene: \(scene)").font(.caption)
+        }
+    }
+
+    @MainActor
+    private static func settingsScene(_ page: Int) -> some View {
+        NavigationStack {
+            SettingsView(initialPage: page)
+                .environmentObject(SessionStore())
         }
     }
 }

@@ -28,6 +28,15 @@ struct WebHost: UIViewRepresentable {
             source: "window.__interunLiveActivity = \"\(status)\";",
             injectionTime: .atDocumentStart, forMainFrameOnly: true))
 
+        #if DEBUG
+        // Turns on the page's keyboard-geometry overlay (see the kbOverlay IIFE in web/app.ts):
+        // live visualViewport numbers painted on screen, so a simulator screenshot carries the
+        // measurements. Debug builds only - a release build never shows it.
+        config.userContentController.addUserScript(WKUserScript(
+            source: "window.__kbDebugOverlay = true;",
+            injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        #endif
+
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator

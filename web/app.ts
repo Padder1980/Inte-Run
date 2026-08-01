@@ -757,6 +757,9 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 
 /* Bottom nav */
 .bottomnav { position: sticky; bottom: 0; z-index: 20; display: grid; grid-template-columns: repeat(5,1fr); background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(10px); border-top: 1px solid var(--line); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); }
+/* While the keyboard is up (html.kbup rides with --vvh) the home indicator is UNDER the keyboard,
+   so its safe-area padding is 34pt of nothing between the nav and the keyboard. Reclaim it. */
+html.kbup .bottomnav { padding-bottom: 6px; }
 .navbtn { display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: 0; padding: 6px 0; cursor: pointer; color: var(--ink-faint); font: inherit; }
 .navbtn svg { width: 22px; height: 22px; }
 .navbtn .nl { font-size: 10.5px; font-weight: 600; }
@@ -7584,8 +7587,13 @@ seedDone();
     // keyboard and above any reporting jitter.
     const layout = document.documentElement.clientHeight || window.innerHeight;
     const h = Math.round(vv.height);
-    if (keyboardPossible() && layout - h > 120) document.documentElement.style.setProperty("--vvh", h + "px");
-    else document.documentElement.style.removeProperty("--vvh");
+    if (keyboardPossible() && layout - h > 120) {
+      document.documentElement.style.setProperty("--vvh", h + "px");
+      document.documentElement.classList.add("kbup");
+    } else {
+      document.documentElement.style.removeProperty("--vvh");
+      document.documentElement.classList.remove("kbup");
+    }
   };
   vv.addEventListener("resize", apply);
   vv.addEventListener("scroll", apply);
@@ -7699,6 +7707,37 @@ seedDone();
   // visualViewport one — the document cannot scroll (overflow: hidden), so any window scroll IS the
   // keyboard pan, whichever event WebKit chose to raise for it.
   window.addEventListener("scroll", () => { if (pending) keepVisible(pending); else unpan(); }, { passive: true });
+})();
+
+// ---- Keyboard-geometry debug overlay (native DEBUG builds only) ----------------------------------
+// Paints the live visualViewport numbers on screen so a SIMULATOR SCREENSHOT carries the
+// measurements - the keyboard-pan bug cannot be diagnosed from pixels alone, and XCUITest cannot
+// read JS state. Enabled solely by the DEBUG-build user script in WebHost.swift; a phone, a PWA and
+// a release build never define __kbDebugOverlay, so this whole block is inert everywhere real.
+(function () {
+  function kbOverlay() {
+    if (!window.__kbDebugOverlay) return;
+    let el = document.getElementById("kbdbg");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "kbdbg";
+      el.style.cssText = "position:fixed;left:4px;top:35%;z-index:2147483000;background:rgba(0,0,0,.85);color:#7CFC00;font:11px/1.5 ui-monospace,monospace;padding:6px 8px;border-radius:6px;pointer-events:none;white-space:pre";
+      document.body.appendChild(el);
+    }
+    const vv = window.visualViewport;
+    const app = document.querySelector(".app");
+    const r = app ? app.getBoundingClientRect() : null;
+    const de = document.documentElement;
+    el.textContent =
+      "vv.h " + (vv ? Math.round(vv.height) : -1) + "  vv.off " + (vv ? Math.round(vv.offsetTop) : -1) + "\\n" +
+      "scrollY " + Math.round(window.scrollY) + "  layout " + de.clientHeight + "\\n" +
+      "--vvh " + (de.style.getPropertyValue("--vvh") || "unset") + "\\n" +
+      "app " + (r ? Math.round(r.top) + ".." + Math.round(r.bottom) : "?") +
+      "  tf " + ((app && app.style.transform) ? app.style.transform : "-") + "\\n" +
+      "kb " + JSON.stringify(window.__kbDiag || null) + "\\n" +
+      "focus " + (document.activeElement ? (document.activeElement.id || document.activeElement.tagName) : "-");
+  }
+  setInterval(kbOverlay, 250);
 })();
 
 // ---- Pinch-to-zoom: an app, not a web page --------------------------------------------------

@@ -57,6 +57,12 @@ ID = {name: "1A%022X" % (i + 1) for i, name in enumerate([
     "embedExtPhase", "xBuildFile", "xDependency", "xProxy",
     # Shared between the app and the extension: the Live Activity's attributes must be one file.
     "sharedSyncGroup",
+    # The UI-test bundle. Exists because the keyboard-pan bug class can only be reproduced with a
+    # REAL tap gesture raising the REAL software keyboard - neither a desktop browser nor
+    # programmatic focus() can do it, so without this target every keyboard fix ships blind and
+    # gets proven (or disproven) on the owner's phone.
+    "uTarget", "uProduct", "uSyncGroup", "uSourcesPhase", "uFrameworksPhase", "uResourcesPhase",
+    "uConfigList", "uDebug", "uRelease", "uDependency", "uProxy",
 ])}
 
 BUNDLE_ID = "com.interun.app"
@@ -143,6 +149,22 @@ WIDGET_COMMON = {
     "ENABLE_DEBUG_DYLIB": "NO",
 }
 
+UITEST_COMMON = {
+    "CODE_SIGN_STYLE": "Automatic",
+    "CURRENT_PROJECT_VERSION": "36",
+    "GENERATE_INFOPLIST_FILE": "YES",
+    "MARKETING_VERSION": "1.0",
+    "PRODUCT_BUNDLE_IDENTIFIER": BUNDLE_ID + ".uitests",
+    "PRODUCT_NAME": '"$(TARGET_NAME)"',
+    "SWIFT_EMIT_LOC_STRINGS": "NO",
+    "SWIFT_VERSION": "5.0",
+    "TARGETED_DEVICE_FAMILY": "1",
+    "IPHONEOS_DEPLOYMENT_TARGET": DEPLOYMENT_TARGET,
+    "LD_RUNPATH_SEARCH_PATHS": '("$(inherited)", "@executable_path/Frameworks", "@loader_path/Frameworks")',
+    # Which app the runner launches and instruments.
+    "TEST_TARGET_NAME": "InteRun",
+}
+
 PROJECT_COMMON = {
     "ALWAYS_SEARCH_USER_PATHS": "NO",
     "CLANG_ANALYZER_NONNULL": "YES",
@@ -206,6 +228,7 @@ if DEVELOPMENT_TEAM:
     TARGET_COMMON["DEVELOPMENT_TEAM"] = DEVELOPMENT_TEAM
     WATCH_COMMON["DEVELOPMENT_TEAM"] = DEVELOPMENT_TEAM
     WIDGET_COMMON["DEVELOPMENT_TEAM"] = DEVELOPMENT_TEAM
+    UITEST_COMMON["DEVELOPMENT_TEAM"] = DEVELOPMENT_TEAM
 
 
 def settings_block(d, indent="\t\t\t\t"):
@@ -246,6 +269,8 @@ def main():
              "includeInIndex = 0; path = InteRunWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };\n" % ID["xProduct"])
     p.append("\t\t%s /* InteRunWidgets-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; "
              'path = "InteRunWidgets-Info.plist"; sourceTree = "<group>"; };\n' % ID["xInfoPlistRef"])
+    p.append("\t\t%s /* InteRunUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; "
+             "includeInIndex = 0; path = InteRunUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };\n" % ID["uProduct"])
     p.append("/* End PBXFileReference section */\n\n")
 
     # The watch app is embedded into the iOS app under Watch/, which is how the OS finds and
@@ -269,6 +294,8 @@ def main():
     # type on each side, and a copied file is a bug waiting to happen.
     p.append("\t\t%s /* InteRunShared */ = {\n\t\t\tisa = PBXFileSystemSynchronizedRootGroup;\n"
              '\t\t\tpath = InteRunShared;\n\t\t\tsourceTree = "<group>";\n\t\t};\n' % ID["sharedSyncGroup"])
+    p.append("\t\t%s /* InteRunUITests */ = {\n\t\t\tisa = PBXFileSystemSynchronizedRootGroup;\n"
+             '\t\t\tpath = InteRunUITests;\n\t\t\tsourceTree = "<group>";\n\t\t};\n' % ID["uSyncGroup"])
     p.append("/* End PBXFileSystemSynchronizedRootGroup section */\n\n")
 
     p.append("/* Begin PBXFrameworksBuildPhase section */\n")
@@ -281,6 +308,9 @@ def main():
     p.append("\t\t%s /* Frameworks */ = {\n\t\t\tisa = PBXFrameworksBuildPhase;\n"
              "\t\t\tbuildActionMask = 2147483647;\n\t\t\tfiles = (\n\t\t\t);\n"
              "\t\t\trunOnlyForDeploymentPostprocessing = 0;\n\t\t};\n" % ID["xFrameworksPhase"])
+    p.append("\t\t%s /* Frameworks */ = {\n\t\t\tisa = PBXFrameworksBuildPhase;\n"
+             "\t\t\tbuildActionMask = 2147483647;\n\t\t\tfiles = (\n\t\t\t);\n"
+             "\t\t\trunOnlyForDeploymentPostprocessing = 0;\n\t\t};\n" % ID["uFrameworksPhase"])
     p.append("/* End PBXFrameworksBuildPhase section */\n\n")
 
     p.append("/* Begin PBXCopyFilesBuildPhase section */\n")
@@ -310,16 +340,17 @@ def main():
              "\t\t\t\t%s /* InteRunWidgets */,\n\t\t\t\t%s /* InteRunShared */,\n"
              "\t\t\t\t%s /* InteRun-Info.plist */,\n\t\t\t\t%s /* InteRunWatch-Info.plist */,\n"
              "\t\t\t\t%s /* InteRunWidgets-Info.plist */,\n"
+             "\t\t\t\t%s /* InteRunUITests */,\n"
              "\t\t\t\t%s /* Products */,\n"
              '\t\t\t);\n\t\t\tsourceTree = "<group>";\n\t\t};\n'
              % (ID["rootGroup"], ID["syncGroup"], ID["wSyncGroup"], ID["xSyncGroup"],
                 ID["sharedSyncGroup"], ID["infoPlistRef"], ID["wInfoPlistRef"],
-                ID["xInfoPlistRef"], ID["productsGroup"]))
+                ID["xInfoPlistRef"], ID["uSyncGroup"], ID["productsGroup"]))
     p.append("\t\t%s /* Products */ = {\n\t\t\tisa = PBXGroup;\n\t\t\tchildren = (\n"
              "\t\t\t\t%s /* InteRun.app */,\n\t\t\t\t%s /* InteRunWatch.app */,\n"
-             "\t\t\t\t%s /* InteRunWidgets.appex */,\n\t\t\t);\n\t\t\tname = Products;\n"
+             "\t\t\t\t%s /* InteRunWidgets.appex */,\n\t\t\t\t%s /* InteRunUITests.xctest */,\n\t\t\t);\n\t\t\tname = Products;\n"
              '\t\t\tsourceTree = "<group>";\n\t\t};\n'
-             % (ID["productsGroup"], ID["product"], ID["wProduct"], ID["xProduct"]))
+             % (ID["productsGroup"], ID["product"], ID["wProduct"], ID["xProduct"], ID["uProduct"]))
     p.append("/* End PBXGroup section */\n\n")
 
     p.append("/* Begin PBXNativeTarget section */\n")
@@ -376,6 +407,20 @@ def main():
              "\t\t};\n" % (ID["xTarget"], ID["xConfigList"], ID["xSourcesPhase"],
                            ID["xFrameworksPhase"], ID["xResourcesPhase"],
                            ID["xSyncGroup"], ID["sharedSyncGroup"], ID["xProduct"]))
+    p.append("\t\t%s /* InteRunUITests */ = {\n"
+             "\t\t\tisa = PBXNativeTarget;\n"
+             "\t\t\tbuildConfigurationList = %s /* Build configuration list for PBXNativeTarget \"InteRunUITests\" */;\n"
+             "\t\t\tbuildPhases = (\n\t\t\t\t%s /* Sources */,\n\t\t\t\t%s /* Frameworks */,\n\t\t\t\t%s /* Resources */,\n\t\t\t);\n"
+             "\t\t\tbuildRules = (\n\t\t\t);\n"
+             "\t\t\tdependencies = (\n\t\t\t\t%s /* PBXTargetDependency */,\n\t\t\t);\n"
+             "\t\t\tfileSystemSynchronizedGroups = (\n\t\t\t\t%s /* InteRunUITests */,\n\t\t\t);\n"
+             "\t\t\tname = InteRunUITests;\n"
+             "\t\t\tproductName = InteRunUITests;\n"
+             "\t\t\tproductReference = %s /* InteRunUITests.xctest */;\n"
+             '\t\t\tproductType = "com.apple.product-type.bundle.ui-testing";\n'
+             "\t\t};\n" % (ID["uTarget"], ID["uConfigList"], ID["uSourcesPhase"],
+                           ID["uFrameworksPhase"], ID["uResourcesPhase"],
+                           ID["uDependency"], ID["uSyncGroup"], ID["uProduct"]))
     p.append("/* End PBXNativeTarget section */\n\n")
 
     p.append("/* Begin PBXTargetDependency section */\n")
@@ -385,6 +430,9 @@ def main():
     p.append("\t\t%s /* PBXTargetDependency */ = {\n\t\t\tisa = PBXTargetDependency;\n"
              "\t\t\ttarget = %s /* InteRunWidgets */;\n\t\t\ttargetProxy = %s /* PBXContainerItemProxy */;\n\t\t};\n"
              % (ID["xDependency"], ID["xTarget"], ID["xProxy"]))
+    p.append("\t\t%s /* PBXTargetDependency */ = {\n\t\t\tisa = PBXTargetDependency;\n"
+             "\t\t\ttarget = %s /* InteRun */;\n\t\t\ttargetProxy = %s /* PBXContainerItemProxy */;\n\t\t};\n"
+             % (ID["uDependency"], ID["target"], ID["uProxy"]))
     p.append("/* End PBXTargetDependency section */\n\n")
 
     p.append("/* Begin PBXContainerItemProxy section */\n")
@@ -396,6 +444,10 @@ def main():
              "\t\t\tcontainerPortal = %s /* Project object */;\n\t\t\tproxyType = 1;\n"
              "\t\t\tremoteGlobalIDString = %s;\n\t\t\tremoteInfo = InteRunWidgets;\n\t\t};\n"
              % (ID["xProxy"], ID["project"], ID["xTarget"]))
+    p.append("\t\t%s /* PBXContainerItemProxy */ = {\n\t\t\tisa = PBXContainerItemProxy;\n"
+             "\t\t\tcontainerPortal = %s /* Project object */;\n\t\t\tproxyType = 1;\n"
+             "\t\t\tremoteGlobalIDString = %s;\n\t\t\tremoteInfo = InteRun;\n\t\t};\n"
+             % (ID["uProxy"], ID["project"], ID["target"]))
     p.append("/* End PBXContainerItemProxy section */\n\n")
 
     p.append("/* Begin PBXProject section */\n")
@@ -407,6 +459,7 @@ def main():
              "\t\t\t\tLastUpgradeCheck = 2700;\n"
              "\t\t\t\tTargetAttributes = {\n"
              "\t\t\t\t\t%s = {\n\t\t\t\t\t\tCreatedOnToolsVersion = 27.0;\n\t\t\t\t\t};\n"
+             "\t\t\t\t\t%s = {\n\t\t\t\t\t\tCreatedOnToolsVersion = 27.0;\n\t\t\t\t\t\tTestTargetID = %s;\n\t\t\t\t\t};\n"
              "\t\t\t\t};\n"
              "\t\t\t};\n"
              "\t\t\tbuildConfigurationList = %s /* Build configuration list for PBXProject \"InteRun\" */;\n"
@@ -420,9 +473,10 @@ def main():
              '\t\t\tprojectDirPath = "";\n'
              '\t\t\tprojectRoot = "";\n'
              "\t\t\ttargets = (\n\t\t\t\t%s /* InteRun */,\n\t\t\t\t%s /* InteRunWatch */,\n"
-             "\t\t\t\t%s /* InteRunWidgets */,\n\t\t\t);\n"
-             "\t\t};\n" % (ID["project"], ID["target"], ID["projConfigList"], ID["rootGroup"],
-                           ID["productsGroup"], ID["target"], ID["wTarget"], ID["xTarget"]))
+             "\t\t\t\t%s /* InteRunWidgets */,\n\t\t\t\t%s /* InteRunUITests */,\n\t\t\t);\n"
+             "\t\t};\n" % (ID["project"], ID["target"], ID["uTarget"], ID["target"],
+                           ID["projConfigList"], ID["rootGroup"],
+                           ID["productsGroup"], ID["target"], ID["wTarget"], ID["xTarget"], ID["uTarget"]))
     p.append("/* End PBXProject section */\n\n")
 
     p.append("/* Begin PBXResourcesBuildPhase section */\n")
@@ -435,6 +489,9 @@ def main():
     p.append("\t\t%s /* Resources */ = {\n\t\t\tisa = PBXResourcesBuildPhase;\n"
              "\t\t\tbuildActionMask = 2147483647;\n\t\t\tfiles = (\n\t\t\t);\n"
              "\t\t\trunOnlyForDeploymentPostprocessing = 0;\n\t\t};\n" % ID["xResourcesPhase"])
+    p.append("\t\t%s /* Resources */ = {\n\t\t\tisa = PBXResourcesBuildPhase;\n"
+             "\t\t\tbuildActionMask = 2147483647;\n\t\t\tfiles = (\n\t\t\t);\n"
+             "\t\t\trunOnlyForDeploymentPostprocessing = 0;\n\t\t};\n" % ID["uResourcesPhase"])
     p.append("/* End PBXResourcesBuildPhase section */\n\n")
 
     p.append("/* Begin PBXShellScriptBuildPhase section */\n")
@@ -464,6 +521,9 @@ def main():
     p.append("\t\t%s /* Sources */ = {\n\t\t\tisa = PBXSourcesBuildPhase;\n"
              "\t\t\tbuildActionMask = 2147483647;\n\t\t\tfiles = (\n\t\t\t);\n"
              "\t\t\trunOnlyForDeploymentPostprocessing = 0;\n\t\t};\n" % ID["xSourcesPhase"])
+    p.append("\t\t%s /* Sources */ = {\n\t\t\tisa = PBXSourcesBuildPhase;\n"
+             "\t\t\tbuildActionMask = 2147483647;\n\t\t\tfiles = (\n\t\t\t);\n"
+             "\t\t\trunOnlyForDeploymentPostprocessing = 0;\n\t\t};\n" % ID["uSourcesPhase"])
     p.append("/* End PBXSourcesBuildPhase section */\n\n")
 
     p.append("/* Begin XCBuildConfiguration section */\n")
@@ -477,6 +537,8 @@ def main():
     p.append(build_config(ID["wRelease"], "Release", WATCH_COMMON))
     p.append(build_config(ID["xDebug"], "Debug", WIDGET_COMMON))
     p.append(build_config(ID["xRelease"], "Release", WIDGET_COMMON))
+    p.append(build_config(ID["uDebug"], "Debug", UITEST_COMMON))
+    p.append(build_config(ID["uRelease"], "Release", UITEST_COMMON))
     p.append("/* End XCBuildConfiguration section */\n\n")
 
     p.append("/* Begin XCConfigurationList section */\n")
@@ -485,6 +547,7 @@ def main():
         (ID["targetConfigList"], 'PBXNativeTarget "InteRun"', ID["targetDebug"], ID["targetRelease"]),
         (ID["wConfigList"], 'PBXNativeTarget "InteRunWatch"', ID["wDebug"], ID["wRelease"]),
         (ID["xConfigList"], 'PBXNativeTarget "InteRunWidgets"', ID["xDebug"], ID["xRelease"]),
+        (ID["uConfigList"], 'PBXNativeTarget "InteRunUITests"', ID["uDebug"], ID["uRelease"]),
     ):
         p.append("\t\t%s /* Build configuration list for %s */ = {\n"
                  "\t\t\tisa = XCConfigurationList;\n"
@@ -498,6 +561,36 @@ def main():
     path = out_dir / "project.pbxproj"
     path.write_text("".join(p), encoding="utf-8")
     print("wrote", path)
+
+    # A shared scheme so `xcodebuild test -scheme InteRunUITests` works headlessly. Xcode's
+    # auto-generated schemes live in per-user folders that a fresh checkout does not have.
+    schemes = out_dir / "xcshareddata" / "xcschemes"
+    schemes.mkdir(parents=True, exist_ok=True)
+    scheme = """<?xml version="1.0" encoding="UTF-8"?>
+<Scheme LastUpgradeVersion="2700" version="1.7">
+  <BuildAction parallelizeBuildables="YES" buildImplicitDependencies="YES">
+    <BuildActionEntries>
+      <BuildActionEntry buildForTesting="YES" buildForRunning="YES" buildForProfiling="NO" buildForArchiving="NO" buildForAnalyzing="YES">
+        <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="%(app)s" BuildableName="InteRun.app" BlueprintName="InteRun" ReferencedContainer="container:InteRun.xcodeproj"/>
+      </BuildActionEntry>
+    </BuildActionEntries>
+  </BuildAction>
+  <TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.DebuggerFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="YES">
+    <Testables>
+      <TestableReference skipped="NO">
+        <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="%(ut)s" BuildableName="InteRunUITests.xctest" BlueprintName="InteRunUITests" ReferencedContainer="container:InteRun.xcodeproj"/>
+      </TestableReference>
+    </Testables>
+  </TestAction>
+  <LaunchAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.DebuggerFoundation.Launcher.LLDB" launchStyle="0" useCustomWorkingDirectory="NO" ignoresPersistentStateOnLaunch="NO" debugDocumentVersioning="YES" debugServiceExtension="internal" allowLocationSimulation="YES">
+    <BuildableProductRunnable runnableDebuggingMode="0">
+      <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="%(app)s" BuildableName="InteRun.app" BlueprintName="InteRun" ReferencedContainer="container:InteRun.xcodeproj"/>
+    </BuildableProductRunnable>
+  </LaunchAction>
+</Scheme>
+""" % {"app": ID["target"], "ut": ID["uTarget"]}
+    (schemes / "InteRunUITests.xcscheme").write_text(scheme, encoding="utf-8")
+    print("wrote", schemes / "InteRunUITests.xcscheme")
 
 
 if __name__ == "__main__":

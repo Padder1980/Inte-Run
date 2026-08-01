@@ -152,7 +152,9 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
    still resolved against the larger box — so the shell was 62pt taller than its own page, the
    sticky bottom nav was pushed past the fold, and a band of background sat where the nav should be.
    The native app never showed it because there its viewport IS the screen and the two agreed.
-   --vvh still overrides both when a keyboard is up; see the publisher near the launch IIFE. */
+   --vvh is a LEGACY HOOK, set by nothing since keyboard v3 — the keyboard overlays a full-height
+   shell now (html.kbup + --kbh add scroll room instead). The var stays in the rule so an emergency
+   can re-enable the shrink behaviour from the console without a deploy. */
 .app { max-width: 440px; height: var(--vvh, 100%); margin: 0 auto; background: var(--bg); display: flex; flex-direction: column; position: relative; box-shadow: 0 0 60px rgba(0,0,0,.06); }
 .topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: calc(14px + env(safe-area-inset-top)) 16px 14px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
 .topbar .title { font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
@@ -757,9 +759,15 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 
 /* Bottom nav */
 .bottomnav { position: sticky; bottom: 0; z-index: 20; display: grid; grid-template-columns: repeat(5,1fr); background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(10px); border-top: 1px solid var(--line); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); }
-/* While the keyboard is up (html.kbup rides with --vvh) the home indicator is UNDER the keyboard,
-   so its safe-area padding is 34pt of nothing between the nav and the keyboard. Reclaim it. */
-html.kbup .bottomnav { padding-bottom: 6px; }
+/* ⚠️ KEYBOARD V3: THE KEYBOARD OVERLAYS THE APP AND NOTHING MOVES — the owner's words, and he is
+   right: that is what every native app does. The shell stays full height (the keyboard covers the
+   bottom bar), and the scroller gains keyboard-height padding so any focused field can still be
+   brought above the keyboard. The previous design shrank the whole shell to the visible area,
+   which dragged the bottom bar up the screen every time the keyboard opened. */
+html.kbup .view { padding-bottom: calc(96px + var(--kbh, 0px)); }
+/* Bottom sheets hold fields at the bottom of the screen, so they DO lift above the keyboard —
+   the one thing that must move, because its inputs are exactly where the keyboard lands. */
+html.kbup .sheet-ov { padding-bottom: var(--kbh, 0px); }
 .navbtn { display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: 0; padding: 6px 0; cursor: pointer; color: var(--ink-faint); font: inherit; }
 .navbtn svg { width: 22px; height: 22px; }
 .navbtn .nl { font-size: 10.5px; font-weight: 600; }
@@ -4610,7 +4618,7 @@ function viewportDiagLines() {
       const q = n.getBoundingClientRect();
       return Math.round(q.top) + ".." + Math.round(q.bottom) + " h" + Math.round(q.height);
     };
-    const vvh = de.style.getPropertyValue("--vvh") || "unset";
+    const vvh = (de.style.getPropertyValue("--kbh") ? "kbh " + de.style.getPropertyValue("--kbh") : "kbh unset");
 
     return [
       "iOS " + ver + " \u00b7 " + (standalone ? "standalone" : "browser") + " \u00b7 dpr " + (window.devicePixelRatio || 1),
@@ -7556,8 +7564,9 @@ seedDone();
 // ---- The shell tracks the visible area, keyboard and all -----------------------------------------
 // Without this the app is 100dvh tall with the keyboard covering the bottom third: #view has no
 // scroll room, so nothing can bring a focused field into view and iOS resorts to panning the whole
-// visual viewport — bars and all. Publishing the visual viewport's height as --vvh makes the shell
-// shrink to what is actually visible, which gives the scroller real room and keeps both bars put.
+// visual viewport — bars and all. V3 answer (the owner's, and the native platforms'): the keyboard
+// OVERLAYS a full-height shell and nothing moves; --kbh adds scroll room under the content and lifts
+// bottom sheets, so any field can still be brought above the keyboard.
 (function () {
   const vv = window.visualViewport;
   if (!vv) return;
@@ -7587,19 +7596,24 @@ seedDone();
     // keyboard and above any reporting jitter.
     const layout = document.documentElement.clientHeight || window.innerHeight;
     const h = Math.round(vv.height);
+    // ⚠️ V3: publish the KEYBOARD's height (--kbh), never the viewport's (--vvh). The shell stays
+    // full size and the keyboard overlays it; --kbh only adds scroll room and lifts sheets. All the
+    // old gates still matter — a stale value left behind is scroll-jank rather than a dead strip
+    // now, but the launch-time bogus visualViewport reading would still poison it without the
+    // focused-field requirement.
     if (keyboardPossible() && layout - h > 120) {
-      document.documentElement.style.setProperty("--vvh", h + "px");
+      document.documentElement.style.setProperty("--kbh", (layout - h) + "px");
       document.documentElement.classList.add("kbup");
     } else {
-      document.documentElement.style.removeProperty("--vvh");
+      document.documentElement.style.removeProperty("--kbh");
       document.documentElement.classList.remove("kbup");
     }
   };
   vv.addEventListener("resize", apply);
   vv.addEventListener("scroll", apply);
   window.addEventListener("resize", apply);
-  // focusout is what reliably ends it: the blur can beat the viewport resize, and a --vvh left
-  // behind after the keyboard has gone is the same dead strip by another route.
+  // focusout is what reliably ends it: the blur can beat the viewport resize, and a --kbh left
+  // behind after the keyboard has gone is phantom scroll-padding and mis-lifted sheets.
   document.addEventListener("focusin", apply);
   document.addEventListener("focusout", () => setTimeout(apply, 0));
   // A page restored from the back/forward cache, or resumed after iOS suspended it, can come back
@@ -7634,7 +7648,7 @@ seedDone();
   // ⚠️ UNDO THE PAN, EVERY TIME — this is the half that was missing, and it is what mangled the
   // whole screen when typing into the profile page. iOS decides INSTANTLY on focus, before any of
   // our handlers run, whether the field will sit under the keyboard; if so it pans the VISUAL
-  // viewport (visualViewport.offsetTop goes positive). We then shrink the shell to --vvh and scroll
+  // viewport (visualViewport.offsetTop goes positive). We make our own room (--kbh) and scroll
   // the field into view ourselves — but the pan was never reverted, so the app slid up under the
   // status bar and a dead black band opened between the bottom nav and the keyboard, for as long as
   // the keyboard stayed up. overflow:hidden on html/body does NOT prevent this pan; the only remedy
@@ -7731,7 +7745,7 @@ seedDone();
     el.textContent =
       "vv.h " + (vv ? Math.round(vv.height) : -1) + "  vv.off " + (vv ? Math.round(vv.offsetTop) : -1) + "\\n" +
       "scrollY " + Math.round(window.scrollY) + "  layout " + de.clientHeight + "\\n" +
-      "--vvh " + (de.style.getPropertyValue("--vvh") || "unset") + "\\n" +
+      "--kbh " + (de.style.getPropertyValue("--kbh") || "unset") + " kbup " + (de.classList.contains("kbup") ? 1 : 0) + "\\n" +
       "app " + (r ? Math.round(r.top) + ".." + Math.round(r.bottom) : "?") +
       "  tf " + ((app && app.style.transform) ? app.style.transform : "-") + "\\n" +
       "kb " + JSON.stringify(window.__kbDiag || null) + "\\n" +

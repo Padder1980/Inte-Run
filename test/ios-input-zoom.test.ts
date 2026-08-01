@@ -79,13 +79,23 @@ test("the shell sizes to its own PAGE, and still yields to a keyboard", () => {
   //    web app is handed a viewport SHORTER than the screen (measured on a 16 Pro Max: screen 956,
   //    page 894), dvh resolved against the bigger box, and the sticky bottom nav was pushed past
   //    the fold with a band of background where it should have been.
-  // 2. --vvh must still override it, or the iOS keyboard covers the bottom third with no scroll
-  //    room and iOS pans the whole viewport instead — bars and all.
+  // 2. The keyboard must still be answered — ⚠️ since v3 by OVERLAYING, not by shrinking. The
+  //    owner's words: "surely the keyboard just overlays the screen and it doesn't move it
+  //    anywhere" — and he was right; the shrink dragged the bottom bar up the screen on every
+  //    keystroke. The shell stays full height; --kbh (published only while a field is focused and
+  //    the visual viewport is genuinely short) adds scroll room under .view and lifts bottom
+  //    sheets, so any focused field can still be brought above the keyboard.
   assert.ok(/\.app \{[^}]*height: var\(--vvh, 100%\)/.test(STYLE),
-    ".app must rest at 100% (its own page) with --vvh as the keyboard override");
+    ".app must rest at 100% (its own page); --vvh stays as the inert emergency hook");
   assert.ok(!/\.app \{[^}]*100dvh/.test(STYLE),
     ".app must not size on dvh — it measures the screen, not the page it was given");
-  assert.ok(/setProperty\("--vvh"/.test(SOURCE), "nothing publishes --vvh from visualViewport");
+  assert.ok(!/setProperty\("--vvh"/.test(SOURCE),
+    "nothing may publish --vvh any more — the v3 keyboard overlays instead of shrinking the shell");
+  assert.ok(/setProperty\("--kbh"/.test(SOURCE), "the keyboard height must be published as --kbh");
+  assert.ok(/html\.kbup \.view \{ padding-bottom: calc\(96px \+ var\(--kbh/.test(STYLE),
+    ".view must gain keyboard-height scroll room while the keyboard is up");
+  assert.ok(/html\.kbup \.sheet-ov \{ padding-bottom: var\(--kbh/.test(STYLE),
+    "bottom sheets must lift above the keyboard — their fields live where the keyboard lands");
 });
 
 test("nothing is SIZED in vh — on iOS that is lvh, taller than the visible area", () => {

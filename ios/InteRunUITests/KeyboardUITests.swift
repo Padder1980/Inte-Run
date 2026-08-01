@@ -71,17 +71,26 @@ final class KeyboardUITests: XCTestCase {
         shoot(app, "final")
     }
 
-    /// THE REGRESSION TEST. Focus a field on the profile/setup screen with the software keyboard
-    /// and assert the layout held together:
-    ///  1. the bottom nav sits just above the keyboard — no dead band between them, and
-    ///  2. the nav has not been shoved off the top half of the screen.
-    /// The broken state this encodes: app shoved up under the status bar, nav floating mid-screen,
-    /// a black void between nav and keyboard for as long as the keyboard stays up.
+    /// THE REGRESSION TEST, encoding the owner's sentence verbatim: "surely the keyboard just
+    /// overlays the screen and it doesn't move it anywhere". Keyboard up: the top bar has not
+    /// moved, the focused field sits above the keyboard, and the bottom nav has NOT ridden up the
+    /// screen (it is simply covered). Keyboard down: everything is back exactly where it was.
     func testKeyboardKeepsLayout() throws {
         let app = XCUIApplication()
         app.launch()
         dismissWelcome(app)
         shoot(app, "before-focus")
+
+        let title = app.webViews.staticTexts["Your profile"].firstMatch
+        let nav = app.webViews.buttons["Today"].firstMatch
+        guard title.waitForExistence(timeout: 8), nav.exists else {
+            XCTFail("top bar or bottom nav not exposed before focusing")
+            return
+        }
+        let titleBefore = title.frame
+        let navBefore = nav.frame
+        XCTAssertGreaterThan(navBefore.maxY, app.frame.height * 0.85,
+                             "precondition: the nav starts at the bottom of the screen")
 
         // First text field on the setup screen ("What should we call you?").
         let field = app.webViews.textFields.firstMatch
@@ -94,60 +103,44 @@ final class KeyboardUITests: XCTestCase {
 
         let keyboard = app.keyboards.firstMatch
         guard keyboard.waitForExistence(timeout: 5) else {
-            // No software keyboard — almost always ConnectHardwareKeyboard=true. A skip, not a
-            // pass: this test proves nothing without the real keyboard.
             throw XCTSkip("software keyboard did not appear — disconnect the hardware keyboard")
         }
-        // iOS pans a beat AFTER the keyboard finishes animating; wait out both, then measure the
-        // settled state, and again a second later to catch late reassertion.
-        Thread.sleep(forTimeInterval: 1.5)
-        shoot(app, "keyboard-up")
-        try assertLayoutHolds(app, keyboard: keyboard, at: "1.5s")
-        Thread.sleep(forTimeInterval: 1.5)
-        try assertLayoutHolds(app, keyboard: keyboard, at: "3.0s")
+        // iOS pans a beat AFTER the keyboard finishes animating; wait out both, measure the
+        // settled state, then again to catch late reassertion.
+        for pause in [1.5, 1.5] {
+            Thread.sleep(forTimeInterval: pause)
+            shoot(app, "keyboard-up")
 
-        // And the way back: dismissing the keyboard must restore the full-height layout.
-        // ⚠️ Tapping empty page does NOT blur a WKWebView field — measured: focus stayed in s_name
-        // and the keyboard stayed up, failing this check against a healthy app. The accessory bar's
-        // own Done control is the reliable dismissal.
+            // 1. The top bar has not moved: the pan glitch shoved it off the top of the screen.
+            XCTAssertLessThan(abs(title.frame.minY - titleBefore.minY), 3,
+                              "the top bar moved when the keyboard opened")
+
+            // 2. The field being typed into sits above the keyboard.
+            XCTAssertLessThan(field.frame.maxY, keyboard.frame.minY + 1,
+                              "the focused field is underneath the keyboard")
+            XCTAssertGreaterThan(field.frame.minY, titleBefore.maxY - 1,
+                                 "the focused field has been shoved under the top bar")
+
+            // 3. The nav has NOT ridden up the screen. Under the overlay design it stays where it
+            //    was (covered by the keyboard); accessibility may hide it entirely, which is fine.
+            //    What must never happen again is the nav floating in the middle of the screen.
+            if nav.exists && nav.isHittable {
+                XCTAssertGreaterThan(nav.frame.maxY, app.frame.height * 0.85,
+                                     "the bottom nav rode up the screen with the keyboard")
+            }
+        }
+
+        // The way back: dismiss via the accessory bar's Done — tapping empty page does NOT blur a
+        // WKWebView field (measured: focus stayed put and the keyboard stayed up).
         let done = app.buttons["Done"].firstMatch
         if done.exists { done.tap() } else { tapNorm(app, 0.92, 0.56) }
         Thread.sleep(forTimeInterval: 1.5)
         shoot(app, "keyboard-down")
-        let nav = app.webViews.buttons["Today"].firstMatch
-        if nav.exists {
-            let screenH = app.frame.height
-            XCTAssertGreaterThan(nav.frame.maxY, screenH * 0.85,
-                                 "after the keyboard closed, the bottom nav did not return to the bottom of the screen")
-        }
-    }
-
-    private func assertLayoutHolds(_ app: XCUIApplication, keyboard: XCUIElement, at label: String) throws {
-        let nav = app.webViews.buttons["Today"].firstMatch
-        guard nav.exists else {
-            // Nav not exposed to accessibility — cannot measure. Fail loudly rather than skip:
-            // the whole point of this test is the measurement.
-            shoot(app, "nav-not-exposed-\(label)")
-            XCTFail("bottom nav not visible to accessibility at \(label)")
-            return
-        }
-        let gap = keyboard.frame.minY - nav.frame.maxY
-        // ⚠️ THE THRESHOLD ENCODES MEASURED CHROME, NOT A GUESS. keyboard.frame.minY is the QWERTY
-        // block, which sits BELOW WebKit's input-accessory bar (~55pt) and the predictive row —
-        // and nav.frame.maxY is the label's bottom, above the nav's own padding. Measured healthy
-        // on the 26.5 simulator: ~110-150pt of purely legitimate chrome. Measured broken (the pan
-        // glitch on the owner's phone): 300pt+ of dead page background. 200 separates them.
-        XCTAssertLessThan(gap, 200,
-                          "at \(label): \(Int(gap))pt between the bottom nav and the keyboard — the dead-band glitch")
-        XCTAssertGreaterThan(gap, -keyboard.frame.height,
-                             "at \(label): the nav is underneath the keyboard entirely")
-        // And the OTHER half of the broken screenshot: the app shoved up under the status bar. The
-        // top bar title must still sit in the top tenth of the screen.
-        let title = app.webViews.staticTexts["Your profile"].firstMatch
-        if title.exists {
-            XCTAssertGreaterThan(title.frame.minY, -2, "at \(label): the top bar is shoved off the top")
-            XCTAssertLessThan(title.frame.minY, app.frame.height * 0.12,
-                              "at \(label): the top bar has drifted down the screen")
-        }
+        XCTAssertLessThan(abs(title.frame.minY - titleBefore.minY), 3,
+                          "the top bar did not return after the keyboard closed")
+        XCTAssertGreaterThan(nav.frame.maxY, app.frame.height * 0.85,
+                             "the bottom nav did not return to the bottom after the keyboard closed")
+        XCTAssertLessThan(abs(nav.frame.minY - navBefore.minY), 3,
+                          "the bottom nav settled somewhere new after the keyboard closed")
     }
 }

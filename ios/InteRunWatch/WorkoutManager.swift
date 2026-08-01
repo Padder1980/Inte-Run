@@ -318,12 +318,13 @@ final class WorkoutManager: NSObject, ObservableObject {
                     // the display and then SNAPPED FORWARD on resume, counting the whole pause.
                     self.elapsed = Date().timeIntervalSince(started) - self.pausedAccum
                     self.advanceStepIfDue()
-                    // The wrist still decides WHEN — it owns the pace data and the hold/quiet
-                    // windows — but the phone says it, in the coach's own recorded voice.
+                    // Pace corrections are the wrist's own voice, WITH the numbers — the owner's
+                    // spec ("your current pace is…, your target pace is…") can never come from a
+                    // recorded clip, so unlike the step cues these are not forwarded to the phone.
                     switch self.paceVerdict {
-                    case .tooFast: self.voice?.paceCue("fast", via: self)
-                    case .tooSlow: self.voice?.paceCue("slow", via: self)
-                    default: self.voice?.paceCue("ok", via: self)
+                    case .tooFast: self.voice?.paceCue("fast", currentSecPerKm: self.paceSecPerKm, band: self.targetBand)
+                    case .tooSlow: self.voice?.paceCue("slow", currentSecPerKm: self.paceSecPerKm, band: self.targetBand)
+                    default: self.voice?.paceCue("ok", currentSecPerKm: nil, band: nil)
                     }
                     let target = self.targetSeconds
                     self.voice?.whyMoment(elapsed: self.elapsed, target: target, hard: self.isHardSession)
@@ -342,6 +343,7 @@ final class WorkoutManager: NSObject, ObservableObject {
         session?.pause()
         phase = .paused
         pauseBegan = Date()
+        voice?.resetPaceHold()   // a hold accrued before the pause must not survive it
         if !speakOnPhone("paused") { voice?.sayPaused() }
         sendLiveTick(force: true)
     }
@@ -352,6 +354,10 @@ final class WorkoutManager: NSObject, ObservableObject {
         if let began = pauseBegan { pausedAccum += Date().timeIntervalSince(began) }
         pauseBegan = nil
         phase = .running
+        // Both ends, deliberately: GPS kept updating pace from WALKING speed during the pause, so
+        // without a fresh hold the first post-resume tick could speak a numbered cue quoting the
+        // walk, straight over this "resumed" clip. The verdict must re-earn its 6 seconds.
+        voice?.resetPaceHold()
         if !speakOnPhone("resumed") { voice?.sayResumed() }
         sendLiveTick(force: true)
     }

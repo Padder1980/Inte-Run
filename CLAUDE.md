@@ -817,8 +817,12 @@ has the system synthesiser, which sounds like a computer beside them. So the **w
 cue is due** (it owns the pace data and the hold/quiet windows) and **the phone decides what it
 sounds like**: `WorkoutManager.speakOnPhone(trigger)` → `WatchBridge.forwardCue` →
 `window.__interunWatchCue` → `coachTrigger`. `WorkoutVoice` on the wrist is now only the fallback for
-when the phone is out of range. The ONE exception is the step announcement, which carries the
-runner's own pace numbers and so can never be a recorded clip.
+when the phone is out of range. TWO exceptions carry the runner's own numbers and so can never be a
+recorded clip: the step announcement, and — since 2026-07-31, at the owner's explicit request — the
+pace corrections, which the wrist speaks in full ("Speed up a little. Your current pace is 6 minutes
+43 per kilometre. Your target pace is 5 minutes 20 to 5 minutes 50."). `paceCue` therefore does NOT
+forward to the phone any more; the `pace-ahead`/`pace-behind` recorded clips still exist for
+phone-recorded runs, whose page-side `coachPaceTick` is untouched.
 
 ⚠️ **`sendToWatch` needs the watch app RUNNING (`isReachable`), so nothing can be pushed to it
 before `startWatchApp` launches it.** The session payload was being sent first and silently dropped,

@@ -96,17 +96,43 @@ final class WorkoutVoice {
 
     /// Pace nudges speak only when the verdict has held for a few seconds AND the last nudge was
     /// a while ago — a coach who nags every stride gets muted in week one.
-    func paceCue(_ verdict: String, via manager: WorkoutManager? = nil) {
+    ///
+    /// ⚠️ Spoken by the WRIST, never forwarded to the phone's recorded clips — the owner's spec is
+    /// the full sentence with the actual numbers ("Speed up a little, your current pace is …, your
+    /// target pace is …"), and no pre-generated clip can say a number. Same rule, same synthesised
+    /// coach voice as the step announcements' fallback.
+    func paceCue(_ verdict: String, currentSecPerKm: Double?, band: (low: Int, high: Int)?) {
         guard verdict == "fast" || verdict == "slow" else { lastVerdict = verdict; verdictSince = nil; return }
         if verdict != lastVerdict { lastVerdict = verdict; verdictSince = Date(); return }
         guard let since = verdictSince,
               Date().timeIntervalSince(since) > 6,
-              Date().timeIntervalSince(lastPaceCue) > 45 else { return }
+              Date().timeIntervalSince(lastPaceCue) > 45,
+              let cur = currentSecPerKm, cur.isFinite, cur > 0,
+              let band else { return }
         lastPaceCue = Date()
-        let trigger = verdict == "fast" ? "pace-ahead" : "pace-behind"
-        if manager?.speakOnPhone(trigger) == true { return }   // the phone said it, in the real voice
-        say(verdict == "fast" ? line("paceAhead", "Ease off a touch.")
-                              : line("paceBehind", "Pick it up a little."))
+        let lead = verdict == "fast" ? "Slow down a little." : "Speed up a little."
+        say(lead
+            + " Your current pace is \(Self.spokenPace(Int(cur.rounded()))) per kilometre."
+            + " Your target pace is \(Self.spokenPace(band.low)) to \(Self.spokenPace(band.high)).")
+    }
+
+    /// Forget any accrued verdict hold. Called on pause AND resume: while paused the tick that
+    /// resets the hold never runs, but GPS keeps updating pace from walking speed — without this,
+    /// the first tick after resuming could pass the "sustained for 6s" guard on pause wall-time
+    /// alone and speak a numbered cue quoting the WALK, straight over the "resumed" clip.
+    func resetPaceHold() {
+        lastVerdict = ""
+        verdictSince = nil
+    }
+
+    /// "5:43" the way a person says it — "5 minutes 43". Spelling it out matters: a synthesiser
+    /// reading "5:43" aloud can render it as a clock time or a ratio. Pure and static so it can be
+    /// verified off-device.
+    static func spokenPace(_ secPerKm: Int) -> String {
+        let m = secPerKm / 60, s = secPerKm % 60
+        if m <= 0 { return "\(s) seconds" }
+        if s == 0 { return "\(m) minutes" }
+        return "\(m) minutes \(s)"
     }
 
     /// The why moment: once per run, late on, in a session long enough for it to mean something.

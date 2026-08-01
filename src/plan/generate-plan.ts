@@ -374,10 +374,23 @@ function applyRaceDay(weeks: PlannedWeek[], goal: Goal, paces: TrainingPaces): v
   if (daysBetween(last.startDateIso, goal.raceDateIso) !== raceDow) return;
 
   const label = RACE_LABELS[goal.distance] ?? goal.distance;
+
+  // ⚠️ THE EVE IS NOT ALWAYS IN THE RACE WEEK. For a MONDAY race raceDow is 0, so `raceDow - 1` is
+  // -1 and matches no dayOfWeek at all — while the real day before is the SUNDAY of the PREVIOUS
+  // week, which this function never opened. Rule 3 therefore did nothing for one weekday in seven.
+  // Measured across 4 events x 7 race weekdays x 7 long-run days: 10 of 196 plans put a
+  // HARD_BEFORE_RACE session on race eve and every single one was a Monday race — worst case, a
+  // 98-minute LONG RUN the day before a marathon. Resolve the eve as a (week, day) pair; an index
+  // into the final week cannot express it.
+  const eve: { week: PlannedWeek; dow: number } | null =
+    raceDow > 0 ? { week: last, dow: raceDow - 1 }
+    : weeks.length > 1 ? { week: weeks[weeks.length - 2]!, dow: 6 }
+    : null;
+
   const kept = last.sessions.filter((s) => {
     if (s.dayOfWeek > raceDow) return false;               // rule 2: nothing after the race
     if (s.dayOfWeek === raceDow) return false;             // rule 1: race day is the race
-    if (s.dayOfWeek === raceDow - 1 && HARD_BEFORE_RACE.has(s.type)) return false;  // rule 3
+    if (eve && eve.week === last && s.dayOfWeek === eve.dow && HARD_BEFORE_RACE.has(s.type)) return false;  // rule 3
     return true;
   });
 
@@ -405,6 +418,23 @@ function applyRaceDay(weeks: PlannedWeek[], goal: Goal, paces: TrainingPaces): v
   last.qualitySessionCount = last.sessions.filter(
     (s) => s.type === "threshold" || s.type === "vo2" || s.type === "race-specific",
   ).length;
+
+  // Rule 3, applied across the week boundary for a Monday race. The eve session is replaced by rest
+  // rather than dropped, so the week keeps all seven days like every other week in the plan.
+  if (eve && eve.week !== last) {
+    const w = eve.week;
+    w.sessions = w.sessions.map((s) =>
+      s.dayOfWeek === eve.dow && HARD_BEFORE_RACE.has(s.type)
+        ? { ...restDay(), id: `w${w.index}-d${eve.dow}-rest`, dayOfWeek: eve.dow, source: "generated" as const }
+        : s,
+    );
+    w.plannedDistanceMeters = Math.round(
+      w.sessions.reduce((m, s) => m + (s.estimatedDistanceMeters ?? 0), 0),
+    );
+    w.qualitySessionCount = w.sessions.filter(
+      (s) => s.type === "threshold" || s.type === "vo2" || s.type === "race-specific",
+    ).length;
+  }
 }
 
 /** Session types that must not sit the day before a goal race. */

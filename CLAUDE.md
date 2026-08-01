@@ -447,6 +447,20 @@ Three rules, enforced in `applyRaceDay` and asserted across all 49 combinations 
 2. Nothing follows it; later days in that week become rest.
 3. Nothing hard the day before (`HARD_BEFORE_RACE`), strength included.
 
+⚠️ **THE EVE CAN LIVE IN THE PREVIOUS WEEK, and both the rule and its test missed it.** `applyRaceDay`
+looked for the day before at `dayOfWeek === raceDow - 1` inside the final week. For a **Monday race**
+`raceDow` is 0, so `raceDow - 1` is −1 and matches nothing — while the real eve is the **Sunday of the
+week before**, which the function never opened. Rule 3 therefore did nothing for one weekday in seven:
+measured, 10 of 196 plans put a hard session on race eve and every one was a Monday race, worst case a
+**98-minute long run the day before a marathon**. The eve is now resolved as a `(week, day)` pair.
+
+⚠️ **The test could only ever agree with the bug**, because it asked the same question the wrong way —
+`dayOfWeek === dow - 1`, inside `weeks.at(-1)`. A guard written in the implementation's own frame of
+reference is not a guard. It now flattens the plan to **calendar dates** and asks what the runner would
+ask ("what am I doing the day before my race?"), which is the only framing in which the Monday case is
+even expressible. Verified: removing the fix fails it; with the fix, 0 hard eves across 588 plans
+(4 events × 7 race weekdays × 7 long-run days × 3 day-counts).
+
 ⚠️ Two consequences for anything that walks sessions:
 - **Race week has NO long run.** "Every week has exactly one long run" is false by design now.
 - **Race week is exempt from the intensity model** — it contains a maximal effort over the race

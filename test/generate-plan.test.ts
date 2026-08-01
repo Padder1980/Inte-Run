@@ -86,24 +86,47 @@ test("race day is in the plan, on the real date, with nothing after it", () => {
 
 test("race day survives EVERY race weekday and long-run day", () => {
   // 6 of these 49 combinations used to put a VO2 session the day before the goal race.
+  //
+  // ⚠️ THIS TEST WORKS IN CALENDAR DATES, NOT IN DAY-OF-WEEK INDICES, and that is the whole point.
+  // It used to look for the eve at `dayOfWeek === dow - 1` INSIDE THE FINAL WEEK — which is the same
+  // assumption applyRaceDay itself was making, so the test could only ever agree with the bug. For a
+  // MONDAY race `dow - 1` is -1 and the real eve is the previous week's Sunday, so both the rule and
+  // its guard quietly skipped it, and a marathon shipped with a 98-minute long run the day before
+  // the race. A guard that shares the implementation's frame of reference is not a guard: flatten to
+  // dates and ask the question the runner would ask — "what am I doing the day before my race?"
+  const HARD = ["threshold", "vo2", "race-specific", "long", "strength"];
   for (let raceShift = 0; raceShift < 7; raceShift++) {
     for (let longDay = 0; longDay < 7; longDay++) {
       const raceIso = shiftIso(goal.raceDateIso, raceShift);
       const p = generatePlan({ ...athlete, longRunDay: longDay }, { ...goal, raceDateIso: raceIso });
-      const wk = p.weeks.at(-1)!;
-      const dow = (new Date(raceIso + "T00:00:00Z").getUTCDay() + 6) % 7;
-      const race = wk.sessions.find((s) => s.type === "race");
-      assert.ok(race, `race missing (shift ${raceShift}, longDay ${longDay})`);
-      assert.equal(race!.dayOfWeek, dow, `race on wrong day (shift ${raceShift}, longDay ${longDay})`);
-      const after = wk.sessions.filter((s) => s.dayOfWeek > dow && s.type !== "rest");
-      assert.equal(after.length, 0, `session after the race (shift ${raceShift}, longDay ${longDay})`);
-      const hardEve = wk.sessions.filter(
-        (s) => s.dayOfWeek === dow - 1 &&
-          ["threshold", "vo2", "race-specific", "long", "strength"].includes(s.type),
-      );
-      assert.equal(hardEve.length, 0,
-        `hard session the day before the race (shift ${raceShift}, longDay ${longDay}): ` +
-        hardEve.map((s) => s.title).join());
+      const where = `(shift ${raceShift}, longDay ${longDay})`;
+
+      // Every session in the plan, keyed by the real date it falls on.
+      const byDate = new Map<string, typeof p.weeks[number]["sessions"]>();
+      for (const w of p.weeks) {
+        for (const s of w.sessions) {
+          const iso = shiftIso(w.startDateIso, s.dayOfWeek);
+          const list = byDate.get(iso) ?? [];
+          list.push(s);
+          byDate.set(iso, list);
+        }
+      }
+
+      const onRaceDay = (byDate.get(raceIso) ?? []).filter((s) => s.type !== "rest");
+      assert.equal(onRaceDay.length, 1, `race day should hold exactly the race ${where}`);
+      assert.equal(onRaceDay[0]!.type, "race", `race missing on its own date ${where}`);
+
+      // Nothing after the race, anywhere in the plan — not merely nothing later in that week.
+      const after = [...byDate.entries()]
+        .filter(([iso]) => iso > raceIso)
+        .flatMap(([, ss]) => ss)
+        .filter((s) => s.type !== "rest");
+      assert.equal(after.length, 0, `session after the race ${where}: ${after.map((s) => s.title).join()}`);
+
+      // The day before, wherever it lives — including in the PREVIOUS week for a Monday race.
+      const eve = (byDate.get(shiftIso(raceIso, -1)) ?? []).filter((s) => HARD.includes(s.type));
+      assert.equal(eve.length, 0,
+        `hard session the day before the race ${where}: ${eve.map((s) => s.title).join()}`);
     }
   }
 });

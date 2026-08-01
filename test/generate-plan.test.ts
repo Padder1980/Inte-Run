@@ -482,7 +482,8 @@ test("a beginner's long run knows what race they entered", () => {
   // linearly to the new endpoint front-loaded the growth and put a 17% jump at week 5 (3.5 → 4.1 km);
   // the ramp is geometric so every step is the same small percentage. Compared against the running
   // maximum, so a deload dip and its rebound are not counted as a spike.
-  for (const distance of ["5k", "10k", "half", "marathon"] as const) {
+  // 5 km / 10 km / half only: "building the habit" is not offered a marathon.
+  for (const distance of ["5k", "10k", "half"] as const) {
     const rungs = ladder(distance, false);
     let prevMax = 0;
     for (const [i, km] of rungs.entries()) {
@@ -495,10 +496,14 @@ test("a beginner's long run knows what race they entered", () => {
     }
   }
 
-  // The run–walk track has to move with the goal too; it was stuck at 2.9 km for everything.
+  // ⚠️ The run–walk track has to move with the goal too — it was stuck at 2.9 km for everything. Only
+  // 5 km and 10 km are compared, because those are the only goals it can HAVE: `GOAL_BY_STATUS` in
+  // web/app.ts offers "just getting started" (the run-walk status) 5 km and 10 km only, on the
+  // deliberate product rule that you finish one of those before entering a half. An earlier version
+  // of this test compared 5 km against a half and was asserting on a combination no user can reach.
   const rwLongest = (d: Goal["distance"]) => Math.max(...ladder(d, true));
-  assert.ok(rwLongest("half") > rwLongest("5k") * 1.5,
-    `run-walk ladder barely moves with the goal: 5k ${rwLongest("5k").toFixed(1)}km vs half ${rwLongest("half").toFixed(1)}km`);
+  assert.ok(rwLongest("10k") > rwLongest("5k") * 1.15,
+    `run-walk ladder barely moves with the goal: 5k ${rwLongest("5k").toFixed(1)}km vs 10k ${rwLongest("10k").toFixed(1)}km`);
 });
 
 test("scaling down never buys volume with intensity", () => {

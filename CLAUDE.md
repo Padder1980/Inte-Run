@@ -584,15 +584,31 @@ week — which is a taper week, eased 25% — and the long run peaked short of i
 ⚠️ **`rwLong`'s cycle clamp is 4–12, not 4–8.** Eight capped the longest run–walk at ~56 minutes of
 running whatever was asked, so a "just getting started" runner heading for a 10 km never passed 2.9 km.
 
-Measured, longest run before → after: continuous 5 km 4.4 → 6.0, 10 km 4.5 → 8.0, half 4.4 → **12.0**,
-marathon 4.3 → 12.6; run–walk 3.1 → 4.8, 2.9 → 6.2, 2.9 → **8.2**, 2.9 → 7.9. Non-beginner plans are
-**byte-identical** (288-plan hash unchanged) — `beginnerRun` and `rwLong` have no other caller.
+⚠️ **MEASURE ONLY THE GOALS A BEGINNER CAN ACTUALLY PICK.** `GOAL_BY_STATUS` (web/app.ts) offers
+**"just getting started" 5 km and 10 km only**, and **"building the habit" 5 km, 10 km and half** — a
+deliberate product rule that you finish one of those before entering something longer, and the reason
+`runWalk` is `status === "new"`. A first pass here measured run–walk against a half and a beginner
+against a marathon, called both a shortfall, and wrote them into this file as known gaps. **Neither
+combination exists.** `BEGINNER_LONG_KM` keeps a marathon entry as a total-function safety net, not
+because anyone reaches it. Sweep the reachable matrix, or you will report on runners who cannot exist
+and miss the ones who do.
 
-Known and not fixed: the run–walk track still sits under the report's bands (they assume continuous
-running, and a run–walker covers less ground per session; the integer cycle count is the structural
-limit), and a beginner MARATHON reaches 12.6 km against a 16–25 km band because the 135-minute ceiling
-binds. Both are arguments with the GOAL rather than with the long run — `assessFeasibility` is what
-should be having them.
+⚠️ **`targetRunMin` aims at the SAME endpoint as the continuous track, not a discounted one.** The
+first pass scaled it to 0.75 reasoning that a run–walker covers less ground per minute. That is true
+and points the *other way*: walk breaks add time without adding distance, so covering 8 km takes more
+session, not less. At 0.75 a "just getting started" runner reached 4.8 km before a 5 km and 6.2 km
+before a 10 km, both under band; at parity, 6.2 and 8.2.
+
+Measured across every reachable combination (16/28/40-week runways), longest run before → after:
+run–walk 5 km **3.1 → 6.2**, 10 km **3.1 → 8.2**; continuous 5 km **4.4 → 6.0**, 10 km **4.4 → 8.0**,
+half **4.4 → 12.0**. All in band. The step up to race day fell from 3.7× to 1.4× for a run–walk 10 km
+and from **5.0× to 1.8×** for a beginner half. Non-beginner plans are **byte-identical** (288-plan
+hash unchanged) — `beginnerRun` and `rwLong` have no other caller.
+
+⚠️ When a beginner's race falls on a **Monday**, their peak long run is the race-eve session and
+`applyRaceDay` replaces it with the shakeout, so the block tops out one rung lower. That is correct,
+and it is also a trap for measurement: a sweep whose race dates are all Mondays reads a 3% shortfall
+that is not there.
 
 ## Race day is a session (added 2026-08-01, from elite-coach feedback)
 

@@ -367,6 +367,11 @@ export function generatePlan(
     BEGINNER_LONG_CEILING_MIN,
     minutesFor(BEGINNER_LONG_KM[goal.distance]),
   );
+  // The last week that actually trains hard — where the beginner ramp should arrive.
+  const lastHardWeek = schedule.reduce(
+    (acc, wp, i) => (wp.phase !== "taper" && !wp.isDeload ? i + 1 : acc),
+    1,
+  );
   const longCapMin = minutesFor(LONG_CAP_KM[goal.distance][abilityKey]);
 
   const buildAll = (vScale: number): PlannedWeek[] => {
@@ -405,7 +410,7 @@ export function generatePlan(
       const weekIndex = i + 1;
       const startDateIso = addDays(raceMonday, -(structuredWeeks - weekIndex) * 7);
       if (beginner) {
-        return buildBeginnerWeek(weekIndex, startDateIso, wp, { athlete, goal, paces, returning, longMin: beginnerLongPeakMin }, nonTaperCount, runWalk);
+        return buildBeginnerWeek(weekIndex, startDateIso, wp, { athlete, goal, paces, returning, longMin: beginnerLongPeakMin }, lastHardWeek, runWalk);
       }
       const longMin = longRunMinutes(
         wp,
@@ -835,10 +840,13 @@ function beginnerRun(
   if (runWalk) {
     const runSec = Math.round(lerp(60, 300, f) / 15) * 15; // 1′ → 5′ run
     const walkSec = Math.max(30, Math.round(lerp(90, 45, f) / 15) * 15); // 90″ → 45″ walk
-    // Run-walk covers less ground per minute of session than continuous running, and the walk breaks
-    // are the point rather than a shortfall — so the running content aims at three quarters of the
-    // continuous endpoint. Below ~14 minutes there is no session left, hence the floor.
-    const rwPeak = Math.max(14, longPeakMin * 0.75);
+    // ⚠️ `targetRunMin` is the RUNNING minutes, and it aims at the SAME endpoint as the continuous
+    // track, not a discounted one. The first version scaled it to 0.75 on the reasoning that a
+    // run-walker covers less ground per minute — which is true and points the other way: the walk
+    // breaks add time without adding much distance, so covering 8 km takes MORE session, not less.
+    // Measured, the discount left a "just getting started" runner at 4.8 km before a 5 km and 6.2 km
+    // before a 10 km, both under the report's Beginner bands; at parity they reach 6.2 and 8.2.
+    const rwPeak = Math.max(14, longPeakMin);
     let targetRunMin = long ? geomLerp(Math.min(14, rwPeak), rwPeak, f) : lerp(10, 26, f);
     if (ease) targetRunMin *= 0.7;
     const spec = { runSec, walkSec, targetRunMin };
@@ -871,12 +879,13 @@ function buildBeginnerWeek(
   rampWeeks: number,
   runWalk: boolean,
 ): PlannedWeek {
-  // ⚠️ THE RAMP REACHES ITS ENDPOINT AT THE LAST HARD WEEK, NOT THE LAST WEEK. `structuredWeeks` used
-  // to be the denominator, so f only hit 1 in race week — which is a taper week, and taper weeks are
-  // eased by 25%. The long run therefore peaked somewhere short of its target and then shrank: for a
-  // beginner half the endpoint was 12 km and the plan actually delivered 11.6. Ramp against the
-  // non-taper weeks and clamp, so the destination is genuinely arrived at and the taper backs off
-  // FROM it.
+  // ⚠️ THE RAMP REACHES ITS ENDPOINT AT THE LAST HARD WEEK — not the last week, and not the last
+  // non-taper week either. `structuredWeeks` was the denominator first, so f only hit 1 in race week,
+  // which is a taper week and eased by 25%. Switching to the non-taper count was still wrong: the
+  // final non-taper week is usually a DELOAD, also eased, so the endpoint landed on a week that then
+  // had 25% taken off it. Measured, a beginner 5 km block aimed at 6.0 km and delivered 5.8. Ramp to
+  // the last week that is neither taper nor deload, and everything after it eases down FROM the
+  // destination rather than toward it.
   const f = Math.min(1, rampWeeks <= 1 ? 0.5 : (index - 1) / (rampWeeks - 1));
   const ease = wp.isDeload || wp.phase === "taper";
   const runningDays = Math.min(runWalk ? 3 : 4, Math.max(2, ctx.athlete.daysPerWeek));

@@ -198,6 +198,12 @@ enum WatchPreview {
         case "settings-audio":   settingsScene(2)
         case "settings-metrics": settingsScene(3)
 
+        // ── Home ──────────────────────────────────────────────────────────────────────────────
+        // Seeded by setting the store's published fields DIRECTLY — apply() would persist to
+        // UserDefaults and leave fake sessions haunting the simulator's real cache.
+        case "home-today":    homeScene(0)
+        case "home-upcoming": homeScene(1)
+
         default:
             Text("Unknown preview scene: \(scene)").font(.caption)
         }
@@ -209,6 +215,37 @@ enum WatchPreview {
             SettingsView(initialPage: page)
                 .environmentObject(SessionStore())
         }
+    }
+
+    @MainActor
+    private static func homeScene(_ page: Int) -> some View {
+        let store = SessionStore()
+        let today = SessionStore.localTodayIso()
+        store.runnerName = "Adam"
+        store.contextIso = today
+        store.hasSynced = true
+        store.session = PlannedSession(
+            title: "Threshold 3 × 8′", type: "threshold", dateIso: today,
+            durationMin: 52, distanceKm: 8.6, paceLow: 305, paceHigh: 320,
+            rpeMin: 6, rpeMax: 7, steps: nil)
+        // Types are the engine's REAL SessionType strings — a seed that invents its own types
+        // (the first draft typed an "easy + strides" day as "easy") masks colour-map bugs in the
+        // very screenshots meant to catch them.
+        store.upcoming = [
+            store.session!,
+            PlannedSession(title: "45′ easy + strides", type: "strides", dateIso: "2099-01-02",
+                           durationMin: 47, distanceKm: 7.5, paceLow: 366, paceHigh: 399,
+                           rpeMin: 2, rpeMax: 3, steps: nil),
+            PlannedSession(title: "Long run 14 km", type: "long", dateIso: "2099-01-04",
+                           durationMin: 84, distanceKm: 14, paceLow: 350, paceHigh: 380,
+                           rpeMin: 3, rpeMax: 4, steps: nil),
+            PlannedSession(title: "VO2 6 × 3′", type: "vo2", dateIso: "2099-01-06",
+                           durationMin: 48, distanceKm: 8, paceLow: 255, paceHigh: 270,
+                           rpeMin: 8, rpeMax: 9, steps: nil),
+        ]
+        // previewInert: the buttons render but refuse to start — a preview that can start a
+        // workout is a preview that can log a fictional run.
+        return TodayView(initialPage: page, previewInert: true).environmentObject(store)
     }
 }
 #endif

@@ -15,6 +15,14 @@ struct TodayView: View {
     @StateObject private var workout = WorkoutManager()
     @State private var running = false
 
+    /// Which home page to open on. Exists for WatchPreview, which cannot swipe.
+    var initialPage: Int = 0
+    /// True only when rendered by WatchPreview: every start path is refused, because a preview
+    /// that can start a workout is a preview that can log a fictional run (WatchPreview's own
+    /// invariant — a review caught the home scenes violating it).
+    var previewInert: Bool = false
+    @State private var page = 0
+
     /// Hand the plan to the workout and go. One path, so a run started from the phone and a run
     /// started on the wrist are the same run with the same targets and the same reasons.
     private func begin(_ s: PlannedSession?) {
@@ -26,6 +34,9 @@ struct TodayView: View {
     /// `count` is false when the PHONE has already counted the runner in — two independent
     /// three-second counts is how the two clocks ended up a second apart.
     private func beginNow(_ s: PlannedSession?, count: Bool = false) {
+        // The preview harness renders this view with seeded fake sessions; starting one would open
+        // a real HKWorkoutSession and send a fictional run home to the phone's logbook.
+        guard !previewInert else { return }
         // Reset FIRST: the manager outlives a run, and a stale phase or a reused run id silently
         // breaks the next one. See WorkoutManager.reset().
         workout.reset()
@@ -74,42 +85,6 @@ struct TodayView: View {
         .padding(.top, 6)
     }
 
-    /// The rest of the week, so a session can be started early — or caught up — from the wrist.
-    @ViewBuilder private var upcomingList: some View {
-        let ahead = store.upcomingAhead.filter { $0.dateIso != SessionStore.localTodayIso() }
-        if !ahead.isEmpty {
-            Text("COMING UP")
-                .font(.system(size: 10, weight: .bold)).kerning(0.6)
-                .foregroundStyle(Brand.inkFaint)
-                .padding(.top, 10)
-            ForEach(Array(ahead.prefix(5).enumerated()), id: \.offset) { _, s in
-                Button { begin(s) } label: {
-                    HStack(spacing: 9) {
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(Brand.accent).frame(width: 3)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(dayLabel(s.dateIso))
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(Brand.inkFaint)
-                            Text(s.title)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(Brand.ink)
-                                .lineLimit(2).multilineTextAlignment(.leading)
-                            if !s.subtitle.isEmpty {
-                                Text(s.subtitle).font(.system(size: 10)).foregroundStyle(Brand.inkSoft)
-                            }
-                        }
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.vertical, 8).padding(.horizontal, 10)
-                    .frame(maxWidth: .infinity)
-                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Brand.surface))
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-
     private var settingsLink: some View {
         NavigationLink {
             SettingsView().environmentObject(store)
@@ -142,35 +117,25 @@ struct TodayView: View {
         NavigationStack {
             ZStack {
                 Brand.backdrop
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 8) {
-                        wordmark
-                        // A context from a previous day is worse than none: showing yesterday's
-                        // session (or yesterday's rest) as today's would quietly mislead. Fall back
-                        // to the waiting state, whose advice - open the phone app - is the fix.
-                        if launch.companionOnly {
-                            // The phone is recording; the wrist is only watching.
+                // The home is TWO swipeable pages, the owner's reference layout: today (with Free
+                // Run always available) and the upcoming week. The companion state replaces the
+                // pager wholesale — a wrist that is only mirroring the phone has no pages to offer.
+                if launch.companionOnly {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 8) {
+                            wordmark
                             CompanionView().environmentObject(store)
-                        } else if store.isCurrent, let s = store.session {
-                            session(s)
-                        } else if let s = store.todayFromCache {
-                            // The context is stale but the cached week still covers today. Better a
-                            // day-old copy of the right session than a spinner.
-                            session(s)
-                        } else if store.isCurrent, store.hasSynced {
-                            restDay
-                        } else {
-                            waiting
                         }
-                        // ⚠️ Always offered, even when nothing has synced. Requiring the phone app
-                        // to be open before the watch will start a run is not a running app, it is
-                        // a chore — and it is exactly the state you are in at the front door.
-                        freeRun
-                        upcomingList
-                        settingsLink
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 2)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 2)
+                } else {
+                    TabView(selection: $page) {
+                        todayPage.tag(0)
+                        upcomingPage.tag(1)
+                    }
+                    .tabViewStyle(.page)
+                    .onAppear { page = initialPage }
                 }
             }
             // The wordmark is drawn in the content (see `wordmark`) rather than set as the
@@ -207,6 +172,123 @@ struct TodayView: View {
             // own second countdown, while the phone counted the session actually chosen. The
             // onStartNow closure above resolves the session at go-time; a go that never arrives
             // leaves the watch honestly on Today with its Start button.
+        }
+    }
+
+    // MARK: - The two home pages
+
+    /// Page 1: the brand, a Free Run that is ALWAYS there, and today's workout as a card.
+    private var todayPage: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 8) {
+                wordmark
+                // ⚠️ Always offered, even when nothing has synced. Requiring the phone app to be
+                // open before the watch will start a run is not a running app, it is a chore — and
+                // it is exactly the state you are in at the front door.
+                freeRun
+                Text("TODAY'S WORKOUT")
+                    .font(.system(size: 10, weight: .bold)).kerning(0.6)
+                    .foregroundStyle(Brand.inkFaint)
+                    .padding(.top, 4)
+                // A context from a previous day is worse than none: showing yesterday's session
+                // (or yesterday's rest) as today's would quietly mislead. Fall back to the waiting
+                // state, whose advice - open the phone app - is the fix.
+                if store.isCurrent, let s = store.session {
+                    card(bar: typeBar(s.type)) { session(s) }
+                } else if let s = store.todayFromCache {
+                    // Stale context but the cached week still covers today. Better a day-old copy
+                    // of the right session than a spinner.
+                    card(bar: typeBar(s.type)) { session(s) }
+                } else if store.isCurrent, store.hasSynced {
+                    card(bar: Brand.inkFaint) { restDay }
+                } else {
+                    card(bar: Brand.inkFaint) { waiting }
+                }
+                settingsLink
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 2)
+            .padding(.bottom, 12)   // clear of the page dots
+        }
+    }
+
+    /// Page 2: the rest of the week, so a session can be started early — or caught up — from the
+    /// wrist without the phone.
+    private var upcomingPage: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("UPCOMING")
+                    .font(.system(size: 10, weight: .bold)).kerning(0.6)
+                    .foregroundStyle(Brand.inkFaint)
+                let ahead = store.upcomingAhead.filter { $0.dateIso != SessionStore.localTodayIso() }
+                if ahead.isEmpty {
+                    Text("Nothing else synced this week — your phone has the full plan.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Brand.inkFaint)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    // No cap: the phone syncs up to seven sessions and the ten-day window exists
+                    // precisely so the wrist stands alone — a prefix(5) here silently binned the
+                    // last sessions the phone deliberately sent. The page scrolls.
+                    ForEach(Array(ahead.enumerated()), id: \.offset) { _, s in
+                        Button { begin(s) } label: {
+                            card(bar: typeBar(s.type)) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(dayLabel(s.dateIso).uppercased())
+                                        .font(.system(size: 10, weight: .bold)).kerning(0.4)
+                                        .foregroundStyle(Brand.accent)
+                                    Text(s.title)
+                                        .font(.system(size: 15, weight: .bold))
+                                        .foregroundStyle(Brand.ink)
+                                        .lineLimit(2).multilineTextAlignment(.leading)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                    if !s.subtitle.isEmpty {
+                                        Text(s.subtitle).font(.system(size: 10.5)).foregroundStyle(Brand.inkSoft)
+                                    }
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 2)
+            .padding(.bottom, 12)
+        }
+    }
+
+    /// The reference's card: content on a surface, with a colour bar down the LEFT EDGE carrying
+    /// the session type — quality amber, easy green, long run teal — so the kind of day is read
+    /// before a single word is.
+    private func card<Content: View>(bar: Color, @ViewBuilder _ content: () -> Content) -> some View {
+        HStack(alignment: .top, spacing: 0) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(bar)
+                .frame(width: 4)
+                .padding(.vertical, 3)
+            content()
+                .padding(.leading, 9)
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 10).padding(.horizontal, 9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 13, style: .continuous).fill(Brand.surface))
+    }
+
+    /// Session type → the card's edge colour: anything easy is green, the long run is the brand
+    /// teal, and the quality days are amber.
+    /// ⚠️ The strings are the ENGINE's SessionType union (src/domain/types.ts), not guesses — a
+    /// review caught this map inventing types ("tempo", "hills") while missing "strides", which is
+    /// how the generator types every routine "easy + strides" day: an EASY day, RPE two-ish, that
+    /// was wearing the hard-day amber. "cross-training" is likewise an easy replacement.
+    private func typeBar(_ type: String) -> Color {
+        switch type {
+        case "easy", "recovery", "strides", "cross-training": return Brand.effEasy
+        case "long": return Brand.accent
+        case "rest": return Brand.inkFaint
+        case "strength", "mobility": return Brand.inkSoft
+        default: return Brand.ease   // threshold, vo2, race-specific — the quality days
         }
     }
 

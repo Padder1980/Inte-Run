@@ -41,6 +41,21 @@ struct WebHost: UIViewRepresentable {
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
 
+        // ⚠️ The web view's own scroll view must NEVER move. The document is exactly viewport-sized
+        // (html/body are overflow: hidden) and every scrollable surface in the app is an inner CSS
+        // scroller — so the ONLY thing that ever writes a non-zero offset here is iOS itself,
+        // shoving the page to "reveal" a focused field the instant the keyboard opens. That shove
+        // is the screen-bump the owner reported twice: the app's JS pulls it back a beat later, but
+        // the jolt is visible. Zeroing the offset the moment it is written kills it at the source,
+        // within the same frame; the page's own keepVisible scrolls the field into view inside
+        // #view instead. (Recursion-safe: resetting to zero re-fires this observer with .zero,
+        // which no longer matches the guard.)
+        context.coordinator.scrollPin = webView.scrollView.observe(\.contentOffset, options: [.new]) { scrollView, _ in
+            if scrollView.contentOffset != .zero {
+                scrollView.setContentOffset(.zero, animated: false)
+            }
+        }
+
         let location = LocationService(webView: webView)
         context.coordinator.location = location
         config.userContentController.add(location, name: LocationService.messageName)
@@ -108,6 +123,8 @@ struct WebHost: UIViewRepresentable {
         var notifications: NotificationService?
         /// Owns the CLLocationManager for the lifetime of the web view. See `LocationService.swift`.
         var location: LocationService?
+        /// Pins the web view's own scroll view at zero — see the note where it is installed.
+        var scrollPin: NSKeyValueObservation?
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             if SelfCheck.isEnabled { SelfCheck.run(on: webView) }

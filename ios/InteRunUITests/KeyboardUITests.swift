@@ -101,6 +101,18 @@ final class KeyboardUITests: XCTestCase {
         }
         field.tap()
 
+        // ⚠️ WATCH THE TRANSITION, NOT JUST THE DESTINATION. The bump the owner reported twice is
+        // iOS shoving the whole view the instant the keyboard starts opening, then the app pulling
+        // it back — the settled state passes every assertion while the journey is a visible jolt.
+        // Sample the top bar through the whole keyboard animation: it must never move at all.
+        var maxShift: CGFloat = 0
+        for _ in 0..<12 {
+            Thread.sleep(forTimeInterval: 0.1)
+            if title.exists { maxShift = max(maxShift, abs(title.frame.minY - titleBefore.minY)) }
+        }
+        XCTAssertLessThan(maxShift, 4,
+                          "the view bumped by \(Int(maxShift))pt while the keyboard opened")
+
         let keyboard = app.keyboards.firstMatch
         guard keyboard.waitForExistence(timeout: 5) else {
             throw XCTSkip("software keyboard did not appear — disconnect the hardware keyboard")
@@ -142,5 +154,35 @@ final class KeyboardUITests: XCTestCase {
                              "the bottom nav did not return to the bottom after the keyboard closed")
         XCTAssertLessThan(abs(nav.frame.minY - navBefore.minY), 3,
                           "the bottom nav settled somewhere new after the keyboard closed")
+
+        // ⚠️ ROUND TWO, ON A FIELD LOW ON THE SCREEN — the case where iOS has a real reason to
+        // shove: the tapped field sits where the keyboard is about to land. The name field at the
+        // top never triggers the shove, which is how a passing test coexisted with a bumping phone.
+        app.swipeUp()
+        Thread.sleep(forTimeInterval: 1.0)
+        let fields = app.webViews.textFields
+        var low: XCUIElement? = nil
+        for i in 0..<min(fields.count, 8) {
+            let f = fields.element(boundBy: i)
+            if f.isHittable && f.frame.midY > app.frame.height * 0.55 { low = f }
+        }
+        guard let lowField = low else {
+            shoot(app, "no-low-field")
+            return // nothing low enough on this screen size — the top-field pass stands
+        }
+        let titleBefore2 = title.exists ? title.frame : titleBefore
+        lowField.tap()
+        var maxShift2: CGFloat = 0
+        for _ in 0..<12 {
+            Thread.sleep(forTimeInterval: 0.1)
+            if title.exists { maxShift2 = max(maxShift2, abs(title.frame.minY - titleBefore2.minY)) }
+        }
+        shoot(app, "low-field-keyboard")
+        XCTAssertLessThan(maxShift2, 4,
+                          "the view bumped by \(Int(maxShift2))pt when a LOW field was focused")
+        if keyboard.exists {
+            XCTAssertLessThan(lowField.frame.maxY, keyboard.frame.minY + 1,
+                              "the low field is underneath the keyboard")
+        }
     }
 }

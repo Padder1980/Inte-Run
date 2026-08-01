@@ -2564,7 +2564,7 @@ function ingestWatchRun(run) {
     // wrist) and again from the effort screen carrying the RPE. The second delivery must write the
     // RPE through, not be binned as a duplicate — the flags engine starves without it.
     if (run.rpe >= 1 && run.rpe <= 10 && prior.rpe !== Math.round(run.rpe)) {
-      prior.rpe = Math.round(run.rpe); saveRuns(); maybeTrainingFlags(); render();
+      prior.rpe = Math.round(run.rpe); saveRuns(); maybeTrainingFlags(); renderUnlessTyping();
     }
     return "already logged";
   }
@@ -2607,7 +2607,7 @@ function ingestWatchRun(run) {
   if (!maybeAutoPaceCalibrate(state.logged[0].type, avgPaceSec, distKm, wctx)) {
     if (!maybeTrainingFlags()) assessFitnessFromRun(state.logged[0].type, avgPaceSec, distKm, wctx);
   }
-  render();
+  renderUnlessTyping();
   return "";
 }
 // ---- A run happening on the wrist, mirrored here -------------------------------------------------
@@ -2639,7 +2639,7 @@ window.__interunWatchLive = function (live) {
     WATCH_LIVE_T = setTimeout(() => {
       WATCH_LIVE = null;
       if (state.screen === "watchlive") state.screen = null;
-      render();
+      renderUnlessTyping();
     }, 45000);
   }
   // A run starting on the wrist takes the whole screen, the same as one started here would. A card
@@ -4448,7 +4448,7 @@ function whyRowsHtml(idPrefix) {
   const spoken = !!(COACH.personal && nm);
   return rows + '<div class="why-row"><label class="why-q" for="' + idPrefix + 'name">Is there one person behind all this?</label>' +
     '<input class="sel" id="' + idPrefix + 'name" data-whyname="1" value="' + esc(nm) + '" placeholder="Their first name\u2026" maxlength="24">' +
-    '<div class="why-hint">' + (spoken
+    '<div class="why-hint" id="' + idPrefix + 'namehint">' + (spoken
       ? 'Your coach can say <b>' + esc(COACH.personal.name || nm) + '</b> out loud \u2014 this build has their voice pack.'
       : nm
         ? 'We\u2019ll put their name on screen at the hard moments. Saying a name aloud needs a voice pack recorded for it, and this build has none for ' + esc(nm) + ' \u2014 so the coach uses the name-free line.'
@@ -4478,10 +4478,35 @@ function wireWhyInputs(onNameChange) {
     WHY.name = nameEl.value.trim();
     saveWhy();
     try { syncWatch(); } catch (e) {}
-    // A different name means a different pack, so re-check and repaint: the hint below the field
-    // tells the runner whether their coach can actually say it.
-    coachLoadPersonal().then(() => { if (onNameChange) onNameChange(); });
+    // A different name means a different pack, so re-check and repaint the hint below the field —
+    // it tells the runner whether their coach can actually say it.
+    //
+    // ⚠️ Repaint THAT ONE ELEMENT, never the screen. This used to call render(), and on the plan
+    // setup form that was catastrophic: viewSetup() rebuilds every field from the saved profile,
+    // re-render throws away everything typed but not yet saved. This field is the LAST question on
+    // the form and onchange fires on blur, so simply tabbing out of it silently reset the name, 5 km
+    // time, target, age, days per week, long-run day, start date and strength toggle to their saved
+    // values — reproduced end to end. It fired every time, because coachLoadPersonal() resolves even
+    // when the pack 404s, which is the normal case.
+    coachLoadPersonal().then(() => {
+      repaintNameHint();
+      if (onNameChange) onNameChange();
+    });
   };
+}
+// Update just the "can your coach say this name" hint, in place, wherever it is mounted (the
+// setup form uses the su_why_ prefix, Support > Your why uses why_).
+function repaintNameHint() {
+  ["su_why_namehint", "why_namehint"].forEach((id) => {
+    const el = $(id); if (!el) return;
+    const nm = whyName();
+    const spoken = !!(COACH.personal && nm);
+    el.innerHTML = spoken
+      ? 'Your coach can say <b>' + esc(COACH.personal.name || nm) + '</b> out loud — this build has their voice pack.'
+      : nm
+        ? 'We’ll put their name on screen at the hard moments. Saying a name aloud needs a voice pack recorded for it, and this build has none for ' + esc(nm) + ' — so the coach uses the name-free line.'
+        : 'Optional. Used at the hardest point of a long run, and nowhere else.';
+  });
 }
 function wireWhyView() { wireWhyInputs(() => { if (state.tab === "support" && state.support === "why") render(); }); }
 // ---- Connected apps & devices -------------------------------------------------------------------
@@ -7149,6 +7174,16 @@ function refreshTodayNavDate() {
 }
 // Keep the date current if the app is left open across midnight and brought back to the foreground.
 document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshTodayNavDate(); });
+// A repaint that ARRIVES ON ITS OWN — a wrist run landing, a mirror going stale — rather than one the
+// runner asked for. It must never rebuild the plan-setup form: viewSetup() reads every value from the
+// saved profile, so redrawing it discards whatever is half-typed. The runner is mid-sentence; their
+// answers outrank a background refresh they did not ask for and cannot see.
+// ⚠️ Deliberately NOT used by trialSaveResult or the avatar crop — those change what the form should
+// SHOW, so they must repaint it.
+function renderUnlessTyping() {
+  if (state.screen === "setup") return;
+  render();
+}
 function render() {
   const v = $("view");
   // A run under way no longer locks the app. Hiding the nav protected the run from a stray tap, but
@@ -7163,7 +7198,9 @@ function render() {
     v.scrollTop = 0;
     document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
     wire();
-    wireWhyInputs(() => { if (state.screen === "setup") render(); });
+    // ⚠️ No callback: the name hint repaints itself in place now. Passing render() here is what
+    // wiped the form — see wireWhyInputs.
+    wireWhyInputs(null);
     refreshTypePreview();
     state.trialSaved = null;
     return;
@@ -7450,7 +7487,10 @@ $("themeBtn").onclick = () => {
   try { localStorage.setItem("interun_theme_v1", next); } catch (e) {}
   syncThemeColor();
 };
-$("profileBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); state.screen = "setup"; render(); };
+// ⚠️ A no-op when the form is ALREADY open. The avatar button stays visible on the setup screen,
+// so tapping it re-rendered viewSetup() and threw away everything typed but not yet saved — the
+// second route into the "my answers keep reverting" bug.
+$("profileBtn").onclick = () => { if (liveRunning() || state.screen === "setup") return; stopTrialRun(); state.screen = "setup"; render(); };
 $("calBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); state.screen = "calendar"; render(); };
 $("bellBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); openRemindersSheet(); };
 migrateRunRoutes();

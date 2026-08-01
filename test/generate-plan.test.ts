@@ -186,3 +186,97 @@ function longMinutes(w: PlannedWeek): number {
   const long = w.sessions.find((s) => s.type === "long")!;
   return Math.round(long.estimatedDurationSeconds / 60);
 }
+
+// ---- volume model ---------------------------------------------------------
+// Added 2026-08-01 after an elite coach said weekly mileage "looks a little on the low side".
+// The cause was not a wrong number: there was no volume model at all. Athlete.weeklyVolumeKmCurrent
+// existed and was read nowhere, so every runner training for a given distance got the same plan.
+
+const peakKm = (p: { weeks: PlannedWeek[] }) =>
+  Math.max(...p.weeks.map((w) => w.plannedDistanceMeters)) / 1000;
+
+const runner = (weeklyVolumeKmCurrent?: number): Athlete => ({
+  daysPerWeek: 6,
+  recent: { distanceMeters: 10000, timeSeconds: 1920 },
+  experience: "competitive",
+  includeStrength: false,
+  returningFromInjury: false,
+  ...(weeklyVolumeKmCurrent ? { weeklyVolumeKmCurrent } : {}),
+});
+
+test("weekly volume follows the runner's actual mileage", () => {
+  const low = generatePlan(runner(40), goal);
+  const mid = generatePlan(runner(80), goal);
+  const high = generatePlan(runner(120), goal);
+  assert.ok(peakKm(low) < peakKm(mid), `40km runner (${peakKm(low).toFixed(0)}) should peak below 80km runner (${peakKm(mid).toFixed(0)})`);
+  assert.ok(peakKm(mid) < peakKm(high), `80km runner (${peakKm(mid).toFixed(0)}) should peak below 120km runner (${peakKm(high).toFixed(0)})`);
+});
+
+test("the peak week lands near 25% above what the runner already does", () => {
+  // The progression rule: build above where they are, but not wildly. Mileage is paired with
+  // ability here on purpose — the plan is built in MINUTES, so a fast runner covers far more
+  // ground in the same session, and a stated mileage only moves the plan once it exceeds what
+  // that runner's sessions already cover (see the "only ever builds up" test below).
+  const paced = (days: number, tenKSec: number, experience: Athlete["experience"], weeklyVolumeKmCurrent: number): Athlete => ({
+    daysPerWeek: days,
+    recent: { distanceMeters: 10000, timeSeconds: tenKSec },
+    experience,
+    includeStrength: false,
+    returningFromInjury: false,
+    weeklyVolumeKmCurrent,
+  });
+  const cases = [
+    [5, 3000, "recreational", 55],
+    [5, 2400, "recreational", 70],
+    [6, 1920, "competitive", 80],
+    [6, 1920, "competitive", 100],
+  ] as const;
+  for (const [days, tenK, experience, stated] of cases) {
+    const p = generatePlan(paced(days, tenK, experience, stated), goal);
+    const ratio = peakKm(p) / stated;
+    assert.ok(ratio > 1.05 && ratio < 1.5,
+      `${stated}km/wk at ${tenK / 60}min 10k over ${days} days peaks at ${peakKm(p).toFixed(0)}km — ratio ${ratio.toFixed(2)} outside 1.05–1.5`);
+  }
+});
+
+test("the volume model only ever builds a plan UP, never down", () => {
+  // ⚠️ THE CENTRAL INVARIANT, and it is a coaching rule before it is a coding one. buildWeek scales
+  // the easy runs and the long run; the quality sessions come from the library at full prescribed
+  // length and do not move. So a smaller week is not a gentler week — it is the SAME hard sessions
+  // on a thinner aerobic base, which is how runners get hurt, and arithmetically it drove the easy
+  // fraction under the intensity model's floor in 175 of 23040 measured weeks.
+  //
+  // So a runner who states LESS than their plan naturally builds gets that plan untouched, and the
+  // mismatch is answered by assessFeasibility's warning rather than by quietly shrinking the block.
+  const natural = generatePlan(runner(undefined), goal);
+  for (const stated of [10, 25, 40, 60, 80]) {
+    const p = generatePlan(runner(stated), goal);
+    assert.ok(peakKm(p) >= peakKm(natural) - 0.01,
+      `stating ${stated}km/wk SHRANK the plan: ${peakKm(natural).toFixed(1)} -> ${peakKm(p).toFixed(1)}km`);
+  }
+  // And below the natural size it is a strict no-op, not merely a non-shrink.
+  assert.equal(
+    JSON.stringify(generatePlan(runner(40), goal).weeks),
+    JSON.stringify(natural.weeks),
+    "a stated mileage under the plan's own size must leave it byte-identical",
+  );
+});
+
+test("a runner who does not state their mileage gets the plan unchanged", () => {
+  // The volume model must be strictly opt-in: blank means "not sure", not "zero".
+  const stated = generatePlan(runner(undefined), goal);
+  const zero = generatePlan({ ...runner(undefined), weeklyVolumeKmCurrent: 0 }, goal);
+  assert.equal(peakKm(stated).toFixed(2), peakKm(zero).toFixed(2), "0 and undefined must mean the same");
+});
+
+test("absurd mileage cannot produce an absurd plan", () => {
+  // A mistyped 500 must not yield four-hour long runs; a mistyped 3 must not yield jogging.
+  const silly = generatePlan(runner(500), goal);
+  const longestMin = Math.max(...silly.weeks.flatMap((w) =>
+    w.sessions.filter((s) => s.type === "long").map((s) => s.estimatedDurationSeconds / 60)));
+  assert.ok(longestMin <= 150, `long run ${longestMin.toFixed(0)} min exceeds the half-marathon ceiling`);
+  const tiny = generatePlan(runner(3), goal);
+  const shortestEasy = Math.min(...tiny.weeks.flatMap((w) =>
+    w.sessions.filter((s) => s.type === "easy").map((s) => s.estimatedDurationSeconds / 60)));
+  assert.ok(shortestEasy >= 20, `easy run ${shortestEasy.toFixed(0)} min is below the floor`);
+});

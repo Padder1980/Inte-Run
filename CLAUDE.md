@@ -374,6 +374,60 @@ faster than the athlete's own mile pace, so race-pace sessions are unrunnable. `
 already returns "unrealistic" with a suggested target, so the runner is warned — but the sessions
 themselves are not clamped. That is a product decision, not a bug fix.
 
+## The volume model (added 2026-08-01, from elite-coach feedback)
+
+"Total mileage for a competitive runner looks a little on the low side." The cause was not a wrong
+constant: **there was no volume model at all.** `Athlete.weeklyVolumeKmCurrent` had existed since the
+first commit and was read **nowhere**, so stated volumes of 50, 90 and 140 km/week produced
+byte-identical plans (measured: peak 74.2 km either way).
+
+`targetPeakWeeklyKm()` in `generate-plan.ts` is stated × **1.25** — build above where the runner is,
+but not by much, since progression is the ceiling on adaptation. The plan is then fitted to it.
+
+⚠️ **SOLVED BY ITERATION, not by a formula.** The week is not linear in the scale: quality sessions
+are prescribed by the library and do not move at all, and the per-session floors/ceilings bind at the
+ends. Two earlier attempts were wrong — scaling against fixed reference constants ignored that the
+natural peak depends on days-per-week as well as race distance, and a **single** corrective pass left
+a 50 km/week runner peaking at 81 km (a 62% jump, not the 25% intended). `buildAll(vScale)` is
+rebuilt to a fixed point, ≤5 passes, 3% tolerance.
+
+⚠️ **THE SCALE FLOOR IS 1 — this model may only build a plan UP.** `vScale` reaches exactly two
+places: the long run (`peakLong`) and the easy runs. Quality keeps its full library length, so
+scaling DOWN shrinks the denominator while the hard minutes stay put and the easy fraction falls as
+pure arithmetic — **175 of 23040 measured weeks went under the intensity model's 0.68 easy floor**,
+the invariant the section above records as never breached. Worse as coaching than as accounting: a
+smaller week with the *same* hard sessions is a harder week on a thinner base. One measured case —
+half, 4 days, 25 km stated — produced a peak week at 64% easy whose "long run" was **shorter than the
+workout beside it**. A runner who states less than their plan naturally builds gets it unchanged;
+`assessFeasibility` is what answers the mismatch. Building a genuinely smaller week needs the quality
+sessions to shrink too, which is a periodisation change, not a scale factor.
+
+⚠️ **The web field is `profile.volKm`, NOT `profile.weeklyVolumeKm`, and that is the whole point.**
+`weeklyVolumeKm: 30` sat in `DEFAULT_PROFILE` from the first commit with **no screen that ever asked
+for it**, and every save copied it forward — so every profile ever stored holds a 30 nobody chose.
+Feeding that phantom to a model that reshapes the plan rebuilds every existing runner's block on the
+first boot after the update, with no tap: measured on the default profile, a half-marathon peak week
+**55 → 40 km** and its longest long run **110 → 55 min**; a competitive marathoner's long run
+**147 → 74 min**, halved, and in the *opposite* direction from the answer they would have given. A
+brand-new key cannot be pre-filled by history, so absent means unanswered and the model stays
+genuinely opt-in. `classifyRunner` now reads `volKm` too (its result, `CLASS`, is assigned and read
+nowhere). Do not "tidy" this back onto one field.
+
+⚠️ **Any new axis must be added to `test/session-library.test.ts`'s intensity sweep.** That sweep is
+the guard for the easy floor, and its athlete did not set `weeklyVolumeKmCurrent` — so the entire new
+dimension was untested and the suite stayed green through the regression above. The sweep now varies
+stated volume, and reverting the floor to 0.5 makes it fail on
+`5k 4d competitive 20wk vol=20 week 11`. Same trap as anchor stamping: a guard blind to the new input
+is not a guard.
+
+Beginners are exempt (`experience === "beginner"`, i.e. status *new* and *building*): their
+progression is deliberately gentle and volume-independent. `syncStatus()` therefore **hides** the
+question for those statuses — a question whose answer is thrown away is worse than no question.
+
+Known and deliberately not fixed: past roughly 130 km/week the per-session caps bind, because that
+mileage cannot be run in six single runs — it needs **doubles**, which the generator cannot schedule.
+An honest 130 beats a fictional 175.
+
 ## Race day is a session (added 2026-08-01, from elite-coach feedback)
 
 ⚠️ **`"race"` is a SessionType, distinct from `"race-specific"`** (which is a rehearsal in

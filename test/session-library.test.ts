@@ -291,13 +291,21 @@ test("EVERY week honours the intensity model, across the whole product", () => {
   //  2. Four runs a week cannot carry two quality sessions outside the peak block — it leaves one
   //     easy run and the long run to hold up the whole aerobic base.
   // Measured before: 61 of 2816 weeks under the floor. After: none.
+  //
+  // ⚠️ THE STATED-MILEAGE AXIS IS PART OF THIS SWEEP, and it is here because leaving it out let a
+  // regression through. When the volume model was added, this athlete never set
+  // weeklyVolumeKmCurrent, so the whole new dimension was untested and the suite stayed green while
+  // low stated mileages put 175 of 23040 weeks under the floor — the plan was being scaled DOWN,
+  // which shrinks the easy running while the library-prescribed quality sessions stay exactly as
+  // long. generatePlan only builds UP now; this axis is what holds it to that.
   const TARGET: Record<string, number> = { "5k": 1200, "10k": 2500, half: 5400, marathon: 11400 };
   let checked = 0;
   for (const dist of ["5k", "10k", "half", "marathon"] as RaceDistanceKey[]) {
     for (const days of [3, 4, 5, 6]) {
       for (const experience of ["recreational", "competitive"] as const) {
         for (const weeks of [12, 20, 28]) {
-          const ath: Athlete = { ...competitive, daysPerWeek: days, experience };
+        for (const vol of [undefined, 20, 40, 70, 120]) {
+          const ath: Athlete = { ...competitive, daysPerWeek: days, experience, ...(vol ? { weeklyVolumeKmCurrent: vol } : {}) };
           const plan = generatePlan(ath, { ...goalFor(dist, weeks), targetTimeSeconds: TARGET[dist]! });
           for (const w of plan.weeks) {
             // ⚠️ The race week is exempt, and only the race week. It contains the goal race — a
@@ -310,10 +318,11 @@ test("EVERY week honours the intensity model, across the whole product", () => {
             checked++;
             assert.ok(
               honoursModel(d, plan.intensityModel),
-              `${dist} ${days}d ${experience} ${weeks}wk week ${w.index} (${w.phase}): ` +
+              `${dist} ${days}d ${experience} ${weeks}wk vol=${vol ?? "unset"} week ${w.index} (${w.phase}): ` +
               `${(d.easy * 100).toFixed(1)}% easy breaks ${plan.intensityModel}`,
             );
           }
+        }
         }
       }
     }

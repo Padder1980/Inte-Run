@@ -70,6 +70,45 @@ const PEAK_LONG_MIN: Record<Goal["distance"], number> = {
   marathon: 150,
 };
 
+/**
+ * Absolute ceiling on a long run, whatever the runner's mileage. Time on feet is the injury
+ * currency: a marathoner running 140 km/week still should not be doing four-hour long runs, and
+ * the standard advice caps the marathon long run around three hours.
+ */
+const LONG_CEILING_MIN: Record<Goal["distance"], number> = {
+  "1mile": 75,
+  "5k": 90,
+  "10k": 110,
+  half: 145,
+  marathon: 180,
+};
+
+/**
+ * How much to scale the plan's volume for the runner actually in front of it.
+ *
+ * ⚠️ Until 2026-08-01 there was NO volume model. Session lengths came from the tables above, keyed
+ * on race distance alone, so a 40 km/week runner and a 140 km/week runner training for the same
+ * marathon got byte-identical plans — measured: stated volumes of 50, 90 and 140 produced exactly
+ * the same peak, mean and long run. `Athlete.weeklyVolumeKmCurrent` existed but was read nowhere.
+ * An elite coach's verdict on the result was "total mileage for a competitive runner looks a
+ * little on the low side", and he was right for anyone above the reference.
+ *
+ * A block should build ABOVE where the runner is now, not merely reproduce it, but not by much —
+ * PROGRESSION is the ceiling on adaptation. 25% over a block is already brisk beside the usual
+ * "add 10% a week, then back off" guidance.
+ *
+ * Returns 1 (no change at all) when the runner has not told us their mileage, which keeps every
+ * existing plan and every existing test exactly as it was.
+ */
+function targetPeakWeeklyKm(athlete: Athlete): number | null {
+  const stated = athlete.weeklyVolumeKmCurrent;
+  if (!stated || !Number.isFinite(stated) || stated <= 0) return null;
+  // A block should build ABOVE where the runner is now, but not by much — progression is the
+  // ceiling on adaptation, and 25% across a whole block is already brisk beside the usual
+  // "add 10% a week, then back off" guidance.
+  return stated * 1.25;
+}
+
 // Day-of-week scheduling (0 = Mon … 6 = Sun) is expressed RELATIVE to the long run, then rotated to
 // whatever long-run day the athlete prefers. The offsets below reproduce the proven Sunday-long
 // layout (quality Tue/Thu, easy Wed/Fri/Mon/Sat); because every spacing rule — hard days separated,
@@ -117,8 +156,7 @@ export function generatePlan(
   }
   const schedule = annotate(phaseSchedule(structuredWeeks, goal.distance, returning));
 
-  const peakLong = PEAK_LONG_MIN[goal.distance];
-  const startLong = Math.round(peakLong * (returning ? 0.42 : 0.55));
+  const targetPeakKm = targetPeakWeeklyKm(athlete);
   const nonTaperCount = schedule.filter((s) => s.phase !== "taper").length;
   const taper = taperFor(goal.distance);
 
@@ -127,28 +165,75 @@ export function generatePlan(
   const beginner = athlete.experience === "beginner";
   const runWalk = athlete.runWalk ?? false;
 
-  const weeks: PlannedWeek[] = schedule.map((wp, i) => {
-    const weekIndex = i + 1;
-    const startDateIso = addDays(raceMonday, -(structuredWeeks - weekIndex) * 7);
-    if (beginner) {
-      return buildBeginnerWeek(weekIndex, startDateIso, wp, { athlete, goal, paces, returning, longMin: 0 }, structuredWeeks, runWalk);
-    }
-    const longMin = longRunMinutes(
-      wp,
-      weekIndex,
-      nonTaperCount,
-      startLong,
-      peakLong,
-      taper.volumeMultiplierByWeek,
+  const buildAll = (vScale: number): PlannedWeek[] => {
+    const peakLong = Math.min(
+      LONG_CEILING_MIN[goal.distance],
+      Math.round(PEAK_LONG_MIN[goal.distance] * vScale),
     );
-    return buildWeek(weekIndex, startDateIso, wp, {
-      athlete,
-      goal,
-      paces,
-      returning,
-      longMin,
+    const startLong = Math.round(peakLong * (returning ? 0.42 : 0.55));
+    return schedule.map((wp, i) => {
+      const weekIndex = i + 1;
+      const startDateIso = addDays(raceMonday, -(structuredWeeks - weekIndex) * 7);
+      if (beginner) {
+        return buildBeginnerWeek(weekIndex, startDateIso, wp, { athlete, goal, paces, returning, longMin: 0 }, structuredWeeks, runWalk);
+      }
+      const longMin = longRunMinutes(
+        wp,
+        weekIndex,
+        nonTaperCount,
+        startLong,
+        peakLong,
+        taper.volumeMultiplierByWeek,
+      );
+      return buildWeek(weekIndex, startDateIso, wp, {
+        athlete, goal, paces, returning, longMin, vScale,
+      });
     });
-  });
+  };
+
+  // ⚠️ SOLVED BY ITERATION, not by a formula. Build unscaled to learn what THIS plan's natural
+  // peak week actually is, then close the gap to the runner's target and rebuild, a few times.
+  //
+  // Two earlier attempts were wrong. Scaling against fixed reference constants ignored that the
+  // natural peak depends on days-per-week as well as race distance. And a single corrective pass
+  // does not land, because the week is not linear in the scale: quality sessions are prescribed by
+  // the library and do not move at all, and the per-session floors and ceilings bind at the ends —
+  // measured, one pass left a 50 km/week runner peaking at 81 km, a 62% jump rather than the 25%
+  // intended. Iterating to a fixed point converges where the target is reachable and settles
+  // honestly where it is not.
+  //
+  // ⚠️ Where it settles short is not a bug. Beyond roughly 130 km/week the caps bind because you
+  // cannot run that mileage in six single runs — it needs DOUBLES, which the generator cannot
+  // schedule yet. Better to hand a high-mileage runner an honest 130 than a fictional 175.
+  //
+  // Beginners are exempt: their progression is deliberately gentle and volume-independent.
+  let weeks = buildAll(1);
+  if (targetPeakKm && !beginner) {
+    let scale = 1;
+    for (let pass = 0; pass < 5; pass++) {
+      const peakKm = Math.max(...weeks.map((w) => w.plannedDistanceMeters)) / 1000;
+      if (peakKm <= 0) break;
+      const ratio = targetPeakKm / peakKm;
+      if (Math.abs(ratio - 1) < 0.03) break;   // within 3% — closer than the input is accurate
+      // ⚠️ THE FLOOR IS 1: this model may only scale a plan UP. buildWeek scales the easy runs and
+      // the long run; the quality sessions come from the library at full prescribed length and do
+      // not move at all. Scaling DOWN therefore shrinks the denominator while the hard minutes stay
+      // put, and the easy fraction falls purely as arithmetic — measured across 23040 weeks, low
+      // stated mileages pushed 175 of them under the intensity model's easy floor (0.68), an
+      // invariant this file's own sweep records as never breached. One case: half, 4 days, 25 km
+      // stated — a peak week at 64% easy, with a "long run" shorter than the workout beside it.
+      // The coach's complaint was that HIGH-mileage runners were under-served, and that is the half
+      // this fixes. Building a genuinely smaller week needs the quality sessions to shrink with it,
+      // which is a periodisation change, not a scale factor. Until then a runner who states less
+      // than the plan asks for gets the plan unchanged plus the existing feasibility warning.
+      // The upper clamp keeps a mistyped mileage from producing an absurd plan; the per-session
+      // ceilings (LONG_CEILING_MIN, and the easy-run bounds in buildWeek) are the real safety net.
+      const next = Math.max(1, Math.min(3, scale * ratio));
+      if (Math.abs(next - scale) < 0.01) break;   // the caps are binding; further passes are futile
+      scale = next;
+      weeks = buildAll(scale);
+    }
+  }
 
   // If the athlete starts mid-week, make week 1 pro-rata: drop the sessions that fall before the
   // start day; full Monday–Sunday weeks follow.
@@ -177,6 +262,8 @@ type WeekContext = {
   paces: TrainingPaces;
   returning: boolean;
   longMin: number;
+  /** Volume scale for this runner (see volumeScale). Absent means 1 — beginner weeks ignore it. */
+  vScale?: number;
 };
 
 function buildWeek(
@@ -212,7 +299,11 @@ function buildWeek(
   // than the cardiovascular system, so they are withheld from anyone coming back from injury.
   const canStride = (wp.phase === "base" || wp.phase === "build") && !wp.isDeload && !ctx.returning;
   easyDays.forEach((d, ei) => {
-    const minutes = wp.isDeload ? 35 : ei === easyDays.length - 1 ? 40 : 45;
+    // Easy running is where weekly volume actually lives, so it scales with the runner too —
+    // bounded so a low-mileage runner still gets a real run and a high-mileage one is not handed
+    // a two-hour midweek easy day.
+    const baseMin = wp.isDeload ? 35 : ei === easyDays.length - 1 ? 40 : 45;
+    const minutes = Math.max(20, Math.min(95, Math.round(baseMin * (ctx.vScale ?? 1))));
     sessions.push(easyVariant(ctx.paces, minutes, index + ei, canStride));
     dayOf.push(d);
   });

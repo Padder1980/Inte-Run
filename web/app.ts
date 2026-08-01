@@ -1841,7 +1841,7 @@ function futureIso(days) { const d = new Date(); d.setDate(d.getDate() + days); 
 function fmtTimeFull(s) { s = Math.round(s); const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), x = s%60; const p = (n) => String(n).padStart(2,"0"); return h>0 ? h+":"+p(m)+":"+p(x) : m+":"+p(x); }
 
 // An example runner to start from — until you make it yours.
-const DEFAULT_PROFILE = { name: "", avatar: "", status: "regular", goalDist: "half", targetS: 6300, raceDate: futureIso(245), startDateIso: "", longRunDay: 6, fitSrc: "recent", recentDistM: 5000, recentTimeS: 1500, noRecent: false, easyPaceS: 0, oneKmS: 255, daysPerWeek: 5, yearsRunning: 3, weeklyVolumeKm: 30, age: 38, sex: "", strength: true, returning: false, personalized: false };
+const DEFAULT_PROFILE = { name: "", avatar: "", status: "regular", goalDist: "half", targetS: 6300, raceDate: futureIso(245), startDateIso: "", longRunDay: 6, fitSrc: "recent", recentDistM: 5000, recentTimeS: 1500, noRecent: false, easyPaceS: 0, oneKmS: 255, daysPerWeek: 5, yearsRunning: 3, volKm: 0, age: 38, sex: "", strength: true, returning: false, personalized: false };
 
 function loadProfile() { try { const s = localStorage.getItem("rc_profile_v1"); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 function saveProfileStore() { try { localStorage.setItem("rc_profile_v1", JSON.stringify(profile)); } catch (e) {} }
@@ -1855,7 +1855,7 @@ function applyProfile(pf) {
   // Fitness can be given three ways (fitSrc): a couch-to-5k beginner (no time — we seed a gentle
   // baseline and flag noRecent), a recent 5 km, or a predicted 5 km. A brand-new beginner isn't fed
   // into runner classification since the baseline time is assumed, not run.
-  const cls = RC.classifyRunner({ runsPerWeek: pf.daysPerWeek, yearsRunning: pf.yearsRunning, weeklyVolumeKm: pf.weeklyVolumeKm || undefined, recent5kSeconds: pf.noRecent ? undefined : pf.recentTimeS, sex: pf.sex || undefined });
+  const cls = RC.classifyRunner({ runsPerWeek: pf.daysPerWeek, yearsRunning: pf.yearsRunning, weeklyVolumeKm: pf.volKm || undefined, recent5kSeconds: pf.noRecent ? undefined : pf.recentTimeS, sex: pf.sex || undefined });
   // Experience comes straight from the self-reported running status — the first question — which maps
   // cleanly to the plan/feasibility improvement ceiling. (Older profiles without a status fall back to
   // the noRecent flag.)
@@ -1875,6 +1875,21 @@ function applyProfile(pf) {
     if (proj5k < recent.timeSeconds) recent = { distanceMeters: 5000, timeSeconds: proj5k };
   }
   const ath = { daysPerWeek: pf.daysPerWeek, recent, experience, includeStrength: pf.strength, returningFromInjury: pf.returning, runWalk: pf.status === "new", longRunDay: pf.longRunDay != null ? pf.longRunDay : 6 };
+  // ⚠️ The runner's actual weekly mileage. weeklyVolumeKmCurrent has existed on Athlete since the
+  // beginning and was read NOWHERE, so 40 km/week and 140 km/week produced identical plans — which
+  // is what an elite coach meant by "mileage for a competitive runner looks a little on the low
+  // side". Only sent when they gave a real number; blank leaves the plan's own defaults alone.
+  //
+  // ⚠️ IT IS volKm, NOT weeklyVolumeKm, AND THAT IS THE WHOLE POINT. weeklyVolumeKm has sat in
+  // DEFAULT_PROFILE at 30 since the first commit with no screen anywhere that asked for it, and
+  // every save copied it forward — so every profile ever stored holds a 30 nobody chose. Feed that
+  // to a model that reshapes the plan around it and every existing runner's block is rebuilt on the
+  // first boot after the update, with no tap: measured on the default profile, a half-marathon peak
+  // week 55 -> 40 km and its longest long run 110 -> 55 min; a competitive marathoner's long run
+  // 147 -> 74 min, i.e. halved, and in the WRONG DIRECTION from the answer they would have given.
+  // A brand-new key cannot be pre-filled by history, so absent means unanswered and the model stays
+  // genuinely opt-in. Do not "tidy" this back onto weeklyVolumeKm.
+  if (pf.volKm > 0) ath.weeklyVolumeKmCurrent = pf.volKm;
   if (pf.oneKmS > 0) ath.oneKmTrialSeconds = pf.oneKmS;
   const startDateIso = (pf.startDateIso && pf.startDateIso >= todayIso()) ? pf.startDateIso : todayIso();
   const goal = { distance: pf.goalDist, targetTimeSeconds: pf.targetS, raceDateIso: pf.raceDate, startDateIso };
@@ -4969,6 +4984,7 @@ function viewSetup() {
   // 4 · A few details
   const secDetails =
     '<div class="q" style="margin-top:0"><label>How many days a week will you run? <span class="q-hint">we\\u2019ll shape the plan around this</span></label>' + seg("days", [["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]], p.daysPerWeek) + '</div>' +
+    '<div class="q" id="volQ"><label>Roughly how far do you run in a normal week? <span class="q-hint">km \\u2014 so we can build on what you already do</span></label><input class="sel" id="s_volume" type="number" inputmode="numeric" min="0" max="250" step="5" style="max-width:140px" value="' + (p.volKm || "") + '" placeholder="e.g. 40"><div class="q-hint" style="margin-top:5px">Leave it blank if you are not sure \\u2014 we\\u2019ll use a sensible default for your goal.</div></div>' +
     '<div class="q"><label>Which day suits your long run? <span class="q-hint">we\\u2019ll build the week around it</span></label><select class="sel" id="s_longday" style="max-width:200px">' + dayOpts(p.longRunDay) + '</select></div>' +
     '<div class="q"><label>When do you want to start? <span class="q-hint">a mid-week start gives a shorter first week</span></label><input class="sel" id="s_startdate" type="date" value="' + (p.startDateIso || todayIso()) + '" min="' + todayIso() + '"></div>' +
     '<div class="q"><label>Age</label><select class="sel" id="s_age" style="max-width:140px">' + ageOpts(p.age) + '</select></div>' +
@@ -4993,6 +5009,9 @@ function viewSetup() {
 // Draft profile from the setup form's current values (may throw on bad times).
 function draftFromForm() {
   const mmss = (s) => /^\\d{1,2}:[0-5]\\d$/.test(s) || /^\\d{1,2}:[0-5]\\d:[0-5]\\d$/.test(s);
+  // Weekly mileage is optional: blank means "not sure", which the engine reads as no volume model
+  // and falls back to the plan's own defaults. 0 and undefined must therefore mean the same thing.
+  const volEl = $("s_volume");
   // The running status gates the rest. Beginners (new / building) give no times — we seed a gentle
   // baseline and flag noRecent. Runners (regular / competitive) give a recent or predicted 5 km, and
   // may optionally add a 1 km trial to sharpen their VO₂ paces.
@@ -5057,7 +5076,8 @@ function draftFromForm() {
     fitSrc, recentDistM, recentTimeS, noRecent, easyPaceS, oneKmS, daysPerWeek: Number(draft.days), yearsRunning: profile.yearsRunning || 3,
     // "Building the habit" with no easy pace given: calibrate from their first run instead.
     autoPace: status === "building" && !easyPaceS,
-    weeklyVolumeKm: profile.weeklyVolumeKm, age: Number($("s_age").value) || 35, sex: $("s_sex").value,
+    volKm: volEl && volEl.value !== "" ? Math.max(0, Math.min(250, Number(volEl.value) || 0)) : 0,
+    age: Number($("s_age").value) || 35, sex: $("s_sex").value,
     strength: draft.strength === "1", returning: draft.returning === "1", personalized: true,
   };
 }
@@ -5209,6 +5229,11 @@ function syncStatus() {
     if (note && st === "new") note.textContent = "Perfect — we\\u2019ll start with walk\\u2013run intervals and build your base gently.";
   }
   const bc = $("buildingCalib"); if (bc) bc.style.display = st === "building" ? "" : "none";
+  // A beginner block is deliberately volume-independent — it builds a base from wherever they are,
+  // gently, and generatePlan exempts it from the mileage model entirely. So don't ask: a question
+  // whose answer is thrown away is worse than no question, and "new"/"building" runners are the
+  // least likely of anyone to have a weekly figure to give.
+  const vq = $("volQ"); if (vq) vq.style.display = beginner ? "none" : "";
   if (!beginner) syncFitSrc();
   // Rebuild the goal card body so its distance options and time field match the status (the numbered
   // section header stays put outside #goalBody).

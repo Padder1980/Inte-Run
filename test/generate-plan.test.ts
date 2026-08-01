@@ -52,12 +52,68 @@ test("a long runway maps to a full-length plan, not a short capped block", () =>
   assert.ok(build <= 10, "the specific build stays concentrated");
 });
 
-test("every week has exactly one long run", () => {
+test("every week has exactly one long run — except race week, which has the race", () => {
+  const raceWeek = plan.weeks.at(-1)!;
   for (const w of plan.weeks) {
     const longs = w.sessions.filter((s) => s.type === "long");
+    if (w === raceWeek) {
+      // The race replaces the long run. Prescribing both would be asking for a long run on, or
+      // days after, the goal race — which is exactly what the plan used to do.
+      assert.equal(longs.length, 0, "race week should not also carry a long run");
+      continue;
+    }
     assert.equal(longs.length, 1, `week ${w.index} long-run count`);
   }
 });
+
+test("race day is in the plan, on the real date, with nothing after it", () => {
+  const raceWeek = plan.weeks.at(-1)!;
+  const races = raceWeek.sessions.filter((s) => s.type === "race");
+  assert.equal(races.length, 1, "exactly one race");
+  const race = races[0]!;
+  // It lands on the actual race date, not merely somewhere in the last week.
+  const raceDow = (new Date(goal.raceDateIso + "T00:00:00Z").getUTCDay() + 6) % 7;
+  assert.equal(race.dayOfWeek, raceDow, "race sits on its real weekday");
+  assert.ok(race.estimatedDistanceMeters! > 21000, "the race covers the race distance");
+  // Nothing is prescribed after you have raced.
+  const after = raceWeek.sessions.filter((s) => s.dayOfWeek > raceDow && s.type !== "rest");
+  assert.equal(after.length, 0, `nothing after race day, found ${after.map((s) => s.type).join()}`);
+  // And nothing hard the day before it.
+  const eve = raceWeek.sessions.filter((s) => s.dayOfWeek === raceDow - 1);
+  const hardEve = eve.filter((s) => ["threshold", "vo2", "race-specific", "long", "strength"].includes(s.type));
+  assert.equal(hardEve.length, 0, `nothing hard the day before, found ${hardEve.map((s) => s.type).join()}`);
+});
+
+test("race day survives EVERY race weekday and long-run day", () => {
+  // 6 of these 49 combinations used to put a VO2 session the day before the goal race.
+  for (let raceShift = 0; raceShift < 7; raceShift++) {
+    for (let longDay = 0; longDay < 7; longDay++) {
+      const raceIso = shiftIso(goal.raceDateIso, raceShift);
+      const p = generatePlan({ ...athlete, longRunDay: longDay }, { ...goal, raceDateIso: raceIso });
+      const wk = p.weeks.at(-1)!;
+      const dow = (new Date(raceIso + "T00:00:00Z").getUTCDay() + 6) % 7;
+      const race = wk.sessions.find((s) => s.type === "race");
+      assert.ok(race, `race missing (shift ${raceShift}, longDay ${longDay})`);
+      assert.equal(race!.dayOfWeek, dow, `race on wrong day (shift ${raceShift}, longDay ${longDay})`);
+      const after = wk.sessions.filter((s) => s.dayOfWeek > dow && s.type !== "rest");
+      assert.equal(after.length, 0, `session after the race (shift ${raceShift}, longDay ${longDay})`);
+      const hardEve = wk.sessions.filter(
+        (s) => s.dayOfWeek === dow - 1 &&
+          ["threshold", "vo2", "race-specific", "long", "strength"].includes(s.type),
+      );
+      assert.equal(hardEve.length, 0,
+        `hard session the day before the race (shift ${raceShift}, longDay ${longDay}): ` +
+        hardEve.map((s) => s.title).join());
+    }
+  }
+});
+
+/** Shift a yyyy-mm-dd string by whole days without timezone drift. */
+function shiftIso(iso: string, days: number): string {
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
 
 test("the taper is present with correct length for a half marathon", () => {
   const taperWeeks = plan.weeks.filter((w) => w.phase === "taper");
@@ -95,8 +151,10 @@ test("the long run progresses then backs off into the taper", () => {
     (w) => w.phase === "build" || w.phase === "peak" || w.phase === "base",
   );
   const longestNonTaper = Math.max(...buildPeak.map((w) => longMinutes(w)));
-  const raceWeekLong = longMinutes(plan.weeks.at(-1)!);
-  assert.ok(raceWeekLong < longestNonTaper, "race-week long run should be reduced vs peak");
+  // The race week has no long run any more — the race is there instead — so the wind-down is
+  // measured on the last week that still has one.
+  const lastLongWeek = [...plan.weeks].reverse().find((w) => w.sessions.some((s) => s.type === "long"))!;
+  assert.ok(longMinutes(lastLongWeek) < longestNonTaper, "the last long run should be reduced vs peak");
   // Peak long run should be materially longer than the first week's.
   assert.ok(longestNonTaper > longMinutes(plan.weeks[0]!) * 1.3);
 });

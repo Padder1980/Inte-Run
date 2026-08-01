@@ -123,7 +123,7 @@
 <div class="hero">
   <h1>Where you're going, one phase at a time</h1>
   <p>Each phase is written in plain English and gives you something real at the end of it. Tap a step to tick it off — this page remembers your progress.</p>
-  <p class="upd">Last updated <b>31 July 2026</b> — the watch's run screens have been rebuilt to be readable mid-run: one big number per screen, the pace band with a bubble showing your current pace, the whole session one swipe away, and a heart that shows your training zone by colour. A bug that pointed the pace marker at the wrong end of the band is fixed, and the coach now speaks pace corrections with the actual numbers ("speed up a little — your current pace is…, your target is…"). Still to do before the watch step is ticked: the home screen and settings. The coach going quiet when the phone locks is still open.</p>
+  <p class="upd">Last updated <b>1 August 2026</b> — an elite coach has been through the app and sent six things back; they are the new section at the top, and the first two are already fixed — the form no longer loses your answers, and race day is now in the plan. Before that: the watch's run screens have been rebuilt to be readable mid-run: one big number per screen, the pace band with a bubble showing your current pace, the whole session one swipe away, and a heart that shows your training zone by colour. A bug that pointed the pace marker at the wrong end of the band is fixed, and the coach now speaks pace corrections with the actual numbers ("speed up a little — your current pace is…, your target is…"). Still to do before the watch step is ticked: the home screen and settings. The coach going quiet when the phone locks is still open.</p>
   <div class="goal"><b>The destination</b>
     <div>Inte-Run in the App Store · full Apple Watch and Garmin support · a coach that notices when your running says the plan should change, and asks before changing it · a community that matches you with runners of similar ability nearby.</div>
   </div>
@@ -145,6 +145,26 @@
     <button class="step" data-id="p0-adapt"><span class="box"></span><span class="st-b"><span class="st-t">The first version of the intelligent coach</span><span class="st-d">It already notices when runs imply you're fitter or more tired than the plan assumes, and asks before adjusting. It can also set a beginner's paces from their first run.</span></span></button>
     <button class="step" data-id="p0-extras"><span class="box"></span><span class="st-b"><span class="st-t">Reminders, Ask Alfie, strength library</span><span class="st-d">Session reminders with calendar export, an in-app coach assistant, and an exercise library with demonstrations.</span></span></button>
   </div>
+</section>
+
+<!-- ═══════════ COACH FEEDBACK ═══════════ -->
+<section class="phase" data-phase="pc">
+  <div class="ph-head"><div class="ph-num">★</div><div class="ph-title">
+    <h2>What a real coach told us</h2>
+    <div class="ph-meta"><span class="tag">Jump the queue</span><span class="tag cost">no cost</span></div>
+  </div></div>
+  <div class="ph-bar"><i></i></div>
+  <p class="ph-why">A GB international 10km runner — an elite coach — used the app and sent six things back. Every one was checked against the actual code and every one was real; three turned out to be worse than he described. This is the most valuable feedback the project has had, because it is the difference between a plan that looks right and one a coach would stand behind.</p>
+  <div class="steps">
+    <button class="step" data-id="pc-form"><span class="box"></span><span class="st-b"><span class="st-t">Stop the profile form losing your answers</span><span class="st-d">He kept having to re-enter things. The form only held what you typed on screen, so anything that refreshed it put your old answers back — and simply tabbing out of the last question did exactly that, every time. Fixed.</span></span></button>
+    <button class="step" data-id="pc-race"><span class="box"></span><span class="st-b"><span class="st-t">Put race day in the plan</span><span class="st-d">Your race is not in the plan at all. With a Sunday race the app puts a long run on race day itself; with a Wednesday race it schedules a recovery jog on the day and the long run four days AFTER you have raced. Worse, on some combinations of race day and long-run day it puts hard intervals the day before. Race day belongs at the end, with nothing after it and nothing hard beside it.</span></span></button>
+    <button class="step" data-id="pc-taper"><span class="box"></span><span class="st-b"><span class="st-t">Taper by race distance</span><span class="st-d">A 10km does not need the same wind-down as a marathon — as he put it, "the taper is not really a taper for a 10km". Shorter races want a few sharp days, not weeks of easing off.</span></span></button>
+    <button class="step" data-id="pc-volume"><span class="box"></span><span class="st-b"><span class="st-t">Ask how much you actually run — and use it</span><span class="st-d">"Total mileage for a competitive runner looks a little on the low side." He is right: there is no mileage model at all. The app never asks your current weekly distance, and the one place in the code that could hold it is never read — you could say 20km or 160km a week and get an identical plan.</span></span></button>
+    <button class="step" data-id="pc-longrun"><span class="box"></span><span class="st-b"><span class="st-t">Break the long run into its parts</span><span class="st-d">"How long do you run easy for, then how long do you steady for, over the course of 32km?" Right now a marathon long run is one undifferentiated block. It should read like a session: 5km warm up, 10km easy, 10km at target pace, and so on.</span></span></button>
+    <button class="step" data-id="pc-fuel"><span class="box"></span><span class="st-b"><span class="st-t">Fuelling advice for the long stuff</span><span class="st-d">Carbohydrate per hour, roughly how often that is a gel, and practising it in training so your stomach is ready on race day. The app has one generic line today and never mentions it when you are actually about to run for two hours.</span></span></button>
+    <button class="step" data-id="pc-days"><span class="box"></span><span class="st-b"><span class="st-t">More days, and two runs in a day</span><span class="st-d">He runs doubles on a Tuesday. The app offers seven days a week and then quietly builds six — and it counts that seventh day when it tells you whether your goal is achievable, so it promises more on the strength of a day it never gives you. Two runs on one day cannot be built at all yet.</span></span></button>
+  </div>
+  <div class="watch"><b>Why this is first:</b> the race-day problem is the only thing on this map that could send someone into a goal race having done hard intervals the day before. That gets fixed before anything cosmetic.</div>
 </section>
 
 <!-- ═══════════ PHASE 1 ═══════════ -->
@@ -314,7 +334,9 @@
     // The iPhone app, the Watch app and the first intelligent-coach release, all on real hardware.
     "2026-07-29": ["p1-xcode", "p2-shell", "p2-brain", "p2-data",
                    "p3-app", "p3-hr", "p3-standalone",
-                   "p4-rpe", "p4-flags", "p4-suggest", "p4-why"]
+                   "p4-rpe", "p4-flags", "p4-suggest", "p4-why"],
+    // Coach feedback triaged; the profile form losing answers is fixed and verified.
+    "2026-08-01": ["pc-form", "pc-race"]
   };
   Object.keys(BATCHES).forEach(function (k) {
     if (seeded[k]) return;

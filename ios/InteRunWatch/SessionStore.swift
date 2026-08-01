@@ -93,7 +93,7 @@ struct PlannedSession: Codable, Equatable {
     /// Logbook, and for strength (which carries an RPE band) evidence fed to the adaptive engine.
     /// Keep this list in step with PRIMARY_TYPES.
     var isRunnable: Bool {
-        ["easy", "long", "recovery", "threshold", "vo2", "strides", "race-specific"].contains(type)
+        ["easy", "long", "recovery", "threshold", "vo2", "strides", "race-specific", "race"].contains(type)
     }
 
     /// How hard the plan says this should feel, as words plus the numbers. RPE is InteRun's own

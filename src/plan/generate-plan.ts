@@ -17,6 +17,7 @@ import type {
   Phase,
   PlannedWeek,
   Session,
+  SessionType,
   TrainingPaces,
 } from "../domain/types.ts";
 import { chooseModel } from "../science/intensity-distribution.ts";
@@ -34,6 +35,7 @@ import {
   generalStrengthSession,
   longRun,
   mobilitySession,
+  raceDay,
   raceSpecificSession,
   restDay,
   rwBuildup,
@@ -151,6 +153,7 @@ export function generatePlan(
   // If the athlete starts mid-week, make week 1 pro-rata: drop the sessions that fall before the
   // start day; full Monday–Sunday weeks follow.
   applyPartialFirstWeek(weeks, startIso);
+  applyRaceDay(weeks, goal, paces);
 
   return {
     goal,
@@ -253,6 +256,74 @@ function buildWeek(
     qualitySessionCount,
   };
 }
+
+/**
+ * Put the goal race on its actual date in the final week, and make the days around it make sense.
+ *
+ * ⚠️ Before this existed the race was not in the plan AT ALL — `goal.raceDateIso` only aligned the
+ * last week to a Monday and printed a date in the header. Whatever the rotation happened to place
+ * on race day was prescribed instead. Measured on real plans: a Sunday race got a 51-minute LONG
+ * RUN on race day; a Wednesday race got a recovery jog on the day and the long run four days AFTER
+ * the race; and 6 of 49 race-day/long-run-day combinations put a 10 x 1' VO2 session the day
+ * before. That last one is not untidy, it is a bad prescription.
+ *
+ * Three rules, in order:
+ *   1. Race day IS the race. Whatever sat there is replaced.
+ *   2. Nothing follows it. Sessions after race day in that week become rest — you have raced.
+ *   3. The day before is a shakeout at most. Any quality session there is replaced by rest.
+ * Strength and mobility are cleared from race day and the day before too: nobody lifts the day
+ * before a goal race.
+ */
+function applyRaceDay(weeks: PlannedWeek[], goal: Goal, paces: TrainingPaces): void {
+  const last = weeks[weeks.length - 1];
+  if (!last) return;
+  const raceDow = dayOfWeekMondayZero(goal.raceDateIso);
+  // The final week is aligned to the race's own Monday, so the race must fall inside it. If some
+  // future change breaks that, do nothing rather than write the race onto the wrong day.
+  if (daysBetween(last.startDateIso, goal.raceDateIso) !== raceDow) return;
+
+  const label = RACE_LABELS[goal.distance] ?? goal.distance;
+  const kept = last.sessions.filter((s) => {
+    if (s.dayOfWeek > raceDow) return false;               // rule 2: nothing after the race
+    if (s.dayOfWeek === raceDow) return false;             // rule 1: race day is the race
+    if (s.dayOfWeek === raceDow - 1 && HARD_BEFORE_RACE.has(s.type)) return false;  // rule 3
+    return true;
+  });
+
+  const race: Session = {
+    ...raceDay(paces, goal.distance, label),
+    id: `w${last.index}-d${raceDow}-race`,
+    dayOfWeek: raceDow,
+    source: "generated",
+  };
+  const filler: Session[] = [];
+  for (let d = 0; d < 7; d++) {
+    if (d === raceDow) continue;
+    if (kept.some((s) => s.dayOfWeek === d)) continue;
+    filler.push({
+      ...restDay(),
+      id: `w${last.index}-d${d}-rest`,
+      dayOfWeek: d,
+      source: "generated",
+    });
+  }
+  last.sessions = [...kept, race, ...filler].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+  last.plannedDistanceMeters = Math.round(
+    last.sessions.reduce((m, s) => m + (s.estimatedDistanceMeters ?? 0), 0),
+  );
+  last.qualitySessionCount = last.sessions.filter(
+    (s) => s.type === "threshold" || s.type === "vo2" || s.type === "race-specific",
+  ).length;
+}
+
+/** Session types that must not sit the day before a goal race. */
+const HARD_BEFORE_RACE = new Set<SessionType>([
+  "threshold", "vo2", "race-specific", "long", "strength",
+]);
+
+const RACE_LABELS: Record<string, string> = {
+  "1mile": "1 mile", "5k": "5K", "10k": "10K", half: "Half marathon", marathon: "Marathon",
+};
 
 const DAY_LABEL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 

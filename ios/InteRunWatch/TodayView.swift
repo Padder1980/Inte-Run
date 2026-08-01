@@ -294,6 +294,7 @@ struct TodayView: View {
     /// was wearing the hard-day amber. "cross-training" is likewise an easy replacement.
     private func typeBar(_ type: String) -> Color {
         switch type {
+        case "race": return Brand.rest      // the goal race itself — unmistakable
         case "easy", "recovery", "strides", "cross-training": return Brand.effEasy
         case "long": return Brand.accent
         case "rest": return Brand.inkFaint

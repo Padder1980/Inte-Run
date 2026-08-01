@@ -300,6 +300,11 @@ test("EVERY week honours the intensity model, across the whole product", () => {
           const ath: Athlete = { ...competitive, daysPerWeek: days, experience };
           const plan = generatePlan(ath, { ...goalFor(dist, weeks), targetTimeSeconds: TARGET[dist]! });
           for (const w of plan.weeks) {
+            // ⚠️ The race week is exempt, and only the race week. It contains the goal race — a
+            // hard effort over the full race distance — so of course it is not pyramidal. Judging
+            // race week against a training distribution would be judging the race as if it were a
+            // workout. Every OTHER week, including the rest of the taper, still has to hold.
+            if (w.sessions.some((s) => s.type === "race")) continue;
             const d = computeDistribution(w.sessions);
             if (d.totalSeconds === 0) continue;
             checked++;

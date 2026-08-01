@@ -61,10 +61,20 @@ export type SessionType =
   | "threshold"
   | "vo2"
   | "strides"
+  /** A rehearsal of race pace in training — NOT the race. See "race". */
   | "race-specific"
   | "strength"
   | "mobility"
   | "cross-training"
+  /**
+   * The goal race itself, on its actual date. Distinct from "race-specific", which is a rehearsal.
+   *
+   * ⚠️ Added 2026-08-01. The plan previously ended at a Monday-aligned final week with no race in
+   * it at all, so whatever the rotation happened to place on race day was prescribed instead: with
+   * a Sunday race the athlete was given a long run ON race day; with a Wednesday race, a recovery
+   * jog on the day and the long run four days AFTER they had raced.
+   */
+  | "race"
   | "rest";
 
 /** Coarse intensity bucket used for training-intensity-distribution accounting. */

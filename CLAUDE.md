@@ -374,6 +374,33 @@ faster than the athlete's own mile pace, so race-pace sessions are unrunnable. `
 already returns "unrealistic" with a suggested target, so the runner is warned — but the sessions
 themselves are not clamped. That is a product decision, not a bug fix.
 
+## Race day is a session (added 2026-08-01, from elite-coach feedback)
+
+⚠️ **`"race"` is a SessionType, distinct from `"race-specific"`** (which is a rehearsal in
+training). `raceDay()` in `session-templates.ts` builds it — a warm-up plus the race distance at
+`paces.goalRace` — and `applyRaceDay()` in `generate-plan.ts` places it on the real date after
+`applyPartialFirstWeek`.
+
+Before this the race was **not in the plan at all**: `goal.raceDateIso` only aligned the final week
+to a Monday and printed a header string, so whatever the rotation happened to put on race day was
+prescribed instead. Measured: a Sunday race got a **51-minute long run ON race day**; a Wednesday
+race got a recovery jog on the day and the long run **four days after** it; and **6 of 49**
+race-day × long-run-day combinations put a `10 × 1′` VO2 session **the day before the race**.
+
+Three rules, enforced in `applyRaceDay` and asserted across all 49 combinations by
+`test/generate-plan.test.ts`:
+1. Race day IS the race — whatever sat there is replaced.
+2. Nothing follows it; later days in that week become rest.
+3. Nothing hard the day before (`HARD_BEFORE_RACE`), strength included.
+
+⚠️ Two consequences for anything that walks sessions:
+- **Race week has NO long run.** "Every week has exactly one long run" is false by design now.
+- **Race week is exempt from the intensity model** — it contains a maximal effort over the race
+  distance. `test/session-library.test.ts` skips exactly that week and no other.
+
+`race` is in `PRIMARY_TYPES` (page) and `PlannedSession.isRunnable` (watch) — it is a run, it is
+trackable, and the plan exists to reach it. Keep those two lists in step.
+
 ## The session library (rebuilt 2026-07-28 from a real coached block)
 
 The owner supplied his own coach's Google Sheet — a full GNR block for a sub-1:20 half runner — and

@@ -10,6 +10,7 @@
 import type {
   PaceRange,
   Phase,
+  RaceDistanceKey,
   RpeBand,
   Session,
   SessionType,
@@ -17,7 +18,7 @@ import type {
   TrainingPaces,
   WorkoutStep,
 } from "../domain/types.ts";
-import { distanceForTime, timeForDistance } from "../domain/units.ts";
+import { distanceForTime, RACE_DISTANCES_M, timeForDistance } from "../domain/units.ts";
 
 export type SessionContent = Omit<Session, "id" | "dayOfWeek" | "source">;
 
@@ -1078,6 +1079,48 @@ export function crossTraining(minutes: number): SessionContent {
         targetRpe: RPE.easy,
       },
     ],
+  );
+}
+
+/**
+ * Race day. The thing the whole plan was for.
+ *
+ * Built as a real session so it occupies its date and everything downstream — the calendar, the
+ * chart, reminders, the watch — can see it. Its steps are a warm-up and the race itself at goal
+ * pace, so the wrist has something to run against; the distance is the race distance, so weekly
+ * volume counts it honestly rather than pretending the week was short.
+ */
+export function raceDay(
+  paces: TrainingPaces,
+  distanceKey: RaceDistanceKey,
+  label: string,
+): SessionContent {
+  const metres = RACE_DISTANCES_M[distanceKey];
+  // A 5k warm-up matters; a marathon one is a jog to the start. Long races warm up ON the way.
+  const warmMin = metres <= 10000 ? 15 : metres <= 21098 ? 10 : 5;
+  const steps: WorkoutStep[] = [
+    {
+      kind: "warmup",
+      label: "Warm up — easy jog, drills, a few strides, then get to the line",
+      durationSeconds: warmMin * 60,
+      targetPaceSecPerKm: paces.easy,
+      targetRpe: RPE.easy,
+    },
+    {
+      kind: "rep",
+      label: label + " — race",
+      distanceMeters: metres,
+      targetPaceSecPerKm: paces.goalRace,
+      targetRpe: { min: 9, max: 10 },
+    },
+  ];
+  return assemble(
+    "race",
+    label + " — RACE DAY",
+    "This is the one. Everything in the plan has been building to it. Warm up properly, start at the pace you have practised, and trust the work.",
+    "hard",
+    steps,
+    { min: 9, max: 10 },
   );
 }
 

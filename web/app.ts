@@ -1126,6 +1126,10 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 #view:has(.plan-head) .phase-key { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 650; color: var(--ink-soft); }
 #view:has(.plan-head) .phase-key i { width: 10px; height: 10px; border-radius: 3px; background: var(--phase); flex: none; }
 #view:has(.plan-head) .bar-btn.phase-start { position: relative; }
+/* Race week: the block ends ON the race, so the last bar wears the race colour and a chequered
+   flag instead of a week number. The coach's note was that the chart should visibly finish there. */
+#view:has(.plan-head) .bar-btn.race-week .bar { box-shadow: 0 0 0 1px color-mix(in srgb, var(--rest) 55%, transparent); }
+#view:has(.plan-head) .bar-btn.race-week .bl { font-size: 10px; }
 #view:has(.plan-head) .bar-btn.phase-start:not(:first-child)::before { content: ""; position: absolute; left: -3px; top: 6px; bottom: 26px; width: 1px; background: color-mix(in srgb, var(--ink) 12%, transparent); }
 #view:has(.plan-head) #weekDetail {
   padding: 18px;
@@ -1940,7 +1944,10 @@ const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness
 function loadDayOverride() { try { return JSON.parse(localStorage.getItem("interun_dayov_v1") || "{}") || {}; } catch (e) { return {}; } }
 function saveDayOverride() { try { Object.keys(state.dayOverride).length ? localStorage.setItem("interun_dayov_v1", JSON.stringify(state.dayOverride)) : localStorage.removeItem("interun_dayov_v1"); } catch (e) {} }
 function effDay(s) { const o = state.dayOverride[s.id]; return o != null ? o : (s.dayOfWeek != null ? s.dayOfWeek : s.dayIndex); }
-const PRIMARY_TYPES = { easy: 1, long: 1, recovery: 1, threshold: 1, vo2: 1, strides: 1, "race-specific": 1 };
+// Sessions the runner actually goes out and RUNS — the ones that get a Start button, reach the
+// watch, and can be rescheduled. "race" is in: race day is a run, it is trackable, and the whole
+// plan exists to reach it. ("race-specific" is a rehearsal in training, not the race.)
+const PRIMARY_TYPES = { easy: 1, long: 1, recovery: 1, threshold: 1, vo2: 1, strides: 1, "race-specific": 1, race: 1 };
 // Move a session to a target day; if a run already sits there, the two swap days.
 function moveSession(week, sess, target) {
   const cur = effDay(sess);
@@ -3872,12 +3879,18 @@ function viewPlan() {
   const phaseSeq = ["base", "build", "peak", "taper"];
   const phasesInPlan = phaseSeq.filter((ph) => PLAN.weeks.some((w) => w.phase === ph));
   const phaseLegend = phasesInPlan.map((ph) =>
-    '<span class="phase-key" style="--phase:' + PHASE[ph] + '"><i aria-hidden="true"></i>' + phaseNames[ph] + '</span>').join("");
+    '<span class="phase-key" style="--phase:' + PHASE[ph] + '"><i aria-hidden="true"></i>' + phaseNames[ph] + '</span>').join("")
+    + '<span class="phase-key" style="--phase:var(--rest)"><i aria-hidden="true"></i>Race day</span>';
+  // The coach's note: the block should visibly END on the race. It does now — race day is a real
+  // session in the last week (see applyRaceDay), so the final bar is flagged and the chart closes
+  // with a race marker rather than trailing off into an unexplained short week.
+  const raceWeekIdx = PLAN.weeks.length - 1;
   const bars = PLAN.weeks.map((w, i) => {
     const phaseStart = i === 0 || PLAN.weeks[i - 1].phase !== w.phase;
     const h = Math.max(6, Math.round(w.distanceKm / peak * 100));
-    const aria = "Week " + w.index + ", " + phaseNames[w.phase] + " phase" + (w.isDeload ? ", deload week" : "") + ", " + w.distanceKm.toFixed(1) + " kilometres";
-    return '<button class="bar-btn' + (phaseStart ? " phase-start" : "") + '" data-phase="' + w.phase + '" data-wk="' + w.index + '" aria-label="' + aria + '" aria-pressed="' + (w.index===state.planWeek) + '"><div class="bar' + (w.isDeload?" deload":"") + '" style="height:' + h + '%;--phase:' + PHASE[w.phase] + '"></div><div class="bl">' + w.index + '</div></button>';
+    const isRace = i === raceWeekIdx;
+    const aria = "Week " + w.index + ", " + phaseNames[w.phase] + " phase" + (w.isDeload ? ", deload week" : "") + (isRace ? ", RACE WEEK" : "") + ", " + w.distanceKm.toFixed(1) + " kilometres";
+    return '<button class="bar-btn' + (phaseStart ? " phase-start" : "") + (isRace ? " race-week" : "") + '" data-phase="' + w.phase + '" data-wk="' + w.index + '" aria-label="' + aria + '" aria-pressed="' + (w.index===state.planWeek) + '"><div class="bar' + (w.isDeload?" deload":"") + '" style="height:' + h + '%;--phase:' + (isRace ? "var(--rest)" : PHASE[w.phase]) + '"></div><div class="bl">' + (isRace ? "\uD83C\uDFC1" : w.index) + '</div></button>';
   }).join("");
   const lead = s.totalWeeks - s.structuredWeeks;
   const note = lead >= 2 ? '<div class="plan-note">Your race is <b>' + s.totalWeeks + ' weeks</b> away — this is your <b>' + s.structuredWeeks + '-week</b> structured build. Until it begins, keep running easy and consistent to bank the base.</div>' : "";

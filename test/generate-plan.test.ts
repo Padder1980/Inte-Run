@@ -407,6 +407,44 @@ test("a half-marathon block builds past the race distance — and the clock stil
   }
 });
 
+test("a marathon block stops well short of the race distance, at every ability", () => {
+  // ⚠️ THE OPPOSITE RULE TO THE HALF, and deliberately so. The evidence report's marathon row is
+  // 24–32 km (Intermediate) / 28–35 km (Advanced) for a 42.2 km race, noting ">35 km benefit
+  // uncertain in recreational cohort". Nobody runs the race distance in training for a marathon.
+  //
+  // A minutes-based cap gets this wrong at BOTH ends. Slow runners were topping out at 19.3 km —
+  // under the "<25 km associated with slower performance" threshold — while a 2:30 marathoner on high
+  // mileage rode the three-hour cap to a **44.4 km** long run, longer than the race itself. Three
+  // hours is a sane amount of time; at 4:00/km it is an insane distance.
+  const marathoner = (fiveKSec: number, experience: Athlete["experience"], vol?: number): Athlete => ({
+    daysPerWeek: 5,
+    recent: { distanceMeters: 5000, timeSeconds: fiveKSec },
+    experience,
+    includeStrength: true,
+    returningFromInjury: false,
+    longRunDay: 6,
+    ...(vol ? { weeklyVolumeKmCurrent: vol } : {}),
+  });
+  const longestKm = (a: Athlete) => Math.max(...generatePlan(a,
+    { ...goal, distance: "marathon", targetTimeSeconds: 14400 }).weeks
+    .flatMap((w) => w.sessions.filter((s) => s.type === "long")
+      .map((s) => (s.estimatedDistanceMeters ?? 0) / 1000)));
+
+  // Nobody, however fast or however high their mileage, is sent past the Advanced band.
+  for (const fiveK of [840, 900, 1080, 1260]) {
+    for (const vol of [undefined, 120, 250]) {
+      const km = longestKm(marathoner(fiveK, "competitive", vol));
+      assert.ok(km <= 36, `a ${fiveK}s 5 km runner on ${vol ?? "unstated"} km/wk peaks at ${km.toFixed(1)}km`);
+      assert.ok(km < 42.2, `longest run ${km.toFixed(1)}km is at or beyond the race distance`);
+    }
+  }
+  // And nobody, however slow, is left under the threshold the report ties to a slower marathon.
+  for (const fiveK of [1700, 1900, 2100]) {
+    const km = longestKm(marathoner(fiveK, "recreational"));
+    assert.ok(km >= 25, `a ${fiveK}s 5 km runner peaks at only ${km.toFixed(1)}km`);
+  }
+});
+
 test("scaling down never buys volume with intensity", () => {
   // ⚠️ WHY THE SCALE-DOWN IS SAFE AT ALL. Quality sessions come from the library at a fixed length,
   // so shrinking a plan shrinks only the easy running around them and the hard fraction climbs by

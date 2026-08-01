@@ -528,11 +528,34 @@ runner **182 minutes** and a 2:45 runner **201**. They are capped at 145 instead
 that carries them (17.5 km and 15.9 km) — a three-hour long run before a half is a worse error than a
 short one. Measured, runners to about 2:00 now clear the race distance and nobody exceeds the ceiling.
 
+⚠️ **A minutes-based cap gets it wrong at BOTH ends, so there is a distance CAP too** (`LONG_CAP_KM`,
+the band's upper edge). While slow runners were short, a **2:30 marathoner stating 120 km/week rode
+the three-hour cap to a 44.4 km long run** — longer than the race, past the Elite band's 40 km, and
+past the report's ">35 km benefit uncertain". Three hours is a sane amount of *time*; at 4:00/km it is
+an insane *distance*. Now 35.6 km. The longest training session anywhere in any plan fell
+**44.7 km → 33.9 km**.
+
+⚠️ **THE MARATHON HAS TWO CEILINGS AND THEY ARE NOT INTERCHANGEABLE.** `LONG_CEILING_MIN` (180) caps
+long runs grown by the **volume** model and must stay put — `peakLong` is `PEAK_LONG_MIN × vScale`, so
+raising it would let a fast high-mileage marathoner scale straight past three hours to a **60 km** long
+run. `LONG_ABS_CEILING_MIN` (**240**, marathon only) caps long runs driven by the **distance floor**,
+where the runner is slow rather than high-mileage. Order in `buildAll` is load-bearing: cap the
+volume-driven length first, *then* let the floor lift it, *then* apply the cap and the absolute
+ceiling. Take the floor before the volume cap and high-mileage runners collect four-hour long runs
+they have not earned.
+
+⚠️ **The 4-hour marathon ceiling is the OWNER'S CALL (2026-08-01), against the time-on-feet
+convention.** Reaching 25 km — the report's "<25 km slower" threshold — takes a 5:00 runner 3h36 and a
+5:30 runner 3h58. The trade-off was put to him explicitly (a 5:30 marathoner now does a four-hour
+training run) and he chose the research threshold over the 3-hour convention. Don't quietly revert it.
+
 Measured across 17,920 weeks, this improved every axis and worsened none: half longest-long/race
-**mean 0.93 → 1.02, min 0.66 → 0.84**; marathon min 0.42 → 0.49; 10 km min 1.09 → 1.36; weeks under
-the intensity floor **7 → 2**; long-run week-on-week jumps over 1.10× **242 → 224**. Beginner plans are
-byte-identical — `buildBeginnerWeek` never reads `peakLong`, which is the separate open problem of a
-beginner never being taken near their race distance at all.
+**mean 0.93 → 1.01, min 0.66 → 0.84**; marathon **min 0.42 → 0.59 and max 0.84 → 0.80** (both ends
+pulled into band); 10 km min 1.09 → 1.36; 5 km min 1.81 → 2.25; weeks under the intensity floor
+**7 → 2**; long-run week-on-week jumps over 1.10× **242 → 224**. Every ability from 2:30 to 5:30
+marathon now lands inside its band. Beginner plans are byte-identical — `buildBeginnerWeek` never
+reads `peakLong`, which is the separate open problem of a beginner never being taken near their race
+distance at all.
 
 ## Race day is a session (added 2026-08-01, from elite-coach feedback)
 

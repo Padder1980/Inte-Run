@@ -90,6 +90,34 @@ const LONG_CEILING_MIN: Record<Goal["distance"], number> = {
 };
 
 /**
+ * The absolute cap: no long run in any plan exceeds this, whatever drives it.
+ *
+ * ⚠️ THIS IS A SECOND, HIGHER CEILING AND THE TWO ARE NOT INTERCHANGEABLE. `LONG_CEILING_MIN` caps
+ * long runs grown by the VOLUME model, and must stay where it is — a marathoner running 140 km/week
+ * should not be doing four-hour long runs just because their mileage is high. This one caps long runs
+ * driven by the DISTANCE floor, where the runner is slow rather than high-mileage, and the extra time
+ * buys distance they genuinely need rather than volume they already have.
+ *
+ * Raising `LONG_CEILING_MIN` itself to 240 instead would be a serious bug: `peakLong` is
+ * `PEAK_LONG_MIN x vScale`, so a 2:30 marathoner stating a big mileage would scale straight past
+ * three hours into a **60 km** long run. The volume cap is what stops that, and it has to keep doing
+ * so.
+ *
+ * The marathon is the only event that needs the headroom. Reaching 25 km — the figure the evidence
+ * report ties to a faster marathon ("<25 km slower") — takes a 5:00 runner 3h36 and a 5:30 runner
+ * 3h58, both past the three-hour cap, which is why those runners were topping out at 21.3 km and
+ * 19.3 km. Owner's decision (2026-08-01), taking the research threshold over the time-on-feet
+ * convention with the trade-off stated: a 5:30 marathoner now does a four-hour training run.
+ */
+const LONG_ABS_CEILING_MIN: Record<Goal["distance"], number> = {
+  "1mile": 75,
+  "5k": 90,
+  "10k": 110,
+  half: 145,
+  marathon: 240,
+};
+
+/**
  * How far the peak long run should reach in DISTANCE, per event and ability.
  *
  * ⚠️ THE PLAN IS BUILT IN MINUTES, WHICH SILENTLY SHORT-CHANGES SLOWER RUNNERS. Everyone got the same
@@ -114,12 +142,31 @@ const LONG_CEILING_MIN: Record<Goal["distance"], number> = {
  * 182 minutes and a 2:45 runner 201, so they are capped rather than sent out for three hours before a
  * half marathon. They land as close as 145 minutes carries them, which is the honest answer.
  */
+/**
+ * The UPPER edge of the same endpoint table — no long run should exceed it.
+ *
+ * ⚠️ A minutes-based cap under-serves slow runners AND over-serves fast ones; `LONG_FLOOR_KM` fixes
+ * the first half and this fixes the second. Measured: a 2:30 marathoner stating 120 km/week rode the
+ * 180-minute volume cap all the way to a **44.4 km** long run — longer than the race itself, past the
+ * Elite band's 40 km, and well past the report's ">35 km benefit uncertain in recreational cohort".
+ * Three hours is a sane amount of time; at 4:00/km it is an insane distance.
+ *
+ * Upper edges, recreational → Intermediate and competitive → Advanced, as for the floor.
+ */
+const LONG_CAP_KM: Record<Goal["distance"], { recreational: number; competitive: number }> = {
+  "1mile": { recreational: 12, competitive: 18 },   // not in the report; scaled from the 5 km row
+  "5k": { recreational: 16, competitive: 22 },
+  "10k": { recreational: 18, competitive: 26 },
+  half: { recreational: 24, competitive: 30 },
+  marathon: { recreational: 32, competitive: 35 },
+};
+
 const LONG_FLOOR_KM: Record<Goal["distance"], { recreational: number; competitive: number }> = {
   "1mile": { recreational: 8, competitive: 12 },   // not in the report; scaled from the 5 km row
   "5k": { recreational: 10, competitive: 14 },
   "10k": { recreational: 12, competitive: 16 },
   half: { recreational: 21.5, competitive: 22 },
-  marathon: { recreational: 24, competitive: 28 },
+  marathon: { recreational: 25, competitive: 28 },   // 25, not the band floor of 24: "<25 km slower"
 };
 
 /**
@@ -278,13 +325,11 @@ export function generatePlan(
 
   // The distance floor in MINUTES for this runner: how long their own easy pace takes to cover the
   // endpoint distance their event and ability call for. Computed once — the paces never change.
-  const longFloorMin = (() => {
-    const band = LONG_FLOOR_KM[goal.distance];
-    if (!band) return 0;
-    const km = athlete.experience === "competitive" ? band.competitive : band.recreational;
-    const easySecPerKm = (paces.easy.minSecPerKm + paces.easy.maxSecPerKm) / 2;
-    return Math.round((km * easySecPerKm) / 60);
-  })();
+  const easySecPerKm = (paces.easy.minSecPerKm + paces.easy.maxSecPerKm) / 2;
+  const minutesFor = (km: number) => Math.round((km * easySecPerKm) / 60);
+  const abilityKey = athlete.experience === "competitive" ? "competitive" : "recreational";
+  const longFloorMin = minutesFor(LONG_FLOOR_KM[goal.distance][abilityKey]);
+  const longCapMin = minutesFor(LONG_CAP_KM[goal.distance][abilityKey]);
 
   const buildAll = (vScale: number): PlannedWeek[] => {
     // ⚠️ THE LONG RUN GROWS WITH MILEAGE BUT IS NEVER CUT BY IT — note the `Math.max(1, vScale)`,
@@ -303,9 +348,19 @@ export function generatePlan(
     // falls apart. Measured with this rule, long-run size is identical to not scaling down at all
     // (mean longest-long/race-distance 1.20 either way; inversions 14.3% vs 14.4%), and week-one
     // anchoring still rises from 66% to 79% of profiles.
-    const peakLong = Math.min(
+    // ⚠️ ORDER MATTERS. Cap the VOLUME-driven length first, then let the distance floor lift it, then
+    // apply the absolute cap. Taking the floor before the volume cap would let a high-mileage runner
+    // ride the higher ceiling and collect a four-hour long run they have not earned.
+    const volumeDriven = Math.min(
       LONG_CEILING_MIN[goal.distance],
-      Math.max(longFloorMin, Math.round(PEAK_LONG_MIN[goal.distance] * Math.max(1, vScale))),
+      Math.round(PEAK_LONG_MIN[goal.distance] * Math.max(1, vScale)),
+    );
+    // The distance cap is applied last but must never fight the floor — if a runner is slow enough
+    // that the floor alone exceeds the cap in minutes, the floor wins and the absolute time ceiling
+    // is what holds them. (Cap > floor by construction: every band's upper edge exceeds its lower.)
+    const peakLong = Math.min(
+      LONG_ABS_CEILING_MIN[goal.distance],
+      Math.max(longFloorMin, Math.min(longCapMin, Math.max(longFloorMin, volumeDriven))),
     );
     const startLong = Math.round(peakLong * (returning ? 0.42 : 0.55));
     return schedule.map((wp, i) => {

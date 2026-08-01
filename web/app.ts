@@ -4636,6 +4636,14 @@ function viewportDiagLines() {
         : "launch chrome: n/a in a browser tab",
       "app " + rect(".app") + " \u00b7 bar " + rect(".topbar"),
       "nav " + rect(".bottomnav"),
+      // What the keyboard actually did this session. pans = times iOS shoved the view; cleared =
+      // scrollTo put it back; followed = it refused and the shell tracked it instead. All zeros
+      // while the glitch reproduces means THIS BUILD DOES NOT HAVE THE FIX - check the stamp above.
+      (window.__kbDiag
+        ? "keyboard: pans " + window.__kbDiag.pans + " \u00b7 max " + window.__kbDiag.maxOff +
+          " \u00b7 cleared " + window.__kbDiag.cleared + " \u00b7 followed " + window.__kbDiag.followed +
+          (window.__kbDiag.last ? " \u00b7 last " + window.__kbDiag.last : "")
+        : "keyboard: handler not loaded"),
     ];
   } catch (e) { return ["diag unavailable"]; }
 }
@@ -7624,10 +7632,34 @@ seedDone();
   // the keyboard stayed up. overflow:hidden on html/body does NOT prevent this pan; the only remedy
   // is scrolling the window back to 0,0 — AFTER the field is visible inside its own scroller, or
   // iOS immediately pans again to reveal it.
+  // Numbers for Support > Your data. A failed keyboard fix cannot be diagnosed from a screenshot:
+  // a pan that scrollTo cleared, a pan that survived it, and a fix that never reached the phone at
+  // all look identical by eye. This records what actually happened, on the device it happened on.
+  window.__kbDiag = { pans: 0, maxOff: 0, cleared: 0, followed: 0, last: "" };
+  // Plan B, engaged only when a pan SURVIVES window.scrollTo — some WKWebView states refuse the
+  // programmatic scroll while the keyboard is animating. If the viewport insists on being panned,
+  // stop fighting it: translate the shell down by the same offset so it covers the visible region
+  // exactly. The user sees a normal app either way; the transform clears with the keyboard.
+  function followPan(off) {
+    const app = document.querySelector(".app");
+    if (!app) return;
+    if (off > 0.5) app.style.transform = "translateY(" + Math.round(off) + "px)";
+    else if (app.style.transform) app.style.transform = "";
+  }
   function unpan() {
     const vv = window.visualViewport;
-    const panned = (vv && vv.offsetTop > 0.5) || window.scrollY > 0.5;
-    if (panned) window.scrollTo(0, 0);
+    const off = Math.max(vv ? vv.offsetTop : 0, window.scrollY || 0);
+    if (off <= 0.5) { followPan(0); return; }
+    const d = window.__kbDiag;
+    d.pans++;
+    if (off > d.maxOff) d.maxOff = Math.round(off);
+    window.scrollTo(0, 0);
+    requestAnimationFrame(() => {
+      const still = Math.max(vv ? vv.offsetTop : 0, window.scrollY || 0);
+      if (still > 0.5) { followPan(still); d.followed++; }
+      else { followPan(0); d.cleared++; }
+      d.last = "off " + Math.round(off) + (still > 0.5 ? " -> FOLLOWED" : " -> cleared");
+    });
   }
   function keepVisible(el) {
     if (!el || !el.isConnected) return;
@@ -7663,6 +7695,10 @@ seedDone();
     // field focused) would stick.
     window.visualViewport.addEventListener("scroll", () => { if (pending) keepVisible(pending); else unpan(); });
   }
+  // In a standalone Home Screen app the same pan can be reported as a WINDOW scroll instead of a
+  // visualViewport one — the document cannot scroll (overflow: hidden), so any window scroll IS the
+  // keyboard pan, whichever event WebKit chose to raise for it.
+  window.addEventListener("scroll", () => { if (pending) keepVisible(pending); else unpan(); }, { passive: true });
 })();
 
 // ---- Pinch-to-zoom: an app, not a web page --------------------------------------------------

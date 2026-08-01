@@ -662,8 +662,23 @@ nothing ever reverted the pan, so the shell sat offset inside the visible area. 
 does not prevent this pan; **the only remedy is `window.scrollTo(0, 0)` — AFTER the field is visible
 in its own scroller**, or iOS immediately pans again. `unpan()` runs at the end of every
 `keepVisible` pass, on `visualViewport` **scroll** (the event the pan itself raises — resize alone
-never fires for a pan), and 350 ms after `focusout` so a pan cannot outlive the keyboard. Verified
-error-free in the browser; the pan itself only reproduces on a real iPhone.
+never fires for a pan), and 350 ms after `focusout` so a pan cannot outlive the keyboard.
+
+⚠️ **The first version did NOT hold on the owner's phone.** Round two adds three things:
+- **A window `scroll` listener** — in a standalone Home Screen app the pan can be reported as a
+  window scroll rather than a visualViewport one, and the document cannot legitimately scroll
+  (overflow: hidden), so any window scroll IS the pan, whichever event WebKit raised for it.
+- **`followPan`, the fallback that cannot lose**: some WKWebView states refuse a programmatic
+  `scrollTo` while the keyboard is animating. One frame after scrolling, if the offset survived, the
+  shell is translated down by exactly that offset so it covers the visible region — stop fighting
+  the pan and track it. The transform clears with the keyboard. (While it is set, `position: fixed`
+  descendants become fixed to the shell — acceptable for the duration of a keyboard.)
+- **`window.__kbDiag`**, surfaced as the "keyboard" line in Support › Your data: pans seen, max
+  offset, cleared vs followed counts. ⚠️ A failed fix cannot be diagnosed from a screenshot — a pan
+  scrollTo cleared, a pan that survived it, and a build without the fix look identical by eye.
+  **All zeros while the glitch reproduces = the phone is running an old copy** (the three-copies
+  trap); nonzero `followed` = the fallback is carrying it; nonzero pans with the glitch visible =
+  new information, report the line.
 
 ## Race day is a session (added 2026-08-01, from elite-coach feedback)
 

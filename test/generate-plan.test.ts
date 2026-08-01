@@ -143,6 +143,58 @@ test("the taper is present with correct length for a half marathon", () => {
   assert.equal(taperWeeks.length, 2);
 });
 
+test("every event tapers for the days the evidence asks, on every race weekday", () => {
+  // ⚠️ MEASURED IN CALENDAR DAYS BEFORE THE RACE, not in weeks — the same lesson as the race-eve
+  // test. Taper weeks are Monday-aligned and the last one IS race week, so "weeks: 1" is not seven
+  // days: it is 0–6 depending on the weekday, zero for a Monday race. The 5K and 10K shipped that
+  // way for months while this suite said the taper was fine, because no test ever asked the
+  // runner's question: "how many days before my race does the plan ease off?" The evidence window
+  // is 7–14 days for 5K/10K/half and 14–21 for the marathon.
+  const WINDOW: Record<string, [number, number]> = {
+    "5k": [7, 14], "10k": [7, 14], half: [7, 14], marathon: [14, 21],
+  };
+  const TT: Record<string, number> = { "5k": 1500, "10k": 3000, half: 6600, marathon: 14400 };
+  for (const distance of ["5k", "10k", "half", "marathon"] as const) {
+    for (let rs = 0; rs < 7; rs++) {
+      const raceIso = shiftIso("2027-03-01", rs); // 2027-03-01 is a Monday
+      const p = generatePlan({ ...athlete, returningFromInjury: false },
+        { distance, raceDateIso: raceIso, targetTimeSeconds: TT[distance]!, startDateIso: "2026-08-03" });
+      const firstTaper = p.weeks.find((w) => w.phase === "taper")!;
+      const days = Math.round((Date.parse(raceIso) - Date.parse(firstTaper.startDateIso)) / 86_400_000);
+      const [lo, hi] = WINDOW[distance]!;
+      assert.ok(days >= lo && days <= hi,
+        `${distance} racing ${raceIso}: ${days} days of taper, outside ${lo}–${hi}`);
+      // Intensity is retained: every taper week still carries quality (race week carries the race).
+      for (const w of p.weeks.filter((x) => x.phase === "taper")) {
+        assert.ok(w.sessions.some((s) => ["threshold", "vo2", "race-specific", "race"].includes(s.type)),
+          `${distance} racing ${raceIso}: taper week ${w.index} lost its intensity`);
+      }
+    }
+  }
+});
+
+test("the taper genuinely cuts the week, not just the long run", () => {
+  // ⚠️ volumeMultiplierByWeek used to reach ONLY longRunMinutes. The easy runs kept their full
+  // length, and because the taper drops the second quality session, the backfilled easy day made
+  // easy volume RISE into the taper — the 10K's last full week measured within 1% of peak, and the
+  // delivered cut was 18–39% against the evidence's 41–60%. The multiplier now reaches the easy
+  // runs, so the last full taper week must sit well under peak.
+  const TT: Record<string, number> = { "5k": 1500, "10k": 3000, half: 6600, marathon: 14400 };
+  for (const distance of ["5k", "10k", "half", "marathon"] as const) {
+    const p = generatePlan({ ...athlete, returningFromInjury: false },
+      { distance, raceDateIso: "2027-03-07", targetTimeSeconds: TT[distance]!, startDateIso: "2026-08-03" });
+    const peakKm2 = Math.max(...p.weeks
+      .filter((w) => !w.sessions.some((s) => s.type === "race"))
+      .map((w) => w.plannedDistanceMeters)) / 1000;
+    const taperWeeks = p.weeks.filter((w) => w.phase === "taper");
+    const lastFull = taperWeeks.length > 1 ? taperWeeks[taperWeeks.length - 2]! : taperWeeks[0]!;
+    const cut = 1 - lastFull.plannedDistanceMeters / 1000 / peakKm2;
+    assert.ok(cut >= 0.30,
+      `${distance}: last full taper week only ${(cut * 100).toFixed(0)}% below peak — barely a taper`);
+    assert.ok(cut <= 0.60, `${distance}: taper cut ${(cut * 100).toFixed(0)}% — past the evidence window`);
+  }
+});
+
 test("no two hard sessions land on adjacent days", () => {
   for (const w of plan.weeks) {
     const hardDays = w.sessions
@@ -504,6 +556,73 @@ test("a beginner's long run knows what race they entered", () => {
   const rwLongest = (d: Goal["distance"]) => Math.max(...ladder(d, true));
   assert.ok(rwLongest("10k") > rwLongest("5k") * 1.15,
     `run-walk ladder barely moves with the goal: 5k ${rwLongest("5k").toFixed(1)}km vs 10k ${rwLongest("10k").toFixed(1)}km`);
+});
+
+test("the taper survives a high stated mileage", () => {
+  // ⚠️ THE 95-MINUTE EASY CAP SWALLOWED THE TAPER. Multiplying before the clamp meant that once
+  // baseMin x vScale sat above 95, the taper multiplier still landed above 95 and the clamp erased
+  // it: a 120 km/week marathoner's first taper week was byte-identical to peak week (three 95-minute
+  // easy runs), and the taper the evidence asks for was delivered to unstated-volume runners and
+  // silently withheld from exactly the high-mileage runners the volume model was built for. Also the
+  // same trap CLAUDE.md records twice already: every taper test used the fixture athlete with no
+  // stated volume, so the suite stayed green — a sweep blind to a new axis is not a guard.
+  const big: Athlete = {
+    daysPerWeek: 6,
+    recent: { distanceMeters: 5000, timeSeconds: 1050 },
+    experience: "competitive",
+    includeStrength: true,
+    returningFromInjury: false,
+    longRunDay: 6,
+    weeklyVolumeKmCurrent: 120,
+  };
+  const p = generatePlan(big, { ...goal, distance: "marathon", targetTimeSeconds: 9900, raceDateIso: "2027-03-07" });
+  const maxEasy = (w: PlannedWeek) => Math.max(0, ...w.sessions
+    .filter((s) => s.type === "easy" || s.type === "recovery")
+    .map((s) => s.estimatedDurationSeconds / 60));
+  const taperIdx = p.weeks.findIndex((w) => w.phase === "taper");
+  const peakWeek = p.weeks.slice(0, taperIdx)
+    .reduce((a, b) => (b.plannedDistanceMeters > a.plannedDistanceMeters ? b : a));
+  const firstTaper = p.weeks[taperIdx]!;
+  assert.ok(maxEasy(firstTaper) < maxEasy(peakWeek) - 1,
+    `first taper week's easy runs (${maxEasy(firstTaper).toFixed(0)}min) did not shrink from peak (${maxEasy(peakWeek).toFixed(0)}min)`);
+  // And the last full taper week delivers a real cut. The bound is lower than the unstated-volume
+  // test's 30% on purpose: quality sessions do not scale with volume, so at high mileage they are a
+  // larger untapered share and the deliverable cut for a 0.65-multiplier week is smaller.
+  const taperWeeks = p.weeks.filter((w) => w.phase === "taper");
+  const lastFull = taperWeeks[taperWeeks.length - 2]!;
+  const cut = 1 - lastFull.plannedDistanceMeters / peakWeek.plannedDistanceMeters;
+  assert.ok(cut >= 0.20,
+    `high-mileage last full taper week only ${(cut * 100).toFixed(0)}% below peak`);
+});
+
+test("a clamped one-week taper still gives race week the race-week depth", () => {
+  // ⚠️ THE LAST MULTIPLIER BELONGS TO RACE WEEK, WHATEVER GOT CLAMPED. A 4-week runway clamps the
+  // taper to one week (periodization: structuredWeeks - 3) and that week IS race week — but
+  // start-aligned indexing handed it mult[0], the gentle 0.72 lead-in, instead of the race-week
+  // 0.55. Measured: a runner entering a 10 km four weeks out got a race-week long run 20% LONGER
+  // than before the taper fix existed. Constant-free assertion: the race-week long run must be the
+  // SAME whether the taper was clamped to one week or given its full two, because both are
+  // peakLong x the race-week multiplier.
+  const runnerA: Athlete = {
+    daysPerWeek: 5,
+    recent: { distanceMeters: 5000, timeSeconds: 1500 },
+    experience: "recreational",
+    includeStrength: true,
+    returningFromInjury: false,
+    longRunDay: 2, // mid-week long run so it survives race-day placement on a Sunday race
+  };
+  const longMin = (raceIso: string) => {
+    const p = generatePlan(runnerA,
+      { distance: "10k", raceDateIso: raceIso, targetTimeSeconds: 3000, startDateIso: "2026-08-03" });
+    const raceWeek = p.weeks[p.weeks.length - 1]!;
+    const long = raceWeek.sessions.find((s) => s.type === "long");
+    return long ? Math.round(long.estimatedDurationSeconds / 60) : null;
+  };
+  const clamped = longMin("2026-08-30"); // 4-week runway -> 1 taper week
+  const full = longMin("2026-10-04");    // 9-week runway -> full 2-week taper
+  assert.ok(clamped !== null && full !== null, "race-week long run missing from a probe plan");
+  assert.ok(Math.abs(clamped! - full!) <= 1,
+    `clamped race week runs a ${clamped}min long run; a full taper's race week runs ${full}min — the clamp changed the race-week depth`);
 });
 
 test("scaling down never buys volume with intensity", () => {

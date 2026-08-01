@@ -7615,6 +7615,20 @@ seedDone();
     }
     return document.getElementById("view");
   }
+  // ⚠️ UNDO THE PAN, EVERY TIME — this is the half that was missing, and it is what mangled the
+  // whole screen when typing into the profile page. iOS decides INSTANTLY on focus, before any of
+  // our handlers run, whether the field will sit under the keyboard; if so it pans the VISUAL
+  // viewport (visualViewport.offsetTop goes positive). We then shrink the shell to --vvh and scroll
+  // the field into view ourselves — but the pan was never reverted, so the app slid up under the
+  // status bar and a dead black band opened between the bottom nav and the keyboard, for as long as
+  // the keyboard stayed up. overflow:hidden on html/body does NOT prevent this pan; the only remedy
+  // is scrolling the window back to 0,0 — AFTER the field is visible inside its own scroller, or
+  // iOS immediately pans again to reveal it.
+  function unpan() {
+    const vv = window.visualViewport;
+    const panned = (vv && vv.offsetTop > 0.5) || window.scrollY > 0.5;
+    if (panned) window.scrollTo(0, 0);
+  }
   function keepVisible(el) {
     if (!el || !el.isConnected) return;
     const box = scrollerFor(el);
@@ -7627,18 +7641,27 @@ seedDone();
     // Below the keyboard: bring it up. Behind the top of its container: bring it down.
     if (r.bottom > bottom - margin) box.scrollTop += r.bottom - (bottom - margin);
     else if (r.top < top + margin) box.scrollTop -= top + margin - r.top;
+    unpan();
   }
   document.addEventListener("focusin", (e) => {
     const el = e.target;
     if (!el || !FIELD.test(el.tagName || "")) return;
     pending = el;
-    // The keyboard animates in; measuring before it lands gives the wrong answer.
+    // The keyboard animates in; measuring before it lands gives the wrong answer. iOS also pans a
+    // beat after the keyboard settles, so a late pass exists purely to catch and revert that.
     setTimeout(() => keepVisible(el), 60);
     setTimeout(() => keepVisible(el), 320);
+    setTimeout(() => keepVisible(el), 600);
   });
-  document.addEventListener("focusout", () => { pending = null; });
+  // The pan can also outlive the keyboard: left in place after blur it misplaces every fixed
+  // element until the next launch. Clear it once the keyboard has finished leaving.
+  document.addEventListener("focusout", () => { pending = null; setTimeout(unpan, 350); });
   if (window.visualViewport) {
     window.visualViewport.addEventListener("resize", () => { if (pending) keepVisible(pending); });
+    // The pan itself arrives as a visualViewport SCROLL event, not a resize — without this listener
+    // a pan that happens after our timed passes (slow keyboard, user scrolling the page with a
+    // field focused) would stick.
+    window.visualViewport.addEventListener("scroll", () => { if (pending) keepVisible(pending); else unpan(); });
   }
 })();
 

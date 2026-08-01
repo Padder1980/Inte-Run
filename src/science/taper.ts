@@ -1,8 +1,15 @@
 // Taper design.
 //
-// Evidence (2023 taper meta-analysis, via the research brief): reduce volume by ~41–60% while
-// maintaining intensity and broadly maintaining training frequency. Duration scales with race
-// distance: 5–10K ≈ 5–8 days, half ≈ 7–14 days, marathon ≈ 14–21 days.
+// Evidence (2023 taper meta-analysis + the 2026 deep-research report): reduce volume by ~41–60%
+// while maintaining intensity and broadly maintaining training frequency. Duration scales with race
+// distance: 5K/10K/half ≈ 7–14 days, marathon ≈ 14–21 days.
+//
+// ⚠️ TAPER WEEKS ARE MONDAY-ALIGNED AND THE LAST ONE IS RACE WEEK, so a one-week taper is NOT seven
+// days — it is however many days of race week precede the race: six for a Sunday race, ZERO for a
+// Monday one. The 5K and 10K shipped with weeks: 1 for months, which measured as 0–6 days of easing
+// against the report's 7–14, and the week before the race ran at within 1% of peak volume. An elite
+// coach's verdict was "the taper is not really a taper for a 10km", and he was right on any weekday.
+// Two Monday-aligned weeks give 7 + raceDow days: 7–13, inside the window on every weekday.
 
 import type { RaceDistanceKey } from "../domain/types.ts";
 
@@ -20,14 +27,14 @@ const TAPERS: Record<RaceDistanceKey, TaperPlan> = {
     notes: ["Short, sharp taper — keep speed, cut volume ~40%."],
   },
   "5k": {
-    weeks: 1,
-    volumeMultiplierByWeek: [0.6],
-    notes: ["~5–8 day taper; retain VO2 touches at low volume."],
+    weeks: 2,
+    volumeMultiplierByWeek: [0.72, 0.58],
+    notes: ["~7–14 day taper; retain VO2 touches while volume falls ~28% then ~42%."],
   },
   "10k": {
-    weeks: 1,
-    volumeMultiplierByWeek: [0.6],
-    notes: ["~5–8 day taper; keep some threshold/VO2 intensity."],
+    weeks: 2,
+    volumeMultiplierByWeek: [0.72, 0.55],
+    notes: ["~7–14 day taper; keep threshold/VO2 intensity while volume falls ~28% then ~45%."],
   },
   half: {
     weeks: 2,

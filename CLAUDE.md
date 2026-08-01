@@ -610,6 +610,61 @@ hash unchanged) — `beginnerRun` and `rwLong` have no other caller.
 and it is also a trap for measurement: a sweep whose race dates are all Mondays reads a 3% shortfall
 that is not there.
 
+## The taper is measured in days before the race, not weeks (fixed 2026-08-01)
+
+⚠️ **Taper weeks are Monday-aligned and the LAST one is race week, so `weeks: 1` is not seven days.**
+It is however many days of race week precede the race: six for a Sunday race, **zero for a Monday
+one**. The 5K and 10K shipped with `weeks: 1` — measured, 0–6 days of easing against the evidence's
+7–14, with the week before the race within 1% of peak volume. The coach's "the taper is not really a
+taper for a 10km" was correct on every weekday. Both are `weeks: 2` now: 7 + raceDow days = 7–13,
+inside the window whatever the weekday. `test/generate-plan.test.ts` asserts the window in **calendar
+days across all 7 race weekdays** — the same lesson as the race-eve test; a guard counting weeks
+could not even express the defect.
+
+⚠️ **`volumeMultiplierByWeek` must reach the EASY runs, not only the long run.** It was applied in
+`longRunMinutes` alone, so a "taper" week kept full-length easy runs — and since the taper drops the
+second quality session, the backfilled easy day meant easy volume *rose* into the taper (+45 min).
+Measured delivered cut: 18–39% against the evidence's 41–60%. `WeekContext.taperMult` now scales the
+easy runs too. After: last-full-taper-week cuts 35–41% (was 22–30), easy-minutes rise +8 (frequency
+maintained, sessions shortened — which is what the evidence asks). Intensity is retained: every taper
+week keeps one quality session, race week keeps the race. Intensity-floor sweep identical (2/17920).
+
+⚠️ **Clamp the volume-driven length to 95 FIRST, then taper, floor of 20 outermost.** Multiplying
+before the clamp let the cap swallow the taper whole for high-mileage runners: at vScale 3,
+45 × 3 × 0.8 = 108 still clamps to 95, byte-identical to peak week — a 120 km/week marathoner's taper
+cut 3%/14%/46% instead of 17%/31%/59%, and the fix the whole change existed to deliver was silently
+withheld from exactly the runners the volume model was built for. And the 20-minute floor must stay
+OUTSIDE the taper multiply, or a down-scaled runner's race week produces 11-minute non-runs. Caught
+by adversarial review; the suite was green because no taper test varied stated volume — the third
+time the "sweep blind to a new axis" trap has fired in two days.
+
+⚠️ **The multiplier array is END-ALIGNED: the last entry belongs to race week, whatever got clamped.**
+`periodization.ts` clamps taper to `structuredWeeks - 3`, so a 4-week plan has ONE taper week — and
+it IS race week. Start-aligned indexing handed it `mult[0]`, the gentle 0.72 lead-in, instead of the
+race-week 0.55: a runner entering a 10 km four weeks out got a race-week long run **20% longer than
+before the taper fix existed**. Resolved once in `buildAll` (end-aligned) and passed to
+`longRunMinutes` as a number — two call sites each indexing the array is how they disagreed. The test
+is constant-free: a clamped race week and a full taper's race week must prescribe the same long run.
+
+Short runways otherwise hold their shape (verified 4/5/6/8/10-week runways). Known and accepted: a
+5-week 5k/10k runway now spends its former peak week tapering, so the race-specific rehearsal
+disappears on exactly that runway length — the 7–14-day taper is what it buys, and 6 weeks up keeps
+the peak week.
+
+## The iOS keyboard pan must be UNDONE, not just absorbed (fixed 2026-08-01, needs on-device proof)
+
+The profile screen mangled itself when a field was focused: app shoved up under the status bar, dead
+black band between the nav and the keyboard, for as long as the keyboard stayed up. ⚠️ **iOS decides
+instantly on focus — before any of our handlers run — whether the field will sit under the keyboard,
+and if so it PANS the visual viewport** (`visualViewport.offsetTop` goes positive). The `--vvh`
+machinery then shrinks the shell and `keepVisible` scrolls the field into view inside `#view`, but
+nothing ever reverted the pan, so the shell sat offset inside the visible area. `overflow: hidden`
+does not prevent this pan; **the only remedy is `window.scrollTo(0, 0)` — AFTER the field is visible
+in its own scroller**, or iOS immediately pans again. `unpan()` runs at the end of every
+`keepVisible` pass, on `visualViewport` **scroll** (the event the pan itself raises — resize alone
+never fires for a pan), and 350 ms after `focusout` so a pan cannot outlive the keyboard. Verified
+error-free in the browser; the pan itself only reproduces on a real iPhone.
+
 ## Race day is a session (added 2026-08-01, from elite-coach feedback)
 
 ⚠️ **`"race"` is a SessionType, distinct from `"race-specific"`** (which is a rehearsal in

@@ -412,16 +412,27 @@ export function generatePlan(
       if (beginner) {
         return buildBeginnerWeek(weekIndex, startDateIso, wp, { athlete, goal, paces, returning, longMin: beginnerLongPeakMin }, lastHardWeek, runWalk);
       }
+      // ⚠️ END-ALIGNED: the LAST array entry belongs to race week, whatever got clamped. A short
+      // runway clamps the taper (periodization.ts: structuredWeeks - 3), so a 4-week plan has ONE
+      // taper week — and that week IS race week. Start-aligned indexing handed it mult[0], the
+      // gentle first-week 0.72, instead of the race-week 0.55: measured, a runner entering a 10 km
+      // 4 weeks out got a race-week long run 20% LONGER than before this taper existed. Aligning
+      // from the end drops the gentle lead-in weeks and keeps the deepest cut on the race,
+      // honouring the "last entry = race week" contract in taper.ts on every runway length.
+      const mults = taper.volumeMultiplierByWeek;
+      const taperMult = wp.phase === "taper"
+        ? (mults[mults.length - wp.phaseTotal + wp.ordinalInPhase - 1] ?? mults[mults.length - 1] ?? 0.55)
+        : 1;
       const longMin = longRunMinutes(
         wp,
         weekIndex,
         nonTaperCount,
         startLong,
         peakLong,
-        taper.volumeMultiplierByWeek,
+        taperMult,
       );
       return buildWeek(weekIndex, startDateIso, wp, {
-        athlete, goal, paces, returning, longMin, vScale,
+        athlete, goal, paces, returning, longMin, vScale, taperMult,
       });
     });
   };
@@ -552,6 +563,14 @@ type WeekContext = {
   longMin: number;
   /** Volume scale for this runner (see volumeScale). Absent means 1 — beginner weeks ignore it. */
   vScale?: number;
+  /**
+   * This week's taper multiplier (1 outside the taper). ⚠️ It must reach the EASY runs, not only the
+   * long run. volumeMultiplierByWeek used to be applied in longRunMinutes alone, so a "taper" week
+   * kept its full-length easy runs — and because the taper drops the second quality session, the
+   * backfilled easy day meant easy volume actually ROSE into the taper. Measured: the delivered cut
+   * was 18–39% against the evidence's 41–60%, and a 10K's last full week ran within 1% of peak.
+   */
+  taperMult?: number;
 };
 
 function buildWeek(
@@ -591,7 +610,13 @@ function buildWeek(
     // bounded so a low-mileage runner still gets a real run and a high-mileage one is not handed
     // a two-hour midweek easy day.
     const baseMin = wp.isDeload ? 35 : ei === easyDays.length - 1 ? 40 : 45;
-    const minutes = Math.max(20, Math.min(95, Math.round(baseMin * (ctx.vScale ?? 1))));
+    // ⚠️ ORDER: clamp the VOLUME-driven length to 95 first, THEN taper, with the 20-minute floor
+    // outermost. Multiplying before the clamp let the cap swallow the taper whole for high-mileage
+    // runners — at vScale 3, 45 x 3 x 0.8 = 108 still clamps to 95, byte-identical to peak week, so
+    // a 120 km/week marathoner's first taper week cut 3% instead of ~25% and race week held three
+    // 68-minute easy runs. And the floor must stay outside the taper multiply, or a down-scaled
+    // runner's race week produces 11-minute non-runs.
+    const minutes = Math.max(20, Math.round(Math.min(95, baseMin * (ctx.vScale ?? 1)) * (ctx.taperMult ?? 1)));
     sessions.push(easyVariant(ctx.paces, minutes, index + ei, canStride));
     dayOf.push(d);
   });
@@ -1142,12 +1167,13 @@ function longRunMinutes(
   nonTaperCount: number,
   startLong: number,
   peakLong: number,
-  taperMultipliers: number[],
+  // ⚠️ The RESOLVED multiplier for this week, not the array. Two call sites each indexing
+  // volumeMultiplierByWeek is how race week got the wrong entry on clamped runways — buildAll
+  // resolves it once, end-aligned, and everything downstream shares the answer.
+  taperMult: number,
 ): number {
   if (wp.phase === "taper") {
-    const idxInTaper = weekIndex - nonTaperCount - 1;
-    const mult = taperMultipliers[idxInTaper] ?? 0.55;
-    return Math.round(peakLong * mult);
+    return Math.round(peakLong * taperMult);
   }
   const fraction = nonTaperCount <= 1 ? 1 : (weekIndex - 1) / (nonTaperCount - 1);
   let minutes = startLong + fraction * (peakLong - startLong);

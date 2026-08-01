@@ -161,6 +161,39 @@ const LONG_CAP_KM: Record<Goal["distance"], { recreational: number; competitive:
   marathon: { recreational: 32, competitive: 35 },
 };
 
+/**
+ * Where a BEGINNER's long run has to arrive, per event.
+ *
+ * ⚠️ THE BEGINNER TRACK USED TO IGNORE THE RACE ENTIRELY. `buildBeginnerWeek` was handed `longMin: 0`
+ * and never read `goal.distance`, so its long run came from one hardcoded ramp — `lerp(22, 38, f) + 8`
+ * — and topped out at **46 minutes for every goal there is**. Measured: a "building the habit" runner
+ * on a 28-week HALF MARATHON plan progressed 2.9 km → **4.4 km** and was then sent to run 21.1 km, a
+ * 5.0x jump against the report's 1.10 single-session guardrail; the long-run ladder was byte-identical
+ * whether the goal was a 5 km or a marathon. A gentle plan is right for a beginner. A plan that never
+ * arrives anywhere is not — it is the runner least able to judge the gap who is left to find it on
+ * race day.
+ *
+ * Numbers are the lower edge of the report's **Beginner** row (5 km 6–10, 10 km 8–14, half 12–18,
+ * marathon 16–25). Note the beginner half target is deliberately UNDER the race distance, where the
+ * recreational one is over it: the report's own row says 12–18 km, and a first-timer's job is to
+ * arrive able to finish, not to have rehearsed the whole thing.
+ */
+const BEGINNER_LONG_KM: Record<Goal["distance"], number> = {
+  "1mile": 4,
+  "5k": 6,
+  "10k": 8,
+  half: 12,
+  marathon: 16,
+};
+
+/**
+ * Time-on-feet ceiling for a beginner's long run — lower than the main track's, because the limit for
+ * someone new is how long their legs tolerate being on the ground, not what their aerobic system can
+ * take. A beginner aiming at a marathon reaches this rather than the 16 km, and that is the honest
+ * answer: `assessFeasibility` is what should be arguing with that goal, not the long run.
+ */
+const BEGINNER_LONG_CEILING_MIN = 135;
+
 const LONG_FLOOR_KM: Record<Goal["distance"], { recreational: number; competitive: number }> = {
   "1mile": { recreational: 8, competitive: 12 },   // not in the report; scaled from the 5 km row
   "5k": { recreational: 10, competitive: 14 },
@@ -329,6 +362,11 @@ export function generatePlan(
   const minutesFor = (km: number) => Math.round((km * easySecPerKm) / 60);
   const abilityKey = athlete.experience === "competitive" ? "competitive" : "recreational";
   const longFloorMin = minutesFor(LONG_FLOOR_KM[goal.distance][abilityKey]);
+  // The beginner track's own endpoint, on the same easy-pace conversion.
+  const beginnerLongPeakMin = Math.min(
+    BEGINNER_LONG_CEILING_MIN,
+    minutesFor(BEGINNER_LONG_KM[goal.distance]),
+  );
   const longCapMin = minutesFor(LONG_CAP_KM[goal.distance][abilityKey]);
 
   const buildAll = (vScale: number): PlannedWeek[] => {
@@ -367,7 +405,7 @@ export function generatePlan(
       const weekIndex = i + 1;
       const startDateIso = addDays(raceMonday, -(structuredWeeks - weekIndex) * 7);
       if (beginner) {
-        return buildBeginnerWeek(weekIndex, startDateIso, wp, { athlete, goal, paces, returning, longMin: 0 }, structuredWeeks, runWalk);
+        return buildBeginnerWeek(weekIndex, startDateIso, wp, { athlete, goal, paces, returning, longMin: beginnerLongPeakMin }, nonTaperCount, runWalk);
       }
       const longMin = longRunMinutes(
         wp,
@@ -768,6 +806,20 @@ const CONT_FLAVOURS = [
 // One beginner running session — a run–walk progression, or short continuous easy running for those
 // who can already jog. `f` is 0→1 across the plan; runs lengthen and (for run–walk) walks shrink.
 // `flavour` selects which format so sessions vary; the weekly long run uses its own long format.
+/**
+ * Interpolate GEOMETRICALLY, so each step is the same PERCENTAGE bigger than the last.
+ *
+ * ⚠️ A straight `lerp` front-loads its growth, which is exactly backwards for a beginner. Ramping the
+ * long run 30 → 112 minutes linearly over 33 weeks made the early steps the steepest in percentage
+ * terms: week 5 went 3.5 km → 4.1 km, a **17% jump**, against the report's 1.10 single-session
+ * guardrail — and the runner least able to absorb it is the one four weeks into their first plan.
+ * Same start, same destination, constant 4% a week instead.
+ */
+function geomLerp(from: number, to: number, f: number): number {
+  if (from <= 0 || to <= 0) return lerp(from, to, f);
+  return from * Math.pow(to / from, f);
+}
+
 function beginnerRun(
   paces: TrainingPaces,
   f: number,
@@ -775,16 +827,30 @@ function beginnerRun(
   runWalk: boolean,
   ease: boolean,
   flavour: number,
+  longPeakMin: number,
 ): SessionContent {
+  // ⚠️ ONLY THE LONG RUN IS EVENT-AWARE. The midweek runs stay on their original gentle ramp: what a
+  // new runner needs on a Tuesday is the habit, and it is the same habit whatever they have entered.
+  // Stretching every session toward the race is how a beginner plan becomes an intermediate one.
   if (runWalk) {
     const runSec = Math.round(lerp(60, 300, f) / 15) * 15; // 1′ → 5′ run
     const walkSec = Math.max(30, Math.round(lerp(90, 45, f) / 15) * 15); // 90″ → 45″ walk
-    let targetRunMin = lerp(10, 26, f) + (long ? 4 : 0);
+    // Run-walk covers less ground per minute of session than continuous running, and the walk breaks
+    // are the point rather than a shortfall — so the running content aims at three quarters of the
+    // continuous endpoint. Below ~14 minutes there is no session left, hence the floor.
+    const rwPeak = Math.max(14, longPeakMin * 0.75);
+    let targetRunMin = long ? geomLerp(Math.min(14, rwPeak), rwPeak, f) : lerp(10, 26, f);
     if (ease) targetRunMin *= 0.7;
     const spec = { runSec, walkSec, targetRunMin };
     return long ? rwLong(paces, spec) : RW_FLAVOURS[flavour % RW_FLAVOURS.length]!(paces, spec);
   }
-  let minutes = Math.round(lerp(22, 38, f)) + (long ? 8 : 0);
+  // The long run ramps from a gentle opening to the event's own endpoint. Starting at 45% of the
+  // destination keeps week one where it always was for a short goal, and keeps the week-on-week
+  // growth inside the report's 1.10 single-session guardrail for a long one.
+  const openMin = Math.min(30, Math.round(longPeakMin * 0.45));
+  let minutes = long
+    ? Math.round(geomLerp(openMin, longPeakMin, f))
+    : Math.round(lerp(22, 38, f));
   if (ease) minutes = Math.round(minutes * 0.75);
   return long ? longRun(paces, minutes) : CONT_FLAVOURS[flavour % CONT_FLAVOURS.length]!(paces, minutes);
 }
@@ -802,10 +868,16 @@ function buildBeginnerWeek(
   startDateIso: string,
   wp: AnnotatedWeek,
   ctx: WeekContext,
-  structuredWeeks: number,
+  rampWeeks: number,
   runWalk: boolean,
 ): PlannedWeek {
-  const f = structuredWeeks <= 1 ? 0.5 : (index - 1) / (structuredWeeks - 1);
+  // ⚠️ THE RAMP REACHES ITS ENDPOINT AT THE LAST HARD WEEK, NOT THE LAST WEEK. `structuredWeeks` used
+  // to be the denominator, so f only hit 1 in race week — which is a taper week, and taper weeks are
+  // eased by 25%. The long run therefore peaked somewhere short of its target and then shrank: for a
+  // beginner half the endpoint was 12 km and the plan actually delivered 11.6. Ramp against the
+  // non-taper weeks and clamp, so the destination is genuinely arrived at and the taper backs off
+  // FROM it.
+  const f = Math.min(1, rampWeeks <= 1 ? 0.5 : (index - 1) / (rampWeeks - 1));
   const ease = wp.isDeload || wp.phase === "taper";
   const runningDays = Math.min(runWalk ? 3 : 4, Math.max(2, ctx.athlete.daysPerWeek));
   const longDay = longRunDayOf(ctx.athlete);
@@ -814,13 +886,13 @@ function buildBeginnerWeek(
   const dayOf: number[] = [];
 
   // The weekly long, gentle session (on the athlete's chosen long-run day).
-  sessions.push(beginnerRun(ctx.paces, f, true, runWalk, ease, 0));
+  sessions.push(beginnerRun(ctx.paces, f, true, runWalk, ease, 0, ctx.longMin));
   dayOf.push(longDay);
 
   // Other easy days — each draws a different flavour, and the set rotates every week.
   const easyDays = BEG_EASY_REL.map((r) => dayRel(longDay, r)).slice(0, runningDays - 1);
   easyDays.forEach((d, ei) => {
-    sessions.push(beginnerRun(ctx.paces, f, false, runWalk, ease, index + ei));
+    sessions.push(beginnerRun(ctx.paces, f, false, runWalk, ease, index + ei, ctx.longMin));
     dayOf.push(d);
   });
 

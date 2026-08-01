@@ -557,6 +557,43 @@ marathon now lands inside its band. Beginner plans are byte-identical — `build
 reads `peakLong`, which is the separate open problem of a beginner never being taken near their race
 distance at all.
 
+### The beginner track arrives somewhere too (added 2026-08-01)
+
+⚠️ **`buildBeginnerWeek` ignored the race entirely.** It was handed `longMin: 0` and never read
+`goal.distance`, so the long run came off one hardcoded ramp (`lerp(22, 38, f) + 8`) and topped out at
+**46 minutes for every goal there is**. Measured: a "building the habit" runner on a 28-week HALF
+plan progressed 2.9 km → **4.4 km** and was then sent to run 21.1 km — a **5.0× jump** against the
+report's 1.10 single-session guardrail — with a ladder byte-identical whether the goal was a 5 km or a
+marathon. Gentle is right for a beginner; never arriving is not, and it is the runner least able to
+judge the gap who was left to find it on race day.
+
+`BEGINNER_LONG_KM` is the report's **Beginner** row (5 km 6, 10 km 8, half 12, marathon 16), converted
+at their easy pace and capped by `BEGINNER_LONG_CEILING_MIN` (135). ⚠️ The beginner half target is
+deliberately **under** 21.1 km where the recreational one is over it — the report's row is 12–18 km,
+and a first-timer's job is to arrive able to finish, not to have rehearsed the whole thing.
+
+⚠️ **THE RAMP IS GEOMETRIC, AND THAT IS HALF THE FIX.** A straight `lerp` front-loads its growth, which
+is backwards for a beginner: ramping 30 → 112 minutes linearly put a **17% jump at week 5** (3.5 →
+4.1 km), past the guardrail, four weeks into someone's first plan. `geomLerp` gives the same start and
+destination at a constant ~4%/week. Continuous beginners now peak at exactly 1.10×; reverting to
+`lerp` fails the test.
+
+⚠️ **`f` ramps against the NON-TAPER weeks.** It used `structuredWeeks`, so it only reached 1 in race
+week — which is a taper week, eased 25% — and the long run peaked short of its target and then shrank.
+
+⚠️ **`rwLong`'s cycle clamp is 4–12, not 4–8.** Eight capped the longest run–walk at ~56 minutes of
+running whatever was asked, so a "just getting started" runner heading for a 10 km never passed 2.9 km.
+
+Measured, longest run before → after: continuous 5 km 4.4 → 6.0, 10 km 4.5 → 8.0, half 4.4 → **12.0**,
+marathon 4.3 → 12.6; run–walk 3.1 → 4.8, 2.9 → 6.2, 2.9 → **8.2**, 2.9 → 7.9. Non-beginner plans are
+**byte-identical** (288-plan hash unchanged) — `beginnerRun` and `rwLong` have no other caller.
+
+Known and not fixed: the run–walk track still sits under the report's bands (they assume continuous
+running, and a run–walker covers less ground per session; the integer cycle count is the structural
+limit), and a beginner MARATHON reaches 12.6 km against a 16–25 km band because the 135-minute ceiling
+binds. Both are arguments with the GOAL rather than with the long run — `assessFeasibility` is what
+should be having them.
+
 ## Race day is a session (added 2026-08-01, from elite-coach feedback)
 
 ⚠️ **`"race"` is a SessionType, distinct from `"race-specific"`** (which is a rehearsal in

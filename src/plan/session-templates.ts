@@ -310,7 +310,11 @@ export function rwBuildup(p: TrainingPaces, s: BeginnerSpec): SessionContent {
 
 export function rwLong(p: TrainingPaces, s: BeginnerSpec): SessionContent {
   const block = r15(s.runSec * 1.4);
-  const cycles = clampN(Math.round((s.targetRunMin * 60) / block), 4, 8);
+  // ⚠️ The upper bound is 12, not 8. It was 8, which capped the longest run-walk session at about
+  // 56 minutes of running whatever was asked of it — so a "just getting started" runner heading for a
+  // 10 km never got past a 2.5 km longest session. Twelve cycles of a 7-minute block is 84 minutes of
+  // running, which is what a beginner half needs and is still a session a person can hold in mind.
+  const cycles = clampN(Math.round((s.targetRunMin * 60) / block), 4, 12);
   return assembleRunWalk(
     p,
     Array(cycles).fill(block),

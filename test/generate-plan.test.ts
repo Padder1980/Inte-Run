@@ -445,6 +445,62 @@ test("a marathon block stops well short of the race distance, at every ability",
   }
 });
 
+test("a beginner's long run knows what race they entered", () => {
+  // ⚠️ IT DID NOT. `buildBeginnerWeek` was handed `longMin: 0` and never read `goal.distance`, so the
+  // long run came off one hardcoded ramp and topped out at 46 minutes for every goal there is. A
+  // "building the habit" runner on a 28-week HALF MARATHON plan progressed 2.9 km → 4.4 km and was
+  // then sent to run 21.1 km — a 5.0x jump against the report's 1.10 single-session guardrail — and
+  // the ladder was byte-identical whether the goal was a 5 km or a marathon.
+  const beginner = (distance: Goal["distance"], runWalk: boolean): Athlete => ({
+    daysPerWeek: 4,
+    recent: { distanceMeters: 5000, timeSeconds: 2250 },
+    experience: "beginner",
+    runWalk,
+    includeStrength: true,
+    returningFromInjury: false,
+    longRunDay: 6,
+  });
+  const target: Record<string, number> = { "5k": 3300, "10k": 3300, half: 9900, marathon: 21600 };
+  const ladder = (distance: Goal["distance"], runWalk: boolean) =>
+    generatePlan(beginner(distance, runWalk), { ...goal, distance, targetTimeSeconds: target[distance]! })
+      .weeks
+      .filter((w) => !w.sessions.some((s) => s.type === "race"))
+      .map((w) => Math.max(0, ...w.sessions.map((s) => (s.estimatedDistanceMeters ?? 0) / 1000)))
+      .filter((km) => km > 0);
+
+  // The whole defect in one assertion: the goal has to change the longest run.
+  const longest = (d: Goal["distance"]) => Math.max(...ladder(d, false));
+  assert.ok(longest("5k") < longest("10k"), "a 10 km beginner should out-run a 5 km beginner");
+  assert.ok(longest("10k") < longest("half"), "a half beginner should out-run a 10 km beginner");
+
+  // A beginner half reaches the report's own Beginner band (12–18 km). It stays UNDER the race
+  // distance on purpose — that band is deliberately short of 21.1 km, unlike the recreational one.
+  assert.ok(longest("half") >= 12, `beginner half peaks at ${longest("half").toFixed(1)}km, under the 12–18 km band`);
+  assert.ok(longest("half") < 21.1, "a beginner should not be rehearsing the whole half marathon");
+
+  // ⚠️ AND THE RAMP MUST STAY GENTLE — this is the half the fix could easily have broken. Ramping
+  // linearly to the new endpoint front-loaded the growth and put a 17% jump at week 5 (3.5 → 4.1 km);
+  // the ramp is geometric so every step is the same small percentage. Compared against the running
+  // maximum, so a deload dip and its rebound are not counted as a spike.
+  for (const distance of ["5k", "10k", "half", "marathon"] as const) {
+    const rungs = ladder(distance, false);
+    let prevMax = 0;
+    for (const [i, km] of rungs.entries()) {
+      if (prevMax > 0) {
+        assert.ok(km <= prevMax * 1.105,
+          `${distance} beginner week ${i + 1}: ${prevMax.toFixed(1)} → ${km.toFixed(1)}km is a ` +
+          `${(100 * (km / prevMax - 1)).toFixed(0)}% jump, past the 10% single-session guardrail`);
+      }
+      prevMax = Math.max(prevMax, km);
+    }
+  }
+
+  // The run–walk track has to move with the goal too; it was stuck at 2.9 km for everything.
+  const rwLongest = (d: Goal["distance"]) => Math.max(...ladder(d, true));
+  assert.ok(rwLongest("half") > rwLongest("5k") * 1.5,
+    `run-walk ladder barely moves with the goal: 5k ${rwLongest("5k").toFixed(1)}km vs half ${rwLongest("half").toFixed(1)}km`);
+});
+
 test("scaling down never buys volume with intensity", () => {
   // ⚠️ WHY THE SCALE-DOWN IS SAFE AT ALL. Quality sessions come from the library at a fixed length,
   // so shrinking a plan shrinks only the easy running around them and the hard fraction climbs by

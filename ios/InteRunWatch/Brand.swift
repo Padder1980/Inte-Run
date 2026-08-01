@@ -52,6 +52,26 @@ enum Brand {
         }
     }
 
+    /// The label for the one primary action on this watch: go running.
+    ///
+    /// Shared by Free run on the home screen, the Start on today's card, and the Start on the
+    /// session detail — one definition, so the three cannot drift into three slightly different
+    /// buttons. The brand mark's own gradient, so it is unmistakably Inte-Run's.
+    struct RunButtonLabel: View {
+        let title: String
+        var body: some View {
+            Label(title, systemImage: "figure.run")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(Brand.accentInk)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 11)
+                .background(
+                    Capsule().fill(LinearGradient(colors: [Brand.mark, Brand.markDeep],
+                                                  startPoint: .topLeading, endPoint: .bottomTrailing))
+                )
+        }
+    }
+
     /// The splash gradient from the web app: radial from the top, teal fading to black.
     /// Reused so the watch feels like the same product rather than a companion someone else wrote.
     static var backdrop: some View {

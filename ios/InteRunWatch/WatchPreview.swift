@@ -202,11 +202,17 @@ enum WatchPreview {
         // Seeded by setting the store's published fields DIRECTLY — apply() would persist to
         // UserDefaults and leave fake sessions haunting the simulator's real cache.
         case "home-today":    homeScene(0)
+        // The FOOT of the today page: the card's pace row, its Start button and Settings — all of
+        // which "home-today" cuts off. Measured: Free run and the card's Start are ~236pt apart on
+        // a ~213pt scrollport, so NO anchor can show both in one shot; do not add a scene claiming
+        // otherwise.
+        case "home-today-bottom": homeScene(0, anchor: .bottom)
         case "home-upcoming": homeScene(1)
 
         // ── Session detail ────────────────────────────────────────────────────────────────────
-        // One scrollable page ending in Start. The top and the foot cannot be in one screenshot,
-        // so "detail" shows the header and facts and "detail-bottom" anchors at the button.
+        // One scrollable page. Start is at the TOP (owner's call), so "detail" is the scene that
+        // shows the button, with the pace/effort facts under it; "detail-bottom" anchors at the
+        // tail of the step list, which is otherwise permanently below the fold.
         case "detail":
             NavigationStack {
                 SessionDetailView(session: intervalSession, start: {}, previewInert: true)
@@ -224,6 +230,21 @@ enum WatchPreview {
         case "detail-easy":
             NavigationStack {
                 SessionDetailView(session: easySession, start: {}, previewInert: true)
+            }
+        // A mobility day: reaches the wrist like any other session, but must NOT offer Start.
+        case "detail-mobility":
+            NavigationStack {
+                SessionDetailView(
+                    session: PlannedSession(
+                        title: "Mobility flow (15′)", type: "mobility",
+                        dateIso: SessionStore.localTodayIso(),
+                        durationMin: 15, distanceKm: nil, paceLow: nil, paceHigh: nil,
+                        rpeMin: nil, rpeMax: nil,
+                        steps: [PlannedStep(label: "Hip openers, ankle mobility, thoracic rotations",
+                                            kind: "steady", seconds: 900, metres: nil,
+                                            paceLow: nil, paceHigh: nil,
+                                            repIndex: nil, repCount: nil)]),
+                    start: {}, previewInert: true)
             }
         case "detail-easy-bottom":
             NavigationStack {
@@ -301,7 +322,7 @@ enum WatchPreview {
     }
 
     @MainActor
-    private static func homeScene(_ page: Int) -> some View {
+    private static func homeScene(_ page: Int, anchor: UnitPoint? = nil) -> some View {
         let store = SessionStore()
         let today = SessionStore.localTodayIso()
         store.runnerName = "Adam"
@@ -324,7 +345,8 @@ enum WatchPreview {
         store.upcoming = [store.session!, easyAhead, longAhead, vo2Ahead]
         // previewInert: the buttons render but refuse to start — a preview that can start a
         // workout is a preview that can log a fictional run.
-        return TodayView(initialPage: page, previewInert: true).environmentObject(store)
+        return TodayView(initialPage: page, previewInert: true, previewAnchor: anchor)
+            .environmentObject(store)
     }
 }
 #endif

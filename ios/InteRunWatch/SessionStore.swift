@@ -83,6 +83,19 @@ struct PlannedSession: Codable, Equatable {
         return out.string(from: d)
     }
 
+    /// Can this session be RUN? Mirrors the phone's `PRIMARY_TYPES` (web/app.ts) exactly.
+    ///
+    /// ⚠️ Strength and mobility days reach the watch — `rawSessionsForIso` filters out only `rest`,
+    /// and the generator puts a mobility session on a free day most weeks — and the phone refuses
+    /// to offer Start for them on both of its own surfaces. The watch had no such gate, so tapping
+    /// Start on a mobility day opened an HKWorkoutSession with `activityType = .running` and
+    /// outdoor GPS, and a bodyweight routine was logged as a run: fabricated distance in the
+    /// Logbook, and for strength (which carries an RPE band) evidence fed to the adaptive engine.
+    /// Keep this list in step with PRIMARY_TYPES.
+    var isRunnable: Bool {
+        ["easy", "long", "recovery", "threshold", "vo2", "strides", "race-specific"].contains(type)
+    }
+
     /// How hard the plan says this should feel, as words plus the numbers. RPE is InteRun's own
     /// signal — it is what the adaptive engine later compares against — so the runner should see
     /// the intended effort before they start, not only be asked for it afterwards.

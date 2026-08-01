@@ -21,6 +21,9 @@ struct TodayView: View {
     /// that can start a workout is a preview that can log a fictional run (WatchPreview's own
     /// invariant — a review caught the home scenes violating it).
     var previewInert: Bool = false
+    /// WatchPreview only: anchor the today page's scroll, since simctl cannot scroll a watch and
+    /// the card's Start button otherwise sits below the fold of every screenshot.
+    var previewAnchor: UnitPoint?
     @State private var page = 0
     /// One-shot: initialPage applies on first appearance only. See the onAppear below.
     @State private var pagePlaced = false
@@ -68,20 +71,13 @@ struct TodayView: View {
             .padding(.bottom, 2)
     }
 
-    /// Start something with no plan behind it. Always available.
+    /// Start something with no plan behind it. Always available — and wearing the same primary
+    /// button as every Start, because it is the same act: go running now.
     private var freeRun: some View {
         Button {
             begin(nil)
         } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "figure.run").font(.system(size: 14, weight: .semibold))
-                Text("Free run").font(.system(size: 15, weight: .semibold))
-                Spacer(minLength: 0)
-            }
-            .foregroundStyle(Brand.ink)
-            .padding(.vertical, 10).padding(.horizontal, 12)
-            .frame(maxWidth: .infinity)
-            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Brand.surface2))
+            Brand.RunButtonLabel(title: "Free run")
         }
         .buttonStyle(.plain)
         .padding(.top, 6)
@@ -216,6 +212,7 @@ struct TodayView: View {
             .padding(.horizontal, 2)
             .padding(.bottom, 12)   // clear of the page dots
         }
+        .defaultScrollAnchor(previewAnchor ?? .top)
     }
 
     /// Page 2: the rest of the week, so a session can be started early — or caught up — from the
@@ -361,22 +358,18 @@ struct TodayView: View {
             }
             .buttonStyle(.plain)
 
-            Button {
-                begin(s)
-            } label: {
-                Label("Start", systemImage: "play.fill")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Brand.accentInk)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 9)
-                    // The brand mark's own gradient, so the button is unmistakably InteRun's.
-                    .background(
-                        Capsule().fill(LinearGradient(colors: [Brand.mark, Brand.markDeep],
-                                                      startPoint: .topLeading, endPoint: .bottomTrailing))
-                    )
+            // ⚠️ Only when the session is actually a run. Mobility and strength days land here
+            // like any other; starting one opens a GPS running workout and logs a bodyweight
+            // routine as a run. Same gate the phone applies. See PlannedSession.isRunnable.
+            if s.isRunnable {
+                Button {
+                    begin(s)
+                } label: {
+                    Brand.RunButtonLabel(title: "Start")
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 4)
             }
-            .buttonStyle(.plain)
-            .padding(.top, 4)
         }
     }
 

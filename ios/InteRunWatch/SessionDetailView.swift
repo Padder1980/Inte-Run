@@ -4,9 +4,14 @@ import SwiftUI
 /// on the home screen.
 ///
 /// ⚠️ **One scrollable page, not three.** The reference app splits this across three swipe pages;
-/// the owner asked for a single scroll, and he is right for a watch: three pages means the step
-/// list and the Start button are each hidden behind a guess about which way to swipe, whereas a
-/// scroll shows the shape of the whole thing and ends, always, on the button you came for.
+/// the owner asked for a single scroll, and he is right for a watch: three pages hide both the
+/// step list and the button behind a guess about which way to swipe, whereas one scroll shows the
+/// shape of the whole thing.
+///
+/// ⚠️ **Start is at the TOP, not the foot** (owner's call, 2026-07-31 — an earlier version put it
+/// last and argued the page should "end on the button you came for"). You arrive here having
+/// already chosen this session, so committing should never require scrolling past detail you may
+/// not want to read; the detail lives below for the times you do.
 ///
 /// Deliberately NOT copied from the reference:
 /// - **No Outdoor/Treadmill toggle.** The wrist has no treadmill mode (no indoor path exists in
@@ -24,8 +29,8 @@ struct SessionDetailView: View {
     /// can start a workout is a preview that can log a fictional run.
     var previewInert: Bool = false
     /// WatchPreview only. simctl can screenshot a watch but cannot scroll one, so the foot of this
-    /// page — the step list and the Start button — could not otherwise be looked at at all. Nil in
-    /// the app, where the page must obviously open at the top.
+    /// page — the tail of the step list — could not otherwise be looked at at all. Nil in the app,
+    /// where the page must obviously open at the top.
     var previewAnchor: UnitPoint?
 
     var body: some View {
@@ -48,6 +53,24 @@ struct SessionDetailView: View {
                         .padding(.top, 2)
                 }
 
+                // ⚠️ Start sits AT THE TOP, under the name and nothing else — the owner's call, and
+                // the right one: you arrive here having already chosen this session, so committing
+                // to it should never require scrolling past the detail you may not want to read.
+                // What the session IS lives underneath, for the times you do.
+                //
+                // ⚠️ Only for sessions that can actually be RUN. A strength or mobility day reaches
+                // the wrist like any other, and starting one opens a running workout with GPS —
+                // logging a bodyweight routine as a run. The phone gates this the same way.
+                if session.isRunnable {
+                    startButton.padding(.vertical, 12)
+                } else {
+                    Text("Do this one off the watch — it isn't a run, so there's nothing here to track.")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(Brand.inkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.vertical, 10)
+                }
+
                 // The two things that decide how the run should go.
                 VStack(alignment: .leading, spacing: 4) {
                     if let pace = session.paceText {
@@ -60,35 +83,7 @@ struct SessionDetailView: View {
                 .padding(.top, 9)
 
                 stepList
-
-                Button {
-                    guard !previewInert else { return }
-                    // ⚠️ Do NOT dismiss() first. This page is pushed on the same NavigationStack
-                    // whose root carries .navigationDestination(isPresented: $running), so a pop
-                    // and the run-screen push land in one transaction and the pop wins: measured
-                    // on the simulator, WorkoutView appeared and was torn down ~400ms later with
-                    // SwiftUI writing `running` back to false, while startCountingDown()'s timer
-                    // kept going. Three seconds later a real HKWorkoutSession, GPS and Live
-                    // Activity began with no run screen and NO WAY BACK — Pause, End and the
-                    // countdown's Cancel all live on WorkoutView, and nothing on the wrist can set
-                    // `running` true again. Setting it alone is correct AND does what the pop was
-                    // meant to: SwiftUI evicts this page itself, and finishing lands on home.
-                    start()
-                } label: {
-                    Label("Start", systemImage: "figure.run")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(Brand.accentInk)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 11)
-                        .background(
-                            Capsule().fill(LinearGradient(colors: [Brand.mark, Brand.markDeep],
-                                                          startPoint: .topLeading,
-                                                          endPoint: .bottomTrailing))
-                        )
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 14)
-                .padding(.bottom, 8)
+                    .padding(.bottom, 10)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 2)
@@ -98,6 +93,25 @@ struct SessionDetailView: View {
     }
 
     // MARK: - Pieces
+
+    private var startButton: some View {
+        Button {
+            guard !previewInert else { return }
+            // ⚠️ Do NOT dismiss() first. This page is pushed on the same NavigationStack whose
+            // root carries .navigationDestination(isPresented: $running), so a pop and the
+            // run-screen push land in one transaction and the pop wins: measured on the simulator,
+            // WorkoutView appeared and was torn down ~400ms later with SwiftUI writing `running`
+            // back to false, while startCountingDown()'s timer kept going. Three seconds later a
+            // real HKWorkoutSession, GPS and Live Activity began with no run screen and NO WAY
+            // BACK — Pause, End and the countdown's Cancel all live on WorkoutView, and nothing on
+            // the wrist can set `running` true again. Setting it alone is correct AND does what the
+            // pop was meant to: SwiftUI evicts this page itself, and finishing lands on home.
+            start()
+        } label: {
+            Brand.RunButtonLabel(title: "Start")
+        }
+        .buttonStyle(.plain)
+    }
 
     private func factRow(icon: String, label: String, value: String) -> some View {
         HStack(spacing: 7) {
@@ -134,7 +148,7 @@ struct SessionDetailView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 12)
         } else {
-            Text("THE SESSION · \(steps.count) STEPS")
+            Text(steps.count == 1 ? "THE SESSION" : "THE SESSION · \(steps.count) STEPS")
                 .font(.system(size: 9.5, weight: .bold)).kerning(0.5)
                 .foregroundStyle(Brand.inkFaint)
                 .padding(.top, 13).padding(.bottom, 4)

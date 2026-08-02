@@ -34,15 +34,15 @@ export function assessFeasibility(
   const start = startDateIso ?? goal.startDateIso ?? isoToday();
   const weeksAvailable = Math.max(0, weeksBetween(start, goal.raceDateIso));
 
-  // Current-fitness read from the recent effort, plus the 1 km trial when present. A fresh all-out
+  // Current-fitness read from the recent effort, plus the 2 km trial when present. A fresh all-out
   // 1 km is genuine evidence, so we take whichever prediction is faster (best current form). The
   // recent effort stays in play so a short 1 km can't over-flatter a long-distance goal on its own.
   const predictedFromRecent = predictRaceTime(athlete.recent, goal.distance);
-  const trialSeconds = athlete.oneKmTrialSeconds && athlete.oneKmTrialSeconds > 0
-    ? athlete.oneKmTrialSeconds
+  const trialSeconds = athlete.twoKmTrialSeconds && athlete.twoKmTrialSeconds > 0
+    ? athlete.twoKmTrialSeconds
     : undefined;
   const predictedFromTrial = trialSeconds
-    ? riegelPredict(1000, trialSeconds, RACE_DISTANCES_M[goal.distance])
+    ? riegelPredict(2000, trialSeconds, RACE_DISTANCES_M[goal.distance])
     : undefined;
   const trialIsStronger = predictedFromTrial !== undefined && predictedFromTrial < predictedFromRecent;
   const currentPredicted = trialIsStronger ? predictedFromTrial! : predictedFromRecent;
@@ -67,8 +67,8 @@ export function assessFeasibility(
   if (predictedFromTrial !== undefined) {
     rationale.push(
       trialIsStronger
-        ? `Your 1 km trial projects a faster ${formatDuration(predictedFromTrial)} than your recent effort (${formatDuration(predictedFromRecent)}), so it sets the current-fitness read.`
-        : `Your 1 km trial projects ${formatDuration(predictedFromTrial)}; your recent effort (${formatDuration(predictedFromRecent)}) is the stronger read, so it stands.`,
+        ? `Your 2 km trial projects a faster ${formatDuration(predictedFromTrial)} than your recent effort (${formatDuration(predictedFromRecent)}), so it sets the current-fitness read.`
+        : `Your 2 km trial projects ${formatDuration(predictedFromTrial)}; your recent effort (${formatDuration(predictedFromRecent)}) is the stronger read, so it stands.`,
     );
   }
 

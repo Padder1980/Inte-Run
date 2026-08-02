@@ -37,3 +37,13 @@ export type { FuellingPlan } from "../src/science/fuelling.ts";
 export { classifyRunner } from "../src/athlete/classification.ts";
 export { assessMasters } from "../src/athlete/masters.ts";
 export { applicability } from "../src/athlete/evidence-tag.ts";
+
+// The 2 km time trial — validation, confidence and the derived velocity. ⚠️ Exported so the page can
+// grade a trial with the SAME rules the engine's tests cover; the page must never re-implement them.
+export {
+  TWO_KM_MODEL_VERSION, TWO_KM_RULES, TWO_KM_DISTANCE_M,
+  validateTwoKmTest, splitDifferencePercent, velocityChangePercent,
+  twoKmVelocityMps, twoKmPaceSecPerKm, paceFromVelocityFraction,
+  isBeyondMaximalAerobic, projectableFrom2k,
+} from "../src/science/two-km-trial.ts";
+export type { TwoKmTimeTrial, TwoKmValidation, TwoKmConfidence, TwoKmTestEnvironment } from "../src/science/two-km-trial.ts";

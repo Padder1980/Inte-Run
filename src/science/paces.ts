@@ -77,6 +77,18 @@ function band(center: number, minusFast: number, plusSlow: number): PaceRange {
  * "your fitness has changed" prompt. One table, both directions.
  */
 export const PACE_RATIOS = {
+  /**
+   * Recovery — slower than easy, and the gear the app did not have.
+   *
+   * ⚠️ Added 2026-08-02 from the 2 km time-trial specification, which is the first document to give
+   * this session its own band. Before it, `recoveryRun()` prescribed `paces.easy`, so the one
+   * session whose entire purpose is being slow was prescribed at the same pace as an ordinary easy
+   * run — measured against the spec's 60–68% of 2 km velocity, up to 50 s/km too fast. The numbers
+   * here are the spec's band expressed in this table's own currency (multiples of threshold), so
+   * there is still exactly ONE pace table; adopting the spec's percentages as a second table is
+   * what its own instruction 4 forbids and what CLAUDE.md's +92 s/km history warns against.
+   */
+  recovery: { fast: 1.36, slow: 1.5 },
   easy: { fast: 1.22, slow: 1.33 },
   aerobic: { fast: 1.13, slow: 1.2 },
   steady: { fast: 1.06, slow: 1.12 },
@@ -116,6 +128,7 @@ export function deriveTrainingPaces(recent: RecentPerformance, goal?: Goal): Tra
   const pace8k = predictedPaceFor(recent, 8000);
 
   // Ratios to threshold, constant across the ability range (see ratioBand).
+  const recovery = ratioBand(thresholdPace, PACE_RATIOS.recovery.fast, PACE_RATIOS.recovery.slow);
   const easy = ratioBand(thresholdPace, PACE_RATIOS.easy.fast, PACE_RATIOS.easy.slow);
   // "Moderate" — between easy and steady, which otherwise leave a hole no session can target.
   const aerobic = ratioBand(thresholdPace, PACE_RATIOS.aerobic.fast, PACE_RATIOS.aerobic.slow);
@@ -142,6 +155,7 @@ export function deriveTrainingPaces(recent: RecentPerformance, goal?: Goal): Tra
   }
 
   return {
+    recovery,
     easy,
     aerobic,
     steady,

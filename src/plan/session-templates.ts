@@ -389,7 +389,9 @@ export function recoveryRun(paces: TrainingPaces, minutes: number): SessionConte
         kind: "steady",
         label: "Very easy jog",
         durationSeconds: minutes * 60,
-        targetPaceSecPerKm: paces.easy,
+        // ⚠️ paces.recovery, not paces.easy. This session exists to be slower than an easy run, and
+        // prescribing it at easy pace made it one — up to 50 s/km too fast against the 2 km spec.
+        targetPaceSecPerKm: paces.recovery,
         targetRpe: { min: 1, max: 2 },
       },
     ],

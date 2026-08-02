@@ -31,7 +31,14 @@ export type Athlete = {
   weeklyVolumeKmCurrent?: number;
   maxHr?: number;
   restingHr?: number;
-  /** Optional 1 km max-effort time-trial (seconds) — anchors MAS-based VO₂/interval paces. */
+  /**
+   * Optional 2 km max-effort time trial (seconds) — the calibration effort, replacing the 1 km on
+   * an elite coach's advice (2026-08-02). It anchors the WHOLE pace ladder through `recent` rather
+   * than feeding one band, so nothing can invert.
+   * ⚠️ This is not a measure of maximal aerobic speed or VO2max, whatever its duration.
+   */
+  twoKmTrialSeconds?: number;
+  /** @deprecated The 1 km trial. Kept readable so plans built before 2026-08-02 still resolve. */
   oneKmTrialSeconds?: number;
   /** Preferred day for the weekly long run (0 = Monday … 6 = Sunday). The rest of the week's
    *  sessions are scheduled around it. Defaults to Sunday (6) when unset. */
@@ -92,6 +99,9 @@ export type HrZone = {
 };
 
 export type TrainingPaces = {
+  /** Slower than easy: shakeout jogs and the seventh-day recovery run. The session whose purpose is
+   *  being slow needs a band of its own, or it is run at easy pace and stops being recovery. */
+  recovery: PaceRange;
   easy: PaceRange;
   /** "Moderate" — quicker than easy, slower than steady. Fills a real ~30 s/km hole between the
    *  two, and is the gear most coached plans call MOD. Aerobic, still comfortable, RPE 3–4. */

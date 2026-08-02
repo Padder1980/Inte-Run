@@ -662,7 +662,7 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 .sec-num { width: 28px; height: 28px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 750; color: var(--accent-ink); background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 86%, #fff), var(--accent)); box-shadow: 0 3px 8px -3px color-mix(in srgb, var(--accent) 55%, transparent); margin-top: 1px; }
 .sec-title { font-size: 17px; font-weight: 750; letter-spacing: -.01em; line-height: 1.2; }
 .sec-sub { font-size: 12.5px; color: var(--ink-faint); margin-top: 2px; }
-/* Actionable callout for optional-but-valuable inputs (easy pace, 1 km trial) */
+/* Actionable callout for optional-but-valuable inputs (easy pace, 2 km trial) */
 .callout { margin-top: 13px; border-radius: 14px; padding: 14px; background: linear-gradient(158deg, color-mix(in srgb, var(--accent) 9%, var(--surface)), var(--surface) 70%); border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line)); }
 .callout-h { display: flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 700; letter-spacing: -.01em; }
 .callout-h .ic { color: var(--accent); display: inline-flex; } .callout-h .ic svg { width: 19px; height: 19px; }
@@ -2098,7 +2098,7 @@ function futureIso(days) { const d = new Date(); d.setDate(d.getDate() + days); 
 function fmtTimeFull(s) { s = Math.round(s); const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), x = s%60; const p = (n) => String(n).padStart(2,"0"); return h>0 ? h+":"+p(m)+":"+p(x) : m+":"+p(x); }
 
 // An example runner to start from — until you make it yours.
-const DEFAULT_PROFILE = { name: "", avatar: "", status: "regular", goalDist: "half", targetS: 6300, raceDate: futureIso(245), startDateIso: "", longRunDay: 6, fitSrc: "recent", recentDistM: 5000, recentTimeS: 1500, noRecent: false, easyPaceS: 0, oneKmS: 255, daysPerWeek: 5, yearsRunning: 3, volKm: 0, age: 38, sex: "", strength: true, returning: false, personalized: false };
+const DEFAULT_PROFILE = { name: "", avatar: "", status: "regular", goalDist: "half", targetS: 6300, raceDate: futureIso(245), startDateIso: "", longRunDay: 6, fitSrc: "recent", recentDistM: 5000, recentTimeS: 1500, noRecent: false, easyPaceS: 0, twoKmS: 0, daysPerWeek: 5, yearsRunning: 3, volKm: 0, age: 38, sex: "", strength: true, returning: false, personalized: false };
 
 function loadProfile() { try { const s = localStorage.getItem("rc_profile_v1"); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 function saveProfileStore() { try { localStorage.setItem("rc_profile_v1", JSON.stringify(profile)); } catch (e) {} }
@@ -2122,13 +2122,18 @@ function applyProfile(pf) {
   // fit, just infrequent — give them the proper structured plan at their real paces rather than the
   // couch-to-5k build. The "returning from a break" toggle keeps the early weeks conservative.
   if (pf.status === "building" && !pf.noRecent && pf.recentTimeS < 1980) experience = "recreational";
-  // The plan is built off the strongest current-fitness signal. When a 1 km trial is given and it
+  // The plan is built off the strongest current-fitness signal. When a 2 km trial is given and it
   // projects a faster 5 km than the 5 km source, it anchors the whole plan — every pace derives from
-  // it — not just the VO₂ interval band. oneKmTrialSeconds is still passed so the VO₂ paces stay
-  // precisely MAS-anchored and feasibility stays consistent.
+  // it. ⚠️ 2 km, not 1 km, since 2026-08-02: the owner's elite coach asked for it, and it is the
+  // better calibration effort — long enough that pacing and aerobic capacity dominate rather than
+  // raw speed, and close enough to 5 km that the projection is barely an extrapolation.
+  // ⚠️ "Fastest wins" is a deliberate product decision (owner, 2026-08-02). The specification ranks
+  // a trial THIRD, below a verified race and below completed sessions; he chose to keep the existing
+  // rule so that nobody's paces change under them. Spec acceptance test 12 therefore does not pass,
+  // and that is a recorded choice rather than an oversight — do not "fix" it silently.
   let recent = { distanceMeters: 5000, timeSeconds: pf.recentTimeS };
-  if (pf.oneKmS > 0) {
-    const proj5k = Math.round(RC.riegelPredict(1000, pf.oneKmS, 5000));
+  if (pf.twoKmS > 0) {
+    const proj5k = Math.round(RC.riegelPredict(2000, pf.twoKmS, 5000));
     if (proj5k < recent.timeSeconds) recent = { distanceMeters: 5000, timeSeconds: proj5k };
   }
   const ath = { daysPerWeek: pf.daysPerWeek, recent, experience, includeStrength: pf.strength, returningFromInjury: pf.returning, runWalk: pf.status === "new", longRunDay: pf.longRunDay != null ? pf.longRunDay : 6 };
@@ -2147,16 +2152,27 @@ function applyProfile(pf) {
   // A brand-new key cannot be pre-filled by history, so absent means unanswered and the model stays
   // genuinely opt-in. Do not "tidy" this back onto weeklyVolumeKm.
   if (pf.volKm > 0) ath.weeklyVolumeKmCurrent = pf.volKm;
-  if (pf.oneKmS > 0) ath.oneKmTrialSeconds = pf.oneKmS;
+  if (pf.twoKmS > 0) ath.twoKmTrialSeconds = pf.twoKmS;
+  // ⚠️ THE TRIAL IS NO LONGER FED IN AS A SEPARATE VO2 BAND, and that is deliberate rather than an
+  // omission. The 1 km version anchored the interval band via MAS while the 5 km anchored everything
+  // else, and two sources for one ladder is exactly what could invert it — reconcileVo2 exists
+  // because 27 of 63 realistic pairings did. At 2 km the trial anchors the WHOLE ladder through
+  // the anchor above, so nothing competes and nothing can invert; test/two-km-trial.test.ts asserts
+  // the order holds across the ability range. reconcileVo2 stays in the engine for any athlete still
+  // carrying oneKmTrialSeconds.
+  // ⚠️ And 2 km is NOT maximal aerobic speed. The spec is explicit that an effort over ten minutes
+  // must not be called MAS, and 2 km at 5:00/km is exactly ten minutes — so carrying the 1 km's
+  // MAS fractions across would have put a confident physiological label on a number that does not
+  // support one.
   const startDateIso = (pf.startDateIso && pf.startDateIso >= todayIso()) ? pf.startDateIso : todayIso();
   const goal = { distance: pf.goalDist, targetTimeSeconds: pf.targetS, raceDateIso: pf.raceDate, startDateIso };
   const plan = RC.buildPlanSummary(ath, goal); // may throw
   const raw = RC.generatePlan(ath, goal); // raw sessions with steps, for the live runtime
-  // Fitness profile is built from real efforts only (the entered 5 km and/or the 1 km trial); a pure
+  // Fitness profile is built from real efforts only (the entered 5 km and/or the 2 km trial); a pure
   // beginner falls back to the seeded baseline so the page still has something to show.
   const efforts = [];
   if (!pf.noRecent) efforts.push({ distanceMeters: 5000, timeSeconds: pf.recentTimeS });
-  if (pf.oneKmS > 0) efforts.push({ distanceMeters: 1000, timeSeconds: pf.oneKmS });
+  if (pf.twoKmS > 0) efforts.push({ distanceMeters: 2000, timeSeconds: pf.twoKmS });
   if (efforts.length === 0) efforts.push({ distanceMeters: 5000, timeSeconds: pf.recentTimeS });
   const fitness = RC.buildFitnessProfile({ efforts });
   const masters = RC.assessMasters({ age: pf.age, sex: pf.sex || undefined });
@@ -2376,7 +2392,7 @@ function viewToday() {
   if (state.trialPending) {
     return weekStrip() +
       '<h2 class="sec">Today\\'s workout</h2><div class="card">' + trialTodayCard() + '</div>' +
-      '<div class="plan-note" style="border-left-color:var(--accent)">We\\'ve added a <b>1 km time trial</b> to today. Warm up as guided — only the 1 km itself is timed, and its time goes straight to your profile.</div>' +
+      '<div class="plan-note" style="border-left-color:var(--accent)">We\\'ve added a <b>2 km time trial</b> to today. Warm up as guided — only the 1 km itself is timed, and its time goes straight to your profile.</div>' +
       '<button class="primary" id="startTrial">' + ICON.play + ' Start time trial</button>' +
       '<button class="primary" id="cancelTrial" style="background:var(--surface-2);color:var(--ink-soft);margin-top:8px">Not today — back to my plan</button>';
   }
@@ -4581,7 +4597,7 @@ function viewPlan() {
   if (profile.status === "new") srcMsg = "Built for a <b>total beginner</b> — walk\\u2013run to start, sharpening as you log runs.";
   else if (profile.status === "building" || profile.noRecent) srcMsg = "Built to <b>grow your consistency</b> — it sharpens as you log runs or record a 1 km trial.";
   else if (profile.fitSrc === "predicted") srcMsg = "Based on your <b>predicted 5 km</b> time — log a real run and it\\'ll re-tune to your actual fitness.";
-  if (profile.oneKmS > 0) srcMsg = (srcMsg ? srcMsg + " " : "") + "Your paces are anchored to your <b>1 km trial</b>.";
+  if (profile.twoKmS > 0) srcMsg = (srcMsg ? srcMsg + " " : "") + "Your paces are anchored to your <b>2 km trial</b>.";
   const starterNote = srcMsg ? '<div class="plan-note" style="border-left-color:var(--accent)">' + srcMsg + '</div>' : "";
   // ⚠️ PLAN.notes reached the UI and was rendered NOWHERE — the same computed-and-discarded trap as
   // CLASS and MASTERS. This surfaces the one note that answers a question the runner actually
@@ -4807,26 +4823,14 @@ function viewPerformance() {
   return '<div class="card hero-pace"><div class="lab">Your strong, steady pace</div><div class="p num">' + fmtPace(t.value) + ' <small>/km</small></div><div class="s">The pace you can hold for a long, hard effort.</div></div>' +
     '<div class="card dim-card" style="margin-top:10px"><div class="lab">Endurance base</div><div class="plain">How big your aerobic engine is.</div><div class="read" style="--rc:var(--build)">' + words[lvl] + '</div><div class="dmeter">' + meter + '</div></div>' +
     '<div class="card dim-card" style="margin-top:10px"><div class="lab">Strength when tired</div><div class="plain">How well you hold pace late in long runs.</div>' + dRead + '</div>' +
-    '';   // MAS moved off Performance: it is a paces reference, not a progress signal.
+    '';   // Performance shows progress signals only.
 }
-// Kept, but no longer shown on Performance: MAS is a reference for setting interval paces, not a
-// measure of how training is going. If it earns a home again, it belongs next to the paces.
-function masCard() {
-  if (!profile.oneKmS) {
-    return '<h2 class="sec">Maximal Aerobic Speed</h2><div class="card"><div class="plain" style="font-size:13px;color:var(--ink-soft)">Add a <b>1 km max-effort time trial</b> in your profile and we\\'ll work out your MAS — and use it to set your VO₂/interval paces.</div></div>';
-  }
-  const m = RC.computeMas(profile.oneKmS);
-  const rows = m.zones.map((z) => {
-    const wr = z.workSeconds ? z.workSeconds + "s / " + z.restSeconds + "s" + (z.repDistanceMeters ? " · ~" + z.repDistanceMeters + " m" : "") : "2–5 min reps";
-    return '<div class="mas-zone"><div class="mz-top"><span class="mz-lab">' + z.label + '</span><span class="mz-pct num">' + z.pct + '%</span></div>' +
-      '<div class="mz-pace num">' + fmtPace(z.paceSecPerKm) + '/km <span class="mz-wr">· ' + wr + '</span></div>' +
-      '<div class="mz-why">' + z.purpose + '</div></div>';
-  }).join("");
-  return '<h2 class="sec">Maximal Aerobic Speed (MAS)</h2>' +
-    '<div class="card"><div class="mas-head"><div><div class="mas-big num">' + m.masMps.toFixed(2) + ' <small>m/s</small></div><div class="plain">from your ' + fmtPace(m.oneKmSeconds) + ' 1 km · pace ' + fmtPace(m.masPaceSecPerKm) + '/km</div></div></div>' +
-    '<div class="mas-zones">' + rows + '</div>' +
-    '<div class="plain" style="font-size:11.5px;color:var(--ink-faint);margin-top:10px">Your plan\\'s VO₂/interval paces are set from this. Interval targets shown as % of MAS.</div></div>';
-}
+// ⚠️ masCard() and the whole "Maximal Aerobic Speed" vocabulary were REMOVED on 2026-08-02 with the
+// move to a 2 km trial. It was already unreferenced -- MAS had been taken off Performance because it
+// is a reference for setting interval paces, not a measure of progress -- and the 2 km specification
+// makes keeping it actively wrong: a result over ten minutes must never be called maximal aerobic
+// speed, and 2 km at 5:00/km is exactly ten minutes, so most runners sit the wrong side of it. The
+// honest term, and the only one the app now uses, is "2 km performance velocity".
 
 // ============ COMMUNITY ====================================================
 function viewCommunity() {
@@ -5663,7 +5667,7 @@ function coachSettingsHtml() {
 }
 function viewSetup() {
   const p = profile;
-  const savedMsg = state.trialSaved ? '<div class="plan-note" style="border-left-color:var(--accent);margin:2px 2px 12px">✓ 1 km time trial saved: <b>' + state.trialSaved + '</b>. Your VO₂/interval paces are now anchored to it.</div>' : "";
+  const savedMsg = state.trialSaved ? '<div class="plan-note" style="border-left-color:var(--accent);margin:2px 2px 12px">✓ 2 km time trial saved: <b>' + state.trialSaved + '</b>. Every pace in your plan is now calibrated to it.</div>' : "";
   const intro = '<div class="setup-intro"><h2>' + (p.personalized ? (p.name ? p.name + "\\u2019s profile" : "Your profile") : "Let\\u2019s build your plan") + '</h2><p>' + (p.personalized ? "Update anything below and we\\u2019ll rebuild your plan." : "A few quick questions — this shapes every pace and session.") + '</p></div>';
 
   // 1 · You
@@ -5686,9 +5690,9 @@ function viewSetup() {
     '<div id="statusRunnerBlock"' + (isBeginnerStatus(p.status) ? ' style="display:none"' : '') + '>' +
     '<div class="q"><label>Your 5 km time — a recent result or an estimate?</label>' + seg("fitsrc", [["recent","Recent"],["predicted","Predicted"]], p.fitSrc === "predicted" ? "predicted" : "recent") + '</div>' +
     '<div class="q" id="fitTimeWrap"><label id="fitTimeLbl"><span class="lblmain">' + (p.fitSrc === "predicted" ? "Your predicted 5 km time" : "Your recent 5 km time") + '</span> <span class="q-hint">just type the numbers</span></label><input class="sel num" id="s_rectime" value="' + (p.noRecent ? "" : fmtTimeFull(p.recentTimeS)) + '" placeholder="e.g. 25:00" inputmode="numeric"></div>' +
-    '<div class="callout"><div class="callout-h"><span class="ic">' + ICON.timer + '</span>1 km time-trial<span class="callout-badge">optional</span></div>' +
-    '<p>A max-effort 1 km sharpens your VO₂ and interval paces — a direct, re-testable measure of fitness.</p>' +
-    '<input class="sel num" id="s_1km" value="' + (p.oneKmS ? fmtTimeFull(p.oneKmS) : "") + '" placeholder="e.g. 4:00" inputmode="numeric"><div class="mas-hint" id="masHint"></div><button class="mini-btn" id="s_1km_rec" type="button">⏱ Haven\\'t done one? Record it now</button></div>' +
+    '<div class="callout"><div class="callout-h"><span class="ic">' + ICON.timer + '</span>2 km time-trial<span class="callout-badge">optional</span></div>' +
+    '<p>A hard, evenly paced 2 km is the most useful thing you can give us: it calibrates every pace in your plan, and repeating it every month or so shows what has actually changed.</p>' +
+    '<input class="sel num" id="s_2km" value="' + (p.twoKmS ? fmtTimeFull(p.twoKmS) : "") + '" placeholder="e.g. 8:00" inputmode="numeric"><div class="mas-hint" id="masHint"></div><button class="mini-btn" id="s_2km_rec" type="button">⏱ Haven\\'t done one? Record it now</button></div>' +
     '</div>';
 
   // 3 · Your goal (goalCardInner supplies its own inner markup; keep the id for syncStatus)
@@ -5730,10 +5734,10 @@ function draftFromForm() {
   const volEl = $("s_volume");
   // The running status gates the rest. Beginners (new / building) give no times — we seed a gentle
   // baseline and flag noRecent. Runners (regular / competitive) give a recent or predicted 5 km, and
-  // may optionally add a 1 km trial to sharpen their VO₂ paces.
+  // may optionally add a 2 km trial, which calibrates every pace in the plan.
   const status = draft.status || "regular";
   const beginner = isBeginnerStatus(status);
-  let fitSrc = "beginner", noRecent = true, recentDistM = 5000, recentTimeS, oneKmS = 0, easyPaceS = 0;
+  let fitSrc = "beginner", noRecent = true, recentDistM = 5000, recentTimeS, twoKmS = 0, easyPaceS = 0;
   if (beginner) {
     recentTimeS = status === "new" ? 2700 : 2250; // couch-to-5k vs a jogger building consistency
     // A "building" runner can optionally give their easy pace. Fitness ≠ frequency: someone fit but
@@ -5758,11 +5762,17 @@ function draftFromForm() {
     recentTimeS = RC.parseDuration(recRaw);
     const pace = recentTimeS / 5; // seconds per km over 5 km
     if (pace < 120 || pace > 720) throw new Error("That 5 km time looks off — please check it (m:ss).");
-    const oneKmRaw = ($("s_1km") ? $("s_1km").value : "").trim();
-    if (oneKmRaw) {
-      if (!mmss(oneKmRaw)) throw new Error("Enter your 1 km time as minutes:seconds, e.g. 4:00.");
-      const s = RC.parseDuration(oneKmRaw);
-      if (s >= 150 && s <= 480) oneKmS = s;
+    const twoKmRaw = ($("s_2km") ? $("s_2km").value : "").trim();
+    if (twoKmRaw) {
+      if (!mmss(twoKmRaw)) throw new Error("Enter your 2 km time as minutes:seconds, e.g. 8:00.");
+      const s = RC.parseDuration(twoKmRaw);
+      // ⚠️ An out-of-range value now SAYS SO. The 1 km version silently dropped it to zero, so the
+      // runner typed a time, saw no error, and their trial simply never existed — the one field on
+      // the form that failed in silence.
+      if (s < RC.TWO_KM_RULES.minSeconds || s > RC.TWO_KM_RULES.maxSeconds) {
+        throw new Error("That does not look like a 2 km time — a measured 2 km lands between about 5 and 20 minutes.");
+      }
+      twoKmS = s;
     }
   }
   // Goal adapts to the status: runners set a target time; beginners work towards *completing* the
@@ -5789,7 +5799,7 @@ function draftFromForm() {
     avatar: draft.avatar != null ? draft.avatar : (profile.avatar || ""),
     status,
     goalDist, targetS, raceDate, startDateIso, longRunDay,
-    fitSrc, recentDistM, recentTimeS, noRecent, easyPaceS, oneKmS, daysPerWeek: Number(draft.days), yearsRunning: profile.yearsRunning || 3,
+    fitSrc, recentDistM, recentTimeS, noRecent, easyPaceS, twoKmS, daysPerWeek: Number(draft.days), yearsRunning: profile.yearsRunning || 3,
     // "Building the habit" with no easy pace given: calibrate from their first run instead.
     autoPace: status === "building" && !easyPaceS,
     // ⚠️ Only count the mileage if the question was actually ON SCREEN. syncStatus() hides it for
@@ -5806,30 +5816,38 @@ function draftFromForm() {
 let draft = {};
 function refreshMasHint() {
   const el = $("masHint"); if (!el) return;
-  const raw = ($("s_1km").value || "").trim();
+  const raw = ($("s_2km").value || "").trim();
   if (!/^\\d{1,2}:[0-5]\\d$/.test(raw)) { el.textContent = ""; return; }
   const s = RC.parseDuration(raw);
-  if (s < 150 || s > 480) { el.textContent = ""; return; }
-  const m = RC.computeMas(s);
-  el.innerHTML = "MAS <b>" + m.masMps.toFixed(2) + " m/s</b> · " + fmtPace(m.masPaceSecPerKm) + "/km — sets your VO₂ paces.";
+  if (s < RC.TWO_KM_RULES.minSeconds || s > RC.TWO_KM_RULES.maxSeconds) { el.textContent = ""; return; }
+  // ⚠️ "Performance velocity", never MAS or VO₂max. This number is the runner's own average speed
+  // over their own 2 km and nothing more; the specification is explicit that dressing it up as a
+  // physiological measurement is the one thing this feature must not do.
+  el.innerHTML = "That is <b>" + fmtPace(Math.round(s / 2)) + "/km</b> · " +
+    (2000 / s).toFixed(2) + " m/s — it calibrates every pace in your plan.";
 }
 
-// ---- 1 km time-trial session ---------------------------------------------
-// Recording a 1 km trial isn't a bare stopwatch — it's a proper session on Today: a guided warm-up,
+// ---- 2 km time-trial session ---------------------------------------------
+// Recording a 2 km trial isn't a bare stopwatch — it's a proper session on Today: a guided warm-up,
 // then the timed 1 km. Only the 1 km itself is measured, and on completion its time flows back to the
 // About-you 1 km field (and re-anchors the plan's paces). In the live app GPS auto-stops at 1 km;
 // here the runner taps Finish.
 function fmtClock(ms) { const t = ms / 1000; const m = Math.floor(t / 60); const s = Math.floor(t % 60); const d = Math.floor((t * 10) % 10); return m + ":" + String(s).padStart(2, "0") + "." + d; }
+// The protocol, from the specification's section 4. The warm-up is longer than the 1 km version's
+// because the effort is longer, and the pacing line is the one piece of coaching that decides
+// whether the result is usable at all: an evenly paced 2 km measures fitness, while a 2 km sprinted
+// from the gun measures how long someone can hang on — and the app cannot tell the two apart from
+// the finishing time alone, which is why it also asks for the splits afterwards.
 const TRIAL_PARTS = [
-  ["easy", "Warm-up", "~10 min easy jog + 3 × 20s strides to open the legs"],
-  ["hard", "1 km time trial", "Max effort — hold the fastest pace you can for the full 1 km"],
+  ["easy", "Warm-up", "10–15 min easy jog, then 3–4 strides of about 20 seconds"],
+  ["hard", "2 km time trial", "The fastest pace you can hold for the whole 2 km — aim to make the second kilometre at least as quick as the first"],
   ["easy", "Cool-down", "5–10 min easy jog to recover"],
 ];
 // Send the runner from the setup form into a trial session that's been added to Today.
 function startTrialFlow() { state.trialPending = true; state.screen = null; state.tab = "today"; render(); }
 function trialTodayCard() {
   const rows = TRIAL_PARTS.map((p) => '<div class="sess"><span class="dot ' + p[0] + '"></span><div><div class="st">' + p[1] + '</div><div class="sm" style="color:var(--ink-soft)">' + p[2] + '</div></div></div>').join("");
-  return '<div class="wk-card" style="--c:var(--eff-hard)"><div class="b"><div class="t">1 km time trial</div><div class="sub">Added to today · warm-up included</div><div style="margin-top:10px;display:flex;flex-direction:column;gap:10px">' + rows + '</div></div></div>';
+  return '<div class="wk-card" style="--c:var(--eff-hard)"><div class="b"><div class="t">2 km time trial</div><div class="sub">Added to today · warm-up included</div><div style="margin-top:10px;display:flex;flex-direction:column;gap:10px">' + rows + '</div></div></div>';
 }
 let TRIALRUN = null;
 function beginTrialRun() { TRIALRUN = { phase: "warmup", wStart: performance.now(), start: 0, secs: 0, raf: null }; state.screen = "trialrun"; render(); }
@@ -5846,31 +5864,36 @@ function viewTrialRun() {
   const back = '<button class="backbtn" id="trBack">‹ Today</button>';
   if (p === "warmup") {
     return back +
-      '<div class="card live-hero"><div class="eyebrow">1 km time trial · step 1 of 2</div><div class="live-title">Warm up first</div>' +
+      '<div class="card live-hero"><div class="eyebrow">2 km time trial · step 1 of 2</div><div class="live-title">Warm up first</div>' +
       '<div class="live-metrics" style="grid-template-columns:1fr"><div><div class="lk">Warm-up time</div><div class="lv num" id="twClock">0:00</div></div></div></div>' +
       '<div class="card"><div class="subhead" style="margin-top:0">Do this before the effort</div><div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">' +
       '<div class="sess"><span class="dot easy"></span><div><div class="st">Easy jog ~10 min</div><div class="sm" style="color:var(--ink-soft)">Raise your heart rate gradually — conversational pace.</div></div></div>' +
       '<div class="sess"><span class="dot moderate"></span><div><div class="st">3 × 20s strides</div><div class="sm" style="color:var(--ink-soft)">Build to fast and smooth, full recovery between each.</div></div></div>' +
       '<div class="sess"><span class="dot hard"></span><div><div class="st">Catch your breath</div><div class="sm" style="color:var(--ink-soft)">Then start the 1 km when you feel ready.</div></div></div></div></div>' +
-      '<div class="trial-controls"><button class="primary" id="twGo">' + ICON.play + ' Start the 1 km</button></div>' +
-      '<div class="trial-foot" style="border:0;text-align:center">Only the 1 km itself is timed and saved to your profile.</div>';
+      '<div class="trial-controls"><button class="primary" id="twGo">' + ICON.play + ' Start the 2 km</button></div>' +
+      '<div class="trial-foot" style="border:0;text-align:center">Only the 2 km itself is timed and saved to your profile.</div>';
   }
   if (p === "run") {
     return back +
-      '<div class="card live-hero" style="border-color:var(--peak)"><div class="eyebrow" style="color:var(--peak)">1 km time trial · max effort</div>' +
+      '<div class="card live-hero" style="border-color:var(--peak)"><div class="eyebrow" style="color:var(--peak)">2 km time trial · max effort</div>' +
       '<div class="trial-clock num" id="twClock" style="margin:14px 0 6px">0:00.0</div>' +
-      '<div style="color:var(--ink-soft);font-size:13.5px">Run 1 km as hard as you can hold. Tap <b>Finish</b> the instant you complete it.</div></div>' +
-      '<div class="trial-controls"><button class="primary" id="twFinish" style="background:var(--peak)">Finish — 1 km done</button></div>' +
-      '<div class="trial-foot" style="border:0;text-align:center">On a phone with GPS the full app stops automatically at 1 km.</div>';
+      '<div style="color:var(--ink-soft);font-size:13.5px">Run 2 km as hard as you can hold, evenly — aim to make the second kilometre at least as quick as the first. Tap <b>Finish</b> the instant you complete it.</div></div>' +
+      '<div class="trial-controls"><button class="primary" id="twFinish" style="background:var(--peak)">Finish — 2 km done</button></div>' +
+      '<div class="trial-foot" style="border:0;text-align:center">Start controlled and settle quickly. The effort should FINISH maximal, not begin that way.</div>';
   }
-  const secs = TRIALRUN.secs, inRange = secs >= 150 && secs <= 480;
-  const mas = inRange ? RC.computeMas(secs) : null;
+  const secs = TRIALRUN.secs;
+  const inRange = secs >= RC.TWO_KM_RULES.minSeconds && secs <= RC.TWO_KM_RULES.maxSeconds;
+  // ⚠️ The number, not a physiological label. A finishing time alone cannot say whether the effort
+  // was a real test, so this screen reports what the runner ran and nothing more; the grading rules
+  // live in the engine and need the splits and the post-run questions, which this screen does not
+  // yet ask for. Better an honest number than a confident one.
+  const vel = inRange ? (2000 / secs) : 0;
   return back +
-    '<div class="card live-hero"><div class="eyebrow">1 km time trial · done</div>' +
+    '<div class="card live-hero"><div class="eyebrow">2 km time trial · done</div>' +
     '<div class="trial-clock num" style="margin:14px 0 8px">' + fmtTimeFull(secs) + '</div>' +
     (inRange
-      ? '<div style="color:var(--ink-soft);font-size:13.5px">MAS <b>' + mas.masMps.toFixed(2) + ' m/s</b> · ' + fmtPace(mas.masPaceSecPerKm) + '/km. Saving this sets your VO₂/interval paces.</div>'
-      : '<div style="color:var(--ease);font-size:13.5px">' + (secs < 150 ? "That's under 2:30 — too fast for a full 1 km. Give it another go." : "That's over 8:00 — for MAS we need a hard 1 km effort. Have a rest and try again.") + '</div>') +
+      ? '<div style="color:var(--ink-soft);font-size:13.5px">That is <b>' + fmtPace(Math.round(secs / 2)) + '/km</b> \u00b7 ' + vel.toFixed(2) + ' m/s. Saving it calibrates every pace in your plan.</div>'
+      : '<div style="color:var(--ease);font-size:13.5px">' + (secs < 150 ? "That's too quick to be a measured 2 km — check the route and give it another go." : "That's over 8:00 — for MAS we need a hard 1 km effort. Have a rest and try again.") + '</div>') +
     '</div>' +
     (inRange
       ? '<div class="trial-controls two"><button class="ctrl" id="twRedo">Redo</button><button class="primary" id="twSave">Save to my profile</button></div>'
@@ -5891,8 +5914,34 @@ function wireTrialRun() {
 }
 // Write just the 1 km time back to the profile's About-you field, re-anchor the plan, and land the
 // runner on About you so they see it recorded.
+// Every trial, kept raw. ⚠️ The 1 km version stored ONE number on the profile with no date, no
+// splits and no history, so the app structurally could not answer "is this better than last time?" —
+// which is most of why a runner repeats the test at all. The record is the raw test; anything
+// derived from it must stay recalculable, so nothing derived is stored here.
+// ⚠️ NO MIGRATION from the old oneKmS. Projecting a 1 km up to 2 km would fabricate a test that
+// never happened and then stamp it with a confidence grade — the record set starts empty, and an
+// existing 1 km simply keeps anchoring the plan until a real 2 km replaces it.
+function loadTwoKm() { try { return JSON.parse(localStorage.getItem("interun_2km_v1") || "[]"); } catch (e) { return []; } }
+function saveTwoKmRecord(secs, extra) {
+  const rec = Object.assign({
+    id: "tt-" + new Date().getTime(), completedAt: new Date().toISOString(),
+    elapsedSeconds: secs, environment: "road",
+    stoppedOrWalked: false, externalInterruption: false, painReported: false, illnessReported: false,
+    modelVersion: RC.TWO_KM_MODEL_VERSION,
+  }, extra || {});
+  const all = loadTwoKm();
+  all.unshift(rec);
+  try { localStorage.setItem("interun_2km_v1", JSON.stringify(all.slice(0, 30))); } catch (e) {}
+  return rec;
+}
+// The previous COMPARABLE test — same environment, per the spec: a track result and a treadmill one
+// are not two points on one line.
+function priorTwoKm(rec) {
+  return loadTwoKm().filter((r) => r && r.id !== rec.id && r.environment === rec.environment)[0] || null;
+}
 function trialSaveResult() {
-  profile.oneKmS = TRIALRUN.secs;
+  profile.twoKmS = TRIALRUN.secs;
+  saveTwoKmRecord(TRIALRUN.secs);
   profile.personalized = true;
   // Re-anchoring moves every week's start, so today has to be relocated in the new plan too — not just
   // the paces rescaled. Without computeToday() the old week/day indices stay and point at the wrong day.
@@ -5941,7 +5990,7 @@ function statusCards(sel) {
   return '<div class="statuscards" data-set="status">' + STATUS_OPTS.map((o) =>
     '<button type="button" data-v="' + o[0] + '" class="statuscard' + (o[0] === sel ? " on" : "") + '"><div class="sc-t">' + o[1] + '</div><div class="sc-d">' + o[2] + '</div></button>').join("") + '</div>';
 }
-// Show the runner-only block (5 km time + 1 km trial) for runners; a reassuring note for beginners.
+// Show the runner-only block (5 km time + 2 km trial) for runners; a reassuring note for beginners.
 function syncStatus() {
   const st = draft.status || "regular";
   const beginner = isBeginnerStatus(st);
@@ -7899,9 +7948,11 @@ function applyTrainFlag() {
   const tf = state.trainFlag; if (!tf || !tf.suggestion || tf.suggestion.action !== "anchor") return;
   const ticks = todayTicks();
   const to = tf.suggestion.proposedRecent5kSeconds;
-  // A 1 km trial, if they did one, still anchors the sharper paces (applyProfile takes whichever
+  // A 2 km trial, if they did one, still anchors the paces (applyProfile takes whichever
   // implies the faster 5K). Move it by the same proportion, or the accepted change is a no-op.
-  if (profile.oneKmS > 0 && profile.recentTimeS > 0) profile.oneKmS = Math.round(profile.oneKmS * (to / profile.recentTimeS));
+  // ⚠️ The trial rescales WITH the anchor. It exists because a faster trial wins: leave it behind and
+  // it re-anchors the plan straight back, making accepting a flag a silent no-op. New field, same rule.
+  if (profile.twoKmS > 0 && profile.recentTimeS > 0) profile.twoKmS = Math.round(profile.twoKmS * (to / profile.recentTimeS));
   profile.recentTimeS = to; profile.noRecent = false; profile.autoPace = false;
   if (profile.status === "new") profile.status = "building";
   try { recompute(); } catch (e) {}
@@ -8173,7 +8224,7 @@ function render() {
     return;
   }
   if (state.screen === "trialrun") {
-    $("topTitle").textContent = "1 km time trial";
+    $("topTitle").textContent = "2 km time trial";
     v.innerHTML = viewTrialRun(); v.scrollTop = 0;
     document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
     wireTrialRun();
@@ -8292,9 +8343,9 @@ function wire() {
   wireCoachSettings();
   ["s_age","s_sex"].forEach((id) => { const e = $(id); if (e) e.oninput = e.onchange = refreshTypePreview; });
   bindTimeInput($("s_target")); bindTimeInput($("s_rectime")); bindTimeInput($("s_easypace"));
-  const km1 = $("s_1km");
+  const km1 = $("s_2km");
   if (km1) { bindTimeInput(km1); km1.addEventListener("input", refreshMasHint); refreshMasHint(); }
-  const km1rec = $("s_1km_rec"); if (km1rec) km1rec.onclick = startTrialFlow;
+  const km1rec = $("s_2km_rec"); if (km1rec) km1rec.onclick = startTrialFlow;
   if (document.querySelector('[data-set="status"]')) syncStatus();
   // Avatar upload
   const avatarFile = $("s_avatar_file");
@@ -8396,7 +8447,7 @@ function wire() {
   const calBack = $("calBack"); if (calBack) calBack.onclick = () => { state.screen = null; render(); };
   if (state.screen === "calendar") wireCalendarDrag();
   document.querySelectorAll("[data-done]").forEach((b) => b.onclick = () => { const k = b.dataset.done; state.done[k] = !state.done[k]; render(); });
-  // 1 km time-trial session wiring
+  // 2 km time-trial session wiring
   const startTrial = $("startTrial"); if (startTrial) startTrial.onclick = beginTrialRun;
   const cancelTrial = $("cancelTrial"); if (cancelTrial) cancelTrial.onclick = () => { state.trialPending = false; render(); };
   // Live session wiring

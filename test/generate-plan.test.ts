@@ -736,6 +736,45 @@ test("the long run reads like a session — real doses, in the right phases only
   }
 });
 
+test("a plan that cannot reach the stated mileage says so, and says WHY", () => {
+  // ⚠️ Silently under-delivering is the worst of both worlds: the runner believes the plan reflects
+  // their answer, and the honest explanation never reaches them. Two causes, two DIFFERENT answers,
+  // and conflating them gives bad advice — a naive "you need doubles" note fired on 247 of 560
+  // plans under 105 km/week, most of them three- and four-day weeks where the right advice is the
+  // opposite: run more DAYS before running twice in one.
+  const big = (daysPerWeek: number, vol: number): Athlete => ({
+    daysPerWeek,
+    recent: { distanceMeters: 5000, timeSeconds: 1020 },
+    experience: "competitive",
+    includeStrength: false,
+    returningFromInjury: false,
+    longRunDay: 6,
+    weeklyVolumeKmCurrent: vol,
+  });
+  const notesFor = (a: Athlete) => generatePlan(a,
+    { distance: "marathon", raceDateIso: "2027-04-04", targetTimeSeconds: 9000, startDateIso: "2026-08-03" }).notes;
+  const doubles = (ns: string[]) => ns.some((n) => /second run in the day/.test(n));
+  const addDay = (ns: string[]) => ns.some((n) => /Adding a day/.test(n));
+
+  // At the six-day ceiling with a mileage the plan cannot fit: the doubles explanation.
+  const saturated = notesFor(big(6, 160));
+  assert.ok(doubles(saturated), "a 160km/wk six-day runner must be told why the plan stops short");
+  assert.ok(!addDay(saturated), "telling someone already on six days to add a day is nonsense");
+  // ⚠️ And it must say doubles are a COACHED decision — the evidence report reserves them for
+  // "verified high-performance athletes with extensive history and professional oversight" and
+  // forbids unlocking them from self-selection, so the app explains rather than schedules.
+  assert.ok(saturated.some((n) => /coached decision/.test(n)));
+
+  // Below the ceiling on few days: the honest answer is more days, never doubles.
+  const fewDays = notesFor(big(3, 90));
+  assert.ok(addDay(fewDays), "a three-day runner asking for 90km/wk should be pointed at frequency");
+  assert.ok(!doubles(fewDays), "a three-day runner must never be told to run twice in a day");
+
+  // A plan that CAN deliver says nothing — the note is an explanation, not decoration.
+  assert.equal(notesFor(big(6, 60)).filter((n) => doubles([n]) || addDay([n])).length, 0,
+    "a plan that reaches its target must not apologise for anything");
+});
+
 test("scaling down never buys volume with intensity", () => {
   // ⚠️ WHY THE SCALE-DOWN IS SAFE AT ALL. Quality sessions come from the library at a fixed length,
   // so shrinking a plan shrinks only the easy running around them and the hard fraction climbs by

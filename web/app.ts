@@ -3960,10 +3960,20 @@ function viewPlan() {
   else if (profile.fitSrc === "predicted") srcMsg = "Based on your <b>predicted 5 km</b> time — log a real run and it\\'ll re-tune to your actual fitness.";
   if (profile.oneKmS > 0) srcMsg = (srcMsg ? srcMsg + " " : "") + "Your paces are anchored to your <b>1 km trial</b>.";
   const starterNote = srcMsg ? '<div class="plan-note" style="border-left-color:var(--accent)">' + srcMsg + '</div>' : "";
+  // ⚠️ PLAN.notes reached the UI and was rendered NOWHERE — the same computed-and-discarded trap as
+  // CLASS and MASTERS. This surfaces the one note that answers a question the runner actually
+  // asked: they typed a weekly mileage, and the plan could not reach it. Silently under-delivering
+  // leaves them believing the plan reflects their answer. Only the volume note is shown here; the
+  // rest describe the plan's own design and belong in Support, not on the header.
+  const volNote = (PLAN.notes || []).find((n) => /second run in the day|Adding a day/.test(n));
+  const mileageNote = volNote
+    ? '<div class="plan-note" style="border-left-color:var(--peak)">' + volNote + '</div>'
+    : "";
   return '<div class="card plan-head"><div class="eyebrow">Your plan</div><div class="goal">' + g.race + ' · ' + g.target + '</div><div class="when">' + g.raceDate + ' · ' + s.structuredWeeks + '-week plan</div>' +
     '<span class="pill" style="--pc:' + (PLAN.feasibility.verdict==="achievable"?"var(--accent)":"var(--peak)") + '">' + PLAN.feasibility.verdict + '</span>' +
     '<div class="statrow"><div class="stat"><div class="k">Weeks</div><div class="v num">' + s.structuredWeeks + '</div></div><div class="stat"><div class="k">Peak/wk</div><div class="v num">' + s.peakKm + ' km</div></div><div class="stat"><div class="k">Goal pace</div><div class="v num">' + PLAN.paces.goal.replace("/km","") + '</div></div></div></div>' +
     starterNote +
+    mileageNote +
     note +
     '<h2 class="sec">Training block</h2><div class="card"><div class="chart" id="chart">' + bars + '</div><div class="phase-legend">' + phaseLegend + '</div></div>' +
     '<h2 class="sec">Week detail</h2><div class="card" id="weekDetail">' + weekDetail() + '</div>';

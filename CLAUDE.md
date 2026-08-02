@@ -495,9 +495,36 @@ and these cases need a slower one. CLAUDE.md's "0 of 2816 weeks" claim is theref
 sounds — it is true of that sweep, not of the product. Not fixed here; fixing it means shrinking
 quality sessions for slow runners on few days a week, which is a session-library change.
 
-Known and deliberately not fixed: past roughly 130 km/week the per-session caps bind, because that
-mileage cannot be run in six single runs — it needs **doubles**, which the generator cannot schedule.
-An honest 130 beats a fictional 175. And below roughly `MIN_VOLUME_SCALE` (0.45) the per-session
+⚠️ **DOUBLES ARE A DELIBERATE NON-GOAL, not a missing feature** (decided 2026-08-02 with the owner,
+who asked the right question: "it would only be appropriate for runners of a certain level"). The
+evidence report is unambiguous and goes further than a level:
+- Its session counts are **sessions, not days** — *"elite doubles therefore count as two sessions"*.
+  Beginner 3–5, Intermediate 4–6, Advanced 5–10, **Elite 10–14**. Only Elite requires them.
+- *"Double-threshold sessions and 11–14 weekly sessions are **reserved for verified high-performance
+  athletes with extensive history and professional oversight**."*
+- The Elite row of the intensity table: *"2–3 key days; **doubles only with oversight**."*
+- The tier gate: *"Tier 4–5 only… may be allowed with **coach override**… **Never unlock from
+  self-selection or goal time**."*
+- Its FALSE-ELITE acceptance case — self-labelled Elite, 25 km/week, no verified result — expects
+  *"**Do not unlock elite volume or doubles**"*.
+
+⚠️ **InteRun structurally cannot satisfy that gate, and that is by design.** `classifyRunner` caps
+self-assessment at tier 4 and says so on screen; there is no verified-result path and no coach
+override. Building automatic doubles would mean either breaking the report's rule or bolting on
+verification machinery for a feature that serves almost nobody — and would be actively wrong for
+anyone who self-selected into it. **Do not build it because it is the last unticked box.**
+
+What ships instead is the honest explanation. Measured, a marathon plan on six days delivers
+everything up to ~100 km/week stated and then saturates near 130 km however much more is typed
+(110, 140 and 200 all give the same peak). `buildNotes` now says so, and `viewPlan` renders it.
+⚠️ **TWO CAUSES, TWO ANSWERS.** A plan also under-delivers when a big mileage is asked of few days:
+a naive "you need doubles" note fired on **247 of 560** plans under 105 km/week, mostly three- and
+four-day weeks where the honest advice is the opposite — run more DAYS before running twice in one.
+Only a runner already at the six-day ceiling gets the doubles explanation.
+
+⚠️ **`PLAN.notes` reached the UI and was rendered NOWHERE** — the same computed-and-discarded trap as
+`CLASS` and `MASTERS`. `viewPlan` now surfaces the volume note specifically; the rest describe the
+plan's own design and belong in Support, not on the header. And below roughly `MIN_VOLUME_SCALE` (0.45) the per-session
 floors bind instead — a 20-minute easy run cannot shrink — so a runner stating a very low mileage for
 a big goal still gets more than they asked for. Lowering the constant does **not** help (measured at
 0.45 / 0.35 / 0.25: identical anchoring, identical worst case); `assessFeasibility` is what should

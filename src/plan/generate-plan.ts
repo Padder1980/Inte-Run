@@ -547,7 +547,7 @@ export function generatePlan(
     paces,
     totalWeeks,
     weeks,
-    notes: buildNotes(athlete, goal, totalWeeks, structuredWeeks, model, weeks),
+    notes: buildNotes(athlete, goal, totalWeeks, structuredWeeks, model, weeks, targetPeakKm),
   };
 }
 
@@ -1348,8 +1348,47 @@ function buildNotes(
   structuredWeeks: number,
   model: IntensityModel,
   weeks: PlannedWeek[],
+  targetPeakKm: number | null,
 ): string[] {
   const notes: string[] = [];
+  // ⚠️ SAY SO WHEN THE PLAN CANNOT REACH THE MILEAGE IT WAS ASKED FOR. Past roughly 105 km/week
+  // stated, the per-session ceilings bind and the block saturates near 130 km however much more is
+  // typed — measured: 110, 140 and 200 km/week all deliver the same 130.5 km peak. Silently
+  // under-delivering is the worst of both worlds: the runner believes the plan reflects their
+  // answer, and the one honest explanation (that mileage needs a second run in the day) never
+  // reaches them. The evidence report is explicit that doubles are "reserved for verified
+  // high-performance athletes with extensive history and professional oversight" and must never be
+  // unlocked from self-selection, so the plan cannot schedule them — but it can say why.
+  if (targetPeakKm) {
+    const deliveredPeak = Math.max(
+      0,
+      ...weeks.filter((w) => !w.sessions.some((s) => s.type === "race"))
+        .map((w) => w.plannedDistanceMeters),
+    ) / 1000;
+    if (deliveredPeak > 0 && deliveredPeak < targetPeakKm * 0.9) {
+      const stated = Math.round(targetPeakKm / 1.25);
+      const head = `You told us you run about ${stated} km a week. This block peaks at ` +
+        `${Math.round(deliveredPeak)} km rather than the ~${Math.round(targetPeakKm)} km that would normally follow`;
+      // ⚠️ TWO CAUSES, TWO DIFFERENT ANSWERS, AND ONLY ONE OF THEM IS DOUBLES. A plan also
+      // under-delivers when the runner has asked for a big mileage on few days — measured, a naive
+      // "you need doubles" note fired on 247 of 560 plans under 105 km/week, most of them three- and
+      // four-day weeks where the honest advice is the opposite: run MORE DAYS before running twice
+      // in one. Only a runner already at the six-day ceiling is looking at a doubles problem.
+      const runDays = Math.min(6, Math.max(3, athlete.daysPerWeek));
+      if (runDays < 6) {
+        notes.push(
+          `${head}, because ${runDays} running days can only carry so much. Adding a day would carry more of it ` +
+          "than stretching the days you have — frequency is the gentler lever, and the sessions stay a sane length.",
+        );
+      } else {
+        notes.push(
+          `${head}, because it only ever schedules one run a day. More than that will not fit into six single runs — ` +
+          "it needs a second run in the day, and doubles are a coached decision rather than something an app hands " +
+          `out on its own. An honest ${Math.round(deliveredPeak)} beats a fictional ${Math.round(targetPeakKm)}.`,
+        );
+      }
+    }
+  }
   const leadIn = totalWeeks - structuredWeeks;
   if (leadIn > 1) {
     const planStart = weeks[0]?.startDateIso ?? goal.startDateIso ?? "";

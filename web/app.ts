@@ -107,6 +107,7 @@ try{if(location.protocol==='interun:'){var v=document.querySelector('meta[name=v
   --accent: #0e8c7f; --accent-ink: #ffffff;
   --base: #2b9eb3; --build: #5fa83c; --peak: #e0863a; --taper: #7a6fd0;
   --ready: #4b9e2f; --steady: #2b9eb3; --ease: #d98a2a; --rest: #c0442e;
+  --brass:#856222; --brass-tint:#f3ead8;
   --eff-easy: #3fa47a; --eff-moderate: #d99a2b; --eff-hard: #d65b36; --eff-none: #9aa8a1; --hz1:#7f8c99; --hz2:#3d7fd6; --hz3:#2fa96b; --hz4:#e2952f; --hz5:#d6493c;
   --shadow: 0 1px 2px rgba(20,32,27,.05), 0 6px 18px rgba(20,32,27,.06);
   /* Launch screen. ⚠️ THE TOP STOP OF --splash-bg MUST EQUAL THAT THEME'S --bg, in BOTH themes.
@@ -132,6 +133,7 @@ try{if(location.protocol==='interun:'){var v=document.querySelector('meta[name=v
     --accent: #2bb3a3; --accent-ink: #06231f;
     --base: #3ab0c4; --build: #74bd52; --peak: #eb9748; --taper: #9184e0;
     --ready: #6bbf46; --steady: #3ab0c4; --ease: #eb9748; --rest: #e8765c;
+    --brass: #d6ae67; --brass-tint: #2a2318;
     --eff-easy: #4cb98a; --eff-moderate: #e6ac3e; --eff-hard: #e56f49; --eff-none: #6f7d76; --hz1:#8b98a5; --hz2:#5296e8; --hz3:#43c184; --hz4:#efab48; --hz5:#e8604f;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 22px rgba(0,0,0,.4);
     --splash-bg: radial-gradient(125% 90% at 50% 0%, #0a100e 0%, #0c2b28 12%, #06110f 56%, #000 100%);
@@ -139,8 +141,8 @@ try{if(location.protocol==='interun:'){var v=document.querySelector('meta[name=v
     --splash-glow: rgba(22,183,164,.38);
   }
 }
-:root[data-theme="light"] { color-scheme: light; --bg:#eef1f1; --surface:#fff; --surface-2:#f6f8f8; --line:#dbe1e0; --ink:#14201b; --ink-soft:#4c5b55; --ink-faint:#7a877f; --accent:#0e8c7f; --accent-ink:#fff; --base:#2b9eb3; --build:#5fa83c; --peak:#e0863a; --taper:#7a6fd0; --ready:#4b9e2f; --steady:#2b9eb3; --ease:#d98a2a; --rest:#c0442e; --eff-easy:#3fa47a; --eff-moderate:#d99a2b; --eff-hard:#d65b36; --eff-none:#9aa8a1; --hz1:#7f8c99; --hz2:#3d7fd6; --hz3:#2fa96b; --hz4:#e2952f; --hz5:#d6493c; --shadow:0 1px 2px rgba(20,32,27,.05),0 6px 18px rgba(20,32,27,.06);  --splash-bg: radial-gradient(125% 90% at 50% 0%, #eef1f1 0%, #e4edeb 52%, #d6e3e0 100%); --splash-ink:#14201b; --splash-soft:#5b6b64; --splash-brand:#0e8c7f; --splash-glow:rgba(14,140,127,.22); }
-:root[data-theme="dark"] { color-scheme: dark; --bg:#0a100e; --surface:#151e1b; --surface-2:#1b2622; --line:#26332e; --ink:#e7eeea; --ink-soft:#a9b7b0; --ink-faint:#74847c; --accent:#2bb3a3; --accent-ink:#06231f; --base:#3ab0c4; --build:#74bd52; --peak:#eb9748; --taper:#9184e0; --ready:#6bbf46; --steady:#3ab0c4; --ease:#eb9748; --rest:#e8765c; --eff-easy:#4cb98a; --eff-moderate:#e6ac3e; --eff-hard:#e56f49; --eff-none:#6f7d76; --hz1:#8b98a5; --hz2:#5296e8; --hz3:#43c184; --hz4:#efab48; --hz5:#e8604f; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.4);  --splash-bg: radial-gradient(125% 90% at 50% 0%, #0a100e 0%, #0c2b28 12%, #06110f 56%, #000 100%); --splash-ink:#ffffff; --splash-soft:#9aa3a0; --splash-brand:#16b7a4; --splash-glow:rgba(22,183,164,.38); }
+:root[data-theme="light"] { color-scheme: light; --bg:#eef1f1; --surface:#fff; --surface-2:#f6f8f8; --line:#dbe1e0; --ink:#14201b; --ink-soft:#4c5b55; --ink-faint:#7a877f; --accent:#0e8c7f; --accent-ink:#fff; --base:#2b9eb3; --build:#5fa83c; --peak:#e0863a; --taper:#7a6fd0; --ready:#4b9e2f; --steady:#2b9eb3; --ease:#d98a2a; --rest:#c0442e; --brass:#856222; --brass-tint:#f3ead8; --eff-easy:#3fa47a; --eff-moderate:#d99a2b; --eff-hard:#d65b36; --eff-none:#9aa8a1; --hz1:#7f8c99; --hz2:#3d7fd6; --hz3:#2fa96b; --hz4:#e2952f; --hz5:#d6493c; --shadow:0 1px 2px rgba(20,32,27,.05),0 6px 18px rgba(20,32,27,.06);  --splash-bg: radial-gradient(125% 90% at 50% 0%, #eef1f1 0%, #e4edeb 52%, #d6e3e0 100%); --splash-ink:#14201b; --splash-soft:#5b6b64; --splash-brand:#0e8c7f; --splash-glow:rgba(14,140,127,.22); }
+:root[data-theme="dark"] { color-scheme: dark; --bg:#0a100e; --surface:#151e1b; --surface-2:#1b2622; --line:#26332e; --ink:#e7eeea; --ink-soft:#a9b7b0; --ink-faint:#74847c; --accent:#2bb3a3; --accent-ink:#06231f; --base:#3ab0c4; --build:#74bd52; --peak:#eb9748; --taper:#9184e0; --ready:#6bbf46; --steady:#3ab0c4; --ease:#eb9748; --rest:#e8765c; --brass:#d6ae67; --brass-tint:#2a2318; --eff-easy:#4cb98a; --eff-moderate:#e6ac3e; --eff-hard:#e56f49; --eff-none:#6f7d76; --hz1:#8b98a5; --hz2:#5296e8; --hz3:#43c184; --hz4:#efab48; --hz5:#e8604f; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.4);  --splash-bg: radial-gradient(125% 90% at 50% 0%, #0a100e 0%, #0c2b28 12%, #06110f 56%, #000 100%); --splash-ink:#ffffff; --splash-soft:#9aa3a0; --splash-brand:#16b7a4; --splash-glow:rgba(22,183,164,.38); }
 * { box-sizing: border-box; }
 /* The app shell owns the viewport; the document itself must never scroll.
    ⚠️ Without this the page was the scroller, not #view, and two consequences followed: an iOS
@@ -669,7 +671,7 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 .callout .mas-hint { margin-top: 9px; }
 .callout .mini-btn { margin-top: 10px; }
 .q-hint { font-size: 12px; color: var(--ink-faint); font-weight: 400; }
-.setup-card { padding: 17px; }
+.setup-card { padding: 17px; margin-top: 12px; }
 .setup-foot { text-align: center; font-size: 12px; color: var(--ink-faint); margin: 14px 0 4px; }
 .result { margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: none; }
 .result.show { display: block; }
@@ -940,15 +942,30 @@ html.kbup .sheet-ov { padding-bottom: var(--kbh, 0px); }
   border-color: color-mix(in srgb, var(--line) 82%, var(--accent)); border-radius: 18px;
   box-shadow: var(--shadow), inset 0 1px 0 color-mix(in srgb, var(--ink) 4%, transparent);
 }
+/* ⚠️ BRASS MARKS STRUCTURE; TEAL MARKS ACTION. The profile is the longest screen in the app and
+   every section looked identical, so scrolling it gave you nothing to navigate by. The fix is a
+   second colour on the section FURNITURE only — the number, the rule under the heading, the top
+   edge of the card — while every control you can actually touch stays teal. That split is the whole
+   idea: colour the chapter headings, not the sentences. Tinting the sections themselves, or giving
+   each a different colour, would make a long form into a rainbow and leave the runner with no way
+   to tell what is a heading and what is a button. Brass is the warm complement of the accent, so it
+   reads as deliberately different rather than as a second accent competing with it. */
+#view:has(#saveProfile) .setup-card { border-top: 3px solid var(--brass, var(--accent)); }
 #view:has(#saveProfile) .sec-head {
-  align-items: center; gap: 11px; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--line);
+  align-items: center; gap: 11px; margin-bottom: 16px; padding-bottom: 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--brass) 38%, var(--line));
 }
 #view:has(#saveProfile) .sec-num {
   width: 29px; min-width: 29px; height: 25px; margin: 0;
-  color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface));
-  border: 1px solid var(--profile-edge); border-radius: 8px; box-shadow: none;
+  color: var(--brass); background: var(--brass-tint);
+  border: 1px solid color-mix(in srgb, var(--brass) 34%, var(--line)); border-radius: 8px; box-shadow: none;
   font-family: var(--fig); font-size: 12px; font-weight: 750;
 }
+/* A little more air between chapters than within one, so the grouping reads before the colour does. */
+/* ⚠️ EVERY card, not "every card after the first". An adjacent-sibling selector cannot match the
+   first one, so section 1 kept the base 12px while sections 2-6 got 20 — a gap that is wrong
+   precisely once, at the top of the screen, which is where it is most visible. */
+#view:has(#saveProfile) .setup-card { margin-top: 20px; }
 #view:has(#saveProfile) .sec-title { color: var(--ink); font-size: 17px; font-weight: 730; letter-spacing: -0.02em; }
 #view:has(#saveProfile) .sec-sub { margin-top: 3px; color: var(--ink-faint); font-size: 12px; line-height: 1.35; }
 #view:has(#saveProfile) .avatar-row { gap: 17px; margin-top: 2px; }
@@ -5557,7 +5574,9 @@ function saveCrop() {
 }
 // A numbered section card — the numbered badge + title makes each step obvious and the page premium.
 function setupSection(num, title, sub, body) {
-  return '<div class="card setup-card" style="margin-top:12px"><div class="sec-head"><div class="sec-num">' + num + '</div>' +
+  // ⚠️ Spacing belongs in the stylesheet. This used to carry style="margin-top:12px" inline, which
+  // no rule can beat without !important — and the !important then applied to only SOME cards.
+  return '<div class="card setup-card"><div class="sec-head"><div class="sec-num">' + num + '</div>' +
     '<div><div class="sec-title">' + title + '</div>' + (sub ? '<div class="sec-sub">' + sub + '</div>' : '') + '</div></div>' + body + '</div>';
 }
 // The voice-coach settings block (lives in the profile/settings screen). Reads/writes COACH.cfg live —
@@ -5646,7 +5665,10 @@ function viewSetup() {
   return savedMsg + intro +
     setupSection(1, "You", "A photo and what to call you", secYou) +
     setupSection(2, "Your running", "So we pitch your paces just right", secRunning) +
-    '<div class="card setup-card" id="goalCard" style="margin-top:12px"><div class="sec-head"><div class="sec-num">3</div><div><div class="sec-title">Your goal</div><div class="sec-sub">What you\\u2019re working towards</div></div></div><div id="goalBody">' + secGoal + '</div></div>' +
+    // ⚠️ Hand-built rather than setupSection() because it needs #goalCard/#goalBody for the live
+    // rebuild — so it must be kept in step by hand. Its inline margin was the last one left, and it
+    // made section 3 the single card in the run with a different gap above it.
+    '<div class="card setup-card" id="goalCard"><div class="sec-head"><div class="sec-num">3</div><div><div class="sec-title">Your goal</div><div class="sec-sub">What you\\u2019re working towards</div></div></div><div id="goalBody">' + secGoal + '</div></div>' +
     setupSection(4, "A few details", "The finishing touches to your plan", secDetails) +
     setupSection(5, "Voice coaching", "Your spoken running coach", coachSettingsHtml()) +
     setupSection(6, "Your why", "The reasons behind the plan",

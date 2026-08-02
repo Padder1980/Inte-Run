@@ -92,6 +92,18 @@ Effort tints: `--eff-easy` · `--eff-moderate` · `--eff-hard` · `--eff-none`.
 
 ### Type
 - `--sans`: system UI stack (`system-ui, -apple-system, "Segoe UI", Roboto, …`).
+- `--brass` / `--brass-tint`: the warm complement of the accent, used ONLY on the profile screen and
+  ONLY for section furniture — the numbered badge, the rule under a section heading, and the card's
+  top edge.
+  ⚠️ **Brass marks STRUCTURE; teal marks ACTION.** The profile is the longest screen in the app and
+  every section looked identical, so there was nothing to navigate by while scrolling. The rule that
+  makes a second colour safe here is that it never touches anything you can press: colour the
+  chapter headings, not the sentences. Tinting whole sections, or giving each section its own
+  colour, turns a long form into a rainbow and destroys the one signal that matters — what is a
+  heading and what is a control. Do not extend brass to buttons, links or inputs, and do not use it
+  outside `#view:has(#saveProfile)`.
+  Contrast is measured, not eyeballed: the badge is 4.66:1 in light and 7.48:1 in dark against its
+  own tint, i.e. it clears AA for the 12px bold text it carries. Keep it there if the value moves.
 - `--fig`: the numeral stack — used via `.num` for **all numbers/stats** with
   `font-variant-numeric: tabular-nums`.
   ⚠️ **It is the SAME sans as body text, not a monospace stack** (owner's call, 2026-08-02, comparing

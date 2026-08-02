@@ -2447,7 +2447,9 @@ function buildReminderSchedule() {
     let list = sessionsForIso(iso);
     if (!list.length) {
       const ex = EXTRA.filter((x) => x.date === iso);
-      if (ex.length) { try { const b = buildCustomSession(ex[ex.length - 1]); if (b) list = [{ title: b.title, durMin: b.estimatedDurationSeconds ? Math.round(b.estimatedDurationSeconds / 60) : null, distKm: b.estimatedDistanceMeters ? Math.round(b.estimatedDistanceMeters / 100) / 10 : null }]; } catch (e) {} }
+      // Same trap as the watch payload: a library pick has no durMin/reps, so buildCustomSession
+      // would name the plan's representative session in the notification instead of the real one.
+      if (ex.length) { try { const b = extraSession(ex[ex.length - 1]); if (b) list = [{ title: b.title, durMin: b.estimatedDurationSeconds ? Math.round(b.estimatedDurationSeconds / 60) : null, distKm: b.estimatedDistanceMeters ? Math.round(b.estimatedDistanceMeters / 100) / 10 : null }]; } catch (e) {} }
     }
     if (!list.length) continue;
     const s = list[0], bits = [];
@@ -2606,7 +2608,12 @@ function watchPayloadForToday() {
   let s = list[0];
   if (!s) {
     const extras = EXTRA.filter((e) => e.date === iso);
-    if (extras.length) { try { s = buildCustomSession(extras[extras.length - 1]); } catch (e) { s = null; } }
+    // ⚠️ extraSession, NOT buildCustomSession. A library pick stores workoutId with durMin and reps
+    // null, which sends buildCustomSession straight into its "no params — return the plan's
+    // representative" early return: the wrist was handed a completely different workout from the
+    // one on the phone, pushed the instant the runner tapped Add, and it is exactly the cached
+    // "today" the watch runs from when it stands alone.
+    if (extras.length) { try { s = extraSession(extras[extras.length - 1]); } catch (e) { s = null; } }
   }
   return watchSessionPayload(s, iso);
 }
@@ -3950,6 +3957,20 @@ const RUN_TYPES = [
   { t: "strides", label: "Easy + Strides", icon: "rStrides", c: "var(--build)", blurb: "An easy run with relaxed fast bursts." },
 ];
 function RUN_TYPE(t) { return RUN_TYPES.find((x) => x.t === t) || RUN_TYPES[0]; }
+/**
+ * The types THIS runner can actually be given.
+ *
+ * ⚠️ RUN_TYPES IS A FIXED LIST OF SEVEN AND THE PLAN IS NOT. The old picker was built from
+ * sessionLibrary(), so it could only ever offer types the plan contained; showing all seven to
+ * everyone broke that in two ways at once. A card whose type the plan has no representative for
+ * made buildCustomSession return null, and reading estimatedDurationSeconds off it threw inside
+ * addSessionSheetHtml — before the innerHTML assignment, so the sheet silently froze with BUILDER
+ * already mutated and every other control on the stale screen dead. Measured: 80 of 128 profiles
+ * had a dead "Easy + Strides" card, including any ordinary runner who ticked "returning from a
+ * break". And a run-walk beginner — whose plan withholds quality on purpose — was being offered
+ * sixteen VO2 interval workouts. Gate on the plan's own library and both go away together.
+ */
+function runTypesAvailable() { return RUN_TYPES.filter((r) => !!extraRep(r.t)); }
 /** Quality types have a real library behind them; easy running is shaped by duration instead. */
 function typeHasLibrary(t) { return t === "threshold" || t === "vo2" || t === "race-specific"; }
 /** The runner's own filters, mirroring the generator's — see listWorkouts. */
@@ -3965,24 +3986,32 @@ function workoutsFor(type, band) {
   else if (band === "long") list = list.filter((w) => w.minutes > 65);
   return list.sort((a, b) => a.minutes - b.minutes);
 }
-/** "Best for" tag — read off the format's own load, not invented. */
+/**
+ * The "best for" tag, from the session's own effort band.
+ *
+ * ⚠️ NOT FROM the format's load field. That is its size RELATIVE TO ITS OWN POOL — the smallest VO2
+ * session in the library is still an RPE 8–9 interval workout, and tagging it "a gentle touch" in
+ * easy-run green told the runner the opposite of the truth. Effort is the honest signal; load only
+ * earns the "big day" wording, and only when the session is genuinely hard as well as long.
+ */
 function loadTag(w) {
-  if (w.load === "big") return { t: "Best for: a big day", c: "var(--eff-hard)" };
-  if (w.load === "small") return { t: "Best for: a gentle touch", c: "var(--eff-easy)" };
-  return { t: "Best for: balance", c: "var(--steady)" };
+  const rpe = w.session && w.session.targetRpe ? w.session.targetRpe.max : 5;
+  if (rpe >= 8) return { t: w.load === "big" ? "Best for: a big speed day" : "Best for: top-end speed", c: "var(--eff-hard)" };
+  if (rpe >= 6) return { t: w.load === "big" ? "Best for: a big day" : "Best for: race sharpness", c: "var(--eff-moderate)" };
+  return { t: w.load === "big" ? "Best for: a long steady day" : "Best for: steady rhythm", c: "var(--steady)" };
 }
 /** The session the current BUILDER describes — a library workout, or a shaped one. */
 function previewSession() {
   if (BUILDER && BUILDER.workoutId) {
     try { return RC.buildWorkout(BUILDER.workoutId, RAW.paces, workoutCtx()); } catch (e) { return null; }
   }
-  return buildCustomSession(Object.assign({ id: "preview" }, BUILDER || {}));
+  try { return buildCustomSession(Object.assign({ id: "preview" }, BUILDER || {})); } catch (e) { return null; }
 }
 function addSessionSheetHtml() {
   const head = '<div class="sd-type" style="--sc:var(--accent)">Build your own run</div>';
   // Stage 1 — the type grid.
   if (!BUILDER) {
-    const cards = RUN_TYPES.map((r) =>
+    const cards = runTypesAvailable().map((r) =>
       '<button class="rt-card" data-pick="' + r.t + '" style="--rc:' + r.c + '">' +
         '<span class="rt-ico">' + ICON[r.icon] + '</span>' +
         '<span class="rt-ghost" aria-hidden="true">' + ICON[r.icon] + '</span>' +
@@ -3990,7 +4019,7 @@ function addSessionSheetHtml() {
       '</button>').join("");
     return head +
       '<div class="sd-title">What do you fancy?</div>' +
-      '<div class="sd-desc" style="margin-bottom:12px">Pick a type. Everything is built at your own paces, from the same library your plan uses.</div>' +
+      '<div class="sd-desc" style="margin-bottom:12px">For <b>' + esc(dayLabelIso(addTargetIso())) + '</b>. Everything is built at your own paces, from the same library your plan uses.</div>' +
       '<div class="rt-grid">' + cards + '</div>';
   }
   const rt = RUN_TYPE(BUILDER.type);
@@ -4013,10 +4042,10 @@ function addSessionSheetHtml() {
     const empty = '<div class="sd-desc">Nothing in the library at that length for this type — try another.</div>';
     return head +
       '<div class="sd-title">' + esc(rt.label) + ' sessions</div>' +
-      '<div class="sd-desc" style="margin-bottom:10px">' + esc(rt.blurb) + ' These are your plan’s own workouts, at your paces.</div>' +
+      '<div class="sd-desc" style="margin-bottom:10px">' + esc(rt.blurb) + ' Your plan’s own workouts, at your paces, for <b>' + esc(dayLabelIso(addTargetIso())) + '</b>.</div>' +
       '<div class="wk-chips">' + chips + '</div>' +
       '<div class="wk-list">' + (rows || empty) + '</div>' +
-      '<button class="rm-test" id="bldShape">Shape one myself instead ›</button>' +
+      (extraRep(BUILDER.type) ? '<button class="rm-test" id="bldShape">Shape one myself instead ›</button>' : "") +
       back;
   }
 
@@ -4040,7 +4069,11 @@ function addSessionSheetHtml() {
   }
 
   // Stage 2b — shape it yourself, by duration or reps.
+  // ⚠️ BELT AND BRACES. The gate above should make this unreachable, but a null here used to throw
+  // one line later and freeze the whole sheet with no console feedback for the runner. Rendering
+  // the grid again is a recoverable dead end; a frozen sheet is not.
   const preview = buildCustomSession(Object.assign({ id: "preview" }, BUILDER));
+  if (!preview) { BUILDER = null; return addSessionSheetHtml(); }
   const dur = Math.round(preview.estimatedDurationSeconds / 60);
   const dist = preview.estimatedDistanceMeters ? (Math.round(preview.estimatedDistanceMeters / 100) / 10) + " km" : null;
   const quality = builderUsesReps(BUILDER.type);

@@ -894,6 +894,44 @@ across all seven long-run-day choices; week-one anchoring, long-run and title-dr
 unchanged. Beginners stay capped by their own track (3 run-walk / 4 continuous) whatever they ask
 for. `assessFeasibility` now counts a day that exists, so no change was needed there.
 
+## Build your own run (added 2026-08-02)
+
+Today › "Add a session" is a three-stage flow: a coloured type grid, then — for quality types — a
+list of real workouts, then the session in full before Add. `RC.listWorkouts` / `RC.buildWorkout`
+surface the generator's **own** 62 formats at the runner's derived paces, with the plan's own
+filters (`competitiveOnly`, `skipWhenReturning`, `minEventKm`). ⚠️ **Never write a second
+catalogue** — it would drift within a release and quietly teach different paces.
+
+⚠️ **THE TYPE GRID MUST BE GATED ON THE PLAN** (`runTypesAvailable`, = `RUN_TYPES` filtered by
+`extraRep`). `RUN_TYPES` is a fixed seven; a plan is not. Showing all seven broke two things at
+once: `buildCustomSession` returns **null** for a type the plan has no representative of, and
+reading `estimatedDurationSeconds` off it threw inside `addSessionSheetHtml` *before* the innerHTML
+assignment — so the sheet silently froze with `BUILDER` already mutated and every other control on
+the stale screen dead. Measured: **80 of 128 profiles** had a dead "Easy + Strides" card, including
+any ordinary runner who ticked "returning from a break". The same gate stops a run-walk beginner —
+whose plan withholds quality deliberately — being offered sixteen VO2 workouts. `addSessionSheetHtml`
+also now falls back to the grid rather than throwing: a recoverable dead end beats a frozen sheet.
+
+⚠️ **A library pick stores its FORMAT ID and is rebuilt from it** at current paces, so a workout
+added last week re-derives if fitness re-anchors. **Everything that reads an extra must call
+`extraSession`, never `buildCustomSession` directly.** A library pick has `durMin`/`reps` null,
+which sends `buildCustomSession` into its "no params — return the plan's representative" early
+return: `watchPayloadForToday` and `buildReminderSchedule` both did, so **the wrist was handed a
+completely different workout from the phone**, pushed the instant the runner tapped Add — and that
+is exactly the cached "today" the watch runs from when it stands alone.
+
+⚠️ **The "best for" tag comes from the session's RPE, not the format's `load` field.** That field is
+size relative to its own pool: the *smallest* VO2 session is still an RPE 8–9 interval workout, and
+tagging it "a gentle touch" in easy-run green told the runner the opposite of the truth.
+
+⚠️ **A doc comment containing backticks broke the build** — the fourth time this file's own rule has
+caught someone. `node web/app.ts` **failed**, so `web/app.html` stayed stale and the `node --check`
+step reported OK on the *previous* build. Check the build exits 0 before trusting any check after it.
+
+Known and not fixed: the browser ignores `fmt.phases`, so a peak-only session can be picked in week
+one. Defensible — the runner is deliberately building their own run — but it is a real difference
+from what the generator would schedule.
+
 ## Race day is a session (added 2026-08-01, from elite-coach feedback)
 
 ⚠️ **`"race"` is a SessionType, distinct from `"race-specific"`** (which is a rehearsal in

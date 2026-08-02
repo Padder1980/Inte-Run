@@ -840,6 +840,8 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 .hr-gl { stroke: var(--ink-faint); stroke-opacity: .6; stroke-width: 1; stroke-dasharray: 3 3; }
 .pc-ax.hr-peak { fill: var(--eff-hard); }
 .hz-xl { font-size: 9px; color: var(--ink-faint); text-align: right; margin: -6px 2px 6px; }
+.wk-review .wr-cta { display: flex; gap: 8px; margin-top: 12px; }
+.wk-review .wr-cta button { flex: 1; }
 .hz-note { font-size: 11.5px; color: var(--ink-faint); margin-top: 8px; }
 .rn-note { width: 100%; box-sizing: border-box; font: inherit; font-size: 16px; line-height: 1.45; color: var(--ink);
   background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; resize: vertical; }
@@ -2407,7 +2409,7 @@ function viewToday() {
   if (mirror || liveRunning()) cta = "";
   else if (sess && onToday && PRIMARY_TYPES[sess.type]) cta = '<button class="primary start-btn" id="startSession">' + ICON.play + ' Start session</button>';
   else if (sess) cta = '<button class="primary start-btn" id="viewSession">' + ICON.play + ' View session</button>';
-  return mirror + banner + autoPaceBanner() + trainFlagBanner() + fitSuggestBanner() + coachWatchCard() + greeting + weekStrip() +
+  return mirror + banner + autoPaceBanner() + trainFlagBanner() + weeklyReviewCard() + fitSuggestBanner() + coachWatchCard() + greeting + weekStrip() +
     heroWorkout() +
     cta +
     '<div class="tsq-row">' + conditionsSquare(sess) + feelSquare() + '</div>' +
@@ -7906,6 +7908,68 @@ function coachWatchCard() {
   return '<div class="cw"><span class="cw-ic">' + ICON.gauge + '</span><span class="cw-b">' +
     '<span class="cw-h">Your coach is watching</span><span class="cw-d">' + body + '</span></span></div>';
 }
+// ---- The weekly review -------------------------------------------------------------------------
+//
+// ⚠️ STANDING INSTRUCTION FROM THE OWNER (2026-08-03): ALWAYS DO THIS WITH THE RUNNER. The review
+// may observe, and it may propose. It may never change a pace, a plan or a target on its own. Every
+// suggestion here ends in a choice the runner makes, and declining is a first-class answer that is
+// remembered rather than re-asked next week.
+//
+// ⚠️ It also does not duplicate the adaptive engine. assessTrainingFlags already decides whether the
+// pace and effort evidence is strong enough to act on, with four guards that each cost a shipped bug
+// (direction sanity, anchor stamping, per-kind muting, one voice). This card FRAMES that answer on a
+// weekly beat and adds the retest offer; it re-derives nothing.
+function reviewWeekStartIso() {
+  const d = new Date(); const dow = (d.getDay() + 6) % 7;   // Monday = 0
+  d.setDate(d.getDate() - dow);
+  return d.toISOString().slice(0, 10);
+}
+function loadReviewSeen() { try { return localStorage.getItem("interun_review_v1") || ""; } catch (e) { return ""; } }
+function dismissWeeklyReview() {
+  try { localStorage.setItem("interun_review_v1", reviewWeekStartIso()); } catch (e) {}
+  render();
+}
+function currentWeeklyReview() {
+  const wkStart = reviewWeekStartIso();
+  if (loadReviewSeen() === wkStart) return null;      // already answered this week
+  const runs = (state.logged || []).filter((r) => r && r.dateIso && r.dateIso >= wkStart).map((r) => ({
+    id: r.id, type: r.type || "easy", distKm: Number(r.distKm) || 0, dateIso: r.dateIso,
+    avgPaceSecPerKm: r.avgPaceSec || null, plannedPaceSecPerKm: r.pband || null,
+    reportedRpe: r.rpe || null, plannedRpe: r.rband || null,
+    avgHr: r.avgHr || null, zoneSec: r.zoneSec || null,
+  }));
+  const flags = { flags: [], suggestion: (state.trainFlag && state.trainFlag.suggestion) || null };
+  const trials = (typeof loadTwoKm === "function" ? loadTwoKm() : []);
+  const last = trials[0] && trials[0].completedAt ? String(trials[0].completedAt).slice(0, 10) : null;
+  const wk = PLAN.weeks && PLAN.weeks[state.selWeek];
+  const phase = wk && wk.phase ? String(wk.phase) : "";
+  try {
+    return RC.buildWeeklyReview({
+      runs, flags, lastTrialIso: last, weekStartIso: wkStart, todayIso: todayIso(),
+      inTaperOrRaceWeek: /taper|race/i.test(phase),
+      // Anything the runner has told us that makes a maximal effort the wrong idea.
+      unwell: !!(state.subj && (state.subj.illness !== "none" || state.subj.soreness === "high")),
+    });
+  } catch (e) { return null; }
+}
+function weeklyReviewCard() {
+  // ⚠️ The pace-change conversation belongs to trainFlagBanner, which owns the accept/decline and the
+  // muting. Showing both would ask the same question twice in two voices.
+  if (state.trainFlag) return "";
+  const r = currentWeeklyReview();
+  if (!r || r.quiet) return "";
+  const lines = r.observations.map((o) => "<p>" + esc(o) + "</p>").join("");
+  const s = r.suggestion;
+  let cta = '<button class="ctrl" id="wrOk">Thanks</button>';
+  if (s && s.kind === "retest") {
+    cta = '<button class="ctrl" id="wrNo">Not now</button><button class="primary" id="wrTrial">Do a 2 km</button>';
+  } else if (s && s.kind === "easy-days-easier") {
+    cta = '<button class="ctrl" id="wrOk">Got it</button>';
+  }
+  return '<div class="card wk-review"><div class="db-head"><span class="db-ic">' + ICON.alfie + '</span><span>Your week</span></div>' +
+    '<div class="db-body">' + lines + (s ? '<p><b>' + esc(s.why) + '</b></p>' : "") + '</div>' +
+    '<div class="wr-cta">' + cta + '</div></div>';
+}
 function trainFlagBanner() {
   const tf = state.trainFlag; if (!tf) return "";
   const evidence = tf.flags.map(flagEvidenceLine).join(" ");
@@ -8392,6 +8456,11 @@ function wire() {
   const tfApply = $("tfApply"); if (tfApply) tfApply.onclick = applyTrainFlag;
   const tfDismiss = $("tfDismiss"); if (tfDismiss) tfDismiss.onclick = dismissTrainFlag;
   const tfOk = $("tfOk"); if (tfOk) tfOk.onclick = dismissTrainFlag;
+  // ⚠️ Every one of these ENDS the conversation for the week rather than acting. "Not now" is a real
+  // answer and is remembered, so the same offer does not reappear tomorrow.
+  const wrOk = $("wrOk"); if (wrOk) wrOk.onclick = dismissWeeklyReview;
+  const wrNo = $("wrNo"); if (wrNo) wrNo.onclick = dismissWeeklyReview;
+  const wrTrial = $("wrTrial"); if (wrTrial) wrTrial.onclick = () => { dismissWeeklyReview(); startTrialFlow(); };
   const fitApply = $("fitApply"); if (fitApply) fitApply.onclick = applyFitSuggest;
   const fitDismiss = $("fitDismiss"); if (fitDismiss) fitDismiss.onclick = dismissFitSuggest;
   const viewSession = $("viewSession"); if (viewSession) viewSession.onclick = () => openSessionSheet(selectedSession(), curWeekNo());

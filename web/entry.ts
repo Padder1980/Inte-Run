@@ -51,3 +51,7 @@ export {
   isBeyondMaximalAerobic, projectableFrom2k,
 } from "../src/science/two-km-trial.ts";
 export type { TwoKmTimeTrial, TwoKmValidation, TwoKmConfidence, TwoKmTestEnvironment } from "../src/science/two-km-trial.ts";
+
+// The weekly review. ⚠️ It returns observations and at most one SUGGESTION — it can change nothing.
+export { buildWeeklyReview, retestDue, RETEST_DUE_DAYS } from "../src/adapt/weekly-review.ts";
+export type { WeeklyReview, WeeklySuggestion, ReviewRun } from "../src/adapt/weekly-review.ts";

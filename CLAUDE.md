@@ -421,6 +421,46 @@ Design rules baked in, each of which cost a real bug when it was missing — don
 - **RPE stays answerable after Save** — the picker writes through to the logged run. Gating it on
   `!saved` starved the whole signal for anyone who taps Save first.
 
+## The weekly review, and the rule that governs it (added 2026-08-03)
+
+⚠️ **STANDING INSTRUCTION FROM THE OWNER (2026-08-03): ALWAYS DO THIS WITH THE RUNNER.** The app may
+observe and it may propose; it may never change a pace, a plan or a target on its own. Every
+suggestion ends in a choice the runner makes, and declining is a first-class answer that is
+remembered rather than re-asked tomorrow. This extends the existing "suggest, never impose" rule
+(p4-suggest) to everything the weekly review does, and to anything built on top of it.
+
+**Why a weekly beat at all.** Flags fire when they fire — which for a runner having a steady month
+is *never*, so the app went quiet exactly when someone was training consistently enough to be worth
+talking to. `buildWeeklyReview` (`src/adapt/weekly-review.ts`, 9 tests) gives the coach a cadence.
+
+⚠️ **IT DOES NOT RE-IMPLEMENT THE ADAPTIVE ENGINE.** `assessTrainingFlags` already decides whether
+pace/effort evidence is strong enough to act on, with four guards that each cost a shipped bug
+(direction sanity, anchor stamping, per-kind muting, one voice). The 2 km spec's §13 describes
+roughly the same behaviour in weaker terms — adopting its version would be a downgrade wearing a
+newer date. The review **calls** the engine and frames its answer.
+
+⚠️ **HEART RATE CONFIRMS; IT NEVER DRIVES A PACE CHANGE.** This is a research position, not a
+preference: HR at a given pace moves with heat, dehydration, caffeine, sleep, altitude and cardiac
+drift *within a single run* — all of which look exactly like a fitness change across a week. Pace
+against a known target and reported effort are the two signals that mean what they appear to mean.
+So the HR path may produce a **sentence** and is structurally incapable of producing a suggestion; a
+test asserts it.
+
+⚠️ **ONE QUESTION A WEEK.** A retest offer and a pace change in the same card means one is dismissed
+unread and the app cannot tell which. The pace decision wins (it is about work already done);
+`weeklyReviewCard()` also returns "" whenever `trainFlagBanner()` is showing, so the same question is
+never asked twice in two voices.
+
+⚠️ **SILENCE IS A VALID ANSWER.** A card that appears every week saying "2 runs, 16 km" becomes
+wallpaper, and then the week it matters it is not read either. `quiet` is returned, and the caller
+renders nothing.
+
+**Retest (spec §14):** `retestDue()` offers a 2 km every ~4 weeks — and refuses during illness or
+reported soreness, in a taper or race week, and for anyone with fewer than two runs that week. Each
+refusal is real: offering a maximal effort into illness is the prompt doing harm, and it teaches the
+runner to ignore every future prompt. Answered state lives in `interun_review_v1`, keyed by the
+week's Monday.
+
 ## The pace model (reworked 2026-07-28) — read before touching `src/science/paces.ts`
 
 **The gears are MULTIPLES of threshold pace, not fixed offsets.** `PACE_RATIOS` in

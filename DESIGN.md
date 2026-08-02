@@ -92,8 +92,15 @@ Effort tints: `--eff-easy` · `--eff-moderate` · `--eff-hard` · `--eff-none`.
 
 ### Type
 - `--sans`: system UI stack (`system-ui, -apple-system, "Segoe UI", Roboto, …`).
-- `--mono`: system mono stack — used via `.num` for **all numbers/stats** with
-  `font-variant-numeric: tabular-nums`. Keep stats monospaced + tabular so they don't jitter.
+- `--fig`: the numeral stack — used via `.num` for **all numbers/stats** with
+  `font-variant-numeric: tabular-nums`.
+  ⚠️ **It is the SAME sans as body text, not a monospace stack** (owner's call, 2026-08-02, comparing
+  against a reference app he sent). It used to be `--mono` (SF Mono et al) and that was wrong: a code
+  font in a running app reads as a spreadsheet, and the wide digits made every stat look spaced out —
+  "6.44 km" sat with gaps between the characters. Tabular figures are kept, because not jittering as
+  a clock ticks or a splits column updates was the only thing the mono stack was genuinely buying;
+  the 12 other selectors that had leaned on the monospace for their alignment now ask for tabular
+  figures explicitly. Don't reinstate a monospace here.
 - Rough scale in use: captions ~10.5–12.5px, body ~13.5–14px, titles ~17–21px, hero numbers 24px+.
 
 ### Shape & spacing

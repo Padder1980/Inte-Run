@@ -2392,7 +2392,7 @@ function viewToday() {
   if (state.trialPending) {
     return weekStrip() +
       '<h2 class="sec">Today\\'s workout</h2><div class="card">' + trialTodayCard() + '</div>' +
-      '<div class="plan-note" style="border-left-color:var(--accent)">We\\'ve added a <b>2 km time trial</b> to today. Warm up as guided — only the 1 km itself is timed, and its time goes straight to your profile.</div>' +
+      '<div class="plan-note" style="border-left-color:var(--accent)">We\\'ve added a <b>2 km time trial</b> to today. Warm up as guided — only the 2 km itself is timed, and its time goes straight to your profile.</div>' +
       '<button class="primary" id="startTrial">' + ICON.play + ' Start time trial</button>' +
       '<button class="primary" id="cancelTrial" style="background:var(--surface-2);color:var(--ink-soft);margin-top:8px">Not today — back to my plan</button>';
   }
@@ -4595,7 +4595,7 @@ function viewPlan() {
   const note = lead >= 2 ? '<div class="plan-note">Your race is <b>' + s.totalWeeks + ' weeks</b> away — this is your <b>' + s.structuredWeeks + '-week</b> structured build. Until it begins, keep running easy and consistent to bank the base.</div>' : "";
   let srcMsg = "";
   if (profile.status === "new") srcMsg = "Built for a <b>total beginner</b> — walk\\u2013run to start, sharpening as you log runs.";
-  else if (profile.status === "building" || profile.noRecent) srcMsg = "Built to <b>grow your consistency</b> — it sharpens as you log runs or record a 1 km trial.";
+  else if (profile.status === "building" || profile.noRecent) srcMsg = "Built to <b>grow your consistency</b> — it sharpens as you log runs or record a 2 km trial.";
   else if (profile.fitSrc === "predicted") srcMsg = "Based on your <b>predicted 5 km</b> time — log a real run and it\\'ll re-tune to your actual fitness.";
   if (profile.twoKmS > 0) srcMsg = (srcMsg ? srcMsg + " " : "") + "Your paces are anchored to your <b>2 km trial</b>.";
   const starterNote = srcMsg ? '<div class="plan-note" style="border-left-color:var(--accent)">' + srcMsg + '</div>' : "";
@@ -5829,7 +5829,7 @@ function refreshMasHint() {
 
 // ---- 2 km time-trial session ---------------------------------------------
 // Recording a 2 km trial isn't a bare stopwatch — it's a proper session on Today: a guided warm-up,
-// then the timed 1 km. Only the 1 km itself is measured, and on completion its time flows back to the
+// then the timed 2 km. Only the 2 km itself is measured, and on completion its time flows back to the
 // About-you 1 km field (and re-anchors the plan's paces). In the live app GPS auto-stops at 1 km;
 // here the runner taps Finish.
 function fmtClock(ms) { const t = ms / 1000; const m = Math.floor(t / 60); const s = Math.floor(t % 60); const d = Math.floor((t * 10) % 10); return m + ":" + String(s).padStart(2, "0") + "." + d; }
@@ -5869,7 +5869,7 @@ function viewTrialRun() {
       '<div class="card"><div class="subhead" style="margin-top:0">Do this before the effort</div><div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">' +
       '<div class="sess"><span class="dot easy"></span><div><div class="st">Easy jog ~10 min</div><div class="sm" style="color:var(--ink-soft)">Raise your heart rate gradually — conversational pace.</div></div></div>' +
       '<div class="sess"><span class="dot moderate"></span><div><div class="st">3 × 20s strides</div><div class="sm" style="color:var(--ink-soft)">Build to fast and smooth, full recovery between each.</div></div></div>' +
-      '<div class="sess"><span class="dot hard"></span><div><div class="st">Catch your breath</div><div class="sm" style="color:var(--ink-soft)">Then start the 1 km when you feel ready.</div></div></div></div></div>' +
+      '<div class="sess"><span class="dot hard"></span><div><div class="st">Catch your breath</div><div class="sm" style="color:var(--ink-soft)">Then start the 2 km when you feel ready.</div></div></div></div></div>' +
       '<div class="trial-controls"><button class="primary" id="twGo">' + ICON.play + ' Start the 2 km</button></div>' +
       '<div class="trial-foot" style="border:0;text-align:center">Only the 2 km itself is timed and saved to your profile.</div>';
   }
@@ -5893,7 +5893,7 @@ function viewTrialRun() {
     '<div class="trial-clock num" style="margin:14px 0 8px">' + fmtTimeFull(secs) + '</div>' +
     (inRange
       ? '<div style="color:var(--ink-soft);font-size:13.5px">That is <b>' + fmtPace(Math.round(secs / 2)) + '/km</b> \u00b7 ' + vel.toFixed(2) + ' m/s. Saving it calibrates every pace in your plan.</div>'
-      : '<div style="color:var(--ease);font-size:13.5px">' + (secs < 150 ? "That's too quick to be a measured 2 km — check the route and give it another go." : "That's over 8:00 — for MAS we need a hard 1 km effort. Have a rest and try again.") + '</div>') +
+      : '<div style="color:var(--ease);font-size:13.5px">' + (secs < RC.TWO_KM_RULES.minSeconds ? "That's too quick to be a measured 2 km — check the route and give it another go." : "That's longer than a hard 2 km should take — check the distance, have a rest and try again.") + '</div>') +
     '</div>' +
     (inRange
       ? '<div class="trial-controls two"><button class="ctrl" id="twRedo">Redo</button><button class="primary" id="twSave">Save to my profile</button></div>'

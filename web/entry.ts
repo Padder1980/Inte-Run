@@ -22,7 +22,11 @@ export { screenRedFlags } from "../src/safety/escalation.ts";
 export { screenRedS, estimateEnergyAvailability } from "../src/safety/red-s.ts";
 export { assessFemaleHealth } from "../src/safety/female-health.ts";
 export { buildFitnessProfile } from "../src/science/fitness-profile.ts";
-export { computeMas } from "../src/science/mas.ts";
+// ⚠️ computeMas is NO LONGER EXPORTED to the page (2026-08-02). The engine still uses it internally
+// for reconcileVo2 on plans built from the old 1 km trial, but nothing in the app may show a runner
+// a "maximal aerobic speed": the 2 km specification is explicit that an effort over ten minutes is
+// not one, and 2 km at 5:00/km is exactly ten minutes. Keeping the export alive is how the term
+// finds its way back onto a screen.
 export { riegelPredict, PACE_RATIOS, paceRatioMid, reconcileVo2 } from "../src/science/paces.ts";
 export { rangeText } from "../src/science/estimate.ts";
 export { assessReadiness } from "../src/readiness/readiness.ts";

@@ -157,3 +157,41 @@ test("no primer, no plyometrics, no device — none of them are defaults", () =>
     }
   }
 });
+
+test("a race is warmed up by its DISTANCE, never by its intensity", () => {
+  // ⚠️ Every race is a maximal effort, so reading effort alone gave a half marathon the same
+  // 34-minute preparation as a VO2 session — against a paper that allows a half 0–15 minutes, a
+  // marathon 0–12, and warns in as many words against copying 5 km logic into longer races.
+  const race = vo2Session(paces, 1); // any maximal-effort session stands in for the race steps
+  const k5 = buildWarmup(race, "intermediate", { raceDistance: "5k" })!;
+  const k10 = buildWarmup(race, "intermediate", { raceDistance: "10k" })!;
+  const half = buildWarmup(race, "intermediate", { raceDistance: "half" })!;
+  const mar = buildWarmup(race, "intermediate", { raceDistance: "marathon" })!;
+  assert.ok(k5.totalMinutes > k10.totalMinutes, "5k needs more than 10k");
+  assert.ok(k10.totalMinutes > half.totalMinutes, "10k needs more than a half");
+  assert.ok(half.totalMinutes > mar.totalMinutes, "a half needs more than a marathon");
+  assert.ok(mar.totalMinutes <= 15, `a marathon warm-up must be small, got ${mar.totalMinutes}`);
+  // Acceptance criterion 2 from the paper, stated exactly.
+  assert.ok(mar.totalMinutes < k5.totalMinutes,
+    "a marathon warm-up is shorter than a 5 km warm-up for the same runner in the same weather");
+});
+
+test("a beginner does no formal running before a half or a marathon", () => {
+  const race = vo2Session(paces, 1);
+  for (const d of ["half", "marathon"] as const) {
+    const w = buildWarmup(race, "new", { raceDistance: d })!;
+    assert.equal(w.embedded, true, `${d}: the race itself is the warm-up`);
+    assert.ok(!w.phases.some((p: any) => p.phase === "potentiate"), `${d}: no strides for a novice`);
+    assert.ok(w.notes.some((n) => /finish|easier/i.test(n)), `${d}: told to start conservatively`);
+  }
+});
+
+test("a long run with its hard work late warms up inside itself", () => {
+  // The paper's T2: a run whose pace block comes later needs no second full warm-up. Taking the
+  // PEAK effort instead of the FIRST put 24 minutes of preparation in front of a 135-minute run
+  // whose opening 40 minutes are easy.
+  const late = longRun(paces, 135, { finishMinutes: 20, finishPace: paces.threshold, finishRpe: { min: 6, max: 7 } } as any);
+  const w = buildWarmup(late, "intermediate")!;
+  assert.equal(w.embedded, true, "the run's own opening is the warm-up");
+  assert.ok(w.totalMinutes <= 12, `got ${w.totalMinutes} minutes before a run that starts easy`);
+});

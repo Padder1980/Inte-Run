@@ -4067,6 +4067,11 @@ function warmupCardFor(sess) {
   try {
     return RC.buildWarmup(sess, warmupAbility(), {
       temperatureC: (state.wx && typeof state.wx.tempC === "number") ? state.wx.tempC : null,
+      // ⚠️ On race day the DISTANCE decides the warm-up, not the effort. Every race is maximal, so
+      // without this a half marathon was handed the same 34-minute preparation as an interval
+      // session — against a paper that gives a half 0-15 minutes and a marathon 0-12, and warns
+      // explicitly against copying short-race logic into long ones.
+      raceDistance: sess.type === "race" ? (profile.goalDist || null) : null,
       // ⚠️ The safety gate. Reported illness or pain that changes how you run means NO warm-up is
       // generated at all — not a gentler one. The paper puts the medical gate above every
       // performance rule so that no later scaling can talk its way past it.

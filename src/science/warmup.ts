@@ -47,6 +47,15 @@ export type EvidenceGrade = "A" | "B" | "B/C" | "C" | "C/D" | "D";
 export type AbilityBand = "new" | "beginner" | "intermediate" | "advanced";
 
 export type WarmupConditions = {
+  /**
+   * The race distance, when this session IS the race.
+   * ⚠️ A RACE IS WARMED UP BY ITS DISTANCE, NOT ITS INTENSITY. Every race is maximal effort, so
+   * reading effort alone handed a half marathon the same 34-minute preparation as a VO2 session —
+   * against a paper that gives a half 0-15 minutes, a marathon 0-12, and warns in as many words not
+   * to copy 5 km logic into longer races. The longer the race, the less you warm up: the opening
+   * kilometres do the job, and everything you spend beforehand is fuel and heat you do not get back.
+   */
+  raceDistance?: "5k" | "10k" | "half" | "marathon" | null;
   /** Degrees C, when known. */
   temperatureC?: number | null;
   /** Minutes the runner has. Undefined means "enough". */
@@ -97,6 +106,13 @@ export const WARMUP_MOVEMENTS = {
  * rule already do. Reading the session's title or type instead is how a "long run" carrying 20
  * minutes at goal pace gets a long run's warm-up, when its first real effort might be 25 minutes in.
  */
+/**
+ * Minutes of easy running before the first demanding step, after which the run has warmed itself up.
+ * The paper's T2: a long run with a pace block later needs no second full warm-up; strides only if
+ * that block starts inside the first 20 minutes.
+ */
+const EMBED_AFTER_MIN = 18;
+
 export function firstHardEffort(session: WarmupSession): FirstHardEffort {
   const steps = (session.steps || []) as WorkoutStep[];
   // ⚠️ A `rep` STEP CARRIES NO RPE OF ITS OWN -- the band lives on the SESSION. Reading only the
@@ -104,18 +120,29 @@ export function firstHardEffort(session: WarmupSession): FirstHardEffort {
   // pace as "easy" and would have handed it a long run's warm-up. The session band describes the
   // reps; that is what to read.
   const sessionMax = session.targetRpe ? session.targetRpe.max : 0;
-  // ⚠️ The jog BETWEEN reps is excluded. It is recovery, so charging it the session's band would
-  // say every interval session opens hard even when it opens with a jog.
-  const work = steps.filter((s) => s.kind === "rep" || s.kind === "steady");
-  let peak = 0;
-  for (const s of work) {
-    const r = s.targetRpe ? s.targetRpe.max : (s.kind === "rep" ? sessionMax : 0);
-    if (r > peak) peak = r;
+  // ⚠️ FIRST, NOT HARDEST. This is the whole rule and getting it wrong is not subtle: taking the
+  // PEAK effort gave a 45-minute easy run with strides on the end a 34-minute warm-up — longer than
+  // a VO2 session — because it looked past three quarters of an hour of easy running to find the
+  // fastest thing in the session. It also put 24 minutes of preparation in front of a 135-minute
+  // long run whose first 40 minutes are easy. Walk the steps in order, stop at the first demanding
+  // one, and count how much easy running came before it.
+  let easyMin = 0;
+  for (const s of steps) {
+    const mins = (s.durationSeconds || 0) / 60;
+    // The jog BETWEEN reps is recovery, not work; charging it the session's band would say every
+    // interval session opens hard even when it opens with a jog.
+    if (s.kind === "recovery") { easyMin += mins; continue; }
+    const rpe = s.targetRpe ? s.targetRpe.max : (s.kind === "rep" ? sessionMax : 0);
+    if (rpe >= 4 && s.kind !== "warmup") {
+      // ⚠️ The run has already warmed itself up by the time the work starts.
+      if (easyMin >= EMBED_AFTER_MIN) return "easy";
+      if (rpe >= 9) return "maximal";
+      if (rpe >= 8) return "hard";
+      if (rpe >= 6) return "threshold";
+      return "steady";
+    }
+    easyMin += mins;
   }
-  if (peak >= 9) return "maximal";
-  if (peak >= 7) return "hard";
-  if (peak >= 6) return "threshold";
-  if (peak >= 4) return "steady";
   return "easy";
 }
 
@@ -145,9 +172,15 @@ export function buildWarmup(
   // scaling can talk its way past it.
   if (conditions.unwell) return null;
 
-  const effort = firstHardEffort(session);
   const notes: string[] = [];
   const phases: WarmupPhase[] = [];
+
+  // ---- Race day: set by the distance (paper R5-R8) ----
+  if (conditions.raceDistance) {
+    return raceWarmup(conditions.raceDistance, ability, conditions, notes);
+  }
+
+  const effort = firstHardEffort(session);
 
   // ---- Easy and long runs: the warm-up IS the first few minutes of the run ----
   if (effort === "easy") {
@@ -232,6 +265,58 @@ export function buildWarmup(
     phases,
     why: whyLine(effort),
     notes,
+  };
+}
+
+/** Race-day warm-ups, from the paper's R5-R8. Short races need preparing for; long ones need you
+ *  to arrive with everything you have. */
+function raceWarmup(
+  distance: "5k" | "10k" | "half" | "marathon",
+  ability: AbilityBand,
+  conditions: WarmupConditions,
+  notes: string[],
+): Warmup {
+  const novice = ability === "new" || ability === "beginner";
+  const spec = {
+    // raise minutes, strides, transition minutes
+    "5k": novice ? { raise: 8, strides: 2 } : { raise: 13, strides: 4 },
+    "10k": novice ? { raise: 6, strides: 0 } : { raise: 10, strides: 3 },
+    half: novice ? { raise: 0, strides: 0 } : { raise: 8, strides: 3 },
+    marathon: novice ? { raise: 0, strides: 0 } : { raise: 6, strides: 0 },
+  }[distance];
+  let raise = spec.raise, strides = spec.strides;
+  const t = conditions.temperatureC;
+  if (typeof t === "number" && t >= 24) {
+    raise = Math.round(raise * 0.6); strides = Math.max(0, strides - 1);
+    notes.push("Cut right back for the heat — every minute you run beforehand is heat you carry to the start line.");
+  }
+  const phases: WarmupPhase[] = [];
+  if (raise > 0) {
+    phases.push({ phase: "raise", minutes: raise, rpe: { min: 2, max: 3 },
+      instruction: `${raise} minutes very easy. This is not training — it is just getting the engine turning over.` });
+  } else {
+    phases.push({ phase: "raise", minutes: 5, rpe: { min: 1, max: 2 },
+      instruction: "No running needed beforehand. Walk briskly while you sort your kit, and use the first kilometre or two of the race itself as the warm-up — deliberately slower than your target pace." });
+  }
+  phases.push({ phase: "mobilise", movements: [WARMUP_MOVEMENTS.ankle_rocks, WARMUP_MOVEMENTS.leg_swings_fb],
+    instruction: "A couple of easy movements to check how the legs feel. Nothing forced." });
+  if (strides > 0) {
+    phases.push({ phase: "potentiate", strides, seconds: 15, effort: "the last one around race pace",
+      instruction: `${strides} × 15 seconds relaxed, the last one around race pace — just enough to make it feel familiar.` });
+  }
+  phases.push({ phase: "transition", minutes: 5,
+    instruction: "Finish 3–8 minutes before the gun, and keep moving gently rather than standing still." });
+  const why = distance === "marathon" || distance === "half"
+    ? "A long race warms you up itself. Anything substantial beforehand costs fuel you will want later, so this is deliberately small."
+    : "A short race starts at full effort, so most of the preparation has to happen before the gun rather than in the first kilometre.";
+  if (novice && (distance === "half" || distance === "marathon")) {
+    notes.push("Your first job is to finish, so start the race easier than feels right — the opening kilometres are the rest of your warm-up.");
+  }
+  return {
+    modelVersion: WARMUP_MODEL_VERSION, firstHardEffort: "maximal",
+    evidenceGrade: distance === "5k" || distance === "10k" ? "C/D" : "D",
+    embedded: raise === 0, totalMinutes: raise + 2 + Math.ceil((strides * 45) / 60) + 5,
+    phases, why, notes,
   };
 }
 

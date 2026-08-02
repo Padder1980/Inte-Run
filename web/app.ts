@@ -501,24 +501,31 @@ h2.sec:first-child { margin-top: 4px; }
 .coachdrawer.on { grid-template-rows: 1fr; opacity: 1; visibility: visible;
   transition: grid-template-rows .26s ease, opacity .2s ease, visibility 0s; }
 .coachdrawer > * { min-height: 0; }
-/* ⚠️ A MARGIN ON THE FIRST CARD, not padding on the grid item. min-height: 0 lets the item's
-   CONTENT box collapse; its padding survives regardless, so padding here left the closed
-   drawer 9px tall instead of 0 — a thin live strip of exactly the kind that cost a phantom
-   tap target on Today. A descendant's margin is clipped with everything else. */
-.coachdrawer .coachcard:first-child { margin-top: 9px; }
+/* ⚠️ THE GAP LIVES ON THE BUTTON, NOT INSIDE THE DRAWER — and this took three attempts to get
+   right, so it is worth stating the rule plainly: "grid-template-rows: 0fr" collapses the TRACK, and
+   nothing on the grid ITEM collapses with it. Padding on it survives (min-height: 0 only frees the
+   content box). A margin on it survives too, because an item's margin box is what sizes the track.
+   Both left the closed drawer 9px tall — the thin invisible-but-live strip that became a phantom tap
+   target on Today. Spacing an ITEM cannot solve it; the spacing has to be outside the drawer
+   entirely. A constant margin under the button reads as ordinary form spacing when closed and as the
+   gap above the cards when open, and the drawer collapses to a true zero either way. */
+.coachsel { margin-bottom: 9px; }
 @media (prefers-reduced-motion: reduce) { .coachdrawer, .cs-chev, .coachsel { transition: none; } }
 /* Voice coach picker */
-.coachcards { display: flex; flex-direction: column; gap: 9px; }
-.coachcard { text-align: left; width: 100%; background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%); border: 1px solid var(--line); border-radius: 14px; padding: 13px 14px; cursor: pointer; box-shadow: 0 1px 2px rgba(20,32,27,.05); transition: border-color .12s ease, box-shadow .12s ease, background .12s ease; }
+/* Two to a row. Grid rather than flex so cards in a row are the same height whatever the length
+   of their description, and so adding a fifth and sixth voice simply adds a row. */
+.coachcards { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.coachcard { display: flex; flex-direction: column; text-align: left; width: 100%; background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%); border: 1px solid var(--line); border-radius: 14px; padding: 12px; cursor: pointer; box-shadow: 0 1px 2px rgba(20,32,27,.05); transition: border-color .12s ease, box-shadow .12s ease, background .12s ease; }
 .coachcard.on { border-color: transparent; background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 12%, var(--surface)), color-mix(in srgb, var(--accent) 5%, var(--surface))); box-shadow: 0 5px 16px -7px color-mix(in srgb, var(--accent) 55%, transparent), 0 0 0 1.5px var(--accent) inset; }
-.cc-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.cc-name { font-size: 15px; font-weight: 750; letter-spacing: -.01em; }
+.cc-name { font-size: 14px; font-weight: 750; letter-spacing: -.01em; line-height: 1.25; }
 .coachcard.on .cc-name { color: var(--accent); }
-.cc-preview { flex: none; display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+.cc-preview { flex: none; display: flex; justify-content: center; align-items: center; gap: 5px; margin-top: 10px; font-size: 11.5px; font-weight: 700; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); border-radius: 999px; padding: 5px 10px; cursor: pointer; }
 .cc-preview svg { width: 12px; height: 12px; }
 .cc-preview:active { transform: translateY(1px); }
-.cc-tag { font-size: 12px; font-weight: 600; color: var(--ink-soft); margin-top: 3px; }
-.cc-desc { font-size: 12.5px; color: var(--ink-faint); margin-top: 4px; line-height: 1.45; }
+.cc-tag { font-size: 11.5px; font-weight: 600; color: var(--ink-soft); margin-top: 3px; line-height: 1.3; }
+/* flex: 1 is what puts every Preview pill in a row on the same line: the description absorbs the
+   difference in card height rather than the button floating up under a short one. */
+.cc-desc { flex: 1; font-size: 11.5px; color: var(--ink-faint); margin-top: 5px; line-height: 1.4; }
 .vol { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 30%, var(--surface-2)); outline: none; }
 .vol::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); box-shadow: 0 2px 6px -1px color-mix(in srgb, var(--accent) 60%, transparent); cursor: pointer; }
 .vol::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); cursor: pointer; }
@@ -5558,10 +5565,14 @@ function coachSettingsHtml() {
   const selCoach = RC.COACHES[c.coach] || RC.COACHES[RC.COACH_IDS[0]];
   const cards = RC.COACH_IDS.map((id) => {
     const co = RC.COACHES[id], sel = c.coach === id;
+    // Two to a row, so the name and the Preview pill can no longer share a line — there is about
+    // 130px of text width in a column. Stacked, with the pill at the foot of the card where it is a
+    // full-width tap target rather than a squeezed one.
     return '<div class="coachcard' + (sel ? " on" : "") + '" data-coach="' + id + '" role="button" tabindex="0">' +
-      '<div class="cc-top"><div class="cc-name">' + co.name + '</div>' +
-      '<span class="cc-preview" data-preview="' + id + '" role="button" tabindex="0">' + ICON.play + ' Preview</span></div>' +
-      '<div class="cc-tag">' + co.tagline + '</div><div class="cc-desc">' + co.description + '</div></div>';
+      '<div class="cc-name">' + esc(co.name) + '</div>' +
+      '<div class="cc-tag">' + esc(co.tagline) + '</div>' +
+      '<div class="cc-desc">' + esc(co.description) + '</div>' +
+      '<span class="cc-preview" data-preview="' + id + '" role="button" tabindex="0">' + ICON.play + ' Preview</span></div>';
   }).join("");
   return '<div class="q" style="margin-top:0"><label>Spoken coaching <span class="q-hint">a voice coaches you through live sessions</span></label>' +
       seg("coach_on", [["1", "On"], ["0", "Off"]], on ? "1" : "0") + '</div>' +

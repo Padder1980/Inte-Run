@@ -775,6 +775,50 @@ test("a plan that cannot reach the stated mileage says so, and says WHY", () => 
     "a plan that reaches its target must not apologise for anything");
 });
 
+test("asking for seven days gets seven days — and the seventh is a recovery jog", () => {
+  // ⚠️ THE FORM OFFERS 3–7 AND THE GENERATOR BUILT 6. A runner who chose seven got six and was
+  // never told, while assessFeasibility's daysFactor DID count the seventh (0.8 + 0.06 × (days − 3)
+  // = 0.98 at six, 1.04 at seven) — so the goal projection was ~6% more optimistic on the strength
+  // of a day the plan never gave them. Promising on a day you do not deliver is the worst of both.
+  const RUN = ["easy", "long", "recovery", "threshold", "vo2", "strides", "race-specific"];
+  const runnerOn = (daysPerWeek: number): Athlete => ({
+    daysPerWeek,
+    recent: { distanceMeters: 5000, timeSeconds: 1020 },
+    experience: "competitive",
+    includeStrength: true,
+    returningFromInjury: false,
+    longRunDay: 6,
+  });
+  const buildWeekOf = (daysPerWeek: number) => {
+    const p = generatePlan(runnerOn(daysPerWeek),
+      { distance: "marathon", raceDateIso: "2027-04-04", targetTimeSeconds: 9000, startDateIso: "2026-08-03" });
+    return p.weeks.find((w) => w.phase === "build" && !w.isDeload)!;
+  };
+  for (const days of [4, 5, 6, 7]) {
+    const runs = buildWeekOf(days).sessions.filter((s) => RUN.includes(s.type));
+    assert.equal(runs.length, days, `asked for ${days} running days, got ${runs.length}`);
+  }
+  // ⚠️ The seventh is a RECOVERY jog, not a fourth 45-minute easy run: seven days means no rest day,
+  // and the extra session exists for circulation on tired legs, not more aerobic volume.
+  const seven = buildWeekOf(7).sessions.filter((s) => RUN.includes(s.type));
+  const rec = seven.filter((s) => s.type === "recovery");
+  assert.equal(rec.length, 1, "a seven-day week must carry exactly one recovery jog");
+  assert.ok(rec[0]!.estimatedDurationSeconds / 60 <= 35,
+    `the recovery jog is ${Math.round(rec[0]!.estimatedDurationSeconds / 60)}min — that is another easy run`);
+  // A seven-day week is genuinely bigger than a six-day one, which is the whole point.
+  const km = (d: number) => buildWeekOf(d).plannedDistanceMeters;
+  assert.ok(km(7) > km(6), "seven days must carry more than six");
+  // ⚠️ And mobility survives: a seven-day week has no free day, so `find` returned undefined and
+  // mobility silently vanished for the runners carrying the most load.
+  assert.ok(buildWeekOf(7).sessions.some((s) => s.type === "mobility"),
+    "mobility disappeared from the seven-day week");
+  // Beginners are capped by their own track, whatever they ask for.
+  const beg = generatePlan({ ...runnerOn(7), experience: "beginner" },
+    { distance: "marathon", raceDateIso: "2027-04-04", targetTimeSeconds: 9000, startDateIso: "2026-08-03" });
+  const begRuns = beg.weeks[10]!.sessions.filter((s) => RUN.includes(s.type)).length;
+  assert.ok(begRuns <= 4, `a beginner asking for 7 days got ${begRuns} runs`);
+});
+
 test("scaling down never buys volume with intensity", () => {
   // ⚠️ WHY THE SCALE-DOWN IS SAFE AT ALL. Quality sessions come from the library at a fixed length,
   // so shrinking a plan shrinks only the easy running around them and the hard fraction climbs by

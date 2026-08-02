@@ -868,6 +868,32 @@ The race-pace detection in `fuelHtml` is the same **content** test `buildWeek` u
 Not done: the watch shows no fuelling text — it would need new payload keys, and the phone is where
 you read a plan. Say so rather than half-doing it.
 
+## Seven days means seven days (fixed 2026-08-02)
+
+⚠️ **The form offered 3–7 and `buildWeek` said `Math.min(6, …)`.** A runner who chose seven got six
+and was never told — while `assessFeasibility`'s `daysFactor` DID count the seventh
+(`0.8 + 0.06 × (days − 3)`: 0.98 at six, **1.04 at seven**), so the goal projection was ~6% more
+optimistic on the strength of a day the plan never gave them. Promising on a day you do not deliver
+is the worst of both worlds. The day slots already existed: long at rel 0, quality at 2 and 4, easy
+at 3, 5, 1, 6 — seven distinct days, exactly 1 + 2 + 4.
+
+⚠️ **The seventh day is a RECOVERY JOG (30 min), not a fourth 45-minute easy run.** Seven days means
+no rest day at all, and the evidence report's Advanced band (5–10 sessions) assumes the extra
+sessions are recovery running — circulation on tired legs, not more aerobic volume. Another full
+easy run is how a seven-day week becomes a six-day week plus an injury.
+
+⚠️ **Mobility had no free day to land on and silently vanished.** `MOB_PREF_REL…find()` returned
+undefined for exactly the runners carrying the most load. It now falls back to the last easy slot —
+the recovery day at seven days, the shortest easy run otherwise, never a quality or long day.
+Strength already shares days with runs by design; this is the same trade and a better one than
+dropping the session.
+
+Measured: 7 days now builds 7 runs (was 6), peak 94.7 → **102.3 km**; the intensity floor **improved**
+(137 vs 143 under-floor weeks of 22,400 — the extra day is easy running); 0 adjacent hard-day pairs
+across all seven long-run-day choices; week-one anchoring, long-run and title-drift invariants all
+unchanged. Beginners stay capped by their own track (3 run-walk / 4 continuous) whatever they ask
+for. `assessFeasibility` now counts a day that exists, so no change was needed there.
+
 ## Race day is a session (added 2026-08-01, from elite-coach feedback)
 
 ⚠️ **`"race"` is a SessionType, distinct from `"race-specific"`** (which is a rehearsal in

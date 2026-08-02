@@ -579,7 +579,13 @@ function buildWeek(
   wp: AnnotatedWeek,
   ctx: WeekContext,
 ): PlannedWeek {
-  const runningDays = Math.min(6, Math.max(3, ctx.athlete.daysPerWeek));
+  // ⚠️ SEVEN DAYS IS BUILT, NOT SILENTLY CLAMPED TO SIX. The form offers 3–7 and this said
+  // Math.min(6, …), so a runner who chose seven got six and was never told — while
+  // assessFeasibility's daysFactor DID count the seventh (0.8 + 0.06 × (days − 3): 0.98 at six,
+  // 1.04 at seven), making the goal projection ~6% more optimistic on the strength of a day the
+  // plan never gave them. The slots already existed: long at rel 0, quality at 2 and 4, easy at
+  // 3, 5, 1, 6 — seven distinct days, which is exactly 1 + 2 + 4.
+  const runningDays = Math.min(7, Math.max(3, ctx.athlete.daysPerWeek));
   const longDay = longRunDayOf(ctx.athlete);
   // ⚠️ THE LONG RUN IS BUILT FIRST, because the quality count needs to see what it carries. A
   // structured long run with a real race-pace dose is a key day in everything but name, and at
@@ -621,7 +627,13 @@ function buildWeek(
     // Easy running is where weekly volume actually lives, so it scales with the runner too —
     // bounded so a low-mileage runner still gets a real run and a high-mileage one is not handed
     // a two-hour midweek easy day.
-    const baseMin = wp.isDeload ? 35 : ei === easyDays.length - 1 ? 40 : 45;
+    // ⚠️ THE SEVENTH DAY IS A RECOVERY JOG, not a fourth 45-minute easy run. Running seven days
+    // means no rest day at all, and the evidence report's Advanced band (5–10 sessions) assumes the
+    // extra sessions are recovery running — the point of a seventh day is circulation on tired
+    // legs, not more aerobic volume. Handing out another full easy run instead is how a seven-day
+    // week becomes a six-day week plus an injury.
+    const seventh = runningDays >= 7 && ei === easyDays.length - 1;
+    const baseMin = wp.isDeload ? 35 : seventh ? 30 : ei === easyDays.length - 1 ? 40 : 45;
     // ⚠️ ORDER: clamp the VOLUME-driven length to 95 first, THEN taper, with the 20-minute floor
     // outermost. Multiplying before the clamp let the cap swallow the taper whole for high-mileage
     // runners — at vScale 3, 45 x 3 x 0.8 = 108 still clamps to 95, byte-identical to peak week, so
@@ -629,21 +641,31 @@ function buildWeek(
     // 68-minute easy runs. And the floor must stay outside the taper multiply, or a down-scaled
     // runner's race week produces 11-minute non-runs.
     const minutes = Math.max(20, Math.round(Math.min(95, baseMin * (ctx.vScale ?? 1)) * (ctx.taperMult ?? 1)));
-    sessions.push(easyVariant(ctx.paces, minutes, index + ei, canStride));
+    sessions.push(seventh
+      ? recoveryRun(ctx.paces, minutes)
+      : easyVariant(ctx.paces, minutes, index + ei, canStride));
     dayOf.push(d);
   });
 
   // Strength (shares days with runs, per the research brief's weekly structure).
   addStrength(wp, ctx, sessions, dayOf);
 
-  // Optional mobility on the first free day.
+  // Optional mobility: the first free day, or — when there is no free day — the lightest running
+  // day.
+  //
+  // ⚠️ A SEVEN-DAY WEEK HAS NO FREE DAY, so `find` returned undefined and mobility silently
+  // vanished for exactly the runners carrying the most load. Strength already shares days with runs
+  // by design; mobility riding along with the recovery jog is the same trade and a better one than
+  // dropping it. It goes on the LAST easy slot, which is the recovery day at seven days and the
+  // shortest easy run otherwise — never on a quality or long day.
   const used = new Set(dayOf);
-  const freeDay = MOB_PREF_REL.map((r) => dayRel(longDay, r)).find((d) => !used.has(d));
-  if (freeDay !== undefined) {
+  const mobDay = MOB_PREF_REL.map((r) => dayRel(longDay, r)).find((d) => !used.has(d))
+    ?? (easyDays.length ? easyDays[easyDays.length - 1] : undefined);
+  if (mobDay !== undefined) {
     const mob = mobilitySession();
     sessions.push(mob);
-    dayOf.push(freeDay);
-    used.add(freeDay);
+    dayOf.push(mobDay);
+    used.add(mobDay);
   }
 
   // Rest on remaining empty days.
@@ -1374,7 +1396,7 @@ function buildNotes(
       // "you need doubles" note fired on 247 of 560 plans under 105 km/week, most of them three- and
       // four-day weeks where the honest advice is the opposite: run MORE DAYS before running twice
       // in one. Only a runner already at the six-day ceiling is looking at a doubles problem.
-      const runDays = Math.min(6, Math.max(3, athlete.daysPerWeek));
+      const runDays = Math.min(7, Math.max(3, athlete.daysPerWeek));
       if (runDays < 6) {
         notes.push(
           `${head}, because ${runDays} running days can only carry so much. Adding a day would carry more of it ` +
@@ -1382,7 +1404,7 @@ function buildNotes(
         );
       } else {
         notes.push(
-          `${head}, because it only ever schedules one run a day. More than that will not fit into six single runs — ` +
+          `${head}, because it only ever schedules one run a day. More than that will not fit into single daily runs — ` +
           "it needs a second run in the day, and doubles are a coached decision rather than something an app hands " +
           `out on its own. An honest ${Math.round(deliveredPeak)} beats a fictional ${Math.round(targetPeakKm)}.`,
         );

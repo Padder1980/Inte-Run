@@ -45,7 +45,27 @@ final class WorkoutManager: NSObject, ObservableObject {
     /// Estimated max heart rate, handed over at start like the fields above. Zones need a ceiling;
     /// nil means the phone could not estimate one and the heart simply is not zone-coloured.
     var maxHr: Int?
-    private var hrSamples: [Double] = []
+    /// The heart-rate trace: one (metres, bpm) pair every HR_SAMPLE_SEC of RUNNING time.
+    ///
+    /// ⚠️ Paired with DISTANCE, not with time, because the chart the phone draws is heart rate
+    /// across the run's distance — pairing with time would make every pause a flat plateau on a
+    /// distance axis. Paused seconds are not sampled at all, for the same reason the zone
+    /// accumulator skips them.
+    ///
+    /// ⚠️ Bounded at source. It is downsampled to HR_MAX_POINTS before it is sent, so a marathon
+    /// costs the same as a 5k: the phone keeps fifty runs in localStorage and an unbounded trace
+    /// would be the one field that grows without limit.
+    /// When `heartRate` last ARRIVED. ⚠️ The property itself is never cleared — HealthKit simply
+    /// stops delivering when the watch loses skin contact — so reading it is not evidence of a
+    /// reading. Without this stamp the sampler charges an entire dropout to the last bpm it saw and
+    /// the phone draws it as a flat line across the run: a runner whose strap loosened 20 minutes
+    /// into an hour gets two thirds of the trace fabricated, and it is indistinguishable from a
+    /// genuinely steady effort. The average could absorb a stale value; a chart renders it as shape.
+    private var heartRateAt: Date?
+    /// The dropout window. A gap in the trace draws as a diagonal, which is honest; a plateau is not.
+    private static let hrFreshSec: TimeInterval = 15
+    private var hrTrack: [(m: Double, bpm: Double)] = []
+    private var lastHrSampleAt: TimeInterval = -99
     /// Peak heart rate seen this run, and seconds spent in each of the five training zones.
     ///
     /// ⚠️ TIME IN ZONE IS ACCUMULATED HERE, not reconstructed on the phone from a sample series.
@@ -171,7 +191,9 @@ final class WorkoutManager: NSObject, ObservableObject {
         stepStartElapsed = 0
         stepStartMetres = 0
         reportedRpe = nil
-        hrSamples = []
+        hrTrack = []
+        lastHrSampleAt = -99
+        heartRateAt = nil
         maxHeartRate = 0
         zoneSeconds = [0, 0, 0, 0, 0]
         elevGainM = 0
@@ -457,9 +479,38 @@ final class WorkoutManager: NSObject, ObservableObject {
     private func accumulateZone(_ seconds: Double) {
         guard heartRate > 0 else { return }
         if heartRate > maxHeartRate { maxHeartRate = heartRate }
+        if let at = heartRateAt, Date().timeIntervalSince(at) <= Self.hrFreshSec,
+           elapsed - lastHrSampleAt >= Self.hrSampleSec {
+            lastHrSampleAt = elapsed
+            hrTrack.append((m: distanceMetres, bpm: heartRate))
+        }
         guard let z = hrZone else { return }
         let idx = max(0, z - 1)
         if idx < zoneSeconds.count { zoneSeconds[idx] += seconds }
+    }
+
+    /// One sample every five seconds of running: dense enough that a two-minute interval has 24
+    /// points and its shape survives, sparse enough that an hour is 720 pairs before downsampling.
+    private static let hrSampleSec: TimeInterval = 5
+    /// What actually crosses to the phone and is stored forever. 160 points across any run is more
+    /// than a 320-pixel-wide chart can resolve, so nothing visible is lost by capping here.
+    private static let hrMaxPoints = 160
+
+    /// Even thinning that keeps the FIRST and LAST samples. Dropping the last one would end the
+    /// chart before the end of the run, which reads as a shorter run rather than as a thinned trace.
+    private func downsampledHrTrack() -> [[Double]] {
+        guard !hrTrack.isEmpty else { return [] }
+        let n = hrTrack.count
+        let pack: ((m: Double, bpm: Double)) -> [Double] = {
+            [($0.m).rounded(), ($0.bpm).rounded()]
+        }
+        if n <= Self.hrMaxPoints { return hrTrack.map(pack) }
+        var out: [[Double]] = []
+        let step = Double(n - 1) / Double(Self.hrMaxPoints - 1)
+        for i in 0..<Self.hrMaxPoints {
+            out.append(pack(hrTrack[min(n - 1, Int((Double(i) * step).rounded()))]))
+        }
+        return out
     }
 
     func summaryPayload() -> [String: Any] {
@@ -481,6 +532,8 @@ final class WorkoutManager: NSObject, ObservableObject {
         if maxHeartRate > 0 { out["maxHr"] = maxHeartRate }
         if zoneSeconds.contains(where: { $0 > 0 }) { out["zoneSec"] = zoneSeconds }
         if activeCalories > 0 { out["kcal"] = activeCalories }
+        let hr = downsampledHrTrack()
+        if hr.count >= 4 { out["hrSeries"] = hr }
         if elevGainM > 0 { out["elevGain"] = elevGainM }
         return out
     }
@@ -813,6 +866,7 @@ extension WorkoutManager: HKLiveWorkoutBuilderDelegate {
                 let mean = stats.averageQuantity()?.doubleValue(for: bpm) ?? 0
                 Task { @MainActor in
                     self.heartRate = value
+                    if value > 0 { self.heartRateAt = Date() }
                     if mean > 0 { self.avgHeartRate = mean }
                 }
             } else if quantityType == HKQuantityType(.activeEnergyBurned) {

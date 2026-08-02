@@ -792,6 +792,15 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 .hz-v { flex: none; font-weight: 650; }
 .hz-bar { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; margin-top: 5px; }
 .hz-bar i { display: block; height: 100%; border-radius: 999px; background: var(--hz, var(--accent)); transition: width .4s ease; }
+.hr-fill { fill: color-mix(in srgb, var(--eff-hard) 16%, transparent); }
+.hr-line { fill: none; stroke: var(--eff-hard); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+/* ⚠️ --ink-faint, NOT --line. --line is a hairline BORDER token tuned to sit just off --surface;
+   over the tinted hr-fill it measured 1.05:1 in dark, i.e. gone exactly where the chart is busiest,
+   leaving its number floating with nothing to anchor it to. This is the same token the labels use,
+   so line and number read as one thing. */
+.hr-gl { stroke: var(--ink-faint); stroke-opacity: .6; stroke-width: 1; stroke-dasharray: 3 3; }
+.pc-ax.hr-peak { fill: var(--eff-hard); }
+.hz-xl { font-size: 9px; color: var(--ink-faint); text-align: right; margin: -6px 2px 6px; }
 .hz-note { font-size: 11.5px; color: var(--ink-faint); margin-top: 8px; }
 .rn-note { width: 100%; box-sizing: border-box; font: inherit; font-size: 16px; line-height: 1.45; color: var(--ink);
   background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; resize: vertical; }
@@ -2820,6 +2829,9 @@ function ingestWatchRun(run) {
     maxHr: run.maxHr ? Math.round(run.maxHr) : null,
     zoneSec: Array.isArray(run.zoneSec) && run.zoneSec.some((s) => Number(s) > 0) ? run.zoneSec.map((s) => Math.round(Number(s) || 0)) : null,
     kcal: run.kcal ? Math.round(run.kcal) : null,
+    // Shape-checked at the bridge, like the route and the splits before it — a chart is the one
+    // place a NaN draws as a plausible line rather than an obvious error.
+    hrSeries: hrSeriesOrNull(run.hrSeries),
     steps: prescribed ? sessionStepText(prescribed) : null,
     type: run.type || (prescribed && prescribed.type) || (planned && planned.type) || "easy",
     rpe: (run.rpe >= 1 && run.rpe <= 10) ? Math.round(run.rpe) : null,
@@ -2935,7 +2947,47 @@ window.__interunCompanionHR = function (bpm) {
     const z = hrZoneIndex(bpm, ceil);
     if (z >= 0) { LIVE.zoneSec = LIVE.zoneSec || [0, 0, 0, 0, 0]; LIVE.zoneSec[z] += gap; }
   }
+  // The trace, paired with DISTANCE rather than time — the chart is heart rate across the run, and
+  // against a time axis every pause would draw as a flat plateau. Sampled on the same clock the
+  // zones use, so a paused run contributes nothing to either.
+  if (!LIVE.pauseStart && (!LIVE.hrSampleAt || now - LIVE.hrSampleAt >= HR_SAMPLE_MS)) {
+    LIVE.hrSampleAt = now;
+    LIVE.hrSeries = LIVE.hrSeries || [];
+    LIVE.hrSeries.push([Math.round(LIVE.dist || 0), bpm]);
+  }
 };
+// One sample every five seconds, and never more than 160 kept — the same numbers the watch uses, so
+// a phone-recorded trace and a wrist-recorded one have the same resolution. ⚠️ 160 points is finer
+// than a 320-unit-wide chart can resolve, and the run store holds fifty runs: an unbounded trace
+// would be the only field in the record that grows without limit.
+const HR_SAMPLE_MS = 5000, HR_MAX_POINTS = 160;
+// Even thinning that KEEPS THE FIRST AND LAST samples — dropping the last ends the chart before the
+// end of the run, which reads as a short run rather than as a thinned trace.
+function downsampleSeries(series, max) {
+  const n = series.length;
+  if (n <= max) return series;
+  const out = [], step = (n - 1) / (max - 1);
+  for (let i = 0; i < max; i++) out.push(series[Math.min(n - 1, Math.round(i * step))]);
+  return out;
+}
+// ⚠️ THE ONE GATE, for both writers. The chart's x-axis is DISTANCE, so a trace whose distance never
+// advances cannot be drawn — and that is the normal case for a TREADMILL run, which records a real
+// clock and deliberately no distance at all. Every sample would sit at metre zero. Storing it would
+// put a field on the record that no screen can ever render, and the treadmill distance the runner
+// types in afterwards cannot rescue it: applyTreadmillDistance sets the TOTAL, and there is nothing
+// to say which beat happened at which point of it. Better an honest absence than a fabricated axis.
+function hrSeriesOrNull(series) {
+  if (!Array.isArray(series) || series.length < 4) return null;
+  const clean = [];
+  for (const p of series) {
+    if (!Array.isArray(p) || p.length < 2) continue;
+    const m = Number(p[0]), b = Number(p[1]);
+    if (isFinite(m) && m >= 0 && isFinite(b) && b >= 30 && b <= 240) clean.push([Math.round(m), Math.round(b)]);
+  }
+  if (clean.length < 4) return null;
+  if (!(clean[clean.length - 1][0] > clean[0][0])) return null;
+  return downsampleSeries(clean, HR_MAX_POINTS);
+}
 // The app's five heart-rate zones, as fractions of maximum. ⚠️ These are the SAME boundaries the
 // watch already colours its heart by (WorkoutManager.hrZone) and the same the engine derives in
 // estimateHrZones — 50/60/70/80/90%. Three copies of one truth is already one too many; if these
@@ -6766,6 +6818,50 @@ function runDescriptionHtml(run) {
 // time-in-zone was accumulated during the run. The bpm ranges alone are derivable from age for
 // almost every runner, but a zones panel showing five ranges and no time in them looks broken and
 // tells the runner nothing they did not already know about arithmetic.
+// Heart rate across the run, drawn over DISTANCE — the axis the reference uses, and the one that
+// matches the splits underneath it. A filled area rather than a bare line: at this size the shape of
+// the effort is what you read, not individual beats.
+function hrChartSvg(series, run) {
+  if (!Array.isArray(series) || series.length < 4) return "";
+  const W = 320, H = 132, L = 34, R = 8, T = 10, B = 20;
+  const iw = W - L - R, ih = H - T - B;
+  const maxM = series[series.length - 1][0] || 1;
+  if (maxM <= 0) return "";
+  let lo = Infinity, hi = -Infinity;
+  for (const p of series) { if (p[1] < lo) lo = p[1]; if (p[1] > hi) hi = p[1]; }
+  // A flat run must not draw as a flat line across a zero-height axis.
+  if (hi - lo < 8) { const mid = (hi + lo) / 2; lo = mid - 5; hi = mid + 5; }
+  const pad = (hi - lo) * 0.12; lo -= pad; hi += pad;
+  const x = (m) => L + iw * Math.min(1, m / maxM);
+  const y = (b) => T + ih * (1 - (b - lo) / (hi - lo));
+  const pts = series.map((p) => x(p[0]).toFixed(1) + "," + y(p[1]).toFixed(1));
+  let out = '<svg viewBox="0 0 ' + W + ' ' + H + '" class="pc-svg hr-svg" role="img" aria-label="Heart rate across the run">';
+  // ⚠️ Both baseline corners come from the DATA. The right one always did; the left was a literal L,
+  // so whenever the first reading arrived after the start — which is the normal case, since the wrist
+  // needs a moment to deliver one — the fill opened as a shaded wedge with no trace above it.
+  out += '<polygon points="' + (x(series[0][0]).toFixed(1) + "," + (T + ih)) + " " + pts.join(" ") + " " + (x(maxM).toFixed(1) + "," + (T + ih)) + '" class="hr-fill"/>';
+  out += '<polyline points="' + pts.join(" ") + '" class="hr-line"/>';
+  // Two labelled gridlines rather than a full axis: the peak, and the average the tiles already show.
+  const gl = (bpm, cls) => (bpm > lo && bpm < hi)
+    ? '<line x1="' + L + '" y1="' + y(bpm).toFixed(1) + '" x2="' + (L + iw) + '" y2="' + y(bpm).toFixed(1) + '" class="hr-gl"/>' +
+      '<text x="' + (L - 5) + '" y="' + (y(bpm) + 3).toFixed(1) + '" class="pc-ax ' + cls + '">' + Math.round(bpm) + '</text>'
+    : "";
+  // ⚠️ TWO 9px LABELS AT THE SAME x COLLIDE. Average and peak sit close together on any run held at
+  // a steady effort, and two three-digit numbers printed over each other are worse than one — the
+  // runner cannot tell which is which, and both numbers are already spelled out in the tiles above.
+  // The peak is the one that earns its place on the chart, so the average yields.
+  const avg = run && run.avgHr, peak = run && run.maxHr;
+  const clash = avg && peak && Math.abs(y(avg) - y(peak)) < 11;
+  if (!clash) out += gl(avg, "");
+  out += gl(peak, "hr-peak");
+  const km = Math.max(1, Math.round(maxM / 1000));
+  for (let i = 0; i <= km; i++) {
+    if (km > 8 && i % 2) continue;
+    const m = i * 1000; if (m > maxM) break;
+    out += '<text x="' + x(m).toFixed(1) + '" y="' + (H - 6) + '" class="pc-xl">' + i + '</text>';
+  }
+  return out + "</svg>";
+}
 const HR_ZONE_NAME = ["Recovery", "Easy", "Steady", "Threshold", "Max"];
 function runHrHtml(run) {
   if (!run.avgHr && !run.maxHr && !run.zoneSec) return "";
@@ -6786,10 +6882,13 @@ function runHrHtml(run) {
   }
   const note = (zs && total > 30 && !ceil)
     ? '<div class="hz-note">Add your age or your measured max heart rate in your profile and these become zones.</div>' : "";
+  const chart = hrChartSvg(run.hrSeries, run);
   // Nothing worth a card: the tiles above already carry avg and max, so a heading with nothing
   // under it would be a section that exists only to be empty.
-  if (!body && !note) return "";
-  return '<div class="card"><div class="subhead" style="margin-top:0">Heart rate</div>' + body + note + '</div>';
+  if (!body && !note && !chart) return "";
+  return '<div class="card"><div class="subhead" style="margin-top:0">Heart rate</div>' +
+    (chart ? '<div class="pc-wrap">' + chart + '</div><div class="hz-xl">km</div>' : "") +
+    body + note + '</div>';
 }
 // Free text on the run. Deliberately private and local — it is a training diary, not a caption.
 function runNoteHtml(run) {
@@ -7334,6 +7433,7 @@ function liveRunRecord(sm) {
     anchor: profile.recentTimeS, pmodel: PACE_MODEL_VERSION,
     avgHr: LIVE.hrN ? Math.round(LIVE.hrSum / LIVE.hrN) : null,
     maxHr: LIVE.hrMax || null,
+    hrSeries: hrSeriesOrNull(LIVE.hrSeries),
     zoneSec: (LIVE.zoneSec && LIVE.zoneSec.some((s) => s > 0)) ? LIVE.zoneSec.slice() : null,
     steps: sessionStepText(LIVE.session),
     sim: LIVE.mode === "sim" || undefined,

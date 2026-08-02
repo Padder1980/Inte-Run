@@ -46,6 +46,22 @@ final class WorkoutManager: NSObject, ObservableObject {
     /// nil means the phone could not estimate one and the heart simply is not zone-coloured.
     var maxHr: Int?
     private var hrSamples: [Double] = []
+    /// Peak heart rate seen this run, and seconds spent in each of the five training zones.
+    ///
+    /// ⚠️ TIME IN ZONE IS ACCUMULATED HERE, not reconstructed on the phone from a sample series.
+    /// Five running totals answer the whole zones panel for six numbers in the payload; shipping
+    /// every sample so the phone could add them up would cost hundreds per run against a store that
+    /// holds fifty runs, to answer exactly the same question. It also survives a run done entirely
+    /// out of range of the phone, which a live-streamed version would not.
+    ///
+    /// ⚠️ FIVE buckets, not six. `hrZone` returns 0-5 with 0 meaning "below 50% of max", but the
+    /// phone's zones panel is 1-5 like every other running app, so zone 0 and zone 1 both land in
+    /// index 0. Time below 50% is still time on your feet and must not be silently dropped.
+    private(set) var maxHeartRate: Double = 0
+    private var zoneSeconds: [Double] = [0, 0, 0, 0, 0]
+    /// Metres climbed, accumulated the same way the phone does it, from the fixes we already have.
+    private var elevGainM: Double = 0
+    private var lastAltitude: Double?
     private(set) var routePoints: [[Double]] = []
     private var splits: [Int] = []
     private var lastSplitMetre = 0.0
@@ -156,6 +172,10 @@ final class WorkoutManager: NSObject, ObservableObject {
         stepStartMetres = 0
         reportedRpe = nil
         hrSamples = []
+        maxHeartRate = 0
+        zoneSeconds = [0, 0, 0, 0, 0]
+        elevGainM = 0
+        lastAltitude = nil
         routePoints = []
         splits = []
         lastSplitMetre = 0
@@ -319,6 +339,7 @@ final class WorkoutManager: NSObject, ObservableObject {
                     // ⚠️ Minus the paused time. Elapsed was wall-clock since start, so pausing froze
                     // the display and then SNAPPED FORWARD on resume, counting the whole pause.
                     self.elapsed = Date().timeIntervalSince(started) - self.pausedAccum
+                    self.accumulateZone(0.5)
                     self.advanceStepIfDue()
                     // Pace corrections are the wrist's own voice, WITH the numbers — the owner's
                     // spec ("your current pace is…, your target pace is…") can never come from a
@@ -430,6 +451,17 @@ final class WorkoutManager: NSObject, ObservableObject {
     }
 
     /// The finished run, in the shape the phone's plan already understands.
+    /// Charge half a second to whichever zone the current reading sits in. Called only from the
+    /// RUNNING branch of the ticker, so a paused run banks nothing — a runner standing at a
+    /// crossing is not accumulating training time, and counting it would inflate every zone.
+    private func accumulateZone(_ seconds: Double) {
+        guard heartRate > 0 else { return }
+        if heartRate > maxHeartRate { maxHeartRate = heartRate }
+        guard let z = hrZone else { return }
+        let idx = max(0, z - 1)
+        if idx < zoneSeconds.count { zoneSeconds[idx] += seconds }
+    }
+
     func summaryPayload() -> [String: Any] {
         var out: [String: Any] = [
             "id": runId,
@@ -446,6 +478,10 @@ final class WorkoutManager: NSObject, ObservableObject {
         }
         if let rpe = reportedRpe { out["rpe"] = rpe }
         if avgHeartRate > 0 { out["avgHr"] = avgHeartRate }
+        if maxHeartRate > 0 { out["maxHr"] = maxHeartRate }
+        if zoneSeconds.contains(where: { $0 > 0 }) { out["zoneSec"] = zoneSeconds }
+        if activeCalories > 0 { out["kcal"] = activeCalories }
+        if elevGainM > 0 { out["elevGain"] = elevGainM }
         return out
     }
 
@@ -723,6 +759,19 @@ extension WorkoutManager: CLLocationManagerDelegate {
             // Downsampled, and only when the runner actually moved. Recording a point per fix
             // regardless drew a map out of standing-still drift — the numbers said 0.02 km and the
             // map still showed a wandering line, which is worse than showing nothing.
+            // Climb, from fixes already in hand. ⚠️ Gated on verticalAccuracy: CoreLocation reports
+            // a negative value when the altitude is unusable, and summing garbage would invent
+            // hills. The 0.6 m step matches the phone's accumulator so a wrist run and a phone run
+            // over the same hill report the same climb.
+            for fix in usable where fix.verticalAccuracy >= 0 && fix.verticalAccuracy < 15 {
+                if let prev = lastAltitude {
+                    let d = fix.altitude - prev
+                    if d > 0.6 { elevGainM += d }
+                    if abs(d) > 0.6 { lastAltitude = fix.altitude }
+                } else {
+                    lastAltitude = fix.altitude
+                }
+            }
             if movedThisBatch, let last = usable.last, routePoints.count < 600 {
                 routePoints.append([
                     (last.coordinate.latitude * 100000).rounded() / 100000,

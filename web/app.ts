@@ -107,7 +107,7 @@ try{if(location.protocol==='interun:'){var v=document.querySelector('meta[name=v
   --accent: #0e8c7f; --accent-ink: #ffffff;
   --base: #2b9eb3; --build: #5fa83c; --peak: #e0863a; --taper: #7a6fd0;
   --ready: #4b9e2f; --steady: #2b9eb3; --ease: #d98a2a; --rest: #c0442e;
-  --eff-easy: #3fa47a; --eff-moderate: #d99a2b; --eff-hard: #d65b36; --eff-none: #9aa8a1;
+  --eff-easy: #3fa47a; --eff-moderate: #d99a2b; --eff-hard: #d65b36; --eff-none: #9aa8a1; --hz1:#7f8c99; --hz2:#3d7fd6; --hz3:#2fa96b; --hz4:#e2952f; --hz5:#d6493c;
   --shadow: 0 1px 2px rgba(20,32,27,.05), 0 6px 18px rgba(20,32,27,.06);
   /* Launch screen. ⚠️ THE TOP STOP OF --splash-bg MUST EQUAL THAT THEME'S --bg, in BOTH themes.
      iOS paints the strip above a Home Screen web app from the CANVAS background, latched at
@@ -126,15 +126,15 @@ try{if(location.protocol==='interun:'){var v=document.querySelector('meta[name=v
     --accent: #2bb3a3; --accent-ink: #06231f;
     --base: #3ab0c4; --build: #74bd52; --peak: #eb9748; --taper: #9184e0;
     --ready: #6bbf46; --steady: #3ab0c4; --ease: #eb9748; --rest: #e8765c;
-    --eff-easy: #4cb98a; --eff-moderate: #e6ac3e; --eff-hard: #e56f49; --eff-none: #6f7d76;
+    --eff-easy: #4cb98a; --eff-moderate: #e6ac3e; --eff-hard: #e56f49; --eff-none: #6f7d76; --hz1:#8b98a5; --hz2:#5296e8; --hz3:#43c184; --hz4:#efab48; --hz5:#e8604f;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 22px rgba(0,0,0,.4);
     --splash-bg: radial-gradient(125% 90% at 50% 0%, #0a100e 0%, #0c2b28 12%, #06110f 56%, #000 100%);
     --splash-ink: #ffffff; --splash-soft: #9aa3a0; --splash-brand: #16b7a4;
     --splash-glow: rgba(22,183,164,.38);
   }
 }
-:root[data-theme="light"] { color-scheme: light; --bg:#eef1f1; --surface:#fff; --surface-2:#f6f8f8; --line:#dbe1e0; --ink:#14201b; --ink-soft:#4c5b55; --ink-faint:#7a877f; --accent:#0e8c7f; --accent-ink:#fff; --base:#2b9eb3; --build:#5fa83c; --peak:#e0863a; --taper:#7a6fd0; --ready:#4b9e2f; --steady:#2b9eb3; --ease:#d98a2a; --rest:#c0442e; --eff-easy:#3fa47a; --eff-moderate:#d99a2b; --eff-hard:#d65b36; --eff-none:#9aa8a1; --shadow:0 1px 2px rgba(20,32,27,.05),0 6px 18px rgba(20,32,27,.06);  --splash-bg: radial-gradient(125% 90% at 50% 0%, #eef1f1 0%, #e4edeb 52%, #d6e3e0 100%); --splash-ink:#14201b; --splash-soft:#5b6b64; --splash-brand:#0e8c7f; --splash-glow:rgba(14,140,127,.22); }
-:root[data-theme="dark"] { color-scheme: dark; --bg:#0a100e; --surface:#151e1b; --surface-2:#1b2622; --line:#26332e; --ink:#e7eeea; --ink-soft:#a9b7b0; --ink-faint:#74847c; --accent:#2bb3a3; --accent-ink:#06231f; --base:#3ab0c4; --build:#74bd52; --peak:#eb9748; --taper:#9184e0; --ready:#6bbf46; --steady:#3ab0c4; --ease:#eb9748; --rest:#e8765c; --eff-easy:#4cb98a; --eff-moderate:#e6ac3e; --eff-hard:#e56f49; --eff-none:#6f7d76; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.4);  --splash-bg: radial-gradient(125% 90% at 50% 0%, #0a100e 0%, #0c2b28 12%, #06110f 56%, #000 100%); --splash-ink:#ffffff; --splash-soft:#9aa3a0; --splash-brand:#16b7a4; --splash-glow:rgba(22,183,164,.38); }
+:root[data-theme="light"] { color-scheme: light; --bg:#eef1f1; --surface:#fff; --surface-2:#f6f8f8; --line:#dbe1e0; --ink:#14201b; --ink-soft:#4c5b55; --ink-faint:#7a877f; --accent:#0e8c7f; --accent-ink:#fff; --base:#2b9eb3; --build:#5fa83c; --peak:#e0863a; --taper:#7a6fd0; --ready:#4b9e2f; --steady:#2b9eb3; --ease:#d98a2a; --rest:#c0442e; --eff-easy:#3fa47a; --eff-moderate:#d99a2b; --eff-hard:#d65b36; --eff-none:#9aa8a1; --hz1:#7f8c99; --hz2:#3d7fd6; --hz3:#2fa96b; --hz4:#e2952f; --hz5:#d6493c; --shadow:0 1px 2px rgba(20,32,27,.05),0 6px 18px rgba(20,32,27,.06);  --splash-bg: radial-gradient(125% 90% at 50% 0%, #eef1f1 0%, #e4edeb 52%, #d6e3e0 100%); --splash-ink:#14201b; --splash-soft:#5b6b64; --splash-brand:#0e8c7f; --splash-glow:rgba(14,140,127,.22); }
+:root[data-theme="dark"] { color-scheme: dark; --bg:#0a100e; --surface:#151e1b; --surface-2:#1b2622; --line:#26332e; --ink:#e7eeea; --ink-soft:#a9b7b0; --ink-faint:#74847c; --accent:#2bb3a3; --accent-ink:#06231f; --base:#3ab0c4; --build:#74bd52; --peak:#eb9748; --taper:#9184e0; --ready:#6bbf46; --steady:#3ab0c4; --ease:#eb9748; --rest:#e8765c; --eff-easy:#4cb98a; --eff-moderate:#e6ac3e; --eff-hard:#e56f49; --eff-none:#6f7d76; --hz1:#8b98a5; --hz2:#5296e8; --hz3:#43c184; --hz4:#efab48; --hz5:#e8604f; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.4);  --splash-bg: radial-gradient(125% 90% at 50% 0%, #0a100e 0%, #0c2b28 12%, #06110f 56%, #000 100%); --splash-ink:#ffffff; --splash-soft:#9aa3a0; --splash-brand:#16b7a4; --splash-glow:rgba(22,183,164,.38); }
 * { box-sizing: border-box; }
 /* The app shell owns the viewport; the document itself must never scroll.
    ⚠️ Without this the page was the scroller, not #view, and two consequences followed: an iOS
@@ -752,7 +752,40 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 .rt-start { fill: var(--accent); stroke: #fff; stroke-width: 2.5; }
 .rt-end { fill: #fff; stroke: var(--accent); stroke-width: 3.5; }
 .rt-none { padding: 26px 16px; text-align: center; font-size: 13px; color: var(--ink-faint); }
-.ov-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 14px 16px; border-top: 1px solid var(--line); }
+/* The post-run debrief: one scroll, map first. Three columns, and the tile count varies with what
+   was actually measured (elevation only on a phone run, heart rate only with a watch), so the last
+   row is often short — left-aligned and even, which is what a stats block should look like. */
+.ov-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 8px; padding: 14px 16px; border-top: 1px solid var(--line); }
+.ov-head { padding: 14px 16px 0; }
+.ov-t { font-size: 19px; font-weight: 750; letter-spacing: -.02em; line-height: 1.2; }
+.ov-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.ov-chip { font-size: 10.5px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; color: var(--sc, var(--accent));
+  background: color-mix(in srgb, var(--sc, var(--accent)) 14%, transparent); border-radius: 7px; padding: 3px 8px; }
+.ov-d { font-size: 12.5px; color: var(--ink-faint); }
+.ov-u { font-size: 12px; font-weight: 600; color: var(--ink-faint); }
+/* "What the plan asked for" — the prescription the debrief just judged the run against. */
+.ds-row { display: flex; gap: 10px; padding: 9px 0; }
+/* ⚠️ Sibling-based, NOT :first-of-type — the card's first div child is the subhead, so
+   :first-of-type never matched a .ds-row and the list opened with a stray divider. */
+.ds-row + .ds-row { border-top: 1px solid var(--line); }
+.ds-tag { flex: none; width: 74px; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint); padding-top: 3px; }
+.ds-b { flex: 1; min-width: 0; }
+.ds-l { font-size: 14px; font-weight: 650; }
+.ds-t { font-size: 12.5px; color: var(--accent); margin-top: 2px; }
+.ds-r { font-size: 12px; color: var(--ink-faint); margin-top: 2px; }
+/* Heart-rate zones. The five tints run cool to hot so the shape of the run reads at a glance. */
+.hz-row { padding: 7px 0; }
+.hz-h { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; }
+.hz-n { flex: none; color: var(--ink-soft); }
+.hz-n b { color: var(--ink); font-weight: 650; }
+.hz-r { flex: 1; color: var(--ink-faint); font-size: 11.5px; }
+.hz-v { flex: none; font-weight: 650; }
+.hz-bar { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; margin-top: 5px; }
+.hz-bar i { display: block; height: 100%; border-radius: 999px; background: var(--hz, var(--accent)); transition: width .4s ease; }
+.hz-note { font-size: 11.5px; color: var(--ink-faint); margin-top: 8px; }
+.rn-note { width: 100%; box-sizing: border-box; font: inherit; font-size: 16px; line-height: 1.45; color: var(--ink);
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; resize: vertical; }
+.rn-note:focus { outline: none; border-color: var(--accent); }
 .ov-stat .ov-v { font-size: 21px; font-weight: 750; letter-spacing: -.02em; }
 .ov-stat .ov-k { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); margin-top: 2px; }
 .sp-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
@@ -1936,6 +1969,15 @@ function dmon(dt) { return dt.getUTCDate() + " " + MONTHS[dt.getUTCMonth()]; }
 // ---- Your profile drives everything ---------------------------------------
 const watch = { sleepHours: 7.5, restingHrDelta: 0, hrvStatus: "normal" };
 function todayIso() { return new Date().toISOString().slice(0, 10); }
+const MON_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+// A date that stays true. Used for watch runs, which have a date but no clock time.
+function runDateLabelIso(iso) {
+  const p = String(iso || "").split("-");
+  if (p.length !== 3) return "";
+  const y = Number(p[0]), m = Number(p[1]) - 1, d = Number(p[2]);
+  if (!(m >= 0 && m < 12)) return "";
+  return d + " " + MON_SHORT[m] + (y === new Date().getFullYear() ? "" : " " + y);
+}
 function futureIso(days) { const d = new Date(); d.setDate(d.getDate() + days); return d.toISOString().slice(0, 10); }
 function fmtTimeFull(s) { s = Math.round(s); const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), x = s%60; const p = (n) => String(n).padStart(2,"0"); return h>0 ? h+":"+p(m)+":"+p(x) : m+":"+p(x); }
 
@@ -2661,6 +2703,22 @@ function watchPayloadForToday() {
 // has always stored [{lat, lng}, ...]. Reading p.lat off an array yields undefined, so every
 // coordinate became NaN and the map drew an empty box rather than failing loudly. Normalised here,
 // at the boundary, so exactly one shape exists everywhere downstream.
+// ⚠️ THE WATCH SENDS SPLITS AS BARE SECONDS; the page stores {km, sec}. Exactly the same class of
+// bug as the route shape, and it failed exactly as quietly: runAnalysis filters on "s.sec > 0", so
+// every split from a wrist run was silently discarded — a watch run got no pace-against-target
+// chart, no splits table, and the share card's "fastest km" computed Math.min of nothing and
+// printed NaN. Anything crossing that bridge needs its shape checked at ingest, not assumed.
+function normalizeSplits(splits) {
+  if (!Array.isArray(splits)) return [];
+  const out = [];
+  for (let i = 0; i < splits.length; i++) {
+    const s = splits[i];
+    if (s && typeof s === "object") { const sec = Number(s.sec); if (isFinite(sec) && sec > 0) out.push({ km: Number(s.km) || (i + 1), sec: sec }); continue; }
+    const sec = Number(s);
+    if (isFinite(sec) && sec > 0) out.push({ km: i + 1, sec: sec });
+  }
+  return out;
+}
 function normalizeRoute(route) {
   if (!Array.isArray(route)) return [];
   const out = [];
@@ -2675,11 +2733,38 @@ function normalizeRoute(route) {
 }
 // Runs logged before the fix hold the wrong shape on disk. Convert them once at boot rather than
 // tolerating two shapes at every read site forever.
+// The run the Logbook detail screen is showing. Resolved by id, falling back to the index only
+// for a run opened before ids were tracked.
+function viewedRun() {
+  if (state.viewRunId) { const byId = (state.logged || []).filter((r) => r && r.id === state.viewRunId)[0]; if (byId) return byId; }
+  return (state.logged || [])[state.viewRunIdx];
+}
 function migrateRunRoutes() {
   let changed = false;
   (state.logged || []).forEach((r) => {
-    if (r && Array.isArray(r.route) && r.route.length && Array.isArray(r.route[0])) {
+    if (!r) return;
+    if (Array.isArray(r.route) && r.route.length && Array.isArray(r.route[0])) {
       r.route = normalizeRoute(r.route); changed = true;
+    }
+    // Watch runs already logged with bare-second splits: repair them so their pace chart and
+    // splits table appear, rather than only fixing runs recorded from here on.
+    if (Array.isArray(r.splits) && r.splits.length && typeof r.splits[0] === "number") {
+      r.splits = normalizeSplits(r.splits); changed = true;
+    }
+    // "today" was written into the caption of every watch run, permanently. There is no way back to
+    // the real date for those, but the id carries the milliseconds for phone runs.
+    if (!r.dateIso) {
+      const ms = Number(String(r.id || "").replace("run-", ""));
+      if (isFinite(ms) && ms > 0) { r.dateIso = new Date(ms).toISOString().slice(0, 10); changed = true; }
+    }
+    if (r.dateIso && /^(today|tomorrow|yesterday)$/i.test(String(r.d || "").trim())) {
+      r.d = runDateLabelIso(r.dateIso); changed = true;
+    } else if (!r.dateIso && /^(today|tomorrow|yesterday)$/i.test(String(r.d || "").trim())) {
+      // ⚠️ A watch run logged before dates were stored cannot have its date recovered — its id is
+      // a UUID, not a timestamp, so there is nothing to reconstruct from. Drop the caption rather
+      // than keep it: "today" on a run from a fortnight ago is not a stale label, it is a false
+      // one, and no date at all is better than a wrong one.
+      r.d = ""; changed = true;
     }
   });
   if (changed) saveRuns();
@@ -2709,12 +2794,23 @@ function ingestWatchRun(run) {
   const planned = sessionsForIso(iso)[0] || null;   // summary: used to tick the plan
   const prescribed = rawSessionsForIso(iso)[0] || null; // engine: carries the bands the flags need
   const title = run.title || (prescribed && prescribed.title) || (planned && planned.title) || "Run";
+  // ⚠️ ONE clamped date, used for both the caption and the record. The watch's UPCOMING page lets a
+  // session be started days early, so its dateIso can be in the future; clamping only the stored
+  // field left the caption reading a date the run cannot have happened on.
+  const runIso = iso > todayIso() ? todayIso() : iso;
   state.logged.unshift({
-    id: run.id, t: title, d: dayLabelIso(iso > todayIso() ? todayIso() : iso), dist: distKm.toFixed(2) + " km",
+    // \u26a0\ufe0f the caption used to be dayLabelIso(), which literally writes the word "today" \u2014 so a wrist run was
+    // still captioned "today" a fortnight later, forever, because nothing ever recomputed it. The
+    // date is stored as a real one now and the caption is derived from it at render time.
+    id: run.id, t: title, d: runDateLabelIso(runIso), dateIso: runIso, dist: distKm.toFixed(2) + " km",
     time: fmtPace(sec), pace: avgPaceSec ? fmtPace(avgPaceSec) + " /km" : "\u2014",
     distKm: Number(distKm.toFixed(2)), sec: sec, avgPaceSec: avgPaceSec,
-    route: normalizeRoute(run.route), splits: Array.isArray(run.splits) ? run.splits : [],
+    route: normalizeRoute(run.route), splits: normalizeSplits(run.splits),
     elevGain: Math.round(Number(run.elevGain) || 0),
+    maxHr: run.maxHr ? Math.round(run.maxHr) : null,
+    zoneSec: Array.isArray(run.zoneSec) && run.zoneSec.some((s) => Number(s) > 0) ? run.zoneSec.map((s) => Math.round(Number(s) || 0)) : null,
+    kcal: run.kcal ? Math.round(run.kcal) : null,
+    steps: prescribed ? sessionStepText(prescribed) : null,
     type: run.type || (prescribed && prescribed.type) || (planned && planned.type) || "easy",
     rpe: (run.rpe >= 1 && run.rpe <= 10) ? Math.round(run.rpe) : null,
     pband: prescribed ? plannedPaceBandOf(prescribed) : null,
@@ -2806,7 +2902,42 @@ window.__interunCompanionHR = function (bpm) {
   if (!bpm || bpm < 30 || bpm > 240 || !LIVE || LIVE.done) return;
   LIVE.watchHr = bpm;
   LIVE.hrSum = (LIVE.hrSum || 0) + bpm; LIVE.hrN = (LIVE.hrN || 0) + 1;
+  if (bpm > (LIVE.hrMax || 0)) LIVE.hrMax = bpm;
+  // ⚠️ TIME IN ZONE IS ACCUMULATED, NOT DERIVED FROM A STORED SERIES. Five running totals answer
+  // the whole zones panel and cost five numbers on the run; keeping every sample so the totals can
+  // be computed afterwards would cost hundreds per run against a 50-run store, to answer the same
+  // question. The gap between samples is measured rather than assumed — the wrist streams roughly
+  // every three seconds, but it drops out whenever the phone is out of range or asleep, and
+  // charging that missing time to whatever zone happened to be current would invent minutes the
+  // runner never ran. Anything over 15s is treated as a dropout and thrown away.
+  // ⚠️ A PAUSED RUN BANKS NOTHING — the same rule the watch's own accumulator states, and the two
+  // must measure the same quantity or a phone run and a wrist run of identical shape produce
+  // different zone panels. The companion watch has no idea the phone is paused: CompanionSession
+  // keeps streaming every three seconds, so without this the seconds spent standing at a crossing
+  // are charged to whatever zone a decaying heart rate is passing through, and the zone totals end
+  // up longer than the elapsed time printed on the same screen.
+  const now = Date.now();
+  if (LIVE.pauseStart) { LIVE.hrAt = 0; return; }
+  const gap = LIVE.hrAt ? (now - LIVE.hrAt) / 1000 : 0;
+  LIVE.hrAt = now;
+  const ceil = maxHrEstimate();
+  if (ceil && gap > 0 && gap <= 15) {
+    const z = hrZoneIndex(bpm, ceil);
+    if (z >= 0) { LIVE.zoneSec = LIVE.zoneSec || [0, 0, 0, 0, 0]; LIVE.zoneSec[z] += gap; }
+  }
 };
+// The app's five heart-rate zones, as fractions of maximum. ⚠️ These are the SAME boundaries the
+// watch already colours its heart by (WorkoutManager.hrZone) and the same the engine derives in
+// estimateHrZones — 50/60/70/80/90%. Three copies of one truth is already one too many; if these
+// ever move, move all three, because a runner comparing wrist and phone will spot it immediately.
+const HR_ZONE_FLOOR = [0.5, 0.6, 0.7, 0.8, 0.9];
+function hrZoneIndex(bpm, ceil) {
+  if (!ceil || !bpm) return -1;
+  const f = bpm / ceil;
+  if (f < HR_ZONE_FLOOR[0]) return 0;   // below zone 1 still counts as zone 1: it is time on feet
+  for (let i = HR_ZONE_FLOOR.length - 1; i >= 0; i--) if (f >= HR_ZONE_FLOOR[i]) return i;
+  return 0;
+}
 // Wake the watch to WATCH the run — display only, no second recorder. Silent if there is no watch.
 function startWatchCompanion(sess) {
   if (!NATIVE_WATCH || !watchAvailable()) return;
@@ -3559,7 +3690,26 @@ function stepChips(st) {
   if (st.targetRpe) b.push('<span class="chip rpe">RPE ' + st.targetRpe.min + "–" + st.targetRpe.max + "</span>");
   return b.join("");
 }
-function structureRows(steps) {
+// the plain flag swaps the HTML chips for plain text so the same grouping serves the run record's stored
+// description. ⚠️ One grouping implementation, not two — a ladder or a compound session is exactly
+// where a second copy would drift, and the grouping is the hard part.
+function stepTargetText(st) {
+  const b = [];
+  if (st.targetPaceSecPerKm) b.push(fmtPace(st.targetPaceSecPerKm.minSecPerKm) + "–" + fmtPace(st.targetPaceSecPerKm.maxSecPerKm) + "/km");
+  if (st.targetRpe) b.push("RPE " + st.targetRpe.min + "–" + st.targetRpe.max);
+  return b.join(" · ");
+}
+// A plain snapshot of what the plan asked for, stored ON the run.
+// ⚠️ SNAPSHOT IT — never re-derive the description from the run's date later. adoptPlan() and
+// applyTrainFlag() rebuild the plan, so a run opened next month would be described by whatever
+// session now sits on that date, which can be a completely different workout from the one that was
+// actually run. Same reasoning as stamping pband/rband and the pace-model version at save time.
+function sessionStepText(sess) {
+  if (!sess || !Array.isArray(sess.steps) || !sess.steps.length) return null;
+  return structureRows(sess.steps, true).map((r) => ({ tag: r.tag, lab: String(r.lab), tgt: r.chips || "", rec: r.rec || "" }));
+}
+function structureRows(steps, plain) {
+  const stepChipsFn = plain ? stepTargetText : stepChips;
   const rows = []; let i = 0;
   while (i < steps.length) {
     const st = steps[i];
@@ -3582,11 +3732,14 @@ function structureRows(steps) {
       else lab = reps.map(workLabel).join(" · ");
       const rec = recs[0];
       const recLine = rec ? "with " + workLabel(rec) + " " + (String(rec.label).toLowerCase().includes("walk") ? "walk" : "easy jog") + " between" : "";
-      rows.push({ tag: "Work", lab, chips: stepChips(reps[0]), rec: recLine, muted: false });
+      rows.push({ tag: "Work", lab: plain ? String(reps.length === 1 ? reps[0].label : lab) : lab, chips: stepChipsFn(reps[0]), rec: recLine, muted: false });
       i = j;
     } else {
       const tag = st.kind === "warmup" ? "Warm-up" : st.kind === "cooldown" ? "Cool-down" : "Steady";
-      rows.push({ tag, lab: esc(st.label), chips: stepChips(st), rec: "", muted: st.kind === "warmup" || st.kind === "cooldown" });
+      // ⚠️ In plain mode the label must stay RAW. It is escaped again by runDescriptionHtml at
+      // render, so escaping it into the stored snapshot too showed a strength session as
+      // "Bodyweight strength &amp; mobility" on screen, entity and all.
+      rows.push({ tag, lab: plain ? String(st.label) : esc(st.label), chips: stepChipsFn(st), rec: "", muted: st.kind === "warmup" || st.kind === "cooldown" });
       i++;
     }
   }
@@ -4001,6 +4154,7 @@ function addedTodayBlock() {
 // what this whole change removed; the anchor staying put under the finger is what makes the grid
 // read as dropping down rather than as having navigated somewhere.
 let ANCHOR_T = 0;
+let NOTE_T = 0;
 function holdScrollAnchor() {
   const v = $("view"); if (!v) return;
   v.style.overflowAnchor = "none";
@@ -4423,11 +4577,16 @@ function viewActivities() {
   return tabs + viewPerformance();
 }
 function viewRunDetail() {
-  const run = state.logged[state.viewRunIdx];
+  const run = viewedRun();
   if (!run) return '<button class="backbtn" id="runBack">\u2039 Logbook</button><div class="card">Run not found.</div>';
+  // The title and date now live on the map card inside runOverviewHtml, so both screens carry them
+  // and neither prints them twice.
   return '<button class="backbtn" id="runBack">\u2039 Logbook</button>' +
-    '<div class="rd-head"><div class="rd-t">' + esc(run.t) + '</div><div class="rd-d">' + esc(run.d || "") + '</div></div>' +
-    runOverviewHtml(run);
+    runOverviewHtml(run) +
+    // \u26a0\ufe0f The effort question used to exist ONLY on the finish screen, so a rating skipped in the
+    // moment could never be given afterwards \u2014 and that rating is half the evidence the adaptive
+    // flags engine runs on. Asking it here too costs nothing and feeds the coach.
+    rpeAskHtml(run);
 }
 // Aggregate all logged strength sets by exercise, in plan order (week = a session instance).
 function strengthHistory() {
@@ -6539,8 +6698,8 @@ function debriefParagraphs(run, a) {
   }
   return p;
 }
-function runDebrief(run) {
-  const a = runAnalysis(run);
+function runDebrief(run, pre) {
+  const a = pre || runAnalysis(run);
   if (!a.n && !a.rpe) return "";
   const name = String(profile.name || "").trim().split(/\\s+/)[0];
   const paras = debriefParagraphs(run, a).map((t) => "<p>" + t + "</p>").join("");
@@ -6560,17 +6719,99 @@ function runDebrief(run) {
     splitsVsTargetHtml(a);
 }
 // Shared overview: route map + key stats + splits + share. Used by the completion screen and Activities.
+// ⚠️ EVERY TILE IS CONDITIONAL, and that is the design rather than tidiness. Elevation is always 0
+// on a wrist run (the watch does not send it), heart rate is null on a phone run with no watch, and
+// calories only exist when a watch measured them. A grid that always shows seven tiles would print
+// a confident "0 m" and "— bpm" for numbers nobody recorded, which reads as a measurement rather
+// than an absence. A tile appears when there is something true to put in it.
+function ovStatsHtml(run, a) {
+  const cells = [];
+  const stat = (k, v) => cells.push('<div class="ov-stat"><div class="ov-v num">' + v + '</div><div class="ov-k">' + k + '</div></div>');
+  stat("Distance", run.dist); stat("Time", run.time); stat("Avg pace", run.pace);
+  if (run.elevGain > 0) stat("Elevation", "▲ " + Math.round(run.elevGain) + " m");
+  if (run.avgHr) stat("Avg HR", Math.round(run.avgHr) + ' <span class="ov-u">bpm</span>');
+  if (run.maxHr) stat("Max HR", Math.round(run.maxHr) + ' <span class="ov-u">bpm</span>');
+  if (run.kcal) stat("Calories", Math.round(run.kcal));
+  // The engine already computes how spread out the kilometres were and nothing has ever read it.
+  // It is the one number here the runner cannot get from their watch: how EVEN the run was.
+  // ⚠️ a.spread is slowest MINUS fastest — the whole range, not a deviation either side of a mean.
+  // Printed with a "±" it read as double what it is. Named for what it measures instead.
+  if (a && a.spread > 0 && a.n >= 3) stat("Pace range", Math.round(a.spread) + '<span class="ov-u">s</span>');
+  return '<div class="ov-stats">' + cells.join("") + '</div>';
+}
+// The prescription, snapshot at save time. Runna calls this "Description"; the point for us is that
+// it is the thing the debrief above just judged the run against, so the two sit together.
+function runDescriptionHtml(run) {
+  const rows = Array.isArray(run.steps) ? run.steps : null;
+  if (!rows || !rows.length) return "";
+  const body = rows.map((r) =>
+    '<div class="ds-row"><div class="ds-tag">' + esc(r.tag) + '</div>' +
+      '<div class="ds-b"><div class="ds-l">' + esc(r.lab) + '</div>' +
+        (r.tgt ? '<div class="ds-t num">' + esc(r.tgt) + '</div>' : "") +
+        (r.rec ? '<div class="ds-r">' + esc(r.rec) + '</div>' : "") +
+      '</div></div>').join("");
+  return '<div class="card"><div class="subhead" style="margin-top:0">What the plan asked for</div>' + body + '</div>';
+}
+// Heart rate: the numbers, then time in each zone. ⚠️ The zone panel is rendered ONLY when real
+// time-in-zone was accumulated during the run. The bpm ranges alone are derivable from age for
+// almost every runner, but a zones panel showing five ranges and no time in them looks broken and
+// tells the runner nothing they did not already know about arithmetic.
+const HR_ZONE_NAME = ["Recovery", "Easy", "Steady", "Threshold", "Max"];
+function runHrHtml(run) {
+  if (!run.avgHr && !run.maxHr && !run.zoneSec) return "";
+  const ceil = maxHrEstimate();
+  const zs = Array.isArray(run.zoneSec) ? run.zoneSec.map((s) => Math.max(0, Math.round(Number(s) || 0))) : null;
+  const total = zs ? zs.reduce((x, y) => x + y, 0) : 0;
+  let body = "";
+  if (zs && total > 30 && ceil) {
+    body = zs.map((sec, i) => {
+      const lo = Math.round(ceil * HR_ZONE_FLOOR[i]);
+      const hi = i === 4 ? null : Math.round(ceil * HR_ZONE_FLOOR[i + 1]) - 1;
+      const pct = Math.round(sec / total * 100);
+      return '<div class="hz-row"><div class="hz-h"><span class="hz-n">Zone ' + (i + 1) + ' <b>' + esc(HR_ZONE_NAME[i]) + '</b></span>' +
+        '<span class="hz-r num">' + lo + (hi ? "–" + hi : "+") + ' bpm</span>' +
+        '<span class="hz-v num">' + pct + '% · ' + fmtPace(sec) + '</span></div>' +
+        '<div class="hz-bar"><i style="width:' + pct + '%;--hz:var(--hz' + (i + 1) + ')"></i></div></div>';
+    }).join("");
+  }
+  const note = (zs && total > 30 && !ceil)
+    ? '<div class="hz-note">Add your age or your measured max heart rate in your profile and these become zones.</div>' : "";
+  // Nothing worth a card: the tiles above already carry avg and max, so a heading with nothing
+  // under it would be a section that exists only to be empty.
+  if (!body && !note) return "";
+  return '<div class="card"><div class="subhead" style="margin-top:0">Heart rate</div>' + body + note + '</div>';
+}
+// Free text on the run. Deliberately private and local — it is a training diary, not a caption.
+function runNoteHtml(run) {
+  const v = String(run.note || "");
+  return '<div class="card"><div class="subhead" style="margin-top:0">Your notes</div>' +
+    '<textarea class="rn-note" id="runNote" rows="3" placeholder="How did it feel? Shoes, route, weather, anything you want to remember.">' + esc(v) + '</textarea>' +
+    '<div class="hz-note" id="runNoteSaved">Saved on this device only.</div></div>';
+}
+// THE post-run debrief, top to bottom, one scroll. Shared by the finish screen and the Logbook, so
+// what you read thirty seconds after a run is exactly what you read a month later.
 function runOverviewHtml(run) {
-  const stat = (k, v) => '<div class="ov-stat"><div class="ov-v num">' + v + '</div><div class="ov-k">' + k + '</div></div>';
+  const a = runAnalysis(run);
+  const sc = run.type ? "var(--eff-" + effortOf({ type: run.type, intensity: run.type === "vo2" || run.type === "threshold" || run.type === "race-specific" ? "hard" : undefined }) + ")" : "var(--accent)";
+  const head = (run.t || run.d)
+    ? '<div class="ov-head">' + (run.t ? '<div class="ov-t">' + esc(run.t) + '</div>' : "") +
+        '<div class="ov-meta">' +
+          (run.type ? '<span class="ov-chip" style="--sc:' + sc + '">' + esc(SESSION_LABEL[run.type] || run.type) + '</span>' : "") +
+          (run.d ? '<span class="ov-d">' + esc(run.d) + '</span>' : "") +
+        '</div></div>'
+    : "";
   return '<div class="card ov-map-card"><div class="ov-map" id="ovMap">' + routeMapSvg(run.route) + '</div>' +
-    '<div class="ov-stats">' + stat("Distance", run.dist) + stat("Time", run.time) + stat("Avg pace", run.pace) + '</div></div>' +
-    runDebrief(run) +
-    '<button class="primary share-btn" id="shareRun">' + ICON.share + ' Share my run</button>';
+    head + ovStatsHtml(run, a) + '</div>' +
+    '<button class="primary share-btn" id="shareRun">' + ICON.share + ' Share my run</button>' +
+    runDebrief(run, a) +
+    runDescriptionHtml(run) +
+    runHrHtml(run) +
+    runNoteHtml(run);
 }
 // ---- Shareable branded run card -------------------------------------------
 // The run whose overview is on screen right now (completion screen or Activities detail).
 function currentOverviewRun() {
-  if (state.screen === "runview") return state.logged[state.viewRunIdx];
+  if (state.screen === "runview") return viewedRun();
   if (LIVE && LIVE.summary) { const sm = LIVE.summary; return { t: LIVE.session.title, d: runDateLabel(), dist: sm.distKm + " km", time: sm.time, pace: (sm.pace || "—") + " /km", route: sm.route, splits: sm.splits, elevGain: sm.elevGain || 0, type: sm.type }; }
   return null;
 }
@@ -6838,8 +7079,11 @@ function downloadShareCard(file, run) {
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 // The one question the intelligent coach needs after every run: how hard did that feel?
+// ⚠️ Takes the band from the record when it has one. It used to read plannedRpeBandOf(LIVE.session)
+// unconditionally, which is fine on the finish screen and throws in the Logbook, where there is no
+// live session at all — the reason this question could only ever be answered in the moment.
 function rpeAskHtml(sm) {
-  const band = plannedRpeBandOf(LIVE.session);
+  const band = (sm && sm.rband) || (LIVE && LIVE.session ? plannedRpeBandOf(LIVE.session) : null);
   const chips = [];
   for (let i = 1; i <= 10; i++) {
     chips.push('<button class="rpe-chip' + (sm.rpe === i ? " on" : "") + '" data-rpe="' + i + '">' + i + '</button>');
@@ -6853,7 +7097,16 @@ function rpeAskHtml(sm) {
 }
 function viewLiveComplete() {
   const sm = LIVE.summary || { distKm: "0.00", time: "0:00", pace: "—", saved: false, route: [], splits: [] };
-  const run = { dist: sm.distKm + " km", time: sm.time, pace: (sm.pace || "—") + " /km", route: sm.route, splits: sm.splits };
+  // ⚠️ THE FINISH SCREEN MUST SHOW THE SAME RUN THE LOGBOOK WILL. It used to hand-build its own
+  // object with five fields — dist, time, pace, route, splits — while the record saved seconds
+  // later carried fifteen. runAnalysis therefore got no pband, so the screen you stare at in the
+  // minute after finishing told you it was "a run by feel, nothing to judge it against" even after
+  // a prescribed session, drew the pace chart with no target band behind it, and showed none of the
+  // on-target / negative-split / effort / bpm chips. Open the identical run from the Logbook a
+  // minute later and every one of them appeared. Two builders, two answers, and the wrong one was
+  // on the screen that matters most. Once saved we show the actual record; before that, the same
+  // shape from the same builder.
+  const run = (sm.saved && sm.runId && state.logged.filter((r) => r.id === sm.runId)[0]) || liveRunRecord(sm);
   const controls = sm.saved
     ? '<div class="live-controls"><button class="primary" id="lDone">' + ICON.check + ' View in your logbook</button></div>'
     : '<div class="live-controls two"><button class="ctrl" id="lDiscard">Discard</button><button class="primary" id="lSave">' + ICON.check + ' Save session</button></div>';
@@ -7048,6 +7301,34 @@ function liveFinish(complete) {
   else speak(complete ? "Well done" + nameTail() + ". Session complete." : "Session ended" + nameTail() + ".");
   render();
 }
+// The ONE place a phone run's record is built. Both the finish screen and the save path come here,
+// so the two can never again describe the same run differently.
+// ⚠️ It is called on EVERY render of the finish screen, not only on save, and it reads the clock —
+// so the id and caption of the unsaved preview differ between renders. That is harmless only
+// because nothing resolves an unsaved run by id: viewLiveComplete looks the saved record up by
+// LIVE.summary.runId, which exists only after saveLiveSession has stored one. Do not start keying
+// anything off this object's id without stamping the id once at save time instead.
+function liveRunRecord(sm) {
+  return {
+    id: "run-" + new Date().getTime(), t: LIVE.session.title, d: runDateLabel(), dateIso: todayIso(),
+    dist: sm.distKm + " km", time: sm.time, pace: (sm.pace || "—") + " /km",
+    distKm: Number(sm.distKm), sec: sm.sec, avgPaceSec: Math.round(sm.avgPaceSec || 0),
+    route: sm.route, splits: sm.splits, elevGain: sm.elevGain || 0, type: sm.type,
+    // What the plan asked for + how it felt — the flags system's evidence.
+    // ⚠️ note takes the same route as rpe, and for the same reason: the finish screen renders the
+    // notes box BEFORE the run is saved, so a note typed in the thirty seconds after finishing —
+    // exactly when someone writes one — had nowhere to go and was thrown away by the Save that
+    // followed, under a hint promising it would be kept.
+    rpe: sm.rpe || null, note: sm.note || undefined,
+    pband: plannedPaceBandOf(LIVE.session), rband: plannedRpeBandOf(LIVE.session),
+    anchor: profile.recentTimeS, pmodel: PACE_MODEL_VERSION,
+    avgHr: LIVE.hrN ? Math.round(LIVE.hrSum / LIVE.hrN) : null,
+    maxHr: LIVE.hrMax || null,
+    zoneSec: (LIVE.zoneSec && LIVE.zoneSec.some((s) => s > 0)) ? LIVE.zoneSec.slice() : null,
+    steps: sessionStepText(LIVE.session),
+    sim: LIVE.mode === "sim" || undefined,
+  };
+}
 function runDateLabel() {
   const d = new Date(), M = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   return d.getDate() + " " + M[d.getMonth()] + " · " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
@@ -7083,13 +7364,7 @@ function plannedRpeBandOf(sess) {
 function saveLiveSession() {
   const sm = LIVE.summary; if (!sm || sm.saved) return;
   if (sm.meaningful) {
-    state.logged.unshift({ id: "run-" + new Date().getTime(), t: LIVE.session.title, d: runDateLabel(), dist: sm.distKm + " km", time: sm.time, pace: sm.pace + " /km",
-      distKm: Number(sm.distKm), sec: sm.sec, avgPaceSec: Math.round(sm.avgPaceSec), route: sm.route, splits: sm.splits, elevGain: sm.elevGain || 0, type: sm.type,
-      // What the plan asked for + how it felt — the flags system's evidence.
-      rpe: sm.rpe || null, pband: plannedPaceBandOf(LIVE.session), rband: plannedRpeBandOf(LIVE.session),
-      anchor: profile.recentTimeS, pmodel: PACE_MODEL_VERSION,
-      avgHr: LIVE.hrN ? Math.round(LIVE.hrSum / LIVE.hrN) : null,
-      sim: LIVE.mode === "sim" || undefined });
+    state.logged.unshift(liveRunRecord(sm));
     sm.runId = state.logged[0].id;
     saveRuns();
   }
@@ -7695,12 +7970,43 @@ function wire() {
     // A swipe that ends in a tap should not also open the run.
     if (b.closest(".swipe") && b.closest(".swipe").classList.contains("open")) { closeSwipes(); return; }
     if (SWIPE.moved) return;
-    state.viewRunIdx = Number(b.dataset.runidx); state.screen = "runview"; render();
+    state.viewRunIdx = Number(b.dataset.runidx);
+    // The index is not a handle. state.logged is unshifted whenever a watch run arrives, so an
+    // index captured when the screen opened can point at a different run by the time the runner
+    // rates it or writes a note — silently attaching both to somebody else's session.
+    state.viewRunId = (state.logged[state.viewRunIdx] || {}).id || null;
+    state.screen = "runview"; render();
   });
   document.querySelectorAll("[data-delrun]").forEach((b) => b.onclick = (e) => { e.stopPropagation(); deleteRun(Number(b.dataset.delrun)); });
   wireSwipes();
   const runBack = $("runBack"); if (runBack) runBack.onclick = () => { state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); };
   const shareRun = $("shareRun"); if (shareRun) { shareRun.onclick = doShareRun; prepareShareCard(currentOverviewRun()); }
+  // Notes save as you type, debounced. No Save button: a note you have to remember to save is a
+  // note that gets lost, and there is nothing here worth confirming.
+  const runNote = $("runNote");
+  if (runNote) runNote.oninput = () => {
+    // ⚠️ THE TEXT IS KEPT SYNCHRONOUSLY; only the WRITE TO DISK is debounced. Holding the text in a
+    // 400ms timer meant any re-render inside that window rebuilt the textarea from the record's old
+    // value and the half-typed note vanished off the screen — and tapping an effort number, which is
+    // right beside the box, re-renders. Debouncing localStorage is worth it; debouncing the state is
+    // how you lose what someone just wrote.
+    const target = state.screen === "runview" ? viewedRun()
+      : (LIVE && LIVE.summary && LIVE.summary.runId ? (state.logged || []).filter((r) => r.id === LIVE.summary.runId)[0] : null);
+    const saved = $("runNoteSaved");
+    if (target) {
+      target.note = runNote.value;
+      if (saved) saved.textContent = "Saved on this device only.";
+      clearTimeout(NOTE_T); NOTE_T = setTimeout(saveRuns, 400);
+      return;
+    }
+    // Not saved yet: park it on the summary, which liveRunRecord carries into the record on Save.
+    if (LIVE && LIVE.summary) {
+      LIVE.summary.note = runNote.value;
+      if (saved) saved.textContent = "Saved with your run when you tap Save session.";
+      return;
+    }
+    if (saved) saved.textContent = "Save the run first and your note saves with it.";
+  };
   const ovMap = $("ovMap"); if (ovMap) { const r = currentOverviewRun(); if (r) buildOverviewMap(ovMap, r.route); }
   document.querySelectorAll("[data-hub]").forEach((b) => b.onclick = () => { if (b.dataset.hub === "alfie") { openAlfie(); return; } state.support = b.dataset.hub; render(); });
   // Support library pages: play any movement, expand any guide.
@@ -7881,6 +8187,13 @@ function wire() {
   const lFinish = $("lFinish"); if (lFinish && !LIVE.done) lFinish.onclick = () => liveFinish(false);
   // Completion screen: save the run to Activities, discard it, or move on to Activities.
   document.querySelectorAll("[data-rpe]").forEach((c) => c.onclick = () => {
+    // In the Logbook there is no live summary — the record IS the target, and rating a past run
+    // must feed the flags engine exactly as rating it in the moment does.
+    if (state.screen === "runview") {
+      const lg = viewedRun();
+      if (lg) { lg.rpe = Number(c.dataset.rpe); saveRuns(); maybeTrainingFlags(); render(); }
+      return;
+    }
     const sm = LIVE && LIVE.summary; if (!sm) return;
     sm.rpe = Number(c.dataset.rpe);
     // Rating after saving is fine — write it through to the logged run and re-read the flags, so a

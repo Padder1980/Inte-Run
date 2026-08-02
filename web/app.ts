@@ -1649,7 +1649,7 @@ body.cal-dragging { overscroll-behavior: none; cursor: grabbing; }
   background: linear-gradient(152deg, color-mix(in srgb, var(--accent) 13%, var(--surface)) 0%, var(--surface) 68%);
   border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
   box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 12px 26px -18px color-mix(in srgb, var(--accent) 75%, transparent);
-  transition: border-color .18s ease, background .18s ease; }
+  transition: color .18s ease, border-color .18s ease, background .18s ease; }
 .add-fold:active { transform: scale(.99); }
 .add-fold.on { color: var(--ink);
   background: linear-gradient(152deg, color-mix(in srgb, var(--accent) 9%, var(--surface)) 0%, var(--surface) 60%);
@@ -1657,9 +1657,17 @@ body.cal-dragging { overscroll-behavior: none; cursor: grabbing; }
 .add-chev { display: flex; align-items: center; transition: transform .24s cubic-bezier(.2,.8,.3,1); color: var(--accent); }
 .add-chev svg { width: 17px; height: 17px; }
 .add-fold.on .add-chev { transform: rotate(180deg); }
-.add-drawer { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .26s ease, opacity .2s ease;
-  opacity: 0; overflow: hidden; margin-bottom: 8px; }
-.add-drawer.on { grid-template-rows: 1fr; opacity: 1; }
+/* ⚠️ THE DRAWER MUST HAVE EXACTLY ONE CHILD. "grid-template-rows: 0fr" declares ONE track, so a
+   second child lands in an IMPLICIT auto-sized row that 0fr never collapses. With the grid and the
+   note as siblings the "closed" drawer measured 33px tall (computed tracks "4px 46.5px"), and that
+   residual strip was live: a tap on what looks like blank page 25px under the button landed on the
+   Easy Run card and opened the add-session sheet. Everything animatable goes inside .add-inner.
+   visibility then removes the collapsed drawer from the tab order and from hit-testing, delayed by
+   the transition duration so the fold-away is still watched all the way down. */
+.add-drawer { display: grid; grid-template-rows: 0fr; opacity: 0; overflow: hidden; margin-bottom: 8px;
+  visibility: hidden; transition: grid-template-rows .26s ease, opacity .2s ease, visibility 0s linear .26s; }
+.add-drawer.on { grid-template-rows: 1fr; opacity: 1; visibility: visible;
+  transition: grid-template-rows .26s ease, opacity .2s ease, visibility 0s; }
 .add-drawer > * { min-height: 0; }
 .add-note { font-size: 11.5px; color: var(--ink-faint); text-align: center; padding: 10px 4px 2px; }
 @media (prefers-reduced-motion: reduce) { .add-drawer, .add-chev, .add-fold { transition: none; } }
@@ -3977,13 +3985,60 @@ function addedTodayBlock() {
     '</button>').join("");
   return card +
     '<button class="add-btn add-fold' + (open ? ' on' : '') + '" id="addSess" aria-expanded="' + (open ? 'true' : 'false') + '" aria-controls="addDrawer">' +
-      '<span>' + (open ? 'What do you fancy?' : 'Add a session ' + dayPhraseIso(iso)) + '</span>' +
+      '<span id="addSessLab">' + (open ? 'What do you fancy?' : 'Add a session ' + dayPhraseIso(iso)) + '</span>' +
       '<span class="add-chev" aria-hidden="true">' + ICON.chevDown + '</span>' +
     '</button>' +
     '<div class="add-drawer' + (open ? ' on' : '') + '" id="addDrawer">' +
-      '<div class="rt-grid">' + cards + '</div>' +
-      '<div class="add-note">Built at your own paces, from the same library your plan uses.</div>' +
+      '<div class="add-inner">' +
+        '<div class="rt-grid">' + cards + '</div>' +
+        '<div class="add-note">Built at your own paces, from the same library your plan uses.</div>' +
+      '</div>' +
     '</div>';
+}
+// A drawer that opens entirely below the fold looks like nothing happened at all. So once it has
+// finished growing, nudge it into view -- but by the SMALLEST amount that shows it, smoothly, and
+// never far enough to pull the tapped button off the top of the screen. Yanking the page is exactly
+// what this whole change removed; the anchor staying put under the finger is what makes the grid
+// read as dropping down rather than as having navigated somewhere.
+let ANCHOR_T = 0;
+function holdScrollAnchor() {
+  const v = $("view"); if (!v) return;
+  v.style.overflowAnchor = "none";
+  clearTimeout(ANCHOR_T);
+  // Long enough to outlast the .26s growth and the reveal nudge that follows it, then handed back:
+  // anchoring is worth having for everything else the scroller does.
+  ANCHOR_T = setTimeout(() => { v.style.overflowAnchor = ""; }, 900);
+}
+function revealDrawer(btn, drawer) {
+  const v = $("view"); if (!v) return;
+  const smooth = !(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  let done = false;
+  const settle = () => {
+    if (done) return; done = true;
+    drawer.removeEventListener("transitionend", onEnd);
+    // ⚠️ THE TAP CAN BE TAKEN BACK. Open, change your mind, tap again inside 340ms: the close
+    // REVERSES the open transition, so no grid-template-rows transitionend for the open ever
+    // arrives and only the timer reaches us -- at which point the drawer is shut and this would
+    // glide the page down to reveal nothing (measured 50-247px depending on scroll position). The
+    // done flag dedupes the two triggers; it cannot tell that the reason for scrolling is gone.
+    if (!drawer.isConnected || !drawer.classList.contains("on")) return;
+    const dr = drawer.getBoundingClientRect(); const vr = v.getBoundingClientRect();
+    const over = dr.bottom - vr.bottom + 12;
+    if (over <= 4) return;
+    const room = Math.max(0, btn.getBoundingClientRect().top - vr.top - 8);
+    const by = Math.min(over, room);
+    if (by > 4) v.scrollBy({ top: by, behavior: smooth ? "smooth" : "auto" });
+  };
+  // ⚠️ Wait for the HEIGHT transition, not whichever finishes first. opacity is .2s and
+  // grid-template-rows is .26s, so listening for any transitionend measures the drawer at about
+  // three quarters of its final height and scrolls short. The timeout covers a browser that
+  // animates neither, and the guard makes whichever arrives first the only one that counts.
+  const onEnd = (e) => { if (!e.propertyName || e.propertyName.indexOf("grid-template") === 0) settle(); };
+  drawer.addEventListener("transitionend", onEnd);
+  // Under reduced motion the CSS transition is switched off, so transitionend never fires and the
+  // drawer is already at full size -- measure on the next frame rather than sitting out a 340ms
+  // delay whose only purpose is to outlast an animation that is not running.
+  if (smooth) setTimeout(settle, 340); else requestAnimationFrame(settle);
 }
 // The add-a-session sheet is a two-step builder: pick a type, then shape it (duration for continuous
 // runs, number of reps for quality sessions) with a live time/distance estimate before adding.
@@ -7731,7 +7786,37 @@ function wire() {
   const fitDismiss = $("fitDismiss"); if (fitDismiss) fitDismiss.onclick = dismissFitSuggest;
   const viewSession = $("viewSession"); if (viewSession) viewSession.onclick = () => openSessionSheet(selectedSession(), curWeekNo());
   // Add-a-session: open the picker, start or remove an added session, or tap it to view its detail.
-  const addSess = $("addSess"); if (addSess) addSess.onclick = () => { state.addOpen = !state.addOpen; render(); };
+  //
+  // ⚠️ THE FOLD ANIMATES IN PLACE AND MUST NEVER CALL render(). One line of
+  // "state.addOpen = !state.addOpen; render()" broke it two separate ways at once, and both were
+  // invisible to every check that was not a human watching the screen:
+  //   1. render() REPLACES the drawer's markup, so the browser has no previous value to transition
+  //      FROM. The grid was created already at 1fr and simply appeared -- the CSS transition was
+  //      correct and never ran a single frame of it.
+  //   2. render() ends with v.scrollTop = 0, so every open AND every close threw the runner back
+  //      to the top of Today, away from the control they had just tapped.
+  // The drawer's contents are in the DOM in BOTH states -- only the classes, the label and
+  // aria-expanded differ -- so toggling those in place is the whole job, and the transition then
+  // has something real to run on. state.addOpen is still written so a later render for some other
+  // reason (weather arriving, a session logged) rebuilds it open.
+  const addSess = $("addSess");
+  if (addSess) addSess.onclick = () => {
+    const open = !state.addOpen; state.addOpen = open;
+    const drawer = $("addDrawer"); const lab = $("addSessLab");
+    // ⚠️ SWITCH OFF SCROLL ANCHORING FOR THE DURATION OF THE MOVE. The browser tries to keep
+    // whatever sits BELOW the drawer visually still as the drawer grows, which means scrolling the
+    // page down by the drawer's whole height: measured with Today scrolled near its end, scrollTop
+    // went 528 -> 926 and put the button the runner had just tapped off the top of the screen. That
+    // is the same jump this change exists to remove, arriving from the browser instead of from
+    // render(). Anchoring is for content that appears WITHOUT being asked for; this growth is the
+    // thing the runner asked for, so it must not be compensated away.
+    holdScrollAnchor();
+    addSess.classList.toggle("on", open);
+    if (drawer) drawer.classList.toggle("on", open);
+    addSess.setAttribute("aria-expanded", open ? "true" : "false");
+    if (lab) lab.textContent = open ? "What do you fancy?" : "Add a session " + dayPhraseIso(selectedDayIso());
+    if (open && drawer) revealDrawer(addSess, drawer);
+  };
   // A type tapped on Today opens the sheet ALREADY PAST the grid — the choice has been made.
   document.querySelectorAll("[data-addpick]").forEach((b) => b.onclick = () => {
     const t = b.dataset.addpick;

@@ -896,8 +896,14 @@ for. `assessFeasibility` now counts a day that exists, so no change was needed t
 
 ## Build your own run (added 2026-08-02)
 
-Today › "Add a session" is a three-stage flow: a coloured type grid, then — for quality types — a
-list of real workouts, then the session in full before Add. `RC.listWorkouts` / `RC.buildWorkout`
+Today › "Add a session" is a **fold-out on the page**, not a modal: the button expands in place and
+the coloured type grid drops down onto Today (owner's request). Tapping a type opens the sheet
+ALREADY PAST the grid — for quality types a list of real workouts, then the session in full before
+Add. ⚠️ The sheet keeps its **own copy** of the grid for the other entry points (the session sheet's
+"add a different session", the Plan screen), which have no room for an inline one — so
+`shapeDefaultsFor` is a top-level function, not a closure inside `wireAddSessionSheet`, because both
+callers need it. The drawer animates on `grid-template-rows: 0fr → 1fr` rather than a `max-height`
+constant, which would clip as soon as the grid gains a row. `RC.listWorkouts` / `RC.buildWorkout`
 surface the generator's **own** 62 formats at the runner's derived paces, with the plan's own
 filters (`competitiveOnly`, `skipWhenReturning`, `minEventKm`). ⚠️ **Never write a second
 catalogue** — it would drift within a release and quietly teach different paces.

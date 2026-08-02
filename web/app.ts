@@ -262,6 +262,21 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .cal-check svg { width: 15px; height: 15px; }
 .cal-open { flex: 1; min-width: 0; text-align: left; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; padding: 0; }
 .cal-check { cursor: pointer; }
+/* The fold-out "add a session" header on Today. Collapsed it reads as the old button; open it
+   becomes a section heading with the grid beneath. Height is animated via grid-template-rows so the
+   drawer can size to its content without a hardcoded max-height that clips on a longer grid. */
+.add-fold { display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left; }
+.add-fold.on { border-style: solid; background: var(--surface); color: var(--ink); font-weight: 750; }
+.add-chev { display: flex; transition: transform .22s ease; color: var(--accent); }
+.add-chev svg { width: 18px; height: 18px; }
+.add-fold.on .add-chev { transform: rotate(180deg); }
+.add-drawer { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .26s ease, opacity .2s ease;
+  opacity: 0; overflow: hidden; margin-bottom: 8px; }
+.add-drawer.on { grid-template-rows: 1fr; opacity: 1; }
+.add-drawer > * { min-height: 0; }
+.add-note { font-size: 11.5px; color: var(--ink-faint); text-align: center; padding: 10px 4px 2px; }
+@media (prefers-reduced-motion: reduce) { .add-drawer, .add-chev { transition: none; } }
+
 /* Build-your-own-run: the type grid. One colour + one mark per card, with a big ghost of the same
    mark bleeding off the corner — recognisable at a glance without reading the label. Colours are
    the app's own effort/phase tokens, so light and dark both adapt. */
@@ -1842,6 +1857,7 @@ const BRAND_SVG = ${JSON.stringify(BRAND_MARK)};
 const EX_ANIM = ${JSON.stringify(exAnimData)};
 const EX_STILL = ${JSON.stringify(exStillData)};
 const ICON = {
+  chevDown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
   // Run-type marks for the "Build your own run" grid. Simple strokes at the set's own weight — a
   // runner glancing at a colour and a shape should know which card is which without reading.
   rEasy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="15.5" cy="4.6" r="1.9"/><path d="M13 9.2 9.6 11l1.9 3.1L9 21"/><path d="m13 9.2 3.4 1.5 2.3 3.4"/><path d="M11.5 14.1 6.6 15"/></svg>',
@@ -2015,7 +2031,7 @@ function computeToday() {
 }
 computeToday();
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "workouts", support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "workouts", support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK, addOpen: false };
 // Effective day index for a session, honouring any user reschedule. Works for raw sessions
 // (dayOfWeek) and summary sessions (dayIndex), keyed by the shared session id.
 function loadDayOverride() { try { return JSON.parse(localStorage.getItem("interun_dayov_v1") || "{}") || {}; } catch (e) { return {}; } }
@@ -3932,7 +3948,29 @@ function addedTodayBlock() {
   }).join("");
   const lab = dayLabelIso(iso);
   const card = list.length ? '<h2 class="sec">Added ' + (lab === "today" ? "today" : "for " + lab) + '</h2><div class="card add-card">' + rows + '</div>' : "";
-  return card + '<button class="add-btn" id="addSess">\\uFF0B Add a session ' + dayPhraseIso(iso) + '</button>';
+  // ⚠️ The type grid DROPS DOWN ONTO TODAY rather than opening a sheet. The runner is on the screen
+  // that already tells them what they are doing today — making them open a modal just to see the
+  // options put a door in front of a decision they had already made. Tapping a type still opens the
+  // sheet, because that is where the workout list and the step detail live; this only moves the
+  // first choice out onto the page. The sheet keeps its own copy of the grid for the OTHER entry
+  // points (the session sheet's "add a different session", the Plan screen), which have no room for
+  // an inline one.
+  const open = !!state.addOpen;
+  const cards = runTypesAvailable().map((r) =>
+    '<button class="rt-card" data-addpick="' + r.t + '" style="--rc:' + r.c + '">' +
+      '<span class="rt-ico">' + ICON[r.icon] + '</span>' +
+      '<span class="rt-ghost" aria-hidden="true">' + ICON[r.icon] + '</span>' +
+      '<span class="rt-lab">' + esc(r.label) + '</span>' +
+    '</button>').join("");
+  return card +
+    '<button class="add-btn add-fold' + (open ? ' on' : '') + '" id="addSess" aria-expanded="' + (open ? 'true' : 'false') + '" aria-controls="addDrawer">' +
+      '<span>' + (open ? 'What do you fancy?' : '\uFF0B Add a session ' + dayPhraseIso(iso)) + '</span>' +
+      '<span class="add-chev" aria-hidden="true">' + ICON.chevDown + '</span>' +
+    '</button>' +
+    '<div class="add-drawer' + (open ? ' on' : '') + '" id="addDrawer">' +
+      '<div class="rt-grid">' + cards + '</div>' +
+      '<div class="add-note">Built at your own paces, from the same library your plan uses.</div>' +
+    '</div>';
 }
 // The add-a-session sheet is a two-step builder: pick a type, then shape it (duration for continuous
 // runs, number of reps for quality sessions) with a live time/distance estimate before adding.
@@ -3999,6 +4037,13 @@ function loadTag(w) {
   if (rpe >= 8) return { t: w.load === "big" ? "Best for: a big speed day" : "Best for: top-end speed", c: "var(--eff-hard)" };
   if (rpe >= 6) return { t: w.load === "big" ? "Best for: a big day" : "Best for: race sharpness", c: "var(--eff-moderate)" };
   return { t: w.load === "big" ? "Best for: a long steady day" : "Best for: steady rhythm", c: "var(--steady)" };
+}
+/** Opening params for the shape stage. Shared: Today's inline grid needs it as much as the sheet. */
+function shapeDefaultsFor(type) {
+  const rep = extraRep(type);
+  return { type: type, stage: "shape", workoutId: null,
+    durMin: Math.max(15, Math.round((rep ? rep.estimatedDurationSeconds : 2700) / 60 / 5) * 5 || 45),
+    reps: builderUsesReps(type) ? Math.min(12, Math.max(2, repCountOf(rep) || 5)) : null };
 }
 /** The session the current BUILDER describes — a library workout, or a shaped one. */
 function previewSession() {
@@ -4095,12 +4140,7 @@ function addSessionSheetHtml() {
 function openAddSessionSheet(iso) { ADD_TARGET = iso || todayIso(); BUILDER = null; ensureSheet(); SHEET_CTX = null; $("sheetBody").innerHTML = addSessionSheetHtml(); wireAddSessionSheet(); $("sheetOv").classList.add("on"); }
 function wireAddSessionSheet() {
   const rerender = () => { $("sheetBody").innerHTML = addSessionSheetHtml(); wireAddSessionSheet(); };
-  const shapeDefaults = (type) => {
-    const rep = extraRep(type);
-    return { type: type, stage: "shape", workoutId: null,
-      durMin: Math.max(15, Math.round((rep ? rep.estimatedDurationSeconds : 2700) / 60 / 5) * 5 || 45),
-      reps: builderUsesReps(type) ? Math.min(12, Math.max(2, repCountOf(rep) || 5)) : null };
-  };
+  const shapeDefaults = shapeDefaultsFor;
   document.querySelectorAll('#sheetBody [data-pick]').forEach((b) => b.onclick = () => {
     const t = b.dataset.pick;
     // Quality types open the library; easy running goes straight to the shaper, because there is
@@ -7678,7 +7718,18 @@ function wire() {
   const fitDismiss = $("fitDismiss"); if (fitDismiss) fitDismiss.onclick = dismissFitSuggest;
   const viewSession = $("viewSession"); if (viewSession) viewSession.onclick = () => openSessionSheet(selectedSession(), curWeekNo());
   // Add-a-session: open the picker, start or remove an added session, or tap it to view its detail.
-  const addSess = $("addSess"); if (addSess) addSess.onclick = () => openAddSessionSheet(selectedDayIso());
+  const addSess = $("addSess"); if (addSess) addSess.onclick = () => { state.addOpen = !state.addOpen; render(); };
+  // A type tapped on Today opens the sheet ALREADY PAST the grid — the choice has been made.
+  document.querySelectorAll("[data-addpick]").forEach((b) => b.onclick = () => {
+    const t = b.dataset.addpick;
+    ADD_TARGET = selectedDayIso();
+    BUILDER = typeHasLibrary(t) && workoutsFor(t, "any").length
+      ? { type: t, stage: "list", band: "any", workoutId: null }
+      : shapeDefaultsFor(t);
+    ensureSheet(); SHEET_CTX = null;
+    $("sheetBody").innerHTML = addSessionSheetHtml(); wireAddSessionSheet();
+    $("sheetOv").classList.add("on");
+  });
   // Tapping a rest day (Plan week detail or the training calendar) adds a session to that day.
   document.querySelectorAll("[data-addday]").forEach((b) => b.onclick = () => openAddSessionSheet(b.dataset.addday));
   document.querySelectorAll("[data-addstart]").forEach((b) => b.onclick = () => { const s = extraSession(EXTRA.find((x) => x.id === b.dataset.addstart)); if (s) openStartWhereSheet(s); });

@@ -262,21 +262,6 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .cal-check svg { width: 15px; height: 15px; }
 .cal-open { flex: 1; min-width: 0; text-align: left; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; padding: 0; }
 .cal-check { cursor: pointer; }
-/* The fold-out "add a session" header on Today. Collapsed it reads as the old button; open it
-   becomes a section heading with the grid beneath. Height is animated via grid-template-rows so the
-   drawer can size to its content without a hardcoded max-height that clips on a longer grid. */
-.add-fold { display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left; }
-.add-fold.on { border-style: solid; background: var(--surface); color: var(--ink); font-weight: 750; }
-.add-chev { display: flex; transition: transform .22s ease; color: var(--accent); }
-.add-chev svg { width: 18px; height: 18px; }
-.add-fold.on .add-chev { transform: rotate(180deg); }
-.add-drawer { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .26s ease, opacity .2s ease;
-  opacity: 0; overflow: hidden; margin-bottom: 8px; }
-.add-drawer.on { grid-template-rows: 1fr; opacity: 1; }
-.add-drawer > * { min-height: 0; }
-.add-note { font-size: 11.5px; color: var(--ink-faint); text-align: center; padding: 10px 4px 2px; }
-@media (prefers-reduced-motion: reduce) { .add-drawer, .add-chev { transition: none; } }
-
 /* Build-your-own-run: the type grid. One colour + one mark per card, with a big ghost of the same
    mark bleeding off the corner — recognisable at a glance without reading the label. Colours are
    the app's own effort/phase tokens, so light and dark both adapt. */
@@ -1650,6 +1635,34 @@ body.cal-dragging { overscroll-behavior: none; cursor: grabbing; }
 /* Add-a-session on Today: button + "Added today" card */
 .add-btn { display: block; width: 100%; margin: 2px 0 8px; padding: 13px; font: inherit; font-size: 14px; font-weight: 650; color: var(--accent); background: var(--surface); border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 14px; cursor: pointer; }
 .add-btn:active { transform: scale(.99); }
+/* ⚠️ THESE RULES MUST SIT AFTER .add-btn. They share its specificity, so when they lived earlier in
+   the sheet .add-btn { display: block } beat .add-fold { display: flex } and the chevron dropped
+   onto its own line under the label — visible on the owner's phone, invisible to every check that
+   was not a screenshot.
+   The collapsed control is the main call to action on Today once the day's session is done, so it
+   reads as a solid, lifted card rather than a dashed placeholder: accent-tinted, softly shadowed,
+   with the chevron sitting immediately beside the words rather than pushed to the far edge. */
+.add-fold { display: flex; align-items: center; justify-content: center; gap: 9px; width: 100%;
+  margin: 6px 0 10px; padding: 15px 16px; font: inherit; font-size: 15px; font-weight: 700;
+  letter-spacing: -.012em; cursor: pointer; border-radius: 16px; text-align: center;
+  color: var(--accent);
+  background: linear-gradient(152deg, color-mix(in srgb, var(--accent) 13%, var(--surface)) 0%, var(--surface) 68%);
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
+  box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 12px 26px -18px color-mix(in srgb, var(--accent) 75%, transparent);
+  transition: border-color .18s ease, background .18s ease; }
+.add-fold:active { transform: scale(.99); }
+.add-fold.on { color: var(--ink);
+  background: linear-gradient(152deg, color-mix(in srgb, var(--accent) 9%, var(--surface)) 0%, var(--surface) 60%);
+  border-color: color-mix(in srgb, var(--accent) 44%, var(--line)); }
+.add-chev { display: flex; align-items: center; transition: transform .24s cubic-bezier(.2,.8,.3,1); color: var(--accent); }
+.add-chev svg { width: 17px; height: 17px; }
+.add-fold.on .add-chev { transform: rotate(180deg); }
+.add-drawer { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .26s ease, opacity .2s ease;
+  opacity: 0; overflow: hidden; margin-bottom: 8px; }
+.add-drawer.on { grid-template-rows: 1fr; opacity: 1; }
+.add-drawer > * { min-height: 0; }
+.add-note { font-size: 11.5px; color: var(--ink-faint); text-align: center; padding: 10px 4px 2px; }
+@media (prefers-reduced-motion: reduce) { .add-drawer, .add-chev, .add-fold { transition: none; } }
 .add-card { padding: 6px; display: flex; flex-direction: column; gap: 4px; }
 .add-row { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 11px; }
 .add-row .dot { flex: 0 0 auto; }
@@ -3964,7 +3977,7 @@ function addedTodayBlock() {
     '</button>').join("");
   return card +
     '<button class="add-btn add-fold' + (open ? ' on' : '') + '" id="addSess" aria-expanded="' + (open ? 'true' : 'false') + '" aria-controls="addDrawer">' +
-      '<span>' + (open ? 'What do you fancy?' : '\uFF0B Add a session ' + dayPhraseIso(iso)) + '</span>' +
+      '<span>' + (open ? 'What do you fancy?' : 'Add a session ' + dayPhraseIso(iso)) + '</span>' +
       '<span class="add-chev" aria-hidden="true">' + ICON.chevDown + '</span>' +
     '</button>' +
     '<div class="add-drawer' + (open ? ' on' : '') + '" id="addDrawer">' +

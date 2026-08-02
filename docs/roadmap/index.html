@@ -361,7 +361,10 @@
     // Doubles: checked against the research, decided against, and the honesty gap closed instead.
     "2026-08-02c": ["pc-days"],
     // Build your own run, folding open on Today.
-    "2026-08-02d": ["pc-build"]
+    "2026-08-02d": ["pc-build"],
+    // Phase 0 had never been seeded, so the foundation the whole map is built on read as not done
+    // and the overall figure under-reported by four steps. Ticked on the owner's say-so.
+    "2026-08-02e": ["p0-live", "p0-gps", "p0-adapt", "p0-extras"]
   };
   Object.keys(BATCHES).forEach(function (k) {
     if (seeded[k]) return;

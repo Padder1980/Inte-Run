@@ -757,6 +757,69 @@ const THRESHOLD_FORMATS: QualityFormat[] = [
     ] },
 ];
 
+/**
+ * The whole quality library, built at THIS runner's paces, for the "build your own run" browser.
+ *
+ * ⚠️ THIS IS THE PLAN'S OWN LIBRARY, NOT A PARALLEL ONE. Every workout offered here is a format the
+ * generator itself schedules, at the runner's own derived paces — so a session picked by hand is
+ * the same evidence-based session, judged by the same debrief, as one the plan prescribed. A second
+ * hand-written catalogue would drift from this one within a release and quietly teach different
+ * paces.
+ *
+ * Filters mirror the generator's: `competitiveOnly` and `skipWhenReturning` are honoured, and
+ * `minEventKm` keeps "2 × 5 km at goal pace" away from a 5 km runner, who would otherwise be
+ * offered twice their race distance at race effort.
+ */
+export type WorkoutOption = {
+  id: string;
+  type: SessionType;
+  title: string;
+  description: string;
+  load: "small" | "normal" | "big";
+  minutes: number;
+  km: number | null;
+  session: SessionContent;
+};
+
+export function listWorkouts(paces: TrainingPaces, ctx: FormatCtx = {}): WorkoutOption[] {
+  const pools: Array<[SessionType, QualityFormat[], (f: QualityFormat) => SessionContent]> = [
+    ["threshold", THRESHOLD_FORMATS, (f) =>
+      assemble("threshold", f.title, f.desc ?? THRESHOLD_DESC, f.intensity ?? "moderate",
+        [warmup(paces, 15, true), ...f.build(paces), cooldown(paces, 10)], f.rpe ?? RPE.threshold)],
+    ["vo2", VO2_FORMATS, (f) =>
+      assemble("vo2", f.title, f.desc ?? VO2_DESC, f.intensity ?? "hard",
+        [warmup(paces, 15, true), ...f.build(paces), cooldown(paces, 10)], f.rpe ?? RPE.vo2)],
+    ["race-specific", RACE_FORMATS, (f) =>
+      assemble("race-specific", f.title, f.desc ?? RACE_DESC, f.intensity ?? "moderate",
+        [warmup(paces, 15, true), ...f.build(paces), cooldown(paces, 10)], f.rpe ?? RPE.steady)],
+  ];
+  const out: WorkoutOption[] = [];
+  for (const [type, pool, make] of pools) {
+    for (const f of pool) {
+      if (f.competitiveOnly && !ctx.competitive) continue;
+      if (f.skipWhenReturning && ctx.returning) continue;
+      if (f.minEventKm && ctx.eventKm !== undefined && ctx.eventKm < f.minEventKm) continue;
+      const session = make(f);
+      out.push({
+        id: f.id,
+        type,
+        title: f.title,
+        description: session.description,
+        load: f.load ?? "normal",
+        minutes: Math.round(session.estimatedDurationSeconds / 60),
+        km: session.estimatedDistanceMeters ? Math.round(session.estimatedDistanceMeters / 100) / 10 : null,
+        session,
+      });
+    }
+  }
+  return out;
+}
+
+/** One workout by id, at this runner's paces. Null when the id is unknown or filtered out. */
+export function buildWorkout(id: string, paces: TrainingPaces, ctx: FormatCtx = {}): SessionContent | null {
+  return listWorkouts(paces, ctx).find((w) => w.id === id)?.session ?? null;
+}
+
 export function thresholdSession(paces: TrainingPaces, variant: number, ctx: FormatCtx = {}): SessionContent {
   const fmt = selectFormat(THRESHOLD_FORMATS, variant, ctx);
   const steps = [warmup(paces, 15, true), ...fmt.build(paces), cooldown(paces, 10)];

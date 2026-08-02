@@ -31,6 +31,8 @@ export { assessTrainingFlags } from "../src/adapt/training-flags.ts";
 export type { RunObservation, TrainingFlag, TrainingFlagsResult } from "../src/adapt/training-flags.ts";
 export { assessConditions } from "../src/environment/weather.ts";
 export { fuellingFor } from "../src/science/fuelling.ts";
+export { listWorkouts, buildWorkout } from "../src/plan/session-templates.ts";
+export type { WorkoutOption } from "../src/plan/session-templates.ts";
 export type { FuellingPlan } from "../src/science/fuelling.ts";
 export { classifyRunner } from "../src/athlete/classification.ts";
 export { assessMasters } from "../src/athlete/masters.ts";

@@ -262,6 +262,37 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .cal-check svg { width: 15px; height: 15px; }
 .cal-open { flex: 1; min-width: 0; text-align: left; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; padding: 0; }
 .cal-check { cursor: pointer; }
+/* Build-your-own-run: the type grid. One colour + one mark per card, with a big ghost of the same
+   mark bleeding off the corner — recognisable at a glance without reading the label. Colours are
+   the app's own effort/phase tokens, so light and dark both adapt. */
+.rt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+.rt-card { position: relative; overflow: hidden; isolation: isolate; min-height: 92px; padding: 12px;
+  border: 0; border-radius: 16px; cursor: pointer; text-align: left; font: inherit; color: #fff;
+  background: linear-gradient(140deg, color-mix(in srgb, var(--rc) 92%, #fff), color-mix(in srgb, var(--rc) 70%, #000));
+  box-shadow: 0 6px 16px -10px var(--rc); display: flex; flex-direction: column; justify-content: space-between; }
+.rt-card:active { transform: scale(.98); }
+.rt-ico svg { width: 22px; height: 22px; }
+.rt-lab { font-size: 15px; font-weight: 750; letter-spacing: -.01em; text-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.rt-ghost { position: absolute; right: -14px; bottom: -18px; opacity: .2; pointer-events: none; z-index: -1; }
+.rt-ghost svg { width: 82px; height: 82px; }
+
+/* The workout list — one row per real library format: what it suits, its name, and its size. */
+.wk-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 12px; }
+.wk-chip { font: inherit; font-size: 12.5px; padding: 6px 11px; border-radius: 999px; cursor: pointer;
+  background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-soft); }
+.wk-chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 650; }
+.wk-list { display: flex; flex-direction: column; gap: 9px; }
+.wk-row { position: relative; overflow: hidden; width: 100%; text-align: left; font: inherit; cursor: pointer;
+  padding: 13px 14px 13px 17px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line);
+  box-shadow: var(--shadow); display: block; }
+.wk-row::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--rc); }
+.wk-row:active { background: var(--surface-2); }
+.wk-tag { float: right; margin-left: 8px; font-size: 10.5px; font-weight: 650; padding: 3px 9px; border-radius: 999px;
+  background: color-mix(in srgb, var(--tc) 16%, var(--surface)); color: var(--tc);
+  border: 1px solid color-mix(in srgb, var(--tc) 34%, var(--line)); }
+.wk-t { display: block; font-size: 14.5px; font-weight: 680; letter-spacing: -.01em; color: var(--ink); }
+.wk-m { display: block; margin-top: 3px; font-size: 12.5px; color: var(--ink-faint); }
+
 /* Fuelling block on a session — see fuelHtml. Reads as guidance, not as an alert: it is a normal
    part of a long run, and a red banner would make eating look like a warning. */
 .fuel-card { margin: 14px 0 4px; padding: 13px 14px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line); }
@@ -1811,6 +1842,15 @@ const BRAND_SVG = ${JSON.stringify(BRAND_MARK)};
 const EX_ANIM = ${JSON.stringify(exAnimData)};
 const EX_STILL = ${JSON.stringify(exStillData)};
 const ICON = {
+  // Run-type marks for the "Build your own run" grid. Simple strokes at the set's own weight — a
+  // runner glancing at a colour and a shape should know which card is which without reading.
+  rEasy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="15.5" cy="4.6" r="1.9"/><path d="M13 9.2 9.6 11l1.9 3.1L9 21"/><path d="m13 9.2 3.4 1.5 2.3 3.4"/><path d="M11.5 14.1 6.6 15"/></svg>',
+  rRecovery: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-5 3 10 2.5-7 1.8 4H21"/></svg>',
+  rLong: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18c3.5 0 3.5-8 7-8s3.5 8 7 8 4-3 4-3"/><circle cx="3" cy="18" r="1.3" fill="currentColor"/></svg>',
+  rTempo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17h4l3-9 3.5 13L17 12h4"/></svg>',
+  rIntervals: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16V9M9 16V6M14 16v-7M19 16v-4"/><path d="M2.5 19.5h19"/></svg>',
+  rRace: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 5h8l-1.4 3L13 11H5"/><path d="M13 5h6l-1.4 3L19 11h-6"/></svg>',
+  rStrides: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h11M3 12h15M3 16h8"/><path d="m18 14 3 2-3 2"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9.5 7V5.4A1.4 1.4 0 0 1 10.9 4h2.2a1.4 1.4 0 0 1 1.4 1.4V7"/><path d="M6.4 7l.8 12.1A1.9 1.9 0 0 0 9.1 21h5.8a1.9 1.9 0 0 0 1.9-1.9L17.6 7"/><path d="M10.5 11v6M13.5 11v6"/></svg>',
   watch: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="3.4"/><path d="M9 6 8.6 3.2A1 1 0 0 1 9.6 2h4.8a1 1 0 0 1 1 1.2L15 6M9 18l-.4 2.8a1 1 0 0 0 1 1.2h4.8a1 1 0 0 0 1-1.2L15 18"/><path d="M12 9.6V12l1.7 1.1"/></svg>',
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.4 5.4h3.2"/><circle cx="12" cy="18.2" r=".7" fill="currentColor" stroke="none"/></svg>',
@@ -3772,7 +3812,11 @@ function dayLabelIso(iso) {
 // "today" / "tomorrow" read fine bare; a date needs a preposition.
 function dayPhraseIso(iso) { const l = dayLabelIso(iso); return (l === "today" || l === "tomorrow") ? l : "on " + l; }
 function addExtra(params) {
-  EXTRA.push({ id: "x" + (EXTRA_SEQ++) + "-" + (new Date().getTime()), type: params.type, durMin: params.durMin || null, reps: params.reps || null, date: addTargetIso() });
+  // ⚠️ A library pick stores its FORMAT ID, not its steps. The session is rebuilt from the id at
+  // the runner's CURRENT paces, so a workout added last week re-derives if their fitness
+  // re-anchors — exactly like every planned session. Storing baked steps would freeze old paces
+  // into the logbook.
+  EXTRA.push({ id: "x" + (EXTRA_SEQ++) + "-" + (new Date().getTime()), type: params.type, workoutId: params.workoutId || null, durMin: params.durMin || null, reps: params.reps || null, date: addTargetIso() });
   saveExtra();
   // The watch and the reminder schedule both describe "what am I doing today" - keep them true.
   try { syncWatch(); } catch (e) {}
@@ -3853,7 +3897,19 @@ function buildCustomSession(e) {
     steps: steps.length ? steps : rep.steps,
   });
 }
-function extraSession(e) { return e ? buildCustomSession(e) : null; }
+function extraSession(e) {
+  if (!e) return null;
+  if (e.workoutId) {
+    try {
+      const w = RC.buildWorkout(e.workoutId, RAW.paces, workoutCtx());
+      if (w) return Object.assign({}, w, { id: e.id, source: "manual",
+        dayOfWeek: e.date ? (isoAdd(e.date, 0).getUTCDay() + 6) % 7 : TODAY_DOW });
+    } catch (err) {}
+    // The format is no longer offered (goal changed, no longer competitive) — fall back to a shaped
+    // session of the same type rather than dropping the runner's day on the floor.
+  }
+  return buildCustomSession(e);
+}
 // The "Added today" card + the "Add a session today" button, shown on Today under the summary squares.
 function addedTodayBlock() {
   const iso = selectedDayIso();
@@ -3875,46 +3931,157 @@ function addedTodayBlock() {
 // runs, number of reps for quality sessions) with a live time/distance estimate before adding.
 let BUILDER = null; // { type, durMin, reps }
 function repCountOf(s) { const r = s.steps.filter((st) => st.kind === "rep"); return r.length ? (r[0].repeatCount || r.length) : 0; }
-function addSessionSheetHtml() {
-  if (!BUILDER) {
-    const items = sessionLibrary().map((s) => {
-      const dur = Math.round(s.estimatedDurationSeconds / 60);
-      const dist = s.estimatedDistanceMeters ? " · " + (Math.round(s.estimatedDistanceMeters / 100) / 10) + " km" : "";
-      return '<button class="pick-row" data-pick="' + s.type + '"><span class="dot ' + effortOf(s) + '"></span>' +
-        '<span class="pick-body"><span class="st">' + esc(SESSION_LABEL[s.type] || s.type) + '</span><span class="sm">' + esc(s.description || "") + '</span></span>' +
-        '<span class="pick-meta num">' + dur + '′' + dist + '</span></button>';
-    }).join("");
-    return '<div class="sd-type" style="--sc:var(--accent)">Add a session</div>' +
-      '<div class="sd-title">Add a session to ' + dayLabelIso(addTargetIso()) + '</div>' +
-      '<div class="sd-desc" style="margin-bottom:12px">Pick a session type, then build it the way you want it.</div>' +
-      '<div class="pick-list">' + items + '</div>';
+// ---- Build your own run -------------------------------------------------------------------
+//
+// Three stages: a coloured type grid, then either the real workout library (quality types) or the
+// duration/reps shaper (easy running), then a detail view with the steps at THIS runner's paces.
+//
+// ⚠️ The library is the PLAN'S OWN (RC.listWorkouts) — every workout offered is a format the
+// generator itself schedules, so a hand-picked session is the same evidence-based session, at the
+// same paces, judged by the same debrief. A second hand-written catalogue would drift within a
+// release and quietly teach different paces.
+const RUN_TYPES = [
+  { t: "easy", label: "Easy Run", icon: "rEasy", c: "var(--eff-easy)", blurb: "Conversational. Most of your running." },
+  { t: "recovery", label: "Recovery", icon: "rRecovery", c: "var(--steady)", blurb: "Shorter and gentler — the day after something hard." },
+  { t: "long", label: "Long Run", icon: "rLong", c: "var(--taper)", blurb: "Time on your feet builds durability." },
+  { t: "threshold", label: "Tempo", icon: "rTempo", c: "var(--eff-moderate)", blurb: "Comfortably hard, held with rhythm." },
+  { t: "vo2", label: "Intervals", icon: "rIntervals", c: "var(--eff-hard)", blurb: "Short and fast, with recoveries." },
+  { t: "race-specific", label: "Race Pace", icon: "rRace", c: "var(--rest)", blurb: "Rehearse the pace you want on the day." },
+  { t: "strides", label: "Easy + Strides", icon: "rStrides", c: "var(--build)", blurb: "An easy run with relaxed fast bursts." },
+];
+function RUN_TYPE(t) { return RUN_TYPES.find((x) => x.t === t) || RUN_TYPES[0]; }
+/** Quality types have a real library behind them; easy running is shaped by duration instead. */
+function typeHasLibrary(t) { return t === "threshold" || t === "vo2" || t === "race-specific"; }
+/** The runner's own filters, mirroring the generator's — see listWorkouts. */
+function workoutCtx() {
+  const KM = { "1mile": 1.6, "5k": 5, "10k": 10, half: 21.1, marathon: 42.2 };
+  return { competitive: profile.status === "competitive", returning: !!profile.returning, eventKm: KM[profile.goalDist] || 10 };
+}
+function workoutsFor(type, band) {
+  let list;
+  try { list = RC.listWorkouts(RAW.paces, workoutCtx()).filter((w) => w.type === type); } catch (e) { return []; }
+  if (band === "short") list = list.filter((w) => w.minutes <= 50);
+  else if (band === "mid") list = list.filter((w) => w.minutes > 50 && w.minutes <= 65);
+  else if (band === "long") list = list.filter((w) => w.minutes > 65);
+  return list.sort((a, b) => a.minutes - b.minutes);
+}
+/** "Best for" tag — read off the format's own load, not invented. */
+function loadTag(w) {
+  if (w.load === "big") return { t: "Best for: a big day", c: "var(--eff-hard)" };
+  if (w.load === "small") return { t: "Best for: a gentle touch", c: "var(--eff-easy)" };
+  return { t: "Best for: balance", c: "var(--steady)" };
+}
+/** The session the current BUILDER describes — a library workout, or a shaped one. */
+function previewSession() {
+  if (BUILDER && BUILDER.workoutId) {
+    try { return RC.buildWorkout(BUILDER.workoutId, RAW.paces, workoutCtx()); } catch (e) { return null; }
   }
-  // Builder step — live preview from the current params.
+  return buildCustomSession(Object.assign({ id: "preview" }, BUILDER || {}));
+}
+function addSessionSheetHtml() {
+  const head = '<div class="sd-type" style="--sc:var(--accent)">Build your own run</div>';
+  // Stage 1 — the type grid.
+  if (!BUILDER) {
+    const cards = RUN_TYPES.map((r) =>
+      '<button class="rt-card" data-pick="' + r.t + '" style="--rc:' + r.c + '">' +
+        '<span class="rt-ico">' + ICON[r.icon] + '</span>' +
+        '<span class="rt-ghost" aria-hidden="true">' + ICON[r.icon] + '</span>' +
+        '<span class="rt-lab">' + esc(r.label) + '</span>' +
+      '</button>').join("");
+    return head +
+      '<div class="sd-title">What do you fancy?</div>' +
+      '<div class="sd-desc" style="margin-bottom:12px">Pick a type. Everything is built at your own paces, from the same library your plan uses.</div>' +
+      '<div class="rt-grid">' + cards + '</div>';
+  }
+  const rt = RUN_TYPE(BUILDER.type);
+  const back = '<button class="rm-test" id="bldBack">‹ Choose a different type</button>';
+
+  // Stage 2a — the workout library, for quality types.
+  if (BUILDER.stage === "list") {
+    const band = BUILDER.band || "any";
+    const chips = [["any", "Any length"], ["short", "Up to 50′"], ["mid", "50–65′"], ["long", "65′+"]]
+      .map((b) => '<button class="wk-chip' + (band === b[0] ? " on" : "") + '" data-band="' + b[0] + '">' + b[1] + '</button>').join("");
+    const list = workoutsFor(BUILDER.type, band);
+    const rows = list.map((w) => {
+      const tag = loadTag(w);
+      return '<button class="wk-row" data-wk="' + esc(w.id) + '" style="--rc:' + rt.c + '">' +
+        '<span class="wk-tag" style="--tc:' + tag.c + '">' + tag.t + '</span>' +
+        '<span class="wk-t">' + esc(w.title) + '</span>' +
+        '<span class="wk-m num">' + esc(rt.label) + ' · ' + w.minutes + '′' + (w.km ? " · " + w.km + " km" : "") + '</span>' +
+      '</button>';
+    }).join("");
+    const empty = '<div class="sd-desc">Nothing in the library at that length for this type — try another.</div>';
+    return head +
+      '<div class="sd-title">' + esc(rt.label) + ' sessions</div>' +
+      '<div class="sd-desc" style="margin-bottom:10px">' + esc(rt.blurb) + ' These are your plan’s own workouts, at your paces.</div>' +
+      '<div class="wk-chips">' + chips + '</div>' +
+      '<div class="wk-list">' + (rows || empty) + '</div>' +
+      '<button class="rm-test" id="bldShape">Shape one myself instead ›</button>' +
+      back;
+  }
+
+  // Stage 3 — the chosen workout, in full.
+  if (BUILDER.stage === "detail") {
+    const prev = previewSession();
+    if (!prev) { BUILDER.stage = "list"; return addSessionSheetHtml(); }
+    const dur = Math.round(prev.estimatedDurationSeconds / 60);
+    const dist = prev.estimatedDistanceMeters ? (Math.round(prev.estimatedDistanceMeters / 100) / 10) + " km" : null;
+    const rows = structureRows(prev.steps).map((r) =>
+      '<div class="sd-step"><div class="sd-dot" style="background:var(--eff-' + effortOf(prev) + ')"></div><div><div class="sd-tag">' + r.tag + '</div><div class="sd-lab">' + r.lab + '</div>' + (r.chips ? '<div class="sd-meta">' + r.chips + '</div>' : "") + '</div></div>').join("");
+    return head +
+      '<div class="sd-title">' + esc(prev.title) + '</div>' +
+      '<div class="sd-chips"><span class="chip">' + dur + '′' + (dist ? " · " + dist : "") + '</span>' +
+        (prev.targetRpe ? '<span class="chip rpe">RPE ' + prev.targetRpe.min + '–' + prev.targetRpe.max + '</span>' : "") + '</div>' +
+      '<div class="sd-desc">' + esc(prev.description || "") + '</div>' +
+      '<div class="sd-steps">' + rows + '</div>' +
+      fuelHtml(prev) +
+      '<button class="primary" id="bldAdd" style="width:100%;margin-top:14px">＋ Add to ' + dayLabelIso(addTargetIso()) + '</button>' +
+      '<button class="rm-test" id="bldRelist">‹ Back to the list</button>';
+  }
+
+  // Stage 2b — shape it yourself, by duration or reps.
   const preview = buildCustomSession(Object.assign({ id: "preview" }, BUILDER));
   const dur = Math.round(preview.estimatedDurationSeconds / 60);
   const dist = preview.estimatedDistanceMeters ? (Math.round(preview.estimatedDistanceMeters / 100) / 10) + " km" : null;
   const quality = builderUsesReps(BUILDER.type);
   const stepper = quality
-    ? '<div class="rm-row"><label>Reps</label><span class="bld-step"><button class="bld-btn" data-bld="reps-">\\u2212</button><span class="bld-val num">' + BUILDER.reps + '</span><button class="bld-btn" data-bld="reps+">\\uFF0B</button></span></div>'
-    : '<div class="rm-row"><label>Duration</label><span class="bld-step"><button class="bld-btn" data-bld="dur-">\\u2212</button><span class="bld-val num">' + BUILDER.durMin + '\\u2032</span><button class="bld-btn" data-bld="dur+">\\uFF0B</button></span></div>';
+    ? '<div class="rm-row"><label>Reps</label><span class="bld-step"><button class="bld-btn" data-bld="reps-">−</button><span class="bld-val num">' + BUILDER.reps + '</span><button class="bld-btn" data-bld="reps+">＋</button></span></div>'
+    : '<div class="rm-row"><label>Duration</label><span class="bld-step"><button class="bld-btn" data-bld="dur-">−</button><span class="bld-val num">' + BUILDER.durMin + '′</span><button class="bld-btn" data-bld="dur+">＋</button></span></div>';
   const rows = structureRows(preview.steps).map((r) =>
     '<div class="sd-step"><div class="sd-dot" style="background:var(--eff-' + effortOf(preview) + ')"></div><div><div class="sd-tag">' + r.tag + '</div><div class="sd-lab">' + r.lab + '</div>' + (r.chips ? '<div class="sd-meta">' + r.chips + '</div>' : "") + '</div></div>').join("");
-  return '<div class="sd-type" style="--sc:var(--eff-' + effortOf(preview) + ')">' + (SESSION_LABEL[BUILDER.type] || BUILDER.type) + '</div>' +
-    '<div class="sd-title">Build your session</div>' +
-    '<div class="sd-chips"><span class="chip">' + dur + '\\u2032' + (dist ? " · " + dist : "") + '</span></div>' +
+  return head +
+    '<div class="sd-title">' + esc(rt.label) + '</div>' +
+    '<div class="sd-chips"><span class="chip">' + dur + '′' + (dist ? " · " + dist : "") + '</span></div>' +
     stepper +
     '<div class="sd-steps" style="margin-top:10px">' + rows + '</div>' +
-    '<button class="primary" id="bldAdd" style="width:100%;margin-top:14px">\\uFF0B Add to today</button>' +
-    '<button class="rm-test" id="bldBack">\\u2039 Choose a different type</button>';
+    fuelHtml(preview) +
+    '<button class="primary" id="bldAdd" style="width:100%;margin-top:14px">＋ Add to ' + dayLabelIso(addTargetIso()) + '</button>' +
+    (typeHasLibrary(BUILDER.type) ? '<button class="rm-test" id="bldRelist">‹ Back to the list</button>' : "") +
+    back;
 }
 function openAddSessionSheet(iso) { ADD_TARGET = iso || todayIso(); BUILDER = null; ensureSheet(); SHEET_CTX = null; $("sheetBody").innerHTML = addSessionSheetHtml(); wireAddSessionSheet(); $("sheetOv").classList.add("on"); }
 function wireAddSessionSheet() {
   const rerender = () => { $("sheetBody").innerHTML = addSessionSheetHtml(); wireAddSessionSheet(); };
+  const shapeDefaults = (type) => {
+    const rep = extraRep(type);
+    return { type: type, stage: "shape", workoutId: null,
+      durMin: Math.max(15, Math.round((rep ? rep.estimatedDurationSeconds : 2700) / 60 / 5) * 5 || 45),
+      reps: builderUsesReps(type) ? Math.min(12, Math.max(2, repCountOf(rep) || 5)) : null };
+  };
   document.querySelectorAll('#sheetBody [data-pick]').forEach((b) => b.onclick = () => {
-    const rep = extraRep(b.dataset.pick);
-    // reps only applies to interval-style quality picks; everything else shapes by duration
-    BUILDER = { type: b.dataset.pick, durMin: Math.max(15, Math.round(rep.estimatedDurationSeconds / 60 / 5) * 5 || 45), reps: builderUsesReps(b.dataset.pick) ? Math.min(12, Math.max(2, repCountOf(rep) || 5)) : null };
+    const t = b.dataset.pick;
+    // Quality types open the library; easy running goes straight to the shaper, because there is
+    // no library of "easy run formats" — an easy run is a duration.
+    BUILDER = typeHasLibrary(t) && workoutsFor(t, "any").length
+      ? { type: t, stage: "list", band: "any", workoutId: null }
+      : shapeDefaults(t);
     rerender();
+  });
+  document.querySelectorAll('#sheetBody [data-band]').forEach((b) => b.onclick = () => {
+    if (!BUILDER) return; BUILDER.band = b.dataset.band; rerender();
+  });
+  document.querySelectorAll('#sheetBody [data-wk]').forEach((b) => b.onclick = () => {
+    if (!BUILDER) return; BUILDER.workoutId = b.dataset.wk; BUILDER.stage = "detail"; rerender();
   });
   document.querySelectorAll('#sheetBody [data-bld]').forEach((b) => b.onclick = () => {
     if (!BUILDER) return;
@@ -3925,11 +4092,13 @@ function wireAddSessionSheet() {
     if (k === "reps+") BUILDER.reps = Math.min(12, BUILDER.reps + 1);
     rerender();
   });
+  const shape = $("bldShape"); if (shape) shape.onclick = () => { BUILDER = shapeDefaults(BUILDER.type); rerender(); };
+  const relist = $("bldRelist"); if (relist) relist.onclick = () => {
+    BUILDER = { type: BUILDER.type, stage: "list", band: BUILDER.band || "any", workoutId: null }; rerender();
+  };
   const back = $("bldBack"); if (back) back.onclick = () => { BUILDER = null; rerender(); };
   const add = $("bldAdd"); if (add) add.onclick = () => { addExtra(BUILDER); BUILDER = null; closeSheet(); render(); };
 }
-
-// ============ PLAN =========================================================
 function viewPlan() {
   const g = PLAN.goal, s = PLAN.summary;
   const peak = s.peakKm || 1;

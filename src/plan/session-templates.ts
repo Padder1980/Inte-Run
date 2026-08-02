@@ -401,6 +401,33 @@ export type LongRunOptions = {
   steadyFinishMin?: number;
   racePace?: PaceRange;
   raceBlockMin?: number;
+  /** What the race-pace work is called on screen and on the wrist ("marathon effort", …). */
+  raceLabel?: string;
+  /** RPE band for the race-pace work — marathon effort is steady, half effort is tempo. */
+  raceRpe?: { min: number; max: number };
+  /**
+   * Progressive long run: the easy main is split 40% easy → 35% aerobic → 25% at finalPace,
+   * biggest gear last. The easy share stays the LONGEST single step on purpose — the debrief
+   * judges a run by its longest continuous step, and a progressive long run is still an easy run.
+   *
+   * ⚠️ finalCapMin/midCapMin are REQUIRED BY REVIEW, not optional polish. Uncapped percentages made
+   * the progressive the only ungoverned format: a 3-day/week 4-hour marathoner drew a 240′ run with
+   * 79′ aerobic + 57′ at marathon pace — nearly double the cap the same plan applied to its
+   * fast-finish sibling, landing on exactly the runner least able to absorb it. Whatever the caps
+   * shave off goes back into the easy first gear, so the run's length never changes.
+   */
+  progressive?: {
+    finalPace: PaceRange; finalLabel: string; finalRpe: { min: number; max: number };
+    finalCapMin?: number; midCapMin?: number;
+  };
+  /**
+   * Interleaved race-pace blocks late in the run: N × blockMin with easy floats between —
+   * "run your race pace on tired legs, recover just enough to do it again". The classic
+   * marathon-block session, and where race-day fuelling gets practised.
+   */
+  blocks?: { count: number; blockMin: number; floatMin: number; pace: PaceRange; label: string; rpe: { min: number; max: number } };
+  /** Title suffix, e.g. "· fast finish" — the minutes stay first so the week list scans. */
+  titleSuffix?: string;
 };
 
 export function longRun(
@@ -408,44 +435,114 @@ export function longRun(
   minutes: number,
   opts: LongRunOptions = {},
 ): SessionContent {
-  const finishMin = (opts.steadyFinishMin ?? 0) + (opts.raceBlockMin ?? 0);
   const warm = Math.min(8, Math.max(4, Math.round(minutes * 0.1)));
   const cool = Math.min(6, Math.max(3, Math.round(minutes * 0.08)));
-  const mainEasy = Math.max(1, minutes - finishMin - warm - cool);
-  const steps: WorkoutStep[] = [
-    easeIn(paces, warm),
-    {
-      kind: "steady",
-      label: "Easy aerobic running — build durability",
-      durationSeconds: mainEasy * 60,
-      targetPaceSecPerKm: paces.easy,
-      targetRpe: RPE.easy,
-    },
-  ];
+  const body = Math.max(1, minutes - warm - cool);
+  const steps: WorkoutStep[] = [easeIn(paces, warm)];
   let description =
     "Long run develops durability: holding economy and mechanics under accumulated fatigue. Ease in, hold an easy rhythm, then ease down to finish.";
-  if (opts.raceBlockMin && opts.racePace) {
+  const easyStep = (min: number): WorkoutStep => ({
+    kind: "steady",
+    label: "Easy aerobic running — build durability",
+    durationSeconds: min * 60,
+    targetPaceSecPerKm: paces.easy,
+    targetRpe: RPE.easy,
+  });
+
+  if (opts.progressive) {
+    // 40 / 35 / 25 — biggest gear last, capped, remainder back into the easy opening. The EASY
+    // share stays the longest single step, so the debrief still judges this run against the easy
+    // band. Coach's question answered on screen: how long easy, how long steady, over the run.
+    const c = Math.min(opts.progressive.finalCapMin ?? Infinity, Math.max(1, Math.round(body * 0.25)));
+    const b = Math.min(opts.progressive.midCapMin ?? Infinity, Math.round(body * 0.35));
+    const a = Math.max(1, body - b - c);
+    steps.push(easyStep(a));
     steps.push({
       kind: "steady",
-      label: "Race-specific block at goal effort (run while already fatigued)",
-      durationSeconds: opts.raceBlockMin * 60,
-      targetPaceSecPerKm: opts.racePace,
-      targetRpe: RPE.steady,
+      label: "Lift to a moderate aerobic rhythm — breathing deepens, still conversational",
+      durationSeconds: b * 60,
+      targetPaceSecPerKm: paces.aerobic,
+      targetRpe: RPE.aerobic,
     });
-    description += " Includes a race-specific block late in the run.";
-  }
-  if (opts.steadyFinishMin) {
     steps.push({
       kind: "steady",
-      label: "Steady progressive finish",
-      durationSeconds: opts.steadyFinishMin * 60,
-      targetPaceSecPerKm: paces.steady,
-      targetRpe: RPE.steady,
+      label: opts.progressive.finalLabel,
+      durationSeconds: c * 60,
+      targetPaceSecPerKm: opts.progressive.finalPace,
+      targetRpe: opts.progressive.finalRpe,
     });
-    description += " Finishes steady, not as a race.";
+    description =
+      "Progressive long run: three gears, biggest last. Start genuinely easy, lift to moderate through the middle, and finish strong on tired legs — the discipline is holding back early.";
+  } else if (opts.blocks) {
+    // Race-pace repeats late in the run, with easy floats between. The easy lead-in takes whatever
+    // the work leaves, and never shrinks below a real run — the blocks are meant to land on tired
+    // legs, which requires the tiredness first.
+    let { count } = opts.blocks;
+    const { blockMin, floatMin, pace, label, rpe } = opts.blocks;
+    // ⚠️ Shed blocks rather than stretch the run. lead = max(10, body - work) alone ADDS time when
+    // the run is too short for the work — a 50′ title over 52′ of steps, with the race block
+    // promoted to the longest step and the debrief judging the whole run at race pace. Unreachable
+    // through generatePlan today (its budget guard filters first), but longRun is an exported
+    // template and the next caller lands here silently.
+    while (count > 1 && body - (count * blockMin + (count - 1) * floatMin) < 10) count--;
+    const work = count * blockMin + (count - 1) * floatMin;
+    const lead = Math.max(10, body - work);
+    steps.push(easyStep(lead));
+    for (let i = 0; i < count; i++) {
+      if (i > 0) {
+        steps.push({
+          kind: "recovery",
+          label: "Float — easy running, just enough to go again",
+          durationSeconds: floatMin * 60,
+          targetPaceSecPerKm: paces.easy,
+          targetRpe: RPE.easy,
+        });
+      }
+      steps.push({
+        kind: "steady",
+        label,
+        durationSeconds: blockMin * 60,
+        targetPaceSecPerKm: pace,
+        targetRpe: rpe,
+      });
+    }
+    description =
+      "Long run with race-pace blocks: get properly tired first, then run your goal pace in pieces with short floats between. This is where race rhythm — and race fuelling — get practised.";
+  } else {
+    const finishMin = (opts.steadyFinishMin ?? 0) + (opts.raceBlockMin ?? 0);
+    steps.push(easyStep(Math.max(1, body - finishMin)));
+    if (opts.raceBlockMin && opts.racePace) {
+      steps.push({
+        kind: "steady",
+        label: opts.raceLabel
+          ? `Fast finish at ${opts.raceLabel} — run it on tired legs`
+          : "Race-specific block at goal effort (run while already fatigued)",
+        durationSeconds: opts.raceBlockMin * 60,
+        targetPaceSecPerKm: opts.racePace,
+        targetRpe: opts.raceRpe ?? RPE.steady,
+      });
+      description += " Finishes with a sustained block at race effort — the point is meeting your goal pace when your legs are already heavy.";
+    }
+    if (opts.steadyFinishMin) {
+      steps.push({
+        kind: "steady",
+        label: "Steady progressive finish",
+        durationSeconds: opts.steadyFinishMin * 60,
+        targetPaceSecPerKm: paces.steady,
+        targetRpe: RPE.steady,
+      });
+      description += " Finishes steady, not as a race.";
+    }
   }
   steps.push(easeDown(paces, cool));
-  return assemble("long", `${minutes}′ long run`, description, "easy", steps, RPE.easy);
+  const title = `${minutes}′ long run` + (opts.titleSuffix ? ` ${opts.titleSuffix}` : "");
+  // ⚠️ The session's intended-effort band must SPAN the work, or the debrief calls a perfect
+  // execution overcooked: plannedRpeBandOf short-circuits on the session band, so a runner who ran
+  // a race-pace block exactly as prescribed and honestly reported five-out-of-ten was told it was
+  // "meant to feel about 2–3" after every structured long run — and two of those in a row raised
+  // an ease-off flag from correctly executed sessions.
+  const maxRpe = steps.reduce((m, st) => Math.max(m, st.targetRpe?.max ?? 0), RPE.easy.max);
+  return assemble("long", title, description, "easy", steps, { min: RPE.easy.min, max: maxRpe });
 }
 
 // ---- Threshold (incl. tempo, cruise, fartlek) -----------------------------

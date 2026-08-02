@@ -753,6 +753,54 @@ kills the whole page silently); the `node --check` step caught it — never skip
 keyboard is up, the nav's `env(safe-area-inset-bottom)` padding is 34pt of nothing above the
 keyboard — the home indicator it exists for is UNDERNEATH the keyboard — so `.kbup` collapses it.
 
+## The long run reads like a session (added 2026-08-02, from elite-coach feedback)
+
+"How long do you run easy for, then how long do you steady for, over the course of 32km?" Structure
+was token before — a 20′ steady finish in build, a capped 30′ block in peak, identical every week —
+and a **5k plan's PEAK long run held up to 25 minutes AT 5K PACE** inside an easy run, unrunnable as
+prescribed, with the debrief then judging the runner against it.
+
+`longRunFor(wp, ctx)` now selects per week: **base, deloads and the taper stay plain** (durability,
+absorption, ease — structure would defeat all three); **5k/10k never carry goal-race pace** (steady
+is the ceiling; race pace lives in the interval sessions); **half/marathon build** rotates
+progressive → steady / steady-finish / plain, and **peak** rotates fast-finish at goal pace /
+interleaved blocks with floats / progressive → goal pace. Rotation runs on its own seed stream
+(`LR_SEED`) — sharing the quality rotation's would lock the two together.
+
+⚠️ **Traps the adversarial review caught in the first cut — all four reproduced, do not reopen:**
+- **Every dose is CAPPED, including the progressive's.** Uncapped percentages made the progressive
+  the only ungoverned format: a 3-day/week 4:00 marathoner drew 240′ with **79′ aerobic + 57′ at
+  marathon pace**, double the cap the same plan applied to its fast-finish sibling. `finalCapMin` /
+  `midCapMin` are review requirements; what the caps shave off returns to the easy opening.
+- **Dose caps SCALE with `vScale`** (`capped()`); percentages already did. Absolute caps on a
+  down-scaled run kept the work full-size while the easy shrank, the honest intensity check then
+  rejected every scaled candidate, and week-one anchoring silently died (25 km/week → 31 km wk1).
+- **Long-run work steps bucket by their OWN RPE in `computeDistribution`** (`stepBucket`,
+  session type "long", RPE ≥ 4 → moderate; the aerobic 3–4 gear stays easy by house convention).
+  Charging steps to the session's "easy" made every dose invisible: the floor sweep was
+  structurally incapable of failing — "identical to HEAD" was guaranteed whatever was added. The
+  FOURTH firing of the guard-blind-to-new-input trap. Measured with the honest ruler: this change
+  is BETTER than HEAD (32 vs 57 under-floor weeks of 4560).
+- **The session RPE band spans the hardest step** (`{min: 2, max: maxStepRpe}`). With the band left
+  at 2–3, a runner who executed a race-pace block perfectly and honestly reported 5 was told it was
+  "meant to feel about 2–3" after every structured long run, and two in a row raised a false
+  ease-off flag from `assessTrainingFlags`.
+- **At ≤4 running days, a long run carrying 10+ min of RPE-4+ work IS the week's second key day** —
+  `buildWeek` builds the long run first and caps quality at 1 when it carries work. Before: a
+  4-day peak week held two interval sessions PLUS the long run's block, honestly 67.0% easy, under
+  the floor. The gate derives from the long run's CONTENT, never the rotation index (the documented
+  unreachable-formats trap).
+- `coachStepTrigger` distinguishes a long run's WORK block (RPE ≥ 4 → "tempo-start") from its easy
+  main ("long-run-settle") — the settle line ("patience early… sip fluids") was the exact wrong
+  instruction at the lift moment. And `longRun`'s blocks path SHEDS blocks when the run is too
+  short rather than stretching past its own title (latent; unreachable via generatePlan, but the
+  template is exported).
+
+Costs, accepted and measured: week-one anchoring 79% → 74% (the honest walk-back refusing scaled
+plans it previously couldn't judge — still far above the pre-anchor 66%); the long-run
+never-shrinks test now holds MINUTES exactly and distance to 2% (scaled caps swap a few race-pace
+minutes back to easy pace, ~200 m of composition drift in the same duration).
+
 ## Race day is a session (added 2026-08-01, from elite-coach feedback)
 
 ⚠️ **`"race"` is a SessionType, distinct from `"race-specific"`** (which is a rehearsal in

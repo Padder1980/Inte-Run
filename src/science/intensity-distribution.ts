@@ -46,13 +46,26 @@ export type Distribution = { easy: number; moderate: number; hard: number; total
  * an accounting artefact. Warm-ups, cool-downs and recoveries are easy running and are counted as
  * such; only the work itself carries the session's intensity.
  */
-function stepBucket(step: WorkoutStep, sessionIntensity: Exclude<IntensityBucket, "none">) {
+function stepBucket(
+  step: WorkoutStep,
+  sessionIntensity: Exclude<IntensityBucket, "none">,
+  sessionType?: string,
+) {
   if (step.kind === "warmup" || step.kind === "cooldown" || step.kind === "recovery") return "easy";
   // Kind alone is not enough. The jog between two blocks of a compound session is written as a
   // "steady" step (deliberately — it is what stops the detail sheet merging the blocks into one
   // row), so bucketing purely by kind charged easy running to the quality bucket. Effort is the
   // honest signal: anything prescribed at RPE 3 or below is easy running, whatever it is called.
   if (step.targetRpe && step.targetRpe.max <= 3) return "easy";
+  // ⚠️ LONG RUNS bucket their work by the STEP's own effort, not the session's. A long run is an
+  // "easy" session, and charging every step to the session made all race-pace work inside one
+  // invisible: a 44-minute marathon-pace block counted as easy running, identical work inside a
+  // race-specific session counted moderate, and the easy-floor sweep was structurally incapable of
+  // failing however big a dose was added — measured, the "guard" reported zero change while
+  // honest bucketing showed +27% under-floor weeks. Same trap CLAUDE.md records twice: a guard
+  // blind to the new input is not a guard. The aerobic gear (RPE 3–4) stays easy by the documented
+  // house convention above; RPE 4+ work is moderate wherever it lives.
+  if (sessionType === "long" && step.targetRpe && step.targetRpe.min >= 4) return "moderate";
   return sessionIntensity;
 }
 
@@ -89,7 +102,7 @@ export function computeDistribution(sessions: Session[]): Distribution {
     if (steps.length > 0 && counted > 0) {
       // Scale to the session's own estimate so rounding in the step maths cannot invent or lose time.
       const scale = s.estimatedDurationSeconds / counted;
-      for (const st of steps) totals[stepBucket(st, s.intensity)] += stepSeconds(st) * scale;
+      for (const st of steps) totals[stepBucket(st, s.intensity, s.type)] += stepSeconds(st) * scale;
       continue;
     }
     totals[s.intensity] += s.estimatedDurationSeconds;

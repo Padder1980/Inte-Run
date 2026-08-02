@@ -580,15 +580,27 @@ function buildWeek(
   ctx: WeekContext,
 ): PlannedWeek {
   const runningDays = Math.min(6, Math.max(3, ctx.athlete.daysPerWeek));
-  const qualityCount = qualitySessionsThisWeek(wp, runningDays, ctx.returning, ctx.vScale ?? 1);
-  const easyCount = Math.max(0, runningDays - qualityCount - 1); // minus the long run
   const longDay = longRunDayOf(ctx.athlete);
+  // ⚠️ THE LONG RUN IS BUILT FIRST, because the quality count needs to see what it carries. A
+  // structured long run with a real race-pace dose is a key day in everything but name, and at
+  // four running days a week the old accounting stacked THREE race-pace days into a peak week —
+  // two interval sessions plus the long run's block — which the honest intensity bucketing now
+  // measures at 67.0% easy, under the floor. The gate is derived from the long run's CONTENT
+  // (a work step of 10+ minutes at RPE 4+), never from the rotation index — deriving gates from
+  // the rotation is the documented trap that made formats unreachable.
+  const long = longRunFor(wp, ctx);
+  const longCarriesWork = long.steps.some(
+    (st) => (st.targetRpe?.min ?? 0) >= 4 && (st.durationSeconds ?? 0) >= 10 * 60,
+  );
+  const baseQuality = qualitySessionsThisWeek(wp, runningDays, ctx.returning, ctx.vScale ?? 1);
+  const qualityCount = runningDays <= 4 && longCarriesWork ? Math.min(baseQuality, 1) : baseQuality;
+  const easyCount = Math.max(0, runningDays - qualityCount - 1); // minus the long run
 
   const sessions: SessionContent[] = [];
   const dayOf: number[] = [];
 
   // Long run (on the athlete's chosen day).
-  sessions.push(longRunFor(wp.phase, ctx));
+  sessions.push(long);
   dayOf.push(longDay);
 
   // Quality sessions — placed relative to the long run so spacing rules hold on any long-run day.
@@ -1122,19 +1134,134 @@ function easyVariant(paces: TrainingPaces, minutes: number, idx: number, canStri
   return pool[idx % pool.length]!(paces, minutes);
 }
 
-function longRunFor(phase: Phase, ctx: WeekContext): SessionContent {
+/**
+ * The long run reads like a SESSION, not one undifferentiated block (elite-coach feedback: "how
+ * long do you run easy for, then how long do you steady for, over the course of 32km?").
+ *
+ * Rules, each of which is a coaching decision:
+ * - ⚠️ Base, deloads and the taper stay PLAIN EASY. The base is building durability, a deload is
+ *   absorbing, and structure on an eased week defeats the ease. Beginners never reach this code
+ *   at all (buildBeginnerWeek), so their long runs are plain by construction.
+ * - ⚠️ 5K and 10K long runs never carry goal-race pace. Before this, a PEAK 5k long run held up to
+ *   25 minutes AT 5K PACE inside an easy run — unrunnable as prescribed, and the debrief then
+ *   judged the runner against it. For short events the long run is aerobic support; race pace
+ *   lives in the interval sessions. Steady is the ceiling here.
+ * - Half and marathon long runs carry REAL doses of race-pace work in build/peak — a fast finish,
+ *   interleaved blocks with floats, or a progressive — rotated per week so no two consecutive
+ *   structured long runs look alike, seeded per plan like the quality rotation (but on its own
+ *   stream: sharing the quality rot would lock the two rotations together).
+ * - Doses respect the week around them: four running days or fewer get the milder caps.
+ */
+function longRunFor(wp: AnnotatedWeek, ctx: WeekContext): SessionContent {
   const min = ctx.longMin;
-  if (phase === "peak") {
-    // Race-specific work while tired.
-    return longRun(ctx.paces, min, {
-      raceBlockMin: Math.min(30, Math.round(min * 0.25)),
-      racePace: ctx.paces.goalRace,
-    });
+  const phase = wp.phase;
+  const dist = ctx.goal.distance;
+  if (wp.isDeload || phase === "taper" || phase === "base") return longRun(ctx.paces, min);
+
+  const LR_SEED: Record<Goal["distance"], number> = { "1mile": 1, "5k": 3, "10k": 4, half: 7, marathon: 9 };
+  const rot = wp.ordinalInPhase + ctx.athlete.daysPerWeek + LR_SEED[dist];
+
+  if (dist !== "half" && dist !== "marathon") {
+    // Short events: at most a modest steady finish, and only every other week.
+    if (rot % 2 === 0) {
+      return longRun(ctx.paces, min, {
+        steadyFinishMin: Math.min(20, Math.round(min * 0.2)),
+        titleSuffix: "· steady finish",
+      });
+    }
+    return longRun(ctx.paces, min);
   }
+
+  const marathon = dist === "marathon";
+  const raceLabel = marathon ? "marathon effort" : "goal race effort";
+  // Half goal pace sits in the tempo zone; marathon pace is steady. The RPE has to say so, or the
+  // debrief's effort check reads a correctly-run block as overcooked.
+  const raceRpe = marathon ? { min: 4, max: 5 } : { min: 5, max: 6 };
+  const fewDays = ctx.athlete.daysPerWeek <= 4;
+  // ⚠️ Dose CAPS shrink with the plan (percentages already do — longMin arrives scaled). Absolute
+  // caps on a down-scaled run let the work keep its full size while the easy running around it
+  // shrank, so the honest intensity check rejected every scaled candidate and week-one anchoring
+  // quietly died: a 25 km/week runner was back to a 31 km first week.
+  const capScale = Math.min(1, ctx.vScale ?? 1);
+  const capped = (n: number) => Math.max(10, Math.round(n * capScale));
+
   if (phase === "build") {
-    return longRun(ctx.paces, min, { steadyFinishMin: Math.min(20, Math.round(min * 0.2)) });
+    switch (rot % 3) {
+      case 0:
+        return longRun(ctx.paces, min, {
+          progressive: {
+            finalPace: ctx.paces.steady,
+            finalLabel: "Strong steady finish — controlled, not raced",
+            finalRpe: { min: 4, max: 5 },
+            finalCapMin: capped(30),   // parity with the steady-finish sibling
+            midCapMin: capped(45),
+          },
+          titleSuffix: "· progressive",
+        });
+      case 1:
+        return longRun(ctx.paces, min, {
+          steadyFinishMin: Math.min(capped(30), Math.round(min * 0.25)),
+          titleSuffix: "· steady finish",
+        });
+      default:
+        return longRun(ctx.paces, min);
+    }
   }
-  return longRun(ctx.paces, min);
+
+  // Peak: race-specific work on tired legs, in honest doses.
+  const finishCap = capped(marathon ? (fewDays ? 30 : 40) : (fewDays ? 25 : 35));
+  switch (rot % 3) {
+    case 0:
+      return longRun(ctx.paces, min, {
+        raceBlockMin: Math.min(finishCap, Math.round(min * (fewDays ? 0.22 : 0.3))),
+        racePace: ctx.paces.goalRace,
+        raceLabel,
+        raceRpe,
+        titleSuffix: "· fast finish",
+      });
+    case 1: {
+      const blockMin = marathon ? 15 : 12;
+      // As many blocks as the run and the cap allow, floors first: the lead-in must leave real
+      // tiredness for the blocks to land on.
+      let count = min >= 110 ? 3 : 2;
+      const budget = Math.min(capped(marathon ? 45 : 36), Math.round(min * (fewDays ? 0.25 : 0.35)));
+      while (count > 1 && count * blockMin > budget) count--;
+      if (count < 2) {
+        return longRun(ctx.paces, min, {
+          raceBlockMin: Math.min(finishCap, Math.round(min * 0.22)),
+          racePace: ctx.paces.goalRace,
+          raceLabel,
+          raceRpe,
+          titleSuffix: "· fast finish",
+        });
+      }
+      return longRun(ctx.paces, min, {
+        blocks: {
+          count,
+          blockMin,
+          floatMin: 5,
+          pace: ctx.paces.goalRace,
+          label: `Block at ${raceLabel} — settle into race rhythm`,
+          rpe: raceRpe,
+        },
+        titleSuffix: `· ${count} × ${blockMin}′ at race effort`,
+      });
+    }
+    default:
+      return longRun(ctx.paces, min, {
+        progressive: {
+          finalPace: ctx.paces.goalRace,
+          finalLabel: `Finish at ${raceLabel} — hold the rhythm on tired legs`,
+          finalRpe: raceRpe,
+          // The same governor as the fast-finish sibling: an ungoverned progressive drew 57
+          // minutes at marathon pace for a three-day-a-week runner. The aerobic middle gets
+          // half again the final's cap — a bigger gear deserves a bigger share, not a blank cheque.
+          finalCapMin: finishCap,
+          midCapMin: Math.round(finishCap * 1.5),
+        },
+        titleSuffix: "· progressive",
+      });
+  }
 }
 
 function addStrength(

@@ -410,15 +410,28 @@ test("a smaller stated mileage never shortens the long run", () => {
   // the midweek workout beside it. The long run answers the RACE, not the week, so it grows with a
   // bigger mileage and is never cut by a smaller one. The intensity guard cannot see this: a shorter
   // long run removes easy minutes proportionally, so the ratio stays healthy while the plan rots.
-  const longestKm = (v?: number) => Math.max(...generatePlan(runner(v), goal).weeks
-    .flatMap((w) => w.sessions.filter((s) => s.type === "long")
-      .map((s) => (s.estimatedDistanceMeters ?? 0) / 1000)));
-  const natural = longestKm(undefined);
+  const longest = (v?: number) => {
+    const longs = generatePlan(runner(v), goal).weeks
+      .flatMap((w) => w.sessions.filter((s) => s.type === "long"));
+    return {
+      km: Math.max(...longs.map((s) => (s.estimatedDistanceMeters ?? 0) / 1000)),
+      min: Math.max(...longs.map((s) => s.estimatedDurationSeconds / 60)),
+    };
+  };
+  const natural = longest(undefined);
   for (const stated of [5, 10, 15, 20, 25, 30, 40, 60]) {
-    assert.ok(longestKm(stated) >= natural - 0.05,
-      `stating ${stated}km/wk cut the longest run from ${natural.toFixed(1)} to ${longestKm(stated).toFixed(1)}km`);
+    const got = longest(stated);
+    // ⚠️ MINUTES are the hard invariant — peakLong's Math.max(1, vScale) enforces it structurally.
+    // Distance gets a small tolerance, NOT because the rule is soft but because a down-scaled
+    // plan's long run carries smaller work doses (the caps scale with the plan), and swapping a
+    // few race-pace minutes back to easy pace covers ~200m less ground in the same time. That
+    // composition wobble is not the 10.3km collapse this test exists to prevent.
+    assert.ok(got.min >= natural.min - 0.5,
+      `stating ${stated}km/wk cut the longest run from ${natural.min.toFixed(0)} to ${got.min.toFixed(0)} minutes`);
+    assert.ok(got.km >= natural.km - Math.max(0.05, natural.km * 0.02),
+      `stating ${stated}km/wk cut the longest run from ${natural.km.toFixed(1)} to ${got.km.toFixed(1)}km`);
   }
-  assert.ok(longestKm(140) > natural, "a much bigger mileage should still lengthen the long run");
+  assert.ok(longest(140).km > natural.km, "a much bigger mileage should still lengthen the long run");
 });
 
 test("a half-marathon block builds past the race distance — and the clock still wins", () => {
@@ -623,6 +636,104 @@ test("a clamped one-week taper still gives race week the race-week depth", () =>
   assert.ok(clamped !== null && full !== null, "race-week long run missing from a probe plan");
   assert.ok(Math.abs(clamped! - full!) <= 1,
     `clamped race week runs a ${clamped}min long run; a full taper's race week runs ${full}min — the clamp changed the race-week depth`);
+});
+
+test("the long run reads like a session — real doses, in the right phases only", () => {
+  // Elite-coach feedback: "how long do you run easy for, then how long do you steady for, over the
+  // course of 32km?" Before this the structure was token — a 20-minute steady finish in build, a
+  // capped 30-minute block in peak, identical every week — and a 5K plan's PEAK long run carried up
+  // to 25 minutes AT 5K PACE inside an easy run, which nobody can run as prescribed.
+  const runnerFor = (distance: Goal["distance"]): Athlete => ({
+    daysPerWeek: 5,
+    recent: { distanceMeters: 5000, timeSeconds: 1500 },
+    experience: "recreational",
+    includeStrength: true,
+    returningFromInjury: false,
+    longRunDay: 6,
+  });
+  const target: Record<string, number> = { "5k": 1500, "10k": 3000, half: 6600, marathon: 14400 };
+  const planFor = (distance: Goal["distance"]) => generatePlan(runnerFor(distance),
+    { distance, raceDateIso: "2027-04-04", targetTimeSeconds: target[distance]!, startDateIso: "2026-08-03" });
+
+  const marathonPlan = planFor("marathon");
+  const longOf = (w: PlannedWeek) => w.sessions.find((s) => s.type === "long");
+
+  // 1. Peak long runs carry a REAL race-pace dose: at least 20% of the run not at easy pace.
+  const peakWeeks = marathonPlan.weeks.filter((w) => w.phase === "peak" && !w.isDeload);
+  assert.ok(peakWeeks.length >= 2, "need peak weeks to judge");
+  for (const w of peakWeeks) {
+    const L = longOf(w)!;
+    const total = L.steps.reduce((m, st) => m + (st.durationSeconds ?? 0), 0);
+    const work = L.steps
+      .filter((st) => (st.targetRpe?.min ?? 0) >= 4)
+      .reduce((m, st) => m + (st.durationSeconds ?? 0), 0);
+    assert.ok(work >= total * 0.2,
+      `peak week ${w.index} long run "${L.title}" carries only ${Math.round(work / 60)}min of work in ${Math.round(total / 60)}`);
+  }
+
+  // 2. Base, deload and taper long runs stay PLAIN — structure on an eased week defeats the ease.
+  for (const w of marathonPlan.weeks) {
+    if (!(w.phase === "base" || w.phase === "taper" || w.isDeload)) continue;
+    const L = longOf(w);
+    if (!L) continue;
+    const hot = L.steps.filter((st) => (st.targetRpe?.min ?? 0) >= 4);
+    assert.equal(hot.length, 0,
+      `${w.phase}${w.isDeload ? " deload" : ""} week ${w.index} long run has work blocks: ${hot.map((s) => s.label).join()}`);
+  }
+
+  // 3. Variety: the build+peak long runs are not one shape stamped out weekly.
+  const titles = new Set(marathonPlan.weeks
+    .filter((w) => (w.phase === "build" || w.phase === "peak") && !w.isDeload)
+    .map((w) => longOf(w)?.title.replace(/^\d+′ /, "") ?? ""));
+  assert.ok(titles.size >= 3, `only ${titles.size} long-run shapes across build+peak: ${[...titles].join(" | ")}`);
+
+  // 4. Every dose is governed — the review found the progressive was the ONLY ungoverned format:
+  //    a 3-day/week 4-hour marathoner drew 57 minutes at race pace after 79 aerobic, double what
+  //    the same plan allowed its fast-finish sibling. No single work step may exceed 45 minutes,
+  //    and at 4 days or fewer, 30.
+  const threeDay = generatePlan({ ...runnerFor("marathon"), daysPerWeek: 3, recent: { distanceMeters: 5000, timeSeconds: 2400 } },
+    { distance: "marathon", raceDateIso: "2026-10-25", targetTimeSeconds: 23040, startDateIso: "2026-08-03" });
+  for (const p of [marathonPlan, threeDay]) {
+    const few = p === threeDay;
+    for (const w of p.weeks) {
+      const L = longOf(w);
+      if (!L) continue;
+      for (const st of L.steps) {
+        const rpeMin = st.targetRpe?.min ?? 0;
+        if (rpeMin < 4) continue;
+        const mins = (st.durationSeconds ?? 0) / 60;
+        assert.ok(mins <= (few ? 30.5 : 45.5),
+          `week ${w.index} long run "${L.title}" holds a ${Math.round(mins)}min work step at ${few ? 3 : 5} days/week`);
+      }
+    }
+  }
+
+  // 5. The session's intended-effort band spans its hardest step, or the debrief calls a perfect
+  //    execution overcooked and two of those raise a false ease-off flag.
+  for (const w of marathonPlan.weeks) {
+    const L = longOf(w);
+    if (!L) continue;
+    const stepMax = Math.max(...L.steps.map((st) => st.targetRpe?.max ?? 0));
+    assert.ok((L.targetRpe?.max ?? 0) >= stepMax,
+      `week ${w.index} "${L.title}": session band tops at ${L.targetRpe?.max} but a step reaches ${stepMax}`);
+  }
+
+  // 6. 5K and 10K long runs never carry goal-race pace — the long run is aerobic support there,
+  //    and race pace lives in the interval sessions.
+  for (const distance of ["5k", "10k"] as const) {
+    const p = planFor(distance);
+    const paces = p.paces;
+    for (const w of p.weeks) {
+      const L = longOf(w);
+      if (!L) continue;
+      for (const st of L.steps) {
+        if (!st.targetPaceSecPerKm) continue;
+        assert.ok(st.targetPaceSecPerKm.minSecPerKm >= paces.goalRace.minSecPerKm + 5 ||
+                  (st.durationSeconds ?? 0) < 300,
+          `${distance} week ${w.index} long run holds ${Math.round((st.durationSeconds ?? 0) / 60)}min near goal-race pace: "${st.label}"`);
+      }
+    }
+  }
 });
 
 test("scaling down never buys volume with intensity", () => {

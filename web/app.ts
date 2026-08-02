@@ -5480,14 +5480,17 @@ function coachResetSession(keepAudio) {
   if (!keepAudio) coachStop();
 }
 // Map a live step's kind + the session type to the right trigger when a step begins.
-function coachStepTrigger(stepKind, sessionType) {
+function coachStepTrigger(stepKind, sessionType, stepRpeMin) {
   if (stepKind === "warmup") return "warmup-start";
   if (stepKind === "cooldown") return "cooldown-start";
   if (stepKind === "recovery") return "recovery-start";
   if (stepKind === "rep") return "interval-start";
   if (stepKind === "steady") {
     if (sessionType === "threshold" || sessionType === "race-specific") return "tempo-start";
-    if (sessionType === "long") return "long-run-settle";
+    // A long run's WORK block is a lift, not a settle. Structured long runs carry race-pace
+    // blocks and fast finishes as steady steps, and the settle line (patience early, sip fluids)
+    // is exactly the wrong instruction at the moment the runner is meant to pick it up.
+    if (sessionType === "long") return (stepRpeMin || 0) >= 4 ? "tempo-start" : "long-run-settle";
     return "easy-settle";
   }
   return null;
@@ -6547,7 +6550,7 @@ function coachRouteCue(cue) {
   if (cue.kind === "step-start") {
     const snap = LIVE.rt.snapshot(liveNowMs());
     if (snap.step) {
-      let trig = coachStepTrigger(snap.step.kind, type);
+      let trig = coachStepTrigger(snap.step.kind, type, snap.step.targetRpe && snap.step.targetRpe.min);
       if (snap.step.kind === "rep" && /hill/i.test(LIVE.session.title || "")) trig = "hill-start";
       if (trig) coachTrigger(trig, type, nowSec);
     }

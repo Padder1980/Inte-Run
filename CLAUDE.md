@@ -293,6 +293,79 @@ climbing). Deliberately not gushing: praise that arrives whatever you did is wor
 session gets an honest read and a pointer to the flags system. Shown by `runOverviewHtml()`, so the
 finish screen and the logbook share it. Note **`splitsHtml()` is superseded** and unreferenced.
 
+## The post-run debrief is ONE screen, and it is built ONCE (rebuilt 2026-08-02)
+
+Modelled on a reference the owner sent (Runna's): map → stats → Share → the coach's read → what the
+plan asked for → heart rate → notes. `runOverviewHtml()` composes all of it and is shared by the
+finish screen and the Logbook, so what you read 30 seconds after a run is what you read a month later.
+
+⚠️ **`liveRunRecord(sm)` is the ONLY builder of a phone run's record — never hand-build another.**
+`viewLiveComplete` used to build its own object with five fields (`dist/time/pace/route/splits`)
+while `saveLiveSession` stored fifteen. `runAnalysis` therefore got **no `pband`** on the finish
+screen: after a *prescribed* session it said "a run by feel, nothing to judge it against", drew the
+pace chart with no target band and showed none of the chips — and the identical run opened from the
+Logbook a minute later showed all of them. It is called on **every render** of the finish screen and
+reads the clock, so its id/caption differ per render; that is safe only because nothing resolves an
+*unsaved* run by id (`viewLiveComplete` looks the saved record up by `LIVE.summary.runId`). Don't
+start keying off it without stamping the id once at save time.
+
+⚠️ **`normalizeSplits()` at ingest — the wrist sends bare seconds, the page stores `{km, sec}`.**
+`runAnalysis` filters on `s.sec > 0`, so every watch split was silently discarded: no pace chart, no
+splits table, and the share card's "fastest km" was `Math.min()` of nothing → NaN. Exactly the
+`normalizeRoute` bug in a second field. `migrateRunRoutes()` repairs runs already stored.
+
+⚠️ **`dayLabelIso()` writes the literal word "today"** — so every watch run was captioned "today"
+forever, because nothing recomputed it. Runs now carry `dateIso`; the caption comes from
+`runDateLabelIso()`. Runs logged before this **cannot** be recovered (watch ids are UUIDs, not
+timestamps), so the migration *clears* the false caption rather than keeping it. And the future-date
+clamp must apply to the caption AND the stored date from one variable — the watch's UPCOMING page
+lets a session start days early.
+
+⚠️ **Time in zone is ACCUMULATED, never derived from a stored series.** Five running totals answer
+the whole zones panel; keeping every sample so the phone could add them up costs hundreds of numbers
+per run against a 50-run store to answer the same question. Both sides accumulate:
+`WorkoutManager.accumulateZone` (watch, from the ticker's **running** branch only) and
+`window.__interunCompanionHR` (phone). **Both must skip paused time** — the companion watch has no
+idea the phone is paused and keeps streaming, so without the `LIVE.pauseStart` guard the zone totals
+exceeded the elapsed time printed on the same screen. The boundaries (50/60/70/80/90% of max) exist
+in **three** places — `HR_ZONE_FLOOR`, `WorkoutManager.hrZone`, `estimateHrZones` — move all three
+together. ⚠️ The watch's `hrZone` returns 0–5 and the panel is 1–5, so zone 0 folds into index 0:
+time below 50% is still time on your feet.
+
+⚠️ **`run.steps` is a SNAPSHOT, not a lookup.** `sessionStepText()` stores the prescription at save
+time. Re-deriving it from the run's date later would describe the run with whatever session now sits
+there — `adoptPlan()`/`applyTrainFlag()` rebuild the plan. Same reasoning as stamping `pband`/`rband`
+/`pmodel`. It shares `structureRows(steps, plain)` so the grouping logic is not duplicated; **in
+plain mode the label stays RAW**, because `runDescriptionHtml` escapes it again (double-escaping
+showed "Bodyweight strength &amp;amp; mobility").
+
+⚠️ **Every stat tile is conditional.** Elevation is 0 on a watch run unless the watch sent it, HR is
+null on a phone run with no watch, calories only exist when measured. A tile appears when there is
+something true to put in it — a confident "0 m" reads as a measurement rather than an absence.
+
+⚠️ **A list INDEX is not a handle.** `state.logged` is unshifted whenever a watch run arrives, so
+`state.viewRunIdx` can point at a different run by the time the runner rates it or writes a note.
+`state.viewRunId` + `viewedRun()` resolve by id.
+
+⚠️ **Notes: keep the TEXT synchronously, debounce only the disk write.** Holding it in a 400 ms timer
+meant any re-render inside that window rebuilt the textarea from the old value — and tapping an
+effort number, an inch away, re-renders. Before the run is saved the note parks on `LIVE.summary`
+and rides out through `liveRunRecord`, the same route `rpe` takes; without that, Save discarded it
+under a hint promising the opposite.
+
+The RPE picker is now on the Logbook screen too — gating it to the finish screen meant a rating
+skipped in the moment could never be given, and it is half the flags engine's evidence.
+
+**Not built, deliberately:** the heart-rate line chart (needs a per-sample series that exists
+nowhere — an average is one number and a chart needs hundreds; an empty chart is worse than none),
+and from the reference the points badge, the Strava link and the thumbs-up rating (a backend, a
+network, and a button with nowhere to send its answer).
+
+**Known, pre-existing, not fixed:** `SHARE_INSIGHT` prints fixed praise keyed only on session type —
+an easy run always gets "Aerobic fitness building exactly as planned" whether it hit target or ran
+60 s/km too fast. That breaks the project's own no-unconditional-praise rule, and putting Share next
+to the debrief on one screen makes the contradiction visible. Feed it `runAnalysis`.
+
 The Activities tab is now **Logbook** (`TITLES.activities`), which covers runs, strength and progress
 rather than only runs. MAS was removed from Performance — it is a reference for setting interval
 paces, not a measure of progress; `masCard()` is kept but unused.

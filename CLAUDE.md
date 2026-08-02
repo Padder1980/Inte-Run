@@ -339,6 +339,28 @@ there — `adoptPlan()`/`applyTrainFlag()` rebuild the plan. Same reasoning as s
 plain mode the label stays RAW**, because `runDescriptionHtml` escapes it again (double-escaping
 showed "Bodyweight strength &amp;amp; mobility").
 
+⚠️ **The heart-rate SERIES is captured, and it is bounded at source.** `hrTrack` on the watch and
+`LIVE.hrSeries` on the phone sample one `[metres, bpm]` pair every 5 s of *running* time, capped at
+160 points by even thinning that keeps the first and last (dropping the last ends the chart before
+the end of the run). Measured 1.7 KB/run — 50 runs ≈ 85 KB; the route is still the large field.
+- ⚠️ **Paired with DISTANCE, not time** — the chart is drawn across the run, and on a time axis every
+  pause is a plateau.
+- ⚠️ **A TREADMILL RUN STORES NO SERIES.** It records a real clock and deliberately no distance, so
+  every sample sits at metre zero with no axis to draw against — and `applyTreadmillDistance` sets a
+  TOTAL, which cannot say which beat happened where. `hrSeriesOrNull()` is the one gate for both
+  writers and refuses a series whose distance never advances.
+- ⚠️ **`WorkoutManager.heartRate` IS NEVER CLEARED.** HealthKit simply stops delivering when the
+  watch loses skin contact, so *polling* it is not evidence of a reading. Sampling it unguarded
+  charged the whole dropout to the last beat seen: measured, a strap loosening 20 min into an hour
+  fabricated **two thirds** of the trace and drew as a genuinely steady effort. `heartRateAt` is
+  stamped when a reading ARRIVES and samples older than `hrFreshSec` (15 s) are skipped, so a
+  dropout leaves a gap the polyline bridges as a diagonal — which is what the event-driven phone
+  path already did. Two writers of one field must agree on what counts as a reading.
+- `hrChartSvg` takes BOTH baseline corners from the data (a literal left edge drew a shaded wedge
+  with no line above it whenever the first reading arrived after the start), drops the average
+  gridline when it would collide with the peak label, and uses `--ink-faint` not `--line` for the
+  gridlines — `--line` is a hairline *border* token and measured 1.05:1 against the tinted fill.
+
 ⚠️ **Every stat tile is conditional.** Elevation is 0 on a watch run unless the watch sent it, HR is
 null on a phone run with no watch, calories only exist when measured. A tile appears when there is
 something true to put in it — a confident "0 m" reads as a measurement rather than an absence.

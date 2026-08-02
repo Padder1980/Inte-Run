@@ -479,6 +479,34 @@ h2.sec:first-child { margin-top: 4px; }
 .seg button { font: inherit; font-size: 12.5px; font-weight: 550; color: var(--ink-soft); background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%); border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; cursor: pointer; box-shadow: 0 1px 0 rgba(255,255,255,.5) inset, 0 1px 2px rgba(20,32,27,.06); transition: transform .12s ease, box-shadow .12s ease, background .12s ease, color .12s ease; }
 .seg button:active { transform: translateY(1px); }
 .seg button.on { background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, #fff) 0%, var(--accent) 60%, color-mix(in srgb, var(--accent) 84%, #000) 100%); color: var(--accent-ink); border-color: transparent; font-weight: 650; box-shadow: 0 1px 0 rgba(255,255,255,.28) inset, 0 4px 12px -3px color-mix(in srgb, var(--accent) 55%, transparent); }
+/* Voice coach picker. The list lives behind a fold so it can grow without taking the page with it.
+   ⚠️ The drawer must have EXACTLY ONE child — "grid-template-rows: 0fr" declares one track, and a
+   second child lands in an implicit auto row that 0fr cannot collapse, leaving a live invisible
+   strip (that cost a real bug on Today). visibility takes the collapsed cards out of the tab order
+   and out of hit-testing, delayed by the transition so the fold-away is still watched all the way
+   down. */
+.coachsel { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; font: inherit; cursor: pointer;
+  color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px;
+  box-shadow: 0 1px 2px rgba(20,32,27,.05); transition: border-color .18s ease; }
+.coachsel.on { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.coachsel:active { transform: scale(.995); }
+.cs-b { flex: 1; min-width: 0; }
+.cs-name { display: block; font-size: 14.5px; font-weight: 700; color: var(--accent); }
+.cs-tag { display: block; font-size: 12px; color: var(--ink-faint); margin-top: 1px; }
+.cs-chev { display: flex; align-items: center; flex: none; color: var(--accent); transition: transform .24s cubic-bezier(.2,.8,.3,1); }
+.cs-chev svg { width: 17px; height: 17px; }
+.coachsel.on .cs-chev { transform: rotate(180deg); }
+.coachdrawer { display: grid; grid-template-rows: 0fr; opacity: 0; overflow: hidden; visibility: hidden;
+  transition: grid-template-rows .26s ease, opacity .2s ease, visibility 0s linear .26s; }
+.coachdrawer.on { grid-template-rows: 1fr; opacity: 1; visibility: visible;
+  transition: grid-template-rows .26s ease, opacity .2s ease, visibility 0s; }
+.coachdrawer > * { min-height: 0; }
+/* ⚠️ A MARGIN ON THE FIRST CARD, not padding on the grid item. min-height: 0 lets the item's
+   CONTENT box collapse; its padding survives regardless, so padding here left the closed
+   drawer 9px tall instead of 0 — a thin live strip of exactly the kind that cost a phantom
+   tap target on Today. A descendant's margin is clipped with everything else. */
+.coachdrawer .coachcard:first-child { margin-top: 9px; }
+@media (prefers-reduced-motion: reduce) { .coachdrawer, .cs-chev, .coachsel { transition: none; } }
 /* Voice coach picker */
 .coachcards { display: flex; flex-direction: column; gap: 9px; }
 .coachcard { text-align: left; width: 100%; background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%); border: 1px solid var(--line); border-radius: 14px; padding: 13px 14px; cursor: pointer; box-shadow: 0 1px 2px rgba(20,32,27,.05); transition: border-color .12s ease, box-shadow .12s ease, background .12s ease; }
@@ -5527,6 +5555,7 @@ function setupSection(num, title, sub, body) {
 // independent of the plan save — so changes take effect immediately.
 function coachSettingsHtml() {
   const c = COACH.cfg, on = !!c.enabled;
+  const selCoach = RC.COACHES[c.coach] || RC.COACHES[RC.COACH_IDS[0]];
   const cards = RC.COACH_IDS.map((id) => {
     const co = RC.COACHES[id], sel = c.coach === id;
     return '<div class="coachcard' + (sel ? " on" : "") + '" data-coach="' + id + '" role="button" tabindex="0">' +
@@ -5537,7 +5566,18 @@ function coachSettingsHtml() {
   return '<div class="q" style="margin-top:0"><label>Spoken coaching <span class="q-hint">a voice coaches you through live sessions</span></label>' +
       seg("coach_on", [["1", "On"], ["0", "Off"]], on ? "1" : "0") + '</div>' +
     '<div id="coachOpts"' + (on ? "" : ' style="display:none"') + '>' +
-      '<div class="q"><label>Your coach</label><div class="coachcards">' + cards + '</div></div>' +
+      '<div class="q"><label>Your coach</label>' +
+        // ⚠️ COLLAPSED BY DEFAULT. Four coaches is already most of a screen, and the point of this
+        // control is that the list grows — every voice added would otherwise push the settings
+        // below it further out of reach. What stays visible is the answer (who is coaching you);
+        // the choosing is one tap away.
+        '<button type="button" class="coachsel" id="coachSel" aria-expanded="false" aria-controls="coachDrawer">' +
+          '<span class="cs-b"><span class="cs-name" id="coachSelName">' + esc(selCoach.name) + '</span>' +
+          '<span class="cs-tag" id="coachSelTag">' + esc(selCoach.tagline) + '</span></span>' +
+          '<span class="cs-chev" aria-hidden="true">' + ICON.chevDown + '</span>' +
+        '</button>' +
+        '<div class="coachdrawer" id="coachDrawer"><div class="coachcards">' + cards + '</div></div>' +
+      '</div>' +
       '<div class="q"><label>Coaching volume</label><input type="range" class="vol" id="coach_vol" min="0" max="100" step="5" value="' + Math.round((c.volume ?? 0.9) * 100) + '" aria-label="Coaching volume"></div>' +
       '<div class="q"><label>How much talking? <span class="q-hint">how chatty your coach is</span></label>' +
         seg("coach_freq", [["minimal", "Minimal"], ["normal", "Balanced"], ["chatty", "Chatty"]], c.frequency || "normal") + '</div>' +
@@ -6151,12 +6191,33 @@ function coachPreview(coachId) {
   if (VOICE_AVAILABLE) speak("Welcome to Inter-run. Let's make today's session count.");
 }
 // Wire the settings-screen coach controls: coach cards, per-coach preview, and volume.
+// Open or close the coach list. Classes only — the same in-place rule the Today fold learned:
+// re-rendering replaces the drawer, so the browser has nothing to animate from, and here it would
+// also discard unsaved answers on the form around it.
+function coachFold(open) {
+  const btn = $("coachSel"), dr = $("coachDrawer");
+  if (!btn || !dr) return;
+  holdScrollAnchor();
+  btn.classList.toggle("on", open);
+  dr.classList.toggle("on", open);
+  btn.setAttribute("aria-expanded", open ? "true" : "false");
+  if (open) revealDrawer(btn, dr);
+}
 function wireCoachSettings() {
   coachLoadManifest();
   document.querySelectorAll("[data-coach]").forEach((el) => {
     const pick = () => {
       COACH.cfg.coach = el.dataset.coach; saveCoachCfg();
       document.querySelectorAll("[data-coach]").forEach((x) => x.classList.toggle("on", x === el));
+      // ⚠️ Update the collapsed row IN PLACE and never call render() here. This is the profile
+      // screen: a re-render rebuilds every field from the saved profile and throws away whatever
+      // the runner has typed but not yet saved — the exact fault the coach reported and that
+      // "stop the profile form losing your answers" was raised for.
+      const co = RC.COACHES[el.dataset.coach];
+      const nm = $("coachSelName"), tg = $("coachSelTag");
+      if (co && nm) nm.textContent = co.name;
+      if (co && tg) tg.textContent = co.tagline;
+      coachFold(false);
       coachUnlock(); coachLoadManifest().then(coachPreload);
     };
     el.onclick = (e) => { if (e.target.closest("[data-preview]")) return; pick(); };
@@ -6167,6 +6228,8 @@ function wireCoachSettings() {
     el.onclick = go;
     el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(e); } };
   });
+  const coachSel = $("coachSel");
+  if (coachSel) coachSel.onclick = () => coachFold(!coachSel.classList.contains("on"));
   const vol = $("coach_vol");
   if (vol) vol.oninput = () => {
     COACH.cfg.volume = Math.max(0, Math.min(1, Number(vol.value) / 100)); saveCoachCfg();

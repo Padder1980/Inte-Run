@@ -840,6 +840,13 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 .hr-gl { stroke: var(--ink-faint); stroke-opacity: .6; stroke-width: 1; stroke-dasharray: 3 3; }
 .pc-ax.hr-peak { fill: var(--eff-hard); }
 .hz-xl { font-size: 9px; color: var(--ink-faint); text-align: right; margin: -6px 2px 6px; }
+.wu-card .wu-why { font-size: 13px; color: var(--ink-soft); line-height: 1.5; margin-bottom: 10px; }
+.wu-min { float: right; font-size: 12px; font-weight: 650; color: var(--accent); }
+.wu-row { display: flex; gap: 10px; padding: 8px 0; }
+.wu-row + .wu-row { border-top: 1px solid var(--line); }
+.wu-tag { flex: none; width: 66px; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint); padding-top: 2px; }
+.wu-b { flex: 1; min-width: 0; font-size: 13px; line-height: 1.45; }
+.wu-note { font-size: 11.5px; color: var(--ink-faint); margin-top: 4px; line-height: 1.4; }
 .wk-review .wr-cta { display: flex; gap: 8px; margin-top: 12px; }
 .wk-review .wr-cta button { flex: 1; }
 .hz-note { font-size: 11.5px; color: var(--ink-faint); margin-top: 8px; }
@@ -4043,6 +4050,50 @@ let SHEET_CTX = null;
 // exactly this: "the app has one generic line today and never mentions it when you are actually
 // about to run for two hours." The dose is computed from THIS session — its length, and whether it
 // carries goal-race-pace work, which is what makes a long run a race-day rehearsal.
+// ⚠️ The runner's ability band for warm-up scaling, from the status they already told us. The
+// specification is emphatic that one dose for everybody is the thing to avoid — the 2026 adolescent
+// study found a standard warm-up helped the fitter group and did nothing for the low-fitness one.
+function warmupAbility() {
+  const st = profile.status;
+  if (st === "new") return "new";
+  if (st === "building") return "beginner";
+  if (st === "competitive") return "advanced";
+  return "intermediate";
+}
+// The warm-up, on the session brief. Generated from the session's FIRST HARD EFFORT rather than its
+// length — a 90-minute long run opens easy and warms itself up; a much shorter interval session
+// opens near-maximal and needs real preparation.
+function warmupCardFor(sess) {
+  try {
+    return RC.buildWarmup(sess, warmupAbility(), {
+      temperatureC: (state.wx && typeof state.wx.tempC === "number") ? state.wx.tempC : null,
+      // ⚠️ The safety gate. Reported illness or pain that changes how you run means NO warm-up is
+      // generated at all — not a gentler one. The paper puts the medical gate above every
+      // performance rule so that no later scaling can talk its way past it.
+      unwell: !!(state.subj && (state.subj.illness !== "none" || state.subj.soreness === "high")),
+    });
+  } catch (e) { return null; }
+}
+function warmupHtml(sess) {
+  let w = null;
+  try { w = warmupCardFor(sess); } catch (e) { return ""; }
+  if (!w) {
+    return '<div class="card wu-card"><div class="subhead" style="margin-top:0">Warm-up</div>' +
+      '<div class="wu-why">You have told us you are unwell or sore enough that it is changing how you run. ' +
+      'That comes before any session — see how you feel tomorrow rather than warming up for this one.</div></div>';
+  }
+  const rowsH = w.phases.map((p) => {
+    const tag = p.phase === "raise" ? "Raise" : p.phase === "mobilise" ? "Mobilise"
+      : p.phase === "potentiate" ? "Strides" : "Then";
+    const lab = p.phase === "mobilise" ? p.movements.map((m) => esc(m)).join(" · ") : esc(p.instruction);
+    return '<div class="wu-row"><div class="wu-tag">' + tag + '</div><div class="wu-b">' + lab +
+      (p.phase === "mobilise" ? '<div class="wu-note">' + esc(p.instruction) + '</div>' : "") + '</div></div>';
+  }).join("");
+  const notes = w.notes.map((n) => '<div class="wu-note">' + esc(n) + '</div>').join("");
+  return '<div class="card wu-card"><div class="subhead" style="margin-top:0">Warm-up' +
+      (w.embedded ? "" : ' <span class="wu-min num">' + w.totalMinutes + ' min</span>') + '</div>' +
+    '<div class="wu-why">' + esc(w.why) + '</div>' + rowsH + notes + '</div>';
+}
 function fuelHtml(sess) {
   if (!sess || !sess.steps) return "";
   const mins = Math.round(sess.estimatedDurationSeconds / 60);
@@ -4071,9 +4122,15 @@ function sessionSheetHtml(sess, week) {
   if (sess.exercises && sess.exercises.length) {
     body = '<div class="ex-list">' + sess.exercises.map((e, ei) => exerciseBlock(sess.id, ei, e)).join("") + '</div>';
   } else {
-    const rows = structureRows(sess.steps).map((r) =>
+    // ⚠️ ONE WARM-UP ON SCREEN. The generated card below is the authority now, so the session's own
+    // one-line warm-up step is dropped from this list rather than printed above it saying a shorter
+    // version of the same thing. The STEP itself is untouched — the live runtime, the watch and the
+    // timings all still run from it; this only stops the brief saying it twice.
+    const shown = warmupCardFor(sess) ? sess.steps.filter((st) => st.kind !== "warmup") : sess.steps;
+    const rows = structureRows(shown).map((r) =>
       '<div class="sd-step"><div class="sd-dot" style="background:' + (r.muted ? "var(--ink-faint)" : sc) + '"></div><div><div class="sd-tag">' + r.tag + '</div><div class="sd-lab">' + r.lab + '</div>' + (r.chips ? '<div class="sd-meta">' + r.chips + '</div>' : "") + (r.rec ? '<div class="sd-rec">' + r.rec + '</div>' : "") + '</div></div>').join("");
-    body = rows ? '<div class="sd-steps">' + rows + '</div>' : "";
+    // The warm-up comes first because that is when it happens.
+    body = warmupHtml(sess) + (rows ? '<div class="sd-steps">' + rows + '</div>' : "");
   }
   // Reschedule row — pick any day; a run already there swaps with this one.
   const cur = effDay(sess);

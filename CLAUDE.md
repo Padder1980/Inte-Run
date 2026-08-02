@@ -801,6 +801,46 @@ plans it previously couldn't judge — still far above the pre-anchor 66%); the 
 never-shrinks test now holds MINUTES exactly and distance to 2% (scaled caps swap a few race-pace
 minutes back to easy pace, ~200 m of composition drift in the same duration).
 
+## Fuelling, on the session (added 2026-08-02, from elite-coach feedback)
+
+"Carbohydrate per hour, roughly how often that is a gel, and practising it in training." The app had
+a flat 30–60 g/h in one Support article and one assistant answer, and **never mentioned it when the
+runner was about to run for two hours** — the coach's actual complaint. `src/science/fuelling.ts`
+computes the dose from THIS session and `fuelHtml` renders it in the session sheet.
+
+⚠️ **THIS IS THE ONE AREA WITH NO BACKING FROM THE COMMISSIONED EVIDENCE REPORT.** That report scopes
+itself to training prescription — **zero** occurrences of carbohydrate, fuel, gel, glycogen or
+hydration in its prose (verified, not assumed). The numbers come from ordinary sports-nutrition
+consensus plus the elite coach's 70–90 g/h for the marathon. Never describe this module as
+report-backed; that distinction is the difference between a claim we can defend and one we cannot.
+
+Tiers: **< 75 min** none (with a line saying so — silence is not the same as "no"); **75–150 min**
+30–60 g/h; **≥ 150 min** 60–90 g/h; **≥ 150 min + goal-race-pace work + half/marathon** is the
+rehearsal, and a marathon one takes the coach's **70–90 g/h**.
+
+⚠️ **The upper tier and the mixed-sugar note are ONE decision.** The gut tops out near 60 g/h on
+glucose alone; past it needs glucose *and* fructose. Printing "90 g/h" without "mixed" tells the
+runner to make themselves ill, so the tier never ships without the explanation.
+
+⚠️ **A rehearsal has to be long enough to be one.** Gating on race-pace work alone called a
+113-minute progressive a dress rehearsal and jumped it from 30–60 straight to 70–90 g/h. It must
+already be in the long tier.
+
+⚠️ **"Gels' worth", never "gels".** At 90 g/h a three-hour run is eleven gels — nobody takes eleven
+gels, and the number reads as absurd and gets dismissed. The copy says drink and chews count towards
+it and that most people split it.
+
+⚠️ **THE FRAMING IS ALWAYS "EAT ENOUGH", NEVER "EAT LESS", and a test enforces it.** This module sits
+beside a RED-S screen whose guidance is "under-eating is not the answer here — if anything you
+likely need more fuel". `test/fuelling.test.ts` fails on calorie, weight, deficit, burn-off or
+lose-weight language anywhere in the generated copy. No exceptions, whatever the request.
+
+The race-pace detection in `fuelHtml` is the same **content** test `buildWeek` uses for key days
+(a 10+ minute step at RPE 4+), never the session title.
+
+Not done: the watch shows no fuelling text — it would need new payload keys, and the phone is where
+you read a plan. Say so rather than half-doing it.
+
 ## Race day is a session (added 2026-08-01, from elite-coach feedback)
 
 ⚠️ **`"race"` is a SessionType, distinct from `"race-specific"`** (which is a rehearsal in

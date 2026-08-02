@@ -262,6 +262,17 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .cal-check svg { width: 15px; height: 15px; }
 .cal-open { flex: 1; min-width: 0; text-align: left; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; padding: 0; }
 .cal-check { cursor: pointer; }
+/* Fuelling block on a session — see fuelHtml. Reads as guidance, not as an alert: it is a normal
+   part of a long run, and a red banner would make eating look like a warning. */
+.fuel-card { margin: 14px 0 4px; padding: 13px 14px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line); }
+.fuel-card.reh { background: color-mix(in srgb, var(--peak) 10%, var(--surface-2)); border-color: color-mix(in srgb, var(--peak) 32%, var(--line)); }
+.fuel-h { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; letter-spacing: -.01em; }
+.fuel-h svg { width: 17px; height: 17px; flex: none; color: var(--peak); }
+.fuel-l { margin: 9px 0 0; padding-left: 18px; }
+.fuel-l li { font-size: 12.8px; line-height: 1.55; color: var(--ink-soft); margin-bottom: 6px; }
+.fuel-l li:last-child { margin-bottom: 0; }
+.fuel-n { margin-top: 9px; font-size: 11px; color: var(--ink-faint); }
+
 /* Session detail sheet */
 .sheet-ov { position: fixed; inset: 0; z-index: 70; display: none; align-items: flex-end; justify-content: center; background: color-mix(in srgb, var(--ink) 52%, transparent); backdrop-filter: blur(3px); }
 .sheet-ov.on { display: flex; }
@@ -3210,7 +3221,7 @@ function alfieIntents() {
     { k: ["strides", "hill sprint"], a: () => "<p><b>Strides</b> are short accelerations \\u2014 around 20 seconds \\u2014 run relaxed and fast, with full recovery.</p><p>They\\u2019re not a workout; they\\u2019re maintenance for your top-end mechanics. They keep you feeling springy without adding meaningful fatigue.</p>" },
     { k: ["recovery run", "what is recovery"], a: () => "<p>A <b>recovery run</b> is deliberately very easy and short \\u2014 slower than your normal easy pace.</p><p>Its job is to move blood through tired legs, not to build fitness. If it feels like effort, walk some of it or take the day off entirely.</p>" },
     { k: ["strength", "gym", "weights", "lifting"], a: () => "<p>Heavy <b>strength training</b> twice a week is one of the best-evidenced things a runner can do \\u2014 it improves running economy and cuts injury risk, and it won\\u2019t make you bulky at these volumes.</p><p>Think squats, single-leg work, calf raises and hip strength. Low reps, challenging load. Put it on a quality day or after an easy run, not the day before a hard session.</p>" },
-    { k: ["fuel", "nutrition", "eat", "gel", "carb"], a: () => "<p>Under ~75 minutes you generally don\\u2019t need fuel mid-run.</p><p>Beyond that, aim for roughly <b>30\\u201360 g of carbohydrate per hour</b>, and practise it in training \\u2014 your gut adapts, and race day is a terrible time to experiment.</p><p>Day to day, the bigger lever is simply <b>eating enough</b>. Under-fuelling is the most common reason training stops working.</p>" },
+    { k: ["fuel", "nutrition", "eat", "gel", "carb"], a: () => "<p>Under ~75 minutes you generally don\\u2019t need fuel mid-run.</p><p>Beyond that it scales with the run: about <b>30\\u201360 g of carbohydrate an hour</b> up to two and a half hours, <b>60\\u201390 g</b> past that, and <b>70\\u201390 g</b> on a marathon-pace long run \\u2014 that one is a dress rehearsal, so use the exact gels and timings you plan to race on.</p><p>Above 60 g an hour, use <b>mixed sugars</b> (glucose and fructose) or your gut will object. Build up gradually.</p><p>Open any long session and I\\u2019ll print the numbers for that specific run.</p><p>Day to day, the bigger lever is simply <b>eating enough</b>. Under-fuelling is the most common reason training stops working.</p>" },
     { k: ["hydrat", "drink", "water", "electrolyte"], a: () => "<p>Drink to thirst \\u2014 it\\u2019s a better guide than a fixed schedule for most runners.</p><p>In heat or on runs over an hour, add <b>sodium</b> (a sports drink or electrolyte tab), not just water. Over-drinking plain water on long efforts is genuinely dangerous.</p>" },
     { k: ["sleep", "recover", "rest"], a: () => "<p><b>Sleep is the most powerful recovery tool you have</b> \\u2014 more than any supplement, gadget or protocol.</p><p>Consistent 7\\u20139 hours does more for your training than an extra session would. When life squeezes your sleep, that\\u2019s the week to take the easy option in training, not the hard one.</p>" },
     { k: ["taper", "before the race", "race week"], a: () => "<p><b>Tapering</b> means cutting volume while keeping some intensity \\u2014 typically over the final 1\\u20133 weeks depending on the distance.</p><p>You keep the sharpness and shed the fatigue. Feeling twitchy, heavy-legged or doubtful during a taper is completely normal \\u2014 resist the urge to \\u201ctest\\u201d your fitness.</p>" },
@@ -3614,6 +3625,28 @@ function exerciseBlock(sessId, ei, e) {
     '<div class="ex-log">' + setRows.join("") + '</div>';
 }
 let SHEET_CTX = null;
+// ⚠️ FUELLING IS SHOWN ON THE SESSION, not only in an article. The elite coach's complaint was
+// exactly this: "the app has one generic line today and never mentions it when you are actually
+// about to run for two hours." The dose is computed from THIS session — its length, and whether it
+// carries goal-race-pace work, which is what makes a long run a race-day rehearsal.
+function fuelHtml(sess) {
+  if (!sess || !sess.steps) return "";
+  const mins = Math.round(sess.estimatedDurationSeconds / 60);
+  // A block of 10+ minutes at RPE 4+ is race-pace work — the same content test buildWeek uses to
+  // decide whether a long run counts as a key day. Never keyed off the title.
+  const racePace = (sess.steps || []).some((st) =>
+    st.targetRpe && st.targetRpe.min >= 4 && (st.durationSeconds || 0) >= 600);
+  let f;
+  try {
+    f = RC.fuellingFor({ durationMinutes: mins, raceDistance: profile.goalDist, sessionType: sess.type, hasRacePaceWork: racePace });
+  } catch (e) { return ""; }
+  if (!f.needed) return "";
+  return '<div class="fuel-card' + (f.rehearsal ? " reh" : "") + '">' +
+    '<div class="fuel-h">' + ICON.fuel + '<span>' + esc(f.headline) + '</span></div>' +
+    '<ul class="fuel-l">' + f.points.map((pt) => "<li>" + pt + "</li>").join("") + '</ul>' +
+    '<div class="fuel-n">General guidance, not personal nutrition advice — and always about eating enough, never less.</div>' +
+    '</div>';
+}
 function sessionSheetHtml(sess, week) {
   const sc = "var(--eff-" + effortOf(sess) + ")";
   const dur = Math.round(sess.estimatedDurationSeconds / 60);
@@ -3641,6 +3674,7 @@ function sessionSheetHtml(sess, week) {
     startBtn +
     '<div class="sd-desc">' + esc(sess.description) + '</div>' +
     body +
+    fuelHtml(sess) +
     moveBlock +
     addLink;
 }
@@ -4304,7 +4338,9 @@ const GUIDES = [
   ] },
   { t: "Fuelling and hydration", k: "fuel", d: "What to take, when, and the mistake most runners make", b: [
     "Under about 75 minutes you generally don't need fuel during a run \\u2014 you have enough stored carbohydrate.",
-    "Beyond that, aim for roughly <b>30\\u201360 g of carbohydrate per hour</b>, and practise it in training. Race day is the worst possible time to try a new gel.",
+    "Beyond that the dose scales with the run: roughly <b>30\\u201360 g of carbohydrate an hour</b> up to about two and a half hours, and <b>60\\u201390 g</b> beyond it \\u2014 a marathon-pace long run is fuelled like the race itself, at <b>70\\u201390 g</b>.",
+    "<b>Above 60 g an hour you need mixed sugars</b> (glucose <i>and</i> fructose). One type alone hits a ceiling in the gut, which is where the classic gel stomach-ache comes from.",
+    "Build up gradually \\u2014 your gut adapts like your legs do. Your plan now prints the numbers on each long session, so you can practise the exact amount you intend to race on.",
     "Drink to thirst. On long or hot runs include <b>sodium</b>, not just water \\u2014 over-drinking plain water during prolonged effort is genuinely dangerous.",
     "<b>The bigger lever is day-to-day:</b> under-eating is the most common reason training stops working. Fuelling enough is a performance decision, not an indulgence.",
   ] },

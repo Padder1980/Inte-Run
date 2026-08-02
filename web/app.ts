@@ -519,13 +519,15 @@ h2.sec:first-child { margin-top: 4px; }
 .coachcard.on { border-color: transparent; background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 12%, var(--surface)), color-mix(in srgb, var(--accent) 5%, var(--surface))); box-shadow: 0 5px 16px -7px color-mix(in srgb, var(--accent) 55%, transparent), 0 0 0 1.5px var(--accent) inset; }
 .cc-name { font-size: 14px; font-weight: 750; letter-spacing: -.01em; line-height: 1.25; }
 .coachcard.on .cc-name { color: var(--accent); }
-.cc-preview { flex: none; display: flex; justify-content: center; align-items: center; gap: 5px; margin-top: 10px; font-size: 11.5px; font-weight: 700; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); border-radius: 999px; padding: 5px 10px; cursor: pointer; }
+/* ⚠️ margin-top: auto, not a fixed margin — this is what now holds every Preview pill in a row on
+   the same line. The description used to do it by absorbing the height difference (flex: 1); with it
+   gone, a fixed margin lets the pill ride up under a one-line tagline while its neighbour's tagline
+   wraps to two. And it must be a MARGIN: a padding-top here would be silently overridden by the
+   padding shorthand later in this very rule. */
+.cc-preview { flex: none; display: flex; justify-content: center; align-items: center; gap: 5px; margin-top: auto; font-size: 11.5px; font-weight: 700; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); border-radius: 999px; padding: 5px 10px; cursor: pointer; }
 .cc-preview svg { width: 12px; height: 12px; }
 .cc-preview:active { transform: translateY(1px); }
-.cc-tag { font-size: 11.5px; font-weight: 600; color: var(--ink-soft); margin-top: 3px; line-height: 1.3; }
-/* flex: 1 is what puts every Preview pill in a row on the same line: the description absorbs the
-   difference in card height rather than the button floating up under a short one. */
-.cc-desc { flex: 1; font-size: 11.5px; color: var(--ink-faint); margin-top: 5px; line-height: 1.4; }
+.cc-tag { font-size: 11.5px; font-weight: 600; color: var(--ink-soft); margin: 3px 0 10px; line-height: 1.3; }
 .vol { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 30%, var(--surface-2)); outline: none; }
 .vol::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); box-shadow: 0 2px 6px -1px color-mix(in srgb, var(--accent) 60%, transparent); cursor: pointer; }
 .vol::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); cursor: pointer; }
@@ -5565,13 +5567,15 @@ function coachSettingsHtml() {
   const selCoach = RC.COACHES[c.coach] || RC.COACHES[RC.COACH_IDS[0]];
   const cards = RC.COACH_IDS.map((id) => {
     const co = RC.COACHES[id], sel = c.coach === id;
-    // Two to a row, so the name and the Preview pill can no longer share a line — there is about
-    // 130px of text width in a column. Stacked, with the pill at the foot of the card where it is a
-    // full-width tap target rather than a squeezed one.
+    // Name, one-line character, Preview — and deliberately NOT the full description. At two cards to
+    // a row that was four lines of small grey text each, which made the picker TALLER than the
+    // stacked version it replaced and buried the thing you are actually choosing between. The
+    // tagline is the character; the description is detail nobody reads while picking a voice.
+    // ⚠️ RC.COACHES[id].description is untouched and still the source of truth for that copy — it is
+    // dropped from this card, not deleted from the app.
     return '<div class="coachcard' + (sel ? " on" : "") + '" data-coach="' + id + '" role="button" tabindex="0">' +
       '<div class="cc-name">' + esc(co.name) + '</div>' +
       '<div class="cc-tag">' + esc(co.tagline) + '</div>' +
-      '<div class="cc-desc">' + esc(co.description) + '</div>' +
       '<span class="cc-preview" data-preview="' + id + '" role="button" tabindex="0">' + ICON.play + ' Preview</span></div>';
   }).join("");
   return '<div class="q" style="margin-top:0"><label>Spoken coaching <span class="q-hint">a voice coaches you through live sessions</span></label>' +

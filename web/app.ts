@@ -107,7 +107,7 @@ try{if(location.protocol==='interun:'){var v=document.querySelector('meta[name=v
   --accent: #0e8c7f; --accent-ink: #ffffff;
   --base: #2b9eb3; --build: #5fa83c; --peak: #e0863a; --taper: #7a6fd0;
   --ready: #4b9e2f; --steady: #2b9eb3; --ease: #d98a2a; --rest: #c0442e;
-  --brass:#856222; --brass-tint:#f3ead8;
+  --brass:#856222; --brass-tint:#f3ead8; --brass-sheen:rgba(255,255,255,.72); --brass-shade:rgba(0,0,0,.04);
   --eff-easy: #3fa47a; --eff-moderate: #d99a2b; --eff-hard: #d65b36; --eff-none: #9aa8a1; --hz1:#7f8c99; --hz2:#3d7fd6; --hz3:#2fa96b; --hz4:#e2952f; --hz5:#d6493c;
   --shadow: 0 1px 2px rgba(20,32,27,.05), 0 6px 18px rgba(20,32,27,.06);
   /* Launch screen. ⚠️ THE TOP STOP OF --splash-bg MUST EQUAL THAT THEME'S --bg, in BOTH themes.
@@ -133,7 +133,7 @@ try{if(location.protocol==='interun:'){var v=document.querySelector('meta[name=v
     --accent: #2bb3a3; --accent-ink: #06231f;
     --base: #3ab0c4; --build: #74bd52; --peak: #eb9748; --taper: #9184e0;
     --ready: #6bbf46; --steady: #3ab0c4; --ease: #eb9748; --rest: #e8765c;
-    --brass: #d6ae67; --brass-tint: #2a2318;
+    --brass: #d6ae67; --brass-tint: #2a2318; --brass-sheen:rgba(255,255,255,.10); --brass-shade:rgba(0,0,0,.34);
     --eff-easy: #4cb98a; --eff-moderate: #e6ac3e; --eff-hard: #e56f49; --eff-none: #6f7d76; --hz1:#8b98a5; --hz2:#5296e8; --hz3:#43c184; --hz4:#efab48; --hz5:#e8604f;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 22px rgba(0,0,0,.4);
     --splash-bg: radial-gradient(125% 90% at 50% 0%, #0a100e 0%, #0c2b28 12%, #06110f 56%, #000 100%);
@@ -141,8 +141,8 @@ try{if(location.protocol==='interun:'){var v=document.querySelector('meta[name=v
     --splash-glow: rgba(22,183,164,.38);
   }
 }
-:root[data-theme="light"] { color-scheme: light; --bg:#eef1f1; --surface:#fff; --surface-2:#f6f8f8; --line:#dbe1e0; --ink:#14201b; --ink-soft:#4c5b55; --ink-faint:#7a877f; --accent:#0e8c7f; --accent-ink:#fff; --base:#2b9eb3; --build:#5fa83c; --peak:#e0863a; --taper:#7a6fd0; --ready:#4b9e2f; --steady:#2b9eb3; --ease:#d98a2a; --rest:#c0442e; --brass:#856222; --brass-tint:#f3ead8; --eff-easy:#3fa47a; --eff-moderate:#d99a2b; --eff-hard:#d65b36; --eff-none:#9aa8a1; --hz1:#7f8c99; --hz2:#3d7fd6; --hz3:#2fa96b; --hz4:#e2952f; --hz5:#d6493c; --shadow:0 1px 2px rgba(20,32,27,.05),0 6px 18px rgba(20,32,27,.06);  --splash-bg: radial-gradient(125% 90% at 50% 0%, #eef1f1 0%, #e4edeb 52%, #d6e3e0 100%); --splash-ink:#14201b; --splash-soft:#5b6b64; --splash-brand:#0e8c7f; --splash-glow:rgba(14,140,127,.22); }
-:root[data-theme="dark"] { color-scheme: dark; --bg:#0a100e; --surface:#151e1b; --surface-2:#1b2622; --line:#26332e; --ink:#e7eeea; --ink-soft:#a9b7b0; --ink-faint:#74847c; --accent:#2bb3a3; --accent-ink:#06231f; --base:#3ab0c4; --build:#74bd52; --peak:#eb9748; --taper:#9184e0; --ready:#6bbf46; --steady:#3ab0c4; --ease:#eb9748; --rest:#e8765c; --brass:#d6ae67; --brass-tint:#2a2318; --eff-easy:#4cb98a; --eff-moderate:#e6ac3e; --eff-hard:#e56f49; --eff-none:#6f7d76; --hz1:#8b98a5; --hz2:#5296e8; --hz3:#43c184; --hz4:#efab48; --hz5:#e8604f; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.4);  --splash-bg: radial-gradient(125% 90% at 50% 0%, #0a100e 0%, #0c2b28 12%, #06110f 56%, #000 100%); --splash-ink:#ffffff; --splash-soft:#9aa3a0; --splash-brand:#16b7a4; --splash-glow:rgba(22,183,164,.38); }
+:root[data-theme="light"] { color-scheme: light; --bg:#eef1f1; --surface:#fff; --surface-2:#f6f8f8; --line:#dbe1e0; --ink:#14201b; --ink-soft:#4c5b55; --ink-faint:#7a877f; --accent:#0e8c7f; --accent-ink:#fff; --base:#2b9eb3; --build:#5fa83c; --peak:#e0863a; --taper:#7a6fd0; --ready:#4b9e2f; --steady:#2b9eb3; --ease:#d98a2a; --rest:#c0442e; --brass:#856222; --brass-tint:#f3ead8; --brass-sheen:rgba(255,255,255,.72); --brass-shade:rgba(0,0,0,.04); --eff-easy:#3fa47a; --eff-moderate:#d99a2b; --eff-hard:#d65b36; --eff-none:#9aa8a1; --hz1:#7f8c99; --hz2:#3d7fd6; --hz3:#2fa96b; --hz4:#e2952f; --hz5:#d6493c; --shadow:0 1px 2px rgba(20,32,27,.05),0 6px 18px rgba(20,32,27,.06);  --splash-bg: radial-gradient(125% 90% at 50% 0%, #eef1f1 0%, #e4edeb 52%, #d6e3e0 100%); --splash-ink:#14201b; --splash-soft:#5b6b64; --splash-brand:#0e8c7f; --splash-glow:rgba(14,140,127,.22); }
+:root[data-theme="dark"] { color-scheme: dark; --bg:#0a100e; --surface:#151e1b; --surface-2:#1b2622; --line:#26332e; --ink:#e7eeea; --ink-soft:#a9b7b0; --ink-faint:#74847c; --accent:#2bb3a3; --accent-ink:#06231f; --base:#3ab0c4; --build:#74bd52; --peak:#eb9748; --taper:#9184e0; --ready:#6bbf46; --steady:#3ab0c4; --ease:#eb9748; --rest:#e8765c; --brass:#d6ae67; --brass-tint:#2a2318; --brass-sheen:rgba(255,255,255,.10); --brass-shade:rgba(0,0,0,.34); --eff-easy:#4cb98a; --eff-moderate:#e6ac3e; --eff-hard:#e56f49; --eff-none:#6f7d76; --hz1:#8b98a5; --hz2:#5296e8; --hz3:#43c184; --hz4:#efab48; --hz5:#e8604f; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.4);  --splash-bg: radial-gradient(125% 90% at 50% 0%, #0a100e 0%, #0c2b28 12%, #06110f 56%, #000 100%); --splash-ink:#ffffff; --splash-soft:#9aa3a0; --splash-brand:#16b7a4; --splash-glow:rgba(22,183,164,.38); }
 * { box-sizing: border-box; }
 /* The app shell owns the viewport; the document itself must never scroll.
    ⚠️ Without this the page was the scroller, not #view, and two consequences followed: an iOS
@@ -950,15 +950,58 @@ html.kbup .sheet-ov { padding-bottom: var(--kbh, 0px); }
    each a different colour, would make a long form into a rainbow and leave the runner with no way
    to tell what is a heading and what is a button. Brass is the warm complement of the accent, so it
    reads as deliberately different rather than as a second accent competing with it. */
-#view:has(#saveProfile) .setup-card { border-top: 3px solid var(--brass, var(--accent)); }
-#view:has(#saveProfile) .sec-head {
-  align-items: center; gap: 11px; margin-bottom: 16px; padding-bottom: 14px;
-  border-bottom: 1px solid color-mix(in srgb, var(--brass) 38%, var(--line));
+/* THE PIPING. ⚠️ A pseudo-element, NOT border-top — and that is the whole point of it. A solid
+   border runs the full width and stops dead where it meets the 1px sides, mitring into a hard
+   corner. This is a strip laid over the top edge that fades to nothing at both ends, so the brass
+   dissolves into the card's own hairline instead of being cut off by it.
+   The polish comes from the gradient having a specular run: dark shoulder, body, a bright highlight
+   off-centre, then a darker band before it fades. That asymmetry is what makes metal read as metal
+   — a symmetrical fade just looks like a blurred line. Off-centre because a highlight dead in the
+   middle looks like a print artefact rather than a light source. */
+#view:has(#saveProfile) .setup-card { position: relative; }
+#view:has(#saveProfile) .setup-card::before {
+  content: ""; position: absolute; left: 10px; right: 10px; top: -1px; height: 3px; border-radius: 3px;
+  pointer-events: none;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--brass) 30%, transparent) 7%,
+    color-mix(in srgb, var(--brass) 78%, #000) 17%,
+    var(--brass) 30%,
+    color-mix(in srgb, #fff 62%, var(--brass)) 44%,
+    var(--brass) 57%,
+    color-mix(in srgb, var(--brass) 72%, #000) 72%,
+    color-mix(in srgb, var(--brass) 34%, transparent) 90%,
+    transparent 100%);
 }
+/* The heading rule fades the same way, for the same reason — two brass marks on one card that end
+   differently would read as a mistake rather than a style. A background-image rather than a border,
+   because a border cannot fade. */
+#view:has(#saveProfile) .sec-head {
+  align-items: center; gap: 11px; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 0;
+  background-image: linear-gradient(90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--brass) 44%, var(--line)) 14%,
+    color-mix(in srgb, var(--brass) 60%, var(--line)) 46%,
+    color-mix(in srgb, var(--brass) 30%, var(--line)) 82%,
+    transparent 100%);
+  background-repeat: no-repeat; background-position: 0 100%; background-size: 100% 1px;
+}
+/* The badge, lit like a small brass plate: a sheen down its face, a bright inner top edge, a soft
+   inner floor.
+   ⚠️ THE SHEEN IS NEUTRAL LIGHT AND SHADE, NOT A MIX TOWARD --brass, AND IT IS PER-THEME. Brass is
+   the DARK colour in light mode and the LIGHT colour in dark mode, so one gradient written in terms
+   of it darkens the face in one theme and lightens it in the other — and whichever way it goes it
+   eats the contrast of the digit sitting on it. Measured with the first attempt: 4.66 -> 4.11 light
+   and 7.48 -> 3.72 dark, i.e. it pushed BOTH themes under the 4.5 bar for 12px bold text. White is
+   dialled right down in dark for the same reason: a bright highlight under light text is exactly
+   what costs contrast there, while darkening the foot BUYS it. */
 #view:has(#saveProfile) .sec-num {
   width: 29px; min-width: 29px; height: 25px; margin: 0;
-  color: var(--brass); background: var(--brass-tint);
-  border: 1px solid color-mix(in srgb, var(--brass) 34%, var(--line)); border-radius: 8px; box-shadow: none;
+  color: var(--brass); border-radius: 8px;
+  background-color: var(--brass-tint);
+  background-image: linear-gradient(168deg, var(--brass-sheen) 0%, transparent 52%, var(--brass-shade) 100%);
+  border: 1px solid color-mix(in srgb, var(--brass) 42%, var(--line));
+  box-shadow: inset 0 1px 0 var(--brass-sheen), inset 0 -1px 0 var(--brass-shade);
   font-family: var(--fig); font-size: 12px; font-weight: 750;
 }
 /* A little more air between chapters than within one, so the grouping reads before the colour does. */

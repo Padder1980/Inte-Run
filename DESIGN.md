@@ -102,8 +102,18 @@ Effort tints: `--eff-easy` · `--eff-moderate` · `--eff-hard` · `--eff-none`.
   colour, turns a long form into a rainbow and destroys the one signal that matters — what is a
   heading and what is a control. Do not extend brass to buttons, links or inputs, and do not use it
   outside `#view:has(#saveProfile)`.
-  Contrast is measured, not eyeballed: the badge is 4.66:1 in light and 7.48:1 in dark against its
-  own tint, i.e. it clears AA for the 12px bold text it carries. Keep it there if the value moves.
+  `--brass-sheen` / `--brass-shade` give it the metallic finish: the piping fades to nothing at both
+  ends rather than mitring into a hard corner (a pseudo-element, not a border — a border cannot
+  fade), and carries an off-centre specular highlight, which is what makes metal read as metal
+  rather than as a blurred line.
+  ⚠️ **The sheen is neutral light and shade, per theme — never a mix toward `--brass`.** Brass is the
+  DARK colour in light mode and the LIGHT colour in dark mode, so a single gradient written in terms
+  of it darkens the face in one theme and lightens it in the other, and either way it eats the
+  contrast of the digit sitting on it. Measured when it was written that way: 4.66 → 4.11 light and
+  7.48 → 3.72 dark, both under the bar. White is dialled right down in dark, because a bright
+  highlight under light text is exactly what costs contrast there.
+  Contrast is measured, not eyeballed, and measured on the band the digit actually occupies: 4.50:1
+  light and 6.63:1 dark. Keep it above 4.5 if any of these values move.
 - `--fig`: the numeral stack — used via `.num` for **all numbers/stats** with
   `font-variant-numeric: tabular-nums`.
   ⚠️ **It is the SAME sans as body text, not a monospace stack** (owner's call, 2026-08-02, comparing

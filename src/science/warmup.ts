@@ -111,39 +111,41 @@ export const WARMUP_MOVEMENTS = {
  * The paper's T2: a long run with a pace block later needs no second full warm-up; strides only if
  * that block starts inside the first 20 minutes.
  */
-const EMBED_AFTER_MIN = 18;
+const EMBED_AFTER_MIN = 12;
 
-export function firstHardEffort(session: WarmupSession): FirstHardEffort {
+/**
+ * The first demanding step: what it asks for, and how much easy running comes before it.
+ * ⚠️ Both halves matter. The effort sets the size of the warm-up; the minutes before it decide
+ * whether the run warms ITSELF up — and, when it does, whether the work still arrives soon enough
+ * to want a couple of strides first (the paper's T2: strides only if the block starts inside the
+ * first 20 minutes).
+ */
+export function analyseSession(session: WarmupSession): { effort: FirstHardEffort; minutesBefore: number } {
   const steps = (session.steps || []) as WorkoutStep[];
-  // ⚠️ A `rep` STEP CARRIES NO RPE OF ITS OWN -- the band lives on the SESSION. Reading only the
-  // step returns nothing for every interval session in the library, which graded 10 x 400m at 5k
-  // pace as "easy" and would have handed it a long run's warm-up. The session band describes the
-  // reps; that is what to read.
   const sessionMax = session.targetRpe ? session.targetRpe.max : 0;
-  // ⚠️ FIRST, NOT HARDEST. This is the whole rule and getting it wrong is not subtle: taking the
-  // PEAK effort gave a 45-minute easy run with strides on the end a 34-minute warm-up — longer than
-  // a VO2 session — because it looked past three quarters of an hour of easy running to find the
-  // fastest thing in the session. It also put 24 minutes of preparation in front of a 135-minute
-  // long run whose first 40 minutes are easy. Walk the steps in order, stop at the first demanding
-  // one, and count how much easy running came before it.
   let easyMin = 0;
   for (const s of steps) {
     const mins = (s.durationSeconds || 0) / 60;
-    // The jog BETWEEN reps is recovery, not work; charging it the session's band would say every
-    // interval session opens hard even when it opens with a jog.
+    // ⚠️ THE SESSION'S OWN WARM-UP STEP DOES NOT COUNT. It is the thing being generated, not
+    // evidence that the run warms itself up — counting it said an interval session had already had
+    // 15 minutes of easy running before its first repetition, so nothing ever needed preparing for
+    // and the stride rule below could never fire. Only easy running that is part of the RUN counts.
+    if (s.kind === "warmup") continue;
     if (s.kind === "recovery") { easyMin += mins; continue; }
     const rpe = s.targetRpe ? s.targetRpe.max : (s.kind === "rep" ? sessionMax : 0);
-    if (rpe >= 4 && s.kind !== "warmup") {
-      // ⚠️ The run has already warmed itself up by the time the work starts.
-      if (easyMin >= EMBED_AFTER_MIN) return "easy";
-      if (rpe >= 9) return "maximal";
-      if (rpe >= 8) return "hard";
-      if (rpe >= 6) return "threshold";
-      return "steady";
+    if (rpe >= 4) {
+      const effort: FirstHardEffort = rpe >= 9 ? "maximal" : rpe >= 8 ? "hard" : rpe >= 6 ? "threshold" : "steady";
+      return { effort, minutesBefore: Math.round(easyMin) };
     }
     easyMin += mins;
   }
-  return "easy";
+  return { effort: "easy", minutesBefore: Math.round(easyMin) };
+}
+
+export function firstHardEffort(session: WarmupSession): FirstHardEffort {
+  const a = analyseSession(session);
+  // Past this much easy running the session has warmed itself up, whatever comes next.
+  return a.minutesBefore >= EMBED_AFTER_MIN ? "easy" : a.effort;
 }
 
 const RAISE_MIN: Record<FirstHardEffort, number> = {
@@ -191,9 +193,25 @@ export function buildWarmup(
         ? "Walk briskly for 3–5 minutes, then mix a few minutes of easy running with short walks until it feels settled."
         : `Run the first ${mins} minutes slower than your normal easy pace, then let it settle.`,
     });
+    // ⚠️ AN EMBEDDED WARM-UP STILL WANTS STRIDES WHEN THE WORK COMES SOON. The paper's T2 is
+    // specific: no second full warm-up for a run whose pace block is later, but 2-4 progressive
+    // strides IF that block starts inside the first 20 minutes — because by then the run's own
+    // opening has had barely any time to do the job. Novices are exempt; their sessions do not open
+    // with work this soon, and strides are the component the paper caps hardest for them.
+    const look = analyseSession(session);
+    if (look.effort !== "easy" && look.minutesBefore <= 20 && ability !== "new") {
+      const n = ability === "beginner" ? 2 : 3;
+      phases.push({
+        phase: "potentiate", strides: n, seconds: 18, effort: "building towards the pace you are about to run",
+        instruction: `${n} × 18 seconds progressive before the work starts — the run's own opening is short here, so these bridge the gap into the first effort.`,
+      });
+      notes.push("The quicker running starts early in this one, so a few strides beforehand stop the first effort being a shock.");
+    }
     return {
       modelVersion: WARMUP_MODEL_VERSION, firstHardEffort: effort, evidenceGrade: GRADE[effort],
-      embedded: true, totalMinutes: mins, phases,
+      embedded: true,
+      totalMinutes: mins + (phases.some((p) => p.phase === "potentiate") ? 4 : 0),
+      phases,
       why: "This run starts easy, so the opening few minutes are the warm-up — there is nothing here demanding enough to need preparing for separately.",
       notes,
     };
@@ -276,14 +294,20 @@ function raceWarmup(
   conditions: WarmupConditions,
   notes: string[],
 ): Warmup {
-  const novice = ability === "new" || ability === "beginner";
+  // ⚠️ THREE TIERS, NOT TWO. The paper gives advanced runners a longer raise and more strides at
+  // every distance — 15-20 min and 4-6 strides before a 5 km against the intermediate's 10-15 and
+  // 4-5, and 2-4 short strides before a marathon where an intermediate usually has none. Collapsing
+  // advanced into intermediate gave an experienced runner a novice-adjacent race routine, which is
+  // the one place the paper says least about averages and most about the individual.
+  const tier = (ability === "new" || ability === "beginner") ? "novice"
+    : ability === "advanced" ? "advanced" : "intermediate";
+  const novice = tier === "novice";
   const spec = {
-    // raise minutes, strides, transition minutes
-    "5k": novice ? { raise: 8, strides: 2 } : { raise: 13, strides: 4 },
-    "10k": novice ? { raise: 6, strides: 0 } : { raise: 10, strides: 3 },
-    half: novice ? { raise: 0, strides: 0 } : { raise: 8, strides: 3 },
-    marathon: novice ? { raise: 0, strides: 0 } : { raise: 6, strides: 0 },
-  }[distance];
+    "5k":      { novice: { raise: 8, strides: 2 }, intermediate: { raise: 13, strides: 4 }, advanced: { raise: 17, strides: 5 } },
+    "10k":     { novice: { raise: 6, strides: 0 }, intermediate: { raise: 10, strides: 3 }, advanced: { raise: 15, strides: 5 } },
+    half:      { novice: { raise: 0, strides: 0 }, intermediate: { raise: 8, strides: 3 },  advanced: { raise: 12, strides: 4 } },
+    marathon:  { novice: { raise: 0, strides: 0 }, intermediate: { raise: 6, strides: 0 },  advanced: { raise: 9, strides: 2 } },
+  }[distance][tier];
   let raise = spec.raise, strides = spec.strides;
   const t = conditions.temperatureC;
   if (typeof t === "number" && t >= 24) {
@@ -298,8 +322,14 @@ function raceWarmup(
     phases.push({ phase: "raise", minutes: 5, rpe: { min: 1, max: 2 },
       instruction: "No running needed beforehand. Walk briskly while you sort your kit, and use the first kilometre or two of the race itself as the warm-up — deliberately slower than your target pace." });
   }
-  phases.push({ phase: "mobilise", movements: [WARMUP_MOVEMENTS.ankle_rocks, WARMUP_MOVEMENTS.leg_swings_fb],
-    instruction: "A couple of easy movements to check how the legs feel. Nothing forced." });
+  // The paper gives an advanced runner "an individual drill sequence" rather than two movements.
+  const moves = tier === "advanced"
+    ? [WARMUP_MOVEMENTS.ankle_rocks, WARMUP_MOVEMENTS.leg_swings_fb, WARMUP_MOVEMENTS.leg_swings_lat, WARMUP_MOVEMENTS.a_skip]
+    : [WARMUP_MOVEMENTS.ankle_rocks, WARMUP_MOVEMENTS.leg_swings_fb];
+  phases.push({ phase: "mobilise", movements: moves,
+    instruction: tier === "advanced"
+      ? "Your own routine, if you have one — this is the shape of it. Race day is not the time to add something new."
+      : "A couple of easy movements to check how the legs feel. Nothing forced." });
   if (strides > 0) {
     phases.push({ phase: "potentiate", strides, seconds: 15, effort: "the last one around race pace",
       instruction: `${strides} × 15 seconds relaxed, the last one around race pace — just enough to make it feel familiar.` });

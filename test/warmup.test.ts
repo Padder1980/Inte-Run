@@ -195,3 +195,55 @@ test("a long run with its hard work late warms up inside itself", () => {
   assert.equal(w.embedded, true, "the run's own opening is the warm-up");
   assert.ok(w.totalMinutes <= 12, `got ${w.totalMinutes} minutes before a run that starts easy`);
 });
+
+test("an advanced runner's RACE warm-up differs from an intermediate's at every distance", () => {
+  // ⚠️ The paper gives advanced runners a longer raise and more strides at every distance — and a
+  // marathon is the sharpest case: 2–4 short strides where an intermediate usually has none.
+  // Collapsing the two tiers gave an experienced runner a near-novice race routine.
+  const race = vo2Session(paces, 1);
+  for (const d of ["5k", "10k", "half", "marathon"] as const) {
+    const int = buildWarmup(race, "intermediate", { raceDistance: d })!;
+    const adv = buildWarmup(race, "advanced", { raceDistance: d })!;
+    assert.ok(adv.totalMinutes > int.totalMinutes, `${d}: advanced ${adv.totalMinutes} must exceed intermediate ${int.totalMinutes}`);
+    const mob = (w: any) => (w.phases.find((p: any) => p.phase === "mobilise") || { movements: [] }).movements.length;
+    assert.ok(mob(adv) > mob(int), `${d}: advanced gets their own drill sequence, not two movements`);
+  }
+  // ...and the distance ordering still holds inside the advanced tier.
+  const mins = (d: any) => buildWarmup(race, "advanced", { raceDistance: d })!.totalMinutes;
+  assert.ok(mins("5k") > mins("10k") && mins("10k") > mins("half") && mins("half") > mins("marathon"));
+});
+
+test("an embedded warm-up gains strides when the hard work starts early", () => {
+  // ⚠️ The paper's T2: no second full warm-up for a run whose pace block comes later, BUT 2–4
+  // progressive strides if that block starts inside the first 20 minutes — by then the run's own
+  // opening has had barely any time to do the job.
+  // ⚠️ The session's OWN warm-up step is deliberately not counted — it is the thing being generated,
+  // not evidence the run warms itself up. Only easy running that is part of the RUN counts, which is
+  // why this fixture carries 15 real minutes of it.
+  const early = {
+    targetRpe: { min: 2, max: 7 },
+    steps: [
+      { kind: "warmup", label: "Easy", durationSeconds: 10 * 60, targetRpe: { min: 2, max: 3 } },
+      { kind: "steady", label: "Easy", durationSeconds: 15 * 60, targetRpe: { min: 2, max: 3 } },
+      { kind: "rep", label: "Threshold block", durationSeconds: 20 * 60, targetRpe: { min: 6, max: 7 } },
+    ],
+  } as any;
+  const w = buildWarmup(early, "intermediate")!;
+  assert.equal(w.embedded, true, "the run still warms itself up");
+  assert.ok(w.phases.some((p: any) => p.phase === "potentiate" && p.strides >= 2), "but strides bridge into the work");
+  assert.ok(w.notes.some((n) => /early|shock/i.test(n)), "and the runner is told why");
+
+  // The same session with the block much later gets no strides — nothing to bridge.
+  const late = { ...early, steps: [early.steps[0], { ...early.steps[1], durationSeconds: 45 * 60 }, early.steps[2]] };
+  // ...and with barely any easy running first, the run has NOT warmed itself up: a real warm-up.
+  const immediate = { ...early, steps: [early.steps[0], { ...early.steps[1], durationSeconds: 4 * 60 }, early.steps[2]] };
+  const wi = buildWarmup(immediate, "intermediate")!;
+  assert.equal(wi.embedded, false, "four minutes of easy running is not a warm-up");
+  assert.ok(wi.totalMinutes > 15, "it gets the full structured version instead");
+  const wl = buildWarmup(late, "intermediate")!;
+  assert.equal(wl.embedded, true);
+  assert.ok(!wl.phases.some((p: any) => p.phase === "potentiate"), "a block 57 minutes in needs no strides beforehand");
+
+  // ⚠️ A brand-new runner is exempt: strides are the component the paper caps hardest for them.
+  assert.ok(!buildWarmup(early, "new")!.phases.some((p: any) => p.phase === "potentiate"));
+});

@@ -1,6 +1,38 @@
 {
-  "guide": { "voice_id": "B9PDs7mcHTMxHUw5U8Cf", "name": "Holly" },
-  "pacer": { "voice_id": "2styzLg7OSeuhPP6uQ26", "name": "Philip" },
-  "motivator": { "voice_id": "tnSpp4vdxKPjI9w0GnoV", "name": "Hope" },
-  "technician": { "voice_id": "EQu48Nbp4OqDxsnYh27f", "name": "Lucy" }
+  "guide": {
+    "voice_id": "B9PDs7mcHTMxHUw5U8Cf",
+    "name": "Holly"
+  },
+  "pacer": {
+    "voice_id": "2styzLg7OSeuhPP6uQ26",
+    "name": "Philip"
+  },
+  "motivator": {
+    "voice_id": "tnSpp4vdxKPjI9w0GnoV",
+    "name": "Hope"
+  },
+  "technician": {
+    "voice_id": "EQu48Nbp4OqDxsnYh27f",
+    "name": "Lucy"
+  },
+  "spark": {
+    "name": "Axell",
+    "voice_id": "2mltbVQP21Fq8XgIfRQJ"
+  },
+  "steady": {
+    "name": "Robert Mitchell",
+    "voice_id": "yI1R3F7EwSlLXnemCn4s"
+  },
+  "storyteller": {
+    "name": "Nathaniel C",
+    "voice_id": "8CjmkufHc22WbMZEBHbm"
+  },
+  "commentator": {
+    "name": "British Football Announcer",
+    "voice_id": "gU0LNdkMOQCOrPrwtbee"
+  },
+  "sportsman": {
+    "name": "Irish Sportsman",
+    "voice_id": "X5w669wwEW4Ah5QaTcuO"
+  }
 }

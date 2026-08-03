@@ -154,7 +154,10 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--list-voices", action="store_true")
     ap.add_argument("--audition", metavar="TEXT")
-    ap.add_argument("--coach", choices=list(CASTING_PREFS))
+    # ⚠️ The roster comes from the dumped catalogue, not a list repeated here. This was hardcoded to
+    # the original four, so casting five more voices produced "invalid choice" rather than clips —
+    # a second copy of a fact that has to agree with coach-prompts.ts and silently did not.
+    ap.add_argument("--coach")
     ap.add_argument("--force", action="store_true", help="regenerate even when the hash matches")
     ap.add_argument("--personal", metavar="NAME",
                     help="generate the private pack in which the coaches say this person's name "

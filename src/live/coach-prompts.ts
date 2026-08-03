@@ -10,7 +10,8 @@ import type { SessionType } from "../domain/types.ts";
 // Original InteRun personalities (not imitations of any real person). Each is bound to one open-source
 // Kokoro voice; the voice carries the personality, while the spoken text is shared across coaches.
 
-export type CoachId = "guide" | "pacer" | "motivator" | "technician";
+export type CoachId = "guide" | "pacer" | "motivator" | "technician"
+  | "spark" | "steady" | "storyteller" | "commentator" | "sportsman";
 
 export type Coach = {
   id: CoachId;
@@ -50,9 +51,54 @@ export const COACHES: Record<CoachId, Coach> = {
     tagline: "Precise and composed",
     description: "Clear, exact cues on form, pacing and structure for the runner who likes the detail.",
   },
+  // ---- Added 2026-08-03 from the owner's own ElevenLabs voices -----------------------------------
+  //
+  // ⚠️ These five carry NO per-coach variants yet, so they speak the catalogue's default text. That
+  // is a deliberate first step, not an oversight: the original four differ in WORDING as well as
+  // sound — the same moment phrased four ways — and until these have their own phrasing they are a
+  // different voice reading the same script. Worth knowing before judging them against Holly.
+  spark: {
+    id: "spark",
+    name: "The Spark",
+    voice: "el:axell",
+    tagline: "Bright and quick",
+    description: "Fast, upbeat and full of energy — the voice for the days you need dragging out of the door.",
+  },
+  steady: {
+    id: "steady",
+    name: "The Steady",
+    voice: "el:robert",
+    tagline: "Unhurried and grounded",
+    description: "Calm and natural, never rushed. The one to run long with when nothing needs to be dramatic.",
+  },
+  storyteller: {
+    id: "storyteller",
+    name: "The Storyteller",
+    voice: "el:nathaniel",
+    tagline: "Expressive and vivid",
+    description: "Warm and animated — makes an ordinary hour out feel like it is going somewhere.",
+  },
+  commentator: {
+    id: "commentator",
+    name: "The Commentator",
+    voice: "el:announcer",
+    tagline: "Crisp and fast-paced",
+    description: "Sharp, energetic match-day delivery. Your intervals narrated like they matter, because they do.",
+  },
+  sportsman: {
+    id: "sportsman",
+    name: "The Sportsman",
+    voice: "el:sportsman",
+    tagline: "Blunt and Irish",
+    description: "Direct, no fuss and quietly certain you have more in you than you think.",
+  }
 };
 
-export const COACH_IDS: CoachId[] = ["guide", "pacer", "motivator", "technician"];
+// ⚠️ Order is the order they appear in the picker. The original four lead because they are the
+// ones with their own per-moment wording; the five added on 2026-08-03 share the default text
+// and differ by voice alone, which is a real difference in depth the runner can hear.
+export const COACH_IDS: CoachId[] = ["guide", "pacer", "motivator", "technician",
+  "spark", "steady", "storyteller", "commentator", "sportsman"];
 export const DEFAULT_COACH: CoachId = "guide";
 
 // ---- Triggers --------------------------------------------------------------

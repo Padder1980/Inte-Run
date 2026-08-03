@@ -20,6 +20,31 @@
       "id": "technician",
       "name": "The Technician",
       "voice": "bm_lewis"
+    },
+    {
+      "id": "spark",
+      "name": "The Spark",
+      "voice": "el:axell"
+    },
+    {
+      "id": "steady",
+      "name": "The Steady",
+      "voice": "el:robert"
+    },
+    {
+      "id": "storyteller",
+      "name": "The Storyteller",
+      "voice": "el:nathaniel"
+    },
+    {
+      "id": "commentator",
+      "name": "The Commentator",
+      "voice": "el:announcer"
+    },
+    {
+      "id": "sportsman",
+      "name": "The Sportsman",
+      "voice": "el:sportsman"
     }
   ],
   "prompts": [
@@ -31,7 +56,12 @@
         "guide": "Welcome to Inter-run. Let's make today's session count.",
         "pacer": "Welcome to Inter-run. Let's make today's session count.",
         "motivator": "Welcome to Inter-run. Let's make today's session count.",
-        "technician": "Welcome to Inter-run. Let's make today's session count."
+        "technician": "Welcome to Inter-run. Let's make today's session count.",
+        "spark": "Welcome to Inter-run. Let's make today's session count.",
+        "steady": "Welcome to Inter-run. Let's make today's session count.",
+        "storyteller": "Welcome to Inter-run. Let's make today's session count.",
+        "commentator": "Welcome to Inter-run. Let's make today's session count.",
+        "sportsman": "Welcome to Inter-run. Let's make today's session count."
       }
     },
     {
@@ -42,7 +72,12 @@
         "guide": "Good to have you here. Take a breath, and let's begin when you're ready.",
         "pacer": "Good to have you here. Take a breath, and let's begin when you're ready.",
         "motivator": "Good to have you here. Take a breath, and let's begin when you're ready.",
-        "technician": "Good to have you here. Take a breath, and let's begin when you're ready."
+        "technician": "Good to have you here. Take a breath, and let's begin when you're ready.",
+        "spark": "Good to have you here. Take a breath, and let's begin when you're ready.",
+        "steady": "Good to have you here. Take a breath, and let's begin when you're ready.",
+        "storyteller": "Good to have you here. Take a breath, and let's begin when you're ready.",
+        "commentator": "Good to have you here. Take a breath, and let's begin when you're ready.",
+        "sportsman": "Good to have you here. Take a breath, and let's begin when you're ready."
       }
     },
     {
@@ -53,7 +88,12 @@
         "guide": "Let's warm up. Start easy and let your body wake up gradually.",
         "pacer": "Let's warm up. Start easy and let your body wake up gradually.",
         "motivator": "Let's warm up. Start easy and let your body wake up gradually.",
-        "technician": "Let's warm up. Start easy and let your body wake up gradually."
+        "technician": "Let's warm up. Start easy and let your body wake up gradually.",
+        "spark": "Let's warm up. Start easy and let your body wake up gradually.",
+        "steady": "Let's warm up. Start easy and let your body wake up gradually.",
+        "storyteller": "Let's warm up. Start easy and let your body wake up gradually.",
+        "commentator": "Let's warm up. Start easy and let your body wake up gradually.",
+        "sportsman": "Let's warm up. Start easy and let your body wake up gradually."
       }
     },
     {
@@ -64,7 +104,12 @@
         "guide": "Ease in gently. Loose shoulders, relaxed breathing, no rush.",
         "pacer": "Ease in gently. Loose shoulders, relaxed breathing, no rush.",
         "motivator": "Ease in gently. Loose shoulders, relaxed breathing, no rush.",
-        "technician": "Ease in gently. Loose shoulders, relaxed breathing, no rush."
+        "technician": "Ease in gently. Loose shoulders, relaxed breathing, no rush.",
+        "spark": "Ease in gently. Loose shoulders, relaxed breathing, no rush.",
+        "steady": "Ease in gently. Loose shoulders, relaxed breathing, no rush.",
+        "storyteller": "Ease in gently. Loose shoulders, relaxed breathing, no rush.",
+        "commentator": "Ease in gently. Loose shoulders, relaxed breathing, no rush.",
+        "sportsman": "Ease in gently. Loose shoulders, relaxed breathing, no rush."
       }
     },
     {
@@ -75,7 +120,12 @@
         "guide": "Here we go. Settle into your rhythm.",
         "pacer": "Here we go. Settle into your rhythm.",
         "motivator": "Here we go. Settle into your rhythm.",
-        "technician": "Here we go. Settle into your rhythm."
+        "technician": "Here we go. Settle into your rhythm.",
+        "spark": "Here we go. Settle into your rhythm.",
+        "steady": "Here we go. Settle into your rhythm.",
+        "storyteller": "Here we go. Settle into your rhythm.",
+        "commentator": "Here we go. Settle into your rhythm.",
+        "sportsman": "Here we go. Settle into your rhythm."
       }
     },
     {
@@ -86,7 +136,12 @@
         "guide": "Let's get to work. Find a pace you can hold.",
         "pacer": "Let's get to work. Find a pace you can hold.",
         "motivator": "Let's get to work. Find a pace you can hold.",
-        "technician": "Let's get to work. Find a pace you can hold."
+        "technician": "Let's get to work. Find a pace you can hold.",
+        "spark": "Let's get to work. Find a pace you can hold.",
+        "steady": "Let's get to work. Find a pace you can hold.",
+        "storyteller": "Let's get to work. Find a pace you can hold.",
+        "commentator": "Let's get to work. Find a pace you can hold.",
+        "sportsman": "Let's get to work. Find a pace you can hold."
       }
     },
     {
@@ -97,7 +152,12 @@
         "guide": "Nice and easy. This pace should feel comfortable and conversational.",
         "pacer": "Nice and easy. This pace should feel comfortable and conversational.",
         "motivator": "Nice and easy. This pace should feel comfortable and conversational.",
-        "technician": "Nice and easy. This pace should feel comfortable and conversational."
+        "technician": "Nice and easy. This pace should feel comfortable and conversational.",
+        "spark": "Nice and easy. This pace should feel comfortable and conversational.",
+        "steady": "Nice and easy. This pace should feel comfortable and conversational.",
+        "storyteller": "Nice and easy. This pace should feel comfortable and conversational.",
+        "commentator": "Nice and easy. This pace should feel comfortable and conversational.",
+        "sportsman": "Nice and easy. This pace should feel comfortable and conversational."
       }
     },
     {
@@ -108,7 +168,12 @@
         "guide": "Relax and enjoy this one. Effort stays gentle throughout.",
         "pacer": "Relax and enjoy this one. Effort stays gentle throughout.",
         "motivator": "Relax and enjoy this one. Effort stays gentle throughout.",
-        "technician": "Relax and enjoy this one. Effort stays gentle throughout."
+        "technician": "Relax and enjoy this one. Effort stays gentle throughout.",
+        "spark": "Relax and enjoy this one. Effort stays gentle throughout.",
+        "steady": "Relax and enjoy this one. Effort stays gentle throughout.",
+        "storyteller": "Relax and enjoy this one. Effort stays gentle throughout.",
+        "commentator": "Relax and enjoy this one. Effort stays gentle throughout.",
+        "sportsman": "Relax and enjoy this one. Effort stays gentle throughout."
       }
     },
     {
@@ -119,7 +184,12 @@
         "guide": "Keep it light. If you can chat, you're right where you should be.",
         "pacer": "Keep it light. If you can chat, you're right where you should be.",
         "motivator": "Keep it light. If you can chat, you're right where you should be.",
-        "technician": "Keep it light. If you can chat, you're right where you should be."
+        "technician": "Keep it light. If you can chat, you're right where you should be.",
+        "spark": "Keep it light. If you can chat, you're right where you should be.",
+        "steady": "Keep it light. If you can chat, you're right where you should be.",
+        "storyteller": "Keep it light. If you can chat, you're right where you should be.",
+        "commentator": "Keep it light. If you can chat, you're right where you should be.",
+        "sportsman": "Keep it light. If you can chat, you're right where you should be."
       }
     },
     {
@@ -130,7 +200,12 @@
         "guide": "This is your long run. Patience early pays off late — settle in.",
         "pacer": "This is your long run. Patience early pays off late — settle in.",
         "motivator": "This is your long run. Patience early pays off late — settle in.",
-        "technician": "This is your long run. Patience early pays off late — settle in."
+        "technician": "This is your long run. Patience early pays off late — settle in.",
+        "spark": "This is your long run. Patience early pays off late — settle in.",
+        "steady": "This is your long run. Patience early pays off late — settle in.",
+        "storyteller": "This is your long run. Patience early pays off late — settle in.",
+        "commentator": "This is your long run. Patience early pays off late — settle in.",
+        "sportsman": "This is your long run. Patience early pays off late — settle in."
       }
     },
     {
@@ -141,7 +216,12 @@
         "guide": "Steady does it. Sip fluids, stay relaxed, and let the miles build.",
         "pacer": "Steady does it. Sip fluids, stay relaxed, and let the miles build.",
         "motivator": "Steady does it. Sip fluids, stay relaxed, and let the miles build.",
-        "technician": "Steady does it. Sip fluids, stay relaxed, and let the miles build."
+        "technician": "Steady does it. Sip fluids, stay relaxed, and let the miles build.",
+        "spark": "Steady does it. Sip fluids, stay relaxed, and let the miles build.",
+        "steady": "Steady does it. Sip fluids, stay relaxed, and let the miles build.",
+        "storyteller": "Steady does it. Sip fluids, stay relaxed, and let the miles build.",
+        "commentator": "Steady does it. Sip fluids, stay relaxed, and let the miles build.",
+        "sportsman": "Steady does it. Sip fluids, stay relaxed, and let the miles build."
       }
     },
     {
@@ -152,7 +232,12 @@
         "guide": "Lifting to tempo now. Strong and controlled — comfortably hard.",
         "pacer": "Lifting to tempo now. Strong and controlled — comfortably hard.",
         "motivator": "Lifting to tempo now. Strong and controlled — comfortably hard.",
-        "technician": "Lifting to tempo now. Strong and controlled — comfortably hard."
+        "technician": "Lifting to tempo now. Strong and controlled — comfortably hard.",
+        "spark": "Lifting to tempo now. Strong and controlled — comfortably hard.",
+        "steady": "Lifting to tempo now. Strong and controlled — comfortably hard.",
+        "storyteller": "Lifting to tempo now. Strong and controlled — comfortably hard.",
+        "commentator": "Lifting to tempo now. Strong and controlled — comfortably hard.",
+        "sportsman": "Lifting to tempo now. Strong and controlled — comfortably hard."
       }
     },
     {
@@ -163,7 +248,12 @@
         "guide": "Hold this effort. Smooth, steady, right on the edge of comfortable.",
         "pacer": "Hold this effort. Smooth, steady, right on the edge of comfortable.",
         "motivator": "Hold this effort. Smooth, steady, right on the edge of comfortable.",
-        "technician": "Hold this effort. Smooth, steady, right on the edge of comfortable."
+        "technician": "Hold this effort. Smooth, steady, right on the edge of comfortable.",
+        "spark": "Hold this effort. Smooth, steady, right on the edge of comfortable.",
+        "steady": "Hold this effort. Smooth, steady, right on the edge of comfortable.",
+        "storyteller": "Hold this effort. Smooth, steady, right on the edge of comfortable.",
+        "commentator": "Hold this effort. Smooth, steady, right on the edge of comfortable.",
+        "sportsman": "Hold this effort. Smooth, steady, right on the edge of comfortable."
       }
     },
     {
@@ -174,7 +264,12 @@
         "guide": "Stay composed. Same effort, same rhythm — keep it repeatable.",
         "pacer": "Stay composed. Same effort, same rhythm — keep it repeatable.",
         "motivator": "Stay composed. Same effort, same rhythm — keep it repeatable.",
-        "technician": "Stay composed. Same effort, same rhythm — keep it repeatable."
+        "technician": "Stay composed. Same effort, same rhythm — keep it repeatable.",
+        "spark": "Stay composed. Same effort, same rhythm — keep it repeatable.",
+        "steady": "Stay composed. Same effort, same rhythm — keep it repeatable.",
+        "storyteller": "Stay composed. Same effort, same rhythm — keep it repeatable.",
+        "commentator": "Stay composed. Same effort, same rhythm — keep it repeatable.",
+        "sportsman": "Stay composed. Same effort, same rhythm — keep it repeatable."
       }
     },
     {
@@ -185,7 +280,12 @@
         "guide": "Next rep coming up. Get ready.",
         "pacer": "Next rep coming up. Get ready.",
         "motivator": "Next rep coming up. Get ready.",
-        "technician": "Next rep coming up. Get ready."
+        "technician": "Next rep coming up. Get ready.",
+        "spark": "Next rep coming up. Get ready.",
+        "steady": "Next rep coming up. Get ready.",
+        "storyteller": "Next rep coming up. Get ready.",
+        "commentator": "Next rep coming up. Get ready.",
+        "sportsman": "Next rep coming up. Get ready."
       }
     },
     {
@@ -196,7 +296,12 @@
         "guide": "This is the work. Strong arms, tall posture, keep driving.",
         "pacer": "This is the work. Strong arms, tall posture, keep driving.",
         "motivator": "This is the work. Strong arms, tall posture, keep driving.",
-        "technician": "This is the work. Strong arms, tall posture, keep driving."
+        "technician": "This is the work. Strong arms, tall posture, keep driving.",
+        "spark": "This is the work. Strong arms, tall posture, keep driving.",
+        "steady": "This is the work. Strong arms, tall posture, keep driving.",
+        "storyteller": "This is the work. Strong arms, tall posture, keep driving.",
+        "commentator": "This is the work. Strong arms, tall posture, keep driving.",
+        "sportsman": "This is the work. Strong arms, tall posture, keep driving."
       }
     },
     {
@@ -207,7 +312,12 @@
         "guide": "Hold your pace. You've got more than you think.",
         "pacer": "Hold your pace. You've got more than you think.",
         "motivator": "Hold your pace. You've got more than you think.",
-        "technician": "Hold your pace. You've got more than you think."
+        "technician": "Hold your pace. You've got more than you think.",
+        "spark": "Hold your pace. You've got more than you think.",
+        "steady": "Hold your pace. You've got more than you think.",
+        "storyteller": "Hold your pace. You've got more than you think.",
+        "commentator": "Hold your pace. You've got more than you think.",
+        "sportsman": "Hold your pace. You've got more than you think."
       }
     },
     {
@@ -218,7 +328,12 @@
         "guide": "Recover now. Ease right down and catch your breath.",
         "pacer": "Recover now. Ease right down and catch your breath.",
         "motivator": "Recover now. Ease right down and catch your breath.",
-        "technician": "Recover now. Ease right down and catch your breath."
+        "technician": "Recover now. Ease right down and catch your breath.",
+        "spark": "Recover now. Ease right down and catch your breath.",
+        "steady": "Recover now. Ease right down and catch your breath.",
+        "storyteller": "Recover now. Ease right down and catch your breath.",
+        "commentator": "Recover now. Ease right down and catch your breath.",
+        "sportsman": "Recover now. Ease right down and catch your breath."
       }
     },
     {
@@ -229,7 +344,12 @@
         "guide": "Good rep. Jog easy and let the heart rate come back.",
         "pacer": "Good rep. Jog easy and let the heart rate come back.",
         "motivator": "Good rep. Jog easy and let the heart rate come back.",
-        "technician": "Good rep. Jog easy and let the heart rate come back."
+        "technician": "Good rep. Jog easy and let the heart rate come back.",
+        "spark": "Good rep. Jog easy and let the heart rate come back.",
+        "steady": "Good rep. Jog easy and let the heart rate come back.",
+        "storyteller": "Good rep. Jog easy and let the heart rate come back.",
+        "commentator": "Good rep. Jog easy and let the heart rate come back.",
+        "sportsman": "Good rep. Jog easy and let the heart rate come back."
       }
     },
     {
@@ -240,7 +360,12 @@
         "guide": "Up the hill. Shorten your stride, drive your arms, keep the effort steady.",
         "pacer": "Up the hill. Shorten your stride, drive your arms, keep the effort steady.",
         "motivator": "Up the hill. Shorten your stride, drive your arms, keep the effort steady.",
-        "technician": "Up the hill. Shorten your stride, drive your arms, keep the effort steady."
+        "technician": "Up the hill. Shorten your stride, drive your arms, keep the effort steady.",
+        "spark": "Up the hill. Shorten your stride, drive your arms, keep the effort steady.",
+        "steady": "Up the hill. Shorten your stride, drive your arms, keep the effort steady.",
+        "storyteller": "Up the hill. Shorten your stride, drive your arms, keep the effort steady.",
+        "commentator": "Up the hill. Shorten your stride, drive your arms, keep the effort steady.",
+        "sportsman": "Up the hill. Shorten your stride, drive your arms, keep the effort steady."
       }
     },
     {
@@ -251,7 +376,12 @@
         "guide": "Attack the climb. Eyes up, strong and powerful.",
         "pacer": "Attack the climb. Eyes up, strong and powerful.",
         "motivator": "Attack the climb. Eyes up, strong and powerful.",
-        "technician": "Attack the climb. Eyes up, strong and powerful."
+        "technician": "Attack the climb. Eyes up, strong and powerful.",
+        "spark": "Attack the climb. Eyes up, strong and powerful.",
+        "steady": "Attack the climb. Eyes up, strong and powerful.",
+        "storyteller": "Attack the climb. Eyes up, strong and powerful.",
+        "commentator": "Attack the climb. Eyes up, strong and powerful.",
+        "sportsman": "Attack the climb. Eyes up, strong and powerful."
       }
     },
     {
@@ -262,7 +392,12 @@
         "guide": "Strength time. Move with control, quality over quantity, and stop before failure.",
         "pacer": "Strength time. Move with control, quality over quantity, and stop before failure.",
         "motivator": "Strength time. Move with control, quality over quantity, and stop before failure.",
-        "technician": "Strength time. Move with control, quality over quantity, and stop before failure."
+        "technician": "Strength time. Move with control, quality over quantity, and stop before failure.",
+        "spark": "Strength time. Move with control, quality over quantity, and stop before failure.",
+        "steady": "Strength time. Move with control, quality over quantity, and stop before failure.",
+        "storyteller": "Strength time. Move with control, quality over quantity, and stop before failure.",
+        "commentator": "Strength time. Move with control, quality over quantity, and stop before failure.",
+        "sportsman": "Strength time. Move with control, quality over quantity, and stop before failure."
       }
     },
     {
@@ -273,7 +408,12 @@
         "guide": "Let's build durability. Brace your core and keep every rep clean.",
         "pacer": "Let's build durability. Brace your core and keep every rep clean.",
         "motivator": "Let's build durability. Brace your core and keep every rep clean.",
-        "technician": "Let's build durability. Brace your core and keep every rep clean."
+        "technician": "Let's build durability. Brace your core and keep every rep clean.",
+        "spark": "Let's build durability. Brace your core and keep every rep clean.",
+        "steady": "Let's build durability. Brace your core and keep every rep clean.",
+        "storyteller": "Let's build durability. Brace your core and keep every rep clean.",
+        "commentator": "Let's build durability. Brace your core and keep every rep clean.",
+        "sportsman": "Let's build durability. Brace your core and keep every rep clean."
       }
     },
     {
@@ -284,7 +424,12 @@
         "guide": "Quick check: relax your shoulders and let your hands stay soft.",
         "pacer": "Quick check: relax your shoulders and let your hands stay soft.",
         "motivator": "Quick check: relax your shoulders and let your hands stay soft.",
-        "technician": "Quick check: relax your shoulders and let your hands stay soft."
+        "technician": "Quick check: relax your shoulders and let your hands stay soft.",
+        "spark": "Quick check: relax your shoulders and let your hands stay soft.",
+        "steady": "Quick check: relax your shoulders and let your hands stay soft.",
+        "storyteller": "Quick check: relax your shoulders and let your hands stay soft.",
+        "commentator": "Quick check: relax your shoulders and let your hands stay soft.",
+        "sportsman": "Quick check: relax your shoulders and let your hands stay soft."
       }
     },
     {
@@ -295,7 +440,12 @@
         "guide": "Light, quick steps. Let your feet land underneath you.",
         "pacer": "Light, quick steps. Let your feet land underneath you.",
         "motivator": "Light, quick steps. Let your feet land underneath you.",
-        "technician": "Light, quick steps. Let your feet land underneath you."
+        "technician": "Light, quick steps. Let your feet land underneath you.",
+        "spark": "Light, quick steps. Let your feet land underneath you.",
+        "steady": "Light, quick steps. Let your feet land underneath you.",
+        "storyteller": "Light, quick steps. Let your feet land underneath you.",
+        "commentator": "Light, quick steps. Let your feet land underneath you.",
+        "sportsman": "Light, quick steps. Let your feet land underneath you."
       }
     },
     {
@@ -306,7 +456,12 @@
         "guide": "Tall through the spine, eyes on the horizon. Run relaxed.",
         "pacer": "Tall through the spine, eyes on the horizon. Run relaxed.",
         "motivator": "Tall through the spine, eyes on the horizon. Run relaxed.",
-        "technician": "Tall through the spine, eyes on the horizon. Run relaxed."
+        "technician": "Tall through the spine, eyes on the horizon. Run relaxed.",
+        "spark": "Tall through the spine, eyes on the horizon. Run relaxed.",
+        "steady": "Tall through the spine, eyes on the horizon. Run relaxed.",
+        "storyteller": "Tall through the spine, eyes on the horizon. Run relaxed.",
+        "commentator": "Tall through the spine, eyes on the horizon. Run relaxed.",
+        "sportsman": "Tall through the spine, eyes on the horizon. Run relaxed."
       }
     },
     {
@@ -317,7 +472,12 @@
         "guide": "You're halfway through. Hold your form and keep working.",
         "pacer": "You're halfway through. Hold your form and keep working.",
         "motivator": "You're halfway through. Hold your form and keep working.",
-        "technician": "You're halfway through. Hold your form and keep working."
+        "technician": "You're halfway through. Hold your form and keep working.",
+        "spark": "You're halfway through. Hold your form and keep working.",
+        "steady": "You're halfway through. Hold your form and keep working.",
+        "storyteller": "You're halfway through. Hold your form and keep working.",
+        "commentator": "You're halfway through. Hold your form and keep working.",
+        "sportsman": "You're halfway through. Hold your form and keep working."
       }
     },
     {
@@ -328,7 +488,12 @@
         "guide": "Halfway done, and looking strong. Stay with it.",
         "pacer": "Halfway done, and looking strong. Stay with it.",
         "motivator": "Halfway done, and looking strong. Stay with it.",
-        "technician": "Halfway done, and looking strong. Stay with it."
+        "technician": "Halfway done, and looking strong. Stay with it.",
+        "spark": "Halfway done, and looking strong. Stay with it.",
+        "steady": "Halfway done, and looking strong. Stay with it.",
+        "storyteller": "Halfway done, and looking strong. Stay with it.",
+        "commentator": "Halfway done, and looking strong. Stay with it.",
+        "sportsman": "Halfway done, and looking strong. Stay with it."
       }
     },
     {
@@ -339,7 +504,12 @@
         "guide": "You've drifted a little soft. Gently find that rhythm again.",
         "pacer": "You're a shade down on target. Lift the rhythm, not the strain.",
         "motivator": "You've got more than this — let's go find it.",
-        "technician": "Pace is down. Lift your cadence a notch and stand tall."
+        "technician": "Pace is down. Lift your cadence a notch and stand tall.",
+        "spark": "You've drifted a little under pace. Gently find that rhythm again.",
+        "steady": "You've drifted a little under pace. Gently find that rhythm again.",
+        "storyteller": "You've drifted a little under pace. Gently find that rhythm again.",
+        "commentator": "You've drifted a little under pace. Gently find that rhythm again.",
+        "sportsman": "You've drifted a little under pace. Gently find that rhythm again."
       }
     },
     {
@@ -350,7 +520,12 @@
         "guide": "A touch under pace. No panic — just lean back into it.",
         "pacer": "Pace has slipped. Quicker feet, same effort.",
         "motivator": "Wake it up! Quick feet, big heart.",
-        "technician": "Losing time. Shorten the stride, quicken the rhythm."
+        "technician": "Losing time. Shorten the stride, quicken the rhythm.",
+        "spark": "A touch under pace. No panic — just ease back into it.",
+        "steady": "A touch under pace. No panic — just ease back into it.",
+        "storyteller": "A touch under pace. No panic — just ease back into it.",
+        "commentator": "A touch under pace. No panic — just ease back into it.",
+        "sportsman": "A touch under pace. No panic — just ease back into it."
       }
     },
     {
@@ -361,7 +536,12 @@
         "guide": "Come back to me. Smooth and steady does it.",
         "pacer": "Below the band. Build back gradually over the next minute.",
         "motivator": "This is where it's won. Pick it up with me.",
-        "technician": "Check in: eyes up, arms driving. Now build the pace back."
+        "technician": "Check in: eyes up, arms driving. Now build the pace back.",
+        "spark": "Come back to target. Smooth and steady does it.",
+        "steady": "Come back to target. Smooth and steady does it.",
+        "storyteller": "Come back to target. Smooth and steady does it.",
+        "commentator": "Come back to target. Smooth and steady does it.",
+        "sportsman": "Come back to target. Smooth and steady does it."
       }
     },
     {
@@ -372,7 +552,12 @@
         "guide": "Easy now — you're quicker than we need. Save it for later.",
         "pacer": "Above target. Ease back — the plan needs this pace, not that one.",
         "motivator": "Whoa, speedster! Bank that fire — you'll want it at the end.",
-        "technician": "Running hot. Drop the effort a notch — same form, less force."
+        "technician": "Running hot. Drop the effort a notch — same form, less force.",
+        "spark": "Easy now — you're quicker than we need. Save it for later.",
+        "steady": "Easy now — you're quicker than we need. Save it for later.",
+        "storyteller": "Easy now — you're quicker than we need. Save it for later.",
+        "commentator": "Easy now — you're quicker than we need. Save it for later.",
+        "sportsman": "Easy now — you're quicker than we need. Save it for later."
       }
     },
     {
@@ -383,7 +568,12 @@
         "guide": "Ahead of pace. Breathe, soften, let it come back.",
         "pacer": "Too quick. Settle down to the band and hold.",
         "motivator": "Too hot too soon. Cool it a touch and finish like a hero instead.",
-        "technician": "Over pace. Relax the shoulders, shorten the push, let it slow."
+        "technician": "Over pace. Relax the shoulders, shorten the push, let it slow.",
+        "spark": "Ahead of pace. Breathe, soften, let it come back.",
+        "steady": "Ahead of pace. Breathe, soften, let it come back.",
+        "storyteller": "Ahead of pace. Breathe, soften, let it come back.",
+        "commentator": "Ahead of pace. Breathe, soften, let it come back.",
+        "sportsman": "Ahead of pace. Breathe, soften, let it come back."
       }
     },
     {
@@ -394,7 +584,12 @@
         "guide": "I love the energy, but ease off. Patience wins today.",
         "pacer": "You're over-pacing. Trim it back and lock in.",
         "motivator": "Save the fireworks! Ease down, we'll light them later.",
-        "technician": "Faster than prescribed. Control is the skill here — dial it back."
+        "technician": "Faster than prescribed. Control is the skill here — dial it back.",
+        "spark": "Lovely energy, but ease off. Patience wins today.",
+        "steady": "Lovely energy, but ease off. Patience wins today.",
+        "storyteller": "Lovely energy, but ease off. Patience wins today.",
+        "commentator": "Lovely energy, but ease off. Patience wins today.",
+        "sportsman": "Lovely energy, but ease off. Patience wins today."
       }
     },
     {
@@ -405,7 +600,12 @@
         "guide": "That's it. Right where you should be.",
         "pacer": "On target. Lock this in.",
         "motivator": "Yes! This is your pace — own it.",
-        "technician": "On pace, and the form matches. Keep it exactly like this."
+        "technician": "On pace, and the form matches. Keep it exactly like this.",
+        "spark": "That's it. Right where you should be.",
+        "steady": "That's it. Right where you should be.",
+        "storyteller": "That's it. Right where you should be.",
+        "commentator": "That's it. Right where you should be.",
+        "sportsman": "That's it. Right where you should be."
       }
     },
     {
@@ -416,7 +616,12 @@
         "guide": "Lovely. Hold this and relax into it.",
         "pacer": "Bang on pace. Hold steady.",
         "motivator": "Dialled in. You look unstoppable.",
-        "technician": "Textbook. Same cadence, same effort."
+        "technician": "Textbook. Same cadence, same effort.",
+        "spark": "Back on target. Hold this and relax into it.",
+        "steady": "Back on target. Hold this and relax into it.",
+        "storyteller": "Back on target. Hold this and relax into it.",
+        "commentator": "Back on target. Hold this and relax into it.",
+        "sportsman": "Back on target. Hold this and relax into it."
       }
     },
     {
@@ -427,7 +632,12 @@
         "guide": "I know it's hard. You've been harder. Keep going.",
         "pacer": "Hold the rhythm. The rhythm carries you.",
         "motivator": "Don't you dare stop now — this is the good part!",
-        "technician": "When it hurts, run taller. Posture first, the rest follows."
+        "technician": "When it hurts, run taller. Posture first, the rest follows.",
+        "spark": "I know it's hard. You've been harder. Keep going.",
+        "steady": "I know it's hard. You've been harder. Keep going.",
+        "storyteller": "I know it's hard. You've been harder. Keep going.",
+        "commentator": "I know it's hard. You've been harder. Keep going.",
+        "sportsman": "I know it's hard. You've been harder. Keep going."
       }
     },
     {
@@ -438,7 +648,12 @@
         "guide": "One step, then the next. That's all it ever is.",
         "pacer": "Nothing changes. Same pace, same breath, keep moving.",
         "motivator": "Tough is temporary. You are not. Go!",
-        "technician": "Reset: shoulders down, breathe long, drive the arms."
+        "technician": "Reset: shoulders down, breathe long, drive the arms.",
+        "spark": "One step, then the next. That's all it ever is.",
+        "steady": "One step, then the next. That's all it ever is.",
+        "storyteller": "One step, then the next. That's all it ever is.",
+        "commentator": "One step, then the next. That's all it ever is.",
+        "sportsman": "One step, then the next. That's all it ever is."
       }
     },
     {
@@ -449,7 +664,12 @@
         "guide": "Stay with me. This part passes — you don't stop.",
         "pacer": "This is where pace is made. Stay on it.",
         "motivator": "Every stride right now is building the runner you want to be.",
-        "technician": "Fatigue is form's enemy. Beat it with technique."
+        "technician": "Fatigue is form's enemy. Beat it with technique.",
+        "spark": "Stay with it. This part passes — you don't stop.",
+        "steady": "Stay with it. This part passes — you don't stop.",
+        "storyteller": "Stay with it. This part passes — you don't stop.",
+        "commentator": "Stay with it. This part passes — you don't stop.",
+        "sportsman": "Stay with it. This part passes — you don't stop."
       }
     },
     {
@@ -460,7 +680,12 @@
         "guide": "Think of the person who inspires you. Run this part with them.",
         "pacer": "Your inspiration didn't quit here. Neither do you.",
         "motivator": "Picture who inspires you — now show them what you've got!",
-        "technician": "Recall who inspires you. Match their standard for one kilometre."
+        "technician": "Recall who inspires you. Match their standard for one kilometre.",
+        "spark": "Think of the person who inspires you. Run this part with them.",
+        "steady": "Think of the person who inspires you. Run this part with them.",
+        "storyteller": "Think of the person who inspires you. Run this part with them.",
+        "commentator": "Think of the person who inspires you. Run this part with them.",
+        "sportsman": "Think of the person who inspires you. Run this part with them."
       }
     },
     {
@@ -471,7 +696,12 @@
         "guide": "Remember why you started. It's still true, right now.",
         "pacer": "You had a reason to start running. Hold it for the next minute.",
         "motivator": "Your why is bigger than this hill. Prove it!",
-        "technician": "Reconnect with your reason. Purpose steadies pace."
+        "technician": "Reconnect with your reason. Purpose steadies pace.",
+        "spark": "Remember why you started. It's still true, right now.",
+        "steady": "Remember why you started. It's still true, right now.",
+        "storyteller": "Remember why you started. It's still true, right now.",
+        "commentator": "Remember why you started. It's still true, right now.",
+        "sportsman": "Remember why you started. It's still true, right now."
       }
     },
     {
@@ -482,7 +712,12 @@
         "guide": "That goal of yours has a reason behind it. This is you earning it.",
         "pacer": "The goal means something. This stretch is where it's paid for.",
         "motivator": "That time goal? You chose it for a reason. Chase it down!",
-        "technician": "Your goal was chosen deliberately. Run this stretch deliberately."
+        "technician": "Your goal was chosen deliberately. Run this stretch deliberately.",
+        "spark": "That goal of yours has a reason behind it. This is you earning it.",
+        "steady": "That goal of yours has a reason behind it. This is you earning it.",
+        "storyteller": "That goal of yours has a reason behind it. This is you earning it.",
+        "commentator": "That goal of yours has a reason behind it. This is you earning it.",
+        "sportsman": "That goal of yours has a reason behind it. This is you earning it."
       }
     },
     {
@@ -493,7 +728,12 @@
         "guide": "It's tough. So think of what keeps you going — and let it.",
         "pacer": "Hard patch. Anchor to your reason and hold the pace.",
         "motivator": "This is the tough bit — and you know exactly who you're doing it for.",
-        "technician": "When it's tough, your anchor is a tool. Use it now."
+        "technician": "When it's tough, your anchor is a tool. Use it now.",
+        "spark": "It's tough. So think of what keeps you going — and let it.",
+        "steady": "It's tough. So think of what keeps you going — and let it.",
+        "storyteller": "It's tough. So think of what keeps you going — and let it.",
+        "commentator": "It's tough. So think of what keeps you going — and let it.",
+        "sportsman": "It's tough. So think of what keeps you going — and let it."
       }
     },
     {
@@ -504,7 +744,12 @@
         "guide": "Three.",
         "pacer": "Three.",
         "motivator": "Three.",
-        "technician": "Three."
+        "technician": "Three.",
+        "spark": "Three.",
+        "steady": "Three.",
+        "storyteller": "Three.",
+        "commentator": "Three.",
+        "sportsman": "Three."
       }
     },
     {
@@ -515,7 +760,12 @@
         "guide": "Two.",
         "pacer": "Two.",
         "motivator": "Two.",
-        "technician": "Two."
+        "technician": "Two.",
+        "spark": "Two.",
+        "steady": "Two.",
+        "storyteller": "Two.",
+        "commentator": "Two.",
+        "sportsman": "Two."
       }
     },
     {
@@ -526,7 +776,12 @@
         "guide": "One.",
         "pacer": "One.",
         "motivator": "One.",
-        "technician": "One."
+        "technician": "One.",
+        "spark": "One.",
+        "steady": "One.",
+        "storyteller": "One.",
+        "commentator": "One.",
+        "sportsman": "One."
       }
     },
     {
@@ -537,7 +792,12 @@
         "guide": "Go.",
         "pacer": "Go.",
         "motivator": "Go.",
-        "technician": "Go."
+        "technician": "Go.",
+        "spark": "Go.",
+        "steady": "Go.",
+        "storyteller": "Go.",
+        "commentator": "Go.",
+        "sportsman": "Go."
       }
     },
     {
@@ -548,7 +808,12 @@
         "guide": "Another kilometre done. Strong and steady.",
         "pacer": "Another kilometre done. Strong and steady.",
         "motivator": "Another kilometre done. Strong and steady.",
-        "technician": "Another kilometre done. Strong and steady."
+        "technician": "Another kilometre done. Strong and steady.",
+        "spark": "Another kilometre done. Strong and steady.",
+        "steady": "Another kilometre done. Strong and steady.",
+        "storyteller": "Another kilometre done. Strong and steady.",
+        "commentator": "Another kilometre done. Strong and steady.",
+        "sportsman": "Another kilometre done. Strong and steady."
       }
     },
     {
@@ -559,7 +824,12 @@
         "guide": "That's another one behind you. Keep rolling.",
         "pacer": "That's another one behind you. Keep rolling.",
         "motivator": "That's another one behind you. Keep rolling.",
-        "technician": "That's another one behind you. Keep rolling."
+        "technician": "That's another one behind you. Keep rolling.",
+        "spark": "That's another one behind you. Keep rolling.",
+        "steady": "That's another one behind you. Keep rolling.",
+        "storyteller": "That's another one behind you. Keep rolling.",
+        "commentator": "That's another one behind you. Keep rolling.",
+        "sportsman": "That's another one behind you. Keep rolling."
       }
     },
     {
@@ -570,7 +840,12 @@
         "guide": "Ticking them off nicely. Same rhythm, keep going.",
         "pacer": "Ticking them off nicely. Same rhythm, keep going.",
         "motivator": "Ticking them off nicely. Same rhythm, keep going.",
-        "technician": "Ticking them off nicely. Same rhythm, keep going."
+        "technician": "Ticking them off nicely. Same rhythm, keep going.",
+        "spark": "Ticking them off nicely. Same rhythm, keep going.",
+        "steady": "Ticking them off nicely. Same rhythm, keep going.",
+        "storyteller": "Ticking them off nicely. Same rhythm, keep going.",
+        "commentator": "Ticking them off nicely. Same rhythm, keep going.",
+        "sportsman": "Ticking them off nicely. Same rhythm, keep going."
       }
     },
     {
@@ -581,7 +856,12 @@
         "guide": "Last effort now. Empty the tank — you're nearly there.",
         "pacer": "Last effort now. Empty the tank — you're nearly there.",
         "motivator": "Last effort now. Empty the tank — you're nearly there.",
-        "technician": "Last effort now. Empty the tank — you're nearly there."
+        "technician": "Last effort now. Empty the tank — you're nearly there.",
+        "spark": "Last effort now. Empty the tank — you're nearly there.",
+        "steady": "Last effort now. Empty the tank — you're nearly there.",
+        "storyteller": "Last effort now. Empty the tank — you're nearly there.",
+        "commentator": "Last effort now. Empty the tank — you're nearly there.",
+        "sportsman": "Last effort now. Empty the tank — you're nearly there."
       }
     },
     {
@@ -592,7 +872,12 @@
         "guide": "This is the finish. Everything you've got, all the way through the line.",
         "pacer": "This is the finish. Everything you've got, all the way through the line.",
         "motivator": "This is the finish. Everything you've got, all the way through the line.",
-        "technician": "This is the finish. Everything you've got, all the way through the line."
+        "technician": "This is the finish. Everything you've got, all the way through the line.",
+        "spark": "This is the finish. Everything you've got, all the way through the line.",
+        "steady": "This is the finish. Everything you've got, all the way through the line.",
+        "storyteller": "This is the finish. Everything you've got, all the way through the line.",
+        "commentator": "This is the finish. Everything you've got, all the way through the line.",
+        "sportsman": "This is the finish. Everything you've got, all the way through the line."
       }
     },
     {
@@ -603,7 +888,12 @@
         "guide": "Ease down now. Let your pace and your breathing settle.",
         "pacer": "Ease down now. Let your pace and your breathing settle.",
         "motivator": "Ease down now. Let your pace and your breathing settle.",
-        "technician": "Ease down now. Let your pace and your breathing settle."
+        "technician": "Ease down now. Let your pace and your breathing settle.",
+        "spark": "Ease down now. Let your pace and your breathing settle.",
+        "steady": "Ease down now. Let your pace and your breathing settle.",
+        "storyteller": "Ease down now. Let your pace and your breathing settle.",
+        "commentator": "Ease down now. Let your pace and your breathing settle.",
+        "sportsman": "Ease down now. Let your pace and your breathing settle."
       }
     },
     {
@@ -614,7 +904,12 @@
         "guide": "Cool-down time. Relax, slow it right down, and enjoy the finish.",
         "pacer": "Cool-down time. Relax, slow it right down, and enjoy the finish.",
         "motivator": "Cool-down time. Relax, slow it right down, and enjoy the finish.",
-        "technician": "Cool-down time. Relax, slow it right down, and enjoy the finish."
+        "technician": "Cool-down time. Relax, slow it right down, and enjoy the finish.",
+        "spark": "Cool-down time. Relax, slow it right down, and enjoy the finish.",
+        "steady": "Cool-down time. Relax, slow it right down, and enjoy the finish.",
+        "storyteller": "Cool-down time. Relax, slow it right down, and enjoy the finish.",
+        "commentator": "Cool-down time. Relax, slow it right down, and enjoy the finish.",
+        "sportsman": "Cool-down time. Relax, slow it right down, and enjoy the finish."
       }
     },
     {
@@ -625,7 +920,12 @@
         "guide": "Session complete. Excellent work today. Recover well.",
         "pacer": "Session complete. Excellent work today. Recover well.",
         "motivator": "Session complete. Excellent work today. Recover well.",
-        "technician": "Session complete. Excellent work today. Recover well."
+        "technician": "Session complete. Excellent work today. Recover well.",
+        "spark": "Session complete. Excellent work today. Recover well.",
+        "steady": "Session complete. Excellent work today. Recover well.",
+        "storyteller": "Session complete. Excellent work today. Recover well.",
+        "commentator": "Session complete. Excellent work today. Recover well.",
+        "sportsman": "Session complete. Excellent work today. Recover well."
       }
     },
     {
@@ -636,7 +936,12 @@
         "guide": "That's it — done and dusted. Really strong session. Be proud.",
         "pacer": "That's it — done and dusted. Really strong session. Be proud.",
         "motivator": "That's it — done and dusted. Really strong session. Be proud.",
-        "technician": "That's it — done and dusted. Really strong session. Be proud."
+        "technician": "That's it — done and dusted. Really strong session. Be proud.",
+        "spark": "That's it — done and dusted. Really strong session. Be proud.",
+        "steady": "That's it — done and dusted. Really strong session. Be proud.",
+        "storyteller": "That's it — done and dusted. Really strong session. Be proud.",
+        "commentator": "That's it — done and dusted. Really strong session. Be proud.",
+        "sportsman": "That's it — done and dusted. Really strong session. Be proud."
       }
     },
     {
@@ -647,7 +952,12 @@
         "guide": "Paused. Take your time.",
         "pacer": "Paused. Take your time.",
         "motivator": "Paused. Take your time.",
-        "technician": "Paused. Take your time."
+        "technician": "Paused. Take your time.",
+        "spark": "Paused. Take your time.",
+        "steady": "Paused. Take your time.",
+        "storyteller": "Paused. Take your time.",
+        "commentator": "Paused. Take your time.",
+        "sportsman": "Paused. Take your time."
       }
     },
     {
@@ -658,7 +968,12 @@
         "guide": "And we're back. Pick up where you left off.",
         "pacer": "And we're back. Pick up where you left off.",
         "motivator": "And we're back. Pick up where you left off.",
-        "technician": "And we're back. Pick up where you left off."
+        "technician": "And we're back. Pick up where you left off.",
+        "spark": "And we're back. Pick up where you left off.",
+        "steady": "And we're back. Pick up where you left off.",
+        "storyteller": "And we're back. Pick up where you left off.",
+        "commentator": "And we're back. Pick up where you left off.",
+        "sportsman": "And we're back. Pick up where you left off."
       }
     },
     {
@@ -669,7 +984,12 @@
         "guide": "Session ended. Every step still counts — well done for getting out.",
         "pacer": "Session ended. Every step still counts — well done for getting out.",
         "motivator": "Session ended. Every step still counts — well done for getting out.",
-        "technician": "Session ended. Every step still counts — well done for getting out."
+        "technician": "Session ended. Every step still counts — well done for getting out.",
+        "spark": "Session ended. Every step still counts — well done for getting out.",
+        "steady": "Session ended. Every step still counts — well done for getting out.",
+        "storyteller": "Session ended. Every step still counts — well done for getting out.",
+        "commentator": "Session ended. Every step still counts — well done for getting out.",
+        "sportsman": "Session ended. Every step still counts — well done for getting out."
       }
     },
     {
@@ -680,7 +1000,12 @@
         "guide": "Easy — your effort's been very high for a while. Back it off and check in with how you feel.",
         "pacer": "Easy — your effort's been very high for a while. Back it off and check in with how you feel.",
         "motivator": "Easy — your effort's been very high for a while. Back it off and check in with how you feel.",
-        "technician": "Easy — your effort's been very high for a while. Back it off and check in with how you feel."
+        "technician": "Easy — your effort's been very high for a while. Back it off and check in with how you feel.",
+        "spark": "Easy — your effort's been very high for a while. Back it off and check in with how you feel.",
+        "steady": "Easy — your effort's been very high for a while. Back it off and check in with how you feel.",
+        "storyteller": "Easy — your effort's been very high for a while. Back it off and check in with how you feel.",
+        "commentator": "Easy — your effort's been very high for a while. Back it off and check in with how you feel.",
+        "sportsman": "Easy — your effort's been very high for a while. Back it off and check in with how you feel."
       }
     },
     {
@@ -691,7 +1016,12 @@
         "guide": "Let's be sensible. Ease down, breathe, and only push on if you feel good.",
         "pacer": "Let's be sensible. Ease down, breathe, and only push on if you feel good.",
         "motivator": "Let's be sensible. Ease down, breathe, and only push on if you feel good.",
-        "technician": "Let's be sensible. Ease down, breathe, and only push on if you feel good."
+        "technician": "Let's be sensible. Ease down, breathe, and only push on if you feel good.",
+        "spark": "Let's be sensible. Ease down, breathe, and only push on if you feel good.",
+        "steady": "Let's be sensible. Ease down, breathe, and only push on if you feel good.",
+        "storyteller": "Let's be sensible. Ease down, breathe, and only push on if you feel good.",
+        "commentator": "Let's be sensible. Ease down, breathe, and only push on if you feel good.",
+        "sportsman": "Let's be sensible. Ease down, breathe, and only push on if you feel good."
       }
     },
     {
@@ -702,7 +1032,12 @@
         "guide": "Nought",
         "pacer": "Nought",
         "motivator": "Nought",
-        "technician": "Nought"
+        "technician": "Nought",
+        "spark": "Nought",
+        "steady": "Nought",
+        "storyteller": "Nought",
+        "commentator": "Nought",
+        "sportsman": "Nought"
       }
     },
     {
@@ -713,7 +1048,12 @@
         "guide": "one",
         "pacer": "one",
         "motivator": "one",
-        "technician": "one"
+        "technician": "one",
+        "spark": "one",
+        "steady": "one",
+        "storyteller": "one",
+        "commentator": "one",
+        "sportsman": "one"
       }
     },
     {
@@ -724,7 +1064,12 @@
         "guide": "two",
         "pacer": "two",
         "motivator": "two",
-        "technician": "two"
+        "technician": "two",
+        "spark": "two",
+        "steady": "two",
+        "storyteller": "two",
+        "commentator": "two",
+        "sportsman": "two"
       }
     },
     {
@@ -735,7 +1080,12 @@
         "guide": "three",
         "pacer": "three",
         "motivator": "three",
-        "technician": "three"
+        "technician": "three",
+        "spark": "three",
+        "steady": "three",
+        "storyteller": "three",
+        "commentator": "three",
+        "sportsman": "three"
       }
     },
     {
@@ -746,7 +1096,12 @@
         "guide": "four",
         "pacer": "four",
         "motivator": "four",
-        "technician": "four"
+        "technician": "four",
+        "spark": "four",
+        "steady": "four",
+        "storyteller": "four",
+        "commentator": "four",
+        "sportsman": "four"
       }
     },
     {
@@ -757,7 +1112,12 @@
         "guide": "five",
         "pacer": "five",
         "motivator": "five",
-        "technician": "five"
+        "technician": "five",
+        "spark": "five",
+        "steady": "five",
+        "storyteller": "five",
+        "commentator": "five",
+        "sportsman": "five"
       }
     },
     {
@@ -768,7 +1128,12 @@
         "guide": "six",
         "pacer": "six",
         "motivator": "six",
-        "technician": "six"
+        "technician": "six",
+        "spark": "six",
+        "steady": "six",
+        "storyteller": "six",
+        "commentator": "six",
+        "sportsman": "six"
       }
     },
     {
@@ -779,7 +1144,12 @@
         "guide": "seven",
         "pacer": "seven",
         "motivator": "seven",
-        "technician": "seven"
+        "technician": "seven",
+        "spark": "seven",
+        "steady": "seven",
+        "storyteller": "seven",
+        "commentator": "seven",
+        "sportsman": "seven"
       }
     },
     {
@@ -790,7 +1160,12 @@
         "guide": "eight",
         "pacer": "eight",
         "motivator": "eight",
-        "technician": "eight"
+        "technician": "eight",
+        "spark": "eight",
+        "steady": "eight",
+        "storyteller": "eight",
+        "commentator": "eight",
+        "sportsman": "eight"
       }
     },
     {
@@ -801,7 +1176,12 @@
         "guide": "nine",
         "pacer": "nine",
         "motivator": "nine",
-        "technician": "nine"
+        "technician": "nine",
+        "spark": "nine",
+        "steady": "nine",
+        "storyteller": "nine",
+        "commentator": "nine",
+        "sportsman": "nine"
       }
     },
     {
@@ -812,7 +1192,12 @@
         "guide": "ten",
         "pacer": "ten",
         "motivator": "ten",
-        "technician": "ten"
+        "technician": "ten",
+        "spark": "ten",
+        "steady": "ten",
+        "storyteller": "ten",
+        "commentator": "ten",
+        "sportsman": "ten"
       }
     },
     {
@@ -823,7 +1208,12 @@
         "guide": "eleven",
         "pacer": "eleven",
         "motivator": "eleven",
-        "technician": "eleven"
+        "technician": "eleven",
+        "spark": "eleven",
+        "steady": "eleven",
+        "storyteller": "eleven",
+        "commentator": "eleven",
+        "sportsman": "eleven"
       }
     },
     {
@@ -834,7 +1224,12 @@
         "guide": "twelve",
         "pacer": "twelve",
         "motivator": "twelve",
-        "technician": "twelve"
+        "technician": "twelve",
+        "spark": "twelve",
+        "steady": "twelve",
+        "storyteller": "twelve",
+        "commentator": "twelve",
+        "sportsman": "twelve"
       }
     },
     {
@@ -845,7 +1240,12 @@
         "guide": "thirteen",
         "pacer": "thirteen",
         "motivator": "thirteen",
-        "technician": "thirteen"
+        "technician": "thirteen",
+        "spark": "thirteen",
+        "steady": "thirteen",
+        "storyteller": "thirteen",
+        "commentator": "thirteen",
+        "sportsman": "thirteen"
       }
     },
     {
@@ -856,7 +1256,12 @@
         "guide": "fourteen",
         "pacer": "fourteen",
         "motivator": "fourteen",
-        "technician": "fourteen"
+        "technician": "fourteen",
+        "spark": "fourteen",
+        "steady": "fourteen",
+        "storyteller": "fourteen",
+        "commentator": "fourteen",
+        "sportsman": "fourteen"
       }
     },
     {
@@ -867,7 +1272,12 @@
         "guide": "fifteen",
         "pacer": "fifteen",
         "motivator": "fifteen",
-        "technician": "fifteen"
+        "technician": "fifteen",
+        "spark": "fifteen",
+        "steady": "fifteen",
+        "storyteller": "fifteen",
+        "commentator": "fifteen",
+        "sportsman": "fifteen"
       }
     },
     {
@@ -878,7 +1288,12 @@
         "guide": "sixteen",
         "pacer": "sixteen",
         "motivator": "sixteen",
-        "technician": "sixteen"
+        "technician": "sixteen",
+        "spark": "sixteen",
+        "steady": "sixteen",
+        "storyteller": "sixteen",
+        "commentator": "sixteen",
+        "sportsman": "sixteen"
       }
     },
     {
@@ -889,7 +1304,12 @@
         "guide": "seventeen",
         "pacer": "seventeen",
         "motivator": "seventeen",
-        "technician": "seventeen"
+        "technician": "seventeen",
+        "spark": "seventeen",
+        "steady": "seventeen",
+        "storyteller": "seventeen",
+        "commentator": "seventeen",
+        "sportsman": "seventeen"
       }
     },
     {
@@ -900,7 +1320,12 @@
         "guide": "eighteen",
         "pacer": "eighteen",
         "motivator": "eighteen",
-        "technician": "eighteen"
+        "technician": "eighteen",
+        "spark": "eighteen",
+        "steady": "eighteen",
+        "storyteller": "eighteen",
+        "commentator": "eighteen",
+        "sportsman": "eighteen"
       }
     },
     {
@@ -911,7 +1336,12 @@
         "guide": "nineteen",
         "pacer": "nineteen",
         "motivator": "nineteen",
-        "technician": "nineteen"
+        "technician": "nineteen",
+        "spark": "nineteen",
+        "steady": "nineteen",
+        "storyteller": "nineteen",
+        "commentator": "nineteen",
+        "sportsman": "nineteen"
       }
     },
     {
@@ -922,7 +1352,12 @@
         "guide": "twenty",
         "pacer": "twenty",
         "motivator": "twenty",
-        "technician": "twenty"
+        "technician": "twenty",
+        "spark": "twenty",
+        "steady": "twenty",
+        "storyteller": "twenty",
+        "commentator": "twenty",
+        "sportsman": "twenty"
       }
     },
     {
@@ -933,7 +1368,12 @@
         "guide": "twenty-one",
         "pacer": "twenty-one",
         "motivator": "twenty-one",
-        "technician": "twenty-one"
+        "technician": "twenty-one",
+        "spark": "twenty-one",
+        "steady": "twenty-one",
+        "storyteller": "twenty-one",
+        "commentator": "twenty-one",
+        "sportsman": "twenty-one"
       }
     },
     {
@@ -944,7 +1384,12 @@
         "guide": "twenty-two",
         "pacer": "twenty-two",
         "motivator": "twenty-two",
-        "technician": "twenty-two"
+        "technician": "twenty-two",
+        "spark": "twenty-two",
+        "steady": "twenty-two",
+        "storyteller": "twenty-two",
+        "commentator": "twenty-two",
+        "sportsman": "twenty-two"
       }
     },
     {
@@ -955,7 +1400,12 @@
         "guide": "twenty-three",
         "pacer": "twenty-three",
         "motivator": "twenty-three",
-        "technician": "twenty-three"
+        "technician": "twenty-three",
+        "spark": "twenty-three",
+        "steady": "twenty-three",
+        "storyteller": "twenty-three",
+        "commentator": "twenty-three",
+        "sportsman": "twenty-three"
       }
     },
     {
@@ -966,7 +1416,12 @@
         "guide": "twenty-four",
         "pacer": "twenty-four",
         "motivator": "twenty-four",
-        "technician": "twenty-four"
+        "technician": "twenty-four",
+        "spark": "twenty-four",
+        "steady": "twenty-four",
+        "storyteller": "twenty-four",
+        "commentator": "twenty-four",
+        "sportsman": "twenty-four"
       }
     },
     {
@@ -977,7 +1432,12 @@
         "guide": "twenty-five",
         "pacer": "twenty-five",
         "motivator": "twenty-five",
-        "technician": "twenty-five"
+        "technician": "twenty-five",
+        "spark": "twenty-five",
+        "steady": "twenty-five",
+        "storyteller": "twenty-five",
+        "commentator": "twenty-five",
+        "sportsman": "twenty-five"
       }
     },
     {
@@ -988,7 +1448,12 @@
         "guide": "twenty-six",
         "pacer": "twenty-six",
         "motivator": "twenty-six",
-        "technician": "twenty-six"
+        "technician": "twenty-six",
+        "spark": "twenty-six",
+        "steady": "twenty-six",
+        "storyteller": "twenty-six",
+        "commentator": "twenty-six",
+        "sportsman": "twenty-six"
       }
     },
     {
@@ -999,7 +1464,12 @@
         "guide": "twenty-seven",
         "pacer": "twenty-seven",
         "motivator": "twenty-seven",
-        "technician": "twenty-seven"
+        "technician": "twenty-seven",
+        "spark": "twenty-seven",
+        "steady": "twenty-seven",
+        "storyteller": "twenty-seven",
+        "commentator": "twenty-seven",
+        "sportsman": "twenty-seven"
       }
     },
     {
@@ -1010,7 +1480,12 @@
         "guide": "twenty-eight",
         "pacer": "twenty-eight",
         "motivator": "twenty-eight",
-        "technician": "twenty-eight"
+        "technician": "twenty-eight",
+        "spark": "twenty-eight",
+        "steady": "twenty-eight",
+        "storyteller": "twenty-eight",
+        "commentator": "twenty-eight",
+        "sportsman": "twenty-eight"
       }
     },
     {
@@ -1021,7 +1496,12 @@
         "guide": "twenty-nine",
         "pacer": "twenty-nine",
         "motivator": "twenty-nine",
-        "technician": "twenty-nine"
+        "technician": "twenty-nine",
+        "spark": "twenty-nine",
+        "steady": "twenty-nine",
+        "storyteller": "twenty-nine",
+        "commentator": "twenty-nine",
+        "sportsman": "twenty-nine"
       }
     },
     {
@@ -1032,7 +1512,12 @@
         "guide": "thirty",
         "pacer": "thirty",
         "motivator": "thirty",
-        "technician": "thirty"
+        "technician": "thirty",
+        "spark": "thirty",
+        "steady": "thirty",
+        "storyteller": "thirty",
+        "commentator": "thirty",
+        "sportsman": "thirty"
       }
     },
     {
@@ -1043,7 +1528,12 @@
         "guide": "thirty-one",
         "pacer": "thirty-one",
         "motivator": "thirty-one",
-        "technician": "thirty-one"
+        "technician": "thirty-one",
+        "spark": "thirty-one",
+        "steady": "thirty-one",
+        "storyteller": "thirty-one",
+        "commentator": "thirty-one",
+        "sportsman": "thirty-one"
       }
     },
     {
@@ -1054,7 +1544,12 @@
         "guide": "thirty-two",
         "pacer": "thirty-two",
         "motivator": "thirty-two",
-        "technician": "thirty-two"
+        "technician": "thirty-two",
+        "spark": "thirty-two",
+        "steady": "thirty-two",
+        "storyteller": "thirty-two",
+        "commentator": "thirty-two",
+        "sportsman": "thirty-two"
       }
     },
     {
@@ -1065,7 +1560,12 @@
         "guide": "thirty-three",
         "pacer": "thirty-three",
         "motivator": "thirty-three",
-        "technician": "thirty-three"
+        "technician": "thirty-three",
+        "spark": "thirty-three",
+        "steady": "thirty-three",
+        "storyteller": "thirty-three",
+        "commentator": "thirty-three",
+        "sportsman": "thirty-three"
       }
     },
     {
@@ -1076,7 +1576,12 @@
         "guide": "thirty-four",
         "pacer": "thirty-four",
         "motivator": "thirty-four",
-        "technician": "thirty-four"
+        "technician": "thirty-four",
+        "spark": "thirty-four",
+        "steady": "thirty-four",
+        "storyteller": "thirty-four",
+        "commentator": "thirty-four",
+        "sportsman": "thirty-four"
       }
     },
     {
@@ -1087,7 +1592,12 @@
         "guide": "thirty-five",
         "pacer": "thirty-five",
         "motivator": "thirty-five",
-        "technician": "thirty-five"
+        "technician": "thirty-five",
+        "spark": "thirty-five",
+        "steady": "thirty-five",
+        "storyteller": "thirty-five",
+        "commentator": "thirty-five",
+        "sportsman": "thirty-five"
       }
     },
     {
@@ -1098,7 +1608,12 @@
         "guide": "thirty-six",
         "pacer": "thirty-six",
         "motivator": "thirty-six",
-        "technician": "thirty-six"
+        "technician": "thirty-six",
+        "spark": "thirty-six",
+        "steady": "thirty-six",
+        "storyteller": "thirty-six",
+        "commentator": "thirty-six",
+        "sportsman": "thirty-six"
       }
     },
     {
@@ -1109,7 +1624,12 @@
         "guide": "thirty-seven",
         "pacer": "thirty-seven",
         "motivator": "thirty-seven",
-        "technician": "thirty-seven"
+        "technician": "thirty-seven",
+        "spark": "thirty-seven",
+        "steady": "thirty-seven",
+        "storyteller": "thirty-seven",
+        "commentator": "thirty-seven",
+        "sportsman": "thirty-seven"
       }
     },
     {
@@ -1120,7 +1640,12 @@
         "guide": "thirty-eight",
         "pacer": "thirty-eight",
         "motivator": "thirty-eight",
-        "technician": "thirty-eight"
+        "technician": "thirty-eight",
+        "spark": "thirty-eight",
+        "steady": "thirty-eight",
+        "storyteller": "thirty-eight",
+        "commentator": "thirty-eight",
+        "sportsman": "thirty-eight"
       }
     },
     {
@@ -1131,7 +1656,12 @@
         "guide": "thirty-nine",
         "pacer": "thirty-nine",
         "motivator": "thirty-nine",
-        "technician": "thirty-nine"
+        "technician": "thirty-nine",
+        "spark": "thirty-nine",
+        "steady": "thirty-nine",
+        "storyteller": "thirty-nine",
+        "commentator": "thirty-nine",
+        "sportsman": "thirty-nine"
       }
     },
     {
@@ -1142,7 +1672,12 @@
         "guide": "forty",
         "pacer": "forty",
         "motivator": "forty",
-        "technician": "forty"
+        "technician": "forty",
+        "spark": "forty",
+        "steady": "forty",
+        "storyteller": "forty",
+        "commentator": "forty",
+        "sportsman": "forty"
       }
     },
     {
@@ -1153,7 +1688,12 @@
         "guide": "forty-one",
         "pacer": "forty-one",
         "motivator": "forty-one",
-        "technician": "forty-one"
+        "technician": "forty-one",
+        "spark": "forty-one",
+        "steady": "forty-one",
+        "storyteller": "forty-one",
+        "commentator": "forty-one",
+        "sportsman": "forty-one"
       }
     },
     {
@@ -1164,7 +1704,12 @@
         "guide": "forty-two",
         "pacer": "forty-two",
         "motivator": "forty-two",
-        "technician": "forty-two"
+        "technician": "forty-two",
+        "spark": "forty-two",
+        "steady": "forty-two",
+        "storyteller": "forty-two",
+        "commentator": "forty-two",
+        "sportsman": "forty-two"
       }
     },
     {
@@ -1175,7 +1720,12 @@
         "guide": "forty-three",
         "pacer": "forty-three",
         "motivator": "forty-three",
-        "technician": "forty-three"
+        "technician": "forty-three",
+        "spark": "forty-three",
+        "steady": "forty-three",
+        "storyteller": "forty-three",
+        "commentator": "forty-three",
+        "sportsman": "forty-three"
       }
     },
     {
@@ -1186,7 +1736,12 @@
         "guide": "forty-four",
         "pacer": "forty-four",
         "motivator": "forty-four",
-        "technician": "forty-four"
+        "technician": "forty-four",
+        "spark": "forty-four",
+        "steady": "forty-four",
+        "storyteller": "forty-four",
+        "commentator": "forty-four",
+        "sportsman": "forty-four"
       }
     },
     {
@@ -1197,7 +1752,12 @@
         "guide": "forty-five",
         "pacer": "forty-five",
         "motivator": "forty-five",
-        "technician": "forty-five"
+        "technician": "forty-five",
+        "spark": "forty-five",
+        "steady": "forty-five",
+        "storyteller": "forty-five",
+        "commentator": "forty-five",
+        "sportsman": "forty-five"
       }
     },
     {
@@ -1208,7 +1768,12 @@
         "guide": "forty-six",
         "pacer": "forty-six",
         "motivator": "forty-six",
-        "technician": "forty-six"
+        "technician": "forty-six",
+        "spark": "forty-six",
+        "steady": "forty-six",
+        "storyteller": "forty-six",
+        "commentator": "forty-six",
+        "sportsman": "forty-six"
       }
     },
     {
@@ -1219,7 +1784,12 @@
         "guide": "forty-seven",
         "pacer": "forty-seven",
         "motivator": "forty-seven",
-        "technician": "forty-seven"
+        "technician": "forty-seven",
+        "spark": "forty-seven",
+        "steady": "forty-seven",
+        "storyteller": "forty-seven",
+        "commentator": "forty-seven",
+        "sportsman": "forty-seven"
       }
     },
     {
@@ -1230,7 +1800,12 @@
         "guide": "forty-eight",
         "pacer": "forty-eight",
         "motivator": "forty-eight",
-        "technician": "forty-eight"
+        "technician": "forty-eight",
+        "spark": "forty-eight",
+        "steady": "forty-eight",
+        "storyteller": "forty-eight",
+        "commentator": "forty-eight",
+        "sportsman": "forty-eight"
       }
     },
     {
@@ -1241,7 +1816,12 @@
         "guide": "forty-nine",
         "pacer": "forty-nine",
         "motivator": "forty-nine",
-        "technician": "forty-nine"
+        "technician": "forty-nine",
+        "spark": "forty-nine",
+        "steady": "forty-nine",
+        "storyteller": "forty-nine",
+        "commentator": "forty-nine",
+        "sportsman": "forty-nine"
       }
     },
     {
@@ -1252,7 +1832,12 @@
         "guide": "fifty",
         "pacer": "fifty",
         "motivator": "fifty",
-        "technician": "fifty"
+        "technician": "fifty",
+        "spark": "fifty",
+        "steady": "fifty",
+        "storyteller": "fifty",
+        "commentator": "fifty",
+        "sportsman": "fifty"
       }
     },
     {
@@ -1263,7 +1848,12 @@
         "guide": "fifty-one",
         "pacer": "fifty-one",
         "motivator": "fifty-one",
-        "technician": "fifty-one"
+        "technician": "fifty-one",
+        "spark": "fifty-one",
+        "steady": "fifty-one",
+        "storyteller": "fifty-one",
+        "commentator": "fifty-one",
+        "sportsman": "fifty-one"
       }
     },
     {
@@ -1274,7 +1864,12 @@
         "guide": "fifty-two",
         "pacer": "fifty-two",
         "motivator": "fifty-two",
-        "technician": "fifty-two"
+        "technician": "fifty-two",
+        "spark": "fifty-two",
+        "steady": "fifty-two",
+        "storyteller": "fifty-two",
+        "commentator": "fifty-two",
+        "sportsman": "fifty-two"
       }
     },
     {
@@ -1285,7 +1880,12 @@
         "guide": "fifty-three",
         "pacer": "fifty-three",
         "motivator": "fifty-three",
-        "technician": "fifty-three"
+        "technician": "fifty-three",
+        "spark": "fifty-three",
+        "steady": "fifty-three",
+        "storyteller": "fifty-three",
+        "commentator": "fifty-three",
+        "sportsman": "fifty-three"
       }
     },
     {
@@ -1296,7 +1896,12 @@
         "guide": "fifty-four",
         "pacer": "fifty-four",
         "motivator": "fifty-four",
-        "technician": "fifty-four"
+        "technician": "fifty-four",
+        "spark": "fifty-four",
+        "steady": "fifty-four",
+        "storyteller": "fifty-four",
+        "commentator": "fifty-four",
+        "sportsman": "fifty-four"
       }
     },
     {
@@ -1307,7 +1912,12 @@
         "guide": "fifty-five",
         "pacer": "fifty-five",
         "motivator": "fifty-five",
-        "technician": "fifty-five"
+        "technician": "fifty-five",
+        "spark": "fifty-five",
+        "steady": "fifty-five",
+        "storyteller": "fifty-five",
+        "commentator": "fifty-five",
+        "sportsman": "fifty-five"
       }
     },
     {
@@ -1318,7 +1928,12 @@
         "guide": "fifty-six",
         "pacer": "fifty-six",
         "motivator": "fifty-six",
-        "technician": "fifty-six"
+        "technician": "fifty-six",
+        "spark": "fifty-six",
+        "steady": "fifty-six",
+        "storyteller": "fifty-six",
+        "commentator": "fifty-six",
+        "sportsman": "fifty-six"
       }
     },
     {
@@ -1329,7 +1944,12 @@
         "guide": "fifty-seven",
         "pacer": "fifty-seven",
         "motivator": "fifty-seven",
-        "technician": "fifty-seven"
+        "technician": "fifty-seven",
+        "spark": "fifty-seven",
+        "steady": "fifty-seven",
+        "storyteller": "fifty-seven",
+        "commentator": "fifty-seven",
+        "sportsman": "fifty-seven"
       }
     },
     {
@@ -1340,7 +1960,12 @@
         "guide": "fifty-eight",
         "pacer": "fifty-eight",
         "motivator": "fifty-eight",
-        "technician": "fifty-eight"
+        "technician": "fifty-eight",
+        "spark": "fifty-eight",
+        "steady": "fifty-eight",
+        "storyteller": "fifty-eight",
+        "commentator": "fifty-eight",
+        "sportsman": "fifty-eight"
       }
     },
     {
@@ -1351,7 +1976,12 @@
         "guide": "fifty-nine",
         "pacer": "fifty-nine",
         "motivator": "fifty-nine",
-        "technician": "fifty-nine"
+        "technician": "fifty-nine",
+        "spark": "fifty-nine",
+        "steady": "fifty-nine",
+        "storyteller": "fifty-nine",
+        "commentator": "fifty-nine",
+        "sportsman": "fifty-nine"
       }
     },
     {
@@ -1362,7 +1992,12 @@
         "guide": "Your current pace is",
         "pacer": "Your current pace is",
         "motivator": "Your current pace is",
-        "technician": "Your current pace is"
+        "technician": "Your current pace is",
+        "spark": "Your current pace is",
+        "steady": "Your current pace is",
+        "storyteller": "Your current pace is",
+        "commentator": "Your current pace is",
+        "sportsman": "Your current pace is"
       }
     },
     {
@@ -1373,7 +2008,12 @@
         "guide": "Your target is",
         "pacer": "Your target is",
         "motivator": "Your target is",
-        "technician": "Your target is"
+        "technician": "Your target is",
+        "spark": "Your target is",
+        "steady": "Your target is",
+        "storyteller": "Your target is",
+        "commentator": "Your target is",
+        "sportsman": "Your target is"
       }
     },
     {
@@ -1384,7 +2024,12 @@
         "guide": "minutes",
         "pacer": "minutes",
         "motivator": "minutes",
-        "technician": "minutes"
+        "technician": "minutes",
+        "spark": "minutes",
+        "steady": "minutes",
+        "storyteller": "minutes",
+        "commentator": "minutes",
+        "sportsman": "minutes"
       }
     },
     {
@@ -1395,7 +2040,12 @@
         "guide": "per kilometre.",
         "pacer": "per kilometre.",
         "motivator": "per kilometre.",
-        "technician": "per kilometre."
+        "technician": "per kilometre.",
+        "spark": "per kilometre.",
+        "steady": "per kilometre.",
+        "storyteller": "per kilometre.",
+        "commentator": "per kilometre.",
+        "sportsman": "per kilometre."
       }
     },
     {
@@ -1406,7 +2056,12 @@
         "guide": "to",
         "pacer": "to",
         "motivator": "to",
-        "technician": "to"
+        "technician": "to",
+        "spark": "to",
+        "steady": "to",
+        "storyteller": "to",
+        "commentator": "to",
+        "sportsman": "to"
       }
     }
   ],
@@ -1419,7 +2074,12 @@
         "guide": "Think of {name}. Run this part with them.",
         "pacer": "{name} is the reason. Hold the pace.",
         "motivator": "Picture {name} — now show them what you've got!",
-        "technician": "Recall {name}. Match that standard for one kilometre."
+        "technician": "Recall {name}. Match that standard for one kilometre.",
+        "spark": "Think of {name}. Run this part with them.",
+        "steady": "Think of {name}. Run this part with them.",
+        "storyteller": "Think of {name}. Run this part with them.",
+        "commentator": "Think of {name}. Run this part with them.",
+        "sportsman": "Think of {name}. Run this part with them."
       }
     },
     {
@@ -1430,7 +2090,12 @@
         "guide": "It's tough. So think of {name}, and let that carry you.",
         "pacer": "Hard patch. Anchor to {name} and hold on.",
         "motivator": "This is the tough bit — and you're doing it for {name}!",
-        "technician": "When it's tough, {name} is your anchor. Use it now."
+        "technician": "When it's tough, {name} is your anchor. Use it now.",
+        "spark": "It's tough. So think of {name}, and let that carry you.",
+        "steady": "It's tough. So think of {name}, and let that carry you.",
+        "storyteller": "It's tough. So think of {name}, and let that carry you.",
+        "commentator": "It's tough. So think of {name}, and let that carry you.",
+        "sportsman": "It's tough. So think of {name}, and let that carry you."
       }
     },
     {
@@ -1441,7 +2106,12 @@
         "guide": "{name} would want you to finish this properly. So finish it properly.",
         "pacer": "Finish this one the way {name} would want it finished.",
         "motivator": "Do it for {name} — all the way to the line!",
-        "technician": "Finish to standard. That is what {name} sees."
+        "technician": "Finish to standard. That is what {name} sees.",
+        "spark": "{name} would want you to finish this properly. So finish it properly.",
+        "steady": "{name} would want you to finish this properly. So finish it properly.",
+        "storyteller": "{name} would want you to finish this properly. So finish it properly.",
+        "commentator": "{name} would want you to finish this properly. So finish it properly.",
+        "sportsman": "{name} would want you to finish this properly. So finish it properly."
       }
     },
     {
@@ -1452,7 +2122,12 @@
         "guide": "That goal has {name} behind it. This is you earning it.",
         "pacer": "The goal, and {name}. Both worth this next stretch.",
         "motivator": "That time goal is for {name} — go and take it!",
-        "technician": "Goal chosen for {name}. Run this stretch deliberately."
+        "technician": "Goal chosen for {name}. Run this stretch deliberately.",
+        "spark": "That goal has {name} behind it. This is you earning it.",
+        "steady": "That goal has {name} behind it. This is you earning it.",
+        "storyteller": "That goal has {name} behind it. This is you earning it.",
+        "commentator": "That goal has {name} behind it. This is you earning it.",
+        "sportsman": "That goal has {name} behind it. This is you earning it."
       }
     },
     {
@@ -1463,7 +2138,12 @@
         "guide": "Last effort. Run this one home for {name}.",
         "pacer": "Final stretch. This one's for {name}.",
         "motivator": "Everything you've got — for {name}!",
-        "technician": "Final effort. Hold form, and bring it home for {name}."
+        "technician": "Final effort. Hold form, and bring it home for {name}.",
+        "spark": "Last effort. Run this one home for {name}.",
+        "steady": "Last effort. Run this one home for {name}.",
+        "storyteller": "Last effort. Run this one home for {name}.",
+        "commentator": "Last effort. Run this one home for {name}.",
+        "sportsman": "Last effort. Run this one home for {name}."
       }
     }
   ]

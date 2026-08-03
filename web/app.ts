@@ -8759,7 +8759,14 @@ function wire() {
       lPause.textContent = "Pause";
     }
   };
-  const lFinish = $("lFinish"); if (lFinish && !LIVE.done) lFinish.onclick = () => liveFinish(false);
+  // ⚠️ ENDING A RUN ASKS FIRST. It is the one control here with no undo — a knock while the phone is
+  // in your hand, or a mis-tap with cold fingers, ended the session outright and there was no way
+  // back into it. The wrist view's Finish already confirmed; the phone's own End did not, which is
+  // the button most people actually press.
+  const lFinish = $("lFinish");
+  if (lFinish && !LIVE.done) lFinish.onclick = () => {
+    confirmSheet("End session?", "This stops recording now. You will still be able to save the run.", "End session", () => liveFinish(false));
+  };
   // Completion screen: save the run to Activities, discard it, or move on to Activities.
   document.querySelectorAll("[data-rpe]").forEach((c) => c.onclick = () => {
     // In the Logbook there is no live summary — the record IS the target, and rating a past run

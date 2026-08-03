@@ -131,13 +131,17 @@ struct WorkoutView: View {
 struct ControlsView: View {
     @ObservedObject var workout: WorkoutManager
     var backToMetrics: () -> Void
+    /// ⚠️ Ending asks first. Putting the button off the main page made a knock less likely; it did
+    /// not make it impossible, and a wrist is exactly where an accidental press happens — sleeve,
+    /// doorframe, wiping sweat. There is no way back into a session once it has ended.
+    @State private var confirmingEnd = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: 8) {
                 HStack(spacing: 10) {
                     Button {
-                        workout.end()
+                        confirmingEnd = true
                     } label: {
                         VStack(spacing: 2) {
                             Image(systemName: "stop.fill").font(.title3)
@@ -179,6 +183,16 @@ struct ControlsView: View {
             }
             .buttonStyle(.bordered)
             .padding(.horizontal, 2)
+        }
+        // ⚠️ A confirmationDialog rather than a second tap-to-arm on the button itself: on a wrist the
+        // dialog takes over the whole screen, so the confirm cannot be hit by the same knock that
+        // opened it. "Cancel" returns to the run with nothing changed — the run is still recording
+        // throughout, because asking must never itself pause or stop anything.
+        .confirmationDialog("End session?", isPresented: $confirmingEnd, titleVisibility: .visible) {
+            Button("End session", role: .destructive) { workout.end() }
+            Button("Cancel", role: .cancel) { backToMetrics() }
+        } message: {
+            Text("This stops recording now. Your run will be saved.")
         }
     }
 }

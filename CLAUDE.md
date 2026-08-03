@@ -1062,6 +1062,53 @@ The race-pace detection in `fuelHtml` is the same **content** test `buildWeek` u
 Not done: the watch shows no fuelling text — it would need new payload keys, and the phone is where
 you read a plan. Say so rather than half-doing it.
 
+## The warm-up is built from the session, and it is MEASURED ON THE SESSION AS DELIVERED (2026-08-03)
+
+`src/science/warmup.ts` builds the warm-up from **the first hard thing the session asks for and how
+soon it arrives** (`analyseSession` → `firstHardEffort`), not from the session's length or its title.
+A run that begins easy is told its opening minutes ARE the warm-up (`embedded: true`); a session that
+opens with repetitions gets raise → mobilise → potentiate → transition. `withGeneratedWarmup(sess)`
+in `web/app.ts` expands it into real steps at `startSession`, so what the brief promises is what the
+live session counts through.
+
+⚠️ **`analyseSession` SKIPS the session's own warm-up step, so `minutesBefore` is NOT the wait the
+runner experiences.** Skipping it is right — that step is the thing being replaced — but the
+generated raise then stands in its place, so the delivered wait is `raise + minutesBefore`. The
+strides gate asked "does the work start inside 20 minutes?" of the *un-raised* number. Found by the
+owner on his phone: **"40′ easy → moderate finish"** printed *"the quicker running starts early in
+this one"* and prescribed 3 × 18s strides, above a session whose moderate lift begins at **minute 24
+of 40**. Measured 18, actual 26. The gate is now `mins + look.minutesBefore <= 20`.
+
+⚠️ **The test that should have caught it was written in the implementation's own frame of reference.**
+Its fixture carried 10 min of warm-up + 15 min of easy and asserted strides, which is only "early"
+if you also discard the 10. Reframed, and it now sits at the exact boundary (12 min) where both
+rules can hold — with `easyProgression(paces, 20)` asserted alongside it as the *wide* window, so a
+future change cannot make strides unreachable without a test failing. Same lesson as the race-eve
+guard: ask the question the runner would ask.
+
+⚠️ **AN EMBEDDED WARM-UP MUST BE CARVED OUT OF THE OPENING, NOT ADDED TO IT.** Its entire claim is
+"the opening few minutes are the warm-up" — minutes the run already contains. Prepending a step
+inflated every session that had one: a plain 40′ easy run was **delivered as 42′**, and the
+progression run as **45.75′** against a duration chip still reading 40′. The difference now comes off
+the first easy step, and **both directions matter** — when the run's own opening is *longer* than the
+generated raise the surplus is given back, or the plan quietly loses minutes it asked for. If there
+is nothing to borrow from, the raise shrinks rather than the session growing: a 20-minute run must
+not become a 29-minute one because its warm-up would not fit inside it.
+
+⚠️ **A non-embedded warm-up IS extra time, and that is not the same bug.** The threshold session is
+53′ of steps delivered as 62′ — correct, and the sheet's duration chip already adds it
+(`extra` is computed only when `!wu.embedded`). Verified they agree to the minute. Don't "fix" it.
+
+⚠️ **Strides go next to the WORK, not at the front.** On an embedded warm-up the run's own easy
+running sits between the two, so prepending them put 3 × 18s at RPE 5–7 immediately before eighteen
+minutes of conversational running — priming the runner for something twenty-one minutes away.
+Strides are a potentiation cue; separated from the effort they precede they are just a hard bit in a
+warm-up. Non-embedded warm-ups keep them at the front, where the work follows straight on.
+
+⚠️ **The gate for "is this a run at all" is a PACE OR A DISTANCE, never the step's kind.** A strength
+session is one `steady` step at RPE 6–7 with neither, indistinguishable from a tempo run by kind and
+effort — which is how "Strength (maintenance)" was handed 21 minutes of jogging and four strides.
+
 ## Seven days means seven days (fixed 2026-08-02)
 
 ⚠️ **The form offered 3–7 and `buildWeek` said `Math.min(6, …)`.** A runner who chose seven got six

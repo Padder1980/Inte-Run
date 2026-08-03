@@ -6801,7 +6801,55 @@ function withGeneratedWarmup(sess) {
   }
   if (!steps.length) return sess;
   const rest = (sess.steps || []).filter((st) => st.kind !== "warmup");
-  const out = Object.assign({}, sess, { steps: steps.concat(rest) });
+  // ⚠️ AN EMBEDDED WARM-UP IS THE RUN'S OPENING, SO IT MUST BE CARVED OUT — NOT ADDED ON. Its whole
+  // claim is "the opening few minutes are the warm-up", i.e. minutes the run already contains.
+  // Prepending it instead inflated every session that had one: a plain 40' easy run was delivered
+  // as 42', and "40' easy -> moderate finish" as 45.75' against a chip still reading 40'. The
+  // difference comes off the first easy step, which is the running the raise is standing in for.
+  if (w.embedded) {
+    const ownWuSec = (sess.steps || []).filter((st) => st.kind === "warmup")
+      .reduce((a, st) => a + (st.durationSeconds || 0), 0);
+    const addedSec = steps.reduce((a, st) => a + (st.durationSeconds || 0), 0);
+    let over = addedSec - ownWuSec;
+    for (let i = 0; i < rest.length && over > 0; i++) {
+      const st = rest[i];
+      if (st.kind === "rep" || st.kind === "cooldown" || (st.targetRpe && st.targetRpe.max >= 4)) continue;
+      const take = Math.min(over, Math.max(0, (st.durationSeconds || 0) - 300));
+      if (take <= 0) continue;
+      rest[i] = Object.assign({}, st, { durationSeconds: st.durationSeconds - take });
+      over -= take;
+    }
+    // Nothing left to borrow from — shorten the raise rather than lengthen the session. A 20-minute
+    // run must not become a 29-minute one because its warm-up would not fit inside it.
+    if (over > 0) {
+      const raise = steps.find((st) => (st.durationSeconds || 0) > 60);
+      if (raise) raise.durationSeconds = Math.max(60, raise.durationSeconds - over);
+    } else if (over < 0) {
+      // And the other direction: a run whose own opening is LONGER than the generated raise would
+      // otherwise come out short, quietly deleting minutes the plan asked for. Give them back to
+      // the easy running rather than to the raise, which is the length the card promises.
+      const i = rest.findIndex((st) => st.kind !== "rep" && st.kind !== "cooldown"
+        && !(st.targetRpe && st.targetRpe.max >= 4) && (st.durationSeconds || 0) > 0);
+      if (i >= 0) rest[i] = Object.assign({}, rest[i], { durationSeconds: rest[i].durationSeconds - over });
+    }
+  }
+  // ⚠️ STRIDES GO NEXT TO THE WORK, NOT AT THE FRONT. On an embedded warm-up the run's own easy
+  // running sits between the two, so prepending them put 3 × 18s at RPE 5-7 immediately before
+  // eighteen minutes of conversational running, priming the runner for something twenty-one minutes
+  // away. Strides are a potentiation cue; separated from the effort they precede, they are just a
+  // hard bit in a warm-up. Non-embedded warm-ups keep them at the front, where the work follows
+  // straight on.
+  let ordered = steps.concat(rest);
+  if (w.embedded) {
+    const pi = steps.findIndex((st) => /strides/.test(String(st.label)));
+    const hard = rest.findIndex((st) => st.kind === "rep" || (st.targetRpe && st.targetRpe.max >= 4));
+    if (pi >= 0 && hard > 0) {
+      const stride = steps[pi];
+      const head = steps.filter((_, i) => i !== pi);
+      ordered = head.concat(rest.slice(0, hard), [stride], rest.slice(hard));
+    }
+  }
+  const out = Object.assign({}, sess, { steps: ordered });
   // The clock the runner sees on the live screen has to agree with the steps it is counting through.
   out.estimatedDurationSeconds = out.steps.reduce((a, st) => a + (st.durationSeconds || 0), 0)
     || sess.estimatedDurationSeconds;

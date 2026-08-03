@@ -260,7 +260,15 @@ export function buildWarmup(
     // opening has had barely any time to do the job. Novices are exempt; their sessions do not open
     // with work this soon, and strides are the component the paper caps hardest for them.
     const look = analyseSession(session);
-    if ((look.effort !== "easy" || effort === "steady") && look.minutesBefore <= 20 && ability !== "new") {
+    // ⚠️ COUNT THE WARM-UP THE RUNNER IS ACTUALLY GOING TO DO. `analyseSession` deliberately skips
+    // the session's own warm-up step (it is the thing being replaced), so `minutesBefore` is the
+    // run's easy running ALONE — and asking "does the work start inside 20 minutes?" of that number
+    // answers a question nobody asked. The delivered session opens with this raise: measured on
+    // "40′ easy → moderate finish", the lift arrives 26 minutes in, and the old gate read 18 and
+    // fired, printing "the quicker running starts early in this one" above a session where it
+    // starts at 60% distance. The paper's 20 minutes is about how long the opening has had to do
+    // its job, which is raise + easy, not easy on its own.
+    if ((look.effort !== "easy" || effort === "steady") && mins + look.minutesBefore <= 20 && ability !== "new") {
       const n = ability === "beginner" ? 2 : 3;
       phases.push({
         phase: "potentiate", strides: n, seconds: 18, effort: "building towards the pace you are about to run",

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { WARMUP_MOVEMENTS, buildWarmup, firstHardEffort, type AbilityBand } from "../src/science/warmup.ts";
 import { deriveTrainingPaces } from "../src/science/paces.ts";
-import { easyRun, longRun, recoveryRun, thresholdSession, vo2Session } from "../src/plan/session-templates.ts";
+import { easyProgression, easyRun, longRun, recoveryRun, thresholdSession, vo2Session } from "../src/plan/session-templates.ts";
 
 const paces = deriveTrainingPaces({ distanceMeters: 5000, timeSeconds: 1500 });
 const all = (w: ReturnType<typeof buildWarmup>) =>
@@ -217,9 +217,17 @@ test("an embedded warm-up gains strides when the hard work starts early", () => 
   // ⚠️ The paper's T2: no second full warm-up for a run whose pace block comes later, BUT 2–4
   // progressive strides if that block starts inside the first 20 minutes — by then the run's own
   // opening has had barely any time to do the job.
-  // ⚠️ The session's OWN warm-up step is deliberately not counted — it is the thing being generated,
-  // not evidence the run warms itself up. Only easy running that is part of the RUN counts, which is
-  // why this fixture carries 15 real minutes of it.
+  // ⚠️ MEASURED ON THE SESSION AS DELIVERED, WHICH IS NOT THE SESSION AS WRITTEN. `analyseSession`
+  // skips the run's own warm-up step, because that step is the thing being replaced — but the
+  // generated raise then takes its place, so the runner still does easy running before the block.
+  // This fixture used to carry 15 real minutes and expect strides; with the 8-minute raise in front
+  // the block actually began at 23 minutes, past the paper's 20, and the assertion was reading the
+  // implementation's own arithmetic back to itself.
+  // ⚠️ 12 minutes is the boundary where both rules can hold at once, and it is deliberately exact:
+  // the run must have warmed itself up (>= EMBED_AFTER_MIN) yet the block must still arrive inside
+  // the first 20 minutes of the DELIVERED session (raise + easy). For a repetition block that is
+  // 12 exactly. Continuous steady work has a wide window instead, covered by the easyProgression
+  // case below — so if this ever becomes unreachable, that test is the one that proves strides live.
   const early = {
     targetRpe: { min: 2, max: 7 },
     steps: [
@@ -227,7 +235,7 @@ test("an embedded warm-up gains strides when the hard work starts early", () => 
       // the generator tells a threshold session from a strength session, both of which are one
       // continuous block at a similar effort.
       { kind: "warmup", label: "Easy", durationSeconds: 10 * 60, targetPaceSecPerKm: paces.easy, targetRpe: { min: 2, max: 3 } },
-      { kind: "steady", label: "Easy", durationSeconds: 15 * 60, targetPaceSecPerKm: paces.easy, targetRpe: { min: 2, max: 3 } },
+      { kind: "steady", label: "Easy", durationSeconds: 12 * 60, targetPaceSecPerKm: paces.easy, targetRpe: { min: 2, max: 3 } },
       { kind: "rep", label: "Threshold block", durationSeconds: 20 * 60, targetPaceSecPerKm: paces.threshold, targetRpe: { min: 6, max: 7 } },
     ],
   } as any;
@@ -359,4 +367,31 @@ test("a warm-up never becomes the session — but repetitions are exempt", () =>
   // ...while a repetition session keeps its full preparation.
   const reps = buildWarmup(vo2Session(paces, 1), "intermediate")!;
   assert.ok(reps.totalMinutes >= 25, `an interval session needs real preparation, got ${reps.totalMinutes}`);
+});
+
+test("strides are gated on when the work arrives in the SESSION AS DELIVERED, raise included", () => {
+  // ⚠️ FOUND ON THE OWNER'S PHONE, 2026-08-03. "40′ easy → moderate finish" showed a warm-up card
+  // saying "the quicker running starts early in this one" and prescribed 3 × 18s strides — above a
+  // session whose moderate lift begins 26 minutes into a 40-minute run. `analyseSession` skips the
+  // session's own warm-up step (it is the thing being replaced), so `minutesBefore` was 18 rather
+  // than the 26 the runner actually experiences, and the 20-minute gate fired on the wrong number.
+  //
+  // ⚠️ BOTH DIRECTIONS ARE ASSERTED, and the pair was chosen by measurement, not taste: the 40′ case
+  // fails on the old gate and passes on the new one, while the 20′ case passes on both. Testing only
+  // the bug would be satisfied by deleting strides altogether.
+  const strides = (s: any) => {
+    const w = buildWarmup(s, "intermediate");
+    assert.ok(w, "expected a warm-up");
+    return w!.phases.filter((p: any) => p.phase === "potentiate");
+  };
+  const far = easyProgression(paces, 40);
+  assert.equal(strides(far).length, 0,
+    "a lift that arrives 26 min into a 40 min run is not something to prime with strides");
+  const wFar = buildWarmup(far, "intermediate")!;
+  assert.ok(!all(wFar).some((t) => /starts early|opening is short/.test(t)),
+    "and the copy must not claim the quicker running starts early");
+
+  // A short progression genuinely does start its work early, and must keep its strides.
+  assert.equal(strides(easyProgression(paces, 20)).length, 1,
+    "work inside the first 20 minutes of the delivered session still wants strides");
 });

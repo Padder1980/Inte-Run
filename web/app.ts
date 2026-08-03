@@ -3213,9 +3213,18 @@ function paceFragmentIds(sec) {
   if (r > 0) ids.push("num_" + r);
   return ids;
 }
-function paceSentenceIds(cur, band) {
-  return ["frag_current_pace"].concat(paceFragmentIds(cur), ["frag_per_km", "frag_target_is"],
-    paceFragmentIds(band.minSecPerKm), ["frag_to"], paceFragmentIds(band.maxSecPerKm));
+// ⚠️ SHORT ON PURPOSE. Read out in full — "Your current pace is six minutes forty-three per
+// kilometre. Your target is five minutes twenty to five minutes fifty." — the stitched sentence
+// measured ELEVEN SECONDS. That is a coach talking over the next eleven seconds of running, against
+// guidance of one to four seconds for a routine cue, and it arrives while the runner is already
+// working. Long enough to be ignored is the same as wrong.
+//
+// So it says the two numbers that decide what to do next: where you are, and the edge of the band
+// you need to reach. Told to ease off, that edge is the slow end; told to lift, the quick end. The
+// full range is on the screen and in the brief for anyone who wants it.
+function paceSentenceIds(cur, band, tooFast) {
+  const edge = tooFast ? band.maxSecPerKm : band.minSecPerKm;
+  return paceFragmentIds(cur).concat(["frag_target_is"], paceFragmentIds(edge));
 }
 // Play a list of clip ids back to back, each starting the moment the last finishes.
 function coachSaySequence(ids, onFail) {
@@ -6468,7 +6477,7 @@ function coachPaceTick(snap, type, nowSec) {
   COACH.lastPaceCueAt = nowSec;
   COACH.paceCorrectionPending = (st !== "on");
   coachTrigger(st === "fast" ? "pace-ahead" : st === "slow" ? "pace-behind" : "pace-on", type, nowSec);
-  if (st !== "on") speakPaceNumbers(snap);
+  if (st !== "on") speakPaceNumbers(snap, st === "fast");
 }
 // Say the actual numbers after the coach's instruction.
 //
@@ -6487,14 +6496,14 @@ function paceWords(sec) {
   const m = Math.floor(s / 60), r = s % 60;
   return r === 0 ? m + " minutes" : m + " " + (m === 1 ? "minute" : "minutes") + " " + r;
 }
-function speakPaceNumbers(snap) {
+function speakPaceNumbers(snap, tooFast) {
   const cur = snap && snap.currentPaceSecPerKm;
   const band = snap && snap.step && snap.step.targetPace;
   if (!cur || !band || !band.minSecPerKm || !band.maxSecPerKm) return;
   if (!VOICE_AVAILABLE) return;
-  const text = "Your current pace is " + paceWords(cur) + " per kilometre. Your target is " +
-    paceWords(band.minSecPerKm) + " to " + paceWords(band.maxSecPerKm) + ".";
-  const ids = paceSentenceIds(cur, band);
+  const edge = tooFast ? band.maxSecPerKm : band.minSecPerKm;
+  const text = paceWords(cur) + ". Target " + paceWords(edge) + ".";
+  const ids = paceSentenceIds(cur, band, tooFast);
   clearTimeout(COACH.numT);
   COACH.numT = setTimeout(() => {
     // The run may have paused, finished or moved on while the clip played — say nothing then.

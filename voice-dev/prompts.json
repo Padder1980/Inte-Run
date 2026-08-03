@@ -693,6 +693,721 @@
         "motivator": "Let's be sensible. Ease down, breathe, and only push on if you feel good.",
         "technician": "Let's be sensible. Ease down, breathe, and only push on if you feel good."
       }
+    },
+    {
+      "id": "num_0",
+      "text": "Nought",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "Nought",
+        "pacer": "Nought",
+        "motivator": "Nought",
+        "technician": "Nought"
+      }
+    },
+    {
+      "id": "num_1",
+      "text": "one",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "one",
+        "pacer": "one",
+        "motivator": "one",
+        "technician": "one"
+      }
+    },
+    {
+      "id": "num_2",
+      "text": "two",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "two",
+        "pacer": "two",
+        "motivator": "two",
+        "technician": "two"
+      }
+    },
+    {
+      "id": "num_3",
+      "text": "three",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "three",
+        "pacer": "three",
+        "motivator": "three",
+        "technician": "three"
+      }
+    },
+    {
+      "id": "num_4",
+      "text": "four",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "four",
+        "pacer": "four",
+        "motivator": "four",
+        "technician": "four"
+      }
+    },
+    {
+      "id": "num_5",
+      "text": "five",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "five",
+        "pacer": "five",
+        "motivator": "five",
+        "technician": "five"
+      }
+    },
+    {
+      "id": "num_6",
+      "text": "six",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "six",
+        "pacer": "six",
+        "motivator": "six",
+        "technician": "six"
+      }
+    },
+    {
+      "id": "num_7",
+      "text": "seven",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "seven",
+        "pacer": "seven",
+        "motivator": "seven",
+        "technician": "seven"
+      }
+    },
+    {
+      "id": "num_8",
+      "text": "eight",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "eight",
+        "pacer": "eight",
+        "motivator": "eight",
+        "technician": "eight"
+      }
+    },
+    {
+      "id": "num_9",
+      "text": "nine",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "nine",
+        "pacer": "nine",
+        "motivator": "nine",
+        "technician": "nine"
+      }
+    },
+    {
+      "id": "num_10",
+      "text": "ten",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "ten",
+        "pacer": "ten",
+        "motivator": "ten",
+        "technician": "ten"
+      }
+    },
+    {
+      "id": "num_11",
+      "text": "eleven",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "eleven",
+        "pacer": "eleven",
+        "motivator": "eleven",
+        "technician": "eleven"
+      }
+    },
+    {
+      "id": "num_12",
+      "text": "twelve",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "twelve",
+        "pacer": "twelve",
+        "motivator": "twelve",
+        "technician": "twelve"
+      }
+    },
+    {
+      "id": "num_13",
+      "text": "thirteen",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "thirteen",
+        "pacer": "thirteen",
+        "motivator": "thirteen",
+        "technician": "thirteen"
+      }
+    },
+    {
+      "id": "num_14",
+      "text": "fourteen",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "fourteen",
+        "pacer": "fourteen",
+        "motivator": "fourteen",
+        "technician": "fourteen"
+      }
+    },
+    {
+      "id": "num_15",
+      "text": "fifteen",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "fifteen",
+        "pacer": "fifteen",
+        "motivator": "fifteen",
+        "technician": "fifteen"
+      }
+    },
+    {
+      "id": "num_16",
+      "text": "sixteen",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "sixteen",
+        "pacer": "sixteen",
+        "motivator": "sixteen",
+        "technician": "sixteen"
+      }
+    },
+    {
+      "id": "num_17",
+      "text": "seventeen",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "seventeen",
+        "pacer": "seventeen",
+        "motivator": "seventeen",
+        "technician": "seventeen"
+      }
+    },
+    {
+      "id": "num_18",
+      "text": "eighteen",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "eighteen",
+        "pacer": "eighteen",
+        "motivator": "eighteen",
+        "technician": "eighteen"
+      }
+    },
+    {
+      "id": "num_19",
+      "text": "nineteen",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "nineteen",
+        "pacer": "nineteen",
+        "motivator": "nineteen",
+        "technician": "nineteen"
+      }
+    },
+    {
+      "id": "num_20",
+      "text": "twenty",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "twenty",
+        "pacer": "twenty",
+        "motivator": "twenty",
+        "technician": "twenty"
+      }
+    },
+    {
+      "id": "num_21",
+      "text": "twenty-one",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "twenty-one",
+        "pacer": "twenty-one",
+        "motivator": "twenty-one",
+        "technician": "twenty-one"
+      }
+    },
+    {
+      "id": "num_22",
+      "text": "twenty-two",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "twenty-two",
+        "pacer": "twenty-two",
+        "motivator": "twenty-two",
+        "technician": "twenty-two"
+      }
+    },
+    {
+      "id": "num_23",
+      "text": "twenty-three",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "twenty-three",
+        "pacer": "twenty-three",
+        "motivator": "twenty-three",
+        "technician": "twenty-three"
+      }
+    },
+    {
+      "id": "num_24",
+      "text": "twenty-four",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "twenty-four",
+        "pacer": "twenty-four",
+        "motivator": "twenty-four",
+        "technician": "twenty-four"
+      }
+    },
+    {
+      "id": "num_25",
+      "text": "twenty-five",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "twenty-five",
+        "pacer": "twenty-five",
+        "motivator": "twenty-five",
+        "technician": "twenty-five"
+      }
+    },
+    {
+      "id": "num_26",
+      "text": "twenty-six",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "twenty-six",
+        "pacer": "twenty-six",
+        "motivator": "twenty-six",
+        "technician": "twenty-six"
+      }
+    },
+    {
+      "id": "num_27",
+      "text": "twenty-seven",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "twenty-seven",
+        "pacer": "twenty-seven",
+        "motivator": "twenty-seven",
+        "technician": "twenty-seven"
+      }
+    },
+    {
+      "id": "num_28",
+      "text": "twenty-eight",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "twenty-eight",
+        "pacer": "twenty-eight",
+        "motivator": "twenty-eight",
+        "technician": "twenty-eight"
+      }
+    },
+    {
+      "id": "num_29",
+      "text": "twenty-nine",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "twenty-nine",
+        "pacer": "twenty-nine",
+        "motivator": "twenty-nine",
+        "technician": "twenty-nine"
+      }
+    },
+    {
+      "id": "num_30",
+      "text": "thirty",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "thirty",
+        "pacer": "thirty",
+        "motivator": "thirty",
+        "technician": "thirty"
+      }
+    },
+    {
+      "id": "num_31",
+      "text": "thirty-one",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "thirty-one",
+        "pacer": "thirty-one",
+        "motivator": "thirty-one",
+        "technician": "thirty-one"
+      }
+    },
+    {
+      "id": "num_32",
+      "text": "thirty-two",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "thirty-two",
+        "pacer": "thirty-two",
+        "motivator": "thirty-two",
+        "technician": "thirty-two"
+      }
+    },
+    {
+      "id": "num_33",
+      "text": "thirty-three",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "thirty-three",
+        "pacer": "thirty-three",
+        "motivator": "thirty-three",
+        "technician": "thirty-three"
+      }
+    },
+    {
+      "id": "num_34",
+      "text": "thirty-four",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "thirty-four",
+        "pacer": "thirty-four",
+        "motivator": "thirty-four",
+        "technician": "thirty-four"
+      }
+    },
+    {
+      "id": "num_35",
+      "text": "thirty-five",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "thirty-five",
+        "pacer": "thirty-five",
+        "motivator": "thirty-five",
+        "technician": "thirty-five"
+      }
+    },
+    {
+      "id": "num_36",
+      "text": "thirty-six",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "thirty-six",
+        "pacer": "thirty-six",
+        "motivator": "thirty-six",
+        "technician": "thirty-six"
+      }
+    },
+    {
+      "id": "num_37",
+      "text": "thirty-seven",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "thirty-seven",
+        "pacer": "thirty-seven",
+        "motivator": "thirty-seven",
+        "technician": "thirty-seven"
+      }
+    },
+    {
+      "id": "num_38",
+      "text": "thirty-eight",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "thirty-eight",
+        "pacer": "thirty-eight",
+        "motivator": "thirty-eight",
+        "technician": "thirty-eight"
+      }
+    },
+    {
+      "id": "num_39",
+      "text": "thirty-nine",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "thirty-nine",
+        "pacer": "thirty-nine",
+        "motivator": "thirty-nine",
+        "technician": "thirty-nine"
+      }
+    },
+    {
+      "id": "num_40",
+      "text": "forty",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "forty",
+        "pacer": "forty",
+        "motivator": "forty",
+        "technician": "forty"
+      }
+    },
+    {
+      "id": "num_41",
+      "text": "forty-one",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "forty-one",
+        "pacer": "forty-one",
+        "motivator": "forty-one",
+        "technician": "forty-one"
+      }
+    },
+    {
+      "id": "num_42",
+      "text": "forty-two",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "forty-two",
+        "pacer": "forty-two",
+        "motivator": "forty-two",
+        "technician": "forty-two"
+      }
+    },
+    {
+      "id": "num_43",
+      "text": "forty-three",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "forty-three",
+        "pacer": "forty-three",
+        "motivator": "forty-three",
+        "technician": "forty-three"
+      }
+    },
+    {
+      "id": "num_44",
+      "text": "forty-four",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "forty-four",
+        "pacer": "forty-four",
+        "motivator": "forty-four",
+        "technician": "forty-four"
+      }
+    },
+    {
+      "id": "num_45",
+      "text": "forty-five",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "forty-five",
+        "pacer": "forty-five",
+        "motivator": "forty-five",
+        "technician": "forty-five"
+      }
+    },
+    {
+      "id": "num_46",
+      "text": "forty-six",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "forty-six",
+        "pacer": "forty-six",
+        "motivator": "forty-six",
+        "technician": "forty-six"
+      }
+    },
+    {
+      "id": "num_47",
+      "text": "forty-seven",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "forty-seven",
+        "pacer": "forty-seven",
+        "motivator": "forty-seven",
+        "technician": "forty-seven"
+      }
+    },
+    {
+      "id": "num_48",
+      "text": "forty-eight",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "forty-eight",
+        "pacer": "forty-eight",
+        "motivator": "forty-eight",
+        "technician": "forty-eight"
+      }
+    },
+    {
+      "id": "num_49",
+      "text": "forty-nine",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "forty-nine",
+        "pacer": "forty-nine",
+        "motivator": "forty-nine",
+        "technician": "forty-nine"
+      }
+    },
+    {
+      "id": "num_50",
+      "text": "fifty",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "fifty",
+        "pacer": "fifty",
+        "motivator": "fifty",
+        "technician": "fifty"
+      }
+    },
+    {
+      "id": "num_51",
+      "text": "fifty-one",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "fifty-one",
+        "pacer": "fifty-one",
+        "motivator": "fifty-one",
+        "technician": "fifty-one"
+      }
+    },
+    {
+      "id": "num_52",
+      "text": "fifty-two",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "fifty-two",
+        "pacer": "fifty-two",
+        "motivator": "fifty-two",
+        "technician": "fifty-two"
+      }
+    },
+    {
+      "id": "num_53",
+      "text": "fifty-three",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "fifty-three",
+        "pacer": "fifty-three",
+        "motivator": "fifty-three",
+        "technician": "fifty-three"
+      }
+    },
+    {
+      "id": "num_54",
+      "text": "fifty-four",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "fifty-four",
+        "pacer": "fifty-four",
+        "motivator": "fifty-four",
+        "technician": "fifty-four"
+      }
+    },
+    {
+      "id": "num_55",
+      "text": "fifty-five",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "fifty-five",
+        "pacer": "fifty-five",
+        "motivator": "fifty-five",
+        "technician": "fifty-five"
+      }
+    },
+    {
+      "id": "num_56",
+      "text": "fifty-six",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "fifty-six",
+        "pacer": "fifty-six",
+        "motivator": "fifty-six",
+        "technician": "fifty-six"
+      }
+    },
+    {
+      "id": "num_57",
+      "text": "fifty-seven",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "fifty-seven",
+        "pacer": "fifty-seven",
+        "motivator": "fifty-seven",
+        "technician": "fifty-seven"
+      }
+    },
+    {
+      "id": "num_58",
+      "text": "fifty-eight",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "fifty-eight",
+        "pacer": "fifty-eight",
+        "motivator": "fifty-eight",
+        "technician": "fifty-eight"
+      }
+    },
+    {
+      "id": "num_59",
+      "text": "fifty-nine",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "fifty-nine",
+        "pacer": "fifty-nine",
+        "motivator": "fifty-nine",
+        "technician": "fifty-nine"
+      }
+    },
+    {
+      "id": "frag_current_pace",
+      "text": "Your current pace is",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "Your current pace is",
+        "pacer": "Your current pace is",
+        "motivator": "Your current pace is",
+        "technician": "Your current pace is"
+      }
+    },
+    {
+      "id": "frag_target_is",
+      "text": "Your target is",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "Your target is",
+        "pacer": "Your target is",
+        "motivator": "Your target is",
+        "technician": "Your target is"
+      }
+    },
+    {
+      "id": "frag_minutes",
+      "text": "minutes",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "minutes",
+        "pacer": "minutes",
+        "motivator": "minutes",
+        "technician": "minutes"
+      }
+    },
+    {
+      "id": "frag_per_km",
+      "text": "per kilometre.",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "per kilometre.",
+        "pacer": "per kilometre.",
+        "motivator": "per kilometre.",
+        "technician": "per kilometre."
+      }
+    },
+    {
+      "id": "frag_to",
+      "text": "to",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "to",
+        "pacer": "to",
+        "motivator": "to",
+        "technician": "to"
+      }
     }
   ],
   "personal": [

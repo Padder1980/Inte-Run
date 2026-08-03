@@ -6414,6 +6414,38 @@ function coachPaceTick(snap, type, nowSec) {
   COACH.lastPaceCueAt = nowSec;
   COACH.paceCorrectionPending = (st !== "on");
   coachTrigger(st === "fast" ? "pace-ahead" : st === "slow" ? "pace-behind" : "pace-on", type, nowSec);
+  if (st !== "on") speakPaceNumbers(snap);
+}
+// Say the actual numbers after the coach's instruction.
+//
+// ⚠️ THE COACH'S LINE IS STILL THEIR OWN VOICE. The recorded clip plays first and carries the
+// instruction and the personality; only the numbers are synthesised, because a pre-generated clip
+// can never contain a digit — that is why every prompt in the catalogue is digit-free and a test
+// enforces it. Replacing the whole cue with synthesis would have got the numbers by throwing away
+// the four voices the app is built around.
+//
+// ⚠️ It waits for the clip to finish rather than talking over it. Two voices at once is worse than
+// either alone, and there is no way to un-hear it mid-rep.
+//
+// The wrist already does this in full (owner's call, 2026-07-31) — this brings the phone in line.
+function paceWords(sec) {
+  const s = Math.round(sec);
+  const m = Math.floor(s / 60), r = s % 60;
+  return r === 0 ? m + " minutes" : m + " " + (m === 1 ? "minute" : "minutes") + " " + r;
+}
+function speakPaceNumbers(snap) {
+  const cur = snap && snap.currentPaceSecPerKm;
+  const band = snap && snap.step && snap.step.targetPace;
+  if (!cur || !band || !band.minSecPerKm || !band.maxSecPerKm) return;
+  if (!VOICE_AVAILABLE) return;
+  const text = "Your current pace is " + paceWords(cur) + " per kilometre. Your target is " +
+    paceWords(band.minSecPerKm) + " to " + paceWords(band.maxSecPerKm) + ".";
+  clearTimeout(COACH.numT);
+  COACH.numT = setTimeout(() => {
+    // The run may have paused, finished or moved on while the clip played — say nothing then.
+    if (!LIVE || LIVE.done || LIVE.pauseStart) return;
+    speak(text);
+  }, 2600);
 }
 // The runner's own reason, at most once per run, and only where it earns its place: deep into a
 // long run, or entering the closing third of a hard session. Rarity is the whole point.

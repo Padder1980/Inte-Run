@@ -62,6 +62,25 @@ export type WarmupConditions = {
   timeAvailableMinutes?: number | null;
   /** Reported illness, or pain that changes how they run. Blocks generation outright. */
   unwell?: boolean;
+  /**
+   * How ready the runner says they feel, 1–5.
+   * ⚠️ IT CAN ONLY EVER REDUCE OR DELAY (the paper's acceptance criterion 4). A good score does not
+   * unlock a bigger warm-up — there is no evidence for that and it is exactly the direction in which
+   * an app talks someone into more work on a day they said they felt fine.
+   */
+  readiness?: number | null;
+  /**
+   * A formal test or a race — a session whose whole value depends on being properly prepared for.
+   * ⚠️ TIME COMPRESSION DOES NOT APPLY. The paper is explicit: for a sprint race or a formal time
+   * trial, less than the minimum safe preparation should return "warm-up incomplete" rather than
+   * squeezing maximal-speed preparation into two minutes. Compressing it produces a number that
+   * measures how badly the runner was warmed up.
+   */
+  formalTest?: boolean;
+  /** Age, when known. Under 18 gets the paper's youth treatment. */
+  ageYears?: number | null;
+  /** The runner has a known mobility restriction or simply prefers a hold or two. */
+  mobilityNeeds?: boolean;
 };
 
 export type WarmupPhase =
@@ -82,7 +101,27 @@ export type Warmup = {
   why: string;
   /** Conditions or limits that changed it, in the runner's words. */
   notes: string[];
+  /**
+   * True when the runner does not have enough time to prepare properly for a session whose value
+   * depends on it. The caller must say so rather than quietly serving a compressed version.
+   */
+  incomplete?: boolean;
+  /** What to do if the start is delayed (paper §7). Never repeat the warm-up; reactivate briefly. */
+  delayPlan?: { afterMinutes: number; actions: string[] };
+  /** The three questions to ask before starting (paper's readiness check). */
+  readinessCheck?: string[];
 };
+
+/**
+ * ⚠️ ASKED AFTER THE WARM-UP, NOT BEFORE. The paper's point is that the warm-up is itself the
+ * readiness check — it is the first chance the runner has to find out what their legs think today,
+ * and the answers change what happens next rather than being collected for a chart.
+ */
+export const WARMUP_READINESS_QUESTIONS = [
+  "How ready do your legs feel, 1 to 5?",
+  "Is your breathing back under control?",
+  "Any pain that is sharp, getting worse, or changing how you run?",
+];
 
 /**
  * The movement library (paper §3). Deliberately small: the same review that supports these says
@@ -223,6 +262,20 @@ export function buildWarmup(
     notes.push("Shorter and gentler than the full version, because a warm-up should never be the hardest part of your day.");
   }
 
+  // ⚠️ Youth: technique-led and smaller, and never the adult template scaled down on paper only.
+  const youth = typeof conditions.ageYears === "number" && conditions.ageYears < 18;
+  if (youth) {
+    vol *= 0.75;
+    notes.push("Kept simple and well short of a workout — building the habit of preparing properly matters more at your age than the size of it.");
+  }
+
+  // ⚠️ Readiness can ONLY reduce. See the note on the field.
+  const rd = conditions.readiness;
+  if (typeof rd === "number" && rd > 0 && rd <= 2) {
+    vol *= 0.8;
+    notes.push("You said you are not feeling great today, so this is shorter and the strides stay controlled — start the first effort conservatively and see how it goes.");
+  }
+
   const t = conditions.temperatureC;
   if (typeof t === "number" && t >= 24) {
     // ⚠️ HEAT ONLY EVER REMOVES. The paper's content assertion is explicit that heat logic never
@@ -240,10 +293,24 @@ export function buildWarmup(
   let movements = pickMovements(effort, ability);
   let transition = effort === "maximal" ? 4 : 3;
 
+  if (typeof rd === "number" && rd > 0 && rd <= 2) strides = Math.min(strides, 2);
+  if (youth) strides = Math.min(strides, 3);
+
   // ---- Time compression (paper's table): keep the specific, drop the extras ----
   const avail = conditions.timeAvailableMinutes;
   if (typeof avail === "number" && avail > 0) {
     const full = raise + 3 + Math.ceil((strides * 75) / 60) + transition;
+    // ⚠️ A FORMAL TEST IS NOT COMPRESSED, IT IS DECLINED. Squeezing the preparation for a time trial
+    // produces a time that measures the warm-up rather than the runner — and the whole point of the
+    // test is that it is comparable with the last one.
+    if (avail < full && conditions.formalTest) {
+      return {
+        modelVersion: WARMUP_MODEL_VERSION, firstHardEffort: effort, evidenceGrade: GRADE[effort],
+        embedded: false, totalMinutes: full, phases: [], incomplete: true,
+        why: "There is not enough time to prepare properly for this one, and a rushed warm-up would make the result mean something different from your last test.",
+        notes: [`Give it about ${full} minutes, or move the test to a day you have them. A time trial is only worth doing if it is comparable.`],
+      };
+    }
     if (avail < full) {
       if (avail >= 12) { raise = Math.max(6, avail - 8); movements = movements.slice(0, 3); strides = Math.min(strides, 4); }
       else if (avail >= 6) { raise = Math.max(4, avail - 4); movements = movements.slice(0, 2); strides = Math.min(strides, 3); transition = 1; }
@@ -256,6 +323,14 @@ export function buildWarmup(
     phase: "raise", minutes: raise, rpe: { min: 2, max: 3 },
     instruction: `${raise} minutes easy — start very gently and finish at your normal easy effort. You should be able to talk in full sentences throughout.`,
   });
+  if (conditions.mobilityNeeds) {
+    // ⚠️ OPTIONAL, SHORT, AND FOLLOWED BY MOVEMENT. The paper does not support making stretching
+    // compulsory — a 2025 review found no reliable acute effect on running economy either way — but
+    // it does allow a hold or two for someone with a known restriction, provided it is brief and
+    // dynamic work follows it. Long holds immediately before fast running are the thing to avoid.
+    movements = ["One or two comfortable holds of 15–30 seconds on the tight spot, then keep moving", ...movements];
+    notes.push("The hold is there because you asked for it — keep it short, never stretch into pain, and let the running that follows do the real preparation.");
+  }
   if (movements.length) {
     phases.push({
       phase: "mobilise", movements,
@@ -283,6 +358,15 @@ export function buildWarmup(
     phases,
     why: whyLine(effort),
     notes,
+    // ⚠️ NEVER REPEAT THE WARM-UP AFTER A DELAY — reactivate briefly instead. Repeating it spends
+    // the runner twice, and in heat it adds thermal strain on top.
+    delayPlan: {
+      afterMinutes: 12,
+      actions: (typeof t === "number" && t >= 24)
+        ? ["Stay in the shade and keep still", "One short stride shortly before you start"]
+        : ["Keep a layer on", "2 minutes easy moving", "One relaxed stride before you start"],
+    },
+    readinessCheck: WARMUP_READINESS_QUESTIONS,
   };
 }
 

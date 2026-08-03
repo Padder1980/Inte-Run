@@ -4053,6 +4053,15 @@ let SHEET_CTX = null;
 // ⚠️ The runner's ability band for warm-up scaling, from the status they already told us. The
 // specification is emphatic that one dose for everybody is the thing to avoid — the 2026 adolescent
 // study found a standard warm-up helped the fitter group and did nothing for the low-fitness one.
+// The daily check-in, as a 1-5 readiness score. ⚠️ Only ever used to REDUCE — a good day must not
+// unlock a bigger warm-up, which is the direction an app talks someone into more work.
+function readinessScore() {
+  const su = state.subj || {};
+  let score = 4;
+  if (su.energy === "low") score -= 2; else if (su.energy === "ok") score -= 1;
+  if (su.soreness === "high") score -= 2; else if (su.soreness === "some") score -= 1;
+  return Math.max(1, Math.min(5, score));
+}
 function warmupAbility() {
   const st = profile.status;
   if (st === "new") return "new";
@@ -4064,6 +4073,14 @@ function warmupAbility() {
 // length — a 90-minute long run opens easy and warms itself up; a much shorter interval session
 // opens near-maximal and needs real preparation.
 function warmupCardFor(sess) {
+  // ⚠️ RUNNING SESSIONS ONLY. A strength or mobility session has no running in it, and the generator
+  // reads only steps and RPE — so a strength session's honest RPE 4–5 looked like a steady run and
+  // was handed 24 minutes of easy jogging and strides. Caught by the duration figures, not by the
+  // warm-up card, because the card was never rendered for those sessions while the CHIP still
+  // counted them: a computed value reaching one consumer and not the other.
+  if (!sess || !sess.steps || !sess.steps.length) return null;
+  if (sess.exercises && sess.exercises.length) return null;
+  if (sess.type === "strength" || sess.type === "mobility" || sess.type === "rest" || sess.type === "cross-training") return null;
   try {
     return RC.buildWarmup(sess, warmupAbility(), {
       temperatureC: (state.wx && typeof state.wx.tempC === "number") ? state.wx.tempC : null,
@@ -4072,6 +4089,11 @@ function warmupCardFor(sess) {
       // session — against a paper that gives a half 0-15 minutes and a marathon 0-12, and warns
       // explicitly against copying short-race logic into long ones.
       raceDistance: sess.type === "race" ? (profile.goalDist || null) : null,
+      // The daily check-in already asks how the runner feels; it can only ever make this smaller.
+      readiness: readinessScore(),
+      ageYears: Number(profile.age) || null,
+      // ⚠️ A formal test is declined rather than compressed when time is short.
+      formalTest: sess.type === "race" || /time trial/i.test(sess.title || ""),
       // ⚠️ The safety gate. Reported illness or pain that changes how you run means NO warm-up is
       // generated at all — not a gentler one. The paper puts the medical gate above every
       // performance rule so that no later scaling can talk its way past it.
@@ -4095,9 +4117,32 @@ function warmupHtml(sess) {
       (p.phase === "mobilise" ? '<div class="wu-note">' + esc(p.instruction) + '</div>' : "") + '</div></div>';
   }).join("");
   const notes = w.notes.map((n) => '<div class="wu-note">' + esc(n) + '</div>').join("");
+  // ⚠️ "Warm-up incomplete" rather than a compressed routine, for a session whose value depends on
+  // being prepared for. The paper asks for this by name and it is the honest answer: a rushed time
+  // trial measures the warm-up, not the runner.
+  if (w.incomplete) {
+    return '<div class="card wu-card"><div class="subhead" style="margin-top:0">Warm-up incomplete</div>' +
+      '<div class="wu-why">' + esc(w.why) + '</div>' + notes + '</div>';
+  }
+  const delay = w.delayPlan
+    ? '<div class="wu-row"><div class="wu-tag">If delayed</div><div class="wu-b">' +
+        esc("Held up more than " + w.delayPlan.afterMinutes + " minutes? ") +
+        esc(w.delayPlan.actions.join(" · ")) +
+        '<div class="wu-note">Never run the whole warm-up again — a brief reactivation is enough, and repeating it spends you twice.</div></div></div>'
+    : "";
+  const check = w.readinessCheck
+    ? '<div class="wu-row"><div class="wu-tag">Before you start</div><div class="wu-b">' +
+        w.readinessCheck.map((q) => esc(q)).join("<br>") +
+        '<div class="wu-note">Sharp or worsening pain, or anything changing how you run, means stop rather than push on.</div></div></div>'
+    : "";
+  // The paper asks that its evidence grades survive into what the runner reads, so nothing here
+  // sounds more certain than the research behind it actually is.
+  const grade = '<div class="wu-note" style="margin-top:10px">Evidence grade ' + esc(w.evidenceGrade) +
+    ' — warm-ups are better supported for preparing you for the session than for anything else. ' +
+    'This one is a considered default, not a proven protocol.</div>';
   return '<div class="card wu-card"><div class="subhead" style="margin-top:0">Warm-up' +
       (w.embedded ? "" : ' <span class="wu-min num">' + w.totalMinutes + ' min</span>') + '</div>' +
-    '<div class="wu-why">' + esc(w.why) + '</div>' + rowsH + notes + '</div>';
+    '<div class="wu-why">' + esc(w.why) + '</div>' + rowsH + (w.embedded ? "" : delay + check) + notes + grade + '</div>';
 }
 function fuelHtml(sess) {
   if (!sess || !sess.steps) return "";
@@ -4119,9 +4164,22 @@ function fuelHtml(sess) {
 }
 function sessionSheetHtml(sess, week) {
   const sc = "var(--eff-" + effortOf(sess) + ")";
-  const dur = Math.round(sess.estimatedDurationSeconds / 60);
+  // ⚠️ THE TIME ON THE CARD MUST INCLUDE THE WARM-UP WE ACTUALLY PRESCRIBE. Generating longer,
+  // more specific warm-ups without telling the clock made every number here wrong: measured, an
+  // interval session said 50 minutes and really wanted 69, and race day said 115 against 139. The
+  // paper lists this as a content assertion for exactly that reason — a warm-up you did not budget
+  // for is one the runner skips.
+  // ⚠️ The session's OWN estimatedDurationSeconds is left alone. It feeds the volume and intensity
+  // models, and rewriting it here would reshape every plan in the app — the weeklyVolumeKm trap in
+  // a new coat. This adjusts what is DISPLAYED, nothing else.
+  const wu = warmupCardFor(sess);
+  const ownWu = (sess.steps || []).filter((st) => st.kind === "warmup")
+    .reduce((a, st) => a + (st.durationSeconds || 0), 0) / 60;
+  const extra = (wu && !wu.embedded && !wu.incomplete) ? Math.max(0, Math.round(wu.totalMinutes - ownWu)) : 0;
+  const dur = Math.round(sess.estimatedDurationSeconds / 60) + extra;
   const dist = sess.estimatedDistanceMeters ? (Math.round(sess.estimatedDistanceMeters / 100) / 10) + " km" : null;
   const chips = ['<span class="chip">' + dur + "′" + (dist ? " · " + dist : "") + "</span>"];
+  if (extra > 0) chips.push('<span class="chip">incl. ' + wu.totalMinutes + "′ warm-up</span>");
   if (sess.targetRpe) chips.push('<span class="chip rpe">RPE ' + sess.targetRpe.min + "–" + sess.targetRpe.max + "</span>");
   let body;
   if (sess.exercises && sess.exercises.length) {
@@ -5909,7 +5967,42 @@ const TRIAL_PARTS = [
 ];
 // Send the runner from the setup form into a trial session that's been added to Today.
 function startTrialFlow() { state.trialPending = true; state.screen = null; state.tab = "today"; render(); }
+// ⚠️ The trial's warm-up is GENERATED now, from the same rules as every other session, so it scales
+// with ability and shortens in heat — and, being a formal test, it is declined rather than
+// compressed when there is not enough time. TRIAL_PARTS is the fallback shape if generation fails.
+function trialWarmupRows() {
+  const mock = {
+    type: "race", title: "2 km time trial",
+    targetRpe: { min: 9, max: 10 },
+    steps: [
+      { kind: "warmup", label: "Easy", durationSeconds: 900, targetRpe: { min: 2, max: 3 } },
+      { kind: "rep", label: "2 km", distanceMeters: 2000, targetRpe: { min: 9, max: 10 } },
+    ],
+  };
+  let w = null;
+  try { w = RC.buildWarmup(mock, warmupAbility(), {
+    temperatureC: (state.wx && typeof state.wx.tempC === "number") ? state.wx.tempC : null,
+    readiness: readinessScore(), ageYears: Number(profile.age) || null, formalTest: true,
+    unwell: !!(state.subj && (state.subj.illness !== "none" || state.subj.soreness === "high")),
+  }); } catch (e) { w = null; }
+  if (!w || w.incomplete || !w.phases.length) return null;
+  return w;
+}
 function trialTodayCard() {
+  const gen = trialWarmupRows();
+  if (gen) {
+    const rows = gen.phases.filter((p) => p.phase !== "transition").map((p) => {
+      const lab = p.phase === "mobilise" ? p.movements.join(" · ") : p.instruction;
+      return '<div class="sess"><span class="dot ' + (p.phase === "potentiate" ? "hard" : "easy") + '"></span><div><div class="st">' +
+        (p.phase === "raise" ? "Warm-up" : p.phase === "mobilise" ? "Mobilise" : "Strides") +
+        '</div><div class="sm" style="color:var(--ink-soft)">' + esc(lab) + '</div></div></div>';
+    }).join("") +
+      '<div class="sess"><span class="dot hard"></span><div><div class="st">2 km time trial</div>' +
+      '<div class="sm" style="color:var(--ink-soft)">The fastest pace you can hold for the whole 2 km — aim to make the second kilometre at least as quick as the first</div></div></div>' +
+      '<div class="sess"><span class="dot easy"></span><div><div class="st">Cool-down</div>' +
+      '<div class="sm" style="color:var(--ink-soft)">5–10 min easy jog to recover</div></div></div>';
+    return '<div class="wk-card" style="--c:var(--eff-hard)"><div class="b"><div class="t">2 km time trial</div><div class="sub">Added to today · ' + gen.totalMinutes + '′ warm-up included</div><div style="margin-top:10px;display:flex;flex-direction:column;gap:10px">' + rows + '</div></div></div>';
+  }
   const rows = TRIAL_PARTS.map((p) => '<div class="sess"><span class="dot ' + p[0] + '"></span><div><div class="st">' + p[1] + '</div><div class="sm" style="color:var(--ink-soft)">' + p[2] + '</div></div></div>').join("");
   return '<div class="wk-card" style="--c:var(--eff-hard)"><div class="b"><div class="t">2 km time trial</div><div class="sub">Added to today · warm-up included</div><div style="margin-top:10px;display:flex;flex-direction:column;gap:10px">' + rows + '</div></div></div>';
 }

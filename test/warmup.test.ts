@@ -247,3 +247,76 @@ test("an embedded warm-up gains strides when the hard work starts early", () => 
   // ⚠️ A brand-new runner is exempt: strides are the component the paper caps hardest for them.
   assert.ok(!buildWarmup(early, "new")!.phases.some((p: any) => p.phase === "potentiate"));
 });
+
+test("readiness can only ever REDUCE, never add", () => {
+  // ⚠️ The paper's acceptance criterion 4. A good readiness score must not unlock a bigger warm-up:
+  // there is no evidence for it, and it is precisely the direction in which an app talks somebody
+  // into more work on a day they happened to say they felt fine.
+  const s = thresholdSession(paces, 1);
+  const normal = buildWarmup(s, "intermediate")!;
+  const flat = buildWarmup(s, "intermediate", { readiness: 2 })!;
+  const great = buildWarmup(s, "intermediate", { readiness: 5 })!;
+  assert.ok(flat.totalMinutes < normal.totalMinutes, "a poor score shortens it");
+  assert.equal(great.totalMinutes, normal.totalMinutes, "a good score changes nothing");
+  const st = (w: any) => (w.phases.find((p: any) => p.phase === "potentiate") || { strides: 0 }).strides;
+  assert.ok(st(flat) <= st(normal), "and it never adds strides");
+  assert.ok(flat.notes.some((n) => /conservativ|not feeling/i.test(n)), "and it says why");
+});
+
+test("a formal test is never compressed — it is declined", () => {
+  // ⚠️ The paper is explicit: for a formal time trial, too little time returns "warm-up incomplete"
+  // rather than squeezing the preparation. A rushed warm-up produces a time that measures the
+  // warm-up, and the whole value of the test is being comparable with the last one.
+  const s = vo2Session(paces, 1);
+  const rushed = buildWarmup(s, "intermediate", { timeAvailableMinutes: 6, formalTest: true })!;
+  assert.equal(rushed.incomplete, true);
+  assert.equal(rushed.phases.length, 0, "no compressed routine is offered");
+  assert.ok(/comparable|not enough time/i.test(rushed.why + rushed.notes.join(" ")));
+  // An ordinary session in the same six minutes still gets the best available version.
+  const ordinary = buildWarmup(s, "intermediate", { timeAvailableMinutes: 6 })!;
+  assert.ok(!ordinary.incomplete && ordinary.phases.length > 0);
+  // And with enough time, a formal test warms up normally.
+  assert.ok(!buildWarmup(s, "intermediate", { timeAvailableMinutes: 60, formalTest: true })!.incomplete);
+});
+
+test("a delayed start gets a re-warm plan, and never a repeat", () => {
+  const w = buildWarmup(thresholdSession(paces, 1), "intermediate")!;
+  assert.ok(w.delayPlan && w.delayPlan.afterMinutes > 0);
+  const txt = w.delayPlan!.actions.join(" ");
+  assert.ok(!/repeat|again from the start|full warm/i.test(txt), "never repeat the warm-up");
+  assert.ok(/stride|easy/i.test(txt), "a brief reactivation instead");
+  // ⚠️ In heat the re-warm must not add movement — thermal strain is the thing being managed.
+  const hot = buildWarmup(thresholdSession(paces, 1), "intermediate", { temperatureC: 30 })!;
+  assert.ok(/shade|still/i.test(hot.delayPlan!.actions.join(" ")));
+});
+
+test("the three readiness questions are asked after the warm-up", () => {
+  const w = buildWarmup(vo2Session(paces, 1), "intermediate")!;
+  assert.ok(w.readinessCheck && w.readinessCheck.length === 3);
+  assert.ok(w.readinessCheck!.some((q) => /legs/i.test(q)));
+  assert.ok(w.readinessCheck!.some((q) => /breathing/i.test(q)));
+  assert.ok(w.readinessCheck!.some((q) => /pain/i.test(q)));
+});
+
+test("under-18s get a smaller, simpler warm-up", () => {
+  const s = vo2Session(paces, 1);
+  const adult = buildWarmup(s, "intermediate")!;
+  const teen = buildWarmup(s, "intermediate", { ageYears: 15 })!;
+  assert.ok(teen.totalMinutes < adult.totalMinutes);
+  const st = (w: any) => (w.phases.find((p: any) => p.phase === "potentiate") || { strides: 0 }).strides;
+  assert.ok(st(teen) <= st(adult));
+  assert.ok(teen.notes.some((n) => /your age|simple/i.test(n)));
+});
+
+test("a static hold appears only when asked for, and is never sold as necessary", () => {
+  // The paper allows a short hold for a known restriction or a preference; it does not support
+  // making it compulsory, and a long hold immediately before fast running is the thing to avoid.
+  const s = thresholdSession(paces, 1);
+  const plain = buildWarmup(s, "intermediate")!;
+  const held = buildWarmup(s, "intermediate", { mobilityNeeds: true })!;
+  const mv = (w: any) => (w.phases.find((p: any) => p.phase === "mobilise") || { movements: [] }).movements.join(" ");
+  assert.ok(!/hold/i.test(mv(plain)), "no holds unless asked for");
+  assert.ok(/15–30 seconds/.test(mv(held)), "a short hold when asked for");
+  assert.ok(held.notes.some((n) => /because you asked/i.test(n)), "framed as the runner's choice");
+  assert.ok(!/must|should always|need to stretch/i.test(held.notes.join(" ")));
+});

@@ -25,6 +25,7 @@ import argparse
 import io
 import json
 import os
+import shutil
 import sys
 import urllib.request
 
@@ -150,6 +151,17 @@ def polish_and_write(mp3_bytes: bytes, path_noext: str) -> str:
         return out
 
 
+# ⚠️ HAND-AUTHORED CLIPS — the generator must NEVER overwrite these, not even under --force.
+# Two of the Sportsman's catchphrases are not plain reads of their text. `keep_going_2` is a
+# directed take (a different model, with its trailing word cut off) and `tempo_1` was chosen by
+# ear from four takes. A fresh read of the same string is NOT equivalent: the owner settled these
+# deliveries over five rounds of listening, and the hash gate cannot see the difference — bump
+# VERSION or touch the wording and both silently revert to a flat read. That is the same
+# computed-and-discarded trap CLAUDE.md documents elsewhere, applied to audio.
+# `--force-hand` re-records them deliberately, which means re-doing that listening.
+HAND_AUTHORED = {("sportsman", "keep_going_2"), ("sportsman", "tempo_1")}
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--list-voices", action="store_true")
@@ -159,6 +171,9 @@ def main() -> None:
     # a second copy of a fact that has to agree with coach-prompts.ts and silently did not.
     ap.add_argument("--coach")
     ap.add_argument("--force", action="store_true", help="regenerate even when the hash matches")
+    ap.add_argument("--force-hand", action="store_true",
+                    help="also re-record the HAND_AUTHORED clips, discarding their approved "
+                         "delivery (--force deliberately does NOT)")
     ap.add_argument("--personal", metavar="NAME",
                     help="generate the private pack in which the coaches say this person's name "
                          "(written to web/voices-personal/<slug>/ — gitignored, never published)")
@@ -188,14 +203,36 @@ def main() -> None:
             old[(c["coach"], c["id"])] = c.get("hash")
 
     coaches = [c for c in data["coaches"] if not args.coach or c["id"] == args.coach]
-    todo = []
+    todo, protected = [], []
     for c in coaches:
         vid = casting[c["id"]]["voice_id"]
         for p in data["prompts"]:
+            if (c["id"], p["id"]) in HAND_AUTHORED and not args.force_hand:
+                protected.append(f'{c["id"]}/{p["id"]}')
+                continue
             text = (p.get("byCoach") or {}).get(c["id"], p["text"])
             h = clip_hash(text, "el:" + vid, VERSION)
             if args.force or old.get((c["id"], p["id"])) != h:
                 todo.append((c, p, vid, h, text))
+    if protected:
+        print("Protected (hand-authored, left as-is): " + ", ".join(protected))
+    # ⚠️ `web/voices/` is GITIGNORED — the committed copy of every clip lives in `docs/voices/`.
+    # So on a fresh clone the protected clips are absent here, and skipping them would drop them
+    # from the manifest (which is rebuilt from the files on disk) while leaving the MP3s sitting
+    # in docs/ untouched by the non-deleting mirror: the audio present, listed nowhere, and the
+    # coach silently falling back to the device voice. Restore them from the committed copy.
+    for cid, pid in sorted(HAND_AUTHORED):
+        live = os.path.join(OUT_ROOT, cid, pid + ".mp3")
+        if os.path.exists(live):
+            continue
+        shipped = os.path.join(ROOT, "docs", "voices", cid, pid + ".mp3")
+        if os.path.exists(shipped):
+            os.makedirs(os.path.dirname(live), exist_ok=True)
+            shutil.copyfile(shipped, live)
+            print(f"Restored hand-authored {cid}/{pid} from docs/voices")
+        else:
+            print(f"⚠️  hand-authored {cid}/{pid} is missing from BOTH web/ and docs/ — "
+                  f"it will be absent from the manifest. Re-record with --force-hand.")
     chars = sum(len(t) for _, _, _, _, t in todo)
     print(f"{len(todo)} clips to generate ({chars} characters). Voices: "
           + ", ".join(f'{c["id"]}={casting[c["id"]]["name"]}' for c in coaches))

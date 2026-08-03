@@ -54,7 +54,7 @@
    "id": "sportsman",
    "name": "The Sportsman",
    "voice": "Irish Sportsman",
-   "bytes": 2559661
+   "bytes": 2543272
   }
  ],
  "clips": [
@@ -11774,9 +11774,9 @@
    "voice": "Irish Sportsman",
    "trigger": "tempo-start",
    "file": "voices/sportsman/tempo_1.mp3",
-   "duration": 3.5,
-   "bytes": 38990,
-   "hash": "3d950af7e4736aa1"
+   "duration": 1.67,
+   "bytes": 17305,
+   "hash": "df9c0af232ea8c60"
   },
   {
    "id": "threshold_1",
@@ -11984,9 +11984,9 @@
    "voice": "Irish Sportsman",
    "trigger": "pace-ahead",
    "file": "voices/sportsman/pace_ahead_2.mp3",
-   "duration": 1.93,
-   "bytes": 23693,
-   "hash": "5ebeef5851b86008"
+   "duration": 2.02,
+   "bytes": 24845,
+   "hash": "d0dc788064a71b64"
   },
   {
    "id": "pace_ahead_3",
@@ -12034,9 +12034,9 @@
    "voice": "Irish Sportsman",
    "trigger": "keep-going",
    "file": "voices/sportsman/keep_going_2.mp3",
-   "duration": 1.43,
-   "bytes": 17438,
-   "hash": "5a78f58266c3c9e2"
+   "duration": 1.68,
+   "bytes": 21582,
+   "hash": "ffe6bd34c1e88a83"
   },
   {
    "id": "keep_going_3",
@@ -13109,5 +13109,5 @@
    "hash": "6afc2957dc5d2876"
   }
  ],
- "totalBytes": 25735266
+ "totalBytes": 25718877
 }

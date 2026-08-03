@@ -140,6 +140,65 @@ runner is out there at all**.
 ⚠️ **No prompt text may contain a digit.** Clips are pre-generated, so a number can never be spoken
 correctly. `test/coach-variants.test.ts` asserts this across every coach.
 
+### Directing a delivery (learned the hard way, 2026-08-03)
+
+The owner supplied a screen recording of a real delivery and asked for a catchphrase to match it.
+**Every attempt that processed recorded speech was rejected by his ear; every attempt that changed
+what the MODEL was asked to perform was accepted.** That is the rule, not a preference of his:
+
+⚠️ **NEVER time-stretch or splice speech to fake a delivery.** Six versions were produced by
+WSOLA time-stretching and mid-phrase splicing, all measured to match the reference's timing to a
+few hundredths of a second, and the verdict was *"too jerky and less flowy"*. Matching the numbers
+is not matching the performance — the artefacts of stretching a vowel and cross-fading mid-phrase
+are audible even when the envelope is right. Delete the DSP and re-ask the model.
+
+⚠️ **`speed` in `voice_settings` re-renders the whole line and COSTS THE ACCENT.** At 0.75 the
+Irish accent and the attitude went with it (*"its lost its irish accent and expression"*). It is
+not a tempo control on a fixed performance; it is a different performance.
+
+**What DOES work, in order of preference:**
+1. `<break time="1.6s" />` in the text — a single continuous take with real pauses. Asked for a
+   0.6s and a 1.6s break, the model performed 0.79s and 1.48s and put its own 0.16s hesitation in
+   the same place the reference does. Nothing spliced, nothing stretched.
+2. **Spelling and punctuation** — `Baaby!` genuinely drawls the word; `Baby?!` reads incredulous;
+   `jooob` lengthens it. This is how to lengthen ONE word without touching the rest.
+3. `eleven_v3` with direction tags (`[slowly]`, `[shouting]`) — more expressive, but it slows the
+   WHOLE line, which was rejected as *"too slow"*.
+4. Lower `stability` (~0.28) for a freer read of the same words.
+
+⚠️ **If a splice is unavoidable, join in SILENCE and match the level.** The one acceptable edit is
+grafting a replacement first/last word across a pause that already exists, with the level matched
+to the word being replaced (different models render at different loudness, and a step in level
+reads as a splice however clean the cut). Find the boundary as the **widest** silence — taking the
+first gap grafted onto a 0.19s breath and silently collapsed the pause, so the "slowed" version
+came out *shorter* than the original.
+
+⚠️ **THE GENERATOR WILL SILENTLY DESTROY A HAND-CUT CLIP.** `HAND_AUTHORED` in
+`generate-elevenlabs.py` names the clips whose delivery was settled by ear; they are skipped even
+under `--force` (only `--force-hand` re-records them). The hash gate compares (text, voice,
+version) and **cannot tell a directed take from a flat read**, so bumping `VERSION` or editing the
+wording would revert five rounds of listening to a plain read with no error and no diff to notice.
+Same computed-and-discarded trap as `CLASS` and `PLAN.notes`, applied to audio.
+
+⚠️ **Keep the catalogue text equal to what the clip actually SAYS.** The final line dropped its
+opening word, so the `sportsman` variant was edited to match. Leaving the old text there would mean
+the protected clip and its prompt disagree, and the day the guard is lifted the runner hears
+something different from what the catalogue promises.
+
+⚠️ **A hand-edited MP3 leaves `manifest.json` STALE — and `coachSaySequence` schedules from
+`clip.duration`.** Measured: `keep_going_2` read 2.70s in the manifest against 3.37s on disk. The
+fix is to re-run the generator, which rebuilds the manifest from the files on disk (durations and
+bytes both) without regenerating anything. ⚠️ **Run it with NO `--coach`** — the manifest rebuild
+loops over the *filtered* coach list, so `--coach sportsman` writes a manifest containing only that
+coach and silently strips the other 1160 clips.
+
+⚠️ **Two ElevenLabs features that would have replaced this whole exercise are blocked by API-key
+permissions**: `speech_to_speech` (feed in the reference recording, get that exact delivery back in
+the target voice) and `speech_to_text` (transcribe with word timings, instead of guessing which of
+three "baby"s the owner meant and sending him two files to choose from). Both return
+`401 missing_permissions`. Enabling them on the key is a tick-box in his ElevenLabs account and is
+worth asking for before attempting to match a supplied performance again.
+
 ### Personal voice packs (a coach saying a real person's name)
 
 Pre-generated audio cannot contain an arbitrary name, so this is a **two-tier** design:

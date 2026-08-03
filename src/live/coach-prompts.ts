@@ -322,7 +322,7 @@ export const PROMPTS: PromptDef[] = [
   { id: "long_2", trigger: "long-run-settle", text: "Steady does it. Sip fluids, stay relaxed, and let the miles build.", priority: P_AMBIENT, interrupt: false, minRepeatSec: 480, sessionTypes: ["long"], intensity: "low" },
 
   // — Tempo / threshold ------------------------------------------------------
-  { id: "tempo_1", trigger: "tempo-start", text: "Lifting to tempo now. Strong and controlled — comfortably hard.", priority: P_KEY, interrupt: false, minRepeatSec: 90, sessionTypes: ["threshold", "race-specific"], intensity: "high" },
+  { id: "tempo_1", trigger: "tempo-start", text: "Lifting to tempo now. Strong and controlled — comfortably hard.", priority: P_KEY, interrupt: false, minRepeatSec: 90, sessionTypes: ["threshold", "race-specific"], intensity: "high", variants: { /* Owner's line, and exactly the right moment for it: the start of the working block. */ sportsman: "Keep it simple and do your job." } },
   { id: "threshold_1", trigger: "threshold-hold", text: "Hold this effort. Smooth, steady, right on the edge of comfortable.", priority: P_INFO, interrupt: false, minRepeatSec: 120, sessionTypes: ["threshold", "race-specific"], intensity: "high" },
   { id: "threshold_2", trigger: "threshold-hold", text: "Stay composed. Same effort, same rhythm — keep it repeatable.", priority: P_INFO, interrupt: false, minRepeatSec: 120, sessionTypes: ["threshold", "race-specific"], intensity: "high" },
 
@@ -386,11 +386,13 @@ export const PROMPTS: PromptDef[] = [
       sportsman: "Too quick. Back off, you'll want that.", guide: "Easy now \u2014 you're quicker than we need. Save it for later.", pacer: "Above target. Ease back \u2014 the plan needs this pace, not that one.", motivator: "Whoa, speedster! Bank that fire \u2014 you'll want it at the end.", technician: "Running hot. Drop the effort a notch \u2014 same form, less force." } },
   { id: "pace_ahead_2", trigger: "pace-ahead", text: "Ahead of pace. Breathe, soften, let it come back.", priority: P_INFO, interrupt: false, minRepeatSec: 90, sessionTypes: "all",
     variants: {
+      // Owner's line. It fits going-too-fast exactly: the runner has misjudged what they can hold.
+      sportsman: "You're living in cuckoo land. Settle down.",
       spark: "Fast! Breathe, soften, settle.",
       steady: "Ahead of target. Let it come back on its own.",
       storyteller: "Running above yourself. Let the pace fall back to you.",
       commentator: "Well ahead of pace — and he needs to settle now.",
-      sportsman: "You're flying. Too early for that. Settle.", guide: "Ahead of pace. Breathe, soften, let it come back.", pacer: "Too quick. Settle down to the band and hold.", motivator: "Too hot too soon. Cool it a touch and finish like a hero instead.", technician: "Over pace. Relax the shoulders, shorten the push, let it slow." } },
+      guide: "Ahead of pace. Breathe, soften, let it come back.", pacer: "Too quick. Settle down to the band and hold.", motivator: "Too hot too soon. Cool it a touch and finish like a hero instead.", technician: "Over pace. Relax the shoulders, shorten the push, let it slow." } },
   { id: "pace_ahead_3", trigger: "pace-ahead", text: "Lovely energy, but ease off. Patience wins today.", priority: P_INFO, interrupt: false, minRepeatSec: 90, sessionTypes: "all",
     variants: {
       spark: "Great legs — but not yet! Ease off.",
@@ -424,11 +426,13 @@ export const PROMPTS: PromptDef[] = [
       sportsman: "It's meant to hurt. Keep going.", guide: "I know it's hard. You've been harder. Keep going.", pacer: "Hold the rhythm. The rhythm carries you.", motivator: "Don't you dare stop now \u2014 this is the good part!", technician: "When it hurts, run taller. Posture first, the rest follows." } },
   { id: "keep_going_2", trigger: "keep-going", text: "One step, then the next. That's all it ever is.", priority: P_KEY, interrupt: false, minRepeatSec: 300, sessionTypes: "all",
     variants: {
+      // ⚠️ Owner's line, and deliberately ONE OF THREE keep-going prompts rather than the only one. The catalogue rotates, so it lands sometimes and not every hard moment — a runner having a genuinely rotten day should not be called a baby three times in one session. Only The Sportsman says it; anyone who does not want this can pick another coach.
+      sportsman: "What a big baby. Just get on with the game.",
       spark: "One step. Then another. Go!",
       steady: "One step, then the next. That's the whole job.",
       storyteller: "One step at a time is how every one of these ends.",
       commentator: "Digging in now — one stride at a time.",
-      sportsman: "One foot, then the other. That's it.", guide: "One step, then the next. That's all it ever is.", pacer: "Nothing changes. Same pace, same breath, keep moving.", motivator: "Tough is temporary. You are not. Go!", technician: "Reset: shoulders down, breathe long, drive the arms." } },
+      guide: "One step, then the next. That's all it ever is.", pacer: "Nothing changes. Same pace, same breath, keep moving.", motivator: "Tough is temporary. You are not. Go!", technician: "Reset: shoulders down, breathe long, drive the arms." } },
   { id: "keep_going_3", trigger: "keep-going", text: "Stay with it. This part passes \u2014 you don't stop.", priority: P_KEY, interrupt: false, minRepeatSec: 300, sessionTypes: "all",
     variants: {
       spark: "Stay with it — this bit ends!",

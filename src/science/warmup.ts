@@ -95,6 +95,13 @@ export type Warmup = {
   evidenceGrade: EvidenceGrade;
   /** True when the warm-up IS the opening of the run rather than something done beforehand. */
   embedded: boolean;
+  /**
+   * For an embedded warm-up: how long the run's OWN opening is, in minutes. The caller pins the
+   * warm-up step to exactly this so the session keeps the length the plan gave it — the warm-up is
+   * describing minutes that already exist, not asking for new ones. Absent when the run has no
+   * opening of its own, in which case the caller carves the raise out of the first easy running.
+   */
+  openingMinutes?: number;
   totalMinutes: number;
   phases: WarmupPhase[];
   /** One plain sentence: why this warm-up, for this session, for this runner. */
@@ -247,7 +254,18 @@ export function buildWarmup(
 
   // ---- Easy, and continuous moderate running: the warm-up IS the opening of the run ----
   if (effort === "easy" || (effort === "steady" && isContinuous)) {
-    const mins = ability === "new" || ability === "beginner" ? 5 : 8;
+    // ⚠️ THE RUN'S OWN OPENING IS THE WARM-UP, SO ITS LENGTH IS THE RUN'S, NOT OURS. Sessions carry
+    // their own opening step — 6 minutes on a progression run, 15 on a threshold one — and an
+    // embedded warm-up is a description of those minutes. Advising a length of our own choosing made
+    // three things disagree at once: the card said 8 minutes, the delivered step was another number,
+    // and the session's total moved. Measured across 432 sessions, 69 had a duration chip that
+    // disagreed with what Start delivered, the worst losing 10 minutes of a 45-minute session.
+    const ownMin = Math.round(steps.filter((s) => s.kind === "warmup")
+      .reduce((a, s) => a + (s.durationSeconds || 0), 0) / 60);
+    const advise = ability === "new" || ability === "beginner" ? 5 : 8;
+    // The opening is however long the run says. The ADVICE is capped by it — "run the first 5 minutes
+    // slower" inside a 15-minute opening is sound; "the first 8" inside a 6-minute one is not.
+    const mins = ownMin > 0 ? Math.min(advise, ownMin) : advise;
     phases.push({
       phase: "raise", minutes: mins, rpe: { min: 2, max: 2 },
       instruction: ability === "new"
@@ -268,7 +286,12 @@ export function buildWarmup(
     // fired, printing "the quicker running starts early in this one" above a session where it
     // starts at 60% distance. The paper's 20 minutes is about how long the opening has had to do
     // its job, which is raise + easy, not easy on its own.
-    if ((look.effort !== "easy" || effort === "steady") && mins + look.minutesBefore <= 20 && ability !== "new") {
+    // ⚠️ And it counts the WHOLE opening, not the advised part of it. A threshold progression opens
+    // with 15 minutes of easy running of which we advise the first 5 be slower still; all 15 prime
+    // the runner. Using the advice instead put "the quicker running starts early" on 12 sessions
+    // whose first effort was 25-28 minutes in.
+    const openMin = ownMin > 0 ? ownMin : mins;
+    if ((look.effort !== "easy" || effort === "steady") && openMin + look.minutesBefore <= 20 && ability !== "new") {
       const n = ability === "beginner" ? 2 : 3;
       phases.push({
         phase: "potentiate", strides: n, seconds: 18, effort: "building towards the pace you are about to run",
@@ -279,7 +302,8 @@ export function buildWarmup(
     return {
       modelVersion: WARMUP_MODEL_VERSION, firstHardEffort: effort, evidenceGrade: GRADE[effort],
       embedded: true,
-      totalMinutes: mins + (phases.some((p) => p.phase === "potentiate") ? 4 : 0),
+      openingMinutes: ownMin > 0 ? ownMin : undefined,
+      totalMinutes: (ownMin > 0 ? ownMin : mins) + (phases.some((p) => p.phase === "potentiate") ? 4 : 0),
       phases,
       why: "This run starts easy, so the opening few minutes are the warm-up — there is nothing here demanding enough to need preparing for separately.",
       notes,

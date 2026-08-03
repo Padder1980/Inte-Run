@@ -223,18 +223,21 @@ test("an embedded warm-up gains strides when the hard work starts early", () => 
   // This fixture used to carry 15 real minutes and expect strides; with the 8-minute raise in front
   // the block actually began at 23 minutes, past the paper's 20, and the assertion was reading the
   // implementation's own arithmetic back to itself.
-  // ⚠️ 12 minutes is the boundary where both rules can hold at once, and it is deliberately exact:
-  // the run must have warmed itself up (>= EMBED_AFTER_MIN) yet the block must still arrive inside
-  // the first 20 minutes of the DELIVERED session (raise + easy). For a repetition block that is
-  // 12 exactly. Continuous steady work has a wide window instead, covered by the easyProgression
-  // case below — so if this ever becomes unreachable, that test is the one that proves strides live.
+  // ⚠️ THIS FIXTURE SITS ON A DELIBERATELY EXACT BOUNDARY, and both halves of it are load-bearing.
+  // For a repetition block to reach an EMBEDDED warm-up at all, the run's own easy running must be
+  // at least EMBED_AFTER_MIN (12) — below that the run has not warmed itself up and gets the full
+  // structured version. For strides, the block must still arrive inside the first 20 minutes of the
+  // DELIVERED session, which is the run's own opening PLUS that easy running. So 8 + 12 = 20 is the
+  // only shape that satisfies both. Continuous steady work has a wide window instead, covered by the
+  // easyProgression case below — if this one ever becomes unreachable, that is the test that proves
+  // strides still exist.
   const early = {
     targetRpe: { min: 2, max: 7 },
     steps: [
       // ⚠️ Steps carry a PACE. A session with neither pace nor distance is not a run — that is how
       // the generator tells a threshold session from a strength session, both of which are one
       // continuous block at a similar effort.
-      { kind: "warmup", label: "Easy", durationSeconds: 10 * 60, targetPaceSecPerKm: paces.easy, targetRpe: { min: 2, max: 3 } },
+      { kind: "warmup", label: "Easy", durationSeconds: 8 * 60, targetPaceSecPerKm: paces.easy, targetRpe: { min: 2, max: 3 } },
       { kind: "steady", label: "Easy", durationSeconds: 12 * 60, targetPaceSecPerKm: paces.easy, targetRpe: { min: 2, max: 3 } },
       { kind: "rep", label: "Threshold block", durationSeconds: 20 * 60, targetPaceSecPerKm: paces.threshold, targetRpe: { min: 6, max: 7 } },
     ],

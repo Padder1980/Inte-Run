@@ -1095,6 +1095,47 @@ generated raise the surplus is given back, or the plan quietly loses minutes it 
 is nothing to borrow from, the raise shrinks rather than the session growing: a 20-minute run must
 not become a 29-minute one because its warm-up would not fit inside it.
 
+⚠️ **SWEEP IT, AND SWEEP THE PLAN — `test/warmup-delivery.test.ts`.** The defects above lived behind a
+green suite because `withGeneratedWarmup` is web-layer code and every warm-up test was a `src/` test.
+That file lifts the function out of the BUILT `web/app.html` (same precedent as
+`home-screen-chrome.test.ts`) and runs it over the whole builder catalogue **and every session of real
+generated plans**, across four ability bands. Traps it caught in its own construction, each of which
+made it prove less than it claimed:
+- ⚠️ **`generatePlan(athlete, goal, options)` is POSITIONAL.** Passing one object threw, a
+  `catch { continue }` swallowed it, and the plan arm contributed **nothing** — the sweep measured 432
+  builder sessions while its comment claimed to cover plans, which are the sessions runners get on
+  Today. It throws now. Fixing it immediately found four more defects.
+- ⚠️ **`Athlete.recent` is `{distanceMeters, timeSeconds}`**, not `recentRaceDistance`/`recentRaceTimeSeconds`.
+- ⚠️ **A NaN duration makes every comparison false, so a broken sweep reports clean.** Paces built from
+  the wrong input shape made distance-derived repetitions non-finite; the sweep said NO DEFECTS.
+  Non-finite now fails loudly.
+- ⚠️ **Never assert a value against itself.** The first version compared the duration chip to the
+  delivered length *after* the fix made both read the same array — passing whatever happened. It
+  asserts the invariants a runner can be wronged by instead.
+- ⚠️ **The strides step is itself RPE 5-7**, so "find the first hard step" finds the strides and
+  compares them to themselves. Skip `kind === "warmup"`. Same for the run's OWN strides step in
+  "40′ easy + strides", which is the session's work.
+
+⚠️ **STRIDES ADD TIME; THE RAISE DOES NOT.** Only the raise describes minutes the run already
+contains, so only the raise is reconciled against the run's own opening. A 23-minute moderate run is
+RPE 3-4 throughout — there is no step worth shortening — so trying to absorb the strides shrank the
+raise to one minute and still overran. They add, and the chip is derived from the delivered steps, so
+the runner is told.
+
+⚠️ **EVERY SECTION OF THE BRIEF CARRIES ITS TIME AND DISTANCE** (`spanText`, owner's request
+2026-08-03). A rep block reports the WHOLE block including recoveries — the per-rep figure is already
+in the label. A distance the plan **asked for** prints at any size (hill reps are 50 m, and
+suppressing that left the row with no figure at all); a distance **inferred** from pace × time is
+hidden under 200 m, where it would be rounding noise. The warm-up card's rows read their times off the
+delivered steps too, not off the phase: the phase says "3 × 18 seconds", the step it becomes is 75 s
+per stride including the walk back.
+
+**Two findings deliberately NOT changed**, both reported to the owner rather than quietly fixed:
+- **Race day prescribes no cool-down.** `applyRaceDay` builds a warm-up plus the race and rests
+  afterwards. Whether a goal race should carry a cool-down jog is a coaching decision, not a test fix.
+- **A recovery jog has no cool-down either**, and correctly so — it is easy from start to finish, so
+  the test scopes that assertion to sessions containing work.
+
 ⚠️ **A non-embedded warm-up IS extra time, and that is not the same bug.** The threshold session is
 53′ of steps delivered as 62′ — correct, and the sheet's duration chip already adds it
 (`extra` is computed only when `!wu.embedded`). Verified they agree to the minute. Don't "fix" it.

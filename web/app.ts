@@ -3950,6 +3950,33 @@ function rawSessionById(wIdx, id) {
 }
 function fmtSec(s) { s = Math.round(s); if (s < 60) return s + "″"; const m = Math.floor(s / 60), x = s % 60; return x ? m + "′" + String(x).padStart(2, "0") + "″" : m + "′"; }
 function workLabel(st) { if (st.distanceMeters) return Math.round(st.distanceMeters) + " m"; if (st.durationSeconds) return fmtSec(st.durationSeconds); return st.label; }
+// ⚠️ EVERY SECTION SAYS HOW LONG YOU ARE IN IT. Owner's request, 2026-08-03: a brief that lists
+// paces and efforts but no durations makes the runner do arithmetic mid-run to work out when the
+// next thing happens. Distance is derived from the step's own pace band when it does not carry one,
+// and suppressed under 200 m where rounding would print a figure with no information in it.
+// ⚠️ A rep block reports the WHOLE block, recoveries included — that is the wall clock you are in it
+// for, and the per-repetition figure is already in the label ("6 × 400 m").
+function spanText(list) {
+  let sec = 0, said = 0, derived = 0;
+  for (const st of list || []) {
+    const d = st.durationSeconds || 0;
+    sec += d;
+    // ⚠️ A DISTANCE THE PLAN ASKED FOR IS PRINTED WHATEVER ITS SIZE. Suppressing small ones under a
+    // single threshold left hill reps with no figure at all — "50 m uphill" is the prescription, not
+    // rounding noise. A distance we INFERRED from pace × time is different: under 200 m it is noise,
+    // so it stays hidden.
+    if (st.distanceMeters) said += st.distanceMeters;
+    else if (d && st.targetPaceSecPerKm) {
+      const p = (st.targetPaceSecPerKm.minSecPerKm + st.targetPaceSecPerKm.maxSecPerKm) / 2;
+      if (p > 0) derived += (d / p) * 1000;
+    }
+  }
+  const m = said + derived;
+  const out = [];
+  if (sec > 0) out.push(sec < 90 ? Math.round(sec) + "s" : Math.round(sec / 60) + " min");
+  if (said > 0 || derived >= 200) out.push(m < 950 ? Math.round(m / 10) * 10 + " m" : (Math.round(m / 100) / 10) + " km");
+  return out.join(" · ");
+}
 function stepChips(st) {
   const b = [];
   if (st.targetPaceSecPerKm) b.push('<span class="chip pace">' + fmtPace(st.targetPaceSecPerKm.minSecPerKm) + "–" + fmtPace(st.targetPaceSecPerKm.maxSecPerKm) + "/km</span>");
@@ -3976,6 +4003,10 @@ function sessionStepText(sess) {
 }
 function structureRows(steps, plain) {
   const stepChipsFn = plain ? stepTargetText : stepChips;
+  // The span leads, because "how long" is the first thing anyone wants from a row.
+  const withSpan = (sp, rest) => plain
+    ? [sp, rest].filter(Boolean).join(" · ")
+    : (sp ? '<span class="chip">' + sp + "</span>" : "") + rest;
   const rows = []; let i = 0;
   while (i < steps.length) {
     const st = steps[i];
@@ -3998,14 +4029,14 @@ function structureRows(steps, plain) {
       else lab = reps.map(workLabel).join(" · ");
       const rec = recs[0];
       const recLine = rec ? "with " + workLabel(rec) + " " + (String(rec.label).toLowerCase().includes("walk") ? "walk" : "easy jog") + " between" : "";
-      rows.push({ tag: "Work", lab: plain ? String(reps.length === 1 ? reps[0].label : lab) : lab, chips: stepChipsFn(reps[0]), rec: recLine, muted: false });
+      rows.push({ tag: "Work", lab: plain ? String(reps.length === 1 ? reps[0].label : lab) : lab, chips: withSpan(spanText(reps.concat(recs)), stepChipsFn(reps[0])), rec: recLine, muted: false });
       i = j;
     } else {
       const tag = st.kind === "warmup" ? "Warm-up" : st.kind === "cooldown" ? "Cool-down" : "Steady";
       // ⚠️ In plain mode the label must stay RAW. It is escaped again by runDescriptionHtml at
       // render, so escaping it into the stored snapshot too showed a strength session as
       // "Bodyweight strength &amp; mobility" on screen, entity and all.
-      rows.push({ tag, lab: plain ? String(st.label) : esc(st.label), chips: stepChipsFn(st), rec: "", muted: st.kind === "warmup" || st.kind === "cooldown" });
+      rows.push({ tag, lab: plain ? String(st.label) : esc(st.label), chips: withSpan(spanText([st]), stepChipsFn(st)), rec: "", muted: st.kind === "warmup" || st.kind === "cooldown" });
       i++;
     }
   }
@@ -4191,11 +4222,23 @@ function warmupHtml(sess) {
       '<div class="wu-why">You have told us you are unwell or sore enough that it is changing how you run. ' +
       'That comes before any session — see how you feel tomorrow rather than warming up for this one.</div></div>';
   }
+  // ⚠️ The time on each warm-up row is read off the STEPS THE RUNNER WILL BE GIVEN, not off the
+  // phase's own minutes. The phase says "3 × 18 seconds"; the step it becomes is 75 s per stride
+  // including the walk back, so quoting the phase would understate that row by nearly half. Same
+  // rule as the duration chip: one source, and it is the session Start runs.
+  let liveWu = [];
+  try { liveWu = (withGeneratedWarmup(sess).steps || []).filter((st) => st.kind === "warmup"); } catch (e) { liveWu = []; }
+  const wuStep = (re) => liveWu.find((st) => re.test(String(st.label)));
   const rowsH = w.phases.map((p) => {
     const tag = p.phase === "raise" ? "Raise" : p.phase === "mobilise" ? "Mobilise"
       : p.phase === "potentiate" ? "Strides" : "Then";
     const lab = p.phase === "mobilise" ? p.movements.map((m) => esc(m)).join(" · ") : esc(p.instruction);
+    const st = p.phase === "raise" ? wuStep(/^Ease in|^Warm up easy/)
+      : p.phase === "mobilise" ? wuStep(/^Mobilise/)
+      : p.phase === "potentiate" ? wuStep(/strides/) : wuStep(/^Settle/);
+    const sp = st ? spanText([st]) : (p.minutes ? Math.round(p.minutes) + " min" : "");
     return '<div class="wu-row"><div class="wu-tag">' + tag + '</div><div class="wu-b">' + lab +
+      (sp ? '<div class="sd-meta"><span class="chip">' + sp + "</span></div>" : "") +
       (p.phase === "mobilise" ? '<div class="wu-note">' + esc(p.instruction) + '</div>' : "") + '</div></div>';
   }).join("");
   const notes = w.notes.map((n) => '<div class="wu-note">' + esc(n) + '</div>').join("");
@@ -4255,13 +4298,25 @@ function sessionSheetHtml(sess, week) {
   // models, and rewriting it here would reshape every plan in the app — the weeklyVolumeKm trap in
   // a new coat. This adjusts what is DISPLAYED, nothing else.
   const wu = warmupCardFor(sess);
+  // ⚠️ THE TIME ON THE CHIP IS MEASURED ON THE SESSION START WILL ACTUALLY RUN. It used to be
+  // rebuilt here from the warm-up's own totalMinutes, which is a second formula for the same
+  // quantity — and two formulas drift: measured across 432 sessions, 57 chips disagreed with what
+  // Start delivered, by up to 1.7 minutes in both directions, because the engine rounds a strides
+  // block to whole minutes while the step is 75 s per stride. There is one answer now, and it comes
+  // from the steps themselves.
+  const live = wu ? withGeneratedWarmup(sess) : sess;
+  const liveSec = (live.steps || []).reduce((a, st) => a + (st.durationSeconds || 0), 0);
   const ownWu = (sess.steps || []).filter((st) => st.kind === "warmup")
     .reduce((a, st) => a + (st.durationSeconds || 0), 0) / 60;
-  const extra = (wu && !wu.embedded && !wu.incomplete) ? Math.max(0, Math.round(wu.totalMinutes - ownWu)) : 0;
-  const dur = Math.round(sess.estimatedDurationSeconds / 60) + extra;
+  const dur = liveSec ? Math.round(liveSec / 60) : Math.round(sess.estimatedDurationSeconds / 60);
+  const extra = (wu && !wu.embedded && !wu.incomplete)
+    ? Math.max(0, dur - Math.round(sess.estimatedDurationSeconds / 60)) : 0;
   const dist = sess.estimatedDistanceMeters ? (Math.round(sess.estimatedDistanceMeters / 100) / 10) + " km" : null;
   const chips = ['<span class="chip">' + dur + "′" + (dist ? " · " + dist : "") + "</span>"];
-  if (extra > 0) chips.push('<span class="chip">incl. ' + wu.totalMinutes + "′ warm-up</span>");
+  // Same rule: quote the warm-up the runner is given, not the engine's rounded estimate of it.
+  if (extra > 0) chips.push('<span class="chip">incl. ' + Math.round(((live.steps || [])
+    .filter((st) => st.kind === "warmup")
+    .reduce((a, st) => a + (st.durationSeconds || 0), 0)) / 60) + "′ warm-up</span>");
   if (sess.targetRpe) chips.push('<span class="chip rpe">RPE ' + sess.targetRpe.min + "–" + sess.targetRpe.max + "</span>");
   let body;
   if (sess.exercises && sess.exercises.length) {
@@ -6809,7 +6864,23 @@ function withGeneratedWarmup(sess) {
   if (w.embedded) {
     const ownWuSec = (sess.steps || []).filter((st) => st.kind === "warmup")
       .reduce((a, st) => a + (st.durationSeconds || 0), 0);
-    const addedSec = steps.reduce((a, st) => a + (st.durationSeconds || 0), 0);
+    // ⚠️ PIN THE RAISE TO THE RUN'S OWN OPENING. The card advises how to run the first few minutes of
+    // an opening the plan already wrote; substituting a length of our own moved the session's total
+    // in both directions — measured, a 45-minute threshold progression was delivered as 35 because
+    // its 15-minute opening was replaced by a 5-minute one, and nothing in it was easy running to
+    // give the difference back to. openingMinutes is that length, decided once, in the engine.
+    if (w.openingMinutes) {
+      const raise = steps.find((st) => /Ease in|Warm up easy/.test(String(st.label)));
+      if (raise) raise.durationSeconds = Math.max(60, Math.round(w.openingMinutes * 60));
+    }
+    // ⚠️ ONLY THE RAISE IS RECONCILED. It describes minutes the run already contains, so it must not
+    // change the total. Strides are the opposite: extra work, done in addition, exactly like a
+    // structured warm-up — and borrowing their time from the session eats the work the plan asked
+    // for. Measured: a 23-minute moderate run has no step this code is willing to shorten (all of it
+    // is RPE 3-4), so trying to absorb them shrank the raise to one minute and still overran. They
+    // add, and the duration chip is derived from these steps so the runner is told.
+    const addedSec = steps.filter((st) => !/strides/.test(String(st.label)))
+      .reduce((a, st) => a + (st.durationSeconds || 0), 0);
     let over = addedSec - ownWuSec;
     for (let i = 0; i < rest.length && over > 0; i++) {
       const st = rest[i];

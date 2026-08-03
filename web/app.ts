@@ -6645,8 +6645,55 @@ window.__interunWatchStart = function (ok, reason) {
   toast(reason || "Couldn\u2019t start your watch \u2014 open Inte-Run on it and press start.");
   render();
 };
+// Put the GENERATED warm-up into the session you actually run.
+//
+// ⚠️ The brief showed the new warm-up while the live session still ran the old one-line step — press
+// Start and you got "Easy jog, dynamic leg swings/drills, then 4-6 progressive strides" and its
+// original duration, because the runtime, the coach cues and the watch all read sess.steps and
+// nothing had rewritten them. A warm-up that exists only on the reading screen is not a warm-up.
+//
+// ⚠️ IT RETURNS A COPY AND NEVER TOUCHES THE PLAN. PLAN/RAW sessions feed the volume and intensity
+// models; rewriting their steps in place would reshape the plan itself — the weeklyVolumeKm trap
+// again. Only the object handed to the live runtime changes.
+//
+// ⚠️ EVERY NEW STEP IS kind "warmup". plannedPaceBandOf reads only steady and rep steps, and
+// plannedRpeBandOf excludes warmup and cooldown, so the debrief still judges the run against the
+// work rather than against the preparation. Adding the strides as rep steps would have quietly
+// changed the band every logged run is graded on.
+function withGeneratedWarmup(sess) {
+  const w = warmupCardFor(sess);
+  if (!w || w.incomplete || !w.phases.length) return sess;
+  const easy = (sess.steps || []).find((st) => st.kind === "warmup" && st.targetPaceSecPerKm);
+  const pace = easy ? easy.targetPaceSecPerKm : null;
+  const steps = [];
+  for (const p of w.phases) {
+    if (p.phase === "raise") {
+      steps.push({ kind: "warmup", label: w.embedded ? "Ease in — " + p.instruction : "Warm up easy",
+        durationSeconds: Math.max(60, Math.round(p.minutes * 60)),
+        targetPaceSecPerKm: pace || undefined, targetRpe: { min: p.rpe.min, max: p.rpe.max } });
+    } else if (p.phase === "mobilise") {
+      steps.push({ kind: "warmup", label: "Mobilise — " + p.movements.join(" · "),
+        durationSeconds: 180, targetRpe: { min: 1, max: 2 } });
+    } else if (p.phase === "potentiate") {
+      steps.push({ kind: "warmup", label: p.strides + " × " + p.seconds + "s strides, " + p.effort,
+        durationSeconds: Math.max(60, p.strides * 75), targetRpe: { min: 5, max: 7 } });
+    } else if (p.phase === "transition" && !w.embedded) {
+      steps.push({ kind: "warmup", label: "Settle — " + p.instruction,
+        durationSeconds: Math.max(60, Math.round(p.minutes * 60)),
+        targetPaceSecPerKm: pace || undefined, targetRpe: { min: 1, max: 2 } });
+    }
+  }
+  if (!steps.length) return sess;
+  const rest = (sess.steps || []).filter((st) => st.kind !== "warmup");
+  const out = Object.assign({}, sess, { steps: steps.concat(rest) });
+  // The clock the runner sees on the live screen has to agree with the steps it is counting through.
+  out.estimatedDurationSeconds = out.steps.reduce((a, st) => a + (st.durationSeconds || 0), 0)
+    || sess.estimatedDurationSeconds;
+  return out;
+}
 function startSession(sess, opts) {
-  const s = (sess && sess.steps) ? sess : rawToday();
+  const base = (sess && sess.steps) ? sess : rawToday();
+  const s = withGeneratedWarmup(base);
   LIVE = { session: s, rt: new RC.LiveSession(s), mode: null, acquiring: false, gpsErr: null,
     startMs: 0, pausedMs: 0, pauseStart: 0, vms: 0, dist: 0, hr: 105, devSpeed: null, curPace: null, win: [],
     timer: null, ui: null, watchId: null, wakeLock: null, lastLat: null, lastLon: null, acc: null,

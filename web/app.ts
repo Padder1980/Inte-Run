@@ -3209,7 +3209,11 @@ function coachSayId(id) {
 function paceFragmentIds(sec) {
   const s = Math.round(sec);
   const m = Math.floor(s / 60), r = s % 60;
-  const ids = ["num_" + m, "frag_minutes"];
+  // ⚠️ "six minutes" comes from ONE clip (min_6), not num_6 + frag_minutes. In speech it is a single
+  // unit with no boundary inside it, so a join there sounds jumpy however short it is — which is the
+  // fault the owner heard. The seconds stay separate: "six minutes | forty-three" has a real
+  // micro-pause in natural speech, so a join belongs there.
+  const ids = ["min_" + m];
   if (r > 0) ids.push("num_" + r);
   return ids;
 }
@@ -3237,7 +3241,11 @@ function coachSaySequence(ids, onFail) {
   // sentence is what made the stitched pace cue sound assembled rather than spoken. Each clip's
   // duration is in the manifest, so the next one is scheduled a fraction early and the tails are
   // simply never heard. "ended" stays wired as the safety net for a late timer or a short clip.
-  const TAIL_TRIM_MS = 130;
+  // ⚠️ SMALL, because the FRAGMENTS themselves were re-trimmed to about 9ms of silence per end.
+  // This was 130ms when the clips still carried the generator's 55ms pad, which was wrong twice
+  // over: it cut 75ms into the speech of the clip playing AND left the next clip's 55ms of leading
+  // silence untouched, so it clipped words and kept the gap. Trim the audio, not the playback.
+  const TAIL_TRIM_MS = 25;
   let t = 0;
   const next = () => {
     clearTimeout(t);

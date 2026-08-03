@@ -1985,6 +1985,310 @@
       }
     },
     {
+      "id": "min_2",
+      "text": "two minutes",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "two minutes",
+        "pacer": "two minutes",
+        "motivator": "two minutes",
+        "technician": "two minutes",
+        "spark": "two minutes",
+        "steady": "two minutes",
+        "storyteller": "two minutes",
+        "commentator": "two minutes",
+        "sportsman": "two minutes"
+      }
+    },
+    {
+      "id": "min_3",
+      "text": "three minutes",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "three minutes",
+        "pacer": "three minutes",
+        "motivator": "three minutes",
+        "technician": "three minutes",
+        "spark": "three minutes",
+        "steady": "three minutes",
+        "storyteller": "three minutes",
+        "commentator": "three minutes",
+        "sportsman": "three minutes"
+      }
+    },
+    {
+      "id": "min_4",
+      "text": "four minutes",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "four minutes",
+        "pacer": "four minutes",
+        "motivator": "four minutes",
+        "technician": "four minutes",
+        "spark": "four minutes",
+        "steady": "four minutes",
+        "storyteller": "four minutes",
+        "commentator": "four minutes",
+        "sportsman": "four minutes"
+      }
+    },
+    {
+      "id": "min_5",
+      "text": "five minutes",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "five minutes",
+        "pacer": "five minutes",
+        "motivator": "five minutes",
+        "technician": "five minutes",
+        "spark": "five minutes",
+        "steady": "five minutes",
+        "storyteller": "five minutes",
+        "commentator": "five minutes",
+        "sportsman": "five minutes"
+      }
+    },
+    {
+      "id": "min_6",
+      "text": "six minutes",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "six minutes",
+        "pacer": "six minutes",
+        "motivator": "six minutes",
+        "technician": "six minutes",
+        "spark": "six minutes",
+        "steady": "six minutes",
+        "storyteller": "six minutes",
+        "commentator": "six minutes",
+        "sportsman": "six minutes"
+      }
+    },
+    {
+      "id": "min_7",
+      "text": "seven minutes",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "seven minutes",
+        "pacer": "seven minutes",
+        "motivator": "seven minutes",
+        "technician": "seven minutes",
+        "spark": "seven minutes",
+        "steady": "seven minutes",
+        "storyteller": "seven minutes",
+        "commentator": "seven minutes",
+        "sportsman": "seven minutes"
+      }
+    },
+    {
+      "id": "min_8",
+      "text": "eight minutes",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "eight minutes",
+        "pacer": "eight minutes",
+        "motivator": "eight minutes",
+        "technician": "eight minutes",
+        "spark": "eight minutes",
+        "steady": "eight minutes",
+        "storyteller": "eight minutes",
+        "commentator": "eight minutes",
+        "sportsman": "eight minutes"
+      }
+    },
+    {
+      "id": "min_9",
+      "text": "nine minutes",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "nine minutes",
+        "pacer": "nine minutes",
+        "motivator": "nine minutes",
+        "technician": "nine minutes",
+        "spark": "nine minutes",
+        "steady": "nine minutes",
+        "storyteller": "nine minutes",
+        "commentator": "nine minutes",
+        "sportsman": "nine minutes"
+      }
+    },
+    {
+      "id": "min_10",
+      "text": "ten minutes",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "ten minutes",
+        "pacer": "ten minutes",
+        "motivator": "ten minutes",
+        "technician": "ten minutes",
+        "spark": "ten minutes",
+        "steady": "ten minutes",
+        "storyteller": "ten minutes",
+        "commentator": "ten minutes",
+        "sportsman": "ten minutes"
+      }
+    },
+    {
+      "id": "min_11",
+      "text": "eleven minutes",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "eleven minutes",
+        "pacer": "eleven minutes",
+        "motivator": "eleven minutes",
+        "technician": "eleven minutes",
+        "spark": "eleven minutes",
+        "steady": "eleven minutes",
+        "storyteller": "eleven minutes",
+        "commentator": "eleven minutes",
+        "sportsman": "eleven minutes"
+      }
+    },
+    {
+      "id": "min_12",
+      "text": "twelve minutes",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "twelve minutes",
+        "pacer": "twelve minutes",
+        "motivator": "twelve minutes",
+        "technician": "twelve minutes",
+        "spark": "twelve minutes",
+        "steady": "twelve minutes",
+        "storyteller": "twelve minutes",
+        "commentator": "twelve minutes",
+        "sportsman": "twelve minutes"
+      }
+    },
+    {
+      "id": "min_13",
+      "text": "thirteen minutes",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "thirteen minutes",
+        "pacer": "thirteen minutes",
+        "motivator": "thirteen minutes",
+        "technician": "thirteen minutes",
+        "spark": "thirteen minutes",
+        "steady": "thirteen minutes",
+        "storyteller": "thirteen minutes",
+        "commentator": "thirteen minutes",
+        "sportsman": "thirteen minutes"
+      }
+    },
+    {
+      "id": "min_14",
+      "text": "fourteen minutes",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "fourteen minutes",
+        "pacer": "fourteen minutes",
+        "motivator": "fourteen minutes",
+        "technician": "fourteen minutes",
+        "spark": "fourteen minutes",
+        "steady": "fourteen minutes",
+        "storyteller": "fourteen minutes",
+        "commentator": "fourteen minutes",
+        "sportsman": "fourteen minutes"
+      }
+    },
+    {
+      "id": "min_15",
+      "text": "fifteen minutes",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "fifteen minutes",
+        "pacer": "fifteen minutes",
+        "motivator": "fifteen minutes",
+        "technician": "fifteen minutes",
+        "spark": "fifteen minutes",
+        "steady": "fifteen minutes",
+        "storyteller": "fifteen minutes",
+        "commentator": "fifteen minutes",
+        "sportsman": "fifteen minutes"
+      }
+    },
+    {
+      "id": "min_16",
+      "text": "sixteen minutes",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "sixteen minutes",
+        "pacer": "sixteen minutes",
+        "motivator": "sixteen minutes",
+        "technician": "sixteen minutes",
+        "spark": "sixteen minutes",
+        "steady": "sixteen minutes",
+        "storyteller": "sixteen minutes",
+        "commentator": "sixteen minutes",
+        "sportsman": "sixteen minutes"
+      }
+    },
+    {
+      "id": "min_17",
+      "text": "seventeen minutes",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "seventeen minutes",
+        "pacer": "seventeen minutes",
+        "motivator": "seventeen minutes",
+        "technician": "seventeen minutes",
+        "spark": "seventeen minutes",
+        "steady": "seventeen minutes",
+        "storyteller": "seventeen minutes",
+        "commentator": "seventeen minutes",
+        "sportsman": "seventeen minutes"
+      }
+    },
+    {
+      "id": "min_18",
+      "text": "eighteen minutes",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "eighteen minutes",
+        "pacer": "eighteen minutes",
+        "motivator": "eighteen minutes",
+        "technician": "eighteen minutes",
+        "spark": "eighteen minutes",
+        "steady": "eighteen minutes",
+        "storyteller": "eighteen minutes",
+        "commentator": "eighteen minutes",
+        "sportsman": "eighteen minutes"
+      }
+    },
+    {
+      "id": "min_19",
+      "text": "nineteen minutes",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "nineteen minutes",
+        "pacer": "nineteen minutes",
+        "motivator": "nineteen minutes",
+        "technician": "nineteen minutes",
+        "spark": "nineteen minutes",
+        "steady": "nineteen minutes",
+        "storyteller": "nineteen minutes",
+        "commentator": "nineteen minutes",
+        "sportsman": "nineteen minutes"
+      }
+    },
+    {
+      "id": "min_20",
+      "text": "twenty minutes",
+      "trigger": "fragment",
+      "byCoach": {
+        "guide": "twenty minutes",
+        "pacer": "twenty minutes",
+        "motivator": "twenty minutes",
+        "technician": "twenty minutes",
+        "spark": "twenty minutes",
+        "steady": "twenty minutes",
+        "storyteller": "twenty minutes",
+        "commentator": "twenty minutes",
+        "sportsman": "twenty minutes"
+      }
+    },
+    {
       "id": "frag_current_pace",
       "text": "Your current pace is",
       "trigger": "fragment",

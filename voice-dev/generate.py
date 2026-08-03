@@ -62,6 +62,11 @@ def check() -> None:
         die(f"missing {CATALOGUE} — run: node voice-dev/dump-catalogue.ts")
 
 
+# ⚠️ pad_ms IS RIGHT FOR A STANDALONE LINE AND WRONG FOR A FRAGMENT. 55ms of silence each end stops a
+# cue sounding clipped when it starts on its own; butt two fragments together and those two pads
+# become a 110ms hole mid-sentence, which is what made the stitched pace cue sound assembled. The
+# pace number bank and sentence fragments are trimmed tight; everything else keeps its breathing room.
+FRAGMENT_PAD_MS = 8
 def trim_silence(a, sr, thresh=0.01, pad_ms=55):
     import numpy as np
     a = np.asarray(a, dtype="float32")

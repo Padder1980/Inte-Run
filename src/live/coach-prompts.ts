@@ -258,6 +258,39 @@ const PACE_NUMBER_CLIPS: PromptDef[] = [
   { id: "num_58", trigger: "fragment", text: "fifty-eight", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
   { id: "num_59", trigger: "fragment", text: "fifty-nine", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
 ];
+
+// ⚠️ "SIX MINUTES" IS ONE CLIP, NOT TWO. It was num_6 + frag_minutes, and the owner heard exactly
+// what was wrong with that: in speech "six minutes" is a single prosodic unit with no boundary
+// inside it, so a join there — however short — sounds jumpy in a way a join between phrases does
+// not. Trimming silence made it shorter without making it flow, because the problem was never the
+// silence; it was cutting a word pair that belongs together.
+//
+// This is the countdown rule turned around. Three, two, one are separate clips because they are
+// MEANT to be separate beats. "Six minutes" is meant to be joined, so it is recorded joined.
+//
+// Two to twenty covers every plausible pace per kilometre; the seconds stay their own clip, because
+// "six minutes | forty-three" DOES have a real micro-pause in natural speech.
+const PACE_MINUTE_CLIPS: PromptDef[] = [
+  { id: "min_2", trigger: "fragment", text: "two minutes", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "min_3", trigger: "fragment", text: "three minutes", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "min_4", trigger: "fragment", text: "four minutes", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "min_5", trigger: "fragment", text: "five minutes", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "min_6", trigger: "fragment", text: "six minutes", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "min_7", trigger: "fragment", text: "seven minutes", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "min_8", trigger: "fragment", text: "eight minutes", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "min_9", trigger: "fragment", text: "nine minutes", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "min_10", trigger: "fragment", text: "ten minutes", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "min_11", trigger: "fragment", text: "eleven minutes", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "min_12", trigger: "fragment", text: "twelve minutes", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "min_13", trigger: "fragment", text: "thirteen minutes", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "min_14", trigger: "fragment", text: "fourteen minutes", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "min_15", trigger: "fragment", text: "fifteen minutes", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "min_16", trigger: "fragment", text: "sixteen minutes", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "min_17", trigger: "fragment", text: "seventeen minutes", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "min_18", trigger: "fragment", text: "eighteen minutes", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "min_19", trigger: "fragment", text: "nineteen minutes", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "min_20", trigger: "fragment", text: "twenty minutes", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+];
 const PACE_FRAGMENT_CLIPS: PromptDef[] = [
   { id: "frag_current_pace", trigger: "fragment", text: "Your current pace is", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
   { id: "frag_target_is", trigger: "fragment", text: "Your target is", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
@@ -477,7 +510,7 @@ export const PROMPTS: PromptDef[] = [
 ];
 // The by-id fragments live in the same catalogue so generation, the manifest and the no-digit
 // test all see them without a second code path.
-export const ALL_PROMPTS: PromptDef[] = PROMPTS.concat(PACE_NUMBER_CLIPS, PACE_FRAGMENT_CLIPS);
+export const ALL_PROMPTS: PromptDef[] = PROMPTS.concat(PACE_NUMBER_CLIPS, PACE_MINUTE_CLIPS, PACE_FRAGMENT_CLIPS);
 
 
 // ---- Selection (pure, testable) -------------------------------------------

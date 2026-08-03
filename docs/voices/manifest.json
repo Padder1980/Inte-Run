@@ -6,55 +6,55 @@
    "id": "guide",
    "name": "The Guide",
    "voice": "Holly",
-   "bytes": 3638271
+   "bytes": 3837999
   },
   {
    "id": "pacer",
    "name": "The Pacer",
    "voice": "Philip",
-   "bytes": 2598797
+   "bytes": 2782854
   },
   {
    "id": "motivator",
    "name": "The Motivator",
    "voice": "Hope",
-   "bytes": 2517880
+   "bytes": 2703209
   },
   {
    "id": "technician",
    "name": "The Technician",
    "voice": "Lucy",
-   "bytes": 2563120
+   "bytes": 2721367
   },
   {
    "id": "spark",
    "name": "The Spark",
    "voice": "Axell",
-   "bytes": 2899232
+   "bytes": 3099707
   },
   {
    "id": "steady",
    "name": "The Steady",
    "voice": "Robert Mitchell",
-   "bytes": 2318360
+   "bytes": 2506906
   },
   {
    "id": "storyteller",
    "name": "The Storyteller",
    "voice": "Nathaniel C",
-   "bytes": 2708169
+   "bytes": 2864926
   },
   {
    "id": "commentator",
    "name": "The Commentator",
    "voice": "British Football Announcer",
-   "bytes": 2485080
+   "bytes": 2658637
   },
   {
    "id": "sportsman",
    "name": "The Sportsman",
    "voice": "Irish Sportsman",
-   "bytes": 2383037
+   "bytes": 2559661
   }
  ],
  "clips": [
@@ -674,8 +674,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_0.mp3",
-   "duration": 0.69,
-   "bytes": 10119,
+   "duration": 0.6,
+   "bytes": 8502,
    "hash": "eec79234d99bbb86"
   },
   {
@@ -684,8 +684,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_1.mp3",
-   "duration": 0.54,
-   "bytes": 6623,
+   "duration": 0.46,
+   "bytes": 5713,
    "hash": "95cff7511f4f171c"
   },
   {
@@ -694,8 +694,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_2.mp3",
-   "duration": 0.59,
-   "bytes": 8058,
+   "duration": 0.5,
+   "bytes": 6937,
    "hash": "dfbd37311cccedf1"
   },
   {
@@ -704,8 +704,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_3.mp3",
-   "duration": 0.46,
-   "bytes": 6260,
+   "duration": 0.37,
+   "bytes": 5269,
    "hash": "bc5c87a31d997337"
   },
   {
@@ -714,8 +714,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_4.mp3",
-   "duration": 0.59,
-   "bytes": 7616,
+   "duration": 0.51,
+   "bytes": 6885,
    "hash": "7d9bfd85cdd0d84a"
   },
   {
@@ -724,8 +724,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_5.mp3",
-   "duration": 0.75,
-   "bytes": 9493,
+   "duration": 0.72,
+   "bytes": 9391,
    "hash": "4704188f47ee4593"
   },
   {
@@ -734,8 +734,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_6.mp3",
-   "duration": 0.59,
-   "bytes": 8187,
+   "duration": 0.56,
+   "bytes": 7770,
    "hash": "ef858546300d759b"
   },
   {
@@ -744,8 +744,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_7.mp3",
-   "duration": 0.65,
-   "bytes": 8523,
+   "duration": 0.56,
+   "bytes": 7563,
    "hash": "696ea4424b3275c6"
   },
   {
@@ -754,8 +754,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_8.mp3",
-   "duration": 0.65,
-   "bytes": 8423,
+   "duration": 0.56,
+   "bytes": 7040,
    "hash": "de37b65a2cd227e9"
   },
   {
@@ -764,8 +764,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_9.mp3",
-   "duration": 0.64,
-   "bytes": 7822,
+   "duration": 0.54,
+   "bytes": 6989,
    "hash": "e3bac827aa5880bd"
   },
   {
@@ -774,8 +774,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_10.mp3",
-   "duration": 0.72,
-   "bytes": 8552,
+   "duration": 0.63,
+   "bytes": 7509,
    "hash": "92cc9b9ce02eeb38"
   },
   {
@@ -784,8 +784,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_11.mp3",
-   "duration": 0.67,
-   "bytes": 8188,
+   "duration": 0.58,
+   "bytes": 7407,
    "hash": "51fc7fb5962f8b98"
   },
   {
@@ -794,8 +794,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_12.mp3",
-   "duration": 0.72,
-   "bytes": 9258,
+   "duration": 0.64,
+   "bytes": 7956,
    "hash": "6e11cf0e6e99eefc"
   },
   {
@@ -804,8 +804,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_13.mp3",
-   "duration": 0.82,
-   "bytes": 10329,
+   "duration": 0.74,
+   "bytes": 9282,
    "hash": "bb3ca11e5036eaac"
   },
   {
@@ -814,8 +814,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_14.mp3",
-   "duration": 1.08,
-   "bytes": 13117,
+   "duration": 1.04,
+   "bytes": 13250,
    "hash": "c5fe300ca4af2ebc"
   },
   {
@@ -824,8 +824,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_15.mp3",
-   "duration": 0.85,
-   "bytes": 10953,
+   "duration": 0.82,
+   "bytes": 10641,
    "hash": "0a178875449e9dde"
   },
   {
@@ -834,8 +834,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_16.mp3",
-   "duration": 0.73,
-   "bytes": 9701,
+   "duration": 0.72,
+   "bytes": 10275,
    "hash": "41613a5d417f5cb3"
   },
   {
@@ -844,8 +844,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_17.mp3",
-   "duration": 0.84,
-   "bytes": 11684,
+   "duration": 0.81,
+   "bytes": 11107,
    "hash": "0b1e66501abd5397"
   },
   {
@@ -854,8 +854,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_18.mp3",
-   "duration": 1.32,
-   "bytes": 14603,
+   "duration": 1.22,
+   "bytes": 13664,
    "hash": "f2c5b9b79adba840"
   },
   {
@@ -864,8 +864,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_19.mp3",
-   "duration": 0.93,
-   "bytes": 11551,
+   "duration": 0.84,
+   "bytes": 10273,
    "hash": "c6824a076e316638"
   },
   {
@@ -874,8 +874,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_20.mp3",
-   "duration": 0.75,
-   "bytes": 10171,
+   "duration": 0.65,
+   "bytes": 8973,
    "hash": "4ae4cb51fb12532d"
   },
   {
@@ -884,8 +884,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_21.mp3",
-   "duration": 0.84,
-   "bytes": 10484,
+   "duration": 0.75,
+   "bytes": 9417,
    "hash": "e348c537632df1e8"
   },
   {
@@ -894,8 +894,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_22.mp3",
-   "duration": 0.91,
-   "bytes": 11292,
+   "duration": 0.81,
+   "bytes": 10587,
    "hash": "7cbd856220f74c66"
   },
   {
@@ -904,8 +904,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_23.mp3",
-   "duration": 1.01,
-   "bytes": 12858,
+   "duration": 0.92,
+   "bytes": 11582,
    "hash": "b715197592fa5a44"
   },
   {
@@ -914,8 +914,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_24.mp3",
-   "duration": 0.88,
-   "bytes": 10875,
+   "duration": 0.82,
+   "bytes": 10015,
    "hash": "c9fb48e45de7781a"
   },
   {
@@ -924,8 +924,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_25.mp3",
-   "duration": 1.18,
-   "bytes": 15542,
+   "duration": 1.09,
+   "bytes": 14293,
    "hash": "e1998764c1fd7a4b"
   },
   {
@@ -934,8 +934,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_26.mp3",
-   "duration": 0.94,
-   "bytes": 11994,
+   "duration": 0.86,
+   "bytes": 11293,
    "hash": "ed1ae392dac20241"
   },
   {
@@ -944,8 +944,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_27.mp3",
-   "duration": 0.97,
-   "bytes": 12466,
+   "duration": 0.88,
+   "bytes": 10903,
    "hash": "717b04c99df97eb1"
   },
   {
@@ -954,8 +954,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_28.mp3",
-   "duration": 0.87,
-   "bytes": 11109,
+   "duration": 0.8,
+   "bytes": 10586,
    "hash": "b5b6e70806c76b4e"
   },
   {
@@ -964,8 +964,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_29.mp3",
-   "duration": 0.93,
-   "bytes": 13066,
+   "duration": 0.85,
+   "bytes": 11605,
    "hash": "b8693ef6634c0b13"
   },
   {
@@ -974,8 +974,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_30.mp3",
-   "duration": 0.7,
-   "bytes": 10271,
+   "duration": 0.65,
+   "bytes": 9284,
    "hash": "a8f985c257fadd3a"
   },
   {
@@ -984,8 +984,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_31.mp3",
-   "duration": 0.8,
-   "bytes": 10355,
+   "duration": 0.74,
+   "bytes": 9807,
    "hash": "236a80abdbd16d37"
   },
   {
@@ -994,8 +994,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_32.mp3",
-   "duration": 0.93,
-   "bytes": 11448,
+   "duration": 0.83,
+   "bytes": 10274,
    "hash": "20c32843f1fd8147"
   },
   {
@@ -1004,8 +1004,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_33.mp3",
-   "duration": 1.01,
-   "bytes": 12749,
+   "duration": 0.97,
+   "bytes": 12469,
    "hash": "7b7d024e825f0162"
   },
   {
@@ -1014,8 +1014,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_34.mp3",
-   "duration": 1.06,
-   "bytes": 12673,
+   "duration": 1.0,
+   "bytes": 11945,
    "hash": "6f3cf294f1e1d4a9"
   },
   {
@@ -1024,8 +1024,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_35.mp3",
-   "duration": 1.13,
-   "bytes": 14347,
+   "duration": 1.04,
+   "bytes": 12806,
    "hash": "d96496e478262348"
   },
   {
@@ -1034,8 +1034,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_36.mp3",
-   "duration": 0.99,
-   "bytes": 12257,
+   "duration": 0.9,
+   "bytes": 11213,
    "hash": "c85fe8510a6bcff0"
   },
   {
@@ -1044,8 +1044,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_37.mp3",
-   "duration": 0.98,
-   "bytes": 12885,
+   "duration": 0.88,
+   "bytes": 11891,
    "hash": "22097f5580919176"
   },
   {
@@ -1054,8 +1054,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_38.mp3",
-   "duration": 0.88,
-   "bytes": 11394,
+   "duration": 0.86,
+   "bytes": 11630,
    "hash": "0e902588c8fe9f00"
   },
   {
@@ -1064,8 +1064,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_39.mp3",
-   "duration": 1.0,
-   "bytes": 12517,
+   "duration": 0.94,
+   "bytes": 11736,
    "hash": "93ac04e239244da0"
   },
   {
@@ -1074,8 +1074,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_40.mp3",
-   "duration": 0.66,
-   "bytes": 9180,
+   "duration": 0.63,
+   "bytes": 8920,
    "hash": "fe041b110de4bb17"
   },
   {
@@ -1084,8 +1084,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_41.mp3",
-   "duration": 0.88,
-   "bytes": 11270,
+   "duration": 0.85,
+   "bytes": 11007,
    "hash": "dbad2110d4a111fd"
   },
   {
@@ -1094,8 +1094,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_42.mp3",
-   "duration": 0.97,
-   "bytes": 11944,
+   "duration": 0.95,
+   "bytes": 11734,
    "hash": "5e5763a87ee07a9b"
   },
   {
@@ -1104,8 +1104,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_43.mp3",
-   "duration": 1.03,
-   "bytes": 13196,
+   "duration": 0.93,
+   "bytes": 12416,
    "hash": "6eefa6f0d558c8c2"
   },
   {
@@ -1114,8 +1114,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_44.mp3",
-   "duration": 1.01,
-   "bytes": 12415,
+   "duration": 0.96,
+   "bytes": 11685,
    "hash": "de9b92eeb64a0d2c"
   },
   {
@@ -1124,8 +1124,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_45.mp3",
-   "duration": 0.99,
-   "bytes": 12466,
+   "duration": 0.96,
+   "bytes": 12024,
    "hash": "4801d843c93652c4"
   },
   {
@@ -1134,8 +1134,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_46.mp3",
-   "duration": 1.05,
-   "bytes": 12831,
+   "duration": 1.01,
+   "bytes": 12363,
    "hash": "bfe58151544ba279"
   },
   {
@@ -1144,8 +1144,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_47.mp3",
-   "duration": 1.07,
-   "bytes": 13771,
+   "duration": 1.05,
+   "bytes": 13404,
    "hash": "45a161990f10e218"
   },
   {
@@ -1154,8 +1154,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_48.mp3",
-   "duration": 0.97,
-   "bytes": 12462,
+   "duration": 0.94,
+   "bytes": 12310,
    "hash": "aeb5687fa9791c2b"
   },
   {
@@ -1164,8 +1164,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_49.mp3",
-   "duration": 0.87,
-   "bytes": 11921,
+   "duration": 0.85,
+   "bytes": 11635,
    "hash": "3f1ca669a1529f8e"
   },
   {
@@ -1174,8 +1174,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_50.mp3",
-   "duration": 0.61,
-   "bytes": 8242,
+   "duration": 0.56,
+   "bytes": 7981,
    "hash": "ffc8654fcc562131"
   },
   {
@@ -1184,8 +1184,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_51.mp3",
-   "duration": 0.74,
-   "bytes": 9547,
+   "duration": 0.66,
+   "bytes": 8555,
    "hash": "9ed6321a3b7a0a1a"
   },
   {
@@ -1194,8 +1194,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_52.mp3",
-   "duration": 0.93,
-   "bytes": 11601,
+   "duration": 0.87,
+   "bytes": 11057,
    "hash": "e7e5499ccc04e6fb"
   },
   {
@@ -1204,8 +1204,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_53.mp3",
-   "duration": 0.91,
-   "bytes": 11891,
+   "duration": 0.81,
+   "bytes": 11111,
    "hash": "e3ccd750aebc8f85"
   },
   {
@@ -1214,8 +1214,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_54.mp3",
-   "duration": 0.92,
-   "bytes": 11578,
+   "duration": 0.88,
+   "bytes": 11005,
    "hash": "b498d60b8dc08d8f"
   },
   {
@@ -1224,8 +1224,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_55.mp3",
-   "duration": 1.27,
-   "bytes": 15155,
+   "duration": 1.22,
+   "bytes": 14607,
    "hash": "c8efa02d1b9dfe2c"
   },
   {
@@ -1234,8 +1234,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_56.mp3",
-   "duration": 1.07,
-   "bytes": 13270,
+   "duration": 1.02,
+   "bytes": 12880,
    "hash": "f59634f57c760fef"
   },
   {
@@ -1244,8 +1244,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_57.mp3",
-   "duration": 0.93,
-   "bytes": 12544,
+   "duration": 0.89,
+   "bytes": 12362,
    "hash": "0c3a18f7fd4e908a"
   },
   {
@@ -1254,8 +1254,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_58.mp3",
-   "duration": 0.92,
-   "bytes": 11631,
+   "duration": 0.88,
+   "bytes": 11082,
    "hash": "afcb2ac649ee14c3"
   },
   {
@@ -1264,9 +1264,199 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/num_59.mp3",
-   "duration": 0.95,
-   "bytes": 13927,
+   "duration": 0.9,
+   "bytes": 12257,
    "hash": "0e7740a0a89b9edb"
+  },
+  {
+   "id": "min_2",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "fragment",
+   "file": "voices/guide/min_2.mp3",
+   "duration": 0.78,
+   "bytes": 11582,
+   "hash": "a6554ded4af3beb2"
+  },
+  {
+   "id": "min_3",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "fragment",
+   "file": "voices/guide/min_3.mp3",
+   "duration": 0.8,
+   "bytes": 11737,
+   "hash": "91cdd8ac01199208"
+  },
+  {
+   "id": "min_4",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "fragment",
+   "file": "voices/guide/min_4.mp3",
+   "duration": 0.88,
+   "bytes": 11059,
+   "hash": "b37a6fa82683324e"
+  },
+  {
+   "id": "min_5",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "fragment",
+   "file": "voices/guide/min_5.mp3",
+   "duration": 0.93,
+   "bytes": 11865,
+   "hash": "e0c890a727bf0240"
+  },
+  {
+   "id": "min_6",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "fragment",
+   "file": "voices/guide/min_6.mp3",
+   "duration": 0.93,
+   "bytes": 12152,
+   "hash": "16308c92c0d11ead"
+  },
+  {
+   "id": "min_7",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "fragment",
+   "file": "voices/guide/min_7.mp3",
+   "duration": 0.92,
+   "bytes": 11997,
+   "hash": "70b3f8f5afe79d61"
+  },
+  {
+   "id": "min_8",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "fragment",
+   "file": "voices/guide/min_8.mp3",
+   "duration": 0.96,
+   "bytes": 12047,
+   "hash": "0190df9ccf636a62"
+  },
+  {
+   "id": "min_9",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "fragment",
+   "file": "voices/guide/min_9.mp3",
+   "duration": 0.95,
+   "bytes": 11577,
+   "hash": "b692f8befbf3713e"
+  },
+  {
+   "id": "min_10",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "fragment",
+   "file": "voices/guide/min_10.mp3",
+   "duration": 0.84,
+   "bytes": 11113,
+   "hash": "9d94f396c8bbf005"
+  },
+  {
+   "id": "min_11",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "fragment",
+   "file": "voices/guide/min_11.mp3",
+   "duration": 1.04,
+   "bytes": 12308,
+   "hash": "66f89a48f9870df4"
+  },
+  {
+   "id": "min_12",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "fragment",
+   "file": "voices/guide/min_12.mp3",
+   "duration": 0.94,
+   "bytes": 12047,
+   "hash": "f08a9b060496798b"
+  },
+  {
+   "id": "min_13",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "fragment",
+   "file": "voices/guide/min_13.mp3",
+   "duration": 1.24,
+   "bytes": 15126,
+   "hash": "19acd4e68ec2866b"
+  },
+  {
+   "id": "min_14",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "fragment",
+   "file": "voices/guide/min_14.mp3",
+   "duration": 1.15,
+   "bytes": 14815,
+   "hash": "5c372a23c1d654c8"
+  },
+  {
+   "id": "min_15",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "fragment",
+   "file": "voices/guide/min_15.mp3",
+   "duration": 1.18,
+   "bytes": 14919,
+   "hash": "736722ccd7f58ae1"
+  },
+  {
+   "id": "min_16",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "fragment",
+   "file": "voices/guide/min_16.mp3",
+   "duration": 1.23,
+   "bytes": 15543,
+   "hash": "94c575c0b7330089"
+  },
+  {
+   "id": "min_17",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "fragment",
+   "file": "voices/guide/min_17.mp3",
+   "duration": 1.38,
+   "bytes": 16273,
+   "hash": "3f1f1d8a086a2bc8"
+  },
+  {
+   "id": "min_18",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "fragment",
+   "file": "voices/guide/min_18.mp3",
+   "duration": 1.26,
+   "bytes": 15490,
+   "hash": "0f652c513efa3a3d"
+  },
+  {
+   "id": "min_19",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "fragment",
+   "file": "voices/guide/min_19.mp3",
+   "duration": 1.12,
+   "bytes": 13507,
+   "hash": "2aff0b5478a2bbe7"
+  },
+  {
+   "id": "min_20",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "fragment",
+   "file": "voices/guide/min_20.mp3",
+   "duration": 1.08,
+   "bytes": 13406,
+   "hash": "5a0fb0bddf1c338e"
   },
   {
    "id": "frag_current_pace",
@@ -1274,8 +1464,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/frag_current_pace.mp3",
-   "duration": 1.45,
-   "bytes": 18778,
+   "duration": 1.36,
+   "bytes": 17420,
    "hash": "a905dcf57d0ddaa8"
   },
   {
@@ -1284,8 +1474,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/frag_target_is.mp3",
-   "duration": 1.5,
-   "bytes": 18100,
+   "duration": 1.41,
+   "bytes": 17681,
    "hash": "62d3a62c26fbd96f"
   },
   {
@@ -1294,8 +1484,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/frag_minutes.mp3",
-   "duration": 0.69,
-   "bytes": 9102,
+   "duration": 0.63,
+   "bytes": 8553,
    "hash": "6382086439efa9f2"
   },
   {
@@ -1304,8 +1494,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/frag_per_km.mp3",
-   "duration": 1.13,
-   "bytes": 14031,
+   "duration": 1.03,
+   "bytes": 12912,
    "hash": "40a7f1c056296a73"
   },
   {
@@ -1314,8 +1504,8 @@
    "voice": "Holly",
    "trigger": "fragment",
    "file": "voices/guide/frag_to.mp3",
-   "duration": 0.48,
-   "bytes": 6444,
+   "duration": 0.41,
+   "bytes": 5582,
    "hash": "9fa27d91b115b570"
   },
   {
@@ -1934,8 +2124,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_0.mp3",
-   "duration": 0.58,
-   "bytes": 8056,
+   "duration": 0.54,
+   "bytes": 7485,
    "hash": "e60e4118c886eb7e"
   },
   {
@@ -1944,8 +2134,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_1.mp3",
-   "duration": 0.4,
-   "bytes": 5475,
+   "duration": 0.35,
+   "bytes": 4902,
    "hash": "ae1cd597223a33cf"
   },
   {
@@ -1954,8 +2144,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_2.mp3",
-   "duration": 0.52,
-   "bytes": 6493,
+   "duration": 0.42,
+   "bytes": 5555,
    "hash": "c9011e746f8aaf9c"
   },
   {
@@ -1964,8 +2154,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_3.mp3",
-   "duration": 0.51,
-   "bytes": 7172,
+   "duration": 0.46,
+   "bytes": 7512,
    "hash": "2c6f72f15f89f77b"
   },
   {
@@ -1974,8 +2164,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_4.mp3",
-   "duration": 0.41,
-   "bytes": 6521,
+   "duration": 0.36,
+   "bytes": 6155,
    "hash": "7ff9d606e698abd7"
   },
   {
@@ -1984,8 +2174,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_5.mp3",
-   "duration": 0.59,
-   "bytes": 8266,
+   "duration": 0.57,
+   "bytes": 8032,
    "hash": "6917f0472213259b"
   },
   {
@@ -1994,8 +2184,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_6.mp3",
-   "duration": 0.58,
-   "bytes": 8109,
+   "duration": 0.53,
+   "bytes": 7666,
    "hash": "3a6935f719a22077"
   },
   {
@@ -2004,8 +2194,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_7.mp3",
-   "duration": 0.48,
-   "bytes": 6362,
+   "duration": 0.43,
+   "bytes": 5998,
    "hash": "d5250683357cba7b"
   },
   {
@@ -2014,8 +2204,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_8.mp3",
-   "duration": 0.43,
-   "bytes": 5474,
+   "duration": 0.37,
+   "bytes": 5267,
    "hash": "0145e7e332de39e7"
   },
   {
@@ -2024,8 +2214,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_9.mp3",
-   "duration": 0.61,
-   "bytes": 9231,
+   "duration": 0.57,
+   "bytes": 9336,
    "hash": "5f1679a6fbbaaaf9"
   },
   {
@@ -2034,8 +2224,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_10.mp3",
-   "duration": 0.6,
-   "bytes": 7248,
+   "duration": 0.51,
+   "bytes": 6700,
    "hash": "eee70297937a0c5f"
   },
   {
@@ -2044,8 +2234,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_11.mp3",
-   "duration": 0.55,
-   "bytes": 7848,
+   "duration": 0.48,
+   "bytes": 6833,
    "hash": "e0165154eec11ef1"
   },
   {
@@ -2054,8 +2244,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_12.mp3",
-   "duration": 0.69,
-   "bytes": 10092,
+   "duration": 0.61,
+   "bytes": 9392,
    "hash": "b72313de2b3dc3b5"
   },
   {
@@ -2064,8 +2254,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_13.mp3",
-   "duration": 0.71,
-   "bytes": 9517,
+   "duration": 0.65,
+   "bytes": 9364,
    "hash": "b3c46dfee0fced71"
   },
   {
@@ -2074,8 +2264,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_14.mp3",
-   "duration": 0.66,
-   "bytes": 8814,
+   "duration": 0.62,
+   "bytes": 8476,
    "hash": "f9ffbe01f1adc411"
   },
   {
@@ -2084,8 +2274,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_15.mp3",
-   "duration": 0.69,
-   "bytes": 8920,
+   "duration": 0.63,
+   "bytes": 8711,
    "hash": "75c7eae11029d6d6"
   },
   {
@@ -2094,8 +2284,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_16.mp3",
-   "duration": 0.71,
-   "bytes": 9857,
+   "duration": 0.67,
+   "bytes": 9544,
    "hash": "a3ead0f4f3bd2716"
   },
   {
@@ -2104,8 +2294,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_17.mp3",
-   "duration": 0.7,
-   "bytes": 10170,
+   "duration": 0.67,
+   "bytes": 10014,
    "hash": "4b336ecb479ebca0"
   },
   {
@@ -2114,8 +2304,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_18.mp3",
-   "duration": 0.67,
-   "bytes": 8735,
+   "duration": 0.6,
+   "bytes": 7954,
    "hash": "ead4f05d3aa3e4a9"
   },
   {
@@ -2124,8 +2314,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_19.mp3",
-   "duration": 0.74,
-   "bytes": 9544,
+   "duration": 0.7,
+   "bytes": 9256,
    "hash": "f88a9e078bc4521a"
   },
   {
@@ -2134,8 +2324,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_20.mp3",
-   "duration": 0.57,
-   "bytes": 7927,
+   "duration": 0.48,
+   "bytes": 6835,
    "hash": "f0d65583814ac2a9"
   },
   {
@@ -2144,8 +2334,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_21.mp3",
-   "duration": 0.8,
-   "bytes": 11004,
+   "duration": 0.7,
+   "bytes": 10068,
    "hash": "29d05ff304e30506"
   },
   {
@@ -2154,8 +2344,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_22.mp3",
-   "duration": 0.71,
-   "bytes": 8945,
+   "duration": 0.61,
+   "bytes": 8529,
    "hash": "e9991d96ca647dc1"
   },
   {
@@ -2164,8 +2354,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_23.mp3",
-   "duration": 0.74,
-   "bytes": 9387,
+   "duration": 0.66,
+   "bytes": 8709,
    "hash": "b64b9ec3be988c71"
   },
   {
@@ -2174,8 +2364,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_24.mp3",
-   "duration": 0.7,
-   "bytes": 8892,
+   "duration": 0.61,
+   "bytes": 8713,
    "hash": "4192bd7f5f07ef62"
   },
   {
@@ -2184,8 +2374,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_25.mp3",
-   "duration": 0.82,
-   "bytes": 11632,
+   "duration": 0.73,
+   "bytes": 9702,
    "hash": "f3cd6fab8a9af64a"
   },
   {
@@ -2194,8 +2384,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_26.mp3",
-   "duration": 0.85,
-   "bytes": 11499,
+   "duration": 0.76,
+   "bytes": 11110,
    "hash": "b59c3d2aa4ae5b26"
   },
   {
@@ -2204,8 +2394,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_27.mp3",
-   "duration": 0.9,
-   "bytes": 11477,
+   "duration": 0.82,
+   "bytes": 10564,
    "hash": "c09420f62ed42d2b"
   },
   {
@@ -2214,8 +2404,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_28.mp3",
-   "duration": 0.77,
-   "bytes": 9541,
+   "duration": 0.67,
+   "bytes": 8632,
    "hash": "bd8f8070bbf93b15"
   },
   {
@@ -2224,8 +2414,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_29.mp3",
-   "duration": 0.81,
-   "bytes": 10951,
+   "duration": 0.74,
+   "bytes": 10771,
    "hash": "1d49f85d1b0af0d9"
   },
   {
@@ -2234,8 +2424,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_30.mp3",
-   "duration": 0.63,
-   "bytes": 8763,
+   "duration": 0.58,
+   "bytes": 8085,
    "hash": "7cc8662627bdd5f6"
   },
   {
@@ -2244,8 +2434,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_31.mp3",
-   "duration": 0.79,
-   "bytes": 11136,
+   "duration": 0.74,
+   "bytes": 11186,
    "hash": "29d54f72cf039404"
   },
   {
@@ -2254,8 +2444,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_32.mp3",
-   "duration": 0.74,
-   "bytes": 10485,
+   "duration": 0.68,
+   "bytes": 10015,
    "hash": "af4fc4f8bf083be6"
   },
   {
@@ -2264,8 +2454,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_33.mp3",
-   "duration": 0.85,
-   "bytes": 10403,
+   "duration": 0.76,
+   "bytes": 9547,
    "hash": "86f9429e95f0a702"
   },
   {
@@ -2274,8 +2464,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_34.mp3",
-   "duration": 0.76,
-   "bytes": 10225,
+   "duration": 0.69,
+   "bytes": 9442,
    "hash": "771778784dbd341e"
   },
   {
@@ -2284,8 +2474,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_35.mp3",
-   "duration": 0.96,
-   "bytes": 13745,
+   "duration": 0.92,
+   "bytes": 13145,
    "hash": "dac271d87d6c1c08"
   },
   {
@@ -2294,8 +2484,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_36.mp3",
-   "duration": 0.73,
-   "bytes": 9544,
+   "duration": 0.63,
+   "bytes": 8867,
    "hash": "7c436815691c7f11"
   },
   {
@@ -2304,8 +2494,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_37.mp3",
-   "duration": 0.77,
-   "bytes": 11579,
+   "duration": 0.71,
+   "bytes": 10435,
    "hash": "8b6e04ee07991fb5"
   },
   {
@@ -2314,8 +2504,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_38.mp3",
-   "duration": 0.81,
-   "bytes": 12048,
+   "duration": 0.78,
+   "bytes": 11842,
    "hash": "c04374e86b960230"
   },
   {
@@ -2324,8 +2514,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_39.mp3",
-   "duration": 0.76,
-   "bytes": 9700,
+   "duration": 0.67,
+   "bytes": 9414,
    "hash": "8765329d2d8f303b"
   },
   {
@@ -2334,8 +2524,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_40.mp3",
-   "duration": 0.55,
-   "bytes": 7978,
+   "duration": 0.5,
+   "bytes": 7354,
    "hash": "aad63ff104a98296"
   },
   {
@@ -2344,8 +2534,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_41.mp3",
-   "duration": 0.78,
-   "bytes": 10172,
+   "duration": 0.74,
+   "bytes": 10018,
    "hash": "0e64796d6cd2dadd"
   },
   {
@@ -2354,8 +2544,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_42.mp3",
-   "duration": 0.73,
-   "bytes": 9597,
+   "duration": 0.67,
+   "bytes": 9128,
    "hash": "ed18d0410d02c45c"
   },
   {
@@ -2364,8 +2554,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_43.mp3",
-   "duration": 0.76,
-   "bytes": 9309,
+   "duration": 0.67,
+   "bytes": 8736,
    "hash": "eb68f64cfbf9e8f0"
   },
   {
@@ -2374,8 +2564,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_44.mp3",
-   "duration": 0.71,
-   "bytes": 8685,
+   "duration": 0.67,
+   "bytes": 8268,
    "hash": "cd1493ba04efccba"
   },
   {
@@ -2384,8 +2574,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_45.mp3",
-   "duration": 0.86,
-   "bytes": 12804,
+   "duration": 0.83,
+   "bytes": 11449,
    "hash": "3f588e3f3395442b"
   },
   {
@@ -2394,8 +2584,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_46.mp3",
-   "duration": 0.86,
-   "bytes": 11528,
+   "duration": 0.79,
+   "bytes": 10274,
    "hash": "43cbf3b8dc9c89d3"
   },
   {
@@ -2404,8 +2594,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_47.mp3",
-   "duration": 0.78,
-   "bytes": 12127,
+   "duration": 0.72,
+   "bytes": 10486,
    "hash": "8b10d60efa035b14"
   },
   {
@@ -2414,8 +2604,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_48.mp3",
-   "duration": 0.82,
-   "bytes": 11290,
+   "duration": 0.78,
+   "bytes": 11164,
    "hash": "b4bc02823fd68d9f"
   },
   {
@@ -2424,8 +2614,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_49.mp3",
-   "duration": 0.73,
-   "bytes": 10510,
+   "duration": 0.64,
+   "bytes": 9310,
    "hash": "f74308fec41d0442"
   },
   {
@@ -2434,8 +2624,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_50.mp3",
-   "duration": 0.64,
-   "bytes": 8476,
+   "duration": 0.59,
+   "bytes": 7954,
    "hash": "19a13cecf7c372df"
   },
   {
@@ -2444,8 +2634,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_51.mp3",
-   "duration": 0.86,
-   "bytes": 10771,
+   "duration": 0.8,
+   "bytes": 10537,
    "hash": "7e639b1fa222b4f7"
   },
   {
@@ -2454,8 +2644,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_52.mp3",
-   "duration": 0.68,
-   "bytes": 9988,
+   "duration": 0.63,
+   "bytes": 9130,
    "hash": "ff2d998554af9c66"
   },
   {
@@ -2464,8 +2654,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_53.mp3",
-   "duration": 0.86,
-   "bytes": 10222,
+   "duration": 0.79,
+   "bytes": 9806,
    "hash": "e22ad60eb12e0b48"
   },
   {
@@ -2474,8 +2664,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_54.mp3",
-   "duration": 0.7,
-   "bytes": 8867,
+   "duration": 0.6,
+   "bytes": 7980,
    "hash": "478c7cbba7c6cb6e"
   },
   {
@@ -2484,8 +2674,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_55.mp3",
-   "duration": 0.82,
-   "bytes": 11291,
+   "duration": 0.75,
+   "bytes": 10537,
    "hash": "948f7fab3fced0ba"
   },
   {
@@ -2494,8 +2684,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_56.mp3",
-   "duration": 0.77,
-   "bytes": 10301,
+   "duration": 0.72,
+   "bytes": 9806,
    "hash": "3c3a823dd00a46d1"
   },
   {
@@ -2504,8 +2694,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_57.mp3",
-   "duration": 0.84,
-   "bytes": 11632,
+   "duration": 0.75,
+   "bytes": 10485,
    "hash": "45ada13d99f1a4ac"
   },
   {
@@ -2514,8 +2704,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_58.mp3",
-   "duration": 0.82,
-   "bytes": 11658,
+   "duration": 0.79,
+   "bytes": 11265,
    "hash": "e4e70fa31c7c1efa"
   },
   {
@@ -2524,9 +2714,199 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/num_59.mp3",
-   "duration": 0.77,
-   "bytes": 11006,
+   "duration": 0.72,
+   "bytes": 10537,
    "hash": "866ea40ec40ecdae"
+  },
+  {
+   "id": "min_2",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "fragment",
+   "file": "voices/pacer/min_2.mp3",
+   "duration": 0.64,
+   "bytes": 8527,
+   "hash": "fb3216eb3b59cf3d"
+  },
+  {
+   "id": "min_3",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "fragment",
+   "file": "voices/pacer/min_3.mp3",
+   "duration": 0.7,
+   "bytes": 10538,
+   "hash": "121b90564c472253"
+  },
+  {
+   "id": "min_4",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "fragment",
+   "file": "voices/pacer/min_4.mp3",
+   "duration": 0.89,
+   "bytes": 11893,
+   "hash": "328de61fd82e2517"
+  },
+  {
+   "id": "min_5",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "fragment",
+   "file": "voices/pacer/min_5.mp3",
+   "duration": 0.84,
+   "bytes": 11057,
+   "hash": "b35c522651a41215"
+  },
+  {
+   "id": "min_6",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "fragment",
+   "file": "voices/pacer/min_6.mp3",
+   "duration": 0.77,
+   "bytes": 11110,
+   "hash": "f9b7886fbf474329"
+  },
+  {
+   "id": "min_7",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "fragment",
+   "file": "voices/pacer/min_7.mp3",
+   "duration": 0.83,
+   "bytes": 11840,
+   "hash": "3bbbb8a396db726a"
+  },
+  {
+   "id": "min_8",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "fragment",
+   "file": "voices/pacer/min_8.mp3",
+   "duration": 0.82,
+   "bytes": 10326,
+   "hash": "c89b1105b8cf04b8"
+  },
+  {
+   "id": "min_9",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "fragment",
+   "file": "voices/pacer/min_9.mp3",
+   "duration": 0.79,
+   "bytes": 11370,
+   "hash": "b198d084c1e23108"
+  },
+  {
+   "id": "min_10",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "fragment",
+   "file": "voices/pacer/min_10.mp3",
+   "duration": 0.71,
+   "bytes": 9650,
+   "hash": "7263ea9555e4a067"
+  },
+  {
+   "id": "min_11",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "fragment",
+   "file": "voices/pacer/min_11.mp3",
+   "duration": 0.76,
+   "bytes": 10693,
+   "hash": "5ebfcd29407bfbde"
+  },
+  {
+   "id": "min_12",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "fragment",
+   "file": "voices/pacer/min_12.mp3",
+   "duration": 0.81,
+   "bytes": 11267,
+   "hash": "0b01053e377010e3"
+  },
+  {
+   "id": "min_13",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "fragment",
+   "file": "voices/pacer/min_13.mp3",
+   "duration": 0.92,
+   "bytes": 12987,
+   "hash": "604a6efd1cbea2e2"
+  },
+  {
+   "id": "min_14",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "fragment",
+   "file": "voices/pacer/min_14.mp3",
+   "duration": 0.96,
+   "bytes": 12938,
+   "hash": "4f23a5cef90e0d96"
+  },
+  {
+   "id": "min_15",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "fragment",
+   "file": "voices/pacer/min_15.mp3",
+   "duration": 0.85,
+   "bytes": 11606,
+   "hash": "9e95411bb7ba7ce7"
+  },
+  {
+   "id": "min_16",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "fragment",
+   "file": "voices/pacer/min_16.mp3",
+   "duration": 1.05,
+   "bytes": 13922,
+   "hash": "a05bdd98dfc696d3"
+  },
+  {
+   "id": "min_17",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "fragment",
+   "file": "voices/pacer/min_17.mp3",
+   "duration": 1.15,
+   "bytes": 16117,
+   "hash": "3aba61fb4fed1bfa"
+  },
+  {
+   "id": "min_18",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "fragment",
+   "file": "voices/pacer/min_18.mp3",
+   "duration": 0.97,
+   "bytes": 12231,
+   "hash": "1c59eeeb4f64071d"
+  },
+  {
+   "id": "min_19",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "fragment",
+   "file": "voices/pacer/min_19.mp3",
+   "duration": 1.01,
+   "bytes": 12750,
+   "hash": "4f5878f1ce258e38"
+  },
+  {
+   "id": "min_20",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "fragment",
+   "file": "voices/pacer/min_20.mp3",
+   "duration": 0.84,
+   "bytes": 11893,
+   "hash": "72283173ed563ca1"
   },
   {
    "id": "frag_current_pace",
@@ -2534,8 +2914,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/frag_current_pace.mp3",
-   "duration": 1.32,
-   "bytes": 16064,
+   "duration": 1.23,
+   "bytes": 14916,
    "hash": "4d6f57619bdc04c9"
   },
   {
@@ -2544,8 +2924,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/frag_target_is.mp3",
-   "duration": 1.02,
-   "bytes": 13198,
+   "duration": 0.93,
+   "bytes": 12338,
    "hash": "a934fd97962fb487"
   },
   {
@@ -2554,8 +2934,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/frag_minutes.mp3",
-   "duration": 0.73,
-   "bytes": 10118,
+   "duration": 0.69,
+   "bytes": 10041,
    "hash": "e936fc36c5810004"
   },
   {
@@ -2564,8 +2944,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/frag_per_km.mp3",
-   "duration": 0.85,
-   "bytes": 11969,
+   "duration": 0.8,
+   "bytes": 10744,
    "hash": "bb433271333f6f22"
   },
   {
@@ -2574,8 +2954,8 @@
    "voice": "Philip",
    "trigger": "fragment",
    "file": "voices/pacer/frag_to.mp3",
-   "duration": 0.46,
-   "bytes": 5867,
+   "duration": 0.39,
+   "bytes": 5531,
    "hash": "fc2849ecdb9070ab"
   },
   {
@@ -3194,8 +3574,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_0.mp3",
-   "duration": 0.69,
-   "bytes": 8395,
+   "duration": 0.62,
+   "bytes": 7611,
    "hash": "fdb346af08da23e3"
   },
   {
@@ -3204,8 +3584,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_1.mp3",
-   "duration": 0.6,
-   "bytes": 6855,
+   "duration": 0.52,
+   "bytes": 6153,
    "hash": "b7845b40e8a949fc"
   },
   {
@@ -3214,8 +3594,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_2.mp3",
-   "duration": 0.47,
-   "bytes": 5683,
+   "duration": 0.38,
+   "bytes": 4954,
    "hash": "29d715f9c892be96"
   },
   {
@@ -3224,8 +3604,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_3.mp3",
-   "duration": 0.47,
-   "bytes": 6469,
+   "duration": 0.39,
+   "bytes": 5373,
    "hash": "536ee37b47de4a19"
   },
   {
@@ -3234,8 +3614,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_4.mp3",
-   "duration": 0.47,
-   "bytes": 6310,
+   "duration": 0.38,
+   "bytes": 5529,
    "hash": "f7a14383c36a33dd"
   },
   {
@@ -3244,8 +3624,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_5.mp3",
-   "duration": 0.54,
-   "bytes": 7537,
+   "duration": 0.45,
+   "bytes": 6939,
    "hash": "8865f489bcd82fdd"
   },
   {
@@ -3254,8 +3634,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_6.mp3",
-   "duration": 0.53,
-   "bytes": 8318,
+   "duration": 0.48,
+   "bytes": 8186,
    "hash": "712fba25d81a9565"
   },
   {
@@ -3264,8 +3644,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_7.mp3",
-   "duration": 0.54,
-   "bytes": 7167,
+   "duration": 0.51,
+   "bytes": 6984,
    "hash": "932d1cab89b2be91"
   },
   {
@@ -3274,8 +3654,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_8.mp3",
-   "duration": 0.46,
-   "bytes": 5370,
+   "duration": 0.37,
+   "bytes": 4981,
    "hash": "9603961c8d48cae2"
   },
   {
@@ -3284,8 +3664,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_9.mp3",
-   "duration": 0.37,
-   "bytes": 5527,
+   "duration": 0.28,
+   "bytes": 4381,
    "hash": "65cf21cf5d526d4c"
   },
   {
@@ -3294,8 +3674,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_10.mp3",
-   "duration": 0.37,
-   "bytes": 4770,
+   "duration": 0.29,
+   "bytes": 4041,
    "hash": "0f5c9caa4ceaa13a"
   },
   {
@@ -3304,8 +3684,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_11.mp3",
-   "duration": 0.62,
-   "bytes": 6751,
+   "duration": 0.53,
+   "bytes": 6412,
    "hash": "41b5be06de4fa432"
   },
   {
@@ -3314,8 +3694,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_12.mp3",
-   "duration": 0.58,
-   "bytes": 7665,
+   "duration": 0.5,
+   "bytes": 6988,
    "hash": "374c8d8a29bb9634"
   },
   {
@@ -3324,8 +3704,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_13.mp3",
-   "duration": 0.69,
-   "bytes": 8106,
+   "duration": 0.61,
+   "bytes": 7613,
    "hash": "65195eeab3242967"
   },
   {
@@ -3334,8 +3714,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_14.mp3",
-   "duration": 0.61,
-   "bytes": 7404,
+   "duration": 0.53,
+   "bytes": 6675,
    "hash": "0d07a86648b98462"
   },
   {
@@ -3344,8 +3724,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_15.mp3",
-   "duration": 0.72,
-   "bytes": 8576,
+   "duration": 0.63,
+   "bytes": 7925,
    "hash": "b844c8fe4a57f512"
   },
   {
@@ -3354,8 +3734,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_16.mp3",
-   "duration": 0.76,
-   "bytes": 9435,
+   "duration": 0.72,
+   "bytes": 9098,
    "hash": "3e745400e5f5a81d"
   },
   {
@@ -3364,8 +3744,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_17.mp3",
-   "duration": 0.8,
-   "bytes": 9777,
+   "duration": 0.75,
+   "bytes": 9388,
    "hash": "0d6a7500d865a078"
   },
   {
@@ -3374,8 +3754,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_18.mp3",
-   "duration": 0.72,
-   "bytes": 8082,
+   "duration": 0.63,
+   "bytes": 7640,
    "hash": "040abfe9ec9581c5"
   },
   {
@@ -3384,8 +3764,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_19.mp3",
-   "duration": 0.64,
-   "bytes": 7979,
+   "duration": 0.55,
+   "bytes": 7404,
    "hash": "912d14b9e80c75ba"
   },
   {
@@ -3394,8 +3774,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_20.mp3",
-   "duration": 0.51,
-   "bytes": 6282,
+   "duration": 0.42,
+   "bytes": 5371,
    "hash": "721a656a59ecbc7b"
   },
   {
@@ -3404,8 +3784,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_21.mp3",
-   "duration": 0.7,
-   "bytes": 8159,
+   "duration": 0.62,
+   "bytes": 7431,
    "hash": "a9f34f1364771ccc"
   },
   {
@@ -3414,8 +3794,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_22.mp3",
-   "duration": 0.72,
-   "bytes": 8606,
+   "duration": 0.63,
+   "bytes": 8138,
    "hash": "9aed1ec34293459b"
   },
   {
@@ -3424,8 +3804,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_23.mp3",
-   "duration": 0.75,
-   "bytes": 9569,
+   "duration": 0.66,
+   "bytes": 8348,
    "hash": "718564861de79639"
   },
   {
@@ -3434,8 +3814,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_24.mp3",
-   "duration": 0.73,
-   "bytes": 8709,
+   "duration": 0.64,
+   "bytes": 7901,
    "hash": "fc6fb29ef24d5e7b"
   },
   {
@@ -3444,8 +3824,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_25.mp3",
-   "duration": 0.77,
-   "bytes": 10483,
+   "duration": 0.71,
+   "bytes": 9962,
    "hash": "bf9a91314a3da19c"
   },
   {
@@ -3454,8 +3834,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_26.mp3",
-   "duration": 0.83,
-   "bytes": 11525,
+   "duration": 0.75,
+   "bytes": 10898,
    "hash": "b5e484d09f812278"
   },
   {
@@ -3464,8 +3844,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_27.mp3",
-   "duration": 0.8,
-   "bytes": 9645,
+   "duration": 0.71,
+   "bytes": 9308,
    "hash": "93982bb4dff66b05"
   },
   {
@@ -3474,8 +3854,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_28.mp3",
-   "duration": 0.86,
-   "bytes": 10717,
+   "duration": 0.76,
+   "bytes": 9675,
    "hash": "c01ad73920e3e786"
   },
   {
@@ -3484,8 +3864,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_29.mp3",
-   "duration": 0.8,
-   "bytes": 9467,
+   "duration": 0.71,
+   "bytes": 9152,
    "hash": "ed3573ff41d1d76b"
   },
   {
@@ -3494,8 +3874,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_30.mp3",
-   "duration": 0.61,
-   "bytes": 7718,
+   "duration": 0.56,
+   "bytes": 7274,
    "hash": "42f9127d557541bd"
   },
   {
@@ -3504,8 +3884,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_31.mp3",
-   "duration": 0.73,
-   "bytes": 8549,
+   "duration": 0.64,
+   "bytes": 8031,
    "hash": "e3e5c49fd6c98b02"
   },
   {
@@ -3514,8 +3894,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_32.mp3",
-   "duration": 0.76,
-   "bytes": 9125,
+   "duration": 0.67,
+   "bytes": 8215,
    "hash": "912df05c3cfc358a"
   },
   {
@@ -3524,8 +3904,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_33.mp3",
-   "duration": 0.76,
-   "bytes": 9751,
+   "duration": 0.67,
+   "bytes": 8997,
    "hash": "b4e380dda6f40331"
   },
   {
@@ -3534,8 +3914,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_34.mp3",
-   "duration": 0.76,
-   "bytes": 9359,
+   "duration": 0.67,
+   "bytes": 8161,
    "hash": "3e4139e198a4956b"
   },
   {
@@ -3544,8 +3924,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_35.mp3",
-   "duration": 0.85,
-   "bytes": 10642,
+   "duration": 0.77,
+   "bytes": 9857,
    "hash": "5dc52da0b41cb246"
   },
   {
@@ -3554,8 +3934,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_36.mp3",
-   "duration": 0.85,
-   "bytes": 11655,
+   "duration": 0.76,
+   "bytes": 10716,
    "hash": "1672a0772aa3ff96"
   },
   {
@@ -3564,8 +3944,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_37.mp3",
-   "duration": 0.81,
-   "bytes": 9881,
+   "duration": 0.72,
+   "bytes": 9443,
    "hash": "0eb265a3c50e9fa4"
   },
   {
@@ -3574,8 +3954,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_38.mp3",
-   "duration": 0.58,
-   "bytes": 7274,
+   "duration": 0.48,
+   "bytes": 6675,
    "hash": "71d7fd0cbd6e743f"
   },
   {
@@ -3584,8 +3964,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_39.mp3",
-   "duration": 0.72,
-   "bytes": 8316,
+   "duration": 0.63,
+   "bytes": 7718,
    "hash": "f4797fea4fbbeca4"
   },
   {
@@ -3594,8 +3974,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_40.mp3",
-   "duration": 0.57,
-   "bytes": 7222,
+   "duration": 0.52,
+   "bytes": 6884,
    "hash": "58310957e7c961cc"
   },
   {
@@ -3604,8 +3984,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_41.mp3",
-   "duration": 0.75,
-   "bytes": 9123,
+   "duration": 0.69,
+   "bytes": 8734,
    "hash": "6e69f0f11d465861"
   },
   {
@@ -3614,8 +3994,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_42.mp3",
-   "duration": 0.65,
-   "bytes": 8448,
+   "duration": 0.59,
+   "bytes": 8111,
    "hash": "d0c47daaf7e2fc98"
   },
   {
@@ -3624,8 +4004,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_43.mp3",
-   "duration": 0.73,
-   "bytes": 9103,
+   "duration": 0.65,
+   "bytes": 8009,
    "hash": "470a80539b1ce66f"
   },
   {
@@ -3634,8 +4014,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_44.mp3",
-   "duration": 0.81,
-   "bytes": 10064,
+   "duration": 0.72,
+   "bytes": 9338,
    "hash": "0202cb8fd441d2be"
   },
   {
@@ -3644,8 +4024,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_45.mp3",
-   "duration": 0.76,
-   "bytes": 10433,
+   "duration": 0.72,
+   "bytes": 9700,
    "hash": "ae347cb66ad70be0"
   },
   {
@@ -3654,8 +4034,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_46.mp3",
-   "duration": 0.85,
-   "bytes": 11835,
+   "duration": 0.76,
+   "bytes": 11264,
    "hash": "717a0c3ace46cad0"
   },
   {
@@ -3664,8 +4044,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_47.mp3",
-   "duration": 0.78,
-   "bytes": 9908,
+   "duration": 0.69,
+   "bytes": 9022,
    "hash": "fc7b8d941bd46e28"
   },
   {
@@ -3674,8 +4054,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_48.mp3",
-   "duration": 0.6,
-   "bytes": 8268,
+   "duration": 0.51,
+   "bytes": 7381,
    "hash": "7bbc36dc92610ac8"
   },
   {
@@ -3684,8 +4064,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_49.mp3",
-   "duration": 0.75,
-   "bytes": 9441,
+   "duration": 0.67,
+   "bytes": 8398,
    "hash": "521bf9dc55eb68d1"
   },
   {
@@ -3694,8 +4074,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_50.mp3",
-   "duration": 0.55,
-   "bytes": 6936,
+   "duration": 0.51,
+   "bytes": 6882,
    "hash": "dcb431f43b9fd175"
   },
   {
@@ -3704,8 +4084,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_51.mp3",
-   "duration": 0.74,
-   "bytes": 9359,
+   "duration": 0.66,
+   "bytes": 8604,
    "hash": "c66f5cbb016b7dad"
   },
   {
@@ -3714,8 +4094,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_52.mp3",
-   "duration": 0.77,
-   "bytes": 9541,
+   "duration": 0.69,
+   "bytes": 8655,
    "hash": "dbf58727a1016d31"
   },
   {
@@ -3724,8 +4104,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_53.mp3",
-   "duration": 0.84,
-   "bytes": 10667,
+   "duration": 0.76,
+   "bytes": 9701,
    "hash": "4186d8c6c52ce8ab"
   },
   {
@@ -3734,8 +4114,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_54.mp3",
-   "duration": 0.85,
-   "bytes": 10744,
+   "duration": 0.78,
+   "bytes": 10089,
    "hash": "5e0db9de8f99d170"
   },
   {
@@ -3744,8 +4124,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_55.mp3",
-   "duration": 0.85,
-   "bytes": 11111,
+   "duration": 0.77,
+   "bytes": 10221,
    "hash": "c482692da2d41d51"
   },
   {
@@ -3754,8 +4134,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_56.mp3",
-   "duration": 0.72,
-   "bytes": 10089,
+   "duration": 0.63,
+   "bytes": 9282,
    "hash": "d320b5777438c850"
   },
   {
@@ -3764,8 +4144,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_57.mp3",
-   "duration": 0.92,
-   "bytes": 12099,
+   "duration": 0.84,
+   "bytes": 11396,
    "hash": "6bab4538c759d963"
   },
   {
@@ -3774,8 +4154,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_58.mp3",
-   "duration": 0.69,
-   "bytes": 9569,
+   "duration": 0.6,
+   "bytes": 8659,
    "hash": "db00fe6ce92d7870"
   },
   {
@@ -3784,9 +4164,199 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/num_59.mp3",
-   "duration": 0.82,
-   "bytes": 9725,
+   "duration": 0.75,
+   "bytes": 9334,
    "hash": "44fc968e88457f70"
+  },
+  {
+   "id": "min_2",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "fragment",
+   "file": "voices/motivator/min_2.mp3",
+   "duration": 0.66,
+   "bytes": 10117,
+   "hash": "2bb8e3b11156cdab"
+  },
+  {
+   "id": "min_3",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "fragment",
+   "file": "voices/motivator/min_3.mp3",
+   "duration": 0.85,
+   "bytes": 11920,
+   "hash": "01dde86e482cb383"
+  },
+  {
+   "id": "min_4",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "fragment",
+   "file": "voices/motivator/min_4.mp3",
+   "duration": 0.75,
+   "bytes": 10455,
+   "hash": "8da94a869b24d773"
+  },
+  {
+   "id": "min_5",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "fragment",
+   "file": "voices/motivator/min_5.mp3",
+   "duration": 0.78,
+   "bytes": 11055,
+   "hash": "39c4b22e7a2e112e"
+  },
+  {
+   "id": "min_6",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "fragment",
+   "file": "voices/motivator/min_6.mp3",
+   "duration": 0.85,
+   "bytes": 12566,
+   "hash": "54bfd31c18c2c7e0"
+  },
+  {
+   "id": "min_7",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "fragment",
+   "file": "voices/motivator/min_7.mp3",
+   "duration": 0.81,
+   "bytes": 11579,
+   "hash": "3bdb3d8f6327e248"
+  },
+  {
+   "id": "min_8",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "fragment",
+   "file": "voices/motivator/min_8.mp3",
+   "duration": 0.72,
+   "bytes": 9725,
+   "hash": "0f0980e002b70c1c"
+  },
+  {
+   "id": "min_9",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "fragment",
+   "file": "voices/motivator/min_9.mp3",
+   "duration": 0.84,
+   "bytes": 12724,
+   "hash": "0a10aeca2b05d0ad"
+  },
+  {
+   "id": "min_10",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "fragment",
+   "file": "voices/motivator/min_10.mp3",
+   "duration": 0.71,
+   "bytes": 9962,
+   "hash": "93369d216850175f"
+  },
+  {
+   "id": "min_11",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "fragment",
+   "file": "voices/motivator/min_11.mp3",
+   "duration": 0.89,
+   "bytes": 11708,
+   "hash": "da9d249316467e37"
+  },
+  {
+   "id": "min_12",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "fragment",
+   "file": "voices/motivator/min_12.mp3",
+   "duration": 0.87,
+   "bytes": 11371,
+   "hash": "b0fd6ef625661264"
+  },
+  {
+   "id": "min_13",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "fragment",
+   "file": "voices/motivator/min_13.mp3",
+   "duration": 1.0,
+   "bytes": 13401,
+   "hash": "2c86dc4fa38f6b78"
+  },
+  {
+   "id": "min_14",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "fragment",
+   "file": "voices/motivator/min_14.mp3",
+   "duration": 1.03,
+   "bytes": 14395,
+   "hash": "46cff8a403593ff4"
+  },
+  {
+   "id": "min_15",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "fragment",
+   "file": "voices/motivator/min_15.mp3",
+   "duration": 0.88,
+   "bytes": 12336,
+   "hash": "6186d8ac739fb5f4"
+  },
+  {
+   "id": "min_16",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "fragment",
+   "file": "voices/motivator/min_16.mp3",
+   "duration": 1.02,
+   "bytes": 14419,
+   "hash": "c0073f1dce270b3f"
+  },
+  {
+   "id": "min_17",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "fragment",
+   "file": "voices/motivator/min_17.mp3",
+   "duration": 1.0,
+   "bytes": 13769,
+   "hash": "7dffdcf1588d3f72"
+  },
+  {
+   "id": "min_18",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "fragment",
+   "file": "voices/motivator/min_18.mp3",
+   "duration": 0.85,
+   "bytes": 11421,
+   "hash": "ba00d1e3559a42fe"
+  },
+  {
+   "id": "min_19",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "fragment",
+   "file": "voices/motivator/min_19.mp3",
+   "duration": 0.95,
+   "bytes": 13301,
+   "hash": "fb00b8cedddd2573"
+  },
+  {
+   "id": "min_20",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "fragment",
+   "file": "voices/motivator/min_20.mp3",
+   "duration": 0.8,
+   "bytes": 11448,
+   "hash": "0da9a16758b19821"
   },
   {
    "id": "frag_current_pace",
@@ -3794,8 +4364,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/frag_current_pace.mp3",
-   "duration": 1.24,
-   "bytes": 15122,
+   "duration": 1.14,
+   "bytes": 14395,
    "hash": "efe1fb69e3893949"
   },
   {
@@ -3804,8 +4374,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/frag_target_is.mp3",
-   "duration": 1.11,
-   "bytes": 14181,
+   "duration": 1.02,
+   "bytes": 13350,
    "hash": "869db5d9ce509826"
   },
   {
@@ -3814,8 +4384,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/frag_minutes.mp3",
-   "duration": 0.61,
-   "bytes": 9647,
+   "duration": 0.58,
+   "bytes": 9439,
    "hash": "fef8f02055397c51"
   },
   {
@@ -3824,8 +4394,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/frag_per_km.mp3",
-   "duration": 0.78,
-   "bytes": 9698,
+   "duration": 0.71,
+   "bytes": 9776,
    "hash": "60db816d6ebc4fbf"
   },
   {
@@ -3834,8 +4404,8 @@
    "voice": "Hope",
    "trigger": "fragment",
    "file": "voices/motivator/frag_to.mp3",
-   "duration": 0.47,
-   "bytes": 6205,
+   "duration": 0.39,
+   "bytes": 5633,
    "hash": "4fd4757f5e5b352f"
   },
   {
@@ -4454,8 +5024,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_0.mp3",
-   "duration": 0.62,
-   "bytes": 7929,
+   "duration": 0.55,
+   "bytes": 7092,
    "hash": "071257bddc9ca465"
   },
   {
@@ -4464,8 +5034,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_1.mp3",
-   "duration": 0.51,
-   "bytes": 5865,
+   "duration": 0.43,
+   "bytes": 5319,
    "hash": "b6a57bc089acc65d"
   },
   {
@@ -4474,8 +5044,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_2.mp3",
-   "duration": 0.43,
-   "bytes": 5370,
+   "duration": 0.33,
+   "bytes": 4538,
    "hash": "eea3e762e9c15746"
   },
   {
@@ -4484,8 +5054,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_3.mp3",
-   "duration": 0.43,
-   "bytes": 5684,
+   "duration": 0.35,
+   "bytes": 5059,
    "hash": "46e400e91fcd68b1"
   },
   {
@@ -4494,8 +5064,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_4.mp3",
-   "duration": 0.47,
-   "bytes": 5997,
+   "duration": 0.39,
+   "bytes": 5164,
    "hash": "0dcd1712e50f4395"
   },
   {
@@ -4504,8 +5074,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_5.mp3",
-   "duration": 0.59,
-   "bytes": 7380,
+   "duration": 0.51,
+   "bytes": 6938,
    "hash": "4e020e5f63ab489b"
   },
   {
@@ -4514,8 +5084,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_6.mp3",
-   "duration": 0.57,
-   "bytes": 7898,
+   "duration": 0.52,
+   "bytes": 7482,
    "hash": "241b77f32ab120bd"
   },
   {
@@ -4524,8 +5094,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_7.mp3",
-   "duration": 0.64,
-   "bytes": 8080,
+   "duration": 0.59,
+   "bytes": 7403,
    "hash": "6917357887175191"
   },
   {
@@ -4534,8 +5104,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_8.mp3",
-   "duration": 0.57,
-   "bytes": 6880,
+   "duration": 0.47,
+   "bytes": 5814,
    "hash": "15feaf00939a3d57"
   },
   {
@@ -4544,8 +5114,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_9.mp3",
-   "duration": 0.52,
-   "bytes": 6596,
+   "duration": 0.48,
+   "bytes": 5892,
    "hash": "a61eafa4d754b538"
   },
   {
@@ -4554,8 +5124,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_10.mp3",
-   "duration": 0.44,
-   "bytes": 5164,
+   "duration": 0.34,
+   "bytes": 4591,
    "hash": "b05d0cbad2222f2c"
   },
   {
@@ -4564,8 +5134,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_11.mp3",
-   "duration": 0.53,
-   "bytes": 6728,
+   "duration": 0.44,
+   "bytes": 5817,
    "hash": "70508ce3859daa75"
   },
   {
@@ -4574,8 +5144,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_12.mp3",
-   "duration": 0.64,
-   "bytes": 7561,
+   "duration": 0.54,
+   "bytes": 6832,
    "hash": "e3788ec0884c1186"
   },
   {
@@ -4584,8 +5154,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_13.mp3",
-   "duration": 0.78,
-   "bytes": 9753,
+   "duration": 0.72,
+   "bytes": 9440,
    "hash": "d63cd231e794f468"
   },
   {
@@ -4594,8 +5164,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_14.mp3",
-   "duration": 0.72,
-   "bytes": 8448,
+   "duration": 0.66,
+   "bytes": 7928,
    "hash": "29113a9c687800b6"
   },
   {
@@ -4604,8 +5174,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_15.mp3",
-   "duration": 0.67,
-   "bytes": 8057,
+   "duration": 0.56,
+   "bytes": 7093,
    "hash": "207d5be537f2b114"
   },
   {
@@ -4614,8 +5184,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_16.mp3",
-   "duration": 0.73,
-   "bytes": 9647,
+   "duration": 0.68,
+   "bytes": 9231,
    "hash": "c74b484932edd58b"
   },
   {
@@ -4624,8 +5194,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_17.mp3",
-   "duration": 0.77,
-   "bytes": 9489,
+   "duration": 0.7,
+   "bytes": 8580,
    "hash": "bc33cfef6ee826b7"
   },
   {
@@ -4634,8 +5204,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_18.mp3",
-   "duration": 0.64,
-   "bytes": 7248,
+   "duration": 0.56,
+   "bytes": 6779,
    "hash": "523980ee1a50a0b6"
   },
   {
@@ -4644,8 +5214,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_19.mp3",
-   "duration": 0.72,
-   "bytes": 8369,
+   "duration": 0.64,
+   "bytes": 7978,
    "hash": "61315a33e8ba36ee"
   },
   {
@@ -4654,8 +5224,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_20.mp3",
-   "duration": 0.63,
-   "bytes": 7878,
+   "duration": 0.54,
+   "bytes": 7018,
    "hash": "9c00b763787eba77"
   },
   {
@@ -4664,8 +5234,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_21.mp3",
-   "duration": 0.72,
-   "bytes": 8576,
+   "duration": 0.63,
+   "bytes": 7565,
    "hash": "e9d4a21552c09073"
   },
   {
@@ -4674,8 +5244,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_22.mp3",
-   "duration": 0.77,
-   "bytes": 9651,
+   "duration": 0.69,
+   "bytes": 8920,
    "hash": "8085888e20068b67"
   },
   {
@@ -4684,8 +5254,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_23.mp3",
-   "duration": 0.75,
-   "bytes": 8995,
+   "duration": 0.66,
+   "bytes": 8293,
    "hash": "ed1a185695d84800"
   },
   {
@@ -4694,8 +5264,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_24.mp3",
-   "duration": 0.75,
-   "bytes": 8578,
+   "duration": 0.66,
+   "bytes": 7926,
    "hash": "753a14a4aeda0805"
   },
   {
@@ -4704,8 +5274,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_25.mp3",
-   "duration": 0.76,
-   "bytes": 9673,
+   "duration": 0.68,
+   "bytes": 8973,
    "hash": "3fd37e611106033a"
   },
   {
@@ -4714,8 +5284,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_26.mp3",
-   "duration": 0.87,
-   "bytes": 11003,
+   "duration": 0.78,
+   "bytes": 10327,
    "hash": "3504a3362ddca302"
   },
   {
@@ -4724,8 +5294,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_27.mp3",
-   "duration": 0.8,
-   "bytes": 9623,
+   "duration": 0.7,
+   "bytes": 8607,
    "hash": "af13dd92b4ba1c9d"
   },
   {
@@ -4734,8 +5304,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_28.mp3",
-   "duration": 0.79,
-   "bytes": 9543,
+   "duration": 0.7,
+   "bytes": 9077,
    "hash": "d1dbaf65ce6ae143"
   },
   {
@@ -4744,8 +5314,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_29.mp3",
-   "duration": 0.81,
-   "bytes": 9674,
+   "duration": 0.72,
+   "bytes": 8816,
    "hash": "994073dd35db6b05"
   },
   {
@@ -4754,8 +5324,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_30.mp3",
-   "duration": 0.63,
-   "bytes": 8083,
+   "duration": 0.55,
+   "bytes": 7460,
    "hash": "8792993e348372e5"
   },
   {
@@ -4764,8 +5334,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_31.mp3",
-   "duration": 0.78,
-   "bytes": 9518,
+   "duration": 0.69,
+   "bytes": 8448,
    "hash": "39603d199beac557"
   },
   {
@@ -4774,8 +5344,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_32.mp3",
-   "duration": 0.65,
-   "bytes": 8553,
+   "duration": 0.56,
+   "bytes": 7615,
    "hash": "7977e54e59373315"
   },
   {
@@ -4784,8 +5354,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_33.mp3",
-   "duration": 0.79,
-   "bytes": 8863,
+   "duration": 0.72,
+   "bytes": 8473,
    "hash": "25af928330efda81"
   },
   {
@@ -4794,8 +5364,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_34.mp3",
-   "duration": 0.83,
-   "bytes": 10090,
+   "duration": 0.77,
+   "bytes": 9334,
    "hash": "2ffe306061d0a20d"
   },
   {
@@ -4804,8 +5374,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_35.mp3",
-   "duration": 0.85,
-   "bytes": 10509,
+   "duration": 0.74,
+   "bytes": 9517,
    "hash": "38b7147a49b1af29"
   },
   {
@@ -4814,8 +5384,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_36.mp3",
-   "duration": 0.9,
-   "bytes": 11785,
+   "duration": 0.79,
+   "bytes": 10640,
    "hash": "0add4a2290837ac9"
   },
   {
@@ -4824,8 +5394,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_37.mp3",
-   "duration": 0.82,
-   "bytes": 10376,
+   "duration": 0.72,
+   "bytes": 9727,
    "hash": "e681ace00627d65b"
   },
   {
@@ -4834,8 +5404,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_38.mp3",
-   "duration": 0.88,
-   "bytes": 10949,
+   "duration": 0.81,
+   "bytes": 10377,
    "hash": "8625893db75a492b"
   },
   {
@@ -4844,8 +5414,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_39.mp3",
-   "duration": 0.82,
-   "bytes": 10067,
+   "duration": 0.73,
+   "bytes": 9284,
    "hash": "77152566d3826faa"
   },
   {
@@ -4854,8 +5424,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_40.mp3",
-   "duration": 0.57,
-   "bytes": 7094,
+   "duration": 0.5,
+   "bytes": 6623,
    "hash": "f89e44bbcbe28ca0"
   },
   {
@@ -4864,8 +5434,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_41.mp3",
-   "duration": 0.7,
-   "bytes": 8318,
+   "duration": 0.62,
+   "bytes": 7718,
    "hash": "f66bb72e04a95922"
   },
   {
@@ -4874,8 +5444,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_42.mp3",
-   "duration": 0.74,
-   "bytes": 9076,
+   "duration": 0.65,
+   "bytes": 8503,
    "hash": "fd649c1efd1c4442"
   },
   {
@@ -4884,8 +5454,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_43.mp3",
-   "duration": 0.75,
-   "bytes": 9649,
+   "duration": 0.68,
+   "bytes": 8504,
    "hash": "4a160b009b5ca5a6"
   },
   {
@@ -4894,8 +5464,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_44.mp3",
-   "duration": 0.83,
-   "bytes": 9754,
+   "duration": 0.75,
+   "bytes": 8998,
    "hash": "41ca5fb2ab9a6f89"
   },
   {
@@ -4904,8 +5474,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_45.mp3",
-   "duration": 0.85,
-   "bytes": 10328,
+   "duration": 0.77,
+   "bytes": 9338,
    "hash": "a29aa95eb5228e3d"
   },
   {
@@ -4914,8 +5484,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_46.mp3",
-   "duration": 0.93,
-   "bytes": 12022,
+   "duration": 0.85,
+   "bytes": 11761,
    "hash": "3f65a24a85403088"
   },
   {
@@ -4924,8 +5494,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_47.mp3",
-   "duration": 0.79,
-   "bytes": 9647,
+   "duration": 0.71,
+   "bytes": 8710,
    "hash": "191617e31f939e4d"
   },
   {
@@ -4934,8 +5504,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_48.mp3",
-   "duration": 0.85,
-   "bytes": 10428,
+   "duration": 0.76,
+   "bytes": 9075,
    "hash": "41723c46e9d86138"
   },
   {
@@ -4944,8 +5514,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_49.mp3",
-   "duration": 0.82,
-   "bytes": 10323,
+   "duration": 0.74,
+   "bytes": 9256,
    "hash": "002b7d96c10b401f"
   },
   {
@@ -4954,8 +5524,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_50.mp3",
-   "duration": 0.56,
-   "bytes": 7143,
+   "duration": 0.48,
+   "bytes": 6415,
    "hash": "8ce8b41fa648f5ab"
   },
   {
@@ -4964,8 +5534,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_51.mp3",
-   "duration": 0.75,
-   "bytes": 8787,
+   "duration": 0.64,
+   "bytes": 7953,
    "hash": "c30cb30954ac98be"
   },
   {
@@ -4974,8 +5544,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_52.mp3",
-   "duration": 0.75,
-   "bytes": 9310,
+   "duration": 0.65,
+   "bytes": 8239,
    "hash": "29775be8343d1b5e"
   },
   {
@@ -4984,8 +5554,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_53.mp3",
-   "duration": 0.81,
-   "bytes": 9467,
+   "duration": 0.73,
+   "bytes": 8922,
    "hash": "3bf7e22dff2cd15c"
   },
   {
@@ -4994,8 +5564,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_54.mp3",
-   "duration": 0.73,
-   "bytes": 8707,
+   "duration": 0.66,
+   "bytes": 8241,
    "hash": "209f820c8906e356"
   },
   {
@@ -5004,8 +5574,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_55.mp3",
-   "duration": 0.8,
-   "bytes": 10015,
+   "duration": 0.72,
+   "bytes": 8919,
    "hash": "6d71089722cada6b"
   },
   {
@@ -5014,8 +5584,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_56.mp3",
-   "duration": 0.93,
-   "bytes": 11680,
+   "duration": 0.85,
+   "bytes": 10978,
    "hash": "b9e676e33ff4c2e7"
   },
   {
@@ -5024,8 +5594,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_57.mp3",
-   "duration": 0.85,
-   "bytes": 10144,
+   "duration": 0.75,
+   "bytes": 9598,
    "hash": "39636dc12324251f"
   },
   {
@@ -5034,8 +5604,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_58.mp3",
-   "duration": 0.79,
-   "bytes": 9333,
+   "duration": 0.71,
+   "bytes": 8996,
    "hash": "69e7e485f56eaca9"
   },
   {
@@ -5044,9 +5614,199 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/num_59.mp3",
-   "duration": 0.81,
-   "bytes": 10794,
+   "duration": 0.72,
+   "bytes": 9307,
    "hash": "d8cea6a1c510c200"
+  },
+  {
+   "id": "min_2",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "fragment",
+   "file": "voices/technician/min_2.mp3",
+   "duration": 0.63,
+   "bytes": 8346,
+   "hash": "664cb46ab8966a3b"
+  },
+  {
+   "id": "min_3",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "fragment",
+   "file": "voices/technician/min_3.mp3",
+   "duration": 0.82,
+   "bytes": 10428,
+   "hash": "5af8509f9989b577"
+  },
+  {
+   "id": "min_4",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "fragment",
+   "file": "voices/technician/min_4.mp3",
+   "duration": 0.68,
+   "bytes": 9178,
+   "hash": "02bdf76c5f5d71ed"
+  },
+  {
+   "id": "min_5",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "fragment",
+   "file": "voices/technician/min_5.mp3",
+   "duration": 0.7,
+   "bytes": 9387,
+   "hash": "b75e5393a87f3510"
+  },
+  {
+   "id": "min_6",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "fragment",
+   "file": "voices/technician/min_6.mp3",
+   "duration": 0.83,
+   "bytes": 11286,
+   "hash": "33f328cead6aa124"
+  },
+  {
+   "id": "min_7",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "fragment",
+   "file": "voices/technician/min_7.mp3",
+   "duration": 0.89,
+   "bytes": 11185,
+   "hash": "b449f47293eff4bd"
+  },
+  {
+   "id": "min_8",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "fragment",
+   "file": "voices/technician/min_8.mp3",
+   "duration": 0.68,
+   "bytes": 9595,
+   "hash": "d6f9ab47baffac00"
+  },
+  {
+   "id": "min_9",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "fragment",
+   "file": "voices/technician/min_9.mp3",
+   "duration": 0.81,
+   "bytes": 10584,
+   "hash": "c7b25f731feff1de"
+  },
+  {
+   "id": "min_10",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "fragment",
+   "file": "voices/technician/min_10.mp3",
+   "duration": 0.76,
+   "bytes": 9310,
+   "hash": "f5d999e0eed69f07"
+  },
+  {
+   "id": "min_11",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "fragment",
+   "file": "voices/technician/min_11.mp3",
+   "duration": 0.87,
+   "bytes": 10718,
+   "hash": "3dd92251fedfd8f5"
+  },
+  {
+   "id": "min_12",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "fragment",
+   "file": "voices/technician/min_12.mp3",
+   "duration": 0.75,
+   "bytes": 9674,
+   "hash": "08d3bd984ac9ef5c"
+  },
+  {
+   "id": "min_13",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "fragment",
+   "file": "voices/technician/min_13.mp3",
+   "duration": 1.01,
+   "bytes": 12591,
+   "hash": "dcd0ed4404e95891"
+  },
+  {
+   "id": "min_14",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "fragment",
+   "file": "voices/technician/min_14.mp3",
+   "duration": 1.02,
+   "bytes": 13063,
+   "hash": "bc9ac89a3d3a05cf"
+  },
+  {
+   "id": "min_15",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "fragment",
+   "file": "voices/technician/min_15.mp3",
+   "duration": 1.02,
+   "bytes": 12646,
+   "hash": "1b4bef2ab35f3e24"
+  },
+  {
+   "id": "min_16",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "fragment",
+   "file": "voices/technician/min_16.mp3",
+   "duration": 0.92,
+   "bytes": 12437,
+   "hash": "73eba41c62250579"
+  },
+  {
+   "id": "min_17",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "fragment",
+   "file": "voices/technician/min_17.mp3",
+   "duration": 0.95,
+   "bytes": 12227,
+   "hash": "7c53cf20c18c5b2f"
+  },
+  {
+   "id": "min_18",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "fragment",
+   "file": "voices/technician/min_18.mp3",
+   "duration": 0.89,
+   "bytes": 11890,
+   "hash": "2b345c1104b9e5cd"
+  },
+  {
+   "id": "min_19",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "fragment",
+   "file": "voices/technician/min_19.mp3",
+   "duration": 0.9,
+   "bytes": 10896,
+   "hash": "4f14e17337bd2355"
+  },
+  {
+   "id": "min_20",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "fragment",
+   "file": "voices/technician/min_20.mp3",
+   "duration": 0.81,
+   "bytes": 10588,
+   "hash": "b54fdab07be7f389"
   },
   {
    "id": "frag_current_pace",
@@ -5054,8 +5814,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/frag_current_pace.mp3",
-   "duration": 1.32,
-   "bytes": 15488,
+   "duration": 1.23,
+   "bytes": 14966,
    "hash": "db7590abc71d7610"
   },
   {
@@ -5064,8 +5824,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/frag_target_is.mp3",
-   "duration": 1.06,
-   "bytes": 12806,
+   "duration": 0.97,
+   "bytes": 12099,
    "hash": "3c61fd5ee83141b6"
   },
   {
@@ -5074,8 +5834,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/frag_minutes.mp3",
-   "duration": 0.64,
-   "bytes": 8526,
+   "duration": 0.59,
+   "bytes": 8029,
    "hash": "95031747cbea3765"
   },
   {
@@ -5084,8 +5844,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/frag_per_km.mp3",
-   "duration": 0.88,
-   "bytes": 11212,
+   "duration": 0.79,
+   "bytes": 10430,
    "hash": "674a67e842aea7d9"
   },
   {
@@ -5094,8 +5854,8 @@
    "voice": "Lucy",
    "trigger": "fragment",
    "file": "voices/technician/frag_to.mp3",
-   "duration": 0.44,
-   "bytes": 5553,
+   "duration": 0.35,
+   "bytes": 5007,
    "hash": "7982359197d52b59"
   },
   {
@@ -5714,8 +6474,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_0.mp3",
-   "duration": 0.6,
-   "bytes": 9860,
+   "duration": 0.57,
+   "bytes": 9651,
    "hash": "b98c8b6ba20609ea"
   },
   {
@@ -5724,8 +6484,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_1.mp3",
-   "duration": 0.42,
-   "bytes": 6648,
+   "duration": 0.38,
+   "bytes": 6520,
    "hash": "2e02a84042c61994"
   },
   {
@@ -5734,8 +6494,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_2.mp3",
-   "duration": 0.44,
-   "bytes": 6493,
+   "duration": 0.35,
+   "bytes": 5372,
    "hash": "28c973f6f28387d0"
   },
   {
@@ -5744,8 +6504,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_3.mp3",
-   "duration": 0.55,
-   "bytes": 8085,
+   "duration": 0.53,
+   "bytes": 7538,
    "hash": "a0352a9a20e70c96"
   },
   {
@@ -5754,8 +6514,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_4.mp3",
-   "duration": 0.44,
-   "bytes": 6155,
+   "duration": 0.41,
+   "bytes": 5763,
    "hash": "77df1a8d3230af95"
   },
   {
@@ -5764,8 +6524,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_5.mp3",
-   "duration": 0.5,
-   "bytes": 7718,
+   "duration": 0.41,
+   "bytes": 7095,
    "hash": "75c9aaf0d74a24d7"
   },
   {
@@ -5774,8 +6534,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_6.mp3",
-   "duration": 0.57,
-   "bytes": 8293,
+   "duration": 0.52,
+   "bytes": 7249,
    "hash": "908f031ef893a562"
   },
   {
@@ -5784,8 +6544,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_7.mp3",
-   "duration": 0.53,
-   "bytes": 7093,
+   "duration": 0.49,
+   "bytes": 6338,
    "hash": "2b76a5d80073b9d8"
   },
   {
@@ -5794,8 +6554,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_8.mp3",
-   "duration": 0.44,
-   "bytes": 6545,
+   "duration": 0.38,
+   "bytes": 5972,
    "hash": "1825357fc73ec7ad"
   },
   {
@@ -5804,8 +6564,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_9.mp3",
-   "duration": 0.45,
-   "bytes": 6674,
+   "duration": 0.38,
+   "bytes": 5918,
    "hash": "4b41cf617104df5d"
   },
   {
@@ -5814,8 +6574,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_10.mp3",
-   "duration": 0.42,
-   "bytes": 6833,
+   "duration": 0.32,
+   "bytes": 6362,
    "hash": "e25985c8159a024c"
   },
   {
@@ -5824,8 +6584,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_11.mp3",
-   "duration": 0.62,
-   "bytes": 9963,
+   "duration": 0.55,
+   "bytes": 9338,
    "hash": "fd2d02bf7082df46"
   },
   {
@@ -5834,8 +6594,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_12.mp3",
-   "duration": 0.6,
-   "bytes": 8033,
+   "duration": 0.51,
+   "bytes": 6886,
    "hash": "79b5c06c11530542"
   },
   {
@@ -5844,8 +6604,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_13.mp3",
-   "duration": 0.67,
-   "bytes": 8865,
+   "duration": 0.62,
+   "bytes": 8635,
    "hash": "32ee794dd49102f9"
   },
   {
@@ -5854,8 +6614,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_14.mp3",
-   "duration": 0.76,
-   "bytes": 10901,
+   "duration": 0.71,
+   "bytes": 10797,
    "hash": "6a220a7c542ed57d"
   },
   {
@@ -5864,8 +6624,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_15.mp3",
-   "duration": 0.63,
-   "bytes": 8970,
+   "duration": 0.56,
+   "bytes": 8084,
    "hash": "d23867651003f740"
   },
   {
@@ -5874,8 +6634,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_16.mp3",
-   "duration": 0.68,
-   "bytes": 10376,
+   "duration": 0.66,
+   "bytes": 10326,
    "hash": "3d9b86ae35af55d8"
   },
   {
@@ -5884,8 +6644,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_17.mp3",
-   "duration": 0.74,
-   "bytes": 9986,
+   "duration": 0.69,
+   "bytes": 9702,
    "hash": "9e95d35e08372cbb"
   },
   {
@@ -5894,8 +6654,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_18.mp3",
-   "duration": 0.68,
-   "bytes": 10902,
+   "duration": 0.62,
+   "bytes": 10275,
    "hash": "6e67a730d7cdf5ac"
   },
   {
@@ -5904,8 +6664,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_19.mp3",
-   "duration": 0.73,
-   "bytes": 10223,
+   "duration": 0.66,
+   "bytes": 9910,
    "hash": "06a9d9026e692918"
   },
   {
@@ -5914,8 +6674,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_20.mp3",
-   "duration": 0.65,
-   "bytes": 8761,
+   "duration": 0.58,
+   "bytes": 8085,
    "hash": "4de74d34156ba1c6"
   },
   {
@@ -5924,8 +6684,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_21.mp3",
-   "duration": 0.81,
-   "bytes": 11320,
+   "duration": 0.72,
+   "bytes": 10121,
    "hash": "ed6f218c8dd02914"
   },
   {
@@ -5934,8 +6694,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_22.mp3",
-   "duration": 0.8,
-   "bytes": 12127,
+   "duration": 0.77,
+   "bytes": 11580,
    "hash": "dbda65112127a430"
   },
   {
@@ -5944,8 +6704,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_23.mp3",
-   "duration": 0.79,
-   "bytes": 11735,
+   "duration": 0.7,
+   "bytes": 10641,
    "hash": "3ef95abc0126d215"
   },
   {
@@ -5954,8 +6714,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_24.mp3",
-   "duration": 0.85,
-   "bytes": 11580,
+   "duration": 0.8,
+   "bytes": 10901,
    "hash": "150d2843aa927923"
   },
   {
@@ -5964,8 +6724,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_25.mp3",
-   "duration": 0.86,
-   "bytes": 13382,
+   "duration": 0.78,
+   "bytes": 12001,
    "hash": "dd3101c481f468a7"
   },
   {
@@ -5974,8 +6734,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_26.mp3",
-   "duration": 0.92,
-   "bytes": 12569,
+   "duration": 0.83,
+   "bytes": 10927,
    "hash": "16ba128ee9809859"
   },
   {
@@ -5984,8 +6744,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_27.mp3",
-   "duration": 0.81,
-   "bytes": 11032,
+   "duration": 0.72,
+   "bytes": 10121,
    "hash": "32bbfa6045805ffb"
   },
   {
@@ -5994,8 +6754,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_28.mp3",
-   "duration": 0.66,
-   "bytes": 11007,
+   "duration": 0.57,
+   "bytes": 9912,
    "hash": "c54cfc5863376db2"
   },
   {
@@ -6004,8 +6764,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_29.mp3",
-   "duration": 0.77,
-   "bytes": 11738,
+   "duration": 0.68,
+   "bytes": 10644,
    "hash": "9d480ea77d06018a"
   },
   {
@@ -6014,8 +6774,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_30.mp3",
-   "duration": 0.88,
-   "bytes": 11681,
+   "duration": 0.78,
+   "bytes": 10455,
    "hash": "71e553f5c99b10b6"
   },
   {
@@ -6024,8 +6784,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_31.mp3",
-   "duration": 0.81,
-   "bytes": 12859,
+   "duration": 0.76,
+   "bytes": 12102,
    "hash": "92b30471d9c2f816"
   },
   {
@@ -6034,8 +6794,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_32.mp3",
-   "duration": 0.86,
-   "bytes": 11660,
+   "duration": 0.81,
+   "bytes": 11736,
    "hash": "edd88349bedfe3cc"
   },
   {
@@ -6044,8 +6804,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_33.mp3",
-   "duration": 0.9,
-   "bytes": 13300,
+   "duration": 0.82,
+   "bytes": 12520,
    "hash": "c36bec4d17632d32"
   },
   {
@@ -6054,8 +6814,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_34.mp3",
-   "duration": 0.82,
-   "bytes": 10693,
+   "duration": 0.78,
+   "bytes": 10302,
    "hash": "b3bbf725d0129141"
   },
   {
@@ -6064,8 +6824,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_35.mp3",
-   "duration": 0.86,
-   "bytes": 14450,
+   "duration": 0.84,
+   "bytes": 14241,
    "hash": "67d448e2dbfcb37f"
   },
   {
@@ -6074,8 +6834,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_36.mp3",
-   "duration": 0.85,
-   "bytes": 12935,
+   "duration": 0.76,
+   "bytes": 11737,
    "hash": "3de368645eefffce"
   },
   {
@@ -6084,8 +6844,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_37.mp3",
-   "duration": 0.94,
-   "bytes": 13614,
+   "duration": 0.88,
+   "bytes": 12962,
    "hash": "8a38e1695308ab04"
   },
   {
@@ -6094,8 +6854,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_38.mp3",
-   "duration": 0.71,
-   "bytes": 11396,
+   "duration": 0.63,
+   "bytes": 11009,
    "hash": "b51edaaefb3f695f"
   },
   {
@@ -6104,8 +6864,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_39.mp3",
-   "duration": 0.83,
-   "bytes": 11999,
+   "duration": 0.77,
+   "bytes": 11529,
    "hash": "efd86e88bb025a17"
   },
   {
@@ -6114,8 +6874,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_40.mp3",
-   "duration": 0.59,
-   "bytes": 9469,
+   "duration": 0.58,
+   "bytes": 9338,
    "hash": "51980a0b5cd2a81f"
   },
   {
@@ -6124,8 +6884,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_41.mp3",
-   "duration": 0.78,
-   "bytes": 11032,
+   "duration": 0.75,
+   "bytes": 10534,
    "hash": "f10d226abef59a81"
   },
   {
@@ -6134,8 +6894,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_42.mp3",
-   "duration": 0.87,
-   "bytes": 12937,
+   "duration": 0.82,
+   "bytes": 12362,
    "hash": "a25760b5bd3e8d02"
   },
   {
@@ -6144,8 +6904,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_43.mp3",
-   "duration": 0.86,
-   "bytes": 12650,
+   "duration": 0.81,
+   "bytes": 11684,
    "hash": "4baa19eba746ac19"
   },
   {
@@ -6154,8 +6914,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_44.mp3",
-   "duration": 0.88,
-   "bytes": 13299,
+   "duration": 0.87,
+   "bytes": 12311,
    "hash": "8fb4a113c31475f7"
   },
   {
@@ -6164,8 +6924,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_45.mp3",
-   "duration": 0.87,
-   "bytes": 12205,
+   "duration": 0.8,
+   "bytes": 11478,
    "hash": "6c6ba5380a1a9e36"
   },
   {
@@ -6174,8 +6934,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_46.mp3",
-   "duration": 0.88,
-   "bytes": 11136,
+   "duration": 0.82,
+   "bytes": 10589,
    "hash": "75c9a89bc529e7f4"
   },
   {
@@ -6184,8 +6944,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_47.mp3",
-   "duration": 0.91,
-   "bytes": 13615,
+   "duration": 0.88,
+   "bytes": 12675,
    "hash": "21883a9ef6afad87"
   },
   {
@@ -6194,8 +6954,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_48.mp3",
-   "duration": 0.65,
-   "bytes": 10275,
+   "duration": 0.61,
+   "bytes": 9806,
    "hash": "e7112a24977c2b33"
   },
   {
@@ -6204,8 +6964,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_49.mp3",
-   "duration": 0.79,
-   "bytes": 11630,
+   "duration": 0.75,
+   "bytes": 10928,
    "hash": "0ed1f1bac52fdef7"
   },
   {
@@ -6214,8 +6974,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_50.mp3",
-   "duration": 0.62,
-   "bytes": 9414,
+   "duration": 0.57,
+   "bytes": 8242,
    "hash": "6126ff28242d535f"
   },
   {
@@ -6224,8 +6984,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_51.mp3",
-   "duration": 0.82,
-   "bytes": 11160,
+   "duration": 0.76,
+   "bytes": 10275,
    "hash": "d45fdaea353e0a75"
   },
   {
@@ -6234,8 +6994,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_52.mp3",
-   "duration": 0.79,
-   "bytes": 11998,
+   "duration": 0.76,
+   "bytes": 11474,
    "hash": "600877333960b6ae"
   },
   {
@@ -6244,8 +7004,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_53.mp3",
-   "duration": 0.77,
-   "bytes": 11033,
+   "duration": 0.71,
+   "bytes": 10903,
    "hash": "510a688785592c14"
   },
   {
@@ -6254,8 +7014,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_54.mp3",
-   "duration": 0.78,
-   "bytes": 9544,
+   "duration": 0.7,
+   "bytes": 8920,
    "hash": "f9a890fe1229f8a7"
   },
   {
@@ -6264,8 +7024,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_55.mp3",
-   "duration": 0.88,
-   "bytes": 11526,
+   "duration": 0.83,
+   "bytes": 11084,
    "hash": "a0890a39bc9dc9ee"
   },
   {
@@ -6274,8 +7034,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_56.mp3",
-   "duration": 0.89,
-   "bytes": 12465,
+   "duration": 0.81,
+   "bytes": 11476,
    "hash": "5f094866e2ac3a7c"
   },
   {
@@ -6284,8 +7044,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_57.mp3",
-   "duration": 0.89,
-   "bytes": 12621,
+   "duration": 0.82,
+   "bytes": 11422,
    "hash": "a7be6beafc71477b"
   },
   {
@@ -6294,8 +7054,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_58.mp3",
-   "duration": 0.68,
-   "bytes": 11108,
+   "duration": 0.59,
+   "bytes": 9391,
    "hash": "c202b6f25e57c587"
   },
   {
@@ -6304,9 +7064,199 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/num_59.mp3",
-   "duration": 0.85,
-   "bytes": 12963,
+   "duration": 0.78,
+   "bytes": 12571,
    "hash": "a5e93c707e337a31"
+  },
+  {
+   "id": "min_2",
+   "coach": "spark",
+   "voice": "Axell",
+   "trigger": "fragment",
+   "file": "voices/spark/min_2.mp3",
+   "duration": 0.78,
+   "bytes": 12729,
+   "hash": "5584ac2c97327f5a"
+  },
+  {
+   "id": "min_3",
+   "coach": "spark",
+   "voice": "Axell",
+   "trigger": "fragment",
+   "file": "voices/spark/min_3.mp3",
+   "duration": 0.85,
+   "bytes": 12988,
+   "hash": "a07014f563ac0537"
+  },
+  {
+   "id": "min_4",
+   "coach": "spark",
+   "voice": "Axell",
+   "trigger": "fragment",
+   "file": "voices/spark/min_4.mp3",
+   "duration": 0.74,
+   "bytes": 11424,
+   "hash": "6bc09198d7228851"
+  },
+  {
+   "id": "min_5",
+   "coach": "spark",
+   "voice": "Axell",
+   "trigger": "fragment",
+   "file": "voices/spark/min_5.mp3",
+   "duration": 0.76,
+   "bytes": 13511,
+   "hash": "a1968076be05b7c4"
+  },
+  {
+   "id": "min_6",
+   "coach": "spark",
+   "voice": "Axell",
+   "trigger": "fragment",
+   "file": "voices/spark/min_6.mp3",
+   "duration": 0.79,
+   "bytes": 12414,
+   "hash": "c4cbbe900fe7596b"
+  },
+  {
+   "id": "min_7",
+   "coach": "spark",
+   "voice": "Axell",
+   "trigger": "fragment",
+   "file": "voices/spark/min_7.mp3",
+   "duration": 0.84,
+   "bytes": 12625,
+   "hash": "882cb455650bc53c"
+  },
+  {
+   "id": "min_8",
+   "coach": "spark",
+   "voice": "Axell",
+   "trigger": "fragment",
+   "file": "voices/spark/min_8.mp3",
+   "duration": 0.71,
+   "bytes": 10852,
+   "hash": "3e29e28494b42e35"
+  },
+  {
+   "id": "min_9",
+   "coach": "spark",
+   "voice": "Axell",
+   "trigger": "fragment",
+   "file": "voices/spark/min_9.mp3",
+   "duration": 0.76,
+   "bytes": 12418,
+   "hash": "bfbdbea2446a0d31"
+  },
+  {
+   "id": "min_10",
+   "coach": "spark",
+   "voice": "Axell",
+   "trigger": "fragment",
+   "file": "voices/spark/min_10.mp3",
+   "duration": 0.72,
+   "bytes": 10356,
+   "hash": "3cec98fd73a31f17"
+  },
+  {
+   "id": "min_11",
+   "coach": "spark",
+   "voice": "Axell",
+   "trigger": "fragment",
+   "file": "voices/spark/min_11.mp3",
+   "duration": 0.91,
+   "bytes": 13771,
+   "hash": "888ac957cc24ba52"
+  },
+  {
+   "id": "min_12",
+   "coach": "spark",
+   "voice": "Axell",
+   "trigger": "fragment",
+   "file": "voices/spark/min_12.mp3",
+   "duration": 0.72,
+   "bytes": 10485,
+   "hash": "f17ee4bf6debc7b5"
+  },
+  {
+   "id": "min_13",
+   "coach": "spark",
+   "voice": "Axell",
+   "trigger": "fragment",
+   "file": "voices/spark/min_13.mp3",
+   "duration": 0.88,
+   "bytes": 14004,
+   "hash": "6621db02aa7f3bd6"
+  },
+  {
+   "id": "min_14",
+   "coach": "spark",
+   "voice": "Axell",
+   "trigger": "fragment",
+   "file": "voices/spark/min_14.mp3",
+   "duration": 0.88,
+   "bytes": 12937,
+   "hash": "9a5fae59d989dc94"
+  },
+  {
+   "id": "min_15",
+   "coach": "spark",
+   "voice": "Axell",
+   "trigger": "fragment",
+   "file": "voices/spark/min_15.mp3",
+   "duration": 0.86,
+   "bytes": 12730,
+   "hash": "47fde0761fe8eb6f"
+  },
+  {
+   "id": "min_16",
+   "coach": "spark",
+   "voice": "Axell",
+   "trigger": "fragment",
+   "file": "voices/spark/min_16.mp3",
+   "duration": 1.11,
+   "bytes": 16901,
+   "hash": "6357056156754444"
+  },
+  {
+   "id": "min_17",
+   "coach": "spark",
+   "voice": "Axell",
+   "trigger": "fragment",
+   "file": "voices/spark/min_17.mp3",
+   "duration": 1.02,
+   "bytes": 16016,
+   "hash": "bb3b400cdd302b97"
+  },
+  {
+   "id": "min_18",
+   "coach": "spark",
+   "voice": "Axell",
+   "trigger": "fragment",
+   "file": "voices/spark/min_18.mp3",
+   "duration": 0.85,
+   "bytes": 13435,
+   "hash": "2074b8d3a5ed1952"
+  },
+  {
+   "id": "min_19",
+   "coach": "spark",
+   "voice": "Axell",
+   "trigger": "fragment",
+   "file": "voices/spark/min_19.mp3",
+   "duration": 0.93,
+   "bytes": 14816,
+   "hash": "b06285e0b5915b42"
+  },
+  {
+   "id": "min_20",
+   "coach": "spark",
+   "voice": "Axell",
+   "trigger": "fragment",
+   "file": "voices/spark/min_20.mp3",
+   "duration": 0.85,
+   "bytes": 13069,
+   "hash": "2d2d2204dfa41971"
   },
   {
    "id": "frag_current_pace",
@@ -6314,8 +7264,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/frag_current_pace.mp3",
-   "duration": 1.4,
-   "bytes": 19249,
+   "duration": 1.31,
+   "bytes": 19146,
    "hash": "8d04596b8bf1602e"
   },
   {
@@ -6324,8 +7274,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/frag_target_is.mp3",
-   "duration": 1.19,
-   "bytes": 18102,
+   "duration": 1.13,
+   "bytes": 17632,
    "hash": "4f7eacc452c66805"
   },
   {
@@ -6334,8 +7284,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/frag_minutes.mp3",
-   "duration": 0.63,
-   "bytes": 10121,
+   "duration": 0.59,
+   "bytes": 9677,
    "hash": "0dff4d2221c656b3"
   },
   {
@@ -6344,8 +7294,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/frag_per_km.mp3",
-   "duration": 0.8,
-   "bytes": 14165,
+   "duration": 0.73,
+   "bytes": 11580,
    "hash": "7017756f42066405"
   },
   {
@@ -6354,8 +7304,8 @@
    "voice": "Axell",
    "trigger": "fragment",
    "file": "voices/spark/frag_to.mp3",
-   "duration": 0.44,
-   "bytes": 7485,
+   "duration": 0.34,
+   "bytes": 5895,
    "hash": "a595798737a8b4b7"
   },
   {
@@ -6975,7 +7925,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_0.mp3",
    "duration": 0.58,
-   "bytes": 7719,
+   "bytes": 7721,
    "hash": "40d4ce63b37fc76b"
   },
   {
@@ -6995,7 +7945,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_2.mp3",
    "duration": 0.48,
-   "bytes": 6101,
+   "bytes": 6048,
    "hash": "ad46ccdbc2c21c33"
   },
   {
@@ -7004,8 +7954,8 @@
    "voice": "Robert Mitchell",
    "trigger": "fragment",
    "file": "voices/steady/num_3.mp3",
-   "duration": 0.41,
-   "bytes": 5425,
+   "duration": 0.37,
+   "bytes": 5112,
    "hash": "0acb10a83b8e6e3d"
   },
   {
@@ -7025,7 +7975,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_5.mp3",
    "duration": 0.37,
-   "bytes": 6676,
+   "bytes": 6468,
    "hash": "b170fd95cb3caced"
   },
   {
@@ -7034,8 +7984,8 @@
    "voice": "Robert Mitchell",
    "trigger": "fragment",
    "file": "voices/steady/num_6.mp3",
-   "duration": 0.7,
-   "bytes": 8708,
+   "duration": 0.67,
+   "bytes": 8526,
    "hash": "928c065954ca6c69"
   },
   {
@@ -7045,7 +7995,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_7.mp3",
    "duration": 0.52,
-   "bytes": 7094,
+   "bytes": 6886,
    "hash": "675b484122cef16d"
   },
   {
@@ -7055,7 +8005,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_8.mp3",
    "duration": 0.36,
-   "bytes": 5398,
+   "bytes": 5684,
    "hash": "3b9a00acfa6be383"
   },
   {
@@ -7065,7 +8015,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_9.mp3",
    "duration": 0.46,
-   "bytes": 6728,
+   "bytes": 6625,
    "hash": "5fda77653b88fcd2"
   },
   {
@@ -7075,7 +8025,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_10.mp3",
    "duration": 0.47,
-   "bytes": 6518,
+   "bytes": 6674,
    "hash": "6bf304d540a71a4a"
   },
   {
@@ -7085,7 +8035,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_11.mp3",
    "duration": 0.45,
-   "bytes": 7041,
+   "bytes": 6937,
    "hash": "5304beac4dcd3666"
   },
   {
@@ -7095,7 +8045,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_12.mp3",
    "duration": 0.75,
-   "bytes": 9521,
+   "bytes": 9573,
    "hash": "48816a6a4962a8a0"
   },
   {
@@ -7114,8 +8064,8 @@
    "voice": "Robert Mitchell",
    "trigger": "fragment",
    "file": "voices/steady/num_14.mp3",
-   "duration": 0.58,
-   "bytes": 7823,
+   "duration": 0.57,
+   "bytes": 7770,
    "hash": "b70d34e5b2cfc5f8"
   },
   {
@@ -7124,8 +8074,8 @@
    "voice": "Robert Mitchell",
    "trigger": "fragment",
    "file": "voices/steady/num_15.mp3",
-   "duration": 0.79,
-   "bytes": 9879,
+   "duration": 0.76,
+   "bytes": 9853,
    "hash": "ec603ac5b0fd4a19"
   },
   {
@@ -7134,8 +8084,8 @@
    "voice": "Robert Mitchell",
    "trigger": "fragment",
    "file": "voices/steady/num_16.mp3",
-   "duration": 0.84,
-   "bytes": 9802,
+   "duration": 0.83,
+   "bytes": 9775,
    "hash": "c4e3ba19b9cf403b"
   },
   {
@@ -7144,8 +8094,8 @@
    "voice": "Robert Mitchell",
    "trigger": "fragment",
    "file": "voices/steady/num_17.mp3",
-   "duration": 0.73,
-   "bytes": 9151,
+   "duration": 0.69,
+   "bytes": 8970,
    "hash": "6d12f187dd407580"
   },
   {
@@ -7155,7 +8105,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_18.mp3",
    "duration": 0.56,
-   "bytes": 7926,
+   "bytes": 7614,
    "hash": "20456880856688b3"
   },
   {
@@ -7164,8 +8114,8 @@
    "voice": "Robert Mitchell",
    "trigger": "fragment",
    "file": "voices/steady/num_19.mp3",
-   "duration": 0.6,
-   "bytes": 6962,
+   "duration": 0.59,
+   "bytes": 6884,
    "hash": "32f4299ec5290c3d"
   },
   {
@@ -7175,7 +8125,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_20.mp3",
    "duration": 0.56,
-   "bytes": 7226,
+   "bytes": 7199,
    "hash": "3a6d673260f66b9c"
   },
   {
@@ -7185,7 +8135,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_21.mp3",
    "duration": 0.69,
-   "bytes": 7952,
+   "bytes": 7900,
    "hash": "b844516a5b515e6d"
   },
   {
@@ -7195,7 +8145,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_22.mp3",
    "duration": 0.76,
-   "bytes": 9232,
+   "bytes": 9073,
    "hash": "fbfc00bbdf06882d"
   },
   {
@@ -7205,7 +8155,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_23.mp3",
    "duration": 0.67,
-   "bytes": 8084,
+   "bytes": 8032,
    "hash": "98c9153df0257679"
   },
   {
@@ -7215,7 +8165,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_24.mp3",
    "duration": 0.72,
-   "bytes": 8661,
+   "bytes": 8686,
    "hash": "9fedc53c3e5927c9"
   },
   {
@@ -7225,7 +8175,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_25.mp3",
    "duration": 0.69,
-   "bytes": 8424,
+   "bytes": 8320,
    "hash": "6a161fdd15e49346"
   },
   {
@@ -7234,8 +8184,8 @@
    "voice": "Robert Mitchell",
    "trigger": "fragment",
    "file": "voices/steady/num_26.mp3",
-   "duration": 0.76,
-   "bytes": 9599,
+   "duration": 0.71,
+   "bytes": 9442,
    "hash": "e205220b46f7ee31"
   },
   {
@@ -7245,7 +8195,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_27.mp3",
    "duration": 0.88,
-   "bytes": 10952,
+   "bytes": 10955,
    "hash": "dcb43ae44be1d3df"
   },
   {
@@ -7255,7 +8205,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_28.mp3",
    "duration": 0.86,
-   "bytes": 11474,
+   "bytes": 11529,
    "hash": "3ab0d5c7dbdc1143"
   },
   {
@@ -7265,7 +8215,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_29.mp3",
    "duration": 0.73,
-   "bytes": 8500,
+   "bytes": 8551,
    "hash": "a09e639cc9e0850b"
   },
   {
@@ -7284,8 +8234,8 @@
    "voice": "Robert Mitchell",
    "trigger": "fragment",
    "file": "voices/steady/num_31.mp3",
-   "duration": 0.59,
-   "bytes": 7511,
+   "duration": 0.58,
+   "bytes": 7721,
    "hash": "31a4ac45924b8f1e"
   },
   {
@@ -7294,8 +8244,8 @@
    "voice": "Robert Mitchell",
    "trigger": "fragment",
    "file": "voices/steady/num_32.mp3",
-   "duration": 0.55,
-   "bytes": 7302,
+   "duration": 0.54,
+   "bytes": 7093,
    "hash": "aafd5419474f7f03"
   },
   {
@@ -7304,8 +8254,8 @@
    "voice": "Robert Mitchell",
    "trigger": "fragment",
    "file": "voices/steady/num_33.mp3",
-   "duration": 0.76,
-   "bytes": 9908,
+   "duration": 0.72,
+   "bytes": 9231,
    "hash": "22e94af4c04f0edc"
   },
   {
@@ -7314,8 +8264,8 @@
    "voice": "Robert Mitchell",
    "trigger": "fragment",
    "file": "voices/steady/num_34.mp3",
-   "duration": 0.6,
-   "bytes": 7665,
+   "duration": 0.55,
+   "bytes": 6885,
    "hash": "40af8b473837a0e6"
   },
   {
@@ -7324,8 +8274,8 @@
    "voice": "Robert Mitchell",
    "trigger": "fragment",
    "file": "voices/steady/num_35.mp3",
-   "duration": 0.64,
-   "bytes": 7929,
+   "duration": 0.62,
+   "bytes": 7642,
    "hash": "e23c25ae44be2289"
   },
   {
@@ -7334,8 +8284,8 @@
    "voice": "Robert Mitchell",
    "trigger": "fragment",
    "file": "voices/steady/num_36.mp3",
-   "duration": 0.78,
-   "bytes": 9938,
+   "duration": 0.77,
+   "bytes": 9702,
    "hash": "61f2ceb9da2cb44d"
   },
   {
@@ -7344,8 +8294,8 @@
    "voice": "Robert Mitchell",
    "trigger": "fragment",
    "file": "voices/steady/num_37.mp3",
-   "duration": 0.75,
-   "bytes": 9651,
+   "duration": 0.74,
+   "bytes": 9546,
    "hash": "6de49fc3e0fce152"
   },
   {
@@ -7355,7 +8305,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_38.mp3",
    "duration": 0.61,
-   "bytes": 7877,
+   "bytes": 7826,
    "hash": "a1bc3354e834928a"
   },
   {
@@ -7365,7 +8315,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_39.mp3",
    "duration": 0.7,
-   "bytes": 8137,
+   "bytes": 8084,
    "hash": "ad0198fe5a68d5d5"
   },
   {
@@ -7375,7 +8325,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_40.mp3",
    "duration": 0.51,
-   "bytes": 7432,
+   "bytes": 7458,
    "hash": "bbb71432ee8ed428"
   },
   {
@@ -7385,7 +8335,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_41.mp3",
    "duration": 0.65,
-   "bytes": 8448,
+   "bytes": 8135,
    "hash": "e372354921764788"
   },
   {
@@ -7395,7 +8345,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_42.mp3",
    "duration": 0.7,
-   "bytes": 8710,
+   "bytes": 8762,
    "hash": "4dfb7afae1214254"
   },
   {
@@ -7404,8 +8354,8 @@
    "voice": "Robert Mitchell",
    "trigger": "fragment",
    "file": "voices/steady/num_43.mp3",
-   "duration": 0.63,
-   "bytes": 7823,
+   "duration": 0.6,
+   "bytes": 7563,
    "hash": "19b0dc7885932757"
   },
   {
@@ -7415,7 +8365,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_44.mp3",
    "duration": 0.67,
-   "bytes": 7848,
+   "bytes": 7796,
    "hash": "ae43ac0f1b45f702"
   },
   {
@@ -7425,7 +8375,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_45.mp3",
    "duration": 0.53,
-   "bytes": 8740,
+   "bytes": 8766,
    "hash": "753a17e967f0f537"
   },
   {
@@ -7435,7 +8385,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_46.mp3",
    "duration": 0.62,
-   "bytes": 7982,
+   "bytes": 8085,
    "hash": "baa082752f68b007"
   },
   {
@@ -7445,7 +8395,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_47.mp3",
    "duration": 0.83,
-   "bytes": 10380,
+   "bytes": 10534,
    "hash": "5b25c5eb71e8ae74"
   },
   {
@@ -7455,7 +8405,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_48.mp3",
    "duration": 0.61,
-   "bytes": 7772,
+   "bytes": 7719,
    "hash": "b0efe809f22a618e"
   },
   {
@@ -7465,7 +8415,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_49.mp3",
    "duration": 0.64,
-   "bytes": 8112,
+   "bytes": 8320,
    "hash": "dbe5ad86d7a83c20"
   },
   {
@@ -7474,8 +8424,8 @@
    "voice": "Robert Mitchell",
    "trigger": "fragment",
    "file": "voices/steady/num_50.mp3",
-   "duration": 0.74,
-   "bytes": 8861,
+   "duration": 0.71,
+   "bytes": 8654,
    "hash": "db0a0c9defede514"
   },
   {
@@ -7495,7 +8445,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_52.mp3",
    "duration": 0.64,
-   "bytes": 9077,
+   "bytes": 8997,
    "hash": "c70b29263296ce5d"
   },
   {
@@ -7505,7 +8455,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_53.mp3",
    "duration": 0.68,
-   "bytes": 9442,
+   "bytes": 9390,
    "hash": "10473f76706e8f27"
   },
   {
@@ -7515,7 +8465,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_54.mp3",
    "duration": 0.69,
-   "bytes": 9389,
+   "bytes": 9649,
    "hash": "5d7e86e1378a0204"
   },
   {
@@ -7524,8 +8474,8 @@
    "voice": "Robert Mitchell",
    "trigger": "fragment",
    "file": "voices/steady/num_55.mp3",
-   "duration": 0.63,
-   "bytes": 7875,
+   "duration": 0.58,
+   "bytes": 7172,
    "hash": "3b38d7715cb46422"
   },
   {
@@ -7535,7 +8485,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_56.mp3",
    "duration": 0.9,
-   "bytes": 11710,
+   "bytes": 11997,
    "hash": "bc8564eddbb2b5aa"
   },
   {
@@ -7545,7 +8495,7 @@
    "trigger": "fragment",
    "file": "voices/steady/num_57.mp3",
    "duration": 0.61,
-   "bytes": 8608,
+   "bytes": 8607,
    "hash": "d01d2707747a5181"
   },
   {
@@ -7554,8 +8504,8 @@
    "voice": "Robert Mitchell",
    "trigger": "fragment",
    "file": "voices/steady/num_58.mp3",
-   "duration": 0.63,
-   "bytes": 9076,
+   "duration": 0.59,
+   "bytes": 8578,
    "hash": "9fa0fa8e64571ed2"
   },
   {
@@ -7565,8 +8515,198 @@
    "trigger": "fragment",
    "file": "voices/steady/num_59.mp3",
    "duration": 0.64,
-   "bytes": 7825,
+   "bytes": 7823,
    "hash": "88b0ad8fa4b5bfd0"
+  },
+  {
+   "id": "min_2",
+   "coach": "steady",
+   "voice": "Robert Mitchell",
+   "trigger": "fragment",
+   "file": "voices/steady/min_2.mp3",
+   "duration": 0.69,
+   "bytes": 9492,
+   "hash": "a096e8a4f4f728f1"
+  },
+  {
+   "id": "min_3",
+   "coach": "steady",
+   "voice": "Robert Mitchell",
+   "trigger": "fragment",
+   "file": "voices/steady/min_3.mp3",
+   "duration": 0.76,
+   "bytes": 10747,
+   "hash": "9e9dc5267daf1139"
+  },
+  {
+   "id": "min_4",
+   "coach": "steady",
+   "voice": "Robert Mitchell",
+   "trigger": "fragment",
+   "file": "voices/steady/min_4.mp3",
+   "duration": 0.59,
+   "bytes": 6988,
+   "hash": "d8bf3345825d2089"
+  },
+  {
+   "id": "min_5",
+   "coach": "steady",
+   "voice": "Robert Mitchell",
+   "trigger": "fragment",
+   "file": "voices/steady/min_5.mp3",
+   "duration": 0.67,
+   "bytes": 9390,
+   "hash": "a49819eabebcc661"
+  },
+  {
+   "id": "min_6",
+   "coach": "steady",
+   "voice": "Robert Mitchell",
+   "trigger": "fragment",
+   "file": "voices/steady/min_6.mp3",
+   "duration": 0.81,
+   "bytes": 10222,
+   "hash": "9c37615e83bfd845"
+  },
+  {
+   "id": "min_7",
+   "coach": "steady",
+   "voice": "Robert Mitchell",
+   "trigger": "fragment",
+   "file": "voices/steady/min_7.mp3",
+   "duration": 0.88,
+   "bytes": 11581,
+   "hash": "16d52233a86cc262"
+  },
+  {
+   "id": "min_8",
+   "coach": "steady",
+   "voice": "Robert Mitchell",
+   "trigger": "fragment",
+   "file": "voices/steady/min_8.mp3",
+   "duration": 0.67,
+   "bytes": 8996,
+   "hash": "fbf37856779076c5"
+  },
+  {
+   "id": "min_9",
+   "coach": "steady",
+   "voice": "Robert Mitchell",
+   "trigger": "fragment",
+   "file": "voices/steady/min_9.mp3",
+   "duration": 0.7,
+   "bytes": 10222,
+   "hash": "5a196cc234887bd4"
+  },
+  {
+   "id": "min_10",
+   "coach": "steady",
+   "voice": "Robert Mitchell",
+   "trigger": "fragment",
+   "file": "voices/steady/min_10.mp3",
+   "duration": 0.69,
+   "bytes": 8791,
+   "hash": "d28b3dc3f9228a9f"
+  },
+  {
+   "id": "min_11",
+   "coach": "steady",
+   "voice": "Robert Mitchell",
+   "trigger": "fragment",
+   "file": "voices/steady/min_11.mp3",
+   "duration": 0.81,
+   "bytes": 11004,
+   "hash": "aebc14dc0afe201e"
+  },
+  {
+   "id": "min_12",
+   "coach": "steady",
+   "voice": "Robert Mitchell",
+   "trigger": "fragment",
+   "file": "voices/steady/min_12.mp3",
+   "duration": 0.84,
+   "bytes": 10902,
+   "hash": "3f43b5c51fc18868"
+  },
+  {
+   "id": "min_13",
+   "coach": "steady",
+   "voice": "Robert Mitchell",
+   "trigger": "fragment",
+   "file": "voices/steady/min_13.mp3",
+   "duration": 0.77,
+   "bytes": 9520,
+   "hash": "8b9606e51f46006a"
+  },
+  {
+   "id": "min_14",
+   "coach": "steady",
+   "voice": "Robert Mitchell",
+   "trigger": "fragment",
+   "file": "voices/steady/min_14.mp3",
+   "duration": 0.87,
+   "bytes": 11369,
+   "hash": "9d4acfd64249fac6"
+  },
+  {
+   "id": "min_15",
+   "coach": "steady",
+   "voice": "Robert Mitchell",
+   "trigger": "fragment",
+   "file": "voices/steady/min_15.mp3",
+   "duration": 0.9,
+   "bytes": 11425,
+   "hash": "0dda2eb07be598d6"
+  },
+  {
+   "id": "min_16",
+   "coach": "steady",
+   "voice": "Robert Mitchell",
+   "trigger": "fragment",
+   "file": "voices/steady/min_16.mp3",
+   "duration": 0.88,
+   "bytes": 11842,
+   "hash": "7439a17fa488e6c7"
+  },
+  {
+   "id": "min_17",
+   "coach": "steady",
+   "voice": "Robert Mitchell",
+   "trigger": "fragment",
+   "file": "voices/steady/min_17.mp3",
+   "duration": 0.93,
+   "bytes": 11525,
+   "hash": "b78afbe5e2ac8197"
+  },
+  {
+   "id": "min_18",
+   "coach": "steady",
+   "voice": "Robert Mitchell",
+   "trigger": "fragment",
+   "file": "voices/steady/min_18.mp3",
+   "duration": 0.88,
+   "bytes": 11627,
+   "hash": "e3062285138d44a6"
+  },
+  {
+   "id": "min_19",
+   "coach": "steady",
+   "voice": "Robert Mitchell",
+   "trigger": "fragment",
+   "file": "voices/steady/min_19.mp3",
+   "duration": 0.84,
+   "bytes": 11164,
+   "hash": "7ba8fc16af6ed5b9"
+  },
+  {
+   "id": "min_20",
+   "coach": "steady",
+   "voice": "Robert Mitchell",
+   "trigger": "fragment",
+   "file": "voices/steady/min_20.mp3",
+   "duration": 0.73,
+   "bytes": 8605,
+   "hash": "1d97e20a302d21a9"
   },
   {
    "id": "frag_current_pace",
@@ -7574,8 +8714,8 @@
    "voice": "Robert Mitchell",
    "trigger": "fragment",
    "file": "voices/steady/frag_current_pace.mp3",
-   "duration": 1.24,
-   "bytes": 14084,
+   "duration": 1.19,
+   "bytes": 13168,
    "hash": "5aba89b534267607"
   },
   {
@@ -7584,8 +8724,8 @@
    "voice": "Robert Mitchell",
    "trigger": "fragment",
    "file": "voices/steady/frag_target_is.mp3",
-   "duration": 1.07,
-   "bytes": 12674,
+   "duration": 1.04,
+   "bytes": 12046,
    "hash": "36f447d078dd1ea8"
   },
   {
@@ -7594,8 +8734,8 @@
    "voice": "Robert Mitchell",
    "trigger": "fragment",
    "file": "voices/steady/frag_minutes.mp3",
-   "duration": 0.61,
-   "bytes": 8291,
+   "duration": 0.58,
+   "bytes": 8085,
    "hash": "f6215411dd91d57c"
   },
   {
@@ -7605,7 +8745,7 @@
    "trigger": "fragment",
    "file": "voices/steady/frag_per_km.mp3",
    "duration": 0.79,
-   "bytes": 10954,
+   "bytes": 10901,
    "hash": "0c67049678e8ba0f"
   },
   {
@@ -7615,7 +8755,7 @@
    "trigger": "fragment",
    "file": "voices/steady/frag_to.mp3",
    "duration": 0.56,
-   "bytes": 7144,
+   "bytes": 7143,
    "hash": "092fee3d180d42a5"
   },
   {
@@ -8234,8 +9374,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_0.mp3",
-   "duration": 0.54,
-   "bytes": 8110,
+   "duration": 0.49,
+   "bytes": 7926,
    "hash": "89abf15ab016e3bc"
   },
   {
@@ -8244,8 +9384,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_1.mp3",
-   "duration": 0.55,
-   "bytes": 7457,
+   "duration": 0.46,
+   "bytes": 7302,
    "hash": "a53f1c97d485864f"
   },
   {
@@ -8254,8 +9394,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_2.mp3",
-   "duration": 0.47,
-   "bytes": 5398,
+   "duration": 0.39,
+   "bytes": 4876,
    "hash": "976d130a7133a64c"
   },
   {
@@ -8264,8 +9404,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_3.mp3",
-   "duration": 0.52,
-   "bytes": 6413,
+   "duration": 0.43,
+   "bytes": 5635,
    "hash": "931228cb533014d7"
   },
   {
@@ -8274,8 +9414,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_4.mp3",
-   "duration": 0.48,
-   "bytes": 5629,
+   "duration": 0.44,
+   "bytes": 5055,
    "hash": "73f78892e42d8a0b"
   },
   {
@@ -8284,8 +9424,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_5.mp3",
-   "duration": 0.53,
-   "bytes": 8397,
+   "duration": 0.49,
+   "bytes": 7669,
    "hash": "d2d11ec72c0fa828"
   },
   {
@@ -8294,8 +9434,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_6.mp3",
-   "duration": 0.58,
-   "bytes": 7588,
+   "duration": 0.53,
+   "bytes": 7354,
    "hash": "54b9eb2d8953d800"
   },
   {
@@ -8304,8 +9444,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_7.mp3",
-   "duration": 0.51,
-   "bytes": 7407,
+   "duration": 0.48,
+   "bytes": 7198,
    "hash": "4fd49ac27576fe03"
   },
   {
@@ -8314,8 +9454,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_8.mp3",
-   "duration": 0.51,
-   "bytes": 8581,
+   "duration": 0.43,
+   "bytes": 7042,
    "hash": "6f6dcc194ebe6bbf"
   },
   {
@@ -8324,8 +9464,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_9.mp3",
-   "duration": 0.49,
-   "bytes": 7694,
+   "duration": 0.47,
+   "bytes": 7304,
    "hash": "c8ba795f6a6ad424"
   },
   {
@@ -8334,8 +9474,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_10.mp3",
-   "duration": 0.46,
-   "bytes": 5265,
+   "duration": 0.37,
+   "bytes": 4744,
    "hash": "57ce4d0066b7222c"
   },
   {
@@ -8344,8 +9484,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_11.mp3",
-   "duration": 0.64,
-   "bytes": 7953,
+   "duration": 0.57,
+   "bytes": 7248,
    "hash": "f0af25d9933327e1"
   },
   {
@@ -8354,8 +9494,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_12.mp3",
-   "duration": 0.62,
-   "bytes": 7510,
+   "duration": 0.54,
+   "bytes": 6963,
    "hash": "b0f6d749c6b9e3af"
   },
   {
@@ -8364,8 +9504,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_13.mp3",
-   "duration": 0.64,
-   "bytes": 8892,
+   "duration": 0.55,
+   "bytes": 8085,
    "hash": "b8cc2817eb14f9d9"
   },
   {
@@ -8374,8 +9514,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_14.mp3",
-   "duration": 0.65,
-   "bytes": 8161,
+   "duration": 0.56,
+   "bytes": 7198,
    "hash": "58c5ebfe17c69a6b"
   },
   {
@@ -8384,8 +9524,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_15.mp3",
-   "duration": 0.69,
-   "bytes": 9493,
+   "duration": 0.62,
+   "bytes": 8736,
    "hash": "8a3087cc65944065"
   },
   {
@@ -8394,8 +9534,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_16.mp3",
-   "duration": 0.71,
-   "bytes": 9645,
+   "duration": 0.65,
+   "bytes": 9050,
    "hash": "03ec931c7c16c560"
   },
   {
@@ -8404,8 +9544,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_17.mp3",
-   "duration": 0.76,
-   "bytes": 10144,
+   "duration": 0.69,
+   "bytes": 8971,
    "hash": "908adb81e7435c46"
   },
   {
@@ -8414,8 +9554,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_18.mp3",
-   "duration": 0.66,
-   "bytes": 8840,
+   "duration": 0.59,
+   "bytes": 8188,
    "hash": "f429fb8665bf91a4"
   },
   {
@@ -8424,8 +9564,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_19.mp3",
-   "duration": 0.67,
-   "bytes": 9310,
+   "duration": 0.6,
+   "bytes": 8919,
    "hash": "ec577936084bab8a"
   },
   {
@@ -8434,8 +9574,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_20.mp3",
-   "duration": 0.55,
-   "bytes": 7616,
+   "duration": 0.46,
+   "bytes": 7224,
    "hash": "c6df3dd1afbd6bf7"
   },
   {
@@ -8444,8 +9584,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_21.mp3",
-   "duration": 0.7,
-   "bytes": 8450,
+   "duration": 0.61,
+   "bytes": 8139,
    "hash": "9c6b8c16fd98e44a"
   },
   {
@@ -8454,8 +9594,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_22.mp3",
-   "duration": 0.75,
-   "bytes": 9181,
+   "duration": 0.65,
+   "bytes": 8348,
    "hash": "d987d6d06992ec1d"
   },
   {
@@ -8464,8 +9604,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_23.mp3",
-   "duration": 0.75,
-   "bytes": 8946,
+   "duration": 0.66,
+   "bytes": 8400,
    "hash": "93d1f368f6bc6183"
   },
   {
@@ -8474,8 +9614,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_24.mp3",
-   "duration": 0.75,
-   "bytes": 9049,
+   "duration": 0.65,
+   "bytes": 8504,
    "hash": "26e1c57289887920"
   },
   {
@@ -8484,8 +9624,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_25.mp3",
-   "duration": 0.82,
-   "bytes": 11319,
+   "duration": 0.72,
+   "bytes": 9883,
    "hash": "4d1ad36f3a70d543"
   },
   {
@@ -8494,8 +9634,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_26.mp3",
-   "duration": 0.87,
-   "bytes": 10325,
+   "duration": 0.78,
+   "bytes": 9701,
    "hash": "31741b80c7ccd73e"
   },
   {
@@ -8504,8 +9644,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_27.mp3",
-   "duration": 0.82,
-   "bytes": 9986,
+   "duration": 0.71,
+   "bytes": 9442,
    "hash": "a97443b9022f33b7"
   },
   {
@@ -8514,8 +9654,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_28.mp3",
-   "duration": 0.76,
-   "bytes": 10640,
+   "duration": 0.67,
+   "bytes": 9756,
    "hash": "cdfc8104bc405978"
   },
   {
@@ -8524,8 +9664,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_29.mp3",
-   "duration": 0.84,
-   "bytes": 10244,
+   "duration": 0.74,
+   "bytes": 9754,
    "hash": "f9b7df165deeb173"
   },
   {
@@ -8534,8 +9674,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_30.mp3",
-   "duration": 0.62,
-   "bytes": 7589,
+   "duration": 0.57,
+   "bytes": 7174,
    "hash": "4c4a521f25089e06"
   },
   {
@@ -8544,8 +9684,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_31.mp3",
-   "duration": 0.7,
-   "bytes": 8945,
+   "duration": 0.64,
+   "bytes": 8034,
    "hash": "abc5b79ed279c95c"
   },
   {
@@ -8554,8 +9694,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_32.mp3",
-   "duration": 0.73,
-   "bytes": 8501,
+   "duration": 0.63,
+   "bytes": 7878,
    "hash": "4c4782ed8a3f082e"
   },
   {
@@ -8564,8 +9704,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_33.mp3",
-   "duration": 0.63,
-   "bytes": 8944,
+   "duration": 0.56,
+   "bytes": 8136,
    "hash": "ee7c3d649d0c5c83"
   },
   {
@@ -8574,8 +9714,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_34.mp3",
-   "duration": 0.66,
-   "bytes": 8161,
+   "duration": 0.57,
+   "bytes": 7510,
    "hash": "eb40425b22f1c6c7"
   },
   {
@@ -8584,8 +9724,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_35.mp3",
-   "duration": 0.84,
-   "bytes": 10459,
+   "duration": 0.75,
+   "bytes": 9651,
    "hash": "d941c48f8d7e7771"
   },
   {
@@ -8594,8 +9734,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_36.mp3",
-   "duration": 0.85,
-   "bytes": 10013,
+   "duration": 0.76,
+   "bytes": 9442,
    "hash": "7db7ee7b4d844397"
   },
   {
@@ -8604,8 +9744,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_37.mp3",
-   "duration": 0.73,
-   "bytes": 9310,
+   "duration": 0.63,
+   "bytes": 8555,
    "hash": "64b050668a56d899"
   },
   {
@@ -8614,8 +9754,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_38.mp3",
-   "duration": 0.75,
-   "bytes": 10094,
+   "duration": 0.66,
+   "bytes": 9128,
    "hash": "79b55f4854c8c22c"
   },
   {
@@ -8624,8 +9764,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_39.mp3",
-   "duration": 0.77,
-   "bytes": 9464,
+   "duration": 0.73,
+   "bytes": 9205,
    "hash": "6f60eaac08e2c3a2"
   },
   {
@@ -8634,8 +9774,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_40.mp3",
-   "duration": 0.58,
-   "bytes": 7251,
+   "duration": 0.53,
+   "bytes": 6836,
    "hash": "99e539dbf4a493c2"
   },
   {
@@ -8644,8 +9784,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_41.mp3",
-   "duration": 0.69,
-   "bytes": 8500,
+   "duration": 0.6,
+   "bytes": 7668,
    "hash": "22533b38649a9696"
   },
   {
@@ -8654,8 +9794,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_42.mp3",
-   "duration": 0.76,
-   "bytes": 8606,
+   "duration": 0.71,
+   "bytes": 8424,
    "hash": "ce3c4ab19ba48088"
   },
   {
@@ -8664,8 +9804,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_43.mp3",
-   "duration": 0.83,
-   "bytes": 9937,
+   "duration": 0.78,
+   "bytes": 9650,
    "hash": "b3febb180d6467ee"
   },
   {
@@ -8674,8 +9814,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_44.mp3",
-   "duration": 0.82,
-   "bytes": 9907,
+   "duration": 0.77,
+   "bytes": 9489,
    "hash": "60369ce65c316463"
   },
   {
@@ -8684,8 +9824,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_45.mp3",
-   "duration": 0.77,
-   "bytes": 10016,
+   "duration": 0.68,
+   "bytes": 9127,
    "hash": "0772f5c8589006c4"
   },
   {
@@ -8694,8 +9834,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_46.mp3",
-   "duration": 0.78,
-   "bytes": 9543,
+   "duration": 0.69,
+   "bytes": 8840,
    "hash": "10223cec7f4ef775"
   },
   {
@@ -8704,8 +9844,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_47.mp3",
-   "duration": 0.85,
-   "bytes": 10952,
+   "duration": 0.8,
+   "bytes": 10616,
    "hash": "ef3b9cf8c5faad08"
   },
   {
@@ -8714,8 +9854,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_48.mp3",
-   "duration": 0.76,
-   "bytes": 10170,
+   "duration": 0.71,
+   "bytes": 9652,
    "hash": "8cf0c135eab657f3"
   },
   {
@@ -8724,8 +9864,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_49.mp3",
-   "duration": 0.77,
-   "bytes": 10223,
+   "duration": 0.73,
+   "bytes": 9963,
    "hash": "d7cefdbc1650da31"
   },
   {
@@ -8734,8 +9874,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_50.mp3",
-   "duration": 0.59,
-   "bytes": 7564,
+   "duration": 0.54,
+   "bytes": 7145,
    "hash": "9d2811c875da86db"
   },
   {
@@ -8744,8 +9884,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_51.mp3",
-   "duration": 0.67,
-   "bytes": 7927,
+   "duration": 0.58,
+   "bytes": 7458,
    "hash": "139b655944af88ff"
   },
   {
@@ -8754,8 +9894,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_52.mp3",
-   "duration": 0.8,
-   "bytes": 9753,
+   "duration": 0.7,
+   "bytes": 8920,
    "hash": "0c151b719ef0d04e"
   },
   {
@@ -8764,8 +9904,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_53.mp3",
-   "duration": 0.79,
-   "bytes": 9336,
+   "duration": 0.69,
+   "bytes": 8817,
    "hash": "9e64a8047d926f91"
   },
   {
@@ -8774,8 +9914,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_54.mp3",
-   "duration": 0.8,
-   "bytes": 9491,
+   "duration": 0.73,
+   "bytes": 8971,
    "hash": "ec769eb8d6ae89a1"
   },
   {
@@ -8784,8 +9924,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_55.mp3",
-   "duration": 0.8,
-   "bytes": 10641,
+   "duration": 0.71,
+   "bytes": 10328,
    "hash": "43bc19a1965d9787"
   },
   {
@@ -8794,8 +9934,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_56.mp3",
-   "duration": 0.87,
-   "bytes": 10715,
+   "duration": 0.77,
+   "bytes": 9622,
    "hash": "cdfdc19e44be8893"
   },
   {
@@ -8804,8 +9944,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_57.mp3",
-   "duration": 0.8,
-   "bytes": 10797,
+   "duration": 0.7,
+   "bytes": 9234,
    "hash": "6cde0dd41b8f9e5f"
   },
   {
@@ -8814,8 +9954,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_58.mp3",
-   "duration": 0.75,
-   "bytes": 10536,
+   "duration": 0.7,
+   "bytes": 9964,
    "hash": "03374fc31095ac56"
   },
   {
@@ -8824,9 +9964,199 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/num_59.mp3",
-   "duration": 0.74,
-   "bytes": 10120,
+   "duration": 0.64,
+   "bytes": 9236,
    "hash": "d8bdf9257e27bdf6"
+  },
+  {
+   "id": "min_2",
+   "coach": "storyteller",
+   "voice": "Nathaniel C",
+   "trigger": "fragment",
+   "file": "voices/storyteller/min_2.mp3",
+   "duration": 0.61,
+   "bytes": 8609,
+   "hash": "011ca1b6fc63a44a"
+  },
+  {
+   "id": "min_3",
+   "coach": "storyteller",
+   "voice": "Nathaniel C",
+   "trigger": "fragment",
+   "file": "voices/storyteller/min_3.mp3",
+   "duration": 0.71,
+   "bytes": 9023,
+   "hash": "c36ae3922c59ba6d"
+  },
+  {
+   "id": "min_4",
+   "coach": "storyteller",
+   "voice": "Nathaniel C",
+   "trigger": "fragment",
+   "file": "voices/storyteller/min_4.mp3",
+   "duration": 0.65,
+   "bytes": 8607,
+   "hash": "cb1bca29592850f9"
+  },
+  {
+   "id": "min_5",
+   "coach": "storyteller",
+   "voice": "Nathaniel C",
+   "trigger": "fragment",
+   "file": "voices/storyteller/min_5.mp3",
+   "duration": 0.63,
+   "bytes": 9754,
+   "hash": "44f74ffd28885e76"
+  },
+  {
+   "id": "min_6",
+   "coach": "storyteller",
+   "voice": "Nathaniel C",
+   "trigger": "fragment",
+   "file": "voices/storyteller/min_6.mp3",
+   "duration": 0.77,
+   "bytes": 9652,
+   "hash": "c4a30b05a43008b2"
+  },
+  {
+   "id": "min_7",
+   "coach": "storyteller",
+   "voice": "Nathaniel C",
+   "trigger": "fragment",
+   "file": "voices/storyteller/min_7.mp3",
+   "duration": 0.73,
+   "bytes": 10065,
+   "hash": "d417c3a82f44e799"
+  },
+  {
+   "id": "min_8",
+   "coach": "storyteller",
+   "voice": "Nathaniel C",
+   "trigger": "fragment",
+   "file": "voices/storyteller/min_8.mp3",
+   "duration": 0.66,
+   "bytes": 9126,
+   "hash": "8444ee3acc077e30"
+  },
+  {
+   "id": "min_9",
+   "coach": "storyteller",
+   "voice": "Nathaniel C",
+   "trigger": "fragment",
+   "file": "voices/storyteller/min_9.mp3",
+   "duration": 0.72,
+   "bytes": 11189,
+   "hash": "e82ef3f1e7e89a7e"
+  },
+  {
+   "id": "min_10",
+   "coach": "storyteller",
+   "voice": "Nathaniel C",
+   "trigger": "fragment",
+   "file": "voices/storyteller/min_10.mp3",
+   "duration": 0.61,
+   "bytes": 9233,
+   "hash": "41e921115f052a35"
+  },
+  {
+   "id": "min_11",
+   "coach": "storyteller",
+   "voice": "Nathaniel C",
+   "trigger": "fragment",
+   "file": "voices/storyteller/min_11.mp3",
+   "duration": 0.8,
+   "bytes": 10406,
+   "hash": "5e78cf2f83160dea"
+  },
+  {
+   "id": "min_12",
+   "coach": "storyteller",
+   "voice": "Nathaniel C",
+   "trigger": "fragment",
+   "file": "voices/storyteller/min_12.mp3",
+   "duration": 0.8,
+   "bytes": 10486,
+   "hash": "63bb52cb0fb75950"
+  },
+  {
+   "id": "min_13",
+   "coach": "storyteller",
+   "voice": "Nathaniel C",
+   "trigger": "fragment",
+   "file": "voices/storyteller/min_13.mp3",
+   "duration": 0.78,
+   "bytes": 10903,
+   "hash": "e8f777a9f1d612a5"
+  },
+  {
+   "id": "min_14",
+   "coach": "storyteller",
+   "voice": "Nathaniel C",
+   "trigger": "fragment",
+   "file": "voices/storyteller/min_14.mp3",
+   "duration": 0.88,
+   "bytes": 11685,
+   "hash": "52cab5bc43229f45"
+  },
+  {
+   "id": "min_15",
+   "coach": "storyteller",
+   "voice": "Nathaniel C",
+   "trigger": "fragment",
+   "file": "voices/storyteller/min_15.mp3",
+   "duration": 0.74,
+   "bytes": 10224,
+   "hash": "53f23b308f150a89"
+  },
+  {
+   "id": "min_16",
+   "coach": "storyteller",
+   "voice": "Nathaniel C",
+   "trigger": "fragment",
+   "file": "voices/storyteller/min_16.mp3",
+   "duration": 0.86,
+   "bytes": 11425,
+   "hash": "126fa6a933ff8dc9"
+  },
+  {
+   "id": "min_17",
+   "coach": "storyteller",
+   "voice": "Nathaniel C",
+   "trigger": "fragment",
+   "file": "voices/storyteller/min_17.mp3",
+   "duration": 0.91,
+   "bytes": 12363,
+   "hash": "35de4064e0f440f8"
+  },
+  {
+   "id": "min_18",
+   "coach": "storyteller",
+   "voice": "Nathaniel C",
+   "trigger": "fragment",
+   "file": "voices/storyteller/min_18.mp3",
+   "duration": 0.86,
+   "bytes": 11163,
+   "hash": "1b2a535e4abf4b67"
+  },
+  {
+   "id": "min_19",
+   "coach": "storyteller",
+   "voice": "Nathaniel C",
+   "trigger": "fragment",
+   "file": "voices/storyteller/min_19.mp3",
+   "duration": 0.85,
+   "bytes": 11503,
+   "hash": "88d3b81304d0ca9a"
+  },
+  {
+   "id": "min_20",
+   "coach": "storyteller",
+   "voice": "Nathaniel C",
+   "trigger": "fragment",
+   "file": "voices/storyteller/min_20.mp3",
+   "duration": 0.88,
+   "bytes": 11478,
+   "hash": "8a4099f05196b2da"
   },
   {
    "id": "frag_current_pace",
@@ -8834,8 +10164,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/frag_current_pace.mp3",
-   "duration": 1.3,
-   "bytes": 15619,
+   "duration": 1.21,
+   "bytes": 14604,
    "hash": "2b5552e68e6f01dc"
   },
   {
@@ -8844,8 +10174,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/frag_target_is.mp3",
-   "duration": 1.11,
-   "bytes": 13667,
+   "duration": 1.01,
+   "bytes": 13196,
    "hash": "30a839a037e39bf2"
   },
   {
@@ -8854,8 +10184,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/frag_minutes.mp3",
-   "duration": 0.59,
-   "bytes": 8502,
+   "duration": 0.55,
+   "bytes": 8242,
    "hash": "885857e6b1da3d80"
   },
   {
@@ -8864,8 +10194,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/frag_per_km.mp3",
-   "duration": 0.88,
-   "bytes": 11003,
+   "duration": 0.78,
+   "bytes": 10849,
    "hash": "e2e789b3e15078c8"
   },
   {
@@ -8874,8 +10204,8 @@
    "voice": "Nathaniel C",
    "trigger": "fragment",
    "file": "voices/storyteller/frag_to.mp3",
-   "duration": 0.45,
-   "bytes": 5216,
+   "duration": 0.35,
+   "bytes": 4800,
    "hash": "576293818309f8bd"
   },
   {
@@ -9494,8 +10824,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_0.mp3",
-   "duration": 0.38,
-   "bytes": 4875,
+   "duration": 0.34,
+   "bytes": 4563,
    "hash": "e42b3442a481847d"
   },
   {
@@ -9504,8 +10834,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_1.mp3",
-   "duration": 0.47,
-   "bytes": 5397,
+   "duration": 0.42,
+   "bytes": 5345,
    "hash": "85cdebd9178db748"
   },
   {
@@ -9514,8 +10844,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_2.mp3",
-   "duration": 0.6,
-   "bytes": 6647,
+   "duration": 0.52,
+   "bytes": 6284,
    "hash": "74cb031cc9461bc5"
   },
   {
@@ -9524,8 +10854,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_3.mp3",
-   "duration": 0.53,
-   "bytes": 5892,
+   "duration": 0.49,
+   "bytes": 5631,
    "hash": "b8edf68145ab259d"
   },
   {
@@ -9534,8 +10864,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_4.mp3",
-   "duration": 0.58,
-   "bytes": 6595,
+   "duration": 0.53,
+   "bytes": 6310,
    "hash": "af72df7757d3c96e"
   },
   {
@@ -9544,8 +10874,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_5.mp3",
-   "duration": 0.72,
-   "bytes": 8862,
+   "duration": 0.5,
+   "bytes": 7432,
    "hash": "8002d0053c62495e"
   },
   {
@@ -9554,8 +10884,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_6.mp3",
-   "duration": 0.56,
-   "bytes": 6728,
+   "duration": 0.51,
+   "bytes": 6493,
    "hash": "aa82a19a8e373cf1"
   },
   {
@@ -9564,8 +10894,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_7.mp3",
-   "duration": 0.6,
-   "bytes": 7091,
+   "duration": 0.55,
+   "bytes": 6987,
    "hash": "526c15f1ca4ac159"
   },
   {
@@ -9574,8 +10904,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_8.mp3",
-   "duration": 0.51,
-   "bytes": 5969,
+   "duration": 0.44,
+   "bytes": 5709,
    "hash": "fd5b2862a16ea883"
   },
   {
@@ -9584,8 +10914,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_9.mp3",
-   "duration": 0.63,
-   "bytes": 8134,
+   "duration": 0.57,
+   "bytes": 7559,
    "hash": "ba0a7a27790c55ff"
   },
   {
@@ -9594,8 +10924,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_10.mp3",
-   "duration": 0.56,
-   "bytes": 6544,
+   "duration": 0.49,
+   "bytes": 6127,
    "hash": "ea4530906897bec6"
   },
   {
@@ -9604,8 +10934,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_11.mp3",
-   "duration": 0.79,
-   "bytes": 8888,
+   "duration": 0.74,
+   "bytes": 8601,
    "hash": "27aa33c081e0adbc"
   },
   {
@@ -9614,8 +10944,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_12.mp3",
-   "duration": 0.67,
-   "bytes": 8267,
+   "duration": 0.58,
+   "bytes": 7722,
    "hash": "14a32c9de161c12a"
   },
   {
@@ -9624,8 +10954,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_13.mp3",
-   "duration": 0.69,
-   "bytes": 7821,
+   "duration": 0.6,
+   "bytes": 6908,
    "hash": "527f27633018b284"
   },
   {
@@ -9634,8 +10964,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_14.mp3",
-   "duration": 0.78,
-   "bytes": 9415,
+   "duration": 0.69,
+   "bytes": 8683,
    "hash": "0b66e150dfe887f7"
   },
   {
@@ -9644,8 +10974,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_15.mp3",
-   "duration": 0.74,
-   "bytes": 8682,
+   "duration": 0.64,
+   "bytes": 8058,
    "hash": "9de365b68ad11892"
   },
   {
@@ -9654,8 +10984,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_16.mp3",
-   "duration": 0.74,
-   "bytes": 9205,
+   "duration": 0.7,
+   "bytes": 8945,
    "hash": "2016e6023b262657"
   },
   {
@@ -9664,8 +10994,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_17.mp3",
-   "duration": 0.78,
-   "bytes": 9877,
+   "duration": 0.73,
+   "bytes": 9722,
    "hash": "2d083eb941d23948"
   },
   {
@@ -9674,8 +11004,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_18.mp3",
-   "duration": 0.72,
-   "bytes": 7977,
+   "duration": 0.66,
+   "bytes": 7690,
    "hash": "29b4af8c7a43817d"
   },
   {
@@ -9684,8 +11014,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_19.mp3",
-   "duration": 0.64,
-   "bytes": 7849,
+   "duration": 0.57,
+   "bytes": 7484,
    "hash": "d8dff1c11582ade1"
   },
   {
@@ -9694,8 +11024,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_20.mp3",
-   "duration": 0.56,
-   "bytes": 7090,
+   "duration": 0.47,
+   "bytes": 6778,
    "hash": "d50e8d5d1b84df1d"
   },
   {
@@ -9704,8 +11034,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_21.mp3",
-   "duration": 0.67,
-   "bytes": 7482,
+   "duration": 0.58,
+   "bytes": 6831,
    "hash": "b7fa1784896160b9"
   },
   {
@@ -9714,8 +11044,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_22.mp3",
-   "duration": 0.69,
-   "bytes": 7978,
+   "duration": 0.6,
+   "bytes": 7747,
    "hash": "19b55da0012b03b3"
   },
   {
@@ -9724,8 +11054,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_23.mp3",
-   "duration": 0.71,
-   "bytes": 7952,
+   "duration": 0.61,
+   "bytes": 7719,
    "hash": "b9598c0835cf2a00"
   },
   {
@@ -9734,8 +11064,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_24.mp3",
-   "duration": 0.83,
-   "bytes": 8705,
+   "duration": 0.74,
+   "bytes": 8392,
    "hash": "a828e98a06006c1b"
   },
   {
@@ -9744,8 +11074,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_25.mp3",
-   "duration": 0.87,
-   "bytes": 10195,
+   "duration": 0.78,
+   "bytes": 9468,
    "hash": "d41ef72c52398ee9"
   },
   {
@@ -9754,8 +11084,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_26.mp3",
-   "duration": 0.83,
-   "bytes": 9517,
+   "duration": 0.74,
+   "bytes": 9205,
    "hash": "77c90cf41c2ac8fb"
   },
   {
@@ -9764,8 +11094,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_27.mp3",
-   "duration": 0.77,
-   "bytes": 8369,
+   "duration": 0.67,
+   "bytes": 7976,
    "hash": "2f1ec7267eaf237e"
   },
   {
@@ -9774,8 +11104,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_28.mp3",
-   "duration": 0.72,
-   "bytes": 8553,
+   "duration": 0.62,
+   "bytes": 8056,
    "hash": "cea1eef4f71aa4aa"
   },
   {
@@ -9784,8 +11114,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_29.mp3",
-   "duration": 0.77,
-   "bytes": 9021,
+   "duration": 0.68,
+   "bytes": 8422,
    "hash": "1b85d6b918f6882f"
   },
   {
@@ -9794,8 +11124,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_30.mp3",
-   "duration": 0.63,
-   "bytes": 7377,
+   "duration": 0.53,
+   "bytes": 6621,
    "hash": "a8be5c0d3e41edac"
   },
   {
@@ -9804,8 +11134,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_31.mp3",
-   "duration": 0.83,
-   "bytes": 9438,
+   "duration": 0.77,
+   "bytes": 9127,
    "hash": "ba88748c6a24b54d"
   },
   {
@@ -9814,8 +11144,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_32.mp3",
-   "duration": 0.93,
-   "bytes": 10377,
+   "duration": 0.87,
+   "bytes": 10328,
    "hash": "294fc994efcf709f"
   },
   {
@@ -9824,8 +11154,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_33.mp3",
-   "duration": 0.98,
-   "bytes": 10188,
+   "duration": 0.88,
+   "bytes": 9616,
    "hash": "168dff226292f155"
   },
   {
@@ -9834,8 +11164,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_34.mp3",
-   "duration": 0.92,
-   "bytes": 10533,
+   "duration": 0.81,
+   "bytes": 9332,
    "hash": "980570cb008939e1"
   },
   {
@@ -9844,8 +11174,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_35.mp3",
-   "duration": 0.88,
-   "bytes": 10615,
+   "duration": 0.78,
+   "bytes": 10094,
    "hash": "705d11af69808973"
   },
   {
@@ -9854,8 +11184,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_36.mp3",
-   "duration": 0.91,
-   "bytes": 10272,
+   "duration": 0.81,
+   "bytes": 9623,
    "hash": "4c72168d2fc5b918"
   },
   {
@@ -9864,8 +11194,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_37.mp3",
-   "duration": 0.8,
-   "bytes": 9465,
+   "duration": 0.7,
+   "bytes": 8710,
    "hash": "d0390081301ec36e"
   },
   {
@@ -9874,8 +11204,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_38.mp3",
-   "duration": 0.75,
-   "bytes": 9387,
+   "duration": 0.65,
+   "bytes": 8581,
    "hash": "98d71d94fe85840b"
   },
   {
@@ -9884,8 +11214,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_39.mp3",
-   "duration": 0.83,
-   "bytes": 9855,
+   "duration": 0.74,
+   "bytes": 9046,
    "hash": "3f17201b2b4f8a2b"
   },
   {
@@ -9894,8 +11224,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_40.mp3",
-   "duration": 0.68,
-   "bytes": 7792,
+   "duration": 0.56,
+   "bytes": 6832,
    "hash": "b87fe552748be062"
   },
   {
@@ -9904,8 +11234,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_41.mp3",
-   "duration": 0.66,
-   "bytes": 7614,
+   "duration": 0.55,
+   "bytes": 6936,
    "hash": "5cc01a0d721507bf"
   },
   {
@@ -9914,8 +11244,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_42.mp3",
-   "duration": 0.75,
-   "bytes": 8764,
+   "duration": 0.65,
+   "bytes": 7930,
    "hash": "1ed31f500ab5d860"
   },
   {
@@ -9924,8 +11254,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_43.mp3",
-   "duration": 0.98,
-   "bytes": 10243,
+   "duration": 0.88,
+   "bytes": 9564,
    "hash": "df3e8edf43dc1da8"
   },
   {
@@ -9934,8 +11264,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_44.mp3",
-   "duration": 0.86,
-   "bytes": 10119,
+   "duration": 0.76,
+   "bytes": 9208,
    "hash": "e6f5f1ac4a9abdf9"
   },
   {
@@ -9944,8 +11274,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_45.mp3",
-   "duration": 0.92,
-   "bytes": 10613,
+   "duration": 0.82,
+   "bytes": 10225,
    "hash": "598768b63e884be3"
   },
   {
@@ -9954,8 +11284,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_46.mp3",
-   "duration": 0.81,
-   "bytes": 9805,
+   "duration": 0.71,
+   "bytes": 9259,
    "hash": "eb2e17702f6ba1bd"
   },
   {
@@ -9964,8 +11294,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_47.mp3",
-   "duration": 0.73,
-   "bytes": 9046,
+   "duration": 0.64,
+   "bytes": 8293,
    "hash": "def02a458899ff49"
   },
   {
@@ -9974,8 +11304,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_48.mp3",
-   "duration": 0.72,
-   "bytes": 8553,
+   "duration": 0.63,
+   "bytes": 7953,
    "hash": "93e20e145a39a6db"
   },
   {
@@ -9984,8 +11314,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_49.mp3",
-   "duration": 0.83,
-   "bytes": 11134,
+   "duration": 0.73,
+   "bytes": 10560,
    "hash": "805a7c88742cc52e"
   },
   {
@@ -9994,8 +11324,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_50.mp3",
-   "duration": 0.71,
-   "bytes": 8262,
+   "duration": 0.63,
+   "bytes": 7794,
    "hash": "6e87046e2b1da675"
   },
   {
@@ -10004,8 +11334,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_51.mp3",
-   "duration": 0.77,
-   "bytes": 8916,
+   "duration": 0.68,
+   "bytes": 8290,
    "hash": "651140f5b8ebfc4e"
   },
   {
@@ -10014,8 +11344,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_52.mp3",
-   "duration": 0.73,
-   "bytes": 8890,
+   "duration": 0.63,
+   "bytes": 8186,
    "hash": "fce83eb19387e1d8"
   },
   {
@@ -10024,8 +11354,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_53.mp3",
-   "duration": 0.78,
-   "bytes": 9200,
+   "duration": 0.68,
+   "bytes": 8368,
    "hash": "eeb0e0af22199db6"
   },
   {
@@ -10034,8 +11364,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_54.mp3",
-   "duration": 0.86,
-   "bytes": 10014,
+   "duration": 0.76,
+   "bytes": 9572,
    "hash": "654cc70e7cd7f8e5"
   },
   {
@@ -10044,8 +11374,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_55.mp3",
-   "duration": 0.99,
-   "bytes": 9978,
+   "duration": 0.89,
+   "bytes": 9535,
    "hash": "d5439ed7b86d7864"
   },
   {
@@ -10054,8 +11384,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_56.mp3",
-   "duration": 0.8,
-   "bytes": 9620,
+   "duration": 0.71,
+   "bytes": 9153,
    "hash": "8b8083521233e75e"
   },
   {
@@ -10064,8 +11394,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_57.mp3",
-   "duration": 0.72,
-   "bytes": 9152,
+   "duration": 0.62,
+   "bytes": 8762,
    "hash": "2e697eef767ace15"
   },
   {
@@ -10074,8 +11404,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_58.mp3",
-   "duration": 0.95,
-   "bytes": 10844,
+   "duration": 0.84,
+   "bytes": 10324,
    "hash": "90203212ea49f475"
   },
   {
@@ -10084,9 +11414,199 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/num_59.mp3",
-   "duration": 0.94,
-   "bytes": 10583,
+   "duration": 0.87,
+   "bytes": 10326,
    "hash": "973923f2151807ad"
+  },
+  {
+   "id": "min_2",
+   "coach": "commentator",
+   "voice": "British Football Announcer",
+   "trigger": "fragment",
+   "file": "voices/commentator/min_2.mp3",
+   "duration": 0.66,
+   "bytes": 8735,
+   "hash": "d4f905184b078b5c"
+  },
+  {
+   "id": "min_3",
+   "coach": "commentator",
+   "voice": "British Football Announcer",
+   "trigger": "fragment",
+   "file": "voices/commentator/min_3.mp3",
+   "duration": 0.73,
+   "bytes": 8998,
+   "hash": "f1754bff62523173"
+  },
+  {
+   "id": "min_4",
+   "coach": "commentator",
+   "voice": "British Football Announcer",
+   "trigger": "fragment",
+   "file": "voices/commentator/min_4.mp3",
+   "duration": 0.89,
+   "bytes": 10822,
+   "hash": "7a99a3270216af5a"
+  },
+  {
+   "id": "min_5",
+   "coach": "commentator",
+   "voice": "British Football Announcer",
+   "trigger": "fragment",
+   "file": "voices/commentator/min_5.mp3",
+   "duration": 0.72,
+   "bytes": 9363,
+   "hash": "117830c3ff2fd662"
+  },
+  {
+   "id": "min_6",
+   "coach": "commentator",
+   "voice": "British Football Announcer",
+   "trigger": "fragment",
+   "file": "voices/commentator/min_6.mp3",
+   "duration": 0.81,
+   "bytes": 10170,
+   "hash": "6fea666a4f4e082f"
+  },
+  {
+   "id": "min_7",
+   "coach": "commentator",
+   "voice": "British Football Announcer",
+   "trigger": "fragment",
+   "file": "voices/commentator/min_7.mp3",
+   "duration": 0.92,
+   "bytes": 12256,
+   "hash": "27f77552a13f8d74"
+  },
+  {
+   "id": "min_8",
+   "coach": "commentator",
+   "voice": "British Football Announcer",
+   "trigger": "fragment",
+   "file": "voices/commentator/min_8.mp3",
+   "duration": 0.9,
+   "bytes": 9929,
+   "hash": "4659e8736d0bffae"
+  },
+  {
+   "id": "min_9",
+   "coach": "commentator",
+   "voice": "British Football Announcer",
+   "trigger": "fragment",
+   "file": "voices/commentator/min_9.mp3",
+   "duration": 0.74,
+   "bytes": 9441,
+   "hash": "282b23673e7aa436"
+  },
+  {
+   "id": "min_10",
+   "coach": "commentator",
+   "voice": "British Football Announcer",
+   "trigger": "fragment",
+   "file": "voices/commentator/min_10.mp3",
+   "duration": 0.67,
+   "bytes": 8214,
+   "hash": "486eee3e0010fe5d"
+  },
+  {
+   "id": "min_11",
+   "coach": "commentator",
+   "voice": "British Football Announcer",
+   "trigger": "fragment",
+   "file": "voices/commentator/min_11.mp3",
+   "duration": 0.87,
+   "bytes": 10825,
+   "hash": "274690ab9f8288ef"
+  },
+  {
+   "id": "min_12",
+   "coach": "commentator",
+   "voice": "British Football Announcer",
+   "trigger": "fragment",
+   "file": "voices/commentator/min_12.mp3",
+   "duration": 0.76,
+   "bytes": 9621,
+   "hash": "c42975ffe0df4810"
+  },
+  {
+   "id": "min_13",
+   "coach": "commentator",
+   "voice": "British Football Announcer",
+   "trigger": "fragment",
+   "file": "voices/commentator/min_13.mp3",
+   "duration": 0.9,
+   "bytes": 11294,
+   "hash": "92bdfa80d1486991"
+  },
+  {
+   "id": "min_14",
+   "coach": "commentator",
+   "voice": "British Football Announcer",
+   "trigger": "fragment",
+   "file": "voices/commentator/min_14.mp3",
+   "duration": 0.93,
+   "bytes": 11345,
+   "hash": "8dd8282e96d96fd7"
+  },
+  {
+   "id": "min_15",
+   "coach": "commentator",
+   "voice": "British Football Announcer",
+   "trigger": "fragment",
+   "file": "voices/commentator/min_15.mp3",
+   "duration": 1.39,
+   "bytes": 15931,
+   "hash": "5b86402ae4046f7b"
+  },
+  {
+   "id": "min_16",
+   "coach": "commentator",
+   "voice": "British Football Announcer",
+   "trigger": "fragment",
+   "file": "voices/commentator/min_16.mp3",
+   "duration": 0.99,
+   "bytes": 12569,
+   "hash": "48d7783243a5d847"
+  },
+  {
+   "id": "min_17",
+   "coach": "commentator",
+   "voice": "British Football Announcer",
+   "trigger": "fragment",
+   "file": "voices/commentator/min_17.mp3",
+   "duration": 1.39,
+   "bytes": 15490,
+   "hash": "674ec053d6c22847"
+  },
+  {
+   "id": "min_18",
+   "coach": "commentator",
+   "voice": "British Football Announcer",
+   "trigger": "fragment",
+   "file": "voices/commentator/min_18.mp3",
+   "duration": 0.98,
+   "bytes": 11500,
+   "hash": "4cf926b3be20722f"
+  },
+  {
+   "id": "min_19",
+   "coach": "commentator",
+   "voice": "British Football Announcer",
+   "trigger": "fragment",
+   "file": "voices/commentator/min_19.mp3",
+   "duration": 0.93,
+   "bytes": 11082,
+   "hash": "fe829c36720ee65d"
+  },
+  {
+   "id": "min_20",
+   "coach": "commentator",
+   "voice": "British Football Announcer",
+   "trigger": "fragment",
+   "file": "voices/commentator/min_20.mp3",
+   "duration": 0.78,
+   "bytes": 9804,
+   "hash": "545c1860f43e725b"
   },
   {
    "id": "frag_current_pace",
@@ -10094,8 +11614,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/frag_current_pace.mp3",
-   "duration": 1.27,
-   "bytes": 13687,
+   "duration": 1.18,
+   "bytes": 13265,
    "hash": "1b9bd9cd2d95409c"
   },
   {
@@ -10104,8 +11624,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/frag_target_is.mp3",
-   "duration": 1.16,
-   "bytes": 13660,
+   "duration": 1.07,
+   "bytes": 12908,
    "hash": "ad1f06bd8a2efec6"
   },
   {
@@ -10114,8 +11634,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/frag_minutes.mp3",
-   "duration": 0.56,
-   "bytes": 6933,
+   "duration": 0.48,
+   "bytes": 6491,
    "hash": "9eae6a1071018f65"
   },
   {
@@ -10124,8 +11644,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/frag_per_km.mp3",
-   "duration": 0.99,
-   "bytes": 11679,
+   "duration": 0.89,
+   "bytes": 11265,
    "hash": "e5b8615b8eea862f"
   },
   {
@@ -10134,8 +11654,8 @@
    "voice": "British Football Announcer",
    "trigger": "fragment",
    "file": "voices/commentator/frag_to.mp3",
-   "duration": 0.53,
-   "bytes": 6726,
+   "duration": 0.48,
+   "bytes": 6155,
    "hash": "8ff5f028b168588c"
   },
   {
@@ -10754,8 +12274,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_0.mp3",
-   "duration": 0.83,
-   "bytes": 9853,
+   "duration": 0.74,
+   "bytes": 9435,
    "hash": "b4c705ca8d81b710"
   },
   {
@@ -10764,8 +12284,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_1.mp3",
-   "duration": 0.94,
-   "bytes": 11707,
+   "duration": 0.84,
+   "bytes": 10584,
    "hash": "83728ea2726e3529"
   },
   {
@@ -10774,8 +12294,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_2.mp3",
-   "duration": 0.76,
-   "bytes": 8652,
+   "duration": 0.68,
+   "bytes": 8108,
    "hash": "b512cf8e019e3826"
   },
   {
@@ -10784,8 +12304,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_3.mp3",
-   "duration": 0.73,
-   "bytes": 10194,
+   "duration": 0.63,
+   "bytes": 9701,
    "hash": "dbc1681076d797a6"
   },
   {
@@ -10794,8 +12314,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_4.mp3",
-   "duration": 0.84,
-   "bytes": 9746,
+   "duration": 0.81,
+   "bytes": 9591,
    "hash": "ea2789db367aa865"
   },
   {
@@ -10804,8 +12324,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_5.mp3",
-   "duration": 0.86,
-   "bytes": 11001,
+   "duration": 0.77,
+   "bytes": 9982,
    "hash": "271bd44b0be8a672"
   },
   {
@@ -10814,8 +12334,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_6.mp3",
-   "duration": 0.68,
-   "bytes": 9277,
+   "duration": 0.59,
+   "bytes": 8628,
    "hash": "c5f28d9facd89765"
   },
   {
@@ -10824,8 +12344,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_7.mp3",
-   "duration": 0.76,
-   "bytes": 8989,
+   "duration": 0.68,
+   "bytes": 8287,
    "hash": "9ecddec75a94037a"
   },
   {
@@ -10834,8 +12354,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_8.mp3",
-   "duration": 0.76,
-   "bytes": 10375,
+   "duration": 0.67,
+   "bytes": 9777,
    "hash": "d714ddeb7fe290f0"
   },
   {
@@ -10844,8 +12364,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_9.mp3",
-   "duration": 0.87,
-   "bytes": 9593,
+   "duration": 0.77,
+   "bytes": 8891,
    "hash": "02194ba774a3f2e8"
   },
   {
@@ -10854,8 +12374,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_10.mp3",
-   "duration": 0.98,
-   "bytes": 10242,
+   "duration": 0.93,
+   "bytes": 9799,
    "hash": "91e9e3b333faa4b7"
   },
   {
@@ -10864,8 +12384,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_11.mp3",
-   "duration": 0.71,
-   "bytes": 7662,
+   "duration": 0.61,
+   "bytes": 6936,
    "hash": "3169091772537d04"
   },
   {
@@ -10874,8 +12394,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_12.mp3",
-   "duration": 0.78,
-   "bytes": 9514,
+   "duration": 0.69,
+   "bytes": 8811,
    "hash": "b758ca9109c0977e"
   },
   {
@@ -10884,8 +12404,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_13.mp3",
-   "duration": 0.7,
-   "bytes": 7974,
+   "duration": 0.65,
+   "bytes": 7663,
    "hash": "ef1e1e01c72ec987"
   },
   {
@@ -10894,8 +12414,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_14.mp3",
-   "duration": 0.74,
-   "bytes": 8889,
+   "duration": 0.65,
+   "bytes": 8082,
    "hash": "178f3bb0de39e046"
   },
   {
@@ -10904,8 +12424,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_15.mp3",
-   "duration": 0.87,
-   "bytes": 11548,
+   "duration": 0.78,
+   "bytes": 10405,
    "hash": "b792a61b35b5e2a3"
   },
   {
@@ -10914,8 +12434,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_16.mp3",
-   "duration": 0.72,
-   "bytes": 9775,
+   "duration": 0.65,
+   "bytes": 9439,
    "hash": "cac12b1642134812"
   },
   {
@@ -10924,8 +12444,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_17.mp3",
-   "duration": 0.72,
-   "bytes": 8652,
+   "duration": 0.61,
+   "bytes": 7875,
    "hash": "289a1fd001b98559"
   },
   {
@@ -10934,8 +12454,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_18.mp3",
-   "duration": 0.83,
-   "bytes": 9458,
+   "duration": 0.75,
+   "bytes": 8834,
    "hash": "60ddebcaa7710c94"
   },
   {
@@ -10944,8 +12464,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_19.mp3",
-   "duration": 0.78,
-   "bytes": 8443,
+   "duration": 0.68,
+   "bytes": 7790,
    "hash": "66cf1f69e6653933"
   },
   {
@@ -10954,8 +12474,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_20.mp3",
-   "duration": 0.5,
-   "bytes": 6778,
+   "duration": 0.41,
+   "bytes": 6127,
    "hash": "667e56950396aafa"
   },
   {
@@ -10964,8 +12484,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_21.mp3",
-   "duration": 0.85,
-   "bytes": 9877,
+   "duration": 0.75,
+   "bytes": 8914,
    "hash": "b470c4f9198be322"
   },
   {
@@ -10974,8 +12494,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_22.mp3",
-   "duration": 1.04,
-   "bytes": 10605,
+   "duration": 0.95,
+   "bytes": 10242,
    "hash": "50816c2e6c288a0c"
   },
   {
@@ -10984,8 +12504,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_23.mp3",
-   "duration": 0.87,
-   "bytes": 12259,
+   "duration": 0.78,
+   "bytes": 11709,
    "hash": "64f891855a84ea3e"
   },
   {
@@ -10994,8 +12514,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_24.mp3",
-   "duration": 0.82,
-   "bytes": 9200,
+   "duration": 0.72,
+   "bytes": 8551,
    "hash": "8c1511a12c2c5c34"
   },
   {
@@ -11004,8 +12524,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_25.mp3",
-   "duration": 0.85,
-   "bytes": 10088,
+   "duration": 0.76,
+   "bytes": 9597,
    "hash": "a379ed94f331dd36"
   },
   {
@@ -11014,8 +12534,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_26.mp3",
-   "duration": 0.84,
-   "bytes": 12099,
+   "duration": 0.75,
+   "bytes": 11158,
    "hash": "540b5e8b6c45612d"
   },
   {
@@ -11024,8 +12544,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_27.mp3",
-   "duration": 0.77,
-   "bytes": 9567,
+   "duration": 0.68,
+   "bytes": 9126,
    "hash": "39509efeaf047a56"
   },
   {
@@ -11034,8 +12554,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_28.mp3",
-   "duration": 0.8,
-   "bytes": 9957,
+   "duration": 0.7,
+   "bytes": 8548,
    "hash": "a32eed4975f6b8ba"
   },
   {
@@ -11044,8 +12564,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_29.mp3",
-   "duration": 0.79,
-   "bytes": 9097,
+   "duration": 0.7,
+   "bytes": 8292,
    "hash": "5b861e71e6e91e5d"
   },
   {
@@ -11054,8 +12574,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_30.mp3",
-   "duration": 0.53,
-   "bytes": 7196,
+   "duration": 0.44,
+   "bytes": 6465,
    "hash": "5d33c0d64763003e"
   },
   {
@@ -11064,8 +12584,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_31.mp3",
-   "duration": 0.91,
-   "bytes": 9823,
+   "duration": 0.83,
+   "bytes": 9014,
    "hash": "e9bf80a317fe5c05"
   },
   {
@@ -11074,8 +12594,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_32.mp3",
-   "duration": 0.71,
-   "bytes": 9122,
+   "duration": 0.61,
+   "bytes": 8656,
    "hash": "40a76228b403d207"
   },
   {
@@ -11084,8 +12604,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_33.mp3",
-   "duration": 0.72,
-   "bytes": 9360,
+   "duration": 0.62,
+   "bytes": 8420,
    "hash": "7b98f0115838155f"
   },
   {
@@ -11094,8 +12614,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_34.mp3",
-   "duration": 0.91,
-   "bytes": 10136,
+   "duration": 0.81,
+   "bytes": 9487,
    "hash": "41d52e874d27bb0f"
   },
   {
@@ -11104,8 +12624,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_35.mp3",
-   "duration": 0.86,
-   "bytes": 11965,
+   "duration": 0.75,
+   "bytes": 11106,
    "hash": "9503905a387a85ce"
   },
   {
@@ -11114,8 +12634,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_36.mp3",
-   "duration": 0.95,
-   "bytes": 13634,
+   "duration": 0.86,
+   "bytes": 12568,
    "hash": "297824f92a9d35b7"
   },
   {
@@ -11124,8 +12644,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_37.mp3",
-   "duration": 0.9,
-   "bytes": 11860,
+   "duration": 0.81,
+   "bytes": 10454,
    "hash": "9d45ec6f48e55092"
   },
   {
@@ -11134,8 +12654,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_38.mp3",
-   "duration": 0.76,
-   "bytes": 11210,
+   "duration": 0.67,
+   "bytes": 10377,
    "hash": "6ee4527af7a41d07"
   },
   {
@@ -11144,8 +12664,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_39.mp3",
-   "duration": 0.75,
-   "bytes": 11397,
+   "duration": 0.66,
+   "bytes": 10383,
    "hash": "758099a9b8f66fd7"
   },
   {
@@ -11154,8 +12674,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_40.mp3",
-   "duration": 0.62,
-   "bytes": 8601,
+   "duration": 0.52,
+   "bytes": 7820,
    "hash": "b142924a1b61caaa"
   },
   {
@@ -11164,8 +12684,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_41.mp3",
-   "duration": 0.94,
-   "bytes": 11468,
+   "duration": 0.86,
+   "bytes": 10579,
    "hash": "3d2ceeb7870fbded"
   },
   {
@@ -11174,8 +12694,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_42.mp3",
-   "duration": 0.91,
-   "bytes": 10867,
+   "duration": 0.82,
+   "bytes": 10428,
    "hash": "9ce33e47f31f8033"
   },
   {
@@ -11184,8 +12704,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_43.mp3",
-   "duration": 0.92,
-   "bytes": 11416,
+   "duration": 0.85,
+   "bytes": 10504,
    "hash": "4d5afb49e0954164"
   },
   {
@@ -11194,8 +12714,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_44.mp3",
-   "duration": 0.72,
-   "bytes": 8915,
+   "duration": 0.62,
+   "bytes": 8290,
    "hash": "1f015377098a144b"
   },
   {
@@ -11204,8 +12724,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_45.mp3",
-   "duration": 1.0,
-   "bytes": 11862,
+   "duration": 0.94,
+   "bytes": 11186,
    "hash": "ba620c416b4e29d8"
   },
   {
@@ -11214,8 +12734,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_46.mp3",
-   "duration": 0.91,
-   "bytes": 11781,
+   "duration": 0.8,
+   "bytes": 11080,
    "hash": "56a8271a4827de5e"
   },
   {
@@ -11224,8 +12744,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_47.mp3",
-   "duration": 1.07,
-   "bytes": 13628,
+   "duration": 1.0,
+   "bytes": 12769,
    "hash": "3aaf484784041372"
   },
   {
@@ -11234,8 +12754,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_48.mp3",
-   "duration": 0.86,
-   "bytes": 10609,
+   "duration": 0.77,
+   "bytes": 10508,
    "hash": "0603098b74c7d3ea"
   },
   {
@@ -11244,8 +12764,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_49.mp3",
-   "duration": 0.65,
-   "bytes": 7296,
+   "duration": 0.55,
+   "bytes": 6778,
    "hash": "b6e0bf5abd723987"
   },
   {
@@ -11254,8 +12774,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_50.mp3",
-   "duration": 0.72,
-   "bytes": 9122,
+   "duration": 0.67,
+   "bytes": 8757,
    "hash": "5731a30a4304fe86"
   },
   {
@@ -11264,8 +12784,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_51.mp3",
-   "duration": 0.94,
-   "bytes": 10292,
+   "duration": 0.88,
+   "bytes": 9691,
    "hash": "716f8a47e01eb0b5"
   },
   {
@@ -11274,8 +12794,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_52.mp3",
-   "duration": 1.0,
-   "bytes": 10995,
+   "duration": 0.94,
+   "bytes": 10343,
    "hash": "858554736f7bbd94"
   },
   {
@@ -11284,8 +12804,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_53.mp3",
-   "duration": 0.92,
-   "bytes": 11027,
+   "duration": 0.84,
+   "bytes": 10534,
    "hash": "42c5cc32571f2bd9"
   },
   {
@@ -11294,8 +12814,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_54.mp3",
-   "duration": 0.97,
-   "bytes": 11391,
+   "duration": 0.92,
+   "bytes": 11079,
    "hash": "93399917ca863e51"
   },
   {
@@ -11304,8 +12824,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_55.mp3",
-   "duration": 0.9,
-   "bytes": 11835,
+   "duration": 0.81,
+   "bytes": 10535,
    "hash": "3c1706bea545bd6b"
   },
   {
@@ -11314,8 +12834,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_56.mp3",
-   "duration": 0.91,
-   "bytes": 12591,
+   "duration": 0.82,
+   "bytes": 11758,
    "hash": "618c0854d61f1aa0"
   },
   {
@@ -11324,8 +12844,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_57.mp3",
-   "duration": 0.99,
-   "bytes": 11543,
+   "duration": 0.92,
+   "bytes": 11338,
    "hash": "9a8e3ce9e46d63da"
   },
   {
@@ -11334,8 +12854,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_58.mp3",
-   "duration": 1.0,
-   "bytes": 12299,
+   "duration": 0.92,
+   "bytes": 10736,
    "hash": "3bbfb39f5a5f8964"
   },
   {
@@ -11344,9 +12864,199 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/num_59.mp3",
-   "duration": 0.96,
-   "bytes": 10315,
+   "duration": 0.89,
+   "bytes": 9714,
    "hash": "bc93bedf82a54a8b"
+  },
+  {
+   "id": "min_2",
+   "coach": "sportsman",
+   "voice": "Irish Sportsman",
+   "trigger": "fragment",
+   "file": "voices/sportsman/min_2.mp3",
+   "duration": 0.67,
+   "bytes": 9698,
+   "hash": "6dce9549f5f767f2"
+  },
+  {
+   "id": "min_3",
+   "coach": "sportsman",
+   "voice": "Irish Sportsman",
+   "trigger": "fragment",
+   "file": "voices/sportsman/min_3.mp3",
+   "duration": 0.67,
+   "bytes": 9857,
+   "hash": "e3859be52588b0cb"
+  },
+  {
+   "id": "min_4",
+   "coach": "sportsman",
+   "voice": "Irish Sportsman",
+   "trigger": "fragment",
+   "file": "voices/sportsman/min_4.mp3",
+   "duration": 0.75,
+   "bytes": 9803,
+   "hash": "6080aaf556b3a493"
+  },
+  {
+   "id": "min_5",
+   "coach": "sportsman",
+   "voice": "Irish Sportsman",
+   "trigger": "fragment",
+   "file": "voices/sportsman/min_5.mp3",
+   "duration": 0.84,
+   "bytes": 12515,
+   "hash": "1aa07cea3a78d833"
+  },
+  {
+   "id": "min_6",
+   "coach": "sportsman",
+   "voice": "Irish Sportsman",
+   "trigger": "fragment",
+   "file": "voices/sportsman/min_6.mp3",
+   "duration": 0.94,
+   "bytes": 13612,
+   "hash": "6cebbb6125e6f416"
+  },
+  {
+   "id": "min_7",
+   "coach": "sportsman",
+   "voice": "Irish Sportsman",
+   "trigger": "fragment",
+   "file": "voices/sportsman/min_7.mp3",
+   "duration": 0.76,
+   "bytes": 11058,
+   "hash": "a76ab9f0cdfff6da"
+  },
+  {
+   "id": "min_8",
+   "coach": "sportsman",
+   "voice": "Irish Sportsman",
+   "trigger": "fragment",
+   "file": "voices/sportsman/min_8.mp3",
+   "duration": 0.8,
+   "bytes": 11397,
+   "hash": "9e95c643cb71712b"
+  },
+  {
+   "id": "min_9",
+   "coach": "sportsman",
+   "voice": "Irish Sportsman",
+   "trigger": "fragment",
+   "file": "voices/sportsman/min_9.mp3",
+   "duration": 0.69,
+   "bytes": 9752,
+   "hash": "ce9dfd5ec3b618e1"
+  },
+  {
+   "id": "min_10",
+   "coach": "sportsman",
+   "voice": "Irish Sportsman",
+   "trigger": "fragment",
+   "file": "voices/sportsman/min_10.mp3",
+   "duration": 0.75,
+   "bytes": 10794,
+   "hash": "a2bfaacb4e618e1a"
+  },
+  {
+   "id": "min_11",
+   "coach": "sportsman",
+   "voice": "Irish Sportsman",
+   "trigger": "fragment",
+   "file": "voices/sportsman/min_11.mp3",
+   "duration": 0.84,
+   "bytes": 10898,
+   "hash": "5db6f26aad07cbf6"
+  },
+  {
+   "id": "min_12",
+   "coach": "sportsman",
+   "voice": "Irish Sportsman",
+   "trigger": "fragment",
+   "file": "voices/sportsman/min_12.mp3",
+   "duration": 0.8,
+   "bytes": 11158,
+   "hash": "be4c1c40c0ea9914"
+  },
+  {
+   "id": "min_13",
+   "coach": "sportsman",
+   "voice": "Irish Sportsman",
+   "trigger": "fragment",
+   "file": "voices/sportsman/min_13.mp3",
+   "duration": 0.92,
+   "bytes": 12934,
+   "hash": "7e156c3ad75d230b"
+  },
+  {
+   "id": "min_14",
+   "coach": "sportsman",
+   "voice": "Irish Sportsman",
+   "trigger": "fragment",
+   "file": "voices/sportsman/min_14.mp3",
+   "duration": 0.95,
+   "bytes": 13034,
+   "hash": "95630ca26c310d70"
+  },
+  {
+   "id": "min_15",
+   "coach": "sportsman",
+   "voice": "Irish Sportsman",
+   "trigger": "fragment",
+   "file": "voices/sportsman/min_15.mp3",
+   "duration": 0.95,
+   "bytes": 14286,
+   "hash": "370f7c384a17066a"
+  },
+  {
+   "id": "min_16",
+   "coach": "sportsman",
+   "voice": "Irish Sportsman",
+   "trigger": "fragment",
+   "file": "voices/sportsman/min_16.mp3",
+   "duration": 0.94,
+   "bytes": 13245,
+   "hash": "fd31c9b6c833ebaa"
+  },
+  {
+   "id": "min_17",
+   "coach": "sportsman",
+   "voice": "Irish Sportsman",
+   "trigger": "fragment",
+   "file": "voices/sportsman/min_17.mp3",
+   "duration": 0.99,
+   "bytes": 13977,
+   "hash": "abbade4f26195e33"
+  },
+  {
+   "id": "min_18",
+   "coach": "sportsman",
+   "voice": "Irish Sportsman",
+   "trigger": "fragment",
+   "file": "voices/sportsman/min_18.mp3",
+   "duration": 1.03,
+   "bytes": 11699,
+   "hash": "4ade191df95db8d0"
+  },
+  {
+   "id": "min_19",
+   "coach": "sportsman",
+   "voice": "Irish Sportsman",
+   "trigger": "fragment",
+   "file": "voices/sportsman/min_19.mp3",
+   "duration": 1.01,
+   "bytes": 12800,
+   "hash": "1ef27005f2e1b06c"
+  },
+  {
+   "id": "min_20",
+   "coach": "sportsman",
+   "voice": "Irish Sportsman",
+   "trigger": "fragment",
+   "file": "voices/sportsman/min_20.mp3",
+   "duration": 0.72,
+   "bytes": 9725,
+   "hash": "64904e17de4e1861"
   },
   {
    "id": "frag_current_pace",
@@ -11354,8 +13064,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/frag_current_pace.mp3",
-   "duration": 1.13,
-   "bytes": 14939,
+   "duration": 1.04,
+   "bytes": 14054,
    "hash": "66322f2c1ffe8217"
   },
   {
@@ -11364,8 +13074,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/frag_target_is.mp3",
-   "duration": 0.95,
-   "bytes": 13169,
+   "duration": 0.86,
+   "bytes": 12567,
    "hash": "b29cb7587752866a"
   },
   {
@@ -11374,8 +13084,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/frag_minutes.mp3",
-   "duration": 0.8,
-   "bytes": 10843,
+   "duration": 0.69,
+   "bytes": 10429,
    "hash": "e40686b684b8bd64"
   },
   {
@@ -11384,8 +13094,8 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/frag_per_km.mp3",
-   "duration": 1.0,
-   "bytes": 12224,
+   "duration": 0.92,
+   "bytes": 11312,
    "hash": "5ce3183f9729c68e"
   },
   {
@@ -11394,10 +13104,10 @@
    "voice": "Irish Sportsman",
    "trigger": "fragment",
    "file": "voices/sportsman/frag_to.mp3",
-   "duration": 0.63,
-   "bytes": 8992,
+   "duration": 0.6,
+   "bytes": 8575,
    "hash": "6afc2957dc5d2876"
   }
  ],
- "totalBytes": 24111946
+ "totalBytes": 25735266
 }

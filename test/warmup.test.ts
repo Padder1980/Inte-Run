@@ -223,9 +223,12 @@ test("an embedded warm-up gains strides when the hard work starts early", () => 
   const early = {
     targetRpe: { min: 2, max: 7 },
     steps: [
-      { kind: "warmup", label: "Easy", durationSeconds: 10 * 60, targetRpe: { min: 2, max: 3 } },
-      { kind: "steady", label: "Easy", durationSeconds: 15 * 60, targetRpe: { min: 2, max: 3 } },
-      { kind: "rep", label: "Threshold block", durationSeconds: 20 * 60, targetRpe: { min: 6, max: 7 } },
+      // ⚠️ Steps carry a PACE. A session with neither pace nor distance is not a run — that is how
+      // the generator tells a threshold session from a strength session, both of which are one
+      // continuous block at a similar effort.
+      { kind: "warmup", label: "Easy", durationSeconds: 10 * 60, targetPaceSecPerKm: paces.easy, targetRpe: { min: 2, max: 3 } },
+      { kind: "steady", label: "Easy", durationSeconds: 15 * 60, targetPaceSecPerKm: paces.easy, targetRpe: { min: 2, max: 3 } },
+      { kind: "rep", label: "Threshold block", durationSeconds: 20 * 60, targetPaceSecPerKm: paces.threshold, targetRpe: { min: 6, max: 7 } },
     ],
   } as any;
   const w = buildWarmup(early, "intermediate")!;
@@ -319,4 +322,41 @@ test("a static hold appears only when asked for, and is never sold as necessary"
   assert.ok(/15–30 seconds/.test(mv(held)), "a short hold when asked for");
   assert.ok(held.notes.some((n) => /because you asked/i.test(n)), "framed as the runner's choice");
   assert.ok(!/must|should always|need to stretch/i.test(held.notes.join(" ")));
+});
+
+test("a session with no running in it gets no running warm-up", () => {
+  // ⚠️ A strength session is ONE continuous 45-minute block at RPE 6-7 with no pace and no distance
+  // — indistinguishable from a tempo run if you look at kind and effort, which is what my first
+  // gate did: it handed "Strength (maintenance)" 21 minutes of jogging and four strides. The tell
+  // is a pace or a distance. And the gate lives in the engine, not the UI, because a UI gate stops
+  // it being SHOWN while every other caller still gets the wrong answer — which is how it reached
+  // the session-duration figures and made a 45-minute strength session read as 69.
+  const strength = {
+    targetRpe: { min: 6, max: 7 },
+    steps: [{ kind: "steady", label: "Strength circuit", durationSeconds: 45 * 60, targetRpe: { min: 6, max: 7 } }],
+  } as any;
+  assert.equal(buildWarmup(strength, "intermediate"), null);
+  assert.equal(buildWarmup({ ...strength, exercises: [{}] }, "intermediate"), null, "a list of exercises is not a run");
+  // The identical shape WITH a pace is a tempo run, and does get one.
+  const tempo = { ...strength, steps: [{ ...strength.steps[0], targetPaceSecPerKm: paces.threshold }] };
+  assert.ok(buildWarmup(tempo, "intermediate"));
+});
+
+test("a warm-up never becomes the session — but repetitions are exempt", () => {
+  // ⚠️ Two failures in opposite directions, both measured. Uncapped, a 35-minute moderate run got a
+  // 19-minute warm-up. Capped blindly, a VO2 session dropped to 17 against the paper's 25-32 — and
+  // the paper's own worked example is that a short repetition session needs MORE preparation, not
+  // less. So the cap guards continuous running only.
+  const moderate = {
+    targetRpe: { min: 3, max: 4 },
+    steps: [
+      { kind: "warmup", label: "Easy", durationSeconds: 6 * 60, targetPaceSecPerKm: paces.easy, targetRpe: { min: 2, max: 3 } },
+      { kind: "steady", label: "Moderate", durationSeconds: 29 * 60, targetPaceSecPerKm: paces.aerobic, targetRpe: { min: 3, max: 4 } },
+    ],
+  } as any;
+  const w = buildWarmup(moderate, "intermediate")!;
+  assert.ok(w.totalMinutes <= 14, `a 35-minute moderate run must not get ${w.totalMinutes} minutes of warm-up`);
+  // ...while a repetition session keeps its full preparation.
+  const reps = buildWarmup(vo2Session(paces, 1), "intermediate")!;
+  assert.ok(reps.totalMinutes >= 25, `an interval session needs real preparation, got ${reps.totalMinutes}`);
 });

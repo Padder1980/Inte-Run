@@ -34,7 +34,7 @@ import type { RpeBand, WorkoutStep } from "../domain/types.ts";
  * concrete type forces a cast at one of the two call sites, and a cast is where the next wrong
  * assumption gets in.
  */
-export type WarmupSession = { steps?: WorkoutStep[]; targetRpe?: RpeBand };
+export type WarmupSession = { steps?: WorkoutStep[]; targetRpe?: RpeBand; exercises?: unknown[] };
 
 export const WARMUP_MODEL_VERSION = "1.0.0";
 
@@ -213,6 +213,21 @@ export function buildWarmup(
   // scaling can talk its way past it.
   if (conditions.unwell) return null;
 
+  // ⚠️ RUNNING SESSIONS ONLY, AND THE GATE LIVES HERE. A strength session's honest RPE 4-5 looks
+  // exactly like a steady run to a generator that reads steps and effort — measured, "Strength
+  // (maintenance)" was handed 24 minutes of easy jogging and four strides. A gate in the UI stops
+  // it being SHOWN while every other caller still gets the wrong answer, which is how it reached
+  // the duration figures. One gate, at the source.
+  // ⚠️ The tell is a PACE OR A DISTANCE, not the step's kind. A strength session is a single
+  // `steady` step of 45 minutes at RPE 6-7 with neither — indistinguishable from a tempo run if you
+  // look at kind and effort, which is exactly what my first gate did and why it still handed
+  // "Strength (maintenance)" 21 minutes of jogging and four strides. A session that is a list of
+  // exercises is not a run either, whatever its steps say.
+  const steps = (session.steps || []) as WorkoutStep[];
+  if (session.exercises && session.exercises.length) return null;
+  const runs = steps.some((s) => (s.targetPaceSecPerKm !== undefined) || (s.distanceMeters || 0) > 0);
+  if (!runs) return null;
+
   const notes: string[] = [];
   const phases: WarmupPhase[] = [];
 
@@ -222,9 +237,16 @@ export function buildWarmup(
   }
 
   const effort = firstHardEffort(session);
+  // ⚠️ CONTINUOUS RUNNING WARMS ITSELF UP; REPETITIONS DO NOT. A 35-minute moderate run was being
+  // given a 19-minute warm-up — more than half the session, to prepare for RPE 3-4 running you can
+  // hold a conversation through. The distinction the paper actually draws is between a run that
+  // BUILDS into its effort (start easy, let it come to you) and one that starts with a repetition
+  // you have to be ready for. A steady effort reached by building is the former.
+  const workSteps = (session.steps || []).filter((s: WorkoutStep) => s.kind === "rep");
+  const isContinuous = workSteps.length <= 1;
 
-  // ---- Easy and long runs: the warm-up IS the first few minutes of the run ----
-  if (effort === "easy") {
+  // ---- Easy, and continuous moderate running: the warm-up IS the opening of the run ----
+  if (effort === "easy" || (effort === "steady" && isContinuous)) {
     const mins = ability === "new" || ability === "beginner" ? 5 : 8;
     phases.push({
       phase: "raise", minutes: mins, rpe: { min: 2, max: 2 },
@@ -238,7 +260,7 @@ export function buildWarmup(
     // opening has had barely any time to do the job. Novices are exempt; their sessions do not open
     // with work this soon, and strides are the component the paper caps hardest for them.
     const look = analyseSession(session);
-    if (look.effort !== "easy" && look.minutesBefore <= 20 && ability !== "new") {
+    if ((look.effort !== "easy" || effort === "steady") && look.minutesBefore <= 20 && ability !== "new") {
       const n = ability === "beginner" ? 2 : 3;
       phases.push({
         phase: "potentiate", strides: n, seconds: 18, effort: "building towards the pace you are about to run",
@@ -350,6 +372,31 @@ export function buildWarmup(
     phase: "transition", minutes: transition,
     instruction: `${transition} minutes easy. Start when your breathing is under control and your legs feel like they will answer.`,
   });
+
+  // ⚠️ THE WARM-UP MUST NEVER BECOME THE SESSION. The paper asks for "the smallest warm-up that
+  // prepares the athlete for the first demanding task", and says in as many words that a novice's
+  // warm-up must not become their first workout. Nothing enforced that, so a short session could be
+  // handed a warm-up longer than the running it was preparing for. Capped against the session's own
+  // work — never below six minutes, because something is always needed before hard running.
+  const workMin = ((session.steps || []) as WorkoutStep[])
+    .filter((s) => s.kind !== "warmup" && s.kind !== "cooldown")
+    .reduce((a, s) => a + (s.durationSeconds || 0), 0) / 60;
+  // ⚠️ THE CAP DOES NOT APPLY TO REPETITION SESSIONS. It exists to stop a moderate CONTINUOUS run
+  // being handed a warm-up half its length — but the paper's own worked example is the opposite
+  // case: "a 45-minute session containing 10 x 400 m at 5 km pace needs a distinct warm-up because
+  // the first repetition is demanding". Applied blindly it cut a VO2 warm-up to 17 minutes against
+  // the paper's 25-32, i.e. it fixed one disproportion by creating the reverse one.
+  if (workMin > 0 && isContinuous) {
+    const cap = Math.max(6, Math.round(workMin * 0.7));
+    let total = raise + (movements.length ? 3 : 0) + Math.ceil((strides * 75) / 60) + transition;
+    if (total > cap) {
+      // Trim the easy running first — the strides are the part that is specific to the work ahead.
+      raise = Math.max(5, raise - (total - cap));
+      total = raise + (movements.length ? 3 : 0) + Math.ceil((strides * 75) / 60) + transition;
+      if (total > cap) { strides = Math.max(1, strides - 1); movements = movements.slice(0, 3); }
+      notes.push("Kept in proportion to the session — a warm-up longer than the running it prepares you for is just a workout with a different name.");
+    }
+  }
 
   return {
     modelVersion: WARMUP_MODEL_VERSION, firstHardEffort: effort, evidenceGrade: GRADE[effort],

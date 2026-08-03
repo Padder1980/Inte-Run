@@ -323,44 +323,119 @@ export const PROMPTS: PromptDef[] = [
   // No numbers anywhere: these are pre-generated clips, so a coach can never say "eight seconds
   // down". Everything is phrased relatively, which also keeps them true on any device.
   { id: "pace_behind_1", trigger: "pace-behind", text: "You've drifted a little under pace. Gently find that rhythm again.", priority: P_INFO, interrupt: false, minRepeatSec: 90, sessionTypes: "all",
-    variants: { guide: "You've drifted a little soft. Gently find that rhythm again.", pacer: "You're a shade down on target. Lift the rhythm, not the strain.", motivator: "You've got more than this \u2014 let's go find it.", technician: "Pace is down. Lift your cadence a notch and stand tall." } },
+    variants: {
+      spark: "Slipped a touch — pick it up, nice and light.",
+      steady: "A little under pace. Bring it back gradually, no rush.",
+      storyteller: "The pace has quietly drifted. Reel it back in.",
+      commentator: "He's dropped off the pace slightly — needs to respond here.",
+      sportsman: "You're off it a bit. Wind it back on.", guide: "You've drifted a little soft. Gently find that rhythm again.", pacer: "You're a shade down on target. Lift the rhythm, not the strain.", motivator: "You've got more than this \u2014 let's go find it.", technician: "Pace is down. Lift your cadence a notch and stand tall." } },
   { id: "pace_behind_2", trigger: "pace-behind", text: "A touch under pace. No panic \u2014 just ease back into it.", priority: P_INFO, interrupt: false, minRepeatSec: 90, sessionTypes: "all",
-    variants: { guide: "A touch under pace. No panic \u2014 just lean back into it.", pacer: "Pace has slipped. Quicker feet, same effort.", motivator: "Wake it up! Quick feet, big heart.", technician: "Losing time. Shorten the stride, quicken the rhythm." } },
+    variants: {
+      spark: "Bit slow — lift it, don't lunge.",
+      steady: "Just under. Add a small amount and hold there.",
+      storyteller: "A shade behind where you meant to be. Ease it forward.",
+      commentator: "Fractionally behind schedule — a gentle response required.",
+      sportsman: "Slightly slow. Nudge it, don't attack it.", guide: "A touch under pace. No panic \u2014 just lean back into it.", pacer: "Pace has slipped. Quicker feet, same effort.", motivator: "Wake it up! Quick feet, big heart.", technician: "Losing time. Shorten the stride, quicken the rhythm." } },
   { id: "pace_behind_3", trigger: "pace-behind", text: "Come back to target. Smooth and steady does it.", priority: P_INFO, interrupt: false, minRepeatSec: 90, sessionTypes: "all",
-    variants: { guide: "Come back to me. Smooth and steady does it.", pacer: "Below the band. Build back gradually over the next minute.", motivator: "This is where it's won. Pick it up with me.", technician: "Check in: eyes up, arms driving. Now build the pace back." } },
+    variants: {
+      spark: "Back on it — smooth and quick.",
+      steady: "Find target again. Slowly does it.",
+      storyteller: "Back towards the pace you set out for.",
+      commentator: "Working his way back onto the pace now.",
+      sportsman: "Get back on target. No drama.", guide: "Come back to me. Smooth and steady does it.", pacer: "Below the band. Build back gradually over the next minute.", motivator: "This is where it's won. Pick it up with me.", technician: "Check in: eyes up, arms driving. Now build the pace back." } },
 
   { id: "pace_ahead_1", trigger: "pace-ahead", text: "Easy now \u2014 you're quicker than we need. Save it for later.", priority: P_INFO, interrupt: false, minRepeatSec: 90, sessionTypes: "all",
-    variants: { guide: "Easy now \u2014 you're quicker than we need. Save it for later.", pacer: "Above target. Ease back \u2014 the plan needs this pace, not that one.", motivator: "Whoa, speedster! Bank that fire \u2014 you'll want it at the end.", technician: "Running hot. Drop the effort a notch \u2014 same form, less force." } },
+    variants: {
+      spark: "Whoa — quick! Rein it in, save that.",
+      steady: "You're ahead of pace. Ease back and keep it there.",
+      storyteller: "Quicker than the plan asked. Put that away for later.",
+      commentator: "He's gone off too fast — that will cost him later.",
+      sportsman: "Too quick. Back off, you'll want that.", guide: "Easy now \u2014 you're quicker than we need. Save it for later.", pacer: "Above target. Ease back \u2014 the plan needs this pace, not that one.", motivator: "Whoa, speedster! Bank that fire \u2014 you'll want it at the end.", technician: "Running hot. Drop the effort a notch \u2014 same form, less force." } },
   { id: "pace_ahead_2", trigger: "pace-ahead", text: "Ahead of pace. Breathe, soften, let it come back.", priority: P_INFO, interrupt: false, minRepeatSec: 90, sessionTypes: "all",
-    variants: { guide: "Ahead of pace. Breathe, soften, let it come back.", pacer: "Too quick. Settle down to the band and hold.", motivator: "Too hot too soon. Cool it a touch and finish like a hero instead.", technician: "Over pace. Relax the shoulders, shorten the push, let it slow." } },
+    variants: {
+      spark: "Fast! Breathe, soften, settle.",
+      steady: "Ahead of target. Let it come back on its own.",
+      storyteller: "Running above yourself. Let the pace fall back to you.",
+      commentator: "Well ahead of pace — and he needs to settle now.",
+      sportsman: "You're flying. Too early for that. Settle.", guide: "Ahead of pace. Breathe, soften, let it come back.", pacer: "Too quick. Settle down to the band and hold.", motivator: "Too hot too soon. Cool it a touch and finish like a hero instead.", technician: "Over pace. Relax the shoulders, shorten the push, let it slow." } },
   { id: "pace_ahead_3", trigger: "pace-ahead", text: "Lovely energy, but ease off. Patience wins today.", priority: P_INFO, interrupt: false, minRepeatSec: 90, sessionTypes: "all",
-    variants: { guide: "I love the energy, but ease off. Patience wins today.", pacer: "You're over-pacing. Trim it back and lock in.", motivator: "Save the fireworks! Ease down, we'll light them later.", technician: "Faster than prescribed. Control is the skill here \u2014 dial it back." } },
+    variants: {
+      spark: "Great legs — but not yet! Ease off.",
+      steady: "Good, but quicker than needed. Ease down a little.",
+      storyteller: "Plenty there today. Spend it later, not here.",
+      commentator: "Looking strong, but this is not the moment to use it.",
+      sportsman: "Grand legs on you. Save them.", guide: "I love the energy, but ease off. Patience wins today.", pacer: "You're over-pacing. Trim it back and lock in.", motivator: "Save the fireworks! Ease down, we'll light them later.", technician: "Faster than prescribed. Control is the skill here \u2014 dial it back." } },
 
   { id: "pace_on_1", trigger: "pace-on", text: "That's it. Right where you should be.", priority: P_AMBIENT, interrupt: false, minRepeatSec: 240, sessionTypes: "all",
-    variants: { guide: "That's it. Right where you should be.", pacer: "On target. Lock this in.", motivator: "Yes! This is your pace \u2014 own it.", technician: "On pace, and the form matches. Keep it exactly like this." } },
+    variants: {
+      spark: "Yes! Bang on.",
+      steady: "That's it. Right where it should be.",
+      storyteller: "There it is — exactly the pace you came for.",
+      commentator: "And he's back on the pace. Nicely done.",
+      sportsman: "That's the one. Stay there.", guide: "That's it. Right where you should be.", pacer: "On target. Lock this in.", motivator: "Yes! This is your pace \u2014 own it.", technician: "On pace, and the form matches. Keep it exactly like this." } },
   { id: "pace_on_2", trigger: "pace-on", text: "Back on target. Hold this and relax into it.", priority: P_AMBIENT, interrupt: false, minRepeatSec: 240, sessionTypes: "all",
-    variants: { guide: "Lovely. Hold this and relax into it.", pacer: "Bang on pace. Hold steady.", motivator: "Dialled in. You look unstoppable.", technician: "Textbook. Same cadence, same effort." } },
+    variants: {
+      spark: "Perfect — hold that!",
+      steady: "Back on target. Settle in and leave it alone.",
+      storyteller: "Back on terms with the plan. Hold it there.",
+      commentator: "Back on schedule, and looking comfortable with it.",
+      sportsman: "On it now. Don't touch a thing.", guide: "Lovely. Hold this and relax into it.", pacer: "Bang on pace. Hold steady.", motivator: "Dialled in. You look unstoppable.", technician: "Textbook. Same cadence, same effort." } },
 
   // — Keep going: the grind, wherever it bites --------------------------------
   { id: "keep_going_1", trigger: "keep-going", text: "I know it's hard. You've been harder. Keep going.", priority: P_KEY, interrupt: false, minRepeatSec: 300, sessionTypes: "all",
-    variants: { guide: "I know it's hard. You've been harder. Keep going.", pacer: "Hold the rhythm. The rhythm carries you.", motivator: "Don't you dare stop now \u2014 this is the good part!", technician: "When it hurts, run taller. Posture first, the rest follows." } },
+    variants: {
+      spark: "This is the bit! Come on — keep going!",
+      steady: "It's hard. You've done hard before. Keep going.",
+      storyteller: "This is the part you'll remember. Keep going.",
+      commentator: "This is where the session is won — and he keeps going!",
+      sportsman: "It's meant to hurt. Keep going.", guide: "I know it's hard. You've been harder. Keep going.", pacer: "Hold the rhythm. The rhythm carries you.", motivator: "Don't you dare stop now \u2014 this is the good part!", technician: "When it hurts, run taller. Posture first, the rest follows." } },
   { id: "keep_going_2", trigger: "keep-going", text: "One step, then the next. That's all it ever is.", priority: P_KEY, interrupt: false, minRepeatSec: 300, sessionTypes: "all",
-    variants: { guide: "One step, then the next. That's all it ever is.", pacer: "Nothing changes. Same pace, same breath, keep moving.", motivator: "Tough is temporary. You are not. Go!", technician: "Reset: shoulders down, breathe long, drive the arms." } },
+    variants: {
+      spark: "One step. Then another. Go!",
+      steady: "One step, then the next. That's the whole job.",
+      storyteller: "One step at a time is how every one of these ends.",
+      commentator: "Digging in now — one stride at a time.",
+      sportsman: "One foot, then the other. That's it.", guide: "One step, then the next. That's all it ever is.", pacer: "Nothing changes. Same pace, same breath, keep moving.", motivator: "Tough is temporary. You are not. Go!", technician: "Reset: shoulders down, breathe long, drive the arms." } },
   { id: "keep_going_3", trigger: "keep-going", text: "Stay with it. This part passes \u2014 you don't stop.", priority: P_KEY, interrupt: false, minRepeatSec: 300, sessionTypes: "all",
-    variants: { guide: "Stay with me. This part passes \u2014 you don't stop.", pacer: "This is where pace is made. Stay on it.", motivator: "Every stride right now is building the runner you want to be.", technician: "Fatigue is form's enemy. Beat it with technique." } },
+    variants: {
+      spark: "Stay with it — this bit ends!",
+      steady: "Stay with it. This part always passes.",
+      storyteller: "Stay with it. This stretch is temporary; you are not.",
+      commentator: "He's hurting — but he's still there!",
+      sportsman: "Stay with it. It passes. You don't stop.", guide: "Stay with me. This part passes \u2014 you don't stop.", pacer: "This is where pace is made. Stay on it.", motivator: "Every stride right now is building the runner you want to be.", technician: "Fatigue is form's enemy. Beat it with technique." } },
 
   // — The runner's own reasons ------------------------------------------------
   // Fired at most once per run, deep into long or hard work. The coach frames it; the runner's own
   // words appear on screen (phone) or are spoken after it (watch, which has live text-to-speech).
   // Rarity is the point: a "why" that plays every run becomes wallpaper.
   { id: "why_inspire_1", trigger: "why-inspire", text: "Think of the person who inspires you. Run this part with them.", priority: P_KEY, interrupt: false, minRepeatSec: ONESHOT, sessionTypes: "all",
-    variants: { guide: "Think of the person who inspires you. Run this part with them.", pacer: "Your inspiration didn't quit here. Neither do you.", motivator: "Picture who inspires you \u2014 now show them what you've got!", technician: "Recall who inspires you. Match their standard for one kilometre." } },
+    variants: {
+      spark: "That person who inspires you? Run this bit for them!",
+      steady: "Think of whoever inspires you. Run this part with them.",
+      storyteller: "Somewhere behind this run is the person who made you want it. Bring them along.",
+      commentator: "And you can be sure someone would be proud of this.",
+      sportsman: "Think of the one who got you into this. Do it for them.", guide: "Think of the person who inspires you. Run this part with them.", pacer: "Your inspiration didn't quit here. Neither do you.", motivator: "Picture who inspires you \u2014 now show them what you've got!", technician: "Recall who inspires you. Match their standard for one kilometre." } },
   { id: "why_reason_1", trigger: "why-reason", text: "Remember why you started. It's still true, right now.", priority: P_KEY, interrupt: false, minRepeatSec: ONESHOT, sessionTypes: "all",
-    variants: { guide: "Remember why you started. It's still true, right now.", pacer: "You had a reason to start running. Hold it for the next minute.", motivator: "Your why is bigger than this hill. Prove it!", technician: "Reconnect with your reason. Purpose steadies pace." } },
+    variants: {
+      spark: "Remember why you started — it still counts!",
+      steady: "Remember why you started. It hasn't changed.",
+      storyteller: "You had a reason for this before today. It is still standing.",
+      commentator: "This is what all that work was for.",
+      sportsman: "You know why you're out here. Nothing's changed.", guide: "Remember why you started. It's still true, right now.", pacer: "You had a reason to start running. Hold it for the next minute.", motivator: "Your why is bigger than this hill. Prove it!", technician: "Reconnect with your reason. Purpose steadies pace." } },
   { id: "why_goal_1", trigger: "why-goal", text: "That goal of yours has a reason behind it. This is you earning it.", priority: P_KEY, interrupt: false, minRepeatSec: ONESHOT, sessionTypes: "all",
-    variants: { guide: "That goal of yours has a reason behind it. This is you earning it.", pacer: "The goal means something. This stretch is where it's paid for.", motivator: "That time goal? You chose it for a reason. Chase it down!", technician: "Your goal was chosen deliberately. Run this stretch deliberately." } },
+    variants: {
+      spark: "That goal! This is you earning it!",
+      steady: "There's a reason behind that goal. This is you paying for it.",
+      storyteller: "The goal has a reason underneath it, and this is the price of it.",
+      commentator: "This is the work that makes the target possible.",
+      sportsman: "You want that goal. This is the cost. Pay it.", guide: "That goal of yours has a reason behind it. This is you earning it.", pacer: "The goal means something. This stretch is where it's paid for.", motivator: "That time goal? You chose it for a reason. Chase it down!", technician: "Your goal was chosen deliberately. Run this stretch deliberately." } },
   { id: "why_anchor_1", trigger: "why-anchor", text: "It's tough. So think of what keeps you going \u2014 and let it.", priority: P_KEY, interrupt: false, minRepeatSec: ONESHOT, sessionTypes: "all",
-    variants: { guide: "It's tough. So think of what keeps you going \u2014 and let it.", pacer: "Hard patch. Anchor to your reason and hold the pace.", motivator: "This is the tough bit \u2014 and you know exactly who you're doing it for.", technician: "When it's tough, your anchor is a tool. Use it now." } },
+    variants: {
+      spark: "Think what keeps you going — and use it!",
+      steady: "It's hard. Think of what keeps you going, and let it.",
+      storyteller: "When it bites, think of whatever holds you together. Let it hold now.",
+      commentator: "Reaching for something extra — and finding it.",
+      sportsman: "It's hard. Think what keeps you at it. Lean on that.", guide: "It's tough. So think of what keeps you going \u2014 and let it.", pacer: "Hard patch. Anchor to your reason and hold the pace.", motivator: "This is the tough bit \u2014 and you know exactly who you're doing it for.", technician: "When it's tough, your anchor is a tool. Use it now." } },
 
   // — The count-in ------------------------------------------------------------
   // Separate beats rather than one clip, so the app can place each on its own second and the run

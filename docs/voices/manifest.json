@@ -30,31 +30,31 @@
    "id": "spark",
    "name": "The Spark",
    "voice": "Axell",
-   "bytes": 3094561
+   "bytes": 2899232
   },
   {
    "id": "steady",
    "name": "The Steady",
    "voice": "Robert Mitchell",
-   "bytes": 2397578
+   "bytes": 2318360
   },
   {
    "id": "storyteller",
    "name": "The Storyteller",
    "voice": "Nathaniel C",
-   "bytes": 2703833
+   "bytes": 2708169
   },
   {
    "id": "commentator",
    "name": "The Commentator",
    "voice": "British Football Announcer",
-   "bytes": 2538508
+   "bytes": 2485080
   },
   {
    "id": "sportsman",
    "name": "The Sportsman",
    "voice": "Irish Sportsman",
-   "bytes": 2506042
+   "bytes": 2383037
   }
  ],
  "clips": [
@@ -5384,9 +5384,9 @@
    "voice": "Axell",
    "trigger": "pace-behind",
    "file": "voices/spark/pace_behind_1.mp3",
-   "duration": 3.12,
-   "bytes": 44339,
-   "hash": "af82e18578533f86"
+   "duration": 2.41,
+   "bytes": 34215,
+   "hash": "f2d5849859ca584f"
   },
   {
    "id": "pace_behind_2",
@@ -5394,9 +5394,9 @@
    "voice": "Axell",
    "trigger": "pace-behind",
    "file": "voices/spark/pace_behind_2.mp3",
-   "duration": 3.18,
-   "bytes": 42717,
-   "hash": "102506ef594cf9a5"
+   "duration": 2.07,
+   "bytes": 29522,
+   "hash": "12e7c428ddd3ba72"
   },
   {
    "id": "pace_behind_3",
@@ -5404,9 +5404,9 @@
    "voice": "Axell",
    "trigger": "pace-behind",
    "file": "voices/spark/pace_behind_3.mp3",
-   "duration": 2.39,
-   "bytes": 35443,
-   "hash": "6f8847e821858903"
+   "duration": 1.72,
+   "bytes": 23002,
+   "hash": "9e8c5c42d0b5f81b"
   },
   {
    "id": "pace_ahead_1",
@@ -5414,9 +5414,9 @@
    "voice": "Axell",
    "trigger": "pace-ahead",
    "file": "voices/spark/pace_ahead_1.mp3",
-   "duration": 2.85,
-   "bytes": 38494,
-   "hash": "ce07bf1762f9ca48"
+   "duration": 2.36,
+   "bytes": 32755,
+   "hash": "35b3f7e09ac7c190"
   },
   {
    "id": "pace_ahead_2",
@@ -5424,9 +5424,9 @@
    "voice": "Axell",
    "trigger": "pace-ahead",
    "file": "voices/spark/pace_ahead_2.mp3",
-   "duration": 3.28,
-   "bytes": 45438,
-   "hash": "7ee4a05a09f944ad"
+   "duration": 2.1,
+   "bytes": 27252,
+   "hash": "57cf3adcd7424008"
   },
   {
    "id": "pace_ahead_3",
@@ -5434,9 +5434,9 @@
    "voice": "Axell",
    "trigger": "pace-ahead",
    "file": "voices/spark/pace_ahead_3.mp3",
-   "duration": 3.02,
-   "bytes": 44705,
-   "hash": "d2a2f8393d2f2e47"
+   "duration": 2.43,
+   "bytes": 32941,
+   "hash": "0ef81655c6105cd8"
   },
   {
    "id": "pace_on_1",
@@ -5444,9 +5444,9 @@
    "voice": "Axell",
    "trigger": "pace-on",
    "file": "voices/spark/pace_on_1.mp3",
-   "duration": 1.78,
-   "bytes": 23785,
-   "hash": "ad4e373affebbef9"
+   "duration": 1.1,
+   "bytes": 16145,
+   "hash": "26e305b947f415b5"
   },
   {
    "id": "pace_on_2",
@@ -5454,9 +5454,9 @@
    "voice": "Axell",
    "trigger": "pace-on",
    "file": "voices/spark/pace_on_2.mp3",
-   "duration": 2.41,
-   "bytes": 32131,
-   "hash": "bd6300351dea4c1b"
+   "duration": 1.16,
+   "bytes": 17526,
+   "hash": "6f08b211518e7fd2"
   },
   {
    "id": "keep_going_1",
@@ -5464,9 +5464,9 @@
    "voice": "Axell",
    "trigger": "keep-going",
    "file": "voices/spark/keep_going_1.mp3",
-   "duration": 2.49,
-   "bytes": 33043,
-   "hash": "ea7d52f8dd492302"
+   "duration": 2.06,
+   "bytes": 25792,
+   "hash": "041eb1ba72649d93"
   },
   {
    "id": "keep_going_2",
@@ -5474,9 +5474,9 @@
    "voice": "Axell",
    "trigger": "keep-going",
    "file": "voices/spark/keep_going_2.mp3",
-   "duration": 2.54,
-   "bytes": 38813,
-   "hash": "2faf836784a84626"
+   "duration": 1.88,
+   "bytes": 23907,
+   "hash": "944df7a4d9651fd9"
   },
   {
    "id": "keep_going_3",
@@ -5484,9 +5484,9 @@
    "voice": "Axell",
    "trigger": "keep-going",
    "file": "voices/spark/keep_going_3.mp3",
-   "duration": 2.71,
-   "bytes": 36300,
-   "hash": "5a4425eb259337da"
+   "duration": 1.53,
+   "bytes": 20186,
+   "hash": "97290bbe7270a63c"
   },
   {
    "id": "why_inspire_1",
@@ -5494,9 +5494,9 @@
    "voice": "Axell",
    "trigger": "why-inspire",
    "file": "voices/spark/why_inspire_1.mp3",
-   "duration": 3.22,
-   "bytes": 42772,
-   "hash": "6aaf3aeb39099a8f"
+   "duration": 2.75,
+   "bytes": 33897,
+   "hash": "d1061b1799dcb632"
   },
   {
    "id": "why_reason_1",
@@ -5504,9 +5504,9 @@
    "voice": "Axell",
    "trigger": "why-reason",
    "file": "voices/spark/why_reason_1.mp3",
-   "duration": 2.75,
-   "bytes": 40323,
-   "hash": "2b928eecbc3e1ccb"
+   "duration": 2.39,
+   "bytes": 31241,
+   "hash": "670a274088f5d925"
   },
   {
    "id": "why_goal_1",
@@ -5514,9 +5514,9 @@
    "voice": "Axell",
    "trigger": "why-goal",
    "file": "voices/spark/why_goal_1.mp3",
-   "duration": 3.61,
-   "bytes": 49913,
-   "hash": "03d0db01d849dcb5"
+   "duration": 1.63,
+   "bytes": 19087,
+   "hash": "e1fc75b83a9a1bce"
   },
   {
    "id": "why_anchor_1",
@@ -5524,9 +5524,9 @@
    "voice": "Axell",
    "trigger": "why-anchor",
    "file": "voices/spark/why_anchor_1.mp3",
-   "duration": 3.02,
-   "bytes": 39408,
-   "hash": "fe66e2cb94f29781"
+   "duration": 1.9,
+   "bytes": 24827,
+   "hash": "a73cc2968d67af65"
   },
   {
    "id": "count_3",
@@ -6644,9 +6644,9 @@
    "voice": "Robert Mitchell",
    "trigger": "pace-behind",
    "file": "voices/steady/pace_behind_1.mp3",
-   "duration": 3.91,
-   "bytes": 42000,
-   "hash": "533356dbb4bac0ee"
+   "duration": 2.49,
+   "bytes": 29200,
+   "hash": "1aa55a7d41d89409"
   },
   {
    "id": "pace_behind_2",
@@ -6654,9 +6654,9 @@
    "voice": "Robert Mitchell",
    "trigger": "pace-behind",
    "file": "voices/steady/pace_behind_2.mp3",
-   "duration": 2.55,
-   "bytes": 32961,
-   "hash": "bf8d81c760264afd"
+   "duration": 2.13,
+   "bytes": 23914,
+   "hash": "a459ce8490e8e1f1"
   },
   {
    "id": "pace_behind_3",
@@ -6664,9 +6664,9 @@
    "voice": "Robert Mitchell",
    "trigger": "pace-behind",
    "file": "voices/steady/pace_behind_3.mp3",
-   "duration": 2.18,
-   "bytes": 27125,
-   "hash": "85b57b51b0476abd"
+   "duration": 1.87,
+   "bytes": 22866,
+   "hash": "8758bc6612059b65"
   },
   {
    "id": "pace_ahead_1",
@@ -6674,9 +6674,9 @@
    "voice": "Robert Mitchell",
    "trigger": "pace-ahead",
    "file": "voices/steady/pace_ahead_1.mp3",
-   "duration": 2.7,
-   "bytes": 31704,
-   "hash": "b281dd7ee6495b17"
+   "duration": 2.5,
+   "bytes": 28388,
+   "hash": "05c55499544233e4"
   },
   {
    "id": "pace_ahead_2",
@@ -6684,9 +6684,9 @@
    "voice": "Robert Mitchell",
    "trigger": "pace-ahead",
    "file": "voices/steady/pace_ahead_2.mp3",
-   "duration": 2.9,
-   "bytes": 33588,
-   "hash": "4ff63e752cddae23"
+   "duration": 1.91,
+   "bytes": 23992,
+   "hash": "d765be27134b2503"
   },
   {
    "id": "pace_ahead_3",
@@ -6694,9 +6694,9 @@
    "voice": "Robert Mitchell",
    "trigger": "pace-ahead",
    "file": "voices/steady/pace_ahead_3.mp3",
-   "duration": 2.29,
-   "bytes": 26643,
-   "hash": "8f966202dbf91953"
+   "duration": 2.91,
+   "bytes": 32579,
+   "hash": "3ee19619a8a6a178"
   },
   {
    "id": "pace_on_1",
@@ -6704,9 +6704,9 @@
    "voice": "Robert Mitchell",
    "trigger": "pace-on",
    "file": "voices/steady/pace_on_1.mp3",
-   "duration": 1.34,
-   "bytes": 18254,
-   "hash": "a37f0b20746ee91a"
+   "duration": 1.55,
+   "bytes": 18415,
+   "hash": "7b828c4a778be042"
   },
   {
    "id": "pace_on_2",
@@ -6714,9 +6714,9 @@
    "voice": "Robert Mitchell",
    "trigger": "pace-on",
    "file": "voices/steady/pace_on_2.mp3",
-   "duration": 2.0,
-   "bytes": 23045,
-   "hash": "a5862627f22a5239"
+   "duration": 2.06,
+   "bytes": 22559,
+   "hash": "a3f3234b722ba5ed"
   },
   {
    "id": "keep_going_1",
@@ -6724,9 +6724,9 @@
    "voice": "Robert Mitchell",
    "trigger": "keep-going",
    "file": "voices/steady/keep_going_1.mp3",
-   "duration": 2.81,
-   "bytes": 29465,
-   "hash": "61d5b6452183a032"
+   "duration": 1.91,
+   "bytes": 21023,
+   "hash": "c9bd7a06d236fb0c"
   },
   {
    "id": "keep_going_2",
@@ -6734,9 +6734,9 @@
    "voice": "Robert Mitchell",
    "trigger": "keep-going",
    "file": "voices/steady/keep_going_2.mp3",
-   "duration": 2.38,
-   "bytes": 31032,
-   "hash": "32206552f6f3d0d8"
+   "duration": 1.97,
+   "bytes": 23550,
+   "hash": "71450aaaa6909d02"
   },
   {
    "id": "keep_going_3",
@@ -6744,9 +6744,9 @@
    "voice": "Robert Mitchell",
    "trigger": "keep-going",
    "file": "voices/steady/keep_going_3.mp3",
-   "duration": 2.55,
-   "bytes": 27951,
-   "hash": "3e8fe088eb10f827"
+   "duration": 1.9,
+   "bytes": 21950,
+   "hash": "58cda7f93bdac4b2"
   },
   {
    "id": "why_inspire_1",
@@ -6754,9 +6754,9 @@
    "voice": "Robert Mitchell",
    "trigger": "why-inspire",
    "file": "voices/steady/why_inspire_1.mp3",
-   "duration": 3.04,
-   "bytes": 32484,
-   "hash": "d140d6b975928c0d"
+   "duration": 2.92,
+   "bytes": 32589,
+   "hash": "bd96d32428cb718f"
   },
   {
    "id": "why_reason_1",
@@ -6764,9 +6764,9 @@
    "voice": "Robert Mitchell",
    "trigger": "why-reason",
    "file": "voices/steady/why_reason_1.mp3",
-   "duration": 2.99,
-   "bytes": 32539,
-   "hash": "719131163a7cfa82"
+   "duration": 2.01,
+   "bytes": 22478,
+   "hash": "c67b5cb470a6a383"
   },
   {
    "id": "why_goal_1",
@@ -6774,9 +6774,9 @@
    "voice": "Robert Mitchell",
    "trigger": "why-goal",
    "file": "voices/steady/why_goal_1.mp3",
-   "duration": 3.47,
-   "bytes": 38996,
-   "hash": "bd49b0bac3d94c48"
+   "duration": 2.9,
+   "bytes": 29680,
+   "hash": "46d5e9133d1e2926"
   },
   {
    "id": "why_anchor_1",
@@ -6784,9 +6784,9 @@
    "voice": "Robert Mitchell",
    "trigger": "why-anchor",
    "file": "voices/steady/why_anchor_1.mp3",
-   "duration": 2.76,
-   "bytes": 30609,
-   "hash": "dcfe2c381ea0b81c"
+   "duration": 2.23,
+   "bytes": 25995,
+   "hash": "4072e9b10971c567"
   },
   {
    "id": "count_3",
@@ -7904,9 +7904,9 @@
    "voice": "Nathaniel C",
    "trigger": "pace-behind",
    "file": "voices/storyteller/pace_behind_1.mp3",
-   "duration": 4.17,
-   "bytes": 45831,
-   "hash": "d476dd93baf37a2b"
+   "duration": 3.11,
+   "bytes": 33402,
+   "hash": "8dafebcb89c09494"
   },
   {
    "id": "pace_behind_2",
@@ -7914,9 +7914,9 @@
    "voice": "Nathaniel C",
    "trigger": "pace-behind",
    "file": "voices/storyteller/pace_behind_2.mp3",
-   "duration": 3.36,
-   "bytes": 34230,
-   "hash": "30de5fe63192285a"
+   "duration": 3.11,
+   "bytes": 36399,
+   "hash": "6447171ae16165d4"
   },
   {
    "id": "pace_behind_3",
@@ -7924,9 +7924,9 @@
    "voice": "Nathaniel C",
    "trigger": "pace-behind",
    "file": "voices/storyteller/pace_behind_3.mp3",
-   "duration": 2.64,
-   "bytes": 27971,
-   "hash": "b820802d62215b07"
+   "duration": 1.99,
+   "bytes": 24410,
+   "hash": "a0ab0a7f93094e46"
   },
   {
    "id": "pace_ahead_1",
@@ -7934,9 +7934,9 @@
    "voice": "Nathaniel C",
    "trigger": "pace-ahead",
    "file": "voices/storyteller/pace_ahead_1.mp3",
-   "duration": 3.45,
-   "bytes": 37150,
-   "hash": "1a3f1b9b209126a9"
+   "duration": 2.58,
+   "bytes": 29906,
+   "hash": "eaa9f052a090d7a9"
   },
   {
    "id": "pace_ahead_2",
@@ -7944,9 +7944,9 @@
    "voice": "Nathaniel C",
    "trigger": "pace-ahead",
    "file": "voices/storyteller/pace_ahead_2.mp3",
-   "duration": 2.95,
-   "bytes": 32022,
-   "hash": "66e90dddabb49ec6"
+   "duration": 3.21,
+   "bytes": 35459,
+   "hash": "ac15b62eab6e7f9f"
   },
   {
    "id": "pace_ahead_3",
@@ -7954,9 +7954,9 @@
    "voice": "Nathaniel C",
    "trigger": "pace-ahead",
    "file": "voices/storyteller/pace_ahead_3.mp3",
-   "duration": 3.92,
-   "bytes": 41769,
-   "hash": "4461c2f788043a80"
+   "duration": 2.95,
+   "bytes": 32336,
+   "hash": "ac7efb7ebdcce91c"
   },
   {
    "id": "pace_on_1",
@@ -7964,9 +7964,9 @@
    "voice": "Nathaniel C",
    "trigger": "pace-on",
    "file": "voices/storyteller/pace_on_1.mp3",
-   "duration": 1.54,
-   "bytes": 17964,
-   "hash": "b16eac34e097619b"
+   "duration": 2.61,
+   "bytes": 26098,
+   "hash": "a5a0c04d3528a054"
   },
   {
    "id": "pace_on_2",
@@ -7974,9 +7974,9 @@
    "voice": "Nathaniel C",
    "trigger": "pace-on",
    "file": "voices/storyteller/pace_on_2.mp3",
-   "duration": 2.47,
-   "bytes": 29179,
-   "hash": "34c4b9bf8c798c05"
+   "duration": 1.94,
+   "bytes": 26703,
+   "hash": "65155efa76f4b566"
   },
   {
    "id": "keep_going_1",
@@ -7984,9 +7984,9 @@
    "voice": "Nathaniel C",
    "trigger": "keep-going",
    "file": "voices/storyteller/keep_going_1.mp3",
-   "duration": 3.02,
-   "bytes": 33817,
-   "hash": "283c56c9afcd4e33"
+   "duration": 2.28,
+   "bytes": 23752,
+   "hash": "96ba81b8ae832070"
   },
   {
    "id": "keep_going_2",
@@ -7994,9 +7994,9 @@
    "voice": "Nathaniel C",
    "trigger": "keep-going",
    "file": "voices/storyteller/keep_going_2.mp3",
-   "duration": 2.42,
-   "bytes": 28783,
-   "hash": "2aabc76d3a58336d"
+   "duration": 2.87,
+   "bytes": 34370,
+   "hash": "edb1282f1b713d98"
   },
   {
    "id": "keep_going_3",
@@ -8004,9 +8004,9 @@
    "voice": "Nathaniel C",
    "trigger": "keep-going",
    "file": "voices/storyteller/keep_going_3.mp3",
-   "duration": 3.12,
-   "bytes": 31696,
-   "hash": "1a6dad5f19f532a0"
+   "duration": 3.54,
+   "bytes": 34123,
+   "hash": "8a5218140fb68a21"
   },
   {
    "id": "why_inspire_1",
@@ -8014,9 +8014,9 @@
    "voice": "Nathaniel C",
    "trigger": "why-inspire",
    "file": "voices/storyteller/why_inspire_1.mp3",
-   "duration": 3.53,
-   "bytes": 40593,
-   "hash": "d623fc37d1685cb6"
+   "duration": 4.7,
+   "bytes": 47082,
+   "hash": "a279c92f5133f2b8"
   },
   {
    "id": "why_reason_1",
@@ -8024,9 +8024,9 @@
    "voice": "Nathaniel C",
    "trigger": "why-reason",
    "file": "voices/storyteller/why_reason_1.mp3",
-   "duration": 2.87,
-   "bytes": 33668,
-   "hash": "fb3d37d7d0beed65"
+   "duration": 3.63,
+   "bytes": 41148,
+   "hash": "e3860dc4ca750556"
   },
   {
    "id": "why_goal_1",
@@ -8034,9 +8034,9 @@
    "voice": "Nathaniel C",
    "trigger": "why-goal",
    "file": "voices/storyteller/why_goal_1.mp3",
-   "duration": 3.86,
-   "bytes": 40186,
-   "hash": "ce675e3506a10fa4"
+   "duration": 3.93,
+   "bytes": 43285,
+   "hash": "040fec0d9a4efddc"
   },
   {
    "id": "why_anchor_1",
@@ -8044,9 +8044,9 @@
    "voice": "Nathaniel C",
    "trigger": "why-anchor",
    "file": "voices/storyteller/why_anchor_1.mp3",
-   "duration": 3.6,
-   "bytes": 34066,
-   "hash": "ca0ff31425b17f48"
+   "duration": 4.19,
+   "bytes": 44788,
+   "hash": "18c86315616fbd6a"
   },
   {
    "id": "count_3",
@@ -9164,9 +9164,9 @@
    "voice": "British Football Announcer",
    "trigger": "pace-behind",
    "file": "voices/commentator/pace_behind_1.mp3",
-   "duration": 3.7,
-   "bytes": 38195,
-   "hash": "112d8c7a5d022c30"
+   "duration": 3.13,
+   "bytes": 32848,
+   "hash": "077af603ba6ecd05"
   },
   {
    "id": "pace_behind_2",
@@ -9174,9 +9174,9 @@
    "voice": "British Football Announcer",
    "trigger": "pace-behind",
    "file": "voices/commentator/pace_behind_2.mp3",
-   "duration": 3.42,
-   "bytes": 33940,
-   "hash": "7e03a8fa309517cf"
+   "duration": 3.38,
+   "bytes": 34336,
+   "hash": "ac10ffc6c9a09d36"
   },
   {
    "id": "pace_behind_3",
@@ -9184,9 +9184,9 @@
    "voice": "British Football Announcer",
    "trigger": "pace-behind",
    "file": "voices/commentator/pace_behind_3.mp3",
-   "duration": 2.33,
-   "bytes": 24506,
-   "hash": "a3f2d14e36350f62"
+   "duration": 2.02,
+   "bytes": 22479,
+   "hash": "c4237327252cebc3"
   },
   {
    "id": "pace_ahead_1",
@@ -9194,9 +9194,9 @@
    "voice": "British Football Announcer",
    "trigger": "pace-ahead",
    "file": "voices/commentator/pace_ahead_1.mp3",
-   "duration": 3.5,
-   "bytes": 34667,
-   "hash": "8df9be8fe2dcc815"
+   "duration": 2.71,
+   "bytes": 27765,
+   "hash": "6ac56b9e735e0e25"
   },
   {
    "id": "pace_ahead_2",
@@ -9204,9 +9204,9 @@
    "voice": "British Football Announcer",
    "trigger": "pace-ahead",
    "file": "voices/commentator/pace_ahead_2.mp3",
-   "duration": 3.54,
-   "bytes": 32784,
-   "hash": "ece8c27ccf4c1492"
+   "duration": 2.77,
+   "bytes": 27348,
+   "hash": "a281a062a807d94c"
   },
   {
    "id": "pace_ahead_3",
@@ -9214,9 +9214,9 @@
    "voice": "British Football Announcer",
    "trigger": "pace-ahead",
    "file": "voices/commentator/pace_ahead_3.mp3",
-   "duration": 3.12,
-   "bytes": 33323,
-   "hash": "b0c67a479c35a395"
+   "duration": 3.11,
+   "bytes": 31411,
+   "hash": "bc724c2e738e6720"
   },
   {
    "id": "pace_on_1",
@@ -9224,9 +9224,9 @@
    "voice": "British Football Announcer",
    "trigger": "pace-on",
    "file": "voices/commentator/pace_on_1.mp3",
-   "duration": 2.06,
-   "bytes": 20910,
-   "hash": "66bbee33f432ee5e"
+   "duration": 2.43,
+   "bytes": 24688,
+   "hash": "4b1fae6072f16ec4"
   },
   {
    "id": "pace_on_2",
@@ -9234,9 +9234,9 @@
    "voice": "British Football Announcer",
    "trigger": "pace-on",
    "file": "voices/commentator/pace_on_2.mp3",
-   "duration": 2.81,
-   "bytes": 28835,
-   "hash": "500a09ff35914f37"
+   "duration": 2.59,
+   "bytes": 27061,
+   "hash": "ae63b9faa72b10f8"
   },
   {
    "id": "keep_going_1",
@@ -9244,9 +9244,9 @@
    "voice": "British Football Announcer",
    "trigger": "keep-going",
    "file": "voices/commentator/keep_going_1.mp3",
-   "duration": 3.17,
-   "bytes": 30945,
-   "hash": "4db4fce3bb081583"
+   "duration": 3.25,
+   "bytes": 34966,
+   "hash": "bfbf263ec06dc1b0"
   },
   {
    "id": "keep_going_2",
@@ -9254,9 +9254,9 @@
    "voice": "British Football Announcer",
    "trigger": "keep-going",
    "file": "voices/commentator/keep_going_2.mp3",
-   "duration": 2.63,
-   "bytes": 27611,
-   "hash": "c7caee6915a3a915"
+   "duration": 2.39,
+   "bytes": 25344,
+   "hash": "8f9b8921c3788051"
   },
   {
    "id": "keep_going_3",
@@ -9264,9 +9264,9 @@
    "voice": "British Football Announcer",
    "trigger": "keep-going",
    "file": "voices/commentator/keep_going_3.mp3",
-   "duration": 3.18,
-   "bytes": 30709,
-   "hash": "025cf978e14d2af0"
+   "duration": 2.48,
+   "bytes": 25499,
+   "hash": "fd183a5615befc68"
   },
   {
    "id": "why_inspire_1",
@@ -9274,9 +9274,9 @@
    "voice": "British Football Announcer",
    "trigger": "why-inspire",
    "file": "voices/commentator/why_inspire_1.mp3",
-   "duration": 3.22,
-   "bytes": 33164,
-   "hash": "a283a3b493145df7"
+   "duration": 2.75,
+   "bytes": 30094,
+   "hash": "371120f82107ad28"
   },
   {
    "id": "why_reason_1",
@@ -9284,9 +9284,9 @@
    "voice": "British Football Announcer",
    "trigger": "why-reason",
    "file": "voices/commentator/why_reason_1.mp3",
-   "duration": 3.19,
-   "bytes": 31389,
-   "hash": "140aa1324f67e9fa"
+   "duration": 2.02,
+   "bytes": 22064,
+   "hash": "1be860fe62e284fe"
   },
   {
    "id": "why_goal_1",
@@ -9294,9 +9294,9 @@
    "voice": "British Football Announcer",
    "trigger": "why-goal",
    "file": "voices/commentator/why_goal_1.mp3",
-   "duration": 4.11,
-   "bytes": 41424,
-   "hash": "97895f364812cca2"
+   "duration": 2.59,
+   "bytes": 28001,
+   "hash": "6d32ed0326b7ff46"
   },
   {
    "id": "why_anchor_1",
@@ -9304,9 +9304,9 @@
    "voice": "British Football Announcer",
    "trigger": "why-anchor",
    "file": "voices/commentator/why_anchor_1.mp3",
-   "duration": 3.49,
-   "bytes": 34206,
-   "hash": "d6a533daab144774"
+   "duration": 2.9,
+   "bytes": 29276,
+   "hash": "fc466d1a82d07ffc"
   },
   {
    "id": "count_3",
@@ -10424,9 +10424,9 @@
    "voice": "Irish Sportsman",
    "trigger": "pace-behind",
    "file": "voices/sportsman/pace_behind_1.mp3",
-   "duration": 3.36,
-   "bytes": 36752,
-   "hash": "8851b8c8da6707f4"
+   "duration": 1.81,
+   "bytes": 17854,
+   "hash": "14eaa1c36c42f34b"
   },
   {
    "id": "pace_behind_2",
@@ -10434,9 +10434,9 @@
    "voice": "Irish Sportsman",
    "trigger": "pace-behind",
    "file": "voices/sportsman/pace_behind_2.mp3",
-   "duration": 2.9,
-   "bytes": 33515,
-   "hash": "fa3b20b6805885c4"
+   "duration": 1.85,
+   "bytes": 21453,
+   "hash": "1f5d59ff867d1ceb"
   },
   {
    "id": "pace_behind_3",
@@ -10444,9 +10444,9 @@
    "voice": "Irish Sportsman",
    "trigger": "pace-behind",
    "file": "voices/sportsman/pace_behind_3.mp3",
-   "duration": 2.13,
-   "bytes": 26334,
-   "hash": "643b48d8b7a5babd"
+   "duration": 1.43,
+   "bytes": 17617,
+   "hash": "b845f1051cbe112e"
   },
   {
    "id": "pace_ahead_1",
@@ -10454,9 +10454,9 @@
    "voice": "Irish Sportsman",
    "trigger": "pace-ahead",
    "file": "voices/sportsman/pace_ahead_1.mp3",
-   "duration": 2.63,
-   "bytes": 29947,
-   "hash": "27708e09a7cfb40e"
+   "duration": 1.85,
+   "bytes": 19572,
+   "hash": "737f2411f03e4b7e"
   },
   {
    "id": "pace_ahead_2",
@@ -10464,9 +10464,9 @@
    "voice": "Irish Sportsman",
    "trigger": "pace-ahead",
    "file": "voices/sportsman/pace_ahead_2.mp3",
-   "duration": 2.21,
-   "bytes": 26824,
-   "hash": "fe673a958f00cf0c"
+   "duration": 1.93,
+   "bytes": 23693,
+   "hash": "5ebeef5851b86008"
   },
   {
    "id": "pace_ahead_3",
@@ -10474,9 +10474,9 @@
    "voice": "Irish Sportsman",
    "trigger": "pace-ahead",
    "file": "voices/sportsman/pace_ahead_3.mp3",
-   "duration": 2.37,
-   "bytes": 27637,
-   "hash": "4ba86724a5a1f6ea"
+   "duration": 1.33,
+   "bytes": 15875,
+   "hash": "a16fb9df69729bbd"
   },
   {
    "id": "pace_on_1",
@@ -10484,9 +10484,9 @@
    "voice": "Irish Sportsman",
    "trigger": "pace-on",
    "file": "voices/sportsman/pace_on_1.mp3",
-   "duration": 1.43,
-   "bytes": 17234,
-   "hash": "c43b698a9eb6978d"
+   "duration": 1.27,
+   "bytes": 14019,
+   "hash": "f601898cb8e78bae"
   },
   {
    "id": "pace_on_2",
@@ -10494,9 +10494,9 @@
    "voice": "Irish Sportsman",
    "trigger": "pace-on",
    "file": "voices/sportsman/pace_on_2.mp3",
-   "duration": 1.93,
-   "bytes": 21969,
-   "hash": "668fa020384d289c"
+   "duration": 1.2,
+   "bytes": 14098,
+   "hash": "1d2c82d59810cd55"
   },
   {
    "id": "keep_going_1",
@@ -10504,9 +10504,9 @@
    "voice": "Irish Sportsman",
    "trigger": "keep-going",
    "file": "voices/sportsman/keep_going_1.mp3",
-   "duration": 2.58,
-   "bytes": 30867,
-   "hash": "b8d7ceb0adda6ffa"
+   "duration": 1.43,
+   "bytes": 15741,
+   "hash": "143b5aee95ffc2c0"
   },
   {
    "id": "keep_going_2",
@@ -10514,9 +10514,9 @@
    "voice": "Irish Sportsman",
    "trigger": "keep-going",
    "file": "voices/sportsman/keep_going_2.mp3",
-   "duration": 2.08,
-   "bytes": 29620,
-   "hash": "35115e37204db7ab"
+   "duration": 1.43,
+   "bytes": 17438,
+   "hash": "5a78f58266c3c9e2"
   },
   {
    "id": "keep_going_3",
@@ -10524,9 +10524,9 @@
    "voice": "Irish Sportsman",
    "trigger": "keep-going",
    "file": "voices/sportsman/keep_going_3.mp3",
-   "duration": 2.55,
-   "bytes": 27574,
-   "hash": "101d9a23ce9f4ba8"
+   "duration": 1.96,
+   "bytes": 25597,
+   "hash": "71ae908441e70722"
   },
   {
    "id": "why_inspire_1",
@@ -10534,9 +10534,9 @@
    "voice": "Irish Sportsman",
    "trigger": "why-inspire",
    "file": "voices/sportsman/why_inspire_1.mp3",
-   "duration": 2.84,
-   "bytes": 32413,
-   "hash": "e9327b1b394a30df"
+   "duration": 2.6,
+   "bytes": 30632,
+   "hash": "ce6457c4f3fe9598"
   },
   {
    "id": "why_reason_1",
@@ -10544,9 +10544,9 @@
    "voice": "Irish Sportsman",
    "trigger": "why-reason",
    "file": "voices/sportsman/why_reason_1.mp3",
-   "duration": 2.75,
-   "bytes": 31747,
-   "hash": "0e7b48e8574d2f96"
+   "duration": 2.31,
+   "bytes": 26088,
+   "hash": "e750c4dc16447511"
   },
   {
    "id": "why_goal_1",
@@ -10554,9 +10554,9 @@
    "voice": "Irish Sportsman",
    "trigger": "why-goal",
    "file": "voices/sportsman/why_goal_1.mp3",
-   "duration": 3.1,
-   "bytes": 32342,
-   "hash": "d792568af91445e5"
+   "duration": 2.01,
+   "bytes": 24658,
+   "hash": "0832048202a38f1b"
   },
   {
    "id": "why_anchor_1",
@@ -10564,9 +10564,9 @@
    "voice": "Irish Sportsman",
    "trigger": "why-anchor",
    "file": "voices/sportsman/why_anchor_1.mp3",
-   "duration": 2.95,
-   "bytes": 33834,
-   "hash": "c0c05b85b72b68f1"
+   "duration": 2.81,
+   "bytes": 31269,
+   "hash": "6c3ec07fa8e2bb41"
   },
   {
    "id": "count_3",
@@ -11399,5 +11399,5 @@
    "hash": "6afc2957dc5d2876"
   }
  ],
- "totalBytes": 24558590
+ "totalBytes": 24111946
 }

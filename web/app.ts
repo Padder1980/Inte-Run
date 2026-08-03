@@ -3232,7 +3232,15 @@ function coachSaySequence(ids, onFail) {
   if (clips.some((c) => !c)) { if (onFail) onFail(); return false; }
   let i = 0;
   const a = coachAudioEl();
+  // ⚠️ THE NEXT FRAGMENT STARTS BEFORE THE LAST ONE FINISHES, by design. Waiting for "ended" waits
+  // for the trailing silence and decay baked into every clip too, and seven of those gaps in one
+  // sentence is what made the stitched pace cue sound assembled rather than spoken. Each clip's
+  // duration is in the manifest, so the next one is scheduled a fraction early and the tails are
+  // simply never heard. "ended" stays wired as the safety net for a late timer or a short clip.
+  const TAIL_TRIM_MS = 130;
+  let t = 0;
   const next = () => {
+    clearTimeout(t);
     if (i >= clips.length) { a.onended = null; return; }
     // A pause, a finish or a higher-priority cue mid-sentence stops it rather than talking over.
     if (!LIVE || LIVE.done || LIVE.pauseStart) { a.onended = null; return; }
@@ -3240,6 +3248,9 @@ function coachSaySequence(ids, onFail) {
     try {
       a.src = clip.file; a.volume = Math.max(0, Math.min(1, COACH.cfg.volume)); a.currentTime = 0;
       const pr = a.play(); if (pr && pr.catch) pr.catch(() => { a.onended = null; if (onFail) onFail(); });
+      // Schedule the follower from the clip's known length rather than from its end event.
+      const ms = Math.max(140, Math.round((clip.duration || 0.6) * 1000) - TAIL_TRIM_MS);
+      t = setTimeout(next, ms);
     } catch (e) { a.onended = null; if (onFail) onFail(); }
   };
   a.onended = next;

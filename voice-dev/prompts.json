@@ -505,11 +505,11 @@
         "pacer": "You're a shade down on target. Lift the rhythm, not the strain.",
         "motivator": "You've got more than this — let's go find it.",
         "technician": "Pace is down. Lift your cadence a notch and stand tall.",
-        "spark": "You've drifted a little under pace. Gently find that rhythm again.",
-        "steady": "You've drifted a little under pace. Gently find that rhythm again.",
-        "storyteller": "You've drifted a little under pace. Gently find that rhythm again.",
-        "commentator": "You've drifted a little under pace. Gently find that rhythm again.",
-        "sportsman": "You've drifted a little under pace. Gently find that rhythm again."
+        "spark": "Slipped a touch — pick it up, nice and light.",
+        "steady": "A little under pace. Bring it back gradually, no rush.",
+        "storyteller": "The pace has quietly drifted. Reel it back in.",
+        "commentator": "He's dropped off the pace slightly — needs to respond here.",
+        "sportsman": "You're off it a bit. Wind it back on."
       }
     },
     {
@@ -521,11 +521,11 @@
         "pacer": "Pace has slipped. Quicker feet, same effort.",
         "motivator": "Wake it up! Quick feet, big heart.",
         "technician": "Losing time. Shorten the stride, quicken the rhythm.",
-        "spark": "A touch under pace. No panic — just ease back into it.",
-        "steady": "A touch under pace. No panic — just ease back into it.",
-        "storyteller": "A touch under pace. No panic — just ease back into it.",
-        "commentator": "A touch under pace. No panic — just ease back into it.",
-        "sportsman": "A touch under pace. No panic — just ease back into it."
+        "spark": "Bit slow — lift it, don't lunge.",
+        "steady": "Just under. Add a small amount and hold there.",
+        "storyteller": "A shade behind where you meant to be. Ease it forward.",
+        "commentator": "Fractionally behind schedule — a gentle response required.",
+        "sportsman": "Slightly slow. Nudge it, don't attack it."
       }
     },
     {
@@ -537,11 +537,11 @@
         "pacer": "Below the band. Build back gradually over the next minute.",
         "motivator": "This is where it's won. Pick it up with me.",
         "technician": "Check in: eyes up, arms driving. Now build the pace back.",
-        "spark": "Come back to target. Smooth and steady does it.",
-        "steady": "Come back to target. Smooth and steady does it.",
-        "storyteller": "Come back to target. Smooth and steady does it.",
-        "commentator": "Come back to target. Smooth and steady does it.",
-        "sportsman": "Come back to target. Smooth and steady does it."
+        "spark": "Back on it — smooth and quick.",
+        "steady": "Find target again. Slowly does it.",
+        "storyteller": "Back towards the pace you set out for.",
+        "commentator": "Working his way back onto the pace now.",
+        "sportsman": "Get back on target. No drama."
       }
     },
     {
@@ -553,11 +553,11 @@
         "pacer": "Above target. Ease back — the plan needs this pace, not that one.",
         "motivator": "Whoa, speedster! Bank that fire — you'll want it at the end.",
         "technician": "Running hot. Drop the effort a notch — same form, less force.",
-        "spark": "Easy now — you're quicker than we need. Save it for later.",
-        "steady": "Easy now — you're quicker than we need. Save it for later.",
-        "storyteller": "Easy now — you're quicker than we need. Save it for later.",
-        "commentator": "Easy now — you're quicker than we need. Save it for later.",
-        "sportsman": "Easy now — you're quicker than we need. Save it for later."
+        "spark": "Whoa — quick! Rein it in, save that.",
+        "steady": "You're ahead of pace. Ease back and keep it there.",
+        "storyteller": "Quicker than the plan asked. Put that away for later.",
+        "commentator": "He's gone off too fast — that will cost him later.",
+        "sportsman": "Too quick. Back off, you'll want that."
       }
     },
     {
@@ -569,11 +569,11 @@
         "pacer": "Too quick. Settle down to the band and hold.",
         "motivator": "Too hot too soon. Cool it a touch and finish like a hero instead.",
         "technician": "Over pace. Relax the shoulders, shorten the push, let it slow.",
-        "spark": "Ahead of pace. Breathe, soften, let it come back.",
-        "steady": "Ahead of pace. Breathe, soften, let it come back.",
-        "storyteller": "Ahead of pace. Breathe, soften, let it come back.",
-        "commentator": "Ahead of pace. Breathe, soften, let it come back.",
-        "sportsman": "Ahead of pace. Breathe, soften, let it come back."
+        "spark": "Fast! Breathe, soften, settle.",
+        "steady": "Ahead of target. Let it come back on its own.",
+        "storyteller": "Running above yourself. Let the pace fall back to you.",
+        "commentator": "Well ahead of pace — and he needs to settle now.",
+        "sportsman": "You're flying. Too early for that. Settle."
       }
     },
     {
@@ -585,11 +585,11 @@
         "pacer": "You're over-pacing. Trim it back and lock in.",
         "motivator": "Save the fireworks! Ease down, we'll light them later.",
         "technician": "Faster than prescribed. Control is the skill here — dial it back.",
-        "spark": "Lovely energy, but ease off. Patience wins today.",
-        "steady": "Lovely energy, but ease off. Patience wins today.",
-        "storyteller": "Lovely energy, but ease off. Patience wins today.",
-        "commentator": "Lovely energy, but ease off. Patience wins today.",
-        "sportsman": "Lovely energy, but ease off. Patience wins today."
+        "spark": "Great legs — but not yet! Ease off.",
+        "steady": "Good, but quicker than needed. Ease down a little.",
+        "storyteller": "Plenty there today. Spend it later, not here.",
+        "commentator": "Looking strong, but this is not the moment to use it.",
+        "sportsman": "Grand legs on you. Save them."
       }
     },
     {
@@ -601,11 +601,11 @@
         "pacer": "On target. Lock this in.",
         "motivator": "Yes! This is your pace — own it.",
         "technician": "On pace, and the form matches. Keep it exactly like this.",
-        "spark": "That's it. Right where you should be.",
-        "steady": "That's it. Right where you should be.",
-        "storyteller": "That's it. Right where you should be.",
-        "commentator": "That's it. Right where you should be.",
-        "sportsman": "That's it. Right where you should be."
+        "spark": "Yes! Bang on.",
+        "steady": "That's it. Right where it should be.",
+        "storyteller": "There it is — exactly the pace you came for.",
+        "commentator": "And he's back on the pace. Nicely done.",
+        "sportsman": "That's the one. Stay there."
       }
     },
     {
@@ -617,11 +617,11 @@
         "pacer": "Bang on pace. Hold steady.",
         "motivator": "Dialled in. You look unstoppable.",
         "technician": "Textbook. Same cadence, same effort.",
-        "spark": "Back on target. Hold this and relax into it.",
-        "steady": "Back on target. Hold this and relax into it.",
-        "storyteller": "Back on target. Hold this and relax into it.",
-        "commentator": "Back on target. Hold this and relax into it.",
-        "sportsman": "Back on target. Hold this and relax into it."
+        "spark": "Perfect — hold that!",
+        "steady": "Back on target. Settle in and leave it alone.",
+        "storyteller": "Back on terms with the plan. Hold it there.",
+        "commentator": "Back on schedule, and looking comfortable with it.",
+        "sportsman": "On it now. Don't touch a thing."
       }
     },
     {
@@ -633,11 +633,11 @@
         "pacer": "Hold the rhythm. The rhythm carries you.",
         "motivator": "Don't you dare stop now — this is the good part!",
         "technician": "When it hurts, run taller. Posture first, the rest follows.",
-        "spark": "I know it's hard. You've been harder. Keep going.",
-        "steady": "I know it's hard. You've been harder. Keep going.",
-        "storyteller": "I know it's hard. You've been harder. Keep going.",
-        "commentator": "I know it's hard. You've been harder. Keep going.",
-        "sportsman": "I know it's hard. You've been harder. Keep going."
+        "spark": "This is the bit! Come on — keep going!",
+        "steady": "It's hard. You've done hard before. Keep going.",
+        "storyteller": "This is the part you'll remember. Keep going.",
+        "commentator": "This is where the session is won — and he keeps going!",
+        "sportsman": "It's meant to hurt. Keep going."
       }
     },
     {
@@ -649,11 +649,11 @@
         "pacer": "Nothing changes. Same pace, same breath, keep moving.",
         "motivator": "Tough is temporary. You are not. Go!",
         "technician": "Reset: shoulders down, breathe long, drive the arms.",
-        "spark": "One step, then the next. That's all it ever is.",
-        "steady": "One step, then the next. That's all it ever is.",
-        "storyteller": "One step, then the next. That's all it ever is.",
-        "commentator": "One step, then the next. That's all it ever is.",
-        "sportsman": "One step, then the next. That's all it ever is."
+        "spark": "One step. Then another. Go!",
+        "steady": "One step, then the next. That's the whole job.",
+        "storyteller": "One step at a time is how every one of these ends.",
+        "commentator": "Digging in now — one stride at a time.",
+        "sportsman": "One foot, then the other. That's it."
       }
     },
     {
@@ -665,11 +665,11 @@
         "pacer": "This is where pace is made. Stay on it.",
         "motivator": "Every stride right now is building the runner you want to be.",
         "technician": "Fatigue is form's enemy. Beat it with technique.",
-        "spark": "Stay with it. This part passes — you don't stop.",
-        "steady": "Stay with it. This part passes — you don't stop.",
-        "storyteller": "Stay with it. This part passes — you don't stop.",
-        "commentator": "Stay with it. This part passes — you don't stop.",
-        "sportsman": "Stay with it. This part passes — you don't stop."
+        "spark": "Stay with it — this bit ends!",
+        "steady": "Stay with it. This part always passes.",
+        "storyteller": "Stay with it. This stretch is temporary; you are not.",
+        "commentator": "He's hurting — but he's still there!",
+        "sportsman": "Stay with it. It passes. You don't stop."
       }
     },
     {
@@ -681,11 +681,11 @@
         "pacer": "Your inspiration didn't quit here. Neither do you.",
         "motivator": "Picture who inspires you — now show them what you've got!",
         "technician": "Recall who inspires you. Match their standard for one kilometre.",
-        "spark": "Think of the person who inspires you. Run this part with them.",
-        "steady": "Think of the person who inspires you. Run this part with them.",
-        "storyteller": "Think of the person who inspires you. Run this part with them.",
-        "commentator": "Think of the person who inspires you. Run this part with them.",
-        "sportsman": "Think of the person who inspires you. Run this part with them."
+        "spark": "That person who inspires you? Run this bit for them!",
+        "steady": "Think of whoever inspires you. Run this part with them.",
+        "storyteller": "Somewhere behind this run is the person who made you want it. Bring them along.",
+        "commentator": "And you can be sure someone would be proud of this.",
+        "sportsman": "Think of the one who got you into this. Do it for them."
       }
     },
     {
@@ -697,11 +697,11 @@
         "pacer": "You had a reason to start running. Hold it for the next minute.",
         "motivator": "Your why is bigger than this hill. Prove it!",
         "technician": "Reconnect with your reason. Purpose steadies pace.",
-        "spark": "Remember why you started. It's still true, right now.",
-        "steady": "Remember why you started. It's still true, right now.",
-        "storyteller": "Remember why you started. It's still true, right now.",
-        "commentator": "Remember why you started. It's still true, right now.",
-        "sportsman": "Remember why you started. It's still true, right now."
+        "spark": "Remember why you started — it still counts!",
+        "steady": "Remember why you started. It hasn't changed.",
+        "storyteller": "You had a reason for this before today. It is still standing.",
+        "commentator": "This is what all that work was for.",
+        "sportsman": "You know why you're out here. Nothing's changed."
       }
     },
     {
@@ -713,11 +713,11 @@
         "pacer": "The goal means something. This stretch is where it's paid for.",
         "motivator": "That time goal? You chose it for a reason. Chase it down!",
         "technician": "Your goal was chosen deliberately. Run this stretch deliberately.",
-        "spark": "That goal of yours has a reason behind it. This is you earning it.",
-        "steady": "That goal of yours has a reason behind it. This is you earning it.",
-        "storyteller": "That goal of yours has a reason behind it. This is you earning it.",
-        "commentator": "That goal of yours has a reason behind it. This is you earning it.",
-        "sportsman": "That goal of yours has a reason behind it. This is you earning it."
+        "spark": "That goal! This is you earning it!",
+        "steady": "There's a reason behind that goal. This is you paying for it.",
+        "storyteller": "The goal has a reason underneath it, and this is the price of it.",
+        "commentator": "This is the work that makes the target possible.",
+        "sportsman": "You want that goal. This is the cost. Pay it."
       }
     },
     {
@@ -729,11 +729,11 @@
         "pacer": "Hard patch. Anchor to your reason and hold the pace.",
         "motivator": "This is the tough bit — and you know exactly who you're doing it for.",
         "technician": "When it's tough, your anchor is a tool. Use it now.",
-        "spark": "It's tough. So think of what keeps you going — and let it.",
-        "steady": "It's tough. So think of what keeps you going — and let it.",
-        "storyteller": "It's tough. So think of what keeps you going — and let it.",
-        "commentator": "It's tough. So think of what keeps you going — and let it.",
-        "sportsman": "It's tough. So think of what keeps you going — and let it."
+        "spark": "Think what keeps you going — and use it!",
+        "steady": "It's hard. Think of what keeps you going, and let it.",
+        "storyteller": "When it bites, think of whatever holds you together. Let it hold now.",
+        "commentator": "Reaching for something extra — and finding it.",
+        "sportsman": "It's hard. Think what keeps you at it. Lean on that."
       }
     },
     {

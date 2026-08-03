@@ -139,24 +139,56 @@ export function easyRun(
   minutes: number,
   withStrides = false,
 ): SessionContent {
-  const strides: WorkoutStep = {
-    kind: "rep",
-    label: "6 × 20s relaxed strides, full recovery",
-    durationSeconds: 6 * 20,
-    targetPaceSecPerKm: paces.rep,
-    targetRpe: RPE.rep,
-    repeatCount: 6,
-  };
+  // ⚠️ STRIDES ARE SIX REPETITIONS WITH A RECOVERY BETWEEN THEM, NOT ONE BLOCK. They shipped as a
+  // single 120-second step labelled "full recovery", which put the recovery in prose and nowhere
+  // else. Two consequences, both real: the brief could not state how long the recovery is (the owner
+  // asked for it and there was no number to show), and the live session counted through it as two
+  // unbroken minutes at repetition pace — 3:49/km for 120 seconds straight, which is not the
+  // prescription. Emitted the same way as hillReps and the session builder: one step per repetition,
+  // a recovery between, no trailing one because the ease-down follows.
+  const STRIDE_SEC = 20, STRIDE_REPS = 6, STRIDE_REC_SEC = 60;
+  const strideSteps: WorkoutStep[] = [];
+  if (withStrides) {
+    for (let i = 1; i <= STRIDE_REPS; i++) {
+      strideSteps.push({
+        kind: "rep",
+        label: `${STRIDE_SEC}s relaxed stride — quick feet, tall, no strain`,
+        durationSeconds: STRIDE_SEC,
+        targetPaceSecPerKm: paces.rep,
+        targetRpe: RPE.rep,
+        repeatIndex: i,
+        repeatCount: STRIDE_REPS,
+      });
+      if (i < STRIDE_REPS) {
+        strideSteps.push({
+          kind: "recovery",
+          label: "Walk back or jog easy — full recovery, until your breathing is back",
+          durationSeconds: STRIDE_REC_SEC,
+          // A walk-back is easier than easy running, and the band is what the debrief judges it by.
+          targetRpe: { min: 1, max: 2 },
+          repeatIndex: i,
+          repeatCount: STRIDE_REPS,
+        });
+      }
+    }
+  }
+  // ⚠️ The recovery is TAKEN OUT OF THE EASY PORTION, not added on top. The session already ran two
+  // minutes over its title for the strides themselves; letting the walk-backs extend it too would add
+  // five minutes to every easy+strides session in every plan, and estimatedDurationSeconds feeds the
+  // volume and intensity models. The session's total is unchanged — the walk-back is now counted as
+  // the recovery it is rather than as easy running.
+  const recTotal = strideSteps.filter((s) => s.kind === "recovery")
+    .reduce((a, s) => a + (s.durationSeconds || 0), 0);
   const steps = framedRun(paces, minutes, (mid) => [
     {
       kind: "steady",
       label: "Conversational easy running (below the first threshold)",
-      durationSeconds: mid * 60,
+      durationSeconds: Math.max(300, mid * 60 - recTotal),
       targetPaceSecPerKm: paces.easy,
       targetRpe: RPE.easy,
     },
     // Relaxed strides come after the easy portion, before the ease-down jog to finish.
-    ...(withStrides ? [strides] : []),
+    ...strideSteps,
   ]);
   return assemble(
     withStrides ? "strides" : "easy",

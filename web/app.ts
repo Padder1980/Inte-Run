@@ -4023,10 +4023,24 @@ function structureRows(steps, plain) {
         (steps[j].kind === "rep" ? reps : recs).push(steps[j]); j++;
       }
       const uniform = reps.every((r) => r.durationSeconds === reps[0].durationSeconds && r.distanceMeters === reps[0].distanceMeters);
+      // ⚠️ KEEP THE WORDS, NOT JUST THE COUNT. Grouping uniform repetitions rendered them as bare
+      // measurements — "6 × 20″", "10 × 50 m" — dropping what the repetition actually is. Splitting
+      // strides into real steps made that visible: a row that used to read "6 × 20s relaxed strides"
+      // became "6 × 20″". The descriptor is the step's own label with its leading measurement removed,
+      // so it is never printed twice.
+      const descriptorOf = (r) => {
+        // ⚠️ Double backslashes: this regex lives inside the outer template literal, so a single one
+        // is eaten and \\d ships as a literal "d" that matches nothing.
+        const t = String(r.label || "").replace(/^\\s*\\d+\\s*(s|″|m|km|metres|minutes?|min|′)\\b[\\s—–-]*/i, "").trim();
+        if (!t || /^\\d/.test(t)) return "";
+        return t.charAt(0).toLowerCase() + t.slice(1);
+      };
       let lab;
       if (reps.length === 1) lab = esc(reps[0].label);
-      else if (uniform) lab = reps.length + " × " + workLabel(reps[0]);
-      else lab = reps.map(workLabel).join(" · ");
+      else if (uniform) {
+        const d = descriptorOf(reps[0]);
+        lab = reps.length + " × " + workLabel(reps[0]) + (d ? " " + (plain ? d : esc(d)) : "");
+      } else lab = reps.map(workLabel).join(" · ");
       const rec = recs[0];
       const recLine = rec ? "with " + workLabel(rec) + " " + (String(rec.label).toLowerCase().includes("walk") ? "walk" : "easy jog") + " between" : "";
       rows.push({ tag: "Work", lab: plain ? String(reps.length === 1 ? reps[0].label : lab) : lab, chips: withSpan(spanText(reps.concat(recs)), stepChipsFn(reps[0])), rec: recLine, muted: false });
@@ -4260,14 +4274,14 @@ function warmupHtml(sess) {
         w.readinessCheck.map((q) => esc(q)).join("<br>") +
         '<div class="wu-note">Sharp or worsening pain, or anything changing how you run, means stop rather than push on.</div></div></div>'
     : "";
-  // The paper asks that its evidence grades survive into what the runner reads, so nothing here
-  // sounds more certain than the research behind it actually is.
-  const grade = '<div class="wu-note" style="margin-top:10px">Evidence grade ' + esc(w.evidenceGrade) +
-    ' — warm-ups are better supported for preparing you for the session than for anything else. ' +
-    'This one is a considered default, not a proven protocol.</div>';
+  // ⚠️ THE EVIDENCE GRADE IS NOT PRINTED ON THE SESSION CARD (owner's call, 2026-08-03). It is a note
+  // about the research behind warm-ups in general, repeated on every session, and it pushed the thing
+  // the runner came for — what to do — further down the screen. It still travels ON the warm-up
+  // (w.evidenceGrade, asserted by test/warmup.test.ts) and belongs in Support, where someone asking
+  // "how sure are you about this?" can find it, rather than under every run they open.
   return '<div class="card wu-card"><div class="subhead" style="margin-top:0">Warm-up' +
       (w.embedded ? "" : ' <span class="wu-min num">' + w.totalMinutes + ' min</span>') + '</div>' +
-    '<div class="wu-why">' + esc(w.why) + '</div>' + rowsH + (w.embedded ? "" : delay + check) + notes + grade + '</div>';
+    '<div class="wu-why">' + esc(w.why) + '</div>' + rowsH + (w.embedded ? "" : delay + check) + notes + '</div>';
 }
 function fuelHtml(sess) {
   if (!sess || !sess.steps) return "";

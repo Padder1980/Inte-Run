@@ -1130,6 +1130,33 @@ hidden under 200 m, where it would be rounding noise. The warm-up card's rows re
 delivered steps too, not off the phase: the phase says "3 × 18 seconds", the step it becomes is 75 s
 per stride including the walk back.
 
+⚠️ **STRIDES ARE SIX REPETITIONS WITH A RECOVERY, NOT ONE BLOCK** (fixed 2026-08-03). `easyRun`
+shipped them as a single 120-second step labelled *"6 × 20s relaxed strides, full recovery"* — the
+recovery existing in prose and nowhere else. The owner asked for its length to be labelled and there
+was no number to show. Worse, the live session counted through it as **two unbroken minutes at
+repetition pace** (3:49/km), which is not the prescription. Now emitted like `hillReps` and the session
+builder: one step per repetition, a 60 s walk-back between, none trailing because the ease-down
+follows. ⚠️ **The recovery is CARVED OUT of the easy portion, not added on top** — the session was
+already two minutes over its title for the strides themselves, and `estimatedDurationSeconds` feeds the
+volume and intensity models, so letting the walk-backs extend it would have added five minutes to
+every easy+strides session in every plan. Total unchanged (47 min before and after); the walk-back is
+now counted as the recovery it is rather than as easy running.
+
+⚠️ **Grouping uniform repetitions was dropping what they ARE.** `structureRows` rendered them as bare
+measurements — "6 × 20″", "10 × 50 m" — so splitting strides into real steps turned a row that read
+"6 × 20s relaxed strides" into "6 × 20″". It now appends the step's own label with its leading
+measurement stripped, so nothing is printed twice: "6 × 20″ relaxed stride — quick feet, tall, no
+strain", "10 × 50 m uphill — strong, tall, driving". ⚠️ That strip regex is in `web/app.ts`, so its
+backslashes must be DOUBLED — `\\d` not `\d`. Written singly it shipped as a literal "d", matched
+nothing, and the row read "6 × 20″ 20s relaxed stride" with the measurement twice. Fifth firing of
+this file's own escaping rule.
+
+⚠️ **The evidence grade is no longer printed on the session card** (owner's call, 2026-08-03). It was a
+note about warm-up research in general, repeated under every single session, pushing what to actually
+do further down the screen. It still travels on the warm-up object and is still asserted by
+`test/warmup.test.ts`; it belongs in Support, where someone asking "how sure are you about this?" can
+find it. Don't reinstate it on the card.
+
 **Two findings deliberately NOT changed**, both reported to the owner rather than quietly fixed:
 - **Race day prescribes no cool-down.** `applyRaceDay` builds a warm-up plus the race and rests
   afterwards. Whether a goal race should carry a cool-down jog is a coaching decision, not a test fix.

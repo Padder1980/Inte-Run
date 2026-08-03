@@ -10,7 +10,7 @@ export { LiveSession } from "../src/live/session-runtime.ts";
 export type { Telemetry, Cue, LiveSnapshot, StepView } from "../src/live/session-runtime.ts";
 // Spoken-coaching catalogue + selection (drives the app's audio controller).
 export {
-  COACHES, COACH_IDS, DEFAULT_COACH, PROMPTS,
+  COACHES, COACH_IDS, DEFAULT_COACH, PROMPTS, ALL_PROMPTS,
   selectPrompt, newPromptHistory, markPlayed, shouldInterrupt, promptsFor, canPlay, promptTextFor,
   PERSONAL_PROMPT_TEMPLATES,
   personalPrompts,

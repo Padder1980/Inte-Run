@@ -3183,6 +3183,60 @@ function coachSayId(id) {
     const pr = a.play(); if (pr && pr.catch) pr.catch(() => {});
   } catch (e) {}
 }
+// ---- Numbers, in the coach's own voice ----------------------------------------------------------
+//
+// The pace correction needs to say a number, and a pre-generated clip cannot contain one: there are
+// thousands of possible paces. The obvious answer is to synthesise the numbers, which is what shipped
+// first — and it means the coach hands over to a robot mid-sentence.
+//
+// ⚠️ THIS APP ALREADY SOLVED THIS PROBLEM ONCE. The count-in is not one clip saying "three, two,
+// one" — it is count_3, count_2, count_1 and count_go, four separate recordings of each coach,
+// stitched with timing so "go" lands exactly on the start. Each coach ALREADY says numbers out loud
+// in their own voice. The pace cue needs the same trick with a bigger bank: the numbers nought to
+// fifty-nine, plus a handful of fixed fragments, and the sentence is assembled from them.
+//
+// Cost: sixty-six extra clips per coach. Only the SELECTED coach is ever downloaded (coachPreload),
+// so a runner fetches about a megabyte more — the same order as the voice they already download.
+//
+// ⚠️ IT PLAYS ON "ended", NOT ON A TIMER. The count-in can use fixed one-second gaps because the
+// beats are meant to be a second apart; a sentence must not be. Timing fragments by guesswork gives
+// either overlap or gaps, and both make a real voice sound synthetic — which is the whole thing we
+// are trying to avoid.
+//
+// ⚠️ AND IT FALLS BACK TO THE SYNTHESISED SENTENCE IF ANY FRAGMENT IS MISSING. Until the audio is
+// generated, the numbers still get said; they are just said by the device. A half-stitched sentence
+// with a hole in it would be worse than either option.
+function paceFragmentIds(sec) {
+  const s = Math.round(sec);
+  const m = Math.floor(s / 60), r = s % 60;
+  const ids = ["num_" + m, "frag_minutes"];
+  if (r > 0) ids.push("num_" + r);
+  return ids;
+}
+function paceSentenceIds(cur, band) {
+  return ["frag_current_pace"].concat(paceFragmentIds(cur), ["frag_per_km", "frag_target_is"],
+    paceFragmentIds(band.minSecPerKm), ["frag_to"], paceFragmentIds(band.maxSecPerKm));
+}
+// Play a list of clip ids back to back, each starting the moment the last finishes.
+function coachSaySequence(ids, onFail) {
+  const clips = ids.map(coachClip);
+  if (clips.some((c) => !c)) { if (onFail) onFail(); return false; }
+  let i = 0;
+  const a = coachAudioEl();
+  const next = () => {
+    if (i >= clips.length) { a.onended = null; return; }
+    // A pause, a finish or a higher-priority cue mid-sentence stops it rather than talking over.
+    if (!LIVE || LIVE.done || LIVE.pauseStart) { a.onended = null; return; }
+    const clip = clips[i++];
+    try {
+      a.src = clip.file; a.volume = Math.max(0, Math.min(1, COACH.cfg.volume)); a.currentTime = 0;
+      const pr = a.play(); if (pr && pr.catch) pr.catch(() => { a.onended = null; if (onFail) onFail(); });
+    } catch (e) { a.onended = null; if (onFail) onFail(); }
+  };
+  a.onended = next;
+  next();
+  return true;
+}
 // Just the voice, no overlay — for when the WATCH is counting and owns the screen.
 function speakCountIn() {
   const ids = ["count_3", "count_2", "count_1", "count_go"];
@@ -6440,11 +6494,13 @@ function speakPaceNumbers(snap) {
   if (!VOICE_AVAILABLE) return;
   const text = "Your current pace is " + paceWords(cur) + " per kilometre. Your target is " +
     paceWords(band.minSecPerKm) + " to " + paceWords(band.maxSecPerKm) + ".";
+  const ids = paceSentenceIds(cur, band);
   clearTimeout(COACH.numT);
   COACH.numT = setTimeout(() => {
     // The run may have paused, finished or moved on while the clip played — say nothing then.
     if (!LIVE || LIVE.done || LIVE.pauseStart) return;
-    speak(text);
+    // The coach's own voice first choice; the device voice only if a fragment is missing.
+    coachSaySequence(ids, () => speak(text));
   }, 2600);
 }
 // The runner's own reason, at most once per run, and only where it earns its place: deep into a

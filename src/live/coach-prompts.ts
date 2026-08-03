@@ -89,7 +89,9 @@ export type PromptTrigger =
   | "why-inspire"         // invoke the runner's "who inspires you" answer
   | "why-reason"          // invoke the runner's "why do you run" answer
   | "why-goal"            // invoke the runner's "why this goal" answer
-  | "why-anchor"          // invoke the runner's "who keeps you going" answer
+  | "why-anchor"
+  /** Number and sentence fragments for the pace cue. NEVER fired by trigger — played by id only. */
+  | "fragment"          // invoke the runner's "who keeps you going" answer
   | "countdown";          // the three beats before the clock starts
 
 /** The words a given coach actually says for a prompt. */
@@ -129,6 +131,94 @@ const P_KEY = 60;       // interval starts, halfway, final effort
 const P_CRITICAL = 90;  // safety warnings — always interrupt
 
 const ONESHOT = 36000;  // effectively once per session
+
+
+// ---- The number bank, so the coach can say a pace in their own voice --------------------------
+//
+// ⚠️ THESE ARE PLAYED BY ID, NEVER BY TRIGGER. The pace cue assembles a sentence from them —
+// "Your current pace is" + six + "minutes" + forty-three + "per kilometre" — the same trick the
+// count-in already uses to say "three, two, one" in each coach's voice. A pre-generated clip cannot
+// hold a number, so the number becomes its own clip.
+//
+// ⚠️ SPELLED OUT, because no prompt text may contain a digit: the clips are generated from this text
+// and a numeral is not reliably spoken. test/coach-variants.test.ts enforces it across every coach.
+//
+// ⚠️ NO PER-COACH VARIANTS, deliberately. A coach saying "forty-three" says "forty-three"; the
+// difference is the voice, not the wording — exactly the reasoning already recorded for the
+// countdown. Personality lives in the instruction that precedes this, which is a normal prompt with
+// its own four variants.
+//
+// Recorded flat and list-like on purpose: these are joined end to end, so a rising or falling
+// intonation baked into one fragment fights the sentence it lands in.
+const PACE_NUMBER_CLIPS: PromptDef[] = [
+  { id: "num_0", trigger: "fragment", text: "Nought", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_1", trigger: "fragment", text: "one", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_2", trigger: "fragment", text: "two", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_3", trigger: "fragment", text: "three", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_4", trigger: "fragment", text: "four", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_5", trigger: "fragment", text: "five", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_6", trigger: "fragment", text: "six", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_7", trigger: "fragment", text: "seven", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_8", trigger: "fragment", text: "eight", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_9", trigger: "fragment", text: "nine", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_10", trigger: "fragment", text: "ten", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_11", trigger: "fragment", text: "eleven", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_12", trigger: "fragment", text: "twelve", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_13", trigger: "fragment", text: "thirteen", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_14", trigger: "fragment", text: "fourteen", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_15", trigger: "fragment", text: "fifteen", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_16", trigger: "fragment", text: "sixteen", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_17", trigger: "fragment", text: "seventeen", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_18", trigger: "fragment", text: "eighteen", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_19", trigger: "fragment", text: "nineteen", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_20", trigger: "fragment", text: "twenty", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_21", trigger: "fragment", text: "twenty-one", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_22", trigger: "fragment", text: "twenty-two", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_23", trigger: "fragment", text: "twenty-three", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_24", trigger: "fragment", text: "twenty-four", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_25", trigger: "fragment", text: "twenty-five", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_26", trigger: "fragment", text: "twenty-six", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_27", trigger: "fragment", text: "twenty-seven", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_28", trigger: "fragment", text: "twenty-eight", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_29", trigger: "fragment", text: "twenty-nine", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_30", trigger: "fragment", text: "thirty", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_31", trigger: "fragment", text: "thirty-one", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_32", trigger: "fragment", text: "thirty-two", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_33", trigger: "fragment", text: "thirty-three", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_34", trigger: "fragment", text: "thirty-four", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_35", trigger: "fragment", text: "thirty-five", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_36", trigger: "fragment", text: "thirty-six", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_37", trigger: "fragment", text: "thirty-seven", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_38", trigger: "fragment", text: "thirty-eight", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_39", trigger: "fragment", text: "thirty-nine", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_40", trigger: "fragment", text: "forty", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_41", trigger: "fragment", text: "forty-one", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_42", trigger: "fragment", text: "forty-two", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_43", trigger: "fragment", text: "forty-three", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_44", trigger: "fragment", text: "forty-four", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_45", trigger: "fragment", text: "forty-five", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_46", trigger: "fragment", text: "forty-six", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_47", trigger: "fragment", text: "forty-seven", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_48", trigger: "fragment", text: "forty-eight", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_49", trigger: "fragment", text: "forty-nine", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_50", trigger: "fragment", text: "fifty", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_51", trigger: "fragment", text: "fifty-one", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_52", trigger: "fragment", text: "fifty-two", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_53", trigger: "fragment", text: "fifty-three", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_54", trigger: "fragment", text: "fifty-four", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_55", trigger: "fragment", text: "fifty-five", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_56", trigger: "fragment", text: "fifty-six", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_57", trigger: "fragment", text: "fifty-seven", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_58", trigger: "fragment", text: "fifty-eight", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "num_59", trigger: "fragment", text: "fifty-nine", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+];
+const PACE_FRAGMENT_CLIPS: PromptDef[] = [
+  { id: "frag_current_pace", trigger: "fragment", text: "Your current pace is", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "frag_target_is", trigger: "fragment", text: "Your target is", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "frag_minutes", trigger: "fragment", text: "minutes", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "frag_per_km", trigger: "fragment", text: "per kilometre.", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+  { id: "frag_to", trigger: "fragment", text: "to", priority: P_CRITICAL, interrupt: false, minRepeatSec: 0, sessionTypes: "all" },
+];
 
 export const PROMPTS: PromptDef[] = [
   // — Session preparation ----------------------------------------------------
@@ -264,6 +354,10 @@ export const PROMPTS: PromptDef[] = [
   { id: "safety_1", trigger: "safety-effort", text: "Easy — your effort's been very high for a while. Back it off and check in with how you feel.", priority: P_CRITICAL, interrupt: true, minRepeatSec: 300, sessionTypes: "all" },
   { id: "safety_2", trigger: "safety-effort", text: "Let's be sensible. Ease down, breathe, and only push on if you feel good.", priority: P_CRITICAL, interrupt: true, minRepeatSec: 300, sessionTypes: "all" },
 ];
+// The by-id fragments live in the same catalogue so generation, the manifest and the no-digit
+// test all see them without a second code path.
+export const ALL_PROMPTS: PromptDef[] = PROMPTS.concat(PACE_NUMBER_CLIPS, PACE_FRAGMENT_CLIPS);
+
 
 // ---- Selection (pure, testable) -------------------------------------------
 

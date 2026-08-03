@@ -3,7 +3,7 @@
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { COACHES, COACH_IDS, PROMPTS, PERSONAL_PROMPT_TEMPLATES, promptTextFor } from "../src/live/coach-prompts.ts";
+import { COACHES, COACH_IDS, ALL_PROMPTS, PERSONAL_PROMPT_TEMPLATES, promptTextFor } from "../src/live/coach-prompts.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const out = {
@@ -11,7 +11,10 @@ const out = {
   version: 1,
   coaches: COACH_IDS.map((id) => ({ id, name: COACHES[id].name, voice: COACHES[id].voice })),
   // Per-coach text, resolved here so the generator never needs the catalogue's fallback rules.
-  prompts: PROMPTS.map((p) => ({
+  // ⚠️ ALL_PROMPTS, not PROMPTS — it includes the pace number bank and sentence fragments, which
+  // are played by id rather than by trigger. Dumping only PROMPTS would generate every coach
+  // without the numbers, and the pace cue would silently fall back to the device voice forever.
+  prompts: ALL_PROMPTS.map((p) => ({
     id: p.id, text: p.text, trigger: p.trigger,
     byCoach: Object.fromEntries(COACH_IDS.map((c) => [c, promptTextFor(p, c)])),
   })),

@@ -678,7 +678,7 @@ function buildWeek(
   }
 
   const finalized = finalize(sessions, dayOf, index);
-  const plannedDistanceMeters = finalized.reduce((m, s) => m + (s.estimatedDistanceMeters ?? 0), 0);
+  const plannedDistanceMeters = finalized.reduce((m, s) => m + (s.trainingDistanceMeters ?? s.estimatedDistanceMeters ?? 0), 0);
   const qualitySessionCount = finalized.filter(
     (s) => s.type === "threshold" || s.type === "vo2" || s.type === "race-specific",
   ).length;
@@ -773,7 +773,7 @@ function applyRaceDay(weeks: PlannedWeek[], goal: Goal, paces: TrainingPaces): v
   }
   last.sessions = [...kept, race, ...filler].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
   last.plannedDistanceMeters = Math.round(
-    last.sessions.reduce((m, s) => m + (s.estimatedDistanceMeters ?? 0), 0),
+    last.sessions.reduce((m, s) => m + (s.trainingDistanceMeters ?? s.estimatedDistanceMeters ?? 0), 0),
   );
   last.qualitySessionCount = last.sessions.filter(
     (s) => s.type === "threshold" || s.type === "vo2" || s.type === "race-specific",
@@ -793,7 +793,7 @@ function applyRaceDay(weeks: PlannedWeek[], goal: Goal, paces: TrainingPaces): v
       return [shakeoutSession(paces, w.index, eve.dow)];
     });
     w.plannedDistanceMeters = Math.round(
-      w.sessions.reduce((m, s) => m + (s.estimatedDistanceMeters ?? 0), 0),
+      w.sessions.reduce((m, s) => m + (s.trainingDistanceMeters ?? s.estimatedDistanceMeters ?? 0), 0),
     );
     w.qualitySessionCount = w.sessions.filter(
       (s) => s.type === "threshold" || s.type === "vo2" || s.type === "race-specific",
@@ -834,7 +834,7 @@ function applyPartialFirstWeek(weeks: PlannedWeek[], startIso: string): void {
   w0.sessions = w0.sessions.filter((s) => s.dayOfWeek >= startDOW);
   w0.startDateIso = startIso;
   w0.plannedDistanceMeters = Math.round(
-    w0.sessions.reduce((m, s) => m + (s.estimatedDistanceMeters ?? 0), 0),
+    w0.sessions.reduce((m, s) => m + (s.trainingDistanceMeters ?? s.estimatedDistanceMeters ?? 0), 0),
   );
   w0.qualitySessionCount = w0.sessions.filter(
     (s) => s.type === "threshold" || s.type === "vo2" || s.type === "race-specific",
@@ -993,7 +993,7 @@ function buildBeginnerWeek(
   }
 
   const finalized = finalize(sessions, dayOf, index);
-  const plannedDistanceMeters = finalized.reduce((m, s) => m + (s.estimatedDistanceMeters ?? 0), 0);
+  const plannedDistanceMeters = finalized.reduce((m, s) => m + (s.trainingDistanceMeters ?? s.estimatedDistanceMeters ?? 0), 0);
   return {
     index,
     startDateIso,

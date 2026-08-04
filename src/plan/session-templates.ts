@@ -19,6 +19,8 @@ import type {
   WorkoutStep,
 } from "../domain/types.ts";
 import { distanceForTime, RACE_DISTANCES_M, timeForDistance } from "../domain/units.ts";
+// ⚠️ One definition of what counts as training, shared with the intensity model — see steps.ts.
+import { isPreparationStep } from "../domain/steps.ts";
 
 export type SessionContent = Omit<Session, "id" | "dayOfWeek" | "source">;
 
@@ -48,6 +50,10 @@ function stepDistance(step: WorkoutStep): number {
   return 0;
 }
 
+function trainingStepDistance(step: WorkoutStep): number {
+  return isPreparationStep(step) ? 0 : stepDistance(step);
+}
+
 function stepDuration(step: WorkoutStep): number {
   if (step.durationSeconds) return step.durationSeconds;
   if (step.distanceMeters && step.targetPaceSecPerKm) {
@@ -66,6 +72,7 @@ function assemble(
 ): SessionContent {
   const estimatedDurationSeconds = Math.round(steps.reduce((s, st) => s + stepDuration(st), 0));
   const estimatedDistanceMeters = Math.round(steps.reduce((s, st) => s + stepDistance(st), 0));
+  const trainingDistanceMeters = Math.round(steps.reduce((s, st) => s + trainingStepDistance(st), 0));
   return {
     type,
     title,
@@ -73,6 +80,7 @@ function assemble(
     intensity,
     estimatedDurationSeconds,
     estimatedDistanceMeters: estimatedDistanceMeters > 0 ? estimatedDistanceMeters : undefined,
+    trainingDistanceMeters: trainingDistanceMeters > 0 ? trainingDistanceMeters : undefined,
     steps,
     targetRpe,
   };

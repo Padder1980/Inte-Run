@@ -161,7 +161,15 @@ export type Session = {
   description: string;
   intensity: IntensityBucket;
   estimatedDurationSeconds: number;
+  /** The whole outing, warm-up and cool-down included — what the session sheet shows the runner. */
   estimatedDistanceMeters?: number;
+  /**
+   * The TRAINING portion only, preparation excluded — what the mileage and intensity models measure.
+   * ⚠️ A warm-up is not training volume: it is preparation, run as slowly as the runner likes, and it
+   * puts no additional strain on the body. See `isPreparationStep`. Counting it as mileage is what made
+   * an additive warm-up look like a 16% volume increase.
+   */
+  trainingDistanceMeters?: number;
   steps: WorkoutStep[];
   targetRpe?: RpeBand;
   optional?: boolean;

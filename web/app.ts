@@ -7939,8 +7939,29 @@ function liveCue(cue) {
   const e = el('<div class="cue ' + cls + '"><span class="badge"></span><span class="ct">' + fmtPace(cue.atMs / 1000) + '</span><span>' + cue.message + '</span></div>');
   log.insertBefore(e, log.firstChild);
 }
+// ⚠️ THE CLOCK RESTARTS WHEN THE WARM-UP ENDS — ON SCREEN ONLY (owner's request, 2026-08-03). The
+// session's named minutes are now its WORK, so the number the runner watches has to be the work too:
+// a 38′ moderate run should read 38:00 at the end of the moderate, not 47:00.
+// ⚠️ IT IS A DISPLAY OFFSET, NEVER A CHANGE TO LIVE.vms. That clock drives the step machine, the coach
+// cues, the split detector, the pace bands and the saved run's duration — rewinding it would move
+// every one of them, and the debrief would judge the run against shifted targets. Only the digits move.
+// The offset is stamped once, the first tick after the last warm-up step ends, so it cannot drift.
+function liveWorkElapsed(snap) {
+  if (!LIVE) return snap.elapsedSeconds;
+  if (LIVE.warmSec === undefined) {
+    const steps = (LIVE.session && LIVE.session.steps) || [];
+    let sec = 0;
+    for (const st of steps) {
+      if (st.kind !== "warmup") break;          // only the warm-up AT THE FRONT is preparation
+      sec += st.durationSeconds || 0;
+    }
+    LIVE.warmSec = sec;
+  }
+  // Count the warm-up down to zero rather than showing a negative: the runner is still warming up.
+  return Math.max(0, snap.elapsedSeconds - LIVE.warmSec);
+}
 function liveUpdate(snap) {
-  $("lElapsed").textContent = fmtPace(snap.elapsedSeconds);
+  $("lElapsed").textContent = fmtPace(liveWorkElapsed(snap));
   $("lDist").innerHTML = (snap.distanceMeters / 1000).toFixed(2) + '<small> km</small>';
   // Hide implausible paces (>20:00/km): those only appear when barely moving and read as nonsense.
   const clamp = (p) => (p && p > 0 && p <= 1200) ? p : null;

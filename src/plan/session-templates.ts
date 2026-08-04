@@ -123,15 +123,34 @@ function easeDown(paces: TrainingPaces, minutes: number): WorkoutStep {
 }
 /** Split a continuous run's minutes into ease-in / main / ease-down blocks. Runs under 10′ are left
  *  as a single block (too short to frame meaningfully). `buildMiddle` fills the main portion. */
+/**
+ * ⚠️ THE MINUTES NAMED ARE THE WORK, NOT THE WHOLE SESSION (owner's decision, 2026-08-03).
+ *
+ * He watched a simulation of "38′ moderate run" and saw it spends 29 minutes at moderate: the frame
+ * was being taken OUT of the named time. Asked whether to grow the sessions or rename them, he chose
+ * to grow them — so `moderateRun(paces, 38)` now delivers 38 minutes at moderate with the warm-up and
+ * cool-down on top, and the title finally describes the work the runner is there to do.
+ *
+ * ⚠️ EVERY SESSION THROUGH HERE THEREFORE GETS LONGER, AND `estimatedDurationSeconds` IS WHAT THE
+ * VOLUME MODEL FITS. `targetPeakWeeklyKm` runs `buildAll(vScale)` to a fixed point against the plan it
+ * actually produces, so it re-converges on the runner's stated mileage by itself — but that is a claim
+ * to MEASURE, not to assume, and `test/volume-anchoring.test.ts` measures it.
+ *
+ * ⚠️ The warm-up is a flat 5 minutes, not a percentage. Also the owner's call: a standard short
+ * warm-up for the low-intensity sessions, with the stretches coming from the warm-up card's mobilise
+ * phase rather than from a step here. A proportional warm-up gave a 90-minute long run 6 minutes and a
+ * 20-minute recovery jog 3, which is backwards — the long run is the one already warm by minute five.
+ */
+const FRAME_WARM_MIN = 5;
+const FRAME_COOL_MIN = 4;
+
 function framedRun(
   paces: TrainingPaces,
-  totalMin: number,
+  workMin: number,
   buildMiddle: (midMin: number) => WorkoutStep[],
 ): WorkoutStep[] {
-  if (totalMin < 10) return buildMiddle(totalMin);
-  const warm = Math.min(6, Math.max(3, Math.round(totalMin * 0.14)));
-  const cool = Math.min(4, Math.max(2, Math.round(totalMin * 0.1)));
-  return [easeIn(paces, warm), ...buildMiddle(Math.max(1, totalMin - warm - cool)), easeDown(paces, cool)];
+  if (workMin < 10) return buildMiddle(workMin);
+  return [easeIn(paces, FRAME_WARM_MIN), ...buildMiddle(workMin), easeDown(paces, FRAME_COOL_MIN)];
 }
 
 export function easyRun(

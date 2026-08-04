@@ -260,12 +260,18 @@ export function buildWarmup(
     // three things disagree at once: the card said 8 minutes, the delivered step was another number,
     // and the session's total moved. Measured across 432 sessions, 69 had a duration chip that
     // disagreed with what Start delivered, the worst losing 10 minutes of a 45-minute session.
+    // ⚠️ A REAL FIVE-MINUTE WARM-UP AND SOME STRETCHES — NOT "your opening minutes are the warm-up"
+    // (owner's decision, 2026-08-03). The embedded model described minutes the run already contained,
+    // which is why the named time had to include them. He asked for the opposite: a standard short
+    // warm-up for the low-intensity sessions, done BEFORE the named time starts. So this path is no
+    // longer embedded, it carries a mobilise phase, and the session's own opening step is replaced by
+    // it exactly as the structured warm-ups are.
+    // ⚠️ Five minutes flat, and deliberately NOT scaled by ability: it is already the shortest warm-up
+    // the model produces, and a new runner needs the gentle opening more than an experienced one, not
+    // less. What ability still changes here is the strides below.
+    const mins = 5;
     const ownMin = Math.round(steps.filter((s) => s.kind === "warmup")
       .reduce((a, s) => a + (s.durationSeconds || 0), 0) / 60);
-    const advise = ability === "new" || ability === "beginner" ? 5 : 8;
-    // The opening is however long the run says. The ADVICE is capped by it — "run the first 5 minutes
-    // slower" inside a 15-minute opening is sound; "the first 8" inside a 6-minute one is not.
-    const mins = ownMin > 0 ? Math.min(advise, ownMin) : advise;
     phases.push({
       phase: "raise", minutes: mins, rpe: { min: 2, max: 2 },
       instruction: ability === "new"
@@ -290,22 +296,32 @@ export function buildWarmup(
     // with 15 minutes of easy running of which we advise the first 5 be slower still; all 15 prime
     // the runner. Using the advice instead put "the quicker running starts early" on 12 sessions
     // whose first effort was 25-28 minutes in.
-    const openMin = ownMin > 0 ? ownMin : mins;
-    if ((look.effort !== "easy" || effort === "steady") && openMin + look.minutesBefore <= 20 && ability !== "new") {
-      const n = ability === "beginner" ? 2 : 3;
-      phases.push({
-        phase: "potentiate", strides: n, seconds: 18, effort: "building towards the pace you are about to run",
-        instruction: `${n} × 18 seconds progressive before the work starts — the run's own opening is short here, so these bridge the gap into the first effort.`,
-      });
-      notes.push("The quicker running starts early in this one, so a few strides beforehand stop the first effort being a shock.");
-    }
+    // A few easy movements before the run — the "stretches" the owner asked for, in the model's own
+    // language: rehearsal and a check on how you feel, never sold as making you faster or safer.
+    const mob = ability === "new"
+      ? [WARMUP_MOVEMENTS.ankle_rocks, WARMUP_MOVEMENTS.leg_swings_fb]
+      : [WARMUP_MOVEMENTS.ankle_rocks, WARMUP_MOVEMENTS.leg_swings_fb, WARMUP_MOVEMENTS.leg_swings_lat];
+    phases.push({
+      phase: "mobilise", movements: mob,
+      instruction: "Move through a comfortable range — this is rehearsal and a check on how you feel today, not stretching for its own sake.",
+    });
+    // ⚠️ NO STRIDES ON THIS PATH ANY MORE. The owner specified what a low-intensity warm-up is —
+    // five easy minutes and some movements — and strides are neither. They were here to bridge into a
+    // pace block arriving inside the first 20 minutes, a job the real warm-up now does; keeping them
+    // meant a gate that had to guess how far away the work was, and it kept guessing wrong (strides
+    // 12 minutes before the effort, "the quicker running starts early" above a session whose first
+    // effort is 23 minutes in). Sessions that genuinely open with repetitions still get the full
+    // structured warm-up, strides included, further down.
     return {
       modelVersion: WARMUP_MODEL_VERSION, firstHardEffort: effort, evidenceGrade: GRADE[effort],
-      embedded: true,
-      openingMinutes: ownMin > 0 ? ownMin : undefined,
-      totalMinutes: (ownMin > 0 ? ownMin : mins) + (phases.some((p) => p.phase === "potentiate") ? 4 : 0),
+      // ⚠️ NOT EMBEDDED ANY MORE. This is time spent before the run's named minutes begin, so it is
+      // added to what the session sheet shows and to what Start counts through — the same treatment a
+      // threshold session's warm-up already gets. `openingMinutes` is deliberately absent: it existed
+      // to pin an embedded raise to the run's own opening, and there is no longer an opening to pin to.
+      embedded: false,
+      totalMinutes: mins + 3 + (phases.some((p) => p.phase === "potentiate") ? 4 : 0),
       phases,
-      why: "This run starts easy, so the opening few minutes are the warm-up — there is nothing here demanding enough to need preparing for separately.",
+      why: "Five easy minutes and a few movements before the run proper — enough for a session this gentle, and it comes before the time on the card rather than out of it.",
       notes,
     };
   }

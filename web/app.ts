@@ -1975,6 +1975,48 @@ input, select, textarea { font-size: 16px; }
 .countin.beat .ci-n { animation: ciBeat .45s cubic-bezier(.22, 1, .36, 1) both; }
 @keyframes ciBeat { from { opacity: 0; transform: scale(.72); } to { opacity: 1; transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .countin.beat .ci-n { animation: none; } }
+
+/* The optional post-run stretch session — the offer on the debrief, and the sheet it opens.
+   Uses the existing exercise-row markup (.ex / .ex-anim / .ex-name / .ex-presc), so only the
+   wrapper, the clock and the current-hold highlight are new. */
+.str-offer { display: flex; width: 100%; align-items: center; gap: 12px; text-align: left;
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--line));
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface)); cursor: pointer; }
+.str-offer-ic { flex: none; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 11px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--accent); }
+.str-offer-ic svg { width: 20px; height: 20px; }
+.str-offer-b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.str-offer-t { font-size: 15px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; }
+.str-offer-d { font-size: 12.5px; color: var(--ink-soft); }
+.str-offer-go { flex: none; color: var(--ink-faint); transform: rotate(-90deg); }
+.str-offer-go svg { width: 18px; height: 18px; }
+
+.str-head { display: flex; align-items: center; gap: 12px; margin: 2px 0 12px; }
+.str-clock { font-family: var(--fig); font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 700;
+  color: var(--ink); letter-spacing: -.02em; }
+.str-clock span { font-size: 14px; font-weight: 600; color: var(--ink-faint); }
+.str-bar { flex: 1; height: 6px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; }
+.str-bar i { display: block; height: 100%; width: 0%; background: var(--accent); transition: width .3s linear; }
+.str-vid { width: 100%; aspect-ratio: 16 / 9; border-radius: 12px; background: var(--surface-2);
+  border: 1px solid var(--line); display: block; }
+.str-vid-soon { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  color: var(--ink-faint); font-size: 12.5px; }
+.str-vid-ic { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface)); color: var(--accent); }
+.str-vid-ic svg { width: 18px; height: 18px; }
+.str-intro { margin: 10px 0 4px; font-size: 13px; }
+.str-list { display: flex; flex-direction: column; gap: 0; }
+.str-item { padding: 12px 0; border-top: 1px solid var(--line); }
+.str-item:first-child { border-top: 0; }
+.str-item.on { background: color-mix(in srgb, var(--accent) 6%, transparent);
+  box-shadow: inset 3px 0 0 var(--accent); border-radius: 0; padding-left: 10px; }
+.str-now { margin-top: 8px; font-family: var(--fig); font-variant-numeric: tabular-nums; font-size: 12.5px;
+  font-weight: 700; color: var(--accent); }
+.str-foot { display: flex; gap: 10px; margin-top: 14px; align-items: stretch; }
+.str-foot .primary { flex: 1; min-width: 0; margin-top: 0; }
+/* flex: none and nowrap, or the primary's flex: 1 squeezes this to a wrapped single-letter column. */
+.str-done { flex: none; white-space: nowrap; margin-top: 0; }
+.str-fin { margin: 12px 0 0; font-size: 13.5px; font-weight: 600; color: var(--accent); text-align: center; }
 </style>
 </head>
 <body>
@@ -4112,6 +4154,41 @@ const POSES = {
     { head: [34, 72], hip: [82, 76], knee: [96, 98], ankle: [108, 100], el: [38, 92], ha: [38, 104] },
     { head: [32, 66], hip: [82, 74], knee: [98, 60], ankle: [114, 52], el: [24, 58], ha: [10, 50] },
   ],
+  // Post-run stretch positions. Each pair is "arriving" then "settled", so the cross-fade reads as
+  // easing INTO the hold rather than as a repetition — a stretch that bobs looks like an exercise.
+  // ⚠️ Placeholders for the demonstration video, not a substitute for it: they exist so every stretch
+  // has its own silhouette instead of six identical squat figures (exAnim falls back to POSES.squat
+  // for an unknown pattern, which would have made the whole routine look like one movement).
+  // The support leg stays vertical and the bent leg swings BEHIND and out, or the two legs sit on the
+  // same line and the whole figure reads as one thick column.
+  quad: [
+    { head: [56, 26], hip: [56, 80], knee: [56, 102], ankle: [56, 124], el: [68, 60], ha: [76, 72], knee2: [66, 102], ankle2: [76, 122] },
+    { head: [56, 24], hip: [56, 78], knee: [56, 100], ankle: [56, 122], el: [72, 62], ha: [82, 78], knee2: [74, 96], ankle2: [86, 72] },
+  ],
+  hamstring: [
+    { head: [92, 52], hip: [60, 78], knee: [60, 100], ankle: [60, 122], el: [88, 66], ha: [92, 86], knee2: [76, 96], ankle2: [96, 104] },
+    { head: [100, 62], hip: [58, 76], knee: [58, 98], ankle: [58, 120], el: [96, 76], ha: [100, 94], knee2: [78, 94], ankle2: [100, 100] },
+  ],
+  calfwall: [
+    { head: [84, 44], hip: [56, 80], knee: [52, 102], ankle: [46, 124], el: [100, 52], ha: [112, 50], knee2: [74, 96], ankle2: [88, 116] },
+    { head: [88, 46], hip: [62, 80], knee: [56, 102], ankle: [48, 124], el: [104, 54], ha: [114, 52], knee2: [80, 96], ankle2: [92, 116] },
+  ],
+  hipflexor: [
+    { head: [60, 40], hip: [60, 88], knee: [84, 100], ankle: [98, 118], el: [52, 66], ha: [50, 86], knee2: [46, 112], ankle2: [30, 122] },
+    { head: [62, 36], hip: [66, 86], knee: [90, 100], ankle: [102, 118], el: [58, 64], ha: [58, 84], knee2: [48, 114], ankle2: [32, 124] },
+  ],
+  // ⚠️ THE LYING POSES NEED THEIR LIMBS TO RADIATE, NOT OVERLAP. Both of these first read as an
+  // indistinct dark mass on screen: at a 9-10px limb stroke, a torso and two legs all within a dozen
+  // pixels of the same y merge into one shape. The raised thigh goes clearly UP and the far leg clearly
+  // out, so the silhouette is legible at 92px wide.
+  glute: [
+    { head: [18, 110], hip: [66, 110], knee: [86, 98], ankle: [100, 114], el: [28, 118], ha: [42, 116], knee2: [84, 110], ankle2: [106, 112] },
+    { head: [18, 110], hip: [64, 110], knee: [70, 74], ankle: [90, 86], el: [28, 116], ha: [54, 88], knee2: [58, 84], ankle2: [92, 66] },
+  ],
+  childs: [
+    { head: [34, 104], hip: [88, 92], knee: [96, 112], ankle: [86, 122], el: [22, 102], ha: [8, 106] },
+    { head: [32, 110], hip: [90, 94], knee: [98, 114], ankle: [88, 124], el: [18, 108], ha: [4, 112] },
+  ],
 };
 function exAnim(pattern) {
   const p = POSES[pattern] || POSES.squat;
@@ -4154,6 +4231,115 @@ function openExDemo(slug, name) {
 function wireExDemos() {
   document.querySelectorAll("[data-exdemo]").forEach((b) => b.onclick = (ev) => { ev.stopPropagation(); openExDemo(b.dataset.exdemo, b.dataset.exname || ""); });
 }
+// ---- The optional post-run stretch session ---------------------------------
+// Offered from the debrief, in place of the cool-down jog the low-intensity runs used to prescribe
+// (owner's decision, 2026-08-03). Deliberately OPTIONAL: it is not a session, it is not logged, it does
+// not appear in the plan and it costs no training volume. Skipping it is a complete answer.
+//
+// ⚠️ THE SLOT ABOVE THE LIST IS FOR THE OWNER'S DEMONSTRATION VIDEO. Set STRETCH_VIDEO to a file the
+// build copies into docs/ and it renders in place of the placeholder — nothing else needs touching. It
+// stays a placeholder rather than an <iframe> or a remote URL because the app ships with no external
+// network assets, which is a rule the whole page depends on for offline use.
+const STRETCH_VIDEO = "";
+let STRETCH = null;
+function stretchHoldRows() {
+  return RC.STRETCHES.map((s) => ({
+    name: s.name,
+    primary: s.area,
+    cue: s.cue,
+    pattern: s.pattern,
+    hold: s.bothSides ? (s.seconds + " secs each side") : (s.seconds + " secs"),
+  }));
+}
+function stretchVideoHtml() {
+  if (STRETCH_VIDEO) {
+    return '<video class="str-vid" src="' + STRETCH_VIDEO + '" controls playsinline preload="metadata"></video>';
+  }
+  return '<div class="str-vid str-vid-soon"><span class="str-vid-ic">' + ICON.play + '</span>' +
+    '<span>Demonstration video coming here</span></div>';
+}
+function stretchSheetHtml() {
+  const total = RC.stretchTotalSeconds();
+  const rows = stretchHoldRows();
+  return '<h3 class="sh-t">Stretch it out</h3>' +
+    '<div class="str-head"><div class="str-clock" id="strClock">0:00 <span>/ ' + fmtPace(total) + '</span></div>' +
+    '<div class="str-bar"><i id="strBar"></i></div></div>' +
+    stretchVideoHtml() +
+    '<p class="muted str-intro">' + esc(RC.STRETCH_INTRO) + '</p>' +
+    '<div class="ex-list str-list" id="strList">' +
+    rows.map((e, i) => '<div class="str-item" data-si="' + i + '">' + exerciseBlock("stretch", i, e) + '</div>').join("") +
+    '</div>' +
+    // ⚠️ mini-btn is an EXISTING class. The first cut invented a "ghost" class that does not exist in
+    // this stylesheet, so the button rendered as an unstyled browser default and the primary's flex: 1
+    // squeezed it to a 48px column with its label wrapped.
+    '<div class="str-foot"><button class="primary" id="strGo">' + ICON.play + ' Start</button>' +
+    '<button class="mini-btn str-done" id="strDone">Done</button></div>';
+}
+function openStretchSheet() {
+  ensureSheet();
+  $("sheetBody").innerHTML = stretchSheetHtml();
+  wireExDemos();
+  wireStretchSheet();
+  $("sheetOv").classList.add("on");
+}
+// ⚠️ The player counts through the HOLDS, not the stretches — a both-sides stretch is two holds, and
+// RC.stretchHolds is what the on-screen total is derived from too, so the clock and the list cannot
+// disagree about how long the routine takes.
+function wireStretchSheet() {
+  const holds = RC.stretchHolds();
+  const total = RC.stretchTotalSeconds();
+  STRETCH = { holds: holds, i: 0, left: holds.length ? holds[0].seconds : 0, done: 0, timer: null };
+  const go = $("strGo"), doneBtn = $("strDone");
+  if (doneBtn) doneBtn.onclick = () => closeSheet();
+  if (go) go.onclick = () => (STRETCH && STRETCH.timer) ? stretchPause() : stretchPlay();
+  stretchPaint();
+  function stretchPaint() { strPaint(total); }
+}
+function strPaint(total) {
+  const S = STRETCH; if (!S) return;
+  const clock = $("strClock"), bar = $("strBar"), go = $("strGo");
+  const elapsed = Math.min(total, S.done + (S.holds[S.i] ? S.holds[S.i].seconds - S.left : 0));
+  if (clock) clock.innerHTML = fmtPace(elapsed) + ' <span>/ ' + fmtPace(total) + '</span>';
+  if (bar) bar.style.width = (total ? (elapsed / total) * 100 : 0) + "%";
+  if (go) go.innerHTML = S.timer ? (ICON.timer + " Pause") : (S.i >= S.holds.length ? (ICON.play + " Again") : (ICON.play + " Start"));
+  document.querySelectorAll(".str-item").forEach((n) => n.classList.remove("on"));
+  const cur = S.holds[S.i];
+  if (!cur) return;
+  const idx = RC.STRETCHES.findIndex((x) => x.id === cur.stretch.id);
+  const node = document.querySelector('.str-item[data-si="' + idx + '"]');
+  if (!node) return;
+  node.classList.add("on");
+  let tag = node.querySelector(".str-now");
+  if (!tag) { tag = el('<div class="str-now"></div>'); node.appendChild(tag); }
+  tag.textContent = (cur.side ? (cur.side === "left" ? "Left side — " : "Right side — ") : "") + S.left + "s left";
+}
+function stretchPlay() {
+  const S = STRETCH; if (!S || !S.holds.length) return;
+  if (S.i >= S.holds.length) { S.i = 0; S.done = 0; S.left = S.holds[0].seconds; }
+  if (S.timer) return;
+  S.timer = setInterval(() => {
+    const T = STRETCH; if (!T) return;
+    T.left--;
+    if (T.left <= 0) {
+      T.done += T.holds[T.i].seconds;
+      T.i++;
+      if (T.i >= T.holds.length) { stretchPause(); T.left = 0; strPaint(RC.stretchTotalSeconds()); stretchFinish(); return; }
+      T.left = T.holds[T.i].seconds;
+      if (navigator.vibrate) navigator.vibrate(60);
+    }
+    strPaint(RC.stretchTotalSeconds());
+  }, 1000);
+  strPaint(RC.stretchTotalSeconds());
+}
+function stretchPause() { const S = STRETCH; if (S && S.timer) { clearInterval(S.timer); S.timer = null; } strPaint(RC.stretchTotalSeconds()); }
+// ⚠️ Called from closeSheet as well, or the interval keeps ticking behind a dismissed sheet — and the
+// next open would then run two of them.
+function stretchStop() { const S = STRETCH; if (S && S.timer) { clearInterval(S.timer); S.timer = null; } STRETCH = null; }
+function stretchFinish() {
+  const list = $("strList");
+  if (list && !$("strFin")) list.insertAdjacentHTML("afterend", '<p class="str-fin" id="strFin">That is the lot. Nicely done.</p>');
+  if (navigator.vibrate) navigator.vibrate([60, 80, 60]);
+}
 // ---- Strength logging (weights & reps, saved locally) ----------------------
 function loadSlog() { try { return JSON.parse(localStorage.getItem("interun_slog") || "{}"); } catch (e) { return {}; } }
 function slogSet(key, field, val) {
@@ -4163,7 +4349,19 @@ function slogSet(key, field, val) {
   if (!Object.keys(s[key]).length) delete s[key];
   localStorage.setItem("interun_slog", JSON.stringify(s));
 }
+// ⚠️ ONE RENDERER, TWO MODES — an exercise is prescribed as sets x reps and gets weight/reps boxes to
+// log into; a STRETCH is prescribed as a hold and has nothing to log. Everything else about the row is
+// the same (the animated demo, the name, the area, the cue), so a stretch carries a hold field and takes the
+// same path rather than getting a parallel list renderer that would drift from this one within a release.
 function exerciseBlock(sessId, ei, e) {
+  if (e.hold) {
+    const sec = e.secondary && e.secondary.length ? ' <span class="ex-sec">· ' + e.secondary.map(esc).join(", ") + '</span>' : "";
+    return '<div class="ex"><div class="ex-anim">' + exVisual(e) + '</div>' +
+      '<div class="ex-main"><div class="ex-name">' + esc(e.name) + '</div>' +
+      '<div class="ex-mus"><b>' + esc(e.primary) + '</b>' + sec + '</div>' +
+      '<div class="ex-presc">' + esc(e.hold) + '</div></div></div>' +
+      '<div class="ex-cue">' + esc(e.cue) + '</div>';
+  }
   const log = loadSlog();
   const setRows = [];
   for (let i = 0; i < e.sets; i++) {
@@ -4400,7 +4598,7 @@ function openSessionSheet(sess, week) {
   wireSheet();
   $("sheetOv").classList.add("on");
 }
-function closeSheet() { const o = $("sheetOv"); if (o) o.classList.remove("on"); WX_SHEET_OPEN = false; }
+function closeSheet() { stretchStop(); const o = $("sheetOv"); if (o) o.classList.remove("on"); WX_SHEET_OPEN = false; }
 // Wire every element carrying data-open to open its session detail (keyed by stable session id).
 function wireSessionTaps() {
   document.querySelectorAll("[data-open]").forEach((b) => b.onclick = () => {
@@ -7568,9 +7766,23 @@ function runOverviewHtml(run) {
     head + ovStatsHtml(run, a) + '</div>' +
     '<button class="primary share-btn" id="shareRun">' + ICON.share + ' Share my run</button>' +
     runDebrief(run, a) +
+    stretchOfferHtml() +
     runDescriptionHtml(run) +
     runHrHtml(run) +
     runNoteHtml(run);
+}
+// The offer that replaced the prescribed cool-down jog. It lives HERE, in the one debrief builder, so it
+// appears on the finish screen AND on the same run reopened from the Logbook — that screen's standing
+// rule, and the reason the finish screen used to disagree with the logbook about the same run.
+// ⚠️ It reads as an invitation, not a chore, and it may not claim more than it does: no injury
+// prevention, no performance claim. See src/science/stretches.ts and test/stretches.test.ts.
+function stretchOfferHtml() {
+  return '<button class="card str-offer" id="strOffer">' +
+    '<span class="str-offer-ic">' + ICON.timer + '</span>' +
+    '<span class="str-offer-b"><span class="str-offer-t">Stretch it out</span>' +
+    '<span class="str-offer-d">' + RC.STRETCHES.length + ' stretches, about ' +
+    Math.round(RC.stretchTotalSeconds() / 60) + ' minutes, while you are still warm. Optional.</span></span>' +
+    '<span class="str-offer-go">' + ICON.chevDown + '</span></button>';
 }
 // ---- Shareable branded run card -------------------------------------------
 // The run whose overview is on screen right now (completion screen or Activities detail).
@@ -8831,6 +9043,9 @@ function wire() {
   wireSwipes();
   const runBack = $("runBack"); if (runBack) runBack.onclick = () => { state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); };
   const shareRun = $("shareRun"); if (shareRun) { shareRun.onclick = doShareRun; prepareShareCard(currentOverviewRun()); }
+  // The stretch offer sits in runOverviewHtml, so this one wiring serves the finish screen and the
+  // Logbook's detail view alike — the same reason the offer itself lives in that one builder.
+  const strOffer = $("strOffer"); if (strOffer) strOffer.onclick = openStretchSheet;
   // Notes save as you type, debounced. No Save button: a note you have to remember to save is a
   // note that gets lost, and there is nothing here worth confirming.
   const runNote = $("runNote");

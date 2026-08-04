@@ -1279,9 +1279,9 @@ session, not none. Do not delete them.
 ⚠️ **Re-record the simulation videos** (`/Volumes/Adam/Inter-Run`, harness in the session scratchpad) —
 every one of the 92 shows the old timing.
 
-## ⚠️ NEXT: THE COOL-DOWN BECOMES AN OPTIONAL STRETCH SESSION (owner, 2026-08-03)
+## THE COOL-DOWN IS NOW AN OPTIONAL STRETCH SESSION (owner 2026-08-03, shipped 2026-08-04)
 
-Not built. He asked for the prescribed cool-down jog to go, replaced by an **optional stretch session
+He asked for the prescribed cool-down jog to go, replaced by an **optional stretch session
 linked from the debrief card** — tap it and you get suggested stretches for runners, with a short
 demonstration video he will embed later.
 
@@ -1293,17 +1293,85 @@ sell it as a volume lever; it is a coaching change (a stretch at the end beats a
 ⚠️ **Ship the replacement in the same change as the removal.** Taking the cool-down out on its own leaves
 the runner with neither a jog nor a stretch — worse than today.
 
-Build notes:
-- `framedRun` drops `easeDown` (and `FRAME_COOL_MIN`); several templates append their own cool-down step
-  directly (`cooldown(paces, 10)` in the threshold/vo2 pools) — decide whether those go too, or whether
-  only the low-intensity framed runs lose theirs. The owner's screenshots are of an easy session.
-- The stretch list belongs beside the existing exercise machinery: `exerciseBlock` already renders an
-  animated demo per movement, and the strength sessions already carry `exercises`. Reuse it rather than
-  writing a second list renderer, and leave a slot for his video above the list.
-- The link lives on the debrief (`runOverviewHtml`), so it appears on the finish screen AND in the
-  Logbook — one builder, both places, which is that screen's existing rule.
-- ⚠️ `test/warmup-delivery.test.ts` asserts every run reaches a cool-down for sessions containing work.
-  That assertion becomes wrong; replace it with one that asserts the stretch session is OFFERED.
+**The rule that came out of building it, and it is the useful half:** ⚠️ **A RUN THAT FINISHES EASY LOSES
+ITS COOL-DOWN; A RUN THAT FINISHES ON WORK KEEPS ITS JOG.** Read from the LAST STEP's own effort, never
+from the session type or from `opts`, so a new format cannot be added without this deciding correctly for
+it. The line sits at **RPE 5**: ending at the aerobic/moderate gear (4) is still conversational and needs
+nothing after it, while steady and above is work. Drawn at 4 instead, "easy → moderate finish" was handed
+a cool-down jog it does not need — reinstating the exact padding this change exists to remove.
+
+So: `framedRun` no longer appends anything (its named minutes are the WORK, so the outing is 4 minutes
+shorter and the named time is untouched); plain long runs give their cool-down minutes back to their own
+easy running; and every threshold / VO2 / race-specific pool, plus a structured long run finishing at goal
+pace, still appends `cooldown(paces, 10)`. Ten minutes of jogging down from maximal intervals is a real
+change of effort; an "ease down" at easy pace at the end of an easy run was the same effort under a
+different label. The stretch session is offered after **every** run either way, so nothing is taken from
+anybody.
+
+⚠️ **THREE SESSIONS ENDED ON A SPRINT, AND ONLY A SWEEP FOUND THEM.** The strides and hill-sprint builders
+deliberately had no recovery after the LAST repetition — "no trailing one because the ease-down follows".
+Remove the ease-down and `easy + strides` ended on a 20-second stride at repetition pace, `easy + hill
+sprints` on a maximal 10-second hill sprint at RPE 8, and `moderate + strides` on an 80 m stride at RPE 9,
+each with nothing whatever after it. All three now carry a trailing walk-back, **carved out of the easy
+portion** exactly as the between-rep recoveries already are, so no session's total moves. `strides()`
+takes a `trailing` flag which is **off by default on purpose** — the quality formats have a ten-minute jog
+after their strides, and adding a walk-back there would inflate sessions whose length feeds the volume
+model.
+
+⚠️ **`body` MUST KEEP THE COOL-DOWN'S MINUTES OUT OF THE LONG RUN'S DOSE MATHS.** Every long-run branch
+sizes its race-pace work as a fraction of `body` (0.25 and 0.35 in the progressive, the leftover lead-in
+in the blocks). Folding the freed minutes into `body` to "give them back to the easy running" instead grew
+every DOSE proportionally — measured, that put a 3-day competitive half's week 9 at **67.3% easy** and broke
+the polarized floor. The minutes are added at the END, where they can only land on easy running, and every
+dose is byte-identical to before.
+
+**Measured over 640 profiles / 19,200 weeks, against the Part 4 baseline:**
+- long run not the longest run of its week: **34.2% → 30.0%** — a 4.2-point improvement, because the easy
+  runs each lost four minutes while the long run kept its whole outing. The best result yet on the defect
+  the progression audit is meant to address.
+- week one within 1.10× stated: **90.0% → 88.5%**, and worst case 1.59× → 1.63×
+- weeks under the intensity floor: **5 → 6**; worst easy fraction 64.6% → 64.1%
+
+⚠️ **THAT ANCHORING COST IS AN ACCOUNTING ARTEFACT, AND THE OWNER SHOULD SETTLE IT.** Real time on feet went
+DOWN (every framed run is four minutes shorter; no run got longer). The counted figure went UP only because
+a plain long run's last few minutes moved from `cooldown` — which `isPreparationStep` excludes — into the
+easy running, where they count. Both readings are defensible: those minutes are easy running and arguably
+always should have counted, or they should stay excluded because nothing about the run changed except a
+label. If he wants the 90.0% held, moving them into `easeIn` instead of the easy body keeps them excluded
+and is a one-line change. Not chosen unilaterally, because it is his stated mileage that the number means.
+
+**Build record:**
+- `src/science/stretches.ts` — six stretches, hold times, cues, ordering, `stretchTotalSeconds` and
+  `stretchHolds`; exported via `web/entry.ts`. ⚠️ `seconds` is ONE hold and the total counts both sides, or
+  the routine advertises half the time it takes and the player runs past its own total.
+- ⚠️ **The copy may not claim injury prevention or a performance benefit**, and `test/stretches.test.ts`
+  fails on either. Static stretching after running is neither; it is range of movement and it feels good.
+  Same rule `test/warmup.test.ts` already enforces on the warm-up copy — this sits beside a RED-S screen,
+  and a claim we cannot defend costs the runner's trust in everything else the app says.
+- `exerciseBlock` gained a **hold mode** rather than a second list renderer: a stretch carries `hold`, and
+  gets the same animated demo, name, area and cue with no sets and no weight boxes to log into.
+- Six new `POSES` entries so each stretch has its own silhouette. ⚠️ `exAnim` falls back to `POSES.squat`
+  for an unknown pattern **silently**, so a typo draws six identical squats rather than failing; the test
+  reads the poses out of the built page and asserts every pattern exists. ⚠️ Lying poses need their limbs
+  to RADIATE — at a 9-10px limb stroke a torso and two legs within a dozen pixels of the same y merge into
+  one dark mass, which is how the glute and child's-pose figures first shipped.
+- The offer lives in `runOverviewHtml`, so the finish screen and the Logbook carry it from one builder.
+  `STRETCH_VIDEO` is the slot for his demonstration video — set it to a file the build copies into `docs/`
+  and it renders in place of the placeholder. It stays a placeholder rather than a remote URL because the
+  page ships with no external network assets.
+- The guided player counts through the HOLDS (a both-sides stretch is two), and `closeSheet` calls
+  `stretchStop()` — without it the interval keeps ticking behind a dismissed sheet and the next open runs
+  two of them.
+- ⚠️ `test/warmup-delivery.test.ts`'s cool-down assertion was **replaced, not deleted**: it now asserts the
+  offer is built, is called from `runOverviewHtml`, is wired to a handler, and that any session finishing
+  above RPE 4 still reaches a jog. It is what caught all three sprint-ending sessions.
+
+⚠️ **THE BACKTICK RULE FIRED TWICE MORE IN THIS ONE CHANGE — and the second time it hid.** Both were in
+comments inside the runtime JS. The first stopped the build outright. The second was worse: `node web/app.ts`
+exited non-zero, the `&& echo` guard meant no success line was printed, and the `node --check` step that
+followed happily reported OK **on the previous build** — so the browser was serving a stale page while every
+check looked green. Read the build's exit code before trusting anything after it; that is why the rule is
+written down.
 
 ## ⚠️ NEXT: REVIEW THE SESSIONS FOR GENUINE PROGRESSION (owner, 2026-08-03)
 
@@ -1333,6 +1401,11 @@ distance so the trees are comparable:
 | `ed9140b` — before the named-time work | **32.7%** |
 | `cbe815f` — after it, before the easy ramp | **40.1%** (+7.4 pts) |
 | with the easy-run ramp (2026-08-04) | **37.6%** (−2.5 pts recovered) |
+| with the cool-down removed (2026-08-04) | **30.0%** (−7.6 pts more — better than before any of this) |
+
+⚠️ **The cool-down removal has already improved this more than anything else tried**, and by accident
+rather than by design: the framed easy runs each lost four minutes while the long run kept its whole
+outing. It is now BELOW the pre-named-time baseline. Re-measure before deciding how much is left to fix.
 
 So there is a large pre-existing defect (a third of all weeks) which the named-time change worsened and the
 easy ramp partly repaired. Two causes, and they need separating before anything is changed:

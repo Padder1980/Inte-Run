@@ -108,22 +108,24 @@ function cooldown(paces: TrainingPaces, minutes: number): WorkoutStep {
   };
 }
 
-// A softer opening/closing for easy & long runs — same easy pace as the run itself, just a labelled
-// "ease in" and "ease down" so every session shares a warm-up → main → cool-down shape (which also
-// gives the live session and voice coaching a consistent start and finish).
+// A softer opening for easy & long runs — same easy pace as the run itself, just a labelled "ease in"
+// so every session shares a consistent start for the live session and the voice coaching.
+//
+// ⚠️ THERE IS NO LONGER AN `easeDown` COUNTERPART (owner's decision, 2026-08-03). The prescribed
+// cool-down jog on the LOW-INTENSITY runs is gone, replaced by the optional stretch session offered on
+// the post-run debrief. At the end of an easy run an "ease down" was prescribed at easy pace inside a
+// run that was already easy — the same effort under a different label, which is a name for the last
+// four minutes rather than a change of anything.
+//
+// ⚠️ THE HARD SESSIONS KEEP THEIRS, and that is deliberate rather than an oversight. `cooldown()`
+// below is still appended by every threshold / VO2 / race-specific pool. Ten minutes of jogging after
+// maximal intervals is a genuine change of effort doing genuine work; stepping straight from 5 km pace
+// to standing still is not the same proposition as easing off an easy run. The stretch session is
+// offered after EVERY run either way, so nothing is taken away from anybody.
 function easeIn(paces: TrainingPaces, minutes: number): WorkoutStep {
   return {
     kind: "warmup",
     label: "Ease in — start gently and let the pace come to you",
-    durationSeconds: minutes * 60,
-    targetPaceSecPerKm: paces.easy,
-    targetRpe: RPE.easy,
-  };
-}
-function easeDown(paces: TrainingPaces, minutes: number): WorkoutStep {
-  return {
-    kind: "cooldown",
-    label: "Ease down — relax the pace and let your breathing settle",
     durationSeconds: minutes * 60,
     targetPaceSecPerKm: paces.easy,
     targetRpe: RPE.easy,
@@ -150,15 +152,18 @@ function easeDown(paces: TrainingPaces, minutes: number): WorkoutStep {
  * 20-minute recovery jog 3, which is backwards — the long run is the one already warm by minute five.
  */
 const FRAME_WARM_MIN = 5;
-const FRAME_COOL_MIN = 4;
 
+// ⚠️ NO CLOSING FRAME ANY MORE — see the note on `easeIn`. The named minutes are the WORK, so removing
+// the ease-down shortens the OUTING by four minutes and leaves the named time untouched, which is the
+// correct pairing: the runner still gets the 38 minutes at moderate the title promises. Training volume
+// does not move at all, because `isPreparationStep` never counted a cool-down as load.
 function framedRun(
   paces: TrainingPaces,
   workMin: number,
   buildMiddle: (midMin: number) => WorkoutStep[],
 ): WorkoutStep[] {
   if (workMin < 10) return buildMiddle(workMin);
-  return [easeIn(paces, FRAME_WARM_MIN), ...buildMiddle(workMin), easeDown(paces, FRAME_COOL_MIN)];
+  return [easeIn(paces, FRAME_WARM_MIN), ...buildMiddle(workMin)];
 }
 
 export function easyRun(
@@ -172,7 +177,14 @@ export function easyRun(
   // asked for it and there was no number to show), and the live session counted through it as two
   // unbroken minutes at repetition pace — 3:49/km for 120 seconds straight, which is not the
   // prescription. Emitted the same way as hillReps and the session builder: one step per repetition,
-  // a recovery between, no trailing one because the ease-down follows.
+  // with a recovery between.
+  //
+  // ⚠️ THE LAST STRIDE NOW GETS A WALK-BACK TOO, and it must. There deliberately was no trailing
+  // recovery here "because the ease-down follows" — and then the ease-down was removed (owner, 2026-08-03),
+  // which left the session ENDING on a 20-second effort at repetition pace with nothing after it at all.
+  // Caught by the delivery sweep, not by eye: an easy run is supposed to finish easy, and a run whose
+  // final step is a sprint is both bad coaching and the one case that would have needed a cool-down jog
+  // adding back. It is still carved OUT of the easy portion below, so the session's total does not move.
   const STRIDE_SEC = 20, STRIDE_REPS = 6, STRIDE_REC_SEC = 60;
   const strideSteps: WorkoutStep[] = [];
   if (withStrides) {
@@ -186,17 +198,17 @@ export function easyRun(
         repeatIndex: i,
         repeatCount: STRIDE_REPS,
       });
-      if (i < STRIDE_REPS) {
-        strideSteps.push({
-          kind: "recovery",
-          label: "Walk back or jog easy — full recovery, until your breathing is back",
-          durationSeconds: STRIDE_REC_SEC,
-          // A walk-back is easier than easy running, and the band is what the debrief judges it by.
-          targetRpe: { min: 1, max: 2 },
-          repeatIndex: i,
-          repeatCount: STRIDE_REPS,
-        });
-      }
+      strideSteps.push({
+        kind: "recovery",
+        label: i < STRIDE_REPS
+          ? "Walk back or jog easy — full recovery, until your breathing is back"
+          : "Walk or jog easy to finish — let your breathing settle",
+        durationSeconds: STRIDE_REC_SEC,
+        // A walk-back is easier than easy running, and the band is what the debrief judges it by.
+        targetRpe: { min: 1, max: 2 },
+        repeatIndex: i,
+        repeatCount: STRIDE_REPS,
+      });
     }
   }
   // ⚠️ The recovery is TAKEN OUT OF THE EASY PORTION, not added on top. The session already ran two
@@ -214,13 +226,13 @@ export function easyRun(
       targetPaceSecPerKm: paces.easy,
       targetRpe: RPE.easy,
     },
-    // Relaxed strides come after the easy portion, before the ease-down jog to finish.
+    // Relaxed strides come after the easy portion, and the last walk-back is what finishes the run.
     ...strideSteps,
   ]);
   return assemble(
     withStrides ? "strides" : "easy",
     withStrides ? `${minutes}′ easy + strides` : `${minutes}′ easy run`,
-    "Foundation aerobic running. Ease in, settle into a conversational rhythm, then ease down to finish.",
+    "Foundation aerobic running. Ease in and settle into a conversational rhythm to the finish.",
     "easy",
     steps,
     RPE.easy,
@@ -241,7 +253,9 @@ export function easyRun(
 export function moderateRun(paces: TrainingPaces, minutes: number, withStrides = false): SessionContent {
   const steps = framedRun(paces, minutes, (mid) => [
     block({ label: "Moderate — quicker than easy, still comfortable", minutes: mid, pace: paces.aerobic, rpe: RPE.aerobic }),
-    ...(withStrides ? strides(5, { distanceMeters: 80, pace: paces.rep }, { durationSeconds: 60, pace: paces.easy }) : []),
+    // ⚠️ `trailing` — the strides are the last thing here, and with the ease-down gone the session would
+    // otherwise end on an 80 m stride at repetition pace with nothing after it.
+    ...(withStrides ? strides(5, { distanceMeters: 80, pace: paces.rep }, { durationSeconds: 60, pace: paces.easy }, undefined, true) : []),
   ]);
   return assemble(
     "easy",
@@ -429,15 +443,20 @@ export function easyHillStrides(paces: TrainingPaces, minutes: number): SessionC
   // — `audit-reps.ts` swept 3,378 sessions and found no other block with a prose-only recovery.
   // 45 seconds is the owner's call (2026-08-03), and it suits the effort: a 10-second maximal hill
   // sprint is about power, so the recovery exists to make the NEXT one as good as the last.
+  // ⚠️ THE LAST SPRINT GETS ITS WALK BACK DOWN TOO — same reason as the strides. There was no trailing
+  // recovery because the ease-down used to follow; with that gone (owner, 2026-08-03) the session ended
+  // on a maximal 10-second hill sprint at RPE 8 with nothing after it, which is the one shape that would
+  // have needed the cool-down jog reinstating. You have to walk back down the hill regardless — it was
+  // always going to happen, it simply was not written down.
   const SPRINT_SEC = 10, SPRINT_REPS = 6, SPRINT_REC_SEC = 45;
   const hills: WorkoutStep[] = [];
   for (let i = 1; i <= SPRINT_REPS; i++) {
     hills.push({ kind: "rep", label: `${SPRINT_SEC}″ hill sprint — short and powerful, tall and driving`,
       durationSeconds: SPRINT_SEC, targetRpe: { min: 7, max: 8 }, repeatIndex: i, repeatCount: SPRINT_REPS });
-    if (i < SPRINT_REPS) {
-      hills.push({ kind: "recovery", label: "Walk back down — full recovery before the next one",
-        durationSeconds: SPRINT_REC_SEC, targetRpe: { min: 1, max: 2 }, repeatIndex: i, repeatCount: SPRINT_REPS });
-    }
+    hills.push({ kind: "recovery",
+      label: i < SPRINT_REPS ? "Walk back down — full recovery before the next one"
+        : "Walk back down and let your breathing settle",
+      durationSeconds: SPRINT_REC_SEC, targetRpe: { min: 1, max: 2 }, repeatIndex: i, repeatCount: SPRINT_REPS });
   }
   // ⚠️ The walk-backs come OUT of the easy portion, not on top of it — the same rule as the strides.
   // estimatedDurationSeconds feeds the volume and intensity models, so adding three and a half minutes
@@ -451,7 +470,7 @@ export function easyHillStrides(paces: TrainingPaces, minutes: number): SessionC
   return assemble(
     "strides",
     `${minutes}′ easy + hill sprints`,
-    "Easy running plus a handful of short, sharp uphill sprints — big power and economy benefit for very little fatigue — then ease down to finish. Full recovery between; quality, not burn.",
+    "Easy running plus a handful of short, sharp uphill sprints — big power and economy benefit for very little fatigue. Full recovery between; quality, not burn.",
     "easy",
     steps,
     RPE.easy,
@@ -519,10 +538,17 @@ export function longRun(
 ): SessionContent {
   const warm = Math.min(8, Math.max(4, Math.round(minutes * 0.1)));
   const cool = Math.min(6, Math.max(3, Math.round(minutes * 0.08)));
+  // ⚠️ `body` KEEPS THE COOL-DOWN'S MINUTES OUT OF THE DOSE MATHS, and that is load-bearing. Every
+  // branch below sizes its race-pace work as a fraction of `body` (0.25 and 0.35 in the progressive,
+  // the leftover lead-in in the blocks), so folding the cool-down's minutes in here to "give them back
+  // to the easy running" instead grew every DOSE proportionally — measured, that put a 3-day
+  // competitive half's week 9 at 67.3% easy and broke the polarized floor. The minutes are given back
+  // at the END instead, where they can only ever land on easy running. Doses are byte-identical to
+  // before the cool-down was removed.
   const body = Math.max(1, minutes - warm - cool);
   const steps: WorkoutStep[] = [easeIn(paces, warm)];
   let description =
-    "Long run develops durability: holding economy and mechanics under accumulated fatigue. Ease in, hold an easy rhythm, then ease down to finish.";
+    "Long run develops durability: holding economy and mechanics under accumulated fatigue. Ease in, then hold an easy rhythm to the finish.";
   const easyStep = (min: number): WorkoutStep => ({
     kind: "steady",
     label: "Easy aerobic running — build durability",
@@ -616,7 +642,31 @@ export function longRun(
       description += " Finishes steady, not as a race.";
     }
   }
-  steps.push(easeDown(paces, cool));
+  // ⚠️ A RUN THAT FINISHES EASY LOSES ITS COOL-DOWN; A RUN THAT FINISHES WITH WORK KEEPS ITS JOG.
+  // The owner's decision removes the prescribed cool-down from the low-intensity running, and a plain
+  // long run is exactly that — its last few minutes were easy pace inside a run that was already easy,
+  // so they simply become part of the easy running and the stretch session takes it from there. But a
+  // progressive long run ends at goal pace and a blocks long run ends on a race-pace repeat: stopping
+  // dead there is the same proposition as stopping dead after intervals, which is why the threshold and
+  // VO2 pools keep `cooldown()` too. Read from the LAST STEP's own effort rather than from `opts`, so a
+  // new long-run format cannot be added without this deciding correctly for it.
+  // ⚠️ Either way the outing is `minutes` long, because the title is built from it — a "69′ long run"
+  // delivering 63 minutes would be the title lying about the session.
+  // ⚠️ THE LINE IS AT RPE 5, NOT 4. A long run finishing at the aerobic/moderate gear is still
+  // conversational — you can stop and stretch after it. From steady upwards (a goal-pace finish, a
+  // race-pace repeat) it is work, and work gets jogged down. Drawn at 4 instead, an "easy → moderate
+  // finish" was handed a cool-down jog it does not need, which is the very padding this change removes.
+  const last = steps[steps.length - 1];
+  const finishesGently = (last?.targetRpe?.max ?? 0) <= RPE.aerobic.max;
+  if (finishesGently) {
+    // Give the minutes to the easy running that is already there rather than appending a second easy
+    // step saying almost the same thing.
+    if (last) last.durationSeconds = (last.durationSeconds ?? 0) + cool * 60;
+    else steps.push(easyStep(cool));
+  } else {
+    steps.push(cooldown(paces, cool));
+    description += " Jog easy at the end — that finish is real work, and it needs winding down.";
+  }
   const title = `${minutes}′ long run` + (opts.titleSuffix ? ` ${opts.titleSuffix}` : "");
   // ⚠️ The session's intended-effort band must SPAN the work, or the debrief calls a perfect
   // execution overcooked: plannedRpeBandOf short-circuits on the session band, so a runner who ran
@@ -1503,8 +1553,17 @@ function gears(blocks: Array<{ label: string; minutes: number; pace: PaceRange; 
   }));
 }
 
-/** Relaxed fast strides, usually tacked on the end of a session. */
-function strides(count: number, work: RepSpec, rec: RepSpec, label?: string): WorkoutStep[] {
+/**
+ * Relaxed fast strides, usually tacked on the end of a session.
+ *
+ * ⚠️ `trailing` adds a recovery AFTER the last stride, and it is off by default on purpose. In the
+ * quality formats a ten-minute cool-down jog follows the strides, so a trailing walk-back would be
+ * redundant AND would add distance to a session whose length feeds the volume model. It is needed only
+ * where the strides are the last thing in the session — which, since the ease-down was removed
+ * (owner, 2026-08-03), is any low-intensity run that carries them. `test/warmup-delivery.test.ts`
+ * catches the case, so a new caller cannot get this wrong silently.
+ */
+function strides(count: number, work: RepSpec, rec: RepSpec, label?: string, trailing = false): WorkoutStep[] {
   const steps: WorkoutStep[] = [];
   for (let i = 1; i <= count; i++) {
     steps.push({
@@ -1517,10 +1576,10 @@ function strides(count: number, work: RepSpec, rec: RepSpec, label?: string): Wo
       repeatIndex: i,
       repeatCount: count,
     });
-    if (i < count) {
+    if (i < count || trailing) {
       steps.push({
         kind: "recovery",
-        label: "Walk back / easy jog, full recovery",
+        label: i < count ? "Walk back / easy jog, full recovery" : "Easy jog to finish — let your breathing settle",
         durationSeconds: rec.durationSeconds,
         distanceMeters: rec.distanceMeters,
         targetPaceSecPerKm: rec.pace,

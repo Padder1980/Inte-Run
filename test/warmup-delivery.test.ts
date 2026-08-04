@@ -145,7 +145,20 @@ test("the card never says the work starts early when it does not", () => {
   }
 });
 
-test("every run walks the runner from a warm-up through to a cool-down", () => {
+test("every run warms up, and the stretch session is offered after all of them", () => {
+  // ⚠️ THIS REPLACED "…through to a cool-down" (owner's decision, 2026-08-03). The prescribed cool-down
+  // jog is gone from the LOW-INTENSITY runs, so asserting every working run reaches a `cooldown` step
+  // now asserts the opposite of the design. What must hold instead is that nobody is left with neither
+  // a jog nor a stretch: the hard sessions keep their jog, and the stretch session is offered after
+  // every run there is — from `runOverviewHtml`, so the finish screen and the Logbook both carry it.
+  const html = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
+  assert.match(html, /function stretchOfferHtml\(/, "the stretch offer is not in the build");
+  const overview = lift("runOverviewHtml");
+  assert.match(overview, /stretchOfferHtml\(\)/,
+    "the offer is not called from runOverviewHtml — the finish screen and the Logbook would disagree");
+  assert.match(html, /strOffer[\s\S]{0,400}?onclick = openStretchSheet/,
+    "the offer is rendered but never wired, so tapping it would do nothing");
+
   for (const ability of ["new", "intermediate"]) {
     ABILITY = ability;
     for (const [where, sess] of everySession()) {
@@ -153,17 +166,30 @@ test("every run walks the runner from a warm-up through to a cool-down", () => {
       if (!w || w.incomplete) continue;
       const steps: any[] = withGeneratedWarmup(sess).steps || [];
       assert.ok(steps.some((s) => s.kind === "warmup"), `${where}: no warm-up step`);
-      // ⚠️ Scoped to sessions that contain WORK. A 40-minute recovery jog is easy from start to
-      // finish; demanding it ease down from nothing is a made-up rule, and asserting it would have
-      // forced a pointless step into the gentlest session in the plan.
-      const hasWork = steps.some((s) => s.kind === "rep"
-        || (s.kind !== "warmup" && s.targetRpe && s.targetRpe.max >= 4));
+      // ⚠️ THE RULE IS ABOUT HOW A SESSION FINISHES, NOT HOW HARD IT IS. A run that ends easy needs no
+      // wind-down — that is the whole point of removing the ease-down. A run that ends ON WORK does:
+      // stopping dead after intervals, or after the goal-pace finish of a progressive long run, is a
+      // different proposition from easing off an easy run, which is why the threshold/VO2 pools and the
+      // structured long runs still carry cooldown().
+      // ⚠️ Stated from the runner's side — "what is the last thing this session asks of me?" — rather
+      // than by session type. Written as a type check it would have missed the defect it actually
+      // caught: with the ease-down gone, "easy + strides" ended on a 20-second stride at repetition
+      // pace with nothing after it at all.
       // ⚠️ RACE DAY IS EXEMPT, AND KNOWINGLY SO. applyRaceDay builds a warm-up plus the race and puts
-      // rest after it — there is no cool-down step in the plan by design. Whether a goal race should
-      // prescribe one is a coaching decision for the owner, not something to slip in under a test.
+      // rest after it. Whether a goal race should prescribe a cool-down is a coaching decision for the
+      // owner, not something to slip in under a test.
+      // ⚠️ THE LINE IS AT RPE 5. Ending at the aerobic/moderate gear (4) is still conversational and
+      // needs nothing after it; from steady upwards it is work. Drawn at 4, this demanded a cool-down
+      // jog after "easy → moderate finish" — reinstating exactly the padding the change removes.
+      const CONVERSATIONAL_MAX = 4;
+      const body = steps.filter((s) => s.kind !== "cooldown");
+      const finalAsk = body[body.length - 1];
+      const finishesOnWork = (finalAsk?.targetRpe?.max ?? 0) > CONVERSATIONAL_MAX;
       const isRace = /RACE DAY/i.test(where) || (sess.type === "race");
-      if (hasWork && !isRace)
-        assert.ok(steps.some((s) => s.kind === "cooldown"), `${where}: work with no cool-down`);
+      if (finishesOnWork && !isRace) {
+        assert.ok(steps.some((s) => s.kind === "cooldown"),
+          `${where}: finishes on "${finalAsk?.label}" (RPE ${finalAsk?.targetRpe?.max}) with nothing after it`);
+      }
     }
   }
 });

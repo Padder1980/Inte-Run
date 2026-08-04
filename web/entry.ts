@@ -60,3 +60,9 @@ export type { WeeklyReview, WeeklySuggestion, ReviewRun } from "../src/adapt/wee
 // that is the specification's one grade-A rule and test/warmup.test.ts enforces it on every string.
 export { buildWarmup, firstHardEffort, WARMUP_MOVEMENTS, WARMUP_MODEL_VERSION } from "../src/science/warmup.ts";
 export type { Warmup, WarmupPhase, AbilityBand, FirstHardEffort } from "../src/science/warmup.ts";
+
+// The optional post-run stretch session, offered on the debrief in place of the cool-down jog the
+// low-intensity runs used to prescribe. ⚠️ Same rule as the warm-up copy: it may never claim to prevent
+// injury or to make anyone faster, and test/stretches.test.ts enforces that on every string it exports.
+export { STRETCHES, STRETCH_INTRO, stretchTotalSeconds, stretchHolds } from "../src/science/stretches.ts";
+export type { Stretch } from "../src/science/stretches.ts";

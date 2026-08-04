@@ -2090,6 +2090,57 @@ background reminders would need a push server (calendar export is the cross-plat
 The native app solves both — see the `ios/` section. It does **not** solve lock-screen audio; that is
 now a confirmed open bug, below.
 
+## Five faults the owner found on his own phone and wrist (fixed 2026-08-04)
+
+He ran a real session and sent five screenshots. Two were functional and both were serious.
+
+⚠️ **THE PHONE RECORDED 0.00 km FOR A WHOLE RUN, AND THE CAUSE WAS A NOISE FLOOR APPLIED TOO WIDELY.**
+`onGpsPos` gates distance behind half the fix's own accuracy, to stop GPS jitter piling up at a
+standstill. That floor was applied to **every** fix, including the ones where the device reports its
+speed — so at the **±14 m** his phone showed, a fix had to move more than **7 metres** to count. Fixes
+arrive about a second apart, so that is 7 m/s, a **2:22/km** pace. At his actual **1.03 m/s** every single
+fix was discarded: no distance, no route (the route push sits inside the same gate), and a debrief with
+nothing to read. Even a good 8 m fix demanded 4 m/s, so **the phone only ever accumulated distance for a
+fast runner under a clear sky.** The floor is a PROXY for "is this real movement?" and it is needed only
+when `speed` is absent — the watch has always worked this way, and the reasoning was already written down
+here against `CLLocation.speed` being −1 when unknown. Now `LIVE.devSpeed != null ? 0.3 : accuracy-scaled`.
+`test/gps-distance.test.ts` pins both halves and was checked by re-breaking the fix: the two slow-movement
+cases go red while all three drift guards stay green.
+
+⚠️ **THE LIVE CLOCK READ 0:00 FOR THE WHOLE WARM-UP.** Part 3 of the named-time work subtracts the warm-up
+from the displayed clock and clamped the result at zero, with a comment claiming it "counts the warm-up
+down to zero" — it did not, it simply showed nothing for five minutes, so "it doesn't start the timer" and
+there was no way to see how far through the warm-up you were. Now the clock shows the **warm-up's own
+elapsed time under a "Warm-up" label**, then restarts from 0:00 as "Elapsed" the instant the work begins.
+The named-time principle is untouched; what changed is that the warm-up is no longer invisible. ⚠️ The
+label must switch with the number — a warm-up clock counting up under "Elapsed" is indistinguishable from
+the work clock, which is the confusion the reset exists to avoid.
+
+⚠️ **THE MIRRORED CLOCK TICKED IN TWOS.** `sendLiveTick` on the watch throttles to one message every two
+seconds (battery, and WCSession traffic) and the phone rendered `sec` raw, so a watch run's elapsed time
+advanced 2 seconds at a time on the phone — on the mirror screen *and* on the live pill. The watch stays
+authoritative: `watchLiveSec()` adds the wall-clock time since the last tick landed, and every new tick
+**snaps** the display back to the wrist's number. ⚠️ Never while paused, or the phone counts on alone and
+disagrees with the watch it is mirroring. Verified all three ways round in the browser: drifts forward
+between ticks, snaps back on arrival, frozen when paused.
+
+Two aesthetic ones, both his call:
+- The gap under **Finish run** was 4px (`.wl-controls` bottom margin) and the card below carries no top
+  margin of its own, so that margin IS the gap. Now 12px.
+- The Logbook run card's **left accent bar** ended dead at full opacity top and bottom. Now it fades out
+  at both ends, extended slightly to keep the same weight of visible colour.
+
+⚠️ **AND ONE ON THE WATCH THAT IS FIXED BUT UNPROVEN.** His photo shows the status word clipped, reading
+"AUSED": `MetricsPage`'s stack started at the very top of the page, where the rounded corner eats the
+first line's leading characters and the system clock occupies the same strip. It now carries
+`.padding(.top, 6)` and the `.padding(.horizontal, 2)` `PacePage` already used, applied to the whole stack
+so the hero number does not shift when a run pauses. **Not verified on hardware** — it needs his eyes or a
+watch-simulator run, and a green build proves nothing about a rounded bezel.
+
+⚠️ **THE BACKTICK RULE FIRED AGAIN, TWICE, IN THIS ROUND TOO.** Both in comments inside the runtime JS.
+Total for the day: four. The build's exit code is the only reliable signal — `node --check` will happily
+pass on a stale `web/app.html` while the browser serves the previous build.
+
 ## OPEN BUGS (confirmed on real hardware, 2026-07-29)
 
 ### 1. Coach audio stops when the iPhone screen locks — diagnosed, not fixed

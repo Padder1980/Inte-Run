@@ -66,6 +66,15 @@ struct MetricsPage: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        // ⚠️ THE STATUS WORD WAS BEING CLIPPED BY THE TOP-LEFT CORNER OF THE DISPLAY. The owner
+        // photographed it mid-run reading "AUSED": this VStack started at the very top of the page, and
+        // on a rounded watch face the first line's leading characters fall outside the drawable area
+        // while the system clock occupies the same strip on the right. `.padding(.horizontal, 2)` is what
+        // PacePage already uses; the top inset is new, and it is applied to the whole stack rather than
+        // to the status word alone so the hero number does not move when a run is not paused (a layout
+        // that shifts on pause is its own legibility problem at arm's length).
+        .padding(.top, 6)
+        .padding(.horizontal, 2)
         .padding(.bottom, 10)   // clear of the page dots
     }
 

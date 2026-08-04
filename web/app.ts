@@ -1432,7 +1432,11 @@ html.kbup .sheet-ov { padding-bottom: var(--kbh, 0px); }
 #view:has(.subtabs) .runcard:hover { border-color: var(--activity-edge); box-shadow: var(--shadow), 0 12px 25px -21px color-mix(in srgb, var(--accent) 48%, transparent); }
 #view:has(.subtabs) .runcard:active { transform: translateY(1px); }
 #view:has(.subtabs) .runcard .act { gap: 13px; padding: 16px 16px 17px 18px; }
-#view:has(.subtabs) .runcard .act::before { top: 17px; bottom: 17px; left: 0; width: 3px; background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 40%, var(--build))); border-radius: 0 999px 999px 0; }
+/* The accent bar FADES OUT at both ends rather than stopping dead (owner, 2026-08-04: "it needs to fade
+   rather than be harsh edges"). The gradient carried a colour shift but full opacity to the last pixel,
+   so both ends read as cut off. Transparent stops top and bottom dissolve it into the card; the bar is
+   extended a little to keep the same weight of visible colour. */
+#view:has(.subtabs) .runcard .act::before { top: 10px; bottom: 10px; left: 0; width: 3px; background: linear-gradient(180deg, transparent 0%, var(--accent) 20%, color-mix(in srgb, var(--accent) 55%, var(--build)) 74%, transparent 100%); border-radius: 0 999px 999px 0; }
 #view:has(.subtabs) .act .b { min-width: 0; }
 #view:has(.subtabs) .act .t { color: var(--ink); font-size: 16px; font-weight: 740; letter-spacing: -0.02em; line-height: 1.3; }
 #view:has(.subtabs) .act .d { margin-top: 3px; color: var(--ink-faint); font-size: 11.5px; line-height: 1.35; }
@@ -1958,7 +1962,9 @@ input, select, textarea { font-size: 16px; }
 .wf-sv { font-size: 22px; font-weight: 700; letter-spacing: -.03em; color: var(--ink); }
 /* Controls for a run the WATCH owns. Deliberately below the numbers, not beside them: the numbers
    are what you came for, and Finish is not something to graze with a thumb mid-stride. */
-.wl-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0 4px; }
+/* 12px below, not 4 (owner, 2026-08-04: the gap under Finish run "looks too tight"). The card that
+   follows carries no top margin of its own, so this margin IS the gap and 4px read as a collision. */
+.wl-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0 12px; }
 .wl-btn { padding: 14px 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface);
   color: var(--ink); font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
 .wl-btn svg { width: 15px; height: 15px; vertical-align: -2px; margin-right: 4px; }
@@ -3028,6 +3034,31 @@ function ingestWatchRun(run) {
 let WATCH_LIVE = null;      // { id, state, sec, distKm, paceSec, avgPaceSec, lapPaceSec, hr, step, title }
 let WATCH_LIVE_T = null;    // stale-timer: a mirror that stops updating must not look live
 function watchLiveActive() { return !!(WATCH_LIVE && (WATCH_LIVE.state === "running" || WATCH_LIVE.state === "paused")); }
+// ⚠️ THE WRIST SENDS A TICK EVERY TWO SECONDS, SO THE PHONE MUST FILL IN THE SECOND BETWEEN THEM.
+// sendLiveTick throttles to 2 s deliberately (battery, and WCSession traffic), and the mirror rendered
+// L.sec raw — so the elapsed clock on the phone advanced in two-second jumps, which the owner spotted
+// straight away. The watch stays the authority: every tick SNAPS the display back to its number, and in
+// between we add the wall-clock time since that tick arrived. Never while paused, or a paused mirror
+// would keep counting up on its own and disagree with the wrist it is mirroring.
+function watchLiveSec() {
+  const L = WATCH_LIVE;
+  if (!L) return 0;
+  const base = Math.max(0, Number(L.sec) || 0);
+  if (L.state !== "running" || !L.at) return base;
+  return base + Math.max(0, (Date.now() - L.at) / 1000);
+}
+// A 1 Hz repaint of the elapsed digits only — NOT a full render. Re-rendering the screen every second
+// would fight the notes field and rebuild the controls under the runner's thumb.
+function watchLiveClockStart() {
+  if (WATCH_LIVE_CLOCK) return;
+  WATCH_LIVE_CLOCK = setInterval(() => {
+    if (!watchLiveActive()) { watchLiveClockStop(); return; }
+    const n = $("wlElapsed"); if (n) n.textContent = fmtPace(watchLiveSec());
+    // The live pill runs its own 1 Hz repaint and reads watchLiveSec too, so it needs nothing here.
+  }, 1000);
+}
+function watchLiveClockStop() { if (WATCH_LIVE_CLOCK) { clearInterval(WATCH_LIVE_CLOCK); WATCH_LIVE_CLOCK = null; } }
+let WATCH_LIVE_CLOCK = null;
 window.__interunWatchLive = function (live) {
   if (!live || !live.id) return;
   // A run in progress on the phone always wins: whatever the wrist is doing, it must never redraw
@@ -3040,8 +3071,11 @@ window.__interunWatchLive = function (live) {
   // still playing when the first tick lands.
   if (live.id !== WATCH_LIVE_ID) { WATCH_LIVE_ID = live.id; coachResetSession(true); }
   const wasActive = watchLiveActive();
+  // Stamp when this tick landed, so the seconds between ticks can be filled in locally. See watchLiveSec.
+  if (live.state !== "ended") live.at = Date.now();
   WATCH_LIVE = (live.state === "ended") ? null : live;
   clearTimeout(WATCH_LIVE_T);
+  if (watchLiveActive()) watchLiveClockStart(); else watchLiveClockStop();
   if (WATCH_LIVE) {
     // Ticks arrive about every two seconds and only while the phone is reachable. If they stop --
     // the phone went out of range, the watch app was killed -- drop the mirror rather than leaving
@@ -3357,14 +3391,14 @@ function viewWatchLive() {
   const L = WATCH_LIVE;
   const paused = L.state === "paused";
   const pace = (v) => (v > 0 ? fmtPace(v) : "\u2014");
-  const big = (k, v, sub) => '<div class="wf-big"><div class="wf-v num">' + v + (sub ? '<small>' + sub + '</small>' : "") + '</div><div class="wf-k">' + k + '</div></div>';
+  const big = (k, v, sub, id) => '<div class="wf-big"><div class="wf-v num"' + (id ? ' id="' + id + '"' : "") + '>' + v + (sub ? '<small>' + sub + '</small>' : "") + '</div><div class="wf-k">' + k + '</div></div>';
   const small = (k, v) => '<div class="wf-s"><div class="wf-sv num">' + v + '</div><div class="wf-k">' + k + '</div></div>';
   return '<button class="backbtn" id="wlBack">\u2039 Back</button>' +
     '<div class="card wf-card' + (paused ? " wl-paused" : "") + '">' +
     '<div class="wl-head"><span class="wl-dot"></span>' + (paused ? "Paused on your Apple Watch" : "Running on your Apple Watch") + '</div>' +
     '<div class="wf-title">' + esc(L.title || "Run") + '</div>' +
     (L.step ? '<div class="wf-step">' + esc(L.step) + '</div>' : "") +
-    '<div class="wf-hero">' + big("Elapsed", fmtPace(Math.max(0, Math.round(L.sec || 0)))) +
+    '<div class="wf-hero">' + big("Elapsed", fmtPace(watchLiveSec()), "", "wlElapsed") +
       big("Distance", (Number(L.distKm) || 0).toFixed(2), " km") + '</div>' +
     '<div class="wf-grid">' + small("Current", pace(L.paceSec)) + small("Lap", pace(L.lapPaceSec)) +
       small("Average", pace(L.avgPaceSec)) + small("Heart", L.hr ? L.hr + " bpm" : "\u2014") + '</div>' +
@@ -7285,7 +7319,19 @@ function onGpsPos(pos) {
   const movingByDevice = LIVE.devSpeed == null || LIVE.devSpeed > 0.7; // <0.7 m/s ≈ standing
   if (good && movingByDevice && LIVE.rt.getStatus() === "active" && LIVE.lastLat != null) {
     const d = haversine(LIVE.lastLat, LIVE.lastLon, c.latitude, c.longitude);
-    const floor = Math.max(2.5, (c.accuracy || 8) * 0.5);
+    // ⚠️ THE NOISE FLOOR APPLIES ONLY WHEN THE DEVICE WILL NOT TELL US ITS SPEED, and applying it
+    // unconditionally was a total failure of distance recording for anyone running slowly. The floor is
+    // half the fix's accuracy, so at the ±14 m the owner's phone reported it demanded a jump of more
+    // than 7 metres BETWEEN CONSECUTIVE FIXES — with fixes about a second apart that is 7 m/s, a
+    // 2:22/km pace. At his actual 1.03 m/s every single fix was discarded and the screen read
+    // 0.00 km for the whole run, with no route recorded either (the route push sits in this gate too).
+    // Even a good 8 m fix demanded 4 m/s, so the phone only ever accumulated distance for a fast
+    // runner with a clear sky.
+    // The floor is a PROXY for "is this real movement?" and it is needed only when speed is absent.
+    // When the device reports 1.03 m/s we already know the runner is moving, so a one-metre step is
+    // real and must be counted. Same rule the watch has always used, and the reasoning is written up
+    // in CLAUDE.md against CLLocation.speed being -1 when unknown.
+    const floor = LIVE.devSpeed != null ? 0.3 : Math.max(2.5, (c.accuracy || 8) * 0.5);
     if (d > floor && d < 80) {
       LIVE.dist += d; LIVE.route.push({ lat: c.latitude, lng: c.longitude });
       // Accumulate elevation gain from the device's altitude, when it reports one (often it doesn't).
@@ -7357,7 +7403,9 @@ function livePillState() {
   }
   if (watchLiveActive() && state.screen !== "live" && state.screen !== "watchlive") {
     return { where: "watch", label: WATCH_LIVE.state === "paused" ? "Paused on watch" : "Live on watch",
-             time: fmtPace(Math.max(0, Math.round(WATCH_LIVE.sec || 0))), paused: WATCH_LIVE.state === "paused" };
+             // watchLiveSec, not WATCH_LIVE.sec: the pill already repaints every second, so reading the
+             // raw two-second-old figure made it tick in twos exactly as the mirror screen did.
+             time: fmtPace(watchLiveSec()), paused: WATCH_LIVE.state === "paused" };
   }
   return null;
 }
@@ -7402,7 +7450,7 @@ function viewLive() {
     '<div class="card live-hero"><div class="live-hero-top"><div class="eyebrow">Live session · <span id="gpsBadge">' + gpsStatusText() + '</span></div>' +
     '<button class="voice-btn' + (coachEnabled() ? ' on' : '') + '" id="lVoice" aria-label="Toggle voice coaching">' + (coachEnabled() ? ICON.vox : ICON.voxOff) + '</button>' +
     '</div><div class="live-title">' + s.title + '</div>' +
-    '<div class="live-metrics"><div><div class="lk">Elapsed</div><div class="lv num" id="lElapsed">0:00</div></div>' +
+    '<div class="live-metrics"><div><div class="lk" id="lElapsedK">Elapsed</div><div class="lv num" id="lElapsed">0:00</div></div>' +
     '<div><div class="lk">Distance</div><div class="lv num" id="lDist">0.00<small> km</small></div></div></div>' +
     '<div class="live-paces">' +
     '<div><div class="lk">Current</div><div class="lv num none" id="lPace">—</div></div>' +
@@ -8169,11 +8217,23 @@ function liveWorkElapsed(snap) {
     }
     LIVE.warmSec = sec;
   }
-  // Count the warm-up down to zero rather than showing a negative: the runner is still warming up.
-  return Math.max(0, snap.elapsedSeconds - LIVE.warmSec);
+  // ⚠️ WHILE THE WARM-UP IS STILL RUNNING, SHOW THE WARM-UP'S OWN CLOCK — do not clamp to zero.
+  // Clamping is what shipped, and the owner caught it on his phone: the big number read 0:00 for the
+  // WHOLE five-minute warm-up, so "it doesn't start the timer" and there was no way to see how far
+  // through the warm-up he was. The comment claimed it counted the warm-up down; it did not, it simply
+  // showed nothing. The named-time principle is untouched — the WORK clock still starts from 0:00 the
+  // moment the warm-up ends — but until then the runner sees the warm-up counting up, under a label
+  // that says so, rather than a dead zero.
+  const work = snap.elapsedSeconds - LIVE.warmSec;
+  return work >= 0
+    ? { seconds: work, label: "Elapsed", warming: false }
+    : { seconds: snap.elapsedSeconds, label: "Warm-up", warming: true };
 }
 function liveUpdate(snap) {
-  $("lElapsed").textContent = fmtPace(liveWorkElapsed(snap));
+  const clock = liveWorkElapsed(snap);
+  $("lElapsed").textContent = fmtPace(clock.seconds);
+  // The label switches with it, or a warm-up clock counting up is indistinguishable from the work one.
+  const ck = $("lElapsedK"); if (ck && ck.textContent !== clock.label) ck.textContent = clock.label;
   $("lDist").innerHTML = (snap.distanceMeters / 1000).toFixed(2) + '<small> km</small>';
   // Hide implausible paces (>20:00/km): those only appear when barely moving and read as nonsense.
   const clamp = (p) => (p && p > 0 && p <= 1200) ? p : null;

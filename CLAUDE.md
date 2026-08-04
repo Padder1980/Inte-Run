@@ -1195,7 +1195,23 @@ change so his stated mileage still means what he answered.
 3. **The live clock resets to zero when the warm-up ends**, so the named time is what the runner watches
    count up. `LIVE.vms` drives everything (cues, steps, splits, the debrief) — reset the DISPLAY, not
    the session clock, or splits and coach timings all shift.
-4. **Re-base the volume model in the same commit.** Sessions grow ~30% in work and ~25% in total, so
+4. **A WARM-UP IS NOT TRAINING VOLUME — the owner's reframing, 2026-08-03, and it is the whole fix.**
+   I had this wrong and reported a problem that does not exist: I measured the new, additive warm-up
+   minutes as mileage, saw week one open at 1.16× stated, and called it a volume increase needing the
+   ramp re-anchored. His correction: *"You can't class warming the body up as real training volume.
+   This is just about preparing the body for training and the user can go as slow as they need to,
+   therefore putting no additional strain on the body."*
+   So the fix is **exclude `warmup` and `cooldown` steps from the volume accounting**, and measure the
+   mileage target AND the week-one guardrail on the training portion only. Then the guardrail compares
+   like with like, and the preparation sits outside it where it belongs.
+   ⚠️ **The work portion DID grow and that part IS volume.** A 38′ moderate asks for 38 minutes at
+   moderate where it asked for 29, which is the "grow the sessions" choice he made. So once warm-ups
+   are out of the count, expect the fit to pull the named minutes down to keep stated mileage honest.
+   The runner covers more ground per week than before — the warm-up jogging — while their training load
+   still matches what they answered. That is the intended outcome, not a discrepancy to chase.
+   ⚠️ Check `computeDistribution` too: if warm-up minutes stop counting as volume they must not keep
+   counting as easy running in the intensity model either, or the easy fraction is inflated by minutes
+   the volume model has just disowned. One definition of what counts, used by both. Sessions grow ~30% in work and ~25% in total, so
    `estimatedDurationSeconds` grows for every session — and that is what `targetPeakWeeklyKm`'s fixed-
    point fit measures. Without a re-base, answering "45 km/week" silently delivers 55+.
 

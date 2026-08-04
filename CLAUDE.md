@@ -1177,14 +1177,15 @@ warm-up. Non-embedded warm-ups keep them at the front, where the work follows st
 session is one `steady` step at RPE 6–7 with neither, indistinguishable from a tempo run by kind and
 effort — which is how "Strength (maintenance)" was handed 21 minutes of jogging and four strides.
 
-## ⚠️ NEXT UP, DECIDED WITH THE OWNER 2026-08-03: THE NAMED TIME IS THE WORK TIME
+## THE NAMED TIME IS THE WORK TIME (decided 2026-08-03, **all four parts shipped 2026-08-04**)
 
-Not built yet. He watched a simulation of "38′ moderate run" and said the 38 should be **the time spent
-at moderate**, not the total including the warm-up. Presented with the fork, he chose **grow the
-sessions** over renaming them, and asked for the plan's volume targets to be re-based in the same
-change so his stated mileage still means what he answered.
+He watched a simulation of "38′ moderate run" and said the 38 should be **the time spent at moderate**,
+not the total including the warm-up. Presented with the fork, he chose **grow the sessions** over
+renaming them, and asked for the plan's volume targets to be re-based in the same change so his stated
+mileage still means what he answered.
 
-**The four parts, and they must ship together:**
+**The four parts — all four are now in.** Parts 1–3 landed 2026-08-04 morning; part 4 that afternoon,
+and it was NOT the change its own description predicted (see the ⚠️ under part 4).
 1. **`framedRun` names the MIDDLE.** `moderateRun(paces, 38)` must deliver 38 minutes at moderate with
    the warm-up and cool-down ON TOP (~48 min door to door), not 6 + 29 + 4. Every template that goes
    through `framedRun` is affected.
@@ -1209,19 +1210,74 @@ change so his stated mileage still means what he answered.
    are out of the count, expect the fit to pull the named minutes down to keep stated mileage honest.
    The runner covers more ground per week than before — the warm-up jogging — while their training load
    still matches what they answered. That is the intended outcome, not a discrepancy to chase.
-   ⚠️ Check `computeDistribution` too: if warm-up minutes stop counting as volume they must not keep
-   counting as easy running in the intensity model either, or the easy fraction is inflated by minutes
-   the volume model has just disowned. One definition of what counts, used by both. Sessions grow ~30% in work and ~25% in total, so
-   `estimatedDurationSeconds` grows for every session — and that is what `targetPeakWeeklyKm`'s fixed-
-   point fit measures. Without a re-base, answering "45 km/week" silently delivers 55+.
+   ⚠️ **ONE DEFINITION OF VOLUME, AND IT IS NOT THE INTENSITY MODEL'S.** I also applied the exclusion to
+   `computeDistribution`, reasoning that one definition should serve both, and the suite refuted it in
+   under a minute: a threshold session fell to 17% easy and a 3-day 5 km peak week to 66.4%, breaking
+   the pyramidal floor. The two models ask different questions and are entitled to different
+   denominators — *volume:* "how much training load is this week?" (preparation is not load);
+   *intensity:* "of the running you do, what fraction is hard?" (warm-up jogging IS easy running).
+   Excluding it there does not remove easy minutes from a week, it removes them from the DENOMINATOR.
+   `src/domain/steps.ts` says so in as many words. Do not repeat it.
 
-⚠️ **The intensity check will move too.** A longer moderate/work portion against an unchanged easy
-volume raises the hard fraction, and `generatePlan`'s `noWorse` guard rejects plans that breach the
-pyramidal floor — expect it to start refusing scaled plans until the easy running grows with it. Do not
-"fix" that by loosening the floor.
+⚠️ **PART 4'S REAL CAUSE WAS NOT THE ACCOUNTING, AND THE ACCOUNTING FIX ALONE CHANGED NOTHING.** Both
+earlier sessions assumed the overshoot was a measurement error, then a re-base. Excluding the frame from
+the count removed about as much as naming-the-work added, so the two cancelled and week one stayed at
+1.16× stated. Measured per-session on the one failing profile (55 km/week, 5 days, 40:00 10k), the
+answer named itself in one run:
 
-⚠️ **Re-record the simulation videos afterwards** (`/Volumes/Adam/Inter-Run`, harness in the session
-scratchpad) — every one of the 92 shows the old timing.
+**`buildWeek`'s easy runs had NO week-to-week progression at all.** `baseMin` is a flat 45 minutes
+scaled only by `vScale` — a whole-plan constant — so a midweek easy run was **the same length in week one
+as in peak week**, while the long run ramped 55% → 100% around it. Week one held four easy runs of 71,
+71, 71 and 63 minutes against a 69-minute "long run", opened at 63.6 km, and sat at **93% of its own
+peak**. A block that starts at 93% of peak is not a progression, it is a plateau with a taper on the end.
+`EASY_START_FRAC` + `easyRampFor` give easy running the same ramp shape `longRunMinutes` already used.
+
+⚠️ **`EASY_START_FRAC` IS DERIVED (`1 / PEAK_VOLUME_MULTIPLIER`), NOT PICKED.** Peak is stated × 1.25 by
+design, so starting easy running at 1/1.25 of its peak length puts week one back at the mileage the
+runner stated. Tying the constants together means a future change to the peak multiplier cannot silently
+un-anchor week one. Swept 0.75 / 0.80 / 0.85: anchoring 90.8 / 90.0 / 88.7% — flat enough that the
+principled value is also the sensible one, so do not "tune" it.
+
+⚠️ **THE RAMP ARRIVES AT THE START OF THE PEAK PHASE AND THEN HOLDS.** Ramping all the way to the last
+non-taper week left every peak week still climbing, so the plan's measured peak fell ~4% and the taper
+read shallower against it — which broke `the taper genuinely cuts the week` at 27.7% against a 30% floor.
+Peak phase is where volume is HELD while the work sharpens.
+
+⚠️ **AND THAT EXPOSED A REAL 5K TAPER SHALLOWNESS — `taper.ts` 5k lead-in is now 0.66, was 0.72.** The
+30% floor had been met only by an inflated denominator: before this change the 5k plan's **biggest week
+was week 3 of 31**, because base weeks carry fewer quality sessions (so more easy days) and flat easy-run
+length let an early base week outweigh the entire peak phase. With the ramp the peak moved to week 27
+where it belongs, the denominator became honest, and the 0.72 multiplier's true depth (27.7%) was under
+both the floor and its own note's claim of ~28%. **Deepened rather than the floor loosened**, and 0.66
+not 0.68 for margin — 0.68 delivers 30.4% against a 30.0% floor, and whoever met that 0.4-point failure
+later would be one keystroke from relaxing the floor instead. Only the 5k was affected; 10k, half and
+marathon already peaked in the peak phase and their cuts are byte-identical.
+
+**Measured over 640 profiles / 19,200 weeks (4 events × 3–6 days × 4 abilities × 2 experience × 5 stated
+volumes), before → after:**
+- week one within 1.10× stated: **80.7% → 90.0%**
+- biggest week sits in build/peak: **76.9% → 96.9%**
+- long run not the longest run of its week: **37.9% → 34.2%** (improved, still the open defect below)
+- weeks under the intensity floor: **5 → 5, unchanged** (the documented pre-existing 3–4-day slow-runner
+  5 km weeks; no new breaches)
+- worst easy fraction: 65.0% → **64.6%** — ⚠️ 0.4 points deeper on the single worst already-breaching
+  week, and insensitive to `EASY_START_FRAC` (64.5–64.8% across the swept range), so it is inherent to
+  having any ramp at all rather than to its steepness. Accepted and reported, not hidden.
+- worst anchoring case unchanged at 1.59× (marathon, 20 km/week stated) — below `MIN_VOLUME_SCALE` the
+  per-session floors bind, which is the documented `assessFeasibility` gap, not this.
+
+⚠️ **A SWEEP THAT READS THE WRONG FIELD REPORTS CLEAN.** The first run of that sweep checked
+`d.easyFraction`; the field is `d.easy`. Every comparison was false, so it reported **0 weeks measured
+and 100% easy** — i.e. "no intensity problems" — while measuring nothing. Fifth firing of this file's
+guard-blind-to-the-new-input trap. Any sweep must throw on a shape it does not recognise.
+
+⚠️ **Still outstanding from this work:** the **six warm-up tests** in `test/warmup.test.ts` (5) and
+`test/warmup-delivery.test.ts` (1) still encode the retired embedded design and fail. They need
+rewriting to the new one, keeping their intent — an easy run gets a SMALLER warm-up than an interval
+session, not none. Do not delete them.
+
+⚠️ **Re-record the simulation videos** (`/Volumes/Adam/Inter-Run`, harness in the session scratchpad) —
+every one of the 92 shows the old timing.
 
 ## ⚠️ NEXT: THE COOL-DOWN BECOMES AN OPTIONAL STRETCH SESSION (owner, 2026-08-03)
 
@@ -1266,11 +1322,30 @@ What each axis means here, and the check to write:
   it is the one most likely to be missing: `selectFormat` rotates a pool rather than progressing it.
 - **Reversibility** — are deloads and the taper deep enough to absorb and short enough not to detrain?
 
-⚠️ **One defect already found, while measuring volume — start here.** On a 55 km/week 5-day half plan,
-week one contains **two 95′ easy runs of 14.5 and 14.3 km and an 80′ "long run" of 10.3 km**. A long run
-that is not the longest run of the week is incoherent as coaching whatever the mileage says, and it is a
-specificity failure, not a rounding one. Unknown whether it predates the named-time-is-work-time change;
-`git stash` the branch and measure both.
+⚠️ **One defect already found, and now MEASURED — start here.** A long run that is not the longest run of
+the week is incoherent as coaching whatever the mileage says, and it is a specificity failure, not a
+rounding one. The open question was whether the named-time change caused it. **It did not cause it, but it
+made it materially worse.** Measured over the same 19,200 weeks at three points in history, on whole-outing
+distance so the trees are comparable:
+
+| tree | long run NOT the longest run of its week |
+|---|---|
+| `ed9140b` — before the named-time work | **32.7%** |
+| `cbe815f` — after it, before the easy ramp | **40.1%** (+7.4 pts) |
+| with the easy-run ramp (2026-08-04) | **37.6%** (−2.5 pts recovered) |
+
+So there is a large pre-existing defect (a third of all weeks) which the named-time change worsened and the
+easy ramp partly repaired. Two causes, and they need separating before anything is changed:
+1. **`startLong` is `peakLong × 0.55` while easy runs now start at `× 0.80`** — the long run ramps from much
+   further back, so in early weeks it is *structurally* allowed to be the shortest run of the week. Whether
+   the long run should ramp that gently, or easy runs be held under it, is a coaching decision.
+2. **The long run's frame is excluded from the count but its CEILING is measured on the whole outing**
+   (`LONG_CEILING_MIN`), so a capped long run silently loses its warm-up and cool-down minutes from the
+   counted figure while a capped easy run does not. That one is arguably a bug.
+
+⚠️ **Do not "fix" this by scaling the long run up.** `Math.max(1, vScale)` is one-way on purpose and the
+reasoning behind it is documented at length in `buildAll` — a marathoner stating 30 km/week got a 10.3 km
+longest run when that rule was absent.
 
 ## Seven days means seven days (fixed 2026-08-02)
 

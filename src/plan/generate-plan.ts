@@ -291,13 +291,61 @@ function noWorse(
  * Returns 1 (no change at all) when the runner has not told us their mileage, which keeps every
  * existing plan and every existing test exactly as it was.
  */
+// A block should build ABOVE where the runner is now, but not by much — progression is the ceiling on
+// adaptation, and 25% across a whole block is already brisk beside the usual "add 10% a week, then
+// back off" guidance.
+const PEAK_VOLUME_MULTIPLIER = 1.25;
+
 function targetPeakWeeklyKm(athlete: Athlete): number | null {
   const stated = athlete.weeklyVolumeKmCurrent;
   if (!stated || !Number.isFinite(stated) || stated <= 0) return null;
-  // A block should build ABOVE where the runner is now, but not by much — progression is the
-  // ceiling on adaptation, and 25% across a whole block is already brisk beside the usual
-  // "add 10% a week, then back off" guidance.
-  return stated * 1.25;
+  return stated * PEAK_VOLUME_MULTIPLIER;
+}
+
+/**
+ * How long the easy runs are in WEEK ONE, as a fraction of their peak-week length.
+ *
+ * ⚠️ EASY RUNNING HAD NO PROGRESSION AT ALL, and that is what broke week-one anchoring. `baseMin` in
+ * `buildWeek` is a flat 45 minutes scaled only by `vScale` — a whole-plan constant — so a midweek easy
+ * run was the SAME LENGTH in week one as in peak week, while the long run ramped 55% → 100% around it.
+ * Measured on the profile the guardrail test fails (55 km/week, 5 days, 40:00 10k): week one held four
+ * easy runs of 71, 71, 71 and 63 minutes against a 69-minute "long run" — so the long run was the
+ * SHORTEST run of the week, and week one opened at 63.6 km, 1.16× stated and 93% of peak. A block that
+ * starts at 93% of its own peak is not a progression, it is a plateau with a taper on the end.
+ *
+ * ⚠️ IT IS DERIVED FROM `PEAK_VOLUME_MULTIPLIER`, NOT PICKED. Peak week is stated × 1.25 by design, so
+ * easy running starting at 1/1.25 of its peak length puts week one back at roughly the mileage the
+ * runner actually told us — which is exactly what the evidence spec asks for in three separate places
+ * ("Set week one near the athlete's recent baseline"). Tying the two constants together means a future
+ * change to the peak multiplier cannot silently un-anchor week one.
+ *
+ * ⚠️ IT IS DELIBERATELY GENTLER THAN THE LONG RUN'S 0.55. The long run ramps steeply because building
+ * it IS the plan; easy running is where the runner already lives, and a runner doing 55 km/week does
+ * not start their midweek runs at 55% of anything. Steeper also risks the pyramidal easy floor: easy
+ * minutes are the DENOMINATOR of the intensity model and quality never scales, so every minute taken
+ * out of an early week raises that week's hard fraction. `test/session-library.test.ts` is the guard.
+ */
+const EASY_START_FRAC = 1 / PEAK_VOLUME_MULTIPLIER;
+
+/**
+ * This week's easy-run length as a fraction of peak, ramped up across base and build so the whole week
+ * grows together instead of the long run climbing alone.
+ *
+ * ⚠️ THE RAMP ARRIVES AT THE START OF THE PEAK PHASE AND THEN HOLDS — it does NOT keep climbing to the
+ * last non-taper week, which is what I wrote first. Peak phase is where the block is biggest and its
+ * volume is meant to be held while the work sharpens; ramping through it left every peak week still
+ * climbing, so the plan's measured peak fell ~4% and the taper looked shallower against it. That broke
+ * `the taper genuinely cuts the week` (5k: 27% cut against the 30% floor) — a real regression, not a
+ * stale test, and it was caught only because the assertion measures the cut against the delivered
+ * peak rather than against a constant.
+ *
+ * ⚠️ The taper returns 1: `taperMult` already cuts those weeks, and multiplying both would cut twice.
+ */
+function easyRampFor(wp: WeekPlan, weekIndex: number, rampEndWeek: number): number {
+  if (wp.phase === "taper") return 1;
+  if (rampEndWeek <= 1) return 1;
+  const fraction = Math.min(1, (weekIndex - 1) / (rampEndWeek - 1));
+  return EASY_START_FRAC + fraction * (1 - EASY_START_FRAC);
 }
 
 // Day-of-week scheduling (0 = Mon … 6 = Sun) is expressed RELATIVE to the long run, then rotated to
@@ -349,6 +397,10 @@ export function generatePlan(
 
   const targetPeakKm = targetPeakWeeklyKm(athlete);
   const nonTaperCount = schedule.filter((s) => s.phase !== "taper").length;
+  // Where the easy-run ramp arrives at full length: the first peak week, or the last non-taper week on
+  // a runway too short to have a peak phase at all. See `easyRampFor`.
+  const firstPeakIdx = schedule.findIndex((s) => s.phase === "peak");
+  const easyRampEndWeek = firstPeakIdx >= 0 ? firstPeakIdx + 1 : nonTaperCount;
   const taper = taperFor(goal.distance);
 
   // Complete beginners get a gentler, purpose-built progression (run–walk or short easy running,
@@ -433,6 +485,7 @@ export function generatePlan(
       );
       return buildWeek(weekIndex, startDateIso, wp, {
         athlete, goal, paces, returning, longMin, vScale, taperMult,
+        easyRamp: easyRampFor(wp, weekIndex, easyRampEndWeek),
       });
     });
   };
@@ -571,6 +624,11 @@ type WeekContext = {
    * was 18–39% against the evidence's 41–60%, and a 10K's last full week ran within 1% of peak.
    */
   taperMult?: number;
+  /**
+   * This week's easy-run length as a fraction of peak (1 = peak-week length). See `EASY_START_FRAC`:
+   * without this the easy runs were flat across the whole block and week one opened at 93% of peak.
+   */
+  easyRamp?: number;
 };
 
 function buildWeek(
@@ -640,7 +698,14 @@ function buildWeek(
     // a 120 km/week marathoner's first taper week cut 3% instead of ~25% and race week held three
     // 68-minute easy runs. And the floor must stay outside the taper multiply, or a down-scaled
     // runner's race week produces 11-minute non-runs.
-    const minutes = Math.max(20, Math.round(Math.min(95, baseMin * (ctx.vScale ?? 1)) * (ctx.taperMult ?? 1)));
+    // ⚠️ THE RAMP GOES AFTER THE 95-MINUTE CLAMP, BEFORE THE TAPER. The clamp defines the PEAK-week
+    // length (nobody gets a two-hour midweek easy run), and the ramp then climbs toward that peak —
+    // exactly the order `longRunMinutes` uses, where `peakLong` is fully clamped before the ramp is
+    // applied to it. Ramping first would instead ramp toward an unclamped number and then clip the
+    // result, which for a high-mileage runner collapses the whole progression into the ceiling.
+    const minutes = Math.max(20, Math.round(
+      Math.min(95, baseMin * (ctx.vScale ?? 1)) * (ctx.easyRamp ?? 1) * (ctx.taperMult ?? 1),
+    ));
     sessions.push(seventh
       ? recoveryRun(ctx.paces, minutes)
       : easyVariant(ctx.paces, minutes, index + ei, canStride));

@@ -26,10 +26,24 @@ const TAPERS: Record<RaceDistanceKey, TaperPlan> = {
     volumeMultiplierByWeek: [0.6],
     notes: ["Short, sharp taper — keep speed, cut volume ~40%."],
   },
+  // ⚠️ THE LEAD-IN WEEK IS 0.68, NOT 0.72, AND THE EASY-RUN RAMP IS WHY (2026-08-04). At 0.72 the
+  // delivered cut against peak was 27.7% — under the 30% floor `test/generate-plan.test.ts` asserts,
+  // and under this entry's own claim of ~28%. It passed for years only because the 5k's biggest week
+  // was WEEK 3 of 31: base weeks carry fewer quality sessions, so more easy days, and easy-run length
+  // was flat across the whole block, which made an early base week outweigh the entire peak phase.
+  // Once easy running ramps, the peak moved to week 27 where it belongs, the denominator became 4%
+  // smaller and honest, and this taper's real depth was exposed. Deepening it is the correct direction
+  // — the floor is not the thing to loosen — and it sits inside the evidence window while matching the
+  // depth the 10k already delivers (33%). The other three distances are unaffected: they already peaked
+  // in the peak phase, and their cuts are byte-identical either way.
+  //
+  // ⚠️ 0.66 rather than 0.68 FOR MARGIN. Swept: 0.68 delivers a 30.4% cut against a 30.0% floor, which
+  // is 0.4 points of headroom — the next change to any part of a taper week would trip it, and whoever
+  // met that failure would be one keystroke from relaxing the floor instead. 0.66 delivers 32.7%.
   "5k": {
     weeks: 2,
-    volumeMultiplierByWeek: [0.72, 0.58],
-    notes: ["~7–14 day taper; retain VO2 touches while volume falls ~28% then ~42%."],
+    volumeMultiplierByWeek: [0.66, 0.58],
+    notes: ["~7–14 day taper; retain VO2 touches while volume falls ~34% then ~42%."],
   },
   "10k": {
     weeks: 2,

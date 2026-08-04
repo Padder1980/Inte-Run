@@ -1177,6 +1177,36 @@ warm-up. Non-embedded warm-ups keep them at the front, where the work follows st
 session is one `steady` step at RPE 6–7 with neither, indistinguishable from a tempo run by kind and
 effort — which is how "Strength (maintenance)" was handed 21 minutes of jogging and four strides.
 
+## ⚠️ NEXT UP, DECIDED WITH THE OWNER 2026-08-03: THE NAMED TIME IS THE WORK TIME
+
+Not built yet. He watched a simulation of "38′ moderate run" and said the 38 should be **the time spent
+at moderate**, not the total including the warm-up. Presented with the fork, he chose **grow the
+sessions** over renaming them, and asked for the plan's volume targets to be re-based in the same
+change so his stated mileage still means what he answered.
+
+**The four parts, and they must ship together:**
+1. **`framedRun` names the MIDDLE.** `moderateRun(paces, 38)` must deliver 38 minutes at moderate with
+   the warm-up and cool-down ON TOP (~48 min door to door), not 6 + 29 + 4. Every template that goes
+   through `framedRun` is affected.
+2. **Easy and long runs get a REAL warm-up: 5 minutes plus stretches**, excluded from the named time.
+   This RETIRES the embedded warm-up for them — the "the opening few minutes are the warm-up" wording
+   and `embedded: true` for `effort === "easy"`. Keep `openingMinutes`/the carve-out machinery for
+   anything still embedded, or delete it with the last caller.
+3. **The live clock resets to zero when the warm-up ends**, so the named time is what the runner watches
+   count up. `LIVE.vms` drives everything (cues, steps, splits, the debrief) — reset the DISPLAY, not
+   the session clock, or splits and coach timings all shift.
+4. **Re-base the volume model in the same commit.** Sessions grow ~30% in work and ~25% in total, so
+   `estimatedDurationSeconds` grows for every session — and that is what `targetPeakWeeklyKm`'s fixed-
+   point fit measures. Without a re-base, answering "45 km/week" silently delivers 55+.
+
+⚠️ **The intensity check will move too.** A longer moderate/work portion against an unchanged easy
+volume raises the hard fraction, and `generatePlan`'s `noWorse` guard rejects plans that breach the
+pyramidal floor — expect it to start refusing scaled plans until the easy running grows with it. Do not
+"fix" that by loosening the floor.
+
+⚠️ **Re-record the simulation videos afterwards** (`/Volumes/Adam/Inter-Run`, harness in the session
+scratchpad) — every one of the 92 shows the old timing.
+
 ## Seven days means seven days (fixed 2026-08-02)
 
 ⚠️ **The form offered 3–7 and `buildWeek` said `Math.min(6, …)`.** A runner who chose seven got six

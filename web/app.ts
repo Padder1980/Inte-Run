@@ -4031,8 +4031,18 @@ function structureRows(steps, plain) {
       const descriptorOf = (r) => {
         // ⚠️ Double backslashes: this regex lives inside the outer template literal, so a single one
         // is eaten and \\d ships as a literal "d" that matches nothing.
-        const t = String(r.label || "").replace(/^\\s*\\d+\\s*(s|″|m|km|metres|minutes?|min|′)\\b[\\s—–-]*/i, "").trim();
+        // ⚠️ A LOOKAHEAD, NOT \\b. The unit can be a symbol — ″ or ′ — and there is no word boundary
+        // between two non-word characters, so \\b failed on every one of them: "10″ hill sprint" kept
+        // its measurement, was then rejected for starting with a digit, and the row printed a bare
+        // "6 × 10″" with the words gone. "20s relaxed stride" worked only because s is a word char.
+        const t = String(r.label || "")
+          .replace(/^\\s*\\d+\\s*(?:s|″|m|km|metres|minutes?|min|′)(?=[\\s—–-]|$)[\\s—–-]*/i, "").trim();
         if (!t || /^\\d/.test(t)) return "";
+        // ⚠️ ONLY KEEP A DESCRIPTOR THAT SAYS SOMETHING. Most rep labels reduce to the bare word
+        // "rep" once the measurement comes off, and "5 × 5′ rep" is worse than "5 × 5′" — 24 of the
+        // catalogue's 28 grouped rows gained a noise word. A single word is never worth printing
+        // here; "uphill — strong, tall, driving" and "hill sprint — short and powerful" are.
+        if (!/\\s/.test(t)) return "";
         return t.charAt(0).toLowerCase() + t.slice(1);
       };
       let lab;

@@ -395,10 +395,31 @@ export function contExplore(p: TrainingPaces, min: number): SessionContent {
 
 // Easy run finished with short, sharp uphill sprints — big neuromuscular benefit, minimal fatigue.
 export function easyHillStrides(paces: TrainingPaces, minutes: number): SessionContent {
-  const hills: WorkoutStep = { kind: "rep", label: "6 × 10″ hill sprints — short and powerful, full walk-back recovery", durationSeconds: 6 * 10, targetRpe: { min: 7, max: 8 }, repeatCount: 6 };
+  // ⚠️ SIX SPRINTS WITH A WALK BACK, NOT ONE 60-SECOND BLOCK. Spotted by the owner in a simulation of
+  // this session: it shipped as a single step labelled "full walk-back recovery" with the recovery in
+  // prose and nowhere else, so the brief could not say how long it was and the live session counted
+  // through it as one unbroken minute at RPE 7-8. Same fault as the strides, and the last of its kind
+  // — `audit-reps.ts` swept 3,378 sessions and found no other block with a prose-only recovery.
+  // 45 seconds is the owner's call (2026-08-03), and it suits the effort: a 10-second maximal hill
+  // sprint is about power, so the recovery exists to make the NEXT one as good as the last.
+  const SPRINT_SEC = 10, SPRINT_REPS = 6, SPRINT_REC_SEC = 45;
+  const hills: WorkoutStep[] = [];
+  for (let i = 1; i <= SPRINT_REPS; i++) {
+    hills.push({ kind: "rep", label: `${SPRINT_SEC}″ hill sprint — short and powerful, tall and driving`,
+      durationSeconds: SPRINT_SEC, targetRpe: { min: 7, max: 8 }, repeatIndex: i, repeatCount: SPRINT_REPS });
+    if (i < SPRINT_REPS) {
+      hills.push({ kind: "recovery", label: "Walk back down — full recovery before the next one",
+        durationSeconds: SPRINT_REC_SEC, targetRpe: { min: 1, max: 2 }, repeatIndex: i, repeatCount: SPRINT_REPS });
+    }
+  }
+  // ⚠️ The walk-backs come OUT of the easy portion, not on top of it — the same rule as the strides.
+  // estimatedDurationSeconds feeds the volume and intensity models, so adding three and a half minutes
+  // to every hill-sprint session would quietly reshape plans.
+  const recTotal = hills.filter((s) => s.kind === "recovery").reduce((a, s) => a + (s.durationSeconds || 0), 0);
   const steps = framedRun(paces, minutes, (mid) => [
-    { kind: "steady", label: "Easy, conversational running", durationSeconds: mid * 60, targetPaceSecPerKm: paces.easy, targetRpe: RPE.easy },
-    hills,
+    { kind: "steady", label: "Easy, conversational running", durationSeconds: Math.max(300, mid * 60 - recTotal),
+      targetPaceSecPerKm: paces.easy, targetRpe: RPE.easy },
+    ...hills,
   ]);
   return assemble(
     "strides",

@@ -1223,6 +1223,55 @@ pyramidal floor — expect it to start refusing scaled plans until the easy runn
 ⚠️ **Re-record the simulation videos afterwards** (`/Volumes/Adam/Inter-Run`, harness in the session
 scratchpad) — every one of the 92 shows the old timing.
 
+## ⚠️ NEXT: THE COOL-DOWN BECOMES AN OPTIONAL STRETCH SESSION (owner, 2026-08-03)
+
+Not built. He asked for the prescribed cool-down jog to go, replaced by an **optional stretch session
+linked from the debrief card** — tap it and you get suggested stretches for runners, with a short
+demonstration video he will embed later.
+
+⚠️ **REMOVING THE COOL-DOWN DOES NOT REDUCE VOLUME, and that was his question.** Measured on a 55 km/week
+5-day profile: the counted figure changes by **0.0 km**, because `isPreparationStep` already excludes
+`cooldown` from `trainingDistanceMeters`. It shortens the outing on the clock and nothing else. Do not
+sell it as a volume lever; it is a coaching change (a stretch at the end beats a prescribed jog).
+
+⚠️ **Ship the replacement in the same change as the removal.** Taking the cool-down out on its own leaves
+the runner with neither a jog nor a stretch — worse than today.
+
+Build notes:
+- `framedRun` drops `easeDown` (and `FRAME_COOL_MIN`); several templates append their own cool-down step
+  directly (`cooldown(paces, 10)` in the threshold/vo2 pools) — decide whether those go too, or whether
+  only the low-intensity framed runs lose theirs. The owner's screenshots are of an easy session.
+- The stretch list belongs beside the existing exercise machinery: `exerciseBlock` already renders an
+  animated demo per movement, and the strength sessions already carry `exercises`. Reuse it rather than
+  writing a second list renderer, and leave a slot for his video above the list.
+- The link lives on the debrief (`runOverviewHtml`), so it appears on the finish screen AND in the
+  Logbook — one builder, both places, which is that screen's existing rule.
+- ⚠️ `test/warmup-delivery.test.ts` asserts every run reaches a cool-down for sessions containing work.
+  That assertion becomes wrong; replace it with one that asserts the stretch session is OFFERED.
+
+## ⚠️ NEXT: REVIEW THE SESSIONS FOR GENUINE PROGRESSION (owner, 2026-08-03)
+
+Not built. He wants the plan audited against the principles of training — Specificity, Progression,
+Overload, Reversibility — with progressive overload examined through **FITT: Frequency, Intensity, Time,
+Type**. Measure it, do not reason about it; every session type, every plan length, several abilities.
+
+What each axis means here, and the check to write:
+- **Frequency** — runs per week across the block. Does it rise, and never by more than one run at a time?
+- **Intensity** — the fraction of weekly minutes at threshold and above, and whether the prescribed paces
+  themselves sharpen as fitness is re-anchored. Beware: paces only move when the runner re-tests, so a
+  block can look flat here and be correct.
+- **Time** — session duration and weekly volume. Monotone rise, deloads excepted, with week-on-week jumps
+  inside the 1.10 guardrail the long run already uses.
+- **Type** — does the mix shift toward race-specific work as the race approaches? That is specificity, and
+  it is the one most likely to be missing: `selectFormat` rotates a pool rather than progressing it.
+- **Reversibility** — are deloads and the taper deep enough to absorb and short enough not to detrain?
+
+⚠️ **One defect already found, while measuring volume — start here.** On a 55 km/week 5-day half plan,
+week one contains **two 95′ easy runs of 14.5 and 14.3 km and an 80′ "long run" of 10.3 km**. A long run
+that is not the longest run of the week is incoherent as coaching whatever the mileage says, and it is a
+specificity failure, not a rounding one. Unknown whether it predates the named-time-is-work-time change;
+`git stash` the branch and measure both.
+
 ## Seven days means seven days (fixed 2026-08-02)
 
 ⚠️ **The form offered 3–7 and `buildWeek` said `Math.min(6, …)`.** A runner who chose seven got six

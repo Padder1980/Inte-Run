@@ -3053,7 +3053,10 @@ function watchLiveClockStart() {
   if (WATCH_LIVE_CLOCK) return;
   WATCH_LIVE_CLOCK = setInterval(() => {
     if (!watchLiveActive()) { watchLiveClockStop(); return; }
-    const n = $("wlElapsed"); if (n) n.textContent = fmtPace(watchLiveSec());
+    // BOTH renderers of this number: the full mirror screen and the card on Today.
+    const t = fmtPace(watchLiveSec());
+    const n = $("wlElapsed"); if (n) n.textContent = t;
+    const cd = $("wlCardElapsed"); if (cd) cd.textContent = t;
     // The live pill runs its own 1 Hz repaint and reads watchLiveSec too, so it needs nothing here.
   }, 1000);
 }
@@ -3422,7 +3425,11 @@ function watchLiveCard() {
     (paused ? "Paused on your Apple Watch" : "Running on your Apple Watch") + '</div>' +
     '<div class="wl-title">' + esc(L.title || "Run") + (L.step ? ' \u00b7 <span class="wl-step">' + esc(L.step) + '</span>' : "") + '</div>' +
     '<div class="wl-stats">' +
-      stat("Time", fmtPace(Math.max(0, Math.round(L.sec || 0)))) +
+      // ⚠️ THE CARD NEEDS THE SMOOTHED CLOCK TOO. Fixing only the full-screen mirror left this one
+      // reading the raw two-second-old figure, so on Today it still ticked in twos — which is where the
+      // owner was looking when he said it was "still going up in two seconds". Two renderers of one
+      // number, and only one of them was fixed.
+      '<div class="wl-stat"><div class="wl-v num" id="wlCardElapsed">' + fmtPace(watchLiveSec()) + '</div><div class="wl-k">Time</div></div>' +
       stat("Distance", (Number(L.distKm) || 0).toFixed(2) + " km") +
       stat("Pace", pace(L.paceSec)) +
     '</div>' +
@@ -5848,9 +5855,25 @@ function viewportDiagLines() {
           " \u00b7 cleared " + window.__kbDiag.cleared + " \u00b7 followed " + window.__kbDiag.followed +
           (window.__kbDiag.last ? " \u00b7 last " + window.__kbDiag.last : "")
         : "keyboard: handler not loaded"),
+      // What GPS actually did on the last run. This has been got wrong in BOTH directions — a run that
+      // recorded 0.00 km and a run that invented 0.14 km standing still — and the two look identical
+      // from a screenshot. seen = fixes delivered; still = rejected because the runner had not genuinely
+      // moved over the trailing window; badAcc = fix too vague to use; spike = an implausible jump;
+      // credited = fixes that added distance. A run with seen high and credited 0 is the first fault
+      // returning; still 0 with a stationary phone is the second.
+      gpsDiagLine(),
     ];
   } catch (e) { return ["diag unavailable"]; }
 }
+// The last run's GPS accounting. Kept on LIVE while a run is live, then stamped onto the saved run so it
+// survives the session \u2014 a report that arrives an hour later still carries its numbers.
+function gpsDiagLine() {
+  const d = (LIVE && LIVE.gpsDiag) || GPS_DIAG_LAST;
+  if (!d) return "gps: no run recorded yet";
+  return "gps: fixes " + d.seen + " \u00b7 credited " + d.credited + " \u00b7 not-moved " + d.still +
+    " \u00b7 vague " + d.badAcc + " \u00b7 spikes " + d.spike + " \u00b7 worst acc " + d.maxAcc + "m";
+}
+let GPS_DIAG_LAST = null;
 function viewportDiag() { return viewportDiagLines().join(" \u00b7 "); }
 function probeInsets() {
   const one = (side) => {
@@ -7311,37 +7334,67 @@ function startSim() {
 // few metres per fix, and haversine is always positive, so without gating that phantom motion piles
 // up. We require the device to report movement (or, when it gives no speed, a step past a noise
 // floor scaled to the fix's own accuracy) before adding distance.
+/**
+ * ⚠️ DISTANCE IS CREDITED ONLY WHILE THE RUNNER IS GENUINELY DISPLACED — not per fix, and NEVER on the
+ * strength of the speed the device reports. Two opposite failures got us here, one after the other, and
+ * the rule below is the one that survives both.
+ *
+ * 1. The original gate demanded each fix jump more than half its own accuracy. At the ±14 m the owner's
+ *    phone reported that is 7 m between fixes about a second apart — 7 m/s, a 2:22/km pace. At his actual
+ *    1.03 m/s every fix was thrown away and a whole run recorded 0.00 km with no route.
+ * 2. So I trusted coords.speed instead: if the device says 1.03 m/s the runner is moving, so a 1 m step
+ *    is real. WRONG, and he caught it in one run — 0.14 km standing still. A stationary receiver reports a
+ *    PHANTOM speed, because its speed comes from the same noisy signal as its position. Speed is not
+ *    independent evidence of movement.
+ *
+ * What IS independent: how far you are from the last point we believed. Jitter is bounded by the fix's own
+ * uncertainty and has no consistent bearing, so a stationary phone never gets far from a fixed anchor
+ * however much its coordinates twitch; a runner leaves that radius and keeps going. So we hold an ANCHOR
+ * and credit the NET displacement from it whenever that exceeds the fix's own stated accuracy, then move
+ * the anchor there.
+ *
+ * ⚠️ CREDIT THE NET DISPLACEMENT, NEVER THE SUM OF THE PER-FIX STEPS — that is a third, separate fault,
+ * and the test caught it before he had to. Noise adds on EVERY reading and haversine is always positive,
+ * so summing increments inflates: measured on a 1.03 m/s fixture with only ±1 m of jitter, 124 m covered
+ * came out as 215 m recorded, 73% long. An anchor is immune, because the jitter on the two endpoints is
+ * a few metres against a leash of ten or more, not a few metres against every single second.
+ *
+ * The visible cost, accepted: distance advances in leash-sized steps (about every 10-14 m) rather than
+ * smoothly. Pace is unaffected — it comes from the device's own speed — and a stepping distance is a far
+ * smaller sin than a distance that is 73% long, or zero, or invented while standing still.
+ *
+ * ⚠️ Instrumented on purpose (LIVE.gpsDiag, shown in Support › Your data). This has now been got wrong
+ * in both directions and a screenshot of "0.00 km" looks identical to a screenshot of "0.14 km standing
+ * still" — the next report needs to carry numbers, exactly as the keyboard diagnostics do.
+ */
 function onGpsPos(pos) {
   if (!LIVE || LIVE.mode !== "gps") return;
   const c = pos.coords; LIVE.acc = c.accuracy;
   const good = c.accuracy == null || c.accuracy <= 35;
   LIVE.devSpeed = (c.speed != null && isFinite(c.speed) && c.speed >= 0) ? c.speed : null;
-  const movingByDevice = LIVE.devSpeed == null || LIVE.devSpeed > 0.7; // <0.7 m/s ≈ standing
-  if (good && movingByDevice && LIVE.rt.getStatus() === "active" && LIVE.lastLat != null) {
-    const d = haversine(LIVE.lastLat, LIVE.lastLon, c.latitude, c.longitude);
-    // ⚠️ THE NOISE FLOOR APPLIES ONLY WHEN THE DEVICE WILL NOT TELL US ITS SPEED, and applying it
-    // unconditionally was a total failure of distance recording for anyone running slowly. The floor is
-    // half the fix's accuracy, so at the ±14 m the owner's phone reported it demanded a jump of more
-    // than 7 metres BETWEEN CONSECUTIVE FIXES — with fixes about a second apart that is 7 m/s, a
-    // 2:22/km pace. At his actual 1.03 m/s every single fix was discarded and the screen read
-    // 0.00 km for the whole run, with no route recorded either (the route push sits in this gate too).
-    // Even a good 8 m fix demanded 4 m/s, so the phone only ever accumulated distance for a fast
-    // runner with a clear sky.
-    // The floor is a PROXY for "is this real movement?" and it is needed only when speed is absent.
-    // When the device reports 1.03 m/s we already know the runner is moving, so a one-metre step is
-    // real and must be counted. Same rule the watch has always used, and the reasoning is written up
-    // in CLAUDE.md against CLLocation.speed being -1 when unknown.
-    const floor = LIVE.devSpeed != null ? 0.3 : Math.max(2.5, (c.accuracy || 8) * 0.5);
-    if (d > floor && d < 80) {
-      LIVE.dist += d; LIVE.route.push({ lat: c.latitude, lng: c.longitude });
-      // Accumulate elevation gain from the device's altitude, when it reports one (often it doesn't).
-      if (c.altitude != null && isFinite(c.altitude)) {
-        if (LIVE.lastAlt != null && c.altitude - LIVE.lastAlt > 0.6) LIVE.elevGain += c.altitude - LIVE.lastAlt;
-        LIVE.lastAlt = c.altitude;
-      }
-    }
+  const D = LIVE.gpsDiag || (LIVE.gpsDiag = { seen: 0, badAcc: 0, still: 0, spike: 0, credited: 0, maxAcc: 0 });
+  D.seen++;
+  if (c.accuracy != null && c.accuracy > D.maxAcc) D.maxAcc = Math.round(c.accuracy);
+  if (!good) { D.badAcc++; return; }
+  if (LIVE.rt.getStatus() !== "active") { LIVE.anchorLat = c.latitude; LIVE.anchorLon = c.longitude; return; }
+  if (LIVE.anchorLat == null) { LIVE.anchorLat = c.latitude; LIVE.anchorLon = c.longitude; D.still++; return; }
+  // Displacement from the last point we credited — the leash.
+  const net = haversine(LIVE.anchorLat, LIVE.anchorLon, c.latitude, c.longitude);
+  const leash = Math.max(10, c.accuracy || 8);
+  if (net <= leash) { D.still++; return; }
+  if (net > 200) { D.spike++; LIVE.anchorLat = c.latitude; LIVE.anchorLon = c.longitude; return; }
+  // Cheap veto: when the device DOES insist it is stationary, believe that much.
+  if (LIVE.devSpeed != null && LIVE.devSpeed <= 0.35) { D.still++; return; }
+  D.credited++;
+  LIVE.dist += net;
+  LIVE.route.push({ lat: c.latitude, lng: c.longitude });
+  LIVE.anchorLat = c.latitude; LIVE.anchorLon = c.longitude;
+  LIVE.lastLat = c.latitude; LIVE.lastLon = c.longitude;
+  // Accumulate elevation gain from the device's altitude, when it reports one (often it doesn't).
+  if (c.altitude != null && isFinite(c.altitude)) {
+    if (LIVE.lastAlt != null && c.altitude - LIVE.lastAlt > 0.6) LIVE.elevGain += c.altitude - LIVE.lastAlt;
+    LIVE.lastAlt = c.altitude;
   }
-  if (good) { LIVE.lastLat = c.latitude; LIVE.lastLon = c.longitude; }
 }
 // Current pace: trust the device's own speed when it's a real running speed; otherwise derive it
 // from distance covered over a trailing ~12s window. When neither shows meaningful movement we
@@ -8337,6 +8390,9 @@ function simRouteStep() {
 function startLoop() { if (!LIVE.timer) LIVE.timer = setInterval(liveTick, 200); }
 function stopLive() {
   if (!LIVE) return;
+  // Keep the GPS accounting after LIVE is torn down, so Support › Your data can still answer "what did
+  // GPS actually do on that run?" an hour later.
+  if (LIVE.gpsDiag) GPS_DIAG_LAST = LIVE.gpsDiag;
   clearCountIn();
   endLiveActivity();
   if (LIVE.timer) { clearInterval(LIVE.timer); LIVE.timer = null; }

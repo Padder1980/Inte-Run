@@ -2094,6 +2094,43 @@ now a confirmed open bug, below.
 
 He ran a real session and sent five screenshots. Two were functional and both were serious.
 
+⚠️ **GPS DISTANCE TOOK THREE GOES. READ ALL THREE BEFORE TOUCHING `onGpsPos`.** The first two were shipped
+to his phone and he caught each within one run; the third fault was caught by its own test.
+
+1. **Recorded 0.00 km for a whole run.** The gate demanded each fix jump more than half its own accuracy.
+   At ±14 m that is 7 m between fixes about a second apart — 7 m/s, a **2:22/km pace**. At his actual
+   1.03 m/s every fix was discarded: no distance, no route (the route push is in the same gate), nothing
+   for the debrief to read. Even a good 8 m fix demanded 4 m/s, so the phone only recorded distance for a
+   fast runner under a clear sky.
+2. **Then it invented 0.14 km standing still.** The fix for (1) trusted `coords.speed`: if the device says
+   1.03 m/s the runner is moving, so a 1 m step is real. ⚠️ **WRONG, AND THE MISTAKE IS WORTH REMEMBERING —
+   A STATIONARY RECEIVER REPORTS A PHANTOM SPEED,** because speed is derived from the same noisy signal as
+   position. Speed is *not* independent evidence of movement, so believing it let every jitter step count.
+3. **And summing per-fix steps inflates distance anyway.** Noise adds on EVERY reading and haversine is
+   always positive, so the sum runs long: measured on a 1.03 m/s fixture with only ±1 m of jitter, 124 m
+   covered came out as **215 m recorded, 73% long**. `test/gps-distance.test.ts` caught this one before he
+   had to.
+
+**What it does now: an ANCHOR and a LEASH.** Hold the last point we believed; when the current fix is
+further from it than the fix's own stated accuracy (min 10 m), credit that **net displacement** and move
+the anchor there. Jitter is bounded by the accuracy and has no consistent bearing, so a stationary phone
+never leaves the leash however much it twitches; a runner leaves it and keeps going. Immune to (3) because
+the jitter is a few metres against a ten-metre leash rather than against every single second.
+
+⚠️ **The visible cost, accepted:** distance advances in leash-sized steps (~10–14 m, so every 4–14 s
+depending on pace) rather than smoothly. Pace is unaffected — it comes from the device's own speed. A
+stepping distance is a far smaller sin than one that is zero, 73% long, or invented at a standstill.
+
+⚠️ **`LIVE.gpsDiag` is surfaced in Support › Your data** (`gpsDiagLine`), and is the reason to instrument
+rather than guess: *"0.00 km"* and *"0.14 km standing still"* look identical in a screenshot. `seen`,
+`credited`, `still`, `badAcc`, `spike`, `maxAcc` — and a test asserts the counters account for every fix,
+so a future fault cannot hide between them. Same precedent as `__kbDiag` for the keyboard.
+
+⚠️ **A BROWSER HARNESS CAN FALL BACK TO THE SIMULATOR AND LOOK LIKE THE BUG.** Overriding
+`watchPosition` but not `getCurrentPosition` left acquisition failing, so the run went to `startSim()` —
+which fabricates distance, and produced **0.13 km**, almost exactly the phantom figure being investigated.
+Check `LIVE.mode === "gps"` before believing anything a harness tells you about GPS.
+
 ⚠️ **THE PHONE RECORDED 0.00 km FOR A WHOLE RUN, AND THE CAUSE WAS A NOISE FLOOR APPLIED TOO WIDELY.**
 `onGpsPos` gates distance behind half the fix's own accuracy, to stop GPS jitter piling up at a
 standstill. That floor was applied to **every** fix, including the ones where the device reports its
@@ -2104,8 +2141,9 @@ nothing to read. Even a good 8 m fix demanded 4 m/s, so **the phone only ever ac
 fast runner under a clear sky.** The floor is a PROXY for "is this real movement?" and it is needed only
 when `speed` is absent — the watch has always worked this way, and the reasoning was already written down
 here against `CLLocation.speed` being −1 when unknown. Now `LIVE.devSpeed != null ? 0.3 : accuracy-scaled`.
-`test/gps-distance.test.ts` pins both halves and was checked by re-breaking the fix: the two slow-movement
-cases go red while all three drift guards stay green.
+⚠️ **That paragraph describes the FIRST fix, which was itself wrong — see the three-goes note above for
+what the code does now.** Kept because the diagnosis of fault (1) is still correct and still the reason
+the floor cannot be unconditional.
 
 ⚠️ **THE LIVE CLOCK READ 0:00 FOR THE WHOLE WARM-UP.** Part 3 of the named-time work subtracts the warm-up
 from the displayed clock and clamped the result at zero, with a comment claiming it "counts the warm-up

@@ -6889,6 +6889,85 @@ function coachKeepGoing(type, nowSec) {
   coachTrigger("keep-going", type, nowSec);
 }
 // Ambient / milestone checker, called each UI tick with a fresh snapshot.
+// ---- The coach with the phone locked ---------------------------------------
+// ⚠️ THE PAGE CANNOT DO THIS ITSELF, and that is the whole bug. Every cue is fired from the live tick
+// inside the web view, and iOS suspends the web content process when the screen locks — the interval
+// stops, nothing asks for the next cue, and the coach is silent for the rest of the run. An audio session
+// keeps ALREADY-PLAYING audio alive; it cannot keep JavaScript running.
+//
+// So the deterministic cues are handed to the native shell, which stays alive on the location background
+// mode and plays them with AVAudioPlayer. The page still decides WHAT is said and WHEN; Swift only owns
+// playback while the page is frozen, and reports back so nothing is said twice. See CoachAudioService.
+//
+// ⚠️ ONLY THE CUES THAT ARE A FUNCTION OF TIME. Step changes and the finish are computable from the
+// session's own steps, so they can be scheduled in advance. The pace cues cannot: they depend on how the
+// run is actually going, which is a judgement only the live layer makes. With the phone locked the runner
+// gets their step changes and their finish, and no pace corrections — that is a real limit, and it is
+// better than the silence it replaces. Say so rather than implying full coverage.
+function coachNativeAvailable() {
+  try { return !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.interunCoachAudio); }
+  catch (e) { return false; }
+}
+function coachNativePost(msg) {
+  try { window.webkit.messageHandlers.interunCoachAudio.postMessage(msg); } catch (e) {}
+}
+// ⚠️ NOT selectPrompt — that is the wrong tool for a SCHEDULE and it fails silently. It is stateful and
+// time-relative: asked for a line at a moment in the future, against a history that has not reached that
+// moment, it returns null. Measured on a real session, every step cue after the first came back empty and
+// the schedule shipped with one entry in it — the completion — which would have looked like "the coach is
+// quieter when locked" rather than a bug.
+//
+// What a schedule needs is deterministic: the candidates for this trigger and session type, picked by
+// position so six hill sprints do not all get the same line. Repeat-window logic still governs the LIVE
+// coach; it just cannot govern a list built in advance.
+function coachScheduledPrompt(trigger, idx) {
+  try {
+    const all = RC.promptsFor(trigger, LIVE.session.type) || [];
+    if (!all.length) return null;
+    // Rotate, then fall back to any candidate that actually has audio for this coach.
+    for (let n = 0; n < all.length; n++) {
+      const p = all[(idx + n) % all.length];
+      const clip = coachClip(p.id);
+      if (clip && clip.file) return { id: p.id, file: clip.file };
+    }
+  } catch (e) {}
+  return null;
+}
+// Every step boundary still ahead of us, as {id, inMs, file}. Built from the session the runner is
+// actually running, at the elapsed time they are actually at.
+function coachNativeSchedule() {
+  if (!coachNativeAvailable()) return;
+  if (!LIVE || !LIVE.started || LIVE.done || !coachEnabled()) { coachNativePost({ action: "clear" }); return; }
+  const steps = (LIVE.session && LIVE.session.steps) || [];
+  if (!steps.length) return;
+  const nowSec = liveNowMs() / 1000;
+  const cues = [];
+  let at = 0;
+  for (let i = 0; i < steps.length; i++) {
+    const st = steps[i];
+    // The cue lands when the step STARTS. The first step's cue has already gone by definition.
+    if (i > 0 && at > nowSec) {
+      const trig = coachStepTrigger(st.kind, LIVE.session.type, (st.targetRpe && st.targetRpe.min) || 0);
+      const pick = trig ? coachScheduledPrompt(trig, i) : null;
+      if (pick) cues.push({ id: pick.id, inMs: Math.round((at - nowSec) * 1000), file: pick.file });
+    }
+    at += (st.durationSeconds || 0);
+  }
+  // And the finish.
+  if (at > nowSec) {
+    const done = coachScheduledPrompt("session-complete", 0);
+    if (done) cues.push({ id: done.id, inMs: Math.round((at - nowSec) * 1000), file: done.file });
+  }
+  coachNativePost({ action: "schedule", cues: cues });
+}
+// Swift telling us a line has been spoken while we were frozen, so our own history matches and the cue is
+// not repeated the instant the runner unlocks the phone.
+window.__interunCoachPlayed = function (id) {
+  try {
+    const p = RC.ALL_PROMPTS.find((x) => x.id === id);
+    if (p) RC.markPlayed(p, liveNowMs() / 1000, COACH.history);
+  } catch (e) {}
+};
 function coachTick(snap) {
   if (!coachEnabled() || !LIVE || !LIVE.started || LIVE.done) return;
   const t = LIVE.session.type, nowSec = (LIVE.mode === "sim" ? LIVE.vms : liveElapsedMs()) / 1000;
@@ -7297,6 +7376,7 @@ function startGps(pos) {
   LIVE.lastLat = pos.coords.latitude; LIVE.lastLon = pos.coords.longitude; LIVE.acc = pos.coords.accuracy;
   requestWakeLock();
   LIVE.rt.start(0).forEach(liveCue);
+  coachNativeSchedule();
   LIVE.watchId = navigator.geolocation.watchPosition(onGpsPos, () => {}, { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
   if (!LIVE.ui) LIVE.ui = setInterval(gpsUiTick, 250);
   renderLiveNow();
@@ -7310,6 +7390,7 @@ function startIndoor() {
   LIVE.acquiring = false; LIVE.mode = "indoor"; LIVE.startMs = Date.now();
   requestWakeLock();
   LIVE.rt.start(0).forEach(liveCue);
+  coachNativeSchedule();
   if (!LIVE.ui) LIVE.ui = setInterval(indoorUiTick, 250);
   renderLiveNow();
 }
@@ -7327,6 +7408,7 @@ function startSim() {
   if (!LIVE || LIVE.done) return;
   LIVE.acquiring = false; LIVE.mode = "sim";
   LIVE.rt.start(LIVE.vms).forEach(liveCue);
+  coachNativeSchedule();
   startLoop();
   renderLiveNow();
 }
@@ -8234,6 +8316,10 @@ function coachRouteCue(cue) {
   if (!coachEnabled() || !LIVE) return;
   const type = LIVE.session.type, nowSec = liveNowMs() / 1000;
   if (cue.kind === "step-start") {
+    // ⚠️ Re-push on every step boundary, not once at the start. The schedule is offsets from "now", so
+    // any drift — a pause, a slow GPS lock, the runtime advancing a step early — would otherwise leave
+    // the locked-phone cues creeping further from the session the runner is actually running.
+    coachNativeSchedule();
     const snap = LIVE.rt.snapshot(liveNowMs());
     if (snap.step) {
       let trig = coachStepTrigger(snap.step.kind, type, snap.step.targetRpe && snap.step.targetRpe.min);
@@ -8390,6 +8476,9 @@ function simRouteStep() {
 function startLoop() { if (!LIVE.timer) LIVE.timer = setInterval(liveTick, 200); }
 function stopLive() {
   if (!LIVE) return;
+  // Whatever ended the run — finished, discarded, or the runner walking away — the locked-phone schedule
+  // goes with it. A cue arriving from a run that is over is the worst kind of ghost.
+  coachNativePost({ action: "clear" });
   // Keep the GPS accounting after LIVE is torn down, so Support › Your data can still answer "what did
   // GPS actually do on that run?" an hour later.
   if (LIVE.gpsDiag) GPS_DIAG_LAST = LIVE.gpsDiag;
@@ -9440,11 +9529,11 @@ function wire() {
     const st = LIVE.rt.getStatus();
     if (st === "active") {
       LIVE.rt.pause(liveNowMs()).forEach(liveCue);
-      if (LIVE.mode === "gps") { LIVE.pauseStart = Date.now(); } else { stopLive(); }
+      if (LIVE.mode === "gps") { LIVE.pauseStart = Date.now(); coachNativePost({ action: "clear" }); } else { stopLive(); }
       lPause.textContent = "Resume";
     } else if (st === "paused") {
-      if (LIVE.mode === "gps") { LIVE.pausedMs += Date.now() - LIVE.pauseStart; LIVE.pauseStart = 0; LIVE.lastLat = null; LIVE.win = []; LIVE.devSpeed = null; LIVE.curPace = null; LIVE.rt.resume(liveNowMs()).forEach(liveCue); if (!LIVE.ui) LIVE.ui = setInterval(gpsUiTick, 250); }
-      else { LIVE.rt.resume(LIVE.vms).forEach(liveCue); startLoop(); }
+      if (LIVE.mode === "gps") { LIVE.pausedMs += Date.now() - LIVE.pauseStart; LIVE.pauseStart = 0; LIVE.lastLat = null; LIVE.win = []; LIVE.devSpeed = null; LIVE.curPace = null; LIVE.rt.resume(liveNowMs()).forEach(liveCue); coachNativeSchedule(); if (!LIVE.ui) LIVE.ui = setInterval(gpsUiTick, 250); }
+      else { LIVE.rt.resume(LIVE.vms).forEach(liveCue); coachNativeSchedule(); startLoop(); }
       lPause.textContent = "Pause";
     }
   };

@@ -68,6 +68,13 @@ struct WebHost: UIViewRepresentable {
 
         config.userContentController.add(HapticService(), name: HapticService.messageName)
 
+        // The coach's voice while the phone is locked. See CoachAudioService: the page owns what is said
+        // and when, but its own timer stops the moment iOS suspends the web content process.
+        let coachAudio = CoachAudioService()
+        coachAudio.webView = webView
+        context.coordinator.coachAudio = coachAudio
+        config.userContentController.add(coachAudio, name: CoachAudioService.messageName)
+
         let notifications = NotificationService(webView: webView)
         context.coordinator.notifications = notifications
         config.userContentController.add(notifications, name: NotificationService.messageName)
@@ -121,6 +128,10 @@ struct WebHost: UIViewRepresentable {
         var watch: WatchBridge?
         /// Owns the notification centre delegate, which the centre only holds weakly.
         var notifications: NotificationService?
+        /// Owns the coach's background audio player. ⚠️ Strong: the message handler is held weakly by
+        /// WKUserContentController, and without an owner here the coach would go silent the moment ARC
+        /// collected it — which is the exact bug this exists to fix, wearing a different hat.
+        var coachAudio: CoachAudioService?
         /// Owns the CLLocationManager for the lifetime of the web view. See `LocationService.swift`.
         var location: LocationService?
         /// Pins the web view's own scroll view at zero — see the note where it is installed.

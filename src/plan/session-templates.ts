@@ -744,6 +744,15 @@ function selectFormat(pool: QualityFormat[], variant: number, ctx: FormatCtx): Q
   if (!ctx.competitive) list = narrow(list, (f) => !f.competitiveOnly);
   if (ctx.returning) list = narrow(list, (f) => !f.skipWhenReturning);
   if (ctx.isDeload || ctx.avoidBig) list = narrow(list, (f) => f.load !== "big");
+  // ⚠️ A DELOAD PREFERS THE SHORTEST SESSION IN THE POOL, and that is how the week gets lighter WITHOUT
+  // getting soft (owner's constraint, 2026-08-06: "I don't want users thinking the plan isn't
+  // challenging enough"). Dropping the "big" formats was the only thing a deload did here, so it still
+  // drew a full-length session and the week's measured cut came out at 13% on a 5 km block — barely an
+  // absorb week. The runner still gets a genuine hard session, at the same intensity; it is simply
+  // short. That is exactly what `taperSession` does with `vo2-10x1`, for the same reason.
+  // `narrow` falls back to the wider list when nothing qualifies, so a pool with no "small" format is
+  // unaffected rather than broken.
+  if (ctx.isDeload) list = narrow(list, (f) => f.load === "small");
   // Modulo over a stable, sorted-by-id list so the rotation does not shift when formats are added
   // in the middle of the array.
   const ordered = [...list].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
@@ -1080,7 +1089,12 @@ const VO2_FORMATS: QualityFormat[] = [
     ] },
 
   // — ladders, cut-downs and pyramids —
-  { id: "vo2-pyramid", title: "VO₂ pyramid: 1–2–3–2–1′ / equal easy", phases: ["base", "build"],
+  // ⚠️ load "small" because it MEASURES small — 42 minutes against the 44 of vo2-10x1, which already
+  // carried the label. The field describes size relative to the pool, and these two were simply never
+  // labelled. It matters now that a deload PREFERS the small formats: with only vo2-10x1 marked, every
+  // VO2 deload in a 35-week plan drew the identical session and "a long plan delivers real variety"
+  // failed at 6 appearances against a limit of 5.
+  { id: "vo2-pyramid", title: "VO₂ pyramid: 1–2–3–2–1′ / equal easy", phases: ["base", "build"], load: "small",
     desc: "A pyramid — ramp rep length up then back down, equal easy recovery. Same hard effort (RPE 8–9) throughout; it plays with rhythm and keeps the mind engaged.",
     build: (p) => pyramid(p) },
   { id: "vo2-ladder-km", title: "Ladder: 1–2–3–4–3–2–1 km / equal jog", phases: ["build", "peak"], minEventKm: 21, load: "big",
@@ -1106,7 +1120,7 @@ const VO2_FORMATS: QualityFormat[] = [
       work: { durationSeconds: m * 60, pace: p.vo2 },
       rec: { durationSeconds: 120, pace: p.aerobic },
     })), (w) => `${Math.round((w.durationSeconds ?? 0) / 60)}′ hard`) },
-  { id: "vo2-mona", title: "Mona fartlek: 2 × (90/60/30/15″ hard, equal float)", phases: ["base", "build", "peak"],
+  { id: "vo2-mona", title: "Mona fartlek: 2 × (90/60/30/15″ hard, equal float)", phases: ["base", "build", "peak"], load: "small",
     desc: "The classic Mona fartlek — descending hard surges with equal-length floats (not full rest). Continuous and rhythmic, hard by feel. A fun, varied way to hit VO₂.",
     build: (p) => monaFartlek(p) },
 

@@ -1562,12 +1562,55 @@ the VO2 ones they replace. `test/race-pace-progression.test.ts` pins all of it, 
 the format picker, which drops the "big" formats, so the week gets the mild cut-down. The first cut of the
 test asserted across every phase, failed on this, and would have had me overturn a real design decision to
 get a green test. Build deloads are the ones that must stay clean, and they do.
-### ⚠️ FINDING 3 — deloads are shallow, and shallower the shorter the race
+### ✅ FINDING 3 — deloads are shallow — **FIXED 2026-08-06**
 
 Mean cut against the week before: **5k 13.2%, 10k 17.5%, half 19.4%, marathon 20.4%**. A 13% cut is not
 much of an absorb week. The taper by contrast is healthy at 36.9% (inside the 30–60% window on every
 distance). Whether a deload should cut 20–40% is a coaching call, but 13% is worth him seeing.
 
+
+**Deepened to a mean 26.5% cut (was 17.8%), with the hard session kept.** The owner's constraint was the
+design: *"I don't want users thinking the plan isn't challenging enough."* So the week loses VOLUME and
+keeps INTENSITY — the same bargain the taper already strikes. Three levers, and they only work together:
+1. ⚠️ **`selectFormat` now PREFERS the "small" formats on a deload**, not merely non-"big" ones. Dropping
+   the big formats was all a deload did there, so it still drew a full-length session. The runner gets a
+   genuine hard session at the same intensity; it is simply short — exactly what `taperSession` does.
+2. The long run's deload multiplier **0.75 → 0.68**, easy runs **35 → 32 minutes**. Swept as a pair; the
+   chosen point lands the mean at 25.7% before the format effect, 26.5% with it.
+3. The quality session **COUNT was already 1 and stays 1**. It is never dropped, and a test asserts it.
+
+⚠️ **THE EASY FLOOR IS UNTOUCHED — 2 breaches in 19,200 weeks either way — precisely BECAUSE the hard
+session got shorter as the volume fell.** Cutting easy running while leaving a full-length quality session
+in place is what would have raised the hard fraction. The two halves of this change protect each other,
+which is why the sweep showed the floor holding at every point in it.
+
+⚠️ **TWO FORMATS WERE MISLABELLED AND IT ONLY SURFACED HERE.** `vo2-mona` (38′) and `vo2-pyramid` (42′)
+are both SHORTER than `vo2-10x1` (44′), which already carried `load: "small"` — they simply had no label.
+It did not matter until a deload started preferring small formats: with only one small VO2 format, every
+VO2 deload in a 35-week plan drew the identical session and `a long plan delivers real variety` failed at
+6 appearances against a limit of 5. ⚠️ `vo2-hills-10x50m` is 39′ and is deliberately NOT labelled small —
+hill sprints are the highest connective-tissue load in the library, which is not what a deload is for.
+
+⚠️ **THE WORDING IS HALF THE FIX.** "Deload — recover and absorb training" is accurate and reads as the
+plan going soft. It now says *"Absorb week — volume down, one hard session kept. This is where the work
+lands"*, and the beginner track likewise. A runner who does not trust the easy week is the one who rides
+through it and reaches the peak phase already tired.
+
+**Measured, before → after:** mean deload cut **17.8% → 26.5%**; 5k **13.2% → 23.1%**, 10k 17.5% → 25.8%,
+half 19.4% → 27.9%, marathon 20.4% → 28.8%. Taper unchanged (36.8%, 20.7–46.7). Week-one anchoring
+unchanged at 88.5%. Easy floor unchanged at 2 of 19,200.
+
+⚠️ **A STRUCTURAL QUIRK FOUND ON THE WAY, WORTH KNOWING.** When a deload takes a week from two quality
+sessions to one it converts a quality day into an EASY day, so that week's easy MINUTES can rise even as
+every run shortens (measured 108′ → 121′ on a 4-day peak deload). The week still cuts properly overall
+because a whole quality session left it. `test/deload-depth.test.ts` therefore compares the easy column
+only where the quality count is unchanged — scoping it by days-per-week was wrong, because a 4-day PEAK
+week carries two quality sessions too.
+
+⚠️ **THE DEPTH TEST'S THRESHOLD IS SET FROM MEASUREMENT.** On its own sweep the shallow version reads
+18.8% and the deepened one 27.2%, so the bar sits at 0.22. It was first written at 0.18 — below the
+shallow figure — and therefore passed on the very code it existed to reject. Re-break the fix and watch a
+guard fail before believing it; that is now three tests in this session that needed it.
 ### ✅ FINDING 4 — the long-run inversion is a SHORT-RACE phenomenon, and the aggregate hid it
 
 | distance | long run NOT the longest run of its week |

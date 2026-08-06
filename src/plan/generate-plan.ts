@@ -756,7 +756,7 @@ function buildWeek(
     // legs, not more aerobic volume. Handing out another full easy run instead is how a seven-day
     // week becomes a six-day week plus an injury.
     const seventh = runningDays >= 7 && ei === easyDays.length - 1;
-    const baseMin = wp.isDeload ? 35 : seventh ? 30 : ei === easyDays.length - 1 ? 40 : 45;
+    const baseMin = wp.isDeload ? 32 : seventh ? 30 : ei === easyDays.length - 1 ? 40 : 45;
     // ⚠️ ORDER: clamp the VOLUME-driven length to 95 first, THEN taper, with the 20-minute floor
     // outermost. Multiplying before the clamp let the cap swallow the taper whole for high-mileage
     // runners — at vScale 3, 45 x 3 x 0.8 = 108 still clamps to 95, byte-identical to peak week, so
@@ -1058,7 +1058,7 @@ function beginnerRun(
 }
 
 function beginnerFocus(wp: AnnotatedWeek, runWalk: boolean): string {
-  if (wp.isDeload) return "Easy week — let your body adapt and come back stronger";
+  if (wp.isDeload) return "Lighter week on purpose — this is when your body turns the work into fitness";
   if (wp.phase === "taper") return "Ease down — stay fresh for your goal";
   return runWalk
     ? "Run–walk foundation — build the habit and let running feel easy"
@@ -1495,7 +1495,13 @@ function longRunMinutes(
   }
   const fraction = nonTaperCount <= 1 ? 1 : (weekIndex - 1) / (nonTaperCount - 1);
   let minutes = startLong + fraction * (peakLong - startLong);
-  if (wp.isDeload) minutes *= 0.75;
+  // ⚠️ 0.68, deepened from 0.75 (2026-08-06 audit). A deload was cutting only 13% of a 5 km week against
+  // the week before it, which is not an absorb week — it is a slightly quieter one. Swept alongside the
+  // easy-run figure: this pair lands the mean cut at 25.7%, the middle of the usual 20–40% guidance,
+  // without tipping into a week off. The easy floor is untouched at every point in that sweep (18 weeks
+  // of 18,624 either way) because the deload's quality session is now SHORT as well as non-"big", so
+  // the week's hard fraction does not climb as its volume falls.
+  if (wp.isDeload) minutes *= 0.68;
   return Math.round(minutes);
 }
 
@@ -1512,7 +1518,12 @@ function annotate(schedule: WeekPlan[]): AnnotatedWeek[] {
 }
 
 function weekFocus(wp: AnnotatedWeek, ctx: WeekContext): string {
-  if (wp.isDeload) return "Deload — recover and absorb training";
+  // ⚠️ THE WORDING CARRIES THE OWNER'S CONSTRAINT (2026-08-06): "I don't want users thinking the plan
+  // isn't challenging enough." A deload that simply says "recover" reads as the plan going soft, and the
+  // runner who does not trust it is the one who rides through it and arrives at the peak phase tired.
+  // So it says what is TRUE and what is different: the hard session is still there, the volume is not,
+  // and this is the week the training actually turns into fitness.
+  if (wp.isDeload) return "Absorb week — volume down, one hard session kept. This is where the work lands";
   switch (wp.phase) {
     case "base": {
       const foundationWeeks = wp.phaseTotal >= 8 ? Math.round(wp.phaseTotal * 0.3) : 0;

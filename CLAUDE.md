@@ -1373,9 +1373,9 @@ followed happily reported OK **on the previous build** — so the browser was se
 check looked green. Read the build's exit code before trusting anything after it; that is why the rule is
 written down.
 
-## ⚠️ NEXT: REVIEW THE SESSIONS FOR GENUINE PROGRESSION (owner, 2026-08-03)
+## REVIEW THE SESSIONS FOR GENUINE PROGRESSION (owner 2026-08-03) — **AUDIT DONE 2026-08-06**
 
-Not built. He wants the plan audited against the principles of training — Specificity, Progression,
+**The measurement is done — findings below.** He wanted the plan audited against the principles of training — Specificity, Progression,
 Overload, Reversibility — with progressive overload examined through **FITT: Frequency, Intensity, Time,
 Type**. Measure it, do not reason about it; every session type, every plan length, several abilities.
 
@@ -1419,6 +1419,87 @@ easy ramp partly repaired. Two causes, and they need separating before anything 
 ⚠️ **Do not "fix" this by scaling the long run up.** `Math.max(1, vScale)` is one-way on purpose and the
 reasoning behind it is documented at length in `buildAll` — a marathoner stating 30 km/week got a 10.3 km
 longest run when that rule was absent.
+
+## THE PROGRESSION AUDIT — measured 2026-08-06
+
+His instruction was *measure it, do not reason about it*. **768 plans / 18,624 weeks**: 4 distances × 4
+runways (13 to 52 weeks) × 3–6 days × 3 abilities × recreational/competitive × stated-volume on/off. The
+partial first week and race week are excluded from every trend — both are fragments by construction.
+
+⚠️ **THREE INSTRUMENT FAULTS CAME FIRST, AND EACH WOULD HAVE PRODUCED A CONFIDENT WRONG REPORT.** Found by
+probing one plan by hand rather than trusting the totals. Anyone repeating this audit should re-read these
+before writing a measurement:
+1. **Hard minutes read from STEP-level `targetRpe`.** Quality reps do not carry one — a threshold session
+   probes at "max RPE 3", a VO2 session at "RPE 3" — so intensity read ~2% everywhere and the taper read
+   **0.0% hard**, which would have been reported as "the taper throws away all intensity". `stepBucket` /
+   `computeDistribution` is the engine's own tested definition. Use it; never roll a second one.
+2. **Race-pace seconds charged the WHOLE race-specific session**, so "15′ easy → 20′ at goal pace → 10′
+   threshold" counted 70 minutes of race pace instead of 20.
+3. **The label is "marathon EFFORT", not "marathon pace".** A regex looking for "pace" missed every
+   marathon race-pace block in the library.
+
+### What the five principles measure at
+
+| principle | measured | verdict |
+|---|---|---|
+| **Frequency** | flat in **81.3%** of plans; **zero** jumps of 2+ running days | not progressed **by design** — the runner picks their days |
+| **Time** | **16.3%** of non-deload week-on-week rises exceed the 1.10 guardrail (1359/8352), worst **1.46×** | ⚠️ real defect, root cause below |
+| **Intensity** | 5k/10k hard **1.4% → 3.4%**; half/marathon hard **1.1% → 0.4%** while moderate **6% → 20%** | correct, and correctly different per race |
+| **Type / specificity** | race-pace share **0.0% base → 0.0% build → 5.2–12.3% peak** | ⚠️ nothing before the peak phase |
+| **Reversibility** | deload **17.8%** deep, every 4.0 weeks; taper **36.9%** (20.7–46.7%) | taper healthy, ⚠️ deloads shallow |
+
+Also: only **23 weeks of 18,624** breach the pyramidal/polarized easy floor, and the biggest week sits in
+build or peak in **97.9%** of plans — both healthy, and both the product of the easy-run ramp.
+
+### ⚠️ FINDING 1 — the volume line SAW-TOOTHS, and the cause is the quality slot's counted distance
+
+Not a ramp that is slightly too steep. Measured on a 3-day 5 km block: **22.4 → 16.6 → 24.2 km** across
+weeks 5–7, with week 6 **not a deload**. The week-6 quality session is `10 × 50 m hill sprints, walk back`
+— **0.50 km** of counted distance for a 39-minute session — where week 7's is `2 × 15′ threshold / 3′
+float` at **7.94 km**.
+
+**The same slot swings by 7.4 km — 37% of that week's entire volume — decided by a format rotation that
+knows nothing about volume.** Hill sprints are effort-only steps (no pace, by design, because pace up a
+hill is a function of gradient) and their walk-back recoveries carry no distance either, so a hill week
+reads as nearly empty to the volume model while the runner is out for the same 39 minutes.
+
+⚠️ **Do not "fix" this by giving hill sprints a synthetic distance** — that would put a fabricated number
+in the runner's logbook and in the mileage they are judged against. The honest options are to smooth the
+ramp across the rotation, or to let `selectFormat` see the volume it is about to spend. That is a design
+decision for the owner.
+
+### ⚠️ FINDING 2 — there is NO race-pace rehearsal before the peak phase, in any distance
+
+`0.0%` in base **and** in build, for 5k, 10k, half and marathon alike, then 5.2–12.3% in peak. The build
+phase's long-run finishes are explicitly `"Strong steady finish — controlled, not raced"`; every
+`"Block at marathon effort"` / `"Finish at marathon effort"` step lives in peak only. For a marathon in
+particular, race-pace long runs during the build are standard practice, and the plan has none.
+
+**And 24 plans (3.1%) never get any race-pace work at all** — all short-runway blocks, concentrated in the
+10 km. A short block spends its whole life in base and build, which is exactly where the library has no
+race-pace work to give.
+
+### ⚠️ FINDING 3 — deloads are shallow, and shallower the shorter the race
+
+Mean cut against the week before: **5k 13.2%, 10k 17.5%, half 19.4%, marathon 20.4%**. A 13% cut is not
+much of an absorb week. The taper by contrast is healthy at 36.9% (inside the 30–60% window on every
+distance). Whether a deload should cut 20–40% is a coaching call, but 13% is worth him seeing.
+
+### ✅ FINDING 4 — the long-run inversion is a SHORT-RACE phenomenon, and the aggregate hid it
+
+| distance | long run NOT the longest run of its week |
+|---|---|
+| 5k | **46.1%** |
+| 10k | 23.2% |
+| half | 3.8% |
+| marathon | **0.0%** |
+
+The headline figure quoted before this audit (30%, then 17.5%) is an average over distances and says
+nothing useful. **Where it would actually matter it is already solved** — a marathon plan never does it,
+a half almost never. What remains is 5 km and 10 km plans, where the "long run" is naturally modest and a
+midweek threshold session can legitimately be longer. ⚠️ **Re-examine whether this is a defect at all for
+those two distances before spending anything on it** — it may be correct coaching that was being measured
+as a fault.
 
 ## Seven days means seven days (fixed 2026-08-02)
 

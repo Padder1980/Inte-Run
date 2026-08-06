@@ -347,14 +347,19 @@ export function buildWarmup(
   }
 
   const t = conditions.temperatureC;
+  // ⚠️ Kept separately from `vol` so the proportion cap below can move with the WEATHER but not with
+  // ability or readiness. A cold morning genuinely warrants a longer preparation, so a cap that ignored
+  // it flattened the cold and mild warm-ups to the same number and broke "cold adds easy minutes".
+  // Ability and readiness must NOT loosen the cap — that is the disproportion it exists to prevent.
+  let tempFactor = 1;
   if (typeof t === "number" && t >= 24) {
     // ⚠️ HEAT ONLY EVER REMOVES. The paper's content assertion is explicit that heat logic never
     // adds active duration — arriving overheated costs more than arriving under-warmed.
-    vol *= 0.7;
+    vol *= 0.7; tempFactor = 0.7;
     notes.push("Cut short for the heat — get ready in the shade and arrive warm, not cooked.");
   } else if (typeof t === "number" && t <= 5) {
     // ⚠️ COLD ADDS EASY ACTIVITY AND CLOTHING, NEVER HARDER WORK.
-    vol *= 1.15;
+    vol *= 1.15; tempFactor = 1.15;
     notes.push("A little longer in the cold, and keep a layer on until you start — extra easy minutes, not harder ones.");
   }
 
@@ -386,6 +391,48 @@ export function buildWarmup(
       else if (avail >= 6) { raise = Math.max(4, avail - 4); movements = movements.slice(0, 2); strides = Math.min(strides, 3); transition = 1; }
       else { raise = Math.max(3, avail - 1); movements = movements.slice(0, 1); strides = Math.min(strides, 1); transition = 1; }
       notes.push("Squeezed to fit the time you have — the easy running and a couple of strides are what matter most, so the extras went first.");
+    }
+  }
+
+  // ⚠️ THE CAP MUST RUN BEFORE THE PHASES ARE BUILT, and for a long time it did not. It sat after this
+  // point and only adjusted `totalMinutes`, so it changed the NUMBER ON THE CARD and never the session:
+  // every phase had already been pushed with the uncapped raise. A guard that cannot reach what it
+  // guards is not a guard, and this one also made the card disagree with the run it described.
+  // ⚠️ COUNT DISTANCE-BASED REPS, OR THE CAP SILENTLY DOES NOTHING. Reading durationSeconds alone made
+  // "5 x 1000 m" measure as ZERO work, so the guard below was skipped entirely for every distance-based
+  // interval session — the sessions most likely to need it. The same field trap caught my own audit
+  // instrument twice; here it was in the shipped code.
+  const stepMin = (s: WorkoutStep): number => {
+    if (s.durationSeconds) return s.durationSeconds / 60;
+    if (s.distanceMeters && s.targetPaceSecPerKm) {
+      const mid = (s.targetPaceSecPerKm.minSecPerKm + s.targetPaceSecPerKm.maxSecPerKm) / 2;
+      return ((s.distanceMeters / 1000) * mid) / 60;
+    }
+    if (s.distanceMeters) return s.distanceMeters / 4 / 60;   // effort-only, ~4 m/s
+    return 0;
+  };
+  const workMin = ((session.steps || []) as WorkoutStep[])
+    .filter((s) => s.kind !== "warmup" && s.kind !== "cooldown")
+    .reduce((a, s) => a + stepMin(s), 0);
+  // ⚠️ THE CAP NOW APPLIES TO REPETITION SESSIONS TOO — the owner looked at a real one and said so
+  // (2026-08-06). It used to be gated on `isContinuous`, on the reasoning that the paper's worked
+  // example wants "a distinct warm-up because the first repetition is demanding". True, but unbounded
+  // it delivered 33 MINUTES OF WARM-UP FOR 19 MINUTES OF WORK on 10 x 1', against a template that had
+  // asked for 15. A warm-up nearly twice what the plan wrote, and longer than the session, is not what
+  // that sentence is arguing for.
+  //
+  // Repetition sessions keep a more generous ratio than continuous ones (0.9 against 0.7) because the
+  // first rep really is demanding, and the floor rises to 10 minutes so a short sharp session still
+  // gets a real preparation. On 10 x 1' that lands at ~15 minutes — which is what the plan asked for.
+  if (workMin > 0) {
+    const cap = Math.max(10, Math.round(workMin * (isContinuous ? 0.7 : 0.9) * tempFactor));
+    let total = raise + (movements.length ? 3 : 0) + Math.ceil((strides * 75) / 60) + transition;
+    if (total > cap) {
+      // Trim the easy running first — the strides are the part that is specific to the work ahead.
+      raise = Math.max(5, raise - (total - cap));
+      total = raise + (movements.length ? 3 : 0) + Math.ceil((strides * 75) / 60) + transition;
+      if (total > cap) { strides = Math.max(1, strides - 1); movements = movements.slice(0, 3); }
+      notes.push("Kept in proportion to the session — a warm-up longer than the running it prepares you for is just a workout with a different name.");
     }
   }
 
@@ -426,26 +473,6 @@ export function buildWarmup(
   // warm-up must not become their first workout. Nothing enforced that, so a short session could be
   // handed a warm-up longer than the running it was preparing for. Capped against the session's own
   // work — never below six minutes, because something is always needed before hard running.
-  const workMin = ((session.steps || []) as WorkoutStep[])
-    .filter((s) => s.kind !== "warmup" && s.kind !== "cooldown")
-    .reduce((a, s) => a + (s.durationSeconds || 0), 0) / 60;
-  // ⚠️ THE CAP DOES NOT APPLY TO REPETITION SESSIONS. It exists to stop a moderate CONTINUOUS run
-  // being handed a warm-up half its length — but the paper's own worked example is the opposite
-  // case: "a 45-minute session containing 10 x 400 m at 5 km pace needs a distinct warm-up because
-  // the first repetition is demanding". Applied blindly it cut a VO2 warm-up to 17 minutes against
-  // the paper's 25-32, i.e. it fixed one disproportion by creating the reverse one.
-  if (workMin > 0 && isContinuous) {
-    const cap = Math.max(6, Math.round(workMin * 0.7));
-    let total = raise + (movements.length ? 3 : 0) + Math.ceil((strides * 75) / 60) + transition;
-    if (total > cap) {
-      // Trim the easy running first — the strides are the part that is specific to the work ahead.
-      raise = Math.max(5, raise - (total - cap));
-      total = raise + (movements.length ? 3 : 0) + Math.ceil((strides * 75) / 60) + transition;
-      if (total > cap) { strides = Math.max(1, strides - 1); movements = movements.slice(0, 3); }
-      notes.push("Kept in proportion to the session — a warm-up longer than the running it prepares you for is just a workout with a different name.");
-    }
-  }
-
   return {
     modelVersion: WARMUP_MODEL_VERSION, firstHardEffort: effort, evidenceGrade: GRADE[effort],
     embedded: false,

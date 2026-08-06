@@ -63,14 +63,18 @@ function everySession(): Array<[string, any]> {
   return out;
 }
 
-test("the warm-up never changes the length of the session the plan wrote", () => {
-  // ⚠️ FOUND ON THE OWNER'S PHONE. An embedded warm-up describes minutes the run ALREADY CONTAINS,
-  // so adding a step for it inflated everything that had one: a plain 40′ easy run was delivered as
-  // 42′ and a progression run as 45.75′, both under a chip still reading 40′. The first fix then
-  // over-corrected in the other direction — a 45-minute threshold progression came out at 35,
-  // because its 15-minute opening was replaced by a 5-minute one and it had no easy running to give
-  // the difference back to. Both directions are asserted here for that reason.
-  let checked = 0, embedded = 0;
+test("the warm-up stays in proportion to the session it prepares you for", () => {
+  // ⚠️ REWRITTEN 2026-08-06, AND THE OWNER FOUND THE DEFECT IT NOW GUARDS. It used to assert that an
+  // EMBEDDED warm-up changes nothing about the session's length — a design retired on 2026-08-04, so it
+  // had been failing on `expected embedded warm-ups, found 0` ever since. While it was red, this went
+  // unguarded and shipped: a `10 × 1′` session whose template asked for a 15-minute warm-up was
+  // delivered with THIRTY-THREE minutes of it, in front of nineteen minutes of work.
+  //
+  // Two causes, both now fixed in `warmup.ts`: the proportion cap was gated on continuous sessions so no
+  // interval session was ever capped, and it ran AFTER the phases were built so it only ever adjusted the
+  // number on the card. A guard that cannot reach what it guards is not a guard — which is the same
+  // lesson twice over, since this test could not reach it either.
+  let checked = 0, worst = 0, worstWhere = "";
   for (const ability of ["new", "beginner", "intermediate", "advanced"]) {
     ABILITY = ability;
     for (const [where, sess] of everySession()) {
@@ -84,19 +88,31 @@ test("the warm-up never changes the length of the session the plan wrote", () =>
       assert.ok(Number.isFinite(advertised) && Number.isFinite(delivered),
         `non-finite duration for ${where}`);
       checked++;
-      if (!w.embedded) continue;
-      embedded++;
-      // ⚠️ Strides are additive even on an embedded warm-up — they are extra work, not a description
-      // of minutes the run already has, and taking their time out of the session would eat the work
-      // the plan asked for. Everything else must come out unchanged.
-      const strideSec = (live.steps || []).filter((s: any) => s.kind === "warmup" && /strides/.test(String(s.label || "")))
-        .reduce((a: number, s: any) => a + (s.durationSeconds || 0), 0) / 60;
-      assert.ok(Math.abs(delivered - advertised - strideSec) <= 1.01,
-        `${where}: plan says ${advertised.toFixed(0)} min + ${strideSec.toFixed(1)} strides, Start delivers ${delivered.toFixed(1)}`);
+      const steps: any[] = live.steps || [];
+      const wu = steps.filter((s) => s.kind === "warmup")
+        .reduce((a, s) => a + (s.durationSeconds || 0), 0) / 60;
+      // Work = everything that is not preparation. Distance-based reps carry no duration, so they must
+      // be converted or an interval session measures as zero work and the ratio is meaningless — the
+      // exact field trap that let the shipped cap read every distance session as empty.
+      const work = steps.filter((s) => s.kind !== "warmup" && s.kind !== "cooldown")
+        .reduce((a, s) => {
+          if (s.durationSeconds) return a + s.durationSeconds / 60;
+          if (s.distanceMeters && s.targetPaceSecPerKm) {
+            const mid = (s.targetPaceSecPerKm.minSecPerKm + s.targetPaceSecPerKm.maxSecPerKm) / 2;
+            return a + ((s.distanceMeters / 1000) * mid) / 60;
+          }
+          if (s.distanceMeters) return a + s.distanceMeters / 4 / 60;
+          return a;
+        }, 0);
+      if (work < 10) continue;   // a very short session is dominated by its floor, not its proportion
+      const ratio = wu / work;
+      if (ratio > worst) { worst = ratio; worstWhere = `${where} (${wu.toFixed(0)}′ warm-up, ${work.toFixed(0)}′ work)`; }
+      assert.ok(ratio <= 1.35,
+        `${where}: ${wu.toFixed(0)} minutes of warm-up before ${work.toFixed(0)} minutes of work`);
     }
   }
   assert.ok(checked > 5000, `expected a broad sweep, only checked ${checked}`);
-  assert.ok(embedded > 200, `expected embedded warm-ups in the sweep, found ${embedded}`);
+  assert.ok(worst > 0.2, `the sweep measured no real warm-ups at all (worst ratio ${worst})`);
 });
 
 test("strides sit next to the work they prime, and never appear without any", () => {

@@ -12,12 +12,17 @@ test("the warm-up comes from the first hard effort, not the session's length", (
   // ⚠️ THE SPECIFICATION'S CENTRAL RULE. A 100-minute long run BEGINS easy, so its opening is the
   // warm-up; a much shorter interval session opens with a near-maximal repetition and needs a real
   // one. Sorting by duration gets this exactly backwards.
+  // ⚠️ REWRITTEN 2026-08-06, KEEPING ITS INTENT. It used to assert `embedded === true` for the long run,
+  // and the named-time change (2026-08-04) retired the embedded warm-up: easy and long runs now get a
+  // real, short warm-up of their own rather than being told their opening minutes are it. The rule this
+  // test exists for is untouched — a shorter, harder session needs MORE preparation, not less — so that
+  // is what it asserts now.
   const long = buildWarmup(longRun(paces, 100), "intermediate")!;
   const reps = buildWarmup(vo2Session(paces, 1), "intermediate")!;
-  assert.equal(long.embedded, true, "a long run warms up inside itself");
-  assert.equal(reps.embedded, false, "an interval session needs preparing for");
-  assert.ok(reps.totalMinutes > long.totalMinutes,
+  assert.ok(reps.totalMinutes > long.totalMinutes * 2,
     `the shorter, harder session needs the longer warm-up (${reps.totalMinutes} vs ${long.totalMinutes})`);
+  assert.ok(reps.phases.some((p: any) => p.phase === "potentiate"), "an interval session gets no strides");
+  assert.ok(!long.phases.some((p: any) => p.phase === "potentiate"), "a long run does not need strides");
 });
 
 test("first hard effort is read from the session's own steps", () => {
@@ -104,12 +109,16 @@ test("less time keeps the specific work and drops the extras", () => {
   assert.ok(rushed.notes.some((n) => /time/i.test(n)));
 });
 
-test("an easy or recovery run needs no separate warm-up at all", () => {
+test("an easy or recovery run gets a SHORT warm-up, not an interval session's", () => {
+  // ⚠️ REWRITTEN 2026-08-06. This asserted `embedded === true` and a single instruction — the design the
+  // owner replaced on 2026-08-04, when easy and long runs gained a real five-minute warm-up plus
+  // stretches. The intent survives exactly: an easy run must not be handed the routine an interval
+  // session needs. Deleting the test would have left that unguarded; only its mechanism changed.
   for (const s of [easyRun(paces, 45), recoveryRun(paces, 30)]) {
     const w = buildWarmup(s, "intermediate")!;
-    assert.equal(w.embedded, true);
+    assert.ok(w.totalMinutes <= 12, `${w.totalMinutes} minutes before an easy run`);
     assert.ok(!w.phases.some((p: any) => p.phase === "potentiate"), "no strides before an easy run");
-    assert.ok(w.phases.length === 1, "one instruction, not a routine");
+    assert.ok(!w.phases.some((p: any) => p.phase === "transition"), "no settle before a run that starts easy");
   }
 });
 
@@ -190,10 +199,13 @@ test("a long run with its hard work late warms up inside itself", () => {
   // The paper's T2: a run whose pace block comes later needs no second full warm-up. Taking the
   // PEAK effort instead of the FIRST put 24 minutes of preparation in front of a 135-minute run
   // whose opening 40 minutes are easy.
-  const late = longRun(paces, 135, { finishMinutes: 20, finishPace: paces.threshold, finishRpe: { min: 6, max: 7 } } as any);
+  // ⚠️ REWRITTEN 2026-08-06 for the same reason as the two above: `embedded` is retired, the rule is not.
+  // A run whose hard block comes an hour in must not be given an interval session's preparation.
+  const late = longRun(paces, 135, { steadyFinishMin: 20 } as any);
   const w = buildWarmup(late, "intermediate")!;
-  assert.equal(w.embedded, true, "the run's own opening is the warm-up");
   assert.ok(w.totalMinutes <= 12, `got ${w.totalMinutes} minutes before a run that starts easy`);
+  assert.ok(!w.phases.some((p: any) => p.phase === "potentiate"),
+    "strides before a 135-minute run whose work is an hour away");
 });
 
 test("an advanced runner's RACE warm-up differs from an intermediate's at every distance", () => {
@@ -213,53 +225,39 @@ test("an advanced runner's RACE warm-up differs from an intermediate's at every 
   assert.ok(mins("5k") > mins("10k") && mins("10k") > mins("half") && mins("half") > mins("marathon"));
 });
 
-test("an embedded warm-up gains strides when the hard work starts early", () => {
-  // ⚠️ The paper's T2: no second full warm-up for a run whose pace block comes later, BUT 2–4
-  // progressive strides if that block starts inside the first 20 minutes — by then the run's own
-  // opening has had barely any time to do the job.
-  // ⚠️ MEASURED ON THE SESSION AS DELIVERED, WHICH IS NOT THE SESSION AS WRITTEN. `analyseSession`
-  // skips the run's own warm-up step, because that step is the thing being replaced — but the
-  // generated raise then takes its place, so the runner still does easy running before the block.
-  // This fixture used to carry 15 real minutes and expect strides; with the 8-minute raise in front
-  // the block actually began at 23 minutes, past the paper's 20, and the assertion was reading the
-  // implementation's own arithmetic back to itself.
-  // ⚠️ THIS FIXTURE SITS ON A DELIBERATELY EXACT BOUNDARY, and both halves of it are load-bearing.
-  // For a repetition block to reach an EMBEDDED warm-up at all, the run's own easy running must be
-  // at least EMBED_AFTER_MIN (12) — below that the run has not warmed itself up and gets the full
-  // structured version. For strides, the block must still arrive inside the first 20 minutes of the
-  // DELIVERED session, which is the run's own opening PLUS that easy running. So 8 + 12 = 20 is the
-  // only shape that satisfies both. Continuous steady work has a wide window instead, covered by the
-  // easyProgression case below — if this one ever becomes unreachable, that is the test that proves
-  // strides still exist.
-  const early = {
-    targetRpe: { min: 2, max: 7 },
+test("the sooner the hard work arrives, the more preparation the runner gets", () => {
+  // ⚠️ REWRITTEN 2026-08-06. This was built entirely on the embedded warm-up — it asserted
+  // `embedded === true` for a run that warmed itself up and `false` for one that did not — and that
+  // design was retired on 2026-08-04 when easy and long runs gained a real warm-up of their own. The
+  // rule worth keeping is the one underneath it, and it is the paper's: preparation is a function of
+  // HOW SOON the first hard effort arrives, not of how long the session is.
+  const mk = (easyMin: number) => ({
+    type: "long", title: "t", intensity: "easy", estimatedDurationSeconds: 0,
     steps: [
-      // ⚠️ Steps carry a PACE. A session with neither pace nor distance is not a run — that is how
-      // the generator tells a threshold session from a strength session, both of which are one
-      // continuous block at a similar effort.
-      { kind: "warmup", label: "Easy", durationSeconds: 8 * 60, targetPaceSecPerKm: paces.easy, targetRpe: { min: 2, max: 3 } },
-      { kind: "steady", label: "Easy", durationSeconds: 12 * 60, targetPaceSecPerKm: paces.easy, targetRpe: { min: 2, max: 3 } },
+      { kind: "warmup", label: "w", durationSeconds: 8 * 60, targetPaceSecPerKm: paces.easy, targetRpe: { min: 2, max: 3 } },
+      { kind: "steady", label: "easy", durationSeconds: easyMin * 60, targetPaceSecPerKm: paces.easy, targetRpe: { min: 2, max: 3 } },
       { kind: "rep", label: "Threshold block", durationSeconds: 20 * 60, targetPaceSecPerKm: paces.threshold, targetRpe: { min: 6, max: 7 } },
     ],
-  } as any;
-  const w = buildWarmup(early, "intermediate")!;
-  assert.equal(w.embedded, true, "the run still warms itself up");
-  assert.ok(w.phases.some((p: any) => p.phase === "potentiate" && p.strides >= 2), "but strides bridge into the work");
-  assert.ok(w.notes.some((n) => /early|shock/i.test(n)), "and the runner is told why");
+  }) as any;
+  const strides = (w: any) => (w.phases.find((p: any) => p.phase === "potentiate") || { strides: 0 }).strides;
 
-  // The same session with the block much later gets no strides — nothing to bridge.
-  const late = { ...early, steps: [early.steps[0], { ...early.steps[1], durationSeconds: 45 * 60 }, early.steps[2]] };
-  // ...and with barely any easy running first, the run has NOT warmed itself up: a real warm-up.
-  const immediate = { ...early, steps: [early.steps[0], { ...early.steps[1], durationSeconds: 4 * 60 }, early.steps[2]] };
-  const wi = buildWarmup(immediate, "intermediate")!;
-  assert.equal(wi.embedded, false, "four minutes of easy running is not a warm-up");
-  assert.ok(wi.totalMinutes > 15, "it gets the full structured version instead");
-  const wl = buildWarmup(late, "intermediate")!;
-  assert.equal(wl.embedded, true);
-  assert.ok(!wl.phases.some((p: any) => p.phase === "potentiate"), "a block 57 minutes in needs no strides beforehand");
+  // Work almost immediately: the run has not warmed itself up, so it gets the full structured version.
+  const immediate = buildWarmup(mk(4), "intermediate")!;
+  assert.ok(immediate.totalMinutes > 15, `only ${immediate.totalMinutes} minutes before work that starts at four`);
+  assert.ok(strides(immediate) >= 2, "no strides bridging into work that is minutes away");
 
-  // ⚠️ A brand-new runner is exempt: strides are the component the paper caps hardest for them.
-  assert.ok(!buildWarmup(early, "new")!.phases.some((p: any) => p.phase === "potentiate"));
+  // Work an hour away: a short warm-up, and nothing to bridge into.
+  const late = buildWarmup(mk(45), "intermediate")!;
+  assert.ok(late.totalMinutes <= 12, `${late.totalMinutes} minutes before a block 57 minutes away`);
+  assert.equal(strides(late), 0, "strides before a block the runner will not reach for an hour");
+  assert.ok(immediate.totalMinutes > late.totalMinutes,
+    "the imminent block and the distant one got the same preparation");
+
+  // ⚠️ A brand-new runner is CAPPED HARDEST, not exempted — strides are halved for them. The old test
+  // asserted zero, which was true of the embedded path it was written against and has never been true
+  // of the structured one. Asserting zero here would have been inventing a rule to make a test pass.
+  assert.ok(strides(buildWarmup(mk(4), "new")!) < strides(immediate),
+    "a new runner got the same stride count as an intermediate");
 });
 
 test("readiness can only ever REDUCE, never add", () => {
@@ -394,7 +392,18 @@ test("strides are gated on when the work arrives in the SESSION AS DELIVERED, ra
   assert.ok(!all(wFar).some((t) => /starts early|opening is short/.test(t)),
     "and the copy must not claim the quicker running starts early");
 
-  // A short progression genuinely does start its work early, and must keep its strides.
-  assert.equal(strides(easyProgression(paces, 20)).length, 1,
-    "work inside the first 20 minutes of the delivered session still wants strides");
+  // ⚠️ THE ANTI-OVER-CORRECTION HALF, REBUILT 2026-08-06. It used to assert that a 20-minute
+  // progression keeps its strides — but a progression's lift is the aerobic gear (RPE 3-4), which
+  // `firstHardEffort` now reads as "easy", so BOTH lengths correctly get none and the pair no longer
+  // discriminates anything. Its job is to stop the bug above being "fixed" by deleting strides
+  // altogether, so it needs a session whose work genuinely is hard and genuinely is imminent.
+  const imminent = {
+    type: "vo2", title: "t", intensity: "hard", estimatedDurationSeconds: 0,
+    steps: [
+      { kind: "warmup", label: "w", durationSeconds: 4 * 60, targetPaceSecPerKm: paces.easy, targetRpe: { min: 2, max: 3 } },
+      { kind: "rep", label: "hard", durationSeconds: 12 * 60, targetPaceSecPerKm: paces.vo2, targetRpe: { min: 8, max: 9 } },
+    ],
+  } as any;
+  assert.equal(strides(imminent).length, 1,
+    "hard work minutes away still wants strides — the gate has been turned off rather than corrected");
 });

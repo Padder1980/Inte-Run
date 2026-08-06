@@ -50,6 +50,8 @@ export type StepView = {
   repeatIndex?: number;
   repeatCount?: number;
   gate: "time" | "distance";
+  /** What to call this section on screen — see WorkoutStep.display. */
+  display?: string;
   targetSeconds?: number;
   targetMeters?: number;
   targetPace?: PaceRange;
@@ -99,6 +101,7 @@ function stepView(steps: WorkoutStep[], index: number): StepView {
     repeatIndex: s.repeatIndex,
     repeatCount: s.repeatCount,
     gate: isDistanceGated(s) ? "distance" : "time",
+    display: s.display,
     targetSeconds: s.durationSeconds,
     targetMeters: s.distanceMeters,
     targetPace: s.targetPaceSecPerKm,

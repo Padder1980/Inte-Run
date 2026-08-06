@@ -888,6 +888,13 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 .lstep .kt { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #fff; background: var(--kc, var(--base)); border-radius: 6px; padding: 2px 8px; }
 .lstep h4 { margin: 8px 0 2px; font-size: 15px; }
 .lstep .tgt { font-size: 12.5px; color: var(--ink-soft); }
+/* The segment clock — restarts at 0:00 at every section boundary, so the runner can see how much of
+   THIS piece is left. Tabular figures, or the numbers jitter sideways as they tick. */
+.lseg { display: flex; align-items: baseline; gap: 8px; margin: 6px 0 2px; }
+.lseg .num { font-variant-numeric: tabular-nums; }
+.lseg-t { font-size: 30px; font-weight: 700; letter-spacing: -.02em; color: var(--ink); line-height: 1.05; }
+.lseg-of { font-size: 14px; font-weight: 600; color: var(--ink-faint); }
+.lseg-left { margin-left: auto; font-size: 12.5px; font-weight: 600; color: var(--kc, var(--accent)); }
 .lpbar { height: 9px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; margin-top: 10px; }
 .lpbar > i { display: block; height: 100%; width: 0; background: var(--kc, var(--accent)); }
 .lstep .cnt { font-size: 12px; color: var(--ink-faint); margin-top: 6px; }
@@ -7197,17 +7204,17 @@ function withGeneratedWarmup(sess) {
   const steps = [];
   for (const p of w.phases) {
     if (p.phase === "raise") {
-      steps.push({ kind: "warmup", label: w.embedded ? "Ease in — " + p.instruction : "Warm up easy",
+      steps.push({ kind: "warmup", display: "Warm up", label: w.embedded ? "Ease in — " + p.instruction : "Warm up easy",
         durationSeconds: Math.max(60, Math.round(p.minutes * 60)),
         targetPaceSecPerKm: pace || undefined, targetRpe: { min: p.rpe.min, max: p.rpe.max } });
     } else if (p.phase === "mobilise") {
-      steps.push({ kind: "warmup", label: "Mobilise — " + p.movements.join(" · "),
+      steps.push({ kind: "warmup", display: "Mobilise", label: "Mobilise — " + p.movements.join(" · "),
         durationSeconds: 180, targetRpe: { min: 1, max: 2 } });
     } else if (p.phase === "potentiate") {
-      steps.push({ kind: "warmup", label: p.strides + " × " + p.seconds + "s strides, " + p.effort,
+      steps.push({ kind: "warmup", display: "Strides", label: p.strides + " × " + p.seconds + "s strides, " + p.effort,
         durationSeconds: Math.max(60, p.strides * 75), targetRpe: { min: 5, max: 7 } });
     } else if (p.phase === "transition" && !w.embedded) {
-      steps.push({ kind: "warmup", label: "Settle — " + p.instruction,
+      steps.push({ kind: "warmup", display: "Settle", label: "Settle — " + p.instruction,
         durationSeconds: Math.max(60, Math.round(p.minutes * 60)),
         targetPaceSecPerKm: pace || undefined, targetRpe: { min: 1, max: 2 } });
     }
@@ -8363,11 +8370,19 @@ function liveWorkElapsed(snap) {
   // showed nothing. The named-time principle is untouched — the WORK clock still starts from 0:00 the
   // moment the warm-up ends — but until then the runner sees the warm-up counting up, under a label
   // that says so, rather than a dead zero.
-  const work = snap.elapsedSeconds - LIVE.warmSec;
-  return work >= 0
-    ? { seconds: work, label: "Elapsed", warming: false }
-    : { seconds: snap.elapsedSeconds, label: "Warm-up", warming: true };
+  // ⚠️ ONE CONTINUOUS TOTAL, and the SEGMENT clock answers the other question (owner, 2026-08-06:
+  // "we can have a total elapsed time measurement that includes the warm up… but each segment needs a
+  // Lap Time which resets at 0:00"). The clock used to subtract the warm-up so the named minutes were
+  // what you watched counting up, which meant it read 0:00 through the whole warm-up until that was
+  // fixed, and then switched labels mid-run. With a per-section clock on the step card there is nothing
+  // left for this number to do except be the honest total.
+  return { seconds: Math.max(0, snap.elapsedSeconds), label: "Elapsed", warming: false };
 }
+// What each kind is CALLED on the live screen. A step's own display field wins when it has one — the
+// generated warm-up's phases all set it — and this is the fallback for everything the engine emits.
+const STEP_BADGE = {
+  warmup: "Warm up", cooldown: "Cool down", recovery: "Recovery", rep: "Work", steady: "Steady",
+};
 function liveUpdate(snap) {
   const clock = liveWorkElapsed(snap);
   $("lElapsed").textContent = fmtPace(clock.seconds);
@@ -8387,10 +8402,29 @@ function liveUpdate(snap) {
   if (step) {
     const c = KIND_COLOR[step.kind] || "var(--base)";
     const tgt = [];
+    // ⚠️ The segment clock below already prints the section's length, so repeating it here showed
+    // "3:00" twice, one line apart. A distance-gated step still needs its target — the clock cannot
+    // show metres.
     if (step.gate === "distance" && step.targetMeters) tgt.push(Math.round(step.targetMeters) + " m");
-    else if (step.targetSeconds) tgt.push(fmtPace(step.targetSeconds));
     if (step.targetPace) tgt.push("target " + fmtPace(step.targetPace.minSecPerKm) + "–" + fmtPace(step.targetPace.maxSecPerKm));
-    card.innerHTML = '<span class="kt" style="--kc:' + c + '">' + step.kind + (step.repeatIndex ? ' ' + step.repeatIndex + '/' + step.repeatCount : '') + '</span><h4>' + step.label + '</h4><div class="tgt">' + tgt.join(" · ") + '</div><div class="lpbar" style="--kc:' + c + '"><i style="width:' + Math.round(snap.stepProgress * 100) + '%"></i></div><div class="cnt">Step ' + (step.index + 1) + ' of ' + step.total + '</div>';
+    // ⚠️ THE BADGE SAYS WHAT THE SECTION IS, not what kind of step it is internally. The owner asked
+    // why "4 × 20s strides" was badged WARMUP: it IS a warm-up step by kind, but the badge is what a
+    // runner reads mid-stride, and that read as a contradiction above near-10k-effort strides.
+    const badge = step.display || STEP_BADGE[step.kind] || step.kind;
+    // "MOBILISE" above "Mobilise — Ankle rocks…" says it twice. Strip the prefix the badge now carries.
+    const heading = step.display
+      ? String(step.label).replace(new RegExp("^" + step.display + "\\s*[—-]\\s*", "i"), "")
+      : step.label;
+    // ⚠️ THE SEGMENT CLOCK — his request, and it answers the question the total elapsed cannot:
+    // "how much of THIS is left?". It restarts at 0:00 at every section boundary. The engine already
+    // tracks stepElapsedSeconds, so this is read, never re-derived.
+    const segEl = Math.max(0, Math.round(snap.stepElapsedSeconds || 0));
+    const segTot = step.gate === "time" && step.targetSeconds ? Math.round(step.targetSeconds) : 0;
+    const left = segTot ? Math.max(0, segTot - segEl) : 0;
+    const seg = '<div class="lseg"><span class="lseg-t num">' + fmtPace(segEl) + '</span>'
+      + (segTot ? '<span class="lseg-of num">/ ' + fmtPace(segTot) + '</span>' : '')
+      + (segTot ? '<span class="lseg-left num">' + fmtPace(left) + ' left</span>' : '') + '</div>';
+    card.innerHTML = '<span class="kt" style="--kc:' + c + '">' + badge + (step.repeatIndex ? ' ' + step.repeatIndex + '/' + step.repeatCount : '') + '</span><h4>' + heading + '</h4>' + seg + '<div class="tgt">' + tgt.join(" · ") + '</div><div class="lpbar" style="--kc:' + c + '"><i style="width:' + Math.round(snap.stepProgress * 100) + '%"></i></div><div class="cnt">Step ' + (step.index + 1) + ' of ' + step.total + '</div>';
   } else if (snap.status === "completed") {
     card.innerHTML = '<span class="kt" style="--kc:var(--build)">done</span><h4>Session complete</h4><div class="tgt">Nice work.</div>';
   }

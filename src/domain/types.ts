@@ -134,6 +134,16 @@ export type WorkoutStep = {
   /** 1-based position within a repeated block, when applicable. */
   repeatIndex?: number;
   repeatCount?: number;
+  /**
+   * What to CALL this section on screen, when its `kind` is not the honest answer.
+   *
+   * ⚠️ The owner asked why a step showing "4 × 20s strides" was badged WARMUP (2026-08-06). It is a
+   * warm-up step by kind — it is preparation, it is excluded from training volume — but the badge is
+   * what the runner reads mid-run, and "WARMUP" above a set of near-10k-effort strides reads as a
+   * contradiction. The generated warm-up's four phases each set this; everything else falls back to a
+   * readable form of its kind.
+   */
+  display?: string;
 };
 
 /** A single strength exercise with its prescription — enables per-exercise, per-set logging. */

@@ -1468,7 +1468,7 @@ in the runner's logbook and in the mileage they are judged against. The honest o
 ramp across the rotation, or to let `selectFormat` see the volume it is about to spend. That is a design
 decision for the owner.
 
-### ⚠️ FINDING 2 — there is NO race-pace rehearsal before the peak phase, in any distance
+### ✅ FINDING 2 — no race-pace rehearsal before the peak phase — **FIXED 2026-08-06**
 
 `0.0%` in base **and** in build, for 5k, 10k, half and marathon alike, then 5.2–12.3% in peak. The build
 phase's long-run finishes are explicitly `"Strong steady finish — controlled, not raced"`; every
@@ -1479,6 +1479,43 @@ particular, race-pace long runs during the build are standard practice, and the 
 10 km. A short block spends its whole life in base and build, which is exactly where the library has no
 race-pace work to give.
 
+
+**Fixed, in two places, because there were two independent causes:**
+1. **Every race-specific format was `phases: ["peak"]`.** The two mildest — `race-3x10` and
+   `race-cutdown` — now allow `["build","peak"]`. The five `load: "big"` ones (8×1k, 4×2k, 2×5k, the
+   sandwich, the 5 km time trial) stay peak-only: a build week is not the place for a time trial.
+2. ⚠️ **AND THE BUILD PHASE NEVER ASKED FOR ONE.** `qualityContentsFor`'s build branch drew only
+   threshold and VO2, so change (1) alone was **dead code and measured as exactly zero effect** — the
+   audit caught that, not a review. Late build weeks now alternate a race-specific session in.
+   Half/marathon build long runs also gained a race-pace fast finish at ~half the peak's cap, which the
+   function's own doc comment had claimed all along ("REAL doses of race-pace work in build/peak") while
+   the code finished every build variant steady, one labelled "controlled, not raced".
+
+⚠️ **SHORT EVENTS ARE DELIBERATELY EXCLUDED, and that is the finding's correction to itself.** For 5 km
+and 10 km, `paces.goalRace` sits on top of threshold/VO2 — **the interval work already IS the rehearsal**,
+so the measured "0.0%" was an artefact of a label-based metric, not a gap in the training. Handing them
+"3 × 10′ at goal race pace" would be thirty minutes at 5 km pace, longer than the race itself, and is the
+identical unrunnable prescription this file records removing from short-event long runs.
+
+⚠️ **A ONE-QUALITY WEEK NEARLY MISSED OUT.** Written as "threshold, plus race-specific if there is room",
+the race-pace session fell off the end of `slice(0, count)` on a three-day week — so the runners with the
+fewest sessions, who most need the one they get to be specific, were the only ones never reached.
+
+**Measured, before → after** (`tools/audit-progression.mjs`, 768 plans):
+| | base | build | peak |
+|---|---|---|---|
+| half | 0.0% | **0.0% → 3.2%** | 12.3% |
+| marathon | 0.0% | **0.0% → 3.1%** | 12.2% |
+
+A clean 0 → 3 → 12 progression, with the peak untouched so build→peak is a real step up. Side effects, all
+measured: weeks under the easy floor **23 → 18**, and week-on-week volume jumps above 1.10 *improved* for
+both (half 18.6% → 17.7%, marathon 13.9% → 12.7%) because race-specific formats vary less in length than
+the VO2 ones they replace. `test/race-pace-progression.test.ts` pins all of it, including the exclusion.
+
+⚠️ **A PEAK deload still carries a race-specific session and that is deliberate** — `fctx.isDeload` reaches
+the format picker, which drops the "big" formats, so the week gets the mild cut-down. The first cut of the
+test asserted across every phase, failed on this, and would have had me overturn a real design decision to
+get a green test. Build deloads are the ones that must stay clean, and they do.
 ### ⚠️ FINDING 3 — deloads are shallow, and shallower the shorter the race
 
 Mean cut against the week before: **5k 13.2%, 10k 17.5%, half 19.4%, marathon 20.4%**. A 13% cut is not

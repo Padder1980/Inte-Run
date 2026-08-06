@@ -1213,8 +1213,19 @@ export function taperSession(paces: TrainingPaces): SessionContent {
 
 const RACE_DESC = "Rehearse goal race pace and rhythm. Controlled, repeatable, race-like.";
 
+// ⚠️ THE TWO MILDEST FORMATS REACH INTO THE BUILD PHASE (2026-08-06 audit). Every race-specific format
+// was `phases: ["peak"]`, which made goal-pace rehearsal STRUCTURALLY IMPOSSIBLE before the peak — measured
+// across 768 plans at 0.0% of running time in base AND build, for every distance, then 5–12% in peak. A
+// runner met the pace they had been training months for only in the last few weeks, and on a short block
+// 24 plans in the sweep met it never.
+//
+// ⚠️ ONLY THE NON-"big" ONES, AND DELIBERATELY SO. `race-8x1k`, `race-4x2k`, `race-2x5k`, `race-sandwich`
+// and the 5 km time trial are all `load: "big"` — a build week is not the place for a time trial or eight
+// kilometres at goal pace, and the deload gating already treats "big" as the thing to hold back. What the
+// build gets is the two ordinary ones: a 3 × 10′ and the cut-down. The peak keeps the whole pool, so the
+// progression from build to peak is still a real step up rather than a relabelling.
 const RACE_FORMATS: QualityFormat[] = [
-  { id: "race-3x10", title: "3 × 10′ at goal race pace / 2′ jog", phases: ["peak"],
+  { id: "race-3x10", title: "3 × 10′ at goal race pace / 2′ jog", phases: ["build", "peak"],
     build: (p) => reps(3, { durationSeconds: 10 * 60, pace: p.goalRace }, { durationSeconds: 2 * 60, pace: p.easy }) },
   { id: "race-8x1k", title: "8 × 1 km at goal race pace / 60″ jog", phases: ["peak"], minEventKm: 10, load: "big",
     desc: "Eight kilometres at goal pace off a minute's jog — short enough recovery that it starts to feel continuous.",
@@ -1225,7 +1236,7 @@ const RACE_FORMATS: QualityFormat[] = [
   { id: "race-2x5k", title: "2 × 5 km at goal race pace / 5′ jog", phases: ["peak"], minEventKm: 21, load: "big", competitiveOnly: true,
     desc: "Two long goal-pace blocks. As close to the real thing as training gets without racing.",
     build: (p) => reps(2, { distanceMeters: 5000, pace: p.goalRace }, { durationSeconds: 5 * 60, pace: p.easy }) },
-  { id: "race-cutdown", title: "Goal-pace cut-down: 3 km – 2 km – 1 km / 3′ jog", phases: ["peak"],
+  { id: "race-cutdown", title: "Goal-pace cut-down: 3 km – 2 km – 1 km / 3′ jog", phases: ["build", "peak"],
     desc: "Goal pace, then a final kilometre quicker than it. Rehearses the finish, not just the rhythm.",
     build: (p) => ladder([
       { work: { distanceMeters: 3000, pace: p.goalRace }, rec: { durationSeconds: 180, pace: p.easy } },

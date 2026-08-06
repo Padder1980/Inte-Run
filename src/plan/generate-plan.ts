@@ -1172,6 +1172,31 @@ function qualityContentsFor(
     return out.slice(0, count);
   }
   if (wp.phase === "build") {
+    // ⚠️ LATE BUILD INTRODUCES GOAL PACE — but only for the half and the marathon, and that restriction
+    // is the whole point rather than an omission. For a 5 km or 10 km runner goal pace IS the interval
+    // work: `paces.goalRace` sits on top of threshold/VO2, so the build phase already rehearses it every
+    // week under a different name. Handing a 5 km runner "3 × 10′ at goal race pace" would be thirty
+    // minutes at 5 km pace — longer than their race, and exactly the unrunnable prescription this file
+    // records removing from short-event long runs.
+    //
+    // For the half and marathon, goal pace is genuinely its own gear, slower than threshold and quicker
+    // than easy, and nothing in base or build touched it — measured at 0.0% of running time before this.
+    // Alternate weeks in the second half of the build, never on a deload: an introduction, not a peak.
+    const lateBuild = wp.ordinalInPhase > Math.ceil(wp.phaseTotal / 2);
+    const introRace = !isShortEvent && lateBuild && !wp.isDeload && rot % 2 === 0;
+    if (introRace) {
+      // ⚠️ On a two-quality week it replaces the VO2 slot, never the threshold one: threshold is the
+      // backbone of a build phase for these events, and goal pace for a half or marathon is far closer
+      // to what the VO2 work was buying than to what the tempo work is.
+      // ⚠️ On a ONE-quality week it takes that slot outright. Written as "threshold, plus race-specific
+      // if there is room", a three-day runner kept their threshold session and the race-pace one fell
+      // off the end of `slice(0, count)` — so the runners with the fewest quality sessions, who most
+      // need the one they get to be specific, were the only ones this never reached. Measured: half /
+      // 3 days had goal pace on the long run and nowhere else.
+      if (count >= 2) out.push(thresholdSession(p, rot, fctx));
+      out.push(raceSpecificSession(p, rot, fctx));
+      return out.slice(0, count);
+    }
     if (count >= 2) {
       // Offset the two variants. With the same index, a given threshold format is locked to a given
       // VO2 format for the whole plan whenever the two pools happen to be the same length.
@@ -1272,18 +1297,27 @@ function longRunFor(wp: AnnotatedWeek, ctx: WeekContext): SessionContent {
   const capScale = Math.min(1, ctx.vScale ?? 1);
   const capped = (n: number) => Math.max(10, Math.round(n * capScale));
 
+  // ⚠️ THE BUILD PHASE NOW MEETS RACE PACE, at roughly HALF the peak's dose. The comment above this
+  // function has always said half and marathon long runs "carry REAL doses of race-pace work in
+  // build/peak" — the code did not: every build variant finished steady, one of them labelled
+  // "controlled, not raced". The 2026-08-06 audit measured the consequence at 0.0% of running time at
+  // race pace across the whole build phase, for every distance. Documented intent and behaviour had
+  // silently diverged, which is the kind of gap only a measurement finds.
+  //
+  // ⚠️ ONE VARIANT IN THREE, not all of them. The other two stay a steady finish and a plain easy long
+  // run, so the build keeps genuinely aerobic weeks — the point of a build phase is still volume, and a
+  // race-pace dose every week would make it a peak phase that lasts for months.
   if (phase === "build") {
+    // Half the peak's cap, so build→peak is a real step up rather than a relabelling.
+    const buildCap = capped(marathon ? (fewDays ? 18 : 24) : (fewDays ? 15 : 21));
     switch (rot % 3) {
       case 0:
         return longRun(ctx.paces, min, {
-          progressive: {
-            finalPace: ctx.paces.steady,
-            finalLabel: "Strong steady finish — controlled, not raced",
-            finalRpe: { min: 4, max: 5 },
-            finalCapMin: capped(30),   // parity with the steady-finish sibling
-            midCapMin: capped(45),
-          },
-          titleSuffix: "· progressive",
+          raceBlockMin: Math.min(buildCap, Math.round(min * (fewDays ? 0.12 : 0.18))),
+          racePace: ctx.paces.goalRace,
+          raceLabel,
+          raceRpe,
+          titleSuffix: "· fast finish",
         });
       case 1:
         return longRun(ctx.paces, min, {

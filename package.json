@@ -11,7 +11,9 @@
     "test": "node --test",
     "demo": "node demo/generate.ts",
     "web": "node web/build.ts && node web/live.ts && node web/safety.ts && node web/fitness.ts && node web/today.ts && node web/profile.ts && node web/app.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "market": "node market/build.ts",
+    "market:test": "node --test \"market/test/*.test.ts\" && node market/build.ts && node market/test/app-smoke.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",

@@ -1451,7 +1451,7 @@ before writing a measurement:
 Also: only **23 weeks of 18,624** breach the pyramidal/polarized easy floor, and the biggest week sits in
 build or peak in **97.9%** of plans — both healthy, and both the product of the easy-run ramp.
 
-### ⚠️ FINDING 1 — the volume line SAW-TOOTHS, and the cause is the quality slot's counted distance
+### ✅ FINDING 1 — the volume line saw-tooths — **FIXED 2026-08-06**
 
 Not a ramp that is slightly too steep. Measured on a 3-day 5 km block: **22.4 → 16.6 → 24.2 km** across
 weeks 5–7, with week 6 **not a deload**. The week-6 quality session is `10 × 50 m hill sprints, walk back`
@@ -1468,6 +1468,52 @@ in the runner's logbook and in the mileage they are judged against. The honest o
 ramp across the rotation, or to let `selectFormat` see the volume it is about to spend. That is a design
 decision for the owner.
 
+
+**Fixed by letting the EASY RUNNING absorb how big this week's quality session happens to be.** The
+compensation is in MINUTES — a week whose quality session is light genuinely carries a little more easy
+running, which is ordinary coaching and honest because the runner really does run those minutes.
+
+⚠️ **TWO THIRDS OF THE VISIBLE SAWTOOTH WAS NEVER A TRAINING PROBLEM.** Measured over 8,352 transitions,
+rises above the 1.10 guardrail were **15.7% on counted distance but only 6.1% on training TIME**. The plan
+is built in minutes and displayed in kilometres, and a hill-sprint session covers almost no ground. Always
+check which of the two a "volume" defect lives in before changing the volume model.
+
+⚠️ **FILL HOLES, NEVER SHAVE PEAKS — the first cut compensated symmetrically and regressed nearly
+everything it touched.** Removing easy running from a big-quality week raises that week's hard fraction:
+weeks under the pyramidal floor went **18 → 83**, deloads went shallower (5k 13.2% → 11.7%), and the
+biggest week left the peak phase in 5.5% more plans. A week whose quality session is genuinely long IS a
+bigger week and must be left alone.
+
+⚠️ **AND IT MUST LEAVE THE DELOADS AND THE TAPER ALONE.** Both are deliberately smaller, so a compensator
+reads them as holes and undoes them. `taperSession` is a short, sharp VO2 session — shorter than the mean
+— so the taper got topped back up and `the taper genuinely cuts the week` failed at 29% against its 30%
+floor. A week that is deliberately smaller is not a week with a hole in it.
+
+⚠️ **The reference is the plan's OWN mean quality session, from a first pass in `buildAll` — not a
+constant.** Quality sessions scale with the runner's paces and with `vScale`, so a hardcoded figure would
+be right for an average runner and quietly biased for everyone else, and it would not fail loudly.
+
+**Measured, before → after:**
+| | before | after |
+|---|---|---|
+| rises >1.10 on counted distance | 15.7% | **10.6%** |
+| rises >1.10 on training time | 6.1% | **3.1%** |
+| worst single jump | 1.46× | **1.35×** |
+| weeks under the easy floor (640-plan sweep) | 18 | **2** |
+| week-one anchoring | 88.5% | 88.5% (unchanged) |
+| deload depth | 17.8% | 18.4% |
+| taper cut | 36.9% (20.7–46.7) | 36.8% (20.7–46.7) |
+
+⚠️ One cost, reported rather than buried: the long-run inversion drifts **30.0% → 30.8%**, because the
+easy runs in hole weeks get slightly longer. Finding 4 already argues that figure is mostly a short-race
+artefact, but it did move the wrong way.
+
+⚠️ **`test/volume-smoothing.test.ts` CONTAINS A TEST THAT DOES NOT DO WHAT ITS FIRST TWO NAMES CLAIMED.**
+"It never shaves a big-quality week" passed under the symmetric bug it was named for (the easy-run ramp
+swamped the comparison); rewritten to measure the easy floor it still passed at 16 plans and at 256,
+because the breaching profiles live in runway lengths the test does not sweep. It is now named `the easy
+floor still holds across the sweep`, for what it actually does. The real discriminator is `deloads and the
+taper are left alone`, and the 18 → 83 signal only appears in the full 768-plan audit.
 ### ✅ FINDING 2 — no race-pace rehearsal before the peak phase — **FIXED 2026-08-06**
 
 `0.0%` in base **and** in build, for 5k, 10k, half and marathon alike, then 5.2–12.3% in peak. The build

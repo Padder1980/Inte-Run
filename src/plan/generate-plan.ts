@@ -426,7 +426,7 @@ export function generatePlan(
   );
   const longCapMin = minutesFor(LONG_CAP_KM[goal.distance][abilityKey]);
 
-  const buildAll = (vScale: number): PlannedWeek[] => {
+  const buildAll = (vScale: number, qRefMin?: number): PlannedWeek[] => {
     // ⚠️ THE LONG RUN GROWS WITH MILEAGE BUT IS NEVER CUT BY IT — note the `Math.max(1, vScale)`,
     // which makes the scaling deliberately one-way. The long run answers the RACE, not the week: a
     // runner doing 25 km/week still has to build toward a 17 km long run before a half marathon, and
@@ -486,6 +486,7 @@ export function generatePlan(
       return buildWeek(weekIndex, startDateIso, wp, {
         athlete, goal, paces, returning, longMin, vScale, taperMult,
         easyRamp: easyRampFor(wp, weekIndex, easyRampEndWeek),
+        qRefMin,
       });
     });
   };
@@ -529,8 +530,28 @@ export function generatePlan(
   // first version of this did) measured a plan nobody is ever given: 969 of 52,920 profiles were
   // delivered a first week under the easy floor that the check had passed, and the web layer
   // defaults the start date to today, so a partial first week is the normal case, not an edge one.
+  /**
+   * The plan's own mean quality-session length, from a first pass with no compensation.
+   *
+   * ⚠️ Measured per plan rather than hardcoded. Quality sessions scale with the runner's paces and with
+   * `vScale`, so a single constant would be right for an average runner and wrong for everyone else —
+   * and being wrong here does not fail loudly, it just biases every easy run in the block.
+   */
+  const qualityRefFor = (vScale: number): number | undefined => {
+    let total = 0, n = 0;
+    for (const w of buildAll(vScale)) {
+      for (const s of w.sessions) {
+        if (s.type === "threshold" || s.type === "vo2" || s.type === "race-specific") {
+          total += (s.estimatedDurationSeconds ?? 0) / 60;
+          n++;
+        }
+      }
+    }
+    return n ? total / n : undefined;
+  };
+
   const buildFull = (vScale: number): PlannedWeek[] => {
-    const w = buildAll(vScale);
+    const w = buildAll(vScale, qualityRefFor(vScale));
     applyPartialFirstWeek(w, startIso);
     applyRaceDay(w, goal, paces);
     return w;
@@ -629,6 +650,12 @@ type WeekContext = {
    * without this the easy runs were flat across the whole block and week one opened at 93% of peak.
    */
   easyRamp?: number;
+  /**
+   * The mean duration, in minutes, of ONE quality session in this plan — measured from a first pass over
+   * the plan itself, never a constant. The easy running compensates toward it so a week whose quality
+   * session happens to be a short one is not a hole in the volume line. See `buildWeek`.
+   */
+  qRefMin?: number;
 };
 
 function buildWeek(
@@ -675,6 +702,44 @@ function buildWeek(
     dayOf.push(qualityDays[qi]!);
   });
 
+  // ⚠️ THE EASY RUNNING ABSORBS HOW BIG THIS WEEK'S QUALITY SESSION HAPPENS TO BE (2026-08-06 audit).
+  //
+  // The quality slot's size swings enormously with which format the rotation lands on, and nothing was
+  // compensating. Measured on a 3-day 5 km block: 22.4 → 16.6 → 24.2 km over three weeks with the middle
+  // one NOT a deload. Week 6's session was `10 × 50 m hill sprints` — 39 minutes, but only 0.50 km of
+  // counted distance because effort-only hill work carries no pace and its walk-backs no distance —
+  // against week 7's `2 × 15′ threshold` at 7.94 km. The same slot swung 7.4 km, 37% of that week's
+  // entire volume, decided by a rotation that knows nothing about volume.
+  //
+  // ⚠️ COMPENSATE IN MINUTES, NEVER BY INVENTING DISTANCE. Giving hill sprints a synthetic distance
+  // would put a fabricated number in the runner's logbook and in the mileage their plan judges them
+  // against. A week whose quality session is light genuinely SHOULD carry a little more easy running —
+  // that is ordinary coaching, and it is honest because the runner really does run those minutes.
+  //
+  // ⚠️ Two thirds of the visible sawtooth was never a training problem at all: measured across 8,352
+  // transitions, rises above the 1.10 guardrail were 15.7% on counted distance but only 6.1% on training
+  // TIME. The plan is built in minutes and displayed in kilometres. This targets the real 6.1%, and the
+  // distance series follows because the easy minutes it adds are ordinary paced running that does count.
+  const qualityMin = qualityContents.reduce((m, s) => m + (s.estimatedDurationSeconds ?? 0), 0) / 60;
+  // The reference is the plan's OWN mean quality session, measured in a first pass (see buildAll) — not
+  // a constant. A constant here would be wrong for every runner whose sessions are not average length.
+  // ⚠️ IT FILLS HOLES AND NEVER SHAVES PEAKS, and never touches a deload. The first cut compensated
+  // symmetrically — adding easy running to a light week and REMOVING it from a heavy one — and measured
+  // as a clear regression on everything except the thing it was aimed at: weeks under the pyramidal floor
+  // went 18 → 83, deloads went shallower (5k 13.2% → 11.7%), and the biggest week left the peak phase in
+  // 5.5% more plans. Removing easy running from a big-quality week raises that week's hard fraction,
+  // which is precisely how the easy floor breaks; and topping a deload back up fights the deload. A week
+  // whose quality session is genuinely long IS a bigger week, and should be left alone.
+  // ⚠️ AND IT MUST LEAVE THE TAPER ALONE FOR THE SAME REASON AS THE DELOAD. `taperSession` is a short,
+  // sharp VO2 session — shorter than the plan's mean quality session — so a compensating week read it as
+  // a hole and topped the easy running back up, undoing the very cut the taper exists to make. Caught by
+  // `the taper genuinely cuts the week`, which measured the 5 km taper at 29% against its 30% floor. A
+  // week that is deliberately smaller is not a week with a hole in it.
+  const compensates = ctx.qRefMin != null && qualityCount > 0 && !wp.isDeload && wp.phase !== "taper";
+  const qualityDeficitMin = compensates
+    ? Math.max(0, ctx.qRefMin! * qualityCount - qualityMin)
+    : 0;
+
   // Easy runs — rotate flavours (plain, strides, hill sprints, explore) so easy days stay fresh.
   const easyDays = EASY_REL.map((r) => dayRel(longDay, r)).slice(0, easyCount);
   // Strides and hill sprints are neuromuscular work with near-zero aerobic cost, but hill sprints
@@ -703,9 +768,14 @@ function buildWeek(
     // exactly the order `longRunMinutes` uses, where `peakLong` is fully clamped before the ramp is
     // applied to it. Ramping first would instead ramp toward an unclamped number and then clip the
     // result, which for a high-mileage runner collapses the whole progression into the ceiling.
-    const minutes = Math.max(20, Math.round(
-      Math.min(95, baseMin * (ctx.vScale ?? 1)) * (ctx.easyRamp ?? 1) * (ctx.taperMult ?? 1),
-    ));
+    const planned = Math.min(95, baseMin * (ctx.vScale ?? 1)) * (ctx.easyRamp ?? 1) * (ctx.taperMult ?? 1);
+    // ⚠️ The compensation is applied LAST, inside the same floor and ceiling as everything else, and it
+    // is BOUNDED to ±30% of the run it is adjusting. Unbounded, a week whose quality session is a pair
+    // of hill sprints would have handed a three-day runner the whole 40-minute shortfall on one easy
+    // day — turning a compensation into a bigger swing than the one it set out to remove.
+    const share = easyDays.length ? qualityDeficitMin / easyDays.length : 0;
+    const adjusted = planned + Math.max(-planned * 0.3, Math.min(planned * 0.3, share));
+    const minutes = Math.max(20, Math.min(95, Math.round(adjusted)));
     sessions.push(seventh
       ? recoveryRun(ctx.paces, minutes)
       : easyVariant(ctx.paces, minutes, index + ei, canStride));

@@ -4116,11 +4116,20 @@ function structureRows(steps, plain) {
       while (j < steps.length && (steps[j].display === "Stride" || steps[j].display === "Walk back")) {
         (steps[j].display === "Stride" ? block : recs).push(steps[j]); j++;
       }
-      // The effort target lives on the LAST stride, because that is the one it applies to. It is
-      // what the single-step version used to say, so the written row is unchanged by the split.
-      const lastLab = String(block[block.length - 1].label || "");
-      const dash = lastLab.indexOf("\\u2014");
-      const cue = dash >= 0 ? lastLab.slice(dash + 1).trim() : "";
+      // ⚠️ READ THE BLOCK'S OWN INSTRUCTION, NEVER REBUILD IT FROM A STEP LABEL. The first cut took
+      // the text after the em dash of the LAST stride — but that label has had "the last one (or
+      // two)" deliberately stripped, because the lead-in reads wrong on the stride it describes. So
+      // the summary row silently changed the prescription from "the last one or two at the pace you
+      // are about to run" to "at the pace you are about to run": every warm-up stride at VO2 pace
+      // rather than the closing one. The em-dash walk is kept only as a fallback for a step built
+      // before blockCue existed.
+      const first = block[0];
+      let cue = String(first.blockCue || "");
+      if (!cue) {
+        const lastLab = String(block[block.length - 1].label || "");
+        const dash = lastLab.indexOf("\\u2014");
+        cue = dash >= 0 ? lastLab.slice(dash + 1).trim() : "";
+      }
       const lab = block.length + " \\u00d7 " + workLabel(block[0]) + " strides" + (cue ? ", " + cue : "");
       const rec = recs[0] ? "with " + workLabel(recs[0]) + " walk back between" : "";
       rows.push({ tag: "Warm-up", lab: plain ? lab : esc(lab),
@@ -7278,6 +7287,14 @@ function withGeneratedWarmup(sess) {
         steps.push({ kind: "warmup", display: "Stride", repeatIndex: i, repeatCount: p.strides,
           label: "Stride " + i + " of " + p.strides + " \\u2014 " +
             (i === p.strides ? lastCue : "relaxed and progressive, tall and quick \\u2014 a build, not a sprint"),
+          // ⚠️ THE WHOLE BLOCK'S INSTRUCTION, KEPT INTACT, because the per-step label CANNOT be
+          // reversed back into it. lastCue deliberately drops "the last one (or two)" — that lead-in
+          // reads wrong on the very stride it describes — and the written brief was then rebuilt from
+          // the stripped text, so a row that used to say "the last one or two at the pace you are
+          // about to run" became "at the pace you are about to run": five 20-second warm-up strides
+          // prescribed at VO2 pace instead of one. Measured on 113 of 151 sessions carrying strides,
+          // and snapshotted permanently onto every logged run by sessionStepText.
+          blockCue: String(p.effort),
           durationSeconds: p.seconds, targetRpe: { min: 5, max: 7 } });
         // ⚠️ INCLUDING AFTER THE LAST ONE. These steps are moved to sit immediately before the work
         // on an embedded warm-up, so without a trailing walk back the runner finishes a stride at
@@ -8484,8 +8501,19 @@ function liveUpdate(snap) {
     // runner reads mid-stride, and that read as a contradiction above near-10k-effort strides.
     const badge = step.display || STEP_BADGE[step.kind] || step.kind;
     // "MOBILISE" above "Mobilise — Ankle rocks…" says it twice. Strip the prefix the badge now carries.
+    // ⚠️ FOUR BACKSLASHES, BECAUSE THIS PATTERN IS A STRING, NOT A REGEX LITERAL. This file's own
+    // escaping rule says double them — but that rule is for a regex literal, where \\s ships as \s
+    // and means whitespace. Inside a RegExp built from a STRING the emitted \s is a string escape,
+    // and \s is not one, so it collapses to a bare "s": the pattern was ^Mobilises*[—-]s* and matched
+    // nothing, on every step, for a whole day. Nothing threw, nothing failed, and the card simply
+    // printed "MOBILISE" above "Mobilise — Ankle rocks…" exactly as before the strip was added.
+    // ⚠️ AND THE INDEX IS OPTIONAL, because a stride's label is "Stride 3 of 5 — …" while its display
+    // is just "Stride". With the escaping fixed but the index unmatched, the most frequent step in
+    // the run would still have printed its name twice — badge "STRIDE 3/5" over "Stride 3 of 5 — …",
+    // the same identifier three times in two lines on the smallest card in the app.
     const heading = step.display
-      ? String(step.label).replace(new RegExp("^" + step.display + "\\s*[—-]\\s*", "i"), "")
+      ? String(step.label).replace(
+          new RegExp("^" + step.display + "(\\\\s+\\\\d+\\\\s+of\\\\s+\\\\d+)?\\\\s*[\\\\u2014\\\\u2013-]\\\\s*", "i"), "")
       : step.label;
     // ⚠️ THE SEGMENT CLOCK — his request, and it answers the question the total elapsed cannot:
     // "how much of THIS is left?". It restarts at 0:00 at every section boundary. The engine already
@@ -8493,7 +8521,12 @@ function liveUpdate(snap) {
     const segEl = Math.max(0, Math.round(snap.stepElapsedSeconds || 0));
     const segTot = step.gate === "time" && step.targetSeconds ? Math.round(step.targetSeconds) : 0;
     const left = segTot ? Math.max(0, segTot - segEl) : 0;
-    const seg = '<div class="lseg"><span class="lseg-t num">' + fmtPace(segEl) + '</span>'
+    // ⚠️ --kc IS SET HERE, NOT ONLY ON THE BADGE AND THE BAR. .lseg-left asks for var(--kc) and the
+    // variable was declared inline on two SIBLINGS, so it was never in scope: the "1:13 left" figure
+    // silently took its fallback and rendered teal on every step of every session, while the badge
+    // and progress bar beside it carried the step's real colour. A var that resolves to its fallback
+    // fails no test and throws nothing — it just quietly never does the thing it was written for.
+    const seg = '<div class="lseg" style="--kc:' + c + '"><span class="lseg-t num">' + fmtPace(segEl) + '</span>'
       + (segTot ? '<span class="lseg-of num">/ ' + fmtPace(segTot) + '</span>' : '')
       + (segTot ? '<span class="lseg-left num">' + fmtPace(left) + ' left</span>' : '') + '</div>';
     card.innerHTML = '<span class="kt" style="--kc:' + c + '">' + badge + (step.repeatIndex ? ' ' + step.repeatIndex + '/' + step.repeatCount : '') + '</span><h4>' + heading + '</h4>' + seg + '<div class="tgt">' + tgt.join(" · ") + '</div><div class="lpbar" style="--kc:' + c + '"><i style="width:' + Math.round(snap.stepProgress * 100) + '%"></i></div><div class="cnt">Step ' + (step.index + 1) + ' of ' + step.total + '</div>';

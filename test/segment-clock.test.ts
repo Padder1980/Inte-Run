@@ -113,6 +113,64 @@ test("⚠️ the WRITTEN brief still says '4 × 20″ strides', not eight lines"
     `the strides row quotes "${stride[0].chips}" for a ${Math.round(blockSec / 60)}-minute block`);
 });
 
+test("⚠️ the grouped row keeps 'the last one', which is the whole prescription", () => {
+  // ⚠️ The per-stride label deliberately drops "the last one (or two)" — that lead-in reads wrong on
+  // the very stride it describes. Rebuilding the SUMMARY row from that stripped text changed what the
+  // session asks for: "the last one or two at the pace you are about to run" became "at the pace you
+  // are about to run", i.e. five 20-second warm-up strides at VO2 pace instead of one. And
+  // sessionStepText snapshots this row onto every logged run, so it would have been permanent.
+  const src = ["esc", "fmtPace", "fmtSec", "spanText", "workLabel", "stepTargetText", "stepChips", "structureRows"]
+    .map(lift).join(";\n");
+  const structureRows = new Function(src + "; return structureRows;")();
+  for (const build of [() => vo2Session(paces, 1), () => thresholdSession(paces, 1)]) {
+    const sess = build();
+    const wu: any = buildWarmup(sess, ABILITY as any);
+    const pot = (wu.phases || []).find((p: any) => p.phase === "potentiate");
+    if (!pot) continue;
+    const row = structureRows(withGeneratedWarmup(sess).steps, true)
+      .find((r: any) => /strides/i.test(String(r.lab)));
+    assert.ok(row, "no strides row");
+    // The row must carry the block's OWN instruction verbatim, not a reconstruction of it.
+    assert.ok(String(row.lab).includes(pot.effort),
+      `the written row says "${row.lab}" where the warm-up asks for "${pot.effort}"`);
+  }
+});
+
+test("⚠️ the segment clock is actually IN the card, not merely computed", () => {
+  // ⚠️ Proved necessary by deletion: with the clock spliced out of the card's innerHTML entirely, all
+  // the other tests here still passed — they measure stepElapsedSeconds from the engine, which is the
+  // input to the clock rather than the clock. A test that verifies the ingredient and not the dish.
+  const body = lift("liveUpdate");
+  assert.match(body, /card\.innerHTML =[^;]*'<\/h4>' \+ seg \+/,
+    "the segment clock is no longer rendered into the step card");
+  assert.match(body, /class="lseg-left num">' \+ fmtPace\(left\)/, "the time-left figure is gone");
+  assert.match(body, /const left = segTot \? Math\.max\(0, segTot - segEl\)/, "the time left is not derived from the section");
+});
+
+test("the step heading does not repeat the badge", () => {
+  // ⚠️ This regex is built from a STRING, so it needs four backslashes in web/app.ts, not the two the
+  // project's escaping rule asks for in a regex LITERAL. Written with two it shipped as \s inside a
+  // string literal, which is a bare "s" — pattern ^Mobilises*[—-]s*, matching nothing, on every step.
+  // Nothing threw; the card just kept printing "MOBILISE" above "Mobilise — Ankle rocks…".
+  const src = html();
+  const at = src.indexOf('new RegExp("^" + step.display');
+  assert.ok(at > 0, "the heading strip is gone");
+  const expr = src.slice(at, src.indexOf("\n", at)).replace(/,\s*""\)\s*$/, "");
+  const strip = new Function("step", "return String(step.label).replace(" + expr + ', "");');
+  const cases = [
+    ["Mobilise", "Mobilise — Ankle rocks, 8–12 each side", "Ankle rocks, 8–12 each side"],
+    ["Walk back", "Walk back — easy until your breathing is back", "easy until your breathing is back"],
+    ["Settle", "Settle — 3 minutes easy.", "3 minutes easy."],
+    // ⚠️ The index is part of the prefix on the most frequent step of all. Escaping alone would have
+    // left "STRIDE 3/5" above "Stride 3 of 5 — …" — the same identifier three times in two lines.
+    ["Stride", "Stride 3 of 5 — relaxed and progressive", "relaxed and progressive"],
+  ];
+  for (const [display, label, want] of cases) {
+    assert.equal(strip({ display, label }).trim(), want,
+      `badge "${display}" leaves heading "${strip({ display, label })}"`);
+  }
+});
+
 test("the coach introduces the strides block once, not ten times", () => {
   // Ten steps in a row, each firing a step-start cue, is a coach talking over every acceleration for
   // six minutes.

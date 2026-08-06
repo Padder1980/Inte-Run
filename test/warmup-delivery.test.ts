@@ -119,14 +119,23 @@ test("strides sit next to the work they prime, and never appear without any", ()
   // ⚠️ Strides are a potentiation cue. Prepended to an embedded warm-up they landed before eighteen
   // minutes of conversational running — priming the runner for something twenty-one minutes away,
   // which is not a warm-up component, just a hard bit in a warm-up.
+  let seen = 0;
   for (const ability of ["beginner", "intermediate", "advanced"]) {
     ABILITY = ability;
     for (const [where, sess] of everySession()) {
       const w: any = buildWarmup(sess, ability as any);
       if (!w || w.incomplete) continue;
       const steps: any[] = withGeneratedWarmup(sess).steps || [];
-      const si = steps.findIndex((s) => s.kind === "warmup" && /strides/.test(String(s.label || "")));
+      // ⚠️ FIND THE BLOCK BY `display`, NOT BY THE WORD "strides" IN A LABEL. When the strides became
+      // one step per repetition, the labels changed to "Stride 1 of 5" and "Walk back" — so this
+      // finder returned -1 for every session, `continue` fired 8,631 times, and the whole test
+      // asserted NOTHING while staying green. Measured: 0 sessions reached the assertions, of 2,691
+      // that genuinely carry a strides block. The same guard-blind-to-the-new-input trap this file
+      // has now recorded six times; a test that silently stops testing is worse than no test,
+      // because the suite still reports it as covered.
+      const si = steps.findIndex((s) => s.display === "Stride");
       if (si < 0) continue;
+      seen++;
       // ⚠️ Skip warm-up steps: the strides step is itself RPE 5-7, so an unfiltered search for the
       // first hard step finds the strides and compares them to themselves.
       const hi = steps.findIndex((s) => s.kind !== "warmup" && (s.kind === "rep" || (s.targetRpe && s.targetRpe.max >= 4)));
@@ -140,6 +149,10 @@ test("strides sit next to the work they prime, and never appear without any", ()
       assert.ok(gap <= 3, `${where}: ${gap.toFixed(0)} min of the run's own easy running between the strides and the work`);
     }
   }
+  // ⚠️ THE COUNT IS THE POINT. Without it the finder above can go blind again — as it just did for a
+  // day — and this test reports success having skipped every single session. A sweep must fail when
+  // it stops sweeping.
+  assert.ok(seen > 500, `only ${seen} sessions carried a strides block — the finder has gone blind again`);
 });
 
 test("the card never says the work starts early when it does not", () => {

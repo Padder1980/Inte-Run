@@ -4100,7 +4100,33 @@ function structureRows(steps, plain) {
   const rows = []; let i = 0;
   while (i < steps.length) {
     const st = steps[i];
-    if (st.kind === "rep") {
+    if (st.display === "Stride") {
+      // ⚠️ THE STRIDES BLOCK IS ONE ROW HERE, THOUGH IT IS TEN STEPS IN THE RUNTIME. Splitting it so
+      // the live screen can count through it made the written brief eight near-identical lines —
+      // and this function also builds the snapshot stored on every logged run, so the Logbook's
+      // "what the plan asked for" would have become a wall of "Walk back — easy until your
+      // breathing is back". A runner reading a plan wants "4 × 20″ strides"; a runner mid-stride
+      // wants to know which one they are on. Those are different questions, so they get different
+      // answers from the same steps.
+      // ⚠️ A BRANCH OF ITS OWN, NOT A LOOSENING OF THE rep ONE. Generalising that collector to
+      // take strides would let it run straight on into the session's first repetition whenever the
+      // work is effort-only — hill reps carry no pace, so the pace signature that normally breaks
+      // the block would not — and the warm-up would swallow the workout.
+      let j = i; const block = [], recs = [];
+      while (j < steps.length && (steps[j].display === "Stride" || steps[j].display === "Walk back")) {
+        (steps[j].display === "Stride" ? block : recs).push(steps[j]); j++;
+      }
+      // The effort target lives on the LAST stride, because that is the one it applies to. It is
+      // what the single-step version used to say, so the written row is unchanged by the split.
+      const lastLab = String(block[block.length - 1].label || "");
+      const dash = lastLab.indexOf("\\u2014");
+      const cue = dash >= 0 ? lastLab.slice(dash + 1).trim() : "";
+      const lab = block.length + " \\u00d7 " + workLabel(block[0]) + " strides" + (cue ? ", " + cue : "");
+      const rec = recs[0] ? "with " + workLabel(recs[0]) + " walk back between" : "";
+      rows.push({ tag: "Warm-up", lab: plain ? lab : esc(lab),
+        chips: withSpan(spanText(block.concat(recs)), stepChipsFn(block[0])), rec: rec, muted: true });
+      i = j;
+    } else if (st.kind === "rep") {
       // Collect one block of work, and STOP at a change of pace. A ladder or a compound session
       // asks for several different paces; merging them into one row shows only the first, which
       // silently misreports half the session (a 2km @ threshold + 400m @ rep cut-down rendered as
@@ -4498,15 +4524,19 @@ function warmupHtml(sess) {
   // rule as the duration chip: one source, and it is the session Start runs.
   let liveWu = [];
   try { liveWu = (withGeneratedWarmup(sess).steps || []).filter((st) => st.kind === "warmup"); } catch (e) { liveWu = []; }
-  const wuStep = (re) => liveWu.find((st) => re.test(String(st.label)));
+  // ⚠️ The strides row must gather the WHOLE block, not one step of it. It is now a stride and a
+  // walk back per repetition, so finding "the strides step" would quote 20 seconds for a phase that
+  // takes six minutes. spanText already reports a block including its recoveries — the same rule the
+  // session sheet uses for a rep block.
+  const wuStep = (re) => liveWu.filter((st) => re.test(String(st.label)));
   const rowsH = w.phases.map((p) => {
     const tag = p.phase === "raise" ? "Raise" : p.phase === "mobilise" ? "Mobilise"
       : p.phase === "potentiate" ? "Strides" : "Then";
     const lab = p.phase === "mobilise" ? p.movements.map((m) => esc(m)).join(" · ") : esc(p.instruction);
     const st = p.phase === "raise" ? wuStep(/^Ease in|^Warm up easy/)
       : p.phase === "mobilise" ? wuStep(/^Mobilise/)
-      : p.phase === "potentiate" ? wuStep(/strides/) : wuStep(/^Settle/);
-    const sp = st ? spanText([st]) : (p.minutes ? Math.round(p.minutes) + " min" : "");
+      : p.phase === "potentiate" ? liveWu.filter(isStrideStep) : wuStep(/^Settle/);
+    const sp = st.length ? spanText(st) : (p.minutes ? Math.round(p.minutes) + " min" : "");
     return '<div class="wu-row"><div class="wu-tag">' + tag + '</div><div class="wu-b">' + lab +
       (sp ? '<div class="sd-meta"><span class="chip">' + sp + "</span></div>" : "") +
       (p.phase === "mobilise" ? '<div class="wu-note">' + esc(p.instruction) + '</div>' : "") + '</div></div>';
@@ -6805,8 +6835,18 @@ function coachResetSession(keepAudio) {
   COACH.settleDone = false; COACH.lastTechAt = -999; COACH.highEffortSince = 0;
   if (!keepAudio) coachStop();
 }
-// Map a live step's kind + the session type to the right trigger when a step begins.
-function coachStepTrigger(stepKind, sessionType, stepRpeMin) {
+// Map a live step to the right trigger when it begins.
+// ⚠️ TAKES THE STEP, NOT ITS PIECES. It used to take (kind, type, rpeMin), and the live path read
+// rpeMin off a StepView — which did not carry targetRpe at all, so it was always undefined and a
+// long run's race-pace block got the settle line. Passing the whole step means the two call sites
+// cannot drift apart again; StepView now carries the field.
+function coachStepTrigger(step, sessionType) {
+  const stepKind = step.kind, stepRpeMin = (step.targetRpe && step.targetRpe.min) || 0;
+  // ⚠️ THE STRIDES BLOCK SPEAKS ONCE. It is now ten steps — five strides and five walk backs — and
+  // a cue on each boundary is a coach talking over every acceleration for six minutes. The first
+  // one introduces the block; after that the runner knows what they are doing.
+  if (step.display === "Walk back") return null;
+  if (step.display === "Stride" && (step.repeatIndex || 1) > 1) return null;
   if (stepKind === "warmup") return "warmup-start";
   if (stepKind === "cooldown") return "cooldown-start";
   if (stepKind === "recovery") return "recovery-start";
@@ -6954,7 +6994,7 @@ function coachNativeSchedule() {
     const st = steps[i];
     // The cue lands when the step STARTS. The first step's cue has already gone by definition.
     if (i > 0 && at > nowSec) {
-      const trig = coachStepTrigger(st.kind, LIVE.session.type, (st.targetRpe && st.targetRpe.min) || 0);
+      const trig = coachStepTrigger(st, LIVE.session.type);
       const pick = trig ? coachScheduledPrompt(trig, i) : null;
       if (pick) cues.push({ id: pick.id, inMs: Math.round((at - nowSec) * 1000), file: pick.file });
     }
@@ -7196,6 +7236,13 @@ window.__interunWatchStart = function (ok, reason) {
 // plannedRpeBandOf excludes warmup and cooldown, so the debrief still judges the run against the
 // work rather than against the preparation. Adding the strides as rep steps would have quietly
 // changed the band every logged run is graded on.
+// ⚠️ ONE TEST FOR "IS THIS PART OF THE STRIDES BLOCK", AND IT IS NOT A LABEL REGEX. Two places
+// depend on it: the carve-out must NOT absorb stride time into the session, and the reordering must
+// move the whole block next to the work. Both used to match /strides/ against the label of a single
+// step. Splitting that step into "Stride 1 of 5" and "Walk back" would have quietly matched neither
+// — the carve-out would have started eating the strides and the block would have stayed at the
+// front of the run — with nothing failing and no way to see it except by running a session.
+function isStrideStep(st) { return st.display === "Stride" || st.display === "Walk back"; }
 function withGeneratedWarmup(sess) {
   const w = warmupCardFor(sess);
   if (!w || w.incomplete || !w.phases.length) return sess;
@@ -7211,8 +7258,34 @@ function withGeneratedWarmup(sess) {
       steps.push({ kind: "warmup", display: "Mobilise", label: "Mobilise — " + p.movements.join(" · "),
         durationSeconds: 180, targetRpe: { min: 1, max: 2 } });
     } else if (p.phase === "potentiate") {
-      steps.push({ kind: "warmup", display: "Strides", label: p.strides + " × " + p.seconds + "s strides, " + p.effort,
-        durationSeconds: Math.max(60, p.strides * 75), targetRpe: { min: 5, max: 7 } });
+      // ⚠️ STRIDES ARE REPETITIONS WITH A RECOVERY, NOT ONE BLOCK. The session library shipped this
+      // exact defect and it was fixed on 2026-08-03; the GENERATED warm-up kept it, and the owner
+      // caught it on his phone — one step badged STRIDES with a single 6:15 clock. "5 × 20s" existed
+      // in the label and nowhere the runner could act on: no way to tell which stride you are on,
+      // when to go, or how long the walk back lasts. Worse, the segment clock — which exists to
+      // answer exactly that — counted 6:15 of unbroken stride effort, and the progress bar filled
+      // smoothly through five accelerations and five walks as though it were one continuous effort.
+      // ⚠️ THE 75-SECOND PER-STRIDE BUDGET IS UNCHANGED, so no session moves by a second. That
+      // number always meant "the stride plus the walk back" — the warm-up card's own comment says
+      // so. Splitting it makes the walk back a thing the runner can see rather than an assumption
+      // buried in a multiplication.
+      const walkSec = Math.max(20, 75 - p.seconds);
+      // The effort line is written for the card ("the last one at about the pace of your first
+      // repetition"), so on the stride it describes, the lead-in reads as though it means a
+      // different stride. Strip it and the remainder is already the instruction.
+      const lastCue = String(p.effort).replace(/^the last one( or two)? /, "");
+      for (let i = 1; i <= p.strides; i++) {
+        steps.push({ kind: "warmup", display: "Stride", repeatIndex: i, repeatCount: p.strides,
+          label: "Stride " + i + " of " + p.strides + " \\u2014 " +
+            (i === p.strides ? lastCue : "relaxed and progressive, tall and quick \\u2014 a build, not a sprint"),
+          durationSeconds: p.seconds, targetRpe: { min: 5, max: 7 } });
+        // ⚠️ INCLUDING AFTER THE LAST ONE. These steps are moved to sit immediately before the work
+        // on an embedded warm-up, so without a trailing walk back the runner finishes a stride at
+        // 10k effort and the next thing that happens is the first repetition. It is also what keeps
+        // the arithmetic exact: strides × (seconds + walk) is strides × 75, as before.
+        steps.push({ kind: "warmup", display: "Walk back", durationSeconds: walkSec,
+          label: "Walk back \\u2014 easy until your breathing is back", targetRpe: { min: 1, max: 2 } });
+      }
     } else if (p.phase === "transition" && !w.embedded) {
       steps.push({ kind: "warmup", display: "Settle", label: "Settle — " + p.instruction,
         durationSeconds: Math.max(60, Math.round(p.minutes * 60)),
@@ -7244,7 +7317,7 @@ function withGeneratedWarmup(sess) {
     // for. Measured: a 23-minute moderate run has no step this code is willing to shorten (all of it
     // is RPE 3-4), so trying to absorb them shrank the raise to one minute and still overran. They
     // add, and the duration chip is derived from these steps so the runner is told.
-    const addedSec = steps.filter((st) => !/strides/.test(String(st.label)))
+    const addedSec = steps.filter((st) => !isStrideStep(st))
       .reduce((a, st) => a + (st.durationSeconds || 0), 0);
     let over = addedSec - ownWuSec;
     for (let i = 0; i < rest.length && over > 0; i++) {
@@ -7277,12 +7350,11 @@ function withGeneratedWarmup(sess) {
   // straight on.
   let ordered = steps.concat(rest);
   if (w.embedded) {
-    const pi = steps.findIndex((st) => /strides/.test(String(st.label)));
+    const block = steps.filter(isStrideStep);
     const hard = rest.findIndex((st) => st.kind === "rep" || (st.targetRpe && st.targetRpe.max >= 4));
-    if (pi >= 0 && hard > 0) {
-      const stride = steps[pi];
-      const head = steps.filter((_, i) => i !== pi);
-      ordered = head.concat(rest.slice(0, hard), [stride], rest.slice(hard));
+    if (block.length && hard > 0) {
+      const head = steps.filter((st) => !isStrideStep(st));
+      ordered = head.concat(rest.slice(0, hard), block, rest.slice(hard));
     }
   }
   const out = Object.assign({}, sess, { steps: ordered });
@@ -8329,7 +8401,7 @@ function coachRouteCue(cue) {
     coachNativeSchedule();
     const snap = LIVE.rt.snapshot(liveNowMs());
     if (snap.step) {
-      let trig = coachStepTrigger(snap.step.kind, type, snap.step.targetRpe && snap.step.targetRpe.min);
+      let trig = coachStepTrigger(snap.step, type);
       if (snap.step.kind === "rep" && /hill/i.test(LIVE.session.title || "")) trig = "hill-start";
       if (trig) coachTrigger(trig, type, nowSec);
     }

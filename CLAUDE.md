@@ -1142,6 +1142,54 @@ volume and intensity models, so letting the walk-backs extend it would have adde
 every easy+strides session in every plan. Total unchanged (47 min before and after); the walk-back is
 now counted as the recovery it is rather than as easy running.
 
+⚠️ **AND THE GENERATED WARM-UP KEPT THE DEFECT FOR FOUR MORE DAYS — fixed 2026-08-07, found by the
+owner on his phone, again.** Fixing `easyRun` fixed the strides the SESSION LIBRARY prescribes;
+`withGeneratedWarmup` builds its own from `WarmupPhase.potentiate` and still emitted
+`durationSeconds: strides * 75` as one step. His screenshot: a single card badged **STRIDES**, one
+6:15 clock, label *"5 × 20s strides, the last one or two at the pace you are about to run"* — the
+five and the twenty seconds existing in prose and nowhere the runner could act on. There is no way
+to tell which stride you are on, when to go, or how long the walk back lasts; the new segment clock,
+which exists to answer exactly that, showed 6:15 of unbroken stride effort and a progress bar
+filling smoothly through five accelerations and five walks. **A fix applied to one builder is not
+applied to the other.** Now one step per repetition with a walk back between, `repeatIndex` set so
+the badge reads **STRIDE 3/4**, and a trailing walk back — needed here because on an embedded warm-up
+the block is moved to sit immediately before the work.
+
+⚠️ **The 75-second budget is UNCHANGED, and that is what makes it safe.** 75 s per stride always
+meant the stride plus its walk back — the warm-up card's own comment said so — so splitting it moves
+nothing: measured across a real 36-week plan, **136 sessions, 39 carrying strides, 0 changed length,
+worst drift 0 s.**
+
+⚠️ **TWO MATCHES BY LABEL REGEX HAD TO GO WITH IT, AND BOTH WOULD HAVE FAILED SILENTLY.** The
+embedded carve-out excluded strides with `!/strides/.test(st.label)` and the reordering found the
+block with `findIndex(/strides/)`. Against "Stride 1 of 5" and "Walk back" neither matches — the
+carve-out would have started absorbing stride time into the session and the block would have stayed
+at the front of the run, with nothing throwing and no way to see it except by running a session.
+One predicate, `isStrideStep`, keyed on `display`.
+
+⚠️ **A SPLIT STEP CHANGES EVERY WRITTEN VIEW BUILT FROM IT.** `structureRows` groups uniform
+repetitions only when `kind === "rep"`, and these are `warmup`, so the session brief went from one
+row to eight — and since `sessionStepText` stores that snapshot on **every logged run**, the
+Logbook's "what the plan asked for" would have become a wall of *"Walk back — easy until your
+breathing is back"*, permanently, on runs already saved. A dedicated branch collapses them back to
+*"4 × 20″ strides, building to about 10 km effort"* with *"with 55″ walk back between"* — which is
+better than before, because the walk back is now stated rather than implied.
+⚠️ **A BRANCH OF ITS OWN, NOT A LOOSENING OF THE `rep` COLLECTOR.** That collector stops at a change
+of pace; strides carry none, and neither do hill reps — so a generalised version would run straight
+out of the warm-up and swallow the workout on exactly the sessions where it matters.
+
+⚠️ **Ten steps in a row is ten step-start cues.** `coachStepTrigger` now returns null for a walk back
+and for any stride after the first, so the coach introduces the block once instead of talking over
+every acceleration for six minutes.
+
+⚠️ **And `StepView` did not carry `targetRpe` at all** — found while changing that function's
+signature. `coachStepTrigger` reads `step.targetRpe.min` to tell a long run's race-pace block ("pick
+it up") from its easy main ("patience early, sip fluids"). The schedule builder passes a raw
+`WorkoutStep` and got it right; the live path passes a `StepView`, where the read was `undefined` on
+every step — so **every structured long run got the settle line at the exact moment it was meant to
+lift**, which is the defect the split was written to prevent. The function now takes the whole step,
+so the two call sites cannot drift apart again.
+
 ⚠️ **Grouping uniform repetitions was dropping what they ARE.** `structureRows` rendered them as bare
 measurements — "6 × 20″", "10 × 50 m" — so splitting strides into real steps turned a row that read
 "6 × 20s relaxed strides" into "6 × 20″". It now appends the step's own label with its leading

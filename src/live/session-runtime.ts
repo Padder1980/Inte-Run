@@ -55,6 +55,15 @@ export type StepView = {
   targetSeconds?: number;
   targetMeters?: number;
   targetPace?: PaceRange;
+  /**
+   * ⚠️ CARRIED BECAUSE THE COACH DECIDES WHAT TO SAY FROM IT. `coachStepTrigger` reads
+   * `step.targetRpe.min` to tell a long run's race-pace block ("pick it up") from its easy main
+   * ("patience early, sip fluids") — and StepView did not carry the field, so that read was
+   * `undefined` on every live step and every structured long run got the settle line at the exact
+   * moment it was meant to lift. The schedule builder passed the raw WorkoutStep and got it right;
+   * the live path passed a StepView and did not, so the two disagreed with nothing to show why.
+   */
+  targetRpe?: { min: number; max: number };
 };
 
 export type LiveSnapshot = {
@@ -105,6 +114,7 @@ function stepView(steps: WorkoutStep[], index: number): StepView {
     targetSeconds: s.durationSeconds,
     targetMeters: s.distanceMeters,
     targetPace: s.targetPaceSecPerKm,
+    targetRpe: s.targetRpe,
   };
 }
 

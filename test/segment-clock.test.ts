@@ -33,7 +33,7 @@ function lift(name: string) {
 }
 let ABILITY = "intermediate";
 const withGeneratedWarmup = new Function("warmupCardFor",
-  lift("withGeneratedWarmup") + "; return withGeneratedWarmup;")((s: any) => buildWarmup(s, ABILITY as any));
+  lift("isStrideStep") + ";" + lift("withGeneratedWarmup") + "; return withGeneratedWarmup;")((s: any) => buildWarmup(s, ABILITY as any));
 
 test("every generated warm-up phase says what it actually is", () => {
   // ⚠️ The owner's question, made into an invariant. Strides inside a warm-up must not be announced as
@@ -45,12 +45,95 @@ test("every generated warm-up phase says what it actually is", () => {
     assert.ok(s.display, `a warm-up step has no display name: "${s.label}"`);
   }
   const names = wu.map((s: any) => s.display);
-  assert.ok(names.includes("Strides"), `strides are not named as strides (got ${names.join(", ")})`);
+  assert.ok(names.includes("Stride"), `strides are not named as strides (got ${names.join(", ")})`);
   assert.ok(names.includes("Warm up"), "the easy raise is not named");
-  // And the strides step really is the hard one — otherwise this test proves nothing.
-  const strides = wu.find((s: any) => s.display === "Strides");
-  assert.ok((strides.targetRpe?.max ?? 0) >= 5,
+  // And a stride really is the hard bit — otherwise naming it separately would prove nothing.
+  const stride = wu.find((s: any) => s.display === "Stride");
+  assert.ok((stride.targetRpe?.max ?? 0) >= 5,
     "the strides step is not actually hard, so naming it separately would be pointless");
+});
+
+test("⚠️ strides are repetitions with a walk back, not one block", () => {
+  // The owner's second catch, from a live session: one step badged STRIDES with a single 6:15 clock.
+  // "5 × 20s" existed in the label and nowhere the runner could act on — no way to know which stride
+  // you are on, when to go, or how long the walk back is. The session library shipped and fixed this
+  // exact defect on 2026-08-03; the generated warm-up kept it.
+  const wu = (withGeneratedWarmup(vo2Session(paces, 1)).steps || [])
+    .filter((s: any) => s.display === "Stride" || s.display === "Walk back");
+  assert.ok(wu.length >= 4, "the strides block did not expand into repetitions");
+  const strides = wu.filter((s: any) => s.display === "Stride");
+  assert.ok(strides.length >= 2, "there is still only one stride step");
+
+  // Each stride is ONE stride: a short effort, not a block containing its own recoveries.
+  for (const s of strides) {
+    assert.ok(s.durationSeconds <= 30,
+      `a "stride" lasts ${s.durationSeconds}s — that is a block, not a repetition`);
+    assert.ok(s.repeatIndex && s.repeatCount,
+      "a stride carries no rep index, so the screen cannot say which one you are on");
+  }
+  // Every stride is followed by a recovery the runner can see and time.
+  for (let i = 0; i < wu.length; i += 2) {
+    assert.equal(wu[i]!.display, "Stride", `position ${i} of the block is not a stride`);
+    assert.equal(wu[i + 1]?.display, "Walk back",
+      `stride ${i / 2 + 1} is not followed by a walk back — including the last, which runs straight into the work`);
+  }
+  // ⚠️ And the block still takes exactly as long as it always did: 75s per stride was ALWAYS the
+  // stride plus its walk back. If this drifts, every session carrying strides changed length.
+  const total = wu.reduce((a: number, s: any) => a + (s.durationSeconds || 0), 0);
+  assert.equal(total, strides.length * 75,
+    "the strides block no longer costs 75s per stride — sessions have changed length");
+});
+
+test("⚠️ the WRITTEN brief still says '4 × 20″ strides', not eight lines", () => {
+  // ⚠️ Splitting a step for the live screen changes what every WRITTEN view renders from it, and
+  // structureRows also builds the snapshot stored on each logged run — so the Logbook's "what the
+  // plan asked for" would have become a wall of "Walk back — easy until your breathing is back",
+  // permanently, on runs already saved. A runner reading a plan and a runner mid-stride are asking
+  // different questions of the same steps.
+  const src = ["esc", "fmtPace", "fmtSec", "spanText", "workLabel", "stepTargetText", "stepChips", "structureRows"]
+    .map(lift).join(";\n");
+  const structureRows = new Function(src + "; return structureRows;")();
+  const delivered = withGeneratedWarmup(vo2Session(paces, 1)).steps;
+  const rows = structureRows(delivered, true);
+  const stride = rows.filter((r: any) => /stride/i.test(String(r.lab)));
+  assert.equal(stride.length, 1, `the strides block renders as ${stride.length} rows, not one`);
+  assert.match(String(stride[0].lab), /^\d+ × /, "the grouped row lost its count");
+  assert.ok(!rows.some((r: any) => /^Walk back/.test(String(r.lab))),
+    "a walk back is printed as its own row in the written brief");
+  // ⚠️ The walk back must still be SAID somewhere — the whole point of splitting the step was that it
+  // existed only in prose. Grouping it back out of existence would undo that.
+  assert.match(String(stride[0].rec), /walk back/i, "the grouped row does not mention the walk back");
+  // And the block reports its WHOLE length, not one stride's. ⚠️ Derived from the steps, never a
+  // constant — the first version of this assertion hardcoded the minutes of a different fixture and
+  // failed on a correct build, which is the same class of mistake as a test that agrees with the bug.
+  const blockSec = delivered
+    .filter((s: any) => s.display === "Stride" || s.display === "Walk back")
+    .reduce((a: number, s: any) => a + (s.durationSeconds || 0), 0);
+  assert.ok(String(stride[0].chips).startsWith(Math.round(blockSec / 60) + " min"),
+    `the strides row quotes "${stride[0].chips}" for a ${Math.round(blockSec / 60)}-minute block`);
+});
+
+test("the coach introduces the strides block once, not ten times", () => {
+  // Ten steps in a row, each firing a step-start cue, is a coach talking over every acceleration for
+  // six minutes.
+  const body = lift("coachStepTrigger");
+  assert.match(body, /display === "Walk back"[\s\S]{0,40}return null/,
+    "a walk back still fires a step cue");
+  assert.match(body, /display === "Stride"[\s\S]{0,60}return null/,
+    "every stride still fires a step cue");
+});
+
+test("⚠️ StepView carries targetRpe, or the long-run lift gets the settle line", () => {
+  // coachStepTrigger reads step.targetRpe.min to tell a long run's race-pace block from its easy
+  // main. StepView did not carry the field, so on the live path that read was always undefined and
+  // the lift moment got "patience early, sip fluids" — the exact instruction the split exists to
+  // avoid. The schedule builder passed a raw step and got it right; the two disagreed silently.
+  const live = withGeneratedWarmup(vo2Session(paces, 1));
+  const rt = new LiveSession(live as any);
+  rt.start(0);
+  const step = rt.snapshot(0).step!;
+  assert.ok(step.targetRpe, "StepView is not carrying targetRpe");
+  assert.equal(typeof step.targetRpe!.min, "number", "targetRpe reached the view in the wrong shape");
 });
 
 test("the display name reaches the live screen, not just the step", () => {

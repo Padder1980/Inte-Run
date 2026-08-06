@@ -46,6 +46,11 @@ export type WeeklyReviewInput = {
   inTaperOrRaceWeek?: boolean;
   /** The runner has reported illness, injury or pain. Blocks any suggestion to test. */
   unwell?: boolean;
+  /**
+   * Everything needed to decide whether to offer another running day. Absent means do not consider it —
+   * a caller that cannot supply the evidence must not get the offer by default. See `addDayOffer`.
+   */
+  addDay?: AddDayInput;
 };
 
 export type WeeklyReview = {
@@ -62,7 +67,94 @@ export type WeeklyReview = {
 export type WeeklySuggestion =
   | { kind: "adjust-paces"; direction: "faster" | "slower"; proposedRecent5kSeconds: number; basis: "pace" | "rpe"; why: string }
   | { kind: "easy-days-easier"; why: string }
-  | { kind: "retest"; why: string };
+  | { kind: "retest"; why: string }
+  | { kind: "add-a-day"; from: number; to: number; why: string };
+
+/**
+ * Offering a fourth (or fifth, or sixth) running day.
+ *
+ * ⚠️ FREQUENCY IS THE ONE FITT AXIS THE PLAN NEVER PROGRESSED. The 2026-08-06 audit measured it flat in
+ * 81.3% of blocks and never rising by even one day — because the runner picks their days at setup and
+ * nothing ever revisits it. That is defensible for a generator and thin as coaching: adding a day is one
+ * of the most effective progressions available, and the only way to get one was to edit your profile and
+ * rebuild the whole plan yourself.
+ *
+ * ⚠️ IT ASKS. It never adds a day on its own — the owner's standing rule (2026-08-03) is that the app may
+ * observe and propose and may never change a plan by itself. Accepting genuinely rewrites the weeks ahead
+ * (his instruction, 2026-08-06: "it does need to change the weeks ahead; that's the whole point of the
+ * app"), so the question has to be asked plainly and declining has to stick.
+ *
+ * ⚠️ EVERY REFUSAL BELOW IS A REAL ONE, the same rule `retestDue` follows. An offer to train more during
+ * illness, in a taper, or to someone already missing sessions is the prompt doing harm — and it teaches
+ * the runner to dismiss every future prompt, which costs more than this feature is worth.
+ */
+export type AddDayInput = {
+  /** Running days the plan is currently built around. */
+  daysPerWeek: number;
+  /** The phase of the week being reviewed. */
+  phase: "base" | "build" | "peak" | "taper";
+  /** Whole weeks of plan left after this one. */
+  weeksRemaining: number;
+  /** Whole weeks the runner has been on this plan. */
+  weeksOnPlan: number;
+  /** Recent weeks, most recent last: how many runs the plan asked for and how many were logged. */
+  recentWeeks: { prescribedRuns: number; completedRuns: number }[];
+  experience: "beginner" | "recreational" | "competitive";
+  returningFromInjury?: boolean;
+  unwell?: boolean;
+  /** ISO date the runner last said no, if they have. */
+  lastDeclinedIso?: string | null;
+  todayIso: string;
+  /** True when the flags engine is already suggesting the runner eases off. */
+  easingSuggested?: boolean;
+};
+
+/** Never offered automatically. Six days is a rest day a week; the seventh is a coached decision. */
+export const ADD_DAY_MAX = 6;
+/** A "no" is remembered for two months, not until tomorrow. */
+export const ADD_DAY_COOLDOWN_DAYS = 56;
+/** Below this there is not enough block left for another day to be worth the disruption. */
+export const ADD_DAY_MIN_RUNWAY_WEEKS = 6;
+/** And not before the runner has actually settled into the plan they have. */
+export const ADD_DAY_MIN_WEEKS_ON_PLAN = 4;
+/** Consistency bar: the evidence that the current load is being absorbed. */
+export const ADD_DAY_MIN_COMPLETION = 0.85;
+const ADD_DAY_WEEKS_OF_EVIDENCE = 3;
+
+export function addDayOffer(input: AddDayInput): WeeklySuggestion | null {
+  if (input.unwell || input.returningFromInjury) return null;
+  // Beginners are on a deliberately gentle, capped track of their own; more days is not that track's
+  // next step, and their plan does not read daysPerWeek the way this offer assumes.
+  if (input.experience === "beginner") return null;
+  if (input.daysPerWeek >= ADD_DAY_MAX) return null;
+  // ⚠️ Never in a peak or a taper. Adding a running day in the sharpening weeks is the worst possible
+  // moment for it: the block is at its biggest, and the change would land with no time to absorb it.
+  if (input.phase === "peak" || input.phase === "taper") return null;
+  if (input.weeksRemaining < ADD_DAY_MIN_RUNWAY_WEEKS) return null;
+  if (input.weeksOnPlan < ADD_DAY_MIN_WEEKS_ON_PLAN) return null;
+  // One voice: if the engine is already saying ease off, the app must not ask for more in the same breath.
+  if (input.easingSuggested) return null;
+  if (input.lastDeclinedIso && daysBetween(input.lastDeclinedIso, input.todayIso) < ADD_DAY_COOLDOWN_DAYS) return null;
+
+  const weeks = input.recentWeeks.slice(-ADD_DAY_WEEKS_OF_EVIDENCE);
+  if (weeks.length < ADD_DAY_WEEKS_OF_EVIDENCE) return null;
+  const prescribed = weeks.reduce((a, w) => a + w.prescribedRuns, 0);
+  const completed = weeks.reduce((a, w) => a + w.completedRuns, 0);
+  if (prescribed <= 0) return null;
+  // ⚠️ THE EVIDENCE IS COMPLETION, NOT ENTHUSIASM. Someone missing sessions does not need a fourth day;
+  // they need the three they already have. This is the whole gate — without it the app would cheerfully
+  // ask a struggling runner to do more, which is how a coaching app loses somebody.
+  if (completed / prescribed < ADD_DAY_MIN_COMPLETION) return null;
+
+  const to = input.daysPerWeek + 1;
+  return {
+    kind: "add-a-day",
+    from: input.daysPerWeek,
+    to,
+    why: `You have run ${completed} of the last ${prescribed} sessions your plan asked for. `
+      + `A ${to}th day is the next step available to you — more easy running, not more hard work.`,
+  };
+}
 
 /** The specification's retest window (§14): often enough to catch real change, rarely enough that
  *  the test itself is not the training. */
@@ -171,6 +263,18 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
         ? "It has been about a month since your last 2 km. Repeating it is the cleanest way to see whether your training has actually moved your fitness."
         : "A hard 2 km would let your plan calibrate to the runner you are now rather than the times you first entered.",
     };
+  }
+
+  // ⚠️ LAST IN THE ORDER, AND THAT IS THE POINT. Adding a running day is the biggest change the review
+  // can propose — it rewrites every week ahead — so it only ever gets asked in a week where there is
+  // nothing more immediate to settle. A pace change is about work already done and wins; a retest
+  // answers a question about the runner now and wins. This is about months from now, and can wait a week.
+  if (!suggestion && input.addDay) {
+    const offer = addDayOffer(input.addDay);
+    if (offer) {
+      suggestion = offer;
+      observations.push("You have been getting your sessions done consistently.");
+    }
   }
 
   return {

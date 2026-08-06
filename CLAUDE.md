@@ -1611,6 +1611,51 @@ week carries two quality sessions too.
 18.8% and the deepened one 27.2%, so the bar sits at 0.22. It was first written at 0.18 — below the
 shallow figure — and therefore passed on the very code it existed to reject. Re-break the fix and watch a
 guard fail before believing it; that is now three tests in this session that needed it.
+### ✅ FREQUENCY — the plan now OFFERS a running day (owner 2026-08-06, shipped)
+
+The audit's frequency answer was "not progressed, by design — the runner picks their days". His reply:
+*"the runner needs to adapt their frequency as an option… an alert at an appropriate time asking the
+runner if they'd like to increase the number of days."* Adding a day is one of the strongest progressions
+available, and the only way to get one was to edit your profile and rebuild the plan yourself.
+
+**It lives in the WEEKLY REVIEW, not a new banner** — `addDayOffer` in `src/adapt/weekly-review.ts`, a new
+`add-a-day` suggestion kind. That inherits everything already solved there: one question a week, the
+answered-state store, `quiet` meaning show nothing, and the existing illness/taper refusals. A second
+banner would have re-implemented all four and drifted from them.
+
+⚠️ **IT IS LAST IN THE SUGGESTION ORDER.** A pace change is about work already done; a retest answers a
+question about the runner now. This is about months from now and can wait a week. A test asserts a pace
+decision displaces it.
+
+⚠️ **ACCEPTING REWRITES EVERY WEEK AHEAD — his explicit instruction**: *"it does need to change the weeks
+ahead; that's the whole point of the app. It adapts and changes based on the runner."* `applyAddDay` bumps
+`profile.daysPerWeek` and goes through `recompute()` → `adoptPlan`, then `seedDone()`/`restoreTicks()`.
+⚠️ Never assign PLAN by hand here: that is the documented trap that skips `normalizeWeekStarts` and leaves
+iOS reminders and the watch holding the old schedule. Verified in the browser — weeks 6, 12 and 20 all
+went from 4 running days to 5 on one tap.
+
+**The gate is COMPLETION, and it is the whole feature:** 85%+ of prescribed runs actually logged over the
+last three plan weeks. Someone missing sessions does not need a fourth day; they need the three they have.
+
+**Every refusal, each a real one:** already at 6 days (⚠️ **the seventh is never offered automatically** —
+that means no rest day at all, which the evidence report reserves for athletes with oversight); in a peak
+or a taper; a beginner (their track is capped by design); returning from injury; unwell; fewer than 4
+weeks on the plan; fewer than 6 weeks of block left; the flags engine already suggesting they ease off;
+or declined within the last 8 weeks. ⚠️ **A "no" is remembered as a DATE** (`interun_addday_v1`) so it
+cannot be re-asked tomorrow — declining is a first-class answer, per the standing instruction.
+
+⚠️ **THE EVIDENCE BUILDER CALLED TWO FUNCTIONS THAT DO NOT EXIST**, and its `try/catch` swallowed the
+ReferenceError — the offer would have shipped as a permanent no-op with nothing to see and nothing in the
+console. `rawSessionsForWeek`/`isRunnableSession` were invented; the real ones are `RAW.weeks[i].sessions`
+(PLAN.weeks is only a display summary) and `PRIMARY_TYPES`. The catch now logs. **A silent catch around
+code you have just written is how a feature ships broken and gets reported as working.**
+
+⚠️ **`CURRENT_WEEK` CANNOT BE FAKED BY SEEDING A PAST START DATE** — `applyProfile` clamps the start to
+today (`pf.startDateIso >= todayIso()`), so a fresh profile is always in week 0 and the offer is
+unreachable from the UI until four real weeks pass. The engine decision is unit-tested instead, and the
+card/accept/decline path was exercised by patching `currentWeeklyReview`. ⚠️ Patching `RC.*` does NOT
+work — esbuild exports are getters, so the assignment silently does nothing and the real function runs.
+
 ### ✅ FINDING 4 — the long-run inversion is a SHORT-RACE phenomenon, and the aggregate hid it
 
 | distance | long run NOT the longest run of its week |

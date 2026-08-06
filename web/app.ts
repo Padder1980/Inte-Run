@@ -8759,9 +8759,83 @@ function currentWeeklyReview() {
       inTaperOrRaceWeek: /taper|race/i.test(phase),
       // Anything the runner has told us that makes a maximal effort the wrong idea.
       unwell: !!(state.subj && (state.subj.illness !== "none" || state.subj.soreness === "high")),
+      addDay: addDayEvidence(phase),
     });
   } catch (e) { return null; }
 }
+// The evidence behind the "add a running day" offer. Returns null when it cannot be answered, and the
+// engine treats absent as "do not offer" — a caller who cannot supply evidence must never get the offer
+// by default.
+//
+// ⚠️ COMPLETION IS COUNTED PER PLAN WEEK, prescribed against logged. That is the whole gate: somebody
+// missing sessions needs the days they already have, not another one.
+function addDayEvidence(phase) {
+  try {
+    if (!PLAN || !PLAN.weeks || !PLAN.weeks.length) return null;
+    const cur = CURRENT_WEEK;
+    if (cur == null || cur < 0) return null;
+    const runsBy = {};
+    for (const r of (state.logged || [])) {
+      if (!r || !r.dateIso) continue;
+      runsBy[r.dateIso] = (runsBy[r.dateIso] || 0) + 1;
+    }
+    // The three completed weeks before this one, oldest first.
+    const recentWeeks = [];
+    for (let i = cur - 3; i < cur; i++) {
+      const wk = PLAN.weeks[i];
+      if (!wk || !wk.startIso) continue;
+      // ⚠️ RAW.weeks carries the prescription; PLAN.weeks is a display summary. PRIMARY_TYPES is the
+      // app's own definition of "a run", the same one Today uses to decide what can be started.
+      const rawWk = (typeof RAW !== "undefined" && RAW.weeks) ? RAW.weeks[i] : null;
+      if (!rawWk || !rawWk.sessions) return null;
+      const prescribedRuns = rawWk.sessions.filter((s) => PRIMARY_TYPES[s.type]).length;
+      let completedRuns = 0;
+      for (let d = 0; d < 7; d++) completedRuns += runsBy[isoAdd(wk.startIso, d).toISOString().slice(0, 10)] || 0;
+      recentWeeks.push({ prescribedRuns, completedRuns: Math.min(completedRuns, prescribedRuns) });
+    }
+    const st = profile.status;
+    return {
+      daysPerWeek: Number(profile.daysPerWeek) || 5,
+      phase: /taper/i.test(phase) ? "taper" : /peak/i.test(phase) ? "peak" : /build/i.test(phase) ? "build" : "base",
+      weeksRemaining: Math.max(0, PLAN.weeks.length - 1 - cur),
+      weeksOnPlan: cur,
+      recentWeeks,
+      experience: (st === "new" || st === "building") ? "beginner" : (st === "competitive" ? "competitive" : "recreational"),
+      returningFromInjury: !!profile.returning,
+      unwell: !!(state.subj && (state.subj.illness !== "none" || state.subj.soreness === "high")),
+      lastDeclinedIso: loadAddDayDeclined(),
+      todayIso: todayIso(),
+      // One voice: never ask for more while the engine is asking them to ease off.
+      easingSuggested: !!(state.trainFlag && state.trainFlag.suggestion && state.trainFlag.suggestion.direction === "slower"),
+    };
+  } catch (e) {
+    // ⚠️ NOT SILENT. The first cut of this called two helpers that do not exist in this file
+    // (rawSessionsForWeek, isRunnableSession); the catch swallowed the ReferenceError and the offer
+    // would simply never have appeared — a feature shipped as a permanent no-op with nothing to see.
+    // A caught error here is a bug in this function, not an expected state.
+    try { console.error("addDayEvidence failed", e); } catch (e2) {}
+    return null;
+  }
+}
+function loadAddDayDeclined() { try { return localStorage.getItem("interun_addday_v1") || null; } catch (e) { return null; } }
+function saveAddDayDeclined() { try { localStorage.setItem("interun_addday_v1", todayIso()); } catch (e) {} }
+// ⚠️ ACCEPTING REWRITES THE WEEKS AHEAD, and that is the owner's explicit instruction (2026-08-06):
+// "it does need to change the weeks ahead; that's the whole point of the app. It adapts and changes
+// based on the runner." So this goes through the same path every accepted suggestion uses — adoptPlan
+// via recompute(), then seedDone/restoreTicks so today's ticked sessions survive the rebuild. Setting
+// PLAN by hand here would skip normalizeWeekStarts and leave iOS and the watch holding the old schedule.
+function applyAddDay() {
+  const r = currentWeeklyReview();
+  const sug = r && r.suggestion;
+  if (!sug || sug.kind !== "add-a-day") return;
+  const ticks = todayTicks();
+  profile.daysPerWeek = sug.to;
+  try { recompute(); } catch (e) { profile.daysPerWeek = sug.from; return; }
+  computeToday(); state.planWeek = PLAN.defaultWeekIndex; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
+  seedDone(); restoreTicks(ticks); saveProfileStore();
+  dismissWeeklyReview();
+}
+function declineAddDay() { saveAddDayDeclined(); dismissWeeklyReview(); }
 function weeklyReviewCard() {
   // ⚠️ The pace-change conversation belongs to trainFlagBanner, which owns the accept/decline and the
   // muting. Showing both would ask the same question twice in two voices.
@@ -8773,6 +8847,8 @@ function weeklyReviewCard() {
   let cta = '<button class="ctrl" id="wrOk">Thanks</button>';
   if (s && s.kind === "retest") {
     cta = '<button class="ctrl" id="wrNo">Not now</button><button class="primary" id="wrTrial">Do a 2 km</button>';
+  } else if (s && s.kind === "add-a-day") {
+    cta = '<button class="ctrl" id="wrNoDay">Not yet</button><button class="primary" id="wrAddDay">Add a ' + s.to + 'th day</button>';
   } else if (s && s.kind === "easy-days-easier") {
     cta = '<button class="ctrl" id="wrOk">Got it</button>';
   }
@@ -9274,6 +9350,8 @@ function wire() {
   const wrOk = $("wrOk"); if (wrOk) wrOk.onclick = dismissWeeklyReview;
   const wrNo = $("wrNo"); if (wrNo) wrNo.onclick = dismissWeeklyReview;
   const wrTrial = $("wrTrial"); if (wrTrial) wrTrial.onclick = () => { dismissWeeklyReview(); startTrialFlow(); };
+  const wrAddDay = $("wrAddDay"); if (wrAddDay) wrAddDay.onclick = applyAddDay;
+  const wrNoDay = $("wrNoDay"); if (wrNoDay) wrNoDay.onclick = declineAddDay;
   const fitApply = $("fitApply"); if (fitApply) fitApply.onclick = applyFitSuggest;
   const fitDismiss = $("fitDismiss"); if (fitDismiss) fitDismiss.onclick = dismissFitSuggest;
   const viewSession = $("viewSession"); if (viewSession) viewSession.onclick = () => openSessionSheet(selectedSession(), curWeekNo());

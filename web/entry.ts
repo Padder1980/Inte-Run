@@ -53,8 +53,13 @@ export {
 export type { TwoKmTimeTrial, TwoKmValidation, TwoKmConfidence, TwoKmTestEnvironment } from "../src/science/two-km-trial.ts";
 
 // The weekly review. ⚠️ It returns observations and at most one SUGGESTION — it can change nothing.
-export { buildWeeklyReview, retestDue, RETEST_DUE_DAYS } from "../src/adapt/weekly-review.ts";
-export type { WeeklyReview, WeeklySuggestion, ReviewRun } from "../src/adapt/weekly-review.ts";
+export {
+  buildWeeklyReview, retestDue, RETEST_DUE_DAYS,
+  // Frequency — the one FITT axis the plan never progressed. It OFFERS a day; it never adds one.
+  addDayOffer, ADD_DAY_MAX, ADD_DAY_COOLDOWN_DAYS, ADD_DAY_MIN_RUNWAY_WEEKS,
+  ADD_DAY_MIN_WEEKS_ON_PLAN, ADD_DAY_MIN_COMPLETION,
+} from "../src/adapt/weekly-review.ts";
+export type { WeeklyReview, WeeklySuggestion, ReviewRun, AddDayInput } from "../src/adapt/weekly-review.ts";
 
 // Warm-ups, generated from the session's first hard effort. ⚠️ Never claims to prevent injury —
 // that is the specification's one grade-A rule and test/warmup.test.ts enforces it on every string.

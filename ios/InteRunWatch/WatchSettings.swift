@@ -60,11 +60,17 @@ final class WatchSettings: ObservableObject {
     /// get to the start line. Without it a run begun from the phone records you standing still.
     @Published var countdown: Bool { didSet { save() } }
 
-    /// ⚠️ THREE, NOT FIVE — the owner's call after a real run: "there only should be 3 metrics on the
-    /// screen to make them bigger". Five numbers on a watch face means five small numbers, and a number
-    /// you cannot read at arm's length while moving is not a metric, it is decoration. Elapsed time is
-    /// not counted here: it has its own permanent line at the top of the page.
-    static let maxMetrics = 3
+    /// ⚠️ FOUR — and the reasoning changed, so it is worth writing down rather than just the number.
+    ///
+    /// He asked for THREE, "to make them bigger". That was the right instinct against the layout at
+    /// the time, where the label sat beside the number and squeezed it to 15pt. But the size was never
+    /// really about the count: with the label wrapped to the right instead, four numbers render at
+    /// 24pt — measured — where three used to render at 15. His own reference app shows four for the
+    /// same reason.
+    ///
+    /// Four also avoids silently deleting a metric he had already chosen. Clamping to three would have
+    /// thrown away his AVG PACE on the next launch, which is not a change he asked for.
+    static let maxMetrics = 4
     static let defaultMetrics: [Metric] = [.elapsed, .distance, .currentPace, .lapPace, .avgPace]
 
     private static let key = "interun_watch_settings_v1"
@@ -87,6 +93,12 @@ final class WatchSettings: ObservableObject {
         voiceCues = stored?.voiceCues ?? true
         countdown = stored?.countdown ?? true
         if metrics.isEmpty { metrics = Self.defaultMetrics }
+        // ⚠️ CLAMP WHAT WAS ALREADY SAVED. The cap is enforced in the editor when ADDING, which does
+        // nothing for a runner who had already chosen five before it changed — their settings load
+        // as-is. That is exactly what happened: four saved metrics against a taller row meant the
+        // page overflowed, the clock was pushed into the top curve and the last metric fell off the
+        // bottom. A limit that only applies to future choices is not a limit.
+        if metrics.count > Self.maxMetrics { metrics = Array(metrics.prefix(Self.maxMetrics)) }
     }
 
     private func save() {

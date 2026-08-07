@@ -39,6 +39,7 @@ enum WatchPreview {
                     // 162 against a ceiling of 182 is 89% — zone 4, so the heart wears the gold.
                     .init(value: "162", unit: "BPM", label: "HEART",
                           icon: .init(systemName: "heart.fill", tint: Brand.hrZoneTint(4))),
+                    .init(value: "5:12", unit: "/KM", label: "AVG PACE"),
                 ],
                 stepProgress: 0.62,
                 stepLabel: "2 km at 4:55/km")

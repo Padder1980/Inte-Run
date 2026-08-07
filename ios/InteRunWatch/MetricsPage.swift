@@ -71,32 +71,29 @@ struct MetricsPage: View {
             // radius, text 6pt from the top edge needs ~35pt of inset — a third of the width of the
             // watch, taken from the one number that has to be readable at a glance. Move the content
             // out of the curve instead of squeezing it past.
-            ZStack {
+            // ⚠️ ONE STRIP, ONE LINE. The elapsed clock had a line of its own beneath this, and with
+            // four metrics below it the page simply did not fit — the overflow is what clipped the
+            // clock into the top curve. The reference app puts a single word here and nothing else,
+            // with the system clock opposite; this carries the run clock in that same strip, which
+            // costs no height at all.
+            HStack(spacing: 6) {
                 if let status {
                     Text(status.text.uppercased())
                         .font(.system(size: 13, weight: .heavy))
                         .kerning(0.6)
                         .foregroundStyle(status.tint)
+                } else if let elapsed {
+                    Text(elapsed)
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(Brand.ink)
                 }
+                Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity, minHeight: 20, alignment: .center)
+            .frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
+            .padding(.leading, 6)
             .padding(.bottom, 2)
 
-            if let elapsed {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(elapsed)
-                        .font(.system(size: 26, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(status?.tint ?? Brand.ink)
-                    Text("ELAPSED")
-                        .font(.system(size: 10, weight: .bold))
-                        .kerning(0.4)
-                        .foregroundStyle(Brand.ink)
-                    Spacer(minLength: 0)
-                }
-                .padding(.leading, 2)
-                .padding(.bottom, 4)
-            }
 
             // ⚠️ EVERY ROW THE SAME SIZE, AND ALL OF THEM BIG. There is no hero any more: with three
             // metrics instead of five there is room to make each one readable at arm's length, which
@@ -138,40 +135,52 @@ struct MetricsPage: View {
     /// reading distance and the wrong one on a wrist at arm's length in daylight, where the faint
     /// grey simply disappears and nothing tells you which number you are looking at.
     private func metricRow(_ r: MetricsPage.Row) -> some View {
-        // ⚠️ THE LABEL GOES UNDERNEATH, and that is what actually makes the number big.
+        // ⚠️ THE LABEL GOES TO THE RIGHT, WRAPPED ONTO TWO SHORT LINES. This is the whole trick, and
+        // it took three wrong attempts to see it. Beside the number on ONE line, the words stole the
+        // width and `minimumScaleFactor` silently shrank the digits to 15pt. Underneath, the number
+        // was full size but every row became two lines tall — so with four metrics saved the page
+        // overflowed, pushing the clock into the top curve and shoving AVG PACE off the bottom.
         //
-        // It was beside the number, sharing one line with the unit — and the number carried
-        // `minimumScaleFactor(0.55)`. So a 40pt font was a CEILING it almost never reached: with
-        // "CUR PACE" and "DISTANCE" competing for the same 205pt of width, SwiftUI shrank the digits
-        // to fit, as far as 22pt. Setting a bigger number here would have changed nothing, because
-        // the constraint was never the font size — it was the width left over after the words.
-        //
-        // On its own line the number has the whole display and renders at its stated size. The words
-        // sit under it, small and bright white, where they cost the number nothing.
-        VStack(alignment: .leading, spacing: -4) {
-            HStack(alignment: .firstTextBaseline, spacing: 5) {
-                if let ic = r.icon { glyph(ic, size: 22) }
-                Text(r.value)
-                    .font(.system(size: 46, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    // Only a genuinely enormous value may shrink, and only a little.
-                    .minimumScaleFactor(0.8)
-                    .lineLimit(1)
-                    .foregroundStyle(Brand.accent)
-                if let u = r.unit {
-                    Text(u)
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Brand.ink)
-                }
-                Spacer(minLength: 0)
-            }
-            Text(r.label)
-                .font(.system(size: 11, weight: .bold))
-                .kerning(0.4)
-                .foregroundStyle(Brand.ink)
+        // Wrapped to the right, the label uses vertical space the number already occupies. The row
+        // stays one number high, the number keeps its size, and four rows still fit. That is what the
+        // reference app does — "NEXT / LAP", "CUR / PACE" — and why its screen holds more while
+        // reading bigger.
+        HStack(alignment: .center, spacing: 0) {
+            if let ic = r.icon { glyph(ic, size: 22).padding(.trailing, 4) }
+            Text(r.value)
+                .font(.system(size: 42, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .minimumScaleFactor(0.85)
                 .lineLimit(1)
+                .foregroundStyle(Brand.accent)
+            // The unit rides on the number with no gap, so "3.50KM" reads as one token rather than
+            // two competing things.
+            if let u = r.unit {
+                Text(u)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(Brand.ink)
+            }
+            Text(wrapped(r.label))
+                .font(.system(size: 12, weight: .bold))
+                .kerning(0.2)
+                .lineSpacing(-2)
+                .foregroundStyle(Brand.ink)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+                .padding(.leading, 6)
+            Spacer(minLength: 0)
         }
-        .padding(.bottom, 4)
+        .padding(.vertical, 1)
+    }
+
+    /// Break a two-word label so it stacks beside the number instead of stretching the row.
+    /// ⚠️ Done here rather than by letting SwiftUI choose, because a label allowed to wrap naturally
+    /// takes whatever width is left and pushes the number to shrink — which is the fault this layout
+    /// exists to remove.
+    private func wrapped(_ label: String) -> String {
+        let parts = label.split(separator: " ")
+        guard parts.count == 2 else { return label }
+        return parts[0] + "\n" + parts[1]
     }
 
     /// The row's leading glyph — the zone-tinted heart. The tint carries the zone by itself

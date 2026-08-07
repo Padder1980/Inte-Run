@@ -43,23 +43,33 @@ struct MetricsPage: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if let status {
-                // ⚠️ CENTRED, BECAUSE NO INSET I GUESSED WAS EVER GOING TO BE RIGHT. This word sits on
-                // the very first line, where the rounded glass cuts deepest: 2pt lost the "P" of
-                // PAUSED, and 16pt still lost it. The arithmetic says why — for a ~62pt corner radius,
-                // text 6pt from the top edge needs about 35pt of leading inset, and every point you
-                // spend there is width taken from the numbers.
-                //
-                // Centred text cannot be reached by either corner at any radius, so this stops being a
-                // number to tune and becomes a property of the layout. The system clock sits top-right
-                // and PAUSED is about 55pt wide, so the two do not meet.
-                Text(status.text.uppercased())
-                    .font(.system(size: 13, weight: .heavy))
-                    .kerning(0.6)
-                    .foregroundStyle(status.tint)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.bottom, 2)
+            // ⚠️ THE TOP STRIP IS ALWAYS RESERVED, WHETHER OR NOT THERE IS A STATUS WORD.
+            //
+            // This is the third and last form of the same fault. Centring fixed PAUSED — centred text
+            // cannot be reached by either corner at any radius — but it fixed only the paused case.
+            // With no status the hero number became the FIRST line, rode up into the curve, and the
+            // owner photographed a running screen with the "3" of 3:26 shaved. The biggest number on
+            // the display, clipped, on the screen you look at most.
+            //
+            // Reserving the strip solves both at once and also delivers what the old comment here
+            // already CLAIMED to deliver — "so the hero number does not move when a run is not
+            // paused". It did move: pausing pushed everything down a line. A layout that shifts on
+            // pause is its own legibility problem at arm's length.
+            //
+            // ⚠️ Do not replace this with a bigger leading inset on the hero. For a ~62pt corner
+            // radius, text 6pt from the top edge needs ~35pt of inset — a third of the width of the
+            // watch, taken from the one number that has to be readable at a glance. Move the content
+            // out of the curve instead of squeezing it past.
+            ZStack {
+                if let status {
+                    Text(status.text.uppercased())
+                        .font(.system(size: 13, weight: .heavy))
+                        .kerning(0.6)
+                        .foregroundStyle(status.tint)
+                }
             }
+            .frame(maxWidth: .infinity, minHeight: 20, alignment: .center)
+            .padding(.bottom, 2)
 
             if let hero = rows.first {
                 heroRow(hero)
@@ -76,15 +86,16 @@ struct MetricsPage: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        // ⚠️ THE STATUS WORD WAS BEING CLIPPED BY THE TOP-LEFT CORNER OF THE DISPLAY. The owner
-        // photographed it mid-run reading "AUSED": this VStack started at the very top of the page, and
-        // on a rounded watch face the first line's leading characters fall outside the drawable area
-        // while the system clock occupies the same strip on the right. `.padding(.horizontal, 2)` is what
-        // PacePage already uses; the top inset is new, and it is applied to the whole stack rather than
-        // to the status word alone so the hero number does not move when a run is not paused (a layout
-        // that shifts on pause is its own legibility problem at arm's length).
-        .padding(.top, 6)
-        .padding(.horizontal, 2)
+        // ⚠️ THE ROUNDED GLASS CUTS INTO EVERY EDGE, AND IT TOOK FOUR ATTEMPTS TO STOP FIGHTING IT.
+        // "AUSED" at 2pt of inset; still clipped at 16pt; centring the status word fixed the paused
+        // case and left the hero clipped whenever the run was NOT paused; and the progress bar's left
+        // end sat outside the glass in every state. The pattern in all four is the same — content
+        // placed at an extreme edge and a margin chosen by eye.
+        // ⚠️ 8pt, not 2pt. A couple of points buys margin against a corner radius I do not actually
+        // know, and costs almost nothing on numbers that are 50pt and 30pt tall. Guessing the exact
+        // inset is what failed twice; leaving real headroom is what does not.
+        .padding(.top, 8)
+        .padding(.horizontal, 8)
         // ⚠️ LIFTED CLEAR OF THE CURVE, not just of the page dots. The lower the text, the further in
         // the rounded glass cuts, so the bottom-most line needs vertical clearance as well as a
         // leading inset — either alone still loses characters.
@@ -187,6 +198,11 @@ struct MetricsPage: View {
                 }
             }
             .frame(height: 4)
+            // ⚠️ THE BAR NEEDS THE SAME INSET AS THE TEXT ABOVE IT. It spans the full width at the very
+            // bottom of the display, so its left end sat outside the glass — found by counting bright
+            // pixels beyond a corner mask rather than by looking, which is exactly the kind of small
+            // clipping the eye skips over. Matching the cue's inset also lines the two up.
+            .padding(.horizontal, 16)
         }
     }
 }

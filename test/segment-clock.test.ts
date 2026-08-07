@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { readFileSync } from "node:fs";
 import { deriveTrainingPaces } from "../src/science/paces.ts";
 import { thresholdSession, vo2Session } from "../src/plan/session-templates.ts";
-import { buildWarmup } from "../src/science/warmup.ts";
+import { buildWarmup, strideTarget } from "../src/science/warmup.ts";
 import { LiveSession } from "../src/live/session-runtime.ts";
 
 /**
@@ -257,4 +257,44 @@ test("the section's length is printed once, not twice", () => {
   assert.ok(!/tgt\.push\(fmtPace\(step\.targetSeconds\)\)/.test(targetBlock),
     "the step's duration is printed both in the segment clock and in the target line");
   assert.match(targetBlock, /targetMeters/, "a distance-gated step no longer shows its distance");
+});
+
+test("⚠️ a grouped row never prints its measurement twice", () => {
+  // ⚠️ The owner's screenshot: "9 × 1′30″ run 1′30″ — easy, conversational". The descriptor strips the
+  // step's measurement so the count line does not repeat it — but it only stripped a LEADING one, and
+  // the run–walk builder labels its steps "Run 1′30″ — easy, conversational", word first. So the one
+  // session type a beginner actually gets was the one it failed on.
+  const src = ["esc", "fmtPace", "fmtSec", "spanText", "workLabel", "stepTargetText", "stepChips", "structureRows"]
+    .map(lift).join(";\n");
+  const structureRows = new Function(src + "; return structureRows;")();
+  const cases: [string, any[]][] = [
+    ["run–walk (measurement in the middle)", [
+      { kind: "rep", label: "Run 1′30″ — easy, conversational", durationSeconds: 90, targetRpe: { min: 3, max: 4 } },
+      { kind: "recovery", label: "Walk 1′30″ — recover", durationSeconds: 90 },
+      { kind: "rep", label: "Run 1′30″ — easy, conversational", durationSeconds: 90, targetRpe: { min: 3, max: 4 } },
+    ]],
+    ["strides (measurement leading)", [
+      { kind: "rep", label: "20″ relaxed stride — quick feet", durationSeconds: 20, targetRpe: { min: 5, max: 7 } },
+      { kind: "recovery", label: "Walk back", durationSeconds: 60 },
+      { kind: "rep", label: "20″ relaxed stride — quick feet", durationSeconds: 20, targetRpe: { min: 5, max: 7 } },
+    ]],
+  ];
+  for (const [what, steps] of cases) {
+    const row = structureRows(steps, true).find((r: any) => r.tag === "Work");
+    assert.ok(row, `${what}: no work row`);
+    const lab = String(row.lab);
+    const meas = lab.match(/\d+(?:′\d*″?|″|s\b|\s?m\b|\s?km\b)/g) || [];
+    // The count prefix ("2 ×") is not a measurement; every other number is, and there must be one.
+    assert.equal(meas.length, 1, `${what}: "${lab}" prints its measurement ${meas.length} times`);
+  }
+});
+
+test("⚠️ the strides copy matches how many strides there are", () => {
+  // ⚠️ "1 × 20″ strides, the last one or two at the pace you are about to run" — a count of one, and a
+  // rule about the last one or two of a set that has neither. Straight off the owner's phone.
+  for (const [n, want, banned] of [[1, /^at /, /last one/], [2, /^the last one at /, /or two/], [4, /^the last one or two at /, /^$/]] as const) {
+    const t = strideTarget(n as number, "the pace you are about to run");
+    assert.match(t, want as RegExp, `${n} stride(s) reads "${t}"`);
+    if (String(banned) !== "/^$/") assert.ok(!(banned as RegExp).test(t), `${n} stride(s) still says "${t}"`);
+  }
 });

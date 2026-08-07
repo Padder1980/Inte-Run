@@ -83,6 +83,21 @@ export type WarmupConditions = {
   mobilityNeeds?: boolean;
 };
 
+/**
+ * How to describe which stride carries the target pace — and it depends on HOW MANY there are.
+ *
+ * ⚠️ The copy was written once, for a full warm-up, and read as nonsense at the small end. A short
+ * session gets a single stride, and the owner's phone showed *"1 × 20″ strides, the last one or two
+ * at the pace you are about to run"* — a plural, a count of one, and a rule about "the last one or
+ * two" of a set that has neither. With two, "the last one or two" means both, which is not what the
+ * phase is for: the point of the closing stride is that everything before it is a build.
+ */
+export function strideTarget(strides: number, pace: string): string {
+  if (strides <= 1) return `at ${pace}`;
+  if (strides === 2) return `the last one at ${pace}`;
+  return `the last one or two at ${pace}`;
+}
+
 export type WarmupPhase =
   | { phase: "raise"; minutes: number; rpe: { min: number; max: number }; instruction: string }
   | { phase: "mobilise"; movements: string[]; instruction: string }
@@ -455,12 +470,15 @@ export function buildWarmup(
     });
   }
   if (strides > 0) {
-    const target = effort === "threshold" ? "building to about 10 km effort"
-      : effort === "hard" ? "the last one at about the pace of your first repetition"
-      : "the last one or two at the pace you are about to run";
+    const pace = effort === "threshold" ? "about 10 km effort"
+      : effort === "hard" ? "about the pace of your first repetition"
+      : "the pace you are about to run";
+    const target = strideTarget(strides, pace);
     phases.push({
       phase: "potentiate", strides, seconds: 20, effort: target,
-      instruction: `${strides} × 20 seconds relaxed and progressive, ${target}. Walk or jog until your breathing is back before the next one. A stride is a smooth build, not a sprint.`,
+      instruction: `${strides} × 20 seconds relaxed and progressive, ${target}.${
+        strides > 1 ? " Walk or jog until your breathing is back before the next one." : ""
+      } A stride is a smooth build, not a sprint.`,
     });
   }
   phases.push({
@@ -537,8 +555,9 @@ function raceWarmup(
       ? "Your own routine, if you have one — this is the shape of it. Race day is not the time to add something new."
       : "A couple of easy movements to check how the legs feel. Nothing forced." });
   if (strides > 0) {
-    phases.push({ phase: "potentiate", strides, seconds: 15, effort: "the last one around race pace",
-      instruction: `${strides} × 15 seconds relaxed, the last one around race pace — just enough to make it feel familiar.` });
+    const target = strideTarget(strides, "race pace");
+    phases.push({ phase: "potentiate", strides, seconds: 15, effort: target,
+      instruction: `${strides} × 15 seconds relaxed, ${target} — just enough to make it feel familiar.` });
   }
   phases.push({ phase: "transition", minutes: 5,
     instruction: "Finish 3–8 minutes before the gun, and keep moving gently rather than standing still." });

@@ -4131,7 +4131,11 @@ function structureRows(steps, plain) {
         cue = dash >= 0 ? lastLab.slice(dash + 1).trim() : "";
       }
       const lab = block.length + " \\u00d7 " + workLabel(block[0]) + " strides" + (cue ? ", " + cue : "");
-      const rec = recs[0] ? "with " + workLabel(recs[0]) + " walk back between" : "";
+      // ⚠️ "between" needs at least two things. A short session gets ONE stride, and the row read
+      // "with 55″ walk back between" — between what? With one, the walk back is simply what follows.
+      const rec = !recs[0] ? ""
+        : block.length > 1 ? "with " + workLabel(recs[0]) + " walk back between"
+        : "then " + workLabel(recs[0]) + " walking back";
       rows.push({ tag: "Warm-up", lab: plain ? lab : esc(lab),
         chips: withSpan(spanText(block.concat(recs)), stepChipsFn(block[0])), rec: rec, muted: true });
       i = j;
@@ -4160,8 +4164,20 @@ function structureRows(steps, plain) {
         // between two non-word characters, so \\b failed on every one of them: "10″ hill sprint" kept
         // its measurement, was then rejected for starting with a digit, and the row printed a bare
         // "6 × 10″" with the words gone. "20s relaxed stride" worked only because s is a word char.
-        const t = String(r.label || "")
-          .replace(/^\\s*\\d+\\s*(?:s|″|m|km|metres|minutes?|min|′)(?=[\\s—–-]|$)[\\s—–-]*/i, "").trim();
+        // ⚠️ AND THE MEASUREMENT IS NOT ALWAYS AT THE FRONT. The run-walk builder labels its steps
+        // "Run 1′30″ — easy, conversational", so a leading-only strip left it in place and the row
+        // read "9 × 1′30″ run 1′30″ — easy, conversational" — the exact double-printing this
+        // descriptor exists to prevent, in the one session type where the word comes first. Caught by
+        // the owner on his phone. Remove the rendered measurement wherever it sits, then tidy the
+        // separator it leaves behind.
+        const meas = workLabel(r);
+        let t = String(r.label || "");
+        if (meas) {
+          const at = t.indexOf(meas);
+          if (at >= 0) t = t.slice(0, at) + t.slice(at + meas.length);
+        }
+        t = t.replace(/^[\\s—–-]+/, "").replace(/\\s{2,}/g, " ").trim();
+        // A label that was ONLY its measurement leaves nothing, which is the right answer.
         if (!t || /^\\d/.test(t)) return "";
         // ⚠️ ONLY KEEP A DESCRIPTOR THAT SAYS SOMETHING. Most rep labels reduce to the bare word
         // "rep" once the measurement comes off, and "5 × 5′ rep" is worse than "5 × 5′" — 24 of the

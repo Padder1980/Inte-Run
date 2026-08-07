@@ -26,7 +26,7 @@ import WebKit
 /// is pushed from the page (it already knows the session's steps and their durations), re-pushed whenever
 /// the run's shape changes, and every clip that plays is reported back so the page does not repeat it.
 @MainActor
-final class CoachAudioService: NSObject, WKScriptMessageHandler {
+final class CoachAudioService: NSObject, WKScriptMessageHandler, AVAudioPlayerDelegate {
     static let messageName = "interunCoachAudio"
     /// ⚠️ Shared, because WatchBridge needs it and the bridge outlives the web view. A wrist-started
     /// run's cues arrive from the watch at unpredictable moments, long after the page that would
@@ -65,15 +65,109 @@ final class CoachAudioService: NSObject, WKScriptMessageHandler {
     ///
     /// The page hands over a map of trigger -> candidate clips once, at the start of the run. After
     /// that the native side can answer a cue on its own, with no page involved.
-    private var cueMap: [String: [String]] = [:]
+    /// ⚠️ PERSISTED, because the run that needs it most starts with no page in existence. A wrist run
+    /// begun without touching the phone wakes this app in the BACKGROUND — there is no web view, so
+    /// nothing can push a map, and every cue would be dropped for the whole run. A map from the last
+    /// time the app was open is correct unless the runner has since changed coach, and the page
+    /// re-pushes on every start, so it is never stale for long.
+    private var cueMap: [String: [String]] = [:] {
+        didSet { UserDefaults.standard.set(cueMap, forKey: Self.mapKey) }
+    }
+    private static let mapKey = "interun_coach_cuemap_v1"
     private var cueRotation: [String: Int] = [:]
     private var lastCueAt: [String: Date] = [:]
+
+    // MARK: - Diagnostics
+    //
+    // ⚠️ A SILENT COACH LOOKS IDENTICAL WHATEVER THE CAUSE, and this feature had no instrumentation at
+    // all — which is why "the voice coaches only said the start but then nothing after" took an audit
+    // to explain rather than a glance. Same precedent as __kbDiag for the keyboard, LIVE.gpsDiag for
+    // distance and LiveActivityService.note() for the lock-screen card. Surfaced in Support > Your data.
+    private var dScheduled = 0, dFired = 0, dStale = 0, dMissing = 0, dFailed = 0
+    private var dWatchOK = 0, dWatchMiss = 0, dInterrupt = 0
+    private var dLast = "nothing yet"
+
+    private func note(_ what: String) {
+        dLast = what
+        SelfCheck.logger.notice("coach audio \(what, privacy: .public)")
+        save()
+    }
+    private func save() {
+        let line = "sched \(dScheduled) . played \(dFired) . stale \(dStale) . missing \(dMissing)"
+            + " . failed \(dFailed) . wrist \(dWatchOK)/\(dWatchOK + dWatchMiss)"
+            + " . interrupts \(dInterrupt) . map \(cueMap.count) . last: \(dLast)"
+        UserDefaults.standard.set(line, forKey: "interun_coach_audio_status")
+    }
+    static var lastStatus: String {
+        UserDefaults.standard.string(forKey: "interun_coach_audio_status") ?? "no run recorded yet"
+    }
+
+    override init() {
+        super.init()
+        cueMap = (UserDefaults.standard.dictionary(forKey: Self.mapKey) as? [String: [String]]) ?? [:]
+        configureSession()
+        let nc = NotificationCenter.default
+        // ⚠️ AN INTERRUPTION USED TO BE UNOBSERVED ANYWHERE IN THE APP. A call, Siri, an alarm or a
+        // Clock timer deactivates our session; AVAudioPlayer re-activates implicitly on the next
+        // play(), so it is not the permanent death it first looks like — but every cue whose moment
+        // falls inside the interruption window is consumed by the scheduler and never heard, and
+        // nothing anywhere recorded that it happened. Reactivating on .ended closes the window, and
+        // counting them is what will settle the next report of a quiet coach.
+        nc.addObserver(self, selector: #selector(interrupted(_:)),
+                       name: AVAudioSession.interruptionNotification, object: nil)
+        // ⚠️ A media-services reset drops the app's whole session configuration. Rare, but the symptom
+        // is total silence for the rest of the run with no way to recover short of relaunching.
+        nc.addObserver(self, selector: #selector(mediaReset),
+                       name: AVAudioSession.mediaServicesWereResetNotification, object: nil)
+    }
+
+    /// ⚠️ CONFIGURE HERE, NOT IN InteRunApp.init, AND DO NOT ACTIVATE. The session used to be activated
+    /// once at app launch and never deactivated — and `.duckOthers` ducks for as long as the session is
+    /// ACTIVE, not for as long as a clip plays. So the runner's music or podcast sat at reduced volume
+    /// from the moment the app launched until it was force-quit: on Today, in Support, long after the
+    /// run. Worse, `init()` runs on background wakes too, so it could start with the app never
+    /// appearing on screen. This is the exact failure this file's own header refuses to introduce via a
+    /// silent keep-alive track, arrived at by a different route.
+    ///
+    /// ⚠️ `.interruptSpokenAudioAndMixWithOthers` PAUSES a podcast for the cue rather than talking over
+    /// it at duck volume — two voices at once is not intelligible, and a runner would fairly report
+    /// that as "the coach went quiet". Music still merely ducks. It implies `.mixWithOthers`.
+    func configureSession() {
+        do {
+            try AVAudioSession.sharedInstance().setCategory(
+                .playback, mode: .spokenAudio,
+                options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers])
+        } catch { note("configure failed: \(error.localizedDescription)") }
+    }
+
+    @objc private func interrupted(_ n: Notification) {
+        guard let raw = n.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: raw) else { return }
+        if type == .began {
+            dInterrupt += 1
+            note("interrupted")
+        } else {
+            // ⚠️ Reactivate even when shouldResume is absent. We are not resuming a track the runner
+            // was listening to — we are making sure the NEXT cue can sound. Waiting for permission to
+            // resume is the wrong question for spoken coaching.
+            try? AVAudioSession.sharedInstance().setActive(true)
+            note("interruption ended")
+        }
+    }
+
+    @objc private func mediaReset() {
+        player = nil
+        configureSession()
+        note("media services reset")
+    }
 
     /// Play a cue the WATCH has asked for, without the page. Returns false when there is nothing to
     /// play, so the caller can fall back to the page rather than the runner getting silence.
     @discardableResult
     func playWatchCue(_ trigger: String) -> Bool {
-        guard let files = cueMap[trigger], !files.isEmpty else { return false }
+        guard let files = cueMap[trigger], !files.isEmpty else {
+            dWatchMiss += 1; note("no clip for wrist cue \(trigger)"); return false
+        }
         // The page's own catalogue enforces per-prompt repeat windows; this is the coarse version of
         // the same idea, so a wrist that re-sends a trigger cannot produce a stutter.
         if let last = lastCueAt[trigger], Date().timeIntervalSince(last) < 20 { return true }
@@ -81,7 +175,9 @@ final class CoachAudioService: NSObject, WKScriptMessageHandler {
         let i = (cueRotation[trigger] ?? 0) % files.count
         cueRotation[trigger] = i + 1
         lastCueAt[trigger] = Date()
-        return playFile(files[i])
+        let ok = playFile(files[i])
+        if ok { dWatchOK += 1 } else { dWatchMiss += 1 }
+        return ok
     }
 
     /// A cue this far past its moment is not worth playing — the runner has moved on, and hearing
@@ -103,6 +199,8 @@ final class CoachAudioService: NSObject, WKScriptMessageHandler {
             }
             // A re-push replaces the schedule outright, so the slot keys start again from zero.
             played.removeAll()
+            dScheduled = cues.count
+            note("scheduled \(cues.count) cues")
             start()
         case "cuemap":
             // ⚠️ Sent once when a WRIST-recorded run starts. Without it the native side has no way to
@@ -111,6 +209,12 @@ final class CoachAudioService: NSObject, WKScriptMessageHandler {
             cueMap = (body["map"] as? [String: [String]]) ?? [:]
             cueRotation = [:]
             lastCueAt = [:]
+        case "clearSchedule":
+            // ⚠️ THE PHONE'S SCHEDULE ONLY. This used to also empty `cueMap`, which belongs to the
+            // WRIST path — and it was not a theoretical overlap: `stopLive()` posts this, and every
+            // bottom-nav button calls `stopLive()` whenever a run is not live, so tapping Today during
+            // a watch-recorded run silenced its coach for the rest of the run.
+            stop()
         case "clear":
             cueMap = [:]
             stop()
@@ -143,13 +247,20 @@ final class CoachAudioService: NSObject, WKScriptMessageHandler {
         guard !cues.isEmpty else { return }
         // ⚠️ ONLY WHILE THE PAGE CANNOT DO IT ITSELF. With the app in front, the web layer's own loop is
         // running and owns the coach — playing here as well would say every line twice.
-        guard UIApplication.shared.applicationState != .active else { return }
+        // ⚠️ `== .background`, NOT `!= .active`. `.inactive` covers the app being ON SCREEN with the
+        // page's timers fully alive: Control Centre pulled down, a notification banner, the moment
+        // after unlocking. In every one of those both players would fire and the runner would hear the
+        // same line twice, overlapping, from two different audio sessions. A locked screen reaches
+        // `.background` within a fraction of a second, so nothing is lost by requiring it.
+        guard UIApplication.shared.applicationState == .background else { return }
         // One at a time: a queue of overlapping voices is worse than a missed line.
         guard player?.isPlaying != true else { return }
         let now = Date()
         guard let next = cues.first(where: { !played.contains($0.key) && $0.fireAt <= now }) else { return }
         played.insert(next.key)
         guard now.timeIntervalSince(next.fireAt) <= staleAfter else {
+            dStale += 1
+            note("skipped a stale cue")
             report(next.id)   // tell the page it is spent, so it does not queue it on return
             return
         }
@@ -162,31 +273,55 @@ final class CoachAudioService: NSObject, WKScriptMessageHandler {
     private func playFile(_ file: String) -> Bool {
         guard let base = Bundle.main.resourceURL else { return false }
         let url = base.appendingPathComponent("web/").appendingPathComponent(file)
-        guard FileManager.default.fileExists(atPath: url.path) else { return false }
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            dMissing += 1; note("missing clip \(file)"); return false
+        }
+        // ⚠️ ACTIVATE PER CLIP. AVFoundation activates implicitly, but doing it explicitly is the only
+        // way to find out whether it WORKED — and after an interruption or a process wake it may not.
+        do { try AVAudioSession.sharedInstance().setActive(true) }
+        catch { dFailed += 1; note("activate failed: \(error.localizedDescription)"); return false }
         do {
             let p = try AVAudioPlayer(contentsOf: url)
+            p.delegate = self
             p.prepareToPlay()
-            p.play()
+            // ⚠️ HONOUR THE RETURN. It was discarded, so a play that produced no sound was
+            // indistinguishable from one that did: the cue was marked spent, the page was told it had
+            // been spoken so it would not repeat it, and on a wrist run the page fallback that exists
+            // for exactly this case was skipped. Silence, with nothing anywhere to show for it.
+            guard p.play() else {
+                dFailed += 1; note("play refused for \(file)"); return false
+            }
             player = p
+            dFired += 1
+            note("played \(file)")
             return true
-        } catch { return false }
+        } catch {
+            dFailed += 1; note("decode failed \(file): \(error.localizedDescription)")
+            return false
+        }
     }
 
+    /// ⚠️ DEACTIVATE WHEN THE CLIP ENDS — this is what stops the ducking outliving the sentence.
+    /// `.notifyOthersOnDeactivation` is what tells the music app it may come back up; without it the
+    /// runner's audio stays quiet until something else happens to reactivate it.
+    func audioPlayerDidFinishPlaying(_ p: AVAudioPlayer, successfully flag: Bool) {
+        guard p === player else { return }
+        player = nil
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
+    /// ⚠️ ONE PLAY PATH, NOT TWO. This used to be a second, near-identical copy of `playFile` — same
+    /// bundle lookup, same AVAudioPlayer construction — and it is exactly the trap this project has
+    /// recorded twice already: a fix applied to one builder and not the other. The activation check,
+    /// the honoured `play()` return and the diagnostics all landed in `playFile` first, and every one
+    /// of them would have missed the SCHEDULED cues, which are the whole locked-phone feature.
+    ///
+    /// ⚠️ The cue stays marked played whether or not it sounded. Deferring that until success would
+    /// re-select a permanently-failing cue every second forever and block every later one — the
+    /// schedule must never wedge. What is conditional is `report()`: telling the page a line was
+    /// spoken when it was not is how the runner ends up with silence AND no repeat on unlock.
     private func play(_ cue: Cue) {
-        // The clips ride in the bundle exactly as the page sees them: `docs/` is embedded as `web/`, so a
-        // manifest path of "voices/guide/prep_1.mp3" lives at "web/voices/guide/prep_1.mp3".
-        guard let base = Bundle.main.resourceURL else { return }
-        let url = base.appendingPathComponent("web/").appendingPathComponent(cue.file)
-        guard FileManager.default.fileExists(atPath: url.path) else { return }
-        do {
-            let p = try AVAudioPlayer(contentsOf: url)
-            p.prepareToPlay()
-            p.play()
-            player = p
-            report(cue.id)
-        } catch {
-            // A clip that will not decode must not wedge the schedule; it is already marked played.
-        }
+        if playFile(cue.file) { report(cue.id) }
     }
 
     /// Tell the page which line has been spoken, so its own history matches and it does not repeat the

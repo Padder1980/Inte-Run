@@ -554,7 +554,25 @@ final class WorkoutManager: NSObject, ObservableObject {
         guard s.activationState == .activated, s.isReachable else { return false }
         var msg: [String: Any] = ["cue": trigger]
         if let text { msg["text"] = text }
-        s.sendMessage(msg, replyHandler: nil, errorHandler: { _ in })
+        // ⚠️ THIS RETURNS TRUE ON *SEND*, NOT ON SPEECH, AND THAT IS DELIBERATE — BUT IT NEEDS AN ACK
+        // BEHIND IT. Every caller reads the Bool as "the phone has this, stay quiet", so when the phone
+        // was reachable but played nothing the two halves were each silent for a different reason and
+        // neither knew: the phone because its cue map was empty and its page suspended, the wrist
+        // because it believed the phone had handled it. That is what "only said the start but then
+        // nothing after" sounded like from the outside.
+        //
+        // We cannot wait for the reply — the caller needs an answer now, and blocking the wrist on the
+        // phone would be worse than either failure. So the ack arrives late and is acted on late: if
+        // the phone says it did NOT play, the wrist speaks the line itself. A synthesised line a second
+        // after the moment is a poor coach; silence for a whole run is not a coach at all.
+        s.sendMessage(msg, replyHandler: { [weak self] reply in
+            let played = (reply["played"] as? Bool) ?? true
+            guard !played else { return }
+            Task { @MainActor in self?.voice?.fallback(for: trigger, text: text) }
+        }, errorHandler: { [weak self] _ in
+            // Unreachable after all — the wrist owns it.
+            Task { @MainActor in self?.voice?.fallback(for: trigger, text: text) }
+        })
         return true
     }
 

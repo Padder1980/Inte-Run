@@ -47,7 +47,13 @@ test("the schedule is pushed on every event that moves the run", () => {
   const calls = (html.match(/coachNativeSchedule\(\)/g) || []).length;
   assert.ok(calls >= 5, `coachNativeSchedule is called ${calls} times — start, resume and step changes are not all covered`);
   // And stopping must clear it: a cue from a finished run is the worst kind of ghost.
-  assert.match(lift("stopLive"), /action: "clear"/, "stopping a run does not clear the native schedule");
+  // ⚠️ "clearSchedule", NOT "clear". They were one action, and `clear` also emptied the WRIST cue map
+  // — which belongs to a different feature and is only re-pushed when a new run id arrives. stopLive()
+  // is called by every bottom-nav button whenever a run is not live, so tapping Today during a
+  // watch-recorded run wiped the map and silenced its coach for the rest of the run.
+  assert.match(lift("stopLive"), /action: "clearSchedule"/, "stopping a run does not clear the native schedule");
+  assert.doesNotMatch(app(), /action: "clear"\s*\}/,
+    "something still posts the blunt clear, which takes the wrist cue map with it");
 });
 
 test("the page marks natively-spoken lines as played", () => {
@@ -69,8 +75,13 @@ test("⚠️ the native player dedupes per SLOT, not per clip", () => {
 
 test("⚠️ the native side only speaks while the page cannot", () => {
   // Both sides playing means every line twice.
-  assert.match(swift(), /applicationState != \.active/,
+  // ⚠️ `== .background`, not `!= .active`. `.inactive` covers the app being ON SCREEN with the page's
+  // timers fully alive — Control Centre open, a banner showing, the instant after unlocking — and in
+  // all of those both players fire and the runner hears the line twice, overlapping.
+  assert.match(swift(), /applicationState == \.background/,
     "the native player does not check whether the app is in the foreground — cues will double up");
+  assert.doesNotMatch(swift(), /applicationState != \.active/,
+    "the loose gate is back: .inactive means the page is alive and both sides will speak");
 });
 
 test("the audio player is owned strongly, on both sides", () => {

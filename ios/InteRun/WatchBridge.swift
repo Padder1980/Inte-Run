@@ -164,6 +164,17 @@ extension WatchBridge: WCSessionDelegate {
     func session(_ session: WCSession, didReceiveMessage message: [String: Any],
                  replyHandler: @escaping ([String: Any]) -> Void) {
         if message["request"] as? String == "sync" { return handleSyncRequest(replyHandler) }
+        // ⚠️ A CUE IS ANSWERED WITH WHETHER IT WAS ACTUALLY SOUNDED, not merely received. The wrist
+        // treats a successful SEND as "the phone has this, stay quiet", so a phone that took the
+        // message and played nothing left both devices silent, each believing the other had it. That
+        // is what the owner heard as "only said the start but then nothing after".
+        if let cue = message["cue"] as? String {
+            let text = (message["text"] as? String) ?? ""
+            DispatchQueue.main.async {
+                replyHandler(["played": self.forwardCue(cue, text: text)])
+            }
+            return
+        }
         replyHandler([:])
         route(message)
     }
@@ -318,21 +329,29 @@ extension WatchBridge: WCSessionDelegate {
     }
 
     @MainActor
-    private func forwardCue(_ trigger: String, text: String) {
+    /// Returns whether the cue was actually SOUNDED, so the wrist knows whether to speak it itself.
+    @discardableResult
+    private func forwardCue(_ trigger: String, text: String) -> Bool {
         // ⚠️ evaluateJavaScript DOES NOTHING against a suspended web content process, and iOS suspends
         // it the moment the phone goes in a pocket. That is why a wrist run's coach spoke once and
         // then fell silent: every later cue was handed to a page that was not running.
         // With the app out of the foreground the native player answers instead — it stays alive on the
         // audio/location background modes, which is the whole reason it exists.
-        if UIApplication.shared.applicationState != .active {
-            if CoachAudioService.shared.playWatchCue(trigger) { return }
+        let active = UIApplication.shared.applicationState == .active
+        if !active {
+            if CoachAudioService.shared.playWatchCue(trigger) { return true }
             // Nothing to play natively (no cue map yet): fall through and try the page, which may
             // still be alive if the screen is merely off.
         }
-        guard let webView else { return }
+        guard let webView else { return false }
         let safe = { (v: String) in v.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") }
         webView.evaluateJavaScript(
             "window.__interunWatchCue && window.__interunWatchCue(\"\(safe(trigger))\", \"\(safe(text))\");")
+        // ⚠️ Optimistic ONLY when the app is in front, because that is the one state where the page is
+        // certainly running and will certainly play. Backgrounded, evaluateJavaScript against a
+        // suspended content process does nothing at all and returns no error — so claiming success
+        // there is exactly the lie that produced the silence. Say no, and let the wrist cover it.
+        return active
     }
 
     private func forwardLive(_ live: [String: Any]) {

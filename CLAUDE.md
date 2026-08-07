@@ -2674,7 +2674,83 @@ pass on a stale `web/app.html` while the browser serves the previous build.
 
 ## OPEN BUGS (confirmed on real hardware, 2026-07-29)
 
-### 1. Coach audio stops when the iPhone screen locks — diagnosed, not fixed
+### 1. Coach audio when the phone is locked or pocketed — FIXED 2026-08-08, unproven on hardware
+
+⚠️ **THE NATIVE FIX EXISTED SINCE 2026-08-07 AND WAS INERT.** `CoachAudioService` was written, wired
+and shipped — and `coachPushWatchCueMap()` posted a map containing **ZERO files, across all 13
+triggers**, measured. `coachScheduledPrompt` read `LIVE.session.type`, and **`LIVE` is null at both
+call sites by construction**: the watch-initiated one is a live-tick handler for a run the phone is
+not recording, and the phone-initiated one sets `LIVE = null` two lines later because the WATCH is
+the recorder. The read threw, a `try/catch` swallowed it, every trigger returned null. So
+`playWatchCue` could never return true, `WatchBridge` always fell through to `evaluateJavaScript`
+against a suspended page, and the coach went silent the moment the phone went in a pocket — which is
+the owner's report *"the voice coaches only said the start but then nothing after"*, against the fix
+written for it. **A feature can be fully wired, fully tested and completely dead.**
+
+**Seven defects, found by audit and each verified before fixing:**
+1. **The empty cue map** (above). `coachScheduledPrompt(trigger, idx, type)` now takes the type; both
+   call sites pass one (the wrist's own live tick carries `type`, and `startOnWatch` has the session).
+2. ⚠️ **`{action:"clear"}` wiped the WRIST cue map as well as the phone schedule** — and `stopLive()`
+   posts it, and every bottom-nav button calls `stopLive()` whenever a run is not live. **Tapping
+   Today during a watch run silenced its coach for the rest of the run.** Split into `clearSchedule`.
+3. ⚠️ **A DISTANCE-gated step froze the schedule's clock.** `coachNativeSchedule` summed
+   `st.durationSeconds`; a "6 × 1 km cruise", a hill rep and an 80 m stride carry none, so every later
+   cue was scheduled that much too early. Measured: **19 of 267 sessions**, worst "6 × 1 km cruise /
+   60″ jog" — schedule believed 30 minutes against an actual 62, so the whole workout's cues arrived
+   in its first half. Uses `stepSecs` now, the same helper the session builder uses.
+4. ⚠️ **`AVAudioPlayer.play()`'s Bool was discarded, and the page was told the line had been spoken
+   BEFORE it was known to have sounded.** A refused play was indistinguishable from success: cue
+   burnt, no repeat on unlock, and on a wrist run the page fallback skipped. Now honoured — but
+   ⚠️ **`played.insert` stays BEFORE the play**, deliberately: deferring it re-selects a permanently
+   failing cue every second forever and blocks every later one. Only `report()` is conditional.
+5. ⚠️ **`applicationState != .active` was the wrong gate.** `.inactive` covers the app being ON SCREEN
+   with the page's timers alive — Control Centre open, a banner, the instant after unlocking — so both
+   players fired and the runner heard the line twice, overlapping, from two audio sessions. Now
+   `== .background`; a locked screen reaches it in a fraction of a second.
+6. ⚠️ **THE SESSION WAS ACTIVATED AT LAUNCH WITH `.duckOthers` AND NEVER DEACTIVATED.** Ducking lasts
+   as long as the session is ACTIVE, not as long as a clip plays — so the runner's music sat at
+   reduced volume from launch until force-quit, and since `init()` runs on background wakes it could
+   start with the app never appearing on screen. **This is the exact failure `CoachAudioService`'s own
+   header refuses to introduce via a silent keep-alive track, arrived at by a different route.**
+   The session now belongs to `CoachAudioService` alone: configured at init, activated per clip,
+   deactivated on `audioPlayerDidFinishPlaying` with `.notifyOthersOnDeactivation`.
+   ⚠️ `.interruptSpokenAudioAndMixWithOthers` replaces `.mixWithOthers` — a podcast PAUSES for the cue
+   instead of being talked over at duck volume, which is not intelligible and reads as a quiet coach.
+7. ⚠️ **Nothing anywhere observed `AVAudioSession.interruptionNotification`.** A call, Siri or an alarm
+   deactivates the session; AVAudioPlayer re-activates implicitly on the next `play()`, so it is not
+   the permanent death it looks like — but every cue whose moment falls inside the window is consumed
+   by the scheduler and never heard, and nothing recorded that it happened. Now observed and counted,
+   along with `mediaServicesWereResetNotification`.
+
+⚠️ **THE BELT AND BRACES, AND THE MOST IMPORTANT PART: `speakOnPhone` NOW GETS AN ACK.** It returned
+true on *send*, and every caller reads that as "the phone has this, stay quiet" — so when the phone
+was reachable but played nothing, **both devices were silent, each believing the other had it.** The
+phone now replies `played: true/false` (true only when a clip actually sounded; **optimistic only when
+the app is in the FOREGROUND**, because `evaluateJavaScript` against a suspended content process does
+nothing and returns no error), and `WorkoutVoice.fallback(for:text:)` speaks it on the wrist when the
+answer is no. A synthesised line a second late is a poor coach; a whole run with none is not one.
+⚠️ The fallback deliberately says nothing for `countdown` (the beats have passed) or for encouragement
+triggers — a robot is worse than silence for those.
+
+⚠️ **TWO PLAY PATHS WERE COLLAPSED INTO ONE.** `play(_ cue:)` was a near-identical copy of `playFile`,
+and every hardening above landed in `playFile` first — so all of it would have missed the SCHEDULED
+cues, which are the entire locked-phone feature. Third firing of the fix-one-builder-not-the-other trap.
+
+⚠️ **`Support › Your data` now carries a `coach:` line** (`CoachAudioService.lastStatus` →
+`window.__interunCoachAudio` → `coachDiagLine()`): scheduled / played / stale / missing / failed /
+wrist hits / interrupts / map size / last event. **A silent coach looks identical whatever the cause**
+— empty map, suspended page, refused session, missing clip — and until this existed there was no way
+to tell them apart from a runner's report. Same precedent as `__kbDiag` and `LIVE.gpsDiag`.
+
+⚠️ **STILL OPEN, AND HONESTLY SO:** a **treadmill/indoor run has nothing keeping the app process
+alive** — no GPS stream — so a 1-second `Timer` cannot fire once the screen locks and its schedule is
+silently discarded. ⚠️ `gpsFallback()` routes a failed GPS acquisition into `startIndoor()`, so an
+**outdoor** run the runner believes is a normal GPS run has the identical gap. Not fixed: the honest
+options are a location keep-alive on a run that has no use for a position, or telling the runner to
+keep the screen on. Needs the owner's call. And **none of this is proven on hardware** — it needs a
+real run with the phone locked, and the `coach:` line is what will settle it.
+
+### 1b. The original diagnosis, kept because it is still correct
 
 ⚠️ **`CLAUDE.md` used to claim going native fixed this. It did not.** The audio *plumbing* is right:
 `InteRunApp.init()` sets an `AVAudioSession` of `.playback`/`.spokenAudio` and activates it, and

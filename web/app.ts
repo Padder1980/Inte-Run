@@ -13,10 +13,10 @@ const bundleJs = await bundleEngine();
 
 // Exercise demonstration animations (looping WebP, 512×512, teal muscle highlights in the brand
 // family). Read from assets/ and inlined as data URIs so the app stays a single self-contained,
-// offline-capable file. Keyed by slug; the strength UI looks these up via each exercise's `anim`.
+// offline-capable file. Keyed by slug; the strength UI looks these up via each exercise's anim.
 // Auto-discovered, not a hardcoded list: drop a new <slug>.webp into assets/exercise-animations/,
-// run `python3 tools/make-stills.py` for its thumbnail, rebuild, and it's live. Anything referenced
-// by an exercise's `anim` that hasn't been produced yet simply falls back to the schematic figure,
+// run python3 tools/make-stills.py for its thumbnail, rebuild, and it's live. Anything referenced
+// by an exercise's anim that hasn't been produced yet simply falls back to the schematic figure,
 // so a slug can be wired up before its artwork exists.
 const animDir = join(here, "..", "assets", "exercise-animations");
 const EX_ANIM_SLUGS = readdirSync(animDir)
@@ -3134,7 +3134,10 @@ window.__interunWatchLive = function (live) {
     // to be pushed from here too. This is the case the owner actually ran: the phone handover failed,
     // he started it on his wrist instead, and the coach went quiet after the first line. Pushing only
     // from the phone's start path would have fixed the half of the problem he had already given up on.
-    coachLoadManifest().then(coachPushWatchCueMap);
+    // ⚠️ The type comes from the WRIST's tick, or from today's plan — never from LIVE, which is null
+    // here by definition (the phone is not the recorder on this path).
+    const wt = live.type || (function () { try { const t = rawToday(); return t && t.type; } catch (e) { return null; } })();
+    coachLoadManifest().then(() => coachPushWatchCueMap(wt));
   }
   const wasActive = watchLiveActive();
   // Stamp when this tick landed, so the seconds between ticks can be filled in locally. See watchLiveSec.
@@ -6149,11 +6152,21 @@ function viewportDiagLines() {
       // credited = fixes that added distance. A run with seen high and credited 0 is the first fault
       // returning; still 0 with a stationary phone is the second.
       gpsDiagLine(),
+      coachDiagLine(),
     ];
   } catch (e) { return ["diag unavailable"]; }
 }
 // The last run's GPS accounting. Kept on LIVE while a run is live, then stamped onto the saved run so it
 // survives the session \u2014 a report that arrives an hour later still carries its numbers.
+// What the native coach player has actually done. A silent coach looks identical whatever the cause —
+// an empty cue map, a suspended page, a refused audio session, a missing clip — and until this line
+// existed there was no way to tell them apart from a runner's report.
+function coachDiagLine() {
+  try {
+    const v = window.__interunCoachAudio;
+    return "coach: " + (v ? String(v) : "native player not present (browser)");
+  } catch (e) { return "coach: unknown"; }
+}
 function gpsDiagLine() {
   const d = (LIVE && LIVE.gpsDiag) || GPS_DIAG_LAST;
   if (!d) return "gps: no run recorded yet";
@@ -7250,13 +7263,13 @@ function coachNativeAvailable() {
 const WATCH_CUE_TRIGGERS = ["session-start", "session-complete", "paused", "resumed",
   "warmup-start", "interval-start", "recovery-start", "cooldown-start", "easy-settle",
   "tempo-start", "long-run-settle", "milestone-distance", "keep-going"];
-function coachPushWatchCueMap() {
+function coachPushWatchCueMap(type) {
   if (!COACH.manifest || !coachEnabled()) return;
   const map = {};
   WATCH_CUE_TRIGGERS.forEach((t) => {
     const files = [];
     for (let i = 0; i < 4; i++) {
-      const p = coachScheduledPrompt(t, i);
+      const p = coachScheduledPrompt(t, i, type);
       if (p && p.file && files.indexOf(p.file) < 0) files.push(p.file);
     }
     if (files.length) map[t] = files;
@@ -7275,9 +7288,19 @@ function coachNativePost(msg) {
 // What a schedule needs is deterministic: the candidates for this trigger and session type, picked by
 // position so six hill sprints do not all get the same line. Repeat-window logic still governs the LIVE
 // coach; it just cannot govern a list built in advance.
-function coachScheduledPrompt(trigger, idx) {
+function coachScheduledPrompt(trigger, idx, type) {
   try {
-    const all = RC.promptsFor(trigger, LIVE.session.type) || [];
+    // ⚠️ THE TYPE IS A PARAMETER BECAUSE LIVE IS NULL ON THE PATH THAT NEEDS THIS MOST, AND READING
+    // IT OFF THE GLOBAL MADE THE ENTIRE WRIST-CUE FIX A NO-OP. Both callers of coachPushWatchCueMap
+    // run with LIVE === null by construction: the watch-initiated one is a live-tick handler for a run
+    // the phone is not recording, and the phone-initiated one sets LIVE = null two lines later
+    // because the WATCH is the recorder. So LIVE.session.type threw, the try/catch below swallowed
+    // it, every trigger returned null, and the map posted to Swift contained ZERO files — measured, 0
+    // across all 13 triggers. playWatchCue could therefore never return true, WatchBridge always
+    // fell through to evaluateJavaScript against a suspended page, and the coach went silent the moment
+    // the phone went in a pocket. That is the owner's report verbatim, and the fix written for it was
+    // inert from the day it shipped.
+    const all = RC.promptsFor(trigger, type || (LIVE && LIVE.session && LIVE.session.type)) || [];
     if (!all.length) return null;
     // Rotate, then fall back to any candidate that actually has audio for this coach.
     for (let n = 0; n < all.length; n++) {
@@ -7292,25 +7315,37 @@ function coachScheduledPrompt(trigger, idx) {
 // actually running, at the elapsed time they are actually at.
 function coachNativeSchedule() {
   if (!coachNativeAvailable()) return;
-  if (!LIVE || !LIVE.started || LIVE.done || !coachEnabled()) { coachNativePost({ action: "clear" }); return; }
+  // ⚠️ "clearSchedule", NOT "clear" — clear also empties the WRIST cue map, which belongs to a
+  // different feature. And this is not theoretical: stopLive() posts it and every bottom-nav button
+  // calls stopLive() whenever a run is not live, so simply tapping Today during a wrist-recorded run
+  // wiped the map and silenced the coach for the rest of it, with nothing to show why.
+  if (!LIVE || !LIVE.started || LIVE.done || !coachEnabled()) { coachNativePost({ action: "clearSchedule" }); return; }
   const steps = (LIVE.session && LIVE.session.steps) || [];
   if (!steps.length) return;
   const nowSec = liveNowMs() / 1000;
   const cues = [];
+  const type = LIVE.session.type;
   let at = 0;
   for (let i = 0; i < steps.length; i++) {
     const st = steps[i];
     // The cue lands when the step STARTS. The first step's cue has already gone by definition.
     if (i > 0 && at > nowSec) {
-      const trig = coachStepTrigger(st, LIVE.session.type);
-      const pick = trig ? coachScheduledPrompt(trig, i) : null;
+      const trig = coachStepTrigger(st, type);
+      const pick = trig ? coachScheduledPrompt(trig, i, type) : null;
       if (pick) cues.push({ id: pick.id, inMs: Math.round((at - nowSec) * 1000), file: pick.file });
     }
-    at += (st.durationSeconds || 0);
+    // ⚠️ stepSecs, NOT st.durationSeconds. A DISTANCE-gated step — "6 × 1 km cruise", every hill
+    // rep, every 80 m stride — carries no duration at all, so summing durations left the clock frozen
+    // through it and every later cue was scheduled that much too early. Measured across a real plan:
+    // 19 of 267 sessions affected, worst "6 × 1 km cruise / 60″ jog", where the schedule believed the
+    // session was 30 minutes long against an actual 62 — so with the phone locked the whole workout's
+    // cues arrived in its first half. stepSecs converts at the step's own pace and is the same
+    // helper the session builder uses, so the two cannot drift.
+    at += stepSecs(st);
   }
   // And the finish.
   if (at > nowSec) {
-    const done = coachScheduledPrompt("session-complete", 0);
+    const done = coachScheduledPrompt("session-complete", 0, type);
     if (done) cues.push({ id: done.id, inMs: Math.round((at - nowSec) * 1000), file: done.file });
   }
   coachNativePost({ action: "schedule", cues: cues });
@@ -7516,7 +7551,7 @@ function startOnWatch(sess, opts) {
     // ⚠️ Pushed HERE, while the app is certainly in the foreground and the page certainly running.
     // Later is too late: by the time the first cue arrives the phone may already be pocketed and this
     // page suspended, which is the very failure the map exists to survive.
-    coachLoadManifest().then(coachPushWatchCueMap);
+    coachLoadManifest().then(() => coachPushWatchCueMap(s && s.type));
     LIVE = null;
     WATCH_LIVE_PENDING = true;
     state.screen = "watchlive"; WATCH_LIVE_LEFT = false; render();
@@ -8966,7 +9001,7 @@ function stopLive() {
   if (!LIVE) return;
   // Whatever ended the run — finished, discarded, or the runner walking away — the locked-phone schedule
   // goes with it. A cue arriving from a run that is over is the worst kind of ghost.
-  coachNativePost({ action: "clear" });
+  coachNativePost({ action: "clearSchedule" });
   // Keep the GPS accounting after LIVE is torn down, so Support › Your data can still answer "what did
   // GPS actually do on that run?" an hour later.
   if (LIVE.gpsDiag) GPS_DIAG_LAST = LIVE.gpsDiag;
@@ -10144,7 +10179,7 @@ function wire() {
     const st = LIVE.rt.getStatus();
     if (st === "active") {
       LIVE.rt.pause(liveNowMs()).forEach(liveCue);
-      if (LIVE.mode === "gps") { LIVE.pauseStart = Date.now(); coachNativePost({ action: "clear" }); } else { stopLive(); }
+      if (LIVE.mode === "gps") { LIVE.pauseStart = Date.now(); coachNativePost({ action: "clearSchedule" }); } else { stopLive(); }
       lPause.textContent = "Resume";
     } else if (st === "paused") {
       if (LIVE.mode === "gps") { LIVE.pausedMs += Date.now() - LIVE.pauseStart; LIVE.pauseStart = 0; LIVE.lastLat = null; LIVE.win = []; LIVE.devSpeed = null; LIVE.curPace = null; LIVE.rt.resume(liveNowMs()).forEach(liveCue); coachNativeSchedule(); if (!LIVE.ui) LIVE.ui = setInterval(gpsUiTick, 250); }

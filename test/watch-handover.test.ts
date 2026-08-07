@@ -41,7 +41,7 @@ test("⚠️ a wrist run's cue survives the phone going in a pocket", () => {
   // reach: only the wrist knows when the next cue is due, so there is no schedule to push.
   const bridge = read("InteRun/WatchBridge.swift");
   const fwd = bridge.slice(bridge.indexOf("private func forwardCue("));
-  assert.match(fwd.slice(0, 900), /applicationState != \.active/,
+  assert.match(fwd.slice(0, 900), /applicationState == \.active/,
     "forwardCue hands every cue to the web view again, including when it cannot run");
   assert.match(fwd.slice(0, 900), /CoachAudioService\.shared\.playWatchCue/,
     "there is no native fallback, so a backgrounded phone drops the cue silently");
@@ -62,11 +62,25 @@ test("⚠️ the cue map is pushed for BOTH ways a wrist run can begin", () => {
   // He hit the second one: the phone handover failed, he started it on his watch instead, and the
   // coach went quiet. Pushing only from the phone's start path fixes the half he had given up on.
   const app = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
-  const pushes = (app.match(/coachPushWatchCueMap\)/g) || []).length;
+  const pushes = (app.match(/coachPushWatchCueMap\(/g) || []).length - 1;   // minus the definition
   assert.ok(pushes >= 2,
     `the cue map is pushed from ${pushes} place(s) — it needs both startOnWatch and the new-run-id tick`);
-  assert.match(app, /if \(live\.id !== WATCH_LIVE_ID\)[\s\S]{0,600}coachPushWatchCueMap/,
+  assert.match(app, /if \(live\.id !== WATCH_LIVE_ID\)[\s\S]{0,1200}coachPushWatchCueMap/,
     "a run started ON the watch never gets a cue map, so its coach still goes silent");
+
+  // ⚠️ AND IT MUST BE CALLED WITH A SESSION TYPE. This is the defect that made the whole native
+  // wrist-cue path inert from the day it shipped: coachScheduledPrompt read LIVE.session.type, and
+  // LIVE is null at BOTH call sites by construction — the watch-initiated one is a live-tick handler
+  // for a run the phone is not recording, and the phone-initiated one sets LIVE = null two lines
+  // later because the WATCH is the recorder. The read threw, a try/catch swallowed it, every trigger
+  // returned null, and the map posted to Swift contained ZERO files across all 13 triggers. So
+  // playWatchCue could never return true, WatchBridge always fell through to evaluateJavaScript
+  // against a suspended page, and the coach went silent the moment the phone went in a pocket —
+  // which is the owner's report, against the fix written for it.
+  assert.doesNotMatch(app, /coachPushWatchCueMap\(\)/,
+    "the cue map is built with no session type again — it will post an empty map and play nothing");
+  assert.match(app, /function coachScheduledPrompt\(trigger, idx, type\)/,
+    "coachScheduledPrompt no longer takes a type, so it will read it off a null LIVE");
 
   // Every trigger the wrist can send must be in the map, or that one cue is the one that goes quiet.
   const wrist = ["session-start", "session-complete", "paused", "resumed",

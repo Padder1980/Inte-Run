@@ -66,6 +66,37 @@ final class WorkoutVoice {
         synth.speak(CoachVoice.utterance(text, coach: coach))
     }
 
+    /// The wrist speaking a line the PHONE was asked for and did not play.
+    ///
+    /// ⚠️ THIS IS THE ONLY THING THAT MAKES THE HANDOVER SAFE. Every caller of `speakOnPhone` reads its
+    /// Bool as "the phone has this, stay quiet" — so any failure on the far side used to be silence
+    /// with nobody aware of it. The phone now replies whether it actually SOUNDED a clip, and when it
+    /// did not, this speaks. A synthesised line arriving a second late is a poor coach; a whole run
+    /// with no coach at all is not one.
+    ///
+    /// ⚠️ Deliberately terse and generic. The recorded clip is the good version; this exists so the
+    /// runner knows the moment happened, not to reproduce it. `text` is passed through when the caller
+    /// had real words (the step announcement and the pace corrections carry the runner's own numbers,
+    /// which no pre-recorded clip may contain).
+    func fallback(for trigger: String, text: String?) {
+        if let text, !text.isEmpty { say(text); return }
+        switch trigger {
+        case "countdown":        return   // the beats have passed; a late "three, two, one" is worse than nothing
+        case "session-start":    sayStart()
+        case "session-complete": sayComplete()
+        case "paused":           sayPaused()
+        case "resumed":          sayResumed()
+        case "warmup-start":     say(line("warmup-start", "Warm-up. Start gently."))
+        case "interval-start":   say(line("interval-start", "Next effort."))
+        case "recovery-start":   say(line("recovery-start", "Recover."))
+        case "cooldown-start":   say(line("cooldown-start", "Ease down."))
+        case "tempo-start":      say(line("tempo-start", "Lift it here."))
+        case "easy-settle", "long-run-settle": say(line(trigger, "Settle in."))
+        case "milestone-distance", "keep-going": return   // encouragement is not worth a robot
+        default: return
+        }
+    }
+
     // The fixed moments, in the chosen coach's words.
     func sayStart() { say(line("start", "Here we go.")) }
     func sayPaused() { say(line("paused", "Paused.")) }
@@ -88,9 +119,11 @@ final class WorkoutVoice {
         case "cooldown": trigger = "cooldown-start"
         default: trigger = "easy-settle"
         }
+        // ⚠️ The `false` branch is now only "WatchConnectivity is not even available". Everything else
+        // — unreachable, reachable-but-silent — comes back through the reply handler as `fallback`,
+        // which is the only path that can tell the difference between the phone speaking and the phone
+        // merely receiving. Keeping a second fallback here as well would double-speak.
         if manager?.speakOnPhone(trigger) == true { return }
-        // Out of range: the wrist says it, and only then does it read the label, because a synthetic
-        // voice with information beats a synthetic voice without.
         say(line(trigger, kind == "rep" ? "Next effort." : "Next section."))
     }
 

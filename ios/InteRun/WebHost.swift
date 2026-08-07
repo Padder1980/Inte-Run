@@ -24,8 +24,10 @@ struct WebHost: UIViewRepresentable {
         // The Live Activity's last outcome, so Support can show it. A missing card looks identical
         // whatever the cause, and this is the only way to tell them apart from outside.
         let status = LiveActivityService.lastStatus.replacingOccurrences(of: "\"", with: "'")
+        let coachStatus = CoachAudioService.lastStatus.replacingOccurrences(of: "\"", with: "'")
         config.userContentController.addUserScript(WKUserScript(
-            source: "window.__interunLiveActivity = \"\(status)\";",
+            source: "window.__interunLiveActivity = \"\(status)\";"
+                  + "window.__interunCoachAudio = \"\(coachStatus)\";",
             injectionTime: .atDocumentStart, forMainFrameOnly: true))
 
         #if DEBUG

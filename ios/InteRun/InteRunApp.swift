@@ -8,10 +8,13 @@ struct InteRunApp: App {
         // a `.playback` session (with the `audio` background mode in Info.plist) keeps the coach
         // talking with the phone in a pocket. `.duckOthers` drops music under a cue rather than
         // killing it, and `.mixWithOthers` means we never stop someone's podcast outright.
-        let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playback, mode: .spokenAudio,
-                                 options: [.duckOthers, .mixWithOthers])
-        try? session.setActive(true)
+        // ⚠️ CONFIGURED, NOT ACTIVATED, and the audio session now belongs to CoachAudioService alone.
+        // `setActive(true)` used to live here, at launch, and was never balanced by a deactivate — and
+        // `.duckOthers` ducks while the session is ACTIVE, not while a clip plays. The runner's music
+        // therefore sat at reduced volume from launch until force-quit, and since init() also runs on
+        // background wakes it could start with the app never appearing on screen. One owner, one place,
+        // activated around each clip.
+        _ = CoachAudioService.shared
         // Bring the watch bridge up now, not when the web view happens to be built. iOS can wake
         // this app in the background purely to answer the watch, and at that point there is no page.
         _ = WatchBridge.shared

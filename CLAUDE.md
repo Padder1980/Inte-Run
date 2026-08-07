@@ -1457,11 +1457,14 @@ two is meant; `withGeneratedWarmup` already returns the session untouched on `!p
   half-marathon block stops building past the race distance.
 
 ⚠️ **THE COOL-DOWN GOES FROM EVERY LONG-RUN FORMAT, INCLUDING THE FOUR THAT FINISH ON WORK** (steady
-finish, fast finish, race-pace blocks, progressive). **This overrides the RPE-5 rule he set on
-2026-08-04** ("a run that finishes on work keeps its jog"), which still governs threshold / VO2 /
-race-specific — where the last effort is 5 km pace rather than marathon effort at the end of a two-hour
-run. Flagged to him; reverting is one constant (`cool` in `longRun`). `test/warmup-delivery.test.ts`
-exempts `type === "long"` and says why.
+finish, fast finish, race-pace blocks, progressive). This narrows the RPE-5 rule he set on 2026-08-04
+("a run that finishes on work keeps its jog"), which still governs threshold / VO2 / race-specific —
+where the last effort is 5 km pace rather than marathon effort at the end of a two-hour run.
+✅ **PUT TO HIM AND CONFIRMED, 2026-08-08: *"Long runs don't need a cool down (just the stretch
+optional function in the debrief card)"*.** So this is his decision, not an override to be tidied away
+later — do NOT "restore consistency" by giving the structured long runs their jog back. The optional
+stretch offer in the debrief is the replacement, and it is shown after every run.
+`test/warmup-delivery.test.ts` exempts `type === "long"` and says why.
 
 ⚠️ **REMOVING A FRAME BY SETTING ITS LENGTH TO ZERO CREATES A ZERO-LENGTH STEP.** `longRun`'s cool-down
 branch was kept so restoring it is one constant — and unguarded it pushes `cooldown(paces, 0)`, a step
@@ -2742,13 +2745,25 @@ wrist hits / interrupts / map size / last event. **A silent coach looks identica
 — empty map, suspended page, refused session, missing clip — and until this existed there was no way
 to tell them apart from a runner's report. Same precedent as `__kbDiag` and `LIVE.gpsDiag`.
 
-⚠️ **STILL OPEN, AND HONESTLY SO:** a **treadmill/indoor run has nothing keeping the app process
-alive** — no GPS stream — so a 1-second `Timer` cannot fire once the screen locks and its schedule is
-silently discarded. ⚠️ `gpsFallback()` routes a failed GPS acquisition into `startIndoor()`, so an
-**outdoor** run the runner believes is a normal GPS run has the identical gap. Not fixed: the honest
-options are a location keep-alive on a run that has no use for a position, or telling the runner to
-keep the screen on. Needs the owner's call. And **none of this is proven on hardware** — it needs a
-real run with the phone locked, and the `coach:` line is what will settle it.
+✅ **THE TREADMILL IS A DECIDED NON-GOAL, NOT AN UNFIXED BUG (owner, 2026-08-08):** *"I don't think
+the treadmill needs the voice coach (if i change my mind we can introduce it)"*. An indoor run has no
+GPS by design, and the location stream is what keeps the app process alive between cues — a one-second
+`Timer` does not tick in a suspended app. Making it work means running GPS on a session with no use for
+a position, purely as a keep-alive: battery and the blue location indicator for nothing. He was asked
+and declined.
+⚠️ **So `startIndoor()` no longer posts a native schedule at all.** It used to, and the schedule was
+accepted, stored and silently discarded — and a schedule that is silently discarded is
+indistinguishable from one that works, which is precisely how the wrist cue map went a whole release
+posting zero clips. The coach still speaks on a treadmill **while the screen is on**; what is not built
+is surviving the screen locking.
+⚠️ **`gpsFallback()` also lands in `startIndoor()`** when an OUTDOOR run fails to acquire GPS, so that
+run inherits the same limit — and nothing can be done about it there either, because the keep-alive
+would be the very signal that just failed. Worth knowing before it is reported as a separate bug.
+
+⚠️ **NONE OF THE COACH FIX IS PROVEN ON HARDWARE** — it needs a real run with the phone locked, and the
+`coach:` line in Support › Your data is what will settle it. ⚠️ **The Road Map step `p2-audio` is
+therefore NOT ticked yet**, deliberately: the map's rule is that only verifiable work is ticked, and a
+wrongly-ticked step destroys its value.
 
 ### 1b. The original diagnosis, kept because it is still correct
 

@@ -7827,7 +7827,23 @@ function startIndoor() {
   LIVE.acquiring = false; LIVE.mode = "indoor"; LIVE.startMs = Date.now();
   requestWakeLock();
   LIVE.rt.start(0).forEach(liveCue);
-  coachNativeSchedule();
+  // ⚠️ NO NATIVE SCHEDULE ON A TREADMILL RUN — DELIBERATE, AND THE OWNER'S CALL (2026-08-08):
+  // "I don't think the treadmill needs the voice coach (if i change my mind we can introduce it)".
+  //
+  // It used to post one, and it could never fire. The native player runs on a one-second Timer, and a
+  // Timer does not tick in a SUSPENDED app; what keeps the app alive on an outdoor run is the location
+  // stream, and a treadmill run deliberately has no GPS at all. So the schedule was accepted, stored
+  // and silently discarded — and a schedule that is silently discarded is indistinguishable from one
+  // that works, which is exactly how the wrist-cue map went a whole release posting zero clips.
+  //
+  // The coach still speaks on a treadmill while the SCREEN IS ON: the page's own loop is running and
+  // owns it. What is not built is surviving the screen locking. Making that work means running GPS on
+  // a session that has no use for a position, purely as a keep-alive — battery and the blue location
+  // indicator for nothing — which he was asked about and declined.
+  //
+  // ⚠️ gpsFallback() also lands here when an OUTDOOR run fails to acquire GPS, so that run has the
+  // same limit. Nothing can be done about it there either — the keep-alive would be the very signal
+  // that just failed. Worth knowing before someone reports it as a separate bug.
   if (!LIVE.ui) LIVE.ui = setInterval(indoorUiTick, 250);
   renderLiveNow();
 }

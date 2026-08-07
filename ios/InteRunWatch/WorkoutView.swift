@@ -89,7 +89,11 @@ struct WorkoutView: View {
     private var metrics: some View {
         MetricsPage(
             status: workout.phase == .paused ? ("Paused", Brand.ease) : nil,
-            rows: settings.metrics.map { m in
+            elapsed: workout.value(for: .elapsed).value,
+            // ⚠️ ELAPSED IS FILTERED OUT OF THE ROWS, because it now has a permanent line of its own
+            // at the top. Left in, a runner who had chosen it would see the same clock twice and lose
+            // one of only three slots to a duplicate.
+            rows: settings.metrics.filter { $0 != .elapsed }.map { m in
                 let v = workout.value(for: m)
                 // The heart-rate row carries a heart tinted by training zone — the colour is the
                 // whole message. No ceiling from the phone (or no reading yet) → the faint heart.

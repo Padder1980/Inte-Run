@@ -60,7 +60,11 @@ final class WatchSettings: ObservableObject {
     /// get to the start line. Without it a run begun from the phone records you standing still.
     @Published var countdown: Bool { didSet { save() } }
 
-    static let maxMetrics = 5
+    /// ⚠️ THREE, NOT FIVE — the owner's call after a real run: "there only should be 3 metrics on the
+    /// screen to make them bigger". Five numbers on a watch face means five small numbers, and a number
+    /// you cannot read at arm's length while moving is not a metric, it is decoration. Elapsed time is
+    /// not counted here: it has its own permanent line at the top of the page.
+    static let maxMetrics = 3
     static let defaultMetrics: [Metric] = [.elapsed, .distance, .currentPace, .lapPace, .avgPace]
 
     private static let key = "interun_watch_settings_v1"

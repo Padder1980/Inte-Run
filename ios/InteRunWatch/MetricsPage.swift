@@ -32,8 +32,13 @@ struct MetricsPage: View {
         let tint: Color
     }
 
-    /// One word, top-left, when the run is not simply running. Nil when it is.
+    /// One word, centred at the top, when the run is not simply running. Nil when it is.
     var status: (text: String, tint: Color)?
+    /// ⚠️ THE CLOCK IS ITS OWN LINE NOW, not the biggest number on the page. Owner's call after a real
+    /// run: "the continuous elapsed time to be in white at the top but smaller". It is the one figure
+    /// that is always wanted and never urgent — you glance at it between efforts, not mid-stride — so
+    /// spending the largest type on it was taking the size away from the numbers being read on the move.
+    var elapsed: String?
     /// In the runner's own chosen order. The first is the hero.
     var rows: [Row]
     /// Progress through the current step, 0–1. Nil for a run with no structure.
@@ -71,12 +76,27 @@ struct MetricsPage: View {
             .frame(maxWidth: .infinity, minHeight: 20, alignment: .center)
             .padding(.bottom, 2)
 
-            if let hero = rows.first {
-                heroRow(hero)
+            if let elapsed {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(elapsed)
+                        .font(.system(size: 26, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(status?.tint ?? Brand.ink)
+                    Text("ELAPSED")
+                        .font(.system(size: 10, weight: .bold))
+                        .kerning(0.4)
+                        .foregroundStyle(Brand.ink)
+                    Spacer(minLength: 0)
+                }
+                .padding(.leading, 2)
+                .padding(.bottom, 4)
             }
 
-            ForEach(rows.dropFirst()) { r in
-                secondaryRow(r)
+            // ⚠️ EVERY ROW THE SAME SIZE, AND ALL OF THEM BIG. There is no hero any more: with three
+            // metrics instead of five there is room to make each one readable at arm's length, which
+            // is the whole point. A hero among three just makes the other two the small ones again.
+            ForEach(rows) { r in
+                metricRow(r)
             }
 
             Spacer(minLength: 0)
@@ -104,58 +124,37 @@ struct MetricsPage: View {
 
     // MARK: - Rows
 
-    /// The one number you can read without focusing. Its label sits underneath, small and quiet,
-    /// because at this size the number is self-explanatory to the person who chose it.
-    private func heroRow(_ r: MetricsPage.Row) -> some View {
-        VStack(alignment: .leading, spacing: -2) {
-            HStack(alignment: .firstTextBaseline, spacing: 3) {
-                if let ic = r.icon { glyph(ic, size: 22) }
-                Text(r.value)
-                    .font(.system(size: 50, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .minimumScaleFactor(0.6)
-                    .lineLimit(1)
-                    .foregroundStyle(status?.tint ?? Brand.accent)
-                if let u = r.unit {
-                    Text(u)
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Brand.inkSoft)
-                }
-            }
-            Text(r.label)
-                .font(.system(size: 10, weight: .bold))
-                .kerning(0.5)
-                .foregroundStyle(Brand.inkFaint)
-        }
-        .padding(.bottom, 6)
-    }
-
-    /// Supporting numbers: still big enough to read moving, with the label immediately after the
-    /// value rather than across the watch from it.
-    private func secondaryRow(_ r: MetricsPage.Row) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 3) {
-            if let ic = r.icon { glyph(ic, size: 14) }
-            // ⚠️ 24pt was too small to read moving — his words, on a real run. These are the numbers
-            // you glance at mid-stride, so they get the increase the hero does not need.
+    /// One metric: a big number and the words that say what it is.
+    ///
+    /// ⚠️ THE COLOURS ARE HIS, FROM A REAL RUN. "the wording e.g. km curr pace needs to be in bright
+    /// white and the clock digits down the left hand side to be bright teal". The numbers were white
+    /// on near-black and the labels were `inkFaint` — which is a deliberate hierarchy on a phone at
+    /// reading distance and the wrong one on a wrist at arm's length in daylight, where the faint
+    /// grey simply disappears and nothing tells you which number you are looking at.
+    private func metricRow(_ r: MetricsPage.Row) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            if let ic = r.icon { glyph(ic, size: 20) }
             Text(r.value)
-                .font(.system(size: 30, weight: .semibold, design: .rounded))
+                .font(.system(size: 40, weight: .semibold, design: .rounded))
                 .monospacedDigit()
-                .minimumScaleFactor(0.6)
+                .minimumScaleFactor(0.55)
                 .lineLimit(1)
-                .foregroundStyle(Brand.ink)
+                .foregroundStyle(Brand.accent)
             if let u = r.unit {
                 Text(u)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Brand.inkFaint)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Brand.ink)
             }
             Text(r.label)
-                .font(.system(size: 10, weight: .bold))
+                .font(.system(size: 12, weight: .bold))
                 .kerning(0.3)
-                .foregroundStyle(Brand.inkFaint)
-                .padding(.leading, 3)
+                .foregroundStyle(Brand.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .padding(.leading, 2)
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 1)
+        .padding(.vertical, 2)
     }
 
     /// The row's leading glyph — the zone-tinted heart. The tint carries the zone by itself

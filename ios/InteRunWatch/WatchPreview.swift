@@ -32,13 +32,13 @@ enum WatchPreview {
         case "mid-run":
             MetricsPage(
                 status: nil,
+                elapsed: "12:04",
                 rows: [
                     .init(value: "1.42", unit: "KM", label: "DISTANCE"),
                     .init(value: "4:58", unit: "/KM", label: "CUR PACE"),
                     // 162 against a ceiling of 182 is 89% — zone 4, so the heart wears the gold.
                     .init(value: "162", unit: "BPM", label: "HEART",
                           icon: .init(systemName: "heart.fill", tint: Brand.hrZoneTint(4))),
-                    .init(value: "12:04", unit: nil, label: "TIME"),
                 ],
                 stepProgress: 0.62,
                 stepLabel: "2 km at 4:55/km")
@@ -47,6 +47,7 @@ enum WatchPreview {
         case "paused":
             MetricsPage(
                 status: ("Paused", Brand.ease),
+                elapsed: "12:04",
                 rows: [
                     .init(value: "1.42", unit: "KM", label: "DISTANCE"),
                     .init(value: "4:58", unit: "/KM", label: "CUR PACE"),
@@ -65,6 +66,7 @@ enum WatchPreview {
         case "cold-start":
             MetricsPage(
                 status: nil,
+                elapsed: "12:04",
                 rows: [
                     .init(value: "0", unit: "M", label: "DISTANCE"),
                     .init(value: "--", unit: "/KM", label: "CUR PACE"),
@@ -80,6 +82,7 @@ enum WatchPreview {
         case "free-run":
             MetricsPage(
                 status: nil,
+                elapsed: "12:04",
                 rows: [
                     .init(value: "3.08", unit: "KM", label: "DISTANCE"),
                     .init(value: "5:41", unit: "/KM", label: "AVG PACE"),
@@ -92,6 +95,7 @@ enum WatchPreview {
         case "five-metrics":
             MetricsPage(
                 status: nil,
+                elapsed: "12:04",
                 rows: [
                     .init(value: "1.42", unit: "KM", label: "DISTANCE"),
                     .init(value: "4:58", unit: "/KM", label: "CUR PACE"),
@@ -109,6 +113,7 @@ enum WatchPreview {
         case "hr-hero":
             MetricsPage(
                 status: nil,
+                elapsed: "12:04",
                 rows: [
                     .init(value: "178", unit: "BPM", label: "HEART",
                           icon: .init(systemName: "heart.fill", tint: Brand.hrZoneTint(5))),

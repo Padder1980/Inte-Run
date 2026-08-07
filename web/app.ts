@@ -2457,6 +2457,27 @@ function weeklyOverview() {
   const body = rows || '<div class="cal-empty" style="padding:14px 16px">Nothing left this week — recover well.</div>';
   return '<h2 class="sec">' + (cur ? "Upcoming this week" : "Week " + wk.index) + '</h2><div class="cal-week ovw">' + head + body + '</div>';
 }
+/**
+ * "You're viewing an example plan" — shown on EVERY screen built from the example plan, not just one.
+ *
+ * ⚠️ IT LIVED ONLY ON TODAY, AND THAT IS NOT WHERE A NEW TESTER LOOKS. A fresh install opens straight
+ * into setup, and the bottom nav is visible and live throughout — so tapping the second tab exits
+ * setup and lands on Plan having never seen the word "example". What they read there is a personal
+ * fitness prediction about a runner the app has never met: "Current fitness predicts 1:55:00 for the
+ * half", under the heading "Your plan", with a 48 km/week peak and a 4:56/km goal pace, every figure
+ * of it derived from DEFAULT_PROFILE.
+ *
+ * Either they believe it — and the app has just told a beginner it predicts them a 1:55 half — or they
+ * work out it is invented, and then every number the app shows is suspect, including the real ones
+ * after setup. On a TestFlight build that costs the tester's trust inside the first minute, which is
+ * the one thing beta feedback cannot win back.
+ */
+function examplePlanBanner() {
+  if (profile.personalized) return "";
+  return '<button class="setup-banner" id="setupBanner"><div><b>You\\'re viewing an example plan</b>' +
+    '<div class="sb-sub">These numbers are a demonstration, not about you. Tell us your goal to make it yours.</div>' +
+    '</div><span>Set up \\u2192</span></button>';
+}
 function viewToday() {
   if (state.trialPending) {
     return weekStrip() +
@@ -2469,7 +2490,7 @@ function viewToday() {
   // another one is hidden while it lasts, because starting a second recorder is never what is meant.
   const mirror = watchLiveCard();
   const sess = selectedSession();
-  const banner = profile.personalized ? "" : '<button class="setup-banner" id="setupBanner"><div><b>You\\'re viewing an example plan</b><div class="sb-sub">Tell us about you and your goal to make it yours.</div></div><span>Set up →</span></button>';
+  const banner = examplePlanBanner();
   const greeting = profile.name ? '<div class="greeting">Hi, <b>' + esc(profile.name) + '</b> \\uD83D\\uDC4B</div>' : "";
   const onToday = TODAY_IN_PLAN && isCurrentWeek() && state.selDay === TODAY_DOW;
   let cta = "";
@@ -2530,6 +2551,20 @@ let WX_FETCHING = false;
 function fetchWeather(force) {
   if (WX_FETCHING || (state.wx && !force)) return;
   if (!(typeof navigator !== "undefined" && "geolocation" in navigator)) return;
+  // ⚠️ NEVER ASK FOR LOCATION BEFORE THE RUNNER KNOWS WHAT THE APP IS. render() runs synchronously at
+  // boot with state.tab === "today", so this fired about 50 ms into the very first launch — while the
+  // splash was still up and two seconds before "Welcome to Inte-Run" was readable. iOS put a location
+  // alert over a screen that had not yet said what the app does, for a WEATHER lookup, worded as being
+  // for a run that was not happening.
+  //
+  // A fair share of people tap "Don't Allow" to a prompt they cannot place, and that answer is sticky:
+  // GPS is then dead for their first real run and can only be undone in iOS Settings, which they will
+  // not think to do. The feedback you get is "the tracking doesn't work" — a permission-timing bug
+  // wearing a GPS bug's clothes, and impossible to diagnose from the report.
+  //
+  // Weather is a nicety. It waits until setup is done, by which point they have chosen a goal and the
+  // prompt makes sense. The force flag is the sheet the runner opened deliberately, which is always allowed.
+  if (!force && !profile.personalized) return;
   WX_FETCHING = true;
   navigator.geolocation.getCurrentPosition((pos) => {
     const la = pos.coords.latitude.toFixed(3), lo = pos.coords.longitude.toFixed(3);
@@ -2583,7 +2618,10 @@ function weatherSheetHtml() {
     '<div class="sd-move"><div class="sd-move-h">' + (w.live ? 'Preview other conditions' : 'Try other conditions') + '</div><div class="seg wx-seg" data-wxseg="1" style="margin-top:10px">' + presetBtns + '</div><div class="sd-move-n">' + (w.live ? 'Tap a preset to preview how a session would feel in different weather.' : 'Sample conditions — allow location to read your local forecast.') + '</div></div>';
 }
 let WX_SHEET_OPEN = false;
-function openWeatherSheet() { ensureSheet(); SHEET_CTX = null; WX_SHEET_OPEN = true; fetchWeather(); $("sheetBody").innerHTML = weatherSheetHtml(); wireWeatherSheet(); $("sheetOv").classList.add("on"); }
+// ⚠️ FORCED, because opening this sheet IS the runner asking. The gate in fetchWeather stops the
+// app prompting for location before setup is done; it must not stop someone who has deliberately
+// tapped the weather card from getting an answer — that would be a dead screen with no explanation.
+function openWeatherSheet() { ensureSheet(); SHEET_CTX = null; WX_SHEET_OPEN = true; fetchWeather(true); $("sheetBody").innerHTML = weatherSheetHtml(); wireWeatherSheet(); $("sheetOv").classList.add("on"); }
 function wireWeatherSheet() {
   // Selecting a preset drops any live forecast and previews that sample instead.
   document.querySelectorAll('#sheetBody [data-wxseg] button').forEach((b) => b.onclick = () => { state.wx = null; state.weather = b.dataset.weather; $("sheetBody").innerHTML = weatherSheetHtml(); wireWeatherSheet(); render(); });
@@ -5221,7 +5259,10 @@ function viewPlan() {
   const mileageNote = volNote
     ? '<div class="plan-note" style="border-left-color:var(--peak)">' + volNote + '</div>'
     : "";
-  return '<div class="card plan-head"><div class="eyebrow">Your plan</div><div class="goal">' + g.race + ' · ' + g.target + '</div><div class="when">' + g.raceDate + ' · ' + s.structuredWeeks + '-week plan</div>' +
+  // ⚠️ The example banner belongs here too — see examplePlanBanner. This screen is the one a new
+  // tester reaches first, and it was the one screen that never said the numbers were invented.
+  return examplePlanBanner() +
+    '<div class="card plan-head"><div class="eyebrow">Your plan</div><div class="goal">' + g.race + ' · ' + g.target + '</div><div class="when">' + g.raceDate + ' · ' + s.structuredWeeks + '-week plan</div>' +
     '<span class="pill" style="--pc:' + (PLAN.feasibility.verdict==="achievable"?"var(--accent)":"var(--peak)") + '">' + PLAN.feasibility.verdict + '</span>' +
     feasibilityWhy() +
     '<div class="statrow"><div class="stat"><div class="k">Weeks</div><div class="v num">' + s.structuredWeeks + '</div></div><div class="stat"><div class="k">Peak/wk</div><div class="v num">' + s.peakKm + ' km</div></div><div class="stat"><div class="k">Goal pace</div><div class="v num">' + PLAN.paces.goal.replace("/km","") + '</div></div></div></div>' +

@@ -10,6 +10,24 @@ ios/InteRun/ are picked up automatically with no project edit at all.
 """
 import os
 import pathlib
+import subprocess
+
+# ⚠️ EVERY TESTFLIGHT UPLOAD NEEDS A HIGHER BUILD NUMBER THAN THE LAST, or App Store Connect rejects
+# it outright — and hand-editing a constant before each archive is exactly the step that gets
+# forgotten once and then costs twenty minutes working out why the upload bounced. The commit count is
+# monotonic, needs no bookkeeping, and is applied identically to all four targets (they must match, or
+# the embedded watch app and widget extension are refused). Floored at 36, so it can never drop below
+# a build that has already gone out.
+def build_number():
+    try:
+        root = os.path.dirname(os.path.abspath(__file__)) + "/.."
+        n = int(subprocess.run(["git", "rev-list", "--count", "HEAD"], cwd=root,
+                               capture_output=True, text=True, check=True).stdout.strip())
+    except Exception:
+        n = 0
+    return str(max(36, n))
+
+BUILD_NUMBER = build_number()
 
 # --- the "Embed web app" build phase ------------------------------------------------------------
 # Copies the built PWA into the app bundle at build time. docs/ stays the single source of truth —
@@ -99,7 +117,7 @@ WATCH_COMMON = {
     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
     "CODE_SIGN_ENTITLEMENTS": '"InteRunWatch.entitlements"',
     "CODE_SIGN_STYLE": "Automatic",
-    "CURRENT_PROJECT_VERSION": "36",
+    "CURRENT_PROJECT_VERSION": BUILD_NUMBER,
     "GENERATE_INFOPLIST_FILE": "NO",
     "INFOPLIST_FILE": '"InteRunWatch-Info.plist"',
     "MARKETING_VERSION": "1.0",
@@ -133,7 +151,7 @@ WIDGET_BUNDLE_ID = BUNDLE_ID + ".widgets"
 WIDGET_COMMON = {
     "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "AccentColor",
     "CODE_SIGN_STYLE": "Automatic",
-    "CURRENT_PROJECT_VERSION": "36",
+    "CURRENT_PROJECT_VERSION": BUILD_NUMBER,
     "GENERATE_INFOPLIST_FILE": "NO",
     "INFOPLIST_FILE": '"InteRunWidgets-Info.plist"',
     # ⚠️ An app extension's version MUST match the app's, or the build fails validation at install.
@@ -152,7 +170,7 @@ WIDGET_COMMON = {
 
 UITEST_COMMON = {
     "CODE_SIGN_STYLE": "Automatic",
-    "CURRENT_PROJECT_VERSION": "36",
+    "CURRENT_PROJECT_VERSION": BUILD_NUMBER,
     "GENERATE_INFOPLIST_FILE": "YES",
     "MARKETING_VERSION": "1.0",
     "PRODUCT_BUNDLE_IDENTIFIER": BUNDLE_ID + ".uitests",
@@ -210,7 +228,7 @@ TARGET_COMMON = {
     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
     "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "AccentColor",
     "CODE_SIGN_STYLE": "Automatic",
-    "CURRENT_PROJECT_VERSION": "36",
+    "CURRENT_PROJECT_VERSION": BUILD_NUMBER,
     "ENABLE_PREVIEWS": "YES",
     "GENERATE_INFOPLIST_FILE": "NO",
     "CODE_SIGN_ENTITLEMENTS": '"InteRun.entitlements"',

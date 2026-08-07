@@ -2,10 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "inte-run",
+      "name": "interun-docs",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8090", "--bind", "127.0.0.1", "--directory", "docs"],
-      "port": 8090
+      "runtimeArgs": ["-m", "http.server", "8777", "--directory", "docs"],
+      "port": 8777
     }
   ]
 }

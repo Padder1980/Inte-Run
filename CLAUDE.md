@@ -2137,6 +2137,36 @@ xcrun devicectl device install app --device 9AC09027-7780-558A-824A-2C535D8203D2
   summer time, and it only changes when `node web/app.ts` is re-run, so re-run it before a build
   that follows a Swift-only change or two installs become indistinguishable.
 
+### Getting a build onto TestFlight (the Developer Program is joined, 2026-08-07)
+
+```bash
+node web/app.ts && python3 ios/make-project.py
+xcodebuild -project ios/InteRun.xcodeproj -scheme InteRun -configuration Release \
+  -destination 'generic/platform=iOS' -allowProvisioningUpdates \
+  -archivePath /tmp/InteRun.xcarchive archive
+xcodebuild -exportArchive -archivePath /tmp/InteRun.xcarchive \
+  -exportOptionsPlist ios/ExportOptions.plist -exportPath /tmp/InteRun-ipa \
+  -allowProvisioningUpdates
+```
+Then upload the `.ipa` with Transporter, or `xcrun altool`/`notarytool` with an App Store Connect
+API key. The app record has to exist in App Store Connect first (same bundle id, `com.interun.app`).
+
+⚠️ **THE BUILD NUMBER NOW COMES FROM THE COMMIT COUNT** (`build_number()` in `make-project.py`),
+floored at 36. App Store Connect **rejects a second upload carrying a build number it has already
+seen**, and hand-bumping a constant before each archive is the step that gets forgotten exactly once.
+⚠️ **All four targets must carry the SAME number** — phone, watch, watch extension, widget — or the
+embedded binaries are refused with an error that names the wrong problem. That is why the value is
+one variable applied in four places rather than four literals.
+⚠️ `MARKETING_VERSION` (1.0) is the number a human sees and is bumped by hand, per release.
+
+Already in place, so none of these will surprise anyone at upload time: `ITSAppUsesNonExemptEncryption
+= false` (or App Store Connect asks the export-compliance question on every single upload), app icons
+for both targets, and plain-English `NS*UsageDescription` strings for location, HealthKit and motion —
+which a reviewer does read.
+
+⚠️ **Internal testing (up to 100 people) needs no review and no privacy policy. EXTERNAL testing does
+— a Beta App Review and a privacy-policy URL.** Start internal.
+
 ### Toolchain on this Mac (re-verified 2026-07-29 — this section changed, don't work from memory)
 
 - **Two Xcodes are installed.** Use the release one for everything:

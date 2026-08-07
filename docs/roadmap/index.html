@@ -365,6 +365,9 @@
   // ADD A NEW DATED BATCH when a milestone lands. Never edit an old one.
   var seeded = state.__seeded || (state.__seeded = {});
   var BATCHES = {
+    // He confirmed the Apple Developer Program is joined, which is the gate everything in
+    // phase 2 sits behind — TestFlight is not possible without it.
+    "2026-08-07": ["p1-dev"],
     // The iPhone app, the Watch app and the first intelligent-coach release, all on real hardware.
     "2026-07-29": ["p1-xcode", "p2-shell", "p2-brain", "p2-data",
                    "p3-app", "p3-hr", "p3-standalone",

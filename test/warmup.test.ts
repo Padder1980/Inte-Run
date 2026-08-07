@@ -407,3 +407,54 @@ test("strides are gated on when the work arrives in the SESSION AS DELIVERED, ra
   assert.equal(strides(imminent).length, 1,
     "hard work minutes away still wants strides — the gate has been turned off rather than corrected");
 });
+
+test("⚠️ a run–walk beginner is warmed up by WALKING, not by running further than the session asks", () => {
+  // ⚠️ The owner's question: "a warm up for someone who is just doing walk/run sessions needs to be
+  // appropriate (does the research suggest brisk walk?)". It did not, and the module already knew the
+  // answer — its `ability === "new"` copy is "walk briskly for 3–5 minutes, then mix a few minutes of
+  // easy running with short walks". A run–walk session never reached that branch, because the gate
+  // was `workSteps.length <= 1` and a run–walk has NINE work steps. Repetitions were read as
+  // intensity, when in fact they exist because the runner cannot yet run continuously.
+  //
+  // Measured on "Long run–walk · 9 × (1′30″ run / 1′30″ walk)" before the fix: six minutes of
+  // CONTINUOUS easy running as the raise plus three more to settle — nine minutes unbroken, before a
+  // session that never asks for more than ninety seconds at a time — a stride at RPE 5–7 in week one,
+  // and 13.3 minutes of warm-up against 13.5 minutes of running in the session itself.
+  const runStep = { kind: "rep", label: "Run 1′30″ — easy, conversational", durationSeconds: 90,
+    targetPaceSecPerKm: { minSecPerKm: 626, maxSecPerKm: 682 }, targetRpe: { min: 3, max: 4 } };
+  const walkStep = { kind: "recovery", label: "Walk 1′30″ — recover", durationSeconds: 90,
+    targetRpe: { min: 1, max: 2 } };
+  const steps: any[] = [{ kind: "warmup", label: "Brisk walk to warm up", durationSeconds: 300, targetRpe: { min: 1, max: 2 } }];
+  for (let i = 0; i < 9; i++) { steps.push({ ...runStep }); if (i < 8) steps.push({ ...walkStep }); }
+  const sess: any = { steps, targetRpe: { min: 2, max: 4 } };
+
+  const w = buildWarmup(sess, "new")!;
+  const raise: any = w.phases.find((p: any) => p.phase === "raise");
+  assert.ok(raise, "no raise phase");
+  assert.match(raise.instruction, /[Ww]alk brisk/, `a run–walk beginner is told: "${raise.instruction}"`);
+  // ⚠️ AND THE STEP'S OWN LABEL, which is what they read mid-session. "Warm up easy" is the opposite
+  // instruction, on the screen they are looking at while doing it.
+  assert.ok(raise.title && /walk/i.test(raise.title), `the raise is labelled "${raise.title}"`);
+  assert.ok(!w.phases.some((p: any) => p.phase === "potentiate"),
+    "a run–walk beginner is given strides — RPE 5–7 accelerations in their first weeks of running");
+  // The paper's §8: a novice's warm-up must not become their first workout.
+  const sessionMin = steps.filter((s) => s.kind === "rep").reduce((a, s) => a + s.durationSeconds, 0) / 60;
+  assert.ok(w.totalMinutes <= sessionMin,
+    `${w.totalMinutes} min of warm-up for ${sessionMin} min of running — the warm-up IS the workout`);
+});
+
+test("⚠️ but a real interval session is NOT mistaken for gentle repetitions", () => {
+  // ⚠️ The first cut of the fix above read a missing step RPE as zero — and quality reps carry no
+  // step-level band, a threshold session probes at the SESSION's 6–7 — so every tempo and interval
+  // session counted as "gentle" and would have been handed a beginner's brisk-walk warm-up with no
+  // strides. Caught by the two ability/readiness tests above on the first run. Unknown must fail
+  // toward the FULLER warm-up, never the smaller one.
+  for (const s of [thresholdSession(paces, 1), vo2Session(paces, 1)]) {
+    const w = buildWarmup(s, "intermediate")!;
+    const raise: any = w.phases.find((p: any) => p.phase === "raise");
+    assert.ok(!/[Ww]alk brisk/.test(raise.instruction),
+      `"${(s as any).title}" is being warmed up by walking`);
+    assert.ok(w.phases.some((p: any) => p.phase === "potentiate"),
+      `"${(s as any).title}" lost its strides — it opens with real work and needs them`);
+  }
+});

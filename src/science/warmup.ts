@@ -99,7 +99,10 @@ export function strideTarget(strides: number, pace: string): string {
 }
 
 export type WarmupPhase =
-  | { phase: "raise"; minutes: number; rpe: { min: number; max: number }; instruction: string }
+  // ⚠️ `title` is the SHORT name the live screen shows. Without it the raise was always labelled
+  // "Warm up easy" — literally the wrong instruction for a run-walk beginner, whose raise is a
+  // brisk walk. The module that decides what the phase IS owns what it is called.
+  | { phase: "raise"; minutes: number; rpe: { min: number; max: number }; instruction: string; title?: string }
   | { phase: "mobilise"; movements: string[]; instruction: string }
   | { phase: "potentiate"; strides: number; seconds: number; effort: string; instruction: string }
   | { phase: "transition"; minutes: number; instruction: string };
@@ -265,7 +268,44 @@ export function buildWarmup(
   // BUILDS into its effort (start easy, let it come to you) and one that starts with a repetition
   // you have to be ready for. A steady effort reached by building is the former.
   const workSteps = (session.steps || []).filter((s: WorkoutStep) => s.kind === "rep");
-  const isContinuous = workSteps.length <= 1;
+  /**
+   * ⚠️ REPETITIONS ARE NOT THE SAME THING AS INTENSITY, and reading them as such gave the app's most
+   * fragile runner its most inappropriate warm-up.
+   *
+   * A run–walk session has NINE work steps, and every one of them is easy conversational running at
+   * RPE 3–4. The repetitions exist because the runner cannot yet run continuously — not because the
+   * effort is hard. Counting them sent a complete beginner down the structured path and produced,
+   * measured on "Long run–walk · 9 × (1′30″ run / 1′30″ walk)":
+   *   • **six minutes of CONTINUOUS easy running** as the raise, then three more to settle — nine
+   *     minutes of unbroken running before a session that never asks for more than ninety seconds
+   *     at a time, for someone whose whole plan exists because they cannot do that yet;
+   *   • **a stride at RPE 5–7**, a near-10 km-effort acceleration, in week one;
+   *   • 13.3 minutes of warm-up against 13.5 minutes of running in the session itself — against the
+   *     paper's own §8 rule, quoted in ABILITY_VOLUME above, that *a novice's warm-up must not
+   *     become their first workout*.
+   * And the session already carried the right answer in its own step, "Brisk walk to warm up",
+   * which the generator discarded.
+   *
+   * The low-intensity path below is the correct one: its `ability === "new"` copy is *"walk briskly
+   * for 3–5 minutes, then mix a few minutes of easy running with short walks"*, and it carries no
+   * strides by design. The gate is the WORK'S OWN EFFORT, so a format that alternates hard reps with
+   * recoveries is unaffected however it is titled.
+   *
+   * ⚠️ AND A MISSING STEP RPE MEANS THE SESSION'S BAND, NOT ZERO. Written as
+   * `(s.targetRpe ? s.targetRpe.max : 0) <= 4` this was far worse than the bug it fixed: quality reps
+   * do not carry a step-level band — a threshold session probes at the SESSION's RPE 6–7 — so every
+   * tempo and interval session read as "gentle" and would have been handed a beginner's brisk-walk
+   * warm-up with no strides. The same undefined-reads-as-zero trap the progression audit hit when it
+   * measured intensity from step RPE. `test/warmup.test.ts` caught it on the first run; the ordering
+   * fallback is exactly what `analyseSession` already uses a few lines above.
+   * A rep with no band anywhere is NOT gentle — unknown must fail toward the fuller warm-up.
+   */
+  const sessionRpeMax = session.targetRpe ? session.targetRpe.max : 0;
+  const gentleReps = workSteps.length > 1 && workSteps.every((s: WorkoutStep) => {
+    const r = s.targetRpe ? s.targetRpe.max : sessionRpeMax;
+    return r > 0 && r <= 4;
+  });
+  const isContinuous = workSteps.length <= 1 || gentleReps;
 
   // ---- Easy, and continuous moderate running: the warm-up IS the opening of the run ----
   if (effort === "easy" || (effort === "steady" && isContinuous)) {
@@ -289,6 +329,7 @@ export function buildWarmup(
       .reduce((a, s) => a + (s.durationSeconds || 0), 0) / 60);
     phases.push({
       phase: "raise", minutes: mins, rpe: { min: 2, max: 2 },
+      title: ability === "new" ? "Brisk walk, easing into running" : "Warm up easy",
       instruction: ability === "new"
         ? "Walk briskly for 3–5 minutes, then mix a few minutes of easy running with short walks until it feels settled."
         : `Run the first ${mins} minutes slower than your normal easy pace, then let it settle.`,

@@ -7277,7 +7277,10 @@ function withGeneratedWarmup(sess) {
   const steps = [];
   for (const p of w.phases) {
     if (p.phase === "raise") {
-      steps.push({ kind: "warmup", display: "Warm up", label: w.embedded ? "Ease in — " + p.instruction : "Warm up easy",
+      // ⚠️ The phase's own title when it has one. A run-walk beginner's raise is a brisk walk, and a
+      // step labelled "Warm up easy" told them to run it — the opposite instruction, on the screen
+      // they watch while doing it, for the one runner who cannot yet run continuously.
+      steps.push({ kind: "warmup", display: "Warm up", label: w.embedded ? "Ease in — " + p.instruction : (p.title || "Warm up easy"),
         durationSeconds: Math.max(60, Math.round(p.minutes * 60)),
         targetPaceSecPerKm: pace || undefined, targetRpe: { min: p.rpe.min, max: p.rpe.max } });
     } else if (p.phase === "mobilise") {

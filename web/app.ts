@@ -3013,6 +3013,7 @@ function ingestWatchRun(run) {
     type: run.type || (prescribed && prescribed.type) || (planned && planned.type) || "easy",
     rpe: (run.rpe >= 1 && run.rpe <= 10) ? Math.round(run.rpe) : null,
     pband: prescribed ? plannedPaceBandOf(prescribed) : null,
+    pmix: prescribed ? isRunWalkShape(prescribed) : false,
     rband: prescribed ? plannedRpeBandOf(prescribed) : null,
     anchor: profile.recentTimeS,
     pmodel: PACE_MODEL_VERSION,
@@ -7804,6 +7805,9 @@ function runAnalysis(run) {
     rpe: run.rpe || null, rband: run.rband || null,
     elevGain: Math.round(run.elevGain || 0), avgHr: run.avgHr || null,
     avgPaceSec: run.avgPaceSec || 0,
+    // ⚠️ Carried so the copy can tell "no prescription" from "prescribed, but a kilometre cannot
+    // measure it". Without it a run-walk beginner is told their session was a run by feel.
+    mixed: !!run.pmix,
   };
   // Did the run get quicker as it went on? Compare the first third with the last third, which is
   // more honest than first-vs-last on a route with a hill in it.
@@ -7864,6 +7868,8 @@ function splitsVsTargetHtml(a) {
   }).join("");
   const head = a.band
     ? '<div class="sv-legend">Target <b>' + fmtPace(a.band.minSecPerKm) + "\\u2013" + fmtPace(a.band.maxSecPerKm) + '</b>/km \\u00b7 ' + a.inBand + ' of ' + a.n + ' on target</div>'
+    : a.mixed
+    ? '<div class="sv-legend">This one alternates running and walking, so each kilometre mixes the two \\u2014 there is no single pace to hold it to. The running itself had a target.</div>'
     : '<div class="sv-legend">This session had no set pace \\u2014 judged on feel.</div>';
   return '<div class="card"><div class="subhead" style="margin-top:0">Splits vs target</div>' + head + rows + '</div>';
 }
@@ -7883,6 +7889,10 @@ function debriefParagraphs(run, a) {
     } else if (a.slow > 0) {
       p.push(kmWord(a.slow) + " came in slower than the band. Worth knowing whether that was the legs, the route, or the weather before reading anything into it.");
     }
+  } else if (a.n && a.mixed) {
+    // ⚠️ NOT "a run by feel". This session was prescribed to the second; it is the kilometre that
+    // cannot judge it, because each one contains both running and walking.
+    p.push("Running and walking in the same kilometre means a split cannot say much \\u2014 what matters here is that the running stayed easy enough to talk through, and that you got round the whole set.");
   } else if (a.n) {
     p.push("A run by feel, so there is no band to judge it against \\u2014 but the splits are here if you want to see how it flowed.");
   }
@@ -7899,7 +7909,13 @@ function debriefParagraphs(run, a) {
     } else if (a.rpe < a.rband.min) {
       p.push("It felt easier than intended \\u2014 " + a.rpe + " against a planned " + a.rband.min + "\\u2013" + a.rband.max + ". Keep that in your pocket; it is the sort of thing that says a step up is coming.");
     } else {
-      p.push("Effort came in at " + a.rpe + " out of 10, right where the session intended. Pace and feel agreeing is the sign that your paces are set correctly.");
+      // ⚠️ ONLY CLAIM PACE AGREEMENT WHEN A PACE WAS ACTUALLY JUDGED. This line fired on every run
+      // whose effort landed in band, including runs with no pace band at all — a free run, a
+      // treadmill effort, a run-walk — so the card said "pace and feel agreeing" one paragraph after
+      // saying there was no pace to agree with. Two sentences on the same screen contradicting each
+      // other is worse than the weaker one alone.
+      p.push("Effort came in at " + a.rpe + " out of 10, right where the session intended." +
+        (a.band && a.n ? " Pace and feel agreeing is the sign that your paces are set correctly." : ""));
     }
   }
 
@@ -8678,6 +8694,7 @@ function liveRunRecord(sm) {
     // followed, under a hint promising it would be kept.
     rpe: sm.rpe || null, note: sm.note || undefined,
     pband: plannedPaceBandOf(LIVE.session), rband: plannedRpeBandOf(LIVE.session),
+    pmix: isRunWalkShape(LIVE.session),
     anchor: profile.recentTimeS, pmodel: PACE_MODEL_VERSION,
     avgHr: LIVE.hrN ? Math.round(LIVE.hrSum / LIVE.hrN) : null,
     maxHr: LIVE.hrMax || null,
@@ -8710,6 +8727,31 @@ function plannedPaceBandOf(sess) {
     ? longest("steady")
     : sess.steps.find((st) => st.kind === "rep" && st.targetPaceSecPerKm) || longest("steady");
   return pick ? { minSecPerKm: pick.targetPaceSecPerKm.minSecPerKm, maxSecPerKm: pick.targetPaceSecPerKm.maxSecPerKm } : null;
+}
+/**
+ * ⚠️ "NO BAND" AND "NO PRESCRIPTION" ARE DIFFERENT THINGS, AND THE CARD SAID THE SECOND FOR BOTH.
+ *
+ * A run-walk session alternates 90s of running with 90s of walking, so plannedPaceBandOf finds no
+ * continuous step and returns null — which is RIGHT, because a kilometre split of that session mixes
+ * the two and means nothing against either pace. But the debrief then printed *"A run by feel, so
+ * there is no band to judge it against"* and the splits table *"This session had no set pace"*, and
+ * both are simply untrue: the plan prescribed 10:26–11:22/km for the running, and says so on the
+ * session card two screens away.
+ *
+ * That lands on the **beginner** track — the runner least able to tell that the app has got it wrong,
+ * being told the session they were given was unstructured. This returns true so the copy can say the
+ * true thing instead: the running had a target, a mixed kilometre cannot be measured against it.
+ *
+ * The tell is the SHAPE, not the title: paced work steps alternating with unpaced recoveries, and no
+ * continuous running anywhere. Reading the title would miss "Run–walk ladder" and "Build-up run–walk".
+ */
+function isRunWalkShape(sess) {
+  const steps = (sess && sess.steps) || [];
+  const work = steps.filter((s) => s.kind === "rep");
+  const rec = steps.filter((s) => s.kind === "recovery");
+  if (!work.length || !rec.length) return false;
+  if (steps.some((s) => s.kind === "steady" && s.targetPaceSecPerKm)) return false;
+  return work.every((s) => s.targetPaceSecPerKm) && rec.every((s) => !s.targetPaceSecPerKm);
 }
 // The session's intended effort band, numerically (session-level band, else the span of its steps').
 function plannedRpeBandOf(sess) {

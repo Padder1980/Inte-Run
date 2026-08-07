@@ -581,6 +581,8 @@ details.more > summary::before { content: "▸ "; } details.more[open] > summary
 .plan-note { margin-top: 12px; background: var(--surface-2); border: 1px solid var(--line); border-left: 4px solid var(--base); border-radius: 0 10px 10px 0; padding: 11px 14px; font-size: 12.5px; color: var(--ink-soft); }
 .plan-note b { color: var(--ink); font-weight: 650; }
 .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 999px; background: color-mix(in srgb, var(--pc, var(--accent)) 15%, transparent); color: var(--pc, var(--accent)); margin-top: 10px; }
+.feas-why { margin-top: 10px; display: grid; gap: 5px; font-size: 13px; line-height: 1.45; color: var(--ink-soft); }
+.feas-why div { padding-left: 11px; border-left: 2px solid var(--line); }
 .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--pc, var(--accent)); }
 .statrow { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 14px; }
 .stat { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 11px; }
@@ -5155,6 +5157,28 @@ function wireAddSessionSheet() {
   const back = $("bldBack"); if (back) back.onclick = () => { BUILDER = null; rerender(); };
   const add = $("bldAdd"); if (add) add.onclick = () => { addExtra(BUILDER); BUILDER = null; closeSheet(); render(); };
 }
+/**
+ * WHY that verdict — the sentences the engine already wrote.
+ *
+ * ⚠️ COMPUTED AND DISCARDED, exactly like CLASS, MASTERS and PLAN.notes before it.
+ * assessFeasibility returns a rationale array spelling out the whole judgement — what the runner's
+ * current fitness predicts, what improvement the target needs against what is realistic in the weeks
+ * available, and a suggested target when it does not fit. The page rendered ONE WORD and threw the
+ * rest away, so "achievable" and "unrealistic" arrived as pronouncements with no way to check them.
+ *
+ * The owner set up two profiles he believed were identical and got different verdicts. They were not
+ * identical: one had "returning from a break" ticked, which raises the improvement ceiling from 0.15
+ * to 0.35 — more than double — and is the ONLY input besides the runway that also reshapes the phase
+ * schedule (base 5/build 6 becomes base 7/build 4 over sixteen weeks, which is what he could see in
+ * the chart). Every word needed to explain that was in the rationale, unrendered. A verdict a runner
+ * cannot interrogate is one they either over-trust or dismiss, and both are worse than the number.
+ */
+function feasibilityWhy() {
+  const f = PLAN.feasibility || {};
+  const lines = (f.rationale || []).filter(Boolean);
+  if (!lines.length) return "";
+  return '<div class="feas-why">' + lines.map((t) => '<div>' + esc(t) + '</div>').join("") + '</div>';
+}
 function viewPlan() {
   const g = PLAN.goal, s = PLAN.summary;
   const peak = s.peakKm || 1;
@@ -5196,6 +5220,7 @@ function viewPlan() {
     : "";
   return '<div class="card plan-head"><div class="eyebrow">Your plan</div><div class="goal">' + g.race + ' · ' + g.target + '</div><div class="when">' + g.raceDate + ' · ' + s.structuredWeeks + '-week plan</div>' +
     '<span class="pill" style="--pc:' + (PLAN.feasibility.verdict==="achievable"?"var(--accent)":"var(--peak)") + '">' + PLAN.feasibility.verdict + '</span>' +
+    feasibilityWhy() +
     '<div class="statrow"><div class="stat"><div class="k">Weeks</div><div class="v num">' + s.structuredWeeks + '</div></div><div class="stat"><div class="k">Peak/wk</div><div class="v num">' + s.peakKm + ' km</div></div><div class="stat"><div class="k">Goal pace</div><div class="v num">' + PLAN.paces.goal.replace("/km","") + '</div></div></div></div>' +
     starterNote +
     mileageNote +

@@ -45,6 +45,17 @@ export type PlanSummary = {
     currentPredicted: string;
     required: number;
     projected: number;
+    /**
+     * ⚠️ THE ENGINE'S OWN EXPLANATION, CARRIED THROUGH. assessFeasibility writes the whole judgement
+     * out in sentences — what current fitness predicts, what the target needs against what is
+     * realistic, and a target that would fit — and this view dropped every one of them, so the app
+     * could only ever say one word. Computed and discarded, the same trap as CLASS and PLAN.notes.
+     * The owner hit it by setting up two profiles he believed identical, getting "achievable" and
+     * "unrealistic", and having nothing on screen to tell him which input differed.
+     */
+    rationale: string[];
+    /** A target that WOULD fit the time available, when the stated one does not. */
+    suggestedTarget: string | null;
   };
   summary: {
     structuredWeeks: number;
@@ -197,6 +208,8 @@ export function buildPlanSummary(athlete: Athlete, goal: Goal): PlanSummary {
       currentPredicted: formatDuration(feas.currentPredictedSeconds),
       required: Math.round(feas.requiredImprovementPct * 10) / 10,
       projected: Math.round(feas.projectedAchievablePct * 10) / 10,
+      rationale: feas.rationale || [],
+      suggestedTarget: feas.suggestedTargetSeconds ? formatDuration(feas.suggestedTargetSeconds) : null,
     },
     summary: {
       structuredWeeks: plan.weeks.length,

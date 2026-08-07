@@ -70,7 +70,10 @@ struct WebHost: UIViewRepresentable {
 
         // The coach's voice while the phone is locked. See CoachAudioService: the page owns what is said
         // and when, but its own timer stops the moment iOS suspends the web content process.
-        let coachAudio = CoachAudioService()
+        // ⚠️ The SHARED instance: WatchBridge plays wrist-driven cues through it, and the bridge
+        // outlives the web view. A fresh instance here would leave the bridge holding a different
+        // object with an empty cue map — silence, with nothing to show why.
+        let coachAudio = CoachAudioService.shared
         coachAudio.webView = webView
         context.coordinator.coachAudio = coachAudio
         config.userContentController.add(coachAudio, name: CoachAudioService.messageName)

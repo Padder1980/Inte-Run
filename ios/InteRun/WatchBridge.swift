@@ -317,7 +317,18 @@ extension WatchBridge: WCSessionDelegate {
         }
     }
 
+    @MainActor
     private func forwardCue(_ trigger: String, text: String) {
+        // ⚠️ evaluateJavaScript DOES NOTHING against a suspended web content process, and iOS suspends
+        // it the moment the phone goes in a pocket. That is why a wrist run's coach spoke once and
+        // then fell silent: every later cue was handed to a page that was not running.
+        // With the app out of the foreground the native player answers instead — it stays alive on the
+        // audio/location background modes, which is the whole reason it exists.
+        if UIApplication.shared.applicationState != .active {
+            if CoachAudioService.shared.playWatchCue(trigger) { return }
+            // Nothing to play natively (no cue map yet): fall through and try the page, which may
+            // still be alive if the screen is merely off.
+        }
         guard let webView else { return }
         let safe = { (v: String) in v.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") }
         webView.evaluateJavaScript(

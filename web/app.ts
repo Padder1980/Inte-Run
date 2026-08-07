@@ -3124,7 +3124,15 @@ window.__interunWatchLive = function (live) {
   // why) or the second run of an app session is completely silent — every prompt still sits inside
   // its repeat window from the previous run. keepAudio, because the count-in's "go" clip is often
   // still playing when the first tick lands.
-  if (live.id !== WATCH_LIVE_ID) { WATCH_LIVE_ID = live.id; coachResetSession(true); }
+  if (live.id !== WATCH_LIVE_ID) {
+    WATCH_LIVE_ID = live.id;
+    coachResetSession(true);
+    // ⚠️ AND A RUN STARTED ON THE WATCH ITSELF NEVER PASSES THROUGH startOnWatch, so the cue map has
+    // to be pushed from here too. This is the case the owner actually ran: the phone handover failed,
+    // he started it on his wrist instead, and the coach went quiet after the first line. Pushing only
+    // from the phone's start path would have fixed the half of the problem he had already given up on.
+    coachLoadManifest().then(coachPushWatchCueMap);
+  }
   const wasActive = watchLiveActive();
   // Stamp when this tick landed, so the seconds between ticks can be filled in locally. See watchLiveSec.
   if (live.state !== "ended") live.at = Date.now();
@@ -7078,6 +7086,37 @@ function coachNativeAvailable() {
   try { return !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.interunCoachAudio); }
   catch (e) { return false; }
 }
+/**
+ * Hand the native side a trigger -> clips map, so a WRIST-recorded run's coach survives the phone
+ * going into a pocket.
+ *
+ * ⚠️ A WATCH RUN'S CUES CANNOT BE SCHEDULED. On a phone run the page knows the whole session up front
+ * and posts a timed schedule; on a watch run only the WRIST knows when the next cue is due, because it
+ * owns the pace data and the hold windows. So the cue arrives at an unpredictable moment, is handed to
+ * the page by evaluateJavaScript — and evaluateJavaScript does NOTHING against a suspended web content
+ * process. The coach spoke while the phone was in his hand and went silent the moment he pocketed it.
+ *
+ * The map is the smallest thing that lets Swift answer on its own: the catalogue, the chosen coach and
+ * their wordings all live here, so the native side cannot resolve a trigger without it.
+ * ⚠️ Every trigger the wrist can send must be in this list, or that cue is the one that goes quiet —
+ * the list is taken from the speakOnPhone call sites in WorkoutManager/WorkoutVoice.
+ */
+const WATCH_CUE_TRIGGERS = ["session-start", "session-complete", "paused", "resumed",
+  "warmup-start", "interval-start", "recovery-start", "cooldown-start", "easy-settle",
+  "tempo-start", "long-run-settle", "milestone-distance", "keep-going"];
+function coachPushWatchCueMap() {
+  if (!COACH.manifest || !coachEnabled()) return;
+  const map = {};
+  WATCH_CUE_TRIGGERS.forEach((t) => {
+    const files = [];
+    for (let i = 0; i < 4; i++) {
+      const p = coachScheduledPrompt(t, i);
+      if (p && p.file && files.indexOf(p.file) < 0) files.push(p.file);
+    }
+    if (files.length) map[t] = files;
+  });
+  coachNativePost({ action: "cuemap", map: map });
+}
 function coachNativePost(msg) {
   try { window.webkit.messageHandlers.interunCoachAudio.postMessage(msg); } catch (e) {}
 }
@@ -7328,6 +7367,10 @@ function startOnWatch(sess, opts) {
       : "Opening Inte-Run on your watch\u2026");
     // One count, one start. The phone counts in — it has the voices — and only on "go" does the
     // watch begin. Two independent three-second counts is how the clocks ended up a second apart.
+    // ⚠️ Pushed HERE, while the app is certainly in the foreground and the page certainly running.
+    // Later is too late: by the time the first cue arrives the phone may already be pocketed and this
+    // page suspended, which is the very failure the map exists to survive.
+    coachLoadManifest().then(coachPushWatchCueMap);
     LIVE = null;
     WATCH_LIVE_PENDING = true;
     state.screen = "watchlive"; WATCH_LIVE_LEFT = false; render();

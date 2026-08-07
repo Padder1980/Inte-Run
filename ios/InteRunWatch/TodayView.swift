@@ -159,8 +159,20 @@ struct TodayView: View {
             // two independent three-second counts and two clocks a second apart. And it used to
             // begin `store.session` — today's CACHED session — so starting anything else on the
             // phone quietly ran the wrong workout on the wrist.
-            .onChange(of: autoStart, initial: true) { _, want in
-                guard want, !running else { return }
+            // ⚠️ INSTALLED ALWAYS, NOT ONLY ON A HEALTHKIT LAUNCH. This was gated on `autoStart`, which
+            // is LaunchRequest.pending — true only when iOS woke the app specifically to run. So if
+            // the watch app was ALREADY OPEN when the runner tapped "My Apple Watch" on the phone,
+            // the handler was never installed at all: the phone counted them in, sent the go, and the
+            // watch parked it in `pendingGo` where nothing would ever read it. The wrist sat on Today
+            // looking like the button had done nothing, which is exactly what the owner reported
+            // after a real run — he gave up and started it on the watch instead.
+            //
+            // ⚠️ `guard !running` belonged at FIRE time, and it was ALSO at install time. A run that
+            // ended without clearing `running` therefore left the watch permanently deaf to the phone,
+            // with nothing on screen to say so. Listening costs nothing; acting is what needs a guard,
+            // and the closure already has one.
+            .onAppear {
+                guard !previewInert else { return }   // a preview must never be able to start a run
                 store.onStartNow = {
                     guard !running else { return }
                     LaunchRequest.shared.consume()

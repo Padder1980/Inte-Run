@@ -3,6 +3,8 @@ import { test } from "node:test";
 import { readFileSync } from "node:fs";
 import { generatePlan } from "../src/plan/generate-plan.ts";
 import { buildWarmup } from "../src/science/warmup.ts";
+import { deriveTrainingPaces as derive } from "../src/science/paces.ts";
+import { easyRun, thresholdSession, vo2Session } from "../src/plan/session-templates.ts";
 
 /**
  * ⚠️ DOES THE POST-RUN CARD DESCRIBE THE SESSION THAT ACTUALLY TOOK PLACE?
@@ -27,7 +29,8 @@ function lift(name: string) {
   }
   throw new Error("unbalanced braces in " + name);
 }
-const NAMES = ["isRunWalkShape", "isStrideStep", "withGeneratedWarmup", "plannedPaceBandOf",
+const NAMES = ["isRunWalkShape", "plannedStepMeters", "paceWindowOf", "paceStampFor", "runWorkPace",
+  "isStrideStep", "withGeneratedWarmup", "plannedPaceBandOf",
   "plannedRpeBandOf", "runAnalysis", "splitsVsTargetHtml", "debriefParagraphs", "esc", "fmtPace",
   "fmtSec", "spanText", "workLabel", "stepTargetText", "stepChips", "structureRows", "sessionStepText"];
 const M: any = new Function("warmupCardFor", "PACE_MODEL_VERSION",
@@ -49,7 +52,10 @@ const recordFor = (sess: any, over: any = {}) => {
   return {
     id: "r", t: sess.title, type: sess.type, d: "7 Aug", dateIso: "2026-08-07",
     dist: 2.6, time: 1560, pace: 600, rpe: 4,
-    pband: M.plannedPaceBandOf(live), pmix: M.isRunWalkShape(live), rband: M.plannedRpeBandOf(live),
+    // ⚠️ The REAL stamping function, not a hand-built approximation of it. Building the fixture by
+    // hand is how a test drifts from the app: this one carried `pmix: true` where the app stamps
+    // "walk", so it silently started exercising the interval wording instead of the run-walk one.
+    ...M.paceStampFor(live), rband: M.plannedRpeBandOf(live),
     splits: [{ km: 1, sec: 615 }, { km: 2, sec: 598 }, { km: 3, sec: 590 }],
     steps: M.sessionStepText(live), route: [], ...over,
   };
@@ -70,7 +76,7 @@ test("⚠️ a run-walk session really is prescribed — the plan gives its runn
 test("⚠️ the card never tells a run-walk runner their session was 'by feel'", () => {
   const run = recordFor(runWalkSession());
   assert.equal(run.pband, null, "a run-walk should NOT be judged by kilometre — it mixes run and walk");
-  assert.equal(run.pmix, true, "the run-walk shape was not recognised, so the copy cannot be right");
+  assert.equal(run.pmix, "walk", "the run-walk shape was not recognised, so the copy cannot be right");
   const a = M.runAnalysis(run);
   const prose = M.debriefParagraphs(run, a).map(strip).join(" ");
   const splits = strip(M.splitsVsTargetHtml(a));
@@ -119,4 +125,76 @@ test("a paced session still gets judged, and praised only when earned", () => {
   assert.match(good, /[Pp]ace and feel agreeing/, "a genuinely paced run lost the pace-agreement line");
   assert.ok(!/inside the target band/i.test(bad), "a run 60s/km too fast is praised for being in band");
   assert.match(bad, /quicker than the plan asked/i, "a too-fast run is not told so");
+});
+
+test("⚠️ an interval session run PERFECTLY is not reported as failed", () => {
+  // ⚠️ A kilometre of "10 × 1′ hard / 1′ jog" contains repetitions AND jog recoveries, so it can
+  // never sit inside the repetition band. Judged that way, a runner who hit every single rep was
+  // told "0 of 7 on target · 7 kilometres came in slower than the band". Measured across 196
+  // sessions, 192 failed to report as on-target under flawless execution and 14 scored zero.
+  // The engine already knew: src/adapt/training-flags.ts excludes these types because "interval
+  // sessions average across recoveries, so their mean pace says nothing".
+  const paces = derive({ distanceMeters: 5000, timeSeconds: 1410 });
+  for (const sess of [vo2Session(paces, 1), vo2Session(paces, 3), thresholdSession(paces, 2)]) {
+    const live = M.withGeneratedWarmup(sess);
+    const stamp = M.paceStampFor(live);
+    const reps = (live.steps || []).filter((s: any) => s.kind === "rep");
+    const recs = (live.steps || []).filter((s: any) => s.kind === "recovery" && s.targetPaceSecPerKm);
+    if (!reps.length || !recs.length) continue;             // not an interval shape
+    assert.equal(stamp.pband, null,
+      `"${(sess as any).title}": still judging whole kilometres against the repetition band`);
+    assert.equal(stamp.pmix, "reps", `"${(sess as any).title}": not recognised as scattered work`);
+    // And the card must then say something true rather than nothing.
+    const run: any = { type: sess.type, ...stamp, rpe: 7, rband: { min: 6, max: 8 },
+      splits: [{ km: 1, sec: 420 }, { km: 2, sec: 400 }, { km: 3, sec: 410 }] };
+    const a = M.runAnalysis(run);
+    assert.equal(a.rows.filter((r: any) => r.verdict !== "none").length, 0,
+      "kilometres are still being scored against a band that does not apply to them");
+    const prose = M.debriefParagraphs(run, a).map(strip).join(" ");
+    assert.ok(!/by feel/i.test(prose), `an interval session is called "by feel": ${prose}`);
+    assert.match(prose, /recover/i, `the card does not explain why a split cannot judge it: ${prose}`);
+  }
+});
+
+test("⚠️ the warm-up is not judged as if it were the session", () => {
+  // ⚠️ Every run now carries a generated warm-up, including three minutes of mobilising that covers
+  // no ground at all. Those opening kilometres were compared to the work band — and worse, the whole
+  // outing's average was fed to the adaptive engine, which measured two perfectly-executed easy runs
+  // as grounds for re-anchoring the plan two minutes per kilometre slower.
+  const paces = derive({ distanceMeters: 5000, timeSeconds: 1410 });
+  const live = M.withGeneratedWarmup(easyRun(paces, 32));
+  const stamp = M.paceStampFor(live);
+  assert.ok(stamp.pband, "an ordinary easy run should still be judged");
+  assert.ok(stamp.pwin && stamp.pwin.s > 0,
+    "the judged window starts at metre zero — the warm-up is being scored as the session");
+  // A run held exactly on the easy pace throughout its WORK, with a slower warm-up in front.
+  const mid = (stamp.pband.minSecPerKm + stamp.pband.maxSecPerKm) / 2;
+  const run: any = { type: "easy", ...stamp, rpe: 3, rband: { min: 2, max: 3 },
+    avgPaceSec: Math.round(mid + 45),
+    splits: [{ km: 1, sec: Math.round(mid + 90) }, { km: 2, sec: Math.round(mid) },
+             { km: 3, sec: Math.round(mid) }, { km: 4, sec: Math.round(mid) }] };
+  const a = M.runAnalysis(run);
+  assert.equal(a.rows[0].verdict, "none", "the warm-up kilometre is still being scored");
+  assert.ok(a.inBand >= 3, `only ${a.inBand} of the work kilometres counted as on target`);
+  // ⚠️ And the adaptive engine must see the WORK pace, not the whole outing.
+  const work = M.runWorkPace(run);
+  assert.ok(work && Math.abs(work - mid) < 5,
+    `the adaptive engine is fed ${work}s/km for a run held at ${Math.round(mid)}s/km`);
+  assert.ok(work < run.avgPaceSec, "the work pace is not distinguished from the whole outing");
+});
+
+test("⚠️ the adaptive engine is WIRED to the work pace, not just able to compute it", () => {
+  // ⚠️ Written as a check on runWorkPace alone, this passed with the wiring deliberately reverted —
+  // the helper was right and nothing called it. Both consumers of a run's average pace decide whether
+  // to re-anchor the runner's whole plan, so both are named here explicitly.
+  for (const fn of ["flagObservations", "currentWeeklyReview"]) {
+    const body = lift(fn);
+    assert.ok(/avgPaceSecPerKm: runWorkPace\(r\)/.test(body),
+      `${fn} feeds the whole outing's average pace again — warm-up minutes included`);
+    assert.ok(!/avgPaceSecPerKm: r\.avgPaceSec/.test(body),
+      `${fn} still reads r.avgPaceSec directly`);
+  }
+  // And the implied fitness estimate, which is what actually moves the plan.
+  assert.match(lift("flagObservations"), /implied5kSeconds: runWorkPace\(r\)/,
+    "the implied 5k is still derived from the whole outing");
 });

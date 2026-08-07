@@ -3012,8 +3012,9 @@ function ingestWatchRun(run) {
     steps: prescribed ? sessionStepText(prescribed) : null,
     type: run.type || (prescribed && prescribed.type) || (planned && planned.type) || "easy",
     rpe: (run.rpe >= 1 && run.rpe <= 10) ? Math.round(run.rpe) : null,
-    pband: prescribed ? plannedPaceBandOf(prescribed) : null,
-    pmix: prescribed ? isRunWalkShape(prescribed) : false,
+    pband: prescribed ? paceStampFor(prescribed).pband : null,
+    pwin: prescribed ? paceStampFor(prescribed).pwin : null,
+    pmix: prescribed ? paceStampFor(prescribed).pmix : null,
     rband: prescribed ? plannedRpeBandOf(prescribed) : null,
     anchor: profile.recentTimeS,
     pmodel: PACE_MODEL_VERSION,
@@ -7787,14 +7788,28 @@ function splitsHtml(splits) {
 function runAnalysis(run) {
   const band = run.pband || null;
   const splits = (run.splits || []).filter((s) => s && s.sec > 0);
+  // ⚠️ ONLY THE KILOMETRES THE BAND ACTUALLY APPLIES TO. Every run now carries a generated warm-up —
+  // including three minutes of mobilising that covers no ground — and a cool-down, and judging those
+  // opening and closing kilometres against the work band marked a perfectly-run session down. The
+  // window is planned distance, so a kilometre counts when its MIDPOINT falls inside it; outside, the
+  // split is still shown, just not scored. verdict "none" already renders as an unjudged row.
+  const win = run.pwin && run.pwin.e > run.pwin.s ? run.pwin : null;
+  // MOST of the kilometre must sit inside the prescribed stretch. A half-kilometre tolerance either
+  // side let the kilometre that STRADDLES the warm-up boundary be scored, and that one genuinely
+  // mixes two paces — it was the single most common false verdict left after the window went in.
+  const judged = (km) => {
+    if (!win) return true;
+    const ov = Math.min(km * 1000, win.e) - Math.max((km - 1) * 1000, win.s);
+    return ov >= 500;
+  };
   const rows = splits.map((s) => {
     let verdict = "none", delta = 0;
-    if (band) {
+    if (band && judged(s.km)) {
       if (s.sec < band.minSecPerKm) { verdict = "fast"; delta = s.sec - band.minSecPerKm; }
       else if (s.sec > band.maxSecPerKm) { verdict = "slow"; delta = s.sec - band.maxSecPerKm; }
       else verdict = "in";
     }
-    return { km: s.km, sec: s.sec, verdict: verdict, delta: delta };
+    return { km: s.km, sec: s.sec, verdict: verdict, delta: delta, judged: !!(band && judged(s.km)) };
   });
   const secs = rows.map((r) => r.sec);
   const n = secs.length;
@@ -7811,6 +7826,16 @@ function runAnalysis(run) {
     // ⚠️ Carried so the copy can tell "no prescription" from "prescribed, but a kilometre cannot
     // measure it". Without it a run-walk beginner is told their session was a run by feel.
     mixed: !!run.pmix,
+    mixKind: run.pmix || null,
+    // ⚠️ THE AVERAGE THE ADAPTIVE ENGINE SHOULD SEE. avgPaceSec is the whole outing, warm-up and
+    // mobilising included, and feeding that to the flags engine against the WORK band measured two
+    // perfectly-executed easy runs as grounds for re-anchoring the plan two minutes per kilometre
+    // slower. This is the mean of the kilometres the band actually applies to; null when there are
+    // none, which is the honest answer for an interval session.
+    workPaceSec: (function () {
+      const j = rows.filter((r) => r.judged);
+      return j.length ? Math.round(j.reduce((x, r) => x + r.sec, 0) / j.length) : null;
+    })(),
   };
   // Did the run get quicker as it went on? Compare the first third with the last third, which is
   // more honest than first-vs-last on a route with a hill in it.
@@ -7872,7 +7897,9 @@ function splitsVsTargetHtml(a) {
   const head = a.band
     ? '<div class="sv-legend">Target <b>' + fmtPace(a.band.minSecPerKm) + "\\u2013" + fmtPace(a.band.maxSecPerKm) + '</b>/km \\u00b7 ' + a.inBand + ' of ' + a.n + ' on target</div>'
     : a.mixed
-    ? '<div class="sv-legend">This one alternates running and walking, so each kilometre mixes the two \\u2014 there is no single pace to hold it to. The running itself had a target.</div>'
+    ? '<div class="sv-legend">' + (a.mixKind === "walk"
+        ? "This one alternates running and walking, so each kilometre mixes the two \\u2014 there is no single pace to hold it to. The running itself had a target."
+        : "The efforts and their recoveries share each kilometre, so a split averages the two \\u2014 there is no single pace to hold it to. Each repetition had a target.") + '</div>'
     : '<div class="sv-legend">This session had no set pace \\u2014 judged on feel.</div>';
   return '<div class="card"><div class="subhead" style="margin-top:0">Splits vs target</div>' + head + rows + '</div>';
 }
@@ -7893,9 +7920,11 @@ function debriefParagraphs(run, a) {
       p.push(kmWord(a.slow) + " came in slower than the band. Worth knowing whether that was the legs, the route, or the weather before reading anything into it.");
     }
   } else if (a.n && a.mixed) {
-    // ⚠️ NOT "a run by feel". This session was prescribed to the second; it is the kilometre that
-    // cannot judge it, because each one contains both running and walking.
-    p.push("Running and walking in the same kilometre means a split cannot say much \\u2014 what matters here is that the running stayed easy enough to talk through, and that you got round the whole set.");
+    // ⚠️ NOT "a run by feel". These sessions are prescribed to the second; it is the KILOMETRE that
+    // cannot judge them, because each one contains both the work and the recovery between it.
+    p.push(a.mixKind === "walk"
+      ? "Running and walking in the same kilometre means a split cannot say much \\u2014 what matters here is that the running stayed easy enough to talk through, and that you got round the whole set."
+      : "Efforts and recoveries land in the same kilometre here, so a split averages the two and cannot tell you much \\u2014 the repetitions themselves are what this session was about.");
   } else if (a.n) {
     p.push("A run by feel, so there is no band to judge it against \\u2014 but the splits are here if you want to see how it flowed.");
   }
@@ -8696,8 +8725,8 @@ function liveRunRecord(sm) {
     // exactly when someone writes one — had nowhere to go and was thrown away by the Save that
     // followed, under a hint promising it would be kept.
     rpe: sm.rpe || null, note: sm.note || undefined,
-    pband: plannedPaceBandOf(LIVE.session), rband: plannedRpeBandOf(LIVE.session),
-    pmix: isRunWalkShape(LIVE.session),
+    pband: paceStampFor(LIVE.session).pband, rband: plannedRpeBandOf(LIVE.session),
+    pwin: paceStampFor(LIVE.session).pwin, pmix: paceStampFor(LIVE.session).pmix,
     anchor: profile.recentTimeS, pmodel: PACE_MODEL_VERSION,
     avgHr: LIVE.hrN ? Math.round(LIVE.hrSum / LIVE.hrN) : null,
     maxHr: LIVE.hrMax || null,
@@ -8755,6 +8784,84 @@ function isRunWalkShape(sess) {
   if (!work.length || !rec.length) return false;
   if (steps.some((s) => s.kind === "steady" && s.targetPaceSecPerKm)) return false;
   return work.every((s) => s.targetPaceSecPerKm) && rec.every((s) => !s.targetPaceSecPerKm);
+}
+/** Planned metres for a step — its own distance, or its duration at the middle of its target pace. */
+function plannedStepMeters(st) {
+  if (st.distanceMeters) return st.distanceMeters;
+  const p = st.targetPaceSecPerKm;
+  if (st.durationSeconds && p && p.minSecPerKm && p.maxSecPerKm) {
+    return (st.durationSeconds / ((p.minSecPerKm + p.maxSecPerKm) / 2)) * 1000;
+  }
+  return 0;
+}
+/**
+ * The pace to judge this run against, AND the stretch of the run it applies to.
+ *
+ * ⚠️ A WHOLE KILOMETRE IS NOT THE SAME THING AS THE PACE THE PLAN ASKED FOR, and the card had been
+ * treating them as identical. Two measured consequences, both of which tell the runner something
+ * false about a session they executed correctly:
+ *
+ *  1. **Interval sessions were judged against the repetition band, per kilometre.** A kilometre of
+ *     "10 × 1′ hard / 1′ jog" contains repetitions AND jog recoveries, so it can never sit inside the
+ *     repetition band. Run perfectly — every rep dead on target — the card said **"0 of 7 on target"**
+ *     and "7 kilometres came in slower than the band". Measured across 196 sessions, 192 failed to
+ *     report as on-target under flawless execution, and 14 scored zero. The engine already knew the
+ *     comparison was invalid: src/adapt/training-flags.ts excludes these types with the comment
+ *     *"interval sessions average across recoveries, so their mean pace says nothing"* — the card
+ *     applied it anyway, per kilometre, where it is worse.
+ *  2. **The warm-up was being judged as if it were the session.** Every run now carries a generated
+ *     warm-up, including three minutes of mobilising on the spot that covers no ground at all, and
+ *     those opening kilometres were compared to the work band and to the runner's average pace. Two
+ *     perfectly-executed easy runs measured as proposing to re-anchor the whole plan two minutes per
+ *     kilometre slower — the adaptive engine acting on the warm-up.
+ *
+ * So: find the steps at the judging band, and return the stretch of planned distance they occupy.
+ * A run is judgeable only when those steps are CONTIGUOUS — nothing at a different prescribed pace
+ * in between. That is true of an easy run and of a continuous tempo (warm-up before, cool-down after)
+ * and false of every interval format and of run–walk, which is exactly the distinction wanted.
+ */
+function paceWindowOf(sess) {
+  const band = plannedPaceBandOf(sess);
+  if (!band) return null;
+  const same = (p) => !!p && p.minSecPerKm === band.minSecPerKm && p.maxSecPerKm === band.maxSecPerKm;
+  const marks = []; let m = 0;
+  for (const st of (sess.steps || [])) {
+    const d = plannedStepMeters(st);
+    // A WARM-UP IS NEVER PART OF THE JUDGED STRETCH, even when it is run at the same pace as the
+    // session — which an easy run's is. Three minutes of mobilising on the spot sits inside that
+    // first kilometre and covers no ground, so scoring it against the easy band marked a
+    // perfectly-run session down on its opening split. Preparation is excluded from training
+    // volume for the same reason; this is the same rule, applied to judging.
+    const prep = st.kind === "warmup" || st.kind === "cooldown";
+    marks.push({ start: m, end: m + d, band: !prep && same(st.targetPaceSecPerKm), paced: !prep && !!st.targetPaceSecPerKm });
+    m += d;
+  }
+  const first = marks.findIndex((x) => x.band);
+  if (first < 0) return null;
+  let last = first;
+  for (let i = marks.length - 1; i > first; i--) if (marks[i].band) { last = i; break; }
+  // ⚠️ Anything at a DIFFERENT prescribed pace inside the window means the work is scattered through
+  // the run rather than being one block of it — an interval session's jog recoveries are exactly
+  // that. Unpaced steps (mobilising, a walk back) do not break it; they simply are not judged.
+  for (let i = first + 1; i < last; i++) if (marks[i].paced && !marks[i].band) return null;
+  return { band: band, startM: marks[first].start, endM: marks[last].end };
+}
+/**
+ * The whole pace prescription stamped onto a logged run, in ONE place.
+ * ⚠️ Two builders write a run record — a phone run and a watch run — and the documented way they go
+ * wrong is by each computing the prescription slightly differently. One helper, two call sites.
+ *   pband — the band to judge against, or null when a kilometre cannot judge this session
+ *   pwin  — the stretch of planned distance that band applies to, so warm-up and cool-down
+ *           kilometres are not scored against the work
+ *   pmix  — why it cannot be judged, so the card can say the true thing: "walk" for a run-walk,
+ *           "reps" for anything whose efforts are scattered through the run. null means there was
+ *           genuinely no prescription, which is a different sentence.
+ */
+function paceStampFor(sess) {
+  const win = paceWindowOf(sess);
+  if (win) return { pband: win.band, pwin: { s: Math.round(win.startM), e: Math.round(win.endM) }, pmix: null };
+  const paced = ((sess && sess.steps) || []).some((st) => st.targetPaceSecPerKm && st.kind !== "warmup" && st.kind !== "cooldown");
+  return { pband: null, pwin: null, pmix: paced ? (isRunWalkShape(sess) ? "walk" : "reps") : null };
 }
 // The session's intended effort band, numerically (session-level band, else the span of its steps').
 function plannedRpeBandOf(sess) {
@@ -8931,6 +9038,21 @@ function clearTrainFlag() { if (!state.trainFlag) return false; state.trainFlag 
 // habit the app itself had prescribed. It is the same trap the anchor stamp already guards against
 // (see CLAUDE.md), except a model change does not touch recentTimeS, so the anchor misses it.
 const PACE_MODEL_VERSION = 2;
+/**
+ * The average pace over the part of the run the plan actually prescribed a pace for.
+ * Falls back to the whole outing for runs logged before the window was stamped — those have no
+ * warm-up recorded separately either, so the old number is the best that exists for them.
+ */
+function runWorkPace(r) {
+  if (!r) return null;
+  if (r.pwin && r.pband && (r.splits || []).length) {
+    const w = r.pwin;
+    const j = r.splits.filter((s) => s && s.sec > 0 &&
+      (Math.min(s.km * 1000, w.e) - Math.max((s.km - 1) * 1000, w.s)) >= 500);
+    if (j.length) return Math.round(j.reduce((x, s) => x + s.sec, 0) / j.length);
+  }
+  return r.avgPaceSec || null;
+}
 function flagObservations() {
   const out = [];
   const runs = state.logged || [];
@@ -8941,11 +9063,17 @@ function flagObservations() {
     if ((r.pmodel || 1) !== PACE_MODEL_VERSION) break;
     out.push({
       id: r.id || r.t + "|" + r.d, type: r.type || "easy", distKm: Number(r.distKm) || 0,
-      avgPaceSecPerKm: r.avgPaceSec || null,
+      // WARM-UP MINUTES ARE NOT THE SESSION. avgPaceSec is the whole outing, and every run now
+      // carries a generated warm-up including three minutes of mobilising that covers no ground at
+      // all. Fed to the flags engine against the WORK band, two perfectly-executed easy runs
+      // measured as grounds for re-anchoring the plan two minutes per kilometre slower. runWorkPace
+      // is the mean of the kilometres the band actually applies to, and falls back to the whole
+      // outing only for runs logged before the window existed.
+      avgPaceSecPerKm: runWorkPace(r),
       plannedPaceSecPerKm: r.pband || null,
       reportedRpe: r.rpe || null,
       plannedRpe: r.rband || null,
-      implied5kSeconds: r.avgPaceSec ? impliedRecentFromRun(r.type, r.avgPaceSec) : null,
+      implied5kSeconds: runWorkPace(r) ? impliedRecentFromRun(r.type, runWorkPace(r)) : null,
     });
   }
   return out;
@@ -9033,7 +9161,7 @@ function currentWeeklyReview() {
   if (loadReviewSeen() === wkStart) return null;      // already answered this week
   const runs = (state.logged || []).filter((r) => r && r.dateIso && r.dateIso >= wkStart).map((r) => ({
     id: r.id, type: r.type || "easy", distKm: Number(r.distKm) || 0, dateIso: r.dateIso,
-    avgPaceSecPerKm: r.avgPaceSec || null, plannedPaceSecPerKm: r.pband || null,
+    avgPaceSecPerKm: runWorkPace(r), plannedPaceSecPerKm: r.pband || null,
     reportedRpe: r.rpe || null, plannedRpe: r.rband || null,
     avgHr: r.avgHr || null, zoneSec: r.zoneSec || null,
   }));

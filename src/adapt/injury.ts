@@ -7,6 +7,7 @@
 // recommended. This is decision-support, not medical advice.
 
 import type { InjuryAssessment, InjuryReport, PlannedWeek, Session } from "../domain/types.ts";
+import { scaleSessionDistance, weekVolumeMeters } from "../domain/steps.ts";
 import { crossTraining, easyRun, restDay } from "../plan/session-templates.ts";
 import type { TrainingPaces } from "../domain/types.ts";
 
@@ -88,14 +89,14 @@ export function applyInjuryAdjustment(
           return finalizeReplacement(crossTraining(minutes), s);
         }
         if (isRunning(s)) {
+          // ⚠️ BOTH distance figures scale together. Cutting only the estimate left
+          // `trainingDistanceMeters` at full size, and since the week's mileage prefers that field,
+          // an injury cut showed on the session card and changed the week's total by nothing.
           return {
-            ...s,
+            ...scaleSessionDistance(s, assessment.volumeScale),
             estimatedDurationSeconds: Math.round(
               s.estimatedDurationSeconds * assessment.volumeScale,
             ),
-            estimatedDistanceMeters: s.estimatedDistanceMeters
-              ? Math.round(s.estimatedDistanceMeters * assessment.volumeScale)
-              : undefined,
           };
         }
         return s;
@@ -125,9 +126,7 @@ export function applyInjuryAdjustment(
       );
     }
 
-    const plannedDistanceMeters = Math.round(
-      sessions.reduce((m, s) => m + (s.estimatedDistanceMeters ?? 0), 0),
-    );
+    const plannedDistanceMeters = weekVolumeMeters(sessions);
     const qualitySessionCount = sessions.filter(
       (s) => s.type === "threshold" || s.type === "vo2" || s.type === "race-specific",
     ).length;

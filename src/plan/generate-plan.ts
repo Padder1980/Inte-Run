@@ -29,6 +29,7 @@ import {
 } from "../science/intensity-distribution.ts";
 import { computeMas, masVo2Range } from "../science/mas.ts";
 import { deriveTrainingPaces, reconcileVo2, withHrZones } from "../science/paces.ts";
+import { sessionVolumeMeters } from "../domain/steps.ts";
 import { taperFor } from "../science/taper.ts";
 import { addDays, dayOfWeekMondayZero, daysBetween, isoToday, weeksBetween } from "./dates.ts";
 import { type WeekPlan, phaseSchedule, structuredWeekCount } from "./periodization.ts";
@@ -542,12 +543,24 @@ export function generatePlan(
     for (const w of buildAll(vScale)) {
       for (const s of w.sessions) {
         if (s.type === "threshold" || s.type === "vo2" || s.type === "race-specific") {
-          total += (s.estimatedDurationSeconds ?? 0) / 60;
+          // ⚠️ SKIP A SESSION WITH NO USABLE DURATION RATHER THAN AVERAGING IT IN. This is a MEAN, so
+          // one non-finite duration makes the mean non-finite — and the consumer's guard was
+          // `qRefMin != null`, which NaN passes. Every compensating easy run in the whole plan then
+          // came out NaN and was titled "NaN′ easy run". Found by feeding generatePlan a Goal with
+          // no targetTimeSeconds: paces.goalRace comes back with null bounds, the distance-gated
+          // race-pace reps cannot be timed, and ONE session's duration is NaN. That input is invalid
+          // — the field is required, and the app always computes one — so no runner has seen it. The
+          // amplification is the real defect: a single bad session should degrade one session, never
+          // silently rewrite every easy run in a 36-week block.
+          const min = (s.estimatedDurationSeconds ?? 0) / 60;
+          if (!Number.isFinite(min)) continue;
+          total += min;
           n++;
         }
       }
     }
-    return n ? total / n : undefined;
+    const mean = n ? total / n : undefined;
+    return mean != null && Number.isFinite(mean) ? mean : undefined;
   };
 
   const buildFull = (vScale: number): PlannedWeek[] => {
@@ -735,7 +748,10 @@ function buildWeek(
   // a hole and topped the easy running back up, undoing the very cut the taper exists to make. Caught by
   // `the taper genuinely cuts the week`, which measured the 5 km taper at 29% against its 30% floor. A
   // week that is deliberately smaller is not a week with a hole in it.
-  const compensates = ctx.qRefMin != null && qualityCount > 0 && !wp.isDeload && wp.phase !== "taper";
+  // ⚠️ `Number.isFinite`, NOT `!= null`. NaN is not null, so a non-finite reference sailed through
+  // this gate and every easy run downstream inherited it. The producer is guarded too — belt and
+  // braces, because the failure is silent in both directions and the cost of the guard is nothing.
+  const compensates = Number.isFinite(ctx.qRefMin) && qualityCount > 0 && !wp.isDeload && wp.phase !== "taper";
   const qualityDeficitMin = compensates
     ? Math.max(0, ctx.qRefMin! * qualityCount - qualityMin)
     : 0;
@@ -813,7 +829,7 @@ function buildWeek(
   }
 
   const finalized = finalize(sessions, dayOf, index);
-  const plannedDistanceMeters = finalized.reduce((m, s) => m + (s.trainingDistanceMeters ?? s.estimatedDistanceMeters ?? 0), 0);
+  const plannedDistanceMeters = finalized.reduce((m, s) => m + sessionVolumeMeters(s), 0);
   const qualitySessionCount = finalized.filter(
     (s) => s.type === "threshold" || s.type === "vo2" || s.type === "race-specific",
   ).length;
@@ -908,7 +924,7 @@ function applyRaceDay(weeks: PlannedWeek[], goal: Goal, paces: TrainingPaces): v
   }
   last.sessions = [...kept, race, ...filler].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
   last.plannedDistanceMeters = Math.round(
-    last.sessions.reduce((m, s) => m + (s.trainingDistanceMeters ?? s.estimatedDistanceMeters ?? 0), 0),
+    last.sessions.reduce((m, s) => m + sessionVolumeMeters(s), 0),
   );
   last.qualitySessionCount = last.sessions.filter(
     (s) => s.type === "threshold" || s.type === "vo2" || s.type === "race-specific",
@@ -928,7 +944,7 @@ function applyRaceDay(weeks: PlannedWeek[], goal: Goal, paces: TrainingPaces): v
       return [shakeoutSession(paces, w.index, eve.dow)];
     });
     w.plannedDistanceMeters = Math.round(
-      w.sessions.reduce((m, s) => m + (s.trainingDistanceMeters ?? s.estimatedDistanceMeters ?? 0), 0),
+      w.sessions.reduce((m, s) => m + sessionVolumeMeters(s), 0),
     );
     w.qualitySessionCount = w.sessions.filter(
       (s) => s.type === "threshold" || s.type === "vo2" || s.type === "race-specific",
@@ -969,7 +985,7 @@ function applyPartialFirstWeek(weeks: PlannedWeek[], startIso: string): void {
   w0.sessions = w0.sessions.filter((s) => s.dayOfWeek >= startDOW);
   w0.startDateIso = startIso;
   w0.plannedDistanceMeters = Math.round(
-    w0.sessions.reduce((m, s) => m + (s.trainingDistanceMeters ?? s.estimatedDistanceMeters ?? 0), 0),
+    w0.sessions.reduce((m, s) => m + sessionVolumeMeters(s), 0),
   );
   w0.qualitySessionCount = w0.sessions.filter(
     (s) => s.type === "threshold" || s.type === "vo2" || s.type === "race-specific",
@@ -1128,7 +1144,7 @@ function buildBeginnerWeek(
   }
 
   const finalized = finalize(sessions, dayOf, index);
-  const plannedDistanceMeters = finalized.reduce((m, s) => m + (s.trainingDistanceMeters ?? s.estimatedDistanceMeters ?? 0), 0);
+  const plannedDistanceMeters = finalized.reduce((m, s) => m + sessionVolumeMeters(s), 0);
   return {
     index,
     startDateIso,

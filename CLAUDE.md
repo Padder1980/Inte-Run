@@ -480,6 +480,67 @@ Design rules baked in, each of which cost a real bug when it was missing — don
 - **RPE stays answerable after Save** — the picker writes through to the logged run. Gating it on
   `!saved` starved the whole signal for anyone who taps Save first.
 
+## ONE DEFINITION OF A WEEK'S MILEAGE (fixed 2026-08-07)
+
+The suite's last failing test — `re-entry eases load without cramming missed work back in`, which had
+been red for days and read like an adaptation bug — was an **accounting** bug, and the whole thing is
+a lesson in where a defect hides.
+
+⚠️ **WHEN `trainingDistanceMeters` ARRIVED, SIX CALL SITES WERE UPDATED AND TWO WERE NOT.** The volume
+reframing (*a warm-up is not training load*) made `generate-plan.ts` sum
+`s.trainingDistanceMeters ?? s.estimatedDistanceMeters ?? 0` in six places. `src/adapt/injury.ts` and
+`src/adapt/missed-sessions.ts` kept summing `estimatedDistanceMeters` — the WHOLE outing. So an
+adjusted week came back **measured on a different scale from every other week in the same plan**:
+measured on a 5-day half block, a re-entry week reported **40.9 → 44.1 km while every session in it
+got shorter**. Nothing threw. The number was simply of a different kind. Bisected to `cbe815f`.
+
+⚠️ **AND THE TRIMS ONLY TOUCHED THE SHOWN FIGURE.** Both modules scaled `estimatedDistanceMeters`
+alone, so "trim the long run 20%" and the injury model's "cut volume to 60%" changed the session
+cards and moved the week's counted mileage **by nothing at all**.
+
+`sessionVolumeMeters` / `weekVolumeMeters` / `scaleSessionDistance` in `src/domain/steps.ts` are now
+the single definition, used by the generator and both adapt modules.
+⚠️ **Verified byte-identical for every valid plan**: 38,160 sessions across 96 profiles, plan hash
+unchanged. The helper replaced the formula; it did not change it.
+
+⚠️ **THE RESIDUAL IS REAL AND IS NOT A BUG.** After the fix, 11% of re-entry weeks still grow in
+kilometres — because demoting a hill or race-pace session (0.5 km of counted distance for 39 minutes)
+to easy running genuinely adds ground while removing work. On MINUTES, the honest ruler, it is 4%.
+Check which of the two a "volume" defect lives in before changing anything; the progression audit
+learned this once already.
+
+### The amplification found on the way, and the four tests that did not discriminate
+
+⚠️ **`Number.isFinite`, NOT `!= null`.** `qualityRefFor` is a MEAN over the plan's quality sessions,
+so one non-finite duration makes the mean non-finite — and its consumer's gate was `qRefMin != null`,
+which **NaN passes**. Every compensating easy run in a 36-week block then came out NaN, titled
+*"NaN′ easy + strides"*. Measured: **1598 of 8480 sessions** with the gate as written, **93** with it
+guarded — and the 93 are the genuinely broken sessions themselves, which is correct.
+
+⚠️ **IT IS NOT REACHABLE BY A RUNNER, AND I REPORTED IT AS IF IT WERE.** The trigger is a `Goal` with
+no `targetTimeSeconds`: `paces.goalRace` comes back with **null bounds**, so distance-gated race-pace
+reps cannot be timed. But that field is `number`, not `number?` — TypeScript rejects it, and
+`web/app.ts` always computes one (Riegel if the runner did not enter it). With a valid goal:
+**0 NaN in 38,160 sessions.** ⚠️ **A plain `.mjs` probe has no typechecking, so it can feed the engine
+a shape no caller can produce and the result looks like a product defect.** Check the type before
+believing a sweep. The amplification is still worth guarding — one bad session must never rewrite a
+whole plan — but it is hardening, not a fix.
+
+⚠️ **FOUR TESTS IN THIS ONE CHANGE PASSED WITH THE FIX DELIBERATELY REMOVED.** Each for a different
+reason, and none was caught by reading them:
+- *Comparing a value with itself.* `assert.equal(week.plannedDistanceMeters, weekVolumeMeters(week.sessions))`
+  holds however the sessions were scaled. The real invariant is that a scaled session moved **both**
+  of its distance figures by the same factor.
+- *One fixture instead of a sweep.* The NaN test built a single plan; most configurations do not
+  amplify at all.
+- *The wrong filter.* It counted `type === "easy"`; the sessions that inherit the NaN are typed
+  `strides` and `recovery`.
+- *A threshold set from taste.* Every bound in the new file is now set from a measurement recorded
+  beside it (re-entry rises: 61% before, 11% after; NaN: 15.5% vs 0.9%).
+
+`test/week-volume-accounting.test.ts` holds all of it, and every guard in it was watched failing
+against the reverted code before being believed.
+
 ## The weekly review, and the rule that governs it (added 2026-08-03)
 
 ⚠️ **STANDING INSTRUCTION FROM THE OWNER (2026-08-03): ALWAYS DO THIS WITH THE RUNNER.** The app may

@@ -5,6 +5,7 @@
 // trim the long run and easy volume) so re-entry is gentle, then normal progression resumes.
 
 import type { PlannedWeek, Session, SessionOutcome } from "../domain/types.ts";
+import { scaleSessionDistance, weekVolumeMeters } from "../domain/steps.ts";
 
 export type MissedSessionResult = {
   triggered: boolean;
@@ -54,6 +55,12 @@ export function applyMissedSessionAdjustment(
         estimatedDistanceMeters: easyPace
           ? Math.round(((minutes * 60) / easyPace) * 1000)
           : s.estimatedDistanceMeters,
+        // ⚠️ The replacement is a single steady step — no warm-up, no cool-down — so all of it is
+        // training. Inheriting the demoted session's `trainingDistanceMeters` would leave the week
+        // counting a workout that is no longer prescribed.
+        trainingDistanceMeters: easyPace
+          ? Math.round(((minutes * 60) / easyPace) * 1000)
+          : s.trainingDistanceMeters,
         steps: [
           {
             kind: "steady",
@@ -66,18 +73,15 @@ export function applyMissedSessionAdjustment(
       };
     }
     if (s.type === "long") {
-      const scaled = Math.round(s.estimatedDurationSeconds * LONG_SCALE);
       return {
-        ...s,
-        estimatedDurationSeconds: scaled,
-        estimatedDistanceMeters: scale(s.estimatedDistanceMeters, LONG_SCALE),
+        ...scaleSessionDistance(s, LONG_SCALE),
+        estimatedDurationSeconds: Math.round(s.estimatedDurationSeconds * LONG_SCALE),
       };
     }
     if (s.intensity === "easy") {
       return {
-        ...s,
+        ...scaleSessionDistance(s, EASY_SCALE),
         estimatedDurationSeconds: Math.round(s.estimatedDurationSeconds * EASY_SCALE),
-        estimatedDistanceMeters: scale(s.estimatedDistanceMeters, EASY_SCALE),
       };
     }
     return s;
@@ -87,9 +91,7 @@ export function applyMissedSessionAdjustment(
     "Trimmed the long run ~20% and easy volume ~15% this week; missed sessions are not added back.",
   );
 
-  const plannedDistanceMeters = Math.round(
-    sessions.reduce((m, s) => m + (s.estimatedDistanceMeters ?? 0), 0),
-  );
+  const plannedDistanceMeters = weekVolumeMeters(sessions);
   const qualitySessionCount = sessions.filter(
     (s) => s.type === "threshold" || s.type === "vo2" || s.type === "race-specific",
   ).length;
@@ -105,10 +107,6 @@ export function applyMissedSessionAdjustment(
       focus: "Re-entry — ease back after missed sessions",
     },
   };
-}
-
-function scale(v: number | undefined, factor: number): number | undefined {
-  return v === undefined ? undefined : Math.round(v * factor);
 }
 
 function hardestSessionId(week: PlannedWeek): string | undefined {

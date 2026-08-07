@@ -51,9 +51,14 @@ enum WatchPreview {
                     .init(value: "1.42", unit: "KM", label: "DISTANCE"),
                     .init(value: "4:58", unit: "/KM", label: "CUR PACE"),
                     .init(value: "162", unit: "BPM", label: "HEART"),
+                    .init(value: "148", unit: "CAL", label: "CALORIES"),
                 ],
-                stepProgress: 0.62,
-                stepLabel: "2 km at 4:55/km")
+                stepProgress: 0.08,
+                // ⚠️ THE REAL CUE HE PHOTOGRAPHED, at full length. The preview used a four-word
+                // label, which fits on one line and so could never show the truncation he reported —
+                // "EASE IN — START GENTLY AND LET THE…". A fixture that only exercises the easy case
+                // is why a legibility fault survived being "verified".
+                stepLabel: "Ease in — start gently and let the legs come to you")
 
         // The first seconds of a run, when pace is genuinely unknown and everything is empty. The
         // layout must not collapse or jump when the real numbers arrive.

@@ -384,7 +384,11 @@ export function generatePlan(
   const totalWeeks = Math.max(0, weeksBetween(startWeekMonday, raceMonday) + 1);
   const structuredWeeks = structuredWeekCount(totalWeeks, goal.distance);
 
-  const returning = athlete.returningFromInjury ?? false;
+  // ⚠️ BOTH kinds of comeback are DETRAINED, so both get the conservative build and the withheld hill
+  // sprints. Only the feasibility CEILING distinguishes them: being injured limits what you can load,
+  // being merely out of practice does not. Reading only the injury flag here would have quietly
+  // stripped that conservatism from everyone who answered "after time off" once the question split.
+  const returning = (athlete.returningFromInjury ?? false) || (athlete.returningFromBreak ?? false);
   const model = options.intensityModel ?? chooseModel(athlete);
   const paces = withHrZones(deriveTrainingPaces(athlete.recent, goal), athlete);
   // If the athlete has done a 1 km time trial, anchor VO₂/interval pace to their MAS — a direct,

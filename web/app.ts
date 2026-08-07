@@ -2202,7 +2202,10 @@ function applyProfile(pf) {
     const proj5k = Math.round(RC.riegelPredict(2000, pf.twoKmS, 5000));
     if (proj5k < recent.timeSeconds) recent = { distanceMeters: 5000, timeSeconds: proj5k };
   }
-  const ath = { daysPerWeek: pf.daysPerWeek, recent, experience, includeStrength: pf.strength, returningFromInjury: pf.returning, runWalk: pf.status === "new", longRunDay: pf.longRunDay != null ? pf.longRunDay : 6 };
+  const rk = returnKind(pf);
+  const ath = { daysPerWeek: pf.daysPerWeek, recent, experience, includeStrength: pf.strength,
+    returningFromInjury: rk === "injury", returningFromBreak: rk === "break",
+    runWalk: pf.status === "new", longRunDay: pf.longRunDay != null ? pf.longRunDay : 6 };
   // ⚠️ The runner's actual weekly mileage. weeklyVolumeKmCurrent has existed on Athlete since the
   // beginning and was read NOWHERE, so 40 km/week and 140 km/week produced identical plans — which
   // is what an elite coach meant by "mileage for a competitive runner looks a little on the low
@@ -6247,6 +6250,18 @@ function saveCrop() {
   CROP = null; closeSheet();
 }
 // A numbered section card — the numbered badge + title makes each step obvious and the page premium.
+/**
+ * Which kind of comeback, from a profile that may predate the question being split.
+ * ⚠️ AN EXISTING returning:true BECOMES "break", NOT "injury". The old label bundled both, so the
+ * answer is genuinely unknown — and "break" is the reading that leaves their current plan and verdict
+ * exactly as they are. Silently re-deciding it as an injury would move someone's goal from achievable
+ * to unrealistic on an app update, for a question they were never asked.
+ */
+function returnKind(p) {
+  const v = p && p.returning;
+  if (v === "injury" || v === "break") return v;
+  return v ? "break" : "0";
+}
 function setupSection(num, title, sub, body) {
   // ⚠️ Spacing belongs in the stylesheet. This used to carry style="margin-top:12px" inline, which
   // no rule can beat without !important — and the !important then applied to only SOME cards.
@@ -6334,7 +6349,14 @@ function viewSetup() {
     '<div class="q"><label>Age</label><select class="sel" id="s_age" style="max-width:140px">' + ageOpts(p.age) + '</select></div>' +
     '<div class="q"><label>Sex <span class="q-hint">helps tailor advice</span></label><select class="sel" id="s_sex" style="max-width:200px"><option value=""' + (!p.sex?" selected":"") + '>Prefer not to say</option><option value="female"' + (p.sex==="female"?" selected":"") + '>Female</option><option value="male"' + (p.sex==="male"?" selected":"") + '>Male</option></select></div>' +
     '<div class="q"><label>Include strength &amp; conditioning?</label>' + seg("strength", [["1","Yes"],["0","No"]], p.strength?"1":"0") + '</div>' +
-    '<div class="q"><label>Returning from injury or a long break?</label>' + seg("returning", [["0","No"],["1","Yes"]], p.returning?"1":"0") + '</div>';
+    // ⚠️ ONE QUESTION FOR TWO DIFFERENT THINGS, and the wording gave it away: "Returning from injury
+    // or a long break?" as a single Yes/No. Both answers were treated as an injury and both got the
+    // same 0.35 improvement ceiling — so a runner coming back hurt was told their goal was MORE
+    // achievable than an uninjured runner's, while the same flag shortened their build phase to keep
+    // the early weeks conservative. The owner put it plainly: being injured makes a goal less likely,
+    // not more. Three answers now, because the two cases genuinely differ.
+    '<div class="q"><label>Coming back to running? <span class="q-hint">time off and injury are different — one limits your fitness, the other limits what your body will take</span></label>' +
+      seg("returning", [["0","No"],["break","After time off"],["injury","After an injury"]], returnKind(p)) + '</div>';
 
   return savedMsg + intro +
     setupSection(1, "You", "A photo and what to call you", secYou) +

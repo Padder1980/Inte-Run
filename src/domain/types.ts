@@ -24,7 +24,21 @@ export type Athlete = {
   experience: ExperienceLevel;
   includeStrength: boolean;
   /** When true the plan starts conservatively (single quality session, gentle volume ramp). */
+  /**
+   * Coming back from an INJURY — the constraint is tissue tolerance, not aerobic capacity.
+   * ⚠️ DISTINCT FROM returningFromBreak, and the distinction is the whole point. The app used to ask
+   * "Returning from injury or a long break?" as one Yes/No and treat both as the same thing, which is
+   * how it ended up giving an injured runner MORE than double the improvement ceiling while
+   * simultaneously shortening their build phase to keep the early weeks conservative. Those two
+   * decisions contradicted each other; the owner spotted it.
+   */
   returningFromInjury?: boolean;
+  /**
+   * Coming back from time off while HEALTHY — detrained, but nothing hurts.
+   * This is the case the high ceiling was written for: regaining fitness genuinely is faster than
+   * gaining it, because the aerobic machinery and the movement pattern were built once already.
+   */
+  returningFromBreak?: boolean;
   /** Couch-to-5k starter: runs become run–walk intervals and the whole plan stays very gentle
    *  (3 run days, short durations, general strength, no strides or hard intervals). */
   runWalk?: boolean;

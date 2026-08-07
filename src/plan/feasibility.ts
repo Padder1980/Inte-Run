@@ -20,8 +20,27 @@ const IMPROVEMENT_CEILING: Record<Athlete["experience"], number> = {
   competitive: 0.08,
 };
 
-/** Returners can regain a large fraction of former fitness — a higher ceiling. */
+/**
+ * A HEALTHY returner can regain a large fraction of former fitness — a higher ceiling.
+ * Regaining is faster than gaining: the aerobic base and the movement pattern were built once.
+ */
 const RETURNING_CEILING = 0.35;
+
+/**
+ * An INJURED returner gets much less of that, and here is why the number is what it is.
+ *
+ * ⚠️ THE OLD MODEL CONTRADICTED ITSELF, and the owner caught it: one checkbox meant "injury or a long
+ * break", and both got 0.35 — more than double a recreational runner's ceiling — while the SAME flag
+ * shortened the build phase from six weeks to four to keep the early weeks conservative. So the app
+ * handed out less specific training and a far higher projection at the same time. His objection was
+ * exactly right: being hurt makes a goal LESS likely, not more.
+ *
+ * The regaining effect is still real for someone who was fit before, so this is not simply the normal
+ * ceiling. It is the healthy-returner ceiling scaled by the specific training they actually get:
+ * build 4 weeks instead of 6, so 0.35 × (4/6) ≈ 0.23. Derived from the plan's own behaviour rather
+ * than picked, which means a future change to the returning build cap should be reflected here.
+ */
+const RETURNING_INJURY_CEILING = 0.23;
 
 /** Weeks at which ~63% of the ceiling is reached (exponential time constant). */
 const TIME_CONSTANT_WEEKS = 18;
@@ -50,6 +69,8 @@ export function assessFeasibility(
   const requiredImprovementPct = ((currentPredicted - goalSeconds) / currentPredicted) * 100;
 
   const ceiling = athlete.returningFromInjury
+    ? RETURNING_INJURY_CEILING
+    : athlete.returningFromBreak
     ? RETURNING_CEILING
     : IMPROVEMENT_CEILING[athlete.experience];
   // Diminishing-returns curve; a few days/week of training assumed. More days nudges it up slightly.
@@ -103,7 +124,11 @@ export function assessFeasibility(
   }
   if (athlete.returningFromInjury) {
     rationale.push(
-      "Returning from injury: fitness may return before joints/tendons are ready — early weeks stay conservative.",
+      "Coming back from injury: your fitness will return before your tendons and joints will take the load, so this projection is deliberately more cautious than for a straightforward break — and the early weeks stay conservative.",
+    );
+  } else if (athlete.returningFromBreak) {
+    rationale.push(
+      "Coming back after time off: regaining fitness is faster than building it the first time, so the ceiling here is higher than it would otherwise be. The early weeks still start gently.",
     );
   }
 

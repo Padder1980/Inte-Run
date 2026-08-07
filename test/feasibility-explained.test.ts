@@ -22,23 +22,40 @@ import { buildPlanSummary } from "../src/view/plan-summary.ts";
 const goal: Goal = {
   distance: "5k", targetTimeSeconds: 19 * 60, raceDateIso: "2026-11-16", startDateIso: "2026-07-27",
 };
-const athlete = (returning: boolean): Athlete => ({
-  daysPerWeek: 5, experience: "recreational", includeStrength: true, returningFromInjury: returning,
+type Comeback = "none" | "break" | "injury";
+const athlete = (back: Comeback): Athlete => ({
+  daysPerWeek: 5, experience: "recreational", includeStrength: true,
+  returningFromInjury: back === "injury", returningFromBreak: back === "break",
   recent: { distanceMeters: 5000, timeSeconds: 21 * 60 },
 });
 
-test("⚠️ one checkbox flips the verdict — so the card must say which one", () => {
-  const no = assessFeasibility(athlete(false), goal);
-  const yes = assessFeasibility(athlete(true), goal);
-  // The premise: this really does flip, on identical running inputs.
-  assert.notEqual(no.verdict, yes.verdict,
-    "the fixture no longer reproduces the owner's two verdicts, so this test proves nothing");
-  // And the returning case must SAY it is the returning case, in words a runner can act on.
-  assert.ok(yes.rationale.some((r) => /returning/i.test(r)),
-    `the achievable verdict never mentions returning: ${JSON.stringify(yes.rationale)}`);
+test("⚠️ being INJURED makes a goal less likely, not more", () => {
+  // ⚠️ The owner's objection, and he was right. One checkbox meant "injury or a long break" and both
+  // got the same 0.35 ceiling — so coming back hurt made a target look MORE achievable than it was
+  // for an uninjured runner, while the very same flag shortened the build phase to keep the early
+  // weeks conservative. The two decisions contradicted each other.
+  const none = assessFeasibility(athlete("none"), goal);
+  const brk = assessFeasibility(athlete("break"), goal);
+  const inj = assessFeasibility(athlete("injury"), goal);
+
+  // Coming back healthy really is faster — regaining beats gaining, and that stays.
+  assert.ok(brk.projectedAchievablePct > none.projectedAchievablePct,
+    "time off no longer helps at all — the regaining effect has been thrown away with the bug");
+  // ⚠️ THE FIX: injured must sit BELOW healthy-returner. This is the assertion that was false before.
+  assert.ok(inj.projectedAchievablePct < brk.projectedAchievablePct,
+    `injured (${inj.projectedAchievablePct.toFixed(1)}%) is still projected as well as or better than a healthy returner (${brk.projectedAchievablePct.toFixed(1)}%)`);
+  // But still above someone who was never fit: a previously-trained runner does come back quicker.
+  assert.ok(inj.projectedAchievablePct > none.projectedAchievablePct,
+    "an injured returner is now projected worse than a runner who was never fit — that is the wrong way too");
+
+  // And each case must SAY which it is, in words a runner can act on.
+  assert.ok(inj.rationale.some((r) => /injur/i.test(r) && /tendon|joint|cautious/i.test(r)),
+    `the injury verdict does not explain itself: ${JSON.stringify(inj.rationale)}`);
+  assert.ok(brk.rationale.some((r) => /time off|regain/i.test(r)),
+    `the time-off verdict does not explain itself: ${JSON.stringify(brk.rationale)}`);
   // The unreachable one must offer a target that would fit, rather than just refusing.
-  assert.ok(no.suggestedTargetSeconds, "an unrealistic goal suggests no alternative");
-  assert.ok(no.rationale.some((r) => /realistic/i.test(r)), "no explanation of what is realistic");
+  assert.ok(none.suggestedTargetSeconds, "an unrealistic goal suggests no alternative");
+  assert.ok(none.rationale.some((r) => /realistic/i.test(r)), "no explanation of what is realistic");
 });
 
 test("⚠️ the same flag reshapes the training block, which is what he could SEE", () => {
@@ -52,13 +69,13 @@ test("⚠️ the same flag reshapes the training block, which is what he could S
 
 test("⚠️ the rationale survives the view layer", () => {
   // Where it was lost. buildPlanSummary kept four numbers and dropped every sentence.
-  const s = buildPlanSummary(athlete(false), goal);
+  const s = buildPlanSummary(athlete("none"), goal);
   assert.ok(Array.isArray(s.feasibility.rationale) && s.feasibility.rationale.length >= 2,
     "the plan summary is dropping the engine's explanation again");
   assert.ok(s.feasibility.suggestedTarget, "and the suggested target with it");
-  const t = buildPlanSummary(athlete(true), goal);
-  assert.ok(t.feasibility.rationale.some((r) => /returning/i.test(r)),
-    "the returning explanation does not reach the view");
+  const t = buildPlanSummary(athlete("injury"), goal);
+  assert.ok(t.feasibility.rationale.some((r) => /injur/i.test(r)),
+    "the comeback explanation does not reach the view");
 });
 
 test("⚠️ and it is rendered, not merely carried", () => {

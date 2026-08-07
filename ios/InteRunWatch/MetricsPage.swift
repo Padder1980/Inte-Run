@@ -44,10 +44,17 @@ struct MetricsPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let status {
+                // ⚠️ THE CORNER EATS THE FIRST CHARACTERS, and a 2pt inset was nowhere near enough.
+                // Reported reading "AUSED" once, and still cut off after the first attempt: on a
+                // rounded watch face the top-left curve is many points deep, so a word starting at
+                // x=2 on the very first line sits outside the drawable area whatever the top padding
+                // is. This row — and only this row — is inset past the curve. The numbers below keep
+                // the full width because by then the edge has straightened out.
                 Text(status.text.uppercased())
-                    .font(.system(size: 11, weight: .heavy))
+                    .font(.system(size: 13, weight: .heavy))
                     .kerning(0.6)
                     .foregroundStyle(status.tint)
+                    .padding(.leading, 16)
                     .padding(.bottom, 2)
             }
 
@@ -87,20 +94,20 @@ struct MetricsPage: View {
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 if let ic = r.icon { glyph(ic, size: 22) }
                 Text(r.value)
-                    .font(.system(size: 46, weight: .semibold, design: .rounded))
+                    .font(.system(size: 50, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
                     .foregroundStyle(status?.tint ?? Brand.accent)
                 if let u = r.unit {
                     Text(u)
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(Brand.inkSoft)
                 }
             }
             Text(r.label)
-                .font(.system(size: 9, weight: .bold))
-                .kerning(0.7)
+                .font(.system(size: 10, weight: .bold))
+                .kerning(0.5)
                 .foregroundStyle(Brand.inkFaint)
         }
         .padding(.bottom, 6)
@@ -111,20 +118,22 @@ struct MetricsPage: View {
     private func secondaryRow(_ r: MetricsPage.Row) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 3) {
             if let ic = r.icon { glyph(ic, size: 14) }
+            // ⚠️ 24pt was too small to read moving — his words, on a real run. These are the numbers
+            // you glance at mid-stride, so they get the increase the hero does not need.
             Text(r.value)
-                .font(.system(size: 24, weight: .medium, design: .rounded))
+                .font(.system(size: 30, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
                 .foregroundStyle(Brand.ink)
             if let u = r.unit {
                 Text(u)
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Brand.inkFaint)
             }
             Text(r.label)
-                .font(.system(size: 9, weight: .bold))
-                .kerning(0.5)
+                .font(.system(size: 10, weight: .bold))
+                .kerning(0.3)
                 .foregroundStyle(Brand.inkFaint)
                 .padding(.leading, 3)
             Spacer(minLength: 0)
@@ -146,11 +155,15 @@ struct MetricsPage: View {
     private func progress(_ p: Double) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             if let s = stepLabel {
-                Text(s.uppercased())
-                    .font(.system(size: 9, weight: .bold))
-                    .kerning(0.4)
-                    .foregroundStyle(Brand.inkFaint)
-                    .lineLimit(1)
+                // ⚠️ TWO LINES, because one truncated it mid-sentence: "EASE IN — START GENTLY AND
+                // LET THE…". A coaching cue you cannot finish reading is worse than no cue — it takes
+                // the space and gives nothing back. Sentence case rather than caps: caps are for the
+                // one-word labels, and a full sentence in caps is markedly slower to read.
+                Text(s)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Brand.inkSoft)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {

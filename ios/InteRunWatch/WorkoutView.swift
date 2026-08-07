@@ -139,6 +139,12 @@ struct ControlsView: View {
     /// not make it impossible, and a wrist is exactly where an accidental press happens — sleeve,
     /// doorframe, wiping sweat. There is no way back into a session once it has ended.
     @State private var confirmingEnd = false
+    /// ⚠️ Settings, reachable DURING a run — his request after using it. Which numbers you want on
+    /// screen is a decision you make while running and looking at them, not one you can make sensibly
+    /// beforehand from the Today screen. Sending someone out of a live session to change it is asking
+    /// them to end the run to fix the run.
+    @State private var showSettings = false
+    @EnvironmentObject private var store: SessionStore
 
     var body: some View {
         ScrollView {
@@ -176,6 +182,12 @@ struct ControlsView: View {
                 }
                 .tint(.blue)
 
+                Button {
+                    showSettings = true
+                } label: {
+                    Label("Settings", systemImage: "gearshape.fill").frame(maxWidth: .infinity)
+                }
+
                 if workout.stepIndex + 1 < workout.steps.count {
                     Button {
                         workout.nextStep()
@@ -192,6 +204,12 @@ struct ControlsView: View {
         // dialog takes over the whole screen, so the confirm cannot be hit by the same knock that
         // opened it. "Cancel" returns to the run with nothing changed — the run is still recording
         // throughout, because asking must never itself pause or stop anything.
+        // ⚠️ A sheet, not a navigation push: the run pages are a TabView, and pushing would trap the
+        // runner behind a back chevron they have to find mid-stride. A sheet is dismissed by the crown
+        // or a swipe down, and the run carries on underneath it throughout — nothing here pauses.
+        .sheet(isPresented: $showSettings) {
+            SettingsView().environmentObject(store)
+        }
         .confirmationDialog("End session?", isPresented: $confirmingEnd, titleVisibility: .visible) {
             Button("End session", role: .destructive) { workout.end() }
             Button("Cancel", role: .cancel) { backToMetrics() }

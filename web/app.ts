@@ -4825,7 +4825,10 @@ function addExtra(params) {
   // the runner's CURRENT paces, so a workout added last week re-derives if their fitness
   // re-anchors — exactly like every planned session. Storing baked steps would freeze old paces
   // into the logbook.
-  EXTRA.push({ id: "x" + (EXTRA_SEQ++) + "-" + (new Date().getTime()), type: params.type, workoutId: params.workoutId || null, durMin: params.durMin || null, reps: params.reps || null, date: addTargetIso() });
+  EXTRA.push({ id: "x" + (EXTRA_SEQ++) + "-" + (new Date().getTime()), type: params.type, workoutId: params.workoutId || null, durMin: params.durMin || null, reps: params.reps || null,
+    // ⚠️ Stored, or the session is rebuilt from minutes on the next launch and quietly stops being
+    // the distance he asked for — extras are re-derived from these params every time, not cached.
+    distKm: params.distKm || null, date: addTargetIso() });
   saveExtra();
   // The watch and the reminder schedule both describe "what am I doing today" - keep them true.
   try { syncWatch(); } catch (e) {}
@@ -4870,7 +4873,40 @@ function buildCustomSession(e) {
     }
     if (cd) push(Object.assign({}, cd));
   } else {
-    const wanted = (e.durMin || Math.round(rep.estimatedDurationSeconds / 60)) * 60;
+    // ⚠️ A CONTINUOUS RUN CAN BE ASKED FOR IN KILOMETRES, NOT ONLY MINUTES — his request after building
+    // one: "I want to be able to either choose it by length of time as it is now or by distance e.g.
+    // being able to choose a 6[k]m easy". Runners think in both, and which one depends on the day.
+    //
+    // ⚠️ THE DISTANCE MEANS THE SAME THING THE MINUTES DO — THE WHOLE OUTING. The two units sit on one
+    // segmented control a centimetre apart, and the minute side has always named the door-to-door
+    // total: dialling 40' here builds a session whose steps sum to 40' (5' ease-in + 35' steady) and
+    // whose chip reads "40' . 6.4 km". Making the kilometres name only the steady portion instead
+    // would have been defensible on its own — it is the plan generator's named-time rule — and it was
+    // the first cut. But it puts two different meanings behind one control, so a runner who switched
+    // from 40' to 6 km would silently get a longer outing than the equivalent minutes, with nothing on
+    // screen saying so. Within one screen, consistency beats the other convention.
+    //
+    // So: subtract the distance the FIXED steps (warm-up, strides, cool-down) already cover, and size
+    // the steady body to cover the remainder.
+    let wanted = (e.durMin || Math.round(rep.estimatedDurationSeconds / 60)) * 60;
+    if (e.distKm > 0) {
+      const midPace = (st) => (st.targetPaceSecPerKm ? (st.targetPaceSecPerKm.minSecPerKm + st.targetPaceSecPerKm.maxSecPerKm) / 2 : 0);
+      const body = rep.steps.filter((st) => st.kind === "steady" && st.targetPaceSecPerKm);
+      const secPerKm = body.length ? midPace(body[0]) : 0;
+      if (secPerKm > 0) {
+        let fixedSec = 0, fixedM = 0;
+        rep.steps.forEach((st) => {
+          if (st.kind === "steady") return;
+          fixedSec += stepSecs(st);
+          if (st.distanceMeters) fixedM += st.distanceMeters;
+          else { const mp = midPace(st); if (mp > 0) fixedM += (st.durationSeconds || 0) / mp * 1000; }
+        });
+        // A floor of 1 km of steady running, so an absurdly short ask cannot produce a warm-up and
+        // nothing else — the same spirit as the 300s floor the scaling below already applies.
+        const bodyM = Math.max(1000, e.distKm * 1000 - fixedM);
+        wanted = Math.round(bodyM / 1000 * secPerKm) + fixedSec;
+      }
+    }
     const steadySecs = rep.steps.reduce((s, st) => s + (st.kind === "steady" ? (st.durationSeconds || 0) : 0), 0);
     if (steadySecs > 0) {
       // Scale the steady body; keep warm-up, strides/pickups and cool-down exactly as designed.
@@ -4893,16 +4929,30 @@ function buildCustomSession(e) {
     }
   }
   // Estimated distance: distance-based steps count directly; timed steps via their mid pace.
-  let dist = 0;
+  // ⚠️ TRAINING distance is counted separately and EXCLUDES the warm-up and cool-down, matching
+  // isPreparationStep in the engine. It was previously inherited unchanged from the representative
+  // session by the Object.assign below, so a 20-minute custom run and a 60-minute one carried the
+  // same training distance — a stale number that reads as a measurement. Nothing on the page uses
+  // it today, which is exactly why a wrong value could sit there indefinitely.
+  let dist = 0, train = 0;
   steps.forEach((st) => {
-    if (st.distanceMeters) dist += st.distanceMeters;
-    else if (st.durationSeconds && st.targetPaceSecPerKm) dist += st.durationSeconds / ((st.targetPaceSecPerKm.minSecPerKm + st.targetPaceSecPerKm.maxSecPerKm) / 2) * 1000;
+    let m = 0;
+    if (st.distanceMeters) m = st.distanceMeters;
+    else if (st.durationSeconds && st.targetPaceSecPerKm) m = st.durationSeconds / ((st.targetPaceSecPerKm.minSecPerKm + st.targetPaceSecPerKm.maxSecPerKm) / 2) * 1000;
+    dist += m;
+    if (st.kind !== "warmup" && st.kind !== "cooldown") train += m;
   });
   const mins = Math.round(total / 60);
   return Object.assign({}, rep, {
     id: e.id, dayOfWeek: e.date ? (isoAdd(e.date, 0).getUTCDay() + 6) % 7 : TODAY_DOW, source: "manual",
-    title: mins + "\\u2032 " + (SESSION_LABEL[e.type] || e.type).toLowerCase() + (usesReps && e.reps ? " \\u2014 " + e.reps + " reps" : "") + " (custom)",
+    // ⚠️ Titled by what the runner ASKED FOR. Someone who chose 6 km wants to see "6 km easy run",
+    // not the minutes it happens to work out at — and the minutes move with their paces, so a
+    // distance run titled in minutes would rename itself after a fitness re-anchor.
+    title: (e.distKm > 0 ? (Math.round(e.distKm * 10) / 10) + " km " : mins + "\\u2032 ") +
+      (SESSION_LABEL[e.type] || e.type).toLowerCase() +
+      (usesReps && e.reps ? " \\u2014 " + e.reps + " reps" : "") + " (custom)",
     estimatedDurationSeconds: total, estimatedDistanceMeters: dist ? Math.round(dist) : rep.estimatedDistanceMeters,
+    trainingDistanceMeters: dist ? Math.round(train) : rep.trainingDistanceMeters,
     steps: steps.length ? steps : rep.steps,
   });
 }
@@ -5076,15 +5126,72 @@ function loadTag(w) {
 function shapeDefaultsFor(type) {
   const rep = extraRep(type);
   return { type: type, stage: "shape", workoutId: null,
+    unit: "time", distKm: null,
     durMin: Math.max(15, Math.round((rep ? rep.estimatedDurationSeconds : 2700) / 60 / 5) * 5 || 45),
     reps: builderUsesReps(type) ? Math.min(12, Math.max(2, repCountOf(rep) || 5)) : null };
+}
+/**
+ * The build params a BUILDER describes, with the unit honoured in ONE place.
+ * ⚠️ distKm survives a switch back to Time — the runner may toggle to have a look and toggle back —
+ * so passing BUILDER straight through would silently keep building the distance version while the
+ * screen showed minutes. Normalise here rather than at each of the three call sites, which is exactly
+ * how a preview and a saved session end up disagreeing.
+ */
+function builderParams(extra) {
+  const b = Object.assign({}, BUILDER || {}, extra || {});
+  // ⚠️ AND a type that cannot be measured in kilometres never is, whatever the stored unit says.
+  // shapeDefaultsFor resets the unit on every type pick so this should be unreachable — which is the
+  // reason to have it: an unreachable path that silently builds the wrong session is undebuggable.
+  if (b.unit !== "dist" || !builderCanUseDistance(b.type)) b.distKm = null;
+  return b;
+}
+/** Roughly how far the currently-dialled duration would cover, at this session type's own pace. */
+/**
+ * The minutes the currently-dialled distance works out at — the mirror of builderKmFromMinutes, and
+ * derived the same way (build it, read its own duration) so the pair cannot disagree.
+ */
+function builderMinutesFromKm(b) {
+  try {
+    const dist = buildCustomSession(Object.assign({}, b, { id: "seed", unit: "dist" }));
+    const sec = dist && dist.estimatedDurationSeconds;
+    if (!sec) return b.durMin || 40;
+    return Math.max(10, Math.min(240, Math.round(sec / 60 / 5) * 5));
+  } catch (e) { return b.durMin || 40; }
+}
+/**
+ * Can this type be dialled in kilometres at all?
+ *
+ * ⚠️ ONLY IF ITS BODY CARRIES A PACE. The conversion sizes the steady step at the runner's own pace,
+ * so a session with no paced steady step has nothing to convert with — and buildCustomSession would
+ * quietly fall back to the minutes, leaving a runner who dialled 6 km with whatever duration happened
+ * to be set last and no sign anything was ignored. That is exactly a run-walk beginner's session: it
+ * is run/walk cycles by feel, deliberately without paces. Offer the choice only where it works.
+ */
+function builderCanUseDistance(type) {
+  try {
+    const rep = extraRep(type);
+    return !!(rep && (rep.steps || []).some((st) => st.kind === "steady" && st.targetPaceSecPerKm));
+  } catch (e) { return false; }
+}
+function builderKmFromMinutes(b) {
+  try {
+    // ⚠️ ASK THE BUILDER, DO NOT RE-DERIVE. The first version converted the steady portion's minutes at
+    // the steady pace and ignored the distance the warm-up covers, so switching a 40' run (chip: 6.4 km)
+    // to Distance seeded 5.5 km — the run shrank on a unit change that should not touch it. Building the
+    // timed session and reading the very figure printed on the chip makes the switch lossless by
+    // construction, and cannot drift the day buildCustomSession changes.
+    const timed = buildCustomSession(Object.assign({}, b, { id: "seed", unit: "time", distKm: null }));
+    const m = timed && timed.estimatedDistanceMeters;
+    if (!m) return 5;
+    return Math.max(1, Math.round(m / 1000 * 2) / 2);
+  } catch (e) { return 5; }
 }
 /** The session the current BUILDER describes — a library workout, or a shaped one. */
 function previewSession() {
   if (BUILDER && BUILDER.workoutId) {
     try { return RC.buildWorkout(BUILDER.workoutId, RAW.paces, workoutCtx()); } catch (e) { return null; }
   }
-  try { return buildCustomSession(Object.assign({ id: "preview" }, BUILDER || {})); } catch (e) { return null; }
+  try { return buildCustomSession(builderParams({ id: "preview" })); } catch (e) { return null; }
 }
 function addSessionSheetHtml() {
   const head = '<div class="sd-type" style="--sc:var(--accent)">Build your own run</div>';
@@ -5156,9 +5263,18 @@ function addSessionSheetHtml() {
   const dur = Math.round(preview.estimatedDurationSeconds / 60);
   const dist = preview.estimatedDistanceMeters ? (Math.round(preview.estimatedDistanceMeters / 100) / 10) + " km" : null;
   const quality = builderUsesReps(BUILDER.type);
+  const canDist = !quality && builderCanUseDistance(BUILDER.type);
+  const unit = canDist ? (BUILDER.unit || "time") : "time";
   const stepper = quality
     ? '<div class="rm-row"><label>Reps</label><span class="bld-step"><button class="bld-btn" data-bld="reps-">−</button><span class="bld-val num">' + BUILDER.reps + '</span><button class="bld-btn" data-bld="reps+">＋</button></span></div>'
-    : '<div class="rm-row"><label>Duration</label><span class="bld-step"><button class="bld-btn" data-bld="dur-">−</button><span class="bld-val num">' + BUILDER.durMin + '′</span><button class="bld-btn" data-bld="dur+">＋</button></span></div>';
+    // ⚠️ TIME OR DISTANCE — his request: "I want to be able to either choose it by length of time as
+    // it is now or by distance e.g. being able to choose a 6[k]m easy". Runners hold a session in
+    // their head one way or the other and it changes by the day; offering only minutes made a
+    // distance runner do arithmetic at the moment they were trying to get out of the door.
+    : (canDist ? '<div class="rm-row"><label>Measure by</label>' + seg("bldunit", [["time","Time"],["dist","Distance"]], unit) + '</div>' : "") +
+      (unit === "dist"
+        ? '<div class="rm-row"><label>Distance</label><span class="bld-step"><button class="bld-btn" data-bld="km-">−</button><span class="bld-val num">' + (Math.round((BUILDER.distKm || 5) * 10) / 10) + ' km</span><button class="bld-btn" data-bld="km+">＋</button></span></div>'
+        : '<div class="rm-row"><label>Duration</label><span class="bld-step"><button class="bld-btn" data-bld="dur-">−</button><span class="bld-val num">' + BUILDER.durMin + '′</span><button class="bld-btn" data-bld="dur+">＋</button></span></div>');
   const rows = structureRows(preview.steps).map((r) =>
     '<div class="sd-step"><div class="sd-dot" style="background:var(--eff-' + effortOf(preview) + ')"></div><div><div class="sd-tag">' + r.tag + '</div><div class="sd-lab">' + r.lab + '</div>' + (r.chips ? '<div class="sd-meta">' + r.chips + '</div>' : "") + '</div></div>').join("");
   return head +
@@ -5195,8 +5311,27 @@ function wireAddSessionSheet() {
     const k = b.dataset.bld;
     if (k === "dur-") BUILDER.durMin = Math.max(15, BUILDER.durMin - 5);
     if (k === "dur+") BUILDER.durMin = Math.min(180, BUILDER.durMin + 5);
+    // Half-kilometre steps: whole kilometres are too coarse for a short easy run and 0.1 would take
+    // fifty taps to reach 10 km.
+    if (k === "km-") BUILDER.distKm = Math.max(1, Math.round(((BUILDER.distKm || 5) - 0.5) * 10) / 10);
+    if (k === "km+") BUILDER.distKm = Math.min(42, Math.round(((BUILDER.distKm || 5) + 0.5) * 10) / 10);
     if (k === "reps-") BUILDER.reps = Math.max(2, BUILDER.reps - 1);
     if (k === "reps+") BUILDER.reps = Math.min(12, BUILDER.reps + 1);
+    rerender();
+  });
+  // ⚠️ THE SWITCH IS A CONVERSION, AND IT GOES BOTH WAYS. Someone who has dialled 40 minutes and then
+  // thinks in kilometres means roughly that run, not a default 5 km — a control that discards what you
+  // just set feels broken. The first cut only converted minutes into kilometres, and only when the
+  // distance was empty, which is two faults in one line: after dialling 7.5 km and switching back, the
+  // stepper read 40' beside a chip reading 47' . 7.5 km — the two numbers on the screen disagreeing
+  // about the same run — and switching to Distance a second time then re-used the stale 7.5 whatever
+  // the minutes now said. Always convert, in whichever direction is being left.
+  document.querySelectorAll('#sheetBody [data-set="bldunit"] button').forEach((b) => b.onclick = () => {
+    if (!BUILDER) return;
+    const to = b.dataset.v;
+    if (to === BUILDER.unit) return;
+    if (to === "dist") { BUILDER.unit = "dist"; BUILDER.distKm = builderKmFromMinutes(BUILDER); }
+    else { BUILDER.durMin = builderMinutesFromKm(BUILDER); BUILDER.unit = "time"; BUILDER.distKm = null; }
     rerender();
   });
   const shape = $("bldShape"); if (shape) shape.onclick = () => { BUILDER = shapeDefaults(BUILDER.type); rerender(); };
@@ -5204,7 +5339,7 @@ function wireAddSessionSheet() {
     BUILDER = { type: BUILDER.type, stage: "list", band: BUILDER.band || "any", workoutId: null }; rerender();
   };
   const back = $("bldBack"); if (back) back.onclick = () => { BUILDER = null; rerender(); };
-  const add = $("bldAdd"); if (add) add.onclick = () => { addExtra(BUILDER); BUILDER = null; closeSheet(); render(); };
+  const add = $("bldAdd"); if (add) add.onclick = () => { addExtra(builderParams()); BUILDER = null; closeSheet(); render(); };
 }
 /**
  * WHY that verdict — the sentences the engine already wrote.

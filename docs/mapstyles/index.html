@@ -46,9 +46,26 @@
 <p class="sub">Same route, same line, six basemaps. The one marked <span style="color:var(--accent);font-weight:650">in use now</span> is what you have today.</p>
 <p class="src" id="src">Loading…</p>
 <div class="grid" id="grid"></div>
+
+<h1 style="margin-top:34px">Mapbox</h1>
+<p class="sub">Worth a look: its <b>Outdoors</b> style draws trails, paths and contour lines, which the
+CARTO maps above do not. That is a real difference for running, not just a nicer palette.</p>
+<p class="src">
+  Mapbox needs an access token. ⚠️ <b>Paste yours below — it is kept in this browser only and is never
+  committed.</b> A public <code>pk.</code> token is designed to sit in client-side code, unlike a
+  Google key, but it is still yours: restrict it by URL in your Mapbox account, and know that the
+  native app's <code>interun://app</code> origin cannot be URL-restricted.
+</p>
+<p class="src"><input id="mbTok" placeholder="pk.eyJ1Ijoi…" autocomplete="off" spellcheck="false"
+   style="width:100%;max-width:520px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:14px ui-monospace,monospace">
+   <button id="mbGo" style="margin-top:8px;padding:10px 16px;border-radius:999px;border:0;background:var(--accent);color:#04120e;font-weight:650">Show Mapbox styles</button></p>
+<div class="grid" id="mbgrid"></div>
 <footer>
-  All of these are OpenStreetMap data, rendered by CARTO. No API key, no account, no per-view cost —
-  which is why they are the options and Google Maps is not.
+  The six above are OpenStreetMap data rendered by CARTO: no key, no account, no per-view cost — which
+  is why they are the default options. Mapbox needs a token and an account but its Outdoors style
+  shows trails and contours, which none of the others do. Google Maps is absent for a different
+  reason: its key cannot be kept private in a public page, it bills per view, and its terms forbid the
+  canvas export the share card depends on.
 </footer>
 
 <script>
@@ -153,6 +170,9 @@
   }
 
   function render(style, canvas, onFail) {
+    return renderWith(function (z, x, y) { return tileURL(style, z, x, y); }, canvas, onFail);
+  }
+  function renderWith(urlFor, canvas, onFail) {
     var dpr = Math.min(2, window.devicePixelRatio || 1);
     canvas.width = W * dpr; canvas.height = H * dpr;
     var g = canvas.getContext("2d");
@@ -173,7 +193,7 @@
         if (++done === jobs.length) finish();
       };
       img.onerror = function () { failed++; if (++done === jobs.length) finish(); };
-      img.src = tileURL(style, F.z, j.x, j.y);
+      img.src = urlFor(F.z, j.x, j.y);
     });
     function finish() {
       // Every tile missing means the style is unreachable, not merely patchy — say so rather than
@@ -182,6 +202,45 @@
       drawRoute(g, route.pts);
     }
   }
+
+  // ---- Mapbox, on demand, with a token the runner supplies and this page keeps to itself ----
+  var MB = [
+    { id: "outdoors-v12",         name: "Mapbox Outdoors",
+      note: "Trails, footpaths and contour lines. The only style here that shows terrain — the reason to consider Mapbox at all." },
+    { id: "streets-v12",          name: "Mapbox Streets",
+      note: "Their general-purpose map. Closest in spirit to Voyager above." },
+    { id: "light-v11",            name: "Mapbox Light",
+      note: "Minimal and pale, like Positron." },
+    { id: "dark-v11",             name: "Mapbox Dark",
+      note: "Their dark basemap." },
+    { id: "satellite-streets-v12", name: "Mapbox Satellite",
+      note: "Aerial imagery with roads over it. Striking on a share card; harder to read a route on." }
+  ];
+  var mbTok = document.getElementById("mbTok");
+  try { mbTok.value = localStorage.getItem("interun_mapbox_probe") || ""; } catch (e) {}
+  document.getElementById("mbGo").onclick = function () {
+    var tok = (mbTok.value || "").trim();
+    if (!tok) return;
+    // ⚠️ This page only. Nothing here writes a token into the app or into the repo.
+    try { localStorage.setItem("interun_mapbox_probe", tok); } catch (e) {}
+    var mg = document.getElementById("mbgrid");
+    mg.innerHTML = "";
+    MB.forEach(function (s2) {
+      var card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = '<h2>' + s2.name + '</h2><p>' + s2.note + '</p>';
+      var cv = document.createElement("canvas");
+      card.appendChild(cv); mg.appendChild(card);
+      renderWith(function (z, x, y) {
+        return "https://api.mapbox.com/styles/v1/mapbox/" + s2.id + "/tiles/256/" + z + "/" + x + "/" + y + "@2x?access_token=" + encodeURIComponent(tok);
+      }, cv, function () {
+        cv.remove();
+        var m = document.createElement("div"); m.className = "miss";
+        m.textContent = "Could not load — check the token, or that this style is enabled on your account.";
+        card.appendChild(m);
+      });
+    });
+  };
 
   var grid = document.getElementById("grid");
   STYLES.forEach(function (s) {

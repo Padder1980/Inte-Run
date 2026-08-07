@@ -355,7 +355,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -eu\nSRC=\"${SRCROOT}/../docs\"\nDST=\"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/web\"\n\nif [ ! -f \"${SRC}/index.html\" ]; then\n  echo \"error: ${SRC}/index.html not found — run 'node web/app.ts' at the repo root first.\" >&2\n  exit 1\nfi\n\nmkdir -p \"${DST}\"\n# Dev-only pages and the owner's private roadmap never ship.\nrsync -a --delete \\\n  --exclude 'coverage.html' \\\n  --exclude 'walkthrough.html' \\\n  --exclude 'roadmap' \\\n  \"${SRC}/\" \"${DST}/\"\necho \"note: embedded web app ($(du -sh \"${DST}\" | cut -f1)) from ${SRC}\"\n";
+			shellScript = "set -eu\nSRC=\"${SRCROOT}/../docs\"\nDST=\"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/web\"\n\nif [ ! -f \"${SRC}/index.html\" ]; then\n  echo \"error: ${SRC}/index.html not found — run 'node web/app.ts' at the repo root first.\" >&2\n  exit 1\nfi\n\nmkdir -p \"${DST}\"\n# Dev-only pages and the owner's private roadmap never ship.\nrsync -a --delete \\\n  --exclude 'coverage.html' \\\n  --exclude 'walkthrough.html' \\\n  --exclude 'roadmap' \\\n  --exclude 'mapstyles' \\\n  \"${SRC}/\" \"${DST}/\"\necho \"note: embedded web app ($(du -sh \"${DST}\" | cut -f1)) from ${SRC}\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

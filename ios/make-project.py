@@ -29,6 +29,7 @@ rsync -a --delete \
   --exclude 'coverage.html' \
   --exclude 'walkthrough.html' \
   --exclude 'roadmap' \
+  --exclude 'mapstyles' \
   "${SRC}/" "${DST}/"
 echo "note: embedded web app ($(du -sh "${DST}" | cut -f1)) from ${SRC}"
 '''

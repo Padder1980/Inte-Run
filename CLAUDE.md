@@ -1388,6 +1388,108 @@ session, not none. Do not delete them.
 ⚠️ **Re-record the simulation videos** (`/Volumes/Adam/Inter-Run`, harness in the session scratchpad) —
 every one of the 92 shows the old timing.
 
+## NO WARM-UP AND NO COOL-DOWN ON THE LOW-INTENSITY RUNS (owner 2026-08-07, shipped same day)
+
+*"I dont think any of the following runs should include a warm up or cool down: 1. Long run 2. Easy
+3. Recovery ... All of the others need a proper warm up as already mapped."* (He listed a fourth and
+left it blank — **still unanswered, ask him.**)
+
+⚠️ **THIS REVERSES PART 2 OF THE NAMED-TIME WORK** (2026-08-03), which gave easy and long runs a real
+five-minute warm-up plus stretches. His reasoning is the same one that removed the ease-down on
+2026-08-03 and it applies just as well to the opening: an "ease in" prescribed at easy pace, at the
+front of a run that is easy from start to finish, is the same effort under a different label.
+
+**Delivered before → after**, measured on a real plan (this is the clearest statement of the change):
+
+| session | delivered before | delivered after |
+|---|---|---|
+| 32′ moderate run | 40′ (8′ generated warm-up) | **32′**, one step |
+| 80′ long run | 80′ (8′ ease-in + 72′) | **80′**, one easy step |
+| 37′ recovery jog | **45′** (8′ warm-up on a recovery jog) | **37′** |
+| 25′ continuous tempo | 53′ (18′ warm-up) | **53′, unchanged** |
+| 10 × 1′ hard | 46′ (17′ warm-up) | **46′, unchanged** |
+
+⚠️ **TWO SYSTEMS PRODUCE A WARM-UP AND BOTH HAD TO CHANGE — changing either alone is a silent no-op.**
+The session library (`easeIn` via `framedRun`, and `longRun`'s own frame) writes the steps **the WATCH
+runs**; `buildWarmup` → `withGeneratedWarmup` writes the ones **the PHONE runs**, replacing whatever the
+library wrote. Library only: the generated warm-up expands into the gap and the runner sees nothing
+change. Delivery only: the wrist keeps warming up while the phone does not.
+
+⚠️ **THE GATE IS KEYED ON THE SESSION TYPE, NOT ON THE WARM-UP BRANCH, AND THAT IS THE WHOLE DESIGN.**
+`buildWarmup`'s low-intensity branch fires for anything whose FIRST effort is gentle — which includes
+the threshold formats **"Geared run: easy → steady → tempo → easy"** and **"Progression tempo"**. Both
+open easy, both land in the same branch as an easy run, and both must keep what they have. Keyed on the
+branch, the rule strips the warm-up off a tempo session. Keyed on the RPE the session reaches, it keeps
+it on "easy + strides" (RPE 9) while removing it from "long run · fast finish" (RPE 6) — backwards.
+`WarmupSession` gained a `type` field for exactly this; it is load-bearing, not convenience.
+
+⚠️ **`moderate + strides` is typed `easy` and KEEPS its 19-minute warm-up** — it carries strides in the
+warm-up, so it takes the structured branch and never reaches the gate. That is the right answer, and a
+type-only rule applied earlier would have got it wrong. `easy + strides` (RPE 9) correctly loses its
+warm-up: those strides sit at the END, after forty minutes that have done the job far better.
+
+⚠️ **RUN–WALK BEGINNERS ARE EXEMPT, and without the exemption the rule strips 100% of a new runner's
+preparation.** Every session in a run–walk plan is typed `"easy"` — `assembleRunWalk` has one exit, and
+a beginner plan contains no `long` and no `recovery` at all. His own earlier request (2026-08-05) put
+the brisk walk there. Ability `"new"` and `runWalk` are exactly coextensive (`runWalk: status === "new"`
+and `warmupAbility()` returns `"new"` for the same status), so the ability band is a sound key.
+⚠️ `test/warmup.test.ts`'s run–walk fixture had **no `type` field**, so it would have stayed green while
+every real run–walk session lost the walk. Sixth firing of the guard-blind-to-the-new-input trap.
+
+⚠️ **"NOT NEEDED" IS A FLAG, NOT `null`, AND THE DIFFERENCE IS A MEDICAL MESSAGE ON EVERY EASY RUN.**
+`warmupHtml` renders *"You have told us you are unwell or sore enough that it is changing how you run"*
+whenever `warmupCardFor` returns falsy. Implementing this by returning null would have put that untrue
+sentence above the step list of every easy run, long run and recovery jog in the app. Seven tests also
+call `buildWarmup(...)!` and would have crashed rather than failed. `Warmup.notNeeded` says which of the
+two is meant; `withGeneratedWarmup` already returns the session untouched on `!phases.length`.
+
+⚠️ **THE TWO BUILDERS TREAT THEIR FRAME OPPOSITELY, so removing it needs two different fixes.**
+- `framedRun` **ADDED** its ease-in on top of the named work minutes, so removing it shortens the
+  outing to exactly the named minutes and **counted training volume moves by ZERO** — measured 0.000%
+  across 13,024 plan weeks and 0 m across 3,024 sessions, because `isPreparationStep` never counted a
+  warm-up as load. The runner covers less ground; their training load is identical.
+- `longRun` **CARVED** its frame out of the named minutes (`body = minutes - warm - cool`), so the
+  minutes must be **GIVEN BACK** (`body = minutes`) or a "90′ long run" silently delivers 82 — the
+  title lying about the session. That moves those minutes from an excluded kind into a counted one, so
+  **counted volume rises** (+8.5%/long run, +2.1%/week after the volume fit re-converges).
+  ⚠️ Shrinking the outing instead to keep the count still was measured and is **worse on every axis**:
+  weeks under the easy floor 18 → 43 of 9,696, and three distance-floor tests fail because a
+  half-marathon block stops building past the race distance.
+
+⚠️ **THE COOL-DOWN GOES FROM EVERY LONG-RUN FORMAT, INCLUDING THE FOUR THAT FINISH ON WORK** (steady
+finish, fast finish, race-pace blocks, progressive). **This overrides the RPE-5 rule he set on
+2026-08-04** ("a run that finishes on work keeps its jog"), which still governs threshold / VO2 /
+race-specific — where the last effort is 5 km pace rather than marathon effort at the end of a two-hour
+run. Flagged to him; reverting is one constant (`cool` in `longRun`). `test/warmup-delivery.test.ts`
+exempts `type === "long"` and says why.
+
+⚠️ **REMOVING A FRAME BY SETTING ITS LENGTH TO ZERO CREATES A ZERO-LENGTH STEP.** `longRun`'s cool-down
+branch was kept so restoring it is one constant — and unguarded it pushes `cooldown(paces, 0)`, a step
+of no duration that nothing filters: unreachable in the live session, lengthless on the watch, and a row
+reading "0′" in the brief. `if (cool > 0)` guards it and `test/no-warmup-low-intensity.test.ts` sweeps
+every session of every plan for one.
+
+**Measured cost, same 512 plans / 11,776 weeks before and after** — reported, not hidden:
+| | before | after |
+|---|---|---|
+| weeks under the pyramidal easy floor | 15 (0.13%) | **20 (0.17%)** |
+| worst easy fraction | 61.6% | **60.8%** |
+| week one within 1.10× stated | 95.1% | **94.5%** |
+| worst anchoring case | 1.21× | **1.27×** |
+
+The intensity cost is real and inherent: warm-up jogging **is** easy running in `computeDistribution`
+(a different denominator from the volume model — `src/domain/steps.ts` explains why), so five minutes
+genuinely leave the denominator of every framed session. Do not "fix" it by putting the frame back.
+
+⚠️ **A SUBAGENT LEFT A `return null` PROBE GATE IN `src/science/warmup.ts` AND IT LOOKED LIKE A REAL
+BUG.** During this work the suite went nondeterministic (10 vs 11 failures on identical runs) and
+`test/warmup.test.ts` passed alone while failing in the suite — because a background agent was
+patching and probing the real source mid-run. Symptom to recognise: **a test that passes in isolation
+and fails in the suite, with the count changing between identical runs, is contamination, not a
+defect.** Stop the background work, `git diff src/`, then re-measure. Also worth knowing: **`node --test
+$FILES` in zsh does not word-split** — it passes one bogus filename and prints nothing, which reads as
+"no failures" if you are grepping for `✖`. Use `${=FILES}` or an array.
+
 ## THE COOL-DOWN IS NOW AN OPTIONAL STRETCH SESSION (owner 2026-08-03, shipped 2026-08-04)
 
 He asked for the prescribed cool-down jog to go, replaced by an **optional stretch session

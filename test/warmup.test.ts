@@ -426,9 +426,18 @@ test("⚠️ a run–walk beginner is warmed up by WALKING, not by running furth
     targetRpe: { min: 1, max: 2 } };
   const steps: any[] = [{ kind: "warmup", label: "Brisk walk to warm up", durationSeconds: 300, targetRpe: { min: 1, max: 2 } }];
   for (let i = 0; i < 9; i++) { steps.push({ ...runStep }); if (i < 8) steps.push({ ...walkStep }); }
-  const sess: any = { steps, targetRpe: { min: 2, max: 4 } };
+  // ⚠️ `type: "easy"` IS LOAD-BEARING IN THIS FIXTURE, and its absence would have made the whole test
+  // a decoration. Every session in a real run–walk plan is typed "easy" — assembleRunWalk's single
+  // exit — and the no-warm-up rule added on 2026-08-07 keys on exactly that type. Built without the
+  // field, this fixture would have sailed through the gate while every real run–walk session in a
+  // beginner's plan lost the brisk walk the test exists to protect: green suite, feature gone, and
+  // the runner least able to tell that the app had got it wrong sent from standing into a 90-second
+  // running repetition. That is the guard-blind-to-the-new-input trap, and it is the sixth time.
+  const sess: any = { type: "easy", steps, targetRpe: { min: 2, max: 4 } };
 
   const w = buildWarmup(sess, "new")!;
+  assert.ok(!w.notNeeded,
+    "a run–walk beginner was swept up by the low-intensity no-warm-up rule — their sessions are typed \"easy\" too");
   const raise: any = w.phases.find((p: any) => p.phase === "raise");
   assert.ok(raise, "no raise phase");
   assert.match(raise.instruction, /[Ww]alk brisk/, `a run–walk beginner is told: "${raise.instruction}"`);

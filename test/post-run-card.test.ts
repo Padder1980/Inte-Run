@@ -157,25 +157,55 @@ test("⚠️ an interval session run PERFECTLY is not reported as failed", () =>
 });
 
 test("⚠️ the warm-up is not judged as if it were the session", () => {
-  // ⚠️ Every run now carries a generated warm-up, including three minutes of mobilising that covers
-  // no ground at all. Those opening kilometres were compared to the work band — and worse, the whole
-  // outing's average was fed to the adaptive engine, which measured two perfectly-executed easy runs
-  // as grounds for re-anchoring the plan two minutes per kilometre slower.
+  // ⚠️ A session that carries a warm-up includes minutes of mobilising that cover no ground at all.
+  // Those opening kilometres were compared to the work band — and worse, the whole outing's average
+  // was fed to the adaptive engine, which measured two perfectly-executed easy runs as grounds for
+  // re-anchoring the plan two minutes per kilometre slower.
+  //
+  // ⚠️ THE FIXTURE MOVED FROM AN EASY RUN TO A THRESHOLD ONE (2026-08-07), and it had to. Easy, long
+  // and recovery runs no longer carry a warm-up at all (the owner's decision), so for those the judged
+  // window correctly DOES start at metre zero — there is nothing in front of the work to exclude.
+  // Leaving the easy fixture here would have turned a real guard into a demand that the app reinstate
+  // the very thing that was removed. The defect it protects against is untouched: a threshold session
+  // still opens with fifteen minutes that must not be scored as the tempo.
   const paces = derive({ distanceMeters: 5000, timeSeconds: 1410 });
-  const live = M.withGeneratedWarmup(easyRun(paces, 32));
+  // Variant 9 is "25′ continuous tempo" — deliberately the CONTINUOUS threshold format, because
+  // paceStampFor judges a run by its longest continuous step and a reps-based session has none to
+  // find. Picked by sweeping the pool rather than assumed: variants 0–8, 10 and 12+ are all reps.
+  const live = M.withGeneratedWarmup(thresholdSession(paces, 9));
   const stamp = M.paceStampFor(live);
-  assert.ok(stamp.pband, "an ordinary easy run should still be judged");
+  assert.ok(stamp.pband, "a threshold session should still be judged");
   assert.ok(stamp.pwin && stamp.pwin.s > 0,
     "the judged window starts at metre zero — the warm-up is being scored as the session");
-  // A run held exactly on the easy pace throughout its WORK, with a slower warm-up in front.
+
+  // ...and the other half of the same rule, which only became statable once the frame was removed:
+  // a run with NO warm-up must be judged from its first metre, not from some inherited offset.
+  const bare = M.withGeneratedWarmup(easyRun(paces, 32));
+  assert.ok(!(bare.steps || []).some((st: any) => st.kind === "warmup"),
+    "an easy run should carry no warm-up step at all now");
+  const bareStamp = M.paceStampFor(bare);
+  assert.ok(bareStamp.pband, "an ordinary easy run should still be judged");
+  assert.equal(bareStamp.pwin && bareStamp.pwin.s, 0,
+    "a run with no warm-up must be judged from its first metre");
+  // A run held exactly on the band throughout its WORK, with a slower warm-up in front.
+  // ⚠️ THE SPLITS ARE DERIVED FROM THE FIXTURE'S OWN WINDOW, not written out by hand. Hand-sized for
+  // an easy run's two-minute opening, they silently stopped testing anything the moment the fixture
+  // became a session with a fifteen-minute one: three of the four kilometres fell inside the warm-up
+  // and the assertion measured the window rather than the judging. Generated from `pwin` it holds for
+  // any fixture, which is the property a guard needs when the thing it guards keeps moving.
   const mid = (stamp.pband.minSecPerKm + stamp.pband.maxSecPerKm) / 2;
+  const warmKm = Math.ceil(stamp.pwin.s / 1000);
+  const workKm = 4;
+  const splits = [];
+  for (let k = 1; k <= warmKm; k++) splits.push({ km: k, sec: Math.round(mid + 90) });
+  for (let k = 1; k <= workKm; k++) splits.push({ km: warmKm + k, sec: Math.round(mid) });
   const run: any = { type: "easy", ...stamp, rpe: 3, rband: { min: 2, max: 3 },
-    avgPaceSec: Math.round(mid + 45),
-    splits: [{ km: 1, sec: Math.round(mid + 90) }, { km: 2, sec: Math.round(mid) },
-             { km: 3, sec: Math.round(mid) }, { km: 4, sec: Math.round(mid) }] };
+    avgPaceSec: Math.round((warmKm * (mid + 90) + workKm * mid) / (warmKm + workKm)),
+    splits };
   const a = M.runAnalysis(run);
   assert.equal(a.rows[0].verdict, "none", "the warm-up kilometre is still being scored");
-  assert.ok(a.inBand >= 3, `only ${a.inBand} of the work kilometres counted as on target`);
+  assert.ok(a.inBand >= workKm - 1,
+    `only ${a.inBand} of the ${workKm} work kilometres counted as on target`);
   // ⚠️ And the adaptive engine must see the WORK pace, not the whole outing.
   const work = M.runWorkPace(run);
   assert.ok(work && Math.abs(work - mid) < 5,

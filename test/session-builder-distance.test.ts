@@ -134,11 +134,15 @@ test("dialling a bigger distance always gives a bigger run", () => {
 });
 
 test("an absurdly short ask still leaves real running in it", () => {
-  // A distance smaller than the warm-up already covers must not produce a warm-up and nothing else.
+  // ⚠️ THE FILTER HAD TO GO. It excluded warm-up and cool-down steps — and now that an easy run has
+  // neither, it matched every step and the test degenerated into "the session has some steps",
+  // passing for any implementation. It measures the RUNNING directly instead: a distance smaller than
+  // the session's fixed parts must not collapse the body to nothing, whether or not those parts exist.
   const s = buildCustomSession({ id: "t", type: "easy", unit: "dist", distKm: 0.2, durMin: 40 });
-  const body = (s.steps || []).filter((x: any) => x.kind !== "warmup" && x.kind !== "cooldown");
-  const bodySec = body.reduce((a: number, x: any) => a + (x.durationSeconds || 0), 0);
-  assert.ok(bodySec >= 240, "only " + bodySec + "s of running left in a 0.2 km ask");
+  const running = (s.steps || []).filter((x: any) => x.targetPaceSecPerKm || x.distanceMeters);
+  assert.ok(running.length, "a 0.2 km ask produced no running at all");
+  const runSec = running.reduce((a: number, x: any) => a + (x.durationSeconds || 0), 0);
+  assert.ok(runSec >= 240, "only " + runSec + "s of running left in a 0.2 km ask");
 });
 
 test("training distance is recomputed, never inherited", () => {
@@ -149,10 +153,22 @@ test("training distance is recomputed, never inherited", () => {
   const long = buildCustomSession({ id: "t", type: "easy", unit: "time", distKm: null, durMin: 70 });
   assert.ok(long.trainingDistanceMeters > short.trainingDistanceMeters * 1.5,
     "training distance did not move with duration: " + short.trainingDistanceMeters + " vs " + long.trainingDistanceMeters);
-  // And it excludes the preparation, so it is always under the whole-outing figure.
-  for (const s of [short, long])
-    assert.ok(s.trainingDistanceMeters < s.estimatedDistanceMeters,
-      "training distance is not below the outing: " + s.trainingDistanceMeters + " / " + s.estimatedDistanceMeters);
+  // ⚠️ EQUAL IS NOW THE CORRECT ANSWER FOR AN EASY RUN, and the assertion had to be rewritten rather
+  // than relaxed. It read `trainingDistanceMeters < estimatedDistanceMeters`, which was true only
+  // because every easy run carried a five-minute ease-in; with the frame removed (owner, 2026-08-07)
+  // an easy run is training from its first metre and the two figures are identical. Relaxing it to
+  // `<=` would have left a guard that passes for any implementation at all. What it asserts instead
+  // is the rule itself — the two differ by EXACTLY the preparation the session contains — which
+  // discriminates whether or not a frame is present.
+  for (const s of [short, long]) {
+    const prep = (s.steps || []).filter((x: any) => x.kind === "warmup" || x.kind === "cooldown");
+    const prepM = prep.reduce((a: number, x: any) => a + (x.durationSeconds && x.targetPaceSecPerKm
+      ? x.durationSeconds / ((x.targetPaceSecPerKm.minSecPerKm + x.targetPaceSecPerKm.maxSecPerKm) / 2) * 1000
+      : x.distanceMeters || 0), 0);
+    assert.ok(Math.abs((s.estimatedDistanceMeters - s.trainingDistanceMeters) - prepM) < 2,
+      "training distance does not exclude exactly the preparation: outing " + s.estimatedDistanceMeters +
+      " − training " + s.trainingDistanceMeters + " should be the " + Math.round(prepM) + " m of prep");
+  }
 });
 
 test("a session with no paced body is never offered in kilometres", () => {

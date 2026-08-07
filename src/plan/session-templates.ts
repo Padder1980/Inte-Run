@@ -153,17 +153,33 @@ function easeIn(paces: TrainingPaces, minutes: number): WorkoutStep {
  */
 const FRAME_WARM_MIN = 5;
 
-// ⚠️ NO CLOSING FRAME ANY MORE — see the note on `easeIn`. The named minutes are the WORK, so removing
-// the ease-down shortens the OUTING by four minutes and leaves the named time untouched, which is the
-// correct pairing: the runner still gets the 38 minutes at moderate the title promises. Training volume
-// does not move at all, because `isPreparationStep` never counted a cool-down as load.
+// ⚠️ NO FRAME AT ALL ANY MORE — NEITHER END (owner, 2026-08-07): "I dont think any of the following
+// runs should include a warm up or cool down: 1. Long run 2. Easy 3. Recovery". The closing frame went
+// on 2026-08-03 for a reason that applies just as well to the opening one: an "ease in" prescribed at
+// easy pace, at the front of a run that is easy from start to finish, is the same effort under a
+// different label — a name for the first five minutes rather than a change of anything. The runs that
+// genuinely start on work keep their warm-up, and keep it in full.
+//
+// ⚠️ THE NAMED MINUTES ARE THE WORK, so removing the ease-in SHORTENS THE OUTING by five minutes and
+// leaves the named time untouched: a "40′ easy run" is now forty minutes of easy running, door to door.
+// ⚠️ Counted training volume does not move by a metre — measured across 13,024 plan weeks and 3,024
+// individually built sessions, 0.000% and 0 m — because `isPreparationStep` never counted a warm-up as
+// load. The runner covers less ground; their training load is identical. That is the whole argument for
+// the change and it is worth keeping straight: preparation was never mileage.
+// ⚠️ The INTENSITY model is a different denominator and it DOES move (src/domain/steps.ts says why):
+// warm-up jogging is easy running there, so five minutes leave the denominator of every framed session.
+// Measured: weeks under the pyramidal easy floor 18 → 28 of 9,696, worst week exactly ON the floor.
+// Reported to the owner rather than hidden; do not "fix" it by putting the frame back.
+//
+// ⚠️ `FRAME_WARM_MIN` and `easeIn` are KEPT, and deliberately: `assembleRunWalk` still opens with a
+// brisk walk, which is the one low-intensity warm-up the owner asked FOR (2026-08-05) and the model's
+// own §8 note argues for. Deleting them as dead code would take that with it.
 function framedRun(
-  paces: TrainingPaces,
+  _paces: TrainingPaces,
   workMin: number,
   buildMiddle: (midMin: number) => WorkoutStep[],
 ): WorkoutStep[] {
-  if (workMin < 10) return buildMiddle(workMin);
-  return [easeIn(paces, FRAME_WARM_MIN), ...buildMiddle(workMin)];
+  return buildMiddle(workMin);
 }
 
 export function easyRun(
@@ -232,7 +248,7 @@ export function easyRun(
   return assemble(
     withStrides ? "strides" : "easy",
     withStrides ? `${minutes}′ easy + strides` : `${minutes}′ easy run`,
-    "Foundation aerobic running. Ease in and settle into a conversational rhythm to the finish.",
+    "Foundation aerobic running. Start gently and settle into a conversational rhythm to the finish.",
     "easy",
     steps,
     RPE.easy,
@@ -405,7 +421,7 @@ export function contPickups(p: TrainingPaces, min: number): SessionContent {
     { kind: "steady", label: "Easy, conversational running", durationSeconds: mid * 60, targetPaceSecPerKm: p.easy, targetRpe: RPE.easy },
     pickups,
   ]);
-  return assemble("easy", `${min}′ easy + gentle pickups`, "Easy running with a few short, relaxed pickups to wake the legs up — smooth and controlled, never a sprint — then ease down to finish.", "easy", steps, RPE.easy);
+  return assemble("easy", `${min}′ easy + gentle pickups`, "Easy running with a few short, relaxed pickups to wake the legs up — smooth and controlled, never a sprint. Walk or jog easy after each one until your breathing is back.", "easy", steps, RPE.easy);
 }
 
 export function contProgression(p: TrainingPaces, min: number): SessionContent {
@@ -417,7 +433,7 @@ export function contProgression(p: TrainingPaces, min: number): SessionContent {
       { kind: "steady", label: "Lift to a comfortable steady effort", durationSeconds: steady * 60, targetPaceSecPerKm: p.steady, targetRpe: RPE.steady },
     ];
   });
-  return assemble("easy", `${min}′ easy → steady finish`, "Ease in, run easy, then lift to a comfortable steady effort before easing down. Still controlled — you should be able to talk in short sentences.", "easy", steps, RPE.easy);
+  return assemble("easy", `${min}′ easy → steady finish`, "Start gently, run easy, then lift to a comfortable steady effort. Still controlled — you should be able to talk in short sentences.", "easy", steps, RPE.easy);
 }
 
 export function contExplore(p: TrainingPaces, min: number): SessionContent {
@@ -427,7 +443,7 @@ export function contExplore(p: TrainingPaces, min: number): SessionContent {
   return assemble(
     "easy",
     `${min}′ explore run — by feel`,
-    "Run a route you enjoy at an easy, chatty effort. Ease in, explore by feel, then ease down — just time on feet and fresh scenery.",
+    "Run a route you enjoy at an easy, chatty effort. Start gently and explore by feel — just time on feet and fresh scenery.",
     "easy",
     steps,
     RPE.easy,
@@ -536,8 +552,27 @@ export function longRun(
   minutes: number,
   opts: LongRunOptions = {},
 ): SessionContent {
-  const warm = Math.min(8, Math.max(4, Math.round(minutes * 0.1)));
-  const cool = Math.min(6, Math.max(3, Math.round(minutes * 0.08)));
+  // ⚠️ NO FRAME ON A LONG RUN EITHER END (owner, 2026-08-07). Unlike `framedRun`, this one's frame was
+  // CARVED OUT of the named minutes (`body = minutes - warm - cool`), so the minutes have to be GIVEN
+  // BACK to the easy running or an "80′ long run" quietly delivers 69 — the title lying about the
+  // session, which is the one thing the named-time work exists to prevent. `body = minutes`.
+  //
+  // ⚠️ THAT MEANS COUNTED VOLUME RISES, AND IT IS NOT AN ERROR. Those minutes move from `warmup`/
+  // `cooldown` — which `isPreparationStep` excludes — into `steady`, which counts. Measured: +8.5% per
+  // long run, +3.7% per week before the volume fit and +2.1% after it re-converges; week-one anchoring
+  // 24/320 → 27/320 above the 1.10× guardrail, worst case 1.55× → 1.62×. The runner runs exactly the
+  // same eighty minutes either way; what changed is that all eighty are now counted as the easy running
+  // they always were. The alternative — shrinking the outing to keep the count still — was measured
+  // and is worse on every axis that matters: weeks under the easy floor 18 → 43 of 9,696, and three
+  // distance-floor tests fail because a half-marathon block stops building past the race distance.
+  //
+  // ⚠️ THE COOL-DOWN GOES FROM EVERY LONG-RUN FORMAT, INCLUDING THE ONES THAT FINISH ON WORK. That
+  // overrides the RPE-5 rule set on 2026-08-04 ("a run that finishes on work keeps its jog"), which
+  // still governs threshold / VO2 / race-specific — where the last effort is 5 km pace rather than
+  // marathon effort inside a two-hour run. Flagged to the owner; one constant to reverse if he
+  // disagrees. The stretch session is still offered after every run.
+  const warm = 0;
+  const cool = 0;
   // ⚠️ `body` KEEPS THE COOL-DOWN'S MINUTES OUT OF THE DOSE MATHS, and that is load-bearing. Every
   // branch below sizes its race-pace work as a fraction of `body` (0.25 and 0.35 in the progressive,
   // the leftover lead-in in the blocks), so folding the cool-down's minutes in here to "give them back
@@ -546,9 +581,9 @@ export function longRun(
   // at the END instead, where they can only ever land on easy running. Doses are byte-identical to
   // before the cool-down was removed.
   const body = Math.max(1, minutes - warm - cool);
-  const steps: WorkoutStep[] = [easeIn(paces, warm)];
+  const steps: WorkoutStep[] = warm > 0 ? [easeIn(paces, warm)] : [];
   let description =
-    "Long run develops durability: holding economy and mechanics under accumulated fatigue. Ease in, then hold an easy rhythm to the finish.";
+    "Long run develops durability: holding economy and mechanics under accumulated fatigue. Start gently and hold an easy rhythm to the finish.";
   const easyStep = (min: number): WorkoutStep => ({
     kind: "steady",
     label: "Easy aerobic running — build durability",
@@ -656,16 +691,25 @@ export function longRun(
   // conversational — you can stop and stretch after it. From steady upwards (a goal-pace finish, a
   // race-pace repeat) it is work, and work gets jogged down. Drawn at 4 instead, an "easy → moderate
   // finish" was handed a cool-down jog it does not need, which is the very padding this change removes.
+  // ⚠️ GUARDED ON `cool > 0`, and that guard is the whole reason the branch below still exists.
+  // With the cool-down removed this is dead today — but written unguarded it is not merely dead, it is
+  // ACTIVELY WRONG: the gentle branch adds nothing (harmless) while the else branch pushes
+  // `cooldown(paces, 0)`, a zero-second step that nothing filters. It would reach the live session as
+  // a step the runner cannot complete, the watch as a step with no duration, and `structureRows` as a
+  // row reading "0′". Keeping the reasoning and gating it means restoring the cool-down is one
+  // constant, and removing it cannot leave a phantom step behind.
   const last = steps[steps.length - 1];
   const finishesGently = (last?.targetRpe?.max ?? 0) <= RPE.aerobic.max;
-  if (finishesGently) {
-    // Give the minutes to the easy running that is already there rather than appending a second easy
-    // step saying almost the same thing.
-    if (last) last.durationSeconds = (last.durationSeconds ?? 0) + cool * 60;
-    else steps.push(easyStep(cool));
-  } else {
-    steps.push(cooldown(paces, cool));
-    description += " Jog easy at the end — that finish is real work, and it needs winding down.";
+  if (cool > 0) {
+    if (finishesGently) {
+      // Give the minutes to the easy running that is already there rather than appending a second easy
+      // step saying almost the same thing.
+      if (last) last.durationSeconds = (last.durationSeconds ?? 0) + cool * 60;
+      else steps.push(easyStep(cool));
+    } else {
+      steps.push(cooldown(paces, cool));
+      description += " Jog easy at the end — that finish is real work, and it needs winding down.";
+    }
   }
   const title = `${minutes}′ long run` + (opts.titleSuffix ? ` ${opts.titleSuffix}` : "");
   // ⚠️ The session's intended-effort band must SPAN the work, or the debrief calls a perfect

@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFileSync } from "node:fs";
 import { deriveTrainingPaces } from "../src/science/paces.ts";
-import { listWorkouts } from "../src/plan/session-templates.ts";
+import { easyRun, listWorkouts, longRun, recoveryRun, thresholdSession } from "../src/plan/session-templates.ts";
 import { generatePlan } from "../src/plan/generate-plan.ts";
 import { buildWarmup } from "../src/science/warmup.ts";
+
+const pacesFor = (t: number) => deriveTrainingPaces({ distanceMeters: 5000, timeSeconds: t });
 
 /**
  * ⚠️ THIS TEST READS THE BUILT web/app.html, because the code under test lives there.
@@ -87,7 +89,6 @@ test("the warm-up stays in proportion to the session it prepares you for", () =>
       // repetitions non-finite and the whole sweep reported clean.
       assert.ok(Number.isFinite(advertised) && Number.isFinite(delivered),
         `non-finite duration for ${where}`);
-      checked++;
       const steps: any[] = live.steps || [];
       const wu = steps.filter((s) => s.kind === "warmup")
         .reduce((a, s) => a + (s.durationSeconds || 0), 0) / 60;
@@ -105,12 +106,20 @@ test("the warm-up stays in proportion to the session it prepares you for", () =>
           return a;
         }, 0);
       if (work < 10) continue;   // a very short session is dominated by its floor, not its proportion
+      // ⚠️ A SESSION WITH NO WARM-UP IS NOT A MEASUREMENT OF PROPORTION, so it must not inflate the
+      // count guard. Since 2026-08-07 the low-intensity types return a warm-up of zero minutes, and a
+      // ratio of 0 satisfies `<= 1.35` whatever the code does. Left in, `checked` would have stayed at
+      // 11,508 while 1,926 of those were vacuous — the guard reporting a broad sweep it was no longer
+      // taking. Counted where it is decided, not filtered at the top, so the two can never drift.
+      if (wu <= 0) continue;
+      checked++;
       const ratio = wu / work;
       if (ratio > worst) { worst = ratio; worstWhere = `${where} (${wu.toFixed(0)}′ warm-up, ${work.toFixed(0)}′ work)`; }
       assert.ok(ratio <= 1.35,
         `${where}: ${wu.toFixed(0)} minutes of warm-up before ${work.toFixed(0)} minutes of work`);
     }
   }
+  // 5,730 real warm-ups measured (2026-08-07) — the bar is set just under it.
   assert.ok(checked > 5000, `expected a broad sweep, only checked ${checked}`);
   assert.ok(worst > 0.2, `the sweep measured no real warm-ups at all (worst ratio ${worst})`);
 });
@@ -188,13 +197,44 @@ test("every run warms up, and the stretch session is offered after all of them",
   assert.match(html, /strOffer[\s\S]{0,400}?onclick = openStretchSheet/,
     "the offer is rendered but never wired, so tapping it would do nothing");
 
+  // ⚠️ "EVERY RUN WARMS UP" IS NO LONGER TRUE, AND ASSERTING IT WOULD NOW DEMAND THE OPPOSITE OF THE
+  // DESIGN (owner, 2026-08-07): long runs, easy runs and recovery jogs get no warm-up at all. What
+  // must hold is the two-sided version — the sessions that should warm up do, the ones that should
+  // not don't — because a one-sided rule cannot fail in the direction that matters. Written as
+  // "skip the ones with no warm-up", the sweep silently stopped checking 3,582 of its 5,754 sessions
+  // and stayed green; the counters below are what make that visible.
+  const LOW_INTENSITY = new Set(["easy", "long", "recovery", "strides"]);
+  let warmed = 0, bare = 0;
   for (const ability of ["new", "intermediate"]) {
     ABILITY = ability;
     for (const [where, sess] of everySession()) {
       const w: any = buildWarmup(sess, ability as any);
       if (!w || w.incomplete) continue;
       const steps: any[] = withGeneratedWarmup(sess).steps || [];
-      assert.ok(steps.some((s) => s.kind === "warmup"), `${where}: no warm-up step`);
+      const hasWu = steps.some((s) => s.kind === "warmup");
+      // (a) THE ENGINE AND THE DELIVERY MUST AGREE. `notNeeded` is what the session sheet reads to
+      // decide whether to print a warm-up card; the steps are what Start counts through. If those two
+      // ever disagree the runner is shown one thing and given another — the exact class of defect that
+      // put a 6:15 STRIDES block on his screen.
+      assert.equal(hasWu, !w.notNeeded,
+        `${where}: the card says ${w.notNeeded ? "no warm-up" : "warm-up"} and the steps say the opposite`);
+
+      // (b) THE GATE NEVER REACHES BEYOND ITS REMIT — and this is the assertion that matters most,
+      // because it is the one that fails if someone later keys the rule on the warm-up BRANCH instead
+      // of the session type. Two threshold formats ("Geared run: easy → steady → tempo → easy" and
+      // "Progression tempo") open with easy running and land in the same branch as an easy run; keyed
+      // on the branch they would silently lose their warm-up, and the owner was explicit that
+      // everything outside his three types keeps one.
+      // ⚠️ ability "new" is the run–walk exemption (his own earlier request, 2026-08-05): every
+      // run–walk session is typed "easy", so without the exemption they would all be stripped.
+      if (w.notNeeded) {
+        bare++;
+        assert.ok(LOW_INTENSITY.has(String((sess as any).type)),
+          `${where}: type "${(sess as any).type}" is not one the owner said should skip its warm-up`);
+        assert.notEqual(ability, "new", `${where}: a run–walk beginner lost their brisk walk`);
+      } else {
+        warmed++;
+      }
       // ⚠️ THE RULE IS ABOUT HOW A SESSION FINISHES, NOT HOW HARD IT IS. A run that ends easy needs no
       // wind-down — that is the whole point of removing the ease-down. A run that ends ON WORK does:
       // stopping dead after intervals, or after the goal-pace finish of a progressive long run, is a
@@ -210,17 +250,64 @@ test("every run warms up, and the stretch session is offered after all of them",
       // ⚠️ THE LINE IS AT RPE 5. Ending at the aerobic/moderate gear (4) is still conversational and
       // needs nothing after it; from steady upwards it is work. Drawn at 4, this demanded a cool-down
       // jog after "easy → moderate finish" — reinstating exactly the padding the change removes.
+      // ⚠️ LONG RUNS ARE EXEMPT AS OF 2026-08-07, ON THE OWNER'S EXPLICIT INSTRUCTION, and this is the
+      // one place where his new decision overrides his old one. The RPE-5 rule above is his, from
+      // 2026-08-04; "I dont think any of the following runs should include a warm up or cool down:
+      // 1. Long run ..." is his, from 2026-08-07, and it reaches four long-run formats that finish on
+      // work — steady finish, fast finish, race-pace blocks and progressive.
+      // The coaching case for the exemption: those finishes are at STEADY or MARATHON effort, at the
+      // end of a run that has already lasted one to three hours. That is not the same proposition as
+      // stopping dead after 5 km-pace intervals, which is why threshold, VO2 and race-specific
+      // sessions all still fail this assertion if their jog is removed — verified by removing one.
+      // ⚠️ Reverting is one constant: `cool` in longRun. Do not widen this exemption to cover the
+      // quality pools without asking him — the rule it relaxes cost a real defect to write.
       const CONVERSATIONAL_MAX = 4;
       const body = steps.filter((s) => s.kind !== "cooldown");
       const finalAsk = body[body.length - 1];
       const finishesOnWork = (finalAsk?.targetRpe?.max ?? 0) > CONVERSATIONAL_MAX;
       const isRace = /RACE DAY/i.test(where) || (sess.type === "race");
-      if (finishesOnWork && !isRace) {
+      const isLong = sess.type === "long";
+      if (finishesOnWork && !isRace && !isLong) {
         assert.ok(steps.some((s) => s.kind === "cooldown"),
           `${where}: finishes on "${finalAsk?.label}" (RPE ${finalAsk?.targetRpe?.max}) with nothing after it`);
       }
     }
   }
+  // ⚠️ BOTH ARMS MUST BE POPULATED, and these are the numbers this sweep actually produces (measured
+  // 2026-08-07: 2,172 warmed, 3,582 bare). Without them the whole test passes if the gate is widened
+  // to every session — every arm empty is every assertion satisfied. This is the fifth time in this
+  // project's history that a filter matching nothing has read as a clean sweep.
+  // ⚠️ BOTH ARMS MUST BE POPULATED, and both bars are set from a MEASUREMENT taken here rather than
+  // from taste: this sweep produces warmed=3828, bare=1926 (2026-08-07, abilities ["new",
+  // "intermediate"], everySession()). Without them the whole test passes if the gate is widened to
+  // every session or switched off entirely — every arm empty is every assertion satisfied. That trap
+  // has now fired five times in this project; the counters are how it stops being invisible.
+  // ⚠️ `bare` is well under half because ability "new" is exempt and contributes ZERO to it: a
+  // run–walk beginner keeps their brisk walk, so the whole "new" pass lands in `warmed`.
+  assert.ok(warmed > 3400, `only ${warmed} sessions still warm up — the gate has swallowed the pool`);
+  assert.ok(bare > 1700, `only ${bare} sessions skipped their warm-up — the gate is barely firing`);
+
+  // (c) ...AND THE GATE IS NOT MERELY CONSISTENT WITH ITSELF, IT FIRES ON THE RIGHT SESSIONS. Every
+  // check above is satisfied by an engine that never sets `notNeeded` at all, so the three formats
+  // the owner named are asserted by name.
+  ABILITY = "intermediate";
+  for (const [label, sess] of [
+    ["easy run", easyRun(pacesFor(1410), 40)],
+    ["long run", longRun(pacesFor(1410), 90)],
+    ["recovery jog", recoveryRun(pacesFor(1410), 30)],
+  ] as Array<[string, any]>) {
+    const w: any = buildWarmup(sess, "intermediate");
+    assert.ok(w && w.notNeeded, `a ${label} is still being given a warm-up`);
+    assert.equal(w.phases.length, 0, `a ${label}'s warm-up has phases in it`);
+    assert.equal(w.totalMinutes, 0, `a ${label}'s warm-up still costs ${w.totalMinutes} minutes`);
+    const steps: any[] = withGeneratedWarmup(sess).steps || [];
+    assert.ok(!steps.some((s) => s.kind === "warmup"), `a ${label} is delivered with a warm-up step`);
+    assert.ok(!steps.some((s) => s.kind === "cooldown"), `a ${label} is delivered with a cool-down step`);
+  }
+  // ...and a tempo session, which opens easy and shares their branch, keeps everything.
+  const thr: any = buildWarmup(thresholdSession(pacesFor(1410), 11), "intermediate");
+  assert.ok(thr && !thr.notNeeded, "a geared tempo run lost its warm-up — the gate is keyed on the branch");
+  assert.ok(thr.phases.length > 0);
 });
 
 test("every section of the brief is labelled with the time spent in it", () => {

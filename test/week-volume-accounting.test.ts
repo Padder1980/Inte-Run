@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Athlete, Goal, PlannedWeek, SessionOutcome } from "../src/domain/types.ts";
-import { sessionVolumeMeters, weekVolumeMeters } from "../src/domain/steps.ts";
+import { scaleSessionDistance, sessionVolumeMeters, weekVolumeMeters } from "../src/domain/steps.ts";
 import { generatePlan } from "../src/plan/generate-plan.ts";
+import { thresholdSession } from "../src/plan/session-templates.ts";
 import { deriveTrainingPaces } from "../src/science/paces.ts";
 import { applyMissedSessionAdjustment } from "../src/adapt/missed-sessions.ts";
 import { applyInjuryAdjustment } from "../src/adapt/injury.ts";
@@ -95,7 +96,7 @@ test("an injury cut moves the week's mileage, not just the session cards", () =>
   // ⚠️ Scaling only `estimatedDistanceMeters` left `trainingDistanceMeters` untouched — and since the
   // total prefers the training figure, a "cut volume to 60%" changed the cards and the week's total
   // by nothing at all.
-  let checked = 0;
+  let checked = 0, framed = 0;
   for (const { where, plan, athlete, goal } of plans()) {
     const paces = deriveTrainingPaces(athlete.recent, goal);
     const i = plan.weeks.findIndex((w) => w.phase === "build" && !w.isDeload);
@@ -121,6 +122,7 @@ test("an injury cut moves the week's mileage, not just the session cards", () =>
       if (b.estimatedDistanceMeters == null || b.trainingDistanceMeters == null) continue;
       if (!s.estimatedDistanceMeters || !s.trainingDistanceMeters) continue;
       checked++;
+      if (b.estimatedDistanceMeters !== b.trainingDistanceMeters) framed++;
       const est = s.estimatedDistanceMeters / b.estimatedDistanceMeters;
       const train = s.trainingDistanceMeters / b.trainingDistanceMeters;
       assert.ok(Math.abs(est - train) < 0.02,
@@ -128,6 +130,34 @@ test("an injury cut moves the week's mileage, not just the session cards", () =>
     }
   }
   assert.ok(checked > 20, `only ${checked} scaled sessions swept`);
+
+  // ⚠️ THE SWEEP ABOVE CAN NO LONGER FALSIFY ITS OWN ASSERTION, AND SAYING SO IS THE POINT.
+  // `est / train` is a ratio of two numbers that are IDENTICAL whenever a session carries no warm-up
+  // or cool-down — and since 2026-08-07 the low-intensity types carry neither. The injury path
+  // replaces quality sessions outright (the `b.title !== s.title` filter above drops those), so what
+  // survives is entirely low-intensity: measured, 0 of 288. The loop is kept because an
+  // implementation that broke the identity WOULD be a real defect and this is where it would surface
+  // first — but it is no longer evidence on its own, and a count guard that quietly passed while
+  // measuring nothing is precisely the failure this file was rewritten to remove once already.
+  assert.equal(framed, 0,
+    `${framed} of ${checked} swept sessions now carry a frame — the direct check below can be retired ` +
+    `and this sweep trusted again`);
+
+  // So the invariant is asserted DIRECTLY, on the shared helper, with a session that genuinely has a
+  // frame. This is what actually discriminates: scale a threshold session and both of its distance
+  // figures must move by the same factor.
+  const paces = deriveTrainingPaces({ distanceMeters: 5000, timeSeconds: 1500 });
+  const framedSession: any = thresholdSession(paces, 9);
+  assert.notEqual(framedSession.estimatedDistanceMeters, framedSession.trainingDistanceMeters,
+    "the fixture has no preparation in it, so it cannot test the thing this test exists for");
+  for (const factor of [0.6, 0.8, 1.2]) {
+    const cut: any = scaleSessionDistance(framedSession, factor);
+    const est = cut.estimatedDistanceMeters / framedSession.estimatedDistanceMeters;
+    const train = cut.trainingDistanceMeters / framedSession.trainingDistanceMeters;
+    assert.ok(Math.abs(est - train) < 0.02,
+      `×${factor}: shown distance moved ×${est.toFixed(3)} but counted distance moved ×${train.toFixed(3)}`);
+    assert.ok(Math.abs(est - factor) < 0.02, `×${factor}: shown distance moved ×${est.toFixed(3)}`);
+  }
 });
 
 test("⚠️ one unusable session degrades itself, never the whole plan", () => {

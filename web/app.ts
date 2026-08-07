@@ -843,6 +843,9 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 .pc-ax.hr-peak { fill: var(--eff-hard); }
 .hz-xl { font-size: 9px; color: var(--ink-faint); text-align: right; margin: -6px 2px 6px; }
 .wu-card .wu-why { font-size: 13px; color: var(--ink-soft); line-height: 1.5; margin-bottom: 10px; }
+/* A run that needs no warm-up says so in one line, not in a card. A card would give the ABSENCE of a
+   warm-up the same visual weight as a real one, on the sessions that are meant to be the simplest. */
+.wu-none { font-size: 13px; color: var(--ink-faint); line-height: 1.5; margin: 2px 0 12px; }
 .wu-min { float: right; font-size: 12px; font-weight: 650; color: var(--accent); }
 .wu-row { display: flex; gap: 10px; padding: 8px 0; }
 .wu-row + .wu-row { border-top: 1px solid var(--line); }
@@ -4591,6 +4594,14 @@ function warmupCardFor(sess) {
 function warmupHtml(sess) {
   let w = null;
   try { w = warmupCardFor(sess); } catch (e) { return ""; }
+  // ⚠️ "NO WARM-UP NEEDED" IS NOT "YOU ARE UNWELL", and conflating them would have printed a medical
+  // message on every easy run, long run and recovery jog in the app — above the step list, in the most
+  // read place on the session sheet, and untrue. The engine says which of the two it means; this must
+  // not infer it from a falsy value. One quiet line, because saying nothing at all reads as an
+  // omission on a screen whose other sessions all carry a warm-up card.
+  if (w && w.notNeeded) {
+    return '<div class="wu-none">' + esc(w.why) + '</div>';
+  }
   if (!w) {
     return '<div class="card wu-card"><div class="subhead" style="margin-top:0">Warm-up</div>' +
       '<div class="wu-why">You have told us you are unwell or sore enough that it is changing how you run. ' +

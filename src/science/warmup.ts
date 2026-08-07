@@ -34,7 +34,24 @@ import type { RpeBand, WorkoutStep } from "../domain/types.ts";
  * concrete type forces a cast at one of the two call sites, and a cast is where the next wrong
  * assumption gets in.
  */
-export type WarmupSession = { steps?: WorkoutStep[]; targetRpe?: RpeBand; exercises?: unknown[] };
+export type WarmupSession = {
+  steps?: WorkoutStep[];
+  targetRpe?: RpeBand;
+  exercises?: unknown[];
+  /**
+   * ⚠️ THE SESSION'S OWN TYPE, AND IT IS LOAD-BEARING — the no-warm-up rule cannot be decided from the
+   * steps alone. Two threshold formats, "Geared run: easy → steady → tempo → easy" and "Progression
+   * tempo", open with easy running and therefore reach the low-intensity branch below exactly as an
+   * easy run does; keyed on the branch, the rule would strip the warm-up off a tempo session. Keyed on
+   * the RPE the session reaches, it would strip it off nothing and keep it on "easy + strides"
+   * (RPE 9) while removing it from "long run · fast finish" (RPE 6), which is backwards. The type is
+   * what separates them, so the type has to travel.
+   * Optional because the builder preview and hand-built fixtures do not always have one; absent means
+   * "not one of the low-intensity types", which fails toward giving a warm-up rather than withholding
+   * one.
+   */
+  type?: string;
+};
 
 export const WARMUP_MODEL_VERSION = "1.0.0";
 
@@ -122,6 +139,19 @@ export type Warmup = {
   openingMinutes?: number;
   totalMinutes: number;
   phases: WarmupPhase[];
+  /**
+   * True when this session is one the owner has said needs no warm-up at all (2026-08-07: long runs,
+   * easy runs and recovery jogs). `phases` is empty and `totalMinutes` is 0.
+   *
+   * ⚠️ A DISTINCT FLAG, NOT `null`, AND THAT IS THE POINT. Returning null was the obvious version and
+   * it is wrong twice over: seven tests call `buildWarmup(...)!` and would crash on it rather than
+   * fail, and — far worse in the product — `warmupHtml` in web/app.ts renders a MEDICAL card on null
+   * ("you have told us you are unwell or sore enough that it is changing how you run"). Every long
+   * run, easy run and recovery jog would have carried that message, above the step list, untrue.
+   * Null already means one specific thing here; "no warm-up needed" is a different thing and needs its
+   * own word.
+   */
+  notNeeded?: boolean;
   /** One plain sentence: why this warm-up, for this session, for this runner. */
   why: string;
   /** Conditions or limits that changed it, in the runner's words. */
@@ -309,6 +339,37 @@ export function buildWarmup(
 
   // ---- Easy, and continuous moderate running: the warm-up IS the opening of the run ----
   if (effort === "easy" || (effort === "steady" && isContinuous)) {
+    // ⚠️ NO WARM-UP AT ALL FOR THE LOW-INTENSITY TYPES (owner, 2026-08-07): "I dont think any of the
+    // following runs should include a warm up or cool down: 1. Long run 2. Easy 3. Recovery ...
+    // All of the others need a proper warm up as already mapped."
+    //
+    // ⚠️ GATED ON THE TYPE, NOT ON THIS BRANCH, and the difference is two real tempo sessions. This
+    // branch is reached by anything whose FIRST effort is gentle, which includes the threshold
+    // formats "Geared run: easy → steady → tempo → easy" and "Progression tempo: 10′ steady →
+    // 10′ threshold" — both open easy, both land here, both must keep what they have.
+    // ⚠️ `strides` is in the list and `easy + strides` reaches RPE 9, which looks like an argument for
+    // keeping its warm-up. It is not: those strides sit at the END, after forty minutes of easy
+    // running that has done the job far better than five minutes at the front could. Whereas
+    // "38′ moderate + strides" carries strides in its own warm-up and takes the structured branch
+    // above, so it never reaches this line at all — which is the right answer for it, and one a
+    // type-only rule applied earlier would have got wrong.
+    //
+    // ⚠️ RUN–WALK BEGINNERS ARE EXEMPT, AND THE EXEMPTION IS THE OWNER'S OWN EARLIER REQUEST
+    // (2026-08-05): a warm-up for someone doing walk/run sessions has to be appropriate, so this
+    // branch grew the brisk walk below. EVERY session in a run–walk plan is typed "easy" — there is no
+    // "long" and no "recovery" in one — so a type rule with no exemption strips the preparation from
+    // 100% of a new runner's running and sends them from standing into a 90-second running repetition.
+    // Ability "new" and a run–walk plan are exactly coextensive (web/app.ts: `runWalk: status === "new"`
+    // and `warmupAbility()` returns "new" for the same status), so the ability band is a sound key.
+    const LOW_INTENSITY = new Set(["easy", "long", "recovery", "strides"]);
+    if (ability !== "new" && session.type && LOW_INTENSITY.has(session.type)) {
+      return {
+        modelVersion: WARMUP_MODEL_VERSION, firstHardEffort: effort, evidenceGrade: GRADE[effort],
+        embedded: false, notNeeded: true, totalMinutes: 0, phases: [],
+        why: "No warm-up for this one — it is easy from the first step, so the run warms you up as it goes. Start gently and let the pace come to you.",
+        notes,
+      };
+    }
     // ⚠️ THE RUN'S OWN OPENING IS THE WARM-UP, SO ITS LENGTH IS THE RUN'S, NOT OURS. Sessions carry
     // their own opening step — 6 minutes on a progression run, 15 on a threshold one — and an
     // embedded warm-up is a description of those minutes. Advising a length of our own choosing made

@@ -86,3 +86,38 @@ test("⚠️ and it is rendered, not merely carried", () => {
   assert.match(html, /feasibilityWhy\(\) \+/, "the plan header no longer calls it");
   assert.match(html, /\.feas-why \{/, "the rationale has no styling, so it would render unreadably");
 });
+
+test("⚠️ the three answers actually SAVE — the control and the reader agree", () => {
+  // ⚠️ THE FIX WAS CORRECT AT ONE END AND UNREAD AT THE OTHER, and the owner found it in seconds:
+  // every one of the three options still said "unrealistic". The segment emitted 0 / break / injury
+  // while the save handler still asked `draft.returning === "1"` — the old Yes value — so all three
+  // stored as false. Third time in one session that a change has been right in the helper and wrong
+  // in the wiring, so this asserts the round trip rather than the pieces.
+  const html = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
+
+  // The control offers exactly the three answers.
+  assert.match(html, /seg\("returning", \[\["0","No"\],\["break","After time off"\],\["injury","After an injury"\]\]/,
+    "the comeback question is no longer a three-way choice");
+  // The save handler reads them — and must NOT be comparing against the retired "1".
+  assert.match(html, /returning: draft\.returning === "injury" \? "injury" : draft\.returning === "break" \? "break" : ""/,
+    "the save handler is not storing the three-way answer");
+  assert.ok(!/returning: draft\.returning === "1"/.test(html),
+    "the save handler still tests the old Yes value, so every answer saves as No");
+  // And the control is seeded through the migration, or an existing profile lights up nothing.
+  assert.match(html, /returning: returnKind\(profile\)/,
+    "the draft seeds the segment with a value none of its buttons carry");
+
+  // The migration itself: an old boolean becomes "break", never "injury".
+  const at = html.indexOf("function returnKind(");
+  assert.ok(at > 0, "returnKind is gone");
+  let d = 0, end = at;
+  for (let i = html.indexOf("{", at); i < html.length; i++) {
+    if (html[i] === "{") d++; else if (html[i] === "}") { d--; if (!d) { end = i + 1; break; } }
+  }
+  const returnKind = new Function(html.slice(at, end) + "; return returnKind;")();
+  assert.equal(returnKind({ returning: true }), "break",
+    "an existing profile is being re-read as an injury — that would move a runner's goal from achievable to unrealistic on an update, for a question they were never asked");
+  assert.equal(returnKind({ returning: false }), "0");
+  assert.equal(returnKind({ returning: "injury" }), "injury");
+  assert.equal(returnKind({ returning: "break" }), "break");
+});

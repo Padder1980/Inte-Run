@@ -82,7 +82,10 @@ struct MetricsPage: View {
         // that shifts on pause is its own legibility problem at arm's length).
         .padding(.top, 6)
         .padding(.horizontal, 2)
-        .padding(.bottom, 10)   // clear of the page dots
+        // ⚠️ LIFTED CLEAR OF THE CURVE, not just of the page dots. The lower the text, the further in
+        // the rounded glass cuts, so the bottom-most line needs vertical clearance as well as a
+        // leading inset — either alone still loses characters.
+        .padding(.bottom, 18)
     }
 
     // MARK: - Rows
@@ -159,11 +162,19 @@ struct MetricsPage: View {
                 // LET THE…". A coaching cue you cannot finish reading is worse than no cue — it takes
                 // the space and gives nothing back. Sentence case rather than caps: caps are for the
                 // one-word labels, and a full sentence in caps is markedly slower to read.
+                // ⚠️ AND THE BOTTOM CORNER EATS THE SECOND LINE. Fixing the truncation created a
+                // second line of text at the very bottom-left — the deepest part of the lower curve —
+                // and the owner photographed it reading "…ce come to you", with the "pa" of "pace"
+                // outside the glass. Same fault as the status word, opposite corner, and it appeared
+                // only BECAUSE the cue now wraps. The inset is the one the status row needs, applied
+                // to whichever line sits lowest.
                 Text(s)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Brand.inkSoft)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 16)
+                    .padding(.trailing, 6)
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {

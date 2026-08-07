@@ -6459,7 +6459,15 @@ function draftFromForm() {
     // invisible answer reshaping the plan is a bug the runner cannot even diagnose.
     volKm: volEl && volEl.value !== "" && !volQHidden() ? Math.max(0, Math.min(250, Number(volEl.value) || 0)) : 0,
     age: Number($("s_age").value) || 35, sex: $("s_sex").value,
-    strength: draft.strength === "1", returning: draft.returning === "1", personalized: true,
+    strength: draft.strength === "1",
+    // ⚠️ THE SEGMENT NOW HAS THREE VALUES, SO A BOOLEAN CANNOT HOLD ITS ANSWER. This read
+    // draft.returning === "1" — the old Yes value — so once the control became
+    // 0 / break / injury, every one of the three saved as FALSE and the verdict never moved
+    // whichever the runner picked. The owner hit it immediately. Third time tonight a change has
+    // been correct at one end and unread at the other, which is why the round trip is now tested
+    // rather than the helper.
+    returning: draft.returning === "injury" ? "injury" : draft.returning === "break" ? "break" : "",
+    personalized: true,
   };
 }
 let draft = {};
@@ -9611,7 +9619,9 @@ function render() {
   syncLivePill();
   if (state.screen === "setup") {
     $("topTitle").textContent = "Your profile";
-    draft = { days: profile.daysPerWeek, strength: profile.strength ? "1" : "0", returning: profile.returning ? "1" : "0", status: profile.status || (profile.noRecent ? "new" : "regular"), fitsrc: (profile.fitSrc === "predicted" ? "predicted" : "recent"), avatar: profile.avatar || "" };
+    // ⚠️ Seeded through returnKind, or an existing profile lights up NO segment at all: the stored
+    // value is "break"/"injury" and this handed the control a "1" that matches none of them.
+    draft = { days: profile.daysPerWeek, strength: profile.strength ? "1" : "0", returning: returnKind(profile), status: profile.status || (profile.noRecent ? "new" : "regular"), fitsrc: (profile.fitSrc === "predicted" ? "predicted" : "recent"), avatar: profile.avatar || "" };
     v.innerHTML = viewSetup();
     v.scrollTop = 0;
     document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));

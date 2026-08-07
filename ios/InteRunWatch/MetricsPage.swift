@@ -9,11 +9,17 @@ import SwiftUI
 /// hardest screen to get right was the one nobody could see while designing it. Now it renders from
 /// values anyone can supply, including `WatchPreview`.
 ///
-/// The hierarchy rules, all learned from watching the screen at arm's length while moving:
-/// - **One number dominates.** The runner's first metric is nearly twice the others. At the old
-///   34-vs-25 the two competed and the eye had to choose, which is the same as reading nothing.
-/// - **The value is big, the label is small and next to it.** The label used to be pushed to the
-///   opposite edge by a `Spacer`, so reading one metric meant crossing the whole watch.
+/// The hierarchy rules, all learned from watching the screen at arm's length while moving — and then
+/// from the owner reporting three times that the numbers were still too small:
+/// - **Three metrics, not five.** Five numbers on a watch face means five small numbers.
+/// - **No hero.** Among three, making one bigger just makes the other two the small ones again.
+/// - **The label goes UNDERNEATH the number, and this is the one that mattered.** Beside it, the label
+///   and unit competed for the same 205pt of width and `minimumScaleFactor` silently shrank the digits
+///   to fit — measured at 15pt of cap height from a 40pt font. On its own line the number keeps the
+///   whole display: 26pt from a 46pt font, a 73% increase, with no font change that would have shown
+///   up in a diff. Raising the point size would have done nothing; the constraint was the width left
+///   over after the words.
+/// - **Number in the accent, words in bright white.** `inkFaint` labels vanish outdoors.
 /// - **Status has one colour-coded word at the top** and never has to be inferred from the numbers.
 struct MetricsPage: View {
     struct Row: Identifiable, Equatable {
@@ -132,29 +138,40 @@ struct MetricsPage: View {
     /// reading distance and the wrong one on a wrist at arm's length in daylight, where the faint
     /// grey simply disappears and nothing tells you which number you are looking at.
     private func metricRow(_ r: MetricsPage.Row) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 4) {
-            if let ic = r.icon { glyph(ic, size: 20) }
-            Text(r.value)
-                .font(.system(size: 40, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .minimumScaleFactor(0.55)
-                .lineLimit(1)
-                .foregroundStyle(Brand.accent)
-            if let u = r.unit {
-                Text(u)
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(Brand.ink)
+        // ⚠️ THE LABEL GOES UNDERNEATH, and that is what actually makes the number big.
+        //
+        // It was beside the number, sharing one line with the unit — and the number carried
+        // `minimumScaleFactor(0.55)`. So a 40pt font was a CEILING it almost never reached: with
+        // "CUR PACE" and "DISTANCE" competing for the same 205pt of width, SwiftUI shrank the digits
+        // to fit, as far as 22pt. Setting a bigger number here would have changed nothing, because
+        // the constraint was never the font size — it was the width left over after the words.
+        //
+        // On its own line the number has the whole display and renders at its stated size. The words
+        // sit under it, small and bright white, where they cost the number nothing.
+        VStack(alignment: .leading, spacing: -4) {
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                if let ic = r.icon { glyph(ic, size: 22) }
+                Text(r.value)
+                    .font(.system(size: 46, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    // Only a genuinely enormous value may shrink, and only a little.
+                    .minimumScaleFactor(0.8)
+                    .lineLimit(1)
+                    .foregroundStyle(Brand.accent)
+                if let u = r.unit {
+                    Text(u)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Brand.ink)
+                }
+                Spacer(minLength: 0)
             }
             Text(r.label)
-                .font(.system(size: 12, weight: .bold))
-                .kerning(0.3)
+                .font(.system(size: 11, weight: .bold))
+                .kerning(0.4)
                 .foregroundStyle(Brand.ink)
                 .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .padding(.leading, 2)
-            Spacer(minLength: 0)
         }
-        .padding(.vertical, 2)
+        .padding(.bottom, 4)
     }
 
     /// The row's leading glyph — the zone-tinted heart. The tint carries the zone by itself

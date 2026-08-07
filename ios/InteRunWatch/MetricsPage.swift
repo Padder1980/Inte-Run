@@ -44,17 +44,20 @@ struct MetricsPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let status {
-                // ⚠️ THE CORNER EATS THE FIRST CHARACTERS, and a 2pt inset was nowhere near enough.
-                // Reported reading "AUSED" once, and still cut off after the first attempt: on a
-                // rounded watch face the top-left curve is many points deep, so a word starting at
-                // x=2 on the very first line sits outside the drawable area whatever the top padding
-                // is. This row — and only this row — is inset past the curve. The numbers below keep
-                // the full width because by then the edge has straightened out.
+                // ⚠️ CENTRED, BECAUSE NO INSET I GUESSED WAS EVER GOING TO BE RIGHT. This word sits on
+                // the very first line, where the rounded glass cuts deepest: 2pt lost the "P" of
+                // PAUSED, and 16pt still lost it. The arithmetic says why — for a ~62pt corner radius,
+                // text 6pt from the top edge needs about 35pt of leading inset, and every point you
+                // spend there is width taken from the numbers.
+                //
+                // Centred text cannot be reached by either corner at any radius, so this stops being a
+                // number to tune and becomes a property of the layout. The system clock sits top-right
+                // and PAUSED is about 55pt wide, so the two do not meet.
                 Text(status.text.uppercased())
                     .font(.system(size: 13, weight: .heavy))
                     .kerning(0.6)
                     .foregroundStyle(status.tint)
-                    .padding(.leading, 16)
+                    .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.bottom, 2)
             }
 

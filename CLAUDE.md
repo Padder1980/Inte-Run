@@ -381,9 +381,25 @@ rule per component is a rule the next component forgets.
 guard failed while the global rule sat two hundred lines below it — and the obvious "fix" would have
 been to delete the assertion. It scans all of them now.
 
-**Still to do in Phase 0:** the first behaviour-rich components — session row, coach note, readiness
-tile, bottom action bar — each with the full state set from the brief's build specification, and
-VoiceOver labels on every icon button.
+**Phase 0 slice 3 (the components) is in, and PHASE 0 IS COMPLETE.** `uiDecisionHero`,
+`uiSessionRow`, `uiCoachNote`, `uiReadinessTile` and `uiActionBar` — **31 states across five
+components**, every one from the brief's build specification, all exercised by
+`test/design-system.test.ts` rather than only the happy path.
+
+⚠️ **THE STATES ARE THE COMPONENT.** "Implement loading, empty, error and accessibility states — not
+only the ideal state." A component with one state is a mockup. Specifically guarded: a disabled row
+is a `div` with `aria-disabled`, not a button that silently does nothing; a low-confidence note says
+**"Low confidence"** in words rather than hedging by colour; a stale readiness score says **when it
+was taken**; every session-row status carries a word (Done / Next / Moved / Missed / Optional).
+
+⚠️ **THE RATCHET CAUGHT MY OWN NEW CODE** on its first outing — one off-ladder `font-size: 18px` on a
+chevron, which is exactly what it is for.
+
+⚠️ **`.ui-bar-wrap` IS `position: sticky`, so ANY SCREEN USING IT NEEDS BOTTOM PADDING** or the bar
+covers the last card. Three of them in one scroll container all pin and overlap, which is a gallery
+artefact rather than a defect — but the padding requirement is real and Phase 1 must honour it.
+
+**Phase 1 (Today) is next**, and it assembles exactly these five components.
 
 ### The seven mockup features that do not exist — his ruling, 2026-08-08
 

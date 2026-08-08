@@ -122,3 +122,122 @@ test("⚠️ every status variant carries a word, not only a colour", () => {
   for (const w of ["Good", "Monitor", "Replace", "Retired"])
     assert.ok(rack.includes(w), "a wear state has no word: " + w);
 });
+
+// ---- The behaviour-rich components ---------------------------------------------------------------
+
+/** Lift a component builder out of the built page and run it for real. */
+function lift(names: string[]): any {
+  const html = css();
+  const src = names.map((fn) => {
+    const at = html.indexOf("function " + fn + "(");
+    assert.ok(at >= 0, "not in the build: " + fn);
+    let d = 0;
+    for (let i = html.indexOf("{", at); i < html.length; i++) {
+      if (html[i] === "{") d++;
+      else if (html[i] === "}") { d--; if (!d) return html.slice(at, i + 1); }
+    }
+    throw new Error("unbalanced braces in " + fn);
+  }).join("\n");
+  // The status/label tables the builders read live outside their own braces.
+  const tables = ["UI_ROW_STATUS", "UI_BAR_STATES"].map((n) => {
+    const at = html.indexOf("const " + n + " = {");
+    if (at < 0) return "";
+    return html.slice(at, html.indexOf("};", at) + 2);
+  }).join("\n");
+  return new Function("esc", "ICON",
+    tables + "\n" + src + "; return {" + names.join(",") + "};")(
+      (v: any) => String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"),
+      { play: "<svg></svg>", coach: "<svg></svg>", alfie: "<svg></svg>" });
+}
+
+const C = lift(["uiDecisionHero", "uiSessionRow", "uiCoachNote", "uiReadinessTile", "uiActionBar"]);
+
+/** The brief's build specification lists these states per component. All of them must render. */
+const STATES = {
+  hero: ["scheduled", "rest", "completed", "missed", "changed", "risk"],
+  row: ["done", "next", "future", "moved", "missed", "optional", "disabled"],
+  note: ["info", "praise", "caution", "progress", "low", "unavailable"],
+  tile: ["incomplete", "ready", "steady", "reduced", "conflict", "stale"],
+  bar: ["start", "pause", "resume", "complete", "preview", "retry", "disabled"],
+};
+
+test("⚠️ every state in the brief's build specification renders", () => {
+  // ⚠️ NOT ONLY THE IDEAL STATE. "Implement loading, empty, error and accessibility states — not only
+  // the ideal state." A component with one state is a mockup, not a component.
+  for (const kind of STATES.hero) {
+    const h = C.uiDecisionHero({ kind, headline: "Recovery day", implication: "Keep today easy.", action: "Preview tomorrow" });
+    assert.ok(h.includes("ui-hero " + kind), "hero state did not render: " + kind);
+    assert.ok(h.includes("Recovery day"), "hero lost its headline in state " + kind);
+  }
+  for (const status of STATES.row) {
+    const r = C.uiSessionRow({ day: "TUE", title: "VO2 pyramid", meta: "44 min - 8 km", status, id: "x" });
+    assert.ok(r.includes("ui-row "), "row did not render: " + status);
+    assert.ok(r.includes("VO2 pyramid"), "row lost its title in state " + status);
+  }
+  for (const tone of STATES.note) {
+    const n = C.uiCoachNote({ tone, observation: "It will be hot tomorrow.", implication: "Your usual pace may feel harder.", action: "Run by effort and take water." });
+    assert.ok(n.includes("ui-note " + tone), "note did not render: " + tone);
+  }
+  for (const state of STATES.tile) {
+    const t = C.uiReadinessTile({ state, score: 4, contributor: "You slept badly", since: "yesterday" });
+    assert.ok(t.includes("ui-tile"), "tile did not render: " + state);
+  }
+  for (const state of STATES.bar) {
+    const b = C.uiActionBar({ state });
+    assert.ok(b.includes("ui-bar-btn"), "bar did not render: " + state);
+  }
+});
+
+test("⚠️ a disabled control is not silently tappable", () => {
+  const row = C.uiSessionRow({ day: "THU", title: "Rest", status: "disabled" });
+  assert.match(row, /aria-disabled="true"/, "a disabled row does not say so to a screen reader");
+  assert.doesNotMatch(row, /<button/, "a disabled row is still a button");
+  const bar = C.uiActionBar({ state: "disabled" });
+  assert.match(bar, /disabled aria-disabled="true"/, "a disabled action bar is still pressable");
+});
+
+test("⚠️ status is carried by a WORD in every component that has one", () => {
+  // The brief, twice: colour is never the only signal. This is the assertion that keeps it true as
+  // states get added.
+  for (const [status, word] of [["done", "Done"], ["next", "Next"], ["moved", "Moved"],
+                                ["missed", "Missed"], ["optional", "Optional"]] as const) {
+    const r = C.uiSessionRow({ day: "MON", title: "Easy run", status });
+    assert.ok(r.includes(">" + word + "<"), `the ${status} row shows no word, only a colour`);
+  }
+  // low confidence must SAY low confidence
+  assert.match(C.uiCoachNote({ tone: "low", observation: "x" }), /Low confidence/,
+    "a low-confidence note hedges only by colour, so it reads as certain");
+  // a stale readiness reading must say when it was taken
+  assert.match(C.uiReadinessTile({ state: "stale", score: 3, since: "yesterday" }), /From yesterday/,
+    "a stale readiness score is presented as if it were current");
+});
+
+test("⚠️ the readiness tile is a whole number out of five", () => {
+  // His ruling, and the scale is five because there are exactly five reachable values.
+  const t = C.uiReadinessTile({ state: "ready", score: 4.4 });
+  assert.match(t, />4</, "the score is not rounded to a whole number");
+  assert.match(t, /\/5</, "the score is not out of five");
+  assert.doesNotMatch(t, /4\.4|\/10/, "false precision, or the mockup's ten-point scale, is back");
+});
+
+test("the coach note carries observation, implication AND action", () => {
+  // ⚠️ The three parts are the whole point — a note that observes and stops is what this replaces.
+  const n = C.uiCoachNote({ tone: "caution", observation: "It will be hot during tomorrow's run.",
+    implication: "Your usual pace may feel harder.", action: "Run by effort and take water." });
+  assert.ok(n.includes("ui-note-o") && n.includes("ui-note-i") && n.includes("ui-note-a"),
+    "the note dropped one of observation / implication / action");
+});
+
+test("components survive real-content extremes", () => {
+  // ⚠️ "Components render with real-content extremes" is the brief's own exit criterion for Phase 0.
+  const long = "Progression tempo: ten minutes steady into ten minutes at threshold, with the last "
+    + "three minutes lifted to critical velocity if it still feels controlled";
+  const r = C.uiSessionRow({ day: "WED", title: long, meta: "62 min - 12.4 km - RPE 6-7", status: "next" });
+  assert.ok(r.includes(long), "a long title was truncated in the markup rather than by CSS");
+  // and nothing breaks with everything missing
+  for (const fn of ["uiDecisionHero", "uiSessionRow", "uiCoachNote", "uiReadinessTile", "uiActionBar"]) {
+    const out = C[fn]({});
+    assert.ok(typeof out === "string" && out.length > 10, fn + " produced nothing for an empty input");
+    assert.doesNotMatch(out, /undefined|NaN|\[object/, fn + " leaked a placeholder into the markup");
+  }
+});

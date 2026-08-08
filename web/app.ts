@@ -2103,6 +2103,75 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important;
     transition-duration: .001ms !important; scroll-behavior: auto !important; }
 }
+/* ---- Phase 0 components -------------------------------------------------------------------- */
+.ui-hero { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-hero); padding: var(--s5) var(--s4); }
+.ui-hero.rest { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 12%, var(--surface)), var(--surface) 70%); }
+.ui-hero.missed { border-color: var(--ease); }
+.ui-hero.risk { border-color: var(--rest); }
+.ui-hero.completed { border-color: var(--ready); }
+.ui-hero-h { font-size: var(--t-display); font-weight: 800; letter-spacing: -.02em; color: var(--ink); margin: 0 0 var(--s2); line-height: 1.08; }
+.ui-hero-i { font-size: var(--t-body); line-height: 1.5; color: var(--ink-soft); margin: 0 0 var(--s4); }
+.ui-hero-act { display: inline-flex; align-items: center; gap: var(--s2); min-height: var(--tap); padding: 0 var(--s5);
+  border: 0; border-radius: var(--r-pill); background: var(--accent); color: var(--accent-ink); font: 700 var(--t-card)/1 inherit; }
+.ui-hero-act svg { width: 15px; height: 15px; }
+
+.ui-row { display: flex; align-items: center; gap: var(--s3); width: 100%; text-align: left;
+  background: none; border: 0; border-top: 1px solid var(--line); padding: var(--s3) var(--s1);
+  min-height: var(--tap); color: var(--ink); font: inherit; }
+.ui-row:first-child { border-top: 0; }
+.ui-row-day { flex: none; width: 34px; font-size: var(--t-label); font-weight: 750; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); }
+.ui-row-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; }
+.ui-row-mid { min-width: 0; flex: 1; }
+.ui-row-t { display: block; font-size: var(--t-card); font-weight: 650; color: var(--ink); line-height: 1.3; }
+.ui-row-m { display: block; font-size: var(--t-meta); color: var(--ink-faint); margin-top: 1px; }
+.ui-row-st { flex: none; font-size: var(--t-label); font-weight: 750; letter-spacing: .05em; text-transform: uppercase; padding: 3px 8px; border-radius: var(--r-pill); background: var(--surface-2); color: var(--ink-soft); }
+.ui-row-st.done { color: var(--ready); }
+.ui-row-st.next { background: var(--accent); color: var(--accent-ink); }
+.ui-row-st.missed { color: var(--rest); }
+.ui-row-st.moved { color: var(--ease); }
+.ui-row-ch { flex: none; color: var(--ink-faint); font-size: var(--t-section); }
+.ui-row.done .ui-row-t { color: var(--ink-soft); }
+.ui-row.disabled { opacity: .5; }
+
+.ui-note { background: var(--surface); border: 1px solid var(--line); border-left-width: 3px; border-radius: var(--r-card); padding: var(--s4); }
+.ui-note.caution { border-left-color: var(--ease); }
+.ui-note.praise, .ui-note.progress { border-left-color: var(--ready); }
+.ui-note.low, .ui-note.unavailable { border-left-color: var(--ink-faint); }
+.ui-note.info { border-left-color: var(--accent); }
+.ui-note-h { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s2); }
+.ui-note-ic { display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center; color: var(--accent); }
+.ui-note-ic svg { width: 16px; height: 16px; }
+.ui-note-lead { font-size: var(--t-label); font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+.ui-note.caution .ui-note-lead, .ui-note.caution .ui-note-ic { color: var(--ease); }
+.ui-note.praise .ui-note-lead, .ui-note.progress .ui-note-lead { color: var(--ready); }
+.ui-note.low .ui-note-lead, .ui-note.unavailable .ui-note-lead { color: var(--ink-faint); }
+.ui-note-o { font-size: var(--t-card); font-weight: 650; color: var(--ink); margin: 0; line-height: 1.4; }
+.ui-note-i { font-size: var(--t-body); color: var(--ink-soft); margin: var(--s2) 0 0; line-height: 1.5; }
+.ui-note-a { font-size: var(--t-body); font-weight: 650; color: var(--accent); margin: var(--s2) 0 0; line-height: 1.5; }
+.ui-note-e { font-size: var(--t-meta); color: var(--ink-faint); margin: var(--s3) 0 0; }
+
+.ui-tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: var(--s3) var(--s4) var(--s4); }
+.ui-tile-k { font-size: var(--t-label); font-weight: 750; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); }
+.ui-tile-v { font-size: var(--t-display); font-weight: 800; color: var(--ink); line-height: 1.1; margin-top: 2px; }
+.ui-tile-v span { font-size: var(--t-section); font-weight: 700; color: var(--ink-faint); }
+.ui-tile-l { font-size: var(--t-body); font-weight: 700; margin-top: 2px; color: var(--eff-easy); }
+.ui-tile.reduced .ui-tile-l { color: var(--ease); }
+.ui-tile.conflict .ui-tile-l { color: var(--ease); }
+.ui-tile.incomplete .ui-tile-l, .ui-tile.stale .ui-tile-l { color: var(--ink-soft); }
+.ui-tile-c { font-size: var(--t-meta); color: var(--ink-faint); margin-top: var(--s2); line-height: 1.45; }
+.ui-tile-c.stale { color: var(--ease); }
+
+.ui-bar-wrap { position: sticky; bottom: 0; padding: var(--s3) 0 var(--s2); background: linear-gradient(to top, var(--bg) 62%, transparent); }
+.ui-bar-note { font-size: var(--t-meta); color: var(--ink-soft); text-align: center; margin-bottom: var(--s2); }
+.ui-bar-btn { display: flex; align-items: center; justify-content: center; gap: var(--s2); width: 100%;
+  min-height: 52px; border: 0; border-radius: var(--r-pill); background: var(--accent); color: var(--accent-ink); font: 750 var(--t-card)/1 inherit; }
+.ui-bar-btn svg { width: 15px; height: 15px; }
+.ui-bar-wrap.hold .ui-bar-btn { background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); }
+.ui-bar-wrap.quiet .ui-bar-btn { background: none; color: var(--accent); border: 1px solid var(--accent); }
+.ui-bar-wrap.warn .ui-bar-btn { background: var(--ease); color: #1a1206; }
+.ui-bar-wrap.done .ui-bar-btn { background: var(--ready); color: #06180a; }
+.ui-bar-wrap.off .ui-bar-btn { background: var(--surface-2); color: var(--ink-faint); }
+.ui-bar-btn[disabled] { opacity: .65; }
 /* ---- Shoe rack ----------------------------------------------------------------- */
 .sr-eyebrow { font-size: var(--t-label); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin: var(--s1) 0 var(--s2); }
 .sr-title { font-size: var(--t-display); font-weight: 800; letter-spacing: -.02em; color: var(--ink); margin: 0 0 var(--s4); line-height: 1.08; }
@@ -6596,6 +6665,137 @@ function wireMapToken() {
  * beside a RED-S screen where one unsupportable claim costs the runner's trust in all the rest.
  * Same rule the warm-up and stretch copy already follow.
  */
+/* ================================================================================================
+   PHASE 0 — THE BEHAVIOUR-RICH COMPONENTS
+   From the brief's build specification: "Build a small, behaviour-rich component library before
+   multiplying screens." Each one lists its required states there, and every one of those states is
+   implemented here rather than only the happy path — because the states are where a design either
+   holds up or falls over, and the ideal state is the one that never ships broken.
+
+   ⚠️ EVERY STATE CARRIES A WORD, NOT ONLY A COLOUR. The brief says it twice and it is the single
+   easiest accessibility rule to break in a dark UI with a strong accent.
+   ================================================================================================ */
+
+/**
+ * DECISION HERO — answers "what should I do now?" with one headline and one action.
+ * States: scheduled, rest, completed, missed, changed, risk.
+ */
+function uiDecisionHero(o) {
+  const kind = o.kind || "scheduled";
+  const act = o.action
+    ? '<button class="ui-hero-act" id="' + (o.actionId || "") + '">' +
+      (o.actionIcon === false ? "" : ICON.play) + " " + esc(o.action) + '</button>'
+    : "";
+  return '<section class="ui-hero ' + kind + '" aria-labelledby="uiHeroH">' +
+    '<div class="ui-eyebrow">' + esc(o.eyebrow || "Today\u2019s plan") + '</div>' +
+    '<h2 class="ui-hero-h" id="uiHeroH">' + esc(o.headline || "") + '</h2>' +
+    (o.implication ? '<p class="ui-hero-i">' + esc(o.implication) + '</p>' : "") +
+    act + '</section>';
+}
+
+/**
+ * SESSION ROW — day, type, title, duration/distance and status in one scan.
+ * States: done, next, future, moved, missed, optional, disabled.
+ * ⚠️ ONE DAY IS ONE ROW. The brief: "Stop card nesting... rest days do not need a large bordered
+ * card." This is deliberately not a card.
+ */
+const UI_ROW_STATUS = {
+  done:     { word: "Done",     cls: "done" },
+  next:     { word: "Next",     cls: "next" },
+  future:   { word: "",         cls: "future" },
+  moved:    { word: "Moved",    cls: "moved" },
+  missed:   { word: "Missed",   cls: "missed" },
+  optional: { word: "Optional", cls: "optional" },
+  disabled: { word: "",         cls: "disabled" },
+};
+function uiSessionRow(o) {
+  const st = UI_ROW_STATUS[o.status] || UI_ROW_STATUS.future;
+  const dis = o.status === "disabled";
+  return '<' + (dis ? "div" : "button") + ' class="ui-row ' + st.cls + '"' +
+    (dis ? ' aria-disabled="true"' : (o.id ? ' data-uirow="' + esc(o.id) + '"' : "")) +
+    ' aria-label="' + esc((o.day || "") + " " + (o.title || "") + (st.word ? ", " + st.word : "")) + '">' +
+    '<span class="ui-row-day">' + esc(o.day || "") + '</span>' +
+    '<span class="ui-row-dot" style="background:' + (o.colour || "var(--eff-none)") + '" aria-hidden="true"></span>' +
+    '<span class="ui-row-mid"><span class="ui-row-t">' + esc(o.title || "") + '</span>' +
+      (o.meta ? '<span class="ui-row-m">' + esc(o.meta) + '</span>' : "") + '</span>' +
+    // ⚠️ The word IS the status. Colour only reinforces it.
+    (st.word ? '<span class="ui-row-st ' + st.cls + '">' + st.word + '</span>' : "") +
+    (dis ? "" : '<span class="ui-row-ch" aria-hidden="true">\u203a</span>') +
+    '</' + (dis ? "div" : "button") + '>';
+}
+
+/**
+ * COACH NOTE — turns data into observation, implication and action.
+ * States: info, praise, caution, progress, low (low confidence), unavailable.
+ * ⚠️ THE THREE PARTS ARE THE POINT. The brief gives the shape explicitly: "It will be hot during
+ * tomorrow's run" / "Your usual pace may feel harder" / "Run by effort and take water." A note that
+ * states an observation and stops is the thing it is replacing.
+ */
+function uiCoachNote(o) {
+  const tone = o.tone || "info";
+  const LEAD = { info: "Coach note", praise: "Well judged", caution: "Worth knowing",
+    progress: "Progress", low: "Early signs", unavailable: "Not enough yet" };
+  return '<section class="ui-note ' + tone + '">' +
+    '<div class="ui-note-h"><span class="ui-note-ic" aria-hidden="true">' + (ICON.coach || ICON.alfie || "") + '</span>' +
+      '<span class="ui-note-lead">' + esc(LEAD[tone] || LEAD.info) + '</span>' +
+      // ⚠️ Low confidence says so IN WORDS. An insight that hedges only by colour is an insight that
+      // reads as certain.
+      (tone === "low" ? '<span class="ui-pill watch"><span class="ui-dot"></span>Low confidence</span>' : "") + '</div>' +
+    (o.observation ? '<p class="ui-note-o">' + esc(o.observation) + '</p>' : "") +
+    (o.implication ? '<p class="ui-note-i">' + esc(o.implication) + '</p>' : "") +
+    (o.action ? '<p class="ui-note-a">' + esc(o.action) + '</p>' : "") +
+    (o.evidence ? '<p class="ui-note-e">' + esc(o.evidence) + '</p>' : "") +
+    '</section>';
+}
+
+/**
+ * READINESS TILE — a score, a plain-language label and the thing that moved it.
+ * States: incomplete, ready, steady, reduced, conflict, stale.
+ * ⚠️ OUT OF FIVE, AS A WHOLE NUMBER — his ruling. readinessScore() is built from two questions worth
+ * two points each, so there are exactly five reachable values; printing it on a ten-point scale would
+ * be the mockup's "7.6 / 10" false precision wearing a different hat.
+ */
+function uiReadinessTile(o) {
+  const state = o.state || "steady";
+  if (state === "incomplete") {
+    return '<section class="ui-tile incomplete"><div class="ui-tile-k">Ready?</div>' +
+      '<div class="ui-tile-v">\u2014</div><div class="ui-tile-l">Answer two quick questions</div></section>';
+  }
+  const LAB = { ready: "Ready", steady: "Steady", reduced: "Take it easy", conflict: "Mixed signals", stale: "Steady" };
+  return '<section class="ui-tile ' + state + '">' +
+    '<div class="ui-tile-k">Ready</div>' +
+    '<div class="ui-tile-v num">' + (o.score != null ? Math.round(o.score) : "\u2014") + '<span>/5</span></div>' +
+    '<div class="ui-tile-l">' + esc(LAB[state] || "Steady") + '</div>' +
+    (o.contributor ? '<div class="ui-tile-c">' + esc(o.contributor) + '</div>' : "") +
+    // ⚠️ A stale reading says when it was taken. An old number presented as current is worse than none.
+    (state === "stale" ? '<div class="ui-tile-c stale">From ' + esc(o.since || "earlier") + '</div>' : "") +
+    '</section>';
+}
+
+/**
+ * BOTTOM ACTION BAR — keeps the primary action reachable while the runner reads.
+ * States: start, pause, resume, complete, preview, retry, disabled.
+ * ⚠️ THE BRIEF'S SPECIFIC COMPLAINT: "Keep Start persistent. The current top CTA scrolls away while
+ * reading a long session."
+ */
+const UI_BAR_STATES = {
+  start:    { label: "Start session",  icon: true,  tone: "go" },
+  pause:    { label: "Pause",          icon: false, tone: "hold" },
+  resume:   { label: "Resume",         icon: true,  tone: "go" },
+  complete: { label: "Finish",         icon: false, tone: "done" },
+  preview:  { label: "Preview",        icon: false, tone: "quiet" },
+  retry:    { label: "Try again",      icon: false, tone: "warn" },
+  disabled: { label: "Not available",  icon: false, tone: "off" },
+};
+function uiActionBar(o) {
+  const st = UI_BAR_STATES[o.state] || UI_BAR_STATES.start;
+  const off = o.state === "disabled";
+  return '<div class="ui-bar-wrap ' + st.tone + '">' +
+    (o.note ? '<div class="ui-bar-note">' + esc(o.note) + '</div>' : "") +
+    '<button class="ui-bar-btn" ' + (off ? 'disabled aria-disabled="true"' : "") +
+      (o.id ? ' id="' + esc(o.id) + '"' : "") + '>' +
+      (st.icon ? ICON.play + " " : "") + esc(o.label || st.label) + '</button></div>';
+}
 function shoeRackView() {
   const list = loadShoes();
   const live = list.filter((x) => !x.retiredIso);

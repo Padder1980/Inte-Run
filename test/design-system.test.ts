@@ -361,3 +361,24 @@ test("⚠️ the goal hero shows one sentence, with the analysis behind a disclo
   assert.match(fn, /<details/, "the disclosure is hand-rolled, so a re-render will close it");
   assert.match(fn, /<summary>/, "the disclosure has no accessible label");
 });
+
+test("⚠️ the session is staged, and Start does not scroll away", () => {
+  // "Stage the workout. Warm-up, main set and cool-down are the top-level units. Expand individual
+  // drills only when needed." And: "Keep Start persistent. The current top CTA scrolls away while
+  // reading a long session."
+  const html = css();
+  const fn = html.slice(html.indexOf("function sessionStages("), html.indexOf("function mainSubtitle("));
+  assert.match(fn, /Main set/, "there is no main-set stage");
+  assert.match(fn, /Cool down/, "there is no cool-down stage");
+  assert.match(fn, /Warm up/, "the warm-up is not a stage");
+  assert.match(fn, /<details class="sd-stage"/, "the stages do not collapse");
+  // ⚠️ The main set is open; the others are not. It is the reason the session exists.
+  assert.match(fn, /main, true/, "the main set is collapsed by default");
+  // Start is the shared action bar, and it keeps its id so the existing handler still finds it.
+  const sheet = html.slice(html.indexOf("function sessionSheetHtml("), html.indexOf("function ensureSheet("));
+  assert.match(sheet, /uiActionBar\(\{ state: "start", id: "sdStart"/, "Start is not the persistent bar");
+  // ⚠️ ...and it is LAST in the composition, or it is not persistent, it is just lower down.
+  const bar = sheet.lastIndexOf("startBtn");
+  const desc = sheet.lastIndexOf("sd-desc");
+  assert.ok(bar > desc, "the Start bar is still inline above the session body");
+});

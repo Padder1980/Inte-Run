@@ -2185,6 +2185,21 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .feas-more summary::-webkit-details-marker { display: none; }
 .feas-more summary::after { content: " ›"; margin-left: 6px; transition: transform .18s; display: inline-block; }
 .feas-more[open] summary::after { transform: rotate(90deg); }
+/* ---- Session stages ------------------------------------------------------------------------- */
+.sd-stage { border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface); margin-top: var(--s3); overflow: hidden; }
+.sd-stage summary { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) var(--s4); cursor: pointer; min-height: var(--tap); }
+.sd-stage summary::-webkit-details-marker { display: none; }
+.sd-sn { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--surface-2); color: var(--ink-soft); font-size: var(--t-meta); font-weight: 750; display: flex; align-items: center; justify-content: center; }
+.sd-stage[open] .sd-sn { background: var(--accent); color: var(--accent-ink); }
+.sd-sh { min-width: 0; flex: 1; }
+.sd-shn { display: block; font-size: var(--t-card); font-weight: 700; color: var(--ink); }
+.sd-shs { display: block; font-size: var(--t-meta); color: var(--ink-faint); margin-top: 1px; }
+.sd-smin { flex: none; font-size: var(--t-meta); font-weight: 650; color: var(--ink-soft); }
+.sd-stage .sd-steps { padding: 0 var(--s4) var(--s4); }
+.sd-stagewu .wu-card { border: 0; background: none; margin: 0; padding: 0 var(--s4) var(--s4); }
+/* ⚠️ The Start bar is sticky, so the sheet needs room under its last card or the bar covers it —
+   recorded in Phase 0 when the component was built, and this is the screen it applies to. */
+.sd-addlink { margin-bottom: var(--s2); }
 .tsq-plain { display: block; width: 100%; padding: 0; border: 0; background: none; text-align: left; font: inherit; color: inherit; }
 .tsq-plain .ui-tile { height: 100%; }
 .sr-eyebrow { font-size: var(--t-label); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin: var(--s1) 0 var(--s2); }
@@ -5113,6 +5128,63 @@ function fuelHtml(sess) {
     '<div class="fuel-n">General guidance, not personal nutrition advice — and always about eating enough, never less.</div>' +
     '</div>';
 }
+/**
+ * The session as three stages rather than a flat list of steps.
+ *
+ * ⚠️ THE BRIEF'S ASK: "Stage the workout. Warm-up, main set and cool-down are the top-level units.
+ * Expand individual drills only when needed." A twenty-row step list is a manual; three stages with
+ * their durations is a briefing, and the runner can open the one they care about.
+ *
+ * ⚠️ THE MAIN SET IS OPEN BY DEFAULT AND THE OTHERS ARE NOT. It is the reason the session exists;
+ * making the runner tap to see what they are about to run would be disclosure for its own sake.
+ */
+function sessionStages(sess, sc) {
+  const all = warmupCardFor(sess) ? sess.steps.filter((st) => st.kind !== "warmup") : sess.steps;
+  const cool = all.filter((st) => st.kind === "cooldown");
+  const main = all.filter((st) => st.kind !== "cooldown");
+  const mins = (list) => Math.round(list.reduce((a, st) => a + stepSecs(st), 0) / 60);
+  const rowsFor = (list) => structureRows(list).map((r) =>
+    '<div class="sd-step"><div class="sd-dot" style="background:' + (r.muted ? "var(--ink-faint)" : sc) + '"></div>' +
+    '<div><div class="sd-tag">' + r.tag + '</div><div class="sd-lab">' + r.lab + '</div>' +
+    (r.chips ? '<div class="sd-meta">' + r.chips + '</div>' : "") +
+    (r.rec ? '<div class="sd-rec">' + r.rec + '</div>' : "") + '</div></div>').join("");
+  const stage = (n, name, sub, list, open) => {
+    if (!list.length) return "";
+    return '<details class="sd-stage"' + (open ? " open" : "") + '>' +
+      '<summary><span class="sd-sn">' + n + '</span>' +
+      '<span class="sd-sh"><span class="sd-shn">' + name + '</span>' +
+      '<span class="sd-shs">' + esc(sub) + '</span></span>' +
+      '<span class="sd-smin num">' + mins(list) + ' min</span></summary>' +
+      '<div class="sd-steps">' + rowsFor(list) + '</div></details>';
+  };
+  // The warm-up keeps its own card — it is generated, carries its own reasoning, and is a stage in
+  // its own right. It simply sits first, because that is when it happens.
+  // ⚠️ THE WARM-UP IS A STAGE TOO, AND COLLAPSED. It is generated, carries its own reasoning and runs
+  // to three phases with drill lists — expanded it filled the sheet before the runner reached the work
+  // they came to read about. "Expand individual drills only when needed" applies to it most of all.
+  // ⚠️ Only when there IS one: the low-intensity runs get a single sentence saying none is needed, and
+  // wrapping one sentence in a disclosure would be ceremony around nothing.
+  const wu = warmupCardFor(sess);
+  const wuHtml = warmupHtml(sess);
+  const wuStage = (wu && !wu.notNeeded && wu.phases && wu.phases.length)
+    ? '<details class="sd-stage"><summary><span class="sd-sn">1</span>' +
+      '<span class="sd-sh"><span class="sd-shn">Warm up</span>' +
+      '<span class="sd-shs">' + esc(wu.phases.map((ph) => ph.phase === "raise" ? "easy running"
+        : ph.phase === "mobilise" ? "mobility" : ph.phase === "potentiate" ? "strides" : "settle").join(" \u00b7 ")) + '</span></span>' +
+      '<span class="sd-smin num">' + Math.round(wu.totalMinutes) + ' min</span></summary>' +
+      '<div class="sd-stagewu">' + wuHtml + '</div></details>'
+    : wuHtml;
+  return wuStage +
+    stage(wu && !wu.notNeeded ? 2 : 1, "Main set", mainSubtitle(main), main, true) +
+    stage(3, "Cool down", "Easy until your breathing settles", cool, false);
+}
+/** One line describing the work, so a collapsed stage still says what it is. */
+function mainSubtitle(list) {
+  const reps = list.filter((st) => st.kind === "rep").length;
+  if (reps > 1) return reps + " repetitions with recoveries";
+  const longest = list.slice().sort((a, b) => stepSecs(b) - stepSecs(a))[0];
+  return longest && longest.label ? String(longest.label).split(" \u2014 ")[0].slice(0, 60) : "The work";
+}
 function sessionSheetHtml(sess, week) {
   const sc = "var(--eff-" + effortOf(sess) + ")";
   // ⚠️ THE TIME ON THE CARD MUST INCLUDE THE WARM-UP WE ACTUALLY PRESCRIBE. Generating longer,
@@ -5152,28 +5224,28 @@ function sessionSheetHtml(sess, week) {
     // one-line warm-up step is dropped from this list rather than printed above it saying a shorter
     // version of the same thing. The STEP itself is untouched — the live runtime, the watch and the
     // timings all still run from it; this only stops the brief saying it twice.
-    const shown = warmupCardFor(sess) ? sess.steps.filter((st) => st.kind !== "warmup") : sess.steps;
-    const rows = structureRows(shown).map((r) =>
-      '<div class="sd-step"><div class="sd-dot" style="background:' + (r.muted ? "var(--ink-faint)" : sc) + '"></div><div><div class="sd-tag">' + r.tag + '</div><div class="sd-lab">' + r.lab + '</div>' + (r.chips ? '<div class="sd-meta">' + r.chips + '</div>' : "") + (r.rec ? '<div class="sd-rec">' + r.rec + '</div>' : "") + '</div></div>').join("");
-    // The warm-up comes first because that is when it happens.
-    body = warmupHtml(sess) + (rows ? '<div class="sd-steps">' + rows + '</div>' : "");
+    // ⚠️ STAGED, NOT A FLAT LIST. See sessionStages.
+    body = sessionStages(sess, sc);
   }
   // Reschedule row — pick any day; a run already there swaps with this one.
   const cur = effDay(sess);
   const dayPicker = DAY_ORDER.map((dn, i) => '<button class="sd-day' + (i === cur ? " on" : "") + '" data-moveto="' + i + '"' + (i === cur ? " disabled" : "") + '>' + dn + '</button>').join("");
   const moveBlock = sess.type === "rest" ? "" :
     '<div class="sd-move"><div class="sd-move-h">Move to another day</div><div class="sd-days">' + dayPicker + '</div><div class="sd-move-n">Pick a day. If a run is already there, the two will swap.</div></div>';
-  const startBtn = PRIMARY_TYPES[sess.type] ? '<button class="primary sd-start" id="sdStart">' + ICON.play + ' Start session</button>' : "";
+  // ⚠️ PERSISTENT, NOT INLINE. The brief: "Keep Start persistent. The current top CTA scrolls away
+  // while reading a long session." It keeps the id sdStart so the existing handler is untouched.
+  const startBtn = PRIMARY_TYPES[sess.type]
+    ? uiActionBar({ state: "start", id: "sdStart", label: "Start session" }) : "";
   const addLink = '<button class="sd-addlink" id="sdAdd">\\uFF0B Add a different session ' + dayPhraseIso(isoAdd(weekByNo(week).startIso, effDay(sess)).toISOString().slice(0, 10)) + '</button>';
   return '<div class="sd-type" style="--sc:' + sc + '">' + (SESSION_LABEL[sess.type] || sess.type) + '</div>' +
     '<div class="sd-title">' + esc(sess.title) + '</div>' +
     '<div class="sd-chips">' + chips.join("") + '</div>' +
-    startBtn +
     '<div class="sd-desc">' + esc(sess.description) + '</div>' +
     body +
     fuelHtml(sess) +
     moveBlock +
-    addLink;
+    addLink +
+    startBtn;
 }
 function ensureSheet() {
   if ($("sheetOv")) return;

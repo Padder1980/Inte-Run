@@ -300,3 +300,28 @@ test("⚠️ the surveillance language is gone", () => {
     "'Your coach is watching' is back — the brief flags it as reducing trust around health data");
   assert.match(html, /Coach check-in/, "the replacement heading is missing");
 });
+
+test("⚠️ readiness is never scored before the runner has answered", () => {
+  // ⚠️ state.subj ships with defaults — energy "good", soreness "none" — so before this the app
+  // computed 4/5 for a runner who had never been asked and showed it as measured. A number with no
+  // answers behind it is exactly what the brief's insight contract exists to prevent.
+  const html = css();
+  const fn = html.slice(html.indexOf("function feelSquare("), html.indexOf("function feelSquare(") + 1600);
+  assert.match(fn, /state\.subjAnswered/, "readiness does not check whether the questions were answered");
+  assert.match(fn, /"incomplete"/, "there is no incomplete state, so defaults are shown as a real score");
+  // ...and answering has to set the marker, or it can never leave the incomplete state.
+  assert.match(html, /state\.subjAnswered = true/, "nothing ever records that the runner answered");
+  // ⚠️ And a reading goes stale: last night's answer is not about this morning.
+  assert.match(fn, /stale/, "an old reading is presented as current");
+});
+
+test("⚠️ readiness and the weather are separate tiles", () => {
+  // "Readiness is qualitative while weather is a warning. The combined meaning is unclear." They must
+  // not be able to contradict each other in one object — a 'good to go' beside a heat warning is the
+  // internal inconsistency the brief opens with.
+  const html = css();
+  const at = html.indexOf("function viewToday(");
+  const body = html.slice(at, html.indexOf("\nfunction ", at + 10));
+  assert.match(body, /conditionsSquare\(sess\) \+ feelSquare\(\)/,
+    "readiness and conditions are no longer two separate tiles");
+});

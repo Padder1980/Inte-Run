@@ -2173,6 +2173,9 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .ui-bar-wrap.off .ui-bar-btn { background: var(--surface-2); color: var(--ink-faint); }
 .ui-bar-btn[disabled] { opacity: .65; }
 /* ---- Shoe rack ----------------------------------------------------------------- */
+/* The readiness tile sits in the two-up row, so its wrapper must not restyle it. */
+.tsq-plain { display: block; width: 100%; padding: 0; border: 0; background: none; text-align: left; font: inherit; color: inherit; }
+.tsq-plain .ui-tile { height: 100%; }
 .sr-eyebrow { font-size: var(--t-label); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin: var(--s1) 0 var(--s2); }
 .sr-title { font-size: var(--t-display); font-weight: 800; letter-spacing: -.02em; color: var(--ink); margin: 0 0 var(--s4); line-height: 1.08; }
 .sr-strip { display: flex; align-items: stretch; gap: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; margin-bottom: var(--s4); }
@@ -2986,14 +2989,29 @@ function conditionsSquare(session) {
     '<div class="tsq-v">' + w.tempC + '° · ' + w.label + '</div>' +
     '<div class="tsq-sub">' + sub + '</div></button>';
 }
+/**
+ * Readiness, as a score with a plain-language label — the brief's ask, and separate from the weather
+ * so that "good to go" can never sit beside a heat warning and contradict it.
+ *
+ * ⚠️ A WHOLE NUMBER OUT OF FIVE. readinessScore() is built from two questions worth two points each,
+ * so there are exactly five reachable values; the mockup's "7.6 / 10" would be false precision and
+ * rescaling to ten would be the same false precision with rounder numbers.
+ */
 function feelSquare() {
-  const r = RC.assessReadiness(readinessInput());
-  const c = BAND[r.band];
-  return '<button class="tsq" id="feelSq" style="--sqc:' + c + '">' +
-    '<div class="tsq-ic">' + ICON.heart + '</div>' +
-    '<div class="tsq-k">How you feel</div>' +
-    '<div class="tsq-v">' + r.headline + '</div>' +
-    '<div class="tsq-sub">Tap to check in</div></button>';
+  const answered = !!state.subjAnswered;
+  const score = readinessScore();
+  // ⚠️ Stale after twelve hours: a reading taken last night is not a reading about this morning, and
+  // an old number shown as current is worse than no number.
+  const stale = answered && state.subjAt && (Date.now() - state.subjAt > 12 * 3600 * 1000);
+  const st = !answered ? "incomplete" : stale ? "stale"
+    : score >= 5 ? "ready" : score <= 2 ? "reduced" : "steady";
+  const su = state.subj || {};
+  const why = su.energy === "low" ? "You said your energy is low"
+    : su.soreness === "high" ? "You reported soreness"
+    : su.soreness === "some" ? "A bit of soreness"
+    : answered ? "Energy and soreness both fine" : "";
+  return '<button class="tsq-plain" id="feelSq" aria-label="Readiness check-in">' +
+    uiReadinessTile({ state: st, score: score, contributor: why, since: "earlier today" }) + '</button>';
 }
 // ---- Detail sheets for conditions & readiness -----------------------------
 function weatherSheetHtml() {
@@ -3042,7 +3060,11 @@ function openFeelSheet() { ensureSheet(); SHEET_CTX = null; $("sheetBody").inner
 function wireFeelSheet() {
   document.querySelectorAll('#sheetBody [data-fseg]').forEach((seg) => seg.querySelectorAll("button").forEach((b) => b.onclick = () => {
     const f = seg.dataset.fseg;
-    if (f === "dayType") state.dayType = b.dataset.v; else state.subj[f] = b.dataset.v;
+    // ⚠️ RECORD THAT THEY ANSWERED. state.subj ships with defaults (energy "good", soreness "none"),
+    // so before this the app computed a readiness of 4/5 for a runner who had never been asked, and
+    // showed it as if it were measured. A score with no answers behind it is the precise thing the
+    // brief's insight contract exists to prevent — meaning, evidence, freshness, confidence.
+    if (f === "dayType") state.dayType = b.dataset.v; else { state.subj[f] = b.dataset.v; state.subjAnswered = true; state.subjAt = Date.now(); }
     $("sheetBody").innerHTML = feelSheetHtml(); wireFeelSheet(); render();
   }));
 }

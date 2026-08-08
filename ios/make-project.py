@@ -58,12 +58,23 @@ echo "note: embedded web app ($(du -sh "${DST}" | cut -f1)) from ${SRC}"
 # build has no key in it, the owner's build does.
 # ⚠️ Absent is the NORMAL case, not an error — a checkout without the file simply builds on the free
 # CARTO maps, which is what anyone else cloning this repo should get.
+# ⚠️ VALIDATE IT, DO NOT JUST COPY IT. The first version copied whatever the file held and announced
+# "embedded a Mapbox token" — and the owner, following an instruction of mine literally, had a file
+# containing the words PASTE_YOUR_TOKEN_HERE. Swift's pk. guard refused it correctly and the app fell
+# back to the free maps, so nothing broke; but the build said the opposite of what it had done, which
+# is how someone spends an evening wondering why their maps have not changed.
 TOK="${SRCROOT}/mapbox-token.txt"
+rm -f "${DST}/mapbox-token.txt"
 if [ -f "${TOK}" ]; then
-  tr -d " \t\r\n" < "${TOK}" > "${DST}/mapbox-token.txt"
-  echo "note: embedded a Mapbox token (maps will use Mapbox)"
+  VAL=$(tr -d " \t\r\n" < "${TOK}")
+  case "${VAL}" in
+    pk.*) printf '%s' "${VAL}" > "${DST}/mapbox-token.txt"
+          echo "note: embedded a Mapbox token — maps will use Mapbox" ;;
+    sk.*) echo "warning: ios/mapbox-token.txt holds a SECRET token (sk.). Refusing to ship it — a secret token must never go in an app. Maps will use the free CARTO styles." ;;
+    "")   echo "note: ios/mapbox-token.txt is empty — maps will use the free CARTO styles" ;;
+    *)    echo "warning: ios/mapbox-token.txt does not contain a Mapbox token (they begin with pk.). Maps will use the free CARTO styles." ;;
+  esac
 else
-  rm -f "${DST}/mapbox-token.txt"
   echo "note: no ios/mapbox-token.txt — maps will use the free CARTO styles"
 fi
 '''

@@ -260,6 +260,15 @@ happened to open the run first.
 ⚠️ **THE STYLE IS PART OF THE KEY**, so changing map provider or style invalidates every stored picture
 by itself — nothing has to be cleared by hand.
 
+**What it costs, measured 2026-08-08.** One recorded run is **~8 tiles** (run card, 700×420 at z11–14);
+a SHARED run adds ~18 more, and only when it is shared. We are on the **Static Tiles API** — raster
+tiles fetched directly — **not** Mapbox GL JS, which matters enormously: 200,000 free tiles/month then
+$0.50/1,000, against GL JS's 50,000 free "map loads" then $5.00/1,000. So it is **free to roughly 1,000
+people each running four times a week**, ≈$70/month at 2,000 and ≈$750/month at 10,000.
+⚠️ **The Road Map's original "£100 a month at 10,000 users" was too optimistic and has been corrected**
+in the page. ⚠️ And `MAPCACHE_MAX` is 120 entries, so after roughly six months of heavy use the oldest
+runs re-fetch when scrolled back to — eviction is by last USE, so it is the forgotten runs that go.
+
 **The swap-point:** `MAP_STYLE_RUN` and `MAP_STYLE_SHARE` are the only two places a style is named, and
 `loadRouteMap` builds the only tile URL in the app. They differ on purpose — the little map on a
 finished run is the colourful one, the share card the dark one. Moving to Mapbox is those two constants

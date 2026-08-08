@@ -348,3 +348,16 @@ test("⚠️ a missed session says it was missed", () => {
   // ⚠️ ...and only in the CURRENT week: "Next" on a week three months away is nonsense.
   assert.match(fn, /isCur && TODAY_IN_PLAN/, "the next marker is not scoped to the current week");
 });
+
+test("⚠️ the goal hero shows one sentence, with the analysis behind a disclosure", () => {
+  // "Reduce the goal hero. Keep target, date, progress, confidence and one sentence of
+  // interpretation. Move the detailed realism analysis behind 'How we calculated this.'"
+  const html = css();
+  const fn = html.slice(html.indexOf("function feasibilityWhy("), html.indexOf("function viewPlan("));
+  assert.match(fn, /lines\[0\]/, "the card no longer leads with a single sentence");
+  assert.match(fn, /lines\.slice\(1\)/, "the rest of the analysis is not separated out");
+  // ⚠️ Native <details>: keyboard- and screen-reader-operable for free, and the browser owns the open
+  // state so a re-render cannot snap it shut — which on this screen happens constantly.
+  assert.match(fn, /<details/, "the disclosure is hand-rolled, so a re-render will close it");
+  assert.match(fn, /<summary>/, "the disclosure has no accessible label");
+});

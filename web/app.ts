@@ -2178,6 +2178,13 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .ui-bar-btn[disabled] { opacity: .65; }
 /* ---- Shoe rack ----------------------------------------------------------------- */
 /* The readiness tile sits in the two-up row, so its wrapper must not restyle it. */
+/* One sentence on the card; the rest is opt-in. Native <details> so it is keyboard- and
+   screen-reader-operable for free, and so a re-render cannot snap it shut. */
+.feas-more { margin-top: var(--s2); }
+.feas-more summary { cursor: pointer; font-size: var(--t-meta); font-weight: 650; color: var(--accent); padding: var(--s2) 0; min-height: var(--tap); display: flex; align-items: center; }
+.feas-more summary::-webkit-details-marker { display: none; }
+.feas-more summary::after { content: " ›"; margin-left: 6px; transition: transform .18s; display: inline-block; }
+.feas-more[open] summary::after { transform: rotate(90deg); }
 .tsq-plain { display: block; width: 100%; padding: 0; border: 0; background: none; text-align: left; font: inherit; color: inherit; }
 .tsq-plain .ui-tile { height: 100%; }
 .sr-eyebrow { font-size: var(--t-label); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin: var(--s1) 0 var(--s2); }
@@ -5798,11 +5805,27 @@ function wireAddSessionSheet() {
  * the chart). Every word needed to explain that was in the rationale, unrendered. A verdict a runner
  * cannot interrogate is one they either over-trust or dismiss, and both are worse than the number.
  */
+/**
+ * The verdict's reasoning — ONE sentence on the card, the rest behind a disclosure.
+ *
+ * ⚠️ THE BRIEF'S ASK, ALMOST WORD FOR WORD: "Reduce the goal hero. Keep target, date, progress,
+ * confidence and one sentence of interpretation. Move the detailed realism analysis behind 'How we
+ * calculated this.'" The analysis is genuinely good and runners who want it should have it — but it
+ * was three paragraphs of percentages arriving before the runner had oriented, which is the
+ * "insight arrives as a data dump" finding.
+ *
+ * ⚠️ <details> RATHER THAN A HAND-ROLLED TOGGLE: it is open-able by a screen reader, keyboard-
+ * operable for free, and it survives a re-render because the browser owns the state — where a
+ * class-toggled div would snap shut every time render() ran, which on this screen is often.
+ */
 function feasibilityWhy() {
   const f = PLAN.feasibility || {};
   const lines = (f.rationale || []).filter(Boolean);
   if (!lines.length) return "";
-  return '<div class="feas-why">' + lines.map((t) => '<div>' + esc(t) + '</div>').join("") + '</div>';
+  const first = lines[0], rest = lines.slice(1);
+  return '<div class="feas-why"><div>' + esc(first) + '</div></div>' +
+    (rest.length ? '<details class="feas-more"><summary>How we worked this out</summary>' +
+      '<div class="feas-why">' + rest.map((t) => '<div>' + esc(t) + '</div>').join("") + '</div></details>' : "");
 }
 function viewPlan() {
   const g = PLAN.goal, s = PLAN.summary;

@@ -2251,6 +2251,47 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 /* A screen arriving. 180ms, inside the brief's 160-220ms; the global reduce-motion rule neutralises it. */
 @keyframes viewIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .view-in { animation: viewIn .18s cubic-bezier(.2, .7, .3, 1) both; }
+/* Profile & settings: inspect first. */
+.pf-id { display: flex; align-items: center; gap: var(--s4); margin-bottom: var(--s5); }
+.pf-av { flex: none; width: 60px; height: 60px; border-radius: var(--r-pill); overflow: hidden; background: var(--surface-2); display: grid; place-items: center; font-size: var(--t-hero); font-weight: 750; color: var(--accent); }
+.pf-av img { width: 100%; height: 100%; object-fit: cover; }
+.pf-av svg { width: 28px; height: 28px; }
+.pf-idb { min-width: 0; }
+.pf-name { font-size: var(--t-hero); font-weight: 780; letter-spacing: -.02em; color: var(--ink); }
+.pf-sub { font-size: var(--t-meta); color: var(--ink-soft); margin-top: 2px; }
+.pf-sec { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3); margin: var(--s5) 2px var(--s2); }
+.pf-sec > span:first-child { font-size: var(--t-section); font-weight: 750; letter-spacing: -.02em; color: var(--ink); }
+.pf-edit { background: none; border: 0; padding: var(--s1) var(--s2); color: var(--accent); font: inherit; font-size: var(--t-body); font-weight: 700; cursor: pointer; }
+.hub-cav { font-size: var(--t-meta); color: var(--ink-soft); }
+.pf-card { padding: 0 var(--s4); }
+.pf-row { display: flex; align-items: center; gap: var(--s3); width: 100%; text-align: left; min-height: 56px; padding: var(--s3) 0; background: none; border: 0; border-bottom: 1px solid var(--line); color: inherit; font: inherit; cursor: pointer; }
+.pf-row:last-child { border-bottom: 0; }
+.pf-ic { flex: none; width: 30px; height: 30px; border-radius: var(--r-ctl); display: grid; place-items: center; background: color-mix(in srgb, var(--pc) 18%, transparent); color: var(--pc); }
+.pf-ic svg { width: 17px; height: 17px; }
+.pf-l { flex: 1; min-width: 0; font-size: var(--t-body); font-weight: 650; color: var(--ink); }
+.pf-v { font-size: var(--t-meta); color: var(--ink-soft); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 45%; }
+/* Support hub: Alfie as a feature, Learn as a list, one safety destination. */
+.alf-feat { display: flex; align-items: center; gap: var(--s4); width: 100%; text-align: left; padding: var(--s4); margin-bottom: var(--s3); background: linear-gradient(150deg, color-mix(in srgb, var(--accent) 14%, var(--surface)), var(--surface) 72%); border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line)); border-radius: var(--r-hero); color: inherit; cursor: pointer; }
+.alf-fi { flex: none; width: 48px; height: 48px; border-radius: var(--r-ctl); display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); }
+.alf-fi svg { width: 24px; height: 24px; }
+.alf-fb { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: var(--s1); }
+.alf-ft { font-size: var(--t-section); font-weight: 780; letter-spacing: -.02em; color: var(--ink); }
+.alf-fd { font-size: var(--t-meta); color: var(--ink-soft); }
+.hub-r { display: flex; align-items: center; gap: var(--s3); width: 100%; text-align: left; min-height: 60px; padding: var(--s3) 0; background: none; border: 0; border-bottom: 1px solid var(--line); color: inherit; font: inherit; cursor: pointer; }
+.hub-r:last-child { border-bottom: 0; }
+.hub-ri { flex: none; width: 36px; height: 36px; border-radius: var(--r-pill); display: grid; place-items: center; background: color-mix(in srgb, var(--hc) 20%, transparent); color: var(--hc); }
+.hub-ri svg { width: 19px; height: 19px; }
+.hub-rb { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.hub-rt { font-size: var(--t-body); font-weight: 700; color: var(--ink); }
+.hub-rd { font-size: var(--t-meta); color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hub-safety { display: flex; align-items: center; gap: var(--s3); width: 100%; text-align: left; margin-top: var(--s4); padding: var(--s4); min-height: var(--tap); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); color: inherit; cursor: pointer; }
+.hub-sb { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.hub-st { font-size: var(--t-body); font-weight: 750; color: var(--ink); }
+.hub-sd { font-size: var(--t-meta); color: var(--ink-soft); }
+.sf-c { padding: var(--s4); margin-bottom: var(--s3); }
+.sf-c p { margin: 0 0 var(--s3); font-size: var(--t-body); line-height: 1.6; color: var(--ink-soft); }
+.sf-c p:last-of-type { margin-bottom: 0; }
+.sf-c b { color: var(--ink); }
 /* Support search. */
 .sup-search { position: relative; display: flex; align-items: center; margin-bottom: var(--s4); }
 .sup-si { position: absolute; left: var(--s3); display: flex; color: var(--ink-faint); pointer-events: none; }
@@ -6795,12 +6836,86 @@ const SUPPORT_HUB = [
  * The order is deliberate: coaching first because it is what most visits want, health second because
  * it must be findable fast, setup last because it is a once-a-month errand.
  */
-const SUPPORT_GROUPS = [
-  ["Coaching", ["alfie", "understand", "guides"]],
-  ["Health and safety", ["redflags", "reds", "female"]],
-  ["Training and kit", ["strength", "shoes", "why"]],
-  ["Your setup", ["connect", "data"]],
-];
+/**
+ * Profile and settings -- inspect first, edit deliberately.
+ *
+ * "A profile should be scannable in seconds and make plan-changing edits feel safe, reversible and
+ * explicit." Until now the profile WAS the six-section setup form: the only way to check what your
+ * goal was set to was to open every question you had ever answered, on a screen where a stray tap on
+ * Save rebuilds the plan. Reading and editing were the same act.
+ *
+ * \u26a0\ufe0f THE FORM IS NOT REPLACED, IT IS MOVED BEHIND THIS. Every question still exists and is
+ * still the one place it is answered -- this page is a summary with a way in, which is what the owner
+ * asked for ("all of the current questions can still sit behind the proposed new design"). Nothing
+ * about the plan-building path changed, so nothing about it can have broken.
+ *
+ * \u26a0\ufe0f NO PREMIUM BADGE, THOUGH THE MOCKUP HAS ONE. The owner cut subscriptions explicitly --
+ * "thats not something we are doing (yet)" -- and CLAUDE.md records "do not reinstate it from the
+ * mockup". A badge for a tier that does not exist is a promise the app cannot keep.
+ */
+function profRow(o) {
+  const tag = o.action ? "button" : "div";
+  return "<" + tag + ' class="pf-row"' + (o.action ? ' data-pf="' + esc(o.action) + '"' : "") + ">" +
+    '<span class="pf-ic" style="--pc:' + (o.colour || "var(--accent)") + '">' + (ICON[o.icon] || "") + '</span>' +
+    '<span class="pf-l">' + esc(o.label) + '</span>' +
+    '<span class="pf-v">' + esc(o.value || "") + '</span>' +
+    (o.action ? '<span class="sd-chev" aria-hidden="true">\u203A</span>' : "") +
+    "</" + tag + ">";
+}
+function profPlanStatus() {
+  if (!PLAN || !PLAN.weeks || !PLAN.weeks.length) return "No plan yet";
+  const total = PLAN.weeks.length;
+  const wk = TODAY_IN_PLAN ? curWeekNo() : null;
+  return (RACE_LABEL[profile.goalDist] || "") + " plan" +
+    (wk ? " \u00b7 Week " + wk + " of " + total : " \u00b7 " + total + " weeks");
+}
+function profFitness() {
+  // \u26a0\ufe0f THE SAME HONESTY AS THE PERFORMANCE CARDS. A seeded beginner has a 5 km time nobody
+  // ran; printing it here as "Current fitness" would be the app quoting a result back at somebody who
+  // never produced it, on the screen where they would most reasonably believe it.
+  if (profile.twoKmS > 0) return "2 km \u00b7 " + fmtTimeFull(profile.twoKmS);
+  if (profile.noRecent || profile.autoPace) return "Not measured yet";
+  if (!profile.recentTimeS) return "Not set";
+  return "5 km \u00b7 " + fmtTimeFull(profile.recentTimeS) + (profile.fitSrc === "predicted" ? " (estimated)" : "");
+}
+function profContext() {
+  const k = returnKind(profile);
+  return k === "injury" ? "Returning from injury" : k === "break" ? "Returning from a break" : "Training as normal";
+}
+function viewProfile() {
+  const shoes = loadShoes().filter((x) => !x.retiredIso);
+  const act = activeShoe();
+  const devices = (WATCH_STATUS && WATCH_STATUS.installed) ? "Apple Watch" : "Not set up";
+  const remind = (REMIND && REMIND.on) ? "On" : "Off";
+  const themeSet = (function () { try { return localStorage.getItem("interun_theme_v1"); } catch (e) { return null; } })();
+  return '<div class="pf-id">' +
+      '<div class="pf-av">' + avatarInner(profile) + '</div>' +
+      '<div class="pf-idb"><div class="pf-name">' + esc(profile.name || "Your profile") + '</div>' +
+      '<div class="pf-sub">' + esc(profPlanStatus()) + '</div></div>' +
+    '</div>' +
+    '<div class="pf-sec"><span>Training profile</span><button class="pf-edit" data-pf="setup">Edit</button></div>' +
+    '<div class="card pf-card">' +
+      profRow({ icon: "rRace", colour: "var(--eff-hard)", label: "Goal", value: (RACE_LABEL[profile.goalDist] || "") + (profile.targetS ? " \u00b7 " + fmtTimeFull(profile.targetS) : ""), action: "setup" }) +
+      profRow({ icon: "gauge", colour: "var(--steady)", label: "Current fitness", value: profFitness(), action: "setup" }) +
+      profRow({ icon: "today", colour: "var(--build)", label: "Training rhythm", value: (profile.daysPerWeek || 0) + " days / week", action: "setup" }) +
+      profRow({ icon: "heart", colour: "var(--rest)", label: "Current context", value: profContext(), action: "setup" }) +
+    '</div>' +
+    '<div class="pf-sec"><span>Connections</span></div>' +
+    '<div class="card pf-card">' +
+      profRow({ icon: "devices", colour: "var(--base)", label: "Apps & devices", value: devices, action: "connect" }) +
+      profRow({ icon: "rEasy", colour: "var(--eff-easy)", label: "Shoes", value: shoes.length ? (act ? act.name : shoes.length + " in the rack") : "None yet", action: "shoes" }) +
+    '</div>' +
+    '<div class="pf-sec"><span>Preferences</span></div>' +
+    '<div class="card pf-card">' +
+      profRow({ icon: "bell", colour: "var(--ease)", label: "Notifications", value: remind, action: "reminders" }) +
+      profRow({ icon: "theme", colour: "var(--taper)", label: "Appearance", value: themeSet ? (themeSet === "dark" ? "Dark" : "Light") : "System", action: "theme" }) +
+    '</div>' +
+    '<div class="pf-sec"><span>Account</span></div>' +
+    '<div class="card pf-card">' +
+      profRow({ icon: "share", colour: "var(--steady)", label: "Your data", value: "Back up or move", action: "data" }) +
+      profRow({ icon: "heart", colour: "var(--rest)", label: "Safety & privacy", value: "How we handle it", action: "safety" }) +
+    '</div>';
+}
 /**
  * Support search. The owner ruled BUILD IT rather than a placeholder -- "the articles are markup in
  * the build; a client-side index over them needs no backend" -- and he was right, except that they
@@ -6855,25 +6970,99 @@ function supportSearchHtml() {
     '<span class="sup-rd">' + esc(h.d) + '</span>' +
     '<span class="ui-pill">' + (h.kind === "guide" ? "Guide" : "Screen") + '</span></button>').join("") + '</div>';
 }
+/**
+ * The Support hub, to the owner's mockup: search, Alfie as a feature card, the private check-ins
+ * together under their own caveat, then Learn, then one destination for safety and privacy.
+ *
+ * \u26a0\ufe0f THE "NOT MEDICAL" LABEL IS ON THE CARD, NOT ONLY BEHIND IT. It was inside the Alfie
+ * screen, which meant it was visible only once you had already decided to go and ask it something.
+ * On the hub it is visible while you are deciding.
+ *
+ * \u26a0\ufe0f THE CHECK-INS CARRY "NOT A DIAGNOSIS" AT SECTION LEVEL, which is the honest scope: it
+ * is true of all three, and repeating it on each card makes it wallpaper.
+ *
+ * \u26a0\ufe0f SHOES AND DEVICES ARE NOT HERE ANY MORE. They moved to Profile > Connections, which is
+ * where the brief always put them and where CLAUDE.md recorded this hub as their "honest interim
+ * home, not the intended one".
+ */
+function hubCard(h) {
+  return '<button class="hubcard" data-hub="' + h.id + '"><div class="ic" style="--hc:' + h.c + '">' + ICON[h.ic] + '</div><div class="b"><div class="t">' + h.t +
+    (h.interactive ? ' <span class="tag-int">Check-in</span>' : '') + '</div><div class="d">' + h.d + '</div></div><div class="arr">\u203a</div></button>';
+}
+function hubRow(h) {
+  return '<button class="hub-r" data-hub="' + h.id + '">' +
+    '<span class="hub-ri" style="--hc:' + h.c + '">' + ICON[h.ic] + '</span>' +
+    '<span class="hub-rb"><span class="hub-rt">' + h.t + '</span><span class="hub-rd">' + h.d + '</span></span>' +
+    '<span class="sd-chev" aria-hidden="true">\u203A</span></button>';
+}
+const HUB_CHECKINS = ["redflags", "reds", "female"];
+const HUB_LEARN = ["understand", "strength", "guides", "why"];
 function viewSupport() {
   if (state.support) return supportDetail(state.support);
-  // \u26a0\ufe0f While a search is running the groups are HIDDEN, not filtered. A grid that quietly
-  // loses eight of its eleven tiles reads as the app having lost them.
   if ((state.supportQ || "").trim()) return supportSearchHtml();
-  const card = (h) => '<button class="hubcard" data-hub="' + h.id + '"><div class="ic" style="--hc:' + h.c + '">' + ICON[h.ic] + '</div><div class="b"><div class="t">' + h.t + (h.interactive ? ' <span class="tag-int">Check-in</span>' : '') + '</div><div class="d">' + h.d + '</div></div><div class="arr">›</div></button>';
-  // \u26a0\ufe0f ANY CARD NOT NAMED IN A GROUP STILL APPEARS, under "More". A hub that silently drops
-  // an entry someone adds later is worse than an ungrouped one, because nothing looks wrong.
-  const placed = {};
-  SUPPORT_GROUPS.forEach((g) => g[1].forEach((id) => { placed[id] = true; }));
-  const groups = SUPPORT_GROUPS.concat([["More", SUPPORT_HUB.filter((h) => !placed[h.id]).map((h) => h.id)]]);
-  return supportSearchHtml() + groups.map((g) => {
-    const items = g[1].map((id) => SUPPORT_HUB.find((h) => h.id === id)).filter(Boolean);
-    if (!items.length) return "";
-    return '<div class="ui-section">' + g[0] + '</div><div class="hub">' + items.map(card).join("") + '</div>';
-  }).join("");
+  const by = (id) => SUPPORT_HUB.find((h) => h.id === id);
+  const alfie = by("alfie");
+  return supportSearchHtml() +
+    // Alfie is the thing most visits want, so it is a card rather than a row in a list.
+    '<button class="alf-feat" data-hub="alfie">' +
+      '<span class="alf-fi">' + ICON.alfie + '</span>' +
+      '<span class="alf-fb"><span class="alf-ft">Ask Alfie</span>' +
+        '<span class="alf-fd">' + esc(alfie ? alfie.d : "") + '</span>' +
+        '<span class="ui-pill watch">AI coach \u00b7 not medical</span></span>' +
+      '<span class="sd-chev" aria-hidden="true">\u203A</span></button>' +
+    '<div class="pf-sec"><span>Private check-ins</span><span class="hub-cav">Not a diagnosis</span></div>' +
+    '<div class="hub">' + HUB_CHECKINS.map(by).filter(Boolean).map(hubCard).join("") + '</div>' +
+    '<div class="pf-sec"><span>Learn</span></div>' +
+    '<div class="card pf-card">' + HUB_LEARN.map(by).filter(Boolean).map(hubRow).join("") + '</div>' +
+    '<button class="hub-safety" data-hub="safety">' +
+      '<span class="hub-sb"><span class="hub-st">Safety, privacy &amp; human help</span>' +
+      '<span class="hub-sd">Medical boundaries \u00b7 your data \u00b7 who to contact</span></span>' +
+      '<span class="sd-chev" aria-hidden="true">\u203A</span></button>';
+}
+/**
+ * Safety, privacy and human help -- one destination, and every sentence in it checked against the code.
+ *
+ * \u26a0\ufe0f THIS PAGE IS THE EASIEST IN THE APP TO WRITE DISHONESTLY, because everything on it sounds
+ * reassuring whether or not it is true. Every claim below was verified: localStorage is the only
+ * store (dataView discovers backup keys by the interun_/rc_ prefix); Alfie answers on-device unless a
+ * proxy is configured, which nothing ships configured; the check-in answers are read out of the DOM
+ * by chkValues and written nowhere; and there is no account, no server and no analytics anywhere in
+ * this build. If any of that changes, this page changes in the same commit.
+ */
+function safetyView() {
+  const proxy = (function () { try { return !!(alfieCfg() || {}).proxy; } catch (e) { return false; } })();
+  return EMERGENCY_BANNER() +
+    '<h2 class="sec" style="margin-top:0">Safety, privacy &amp; human help</h2>' +
+    '<div class="card sf-c"><div class="subhead" style="margin-top:0">What this app is not</div>' +
+      '<p>Inte-Run is a training companion. It is <b>not a doctor, a physiotherapist or a dietitian</b>, ' +
+      'and it cannot examine you. Its check-ins are built from published warning signs and are there to ' +
+      'help you decide <i>whether to go and see somebody</i> \u2014 they are not a diagnosis and cannot be one.</p>' +
+      '<p>Ask Alfie is an <b>AI coach</b>. It knows your plan and a store of running knowledge. It can be ' +
+      'wrong, and it is not medical advice.</p></div>' +
+    '<div class="card sf-c"><div class="subhead" style="margin-top:0">When to stop and get help</div>' +
+      '<p>Chest pain, fainting, a sudden severe headache, or an injury you cannot walk on: stop and get ' +
+      'medical help now \u2014 do not use an app to decide.</p>' +
+      '<p>Pain that sharpens as you run, changes how you move, or wakes you at night is worth a ' +
+      'professional\u2019s opinion rather than another week of guessing.</p>' +
+      '<button class="perf-a" data-hub="redflags">Check a symptom \u203a</button></div>' +
+    '<div class="card sf-c"><div class="subhead" style="margin-top:0">Where your information lives</div>' +
+      '<p><b>On this phone.</b> Your runs, your plan, your profile and your answers are stored in this ' +
+      'app on this device. There is no account and no server holding them.</p>' +
+      '<p><b>The health check-ins keep nothing at all.</b> Your answers are read as you tick them and ' +
+      'are gone the moment you leave the screen.</p>' +
+      '<p><b>Ask Alfie answers on this phone</b>' + (proxy
+        ? ', except that you have connected it to your own service, so questions are sent there.'
+        : ' and works with no signal. Nothing you type is sent anywhere.') + '</p>' +
+      '<p>Two things do reach the internet, and only these: the <b>weather</b> for your next session, ' +
+      'and the <b>map tiles</b> for a run you have recorded.</p>' +
+      '<button class="perf-a" data-hub="data">Back up or move your data \u203a</button></div>' +
+    '<div class="card sf-c"><div class="subhead" style="margin-top:0">A human, not an app</div>' +
+      '<p>Nothing here replaces a coach who can watch you run, or a clinician who can examine you. If ' +
+      'something feels wrong and the app is telling you it is fine, believe yourself.</p></div>';
 }
 function supportDetail(id) {
   const back = '<button class="backbtn" id="supBack">‹ Support</button>';
+  if (id === "safety") return back + safetyView();
   if (id === "understand") return back + understandView();
   if (id === "redflags") return back + redflagsView();
   if (id === "reds") return back + redsView();
@@ -11819,7 +12008,7 @@ function maybeAutoGuide() {
 }
 
 // ---- Router ---------------------------------------------------------------
-const TITLES = { today: "Today", plan: "Your Plan", activities: "Logbook", community: "Community", support: "Support" };
+const TITLES = { today: "Today", plan: "Your Plan", activities: "Logbook", community: "Community", support: "Support & guidance" };
 // The Today tab shows a live calendar glyph with today's date (drawn in CSS; number injected here).
 function todayNavIcon() {
   return '<span class="nav-date" aria-hidden="true"><span class="nav-date-day num">' + new Date().getDate() + '</span></span>';
@@ -11921,6 +12110,15 @@ function render() {
     wire();
     return;
   }
+  if (state.screen === "profile") {
+    $("topTitle").textContent = "Profile & settings";
+    v.innerHTML = viewProfile();
+    v.scrollTop = 0;
+    document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
+    wire();
+    viewEnter(v);
+    return;
+  }
   $("topTitle").textContent = state.support ? "Support" : TITLES[state.tab];
   if (state.tab === "today") { fetchWeather(); v.innerHTML = viewToday(); maybeAutoGuide(); }
   else if (state.tab === "plan") v.innerHTML = viewPlan();
@@ -12016,6 +12214,19 @@ function wire() {
   const pt = $("perfTrial"); if (pt) pt.onclick = startTrialFlow;
   linkFormLabels();
   syncTextScale();
+  // \u26a0\ufe0f EVERY DESTINATION HERE ALREADY EXISTS. This page is a way in to screens the app
+  // already has, not a set of new ones -- which is what keeps it a summary rather than a rewrite.
+  document.querySelectorAll("[data-pf]").forEach((b) => b.onclick = () => {
+    const to = b.dataset.pf;
+    if (to === "setup") { state.screen = "setup"; render(); return; }
+    // \u26a0\ufe0f BOTH OF THESE WERE INVENTED FIRST TIME ROUND -- "toggleTheme" and "openRemindSheet"
+    // exist nowhere in the app. The real ones are the inline handler on #themeBtn and
+    // openRemindersSheet(). Clicking the real button rather than copying its body means there stays
+    // exactly one implementation of what changing the theme does.
+    if (to === "theme") { const t = $("themeBtn"); if (t) t.click(); render(); return; }
+    if (to === "reminders") { openRemindersSheet(); return; }
+    state.screen = null; state.tab = "support"; state.support = to; render();
+  });
   const sq = $("supQ");
   if (sq) {
     // \u26a0\ufe0f RE-RENDER ON INPUT MEANS THE FIELD IS REBUILT UNDER THE RUNNER'S FINGER, so the
@@ -12392,7 +12603,7 @@ $("themeBtn").onclick = () => {
 // ⚠️ A no-op when the form is ALREADY open. The avatar button stays visible on the setup screen,
 // so tapping it re-rendered viewSetup() and threw away everything typed but not yet saved — the
 // second route into the "my answers keep reverting" bug.
-$("profileBtn").onclick = () => { if (liveRunning() || state.screen === "setup") return; stopTrialRun(); state.screen = "setup"; render(); };
+$("profileBtn").onclick = () => { if (liveRunning() || state.screen === "setup") return; stopTrialRun(); state.screen = "profile"; render(); };
 $("calBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); state.screen = "calendar"; render(); };
 $("bellBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); openRemindersSheet(); };
 migrateRunRoutes();

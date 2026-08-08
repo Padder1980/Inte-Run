@@ -317,25 +317,38 @@ test("⚠️ every health check-in says what happens to the answers, and says it
   }
 });
 
-test("⚠️ the Support hub is grouped, and grouping cannot silently drop a card", () => {
+test("⚠️ the Support hub matches the mockup, and cannot silently drop a card", () => {
   const html = page();
-  // Anchored on viewSupport itself, not on the next named function — the search builders landed
-  // between the two and stretched the old window past what it was measuring.
-  const fn = html.slice(html.indexOf("const SUPPORT_GROUPS"), html.indexOf("\nfunction supportDetail("));
-  assert.ok(fn.length > 0 && fn.length < 5200, "the viewSupport slice window is wrong: " + fn.length);
-  for (const g of ["Coaching", "Health and safety", "Your setup"]) {
-    assert.ok(fn.includes('"' + g + '"'), "no " + g + " group");
-  }
-  // ⚠️ AN UNGROUPED CARD MUST STILL APPEAR. A hub that silently drops an entry somebody adds later
-  // is worse than a flat one, because nothing looks wrong.
-  assert.match(fn, /placed\[h\.id\]/, "cards not named in a group are dropped");
-  assert.match(fn, /"More"/, "there is no home for an ungrouped card");
-  // The health check-ins must not be last: somebody arrives there worried and in a hurry.
-  const groups = fn.slice(fn.indexOf("SUPPORT_GROUPS"));
-  assert.ok(groups.indexOf('"Health and safety"') < groups.indexOf('"Your setup"'),
-    "the health check-ins sit below the housekeeping");
-});
+  const fn = fnSrc("viewSupport");
+  // Alfie is a feature card, not a tile in a grid — it is what most visits want.
+  assert.match(fn, /alf-feat/, "Alfie is not the feature card the mockup shows");
+  // ⚠️ THE "NOT MEDICAL" LABEL IS ON THE CARD, not only behind it. It used to live inside the Alfie
+  // screen, so it was visible only once you had already decided to go and ask it something.
+  assert.match(fn, /AI coach \\u00b7 not medical|AI coach · not medical/,
+    "the hub card does not say Alfie is an AI and not medical");
+  // ⚠️ "Not a diagnosis" sits at SECTION level — true of all three check-ins, and repeating it on
+  // each card makes it wallpaper.
+  assert.match(fn, /Private check-ins/, "the check-ins are not grouped together");
+  assert.match(fn, /Not a diagnosis/, "the check-ins carry no scope caveat");
+  assert.match(fn, /Learn/, "there is no Learn section");
+  assert.match(fn, /hub-safety/, "there is no safety and privacy destination");
 
+  // ⚠️ NOTHING MAY BE SILENTLY DROPPED. Every hub id must be reachable from this screen or from the
+  // Profile page it moved to — a card that quietly disappears in a restructure is the failure mode
+  // nobody notices, because nothing looks wrong.
+  const ids = [...html.matchAll(/\{ id: "([a-z]+)", ic:/g)].map((m) => m[1]!);
+  assert.ok(ids.length >= 10, "the hub list is not where this test thinks it is: " + ids.length);
+  const listed = fnSrc("viewSupport") + html.slice(html.indexOf("const HUB_CHECKINS"), html.indexOf("function viewSupport("));
+  const prof = fnSrc("viewProfile");
+  const missing = ids.filter((id) => !listed.includes('"' + id + '"') && !prof.includes('"' + id + '"'));
+  assert.deepEqual(missing, [],
+    "these hub cards are reachable from nowhere after the restructure: " + missing.join(", "));
+
+  // ⚠️ Shoes and devices MOVED to Profile > Connections — the brief always put them there, and
+  // CLAUDE.md recorded the hub as their "honest interim home, not the intended one".
+  assert.match(prof, /"shoes"/, "the shoe rack lost its home when it left the hub");
+  assert.match(prof, /"connect"/, "apps and devices lost their home when they left the hub");
+});
 test("⚠️ a profile edit previews before it rebuilds, and the preview commits nothing", () => {
   // The brief's clearest safety recommendation. Saving used to rebuild every week, clear the day's
   // ticks, drop every session the runner had moved and push the new schedule to iOS and the watch —
@@ -592,4 +605,57 @@ test("⚠️ a screen arrives in one motion, and the haptic goes through the bri
   const html = page().replace(/\/\*[\s\S]*?\*\//g, "");
   const raw = (html.match(/navigator\.vibrate\(/g) || []).length;
   assert.equal(raw, 1, "navigator.vibrate is called outside haptic(), so it is silent in the app");
+});
+
+test("⚠️ the profile is a summary you can read, with the form behind it", () => {
+  // "A profile should be scannable in seconds and make plan-changing edits feel safe, reversible and
+  // explicit." The profile WAS the six-section setup form: the only way to check what your goal was
+  // set to was to open every question you had ever answered, on the screen where a stray tap on Save
+  // rebuilds your plan. Reading and editing were the same act.
+  const html = page();
+  const fn = fnSrc("viewProfile");
+  for (const sec of ["Training profile", "Connections", "Preferences", "Account"]) {
+    assert.ok(fn.includes(sec), "the profile has no " + sec + " section");
+  }
+  for (const row of ["Goal", "Current fitness", "Training rhythm", "Current context"]) {
+    assert.ok(fn.includes('label: "' + row + '"'), "no " + row + " row");
+  }
+  // ⚠️ THE FORM IS MOVED BEHIND IT, NOT REPLACED. Every question is still answered in the same place.
+  assert.match(fn, /action: "setup"/, "there is no way through to the questions");
+  assert.match(html, /profileBtn"\)\.onclick[^\n]*state\.screen = "profile"/,
+    "the avatar still opens the raw form rather than the summary");
+
+  // ⚠️ NO PREMIUM BADGE, THOUGH THE MOCKUP HAS ONE. The owner cut subscriptions — "thats not
+  // something we are doing (yet)" — and CLAUDE.md says do not reinstate it from the mockup. A badge
+  // for a tier that does not exist is a promise the app cannot keep.
+  assert.ok(!/PREMIUM|Premium/.test(fn), "the profile advertises a subscription that does not exist");
+
+  // ⚠️ A SEEDED FITNESS FIGURE MUST SAY SO. Printing a 5 km time nobody ran as "Current fitness" is
+  // the app quoting a result back at somebody who never produced it, on the screen where they would
+  // most reasonably believe it.
+  const fit = fnSrc("profFitness");
+  assert.match(fit, /profile\.noRecent \|\| profile\.autoPace/, "a seeded time is shown as a measurement");
+  assert.match(fit, /Not measured yet/, "there is no honest value for an unmeasured runner");
+
+  // ⚠️ EVERY DESTINATION ALREADY EXISTS — this page is a way in, not a set of new screens. Both of
+  // these were INVENTED first time round ("toggleTheme", "openRemindSheet") and did nothing.
+  assert.match(html, /openRemindersSheet\(\)/, "the notifications row goes nowhere");
+  assert.ok(!/toggleTheme\(\)|openRemindSheet\(\)/.test(html), "a row calls a function that does not exist");
+});
+
+test("⚠️ the safety page states only what the code actually does", () => {
+  // ⚠️ THIS IS THE EASIEST PAGE IN THE APP TO WRITE DISHONESTLY, because every sentence on it sounds
+  // reassuring whether or not it is true — and it is the page somebody reads most carefully.
+  const fn = fnSrc("safetyView");
+  assert.match(fn, /not a doctor, a physiotherapist or a dietitian/i, "it never says what it is not");
+  assert.match(fn, /not a diagnosis and cannot be one/i, "the check-ins are not scoped");
+  assert.match(fn, /On this phone/, "it does not say where the data lives");
+  // The check-ins genuinely keep nothing — chkValues reads the DOM and writes nowhere.
+  assert.match(fn, /keep nothing at all/i, "it overstates or understates what the check-ins retain");
+  // ⚠️ It must name the two things that DO leave the phone, or "nothing is sent anywhere" is false.
+  assert.match(fn, /weather/i, "the weather request is not disclosed");
+  assert.match(fn, /map tiles/i, "the map tile request is not disclosed");
+  // ⚠️ And it must adapt if the runner has pointed Alfie at their own service.
+  assert.match(fn, /alfieCfg\(\) \|\| \{\}\)\.proxy/, "the Alfie claim is fixed rather than read from config");
+  assert.match(fn, /EMERGENCY_BANNER\(\)/, "the emergency route is missing from the safety page");
 });

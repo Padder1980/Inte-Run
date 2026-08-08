@@ -10595,7 +10595,7 @@ writeFileSync(join(docsDir, "manifest.webmanifest"), JSON.stringify(manifest, nu
 // network-first (updates reach the user) while assets are cache-first (fast + offline-capable).
 const cacheName = `interun-${html.length}`;
 const sw = `const CACHE = ${JSON.stringify(cacheName)};
-const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png", "./apple-touch-icon.png", "./roadmap/", "./roadmap/index.html", "./roadmap/manifest.webmanifest"];
+const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png", "./apple-touch-icon.png", "./roadmap/", "./roadmap/index.html", "./roadmap/manifest.webmanifest", "./mapstyles/", "./mapstyles/index.html"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener("fetch", (e) => {

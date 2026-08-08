@@ -363,6 +363,32 @@ each watched failing their own guard.
 semantic tokens split from workout colours, the first components (session row, coach note, readiness
 tile, bottom action bar) with their full state sets, focus-visible and VoiceOver labels.
 
+### The seven mockup features that do not exist — his ruling, 2026-08-08
+
+*"I would build those features in advance and leave a place holder message like coming soon"* — build
+the shell now so the navigation is complete, and fill in behaviour later.
+
+⚠️ **BUT THEY ARE NOT ALL THE SAME THING, AND THREE NEED NO PLACEHOLDER AT ALL.** Treating them
+uniformly would add seven unfinished surfaces where three could simply be finished — and a
+"coming soon" on something the app can already compute is worse than no feature, because it says the
+app cannot do a thing it demonstrably can.
+
+| Mockup feature | Verdict | Why |
+|---|---|---|
+| Logbook period totals, consistency, filters | **BUILD IT** | Every run is in `interun_runs` with `dateIso`, distance, time and type. Nothing is missing. |
+| Support search | **BUILD IT** | The articles are markup in the build; a client-side index over them needs no backend. |
+| Apps & devices | **BUILD IT, partially** | `WatchBridge` already knows `isPaired` / `isWatchAppInstalled`. Show the real state; "coming soon" only for the things that are not the watch. |
+| Subscription / PREMIUM badge | **PLACEHOLDER** | No account, no server, nothing to show. |
+| Community | **PLACEHOLDER** | Needs a backend the app deliberately does not have. |
+| Shoes | **PLACEHOLDER, or a real feature** | No data model. Mileage tracking is buildable locally but is a feature build, not a placeholder — his call. |
+| Plan move / swap / skip + impact sheet | **ENGINE WORK, not a placeholder** | The engine can rebuild a plan; it cannot move one session and describe the consequence. The largest genuinely new capability in the brief. |
+
+⚠️ **A "coming soon" placeholder was REMOVED on 2026-08-08** (the stretch-video box, offered after
+every run) because the TestFlight audit called it the most visible unfinished surface in the app, and
+separately predicted the Community tab's "on the way" would be a leading piece of tester feedback.
+Adding placeholders is therefore a deliberate reversal, made safe only by the redesign landing BEFORE
+TestFlight. If that ordering ever changes, revisit this.
+
 ## Deploy & links
 
 - Push to **`main`** → GitHub Pages serves `docs/` at **https://padder1980.github.io/Inte-Run/**.

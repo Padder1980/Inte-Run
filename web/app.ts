@@ -3045,7 +3045,8 @@ function feelSquare() {
   const su = state.subj || {};
   const why = su.energy === "low" ? "You said your energy is low"
     : su.soreness === "high" ? "You reported soreness"
-    : su.soreness === "some" ? "A bit of soreness"
+    : su.soreness === "moderate" ? "You reported soreness"
+    : su.soreness === "mild" ? "A bit of stiffness"
     : answered ? "Energy and soreness both fine" : "";
   return '<button class="tsq-plain" id="feelSq" aria-label="Readiness check-in">' +
     uiReadinessTile({ state: st, score: score, contributor: why, since: "earlier today" }) + '</button>';
@@ -4385,7 +4386,12 @@ function alfieAsk(text) {
     alfieSaveMsgs(); alfieRenderLog();
   };
   const local = () => { try { return alfieLocalAnswer(t); } catch (e) { return "<p>Something went wrong finding that answer \\u2014 try asking a different way.</p>"; } };
-  if (alfieCfg().proxy) {
+  // \u26a0\ufe0f SCREEN FOR RED FLAGS BEFORE DISPATCHING ANYWHERE. alfieRedFlags lives inside
+  // alfieLocalAnswer, which the remote path only reaches on FAILURE -- so with a proxy configured, a
+  // runner typing "chest pain" got a language model's reply and no escalation at all. The whole point
+  // of the screener is that it does not depend on a model choosing to escalate. It runs first now, and
+  // a hit is answered locally and never sent, which also keeps a symptom disclosure off the network.
+  if (alfieCfg().proxy && !alfieRedFlags(t).length) {
     alfieRemote(t).then(finish).catch(() => setTimeout(() => finish(local()), 120));
   } else {
     setTimeout(() => finish(local()), 260); // a beat, so it reads as a reply rather than a jump
@@ -5008,11 +5014,28 @@ let SHEET_CTX = null;
 // study found a standard warm-up helped the fitter group and did nothing for the low-fitness one.
 // The daily check-in, as a 1-5 readiness score. ⚠️ Only ever used to REDUCE — a good day must not
 // unlock a bigger warm-up, which is the direction an app talks someone into more work.
+// \u26a0\ufe0f THERE IS NO #readySlot IN THE MARKUP. This handler is bound on every render to any
+// [data-seg] element; the live check-in happens to use data-fseg, so it has never fired -- but the
+// moment anything uses the perfectly natural data-seg attribute it dereferences null and takes the
+// render with it. Guarded rather than deleted, because renderReadiness is the honest fallback if the
+// slot is ever added back.
+function readySlotPaint() { const el = $("readySlot"); if (el) el.innerHTML = renderReadiness(); }
 function readinessScore() {
+  // \u26a0\ufe0f "some" IS NOT A VALUE THIS APP EVER WRITES. The check-in offers none / mild / moderate
+  // / high (the engine's own vocabulary, src/readiness/readiness.ts), so the branch was unreachable
+  // and a runner answering SORE scored exactly the same as one answering FINE -- the question was on
+  // screen, was answered honestly, and changed nothing.
+  // \u26a0\ufe0f AND THE BASE WAS 4 WITH NO POSITIVE TERM, so 5 was unreachable: a four-point scale
+  // printed as n/5, which is the same false precision the owner's "whole numbers" ruling rejected in
+  // the mockup's 7.6/10. CLAUDE.md's claim of "exactly five reachable values" was describing intent,
+  // not the code. Base 5 with four honest soreness steps makes all five reachable, and makes
+  // feelSquare's "ready" state renderable for the first time.
   const su = state.subj || {};
-  let score = 4;
+  let score = 5;
   if (su.energy === "low") score -= 2; else if (su.energy === "ok") score -= 1;
-  if (su.soreness === "high") score -= 2; else if (su.soreness === "some") score -= 1;
+  if (su.soreness === "high") score -= 3;
+  else if (su.soreness === "moderate") score -= 2;
+  else if (su.soreness === "mild") score -= 1;
   return Math.max(1, Math.min(5, score));
 }
 function warmupAbility() {
@@ -6015,7 +6038,12 @@ function weekDetail() {
   const w = PLAN.weeks.find((x) => x.index === state.planWeek) || PLAN.weeks[0];
   const byDay = {};
   w.sessions.filter((s) => s.type !== "rest").forEach((s) => { const d = effDay(s); (byDay[d] = byDay[d] || []).push(s); });
-  const isCur = w.index === CURRENT_WEEK;
+  // \u26a0\ufe0f CURRENT_WEEK IS A 0-BASED ARRAY INDEX AND w.index IS 1-BASED. Compared directly, this
+  // marked the week AFTER the current one as current -- and in week 1 (CURRENT_WEEK === 0) nothing
+  // matched at all, so "Next" never appeared for a runner in their first week. curWeekNo() exists to
+  // convert and is the only correct reader. Gated on TODAY_IN_PLAN because curWeekNo() falls back to
+  // week 1 when today is outside the block, which would mark week 1 current all through a finished plan.
+  const isCur = TODAY_IN_PLAN && w.index === curWeekNo();
   // ⚠️ THE NEXT SESSION IS THE FIRST UNDONE ONE FROM TODAY, and only in the current week. Marking a
   // session "Next" in a week three months away would be nonsense.
   let nextId = null;
@@ -6050,7 +6078,11 @@ function weekDetail() {
   }).join("");
   return '<div class="ui-hero-t">Week ' + w.index + '</div>' +
     '<div class="ui-sub">' + esc(w.phase) + (w.isDeload ? " \u00b7 absorb week" : "") +
-      (w.plannedDistanceMeters ? " \u00b7 " + (w.plannedDistanceMeters / 1000).toFixed(1) + " km" : "") + '</div>' +
+      // \u26a0\ufe0f WeekView carries distanceKm, NOT plannedDistanceMeters -- that name is the engine's
+      // PlannedWeek field and does not survive weekView(). Reading it gave undefined, so the week's
+      // mileage never once appeared on this line. There is no type checking inside the template
+      // literal to catch a field that does not exist.
+      (w.distanceKm ? " \u00b7 " + w.distanceKm.toFixed(1) + " km" : "") + '</div>' +
     rows;
 }
 
@@ -7325,7 +7357,12 @@ const DAY_NAMES_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", 
 function dayOpts(sel) { const s = sel != null ? Number(sel) : 6; return DAY_NAMES_FULL.map((d, i) => '<option value="' + i + '"' + (i === s ? " selected" : "") + '>' + d + '</option>').join(""); }
 function seg(name, opts, val) { return '<div class="seg" data-set="' + name + '">' + opts.map((o) => '<button data-v="' + o[0] + '"' + (String(o[0]) === String(val) ? ' class="on"' : '') + '>' + o[1] + '</button>').join("") + '</div>'; }
 // ---- Name & profile picture ----------------------------------------------
-function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+// \u26a0\ufe0f QUOTES TOO. This escaped only & < > while user-controlled text already reached HTML
+// ATTRIBUTE position through it: the four "your why" answers (120 characters of free text each), the
+// why name, and the shoe name. A double quote in any of them closed the attribute early and the rest
+// of the value became markup -- so a runner whose shoe is called 5" Racer lost the row. In text
+// position &quot; and &#39; render as the characters themselves, so widening it is safe everywhere.
+function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#39;"); }
 function initials(name) { const parts = (name || "").trim().split(/\\s+/).filter(Boolean); if (!parts.length) return ""; return (parts[0].charAt(0) + (parts.length > 1 ? parts[parts.length - 1].charAt(0) : "")).toUpperCase(); }
 function avatarInner(p) { if (p.avatar) return '<img src="' + p.avatar + '" alt="">'; const init = initials(p.name); return init || ICON.person; }
 // Paint the top-bar profile button from the current profile: photo, else initials, else the person icon.
@@ -10027,8 +10064,14 @@ function treadmillDistanceHtml(sm) {
     '<div class="bk-md">' + (denied
       ? 'This run was timed but not tracked \u2014 your phone could not get a GPS signal, so there is no distance or route for it. If you know how far you went, put it in and your pace, splits and plan all stay right.<br><br>If you meant to record the route, check that Inte-Run is allowed to use your location in <b>Settings \u203a Privacy &amp; Security \u203a Location Services</b>.'
       : 'Your phone can\u2019t measure distance indoors, so we haven\u2019t guessed. Type what the machine says and your pace, splits and plan all stay right.') +
-    '</div>' 
-    '<div class="bk-md">Your phone can\u2019t measure distance indoors, so we haven\u2019t guessed. Type what the machine says and your pace, splits and plan all stay honest.</div>' +
+    // \u26a0\ufe0f THIS LINE HAD NO + AND EVERYTHING BELOW IT WAS UNREACHABLE. Automatic semicolon
+    // insertion ended the return statement here, so the card rendered its heading and paragraph and
+    // then stopped: no distance box, no button, no note. Every treadmill run AND every outdoor run
+    // that failed to get GPS (gpsFallback lands in startIndoor) could never have its distance added,
+    // for as long as the app has shipped the denied/indoor split. The line below it was the ORIGINAL
+    // paragraph, left behind when the conditional above replaced it -- a botched edit that read as
+    // harmless duplication and was in fact a return statement.
+    '</div>' +
     '<div class="tm-row"><input class="sel num" id="tmDist" inputmode="decimal" placeholder="e.g. 8.05" value="' + (set ? esc(sm.distKm) : "") + '">' +
     '<span class="tm-unit">km</span><button class="mini-btn" id="tmSet">' + (set ? "Update" : "Add distance") + '</button></div>' +
     '<div class="tm-note" id="tmNote">' + (set ? "Pace recalculated from " + esc(sm.distKm) + " km." : "Leave it blank and this is logged by time alone \u2014 which still counts.") + '</div></div>';
@@ -11241,9 +11284,16 @@ function wire() {
   document.querySelectorAll("[data-seg]").forEach((seg) => seg.querySelectorAll("button").forEach((b) => b.onclick = () => {
     const f = seg.dataset.seg; const v = b.dataset.v;
     if (f === "dayType") { state.dayType = v; render(); return; }
-    state.subj[f] = v; seg.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); $("readySlot").innerHTML = renderReadiness();
+    state.subj[f] = v; seg.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); readySlotPaint();
   }));
-  document.querySelectorAll("[data-wk]").forEach((b) => b.onclick = () => { state.planWeek = Number(b.dataset.wk); document.querySelectorAll("[data-wk]").forEach((x) => x.setAttribute("aria-pressed", x === b)); $("weekDetail").innerHTML = weekDetail(); wireSessionTaps(); });
+  // \u26a0\ufe0f SCOPED TO THE CHART. data-wk names two unrelated things: a WEEK NUMBER on the plan
+  // chart's bars, and a workout FORMAT ID (a string, "vo2-10x1") on the add-a-session sheet's library
+  // rows. The sheet binds its own handler scoped to #sheetBody, but this one was unscoped and both use
+  // .onclick, so whichever ran last won. #sheetOv lives outside #view and survives a render, so any
+  // background render while the builder sheet was open -- a watch live tick, a coach cue -- rebound
+  // those rows to state.planWeek = Number("vo2-10x1") = NaN and then innerHTML on a #weekDetail that
+  // does not exist on that screen. The sheet died with a TypeError and no way back.
+  document.querySelectorAll("#chart [data-wk]").forEach((b) => b.onclick = () => { state.planWeek = Number(b.dataset.wk); document.querySelectorAll("#chart [data-wk]").forEach((x) => x.setAttribute("aria-pressed", x === b)); $("weekDetail").innerHTML = weekDetail(); wireSessionTaps(); });
   centerPlanWeek();
   document.querySelectorAll("[data-at]").forEach((b) => b.onclick = () => { state.actTab = b.dataset.at; render(); });
   document.querySelectorAll("[data-runidx]").forEach((b) => b.onclick = () => {

@@ -8086,14 +8086,15 @@ const OVMAP_W = 700, OVMAP_H = 420;
 // (offline / sandbox), the marching-ants fallback already in the container stays.
 function buildOverviewMap(container, route) {
   if (!container || !route || route.length < 2) return;
-  loadRouteMap(route, OVMAP_W, OVMAP_H, "rastertiles/voyager").then((md) => {
+  routeMapFor(route, OVMAP_W, OVMAP_H, MAP_STYLE_RUN).then((md) => {
     if (!container.isConnected) return;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const cv = document.createElement("canvas"); cv.width = OVMAP_W * dpr; cv.height = OVMAP_H * dpr;
     cv.className = "ov-mapcv";
     const g = cv.getContext("2d"); g.scale(dpr, dpr);
     g.fillStyle = "#eef1ee"; g.fillRect(0, 0, OVMAP_W, OVMAP_H);
-    md.tiles.forEach((t) => { try { g.drawImage(t.img, t.dx, t.dy, MAP_TILE, MAP_TILE); } catch (e) {} });
+    // One image now, cached or freshly composited — the caller cannot tell which, which is the point.
+    try { g.drawImage(md.image, 0, 0, OVMAP_W, OVMAP_H); } catch (e) {}
     const overlay = routeMapSvg(route, md.proj, OVMAP_W, OVMAP_H);
     container.classList.add("ov-light");
     container.innerHTML = "";
@@ -8593,6 +8594,143 @@ function loadTileImage(url) {
 // Load CORS-enabled dark basemap tiles (CARTO/OpenStreetMap) covering the route, plus a projection
 // so the route aligns with the streets. Rejects on any failure (offline / sandbox / CORS) so the
 // caller can fall back to the grid map.
+
+// ⚠️ THE ONLY TWO PLACES A MAP STYLE IS NAMED, and they are deliberately separate: the little map on
+// a finished run and the picture that gets shared are different surfaces and may want different maps.
+// They currently differ — the run card is the colourful one, the share card the dark one — which is a
+// choice, not an oversight. Changing provider is a change to these two constants plus the URL built in
+// loadRouteMap, and nothing else in the app names a tile source.
+// ⚠️ Changing either one invalidates the cached pictures by itself, because the style is part of
+// routeMapKey. Nothing has to be cleared by hand.
+const MAP_STYLE_RUN = "rastertiles/voyager";
+const MAP_STYLE_SHARE = "dark_all";
+// ---- The map is drawn ONCE and kept -------------------------------------------------------------
+//
+// A run's route never changes, so the picture of it never changes either. Before this, every glance
+// at a run in the Logbook re-fetched its map tiles: free on CARTO, billed per request on Mapbox, and
+// on the NATIVE app not cached by anything at all (the service worker is gated on http(s) and the app
+// serves itself from interun://app, so the SW's tile caching does not exist there). Rendering once and
+// keeping the result means the bill tracks HOW MANY RUNS ARE RECORDED, not how often they are browsed.
+//
+// ⚠️ THE PICTURE IS A CACHE, NOT DATA. Three consequences, and all three are load-bearing:
+//   1. It lives in IndexedDB, never in localStorage. A composited map is ~100-250 KB; fifty runs of
+//      those would blow the localStorage quota and take the runner's entire training history with
+//      them. localStorage holds the runs; this holds a redrawable picture of them.
+//   2. It is therefore NOT in the backup, and must not be. dataView() discovers backup keys by the
+//      interun_/rc_ PREFIX in localStorage, so this is excluded by construction — which is correct:
+//      an export should carry the run, not a regenerable image of it, and adding megabytes of PNG to
+//      a file the runner emails themselves would be a poor trade.
+//   3. Every miss must be silent and harmless. If IndexedDB is unavailable — private browsing, a
+//      quota refusal, an old engine — the map still draws, straight from tiles, exactly as before.
+const MAPCACHE_DB = "interun_mapcache_v1", MAPCACHE_STORE = "maps", MAPCACHE_MAX = 120;
+function mapCacheOpen() {
+  return new Promise((resolve) => {
+    try {
+      if (!window.indexedDB) return resolve(null);
+      const rq = indexedDB.open(MAPCACHE_DB, 1);
+      rq.onupgradeneeded = () => {
+        const db = rq.result;
+        if (!db.objectStoreNames.contains(MAPCACHE_STORE)) db.createObjectStore(MAPCACHE_STORE, { keyPath: "k" });
+      };
+      rq.onsuccess = () => resolve(rq.result);
+      rq.onerror = () => resolve(null);
+    } catch (e) { resolve(null); }
+  });
+}
+function mapCacheGet(key) {
+  return mapCacheOpen().then((db) => new Promise((resolve) => {
+    if (!db) return resolve(null);
+    try {
+      const tx = db.transaction(MAPCACHE_STORE, "readwrite"), st = tx.objectStore(MAPCACHE_STORE);
+      const rq = st.get(key);
+      rq.onsuccess = () => {
+        const v = rq.result;
+        // Stamp the read so eviction can drop the least recently LOOKED AT, not the oldest written —
+        // a run opened every week should outlive one recorded once and never revisited.
+        if (v) { v.used = Date.now(); try { st.put(v); } catch (e) {} }
+        resolve(v || null);
+      };
+      rq.onerror = () => resolve(null);
+    } catch (e) { resolve(null); }
+  }));
+}
+function mapCachePut(key, blob, meta) {
+  return mapCacheOpen().then((db) => new Promise((resolve) => {
+    if (!db) return resolve(false);
+    try {
+      const tx = db.transaction(MAPCACHE_STORE, "readwrite"), st = tx.objectStore(MAPCACHE_STORE);
+      st.put({ k: key, blob: blob, z: meta.z, ox: meta.originX, oy: meta.originY, used: Date.now() });
+      // Bounded, or a heavy user's cache grows without limit on a device that never asked for it.
+      const all = st.getAllKeys();
+      all.onsuccess = () => {
+        if (!all.result || all.result.length <= MAPCACHE_MAX) return;
+        const every = st.getAll();
+        every.onsuccess = () => {
+          const rows = (every.result || []).sort((a, b) => (a.used || 0) - (b.used || 0));
+          rows.slice(0, rows.length - MAPCACHE_MAX).forEach((r) => { try { st.delete(r.k); } catch (e) {} });
+        };
+      };
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    } catch (e) { resolve(false); }
+  }));
+}
+/**
+ * A stable key for THIS route at THIS size in THIS style.
+ *
+ * ⚠️ KEYED ON THE ROUTE, NEVER ON THE RUN ID. liveRunRecord stamps a fresh id from the clock on EVERY
+ * render of the finish screen, so a run-id key would mint a new cache entry several times a second
+ * while the runner sat looking at their finished run — an unbounded store filled with identical
+ * pictures. The route is the thing that decides what the map looks like, so the route is the key, and
+ * a bonus falls out of it: the finish screen and the Logbook share one entry for the same run.
+ */
+function routeMapKey(route, pw, ph, style) {
+  let h = 2166136261;
+  const mix = (n) => { h ^= n | 0; h = Math.imul(h, 16777619); };
+  mix(route.length);
+  // Every point, rounded to about a metre so float noise cannot change the key.
+  for (let i = 0; i < route.length; i++) { mix(Math.round(route[i].lat * 1e5)); mix(Math.round(route[i].lng * 1e5)); }
+  return (h >>> 0).toString(36) + "|" + route.length + "|" + pw + "x" + ph + "|" + style;
+}
+/**
+ * The basemap for a route, from the cache when we have it and from tiles when we do not.
+ * Resolves { image, proj } — one drawable instead of a pile of tiles.
+ *
+ * ⚠️ COMPOSITED AT 2x, ALWAYS. The tiles are @2x and the callers draw onto DPR-scaled canvases, so
+ * caching at 1x would bake a soft map into every retina screen forever. A fixed 2x also means the
+ * cached size does not depend on which device happened to draw it first.
+ */
+const MAPCACHE_SS = 2;
+function routeMapFor(route, pw, ph, style) {
+  const key = routeMapKey(route, pw, ph, style);
+  const fromBlob = (blob, z, ox, oy) => new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob), img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve({ image: img, proj: (p) => [mercX(p.lng, z) - ox, mercY(p.lat, z) - oy] }); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("cached map unreadable")); };
+    img.src = url;
+  });
+  return mapCacheGet(key)
+    .then((hit) => (hit && hit.blob ? fromBlob(hit.blob, hit.z, hit.ox, hit.oy) : null))
+    .catch(() => null)
+    .then((hit) => {
+      if (hit) return hit;
+      return loadRouteMap(route, pw, ph, style).then((md) => {
+        const cv = document.createElement("canvas");
+        cv.width = pw * MAPCACHE_SS; cv.height = ph * MAPCACHE_SS;
+        const g = cv.getContext("2d");
+        g.scale(MAPCACHE_SS, MAPCACHE_SS);
+        g.fillStyle = "#eef1ee"; g.fillRect(0, 0, pw, ph);
+        md.tiles.forEach((t) => { try { g.drawImage(t.img, t.dx, t.dy, MAP_TILE, MAP_TILE); } catch (e) {} });
+        // Hand the caller a usable map first; storing it must never delay the screen.
+        const out = { image: cv, proj: md.proj };
+        try {
+          cv.toBlob((b) => { if (b) mapCachePut(key, b, md); },
+            "image/webp", 0.8);
+        } catch (e) {}
+        return out;
+      });
+    });
+}
 function loadRouteMap(route, pw, ph, style) {
   pw = pw || MAP_W; ph = ph || MAP_H; style = style || "dark_all";
   return new Promise((resolve, reject) => {
@@ -8611,7 +8749,8 @@ function loadRouteMap(route, pw, ph, style) {
       }
     if (!specs.length || specs.length > 40) return reject(new Error("tile count"));
     Promise.all(specs.map((s) => loadTileImage(s.url).then((img) => ({ img, dx: s.dx, dy: s.dy }))))
-      .then((tiles) => resolve({ tiles, proj: (p) => [mercX(p.lng, z) - originX, mercY(p.lat, z) - originY] }))
+      .then((tiles) => resolve({ tiles, z: z, originX: originX, originY: originY,
+        proj: (p) => [mercX(p.lng, z) - originX, mercY(p.lat, z) - originY] }))
       .catch(reject);
   });
 }
@@ -8619,7 +8758,7 @@ function drawMapPanel(g, run, mx, my, mw, mh, mapData) {
   rr(g, mx, my, mw, mh, 30); g.fillStyle = "#0a1714"; g.fill();
   g.save(); rr(g, mx, my, mw, mh, 30); g.clip();
   if (mapData) {
-    mapData.tiles.forEach((t) => { try { g.drawImage(t.img, mx + t.dx, my + t.dy, MAP_TILE, MAP_TILE); } catch (e) {} });
+    try { g.drawImage(mapData.image, mx, my, mw, mh); } catch (e) {}
     g.fillStyle = "rgba(4,16,13,.4)"; g.fillRect(mx, my, mw, mh); // dim map for route contrast
     drawRouteGlow(g, run.route, mx, my, mw, mh, (p) => { const q = mapData.proj(p); return [mx + q[0], my + q[1]]; });
   } else {
@@ -8695,7 +8834,7 @@ function buildShareCanvasCore(run, mapData) {
   return c;
 }
 function buildShareCanvasSync(run) { return buildShareCanvasCore(run, null); }
-function buildShareCanvasWithMap(run) { return loadRouteMap(run.route, MAP_W, MAP_H).then((md) => buildShareCanvasCore(run, md)); }
+function buildShareCanvasWithMap(run) { return routeMapFor(run.route, MAP_W, MAP_H, MAP_STYLE_SHARE).then((md) => buildShareCanvasCore(run, md)); }
 function canvasToPngFile(canvas, name) {
   const dataUrl = canvas.toDataURL("image/png");
   const b64 = dataUrl.split(",")[1], bin = atob(b64), arr = new Uint8Array(bin.length);

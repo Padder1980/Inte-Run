@@ -223,6 +223,56 @@ Pre-generated audio cannot contain an arbitrary name, so this is a **two-tier** 
   Requires `espeak-ng` (system) — Kokoro weights come from GitHub (huggingface.co is blocked in the
   sandbox). Countdowns are stitched from separate number beats so 3-2-1 lasts exactly 3 seconds.
 
+## THE MAP IS DRAWN ONCE AND KEPT (added 2026-08-08, ahead of the provider move)
+
+A run's route never changes, so the picture of it never changes either — and yet every glance at a run
+in the Logbook re-fetched its tiles. Free on CARTO, **billed per request on Mapbox**, and on the NATIVE
+app cached by nothing at all: the service worker is gated on `location.protocol` being http(s) and the
+app serves itself from `interun://app`, so the SW's cache-first tile branch does not exist there.
+Rendering once makes the bill track **how many runs are recorded**, not how often they are browsed.
+That is the difference between a paid map provider being affordable and not, and it is why this landed
+before the provider choice rather than after it.
+
+`routeMapFor(route, pw, ph, style)` returns `{ image, proj }` and is the only thing the app calls;
+`loadRouteMap` is now the tile fetcher behind it, with exactly one caller. **Measured: 64 KB per map
+(WebP q0.8), 137 ms → 6 ms on a repeat, and zero tile requests on the second view.**
+
+⚠️ **KEYED ON THE ROUTE, NEVER ON THE RUN ID.** `liveRunRecord` stamps `id: "run-" + new Date().getTime()`
+on **every render** of the finish screen (documented above), so a run-id key would mint a fresh cache
+entry several times a second while the runner sat looking at their own finished run — an unbounded
+store of identical pictures. The route decides what the map looks like, so the route is the key, and a
+bonus falls out: the finish screen and the Logbook share one entry. Coordinates are rounded to ~1 m so
+float noise across a JSON round-trip cannot invalidate it.
+
+⚠️ **THE PICTURE IS A CACHE, NOT DATA, AND ALL THREE CONSEQUENCES ARE LOAD-BEARING.**
+1. **IndexedDB, never localStorage.** 64 KB × 50 runs would blow the localStorage quota and take the
+   runner's entire training history with it — localStorage is where the RUNS live.
+2. **It is therefore not in the backup, and must not be.** `dataView()` discovers backup keys by the
+   `interun_`/`rc_` prefix in localStorage, so IndexedDB is excluded by construction. That is correct:
+   an export should carry the run, not a regenerable image of it.
+3. **Every failure is silent and harmless.** No IndexedDB, a quota refusal, private browsing — the map
+   still draws straight from tiles. A cache that can break the screen is worse than no cache.
+
+⚠️ **COMPOSITED AT A FIXED 2×, not at the device's DPR.** At 1× a soft map would be baked into every
+retina screen forever; at the drawing device's own DPR the stored size would depend on which phone
+happened to open the run first.
+
+⚠️ **THE STYLE IS PART OF THE KEY**, so changing map provider or style invalidates every stored picture
+by itself — nothing has to be cleared by hand.
+
+**The swap-point:** `MAP_STYLE_RUN` and `MAP_STYLE_SHARE` are the only two places a style is named, and
+`loadRouteMap` builds the only tile URL in the app. They differ on purpose — the little map on a
+finished run is the colourful one, the share card the dark one. Moving to Mapbox is those two constants
+plus that one URL. `test/route-map-cache.test.ts` asserts there is exactly ONE tile host and that both
+surfaces go through the cache; all six of its guards were watched failing before being believed.
+
+⚠️ **Mapbox has NO spending cap and NO configurable usage alerts** (verified against their own FAQ,
+2026-08-08) — one email the first time you cross the free tier, and that is all. So the protections are
+this cache, a URL-restricted token, and watching the Statistics page. ⚠️ **URL restrictions cannot be
+applied to the account's DEFAULT public token** — a second token has to be created. And ⚠️ **a
+URL-restricted token will very likely be refused in the native app**, which is not a web page and
+serves itself from `interun://app`; that needs its own answer before the App Store.
+
 ## Deploy & links
 
 - Push to **`main`** → GitHub Pages serves `docs/` at **https://padder1980.github.io/Inte-Run/**.

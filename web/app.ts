@@ -5821,11 +5821,19 @@ const BACKUP_FORMAT = "interun-backup";
 const BACKUP_PREFIXES = ["interun_", "rc_"];
 // Keys are discovered at runtime rather than listed, so a key added in a later version still
 // travels without anyone remembering to update a list here.
+// ⚠️ THE ONE THING THE PREFIX RULE MUST NOT SWEEP UP: a credential. Backup keys are discovered by the
+// interun_/rc_ prefix precisely so a key added later still travels — which is right for training data
+// and exactly wrong for a billable Mapbox token. An export is a file the runner emails themselves,
+// AirDrops, or hands to someone helping them; a token in it is a token given away. It is a
+// per-device setting, not part of a training history, so it does not belong in a backup on either
+// count. Keep this list to things that are genuinely NOT the runner's data.
+const BACKUP_NEVER = ["interun_mapbox_v1"];
 function backupKeys() {
   const out = [];
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
+      if (k && BACKUP_NEVER.indexOf(k) >= 0) continue;
       if (k && BACKUP_PREFIXES.some((p) => k.indexOf(p) === 0)) out.push(k);
     }
   } catch (e) {}
@@ -6191,6 +6199,59 @@ function probeInsets() {
 function liveActivityStatus() {
   try { return String(window.__interunLiveActivity || "not attempted yet"); } catch (e) { return "unknown"; }
 }
+/**
+ * Paste a Mapbox token, on the phone, with no terminal and no rebuild.
+ *
+ * ⚠️ BUILT BECAUSE THE FILE ROUTE WAS THE WRONG ANSWER FOR HIM. The token belongs in gitignored
+ * ios/mapbox-token.txt for a SHIPPED build — that is still how it reaches TestFlight — but asking the
+ * owner to open a terminal and redirect a string into a path, on the day he wanted to see his maps,
+ * was a worse answer than a text box. This is the same escape hatch the Alfie proxy already uses
+ * (localStorage interun_alfie_v1), given a face.
+ *
+ * ⚠️ IT MUST NOT TRAVEL IN A BACKUP, and it very nearly did. Backup keys are discovered by the
+ * interun_/rc_ PREFIX, so interun_mapbox_v1 would have been swept straight into every export — a file
+ * the runner emails themselves or hands to someone helping them. BACKUP_NEVER excludes it. It is a
+ * per-device setting rather than part of a training history, so it does not belong there on either
+ * count, but the reason it is written down is the credential one.
+ */
+function mapTokenCard() {
+  const prov = mapProviderFor(MAP_STYLE_RUN);
+  const injected = (function () { try { return typeof window.__interunMapboxToken === "string"; } catch (e) { return false; } })();
+  const state = prov.kind === "mapbox"
+    ? '<div class="bk-val">Mapbox \u2014 Outdoors</div><div class="bk-lab" style="margin-top:4px">Trails, footpaths and contour lines' +
+      (injected ? " \u00b7 from this build" : " \u00b7 from the token below") + '</div>'
+    : '<div class="bk-val">Standard maps</div><div class="bk-lab" style="margin-top:4px">Free, no account. Paste a Mapbox token below to switch.</div>';
+  return '<div class="card"><div class="subhead" style="margin-top:0">Maps</div>' +
+    '<div class="bk-box">' + state + '</div>' +
+    (injected ? "" :
+      '<input id="mbxTok" type="text" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" ' +
+      'placeholder="pk.\u2026 paste your Mapbox token" ' +
+      'style="width:100%;margin-top:12px;padding:12px;border-radius:12px;border:1px solid var(--line);' +
+      'background:var(--surface);color:var(--ink);font:16px ui-monospace,monospace">' +
+      '<button class="primary" id="mbxSave" style="width:100%;margin-top:10px">Use these maps</button>' +
+      (prov.kind === "mapbox" ? '<button class="bk-btn2" id="mbxClear">Go back to the standard maps</button>' : "") +
+      '<div class="bk-lab" style="margin-top:10px;line-height:1.45">Stays on this phone. It is never included in a backup and never leaves the app.</div>') +
+    '<div class="bk-msg" id="mbxMsg"></div></div>';
+}
+function wireMapToken() {
+  const inp = $("mbxTok"), save = $("mbxSave"), clr = $("mbxClear"), msg = $("mbxMsg");
+  if (inp) { try { inp.value = localStorage.getItem("interun_mapbox_v1") || ""; } catch (e) {} }
+  if (save && inp) save.onclick = () => {
+    const t = (inp.value || "").trim();
+    // ⚠️ A SECRET TOKEN IS REFUSED, and told about. sk. tokens can read and write the account; one
+    // pasted into a client is a real exposure, and silently ignoring it would leave him believing it
+    // had worked.
+    if (t.indexOf("sk.") === 0) { if (msg) msg.textContent = "That is a secret token (sk.). Use a public one (pk.) \u2014 a secret token must never go in an app."; return; }
+    if (t && t.indexOf("pk.") !== 0) { if (msg) msg.textContent = "That does not look like a Mapbox token \u2014 they begin with pk."; return; }
+    try { if (t) localStorage.setItem("interun_mapbox_v1", t); else localStorage.removeItem("interun_mapbox_v1"); } catch (e) {}
+    if (msg) msg.textContent = t ? "Saved. Your next run\u2019s map will use Mapbox Outdoors." : "Back to the standard maps.";
+    render();
+  };
+  if (clr) clr.onclick = () => {
+    try { localStorage.removeItem("interun_mapbox_v1"); } catch (e) {}
+    render();
+  };
+}
 function dataView() {
   const cur = backupSummary(collectBackup().data);
   const bytes = JSON.stringify(collectBackup()).length;
@@ -6206,6 +6267,7 @@ function dataView() {
     '<input type="file" id="bkFile" accept="application/json,.json" style="display:none">' +
     '<div class="bk-msg" id="dataMsg"></div>' +
     '</div>' +
+    mapTokenCard() +
     '<div class="card"><div class="subhead" style="margin-top:0">This version</div>' +
     '<div class="bk-box"><div class="bk-val">' + (inNativeApp() ? "iPhone app" : "Web") + '</div>' +
     '<div class="bk-lab" style="margin-top:4px">Built ' + BUILD + ' UTC</div>' +
@@ -6226,6 +6288,7 @@ function dataView() {
     '<div class="bk-md">Your profile and goal, your plan, every logged run with its route and splits, your coach and reminder choices, and anything you\\u2019ve told Alfie. It\\u2019s a plain file on your device \\u2014 nothing is uploaded anywhere, because Inte-Run has no server to upload it to.</div></div>';
 }
 function wireDataView() {
+  wireMapToken();
   const ex = $("bkExport"); if (ex) ex.onclick = exportBackup;
   const im = $("bkImport"), f = $("bkFile");
   if (im && f) {

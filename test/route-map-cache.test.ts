@@ -210,3 +210,25 @@ test("the share card stays DARK on both providers", () => {
   assert.match(html, /MAP_STYLE_RUN = \{ mapbox: "outdoors-v12"/,
     "the run card is not on Mapbox Outdoors, which is the style the owner picked");
 });
+
+
+test("⚠️ a pasted token never travels in a backup", () => {
+  // ⚠️ IT VERY NEARLY DID. Backup keys are discovered by the interun_/rc_ PREFIX so that a key added
+  // later still travels — right for training data, exactly wrong for a billable credential. An export
+  // is a file the runner emails themselves or hands to someone helping them; a token in it is a token
+  // given away.
+  const html = app();
+  assert.match(html, /BACKUP_NEVER/, "there is no exclusion list, so the token rides out in every export");
+  assert.match(html, /BACKUP_NEVER = \["interun_mapbox_v1"\]/, "the Mapbox token is not the thing excluded");
+  assert.match(lift("backupKeys"), /BACKUP_NEVER\.indexOf\(k\) >= 0. continue/,
+    "backupKeys does not consult the exclusion list");
+});
+
+test("the in-app token field refuses a secret token and says why", () => {
+  // sk. tokens can read and write the whole account. Silently ignoring one would leave the runner
+  // believing it had worked, which is worse than refusing it.
+  const w = lift("wireMapToken");
+  assert.match(w, /indexOf\("sk\."\) === 0/, "a secret token is accepted");
+  assert.match(w, /secret token/, "a refused secret token is not explained");
+  assert.match(w, /indexOf\("pk\."\) !== 0/, "anything at all can be pasted in");
+});

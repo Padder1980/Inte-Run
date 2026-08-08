@@ -249,3 +249,80 @@ test("⚠️ consistency is measured against runs actually logged, never against
   // ⚠️ It must not count days that have not happened yet, or every week reads as a failure until Sunday.
   assert.match(fn, /if \(iso > todayIso\(\)\) break;/, "future days of this week are counted as missed");
 });
+
+test("⚠️ every emitted <script> block actually parses", () => {
+  // ⚠️ THIS EXISTED ONLY AS A MANUAL STEP, AND THE MANUAL STEP GETS SKIPPED. CLAUDE.md documents
+  // running node --check over the generated blocks after any runtime-JS edit, precisely because
+  // `node web/app.ts` only builds the OUTER template literal: a broken string inside it produces a
+  // file that builds cleanly, typechecks cleanly, passes every other test, and then dies silently in
+  // the browser with a blank screen. It happened again while writing this file — 451 tests green
+  // against an app that would not boot. A check nobody can forget is worth more than a documented one.
+  const html = page();
+  const blocks = html.match(/<script>([\s\S]*?)<\/script>/g) || [];
+  assert.ok(blocks.length >= 2, "no inline scripts found — this test no longer proves anything");
+  for (let i = 0; i < blocks.length; i++) {
+    const src = blocks[i]!.replace(/^<script>/, "").replace(/<\/script>$/, "");
+    // new Function throws a SyntaxError on exactly what node --check catches, without executing it.
+    assert.doesNotThrow(() => new Function(src),
+      "script block " + i + " does not parse — the app will be blank with no console error");
+  }
+});
+
+test("⚠️ Alfie says what it is BEFORE the first question, and outside the log", () => {
+  // Exit criterion: "Ask Alfie's limits are visible before the first question." It failed on every
+  // entry point — the bubble, the Support card and the Guides button all landed on a greeting and
+  // an input, with the only "not medical" sentence buried inside the answer to "who are you".
+  const html = page();
+  const view = fnSrc("viewAlfie");
+  assert.match(view, /alfieLimits\(\)/, "viewAlfie does not show the limits");
+  // ⚠️ ABOVE THE LOG, NOT INSIDE IT. alfieRenderLog() rebuilds #alfieLog's innerHTML on every
+  // message, so a label placed in there is destroyed by the first question — the precise moment the
+  // criterion is about.
+  assert.ok(view.indexOf("alfieLimits()") < view.indexOf('id="alfieLog"'),
+    "the limits are rendered after the log, so the first answer scrolls them away");
+  const lim = fnSrc("alfieLimits");
+  assert.match(lim, /not medical advice/i, "there is no 'not medical' label");
+  assert.match(lim, /AI coach/i, "it never says it is an AI");
+  assert.match(lim, /not a doctor or a physiotherapist/i, "it never says what it cannot do");
+  // ⚠️ THE ESCALATION ROUTE IS A BUTTON, NOT A SENTENCE. The screener was reachable only by typing a
+  // symptom AT Alfie and having it matched; a worried runner could not go and find it.
+  assert.match(lim, /id="alfEsc"/, "there is no way to reach the symptom check-in from Alfie");
+  assert.match(html, /alfEsc.*state\.support = "redflags"/s, "the escalation button goes nowhere");
+});
+
+test("⚠️ every health check-in says what happens to the answers, and says it truthfully", () => {
+  const html = page();
+  const con = fnSrc("checkinConsent");
+  // ⚠️ THE WORDING HAD TO BE CHECKED AGAINST THE CODE. chkValues() reads the boxes straight out of
+  // the DOM and nothing writes them anywhere, so "saved on this device" would have been FALSE. A
+  // consent line that overstates what is kept is worse than none — it is the sentence a worried
+  // runner reads most carefully.
+  assert.ok(!/saved|stored on|we keep|remembered/i.test(con),
+    "the consent copy claims the answers are kept, and they are not");
+  assert.match(con, /stay on this phone/i, "it does not say where the answers stay");
+  assert.match(con, /nothing is kept/i, "it does not say the answers are not kept");
+  for (const view of ["redflagsView", "redsView", "femaleView"]) {
+    const fn = fnSrc(view);
+    assert.match(fn, /checkinConsent\(\)/, view + " has no consent copy");
+    // Every screener carries the emergency route, not just the injury one — somebody arrives at the
+    // fuelling or women's-health check-in in exactly the same state of worry.
+    assert.ok(/promise|EMERGENCY_BANNER\(\)/.test(fn), view + " has no emergency route");
+  }
+});
+
+test("⚠️ the Support hub is grouped, and grouping cannot silently drop a card", () => {
+  const html = page();
+  const fn = html.slice(html.indexOf("const SUPPORT_GROUPS"), html.indexOf("function supportDetail("));
+  assert.ok(fn.length > 0 && fn.length < 2200, "the viewSupport slice window is wrong: " + fn.length);
+  for (const g of ["Coaching", "Health and safety", "Your setup"]) {
+    assert.ok(fn.includes('"' + g + '"'), "no " + g + " group");
+  }
+  // ⚠️ AN UNGROUPED CARD MUST STILL APPEAR. A hub that silently drops an entry somebody adds later
+  // is worse than a flat one, because nothing looks wrong.
+  assert.match(fn, /placed\[h\.id\]/, "cards not named in a group are dropped");
+  assert.match(fn, /"More"/, "there is no home for an ungrouped card");
+  // The health check-ins must not be last: somebody arrives there worried and in a hurry.
+  const groups = fn.slice(fn.indexOf("SUPPORT_GROUPS"));
+  assert.ok(groups.indexOf('"Health and safety"') < groups.indexOf('"Your setup"'),
+    "the health check-ins sit below the housekeeping");
+});

@@ -2201,6 +2201,18 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .sd-sn { color: #04120e !important; }
 .sd-chev { flex: none; margin-left: 2px; color: var(--ink-faint); font-size: var(--t-card); line-height: 1; transition: transform .18s ease; }
 .sd-stage[open] .sd-chev, .sd-why[open] .sd-chev { transform: rotate(90deg); }
+/* Ask Alfie: what it is, before the first question. */
+.alf-lim { margin: 0 0 var(--s3); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; }
+.alf-lim > summary { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; padding: var(--s3) var(--s4); min-height: var(--tap); cursor: pointer; list-style: none; }
+.alf-lim > summary::-webkit-details-marker { display: none; }
+.alf-lim[open] .sd-chev { transform: rotate(90deg); }
+.alf-limq { flex: 1; min-width: 0; font-size: var(--t-meta); color: var(--ink-soft); }
+.alf-limb { padding: 0 var(--s4) var(--s4); font-size: var(--t-body); line-height: 1.55; color: var(--ink-soft); }
+.alf-limb p { margin: 0 0 var(--s3); }
+.alf-limb b { color: var(--ink); }
+.alf-esc { width: 100%; min-height: var(--tap); background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-ctl); color: var(--accent); font: inherit; font-weight: 700; cursor: pointer; }
+/* The consent line on every health check-in. */
+.ci-consent { margin-bottom: var(--s3); padding: var(--s3); background: var(--surface-2); border-radius: var(--r-ctl); font-size: var(--t-meta); line-height: 1.5; color: var(--ink-soft); }
 /* Logbook: the period snapshot, filters and month headings. */
 .lb-snap { padding: var(--s4); margin-bottom: var(--s3); }
 .lb-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); }
@@ -4442,13 +4454,40 @@ function viewAlfie() {
   const chips = ALFIE_CHIPS.map((c) => '<button class="alf-chip" data-alfq="' + esc(c) + '">' + c + "</button>").join("");
   return '<button class="backbtn" id="alfBack">\\u2039 Back</button>' +
     '<div class="alf-head"><div class="alf-hero">' + ICON.alfie + '</div><div><div class="alf-name">Ask Alfie</div><div class="alf-sub">Your coach \\u2014 knows your plan</div></div></div>' +
+    alfieLimits() +
     '<div class="alf-log" id="alfieLog"></div>' +
     '<div class="alf-chips">' + chips + "</div>" +
     '<div class="alf-input"><input id="alfieIn" placeholder="Ask about your plan or running\\u2026" autocomplete="off"><button id="alfieSend" aria-label="Send">\\u2191</button></div>';
 }
+/**
+ * What Alfie is, and what it is not - above the log, before anything is asked.
+ *
+ * \u26a0\ufe0f IT MUST SIT OUTSIDE #alfieLog. alfieRenderLog() rebuilds that element on every message
+ * and .alf-log is a scroller pinned to its own bottom, so a label placed inside it is destroyed by
+ * the first question - the exact moment the brief criterion is about ("Ask Alfie's limits are
+ * visible BEFORE the first question").
+ *
+ * \u26a0\ufe0f AND THE ESCALATION ROUTE IS A BUTTON, NOT A SENTENCE. The red-flag screener could only
+ * be reached by typing a symptom AT Alfie and having it recognised, so a runner worried about their
+ * knee had no way to find it deliberately. The machinery was complete, good, and invisible.
+ */
+function alfieLimits() {
+  return '<details class="alf-lim"><summary>' +
+    '<span class="ui-pill watch">AI coach \u00b7 not medical advice</span>' +
+    '<span class="alf-limq">What Alfie can and cannot do</span>' +
+    '<span class="sd-chev" aria-hidden="true">\u203A</span></summary>' +
+    '<div class="alf-limb">' +
+      '<p><b>It knows your plan.</b> Your next session, your paces, the phase you are in and how far off your race is, plus a store of running knowledge.</p>' +
+      '<p><b>It answers on this phone.</b> Nothing you type is sent anywhere, and it works with no signal.</p>' +
+      '<p><b>It is not a doctor or a physiotherapist</b>, and it cannot examine you. For pain, injury or anything that feels wrong, use the symptom check-in \u2014 it is built from published warning signs and will tell you plainly when to see somebody.</p>' +
+      '<button class="alf-esc" id="alfEsc">Check a symptom \u203a</button>' +
+    '</div></details>';
+}
 function wireAlfie() {
   alfieRenderLog();
   const back = $("alfBack"); if (back) back.onclick = () => { state.screen = null; render(); };
+  const escBtn = $("alfEsc");
+  if (escBtn) escBtn.onclick = () => { state.screen = null; state.tab = "support"; state.support = "redflags"; render(); };
   const input = $("alfieIn"), send = $("alfieSend");
   const go = () => { if (!input) return; const v = input.value; input.value = ""; alfieAsk(v); };
   if (send) send.onclick = go;
@@ -6515,10 +6554,32 @@ const SUPPORT_HUB = [
   { id: "shoes", ic: "rEasy", c: "var(--eff-easy)", t: "Shoe rack", d: "Track the mileage in your trainers and see when they are due.", interactive: false },
   { id: "data", ic: "share", c: "var(--steady)", t: "Your data", d: "Back it up, or move it to another device.", interactive: false },
 ];
+/**
+ * \u26a0\ufe0f GROUPED BY WHAT YOU CAME FOR, NOT BY WHAT IT IS MADE OF. Eleven undifferentiated cards
+ * put "Ask Alfie" and "Your data" at the same level, so the health check-ins -- the ones somebody
+ * arrives at worried and in a hurry -- were three tiles down a flat grid with nothing to aim at.
+ * The order is deliberate: coaching first because it is what most visits want, health second because
+ * it must be findable fast, setup last because it is a once-a-month errand.
+ */
+const SUPPORT_GROUPS = [
+  ["Coaching", ["alfie", "understand", "guides"]],
+  ["Health and safety", ["redflags", "reds", "female"]],
+  ["Training and kit", ["strength", "shoes", "why"]],
+  ["Your setup", ["connect", "data"]],
+];
 function viewSupport() {
   if (state.support) return supportDetail(state.support);
-  const cards = SUPPORT_HUB.map((h) => '<button class="hubcard" data-hub="' + h.id + '"><div class="ic" style="--hc:' + h.c + '">' + ICON[h.ic] + '</div><div class="b"><div class="t">' + h.t + (h.interactive ? ' <span class="tag-int">Check-in</span>' : '') + '</div><div class="d">' + h.d + '</div></div><div class="arr">›</div></button>').join("");
-  return '<div class="hub">' + cards + '</div>';
+  const card = (h) => '<button class="hubcard" data-hub="' + h.id + '"><div class="ic" style="--hc:' + h.c + '">' + ICON[h.ic] + '</div><div class="b"><div class="t">' + h.t + (h.interactive ? ' <span class="tag-int">Check-in</span>' : '') + '</div><div class="d">' + h.d + '</div></div><div class="arr">›</div></button>';
+  // \u26a0\ufe0f ANY CARD NOT NAMED IN A GROUP STILL APPEARS, under "More". A hub that silently drops
+  // an entry someone adds later is worse than an ungrouped one, because nothing looks wrong.
+  const placed = {};
+  SUPPORT_GROUPS.forEach((g) => g[1].forEach((id) => { placed[id] = true; }));
+  const groups = SUPPORT_GROUPS.concat([["More", SUPPORT_HUB.filter((h) => !placed[h.id]).map((h) => h.id)]]);
+  return groups.map((g) => {
+    const items = g[1].map((id) => SUPPORT_HUB.find((h) => h.id === id)).filter(Boolean);
+    if (!items.length) return "";
+    return '<div class="ui-section">' + g[0] + '</div><div class="hub">' + items.map(card).join("") + '</div>';
+  }).join("");
 }
 function supportDetail(id) {
   const back = '<button class="backbtn" id="supBack">‹ Support</button>';
@@ -7556,15 +7617,31 @@ function understandView() {
     '<div class="card" style="margin-top:12px"><div class="subhead" style="margin-top:0">The symbols</div>' + legend + '</div>' +
     '<div class="card" style="margin-top:12px"><div class="subhead" style="margin-top:0">The effort levels</div><div class="gloss">' + efforts + '</div></div>';
 }
+/**
+ * What happens to a check-in answer. Shown on all three screeners.
+ * \u26a0\ufe0f THE WORDING IS TRUE, AND CHECKING THAT WAS THE WORK. "Saved on this device" would have
+ * been FALSE: chkValues() reads the boxes straight out of the DOM and nothing writes them anywhere,
+ * so the answers do not survive leaving the screen. A consent line that overstates what is kept is
+ * worse than none, because it is the sentence a worried runner reads most carefully.
+ */
+function checkinConsent() {
+  return '<div class="ci-consent">Your answers stay on this phone. Nothing is sent anywhere, ' +
+    'and nothing is kept \u2014 leave this screen and they are gone.</div>';
+}
+function EMERGENCY_BANNER() {
+  return '<div class="promise"><span><b>In an emergency</b>, do not use an app \u2014 call your local emergency number.</span></div>';
+}
 function redflagsView() {
   return '<div class="promise"><span><b>In an emergency</b>, don\\'t use an app — call your local emergency number.</span></div>' +
-    '<h2 class="sec" style="margin-top:0">How are you feeling?</h2><div class="card"><div class="subhead">Physical</div><div class="opts">' + checks(FLAGS_PHYS,"rf") + '</div><div class="subhead">Wellbeing</div><div class="opts">' + checks(FLAGS_WELL,"rf") + '</div><div class="result" id="rfRes"></div></div>';
+    '<h2 class="sec" style="margin-top:0">How are you feeling?</h2><div class="card">' + checkinConsent() + '<div class="subhead">Physical</div><div class="opts">' + checks(FLAGS_PHYS,"rf") + '</div><div class="subhead">Wellbeing</div><div class="opts">' + checks(FLAGS_WELL,"rf") + '</div><div class="result" id="rfRes"></div></div>';
 }
 function redsView() {
-  return '<h2 class="sec" style="margin-top:0">Fuelling &amp; energy</h2><div class="card"><div style="font-size:12.5px;color:var(--ink-faint);margin-bottom:8px">Under-fuelling harms health and performance. Tick anything that sounds like you — this is about getting enough, never eating less.</div><div class="opts">' + checks(REDS_OPTS,"reds") + '</div><div class="result" id="redsRes"></div></div>';
+  return EMERGENCY_BANNER() +
+    '<h2 class="sec" style="margin-top:0">Fuelling &amp; energy</h2><div class="card">' + checkinConsent() + '<div style="font-size:12.5px;color:var(--ink-faint);margin-bottom:8px">Under-fuelling harms health and performance. Tick anything that sounds like you — this is about getting enough, never eating less.</div><div class="opts">' + checks(REDS_OPTS,"reds") + '</div><div class="result" id="redsRes"></div></div>';
 }
 function femaleView() {
-  return '<h2 class="sec" style="margin-top:0">Women\\'s health</h2><div class="card"><div style="font-size:12.5px;color:var(--ink-faint);margin-bottom:10px">Symptom-informed, not calendar-based. It just surfaces what\\'s worth a conversation.</div>' +
+  return EMERGENCY_BANNER() +
+    '<h2 class="sec" style="margin-top:0">Women\\'s health</h2><div class="card">' + checkinConsent() + '<div style="font-size:12.5px;color:var(--ink-faint);margin-bottom:10px">Symptom-informed, not calendar-based. It just surfaces what\\'s worth a conversation.</div>' +
     '<label style="font-size:12.5px;font-weight:600;color:var(--ink-soft)">Menstrual status</label><select class="sel" id="fhStatus" style="margin-top:6px"><option value="regular">Regular periods</option><option value="irregular">Irregular periods</option><option value="absent-3m-plus">No period for 3+ months</option><option value="postpartum">Postpartum</option><option value="perimenopause">Perimenopause</option><option value="menopause">Menopause</option><option value="prefer-not-to-say">Prefer not to say</option></select>' +
     '<div class="subhead">Any of these?</div><div class="opts">' + checks({ "pelvic-floor":"Leaking / heaviness","iron-fatigue":"Tired / breathless","heavy-bleeding":"Very heavy periods","painful-periods":"Painful periods" },"fh") + '</div><div class="result" id="fhRes"></div></div>';
 }

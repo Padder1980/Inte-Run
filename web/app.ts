@@ -6764,6 +6764,26 @@ function draftFromForm() {
     personalized: true,
   };
 }
+/**
+ * Keep what the runner has typed into the setup form across a trip to another tab.
+ * ⚠️ Generic over the s_ prefix rather than a list of ids: a list would go stale the first time a
+ * question was added, and the failure — one field silently not restored — is invisible.
+ */
+function captureSetupFields() {
+  if (!draft.__f) draft.__f = {};
+  document.querySelectorAll('#view [id^="s_"]').forEach((el) => {
+    if (el.id && typeof el.value === "string") draft.__f[el.id] = el.value;
+  });
+}
+function restoreSetupFields() {
+  const f = draft.__f; if (!f) return;
+  Object.keys(f).forEach((id) => {
+    const el = $(id);
+    // Only restore a field the runner actually reached — an empty string would blank a sensible
+    // default on a question they never scrolled to.
+    if (el && typeof el.value === "string" && f[id] !== "") el.value = f[id];
+  });
+}
 let draft = {};
 function refreshMasHint() {
   const el = $("masHint"); if (!el) return;
@@ -10197,8 +10217,23 @@ function render() {
     $("topTitle").textContent = "Your profile";
     // ⚠️ Seeded through returnKind, or an existing profile lights up NO segment at all: the stored
     // value is "break"/"injury" and this handed the control a "1" that matches none of them.
-    draft = { days: profile.daysPerWeek, strength: profile.strength ? "1" : "0", returning: returnKind(profile), status: profile.status || (profile.noRecent ? "new" : "regular"), fitsrc: (profile.fitSrc === "predicted" ? "predicted" : "recent"), avatar: profile.avatar || "" };
+    // ⚠️ SEED ONCE, ON ENTRY — NOT ON EVERY RENDER. This line ran on every single render of the setup
+    // screen, and the bottom nav is live throughout it. So a first-time runner six questions into a
+    // six-section form who glanced at the Plan tab to see what they were signing up for came back to
+    // an empty form, with no warning and no undo. There is no Cancel and no other way to look around,
+    // so the only way to see the app before committing to it was to lose everything typed so far.
+    // Several people would simply have closed it — and it is the very first thing a TestFlight tester
+    // does. __live is cleared when the profile is saved, so a genuine re-entry still seeds fresh.
+    if (!draft.__live) {
+      draft = { days: profile.daysPerWeek, strength: profile.strength ? "1" : "0", returning: returnKind(profile), status: profile.status || (profile.noRecent ? "new" : "regular"), fitsrc: (profile.fitSrc === "predicted" ? "predicted" : "recent"), avatar: profile.avatar || "", __live: true, __f: {} };
+    }
     v.innerHTML = viewSetup();
+    // ⚠️ AND THE TYPED FIELDS TOO. The segment answers live in draft, but name, age, times and dates
+    // are read straight off the DOM at save time and rebuilt from profile on every render — so
+    // preserving the draft alone would have restored half a form and looked like a worse bug than
+    // losing all of it. Every field is s_-prefixed, so one delegated capture covers them all and a
+    // field added later is carried automatically.
+    restoreSetupFields();
     v.scrollTop = 0;
     document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
     wire();
@@ -10366,9 +10401,13 @@ function wire() {
     let pf; try { pf = draftFromForm(); } catch (e) { const er = $("setupErr"); er.style.display = "block"; er.textContent = e.message; return; }
     let out; try { out = applyProfile(pf); } catch (e) { const er = $("setupErr"); er.style.display = "block"; er.textContent = "That goal can't be planned yet — try a race date further out."; return; }
     profile = pf; adoptPlan(out); computeToday(); state.planWeek = PLAN.defaultWeekIndex; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; seedDone(); saveProfileStore(); renderAvatar();
+    // ⚠️ The draft is now sticky across navigation, so SAVING has to be what releases it — otherwise
+    // the answers a runner just committed are re-restored over the top of the profile they built.
+    draft = {};
     state.screen = null; state.tab = "plan"; render();
   }
-  const cancel = $("cancelSetup"); if (cancel) cancel.onclick = () => { state.screen = null; state.tab = "today"; render(); };
+  // Cancel means cancel: an explicit "no thanks" discards the draft, where a glance at another tab does not.
+  const cancel = $("cancelSetup"); if (cancel) cancel.onclick = () => { draft = {}; state.screen = null; state.tab = "today"; render(); };
   // Session detail taps (Plan, calendar, Today)
   wireSessionTaps();
   // Today: clickable dates, conditions & feel squares, view-session
@@ -10542,7 +10581,7 @@ function buildNav() {
   // ⚠️ Same rule as liveBack: mid-run a tab tap is NAVIGATION, and the live pill is the way back.
   // Without the guard this tore down GPS, the coach and the lock-screen card while the pill kept
   // ticking — the run silently stopped recording and was then logged with a truncated distance.
-  document.querySelectorAll(".navbtn").forEach((b) => b.onclick = () => { if (!liveRunning()) { coachStop(); stopLive(); stopSpeech(); } stopTrialRun(); TRIALRUN = null; state.screen = null; state.tab = b.dataset.tab; if (b.dataset.tab !== "support") state.support = null; if (b.dataset.tab === "today") { state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; } render(); });
+  document.querySelectorAll(".navbtn").forEach((b) => b.onclick = () => { if (state.screen === "setup") captureSetupFields(); if (!liveRunning()) { coachStop(); stopLive(); stopSpeech(); } stopTrialRun(); TRIALRUN = null; state.screen = null; state.tab = b.dataset.tab; if (b.dataset.tab !== "support") state.support = null; if (b.dataset.tab === "today") { state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; } render(); });
 }
 $("bellBtn").innerHTML = ICON.bell; $("themeBtn").innerHTML = ICON.theme; $("calBtn").innerHTML = ICON.cal; $("alfieBtn").innerHTML = ICON.alfie; renderAvatar();
 // The strip above a Home Screen web app is painted by iOS, not by us. Since iOS 26 a standalone

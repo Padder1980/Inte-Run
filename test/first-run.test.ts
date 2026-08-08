@@ -78,3 +78,24 @@ test("the example banner is honest about what the numbers are", () => {
     "the banner does not say the NUMBERS are invented, only that the plan is an example");
   assert.match(banner, /Set up/, "there is no way out of the example state from the banner");
 });
+
+test("⚠️ the setup form survives a glance at another tab", () => {
+  // ⚠️ THE FIRST THING A TESTFLIGHT TESTER DOES, AND IT THREW EVERYTHING AWAY. render() reseeded
+  // `draft` from the profile on EVERY render of the setup screen, and the bottom nav is live
+  // throughout a six-section form with no Cancel. So a first-time runner who tapped Plan to see what
+  // they were signing up for came back to an empty form — no warning, no undo, and the only way to
+  // look around the app before committing to it. Several people would simply have closed it.
+  const html = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
+  assert.match(html, /if \(!draft\.__live\)/,
+    "the setup draft is reseeded on every render again — a nav tap will wipe the form");
+  // ⚠️ AND THE TYPED FIELDS, or half a form is restored, which reads as a worse bug than losing it
+  // all. Generic over the s_ prefix so a question added later is carried without anyone remembering.
+  assert.match(html, /function captureSetupFields\(/, "typed fields are not captured");
+  assert.match(html, /function restoreSetupFields\(/, "typed fields are not restored");
+  assert.match(html, /\[id\^="s_"\]/, "the capture is not generic over the field prefix");
+  assert.match(html, /state\.screen === "setup"\) captureSetupFields\(\)/,
+    "nothing captures the fields before the nav changes screen");
+  // ...and saving must RELEASE it, or the answers just committed are restored over the new profile.
+  assert.match(html, /draft = \{\};\s*\n\s*state\.screen = null; state\.tab = "plan"/,
+    "saving the profile does not clear the sticky draft");
+});

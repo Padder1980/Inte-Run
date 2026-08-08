@@ -2227,6 +2227,18 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 /* The consent line on every health check-in. */
 .ci-consent { margin-bottom: var(--s3); padding: var(--s3); background: var(--surface-2); border-radius: var(--r-ctl); font-size: var(--t-meta); line-height: 1.5; color: var(--ink-soft); }
 .tp-card { padding: var(--s3) var(--s4); margin: var(--s3) 0; }
+/* \u26a0\ufe0f A 44px HIT AREA WITHOUT A 44px BOX. --tap is the design system's minimum, and measured,
+   these all sat under it: the top-bar icon buttons (36), the back button (20), Alfie's suggestion
+   chips (35), the logbook filters (34), a calendar tick (24) and the profile's segmented buttons
+   (38). Growing them would relayout the top bar and every segmented control; expanding the hit area
+   with a pseudo-element leaves the design exactly as drawn and still gives a thumb 44px to land on.
+   Kept off anything already >= 44 so it cannot overlap a neighbour. */
+.iconbtn, .backbtn, .alf-chip, .lb-f, .cal-check, .mini-btn, .seg button, .sup-sx { position: relative; }
+.iconbtn::after, .backbtn::after, .alf-chip::after, .lb-f::after, .cal-check::after,
+.mini-btn::after, .seg button::after, .sup-sx::after {
+  content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 100%; height: 100%; min-width: var(--tap); min-height: var(--tap);
+}
 /* Support search. */
 .sup-search { position: relative; display: flex; align-items: center; margin-bottom: var(--s4); }
 .sup-si { position: absolute; left: var(--s3); display: flex; color: var(--ink-faint); pointer-events: none; }
@@ -2395,7 +2407,7 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
       <button class="iconbtn" id="themeBtn" title="Theme" aria-label="Toggle theme"></button>
     </div>
   </div>
-  <div class="view" id="view"></div>
+  <main class="view" id="view"></main>
   <nav class="bottomnav" id="nav"></nav>
 </div>
 
@@ -8155,7 +8167,7 @@ function viewSetup() {
   const secYou =
     '<div class="avatar-row"><div class="avatar-pic" id="avatarPic">' + avatarInner(p) + '</div>' +
     '<div><button class="avatar-cta" id="avatarBtn" type="button">' + (p.avatar ? "Change photo" : "\\uD83D\\uDCF7 Add photo") + '</button><div class="avatar-hint">Shows in your top-bar icon.</div></div></div>' +
-    '<input type="file" id="s_avatar_file" accept="image/*" style="display:none">' +
+    '<input type="file" id="s_avatar_file" accept="image/*" aria-label="Choose a profile photo" style="display:none">' +
     '<div class="q" style="margin-top:16px"><label>Your name</label><input class="sel" id="s_name" value="' + (p.name || "").replace(/"/g, "&quot;") + '" placeholder="What should we call you?" autocomplete="name"></div>';
 
   // 2 · Your running (status gates the fitness inputs)
@@ -8579,6 +8591,10 @@ function syncStatus() {
       target: $("s_target") ? $("s_target").value : fmtTimeFull(profile.targetS),
     };
     gb.innerHTML = goalCardInner(st, cur);
+    // \u26a0\ufe0f RE-LINK. This block is rebuilt after wire() has run, so the labels inside it were
+    // still floating -- which is why "Your race", "Target time" and "Race date" stayed unnamed while
+    // the static questions above them were fixed. Anything that replaces form markup must re-link.
+    linkFormLabels();
     bindTimeInput($("s_target"));
   }
 }
@@ -11513,6 +11529,42 @@ function trainFlagBanner() {
 }
 // seedDone() rebuilds the completed map from dates alone, so it drops anything ticked TODAY — the
 // session the runner has just finished. Capture those ticks before the plan is rebuilt, restore after.
+let LABEL_N = 0;
+/**
+ * Connect every form label to the field it names.
+ * \u26a0\ufe0f THIRTEEN OF THEM WERE FLOATING. The setup form is built as
+ * <div class="q"><label>Age</label><select id="s_age">...</select></div> -- a label that is a SIBLING
+ * of its field with no "for" attribute, so a screen reader reads an unlabelled combo box and says
+ * about what it is for. It is the most form-heavy screen in the app and the one a runner meets first.
+ * \u26a0\ufe0f DONE AT RUNTIME, NOT BY EDITING THIRTEEN CALL SITES. A pass over the rendered markup
+ * cannot drift, and it covers every question added later for free -- which thirteen hand edits and a
+ * convention nobody remembers would not.
+ * \u26a0\ufe0f AND A SEGMENTED CONTROL HAS NO FIELD TO POINT AT: it is a row of buttons. Those get a
+ * group role and aria-labelledby instead, or the label is announced for nothing.
+ */
+function linkFormLabels() {
+  document.querySelectorAll(".q").forEach((q) => {
+    const lab = q.querySelector("label");
+    if (!lab) return;
+    const f = q.querySelector("input, select, textarea");
+    if (f) {
+      if (lab.getAttribute("for")) return;
+      if (!f.id) f.id = "fld" + (++LABEL_N);
+      lab.setAttribute("for", f.id);
+      return;
+    }
+    // \u26a0\ufe0f FOUR GROUP SHAPES, NOT ONE. Segmented controls, checkbox lists, the status card
+    // grid and the coach picker are all "a label naming several controls", and a selector listing
+    // only the first two left the two biggest questions on the screen -- what kind of runner you are,
+    // and which coach speaks to you -- announced as unlabelled buttons.
+    const grp = q.querySelector(".seg, .opts, .statuscards, .coachsel");
+    if (!grp || grp.getAttribute("aria-labelledby")) return;
+    if (!lab.id) lab.id = "flab" + (++LABEL_N);
+    // A single button takes the label directly; a container of controls becomes a group.
+    if (grp.tagName === "BUTTON") grp.setAttribute("aria-labelledby", lab.id + " " + (grp.id || ""));
+    else { grp.setAttribute("role", "group"); grp.setAttribute("aria-labelledby", lab.id); }
+  });
+}
 function todayTicks() {
   const today = todayIso(); const days = [];
   PLAN.weeks.forEach((wk) => wk.sessions.forEach((s) => {
@@ -11795,6 +11847,7 @@ function render() {
       draft = { days: profile.daysPerWeek, strength: profile.strength ? "1" : "0", returning: returnKind(profile), status: profile.status || (profile.noRecent ? "new" : "regular"), fitsrc: (profile.fitSrc === "predicted" ? "predicted" : "recent"), avatar: profile.avatar || "", __live: true, __f: {} };
     }
     v.innerHTML = viewSetup();
+    linkFormLabels();
     // ⚠️ AND THE TYPED FIELDS TOO. The segment answers live in draft, but name, age, times and dates
     // are read straight off the DOM at save time and rebuilt from profile on every render — so
     // preserving the draft alone would have restored half a form and looked like a worse bug than
@@ -11895,6 +11948,7 @@ function wire() {
   document.querySelectorAll("[data-logf]").forEach((b) => b.onclick = () => { state.logFilter = b.dataset.logf; render(); });
   const lbc = $("lbClear"); if (lbc) lbc.onclick = () => { state.logFilter = "all"; render(); };
   const pt = $("perfTrial"); if (pt) pt.onclick = startTrialFlow;
+  linkFormLabels();
   const sq = $("supQ");
   if (sq) {
     // \u26a0\ufe0f RE-RENDER ON INPUT MEANS THE FIELD IS REBUILT UNDER THE RUNNER'S FINGER, so the

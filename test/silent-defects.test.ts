@@ -502,3 +502,45 @@ test("⚠️ Support search reads the articles' bodies, not just their titles", 
   assert.match(gv, /data-gd="' \+ esc\(g\.k\)/, "a guide carries no stable name");
   assert.match(gv, /state\.openGuide === g\.k/, "a search result cannot open its article");
 });
+
+test("⚠️ every form label names its own field, and there is a main landmark", () => {
+  const html = page();
+  // ⚠️ THIRTEEN LABELS WERE FLOATING. The setup form is built as
+  // <div class="q"><label>Age</label><select id="s_age">…</select></div> — a label that is a SIBLING
+  // of its field with no "for", so a screen reader announces an unlabelled combo box. It is the most
+  // form-heavy screen in the app and the first one a runner meets.
+  const fn = fnSrc("linkFormLabels");
+  assert.match(fn, /lab\.setAttribute\("for", f\.id\)/, "labels are never connected to their fields");
+  // ⚠️ FOUR GROUP SHAPES, NOT ONE. Segmented controls, checkbox lists, the status-card grid and the
+  // coach picker are all "one label naming several controls". A selector listing only the first two
+  // left the two biggest questions on the screen — what kind of runner you are, and which coach
+  // speaks to you — announced as unlabelled buttons.
+  for (const cls of [".seg", ".opts", ".statuscards", ".coachsel"]) {
+    assert.ok(fn.includes(cls), "the group-label pass does not cover " + cls);
+  }
+  // ⚠️ DONE AT RUNTIME, and re-run wherever form markup is REPLACED — the goal block is rebuilt
+  // after wire() has run, which is why its three fields stayed unnamed while the static ones above
+  // them were fixed.
+  assert.ok((html.match(/linkFormLabels\(\)/g) || []).length >= 3,
+    "linkFormLabels is not re-run after the form is rebuilt");
+  assert.match(html, /gb\.innerHTML = goalCardInner\(st, cur\);\s*(\/\/[^\n]*\n\s*)*linkFormLabels\(\)/,
+    "the goal block is rebuilt without re-linking its labels");
+  // The hidden file input can never take a visible label, so it carries its own.
+  assert.match(html, /id="s_avatar_file"[^>]*aria-label=/, "the avatar file input has no accessible name");
+  // A screen reader needs somewhere to skip to.
+  assert.match(html, /<main class="view" id="view">/, "there is no main landmark");
+});
+
+test("⚠️ small controls still offer a 44px hit area", () => {
+  // --tap is the design system's minimum. Measured, these all sat under it: the top-bar icon buttons
+  // (36px), the back button (20), Alfie's chips (35), the logbook filters (34), a calendar tick (24)
+  // and the profile's segmented buttons (38).
+  const css = sheetOf(page());
+  // ⚠️ THE HIT AREA GROWS, NOT THE BOX. Growing the boxes would relayout the top bar and every
+  // segmented control; a pseudo-element leaves the design exactly as drawn.
+  assert.match(css, /\.iconbtn::after[\s\S]{0,400}?min-height: var\(--tap\)/,
+    "small controls have no expanded hit area");
+  for (const sel of [".backbtn::after", ".seg button::after", ".lb-f::after", ".cal-check::after"]) {
+    assert.ok(css.includes(sel), sel + " has no expanded hit area");
+  }
+});

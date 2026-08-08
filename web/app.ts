@@ -448,7 +448,7 @@ h2.sec:first-child { margin-top: 4px; }
 @keyframes maSpin { to { --ma: 360deg; } }
 @media (prefers-reduced-motion: reduce) { .start-btn::before { animation: none; } }
 /* Today's two summary squares */
-.tsq-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 22px; }
+.tsq-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); margin-top: var(--s5); }
 .tsq { position: relative; text-align: left; background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%); border: 1px solid var(--line); border-radius: 18px; padding: 15px 15px 16px; cursor: pointer; font: inherit; color: inherit; box-shadow: var(--shadow); transition: transform .12s ease, box-shadow .12s ease; }
 .tsq:active { transform: translateY(1px); }
 .tsq-ic { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #fff; background: linear-gradient(160deg, color-mix(in srgb, var(--sqc, var(--accent)) 92%, #fff), var(--sqc, var(--accent))); box-shadow: 0 5px 12px -5px var(--sqc, var(--accent)); margin-bottom: 12px; }
@@ -740,7 +740,11 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 /* "Your coach is watching" — the calm, everyday face of the adaptive engine. Deliberately quieter
    than .fit-banner: that shouts because it wants a decision, this only reports. Same left-icon
    geometry so the two read as one family when they alternate. */
-.cw { display: flex; gap: 12px; width: 100%; align-items: flex-start; border-radius: 14px; padding: 12px 13px; margin-bottom: 14px;
+/* ⚠️ IT NEEDED A TOP MARGIN THE MOMENT IT MOVED. This card had margin-bottom only, which was fine
+   while it sat above the hero with the greeting spacing it out — Phase 1 put it directly beneath the
+   conditions/readiness tiles and the two ran together with no gap at all. Both margins come off the
+   spacing ladder now, so it cannot drift again. */
+.cw { display: flex; gap: 12px; width: 100%; align-items: flex-start; border-radius: 14px; padding: 12px 13px; margin: var(--s4) 0;
   background: color-mix(in srgb, var(--accent) 5%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--line)); }
 .cw .cw-ic { flex: none; width: 28px; height: 28px; border-radius: 9px; display: flex; align-items: center; justify-content: center;
   color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, transparent); }

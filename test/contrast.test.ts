@@ -145,10 +145,16 @@ test("⚠️ the shoe rack never claims a new pair prevents injury", () => {
   const html = css();
   const at = html.indexOf("function shoeRackView(");
   assert.ok(at >= 0, "shoeRackView is not in the build");
-  const view = html.slice(at, at + 4000);
+  const view = html.slice(at, html.indexOf("function shoeBar(", at) + 600);
   const sheet = html.slice(html.indexOf("function openShoeSheet("), html.indexOf("function openShoeSheet(") + 5000);
   const banned = /prevent\w* (an )?injur|avoid\w* injur|protects? your (joints|knees|legs)|reduces? (the )?risk|safer|injury[- ]free|worn[- ]out shoes cause/i;
-  for (const [where, body] of [["the rack", view], ["the edit sheet", sheet]] as const) {
+  // ⚠️ STRIP THE COMMENTS FIRST. This guard reads the source, and the source explains WHY the banned
+  // phrasing is banned — by quoting it. So the comment documenting the rule tripped the rule, and the
+  // fix would obviously have been to soften the comment, which is exactly backwards. It must measure
+  // the copy that SHIPS, not the reasoning beside it.
+  const strip = (b: string) => b.split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+  for (const [where, raw] of [["the rack", view], ["the edit sheet", sheet]] as const) {
+    const body = strip(raw);
     const copy = (body.match(/'[^']{25,}'/g) || []).join(" ");
     assert.ok(copy.length > 100, `${where}: found almost no copy to check — the guard is not reading it`);
     const m = copy.match(banned);
@@ -163,8 +169,11 @@ test("the shoe rack states are carried by words, not only colour", () => {
   // The brief: colour is never the only workout, completion or risk signal. A wear bar is exactly
   // where that is tempting.
   const html = css();
-  const view = html.slice(html.indexOf("function shoeRackView("), html.indexOf("function shoeRackView(") + 4000);
-  for (const word of ["Plenty left", "Getting there", "Due to be replaced", "Retired"]) {
+  // ⚠️ The wear labels live in shoePill(), not shoeRackView() — the slice has to reach past it or the
+  // guard fails for the wrong reason and someone "fixes" it by deleting the assertion.
+  const view = html.slice(html.indexOf("function shoeRackView("), html.indexOf("function shoeBar(") + 600);
+  // The wording follows his mockup: Good / Monitor / Replace, plus Retired.
+  for (const word of ["Good", "Monitor", "Replace", "Retired"]) {
     assert.ok(view.includes(word), `no text label for a wear state: ${word}`);
   }
   assert.match(view, /role="img" aria-label=/, "the wear bar has no accessible label");

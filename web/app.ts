@@ -2036,31 +2036,68 @@ input, select, textarea { font-size: 16px; }
 .str-done { flex: none; white-space: nowrap; margin-top: 0; }
 .str-fin { margin: 12px 0 0; font-size: 13.5px; font-weight: 600; color: var(--accent); text-align: center; }
 
-/* ---- Shoe rack ---------------------------------------------------------------- */
-/* ⚠️ NOT .bk-lab — that token is uppercased, which is right for a two-word label and wrong for a
-   sentence. The brief is explicit: avoid long all-caps labels. */
+/* ---- Shoe rack ----------------------------------------------------------------- */
+.sr-eyebrow { font-size: 11.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin: 4px 0 6px; }
+.sr-title { font-size: 32px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); margin: 0 0 14px; }
+.sr-strip { display: flex; align-items: stretch; gap: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; margin-bottom: 14px; }
+.sr-stat { flex: 1; padding: 12px 10px; border-right: 1px solid var(--line); min-width: 0; }
+.sr-statv { font-size: 21px; font-weight: 800; color: var(--ink); line-height: 1.1; }
+.sr-statk { font-size: 10.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-faint); margin-top: 3px; }
+.sr-sync { display: flex; align-items: center; gap: 7px; padding: 12px 12px; font-size: 11.5px; font-weight: 650; color: var(--ink-soft); background: var(--surface-2); flex: 1.1; min-width: 0; }
+.sr-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--eff-easy); flex: none; }
+.sr-sync.off .sr-dot { background: var(--ease); }
+.sr-hero { padding: 0; overflow: hidden; }
+.sr-heroh { display: flex; align-items: center; gap: 8px; padding: 13px 16px; border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); }
+.sr-change { margin-left: auto; background: none; border: 0; color: var(--ink-soft); font: 650 14px/1 inherit; text-transform: none; letter-spacing: 0; min-height: 44px; padding: 0 2px; }
+.sr-herob { display: flex; align-items: center; gap: 14px; padding: 18px 16px 6px; }
+.sr-art { flex: none; filter: drop-shadow(0 6px 14px rgba(0,0,0,.35)); }
+.sr-herot { min-width: 0; }
+.sr-brand { font-size: 11px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); }
+.sr-model { font-size: 24px; font-weight: 750; color: var(--ink); line-height: 1.15; margin: 2px 0 8px; }
+.sr-km { font-size: 34px; font-weight: 800; color: var(--ink); line-height: 1; margin-top: 10px; }
+.sr-km b { font-weight: 800; }
+.sr-of { font-size: 12px; color: var(--ink-faint); margin-top: 4px; }
+.sr-wearh { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 16px 6px; font-size: 12px; font-weight: 650; color: var(--ink-soft); }
+.sr-left { padding: 6px 16px 16px; font-size: 12.5px; color: var(--ink-soft); }
+.sr-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; background: var(--surface-2); color: var(--ink-soft); }
+.sr-pill.fresh, .sr-pill.fresh .sr-dot { color: var(--eff-easy); }
+.sr-pill.wearing { color: var(--ease); } .sr-pill.wearing .sr-dot { background: var(--ease); }
+.sr-pill.due, .sr-pill.retired { color: var(--rest); } .sr-pill.due .sr-dot, .sr-pill.retired .sr-dot { background: var(--rest); }
+.sr-secth { font-size: 20px; font-weight: 750; color: var(--ink); margin: 22px 0 2px; }
+.sr-secsub { font-size: 13px; color: var(--ink-faint); margin-bottom: 12px; }
+.sr-rack { border: 1px solid var(--line); border-radius: 20px; padding: 14px; background: var(--surface); }
+.sr-rackt, .sr-rackf { text-align: center; font-size: 10.5px; font-weight: 750; letter-spacing: .16em; text-transform: uppercase; color: var(--brass); }
+.sr-rackt { margin-bottom: 12px; } .sr-rackf { margin-top: 12px; opacity: .8; letter-spacing: .1em; }
+.sr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sr-tile { position: relative; text-align: left; background: var(--surface-2); border: 1px solid var(--line); border-radius: 16px; padding: 12px; min-height: 150px; color: var(--ink); font: inherit; display: flex; flex-direction: column; gap: 2px; }
+.sr-tile.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--surface-2)); }
+.sr-tile .sr-art { align-self: center; margin-bottom: 4px; }
+.sr-tbrand { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); }
+.sr-tname { font-size: 15px; font-weight: 700; color: var(--ink); line-height: 1.25; }
+.sr-trow { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 12.5px; color: var(--ink-soft); margin: 6px 0 6px; }
+.sr-trow .sr-pill { padding: 3px 7px; font-size: 9.5px; }
+.sr-edit { position: absolute; top: 8px; right: 10px; font-size: 12px; font-weight: 650; color: var(--accent); padding: 6px; }
+.sr-add { align-items: center; justify-content: center; text-align: center; border-style: dashed; background: none; }
+.sr-plus { font-size: 26px; color: var(--accent); line-height: 1; margin-bottom: 6px; }
+.sr-mlist { margin-top: 12px; }
+.sr-mrow { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid var(--line); }
+.sr-mkm { flex: none; width: 46px; height: 46px; border-radius: 13px; background: var(--surface-2); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 750; color: var(--accent); }
+.sr-mt { font-size: 15px; font-weight: 650; color: var(--ink); }
+.sr-md { font-size: 12.5px; color: var(--ink-faint); margin-top: 1px; }
+.sr-un { color: var(--ease); font-weight: 650; }
+.sr-mplus { margin-left: auto; font-size: 13.5px; font-weight: 700; color: var(--ink-soft); white-space: nowrap; }
+.sr-att { display: flex; align-items: flex-start; gap: 14px; }
+.sr-ring { flex: none; width: 68px; height: 68px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 800; color: var(--ink);
+  background: conic-gradient(var(--ease) calc(var(--p) * 1%), var(--surface-2) 0); }
+.sr-ring span { width: 52px; height: 52px; border-radius: 50%; background: var(--surface); display: flex; align-items: center; justify-content: center; }
+.sr-atth { font-size: 11px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; color: var(--ease); }
+.sr-attn { font-size: 18px; font-weight: 750; color: var(--ink); margin: 2px 0 4px; }
 .shoe-intro { font-size: 13.5px; line-height: 1.5; color: var(--ink-soft); margin-top: 6px; }
-.shoe { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; margin-top: 10px; }
-.shoe.on { border-color: var(--accent); }
-.shoe.out { opacity: .62; }
-.shoe-top { display: flex; align-items: flex-start; gap: 12px; }
-.shoe-nm { font-size: 16px; font-weight: 650; color: var(--ink); }
-.shoe-sub { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
-.shoe-sub b { color: var(--accent); font-weight: 650; }
-.shoe-edit { margin-left: auto; background: none; border: 0; color: var(--accent); font: 600 14px/1 inherit; padding: 6px 2px; min-height: 44px; }
-.shoe-bar { height: 8px; border-radius: 5px; background: var(--surface-2); overflow: hidden; margin: 12px 0 8px; }
-.shoe-bar i { display: block; height: 100%; background: var(--eff-easy); border-radius: 5px; }
-.shoe-st { font-size: 12.5px; font-weight: 640; }
-.shoe-st.fresh { color: var(--eff-easy); }
-.shoe-st.wearing { color: var(--ease); }
-.shoe-st.due, .shoe-st.retired { color: var(--rest); }
-.shoe.out .shoe-bar i, .shoe-st.retired { filter: grayscale(.5); }
-.shoe:has(.shoe-st.wearing) .shoe-bar i { background: var(--ease); }
-.shoe:has(.shoe-st.due) .shoe-bar i { background: var(--rest); }
-.shoe-acts { display: flex; gap: 8px; margin-top: 12px; }
-.shoe-acts button { flex: 1; min-height: 44px; border-radius: 12px; font: 600 14px/1 inherit; }
-.shoe-use { background: var(--accent); color: var(--accent-ink); border: 0; }
-.shoe-ret { background: none; border: 1px solid var(--line); color: var(--ink-soft); }
+.shoe-bar { height: 7px; border-radius: 5px; background: var(--surface-2); overflow: hidden; margin: 4px 16px 0; }
+.sr-tile .shoe-bar { margin: 0; }
+.shoe-bar i { display: block; height: 100%; border-radius: 5px; background: var(--eff-easy); }
+.shoe-bar.wearing i { background: var(--ease); }
+.shoe-bar.due i, .shoe-bar.retired i { background: var(--rest); }
 </style>
 </head>
 <body>
@@ -2232,6 +2269,26 @@ function shoeWear(sh) {
   const target = Number(sh.retireKm) || SHOE_DEFAULT_RETIRE_KM;
   return target > 0 ? shoeTotalKm(sh) / target : 0;
 }
+/** The rack's headline numbers. Derived, never stored — a stored total is a total that can drift. */
+function shoeRackStats() {
+  const list = loadShoes().filter((x) => !x.retiredIso);
+  return {
+    pairs: list.length,
+    totalKm: Math.round(list.reduce((a, x) => a + shoeTotalKm(x), 0)),
+    attention: list.filter((x) => shoeState(x) !== "fresh" && shoeState(x) !== "retired").length,
+  };
+}
+/**
+ * Runs that were recorded with no pair on, so their distance is in nobody's total.
+ * ⚠️ THIS IS THE NUMBER THAT MAKES THE RACK TRUSTWORTHY. A mileage figure the runner cannot audit is
+ * a mileage figure they will stop believing the first time it looks wrong — and it WILL look wrong,
+ * because the shoe is only credited if one was active when the run was saved. Saying "0 unassigned"
+ * out loud is what turns an accumulating number into a number with evidence behind it.
+ */
+function shoeUnassignedRuns() {
+  return (state.logged || []).filter((r) => !r.shoeId && Number(r.distKm) > 0);
+}
+function shoeById(id) { return loadShoes().find((x) => x.id === id) || null; }
 function shoeState(sh) {
   if (sh.retiredIso) return "retired";
   const w = shoeWear(sh);
@@ -6476,38 +6533,133 @@ function shoeRackView() {
   const list = loadShoes();
   const live = list.filter((x) => !x.retiredIso);
   const retired = list.filter((x) => x.retiredIso);
-  const card = (sh) => {
-    const total = shoeTotalKm(sh), target = Number(sh.retireKm) || SHOE_DEFAULT_RETIRE_KM;
-    const st = shoeState(sh), pct = Math.min(100, Math.round(shoeWear(sh) * 100));
-    // ⚠️ State carried by a WORD as well as the bar's colour — the brief is explicit that colour must
-    // never be the only signal, and a wear bar is exactly where that is tempting.
-    const label = st === "retired" ? "Retired" : st === "due" ? "Due to be replaced"
-      : st === "wearing" ? "Getting there" : "Plenty left";
-    return '<div class="shoe' + (sh.active && !sh.retiredIso ? " on" : "") + (sh.retiredIso ? " out" : "") + '">' +
-      '<div class="shoe-top">' +
-        '<div><div class="shoe-nm">' + esc(sh.name || "Trainers") + '</div>' +
-        '<div class="shoe-sub">' + (Math.round(total) + " km of " + Math.round(target) + " km") +
-          (sh.active && !sh.retiredIso ? ' \u00b7 <b>wearing now</b>' : "") + '</div></div>' +
-        '<button class="shoe-edit" data-shoeedit="' + sh.id + '" aria-label="Edit ' + esc(sh.name || "trainers") + '">Edit</button>' +
-      '</div>' +
-      '<div class="shoe-bar" role="img" aria-label="' + pct + '% of the way to the replacement distance"><i style="width:' + pct + '%"></i></div>' +
-      '<div class="shoe-st ' + st + '">' + label + '</div>' +
-      (sh.retiredIso ? "" :
-        '<div class="shoe-acts">' +
-          (sh.active ? '' : '<button class="shoe-use" data-shoewear="' + sh.id + '">Wear these</button>') +
-          '<button class="shoe-ret" data-shoeretire="' + sh.id + '">Retire</button>' +
-        '</div>') +
+  const act = live.find((x) => x.active) || null;
+  const st = shoeRackStats();
+  const un = shoeUnassignedRuns();
+
+  // ---- the strip of headline numbers ----------------------------------------------------------
+  const stat = (v, k) => '<div class="sr-stat"><div class="sr-statv num">' + v + '</div><div class="sr-statk">' + k + '</div></div>';
+  const strip = '<div class="sr-strip">' + stat(st.pairs, "pairs") + stat(st.totalKm, "total km") +
+    stat(st.attention, "needs attention") +
+    '<div class="sr-sync' + (un.length ? " off" : "") + '"><span class="sr-dot"></span>' +
+    (un.length ? un.length + " run" + (un.length === 1 ? "" : "s") + " unassigned" : "every run counted") + '</div></div>';
+
+  // ---- the pair you are wearing next -----------------------------------------------------------
+  let hero = "";
+  if (act) {
+    const total = shoeTotalKm(act), target = Number(act.retireKm) || SHOE_DEFAULT_RETIRE_KM;
+    const pct = Math.round(shoeWear(act) * 100), left = Math.max(0, target - total);
+    hero = '<div class="card sr-hero">' +
+      '<div class="sr-heroh"><span class="sr-dot"></span>Active for your next run' +
+        '<button class="sr-change" id="shoeChange">Change</button></div>' +
+      '<div class="sr-herob">' + shoeArt(act, 132) +
+        '<div class="sr-herot">' +
+          (act.brand ? '<div class="sr-brand">' + esc(act.brand) + '</div>' : "") +
+          '<div class="sr-model">' + esc(act.name || "Trainers") + '</div>' +
+          shoePill(act) +
+          '<div class="sr-km"><b class="num">' + (Math.round(total * 10) / 10) + '</b> km</div>' +
+          '<div class="sr-of">of ' + Math.round(target) + ' km before you replace them</div>' +
+        '</div></div>' +
+      '<div class="sr-wearh"><span>Estimated wear</span><b class="num">' + pct + '%</b></div>' +
+      shoeBar(act) +
+      '<div class="sr-left"><b class="num">' + (Math.round(left * 10) / 10) + ' km</b> to go on this pair</div>' +
       '</div>';
+  }
+
+  // ---- the rotation ----------------------------------------------------------------------------
+  const tile = (sh) => {
+    const total = shoeTotalKm(sh), target = Number(sh.retireKm) || SHOE_DEFAULT_RETIRE_KM;
+    return '<button class="sr-tile' + (sh.active ? " on" : "") + '" data-shoewear="' + sh.id + '"' +
+      ' aria-label="Wear ' + esc(sh.name || "trainers") + '">' +
+      shoeArt(sh, 76) +
+      (sh.brand || sh.role ? '<div class="sr-tbrand">' + esc([sh.brand, sh.role].filter(Boolean).join(" \u00b7 ")) + '</div>' : "") +
+      '<div class="sr-tname">' + esc(sh.name || "Trainers") + '</div>' +
+      '<div class="sr-trow"><span class="num">' + (Math.round(total * 10) / 10) + ' km</span>' + shoePill(sh) + '</div>' +
+      shoeBar(sh) +
+      '<span class="sr-edit" data-shoeedit="' + sh.id + '" role="button" tabindex="0">Edit</span>' +
+      '</button>';
   };
-  const empty = '<div class="card"><div class="bk-box"><div class="bk-val">No trainers yet</div>' +
-    '<div class="bk-lab" style="margin-top:4px">Add the pair you run in and Inte-Run will keep their mileage for you, so you can see when they are getting on.</div></div></div>';
-  return '<div class="card"><div class="subhead" style="margin-top:0">Shoe rack</div>' +
-      '<div class="shoe-intro">Pick the trainers you are wearing and every run you record adds to them. Most road shoes are built for somewhere between 500 and 800 km \u2014 it is a reminder, not a rule, and you can set your own distance for each pair.</div>' +
-      '<button class="primary" id="shoeAdd" style="width:100%;margin-top:14px">\uff0b Add a pair</button></div>' +
-    (live.length ? live.map(card).join("") : empty) +
-    (retired.length ? '<div class="card"><div class="subhead" style="margin-top:0">Retired</div>' +
-      retired.map(card).join("") + '</div>' : "");
+  const addTile = '<button class="sr-tile sr-add" id="shoeAdd" aria-label="Add another pair">' +
+    '<span class="sr-plus">\uff0b</span><div class="sr-tname">Add another pair</div>' +
+    '<div class="sr-tbrand">Name them however you like</div></button>';
+
+  const rack = '<div class="sr-secth">My rotation</div>' +
+    '<div class="sr-secsub">' + (live.length ? "Tap a pair to wear it next." : "Add the pair you run in and every run you record adds to them.") + '</div>' +
+    '<div class="sr-rack"><div class="sr-rackt">' + esc((profile.name || "Your").trim() + (profile.name ? "\u2019s" : "") ) + ' shoe rack</div>' +
+      '<div class="sr-grid">' + live.map(tile).join("") + addTile + '</div>' +
+      '<div class="sr-rackf">Inte-Run \u00b7 every run, every mile, every pair</div></div>';
+
+  // ---- where the kilometres came from ----------------------------------------------------------
+  const recent = (state.logged || []).filter((r) => Number(r.distKm) > 0).slice(0, 5);
+  const mileage = '<div class="card"><div class="sr-secth" style="margin-top:0">Recent mileage</div>' +
+    '<div class="shoe-intro">Every completed run is credited to one pair, so a kilometre is never counted twice.</div>' +
+    (recent.length ? '<div class="sr-mlist">' + recent.map((r) => {
+      const sh = r.shoeId ? shoeById(r.shoeId) : null;
+      return '<div class="sr-mrow"><div class="sr-mkm num">' + (Math.round(Number(r.distKm) * 10) / 10) + '</div>' +
+        '<div><div class="sr-mt">' + esc(r.t || "Run") + '</div>' +
+        '<div class="sr-md">' + esc(runDateLabelIso(r.dateIso) || "") +
+          (sh ? " \u00b7 " + esc(sh.name) : ' \u00b7 <span class="sr-un">no pair recorded</span>') + '</div></div>' +
+        '<div class="sr-mplus num">+' + (Math.round(Number(r.distKm) * 10) / 10) + ' km</div></div>';
+    }).join("") + '</div>'
+      : '<div class="bk-box" style="margin-top:12px"><div class="bk-val">No runs yet</div>' +
+        '<div class="shoe-intro">Record a run and it will appear here, credited to the pair you were wearing.</div></div>') +
+    '</div>';
+
+  // ---- the pair worth watching ------------------------------------------------------------------
+  let attention = "";
+  const worn = live.filter((x) => shoeState(x) !== "fresh").sort((a, b) => shoeWear(b) - shoeWear(a))[0];
+  if (worn) {
+    const total = shoeTotalKm(worn), target = Number(worn.retireKm) || SHOE_DEFAULT_RETIRE_KM;
+    const pct = Math.round(shoeWear(worn) * 100);
+    attention = '<div class="card sr-att"><div class="sr-ring num" style="--p:' + Math.min(100, pct) + '">' +
+      '<span>' + pct + '%</span></div><div><div class="sr-atth">Worth keeping an eye on</div>' +
+      '<div class="sr-attn">' + esc(worn.name || "Trainers") + '</div>' +
+      '<div class="shoe-intro">' + (total >= target
+        ? "These have passed the distance you set for them. Shoes do not fail on a date \u2014 go by how they feel underfoot, and by the tread."
+        : (Math.round(target - total) + " km to go. Worth starting to notice how they feel, and how the tread is wearing.")) +
+      '</div></div></div>';
+  }
+
+  // ⚠️ THE HONEST CLAIM, KEPT ON THE PAGE. Most road shoes are built for roughly this range and
+  // cushioning changes with use; "replace them to avoid injury" is not supported by the evidence and
+  // must never appear. A test fails on either omission.
+  const footer = '<div class="shoe-intro" style="margin:18px 4px 0">Most road shoes are built for somewhere ' +
+    'between 500 and 800 km, and trail or carbon-plated shoes differ. It is a reminder, not a rule \u2014 ' +
+    'set whatever distance suits each pair, and go by how they feel underfoot.</div>';
+  return '<div class="sr-eyebrow">Your running gear</div>' +
+    '<h2 class="sr-title">Shoe rack</h2>' + strip + hero + rack + mileage + attention + footer +
+    (retired.length ? '<div class="card"><div class="sr-secth" style="margin-top:0">Retired</div>' +
+      '<div class="sr-grid">' + retired.map(tile).join("") + '</div></div>' : "");
 }
+/**
+ * A drawn shoe, tinted by the colour the runner picked.
+ *
+ * ⚠️ DRAWN, NOT PHOTOGRAPHED, AND THAT IS A LEGAL DECISION RATHER THAN AN AESTHETIC ONE. The mockup
+ * shows real product photography of a HOKA, a Nike and an adidas. Shipping brand product shots in an
+ * App Store app is somebody else's copyright and trademark, the app deliberately carries no external
+ * network assets, and "search genuine models" would need a shoe database that does not exist.
+ * A tinted silhouette is ownable, weighs nothing, works offline and never dates. Same precedent as
+ * the strength-exercise POSES, which are drawn for the same reason.
+ */
+function shoeArt(sh, size) {
+  const c = sh.colour || "var(--accent)";
+  return '<svg class="sr-art" viewBox="0 0 120 64" width="' + size + '" height="' + Math.round(size * 0.53) + '" aria-hidden="true">' +
+    '<path d="M6 46c0-6 2-10 6-13l16-11c3-2 6-2 8 1l7 9c2 3 5 4 8 3l14-5c14-5 26-2 38 8 5 4 7 8 7 12 0 3-2 5-6 5H12c-4 0-6-2-6-6z" fill="' + c + '" opacity=".92"/>' +
+    '<path d="M6 46c0 4 2 6 6 6h92c4 0 6-2 6-5H6z" fill="var(--ink)" opacity=".22"/>' +
+    '<path d="M34 24l10 12M46 19l9 11" stroke="var(--surface)" stroke-width="3" stroke-linecap="round" opacity=".55" fill="none"/>' +
+    '</svg>';
+}
+function shoePill(sh) {
+  const s = shoeState(sh);
+  const t = s === "retired" ? "Retired" : s === "due" ? "Replace" : s === "wearing" ? "Monitor" : "Good";
+  return '<span class="sr-pill ' + s + '"><span class="sr-dot"></span>' + t + '</span>';
+}
+function shoeBar(sh) {
+  const pct = Math.min(100, Math.round(shoeWear(sh) * 100));
+  return '<div class="shoe-bar ' + shoeState(sh) + '" role="img" aria-label="' + pct +
+    '% of the way to the distance you set"><i style="width:' + pct + '%"></i></div>';
+}
+
 function dataView() {
   const cur = backupSummary(collectBackup().data);
   const bytes = JSON.stringify(collectBackup()).length;

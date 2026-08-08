@@ -548,6 +548,76 @@ because position in the rendered list stops matching position in the array — d
 of a filtered list would delete the third run of the store. `migrateRunRoutes` backfills ids on runs
 logged before they existed.
 
+### PHASE 3 IS COMPLETE; PHASE 4 IS HALF IN (2026-08-08)
+
+Performance, Support search and the accessibility pass landed after the notes above.
+
+⚠️ **EVERY PART OF THE PERFORMANCE "PROVENANCE" WORK WAS ALREADY COMPUTED AND DISCARDED.** Each
+dimension is an `Estimate` carrying `.low/.high/.confidence/.method`; `RC.rangeText` exists to format
+exactly that and had **zero callers**; `FITNESS.summary` is a ready-made honest provenance sentence
+rendered nowhere; and `uiCoachNote`, built in Phase 0 with all its states, had no production caller at
+all. The screen was three numbers with no source, no date and no uncertainty.
+
+⚠️ **A NUMBER WITH NO DATE READS AS A MEASUREMENT OF TODAY.** All three dimensions come from ONE input
+— the 5 km time typed into setup, or a 2 km trial — so the meter labelled "endurance base" only ever
+moves when that input changes, however much training has happened.
+
+⚠️ **A SEEDED ANCHOR IS NOT EVIDENCE.** `buildProfileFromDraft` seeds a 5 km time for a beginner and
+sets `noRecent` — a time nobody ran. This app already refuses to raise adaptive flags off a seeded
+anchor; printing a fitness estimate from one as measured is the same mistake somewhere else.
+
+⚠️ **`durability` IS PERMANENTLY EMPTY** (`confidence` is always `"none"`; nothing computes it). The
+old copy — *"We'll learn this from your long runs"* — was a promise the app never keeps. It is the
+`unavailable` state now and says **why**: no method behind it yet, rather than not enough data.
+
+⚠️ **`refreshTypePreview` HAD NO CONTAINER.** Wired to three call sites including `oninput` on the two
+fields above it, it computed `classifyRunner` and `assessMasters` on every keystroke and returned at
+`if (!tp) return` — `#typePreview` was nowhere in the markup. That is the only place `CLASS` and
+`MASTERS` were ever going to be read, so this trap was holding its own last two examples. It also
+matters because `classifyRunner` caps self-assessment at tier 4 and this panel is where the app was
+supposed to SAY so. Given its container.
+
+⚠️ **THE `$("id")` GUARD HAD TO BE RESTATED, because its first version rejected a correct fix.** The
+invariant is **"something produces this id"**, not "it appears as a literal `id=`" — several real ids
+are string-built (`uiActionBar`'s `id`, `uiDecisionHero`'s `actionId`), and a hand-written exemption
+list goes stale the first time somebody adds a builder and then gets deleted rather than updated.
+⚠️ **And the obvious fix for it tripping on a comment — strip comments first — was tried, MEASURED and
+REVERTED:** a regex doing that over 1.6 MB of generated page ate real markup and reported sixteen live
+ids as missing. Far worse than the false positive. The app's comment was reworded instead.
+
+⚠️ **SUPPORT SEARCH READS THE ARTICLE BODIES.** Somebody typing "gel" is not looking for an article
+called that. `GUIDES` and `SUPPORT_HUB` are both DATA, so the index is a filter — no backend, exactly
+as the owner said. While searching, the hub groups are **hidden, not filtered**: a grid that quietly
+loses eight of its eleven tiles reads as the app having lost them. A guide is keyed on its **slug**
+now, so a result can open the right one. ⚠️ `ICON.search` **did not exist**, so `(ICON.search || "")`
+drew an empty slot in silence.
+⚠️ **16px ON A SEARCH FIELD FAILS THE TYPE RATCHET, and both constraints are real** — under 16px iOS
+auto-zooms and pinch is disabled, so the runner can never zoom back. `var(--t-card)` is **17px**: on
+the ladder AND above the floor. Do not widen the ladder to admit 16px.
+⚠️ **Re-rendering on every keystroke rebuilds the field under the runner's finger**, so the caret is
+captured and restored — otherwise every character types to the front of the box.
+
+⚠️ **THIRTEEN FORM LABELS NAMED NOTHING.** The setup form is `<div class="q"><label>Age</label><select
+id="s_age">` — a label that is a SIBLING of its field with no `for`, so a screen reader announces an
+unlabelled combo box. It is the most form-heavy screen in the app and the first one a runner meets.
+`linkFormLabels()` fixes it **at runtime**, so it cannot drift and covers questions added later.
+⚠️ **It must re-run wherever form markup is REPLACED** — the goal block is rebuilt after `wire()`, which
+is why its three fields stayed unnamed while the static ones above them were fixed.
+⚠️ **FOUR GROUP SHAPES, NOT ONE**: `.seg`, `.opts`, `.statuscards`, `.coachsel`. Written against the
+first two it left the two biggest questions on the screen — what kind of runner you are, and which
+coach speaks to you — announced as unlabelled buttons.
+
+⚠️ **NOTHING HAD A 44px HIT AREA** despite `--tap` existing since Phase 0: icon buttons 36, back button
+20, Alfie chips 35, logbook filters 34, a calendar tick 24, segmented buttons 38. **THE HIT AREA GROWS,
+NOT THE BOX** — growing the boxes relayouts the top bar and every segmented control.
+
+**Measured clean:** no horizontal page scroll on any screen with a 40-character name and 100-character
+free-text answers; every wide element sits inside a deliberate scroller (`#chart`, `.weekstrip`).
+
+**Still open in Phase 4:** content-preserving transitions (160–220 ms), and Dynamic Type — the app is
+px throughout, so it does not honour the phone's text-size setting at all. That is 443 font sizes and
+a large regression risk; the brief itself scopes it separately.
+
 ### The seven mockup features that do not exist — his ruling, 2026-08-08
 
 *"I would build those features in advance and leave a place holder message like coming soon"* — build

@@ -378,10 +378,21 @@ app cannot do a thing it demonstrably can.
 | Logbook period totals, consistency, filters | **BUILD IT** | Every run is in `interun_runs` with `dateIso`, distance, time and type. Nothing is missing. |
 | Support search | **BUILD IT** | The articles are markup in the build; a client-side index over them needs no backend. |
 | Apps & devices | **BUILD IT, partially** | `WatchBridge` already knows `isPaired` / `isWatchAppInstalled`. Show the real state; "coming soon" only for the things that are not the watch. |
-| Subscription / PREMIUM badge | **PLACEHOLDER** | No account, no server, nothing to show. |
+| Subscription / PREMIUM badge | ❌ **CUT** | *"Leave the subscription one out.....thats not something we are doing (yet)"* (owner, 2026-08-08). Not a placeholder — it does not appear at all. Do not reinstate it from the mockup. |
 | Community | **PLACEHOLDER** | Needs a backend the app deliberately does not have. |
-| Shoes | **PLACEHOLDER, or a real feature** | No data model. Mileage tracking is buildable locally but is a feature build, not a placeholder — his call. |
+| Shoes | ✅ **BUILD IT — "Shoe Rack"** | *"I want the shoes one....it will be called 'shoe rack' and it will allow users to choose what trainers they're wearing and be able to track the milage in them so they know when to retire the trainers"* (owner, 2026-08-08). His name, his framing — keep both. |
 | Plan move / swap / skip + impact sheet | **ENGINE WORK, not a placeholder** | The engine can rebuild a plan; it cannot move one session and describe the consequence. The largest genuinely new capability in the brief. |
+
+### The readiness score is a WHOLE NUMBER OUT OF FIVE (owner, 2026-08-08)
+
+*"The readiness score needs to be whole numbers."*
+
+⚠️ **AND THE SCALE IS FIVE, NOT THE MOCKUP'S TEN.** `readinessScore()` already returns a whole 1–5,
+built from two questions worth ±2 each — so there are exactly five reachable values. Rescaling to /10
+would print 2, 4, 6, 8, 10: a ten-point scale with five possible answers, which is the same false
+precision as the mockup's "7.6 / 10" wearing a different disguise. The brief's own insight contract
+(meaning, evidence, freshness, confidence) argues against it. Show `n/5` with the plain-language
+label beside it. If the inputs ever grow, the scale can grow with them.
 
 ⚠️ **A "coming soon" placeholder was REMOVED on 2026-08-08** (the stretch-video box, offered after
 every run) because the TestFlight audit called it the most visible unfinished surface in the app, and

@@ -135,3 +135,53 @@ test("the identity survived the refinement", () => {
   assert.ok(ag! > ar! && ag! >= ab!,
     `the accent is no longer teal (green must dominate): ${d["accent"]}`);
 });
+
+// ---- Shoe Rack -----------------------------------------------------------------------------------
+
+test("⚠️ the shoe rack never claims a new pair prevents injury", () => {
+  // ⚠️ THE SAME RULE THE WARM-UP AND STRETCH COPY ALREADY FOLLOW, and for the same reason: this app
+  // sits beside a RED-S screen, and one claim it cannot defend costs the runner's trust in all the
+  // rest. Shoes wearing out is real; "replace them to avoid injury" is not supported by the evidence.
+  const html = css();
+  const at = html.indexOf("function shoeRackView(");
+  assert.ok(at >= 0, "shoeRackView is not in the build");
+  const view = html.slice(at, at + 4000);
+  const sheet = html.slice(html.indexOf("function openShoeSheet("), html.indexOf("function openShoeSheet(") + 5000);
+  const banned = /prevent\w* (an )?injur|avoid\w* injur|protects? your (joints|knees|legs)|reduces? (the )?risk|safer|injury[- ]free|worn[- ]out shoes cause/i;
+  for (const [where, body] of [["the rack", view], ["the edit sheet", sheet]] as const) {
+    const copy = (body.match(/'[^']{25,}'/g) || []).join(" ");
+    assert.ok(copy.length > 100, `${where}: found almost no copy to check — the guard is not reading it`);
+    const m = copy.match(banned);
+    assert.equal(m, null, `${where} claims a health benefit: "${m && m[0]}"`);
+  }
+  // ...and it must still say the honest thing: that it is a reminder, not a rule.
+  assert.match(view + sheet, /reminder, not a rule/i,
+    "the rack no longer says the replacement distance is a reminder rather than a rule");
+});
+
+test("the shoe rack states are carried by words, not only colour", () => {
+  // The brief: colour is never the only workout, completion or risk signal. A wear bar is exactly
+  // where that is tempting.
+  const html = css();
+  const view = html.slice(html.indexOf("function shoeRackView("), html.indexOf("function shoeRackView(") + 4000);
+  for (const word of ["Plenty left", "Getting there", "Due to be replaced", "Retired"]) {
+    assert.ok(view.includes(word), `no text label for a wear state: ${word}`);
+  }
+  assert.match(view, /role="img" aria-label=/, "the wear bar has no accessible label");
+});
+
+test("⚠️ every commit point credits the rack", () => {
+  // ⚠️ A phone run and a wrist run are committed in two different places, and this project's
+  // most-repeated defect is a fix applied to one builder and not the other. A runner who records on
+  // their watch would otherwise watch their shoes never wear out.
+  const html = css();
+  assert.equal((html.match(/shoeCreditRun\(/g) || []).length, 3,
+    "expected the definition plus BOTH commit points (phone and wrist) to credit the rack");
+  // ⚠️ SCOPED TO deleteRun's BODY. Written against the whole document, /shoeUncreditRun\(run\)/ matched
+  // the FUNCTION DECLARATION — `function shoeUncreditRun(run) {` — so the guard passed with the call
+  // site deliberately deleted. A regex that matches a definition can never prove a caller exists.
+  const del = html.slice(html.indexOf("function deleteRun("), html.indexOf("function deleteRun(") + 1400);
+  assert.ok(del.length > 200, "could not read deleteRun");
+  assert.match(del, /shoeUncreditRun\(run\)/, "deleting a run does not take its distance back off");
+  assert.match(del, /shoeRecreditRun\(UNDO_RUN\.run\)/, "undoing a delete does not restore the mileage");
+});

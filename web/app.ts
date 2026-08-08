@@ -2035,6 +2035,32 @@ input, select, textarea { font-size: 16px; }
 /* flex: none and nowrap, or the primary's flex: 1 squeezes this to a wrapped single-letter column. */
 .str-done { flex: none; white-space: nowrap; margin-top: 0; }
 .str-fin { margin: 12px 0 0; font-size: 13.5px; font-weight: 600; color: var(--accent); text-align: center; }
+
+/* ---- Shoe rack ---------------------------------------------------------------- */
+/* ⚠️ NOT .bk-lab — that token is uppercased, which is right for a two-word label and wrong for a
+   sentence. The brief is explicit: avoid long all-caps labels. */
+.shoe-intro { font-size: 13.5px; line-height: 1.5; color: var(--ink-soft); margin-top: 6px; }
+.shoe { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; margin-top: 10px; }
+.shoe.on { border-color: var(--accent); }
+.shoe.out { opacity: .62; }
+.shoe-top { display: flex; align-items: flex-start; gap: 12px; }
+.shoe-nm { font-size: 16px; font-weight: 650; color: var(--ink); }
+.shoe-sub { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
+.shoe-sub b { color: var(--accent); font-weight: 650; }
+.shoe-edit { margin-left: auto; background: none; border: 0; color: var(--accent); font: 600 14px/1 inherit; padding: 6px 2px; min-height: 44px; }
+.shoe-bar { height: 8px; border-radius: 5px; background: var(--surface-2); overflow: hidden; margin: 12px 0 8px; }
+.shoe-bar i { display: block; height: 100%; background: var(--eff-easy); border-radius: 5px; }
+.shoe-st { font-size: 12.5px; font-weight: 640; }
+.shoe-st.fresh { color: var(--eff-easy); }
+.shoe-st.wearing { color: var(--ease); }
+.shoe-st.due, .shoe-st.retired { color: var(--rest); }
+.shoe.out .shoe-bar i, .shoe-st.retired { filter: grayscale(.5); }
+.shoe:has(.shoe-st.wearing) .shoe-bar i { background: var(--ease); }
+.shoe:has(.shoe-st.due) .shoe-bar i { background: var(--rest); }
+.shoe-acts { display: flex; gap: 8px; margin-top: 12px; }
+.shoe-acts button { flex: 1; min-height: 44px; border-radius: 12px; font: 600 14px/1 inherit; }
+.shoe-use { background: var(--accent); color: var(--accent-ink); border: 0; }
+.shoe-ret { background: none; border: 1px solid var(--line); color: var(--ink-soft); }
 </style>
 </head>
 <body>
@@ -2173,6 +2199,84 @@ function loadProfile() { try { const s = localStorage.getItem("rc_profile_v1"); 
 function saveProfileStore() { try { localStorage.setItem("rc_profile_v1", JSON.stringify(profile)); } catch (e) {} }
 // Completed runs recorded in-app (from a live GPS or simulated session) — persisted so they
 // survive a reload and show up in your logbook alongside the sample history.
+// ---- SHOE RACK ---------------------------------------------------------------------------------
+//
+// His feature, his name: "it will be called shoe rack and it will allow users to choose what
+// trainers they are wearing and be able to track the milage in them so they know when to retire the
+// trainers" (2026-08-08).
+//
+// A shoe is { id, name, km, baseKm, retireKm, active, addedIso, retiredIso }.
+//
+// WHY THE MILEAGE IS ACCUMULATED ON THE SHOE RATHER THAN DERIVED FROM THE RUNS.
+// Deriving it would be self-correcting and is the obvious design — stamp shoeId on each run, add up
+// the runs. It is wrong here for one reason: saveRuns() keeps only the most recent 50 runs. A shoe
+// worn for a year would silently LOSE distance as old runs aged out of storage, and the number that
+// tells you when to retire a shoe is the one number in this feature that must only ever go up.
+// So the shoe carries the total, the run carries a shoeId for provenance, and deleting a run
+// subtracts from the shoe. baseKm is what the runner had already put in them before today.
+const SHOES_KEY = "interun_shoes_v1";
+// ⚠️ Roughly the range shoe manufacturers themselves quote. It is a REMINDER, NOT A RULE, and the
+// copy must never claim that replacing a shoe on schedule prevents injury — the evidence does not
+// support it, and this app sits beside a RED-S screen where an unsupportable claim costs the
+// runner's trust in everything else it says. Same rule the warm-up and stretch copy already follow.
+const SHOE_DEFAULT_RETIRE_KM = 700;
+function loadShoes() {
+  try { const v = JSON.parse(localStorage.getItem(SHOES_KEY) || "[]"); return Array.isArray(v) ? v : []; }
+  catch (e) { return []; }
+}
+function saveShoes(list) { try { localStorage.setItem(SHOES_KEY, JSON.stringify(list.slice(0, 40))); } catch (e) {} }
+function shoeTotalKm(sh) { return Math.max(0, (Number(sh.baseKm) || 0) + (Number(sh.km) || 0)); }
+function activeShoe() { return loadShoes().find((s) => s.active && !s.retiredIso) || null; }
+/** 0..1+ of the way to the retirement distance. Can exceed 1 — that is the point of it. */
+function shoeWear(sh) {
+  const target = Number(sh.retireKm) || SHOE_DEFAULT_RETIRE_KM;
+  return target > 0 ? shoeTotalKm(sh) / target : 0;
+}
+function shoeState(sh) {
+  if (sh.retiredIso) return "retired";
+  const w = shoeWear(sh);
+  return w >= 1 ? "due" : w >= 0.8 ? "wearing" : "fresh";
+}
+/**
+ * Credit a finished run to whichever shoe is on. Called once, where a run is COMMITTED.
+ * ⚠️ Stamps the id on the run as well, so the Logbook can say which shoes a run was done in and so
+ * deleting that run can take its distance back off the right shoe. The shoe total stays
+ * authoritative — see the note above about the 50-run cap.
+ */
+function shoeCreditRun(run) {
+  try {
+    if (!run || !(Number(run.distKm) > 0) || run.shoeId) return;
+    const list = loadShoes();
+    const sh = list.find((x) => x.active && !x.retiredIso);
+    if (!sh) return;
+    sh.km = (Number(sh.km) || 0) + Number(run.distKm);
+    run.shoeId = sh.id;
+    saveShoes(list);
+  } catch (e) {}
+}
+/** Put a restored run's distance back, after an undo. Separate from shoeCreditRun because that one
+ *  deliberately refuses a run that already carries a shoeId — which every restored run does. */
+function shoeRecreditRun(run) {
+  try {
+    if (!run || !run.shoeId || !(Number(run.distKm) > 0)) return;
+    const list = loadShoes();
+    const sh = list.find((x) => x.id === run.shoeId);
+    if (!sh) return;
+    sh.km = (Number(sh.km) || 0) + Number(run.distKm);
+    saveShoes(list);
+  } catch (e) {}
+}
+/** Take a deleted run's distance back off its shoe, so the rack cannot drift upward for ever. */
+function shoeUncreditRun(run) {
+  try {
+    if (!run || !run.shoeId || !(Number(run.distKm) > 0)) return;
+    const list = loadShoes();
+    const sh = list.find((x) => x.id === run.shoeId);
+    if (!sh) return;
+    sh.km = Math.max(0, (Number(sh.km) || 0) - Number(run.distKm));
+    saveShoes(list);
+  } catch (e) {}
+}
 function loadRuns() { try { return JSON.parse(localStorage.getItem("interun_runs") || "[]"); } catch (e) { return []; } }
 function saveRuns() { try { localStorage.setItem("interun_runs", JSON.stringify(state.logged.slice(0, 50))); } catch (e) {} }
 
@@ -3069,6 +3173,10 @@ function ingestWatchRun(run) {
   });
   saveRuns();
   // Tick it off the plan, the same as finishing it on the phone would.
+  // ⚠️ THE WRIST CREDITS THE RACK TOO. A fix applied to one commit point and not the other is this
+  // project's most-repeated trap; a runner who records on their watch would otherwise see their
+  // shoes never wear out.
+  shoeCreditRun(state.logged[0]);
   if (planned) {
     const wk = PLAN.weeks.find((w) => w.sessions.indexOf(planned) >= 0);
     if (wk) state.done[doneKey(wk.index, planned)] = true;
@@ -5525,12 +5633,18 @@ function deleteRun(idx) {
   if (!run) return;
   UNDO_RUN = { run: run, idx: idx };
   state.logged.splice(idx, 1);
+  // ⚠️ AND TAKE THE DISTANCE BACK OFF THE SHOE, or the rack only ever climbs and the one number that
+  // says "replace these" becomes fiction after the first mistaken entry.
+  shoeUncreditRun(run);
   saveRuns();
   clearTrainFlag();
   render();
   toastUndo("Run deleted", () => {
     if (!UNDO_RUN) return;
     state.logged.splice(Math.min(UNDO_RUN.idx, state.logged.length), 0, UNDO_RUN.run);
+    // ⚠️ Undo must put the mileage back too. The run still carries its shoeId, but shoeCreditRun
+    // refuses a run that already has one — so credit it explicitly rather than through that guard.
+    shoeRecreditRun(UNDO_RUN.run);
     saveRuns(); UNDO_RUN = null; render();
   });
 }
@@ -5664,6 +5778,9 @@ const SUPPORT_HUB = [
   { id: "guides", ic: "book", c: "var(--accent)", t: "Training guides", d: "Plain-English answers grounded in the research.", interactive: false },
   { id: "why", ic: "heart", c: "var(--rest)", t: "Your why", d: "The reasons behind the running \u2014 for the hard miles.", interactive: false },
   { id: "connect", ic: "devices", c: "var(--base)", t: "Connected apps & devices", d: "Your watch, health apps and calendars.", interactive: false },
+  // ⚠️ Lives here for now. The design brief and its mockup put shoes under Profile > Connections, and
+  // Phase 3 builds that screen — this is the honest interim home, not the intended one.
+  { id: "shoes", ic: "rEasy", c: "var(--eff-easy)", t: "Shoe rack", d: "Track the mileage in your trainers and see when they are due.", interactive: false },
   { id: "data", ic: "share", c: "var(--steady)", t: "Your data", d: "Back it up, or move it to another device.", interactive: false },
 ];
 function viewSupport() {
@@ -5680,6 +5797,7 @@ function supportDetail(id) {
   if (id === "strength") return back + strengthView();
   if (id === "why") return back + whyView();
   if (id === "connect") return back + connectView();
+  if (id === "shoes") return back + shoeRackView();
   if (id === "data") return back + dataView();
   return back + guidesView();
 }
@@ -6256,6 +6374,76 @@ function mapDevMode() {
     return !!localStorage.getItem("interun_mapbox_v1");     // already configured here
   } catch (e) { return false; }
 }
+function wireShoeRack() {
+  const add = $("shoeAdd");
+  if (add) add.onclick = () => openShoeSheet(null);
+  document.querySelectorAll("[data-shoeedit]").forEach((b) => b.onclick = () => openShoeSheet(b.dataset.shoeedit));
+  document.querySelectorAll("[data-shoewear]").forEach((b) => b.onclick = () => {
+    // Exactly one pair is on at a time — otherwise a run has no unambiguous shoe to be credited to.
+    const list = loadShoes();
+    list.forEach((x) => { x.active = x.id === b.dataset.shoewear && !x.retiredIso; });
+    saveShoes(list); render();
+  });
+  document.querySelectorAll("[data-shoeretire]").forEach((b) => b.onclick = () => {
+    const list = loadShoes();
+    const sh = list.find((x) => x.id === b.dataset.shoeretire);
+    if (!sh) return;
+    sh.retiredIso = todayIso(); sh.active = false;
+    saveShoes(list); render();
+  });
+}
+function openShoeSheet(id) {
+  const list = loadShoes();
+  const sh = id ? list.find((x) => x.id === id) : null;
+  const nm = sh ? sh.name || "" : "";
+  const start = sh ? Math.round(Number(sh.baseKm) || 0) : 0;
+  const ret = sh ? Math.round(Number(sh.retireKm) || SHOE_DEFAULT_RETIRE_KM) : SHOE_DEFAULT_RETIRE_KM;
+  // ⚠️ THE HOUSE SHEET PATTERN, NOT AN INVENTED HELPER. There is no openSheet(); every sheet in this
+  // app calls ensureSheet(), writes #sheetBody, wires it, then adds .on to #sheetOv. Inventing a
+  // wrapper would have built cleanly and done nothing at all when tapped.
+  ensureSheet(); SHEET_CTX = null;
+  $("sheetBody").innerHTML = ('<div class="rm-row"><label>Name</label></div>' +
+    '<input id="shName" type="text" autocomplete="off" placeholder="Pegasus 41" value="' + esc(nm) + '" ' +
+      'style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:16px inherit">' +
+    // ⚠️ 16px minimum on every focusable control. Below it iOS auto-zooms on focus and, with pinch
+    // disabled, the runner can never zoom back out — the app stays scaled for the rest of the session.
+    '<div class="rm-row" style="margin-top:14px"><label>Distance already in them</label>' +
+      '<span class="bld-step"><input id="shBase" type="number" inputmode="numeric" min="0" max="3000" value="' + start + '" ' +
+      'style="width:88px;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:16px inherit;text-align:right"> km</span></div>' +
+    '<div class="rm-row"><label>Replace at</label>' +
+      '<span class="bld-step"><input id="shRet" type="number" inputmode="numeric" min="100" max="3000" step="50" value="' + ret + '" ' +
+      'style="width:88px;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:16px inherit;text-align:right"> km</span></div>' +
+    '<div class="shoe-intro" style="margin-top:10px">Most road shoes are built for somewhere between 500 and 800 km. Trail and carbon-plated shoes differ, so set whatever suits this pair.</div>' +
+    '<button class="primary" id="shSave" style="width:100%;margin-top:16px">' + (sh ? "Save" : "Add to the rack") + '</button>' +
+    (sh ? '<button class="bk-btn2" id="shDel">Remove from the rack</button>' : ""));
+  $("sheetOv").classList.add("on");
+  const save = $("shSave");
+  if (save) save.onclick = () => {
+    const name = ($("shName").value || "").trim().slice(0, 40) || "Trainers";
+    const baseKm = Math.max(0, Math.min(3000, Number($("shBase").value) || 0));
+    const retireKm = Math.max(100, Math.min(3000, Number($("shRet").value) || SHOE_DEFAULT_RETIRE_KM));
+    const l = loadShoes();
+    if (sh) {
+      const t = l.find((x) => x.id === sh.id);
+      if (t) { t.name = name; t.baseKm = baseKm; t.retireKm = retireKm; }
+    } else {
+      // The first pair added is the pair being worn — otherwise the runner adds a shoe, records a run
+      // and finds nothing happened.
+      const first = !l.some((x) => !x.retiredIso);
+      l.unshift({ id: "shoe-" + Date.now(), name: name, km: 0, baseKm: baseKm, retireKm: retireKm,
+        active: first, addedIso: todayIso(), retiredIso: null });
+    }
+    saveShoes(l); closeSheet(); render();
+  };
+  const del = $("shDel");
+  if (del && sh) del.onclick = () => {
+    // ⚠️ Removing a pair does NOT touch the runs done in them. Their shoeId simply stops resolving,
+    // which is correct: the run happened, and rewriting history to tidy a list is worse than a
+    // dangling reference nothing displays.
+    saveShoes(loadShoes().filter((x) => x.id !== sh.id));
+    closeSheet(); render();
+  };
+}
 function wireMapToken() {
   const inp = $("mbxTok"), save = $("mbxSave"), clr = $("mbxClear"), msg = $("mbxMsg");
   if (inp) { try { inp.value = localStorage.getItem("interun_mapbox_v1") || ""; } catch (e) {} }
@@ -6274,6 +6462,51 @@ function wireMapToken() {
     try { localStorage.removeItem("interun_mapbox_v1"); } catch (e) {}
     render();
   };
+}
+/**
+ * The Shoe Rack: which trainers you own, how far you have run in them, and when they are due.
+ *
+ * ⚠️ THE COPY NEVER CLAIMS A RETIRED SHOE PREVENTS INJURY, and a test enforces it. The honest claim
+ * is that manufacturers build road shoes for roughly this distance and that cushioning changes with
+ * use; "replace your shoes to avoid injury" is not supported by the evidence, and this app sits
+ * beside a RED-S screen where one unsupportable claim costs the runner's trust in all the rest.
+ * Same rule the warm-up and stretch copy already follow.
+ */
+function shoeRackView() {
+  const list = loadShoes();
+  const live = list.filter((x) => !x.retiredIso);
+  const retired = list.filter((x) => x.retiredIso);
+  const card = (sh) => {
+    const total = shoeTotalKm(sh), target = Number(sh.retireKm) || SHOE_DEFAULT_RETIRE_KM;
+    const st = shoeState(sh), pct = Math.min(100, Math.round(shoeWear(sh) * 100));
+    // ⚠️ State carried by a WORD as well as the bar's colour — the brief is explicit that colour must
+    // never be the only signal, and a wear bar is exactly where that is tempting.
+    const label = st === "retired" ? "Retired" : st === "due" ? "Due to be replaced"
+      : st === "wearing" ? "Getting there" : "Plenty left";
+    return '<div class="shoe' + (sh.active && !sh.retiredIso ? " on" : "") + (sh.retiredIso ? " out" : "") + '">' +
+      '<div class="shoe-top">' +
+        '<div><div class="shoe-nm">' + esc(sh.name || "Trainers") + '</div>' +
+        '<div class="shoe-sub">' + (Math.round(total) + " km of " + Math.round(target) + " km") +
+          (sh.active && !sh.retiredIso ? ' \u00b7 <b>wearing now</b>' : "") + '</div></div>' +
+        '<button class="shoe-edit" data-shoeedit="' + sh.id + '" aria-label="Edit ' + esc(sh.name || "trainers") + '">Edit</button>' +
+      '</div>' +
+      '<div class="shoe-bar" role="img" aria-label="' + pct + '% of the way to the replacement distance"><i style="width:' + pct + '%"></i></div>' +
+      '<div class="shoe-st ' + st + '">' + label + '</div>' +
+      (sh.retiredIso ? "" :
+        '<div class="shoe-acts">' +
+          (sh.active ? '' : '<button class="shoe-use" data-shoewear="' + sh.id + '">Wear these</button>') +
+          '<button class="shoe-ret" data-shoeretire="' + sh.id + '">Retire</button>' +
+        '</div>') +
+      '</div>';
+  };
+  const empty = '<div class="card"><div class="bk-box"><div class="bk-val">No trainers yet</div>' +
+    '<div class="bk-lab" style="margin-top:4px">Add the pair you run in and Inte-Run will keep their mileage for you, so you can see when they are getting on.</div></div></div>';
+  return '<div class="card"><div class="subhead" style="margin-top:0">Shoe rack</div>' +
+      '<div class="shoe-intro">Pick the trainers you are wearing and every run you record adds to them. Most road shoes are built for somewhere between 500 and 800 km \u2014 it is a reminder, not a rule, and you can set your own distance for each pair.</div>' +
+      '<button class="primary" id="shoeAdd" style="width:100%;margin-top:14px">\uff0b Add a pair</button></div>' +
+    (live.length ? live.map(card).join("") : empty) +
+    (retired.length ? '<div class="card"><div class="subhead" style="margin-top:0">Retired</div>' +
+      retired.map(card).join("") + '</div>' : "");
 }
 function dataView() {
   const cur = backupSummary(collectBackup().data);
@@ -6311,6 +6544,7 @@ function dataView() {
     '<div class="bk-md">Your profile and goal, your plan, every logged run with its route and splits, your coach and reminder choices, and anything you\\u2019ve told Alfie. It\\u2019s a plain file on your device \\u2014 nothing is uploaded anywhere, because Inte-Run has no server to upload it to.</div></div>';
 }
 function wireDataView() {
+  wireShoeRack();
   wireMapToken();
   const ex = $("bkExport"); if (ex) ex.onclick = exportBackup;
   const im = $("bkImport"), f = $("bkFile");
@@ -9525,7 +9759,10 @@ function plannedRpeBandOf(sess) {
 function saveLiveSession() {
   const sm = LIVE.summary; if (!sm || sm.saved) return;
   if (sm.meaningful) {
-    state.logged.unshift(liveRunRecord(sm));
+    // ⚠️ Credited BEFORE the record is stored, so the shoeId is stamped on the copy that gets saved.
+    const rec = liveRunRecord(sm);
+    shoeCreditRun(rec);
+    state.logged.unshift(rec);
     sm.runId = state.logged[0].id;
     saveRuns();
   }

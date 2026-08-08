@@ -618,6 +618,37 @@ free-text answers; every wide element sits inside a deliberate scroller (`#chart
 px throughout, so it does not honour the phone's text-size setting at all. That is 443 font sizes and
 a large regression risk; the brief itself scopes it separately.
 
+### PHASE 4 IS COMPLETE — THE REDESIGN IS DONE (2026-08-08)
+
+⚠️ **THE TYPE LADDER IS THE DYNAMIC TYPE MECHANISM, and that is the payoff for having built one.**
+Every size in the app is px, so it honoured the phone's text-size setting nowhere at all. The seven
+tokens are now `calc(Npx * var(--tscale))`, so every screen already migrated onto the ladder scales
+for free — and the off-ladder ratchet gains a second meaning: an off-ladder value is no longer merely
+inconsistent, it is one that **does not grow for somebody who needs it to**. Do not convert the 443
+individual sizes; migrate screens onto the ladder instead.
+
+⚠️ **`font: -apple-system-body` IS THE ONLY THING THAT TRACKS DYNAMIC TYPE INSIDE A WKWebView.** `rem`
+follows the page, not the phone, and there is no API to ask. An off-screen probe is measured at boot
+and on `visibilitychange` — **iOS never notifies a web view that the setting changed**, so returning to
+the app is the only moment it can be caught.
+
+⚠️ **CLAMPED TO 1.0–1.3, WHICH IS A LIMITATION, NOT A PREFERENCE.** The app is full of fixed-height
+controls (the 44px target, the nav, the live hero), so an unclamped 235% overlaps rather than reflows.
+Never below 1 either. Measured at the cap across six screens: no horizontal page scroll, nothing
+escaping a scroller. Lifting the cap means making those controls reflow first.
+
+⚠️ **`.view-in` MUST BE REMOVED, A REFLOW READ, THEN ADDED.** Otherwise a second render inside the
+180 ms window finds the class present, the animation does not restart, and the screen simply appears —
+which is most tab switches, because `render()` is called from many paths.
+
+⚠️ **TWO HAPTICS WERE SILENT IN THE NATIVE APP.** The stretch player called `navigator.vibrate`
+directly and **WKWebView has no vibrate API at all**, so the guided routine buzzed in a browser and did
+nothing on the phone. `haptic()` and its native bridge is the only path that reaches a real generator;
+a test allows exactly one raw call, the one inside `haptic()`.
+
+**`test/silent-defects.test.ts` now holds 24 guards** covering every defect found in this work, each
+watched failing against a deliberate re-break before being believed.
+
 ### The seven mockup features that do not exist — his ruling, 2026-08-08
 
 *"I would build those features in advance and leave a place holder message like coming soon"* — build

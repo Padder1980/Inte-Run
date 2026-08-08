@@ -359,9 +359,31 @@ every value was "found"; and the identity check ("green and blue both beat red")
 BLUE — swapping the accent for `#3a7ce8` passed it. Both tightened. Six deliberate regressions were
 each watched failing their own guard.
 
-**Still to do in Phase 0:** radius hierarchy, the 8-point spacing scale, the type ladder as tokens,
-semantic tokens split from workout colours, the first components (session row, coach note, readiness
-tile, bottom action bar) with their full state sets, focus-visible and VoiceOver labels.
+**Phase 0 slice 2 (the ladders) is in.** Measured first: the stylesheet carried **TEN distinct
+border-radius values and TWELVE font sizes**, which is the brief's "everything competes" made
+countable. `--r-*`, `--s1..6`, `--t-*` and `--tap` are now the ladders, plus a shared `.ui-*`
+vocabulary (eyebrow, display, section, pill, bar) generalised from the Shoe Rack, which got there
+first by being built to his mockup.
+
+⚠️ **THE 200-ODD OFF-LADDER VALUES ARE NOT REWRITTEN, AND THAT IS THE DESIGN.** A blind sweep across
+1,900 lines of CSS is a large regression risk for no visible gain, and this project's history says the
+dangerous changes are the ones that look mechanical. `test/design-system.test.ts` **counts the drift
+and refuses to let it grow** — 143 off-ladder radii of 225, 323 font sizes of 442, measured
+2026-08-08. Migration then happens screen by screen inside the phase that touches that screen.
+⚠️ **When you migrate a screen, LOWER THE CEILING to what it then measures.** Leaving it high is how a
+ratchet quietly becomes a rubber band.
+
+⚠️ **There were FOUR `:focus-visible` rules in the whole stylesheet** — a keyboard or switch-control
+user could not see where they were. Now global, plus per-element for button/a/input/select/textarea
+and `[role=button]`. Reduce Motion is honoured **globally**; there were 14 per-component blocks, and a
+rule per component is a rule the next component forgets.
+⚠️ That last one caught its own test: `indexOf` found the FIRST of the 14 pre-existing blocks, so the
+guard failed while the global rule sat two hundred lines below it — and the obvious "fix" would have
+been to delete the assertion. It scans all of them now.
+
+**Still to do in Phase 0:** the first behaviour-rich components — session row, coach note, readiness
+tile, bottom action bar — each with the full state set from the brief's build specification, and
+VoiceOver labels on every icon button.
 
 ### The seven mockup features that do not exist — his ruling, 2026-08-08
 

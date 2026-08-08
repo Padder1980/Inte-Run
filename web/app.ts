@@ -2036,10 +2036,77 @@ input, select, textarea { font-size: 16px; }
 .str-done { flex: none; white-space: nowrap; margin-top: 0; }
 .str-fin { margin: 12px 0 0; font-size: 13.5px; font-weight: 600; color: var(--accent); text-align: center; }
 
+/* ================================================================================================
+   PHASE 0 — THE LADDERS
+   The design brief's central visual finding: "repeated rounded containers and outlines give most
+   elements similar weight". Measured before writing this — the stylesheet carried TEN distinct
+   border-radius values and TWELVE font sizes, none of them a system. Hierarchy cannot survive that,
+   because every object ends up shouting at the same volume.
+
+   ⚠️ THESE ARE THE ONLY SIZES NEW WORK MAY USE. The existing 200-odd off-ladder values are NOT
+   rewritten here: a blind sweep across 1,900 lines of CSS is a large regression risk for no visible
+   gain, and this project's own history says the dangerous changes are the ones that look mechanical.
+   test/design-system.test.ts counts the drift instead and refuses to let it grow — so migration
+   happens screen by screen, in the phase that touches that screen, and can only ever go one way.
+   ================================================================================================ */
+:root {
+  /* Radius: three steps, not ten. Hero groups, cards, controls. Pills stay fully round. */
+  --r-hero: 24px; --r-card: 18px; --r-ctl: 12px; --r-pill: 999px;
+  /* Spacing: an 8-point grid, with a 4 for tight pairs. */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+  /* Screen gutter, per the brief's 20-24px. */
+  --gutter: 20px;
+  /* Type: seven steps. Display, page hero, section, card title, body, metadata, label. */
+  --t-display: 32px; --t-hero: 24px; --t-section: 20px; --t-card: 17px;
+  --t-body: 15px; --t-meta: 13px; --t-label: 11px;
+  /* ⚠️ MINIMUM TOUCH TARGET. 44px is Apple's floor and this app has controls below it today. */
+  --tap: 44px;
+}
+
+/* ---- The shared component vocabulary -----------------------------------------------------------
+   Generalised from the Shoe Rack, which was built to his mockup and got there first. These are the
+   classes new screens use; the .sr-* rules below now inherit from them rather than restating them. */
+.ui-eyebrow { font-size: var(--t-label); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin: var(--s1) 0 var(--s2); }
+.ui-display { font-size: var(--t-display); font-weight: 800; letter-spacing: -.02em; color: var(--ink); margin: 0 0 var(--s3); line-height: 1.08; }
+.ui-hero-t { font-size: var(--t-hero); font-weight: 750; color: var(--ink); line-height: 1.15; }
+.ui-section { font-size: var(--t-section); font-weight: 750; color: var(--ink); margin: var(--s5) 0 2px; }
+.ui-sub { font-size: var(--t-meta); color: var(--ink-faint); margin-bottom: var(--s3); }
+/* ⚠️ STATE IS CARRIED BY A WORD, NOT ONLY BY COLOUR — the brief is explicit, and a pill is exactly
+   where the temptation is. Every variant below has text in it; none is colour alone. */
+.ui-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--r-pill);
+  font-size: var(--t-label); font-weight: 750; letter-spacing: .04em; text-transform: uppercase;
+  background: var(--surface-2); color: var(--ink-soft); }
+.ui-pill .ui-dot, .sr-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+.ui-pill.good { color: var(--eff-easy); }
+.ui-pill.watch { color: var(--ease); }
+.ui-pill.stop { color: var(--rest); }
+.ui-pill.done { color: var(--ready); }
+/* ⚠️ Semantic status is its own scale, SEPARATE from the workout-type colours. The brief: "give
+   completion, warning, error and workout type distinct tokens plus icons/text". Sharing one palette
+   is why a hard session and an error currently look alike. */
+.ui-bar { height: 7px; border-radius: 5px; background: var(--surface-2); overflow: hidden; }
+.ui-bar > i { display: block; height: 100%; border-radius: 5px; background: var(--eff-easy); }
+.ui-bar.watch > i { background: var(--ease); }
+.ui-bar.stop > i { background: var(--rest); }
+
+/* ---- Accessibility floor ------------------------------------------------------------------------
+   ⚠️ A VISIBLE FOCUS RING ON EVERYTHING FOCUSABLE. There were four focus-visible rules in the whole
+   stylesheet; a keyboard or switch-control user could not see where they were. The accent clears 3:1
+   against every ground (measured in test/contrast.test.ts), which is the brief's target for a focus
+   indicator. */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-ctl); }
+button:focus-visible, a:focus-visible, [role="button"]:focus-visible, input:focus-visible,
+select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* ⚠️ Honoured globally, not per-animation. The brief asks for Reduce Motion to be respected; a rule
+   per component is a rule that gets forgotten by the next component. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important; scroll-behavior: auto !important; }
+}
 /* ---- Shoe rack ----------------------------------------------------------------- */
-.sr-eyebrow { font-size: 11.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin: 4px 0 6px; }
-.sr-title { font-size: 32px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); margin: 0 0 14px; }
-.sr-strip { display: flex; align-items: stretch; gap: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; margin-bottom: 14px; }
+.sr-eyebrow { font-size: var(--t-label); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin: var(--s1) 0 var(--s2); }
+.sr-title { font-size: var(--t-display); font-weight: 800; letter-spacing: -.02em; color: var(--ink); margin: 0 0 var(--s4); line-height: 1.08; }
+.sr-strip { display: flex; align-items: stretch; gap: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; margin-bottom: var(--s4); }
 .sr-stat { flex: 1; padding: 12px 10px; border-right: 1px solid var(--line); min-width: 0; }
 .sr-statv { font-size: 21px; font-weight: 800; color: var(--ink); line-height: 1.1; }
 .sr-statk { font-size: 10.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-faint); margin-top: 3px; }
@@ -2048,7 +2115,7 @@ input, select, textarea { font-size: 16px; }
 .sr-sync.off .sr-dot { background: var(--ease); }
 .sr-hero { padding: 0; overflow: hidden; }
 .sr-heroh { display: flex; align-items: center; gap: 8px; padding: 13px 16px; border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); }
-.sr-change { margin-left: auto; background: none; border: 0; color: var(--ink-soft); font: 650 14px/1 inherit; text-transform: none; letter-spacing: 0; min-height: 44px; padding: 0 2px; }
+.sr-change { margin-left: auto; background: none; border: 0; color: var(--ink-soft); font: 650 14px/1 inherit; text-transform: none; letter-spacing: 0; min-height: var(--tap); padding: 0 2px; }
 .sr-herob { display: flex; align-items: center; gap: 14px; padding: 18px 16px 6px; }
 .sr-art { flex: none; filter: drop-shadow(0 6px 14px rgba(0,0,0,.35)); }
 .sr-herot { min-width: 0; }
@@ -2063,9 +2130,9 @@ input, select, textarea { font-size: 16px; }
 .sr-pill.fresh, .sr-pill.fresh .sr-dot { color: var(--eff-easy); }
 .sr-pill.wearing { color: var(--ease); } .sr-pill.wearing .sr-dot { background: var(--ease); }
 .sr-pill.due, .sr-pill.retired { color: var(--rest); } .sr-pill.due .sr-dot, .sr-pill.retired .sr-dot { background: var(--rest); }
-.sr-secth { font-size: 20px; font-weight: 750; color: var(--ink); margin: 22px 0 2px; }
-.sr-secsub { font-size: 13px; color: var(--ink-faint); margin-bottom: 12px; }
-.sr-rack { border: 1px solid var(--line); border-radius: 20px; padding: 14px; background: var(--surface); }
+.sr-secth { font-size: var(--t-section); font-weight: 750; color: var(--ink); margin: var(--s5) 0 2px; }
+.sr-secsub { font-size: var(--t-meta); color: var(--ink-faint); margin-bottom: var(--s3); }
+.sr-rack { border: 1px solid var(--line); border-radius: var(--r-hero); padding: var(--s4); background: var(--surface); }
 .sr-rackt, .sr-rackf { text-align: center; font-size: 10.5px; font-weight: 750; letter-spacing: .16em; text-transform: uppercase; color: var(--brass); }
 .sr-rackt { margin-bottom: 12px; } .sr-rackf { margin-top: 12px; opacity: .8; letter-spacing: .1em; }
 .sr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }

@@ -326,3 +326,74 @@ test("⚠️ the Support hub is grouped, and grouping cannot silently drop a car
   assert.ok(groups.indexOf('"Health and safety"') < groups.indexOf('"Your setup"'),
     "the health check-ins sit below the housekeeping");
 });
+
+test("⚠️ a profile edit previews before it rebuilds, and the preview commits nothing", () => {
+  // The brief's clearest safety recommendation. Saving used to rebuild every week, clear the day's
+  // ticks, drop every session the runner had moved and push the new schedule to iOS and the watch —
+  // on one tap, with no warning and nothing to go back to.
+  const html = page();
+  const imp = fnSrc("profileImpact");
+  // ⚠️ applyProfile IS PURE; adoptPlan/recompute COMMIT — and adoptPlan fires syncNativeReminders()
+  // and syncWatch() inside try/catch. Building a preview with the familiar helper would push a plan
+  // the runner has not accepted to the notification scheduler and to the wrist, where it becomes
+  // what the watch runs from when it stands alone. Nothing would throw; nothing would look different.
+  assert.match(imp, /applyProfile\(pf\)/, "the preview does not build a candidate plan");
+  assert.ok(!/adoptPlan|recompute\(/.test(imp), "the preview COMMITS the plan it is meant to preview");
+  // The reschedules seedDone would silently drop must be counted and named before it happens.
+  assert.match(imp, /state\.dayOverride/, "the preview never mentions the runner's own reschedules");
+
+  const save = html.slice(html.indexOf("function doSaveProfile("), html.indexOf("function doSaveProfile(") + 3000)
+    .replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  assert.match(save, /if \(imp && !PROFILE_CONFIRMED\) \{ openProfilePreview/,
+    "saving does not go through the preview");
+  // ⚠️ ONE-SHOT. Left set, the NEXT edit saves silently — the exact behaviour this removes,
+  // reintroduced by a variable nobody would think to look at.
+  assert.match(save, /PROFILE_CONFIRMED = false;/, "the confirm flag is never cleared");
+});
+
+test("⚠️ undo puts back everything the rebuild destroys, not just the profile", () => {
+  const html = page();
+  // ⚠️ COMMENTS STRIPPED, because the comment explaining the fix names seedDone() — so an
+  // ordering assertion measured against the raw text finds the WORD before the CALL and fails on
+  // correct code. Fourth outing of that trap in this file; it is why fnSrc strips them.
+  const save = html.slice(html.indexOf("function doSaveProfile("), html.indexOf("function doSaveProfile(") + 4000)
+    .replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  // ⚠️ SNAPSHOT BEFORE THE REBUILD. seedDone() prunes state.dayOverride and PERSISTS the prune, so
+  // by the time a toast appears the reschedules are already gone from disk. An undo restoring only
+  // the profile — the obvious implementation, and the one the toastUndo precedent models — hands
+  // back a plan with the runner's own moves deleted, on a screen they were not looking at.
+  const snap = save.indexOf("undoSnap = {");
+  const seed = save.indexOf("seedDone()");
+  assert.ok(snap > 0, "nothing is snapshotted for undo");
+  assert.ok(snap < seed, "the snapshot is taken AFTER seedDone has already pruned the reschedules");
+  for (const field of ["profile:", "dayOverride:", "ticks:"]) {
+    assert.ok(save.slice(snap, snap + 400).includes(field), "undo does not capture " + field);
+  }
+  assert.match(save, /state\.dayOverride = undoSnap\.dayOverride; saveDayOverride\(\)/,
+    "undo does not restore the reschedules to disk");
+  assert.match(save, /restoreTicks\(undoSnap\.ticks\)/, "undo does not restore today's ticks");
+  assert.match(save, /recompute\(\); computeToday\(\)/,
+    "undo does not rebuild, so iOS and the watch keep the plan the runner just rejected");
+  // ⚠️ AND THE FORWARD PATH HAD THE SAME HOLE. doSaveProfile was the ONE rebuild path that never
+  // bracketed seedDone with todayTicks/restoreTicks, so editing your profile silently un-ticked the
+  // run you had already done today.
+  assert.match(save, /const keptTicks = todayTicks\(\)/, "the forward save does not keep today's ticks");
+  assert.match(save, /seedDone\(\); restoreTicks\(keptTicks\)/, "the forward save does not restore them");
+});
+
+test("⚠️ no handler reaches for an element id that does not exist", () => {
+  // The confirm button first clicked "#saveSetup", which is nowhere in the app. It built, typechecked
+  // and passed every test, and the button silently did nothing — this codebase's documented
+  // invented-identifier trap, third outing.
+  const html = page();
+  const ids = new Set<string>();
+  for (const m of html.matchAll(/id="([A-Za-z][\w-]*)"/g)) ids.add(m[1]!);
+  const refs = new Set<string>();
+  for (const m of html.matchAll(/\$\("([A-Za-z][\w-]*)"\)/g)) refs.add(m[1]!);
+  // ⚠️ These four are built by string concatenation (uiActionBar's id option, the live-metric
+  // builder, uiDecisionHero's actionId), so they never appear as a literal id= and are NOT defects.
+  // readySlot is the documented landmine and is guarded. Anything else is a typo nobody will notice.
+  const dynamic = new Set(["wlElapsed", "sdStart", "todayPreview", "readySlot", "typePreview"]);
+  const missing = [...refs].filter((r) => !ids.has(r) && !dynamic.has(r));
+  assert.deepEqual(missing, [], "these ids are looked up but never rendered: " + missing.join(", "));
+});

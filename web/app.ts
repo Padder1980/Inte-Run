@@ -2201,6 +2201,19 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .sd-sn { color: #04120e !important; }
 .sd-chev { flex: none; margin-left: 2px; color: var(--ink-faint); font-size: var(--t-card); line-height: 1; transition: transform .18s ease; }
 .sd-stage[open] .sd-chev, .sd-why[open] .sd-chev { transform: rotate(90deg); }
+/* The profile-change preview. */
+.pi-rows { margin-bottom: var(--s3); }
+.pi-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3); padding: var(--s3) 0; border-bottom: 1px solid var(--line); }
+.pi-row:last-child { border-bottom: 0; }
+.pi-l { font-size: var(--t-body); color: var(--ink-soft); }
+.pi-v { font-size: var(--t-body); color: var(--ink); text-align: right; }
+.pi-v s { color: var(--ink-faint); text-decoration-thickness: 1px; }
+.pi-v b { font-weight: 750; }
+.pi-warn { padding: var(--s3); background: var(--surface-2); border-left: 3px solid var(--ease); border-radius: 0; font-size: var(--t-body); line-height: 1.5; color: var(--ink-soft); }
+.pi-none { padding: var(--s3) 0 var(--s4); font-size: var(--t-body); line-height: 1.55; color: var(--ink-soft); }
+.pi-acts { display: flex; gap: var(--s3); margin-top: var(--s4); }
+.pi-acts .mini-btn { flex: 1; min-height: var(--tap); }
+.pi-ghost { background: var(--surface-2); color: var(--ink); }
 /* Ask Alfie: what it is, before the first question. */
 .alf-lim { margin: 0 0 var(--s3); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; }
 .alf-lim > summary { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; padding: var(--s3) var(--s4); min-height: var(--tap); cursor: pointer; list-style: none; }
@@ -2648,6 +2661,94 @@ let PLAN, RAW, FITNESS, CLASS, MASTERS;
 // in the UI — so Today shows Monday's session until the app is restarted (a restart re-runs recompute
 // and hides the bug). The reminder schedule and the watch payload also describe the plan, so they get
 // re-sent from the same place or they go stale in exactly the same silent way.
+/**
+ * What saving this profile would actually do to the plan, worked out WITHOUT doing it.
+ *
+ * The brief's clearest safety recommendation: "preview the plan impact before applying, and offer
+ * undo. The app currently rebuilds silently." It did -- one tap on Save rebuilt every week, cleared
+ * the day's ticks, dropped every session the runner had moved, and pushed the new schedule to iOS
+ * and to the watch, with no warning and nothing to go back to.
+ *
+ * \u26a0\ufe0f applyProfile() IS PURE; adoptPlan()/recompute() COMMIT. They are one line apart and the
+ * familiar one is the committing one -- and adoptPlan fires syncNativeReminders() and syncWatch()
+ * inside try/catch, so building a preview with it would push a plan the runner has not accepted to
+ * the notification scheduler and to the wrist, where it becomes what the watch runs from when it
+ * stands alone. Nothing would throw and nothing would look different. Only applyProfile here.
+ */
+function profileImpact(pf) {
+  let out;
+  try { out = applyProfile(pf); } catch (e) { return null; }
+  const a = PLAN && PLAN.summary ? PLAN.summary : null;
+  const b = out.plan.summary;
+  const rows = [];
+  const cmp = (label, was, now, fmt) => {
+    if (was == null || now == null || Math.abs(was - now) < 0.05) return;
+    rows.push({ label: label, was: fmt(was), now: fmt(now), up: now > was });
+  };
+  const km = (v) => v.toFixed(1) + " km";
+  const wks = (v) => Math.round(v) + (Math.round(v) === 1 ? " week" : " weeks");
+  if (a) {
+    cmp("Length of the block", a.totalWeeks, b.totalWeeks, wks);
+    cmp("Biggest week", a.peakKm, b.peakKm, km);
+  }
+  const runDays = (plan) => {
+    const w = plan.weeks[Math.min(plan.weeks.length - 1, Math.floor(plan.weeks.length / 2))];
+    return w ? w.sessions.filter((x) => PRIMARY_TYPES[x.type]).length : null;
+  };
+  cmp("Runs in a typical week", PLAN ? runDays(PLAN) : null, runDays(out.plan), (v) => String(Math.round(v)));
+  // \u26a0\ufe0f THE ONE NOBODY WOULD THINK TO WARN ABOUT, and the reason this screen needed an undo at
+  // all. seedDone() prunes state.dayOverride of every session id the new plan does not contain, and
+  // PERSISTS the prune. Those are the runner's OWN reschedules, made on a different screen entirely
+  // (the session sheet's "Move to another day"). They were deleted before any toast could appear.
+  const liveIds = {};
+  out.plan.weeks.forEach((wk) => wk.sessions.forEach((x) => { liveIds[x.id] = 1; }));
+  const lost = Object.keys(state.dayOverride || {}).filter((k) => !liveIds[k]).length;
+  return { out: out, rows: rows, lost: lost, none: !rows.length && !lost };
+}
+function profileImpactHtml(imp) {
+  if (!imp) return "";
+  if (imp.none) {
+    return '<div class="pi-none">Nothing about your plan changes \u2014 the answers you edited do not ' +
+      'affect how it is built. Saving is safe.</div>';
+  }
+  const rows = imp.rows.map((r) =>
+    '<div class="pi-row"><span class="pi-l">' + esc(r.label) + '</span>' +
+    '<span class="pi-v"><s>' + esc(r.was) + '</s> <b>' + esc(r.now) + '</b></span></div>').join("");
+  // \u26a0\ufe0f Said in words, before it happens, because it cannot be undone by rebuilding the plan.
+  const lost = imp.lost
+    ? '<div class="pi-warn"><b>' + imp.lost + (imp.lost === 1 ? " session you moved" : " sessions you moved") +
+      '</b> to a different day will go back to where the plan put them.</div>'
+    : "";
+  return '<div class="pi-rows">' + rows + '</div>' + lost;
+}
+let PROFILE_CONFIRMED = false;
+/**
+ * The preview sheet. Its button is the only thing that commits.
+ * \u26a0\ufe0f A ONE-SHOT FLAG, cleared the instant doSaveProfile reads it. Left set, the NEXT edit
+ * would save silently -- which is exactly the behaviour this change exists to remove, reintroduced
+ * by a variable nobody would think to look at.
+ */
+function openProfilePreview(pf, imp) {
+  ensureSheet();
+  $("sheetBody").innerHTML =
+    '<div class="ui-eyebrow">Before we rebuild</div>' +
+    '<div class="ui-hero-t" style="margin-bottom:12px">What changes in your plan</div>' +
+    profileImpactHtml(imp) +
+    '<div class="pi-acts">' +
+      '<button class="mini-btn pi-ghost" id="piBack">Go back</button>' +
+      '<button class="mini-btn" id="piGo">' + (imp.none ? "Save" : "Rebuild my plan") + '</button>' +
+    '</div>';
+  $("sheetOv").classList.add("on");
+  $("piBack").onclick = () => closeSheet();
+  $("piGo").onclick = () => {
+    PROFILE_CONFIRMED = true;
+    closeSheet();
+    // \u26a0\ufe0f #saveProfile, and doSaveProfile is a CLOSURE inside wire() so it cannot be called
+    // from here. The first version clicked "#saveSetup", which does not exist anywhere in the app --
+    // it built, typechecked, passed every test, and the confirm button silently did nothing.
+    const save = $("saveProfile"); if (save) save.click();
+  };
+}
 function adoptPlan(out) {
   PLAN = out.plan; RAW = out.raw; FITNESS = out.fitness; CLASS = out.classification; MASTERS = out.masters;
   normalizeWeekStarts();
@@ -11701,12 +11802,45 @@ function wire() {
   };
   function doSaveProfile() {
     let pf; try { pf = draftFromForm(); } catch (e) { const er = $("setupErr"); er.style.display = "block"; er.textContent = e.message; return; }
+    // \u26a0\ufe0f SHOW IT FIRST. Save used to rebuild every week, clear the day's ticks, drop every
+    // session the runner had moved and push the new schedule to iOS and the watch, on one tap with no
+    // warning. The preview is computed with applyProfile, which is pure; nothing is committed until
+    // the sheet's own button is pressed.
+    const imp = profileImpact(pf);
+    if (imp && !PROFILE_CONFIRMED) { openProfilePreview(pf, imp); return; }
+    PROFILE_CONFIRMED = false;
     let out; try { out = applyProfile(pf); } catch (e) { const er = $("setupErr"); er.style.display = "block"; er.textContent = "That goal can't be planned yet — try a race date further out."; return; }
-    profile = pf; adoptPlan(out); computeToday(); state.planWeek = PLAN.defaultWeekIndex; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; seedDone(); saveProfileStore(); renderAvatar();
+    // \u26a0\ufe0f SNAPSHOT BEFORE THE REBUILD, NOT AFTER. seedDone() prunes state.dayOverride and
+    // PERSISTS the prune, so by the time a toast appears those reschedules are already gone from
+    // disk. An undo that restores only the profile object -- the obvious implementation, and the one
+    // existing toastUndo precedent models -- would hand back a plan with the runner's own moves
+    // silently deleted, on a screen they were not looking at.
+    const undoSnap = { profile: JSON.parse(JSON.stringify(profile || {})),
+                       dayOverride: JSON.parse(JSON.stringify(state.dayOverride || {})),
+                       ticks: todayTicks() };
+    // \u26a0\ufe0f AND THIS IS THE ONE REBUILD PATH THAT NEVER RESTORED TODAY'S TICKS. Every other one
+    // (the flag banner, the retest, the add-a-day offer) brackets seedDone with todayTicks/
+    // restoreTicks; this one did not, so editing your profile silently un-ticked the run you had
+    // already done today.
+    const keptTicks = todayTicks();
+    profile = pf; adoptPlan(out); computeToday(); state.planWeek = PLAN.defaultWeekIndex; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; seedDone(); restoreTicks(keptTicks); saveProfileStore(); renderAvatar();
     // ⚠️ The draft is now sticky across navigation, so SAVING has to be what releases it — otherwise
     // the answers a runner just committed are re-restored over the top of the profile they built.
     draft = {};
     state.screen = null; state.tab = "plan"; render();
+    if (!imp || !imp.none) {
+      toastUndo("Plan updated", () => {
+        // Everything the rebuild touched, put back in the order it was taken. recompute() re-syncs
+        // iOS and the watch, so they end up holding the plan the runner actually has.
+        profile = undoSnap.profile;
+        state.dayOverride = undoSnap.dayOverride; saveDayOverride();
+        recompute(); computeToday();
+        state.planWeek = PLAN.defaultWeekIndex; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
+        seedDone(); restoreTicks(undoSnap.ticks);
+        saveProfileStore();
+        render();
+      });
+    }
   }
   // Cancel means cancel: an explicit "no thanks" discards the draft, where a glance at another tab does not.
   const cancel = $("cancelSetup"); if (cancel) cancel.onclick = () => { draft = {}; state.screen = null; state.tab = "today"; render(); };

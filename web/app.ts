@@ -67,7 +67,7 @@ const html = `<!doctype html>
 <title>Inte-Run — The Intelligent Training Companion</title>
 <meta name="description" content="Inte-Run — evidence-based running coach with live GPS sessions and voice coaching.">
 <meta name="theme-color" content="#eef1f1" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0a100e" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#06110e" media="(prefers-color-scheme: dark)">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <!-- ⚠️ NOT black-translucent. Measured on the owner's 16 Pro Max, iOS 18.7, Home Screen:
@@ -103,8 +103,8 @@ try{if(location.protocol==='interun:'){var v=document.querySelector('meta[name=v
 :root {
   color-scheme: light dark;
   --bg: #eef1f1; --surface: #ffffff; --surface-2: #f6f8f8; --line: #dbe1e0;
-  --ink: #14201b; --ink-soft: #4c5b55; --ink-faint: #7a877f;
-  --accent: #0e8c7f; --accent-ink: #ffffff;
+  --ink: #14201b; --ink-soft: #4c5b55; --ink-faint: #63706a;
+  --accent: #0c7b70; --accent-ink: #ffffff;
   --base: #2b9eb3; --build: #5fa83c; --peak: #e0863a; --taper: #7a6fd0;
   --ready: #4b9e2f; --steady: #2b9eb3; --ease: #d98a2a; --rest: #c0442e;
   --brass:#856222; --brass-tint:#f3ead8; --brass-sheen:rgba(255,255,255,.72); --brass-shade:rgba(0,0,0,.04);
@@ -128,21 +128,21 @@ try{if(location.protocol==='interun:'){var v=document.querySelector('meta[name=v
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0a100e; --surface: #151e1b; --surface-2: #1b2622; --line: #26332e;
-    --ink: #e7eeea; --ink-soft: #a9b7b0; --ink-faint: #74847c;
-    --accent: #2bb3a3; --accent-ink: #06231f;
+    --bg: #06110e; --surface: #10201b; --surface-2: #142822; --line: #263d36;
+    --ink: #f4f8f6; --ink-soft: #aab8b2; --ink-faint: #8a9a92;
+    --accent: #32c8b2; --accent-ink: #06231f;
     --base: #3ab0c4; --build: #74bd52; --peak: #eb9748; --taper: #9184e0;
     --ready: #6bbf46; --steady: #3ab0c4; --ease: #eb9748; --rest: #e8765c;
     --brass: #d6ae67; --brass-tint: #2a2318; --brass-sheen:rgba(255,255,255,.10); --brass-shade:rgba(0,0,0,.34);
     --eff-easy: #4cb98a; --eff-moderate: #e6ac3e; --eff-hard: #e56f49; --eff-none: #6f7d76; --hz1:#8b98a5; --hz2:#5296e8; --hz3:#43c184; --hz4:#efab48; --hz5:#e8604f;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 22px rgba(0,0,0,.4);
-    --splash-bg: radial-gradient(125% 90% at 50% 0%, #0a100e 0%, #0c2b28 12%, #06110f 56%, #000 100%);
+    --splash-bg: radial-gradient(125% 90% at 50% 0%, #06110e 0%, #0c2b28 12%, #06110f 56%, #000 100%);
     --splash-ink: #ffffff; --splash-soft: #9aa3a0; --splash-brand: #16b7a4;
     --splash-glow: rgba(22,183,164,.38);
   }
 }
-:root[data-theme="light"] { color-scheme: light; --bg:#eef1f1; --surface:#fff; --surface-2:#f6f8f8; --line:#dbe1e0; --ink:#14201b; --ink-soft:#4c5b55; --ink-faint:#7a877f; --accent:#0e8c7f; --accent-ink:#fff; --base:#2b9eb3; --build:#5fa83c; --peak:#e0863a; --taper:#7a6fd0; --ready:#4b9e2f; --steady:#2b9eb3; --ease:#d98a2a; --rest:#c0442e; --brass:#856222; --brass-tint:#f3ead8; --brass-sheen:rgba(255,255,255,.72); --brass-shade:rgba(0,0,0,.04); --eff-easy:#3fa47a; --eff-moderate:#d99a2b; --eff-hard:#d65b36; --eff-none:#9aa8a1; --hz1:#7f8c99; --hz2:#3d7fd6; --hz3:#2fa96b; --hz4:#e2952f; --hz5:#d6493c; --shadow:0 1px 2px rgba(20,32,27,.05),0 6px 18px rgba(20,32,27,.06);  --splash-bg: radial-gradient(125% 90% at 50% 0%, #eef1f1 0%, #e4edeb 52%, #d6e3e0 100%); --splash-ink:#14201b; --splash-soft:#5b6b64; --splash-brand:#0e8c7f; --splash-glow:rgba(14,140,127,.22); }
-:root[data-theme="dark"] { color-scheme: dark; --bg:#0a100e; --surface:#151e1b; --surface-2:#1b2622; --line:#26332e; --ink:#e7eeea; --ink-soft:#a9b7b0; --ink-faint:#74847c; --accent:#2bb3a3; --accent-ink:#06231f; --base:#3ab0c4; --build:#74bd52; --peak:#eb9748; --taper:#9184e0; --ready:#6bbf46; --steady:#3ab0c4; --ease:#eb9748; --rest:#e8765c; --brass:#d6ae67; --brass-tint:#2a2318; --brass-sheen:rgba(255,255,255,.10); --brass-shade:rgba(0,0,0,.34); --eff-easy:#4cb98a; --eff-moderate:#e6ac3e; --eff-hard:#e56f49; --eff-none:#6f7d76; --hz1:#8b98a5; --hz2:#5296e8; --hz3:#43c184; --hz4:#efab48; --hz5:#e8604f; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.4);  --splash-bg: radial-gradient(125% 90% at 50% 0%, #0a100e 0%, #0c2b28 12%, #06110f 56%, #000 100%); --splash-ink:#ffffff; --splash-soft:#9aa3a0; --splash-brand:#16b7a4; --splash-glow:rgba(22,183,164,.38); }
+:root[data-theme="light"] { color-scheme: light; --bg:#eef1f1; --surface:#fff; --surface-2:#f6f8f8; --line:#dbe1e0; --ink:#14201b; --ink-soft:#4c5b55; --ink-faint:#63706a; --accent:#0c7b70; --accent-ink:#fff; --base:#2b9eb3; --build:#5fa83c; --peak:#e0863a; --taper:#7a6fd0; --ready:#4b9e2f; --steady:#2b9eb3; --ease:#d98a2a; --rest:#c0442e; --brass:#856222; --brass-tint:#f3ead8; --brass-sheen:rgba(255,255,255,.72); --brass-shade:rgba(0,0,0,.04); --eff-easy:#3fa47a; --eff-moderate:#d99a2b; --eff-hard:#d65b36; --eff-none:#9aa8a1; --hz1:#7f8c99; --hz2:#3d7fd6; --hz3:#2fa96b; --hz4:#e2952f; --hz5:#d6493c; --shadow:0 1px 2px rgba(20,32,27,.05),0 6px 18px rgba(20,32,27,.06);  --splash-bg: radial-gradient(125% 90% at 50% 0%, #eef1f1 0%, #e4edeb 52%, #d6e3e0 100%); --splash-ink:#14201b; --splash-soft:#5b6b64; --splash-brand:#0e8c7f; --splash-glow:rgba(14,140,127,.22); }
+:root[data-theme="dark"] { color-scheme: dark; --bg:#06110e; --surface:#10201b; --surface-2:#142822; --line:#263d36; --ink:#f4f8f6; --ink-soft:#aab8b2; --ink-faint:#8a9a92; --accent:#32c8b2; --accent-ink:#06231f; --base:#3ab0c4; --build:#74bd52; --peak:#eb9748; --taper:#9184e0; --ready:#6bbf46; --steady:#3ab0c4; --ease:#eb9748; --rest:#e8765c; --brass:#d6ae67; --brass-tint:#2a2318; --brass-sheen:rgba(255,255,255,.10); --brass-shade:rgba(0,0,0,.34); --eff-easy:#4cb98a; --eff-moderate:#e6ac3e; --eff-hard:#e56f49; --eff-none:#6f7d76; --hz1:#8b98a5; --hz2:#5296e8; --hz3:#43c184; --hz4:#efab48; --hz5:#e8604f; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.4);  --splash-bg: radial-gradient(125% 90% at 50% 0%, #06110e 0%, #0c2b28 12%, #06110f 56%, #000 100%); --splash-ink:#ffffff; --splash-soft:#9aa3a0; --splash-brand:#16b7a4; --splash-glow:rgba(22,183,164,.38); }
 * { box-sizing: border-box; }
 /* The app shell owns the viewport; the document itself must never scroll.
    ⚠️ Without this the page was the scroller, not #view, and two consequences followed: an iOS

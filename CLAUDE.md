@@ -325,6 +325,44 @@ applied to the account's DEFAULT public token** — a second token has to be cre
 URL-restricted token will very likely be refused in the native app**, which is not a web page and
 serves itself from `interun://app`; that needs its own answer before the App Store.
 
+## THE REDESIGN (brief 2026-08-08) — PHASE 0 STARTED, TESTFLIGHT HELD
+
+The owner commissioned an Experience Design Brief (20pp, 6 concept screens) and decided the redesign
+goes in **before** TestFlight: *"i think the redesign is best before we go to test flight"*. The
+phased plan is at https://claude.ai/code/artifact/46e85e7b-bbc3-4ee8-8698-c2916a2e6b40 — read it
+before continuing the work.
+
+⚠️ **THE BRIEF REVIEWED DARK SCREENSHOTS ONLY, AND THE REAL DEFECT WAS IN LIGHT MODE.** It scored
+accessibility 2.6/5 and asked for 4.5:1 on body text. Measured: in DARK every text token already
+passed — the brief's own secondary target (9.33:1) was within a rounding error of what shipped
+(9.23:1). In LIGHT, `--accent` measured **4.14:1 on white and 3.64:1 on the canvas** — the primary
+action colour, on every button and every link, failing AA. Fixed to `#0c7b70`: same hue, darker.
+
+**Phase 0 slice 1 (tokens + contrast) is in.** Dark moved to the brief's targets; `--ink-faint` was
+lifted in both themes (dark 4.32 → 5.25, light 3.30 → 4.56). Every text token now clears 4.5:1 on
+canvas, surface and surface-2 in both themes.
+
+⚠️ **THE ACCENT IS BOTH A TEXT COLOUR AND A BUTTON BACKGROUND.** Darkening it until it passes as text
+can push the label on top of it the other way. `test/contrast.test.ts` checks both directions.
+
+⚠️ **FOUR PLACES DEFINE THESE TOKENS** — `:root`, the `prefers-color-scheme` block, and the two
+`data-theme` blocks. A change applied to three leaves the fourth stale, and which one a runner gets
+depends on their OS setting, so it reproduces for some people and not others. Guarded.
+
+⚠️ **AND CHANGING `--bg` IS COUPLED TO TWO OTHER VALUES** — the `theme-color` meta and the first stop
+of `--splash-bg`, both per-theme. Miss either and the iOS status strip mismatches the app for the
+whole session (documented at length above). Both guarded.
+
+⚠️ **TWO OF THAT TEST'S OWN GUARDS COULD NOT FAIL WHEN FIRST WRITTEN, AND WERE CAUGHT BY RE-BREAKING.**
+The media-query check sliced to the end of the DOCUMENT, which contains the `data-theme` block, so
+every value was "found"; and the identity check ("green and blue both beat red") is satisfied by a
+BLUE — swapping the accent for `#3a7ce8` passed it. Both tightened. Six deliberate regressions were
+each watched failing their own guard.
+
+**Still to do in Phase 0:** radius hierarchy, the 8-point spacing scale, the type ladder as tokens,
+semantic tokens split from workout colours, the first components (session row, coach note, readiness
+tile, bottom action bar) with their full state sets, focus-visible and VoiceOver labels.
+
 ## Deploy & links
 
 - Push to **`main`** → GitHub Pages serves `docs/` at **https://padder1980.github.io/Inte-Run/**.

@@ -20,6 +20,13 @@ import { readFileSync } from "node:fs";
 
 const page = () => readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
 
+/** Just the stylesheet — matching the whole document would sweep up inline styles in the markup. */
+function sheetOf(html: string): string {
+  const a = html.indexOf("<style>"), b = html.indexOf("</style>");
+  assert.ok(a >= 0 && b > a, "no style block in the build");
+  return html.slice(a, b);
+}
+
 /**
  * The source of one function, COMMENTS STRIPPED.
  * ⚠️ Both halves are load-bearing. Slicing to a named later function assumes an order the file does
@@ -312,8 +319,10 @@ test("⚠️ every health check-in says what happens to the answers, and says it
 
 test("⚠️ the Support hub is grouped, and grouping cannot silently drop a card", () => {
   const html = page();
-  const fn = html.slice(html.indexOf("const SUPPORT_GROUPS"), html.indexOf("function supportDetail("));
-  assert.ok(fn.length > 0 && fn.length < 2200, "the viewSupport slice window is wrong: " + fn.length);
+  // Anchored on viewSupport itself, not on the next named function — the search builders landed
+  // between the two and stretched the old window past what it was measuring.
+  const fn = html.slice(html.indexOf("const SUPPORT_GROUPS"), html.indexOf("\nfunction supportDetail("));
+  assert.ok(fn.length > 0 && fn.length < 5200, "the viewSupport slice window is wrong: " + fn.length);
   for (const g of ["Coaching", "Health and safety", "Your setup"]) {
     assert.ok(fn.includes('"' + g + '"'), "no " + g + " group");
   }
@@ -452,4 +461,44 @@ test("⚠️ every performance insight carries its provenance", () => {
   assert.match(view, /no method behind it yet/, "the empty state does not say WHY it is empty");
   // FITNESS.summary is the engine's own honest one-liner and was rendered nowhere.
   assert.match(view, /FITNESS\.summary/, "the engine's own provenance line is still discarded");
+});
+
+test("⚠️ Support search reads the articles' bodies, not just their titles", () => {
+  // The owner ruled this BUILD IT, not a placeholder: "the articles are markup in the build; a
+  // client-side index over them needs no backend."
+  const fn = fnSrc("supportSearch");
+  // ⚠️ THE BODY IS THE POINT. Somebody typing "gel" or "shin splints" is not looking for an article
+  // called that — they want the paragraph that mentions it. A title-only search returns nothing and
+  // teaches them the search does not work.
+  assert.match(fn, /g\.b\.join/, "the search never looks inside an article");
+  assert.match(fn, /SUPPORT_HUB/, "the search does not cover the help screens");
+  assert.match(fn, /rank/, "title matches are not ranked above body matches");
+  assert.match(fn, /needle\.length < 2/, "a single character searches the whole corpus");
+
+  const view = fnSrc("supportSearchHtml");
+  // ⚠️ A focusable field must be >= 16px or iOS auto-zooms on focus, and pinch is deliberately
+  // disabled so the runner can never zoom back out. --t-card is 17px: on the type ladder AND above
+  // the floor, so it satisfies both without widening the ladder to admit 16px everywhere.
+  const css = sheetOf(page());
+  assert.match(css, /\.sup-search input \{[^}]*font-size: var\(--t-card\)/,
+    "the search field's size is not on the ladder and above the iOS zoom floor");
+  assert.match(view, /Nothing matches/, "there is no empty state");
+  assert.match(view, /supAskAlfie/, "the empty state offers no way forward");
+
+  // ⚠️ The icon must EXIST. ICON.search did not, so `(ICON.search || "")` rendered an empty slot in
+  // silence — the same shape as every other invented-identifier bug in this file.
+  const html = page();
+  assert.match(html, /\bsearch: '<svg/, "ICON.search is not defined, so the field shows a blank slot");
+
+  // ⚠️ While searching, the groups are HIDDEN, not filtered. A grid that quietly loses eight of its
+  // eleven tiles reads as the app having lost them.
+  const vs = fnSrc("viewSupport");
+  assert.match(vs, /if \(\(state\.supportQ \|\| ""\)\.trim\(\)\) return supportSearchHtml\(\)/,
+    "the hub is filtered rather than replaced while searching");
+
+  // A guide is named by its slug, so a search result can open the right one.
+  const gv = fnSrc("guidesView");
+  assert.ok(!/data-gd="' \+ i \+ '"/.test(gv), "a guide is still keyed on its array index");
+  assert.match(gv, /data-gd="' \+ esc\(g\.k\)/, "a guide carries no stable name");
+  assert.match(gv, /state\.openGuide === g\.k/, "a search result cannot open its article");
 });

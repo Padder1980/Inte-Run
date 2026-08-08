@@ -2227,6 +2227,19 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 /* The consent line on every health check-in. */
 .ci-consent { margin-bottom: var(--s3); padding: var(--s3); background: var(--surface-2); border-radius: var(--r-ctl); font-size: var(--t-meta); line-height: 1.5; color: var(--ink-soft); }
 .tp-card { padding: var(--s3) var(--s4); margin: var(--s3) 0; }
+/* Support search. */
+.sup-search { position: relative; display: flex; align-items: center; margin-bottom: var(--s4); }
+.sup-si { position: absolute; left: var(--s3); display: flex; color: var(--ink-faint); pointer-events: none; }
+.sup-si svg { width: 18px; height: 18px; }
+.sup-search input { width: 100%; min-height: var(--tap); padding: 0 40px 0 42px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-pill); color: var(--ink); font: inherit; font-size: var(--t-card); }
+.sup-search input::-webkit-search-cancel-button { display: none; }
+.sup-sx { position: absolute; right: var(--s2); width: 32px; height: 32px; background: var(--surface-2); border: 0; border-radius: var(--r-pill); color: var(--ink-soft); font-size: var(--t-section); line-height: 1; cursor: pointer; }
+.sup-res { display: flex; flex-direction: column; gap: var(--s2); }
+.sup-r { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: left; padding: var(--s3) var(--s4); min-height: var(--tap); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); color: inherit; cursor: pointer; }
+.sup-rt { font-size: var(--t-body); font-weight: 700; color: var(--ink); }
+.sup-rd { font-size: var(--t-meta); line-height: 1.5; color: var(--ink-soft); }
+.sup-r .ui-pill { margin-top: 3px; }
+.sup-none { padding: var(--s5) var(--s4); text-align: center; font-size: var(--t-body); line-height: 1.6; color: var(--ink-soft); }
 /* Performance: an insight with its provenance. */
 .perf-c { padding: var(--s4); margin-bottom: var(--s3); }
 .perf-v { font-size: var(--t-display); font-weight: 780; color: var(--ink); line-height: 1.05; margin-top: 3px; }
@@ -2418,6 +2431,7 @@ const ICON = {
   rIntervals: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16V9M9 16V6M14 16v-7M19 16v-4"/><path d="M2.5 19.5h19"/></svg>',
   rRace: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 5h8l-1.4 3L13 11H5"/><path d="M13 5h6l-1.4 3L19 11h-6"/></svg>',
   rStrides: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h11M3 12h15M3 16h8"/><path d="m18 14 3 2-3 2"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9.5 7V5.4A1.4 1.4 0 0 1 10.9 4h2.2a1.4 1.4 0 0 1 1.4 1.4V7"/><path d="M6.4 7l.8 12.1A1.9 1.9 0 0 0 9.1 21h5.8a1.9 1.9 0 0 0 1.9-1.9L17.6 7"/><path d="M10.5 11v6M13.5 11v6"/></svg>',
   watch: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="3.4"/><path d="M9 6 8.6 3.2A1 1 0 0 1 9.6 2h4.8a1 1 0 0 1 1 1.2L15 6M9 18l-.4 2.8a1 1 0 0 0 1 1.2h4.8a1 1 0 0 0 1-1.2L15 18"/><path d="M12 9.6V12l1.7 1.1"/></svg>',
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.4 5.4h3.2"/><circle cx="12" cy="18.2" r=".7" fill="currentColor" stroke="none"/></svg>',
@@ -2796,7 +2810,7 @@ function computeToday() {
 }
 computeToday();
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "workouts", logFilter: "all", support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK, addOpen: false };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "workouts", logFilter: "all", supportQ: "", openGuide: null, support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK, addOpen: false };
 // Effective day index for a session, honouring any user reschedule. Works for raw sessions
 // (dayOfWeek) and summary sessions (dayIndex), keyed by the shared session id.
 function loadDayOverride() { try { return JSON.parse(localStorage.getItem("interun_dayov_v1") || "{}") || {}; } catch (e) { return {}; } }
@@ -6760,15 +6774,72 @@ const SUPPORT_GROUPS = [
   ["Training and kit", ["strength", "shoes", "why"]],
   ["Your setup", ["connect", "data"]],
 ];
+/**
+ * Support search. The owner ruled BUILD IT rather than a placeholder -- "the articles are markup in
+ * the build; a client-side index over them needs no backend" -- and he was right, except that they
+ * are better than markup: GUIDES and SUPPORT_HUB are both DATA, so the index is a filter.
+ *
+ * \u26a0\ufe0f IT SEARCHES THE BODY, NOT JUST THE TITLES. Somebody typing "shin splints" or "gel" is
+ * not looking for an article called that -- they are looking for the paragraph that mentions it, and
+ * a title-only search returns nothing and teaches them the search does not work.
+ */
+function supportSearch(q) {
+  const needle = String(q || "").trim().toLowerCase();
+  if (needle.length < 2) return [];
+  const hits = [];
+  SUPPORT_HUB.forEach((h) => {
+    const hay = (h.t + " " + h.d).toLowerCase();
+    if (hay.indexOf(needle) >= 0) hits.push({ kind: "hub", id: h.id, t: h.t, d: h.d, rank: hay.indexOf(needle) === 0 ? 0 : 1 });
+  });
+  GUIDES.forEach((g) => {
+    const inTitle = (g.t + " " + g.d).toLowerCase().indexOf(needle) >= 0;
+    const body = g.b.join(" ");
+    const at = body.toLowerCase().indexOf(needle);
+    if (!inTitle && at < 0) return;
+    // A snippet around the match, so the runner can see WHY this article came back.
+    let snip = g.d;
+    if (!inTitle && at >= 0) {
+      const from = Math.max(0, at - 60);
+      snip = (from > 0 ? "\u2026" : "") + body.slice(from, at + needle.length + 90).replace(/<[^>]+>/g, "") + "\u2026";
+    }
+    hits.push({ kind: "guide", id: g.k, t: g.t, d: snip, rank: inTitle ? 0 : 2 });
+  });
+  hits.sort((x, y) => x.rank - y.rank);
+  return hits.slice(0, 12);
+}
+function supportSearchHtml() {
+  const q = state.supportQ || "";
+  // \u26a0\ufe0f 16px MINIMUM ON A FOCUSABLE FIELD. Below it iOS auto-zooms on focus, and because
+  // pinch is deliberately disabled the runner can never zoom back out -- the app stays scaled for
+  // every screen after it. test/ios-input-zoom.test.ts scans for exactly this.
+  const box = '<div class="sup-search"><span class="sup-si" aria-hidden="true">' + (ICON.search || "") + '</span>' +
+    '<input id="supQ" type="search" value="' + esc(q) + '" placeholder="Search help and guides" ' +
+    'autocomplete="off" aria-label="Search help and guides">' +
+    (q ? '<button class="sup-sx" id="supQx" aria-label="Clear search">\u00d7</button>' : "") + '</div>';
+  if (!q.trim()) return box;
+  const hits = supportSearch(q);
+  if (!hits.length) {
+    return box + '<div class="sup-none">Nothing matches <b>' + esc(q.trim()) + '</b>. ' +
+      'Try a shorter word \u2014 or <button class="lb-clear" id="supAskAlfie">ask Alfie</button>, which can answer against your own plan.</div>';
+  }
+  return box + '<div class="sup-res">' + hits.map((h) =>
+    '<button class="sup-r" data-supres="' + esc(h.kind) + ':' + esc(h.id) + '">' +
+    '<span class="sup-rt">' + esc(h.t) + '</span>' +
+    '<span class="sup-rd">' + esc(h.d) + '</span>' +
+    '<span class="ui-pill">' + (h.kind === "guide" ? "Guide" : "Screen") + '</span></button>').join("") + '</div>';
+}
 function viewSupport() {
   if (state.support) return supportDetail(state.support);
+  // \u26a0\ufe0f While a search is running the groups are HIDDEN, not filtered. A grid that quietly
+  // loses eight of its eleven tiles reads as the app having lost them.
+  if ((state.supportQ || "").trim()) return supportSearchHtml();
   const card = (h) => '<button class="hubcard" data-hub="' + h.id + '"><div class="ic" style="--hc:' + h.c + '">' + ICON[h.ic] + '</div><div class="b"><div class="t">' + h.t + (h.interactive ? ' <span class="tag-int">Check-in</span>' : '') + '</div><div class="d">' + h.d + '</div></div><div class="arr">›</div></button>';
   // \u26a0\ufe0f ANY CARD NOT NAMED IN A GROUP STILL APPEARS, under "More". A hub that silently drops
   // an entry someone adds later is worse than an ungrouped one, because nothing looks wrong.
   const placed = {};
   SUPPORT_GROUPS.forEach((g) => g[1].forEach((id) => { placed[id] = true; }));
   const groups = SUPPORT_GROUPS.concat([["More", SUPPORT_HUB.filter((h) => !placed[h.id]).map((h) => h.id)]]);
-  return groups.map((g) => {
+  return supportSearchHtml() + groups.map((g) => {
     const items = g[1].map((id) => SUPPORT_HUB.find((h) => h.id === id)).filter(Boolean);
     if (!items.length) return "";
     return '<div class="ui-section">' + g[0] + '</div><div class="hub">' + items.map(card).join("") + '</div>';
@@ -7771,8 +7842,10 @@ function wireDataView() {
   }
 }
 function guidesView() {
-  const cards = GUIDES.map((g, i) =>
-    '<div class="gd" data-gd="' + i + '"><button class="gd-h"><span class="gd-t">' + g.t + '</span>' +
+  const cards = GUIDES.map((g) =>
+    // \u26a0\ufe0f KEYED ON THE SLUG, NOT THE ARRAY INDEX. The accordion toggle is element-scoped so
+    // it survives either way, but an index cannot name an article to arrive at from a search result.
+    '<div class="gd' + (state.openGuide === g.k ? " on" : "") + '" data-gd="' + esc(g.k) + '"><button class="gd-h"><span class="gd-t">' + g.t + '</span>' +
     '<span class="gd-d">' + g.d + '</span><span class="gd-arr">\\u203a</span></button>' +
     '<div class="gd-b">' + g.b.map((p) => "<p>" + p + "</p>").join("") + '</div></div>').join("");
   return '<div class="lib-hero"><div class="lib-eyebrow">Training guides</div>' +
@@ -11822,6 +11895,28 @@ function wire() {
   document.querySelectorAll("[data-logf]").forEach((b) => b.onclick = () => { state.logFilter = b.dataset.logf; render(); });
   const lbc = $("lbClear"); if (lbc) lbc.onclick = () => { state.logFilter = "all"; render(); };
   const pt = $("perfTrial"); if (pt) pt.onclick = startTrialFlow;
+  const sq = $("supQ");
+  if (sq) {
+    // \u26a0\ufe0f RE-RENDER ON INPUT MEANS THE FIELD IS REBUILT UNDER THE RUNNER'S FINGER, so the
+    // caret has to be put back or every keystroke jumps it to the front. Same class of bug as the
+    // run-note debounce documented in CLAUDE.md: keep the value, restore the position.
+    sq.oninput = () => {
+      const pos = sq.selectionStart;
+      state.supportQ = sq.value;
+      render();
+      const again = $("supQ");
+      if (again) { again.focus(); try { again.setSelectionRange(pos, pos); } catch (e) {} }
+    };
+  }
+  const sqx = $("supQx"); if (sqx) sqx.onclick = () => { state.supportQ = ""; render(); };
+  const ask = $("supAskAlfie"); if (ask) ask.onclick = () => { state.supportQ = ""; state.screen = "alfie"; render(); };
+  document.querySelectorAll("[data-supres]").forEach((b) => b.onclick = () => {
+    const parts = String(b.dataset.supres).split(":");
+    state.supportQ = "";
+    if (parts[0] === "hub") { state.support = parts[1]; if (parts[1] === "alfie") { state.support = null; state.screen = "alfie"; } }
+    else { state.support = "guides"; state.openGuide = parts[1]; }
+    render();
+  });
   wireSwipes();
   const runBack = $("runBack"); if (runBack) runBack.onclick = () => { state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); };
   const shareRun = $("shareRun"); if (shareRun) { shareRun.onclick = doShareRun; prepareShareCard(currentOverviewRun()); }

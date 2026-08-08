@@ -379,6 +379,31 @@ test("⚠️ the session is staged, and Start does not scroll away", () => {
   assert.match(sheet, /uiActionBar\(\{ state: "start", id: "sdStart"/, "Start is not the persistent bar");
   // ⚠️ ...and it is LAST in the composition, or it is not persistent, it is just lower down.
   const bar = sheet.lastIndexOf("startBtn");
-  const desc = sheet.lastIndexOf("sd-desc");
-  assert.ok(bar > desc, "the Start bar is still inline above the session body");
+  // \u26a0\ufe0f ANCHORED ON SOMETHING THE SHEET STILL CONTAINS. This read "sd-desc" until the description
+  // moved into the Why disclosure, at which point lastIndexOf returned -1 and "bar > -1" was true
+  // however the sheet was ordered -- a guard that could no longer fail. Anchor on the last real
+  // section instead, and assert it is found before comparing.
+  const lastSection = sheet.lastIndexOf("whyThisSession(sess)");
+  assert.ok(lastSection > 0, "the Why disclosure is no longer in the sheet");
+  assert.ok(bar > lastSection, "the Start bar is still inline above the session body");
+
+  // --- the three things the owner asked for after seeing it beside the mockup -----------------
+  // 1. Each stage number carries its own colour, and only the MIDDLE one varies with the session.
+  assert.match(fn, /stage\(3, "Cool down".*"var\(--eff-easy\)"\)/, "the cool-down stage has no colour");
+  assert.match(fn, /"Main set", mainSubtitle\(main\), main, true, sc\)/, "the main set does not take the session's effort colour");
+  assert.match(fn, /sd-sn" style="background:var\(--steady\)/, "the warm-up stage has no colour");
+  // \u26a0\ufe0f The ink on those circles must NOT be a theme token: the circle behind it does not flip
+  // with the theme, so an ink that does would fail in one of the two.
+  assert.match(html, /\.sd-sn \{ color: #[0-9a-f]{6} !important/, "the stage number's ink flips with the theme");
+  // 2. A chevron on every stage, so a collapsed row reads as openable.
+  assert.equal((fn.match(/sd-chev/g) || []).length, 2, "not every stage summary carries a chevron");
+  assert.match(html, /\.sd-stage\[open\][^{]*\.sd-chev[^{]*\{[^}]*rotate/, "the chevron does not turn when the stage opens");
+  // 3. "Why this session?" -- optional rationale, using the session's OWN description.
+  assert.match(html, /class="sd-why"/, "there is no Why this session disclosure");
+  assert.match(html, /sd-whyb">' \+ esc\(sess\.description\)/, "the Why body is not the session's own description");
+  // \u26a0\ufe0f ...and it must not be invented copy. Every short line is keyed on the session type.
+  const whyShort = html.slice(html.indexOf("const WHY_SHORT"), html.indexOf("function whyThisSession"));
+  for (const t of ["vo2", "threshold", "easy", "long", "recovery"]) {
+    assert.ok(whyShort.includes(t + ":") || whyShort.includes('"' + t + '"'), "no Why line for " + t);
+  }
 });

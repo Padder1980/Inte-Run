@@ -2190,7 +2190,18 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .sd-stage summary { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) var(--s4); cursor: pointer; min-height: var(--tap); }
 .sd-stage summary::-webkit-details-marker { display: none; }
 .sd-sn { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--surface-2); color: var(--ink-soft); font-size: var(--t-meta); font-weight: 750; display: flex; align-items: center; justify-content: center; }
-.sd-stage[open] .sd-sn { background: var(--accent); color: var(--accent-ink); }
+/* \u26a0\ufe0f A FIXED DARK INK, not white and not --ink. The six effort colours span a light-mode coral
+   and a dark-mode mint; white clears 4.5:1 on none of them, and --ink flips with the theme while the
+   circle behind it does not. Dark ink clears 5.9:1 on the worst of the six. */
+.sd-sn { color: #04120e !important; }
+.sd-chev { flex: none; margin-left: 2px; color: var(--ink-faint); font-size: var(--t-card); line-height: 1; transition: transform .18s ease; }
+.sd-stage[open] .sd-chev, .sd-why[open] .sd-chev { transform: rotate(90deg); }
+.sd-why { margin-top: var(--s3); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; }
+.sd-why > summary { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) var(--s4); min-height: var(--tap); cursor: pointer; list-style: none; }
+.sd-why > summary::-webkit-details-marker { display: none; }
+.sd-whyq { flex: 1; font-size: var(--t-body); font-weight: 600; color: var(--ink); }
+.sd-whya { font-size: var(--t-meta); color: var(--ink-soft); text-align: right; }
+.sd-whyb { padding: 0 var(--s4) var(--s4); font-size: var(--t-body); line-height: 1.55; color: var(--ink-soft); }
 .sd-sh { min-width: 0; flex: 1; }
 .sd-shn { display: block; font-size: var(--t-card); font-weight: 700; color: var(--ink); }
 .sd-shs { display: block; font-size: var(--t-meta); color: var(--ink-faint); margin-top: 1px; }
@@ -5148,13 +5159,20 @@ function sessionStages(sess, sc) {
     '<div><div class="sd-tag">' + r.tag + '</div><div class="sd-lab">' + r.lab + '</div>' +
     (r.chips ? '<div class="sd-meta">' + r.chips + '</div>' : "") +
     (r.rec ? '<div class="sd-rec">' + r.rec + '</div>' : "") + '</div></div>').join("");
-  const stage = (n, name, sub, list, open) => {
+  // ⚠️ THE STAGE COLOUR SAYS WHAT KIND OF RUNNING IT IS, and that is why only the middle one varies.
+  // A warm-up is easy whatever the session and a cool-down likewise, so those two are fixed; the main
+  // set carries the session's own effort colour. A hard session therefore reads blue -> coral -> green
+  // and the runner can see at a glance that the hard part is one stage of three.
+  const stage = (n, name, sub, list, open, colour) => {
     if (!list.length) return "";
     return '<details class="sd-stage"' + (open ? " open" : "") + '>' +
-      '<summary><span class="sd-sn">' + n + '</span>' +
+      '<summary><span class="sd-sn" style="background:' + colour + '">' + n + '</span>' +
       '<span class="sd-sh"><span class="sd-shn">' + name + '</span>' +
       '<span class="sd-shs">' + esc(sub) + '</span></span>' +
-      '<span class="sd-smin num">' + mins(list) + ' min</span></summary>' +
+      '<span class="sd-smin num">' + mins(list) + ' min</span>' +
+      // A chevron, because nothing else said there was anything behind the row. A disclosure with no
+      // affordance is a card nobody opens.
+      '<span class="sd-chev" aria-hidden="true">\u203A</span></summary>' +
       '<div class="sd-steps">' + rowsFor(list) + '</div></details>';
   };
   // The warm-up keeps its own card — it is generated, carries its own reasoning, and is a stage in
@@ -5167,16 +5185,17 @@ function sessionStages(sess, sc) {
   const wu = warmupCardFor(sess);
   const wuHtml = warmupHtml(sess);
   const wuStage = (wu && !wu.notNeeded && wu.phases && wu.phases.length)
-    ? '<details class="sd-stage"><summary><span class="sd-sn">1</span>' +
+    ? '<details class="sd-stage"><summary><span class="sd-sn" style="background:var(--steady)">1</span>' +
       '<span class="sd-sh"><span class="sd-shn">Warm up</span>' +
       '<span class="sd-shs">' + esc(wu.phases.map((ph) => ph.phase === "raise" ? "easy running"
         : ph.phase === "mobilise" ? "mobility" : ph.phase === "potentiate" ? "strides" : "settle").join(" \u00b7 ")) + '</span></span>' +
-      '<span class="sd-smin num">' + Math.round(wu.totalMinutes) + ' min</span></summary>' +
+      '<span class="sd-smin num">' + Math.round(wu.totalMinutes) + ' min</span>' +
+      '<span class="sd-chev" aria-hidden="true">\u203A</span></summary>' +
       '<div class="sd-stagewu">' + wuHtml + '</div></details>'
     : wuHtml;
   return wuStage +
-    stage(wu && !wu.notNeeded ? 2 : 1, "Main set", mainSubtitle(main), main, true) +
-    stage(3, "Cool down", "Easy until your breathing settles", cool, false);
+    stage(wu && !wu.notNeeded ? 2 : 1, "Main set", mainSubtitle(main), main, true, sc) +
+    stage(3, "Cool down", "Easy until your breathing settles", cool, false, "var(--eff-easy)");
 }
 /** One line describing the work, so a collapsed stage still says what it is. */
 function mainSubtitle(list) {
@@ -5184,6 +5203,29 @@ function mainSubtitle(list) {
   if (reps > 1) return reps + " repetitions with recoveries";
   const longest = list.slice().sort((a, b) => stepSecs(b) - stepSecs(a))[0];
   return longest && longest.label ? String(longest.label).split(" \u2014 ")[0].slice(0, 60) : "The work";
+}
+/**
+ * Why this session — one line, with the reasoning a tap away.
+ * The brief asks for rationale to be OPTIONAL, "for runners who want the science". These are the same
+ * words that used to open the sheet in full; what changed is that they no longer sit ahead of the
+ * thing the runner opened the sheet to read.
+ * \u26a0\ufe0f The short line is keyed on the session TYPE and the body is the session's own description --
+ * neither is written here. Inventing a rationale would put a claim in front of the runner that the
+ * plan cannot stand behind.
+ */
+const WHY_SHORT = {
+  vo2: "Build VO\u2082 power", threshold: "Raise your threshold", "race-specific": "Rehearse race pace",
+  easy: "Build your aerobic base", long: "Build durability", recovery: "Help you recover",
+  strides: "Sharpen your legs", strength: "Build resilience", mobility: "Keep you moving well",
+  race: "Race day", "cross-training": "Aerobic work, less impact",
+};
+function whyThisSession(sess) {
+  if (!sess.description) return "";
+  return '<details class="sd-why"><summary>' +
+    '<span class="sd-whyq">Why this session?</span>' +
+    '<span class="sd-whya">' + esc(WHY_SHORT[sess.type] || "What it is for") + '</span>' +
+    '<span class="sd-chev" aria-hidden="true">\u203A</span></summary>' +
+    '<div class="sd-whyb">' + esc(sess.description) + '</div></details>';
 }
 function sessionSheetHtml(sess, week) {
   const sc = "var(--eff-" + effortOf(sess) + ")";
@@ -5240,8 +5282,8 @@ function sessionSheetHtml(sess, week) {
   return '<div class="sd-type" style="--sc:' + sc + '">' + (SESSION_LABEL[sess.type] || sess.type) + '</div>' +
     '<div class="sd-title">' + esc(sess.title) + '</div>' +
     '<div class="sd-chips">' + chips.join("") + '</div>' +
-    '<div class="sd-desc">' + esc(sess.description) + '</div>' +
     body +
+    whyThisSession(sess) +
     fuelHtml(sess) +
     moveBlock +
     addLink +

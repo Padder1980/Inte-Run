@@ -19,5 +19,14 @@
   <!-- Keep the watch app and the widget extension in the upload; they are the point of the app. -->
   <key>stripSwiftSymbols</key>
   <true/>
+  <!-- ⚠️ Named explicitly. It exported fine without this only because there is exactly one team on
+       the account; the day he is added to a second (a client, an employer) the export becomes
+       ambiguous and fails with an error that does not say so. -->
+  <key>teamID</key>
+  <string>PSHC485BRX</string>
+  <!-- ⚠️ OFF, so the commit-count build number stays authoritative. Left on, Xcode may renumber the
+       build during export and the number in the archive stops matching the one that was uploaded. -->
+  <key>manageAppVersionAndBuildNumber</key>
+  <false/>
 </dict>
 </plist>

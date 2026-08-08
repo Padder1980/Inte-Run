@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- ⚠️ WITHOUT THIS FILE THE FIRST UPLOAD IS EMAILED BACK AS ITMS-91053, "Missing API Declaration".
+       Since 1 May 2024 Apple requires any app using a "required reason" API to declare which of those
+       APIs it uses and why. This app uses exactly one of them, in 35 places: UserDefaults. The error
+       arrives by email after the upload appears to have succeeded, which is a slow way to find out. -->
+
+  <!-- Nothing is collected. Every run, every route and every answer stays in localStorage on the
+       device; there is no account, no server and no analytics. The only network calls are for map
+       tiles and a weather lookup, neither of which is tied to an identity. -->
+  <key>NSPrivacyCollectedDataTypes</key>
+  <array/>
+
+  <!-- No tracking, and no third-party SDKs to do any. -->
+  <key>NSPrivacyTracking</key>
+  <false/>
+  <key>NSPrivacyTrackingDomains</key>
+  <array/>
+
+  <key>NSPrivacyAccessedAPITypes</key>
+  <array>
+    <dict>
+      <!-- CA92.1: reading and writing this app's own preferences, never another app's and never a
+           shared container. Used for the runner's settings, the watch bridge's last payload, and the
+           coach/keyboard/live-activity diagnostics. -->
+      <key>NSPrivacyAccessedAPIType</key>
+      <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+      <key>NSPrivacyAccessedAPITypeReasons</key>
+      <array>
+        <string>CA92.1</string>
+      </array>
+    </dict>
+    <dict>
+      <!-- C617.1: BundleSchemeHandler reads the size of files INSIDE THIS APP'S OWN BUNDLE to answer
+           HTTP range requests, which is what makes the coach's audio play at all. It never inspects a
+           file it did not ship. -->
+      <key>NSPrivacyAccessedAPIType</key>
+      <string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+      <key>NSPrivacyAccessedAPITypeReasons</key>
+      <array>
+        <string>C617.1</string>
+      </array>
+    </dict>
+  </array>
+</dict>
+</plist>

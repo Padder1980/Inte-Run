@@ -23,15 +23,13 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSHealthShareUsageDescription</key>
-	<string>InteRun uses HealthKit only to start a run on your Apple Watch from your phone. Your health data stays on your devices.</string>
+	<string>InteRun reads your heart rate during a run so it can show it live and save it with the session. It also uses HealthKit to start a run on your Apple Watch from your phone. Your health data stays on your devices and is never sent anywhere.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>InteRun uses HealthKit only to start a run on your Apple Watch from your phone. Your health data stays on your devices.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>InteRun keeps tracking your run when your phone is locked or in a pocket, so your pace and route stay accurate for the whole session.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>InteRun uses your location to measure pace, distance and your route while a session is running.</string>
-	<key>NSMotionUsageDescription</key>
-	<string>InteRun uses motion data to keep your distance accurate when the GPS signal drops.</string>
+	<string>InteRun uses your location to measure pace, distance and your route while a session is running, including when your phone is locked or in your pocket.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>UIBackgroundModes</key>
@@ -46,7 +44,7 @@
 	</dict>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
-		<string>armv7</string>
+		<string>arm64</string>
 	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>

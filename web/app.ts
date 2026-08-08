@@ -2589,7 +2589,7 @@ function conditionsSquare(session) {
   const sub = imp.effortBased ? "Run by effort today" : imp.pacePenaltySecPerKm ? "≈ +" + imp.pacePenaltySecPerKm + "s/km" : "Good to run";
   return '<button class="tsq" id="condSq" style="--sqc:' + c + '">' +
     '<div class="tsq-ic">' + ICON[w.iconKey] + '</div>' +
-    '<div class="tsq-k">Conditions' + (w.live ? ' · live' : '') + '</div>' +
+    '<div class="tsq-k">Conditions' + (w.live ? ' · live' : ' · example') + '</div>' +
     '<div class="tsq-v">' + w.tempC + '° · ' + w.label + '</div>' +
     '<div class="tsq-sub">' + sub + '</div></button>';
 }
@@ -2613,7 +2613,7 @@ function weatherSheetHtml() {
   const source = w.live
     ? '<div class="wx-src live"><span class="dot"></span>Live forecast · ' + w.windKph + ' km/h wind · ' + w.humidityPct + '% humidity</div>'
     : (WX_FETCHING ? '<div class="wx-src">Reading your local forecast…</div>' : '<div class="wx-src">Sample conditions · <button class="wx-loc" id="wxUseLoc">Use my location</button></div>');
-  return '<div class="sd-type" style="--sc:' + c + '">Conditions' + (w.live ? ' · live' : '') + '</div>' +
+  return '<div class="sd-type" style="--sc:' + c + '">Conditions' + (w.live ? ' · live' : ' · example') + '</div>' +
     '<div class="sd-title">' + w.tempC + '° · ' + imp.summary + '</div>' +
     source +
     '<div class="sd-chips"><span class="chip">' + esc(imp.headline) + '</span>' + (imp.effortBased ? '<span class="chip rpe">Run by effort</span>' : '') + pen + '</div>' +
@@ -4413,8 +4413,12 @@ function stretchVideoHtml() {
   if (STRETCH_VIDEO) {
     return '<video class="str-vid" src="' + STRETCH_VIDEO + '" controls playsinline preload="metadata"></video>';
   }
-  return '<div class="str-vid str-vid-soon"><span class="str-vid-ic">' + ICON.play + '</span>' +
-    '<span>Demonstration video coming here</span></div>';
+  // ⚠️ NOTHING, RATHER THAN A BOX ANNOUNCING A MISSING FEATURE. This slot is offered after EVERY run,
+  // so an empty grey rectangle reading "Demonstration video coming here" was the most visible
+  // unfinished surface in the app — the first thing a tester meets after their first session. The
+  // stretches below it are complete and useful on their own; the video is an addition, not a
+  // prerequisite, so its absence should be silent. Set STRETCH_VIDEO and it appears.
+  return "";
 }
 function stretchSheetHtml() {
   const total = RC.stretchTotalSeconds();
@@ -6223,7 +6227,12 @@ function mapTokenCard() {
     : '<div class="bk-val">Standard maps</div><div class="bk-lab" style="margin-top:4px">Free, no account. Paste a Mapbox token below to switch.</div>';
   return '<div class="card"><div class="subhead" style="margin-top:0">Maps</div>' +
     '<div class="bk-box">' + state + '</div>' +
-    (injected ? "" :
+    // ⚠️ THE PASTE FIELD IS FOR WHOEVER BUILT THE APP, NOT FOR A RUNNER. Shipped as-is it invites
+    // every TestFlight tester to paste an API token they have never heard of into a running app,
+    // which reads as an unfinished internal build — and there is nothing they could usefully type.
+    // Shown only when the build carries no token AND one has already been set here, so it stays
+    // reachable for the owner and invisible to everyone else. mapDevMode is the whole gate.
+    (injected || !mapDevMode() ? "" :
       '<input id="mbxTok" type="text" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" ' +
       'placeholder="pk.\u2026 paste your Mapbox token" ' +
       'style="width:100%;margin-top:12px;padding:12px;border-radius:12px;border:1px solid var(--line);' +
@@ -6232,6 +6241,20 @@ function mapTokenCard() {
       (prov.kind === "mapbox" ? '<button class="bk-btn2" id="mbxClear">Go back to the standard maps</button>' : "") +
       '<div class="bk-lab" style="margin-top:10px;line-height:1.45">Stays on this phone. It is never included in a backup and never leaves the app.</div>') +
     '<div class="bk-msg" id="mbxMsg"></div></div>';
+}
+/**
+ * Is this a build whose owner is expected to configure maps by hand?
+ *
+ * ⚠️ A TESTER MUST NEVER BE ASKED FOR A CREDENTIAL. The only people who should see the paste field are
+ * whoever set one before (so they can change or clear it) and anyone running the page in a browser,
+ * where this is a development surface anyway. A tester on a TestFlight build sees the card state it in
+ * one line and nothing to fill in.
+ */
+function mapDevMode() {
+  try {
+    if (!inNativeApp()) return true;                       // a browser is a dev surface
+    return !!localStorage.getItem("interun_mapbox_v1");     // already configured here
+  } catch (e) { return false; }
 }
 function wireMapToken() {
   const inp = $("mbxTok"), save = $("mbxSave"), clr = $("mbxClear"), msg = $("mbxMsg");
@@ -7867,7 +7890,12 @@ function beginLive() {
 function gpsFallback() {
   if (!LIVE || LIVE.done || LIVE.mode) return;
   clearTimeout(LIVE.acqT);
-  if (inNativeApp()) { LIVE.indoor = true; startIndoor(); } else startSim();
+  // ⚠️ MARK IT AS A FAILED OUTDOOR RUN, NOT AS A TREADMILL. It borrows the indoor runtime because
+  // that is the only mode that records a real clock without inventing distance — but the runner chose
+  // to go OUTSIDE, and telling them afterwards that "your phone can't measure distance indoors" and
+  // asking for a number off a machine they never touched is the most confusing screen in the app.
+  // The live pill already says "No GPS", so the finish screen contradicting it is worse still.
+  if (inNativeApp()) { LIVE.indoor = true; LIVE.gpsDenied = true; startIndoor(); } else startSim();
 }
 function startGps(pos) {
   if (!LIVE || LIVE.done || LIVE.mode) return;   // the timeout may already have started timed mode
@@ -9036,7 +9064,16 @@ function viewLiveComplete() {
 // distance would feed the pace bands, the flags engine and every future plan adjustment.
 function treadmillDistanceHtml(sm) {
   const set = Number(sm.distKm) > 0;
-  return '<div class="card tm-ask"><div class="subhead" style="margin-top:0">Distance from the treadmill</div>' +
+  // ⚠️ TWO CAUSES, TWO MESSAGES. A treadmill runner chose to be indoors; a runner whose GPS was
+  // refused or never acquired chose the opposite and is being told the reverse of what happened.
+  // Same question either way — how far did you go — but asked truthfully.
+  const denied = !!(LIVE && LIVE.gpsDenied);
+  return '<div class="card tm-ask"><div class="subhead" style="margin-top:0">' +
+    (denied ? 'How far did you go?' : 'Distance from the treadmill') + '</div>' +
+    '<div class="bk-md">' + (denied
+      ? 'This run was timed but not tracked \u2014 your phone could not get a GPS signal, so there is no distance or route for it. If you know how far you went, put it in and your pace, splits and plan all stay right.<br><br>If you meant to record the route, check that Inte-Run is allowed to use your location in <b>Settings \u203a Privacy &amp; Security \u203a Location Services</b>.'
+      : 'Your phone can\u2019t measure distance indoors, so we haven\u2019t guessed. Type what the machine says and your pace, splits and plan all stay right.') +
+    '</div>' 
     '<div class="bk-md">Your phone can\u2019t measure distance indoors, so we haven\u2019t guessed. Type what the machine says and your pace, splits and plan all stay honest.</div>' +
     '<div class="tm-row"><input class="sel num" id="tmDist" inputmode="decimal" placeholder="e.g. 8.05" value="' + (set ? esc(sm.distKm) : "") + '">' +
     '<span class="tm-unit">km</span><button class="mini-btn" id="tmSet">' + (set ? "Update" : "Add distance") + '</button></div>' +

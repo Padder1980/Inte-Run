@@ -544,3 +544,52 @@ test("⚠️ small controls still offer a 44px hit area", () => {
     assert.ok(css.includes(sel), sel + " has no expanded hit area");
   }
 });
+
+test("⚠️ the type ladder scales with the reader's own text-size setting", () => {
+  const css = sheetOf(page());
+  // ⚠️ THE LADDER IS THE SCALING MECHANISM, and that is the point of having had one. Every size in
+  // this app is px, so it honoured the phone's text-size setting NOWHERE — and making 443 individual
+  // font sizes responsive is exactly the "looks mechanical" sweep this project's history says goes
+  // wrong. Scaling the seven TOKENS means every screen already on the ladder scales for free, and
+  // gives the off-ladder ratchet a second meaning: an off-ladder value is one that does not grow.
+  for (const t of ["--t-display", "--t-hero", "--t-section", "--t-card", "--t-body", "--t-meta", "--t-label"]) {
+    assert.match(css, new RegExp(t + ": calc\\([0-9.]+px \\* var\\(--tscale\\)\\)"),
+      t + " is a fixed size, so it cannot follow the reader's setting");
+  }
+  assert.match(css, /--tscale: 1;/, "there is no default scale, so the ladder resolves to nothing");
+
+  const fn = fnSrc("syncTextScale");
+  // ⚠️ font: -apple-system-body IS THE ONLY THING THAT TRACKS DYNAMIC TYPE INSIDE A WKWebView.
+  // rem follows the page, not the phone, and there is no API to ask.
+  assert.match(fn, /-apple-system-body/, "nothing measures the reader's actual setting");
+  // ⚠️ CLAMPED, and never below 1: this app is full of fixed-height controls, so an unclamped 235%
+  // overlaps them rather than reflowing, and a runner who shrank their type should still get the
+  // design as drawn. A partial improvement beats a broken layout at the largest setting.
+  assert.match(fn, /Math\.max\(1, Math\.min\(1\.3, raw\)\)/, "the scale is unclamped or can shrink text");
+  // ⚠️ iOS never tells a web view the setting changed, so returning to the app is the only chance.
+  assert.match(page(), /visibilitychange[^\n]*syncTextScale\(\)/,
+    "the scale is read once at boot and never again");
+});
+
+test("⚠️ a screen arrives in one motion, and the haptic goes through the bridge", () => {
+  const css = sheetOf(page());
+  // The brief asks for 160-220ms content-preserving transitions.
+  const dur = Number((css.match(/\.view-in \{ animation: viewIn \.([0-9]+)s/) || [])[1]);
+  assert.ok(dur >= 16 && dur <= 22, "the view transition is outside 160-220ms: ." + dur + "s");
+  // ⚠️ CONTENT-PRESERVING: it fades and rises 4px. No slide, no scale, nothing that reflows — text
+  // stays legible throughout rather than arriving from off-screen.
+  assert.match(css, /@keyframes viewIn \{ from \{ opacity: 0; transform: translateY\(4px\)/,
+    "the transition moves content the runner is trying to read");
+  // ⚠️ THE CLASS IS REMOVED, A REFLOW READ, THEN ADDED. Without that a second render inside the
+  // window finds the class present, the animation does not restart, and the screen just appears —
+  // which is most tab switches, because render() is called from many paths.
+  const fn = fnSrc("viewEnter");
+  assert.match(fn, /classList\.remove\("view-in"\);\s*void v\.offsetWidth;\s*v\.classList\.add\("view-in"\)/,
+    "the animation will not restart on a second render");
+
+  // ⚠️ WKWebView HAS NO navigator.vibrate AT ALL, so calling it raw is silent in the native app —
+  // which is where the runner actually is. haptic() is the only path that reaches a real generator.
+  const html = page().replace(/\/\*[\s\S]*?\*\//g, "");
+  const raw = (html.match(/navigator\.vibrate\(/g) || []).length;
+  assert.equal(raw, 1, "navigator.vibrate is called outside haptic(), so it is silent in the app");
+});

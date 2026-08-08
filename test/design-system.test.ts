@@ -42,7 +42,9 @@ test("the type ladder is seven steps and they are distinct", () => {
   // A ladder with two rungs the same height is not a ladder.
   const s = sheet();
   const vals = ["--t-display", "--t-hero", "--t-section", "--t-card", "--t-body", "--t-meta", "--t-label"]
-    .map((t) => Number((s.match(new RegExp(t + ": *([0-9.]+)px")) || [])[1]));
+    // ⚠️ The ladder is calc(Npx * var(--tscale)) now, so that the seven tokens ARE the app's
+    // Dynamic Type support. Read the base size out of the calc.
+    .map((t) => Number((s.match(new RegExp(t + ": *calc\\(([0-9.]+)px")) || [])[1]));
   assert.ok(vals.every((v) => v > 0), "a type token has no value: " + JSON.stringify(vals));
   assert.equal(new Set(vals).size, 7, "two type steps are the same size: " + vals.join(", "));
   for (let i = 1; i < vals.length; i++) assert.ok(vals[i]! < vals[i - 1]!, "the ladder is not descending: " + vals.join(", "));

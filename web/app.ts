@@ -2065,9 +2065,18 @@ input, select, textarea { font-size: 16px; }
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
   /* Screen gutter, per the brief's 20-24px. */
   --gutter: 20px;
-  /* Type: seven steps. Display, page hero, section, card title, body, metadata, label. */
-  --t-display: 32px; --t-hero: 24px; --t-section: 20px; --t-card: 17px;
-  --t-body: 15px; --t-meta: 13px; --t-label: 11px;
+  /* Type: seven steps. Display, page hero, section, card title, body, metadata, label.
+     \u26a0\ufe0f THE LADDER IS THE SCALING MECHANISM, and that is the point of having had one. Every
+     size is px, so the app honoured the phone's own text-size setting nowhere at all -- and making
+     443 individual font sizes responsive is exactly the kind of "looks mechanical" sweep this
+     project's history says goes wrong. Scaling the seven TOKENS instead means every screen already
+     migrated onto the ladder scales for free, and the off-ladder ratchet stops being only about
+     consistency: an off-ladder value is now a value that does not grow for someone who needs it to. */
+  --tscale: 1;
+  --t-display: calc(32px * var(--tscale)); --t-hero: calc(24px * var(--tscale));
+  --t-section: calc(20px * var(--tscale)); --t-card: calc(17px * var(--tscale));
+  --t-body: calc(15px * var(--tscale)); --t-meta: calc(13px * var(--tscale));
+  --t-label: calc(11px * var(--tscale));
   /* ⚠️ MINIMUM TOUCH TARGET. 44px is Apple's floor and this app has controls below it today. */
   --tap: 44px;
 }
@@ -2239,6 +2248,9 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
   content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
   width: 100%; height: 100%; min-width: var(--tap); min-height: var(--tap);
 }
+/* A screen arriving. 180ms, inside the brief's 160-220ms; the global reduce-motion rule neutralises it. */
+@keyframes viewIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.view-in { animation: viewIn .18s cubic-bezier(.2, .7, .3, 1) both; }
 /* Support search. */
 .sup-search { position: relative; display: flex; align-items: center; margin-bottom: var(--s4); }
 .sup-si { position: absolute; left: var(--s3); display: flex; color: var(--ink-faint); pointer-events: none; }
@@ -5168,7 +5180,10 @@ function stretchPlay() {
       T.i++;
       if (T.i >= T.holds.length) { stretchPause(); T.left = 0; strPaint(RC.stretchTotalSeconds()); stretchFinish(); return; }
       T.left = T.holds[T.i].seconds;
-      if (navigator.vibrate) navigator.vibrate(60);
+      // \u26a0\ufe0f haptic(), NOT navigator.vibrate. WKWebView has no vibrate API at all, so calling
+      // it raw is silent in the native app -- which is where the runner actually is. The bridge in
+      // haptic() is the only path that reaches a real generator.
+      haptic("lift");
     }
     strPaint(RC.stretchTotalSeconds());
   }, 1000);
@@ -5181,7 +5196,7 @@ function stretchStop() { const S = STRETCH; if (S && S.timer) { clearInterval(S.
 function stretchFinish() {
   const list = $("strList");
   if (list && !$("strFin")) list.insertAdjacentHTML("afterend", '<p class="str-fin" id="strFin">That is the lot. Nicely done.</p>');
-  if (navigator.vibrate) navigator.vibrate([60, 80, 60]);
+  haptic("success");
 }
 // ---- Strength logging (weights & reps, saved locally) ----------------------
 function loadSlog() { try { return JSON.parse(localStorage.getItem("interun_slog") || "{}"); } catch (e) { return {}; } }
@@ -11814,7 +11829,7 @@ function refreshTodayNavDate() {
   if (day) day.textContent = String(new Date().getDate());
 }
 // Keep the date current if the app is left open across midnight and brought back to the foreground.
-document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshTodayNavDate(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { refreshTodayNavDate(); syncTextScale(); } });
 // A repaint that ARRIVES ON ITS OWN — a wrist run landing, a mirror going stale — rather than one the
 // runner asked for. It must never rebuild the plan-setup form: viewSetup() reads every value from the
 // saved profile, so redrawing it discards whatever is half-typed. The runner is mid-sentence; their
@@ -11915,6 +11930,57 @@ function render() {
   v.scrollTop = 0;
   document.querySelectorAll(".navbtn").forEach((b) => b.classList.toggle("on", b.dataset.tab === state.tab));
   wire();
+  viewEnter(v);
+}
+/**
+ * The arrival of a screen, 180 ms.
+ * \u26a0\ufe0f CONTENT-PRESERVING MEANS NOTHING MOVES THAT THE RUNNER IS READING. It fades and rises
+ * four pixels -- no slide, no scale, nothing that reflows -- so text is legible throughout rather
+ * than arriving from off-screen. The brief asks for 160-220 ms; 180 sits in the middle.
+ * \u26a0\ufe0f THE CLASS IS REMOVED BEFORE IT IS ADDED, with a reflow read between. Without that, a
+ * second render inside the animation window finds the class already present, the browser does not
+ * restart the animation, and the screen simply appears -- which is most tab switches, because render()
+ * is called from many paths.
+ * \u26a0\ufe0f Reduce Motion is handled globally (one rule for the whole stylesheet, so a new animation
+ * cannot forget it), which is why there is no media query here.
+ */
+/**
+ * Publish the reader's own text-size preference as --tscale.
+ *
+ * \u26a0\ufe0f MEASURED FROM font: -apple-system-body, WHICH IS THE ONE THING THAT TRACKS DYNAMIC TYPE
+ * INSIDE A WKWebView. Nothing else does: rem follows the page, not the phone, and there is no API to
+ * ask. The probe is rendered off-screen, measured once at boot and again whenever the app returns to
+ * the front -- iOS does not notify a web view when the setting changes, so coming back is the only
+ * moment we can catch it. In a desktop browser it lands on that browser's own default size instead,
+ * which is the right answer there too.
+ *
+ * \u26a0\ufe0f CLAMPED TO 1.0-1.3, AND THAT IS A LIMITATION, NOT A CHOICE I LIKE. This app is full of
+ * fixed-height controls -- a 44px tap target, a bottom nav, a live-session hero -- so an unclamped
+ * 235% would overlap them rather than reflow. Shipping a broken layout at the largest setting is
+ * worse than shipping a partial improvement at the common ones, and the range below the cap covers
+ * the settings most people actually use. It never SHRINKS text either: a runner who has made type
+ * smaller still gets the design as drawn.
+ */
+function syncTextScale() {
+  try {
+    let probe = $("tscaleProbe");
+    if (!probe) {
+      probe = el('<span id="tscaleProbe" aria-hidden="true" style="position:absolute;left:-9999px;top:0;font:-apple-system-body">M</span>');
+      document.body.appendChild(probe);
+    }
+    const px = parseFloat(getComputedStyle(probe).fontSize);
+    if (!isFinite(px) || px <= 0) return;
+    // 17px is the iOS body default and the size --t-card is drawn at.
+    const raw = px / 17;
+    const scale = Math.max(1, Math.min(1.3, raw));
+    document.documentElement.style.setProperty("--tscale", String(Math.round(scale * 100) / 100));
+  } catch (e) {}
+}
+function viewEnter(v) {
+  if (!v) return;
+  v.classList.remove("view-in");
+  void v.offsetWidth;
+  v.classList.add("view-in");
 }
 function wire() {
   document.querySelectorAll("[data-seg]").forEach((seg) => seg.querySelectorAll("button").forEach((b) => b.onclick = () => {
@@ -11949,6 +12015,7 @@ function wire() {
   const lbc = $("lbClear"); if (lbc) lbc.onclick = () => { state.logFilter = "all"; render(); };
   const pt = $("perfTrial"); if (pt) pt.onclick = startTrialFlow;
   linkFormLabels();
+  syncTextScale();
   const sq = $("supQ");
   if (sq) {
     // \u26a0\ufe0f RE-RENDER ON INPUT MEANS THE FIELD IS REBUILT UNDER THE RUNNER'S FINGER, so the

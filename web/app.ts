@@ -2251,6 +2251,13 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 /* A screen arriving. 180ms, inside the brief's 160-220ms; the global reduce-motion rule neutralises it. */
 @keyframes viewIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .view-in { animation: viewIn .18s cubic-bezier(.2, .7, .3, 1) both; }
+/* \u26a0\ufe0f display:none, NOT removal. Every field stays in the DOM because draftFromForm() reads
+   its values straight out of it -- a form that genuinely omitted the other sections would read them
+   as blank and write those blanks over the profile. */
+.setup-off { display: none !important; }
+.setup-focus { margin-bottom: var(--s4); }
+.setup-focus p { margin: var(--s2) 0 var(--s3); font-size: var(--t-body); color: var(--ink-soft); }
+.setup-focus .pf-edit { padding: 0; }
 /* Profile & settings: inspect first. */
 .pf-id { display: flex; align-items: center; gap: var(--s4); margin-bottom: var(--s5); }
 .pf-av { flex: none; width: 60px; height: 60px; border-radius: var(--r-pill); overflow: hidden; background: var(--surface-2); display: grid; place-items: center; font-size: var(--t-hero); font-weight: 750; color: var(--accent); }
@@ -2875,7 +2882,7 @@ function computeToday() {
 }
 computeToday();
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "workouts", logFilter: "all", supportQ: "", openGuide: null, support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK, addOpen: false };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "workouts", logFilter: "all", supportQ: "", openGuide: null, setupFocus: null, support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK, addOpen: false };
 // Effective day index for a session, honouring any user reschedule. Works for raw sessions
 // (dayOfWeek) and summary sessions (dayIndex), keyed by the shared session id.
 function loadDayOverride() { try { return JSON.parse(localStorage.getItem("interun_dayov_v1") || "{}") || {}; } catch (e) { return {}; } }
@@ -6895,10 +6902,10 @@ function viewProfile() {
     '</div>' +
     '<div class="pf-sec"><span>Training profile</span><button class="pf-edit" data-pf="setup">Edit</button></div>' +
     '<div class="card pf-card">' +
-      profRow({ icon: "rRace", colour: "var(--eff-hard)", label: "Goal", value: (RACE_LABEL[profile.goalDist] || "") + (profile.targetS ? " \u00b7 " + fmtTimeFull(profile.targetS) : ""), action: "setup" }) +
-      profRow({ icon: "gauge", colour: "var(--steady)", label: "Current fitness", value: profFitness(), action: "setup" }) +
-      profRow({ icon: "today", colour: "var(--build)", label: "Training rhythm", value: (profile.daysPerWeek || 0) + " days / week", action: "setup" }) +
-      profRow({ icon: "heart", colour: "var(--rest)", label: "Current context", value: profContext(), action: "setup" }) +
+      profRow({ icon: "rRace", colour: "var(--eff-hard)", label: "Goal", value: (RACE_LABEL[profile.goalDist] || "") + (profile.targetS ? " \u00b7 " + fmtTimeFull(profile.targetS) : ""), action: "setup:goal" }) +
+      profRow({ icon: "gauge", colour: "var(--steady)", label: "Current fitness", value: profFitness(), action: "setup:fitness" }) +
+      profRow({ icon: "today", colour: "var(--build)", label: "Training rhythm", value: (profile.daysPerWeek || 0) + " days / week", action: "setup:rhythm" }) +
+      profRow({ icon: "heart", colour: "var(--rest)", label: "Current context", value: profContext(), action: "setup:context" }) +
     '</div>' +
     '<div class="pf-sec"><span>Connections</span></div>' +
     '<div class="card pf-card">' +
@@ -8440,6 +8447,65 @@ function viewSetup() {
     '<div class="setup-foot">You can change any of this later.</div>';
 }
 // Draft profile from the setup form's current values (may throw on bad times).
+/**
+ * Editing ONE thing from the profile page.
+ *
+ * The owner, seeing all four chevrons open the whole form: "only the appropriate questions need to
+ * live behind the chevron....at the moment they all live behind each one." Right -- a summary row
+ * that opens six sections is a summary row that has not saved anybody anything.
+ *
+ * \u26a0\ufe0f THE WHOLE FORM IS STILL RENDERED; THE IRRELEVANT QUESTIONS ARE HIDDEN. That is not
+ * laziness, it is the only safe shape. draftFromForm() reads its values straight out of the DOM --
+ * $("s_dist").value, $("s_date").value and so on -- so a form that genuinely omitted the other
+ * sections would read those fields as absent and write blanks over them. Editing your goal would
+ * quietly erase your age, your long-run day and your stated mileage, and the plan would rebuild
+ * around the gap. display:none keeps every field readable, so the save path cannot tell the
+ * difference and nothing about it had to change.
+ *
+ * \u26a0\ufe0f BY QUESTION, NOT BY SECTION. Training rhythm and current context both live in section 4
+ * of the form, so focusing a whole section would put eight questions behind "Current context", which
+ * has one. The topics below name fields; the pass finds whichever .q contains them.
+ */
+const SETUP_TOPICS = {
+  fitness: ["s_rectime", "s_2km", "s_2km_rec", "s_easypace", "fitsrc", "status"],
+  goal: ["s_dist", "s_target", "s_date"],
+  rhythm: ["days", "s_longday", "s_volume", "s_startdate", "strength"],
+  context: ["returning", "s_age", "s_sex"],
+};
+const SETUP_TOPIC_TITLE = { fitness: "Current fitness", goal: "Your goal", rhythm: "Training rhythm", context: "Current context" };
+function applySetupFocus() {
+  document.querySelectorAll(".setup-off").forEach((e) => e.classList.remove("setup-off"));
+  const topic = state.setupFocus;
+  if (!topic || !SETUP_TOPICS[topic]) return;
+  const want = SETUP_TOPICS[topic];
+  const owns = (node) => want.some((k) =>
+    node.querySelector("#" + k) || node.querySelector('[data-set="' + k + '"]'));
+  document.querySelectorAll(".q").forEach((q) => { if (!owns(q)) q.classList.add("setup-off"); });
+  // A wrapper that is not a .q but holds the fields (the runner block, the volume question).
+  document.querySelectorAll("#statusRunnerBlock").forEach((b) => { if (!owns(b)) b.classList.add("setup-off"); });
+  // Then any section card with nothing left showing, plus the intro and the closing note.
+  document.querySelectorAll(".setup-card, #goalCard").forEach((c) => {
+    if (!c.querySelector(".q:not(.setup-off)") && !c.querySelector("#statusRunnerBlock:not(.setup-off)")) {
+      c.classList.add("setup-off");
+    }
+  });
+  document.querySelectorAll(".setup-intro, .setup-foot").forEach((e) => e.classList.add("setup-off"));
+  // \u26a0\ufe0f AND SAY WHAT IS NOT ON SCREEN. A form showing one question, with a button reading
+  // "Update my plan", looks like it is about to save only that -- when it saves everything, exactly
+  // as it always did. The runner is told their other answers are untouched rather than left to guess.
+  const host = $("view");
+  if (host && !$("setupFocusHead")) {
+    const first = host.querySelector(".setup-card:not(.setup-off), #goalCard:not(.setup-off)");
+    if (first) first.insertAdjacentHTML("beforebegin",
+      '<div class="setup-focus" id="setupFocusHead">' +
+      '<div class="ui-eyebrow">Editing</div>' +
+      '<div class="ui-hero-t">' + esc(SETUP_TOPIC_TITLE[topic] || "") + '</div>' +
+      '<p>Your other answers stay exactly as they are.</p>' +
+      '<button class="pf-edit" id="setupAll">Show every question</button></div>');
+    const all = $("setupAll");
+    if (all) all.onclick = () => { state.setupFocus = null; render(); };
+  }
+}
 function draftFromForm() {
   const mmss = (s) => /^\\d{1,2}:[0-5]\\d$/.test(s) || /^\\d{1,2}:[0-5]\\d:[0-5]\\d$/.test(s);
   // Weekly mileage is optional: blank means "not sure", which the engine reads as no volume model
@@ -8799,6 +8865,12 @@ function syncStatus() {
     // still floating -- which is why "Your race", "Target time" and "Race date" stayed unnamed while
     // the static questions above them were fixed. Anything that replaces form markup must re-link.
     linkFormLabels();
+    // \u26a0\ufe0f AND RE-APPLY THE FOCUS. This block is rebuilt after applySetupFocus has run, so its
+    // three questions came back visible in every topic -- "Your race / Target time / Race date"
+    // appeared above Current context, Training rhythm and Current fitness alike. Exactly the same
+    // trap as the labels above, two lines apart, and it had to be fixed twice because anything that
+    // REPLACES form markup has to re-run both passes.
+    applySetupFocus();
     bindTimeInput($("s_target"));
   }
 }
@@ -12008,7 +12080,11 @@ function maybeAutoGuide() {
 }
 
 // ---- Router ---------------------------------------------------------------
+// \u26a0\ufe0f TWO STRINGS, NOT ONE. TITLES feeds the screen heading AND the bottom-nav label, so
+// renaming Support to "Support & guidance" for the header truncated the tab to "Support & gui...".
+// A tab label has about eight characters; a heading has a screen.
 const TITLES = { today: "Today", plan: "Your Plan", activities: "Logbook", community: "Community", support: "Support & guidance" };
+const NAV_LABEL = { today: "Today", plan: "Plan", activities: "Logbook", community: "Community", support: "Support" };
 // The Today tab shows a live calendar glyph with today's date (drawn in CSS; number injected here).
 function todayNavIcon() {
   return '<span class="nav-date" aria-hidden="true"><span class="nav-date-day num">' + new Date().getDate() + '</span></span>';
@@ -12052,6 +12128,7 @@ function render() {
     }
     v.innerHTML = viewSetup();
     linkFormLabels();
+    applySetupFocus();
     // ⚠️ AND THE TYPED FIELDS TOO. The segment answers live in draft, but name, age, times and dates
     // are read straight off the DOM at save time and rebuilt from profile on every render — so
     // preserving the draft alone would have restored half a form and looked like a worse bug than
@@ -12119,7 +12196,7 @@ function render() {
     viewEnter(v);
     return;
   }
-  $("topTitle").textContent = state.support ? "Support" : TITLES[state.tab];
+  $("topTitle").textContent = state.support ? "Support & guidance" : TITLES[state.tab];
   if (state.tab === "today") { fetchWeather(); v.innerHTML = viewToday(); maybeAutoGuide(); }
   else if (state.tab === "plan") v.innerHTML = viewPlan();
   else if (state.tab === "activities") v.innerHTML = viewActivities();
@@ -12218,7 +12295,11 @@ function wire() {
   // already has, not a set of new ones -- which is what keeps it a summary rather than a rewrite.
   document.querySelectorAll("[data-pf]").forEach((b) => b.onclick = () => {
     const to = b.dataset.pf;
-    if (to === "setup") { state.screen = "setup"; render(); return; }
+    // "setup" on its own is the Edit link: every question. "setup:goal" is one row's own questions.
+    if (to === "setup" || to.indexOf("setup:") === 0) {
+      state.setupFocus = to.indexOf(":") > 0 ? to.split(":")[1] : null;
+      state.screen = "setup"; render(); return;
+    }
     // \u26a0\ufe0f BOTH OF THESE WERE INVENTED FIRST TIME ROUND -- "toggleTheme" and "openRemindSheet"
     // exist nowhere in the app. The real ones are the inline handler on #themeBtn and
     // openRemindersSheet(). Clicking the real button rather than copying its body means there stays
@@ -12356,6 +12437,7 @@ function wire() {
     // ⚠️ The draft is now sticky across navigation, so SAVING has to be what releases it — otherwise
     // the answers a runner just committed are re-restored over the top of the profile they built.
     draft = {};
+    state.setupFocus = null;
     state.screen = null; state.tab = "plan"; render();
     if (!imp || !imp.none) {
       toastUndo("Plan updated", () => {
@@ -12372,7 +12454,7 @@ function wire() {
     }
   }
   // Cancel means cancel: an explicit "no thanks" discards the draft, where a glance at another tab does not.
-  const cancel = $("cancelSetup"); if (cancel) cancel.onclick = () => { draft = {}; state.screen = null; state.tab = "today"; render(); };
+  const cancel = $("cancelSetup"); if (cancel) cancel.onclick = () => { draft = {}; state.setupFocus = null; state.screen = null; state.tab = "today"; render(); };
   // Session detail taps (Plan, calendar, Today)
   wireSessionTaps();
   // Today: clickable dates, conditions & feel squares, view-session
@@ -12551,7 +12633,7 @@ function wire() {
   const lDone = $("lDone"); if (lDone) lDone.onclick = () => { coachStop(); stopSpeech(); LIVE = null; state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); };
 }
 function buildNav() {
-  $("nav").innerHTML = ["today","plan","activities","community","support"].map((t) => '<button type="button" class="navbtn' + (t===state.tab?" on":"") + '" data-tab="' + t + '">' + (t === "today" ? todayNavIcon() : ICON[t]) + '<span class="nl">' + TITLES[t].replace("Your ","") + '</span></button>').join("");
+  $("nav").innerHTML = ["today","plan","activities","community","support"].map((t) => '<button type="button" class="navbtn' + (t===state.tab?" on":"") + '" data-tab="' + t + '">' + (t === "today" ? todayNavIcon() : ICON[t]) + '<span class="nl">' + (NAV_LABEL[t] || TITLES[t].replace("Your ","")) + '</span></button>').join("");
   // ⚠️ Same rule as liveBack: mid-run a tab tap is NAVIGATION, and the live pill is the way back.
   // Without the guard this tore down GPS, the coach and the lock-screen card while the pill kept
   // ticking — the run silently stopped recording and was then logged with a truncated distance.

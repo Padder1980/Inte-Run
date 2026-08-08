@@ -621,7 +621,28 @@ test("⚠️ the profile is a summary you can read, with the form behind it", ()
     assert.ok(fn.includes('label: "' + row + '"'), "no " + row + " row");
   }
   // ⚠️ THE FORM IS MOVED BEHIND IT, NOT REPLACED. Every question is still answered in the same place.
-  assert.match(fn, /action: "setup"/, "there is no way through to the questions");
+  // ⚠️ AND EACH ROW OPENS ITS OWN QUESTIONS. All four used to open the whole six-section form, which
+  // is a summary row that has saved nobody anything. Every row must name a DISTINCT topic.
+  const topics = [...fn.matchAll(/action: "setup:([a-z]+)"/g)].map((m) => m[1]!);
+  assert.equal(topics.length, 4, "not every training row opens a scoped edit: " + topics.join(","));
+  assert.equal(new Set(topics).size, 4, "two rows open the same questions: " + topics.join(","));
+  assert.match(fn, /data-pf="setup"/, "the section Edit link no longer opens every question");
+  const map = fnSrc("applySetupFocus");
+  const defs = html.slice(html.indexOf("const SETUP_TOPICS"), html.indexOf("function applySetupFocus"));
+  for (const t of topics) assert.ok(defs.includes(t + ":"), "no questions defined for topic " + t);
+  // ⚠️ HIDDEN, NOT OMITTED. draftFromForm() reads values straight out of the DOM, so a form that
+  // genuinely left the other sections out would read them as blank and write those blanks over the
+  // profile — editing your goal would erase your age, your long-run day and your stated mileage.
+  assert.match(map, /classList\.add\("setup-off"\)/, "the focus pass removes fields instead of hiding them");
+  assert.ok(!/\.remove\(\)|innerHTML = ""/.test(map), "the focus pass destroys fields the save path reads");
+  assert.match(sheetOf(html), /\.setup-off \{ display: none !important; \}/,
+    "hidden questions are not merely hidden, so their values may not be readable");
+  // ⚠️ And it must say what is NOT on screen: one question above a button reading "Update my plan"
+  // looks like it saves only that, when it saves everything exactly as it always did.
+  assert.match(map, /Your other answers stay exactly as they are/, "the runner is not told the rest is untouched");
+  // ⚠️ The focus must not outlive the visit, or the next Edit opens a single question.
+  assert.match(html, /state\.setupFocus = null;\s*\n\s*state\.screen = null; state\.tab = "plan"/,
+    "the edit focus survives a save");
   assert.match(html, /profileBtn"\)\.onclick[^\n]*state\.screen = "profile"/,
     "the avatar still opens the raw form rather than the summary");
 
@@ -658,4 +679,16 @@ test("⚠️ the safety page states only what the code actually does", () => {
   // ⚠️ And it must adapt if the runner has pointed Alfie at their own service.
   assert.match(fn, /alfieCfg\(\) \|\| \{\}\)\.proxy/, "the Alfie claim is fixed rather than read from config");
   assert.match(fn, /EMERGENCY_BANNER\(\)/, "the emergency route is missing from the safety page");
+});
+
+test("⚠️ the bottom-nav label and the screen heading are separate strings", () => {
+  // ⚠️ TITLES feeds BOTH. Renaming Support to "Support & guidance" for the header truncated the tab
+  // to "Support & gui…" — a tab label has about eight characters, a heading has a screen.
+  const html = page();
+  assert.match(html, /const NAV_LABEL = \{/, "the nav has no labels of its own");
+  assert.match(html, /NAV_LABEL\[t\] \|\| TITLES\[t\]/, "the nav still derives its label from the heading");
+  const nav = html.slice(html.indexOf("const NAV_LABEL"), html.indexOf("const NAV_LABEL") + 220);
+  for (const m of nav.matchAll(/: "([^"]+)"/g)) {
+    assert.ok(m[1]!.length <= 9, "the nav label \"" + m[1] + "\" is too long for a tab and will truncate");
+  }
 });

@@ -96,6 +96,9 @@ test("⚠️ the setup form survives a glance at another tab", () => {
   assert.match(html, /state\.screen === "setup"\) captureSetupFields\(\)/,
     "nothing captures the fields before the nav changes screen");
   // ...and saving must RELEASE it, or the answers just committed are restored over the new profile.
-  assert.match(html, /draft = \{\};\s*\n\s*state\.screen = null; state\.tab = "plan"/,
-    "saving the profile does not clear the sticky draft");
+  // ⚠️ Anchored on the two facts, not on their adjacency — a line landed between them (clearing the
+  // edit focus) and failed a guard that was only ever about the draft being released.
+  const save = html.slice(html.indexOf("function doSaveProfile("), html.indexOf("function doSaveProfile(") + 4000);
+  assert.match(save, /draft = \{\};/, "saving the profile does not clear the sticky draft");
+  assert.match(save, /state\.screen = null; state\.tab = "plan"/, "saving does not leave the setup screen");
 });

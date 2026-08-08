@@ -25,9 +25,25 @@ struct WebHost: UIViewRepresentable {
         // whatever the cause, and this is the only way to tell them apart from outside.
         let status = LiveActivityService.lastStatus.replacingOccurrences(of: "\"", with: "'")
         let coachStatus = CoachAudioService.lastStatus.replacingOccurrences(of: "\"", with: "'")
+        // ⚠️ THE MAPBOX TOKEN REACHES THE PAGE FROM THE BUNDLE, NEVER FROM THE REPO. The "Embed web app"
+        // build phase copies ios/mapbox-token.txt (gitignored) into the bundle; docs/ is committed and
+        // published by GitHub Pages, so a token written into the page source would be public and, since
+        // it is billable, scraped. Absent is the normal case for anyone else's checkout — the page then
+        // falls back to the free CARTO styles on its own.
+        var mapboxToken = ""
+        if let url = Bundle.main.resourceURL?.appendingPathComponent("web/mapbox-token.txt"),
+           let raw = try? String(contentsOf: url, encoding: .utf8) {
+            // Only ever a Mapbox PUBLIC token. A secret one (sk.) must not be shipped in a client at
+            // all, so refuse it rather than embed it — a mistake here is expensive and silent.
+            let t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            if t.hasPrefix("pk.") { mapboxToken = t }
+        }
+        let tokenJS = mapboxToken.isEmpty ? ""
+            : "window.__interunMapboxToken = \"\(mapboxToken.replacingOccurrences(of: "\"", with: ""))\";"
         config.userContentController.addUserScript(WKUserScript(
             source: "window.__interunLiveActivity = \"\(status)\";"
-                  + "window.__interunCoachAudio = \"\(coachStatus)\";",
+                  + "window.__interunCoachAudio = \"\(coachStatus)\";"
+                  + tokenJS,
             injectionTime: .atDocumentStart, forMainFrameOnly: true))
 
         #if DEBUG

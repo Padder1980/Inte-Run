@@ -24,3 +24,8 @@ voice-dev/audition-el-*.mp3
 web/voices-personal/
 docs/voices-personal/
 voice-dev/personal.json
+
+# ⚠️ The Mapbox token is billable and this repo is public. It is copied into the app bundle at build
+# time by the "Embed web app" phase and must never be committed — a token in git history is a token
+# that has been published, whatever is done afterwards.
+ios/mapbox-token.txt

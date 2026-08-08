@@ -8100,7 +8100,7 @@ function buildOverviewMap(container, route) {
     container.innerHTML = "";
     container.appendChild(cv);
     container.appendChild(el('<div class="ov-mapov">' + overlay + '</div>'));
-    container.appendChild(el('<div class="ov-attr">© OpenStreetMap contributors © CARTO</div>'));
+    container.appendChild(el('<div class="ov-attr">' + esc(mapAttribution(MAP_STYLE_RUN)) + '</div>'));
   }).catch(() => {});
 }
 // Superseded by splitsVsTargetHtml, which judges each kilometre against the band the plan set
@@ -8602,8 +8602,51 @@ function loadTileImage(url) {
 // loadRouteMap, and nothing else in the app names a tile source.
 // ⚠️ Changing either one invalidates the cached pictures by itself, because the style is part of
 // routeMapKey. Nothing has to be cleared by hand.
-const MAP_STYLE_RUN = "rastertiles/voyager";
-const MAP_STYLE_SHARE = "dark_all";
+// Each surface names a style for BOTH providers, so the app degrades to the free maps by itself when
+// no token is present — which is what anyone else's checkout, and the public GitHub Pages site, get.
+// ⚠️ The run card is Mapbox OUTDOORS (owner's pick, 2026-08-08): trails, footpaths and contour lines,
+// which is the only thing any of these maps offers that the free ones do not, and the reason to be on
+// a paid provider at all for a running app.
+// ⚠️ The share card is DARK on both providers and deliberately not Outdoors. That card is a dark
+// branded panel — it paints rgba(4,16,13,.4) over the map and draws light text on top — so a pale
+// outdoors map behind it would be washed out and the text unreadable. Two surfaces, two answers.
+const MAP_STYLE_RUN = { mapbox: "outdoors-v12", carto: "rastertiles/voyager" };
+const MAP_STYLE_SHARE = { mapbox: "dark-v11", carto: "dark_all" };
+/**
+ * The Mapbox token, or "" when there is none.
+ *
+ * ⚠️ IT IS NEVER IN THIS FILE, AND MUST NOT BE. docs/ is committed and served publicly by GitHub
+ * Pages, so a token written here would be published — and a Mapbox token is billable, so a published
+ * one is somebody else's free maps at the owner's expense. It arrives from the app bundle at runtime
+ * (WebHost injects it from ios/mapbox-token.txt, which is gitignored), and localStorage is offered as
+ * a second route purely so it can be tried in a browser without a rebuild.
+ */
+function mapboxToken() {
+  try {
+    const inj = window.__interunMapboxToken;
+    if (typeof inj === "string" && inj.indexOf("pk.") === 0) return inj;
+    const ls = localStorage.getItem("interun_mapbox_v1");
+    if (ls && ls.indexOf("pk.") === 0) return ls;
+  } catch (e) {}
+  return "";
+}
+/**
+ * The attribution line, which is a LICENCE REQUIREMENT and not decoration — and it differs by
+ * provider. Mapbox's terms require Mapbox and OpenStreetMap to be credited on the map; CARTO's require
+ * OpenStreetMap and CARTO. Shipping the wrong one is a breach whichever way round it is, so it is
+ * derived from the same provider decision that chose the tiles rather than typed twice.
+ */
+function mapAttribution(styles) {
+  return mapProviderFor(styles).kind === "mapbox"
+    ? "\u00a9 Mapbox \u00a9 OpenStreetMap"
+    : "\u00a9 OpenStreetMap contributors \u00a9 CARTO";
+}
+/** Which provider is actually in use, and the style name for it. */
+function mapProviderFor(styles) {
+  const tok = mapboxToken();
+  return tok ? { kind: "mapbox", style: styles.mapbox, token: tok }
+             : { kind: "carto", style: styles.carto, token: "" };
+}
 // ---- The map is drawn ONCE and kept -------------------------------------------------------------
 //
 // A run's route never changes, so the picture of it never changes either. Before this, every glance
@@ -8701,8 +8744,14 @@ function routeMapKey(route, pw, ph, style) {
  * cached size does not depend on which device happened to draw it first.
  */
 const MAPCACHE_SS = 2;
-function routeMapFor(route, pw, ph, style) {
-  const key = routeMapKey(route, pw, ph, style);
+function routeMapFor(route, pw, ph, styles) {
+  // ⚠️ RESOLVE THE PROVIDER ONCE, HERE, and key on the RESOLVED name. styles is now an object with a
+  // name per provider, and passing it straight to routeMapKey would stringify it to "[object Object]"
+  // — identical for every style, so the run card and the share card would silently share one cache
+  // entry and whichever drew first would win. It would have looked like the share card rendering the
+  // wrong map at the wrong size, with nothing to point at.
+  const prov = mapProviderFor(styles || MAP_STYLE_SHARE);
+  const key = routeMapKey(route, pw, ph, prov.kind + ":" + prov.style);
   const fromBlob = (blob, z, ox, oy) => new Promise((resolve, reject) => {
     const url = URL.createObjectURL(blob), img = new Image();
     img.onload = () => { URL.revokeObjectURL(url); resolve({ image: img, proj: (p) => [mercX(p.lng, z) - ox, mercY(p.lat, z) - oy] }); };
@@ -8714,7 +8763,7 @@ function routeMapFor(route, pw, ph, style) {
     .catch(() => null)
     .then((hit) => {
       if (hit) return hit;
-      return loadRouteMap(route, pw, ph, style).then((md) => {
+      return loadRouteMap(route, pw, ph, prov).then((md) => {
         const cv = document.createElement("canvas");
         cv.width = pw * MAPCACHE_SS; cv.height = ph * MAPCACHE_SS;
         const g = cv.getContext("2d");
@@ -8731,8 +8780,9 @@ function routeMapFor(route, pw, ph, style) {
       });
     });
 }
-function loadRouteMap(route, pw, ph, style) {
-  pw = pw || MAP_W; ph = ph || MAP_H; style = style || "dark_all";
+function loadRouteMap(route, pw, ph, prov) {
+  pw = pw || MAP_W; ph = ph || MAP_H;
+  prov = prov || mapProviderFor(MAP_STYLE_SHARE);
   return new Promise((resolve, reject) => {
     if (!route || route.length < 2) return reject(new Error("no route"));
     const lats = route.map((p) => p.lat), lngs = route.map((p) => p.lng);
@@ -8745,7 +8795,13 @@ function loadRouteMap(route, pw, ph, style) {
       for (let ty = Math.floor(originY / MAP_TILE); ty <= Math.floor((originY + ph) / MAP_TILE); ty++) {
         if (ty < 0 || ty >= n) continue;
         const wx = ((tx % n) + n) % n, sub = ["a", "b", "c"][((tx % 3) + 3) % 3];
-        specs.push({ url: "https://" + sub + ".basemaps.cartocdn.com/" + style + "/" + z + "/" + wx + "/" + ty + "@2x.png", dx: tx * MAP_TILE - originX, dy: ty * MAP_TILE - originY });
+        // ⚠️ THE ONLY TILE URL IN THE APP. Both providers are built here, so a swap cannot leave one
+        // surface behind — and test/route-map-cache.test.ts counts the hosts to keep it that way.
+        const url = prov.kind === "mapbox"
+          ? "https://api.mapbox.com/styles/v1/mapbox/" + prov.style + "/tiles/" + MAP_TILE + "/" +
+            z + "/" + wx + "/" + ty + "@2x?access_token=" + encodeURIComponent(prov.token)
+          : "https://" + sub + ".basemaps.cartocdn.com/" + prov.style + "/" + z + "/" + wx + "/" + ty + "@2x.png";
+        specs.push({ url: url, dx: tx * MAP_TILE - originX, dy: ty * MAP_TILE - originY });
       }
     if (!specs.length || specs.length > 40) return reject(new Error("tile count"));
     Promise.all(specs.map((s) => loadTileImage(s.url).then((img) => ({ img, dx: s.dx, dy: s.dy }))))
@@ -8776,7 +8832,7 @@ function drawMapPanel(g, run, mx, my, mw, mh, mapData) {
     g.textAlign = "right"; g.fillStyle = "#eafff5"; g.font = "800 34px " + FF; g.fillText(corner.v, mx + mw - 34, my + mh - 56);
     g.fillStyle = "rgba(190,215,205,.6)"; g.font = "600 19px " + FF; lsText(g, corner.k, mx + mw - 34, my + mh - 28, 1.5, "right"); g.textAlign = "left";
   }
-  if (mapData) { g.textAlign = "left"; g.fillStyle = "rgba(200,220,210,.32)"; g.font = "500 15px " + FF; g.fillText("© OpenStreetMap © CARTO", mx + 22, my + mh - 20); }
+  if (mapData) { g.textAlign = "left"; g.fillStyle = "rgba(200,220,210,.32)"; g.font = "500 15px " + FF; g.fillText(mapAttribution(MAP_STYLE_SHARE), mx + 22, my + mh - 20); }
 }
 // Draw the whole card; mapData (optional) puts the route over a real map instead of the grid.
 function buildShareCanvasCore(run, mapData) {

@@ -130,8 +130,14 @@ test("there is exactly ONE tile source, and ONE place naming the styles", () => 
   // https://…cartocdn string matched NOTHING and the count came back 0. Written as `<= 1` that would
   // have passed while measuring nothing at all — the exact shape of dead guard this project keeps
   // hitting. `=== 1` is what turned a silent pass into a visible failure.
+  // ⚠️ TWO HOSTS IS NOW CORRECT — there are two providers. What must stay true is that they are both
+  // built in ONE FUNCTION, so a swap cannot leave a surface behind on the old provider.
   const hosts = (html.match(/basemaps\.cartocdn|api\.mapbox\.com/g) || []);
-  assert.equal(hosts.length, 1, "expected exactly one tile host in the app, found " + hosts.length);
+  assert.equal(hosts.length, 2, "expected both tile hosts, found " + hosts.length);
+  const inLoader = (lift("loadRouteMap").match(/basemaps\.cartocdn|api\.mapbox\.com/g) || []);
+  assert.equal(inLoader.length, 2,
+    "a tile URL is built outside loadRouteMap — the two providers will drift and one surface will " +
+    "keep the old one, silently");
   assert.match(html, /const MAP_STYLE_RUN = /, "the run card's style is not named in one place");
   assert.match(html, /const MAP_STYLE_SHARE = /, "the share card's style is not named in one place");
   // Both consumers go through the cache, or one of them still bills per view.
@@ -139,4 +145,68 @@ test("there is exactly ONE tile source, and ONE place naming the styles", () => 
     "a map consumer is bypassing the cache (expected: the definition plus both call sites)");
   assert.equal((html.match(/loadRouteMap\(/g) || []).length, 2,
     "loadRouteMap has a caller other than routeMapFor — that one re-fetches tiles on every view");
+});
+
+
+// ---- Mapbox --------------------------------------------------------------------------------------
+
+test("⚠️ no Mapbox token is ever in the built page", () => {
+  // ⚠️ THE ONE THAT MATTERS MOST. docs/index.html is committed and served publicly by GitHub Pages,
+  // and a Mapbox token is BILLABLE — a published one is somebody else's free maps at the owner's
+  // expense, and a token in git history has been published whatever is done afterwards. It reaches
+  // the app from ios/mapbox-token.txt (gitignored) via the bundle at build time, never from here.
+  const html = app();
+  const found = html.match(/pk\.ey[A-Za-z0-9._-]{20,}/g) || [];
+  assert.equal(found.length, 0, "a Mapbox token has been built into the public page");
+  assert.doesNotMatch(html, /sk\.ey/, "a Mapbox SECRET token appears in the page — that must never ship at all");
+});
+
+test("the app falls back to the free maps when there is no token", () => {
+  // Anyone else's checkout, and the public Pages build, must work with no account at all.
+  const fn = lift("mapProviderFor");
+  assert.match(fn, /kind: "carto"/, "there is no free fallback — a checkout without a token gets no maps");
+  assert.match(fn, /kind: "mapbox"/);
+  const tok = lift("mapboxToken");
+  assert.match(tok, /__interunMapboxToken/, "the injected token is not read");
+  assert.match(tok, /indexOf\("pk\."\) === 0/, "the token is not checked for being a PUBLIC one");
+  assert.match(tok, /return ""/, "there is no empty default, so an absent token would be undefined");
+});
+
+test("⚠️ the cache key includes the PROVIDER, not an object", () => {
+  // ⚠️ THE BUG THIS CAUGHT. Once each surface named a style per provider, `styles` became an object —
+  // and passing it to routeMapKey stringifies it to "[object Object]", identical for every style. The
+  // run card and the share card would then share one cache entry and whichever drew first would win,
+  // presenting as the share card rendering the wrong map at the wrong size with nothing to point at.
+  const body = lift("routeMapFor");
+  assert.match(body, /mapProviderFor\(/, "routeMapFor does not resolve the provider");
+  assert.match(body, /prov\.kind \+ ":" \+ prov\.style/, "the key does not include the resolved provider and style");
+  // and two different styles must produce two different keys, run for real
+  assert.notEqual(routeMapKey(ring(60), 700, 420, "mapbox:outdoors-v12"),
+                  routeMapKey(ring(60), 700, 420, "mapbox:dark-v11"));
+  assert.notEqual(routeMapKey(ring(60), 700, 420, "mapbox:outdoors-v12"),
+                  routeMapKey(ring(60), 700, 420, "carto:rastertiles/voyager"),
+                  "switching provider would reuse the other provider's pictures");
+});
+
+test("⚠️ attribution follows the provider — it is a licence term, not decoration", () => {
+  // Mapbox's terms require Mapbox and OpenStreetMap credited on the map; CARTO's require OpenStreetMap
+  // and CARTO. Shipping the wrong one is a breach whichever way round it is.
+  const fn = lift("mapAttribution");
+  assert.match(fn, /Mapbox/, "no Mapbox attribution exists");
+  assert.match(fn, /CARTO/, "the CARTO attribution has been dropped");
+  assert.match(fn, /mapProviderFor/, "attribution is not derived from the provider actually in use");
+  const html = app();
+  // Both surfaces must ask for it rather than carrying a hardcoded string.
+  assert.equal((html.match(/mapAttribution\(/g) || []).length, 3,
+    "a surface still prints a hardcoded attribution (expected: the definition plus both call sites)");
+});
+
+test("the share card stays DARK on both providers", () => {
+  // ⚠️ Not an oversight that it is not Outdoors. The share card paints rgba(4,16,13,.4) over the map
+  // and draws light text on it; a pale outdoors basemap behind that is washed out and unreadable.
+  const html = app();
+  assert.match(html, /MAP_STYLE_SHARE = \{ mapbox: "dark-v11", carto: "dark_all" \}/,
+    "the share card is no longer dark on both providers");
+  assert.match(html, /MAP_STYLE_RUN = \{ mapbox: "outdoors-v12"/,
+    "the run card is not on Mapbox Outdoors, which is the style the owner picked");
 });

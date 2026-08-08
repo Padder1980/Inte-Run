@@ -269,6 +269,49 @@ people each running four times a week**, ≈$70/month at 2,000 and ≈$750/month
 in the page. ⚠️ And `MAPCACHE_MAX` is 120 entries, so after roughly six months of heavy use the oldest
 runs re-fetch when scrolled back to — eviction is by last USE, so it is the forgotten runs that go.
 
+## MAPBOX OUTDOORS ON THE RUN CARD (owner's pick, 2026-08-08)
+
+*"I like the first mapbox style and want to use that"* — **Mapbox Outdoors**: trails, footpaths and
+contour lines, the one thing none of the free styles offers and the reason to be on a paid provider at
+all for a running app.
+
+- `MAP_STYLE_RUN = { mapbox: "outdoors-v12", carto: "rastertiles/voyager" }`
+- `MAP_STYLE_SHARE = { mapbox: "dark-v11", carto: "dark_all" }`
+
+⚠️ **THE SHARE CARD IS DARK ON BOTH PROVIDERS AND DELIBERATELY NOT OUTDOORS.** That card is a dark
+branded panel — it paints `rgba(4,16,13,.4)` over the map and draws light text on top — so a pale
+outdoors basemap behind it is washed out and the text unreadable. Two surfaces, two answers.
+
+⚠️ **EACH SURFACE NAMES A STYLE FOR BOTH PROVIDERS, so the app falls back to the free CARTO maps by
+itself when there is no token.** That is what anyone else's checkout gets, and what the public GitHub
+Pages build gets. `mapProviderFor()` is the single decision; `mapAttribution()` follows it.
+
+⚠️ **THE TOKEN NEVER TOUCHES THE REPO.** `docs/` is committed and served publicly by Pages, and a
+Mapbox token is BILLABLE — a published one is somebody else's free maps at the owner's expense, and a
+token in git history has been published whatever is done afterwards. So: it lives in
+**`ios/mapbox-token.txt`, which is gitignored**, the "Embed web app" build phase copies it into the app
+bundle, and `WebHost` injects it as `window.__interunMapboxToken` at document start. Exactly the
+two-tier shape the personal voice packs already use. `localStorage interun_mapbox_v1` is a second route
+for trying it in a browser without a rebuild.
+⚠️ **A `sk.` token is REFUSED**, in Swift and again on the page. A secret token must never ship in a
+client at all, and that mistake is expensive and silent.
+⚠️ `test/route-map-cache.test.ts` asserts **no `pk.` token is ever in the built page**. That is the
+guard that matters most in this whole area.
+
+⚠️ **ATTRIBUTION IS A LICENCE TERM AND IT DIFFERS BY PROVIDER** — Mapbox requires Mapbox +
+OpenStreetMap, CARTO requires OpenStreetMap + CARTO. Derived from the same provider decision that chose
+the tiles, never typed twice, and asserted at both call sites.
+
+⚠️ **THE CACHE KEY CAUGHT A REAL BUG HERE.** Once each surface named a style per provider, `styles`
+became an OBJECT — and passing it to `routeMapKey` stringifies to `"[object Object]"`, identical for
+every style. The run card and share card would have shared one cache entry, whichever drew first
+winning, presenting as the share card rendering the wrong map at the wrong size with nothing to point
+at. The provider is resolved ONCE in `routeMapFor` and the key is `kind + ":" + style`.
+
+⚠️ **STILL OPEN: a URL-restricted token will very likely be REFUSED in the native app**, which is not
+a web page and serves itself from `interun://app`. Mapbox restrictions check the requesting URL. That
+needs its own answer before the App Store — probably a second, differently-restricted token.
+
 **The swap-point:** `MAP_STYLE_RUN` and `MAP_STYLE_SHARE` are the only two places a style is named, and
 `loadRouteMap` builds the only tile URL in the app. They differ on purpose — the little map on a
 finished run is the colourful one, the share card the dark one. Moving to Mapbox is those two constants

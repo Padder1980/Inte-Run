@@ -355,7 +355,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -eu\nSRC=\"${SRCROOT}/../docs\"\nDST=\"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/web\"\n\nif [ ! -f \"${SRC}/index.html\" ]; then\n  echo \"error: ${SRC}/index.html not found — run 'node web/app.ts' at the repo root first.\" >&2\n  exit 1\nfi\n\nmkdir -p \"${DST}\"\n# Dev-only pages and the owner's private roadmap never ship.\nrsync -a --delete \\\n  --exclude 'coverage.html' \\\n  --exclude 'walkthrough.html' \\\n  --exclude 'roadmap' \\\n  --exclude 'mapstyles' \\\n  \"${SRC}/\" \"${DST}/\"\necho \"note: embedded web app ($(du -sh \"${DST}\" | cut -f1)) from ${SRC}\"\n";
+			shellScript = "set -eu\nSRC=\"${SRCROOT}/../docs\"\nDST=\"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/web\"\n\nif [ ! -f \"${SRC}/index.html\" ]; then\n  echo \"error: ${SRC}/index.html not found — run 'node web/app.ts' at the repo root first.\" >&2\n  exit 1\nfi\n\nmkdir -p \"${DST}\"\n# Dev-only pages and the owner's private roadmap never ship.\nrsync -a --delete \\\n  --exclude 'coverage.html' \\\n  --exclude 'walkthrough.html' \\\n  --exclude 'roadmap' \\\n  --exclude 'mapstyles' \\\n  \"${SRC}/\" \"${DST}/\"\necho \"note: embedded web app ($(du -sh \"${DST}\" | cut -f1)) from ${SRC}\"\n\n# ⚠️ THE MAPBOX TOKEN TRAVELS WITH THE APP AND NEVER WITH THE REPO. docs/ is committed and is served\n# publicly by GitHub Pages, so a token written into the built page would be published and scraped —\n# and a Mapbox token is billable. It lives in ios/mapbox-token.txt, which is gitignored, and is copied\n# into the bundle here at build time. Same two-tier shape as the personal voice packs: the public\n# build has no key in it, the owner's build does.\n# ⚠️ Absent is the NORMAL case, not an error — a checkout without the file simply builds on the free\n# CARTO maps, which is what anyone else cloning this repo should get.\nTOK=\"${SRCROOT}/mapbox-token.txt\"\nif [ -f \"${TOK}\" ]; then\n  tr -d \" \\t\\r\\n\" < \"${TOK}\" > \"${DST}/mapbox-token.txt\"\n  echo \"note: embedded a Mapbox token (maps will use Mapbox)\"\nelse\n  rm -f \"${DST}/mapbox-token.txt\"\n  echo \"note: no ios/mapbox-token.txt — maps will use the free CARTO styles\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -455,7 +455,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "InteRun.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 277;
+				CURRENT_PROJECT_VERSION = 278;
 				DEVELOPMENT_TEAM = PSHC485BRX;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -479,7 +479,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "InteRun.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 277;
+				CURRENT_PROJECT_VERSION = 278;
 				DEVELOPMENT_TEAM = PSHC485BRX;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -504,7 +504,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "InteRunWatch.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 277;
+				CURRENT_PROJECT_VERSION = 278;
 				DEVELOPMENT_TEAM = PSHC485BRX;
 				ENABLE_DEBUG_DYLIB = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -529,7 +529,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "InteRunWatch.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 277;
+				CURRENT_PROJECT_VERSION = 278;
 				DEVELOPMENT_TEAM = PSHC485BRX;
 				ENABLE_DEBUG_DYLIB = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -551,7 +551,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 277;
+				CURRENT_PROJECT_VERSION = 278;
 				DEVELOPMENT_TEAM = PSHC485BRX;
 				ENABLE_DEBUG_DYLIB = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -573,7 +573,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 277;
+				CURRENT_PROJECT_VERSION = 278;
 				DEVELOPMENT_TEAM = PSHC485BRX;
 				ENABLE_DEBUG_DYLIB = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -594,7 +594,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 277;
+				CURRENT_PROJECT_VERSION = 278;
 				DEVELOPMENT_TEAM = PSHC485BRX;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -613,7 +613,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 277;
+				CURRENT_PROJECT_VERSION = 278;
 				DEVELOPMENT_TEAM = PSHC485BRX;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;

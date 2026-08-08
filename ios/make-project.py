@@ -50,6 +50,22 @@ rsync -a --delete \
   --exclude 'mapstyles' \
   "${SRC}/" "${DST}/"
 echo "note: embedded web app ($(du -sh "${DST}" | cut -f1)) from ${SRC}"
+
+# ⚠️ THE MAPBOX TOKEN TRAVELS WITH THE APP AND NEVER WITH THE REPO. docs/ is committed and is served
+# publicly by GitHub Pages, so a token written into the built page would be published and scraped —
+# and a Mapbox token is billable. It lives in ios/mapbox-token.txt, which is gitignored, and is copied
+# into the bundle here at build time. Same two-tier shape as the personal voice packs: the public
+# build has no key in it, the owner's build does.
+# ⚠️ Absent is the NORMAL case, not an error — a checkout without the file simply builds on the free
+# CARTO maps, which is what anyone else cloning this repo should get.
+TOK="${SRCROOT}/mapbox-token.txt"
+if [ -f "${TOK}" ]; then
+  tr -d " \t\r\n" < "${TOK}" > "${DST}/mapbox-token.txt"
+  echo "note: embedded a Mapbox token (maps will use Mapbox)"
+else
+  rm -f "${DST}/mapbox-token.txt"
+  echo "note: no ios/mapbox-token.txt — maps will use the free CARTO styles"
+fi
 '''
 
 

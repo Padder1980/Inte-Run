@@ -2201,6 +2201,22 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .sd-sn { color: #04120e !important; }
 .sd-chev { flex: none; margin-left: 2px; color: var(--ink-faint); font-size: var(--t-card); line-height: 1; transition: transform .18s ease; }
 .sd-stage[open] .sd-chev, .sd-why[open] .sd-chev { transform: rotate(90deg); }
+/* Logbook: the period snapshot, filters and month headings. */
+.lb-snap { padding: var(--s4); margin-bottom: var(--s3); }
+.lb-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); }
+.lb-cell { min-width: 0; }
+.lb-cl { font-size: var(--t-label); font-weight: 750; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-faint); }
+.lb-cv { font-size: var(--t-hero); font-weight: 780; color: var(--ink); line-height: 1.1; margin-top: 3px; }
+.lb-cv span { font-size: var(--t-meta); font-weight: 650; color: var(--ink-soft); margin-left: 3px; }
+.lb-cs { font-size: var(--t-meta); color: var(--ink-soft); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-con { margin-top: var(--s3); padding-top: var(--s3); border-top: 1px solid var(--line); font-size: var(--t-body); color: var(--ink-soft); }
+.lb-con b { color: var(--ink); }
+.lb-filters { display: flex; gap: var(--s2); overflow-x: auto; margin-bottom: var(--s3); padding-bottom: 2px; -webkit-overflow-scrolling: touch; }
+.lb-f { flex: none; padding: var(--s2) var(--s3); min-height: 34px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-pill); color: var(--ink-soft); font-size: var(--t-meta); font-weight: 700; cursor: pointer; }
+.lb-f.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.lb-mon { font-size: var(--t-label); font-weight: 750; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-faint); margin: var(--s4) 2px var(--s2); }
+.lb-none { padding: var(--s5) var(--s4); text-align: center; font-size: var(--t-body); color: var(--ink-soft); }
+.lb-clear { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
 /* The week list: one line per week, the selected one expanded into day rows. */
 .wk-sum { display: flex; align-items: center; gap: var(--s3); width: 100%; text-align: left; margin-bottom: var(--s2); padding: var(--s3) var(--s4); min-height: var(--tap); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); color: inherit; cursor: pointer; }
 .wk-sum.past { opacity: .62; }
@@ -2655,7 +2671,7 @@ function computeToday() {
 }
 computeToday();
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "workouts", support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK, addOpen: false };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "workouts", logFilter: "all", support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK, addOpen: false };
 // Effective day index for a session, honouring any user reschedule. Works for raw sessions
 // (dayOfWeek) and summary sessions (dayIndex), keyed by the shared session id.
 function loadDayOverride() { try { return JSON.parse(localStorage.getItem("interun_dayov_v1") || "{}") || {}; } catch (e) { return {}; } }
@@ -3468,6 +3484,11 @@ function migrateRunRoutes() {
     }
     // "today" was written into the caption of every watch run, permanently. There is no way back to
     // the real date for those, but the id carries the milliseconds for phone runs.
+    // \u26a0\ufe0f A RUN WITHOUT AN ID CANNOT BE ADDRESSED ONCE THE LIST IS FILTERED. The rows used to
+    // carry their ARRAY INDEX, which this file already documents as "not a handle" -- and grouping or
+    // filtering the list breaks that in a second way, because position in the rendered list stops
+    // matching position in state.logged. Backfilled from the date so an old run keeps a handle.
+    if (!r.id) { r.id = "run-x-" + (r.dateIso || "0000-00-00") + "-" + Math.round((r.sec || 0) + (r.distKm || 0) * 1000); changed = true; }
     if (!r.dateIso) {
       const ms = Number(String(r.id || "").replace("run-", ""));
       if (isFinite(ms) && ms > 0) { r.dateIso = new Date(ms).toISOString().slice(0, 10); changed = true; }
@@ -6215,6 +6236,12 @@ function wireSwipes() {
 // Remove a run, with a real undo. Deleting also has to unpick what the run implied: its tick on the
 // plan and any flag it was evidence for, or the app keeps reasoning from a run that no longer exists.
 let UNDO_RUN = null;
+/** Resolve the run by id, then delete it by position — the position is derived, never stored. */
+function deleteRunById(id) {
+  const idx = (state.logged || []).findIndex((r) => r && r.id === id);
+  if (idx < 0) return;
+  deleteRun(idx);
+}
 function deleteRun(idx) {
   const run = state.logged[idx];
   if (!run) return;
@@ -6255,18 +6282,136 @@ function viewActivities() {
     if (!state.logged.length) {
       return tabs + '<div class="empty-acts"><div class="ea-ic">' + ICON.today + '</div><div class="ea-h">No runs yet</div><div class="ea-b">Start a session from the <b>Today</b> tab. Once you finish, your runs — with route maps and splits — will appear here.</div></div>';
     }
+    const shown = logbookFiltered();
+    LOG_MONTH = ""; // \u26a0\ufe0f or the second render of this screen emits no month headings at all
     // Each row rides in a swipe track with a delete action revealed behind it.
-    const list = state.logged.map((a, i) => {
-      return '<div class="swipe" data-swipe="' + i + '">' +
-        '<button class="swipe-del" data-delrun="' + i + '" aria-label="Delete this run">' + ICON.trash + '<span>Delete</span></button>' +
-        '<button class="card runcard swipe-face" data-runidx="' + i + '">' +
+    const list = shown.map((a) => {
+      const rid = esc(a.id || "");
+      return logMonthHead(a) + '<div class="swipe" data-swipe="' + rid + '">' +
+        '<button class="swipe-del" data-delrun="' + rid + '" aria-label="Delete this run">' + ICON.trash + '<span>Delete</span></button>' +
+        '<button class="card runcard swipe-face" data-runid="' + rid + '">' +
         '<div class="act"><div class="b"><div class="t">' + esc(a.t) + '</div><div class="d">' + esc(a.d || "") + '</div>' +
         '<div class="m"><div><b class="num">' + a.dist + '</b><span>Distance</span></div><div><b class="num">' + a.time + '</b><span>Time</span></div><div><b class="num">' + a.pace + '</b><span>Avg pace</span></div></div></div><div class="rc-arr">›</div></div></button></div>';
     }).join("");
-    return tabs + '<div style="font-size:12.5px;color:var(--ink-faint);margin:0 2px 12px">Your recent runs</div>' + list;
+    const none = !shown.length
+      ? '<div class="lb-none">Nothing logged of that kind yet. <button class="lb-clear" id="lbClear">Show every run</button></div>'
+      : "";
+    return tabs + logbookSnapshot() + logbookFilters() + list + none;
   }
   if (state.actTab === "strength") return tabs + viewStrengthHistory();
   return tabs + viewPerformance();
+}
+/**
+ * The Logbook's period totals, consistency and filters.
+ *
+ * \u26a0\ufe0f THE STORE IS CAPPED AT 50 RUNS (saveRuns slices to 50), so an "all time" total is a lie
+ * the moment somebody has run fifty-one times. This week and this month are always inside the cap for
+ * any realistic runner; the all-logged figure says "your last 50 runs" the moment the cap binds, which
+ * is the honest form of the same number rather than a wrong one.
+ */
+function logWeekStartIso() {
+  // \u26a0\ufe0f ENTIRELY IN UTC, because todayIso() and isoAdd() are. new Date(iso + "T00:00:00") has
+  // no Z, so it parses as LOCAL midnight; calling toISOString() on it then hands back the PREVIOUS
+  // day for the whole of British Summer Time. That put the week boundary one day early for half the
+  // year -- so on a Monday the "this week" total silently included Sunday's long run, which is the
+  // single biggest run of the week and would have made the figure look right most of the time.
+  const iso = todayIso(), p = iso.split("-").map(Number);
+  const dow = (new Date(Date.UTC(p[0], (p[1] || 1) - 1, p[2] || 1)).getUTCDay() + 6) % 7;
+  return isoAdd(iso, -dow).toISOString().slice(0, 10);
+}
+function logTotals(fromIso) {
+  let runs = 0, km = 0, sec = 0;
+  for (const r of (state.logged || [])) {
+    if (!r || !r.dateIso || (fromIso && r.dateIso < fromIso)) continue;
+    runs++; km += Number(r.distKm) || 0; sec += Number(r.sec) || 0;
+  }
+  return { runs: runs, km: km, sec: sec };
+}
+/**
+ * How much of this week's plan has actually been run.
+ * \u26a0\ufe0f NEVER FROM state.done. That object is rebuilt at every boot by seedDone(), which marks
+ * every non-rest session dated before today as done whether or not anybody ran it -- so a consistency
+ * figure taken from it would read 100% for a runner who has not run at all. Logged runs against the
+ * prescription in RAW.weeks is the only honest pair, and addDayEvidence already does it this way.
+ */
+function logConsistency() {
+  try {
+    if (!TODAY_IN_PLAN || CURRENT_WEEK == null || CURRENT_WEEK < 0) return null;
+    const rawWk = (typeof RAW !== "undefined" && RAW.weeks) ? RAW.weeks[CURRENT_WEEK] : null;
+    const wk = PLAN && PLAN.weeks ? PLAN.weeks[CURRENT_WEEK] : null;
+    if (!rawWk || !rawWk.sessions || !wk || !wk.startIso) return null;
+    const prescribed = rawWk.sessions.filter((x) => PRIMARY_TYPES[x.type]).length;
+    if (!prescribed) return null;
+    let done = 0;
+    for (let d = 0; d < 7; d++) {
+      const iso = isoAdd(wk.startIso, d).toISOString().slice(0, 10);
+      if (iso > todayIso()) break;
+      done += (state.logged || []).filter((r) => r && r.dateIso === iso).length;
+    }
+    return { done: Math.min(done, prescribed), prescribed: prescribed };
+  } catch (e) { return null; }
+}
+function logbookSnapshot() {
+  const wk = logTotals(logWeekStartIso());
+  const mo = logTotals(todayIso().slice(0, 7) + "-01");
+  const all = logTotals(null);
+  const capped = (state.logged || []).length >= 50;
+  const cell = (lab, t) => '<div class="lb-cell"><div class="lb-cl">' + lab + '</div>' +
+    '<div class="lb-cv num">' + (t.km ? t.km.toFixed(1) : "0") + '<span>km</span></div>' +
+    '<div class="lb-cs">' + t.runs + (t.runs === 1 ? " run" : " runs") +
+      (t.sec ? " \u00b7 " + fmtTimeFull(Math.round(t.sec)) : "") + '</div></div>';
+  const con = logConsistency();
+  // \u26a0\ufe0f The consistency line states the EVIDENCE, not a percentage. "3 of 4" can be checked
+  // against the week the runner just looked at; "75%" cannot, and invites a judgement the app has not
+  // earned -- a missed run may have been the right call.
+  const conRow = con
+    ? '<div class="lb-con"><b>' + con.done + ' of ' + con.prescribed + '</b> planned runs done this week</div>'
+    : "";
+  return '<div class="card lb-snap">' +
+    '<div class="lb-grid">' + cell("This week", wk) + cell("This month", mo) +
+      cell(capped ? "Last 50 runs" : "All logged", all) + '</div>' + conRow + '</div>';
+}
+const LOG_FILTERS = [["all", "All"], ["easy", "Easy"], ["long", "Long"], ["quality", "Quality"], ["other", "Other"]];
+function logFilterOf(r) {
+  const t = r && r.type;
+  if (t === "easy" || t === "recovery" || t === "strides") return "easy";
+  if (t === "long") return "long";
+  if (t === "vo2" || t === "threshold" || t === "race-specific" || t === "race") return "quality";
+  return "other";
+}
+function logbookFiltered() {
+  const f = state.logFilter || "all";
+  const list = (state.logged || []).filter(Boolean);
+  return f === "all" ? list : list.filter((r) => logFilterOf(r) === f);
+}
+function logbookFilters() {
+  // Only offer a filter that has something behind it -- a chip that always returns nothing is a
+  // dead end wearing the clothes of a feature.
+  const present = {};
+  (state.logged || []).forEach((r) => { if (r) present[logFilterOf(r)] = true; });
+  const kinds = LOG_FILTERS.filter((k) => k[0] === "all" || present[k[0]]);
+  if (kinds.length < 3) return "";
+  const cur = state.logFilter || "all";
+  return '<div class="lb-filters" role="group" aria-label="Filter runs">' + kinds.map((k) =>
+    '<button class="lb-f' + (cur === k[0] ? " on" : "") + '" data-logf="' + k[0] + '"' +
+    ' aria-pressed="' + (cur === k[0]) + '">' + k[1] + '</button>').join("") + '</div>';
+}
+/**
+ * A month heading, emitted when the run below it starts a new month.
+ * \u26a0\ufe0f state.logged IS INSERTION-ORDERED, NOT DATE-SORTED -- a watch run arriving late is
+ * unshifted to the front whatever day it happened. So this tracks the last month it EMITTED rather
+ * than comparing with the previous row, and a list that jumps back and forth still reads correctly.
+ */
+let LOG_MONTH = "";
+function logMonthHead(r) {
+  const iso = r && r.dateIso;
+  if (!iso) return "";
+  const m = iso.slice(0, 7);
+  if (m === LOG_MONTH) return "";
+  LOG_MONTH = m;
+  const y = iso.slice(0, 4), mi = Number(iso.slice(5, 7)) - 1;
+  const label = (MON_SHORT[mi] || "") + (y === todayIso().slice(0, 4) ? "" : " " + y);
+  return '<div class="lb-mon">' + esc(label) + '</div>';
 }
 function viewRunDetail() {
   const run = viewedRun();
@@ -11383,18 +11528,20 @@ function wire() {
   wireWeekList();
   centerPlanWeek();
   document.querySelectorAll("[data-at]").forEach((b) => b.onclick = () => { state.actTab = b.dataset.at; render(); });
-  document.querySelectorAll("[data-runidx]").forEach((b) => b.onclick = () => {
+  // \u26a0\ufe0f BY ID, NOT BY POSITION. The index was already "not a handle" because state.logged is
+  // unshifted whenever a watch run arrives; filtering the list breaks it a second way, because
+  // position in the RENDERED list stopped matching position in the array the moment a filter existed.
+  document.querySelectorAll("[data-runid]").forEach((b) => b.onclick = () => {
     // A swipe that ends in a tap should not also open the run.
     if (b.closest(".swipe") && b.closest(".swipe").classList.contains("open")) { closeSwipes(); return; }
     if (SWIPE.moved) return;
-    state.viewRunIdx = Number(b.dataset.runidx);
-    // The index is not a handle. state.logged is unshifted whenever a watch run arrives, so an
-    // index captured when the screen opened can point at a different run by the time the runner
-    // rates it or writes a note — silently attaching both to somebody else's session.
-    state.viewRunId = (state.logged[state.viewRunIdx] || {}).id || null;
+    state.viewRunId = b.dataset.runid || null;
+    state.viewRunIdx = (state.logged || []).findIndex((r) => r && r.id === state.viewRunId);
     state.screen = "runview"; render();
   });
-  document.querySelectorAll("[data-delrun]").forEach((b) => b.onclick = (e) => { e.stopPropagation(); deleteRun(Number(b.dataset.delrun)); });
+  document.querySelectorAll("[data-delrun]").forEach((b) => b.onclick = (e) => { e.stopPropagation(); deleteRunById(b.dataset.delrun); });
+  document.querySelectorAll("[data-logf]").forEach((b) => b.onclick = () => { state.logFilter = b.dataset.logf; render(); });
+  const lbc = $("lbClear"); if (lbc) lbc.onclick = () => { state.logFilter = "all"; render(); };
   wireSwipes();
   const runBack = $("runBack"); if (runBack) runBack.onclick = () => { state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); };
   const shareRun = $("shareRun"); if (shareRun) { shareRun.onclick = doShareRun; prepareShareCard(currentOverviewRun()); }

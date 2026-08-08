@@ -192,3 +192,60 @@ test("⚠️ the red-flag screen runs BEFORE anything is sent to a remote model"
   assert.match(fn, /alfieCfg\(\)\.proxy && !alfieRedFlags\(/,
     "a red-flag question is still dispatched to the proxy");
 });
+
+test("⚠️ the logbook's week starts on a Monday, in every timezone and every week of the year", () => {
+  // ⚠️ new Date(iso + "T00:00:00") has no Z, so it parses as LOCAL midnight — and calling
+  // toISOString() on that hands back the PREVIOUS day for the whole of British Summer Time. The
+  // first version of logWeekStartIso did exactly that, which put the week boundary one day early
+  // for half the year: on a Monday the "this week" total silently included Sunday's long run. The
+  // biggest run of the week, so the figure would have looked plausible almost every time.
+  const html = page();
+  const at = html.indexOf("function logWeekStartIso(");
+  assert.ok(at > 0, "logWeekStartIso is gone");
+  const src = html.slice(at, html.indexOf("\nfunction ", at + 10));
+  const isoAdd = (iso: string, days: number) => {
+    const p = String(iso).split("-").map(Number);
+    const dt = new Date(Date.UTC(p[0]!, (p[1] || 1) - 1, p[2] || 1));
+    dt.setUTCDate(dt.getUTCDate() + days);
+    return dt;
+  };
+  // ⚠️ A SWEEP, NOT A FIXTURE. One date passes under the bug for five days in seven, and passes
+  // always outside summer time — which is exactly how it would have reached a runner.
+  for (let i = 0; i < 400; i++) {
+    const t = new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10);
+    const f = new Function("todayIso", "isoAdd", src + "\nreturn logWeekStartIso;")(() => t, isoAdd);
+    const ws = f() as string;
+    assert.equal(new Date(ws + "T00:00:00Z").getUTCDay(), 1, "week start is not a Monday: " + t + " -> " + ws);
+    assert.ok(ws <= t, "the week starts in the future: " + t + " -> " + ws);
+    assert.ok(isoAdd(ws, 7).toISOString().slice(0, 10) > t, "today is not inside its own week: " + t + " -> " + ws);
+  }
+});
+
+test("⚠️ the logbook addresses a run by id, never by its position in the list", () => {
+  // The index was already "not a handle" — state.logged is unshifted whenever a watch run arrives.
+  // Filtering breaks it a SECOND way: position in the rendered list stops matching position in the
+  // array. Deleting run 3 of a filtered list would delete run 3 of the whole store.
+  const html = page().replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  assert.ok(!/data-runidx="/.test(html), "a run row still carries its array index as its handle");
+  assert.match(html, /data-runid="/, "run rows carry no id");
+  assert.match(html, /deleteRunById\(b\.dataset\.delrun\)/, "delete still resolves by position");
+  // Every run must HAVE an id, including ones logged before ids existed.
+  assert.match(html, /if \(!r\.id\) \{ r\.id = /, "old runs are never given an id, so they cannot be addressed");
+});
+
+test("⚠️ consistency is measured against runs actually logged, never against state.done", () => {
+  // seedDone() rebuilds state.done at every boot by marking every non-rest session dated before
+  // today as done, whether or not anybody ran it. A consistency figure taken from it would read
+  // 100% for a runner who has not run at all — praise for nothing, which this app has a rule against.
+  const html = page();
+  const at = html.indexOf("function logConsistency(");
+  assert.ok(at > 0, "logConsistency is gone");
+  const fn = html.slice(at, html.indexOf("\nfunction ", at + 10));
+  assert.ok(!fn.includes("state.done"), "consistency is computed from state.done, which is not evidence");
+  assert.match(fn, /state\.logged/, "consistency does not look at logged runs");
+  assert.match(fn, /RAW\.weeks/, "the prescription is not read from RAW.weeks");
+  assert.ok(!fn.includes("PLAN.weeks[CURRENT_WEEK].sessions"),
+    "the prescription is read from PLAN.weeks, which is a display summary with no session detail");
+  // ⚠️ It must not count days that have not happened yet, or every week reads as a failure until Sunday.
+  assert.match(fn, /if \(iso > todayIso\(\)\) break;/, "future days of this week are counted as missed");
+});

@@ -2226,6 +2226,18 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .alf-esc { width: 100%; min-height: var(--tap); background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-ctl); color: var(--accent); font: inherit; font-weight: 700; cursor: pointer; }
 /* The consent line on every health check-in. */
 .ci-consent { margin-bottom: var(--s3); padding: var(--s3); background: var(--surface-2); border-radius: var(--r-ctl); font-size: var(--t-meta); line-height: 1.5; color: var(--ink-soft); }
+.tp-card { padding: var(--s3) var(--s4); margin: var(--s3) 0; }
+/* Performance: an insight with its provenance. */
+.perf-c { padding: var(--s4); margin-bottom: var(--s3); }
+.perf-v { font-size: var(--t-display); font-weight: 780; color: var(--ink); line-height: 1.05; margin-top: 3px; }
+.perf-v small { font-size: var(--t-card); font-weight: 650; color: var(--ink-soft); }
+.perf-r { font-size: var(--t-meta); color: var(--ink-soft); margin-top: 2px; }
+.perf-c .ui-pill { margin-top: var(--s2); }
+.perf-m { margin: var(--s3) 0 0; font-size: var(--t-body); line-height: 1.55; color: var(--ink); }
+.perf-i { margin: var(--s2) 0 0; font-size: var(--t-body); line-height: 1.55; color: var(--ink-soft); }
+.perf-e { margin: var(--s3) 0 0; padding-top: var(--s3); border-top: 1px solid var(--line); font-size: var(--t-meta); line-height: 1.5; color: var(--ink-faint); }
+.perf-a { width: 100%; min-height: var(--tap); margin-top: var(--s3); background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-ctl); color: var(--accent); font: inherit; font-weight: 700; cursor: pointer; }
+.perf-sum { margin: var(--s3) 2px 0; font-size: var(--t-meta); line-height: 1.5; color: var(--ink-faint); }
 /* Logbook: the period snapshot, filters and month headings. */
 .lb-snap { padding: var(--s4); margin-bottom: var(--s3); }
 .lb-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); }
@@ -6617,15 +6629,95 @@ function viewStrengthHistory() {
   return '<div style="font-size:12.5px;color:var(--ink-faint);margin:0 2px 12px">Your logged lifts — weight & reps over time.</div>' + cards;
 }
 function dimLevel(vo2) { return vo2 < 40 ? 1 : vo2 < 50 ? 2 : vo2 < 60 ? 3 : 4; }
+/**
+ * The insight contract, applied: what it MEANS, what it is BASED ON, how FRESH that is, how SURE we
+ * are, and ONE next action. The brief: "insight arrives as a data dump ... every performance insight
+ * gains provenance."
+ *
+ * Before this the screen was three numbers with no source, no date and no uncertainty -- and all of
+ * that was already computed and thrown away. Every dimension is an Estimate carrying .low/.high/
+ * .confidence/.method; RC.rangeText exists to format exactly that and had ZERO callers; and
+ * FITNESS.summary is a ready-made honest provenance sentence rendered nowhere.
+ *
+ * \u26a0\ufe0f A NUMBER WITH NO DATE READS AS A MEASUREMENT OF TODAY. All three dimensions come from
+ * ONE input -- the 5 km time typed into setup, or a 2 km trial -- so the meter labelled "endurance
+ * base" only ever moves when that input changes, however much training has happened in between.
+ * Saying so is the whole difference between an estimate and a claim.
+ */
+function perfSource() {
+  const trials = loadTwoKm();
+  const t0 = trials && trials[0];
+  if (profile.twoKmS > 0 && t0 && t0.completedAt) {
+    return { what: "your two kilometre trial", when: String(t0.completedAt).slice(0, 10), seeded: false };
+  }
+  if (profile.twoKmS > 0) return { what: "your two kilometre trial", when: null, seeded: false };
+  // \u26a0\ufe0f A SEEDED ANCHOR IS NOT EVIDENCE. buildProfileFromDraft seeds recentTimeS for a
+  // beginner and sets noRecent -- a 5 km time nobody ran. This app already refuses to raise adaptive
+  // flags off a seeded anchor for exactly that reason; printing a fitness estimate from one as
+  // though it were measured is the same mistake somewhere else.
+  if (profile.noRecent || profile.autoPace) return { what: "your starting point", when: null, seeded: true };
+  if (profile.fitSrc === "predicted") return { what: "a predicted five kilometre time", when: null, seeded: true };
+  return { what: "the five kilometre time you entered", when: null, seeded: false };
+}
+function perfEvidence(est) {
+  const src = perfSource();
+  const bits = ["Based on " + src.what + (src.when ? ", " + runDateLabelIso(src.when) : "")];
+  if (src.seeded) bits.push("an estimate, not something you have run");
+  else if (!src.when) bits.push("no date recorded");
+  if (est && est.confidence === "low") bits.push("one effort only, so treat it loosely");
+  return bits.join(" \u00b7 ");
+}
+function perfInsight(o) {
+  const est = o.est || {};
+  const low = est.confidence === "low" || perfSource().seeded;
+  return '<div class="card perf-c">' +
+    '<div class="ui-eyebrow">' + esc(o.label) + '</div>' +
+    '<div class="perf-v num">' + o.value + (o.unit ? ' <small>' + esc(o.unit) + '</small>' : "") + '</div>' +
+    (o.range ? '<div class="perf-r">likely ' + esc(o.range) + '</div>' : "") +
+    (low ? '<div class="ui-pill watch"><span class="ui-dot"></span>Low confidence</div>' : "") +
+    '<p class="perf-m">' + esc(o.meaning) + '</p>' +
+    (o.implication ? '<p class="perf-i">' + esc(o.implication) + '</p>' : "") +
+    '<p class="perf-e">' + esc(perfEvidence(est)) + '</p>' +
+    (o.actionId ? '<button class="perf-a" id="' + esc(o.actionId) + '">' + esc(o.action) + '</button>' : "") +
+    '</div>';
+}
 function viewPerformance() {
   const t = FITNESS.thresholdSpeed, a = FITNESS.aerobicCapacity, d = FITNESS.durability;
-  const lvl = dimLevel(a.value); const words = { 1:"Building your base", 2:"A solid base", 3:"Strong endurance", 4:"Very strong endurance" };
-  const meter = [1,2,3,4].map((i) => '<i class="' + (i<=lvl?"on":"") + '" style="--rc:var(--build)"></i>').join("");
-  const dRead = d.confidence === "none" ? '<div class="read q">We\\'ll learn this from your long runs</div>' : '<div class="read">Holds pace well</div>';
-  return '<div class="card hero-pace"><div class="lab">Your strong, steady pace</div><div class="p num">' + fmtPace(t.value) + ' <small>/km</small></div><div class="s">The pace you can hold for a long, hard effort.</div></div>' +
-    '<div class="card dim-card" style="margin-top:10px"><div class="lab">Endurance base</div><div class="plain">How big your aerobic engine is.</div><div class="read" style="--rc:var(--build)">' + words[lvl] + '</div><div class="dmeter">' + meter + '</div></div>' +
-    '<div class="card dim-card" style="margin-top:10px"><div class="lab">Strength when tired</div><div class="plain">How well you hold pace late in long runs.</div>' + dRead + '</div>' +
-    '';   // Performance shows progress signals only.
+  const lvl = dimLevel(a.value);
+  const words = { 1: "Building your base", 2: "A solid base", 3: "Strong endurance", 4: "Very strong endurance" };
+  // \u26a0\ufe0f ONE ACTION, AND IT IS A REAL ONE. Both numbers move only when the input behind them
+  // moves, and a two kilometre trial is the single thing a runner can do about that. startTrialFlow
+  // already exists, so this is a route to something built, not a new promise.
+  const pace = perfInsight({
+    label: "Your strong, steady pace", value: fmtPace(t.value), unit: "/km", est: t,
+    // \u26a0\ufe0f thresholdSpeed's low/high are SECONDS PER KILOMETRE, not a speed, so low is the
+    // faster end. Written high-first it printed "5:21-5:09", a range running backwards.
+    range: (t.low && t.high) ? fmtPace(t.low) + "\u2013" + fmtPace(t.high) + " /km" : null,
+    meaning: "The pace you could hold for a long, hard effort \u2014 roughly an hour, flat out.",
+    implication: "It is what your threshold and tempo sessions are built around.",
+    action: "Record a two kilometre trial", actionId: "perfTrial",
+  });
+  const rt = RC.rangeText(a, 0);
+  const base = perfInsight({
+    label: "Endurance base", value: words[lvl] || words[1], est: a,
+    range: rt && rt !== "\u2014" ? rt + " ml/kg/min" : null,
+    meaning: "How big your aerobic engine is \u2014 the ceiling your easy running raises.",
+    implication: "It moves slowly, over months, and mostly from time on your feet.",
+  });
+  // \u26a0\ufe0f THE THIRD ONE IS PERMANENTLY EMPTY AND NOW SAYS SO. durability.confidence is always
+  // "none" because nothing in this app computes it, and the old copy -- "We will learn this from your
+  // long runs" -- was a promise it never keeps. An empty state that admits what is missing is honest;
+  // one that promises is a lie with a deadline on it.
+  const dur = d.confidence === "none"
+    ? uiCoachNote({ tone: "unavailable",
+        observation: "We cannot tell yet how well you hold pace late in a long run.",
+        implication: "Working that out means comparing your pace across the second half of a long run with the first, and Inte-Run does not calculate it today.",
+        evidence: "Not estimated \u2014 there is no method behind it yet, rather than not enough data." })
+    : perfInsight({ label: "Strength when tired", value: "Holds pace well", est: d,
+        meaning: "How well you hold pace late in long runs." });
+  // FITNESS.summary is the engine's own honest one-liner, and it was rendered nowhere.
+  const sum = FITNESS.summary ? '<div class="perf-sum">' + esc(FITNESS.summary) + '</div>' : "";
+  return pace + base + dur + sum;
 }
 // ⚠️ masCard() and the whole "Maximal Aerobic Speed" vocabulary were REMOVED on 2026-08-02 with the
 // move to a 2 km trial. It was already unreferenced -- MAS had been taken off Performance because it
@@ -8022,6 +8114,15 @@ function viewSetup() {
     '<div class="q"><label>When do you want to start? <span class="q-hint">a mid-week start gives a shorter first week</span></label><input class="sel" id="s_startdate" type="date" value="' + (p.startDateIso || todayIso()) + '" min="' + todayIso() + '"></div>' +
     '<div class="q"><label>Age</label><select class="sel" id="s_age" style="max-width:140px">' + ageOpts(p.age) + '</select></div>' +
     '<div class="q"><label>Sex <span class="q-hint">helps tailor advice</span></label><select class="sel" id="s_sex" style="max-width:200px"><option value=""' + (!p.sex?" selected":"") + '>Prefer not to say</option><option value="female"' + (p.sex==="female"?" selected":"") + '>Female</option><option value="male"' + (p.sex==="male"?" selected":"") + '>Male</option></select></div>' +
+    // \u26a0\ufe0f THIS CONTAINER DID NOT EXIST, so refreshTypePreview -- wired to three call sites,
+    // including oninput on the two fields right above -- computed the runner\'s classification and
+    // their masters status on every keystroke and then returned at "if (!tp) return". The same
+    // computed-and-discarded trap as CLASS, MASTERS and PLAN.notes, and in fact it IS those two: this
+    // panel is the only place either was ever going to be read. It matters more than a tidy-up,
+    // because classifyRunner deliberately caps self-assessment at tier 4 and this is where the app
+    // was supposed to SAY so. Found by the test asserting that every element lookup in the built page
+    // resolves to an id something actually produces.
+    '<div class="card tp-card" id="typePreview"></div>' +
     '<div class="q"><label>Include strength &amp; conditioning?</label>' + seg("strength", [["1","Yes"],["0","No"]], p.strength?"1":"0") + '</div>' +
     // ⚠️ ONE QUESTION FOR TWO DIFFERENT THINGS, and the wording gave it away: "Returning from injury
     // or a long break?" as a single Yes/No. Both answers were treated as an injury and both got the
@@ -11720,6 +11821,7 @@ function wire() {
   document.querySelectorAll("[data-delrun]").forEach((b) => b.onclick = (e) => { e.stopPropagation(); deleteRunById(b.dataset.delrun); });
   document.querySelectorAll("[data-logf]").forEach((b) => b.onclick = () => { state.logFilter = b.dataset.logf; render(); });
   const lbc = $("lbClear"); if (lbc) lbc.onclick = () => { state.logFilter = "all"; render(); };
+  const pt = $("perfTrial"); if (pt) pt.onclick = startTrialFlow;
   wireSwipes();
   const runBack = $("runBack"); if (runBack) runBack.onclick = () => { state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); };
   const shareRun = $("shareRun"); if (shareRun) { shareRun.onclick = doShareRun; prepareShareCard(currentOverviewRun()); }

@@ -385,15 +385,71 @@ test("⚠️ no handler reaches for an element id that does not exist", () => {
   // The confirm button first clicked "#saveSetup", which is nowhere in the app. It built, typechecked
   // and passed every test, and the button silently did nothing — this codebase's documented
   // invented-identifier trap, third outing.
+  // ⚠️ NOT COMMENT-STRIPPED, DELIBERATELY. The obvious fix when this tripped on a comment in the app
+  // containing the literal dollar-paren-"id" was to strip comments first — and a regex doing that
+  // over 1.6 MB of generated page ate real markup and reported sixteen live ids as missing, which is
+  // far worse than the false positive it was fixing. The app's comment was reworded instead.
   const html = page();
   const ids = new Set<string>();
   for (const m of html.matchAll(/id="([A-Za-z][\w-]*)"/g)) ids.add(m[1]!);
   const refs = new Set<string>();
   for (const m of html.matchAll(/\$\("([A-Za-z][\w-]*)"\)/g)) refs.add(m[1]!);
-  // ⚠️ These four are built by string concatenation (uiActionBar's id option, the live-metric
-  // builder, uiDecisionHero's actionId), so they never appear as a literal id= and are NOT defects.
-  // readySlot is the documented landmine and is guarded. Anything else is a typo nobody will notice.
-  const dynamic = new Set(["wlElapsed", "sdStart", "todayPreview", "readySlot", "typePreview"]);
-  const missing = [...refs].filter((r) => !ids.has(r) && !dynamic.has(r));
-  assert.deepEqual(missing, [], "these ids are looked up but never rendered: " + missing.join(", "));
+  // ⚠️ THE INVARIANT IS "SOMETHING PRODUCES IT", NOT "IT APPEARS AS A LITERAL id=". Several real ids
+  // are built by string concatenation — uiActionBar's `id` option, uiDecisionHero's `actionId`, the
+  // live-metric builder — so a literal-only check rejects correct code, and the first version of this
+  // guard did exactly that and had to carry a hand-written exemption list. A list like that goes
+  // stale the first time somebody adds a builder, and then it gets deleted rather than updated.
+  // An id that is PASSED to a builder still appears as a quoted string somewhere; an invented one
+  // (the "#saveSetup" that started this) appears only inside its own failed lookup.
+  const produced = new Set(ids);
+  for (const m of html.matchAll(/["']([A-Za-z][\w-]*)["']/g)) {
+    // Only count it as "produced" if the quoted string occurs somewhere OTHER than a $() lookup.
+    const before = html.slice(Math.max(0, m.index! - 2), m.index!);
+    if (before !== '$(') produced.add(m[1]!);
+  }
+  // readySlot is the documented landmine: guarded, deliberately kept, and covered by its own test.
+  const missing = [...refs].filter((r) => !produced.has(r) && r !== "readySlot");
+  assert.deepEqual(missing, [], "these ids are looked up but nothing ever produces them: " + missing.join(", "));
+});
+
+test("⚠️ every performance insight carries its provenance", () => {
+  // "Every performance insight gains provenance: what it means, what it is based on, how fresh it is,
+  // and one next action." Before this the screen was three numbers with no source, no date and no
+  // uncertainty — and ALL of it was already computed and thrown away.
+  const html = page();
+  const view = fnSrc("viewPerformance");
+  const ins = fnSrc("perfInsight");
+  const ev = fnSrc("perfEvidence");
+
+  assert.match(ins, /perfEvidence\(est\)/, "an insight is rendered without its evidence");
+  assert.match(ev, /Based on /, "the evidence never says what it is based on");
+  // ⚠️ FRESHNESS. All three dimensions come from ONE input, so the meter labelled "endurance base"
+  // only ever moves when that input changes, however much training has happened. A number with no
+  // date reads as a measurement of today.
+  assert.match(ev, /src\.when/, "the evidence never dates its input");
+  assert.match(ev, /no date recorded/, "an undated input is not admitted as undated");
+  // ⚠️ CONFIDENCE IN WORDS, not by colour. RC.rangeText and every Estimate's .low/.high/.confidence
+  // were computed on every render and had zero readers.
+  assert.match(ins, /Low confidence/, "low confidence is not stated in words");
+  assert.match(ins, /o\.range/, "the range is never shown, so a point estimate reads as fact");
+  assert.match(view, /RC\.rangeText\(/, "rangeText still has no callers");
+  assert.match(view, /actionId: "perfTrial"/, "there is no next action");
+  assert.match(html, /perfTrial.*startTrialFlow/s, "the action button goes nowhere");
+
+  // ⚠️ A SEEDED ANCHOR IS NOT EVIDENCE. buildProfileFromDraft seeds a 5 km time for a beginner and
+  // sets noRecent — a time nobody ran. This app already refuses to raise adaptive flags off a seeded
+  // anchor; printing a fitness estimate from one as measured is the same mistake elsewhere.
+  const src = fnSrc("perfSource");
+  assert.match(src, /profile\.noRecent/, "a seeded anchor is treated as a real result");
+  assert.match(src, /seeded: true/, "nothing marks an estimate as unmeasured");
+  assert.match(ev, /not something you have run/, "a seeded estimate never says so");
+
+  // ⚠️ THE THIRD DIMENSION IS PERMANENTLY EMPTY. durability.confidence is always "none" because
+  // nothing computes it. The old copy promised "we'll learn this from your long runs" — a promise the
+  // app never keeps. An empty state that admits what is missing is honest; one that promises is not.
+  assert.ok(!/learn this from your long runs/i.test(html), "the durability card still promises");
+  assert.match(view, /tone: "unavailable"/, "the empty dimension does not use the unavailable state");
+  assert.match(view, /no method behind it yet/, "the empty state does not say WHY it is empty");
+  // FITNESS.summary is the engine's own honest one-liner and was rendered nowhere.
+  assert.match(view, /FITNESS\.summary/, "the engine's own provenance line is still discarded");
 });

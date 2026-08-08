@@ -241,3 +241,62 @@ test("components survive real-content extremes", () => {
     assert.doesNotMatch(out, /undefined|NaN|\[object/, fn + " leaked a placeholder into the markup");
   }
 });
+
+// ---- Phase 1: Today ------------------------------------------------------------------------------
+
+test("⚠️ Today leads with the decision, then what is next", () => {
+  // The brief's recommended content order, and its specific complaint that "multiple large cards
+  // precede upcoming training" — there were FIVE banners ahead of the prescription.
+  const html = css();
+  // ⚠️ ASSERT THE RETURN EXPRESSION, NOT THE FUNCTION BODY. `nextUp` is BUILT into a const above the
+  // return and CONCATENATED below it, so reading the whole body put "Next up" before the hero in the
+  // source while the rendered order was correct. A test measuring source position was measuring the
+  // wrong thing entirely.
+  const at = html.indexOf("function viewToday(");
+  const fnBody = html.slice(at, html.indexOf("\nfunction ", at + 10));
+  const body = fnBody.slice(fnBody.lastIndexOf("return mirror"));
+  assert.ok(body.length > 100, "could not find viewToday's return expression");
+  const hero = body.indexOf("uiDecisionHero(");
+  const next = body.indexOf("nextUp");
+  const know = body.indexOf("What to know today");
+  const week = body.indexOf("weeklyOverview()");
+  assert.ok(hero > 0 && next > hero, "Next up does not come directly after the decision hero");
+  assert.ok(know > next, "What to know is not below Next up");
+  assert.ok(week > know, "the week overview is not below the fold");
+  // ⚠️ ONE attention item above the decision, not five.
+  assert.match(body, /todayAttention\(\)/, "the banners are not collapsed to one above the hero");
+  assert.match(body, /todayBelowAttention\(\)/, "the other banners were dropped rather than moved");
+});
+
+test("⚠️ the prescription decides the action, and a rest day is never asked to record", () => {
+  // "On a rest day, the premium action is often reassurance or preview — not a large record-workout
+  // button. The interface should respect the coach's own prescription."
+  const html = css();
+  const fn = html.slice(html.indexOf("function todayDecision("), html.indexOf("function todayNextUp("));
+  assert.match(fn, /kind: "rest"/, "there is no rest state");
+  assert.match(fn, /todayPreview/, "a rest day is not offered a preview");
+  const rest = fn.slice(fn.indexOf('kind: "rest"'), fn.indexOf('kind: "rest"') + 400);
+  assert.doesNotMatch(rest, /Start session/, "a rest day offers a record button");
+});
+
+test("⚠️ a risk warning is never drawn from example weather", () => {
+  // The weather falls back to a sample preset that defaults to 30C, so every runner who had not
+  // granted location saw a red-bordered heat warning built from weather that was not theirs.
+  const html = css();
+  const fn = html.slice(html.indexOf("function todayDecision("), html.indexOf("function todayNextUp("));
+  assert.match(fn, /state\.wx && state\.wx\.live/, "the risk state is not gated on a live reading");
+});
+
+test("⚠️ the surveillance language is gone", () => {
+  // ⚠️ STRIP COMMENTS FIRST. The source EXPLAINS why the phrase was retired — by quoting it — so the
+  // note recording the decision tripped the guard enforcing it. Second time this exact shape has
+  // appeared today; the fix is never to soften the comment.
+  // ⚠️ STRIP BLOCK COMMENTS PROPERLY, not by line prefix. A continuation line inside a /* */ block
+  // starts with neither // nor * nor /*, so a prefix filter left it in and the guard still tripped on
+  // the note explaining the decision.
+  const html = css().replace(/\/\*[\s\S]*?\*\//g, " ").split("\n")
+    .filter((l) => !l.trim().startsWith("//")).join("\n");
+  assert.doesNotMatch(html, /coach is watching/i,
+    "'Your coach is watching' is back — the brief flags it as reducing trust around health data");
+  assert.match(html, /Coach check-in/, "the replacement heading is missing");
+});

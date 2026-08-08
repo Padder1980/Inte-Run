@@ -2778,6 +2778,88 @@ function examplePlanBanner() {
     '<div class="sb-sub">These numbers are a demonstration, not about you. Tell us your goal to make it yours.</div>' +
     '</div><span>Set up \\u2192</span></button>';
 }
+/* ================================================================================================
+   PHASE 1 — TODAY, REBUILT AROUND ONE DECISION
+   The brief's first and largest finding: "Rebuild Today around one decision. Show today's
+   prescription, the next session and one contextual coach note." Its specific complaints, all of
+   which were true of the old composition:
+     - "Rest day", "Good to go" and "Add a session today" appeared together, so the system looked
+       internally inconsistent and could encourage over-training.
+     - "Multiple large cards precede upcoming training", pushing the next meaningful event below
+       the fold. There were FIVE banners ahead of the prescription.
+     - "Your coach is watching" used surveillance language.
+     - Readiness was qualitative while weather was a warning, and the combined meaning was unclear.
+   ================================================================================================ */
+
+/**
+ * What is the ONE thing to do today, and what does the button say?
+ * ⚠️ THE PRESCRIPTION DECIDES, NOT THE SCREEN. The brief: "On a rest day, the premium action is often
+ * reassurance or preview — not a large record-workout button. The interface should respect the
+ * coach's own prescription." That is why this returns the action rather than Today choosing one.
+ */
+function todayDecision() {
+  const sess = selectedSession();
+  const onToday = TODAY_IN_PLAN && isCurrentWeek() && state.selDay === TODAY_DOW;
+  const doneToday = !!(sess && state.done[doneKey(curWeek().index, sess)]);
+  const nxt = todayNextUp();
+
+  if (!sess || sess.type === "rest") {
+    return { kind: "rest", eyebrow: "Today\u2019s plan", headline: "Recovery day",
+      implication: "Your training is working while you recover. Keep today easy and arrive fresh for the next one.",
+      action: nxt ? "Preview " + (nxt.whenWord || "the next run") : null, actionId: "todayPreview" };
+  }
+  if (doneToday) {
+    return { kind: "completed", eyebrow: "Today\u2019s plan", headline: "Done for today",
+      implication: sess.title + " is logged. Rest of the day is yours.",
+      action: nxt ? "Preview " + (nxt.whenWord || "what is next") : null, actionId: "todayPreview" };
+  }
+  // ⚠️ The risk state is the weather one, and it is the reason readiness and conditions are separate:
+  // "good to go" must never be able to contradict a heat warning sitting beside it.
+  // ⚠️ ONLY FROM A REAL READING. The weather falls back to a sample preset, which defaults to 30 C —
+  // so every runner who had not granted location saw a red-bordered "run by effort" hero built from
+  // weather that is not theirs. A warning drawn from example data is worse than no warning: it is the
+  // app crying wolf on its own placeholder.
+  const cond = (state.wx && state.wx.live) ? currentConditions(sess) : null;
+  const risky = !!(cond && (cond.severity === "high" || cond.severity === "severe"));
+  return {
+    kind: risky ? "risk" : "scheduled",
+    eyebrow: onToday ? "Today\u2019s plan" : DAY_ORDER[state.selDay] + " " + dmon(isoAdd(curWeek().startIso, state.selDay)),
+    headline: sess.title,
+    implication: risky && cond.advice ? cond.advice
+      : (sess.description ? String(sess.description).split(". ")[0].replace(/\.$/, "") + "." : ""),
+    action: onToday && PRIMARY_TYPES[sess.type] ? "Start session" : "View session",
+    actionId: onToday && PRIMARY_TYPES[sess.type] ? "startSession" : "viewSession",
+  };
+}
+
+/** The next prescribed session after today — the thing the brief wants directly under the decision. */
+function todayNextUp() {
+  try {
+    const wk = curWeek();
+    const from = (TODAY_IN_PLAN && isCurrentWeek()) ? TODAY_DOW + 1 : state.selDay + 1;
+    for (let d = from; d < 7; d++) {
+      const s = wk.sessions.filter((x) => x.type !== "rest" && effDay(x) === d)[0];
+      if (s) return { sess: s, day: d, whenWord: d === from ? "tomorrow\u2019s run" : DAY_ORDER[d] + "\u2019s run" };
+    }
+  } catch (e) {}
+  return null;
+}
+
+/**
+ * The one attention item allowed ABOVE the decision.
+ * ⚠️ ONE, NOT FIVE. Each of these is a question for the runner, and the brief's own rule elsewhere is
+ * "one question a week" — five stacked above the prescription is how the next meaningful event ended
+ * up below the fold. The rest still render, further down, where they can be read rather than skipped.
+ */
+function todayAttention() {
+  const all = [trainFlagBanner(), weeklyReviewCard(), fitSuggestBanner(), autoPaceBanner()];
+  return all.find((x) => x && x.trim()) || "";
+}
+function todayBelowAttention() {
+  const all = [trainFlagBanner(), weeklyReviewCard(), fitSuggestBanner(), autoPaceBanner()];
+  const first = all.findIndex((x) => x && x.trim());
+  return all.filter((x, i) => i !== first && x && x.trim()).join("");
+}
 function viewToday() {
   if (state.trialPending) {
     return weekStrip() +
@@ -2797,12 +2879,26 @@ function viewToday() {
   if (mirror || liveRunning()) cta = "";
   else if (sess && onToday && PRIMARY_TYPES[sess.type]) cta = '<button class="primary start-btn" id="startSession">' + ICON.play + ' Start session</button>';
   else if (sess) cta = '<button class="primary start-btn" id="viewSession">' + ICON.play + ' View session</button>';
-  return mirror + banner + autoPaceBanner() + trainFlagBanner() + weeklyReviewCard() + fitSuggestBanner() + coachWatchCard() + greeting + weekStrip() +
-    heroWorkout() +
-    cta +
+  // ⚠️ THE ORDER IS THE FEATURE. Decision, then what is next, then what to know, then one note from
+  // the coach, then everything optional. The brief's recommended content order, in that order.
+  const dec = todayDecision();
+  const nxt = todayNextUp();
+  const nextUp = nxt ? '<div class="ui-section">Next up</div>' +
+    '<div class="card" style="padding:2px 14px">' +
+    uiSessionRow({ day: DAY_ORDER[nxt.day].slice(0, 3).toUpperCase(), title: nxt.sess.title,
+      meta: [nxt.sess.durMin ? nxt.sess.durMin + " min" : "", nxt.sess.distKm ? nxt.sess.distKm + " km" : ""]
+        .filter(Boolean).join(" \u00b7 "),
+      status: "next", colour: "var(--eff-" + (nxt.sess.effort || "easy") + ")",
+      open: { week: curWeek().index, id: nxt.sess.id } }) + '</div>' : "";
+  return mirror + banner + todayAttention() + greeting + weekStrip() +
+    (mirror || liveRunning() ? "" : uiDecisionHero(dec)) +
+    nextUp +
+    '<div class="ui-section">What to know today</div>' +
     '<div class="tsq-row">' + conditionsSquare(sess) + feelSquare() + '</div>' +
+    coachWatchCard() +
     addedTodayBlock() +
-    weeklyOverview();
+    weeklyOverview() +
+    todayBelowAttention();
 }
 const WEATHER_PRESETS = {
   mild: { label: "Mild", tempC: 12, humidityPct: 55, windKph: 8 },
@@ -6712,7 +6808,11 @@ function uiSessionRow(o) {
   const st = UI_ROW_STATUS[o.status] || UI_ROW_STATUS.future;
   const dis = o.status === "disabled";
   return '<' + (dis ? "div" : "button") + ' class="ui-row ' + st.cls + '"' +
-    (dis ? ' aria-disabled="true"' : (o.id ? ' data-uirow="' + esc(o.id) + '"' : "")) +
+    (dis ? ' aria-disabled="true"'
+      // ⚠️ Sessions are opened by the app's own delegated handler, which reads these three attributes.
+      // A bespoke click handler here would be a second way to do the same thing, and the two drift.
+      : (o.open ? ' data-open="1" data-oweek="' + o.open.week + '" data-oid="' + esc(o.open.id) + '"'
+        : (o.id ? ' data-uirow="' + esc(o.id) + '"' : ""))) +
     ' aria-label="' + esc((o.day || "") + " " + (o.title || "") + (st.word ? ", " + st.word : "")) + '">' +
     '<span class="ui-row-day">' + esc(o.day || "") + '</span>' +
     '<span class="ui-row-dot" style="background:' + (o.colour || "var(--eff-none)") + '" aria-hidden="true"></span>' +
@@ -10440,7 +10540,11 @@ function coachWatchCard() {
     else body = "Watching your last <b>" + usable.length + " runs</b> \\u2014 pace and effort are both tracking the plan. I\\u2019ll say something the moment they aren\\u2019t.";
   }
   return '<div class="cw"><span class="cw-ic">' + ICON.gauge + '</span><span class="cw-b">' +
-    '<span class="cw-h">Your coach is watching</span><span class="cw-d">' + body + '</span></span></div>';
+    // ⚠️ "YOUR COACH IS WATCHING" IS GONE. The brief: surveillance language "can reduce trust,
+    // especially around health and performance data", and recommends "Coach check-in" or "Your coach
+    // will learn from completed sessions". The card is unchanged in what it says next — only in
+    // whether the runner is told they are being watched or told what the coach has learned.
+    '<span class="cw-h">Coach check-in</span><span class="cw-d">' + body + '</span></span></div>';
 }
 // ---- The weekly review -------------------------------------------------------------------------
 //
@@ -11157,6 +11261,15 @@ function wire() {
   const cancelTrial = $("cancelTrial"); if (cancelTrial) cancelTrial.onclick = () => { state.trialPending = false; render(); };
   // Live session wiring
   const startBtn = $("startSession"); if (startBtn) startBtn.onclick = () => openStartWhereSheet(null);
+  // ⚠️ The decision hero's action on a rest or completed day is PREVIEW, not start — the brief is
+  // explicit that a rest day's premium action is reassurance or preview, never a record button.
+  const prev = $("todayPreview"); if (prev) prev.onclick = () => {
+    const n = todayNextUp();
+    if (!n) return;
+    state.selDay = n.day; render();
+    const row = document.querySelector('[data-oid="' + n.sess.id + '"]');
+    if (row) row.click();
+  };
   const wlb = $("wlBack"); if (wlb) wlb.onclick = () => { WATCH_LIVE_LEFT = true; WATCH_LIVE_PENDING = false; state.screen = null; state.tab = "today"; render(); };
   const wlp = $("wlPause"); if (wlp) wlp.onclick = () => {
     const paused = !!(WATCH_LIVE && WATCH_LIVE.state === "paused");

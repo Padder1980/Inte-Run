@@ -146,12 +146,25 @@ test("⚠️ data-wk means two things, so the chart handler is scoped to the cha
   // survives a render because #sheetOv is outside #view, so an unscoped rebind turned every library
   // row into state.planWeek = Number("vo2-10x1") = NaN and killed the sheet.
   const html = page().replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-  // ⚠️ There were TWO in one line: the click binder and the aria-pressed sweep beside it. Fixing the
-  // first and not the second left every library row losing its pressed state to the chart.
-  assert.equal((html.match(/querySelectorAll\("\[data-wk\]"\)/g) || []).length, 0,
-    "an unscoped [data-wk] handler will capture the workout library rows too");
-  assert.equal((html.match(/querySelectorAll\("#chart \[data-wk\]"\)/g) || []).length, 2,
-    "both the click binder and the aria-pressed sweep must be scoped");
+  // ⚠️ There were TWO of them in one line: the click binder and the aria-pressed sweep beside it.
+  // ⚠️ AND THE INVARIANT IS "NEVER FROM document", NOT "always via a #chart selector string" — the
+  // first version of this guard counted selector strings, so scoping via the chart ELEMENT instead
+  // (chart.querySelectorAll(...), which is stricter) failed it. A guard that rejects a better fix
+  // than the one it was written against is a guard that gets deleted.
+  const fromDocument = html.match(/document\.querySelectorAll\(\s*["'`]\[data-wk\]["'`]\s*\)/g) || [];
+  assert.deepEqual(fromDocument, [],
+    "an unscoped [data-wk] query from document will capture the workout library rows too");
+  // Every reader must be scoped to the chart, one way or the other.
+  // Match the RECEIVER too, or "chart.querySelectorAll(...)" is indistinguishable from a bare one.
+  const readers = html.match(/[A-Za-z_$][\w$]*\.querySelectorAll\(\s*["'`][^"'`]*\[data-wk\][^"'`]*["'`]\s*\)/g) || [];
+  assert.ok(readers.length >= 2, "nothing reads the chart bars any more: " + readers.length);
+  for (const r of readers) {
+    assert.ok(/#chart |#sheetBody /.test(r) || /^chart\./.test(r),
+      "an unscoped [data-wk] reader: " + r);
+  }
+  const anyChartScoped = (html.match(/chart\.querySelectorAll\(\s*["'`]\[data-wk\]["'`]/g) || []).length
+    + (html.match(/querySelectorAll\("#chart \[data-wk\]"\)/g) || []).length;
+  assert.ok(anyChartScoped >= 2, "both the click binder and the aria-pressed sweep must be scoped to the chart");
   // Both writers still exist, which is why the scoping is needed rather than a rename.
   assert.ok(html.includes('#sheetBody [data-wk]'), "the sheet's own scoped handler is gone");
 });

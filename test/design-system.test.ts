@@ -52,8 +52,9 @@ test("the type ladder is seven steps and they are distinct", () => {
  * ⚠️ THE RATCHET. These ceilings are the measurement taken on 2026-08-08, not a target. Adding an
  * off-ladder value fails; migrating a screen lowers them.
  */
-const RADIUS_CEILING = 143;   // measured 2026-08-08: 143 of 225
-const FONTSIZE_CEILING = 323; // measured 2026-08-08: 323 of 442
+const RADIUS_CEILING = 143;   // measured 2026-08-08: 143 of 227
+const FONTSIZE_CEILING = 322; // measured 2026-08-08: 322 of 443 (was 323 — the Plan week card's
+                              // 12.5px subtitle went onto the ladder when it was retargeted by class)
 
 test("⚠️ off-ladder radii do not increase", () => {
   const s = sheet();
@@ -360,6 +361,61 @@ test("⚠️ the goal hero shows one sentence, with the analysis behind a disclo
   // state so a re-render cannot snap it shut — which on this screen happens constantly.
   assert.match(fn, /<details/, "the disclosure is hand-rolled, so a re-render will close it");
   assert.match(fn, /<summary>/, "the disclosure has no accessible label");
+});
+
+test("⚠️ future weeks collapse to summaries, and the summary uses words", () => {
+  // "Current week as one row per day. Future weeks collapse to summaries." Before this the Plan
+  // screen showed the chart and then exactly ONE week, so the only way to learn what week nine held
+  // was to hunt for its bar on a horizontally scrolling chart and tap it.
+  const html = css();
+  const fn = html.slice(html.indexOf("function weekList("), html.indexOf("function selectPlanWeek("));
+  assert.ok(fn.length > 0 && fn.length < 1200, "the weekList slice window is wrong: " + fn.length);
+  assert.match(fn, /w\.index === state\.planWeek/, "weekList does not expand the selected week");
+  assert.match(fn, /weekDetail\(\)/, "the expanded week is not the real week detail");
+  assert.match(fn, /weekSummaryRow\(/, "the other weeks are not summarised");
+
+  const row = css().slice(css().indexOf("function weekSummaryRow("), css().indexOf("function weekList("));
+  // ⚠️ THE KIND OF WEEK IS A WORD. An absorb week is a diagonal hatch on the chart and a taper is a
+  // hue — and those are precisely the weeks a runner needs to see coming. "Text/icon support;
+  // colour alone is insufficient."
+  for (const word of ["Race week", "Taper", "Absorb week"]) {
+    assert.ok(row.includes('"' + word + '"'), "a summary never says " + word);
+  }
+  assert.match(row, /w\.distanceKm/, "a summary does not say how far the week is");
+  assert.match(row, /This week/, "a summary cannot say which week is the current one");
+
+  // ⚠️ ONE PLACE SETS THE WEEK, so the chart and the list can never disagree about which is open.
+  const sel = html.slice(html.indexOf("function selectPlanWeek("), html.indexOf("function wireWeekList("));
+  assert.match(sel, /aria-pressed/, "selecting a week does not move the chart's pressed state");
+  assert.match(sel, /wireSessionTaps\(\)/, "the newly expanded week's sessions are not tappable");
+  assert.match(html, /onclick = \(\) => selectPlanWeek\(Number\(b\.dataset\.wk\)\)/,
+    "the chart does not go through selectPlanWeek");
+});
+
+test("⚠️ the phase legend names where each phase IS, not just its colour", () => {
+  // "Text labels, not colour alone." A swatch reading "Build" only helps if you can then match that
+  // colour to a bar, which is the one task a colour-blind runner cannot do.
+  const html = css();
+  const fn = html.slice(html.indexOf("const phaseRange ="), html.indexOf("const bars ="));
+  assert.ok(fn.length > 0 && fn.length < 1400, "the phaseRange slice window is wrong: " + fn.length);
+  assert.match(fn, /Math\.min/, "the range is not computed from the weeks in the plan");
+  assert.match(html, /pk-wk/, "the legend carries no week range");
+  assert.match(html, /phaseRange\(ph\)/, "the legend does not use the range");
+});
+
+test("⚠️ the plan week card is styled by name, not by position", () => {
+  // These rules were "> div:first-child" and "> div:nth-child(2)" on #weekDetail, which addressed the
+  // week heading and subtitle only while that element held exactly one week. It now holds the whole
+  // list. Position is not a name.
+  const s = sheet();
+  assert.ok(!/#weekDetail > div:(first-child|nth-child)/.test(s),
+    "the week card is still styled by child position");
+  assert.match(s, /\.wk-open \.ui-hero-t/, "the week heading is not targeted by class");
+  assert.match(s, /\.wk-open \.ui-sub/, "the week subtitle is not targeted by class");
+  // ⚠️ And the card styling moved WITH them, or #weekDetail draws a card around the whole list and
+  // .wk-open draws a second one inside it — the nested cards the brief exists to remove.
+  assert.ok(!/#view:has\(\.plan-head\) #weekDetail \{\s*padding/.test(s),
+    "#weekDetail still carries the card padding, so every week sits inside a second card");
 });
 
 test("⚠️ the session is staged, and Start does not scroll away", () => {

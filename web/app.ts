@@ -1358,17 +1358,22 @@ html.kbup .sheet-ov { padding-bottom: var(--kbh, 0px); }
 #view:has(.plan-head) .bar-btn.race-week .bar { box-shadow: 0 0 0 1px color-mix(in srgb, var(--rest) 55%, transparent); }
 #view:has(.plan-head) .bar-btn.race-week .bl { font-size: 10px; }
 #view:has(.plan-head) .bar-btn.phase-start:not(:first-child)::before { content: ""; position: absolute; left: -3px; top: 6px; bottom: 26px; width: 1px; background: color-mix(in srgb, var(--ink) 12%, transparent); }
-#view:has(.plan-head) #weekDetail {
+#view:has(.plan-head) .wk-open {
   padding: 18px;
   background: linear-gradient(165deg, var(--surface), color-mix(in srgb, var(--surface-2) 30%, var(--surface)));
   border-color: color-mix(in srgb, var(--line) 85%, var(--accent)); border-radius: 18px;
   box-shadow: var(--shadow), inset 0 1px 0 color-mix(in srgb, var(--ink) 3%, transparent);
 }
-#view:has(.plan-head) #weekDetail > div:first-child {
-  color: var(--ink); font-size: 17px !important; font-weight: 760 !important; letter-spacing: -0.025em; line-height: 1.25;
+/* \u26a0\ufe0f TARGETED BY CLASS, NOT BY POSITION. These were "> div:first-child" and
+   "> div:nth-child(2)", which addressed the week heading and subtitle only because #weekDetail held
+   exactly one week. It now holds the whole list, so the positional rules landed on whichever week
+   happened to be first -- and the second one stopped matching at all, because a summary row is a
+   button, not a div. Position is not a name. */
+#view:has(.plan-head) .wk-open .ui-hero-t {
+  color: var(--ink); font-size: var(--t-card) !important; font-weight: 760 !important; letter-spacing: -0.025em; line-height: 1.25;
 }
-#view:has(.plan-head) #weekDetail > div:nth-child(2) {
-  max-width: 32ch; margin-top: 4px !important; margin-bottom: 16px !important; color: var(--ink-soft) !important; font-size: 12.5px !important; line-height: 1.45;
+#view:has(.plan-head) .wk-open .ui-sub {
+  max-width: 32ch; margin-top: 4px !important; margin-bottom: 16px !important; color: var(--ink-soft) !important; font-size: var(--t-meta) !important; line-height: 1.45;
 }
 #view:has(.plan-head) .day-row {
   grid-template-columns: 42px minmax(0, 1fr); gap: 8px; margin-top: 7px; padding: 11px 10px;
@@ -1394,7 +1399,7 @@ html.kbup .sheet-ov { padding-bottom: var(--kbh, 0px); }
   #view:has(.plan-head) .plan-head .goal { font-size: 23px; }
   #view:has(.plan-head) .stat { padding: 10px 7px; }
   #view:has(.plan-head) .stat .v { font-size: 14.5px; }
-  #view:has(.plan-head) #weekDetail { padding: 15px; }
+  #view:has(.plan-head) .wk-open { padding: 15px; }
   #view:has(.plan-head) .day-row { grid-template-columns: 37px minmax(0, 1fr); padding: 9px 8px; }
   #view:has(.plan-head) .sess.tap { padding: 8px; }
 }
@@ -2196,6 +2201,21 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .sd-sn { color: #04120e !important; }
 .sd-chev { flex: none; margin-left: 2px; color: var(--ink-faint); font-size: var(--t-card); line-height: 1; transition: transform .18s ease; }
 .sd-stage[open] .sd-chev, .sd-why[open] .sd-chev { transform: rotate(90deg); }
+/* The week list: one line per week, the selected one expanded into day rows. */
+.wk-sum { display: flex; align-items: center; gap: var(--s3); width: 100%; text-align: left; margin-bottom: var(--s2); padding: var(--s3) var(--s4); min-height: var(--tap); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); color: inherit; cursor: pointer; }
+.wk-sum.past { opacity: .62; }
+.wk-sum.cur { border-color: var(--accent); }
+.wk-n { flex: none; width: 26px; height: 26px; border-radius: var(--r-pill); background: var(--surface-2); color: var(--ink-soft); font-size: var(--t-meta); font-weight: 750; display: grid; place-items: center; }
+.wk-sum.cur .wk-n { background: var(--accent); color: var(--accent-ink); }
+.wk-b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.wk-t { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; font-size: var(--t-body); font-weight: 700; color: var(--ink); }
+/* \u26a0\ufe0f THE BADGE IS A WORD, NOT A COLOUR. An absorb week is a diagonal hatch on the chart and a
+   taper is a hue; both are the weeks a runner most needs to see coming. */
+.wk-tag { font-size: var(--t-label); font-weight: 750; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-soft); background: var(--surface-2); border-radius: var(--r-pill); padding: 2px var(--s2); }
+.wk-tag.cur { background: var(--accent); color: var(--accent-ink); }
+.wk-m { font-size: var(--t-meta); color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wk-open { margin-bottom: var(--s2); }
+.pk-wk { font-weight: 650; color: var(--ink-faint); margin-left: 3px; }
 .sd-why { margin-top: var(--s3); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; }
 .sd-why > summary { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) var(--s4); min-height: var(--tap); cursor: pointer; list-style: none; }
 .sd-why > summary::-webkit-details-marker { display: none; }
@@ -5969,11 +5989,22 @@ function viewPlan() {
   const peak = s.peakKm || 1;
   // Chart legend + bars: label each phase (Base/Build/Peak/Taper) so the chart isn't read by colour
   // alone, mark where each phase starts, and give every bar an accessible label.
-  const phaseNames = { base: "Base", build: "Build", peak: "Peak", taper: "Taper" };
+  const phaseNames = PHASE_NAME;
   const phaseSeq = ["base", "build", "peak", "taper"];
   const phasesInPlan = phaseSeq.filter((ph) => PLAN.weeks.some((w) => w.phase === ph));
+  // \u26a0\ufe0f THE LEGEND NAMES WHERE EACH PHASE IS, not just what colour it is. The brief asks for
+  // "text labels, not colour alone", and a swatch reading "Build" only helps if you can then match
+  // that colour to a bar -- which is the exact task colour-blind and low-vision runners cannot do,
+  // and which nobody enjoys. The week range is the label the colour was standing in for.
+  const phaseRange = (ph) => {
+    const ws = PLAN.weeks.filter((w) => w.phase === ph).map((w) => w.index);
+    if (!ws.length) return "";
+    const lo = Math.min.apply(null, ws), hi = Math.max.apply(null, ws);
+    return lo === hi ? "wk " + lo : "wk " + lo + "\u2013" + hi;
+  };
   const phaseLegend = phasesInPlan.map((ph) =>
-    '<span class="phase-key" style="--phase:' + PHASE[ph] + '"><i aria-hidden="true"></i>' + phaseNames[ph] + '</span>').join("")
+    '<span class="phase-key" style="--phase:' + PHASE[ph] + '"><i aria-hidden="true"></i>' + phaseNames[ph] +
+    '<b class="pk-wk">' + phaseRange(ph) + '</b></span>').join("")
     + '<span class="phase-key" style="--phase:var(--rest)"><i aria-hidden="true"></i>Race day</span>';
   // The coach's note: the block should visibly END on the race. It does now — race day is a real
   // session in the last week (see applyRaceDay), so the final bar is flagged and the chart closes
@@ -6014,13 +6045,68 @@ function viewPlan() {
     mileageNote +
     note +
     '<h2 class="sec">Training block</h2><div class="card"><div class="chart" id="chart">' + bars + '</div><div class="phase-legend">' + phaseLegend + '</div></div>' +
-    '<h2 class="sec">Week detail</h2><div class="card" id="weekDetail">' + weekDetail() + '</div>';
+    '<h2 class="sec">Your weeks</h2><div id="weekDetail">' + weekList() + '</div>';
 }
 // The training-block chart scrolls horizontally, so a long plan renders it at week 1 while
 // state.planWeek is usually the CURRENT week — leaving "Week detail" naming a week whose highlighted
 // bar sits off-screen. Bring the selected bar into view. This has to be called from wire(), which runs
 // on every render: it used to live at the top of buildNav(), which runs exactly once at boot, when
 // there is no Plan screen yet and $("chart") is null — so it never actually ran.
+/**
+ * Every week of the block: the selected one open, the rest as one-line summaries.
+ * The brief's disclosure ladder -- "overview, week, preview, active, each answering a different
+ * question". Before this the Plan screen showed the chart and then exactly ONE week, so the only way
+ * to find out what week nine looked like was to hunt for its bar and tap it.
+ *
+ * \u26a0\ufe0f A SUMMARY SAYS WHAT KIND OF WEEK IT IS, IN WORDS. An absorb week is drawn on the chart
+ * with a diagonal hatch and nothing else; the taper by colour alone. Both are exactly the weeks a
+ * runner most needs to recognise in advance, and both were unreadable without tapping. Deload, taper
+ * and race week now carry the word.
+ */
+function weekSummaryRow(w, isRace) {
+  const past = isoAdd(w.startIso, 6).toISOString().slice(0, 10) < todayIso();
+  const cur = TODAY_IN_PLAN && w.index === curWeekNo();
+  const badge = isRace ? "Race week" : w.phase === "taper" ? "Taper" : w.isDeload ? "Absorb week" : "";
+  const meta = [PHASE_NAME[w.phase] || w.phase,
+    w.distanceKm ? w.distanceKm.toFixed(1) + " km" : "",
+    w.quality ? w.quality + (w.quality === 1 ? " quality" : " quality") : "",
+    w.longRunMin ? "long " + Math.round(w.longRunMin) + " min" : ""].filter(Boolean).join(" \u00b7 ");
+  return '<button class="wk-sum' + (past ? " past" : "") + (cur ? " cur" : "") + '" data-weeksel="' + w.index + '">' +
+    '<span class="wk-n">' + w.index + '</span>' +
+    '<span class="wk-b"><span class="wk-t">Week ' + w.index +
+      (cur ? '<span class="wk-tag cur">This week</span>' : "") +
+      (badge ? '<span class="wk-tag">' + badge + '</span>' : "") + '</span>' +
+      '<span class="wk-m">' + esc(meta) + '</span></span>' +
+    '<span class="sd-chev" aria-hidden="true">\u203A</span></button>';
+}
+function weekList() {
+  const raceIdx = PLAN.weeks.length;
+  return PLAN.weeks.map((w) =>
+    w.index === state.planWeek
+      ? '<div class="card wk-open">' + weekDetail() + '</div>'
+      : weekSummaryRow(w, w.index === raceIdx)).join("");
+}
+/** One place that changes the selected week, so the chart and the list can never disagree. */
+function selectPlanWeek(n) {
+  state.planWeek = n;
+  const chart = $("chart");
+  if (chart) chart.querySelectorAll("[data-wk]").forEach((x) =>
+    x.setAttribute("aria-pressed", String(Number(x.dataset.wk) === n)));
+  const host = $("weekDetail");
+  if (host) { host.innerHTML = weekList(); wireSessionTaps(); wireWeekList(); }
+  centerPlanWeek();
+}
+function wireWeekList() {
+  document.querySelectorAll("[data-weeksel]").forEach((b) => b.onclick = () => {
+    selectPlanWeek(Number(b.dataset.weeksel));
+    // \u26a0\ufe0f Bring the week the runner just opened back under their thumb. Collapsing the week
+    // above it moves everything up by the height of a whole expanded card, so without this the tap
+    // appears to scroll the page somewhere unrelated.
+    const el = document.querySelector('.wk-open');
+    if (el && el.scrollIntoView) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  });
+}
+const PHASE_NAME = { base: "Base", build: "Build", peak: "Peak", taper: "Taper" };
 function centerPlanWeek() {
   const chart = $("chart");
   // A chart that has not been laid out measures 0, which would compute a bogus offset.
@@ -6077,7 +6163,7 @@ function weekDetail() {
     }).join("");
   }).join("");
   return '<div class="ui-hero-t">Week ' + w.index + '</div>' +
-    '<div class="ui-sub">' + esc(w.phase) + (w.isDeload ? " \u00b7 absorb week" : "") +
+    '<div class="ui-sub">' + esc(PHASE_NAME[w.phase] || w.phase) + (w.isDeload ? " \u00b7 absorb week" : "") +
       // \u26a0\ufe0f WeekView carries distanceKm, NOT plannedDistanceMeters -- that name is the engine's
       // PlannedWeek field and does not survive weekView(). Reading it gave undefined, so the week's
       // mileage never once appeared on this line. There is no type checking inside the template
@@ -11293,7 +11379,8 @@ function wire() {
   // background render while the builder sheet was open -- a watch live tick, a coach cue -- rebound
   // those rows to state.planWeek = Number("vo2-10x1") = NaN and then innerHTML on a #weekDetail that
   // does not exist on that screen. The sheet died with a TypeError and no way back.
-  document.querySelectorAll("#chart [data-wk]").forEach((b) => b.onclick = () => { state.planWeek = Number(b.dataset.wk); document.querySelectorAll("#chart [data-wk]").forEach((x) => x.setAttribute("aria-pressed", x === b)); $("weekDetail").innerHTML = weekDetail(); wireSessionTaps(); });
+  document.querySelectorAll("#chart [data-wk]").forEach((b) => b.onclick = () => selectPlanWeek(Number(b.dataset.wk)));
+  wireWeekList();
   centerPlanWeek();
   document.querySelectorAll("[data-at]").forEach((b) => b.onclick = () => { state.actTab = b.dataset.at; render(); });
   document.querySelectorAll("[data-runidx]").forEach((b) => b.onclick = () => {

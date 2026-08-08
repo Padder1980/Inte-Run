@@ -325,3 +325,26 @@ test("⚠️ readiness and the weather are separate tiles", () => {
   assert.match(body, /conditionsSquare\(sess\) \+ feelSquare\(\)/,
     "readiness and conditions are no longer two separate tiles");
 });
+
+// ---- Phase 2: Plan -------------------------------------------------------------------------------
+
+test("⚠️ the plan week is one day per row, not nested cards", () => {
+  // "Stop card nesting. One day should be one row. Rest days do not need a large bordered card."
+  const html = css();
+  const fn = html.slice(html.indexOf("function weekDetail("), html.indexOf("function weekDetail(") + 2600);
+  assert.match(fn, /uiSessionRow\(/, "the week still builds its own markup instead of the shared row");
+  assert.doesNotMatch(fn, /class="sess/, "the nested .sess cards are back");
+  assert.doesNotMatch(fn, /day-row/, "the wrapping day cards are back");
+});
+
+test("⚠️ a missed session says it was missed", () => {
+  // "Use completion semantics. Done, next, changed and missed need text/icon support; colour alone is
+  // insufficient." A past session that was never ticked is the one the runner most needs told.
+  const html = css();
+  const fn = html.slice(html.indexOf("function weekDetail("), html.indexOf("function weekDetail(") + 2600);
+  assert.match(fn, /"missed"/, "a past unticked session is not marked missed");
+  assert.match(fn, /"done"/, "a completed session is not marked done");
+  assert.match(fn, /nextId/, "nothing identifies the next session");
+  // ⚠️ ...and only in the CURRENT week: "Next" on a week three months away is nonsense.
+  assert.match(fn, /isCur && TODAY_IN_PLAN/, "the next marker is not scoped to the current week");
+});

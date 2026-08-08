@@ -5878,26 +5878,43 @@ function weekDetail() {
   const w = PLAN.weeks.find((x) => x.index === state.planWeek) || PLAN.weeks[0];
   const byDay = {};
   w.sessions.filter((s) => s.type !== "rest").forEach((s) => { const d = effDay(s); (byDay[d] = byDay[d] || []).push(s); });
+  const isCur = w.index === CURRENT_WEEK;
+  // ⚠️ THE NEXT SESSION IS THE FIRST UNDONE ONE FROM TODAY, and only in the current week. Marking a
+  // session "Next" in a week three months away would be nonsense.
+  let nextId = null;
+  if (isCur && TODAY_IN_PLAN) {
+    for (let d = TODAY_DOW; d < 7 && !nextId; d++)
+      (byDay[d] || []).forEach((s) => { if (!nextId && !state.done[doneKey(w.index, s)]) nextId = s.id; });
+  }
   const rows = DAY_ORDER.map((dn, di) => {
     const list = byDay[di];
-    let inner;
+    const riso = isoAdd(w.startIso, di).toISOString().slice(0, 10);
+    const past = riso < todayIso();
+    // ⚠️ ONE DAY IS ONE ROW, AND A REST DAY IS NOT A CARD. The brief: "Stop card nesting. One day
+    // should be one row. Rest days do not need a large bordered card." A rest day is still the way in
+    // to adding a session, so it stays tappable unless it has already been and gone.
     if (!list || !list.length) {
-      // A rest day is a legitimate place to add a session, so make the row itself the way in
-      // (there was previously no route to the add flow for a rest day). Past days can't take one.
-      const riso = isoAdd(w.startIso, di).toISOString().slice(0, 10);
-      inner = riso < todayIso()
-        ? '<div class="sess"><span class="dot none"></span><div><div class="st" style="color:var(--ink-faint);font-weight:550">Rest</div></div></div>'
-        : '<button class="sess rest-add" data-addday="' + riso + '"><span class="dot none"></span><div><div class="st">Rest</div></div><span class="rest-plus">\\uFF0B Add</span></button>';
-    } else {
-      inner = list.map((s) => {
-        const meta = ['<span class="chip">' + s.durMin + "′" + (s.distKm ? " · " + s.distKm + "km" : "") + "</span>"];
-        if (s.pace) meta.push('<span class="chip pace">' + s.pace + "</span>");
-        return '<div class="sess tap" data-open="1" data-oweek="' + w.index + '" data-oid="' + s.id + '"><span class="dot ' + s.effort + '"></span><div><div class="st">' + s.title + '</div><div class="sm">' + meta.join("") + '</div></div></div>';
-      }).join("");
+      return uiSessionRow({ day: dn.slice(0, 3).toUpperCase(), title: "Rest", meta: "Recovery",
+        colour: "var(--eff-none)", status: past ? "disabled" : "optional",
+        addDay: past ? null : riso });
     }
-    return '<div class="day-row"><div class="day-nm">' + dn + '</div><div>' + inner + '</div></div>';
+    return list.map((s) => {
+      const done = !!state.done[doneKey(w.index, s)];
+      // ⚠️ COMPLETION SEMANTICS IN WORDS. "Done, next, changed and missed need text/icon support;
+      // colour alone is insufficient." A past session that was never ticked is MISSED, and saying so
+      // is the whole point — a silent gap teaches the runner nothing.
+      const status = done ? "done" : s.id === nextId ? "next" : past ? "missed" : "future";
+      const meta = [s.durMin ? s.durMin + " min" : "", s.distKm ? s.distKm + " km" : "", s.pace || ""]
+        .filter(Boolean).join(" \u00b7 ");
+      return uiSessionRow({ day: dn.slice(0, 3).toUpperCase(), title: s.title, meta: meta,
+        colour: "var(--eff-" + s.effort + ")", status: status,
+        open: { week: w.index, id: s.id } });
+    }).join("");
   }).join("");
-  return '<div style="font-weight:650;font-size:15px;margin-bottom:2px">Week ' + w.index + ' · ' + w.phase + (w.isDeload?" · deload":"") + '</div><div style="font-size:12.5px;color:var(--ink-faint);margin-bottom:8px">' + w.focus + '</div>' + rows;
+  return '<div class="ui-hero-t">Week ' + w.index + '</div>' +
+    '<div class="ui-sub">' + esc(w.phase) + (w.isDeload ? " \u00b7 absorb week" : "") +
+      (w.plannedDistanceMeters ? " \u00b7 " + (w.plannedDistanceMeters / 1000).toFixed(1) + " km" : "") + '</div>' +
+    rows;
 }
 
 // ---- Swipe a row to reveal Delete ---------------------------------------------------------------
@@ -6838,7 +6855,8 @@ function uiSessionRow(o) {
       // ⚠️ Sessions are opened by the app's own delegated handler, which reads these three attributes.
       // A bespoke click handler here would be a second way to do the same thing, and the two drift.
       : (o.open ? ' data-open="1" data-oweek="' + o.open.week + '" data-oid="' + esc(o.open.id) + '"'
-        : (o.id ? ' data-uirow="' + esc(o.id) + '"' : ""))) +
+        : (o.addDay ? ' data-addday="' + esc(o.addDay) + '"'
+          : (o.id ? ' data-uirow="' + esc(o.id) + '"' : "")))) +
     ' aria-label="' + esc((o.day || "") + " " + (o.title || "") + (st.word ? ", " + st.word : "")) + '">' +
     '<span class="ui-row-day">' + esc(o.day || "") + '</span>' +
     '<span class="ui-row-dot" style="background:' + (o.colour || "var(--eff-none)") + '" aria-hidden="true"></span>' +

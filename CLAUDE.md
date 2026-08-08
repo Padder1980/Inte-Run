@@ -401,6 +401,153 @@ artefact rather than a defect — but the padding requirement is real and Phase 
 
 **Phase 1 (Today) is next**, and it assembles exactly these five components.
 
+### PHASES 1, 2 AND MOST OF 3 ARE IN (2026-08-08)
+
+**Phase 1 (Today)** assembles the five components. **Phase 2 (Plan + session preview)** is complete:
+the session is staged into warm-up / main set / cool-down, each with its own colour and its own time
+and a chevron; "Why this session?" carries the rationale the sheet used to open with; every week of
+the block is a one-line summary with the selected one expanded; and the phase legend names WEEK
+RANGES ("Base wk 1–20"), because a swatch reading "Build" only helps if you can match its colour to
+a bar, which is the one task a colour-blind runner cannot do. **Phase 3** has landed the Logbook, the
+Support/Alfie safety work and the Profile preview; Performance provenance and Support search remain.
+
+⚠️ **`#weekDetail` CARRIED THE CARD STYLING FROM WHEN IT WAS THE CARD.** Once it wrapped a list it
+drew a card round every week and `.wk-open` drew a second inside it — the nested cards the brief
+exists to remove, introduced by not moving a rule. Its two child rules were also addressed by
+POSITION (`> div:first-child`, `> div:nth-child(2)`), which worked only while it held exactly one
+week; with a list they landed on whichever week came first, and the second stopped matching at all
+because a summary row is a button, not a div. Position is not a name.
+
+⚠️ **THE RATCHET CAME DOWN TO 322** when that subtitle's 12.5px went onto the type ladder. Radii
+unchanged at 143. Migrating a screen lowers the ceiling — leaving it high is how a ratchet becomes a
+rubber band.
+
+### EIGHT SILENT DEFECTS FOUND BY SURVEYING BEFORE BUILDING (2026-08-08)
+
+Surveying the app against the brief before starting Phase 3 turned up eight faults, ALL of them
+behind a green suite of 437 tests, two of them four days old and mine. `test/silent-defects.test.ts`
+holds the guards; every one was watched failing against the pre-fix build (0 pass / 8 fail).
+
+⚠️ **NONE OF THEM THREW**, and that is the lesson. Inside one 20,000-line template literal there is
+no typechecking and no linting, so the only thing that can see any of this is a test asking the
+question a runner would ask.
+
+1. **A MISSING `+` ENDED A RETURN STATEMENT.** `treadmillDistanceHtml` rendered its heading and
+   paragraph and stopped — no distance box, no button. **Every treadmill run AND every outdoor run
+   that failed to get GPS** (`gpsFallback` lands in `startIndoor`) was logged by time with no way,
+   ever, to add its distance. The dead line below it was the ORIGINAL paragraph, left behind when the
+   denied/indoor conditional replaced it: it read as harmless duplication and was a severed return.
+2. **`w.index === CURRENT_WEEK` compares 1-based to 0-based.** `curWeekNo()` exists to convert. The
+   week AFTER the current one was marked current, and in week 1 nothing matched, so a runner in their
+   first week never saw "Next". Must also be gated on `TODAY_IN_PLAN`.
+3. **`w.plannedDistanceMeters` IS NOT ON `WeekView`** (it is `distanceKm`; the other name is the
+   engine's `PlannedWeek` field and does not survive `weekView()`). The week's mileage never rendered.
+4. **THE READINESS SCALE HAD A DEAD BRANCH AND COULD NOT REACH ITS OWN TOP.** It branched on
+   `soreness === "some"`, which nothing writes — the check-in offers none/mild/moderate/high — so a
+   runner answering **Sore scored identically to Fine**. And the base was 4 with no positive term, so
+   5 was unreachable: a four-point scale printed as n/5, the same false precision the owner's "whole
+   numbers" ruling rejected in the mockup's 7.6/10. ⚠️ **CLAUDE.md's own "exactly five reachable
+   values" was describing intent, not the code.** Now none 5 / mild 4 / moderate 3 / high 2, and
+   `feelSquare`'s `ready` state is renderable for the first time. Safe at the engine boundary:
+   `buildWarmup` only acts on readiness ≤ 2 and the change can only move a runner INTO that band.
+5. **`esc()` DID NOT ESCAPE QUOTES** while user text already reached ATTRIBUTES through it — the four
+   "your why" answers, the why name, the shoe name. A shoe called `5" Racer` lost its row.
+6. **`data-wk` MEANS TWO THINGS** — a week NUMBER on the chart, a workout FORMAT ID on the
+   add-a-session library rows — and `wire()` bound it from `document`. `#sheetOv` is outside `#view`
+   and survives a render, so any background render while the builder sheet was open rebound those
+   rows to `state.planWeek = Number("vo2-10x1")` = NaN and killed the sheet. ⚠️ **There were TWO
+   selectors in one line**; fixing one left the aria-pressed sweep.
+7. **`$("readySlot").innerHTML` with no such element**, bound on every render to any `[data-seg]`.
+   The live check-in uses `data-fseg` by accident of naming, so it has never fired — one natural
+   attribute name away from taking the render with it.
+8. **THE RED-FLAG SCREEN SAT ON THE FAILURE PATH OF WHAT IT SCREENS.** `alfieAsk` dispatches to the
+   remote proxy when one is configured and only reaches `alfieRedFlags` via `alfieLocalAnswer`, which
+   the SUCCESS path never touches — so "chest pain" got a language model's reply and no escalation.
+   It runs first now, and a hit is answered locally and never sent.
+
+⚠️ **AND A NINTH, IN MY OWN NEW LOGBOOK CODE: `new Date(iso + "T00:00:00")` HAS NO Z.** It parses as
+LOCAL midnight, and `toISOString()` on that returns the PREVIOUS day for the whole of British Summer
+Time — so the week boundary was one day early for half the year, and on a Monday the "this week"
+total silently included Sunday's long run. The biggest run of the week, so it would have looked
+plausible almost every time. `todayIso()` and `isoAdd()` are UTC; anything computing a date must be.
+Guarded by a **400-day sweep**, because one fixture passes under the bug five days in seven.
+
+⚠️ **`node --check` OVER THE EMITTED SCRIPT BLOCKS IS NOW A TEST, NOT A DOCUMENTED MANUAL STEP.** I
+broke the app completely during this work (a dangling `).join("")` left by an edit) and
+`node web/app.ts` exited 0, tsc was clean, and **451 tests passed against a page that would not
+boot**. A check nobody can forget beats a documented one.
+
+⚠️ **AND EVERY `$("id")` LOOKUP MUST RESOLVE TO A REAL `id=`.** The profile confirm button clicked
+`#saveSetup`, which is nowhere in the app: it built, typechecked, passed everything, and did nothing.
+Third outing of the invented-identifier trap. The guard names the five string-built ids as exempt.
+It also found **`refreshTypePreview` writing into `#typePreview`, which does not exist** — the same
+computed-and-discarded trap as `CLASS`, `MASTERS` and `PLAN.notes`. Inert, guarded, NOT built.
+
+⚠️ **FOUR OF THE GUARDS TRIPPED ON THEIR OWN EXPLANATORY COMMENTS**, which quote the strings they
+forbid. `fnSrc()` strips comments for exactly this. Two more sliced to a function that turned out to
+sit 68,000 characters LATER in the file, swallowing a third of the app.
+
+### THE PROFILE EDIT NOW PREVIEWS, CONFIRMS AND UNDOES (2026-08-08)
+
+⚠️ **`applyProfile` IS PURE; `adoptPlan` AND `recompute` COMMIT.** They are one line apart and the
+familiar one is the committing one — and `adoptPlan` fires `syncNativeReminders()` and `syncWatch()`
+inside try/catch. Building a preview with it pushes a plan the runner has not accepted to the iOS
+notification scheduler and to the wrist, where it becomes what the watch runs from when it stands
+alone. Nothing throws; the runner meets it as reminders for sessions they declined. `profileImpact`
+uses `applyProfile` only, and a test fails if the other two ever appear in it.
+
+⚠️ **THE UNDO SNAPSHOT IS TAKEN BEFORE THE REBUILD, AND THAT IS THE WHOLE FEATURE.** `seedDone()`
+prunes `state.dayOverride` of every session id the new plan lacks and **persists the prune**, so by
+the time a toast appears the runner's own reschedules — made on a different screen, the session
+sheet's day picker — are already gone from disk. An undo restoring only the profile, which is what
+the existing `toastUndo` precedent models, hands back a plan with those moves deleted under a button
+labelled Undo. Guarded by ORDERING, not by presence.
+
+⚠️ **`doSaveProfile` WAS THE ONE REBUILD PATH THAT NEVER RESTORED TODAY'S TICKS.** Every other one
+brackets `seedDone` with `todayTicks()`/`restoreTicks()`; this one did not, so editing your profile
+silently un-ticked the run you had already done today. Fixed in the same change.
+
+⚠️ **`PROFILE_CONFIRMED` IS ONE-SHOT**, cleared the instant `doSaveProfile` reads it. Left set, the
+next edit saves silently — the exact behaviour this removes, reintroduced by a variable nobody would
+think to look at.
+
+### SUPPORT, ALFIE AND THE CHECK-INS (2026-08-08)
+
+⚠️ **ALFIE'S LIMITS SIT ABOVE `#alfieLog`, NOT INSIDE IT.** `alfieRenderLog()` rebuilds that element's
+innerHTML on every message and it is a scroller pinned to its own bottom, so a label placed in there
+is destroyed by the first question — the precise moment the brief's criterion is about. The guard
+compares the two POSITIONS, not presence.
+
+⚠️ **THE ESCALATION ROUTE IS A BUTTON, NOT A SENTENCE.** The red-flag screener could only be reached
+by typing a symptom AT Alfie and having it matched; a runner worried about their knee had no way to
+go and find it. The machinery was complete, good and invisible.
+
+⚠️ **THE CONSENT COPY HAD TO BE CHECKED AGAINST THE CODE, AND CHECKING IT WAS THE WORK.** "Saved on
+this device" would have been FALSE: `chkValues()` reads the boxes straight out of the DOM and nothing
+writes them anywhere, so the answers do not survive leaving the screen. `test/silent-defects.test.ts`
+fails on saved / stored / we keep / remembered. A consent line that overstates what is kept is worse
+than none — it is the sentence a worried runner reads most carefully.
+
+⚠️ **A HUB CARD NAMED IN NO GROUP STILL APPEARS**, under "More". A hub that silently drops an entry
+somebody adds later is worse than a flat one, because nothing looks wrong.
+
+### THE LOGBOOK'S TOTALS ARE BOUNDED BY THE 50-RUN CAP (2026-08-08)
+
+⚠️ `saveRuns()` slices to 50, so an "all time" figure is a lie the moment somebody runs fifty-one
+times. The third column says **"Last 50 runs"** once the cap binds. Week and month are always inside it.
+
+⚠️ **CONSISTENCY IS NEVER TAKEN FROM `state.done`.** `seedDone()` rebuilds it at every boot by marking
+every non-rest session dated before today as done, run or not — so a figure from there reads 100% for
+somebody who has not run at all. Logged runs against `RAW.weeks` is the only honest pair. And days
+that have not happened yet are not counted, or every week reads as a failure until Sunday. It states
+the evidence ("2 of 4 planned runs done this week"), never a percentage.
+
+⚠️ **RUN ROWS CARRY AN ID, NOT AN ARRAY INDEX.** The index was already documented as "not a handle"
+because `state.logged` is unshifted whenever a watch run arrives; filtering breaks it a SECOND way,
+because position in the rendered list stops matching position in the array — deleting the third row
+of a filtered list would delete the third run of the store. `migrateRunRoutes` backfills ids on runs
+logged before they existed.
+
 ### The seven mockup features that do not exist — his ruling, 2026-08-08
 
 *"I would build those features in advance and leave a place holder message like coming soon"* — build

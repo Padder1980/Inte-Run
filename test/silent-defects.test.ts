@@ -841,3 +841,18 @@ test("⚠️ every run row but the last carries a separator", () => {
   assert.match(css, /\.lg-row \{[^}]*border-bottom: 1px solid var\(--line\)/,
     "the rows carry no separator at all");
 });
+
+test("⚠️ the streak quote is the brand colour, centred, with the author to the right", () => {
+  const css = sheetOf(page());
+  const q = (css.match(/\.st-q \{[^}]*\}/) || [""])[0];
+  const a = (css.match(/\.st-qa \{[^}]*\}/) || [""])[0];
+  assert.match(q, /color: var\(--accent\)/, "the quote is not in the brand colour");
+  assert.match(q, /text-align: center/, "the quote is not centred");
+  // ⚠️ The author is NOT the accent — one voice per line, and it is the attribution rather than the
+  // quote. --ink is the plain text colour in both themes.
+  assert.match(a, /color: var\(--ink\)/, "the author is not in plain text colour");
+  assert.match(a, /text-align: right/, "the author is not to the right");
+  // ⚠️ --accent is BOTH a text colour and a button background, which is why it was darkened in light
+  // mode to clear 4.5:1 as text. Measured on the card it sits on: 8.07:1 dark, 5.14:1 light.
+  assert.match(css, /--accent: *#0c7b70/, "the light accent is back below the contrast floor for text");
+});

@@ -340,7 +340,9 @@ test("⚠️ the Support hub matches the mockup, and cannot silently drop a card
   assert.ok(ids.length >= 10, "the hub list is not where this test thinks it is: " + ids.length);
   const listed = fnSrc("viewSupport") + html.slice(html.indexOf("const HUB_CHECKINS"), html.indexOf("function viewSupport("));
   const prof = fnSrc("viewProfile");
-  const missing = ids.filter((id) => !listed.includes('"' + id + '"') && !prof.includes('"' + id + '"'));
+  // ⚠️ A card can be reachable via a SCOPED PROFILE EDIT too ("setup:why"), not only as a hub id.
+  const missing = ids.filter((id) =>
+    !listed.includes('"' + id + '"') && !prof.includes('"' + id + '"') && !prof.includes('setup:' + id));
   assert.deepEqual(missing, [],
     "these hub cards are reachable from nowhere after the restructure: " + missing.join(", "));
 
@@ -859,4 +861,28 @@ test("⚠️ the streak quote is the brand colour, centred, with the author to t
   // ⚠️ --accent is BOTH a text colour and a button background, which is why it was darkened in light
   // mode to clear 4.5:1 as text. Measured on the card it sits on: 8.07:1 dark, 5.14:1 light.
   assert.match(css, /--accent: *#0c7b70/, "the light accent is back below the contrast floor for text");
+});
+
+test("⚠️ Motivation lives with the training profile, and the overlay says what it is editing", () => {
+  const html = page();
+  const prof = fnSrc("viewProfile");
+  // ⚠️ It is a thing about the RUNNER, not an article to read, so it sits with the other answers that
+  // shape the plan rather than in Support's Learn list.
+  assert.match(prof, /label: "Motivation".*action: "setup:why"/, "Motivation is not on the profile");
+  const learn = html.slice(html.indexOf("const HUB_LEARN"), html.indexOf("const HUB_LEARN") + 120);
+  assert.ok(!learn.includes('"why"'), "Your why is still in the Support hub as well");
+  // ⚠️ COUNTED, NOT QUOTED. Putting one of the runner's own sentences on a settings row, in a summary
+  // of everything else, cheapens it.
+  const w = fnSrc("profWhy");
+  assert.match(w, /" of " \+ WHY_QUESTIONS\.length \+ " answered"/, "the row does not say how many are answered");
+
+  // ⚠️ THE FOCUS HEADER RENDERS WHEREVER THE FORM IS. It looked inside #view only, so once a scoped
+  // edit opened in a sheet it silently skipped — and "Your other answers stay exactly as they are"
+  // never appeared in the overlay, which is now the main way anybody edits one answer.
+  const focus = fnSrc("applySetupFocus");
+  assert.match(focus, /PROFILE_EDIT_OPEN \? \$\("sheetBody"\) : \$\("view"\)/,
+    "the focus header is looked for in the wrong container when the form is in a sheet");
+  // ⚠️ And the why answers write through their own handler, not draftFromForm — without wiring them
+  // in the overlay, typing one would look accepted and save nothing.
+  assert.match(fnSrc("openProfileEdit"), /wireWhyInputs\(null\)/, "the why answers are not wired in the overlay");
 });

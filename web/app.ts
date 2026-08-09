@@ -7055,6 +7055,15 @@ function profFitness() {
   if (!profile.recentTimeS) return "Not set";
   return "5 km \u00b7 " + fmtTimeFull(profile.recentTimeS) + (profile.fitSrc === "predicted" ? " (estimated)" : "");
 }
+/**
+ * \u26a0\ufe0f COUNTED, NOT QUOTED. The four answers are the runner's own words about why they run --
+ * putting one of them on a settings row, in a summary of everything else, cheapens it. How many they
+ * have written is the honest thing to show at this size.
+ */
+function profWhy() {
+  const n = WHY_QUESTIONS.filter((q) => String(WHY[q.k] || "").trim()).length;
+  return n ? n + " of " + WHY_QUESTIONS.length + " answered" : "Not yet";
+}
 function profContext() {
   const k = returnKind(profile);
   return k === "injury" ? "Returning from injury" : k === "break" ? "Returning from a break" : "Training as normal";
@@ -7097,6 +7106,9 @@ function openProfileEdit(topic) {
   $("sheetOv").classList.add("on");
   PROFILE_EDIT_OPEN = true;
   wire();
+  // \u26a0\ufe0f The why answers write through their own handler, not through draftFromForm -- without
+  // this, typing one in the overlay would look accepted and save nothing.
+  wireWhyInputs(null);
 }
 function closeProfileEdit() {
   PROFILE_EDIT_OPEN = false;
@@ -7122,6 +7134,7 @@ function viewProfile() {
       profRow({ icon: "gauge", colour: "var(--steady)", label: "Current fitness", value: profFitness(), action: "setup:fitness" }) +
       profRow({ icon: "today", colour: "var(--build)", label: "Training rhythm", value: (profile.daysPerWeek || 0) + " days / week", action: "setup:rhythm" }) +
       profRow({ icon: "heart", colour: "var(--rest)", label: "Current context", value: profContext(), action: "setup:context" }) +
+      profRow({ icon: "flame", colour: "var(--ease)", label: "Motivation", value: profWhy(), action: "setup:why" }) +
     '</div>' +
     '<div class="pf-sec"><span>Connections</span></div>' +
     '<div class="card pf-card">' +
@@ -7220,7 +7233,9 @@ function hubRow(h) {
     '<span class="sd-chev" aria-hidden="true">\u203A</span></button>';
 }
 const HUB_CHECKINS = ["redflags", "reds", "female"];
-const HUB_LEARN = ["understand", "strength", "guides", "why"];
+// \u26a0\ufe0f "why" IS NOT HERE ANY MORE -- it moved to the profile, under Motivation, beside the other
+// answers that shape the plan. It is a thing about the runner, not an article to read.
+const HUB_LEARN = ["understand", "strength", "guides"];
 function viewSupport() {
   if (state.support) return supportDetail(state.support);
   if ((state.supportQ || "").trim()) return supportSearchHtml();
@@ -8670,7 +8685,7 @@ function viewSetup() {
     setupSection(4, "Training rhythm", "How your week is shaped", secRhythm) +
     setupSection(5, "Current context", "Anything that changes what your body will take", secContext) +
     setupSection(6, "Voice coaching", "Your spoken running coach", coachSettingsHtml()) +
-    setupSection(7, "Your why", "The reasons behind the plan",
+    setupSection(7, "Motivation", "The reasons behind the plan",
       '<div class="bk-md" style="margin:0 0 14px">Training gets hard long before race day. Tell us what this is really for, and deep into a long run \u2014 when it starts to bite \u2014 your coach will bring it back to you in your own words. Every one of these is optional; blanks are simply never used.</div>' +
       whyRowsHtml("su_why_")) +
     '<div class="err" id="setupErr" style="display:none;color:var(--rest);font-size:13px;margin:14px 2px 0;font-weight:600"></div>' +
@@ -8701,12 +8716,13 @@ function viewSetup() {
 const SETUP_TOPICS = {
   fitness: ["s_rectime", "s_2km", "s_2km_rec", "s_easypace", "fitsrc", "status"],
   you: ["s_name", "s_avatar_file"],
+  why: ["su_why_inspire", "su_why_reason", "su_why_goal", "su_why_anchor"],
   goal: ["s_dist", "s_target", "s_date"],
   rhythm: ["days", "s_longday", "s_volume", "s_startdate", "strength"],
   context: ["returning", "s_age", "s_sex"],
   voice: ["coachSel"],
 };
-const SETUP_TOPIC_TITLE = { you: "You", fitness: "Current fitness", goal: "Your goal", rhythm: "Training rhythm", context: "Current context", voice: "Voice coaching" };
+const SETUP_TOPIC_TITLE = { you: "You", why: "Motivation", fitness: "Current fitness", goal: "Your goal", rhythm: "Training rhythm", context: "Current context", voice: "Voice coaching" };
 function applySetupFocus() {
   document.querySelectorAll(".setup-off").forEach((e) => e.classList.remove("setup-off"));
   const topic = state.setupFocus;
@@ -8729,7 +8745,12 @@ function applySetupFocus() {
   // \u26a0\ufe0f AND SAY WHAT IS NOT ON SCREEN. A form showing one question, with a button reading
   // "Update my plan", looks like it is about to save only that -- when it saves everything, exactly
   // as it always did. The runner is told their other answers are untouched rather than left to guess.
-  const host = $("view");
+  // \u26a0\ufe0f WHEREVER THE FORM IS, NOT ALWAYS #view. Once a scoped edit opened in a sheet this
+  // looked for the first visible section inside #view, found none, and silently skipped the header --
+  // so "Editing / Your other answers stay exactly as they are" never appeared in the overlay, which
+  // is now the main way anybody edits one answer. The sentence that says the rest is untouched was
+  // missing from the only place it matters.
+  const host = PROFILE_EDIT_OPEN ? $("sheetBody") : $("view");
   if (host && !$("setupFocusHead")) {
     const first = host.querySelector(".setup-card:not(.setup-off), #goalCard:not(.setup-off)");
     if (first) first.insertAdjacentHTML("beforebegin",

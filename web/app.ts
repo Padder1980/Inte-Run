@@ -3791,6 +3791,54 @@ function normalizeSplits(splits) {
   }
   return out;
 }
+/**
+ * A run as Strava will accept it.
+ *
+ * \u26a0\ufe0f TWO SHAPES, AND WHICH ONE IS DECIDED BY THE DATA, NOT THE SESSION TYPE. A run with a
+ * timed route becomes a GPX file, which Strava turns into a map, splits and pace. A run without one
+ * -- a treadmill session, a run where GPS was refused, or anything recorded before this app started
+ * stamping times -- has no trace to send, so it goes as a MANUAL activity carrying the real totals.
+ *
+ * \u26a0\ufe0f WHAT IT WILL NOT DO IS INVENT THE MISSING HALF. The obvious way to make an old run into
+ * a GPX is to spread its total time evenly across the points it does have. That draws a perfectly
+ * even run that never happened, in somebody else's training log, under their name. This app already
+ * refuses to fabricate: a simulated run is stamped sim:true and skipped by every adaptive check, and
+ * a treadmill run stores no route rather than a guessed one. Same rule here.
+ */
+function runStravaPayload(run) {
+  const pts = (run && Array.isArray(run.route) ? run.route : []).filter((p) => p && isFinite(p.t));
+  const startMs = runStartMs(run);
+  const name = String(run && run.t ? run.t : "Run");
+  const type = run && run.type === "race" ? "Run" : "Run";
+  if (pts.length < 2) {
+    return { kind: "manual", name: name, type: type, startMs: startMs,
+             distanceM: Math.round((Number(run.distKm) || 0) * 1000),
+             elapsedSec: Math.round(Number(run.sec) || 0),
+             trainer: !(run.route && run.route.length) };
+  }
+  // \u26a0\ufe0f DOUBLED BACKSLASHES. Written singly this shipped as /.d{3}Z$/ and matched nothing, so
+  // every timestamp kept its milliseconds. Seventh firing of this file's own escaping rule today.
+  const iso = (sec) => new Date(startMs + sec * 1000).toISOString().replace(/\\.\\d{3}Z$/, "Z");
+  const trk = pts.map((p) =>
+    '<trkpt lat="' + p.lat.toFixed(6) + '" lon="' + p.lng.toFixed(6) + '"><time>' + iso(p.t) + '</time></trkpt>').join("");
+  const gpx = '<?xml version="1.0" encoding="UTF-8"?>' +
+    '<gpx version="1.1" creator="Inte-Run" xmlns="http://www.topografix.com/GPX/1/1">' +
+    '<metadata><time>' + iso(0) + '</time></metadata>' +
+    '<trk><name>' + esc(name) + '</name><type>running</type><trkseg>' + trk + '</trkseg></trk></gpx>';
+  return { kind: "gpx", name: name, type: type, startMs: startMs, gpx: gpx, points: pts.length };
+}
+/**
+ * When the run began, in real time.
+ * \u26a0\ufe0f A run stores its DATE and its duration, not its start instant -- so for anything but
+ * today the honest answer is that day at a sensible hour rather than a precise lie. Phone runs carry
+ * the milliseconds in their id ("run-1723...") which is exact, so that is preferred wherever present.
+ */
+function runStartMs(run) {
+  const fromId = Number(String((run && run.id) || "").replace("run-", ""));
+  if (isFinite(fromId) && fromId > 1e12) return fromId - (Number(run.sec) || 0) * 1000;
+  if (run && run.dateIso) return Date.parse(run.dateIso + "T09:00:00Z");
+  return Date.now() - (Number(run && run.sec) || 0) * 1000;
+}
 function normalizeRoute(route) {
   if (!Array.isArray(route)) return [];
   const out = [];
@@ -3799,7 +3847,13 @@ function normalizeRoute(route) {
     if (Array.isArray(p)) { la = Number(p[0]); lo = Number(p[1]); }
     else if (p && typeof p === "object") { la = Number(p.lat); lo = Number(p.lng); }
     else continue;
-    if (isFinite(la) && isFinite(lo) && (la !== 0 || lo !== 0)) out.push({ lat: la, lng: lo });
+    // \u26a0\ufe0f CARRY THE TIME THROUGH. This function runs on every ingest, so dropping an unknown
+    // field here would silently strip the timestamps off every watch run and every repaired run --
+    // and the loss would only show up as a Strava upload with no pace in it.
+    if (isFinite(la) && isFinite(lo) && (la !== 0 || lo !== 0)) {
+      const t = (p && typeof p === "object" && isFinite(Number(p.t))) ? Number(p.t) : null;
+      out.push(t == null ? { lat: la, lng: lo } : { lat: la, lng: lo, t: t });
+    }
   }
   return out;
 }
@@ -10238,7 +10292,17 @@ function onGpsPos(pos) {
   if (LIVE.devSpeed != null && LIVE.devSpeed <= 0.35) { D.still++; return; }
   D.credited++;
   LIVE.dist += net;
-  LIVE.route.push({ lat: c.latitude, lng: c.longitude });
+  // \u26a0\ufe0f AND WHEN. A route of bare coordinates cannot become a Strava activity: without a time
+  // on each point there is no pace, no moving time and no splits, and the only way to supply them
+  // afterwards is to spread the total evenly across the points -- which draws a perfectly even run
+  // that never happened. This app refuses to fabricate data elsewhere (a simulated run is stamped
+  // sim:true and skipped by every adaptive check) and it will not start here.
+  // Stored as SECONDS SINCE THE RUN STARTED, not a full timestamp: the route is already the largest
+  // field on a run, and a small integer per point costs a fraction of a 13-digit one.
+  // \u26a0\ufe0f liveElapsedMs(), NOT Date.now() minus a start -- it already subtracts paused time, so a
+  // runner who stops at a crossing does not get a straight line through the junction at walking pace.
+  // "LIVE.startedMs" does not exist; the field is LIVE.startMs and using it raw would count pauses.
+  LIVE.route.push({ lat: c.latitude, lng: c.longitude, t: Math.max(0, Math.round(liveElapsedMs() / 1000)) });
   LIVE.anchorLat = c.latitude; LIVE.anchorLon = c.longitude;
   LIVE.lastLat = c.latitude; LIVE.lastLon = c.longitude;
   // Accumulate elevation gain from the device's altitude, when it reports one (often it doesn't).

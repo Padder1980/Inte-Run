@@ -69,7 +69,11 @@ function run(o: Opts) {
   };
   let clock = 1_760_000_000_000;
   const FakeDate = { now: () => clock };
-  const onGpsPos = new Function("LIVE", "Date", src + "; return onGpsPos;")(LIVE, FakeDate);
+  // ⚠️ onGpsPos now stamps each route point with the elapsed time, so the harness has to supply the
+  // same clock the app uses. liveElapsedMs subtracts paused time; this fake mirrors that with no
+  // pauses, which is what these fixtures replay.
+  const liveElapsedMs = () => FakeDate.now() - (LIVE.startMs || 0) - (LIVE.pausedMs || 0);
+  const onGpsPos = new Function("LIVE", "Date", "liveElapsedMs", src + "; return onGpsPos;")(LIVE, FakeDate, liveElapsedMs);
   const M_PER_DEG = 111320;
   let travelled = 0;
   for (let i = 0; i < o.seconds; i++) {

@@ -2337,8 +2337,9 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .st-f svg { width: 17px; height: 17px; }
 .st-n { font-size: var(--t-body); font-weight: 700; color: var(--ink); }
 .st-q { margin-top: var(--s3); font-size: var(--t-meta); line-height: 1.5; color: var(--accent); font-style: italic; text-align: center; }
-/* The attribution sits under the quote, to the right, and is NOT the accent — one voice per line. */
-.st-qa { display: block; margin-top: var(--s2); font-style: normal; text-align: right; color: var(--ink); font-weight: 650; }
+/* The attribution sits under the quote, to the right, and is NOT the accent — one voice per line.
+   Tucked close to the words it belongs to, and a rung smaller: it is the source, not the quote. */
+.st-qa { display: block; margin-top: 3px; font-style: normal; text-align: right; color: var(--ink); font-size: var(--t-label); font-weight: 650; }
 /* Logbook rows: compact and date-aware. */
 .lg-list { padding: 0 var(--s4); }
 .lg-row { display: flex; align-items: center; gap: var(--s3); width: 100%; text-align: left; min-height: 62px; padding: var(--s3) 0; background: var(--surface); border: 0; border-bottom: 1px solid var(--line); color: inherit; font: inherit; cursor: pointer; }

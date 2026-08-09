@@ -852,6 +852,10 @@ test("⚠️ the streak quote is the brand colour, centred, with the author to t
   // quote. --ink is the plain text colour in both themes.
   assert.match(a, /color: var\(--ink\)/, "the author is not in plain text colour");
   assert.match(a, /text-align: right/, "the author is not to the right");
+  // ⚠️ A RUNG SMALLER THAN THE QUOTE, AND TUCKED UNDER IT. It is the source, not the words — set at
+  // the same size and pushed away it reads as a second line of the quotation.
+  assert.match(a, /font-size: var\(--t-label\)/, "the author is not smaller than the quote it attributes");
+  assert.match(a, /margin-top: 3px/, "the author has drifted away from its quote");
   // ⚠️ --accent is BOTH a text colour and a button background, which is why it was darkened in light
   // mode to clear 4.5:1 as text. Measured on the card it sits on: 8.07:1 dark, 5.14:1 light.
   assert.match(css, /--accent: *#0c7b70/, "the light accent is back below the contrast floor for text");

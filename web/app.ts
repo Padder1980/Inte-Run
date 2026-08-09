@@ -2258,6 +2258,12 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .setup-focus { margin-bottom: var(--s4); }
 .setup-focus p { margin: var(--s2) 0 var(--s3); font-size: var(--t-body); color: var(--ink-soft); }
 .setup-focus .pf-edit { padding: 0; }
+/* The open week's heading doubles as its close control. */
+.wk-close { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); width: 100%; text-align: left; padding: 0; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; min-height: var(--tap); }
+.wk-cx { transform: rotate(-90deg); }
+/* \u26a0\ufe0f The 2 km trial button sat at 239px under a full-width field, so the pair read as two
+   different-sized controls rather than one question. It matches the input it belongs to now. */
+.mini-btn.wide-btn { display: flex; width: 100%; justify-content: center; min-height: var(--tap); font-size: var(--t-body); border-radius: var(--r-ctl); }
 /* Profile & settings: inspect first. */
 .pf-id { display: flex; align-items: center; gap: var(--s4); margin-bottom: var(--s5); }
 .pf-av { flex: none; width: 60px; height: 60px; border-radius: var(--r-pill); overflow: hidden; background: var(--surface-2); display: grid; place-items: center; font-size: var(--t-hero); font-weight: 750; color: var(--accent); }
@@ -2827,6 +2833,11 @@ let PROFILE_CONFIRMED = false;
  * by a variable nobody would think to look at.
  */
 function openProfilePreview(pf, imp) {
+  // \u26a0\ufe0f THE PREVIEW AND THE EDIT FORM SHARE ONE SHEET, so showing the preview destroys the
+  // form -- and the confirm button then clicked a #saveProfile that was no longer in the document.
+  // Capture what was typed, remember which topic was open, and put the form back on confirm.
+  const editing = PROFILE_EDIT_OPEN ? (state.setupFocus || null) : false;
+  if (PROFILE_EDIT_OPEN) captureSetupFields();
   ensureSheet();
   $("sheetBody").innerHTML =
     '<div class="ui-eyebrow">Before we rebuild</div>' +
@@ -2840,11 +2851,13 @@ function openProfilePreview(pf, imp) {
   $("piBack").onclick = () => closeSheet();
   $("piGo").onclick = () => {
     PROFILE_CONFIRMED = true;
-    closeSheet();
+    if (editing !== false) { openProfileEdit(editing); }
+    else closeSheet();
     // \u26a0\ufe0f #saveProfile, and doSaveProfile is a CLOSURE inside wire() so it cannot be called
     // from here. The first version clicked "#saveSetup", which does not exist anywhere in the app --
     // it built, typechecked, passed every test, and the confirm button silently did nothing.
     const save = $("saveProfile"); if (save) save.click();
+    else { PROFILE_CONFIRMED = false; closeProfileEdit(); render(); }
   };
 }
 function adoptPlan(out) {
@@ -5621,7 +5634,7 @@ function openSessionSheet(sess, week) {
   wireSheet();
   $("sheetOv").classList.add("on");
 }
-function closeSheet() { stretchStop(); const o = $("sheetOv"); if (o) o.classList.remove("on"); WX_SHEET_OPEN = false; }
+function closeSheet() { PROFILE_EDIT_OPEN = false; state.setupFocus = null; stretchStop(); const o = $("sheetOv"); if (o) o.classList.remove("on"); WX_SHEET_OPEN = false; }
 // Wire every element carrying data-open to open its session detail (keyed by stable session id).
 function wireSessionTaps() {
   document.querySelectorAll("[data-open]").forEach((b) => b.onclick = () => {
@@ -6343,6 +6356,8 @@ function weekSummaryRow(w, isRace) {
 }
 function weekList() {
   const raceIdx = PLAN.weeks.length;
+  // state.planWeek of 0 means nothing is open, which is a legitimate state: the chart still shows the
+  // shape of the block and every week reads as a one-line summary.
   return PLAN.weeks.map((w) =>
     w.index === state.planWeek
       ? '<div class="card wk-open">' + weekDetail() + '</div>'
@@ -6359,6 +6374,7 @@ function selectPlanWeek(n) {
   centerPlanWeek();
 }
 function wireWeekList() {
+  document.querySelectorAll("[data-weekclose]").forEach((b) => b.onclick = () => selectPlanWeek(0));
   document.querySelectorAll("[data-weeksel]").forEach((b) => b.onclick = () => {
     selectPlanWeek(Number(b.dataset.weeksel));
     // \u26a0\ufe0f Bring the week the runner just opened back under their thumb. Collapsing the week
@@ -6424,8 +6440,13 @@ function weekDetail() {
         open: { week: w.index, id: s.id } });
     }).join("");
   }).join("");
-  return '<div class="ui-hero-t">Week ' + w.index + '</div>' +
-    '<div class="ui-sub">' + esc(PHASE_NAME[w.phase] || w.phase) + (w.isDeload ? " \u00b7 absorb week" : "") +
+  // \u26a0\ufe0f AN OPEN WEEK HAD NO WAY BACK. Every other week was a tappable summary; the one you had
+  // opened was the only row on the screen you could not act on, so the list could be expanded and
+  // never collapsed. Its heading is the control now.
+  return '<button class="wk-close" data-weekclose="1" aria-expanded="true">' +
+      '<span class="ui-hero-t">Week ' + w.index + '</span>' +
+      '<span class="sd-chev wk-cx" aria-hidden="true">\u203A</span></button>' +
+    '<div class="ui-sub wk-osub">' + esc(PHASE_NAME[w.phase] || w.phase) + (w.isDeload ? " \u00b7 absorb week" : "") +
       // \u26a0\ufe0f WeekView carries distanceKm, NOT plannedDistanceMeters -- that name is the engine's
       // PlannedWeek field and does not survive weekView(). Reading it gave undefined, so the week's
       // mileage never once appeared on this line. There is no type checking inside the template
@@ -6888,6 +6909,49 @@ function profFitness() {
 function profContext() {
   const k = returnKind(profile);
   return k === "injury" ? "Returning from injury" : k === "break" ? "Returning from a break" : "Training as normal";
+}
+/**
+ * The draft the setup form is built from.
+ * \u26a0\ufe0f THE OVERLAY FORGOT THIS AND THE FAILURE WAS UNRECOGNISABLE. render()'s setup branch
+ * seeded the draft inline; openProfileEdit renders the same form and did not, so draft.days and
+ * draft.status were undefined, the generator was handed a plan with no days per week, and it died
+ * deep inside with "Cannot read properties of undefined (reading 'build')" -- which doSaveProfile
+ * caught and reported as "That goal can't be planned yet, try a race date further out." A wrong
+ * message about a field the runner had not touched. One seeder, two callers.
+ */
+function seedSetupDraft() {
+  if (draft.__live) return;
+  draft = { days: profile.daysPerWeek, strength: profile.strength ? "1" : "0", returning: returnKind(profile), status: profile.status || (profile.noRecent ? "new" : "regular"), fitsrc: (profile.fitSrc === "predicted" ? "predicted" : "recent"), avatar: profile.avatar || "", __live: true, __f: {} };
+}
+let PROFILE_EDIT_OPEN = false;
+/**
+ * One profile answer, edited in a sheet over the profile page.
+ *
+ * \u26a0\ufe0f THE WHOLE FORM GOES INTO THE SHEET, with the other sections hidden -- exactly as it did
+ * on the full screen, and for the same reason: draftFromForm() reads its values straight out of the
+ * DOM, so a sheet holding only the focused section would read every other field as blank and write
+ * those blanks over the profile.
+ *
+ * \u26a0\ufe0f wire() BINDS THE SETUP HANDLERS ON ELEMENT PRESENCE, NOT ON state.screen -- every one is
+ * guarded with "if (el)". That is the only reason the form works here at all, and it is worth knowing
+ * before anybody "tidies" those guards into a screen check.
+ */
+function openProfileEdit(topic) {
+  state.setupFocus = topic;
+  seedSetupDraft();
+  ensureSheet();
+  $("sheetBody").innerHTML = viewSetup();
+  linkFormLabels();
+  applySetupFocus();
+  restoreSetupFields();
+  $("sheetOv").classList.add("on");
+  PROFILE_EDIT_OPEN = true;
+  wire();
+}
+function closeProfileEdit() {
+  PROFILE_EDIT_OPEN = false;
+  state.setupFocus = null;
+  closeSheet();
 }
 function viewProfile() {
   const shoes = loadShoes().filter((x) => !x.retiredIso);
@@ -8325,10 +8389,14 @@ function returnKind(p) {
   if (v === "injury" || v === "break") return v;
   return v ? "break" : "0";
 }
+// \u26a0\ufe0f THE NUMBER ARGUMENT IS KEPT AND IGNORED. Every call site passes one, and the sections
+// are no longer a numbered sequence -- they are named topics reached one at a time from the profile
+// page, where "3" means nothing. Removing the parameter instead would touch seven call sites for no
+// gain and make the diff harder to read than the change it carries.
 function setupSection(num, title, sub, body) {
   // ⚠️ Spacing belongs in the stylesheet. This used to carry style="margin-top:12px" inline, which
   // no rule can beat without !important — and the !important then applied to only SOME cards.
-  return '<div class="card setup-card"><div class="sec-head"><div class="sec-num">' + num + '</div>' +
+  return '<div class="card setup-card"><div class="sec-head">' +
     '<div><div class="sec-title">' + title + '</div>' + (sub ? '<div class="sec-sub">' + sub + '</div>' : '') + '</div></div>' + body + '</div>';
 }
 // The voice-coach settings block (lives in the profile/settings screen). Reads/writes COACH.cfg live —
@@ -8397,7 +8465,7 @@ function viewSetup() {
     '<div class="q" id="fitTimeWrap"><label id="fitTimeLbl"><span class="lblmain">' + (p.fitSrc === "predicted" ? "Your predicted 5 km time" : "Your recent 5 km time") + '</span> <span class="q-hint">just type the numbers</span></label><input class="sel num" id="s_rectime" value="' + (p.noRecent ? "" : fmtTimeFull(p.recentTimeS)) + '" placeholder="e.g. 25:00" inputmode="numeric"></div>' +
     '<div class="callout"><div class="callout-h"><span class="ic">' + ICON.timer + '</span>2 km time-trial<span class="callout-badge">optional</span></div>' +
     '<p>A hard, evenly paced 2 km is the most useful thing you can give us: it calibrates every pace in your plan, and repeating it every month or so shows what has actually changed.</p>' +
-    '<input class="sel num" id="s_2km" value="' + (p.twoKmS ? fmtTimeFull(p.twoKmS) : "") + '" placeholder="e.g. 8:00" inputmode="numeric"><div class="mas-hint" id="masHint"></div><button class="mini-btn" id="s_2km_rec" type="button">⏱ Haven\\'t done one? Record it now</button></div>' +
+    '<input class="sel num" id="s_2km" value="' + (p.twoKmS ? fmtTimeFull(p.twoKmS) : "") + '" placeholder="e.g. 8:00" inputmode="numeric"><div class="mas-hint" id="masHint"></div><button class="mini-btn wide-btn" id="s_2km_rec" type="button">⏱ Haven\\'t done one? Record it now</button></div>' +
     '</div>';
 
   // 3 · Your goal (goalCardInner supplies its own inner markup; keep the id for syncStatus)
@@ -8442,7 +8510,7 @@ function viewSetup() {
     // ⚠️ Hand-built rather than setupSection() because it needs #goalCard/#goalBody for the live
     // rebuild — so it must be kept in step by hand. Its inline margin was the last one left, and it
     // made section 3 the single card in the run with a different gap above it.
-    '<div class="card setup-card" id="goalCard"><div class="sec-head"><div class="sec-num">3</div><div><div class="sec-title">Your goal</div><div class="sec-sub">What you\\u2019re working towards</div></div></div><div id="goalBody">' + secGoal + '</div></div>' +
+    '<div class="card setup-card" id="goalCard"><div class="sec-head"><div><div class="sec-title">Your goal</div><div class="sec-sub">What you\\u2019re working towards</div></div></div><div id="goalBody">' + secGoal + '</div></div>' +
     setupSection(4, "Training rhythm", "How your week is shaped", secRhythm) +
     setupSection(5, "Current context", "Anything that changes what your body will take", secContext) +
     setupSection(6, "Voice coaching", "Your spoken running coach", coachSettingsHtml()) +
@@ -8514,7 +8582,12 @@ function applySetupFocus() {
       '<p>Your other answers stay exactly as they are.</p>' +
       '<button class="pf-edit" id="setupAll">Show every question</button></div>');
     const all = $("setupAll");
-    if (all) all.onclick = () => { state.setupFocus = null; render(); };
+    if (all) all.onclick = () => {
+      const wasSheet = PROFILE_EDIT_OPEN;
+      closeProfileEdit();
+      if (wasSheet) { state.screen = "setup"; }
+      render();
+    };
   }
 }
 function draftFromForm() {
@@ -8618,7 +8691,10 @@ function draftFromForm() {
  */
 function captureSetupFields() {
   if (!draft.__f) draft.__f = {};
-  document.querySelectorAll('#view [id^="s_"]').forEach((el) => {
+  // \u26a0\ufe0f NOT SCOPED TO #view. The form is rendered into a sheet when one answer is edited from
+  // the profile page, and a capture that only looks inside #view finds nothing there -- so the typed
+  // values were lost the moment the confirm sheet replaced the form.
+  document.querySelectorAll('[id^="s_"]').forEach((el) => {
     if (el.id && typeof el.value === "string") draft.__f[el.id] = el.value;
   });
 }
@@ -12134,9 +12210,7 @@ function render() {
     // so the only way to see the app before committing to it was to lose everything typed so far.
     // Several people would simply have closed it — and it is the very first thing a TestFlight tester
     // does. __live is cleared when the profile is saved, so a genuine re-entry still seeds fresh.
-    if (!draft.__live) {
-      draft = { days: profile.daysPerWeek, strength: profile.strength ? "1" : "0", returning: returnKind(profile), status: profile.status || (profile.noRecent ? "new" : "regular"), fitsrc: (profile.fitSrc === "predicted" ? "predicted" : "recent"), avatar: profile.avatar || "", __live: true, __f: {} };
-    }
+    seedSetupDraft();
     v.innerHTML = viewSetup();
     linkFormLabels();
     applySetupFocus();
@@ -12306,11 +12380,11 @@ function wire() {
   // already has, not a set of new ones -- which is what keeps it a summary rather than a rewrite.
   document.querySelectorAll("[data-pf]").forEach((b) => b.onclick = () => {
     const to = b.dataset.pf;
-    // "setup" on its own is the Edit link: every question. "setup:goal" is one row's own questions.
-    if (to === "setup" || to.indexOf("setup:") === 0) {
-      state.setupFocus = to.indexOf(":") > 0 ? to.split(":")[1] : null;
-      state.screen = "setup"; render(); return;
-    }
+    // \u26a0\ufe0f A ROW OPENS AN OVERLAY, NOT A PAGE. Editing one answer and then having to find your
+    // way back to the profile is the navigation this page exists to remove. The Edit link still opens
+    // the whole form as a screen, because that is a sit-down job rather than a glance.
+    if (to.indexOf("setup:") === 0) { openProfileEdit(to.split(":")[1]); return; }
+    if (to === "setup") { state.setupFocus = null; state.screen = "setup"; render(); return; }
     // \u26a0\ufe0f BOTH OF THESE WERE INVENTED FIRST TIME ROUND -- "toggleTheme" and "openRemindSheet"
     // exist nowhere in the app. The real ones are the inline handler on #themeBtn and
     // openRemindersSheet(). Clicking the real button rather than copying its body means there stays
@@ -12448,8 +12522,14 @@ function wire() {
     // ⚠️ The draft is now sticky across navigation, so SAVING has to be what releases it — otherwise
     // the answers a runner just committed are re-restored over the top of the profile they built.
     draft = {};
+    // \u26a0\ufe0f COMING BACK TO WHERE YOU STARTED. Saving from the profile overlay used to land the
+    // runner on the Plan tab, which is the right destination for first-run setup and disorienting for
+    // somebody who just corrected their age.
+    const fromSheet = PROFILE_EDIT_OPEN;
     state.setupFocus = null;
-    state.screen = null; state.tab = "plan"; render();
+    if (fromSheet) { PROFILE_EDIT_OPEN = false; closeSheet(); state.screen = "profile"; }
+    else { state.screen = null; state.tab = "plan"; }
+    render();
     if (!imp || !imp.none) {
       toastUndo("Plan updated", () => {
         // Everything the rebuild touched, put back in the order it was taken. recompute() re-syncs

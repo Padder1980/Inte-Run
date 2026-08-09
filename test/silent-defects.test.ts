@@ -645,8 +645,13 @@ test("⚠️ the profile is a summary you can read, with the form behind it", ()
   // looks like it saves only that, when it saves everything exactly as it always did.
   assert.match(map, /Your other answers stay exactly as they are/, "the runner is not told the rest is untouched");
   // ⚠️ The focus must not outlive the visit, or the next Edit opens a single question.
-  assert.match(html, /state\.setupFocus = null;\s*\n\s*state\.screen = null; state\.tab = "plan"/,
-    "the edit focus survives a save");
+  // ⚠️ Anchored on the fact, not on two lines being adjacent — saving from the overlay now branches
+  // (back to the profile) or falls through (to the plan), so the two statements are no longer
+  // neighbours. The invariant is that the focus is cleared, and that EVERY exit clears it.
+  const saveFn = html.slice(html.indexOf("function doSaveProfile("), html.indexOf("function doSaveProfile(") + 4000);
+  assert.match(saveFn, /state\.setupFocus = null;/, "the edit focus survives a save");
+  assert.match(fnSrc("closeSheet"), /state\.setupFocus = null/,
+    "dismissing the overlay leaves the form focused, so the next full Edit opens one question");
   assert.match(html, /profileBtn"\)\.onclick[^\n]*state\.screen = "profile"/,
     "the avatar still opens the raw form rather than the summary");
 

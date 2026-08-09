@@ -86,8 +86,16 @@ test("⚠️ the setup form survives a glance at another tab", () => {
   // they were signing up for came back to an empty form — no warning, no undo, and the only way to
   // look around the app before committing to it. Several people would simply have closed it.
   const html = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
-  assert.match(html, /if \(!draft\.__live\)/,
+  // ⚠️ The guard is on the SEEDER now, not inline in render() — the overlay renders the same form and
+  // has to seed it too, and two copies of the seeding is how one of them ends up missing a field.
+  const seed = html.slice(html.indexOf("function seedSetupDraft("), html.indexOf("function seedSetupDraft(") + 700);
+  assert.ok(seed.length > 100, "seedSetupDraft is gone — the draft is seeded somewhere unguarded");
+  assert.match(seed, /if \(draft\.__live\) return;/,
     "the setup draft is reseeded on every render again — a nav tap will wipe the form");
+  // ⚠️ EVERY path that renders the form must seed it. openProfileEdit did not, and the generator died
+  // deep inside on a draft with no daysPerWeek, reported as a wrong message about the race date.
+  assert.equal((html.match(/seedSetupDraft\(\)/g) || []).length, 3,
+    "a path renders the setup form without seeding its draft");
   // ⚠️ AND THE TYPED FIELDS, or half a form is restored, which reads as a worse bug than losing it
   // all. Generic over the s_ prefix so a question added later is carried without anyone remembering.
   assert.match(html, /function captureSetupFields\(/, "typed fields are not captured");

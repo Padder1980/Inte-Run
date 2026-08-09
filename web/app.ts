@@ -98,7 +98,7 @@ const html = `<!doctype html>
 <script>try{var t=localStorage.getItem('interun_theme_v1');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}
 // The native app is served over interun:// and DOES want viewport-fit=cover - WKWebView needs it
 // for env(safe-area-inset-*) to report anything. The Home Screen PWA must not have it.
-try{if(location.protocol==='interun:'){var v=document.querySelector('meta[name=viewport]');if(v)v.setAttribute('content','width=device-width, initial-scale=1, viewport-fit=cover');}}catch(e){}</script>
+try{if(location.protocol==='interun:'){var v=document.querySelector('meta[name=viewport]');if(v)v.setAttribute('content','width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no');}}catch(e){}</script>
 <style>
 :root {
   color-scheme: light dark;

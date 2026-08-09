@@ -109,10 +109,7 @@ struct WebHost: UIViewRepresentable {
         //
         // The avatar cropper still pinches: it reads pointer events and WebKit's gesture events, not
         // this recogniser, and it falls back to measuring the distance between two pointers anyway.
-        webView.scrollView.pinchGestureRecognizer?.isEnabled = false
-        webView.scrollView.bouncesZoom = false
-        webView.scrollView.minimumZoomScale = 1
-        webView.scrollView.maximumZoomScale = 1
+        Coordinator.lockZoom(webView)
 
         // Match the splash so there is no white flash between the launch screen and the page.
         let launch = UIColor(named: "LaunchBackground") ?? .black
@@ -159,7 +156,32 @@ struct WebHost: UIViewRepresentable {
         var scrollPin: NSKeyValueObservation?
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            // ⚠️ WKWebView RE-DERIVES THE SCROLL VIEW'S ZOOM SCALES FROM THE PAGE'S VIEWPORT META ON
+            // EVERY NAVIGATION, so pinning them once in makeUIView does not stick. That is why double
+            // tap still zoomed after pinchGestureRecognizer was disabled and the scales were set to 1
+            // — the settings were correct and had been overwritten by the time anybody could tap.
+            // Re-applied here, where the page has finished parsing its own viewport.
+            Self.lockZoom(webView)
             if SelfCheck.isEnabled { SelfCheck.run(on: webView) }
+        }
+
+        func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+            Self.lockZoom(webView)
+        }
+
+        /// One definition, three call sites — makeUIView, didCommit and didFinish.
+        static func lockZoom(_ webView: WKWebView) {
+            webView.scrollView.pinchGestureRecognizer?.isEnabled = false
+            webView.scrollView.bouncesZoom = false
+            webView.scrollView.minimumZoomScale = 1
+            webView.scrollView.maximumZoomScale = 1
+            if webView.scrollView.zoomScale != 1 { webView.scrollView.setZoomScale(1, animated: false) }
+            // ⚠️ AND THE DOUBLE-TAP RECOGNISER ITSELF. Pinning the scales stops a pinch, but WebKit's
+            // double-tap-to-zoom is its own gesture recogniser on the scroll view and asks the page to
+            // scale to the tapped element — which is why the amount varied with the size of the box.
+            for g in webView.scrollView.gestureRecognizers ?? [] {
+                if let t = g as? UITapGestureRecognizer, t.numberOfTapsRequired == 2 { t.isEnabled = false }
+            }
         }
 
         func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {

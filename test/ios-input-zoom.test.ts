@@ -129,3 +129,28 @@ test("⚠️ double-tap cannot zoom the app, on any element", () => {
   assert.deepEqual(nones, [".crop-stage"],
     "something other than the cropper disables touch entirely: " + nones.join(", "));
 });
+
+test("⚠️ the native app locks zoom after every navigation, not just at launch", () => {
+  // ⚠️ WKWebView RE-DERIVES THE SCROLL VIEW'S ZOOM SCALES FROM THE PAGE'S VIEWPORT META ON EVERY
+  // NAVIGATION. Pinning them once in makeUIView is overwritten by the time anybody can tap, which is
+  // why double-tap still zoomed with pinchGestureRecognizer disabled and the scales already set to 1.
+  const swift = readFileSync(new URL("../ios/InteRun/WebHost.swift", import.meta.url), "utf8");
+  assert.match(swift, /static func lockZoom\(_ webView: WKWebView\)/, "there is no single zoom-lock helper");
+  assert.match(swift, /func webView\(_ webView: WKWebView, didCommit navigation/, "zoom is not re-locked on navigation");
+  assert.ok((swift.match(/lockZoom\(webView\)/g) || []).length >= 3,
+    "lockZoom is not called from all three points (creation, commit, finish)");
+  // ⚠️ Double-tap-to-zoom is its OWN gesture recogniser, separate from pinch — it asks the page to
+  // scale to the tapped element, which is why the amount varied with the size of the box.
+  assert.match(swift, /UITapGestureRecognizer, t\.numberOfTapsRequired == 2/,
+    "the double-tap recogniser is not disabled, only pinch");
+
+  // ⚠️ NATIVE ONLY in the viewport meta. WKWebView honours user-scalable=no; Safari deliberately
+  // ignores it, so putting it in the shared static meta is an accessibility smell for no effect —
+  // and docs/ is one page serving both the PWA and the app.
+  const html = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
+  const staticMeta = (html.match(/<meta name="viewport" content="([^"]*)"/) || [])[1] || "";
+  assert.ok(!/user-scalable=no/.test(staticMeta),
+    "user-scalable=no is in the shared meta, which reaches the browser too");
+  assert.match(html, /location\.protocol==='interun:'[\s\S]{0,220}user-scalable=no/,
+    "the native app does not get user-scalable=no");
+});

@@ -7872,13 +7872,28 @@ function wireWhyView() { wireWhyInputs(() => { if (state.tab === "support" && st
 function stravaCfg() { try { return JSON.parse(localStorage.getItem("interun_strava_v1") || "null") || {}; } catch (e) { return {}; } }
 function stravaSaveCfg(c) { try { localStorage.setItem("interun_strava_v1", JSON.stringify(c)); } catch (e) {} }
 /**
- * Where Inte-Run’s server is. ONE Worker does Alfie and Strava — same secrecy problem, same box — so a
- * proxy already configured for Alfie serves Strava with nothing further to set up. Strava still keeps
- * its own setting, so it can be pointed elsewhere and so clearing one never silently clears the other.
+ * The address Inte-Run’s own server answers on, SHIPPED WITH THE BUILD.
+ *
+ * ONE Worker does Alfie and Strava — same secrecy problem, same box — so a proxy already configured
+ * for Alfie serves Strava with nothing further to set up. Strava still keeps its own setting, so it can
+ * be pointed elsewhere and so clearing one never silently clears the other.
+ *
+ * ⚠️ THIS IS WHAT MAKES STRAVA ONE TAP FOR EVERYBODY ELSE. Without it the only way to reach a server
+ * is the paste box, which is a development tool — asking a runner who downloaded a running app to type
+ * in a URL is not a connect flow, it is a confession. Set this and every runner gets: tap Connect →
+ * authorise on Strava → done, with nothing to configure and no account to make.
+ *
+ * ⚠️ IT IS NOT A SECRET AND MUST NOT BE TREATED LIKE ONE. It is an address, like a website's. The
+ * secret is the Strava client secret, which never leaves the server — so unlike the Mapbox token
+ * (billable, gitignored, injected at build time) this belongs in the committed source, where every
+ * build gets it. Filled in by alfie-proxy/setup-strava.sh once the Worker exists.
  */
+const STRAVA_SERVER = "";
 function stravaBase() {
+  // A pasted override wins (so a second server can be tried without a rebuild), then the shipped
+  // default, then Alfie's proxy — one Worker does both, so an Alfie URL already points at Strava.
   let url = "";
-  try { url = String(stravaCfg().proxy || (alfieCfg() || {}).proxy || "").trim(); } catch (e) { url = ""; }
+  try { url = String(stravaCfg().proxy || STRAVA_SERVER || (alfieCfg() || {}).proxy || "").trim(); } catch (e) { url = ""; }
   return url ? url.replace(/\\/+$/, "") : "";
 }
 function stravaDeviceKey() {
@@ -7897,8 +7912,15 @@ function stravaDeviceKey() {
 function stravaConnected() { const c = stravaCfg(); return !!(c.connected && c.key); }
 /** Is this someone who is expected to configure a server by hand? Same gate as the Mapbox field:
  *  a TestFlight tester must never be shown a box asking for a URL they have never heard of. */
+/**
+ * ⚠️ KEYED ON AN EXPLICIT PASTED OVERRIDE, NOT ON "a server exists". Written as a truthiness test on
+ * stravaBase() it was correct only while the only way to have a server was to have pasted one — the
+ * moment STRAVA_SERVER ships filled in that call is always truthy and the paste box appears for EVERY
+ * runner, on the one screen where the app is meant to look finished. The question is "did somebody
+ * configure this by hand here?", which is exactly what mapDevMode() asks.
+ */
 function stravaDevMode() {
-  try { return !inNativeApp() || !!stravaBase(); } catch (e) { return false; }
+  try { return !inNativeApp() || !!stravaCfg().proxy; } catch (e) { return false; }
 }
 function stravaCall(path, opts) {
   const base = stravaBase();

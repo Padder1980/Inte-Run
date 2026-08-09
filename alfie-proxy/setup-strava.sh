@@ -93,7 +93,27 @@ rm -f "$DEPLOY_LOG"
 
 HOST="${URL#https://}"
 
-say "4/4  Two things left, both by hand"
+# ---- Bake the address into the app, so nobody else ever pastes anything -------------------------
+# ⚠️ THIS IS WHAT MAKES STRAVA ONE TAP FOR EVERY OTHER RUNNER. The paste box is a development tool;
+# without a shipped default it is the only route to a server, and asking someone who downloaded a
+# running app to type in a URL is not a connect flow. The address is not a secret — the client secret
+# is, and that never leaves the Worker.
+say "4/5  Teach the app where its server is"
+cd ..
+node -e '
+  const fs = require("fs");
+  const p = "web/app.ts";
+  const before = fs.readFileSync(p, "utf8");
+  const after = before.replace(/const STRAVA_SERVER = "[^"]*";/, "const STRAVA_SERVER = \"" + process.argv[1] + "\";");
+  if (before === after) { console.error("     could not find STRAVA_SERVER in web/app.ts — set it by hand"); process.exit(1); }
+  fs.writeFileSync(p, after);
+  console.log("     web/app.ts updated");
+' "$URL"
+node web/app.ts >/dev/null && echo "     app rebuilt"
+node --test >/dev/null 2>&1 && echo "     tests still pass" || echo "     ⚠️  tests FAILED — tell Claude before committing"
+cd alfie-proxy
+
+say "5/5  Two things left, both by hand"
 cat <<EOF
 
   A. Tell Strava it is allowed to send people back here.
@@ -113,6 +133,12 @@ cat <<EOF
 
      Tap "Use this server", then "Connect to Strava".
 
+     (Only needed on THIS phone, because its app was built before the address existed.
+      Every future build already has it, so everyone else just taps Connect.)
+
   Then open any run in your Logbook and tap "Send to Strava".
+
+  One last thing: web/app.ts changed, so commit it —
+      git add web/app.ts docs web/app.html && git commit -m "Ship the Strava server address"
 
 EOF

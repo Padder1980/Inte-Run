@@ -114,9 +114,68 @@ test("⚠️ nothing is sent to Strava on its own, and nothing is offered that c
 test("⚠️ a tester is never shown a box asking for a server address", () => {
   // The same gate as the Mapbox paste field. In the native app with nothing configured the row stays
   // an untappable "Planned", exactly as it read before any of this existed.
-  assert.match(fn("stravaDevMode"), /!inNativeApp\(\) \|\| !!stravaBase\(\)/, "the setup field is not gated");
+  const gate = fn("stravaDevMode");
+  assert.match(gate, /!inNativeApp\(\) \|\| !!stravaCfg\(\)\.proxy/, "the setup field is not gated");
+  // ⚠️ THE GATE MUST NOT KEY ON stravaBase(). Written that way it is correct only while the sole way to
+  // have a server is to have pasted one — the moment STRAVA_SERVER ships filled in, stravaBase() is
+  // always truthy and the paste box appears for EVERY runner, on the screen meant to look finished.
+  assert.ok(!/stravaBase\(\)/.test(gate),
+    "stravaDevMode keys on stravaBase(), so a shipped server address shows the paste box to everyone");
   assert.match(fn("connectView"), /\(stvSetUp \|\| stravaDevMode\(\)\) \? "strava" : null/,
     "the Strava row is tappable for someone who has no server to connect to");
+});
+
+test("⚠️ Strava is one tap for everybody else — the address ships with the build", () => {
+  // ⚠️ WITHOUT A SHIPPED DEFAULT THE ONLY ROUTE TO A SERVER IS THE PASTE BOX, which is a development
+  // tool. Asking a runner who downloaded a running app to type in a URL is not a connect flow.
+  const html = page();
+  assert.match(html, /const STRAVA_SERVER = "/, "there is no shipped server address at all");
+  // A pasted override must still win, so a second server can be tried without a rebuild.
+  assert.match(fn("stravaBase"),
+    /stravaCfg\(\)\.proxy \|\| STRAVA_SERVER \|\| \(alfieCfg\(\) \|\| \{\}\)\.proxy/,
+    "the shipped default does not sit between the hand-set override and Alfie's proxy");
+  // ⚠️ AND WHENEVER IT IS FILLED IN, IT MUST BE https. The device key travels on that URL, so a plain
+  // http address is a key handed to anyone on the same café network. This guard is dormant while the
+  // constant is empty and fires the moment somebody sets it wrongly.
+  const set = /const STRAVA_SERVER = "([^"]*)"/.exec(html);
+  assert.ok(set, "STRAVA_SERVER is no longer a plain string the setup script can fill in");
+  if (set![1]) {
+    assert.match(set![1]!, /^https:\/\/[^\s/]+$/,
+      "the shipped server address must be https and carry no path or trailing slash");
+  }
+});
+
+test("⚠️ with an address shipped, a runner gets one tap and no paste box", () => {
+  // ⚠️ THE SHIPPING CASE IS THE ONE THAT MATTERS AND THE CONSTANT IS STILL EMPTY, so asserting on the
+  // source alone proves nothing about what a runner meets. These run the real functions with the
+  // constant filled in, which is the state every build after the deploy is in.
+  const SERVER = "https://alfie-proxy.example.workers.dev";
+  const build = (cfg: Record<string, unknown>, native: boolean) => {
+    const src = fn("stravaBase") + "\n" + fn("stravaDevMode");
+    const scope = {
+      STRAVA_SERVER: SERVER,
+      stravaCfg: () => cfg,
+      alfieCfg: () => ({ proxy: "" }),
+      inNativeApp: () => native,
+    };
+    const keys = Object.keys(scope);
+    return new Function(...keys, src + "\nreturn { stravaBase: stravaBase, stravaDevMode: stravaDevMode };")(
+      ...keys.map((k) => (scope as any)[k]));
+  };
+
+  // A runner on the shipped app: the server is found, so the row is live and Connect works…
+  const runner = build({}, true);
+  assert.equal(runner.stravaBase(), SERVER, "a runner's app cannot find the shipped server");
+  // …and they are never shown the developer's paste box.
+  assert.equal(runner.stravaDevMode(), false, "the paste box is shown to an ordinary runner");
+
+  // The owner, having pasted an override, still gets it — and keeps the box to change it.
+  const owner = build({ proxy: "https://other.workers.dev" }, true);
+  assert.equal(owner.stravaBase(), "https://other.workers.dev", "a hand-set override is ignored");
+  assert.equal(owner.stravaDevMode(), true, "the override cannot be changed once set");
+
+  // In a browser the box is always available, because that is a development surface.
+  assert.equal(build({}, false).stravaDevMode(), true, "the paste box is unreachable in a browser");
 });
 
 // ---- The Worker -----------------------------------------------------------------------------------

@@ -902,8 +902,12 @@ skipped in the moment could never be given, and it is half the flags engine's ev
 
 **Not built, deliberately:** the heart-rate line chart (needs a per-sample series that exists
 nowhere — an average is one number and a chart needs hundreds; an empty chart is worse than none),
-and from the reference the points badge, the Strava link and the thumbs-up rating (a backend, a
-network, and a button with nowhere to send its answer).
+and from the reference the points badge and the thumbs-up rating (a backend, a network, and a button
+with nowhere to send its answer).
+
+⚠️ **The Strava link WAS on that list and no longer is — see the Strava section below (2026-08-09).**
+It is on the run's own page as *Send to Strava*, beside *Share my run*. What made it possible was
+accepting the backend: `alfie-proxy/` holds the client secret, because nothing else can.
 
 **Known, pre-existing, not fixed:** `SHARE_INSIGHT` prints fixed praise keyed only on session type —
 an easy run always gets "Aerobic fitness building exactly as planned" whether it hit target or ran
@@ -2504,6 +2508,100 @@ Two bugs fixed alongside, both pre-existing and both made likelier by the new fo
 Known and deliberately not fixed: a handful of five-day build weeks with two quality sessions sit
 just under the pyramidal easy-fraction floor (measured 6 of 35, unchanged by this work). That is a
 periodisation question about two-quality weeks, not a session-library one.
+
+## Strava (2026-08-09) — and the first time this app has needed a server
+
+The owner chose Strava over a second Mapbox token, reasoning that **a tester will not move off the app
+they already use if it means losing their Strava log.** Finish a run → **Send to Strava** on the run's
+own page → it lands there with map, splits and pace.
+
+⚠️ **THE BLOCKER WAS THE DATA, NOT THE API** (groundwork commit `0106126`). Route points were
+`{lat,lng}` with no times, and Strava needs a time on each point to derive pace, moving time and
+splits — which is most of why anyone wants the run there. Points now carry `t` = seconds since the run
+started, **recorded from `liveElapsedMs()` so paused time is subtracted** (`Date.now()` minus a start
+draws a straight line at walking pace through the junction the runner waited at), and the field is
+carried through `normalizeRoute()`, which silently drops anything it does not name.
+
+⚠️ **NEVER FABRICATE THE MISSING HALF.** The obvious way to make an older run into a GPX is to spread
+its total time evenly across the points it has. That draws a perfectly even run **that never happened,
+in somebody else's training log, under their name.** So `runStravaPayload()` picks its shape from the
+DATA: timed points → `gpx`; no timed points → `manual`, carrying the real distance and time. A run with
+no route at all is `trainer: true` (treadmill); a GPS-refused outdoor run is not. Same rule as
+`sim: true` and as a treadmill run storing no route. `test/strava-payload.test.ts` enforces it.
+
+**Where the secrets live: `alfie-proxy/` — ONE Worker, two jobs.** Same secrecy problem, same box.
+- ⚠️ **`POST /` STAYS ALFIE'S.** The app POSTs to the bare proxy URL it was given (`fetch(cfg.proxy…)`),
+  so moving Alfie to a path would silently break every install already configured. Strava is under
+  `/strava/*`, and `stravaRoute()` returns `null` for anything else.
+- Routes: `/strava/start` (302 to Strava), `/strava/callback` (HTML result page), `/strava/status`,
+  `/strava/upload`, `/strava/upload-status`, `/strava/disconnect`.
+- Tokens live in a **Cloudflare KV namespace bound as `STRAVA`**. `wrangler.toml` carries a
+  **placeholder id** — it deploys cleanly and then fails at runtime with "not configured".
+
+⚠️ **THE PAGE NEVER HOLDS A STRAVA TOKEN, and that is the design rather than a detail.** The obvious
+build hands the access token back after the OAuth dance and uploads from the page — putting a live
+credential for somebody's Strava account into `localStorage` on a **public origin**, where every backup
+export and every storage-inspector screenshot carries it away, and a refresh token cannot be revoked
+from there. Instead the page holds a **device key** (32 bytes of `crypto.getRandomValues`, base64url) in
+`interun_strava_v1`; the Worker maps it to the tokens and never returns them.
+- ⚠️ **`interun_strava_v1` IS IN `BACKUP_NEVER`.** Backup keys are found by the `interun_` PREFIX, so it
+  would otherwise ride out in every export — a file the runner emails themselves. Whoever held it could
+  push runs into their Strava account. Same trap as `interun_mapbox_v1`, worse consequence.
+- ⚠️ The KV key is a **SHA-256 of the device key**, so a dump of the store yields nothing replayable.
+
+⚠️ **The device key does NOT round-trip through Strava.** `state` lands in a redirect URL, browser
+history and any log in between, so `/strava/start` stores a **single-use nonce → key-hash** with a
+600s TTL and sends the nonce. That is also the CSRF gate: a code arriving without a nonce we issued is
+refused.
+
+⚠️ **`activity:write` AND NOTHING ELSE.** It is the only scope that permits an upload or a manual
+activity. Every tutorial also asks for `activity:read_all`, which would hand the Worker the runner's
+entire private history including their privacy zones — to push one run.
+
+⚠️ **CHECK THE GRANTED SCOPE, don't assume it.** Strava's consent screen lets the runner untick the
+permission and continue, returning a perfectly valid token that cannot upload. Stored, that reports
+"Connected" and then fails on every run, which reads as a bug in the app rather than a decision they
+made thirty seconds earlier. The check is before the `put`, asserted by a test.
+
+⚠️ **`start_date_local` IS LOCAL TIME and no server can know the runner's timezone**, so the device
+computes it. Written out from `getFullYear/getMonth/getDate/getHours/…`, **not** sliced off
+`toISOString()` — that is UTC, and it moved every British summer run an hour earlier in the runner's
+own log, invisibly for five months of the year. Verified on-device: UTC `06:39:10Z` → local `07:39:10`.
+
+⚠️ **A DUPLICATE IS A SUCCESS.** Strava answers `"duplicate of activity N"` when the run is already
+there — exactly what a retry produces. Reporting it as an error teaches the runner to tap again, which
+cannot help. `external_id` = the run's own id is what makes Strava able to say so.
+
+⚠️ **A rotated `refresh_token` must be written back.** Strava may rotate it on refresh; keeping the old
+one works until it doesn't, and then the runner is silently disconnected with no way to tell why.
+
+⚠️ **Disconnect tells STRAVA, not just us.** Forgetting our copy alone leaves Inte-Run standing in the
+runner's Strava settings with write access forever. Local record first, so a failed deauthorise still
+disconnects rather than trapping a half state.
+
+Other rules baked in:
+- **The server's answer wins.** A runner can revoke from Strava's settings and the page would never
+  hear; `stravaRefresh()` runs on every mount of Connections, and a 401 on upload clears `connected`.
+- **Coming back into view is the ONLY signal consent succeeded** — nothing redirects into the app. See
+  `stravaResume()` on `visibilitychange`. ⚠️ It must stay on ONE LINE with `syncTextScale()`; a test
+  asserts that pairing (iOS never tells a web view its text-size setting changed).
+- **Consent opens in Safari** via `window.open(…, "_blank")`, which `WebHost.createWebViewWith` already
+  routes out. A login page inside our own web view is the shape of a phishing screen.
+- **Nothing uploads on its own.** The only caller of `stravaSendRun` is a tap; a test counts them.
+- **The button is ABSENT, not disabled, when not connected** — a greyed-out Strava button on every run
+  advertises a feature the runner has not set up.
+- **A tester is never asked for a URL.** `stravaDevMode()` gates the paste field exactly as
+  `mapDevMode()` does; with no server the row stays an untappable "Planned".
+
+⚠️ **`npx tsc --noEmit` DOES NOT COVER `alfie-proxy/`** (tsconfig `include` is `src`/`test`/`demo`), so
+a type error there surfaces at deploy. The command to check it by hand is in `alfie-proxy/README.md`.
+Behaviour is covered from the repo suite instead — `test/strava-connect.test.ts` reads both the page and
+the Worker as source (17 tests).
+
+**Still the owner's to do:** the Cloudflare deploy, and registering the Worker's host as Strava's
+**Authorization Callback Domain** (host only — no scheme, no path). Written up step by step in
+`alfie-proxy/README.md`. The Road Map step `p2-strava` is deliberately **unticked** until a real run
+has gone across. Credentials are in gitignored `strava-secret.txt`.
 
 ## The native app (`ios/`) — started 2026-07-27
 

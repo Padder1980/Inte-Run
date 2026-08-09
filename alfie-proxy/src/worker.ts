@@ -1,16 +1,24 @@
 /**
- * Alfie proxy — the optional "real AI" brain for Ask Alfie.
+ * Inte-Run's server — the one place a secret can live.
  *
- * WHY THIS EXISTS: InteRun is a public static site. An Anthropic API key cannot live in it — anyone
- * could read the page source and spend your money. This tiny Worker holds the key server-side; the
- * app POSTs a question plus the user's plan context, and gets back plain text.
+ * WHY THIS EXISTS: InteRun is a public static site, and a native app whose strings anyone can read.
+ * Neither can hold a credential. This Worker holds them instead, and it now does two unrelated jobs
+ * for that one reason:
  *
- * The app works fine WITHOUT this: Ask Alfie falls back to its on-device answers. Deploy this only
- * if you want open-ended conversation. See ../README.md.
+ *   POST /            → Ask Alfie's optional "real AI" brain (holds the Anthropic API key)
+ *   /strava/*         → the Strava token holder (holds the Strava client secret + the runner's tokens)
+ *
+ * ⚠️ THE ROOT PATH IS ALFIE'S AND MUST STAY THAT WAY. The app POSTs to the bare proxy URL it was
+ * given (`fetch(cfg.proxy, …)` in web/app.ts), so moving Alfie to /alfie would silently break every
+ * install already configured. New jobs get a path; the original keeps the root.
+ *
+ * Either half works without the other: Ask Alfie falls back to its on-device answers, and Strava is
+ * simply not offered when its credentials are absent. See ../README.md.
  */
 import Anthropic from "@anthropic-ai/sdk";
+import { stravaRoute, type StravaEnv } from "./strava.ts";
 
-type Env = {
+type Env = StravaEnv & {
   ANTHROPIC_API_KEY: string;
   /** Comma-separated origins allowed to call this Worker. */
   ALLOWED_ORIGINS?: string;
@@ -48,13 +56,26 @@ const SYSTEM = [
   "Keep replies under about 180 words unless the question genuinely needs more.",
 ].join("\n");
 
+/**
+ * ⚠️ THE NATIVE APP'S ORIGIN IS NOT AN HTTPS ONE. Inte-Run serves its page over `interun://app` so
+ * that WKWebView will allow fetch() at all, and that is the Origin its requests carry — so an
+ * allow-list of https origins locks the native app out of its own server. It is always allowed.
+ *
+ * ⚠️ AND A CUSTOM SCHEME MAY SEND NO ORIGIN AT ALL, which is why a missing one falls through to `*`.
+ * That is deliberate and it is not the security boundary: every Strava route is authorised by the
+ * device key in the request itself, which a hostile page cannot obtain by being able to call this.
+ */
+const APP_ORIGIN = "interun://app";
+
 function cors(env: Env, origin: string | null): Record<string, string> {
-  const allowed = (env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
-  const ok = origin && (allowed.length === 0 || allowed.includes(origin));
+  const configured = (env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
+  // With no ALLOWED_ORIGINS set, any origin is allowed — the same open default this Worker shipped
+  // with, so an existing Alfie deploy behaves exactly as before until its owner locks it down.
+  const ok = !origin || configured.length === 0 || origin === APP_ORIGIN || configured.includes(origin);
   return {
-    "access-control-allow-origin": ok && origin ? origin : allowed[0] || "*",
+    "access-control-allow-origin": ok ? (origin || "*") : (configured[0] || "*"),
     "access-control-allow-headers": "content-type",
-    "access-control-allow-methods": "POST, OPTIONS",
+    "access-control-allow-methods": "GET, POST, OPTIONS",
     "access-control-max-age": "86400",
   };
 }
@@ -62,6 +83,11 @@ function cors(env: Env, origin: string | null): Record<string, string> {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const headers = cors(env, request.headers.get("origin"));
+
+    // Strava first: it owns /strava/*, and returns null for everything else so the root stays Alfie's.
+    const strava = await stravaRoute(request, env, headers);
+    if (strava) return strava;
+
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
     if (request.method !== "POST") return new Response("POST only", { status: 405, headers });
 

@@ -4,5 +4,16 @@ compatibility_date = "2026-07-01"
 compatibility_flags = ["nodejs_compat"]
 
 # Secrets are NOT set here — never commit a key. Set them with:
-#   npx wrangler secret put ANTHROPIC_API_KEY
-#   npx wrangler secret put ALLOWED_ORIGINS      # e.g. https://padder1980.github.io
+#   npx wrangler secret put ANTHROPIC_API_KEY     # only for Ask Alfie
+#   npx wrangler secret put STRAVA_CLIENT_ID      # only for Strava
+#   npx wrangler secret put STRAVA_CLIENT_SECRET  # only for Strava
+#   npx wrangler secret put ALLOWED_ORIGINS       # e.g. https://padder1980.github.io
+#
+# Either half works alone: with no Strava credentials set, the app is simply not offered Strava.
+
+# Where the runners' Strava tokens live. ⚠️ Create it once and paste the id below — a placeholder id
+# deploys cleanly and then fails at runtime with "not configured", which reads as a code bug:
+#   npx wrangler kv namespace create STRAVA
+[[kv_namespaces]]
+binding = "STRAVA"
+id = "PASTE_THE_ID_FROM_wrangler_kv_namespace_create"

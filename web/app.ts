@@ -2525,6 +2525,20 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .shoe-bar i { display: block; height: 100%; border-radius: 5px; background: var(--eff-easy); }
 .shoe-bar.wearing i { background: var(--ease); }
 .shoe-bar.due i, .shoe-bar.retired i { background: var(--rest); }
+/* Strava, on a run. The sent state is a row rather than a button because it is a place to go, not an
+   action to repeat — it mirrors .str-offer so the debrief keeps one shape for "tap this to leave". */
+.stv-done { display: flex; align-items: center; gap: 12px; width: 100%; margin-top: 10px; padding: 14px 16px;
+  text-align: left; text-decoration: none; color: inherit; }
+.stv-ic { flex: 0 0 auto; width: 34px; height: 34px; border-radius: var(--r-ctl); display: grid; place-items: center;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-2)); color: var(--accent); }
+.stv-ic svg { width: 17px; height: 17px; }
+.stv-b { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.stv-t { font-size: var(--t-body); font-weight: 700; color: var(--ink); }
+.stv-d { font-size: var(--t-meta); color: var(--ink-soft); }
+.stv-err { margin-top: 8px; padding: 10px 12px; font-size: var(--t-meta); line-height: 1.5; color: var(--ink);
+  background: color-mix(in srgb, var(--rest) 10%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--rest) 40%, var(--line)); border-radius: var(--r-ctl); }
+#stvSend[disabled] { opacity: .6; }
 </style>
 </head>
 <body>
@@ -3810,8 +3824,19 @@ function runStravaPayload(run) {
   const startMs = runStartMs(run);
   const name = String(run && run.t ? run.t : "Run");
   const type = run && run.type === "race" ? "Run" : "Run";
+  // ⚠️ STRAVA WANTS A MANUAL ACTIVITY'S START IN LOCAL TIME, and no server can work out which
+  // timezone somebody ran in -- so the device that was there computes it. Written out by hand rather
+  // than sliced off toISOString(), which is UTC: that quietly moved every British summer run an hour
+  // earlier in the runner's own log. No suffix, because the absence of one is what says "local".
+  const p2 = (n) => (n < 10 ? "0" + n : String(n));
+  const ld = new Date(startMs);
+  const startLocal = ld.getFullYear() + "-" + p2(ld.getMonth() + 1) + "-" + p2(ld.getDate()) +
+    "T" + p2(ld.getHours()) + ":" + p2(ld.getMinutes()) + ":" + p2(ld.getSeconds());
+  // Strava's own dedupe handle, so the same run sent twice comes back as a duplicate rather than
+  // appearing twice in somebody's training log.
+  const externalId = String((run && run.id) || "");
   if (pts.length < 2) {
-    return { kind: "manual", name: name, type: type, startMs: startMs,
+    return { kind: "manual", name: name, type: type, startMs: startMs, startLocal: startLocal, externalId: externalId,
              distanceM: Math.round((Number(run.distKm) || 0) * 1000),
              elapsedSec: Math.round(Number(run.sec) || 0),
              trainer: !(run.route && run.route.length) };
@@ -3825,7 +3850,8 @@ function runStravaPayload(run) {
     '<gpx version="1.1" creator="Inte-Run" xmlns="http://www.topografix.com/GPX/1/1">' +
     '<metadata><time>' + iso(0) + '</time></metadata>' +
     '<trk><name>' + esc(name) + '</name><type>running</type><trkseg>' + trk + '</trkseg></trk></gpx>';
-  return { kind: "gpx", name: name, type: type, startMs: startMs, gpx: gpx, points: pts.length };
+  return { kind: "gpx", name: name, type: type, startMs: startMs, startLocal: startLocal, externalId: externalId,
+           gpx: gpx, points: pts.length };
 }
 /**
  * When the run began, in real time.
@@ -7598,7 +7624,11 @@ const BACKUP_PREFIXES = ["interun_", "rc_"];
 // AirDrops, or hands to someone helping them; a token in it is a token given away. It is a
 // per-device setting, not part of a training history, so it does not belong in a backup on either
 // count. Keep this list to things that are genuinely NOT the runner's data.
-const BACKUP_NEVER = ["interun_mapbox_v1"];
+// ⚠️ CREDENTIALS, NOT TRAINING HISTORY. Backup keys are discovered by the interun_ PREFIX, so anything
+// added here would otherwise be swept into every export — a file the runner emails themselves or hands
+// to whoever is helping them. interun_strava_v1 holds the device key that authorises uploads to their
+// Strava account; whoever held a backup containing it could push runs into that account.
+const BACKUP_NEVER = ["interun_mapbox_v1", "interun_strava_v1"];
 function backupKeys() {
   const out = [];
   try {
@@ -7817,6 +7847,269 @@ function repaintNameHint() {
   });
 }
 function wireWhyView() { wireWhyInputs(() => { if (state.tab === "support" && state.support === "why") render(); }); }
+// ---- Strava ---------------------------------------------------------------------------------------
+/**
+ * Sending a finished run to Strava.
+ *
+ * ⚠️ WHY THERE IS A SERVER IN THIS AT ALL, when everything else in this app runs on the device.
+ * Exchanging Strava’s authorisation code for tokens needs the client SECRET, which behaves like a
+ * password for every account that has connected. This page is public and the native app’s strings are
+ * readable by anyone who installs it, so neither can hold it. alfie-proxy/ holds it, and holds each
+ * runner’s Strava tokens with it.
+ *
+ * ⚠️ THIS PAGE NEVER SEES A STRAVA TOKEN, and that is the point of the design rather than a detail of
+ * it. The obvious build hands the access token back after the OAuth dance and uploads from here; that
+ * puts a live credential for somebody’s Strava account into localStorage on a public origin. Instead
+ * this page holds a DEVICE KEY it generated itself and the server maps that key to the tokens. A
+ * leaked device key is revocable and cannot be used against Strava directly; a refresh token is
+ * neither.
+ *
+ * ⚠️ AND THE DEVICE KEY IS EXCLUDED FROM BACKUPS (BACKUP_NEVER), for exactly the reason the Mapbox
+ * token is: backup keys are discovered by the interun_ PREFIX, so interun_strava_v1 would otherwise be
+ * swept into every export — a file the runner emails themselves or hands to whoever is helping them.
+ * Whoever held that file could push runs into their Strava account.
+ */
+function stravaCfg() { try { return JSON.parse(localStorage.getItem("interun_strava_v1") || "null") || {}; } catch (e) { return {}; } }
+function stravaSaveCfg(c) { try { localStorage.setItem("interun_strava_v1", JSON.stringify(c)); } catch (e) {} }
+/**
+ * Where Inte-Run’s server is. ONE Worker does Alfie and Strava — same secrecy problem, same box — so a
+ * proxy already configured for Alfie serves Strava with nothing further to set up. Strava still keeps
+ * its own setting, so it can be pointed elsewhere and so clearing one never silently clears the other.
+ */
+function stravaBase() {
+  let url = "";
+  try { url = String(stravaCfg().proxy || (alfieCfg() || {}).proxy || "").trim(); } catch (e) { url = ""; }
+  return url ? url.replace(/\\/+$/, "") : "";
+}
+function stravaDeviceKey() {
+  const cfg = stravaCfg();
+  if (cfg.key) return String(cfg.key);
+  try {
+    const raw = new Uint8Array(32);
+    crypto.getRandomValues(raw);
+    let s = "";
+    for (let i = 0; i < raw.length; i++) s += String.fromCharCode(raw[i]);
+    cfg.key = btoa(s).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/, "");
+  } catch (e) { return ""; }
+  stravaSaveCfg(cfg);
+  return String(cfg.key);
+}
+function stravaConnected() { const c = stravaCfg(); return !!(c.connected && c.key); }
+/** Is this someone who is expected to configure a server by hand? Same gate as the Mapbox field:
+ *  a TestFlight tester must never be shown a box asking for a URL they have never heard of. */
+function stravaDevMode() {
+  try { return !inNativeApp() || !!stravaBase(); } catch (e) { return false; }
+}
+function stravaCall(path, opts) {
+  const base = stravaBase();
+  if (!base) return Promise.reject(new Error("no server"));
+  return fetch(base + path, opts || {}).then((r) =>
+    r.json().catch(() => ({})).then((j) => ({ ok: r.ok, status: r.status, json: j || {} })));
+}
+/**
+ * Ask the server whether this device is connected, and to whom.
+ *
+ * ⚠️ THE SERVER’S ANSWER WINS, ALWAYS. A runner can revoke Inte-Run from Strava’s own settings page
+ * at any time and this page would never hear about it, so "connected" is re-checked rather than
+ * trusted from what we wrote down when they linked it. Otherwise the Logbook offers a button that
+ * cannot work and blames the app when it fails.
+ */
+function stravaRefresh() {
+  const cfg = stravaCfg();
+  if (!cfg.key || !stravaBase()) return Promise.resolve(cfg);
+  return stravaCall("/strava/status?dk=" + encodeURIComponent(cfg.key)).then((r) => {
+    const c = stravaCfg();
+    const was = !!c.connected;
+    c.connected = !!(r.json && r.json.connected && r.json.canWrite !== false);
+    c.name = String((r.json && r.json.name) || "");
+    // The pending flag only exists to explain the gap while the runner is away in Safari. It clears
+    // when they come back connected, and it times out either way so it can never stick.
+    if (c.connected || !c.pending || Date.now() - Number(c.pending) > 600000) c.pending = 0;
+    stravaSaveCfg(c);
+    if (was !== c.connected || !c.pending) stravaRerender();
+    return c;
+  }).catch(() => cfg);
+}
+function stravaRerender() {
+  if ($("stvSheet")) { openStravaSheet(); return; }
+  if (state.tab === "support" && state.support === "connect") render();
+}
+/**
+ * Step one: hand the runner to Strava, in a real browser.
+ *
+ * ⚠️ IT HAS TO LEAVE THE APP. Strava’s consent screen cannot be shown inside our own web view — in
+ * the native app that is an unbranded browser with no way back, and a login page inside somebody
+ * else’s app is the exact shape of a phishing screen. window.open(_blank) is already routed to Safari
+ * by WebHost’s createWebViewWith, so one call serves the browser and the app alike.
+ *
+ * ⚠️ THE DEVICE KEY TRAVELS IN THAT URL, so it lands in Safari’s history. Written down rather than
+ * discovered: it goes only to the owner’s own server over TLS, it authorises uploads to this runner’s
+ * own Strava and nothing else, and disconnecting revokes it.
+ */
+function stravaConnect() {
+  const base = stravaBase();
+  if (!base) return;
+  const key = stravaDeviceKey();
+  if (!key) { toast("This browser cannot generate a secure key."); return; }
+  const cfg = stravaCfg(); cfg.pending = Date.now(); stravaSaveCfg(cfg);
+  try { window.open(base + "/strava/start?dk=" + encodeURIComponent(key), "_blank"); } catch (e) {}
+  stravaRerender();
+}
+/**
+ * ⚠️ IT TELLS STRAVA, NOT JUST ITSELF. Forgetting our own copy would leave Inte-Run standing in the
+ * runner’s Strava settings with write access to their account forever. The local state goes first so
+ * the screen is honest immediately even if the network call fails.
+ */
+function stravaDisconnect() {
+  const cfg = stravaCfg();
+  const key = cfg.key;
+  cfg.connected = false; cfg.name = ""; cfg.pending = 0; stravaSaveCfg(cfg);
+  stravaRerender();
+  if (!key || !stravaBase()) return;
+  stravaCall("/strava/disconnect", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ dk: key }) })
+    .catch(() => {});
+}
+/**
+ * Send one run.
+ *
+ * ⚠️ WHAT HAPPENED IS RECORDED ON THE RUN ITSELF (run.strava), so the button knows next time. Without
+ * it the only way to find out whether a run is already on Strava is to send it again and read the
+ * duplicate error back — a poor way to treat somebody’s training log, and it reads as a bug.
+ *
+ * ⚠️ THE "sending" STATE IS DELIBERATELY NOT SAVED TO DISK. If the app is killed mid-upload a saved
+ * one would come back as a run stuck sending forever, with no button to try again.
+ */
+function stravaSendRun(run, onDone) {
+  if (!run || !stravaConnected()) return;
+  const key = stravaCfg().key;
+  const payload = runStravaPayload(run);
+  const finish = () => { saveRuns(); if (onDone) onDone(); };
+  run.strava = { state: "sending" };
+  if (onDone) onDone();
+  stravaCall("/strava/upload", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ dk: key, run: payload }),
+  }).then((r) => {
+    const j = r.json || {};
+    // ⚠️ A 401 means the connection is gone at Strava’s end, so the screen must stop claiming it.
+    if (r.status === 401) { const c = stravaCfg(); c.connected = false; stravaSaveCfg(c); }
+    if (j.ok && j.activityId) run.strava = { state: "done", id: String(j.activityId), duplicate: !!j.duplicate };
+    else if (j.ok && j.pending) run.strava = { state: "pending", uploadId: String(j.uploadId || "") };
+    else run.strava = { state: "error", msg: String(j.error || "Strava could not be reached.") };
+    finish();
+  }).catch(() => {
+    run.strava = { state: "error", msg: "No connection \\u2014 try again when you are back online." };
+    finish();
+  });
+}
+/** Finish a run Strava was still processing when we stopped waiting. */
+function stravaCheckPending(run, onDone) {
+  const s = (run && run.strava) || {};
+  if (s.state !== "pending" || !s.uploadId || !stravaConnected()) return;
+  run.strava = { state: "sending" };
+  if (onDone) onDone();
+  stravaCall("/strava/upload-status?dk=" + encodeURIComponent(stravaCfg().key) + "&id=" + encodeURIComponent(s.uploadId))
+    .then((r) => {
+      const j = r.json || {};
+      if (j.ok && j.activityId) run.strava = { state: "done", id: String(j.activityId), duplicate: !!j.duplicate };
+      else if (j.ok && j.pending) run.strava = { state: "pending", uploadId: s.uploadId };
+      else run.strava = { state: "error", msg: String(j.error || "Strava could not be reached.") };
+      saveRuns(); if (onDone) onDone();
+    }).catch(() => { run.strava = { state: "pending", uploadId: s.uploadId }; if (onDone) onDone(); });
+}
+/**
+ * The Strava control on a run, in the one debrief builder — so it appears on the finish screen and on
+ * the same run reopened from the Logbook, which is that screen’s standing rule.
+ *
+ * ⚠️ IT IS ABSENT, NOT DISABLED, WHEN STRAVA IS NOT CONNECTED. A greyed-out Strava button on every run
+ * advertises a feature the runner has not set up, on the screen they came to read about their run.
+ * Connecting lives in Support › Apps & devices, once.
+ */
+function stravaRunButtonHtml(run) {
+  if (!stravaConnected()) return "";
+  const s = (run && run.strava) || {};
+  if (s.state === "done") {
+    return '<a class="card stv-done" href="https://www.strava.com/activities/' + esc(s.id) + '" target="_blank" rel="noopener">' +
+      '<span class="stv-ic">' + ICON.share + '</span>' +
+      '<span class="stv-b"><span class="stv-t">' + (s.duplicate ? "Already on Strava" : "On Strava") + '</span>' +
+      '<span class="stv-d">Open the activity</span></span><span class="arr">\\u203a</span></a>';
+  }
+  if (s.state === "sending") {
+    return '<button class="primary share-btn" id="stvSend" disabled>Sending to Strava\\u2026</button>';
+  }
+  if (s.state === "pending") {
+    return '<button class="primary share-btn" id="stvCheck">' + ICON.share + ' Strava is still processing it \\u2014 check now</button>';
+  }
+  const err = s.state === "error" ? '<div class="stv-err">' + esc(s.msg || "") + '</div>' : "";
+  return '<button class="primary share-btn" id="stvSend">' + ICON.share + ' ' +
+    (s.state === "error" ? "Try Strava again" : "Send to Strava") + '</button>' + err;
+}
+/**
+ * The connect sheet. Everything about Strava that is not "send this run" lives here, so the
+ * Connections row stays one line and the setup box stays out of a tester’s way.
+ */
+function stravaSheetHtml() {
+  const cfg = stravaCfg();
+  const base = stravaBase();
+  const waiting = !!cfg.pending && Date.now() - Number(cfg.pending) < 600000;
+  let body;
+  if (!base) {
+    body = '<div class="bk-md">Strava needs Inte-Run\\u2019s own small server to hold the connection \\u2014 the ' +
+      'password that authorises it can never sit inside an app, where anyone could read it.</div>' +
+      (stravaDevMode()
+        ? '<input id="stvUrl" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" ' +
+          'placeholder="https://alfie-proxy.\\u2026workers.dev" ' +
+          'style="width:100%;margin-top:12px;padding:12px;border-radius:12px;border:1px solid var(--line);' +
+          'background:var(--surface);color:var(--ink);font:16px ui-monospace,monospace">' +
+          '<button class="primary" id="stvUrlSave" style="width:100%;margin-top:10px">Use this server</button>' +
+          '<div class="bk-md" style="margin-top:10px;line-height:1.45">Stays on this phone. See alfie-proxy in the repo for the ten-minute deploy.</div>'
+        : '<div class="bk-md" style="margin-top:10px">It arrives with the App Store release.</div>');
+  } else if (stravaConnected()) {
+    body = '<div class="bk-box"><div class="bk-val">Connected' + (cfg.name ? " as " + esc(cfg.name) : "") + '</div>' +
+      '<div class="bk-md" style="margin-top:4px">Open any run in your Logbook and tap Send to Strava.</div></div>' +
+      '<div class="bk-md" style="margin-top:12px">Inte-Run can only <b>add</b> activities. It cannot read your ' +
+      'Strava history, and it never sees your Strava password.</div>' +
+      '<button class="bk-btn2" id="stvOff">Disconnect from Strava</button>';
+  } else if (waiting) {
+    body = '<div class="bk-box"><div class="bk-val">Waiting for Strava</div>' +
+      '<div class="bk-md" style="margin-top:4px">Finish giving permission in the browser, then come back here.</div></div>' +
+      '<button class="primary" id="stvCheckLink" style="width:100%;margin-top:12px">I\\u2019ve done that \\u2014 check now</button>' +
+      '<button class="bk-btn2" id="stvRetry">Start again</button>';
+  } else {
+    body = '<div class="bk-md">Send your finished runs to Strava, so your training log stays where your ' +
+      'friends can see it. Inte-Run asks for one permission \\u2014 to add activities \\u2014 and nothing else: it ' +
+      'cannot read your Strava history and never sees your Strava password.</div>' +
+      '<button class="primary" id="stvGo" style="width:100%;margin-top:14px">Connect to Strava</button>' +
+      '<div class="bk-md" style="margin-top:10px;line-height:1.45">Opens Strava in your browser. Runs are only ' +
+      'sent when you tap Send on a run \\u2014 nothing goes across on its own.</div>';
+  }
+  return '<div id="stvSheet"></div><div class="sd-type" style="--sc:var(--accent)">Apps</div>' +
+    '<div class="sd-title">Strava</div>' + body;
+}
+function openStravaSheet() {
+  ensureSheet(); SHEET_CTX = null;
+  $("sheetBody").innerHTML = stravaSheetHtml();
+  wireStravaSheet();
+  $("sheetOv").classList.add("on");
+}
+function wireStravaSheet() {
+  const go = $("stvGo"); if (go) go.onclick = stravaConnect;
+  const retry = $("stvRetry"); if (retry) retry.onclick = stravaConnect;
+  const off = $("stvOff"); if (off) off.onclick = stravaDisconnect;
+  const chk = $("stvCheckLink"); if (chk) chk.onclick = () => { chk.textContent = "Checking\\u2026"; stravaRefresh(); };
+  const save = $("stvUrlSave"), inp = $("stvUrl");
+  if (inp) inp.value = String(stravaCfg().proxy || "");
+  if (save && inp) save.onclick = () => {
+    const v = (inp.value || "").trim().replace(/\\/+$/, "");
+    // ⚠️ http:// IS REFUSED. The device key travels on this URL, and a key sent in clear over a
+    // café network is a key somebody else has.
+    if (v && v.indexOf("https://") !== 0) { toast("That must be an https:// address."); return; }
+    const cfg = stravaCfg();
+    if (v) cfg.proxy = v; else delete cfg.proxy;
+    stravaSaveCfg(cfg);
+    openStravaSheet();
+  };
+}
 // ---- Connected apps & devices -------------------------------------------------------------------
 // The honest version of the screen every big fitness app has. Three kinds of row: things that are
 // genuinely working (watch, Health-via-watch, calendars), things that need the runner to act, and
@@ -7838,6 +8131,18 @@ function connectView() {
   else if (WATCH_STATUS.paired) { watchNote = "Watch paired \u2014 install Inte-Run from the Watch app on your iPhone."; watchBadge = "Not installed"; watchCls = "soon"; }
   else { watchNote = "No Apple Watch is paired with this iPhone."; watchBadge = "No watch"; watchCls = "soon"; }
 
+  // Strava. ⚠️ A "Planned" row stays untappable for anyone who has no server, which is every tester —
+  // the same rule as the Mapbox paste field: nobody should be shown a box asking for a URL they have
+  // never heard of. The owner (in a browser, or already configured) gets the row that opens.
+  const stvCfg = stravaCfg();
+  const stvSetUp = !!stravaBase();
+  const stvWaiting = !!stvCfg.pending && Date.now() - Number(stvCfg.pending) < 600000;
+  let stvNote, stvBadge, stvCls;
+  if (!stvSetUp) { stvNote = "Needs Inte-Run’s own server to hold the connection — it arrives with the App Store release."; stvBadge = "Planned"; stvCls = "soon"; }
+  else if (stravaConnected()) { stvNote = "Connected" + (stvCfg.name ? " as " + esc(stvCfg.name) : "") + " — send a run from its page in your Logbook."; stvBadge = "Connected"; stvCls = "ok"; }
+  else if (stvWaiting) { stvNote = "Waiting for you to give permission in your browser."; stvBadge = "…"; stvCls = "soon"; }
+  else { stvNote = "Send your finished runs to Strava. One permission — to add activities."; stvBadge = "Ready"; stvCls = "ok"; }
+
   return '<div class="card">' +
     '<div class="cn-sec">Watches</div>' +
     row(ICON.devices, "Apple Watch", watchNote, watchBadge, watchCls, null) +
@@ -7846,7 +8151,7 @@ function connectView() {
     row(ICON.heart, "Apple Health", native
       ? "Watch runs save to Health automatically and count towards your rings."
       : "Works with the Inte-Run iPhone app \u2014 watch runs save to Health.", native ? "Automatic" : "Needs the app", native ? "ok" : "soon", null) +
-    row(ICON.share, "Strava", "On the road map \u2014 needs Inte-Run\u2019s server, which arrives with the App Store release.", "Planned", "soon", null) +
+    row(ICON.share, "Strava", stvNote, stvBadge, stvCls, (stvSetUp || stravaDevMode()) ? "strava" : null) +
     '<div class="cn-sec">Calendars</div>' +
     row(ICON.plan, "Apple, Google & Outlook", "Put every planned session in your calendar, with a morning alert.", "Ready", "ok", "cal") +
     '</div>' +
@@ -7857,6 +8162,11 @@ function wireConnectView() {
   if (!document.querySelector(".cn-row")) return;
   if (NATIVE_WATCH && !WATCH_STATUS) { try { window.webkit.messageHandlers.interunWatch.postMessage({ action: "status" }); } catch (e) {} }
   document.querySelectorAll('[data-cn="cal"]').forEach((b) => b.onclick = openRemindersSheet);
+  document.querySelectorAll('[data-cn="strava"]').forEach((b) => b.onclick = openStravaSheet);
+  // ⚠️ ASK THE SERVER EVERY TIME THIS SCREEN IS OPENED. A runner can revoke Inte-Run from Strava's own
+  // settings page, and this is the screen where they come to find out whether it is still connected —
+  // reporting our own stale copy of the answer is the one thing it must not do.
+  if (stravaCfg().key && stravaBase()) stravaRefresh();
 }
 // One line that diagnoses letterboxing from a screenshot: if "page" is short of "screen", iOS is
 // boxing the web app inside system bands and no CSS in this file can reach them — the Home Screen
@@ -10915,6 +11225,7 @@ function runOverviewHtml(run) {
   return '<div class="card ov-map-card"><div class="ov-map" id="ovMap">' + routeMapSvg(run.route) + '</div>' +
     head + ovStatsHtml(run, a) + '</div>' +
     '<button class="primary share-btn" id="shareRun">' + ICON.share + ' Share my run</button>' +
+    stravaRunButtonHtml(run) +
     // \u26a0\ufe0f THE PACE CHART, THE SPLITS AND THE HEART-RATE PANEL NO LONGER STACK HERE. Each is
     // reached by tapping the stat it belongs to. What is left is his list: share, the written
     // debrief, the stretch offer, what the plan asked for, trainers, notes, effort.
@@ -12612,7 +12923,13 @@ function refreshTodayNavDate() {
   if (day) day.textContent = String(new Date().getDate());
 }
 // Keep the date current if the app is left open across midnight and brought back to the foreground.
-document.addEventListener("visibilitychange", () => { if (!document.hidden) { refreshTodayNavDate(); syncTextScale(); } });
+// ⚠️ COMING BACK INTO VIEW IS THE ONLY MOMENT THE APP CAN LEARN THE STRAVA LINK SUCCEEDED. Permission
+// is given in Safari and nothing comes back to the page — no redirect into the app, no message — so
+// stravaResume() is what saves the runner from staring at "waiting for Strava" having already done it.
+// ⚠️ Kept on ONE LINE with syncTextScale(): a test asserts that pairing, because iOS never tells a web
+// view its text-size setting changed and this listener is the only chance to re-read it.
+function stravaResume() { try { const c = stravaCfg(); if (c.pending && c.key && stravaBase()) stravaRefresh(); } catch (e) {} }
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { refreshTodayNavDate(); syncTextScale(); stravaResume(); } });
 // A repaint that ARRIVES ON ITS OWN — a wrist run landing, a mirror going stale — rather than one the
 // runner asked for. It must never rebuild the plan-setup form: viewSetup() reads every value from the
 // saved profile, so redrawing it discards whatever is half-typed. The runner is mid-sentence; their
@@ -12888,6 +13205,14 @@ function wire() {
   wireSwipes();
   const runBack = $("runBack"); if (runBack) runBack.onclick = () => { state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); };
   const shareRun = $("shareRun"); if (shareRun) { shareRun.onclick = doShareRun; prepareShareCard(currentOverviewRun()); }
+  // Strava sits in runOverviewHtml beside Share, so this one wiring serves the finish screen and the
+  // Logbook's detail view alike. ⚠️ The callback re-renders rather than patching the button: the state
+  // it has to show (sending / on Strava / still processing / failed with a reason) is built in one
+  // place, and a second copy of that logic here is how the two screens start disagreeing.
+  const stvSend = $("stvSend");
+  if (stvSend && !stvSend.disabled) stvSend.onclick = () => stravaSendRun(currentOverviewRun(), render);
+  const stvCheck = $("stvCheck");
+  if (stvCheck) stvCheck.onclick = () => stravaCheckPending(currentOverviewRun(), render);
   // The stretch offer sits in runOverviewHtml, so this one wiring serves the finish screen and the
   // Logbook's detail view alike — the same reason the offer itself lives in that one builder.
   const strOffer = $("strOffer"); if (strOffer) strOffer.onclick = openStretchSheet;

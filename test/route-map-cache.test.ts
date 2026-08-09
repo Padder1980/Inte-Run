@@ -219,7 +219,20 @@ test("⚠️ a pasted token never travels in a backup", () => {
   // given away.
   const html = app();
   assert.match(html, /BACKUP_NEVER/, "there is no exclusion list, so the token rides out in every export");
-  assert.match(html, /BACKUP_NEVER = \["interun_mapbox_v1"\]/, "the Mapbox token is not the thing excluded");
+  // ⚠️ MEMBERSHIP, NOT THE EXACT LITERAL. This asserted the whole array as written, so adding a second
+  // credential to it failed the test that exists to protect credentials — which pushes whoever hit it
+  // towards editing the guard. Every credential is named individually instead, so the list can grow
+  // and each entry still has a test of its own.
+  const list = /BACKUP_NEVER = \[([^\]]*)\]/.exec(html);
+  assert.ok(list, "BACKUP_NEVER is no longer a literal array this test can read");
+  for (const [key, what] of [
+    ["interun_mapbox_v1", "the billable Mapbox token"],
+    // The device key that authorises uploads to the runner's Strava account. Whoever held a backup
+    // containing it could push runs into that account.
+    ["interun_strava_v1", "the Strava device key"],
+  ] as const) {
+    assert.match(list![1]!, new RegExp('"' + key + '"'), what + " rides out in every export");
+  }
   assert.match(lift("backupKeys"), /BACKUP_NEVER\.indexOf\(k\) >= 0. continue/,
     "backupKeys does not consult the exclusion list");
 });

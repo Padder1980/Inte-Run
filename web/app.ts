@@ -6916,6 +6916,7 @@ function viewProfile() {
     '<div class="card pf-card">' +
       profRow({ icon: "bell", colour: "var(--ease)", label: "Notifications", value: remind, action: "reminders" }) +
       profRow({ icon: "theme", colour: "var(--taper)", label: "Appearance", value: themeSet ? (themeSet === "dark" ? "Dark" : "Light") : "System", action: "theme" }) +
+      profRow({ icon: "vox", colour: "var(--accent)", label: "Voice coaching", value: coachEnabled() ? (((RC.COACHES || {})[COACH.cfg.coach] || {}).name || "On") : "Off", action: "setup:voice" }) +
     '</div>' +
     '<div class="pf-sec"><span>Account</span></div>' +
     '<div class="card pf-card">' +
@@ -8403,12 +8404,25 @@ function viewSetup() {
   const secGoal = goalCardInner(p.status || "regular", { dist: p.goalDist, date: p.raceDate, target: fmtTimeFull(p.targetS) });
 
   // 4 · A few details
-  const secDetails =
+  // \u26a0\ufe0f THE FORM'S SECTIONS NOW MATCH THE PROFILE PAGE'S ROWS, which is what makes a scoped
+  // edit coherent: tapping "Training rhythm" opens a section CALLED Training rhythm, not five
+  // questions borrowed out of "A few details". The old section 4 held both rhythm and context, so
+  // the two rows either shared a screen or the split had to be invented per-question.
+  const secRhythm =
     '<div class="q" style="margin-top:0"><label>How many days a week will you run? <span class="q-hint">we\\u2019ll shape the plan around this</span></label>' + seg("days", [["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]], p.daysPerWeek) + '</div>' +
     '<div class="q" id="volQ"><label>Roughly how far do you run in a normal week? <span class="q-hint">km \\u2014 so we can build on what you already do</span></label><input class="sel" id="s_volume" type="number" inputmode="numeric" min="0" max="250" step="5" style="max-width:140px" value="' + (p.volKm || "") + '" placeholder="e.g. 40"><div class="q-hint" style="margin-top:5px">Leave it blank if you are not sure \\u2014 we\\u2019ll use a sensible default for your goal.</div></div>' +
     '<div class="q"><label>Which day suits your long run? <span class="q-hint">we\\u2019ll build the week around it</span></label><select class="sel" id="s_longday" style="max-width:200px">' + dayOpts(p.longRunDay) + '</select></div>' +
     '<div class="q"><label>When do you want to start? <span class="q-hint">a mid-week start gives a shorter first week</span></label><input class="sel" id="s_startdate" type="date" value="' + (p.startDateIso || todayIso()) + '" min="' + todayIso() + '"></div>' +
-    '<div class="q"><label>Age</label><select class="sel" id="s_age" style="max-width:140px">' + ageOpts(p.age) + '</select></div>' +
+    '<div class="q"><label>Include strength &amp; conditioning?</label>' + seg("strength", [["1","Yes"],["0","No"]], p.strength?"1":"0") + '</div>';
+
+    // ⚠️ ONE QUESTION FOR TWO DIFFERENT THINGS, and the wording gave it away: "Returning from injury
+    // or a long break?" as a single Yes/No. Both answers were treated as an injury and both got the
+    // same 0.35 improvement ceiling — so a runner coming back hurt was told their goal was MORE
+    // achievable than an uninjured runner's, while the same flag shortened their build phase to keep
+    // the early weeks conservative. The owner put it plainly: being injured makes a goal less likely,
+    // not more. Three answers now, because the two cases genuinely differ.
+  const secContext =
+    '<div class="q" style="margin-top:0"><label>Age</label><select class="sel" id="s_age" style="max-width:140px">' + ageOpts(p.age) + '</select></div>' +
     '<div class="q"><label>Sex <span class="q-hint">helps tailor advice</span></label><select class="sel" id="s_sex" style="max-width:200px"><option value=""' + (!p.sex?" selected":"") + '>Prefer not to say</option><option value="female"' + (p.sex==="female"?" selected":"") + '>Female</option><option value="male"' + (p.sex==="male"?" selected":"") + '>Male</option></select></div>' +
     // \u26a0\ufe0f THIS CONTAINER DID NOT EXIST, so refreshTypePreview -- wired to three call sites,
     // including oninput on the two fields right above -- computed the runner\'s classification and
@@ -8419,26 +8433,20 @@ function viewSetup() {
     // was supposed to SAY so. Found by the test asserting that every element lookup in the built page
     // resolves to an id something actually produces.
     '<div class="card tp-card" id="typePreview"></div>' +
-    '<div class="q"><label>Include strength &amp; conditioning?</label>' + seg("strength", [["1","Yes"],["0","No"]], p.strength?"1":"0") + '</div>' +
-    // ⚠️ ONE QUESTION FOR TWO DIFFERENT THINGS, and the wording gave it away: "Returning from injury
-    // or a long break?" as a single Yes/No. Both answers were treated as an injury and both got the
-    // same 0.35 improvement ceiling — so a runner coming back hurt was told their goal was MORE
-    // achievable than an uninjured runner's, while the same flag shortened their build phase to keep
-    // the early weeks conservative. The owner put it plainly: being injured makes a goal less likely,
-    // not more. Three answers now, because the two cases genuinely differ.
     '<div class="q"><label>Coming back to running? <span class="q-hint">time off and injury are different — one limits your fitness, the other limits what your body will take</span></label>' +
       seg("returning", [["0","No"],["break","After time off"],["injury","After an injury"]], returnKind(p)) + '</div>';
 
   return savedMsg + intro +
     setupSection(1, "You", "A photo and what to call you", secYou) +
-    setupSection(2, "Your running", "So we pitch your paces just right", secRunning) +
+    setupSection(2, "Current fitness", "So we pitch your paces just right", secRunning) +
     // ⚠️ Hand-built rather than setupSection() because it needs #goalCard/#goalBody for the live
     // rebuild — so it must be kept in step by hand. Its inline margin was the last one left, and it
     // made section 3 the single card in the run with a different gap above it.
     '<div class="card setup-card" id="goalCard"><div class="sec-head"><div class="sec-num">3</div><div><div class="sec-title">Your goal</div><div class="sec-sub">What you\\u2019re working towards</div></div></div><div id="goalBody">' + secGoal + '</div></div>' +
-    setupSection(4, "A few details", "The finishing touches to your plan", secDetails) +
-    setupSection(5, "Voice coaching", "Your spoken running coach", coachSettingsHtml()) +
-    setupSection(6, "Your why", "The reasons behind the plan",
+    setupSection(4, "Training rhythm", "How your week is shaped", secRhythm) +
+    setupSection(5, "Current context", "Anything that changes what your body will take", secContext) +
+    setupSection(6, "Voice coaching", "Your spoken running coach", coachSettingsHtml()) +
+    setupSection(7, "Your why", "The reasons behind the plan",
       '<div class="bk-md" style="margin:0 0 14px">Training gets hard long before race day. Tell us what this is really for, and deep into a long run \u2014 when it starts to bite \u2014 your coach will bring it back to you in your own words. Every one of these is optional; blanks are simply never used.</div>' +
       whyRowsHtml("su_why_")) +
     '<div class="err" id="setupErr" style="display:none;color:var(--rest);font-size:13px;margin:14px 2px 0;font-weight:600"></div>' +
@@ -8471,8 +8479,9 @@ const SETUP_TOPICS = {
   goal: ["s_dist", "s_target", "s_date"],
   rhythm: ["days", "s_longday", "s_volume", "s_startdate", "strength"],
   context: ["returning", "s_age", "s_sex"],
+  voice: ["coachSel"],
 };
-const SETUP_TOPIC_TITLE = { fitness: "Current fitness", goal: "Your goal", rhythm: "Training rhythm", context: "Current context" };
+const SETUP_TOPIC_TITLE = { fitness: "Current fitness", goal: "Your goal", rhythm: "Training rhythm", context: "Current context", voice: "Voice coaching" };
 function applySetupFocus() {
   document.querySelectorAll(".setup-off").forEach((e) => e.classList.remove("setup-off"));
   const topic = state.setupFocus;
@@ -8483,9 +8492,11 @@ function applySetupFocus() {
   document.querySelectorAll(".q").forEach((q) => { if (!owns(q)) q.classList.add("setup-off"); });
   // A wrapper that is not a .q but holds the fields (the runner block, the volume question).
   document.querySelectorAll("#statusRunnerBlock").forEach((b) => { if (!owns(b)) b.classList.add("setup-off"); });
+  // \u26a0\ufe0f THE VOICE SECTION HAS NO .q WRAPPERS AT ALL -- it is a coach picker and a drawer -- so
+  // the .q sweep above neither hides nor keeps it. Its card is judged on its own contents below.
   // Then any section card with nothing left showing, plus the intro and the closing note.
   document.querySelectorAll(".setup-card, #goalCard").forEach((c) => {
-    if (!c.querySelector(".q:not(.setup-off)") && !c.querySelector("#statusRunnerBlock:not(.setup-off)")) {
+    if (!c.querySelector(".q:not(.setup-off)") && !c.querySelector("#statusRunnerBlock:not(.setup-off)") && !owns(c)) {
       c.classList.add("setup-off");
     }
   });

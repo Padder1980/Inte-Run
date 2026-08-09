@@ -624,8 +624,12 @@ test("⚠️ the profile is a summary you can read, with the form behind it", ()
   // ⚠️ AND EACH ROW OPENS ITS OWN QUESTIONS. All four used to open the whole six-section form, which
   // is a summary row that has saved nobody anything. Every row must name a DISTINCT topic.
   const topics = [...fn.matchAll(/action: "setup:([a-z]+)"/g)].map((m) => m[1]!);
-  assert.equal(topics.length, 4, "not every training row opens a scoped edit: " + topics.join(","));
-  assert.equal(new Set(topics).size, 4, "two rows open the same questions: " + topics.join(","));
+  // ⚠️ DISTINCT, not a fixed count — the count was 4 and became 5 the moment voice coaching gained a
+  // row, and a guard that fails on a legitimate addition is a guard somebody deletes.
+  for (const t of ["goal", "fitness", "rhythm", "context"]) {
+    assert.ok(topics.includes(t), "no scoped edit for " + t);
+  }
+  assert.equal(new Set(topics).size, topics.length, "two rows open the same questions: " + topics.join(","));
   assert.match(fn, /data-pf="setup"/, "the section Edit link no longer opens every question");
   const map = fnSrc("applySetupFocus");
   const defs = html.slice(html.indexOf("const SETUP_TOPICS"), html.indexOf("function applySetupFocus"));
@@ -690,5 +694,36 @@ test("⚠️ the bottom-nav label and the screen heading are separate strings", 
   const nav = html.slice(html.indexOf("const NAV_LABEL"), html.indexOf("const NAV_LABEL") + 220);
   for (const m of nav.matchAll(/: "([^"]+)"/g)) {
     assert.ok(m[1]!.length <= 9, "the nav label \"" + m[1] + "\" is too long for a tab and will truncate");
+  }
+});
+
+test("⚠️ the form's sections are the profile page's rows, under the same names", () => {
+  // "All of the profile questions need ordering in such a way that they fit neatly under the new
+  // sections." They did not: section 4 was "A few details" and held BOTH training rhythm and current
+  // context, so the two profile rows either shared a screen or the split had to be invented per
+  // question. A row that opens a section called something else makes the runner work out that they
+  // are the same thing.
+  const html = page();
+  const setup = html.slice(html.indexOf("return savedMsg"), html.indexOf("function draftFromForm("));
+  const order = [...setup.matchAll(/setupSection\(\d+, "([^"]+)"/g)].map((m) => m[1]!);
+  for (const name of ["Current fitness", "Training rhythm", "Current context"]) {
+    assert.ok(order.includes(name), "the form has no section called " + name);
+  }
+  assert.ok(!setup.includes('"A few details"'), "the catch-all section is still there");
+  assert.match(setup, /Your goal/, "the goal section is gone");
+
+  // ⚠️ CURRENT FITNESS MUST COME BEFORE THE GOAL, and that is a real dependency rather than taste:
+  // GOAL_BY_STATUS gates which races are offered on the running status, and syncStatus rebuilds the
+  // goal block from it. Asking somebody to pick a race before saying what kind of runner they are
+  // means the options change under them.
+  const fit = setup.indexOf('"Current fitness"'), goal = setup.indexOf("Your goal");
+  assert.ok(fit > 0 && goal > 0 && fit < goal, "the goal is asked before the fitness that gates it");
+
+  // Every row's topic must name a section that exists.
+  const defs = html.slice(html.indexOf("const SETUP_TOPIC_TITLE"), html.indexOf("const SETUP_TOPIC_TITLE") + 400);
+  for (const m of defs.matchAll(/: "([^"]+)"/g)) {
+    const title = m[1]!;
+    assert.ok(order.includes(title) || setup.includes(title),
+      "a profile row opens \"" + title + "\", which is not a section in the form");
   }
 });

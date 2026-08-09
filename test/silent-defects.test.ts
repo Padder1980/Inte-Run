@@ -1008,3 +1008,37 @@ test("⚠️ the debrief's blocks have a rhythm between them", () => {
   assert.ok(!/^\.card \{[^}]*margin-bottom/m.test(css),
     "a bottom margin was put on .card globally, which shifts every screen in the app");
 });
+
+test("⚠️ the stat card drives the detail, and only where there is detail", () => {
+  // His restructure: "the card with the data on drives the more detailed cards underneath — click on
+  // the heart rate and it creates a pop up of the additional information tied to heart rates,
+  // otherwise it is not there." The screen stacked a pace chart, a splits table and a heart-rate
+  // panel whether or not anybody wanted them.
+  const html = page();
+  const ov = fnSrc("runOverviewHtml");
+  for (const gone of ["paceChartSvg", "splitsVsTargetHtml", "runHrHtml"]) {
+    assert.ok(!ov.includes(gone), gone + " is still stacked on the debrief screen");
+  }
+  const debrief = fnSrc("runDebrief");
+  assert.ok(!debrief.includes("paceChartSvg") && !debrief.includes("splitsVsTargetHtml"),
+    "the chart and splits are still rendered from runDebrief");
+  // What he asked to remain, in order.
+  for (const keep of ["shareRun", "runDebrief(run, a)", "stretchOfferHtml()", "runShoeHtml(run)", "runNoteHtml(run)"]) {
+    assert.ok(ov.includes(keep), "the debrief screen lost " + keep);
+  }
+
+  // ⚠️ A STAT IS ONLY TAPPABLE WHEN THERE IS SOMETHING BEHIND IT. A chevron on a tile that opens an
+  // empty sheet is worse than a plain number, so availability is computed from the run.
+  const avail = fnSrc("ovStatDetail");
+  assert.match(avail, /pace: !!\(a && a\.n >= 2\)/, "pace detail is offered without splits to show");
+  assert.match(avail, /run\.avgHr \|\| run\.maxHr/, "heart detail is offered with no beats recorded");
+  const stats = fnSrc("ovStatsHtml");
+  assert.match(stats, /const open = !!\(kind && has\[kind\]\)/, "every tile is made tappable regardless");
+  assert.match(stats, /const tag = open \? "button" : "div"/, "a tile with no detail is still a button");
+  assert.match(html, /data-ovstat\]"\)\.forEach\(\(b\) => b\.onclick = \(\) => openRunStat/, "the tiles are not wired");
+
+  // ⚠️ The sheet adds no heading of its own — both panels already carry one, so an eyebrow above
+  // them printed "HEART RATE" twice, one above the other.
+  const sheet = fnSrc("openRunStat");
+  assert.ok(!/ui-eyebrow">Heart rate/.test(sheet), "the heart sheet prints its heading twice");
+});

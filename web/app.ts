@@ -2378,6 +2378,10 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 /* The attribution sits under the quote, to the right, and is NOT the accent — one voice per line.
    Tucked close to the words it belongs to, and a rung smaller: it is the source, not the quote. */
 .st-qa { display: block; margin-top: 3px; font-style: normal; text-align: right; color: var(--ink); font-size: var(--t-label); font-weight: 650; }
+/* A stat you can open. The chevron marks the ones with detail behind them; the rest stay plain, so
+   the affordance means something rather than decorating every tile. */
+.ov-stat.tap { background: none; border: 0; padding: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.ov-more { display: inline-block; margin-left: 4px; font-size: var(--t-body); font-weight: 700; color: var(--accent); vertical-align: 1px; }
 /* Which trainers a run was in. */
 .sh-pick { padding: var(--s4); margin-bottom: var(--s3); }
 .sh-opts { display: flex; flex-direction: column; gap: var(--s2); margin-top: var(--s3); }
@@ -10622,7 +10626,6 @@ function runDebrief(run, pre) {
   if (!a.n && !a.rpe) return "";
   const name = String(profile.name || "").trim().split(/\\s+/)[0];
   const paras = debriefParagraphs(run, a).map((t) => "<p>" + t + "</p>").join("");
-  const chart = paceChartSvg(a);
   const chips = [];
   if (a.band) chips.push('<span class="db-chip' + (a.inBand === a.n ? " good" : "") + '">' + a.inBand + "/" + a.n + " on target</span>");
   if (a.progressive) chips.push('<span class="db-chip good">Negative split</span>');
@@ -10633,9 +10636,8 @@ function runDebrief(run, pre) {
   return '<div class="card debrief">' +
     '<div class="db-head"><span class="db-ic">' + ICON.alfie + '</span><span>Your debrief' + (name ? ", " + esc(name) : "") + '</span></div>' +
     (chips.length ? '<div class="db-chips">' + chips.join("") + "</div>" : "") +
-    '<div class="db-body">' + paras + '</div></div>' +
-    (chart ? '<div class="card"><div class="subhead" style="margin-top:0">' + (a.band ? "Pace against target" : "How your pace flowed") + '</div><div class="pc-wrap">' + chart + '</div></div>' : "") +
-    splitsVsTargetHtml(a);
+    '<div class="db-body">' + paras + '</div></div>';
+
 }
 // Shared overview: route map + key stats + splits + share. Used by the completion screen and Activities.
 // ⚠️ EVERY TILE IS CONDITIONAL, and that is the design rather than tidiness. Elevation is always 0
@@ -10643,19 +10645,45 @@ function runDebrief(run, pre) {
 // calories only exist when a watch measured them. A grid that always shows seven tiles would print
 // a confident "0 m" and "— bpm" for numbers nobody recorded, which reads as a measurement rather
 // than an absence. A tile appears when there is something true to put in it.
+/**
+ * The stat card is the index; the detail lives behind it.
+ *
+ * His restructure: "the card with the data on drives the more detailed cards underneath -- click on
+ * the heart rate and it creates a pop up of the additional information tied to heart rates,
+ * otherwise it is not there." Before this the screen stacked a pace chart, a splits table and a
+ * heart-rate panel whether or not anybody wanted them, each a slab to scroll past to reach the notes.
+ *
+ * \u26a0\ufe0f A STAT IS ONLY TAPPABLE WHEN THERE IS SOMETHING BEHIND IT. A chevron that opens an empty
+ * sheet is worse than a plain number, so availability is computed from the run rather than assumed:
+ * under two splits there is no pace detail, and with no beats and no zones there is no heart detail.
+ */
+function ovStatDetail(run, a) {
+  return {
+    pace: !!(a && a.n >= 2),
+    heart: !!(run.avgHr || run.maxHr || (Array.isArray(run.zoneSec) && run.zoneSec.some((x) => Number(x) > 0))),
+  };
+}
 function ovStatsHtml(run, a) {
   const cells = [];
-  const stat = (k, v) => cells.push('<div class="ov-stat"><div class="ov-v num">' + v + '</div><div class="ov-k">' + k + '</div></div>');
-  stat("Distance", run.dist); stat("Time", run.time); stat("Avg pace", run.pace);
+  const has = ovStatDetail(run, a);
+  const stat = (k, v, kind) => {
+    const open = !!(kind && has[kind]);
+    const tag = open ? "button" : "div";
+    const more = open ? '<span class="ov-more" aria-hidden="true">\u203A</span>' : "";
+    const attr = open ? ' data-ovstat="' + kind + '" aria-label="' + esc(k) + ', see more"' : "";
+    cells.push("<" + tag + ' class="ov-stat' + (open ? " tap" : "") + '"' + attr + ">" +
+      '<div class="ov-v num">' + v + more + '</div><div class="ov-k">' + k + "</div></" + tag + ">");
+  };
+  stat("Distance", run.dist, "pace"); stat("Time", run.time); stat("Avg pace", run.pace, "pace");
   if (run.elevGain > 0) stat("Elevation", "▲ " + Math.round(run.elevGain) + " m");
-  if (run.avgHr) stat("Avg HR", Math.round(run.avgHr) + ' <span class="ov-u">bpm</span>');
-  if (run.maxHr) stat("Max HR", Math.round(run.maxHr) + ' <span class="ov-u">bpm</span>');
+  if (run.avgHr) stat("Avg HR", Math.round(run.avgHr) + ' <span class="ov-u">bpm</span>', "heart");
+  if (run.maxHr) stat("Max HR", Math.round(run.maxHr) + ' <span class="ov-u">bpm</span>', "heart");
   if (run.kcal) stat("Calories", Math.round(run.kcal));
   // The engine already computes how spread out the kilometres were and nothing has ever read it.
   // It is the one number here the runner cannot get from their watch: how EVEN the run was.
   // ⚠️ a.spread is slowest MINUS fastest — the whole range, not a deviation either side of a mean.
   // Printed with a "±" it read as double what it is. Named for what it measures instead.
-  if (a && a.spread > 0 && a.n >= 3) stat("Pace range", Math.round(a.spread) + '<span class="ov-u">s</span>');
+  if (a && a.spread > 0 && a.n >= 3) stat("Pace range", Math.round(a.spread) + '<span class="ov-u">s</span>', "pace");
   return '<div class="ov-stats">' + cells.join("") + '</div>';
 }
 // The prescription, snapshot at save time. Runna calls this "Description"; the point for us is that
@@ -10788,6 +10816,28 @@ function runShoeHtml(run) {
         '<span class="sh-on">No trainers</span></button>' +
     '</div></div>';
 }
+/** The detail behind a stat, in a sheet over the run. */
+function openRunStat(kind) {
+  const run = currentOverviewRun();
+  if (!run) return;
+  const a = runAnalysis(run);
+  let body = "";
+  // \u26a0\ufe0f NO HEADING OF MY OWN. Both panels already carry one, so adding an eyebrow above them
+  // printed "HEART RATE" twice, one above the other. The chart is the exception -- it has never had a
+  // heading of its own, so it keeps the card that used to supply it.
+  if (kind === "pace") {
+    const chart = paceChartSvg(a);
+    body = (chart ? '<div class="card"><div class="subhead" style="margin-top:0">' +
+        (a.band ? "Pace against target" : "How your pace flowed") + '</div><div class="pc-wrap">' + chart + '</div></div>' : "") +
+      splitsVsTargetHtml(a);
+  } else if (kind === "heart") {
+    body = runHrHtml(run);
+  }
+  if (!body) return;
+  ensureSheet();
+  $("sheetBody").innerHTML = body;
+  $("sheetOv").classList.add("on");
+}
 function runOverviewHtml(run) {
   const a = runAnalysis(run);
   const sc = run.type ? "var(--eff-" + effortOf({ type: run.type, intensity: run.type === "vo2" || run.type === "threshold" || run.type === "race-specific" ? "hard" : undefined }) + ")" : "var(--accent)";
@@ -10801,11 +10851,13 @@ function runOverviewHtml(run) {
   return '<div class="card ov-map-card"><div class="ov-map" id="ovMap">' + routeMapSvg(run.route) + '</div>' +
     head + ovStatsHtml(run, a) + '</div>' +
     '<button class="primary share-btn" id="shareRun">' + ICON.share + ' Share my run</button>' +
+    // \u26a0\ufe0f THE PACE CHART, THE SPLITS AND THE HEART-RATE PANEL NO LONGER STACK HERE. Each is
+    // reached by tapping the stat it belongs to. What is left is his list: share, the written
+    // debrief, the stretch offer, what the plan asked for, trainers, notes, effort.
     runDebrief(run, a) +
     stretchOfferHtml() +
     runDescriptionHtml(run) +
     runShoeHtml(run) +
-    runHrHtml(run) +
     runNoteHtml(run);
 }
 // The offer that replaced the prescribed cool-down jog. It lives HERE, in the one debrief builder, so it
@@ -12692,6 +12744,7 @@ function wire() {
   const lgAll = $("lgAll"); if (lgAll) lgAll.onclick = () => { state.logAll = !state.logAll; render(); };
   const lgT = $("lgTrends"); if (lgT) lgT.onclick = () => { state.actTab = "performance"; render(); };
   const lgS = $("lgSnap"); if (lgS) lgS.onclick = () => { state.actTab = "performance"; render(); };
+  document.querySelectorAll("[data-ovstat]").forEach((b) => b.onclick = () => openRunStat(b.dataset.ovstat));
   const shAdd = $("shoeAdd"); if (shAdd) shAdd.onclick = () => { state.screen = null; state.tab = "support"; state.support = "shoes"; render(); };
   document.querySelectorAll("[data-runshoe]").forEach((b) => b.onclick = () => {
     const id = b.dataset.runshoe || null;

@@ -86,9 +86,27 @@ for i,b in enumerate(re.findall(r'<script>(.*?)</script>', h, re.S)):
 ```bash
 node web/app.ts        # build web/app.html + docs/* (run after ANY edit to web/app.ts)
 npx tsc --noEmit       # typecheck (must be clean)
-node --test            # test suite (currently 143 passing)
+node --test            # test suite (504 passing as of 2026-08-09)
 npm run web            # builds all the standalone pages too
 ```
+
+⚠️ **`node web/app.ts` CAN SILENTLY DESTROY THE COMMITTED COACH AUDIO — always read `git status`
+before staging.** The build mirrors `web/voices/` → `docs/voices/`, but `web/voices/` is **gitignored**
+while `docs/voices/` is **committed**. So on any machine whose local `web/voices/` is stale, partial or
+absent, a routine build overwrites the shipped audio with the lesser copy. Hit for real on 2026-08-09
+during unrelated work: one build rewrote ~250 MP3s and cut `docs/voices/manifest.json` from **11,908
+lines to 1,268**, dropping the extra coaches and the per-coach number banks the pace cues depend on.
+**Nothing catches this** — the build, the typecheck and all 504 tests pass either way. Recovery is
+`git checkout -- docs/voices/`, run *after* building. Only commit `docs/voices/` when you actually
+regenerated the audio and meant to.
+
+⚠️ **When serving `docs/` to verify a screen, CHECK THE PORT IS FREE FIRST.** A leftover
+`python3 -m http.server` from an earlier session keeps the port, so the new one exits with
+`Address already in use` — into a log nobody reads — and the browser silently keeps loading the OLD
+server's build. On 2026-08-09 the squatter's cwd was a `.claude/worktrees/` copy, so every check ran
+against a different app entirely; the giveaway was a function that demonstrably existed in
+`docs/index.html` being `undefined` in the page. `lsof -nP -iTCP:$PORT -sTCP:LISTEN` before serving,
+and confirm with `curl -s localhost:$PORT/index.html | grep -c <a-symbol-you-just-added>`.
 
 ## How we work — the design workflow
 

@@ -7888,7 +7888,7 @@ function stravaSaveCfg(c) { try { localStorage.setItem("interun_strava_v1", JSON
  * (billable, gitignored, injected at build time) this belongs in the committed source, where every
  * build gets it. Filled in by alfie-proxy/setup-strava.sh once the Worker exists.
  */
-const STRAVA_SERVER = "";
+const STRAVA_SERVER = "https://alfie-proxy.alfie-proxy.workers.dev";
 function stravaBase() {
   // A pasted override wins (so a second server can be tried without a rebuild), then the shipped
   // default, then Alfie's proxy — one Worker does both, so an Alfie URL already points at Strava.

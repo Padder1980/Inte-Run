@@ -16,4 +16,4 @@ compatibility_flags = ["nodejs_compat"]
 #   npx wrangler kv namespace create STRAVA
 [[kv_namespaces]]
 binding = "STRAVA"
-id = "PASTE_THE_ID_FROM_wrangler_kv_namespace_create"
+id = "52ff9e8a2b944d058efabc3abe33ad1c"

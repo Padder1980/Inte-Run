@@ -29,3 +29,7 @@ voice-dev/personal.json
 # time by the "Embed web app" phase and must never be committed — a token in git history is a token
 # that has been published, whatever is done afterwards.
 ios/mapbox-token.txt
+
+# Strava API credentials — the client secret must never be committed.
+strava-secret.txt
+alfie-proxy/.dev.vars

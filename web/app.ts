@@ -12754,7 +12754,16 @@ function wire() {
     // the choice is the whole mechanism; assigning here would credit a run that may never be saved.
     else if (LIVE && LIVE.summary) LIVE.summary.shoeId = id;
     haptic("tap");
-    render();
+    // \u26a0\ufe0f REPAINT THE CARD, DO NOT render(). Every render branch sets #view.scrollTop = 0 --
+    // deliberately, so switching tabs starts at the top -- so a full render threw the runner back to
+    // the map every time they picked a pair, on a card that sits most of a screen down. Nothing else
+    // on this screen depends on which trainers were worn, so the card is the only thing to redraw.
+    // Same in-place pattern the plan's week list uses.
+    const card = b.closest(".sh-pick");
+    if (card) {
+      card.outerHTML = runShoeHtml(run || (LIVE && LIVE.summary ? { id: "live", distKm: 0 } : {}));
+      wire();
+    } else render();
   });
   const pt = $("perfTrial"); if (pt) pt.onclick = startTrialFlow;
   linkFormLabels();

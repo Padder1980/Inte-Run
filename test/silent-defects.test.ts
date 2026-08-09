@@ -1042,3 +1042,19 @@ test("⚠️ the stat card drives the detail, and only where there is detail", (
   const sheet = fnSrc("openRunStat");
   assert.ok(!/ui-eyebrow">Heart rate/.test(sheet), "the heart sheet prints its heading twice");
 });
+
+test("⚠️ picking trainers repaints the card, it does not re-render the screen", () => {
+  // ⚠️ EVERY render() BRANCH SETS #view.scrollTop = 0 — deliberately, so switching tabs starts at the
+  // top. The trainers card sits most of a screen down the debrief, so calling render() after a tap
+  // threw the runner back up to the map every single time they chose a pair.
+  const html = page();
+  const at = html.indexOf('data-runshoe]").forEach');
+  assert.ok(at > 0, "the trainers handler is gone");
+  const handler = html.slice(at, at + 1800);
+  assert.match(handler, /card\.outerHTML = runShoeHtml\(/, "the card is not repainted in place");
+  assert.ok(!/haptic\("tap"\);\s*render\(\);/.test(handler), "the handler still does a full render");
+  // ⚠️ …and the repaint must re-wire, or the second tap does nothing at all.
+  assert.match(handler, /card\.outerHTML = runShoeHtml\([\s\S]{0,120}wire\(\);/, "the repainted card is never re-wired");
+  // A fallback still exists for the case where the card cannot be found.
+  assert.match(handler, /\} else render\(\);/, "there is no fallback if the card is missing");
+});

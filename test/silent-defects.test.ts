@@ -777,3 +777,41 @@ test("⚠️ a first-time runner cannot build a plan on questions they never ans
   assert.match(html, /statusCards\(draft\.status != null/, "the status cards render from the stored profile");
   assert.match(html, /draft\.days != null \? draft\.days/, "the days control renders from the stored profile");
 });
+
+test("⚠️ the Logbook summarises the period, then interprets it, then lists it", () => {
+  const html = page();
+  const snap = fnSrc("logbookSnapshot");
+  // "Summarise the period before listing individual sessions." ⚠️ ONE PERIOD, NOT THREE COLUMNS OF
+  // DIFFERENT PERIODS — the first version showed this week, this month and all-logged side by side,
+  // which asks the reader to work out which one answers their question.
+  assert.match(snap, /MON_FULL/, "the period is not named");
+  assert.match(snap, /Consistency/, "there is no consistency figure");
+  assert.match(snap, /in a row with at least one run/, "the consistency number does not say what it counted");
+
+  const streak = fnSrc("logStreakWeeks");
+  // ⚠️ LAST WEEK COUNTS AS THE START. Measured from THIS week only, the number collapses to zero every
+  // Monday until the first run of the week — a runner with four months of consistency would open the
+  // app on a Monday and be told nothing.
+  assert.match(streak, /if \(!wk\.has\(cursor\)\) cursor = isoAdd\(cursor, -7\)/,
+    "the streak breaks every Monday morning");
+
+  const prog = fnSrc("progressSnapshot");
+  // "Interpret comparable runs and state the evidence behind the insight."
+  // ⚠️ COMPARABLE MEANS THE SAME KIND OF RUN. Comparing every run's pace would report a gain whenever
+  // the plan happened to schedule more easy running — a change in the PLAN read as a change in the
+  // RUNNER, which is the exact mistake this app already refuses to make with fitness estimates.
+  assert.match(prog, /logFilterOf\(r\) === "easy"/, "the snapshot compares runs that are not comparable");
+  assert.match(prog, /Based on ' \+ easy\.length \+ ' comparable runs/, "the insight does not state its evidence");
+  // ⚠️ AND IT REFUSES RATHER THAN GUESSES. A snapshot that always finds something is one nobody can
+  // trust the day it finds something real.
+  assert.match(prog, /if \(easy\.length < 6\) return "";/, "it will make a claim from a handful of runs");
+  assert.match(prog, /Math\.abs\(delta\) < 3\) return "";/, "it will report noise as a trend");
+
+  // "Use compact, date-aware rows so history remains scannable."
+  const view = fnSrc("viewActivities");
+  assert.match(view, /lg-row/, "the runs are still full cards with stat blocks");
+  assert.match(view, /runDateLabelIso\(a\.dateIso\)/, "a row does not carry its own date");
+  assert.ok(!view.includes('class="card runcard'), "the old three-column run card is still there");
+  // "Provide filters without turning them into a second navigation layer."
+  assert.match(snap, /id="lbFilterBtn"/, "the filters are always on screen as a second nav layer");
+});

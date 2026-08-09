@@ -2330,6 +2330,24 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .perf-e { margin: var(--s3) 0 0; padding-top: var(--s3); border-top: 1px solid var(--line); font-size: var(--t-meta); line-height: 1.5; color: var(--ink-faint); }
 .perf-a { width: 100%; min-height: var(--tap); margin-top: var(--s3); background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-ctl); color: var(--accent); font: inherit; font-weight: 700; cursor: pointer; }
 .perf-sum { margin: var(--s3) 2px 0; font-size: var(--t-meta); line-height: 1.5; color: var(--ink-faint); }
+/* Logbook rows: compact and date-aware. */
+.lg-list { padding: 0 var(--s4); }
+.lg-row { display: flex; align-items: center; gap: var(--s3); width: 100%; text-align: left; min-height: 62px; padding: var(--s3) 0; background: var(--surface); border: 0; border-bottom: 1px solid var(--line); color: inherit; font: inherit; cursor: pointer; }
+.lg-row:last-child { border-bottom: 0; }
+.lg-d { flex: none; width: 46px; font-size: var(--t-label); font-weight: 750; letter-spacing: .04em; color: var(--ink-faint); }
+.lg-bar { flex: none; width: 3px; align-self: stretch; border-radius: var(--r-pill); margin: 3px 0; }
+.lg-b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lg-t { font-size: var(--t-body); font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lg-m { font-size: var(--t-meta); color: var(--ink-soft); }
+.lg-p { font-size: var(--t-body); font-weight: 700; color: var(--ink); white-space: nowrap; }
+/* The progress snapshot: an interpretation, with what it rests on underneath. */
+.lg-snap { display: flex; align-items: center; gap: var(--s3); width: 100%; text-align: left; margin-bottom: var(--s3); padding: var(--s4); background: linear-gradient(150deg, color-mix(in srgb, var(--accent) 13%, var(--surface)), var(--surface) 72%); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); border-radius: var(--r-card); color: inherit; cursor: pointer; }
+.lg-si { flex: none; width: 38px; height: 38px; border-radius: var(--r-pill); display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); }
+.lg-si svg { width: 19px; height: 19px; }
+.lg-sb { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lg-sl { font-size: var(--t-meta); font-weight: 750; color: var(--accent); }
+.lg-st { font-size: var(--t-body); font-weight: 700; color: var(--ink); }
+.lg-se { font-size: var(--t-meta); color: var(--ink-soft); }
 /* Logbook: the period snapshot, filters and month headings. */
 .lb-snap { padding: var(--s4); margin-bottom: var(--s3); }
 .lb-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); }
@@ -2896,7 +2914,7 @@ function computeToday() {
 }
 computeToday();
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "workouts", logFilter: "all", supportQ: "", openGuide: null, setupFocus: null, supportFrom: null, support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK, addOpen: false };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "workouts", logFilter: "all", supportQ: "", openGuide: null, setupFocus: null, supportFrom: null, logFilterOpen: false, logAll: false, support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK, addOpen: false };
 // Effective day index for a session, honouring any user reschedule. Works for raw sessions
 // (dayOfWeek) and summary sessions (dayIndex), keyed by the shared session id.
 function loadDayOverride() { try { return JSON.parse(localStorage.getItem("interun_dayov_v1") || "{}") || {}; } catch (e) { return {}; } }
@@ -6546,20 +6564,39 @@ function viewActivities() {
       return tabs + '<div class="empty-acts"><div class="ea-ic">' + ICON.today + '</div><div class="ea-h">No runs yet</div><div class="ea-b">Start a session from the <b>Today</b> tab. Once you finish, your runs — with route maps and splits — will appear here.</div></div>';
     }
     const shown = logbookFiltered();
-    LOG_MONTH = ""; // \u26a0\ufe0f or the second render of this screen emits no month headings at all
-    // Each row rides in a swipe track with a delete action revealed behind it.
+    LOG_MONTH = "";
+    // \u26a0\ufe0f COMPACT, DATE-AWARE ROWS. "Use compact rows so history remains scannable" -- the old
+    // card carried a three-column stat block each, so four runs filled the screen and the date was
+    // buried inside. Date on the left, effort colour down the edge, pace on the right.
     const list = shown.map((a) => {
       const rid = esc(a.id || "");
+      const dt = a.dateIso ? runDateLabelIso(a.dateIso).toUpperCase() : "";
+      const meta = [a.dist, a.time].filter(Boolean).join(" \u2022 ");
       return logMonthHead(a) + '<div class="swipe" data-swipe="' + rid + '">' +
         '<button class="swipe-del" data-delrun="' + rid + '" aria-label="Delete this run">' + ICON.trash + '<span>Delete</span></button>' +
-        '<button class="card runcard swipe-face" data-runid="' + rid + '">' +
-        '<div class="act"><div class="b"><div class="t">' + esc(a.t) + '</div><div class="d">' + esc(a.d || "") + '</div>' +
-        '<div class="m"><div><b class="num">' + a.dist + '</b><span>Distance</span></div><div><b class="num">' + a.time + '</b><span>Time</span></div><div><b class="num">' + a.pace + '</b><span>Avg pace</span></div></div></div><div class="rc-arr">›</div></div></button></div>';
+        '<button class="lg-row swipe-face" data-runid="' + rid + '">' +
+          '<span class="lg-d">' + esc(dt) + '</span>' +
+          '<span class="lg-bar" style="background:var(--eff-' + effortOf({ type: a.type, intensity: a.type === "vo2" || a.type === "threshold" ? "hard" : "" }) + ')"></span>' +
+          '<span class="lg-b"><span class="lg-t">' + esc(a.t) + '</span>' +
+            '<span class="lg-m">' + esc(meta) + '</span></span>' +
+          '<span class="lg-p num">' + esc(String(a.pace || "").replace(" /km", "/km")) + '</span>' +
+          '<span class="sd-chev" aria-hidden="true">\u203A</span>' +
+        '</button></div>';
     }).join("");
     const none = !shown.length
       ? '<div class="lb-none">Nothing logged of that kind yet. <button class="lb-clear" id="lbClear">Show every run</button></div>'
       : "";
-    return tabs + logbookSnapshot() + logbookFilters() + list + none;
+    return tabs + logbookSnapshot() + progressSnapshot() +
+      '<div class="pf-sec"><span>Recent runs</span>' +
+      (shown.length > 6 ? '<button class="pf-edit" id="lgAll">' + (state.logAll ? "Show less" : "View all") + '</button>' : "") +
+      '</div>' +
+      '<div class="card pf-card lg-list">' + list + '</div>' + none +
+      // "Personal bests & trends" in the mockup. It goes to the Performance tab, which is the screen
+      // that already answers it -- a new destination would be a promise with nothing behind it.
+      '<button class="hub-safety" id="lgTrends">' +
+        '<span class="hub-sb"><span class="hub-st">Personal bests &amp; trends</span>' +
+        '<span class="hub-sd">What has actually changed, and what it rests on</span></span>' +
+        '<span class="pf-edit">Explore</span><span class="sd-chev" aria-hidden="true">\u203A</span></button>';
   }
   if (state.actTab === "strength") return tabs + viewStrengthHistory();
   return tabs + viewPerformance();
@@ -6614,25 +6651,86 @@ function logConsistency() {
     return { done: Math.min(done, prescribed), prescribed: prescribed };
   } catch (e) { return null; }
 }
+/**
+ * How many weeks in a row you have run at least once, counting back from this week or last.
+ * \u26a0\ufe0f LAST WEEK COUNTS AS THE START. Measured from THIS week only, the number collapses to
+ * zero every Monday morning until the first run of the week -- so a runner with four months of
+ * consistency would open the app on a Monday and be told nothing. It breaks when a whole week passes
+ * with no run, which is what a streak actually means.
+ */
+function logStreakWeeks() {
+  const runs = (state.logged || []).filter((r) => r && r.dateIso);
+  if (!runs.length) return 0;
+  const wk = new Set();
+  for (const r of runs) {
+    const p = r.dateIso.split("-").map(Number);
+    const d = new Date(Date.UTC(p[0], (p[1] || 1) - 1, p[2] || 1));
+    const dow = (d.getUTCDay() + 6) % 7;
+    wk.add(isoAdd(r.dateIso, -dow).toISOString().slice(0, 10));
+  }
+  let cursor = logWeekStartIso();
+  if (!wk.has(cursor)) cursor = isoAdd(cursor, -7).toISOString().slice(0, 10);
+  let n = 0;
+  while (wk.has(cursor)) { n++; cursor = isoAdd(cursor, -7).toISOString().slice(0, 10); }
+  return n;
+}
+/**
+ * The month you are looking at, summarised before any of its runs are listed.
+ * \u26a0\ufe0f ONE PERIOD, NOT THREE COLUMNS OF DIFFERENT PERIODS. The first version showed this week,
+ * this month and all-logged side by side, which asks the reader to work out which one answers their
+ * question. The mockup's shape is better: name the period, then summarise it.
+ */
 function logbookSnapshot() {
-  const wk = logTotals(logWeekStartIso());
-  const mo = logTotals(todayIso().slice(0, 7) + "-01");
-  const all = logTotals(null);
-  const capped = (state.logged || []).length >= 50;
-  const cell = (lab, t) => '<div class="lb-cell"><div class="lb-cl">' + lab + '</div>' +
-    '<div class="lb-cv num">' + (t.km ? t.km.toFixed(1) : "0") + '<span>km</span></div>' +
-    '<div class="lb-cs">' + t.runs + (t.runs === 1 ? " run" : " runs") +
-      (t.sec ? " \u00b7 " + fmtTimeFull(Math.round(t.sec)) : "") + '</div></div>';
-  const con = logConsistency();
-  // \u26a0\ufe0f The consistency line states the EVIDENCE, not a percentage. "3 of 4" can be checked
-  // against the week the runner just looked at; "75%" cannot, and invites a judgement the app has not
-  // earned -- a missed run may have been the right call.
-  const conRow = con
-    ? '<div class="lb-con"><b>' + con.done + ' of ' + con.prescribed + '</b> planned runs done this week</div>'
-    : "";
-  return '<div class="card lb-snap">' +
-    '<div class="lb-grid">' + cell("This week", wk) + cell("This month", mo) +
-      cell(capped ? "Last 50 runs" : "All logged", all) + '</div>' + conRow + '</div>';
+  const from = todayIso().slice(0, 7) + "-01";
+  const t = logTotals(from);
+  const streak = logStreakWeeks();
+  // The full month name, not the three-letter one -- this is a heading, not a chart axis.
+  const MON_FULL = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const mon = MON_FULL[Number(todayIso().slice(5, 7)) - 1] || "";
+  const cell = (lab, val) => '<div class="lb-cell"><div class="lb-cl">' + esc(lab) + '</div>' +
+    '<div class="lb-cv num">' + val + '</div></div>';
+  return '<div class="pf-sec"><span>' + esc(mon) + '</span>' +
+      '<button class="pf-edit" id="lbFilterBtn" aria-expanded="' + (state.logFilterOpen ? "true" : "false") + '">Filter</button></div>' +
+    (state.logFilterOpen ? logbookFilters() : "") +
+    '<div class="card lb-snap"><div class="lb-grid">' +
+      cell(t.runs + (t.runs === 1 ? " run" : " runs"), (t.km ? t.km.toFixed(1) : "0") + '<small>km</small>') +
+      cell("Time", t.sec ? fmtTimeFull(Math.round(t.sec)).replace(/^(\\d+):(\\d\\d):\\d\\d$/, "$1h $2m").replace(/^(\\d+):(\\d\\d)$/, "$1m") : "\u2014") +
+      // \u26a0\ufe0f "3 weeks" is weeks in a row with a run in them, not a percentage of a plan. It says
+      // what it counted underneath, because a bare number invites the reader to invent a meaning.
+      cell("Consistency", streak ? streak + (streak === 1 ? " week" : " weeks") : "\u2014") +
+    '</div>' +
+    (streak ? '<div class="lb-con">' + streak + (streak === 1 ? " week" : " weeks") + ' in a row with at least one run</div>' : "") +
+    '</div>';
+}
+/**
+ * "Interpret comparable runs and state the evidence behind the insight."
+ *
+ * \u26a0\ufe0f COMPARABLE MEANS THE SAME KIND OF RUN, and that is the whole reason this can be honest.
+ * Comparing every run's pace would report a "gain" whenever the plan happened to schedule more easy
+ * running -- a change in the PLAN read as a change in the RUNNER. Easy runs only, split into an older
+ * half and a newer half, and it says how many runs it looked at.
+ *
+ * \u26a0\ufe0f AND IT REFUSES RATHER THAN GUESSES. Under six easy runs, or a difference under 3 s/km,
+ * there is nothing here worth a headline -- a snapshot that always finds something is one nobody can
+ * trust the day it finds something real.
+ */
+function progressSnapshot() {
+  const easy = (state.logged || [])
+    .filter((r) => r && r.dateIso && r.avgPaceSec > 0 && logFilterOf(r) === "easy")
+    .sort((a, b) => (a.dateIso < b.dateIso ? -1 : 1));
+  if (easy.length < 6) return "";
+  const half = Math.floor(easy.length / 2);
+  const mean = (list) => list.reduce((n, r) => n + r.avgPaceSec, 0) / list.length;
+  const older = mean(easy.slice(0, half)), newer = mean(easy.slice(easy.length - half));
+  const delta = Math.round(older - newer);
+  if (Math.abs(delta) < 3) return "";
+  const faster = delta > 0;
+  return '<button class="lg-snap" id="lgSnap">' +
+    '<span class="lg-si">' + (faster ? ICON.trendUp : ICON.trendDown) + '</span>' +
+    '<span class="lg-sb"><span class="lg-sl">Progress snapshot</span>' +
+      '<span class="lg-st">Easy pace is trending ' + Math.abs(delta) + ' sec/km ' + (faster ? "faster" : "slower") + '</span>' +
+      '<span class="lg-se">Based on ' + easy.length + ' comparable runs</span></span>' +
+    '<span class="sd-chev" aria-hidden="true">\u203A</span></button>';
 }
 const LOG_FILTERS = [["all", "All"], ["easy", "Easy"], ["long", "Long"], ["quality", "Quality"], ["other", "Other"]];
 function logFilterOf(r) {
@@ -6645,7 +6743,9 @@ function logFilterOf(r) {
 function logbookFiltered() {
   const f = state.logFilter || "all";
   const list = (state.logged || []).filter(Boolean);
-  return f === "all" ? list : list.filter((r) => logFilterOf(r) === f);
+  const kept = f === "all" ? list : list.filter((r) => logFilterOf(r) === f);
+  // "Recent runs" means recent. The rest are behind View all rather than poured onto the screen.
+  return state.logAll ? kept : kept.slice(0, 6);
 }
 function logbookFilters() {
   // Only offer a filter that has something behind it -- a chip that always returns nothing is a
@@ -12397,6 +12497,10 @@ function wire() {
   document.querySelectorAll("[data-delrun]").forEach((b) => b.onclick = (e) => { e.stopPropagation(); deleteRunById(b.dataset.delrun); });
   document.querySelectorAll("[data-logf]").forEach((b) => b.onclick = () => { state.logFilter = b.dataset.logf; render(); });
   const lbc = $("lbClear"); if (lbc) lbc.onclick = () => { state.logFilter = "all"; render(); };
+  const lbf = $("lbFilterBtn"); if (lbf) lbf.onclick = () => { state.logFilterOpen = !state.logFilterOpen; render(); };
+  const lgAll = $("lgAll"); if (lgAll) lgAll.onclick = () => { state.logAll = !state.logAll; render(); };
+  const lgT = $("lgTrends"); if (lgT) lgT.onclick = () => { state.actTab = "performance"; render(); };
+  const lgS = $("lgSnap"); if (lgS) lgS.onclick = () => { state.actTab = "performance"; render(); };
   const pt = $("perfTrial"); if (pt) pt.onclick = startTrialFlow;
   linkFormLabels();
   syncTextScale();

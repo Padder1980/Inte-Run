@@ -1058,3 +1058,27 @@ test("⚠️ picking trainers repaints the card, it does not re-render the scree
   // A fallback still exists for the case where the card cannot be found.
   assert.match(handler, /\} else render\(\);/, "there is no fallback if the card is missing");
 });
+
+test("⚠️ a render of the same screen keeps its scroll position", () => {
+  // ⚠️ EVERY render BRANCH ENDED WITH A SCROLL TO THE TOP. That is right when the runner has
+  // NAVIGATED somewhere and wrong every other time — and "every other time" is any in-page control
+  // that repaints: rating an effort, picking a pair of trainers, changing a filter. Each threw the
+  // runner to the top of a long screen, away from the thing they had just tapped. This file already
+  // records the same bug being fixed by hand for the add-a-session drawer; a third instance is a
+  // class, not a coincidence.
+  const html = page();
+  assert.ok(!/v\.scrollTop = 0;/.test(html), "a render branch still resets the scroll unconditionally");
+  assert.match(html, /const keepScroll = scrollKey === LAST_SCROLL_KEY \? v\.scrollTop : 0;/,
+    "there is no same-screen scroll preservation");
+  assert.ok((html.match(/v\.scrollTop = keepScroll;/g) || []).length >= 8,
+    "not every render branch goes through the preserved value");
+  // ⚠️ THE KEY IS WHAT MAKES IT A DIFFERENT SCREEN, not what makes it different content — a Logbook
+  // sub-tab is a navigation and must still reset; a filter within one is not.
+  const key = (html.match(/const scrollKey = \[[^\]]*\]/) || [""])[0];
+  for (const part of ["state.tab", "state.screen", "state.support", "state.actTab", "state.viewRunId"]) {
+    assert.ok(key.includes(part), "the scroll key ignores " + part + ", so that navigation keeps a stale position");
+  }
+  for (const content of ["logFilter", "supportQ", "planWeek"]) {
+    assert.ok(!key.includes(content), key + " treats " + content + " as a navigation, so it will jump on a filter");
+  }
+});

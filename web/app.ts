@@ -12559,8 +12559,20 @@ function renderUnlessTyping() {
   if (state.screen === "setup") return;
   render();
 }
+let LAST_SCROLL_KEY = null;
 function render() {
   const v = $("view");
+  // \u26a0\ufe0f A RENDER OF THE SAME SCREEN KEEPS ITS SCROLL POSITION. Every branch below ends with a
+  // scroll to the top, which is right when the runner has NAVIGATED somewhere and wrong every other
+  // time -- and "every other time" is any in-page control that repaints: rating an effort, picking a
+  // pair of trainers, changing a filter. Each threw the runner back to the top of a long screen,
+  // away from the thing they had just tapped. This file already records the same bug being fixed by
+  // hand for the add-a-session drawer; a third instance is a class, not a coincidence.
+  // The key is what makes it a DIFFERENT SCREEN, not what makes it different content: a Logbook
+  // sub-tab is a navigation and still resets, a filter within one is not.
+  const scrollKey = [state.tab, state.screen, state.support, state.actTab, state.viewRunId].join("|");
+  const keepScroll = scrollKey === LAST_SCROLL_KEY ? v.scrollTop : 0;
+  LAST_SCROLL_KEY = scrollKey;
   // A run under way no longer locks the app. Hiding the nav protected the run from a stray tap, but
   // it also trapped the runner: checking tomorrow's session mid-cool-down meant ending the run. The
   // protection now comes from the live pill instead -- leaving is obvious, and so is the way back.
@@ -12587,7 +12599,7 @@ function render() {
     // losing all of it. Every field is s_-prefixed, so one delegated capture covers them all and a
     // field added later is carried automatically.
     restoreSetupFields();
-    v.scrollTop = 0;
+    v.scrollTop = keepScroll;
     document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
     wire();
     // ⚠️ No callback: the name hint repaints itself in place now. Passing render() here is what
@@ -12599,42 +12611,42 @@ function render() {
   }
   if (state.screen === "watchlive") {
     $("topTitle").textContent = "Session";
-    v.innerHTML = viewWatchLive(); v.scrollTop = 0;
+    v.innerHTML = viewWatchLive(); v.scrollTop = keepScroll;
     document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
     wire();
     return;
   }
   if (state.screen === "live") {
     $("topTitle").textContent = "Session";
-    v.innerHTML = viewLive(); v.scrollTop = 0;
+    v.innerHTML = viewLive(); v.scrollTop = keepScroll;
     document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
     wire();
     return;
   }
   if (state.screen === "trialrun") {
     $("topTitle").textContent = "2 km time trial";
-    v.innerHTML = viewTrialRun(); v.scrollTop = 0;
+    v.innerHTML = viewTrialRun(); v.scrollTop = keepScroll;
     document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
     wireTrialRun();
     return;
   }
   if (state.screen === "calendar") {
     $("topTitle").textContent = "Training calendar";
-    v.innerHTML = viewCalendar(); v.scrollTop = 0;
+    v.innerHTML = viewCalendar(); v.scrollTop = keepScroll;
     document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
     wire();
     return;
   }
   if (state.screen === "alfie") {
     $("topTitle").textContent = "Ask Alfie";
-    v.innerHTML = viewAlfie(); v.scrollTop = 0;
+    v.innerHTML = viewAlfie(); v.scrollTop = keepScroll;
     document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
     wire(); wireAlfie();
     return;
   }
   if (state.screen === "runview") {
     $("topTitle").textContent = "Run";
-    v.innerHTML = viewRunDetail(); v.scrollTop = 0;
+    v.innerHTML = viewRunDetail(); v.scrollTop = keepScroll;
     document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
     wire();
     return;
@@ -12642,7 +12654,7 @@ function render() {
   if (state.screen === "profile") {
     $("topTitle").textContent = "Profile & settings";
     v.innerHTML = viewProfile();
-    v.scrollTop = 0;
+    v.scrollTop = keepScroll;
     document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
     wire();
     viewEnter(v);
@@ -12654,7 +12666,7 @@ function render() {
   else if (state.tab === "activities") v.innerHTML = viewActivities();
   else if (state.tab === "community") v.innerHTML = viewCommunity();
   else if (state.tab === "support") v.innerHTML = viewSupport();
-  v.scrollTop = 0;
+  v.scrollTop = keepScroll;
   document.querySelectorAll(".navbtn").forEach((b) => b.classList.toggle("on", b.dataset.tab === state.tab));
   wire();
   viewEnter(v);

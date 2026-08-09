@@ -1787,7 +1787,12 @@ body.cal-dragging { overscroll-behavior: none; cursor: grabbing; }
 .db-body p:last-child { margin-bottom: 0; }
 .db-body p:first-child { color: var(--ink); font-weight: 500; }
 /* Pace against the prescribed band */
-.pc-wrap { margin-top: 4px; }
+/* \u26a0\ufe0f AN SVG WITH NO HEIGHT SCALES TO ITS ASPECT RATIO. The viewBox is 320x132, so at phone
+   width this became a ~330px tall block with three points floating in the middle of it. Capped, and
+   the SVG told to fill rather than preserve its ratio, so a three-split run and a twenty-split run
+   occupy the same sensible band of the screen. */
+.pc-wrap { margin-top: 4px; height: 132px; }
+.pc-wrap svg { width: 100%; height: 100%; display: block; }
 .pc-svg { display: block; width: 100%; height: auto; }
 .pc-band { fill: color-mix(in srgb, var(--accent) 20%, transparent); }
 .pc-line { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
@@ -10490,7 +10495,9 @@ function paceChartSvg(a) {
   const iw = W - L - R, ih = H - T - B;
   let lo = a.fastest, hi = a.slowest;
   if (a.band) { lo = Math.min(lo, a.band.minSecPerKm); hi = Math.max(hi, a.band.maxSecPerKm); }
-  const pad = Math.max(12, (hi - lo) * 0.25);
+  // \u26a0\ufe0f THE PADDING EXISTS TO KEEP THE TARGET BAND IN FRAME. With no band there is nothing to
+  // keep in frame, and 25% either side left the line using under a quarter of the chart's height.
+  const pad = a.band ? Math.max(12, (hi - lo) * 0.25) : Math.max(5, (hi - lo) * 0.12);
   lo -= pad; hi += pad;
   const y = (sec) => T + ih * ((sec - lo) / (hi - lo));       // slower = lower down
   const x = (i) => L + (a.n === 1 ? iw / 2 : iw * (i / (a.n - 1)));
@@ -10500,6 +10507,13 @@ function paceChartSvg(a) {
     out += '<rect x="' + L + '" y="' + yTop.toFixed(1) + '" width="' + iw + '" height="' + Math.max(2, yBot - yTop).toFixed(1) + '" class="pc-band"/>';
     out += '<text x="' + (L - 5) + '" y="' + (yTop + 3).toFixed(1) + '" class="pc-ax">' + fmtPace(a.band.minSecPerKm) + '</text>';
     out += '<text x="' + (L - 5) + '" y="' + (yBot + 3).toFixed(1) + '" class="pc-ax">' + fmtPace(a.band.maxSecPerKm) + '</text>';
+  }
+  // \u26a0\ufe0f A SHAPE WITH NO SCALE MEANS NOTHING. The y labels were drawn only inside the band
+  // branch, so a run by feel got a line floating in an empty box -- you could not tell whether that
+  // dip was two seconds or two minutes, and 34px of gutter sat reserved for labels nobody drew.
+  if (!a.band) {
+    out += '<text x="' + (L - 5) + '" y="' + (y(a.fastest) + 3).toFixed(1) + '" class="pc-ax">' + fmtPace(a.fastest) + '</text>';
+    out += '<text x="' + (L - 5) + '" y="' + (y(a.slowest) + 3).toFixed(1) + '" class="pc-ax">' + fmtPace(a.slowest) + '</text>';
   }
   const pts = a.rows.map((r, i) => x(i).toFixed(1) + "," + y(r.sec).toFixed(1));
   out += '<polyline points="' + pts.join(" ") + '" class="pc-line"/>';
@@ -10534,7 +10548,10 @@ function splitsVsTargetHtml(a) {
         ? "This one alternates running and walking, so each kilometre mixes the two \\u2014 there is no single pace to hold it to. The running itself had a target."
         : "The efforts and their recoveries share each kilometre, so a split averages the two \\u2014 there is no single pace to hold it to. Each repetition had a target.") + '</div>'
     : '<div class="sv-legend">This session had no set pace \\u2014 judged on feel.</div>';
-  return '<div class="card"><div class="subhead" style="margin-top:0">Splits vs target</div>' + head + rows + '</div>';
+  // \u26a0\ufe0f THE HEADING FOLLOWS THE SAME FACT THE BODY DOES. "Splits vs target" sat directly above
+  // "This session had no set pace -- judged on feel", so the card contradicted itself in two lines.
+  const title = a.band ? "Splits vs target" : "Your splits";
+  return '<div class="card"><div class="subhead" style="margin-top:0">' + title + '</div>' + head + rows + '</div>';
 }
 // The write-up. Assembled from what actually happened rather than a template with the numbers poured
 // in, and deliberately not gushing: praise that arrives whatever you did is worth nothing.
@@ -10606,7 +10623,7 @@ function runDebrief(run, pre) {
     '<div class="db-head"><span class="db-ic">' + ICON.alfie + '</span><span>Your debrief' + (name ? ", " + esc(name) : "") + '</span></div>' +
     (chips.length ? '<div class="db-chips">' + chips.join("") + "</div>" : "") +
     '<div class="db-body">' + paras + '</div></div>' +
-    (chart ? '<div class="card"><div class="subhead" style="margin-top:0">Pace against target</div><div class="pc-wrap">' + chart + '</div></div>' : "") +
+    (chart ? '<div class="card"><div class="subhead" style="margin-top:0">' + (a.band ? "Pace against target" : "How your pace flowed") + '</div><div class="pc-wrap">' + chart + '</div></div>' : "") +
     splitsVsTargetHtml(a);
 }
 // Shared overview: route map + key stats + splits + share. Used by the completion screen and Activities.

@@ -966,3 +966,28 @@ test("⚠️ two buttons side by side are the same button", () => {
   const pairs = [...html.matchAll(/class="(wr-cta|live-controls two|trial-controls two)"/g)].map((m) => m[1]);
   assert.ok(new Set(pairs).size >= 2, "the paired rows moved or were renamed: " + [...new Set(pairs)].join(", "));
 });
+
+test("⚠️ the debrief cards do not claim a target the run never had", () => {
+  const html = page();
+  // ⚠️ "Splits vs target" sat directly above "This session had no set pace — judged on feel", and
+  // "Pace against target" above a chart with no target drawn on it. The card contradicted its own
+  // body two lines apart, on the screen a runner reads straight after finishing.
+  const splits = fnSrc("splitsVsTargetHtml");
+  assert.match(splits, /a\.band \? "Splits vs target" : "Your splits"/, "the splits heading ignores whether a target exists");
+  assert.match(html, /a\.band \? "Pace against target" : "How your pace flowed"/, "the chart heading ignores it too");
+
+  const chart = fnSrc("paceChartSvg");
+  // ⚠️ A SHAPE WITH NO SCALE MEANS NOTHING. The y labels were drawn only inside the band branch, so a
+  // run by feel got a line floating in an empty box — you could not tell whether a dip was two
+  // seconds or two minutes — with 34px of gutter reserved for labels nobody drew.
+  assert.match(chart, /if \(!a\.band\) \{[\s\S]{0,400}fmtPace\(a\.fastest\)/,
+    "an unbanded chart draws no pace scale at all");
+  // ⚠️ The generous padding exists to keep the target band in frame; with no band it just wasted the box.
+  assert.match(chart, /a\.band \? Math\.max\(12,[^:]*: Math\.max\(5,/, "the padding is not relaxed when there is no band");
+
+  // ⚠️ An SVG with no height scales to its aspect ratio — 320x132 became a ~330px slab at phone width,
+  // three points floating in the middle of it.
+  const css = sheetOf(html);
+  assert.match(css, /\.pc-wrap \{[^}]*height: 132px/, "the pace chart has no height limit");
+  assert.match(css, /\.pc-wrap svg \{[^}]*height: 100%/, "the chart does not fill its capped box");
+});

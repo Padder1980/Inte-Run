@@ -886,3 +886,64 @@ test("⚠️ Motivation lives with the training profile, and the overlay says wh
   // in the overlay, typing one would look accepted and save nothing.
   assert.match(fnSrc("openProfileEdit"), /wireWhyInputs\(null\)/, "the why answers are not wired in the overlay");
 });
+
+test("⚠️ a run can be assigned to trainers, and the mileage moves with it", () => {
+  // The rack only ever credited whichever pair was marked ACTIVE, and nothing let a runner say what
+  // they actually wore — so somebody who owns two pairs and swaps between them had one number
+  // climbing and one frozen, and the one figure the rack exists to produce ("when do I replace
+  // these") was wrong for both.
+  const html = page();
+  const assign = fnSrc("shoeAssignRun");
+  // ⚠️ THE DISTANCE MOVES BOTH WAYS. Setting run.shoeId alone leaves the old pair carrying kilometres
+  // it never ran and the new pair short by the same amount — two wrong numbers from one tap.
+  // ⚠️ RUN THE ARITHMETIC, DO NOT MATCH THE SOURCE. The first version of this asserted the two lines
+  // that add and subtract — and they survive inside a dead branch, so wrapping them in "if (false)"
+  // left the test green while the mileage stopped moving. A guard that cannot fail is worse than none.
+  let shoes: Array<{ id: string; km: number }> = [];
+  const fn = lift("shoeAssignRun", {
+    loadShoes: () => shoes,
+    saveShoes: (l: typeof shoes) => { shoes = l; },
+    saveRuns: () => {},
+  }) as (run: Record<string, unknown>, id: string | null) => void;
+  const reset = () => { shoes = [{ id: "a", km: 100 }, { id: "b", km: 50 }]; };
+  const km = (id: string) => shoes.find((s) => s.id === id)!.km;
+
+  reset();
+  const run = { distKm: 10, shoeId: null as string | null };
+  fn(run, "a");
+  assert.equal(km("a"), 110, "assigning a run does not credit the pair");
+  fn(run, "b");
+  assert.equal(km("a"), 100, "the old pair keeps distance it never ran");
+  assert.equal(km("b"), 60, "the new pair does not gain the distance");
+  // ⚠️ Re-picking the same pair is idempotent — and NOT because of the early return, which I first
+  // claimed. Without it the move subtracts from the pair and adds straight back, so the total is
+  // identical either way. The early return saves a pointless write; it is not what protects the
+  // number, and a comment saying otherwise would send the next person to the wrong line.
+  fn(run, "b");
+  assert.equal(km("b"), 60, "re-picking the same pair changed the total");
+  fn(run, null);
+  assert.equal(km("b"), 50, "removing the trainers leaves the distance behind");
+  assert.equal(run.shoeId, null, "the run still claims a pair it is no longer credited to");
+  // ⚠️ A run with no distance must not move anything — a treadmill run before its distance is typed in.
+  reset();
+  const zero = { distKm: 0, shoeId: null as string | null };
+  fn(zero, "a");
+  assert.equal(km("a"), 100, "a run with no distance still credited a pair");
+  assert.equal(zero.shoeId, "a", "a distance-less run cannot be assigned at all");
+
+  // Crediting can be told which pair rather than always taking the active one.
+  const credit = fnSrc("shoeCreditRun");
+  assert.match(credit, /preferId \? list\.find\(\(x\) => x\.id === preferId\)/, "a chosen pair is ignored at save");
+  assert.match(html, /shoeCreditRun\(rec, LIVE && LIVE\.summary \? LIVE\.summary\.shoeId : null\)/,
+    "the pair picked on the finish screen is not honoured when the run is saved");
+
+  // ⚠️ ON AN UNSAVED RUN THE CHOICE PARKS ON LIVE.summary, exactly as the note and the effort rating
+  // do — liveRunRecord rebuilds the record on every render of the finish screen, so anything written
+  // onto the record itself is gone by the next tick and the run would save to the wrong pair.
+  const choice = fnSrc("runShoeChoice");
+  assert.match(choice, /LIVE\.summary\.shoeId/, "an unsaved run's choice is not parked where it survives a render");
+  assert.match(html, /else if \(LIVE && LIVE\.summary\) LIVE\.summary\.shoeId = id;/,
+    "picking on the finish screen assigns a run that may never be saved");
+  // It appears on both surfaces because runOverviewHtml is shared.
+  assert.match(fnSrc("runOverviewHtml"), /runShoeHtml\(run\)/, "the picker is not on the debrief");
+});

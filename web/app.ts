@@ -2352,6 +2352,14 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 /* The attribution sits under the quote, to the right, and is NOT the accent — one voice per line.
    Tucked close to the words it belongs to, and a rung smaller: it is the source, not the quote. */
 .st-qa { display: block; margin-top: 3px; font-style: normal; text-align: right; color: var(--ink); font-size: var(--t-label); font-weight: 650; }
+/* Which trainers a run was in. */
+.sh-pick { padding: var(--s4); margin-bottom: var(--s3); }
+.sh-opts { display: flex; flex-direction: column; gap: var(--s2); margin-top: var(--s3); }
+.sh-opt { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); width: 100%; text-align: left; min-height: var(--tap); padding: var(--s3) var(--s4); background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-ctl); color: var(--ink); font: inherit; cursor: pointer; }
+.sh-opt.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface-2)); }
+.sh-on { font-size: var(--t-body); font-weight: 650; }
+.sh-ok { font-size: var(--t-meta); color: var(--ink-soft); }
+.sh-none { margin: var(--s3) 0 0; font-size: var(--t-body); line-height: 1.55; color: var(--ink-soft); }
 /* Logbook rows: compact and date-aware. */
 .lg-list { padding: 0 var(--s4); }
 .lg-row { display: flex; align-items: center; gap: var(--s3); width: 100%; text-align: left; min-height: 62px; padding: var(--s3) 0; background: var(--surface); border: 0; border-bottom: 1px solid var(--line); color: inherit; font: inherit; cursor: pointer; }
@@ -2691,11 +2699,14 @@ function shoeState(sh) {
  * deleting that run can take its distance back off the right shoe. The shoe total stays
  * authoritative — see the note above about the 50-run cap.
  */
-function shoeCreditRun(run) {
+function shoeCreditRun(run, preferId) {
   try {
     if (!run || !(Number(run.distKm) > 0) || run.shoeId) return;
     const list = loadShoes();
-    const sh = list.find((x) => x.active && !x.retiredIso);
+    // \u26a0\ufe0f WHAT THEY SAID THEY WORE BEATS WHATEVER IS MARKED ACTIVE. Without this the rack only
+    // ever counted the active pair, so a runner who owns two and swaps between them had one number
+    // climbing and one frozen -- and the one number that says "replace these" was wrong for both.
+    const sh = preferId ? list.find((x) => x.id === preferId) : list.find((x) => x.active && !x.retiredIso);
     if (!sh) return;
     sh.km = (Number(sh.km) || 0) + Number(run.distKm);
     run.shoeId = sh.id;
@@ -2712,6 +2723,32 @@ function shoeRecreditRun(run) {
     if (!sh) return;
     sh.km = (Number(sh.km) || 0) + Number(run.distKm);
     saveShoes(list);
+  } catch (e) {}
+}
+/**
+ * Move a logged run onto a different pair, or off shoes entirely.
+ * \u26a0\ufe0f THE DISTANCE MOVES WITH IT, both ways. Setting run.shoeId alone would leave the old pair
+ * carrying kilometres it never ran and the new pair short by the same amount -- two wrong numbers
+ * from one tap, and the rack exists to answer exactly one question: when do I replace these.
+ */
+function shoeAssignRun(run, shoeId) {
+  try {
+    if (!run) return;
+    const next = shoeId || null;
+    if ((run.shoeId || null) === next) return;
+    const list = loadShoes();
+    const km = Number(run.distKm) || 0;
+    if (km > 0 && run.shoeId) {
+      const old = list.find((x) => x.id === run.shoeId);
+      if (old) old.km = Math.max(0, (Number(old.km) || 0) - km);
+    }
+    if (km > 0 && next) {
+      const sh = list.find((x) => x.id === next);
+      if (sh) sh.km = (Number(sh.km) || 0) + km;
+    }
+    run.shoeId = next;
+    saveShoes(list);
+    saveRuns();
   } catch (e) {}
 }
 /** Take a deleted run's distance back off its shoe, so the rack cannot drift upward for ever. */
@@ -10681,6 +10718,38 @@ function runNoteHtml(run) {
 }
 // THE post-run debrief, top to bottom, one scroll. Shared by the finish screen and the Logbook, so
 // what you read thirty seconds after a run is exactly what you read a month later.
+/**
+ * Which trainers this run was in.
+ * \u26a0\ufe0f ON AN UNSAVED RUN THE CHOICE PARKS ON LIVE.summary, exactly as the note and the effort
+ * rating do. liveRunRecord rebuilds the record on every render of the finish screen, so anything
+ * written onto the record itself is gone by the next tick -- and the runner would have picked their
+ * shoes, watched it stick, and saved a run credited to the wrong pair.
+ */
+function runShoeChoice(run) {
+  if (run && run.id && (state.logged || []).some((r) => r && r.id === run.id)) return run.shoeId || null;
+  const parked = LIVE && LIVE.summary ? LIVE.summary.shoeId : null;
+  if (parked !== undefined && parked !== null) return parked;
+  const act = activeShoe();
+  return act ? act.id : null;
+}
+function runShoeHtml(run) {
+  const list = loadShoes().filter((x) => !x.retiredIso);
+  if (!list.length) {
+    return '<div class="card sh-pick"><div class="ui-eyebrow">Trainers</div>' +
+      '<p class="sh-none">No trainers in your rack yet \u2014 add a pair and every run you log will count towards them.</p>' +
+      '<button class="perf-a" id="shoeAdd">Open the shoe rack \u203a</button></div>';
+  }
+  const cur = runShoeChoice(run);
+  const opts = list.map((sh) =>
+    '<button class="sh-opt' + (sh.id === cur ? " on" : "") + '" data-runshoe="' + esc(sh.id) + '">' +
+      '<span class="sh-on">' + esc(sh.name) + '</span>' +
+      '<span class="sh-ok">' + shoeTotalKm(sh).toFixed(0) + ' km</span></button>').join("");
+  return '<div class="card sh-pick"><div class="ui-eyebrow">Trainers</div>' +
+    '<div class="sh-opts">' + opts +
+      '<button class="sh-opt' + (!cur ? " on" : "") + '" data-runshoe="">' +
+        '<span class="sh-on">No trainers</span></button>' +
+    '</div></div>';
+}
 function runOverviewHtml(run) {
   const a = runAnalysis(run);
   const sc = run.type ? "var(--eff-" + effortOf({ type: run.type, intensity: run.type === "vo2" || run.type === "threshold" || run.type === "race-specific" ? "hard" : undefined }) + ")" : "var(--accent)";
@@ -10697,6 +10766,7 @@ function runOverviewHtml(run) {
     runDebrief(run, a) +
     stretchOfferHtml() +
     runDescriptionHtml(run) +
+    runShoeHtml(run) +
     runHrHtml(run) +
     runNoteHtml(run);
 }
@@ -11671,7 +11741,9 @@ function saveLiveSession() {
   if (sm.meaningful) {
     // ⚠️ Credited BEFORE the record is stored, so the shoeId is stamped on the copy that gets saved.
     const rec = liveRunRecord(sm);
-    shoeCreditRun(rec);
+    // \u26a0\ufe0f The pair chosen on the finish screen parks on LIVE.summary, like the note and the
+    // effort rating, because liveRunRecord rebuilds the record on every render.
+    shoeCreditRun(rec, LIVE && LIVE.summary ? LIVE.summary.shoeId : null);
     state.logged.unshift(rec);
     sm.runId = state.logged[0].id;
     saveRuns();
@@ -12582,6 +12654,17 @@ function wire() {
   const lgAll = $("lgAll"); if (lgAll) lgAll.onclick = () => { state.logAll = !state.logAll; render(); };
   const lgT = $("lgTrends"); if (lgT) lgT.onclick = () => { state.actTab = "performance"; render(); };
   const lgS = $("lgSnap"); if (lgS) lgS.onclick = () => { state.actTab = "performance"; render(); };
+  const shAdd = $("shoeAdd"); if (shAdd) shAdd.onclick = () => { state.screen = null; state.tab = "support"; state.support = "shoes"; render(); };
+  document.querySelectorAll("[data-runshoe]").forEach((b) => b.onclick = () => {
+    const id = b.dataset.runshoe || null;
+    const run = state.screen === "runview" ? viewedRun() : null;
+    if (run) shoeAssignRun(run, id);
+    // \u26a0\ufe0f An UNSAVED run has nothing to move yet -- the credit happens once, at save. Parking
+    // the choice is the whole mechanism; assigning here would credit a run that may never be saved.
+    else if (LIVE && LIVE.summary) LIVE.summary.shoeId = id;
+    haptic("tap");
+    render();
+  });
   const pt = $("perfTrial"); if (pt) pt.onclick = startTrialFlow;
   linkFormLabels();
   syncTextScale();

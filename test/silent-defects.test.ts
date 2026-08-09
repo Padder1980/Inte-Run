@@ -815,3 +815,16 @@ test("⚠️ the Logbook summarises the period, then interprets it, then lists i
   // "Provide filters without turning them into a second navigation layer."
   assert.match(snap, /id="lbFilterBtn"/, "the filters are always on screen as a second nav layer");
 });
+
+test("⚠️ every run row but the last carries a separator", () => {
+  // ⚠️ EVERY ROW IS THE LAST CHILD OF ITS OWN SWIPE WRAPPER, so ".lg-row:last-child { border: 0 }"
+  // matched ALL of them and removed every separator in the list — the same "position is not a name"
+  // mistake as the plan week card, in reverse. The wrapper is the thing to count.
+  const css = sheetOf(page());
+  assert.ok(!/\.lg-row:last-child \{ border-bottom: 0/.test(css),
+    "the separator is removed from every row, because each one is the last child of its own wrapper");
+  assert.match(css, /\.lg-list \.swipe:last-child \.lg-row \{ border-bottom: 0/,
+    "only the final row in the list should lose its separator");
+  assert.match(css, /\.lg-row \{[^}]*border-bottom: 1px solid var\(--line\)/,
+    "the rows carry no separator at all");
+});

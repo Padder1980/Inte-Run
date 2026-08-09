@@ -2333,7 +2333,15 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 /* Logbook rows: compact and date-aware. */
 .lg-list { padding: 0 var(--s4); }
 .lg-row { display: flex; align-items: center; gap: var(--s3); width: 100%; text-align: left; min-height: 62px; padding: var(--s3) 0; background: var(--surface); border: 0; border-bottom: 1px solid var(--line); color: inherit; font: inherit; cursor: pointer; }
-.lg-row:last-child { border-bottom: 0; }
+/* \u26a0\ufe0f EVERY ROW IS THE LAST CHILD OF ITS OWN SWIPE WRAPPER, so ".lg-row:last-child" matched
+   ALL of them and removed every separator in the list. The wrapper is the thing to count, not the
+   row inside it -- the same "position is not a name" mistake as the plan week card, in reverse. */
+.lg-list .swipe:last-child .lg-row { border-bottom: 0; }
+/* \u26a0\ufe0f The delete panel sits BEHIND each row and kept its rounded corners from when a run was
+   a free-standing card. In a joined list those corners showed as faint arcs down the right-hand edge
+   of every row -- decoration from a component that is no longer there. */
+.lg-list .swipe { background: var(--surface); border-radius: 0; }
+.lg-list .swipe-del { border-radius: 0; }
 .lg-d { flex: none; width: 46px; font-size: var(--t-label); font-weight: 750; letter-spacing: .04em; color: var(--ink-faint); }
 .lg-bar { flex: none; width: 3px; align-self: stretch; border-radius: var(--r-pill); margin: 3px 0; }
 .lg-b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }

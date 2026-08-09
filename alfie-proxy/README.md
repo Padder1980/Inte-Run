@@ -90,47 +90,60 @@ useless against Strava directly; a leaked refresh token is neither.
 The two halves are independent — Alfie works with no Strava credentials set, and Strava works with no
 Anthropic key. `POST /` stays Alfie's; Strava lives under `/strava/*`.
 
-## Deploy (about 15 minutes)
+## Deploy — the short way
 
-Prerequisites: a Cloudflare account (free tier is fine) and a Strava API application.
+Prerequisites: a Cloudflare account (free tier is fine) and the Strava API application already
+registered (its credentials are in gitignored `strava-secret.txt` in the repo root).
 
-**1. Create the token store.** Copy the `id` it prints into `wrangler.toml`, replacing the placeholder
-— a placeholder deploys cleanly and then fails at runtime with "not configured", which reads as a bug
-in the app.
-
-```bash
-cd alfie-proxy && npm install && npx wrangler login && npx wrangler kv namespace create STRAVA
-```
-
-**2. Deploy once, to find out your Worker's address.**
+**Step 1 — sign in to Cloudflare.** This one has to be done by hand; it opens a browser.
 
 ```bash
-npx wrangler deploy
+cd alfie-proxy && npm install && ./node_modules/.bin/wrangler login
 ```
 
-It prints something like `https://alfie-proxy.<your-subdomain>.workers.dev`. You need that next.
-
-**3. Register it with Strava.** At <https://www.strava.com/settings/api>, set
-**Authorization Callback Domain** to your Worker's host **only** — `alfie-proxy.<your-subdomain>.workers.dev`,
-with no `https://`, no path, no trailing slash. Strava refuses any redirect outside that domain, and the
-error it gives back does not say that clearly.
-
-**4. Give the Worker the credentials** from `strava-secret.txt` (gitignored, in the repo root), then
-redeploy:
+**Step 2 — run the setup script.** It creates the token store, writes its id into `wrangler.toml`,
+sends Cloudflare the Strava credentials, deploys, and then prints the two things left to paste.
 
 ```bash
-npx wrangler secret put STRAVA_CLIENT_ID
-npx wrangler secret put STRAVA_CLIENT_SECRET
-npx wrangler secret put ALLOWED_ORIGINS      # https://padder1980.github.io
-npx wrangler deploy
+./alfie-proxy/setup-strava.sh
 ```
 
-**5. Point the app at it.** In Inte-Run: **Support › Apps & devices › Strava**, paste the Worker URL,
-then **Connect to Strava**. (The paste box only appears in a browser, or once a server has already been
-set here — a TestFlight tester is never asked for a URL they have never heard of.) Consent opens in
-Safari; come back to the app and it picks up the connection on its own.
+⚠️ The script never prints a secret, never writes one to disk, and is safe to re-run — an existing
+token store is reused rather than replaced, because replacing it would sign out every runner who had
+already connected.
 
-Then open any run in the Logbook and tap **Send to Strava**.
+**Steps 3 and 4** are the two the script prints for you: paste the Worker's **host** into Strava's
+*Authorization Callback Domain* at <https://www.strava.com/settings/api>, and paste the Worker's
+**full URL** into the app at *Support › Apps & devices › Strava*. Then tap **Connect to Strava**.
+
+⚠️ The callback domain is the **host only** — no `https://`, no path, no trailing slash. Strava
+refuses any redirect outside it and the error it returns does not say so clearly.
+
+Consent opens in Safari; come back to the app and it picks the connection up on its own. Then open any
+run in the Logbook and tap **Send to Strava**.
+
+## Deploy — by hand, if the script fails
+
+```bash
+cd alfie-proxy && npm install
+./node_modules/.bin/wrangler login
+./node_modules/.bin/wrangler kv namespace create STRAVA   # paste the id into wrangler.toml
+./node_modules/.bin/wrangler secret put STRAVA_CLIENT_ID
+./node_modules/.bin/wrangler secret put STRAVA_CLIENT_SECRET
+./node_modules/.bin/wrangler secret put ALLOWED_ORIGINS   # https://padder1980.github.io
+./node_modules/.bin/wrangler deploy
+```
+
+⚠️ The `id` in `wrangler.toml` ships as a **placeholder**. Left as it is, the Worker deploys perfectly
+cleanly and then answers every request with "not configured" — which reads as a bug in the app.
+
+⚠️ **`wrangler whoami` exits 0 even when it is telling you "You are not authenticated"**, so a script
+guarding on its exit code sails straight past. Read its output instead. (`setup-strava.sh` does.)
+
+⚠️ **npm 11 blocks install scripts by default**, so `npm install` prints an `allow-scripts` warning for
+`esbuild` and `workerd`. Wrangler and `deploy` both work anyway — verified with `wrangler deploy
+--dry-run`. Only `wrangler dev` (the local server) needs `workerd`, and if you want it:
+`npm approve-scripts --allow-scripts-pending`.
 
 ## What it asks Strava for
 

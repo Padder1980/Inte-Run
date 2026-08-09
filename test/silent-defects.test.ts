@@ -947,3 +947,22 @@ test("⚠️ a run can be assigned to trainers, and the mileage moves with it", 
   // It appears on both surfaces because runOverviewHtml is shared.
   assert.match(fnSrc("runOverviewHtml"), /runShoeHtml\(run\)/, "the picker is not on the debrief");
 });
+
+test("⚠️ two buttons side by side are the same button", () => {
+  // ⚠️ .ctrl AND .primary ARE SEPARATE COMPONENTS with their own metrics — 14px against 15px,
+  // different padding, and .primary carries a margin-top of its own for when it stands alone at the
+  // foot of a card. Put them in a row and the accented one comes out taller AND pushed down, which
+  // reads as the app not knowing which of the two it means.
+  const css = sheetOf(page());
+  const rule = (css.match(/\.wr-cta button, \.live-controls\.two button, \.trial-controls\.two button \{[^}]*\}/) || [""])[0];
+  assert.ok(rule, "the paired-button rows are not normalised in one place");
+  for (const prop of ["min-height: var(--tap)", "margin: 0", "font-size: var(--t-body)", "border-radius: var(--r-ctl)"]) {
+    assert.ok(rule.includes(prop), "paired buttons do not share " + prop);
+  }
+  // ⚠️ ALL THREE ROWS, not just the one he reported. .live-controls and .trial-controls had each
+  // zeroed the margin locally and still differed in height — a fix applied to one row and not the
+  // others is this codebase's most repeated mistake.
+  const html = page();
+  const pairs = [...html.matchAll(/class="(wr-cta|live-controls two|trial-controls two)"/g)].map((m) => m[1]);
+  assert.ok(new Set(pairs).size >= 2, "the paired rows moved or were renamed: " + [...new Set(pairs)].join(", "));
+});

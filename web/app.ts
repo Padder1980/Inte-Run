@@ -858,6 +858,16 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 .wu-note { font-size: 11.5px; color: var(--ink-faint); margin-top: 4px; line-height: 1.4; }
 .wk-review .wr-cta { display: flex; gap: 8px; margin-top: 12px; }
 .wk-review .wr-cta button { flex: 1; }
+/* \u26a0\ufe0f A PAIR OF BUTTONS SIDE BY SIDE MUST BE THE SAME BUTTON. .ctrl and .primary are separate
+   components with their own metrics -- 14px against 15px, different padding, and .primary carries a
+   margin-top of its own for when it stands alone at the foot of a card. Put them in a row and the
+   accented one comes out taller AND pushed down, which reads as the app not knowing which it means.
+   .live-controls and .trial-controls had each zeroed the margin locally and still differed in height;
+   this normalises all three in one place, so a fourth row cannot be added wrong. */
+.wr-cta button, .live-controls.two button, .trial-controls.two button {
+  min-height: var(--tap); margin: 0; padding: var(--s3) var(--s4);
+  font-size: var(--t-body); border-radius: var(--r-ctl);
+}
 .hz-note { font-size: 11.5px; color: var(--ink-faint); margin-top: 8px; }
 .rn-note { width: 100%; box-sizing: border-box; font: inherit; font-size: 16px; line-height: 1.45; color: var(--ink);
   background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; resize: vertical; }

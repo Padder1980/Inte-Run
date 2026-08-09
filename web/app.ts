@@ -2330,6 +2330,14 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .perf-e { margin: var(--s3) 0 0; padding-top: var(--s3); border-top: 1px solid var(--line); font-size: var(--t-meta); line-height: 1.5; color: var(--ink-faint); }
 .perf-a { width: 100%; min-height: var(--tap); margin-top: var(--s3); background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-ctl); color: var(--accent); font: inherit; font-weight: 700; cursor: pointer; }
 .perf-sum { margin: var(--s3) 2px 0; font-size: var(--t-meta); line-height: 1.5; color: var(--ink-faint); }
+/* The consistency streak: one flame per week, then a line to keep it going. */
+.st-row { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+.st-flames { display: inline-flex; gap: 2px; }
+.st-f { display: inline-flex; color: var(--ease); }
+.st-f svg { width: 17px; height: 17px; }
+.st-n { font-size: var(--t-body); font-weight: 700; color: var(--ink); }
+.st-q { margin-top: var(--s2); font-size: var(--t-meta); line-height: 1.5; color: var(--ink-soft); font-style: italic; }
+.st-qa { display: block; margin-top: 2px; font-style: normal; color: var(--ink-faint); }
 /* Logbook rows: compact and date-aware. */
 .lg-list { padding: 0 var(--s4); }
 .lg-row { display: flex; align-items: center; gap: var(--s3); width: 100%; text-align: left; min-height: 62px; padding: var(--s3) 0; background: var(--surface); border: 0; border-bottom: 1px solid var(--line); color: inherit; font: inherit; cursor: pointer; }
@@ -2536,6 +2544,7 @@ const ICON = {
   rIntervals: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16V9M9 16V6M14 16v-7M19 16v-4"/><path d="M2.5 19.5h19"/></svg>',
   rRace: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 5h8l-1.4 3L13 11H5"/><path d="M13 5h6l-1.4 3L19 11h-6"/></svg>',
   rStrides: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h11M3 12h15M3 16h8"/><path d="m18 14 3 2-3 2"/></svg>',
+  flame: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12.7 2.2c.3 2.6-.6 4.2-2 5.6-1.6 1.7-3.7 3.2-3.7 6.4a5.6 5.6 0 0 0 11.2.3c0-2.3-1-3.9-2.1-5.2-.4 1-1 1.7-1.8 2 .5-3.2-.6-6.6-1.6-9.1Z"/></svg>',
   search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9.5 7V5.4A1.4 1.4 0 0 1 10.9 4h2.2a1.4 1.4 0 0 1 1.4 1.4V7"/><path d="M6.4 7l.8 12.1A1.9 1.9 0 0 0 9.1 21h5.8a1.9 1.9 0 0 0 1.9-1.9L17.6 7"/><path d="M10.5 11v6M13.5 11v6"/></svg>',
   watch: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="3.4"/><path d="M9 6 8.6 3.2A1 1 0 0 1 9.6 2h4.8a1 1 0 0 1 1 1.2L15 6M9 18l-.4 2.8a1 1 0 0 0 1 1.2h4.8a1 1 0 0 0 1-1.2L15 18"/><path d="M12 9.6V12l1.7 1.1"/></svg>',
@@ -6707,8 +6716,37 @@ function logbookSnapshot() {
       // what it counted underneath, because a bare number invites the reader to invent a meaning.
       cell("Consistency", streak ? streak + (streak === 1 ? " week" : " weeks") : "\u2014") +
     '</div>' +
-    (streak ? '<div class="lb-con">' + streak + (streak === 1 ? " week" : " weeks") + ' in a row with at least one run</div>' : "") +
+    streakRow(streak) +
     '</div>';
+}
+/**
+ * A flame for every week of the streak, and a line to keep it going.
+ *
+ * \u26a0\ufe0f ONE FLAME PER WEEK, COUNTED, NOT A DECORATION. Five flames means five weeks; the number
+ * stays beside them so the picture can be checked against something. Past twelve it stops drawing
+ * and says the number instead -- a row of thirty flames is a smear, not an achievement.
+ *
+ * \u26a0\ufe0f AND THE QUOTE IS EARNED, WHICH IS THE ONLY REASON IT IS HERE. This app has a rule against
+ * praise that arrives whatever you did -- it is why the post-run debrief gives a bad session an
+ * honest read. A streak is the one thing on this screen the runner unambiguously did, so encouraging
+ * them to protect it is not flattery. It appears only from two weeks; congratulating somebody on a
+ * single week is the empty praise the rule exists to prevent.
+ *
+ * \u26a0\ufe0f THE QUOTE IS PICKED BY WEEK, NOT AT RANDOM. randomQuote() would hand out a different one
+ * on every render -- and this screen re-renders on a filter tap, a delete, a swipe -- so the quote
+ * would flicker while the runner was reading it.
+ */
+function streakRow(streak) {
+  if (!streak) return "";
+  const flames = streak <= 12
+    ? '<span class="st-flames" aria-hidden="true">' + Array(streak + 1).join('<span class="st-f">' + ICON.flame + '</span>') + '</span>'
+    : "";
+  const label = streak + (streak === 1 ? " week" : " weeks") + " in a row";
+  if (streak < 2) return '<div class="lb-con">' + flames + '<span class="st-n">' + label + ' with at least one run</span></div>';
+  const q = QUOTES[streak % QUOTES.length];
+  return '<div class="lb-con st-row">' + flames +
+    '<span class="st-n">' + label + '</span></div>' +
+    '<div class="st-q">\u201c' + esc(q[0]) + '\u201d' + (q[1] ? '<span class="st-qa">' + esc(q[1]) + '</span>' : "") + '</div>';
 }
 /**
  * "Interpret comparable runs and state the evidence behind the insight."

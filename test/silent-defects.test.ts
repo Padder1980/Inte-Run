@@ -786,7 +786,20 @@ test("⚠️ the Logbook summarises the period, then interprets it, then lists i
   // which asks the reader to work out which one answers their question.
   assert.match(snap, /MON_FULL/, "the period is not named");
   assert.match(snap, /Consistency/, "there is no consistency figure");
-  assert.match(snap, /in a row with at least one run/, "the consistency number does not say what it counted");
+  // The streak's own explanation moved into streakRow, which draws it as flames.
+  const st = fnSrc("streakRow");
+  assert.match(st, /in a row/, "the consistency number does not say what it counted");
+  // ⚠️ ONE FLAME PER WEEK, and the number stays beside them so the picture can be checked.
+  assert.match(st, /Array\(streak \+ 1\)\.join/, "the flames are not counted from the streak");
+  assert.match(st, /streak <= 12/, "a thirty-week streak draws thirty flames, which is a smear");
+  assert.match(st, /streak \+ \(streak === 1 \? " week" : " weeks"\)/, "the number is not shown beside the flames");
+  // ⚠️ THE QUOTE IS EARNED — this app has a rule against praise that arrives whatever you did. A
+  // single week is not a streak, and congratulating it is the empty praise the rule exists to prevent.
+  assert.match(st, /if \(streak < 2\)/, "one week gets congratulated");
+  // ⚠️ …and it is picked by week, not at random: this screen re-renders on a filter tap, a delete or
+  // a swipe, so randomQuote() would make the quote flicker while it was being read.
+  assert.match(st, /QUOTES\[streak % QUOTES\.length\]/, "the quote changes on every render");
+  assert.ok(!/randomQuote\(\)/.test(st), "the quote is random, so it will not sit still");
 
   const streak = fnSrc("logStreakWeeks");
   // ⚠️ LAST WEEK COUNTS AS THE START. Measured from THIS week only, the number collapses to zero every

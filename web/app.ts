@@ -788,6 +788,17 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 .dn-stat .dn-k { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); margin-top: 2px; }
 /* Run overview: route map (brand-colour marching-ants line) + stats + splits */
 .ov-map-card { padding: 0; overflow: hidden; }
+/* \u26a0\ufe0f THE DEBRIEF'S BLOCKS WERE TOUCHING. .card carries no bottom margin — every screen adds
+   its own rhythm, and this one never did, so the cards butted together separated only by their own
+   1px borders. Measured before the fix, the gaps down the screen read 70, 0, 0, 0, 0, 12, 0: one
+   chasm under the share button, one lonely 12, and the rest flush. That is what "the blocks don't
+   sit well together" is — not any single card being wrong, but no rhythm between them.
+   Scoped to the run overview by its map card, so no other screen's spacing moves. */
+#view:has(.ov-map-card) > .card,
+#view:has(.ov-map-card) > button.card,
+#view:has(.ov-map-card) > .primary { margin-bottom: var(--s3); }
+/* The share button brought a 16px top margin of its own, which made one gap five times the others. */
+#view:has(.ov-map-card) > .share-btn { margin-top: 0; }
 .ov-map { position: relative; background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 8%, var(--surface-2)), var(--surface-2)); }
 .ov-mapcv { display: block; width: 100%; height: auto; }
 .ov-mapov { position: absolute; inset: 0; }

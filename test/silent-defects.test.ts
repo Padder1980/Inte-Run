@@ -991,3 +991,20 @@ test("⚠️ the debrief cards do not claim a target the run never had", () => {
   assert.match(css, /\.pc-wrap \{[^}]*height: 132px/, "the pace chart has no height limit");
   assert.match(css, /\.pc-wrap svg \{[^}]*height: 100%/, "the chart does not fill its capped box");
 });
+
+test("⚠️ the debrief's blocks have a rhythm between them", () => {
+  // ⚠️ .card CARRIES NO BOTTOM MARGIN — every screen supplies its own rhythm, and the run debrief
+  // never did. Measured before the fix, the gaps down the screen read 70, 0, 0, 0, 0, 12, 0: one
+  // chasm under the share button, one lonely 12, and everything else flush, separated only by each
+  // card's own 1px border. No single card was wrong; there was simply nothing between them.
+  const css = sheetOf(page());
+  const rule = (css.match(/#view:has\(\.ov-map-card\) > \.card[\s\S]{0,220}?\}/) || [""])[0];
+  assert.ok(rule, "the debrief screen sets no spacing between its cards");
+  assert.match(rule, /margin-bottom: var\(--s3\)/, "the spacing is not on the ladder");
+  // ⚠️ The share button brought a 16px top margin of its own, which made one gap five times the rest.
+  assert.match(css, /#view:has\(\.ov-map-card\) > \.share-btn \{ margin-top: 0; \}/,
+    "the share button's own margin still breaks the rhythm");
+  // ⚠️ SCOPED, so no other screen's spacing moves. .card is used everywhere.
+  assert.ok(!/^\.card \{[^}]*margin-bottom/m.test(css),
+    "a bottom margin was put on .card globally, which shifts every screen in the app");
+});

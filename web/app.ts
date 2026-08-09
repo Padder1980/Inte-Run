@@ -1946,8 +1946,20 @@ button.sw-row:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--
 body.has-live-pill #view { padding-top: 46px; }
 /* An app should not zoom. touch-action: manipulation removes the double-tap-to-zoom delay and the
    zoom itself; pinch is blocked in JS (see the gesture guard) because iOS ignores both
-   user-scalable=no and touch-action for pinch. The avatar cropper opts back in. */
+   user-scalable=no and touch-action for pinch. The avatar cropper opts back in.
+
+   \u26a0\ufe0f ON EVERY ELEMENT, BECAUSE touch-action DOES NOT INHERIT. This was set on html and body
+   alone, which governs only the taps that land on html or body themselves -- so a double tap on a
+   card, a row, a stat tile or an input hit an element with the default value and iOS zoomed the page
+   to fit whatever box was under the finger. That is why the zoom was inconsistent: it scales to the
+   tapped element, so a small tile zoomed far more than a wide card, which reads as a random bug
+   rather than a missing rule. The comment two lines up claimed this was "handled by touch-action in
+   CSS" and it was not.
+   \u26a0\ufe0f manipulation STILL ALLOWS PINCH and scrolling -- it removes double-tap zoom and the
+   300ms tap delay, nothing else. So the two deliberate exceptions below keep working, and both are
+   class selectors, which outrank the universal one whatever the order. */
 html, body { touch-action: manipulation; }
+* { touch-action: manipulation; }
 .crop-stage { touch-action: none; }
 /* ⚠️ 16px is a hard floor for anything you can type into. iOS auto-zooms the page when a field with
    a computed font-size under 16px takes focus, and because pinch is disabled the runner cannot zoom

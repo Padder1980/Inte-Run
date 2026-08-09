@@ -108,3 +108,24 @@ test("nothing is SIZED in vh — on iOS that is lvh, taller than the visible are
   }
   assert.deepEqual(bad, [], "these size on vh rather than dvh");
 });
+
+test("⚠️ double-tap cannot zoom the app, on any element", () => {
+  // ⚠️ touch-action DOES NOT INHERIT. It was set on html and body alone, which governs only the taps
+  // that land on html or body themselves — so a double tap on a card, a row, a stat tile or an input
+  // hit an element with the default value and iOS zoomed the page to fit whatever box was under the
+  // finger. That is why the zoom looked inconsistent: it scales to the TAPPED ELEMENT, so a small
+  // tile zoomed far more than a wide card, which reads as a random bug rather than a missing rule.
+  const css = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
+  const style = css.slice(css.indexOf("<style>"), css.indexOf("</style>"));
+  assert.match(style, /\n\* \{ touch-action: manipulation; \}/,
+    "touch-action is not applied to every element, so double-tap zoom works on anything nested");
+  // ⚠️ manipulation still allows pinch and scrolling — it removes double-tap zoom and the tap delay.
+  // The two deliberate exceptions are class selectors, so they outrank the universal rule whatever
+  // the source order: the cropper drives its own zoom, and a swipeable row must pan vertically.
+  assert.match(style, /\.crop-stage \{ touch-action: none; \}/, "the avatar cropper lost its own gestures");
+  assert.match(style, /\.swipe-face \{[^}]*touch-action: pan-y/, "a swipeable run row lost vertical panning");
+  // Nothing may set touch-action: none on a scroller, or the screen stops scrolling entirely.
+  const nones = [...new Set([...style.matchAll(/([^\s{}]+) \{[^}]*touch-action: none/g)].map((m) => m[1]))];
+  assert.deepEqual(nones, [".crop-stage"],
+    "something other than the cropper disables touch entirely: " + nones.join(", "));
+});

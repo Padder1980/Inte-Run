@@ -732,3 +732,48 @@ test("⚠️ the form's sections are the profile page's rows, under the same nam
       "a profile row opens \"" + title + "\", which is not a section in the form");
   }
 });
+
+test("⚠️ the profile photo is tappable, and back goes where you came from", () => {
+  const html = page();
+  const fn = fnSrc("viewProfile");
+  // ⚠️ THE PICTURE WAS A DIV. It looks exactly like the thing you tap to change your photo — a photo,
+  // in a circle, at the top of your profile — and it did nothing at all.
+  assert.match(fn, /<button class="pf-av" data-pf="setup:you"/, "the profile photo is not tappable");
+  assert.match(fn, /aria-label="Change your photo or name"/, "the photo button has no accessible name");
+  const defs = html.slice(html.indexOf("const SETUP_TOPICS"), html.indexOf("function applySetupFocus"));
+  assert.match(defs, /you: \["s_name", "s_avatar_file"\]/, "the You topic does not reach the photo picker");
+
+  // ⚠️ BACK MEANS WHERE YOU CAME FROM. Apps & devices, Shoes, Your data and Safety are Support
+  // screens, so opening one from the profile and pressing back dumped the runner into the Support
+  // hub — a tab they had not been near.
+  const det = fnSrc("supportDetail");
+  assert.match(det, /state\.supportFrom === "profile"/, "the back button does not know where it came from");
+  assert.match(det, /fromProfile \? "Profile" : "Support"/, "the back button always says Support");
+  assert.match(html, /wasFrom === "profile"\) state\.screen = "profile"/, "back does not return to the profile");
+  // ⚠️ …and arriving from the Support hub must CLEAR the origin, or a later back goes to the profile
+  // from a screen the runner reached through Support.
+  assert.match(html, /state\.support = b\.dataset\.hub; state\.supportFrom = null;/,
+    "opening a hub card leaves a stale origin behind");
+});
+
+test("⚠️ a first-time runner cannot build a plan on questions they never answered", () => {
+  const html = page();
+  const fn = fnSrc("draftFromForm");
+  // ⚠️ THE DRAFT WAS SEEDED FROM DEFAULT_PROFILE, so the two questions that shape the whole plan —
+  // what kind of runner you are, and how many days a week you run — arrived already answered
+  // ("Regular runner", "5 days"). Somebody who scrolled past them got a plan built for a runner they
+  // had never claimed to be, with nothing on screen to say the app had decided for them.
+  assert.match(fn, /!profile\.personalized/, "the check runs for everyone, not just a first run");
+  assert.match(fn, /Before we can build your plan/, "there is no message naming what is missing");
+  assert.match(fn, /!draft\.status/, "the running status can still be left unanswered");
+  assert.match(fn, /!draft\.days/, "days per week can still be left unanswered");
+
+  // The seeder must leave them EMPTY on a first run, or the check has nothing to catch.
+  const seed = fnSrc("seedSetupDraft");
+  assert.match(seed, /const first = !profile\.personalized/, "the seeder cannot tell a first run");
+  assert.match(seed, /days: first \? "" :/, "days is pre-answered from the defaults");
+  assert.match(seed, /status: first \? "" :/, "the running status is pre-answered from the defaults");
+  // ⚠️ And both controls must render from the DRAFT, or they show a selection nobody made.
+  assert.match(html, /statusCards\(draft\.status != null/, "the status cards render from the stored profile");
+  assert.match(html, /draft\.days != null \? draft\.days/, "the days control renders from the stored profile");
+});

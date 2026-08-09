@@ -2270,7 +2270,8 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .pf-av img { width: 100%; height: 100%; object-fit: cover; }
 .pf-av svg { width: 28px; height: 28px; }
 .pf-idb { min-width: 0; }
-.pf-name { font-size: var(--t-hero); font-weight: 780; letter-spacing: -.02em; color: var(--ink); }
+.pf-av { border: 0; cursor: pointer; padding: 0; }
+.pf-name { background: none; border: 0; padding: 0; text-align: left; cursor: pointer; font-size: var(--t-hero); font-weight: 780; letter-spacing: -.02em; color: var(--ink); }
 .pf-sub { font-size: var(--t-meta); color: var(--ink-soft); margin-top: 2px; }
 .pf-sec { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3); margin: var(--s5) 2px var(--s2); }
 .pf-sec > span:first-child { font-size: var(--t-section); font-weight: 750; letter-spacing: -.02em; color: var(--ink); }
@@ -2895,7 +2896,7 @@ function computeToday() {
 }
 computeToday();
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "workouts", logFilter: "all", supportQ: "", openGuide: null, setupFocus: null, support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK, addOpen: false };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "workouts", logFilter: "all", supportQ: "", openGuide: null, setupFocus: null, supportFrom: null, support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK, addOpen: false };
 // Effective day index for a session, honouring any user reschedule. Works for raw sessions
 // (dayOfWeek) and summary sessions (dayIndex), keyed by the shared session id.
 function loadDayOverride() { try { return JSON.parse(localStorage.getItem("interun_dayov_v1") || "{}") || {}; } catch (e) { return {}; } }
@@ -6921,7 +6922,8 @@ function profContext() {
  */
 function seedSetupDraft() {
   if (draft.__live) return;
-  draft = { days: profile.daysPerWeek, strength: profile.strength ? "1" : "0", returning: returnKind(profile), status: profile.status || (profile.noRecent ? "new" : "regular"), fitsrc: (profile.fitSrc === "predicted" ? "predicted" : "recent"), avatar: profile.avatar || "", __live: true, __f: {} };
+  const first = !profile.personalized;
+  draft = { days: first ? "" : profile.daysPerWeek, strength: profile.strength ? "1" : "0", returning: returnKind(profile), status: first ? "" : (profile.status || (profile.noRecent ? "new" : "regular")), fitsrc: (profile.fitSrc === "predicted" ? "predicted" : "recent"), avatar: profile.avatar || "", __live: true, __f: {} };
 }
 let PROFILE_EDIT_OPEN = false;
 /**
@@ -6960,8 +6962,10 @@ function viewProfile() {
   const remind = (REMIND && REMIND.on) ? "On" : "Off";
   const themeSet = (function () { try { return localStorage.getItem("interun_theme_v1"); } catch (e) { return null; } })();
   return '<div class="pf-id">' +
-      '<div class="pf-av">' + avatarInner(profile) + '</div>' +
-      '<div class="pf-idb"><div class="pf-name">' + esc(profile.name || "Your profile") + '</div>' +
+      // \u26a0\ufe0f THE PICTURE WAS A DIV. It looks exactly like the thing you tap to change your photo
+      // -- a photo, in a circle, at the top of your profile -- and it did nothing at all.
+      '<button class="pf-av" data-pf="setup:you" aria-label="Change your photo or name">' + avatarInner(profile) + '</button>' +
+      '<div class="pf-idb"><button class="pf-name" data-pf="setup:you">' + esc(profile.name || "Your profile") + '</button>' +
       '<div class="pf-sub">' + esc(profPlanStatus()) + '</div></div>' +
     '</div>' +
     '<div class="pf-sec"><span>Training profile</span><button class="pf-edit" data-pf="setup">Edit</button></div>' +
@@ -7133,7 +7137,11 @@ function safetyView() {
       'something feels wrong and the app is telling you it is fine, believe yourself.</p></div>';
 }
 function supportDetail(id) {
-  const back = '<button class="backbtn" id="supBack">‹ Support</button>';
+  // \u26a0\ufe0f BACK MEANS WHERE YOU CAME FROM. Apps & devices, Shoes, Your data and Safety are all
+  // Support screens, so opening one from the profile and pressing back dumped the runner into the
+  // Support hub -- a tab they had not been near. The origin is remembered rather than assumed.
+  const fromProfile = state.supportFrom === "profile";
+  const back = '<button class="backbtn" id="supBack">‹ ' + (fromProfile ? "Profile" : "Support") + '</button>';
   if (id === "safety") return back + safetyView();
   if (id === "understand") return back + understandView();
   if (id === "redflags") return back + redflagsView();
@@ -8452,7 +8460,7 @@ function viewSetup() {
 
   // 2 · Your running (status gates the fitness inputs)
   const secRunning =
-    '<div class="q" style="margin-top:0"><label>What\\u2019s your current running status?</label>' + statusCards(p.status || "regular") + '</div>' +
+    '<div class="q" style="margin-top:0"><label>What\\u2019s your current running status?</label>' + statusCards(draft.status != null ? draft.status : (p.status || "regular")) + '</div>' +
     '<div class="q" id="statusBegNote"' + (p.status === "new" ? '' : ' style="display:none"') + '><div class="mas-hint"></div></div>' +
     // Fitness ≠ frequency: a "building the habit" runner can be genuinely fit but just not running
     // often. This callout makes the optional pace calibration obvious and inviting to fill in.
@@ -8477,7 +8485,7 @@ function viewSetup() {
   // questions borrowed out of "A few details". The old section 4 held both rhythm and context, so
   // the two rows either shared a screen or the split had to be invented per-question.
   const secRhythm =
-    '<div class="q" style="margin-top:0"><label>How many days a week will you run? <span class="q-hint">we\\u2019ll shape the plan around this</span></label>' + seg("days", [["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]], p.daysPerWeek) + '</div>' +
+    '<div class="q" style="margin-top:0"><label>How many days a week will you run? <span class="q-hint">we\\u2019ll shape the plan around this</span></label>' + seg("days", [["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]], draft.days != null ? draft.days : p.daysPerWeek) + '</div>' +
     '<div class="q" id="volQ"><label>Roughly how far do you run in a normal week? <span class="q-hint">km \\u2014 so we can build on what you already do</span></label><input class="sel" id="s_volume" type="number" inputmode="numeric" min="0" max="250" step="5" style="max-width:140px" value="' + (p.volKm || "") + '" placeholder="e.g. 40"><div class="q-hint" style="margin-top:5px">Leave it blank if you are not sure \\u2014 we\\u2019ll use a sensible default for your goal.</div></div>' +
     '<div class="q"><label>Which day suits your long run? <span class="q-hint">we\\u2019ll build the week around it</span></label><select class="sel" id="s_longday" style="max-width:200px">' + dayOpts(p.longRunDay) + '</select></div>' +
     '<div class="q"><label>When do you want to start? <span class="q-hint">a mid-week start gives a shorter first week</span></label><input class="sel" id="s_startdate" type="date" value="' + (p.startDateIso || todayIso()) + '" min="' + todayIso() + '"></div>' +
@@ -8544,12 +8552,13 @@ function viewSetup() {
  */
 const SETUP_TOPICS = {
   fitness: ["s_rectime", "s_2km", "s_2km_rec", "s_easypace", "fitsrc", "status"],
+  you: ["s_name", "s_avatar_file"],
   goal: ["s_dist", "s_target", "s_date"],
   rhythm: ["days", "s_longday", "s_volume", "s_startdate", "strength"],
   context: ["returning", "s_age", "s_sex"],
   voice: ["coachSel"],
 };
-const SETUP_TOPIC_TITLE = { fitness: "Current fitness", goal: "Your goal", rhythm: "Training rhythm", context: "Current context", voice: "Voice coaching" };
+const SETUP_TOPIC_TITLE = { you: "You", fitness: "Current fitness", goal: "Your goal", rhythm: "Training rhythm", context: "Current context", voice: "Voice coaching" };
 function applySetupFocus() {
   document.querySelectorAll(".setup-off").forEach((e) => e.classList.remove("setup-off"));
   const topic = state.setupFocus;
@@ -8592,6 +8601,21 @@ function applySetupFocus() {
 }
 function draftFromForm() {
   const mmss = (s) => /^\\d{1,2}:[0-5]\\d$/.test(s) || /^\\d{1,2}:[0-5]\\d:[0-5]\\d$/.test(s);
+  // \u26a0\ufe0f ON THE VERY FIRST RUN, THE UNANSWERED QUESTIONS ARE ANSWERED BY DEFAULTS, SILENTLY.
+  // draft.status falls back to "regular" and draft.days to the DEFAULT_PROFILE value, so somebody who
+  // scrolled past the two questions that shape the whole plan -- what kind of runner they are, and
+  // how many days a week they run -- got a plan built for a five-day regular runner and no hint that
+  // the app had decided for them. Every other question already throws its own message; these two had
+  // no way to. Only on first run: an existing profile has real answers behind it, and re-asking would
+  // block somebody editing one unrelated field.
+  if (!profile.personalized) {
+    const missing = [];
+    if (!draft.status) missing.push("what kind of runner you are");
+    if (!draft.days) missing.push("how many days a week you run");
+    if (missing.length) {
+      throw new Error("Before we can build your plan, tell us " + missing.join(" and ") + ".");
+    }
+  }
   // Weekly mileage is optional: blank means "not sure", which the engine reads as no volume model
   // and falls back to the plan's own defaults. 0 and undefined must therefore mean the same thing.
   const volEl = $("s_volume");
@@ -12391,7 +12415,9 @@ function wire() {
     // exactly one implementation of what changing the theme does.
     if (to === "theme") { const t = $("themeBtn"); if (t) t.click(); render(); return; }
     if (to === "reminders") { openRemindersSheet(); return; }
-    state.screen = null; state.tab = "support"; state.support = to; render();
+    state.screen = null; state.tab = "support"; state.support = to;
+    state.supportFrom = "profile";
+    render();
   });
   const sq = $("supQ");
   if (sq) {
@@ -12448,14 +12474,19 @@ function wire() {
     if (saved) saved.textContent = "Save the run first and your note saves with it.";
   };
   const ovMap = $("ovMap"); if (ovMap) { const r = currentOverviewRun(); if (r) buildOverviewMap(ovMap, r.route); }
-  document.querySelectorAll("[data-hub]").forEach((b) => b.onclick = () => { if (b.dataset.hub === "alfie") { openAlfie(); return; } state.support = b.dataset.hub; render(); });
+  document.querySelectorAll("[data-hub]").forEach((b) => b.onclick = () => { if (b.dataset.hub === "alfie") { openAlfie(); return; } state.support = b.dataset.hub; state.supportFrom = null; render(); });
   // Support library pages: play any movement, expand any guide.
   wireExDemos();
   document.querySelectorAll("[data-gd]").forEach((g) => { const h = g.querySelector(".gd-h"); if (h) h.onclick = () => g.classList.toggle("on"); });
   const gAlfie = $("guidesAlfie"); if (gAlfie) gAlfie.onclick = openAlfie;
   const guideReplay = $("guideReplay"); if (guideReplay) guideReplay.onclick = () => openSessionGuide(GUIDE_EXAMPLE, { fromSupport: true });
   wireDataView();
-  const back = $("supBack"); if (back) back.onclick = () => { state.support = null; render(); };
+  const back = $("supBack"); if (back) back.onclick = () => {
+    const wasFrom = state.supportFrom;
+    state.support = null; state.supportFrom = null;
+    if (wasFrom === "profile") state.screen = "profile";
+    render();
+  };
   wireConnectView();
   wireWhyView();
   document.querySelectorAll('[data-chk="rf"]').forEach((c) => c.onchange = runRf);
@@ -12501,6 +12532,9 @@ function wire() {
     // session the runner had moved and push the new schedule to iOS and the watch, on one tap with no
     // warning. The preview is computed with applyProfile, which is pure; nothing is committed until
     // the sheet's own button is pressed.
+    // \u26a0\ufe0f CLEAR THE LAST COMPLAINT. It stayed on screen beside a working preview sheet, so a
+    // runner who had just fixed the thing it named was still being told about it.
+    const erOk = $("setupErr"); if (erOk) { erOk.style.display = "none"; erOk.textContent = ""; }
     const imp = profileImpact(pf);
     if (imp && !PROFILE_CONFIRMED) { openProfilePreview(pf, imp); return; }
     PROFILE_CONFIRMED = false;

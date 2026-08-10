@@ -69,6 +69,67 @@ for (const theme of ["light", "dark"] as const) {
     assert.deepEqual(failures, [], `${theme} text below 4.5:1 —\n  ` + failures.join("\n  "));
   });
 
+  /**
+   * ⚠️ A CATEGORY COLOUR USED AS TEXT IS TEXT, AND NOTHING WAS CHECKING IT. The sweep above covers the
+   * four INK tokens on the three neutral grounds — which is where body copy lives — so it never looked
+   * at the pattern the new injury guide uses: a small uppercase label in `--rest` or `--ease` sitting on a
+   * panel tinted 8% with that same colour. Measured 2026-08-10, both in LIGHT mode:
+   *
+   *   --ease  on its own 8% tint  2.41:1   (the injury guide's URGENT band title)
+   *   --rest  on its own 8% tint  4.31:1   (the injury guide's EMERGENCY band title)
+   *
+   * Dark mode passed all three, which is exactly the trap the accent fix already taught this file: the
+   * brief reviewed dark screenshots, and the failures live in light. Each is now mixed toward the
+   * theme's own `--ink`, so one declaration darkens in light and lightens in dark.
+   *
+   * ⚠️ THE GROUND IS THE TINT, NOT THE PLAIN SURFACE. Checking these against `--surface-2` would be
+   * measuring a background the label never appears on, and the tint is the harder case in light mode.
+   */
+  test(`category colours used as text clear AA on their own tinted panels — ${theme}`, () => {
+    const t = tokens(theme);
+    /** color-mix(in srgb, a p%, b) — component-wise on gamma-encoded sRGB, which is what CSS does. */
+    const mix = (a: string, b: string, p: number): string => {
+      const px = (h: string) => [0, 2, 4].map((i) => parseInt(h.replace("#", "").slice(i, i + 2), 16));
+      const [x, y] = [px(a), px(b)];
+      return "#" + [0, 1, 2].map((i) => Math.round(x[i]! * p + y[i]! * (1 - p))
+        .toString(16).padStart(2, "0")).join("");
+    };
+    // [label, ink colour as shipped, the ground it actually sits on]
+    const pairs: Array<[string, string, string]> = [
+      ["injury emergency band title", mix(t["rest"]!, t["ink"]!, 0.8), mix(t["rest"]!, t["surface-2"]!, 0.08)],
+      ["injury urgent band title", mix(t["ease"]!, t["ink"]!, 0.6), mix(t["ease"]!, t["surface-2"]!, 0.08)],
+    ];
+    const failures: string[] = [];
+    for (const [name, ink, ground] of pairs) {
+      const r = ratio(ink, ground);
+      if (r < 4.5) failures.push(`${name}: ${r.toFixed(2)}:1`);
+    }
+    assert.deepEqual(failures, [], `${theme} category text below 4.5:1 —\n  ` + failures.join("\n  "));
+    // ⚠️ AND THE RAW TOKENS MUST STILL BE THE FAILING CASE, or this test is measuring a mix nobody uses.
+    // If a future palette change made raw --peak pass on its own, the mixes above became unnecessary
+    // and somebody should simplify them rather than leave the indirection in place unexplained.
+    if (theme === "light") {
+      assert.ok(ratio(t["ease"]!, mix(t["ease"]!, t["surface-2"]!, 0.08)) < 4.5,
+        "raw --ease now passes on its own tint — the color-mix indirection can be removed");
+    }
+    // The declarations really are the ones measured above, not a table that has drifted from the CSS.
+    // ⚠️ COUNTED, NOT `includes`. Two of the three appear TWICE (--peak on .fg-bda-k and .fg-part-h,
+    // --rest on both guides' band titles), so a presence check let either element of a pair revert to the
+    // raw token while its sibling kept the guard green — which is the failing case, undetected.
+    const html = css();
+    for (const [decl, want] of [
+      ["color: color-mix(in srgb, var(--rest) 80%, var(--ink))", 1],
+      ["color: color-mix(in srgb, var(--ease) 60%, var(--ink))", 1],
+    ] as Array<[string, number]>) {
+      const n = html.split(decl).length - 1;
+      assert.equal(n, want, "expected " + want + " uses of `" + decl + "`, found " + n);
+    }
+    // ⚠️ AND THE GROUND ITSELF IS ASSERTED. The 8% tint above is hardcoded here; darkening it in the CSS
+    // would drop the real contrast while every number in this test stayed the same.
+    for (const tint of ["var(--rest) 8%, var(--surface-2)", "var(--ease) 8%, var(--surface-2)"])
+      assert.ok(html.includes(tint), "the band tint changed but this test still assumes 8%: " + tint);
+  });
+
   test(`the accent works as a button background too — ${theme}`, () => {
     // ⚠️ THE ACCENT IS BOTH A TEXT COLOUR AND A SURFACE. Darkening it until it passes as text can
     // push the label on top of it the other way, so both directions have to be checked or the fix

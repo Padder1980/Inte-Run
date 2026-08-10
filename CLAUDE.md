@@ -704,6 +704,118 @@ separately predicted the Community tab's "on the way" would be a leading piece o
 Adding placeholders is therefore a deliberate reversal, made safe only by the redesign landing BEFORE
 TestFlight. If that ordering ever changes, revisit this.
 
+## THE INJURY CHECK-IN BECAME A GUIDE (commissioned brief, 2026-08-10)
+
+`Support › Private check-ins › Injury & symptoms` was a consent line and ten tick-boxes, which answered
+"is this worth mentioning to somebody?" and nothing else. It is now a chronological guide to a NEW,
+CLOSED lower-limb sprain, strain or bruise, after screening for the things that must not be
+self-managed. **⚠️ NOT CLEARED FOR PUBLIC RELEASE until a UK-registered sports physiotherapist or
+sports-medicine clinician has read the wording.**
+
+The product position, and every decision follows from it:
+> Protect it briefly. Keep it gently moving. Rebuild load before you rebuild speed.
+
+⚠️ **THE `redflags` ID, ROUTE, HEART ICON AND HUB POSITION ARE UNCHANGED — an explicit constraint.** The
+brief asked for a replacement, not a new destination: a second card splits one question across two
+places, each of which then looks like the whole answer. The card dropped `interactive: true` (which
+renders a "CHECK-IN" chip) because the form is gone.
+
+⚠️ **`kw` ON A HUB CARD IS SEARCH-ONLY, and it is what makes the page findable.** `supportSearch` indexes
+a card on title + description, and the agreed description contains none of the words a hurt runner types
+— "twisted ankle", "pulled muscle", "ice". Putting them in the visible description turns a calm card into
+a keyword list, so they live in an invisible field. A card added without one is effectively unsearchable.
+
+### The clinical rules, which are the whole feature
+
+⚠️ **NO ACRONYM PROTOCOL — no RICE, PRICE, POLICE or PEACE & LOVE, and a test forbids all four.** They
+read as a protocol with uniform evidence behind them, and the evidence is not uniform. "Relative rest" is
+used instead, and it is **defined in the same breath** ("change what you do"), because a runner meeting
+the phrase cold reads it as "rest".
+
+⚠️ **ICE IS A COMFORT MEASURE, NOT A TREATMENT, AND SAYING SO IS THE HARDEST LINE ON THE PAGE.** The
+guide states plainly that cooling **"has not been shown to speed healing"**; heat and massage are "not a
+proven cure". This is the opposite of almost all consumer advice, so `test/soft-tissue-guide.test.ts`
+sweeps for any healing-speed claim and requires a negation within 70 characters of it.
+
+⚠️ **NO DOSE, NO BRAND, NO PRESCRIPTION-STRENGTH DRUG.** Paracetamol and topical anti-inflammatories are
+named (following NHS advice) and only ever beside the caveat that they **do not make the injury safe to
+run on** and **do not speed up tissue repair**, plus who must ask a pharmacist first: under 16, pregnant,
+on blood thinners, past stomach ulcer, kidney or heart disease, or asthma that anti-inflammatories set
+off. That list is the part a runner is least likely to know and most likely to be harmed by.
+
+⚠️ **RETURN TO RUNNING IS GATED ON FUNCTION, NEVER ON A DATE.** "Do not run because seven or fourteen
+days have passed"; two weeks is "a review point, not automatic clearance". Six gates: walking and stairs
+without a limp, swelling not returning after a normal day, range close to the other side, controlled
+strength without sharp pain, ten gentle two-footed hops, and **the same or better the next morning** —
+which is the honest gate, and the one "pain-free" alone always misses.
+
+⚠️ **THE STOP SCREEN IS ALWAYS VISIBLE, NOT COLLAPSIBLE, AND NEVER LINKS OUT.** Hiding danger signs
+behind a tap is how somebody with a cold, blue foot reads a recovery timeline instead. The wireframe
+offered a "Check my symptoms ›" button and it was deliberately not built — the brief forbids sending a
+worried runner to a second symptom screen.
+
+⚠️ **THE ENGINE TRIAGES; IT NEVER DIAGNOSES.** Eight acute-limb flags were added to
+`src/safety/escalation.ts` — three emergency (visible deformity or a crack, a cold/blue/numb limb,
+severe constant pain with tense swelling) and five urgent (cannot bear weight for four steps, rapid
+swelling or bruising, a pop with loss of push-off, a hot swollen one-sided calf, an open wound or fever).
+No flag or guidance string may name a fracture, rupture, clot, compartment syndrome or injury grade, and
+`test/acute-limb-flags.test.ts` sweeps both the output AND the source for those words.
+
+⚠️ **ONE ESCALATING PAIR, BECAUSE IT IS THE PAIRING THAT KILLS PEOPLE.** A newly swollen warm calf is
+same-day on its own; the same calf **plus chest pain, severe breathlessness or collapse** is now.
+`ESCALATING_PAIRS` is applied **before** the sort and before the overall urgency, so the headline
+reflects it. ⚠️ Assert it on the CALF ROW, not on the overall urgency — chest pain is an emergency by
+itself, so `urgency === "emergency"` for the pair passes whether the rule fires or not. Pinned that way
+it was a test that could not fail.
+
+⚠️ **THREE PLACES CONTRADICTED THIS, NOT TWO.** The brief found two "usually fine to run through"
+strings; a third said "soreness that eases as you warm up is usually fine" — the same claim in other
+words, and all three contradicted `src/adapt/injury.ts`, which treats pain while running as a stop
+signal. All three now carry one agreed sentence and a test asserts the count is exactly **3**.
+
+### ⚠️ A CATEGORY COLOUR USED AS TEXT IS TEXT, AND NOTHING WAS CHECKING IT
+
+`test/contrast.test.ts` swept the four **ink** tokens on the three neutral grounds — where body copy
+lives — so it never looked at this page's pattern: a small uppercase label in `--rest` or `--ease` on a
+panel tinted 8% with that same colour. Measured, both in **LIGHT** mode:
+
+| label | measured | fixed to |
+|---|---|---|
+| **URGENT** band title (`--ease`) | **2.41:1** | 4.86:1 |
+| **EMERGENCY** band title (`--rest`) | **4.31:1** | 5.61:1 |
+
+Dark mode passed both — the same trap the accent fix already taught that file, because the design brief
+reviewed dark screenshots. The fix is `color-mix(in srgb, var(--X) N%, var(--ink))`, which darkens in
+light and lightens in dark from one declaration. These are the two **safety** labels, i.e. the first
+thing a frightened runner reads.
+
+⚠️ **MEASURE CONTRAST FROM RENDERED PIXELS, NEVER FROM `getComputedStyle`.** Chromium leaves
+`color-mix()` unresolved and reports tinted backgrounds as `oklab(0.9569 …)`; parsing that as rgb
+reported a **1.25:1** on a pairing that is really 14.56:1, which would have sent me chasing a defect that
+did not exist while the real ones sat in the same table. Paint a probe div and read the screenshot.
+
+### Still open on this route — read before the injury update
+
+⚠️ **REMOVING THE WELLBEING TICK-BOXES REMOVED THE ONLY TICKABLE ROUTE TO A CRISIS ESCALATION.**
+`FLAGS_WELL` (self-harm, eating-disorder concern, mental-health concern, menstrual disruption) is still
+DEFINED and still reachable through Ask Alfie's text screener, and a test keeps it resolving — but it now
+requires typing rather than ticking. That is a reduction in disclosure routes and it is the owner's
+decision, not a tidy-up.
+
+⚠️ **THE EIGHT NEW ACUTE-LIMB FLAGS ARE UNREACHABLE FROM THE UI.** They are defined, tested and
+exercised by the engine, and nothing renders them — `FLAGS_PHYS`/`FLAGS_WELL` are no longer rendered
+either, and no phrase matcher was added to `alfieRedFlags` for the new ids. This is the documented
+computed-and-discarded trap (`CLASS`, `MASTERS`, `PLAN.notes`), caught by an adversarial pre-push review
+rather than by a test, because a test that only calls the engine cannot see that nothing calls it.
+
+⚠️ **TWO PLACES STILL PROMISE "A PROPER SYMPTOM CHECKER"** at this route, and both `Check a symptom ›`
+buttons now land on a leg-injury guide: Alfie's injury answer, and the `perf-a` button on the Performance
+and Support screens. Reword or repoint them with the injury update.
+
+⚠️ **`runRf()` AND ITS `[data-chk="rf"]` BINDING ARE NOW DEAD CODE**, and `runRf` reads `$("rfRes")`
+unguarded. Left deliberately rather than deleted on my own initiative. It does not trip the
+`$("id")-must-resolve` guard because `renderResult("rfRes", …)` passes the id as a plain string.
+
 ## Deploy & links
 
 - Push to **`main`** → GitHub Pages serves `docs/` at **https://padder1980.github.io/Inte-Run/**.

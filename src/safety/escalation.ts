@@ -23,7 +23,19 @@ export type RedFlag =
   | "eating-disorder-concern"
   | "menstrual-disruption"
   | "mental-health-concern"
-  | "self-harm-thoughts";
+  | "self-harm-thoughts"
+  // Acute limb injury. ⚠️ TRIAGE ONLY, AND THE NAMES ARE DELIBERATE: every one describes what the
+  // runner can OBSERVE, never what it might be. There is no "achilles-rupture", "fracture", "dvt" or
+  // "grade-2" flag here, because the app must not name a diagnosis it cannot make — the output is the
+  // urgency and where to go, and nothing else.
+  | "deformity-or-crack"
+  | "cold-blue-or-numb-limb"
+  | "severe-constant-pain-or-tense-swelling"
+  | "cannot-bear-weight-four-steps"
+  | "rapid-swelling-or-bruising"
+  | "pop-with-loss-of-push-off"
+  | "hot-swollen-one-sided-calf"
+  | "open-wound-or-fever";
 
 export type FlagCategory =
   | "cardiac"
@@ -128,7 +140,90 @@ const FLAGS: Record<RedFlag, FlagDef> = {
     guidance: "Talking to someone helps. A GP or psychologist can support you — training should not come before your wellbeing.",
     refer: ["psychologist", "gp"],
   },
+
+  // ---- Acute limb injury -------------------------------------------------------------------------
+  // ⚠️ EVERY GUIDANCE STRING NAMES A DESTINATION, NOT A DIAGNOSIS. "Possible Achilles rupture" or
+  // "suspected DVT" would be the app diagnosing from a checkbox, which it is in no position to do —
+  // and a wrong guess is worse than none, because a runner told "probably a strain" stops seeking help.
+  "deformity-or-crack": {
+    category: "musculoskeletal",
+    urgency: "emergency",
+    label: "Limb looks out of shape, or you heard a crack",
+    guidance: "Do not walk on it. Call your local emergency number or go to emergency care now.",
+    refer: ["emergency-services"],
+  },
+  "cold-blue-or-numb-limb": {
+    category: "musculoskeletal",
+    urgency: "emergency",
+    label: "Limb is numb, cold, pale or blue",
+    guidance: "Get emergency care now. Loss of feeling, colour or warmth in a limb needs to be seen immediately, not monitored.",
+    refer: ["emergency-services"],
+  },
+  "severe-constant-pain-or-tense-swelling": {
+    category: "musculoskeletal",
+    urgency: "emergency",
+    label: "Severe constant pain, or tense hard swelling",
+    guidance: "Get emergency care now. Pain that is severe and unrelenting, especially with tight hard swelling, needs assessment straight away.",
+    refer: ["emergency-services"],
+  },
+  "cannot-bear-weight-four-steps": {
+    category: "musculoskeletal",
+    urgency: "urgent",
+    label: "Cannot take four steps on it",
+    guidance: "Arrange assessment today rather than waiting. Keep weight off it and use support to get about.",
+    refer: ["sports-physician", "physiotherapist"],
+  },
+  "rapid-swelling-or-bruising": {
+    category: "musculoskeletal",
+    urgency: "urgent",
+    label: "Large or fast-growing swelling or bruising",
+    guidance: "Arrange assessment today. Swelling or bruising that is large or still increasing should be looked at before you load it again.",
+    refer: ["sports-physician", "physiotherapist"],
+  },
+  "pop-with-loss-of-push-off": {
+    category: "musculoskeletal",
+    urgency: "urgent",
+    label: "A pop or snap, and now you cannot push off",
+    guidance: "Arrange assessment today and avoid loading it. Losing push-off, stairs or the ability to rise onto your toes after a sudden pop needs examining.",
+    refer: ["sports-physician", "physiotherapist"],
+  },
+  "hot-swollen-one-sided-calf": {
+    category: "musculoskeletal",
+    urgency: "urgent",
+    label: "One calf newly swollen, warm or red",
+    guidance: "Get medical advice today, especially without a clear injury moment. Do not massage it, stretch it or run on it while you wait.",
+    refer: ["gp", "sports-physician"],
+  },
+  "open-wound-or-fever": {
+    category: "musculoskeletal",
+    urgency: "urgent",
+    label: "Open wound, fever, or hot red skin",
+    guidance: "Arrange assessment today. A wound, a temperature or skin that is hot and red needs to be checked rather than covered up.",
+    refer: ["gp", "sports-physician"],
+  },
 };
+
+/**
+ * ⚠️ ONE PAIRING ESCALATES, AND IT IS THE ONE THAT KILLS PEOPLE. A newly swollen, warm calf is an
+ * urgent same-day matter on its own; the same calf together with chest pain, breathlessness, feeling
+ * faint or coughing blood is an emergency, because those symptoms together are how a clot in the leg
+ * announces that part of it has travelled. Encoded as a PAIR so neither flag has to overstate its own
+ * urgency, and still without naming the condition — the output is "call emergency services now".
+ */
+const ESCALATING_PAIRS: Array<{ needs: RedFlag[]; because: string }> = [
+  {
+    needs: ["hot-swollen-one-sided-calf", "chest-pain"],
+    because: "A newly swollen or warm calf together with chest pain needs emergency assessment now, not today.",
+  },
+  {
+    needs: ["hot-swollen-one-sided-calf", "severe-breathlessness"],
+    because: "A newly swollen or warm calf together with breathlessness needs emergency assessment now, not today.",
+  },
+  {
+    needs: ["hot-swollen-one-sided-calf", "collapse-or-fainting"],
+    because: "A newly swollen or warm calf together with feeling faint needs emergency assessment now, not today.",
+  },
+];
 
 export type FlagAssessment = {
   flag: RedFlag;
@@ -172,6 +267,17 @@ export function screenRedFlags(reported: RedFlag[]): EscalationResult {
       refer: def.refer,
     };
   });
+  // ⚠️ APPLIED BEFORE THE SORT AND BEFORE THE OVERALL URGENCY IS TAKEN, so a pair that escalates is
+  // reflected in the headline the runner reads rather than only in one row further down the list.
+  for (const pair of ESCALATING_PAIRS) {
+    if (!pair.needs.every((f) => unique.includes(f))) continue;
+    const target = flags.find((f) => f.flag === pair.needs[0]);
+    if (!target) continue;
+    target.urgency = "emergency";
+    target.guidance = pair.because + " Call your local emergency number.";
+    target.refer = ["emergency-services"];
+  }
+
   flags.sort((a, b) => URGENCY_RANK[b.urgency] - URGENCY_RANK[a.urgency]);
 
   const urgency = flags.reduce<Urgency>((u, f) => maxUrgency(u, f.urgency), "none");

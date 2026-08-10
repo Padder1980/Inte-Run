@@ -2525,6 +2525,118 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .shoe-bar i { display: block; height: 100%; border-radius: 5px; background: var(--eff-easy); }
 .shoe-bar.wearing i { background: var(--ease); }
 .shoe-bar.due i, .shoe-bar.retired i { background: var(--rest); }
+/* ---- Soft-tissue injury guide (Support > Injury & symptoms) -------------------------------------
+   ⚠️ SCOPED UNDER #view:has(.sti-page) and built from tokens only — no page colour is hard-coded, so
+   both themes come out of the existing palette. The supplied wireframe is directional; its greys are
+   not values to copy.
+   ⚠️ --rest IS USED FOR THE EMERGENCY LABEL AND A BORDER TINT ONLY, never as a full red panel. A page
+   somebody reads while frightened should not itself look like an alarm. */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+#view:has(.sti-page) .sti-scope { margin: 10px 0 0; font-size: var(--t-meta); line-height: 1.55; color: var(--ink-faint); }
+#view:has(.sti-page) .sti-page > .card { margin-top: 12px; }
+#view:has(.sti-page) .sti-p, #view:has(.sti-page) .sti-small {
+  font-size: var(--t-meta); line-height: 1.6; color: var(--ink-soft); margin: 0 0 10px; }
+#view:has(.sti-page) .sti-small { color: var(--ink-faint); margin-bottom: 14px; }
+#view:has(.sti-page) .sti-list, #view:has(.sti-page) .sti-steps {
+  margin: 0; padding-left: 18px; font-size: var(--t-meta); line-height: 1.6; color: var(--ink); }
+#view:has(.sti-page) .sti-list { list-style: disc; }
+#view:has(.sti-page) .sti-steps { list-style: decimal; }
+#view:has(.sti-page) .sti-list > li, #view:has(.sti-page) .sti-steps > li { margin-bottom: 7px; }
+#view:has(.sti-page) .sti-list > li:last-child, #view:has(.sti-page) .sti-steps > li:last-child { margin-bottom: 0; }
+#view:has(.sti-page) .sti-ic svg { width: 15px; height: 15px; vertical-align: -2px; }
+
+/* The stop screen. Always open, first thing after the hero. */
+#view:has(.sti-page) .sti-stop { border-color: color-mix(in srgb, var(--rest) 34%, var(--line)); }
+#view:has(.sti-page) .sti-stop-h { color: var(--ink); }
+#view:has(.sti-page) .sti-band { margin-top: 10px; padding: 11px 13px; border-radius: var(--r-ctl);
+  background: var(--surface-2); border: 1px solid var(--line); }
+#view:has(.sti-page) .sti-band-emg { background: color-mix(in srgb, var(--rest) 8%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--rest) 38%, var(--line)); }
+#view:has(.sti-page) .sti-band-urg { background: color-mix(in srgb, var(--ease) 8%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--ease) 34%, var(--line)); }
+#view:has(.sti-page) .sti-band-t { display: flex; align-items: flex-start; gap: 7px; font-size: var(--t-meta);
+  font-weight: 750; line-height: 1.45; margin-bottom: 7px; }
+/* ⚠️ MEASURED AND FIXED 2026-08-10, while measuring the fuelling guide's identical construct. These
+   are the two SAFETY labels on the injury page and they were the worst pair in either guide: raw
+   --ease on its own 8% tint is 2.41:1 in light mode, and raw --rest 4.31:1 — both below AA, on the one
+   band somebody frightened reads first. test/contrast.test.ts now guards every category colour used as
+   text on its own tinted panel, which is the class of defect neither guide's own tests could see. */
+#view:has(.sti-page) .sti-band-emg .sti-band-t { color: color-mix(in srgb, var(--rest) 80%, var(--ink)); }
+#view:has(.sti-page) .sti-band-urg .sti-band-t { color: color-mix(in srgb, var(--ease) 60%, var(--ink)); }
+#view:has(.sti-page) .sti-note { margin: 11px 0 0; font-size: var(--t-meta); line-height: 1.55; color: var(--ink-faint); }
+
+/* The timeline. A thin line joins the numbered markers. */
+#view:has(.sti-page) .sti-tl { list-style: none; margin: 0; padding: 0; position: relative; }
+#view:has(.sti-page) .sti-stage { position: relative; padding: 0 0 18px 34px; }
+#view:has(.sti-page) .sti-stage:last-child { padding-bottom: 0; }
+#view:has(.sti-page) .sti-stage::before { content: ""; position: absolute; left: 11px; top: 24px; bottom: 0;
+  width: 2px; background: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+#view:has(.sti-page) .sti-stage:last-child::before { display: none; }
+#view:has(.sti-page) .sti-marker { position: absolute; left: 0; top: 1px; width: 24px; height: 24px;
+  border-radius: 50%; display: grid; place-items: center; font-family: var(--fig);
+  font-size: var(--t-label); font-weight: 750; font-variant-numeric: tabular-nums;
+  color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  border: 1.5px solid color-mix(in srgb, var(--accent) 45%, var(--line)); }
+#view:has(.sti-page) .sti-stage:first-child .sti-marker { color: var(--accent-ink); background: var(--accent);
+  border-color: var(--accent); }
+#view:has(.sti-page) .sti-when { font-size: var(--t-label); font-weight: 760; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--ink-faint); }
+#view:has(.sti-page) .sti-stage-t { margin: 3px 0 8px; font-size: var(--t-card); font-weight: 740;
+  letter-spacing: -.01em; color: var(--ink); }
+#view:has(.sti-page) .sti-safe { margin: 10px 0 0; padding: 9px 11px; border-radius: var(--r-ctl);
+  font-size: var(--t-meta); line-height: 1.55; color: var(--ink);
+  background: color-mix(in srgb, var(--rest) 7%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--rest) 26%, var(--line)); }
+
+/* Green / amber / red. The words and an icon carry it; colour is the third signal. */
+#view:has(.sti-page) .sti-inset { margin-top: 12px; padding: 12px; border-radius: var(--r-ctl);
+  background: var(--surface-2); border: 1px solid var(--line); }
+#view:has(.sti-page) .sti-inset-h { font-size: var(--t-label); font-weight: 760; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ink-faint); margin-bottom: 9px; }
+#view:has(.sti-page) .sti-rag { display: flex; align-items: flex-start; gap: 10px; padding: 7px 0;
+  border-top: 1px solid var(--line); }
+#view:has(.sti-page) .sti-rag:first-of-type { border-top: 0; padding-top: 0; }
+#view:has(.sti-page) .sti-rag .ui-pill { flex: none; font-weight: 750; }
+#view:has(.sti-page) .sti-rag-b { font-size: var(--t-meta); line-height: 1.55; color: var(--ink-soft); }
+#view:has(.sti-page) .sti-rag-do { color: var(--ink); margin-top: 2px; }
+
+/* Return-to-run gates and the first session. */
+#view:has(.sti-page) .sti-gates { list-style: none; margin: 0 0 10px; padding: 0; }
+#view:has(.sti-page) .sti-gates > li { display: flex; align-items: flex-start; gap: 9px; padding: 6px 0;
+  font-size: var(--t-meta); line-height: 1.55; color: var(--ink); }
+#view:has(.sti-page) .sti-tick { flex: none; color: var(--accent); }
+#view:has(.sti-page) .sti-tick svg { width: 15px; height: 15px; vertical-align: -2px; }
+#view:has(.sti-page) .sti-sess { margin: 0 0 12px; border-radius: var(--r-ctl); overflow: hidden;
+  border: 1px solid var(--line); }
+#view:has(.sti-page) .sti-sess-r { display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+  font-size: var(--t-meta); color: var(--ink); background: var(--surface-2); border-top: 1px solid var(--line); }
+#view:has(.sti-page) .sti-sess-r:first-child { border-top: 0; }
+#view:has(.sti-page) .sti-sess-n { flex: none; min-width: 42px; font-family: var(--fig); font-weight: 750;
+  font-variant-numeric: tabular-nums; color: var(--accent); }
+
+/* What slows a good recovery — a quiet inset, not a wall of red. */
+#view:has(.sti-page) .sti-not { background: var(--surface-2); }
+#view:has(.sti-page) .sti-nots { list-style: none; margin: 0; padding: 0; }
+#view:has(.sti-page) .sti-nots > li { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0;
+  border-top: 1px solid var(--line); font-size: var(--t-meta); line-height: 1.55; color: var(--ink); }
+#view:has(.sti-page) .sti-nots > li:first-child { border-top: 0; padding-top: 0; }
+#view:has(.sti-page) .sti-x { flex: none; width: 18px; height: 18px; border-radius: 50%; display: grid;
+  place-items: center; font-size: var(--t-label); font-weight: 700; margin-top: 1px;
+  color: var(--rest); background: color-mix(in srgb, var(--rest) 12%, transparent); }
+#view:has(.sti-page) .sti-why { color: var(--ink-soft); margin-top: 2px; }
+
+/* Pain relief, collapsed. ⚠️ --tap on the summary: it is the only control on the page. */
+#view:has(.sti-page) .sti-sum { display: flex; align-items: center; min-height: var(--tap); cursor: pointer;
+  font-size: var(--t-card); font-weight: 700; color: var(--ink); list-style: none; }
+#view:has(.sti-page) .sti-sum::-webkit-details-marker { display: none; }
+#view:has(.sti-page) .sti-sum::after { content: "+"; margin-left: auto; font-family: var(--fig);
+  font-size: var(--t-card); color: var(--ink-faint); }
+#view:has(.sti-page) .sti-det[open] .sti-sum::after { content: "\\2212"; }
+#view:has(.sti-page) .sti-det-b { padding-top: 4px; }
+#view:has(.sti-page) .sti-foot { margin: 14px 2px 0; font-size: var(--t-meta); line-height: 1.6;
+  color: var(--ink-faint); }
+#view:has(.sti-page) .sti-foot .ui-pill { margin-right: 6px; }
 /* Strava, on a run. The sent state is a row rather than a button because it is a place to go, not an
    action to repeat — it mirrors .str-offer so the debrief keeps one shape for "tap this to leave". */
 .stv-done { display: flex; align-items: center; gap: 12px; width: 100%; margin-top: 10px; padding: 14px 16px;
@@ -4786,7 +4898,7 @@ function alfieIntents() {
   return [
     { k: ["sore", "should i run", "tired", "fatigued", "heavy legs", "rest day today", "skip"], a: () => {
       let r; try { r = RC.assessReadiness(readinessInput()); } catch (e) { r = null; }
-      return "<p>Honest answer: <b>soreness that eases as you warm up is usually fine</b>. Pain that sharpens, changes your gait, or sits in one specific spot is not \\u2014 back off and get it looked at.</p>" +
+      return "<p>" + "<b>Mild awareness that stays stable</b>, does not change your stride and is no worse later or the next morning can be monitored on easy running. <b>Pain that sharpens, grows, causes a limp, or sits sharply on a bone is a stop signal.</b>" + "</p>" +
         (r ? "<p>From your latest check-in, Inte-Run rates you <b>" + esc(r.headline) + "</b>. " + esc(r.recommendation) + "</p>" : "") +
         "<p>A good rule: if you\\u2019re unsure, run the <b>easy</b> version. Swapping a hard session for an easy one costs you almost nothing; training through a real injury costs weeks.</p>" +
         "<p class=\\"alf-dim\\">Tap \\u201cHow you feel\\u201d on Today to update your check-in.</p>";
@@ -4795,10 +4907,10 @@ function alfieIntents() {
       let imp; try { imp = currentConditions(selectedSession()); } catch (e) { imp = null; }
       return "<p>Heat makes the same pace cost more \\u2014 that\\u2019s physiology, not weakness. <b>Run by effort</b> and let the pace be whatever it is.</p>" +
         (imp ? "<p>Right now Inte-Run rates conditions as <b>" + esc(imp.headline) + "</b>." + (imp.pacePenaltySecPerKm ? " Expect around <b>+" + imp.pacePenaltySecPerKm + "s/km</b> at the same effort." : "") + "</p>" : "") +
-        "<p>Go earlier or later in the day, take fluid with sodium, and give yourself 10\\u201314 days to acclimatise.</p>";
+        "<p>Go earlier or later in the day, take fluid with some sodium in it \\u2014 without over-drinking, since sodium doesn\\u2019t make excess fluid safe \\u2014 and give yourself 10\\u201314 days to acclimatise.</p>";
     } },
     { k: ["cold", "winter", "ice", "dark"], a: () => "<p>Cold running is mostly a kit problem: layer up, cover extremities, and be seen \\u2014 lights and reflective gear.</p><p>Warm up a bit longer than usual, and on ice shorten your stride and slow down. A missed session beats a fall.</p>" },
-    { k: ["injur", "hurt", "pain", "niggle", "ache"], a: () => "<p>The line worth holding: <b>discomfort that fades as you warm up</b> is usually fine to run through. <b>Pain that sharpens, changes how you move, or is in one pinpoint spot</b> is not.</p><p>Swelling, night pain, or pain that\\u2019s getting worse week to week all mean stop and get assessed.</p><p>Taking three days off early is almost always cheaper than taking six weeks off later.</p><p class=\\"alf-dim\\">Support \\u2192 \\u201cWhen to stop and seek help\\u201d has a proper symptom checker.</p>" },
+    { k: ["injur", "hurt", "pain", "niggle", "ache"], a: () => "<p>The line worth holding: <b>Mild awareness that stays stable</b>, does not change your stride and is no worse later or the next morning can be monitored on easy running. <b>Pain that sharpens, grows, causes a limp, or sits sharply on a bone is a stop signal.</b></p><p>Swelling, night pain, or pain that\\u2019s getting worse week to week all mean stop and get assessed.</p><p>Taking three days off early is almost always cheaper than taking six weeks off later.</p><p class=\\"alf-dim\\">Support \\u2192 \\u201cWhen to stop and seek help\\u201d has a proper symptom checker.</p>" },
     { k: ["next session", "next run", "what's next", "whats next", "next workout"], a: () => {
       const n = alfieNextSession();
       if (!n) return "<p>There\\u2019s nothing left scheduled in your plan \\u2014 nice work getting through it.</p>";
@@ -7245,7 +7357,16 @@ function viewCommunity() {
 const SUPPORT_HUB = [
   { id: "alfie", ic: "alfie", c: "var(--accent)", t: "Ask Alfie", d: "Your coach — questions about your plan, or running in general.", interactive: false },
   { id: "understand", ic: "guide", c: "var(--accent)", t: "Understanding my sessions", d: "What the numbers in a session mean — with a walkthrough.", interactive: false },
-  { id: "redflags", ic: "heart", c: "var(--rest)", t: "Injury & symptoms", d: "A quick check for anything that needs attention now.", interactive: true },
+  // ⚠️ interactive:false DROPS THE "CHECK-IN" BADGE, and that is the point: this destination is a
+  // safety-and-recovery guide now, not a checkbox form, and a badge promising a form is a small lie on
+  // the card. Everything else is deliberately unchanged — same id, same position under Private
+  // check-ins, same heart, same --rest — so existing navigation, links and search keep working.
+  // ⚠️ kw IS SEARCH-ONLY. supportSearch indexes a hub card on its title and description alone, and the
+  // agreed description contains none of the words a hurt runner actually types ("twisted ankle",
+  // "pulled muscle", "ice"). Putting them in the visible description instead would turn a calm card
+  // into a keyword list.
+  { id: "redflags", ic: "heart", c: "var(--rest)", t: "Injury & symptoms", d: "What to do now, through the first two weeks.", interactive: false,
+    kw: "sprain strain sprained strained pulled muscle pull twisted ankle rolled ankle hamstring calf quad quadriceps groin adductor glute bruise bruising contusion swelling swollen ice icing cold pack compression elevation massage heat limp hobbling first 24 hours first two weeks when can I run return to running walk run rehab recovery hurt injury injured niggle" },
   { id: "reds", ic: "fuel", c: "var(--peak)", t: "Fuelling & energy", d: "Are you getting enough? A gentle RED-S check.", interactive: true },
   { id: "female", ic: "flower", c: "var(--taper)", t: "Women's health", d: "Symptom-informed prompts — periods, postpartum, more.", interactive: true },
   { id: "strength", ic: "dumbbell", c: "var(--build)", t: "Strength & mobility", d: "Why strength matters, and how to fit it in.", interactive: false },
@@ -7418,7 +7539,8 @@ function supportSearch(q) {
   if (needle.length < 2) return [];
   const hits = [];
   SUPPORT_HUB.forEach((h) => {
-    const hay = (h.t + " " + h.d).toLowerCase();
+    // kw is invisible on screen and searchable — see the redflags entry for why it exists.
+    const hay = (h.t + " " + h.d + " " + (h.kw || "")).toLowerCase();
     if (hay.indexOf(needle) >= 0) hits.push({ kind: "hub", id: h.id, t: h.t, d: h.d, rank: hay.indexOf(needle) === 0 ? 0 : 1 });
   });
   GUIDES.forEach((g) => {
@@ -7699,7 +7821,7 @@ const GUIDES = [
     "When life squeezes your sleep or stress spikes, that's the week to take the easy option in training \\u2014 not the week to prove something.",
   ] },
   { t: "Niggles, aches and when to stop", k: "niggles", d: "The line between discomfort and injury", b: [
-    "<b>Discomfort that eases as you warm up</b> is usually fine to run through. <b>Pain that sharpens, changes how you move, or sits in one pinpoint spot</b> is not.",
+    "<b>Mild awareness that stays stable</b>, does not change your stride and is no worse later or the next morning can be monitored on easy running. <b>Pain that sharpens, grows, causes a limp, or sits sharply on a bone is a stop signal.</b>",
     "Swelling, pain at night, or pain getting worse week on week all mean stop and get assessed properly.",
     "Taking three days off early is almost always cheaper than taking six weeks off later. Runners are consistently bad at this trade.",
     "<b>This app is not a diagnosis.</b> Support \\u2192 <i>Injury &amp; symptoms</i> has a proper symptom checker, and a physiotherapist or GP beats any app when something hurts.",
@@ -8955,9 +9077,262 @@ function checkinConsent() {
 function EMERGENCY_BANNER() {
   return '<div class="promise"><span><b>In an emergency</b>, do not use an app \u2014 call your local emergency number.</span></div>';
 }
+/**
+ * Support > Private check-ins > Injury & symptoms.
+ *
+ * A calm, chronological plan for a NEW, CLOSED lower-limb sprain, strain or bruise, after screening
+ * for the injuries that must not be self-managed. Replaces the checkbox-only "How are you feeling?"
+ * screen that used to live on this route. Implements INTE-RUN_SOFT-TISSUE_INJURY_BRIEF.md.
+ *
+ * The product position, and every deviation from the usual consumer advice follows from it:
+ *   Protect it briefly. Keep it gently moving. Rebuild load before you rebuild speed.
+ *
+ * ⚠️ NO ACRONYM. Not RICE, PRICE, POLICE or PEACE & LOVE. They read as a protocol and hide how weak
+ * the evidence is for three of their four letters, which encourages treating every injury the same.
+ *
+ * ⚠️ ICE IS OPTIONAL PAIN RELIEF AND IS NEVER CALLED A TREATMENT. The 2024 BJSM critical review found
+ * no human evidence that cooling limits secondary injury or speeds tissue repair. Saying "ice to heal
+ * faster" would be the single easiest untruth to write on this page.
+ *
+ * ⚠️ NO DOSES, EVER, and no drug named as a recommendation. The pain-relief note sends the runner to a
+ * pharmacist and lists who must ask first.
+ *
+ * ⚠️ TIME IS A CHECKPOINT, NOT A CLEARANCE. Every stage is gated on function and on how the leg is the
+ * NEXT MORNING, because return-to-sport evidence does not support clearing by date. "Pain-free" is
+ * never the only gate.
+ *
+ * ⚠️ THE STOP SCREEN IS NOT COLLAPSIBLE AND NOT A SECOND PAGE. It is the first thing under the hero,
+ * always open. Hiding danger signs behind a tap, or behind a "check my symptoms" button, is how a
+ * runner with a cold blue foot reads a recovery timeline instead.
+ *
+ * ⚠️ NOT REVIEWED BY A CLINICIAN YET. Owner's brief requires sign-off by a UK-registered sports
+ * physiotherapist or sports-medicine clinician before public release.
+ */
+// A cross glyph rather than an invented ICON key: the icon set has no x, and a missing
+// ICON member renders as nothing at all with no error.
+const STI_CROSS = '\u2715';
+function stiStopScreen() {
+  const emergency = [
+    "The limb looks bent or out of shape, or you heard a crack.",
+    "It is numb, cold, blue or grey, very pale, or you have new pins and needles.",
+    "Pain is sudden, severe and constant — especially with a tense or hard swelling.",
+    "You have chest pain, sudden breathlessness, feel faint, or cough blood.",
+  ];
+  const urgent = [
+    "You cannot take four steps or put useful weight through the leg.",
+    "Swelling or bruising is large, growing quickly, or the pain is getting worse.",
+    "You felt a pop or snap and now cannot push off, manage stairs, or rise onto your toes.",
+    "One calf is newly swollen, warm or red — especially without a clear injury.",
+    "There is an open wound or a fever, or the area is unusually hot and red.",
+    "The pain sits sharply on a bone, wakes you at night, or began without one clear moment.",
+  ];
+  const li = (a) => a.map((t) => '<li>' + t + '</li>').join("");
+  return '<section class="card sti-stop" aria-labelledby="stiStopH">' +
+    '<h3 class="subhead sti-stop-h" id="stiStopH" style="margin-top:0">First: should you get help now?</h3>' +
+    '<div class="sti-band sti-band-emg">' +
+      '<div class="sti-band-t">' +
+      'Emergency — call your local emergency number or go to emergency care</div>' +
+      '<ul class="sti-list">' + li(emergency) + '</ul></div>' +
+    '<div class="sti-band sti-band-urg">' +
+      '<div class="sti-band-t">' +
+      'Urgent — get assessed today</div>' +
+      '<ul class="sti-list">' + li(urgent) + '</ul></div>' +
+    '<p class="sti-note">If none of these apply, work through the stages below. If any of them start ' +
+    'later, come back to this list — it applies at every stage, not just today.</p></section>';
+}
+/**
+ * The six stages, as a real ordered list.
+ * ⚠️ <ol> AND A "Stage n of 6" LABEL PER ITEM, not a row of styled divs. A screen-reader user needs to
+ * know where they are in a sequence; the numbered circles are decoration of that fact, not the fact.
+ */
+function stiTimeline() {
+  const stages = [
+    { when: "Now", t: "Stop the run", body:
+      '<ol class="sti-steps">' +
+      '<li><b>Stop running.</b> Do not test it with one more kilometre.</li>' +
+      '<li><b>Check the list above.</b> If none of it applies, move somewhere safe.</li>' +
+      '<li><b>Protect it.</b> Walk only as normally as you can. If you are limping heavily, take the ' +
+      'weight off it and arrange an assessment.</li>' +
+      '<li><b>For pain only:</b> a wrapped cold pack for 10–15 minutes can numb it in the first few ' +
+      'hours. Optional — it has not been shown to speed healing.</li>' +
+      '<li><b>If it is swelling:</b> raise it when you rest. A light wrap is optional if it feels supportive.</li>' +
+      '</ol>' +
+      '<p class="sti-safe"><b>Cold-pack safety:</b> never put ice straight on skin, never fall asleep ' +
+      'with it on, and do not use it where feeling or circulation is poor. Take it off if the skin goes ' +
+      'very pale, blotchy, painful or numb.</p>' },
+
+    { when: "First 24 hours", t: "Calm it without freezing it still", body:
+      '<ul class="sti-list">' +
+      '<li>No running, jumping, hard strength work or stretching into pain.</li>' +
+      '<li>Use <b>relative rest</b> — change what you do, rather than staying completely still all day.</li>' +
+      '<li>A few times through the day, gently bend and straighten it through a comfortable range. ' +
+      'Stop before sharp pain.</li>' +
+      '<li>If a wrap helps, keep it snug rather than tight and take it off at night. Remove it at once ' +
+      'for tingling, numbness, coldness or a colour change.</li>' +
+      '<li>Eat normally, drink to thirst, and sleep. Recovery needs energy — this is not the time to ' +
+      'diet harder.</li>' +
+      '<li>If you want pain relief, ask a pharmacist what is safe for you and follow the label.</li>' +
+      '</ul>' },
+
+    { when: "24–72 hours", t: "Restore normal movement", body:
+      '<ul class="sti-list">' +
+      '<li>Keep running paused while you have a limp, rising swelling, or pain that grows as you do more.</li>' +
+      '<li>Do a little more normal walking and daily movement, as long as it stays comfortable and is ' +
+      'no worse later that day or the next morning.</li>' +
+      '<li>Start gentle muscle work without holding your breath or pushing into sharp pain — lightly ' +
+      'tightening the injured muscle, or controlled bodyweight movement.</li>' +
+      '<li>If every attempt makes it worse, or nothing is improving, book a clinician or sports physiotherapist.</li>' +
+      '</ul>' + stiLoadRule() },
+
+    { when: "Days 3–7", t: "Rebuild capacity", body:
+      '<ul class="sti-list">' +
+      '<li>Aim to walk normally before you add any impact.</li>' +
+      '<li>Build comfortable range of movement and controlled strength. Quality matters more than quantity.</li>' +
+      '<li>Easy cycling, pool work or an elliptical is reasonable <i>only</i> if it is pain-free during ' +
+      'the session and no worse the next morning.</li>' +
+      '<li>Do not use cross-training that loads the injury the same painful way just to protect a streak.</li>' +
+      '<li>A large bruise, obvious weakness, repeated giving-way, or still not walking normally deserves ' +
+      'an assessment this week.</li>' +
+      '</ul>' },
+
+    { when: "Week 1–2", t: "Earn the first run", body:
+      '<p class="sti-p">Do not run because seven or fourteen days have passed. Start a walk–run only ' +
+      'when <b>all</b> of these are true:</p>' + stiGates() +
+      '<p class="sti-p">If you cannot meet these, keep going with the earlier stages or ask a sports ' +
+      'physiotherapist for a plan for your specific injury.</p>' },
+
+    { when: "Two weeks and beyond", t: "Rebuild running, then speed", body:
+      '<ul class="sti-list">' +
+      '<li>Most mild sprains and strains should be <b>clearly improving</b> by two weeks, even if they ' +
+      'are not fully healed.</li>' +
+      '<li>Once two or three easy runs are symptom-stable, gradually rebuild your normal easy volume.</li>' +
+      '<li>Add hills or faster running only after easy running and strength work are reliable.</li>' +
+      '<li>Keep strength work — and after an ankle sprain, balance work — in the plan. Rehab lowers ' +
+      'the chance of it happening again even after the pain has gone.</li>' +
+      '<li>If you are not clearly improving by two weeks, cannot walk normally, or flare every time you ' +
+      'load it, arrange an assessment.</li>' +
+      '<li>Pain, weakness or instability still there at around six weeks should not be managed by ' +
+      'resting and trying again.</li>' +
+      '</ul>' },
+  ];
+  const items = stages.map((st, i) =>
+    '<li class="sti-stage">' +
+      '<span class="sti-marker" aria-hidden="true">' + (i + 1) + '</span>' +
+      '<div class="sti-stage-b">' +
+        '<span class="sr-only">Stage ' + (i + 1) + ' of ' + stages.length + ': </span>' +
+        '<div class="sti-when">' + st.when + '</div>' +
+        '<h3 class="sti-stage-t">' + st.t + '</h3>' +
+        st.body +
+      '</div></li>').join("");
+  return '<section class="card sti-tl-card" aria-labelledby="stiTlH">' +
+    '<h3 class="subhead" id="stiTlH" style="margin-top:0">Your recovery timeline</h3>' +
+    '<p class="sti-small">Move on when the stage you are in is going well. A mild injury can move ' +
+    'quickly; a bigger strain or sprain can take several weeks or longer.</p>' +
+    '<ol class="sti-tl">' + items + '</ol></section>';
+}
+/**
+ * ⚠️ THE WORDS "GREEN", "AMBER" AND "RED" ARE IN THE TEXT, and each row carries an icon. Colour is the
+ * third signal, not the first — a colour-blind runner reading this on a phone in the rain must still be
+ * able to tell "carry on" from "stop and get assessed".
+ */
+function stiLoadRule() {
+  const rows = [
+    ["good", ICON.check, "Green", "Movement stays smooth, symptoms settle quickly, and the next morning is the same or better.", "Carry on."],
+    ["watch", ICON.timer, "Amber", "Swelling comes back, soreness lasts into the next day, or movement becomes guarded.", "Repeat the easier stage, or do less."],
+    ["stop", STI_CROSS, "Red", "Pain sharpens or grows, you limp, the leg gives way, or strength suddenly drops.", "Stop and get assessed."],
+  ].map((r) =>
+    '<div class="sti-rag">' +
+      '<span class="ui-pill ' + r[0] + '"><span class="sti-ic" aria-hidden="true">' + r[1] + '</span>' + r[2] + '</span>' +
+      '<div class="sti-rag-b"><div>' + r[3] + '</div><div class="sti-rag-do"><b>' + r[4] + '</b></div></div>' +
+    '</div>').join("");
+  return '<div class="sti-inset"><div class="sti-inset-h">How to read your own response</div>' + rows + '</div>';
+}
+/** The return-to-run gates. Function and next-morning response, never a date. */
+function stiGates() {
+  const gates = [
+    "You can walk briskly and use stairs without a limp.",
+    "A normal day does not bring the swelling back.",
+    "Movement is close to the other side, and comfortable.",
+    "You can do controlled strength for the area — calf raises, sit-to-stands or a bridge — without sharp pain or compensating.",
+    "You can manage ten gentle two-footed hops without pain, wobble or hesitation.",
+    "It is the same or better the next morning after those checks.",
+  ];
+  return '<ul class="sti-gates">' + gates.map((g) =>
+    '<li><span class="sti-tick" aria-hidden="true">' + ICON.check + '</span><span>' + g + '</span></li>').join("") + '</ul>';
+}
+/** The first session, and the rule for the one after it. */
+function stiFirstRun() {
+  return '<section class="card sti-run" aria-labelledby="stiRunH">' +
+    '<h3 class="subhead" id="stiRunH" style="margin-top:0">Your first walk–run</h3>' +
+    '<div class="sti-sess">' +
+      '<div class="sti-sess-r"><span class="sti-sess-n num">5′</span><span>easy walking</span></div>' +
+      '<div class="sti-sess-r"><span class="sti-sess-n num">6 ×</span><span>1′ very easy running / 2′ walking</span></div>' +
+      '<div class="sti-sess-r"><span class="sti-sess-n num">5′</span><span>easy walking</span></div>' +
+    '</div>' +
+    '<p class="sti-p">Use a flat, predictable route and keep the effort conversational. Leave at least ' +
+    'one non-running day before the next one.</p>' +
+    '<p class="sti-p"><b>Then:</b> if it stayed green during the run, later that day and the next ' +
+    'morning, add a little running time next session. Build continuous easy running before you add ' +
+    'distance, hills or speed — and change one thing at a time.</p>' +
+    '<p class="sti-safe"><b>Stop the run if</b> pain grows or sharpens, your stride changes, the leg ' +
+    'feels unstable, or the same spot is clearly worse with every interval.</p></section>';
+}
+/** ⚠️ A quiet --surface-2 inset with small crosses, not a wall of red. Ten items is a lot of "do not". */
+function stiWhatNot() {
+  const items = [
+    ["Do not run through pain that sharpens or changes your stride.", "Fitness is easier to rebuild than a re-injury."],
+    ["Do not completely rest a simple injury for days.", "Protect it briefly, then get comfortable movement back."],
+    ["Do not keep icing to speed healing.", "Cold may numb pain; human evidence has not shown it repairs tissue faster."],
+    ["Do not use a tight bandage.", "Off at night, and off immediately for numbness, tingling, coldness or colour change."],
+    ["Do not use heat, alcohol or deep massage in the first 48 hours if it is actively swelling or bruising.", "Warmth may feel good later, but it is not a proven cure."],
+    ["Do not force a stretch into pain, or try to stretch out a tear.", "Get the range back gradually instead."],
+    ["Do not take pain relief so you can test a run.", "Less pain does not mean the tissue is ready."],
+    ["Do not jump back to your old distance, hills or speed.", "Add easy running time first, and change one load at a time."],
+    ["Do not trust the calendar more than your leg.", "Two weeks is a review point, not automatic clearance."],
+    ["Do not assume every painful calf is a strain.", "A hot, swollen, red calf — especially with no clear injury — needs medical advice today."],
+  ].map((r) => '<li><span class="sti-x" aria-hidden="true">' + STI_CROSS + '</span>' +
+    '<div><b>' + r[0] + '</b><div class="sti-why">' + r[1] + '</div></div></li>').join("");
+  return '<section class="card sti-not" aria-labelledby="stiNotH">' +
+    '<h3 class="subhead" id="stiNotH" style="margin-top:0">What slows a good recovery</h3>' +
+    '<ul class="sti-nots">' + items + '</ul></section>';
+}
+/**
+ * ⚠️ COLLAPSED BY DEFAULT, AND IT CONTAINS NO DOSE AND NO DRUG RECOMMENDATION. It names who must ask
+ * first, which is the part a runner is least likely to know and most likely to be harmed by.
+ */
+function stiPainRelief() {
+  return '<details class="card sti-det"><summary class="sti-sum">Pain relief: what is safe?</summary>' +
+    '<div class="guide-body sti-det-b">' +
+    '<p>A pharmacist can help you choose. Paracetamol or a topical anti-inflammatory may suit some ' +
+    'simple sprains and strains, but they do not make the injury safe to run on, and anti-inflammatories ' +
+    'do not speed up tissue repair.</p>' +
+    '<p><b>Ask before using anti-inflammatories</b> if you are under 16, pregnant, taking blood ' +
+    'thinners, have had a stomach ulcer, have kidney or heart disease, or have asthma that ' +
+    'anti-inflammatories set off.</p>' +
+    '<p>Follow the label, and do not combine two products containing the same ingredient.</p>' +
+    '</div></details>';
+}
 function redflagsView() {
-  return '<div class="promise"><span><b>In an emergency</b>, don\\'t use an app — call your local emergency number.</span></div>' +
-    '<h2 class="sec" style="margin-top:0">How are you feeling?</h2><div class="card">' + checkinConsent() + '<div class="subhead">Physical</div><div class="opts">' + checks(FLAGS_PHYS,"rf") + '</div><div class="subhead">Wellbeing</div><div class="opts">' + checks(FLAGS_WELL,"rf") + '</div><div class="result" id="rfRes"></div></div>';
+  return EMERGENCY_BANNER() +
+    '<div class="sti-page">' +
+      '<div class="lib-hero">' +
+        '<div class="lib-eyebrow">Injury guide</div>' +
+        '<h2 class="lib-title">A simple plan for a fresh sprain or strain</h2>' +
+        '<p class="lib-lead">For a new muscle pull, twisted joint or bruise in your leg. First check ' +
+        'that it is safe to look after yourself, then work through the stages. The dates are ' +
+        'checkpoints, not deadlines.</p>' +
+        '<p class="sti-scope">This is general guidance, not a diagnosis. Gradual pain, or pain sitting ' +
+        'sharply on a bone, needs different advice.</p>' +
+      '</div>' +
+      stiStopScreen() +
+      stiTimeline() +
+      stiFirstRun() +
+      stiWhatNot() +
+      stiPainRelief() +
+      '<p class="sti-foot"><span class="ui-pill">Evidence reviewed 10 August 2026</span> ' +
+      'This guide covers new, closed sprains, strains and bruises in the leg. It does not diagnose an ' +
+      'injury and does not replace being examined.</p>' +
+    '</div>';
 }
 function redsView() {
   return EMERGENCY_BANNER() +

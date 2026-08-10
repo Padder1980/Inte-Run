@@ -44,6 +44,36 @@ function fnSrc(name: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 }
 
+/**
+ * Every top-level function name in the built page.
+ * ⚠️ FOR GUARDS THAT MUST NOT BE A HAND-WRITTEN LIST. A rule like "anything collecting check-in answers
+ * discloses what happens to them" is only worth having if it finds the screener somebody adds next year;
+ * spelled as three view names it passes forever and protects nothing. Line-anchored so a nested function
+ * or the word "function" inside a string cannot enter the list.
+ */
+function fnNames(): string[] {
+  const html = page();
+  const out = new Set<string>();
+  for (const m of html.matchAll(/^function ([A-Za-z_$][\w$]*)\(/gm)) out.add(m[1]!);
+  assert.ok(out.size > 100, "only " + out.size + " top-level functions found — the scan is broken");
+  return [...out];
+}
+
+/**
+ * A function's body for SWEEPING, comments stripped. Unlike fnSrc this never asserts on the window
+ * size — ⚠️ several functions in the page are followed by tens of thousands of characters before the
+ * next top-level `function`, so fnSrc's (correct, deliberate) window check makes it unusable for a scan
+ * over every name. This stops at the next top-level declaration of any kind and hard-caps the slice.
+ */
+function fnBody(name: string): string {
+  const html = page();
+  const at = html.indexOf("function " + name + "(");
+  if (at < 0) return "";
+  const end = html.slice(at + 1).search(/\n(function |const |let |\/\*\*)/);
+  const src = html.slice(at, end > 0 ? Math.min(at + 1 + end, at + 12000) : at + 12000);
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+}
+
 /** Pull a top-level function out of the built page and evaluate it with a supplied scope. */
 function lift(name: string, scope: Record<string, unknown> = {}): Function {
   const html = page();
@@ -313,13 +343,39 @@ test("⚠️ every health check-in says what happens to the answers, and says it
     "the consent copy claims the answers are kept, and they are not");
   assert.match(con, /stay on this phone/i, "it does not say where the answers stay");
   assert.match(con, /nothing is kept/i, "it does not say the answers are not kept");
-  for (const view of ["redflagsView", "redsView", "femaleView"]) {
-    const fn = fnSrc(view);
-    assert.match(fn, /checkinConsent\(\)/, view + " has no consent copy");
-    // Every screener carries the emergency route, not just the injury one — somebody arrives at the
-    // fuelling or women's-health check-in in exactly the same state of worry.
-    assert.ok(/promise|EMERGENCY_BANNER\(\)/.test(fn), view + " has no emergency route");
-  }
+  // ⚠️ THE INVARIANT IS "ANYTHING THAT COLLECTS MUST DISCLOSE", not "these named views must call
+  // checkinConsent". Both guides have now outgrown a view-name list: the injury one collects nothing at
+  // all, and the fuelling one moved its checklist into fgEnergyCheck, one collapsed section inside a
+  // page that is mostly food. So the guard DISCOVERS the builders that collect and requires consent
+  // beside the inputs — which is where it has to be, since these sections are collapsed and a consent
+  // line at the top of a long page is not attached to the question it answers.
+  //
+  // ⚠️ Derived, never listed. A hand-written list of screener names goes stale the first time somebody
+  // adds one, and the failure mode is silence: a new checkbox with no disclosure and a green suite.
+  // ⚠️ BUILDERS THAT RENDER INPUTS, not functions that read them. Keyed on calling checks() or writing
+  // an <input data-chk> by hand; `checks` itself and the readers (chkValues, wire) are correctly excluded
+  // because a consent line belongs where the question is asked, not where the answer is collected.
+  const collectors = fnNames().filter((n) => {
+    if (n === "checks") return false;
+    const fn = fnBody(n);
+    return /\bchecks\(/.test(fn) || /<input[^>]*data-chk/.test(fn);
+  });
+  assert.ok(collectors.length >= 2,
+    "found only " + collectors.length + " builders that collect answers — the discovery is broken, not the app");
+  for (const fn of collectors)
+    assert.match(fnBody(fn), /checkinConsent\(\)/,
+      fn + " collects check-in answers but does not say what happens to them");
+  // Every screener route carries the emergency route, not just the injury one — somebody arrives at the
+  // fuelling or women's-health page in exactly the same state of worry.
+  for (const view of ["redsView", "femaleView", "redflagsView"])
+    assert.ok(/promise|EMERGENCY_BANNER\(\)/.test(fnSrc(view)), view + " has no emergency route");
+
+  // The injury guide collects nothing, so it needs no consent line — but that only holds while it
+  // really has no inputs, so assert the absence rather than exempting it by name.
+  const rf = fnSrc("redflagsView");
+  for (const collects of ["checks(", "data-chk", "<input", "<select"])
+    assert.ok(!rf.includes(collects),
+      "the injury guide collects answers (" + collects + ") but carries no consent copy");
 });
 
 test("⚠️ the Support hub matches the mockup, and cannot silently drop a card", () => {

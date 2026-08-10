@@ -3303,7 +3303,18 @@ function computeToday() {
 }
 computeToday();
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: PLAN.defaultWeekIndex, actTab: "workouts", logFilter: "all", supportQ: "", openGuide: null, setupFocus: null, supportFrom: null, logFilterOpen: false, logAll: false, support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK, addOpen: false };
+// Which week the Plan tab opens on. In an ACTIVE plan that must be the week you are actually in — what
+// "my plan" means day to day, and what the owner expected. PLAN.defaultWeekIndex is the ENGINE's
+// representative week (roughly the first build week carrying two quality sessions, which for a typical
+// block is week 7) and is only right for a PREVIEW — before the plan has a current week: during setup,
+// before the start date, or after the race. Reading defaultWeekIndex unconditionally is why the Plan tab
+// always opened on week 7 instead of the current week.
+function planDefaultWeek() {
+  if (TODAY_IN_PLAN && PLAN.weeks[CURRENT_WEEK]) return PLAN.weeks[CURRENT_WEEK].index;
+  return PLAN.defaultWeekIndex;
+}
+
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: planDefaultWeek(), actTab: "workouts", logFilter: "all", supportQ: "", openGuide: null, setupFocus: null, supportFrom: null, logFilterOpen: false, logAll: false, support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK, addOpen: false };
 // Effective day index for a session, honouring any user reschedule. Works for raw sessions
 // (dayOfWeek) and summary sessions (dayIndex), keyed by the shared session id.
 function loadDayOverride() { try { return JSON.parse(localStorage.getItem("interun_dayov_v1") || "{}") || {}; } catch (e) { return {}; } }
@@ -10950,7 +10961,7 @@ function trialSaveResult() {
   profile.personalized = true;
   // Re-anchoring moves every week's start, so today has to be relocated in the new plan too — not just
   // the paces rescaled. Without computeToday() the old week/day indices stay and point at the wrong day.
-  try { adoptPlan(applyProfile(profile)); computeToday(); state.planWeek = PLAN.defaultWeekIndex; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; } catch (e) {}
+  try { adoptPlan(applyProfile(profile)); computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; } catch (e) {}
   saveProfileStore();
   state.trialSaved = fmtTimeFull(TRIALRUN.secs);
   state.trialPending = false; TRIALRUN = null;
@@ -13711,7 +13722,7 @@ function applyFitSuggest() {
   profile.recentTimeS = fs.implied; profile.noRecent = false;
   if (profile.status === "new") profile.status = "building"; // a real run means they're past couch-to-5k
   try { recompute(); } catch (e) {}
-  computeToday(); state.planWeek = PLAN.defaultWeekIndex; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; seedDone(); restoreTicks(ticks); saveProfileStore();
+  computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; seedDone(); restoreTicks(ticks); saveProfileStore();
   state.fitSuggest = null; saveFitSuggest();
   render();
 }
@@ -13773,7 +13784,7 @@ function maybeAutoPaceCalibrate(type, avgPaceSec, distKm, ctx) {
   const easy = Math.round(type === "steady" ? avgPaceSec + 57 : avgPaceSec);
   profile.easyPaceS = easy; profile.recentTimeS = implied; profile.noRecent = false; profile.autoPace = false;
   try { recompute(); } catch (e) { return false; }
-  computeToday(); state.planWeek = PLAN.defaultWeekIndex; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; seedDone();
+  computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; seedDone();
   // seedDone() rebuilt the completed map — re-tick the run they just finished.
   const wk = curWeek();
   if (c.completedFull && wk) { const m = ctxSession(c); if (m) state.done[doneKey(wk.index, m)] = true; }
@@ -14029,7 +14040,7 @@ function applyAddDay() {
   const ticks = todayTicks();
   profile.daysPerWeek = sug.to;
   try { recompute(); } catch (e) { profile.daysPerWeek = sug.from; return; }
-  computeToday(); state.planWeek = PLAN.defaultWeekIndex; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
+  computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
   seedDone(); restoreTicks(ticks); saveProfileStore();
   dismissWeeklyReview();
 }
@@ -14140,7 +14151,7 @@ function applyTrainFlag() {
   profile.recentTimeS = to; profile.noRecent = false; profile.autoPace = false;
   if (profile.status === "new") profile.status = "building";
   try { recompute(); } catch (e) {}
-  computeToday(); state.planWeek = PLAN.defaultWeekIndex; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
+  computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
   seedDone(); restoreTicks(ticks); saveProfileStore();
   state.trainFlag = null; saveTrainFlag();
   render();
@@ -14773,7 +14784,7 @@ function wire() {
     // restoreTicks; this one did not, so editing your profile silently un-ticked the run you had
     // already done today.
     const keptTicks = todayTicks();
-    profile = pf; adoptPlan(out); computeToday(); state.planWeek = PLAN.defaultWeekIndex; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; seedDone(); restoreTicks(keptTicks); saveProfileStore(); renderAvatar();
+    profile = pf; adoptPlan(out); computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; seedDone(); restoreTicks(keptTicks); saveProfileStore(); renderAvatar();
     // ⚠️ The draft is now sticky across navigation, so SAVING has to be what releases it — otherwise
     // the answers a runner just committed are re-restored over the top of the profile they built.
     draft = {};
@@ -14792,7 +14803,7 @@ function wire() {
         profile = undoSnap.profile;
         state.dayOverride = undoSnap.dayOverride; saveDayOverride();
         recompute(); computeToday();
-        state.planWeek = PLAN.defaultWeekIndex; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
+        state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
         seedDone(); restoreTicks(undoSnap.ticks);
         saveProfileStore();
         render();
@@ -15264,7 +15275,14 @@ try { if (NATIVE_WATCH) window.webkit.messageHandlers.interunWatch.postMessage({
   // cannot be told to stop (WebKit bug 301994), so the only thing that hides it is matching whatever
   // is on screen — and the launch sequence changes that twice in three seconds.
   const removeSplash = () => { sp.classList.add("hide"); syncThemeColor(); setTimeout(() => { sp.remove(); syncThemeColor(); }, 600); };
-  if (FIRST_RUN) {
+  // ⚠️ THE WEB VERSION LANDS IN THE APP, NOT IN SETUP. A browser or the Pages PWA has its OWN
+  // localStorage, separate from the native app, so a fresh web session simply has no saved profile — and
+  // the first-run flow was dumping it into the setup form every single time. Only a genuine NATIVE first
+  // launch keeps the guided welcome → setup (its onboarding, and deliberately unchanged before
+  // TestFlight); a web first session goes straight to Today with the example plan and its "Set up →"
+  // banner (examplePlanBanner in viewToday), which is the affordance to personalise.
+  const nativeFirstRun = FIRST_RUN && location.protocol === "interun:";
+  if (nativeFirstRun) {
     setTimeout(() => {
       removeSplash();
       const wel = $("welcome"); if (!wel) return;
@@ -15273,6 +15291,13 @@ try { if (NATIVE_WATCH) window.webkit.messageHandlers.interunWatch.postMessage({
       const go = () => { wel.classList.add("hide"); syncThemeColor(); setTimeout(() => { wel.remove(); syncThemeColor(); }, 500); state.screen = "setup"; render(); };
       const btn = $("welcomeGo"); if (btn) btn.onclick = go;
     }, 2000);
+  } else if (FIRST_RUN) {
+    // Web first session: brand splash → Today. No "welcome back" (they have not been here), no forced
+    // setup — the example-plan banner on Today is the way in to personalising.
+    let started = false;
+    const go = () => { if (started) return; started = true; removeSplash(); syncThemeColor(); };
+    sp.addEventListener("click", go);
+    setTimeout(go, 2200);
   } else {
     // Returning user: brand splash → a brief personalised welcome with a rotating quote → Today.
     let started = false;

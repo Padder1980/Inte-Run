@@ -94,8 +94,8 @@ npm run web            # builds all the standalone pages too
 before staging.** The build mirrors `web/voices/` → `docs/voices/`, but `web/voices/` is **gitignored**
 while `docs/voices/` is **committed**. So on any machine whose local `web/voices/` is stale, partial or
 absent, a routine build overwrites the shipped audio with the lesser copy. Hit for real on 2026-08-09
-during unrelated work: one build rewrote ~250 MP3s and cut `docs/voices/manifest.json` from **11,908
-lines to 1,268**, dropping the extra coaches and the per-coach number banks the pace cues depend on.
+during unrelated work: one build rewrote ~250 MP3s and stripped **11,908 of `docs/voices/manifest.json`'s 13,112
+lines**, dropping the extra coaches and the per-coach number banks the pace cues depend on.
 **Nothing catches this** — the build, the typecheck and all 504 tests pass either way. Recovery is
 `git checkout -- docs/voices/`, run *after* building. Only commit `docs/voices/` when you actually
 regenerated the audio and meant to.

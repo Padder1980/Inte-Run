@@ -153,8 +153,7 @@ node -e '
 node web/app.ts >/dev/null && echo "     app rebuilt"
 # ⚠️ THE BUILD MIRRORS web/voices/ OVER THE COMMITTED docs/voices/, and web/voices/ is gitignored — so
 # on a machine whose local copy is stale or partial, simply building here would silently delete most of
-# the shipped coach audio (measured once: 250 files rewritten, the manifest cut from 11,908 lines to
-# 1,268). This script has no business touching audio, so it puts it straight back.
+# the shipped coach audio (measured once: 250 files rewritten, 11,908 of the manifest's 13,112 lines removed). This script has no business touching audio, so it puts it straight back.
 git checkout -- docs/voices/ 2>/dev/null && echo "     coach audio left untouched" || true
 node --test >/dev/null 2>&1 && echo "     tests still pass" || echo "     ⚠️  tests FAILED — tell Claude before committing"
 cd alfie-proxy

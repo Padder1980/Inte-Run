@@ -338,6 +338,8 @@ extension WatchBridge: WCSessionDelegate {
         // With the app out of the foreground the native player answers instead — it stays alive on the
         // audio/location background modes, which is the whole reason it exists.
         let active = UIApplication.shared.applicationState == .active
+        // Trace: absent on a locked run means the cue never arrived; see CoachAudioService for the rest.
+        SelfCheck.logger.notice("watch->phone cue \(trigger, privacy: .public) active=\(active)")
         if !active {
             if CoachAudioService.shared.playWatchCue(trigger) { return true }
             // Nothing to play natively (no cue map yet): fall through and try the page, which may

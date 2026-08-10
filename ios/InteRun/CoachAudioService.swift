@@ -76,6 +76,9 @@ final class CoachAudioService: NSObject, WKScriptMessageHandler, AVAudioPlayerDe
     private static let mapKey = "interun_coach_cuemap_v1"
     private var cueRotation: [String: Int] = [:]
     private var lastCueAt: [String: Date] = [:]
+    /// When the current clip actually began — used to tell a genuinely-playing clip from a player
+    /// left stuck by a mid-clip suspension, so a stuck player cannot silence the rest of a run.
+    private var playStartedAt = Date.distantPast
 
     // MARK: - Diagnostics
     //
@@ -92,14 +95,48 @@ final class CoachAudioService: NSObject, WKScriptMessageHandler, AVAudioPlayerDe
         SelfCheck.logger.notice("coach audio \(what, privacy: .public)")
         save()
     }
-    private func save() {
-        let line = "sched \(dScheduled) . played \(dFired) . stale \(dStale) . missing \(dMissing)"
+    private func statusLine() -> String {
+        "sched \(dScheduled) . played \(dFired) . stale \(dStale) . missing \(dMissing)"
             + " . failed \(dFailed) . wrist \(dWatchOK)/\(dWatchOK + dWatchMiss)"
             + " . interrupts \(dInterrupt) . map \(cueMap.count) . last: \(dLast)"
+    }
+    private func save() {
+        let line = statusLine()
         UserDefaults.standard.set(line, forKey: "interun_coach_audio_status")
+        pushLineToPage(line)
     }
     static var lastStatus: String {
         UserDefaults.standard.string(forKey: "interun_coach_audio_status") ?? "no run recorded yet"
+    }
+
+    /// ⚠️ THE DIAGNOSTIC WAS STALE, AND THAT MADE EVERY MID-RUN "MAP 0" UNTRUSTWORTHY. `window.__interunCoachAudio`
+    /// was written ONCE, by the page-load user script in WebHost, and never touched again — so the coach line
+    /// in Support › Your data always showed the value from app LAUNCH, not the live run. The owner's mid-run
+    /// "MAP 0" reading was therefore evidence of nothing. Every counter change now pushes the fresh line to
+    /// the page: it lands when the page is alive (foreground, or the instant the screen comes back on), and
+    /// while the phone is LOCKED the os_log trail (Console.app, subsystem com.interun.app) is the live source
+    /// instead. syncStatusToPage() catches the page up on the next foreground.
+    private func pushLineToPage(_ line: String) {
+        let safe = line.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+        DispatchQueue.main.async { [weak self] in
+            self?.webView?.evaluateJavaScript("window.__interunCoachAudio = \"\(safe)\";", completionHandler: nil)
+        }
+    }
+    /// Re-assert the live line when the app returns to the front — called from InteRunApp's scenePhase hook,
+    /// so Support reflects the run that just happened rather than the launch-time snapshot.
+    @MainActor
+    func syncStatusToPage() { pushLineToPage(statusLine()) }
+
+    /// For diagnostics: which lifecycle state we are actually in when a clip is attempted. A silent coach on
+    /// a locked phone and one on a foregrounded phone are entirely different faults, and the log has to say
+    /// which. Read on the main actor, which this class always is.
+    private var appStateWord: String {
+        switch UIApplication.shared.applicationState {
+        case .active: return "active"
+        case .inactive: return "inactive"
+        case .background: return "background"
+        @unknown default: return "unknown"
+        }
     }
 
     override init() {
@@ -165,18 +202,40 @@ final class CoachAudioService: NSObject, WKScriptMessageHandler, AVAudioPlayerDe
     /// play, so the caller can fall back to the page rather than the runner getting silence.
     @discardableResult
     func playWatchCue(_ trigger: String) -> Bool {
+        SelfCheck.logger.notice("coach wrist cue \(trigger, privacy: .public): map=\(self.cueMap.count) state=\(self.appStateWord, privacy: .public)")
         guard let files = cueMap[trigger], !files.isEmpty else {
-            dWatchMiss += 1; note("no clip for wrist cue \(trigger)"); return false
+            dWatchMiss += 1; note("no clip for wrist cue \(trigger) (map \(cueMap.count))"); return false
         }
         // The page's own catalogue enforces per-prompt repeat windows; this is the coarse version of
         // the same idea, so a wrist that re-sends a trigger cannot produce a stutter.
-        if let last = lastCueAt[trigger], Date().timeIntervalSince(last) < 20 { return true }
-        guard player?.isPlaying != true else { return true }
+        if let last = lastCueAt[trigger], Date().timeIntervalSince(last) < 20 {
+            SelfCheck.logger.notice("coach wrist cue \(trigger, privacy: .public): deduped (<20s window)")
+            return true
+        }
+        // ⚠️ A STUCK PLAYER MUST NOT SILENCE THE WHOLE RUN. `audioPlayerDidFinishPlaying` clears the
+        // player on completion, but if the app is suspended mid-clip that callback never fires and the
+        // player is left claiming isPlaying forever — after which this guard would suppress EVERY later
+        // cue with a "handled" answer, and the wrist, believing the phone had it, would stay silent too.
+        // A clip is a few seconds at most, so a player still "playing" well beyond that is stuck: ignore
+        // it and let the new cue replace it (assigning `player` in playFile deallocates the stuck one).
+        if player?.isPlaying == true, Date().timeIntervalSince(playStartedAt) < 12 {
+            SelfCheck.logger.notice("coach wrist cue \(trigger, privacy: .public): suppressed, already playing")
+            return true
+        }
+        // ⚠️ ADVANCE THE ROTATION AND ARM THE DEDUPE ONLY ON A CLIP THAT ACTUALLY SOUNDED. Setting them
+        // before playFile meant a FAILED play still poisoned the 20s window: the next same-trigger cue
+        // was deduped and answered "handled" (return true), so nothing played natively AND the wrist did
+        // not cover it — silence for the rest of the run after a single failure. On failure we return
+        // false instead, which is the wrist's signal to speak the line itself.
         let i = (cueRotation[trigger] ?? 0) % files.count
-        cueRotation[trigger] = i + 1
-        lastCueAt[trigger] = Date()
         let ok = playFile(files[i])
-        if ok { dWatchOK += 1 } else { dWatchMiss += 1 }
+        if ok {
+            cueRotation[trigger] = i + 1
+            lastCueAt[trigger] = Date()
+            dWatchOK += 1
+        } else {
+            dWatchMiss += 1
+        }
         return ok
     }
 
@@ -206,9 +265,31 @@ final class CoachAudioService: NSObject, WKScriptMessageHandler, AVAudioPlayerDe
             // ⚠️ Sent once when a WRIST-recorded run starts. Without it the native side has no way to
             // know which clip a trigger means — the catalogue, the chosen coach and their wordings
             // all live in the page.
-            cueMap = (body["map"] as? [String: [String]]) ?? [:]
+            // ⚠️ TOLERANT PARSE, NOT ONE STRICT DEEP CAST. `body["map"] as? [String: [String]]` casts the
+            // whole nested structure at once: a single value that is not a homogeneous [String] fails the
+            // ENTIRE cast and leaves an empty map — which is silence for the whole run AND indistinguishable
+            // from "no map was ever sent". Parse per entry instead, keep every trigger whose value is an
+            // array of strings, and log the raw bridged type plus the resulting count so a genuine receipt
+            // can be told apart from a deserialize failure. (WKScriptMessage bridges a JS object to
+            // NSDictionary and a JS array to NSArray; this copes whether the values arrive as [String] or
+            // the looser [Any].)
+            let rawMap = body["map"]
+            var parsedMap: [String: [String]] = [:]
+            if let dict = rawMap as? [String: Any] {
+                for (k, v) in dict {
+                    if let arr = v as? [String], !arr.isEmpty { parsedMap[k] = arr }
+                    else if let arr = v as? [Any] {
+                        let strs = arr.compactMap { $0 as? String }
+                        if !strs.isEmpty { parsedMap[k] = strs }
+                    }
+                }
+            }
+            cueMap = parsedMap
             cueRotation = [:]
             lastCueAt = [:]
+            let rawDesc = rawMap.map { String(describing: type(of: $0)) } ?? "absent"
+            note("cuemap received: raw \(rawDesc), \(parsedMap.count) triggers")
+            SelfCheck.logger.notice("coach cuemap keys=[\(parsedMap.keys.sorted().joined(separator: ","), privacy: .public)]")
         case "clearSchedule":
             // ⚠️ THE PHONE'S SCHEDULE ONLY. This used to also empty `cueMap`, which belongs to the
             // WRIST path — and it was not a theoretical overlap: `stopLive()` posts this, and every
@@ -273,13 +354,15 @@ final class CoachAudioService: NSObject, WKScriptMessageHandler, AVAudioPlayerDe
     private func playFile(_ file: String) -> Bool {
         guard let base = Bundle.main.resourceURL else { return false }
         let url = base.appendingPathComponent("web/").appendingPathComponent(file)
-        guard FileManager.default.fileExists(atPath: url.path) else {
+        let exists = FileManager.default.fileExists(atPath: url.path)
+        SelfCheck.logger.notice("coach playFile \(file, privacy: .public) exists=\(exists) state=\(self.appStateWord, privacy: .public)")
+        guard exists else {
             dMissing += 1; note("missing clip \(file)"); return false
         }
         // ⚠️ ACTIVATE PER CLIP. AVFoundation activates implicitly, but doing it explicitly is the only
         // way to find out whether it WORKED — and after an interruption or a process wake it may not.
         do { try AVAudioSession.sharedInstance().setActive(true) }
-        catch { dFailed += 1; note("activate failed: \(error.localizedDescription)"); return false }
+        catch { dFailed += 1; note("activate failed [\(appStateWord)]: \(error.localizedDescription)"); return false }
         do {
             let p = try AVAudioPlayer(contentsOf: url)
             p.delegate = self
@@ -289,11 +372,12 @@ final class CoachAudioService: NSObject, WKScriptMessageHandler, AVAudioPlayerDe
             // been spoken so it would not repeat it, and on a wrist run the page fallback that exists
             // for exactly this case was skipped. Silence, with nothing anywhere to show for it.
             guard p.play() else {
-                dFailed += 1; note("play refused for \(file)"); return false
+                dFailed += 1; note("play refused for \(file) [\(appStateWord)]"); return false
             }
             player = p
+            playStartedAt = Date()
             dFired += 1
-            note("played \(file)")
+            note("played \(file) [\(appStateWord)]")
             return true
         } catch {
             dFailed += 1; note("decode failed \(file): \(error.localizedDescription)")

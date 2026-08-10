@@ -172,6 +172,12 @@ final class SessionStore: NSObject, ObservableObject {
     /// The phone's own run, while the watch is only watching. Nil when the phone is not recording.
     @Published var phoneLive: [String: Double]?
     @Published var phoneLiveTitle: String?
+    /// When the last phone tick arrived, and whether the phone's clock was advancing — so the watch can
+    /// FILL the seconds between the phone's ~2s ticks instead of jumping in 2s steps (the phone smooths
+    /// its own mirror the same way). Advancing seconds mean running; a repeated value means paused, and
+    /// the filled clock then freezes rather than creeping past the phone and snapping back every 2s.
+    @Published var phoneLiveAt: Date?
+    @Published var phoneLiveRunning = false
 
     /// Set by whatever is running the workout, so a phone command reaches it. Nil when nothing is
     /// running, which makes a stray command a no-op rather than a crash.
@@ -322,7 +328,13 @@ extension SessionStore: WCSessionDelegate {
         if let live = message["phoneLive"] as? [String: Any] {
             let nums = live.compactMapValues { $0 as? Double }
             let title = live["title"] as? String
-            Task { @MainActor in self.phoneLive = nums; self.phoneLiveTitle = title }
+            Task { @MainActor in
+                let prev = self.phoneLive?["sec"]
+                if let newSec = nums["sec"] { self.phoneLiveRunning = prev.map { newSec > $0 } ?? true }
+                self.phoneLive = nums
+                self.phoneLiveTitle = title
+                self.phoneLiveAt = Date()
+            }
             return
         }
         guard let action = message["command"] as? String else { return }
@@ -345,6 +357,9 @@ extension SessionStore: WCSessionDelegate {
             case "companionEnd":
                 LaunchRequest.shared.endCompanion()
                 CompanionSession.shared.stop()
+                // Stop the filled clock: without this the interpolation would keep ticking against a
+                // stale arrival time if the companion view lingered.
+                self.phoneLive = nil; self.phoneLiveTitle = nil; self.phoneLiveRunning = false
             case "stop": self.onStopRequested?()
             case "pause": self.onPauseRequested?()
             case "resume": self.onResumeRequested?()

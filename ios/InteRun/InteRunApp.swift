@@ -43,6 +43,10 @@ struct InteRunApp: App {
                 // Foregrounding is the only event that can change ActivityKit's answer.
                 Task { @MainActor in LiveActivityService.shared.clearRefusals() }
                 WatchBridge.shared.replayLiveOnActivate()
+                // The coach diagnostic was written once at launch and never updated, so any mid-run reading
+                // was really the launch snapshot. Re-assert the live line now the page can receive it, so
+                // Support › Your data shows the run that just happened rather than app start.
+                Task { @MainActor in CoachAudioService.shared.syncStatusToPage() }
                 // Look for a newer web layer while the runner is here (throttled inside). A build found
                 // now is adopted on the NEXT launch, never under a live session.
                 WebUpdateService.shared.checkForUpdate()

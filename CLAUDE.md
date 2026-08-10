@@ -709,8 +709,11 @@ TestFlight. If that ordering ever changes, revisit this.
 `Support › Private check-ins › Injury & symptoms` was a consent line and ten tick-boxes, which answered
 "is this worth mentioning to somebody?" and nothing else. It is now a chronological guide to a NEW,
 CLOSED lower-limb sprain, strain or bruise, after screening for the things that must not be
-self-managed. **⚠️ NOT CLEARED FOR PUBLIC RELEASE until a UK-registered sports physiotherapist or
-sports-medicine clinician has read the wording.**
+self-managed. **✅ CLINICALLY REVIEWED AND APPROVED — the owner confirmed on 2026-08-10 that it has been
+through clinical review and is cleared to ship.** ⚠️ **THE APPROVAL IS OF THE WORDING AS IT STANDS AND DOES
+NOT TRAVEL WITH A REWRITE.** Change what a sentence claims — not how it is phrased — and it needs
+re-reviewing. `test/soft-tissue-guide.test.ts` is the line between the two: a failure there is a change of
+clinical meaning, and it is the signal to go back rather than to relax the assertion.
 
 The product position, and every decision follows from it:
 > Protect it briefly. Keep it gently moving. Rebuild load before you rebuild speed.
@@ -821,8 +824,10 @@ unguarded. Left deliberately rather than deleted on my own initiative. It does n
 `Support › Private check-ins › Fuelling & energy` was a consent line and eight tick-boxes. It is now a
 food-first guide to fuelling, fluids and recovery, with the under-fuelling checklist as one collapsed
 section inside it. Same `reds` id, route, orange drop and hub position; `interactive: false` drops the
-"CHECK-IN" chip. **⚠️ NOT CLEARED FOR PUBLIC RELEASE until a UK-registered sports dietitian has read the
-nutritional wording.** `kw` on the hub card is search-only, exactly as on the injury card.
+"CHECK-IN" chip. **✅ CLINICALLY REVIEWED AND APPROVED — the owner confirmed on 2026-08-10 that the
+nutritional wording has been through review and is cleared to ship**, with the same standing condition as
+the injury guide: the approval covers the wording as it stands, and a change of meaning needs re-reviewing.
+`kw` on the hub card is search-only, exactly as on the injury card.
 
 > Eat enough every day. Add fuel as the work gets longer or harder. Practise race day before race day.
 

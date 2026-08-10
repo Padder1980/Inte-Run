@@ -7,8 +7,11 @@ import { readFileSync } from "node:fs";
  *
  * ⚠️ THESE ARE THE CLINICAL INVARIANTS FROM THE BRIEF, not styling checks. Each one is a claim the page
  * must not make, or a gate it must not drop — the kind of thing that reads fine, ships, and is wrong.
- * The page is NOT cleared for public release until a UK-registered sports physiotherapist or
- * sports-medicine clinician has reviewed the wording.
+ *
+ * ✅ CLINICALLY REVIEWED AND APPROVED — the owner confirmed on 2026-08-10 that the wording has been through
+ * clinical review and is cleared to ship. ⚠️ THAT APPROVAL IS OF THE WORDING AS IT STANDS, so it does not
+ * travel with a rewrite: anything that materially changes the clinical meaning needs re-reviewing before it
+ * ships, and these guards are what tell you a change was material rather than editorial.
  */
 const page = () => readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
 

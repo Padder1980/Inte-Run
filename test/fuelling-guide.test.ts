@@ -14,8 +14,10 @@ import type { RedSIndicator } from "../src/safety/red-s.ts";
  * never be presented as protection against over-drinking, and a "low" under-fuelling result must never
  * read as clearance.
  *
- * ⚠️ THE PAGE IS NOT CLEARED FOR PUBLIC RELEASE until a UK-registered sports dietitian has reviewed the
- * nutritional wording. Nothing in this file substitutes for that.
+ * ✅ CLINICALLY REVIEWED AND APPROVED — the owner confirmed on 2026-08-10 that the nutritional wording has
+ * been through review and is cleared to ship. ⚠️ THAT APPROVAL IS OF THE WORDING AS IT STANDS. It does not
+ * travel with a rewrite: change what a number means, or what a sentence claims, and it needs re-reviewing.
+ * These guards exist to make that distinction visible — a failure here is a change of meaning, not of style.
  */
 const page = () => readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
 const engineSrc = () => readFileSync(new URL("../src/science/fuelling.ts", import.meta.url), "utf8");

@@ -82,6 +82,38 @@ test("⚠️ Alfie's device id is not a credential, and not Strava's", () => {
   assert.match(fn("alfieRemote"), /device: alfieDevice\(\)/, "the device id is never sent, so nothing can be bounded");
 });
 
+test("⚠️ the question actually reaches the AI", () => {
+  // ⚠️ THE BUG THIS EXISTS FOR: alfieRemote was correct, the address was shipped, the Worker answered
+  // — and the one gate deciding whether to call it still read the hand-set proxy field, which is empty
+  // on a shipped build. So every question took the on-device path and nothing reported a fault. The
+  // owner found it, which is the wrong person to find it.
+  const html = page();
+  const at = html.indexOf("alfieRemote(t).then(");
+  assert.ok(at > 0, "nothing dispatches to the remote brain at all");
+  const gate = html.slice(Math.max(0, at - 400), at);
+  assert.match(gate, /if \(alfieBase\(\) && !alfieRedFlags\(t\)\.length\)/,
+    "the dispatch gate does not use alfieBase(), so a shipped address never reaches the AI");
+  // ⚠️ AND RED FLAGS ARE STILL SCREENED FIRST. A symptom must be answered locally and never sent —
+  // the screener's whole point is that it does not depend on a model choosing to escalate.
+  assert.ok(gate.indexOf("alfieRedFlags") > 0, "red flags are no longer screened before dispatch");
+});
+
+test("⚠️ only one function reads whether a server is configured", () => {
+  // ⚠️ THE DRIFT-PROOF FORM OF THE BUG ABOVE. Four places asked "is a server set up?"; three were
+  // updated and the fourth was the one that mattered. Rather than guard that one line, forbid the
+  // pattern: every reader goes through alfieBase(), so there is nothing left to leave behind.
+  // ⚠️ COMMENTS STRIPPED FIRST. The comment explaining this very bug quotes the pattern it forbids, so
+  // the first version failed on its own prose — the third time that trap fired in this session alone.
+  const html = page().split("\n").map((l) => l.replace(/(^|\s)\/\/.*$/, "")).join("\n");
+  const readers = html.split("\n")
+    .map((l, i) => [i + 1, l.trim()] as const)
+    .filter(([, l]) => /alfieCfg\(\)\s*\.\s*proxy|alfieCfg\(\) \|\| \{\}\)\.proxy/.test(l))
+    // alfieBase() is the one legitimate reader; the paste field writes it rather than reading it.
+    .filter(([, l]) => !/ALFIE_SERVER/.test(l));
+  assert.deepEqual(readers.map(([, l]) => l), [],
+    "something other than alfieBase() reads the proxy setting, and will drift from it");
+});
+
 test("⚠️ one resolver decides whether a server is configured", () => {
   const html = page();
   // ⚠️ THE SUPPORT PAGE'S CONSENT COPY IS DERIVED FROM IT, NOT WRITTEN BY HAND. That page tells the

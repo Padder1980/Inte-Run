@@ -196,8 +196,13 @@ test("⚠️ the red-flag screen runs BEFORE anything is sent to a remote model"
   const screen = fn.indexOf("alfieRedFlags(");
   assert.ok(screen > 0, "alfieAsk does not screen for red flags at all");
   assert.ok(screen < remote, "the red-flag screen runs after the remote dispatch");
-  assert.match(fn, /alfieCfg\(\)\.proxy && !alfieRedFlags\(/,
-    "a red-flag question is still dispatched to the proxy");
+  // ⚠️ THE SHAPE, NOT THE SPELLING. This pinned `alfieCfg().proxy && !alfieRedFlags(` and so failed the
+  // day the "is a server configured" check moved into alfieBase() — a safety guard breaking on a
+  // rename, which invites whoever meets it to edit the assertion. What must hold is that the remote
+  // dispatch is gated on the red-flag screen finding nothing, whichever function answers the first
+  // half. test/alfie-proxy.test.ts separately pins that resolver.
+  assert.match(fn, /\w+\(\) && !alfieRedFlags\(t\)\.length/,
+    "the remote dispatch is no longer gated on the red-flag screen, so a symptom can be sent");
 });
 
 test("⚠️ the logbook's week starts on a Monday, in every timezone and every week of the year", () => {

@@ -4941,7 +4941,11 @@ function alfieAsk(text) {
   // runner typing "chest pain" got a language model's reply and no escalation at all. The whole point
   // of the screener is that it does not depend on a model choosing to escalate. It runs first now, and
   // a hit is answered locally and never sent, which also keeps a symptom disclosure off the network.
-  if (alfieCfg().proxy && !alfieRedFlags(t).length) {
+  // ⚠️ alfieBase(), NOT alfieCfg().proxy. This gate decides whether the AI is used AT ALL, and it was
+  // the one reader of "is a server configured" left behind when the address moved into the build — so
+  // alfieRemote existed, worked, and was never called: every question quietly took the on-device path
+  // and nothing anywhere reported a fault. Fix-one-caller-not-the-other, this file's oldest trap.
+  if (alfieBase() && !alfieRedFlags(t).length) {
     alfieRemote(t).then(finish).catch(() => setTimeout(() => finish(local()), 120));
   } else {
     setTimeout(() => finish(local()), 260); // a beat, so it reads as a reply rather than a jump

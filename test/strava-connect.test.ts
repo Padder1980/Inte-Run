@@ -103,12 +103,45 @@ test("⚠️ nothing is sent to Strava on its own, and nothing is offered that c
   // ⚠️ ABSENT, NOT DISABLED. A greyed-out Strava button on every run advertises a feature the runner
   // has not set up, on the screen they came to read about their run.
   assert.match(src, /if \(!stravaConnected\(\)\) return "";/, "the button is shown when Strava is not connected");
-  // ⚠️ NO AUTOMATIC UPLOAD. Pushing somebody's run into their public training log is theirs to ask
-  // for. The only caller of stravaSendRun is a tap.
+  // ⚠️ EVERY SEND IS EITHER A TAP OR THE SETTING THE RUNNER SWITCHED ON — there is no third path.
+  // This replaced a count of stravaSendRun call sites, which said "nothing uploads on its own" and
+  // became false the moment automatic sending existed. A bare count would have been "fixed" by bumping
+  // the number, which guards nothing; the invariant worth holding is that each caller is accounted for.
   const html = page();
-  const callers = (html.match(/stravaSendRun\(/g) || []).length;
-  assert.equal(callers, 2, "stravaSendRun has calls beyond its definition and the button's onclick");
+  // ⚠️ MEMBERSHIP OF THE OPT-IN FUNCTION, NOT A KEYWORD ON THE LINE. The call inside
+  // stravaMaybeAutoSend does not mention its own name, so a line-by-line check rejected the very path
+  // it was written to allow. Ask whether each call site sits inside that function instead.
+  const optIn = fn("stravaMaybeAutoSend");
+  const callers = html.split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.includes("stravaSendRun(") && !l.startsWith("function stravaSendRun"));
+  assert.ok(callers.length >= 2, "expected at least the button and the opt-in path to call it");
+  for (const l of callers)
+    assert.ok(l.includes("stvSend.onclick") || optIn.includes(l),
+      "an upload is triggered from somewhere that is neither the button nor the opt-in path: " + l.slice(0, 100));
   assert.match(html, /stvSend\.onclick = \(\) => stravaSendRun/, "the send button is not what triggers a send");
+});
+
+test("⚠️ automatic sending is opt-in, forward-only, and never a simulated run", () => {
+  const src = fn("stravaMaybeAutoSend");
+  // ⚠️ A SIMULATED RUN FABRICATES DISTANCE AND A LONDON ROUTE. Every adaptive check already skips it;
+  // automatic upload is the one path where that invention would leave the app and become a permanent
+  // public record of a run nobody did. The guard is first in the function.
+  assert.match(src, /if \(!run \|\| run\.sim\) return;/, "a simulated run can reach somebody's Strava");
+  assert.ok(src.indexOf("run.sim") < src.indexOf("cfg.auto"), "the sim guard runs after the setting check");
+  // Off unless switched on, and connected.
+  assert.match(src, /if \(!cfg\.auto \|\| !stravaConnected\(\)\) return;/, "automatic sending is not gated on the setting");
+  // ⚠️ NEVER RE-SENDS. Without this, every later save would try the same run again.
+  assert.match(src, /if \(run\.strava\) return;/, "a run that has already been tried can be sent again");
+  // ⚠️ FORWARD-ONLY: called where a run is saved, never over the stored history. Flipping the toggle
+  // must not dump fifty old runs into somebody's feed, which they cannot undo.
+  const html = page();
+  for (const l of html.split("\n").filter((l) => /stravaMaybeAutoSend\(/.test(l) && !/^function/.test(l.trim())))
+    assert.match(l, /state\.logged\[0\]/, "auto-send is called over something other than the run just saved: " + l.trim().slice(0, 90));
+  // ⚠️ BOTH SAVE PATHS. A fix applied to the phone and not the watch is this project's most-repeated
+  // trap, and a watch runner is exactly who expects runs to appear without being asked.
+  assert.equal((html.match(/stravaMaybeAutoSend\(state\.logged\[0\]\)/g) || []).length, 2,
+    "auto-send is wired to only one of the two save paths (phone and watch)");
 });
 
 test("⚠️ a tester is never shown a box asking for a server address", () => {

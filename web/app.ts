@@ -3844,14 +3844,64 @@ function runStravaPayload(run) {
   // \u26a0\ufe0f DOUBLED BACKSLASHES. Written singly this shipped as /.d{3}Z$/ and matched nothing, so
   // every timestamp kept its milliseconds. Seventh firing of this file's own escaping rule today.
   const iso = (sec) => new Date(startMs + sec * 1000).toISOString().replace(/\\.\\d{3}Z$/, "Z");
-  const trk = pts.map((p) =>
-    '<trkpt lat="' + p.lat.toFixed(6) + '" lon="' + p.lng.toFixed(6) + '"><time>' + iso(p.t) + '</time></trkpt>').join("");
+
+  // \u26a0\ufe0f HEART RATE IS PAIRED WITH DISTANCE, NOT TIME. hrSeries is [metres, bpm] on purpose -- on a time
+  // axis every pause is a plateau -- so putting it on a trackpoint means walking the route's OWN
+  // cumulative distance and reading the series at that point. Nothing new is inferred; this is the
+  // same pairing the in-app chart already draws from.
+  const rad = (d) => d * Math.PI / 180;
+  const stepM = (a, b) => {
+    const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
+    const h = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 2 * 6371000 * Math.asin(Math.min(1, Math.sqrt(h)));
+  };
+  const hrs = (run && Array.isArray(run.hrSeries) ? run.hrSeries : [])
+    .filter((s) => Array.isArray(s) && isFinite(Number(s[0])) && Number(s[1]) > 0);
+  // \u26a0\ufe0f A DROPOUT IS NOT INTERPOLATED ACROSS. HealthKit simply stops delivering when the watch loses
+  // skin contact, so a wide gap between samples is missing evidence, not a slow change -- and drawing
+  // a smooth line through it would put a fabricated steady effort into somebody's training log. The
+  // app's own chart leaves that gap for the same reason. Samples land every ~5s, so 400 m apart is far
+  // beyond any real sampling interval.
+  const HR_GAP_M = 400;
+  const hrAt = (m) => {
+    if (hrs.length < 2) return null;
+    const first = hrs[0], last = hrs[hrs.length - 1];
+    if (m <= Number(first[0])) return m >= Number(first[0]) - HR_GAP_M ? Math.round(Number(first[1])) : null;
+    for (let i = 1; i < hrs.length; i++) {
+      const a = hrs[i - 1], b = hrs[i];
+      if (m <= Number(b[0])) {
+        const span = Number(b[0]) - Number(a[0]);
+        if (span > HR_GAP_M) return null;
+        const f = span > 0 ? (m - Number(a[0])) / span : 0;
+        return Math.round(Number(a[1]) + (Number(b[1]) - Number(a[1])) * f);
+      }
+    }
+    return m <= Number(last[0]) + HR_GAP_M ? Math.round(Number(last[1])) : null;
+  };
+
+  let metres = 0, withHr = 0;
+  const trk = pts.map((p, i) => {
+    if (i > 0) metres += stepM(pts[i - 1], p);
+    const bpm = hrAt(metres);
+    if (bpm != null) withHr++;
+    return '<trkpt lat="' + p.lat.toFixed(6) + '" lon="' + p.lng.toFixed(6) + '">' +
+      '<time>' + iso(p.t) + '</time>' +
+      (bpm == null ? "" :
+        '<extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>' + bpm + '</gpxtpx:hr>' +
+        '</gpxtpx:TrackPointExtension></extensions>') +
+      '</trkpt>';
+  }).join("");
+
+  // The namespace is declared only when something actually uses it, so a run with no heart rate does
+  // not ship a GPX advertising an extension it never carries.
+  const ns = withHr ? ' xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1"' : "";
   const gpx = '<?xml version="1.0" encoding="UTF-8"?>' +
-    '<gpx version="1.1" creator="Inte-Run" xmlns="http://www.topografix.com/GPX/1/1">' +
+    '<gpx version="1.1" creator="Inte-Run" xmlns="http://www.topografix.com/GPX/1/1"' + ns + '>' +
     '<metadata><time>' + iso(0) + '</time></metadata>' +
     '<trk><name>' + esc(name) + '</name><type>running</type><trkseg>' + trk + '</trkseg></trk></gpx>';
   return { kind: "gpx", name: name, type: type, startMs: startMs, startLocal: startLocal, externalId: externalId,
-           gpx: gpx, points: pts.length };
+           gpx: gpx, points: pts.length, hrPoints: withHr };
 }
 /**
  * When the run began, in real time.
@@ -3988,6 +4038,10 @@ function ingestWatchRun(run) {
   // project's most-repeated trap; a runner who records on their watch would otherwise see their
   // shoes never wear out.
   shoeCreditRun(state.logged[0]);
+  // ⚠️ THE WRIST GOES TO STRAVA TOO. A fix applied to the phone's save path and not the watch's is
+  // this project's most-repeated trap — and a runner who records on their watch is exactly the person
+  // who expects their runs to appear in Strava without being asked twice.
+  stravaMaybeAutoSend(state.logged[0]);
   if (planned) {
     const wk = PLAN.weeks.find((w) => w.sessions.indexOf(planned) >= 0);
     if (wk) state.done[doneKey(wk.index, planned)] = true;
@@ -8024,6 +8078,28 @@ function stravaSendRun(run, onDone) {
     finish();
   });
 }
+/**
+ * Send a just-saved run without being asked — but only because the runner turned it on.
+ *
+ * ⚠️ A SIMULATED RUN MUST NEVER REACH SOMEBODY'S TRAINING LOG. The browser demo fabricates distance
+ * and a London route, and this app's standing rule is that a sim run is stamped sim:true and skipped
+ * by every adaptive check. Automatic upload is the one path where that invention would escape the app
+ * entirely and become a permanent public record of a run nobody did. First guard, deliberately.
+ *
+ * ⚠️ ONLY A RUN THAT HAS NEVER BEEN TRIED. Without the run.strava check, enabling the setting would
+ * re-send on every later save, and a retry loop into somebody's Strava is not a thing to risk.
+ *
+ * ⚠️ AND ONLY FROM THIS MOMENT ON — it is called where a run is SAVED, never over the stored history.
+ * Sweeping the logbook when the toggle is flipped would dump fifty old runs into their feed at once,
+ * which is unrecoverable by them and is not what "send new runs automatically" says.
+ */
+function stravaMaybeAutoSend(run) {
+  if (!run || run.sim) return;
+  if (run.strava) return;
+  const cfg = stravaCfg();
+  if (!cfg.auto || !stravaConnected()) return;
+  stravaSendRun(run, () => { try { renderUnlessTyping(); } catch (e) {} });
+}
 /** Finish a run Strava was still processing when we stopped waiting. */
 function stravaCheckPending(run, onDone) {
   const s = (run && run.strava) || {};
@@ -8087,8 +8163,17 @@ function stravaSheetHtml() {
           '<div class="bk-md" style="margin-top:10px;line-height:1.45">Stays on this phone. See alfie-proxy in the repo for the ten-minute deploy.</div>'
         : '<div class="bk-md" style="margin-top:10px">It arrives with the App Store release.</div>');
   } else if (stravaConnected()) {
+    const on = !!cfg.auto;
     body = '<div class="bk-box"><div class="bk-val">Connected' + (cfg.name ? " as " + esc(cfg.name) : "") + '</div>' +
-      '<div class="bk-md" style="margin-top:4px">Open any run in your Logbook and tap Send to Strava.</div></div>' +
+      '<div class="bk-md" style="margin-top:4px">' + (on
+        ? 'Every run you finish goes to Strava on its own.'
+        : 'Open any run in your Logbook and tap Send to Strava.') + '</div></div>' +
+      '<div class="rm-row" style="margin-top:12px"><label for="stvAuto">Send new runs automatically</label>' +
+      '<button class="rm-switch' + (on ? " on" : "") + '" id="stvAuto" role="switch" aria-checked="' + (on ? "true" : "false") +
+      '" aria-label="Send new runs to Strava automatically"><span class="rm-knob"></span></button></div>' +
+      '<div class="bk-md" style="margin-top:8px">' + (on
+        ? 'Only runs you finish from now on \\u2014 your existing runs stay where they are unless you send them yourself.'
+        : 'Off, so nothing goes across unless you tap Send on a run.') + '</div>' +
       '<div class="bk-md" style="margin-top:12px">Inte-Run can only <b>add</b> activities. It cannot read your ' +
       'Strava history, and it never sees your Strava password.</div>' +
       '<button class="bk-btn2" id="stvOff">Disconnect from Strava</button>';
@@ -8118,6 +8203,12 @@ function wireStravaSheet() {
   const go = $("stvGo"); if (go) go.onclick = stravaConnect;
   const retry = $("stvRetry"); if (retry) retry.onclick = stravaConnect;
   const off = $("stvOff"); if (off) off.onclick = stravaDisconnect;
+  const auto = $("stvAuto");
+  if (auto) auto.onclick = () => {
+    const c = stravaCfg(); c.auto = !c.auto; stravaSaveCfg(c);
+    haptic(c.auto ? "success" : "tap");
+    openStravaSheet();
+  };
   const chk = $("stvCheckLink"); if (chk) chk.onclick = () => { chk.textContent = "Checking\\u2026"; stravaRefresh(); };
   const save = $("stvUrlSave"), inp = $("stvUrl");
   if (inp) inp.value = String(stravaCfg().proxy || "");
@@ -12234,6 +12325,8 @@ function saveLiveSession() {
     state.logged.unshift(rec);
     sm.runId = state.logged[0].id;
     saveRuns();
+    // Straight after the run exists on disk, so a failed upload leaves the run saved and retryable.
+    stravaMaybeAutoSend(state.logged[0]);
   }
   const wk0 = PLAN.weeks[0]; const dn = DAY_ORDER[LIVE.session.dayOfWeek];
   if (LIVE.completedFull && wk0) { const m = wk0.sessions.find((s) => s.day === dn && s.title === LIVE.session.title); if (m) state.done[doneKey(wk0.index, m)] = true; }

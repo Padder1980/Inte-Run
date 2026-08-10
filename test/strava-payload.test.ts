@@ -59,6 +59,57 @@ test("⚠️ a run with no usable trace goes as a manual activity, not an invent
   assert.equal(fn(RUN_UNTIMED).trainer, false, "an outdoor run with a route was marked as a treadmill run");
 });
 
+/**
+ * Heart rate. ⚠️ hrSeries is [metres, bpm] — paired with DISTANCE, not time, because on a time axis
+ * every pause is a plateau. Putting it on a trackpoint therefore means walking the route's own
+ * cumulative distance, which is the same pairing the in-app chart draws from.
+ */
+const HR_RUN = {
+  ...RUN_WITH_TRACE,
+  // The fixture's three points sit ~130 m apart, so these samples bracket them.
+  hrSeries: [[0, 120], [100, 140], [200, 160], [300, 170]],
+};
+
+test("⚠️ heart rate reaches Strava, attached by distance", () => {
+  const fn = lift("runStravaPayload") as (r: unknown) => any;
+  const p = fn(HR_RUN);
+  assert.equal(p.kind, "gpx");
+  assert.ok(p.hrPoints > 0, "no trackpoint carried a heart rate");
+  // ⚠️ Without the namespace declaration Strava ignores the extension silently — the upload succeeds
+  // and the heart rate is simply absent, which is indistinguishable from not having sent it.
+  assert.match(p.gpx, /xmlns:gpxtpx="http:\/\/www\.garmin\.com\/xmlschemas\/TrackPointExtension\/v1"/,
+    "the heart-rate namespace is missing, so Strava will drop the readings");
+  assert.match(p.gpx, /<gpxtpx:TrackPointExtension><gpxtpx:hr>\d+<\/gpxtpx:hr><\/gpxtpx:TrackPointExtension>/,
+    "the heart rate is not in the shape Strava reads");
+  for (const bpm of p.gpx.match(/<gpxtpx:hr>(\d+)<\/gpxtpx:hr>/g) || []) {
+    const n = Number(/(\d+)/.exec(bpm)![1]);
+    assert.ok(n >= 100 && n <= 180, "a heart rate outside the fixture's own range appeared: " + n);
+  }
+  assert.ok(!/NaN|undefined/.test(p.gpx), "the heart-rate maths produced a broken value");
+});
+
+test("⚠️ a run with no heart rate ships no heart-rate machinery at all", () => {
+  const fn = lift("runStravaPayload") as (r: unknown) => any;
+  const p = fn(RUN_WITH_TRACE);   // same run, no hrSeries
+  assert.equal(p.hrPoints, 0, "a run without heart rate reported some");
+  assert.ok(!p.gpx.includes("gpxtpx"), "a GPX advertises an extension it never carries");
+  // The plain trackpoints must be untouched by the heart-rate work.
+  assert.equal((p.gpx.match(/<time>/g) || []).length, 4, "adding heart rate changed the plain trackpoints");
+});
+
+test("⚠️ a heart-rate dropout is left as a gap, not interpolated across", () => {
+  // ⚠️ HealthKit stops delivering when the watch loses skin contact, so a wide gap between samples is
+  // missing evidence — not a slow change. Drawing a smooth line through it would fabricate a steady
+  // effort in somebody's training log, which is the rule this whole file exists to hold. Samples land
+  // every ~5s, so a 400 m gap is far beyond any real sampling interval.
+  const fn = lift("runStravaPayload") as (r: unknown) => any;
+  const dropout = { ...RUN_WITH_TRACE, hrSeries: [[0, 120], [5000, 175]] };
+  const p = fn(dropout);
+  const beats = (p.gpx.match(/<gpxtpx:hr>/g) || []).length;
+  assert.ok(beats <= 1,
+    `heart rate was invented across a dropout — ${beats} trackpoints got a reading from two samples 5 km apart`);
+});
+
 test("⚠️ the start time is taken from the run, never from now", () => {
   const html = page();
   const at = html.indexOf("function runStartMs(");

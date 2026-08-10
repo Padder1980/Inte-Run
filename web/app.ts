@@ -2571,6 +2571,10 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
   clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 #view:has(.sti-page) .sti-scope { margin: 10px 0 0; font-size: var(--t-meta); line-height: 1.55; color: var(--ink-faint); }
 #view:has(.sti-page) .sti-page > .card { margin-top: 12px; }
+#view:has(.sti-page) .sti-msg { margin: 12px 2px 0; padding: 11px 13px; border-radius: var(--r-ctl);
+  font-size: var(--t-meta); line-height: 1.55; color: var(--ink);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--line)); }
 #view:has(.sti-page) .sti-p, #view:has(.sti-page) .sti-small {
   font-size: var(--t-meta); line-height: 1.6; color: var(--ink-soft); margin: 0 0 10px; }
 #view:has(.sti-page) .sti-small { color: var(--ink-faint); margin-bottom: 14px; }
@@ -2625,6 +2629,21 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
   background: color-mix(in srgb, var(--rest) 7%, var(--surface-2));
   border: 1px solid color-mix(in srgb, var(--rest) 26%, var(--line)); }
 
+/* PRICE. ⚠️ A quiet inset with letter markers, NOT five coloured tiles: it is first aid, and the letters
+   are a memory aid rather than five things of equal weight. The accent marks them; the words carry them. */
+#view:has(.sti-page) .sti-price { margin: 12px 0 0; padding: 12px; border-radius: var(--r-ctl);
+  background: var(--surface-2); border: 1px solid var(--line); }
+#view:has(.sti-page) .sti-price-h { font-size: var(--t-label); font-weight: 760; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ink-faint); margin-bottom: 9px; }
+#view:has(.sti-page) .sti-prs { list-style: none; margin: 0; padding: 0; }
+#view:has(.sti-page) .sti-pr { display: flex; align-items: flex-start; gap: 11px; padding: 8px 0;
+  border-top: 1px solid var(--line); font-size: var(--t-meta); line-height: 1.55; color: var(--ink); }
+#view:has(.sti-page) .sti-pr:first-child { border-top: 0; padding-top: 0; }
+#view:has(.sti-page) .sti-pr-l { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid;
+  place-items: center; margin-top: 1px; font-family: var(--fig); font-size: var(--t-label);
+  font-weight: 760; color: var(--accent-ink); background: var(--accent); }
+#view:has(.sti-page) .sti-pr-b { color: var(--ink-soft); margin-top: 2px; }
+#view:has(.sti-page) .sti-pr-n { margin: 10px 0 0; font-size: var(--t-meta); line-height: 1.55; color: var(--ink-faint); }
 /* Green / amber / red. The words and an icon carry it; colour is the third signal. */
 #view:has(.sti-page) .sti-inset { margin-top: 12px; padding: 12px; border-radius: var(--r-ctl);
   background: var(--surface-2); border: 1px solid var(--line); }
@@ -5075,7 +5094,7 @@ function alfieIntents() {
   return [
     { k: ["sore", "should i run", "tired", "fatigued", "heavy legs", "rest day today", "skip"], a: () => {
       let r; try { r = RC.assessReadiness(readinessInput()); } catch (e) { r = null; }
-      return "<p>" + "<b>Mild awareness that stays stable</b>, does not change your stride and is no worse later or the next morning can be monitored on easy running. <b>Pain that sharpens, grows, causes a limp, or sits sharply on a bone is a stop signal.</b>" + "</p>" +
+      return "<p>" + "<b>Mild awareness that stays stable</b>, does not change your stride and is no worse later or the next morning can be monitored on easy running. <b>Pain that sharpens, grows, causes a limp, or sits sharply on a bone is a stop signal.</b> In the first 72 hours after a fresh sprain or strain, none of this applies \u2014 follow Support \u2192 <i>Injury &amp; symptoms</i> instead." + "</p>" +
         (r ? "<p>From your latest check-in, Inte-Run rates you <b>" + esc(r.headline) + "</b>. " + esc(r.recommendation) + "</p>" : "") +
         "<p>A good rule: if you\\u2019re unsure, run the <b>easy</b> version. Swapping a hard session for an easy one costs you almost nothing; training through a real injury costs weeks.</p>" +
         "<p class=\\"alf-dim\\">Tap \\u201cHow you feel\\u201d on Today to update your check-in.</p>";
@@ -5087,7 +5106,7 @@ function alfieIntents() {
         "<p>Go earlier or later in the day, take fluid with some sodium in it \\u2014 without over-drinking, since sodium doesn\\u2019t make excess fluid safe \\u2014 and give yourself 10\\u201314 days to acclimatise.</p>";
     } },
     { k: ["cold", "winter", "ice", "dark"], a: () => "<p>Cold running is mostly a kit problem: layer up, cover extremities, and be seen \\u2014 lights and reflective gear.</p><p>Warm up a bit longer than usual, and on ice shorten your stride and slow down. A missed session beats a fall.</p>" },
-    { k: ["injur", "hurt", "pain", "niggle", "ache"], a: () => "<p>The line worth holding: <b>Mild awareness that stays stable</b>, does not change your stride and is no worse later or the next morning can be monitored on easy running. <b>Pain that sharpens, grows, causes a limp, or sits sharply on a bone is a stop signal.</b></p><p>Swelling, night pain, or pain that\\u2019s getting worse week to week all mean stop and get assessed.</p><p>Taking three days off early is almost always cheaper than taking six weeks off later.</p><p class=\\"alf-dim\\">Support \\u2192 \\u201cWhen to stop and seek help\\u201d has a proper symptom checker.</p>" },
+    { k: ["injur", "hurt", "pain", "niggle", "ache"], a: () => "<p>The line worth holding: <b>Mild awareness that stays stable</b>, does not change your stride and is no worse later or the next morning can be monitored on easy running. <b>Pain that sharpens, grows, causes a limp, or sits sharply on a bone is a stop signal.</b> In the first 72 hours after a fresh sprain or strain, none of this applies \u2014 follow Support \u2192 <i>Injury &amp; symptoms</i> instead.</p><p>Swelling, night pain, or pain that\\u2019s getting worse week to week all mean stop and get assessed.</p><p>Taking three days off early is almost always cheaper than taking six weeks off later.</p><p class=\\"alf-dim\\">Support \\u2192 <i>Injury &amp; symptoms</i> has a step-by-step guide for a fresh sprain or strain, starting with the signs that need help today.</p>" },
     { k: ["next session", "next run", "what's next", "whats next", "next workout"], a: () => {
       const n = alfieNextSession();
       if (!n) return "<p>There\\u2019s nothing left scheduled in your plan \\u2014 nice work getting through it.</p>";
@@ -8117,10 +8136,10 @@ const GUIDES = [
     "When life squeezes your sleep or stress spikes, that's the week to take the easy option in training \\u2014 not the week to prove something.",
   ] },
   { t: "Niggles, aches and when to stop", k: "niggles", d: "The line between discomfort and injury", b: [
-    "<b>Mild awareness that stays stable</b>, does not change your stride and is no worse later or the next morning can be monitored on easy running. <b>Pain that sharpens, grows, causes a limp, or sits sharply on a bone is a stop signal.</b>",
+    "<b>Mild awareness that stays stable</b>, does not change your stride and is no worse later or the next morning can be monitored on easy running. <b>Pain that sharpens, grows, causes a limp, or sits sharply on a bone is a stop signal.</b> In the first 72 hours after a fresh sprain or strain, none of this applies \u2014 follow Support \u2192 <i>Injury &amp; symptoms</i> instead.",
     "Swelling, pain at night, or pain getting worse week on week all mean stop and get assessed properly.",
     "Taking three days off early is almost always cheaper than taking six weeks off later. Runners are consistently bad at this trade.",
-    "<b>This app is not a diagnosis.</b> Support \\u2192 <i>Injury &amp; symptoms</i> has a proper symptom checker, and a physiotherapist or GP beats any app when something hurts.",
+    "<b>This app is not a diagnosis.</b> Support \\u2192 <i>Injury &amp; symptoms</i> walks you through a fresh sprain or strain and lists the signs that need seeing today \\u2014 and a physiotherapist or GP beats any app when something hurts.",
   ] },
 ];
 // ---- Your data: backup, restore, and moving between devices -----------------------------------
@@ -9404,10 +9423,15 @@ function EMERGENCY_BANNER() {
  * screen that used to live on this route. Implements INTE-RUN_SOFT-TISSUE_INJURY_BRIEF.md.
  *
  * The product position, and every deviation from the usual consumer advice follows from it:
- *   Protect it briefly. Keep it gently moving. Rebuild load before you rebuild speed.
+ *   Use PRICE for first aid. Then keep it gently moving, and rebuild load before speed.
  *
- * ⚠️ NO ACRONYM. Not RICE, PRICE, POLICE or PEACE & LOVE. They read as a protocol and hide how weak
- * the evidence is for three of their four letters, which encourages treating every injury the same.
+ * ⚠️ PRICE IS THE OPENING FRAMEWORK — AND THIS HEADER USED TO SAY THE OPPOSITE. It read "NO ACRONYM.
+ * Not RICE, PRICE, POLICE or PEACE & LOVE", on the reasoning that an acronym reads as a protocol and
+ * hides how weak the evidence is for three of its letters. The owner reversed that on 2026-08-10:
+ * current NHS guidance recommends PRICE for the first two to three days, so it must be named. See
+ * stiPrice() below for the full reasoning and for what the old rule was protecting, all of which
+ * survives — R is explicitly not immobility, and none of I/C/E is sold as speeding repair.
+ * ⚠️ Do not re-ban it from this comment. That is the failure this paragraph now exists to prevent.
  *
  * ⚠️ ICE IS OPTIONAL PAIN RELIEF AND IS NEVER CALLED A TREATMENT. The 2024 BJSM critical review found
  * no human evidence that cooling limits secondary injury or speeds tissue repair. Saying "ice to heal
@@ -9420,12 +9444,18 @@ function EMERGENCY_BANNER() {
  * NEXT MORNING, because return-to-sport evidence does not support clearing by date. "Pain-free" is
  * never the only gate.
  *
- * ⚠️ THE STOP SCREEN IS NOT COLLAPSIBLE AND NOT A SECOND PAGE. It is the first thing under the hero,
- * always open. Hiding danger signs behind a tap, or behind a "check my symptoms" button, is how a
- * runner with a cold blue foot reads a recovery timeline instead.
+ * ⚠️ THE STOP SCREEN IS NOT COLLAPSIBLE, NOT A SECOND PAGE, AND NOTHING SELF-CARE SITS ABOVE IT. It is
+ * the first thing under the hero, always open. Hiding danger signs behind a tap, or behind a "check my
+ * symptoms" button, is how a runner with a cold blue foot reads a recovery timeline instead.
+ * ⚠️ THE PRICE BAND WAS BRIEFLY ABOVE IT AND HAD TO MOVE. The owner's requirement is explicit —
+ * "keep emergency and urgent warning signs visible above all self-care advice" — and "Use PRICE for
+ * first aid" is self-care advice however short it is. It now sits between the stop screen and the
+ * timeline, which announces the framework without putting anything in front of the danger signs.
  *
- * ⚠️ NOT REVIEWED BY A CLINICIAN YET. Owner's brief requires sign-off by a UK-registered sports
- * physiotherapist or sports-medicine clinician before public release.
+ * ⚠️ THE PRE-PRICE WORDING WAS CLINICALLY REVIEWED AND APPROVED (owner, 2026-08-10); THE PRICE REWRITE
+ * LATER THAT DAY HAS NOT ITSELF BEEN SIGNED OFF. It came from the updated brief's own clinical
+ * re-audit, and that brief still asks for a UK-registered sports physiotherapist or sports-medicine
+ * clinician to read the final page before release.
  */
 // A cross glyph rather than an invented ICON key: the icon set has no x, and a missing
 // ICON member renders as nothing at all with no error.
@@ -9441,7 +9471,7 @@ function stiStopScreen() {
     "You cannot take four steps or put useful weight through the leg.",
     "Swelling or bruising is large, growing quickly, or the pain is getting worse.",
     "You felt a pop or snap and now cannot push off, manage stairs, or rise onto your toes.",
-    "One calf is newly swollen, warm or red — especially without a clear injury.",
+    "One calf is newly swollen, warm or red — especially without a clear injury, or if you are pregnant, recently had surgery, have been immobile or on a long flight, or have had a clot before.",
     "There is an open wound or a fever, or the area is unusually hot and red.",
     "The pain sits sharply on a bone, wakes you at night, or began without one clear moment.",
   ];
@@ -9460,32 +9490,70 @@ function stiStopScreen() {
     'later, come back to this list — it applies at every stage, not just today.</p></section>';
 }
 /**
+ * PRICE — Protect, Relative rest, Ice, Compression, Elevation.
+ *
+ * ⚠️ THIS REVERSES THIS PROJECT'S PREVIOUS RULE, DELIBERATELY AND ON INSTRUCTION (owner, 2026-08-10):
+ * "ignore any earlier instruction saying not to use RICE or PRICE. Current NHS guidance recommends PRICE
+ * for the first two to three days, so PRICE must be clearly presented as the opening first-aid
+ * framework." The first version of this page BANNED the acronym and a test forbade it. That was wrong on
+ * the guidance: NHS "Sprains and strains" (reviewed April 2024) recommends PRICE for the first two to
+ * three days, Cambridge University Hospitals publishes PRICE instructions, and the British Red Cross
+ * still teaches RICE. An acronym a runner has already met is a memory aid, not a claim.
+ *
+ * ⚠️ WHAT WAS RIGHT IN THE OLD VERSION SURVIVES INTACT, and it is the harder half: the acronym is the
+ * OPENING FIRST AID, not a rehabilitation plan, its R means relative rest rather than immobility, and
+ * ice, compression and elevation may ease symptoms without being shown to repair tissue faster. Naming
+ * PRICE and being honest about it are not in conflict — presenting it as a complete protocol would be.
+ *
+ * ⚠️ EVERY NUMBER HERE IS A CLINICAL THRESHOLD FROM THE BRIEF, NOT A ROUNDED-OFF CONVENIENCE.
+ * 10–15 minutes per application, never beyond 20, at least two hours between. Do not tidy them.
+ */
+function stiPrice() {
+  const rows = [
+    ["P", "Protect", "Avoid the movement that caused it. Walk only as normally as you can — " +
+      "if you are limping heavily, take the weight off it and arrange an assessment."],
+    ["R", "Relative rest", "<b>Not complete immobility.</b> Pause running, jumping and heavy loading, " +
+      "but do not assume the leg has to stay completely still."],
+    ["I", "Ice, if it helps", "A cold pack <b>wrapped in a towel</b> for <b>10–15 minutes</b>, " +
+      "never longer than <b>20 minutes</b>, and <b>at least two hours</b> between applications. " +
+      "Optional, and for pain or swelling only."],
+    ["C", "Compression, if comfortable", "A light elastic wrap may support it or make swelling easier " +
+      "to manage. <b>Snug, never tight.</b> Take it off at night, and straight away if you get " +
+      "tingling, numbness, coldness or a change of colour."],
+    ["E", "Elevation", "Raise it while you are resting, if it is swelling."],
+  ].map((r) => '<li class="sti-pr">' +
+    '<span class="sti-pr-l" aria-hidden="true">' + r[0] + '</span>' +
+    '<div><b>' + r[1] + '</b><div class="sti-pr-b">' + r[2] + '</div></div></li>').join("");
+  return '<div class="sti-price"><div class="sti-price-h">PRICE — the first two to three days</div>' +
+    '<ul class="sti-prs">' + rows + '</ul>' +
+    '<p class="sti-pr-n">This is the opening first aid, not the whole recovery. Ice, compression and ' +
+    'elevation may make pain or swelling easier to live with, but <b>none of them has been shown to ' +
+    'speed up tissue repair</b> — so use them if they help you, and skip them if they do not.</p></div>';
+}
+/**
  * The six stages, as a real ordered list.
  * ⚠️ <ol> AND A "Stage n of 6" LABEL PER ITEM, not a row of styled divs. A screen-reader user needs to
  * know where they are in a sequence; the numbered circles are decoration of that fact, not the fact.
  */
 function stiTimeline() {
   const stages = [
-    { when: "Now", t: "Stop the run", body:
+    { when: "Now", t: "Stop, then start PRICE", body:
       '<ol class="sti-steps">' +
       '<li><b>Stop running.</b> Do not test it with one more kilometre.</li>' +
       '<li><b>Check the list above.</b> If none of it applies, move somewhere safe.</li>' +
-      '<li><b>Protect it.</b> Walk only as normally as you can. If you are limping heavily, take the ' +
-      'weight off it and arrange an assessment.</li>' +
-      '<li><b>For pain only:</b> a wrapped cold pack for 10–15 minutes can numb it in the first few ' +
-      'hours. Optional — it has not been shown to speed healing.</li>' +
-      '<li><b>If it is swelling:</b> raise it when you rest. A light wrap is optional if it feels supportive.</li>' +
-      '</ol>' +
-      '<p class="sti-safe"><b>Cold-pack safety:</b> never put ice straight on skin, never fall asleep ' +
-      'with it on, and do not use it where feeling or circulation is poor. Take it off if the skin goes ' +
-      'very pale, blotchy, painful or numb.</p>' },
+      '</ol>' + stiPrice() +
+      '<p class="sti-safe"><b>Cold-pack safety:</b> never put ice straight on skin, never use it for ' +
+      'longer than 20 minutes, never fall asleep with it on, and do not use it where feeling or ' +
+      'circulation is poor. Take it off if the skin goes very pale, blotchy, painful or numb.</p>' },
 
-    { when: "First 24 hours", t: "Calm it without freezing it still", body:
+    { when: "First 24 hours", t: "Keep PRICE going, and add gentle movement", body:
       '<ul class="sti-list">' +
       '<li>No running, jumping, hard strength work or stretching into pain.</li>' +
       '<li>Use <b>relative rest</b> — change what you do, rather than staying completely still all day.</li>' +
-      '<li>A few times through the day, gently bend and straighten it through a comfortable range. ' +
-      'Stop before sharp pain.</li>' +
+      '<li>If cold helps, repeat a wrapped cold pack for <b>10–15 minutes</b>, leaving <b>at least two ' +
+      'hours</b> between applications. It is for symptom relief, not faster healing.</li>' +
+      '<li><b>You do not have to wait 72 hours to start moving.</b> A few times through the day, gently ' +
+      'bend and straighten it through a comfortable range. Stop before sharp pain.</li>' +
       '<li>If a wrap helps, keep it snug rather than tight and take it off at night. Remove it at once ' +
       'for tingling, numbness, coldness or a colour change.</li>' +
       '<li>Eat normally, drink to thirst, and sleep. Recovery needs energy — this is not the time to ' +
@@ -9496,6 +9564,9 @@ function stiTimeline() {
     { when: "24–72 hours", t: "Restore normal movement", body:
       '<ul class="sti-list">' +
       '<li>Keep running paused while you have a limp, rising swelling, or pain that grows as you do more.</li>' +
+      '<li>Carry on with the <b>ice, compression and elevation</b> parts of PRICE only while they make ' +
+      'pain or swelling easier to manage. They are optional — <b>movement is the important ' +
+      'progression</b>.</li>' +
       '<li>Do a little more normal walking and daily movement, as long as it stays comfortable and is ' +
       'no worse later that day or the next morning.</li>' +
       '<li>Start gentle muscle work without holding your breath or pushing into sharp pain — lightly ' +
@@ -9596,12 +9667,13 @@ function stiFirstRun() {
     '<p class="sti-safe"><b>Stop the run if</b> pain grows or sharpens, your stride changes, the leg ' +
     'feels unstable, or the same spot is clearly worse with every interval.</p></section>';
 }
-/** ⚠️ A quiet --surface-2 inset with small crosses, not a wall of red. Ten items is a lot of "do not". */
+/** ⚠️ A quiet --surface-2 inset with small crosses, not a wall of red. Eleven items is a lot of "do not". */
 function stiWhatNot() {
   const items = [
     ["Do not run through pain that sharpens or changes your stride.", "Fitness is easier to rebuild than a re-injury."],
-    ["Do not completely rest a simple injury for days.", "Protect it briefly, then get comfortable movement back."],
-    ["Do not keep icing to speed healing.", "Cold may numb pain; human evidence has not shown it repairs tissue faster."],
+    ["Do not read the R in PRICE as complete bed rest.", "Protect it, then get comfortable movement back as pain allows."],
+    ["Do not use ice as a test of whether it is safe to run on.", "Cold may ease pain or swelling; human evidence has not shown it repairs tissue faster."],
+    ["Do not put ice straight on skin, or leave it on for more than 20 minutes.", "Stop if the skin goes numb, painful, very pale or blotchy."],
     ["Do not use a tight bandage.", "Off at night, and off immediately for numbness, tingling, coldness or colour change."],
     ["Do not use heat, alcohol or deep massage in the first 48 hours if it is actively swelling or bruising.", "Warmth may feel good later, but it is not a proven cure."],
     ["Do not force a stretch into pain, or try to stretch out a tear.", "Get the range back gradually instead."],
@@ -9631,6 +9703,41 @@ function stiPainRelief() {
     '<p>Follow the label, and do not combine two products containing the same ingredient.</p>' +
     '</div></details>';
 }
+/**
+ * "Why this advice?" — the brief's compact evidence drawer.
+ *
+ * ⚠️ ITS JOB IS TO SAY WHERE THE EVIDENCE IS WEAK, not to look authoritative. This page tells a runner to
+ * do several things that consumer advice states far more confidently than the trials justify, and a
+ * drawer that only listed sources would lend borrowed authority to exactly those claims. So it names the
+ * disagreement: current UK first-aid guidance recommends PRICE, and the recent human evidence for the
+ * ice/compression/elevation part of it is weak or indirect. Both are true, and a runner is entitled to
+ * know that is why the wording hedges rather than assuming the app is being vague.
+ */
+function stiWhy() {
+  return '<details class="card sti-det"><summary class="sti-sum">Why this advice?</summary>' +
+    '<div class="guide-body sti-det-b">' +
+    '<p><b>PRICE is here because current UK guidance recommends it.</b> The NHS advises PRICE for the ' +
+    'first two to three days after a sprain or strain, hospital physiotherapy departments publish the ' +
+    'same instructions, and first-aid training still teaches it. It is a memory aid for the first couple ' +
+    'of days, and it is genuinely useful as one.</p>' +
+    '<p><b>The honest part is what it does and does not do.</b> A 2024 review in the British Journal of ' +
+    'Sports Medicine found no human evidence that cooling limits further damage or helps tissue rebuild, ' +
+    'though it may ease pain early on. International first-aid reviewers rate the evidence for ' +
+    'compression as very low certainty, and say compression or no compression are both reasonable. So ' +
+    'this page offers all of it for comfort, and none of it as a cure.</p>' +
+    '<p><b>Movement is the part with the stronger case.</b> Guidance and clinical reviews agree on a ' +
+    'short period of protection followed by early movement within comfort, rather than immobilising a ' +
+    'simple sprain. That is why the plan has you moving gently in the first day instead of waiting for ' +
+    'the PRICE window to end.</p>' +
+    '<p><b>Returning to running is judged on function, not dates.</b> Reviews of getting back after ' +
+    'hamstring injuries and after ankle sprains agree that pain alone is not enough — strength, range, ' +
+    'impact tolerance and confidence all matter. The walk–run here is deliberately conservative, and it ' +
+    'is a starting point rather than a prescription for your particular injury.</p>' +
+    '<p class="sti-small" style="margin-bottom:0">Reviewed against NHS, hospital physiotherapy and ' +
+    'first-aid guidance current in August 2026, alongside human research published in the two years ' +
+    'before that. The hour-by-hour timings are a safe synthesis rather than a validated schedule.</p>' +
+    '</div></details>';
+}
 function redflagsView() {
   return EMERGENCY_BANNER() +
     '<div class="sti-page">' +
@@ -9644,10 +9751,13 @@ function redflagsView() {
         'sharply on a bone, needs different advice.</p>' +
       '</div>' +
       stiStopScreen() +
+      '<div class="sti-msg"><b>Use PRICE for first aid. Then keep it gently moving, and rebuild load ' +
+      'before speed.</b></div>' +
       stiTimeline() +
       stiFirstRun() +
       stiWhatNot() +
       stiPainRelief() +
+      stiWhy() +
       '<p class="sti-foot"><span class="ui-pill">Evidence reviewed 10 August 2026</span> ' +
       'This guide covers new, closed sprains, strains and bruises in the leg. It does not diagnose an ' +
       'injury and does not replace being examined.</p>' +

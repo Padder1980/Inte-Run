@@ -8,10 +8,13 @@ import { readFileSync } from "node:fs";
  * ⚠️ THESE ARE THE CLINICAL INVARIANTS FROM THE BRIEF, not styling checks. Each one is a claim the page
  * must not make, or a gate it must not drop — the kind of thing that reads fine, ships, and is wrong.
  *
- * ✅ CLINICALLY REVIEWED AND APPROVED — the owner confirmed on 2026-08-10 that the wording has been through
- * clinical review and is cleared to ship. ⚠️ THAT APPROVAL IS OF THE WORDING AS IT STANDS, so it does not
- * travel with a rewrite: anything that materially changes the clinical meaning needs re-reviewing before it
- * ships, and these guards are what tell you a change was material rather than editorial.
+ * ✅ THE PRE-PRICE WORDING WAS REVIEWED AND APPROVED (owner, 2026-08-10). ⚠️ AND THE PRICE REWRITE LATER
+ * THE SAME DAY IS NEWER THAN THAT SIGN-OFF. It is sourced — the updated brief carries its own clinical
+ * re-audit reconciling the page with current NHS and British Red Cross PRICE/RICE guidance — but the same
+ * brief still asks for a clinician to read the final page before release, so the first-aid wording below
+ * has not itself been signed off. This is the condition the earlier note predicted: an approval covers the
+ * wording as it stands and does not travel with a rewrite. These guards are what tell you a change was
+ * material rather than editorial; a failure here means go back, not relax the assertion.
  */
 const page = () => readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
 
@@ -43,8 +46,8 @@ function guide(): string {
   const at = html.indexOf("function redflagsView()");
   assert.ok(at > 0, "redflagsView is gone");
   // Every builder the view composes, plus the view itself.
-  const names = ["stiStopScreen", "stiTimeline", "stiLoadRule", "stiGates", "stiFirstRun",
-    "stiWhatNot", "stiPainRelief", "redflagsView"];
+  const names = ["stiStopScreen", "stiPrice", "stiTimeline", "stiLoadRule", "stiGates", "stiFirstRun",
+    "stiWhatNot", "stiPainRelief", "stiWhy", "redflagsView"];
   return names.map((n) => {
     const s = html.indexOf("function " + n + "(");
     assert.ok(s > 0, "no function " + n);
@@ -79,8 +82,13 @@ test("⚠️ nothing is promised to speed healing", () => {
   // ⚠️ THE EASIEST UNTRUTH ON THIS PAGE. The 2024 BJSM critical review found no human evidence that
   // cooling limits secondary injury or speeds repair, yet "ice to heal faster" is what most consumer
   // advice says. Ice, compression, elevation, heat and massage are comfort measures here, never cures.
-  assert.match(g, /has not been shown to speed healing/i,
+  assert.match(g, /has not been shown to speed healing|has not shown it repairs tissue faster/i,
     "the cold-pack line does not say plainly that it has not been shown to speed healing");
+  // ⚠️ AND THE PRICE BLOCK ITSELF MUST CARRY IT. Naming a framework the NHS recommends is the moment the
+  // page is most likely to be read as endorsement, so the disclaimer sits inside the block rather than
+  // somewhere further down the page.
+  assert.match(fn("stiPrice"), /none of them has been shown to speed up tissue repair/i,
+    "the PRICE block offers ice, compression and elevation without saying they are not proven to heal");
   assert.match(g, /not a proven cure/i, "heat/massage are not qualified as unproven");
   // No claim of the opposite shape anywhere.
   const claims = /(speeds? (up )?(healing|recovery|repair)|heals? faster|reduces? healing time|repairs? tissue faster)/gi;
@@ -92,16 +100,95 @@ test("⚠️ nothing is promised to speed healing", () => {
   }
 });
 
-test("⚠️ no acronym protocol, and relative rest is defined where it is used", () => {
+test("⚠️ PRICE is the opening framework, every letter is explained, and R is not immobility", () => {
+  // ⚠️ THIS TEST REPLACED AN INVERTED ONE, ON INSTRUCTION (owner, 2026-08-10). Its first version FORBADE
+  // the acronym — "no RICE, PRICE, POLICE or PEACE & LOVE" — on the reasoning that an acronym reads as a
+  // protocol with uniform evidence behind it. That was wrong on the guidance: the NHS recommends PRICE
+  // for the first two to three days, hospital physiotherapy departments publish it, and the British Red
+  // Cross still teaches RICE. Deleting the assertion would have been the lazy fix; what it was actually
+  // protecting — R is not bed rest, and none of I/C/E is sold as a cure — is asserted here instead.
   const g = guide();
-  // RICE/PRICE/POLICE/PEACE & LOVE read as a protocol and hide how weak the evidence is for most of it.
-  for (const a of ["RICE", "PRICE", "POLICE", "PEACE & LOVE", "PEACE AND LOVE"])
-    assert.ok(!g.includes(a), "the guide presents " + a + " as a branded protocol");
+  const price = fn("stiPrice");
+  assert.match(g, /PRICE/, "PRICE is not presented at all");
+  assert.match(fn("stiTimeline"), /Stop, then start PRICE/,
+    "PRICE is not the opening stage of the timeline");
+  // Every letter, named and explained.
+  for (const [letter, word] of [["P", "Protect"], ["R", "Relative rest"], ["I", "Ice"],
+    ["C", "Compression"], ["E", "Elevation"]] as Array<[string, string]>) {
+    // ⚠️ ASSERTED ON THE SOURCE'S DATA, NOT ON RENDERED MARKUP. guide() extracts the builder's SOURCE, so
+    // the letter reaches the page through r[0] and the string ">P<" never appears in it — a marker regex
+    // would fail on a perfectly correct page, which is the kind of guard that gets deleted rather than fixed.
+    assert.match(price, new RegExp('\\["' + letter + '",\\s*"' + word.split(",")[0]),
+      "PRICE has no row for " + letter + " (" + word + ")");
+    assert.match(price, /class="sti-pr-l"/, "the PRICE letters have no marker element");
+  }
+  // ⚠️ R IS THE LETTER THAT DOES HARM IF MISREAD, so it is explained twice: in PRICE and in the
+  // what-not-to-do list, and both must say it is not immobility.
+  assert.match(price, /Not complete immobility/i, "the R in PRICE is not qualified");
+  assert.match(g, /Do not read the R in PRICE as complete bed rest/i,
+    "nothing corrects the bed-rest reading of PRICE");
   assert.match(g, /relative rest/i, "the guide never says relative rest");
-  // ⚠️ Defined in the same breath — a runner meeting the phrase cold will read it as "rest".
   const at = g.toLowerCase().indexOf("relative rest");
-  assert.match(g.slice(at, at + 160), /change what you do/i,
+  assert.match(g.slice(at, at + 200), /[Nn]ot complete immobility|change what you do/i,
     "relative rest is used without being explained immediately");
+  // ⚠️ AND IT IS FIRST AID, NOT A REHAB PLAN. Presenting the acronym as the whole recovery is the thing
+  // the original ban was reaching for, and it is the claim that would actually mislead somebody.
+  assert.match(price, /opening first aid, not the whole recovery/i,
+    "PRICE is not bounded as first aid rather than a full plan");
+});
+
+test("⚠️ every ice threshold from the brief is on the page, exactly", () => {
+  // ⚠️ THESE ARE CLINICAL THRESHOLDS, NOT ROUNDED-OFF COPY. 10–15 minutes per application, a hard cap of
+  // 20, and at least two hours between. A guide that says "ice it for a bit" is not the same document.
+  const g = guide();
+  assert.match(g, /10–15 minutes/, "the per-application window is missing");
+  // ⚠️ THE CAP, NOT THE NUMBER. Written with the phrasing in an OPTIONAL group this reduced to /20
+  // minutes/, so softening "never longer than 20 minutes" to "up to 20 minutes" — which turns a hard
+  // ceiling into a target, a change of clinical meaning — left it green while the failure message still
+  // claimed to be checking the cap. Its two sibling thresholds were unconditional; this one was not.
+  assert.match(g, /never (use it for )?longer than (<b>)?20 minutes/i, "the 20-minute cap is missing");
+  assert.ok(!/up to 20 minutes|for 20 minutes/i.test(g),
+    "the 20-minute ceiling is phrased as a target rather than a limit");
+  assert.match(g, /at least two hours/i, "the gap between applications is missing");
+  assert.match(g, /wrapped|wrap a cold pack|wrapped in a towel/i, "nothing says to wrap the pack");
+  // The cap and the gap each appear where a runner would act on them, not only in the safety note.
+  assert.match(fn("stiPrice"), /never longer than (<b>)?20 minutes/i, "the PRICE block omits the 20-minute cap");
+  assert.match(fn("stiPrice"), /at least two hours/i, "the PRICE block omits the two-hour gap");
+  assert.match(fn("stiTimeline"), /at least two hours/i,
+    "the first-24-hours stage does not say how long to leave between cold packs");
+  // Cold-pack safety, in full.
+  for (const rule of ["straight on skin", "fall asleep", "circulation"])
+    assert.ok(g.toLowerCase().includes(rule), "the cold-pack safety note omits: " + rule);
+  // ⚠️ COMPRESSION CARRIES ITS CIRCULATION WARNING IN THE SAME BREATH AS THE INSTRUCTION. A wrap told
+  // about on one screen and warned about on another is a wrap left on overnight.
+  const comp = fn("stiPrice");
+  const ci = comp.indexOf("Compression");
+  assert.match(comp.slice(ci, ci + 420), /tingling|numbness|coldness|colour/i,
+    "compression is offered without a circulation warning beside it");
+  assert.match(comp.slice(ci, ci + 420), /[Ss]nug, never tight/,
+    "compression does not say snug rather than tight");
+  // Elevation is tied to resting and to swelling, which is the whole of its instruction.
+  const ei = comp.indexOf("Elevation");
+  assert.match(comp.slice(ei, ei + 200), /resting/i, "elevation is not tied to resting");
+  assert.match(comp.slice(ei, ei + 200), /swell/i, "elevation is not tied to swelling");
+});
+
+test("⚠️ gentle movement is NOT gated on 72 hours", () => {
+  // ⚠️ THE MOST LIKELY MISREADING OF A PRICE-LED PAGE. Naming a "first two to three days" framework
+  // invites a runner to hold still until it is over, and the guidance says the opposite: protect briefly,
+  // then move within comfort. So the first-24-hours stage has to carry the movement instruction, and say
+  // out loud that waiting is not required.
+  const tl = fn("stiTimeline");
+  const first = tl.slice(tl.indexOf('when: "First 24 hours"'), tl.indexOf('when: "24–72 hours"'));
+  assert.ok(first.length > 300, "the first-24-hours slice is wrong");
+  assert.match(first, /do not have to wait 72 hours/i,
+    "nothing tells the runner they can start moving before 72 hours");
+  assert.match(first, /gently bend and straighten/i, "the first 24 hours prescribes no movement at all");
+  // And from 24–72 hours the acronym becomes optional while movement becomes the progression.
+  const second = tl.slice(tl.indexOf('when: "24–72 hours"'), tl.indexOf('when: "Days 3–7"'));
+  assert.match(second, /optional/i, "ice, compression and elevation are not marked optional later on");
+  assert.match(second, /movement is the important progression/i,
+    "nothing says movement matters more than the ice and the wrap");
 });
 
 test("⚠️ return to running is gated on function, never on a date", () => {

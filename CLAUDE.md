@@ -709,14 +709,24 @@ TestFlight. If that ordering ever changes, revisit this.
 `Support › Private check-ins › Injury & symptoms` was a consent line and ten tick-boxes, which answered
 "is this worth mentioning to somebody?" and nothing else. It is now a chronological guide to a NEW,
 CLOSED lower-limb sprain, strain or bruise, after screening for the things that must not be
-self-managed. **✅ CLINICALLY REVIEWED AND APPROVED — the owner confirmed on 2026-08-10 that it has been
-through clinical review and is cleared to ship.** ⚠️ **THE APPROVAL IS OF THE WORDING AS IT STANDS AND DOES
+self-managed. **✅ THE PRE-PRICE WORDING WAS REVIEWED AND APPROVED** — the owner confirmed on 2026-08-10
+that it had been through clinical review and was cleared to ship.
+⚠️ **THE PRICE REWRITE LATER THE SAME DAY IS NEWER THAN THAT SIGN-OFF, AND HAS NOT ITSELF BEEN SIGNED
+OFF.** It came from the updated brief's own "Clinical re-audit: 10 August 2026 — reconciled with current
+NHS and British Red Cross PRICE/RICE guidance", so it is not an unsourced change — but that same brief
+re-asserts in §1 that the page "requires a final review by a UK-registered sports physiotherapist or
+sports-medicine clinician before release". Do not let the earlier ✅ be read as covering the PRICE copy.
+Flagged to the owner rather than quietly inherited, because he explicitly asked for any change to the
+clinical wording or thresholds to be flagged for review. ⚠️ **THE APPROVAL IS OF THE WORDING AS IT STANDS AND DOES
 NOT TRAVEL WITH A REWRITE.** Change what a sentence claims — not how it is phrased — and it needs
 re-reviewing. `test/soft-tissue-guide.test.ts` is the line between the two: a failure there is a change of
 clinical meaning, and it is the signal to go back rather than to relax the assertion.
 
 The product position, and every decision follows from it:
-> Protect it briefly. Keep it gently moving. Rebuild load before you rebuild speed.
+> Use PRICE for first aid. Then keep it gently moving, and rebuild load before speed.
+
+(It is on the page, in a band under the hero. It replaced *"Protect it briefly. Keep it gently moving.
+Rebuild load before you rebuild speed."* when PRICE became the named opening framework.)
 
 ⚠️ **THE `redflags` ID, ROUTE, HEART ICON AND HUB POSITION ARE UNCHANGED — an explicit constraint.** The
 brief asked for a replacement, not a new destination: a second card splits one question across two
@@ -730,15 +740,47 @@ a keyword list, so they live in an invisible field. A card added without one is 
 
 ### The clinical rules, which are the whole feature
 
-⚠️ **NO ACRONYM PROTOCOL — no RICE, PRICE, POLICE or PEACE & LOVE, and a test forbids all four.** They
-read as a protocol with uniform evidence behind them, and the evidence is not uniform. "Relative rest" is
-used instead, and it is **defined in the same breath** ("change what you do"), because a runner meeting
-the phrase cold reads it as "rest".
+⚠️ **PRICE IS THE OPENING FRAMEWORK — AND THIS REVERSES THE RULE THIS FILE CARRIED FOR ONE DAY.** The
+first version of the page BANNED the acronym and `test/soft-tissue-guide.test.ts` forbade RICE, PRICE,
+POLICE and PEACE & LOVE outright, on the reasoning that an acronym reads as a protocol with uniform
+evidence behind it. **That was wrong on the guidance, and the owner corrected it on 2026-08-10:** *"ignore
+any earlier instruction saying not to use RICE or PRICE. Current NHS guidance recommends PRICE for the
+first two to three days, so PRICE must be clearly presented as the opening first-aid framework."* NHS
+"Sprains and strains" (reviewed April 2024) recommends PRICE, Cambridge University Hospitals publishes
+PRICE instructions, and the British Red Cross still teaches RICE. An acronym a runner has already met is a
+memory aid, not a claim.
 
-⚠️ **ICE IS A COMFORT MEASURE, NOT A TREATMENT, AND SAYING SO IS THE HARDEST LINE ON THE PAGE.** The
-guide states plainly that cooling **"has not been shown to speed healing"**; heat and massage are "not a
-proven cure". This is the opposite of almost all consumer advice, so `test/soft-tissue-guide.test.ts`
-sweeps for any healing-speed claim and requires a negation within 70 characters of it.
+⚠️ **WHAT THE BAN WAS PROTECTING SURVIVES INTACT, AND THAT IS THE POINT OF HOW IT WAS REPLACED.** The
+assertion was not deleted, it was inverted and made specific — `stiPrice()` must name and explain every
+letter; **R must say "Not complete immobility"** in the block AND be corrected again in the
+what-not-to-do list; and the block must state that **none of ice, compression or elevation has been shown
+to speed up tissue repair**, inside the block rather than further down the page, because naming a
+framework the NHS recommends is the moment the page is most likely to be read as blanket endorsement.
+Deleting the assertion would have been the lazy fix for a failing test.
+⚠️ "Relative rest" is still used and still **defined in the same breath**, because a runner meeting the
+phrase cold reads it as "rest".
+
+⚠️ **EVERY ICE NUMBER IS A CLINICAL THRESHOLD, NOT ROUNDED-OFF COPY.** Wrapped, **10–15 minutes** per
+application, **never longer than 20**, **at least two hours** between, and only while it helps pain or
+swelling. Guarded individually, and the cap and the gap must appear where a runner acts on them (the PRICE
+block and the first-24-hours stage) rather than only in the safety note.
+
+⚠️ **AND GENTLE MOVEMENT IS NOT GATED ON 72 HOURS — the most likely misreading of a PRICE-led page.**
+Naming a "first two to three days" framework invites somebody to hold still until it is over, and the
+guidance says the opposite: protect briefly, then move within comfort. The first-24-hours stage says *"You
+do not have to wait 72 hours to start moving"* in as many words, and from 24–72 hours ice, compression and
+elevation become explicitly optional while **movement is the important progression**. Both guarded.
+
+⚠️ **A "Why this advice?" DRAWER EXISTS TO SAY WHERE THE EVIDENCE IS WEAK**, not to look authoritative. It
+names the disagreement out loud: UK first-aid guidance recommends PRICE, and the recent human evidence for
+the ice/compression/elevation part of it is weak or indirect. A drawer that only listed sources would lend
+borrowed authority to exactly the claims the copy deliberately hedges.
+
+⚠️ **ICE IS OFFERED, AND IT IS A COMFORT MEASURE RATHER THAN A TREATMENT — both halves ship together.**
+The guide states plainly that cooling **"has not been shown to speed healing"**; heat and massage are "not
+a proven cure". Consumer advice is far more confident about this than the trials justify, so
+`test/soft-tissue-guide.test.ts` sweeps for any healing-speed claim and requires a negation within 70
+characters of it.
 
 ⚠️ **NO DOSE, NO BRAND, NO PRESCRIPTION-STRENGTH DRUG.** Paracetamol and topical anti-inflammatories are
 named (following NHS advice) and only ever beside the caveat that they **do not make the injury safe to

@@ -9,6 +9,9 @@ voice-dev/audition/
 # The served coach audio lives in docs/voices (committed). web/voices is the local
 # generation source that the build mirrors to docs — regenerate it, don't commit it.
 web/voices/
+# The anatomical stretch frames are mirrored from assets/anatomical-stretch-motion/assets/frames
+# into docs/stretch-frames (committed, Pages-served) and web/stretch-frames (local serving only).
+web/stretch-frames/
 *.tsbuildinfo
 .DS_Store
 # Verification marker (this project's own gate signal; not source)

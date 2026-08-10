@@ -4681,6 +4681,39 @@ const ALFIE_GREETING = "Hi, I\\u2019m Alfie \\u2014 your running coach in the ap
 const ALFIE_CHIPS = ["What\\u2019s my next session?", "How\\u2019s my week looking?", "What pace should I run easy?", "Should I run if I\\u2019m sore?", "What is a threshold run?", "How far away is my race?"];
 function alfieCfg() { try { return JSON.parse(localStorage.getItem("interun_alfie_v1") || "null") || { proxy: "" }; } catch (e) { return { proxy: "" }; } }
 function alfieSaveCfg(c) { try { localStorage.setItem("interun_alfie_v1", JSON.stringify(c)); } catch (e) {} }
+/**
+ * Where Alfie asks its questions. Same shape as STRAVA_SERVER and the same ONE Worker — so filling
+ * this in is what turns Alfie from the on-device answers into open conversation for every runner,
+ * with nothing to paste.
+ * ⚠️ IT IS EMPTY UNTIL THE SERVER HAS AN ANTHROPIC KEY. Pointed at a Worker with no key, every
+ * question costs a round trip and falls back anyway — slower than not trying. Filled in by hand once
+ * the key is set, not by the Strava setup script.
+ */
+const ALFIE_SERVER = "";
+function alfieBase() {
+  let url = "";
+  try { url = String(alfieCfg().proxy || ALFIE_SERVER || "").trim(); } catch (e) { url = ""; }
+  return url ? url.replace(/\\/+$/, "") : "";
+}
+/**
+ * An opaque id for THIS install, so the server can bound how much one device spends.
+ * ⚠️ NOT A CREDENTIAL, and deliberately not the Strava device key. That key authorises uploads to a
+ * runner's Strava account; this one only consumes a question quota, and reusing the Strava key here
+ * would send a real credential on every Alfie question for no reason.
+ */
+function alfieDevice() {
+  const cfg = alfieCfg();
+  if (cfg.device) return String(cfg.device);
+  try {
+    const raw = new Uint8Array(16);
+    crypto.getRandomValues(raw);
+    let s = "";
+    for (let i = 0; i < raw.length; i++) s += String.fromCharCode(raw[i]);
+    cfg.device = btoa(s).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/, "");
+  } catch (e) { return "anonymous"; }
+  alfieSaveCfg(cfg);
+  return String(cfg.device);
+}
 let ALFIE_MSGS = [];
 function alfieLoadMsgs() { try { const a = JSON.parse(localStorage.getItem("interun_alfie_msgs") || "[]"); return Array.isArray(a) ? a.slice(-30) : []; } catch (e) { return []; } }
 function alfieSaveMsgs() { try { localStorage.setItem("interun_alfie_msgs", JSON.stringify(ALFIE_MSGS.slice(-30))); } catch (e) {} }
@@ -4871,10 +4904,11 @@ function alfiePlanContext() {
 }
 function alfieRemote(question) {
   const cfg = alfieCfg();
-  if (!cfg.proxy) return Promise.reject(new Error("no proxy"));
-  return fetch(cfg.proxy, {
+  const base = alfieBase();
+  if (!base) return Promise.reject(new Error("no proxy"));
+  return fetch(base, {
     method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ question: question, context: alfiePlanContext(), history: ALFIE_MSGS.slice(-8) }),
+    body: JSON.stringify({ question: question, context: alfiePlanContext(), history: ALFIE_MSGS.slice(-8), device: alfieDevice() }),
   }).then((r) => r.ok ? r.json() : Promise.reject(new Error("http " + r.status))).then((d) => {
     if (!d || !d.answer) throw new Error("bad reply");
     return "<p>" + esc(d.answer).split("\\n\\n").join("</p><p>").split("\\n").join("<br>") + "</p>";
@@ -7482,7 +7516,7 @@ function viewSupport() {
  * this build. If any of that changes, this page changes in the same commit.
  */
 function safetyView() {
-  const proxy = (function () { try { return !!(alfieCfg() || {}).proxy; } catch (e) { return false; } })();
+  const proxy = (function () { try { return !!alfieBase(); } catch (e) { return false; } })();
   return EMERGENCY_BANNER() +
     '<h2 class="sec" style="margin-top:0">Safety, privacy &amp; human help</h2>' +
     '<div class="card sf-c"><div class="subhead" style="margin-top:0">What this app is not</div>' +
@@ -7947,7 +7981,7 @@ function stravaBase() {
   // A pasted override wins (so a second server can be tried without a rebuild), then the shipped
   // default, then Alfie's proxy — one Worker does both, so an Alfie URL already points at Strava.
   let url = "";
-  try { url = String(stravaCfg().proxy || STRAVA_SERVER || (alfieCfg() || {}).proxy || "").trim(); } catch (e) { url = ""; }
+  try { url = String(stravaCfg().proxy || STRAVA_SERVER || alfieBase() || "").trim(); } catch (e) { url = ""; }
   return url ? url.replace(/\\/+$/, "") : "";
 }
 function stravaDeviceKey() {

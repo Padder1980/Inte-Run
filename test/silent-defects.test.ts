@@ -688,7 +688,7 @@ test("⚠️ the safety page states only what the code actually does", () => {
   assert.match(fn, /weather/i, "the weather request is not disclosed");
   assert.match(fn, /map tiles/i, "the map tile request is not disclosed");
   // ⚠️ And it must adapt if the runner has pointed Alfie at their own service.
-  assert.match(fn, /alfieCfg\(\) \|\| \{\}\)\.proxy/, "the Alfie claim is fixed rather than read from config");
+  assert.match(fn, /!!alfieBase\(\)/, "the Alfie claim is fixed rather than read from config");
   assert.match(fn, /EMERGENCY_BANNER\(\)/, "the emergency route is missing from the safety page");
 });
 

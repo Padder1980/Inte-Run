@@ -17,3 +17,15 @@ compatibility_flags = ["nodejs_compat"]
 [[kv_namespaces]]
 binding = "STRAVA"
 id = "52ff9e8a2b944d058efabc3abe33ad1c"
+
+# ⚠️ KV CANNOT STOP A BURST, AND THAT IS WHY THIS BINDING EXISTS. KV reads are eventually consistent —
+# cached at the edge for up to a minute — so rapid successive questions all read the same stale count
+# and sail past a KV-only cap. Measured against the deployed Worker: 31 requests in a few seconds left
+# the counter reading 21 and never tripped a limit of 30. This binding is Cloudflare's own counter and
+# is accurate at seconds resolution, so it owns the burst; KV still owns the daily budget, where a
+# minute of lag does not matter.
+[[unsafe.bindings]]
+name = "BURST"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 12, period = 60 }

@@ -165,7 +165,7 @@ test("⚠️ Strava is one tap for everybody else — the address ships with the
   assert.match(html, /const STRAVA_SERVER = "/, "there is no shipped server address at all");
   // A pasted override must still win, so a second server can be tried without a rebuild.
   assert.match(fn("stravaBase"),
-    /stravaCfg\(\)\.proxy \|\| STRAVA_SERVER \|\| \(alfieCfg\(\) \|\| \{\}\)\.proxy/,
+    /stravaCfg\(\)\.proxy \|\| STRAVA_SERVER \|\| alfieBase\(\)/,
     "the shipped default does not sit between the hand-set override and Alfie's proxy");
   // ⚠️ AND WHENEVER IT IS FILLED IN, IT MUST BE https. The device key travels on that URL, so a plain
   // http address is a key handed to anyone on the same café network. This guard is dormant while the

@@ -36,6 +36,25 @@ for (const slug of EX_ANIM_SLUGS) {
   try { exStillData[slug] = "data:image/webp;base64," + readFileSync(join(stillDir, slug + ".webp")).toString("base64"); } catch { /* still optional */ }
 }
 
+// Anatomical stretch-motion frames — the supplied version-2 artwork, used UNCHANGED. Inlined as data
+// URIs (not served as files) so the app stays a single self-contained page with no external network
+// assets, which is the rule everything but the coach audio follows — and so the artwork appears in the
+// artifact preview, where a relative fetch has nothing to resolve against. Four frames per stretch,
+// keyed by the anatomical id; the runtime's ASM controller plays them per the ported component.
+const STRETCH_ANAT_IDS = [
+  "standing-quad", "standing-hamstring", "wall-calf", "kneeling-hip-flexor", "figure-four-glute", "childs-pose",
+];
+const stretchFramesDir = join(here, "..", "assets", "anatomical-stretch-motion", "assets", "frames");
+const stretchFrameData: Record<string, string[]> = {};
+for (const anat of STRETCH_ANAT_IDS) {
+  stretchFrameData[anat] = [];
+  for (let n = 1; n <= 4; n++) {
+    stretchFrameData[anat].push(
+      "data:image/png;base64," + readFileSync(join(stretchFramesDir, anat, "0" + n + ".png")).toString("base64"),
+    );
+  }
+}
+
 // Inte-Run brand mark — an original glyph: a teal badge holding a forward-striding runner (head dot +
 // two motion bars leaning into the run). Not derived from any other app's logo.
 const BRAND_MARK = `<svg viewBox="0 0 120 120" width="104" height="104" role="img" aria-label="Inte-Run">
@@ -2083,6 +2102,23 @@ input, select, textarea { font-size: 16px; }
 .str-done { flex: none; white-space: nowrap; margin-top: 0; }
 .str-fin { margin: 12px 0 0; font-size: 13.5px; font-weight: 600; color: var(--accent); text-align: center; }
 
+/* The anatomical stretch-motion hero — the active stretch only. The white square is the supplied
+   artwork's own canvas (backgroundColor #FFF, borderRadius 20 in the component); it is capped at
+   360px, stays square via aspect-ratio, and object-fit: contain guarantees the model is never cropped.
+   Copy lives strictly ABOVE and BELOW the square — nothing is drawn over the artwork. */
+.asm-hero { margin: 4px 0 14px; }
+.asm-top { text-align: center; margin-bottom: 10px; }
+.asm-name { font-size: var(--t-card); font-weight: 700; color: var(--ink); letter-spacing: -.01em; }
+.asm-meta { margin-top: 3px; font-family: var(--fig); font-variant-numeric: tabular-nums;
+  font-size: var(--t-meta); font-weight: 600; color: var(--accent); }
+.asm-stage { display: flex; justify-content: center; }
+.asm-frame { width: 100%; max-width: 360px; aspect-ratio: 1 / 1; border-radius: var(--r-card); overflow: hidden;
+  background: #fff; border: 1px solid var(--line); }
+.asm-img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.asm-bot { margin-top: 12px; }
+.asm-cue { font-size: var(--t-body); color: var(--ink-soft); line-height: 1.5; }
+.asm-safe { margin-top: 8px; font-size: var(--t-meta); font-weight: 600; color: var(--ink-faint); }
+
 /* ================================================================================================
    PHASE 0 — THE LADDERS
    The design brief's central visual finding: "repeated rounded containers and outlines give most
@@ -2819,6 +2855,8 @@ function bindTimeInput(el) {
 const BRAND_SVG = ${JSON.stringify(BRAND_MARK)};
 const EX_ANIM = ${JSON.stringify(exAnimData)};
 const EX_STILL = ${JSON.stringify(exStillData)};
+// Anatomical stretch frames as data URIs: ASM_FRAMES[anat][0..3] -> "data:image/png;base64,...".
+const ASM_FRAMES = ${JSON.stringify(stretchFrameData)};
 const ICON = {
   chevDown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
   // Run-type marks for the "Build your own run" grid. Simple strokes at the set's own weight — a
@@ -5652,6 +5690,89 @@ function openExDemo(slug, name) {
 function wireExDemos() {
   document.querySelectorAll("[data-exdemo]").forEach((b) => b.onclick = (ev) => { ev.stopPropagation(); openExDemo(b.dataset.exdemo, b.dataset.exname || ""); });
 }
+// ---- Anatomical stretch motion (vanilla port of AnatomicalStretchMotion.tsx) ------------------
+// The supplied anatomical artwork is the visual source of truth and is used UNCHANGED. The four frames
+// per stretch are inlined as data URIs (ASM_FRAMES, built from assets/anatomical-stretch-motion), so the
+// page stays a single self-contained file with no external network assets -- the rule everything but the
+// coach audio follows -- and so the artwork renders in the artifact preview too, where a relative fetch
+// would have nothing to resolve against. asmFrameSrc reads ASM_FRAMES; nothing is fetched at runtime.
+// The frame sequence, per-step timings and crossfade below are ported from the component and MUST match
+// it: SEQUENCE = [0,1,2,3,3,3,2,1], STEP_DURATION_MS = [700,700,700,650,650,1650,600,600], fade to 0.2
+// over 100ms then back to 1 over 140ms. The hold frame (04.png, sequence index 3) is shown when paused
+// or when Reduce Motion is on. Right side mirrors with scaleX(-1) for every stretch except child's pose.
+//
+// ⚠️ EXACT STABLE-ID MAPPING, no partial name matching (the app's db ids differ from the frame folders).
+var STRETCH_MOTION_IDS = {
+  "standing-quad": "standing-quad",
+  "standing-hamstring": "standing-hamstring",
+  "calf-wall": "wall-calf",
+  "hip-flexor": "kneeling-hip-flexor",
+  "figure-four": "figure-four-glute",
+  "childs-pose": "childs-pose"
+};
+var ASM_SEQUENCE = [0, 1, 2, 3, 3, 3, 2, 1];
+var ASM_STEP_MS = [700, 700, 700, 650, 650, 1650, 600, 600];
+var ASM_HOLD_SEQ = 3; // 04.png — shown when paused or Reduce Motion is enabled
+function asmReduceMotion() {
+  try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; }
+}
+function asmFrameSrc(anat, seqIdx) { var f = ASM_FRAMES[anat]; return (f && f[seqIdx]) || ""; }
+// The still used for the list-row thumbnail — reuses .ex-webp so it inherits the white bg + contain fit.
+function asmStillHtml(anat) {
+  return '<img class="ex-webp" src="' + asmFrameSrc(anat, ASM_HOLD_SEQ) + '" alt="" loading="lazy" draggable="false">';
+}
+var ASM = { anat: null, side: "left", playing: false, step: 0, timer: null };
+// ⚠️ Child's pose is not bilateral — the component never mirrors it, so neither do we.
+function asmMirror(anat, side) { return (anat !== "childs-pose" && side === "right") ? "scaleX(-1)" : "none"; }
+function asmRender() {
+  var img = $("asmImg"); if (!img || !ASM.anat) return;
+  img.src = asmFrameSrc(ASM.anat, ASM_SEQUENCE[ASM.step]);
+  img.style.transform = asmMirror(ASM.anat, ASM.side);
+}
+function asmClearTimer() { if (ASM.timer) { clearTimeout(ASM.timer); ASM.timer = null; } }
+function asmSchedule() {
+  asmClearTimer();
+  if (!ASM.playing) return;
+  ASM.timer = setTimeout(function () {
+    var img = $("asmImg");
+    if (!img || !ASM.playing) { asmClearTimer(); return; }
+    img.style.transition = "opacity .1s linear";
+    img.style.opacity = "0.2";
+    setTimeout(function () {
+      if (!ASM.playing) return;
+      ASM.step = (ASM.step + 1) % ASM_SEQUENCE.length;
+      asmRender();
+      var i2 = $("asmImg"); if (i2) { i2.style.transition = "opacity .14s linear"; i2.style.opacity = "1"; }
+      asmSchedule();
+    }, 100);
+  }, ASM_STEP_MS[ASM.step]);
+}
+// Set the active stretch. Restarts the animation only when the stretch, the side or the playing state
+// actually changes, so being called every countdown tick is cheap and does not stutter the loop.
+function asmSet(anat, side, playing) {
+  var effPlaying = !!playing && !asmReduceMotion();
+  var changed = (anat !== ASM.anat) || (side !== ASM.side) || (effPlaying !== ASM.playing);
+  ASM.anat = anat; ASM.side = side;
+  if (!changed) return;
+  ASM.playing = effPlaying;
+  ASM.step = effPlaying ? 0 : ASM_HOLD_SEQ;
+  var img = $("asmImg");
+  if (img) { img.style.transition = "none"; img.style.opacity = "1"; }
+  asmRender();
+  asmClearTimer();
+  if (effPlaying) asmSchedule();
+}
+function asmStop() { asmClearTimer(); ASM.anat = null; ASM.side = "left"; ASM.playing = false; ASM.step = ASM_HOLD_SEQ; }
+// Pause when the app backgrounds or the tab loses focus; resume if the routine is still running and the
+// sheet is on screen. Registered once — it no-ops whenever there is no active stretch.
+function asmSyncPlaying() {
+  if (!ASM.anat) return;
+  var running = !!(STRETCH && STRETCH.timer);
+  var focused = !document.hidden && !!$("asmImg");
+  asmSet(ASM.anat, ASM.side, running && focused);
+}
+try { document.addEventListener("visibilitychange", asmSyncPlaying); } catch (e) {}
+
 // ---- The optional post-run stretch session ---------------------------------
 // Offered from the debrief, in place of the cool-down jog the low-intensity runs used to prescribe
 // (owner's decision, 2026-08-03). Deliberately OPTIONAL: it is not a session, it is not logged, it does
@@ -5665,12 +5786,27 @@ const STRETCH_VIDEO = "";
 let STRETCH = null;
 function stretchHoldRows() {
   return RC.STRETCHES.map((s) => ({
+    id: s.id,
+    anat: STRETCH_MOTION_IDS[s.id],
     name: s.name,
     primary: s.area,
     cue: s.cue,
     pattern: s.pattern,
     hold: s.bothSides ? (s.seconds + " secs each side") : (s.seconds + " secs"),
   }));
+}
+// The active-stretch hero: name + target area + duration + side ABOVE the square, the setup cue and the
+// safety line BELOW it. strPaint() fills the dynamic copy and drives the animation; this is the shell.
+function stretchMotionHtml() {
+  const s0 = RC.STRETCHES[0];
+  const anat0 = STRETCH_MOTION_IDS[s0.id];
+  return '<div class="asm-hero" id="asmHero">' +
+    '<div class="asm-top"><div class="asm-name" id="asmName">' + esc(s0.name) + '</div>' +
+    '<div class="asm-meta" id="asmMeta"></div></div>' +
+    '<div class="asm-stage"><div class="asm-frame">' +
+    '<img class="asm-img" id="asmImg" alt="" draggable="false" src="' + asmFrameSrc(anat0, ASM_HOLD_SEQ) + '"></div></div>' +
+    '<div class="asm-bot"><div class="asm-cue" id="asmCue">' + esc(s0.cue) + '</div>' +
+    '<div class="asm-safe">Move gently. Do not bounce. Stop if you feel pain.</div></div></div>';
 }
 function stretchVideoHtml() {
   if (STRETCH_VIDEO) {
@@ -5689,6 +5825,7 @@ function stretchSheetHtml() {
   return '<h3 class="sh-t">Stretch it out</h3>' +
     '<div class="str-head"><div class="str-clock" id="strClock">0:00 <span>/ ' + fmtPace(total) + '</span></div>' +
     '<div class="str-bar"><i id="strBar"></i></div></div>' +
+    stretchMotionHtml() +
     stretchVideoHtml() +
     '<p class="muted str-intro">' + esc(RC.STRETCH_INTRO) + '</p>' +
     '<div class="ex-list str-list" id="strList">' +
@@ -5730,6 +5867,17 @@ function strPaint(total) {
   document.querySelectorAll(".str-item").forEach((n) => n.classList.remove("on"));
   const cur = S.holds[S.i];
   if (!cur) return;
+  // Drive the anatomical hero for the CURRENT hold only. Copy above the square, artwork untouched.
+  const anat = STRETCH_MOTION_IDS[cur.stretch.id];
+  const nm = $("asmName"); if (nm) nm.textContent = cur.stretch.name;
+  const meta = $("asmMeta");
+  if (meta) {
+    const sideTxt = cur.side ? (cur.side === "left" ? "Left side" : "Right side") : "";
+    const area = cur.stretch.area ? (cur.stretch.area.charAt(0).toUpperCase() + cur.stretch.area.slice(1)) : "";
+    meta.textContent = area + " \\u00b7 " + cur.stretch.seconds + "s" + (sideTxt ? " \\u00b7 " + sideTxt : "");
+  }
+  const cueEl = $("asmCue"); if (cueEl) cueEl.textContent = cur.stretch.cue;
+  if (anat) asmSet(anat, cur.side || "left", !!S.timer && !document.hidden);
   const idx = RC.STRETCHES.findIndex((x) => x.id === cur.stretch.id);
   const node = document.querySelector('.str-item[data-si="' + idx + '"]');
   if (!node) return;
@@ -5762,7 +5910,7 @@ function stretchPlay() {
 function stretchPause() { const S = STRETCH; if (S && S.timer) { clearInterval(S.timer); S.timer = null; } strPaint(RC.stretchTotalSeconds()); }
 // ⚠️ Called from closeSheet as well, or the interval keeps ticking behind a dismissed sheet — and the
 // next open would then run two of them.
-function stretchStop() { const S = STRETCH; if (S && S.timer) { clearInterval(S.timer); S.timer = null; } STRETCH = null; }
+function stretchStop() { const S = STRETCH; if (S && S.timer) { clearInterval(S.timer); S.timer = null; } STRETCH = null; asmStop(); }
 function stretchFinish() {
   const list = $("strList");
   if (list && !$("strFin")) list.insertAdjacentHTML("afterend", '<p class="str-fin" id="strFin">That is the lot. Nicely done.</p>');
@@ -5784,7 +5932,9 @@ function slogSet(key, field, val) {
 function exerciseBlock(sessId, ei, e) {
   if (e.hold) {
     const sec = e.secondary && e.secondary.length ? ' <span class="ex-sec">· ' + e.secondary.map(esc).join(", ") + '</span>' : "";
-    return '<div class="ex"><div class="ex-anim">' + exVisual(e) + '</div>' +
+    // A stretch row carries the anatomical id — show its hold still, not the old schematic figure.
+    const vis = e.anat ? asmStillHtml(e.anat) : exVisual(e);
+    return '<div class="ex"><div class="ex-anim">' + vis + '</div>' +
       '<div class="ex-main"><div class="ex-name">' + esc(e.name) + '</div>' +
       '<div class="ex-mus"><b>' + esc(e.primary) + '</b>' + sec + '</div>' +
       '<div class="ex-presc">' + esc(e.hold) + '</div></div></div>' +

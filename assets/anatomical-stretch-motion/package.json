@@ -1,0 +1,11 @@
+{
+  "name": "inte-run-anatomical-stretch-motion",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Anatomical four-frame stretch demonstrations for the Inte-Run mobile app.",
+  "main": "src/index.ts",
+  "peerDependencies": {
+    "react": ">=18",
+    "react-native": ">=0.72"
+  }
+}

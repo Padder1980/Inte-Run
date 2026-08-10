@@ -4689,7 +4689,7 @@ function alfieSaveCfg(c) { try { localStorage.setItem("interun_alfie_v1", JSON.s
  * question costs a round trip and falls back anyway — slower than not trying. Filled in by hand once
  * the key is set, not by the Strava setup script.
  */
-const ALFIE_SERVER = "";
+const ALFIE_SERVER = "https://alfie-proxy.alfie-proxy.workers.dev";
 function alfieBase() {
   let url = "";
   try { url = String(alfieCfg().proxy || ALFIE_SERVER || "").trim(); } catch (e) { url = ""; }
@@ -7536,9 +7536,14 @@ function safetyView() {
       'app on this device. There is no account and no server holding them.</p>' +
       '<p><b>The health check-ins keep nothing at all.</b> Your answers are read as you tick them and ' +
       'are gone the moment you leave the screen.</p>' +
-      '<p><b>Ask Alfie answers on this phone</b>' + (proxy
-        ? ', except that you have connected it to your own service, so questions are sent there.'
-        : ' and works with no signal. Nothing you type is sent anywhere.') + '</p>' +
+      (proxy
+        ? '<p><b>Ask Alfie sends your question off this phone.</b> It goes to Inte-Run\u2019s own server, ' +
+          'which asks an AI to answer it. Your question, a short summary of your plan and the last few ' +
+          'messages go with it \u2014 never your name, your location, or your check-in answers. Inte-Run ' +
+          'does not store any of it.</p>' +
+          '<p>If that server cannot be reached, Alfie answers on this phone instead, from what it already ' +
+          'knows about running and about your plan.</p>'
+        : '<p><b>Ask Alfie answers on this phone</b> and works with no signal. Nothing you type is sent anywhere.</p>') +
       '<p>Two things do reach the internet, and only these: the <b>weather</b> for your next session, ' +
       'and the <b>map tiles</b> for a run you have recorded.</p>' +
       '<button class="perf-a" data-hub="data">Back up or move your data \u203a</button></div>' +

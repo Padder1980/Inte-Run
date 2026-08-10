@@ -21,8 +21,13 @@ import { stravaRoute, type StravaEnv } from "./strava.ts";
 /** Cloudflare's own rate-limit binding — accurate at seconds resolution, unlike KV. */
 type RateLimiter = { limit(opts: { key: string }): Promise<{ success: boolean }> };
 
+/** Cloudflare's Workers AI binding. Loosely typed so the Worker needs no extra type dependency. */
+type WorkersAI = { run(model: string, input: Record<string, unknown>): Promise<unknown> };
+
 type Env = StravaEnv & {
+  /** Only needed when BRAIN is "claude". */
   ANTHROPIC_API_KEY: string;
+  AI?: WorkersAI;
   /** Burst protection. Absent in older deploys, so every use is guarded. */
   BURST?: RateLimiter;
   /** Comma-separated origins allowed to call this Worker. */
@@ -37,6 +42,25 @@ type Ask = {
   device?: string;
 };
 
+/**
+ * WHICH BRAIN ANSWERS. Owner's choice, 2026-08-10: Cloudflare's own AI, because it is genuinely free
+ * on the plan he is already on — no card, no API key, nothing further to set up.
+ *
+ * ⚠️ SWITCHING IS THIS ONE LINE, and that is deliberate. Set it to "claude", set ANTHROPIC_API_KEY,
+ * redeploy — better answers for roughly 0.3p a question on Haiku. The point of the constant is that
+ * he can judge the free answers himself and change his mind without a rewrite.
+ */
+const BRAIN: "cloudflare" | "claude" = "cloudflare";
+
+/**
+ * Cloudflare's model. A 70-billion-parameter Llama, not one of the small ones — chosen because the
+ * difference shows on exactly the questions this app gets asked, and the free allowance covers it.
+ * ⚠️ Its `max_tokens` DEFAULTS TO 256, which truncates a coaching answer mid-sentence. Set explicitly.
+ */
+const CF_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+const CF_MAX_TOKENS = 700;
+
+/** Used only when BRAIN is "claude". */
 const MODEL = "claude-opus-5";
 
 /**
@@ -89,6 +113,25 @@ const SYSTEM = [
  * device key in the request itself, which a hostile page cannot obtain by being able to call this.
  */
 const APP_ORIGIN = "interun://app";
+
+/**
+ * What a smaller model needs told that Claude does not.
+ *
+ * ⚠️ EVERY LINE HERE IS A FAILURE MODE, NOT A PREFERENCE. A 70B model given this app's system prompt
+ * will otherwise: run long past the word limit; open with "Great question!"; invent a session or a
+ * pace that is not in the plan JSON; and — the one that matters — answer a pain question with
+ * confident medical advice. The app's own red-flag screen runs on the PHONE before anything reaches
+ * here, so the worst questions never arrive, but this is the second line of that defence and not a
+ * substitute for it.
+ */
+const CF_EXTRA = [
+  "Answer in at most 120 words. No preamble, no sign-off, no bullet lists unless the answer is genuinely a list.",
+  "Never open with a compliment about the question.",
+  "Use ONLY the numbers in the plan JSON above. If a figure is not there, say you do not have it rather than estimating one.",
+  "If the question is about pain, injury, illness or an eating problem: do not diagnose and do not give a treatment plan.",
+  "Say plainly that it needs a physio or GP, and that stopping and getting it looked at beats running through it.",
+  "You are not a doctor. Never guess at what an injury is.",
+].join("\n");
 
 function cors(env: Env, origin: string | null): Record<string, string> {
   const configured = (env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
@@ -184,7 +227,13 @@ export default {
     // spending a question. Reports presence, never the key itself.
     if (request.method === "GET") {
       return Response.json({
-        alfie: env.ANTHROPIC_API_KEY ? "configured" : "no key",
+        // ⚠️ Reports the brain, not the key. It said "no key" while running perfectly well on
+        // Cloudflare's AI, which needs none — a probe that reports a fault where there is none is
+        // exactly as misleading as one that reports health where there is a fault.
+        brain: BRAIN,
+        alfie: BRAIN === "cloudflare"
+          ? (env.AI ? "ready (cloudflare ai)" : "no ai binding")
+          : (env.ANTHROPIC_API_KEY ? "ready (claude)" : "no key"),
         burstGuard: env.BURST ? (burstFault ? "failing: " + burstFault : "bound") : "absent",
         budgetStore: env.STRAVA ? "bound" : "absent",
       }, { headers });
@@ -213,6 +262,36 @@ export default {
       content: String(m.text ?? m.html ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 1200),
     })).filter((m) => m.content);
 
+    // ---- Cloudflare's own AI: the default, and the whole point of it is that it needs no key -----
+    if (BRAIN === "cloudflare") {
+      if (!env.AI) return Response.json({ error: "no ai binding" }, { status: 503, headers });
+      try {
+        // ⚠️ THE PLAN CONTEXT GOES IN THE SYSTEM TURN, NOT THE QUESTION. Put in the user turn, a
+        // smaller model answers *about* the JSON ("your plan says...") instead of using it, and will
+        // happily read a field back at the runner verbatim.
+        const out = await env.AI.run(CF_MODEL, {
+          max_tokens: CF_MAX_TOKENS,
+          messages: [
+            { role: "system", content: SYSTEM + "\n\n" + CF_EXTRA },
+            { role: "system", content: "The runner's current plan (JSON):\n" + JSON.stringify(body.context ?? {}) },
+            ...history,
+            { role: "user", content: question },
+          ],
+        }) as { response?: string };
+        const answer = String(out?.response ?? "").trim();
+        // An empty answer must NOT be returned as a success — the app would render a blank bubble.
+        // A non-200 sends it to alfieLocalAnswer, which always has something to say.
+        if (!answer) return Response.json({ error: "empty" }, { status: 502, headers });
+        return Response.json({ answer }, { headers });
+      } catch (err) {
+        // ⚠️ EXHAUSTING THE FREE DAILY ALLOWANCE ARRIVES HERE AS AN ORDINARY ERROR, and that is the
+        // designed end state rather than a fault: on the Workers Free plan usage above the allowance
+        // cannot be billed, so the request fails and the runner gets the on-device answer instead.
+        return Response.json({ error: "upstream", detail: String(err).slice(0, 120) }, { status: 502, headers });
+      }
+    }
+
+    if (!env.ANTHROPIC_API_KEY) return Response.json({ error: "no key" }, { status: 503, headers });
     const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
 
     try {

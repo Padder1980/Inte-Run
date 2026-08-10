@@ -2527,6 +2527,65 @@ Known and deliberately not fixed: a handful of five-day build weeks with two qua
 just under the pyramidal easy-fraction floor (measured 6 of 35, unchanged by this work). That is a
 periodisation question about two-quality weeks, not a session-library one.
 
+## ASK ALFIE'S REMOTE BRAIN IS CLOUDFLARE'S FREE AI (owner's call, 2026-08-10)
+
+He asked for Alfie to answer anything, "like the AI at the top of a Google search", then pushed back on
+paying for it: *"Is there no way I can just connect it to a free version of AI? I don't need complex
+answers… they're just every day questions."* Costed, he was right to ask.
+
+| brain | per question | 10 testers × 5 questions/day |
+|---|---|---|
+| `claude-opus-5` | ~2.5p | ~£1.25/day |
+| `claude-haiku-4-5` | ~0.3p | ~15p/day |
+| **Cloudflare Workers AI** | **£0** | **£0** |
+
+⚠️ **`BRAIN` IN `alfie-proxy/src/worker.ts` IS THE WHOLE SWITCH.** `"cloudflare"` (shipped) needs no key
+and no card; `"claude"` needs `ANTHROPIC_API_KEY` and gives better answers. One line, so his mind can
+change without a rewrite.
+
+⚠️ **THE WORKERS FREE PLAN CANNOT BE BILLED, AND THAT IS THE REASON THIS IS THE DEFAULT.** 10,000
+Neurons/day are included; above it requests simply **fail** rather than costing money, and a failure
+sends the app to `alfieLocalAnswer`. Roughly ~70 questions/day before that bites. There is no bill to
+run up, only an allowance to exhaust.
+
+⚠️ **`@cf/meta/llama-3.3-70b-instruct-fp8-fast`, and its `max_tokens` DEFAULTS TO 256** — left alone
+that truncates a coaching answer mid-sentence. Set to 700.
+
+⚠️ **THE PLAN CONTEXT GOES IN A SYSTEM TURN, NOT THE QUESTION.** In the user turn a smaller model
+answers *about* the JSON ("your plan says…") or reads a field back verbatim instead of using it.
+Verified live: asked whether easy runs were too slow, it quoted the runner's real 6:10–6:40/km band.
+
+⚠️ **`CF_EXTRA` IS SIX FAILURE MODES, NOT PREFERENCES.** A 70B model given this app's Claude-tuned
+system prompt runs long, opens with "Great question!", invents paces, and — the one that matters —
+answers a pain question with confident medical advice. Verified live: "knee sore for two weeks" and
+"might have a stress fracture" both returned *stop running, see a physio or GP, I am not a doctor*.
+⚠️ It is the SECOND line of that defence. `alfieRedFlags` runs on the PHONE first, so the worst
+questions never reach the server at all — do not let this replace it.
+
+⚠️ **THE CONSENT COPY HAD TO BE REWRITTEN, and this is the second time that sentence has been the
+work.** It read *"except that you have connected it to your own service"* — true only while a server
+was something the owner opted into by hand. Shipped on by default it tells every runner they did
+something they did not, on the one screen a worried person reads carefully. It now names what leaves
+the phone (question, a plan summary, the last few messages), what never does (name, location, check-in
+answers), and that Inte-Run stores none of it — and it does **not** claim anything about what
+Cloudflare keeps, which is not ours to assert.
+
+**Spend/allowance ceiling.** Per-device 15/hour and 40/day, global 200/day, checked BEFORE the model
+call; over it returns 429 and the app answers on-device. ⚠️ **The caps are PRICED, not picked** — the
+1500/day first written was ~£30/day (~£900/month) on Opus, which is not a hobby-project number.
+
+⚠️ **KV CANNOT STOP A BURST, AND THE BURST GUARD IS UNPROVEN.** KV reads are edge-cached for up to a
+minute, so rapid questions all read the same stale count: measured against the deployed Worker, **31
+requests in seconds left the counter at 21 and tripped a limit of 30 not once.** Cloudflare's own
+`ratelimit` binding was added for that dimension — it deploys, binds, never throws, and **still did
+not enforce across 16 rapid requests.** So the daily budget is the ceiling that actually holds, and it
+holds approximately. A **GET on the Worker** reports brain / key / burst guard / store, because a
+silent catch would report protection that is not there.
+
+⚠️ **`npx tsc --noEmit` does not cover `alfie-proxy/`, and that hid a real type error**: the pinned SDK
+(0.70) had no types for `output_config`, so the effort setting only survived because wrangler's esbuild
+does not typecheck. Upgraded to 0.116. The by-hand command is in `alfie-proxy/README.md`.
+
 ## Strava (2026-08-09) — and the first time this app has needed a server
 
 The owner chose Strava over a second Mapbox token, reasoning that **a tester will not move off the app

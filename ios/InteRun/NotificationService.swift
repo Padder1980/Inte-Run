@@ -88,6 +88,20 @@ final class NotificationService: NSObject {
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
     }
 
+    /// A one-off reminder a few seconds out, so a runner can confirm delivery works. Deliberately a
+    /// time-interval trigger with a fixed id — it never touches the pending session reminders (unlike
+    /// `schedule`, which replaces them wholesale), so tapping "test" cannot wipe the real schedule.
+    private func test(_ item: [String: Any]) {
+        let content = UNMutableNotificationContent()
+        content.title = (item["title"] as? String) ?? "Inte-Run test reminder"
+        content.body = (item["body"] as? String) ?? "This is how your session reminders will look."
+        content.sound = .default
+        UNUserNotificationCenter.current().add(UNNotificationRequest(
+            identifier: "interun-test",
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)))
+    }
+
     /// Debug hook for the smoke test: how many reminders the OS is actually holding.
     private func reportPending() {
         UNUserNotificationCenter.current().getPendingNotificationRequests { reqs in
@@ -124,6 +138,7 @@ extension NotificationService: WKScriptMessageHandler {
         case "request": requestPermission()
         case "schedule": schedule((body["items"] as? [[String: Any]]) ?? [])
         case "clear": clear()
+        case "test": test(body)
         case "pending": reportPending()
         default: break
         }

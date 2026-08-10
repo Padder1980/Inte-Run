@@ -3779,6 +3779,10 @@ const NATIVE_NOTIFY = (function () {
 let NATIVE_PERM = "default";
 let NOTIFY_ASKED = false;
 let NOTIFY_RERENDER = null; // set while the reminders sheet is open, so an async grant redraws it
+// What iOS is ACTUALLY holding, reported by the native side's reportPending. Surfaced in Support ›
+// Your data so "notifications aren't working" becomes a measurement rather than a guess: a schedule
+// the OS is not holding, or a permission that is not granted, look identical from a screenshot.
+let NOTIFY_PENDING = null;
 function nativeNotify(action, payload) {
   try { window.webkit.messageHandlers.interunNotify.postMessage(Object.assign({ action: action }, payload || {})); } catch (e) {}
 }
@@ -3795,7 +3799,12 @@ window.__interunNotify = {
     try { syncNativeReminders(); } catch (e) {}
     if (NOTIFY_RERENDER) { try { NOTIFY_RERENDER(); } catch (e) {} }
   },
-  pending: function () {}
+  // native reportPending(count, nextIso) — the truth about the OS's schedule. Kept for Support and to
+  // redraw the reminders sheet if it is open when the count arrives.
+  pending: function (count, next) {
+    NOTIFY_PENDING = { count: Number(count) || 0, next: next || "", at: Date.now() };
+    if (NOTIFY_RERENDER) { try { NOTIFY_RERENDER(); } catch (e) {} }
+  }
 };
 function notifSupported() { return NATIVE_NOTIFY || typeof Notification !== "undefined"; }
 function notifPerm() {
@@ -3806,6 +3815,15 @@ function updateBell() {
   const b = $("bellBtn"); if (!b) return;
   b.classList.toggle("rm-on", REMIND.enabled && notifPerm() === "granted");
   b.classList.toggle("rm-attn", !REMIND.decided); // pulse until the user makes a choice
+}
+// The Profile row's summary. ⚠️ It read REMIND.on — a field that DOES NOT EXIST (the flag is
+// REMIND.enabled) — so it printed "Off" for everyone, always, which is the exact contradiction of a
+// green toggle in the reminders sheet. Same "on = enabled AND permitted" the bell and the sheet use,
+// plus an explicit "Blocked" so a runner whose iOS permission was later revoked is told WHY, rather
+// than seeing an "On" that never fires.
+function remindStateLabel() {
+  if (!REMIND || !REMIND.enabled) return "Off";
+  return notifPerm() === "denied" ? "Blocked" : "On";
 }
 function showNotif(title, opts) {
   try { new Notification(title, opts); return; } catch (e) {}
@@ -3905,8 +3923,11 @@ function syncNativeReminders() {
   if (!NATIVE_NOTIFY) return;
   clearTimeout(NOTIFY_SYNC_T);
   NOTIFY_SYNC_T = setTimeout(() => {
-    if (NATIVE_PERM !== "granted" || !REMIND.enabled) { nativeNotify("clear"); return; }
-    nativeNotify("schedule", { items: buildReminderSchedule() });
+    if (NATIVE_PERM !== "granted" || !REMIND.enabled) { nativeNotify("clear"); }
+    else { nativeNotify("schedule", { items: buildReminderSchedule() }); }
+    // Read back what the OS now holds. Messages are delivered in order, so this reflects the schedule
+    // (or clear) just applied — the count that Support › Your data shows.
+    nativeNotify("pending");
   }, 400);
 }
 // ---- Your why: the reasons behind the running ---------------------------------------------------
@@ -4927,7 +4948,17 @@ function wireRemindersSheet() {
     try { window.open(kind === "google" ? "https://calendar.google.com/calendar/u/0/r/settings/export" : "https://outlook.live.com/calendar/0/addcalendar", "_blank"); } catch (e) {}
     if (n) n.textContent = "Downloaded interun-sessions.ics. In the " + name + " tab that opened, sign in to the account you want and upload that file.";
   });
-  const test = $("rmTest"); if (test) test.onclick = () => { const q = randomQuote(); showNotif("Inte-Run test reminder", { body: "This is how your session reminders will look.\\n\\u201C" + q[0] + "\\u201D" + (q[1] ? " \\u2014 " + q[1] : ""), tag: "interun-test", icon: "./icon-192.png", data: { url: "./" } }); };
+  const test = $("rmTest"); if (test) test.onclick = () => {
+    const q = randomQuote();
+    const body = "This is how your session reminders will look.\\n\\u201C" + q[0] + "\\u201D" + (q[1] ? " \\u2014 " + q[1] : "");
+    // ⚠️ In the native app the web Notification API does not exist (and the service worker is disabled
+    // under interun://), so showNotif is inert there — the button looked broken exactly where the real
+    // reminders live. Route the test through the OS bridge; it arrives in a few seconds without
+    // touching the scheduled reminders, so a runner can confirm delivery works before trusting it.
+    if (NATIVE_NOTIFY) { nativeNotify("test", { title: "Inte-Run test reminder", body: body }); }
+    else { showNotif("Inte-Run test reminder", { body: body, tag: "interun-test", icon: "./icon-192.png", data: { url: "./" } }); }
+    const n = $("rmCalNote"); if (n && NATIVE_NOTIFY) n.textContent = "Test reminder sent \\u2014 it should arrive in a few seconds.";
+  };
 }
 
 // ============ ASK ALFIE ====================================================
@@ -7756,7 +7787,7 @@ function viewProfile() {
   const shoes = loadShoes().filter((x) => !x.retiredIso);
   const act = activeShoe();
   const devices = (WATCH_STATUS && WATCH_STATUS.installed) ? "Apple Watch" : "Not set up";
-  const remind = (REMIND && REMIND.on) ? "On" : "Off";
+  const remind = remindStateLabel();
   const themeSet = (function () { try { return localStorage.getItem("interun_theme_v1"); } catch (e) { return null; } })();
   return '<div class="pf-id">' +
       // \u26a0\ufe0f THE PICTURE WAS A DIV. It looks exactly like the thing you tap to change your photo
@@ -8785,8 +8816,24 @@ function viewportDiagLines() {
       // returning; still 0 with a stationary phone is the second.
       gpsDiagLine(),
       coachDiagLine(),
+      notifDiagLine(),
     ];
   } catch (e) { return ["diag unavailable"]; }
+}
+// What the OS is ACTUALLY holding for session reminders. "Notifications aren't working" has three
+// invisible causes that look identical from a screenshot — permission not granted, the schedule not
+// held by iOS, or a genuine delivery problem — and this is the line that tells them apart. permission
+// is what iOS reports; enabled is the runner's toggle; scheduled is how many reminders the OS is
+// holding right now (0 with the toggle on and permission granted is a real scheduling fault). Native
+// only — a web tab cannot schedule OS-held reminders at all.
+function notifDiagLine() {
+  try {
+    if (!NATIVE_NOTIFY) return "reminders: web tab (no OS-held reminders — use the calendar export)";
+    let s = "reminders: permission " + notifPerm() + " · " + (REMIND.enabled ? "on" : "off");
+    if (NOTIFY_PENDING) s += " · " + NOTIFY_PENDING.count + " scheduled" + (NOTIFY_PENDING.next ? " · next " + NOTIFY_PENDING.next : "");
+    else s += " · count pending…";
+    return s;
+  } catch (e) { return "reminders: unknown"; }
 }
 // The last run's GPS accounting. Kept on LIVE while a run is live, then stamped onto the saved run so it
 // survives the session \u2014 a report that arrives an hour later still carries its numbers.

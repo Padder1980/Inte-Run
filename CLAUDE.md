@@ -2616,10 +2616,79 @@ a type error there surfaces at deploy. The command to check it by hand is in `al
 Behaviour is covered from the repo suite instead — `test/strava-connect.test.ts` reads both the page and
 the Worker as source (17 tests).
 
-**Still the owner's to do:** the Cloudflare deploy, and registering the Worker's host as Strava's
-**Authorization Callback Domain** (host only — no scheme, no path). Written up step by step in
-`alfie-proxy/README.md`. The Road Map step `p2-strava` is deliberately **unticked** until a real run
-has gone across. Credentials are in gitignored `strava-secret.txt`.
+**The Worker is DEPLOYED and verified live (2026-08-09):** `https://alfie-proxy.alfie-proxy.workers.dev`,
+KV namespace `52ff9e8a2b944d058efabc3abe33ad1c`, all three secrets confirmed on the server.
+`STRAVA_SERVER` in `web/app.ts` ships filled in, so every build connects in one tap. Smoke-tested
+against the running Worker: `/strava/status` → `configured:true`, `/strava/start` → 302 to Strava with
+`activity:write`, `/strava/upload` with a bogus device key → refused.
+
+### ⚠️ STRAVA'S OWN LIMITS ARE THE REAL GATE, NOT THE CODE (researched 2026-08-09)
+
+95 claims checked against Strava-owned pages; 40 were refuted or corrected on inspection, which is why
+these are worth trusting over recollection. **Sources: `developers.strava.com/docs/rate-limits/`,
+`developers.strava.com/docs/getting-started/`, `developers.strava.com/guidelines/`,
+`strava.com/legal/api_policy`.**
+
+⚠️ **A NEW STRAVA APP HAS AN ATHLETE CAPACITY OF ONE.** *"All newly created apps will have an athlete
+capacity of 1, aka Single Player Mode."* Only the owner's own Strava account can authenticate. **This
+is not a rate limit and no amount of code fixes it** — the second tester to tap Connect simply fails.
+- **10 athletes is self-serve** from the API Settings Dashboard, no review (and doubles the request
+  limits to 400/15min, 4,000/day).
+- **Beyond 10 requires submitting the app for Strava review**, and *"increased access is not a
+  guarantee"*. Standard Tier tops out at **9,999**; 10,000+ needs the Extended Access Tier, case by
+  case. ⚠️ **No exemption for upload-only apps** — capacity counts athletes who authenticated,
+  whatever scope they granted.
+- ⚠️ **The review asks for SCREENSHOTS of every place Strava data appears and of the "Connect with
+  Strava" button**, so those screens must exist before applying.
+
+⚠️ **A PAID STRAVA SUBSCRIPTION IS NOW REQUIRED TO HAVE AN API APP AT ALL** (Standard Tier; 1 June 2026
+for new developers, 30 June for existing). *"A Strava subscription is a prerequisite for creating an
+app."* It falls on the OWNER, not on runners — no Strava page requires end users to be subscribers.
+
+⚠️ **RATE LIMITS ARE PER APPLICATION, NOT PER ATHLETE** — one shared pool for every runner. Default
+**200 requests/15min and 2,000/day overall**, plus a separate **non-upload (read) limit of 100/15min
+and 1,000/day**. Uploads are exempt from the read limit but counted by the overall one, so writes
+always keep ≥100/15min of headroom. Daily limits reset at **midnight UTC**. Strava *"only raise rate
+limits for apps that are approaching capacity"*, so headroom cannot be requested before launch.
+
+⚠️ **THE CONNECT BUTTON SHOULD BE STRAVA'S OWN ARTWORK, AND OURS CURRENTLY IS NOT.** The Brand
+Guidelines are written conditionally (*"apps that choose to use the Connect with Strava button"*) but
+the developer landing page calls the rules *"Mandatory"*, **Strava is the sole judge of compliance**,
+and branding non-compliance is an express ground for revoking the token. Treat the official button as
+required.
+- ⚠️ **"Connect to Strava" IS NOT SANCTIONED WORDING.** The only permitted strings are **"Powered by
+  Strava"**, **"Compatible with Strava"** and **"View on Strava"**. "Works with Strava", "Syncs with
+  Strava" and "Connect your Strava" are all outside it.
+- Official button: **48px high @1x (96 @2x)**, artwork 237×48, **orange or white only**, and *"never
+  modify, alter or animate"* — no recolouring to our palette, no re-typesetting.
+- A Strava logo must be **visually separate from ours and never more prominent**. Never a Strava logo
+  as the app icon; never "Strava" in the app's name; the word must not be set larger than surrounding
+  text. `#FC5200` is the only published Strava orange, and only for making a "View on Strava" link
+  identifiable.
+- ⚠️ Attribution (*"Powered by Strava"*) is **optional** — there is no place Strava mandates it.
+- ⚠️ These branding claims are the one group whose **adversarial verification did not finish** (session
+  limit), so confirm against `developers.strava.com/guidelines/` before acting.
+
+⚠️ **API Policy §2.4 requires clear links out to the runner's own Strava account** plus accessible
+support contact information. §4.3 forbids anything implying affiliation or endorsement; §5.2 forbids
+imitating Strava's look. Before consent, §7 requires disclosing what is collected, how to withdraw and
+how to request deletion — **a screen Inte-Run has not built** — and a GDPR-compliant privacy policy
+behind a prominent link.
+
+⚠️ **§5.8: THE STRAVA SYNC MAY NEVER BE A PAID FEATURE.** No charging *"in any manner"* for access to
+the API Materials. Charging for our OWN non-duplicative functionality is expressly permitted, so a paid
+coaching plan is defensible — putting Strava export behind it is not. (Subscriptions are already cut.)
+
+⚠️ **§5.16 bans a "pass-through proxy, intermediary, or aggregator that re-exposes the Strava API"** and
+bans sharing or multiplexing tokens across users. `alfie-proxy` holds each runner's own tokens under
+their own device key and exposes only our own upload action, never a generic Strava proxy — which is the
+ordinary server-side OAuth shape Strava's own secret-handling rules force on everyone. **Read as
+compliant, but it is the clause to re-read before adding any new route**, and it is unverified.
+
+**Still the owner's to do:** register the Worker host as Strava's **Authorization Callback Domain**
+(host only — no scheme, no path), raise athlete capacity to 10 in the API Settings Dashboard before any
+tester tries it, and confirm the paid Strava subscription. The Road Map step `p2-strava` stays
+**unticked** until a real run has gone across. Credentials are in gitignored `strava-secret.txt`.
 
 ## The native app (`ios/`) — started 2026-07-27
 

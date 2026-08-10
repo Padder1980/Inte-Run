@@ -365,6 +365,10 @@ test("⚠️ every health check-in says what happens to the answers, and says it
   for (const fn of collectors)
     assert.match(fnBody(fn), /checkinConsent\(\)/,
       fn + " collects check-in answers but does not say what happens to them");
+  // And the fuelling check specifically: it is the one that moved, so pin that it really is still there.
+  assert.ok(collectors.includes("fgEnergyCheck"),
+    "the under-fuelling checklist has gone — it is the only safety-critical thing on that route");
+
   // Every screener route carries the emergency route, not just the injury one — somebody arrives at the
   // fuelling or women's-health page in exactly the same state of worry.
   for (const view of ["redsView", "femaleView", "redflagsView"])

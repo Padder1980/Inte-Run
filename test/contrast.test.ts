@@ -72,11 +72,12 @@ for (const theme of ["light", "dark"] as const) {
   /**
    * ⚠️ A CATEGORY COLOUR USED AS TEXT IS TEXT, AND NOTHING WAS CHECKING IT. The sweep above covers the
    * four INK tokens on the three neutral grounds — which is where body copy lives — so it never looked
-   * at the pattern the new injury guide uses: a small uppercase label in `--rest` or `--ease` sitting on a
-   * panel tinted 8% with that same colour. Measured 2026-08-10, both in LIGHT mode:
+   * at the pattern both new guide pages use: a small uppercase label in `--peak`, `--rest` or `--ease`
+   * sitting on a panel tinted 8–9% with that same colour. Measured 2026-08-10, all in LIGHT mode:
    *
    *   --ease  on its own 8% tint  2.41:1   (the injury guide's URGENT band title)
-   *   --rest  on its own 8% tint  4.31:1   (the injury guide's EMERGENCY band title)
+   *   --peak  on --surface-2      2.58:1   (BEFORE/DURING keys, meal-part headings)
+   *   --rest  on its own 8% tint  4.31:1   (both guides' emergency band titles)
    *
    * Dark mode passed all three, which is exactly the trap the accent fix already taught this file: the
    * brief reviewed dark screenshots, and the failures live in light. Each is now mixed toward the
@@ -96,6 +97,9 @@ for (const theme of ["light", "dark"] as const) {
     };
     // [label, ink colour as shipped, the ground it actually sits on]
     const pairs: Array<[string, string, string]> = [
+      ["fuelling BEFORE/DURING key", mix(t["peak"]!, t["ink"]!, 0.6), t["surface-2"]!],
+      ["fuelling meal-part heading", mix(t["peak"]!, t["ink"]!, 0.6), t["surface-2"]!],
+      ["fuelling emergency heading", mix(t["rest"]!, t["ink"]!, 0.8), mix(t["rest"]!, t["surface-2"]!, 0.08)],
       ["injury emergency band title", mix(t["rest"]!, t["ink"]!, 0.8), mix(t["rest"]!, t["surface-2"]!, 0.08)],
       ["injury urgent band title", mix(t["ease"]!, t["ink"]!, 0.6), mix(t["ease"]!, t["surface-2"]!, 0.08)],
     ];
@@ -109,6 +113,8 @@ for (const theme of ["light", "dark"] as const) {
     // If a future palette change made raw --peak pass on its own, the mixes above became unnecessary
     // and somebody should simplify them rather than leave the indirection in place unexplained.
     if (theme === "light") {
+      assert.ok(ratio(t["peak"]!, t["surface-2"]!) < 4.5,
+        "raw --peak now passes as text in light mode — the color-mix indirection can be removed");
       assert.ok(ratio(t["ease"]!, mix(t["ease"]!, t["surface-2"]!, 0.08)) < 4.5,
         "raw --ease now passes on its own tint — the color-mix indirection can be removed");
     }
@@ -118,7 +124,8 @@ for (const theme of ["light", "dark"] as const) {
     // raw token while its sibling kept the guard green — which is the failing case, undetected.
     const html = css();
     for (const [decl, want] of [
-      ["color: color-mix(in srgb, var(--rest) 80%, var(--ink))", 1],
+      ["color: color-mix(in srgb, var(--peak) 60%, var(--ink))", 2],
+      ["color: color-mix(in srgb, var(--rest) 80%, var(--ink))", 2],
       ["color: color-mix(in srgb, var(--ease) 60%, var(--ink))", 1],
     ] as Array<[string, number]>) {
       const n = html.split(decl).length - 1;

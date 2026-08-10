@@ -39,19 +39,24 @@ test("the dose steps up with duration, and the top tier says WHY it needs mixed 
     "the 60–90 tier MUST explain that it needs mixed sugars");
 });
 
-test("a marathon-pace long run is fuelled like race day — the coach's 70–90 g/h", () => {
-  // The elite coach's specific number, and the specific session it belongs to: the long run that
-  // carries goal-pace work is the rehearsal, so it is fuelled as the race is.
+test("a marathon-pace long run is the rehearsal — same 60–90 g/h band, race-day products", () => {
+  // The long run carrying goal-pace work is the rehearsal, so it is fuelled as the race is.
   //
-  // ⚠️ But it must be LONG enough to be a rehearsal. Gating on race-pace work alone called a
-  // 113-minute progressive a dress rehearsal and jumped it from 30–60 straight to 70–90 g/h.
+  // ⚠️ THE RATE IS THE PUBLIC 60–90 g/h BAND, NOT A LIFTED 70–90 FLOOR (changed 2026-08-10, fuelling
+  // brief §16). Raising the bottom of the band for a marathon made an unpractised rate the default on
+  // every qualifying long run, contradicting the "start at the bottom and build" instruction in the
+  // same card. What the rehearsal changes is the PRODUCTS and TIMINGS — which is the part that
+  // actually needs rehearsing — so this test now pins the copy rather than a bigger number.
+  //
+  // ⚠️ And it must be LONG enough to be a rehearsal. Gating on race-pace work alone called a
+  // 113-minute progressive a dress rehearsal and jumped it straight out of the 30–60 tier.
   const tooShort = long(113, { hasRacePaceWork: true });
   assert.equal(tooShort.rehearsal, false, "a sub-2:30 session is not a race rehearsal");
   assert.deepEqual(tooShort.perHour, { min: 30, max: 60 });
 
   const rehearsal = long(165, { hasRacePaceWork: true });
   assert.equal(rehearsal.rehearsal, true);
-  assert.deepEqual(rehearsal.perHour, { min: 70, max: 90 });
+  assert.deepEqual(rehearsal.perHour, { min: 60, max: 90 });
   assert.match(rehearsal.headline, /rehears/i);
   assert.ok(rehearsal.points.some((p) => /same brand|exact gels/i.test(p)),
     "a rehearsal must tell the runner to use race-day products, not just race-day amounts");
@@ -60,10 +65,12 @@ test("a marathon-pace long run is fuelled like race day — the coach's 70–90 
   assert.ok(rehearsal.points.some((p) => /drink|chews/i.test(p) && /split/i.test(p)),
     "the gram total must make clear that drink and chews count towards it");
 
-  // The same run without race-pace work is a training long run, fuelled as one.
+  // The same run without race-pace work is a training long run — same numbers, no rehearsal framing.
   const plain = long(165);
   assert.equal(plain.rehearsal, false);
   assert.deepEqual(plain.perHour, { min: 60, max: 90 });
+  assert.ok(!plain.points.some((p) => /exact gels|same brand/i.test(p)),
+    "a training long run should not be dressed up as a dress rehearsal");
 
   // ⚠️ And a 5k/10k runner is never handed marathon race-fuelling, whatever their long run holds:
   // their race is over long before fuelling matters, so there is nothing to rehearse.

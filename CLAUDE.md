@@ -816,6 +816,136 @@ and Support screens. Reword or repoint them with the injury update.
 unguarded. Left deliberately rather than deleted on my own initiative. It does not trip the
 `$("id")-must-resolve` guard because `renderResult("rfRes", …)` passes the id as a plain string.
 
+## THE FUELLING CHECK-IN BECAME A GUIDE (commissioned brief, 2026-08-10)
+
+`Support › Private check-ins › Fuelling & energy` was a consent line and eight tick-boxes. It is now a
+food-first guide to fuelling, fluids and recovery, with the under-fuelling checklist as one collapsed
+section inside it. Same `reds` id, route, orange drop and hub position; `interactive: false` drops the
+"CHECK-IN" chip. **⚠️ NOT CLEARED FOR PUBLIC RELEASE until a UK-registered sports dietitian has read the
+nutritional wording.** `kw` on the hub card is search-only, exactly as on the injury card.
+
+> Eat enough every day. Add fuel as the work gets longer or harder. Practise race day before race day.
+
+⚠️ **IT IS NOT A CALORIE TRACKER, A DIET PLAN OR A PERFECT PLATE, and it must never become one.** This
+page shares a route with a low-energy-availability screen, so a number a runner could eat down to is not
+a feature here, it is a hazard. Nothing is stored, nothing is weighed, nothing is scored. The brief's
+optional sweat-rate tool ships as a **written method, not a form** — five weight fields one section above
+a RED-S screen is not a trade worth making, and the page says the app keeps none of it.
+
+### §16 reconciled FOUR claims that were WRONG, not just old
+
+The app already had fuelling copy in four other places and it disagreed with the evidence. All were
+corrected together, because a runner meets whichever one they open first.
+
+1. ⚠️ **"Include sodium rather than plain water" NAMED THE WRONG DANGER, and it is the one sentence in
+   this area that could genuinely harm somebody.** Hyponatraemia is driven by drinking **beyond your
+   losses**, and a sports drink can be over-consumed exactly as water can — so contrasting sodium *with*
+   water implies the sodium is the protection. It is not. Volume is the risk. Every mention now carries
+   "does not make excess fluid safe" in the same breath, and `test/fuelling-guide.test.ts` sweeps **five
+   scopes** requiring the caveat beside every occurrence of the word.
+2. ⚠️ **The single-sugar story for gel stomach-ache was a one-cause explanation**, so a runner who
+   switched to mixed sugars and still felt sick had nothing left to change. Absorption above ~60 g/h is
+   the true part; the symptoms are multifactorial.
+3. ⚠️ **The 70–90 g/h marathon rehearsal floor is gone; it is the public 60–90 band.** Lifting the bottom
+   made an **unpractised** rate the default on every qualifying long run, three lines above the same
+   card's "start at the bottom and build". The rehearsal changes the **products and timings** now, not the
+   numbers. `120 g/h` is never prescribed and a sweep of 1,800 session shapes asserts it — it comes from
+   one crossover trial in **eight elite men** which found the worst peak nausea of the three rates tested.
+4. ⚠️ **"Taking gels adds nothing" was an absolute the evidence does not support**, and **every gel count
+   now says "check the label; products vary"** — `GEL_GRAMS` is 22 against real products of 20–30 g, so
+   somebody counting four gels for a 90 g hour is a third short on the day it matters most.
+
+⚠️ **THE COPY NAMES 75 MINUTES BECAUSE `NO_FUEL_BELOW_MIN` IS 75.** The brief's ladder was 60–90 /
+90–150, which is the better consumer synthesis in the abstract and disagrees with this app: measured on
+one real half-marathon plan, **six long runs land in the 75–89 minute window** and every one renders a
+card reading "Fuel this one: 30–60 g of carbs an hour" — so the ladder said "optional" for a run the
+session card prescribes for, and the session card is the surface a runner meets first. The rungs are the
+engine's boundaries, and a test derives the ladder's threshold and asserts it equals the constant.
+Lowering the constant to 60 was considered and rejected: it would *prescribe* to a 65-minute run.
+
+⚠️ **FOUR OF THE TWELVE `RedSIndicator` VALUES HAD NO CHECKBOX** — preoccupation with food, libido, poor
+recovery, gut discomfort — so `screenRedS` was **structurally unable to see them**. A runner could tick
+everything on screen and still not describe what was happening to them. A test compares the rendered
+options against the union and fails on drift.
+
+⚠️ **AND GIVING FOOD PREOCCUPATION A CHECKBOX CREATED A SAFETY DEFECT THAT HAD TO BE FIXED WITH IT.** It
+was not in the engine's `STRONG` set, so a runner whose only disclosure was distress about food, exercise
+or weight scored 1, came back `risk: "low"` with an **empty refer list**, and was told nothing here points
+to a problem — while the app's own `escalation.ts` grades the same disclosure `professional` and refers to
+a GP, a dietitian and a psychologist. **The same sentence cannot mean "see three professionals" on one
+screen and "nothing to worry about" on another.** It is STRONG now and refers to gp + dietitian +
+psychologist. Found by an adversarial pre-push review, not by a test.
+
+⚠️ **"RISK: HIGH" IS GONE AS A HEADLINE** — a verdict the app is not entitled to give, and the first thing
+the eye lands on. The band carries the engine's own message; a **low result says it cannot rule
+under-fuelling out** and names what would change the answer. ⚠️ Guard the INVARIANT ("the band carries
+`r.message`"), not the absence of one spelling: pinned as `!/"Risk: " \+/`, both `'Risk: ' + r.risk` and
+`"Risk level: " + r.risk` slipped past. `estimateEnergyAvailability()` stays in the engine and **out of
+the UI**: three imprecise inputs divided into each other produce false precision, the 2023 IOC consensus
+says the thresholds are not diagnostic cut-offs, and a number on screen becomes a number to eat down to.
+
+⚠️ **THE RESULT MUST NOT RENDER BEFORE ANYTHING IS TICKED.** The element exists from first render inside
+the collapsed section, so `if ($("redsRes")) runReds()` printed "nothing here strongly points to
+under-fuelling" to somebody who had answered nothing.
+
+⚠️ **THE CONSENT GUARD STOPPED BEING A LIST OF VIEW NAMES.** The checklist moved into `fgEnergyCheck`
+(consent belongs beside the question, not at the top of a long page), so `silent-defects` now **discovers**
+every builder that renders inputs and requires consent in the same function. A hand-written list goes
+stale the first time somebody adds a screener, and the failure mode is silence.
+
+⚠️ **A FIFTH AND SIXTH SITE WERE MISSED BY THE FIRST PASS and found by review.** `docs/roadmap/index.html`
+— the owner's own installed page — still stated both reversed claims, and `src/environment/weather.ts`
+told every runner on a hot quality session to "hydrate beforehand with electrolytes", which the guide
+rules out twice over (arrive normally hydrated; no salt "just in case"). The sodium sweep could not see it
+because it enumerates fixed scopes and matches `/sodium/`, and that line says "electrolytes".
+
+### Traps this work paid for again
+
+⚠️ **The backtick rule fired once more** — `` `screenRedS` `` in a runtime-JS comment. The build failed
+outright, which is the good outcome.
+
+⚠️ **A GUARD MUST STRIP COMMENTS FROM ITS SCOPE, AND BOTH DIRECTIONS BITE.** The familiar half: comments
+here quote the phrases they forbid, so the sodium guard reported the engine's own
+warning-about-the-old-wording *as* the old wording. The half that matters more is the **reverse** — the
+guide's file header restates the product message, so a test asserting the page says "eat enough every day"
+could be satisfied by a comment while the markup said nothing.
+
+⚠️ **A CHARACTER WINDOW IS NOT A CARD, AND THIS FIRED THREE TIMES IN ONE FEATURE.** "Every rate is paired
+with practice" passed with the practice clause deliberately deleted, because the card *below* said
+"practise" within the window; the ladder-threshold check reached into the next rung and reported the
+ladder prescribing at 60; and the injury file's gate sweep searched the whole guide, where a decoy
+"controlled strength" in the timeline kept it green with the real gate deleted. Scope to the thing the
+runner opens.
+
+⚠️ **A `/* … */` SWEEP OVER THE APP SCRIPT HAS A 10 KB BLIND WINDOW.** `accept="image/*"` in the profile
+setup markup is an unbalanced comment opener mid-line, so the regex opened there and closed at the next
+real terminator, deleting **10,382 characters of live code** — and a guard with a ten-kilobyte blind spot
+reports clean for anything hiding in it. Anchor block comments to the start of a line, and assert a
+**landmark from inside the old window** (`id="s_easypace"`) rather than a total-length threshold: this file
+is 276 KB of legitimate comments, so any ceiling loose enough to pass is far too loose to catch the bite.
+
+⚠️ **`fnSrc()` in `silent-defects.test.ts` CANNOT BE USED FOR A SWEEP over every function name** — its
+window assertion is correct and deliberate, but several functions are followed by tens of thousands of
+characters before the next top-level `function`. `fnBody()` is the non-asserting variant for scans.
+
+⚠️ **THE SWEEP THAT FINDS A CLASS OF DEFECT MUST BE DERIVED, NOT LISTED.** Hand-written lists of flag ids,
+screener names and colour declarations each passed while missing a real case; and a `includes()` check on
+a declaration used **twice** let one of the pair revert to the raw token undetected. Count, or derive.
+
+⚠️ **Nine deliberate regressions were watched failing before any guard was believed, and three did not
+fail on the first attempt** — the window above, a 120 g/h break that tripped a different test first, and a
+`git checkout` during the re-break that silently discarded the injury work's flags. Re-break, then check
+the suite is green again before trusting the next measurement.
+
+⚠️ **Native `<details name="…">` gives an accordion with no JS and no animation.** Measured: 25 cards
+force-opened, 9 stay open — one per group, which is intended. The anchor jump moves **focus** as well as
+pixels (`.focus({ preventScroll: true })` on a `tabindex="-1"` heading) or a keyboard user reads nothing,
+and Reduce Motion turns the animation off but keeps the jump.
+
+⚠️ **`web/voices/` IS STALE ON THIS MAC — 4 coaches against `docs/voices/`'s 10** (measured 2026-08-10).
+So the documented clobber is not hypothetical here: every `node web/app.ts` overwrites the committed audio,
+and `git checkout -- docs/voices/` after each build is mandatory, not cautionary.
+
 ## Deploy & links
 
 - Push to **`main`** → GitHub Pages serves `docs/` at **https://padder1980.github.io/Inte-Run/**.

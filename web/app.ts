@@ -2637,6 +2637,114 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 #view:has(.sti-page) .sti-foot { margin: 14px 2px 0; font-size: var(--t-meta); line-height: 1.6;
   color: var(--ink-faint); }
 #view:has(.sti-page) .sti-foot .ui-pill { margin-right: 6px; }
+/* ---- Fuelling & energy guide (Support > Fuelling & energy) ---------------------------------------
+   ⚠️ SCOPED UNDER #view:has(.fuel-guide-page) and built from tokens only, so both themes come out of
+   the existing palette. --peak (orange) is the CATEGORY cue for fuelling and is used for small
+   accents, rails and numbers; --accent (teal) stays the colour of navigation and actions. Orange is
+   never a second primary button colour and never a filled card, because a pale orange panel goes
+   muddy in dark mode and a saturated one shouts at somebody reading about their dinner.
+   ⚠️ Colour is never the only signal: every stage, band and rail also carries a word. */
+#view:has(.fuel-guide-page) .fg-scope { margin: 10px 0 0; font-size: var(--t-meta); line-height: 1.55;
+  color: var(--ink-faint); }
+#view:has(.fuel-guide-page) .fg-msg { margin: 12px 2px 0; padding: 11px 13px; border-radius: var(--r-ctl);
+  font-size: var(--t-meta); line-height: 1.55; color: var(--ink);
+  background: color-mix(in srgb, var(--peak) 9%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--peak) 26%, var(--line)); }
+/* The six quick choices. ⚠️ A WRAPPING GRID, NOT A SCROLLER — a horizontal chip row hides half the
+   choices at 390px, and the one somebody needs is as likely to be the sixth as the first. */
+#view:has(.fuel-guide-page) .fg-nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px; margin: 14px 0 4px; }
+#view:has(.fuel-guide-page) .fg-chip { display: flex; flex-direction: column; justify-content: center;
+  gap: 2px; min-height: var(--tap); padding: 9px 11px; text-align: left; font: inherit; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-ctl);
+  box-shadow: var(--shadow); }
+#view:has(.fuel-guide-page) .fg-chip:active { transform: scale(.99); }
+#view:has(.fuel-guide-page) .fg-chip b { font-size: var(--t-meta); font-weight: 720; color: var(--ink);
+  letter-spacing: -.01em; }
+#view:has(.fuel-guide-page) .fg-chip span { font-size: var(--t-label); line-height: 1.35; color: var(--ink-faint); }
+/* Sections. ⚠️ scroll-margin-top so a jumped-to heading does not sit against the app bar. */
+#view:has(.fuel-guide-page) .fg-sec { margin-top: 22px; scroll-margin-top: 12px; }
+#view:has(.fuel-guide-page) .fg-sech { margin: 0 2px 4px; font-size: var(--t-section); font-weight: 750;
+  letter-spacing: -.02em; color: var(--ink); }
+#view:has(.fuel-guide-page) .fg-sech:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+#view:has(.fuel-guide-page) .fg-secl { margin: 0 2px 10px; font-size: var(--t-meta); line-height: 1.55;
+  color: var(--ink-faint); }
+#view:has(.fuel-guide-page) .fg-p { margin: 0 0 10px; font-size: var(--t-meta); line-height: 1.6; color: var(--ink-soft); }
+#view:has(.fuel-guide-page) .fg-p:last-child { margin-bottom: 0; }
+#view:has(.fuel-guide-page) .fg-ul { margin: 0; padding-left: 18px; list-style: disc;
+  font-size: var(--t-meta); line-height: 1.6; color: var(--ink); }
+#view:has(.fuel-guide-page) .fg-ul > li { margin-bottom: 6px; }
+#view:has(.fuel-guide-page) .fg-ul > li:last-child { margin-bottom: 0; }
+#view:has(.fuel-guide-page) .fg-key { margin: 11px 0 0; font-size: var(--t-meta); line-height: 1.55; color: var(--ink); }
+#view:has(.fuel-guide-page) .fg-note { margin: 10px 0 0; font-size: var(--t-meta); line-height: 1.55; color: var(--ink-faint); }
+/* Collapsed cards: sessions, races, examples, the sweat-rate method and the energy check.
+   ⚠️ A THIN ORANGE RAIL, DRAWN AS AN INSET SHADOW so it follows the card radius instead of squaring
+   off the corners the way a left border does. */
+#view:has(.fuel-guide-page) .fg-det { margin-top: 9px; box-shadow: var(--shadow), inset 3px 0 0 0 color-mix(in srgb, var(--peak) 60%, var(--line)); }
+#view:has(.fuel-guide-page) .fg-det.plain { box-shadow: var(--shadow); }
+#view:has(.fuel-guide-page) .fg-sum { display: flex; align-items: center; gap: 10px; min-height: var(--tap);
+  cursor: pointer; list-style: none; }
+#view:has(.fuel-guide-page) .fg-sum::-webkit-details-marker { display: none; }
+#view:has(.fuel-guide-page) .fg-sum-b { flex: 1 1 auto; min-width: 0; }
+#view:has(.fuel-guide-page) .fg-sum-t { display: block; font-size: var(--t-card); font-weight: 720; letter-spacing: -.01em; color: var(--ink); }
+#view:has(.fuel-guide-page) .fg-sum-d { display: block; margin-top: 1px; font-size: var(--t-meta); line-height: 1.4; color: var(--ink-faint); }
+#view:has(.fuel-guide-page) .fg-sum::after { content: "+"; flex: none; margin-left: auto; font-family: var(--fig);
+  font-size: var(--t-card); color: var(--ink-faint); }
+#view:has(.fuel-guide-page) .fg-det[open] > .fg-sum::after { content: "\\2212"; }
+#view:has(.fuel-guide-page) .fg-det-b { padding-top: 6px; }
+/* Before / During / After. Stacked rows at every width — a three-column table is unreadable at 390px
+   and a horizontal scroller inside a card is worse. */
+#view:has(.fuel-guide-page) .fg-bda { margin: 0; border-radius: var(--r-ctl); overflow: hidden; border: 1px solid var(--line); }
+#view:has(.fuel-guide-page) .fg-bda-r { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px;
+  background: var(--surface-2); border-top: 1px solid var(--line); font-size: var(--t-meta); line-height: 1.55; color: var(--ink); }
+#view:has(.fuel-guide-page) .fg-bda-r:first-child { border-top: 0; }
+/* ⚠️ NOT RAW --peak: MEASURED 2.58:1 ON --surface-2 IN LIGHT MODE, which is a fail by a mile for
+   text. The orange is fine as a rail, a bar or a marker — it is a fill there, not something to read —
+   but the moment it carries words it has to clear 4.5:1. Mixed toward the theme's OWN ink, so it
+   darkens in light (5.25:1) and lightens in dark (9.16:1) from one declaration. */
+#view:has(.fuel-guide-page) .fg-bda-k { flex: none; min-width: 52px; font-size: var(--t-label); font-weight: 760;
+  letter-spacing: .06em; text-transform: uppercase; color: color-mix(in srgb, var(--peak) 60%, var(--ink));
+  padding-top: 2px; }
+/* The duration ladder. Words and numbers both, with the bar as the third signal. */
+#view:has(.fuel-guide-page) .fg-lad { margin: 0; border-radius: var(--r-ctl); overflow: hidden; border: 1px solid var(--line); }
+#view:has(.fuel-guide-page) .fg-lad-r { display: flex; align-items: center; gap: 11px; padding: 10px 12px;
+  background: var(--surface-2); border-top: 1px solid var(--line); }
+#view:has(.fuel-guide-page) .fg-lad-r:first-child { border-top: 0; }
+#view:has(.fuel-guide-page) .fg-lad-d { flex: none; min-width: 76px; font-family: var(--fig); font-weight: 750;
+  font-variant-numeric: tabular-nums; font-size: var(--t-meta); color: var(--ink); }
+#view:has(.fuel-guide-page) .fg-lad-w { font-size: var(--t-meta); line-height: 1.45; color: var(--ink-soft); }
+#view:has(.fuel-guide-page) .fg-lad-w b { color: var(--ink); }
+#view:has(.fuel-guide-page) .fg-bar { flex: none; width: 34px; height: 6px; border-radius: var(--r-pill); background: var(--line); overflow: hidden; }
+#view:has(.fuel-guide-page) .fg-bar i { display: block; height: 100%; border-radius: var(--r-pill); background: var(--peak); }
+/* The four-part meal. A 2x2 grid that becomes one column if the words get big. */
+#view:has(.fuel-guide-page) .fg-plate { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+#view:has(.fuel-guide-page) .fg-part { padding: 11px 12px; border-radius: var(--r-ctl); background: var(--surface-2);
+  border: 1px solid var(--line); }
+#view:has(.fuel-guide-page) .fg-part-h { font-size: var(--t-label); font-weight: 760; letter-spacing: .05em;
+  text-transform: uppercase; color: color-mix(in srgb, var(--peak) 60%, var(--ink)); }
+#view:has(.fuel-guide-page) .fg-part-b { margin-top: 4px; font-size: var(--t-meta); line-height: 1.5; color: var(--ink-soft); }
+/* Safety bands. --rest for the emergency one only; nothing else on this page is red. */
+#view:has(.fuel-guide-page) .fg-warn { margin: 11px 0 0; padding: 11px 13px; border-radius: var(--r-ctl);
+  font-size: var(--t-meta); line-height: 1.55; color: var(--ink);
+  background: color-mix(in srgb, var(--rest) 8%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--rest) 34%, var(--line)); }
+#view:has(.fuel-guide-page) .fg-warn-t { font-weight: 750; margin-bottom: 5px;
+  color: color-mix(in srgb, var(--rest) 80%, var(--ink)); }
+/* Common mistakes — a quiet inset, same shape as the injury guide's. */
+#view:has(.fuel-guide-page) .fg-not { background: var(--surface-2); }
+#view:has(.fuel-guide-page) .fg-nots { list-style: none; margin: 0; padding: 0; }
+#view:has(.fuel-guide-page) .fg-nots > li { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0;
+  border-top: 1px solid var(--line); font-size: var(--t-meta); line-height: 1.55; color: var(--ink); }
+#view:has(.fuel-guide-page) .fg-nots > li:first-child { border-top: 0; padding-top: 0; }
+#view:has(.fuel-guide-page) .fg-x { flex: none; width: 18px; height: 18px; border-radius: 50%; display: grid;
+  place-items: center; font-size: var(--t-label); font-weight: 700; margin-top: 1px;
+  color: var(--rest); background: color-mix(in srgb, var(--rest) 12%, transparent); }
+#view:has(.fuel-guide-page) .fg-why { color: var(--ink-soft); margin-top: 2px; }
+#view:has(.fuel-guide-page) .fg-foot { margin: 16px 2px 0; font-size: var(--t-meta); line-height: 1.6; color: var(--ink-faint); }
+#view:has(.fuel-guide-page) .fg-foot .ui-pill { margin-right: 6px; }
+/* The energy check-in keeps the existing screener's own controls; only its framing is new. */
+#view:has(.fuel-guide-page) .fg-det .opts { margin-top: 10px; }
+#view:has(.fuel-guide-page) .fg-det .ci-consent { margin-bottom: 8px; }
 /* Strava, on a run. The sent state is a row rather than a button because it is a place to go, not an
    action to repeat — it mirrors .str-offer so the debrief keeps one shape for "tap this to leave". */
 .stv-done { display: flex; align-items: center; gap: 12px; width: 100%; margin-top: 10px; padding: 14px 16px;
@@ -4969,8 +5077,8 @@ function alfieIntents() {
     { k: ["strides", "hill sprint"], a: () => "<p><b>Strides</b> are short accelerations \\u2014 around 20 seconds \\u2014 run relaxed and fast, with full recovery.</p><p>They\\u2019re not a workout; they\\u2019re maintenance for your top-end mechanics. They keep you feeling springy without adding meaningful fatigue.</p>" },
     { k: ["recovery run", "what is recovery"], a: () => "<p>A <b>recovery run</b> is deliberately very easy and short \\u2014 slower than your normal easy pace.</p><p>Its job is to move blood through tired legs, not to build fitness. If it feels like effort, walk some of it or take the day off entirely.</p>" },
     { k: ["strength", "gym", "weights", "lifting"], a: () => "<p>Heavy <b>strength training</b> twice a week is one of the best-evidenced things a runner can do \\u2014 it improves running economy and cuts injury risk, and it won\\u2019t make you bulky at these volumes.</p><p>Think squats, single-leg work, calf raises and hip strength. Low reps, challenging load. Put it on a quality day or after an easy run, not the day before a hard session.</p>" },
-    { k: ["fuel", "nutrition", "eat", "gel", "carb"], a: () => "<p>Under ~75 minutes you generally don\\u2019t need fuel mid-run.</p><p>Beyond that it scales with the run: about <b>30\\u201360 g of carbohydrate an hour</b> up to two and a half hours, <b>60\\u201390 g</b> past that, and <b>70\\u201390 g</b> on a marathon-pace long run \\u2014 that one is a dress rehearsal, so use the exact gels and timings you plan to race on.</p><p>Above 60 g an hour, use <b>mixed sugars</b> (glucose and fructose) or your gut will object. Build up gradually.</p><p>Open any long session and I\\u2019ll print the numbers for that specific run.</p><p>Day to day, the bigger lever is simply <b>eating enough</b>. Under-fuelling is the most common reason training stops working.</p>" },
-    { k: ["hydrat", "drink", "water", "electrolyte"], a: () => "<p>Drink to thirst \\u2014 it\\u2019s a better guide than a fixed schedule for most runners.</p><p>In heat or on runs over an hour, add <b>sodium</b> (a sports drink or electrolyte tab), not just water. Over-drinking plain water on long efforts is genuinely dangerous.</p>" },
+    { k: ["fuel", "nutrition", "eat", "gel", "carb"], a: () => "<p>Under ~75 minutes you generally don\\u2019t need fuel mid-run if you started fed. A small amount can help a hard effort approaching an hour, but it\\u2019s optional.</p><p>Beyond that it scales with the run: about <b>30\\u201360 g of carbohydrate an hour</b> up to two and a half hours, and <b>60\\u201390 g</b> past that. A marathon-pace long run is the dress rehearsal \\u2014 same band, but use the exact products and timings you plan to race on.</p><p>Above about 60 g an hour, <b>mixed sugars</b> (glucose or maltodextrin and fructose) absorb better than one type alone. Gut symptoms have several causes though \\u2014 high intakes, concentrated products, heat, pace and fluid balance \\u2014 so build up gradually and practise it.</p><p>Gel counts are an estimate: <b>check the label, products vary</b>. Think in grams an hour and split it across drink, chews and food.</p><p>Open any long session and I\\u2019ll print the numbers for that specific run.</p><p>Day to day, the bigger lever is simply <b>eating enough</b>. Under-fuelling is the most common reason training stops working.</p>" },
+    { k: ["hydrat", "drink", "water", "electrolyte"], a: () => "<p>Drink to thirst on most runs \\u2014 it\\u2019s a better guide than a fixed schedule.</p><p>On long or hot runs, use a fluid plan you\\u2019ve practised and consider <b>sodium</b> (a sports drink or electrolyte tab) to replace what you sweat out.</p><p><b>Don\\u2019t over-drink water or sports drink.</b> Sodium doesn\\u2019t make excess fluid safe \\u2014 drinking beyond your losses on a long effort can push your blood sodium dangerously low, and you should never finish a run heavier than you started.</p>" },
     { k: ["sleep", "recover", "rest"], a: () => "<p><b>Sleep is the most powerful recovery tool you have</b> \\u2014 more than any supplement, gadget or protocol.</p><p>Consistent 7\\u20139 hours does more for your training than an extra session would. When life squeezes your sleep, that\\u2019s the week to take the easy option in training, not the hard one.</p>" },
     { k: ["taper", "before the race", "race week"], a: () => "<p><b>Tapering</b> means cutting volume while keeping some intensity \\u2014 typically over the final 1\\u20133 weeks depending on the distance.</p><p>You keep the sharpness and shed the fatigue. Feeling twitchy, heavy-legged or doubtful during a taper is completely normal \\u2014 resist the urge to \\u201ctest\\u201d your fitness.</p>" },
     { k: ["missed", "behind", "skipped a", "fell off", "catch up"], a: () => "<p>Missing sessions is normal and it doesn\\u2019t undo your training.</p><p><b>Don\\u2019t try to make them up.</b> Cramming two hard sessions together is how a missed week turns into an injured month. Just rejoin the plan where it is today.</p><p>If you\\u2019ve missed more than a couple of weeks, ease back in \\u2014 drop the intensity for a few runs before picking the plan back up.</p>" },
@@ -7367,7 +7475,14 @@ const SUPPORT_HUB = [
   // into a keyword list.
   { id: "redflags", ic: "heart", c: "var(--rest)", t: "Injury & symptoms", d: "What to do now, through the first two weeks.", interactive: false,
     kw: "sprain strain sprained strained pulled muscle pull twisted ankle rolled ankle hamstring calf quad quadriceps groin adductor glute bruise bruising contusion swelling swollen ice icing cold pack compression elevation massage heat limp hobbling first 24 hours first two weeks when can I run return to running walk run rehab recovery hurt injury injured niggle" },
-  { id: "reds", ic: "fuel", c: "var(--peak)", t: "Fuelling & energy", d: "Are you getting enough? A gentle RED-S check.", interactive: true },
+  // ⚠️ interactive:false DROPS THE "CHECK-IN" BADGE, same reasoning as the injury card above: this is a
+  // food-first guide now, and the under-fuelling checklist is one collapsed section inside it rather
+  // than the whole destination. Everything else is unchanged on purpose — same id, same position under
+  // Private check-ins, same orange drop — so existing navigation, links and search keep working.
+  // ⚠️ kw IS SEARCH-ONLY, and it is what makes "porridge" or "gel" find this page. The description is
+  // one calm line; the words a hungry runner actually types are not.
+  { id: "reds", ic: "fuel", c: "var(--peak)", t: "Fuelling & energy", d: "Food, fluids and recovery for every run.", interactive: false,
+    kw: "food eat eating meal meals breakfast lunch dinner snack snacks porridge oats pasta rice banana before run after run pre-run post-run carb carbs carbohydrate protein iron calcium fat fibre drink drinking water hydration hydrate dehydration fluid fluids sodium salt electrolyte sports drink gel gels chews loading carb loading 5k 10k half marathon race day fuelling fueling recovery refuel sleep rest gut stomach nausea RED-S under-fuelling underfuelling low energy availability energy availability appetite dietitian vegan vegetarian plant-based" },
   { id: "female", ic: "flower", c: "var(--taper)", t: "Women's health", d: "Symptom-informed prompts — periods, postpartum, more.", interactive: true },
   { id: "strength", ic: "dumbbell", c: "var(--build)", t: "Strength & mobility", d: "Why strength matters, and how to fit it in.", interactive: false },
   { id: "guides", ic: "book", c: "var(--accent)", t: "Training guides", d: "Plain-English answers grounded in the research.", interactive: false },
@@ -7807,11 +7922,11 @@ const GUIDES = [
     "<b>Resist testing yourself.</b> A hard session late in the taper can only confirm what you already know or cost you the race.",
   ] },
   { t: "Fuelling and hydration", k: "fuel", d: "What to take, when, and the mistake most runners make", b: [
-    "Under about 75 minutes you generally don't need fuel during a run \\u2014 you have enough stored carbohydrate.",
-    "Beyond that the dose scales with the run: roughly <b>30\\u201360 g of carbohydrate an hour</b> up to about two and a half hours, and <b>60\\u201390 g</b> beyond it \\u2014 a marathon-pace long run is fuelled like the race itself, at <b>70\\u201390 g</b>.",
-    "<b>Above 60 g an hour you need mixed sugars</b> (glucose <i>and</i> fructose). One type alone hits a ceiling in the gut, which is where the classic gel stomach-ache comes from.",
-    "Build up gradually \\u2014 your gut adapts like your legs do. Your plan now prints the numbers on each long session, so you can practise the exact amount you intend to race on.",
-    "Drink to thirst. On long or hot runs include <b>sodium</b>, not just water \\u2014 over-drinking plain water during prolonged effort is genuinely dangerous.",
+    "Under about 75 minutes you generally don't need fuel during a run if you started fed \\u2014 you have enough stored carbohydrate. A small amount can help a hard effort approaching an hour, but it's optional.",
+    "Beyond that the dose scales with the run: roughly <b>30\\u201360 g of carbohydrate an hour</b> up to about two and a half hours, and <b>60\\u201390 g</b> beyond it. A marathon-pace long run is the dress rehearsal \\u2014 same band, but use the exact products and timings you plan to race on.",
+    "<b>Above about 60 g an hour, mixed sugars absorb better</b> than one type alone (glucose or maltodextrin <i>and</i> fructose). Gut symptoms have several causes though \\u2014 high intakes, concentrated products, heat, pace and fluid balance all contribute \\u2014 so build up gradually and practise.",
+    "Gel counts are only ever an estimate: <b>check the label, because products vary</b> from about 20 to 30 g. Think in grams an hour, and split it across drink, chews and food if that's easier.",
+    "Drink to thirst on most runs. On long or hot ones use a fluid plan you've practised and consider <b>sodium</b> to replace what you sweat out \\u2014 but don't over-drink water <i>or</i> sports drink, because sodium doesn't make excess fluid safe.",
     "<b>The bigger lever is day-to-day:</b> under-eating is the most common reason training stops working. Fuelling enough is a performance decision, not an indulgence.",
   ] },
   { t: "Recovery, sleep and rest days", k: "recovery", d: "Where the adaptation actually happens", b: [
@@ -9038,7 +9153,14 @@ function guidesView() {
 }
 const FLAGS_PHYS = { "chest-pain":"Chest pain or pressure","collapse-or-fainting":"Fainting or collapse","severe-breathlessness":"Severe breathlessness","neurological":"Confusion, severe headache, weakness","bone-pain":"Pinpoint bone pain","rapidly-worsening-pain":"Pain worsening quickly" };
 const FLAGS_WELL = { "eating-disorder-concern":"Worries about my eating","menstrual-disruption":"Periods stopped / irregular","mental-health-concern":"Struggling mentally","self-harm-thoughts":"Thoughts of harming myself" };
-const REDS_OPTS = { "unintentional-weight-loss":"Losing weight unintentionally","restrictive-or-skipped-meals":"Skipping / restricting meals","menstrual-disruption":"Periods stopped / irregular","bone-stress-history":"Bone stress injury history","recurrent-illness":"Getting ill often","persistent-fatigue":"Persistent fatigue","always-feeling-cold":"Always cold","low-mood-or-irritability":"Low mood" };
+/**
+ * ⚠️ ALL TWELVE INDICATORS THE ENGINE SUPPORTS, IN THE ORDER SOMEBODY WOULD NOTICE THEM. Four of the
+ * RedSIndicator union had no checkbox at all — preoccupation with food, libido, poor recovery and gut
+ * discomfort — so screenRedS could never see them, and a runner could tick every box on screen while
+ * the thing actually happening to them had nowhere to go. Two of the four missing ones are STRONG-
+ * adjacent signals a dietitian would ask about first. Keep this map and the union in step.
+ */
+const REDS_OPTS = { "unintentional-weight-loss":"Losing weight without trying","restrictive-or-skipped-meals":"Skipping or restricting meals, or avoiding food groups","preoccupation-with-food-or-weight":"Preoccupied or distressed about food, exercise or weight","menstrual-disruption":"Periods stopped or became irregular","low-libido":"Lower libido, or loss of morning erections","recurrent-illness":"Repeated illness","bone-stress-history":"Bone stress injury history, or pinpoint bone pain","poor-recovery":"Poor recovery, or performance falling away","persistent-fatigue":"Persistent fatigue","always-feeling-cold":"Feeling cold often","low-mood-or-irritability":"Low mood or irritability","gi-discomfort":"Repeated stomach or gut discomfort" };
 const PROF = RC.PROFESSIONAL_LABEL;
 function referLine(refer) { if (!refer || !refer.length) return ""; const n = refer.map((r) => PROF[r] || r); const j = n.length>1 ? n.slice(0,-1).join(", ") + " or " + n[n.length-1] : n[0]; return '<div class="rf">Talk to ' + j + '.</div>'; }
 function checks(map, name) { return Object.entries(map).map(([k,v]) => '<label class="opt"><input type="checkbox" data-chk="' + name + '" value="' + k + '"><span>' + v + '</span></label>').join(""); }
@@ -9334,9 +9456,455 @@ function redflagsView() {
       'injury and does not replace being examined.</p>' +
     '</div>';
 }
+/* ============ FUELLING & ENERGY GUIDE ======================================
+ * Support > Fuelling & energy. Implements INTE-RUN_FUELLING_ENERGY_BRIEF.md, replacing the
+ * checkbox-only RED-S screen that used to be this whole destination.
+ *
+ * The product position, and every decision below follows from it:
+ *   Eat enough every day. Add fuel as the work gets longer or harder. Practise race day before race day.
+ *
+ * ⚠️ IT IS NOT A CALORIE TRACKER, A DIET PLAN OR A PERFECT PLATE, and it never can become one. This
+ * page sits on the same route as a low-energy-availability screen, so a number a runner could eat down
+ * to is not a feature here, it is a hazard. Nothing is stored, nothing is weighed, nothing is scored.
+ *
+ * ⚠️ THE RED-S SCREEN IS STILL HERE — moved, not deleted, into "Could you be under-fuelling?" near the
+ * end. Deleting it would remove the one genuinely safety-critical thing this destination did; burying
+ * it in the footer would be the same thing done quietly. It is one tap from the quick choices at the
+ * top and it renders every indicator the engine supports, which it did not before.
+ */
+/** A collapsed card. ⚠️ name= makes a group behave as an accordion natively — no JS, no animation. */
+function fgDet(o) {
+  return '<details class="card fg-det' + (o.plain ? " plain" : "") + '"' +
+    (o.group ? ' name="' + o.group + '"' : "") + (o.open ? " open" : "") + '>' +
+    '<summary class="fg-sum"><span class="fg-sum-b"><b class="fg-sum-t">' + o.t + '</b>' +
+    (o.d ? '<span class="fg-sum-d">' + o.d + '</span>' : "") + '</span></summary>' +
+    '<div class="fg-det-b">' + o.b + '</div></details>';
+}
+/**
+ * Before / during / after, stacked.
+ * ⚠️ ALWAYS ALL THREE ROWS, even when the answer is "nothing special". A missing During row reads as
+ * an omission the runner has to resolve themselves, and the resolution they reach for is a gel.
+ */
+function fgBda(before, during, after) {
+  return '<div class="fg-bda">' +
+    '<div class="fg-bda-r"><span class="fg-bda-k">Before</span><span>' + before + '</span></div>' +
+    '<div class="fg-bda-r"><span class="fg-bda-k">During</span><span>' + during + '</span></div>' +
+    '<div class="fg-bda-r"><span class="fg-bda-k">After</span><span>' + after + '</span></div>' +
+    '</div>';
+}
+/** A section wrapper. The heading takes focus when a quick choice jumps to it. */
+function fgSec(id, title, lead, body) {
+  return '<section class="fg-sec" id="' + id + '">' +
+    '<h3 class="fg-sech" tabindex="-1">' + title + '</h3>' +
+    (lead ? '<p class="fg-secl">' + lead + '</p>' : "") + body + '</section>';
+}
+/**
+ * The six quick choices.
+ * ⚠️ ANCHORS WITHIN THIS PAGE, NEVER SIX NEW ROUTES. A runner asking "what do I eat before my long
+ * run" and a runner asking "am I eating enough" are the same person on different days, and splitting
+ * them across six destinations means whichever one they land on looks like the whole answer.
+ */
+function fgNav() {
+  const items = [
+    ["fgSession", "Fuel a session", "Easy, hard, long or strength"],
+    ["fgRace", "Plan race day", "5K to marathon"],
+    ["fgMeals", "Build everyday meals", "Simple meals and snacks"],
+    ["fgDrink", "Drink well", "Before, during and after"],
+    ["fgRecover", "Recover", "Food, fluid, rest and sleep"],
+    ["fgEnergy", "Check my energy health", "Signs you may not be eating enough"],
+  ];
+  return '<nav class="fg-nav" aria-label="Fuelling guide sections">' + items.map((i) =>
+    '<button class="fg-chip" data-fgnav="' + i[0] + '"><b>' + i[1] + '</b><span>' + i[2] + '</span></button>').join("") + '</nav>';
+}
+/**
+ * The duration ladder.
+ * ⚠️ WORDS AND NUMBERS ON EVERY RUNG, with the bar as the third signal only. A ladder whose meaning
+ * lives in the width of an orange bar says nothing to somebody who cannot see it, and nothing at all
+ * in a screenshot.
+ */
+function fgLadder() {
+  // ⚠️ THE RUNGS ARE THE ENGINE'S BOUNDARIES, NOT THE BRIEF'S. The brief's ladder is 60–90 / 90–150,
+  // which is the right consumer synthesis in the abstract and disagrees with this app: NO_FUEL_BELOW_MIN
+  // is 75, so every session of 75 minutes or more already renders a card reading "Fuel this one: 30–60 g
+  // of carbs an hour". Measured on one real half-marathon plan, six long runs land in the 75–89 minute
+  // window — so a runner would read "a small amount is optional" here and be handed a prescription on
+  // Today, which is the surface they meet first. Four other places (both guide articles, both Alfie
+  // answers) already say 75, and the Long run card below says 75. The ladder was the only outlier.
+  const rows = [
+    ["Under 60 min", 8, "<b>Usually nothing during.</b> Turn up fed and drink to thirst."],
+    ["60–75 min", 16, "<b>A small amount is optional</b> for hard work, and unnecessary for most training runs."],
+    ["75–150 min", 26, "<b>Build towards 30–60 g of carbohydrate an hour</b>, starting early."],
+    ["Over 150 min", 34, "<b>Build towards 60–90 g an hour</b> from mixed sugars, practised in advance."],
+  ];
+  return '<div class="fg-lad">' + rows.map((r) =>
+    '<div class="fg-lad-r"><span class="fg-lad-d">' + r[0] + '</span>' +
+    '<span class="fg-bar" aria-hidden="true"><i style="width:' + Math.round((r[1] / 34) * 100) + '%"></i></span>' +
+    '<span class="fg-lad-w">' + r[2] + '</span></div>').join("") + '</div>';
+}
+/** One card per kind of session. All collapsed: ten open cards is not a decision, it is a document. */
+function fgSessions() {
+  const cards = [
+    { t: "Easy or recovery run", d: "Usually under 60 minutes",
+      b: fgBda(
+        "Normal meals are enough. A small snack if you are hungry, or if your last meal was several hours ago.",
+        "No carbohydrate is normally needed. Drink to thirst.",
+        "Carry on eating normally. If your next meal is soon, no special shake or bar is needed.") },
+    { t: "Intervals, hills or tempo", d: "Hard work, usually inside an hour",
+      b: fgBda(
+        "Make the meal before it carbohydrate-rich. If that was more than two to three hours ago, add a light snack 30–90 minutes before.",
+        "For most sessions under an hour, water is enough. If the whole session runs over an hour, is very hard, or is in heat, a sports drink or small carbohydrate intake can help.",
+        "Carbohydrate plus a protein source — particularly if you are running again tomorrow.") },
+    { t: "Long run", d: "About 60–150 minutes",
+      b: fgBda(
+        "A familiar carbohydrate-rich meal two to four hours before, and a small snack nearer the start if you need it.",
+        "Once the run moves beyond roughly 75–90 minutes, aim for <b>30–60 g of carbohydrate an hour</b>, starting early rather than waiting to feel empty. Practise the lower end first.",
+        "A normal meal with carbohydrate, protein and fluid within roughly two hours.") },
+    { t: "Very long run or marathon rehearsal", d: "Over about 2.5 hours",
+      b: fgBda(
+        "The same meal, timing and foods you intend to use on race day. That is the point of the session.",
+        "Build towards <b>60–90 g of carbohydrate an hour</b> from a mixture of glucose or maltodextrin and fructose. Start lower, build across several long runs, and use the exact products you plan to race on.",
+        "Start recovery soon, especially if you are training again within 24 hours.") +
+        '<p class="fg-note">Your plan prints the numbers on each long session, so you can practise the amount you intend to race on.</p>' },
+    { t: "Strength or cross-training", d: "Gym, bike, swim, class",
+      b: fgBda(
+        "Normal meals are usually enough. A snack if it has been several hours since you ate.",
+        "Water is normally enough for a standard session.",
+        "A meaningful protein serving and some carbohydrate, especially when a run follows later that day or the next morning.") },
+    { t: "Rest day", d: "Not a fasting day",
+      b: '<p class="fg-p">Eat regular meals. Keep protein, fruit and vegetables and fluids steady. ' +
+        'Extra sports fuel is unnecessary, but carbohydrate is still part of the day.</p>' +
+        '<p class="fg-p">A rest day is where training is absorbed. It is not a day to compensate for eating.</p>' },
+  ];
+  return cards.map((c) => fgDet({ t: c.t, d: c.d, b: c.b, group: "fgSess" })).join("");
+}
+/**
+ * Making the grams mean something.
+ * ⚠️ EVERY CONVERSION CARRIES "CHECK THE LABEL", because GEL_GRAMS is 22 and real products run 20–30.
+ * An unqualified gel count is presented as nutrition data and acted on as one — and a runner who
+ * counts four gels for a 90 g hour is a third short.
+ */
+function fgCarbAmounts() {
+  const twenty = ["One typical gel.", "About 500 ml of a 6% sports drink.", "One banana, depending on size.",
+    "A small box or handful of raisins.", "A serving of chews, according to the packet.",
+    "One slice of bread with jam or honey."];
+  const hourly = ["<b>About 30 g an hour:</b> one gel, or 500 ml of sports drink, or the food equivalent.",
+    "<b>About 45–60 g an hour:</b> one gel plus sports drink, or two smaller servings spread across the hour.",
+    "<b>About 60–90 g an hour:</b> several small servings from a glucose-plus-fructose mix, practised over time."];
+  return fgDet({ t: "What does 30 g of carbohydrate look like?", d: "Roughly 20–30 g each", plain: true, group: "fgSess",
+    b: '<ul class="fg-ul">' + twenty.map((t) => "<li>" + t + "</li>").join("") + '</ul>' +
+      '<div class="fuel-card" style="margin-top:14px"><div class="fuel-h">' + ICON.fuel + '<span>Simple hourly examples</span></div>' +
+      '<ul class="fuel-l">' + hourly.map((t) => "<li>" + t + "</li>").join("") + '</ul>' +
+      '<div class="fuel-n">Exact amounts vary by brand and portion — check the label; products vary. ' +
+      'An hourly target can be split across drink, gels, chews and ordinary food, and most people do split it. ' +
+      'Take water with a gel when the label says to.</div></div>' });
+}
+/**
+ * Race day.
+ * ⚠️ DISTANCE IS THE WAY IN, TIME IS THE ANSWER. People recognise "half marathon" and not "about two
+ * hours twenty", so the cards are labelled by distance — and every one of them says immediately that
+ * the expected finish time matters more, because a 2:45 half and a 1:20 half are different problems.
+ */
+function fgRaces() {
+  const cards = [
+    { t: "5K", d: "No fuel needed during it",
+      b: '<ul class="fg-ul">' +
+        '<li><b>Day before:</b> normal balanced meals. No carbohydrate load is needed.</li>' +
+        '<li><b>2–3 hours before:</b> a familiar breakfast or meal — porridge and banana, cereal and toast, or a bagel with yoghurt.</li>' +
+        '<li><b>Near the start:</b> an optional small snack if you are hungry.</li>' +
+        '<li><b>During:</b> no fuel is needed. A small drink may help in heat, but do not gulp at the start.</li></ul>' },
+    { t: "10K", d: "A gel is optional, not expected",
+      b: '<ul class="fg-ul">' +
+        '<li><b>Day before:</b> normal meals with a familiar carbohydrate source. No formal loading is needed.</li>' +
+        '<li><b>2–3 hours before:</b> a carbohydrate-rich meal with moderate protein and familiar fluid.</li>' +
+        '<li><b>During:</b> most runners do not need a gel. If you will be racing for more than about an hour, a small carbohydrate amount or sports drink is optional — and should be practised first.</li></ul>' },
+    { t: "Half marathon", d: "30–60 g an hour, started early",
+      b: '<ul class="fg-ul">' +
+        '<li><b>Day before:</b> make meals and snacks carbohydrate-forward, particularly if you expect to be out more than 90 minutes. Avoid unusually large, rich or high-fibre meals if they cause you symptoms.</li>' +
+        '<li><b>2–4 hours before:</b> a familiar carbohydrate-rich breakfast.</li>' +
+        '<li><b>During:</b> aim for <b>30–60 g an hour</b>, beginning in the first 20–30 minutes. Drink according to thirst and the plan you practised. If you expect to be out more than 2.5 hours, work towards the lower part of the 60–90 g band.</li>' +
+        '<li><b>Practice:</b> rehearse the same breakfast and the same intake on your long runs.</li></ul>' },
+    { t: "Marathon", d: "60–90 g an hour, and nothing new on the day",
+      b: '<ul class="fg-ul">' +
+        '<li><b>Final 36–48 hours:</b> make each meal and snack carbohydrate-rich. Reduce very high-fibre foods only if your gut is sensitive. Do not turn loading into one huge pasta dinner.</li>' +
+        '<li><b>2–4 hours before:</b> a familiar carbohydrate-rich breakfast.</li>' +
+        '<li><b>During:</b> build and rehearse towards <b>60–90 g an hour</b>, starting early, using glucose or maltodextrin plus fructose.</li>' +
+        '<li><b>Fluids:</b> plan around the weather, the spacing of the aid stations, your pace and your sweat rate. Do not drink at every station automatically, and do not drink beyond your losses.</li></ul>' +
+        '<p class="fg-key"><b>The golden rule:</b> nothing new on race morning. Not food, not drink, not a gel, not a caffeine dose, not a supplement.</p>' +
+        fgDet({ t: "The specialist version of carbohydrate loading", plain: true,
+          b: '<p class="fg-p">Full glycogen loading is commonly described as roughly <b>10–12 g of carbohydrate per kg of body mass per day for 36–48 hours</b>. ' +
+            'It is a specialist target, it feels like a very large volume of food, and it needs to have been practised.</p>' +
+            '<p class="fg-p">It is not something to attempt for the first time before a race, and it is not appropriate ' +
+            'for anyone with a history of disordered eating. Carbohydrate-rich normal meals are the version almost everybody should use.</p>' }) +
+        fgDet({ t: "An example day before", plain: true,
+          b: '<p class="fg-p">An example, not a compulsory menu — swap in the foods you actually eat.</p>' +
+            '<ul class="fg-ul">' +
+            '<li><b>Breakfast:</b> cereal, milk or soya drink, banana, toast with jam.</li>' +
+            '<li><b>Snack:</b> yoghurt or soya yoghurt, granola, fruit juice.</li>' +
+            '<li><b>Lunch:</b> a rice bowl, or sandwiches or wraps with a moderate protein filling, and fruit.</li>' +
+            '<li><b>Snack:</b> crumpets, pancakes or rice pudding.</li>' +
+            '<li><b>Dinner:</b> pasta, noodles or rice with a familiar lower-fat sauce and modest protein.</li>' +
+            '<li><b>Evening:</b> cereal, toast or a milk-based drink if you are hungry.</li></ul>' }) },
+  ];
+  return '<p class="fg-key"><b>Your expected time matters more than the distance.</b> Two hours on your ' +
+    'feet is two hours on your feet, whatever the race is called — and everything below should be ' +
+    'rehearsed in training before you rely on it.</p>' +
+    cards.map((c) => fgDet({ t: c.t, d: c.d, b: c.b, group: "fgRace" })).join("");
+}
+/**
+ * Everyday food.
+ * ⚠️ FOUR PARTS, NO PERCENTAGES. Requirements move day to day and the standard national proportions
+ * apply across a week rather than to every athlete plate, so a pie chart would be precise and wrong.
+ * Every carbohydrate and protein example has a plant version beside it.
+ */
+function fgMeals() {
+  const parts = [
+    ["Carbohydrate", "For running: oats, cereal, bread, rice, pasta, potatoes, noodles, couscous, wraps or fruit."],
+    ["Protein", "For repair: yoghurt, milk, eggs, fish, chicken, lean meat, tofu, tempeh, beans or lentils."],
+    ["Colour", "Fruit or vegetables you actually enjoy — fresh, frozen or tinned all count."],
+    ["Fats and flavour", "Olive or rapeseed oil, nuts, seeds, avocado, nut butter, cheese or sauces."],
+  ].map((p) => '<div class="fg-part"><div class="fg-part-h">' + p[0] + '</div><div class="fg-part-b">' + p[1] + '</div></div>').join("");
+  const grow = [
+    ["Easy day", 12, "A normal serving of carbohydrate."],
+    ["Hard day", 22, "A bigger serving, and a snack around the session."],
+    ["Long day", 34, "The biggest servings, plus extra snacks across the day."],
+  ].map((r) => '<div class="fg-lad-r"><span class="fg-lad-d">' + r[0] + '</span>' +
+    '<span class="fg-bar" aria-hidden="true"><i style="width:' + Math.round((r[1] / 34) * 100) + '%"></i></span>' +
+    '<span class="fg-lad-w">' + r[2] + '</span></div>').join("");
+  return '<section class="card"><h4 class="subhead" style="margin-top:0">Build most meals from four parts</h4>' +
+    '<div class="fg-plate">' + parts + '</div>' +
+    '<p class="fg-key"><b>Keep protein regular. Turn carbohydrate up when the running gets longer or harder.</b></p>' +
+    '<p class="fg-note">This balance is built across the day, not judged at every plate. Rest days still ' +
+    'need regular meals, protein and carbohydrate — they are not fasting days.</p>' +
+    '<div class="fg-lad" style="margin-top:12px">' + grow + '</div></section>' +
+    fgDet({ t: "A useful eating rhythm", d: "Three meals plus one to three snacks", group: "fgMeal",
+      b: '<p class="fg-p">Most runners find <b>three meals plus one to three snacks</b> easier than trying to ' +
+        'repair a whole training day with dinner. Use hunger, when you train and what the day demands, ' +
+        'rather than the clock alone.</p>' +
+        '<p class="fg-p">On heavy days, avoid gaps much longer than about four waking hours when you can.</p>' }) +
+    fgDet({ t: "Breakfast ideas", group: "fgMeal", b: '<ul class="fg-ul">' +
+      '<li>Porridge with milk or fortified soya drink, banana, honey and yoghurt.</li>' +
+      '<li>Cereal with milk or soya drink, berries and toast.</li>' +
+      '<li>Eggs on toast with fruit and yoghurt.</li>' +
+      '<li>Bagel with peanut butter and banana.</li>' +
+      '<li>Overnight oats with yoghurt or soya yoghurt, fruit and seeds.</li></ul>' }) +
+    fgDet({ t: "Lunch and dinner ideas", group: "fgMeal", b: '<ul class="fg-ul">' +
+      '<li>Rice bowl with chicken, tofu or beans, vegetables and a sauce.</li>' +
+      '<li>Pasta with tomato sauce, lean mince or lentils, and a side salad.</li>' +
+      '<li>Jacket potato with tuna, cottage cheese, chilli or beans, plus vegetables.</li>' +
+      '<li>Noodles with eggs or tofu, vegetables and a sesame or peanut sauce.</li>' +
+      '<li>Wraps with chicken or falafel, hummus, salad and fruit.</li>' +
+      '<li>Curry with rice, vegetables and fish, chicken, tofu or lentils.</li></ul>' }) +
+    fgDet({ t: "Snacks that work", group: "fgMeal", b: '<ul class="fg-ul">' +
+      '<li>Yoghurt or fortified soya yoghurt with fruit and granola.</li>' +
+      '<li>Toast, a crumpet or a bagel with jam, honey, cheese or nut butter.</li>' +
+      '<li>Banana and a glass of milk or soya drink.</li>' +
+      '<li>Cereal and milk.</li>' +
+      '<li>A sandwich or a wrap.</li>' +
+      '<li>Dried fruit and nuts, when there is plenty of time before running.</li>' +
+      '<li>Rice pudding, overnight oats or a smoothie when your appetite is low.</li></ul>' }) +
+    fgDet({ t: "Nutrients worth not ignoring", d: "Iron, calcium, and why not to guess", group: "fgMeal",
+      b: '<ul class="fg-ul">' +
+        '<li><b>Iron:</b> meat, fish, eggs, fortified cereal, beans, lentils and tofu. Add a vitamin-C food ' +
+        'alongside plant sources. <b>Do not take iron supplements without a blood test and clinical advice.</b></li>' +
+        '<li><b>Calcium:</b> dairy or calcium-fortified alternatives, calcium-set tofu, and some tinned fish.</li>' +
+        '<li><b>Fruit and vegetables:</b> variety across the week matters far more than any single food.</li></ul>' +
+        '<p class="fg-note">Persistent fatigue, breathlessness, unusually poor training, frequent illness or ' +
+        'heavy periods deserve a proper assessment rather than a supplement chosen by guesswork.</p>' }) +
+    fgTiming();
+}
+/** When you run decides what fits around it. Four situations, because those are the four people. */
+function fgTiming() {
+  return fgDet({ t: "Eating around when you run", d: "Morning, lunchtime, after work — and close to the start", group: "fgMeal",
+    b: '<p class="fg-p"><b>If you run early morning.</b> For an easy run under about an hour, a full meal ' +
+      'first is not essential if you feel well — a banana, toast with jam, or a few mouthfuls of sports drink ' +
+      'if you are hungry, and breakfast afterwards. Before a hard or long run, have a small carbohydrate snack ' +
+      'and fuel during it when the duration calls for it; a larger familiar breakfast two to four hours before ' +
+      'is better when the start time allows. <b>Do not make fasted running a rule</b>, and stop if you feel ' +
+      'dizzy, shaky, faint or unable to hold a normal effort.</p>' +
+      '<p class="fg-p"><b>If you run at lunchtime.</b> Eat breakfast normally. Have a carbohydrate-rich snack ' +
+      'one to two hours before if lunch will come afterwards — a banana and yoghurt, toast with jam, cereal ' +
+      'and milk, or a small bagel. Then eat lunch with carbohydrate, protein and fluid.</p>' +
+      '<p class="fg-p"><b>If you run after work.</b> Do not try to carry the session on breakfast alone. Eat ' +
+      'lunch, then add a snack one to two hours before — a cereal bar and fruit, yoghurt and granola, toast, ' +
+      'a small sandwich or a banana. Eat a normal dinner afterwards; a recovery snack is only useful if dinner ' +
+      'will be delayed.</p>' +
+      '<div class="fg-bda" style="margin-top:12px">' +
+      '<div class="fg-bda-r"><span class="fg-bda-k">2–4 h</span><span>A normal carbohydrate-rich meal with some protein.</span></div>' +
+      '<div class="fg-bda-r"><span class="fg-bda-k">1–2 h</span><span>A smaller meal or a snack.</span></div>' +
+      '<div class="fg-bda-r"><span class="fg-bda-k">Under 1 h</span><span>A small, lower-fibre carbohydrate snack if you need one.</span></div>' +
+      '</div>' +
+      '<p class="fg-note">The closer the run, the smaller and simpler the food. If fat, fibre, dairy or large ' +
+      'meals repeatedly upset your stomach, reduce that trigger close to running — do not remove it from your ' +
+      'whole diet without a good reason.</p>' });
+}
+/**
+ * Fluids.
+ * ⚠️ THE SAFETY POINT IS NOT "DRINK MORE", AND THIS IS THE ONE SECTION ON THE PAGE THAT COULD HARM
+ * SOMEBODY. Exercise-associated low blood sodium is driven by drinking beyond your losses, and a
+ * sports drink can be over-consumed exactly as water can. So sodium is never described as protection
+ * against over-drinking, and the emergency signs are stated plainly rather than implied.
+ */
+function fgFluids() {
+  return '<section class="card">' +
+    '<p class="fg-p"><b>Every day.</b> Drink regularly across the day and with meals. Pale-straw urine is a ' +
+    'useful rough check — perfectly clear urine all day can mean more fluid than you need. Morning urine, ' +
+    'supplements and some foods change the colour, so it is not a precise test.</p>' +
+    '<p class="fg-p"><b>Before a run.</b> Arrive having drunk normally. Do not water-load. Sip with your ' +
+    'pre-run meal and use thirst and urine colour as rough cues.</p>' +
+    '<p class="fg-p"><b>During a run.</b> On short or cool runs, drink to thirst — carrying fluid may be ' +
+    'unnecessary. On long or hot runs, take small regular amounts based on your previous runs, the ' +
+    'temperature, what you can carry or reach, and how much you sweat.</p>' +
+    '<p class="fg-p"><b>A sports drink</b> can give you carbohydrate, fluid and sodium together, but it still ' +
+    'counts towards your total fluid. Sodium can help during prolonged or hot running if you lose a lot of it, ' +
+    'or your sweat tastes salty — but <b>it does not make excess fluid safe</b>. You should never finish a ' +
+    'run heavier than you started it: over-drinking water <i>or</i> sports drink can push your blood sodium ' +
+    'dangerously low.</p>' +
+    '<p class="fg-p"><b>After a run.</b> For ordinary training, drink to thirst and eat a meal or snack with ' +
+    'fluid and some salt in it. Continuing dark urine, dizziness, being unable to keep fluid down, or ' +
+    'passing very little urine needs medical advice.</p>' +
+    '<div class="fg-warn"><div class="fg-warn-t">During or after a long event, this is an emergency</div>' +
+    'Confusion, a severe or worsening headache, repeated vomiting, a seizure, collapse, unusual swelling or ' +
+    'breathlessness. <b>Stop drinking and get emergency help.</b> Do not try to fix it with more water or ' +
+    'with salt tablets.</div></section>' +
+    fgDet({ t: "Estimate my fluid needs", d: "A rough sweat-rate method, and its limits", plain: true,
+      b: '<p class="fg-p">This is an <b>estimate</b>, not a prescription, and it tells you what you lost — ' +
+        'not how much to put back during the run.</p>' +
+        '<p class="fg-p">Weigh yourself before and after a run, in kilograms. Take the weight after away from ' +
+        'the weight before, add the litres you drank, take away any urine you passed, then divide by the hours ' +
+        'you ran. That gives you roughly how many litres an hour you lose.</p>' +
+        '<p class="fg-p">Do it in similar weather on two or three runs, because one run tells you very little. ' +
+        'Then use it to shape a plan you rehearse, alongside the weather and what you can actually carry.</p>' +
+        '<p class="fg-note">Not for children, in pregnancy, or for anyone who has been told to limit their ' +
+        'fluid. Inte-Run does not ask for or keep any of these numbers.</p>' }) +
+    fgDet({ t: "If another hard session is close", d: "Replacing fluid deliberately", plain: true,
+      b: '<p class="fg-p">If you are running hard again soon and you did weigh yourself, drink gradually — ' +
+        'roughly <b>1.25 to 1.5 litres for every kilogram lost</b>, spread over the next two to four hours ' +
+        'rather than all at once — and eat normally alongside it.</p>' +
+        '<p class="fg-p">For everything else, thirst and a normal meal do this job perfectly well.</p>' });
+}
+/** Recovery: food, fluid, rest and sleep. No supplement carousel, because none of it is a supplement. */
+function fgRecovery() {
+  return '<section class="card"><h4 class="subhead" style="margin-top:0">Refill, repair, rehydrate</h4>' +
+    '<ul class="fg-ul">' +
+    '<li>A carbohydrate source.</li>' +
+    '<li>A meaningful protein source — a normal meal-sized serving is the practical version.</li>' +
+    '<li>Fluid, plus some salt from ordinary food after a sweaty run.</li>' +
+    '<li>Fruit or vegetables across the next few meals.</li></ul>' +
+    '<p class="fg-note">Chocolate milk or soya drink and a banana; yoghurt, granola and fruit; eggs or tofu ' +
+    'on toast; a chicken, tuna, tofu or bean sandwich with a milk or soya drink; rice, noodles or pasta with ' +
+    'eggs, fish, chicken, tofu or lentils; or cereal with milk and fruit when your appetite is low.</p></section>' +
+    fgDet({ t: "How quickly does it need to happen?", d: "There is no 30-minute cliff edge", group: "fgRec",
+      b: '<p class="fg-p"><b>No second hard session within about eight hours:</b> a normal meal within roughly ' +
+        'two hours, then regular meals afterwards. That is genuinely all.</p>' +
+        '<p class="fg-p"><b>Another demanding session within about eight hours:</b> start carbohydrate and fluid ' +
+        'in the first hour and keep eating regularly. This is the only situation where the timing really matters.</p>' +
+        '<p class="fg-note">Protein across the day matters more than whether you take it in the half hour after ' +
+        'a run. Three to five eating occasions is the usable version of that.</p>' }) +
+    fgDet({ t: "Sleep and rest", d: "Not a supplement", group: "fgRec",
+      b: '<ul class="fg-ul">' +
+        '<li>Most adults need about <b>7 to 9 hours</b>. A regular schedule usually matters more than anything you can buy.</li>' +
+        '<li>Eat enough after evening training. Going to bed hungry makes both recovery and sleep harder.</li>' +
+        '<li>Rest days still need meals and protein. What you reduce is the extra fuel used during long or hard sessions.</li>' +
+        '<li><b>Alcohol is not a recovery drink</b> — it can impair sleep, rehydration and recovery.</li></ul>' +
+        '<p class="fg-note">Persistent exhaustion, falling performance, repeated illness or simply not recovering ' +
+        'is a reason to reduce training load and review your fuelling with a professional.</p>' }) +
+    fgGut();
+}
+/** Gut comfort. "Practise and personalise", never "mixed sugars prevent stomach ache". */
+function fgGut() {
+  return fgDet({ t: "Train your stomach as well as your legs", d: "Gut comfort on long runs and race day", group: "fgRec",
+    b: '<ul class="fg-ul">' +
+      '<li>Practise the fuel you plan to race on, on your long runs, for several weeks.</li>' +
+      '<li>Start at the bottom of the carbohydrate range and increase gradually.</li>' +
+      '<li>Spread intake into small, frequent servings rather than one big hit.</li>' +
+      '<li>Check drink concentration, and take water with a gel when the label says to.</li>' +
+      '<li>Keep the last meal before a run familiar, and smaller the closer you get to the start.</li>' +
+      '<li>If fibre, fat, dairy or particular foods repeatedly cause symptoms, reduce that trigger around key ' +
+      'runs — and get dietitian advice before cutting anything out broadly.</li>' +
+      '<li>Heat and high intensity both make gut symptoms worse. Slow down and cool off where you can.</li>' +
+      '<li><b>Eating gluten-free does not improve a running stomach</b> unless you have coeliac disease or ' +
+      'another clinical reason.</li></ul>' +
+      '<div class="fg-warn"><div class="fg-warn-t">Get medical help for</div>' +
+      'Blood in your stool, black stool, repeated vomiting, severe abdominal pain, unexplained weight change, ' +
+      'a fever, or symptoms that also happen when you are not running.</div>' });
+}
+/**
+ * The under-fuelling screen. Collapsed, findable, and deliberately not in the footer.
+ *
+ * ⚠️ IT RENDERS EVERY INDICATOR THE ENGINE SUPPORTS, WHICH IT DID NOT BEFORE. Four of the twelve in
+ * the RedSIndicator union had no checkbox — preoccupation with food, libido, poor recovery and gut
+ * discomfort — so a runner could tick everything on screen and still not describe what was happening
+ * to them. A screen that cannot hear half its own inputs reports "no strong signs" and is believed.
+ *
+ * ⚠️ NO CALCULATOR, NO SCORE, NO INTAKE FIELD. estimateEnergyAvailability() exists in the engine and
+ * stays out of here on purpose: three imprecise inputs divided into each other produce a number whose
+ * precision is entirely false, and a threshold printed on screen becomes a target to eat down to. The
+ * 2023 IOC consensus says as much about the thresholds themselves.
+ */
+function fgEnergyCheck() {
+  return fgDet({ t: "Could you be under-fuelling?", d: "A short private checklist — nothing is saved", plain: true,
+    b: '<p class="fg-p">Training can outgrow your appetite, or the time you have to eat. This can affect any ' +
+      'runner, of any sex and any body size, and it is not always intentional.</p>' +
+      checkinConsent() +
+      '<div class="opts">' + checks(REDS_OPTS, "reds") + '</div>' +
+      '<div class="result" id="redsRes"></div>' +
+      '<p class="fg-note">This is a screen, not a diagnosis, and a short checklist cannot rule under-fuelling ' +
+      'out. If several of these are true, the next step is a review with a registered sports dietitian, or ' +
+      'your GP or a sports-medicine clinician — not eating less.</p>' });
+}
+/** ⚠️ A quiet inset with small crosses, not a wall of red. Eleven items is a lot of "do not". */
+function fgMistakes() {
+  const items = [
+    ["Do not save all your food for dinner.", "Regular meals and snacks make heavy training much easier to cover."],
+    ["Do not make every run fasted.", "It is not required for fitness, and it can undermine hard or long work."],
+    ["Do not use gels for every short easy run.", "Normal meals do the important work."],
+    ["Do not wait until you feel empty on a long run.", "Start the plan you practised, early."],
+    ["Do not jump straight to 90 g an hour or beyond.", "Build gut tolerance gradually. Very high rates are a research strategy for elite athletes, not default advice."],
+    ["Do not try new food, drink or supplements on race day.", "Rehearse them, every one."],
+    ["Do not assume a sports drink prevents over-hydration.", "Over-drinking water or sports drink can push blood sodium dangerously low."],
+    ["Do not take salt tablets or iron supplements just in case.", "Both need individual advice, and iron needs a blood test."],
+    ["Do not permanently cut gluten, dairy, fibre or fermentable foods for a running stomach.", "Not without assessment — narrow diets make it harder to eat enough of everything else."],
+    ["Do not treat pain, exhaustion or missed periods as proof of hard training.", "They can be signs that your health needs attention."],
+    ["Do not use this page as a weight-loss plan.", "It is here for your health, your training and your running."],
+  ].map((r) => '<li><span class="fg-x" aria-hidden="true">' + STI_CROSS + '</span>' +
+    '<div><b>' + r[0] + '</b><div class="fg-why">' + r[1] + '</div></div></li>').join("");
+  return '<section class="card fg-not" aria-labelledby="fgNotH">' +
+    '<h4 class="subhead" id="fgNotH" style="margin-top:0">Common fuelling mistakes</h4>' +
+    '<ul class="fg-nots">' + items + '</ul></section>';
+}
 function redsView() {
   return EMERGENCY_BANNER() +
-    '<h2 class="sec" style="margin-top:0">Fuelling &amp; energy</h2><div class="card">' + checkinConsent() + '<div style="font-size:12.5px;color:var(--ink-faint);margin-bottom:8px">Under-fuelling harms health and performance. Tick anything that sounds like you — this is about getting enough, never eating less.</div><div class="opts">' + checks(REDS_OPTS,"reds") + '</div><div class="result" id="redsRes"></div></div>';
+    '<div class="fuel-guide-page">' +
+      '<div class="lib-hero">' +
+        '<div class="lib-eyebrow">Runner’s fuel guide</div>' +
+        '<h2 class="lib-title">Eat for the run you’re doing</h2>' +
+        '<p class="lib-lead">Simple food, fluid and recovery choices for everyday training and for race ' +
+        'day. Start with the session you are doing, then use the deeper sections when you need them.</p>' +
+        '<p class="fg-scope">General guidance for healthy adults. Medical conditions, pregnancy, ' +
+        'breastfeeding, under-18s, a current or past eating disorder and persistent gut symptoms all need ' +
+        'individual advice from a GP and a registered sports dietitian.</p>' +
+      '</div>' +
+      '<div class="fg-msg"><b>Eat enough every day. Add fuel as the work gets longer or harder. ' +
+      'Practise race day before race day.</b></div>' +
+      fgNav() +
+      fgSec("fgSession", "Fuel a session", "How long you are out for decides this, far more than how far you go.",
+        fgLadder() + fgSessions() + fgCarbAmounts()) +
+      fgSec("fgRace", "Plan race day", null, fgRaces()) +
+      fgSec("fgMeals", "Build everyday meals", "The base underneath everything else. Gels and sports drinks are tools for specific sessions; this is the part that does the work.",
+        fgMeals()) +
+      fgSec("fgDrink", "Drink well", "Individual, and not a competition. Both drinking too little and drinking too much can do harm.",
+        fgFluids()) +
+      fgSec("fgRecover", "Recover", "Carbohydrate, protein, fluid and sleep. That is the whole list.", fgRecovery()) +
+      fgSec("fgEnergy", "Check my energy health", "Under-fuelling affects runners of every sex and body size, and it is worth catching early.",
+        fgEnergyCheck()) +
+      '<div class="fg-sec">' + fgMistakes() + '</div>' +
+      '<p class="fg-foot"><span class="ui-pill">Evidence reviewed 10 August 2026</span> ' +
+      'General education for healthy adult runners training for 5K to marathon. It is not a nutrition ' +
+      'plan, and it does not cover diabetes, kidney or heart disease, pregnancy, children, eating ' +
+      'disorders, coeliac disease, inflammatory bowel disease or food allergy — those need individual ' +
+      'advice. Carbohydrate and fluid figures are consensus ranges, not personal prescriptions: ' +
+      'tolerance, pace, weather and what you ate beforehand all change the answer.</p>' +
+    '</div>';
 }
 function femaleView() {
   return EMERGENCY_BANNER() +
@@ -9352,7 +9920,27 @@ function renderResult(elId, urgency, headline, items, disclaimer) {
 }
 function chkValues(name) { return [].slice.call(document.querySelectorAll('[data-chk="' + name + '"]:checked')).map((x) => x.value); }
 function runRf() { const picks = chkValues("rf"); const e = $("rfRes"); if (!picks.length) { e.classList.remove("show"); return; } const r = RC.screenRedFlags(picks); renderResult("rfRes", r.urgency, r.headline, r.flags.map((f) => ({ title: f.label, guidance: f.guidance, refer: f.refer })), r.disclaimer); }
-function runReds() { const r = RC.screenRedS(chkValues("reds")); const items = [{ title: r.message, guidance: r.guidance.join(" "), refer: r.refer }]; renderResult("redsRes", r.risk === "low" ? "monitor" : "professional", "Risk: " + r.risk, items, r.disclaimer); }
+/**
+ * ⚠️ THE HEADLINE IS NEVER "RISK: HIGH" ANY MORE. A risk grade is a verdict the app is not entitled to
+ * give, it is the first thing the eye lands on, and it is the wording most likely to be screenshotted
+ * and believed. The engine's own message says what the answer means and what to do about it, so that is
+ * what the band carries.
+ * ⚠️ AND NOTHING IS SHOWN UNTIL SOMETHING IS TICKED. With the checklist collapsed inside the guide the
+ * result element exists from first render, so an unguarded run printed "nothing here strongly points to
+ * under-fuelling" before the runner had answered a single question — reassurance about nothing, which
+ * is worse than silence. Same guard runRf has always had.
+ */
+function runReds() {
+  const picks = chkValues("reds"); const e = $("redsRes"); if (!e) return;
+  if (!picks.length) { e.classList.remove("show"); e.innerHTML = ""; return; }
+  const r = RC.screenRedS(picks);
+  // ⚠️ THE LOW TITLE MUST NOT REASSURE. It read "Worth re-checking, not worth worrying about" — my
+  // wording, not the engine's, and a judgement the app cannot make about answers it has only just been
+  // handed. A runner who ticked one box and got told not to worry has been answered rather than heard.
+  const items = [{ title: r.risk === "low" ? "What to keep an eye on" : "What to do next",
+    guidance: r.guidance.join(" "), refer: r.refer }];
+  renderResult("redsRes", r.risk === "low" ? "monitor" : "professional", r.message, items, r.disclaimer);
+}
 function runFh() { const status = $("fhStatus").value; const r = RC.assessFemaleHealth({ status, symptoms: chkValues("fh") }); if (!r.prompts.length) { renderResult("fhRes","none","Nothing flagged — keep tracking how you feel.",[],r.disclaimer); return; } renderResult("fhRes", r.urgency, r.urgency === "professional" ? "Worth a conversation" : "A couple of things to watch", r.prompts.map((p) => ({ title: p.topic, guidance: p.message, refer: p.refer })), r.disclaimer); }
 
 // ============ SETUP / PROFILE ==============================================
@@ -13791,6 +14379,16 @@ function wire() {
   };
   wireConnectView();
   wireWhyView();
+  // The fuelling guide's quick choices. ⚠️ scrollIntoView ON THE SECTION, then focus moves to its
+  // heading — a jump that moves the pixels but not the focus ring leaves a keyboard or switch-control
+  // user exactly where they were, reading nothing. preventScroll, or focus() undoes the smooth scroll.
+  // ⚠️ Reduced Motion turns the animation off; the jump still happens, which is the point of it.
+  document.querySelectorAll("[data-fgnav]").forEach((b) => b.onclick = () => {
+    const t = $(b.dataset.fgnav); if (!t) return;
+    const still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    try { t.scrollIntoView({ block: "start", behavior: still ? "auto" : "smooth" }); } catch (e) { t.scrollIntoView(); }
+    const h = t.querySelector(".fg-sech"); if (h) h.focus({ preventScroll: true });
+  });
   document.querySelectorAll('[data-chk="rf"]').forEach((c) => c.onchange = runRf);
   document.querySelectorAll('[data-chk="reds"]').forEach((c) => c.onchange = runReds);
   document.querySelectorAll('[data-chk="fh"]').forEach((c) => c.onchange = runFh);

@@ -82,7 +82,12 @@ export function assessConditions(input: Conditions): WeatherImpact {
     pacePenalty = Math.min(30, Math.round((feels - 16) * 2.2));
     if (isQuality) {
       points.push(`Run these by effort, not the clock — expect roughly ${pacePenalty}s/km slower at the same RPE.`);
-      if (RANK[heat] >= RANK.moderate) points.push("Take full recoveries between reps, and hydrate beforehand with electrolytes.");
+      // ⚠️ "HYDRATE BEFOREHAND WITH ELECTROLYTES" WAS THE ONE HYDRATION LINE IN THE APP THE FUELLING
+      // RECONCILIATION MISSED (fixed 2026-08-10). It contradicted the guide twice over: the guide says
+      // arrive having drunk normally and do NOT load up, and it says not to take salt "just in case".
+      // It also carried no volume caveat, which is the invariant that reconciliation established —
+      // drinking beyond your losses is the actual danger, and electrolytes do not make it safe.
+      if (RANK[heat] >= RANK.moderate) points.push("Take full recoveries between reps, and arrive normally hydrated — no need to load up beforehand. If you drink during it, something with a little sodium in it helps, without drinking more than you lose.");
       if (heat === "severe") points.push("Strongly consider moving this to a cooler time of day, or swapping it for an easy run — heat illness is a real risk.");
     } else {
       points.push("Just slow down and go by feel — effort matters far more than pace in this heat.");

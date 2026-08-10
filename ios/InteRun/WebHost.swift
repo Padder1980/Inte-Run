@@ -14,6 +14,9 @@ struct WebHost: UIViewRepresentable {
         config.mediaTypesRequiringUserActionForPlayback = [] // coach audio is our own content
 
         if let root = BundleSchemeHandler.webRoot {
+            // Decide bundle-vs-downloaded BEFORE the page loads: the scheme handler serves whichever
+            // index.html this returns. Over-the-air updates land here; the bundle is always the floor.
+            WebUpdateService.shared.prepare(bundleRoot: root)
             config.setURLSchemeHandler(BundleSchemeHandler(root: root),
                                        forURLScheme: BundleSchemeHandler.scheme)
         }
@@ -43,6 +46,7 @@ struct WebHost: UIViewRepresentable {
         config.userContentController.addUserScript(WKUserScript(
             source: "window.__interunLiveActivity = \"\(status)\";"
                   + "window.__interunCoachAudio = \"\(coachStatus)\";"
+                  + WebUpdateService.shared.diagnosticJS
                   + tokenJS,
             injectionTime: .atDocumentStart, forMainFrameOnly: true))
 
@@ -99,6 +103,13 @@ struct WebHost: UIViewRepresentable {
         let notifications = NotificationService(webView: webView)
         context.coordinator.notifications = notifications
         config.userContentController.add(notifications, name: NotificationService.messageName)
+
+        // Over-the-air web-layer updates. The service is a singleton (its download outlives any one web
+        // view); it takes a weak webView so it can push its check result into Support › Your data, and
+        // receives the page's "booted" confirmation that clears the watchdog.
+        WebUpdateService.shared.webView = webView
+        config.userContentController.add(WebUpdateService.shared, name: WebUpdateService.messageName)
+        WebUpdateService.shared.checkForUpdate()
         webView.allowsBackForwardNavigationGestures = false
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.scrollView.bounces = false

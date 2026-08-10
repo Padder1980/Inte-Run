@@ -43,6 +43,9 @@ struct InteRunApp: App {
                 // Foregrounding is the only event that can change ActivityKit's answer.
                 Task { @MainActor in LiveActivityService.shared.clearRefusals() }
                 WatchBridge.shared.replayLiveOnActivate()
+                // Look for a newer web layer while the runner is here (throttled inside). A build found
+                // now is adopted on the NEXT launch, never under a live session.
+                WebUpdateService.shared.checkForUpdate()
             }
         }
     }

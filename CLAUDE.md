@@ -3038,6 +3038,47 @@ compliant, but it is the clause to re-read before adding any new route**, and it
 tester tries it, and confirm the paid Strava subscription. The Road Map step `p2-strava` stays
 **unticked** until a real run has gone across. Credentials are in gitignored `strava-secret.txt`.
 
+## THE NATIVE APP NOW SELF-UPDATES THE WEB LAYER OVER THE AIR (2026-08-10)
+
+⚠️ **THE DEPLOY MODEL CHANGED. A web-only change on `main` now reaches the phone on the NEXT LAUNCH,
+with no Xcode rebuild.** This retires the trap documented all over this file — "three copies update
+differently", and the repeated "a fix reported not working that had simply never been installed"
+(the keyboard fixes on 2026-08-01, and the notifications/stretch fixes on 2026-08-10, which cost the
+owner two mystified rebuilds in one day). `WebUpdateService.swift` checks GitHub Pages on launch and
+on foreground; when a newer `index.html` is published it downloads it and serves THAT over the same
+`interun://app` origin from the next launch. `localStorage` is untouched (same origin).
+
+- **Only `docs/index.html` travels over the air.** It is one self-contained ~11.5 MB file (the frames
+  are inlined). **Voices, icons, the peripheral pages (`roadmap/`, `mapstyles/`) and ALL native/Swift
+  code still need a rebuild** — a new coach clip, a GPS/notification/watch change. The page already
+  falls back to the device voice when a clip is missing, and a page that needs a NEW native bridge
+  degrades gracefully (it guards `window.webkit.messageHandlers.*`), so a web feature can ship OTA and
+  stay dormant until a rebuild adds the Swift.
+- ⚠️ **THE BUNDLE IS ALWAYS THE FLOOR.** No network, a bad/short download, or a download older than the
+  bundle → serve the bundled copy, which shipped working. A native rebuild whose bundle is newer than a
+  stored OTA copy wins and deletes the stale copy.
+- ⚠️ **AN UPDATE IS ADOPTED ONLY ON THE NEXT LAUNCH, never hot-swapped** — swapping the page under a
+  live run would be a disaster. `checkForUpdate` writes the file; `prepare` (next launch) reads it.
+- ⚠️ **A WATCHDOG MAKES A BAD WEB PUSH RECOVERABLE WITHOUT A MAC.** An adopted build must post
+  `interunUpdate {action:"booted"}` from the page — placed right after `render()` in the boot tail, so
+  a build that throws before rendering never confirms. A build served twice without confirming is
+  **rejected** (deleted, and its stamp remembered so `checkForUpdate` won't re-download it), and the
+  app falls back to the bundle. Only a NEWER published stamp clears the rejection. Without the reject
+  memory a broken build would revert → re-download → revert forever.
+- ⚠️ **Version compare is the `const BUILD = "YYYY-MM-DD HH:MM"` stamp** (lexical == chronological),
+  read from the raw bytes so an 11 MB doc isn't decoded to find one string. Efficiency: a conditional
+  GET (`If-None-Match` ETag) returns 304 when nothing changed, so only a genuinely new build transfers
+  the 11.5 MB. `validate()` refuses anything under 1 MB or without a stamp (captive portal, 404 page).
+- **Diagnostic:** Support › Your data now carries a **`web layer:`** line — `built-in <stamp>` vs
+  `over-the-air <stamp>`, plus the last check result (`up-to-date` / `downloaded <stamp>` / `offline`).
+  ⚠️ **THIS is now the source of truth for "did my change land", not the build stamp** — a fresh stamp
+  can sit on stale code (it did, twice, on 2026-08-10). `channel=ota` with the new stamp is the proof.
+- The wiring: `WebHost` calls `prepare` before load + injects `window.__interunWebUpdate` + registers
+  the `interunUpdate` handler + kicks `checkForUpdate`; `BundleSchemeHandler` serves `activeIndexData`
+  for the index request only; `InteRunApp` re-checks on `scenePhase == .active`.
+- ⚠️ **The owner must do ONE more manual Xcode rebuild to install this OTA-capable build.** After that,
+  web-only changes flow automatically. (Native changes always need a rebuild — that is unchanged.)
+
 ## The native app (`ios/`) — started 2026-07-27
 
 InteRun is now **also a native iPhone app**, built as a **hybrid**: a thin Swift shell that runs the

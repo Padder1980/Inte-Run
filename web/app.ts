@@ -8845,6 +8845,19 @@ function viewportDiagLines() {
 // is what iOS reports; enabled is the runner's toggle; scheduled is how many reminders the OS is
 // holding right now (0 with the toggle on and permission granted is a real scheduling fault). Native
 // only — a web tab cannot schedule OS-held reminders at all.
+// Which copy of the web layer is running, and what the last over-the-air check found. The native shell
+// injects window.__interunWebUpdate at document start. ⚠️ This is the line that turns "my fix didn't
+// land" into a fact: channel=bundle means the built-in copy (needs a rebuild), channel=ota means a
+// downloaded build, and check reports the latest fetch (up-to-date / downloaded <stamp> / offline).
+function webUpdateLine() {
+  const u = (function () { try { return window.__interunWebUpdate || null; } catch (e) { return null; } })();
+  if (!u) return "";
+  const running = u.channel === "ota" ? ("over-the-air " + (u.ota || "?")) : ("built-in " + (u.bundle || "?"));
+  let s = "web layer: " + running;
+  if (u.channel === "ota" && u.bundle) s += " (built-in " + u.bundle + ")";
+  if (u.check) s += " \\u00b7 check: " + u.check;
+  return s;
+}
 function notifDiagLine() {
   try {
     if (!NATIVE_NOTIFY) return "reminders: web tab (no OS-held reminders — use the calendar export)";
@@ -9330,9 +9343,10 @@ function dataView() {
     // it exists to settle (a band of dead background) looks identical from several different causes.
     viewportDiagLines().map((l) =>
       '<div class="bk-lab num" style="margin-top:3px;font-size:11px;line-height:1.35">' + esc(l) + '</div>'
-    ).join("") + '</div>' +
+    ).join("") +
+    (webUpdateLine() ? '<div class="bk-lab num" style="margin-top:3px;font-size:11px;line-height:1.35">' + esc(webUpdateLine()) + '</div>' : "") + '</div>' +
     '<div class="bk-md" style="margin-top:8px">' + (inNativeApp()
-      ? "The app carries its own copy of Inte-Run, built when the app was built \u2014 it doesn\u2019t update over the internet. A newer web version won\u2019t appear here until the app itself is rebuilt."
+      ? "The app now keeps itself up to date: on launch it checks for a newer web version and, if there is one, switches to it from the next launch \u2014 so screen, layout and wording changes arrive without a rebuild. Changes to the app\u2019s native parts (GPS, notifications, the watch) still need one. The web-layer line above shows which copy is running."
       : "Added to your Home Screen? It caches a copy. If an update seems missing, close it fully (swipe it away from the app switcher) and reopen \u2014 twice if needed.") + '</div></div>' +
     (inNativeApp() ? '<div class="card"><div class="subhead" style="margin-top:0">Live Activity</div>' +
       '<div class="bk-box"><div class="bk-val" style="font-size:14px">' + esc(liveActivityStatus()) + '</div>' +
@@ -15233,6 +15247,11 @@ seedDone();
 })();
 buildNav();
 render();
+// Tell the native shell this build rendered, so an over-the-air update is confirmed good and the
+// watchdog stops counting it against its revert budget. render() succeeding IS the boot signal; a
+// build that throws before here never confirms and is reverted to the bundle on the next launch.
+// Harmless anywhere else — there is no such bridge in a browser or the PWA.
+try { if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.interunUpdate) window.webkit.messageHandlers.interunUpdate.postMessage({ action: "booted" }); } catch (e) {}
 try { if (NATIVE_NOTIFY) nativeNotify("status"); updateBell(); initReminders(); syncWatch(); } catch (e) {}
 // Tell the native side the page can accept runs now, so anything the watch logged while the phone
 // app was closed gets handed over rather than sitting in a queue forever.

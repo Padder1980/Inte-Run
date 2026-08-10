@@ -33,6 +33,18 @@ final class BundleSchemeHandler: NSObject, WKURLSchemeHandler {
         let key = ObjectIdentifier(task)
         live.insert(key)
 
+        // The one file that travels over the air: if a newer, boot-proven index.html was downloaded,
+        // serve it in place of the bundled copy. Everything else flows through the bundle unchanged.
+        if let url = task.request.url, Self.isIndexRequest(url),
+           let data = WebUpdateService.shared.activeIndexData {
+            respond(task, key: key, status: 200, headers: [
+                "Content-Type": "text/html; charset=utf-8",
+                "Content-Length": String(data.count),
+                "Cache-Control": "no-cache",
+            ], body: data)
+            return
+        }
+
         guard let url = task.request.url, let file = resolve(url) else {
             respond(task, key: key, status: 404, headers: [:], body: Data())
             return
@@ -55,6 +67,13 @@ final class BundleSchemeHandler: NSObject, WKURLSchemeHandler {
 
     func webView(_ webView: WKWebView, stop task: WKURLSchemeTask) {
         live.remove(ObjectIdentifier(task))
+    }
+
+    /// The root document — the only request the over-the-air copy answers. `voices/`, icons and the
+    /// peripheral pages are always bundle-served.
+    private static func isIndexRequest(_ url: URL) -> Bool {
+        let p = url.path
+        return p.isEmpty || p == "/" || p == "/index.html"
     }
 
     // MARK: - Path resolution

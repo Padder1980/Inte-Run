@@ -107,6 +107,21 @@ test("every wizard step fits on a 375-wide phone", () => {
     "the reminder time is always rendered — the schedule step will overflow when reminders are off");
 });
 
+test("the trial day is moved if the adjacent plan sessions are hard", () => {
+  // ⚠️ The plan is built BEFORE the trial date is committed, so we can ask whether the neighbouring
+  // days are hard (threshold, VO2, long run) and pick the nearest easier day if so.
+  // findGoodTrialDay must exist and be called inside wizardFinish.
+  assert.match(html, /function findGoodTrialDay\(/, "findGoodTrialDay is missing");
+  const finish = fn("wizardFinish");
+  assert.match(finish, /findGoodTrialDay\(draft\.trialIso\)/, "wizardFinish does not call findGoodTrialDay");
+  // The helper must check BOTH neighbours — day before AND day after — to protect the trial.
+  const helper = fn("findGoodTrialDay");
+  assert.match(helper, /effortOn.*isoAdd.*-1/, "findGoodTrialDay does not check the day before the trial");
+  assert.match(helper, /effortOn.*isoAdd.*1/, "findGoodTrialDay does not check the day after the trial");
+  // It must prefer the original date when both neighbours are safe.
+  assert.match(helper, /if \(isGoodDay\(preferredIso\)\) return preferredIso/, "findGoodTrialDay does not short-circuit on the original day");
+});
+
 test("beginners are not asked for a 5 km time or weekly mileage", () => {
   const ids = fn("wizStepIds");
   assert.ok(ids.length > 50, "wizStepIds is missing");

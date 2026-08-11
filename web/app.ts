@@ -11440,6 +11440,36 @@ function wizBack() {
   state.wizStep = (state.wizStep || 0) - 1;
   render();
 }
+// After adoptPlan() has committed the new plan, find the nearest trial day where neither the day
+// before nor the day after has a hard-effort session. Tries ±1..3 days, preferring the closest,
+// staying on or after today. Returns the original date when nothing better exists.
+function findGoodTrialDay(preferredIso) {
+  function effortOn(iso) {
+    if (!PLAN || !PLAN.weeks) return "rest";
+    for (var wi = 0; wi < PLAN.weeks.length; wi++) {
+      const wk = PLAN.weeks[wi];
+      for (var d = 0; d < 7; d++) {
+        if (isoAdd(wk.startIso, d).toISOString().slice(0, 10) === iso) {
+          const sess = wk.sessions.find((s) => s.type !== "rest" && effDay(s) === d);
+          return sess ? sess.effort : "rest";
+        }
+      }
+    }
+    return "rest";
+  }
+  function isGoodDay(iso) {
+    return effortOn(isoAdd(iso, -1).toISOString().slice(0, 10)) !== "hard" &&
+           effortOn(isoAdd(iso,  1).toISOString().slice(0, 10)) !== "hard";
+  }
+  if (isGoodDay(preferredIso)) return preferredIso;
+  const today = todayIso();
+  for (const off of [1, -1, 2, -2, 3, -3]) {
+    const candidate = isoAdd(preferredIso, off).toISOString().slice(0, 10);
+    if (candidate < today) continue;
+    if (isGoodDay(candidate)) return candidate;
+  }
+  return preferredIso;
+}
 // Build the plan from every collected answer and land on Today. The same sequence doSaveProfile uses,
 // minus the edit-only impact preview and undo toast (a first run has no prior plan to weigh or undo).
 function wizardFinish() {
@@ -11461,7 +11491,7 @@ function wizardFinish() {
   // trial-run flow.
   try {
     if (draft.trialWant === "1" && draft.trialIso) {
-      SCHEDULED_TRIAL = { iso: draft.trialIso, createdIso: todayIso() };
+      SCHEDULED_TRIAL = { iso: findGoodTrialDay(draft.trialIso), createdIso: todayIso() };
       saveScheduledTrial();
     }
   } catch (e) {}

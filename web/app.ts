@@ -10711,7 +10711,7 @@ function viewSetup() {
  * has one. The topics below name fields; the pass finds whichever .q contains them.
  */
 const SETUP_TOPICS = {
-  fitness: ["s_rectime", "s_2km", "s_2km_rec", "s_easypace", "fitsrc", "status"],
+  fitness: ["s_rectime", "s_2km", "s_2km_rec", "s_easypace", "fitsrc", "status", "trialWant", "s_trialday"],
   you: ["s_name", "s_avatar_file"],
   why: ["su_why_inspire", "su_why_reason", "su_why_goal", "su_why_anchor"],
   goal: ["s_dist", "s_target", "s_date"],

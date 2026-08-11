@@ -3538,17 +3538,20 @@ function weeklyOverview() {
   const wk = curWeek();
   const cur = isCurrentWeek();
   const days = [];
+  const trialInWeek = SCHEDULED_TRIAL && SCHEDULED_TRIAL.iso >= wk.startIso &&
+    SCHEDULED_TRIAL.iso <= isoAdd(wk.startIso, 6).toISOString().slice(0, 10);
   DAY_ORDER.forEach((dn, i) => {
     if (cur && TODAY_IN_PLAN && i < TODAY_DOW) return;                  // past days aren't "upcoming"
     const ds = wk.sessions.filter((s) => s.type !== "rest" && effDay(s) === i); // drop rest days
-    if (ds.length) days.push({ i: i, dn: dn, ds: ds });
+    const hasTrial = !!(trialInWeek && isoAdd(wk.startIso, i).toISOString().slice(0, 10) === SCHEDULED_TRIAL.iso);
+    if (ds.length || hasTrial) days.push({ i: i, dn: dn, ds: ds, trial: hasTrial });
   });
   let n = 0, km = 0;
   days.forEach((g) => g.ds.forEach((s) => { n++; if (s.distKm) km += s.distKm; }));
   const rows = days.map((g) => {
     const dt = isoAdd(wk.startIso, g.i);
     const cls = "cal-day" + (cur && TODAY_IN_PLAN && g.i === TODAY_DOW ? " is-today" : "") + (g.i === state.selDay ? " is-sel" : "");
-    const cells = g.ds.map((s) => calSessionRow(wk.index, s)).join("");
+    const cells = g.ds.map((s) => calSessionRow(wk.index, s)).join("") + (g.trial ? calTrialRow() : "");
     return '<div class="' + cls + '"><div class="cal-dcol"><div class="cal-dn">' + g.dn.toUpperCase() + '</div><div class="cal-dd">' + dt.getUTCDate() + '</div></div><div class="cal-scol">' + cells + '</div></div>';
   }).join("");
   const phase = wk.phase ? '<span class="cal-badge">' + esc(String(wk.phase).toUpperCase()) + (wk.isDeload ? " · DELOAD" : "") + '</span>' : "";
@@ -5411,6 +5414,12 @@ function calSessionRow(wIdx, s) {
     '<button class="cal-open" data-open="1" data-oweek="' + wIdx + '" data-oid="' + s.id + '"><span class="cal-t">' + s.title + '</span><span class="cal-sub">' + bits.join(" • ") + '</span></button>' +
     '<button class="cal-check" data-done="' + key + '" aria-label="Mark done">' + (done ? ICON.check : "") + '</button></div>';
 }
+function calTrialRow() {
+  return '<div class="cal-sess">' +
+    '<span class="cal-bar" style="background:var(--eff-hard)"></span>' +
+    '<button class="cal-open" data-trialopen="1"><span class="cal-t">2 km time trial</span><span class="cal-sub">calibrates every pace</span></button>' +
+    '<button class="cal-check" data-trialrm="1" aria-label="Remove" title="Remove">&#x2715;</button></div>';
+}
 // ---- Drag a session to another day -------------------------------------------------------------
 // Press and hold a session card in the Training calendar, then drag it onto another day of the SAME
 // week. Under the hood this is moveSession(), the same engine path the sheet buttons use - so the
@@ -5517,7 +5526,9 @@ function viewCalendar() {
       const isToday = dt.toISOString().slice(0, 10) === todayIsoStr;
       const daySessions = w.sessions.filter((s) => s.type !== "rest" && effDay(s) === i);
       const disoStr = dt.toISOString().slice(0, 10);
-      const cells = daySessions.length ? daySessions.map((s) => calSessionRow(w.index, s)).join("")
+      const hasTrial = scheduledTrialOn(disoStr);
+      const cells = (daySessions.length || hasTrial)
+        ? daySessions.map((s) => calSessionRow(w.index, s)).join("") + (hasTrial ? calTrialRow() : "")
         : (disoStr < todayIsoStr ? '<div class="cal-empty">Rest</div>'
           : '<button class="cal-empty rest-add cal" data-addday="' + disoStr + '">Rest<span class="rest-plus">\\uFF0B Add</span></button>');
       return '<div class="cal-day' + (isToday ? " is-today" : "") + '" data-w="' + w.index + '" data-di="' + i + '"><div class="cal-dcol"><div class="cal-dn">' + dn.toUpperCase() + '</div><div class="cal-dd">' + dt.getUTCDate() + '</div></div><div class="cal-scol">' + cells + '</div></div>';

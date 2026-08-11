@@ -10632,8 +10632,11 @@ function viewSetup() {
     '<div class="q" id="fitTimeWrap"><label id="fitTimeLbl"><span class="lblmain">' + (p.fitSrc === "predicted" ? "Your predicted 5 km time" : "Your recent 5 km time") + '</span> <span class="q-hint">just type the numbers</span></label><input class="sel num" id="s_rectime" value="' + (p.noRecent ? "" : fmtTimeFull(p.recentTimeS)) + '" placeholder="e.g. 25:00" inputmode="numeric"></div>' +
     '<div class="callout"><div class="callout-h"><span class="ic">' + ICON.timer + '</span>2 km time-trial<span class="callout-badge">optional</span></div>' +
     '<p>A hard, evenly paced 2 km is the most useful thing you can give us: it calibrates every pace in your plan, and repeating it every month or so shows what has actually changed.</p>' +
-    '<input class="sel num" id="s_2km" value="' + (p.twoKmS ? fmtTimeFull(p.twoKmS) : "") + '" placeholder="e.g. 8:00" inputmode="numeric"><div class="mas-hint" id="masHint"></div><button class="mini-btn wide-btn" id="s_2km_rec" type="button">⏱ Haven\\'t done one? Record it now</button></div>' +
-    wizTrialOfferHtml() +
+    '<input class="sel num" id="s_2km" value="' + (p.twoKmS ? fmtTimeFull(p.twoKmS) : "") + '" placeholder="e.g. 8:00" inputmode="numeric"><div class="mas-hint" id="masHint"></div>' +
+    '<p class="q-hint" style="margin:10px 0 4px">Haven\\'t done one?</p>' +
+    '<button class="mini-btn wide-btn" id="s_trial_sched" type="button">Schedule one now</button>' +
+    '<div id="trialSchedPick" style="' + (draft.trialWant === "1" ? "" : "display:none;") + 'margin-top:10px"><div class="q" style="margin:0"><label>Which day this week?</label><select class="sel" id="s_trialday" style="max-width:200px">' + wizTrialDayOpts().map((d) => '<option value="' + d.iso + '">' + d.label + '</option>').join("") + '</select></div></div>' +
+    '</div>' +
     '</div>';
 
   // 3 · Your goal (goalCardInner supplies its own inner markup; keep the id for syncStatus)
@@ -15310,7 +15313,7 @@ function wire() {
   bindTimeInput($("s_target")); bindTimeInput($("s_rectime")); bindTimeInput($("s_easypace"));
   const km1 = $("s_2km");
   if (km1) { bindTimeInput(km1); km1.addEventListener("input", refreshMasHint); refreshMasHint(); }
-  const km1rec = $("s_2km_rec"); if (km1rec) km1rec.onclick = startTrialFlow;
+  const trialSched = $("s_trial_sched"); if (trialSched) trialSched.onclick = () => { const pick = $("trialSchedPick"); if (!pick) return; const show = pick.style.display === "none"; pick.style.display = show ? "" : "none"; draft.trialWant = show ? "1" : "0"; if (show && $("s_trialday")) draft.trialIso = draft.trialIso || $("s_trialday").value; };
   const trialDay2 = $("s_trialday"); if (trialDay2) { if (!draft.trialIso) draft.trialIso = trialDay2.value; trialDay2.onchange = () => { draft.trialIso = trialDay2.value; }; }
   if (document.querySelector('[data-set="status"]')) syncStatus();
   // Avatar upload

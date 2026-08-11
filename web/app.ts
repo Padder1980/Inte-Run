@@ -3522,8 +3522,11 @@ function weekStrip() {
     const days = DAY_ORDER.map((d, i) => {
       const dt = isoAdd(wk.startIso, i);
       const dtIso = dt.toISOString().slice(0, 10);
-      const has = wk.sessions.some((s) => s.type !== "rest" && effDay(s) === i) || scheduledTrialOn(dtIso);
-      const eff = (wk.sessions.find((s) => s.type !== "rest" && effDay(s) === i) || {}).effort;
+      const trial = scheduledTrialOn(dtIso);
+      const has = wk.sessions.some((s) => s.type !== "rest" && effDay(s) === i) || trial;
+      // A scheduled 2 km trial is the notable effort of its day, so it colours the dot (hard) even when
+      // it shares the day with a strength or mobility session whose own dot would otherwise win.
+      const eff = trial ? "hard" : (wk.sessions.find((s) => s.type !== "rest" && effDay(s) === i) || {}).effort;
       const cls = "d" + (i === state.selDay ? " sel" : "") + (cur && TODAY_IN_PLAN && i === TODAY_DOW ? " today" : "");
       return '<button class="' + cls + '" data-week="' + wi + '" data-day="' + i + '"><div class="dn">' + d + '</div><div class="dd">' + dt.getUTCDate() + '</div>' + (has ? '<div class="dot" style="background:var(--eff-' + (eff || "easy") + ')"></div>' : '<div class="dot" style="background:transparent"></div>') + '</button>';
     }).join("");
@@ -11455,7 +11458,11 @@ function findGoodTrialDay(preferredIso) {
       const wk = PLAN.weeks[wi];
       for (var d = 0; d < 7; d++) {
         if (isoAdd(wk.startIso, d).toISOString().slice(0, 10) === iso) {
-          const sess = wk.sessions.find((s) => s.type !== "rest" && effDay(s) === d);
+          // Only a RUN occupies the day for the trial's purposes. Strength and mobility routinely
+          // share a day with a run in the plan itself, so counting them as blockers left the trial no
+          // free day in a 5-6 day week and dumped it onto the runner's chosen day even when that day
+          // already held a running session -- where it is invisible behind the run's own dot.
+          const sess = wk.sessions.find((s) => PRIMARY_TYPES[s.type] && effDay(s) === d);
           return sess ? sess.effort : "rest";
         }
       }
@@ -11463,7 +11470,7 @@ function findGoodTrialDay(preferredIso) {
     return "rest";
   }
   function isGoodDay(iso) {
-    if (effortOn(iso) !== "rest") return false;  // the trial day must be free of plan sessions
+    if (effortOn(iso) !== "rest") return false;  // the trial day must be free of RUNS (strength/mobility are fine)
     return effortOn(isoAdd(iso, -1).toISOString().slice(0, 10)) !== "hard" &&
            effortOn(isoAdd(iso,  1).toISOString().slice(0, 10)) !== "hard";
   }

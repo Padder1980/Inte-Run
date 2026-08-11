@@ -124,6 +124,68 @@ test("the trial day is moved if the adjacent plan sessions are hard", () => {
   assert.match(helper, /if \(isGoodDay\(preferredIso\)\) return preferredIso/, "findGoodTrialDay does not short-circuit on the original day");
 });
 
+test("⚠️ the trial lands on a day with no RUN — strength and mobility do not block it", () => {
+  // ⚠️ FOUND ON A REAL PHONE. A 5-6 day plan carries strength and mobility on most days, so when
+  // findGoodTrialDay treated ANY non-rest session as occupying the day it could not find a free day
+  // and fell back to the runner's chosen day -- even when that day already held a RUNNING session.
+  // The trial then stacked on the run, invisible behind the run's own dot in the week strip, and the
+  // runner reported "it didn't add my trial anywhere". A strength or mobility day is a fine home for a
+  // 2 km trial (the plan itself stacks strength onto running days); only another RUN is the problem.
+  //
+  // Lift the real helper and run it against a plan where every day is a run EXCEPT a mobility-only
+  // Thursday. Picking Friday (a run) must move the trial to Thursday, not leave it on the run.
+  const at = html.indexOf("function findGoodTrialDay(");
+  assert.ok(at >= 0, "findGoodTrialDay is not in the build");
+  let depth = 0, end = -1;
+  for (let i = html.indexOf("{", at); i < html.length; i++) {
+    if (html[i] === "{") depth++;
+    else if (html[i] === "}") { depth--; if (!depth) { end = i + 1; break; } }
+  }
+  const src = html.slice(at, end);
+  const PRIMARY_TYPES = { easy: 1, long: 1, recovery: 1, threshold: 1, vo2: 1, strides: 1, "race-specific": 1, race: 1 };
+  const isoAdd = (iso: string, days: number) => {
+    const p = String(iso).split("-").map(Number);
+    const dt = new Date(Date.UTC(p[0], (p[1] || 1) - 1, p[2] || 1));
+    dt.setUTCDate(dt.getUTCDate() + days);
+    return dt;
+  };
+  const effDay = (s: any) => s.dayIndex;
+  const todayIso = () => "2020-01-01"; // far in the past so no future candidate is skipped
+  const run = (di: number, eff = "easy") => ({ dayIndex: di, type: "easy", effort: eff });
+  const week = (startIso: string, sessions: any[]) => ({ startIso, sessions });
+  const make = (sessW0: any[], sessW1: any[] = [0, 1, 2, 3, 4, 5, 6].map((d) => run(d))) => {
+    const PLAN = { weeks: [week("2026-06-01", sessW0), week("2026-06-08", sessW1)] };
+    return new Function("PLAN", "isoAdd", "PRIMARY_TYPES", "effDay", "todayIso", src + "; return findGoodTrialDay;")(
+      PLAN, isoAdd, PRIMARY_TYPES, effDay, todayIso);
+  };
+  const mobility = (di: number) => ({ dayIndex: di, type: "mobility", effort: "none" });
+  const strength = (di: number) => ({ dayIndex: di, type: "strength", effort: "moderate" });
+
+  // 2026-06-01 is Mon; Thu = +3 = 2026-06-04, Fri = +4 = 2026-06-05.
+  // Every day is an easy run except Thursday, which is mobility-only.
+  const fullExceptThu = [run(0), run(1), run(2), mobility(3), run(4), run(5), run(6)];
+  const find = make(fullExceptThu);
+
+  // Picking Friday (a run) must MOVE the trial to the mobility-only Thursday, never leave it on the run.
+  assert.equal(find("2026-06-05"), "2026-06-04",
+    "the trial stayed on a running day instead of moving to the run-free mobility day");
+
+  // Picking the mobility day itself must KEEP it there — strength/mobility never block the trial.
+  assert.equal(find("2026-06-04"), "2026-06-04",
+    "a mobility-only day was rejected as a trial home; strength/mobility must not count as a run");
+
+  // A strength-only day is equally a valid home.
+  const strengthThu = make([run(0), run(1), run(2), strength(3), run(4), run(5), run(6)]);
+  assert.equal(strengthThu("2026-06-04"), "2026-06-04",
+    "a strength-only day was rejected as a trial home");
+
+  // ⚠️ The neighbour guard still bites on a hard RUN: a free day flanked by a hard run must be rejected.
+  // Thu is mobility (free) but Fri is a HARD run — so picking Thu must move away from the hard neighbour.
+  const hardFriday = make([mobility(0), mobility(1), mobility(2), mobility(3), run(4, "hard"), mobility(5), mobility(6)]);
+  assert.notEqual(hardFriday("2026-06-04"), "2026-06-04",
+    "the trial sat next to a hard run — the neighbour guard stopped working");
+});
+
 test("beginners are not asked for a 5 km time or weekly mileage", () => {
   const ids = fn("wizStepIds");
   assert.ok(ids.length > 50, "wizStepIds is missing");

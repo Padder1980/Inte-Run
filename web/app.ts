@@ -11458,6 +11458,7 @@ function findGoodTrialDay(preferredIso) {
     return "rest";
   }
   function isGoodDay(iso) {
+    if (effortOn(iso) !== "rest") return false;  // the trial day must be free of plan sessions
     return effortOn(isoAdd(iso, -1).toISOString().slice(0, 10)) !== "hard" &&
            effortOn(isoAdd(iso,  1).toISOString().slice(0, 10)) !== "hard";
   }

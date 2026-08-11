@@ -114,11 +114,13 @@ test("the trial day is moved if the adjacent plan sessions are hard", () => {
   assert.match(html, /function findGoodTrialDay\(/, "findGoodTrialDay is missing");
   const finish = fn("wizardFinish");
   assert.match(finish, /findGoodTrialDay\(draft\.trialIso\)/, "wizardFinish does not call findGoodTrialDay");
-  // The helper must check BOTH neighbours — day before AND day after — to protect the trial.
+  // The helper must check ALL THREE days — the trial day must be free of plan sessions, AND
+  // neither neighbour should be a hard session.
   const helper = fn("findGoodTrialDay");
+  assert.match(helper, /effortOn\(iso\) !== "rest"/, "findGoodTrialDay does not reject a trial day that already has a plan session");
   assert.match(helper, /effortOn.*isoAdd.*-1/, "findGoodTrialDay does not check the day before the trial");
   assert.match(helper, /effortOn.*isoAdd.*1/, "findGoodTrialDay does not check the day after the trial");
-  // It must prefer the original date when both neighbours are safe.
+  // It must prefer the original date when all three conditions are met.
   assert.match(helper, /if \(isGoodDay\(preferredIso\)\) return preferredIso/, "findGoodTrialDay does not short-circuit on the original day");
 });
 

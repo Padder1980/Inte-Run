@@ -2814,6 +2814,65 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
   background: color-mix(in srgb, var(--rest) 10%, var(--surface-2));
   border: 1px solid color-mix(in srgb, var(--rest) 40%, var(--line)); border-radius: var(--r-ctl); }
 #stvSend[disabled] { opacity: .6; }
+
+/* ===== First-run onboarding wizard ===== */
+.wizard { display: flex; flex-direction: column; min-height: 100%; padding: 4px 2px 0; }
+/* #view reserves 96px at the bottom for the nav — which the wizard hides. Reclaim it so the flex
+   column fills the screen and the sticky footer sits on the bottom edge instead of floating above it. */
+#view:has(.wizard) { padding-bottom: 0; }
+/* ⚠️ Hero is DELIBERATELY compact — the design goal is every wizard step fits without scrolling on a
+   375×812 phone. The old 26/30 padding + margin 20 wasted vertical room and pushed level/plan/schedule
+   into overflow (measured +90 / +187 / +20). Tighter here + tighter cards + card-only titles clears it. */
+.wz-hero { position: relative; border-radius: var(--r-hero); padding: 16px 20px 18px; text-align: center; overflow: visible; margin: 2px 2px 14px;
+  background: linear-gradient(158deg, #0f8c7f 0%, #0c5f56 55%, #0a463f 100%);
+  box-shadow: 0 12px 30px -14px rgba(11,79,72,.7); }
+.wz-mark { display: flex; justify-content: center; }
+.wz-mark svg { width: 46px; height: 46px; filter: drop-shadow(0 4px 12px rgba(0,0,0,.3)); }
+.wz-eyebrow { font-size: var(--t-label); font-weight: 800; letter-spacing: .14em; color: rgba(255,255,255,.72); }
+.wz-title { margin-top: 4px; font-size: var(--t-section); font-weight: 800; letter-spacing: -.02em; color: #fff; }
+.wz-badge { position: absolute; left: 50%; bottom: -13px; transform: translateX(-50%); z-index: 2;
+  font-size: var(--t-meta); font-weight: 800; letter-spacing: .02em; color: #fff; padding: 5px 16px; border-radius: var(--r-pill);
+  background: linear-gradient(180deg, #f8ab3a 0%, #ec7d1f 100%); box-shadow: 0 6px 16px -5px rgba(232,121,31,.7); }
+.wz-dots { display: flex; justify-content: center; gap: 7px; margin: 4px 0 12px; }
+.wz-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line); transition: background .18s ease, transform .18s ease; }
+.wz-dot.done { background: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.wz-dot.on { background: var(--accent); transform: scale(1.35); }
+/* flex-grow pins the footer to the bottom on short steps; flex-shrink:0 is load-bearing — with shrink
+   on, a tall step (e.g. the status cards) squashed this box and its cards overflowed past the footer.
+   The bottom padding is the room the last field needs to scroll clear of the sticky footer. */
+.wz-step { flex: 1 0 auto; padding: 0 4px 92px; }
+.wz-lead { font-size: var(--t-body); line-height: 1.5; color: var(--ink-soft); margin: 0 0 12px; }
+.wz-lead b { color: var(--ink); }
+.wz-fields { margin-top: 2px; }
+.wz-plans { display: flex; flex-direction: column; gap: 8px; }
+/* ⚠️ COMPACT LAYOUT: tag pinned top-right, runs/week + meta on one row. Old stacked version (tag →
+   runs → meta → focus, four rows per card) overflowed by 187px on 375×812. Focus line dropped — it
+   duplicated the tag ("Recommended"/"Steady"/"Ambitious"). */
+.wz-plan { position: relative; text-align: left; width: 100%; background: var(--surface); border: 1.5px solid var(--line); border-radius: var(--r-card); padding: 12px 14px; cursor: pointer; font: inherit; color: inherit;
+  transition: transform .12s ease, border-color .12s ease, box-shadow .12s ease, background .12s ease; }
+.wz-plan:active { transform: translateY(1px); }
+.wz-plan.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  box-shadow: 0 8px 22px -12px color-mix(in srgb, var(--accent) 60%, transparent), 0 0 0 1px var(--accent) inset; }
+.wz-plan-tag { position: absolute; top: 12px; right: 12px; font-size: var(--t-label); font-weight: 800; letter-spacing: .05em; text-transform: uppercase; padding: 3px 9px; border-radius: var(--r-pill);
+  background: var(--surface-2); color: var(--ink-faint); }
+.wz-plan.rec .wz-plan-tag { background: color-mix(in srgb, var(--accent) 16%, var(--surface)); color: var(--accent); }
+.wz-plan-h { font-size: var(--t-card); font-weight: 800; letter-spacing: -.01em; color: var(--ink); padding-right: 110px; }
+.wz-plan-meta { font-size: var(--t-meta); color: var(--ink-soft); margin-top: 2px; }
+.wz-summary { text-align: center; padding: 4px 2px; }
+.wz-sum-goal { font-size: var(--t-hero); font-weight: 800; letter-spacing: -.02em; color: var(--ink); margin-bottom: 14px; }
+.wz-sum-grid { display: flex; gap: 10px; }
+.wz-sum-tile { flex: 1; background: var(--surface-2); border-radius: var(--r-card); padding: 16px 8px; }
+.wz-sum-n { font-size: var(--t-display); font-weight: 800; letter-spacing: -.02em; color: var(--accent); font-variant-numeric: tabular-nums; }
+.wz-sum-l { font-size: var(--t-label); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-faint); margin-top: 3px; }
+.wz-note { font-size: var(--t-meta); line-height: 1.55; color: var(--ink-soft); margin: 22px 0 0; }
+.wz-note b { color: var(--ink); }
+.wz-err { margin: 14px 4px 0; padding: 11px 13px; font-size: var(--t-meta); line-height: 1.5; font-weight: 600; color: var(--rest);
+  background: color-mix(in srgb, var(--rest) 9%, var(--surface-2)); border: 1px solid color-mix(in srgb, var(--rest) 35%, var(--line)); border-radius: var(--r-ctl); }
+.wz-foot { position: sticky; bottom: 0; display: flex; gap: 10px; align-items: center; margin-top: 22px; padding: 14px 2px calc(14px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to top, var(--bg) 68%, transparent); }
+.wz-back { flex: 0 0 auto; font: inherit; font-size: var(--t-body); font-weight: 700; color: var(--ink-soft); background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-ctl); padding: 14px 20px; cursor: pointer; min-height: var(--tap); }
+.wz-back:active { transform: translateY(1px); }
+.wz-next { flex: 1 1 auto; margin: 0 !important; }
 </style>
 </head>
 <body>
@@ -10662,6 +10721,14 @@ function applySetupFocus() {
     };
   }
 }
+// Read a setup field by id. In the WIZARD only the current step's fields are in the DOM, so a value
+// the runner gave on an earlier step is read back from the persisted draft (draft.__f) instead. The
+// full edit form always has every field present, so this returns the live DOM value there — unchanged.
+function wizFieldVal(id) {
+  const el = $(id);
+  if (el && typeof el.value === "string") return el.value;
+  return (draft.__f && draft.__f[id] != null) ? String(draft.__f[id]) : "";
+}
 function draftFromForm() {
   const mmss = (s) => /^\\d{1,2}:[0-5]\\d$/.test(s) || /^\\d{1,2}:[0-5]\\d:[0-5]\\d$/.test(s);
   // \u26a0\ufe0f ON THE VERY FIRST RUN, THE UNANSWERED QUESTIONS ARE ANSWERED BY DEFAULTS, SILENTLY.
@@ -10681,7 +10748,7 @@ function draftFromForm() {
   }
   // Weekly mileage is optional: blank means "not sure", which the engine reads as no volume model
   // and falls back to the plan's own defaults. 0 and undefined must therefore mean the same thing.
-  const volEl = $("s_volume");
+  const volRaw = wizFieldVal("s_volume");
   // The running status gates the rest. Beginners (new / building) give no times — we seed a gentle
   // baseline and flag noRecent. Runners (regular / competitive) give a recent or predicted 5 km, and
   // may optionally add a 2 km trial, which calibrates every pace in the plan.
@@ -10695,7 +10762,7 @@ function draftFromForm() {
     // from the easy pace (easy bands sit ~92 s/km above threshold; threshold ≈ Riegel-predicted 15 km
     // pace) so every training pace scales to their real ability.
     if (status === "building") {
-      const epRaw = ($("s_easypace") ? $("s_easypace").value : "").trim();
+      const epRaw = wizFieldVal("s_easypace").trim();
       if (epRaw) {
         if (!mmss(epRaw)) throw new Error("Enter your easy pace as minutes:seconds per km, e.g. 6:00.");
         const ep = RC.parseDuration(epRaw);
@@ -10707,12 +10774,12 @@ function draftFromForm() {
     }
   } else {
     fitSrc = draft.fitsrc || "recent"; noRecent = false;
-    const recRaw = $("s_rectime").value.trim();
+    const recRaw = wizFieldVal("s_rectime").trim();
     if (!mmss(recRaw)) throw new Error(fitSrc === "predicted" ? "Enter your predicted 5 km time as m:ss, e.g. 28:00." : "Enter your recent 5 km time as m:ss, e.g. 25:00.");
     recentTimeS = RC.parseDuration(recRaw);
     const pace = recentTimeS / 5; // seconds per km over 5 km
     if (pace < 120 || pace > 720) throw new Error("That 5 km time looks off — please check it (m:ss).");
-    const twoKmRaw = ($("s_2km") ? $("s_2km").value : "").trim();
+    const twoKmRaw = wizFieldVal("s_2km").trim();
     if (twoKmRaw) {
       if (!mmss(twoKmRaw)) throw new Error("Enter your 2 km time as minutes:seconds, e.g. 8:00.");
       const s = RC.parseDuration(twoKmRaw);
@@ -10728,24 +10795,25 @@ function draftFromForm() {
   // Goal adapts to the status: runners set a target time; beginners work towards *completing* the
   // distance, so we derive a realistic finish time from their current ability (no time to enter).
   const goalCfg = GOAL_BY_STATUS[status] || GOAL_BY_STATUS.regular;
-  const goalDist = $("s_dist") ? $("s_dist").value : profile.goalDist;
+  const goalDist = wizFieldVal("s_dist") || profile.goalDist;
   let targetS;
   if (goalCfg.time) {
-    const targetRaw = $("s_target").value.trim();
+    const targetRaw = wizFieldVal("s_target").trim();
     if (!mmss(targetRaw)) throw new Error("Enter your target time as h:mm:ss or m:ss, e.g. 1:45:00.");
     targetS = RC.parseDuration(targetRaw);
   } else {
     targetS = Math.round(RC.riegelPredict(5000, recentTimeS, DIST_M[goalDist] || 5000));
   }
-  const raceDate = $("s_date").value;
+  const raceDate = wizFieldVal("s_date");
   if (!raceDate) throw new Error("Pick your " + (goalCfg.time ? "race" : "target") + " date.");
   if (raceDate <= todayIso()) throw new Error("Your " + (goalCfg.time ? "race" : "target") + " date needs to be in the future.");
-  const longRunDay = $("s_longday") ? Number($("s_longday").value) : (profile.longRunDay != null ? profile.longRunDay : 6);
-  let startDateIso = $("s_startdate") ? $("s_startdate").value : (profile.startDateIso || "");
+  const _ld = wizFieldVal("s_longday");
+  const longRunDay = _ld !== "" ? Number(_ld) : (profile.longRunDay != null ? profile.longRunDay : 6);
+  let startDateIso = wizFieldVal("s_startdate") || (profile.startDateIso || "");
   if (startDateIso && startDateIso < todayIso()) startDateIso = todayIso();
   if (startDateIso && startDateIso >= raceDate) throw new Error("Your start date needs to be before your race date.");
   return {
-    name: ($("s_name") ? $("s_name").value : "").trim().slice(0, 40),
+    name: wizFieldVal("s_name").trim().slice(0, 40),
     avatar: draft.avatar != null ? draft.avatar : (profile.avatar || ""),
     status,
     goalDist, targetS, raceDate, startDateIso, longRunDay,
@@ -10758,8 +10826,8 @@ function draftFromForm() {
     // "building", where the runner can no longer see it, change it or clear it. It used to be
     // harmless because a stale value could only build the plan UP; now that it can shrink one, an
     // invisible answer reshaping the plan is a bug the runner cannot even diagnose.
-    volKm: volEl && volEl.value !== "" && !volQHidden() ? Math.max(0, Math.min(250, Number(volEl.value) || 0)) : 0,
-    age: Number($("s_age").value) || 35, sex: $("s_sex").value,
+    volKm: (!beginner && volRaw !== "") ? Math.max(0, Math.min(250, Number(volRaw) || 0)) : 0,
+    age: Number(wizFieldVal("s_age")) || 35, sex: wizFieldVal("s_sex"),
     strength: draft.strength === "1",
     // ⚠️ THE SEGMENT NOW HAS THREE VALUES, SO A BOOLEAN CANNOT HOLD ITS ANSWER. This read
     // draft.returning === "1" — the old Yes value — so once the control became
@@ -11002,9 +11070,13 @@ function goalCardInner(status, cur) {
   h += '<div class="q"><label>' + (cfg.time ? "Race date" : "Target date") + '</label><input class="sel" id="s_date" type="date" value="' + cur.date + '"></div>';
   return h;
 }
-function statusCards(sel) {
+function statusCards(sel, opts) {
+  // ⚠️ The wizard's level step passes { compact: true } to drop the two-line description under each
+  // title — four options × two lines was the difference between "fits" and "scrolls" on 375×812. The
+  // long form (edit) keeps the description; the wizard's lead paragraph already frames the choice.
+  const compact = opts && opts.compact;
   return '<div class="statuscards" data-set="status">' + STATUS_OPTS.map((o) =>
-    '<button type="button" data-v="' + o[0] + '" class="statuscard' + (o[0] === sel ? " on" : "") + '"><div class="sc-t">' + o[1] + '</div><div class="sc-d">' + o[2] + '</div></button>').join("") + '</div>';
+    '<button type="button" data-v="' + o[0] + '" class="statuscard' + (o[0] === sel ? " on" : "") + '"><div class="sc-t">' + o[1] + '</div>' + (compact ? "" : '<div class="sc-d">' + o[2] + '</div>') + '</button>').join("") + '</div>';
 }
 // Show the runner-only block (5 km time + 2 km trial) for runners; a reassuring note for beginners.
 function syncStatus() {
@@ -11062,6 +11134,290 @@ function refreshTypePreview() {
     const tp = $("typePreview"); if (!tp) return;
     tp.innerHTML = '<div class="eyebrow" style="margin:0 0 4px">Your runner type</div><div style="font-size:17px;font-weight:700;letter-spacing:-.01em">' + cls.label + '</div><div style="font-size:12.5px;color:var(--ink-soft);margin-top:4px">' + cls.meaning + '</div>' + (m.isMasters ? '<div style="font-size:12.5px;color:var(--ink-faint);margin-top:8px;border-top:1px solid var(--line);padding-top:8px">' + m.headline + '</div>' : '');
   } catch (e) {}
+}
+
+// ============ FIRST-RUN ONBOARDING WIZARD =================================
+// A guided, one-step-at-a-time build of the plan that ends by letting the runner PICK between a few
+// real plan variants. It reuses the existing field ids, the draft, and draftFromForm() /
+// applyProfile() / adoptPlan() unchanged, so validation and plan generation are shared with the long
+// edit form (viewSetup), which is untouched and still used for editing from Profile.
+// ⚠️ THE VARIANTS ARE REAL PLANS: applyProfile() run at different days-per-week — the existing
+// generator with a different input, not new engine logic. Peak volume and session count already scale
+// with days, so the plans genuinely differ.
+const WIZ_BADGE = { "5k": "5K", "10k": "10K", half: "21K", marathon: "42K" };
+// The ordered step ids for the current status. Beginners give no 5 km time or weekly mileage, so those
+// steps drop out — the same rule syncStatus uses on the full form.
+function wizStepIds() {
+  const st = draft.status || "";
+  const beginner = isBeginnerStatus(st);
+  const ids = ["level", "goal"];
+  if (st === "building" || (st && !beginner)) ids.push("fitness");
+  if (st && !beginner) ids.push("volume");
+  ids.push("details", "plan", "schedule", "summary");
+  return ids;
+}
+function wizMeta(id, st) {
+  if (id === "level") return { eyebrow: "CREATE YOUR PLAN", title: "Where are you at?" };
+  if (id === "goal") return { eyebrow: "YOUR GOAL", title: "Choose your goal", badge: true };
+  if (id === "fitness") return { eyebrow: "CURRENT FITNESS", title: "How fit are you now?" };
+  if (id === "volume") return { eyebrow: "WEEKLY DISTANCE", title: "How far a week?" };
+  if (id === "details") return { eyebrow: "A FEW DETAILS", title: "A little about you" };
+  if (id === "plan") return { eyebrow: "CHOOSE YOUR PLAN", title: "Pick your plan", badge: true };
+  if (id === "schedule") return { eyebrow: "SCHEDULE", title: "When will you run?" };
+  if (id === "summary") return { eyebrow: "YOUR PLAN", title: "You\\u2019re all set", badge: true };
+  return { eyebrow: "", title: "" };
+}
+function wizGoalBadge() {
+  const d = wizFieldVal("s_dist") || (profile && profile.goalDist) || "10k";
+  return '<span class="wz-badge">' + (WIZ_BADGE[d] || "10K") + '</span>';
+}
+function wizHero(eyebrow, title, badge) {
+  // ⚠️ NO BRAND_MARK HERE. That is a BUILD-TIME backtick constant used to inject the SVG into the
+  // static splash/welcome HTML; it does not exist in the runtime page scope, so referencing it threw
+  // and the wizard silently fell back to whatever was under it. The gradient band, eyebrow, title and
+  // goal badge carry the hero on their own.
+  return '<div class="wz-hero">' + (badge || "") +
+    '<div class="wz-eyebrow">' + eyebrow + '</div>' +
+    '<div class="wz-title">' + title + '</div></div>';
+}
+// Generate 2-3 real plans by running applyProfile at different day counts. Deduped where a beginner cap
+// collapses two counts to the same plan. draft.days is set temporarily per candidate and restored.
+function wizVariants() {
+  const st = draft.status || "regular";
+  let cand, rec;
+  if (st === "new") { cand = [3, 4]; rec = 3; }
+  else if (st === "building") { cand = [3, 4, 5]; rec = 4; }
+  else if (st === "competitive") { cand = [5, 6, 7]; rec = 6; }
+  else { cand = [4, 5, 6]; rec = 5; }
+  const savedDays = draft.days;
+  const built = [], seen = {};
+  for (let k = 0; k < cand.length; k++) {
+    const d = cand[k];
+    draft.days = String(d);
+    let out;
+    try { out = applyProfile(draftFromForm()); } catch (e) { continue; }
+    const sum = (out.plan && out.plan.summary) ? out.plan.summary : {};
+    const weeks = sum.structuredWeeks || sum.totalWeeks || (out.plan && out.plan.weeks ? out.plan.weeks.length : 0);
+    const peak = Math.round(sum.peakKm || 0);
+    const key = weeks + ":" + peak;
+    if (seen[key]) continue;
+    seen[key] = true;
+    built.push({ days: d, weeks: weeks, peak: peak, rec: d === rec });
+  }
+  draft.days = savedDays;
+  if (built.length && !built.some((v) => v.rec)) built[Math.floor(built.length / 2)].rec = true;
+  return built;
+}
+function wizBody(id, p, st) {
+  if (id === "level") {
+    return '<p class="wz-lead">Tell us where you\\u2019re at, so every pace and session fits you.</p>' +
+      statusCards(draft.status != null ? draft.status : "", { compact: true });
+  }
+  if (id === "goal") {
+    const cur = { dist: wizFieldVal("s_dist") || p.goalDist, date: wizFieldVal("s_date") || p.raceDate || "", target: wizFieldVal("s_target") || "" };
+    return '<p class="wz-lead">What are you working towards?</p>' +
+      '<div id="goalBody" class="wz-fields">' + goalCardInner(st || "regular", cur) + '</div>';
+  }
+  if (id === "fitness") {
+    if (st === "building") {
+      return '<p class="wz-lead">Optional. If you know a pace you can comfortably <b>chat at</b>, every training pace scales to you. Leave it blank and we\\u2019ll start gently and learn as you run.</p>' +
+        '<div class="q"><label>Your easy pace <span class="q-hint">minutes:seconds per km</span></label><input class="sel num" id="s_easypace" value="' + esc(wizFieldVal("s_easypace")) + '" placeholder="e.g. 6:00 / km" inputmode="numeric"></div>';
+    }
+    const fs = draft.fitsrc || "recent";
+    return '<p class="wz-lead">This sets every pace in your plan.</p>' +
+      '<div class="q"><label>Your 5 km time \\u2014 recent or an estimate?</label>' + seg("fitsrc", [["recent", "Recent"], ["predicted", "Predicted"]], fs) + '</div>' +
+      '<div class="q" id="fitTimeWrap"><label id="fitTimeLbl"><span class="lblmain">' + (fs === "predicted" ? "Your predicted 5 km time" : "Your recent 5 km time") + '</span> <span class="q-hint">just type the numbers</span></label><input class="sel num" id="s_rectime" value="' + esc(wizFieldVal("s_rectime")) + '" placeholder="e.g. 25:00" inputmode="numeric"></div>' +
+      '<div class="q"><label>2 km time-trial <span class="q-hint">optional \\u2014 sharpens every pace</span></label><input class="sel num" id="s_2km" value="' + esc(wizFieldVal("s_2km")) + '" placeholder="e.g. 8:00" inputmode="numeric"></div>';
+  }
+  if (id === "volume") {
+    return '<p class="wz-lead">So we can build on what you already do. Leave it blank if you\\u2019re not sure \\u2014 we\\u2019ll use a sensible default for your goal.</p>' +
+      '<div class="q"><label>Roughly how far in a normal week? <span class="q-hint">km</span></label><input class="sel" id="s_volume" type="number" inputmode="numeric" min="0" max="250" step="5" style="max-width:160px" value="' + esc(wizFieldVal("s_volume")) + '" placeholder="e.g. 40"></div>';
+  }
+  if (id === "details") {
+    const sx = wizFieldVal("s_sex");
+    return '<p class="wz-lead">These fine-tune the plan. Skip anything you\\u2019d rather not answer.</p>' +
+      '<div class="q"><label>Coming back to running? <span class="q-hint">time off and injury shape the early weeks differently</span></label>' + seg("returning", [["0", "No"], ["break", "After time off"], ["injury", "After an injury"]], draft.returning || "0") + '</div>' +
+      '<div class="q"><label>Age</label><select class="sel" id="s_age" style="max-width:140px">' + ageOpts(Number(wizFieldVal("s_age")) || p.age) + '</select></div>' +
+      '<div class="q"><label>Sex <span class="q-hint">helps tailor advice</span></label><select class="sel" id="s_sex" style="max-width:200px"><option value=""' + (!sx ? " selected" : "") + '>Prefer not to say</option><option value="female"' + (sx === "female" ? " selected" : "") + '>Female</option><option value="male"' + (sx === "male" ? " selected" : "") + '>Male</option></select></div>';
+  }
+  if (id === "plan") {
+    const vars = wizVariants();
+    if (!vars.length) return '<p class="wz-lead">We couldn\\u2019t build a plan from those answers \\u2014 go back and check your goal date is far enough ahead.</p>';
+    if (!draft.days) { const r = vars.find((v) => v.rec) || vars[Math.floor(vars.length / 2)]; if (r) draft.days = String(r.days); }
+    const sel = Number(draft.days), minDays = vars[0].days;
+    const cards = vars.map((v) => {
+      const label = v.rec ? "Recommended" : (v.days === minDays ? "Steady" : "Ambitious");
+      // ⚠️ NO focus line — it duplicated the tag ("Recommended" / "The balance we suggest for you")
+      // and pushed the plan step to 187px overflow on 375×812. The tag says what the card is; the
+      // meta says what the plan is; that is enough.
+      return '<button type="button" class="wz-plan' + (v.days === sel ? " on" : "") + (v.rec ? " rec" : "") + '" data-wizdays="' + v.days + '">' +
+        '<div class="wz-plan-tag">' + label + '</div>' +
+        '<div class="wz-plan-h">' + v.days + ' runs / week</div>' +
+        '<div class="wz-plan-meta">' + v.weeks + ' weeks \\u00b7 peak ' + v.peak + ' km</div></button>';
+    }).join("");
+    return '<p class="wz-lead">Each is a real plan we\\u2019ve built for you. Pick the rhythm that fits your week \\u2014 you can change it later.</p><div class="wz-plans">' + cards + '</div>';
+  }
+  if (id === "schedule") {
+    const ldRaw = wizFieldVal("s_longday");
+    const ld = ldRaw !== "" ? Number(ldRaw) : p.longRunDay;
+    const rmOn = draft.wizRemind != null ? draft.wizRemind : "1";
+    // ⚠️ NO lead line — the hero title says it. Reminder time hidden when the toggle is Off (no point
+     // asking a time for a reminder that never fires). Both shave enough for the step to fit at 375×812.
+    return '<div class="q" style="margin-top:0"><label>Which day suits your long run?</label><select class="sel" id="s_longday" style="max-width:200px">' + dayOpts(ld) + '</select></div>' +
+      '<div class="q"><label>When do you want to start?</label><input class="sel" id="s_startdate" type="date" value="' + (wizFieldVal("s_startdate") || todayIso()) + '" min="' + todayIso() + '"></div>' +
+      '<div class="q"><label>Training-day reminders</label>' + seg("wizRemind", [["1", "On"], ["0", "Off"]], rmOn) + '</div>' +
+      (rmOn === "1" ? '<div class="q"><label>Reminder time</label><input class="sel" id="s_remindtime" type="time" style="max-width:140px" value="' + (wizFieldVal("s_remindtime") || REMIND.time || "08:00") + '"></div>' : '');
+  }
+  if (id === "summary") {
+    captureSetupFields();
+    let sum = null;
+    try { const out = applyProfile(draftFromForm()); sum = (out.plan && out.plan.summary) ? out.plan.summary : null; } catch (e) {}
+    const dist = wizFieldVal("s_dist") || p.goalDist;
+    const weeks = sum ? (sum.structuredWeeks || sum.totalWeeks) : 0;
+    const peak = sum ? Math.round(sum.peakKm || 0) : 0;
+    const days = Number(draft.days) || 0;
+    const goalLbl = (GOAL_BY_STATUS[st] && GOAL_BY_STATUS[st].time) ? RACE_LABEL[dist] : FINISH_LABEL[dist];
+    return '<div class="wz-summary">' +
+      '<div class="wz-sum-goal">' + esc(goalLbl || "Your plan") + '</div>' +
+      '<div class="wz-sum-grid">' +
+        '<div class="wz-sum-tile"><div class="wz-sum-n">' + weeks + '</div><div class="wz-sum-l">weeks</div></div>' +
+        '<div class="wz-sum-tile"><div class="wz-sum-n">' + days + '</div><div class="wz-sum-l">runs / week</div></div>' +
+        '<div class="wz-sum-tile"><div class="wz-sum-n">' + peak + '</div><div class="wz-sum-l">peak km</div></div>' +
+      '</div>' +
+      '</div>';
+  }
+  return "";
+}
+function wizStepError(id) {
+  const mmss = (s) => /^\\d{1,2}:[0-5]\\d$/.test(s) || /^\\d{1,2}:[0-5]\\d:[0-5]\\d$/.test(s);
+  const st = draft.status || "";
+  if (id === "level") return st ? null : "Tap the option that fits you best.";
+  if (id === "goal") {
+    const cfg = GOAL_BY_STATUS[st] || GOAL_BY_STATUS.regular;
+    if (cfg.time && !mmss(wizFieldVal("s_target").trim())) return "Enter your target time, e.g. 1:45:00.";
+    const d = wizFieldVal("s_date");
+    if (!d) return "Pick your " + (cfg.time ? "race" : "target") + " date.";
+    if (d <= todayIso()) return "That date needs to be in the future.";
+    return null;
+  }
+  if (id === "fitness") {
+    if (!isBeginnerStatus(st)) { if (!mmss(wizFieldVal("s_rectime").trim())) return "Enter your recent 5 km time, e.g. 25:00."; }
+    else if (st === "building") { const ep = wizFieldVal("s_easypace").trim(); if (ep && !mmss(ep)) return "Enter your easy pace as m:ss per km, e.g. 6:00."; }
+    return null;
+  }
+  if (id === "plan") return draft.days ? null : "Choose a plan to continue.";
+  return null;
+}
+function viewWizard() {
+  const ids = wizStepIds();
+  const i = Math.max(0, Math.min(state.wizStep || 0, ids.length - 1));
+  state.wizStep = i;
+  const id = ids[i], p = profile, st = draft.status || "";
+  const meta = wizMeta(id, st);
+  const dots = '<div class="wz-dots">' + ids.map((_, k) => '<span class="wz-dot' + (k === i ? " on" : (k < i ? " done" : "")) + '"></span>').join("") + '</div>';
+  const err = state.wizErr ? '<div class="wz-err">' + esc(state.wizErr) + '</div>' : "";
+  return '<div class="wizard">' +
+    wizHero(meta.eyebrow, meta.title, meta.badge ? wizGoalBadge() : "") +
+    dots +
+    // ⚠️ The error and the step body share ONE scroller with bottom padding, so the sticky footer never
+    // covers the last field. wz-step is flex:1, which pins the footer to the bottom on short steps too.
+    '<div class="wz-step">' + wizBody(id, p, st) + err + '</div>' +
+    '<div class="wz-foot">' +
+      '<button class="wz-back" id="wizBack" type="button">' + (i === 0 ? "Exit" : "Back") + '</button>' +
+      '<button class="wz-next primary" id="wizNext" type="button">' + (id === "summary" ? "Start my plan" : "Next") + '</button>' +
+    '</div></div>';
+}
+function wizNext() {
+  const ids = wizStepIds();
+  const id = ids[Math.max(0, Math.min(state.wizStep || 0, ids.length - 1))];
+  captureSetupFields();
+  const err = wizStepError(id);
+  if (err) { state.wizErr = err; render(); return; }
+  state.wizErr = null;
+  if (id === "summary") { wizardFinish(); return; }
+  state.wizStep = Math.min((state.wizStep || 0) + 1, wizStepIds().length - 1);
+  render();
+}
+function wizBack() {
+  captureSetupFields();
+  state.wizErr = null;
+  if ((state.wizStep || 0) <= 0) { state.screen = null; state.tab = "today"; render(); return; }
+  state.wizStep = (state.wizStep || 0) - 1;
+  render();
+}
+// Build the plan from every collected answer and land on Today. The same sequence doSaveProfile uses,
+// minus the edit-only impact preview and undo toast (a first run has no prior plan to weigh or undo).
+function wizardFinish() {
+  captureSetupFields();
+  let pf;
+  try { pf = draftFromForm(); } catch (e) { state.wizErr = e.message; render(); return; }
+  let out;
+  try { out = applyProfile(pf); } catch (e) { state.wizErr = "That goal can\\u2019t be planned yet — try a date further ahead."; render(); return; }
+  const keptTicks = todayTicks();
+  profile = pf; adoptPlan(out); computeToday();
+  state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
+  seedDone(); restoreTicks(keptTicks); saveProfileStore(); renderAvatar();
+  // Apply the reminder choice from the schedule step.
+  try {
+    if (draft.wizRemind === "1") { REMIND.enabled = true; REMIND.decided = true; const t = wizFieldVal("s_remindtime"); if (t) REMIND.time = t; saveReminders(); }
+  } catch (e) {}
+  draft = {}; state.wizErr = null; state.wizStep = 0;
+  state.screen = null; state.tab = "today"; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
+  render();
+  try { updateBell(); initReminders(); syncWatch(); if (typeof NATIVE_NOTIFY !== "undefined" && NATIVE_NOTIFY) nativeNotify("status"); } catch (e) {}
+  // The one-shot extras popup: coach + motivation, do now or later. Deferred a beat so the Today
+  // repaint lands first — the popup then dims a real Today rather than a blank canvas.
+  setTimeout(openExtrasOffer, 60);
+}
+function wireWizard() {
+  const next = $("wizNext"); if (next) next.onclick = wizNext;
+  const back = $("wizBack"); if (back) back.onclick = wizBack;
+  document.querySelectorAll("[data-wizdays]").forEach((b) => b.onclick = () => { draft.days = b.dataset.wizdays; state.wizErr = null; render(); });
+}
+
+// The after-Start popup: "want to set up your voice coach and motivation now, or later?" — same visual
+// language as openSessionGuide (the "Understanding your sessions" walkthrough) so a new runner meets one
+// popup style, not two. Two pages: (1) the ask; (2) if they picked "later", where to find it. No
+// localStorage — this is a one-shot on the exact moment the plan starts.
+let EXTRAS = null;
+function ensureExtrasOv() {
+  if ($("extrasOv")) return;
+  const ov = el('<div class="guide-ov" id="extrasOv"><div class="guide-card">' +
+    '<div class="guide-eyebrow" id="extrasEyebrow">A couple of extras</div>' +
+    '<div class="guide-cap"><div class="guide-cap-h" id="extrasCapH"></div><div class="guide-cap-b" id="extrasCapB"></div></div>' +
+    '<div class="guide-foot"><div class="guide-dots" id="extrasDots"></div><div class="guide-btns" id="extrasBtns"></div></div>' +
+    '</div></div>');
+  document.body.appendChild(ov);
+  ov.addEventListener("click", (e) => { if (e.target === ov) closeExtras(); });
+}
+function openExtrasOffer() {
+  ensureExtrasOv();
+  EXTRAS = { i: 0 };
+  renderExtras();
+  const ov = $("extrasOv"); ov.classList.add("on");
+}
+function renderExtras() {
+  const step = EXTRAS.i;
+  const h = $("extrasCapH"), b = $("extrasCapB"), btns = $("extrasBtns"), dots = $("extrasDots");
+  dots.innerHTML = '<span class="gd' + (step === 0 ? " on" : "") + '"></span><span class="gd' + (step === 1 ? " on" : "") + '"></span>';
+  if (step === 0) {
+    h.textContent = "Voice coach & motivation";
+    b.textContent = "Pick a coach whose voice speaks to you, and tell us the reasons behind the plan. Both make sessions land harder — you can do them now, or later.";
+    btns.innerHTML = '<button class="guide-skip" id="extrasLater">Later</button><button class="guide-next" id="extrasNow">Do it now</button>';
+    $("extrasLater").onclick = () => { EXTRAS.i = 1; renderExtras(); };
+    $("extrasNow").onclick = () => { closeExtras(); state.setupFocus = "voice"; state.screen = "setup"; render(); };
+  } else {
+    h.textContent = "Any time in Profile";
+    b.textContent = "Open Profile from the top-left — Voice coaching and Motivation are two of the rows. Add them whenever you\\u2019re ready.";
+    btns.innerHTML = '<button class="guide-next" id="extrasOk">OK</button>';
+    $("extrasOk").onclick = closeExtras;
+  }
+}
+function closeExtras() {
+  const ov = $("extrasOv"); if (ov) ov.classList.remove("on");
+  EXTRAS = null;
+  // Now the session-shorthand walkthrough can fire (it was gated on our popup being open).
+  try { if (state.tab === "today" && !state.screen) maybeAutoGuide(); } catch (e) {}
 }
 
 // ============ LIVE SESSION (in-app) ========================================
@@ -14356,9 +14712,13 @@ function maybeAutoGuide() {
   if (guideSeen() || !profile.personalized || GUIDE) return;
   // Hold off while the splash / welcome-back overlays are still up — it fires when they clear.
   if ($("splash") || $("welcomeback")) return;
+  // ⚠️ AND WHILE THE EXTRAS POPUP IS UP. wizardFinish opens it on Today right after Start; running the
+  // auto-guide underneath means two popups stacked (the "Understanding your sessions" walkthrough on
+  // top of the coach/motivation offer). closeExtras re-runs this once it's dismissed.
+  if (EXTRAS || ($("extrasOv") && $("extrasOv").classList.contains("on"))) return;
   const s = selectedSession();
   const title = s && guideStepCount(s.title) >= 2 ? s.title : GUIDE_EXAMPLE;
-  setTimeout(() => { if (!guideSeen() && !GUIDE && state.tab === "today" && !state.screen && !$("welcomeback")) openSessionGuide(title, {}); }, 550);
+  setTimeout(() => { if (!guideSeen() && !GUIDE && state.tab === "today" && !state.screen && !$("welcomeback") && !EXTRAS) openSessionGuide(title, {}); }, 550);
 }
 
 // ---- Router ---------------------------------------------------------------
@@ -14390,7 +14750,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) { re
 // ⚠️ Deliberately NOT used by trialSaveResult or the avatar crop — those change what the form should
 // SHOW, so they must repaint it.
 function renderUnlessTyping() {
-  if (state.screen === "setup") return;
+  if (state.screen === "setup" || state.screen === "wizard") return;
   render();
 }
 let LAST_SCROLL_KEY = null;
@@ -14404,7 +14764,7 @@ function render() {
   // hand for the add-a-session drawer; a third instance is a class, not a coincidence.
   // The key is what makes it a DIFFERENT SCREEN, not what makes it different content: a Logbook
   // sub-tab is a navigation and still resets, a filter within one is not.
-  const scrollKey = [state.tab, state.screen, state.support, state.actTab, state.viewRunId].join("|");
+  const scrollKey = [state.tab, state.screen, state.support, state.actTab, state.viewRunId, state.wizStep].join("|");
   const keepScroll = scrollKey === LAST_SCROLL_KEY ? v.scrollTop : 0;
   LAST_SCROLL_KEY = scrollKey;
   // A run under way no longer locks the app. Hiding the nav protected the run from a stray tap, but
@@ -14412,6 +14772,24 @@ function render() {
   // protection now comes from the live pill instead -- leaving is obvious, and so is the way back.
   const nav = $("nav"); if (nav) nav.style.display = "";
   syncLivePill();
+  if (state.screen === "wizard") {
+    // Full-screen, focused onboarding — no bottom nav to tap away into. The draft is sticky
+    // (draft.__live), so backgrounding and returning keeps every answer.
+    // ⚠️ Short. "Create your plan" wrapped to two lines on 375-wide phones once the top-bar icons were
+    // in the row — the wizard's OWN hero already says "Create your plan", so the top bar can just say
+    // "Setup" without saying it twice.
+    $("topTitle").textContent = "Setup";
+    if (nav) nav.style.display = "none";
+    seedSetupDraft();
+    v.innerHTML = viewWizard();
+    linkFormLabels();
+    restoreSetupFields();
+    v.scrollTop = keepScroll;
+    document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
+    wire();
+    wireWizard();
+    return;
+  }
   if (state.screen === "setup") {
     $("topTitle").textContent = "Your profile";
     // ⚠️ Seeded through returnKind, or an existing profile lights up NO segment at all: the stored
@@ -14751,7 +15129,7 @@ function wire() {
   const avatarBtn = $("avatarBtn"); if (avatarBtn && avatarFile) avatarBtn.onclick = () => avatarFile.click();
   const avatarPic = $("avatarPic"); if (avatarPic && avatarFile) avatarPic.onclick = () => avatarFile.click();
   if (avatarFile) avatarFile.onchange = () => processAvatarFile(avatarFile.files && avatarFile.files[0]);
-  const setupBanner = $("setupBanner"); if (setupBanner) setupBanner.onclick = () => { state.screen = "setup"; render(); };
+  const setupBanner = $("setupBanner"); if (setupBanner) setupBanner.onclick = () => { state.screen = profile.personalized ? "setup" : "wizard"; render(); };
   const wxSeg = document.querySelector("[data-weatherseg]"); if (wxSeg) wxSeg.querySelectorAll("button").forEach((b) => b.onclick = () => { state.weather = b.dataset.weather; render(); });
   const save = $("saveProfile"); if (save) save.onclick = () => {
     // Blank easy pace on a "building" profile: ask once before saving.
@@ -15281,23 +15659,19 @@ try { if (NATIVE_WATCH) window.webkit.messageHandlers.interunWatch.postMessage({
   // launch keeps the guided welcome → setup (its onboarding, and deliberately unchanged before
   // TestFlight); a web first session goes straight to Today with the example plan and its "Set up →"
   // banner (examplePlanBanner in viewToday), which is the affordance to personalise.
-  const nativeFirstRun = FIRST_RUN && location.protocol === "interun:";
-  if (nativeFirstRun) {
+  if (FIRST_RUN) {
+    // First launch, NATIVE OR WEB: brand splash → the welcome → the guided plan-building WIZARD. The
+    // welcome's "a few quick questions" leads straight into it, one section at a time, ending with a
+    // choice of plan. Backing out of the wizard lands on Today with the example-plan banner, which
+    // re-enters the wizard.
     setTimeout(() => {
       removeSplash();
       const wel = $("welcome"); if (!wel) return;
       wel.classList.add("on");   // opaque, directly under the fading splash; its copy arrives via welIn
       syncThemeColor();
-      const go = () => { wel.classList.add("hide"); syncThemeColor(); setTimeout(() => { wel.remove(); syncThemeColor(); }, 500); state.screen = "setup"; render(); };
+      const go = () => { wel.classList.add("hide"); syncThemeColor(); setTimeout(() => { wel.remove(); syncThemeColor(); }, 500); state.screen = "wizard"; state.wizStep = 0; render(); };
       const btn = $("welcomeGo"); if (btn) btn.onclick = go;
     }, 2000);
-  } else if (FIRST_RUN) {
-    // Web first session: brand splash → Today. No "welcome back" (they have not been here), no forced
-    // setup — the example-plan banner on Today is the way in to personalising.
-    let started = false;
-    const go = () => { if (started) return; started = true; removeSplash(); syncThemeColor(); };
-    sp.addEventListener("click", go);
-    setTimeout(go, 2200);
   } else {
     // Returning user: brand splash → a brief personalised welcome with a rotating quote → Today.
     let started = false;

@@ -94,7 +94,10 @@ test("⚠️ the setup form survives a glance at another tab", () => {
     "the setup draft is reseeded on every render again — a nav tap will wipe the form");
   // ⚠️ EVERY path that renders the form must seed it. openProfileEdit did not, and the generator died
   // deep inside on a draft with no daysPerWeek, reported as a wrong message about the race date.
-  assert.equal((html.match(/seedSetupDraft\(\)/g) || []).length, 3,
+  // Four paths now: render()'s setup branch, openProfileEdit's sheet, the render() wizard branch, and
+  // the initial seed call. The first-run WIZARD renders the same form fields (status cards, goal, the
+  // s_ inputs), so it must seed the draft too — guarded by the same draft.__live check.
+  assert.equal((html.match(/seedSetupDraft\(\)/g) || []).length, 4,
     "a path renders the setup form without seeding its draft");
   // ⚠️ AND THE TYPED FIELDS, or half a form is restored, which reads as a worse bug than losing it
   // all. Generic over the s_ prefix so a question added later is carried without anyone remembering.

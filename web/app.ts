@@ -2873,6 +2873,28 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .wz-back { flex: 0 0 auto; font: inherit; font-size: var(--t-body); font-weight: 700; color: var(--ink-soft); background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-ctl); padding: 14px 20px; cursor: pointer; min-height: var(--tap); }
 .wz-back:active { transform: translateY(1px); }
 .wz-next { flex: 1 1 auto; margin: 0 !important; }
+
+/* ===== Extras popup — mini-wizard body (coach + why pages) =====
+   Widened card and a bounded scroller for the coach picker and the why inputs, so the buttons never
+   scroll away and a tall body never bursts the card. */
+.wz-extras-card { max-width: 420px; }
+/* ⚠️ dvh, not vh — on iOS Safari 1vh is the LARGEST viewport height (with URL bar hidden), so a
+   44vh cap becomes 44% of the TALLER viewport and the popup body pushes past the visible screen
+   when the URL bar is showing. Enforced by test/ios-viewport.test.ts. */
+.wz-extras-body { max-height: 44dvh; overflow-y: auto; margin-top: 10px; }
+.wz-extras-body:empty { display: none; }
+.wz-coaches { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.wz-extras-body .coachcard { text-align: left; background: var(--surface-2); border: 1.5px solid var(--line); border-radius: var(--r-ctl); padding: 10px 12px; cursor: pointer; font: inherit; color: inherit;
+  transition: border-color .12s ease, background .12s ease, box-shadow .12s ease; }
+.wz-extras-body .coachcard:active { transform: translateY(1px); }
+.wz-extras-body .coachcard.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  box-shadow: 0 0 0 1px var(--accent) inset; }
+.wz-extras-body .cc-name { font-size: var(--t-card); font-weight: 800; color: var(--ink); }
+.wz-extras-body .cc-tag { font-size: var(--t-meta); color: var(--ink-soft); margin-top: 2px; }
+.wz-extras-body .why-row { margin-top: 10px; }
+.wz-extras-body .why-row:first-child { margin-top: 0; }
+.wz-extras-body .why-q { display: block; font-size: var(--t-meta); font-weight: 700; color: var(--ink); margin-bottom: 4px; }
+.wz-extras-body .why-hint { font-size: var(--t-label); color: var(--ink-faint); margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -6641,8 +6663,18 @@ function addedTodayBlock() {
       '<button class="add-go" data-addstart="' + e.id + '" aria-label="Start">' + ICON.play + '</button>' +
       '<button class="add-rm" data-addrm="' + e.id + '" aria-label="Remove">✕</button></div>';
   }).join("");
+  // ⚠️ The scheduled 2 km trial is rendered here alongside extras, but it is NOT one — see the note on
+  // TRIAL_KEY for why. Tapping Start opens the existing trial-run flow; Remove clears the record so
+  // running it "steals" today's scheduled trial rather than piling up a stale card.
+  const trialRow = scheduledTrialOn(iso)
+    ? '<div class="add-row"><span class="dot hard"></span>' +
+      '<button class="add-open" data-trialopen="1"><span class="st">2 km time trial</span><span class="sm">calibrates every pace</span></button>' +
+      '<button class="add-go" data-trialstart="1" aria-label="Start">' + ICON.play + '</button>' +
+      '<button class="add-rm" data-trialrm="1" aria-label="Remove">✕</button></div>'
+    : "";
   const lab = dayLabelIso(iso);
-  const card = list.length ? '<h2 class="sec">Added ' + (lab === "today" ? "today" : "for " + lab) + '</h2><div class="card add-card">' + rows + '</div>' : "";
+  const anyRow = list.length || trialRow;
+  const card = anyRow ? '<h2 class="sec">Added ' + (lab === "today" ? "today" : "for " + lab) + '</h2><div class="card add-card">' + trialRow + rows + '</div>' : "";
   // ⚠️ The type grid DROPS DOWN ONTO TODAY rather than opening a sheet. The runner is on the screen
   // that already tells them what they are doing today — making them open a modal just to see the
   // options put a door in front of a decision they had already made. Tapping a type still opens the
@@ -11033,6 +11065,8 @@ function trialSaveResult() {
   saveProfileStore();
   state.trialSaved = fmtTimeFull(TRIALRUN.secs);
   state.trialPending = false; TRIALRUN = null;
+  // The scheduled trial has now happened — clear it so Today does not keep offering it forever.
+  clearScheduledTrial();
   state.screen = "setup"; render();
 }
 // The gating first question: current running status decides which fields we ask for.
@@ -11150,13 +11184,14 @@ const WIZ_BADGE = { "5k": "5K", "10k": "10K", half: "21K", marathon: "42K" };
 function wizStepIds() {
   const st = draft.status || "";
   const beginner = isBeginnerStatus(st);
-  const ids = ["level", "goal"];
+  const ids = ["you", "level", "goal"];
   if (st === "building" || (st && !beginner)) ids.push("fitness");
   if (st && !beginner) ids.push("volume");
   ids.push("details", "plan", "schedule", "summary");
   return ids;
 }
 function wizMeta(id, st) {
+  if (id === "you") return { eyebrow: "CREATE YOUR PLAN", title: "First, about you" };
   if (id === "level") return { eyebrow: "CREATE YOUR PLAN", title: "Where are you at?" };
   if (id === "goal") return { eyebrow: "YOUR GOAL", title: "Choose your goal", badge: true };
   if (id === "fitness") return { eyebrow: "CURRENT FITNESS", title: "How fit are you now?" };
@@ -11208,7 +11243,55 @@ function wizVariants() {
   if (built.length && !built.some((v) => v.rec)) built[Math.floor(built.length / 2)].rec = true;
   return built;
 }
+// ⚠️ The scheduled 2 km trial is a FIRST-CLASS SLOT, not an EXTRA. The extra system rebuilds from an
+// engine format id (extraRep by type) — there is no "trial" format, so shoehorning it in as an extra
+// would return null. It is instead stored as one iso date and rendered as its own card on Today for
+// that date, whose tap opens the existing trial-run flow. A single record, keyed by iso, so setting
+// it twice replaces the earlier one.
+const TRIAL_KEY = "interun_scheduled_trial_v1";
+function loadScheduledTrial() { try { const s = localStorage.getItem(TRIAL_KEY); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
+function saveScheduledTrial() { try { SCHEDULED_TRIAL ? localStorage.setItem(TRIAL_KEY, JSON.stringify(SCHEDULED_TRIAL)) : localStorage.removeItem(TRIAL_KEY); } catch (e) {} }
+let SCHEDULED_TRIAL = loadScheduledTrial();
+function clearScheduledTrial() { SCHEDULED_TRIAL = null; saveScheduledTrial(); }
+function scheduledTrialOn(iso) { return !!(SCHEDULED_TRIAL && SCHEDULED_TRIAL.iso === iso); }
+
+// The seven upcoming days as {iso,label} — used by the wizard's trial-day picker. Names the day
+// ("Wed") rather than the date on its own; "Today" and "Tomorrow" for the two obvious ones.
+function wizTrialDayOpts() {
+  const t = todayIso();
+  const dayLbl = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const out = [];
+  for (let i = 0; i < 7; i++) {
+    const dt = isoAdd(t, i);
+    const iso = dt.toISOString().slice(0, 10);
+    const dow = (dt.getUTCDay() + 6) % 7;   // Monday-based
+    const nm = i === 0 ? "Today" : i === 1 ? "Tomorrow" : dayLbl[dow];
+    out.push({ iso: iso, label: nm });
+  }
+  return out;
+}
+function wizTrialOfferHtml() {
+  const on = draft.trialWant === "1";
+  const opts = wizTrialDayOpts();
+  const sel = draft.trialIso || opts[0].iso;
+  const days = opts.map((d) => '<option value="' + d.iso + '"' + (d.iso === sel ? " selected" : "") + '>' + d.label + '</option>').join("");
+  return '<div class="q"><label>Schedule a 2 km time trial this week? <span class="q-hint">a hard, evenly paced 2 km calibrates every pace we prescribe</span></label>' +
+    seg("trialWant", [["1", "Yes"], ["0", "No"]], on ? "1" : "0") + '</div>' +
+    (on ? '<div class="q"><label>Which day?</label><select class="sel" id="s_trialday" style="max-width:200px">' + days + '</select></div>' : "");
+}
+
 function wizBody(id, p, st) {
+  if (id === "you") {
+    // ⚠️ Reuses the SAME field ids the edit form uses (s_avatar_file, s_name, avatarPic, avatarBtn) so
+    // the existing wire() bindings pick them up unchanged — the avatar cropper, the file input, and
+    // the name capture all fire without a second wiring path. draft.avatar carries a chosen photo
+    // through subsequent steps (avatarInner reads it from draft first, then profile).
+    return '<p class="wz-lead">A photo and what to call you. Both are optional \\u2014 you can skip them and set them later.</p>' +
+      '<div class="avatar-row"><div class="avatar-pic" id="avatarPic">' + avatarInner({ avatar: draft.avatar || p.avatar || "", name: wizFieldVal("s_name") || p.name || "" }) + '</div>' +
+      '<div><button class="avatar-cta" id="avatarBtn" type="button">' + ((draft.avatar || p.avatar) ? "Change photo" : "\\uD83D\\uDCF7 Add photo") + '</button><div class="avatar-hint">Shows in your top-bar icon.</div></div></div>' +
+      '<input type="file" id="s_avatar_file" accept="image/*" aria-label="Choose a profile photo" style="display:none">' +
+      '<div class="q" style="margin-top:16px"><label>Your name</label><input class="sel" id="s_name" value="' + esc(wizFieldVal("s_name") || p.name || "") + '" placeholder="What should we call you?" autocomplete="name"></div>';
+  }
   if (id === "level") {
     return '<p class="wz-lead">Tell us where you\\u2019re at, so every pace and session fits you.</p>' +
       statusCards(draft.status != null ? draft.status : "", { compact: true });
@@ -11221,13 +11304,14 @@ function wizBody(id, p, st) {
   if (id === "fitness") {
     if (st === "building") {
       return '<p class="wz-lead">Optional. If you know a pace you can comfortably <b>chat at</b>, every training pace scales to you. Leave it blank and we\\u2019ll start gently and learn as you run.</p>' +
-        '<div class="q"><label>Your easy pace <span class="q-hint">minutes:seconds per km</span></label><input class="sel num" id="s_easypace" value="' + esc(wizFieldVal("s_easypace")) + '" placeholder="e.g. 6:00 / km" inputmode="numeric"></div>';
+        '<div class="q"><label>Your easy pace <span class="q-hint">minutes:seconds per km</span></label><input class="sel num" id="s_easypace" value="' + esc(wizFieldVal("s_easypace")) + '" placeholder="e.g. 6:00 / km" inputmode="numeric"></div>' +
+        wizTrialOfferHtml();
     }
     const fs = draft.fitsrc || "recent";
     return '<p class="wz-lead">This sets every pace in your plan.</p>' +
       '<div class="q"><label>Your 5 km time \\u2014 recent or an estimate?</label>' + seg("fitsrc", [["recent", "Recent"], ["predicted", "Predicted"]], fs) + '</div>' +
       '<div class="q" id="fitTimeWrap"><label id="fitTimeLbl"><span class="lblmain">' + (fs === "predicted" ? "Your predicted 5 km time" : "Your recent 5 km time") + '</span> <span class="q-hint">just type the numbers</span></label><input class="sel num" id="s_rectime" value="' + esc(wizFieldVal("s_rectime")) + '" placeholder="e.g. 25:00" inputmode="numeric"></div>' +
-      '<div class="q"><label>2 km time-trial <span class="q-hint">optional \\u2014 sharpens every pace</span></label><input class="sel num" id="s_2km" value="' + esc(wizFieldVal("s_2km")) + '" placeholder="e.g. 8:00" inputmode="numeric"></div>';
+      wizTrialOfferHtml();
   }
   if (id === "volume") {
     return '<p class="wz-lead">So we can build on what you already do. Leave it blank if you\\u2019re not sure \\u2014 we\\u2019ll use a sensible default for your goal.</p>' +
@@ -11361,6 +11445,15 @@ function wizardFinish() {
   try {
     if (draft.wizRemind === "1") { REMIND.enabled = true; REMIND.decided = true; const t = wizFieldVal("s_remindtime"); if (t) REMIND.time = t; saveReminders(); }
   } catch (e) {}
+  // Apply the 2 km time-trial the runner scheduled on the fitness step. Stored as its own record so
+  // Today can surface a card on that date (see scheduledTrialOn); the card opens the existing
+  // trial-run flow.
+  try {
+    if (draft.trialWant === "1" && draft.trialIso) {
+      SCHEDULED_TRIAL = { iso: draft.trialIso, createdIso: todayIso() };
+      saveScheduledTrial();
+    }
+  } catch (e) {}
   draft = {}; state.wizErr = null; state.wizStep = 0;
   state.screen = null; state.tab = "today"; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
   render();
@@ -11373,6 +11466,9 @@ function wireWizard() {
   const next = $("wizNext"); if (next) next.onclick = wizNext;
   const back = $("wizBack"); if (back) back.onclick = wizBack;
   document.querySelectorAll("[data-wizdays]").forEach((b) => b.onclick = () => { draft.days = b.dataset.wizdays; state.wizErr = null; render(); });
+  // The trial-day picker is a plain <select>: capture its value into the draft so wizardFinish can
+  // commit it. Not an s_-prefixed field (those flow through wizFieldVal); the trial is its own store.
+  const trialDay = $("s_trialday"); if (trialDay) trialDay.onchange = () => { draft.trialIso = trialDay.value; };
 }
 
 // The after-Start popup: "want to set up your voice coach and motivation now, or later?" — same visual
@@ -11382,36 +11478,75 @@ function wireWizard() {
 let EXTRAS = null;
 function ensureExtrasOv() {
   if ($("extrasOv")) return;
-  const ov = el('<div class="guide-ov" id="extrasOv"><div class="guide-card">' +
+  // ⚠️ Widened the guide-card for the coach + why steps — those bodies carry cards and inputs, not
+  // one sentence. wz-extras-body is a scrolling region so a tall body never covers the buttons.
+  const ov = el('<div class="guide-ov" id="extrasOv"><div class="guide-card wz-extras-card">' +
     '<div class="guide-eyebrow" id="extrasEyebrow">A couple of extras</div>' +
     '<div class="guide-cap"><div class="guide-cap-h" id="extrasCapH"></div><div class="guide-cap-b" id="extrasCapB"></div></div>' +
+    '<div class="wz-extras-body" id="extrasBody"></div>' +
     '<div class="guide-foot"><div class="guide-dots" id="extrasDots"></div><div class="guide-btns" id="extrasBtns"></div></div>' +
     '</div></div>');
   document.body.appendChild(ov);
   ov.addEventListener("click", (e) => { if (e.target === ov) closeExtras(); });
 }
+// The offer is a small state machine: "ask" -> ("later" -> "where") | ("now" -> "coach" -> "why" -> "done").
+// EXTRAS.step names the page; the dots reflect the runner's PATH, not the union of all pages, so a
+// runner who picks Later sees 1/2 → 2/2 and a runner who picks Do it now sees 1/3 → 2/3 → 3/3.
 function openExtrasOffer() {
   ensureExtrasOv();
-  EXTRAS = { i: 0 };
+  EXTRAS = { step: "ask" };
   renderExtras();
   const ov = $("extrasOv"); ov.classList.add("on");
 }
+function extrasDots() {
+  const path = EXTRAS.path === "now" ? ["ask", "coach", "why"] : ["ask", "where"];
+  const i = path.indexOf(EXTRAS.step); if (i < 0) return "";
+  return path.map((_, k) => '<span class="gd' + (k === i ? " on" : "") + '"></span>').join("");
+}
 function renderExtras() {
-  const step = EXTRAS.i;
-  const h = $("extrasCapH"), b = $("extrasCapB"), btns = $("extrasBtns"), dots = $("extrasDots");
-  dots.innerHTML = '<span class="gd' + (step === 0 ? " on" : "") + '"></span><span class="gd' + (step === 1 ? " on" : "") + '"></span>';
-  if (step === 0) {
+  const step = EXTRAS.step;
+  const h = $("extrasCapH"), b = $("extrasCapB"), btns = $("extrasBtns"), body = $("extrasBody"), dots = $("extrasDots");
+  body.innerHTML = "";
+  if (step === "ask") {
     h.textContent = "Voice coach & motivation";
     b.textContent = "Pick a coach whose voice speaks to you, and tell us the reasons behind the plan. Both make sessions land harder — you can do them now, or later.";
     btns.innerHTML = '<button class="guide-skip" id="extrasLater">Later</button><button class="guide-next" id="extrasNow">Do it now</button>';
-    $("extrasLater").onclick = () => { EXTRAS.i = 1; renderExtras(); };
-    $("extrasNow").onclick = () => { closeExtras(); state.setupFocus = "voice"; state.screen = "setup"; render(); };
-  } else {
+    $("extrasLater").onclick = () => { EXTRAS.path = "later"; EXTRAS.step = "where"; renderExtras(); };
+    $("extrasNow").onclick = () => { EXTRAS.path = "now"; EXTRAS.step = "coach"; renderExtras(); };
+  } else if (step === "where") {
     h.textContent = "Any time in Profile";
     b.textContent = "Open Profile from the top-left — Voice coaching and Motivation are two of the rows. Add them whenever you\\u2019re ready.";
     btns.innerHTML = '<button class="guide-next" id="extrasOk">OK</button>';
     $("extrasOk").onclick = closeExtras;
+  } else if (step === "coach") {
+    h.textContent = "Choose your coach";
+    b.textContent = "The voice you\\u2019ll hear on runs. Preview a couple and pick one that lands \\u2014 you can change it any time.";
+    // Reuse the same coach cards the settings picker uses, so a coach added later shows up here too.
+    // Volume, frequency and the notes stay on the settings page — this is the identity choice only.
+    const cur = COACH.cfg.coach;
+    body.innerHTML = '<div class="wz-coaches">' + RC.COACH_IDS.map((id) => {
+      const co = RC.COACHES[id], sel = cur === id;
+      return '<button class="coachcard' + (sel ? " on" : "") + '" data-extracoach="' + id + '" type="button">' +
+        '<div class="cc-name">' + esc(co.name) + '</div>' +
+        '<div class="cc-tag">' + esc(co.tagline) + '</div></button>';
+    }).join("") + '</div>';
+    body.querySelectorAll("[data-extracoach]").forEach((el) => el.onclick = () => {
+      COACH.cfg.coach = el.dataset.extracoach; COACH.cfg.enabled = true; saveCoachCfg();
+      try { coachUnlock(); coachLoadManifest(); } catch (e) {}
+      body.querySelectorAll(".coachcard").forEach((c) => c.classList.toggle("on", c === el));
+    });
+    btns.innerHTML = '<button class="guide-skip" id="extrasSkipCoach">Skip</button><button class="guide-next" id="extrasCoachNext">Next</button>';
+    $("extrasSkipCoach").onclick = () => { EXTRAS.step = "why"; renderExtras(); };
+    $("extrasCoachNext").onclick = () => { EXTRAS.step = "why"; renderExtras(); };
+  } else if (step === "why") {
+    h.textContent = "Your why";
+    b.textContent = "One line for each \\u2014 skip anything that\\u2019s not you. On a hard run your coach will bring one of these back to you in your own words.";
+    body.innerHTML = whyRowsHtml("xw_");   // reuses the same builder the profile screen uses
+    try { wireWhyInputs(null); } catch (e) {}   // WHY is persisted on change by this helper
+    btns.innerHTML = '<button class="guide-next" id="extrasWhyDone">Done</button>';
+    $("extrasWhyDone").onclick = () => { try { syncWatch(); } catch (e) {} closeExtras(); };
   }
+  dots.innerHTML = extrasDots();
 }
 function closeExtras() {
   const ov = $("extrasOv"); if (ov) ov.classList.remove("on");
@@ -15115,6 +15250,13 @@ function wire() {
       if (COACH.cfg.enabled) { coachUnlock(); coachLoadManifest(); } else coachStop();
     }
     if (s.dataset.set === "coach_freq") { COACH.cfg.frequency = b.dataset.v; saveCoachCfg(); }
+    // ⚠️ Wizard-only toggles that CHANGE what the step shows: the trial-day picker only exists when
+    // the runner said Yes to a trial; the reminder-time field only when reminders are On. A full
+    // re-render is the simplest way to reveal/hide those without wiring per-toggle DOM surgery. Only
+    // triggered inside the wizard, so the profile edit form is unchanged.
+    if (state.screen === "wizard" && (s.dataset.set === "trialWant" || s.dataset.set === "wizRemind")) {
+      captureSetupFields(); render();
+    }
     refreshTypePreview();
   }));
   wireCoachSettings();
@@ -15274,6 +15416,11 @@ function wire() {
   document.querySelectorAll("[data-addstart]").forEach((b) => b.onclick = () => { const s = extraSession(EXTRA.find((x) => x.id === b.dataset.addstart)); if (s) openStartWhereSheet(s); });
   document.querySelectorAll("[data-addrm]").forEach((b) => b.onclick = () => { removeExtra(b.dataset.addrm); render(); });
   document.querySelectorAll("[data-addopen]").forEach((b) => b.onclick = () => { const s = extraSession(EXTRA.find((x) => x.id === b.dataset.addopen)); if (s) openSessionSheet(s, curWeekNo()); });
+  // The scheduled 2 km trial card: Start opens the existing trial-run flow (with its warm-up and
+  // measured 2 K); Remove clears the record. Open (tap on the label) also opens the flow — there is
+  // no separate detail sheet for a trial.
+  document.querySelectorAll("[data-trialstart], [data-trialopen]").forEach((b) => b.onclick = () => startTrialFlow());
+  document.querySelectorAll("[data-trialrm]").forEach((b) => b.onclick = () => { clearScheduledTrial(); render(); });
   // Training-calendar wiring
   const calBack = $("calBack"); if (calBack) calBack.onclick = () => { state.screen = null; render(); };
   if (state.screen === "calendar") wireCalendarDrag();

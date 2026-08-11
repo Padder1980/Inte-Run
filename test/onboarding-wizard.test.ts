@@ -76,7 +76,13 @@ test("Start my plan opens the extras popup (coach + motivation, now or later)", 
   assert.match(render, /Do it now/, "the Do it now button is gone");
   assert.match(render, />Later</, "the Later button is gone");
   assert.match(render, /Any time in Profile/, "the second page (where-to-find-it) is gone");
-  assert.match(render, /state\.setupFocus = "voice"/, "Do it now no longer jumps to the voice section");
+  // ⚠️ Do it now is a MINI-WIZARD INSIDE the popup now (coach page -> why page -> done), not a jump to
+  // the setup screen. The pages are named on EXTRAS.step; assert both are handled and the final saves.
+  assert.match(render, /step === "coach"/, "the coach page inside the popup is gone");
+  assert.match(render, /step === "why"/, "the why page inside the popup is gone");
+  assert.match(render, /COACH\.cfg\.coach = /, "picking a coach in the popup no longer saves it");
+  // The why page reuses the profile's whyRowsHtml/wireWhyInputs so answers persist to WHY on change.
+  assert.match(render, /whyRowsHtml\("xw_"\)/, "the popup's why page no longer uses the shared whyRowsHtml");
   // ⚠️ The auto-guide ("Understanding your sessions") must stand aside while the extras popup is up,
   // or a new runner sees TWO overlapping popups the first time Today loads.
   const auto = fn("maybeAutoGuide");

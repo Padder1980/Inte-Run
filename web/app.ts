@@ -11468,7 +11468,7 @@ function wireWizard() {
   document.querySelectorAll("[data-wizdays]").forEach((b) => b.onclick = () => { draft.days = b.dataset.wizdays; state.wizErr = null; render(); });
   // The trial-day picker is a plain <select>: capture its value into the draft so wizardFinish can
   // commit it. Not an s_-prefixed field (those flow through wizFieldVal); the trial is its own store.
-  const trialDay = $("s_trialday"); if (trialDay) trialDay.onchange = () => { draft.trialIso = trialDay.value; };
+  const trialDay = $("s_trialday"); if (trialDay) { if (!draft.trialIso) draft.trialIso = trialDay.value; trialDay.onchange = () => { draft.trialIso = trialDay.value; }; }
 }
 
 // The after-Start popup: "want to set up your voice coach and motivation now, or later?" — same visual

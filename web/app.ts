@@ -10633,6 +10633,7 @@ function viewSetup() {
     '<div class="callout"><div class="callout-h"><span class="ic">' + ICON.timer + '</span>2 km time-trial<span class="callout-badge">optional</span></div>' +
     '<p>A hard, evenly paced 2 km is the most useful thing you can give us: it calibrates every pace in your plan, and repeating it every month or so shows what has actually changed.</p>' +
     '<input class="sel num" id="s_2km" value="' + (p.twoKmS ? fmtTimeFull(p.twoKmS) : "") + '" placeholder="e.g. 8:00" inputmode="numeric"><div class="mas-hint" id="masHint"></div><button class="mini-btn wide-btn" id="s_2km_rec" type="button">⏱ Haven\\'t done one? Record it now</button></div>' +
+    wizTrialOfferHtml() +
     '</div>';
 
   // 3 · Your goal (goalCardInner supplies its own inner markup; keep the id for syncStatus)
@@ -15299,6 +15300,9 @@ function wire() {
     if (state.screen === "wizard" && (s.dataset.set === "trialWant" || s.dataset.set === "wizRemind")) {
       captureSetupFields(); render();
     }
+    if ((state.screen === "setup" || PROFILE_EDIT_OPEN) && s.dataset.set === "trialWant") {
+      captureSetupFields(); render();
+    }
     refreshTypePreview();
   }));
   wireCoachSettings();
@@ -15307,6 +15311,7 @@ function wire() {
   const km1 = $("s_2km");
   if (km1) { bindTimeInput(km1); km1.addEventListener("input", refreshMasHint); refreshMasHint(); }
   const km1rec = $("s_2km_rec"); if (km1rec) km1rec.onclick = startTrialFlow;
+  const trialDay2 = $("s_trialday"); if (trialDay2) { if (!draft.trialIso) draft.trialIso = trialDay2.value; trialDay2.onchange = () => { draft.trialIso = trialDay2.value; }; }
   if (document.querySelector('[data-set="status"]')) syncStatus();
   // Avatar upload
   const avatarFile = $("s_avatar_file");
@@ -15347,6 +15352,7 @@ function wire() {
     // already done today.
     const keptTicks = todayTicks();
     profile = pf; adoptPlan(out); computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; seedDone(); restoreTicks(keptTicks); saveProfileStore(); renderAvatar();
+    if (draft.trialWant === "1" && draft.trialIso) { SCHEDULED_TRIAL = { iso: findGoodTrialDay(draft.trialIso), createdIso: todayIso() }; saveScheduledTrial(); }
     // ⚠️ The draft is now sticky across navigation, so SAVING has to be what releases it — otherwise
     // the answers a runner just committed are re-restored over the top of the profile they built.
     draft = {};

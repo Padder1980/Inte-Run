@@ -3521,7 +3521,8 @@ function weekStrip() {
     const cur = wi === CURRENT_WEEK;
     const days = DAY_ORDER.map((d, i) => {
       const dt = isoAdd(wk.startIso, i);
-      const has = wk.sessions.some((s) => s.type !== "rest" && effDay(s) === i);
+      const dtIso = dt.toISOString().slice(0, 10);
+      const has = wk.sessions.some((s) => s.type !== "rest" && effDay(s) === i) || scheduledTrialOn(dtIso);
       const eff = (wk.sessions.find((s) => s.type !== "rest" && effDay(s) === i) || {}).effort;
       const cls = "d" + (i === state.selDay ? " sel" : "") + (cur && TODAY_IN_PLAN && i === TODAY_DOW ? " today" : "");
       return '<button class="' + cls + '" data-week="' + wi + '" data-day="' + i + '"><div class="dn">' + d + '</div><div class="dd">' + dt.getUTCDate() + '</div>' + (has ? '<div class="dot" style="background:var(--eff-' + (eff || "easy") + ')"></div>' : '<div class="dot" style="background:transparent"></div>') + '</button>';
@@ -15355,7 +15356,8 @@ function wire() {
     // already done today.
     const keptTicks = todayTicks();
     profile = pf; adoptPlan(out); computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; seedDone(); restoreTicks(keptTicks); saveProfileStore(); renderAvatar();
-    if (draft.trialWant === "1" && draft.trialIso) { SCHEDULED_TRIAL = { iso: findGoodTrialDay(draft.trialIso), createdIso: todayIso() }; saveScheduledTrial(); }
+    const scheduledNewTrial = draft.trialWant === "1" && !!draft.trialIso;
+    if (scheduledNewTrial) { SCHEDULED_TRIAL = { iso: findGoodTrialDay(draft.trialIso), createdIso: todayIso() }; saveScheduledTrial(); }
     // ⚠️ The draft is now sticky across navigation, so SAVING has to be what releases it — otherwise
     // the answers a runner just committed are re-restored over the top of the profile they built.
     draft = {};
@@ -15364,7 +15366,16 @@ function wire() {
     // somebody who just corrected their age.
     const fromSheet = PROFILE_EDIT_OPEN;
     state.setupFocus = null;
-    if (fromSheet) { PROFILE_EDIT_OPEN = false; closeSheet(); state.screen = "profile"; }
+    if (fromSheet && scheduledNewTrial && SCHEDULED_TRIAL) {
+      PROFILE_EDIT_OPEN = false; closeSheet();
+      state.tab = "today"; state.screen = null;
+      const tIso = SCHEDULED_TRIAL.iso;
+      const tWi = PLAN.weeks.findIndex((wk) => tIso >= wk.startIso && tIso <= isoAdd(wk.startIso, 6).toISOString().slice(0, 10));
+      if (tWi >= 0) {
+        state.selWeek = tWi;
+        state.selDay = DAY_ORDER.findIndex((_, di) => isoAdd(PLAN.weeks[tWi].startIso, di).toISOString().slice(0, 10) === tIso);
+      }
+    } else if (fromSheet) { PROFILE_EDIT_OPEN = false; closeSheet(); state.screen = "profile"; }
     else { state.screen = null; state.tab = "plan"; }
     render();
     if (!imp || !imp.none) {

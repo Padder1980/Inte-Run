@@ -445,7 +445,7 @@ test("⚠️ undo puts back everything the rebuild destroys, not just the profil
   // ⚠️ COMMENTS STRIPPED, because the comment explaining the fix names seedDone() — so an
   // ordering assertion measured against the raw text finds the WORD before the CALL and fails on
   // correct code. Fourth outing of that trap in this file; it is why fnSrc strips them.
-  const save = html.slice(html.indexOf("function doSaveProfile("), html.indexOf("function doSaveProfile(") + 4000)
+  const save = html.slice(html.indexOf("function doSaveProfile("), html.indexOf("function doSaveProfile(") + 5000)
     .replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
   // ⚠️ SNAPSHOT BEFORE THE REBUILD. seedDone() prunes state.dayOverride and PERSISTS the prune, so
   // by the time a toast appears the reschedules are already gone from disk. An undo restoring only

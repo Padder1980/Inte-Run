@@ -156,15 +156,9 @@ WATCH_COMMON = {
     # be verified" - even though the signature verifies perfectly on the Mac. Costs only in-app
     # previews for the watch target, which is a trivial price for being installable.
     "ENABLE_DEBUG_DYLIB": "NO",
-    # ⚠️ arm64_32 only. watchOS 26 introduced a 64-bit arm64 slice, and Xcode clamps that slice to
-    # minos 26.0 no matter what the deployment target says — so a fat binary carries a slice a
-    # watchOS 26.5 device may prefer and then reject ("integrity could not be verified"), while the
-    # arm64_32 slice it would happily run sits unused. arm64_32 is the long-established watchOS
-    # architecture that every Apple Watch runs, and it honours the real deployment target.
-    # Scoped to the DEVICE sdk only: the watch simulator on Apple Silicon is arm64, so excluding it
-    # unconditionally breaks every simulator build.
-    '"ARCHS[sdk=watchos*]"': '"arm64_32"',
-    '"EXCLUDED_ARCHS[sdk=watchos*]"': '"arm64"',
+    # Standard architectures (arm64 + arm64_32). arm64 is required by Apple's upload validator;
+    # ENABLE_DEBUG_DYLIB=NO above is what prevents the "integrity could not be verified" install
+    # failure on real devices, so there is no longer any reason to exclude arm64.
     "SDKROOT": "watchos",
     "SKIP_INSTALL": "YES",
     "SWIFT_EMIT_LOC_STRINGS": "YES",

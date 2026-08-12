@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TestFlight: Your Step-by-Step Guide</title>
+<style>
+  :root {
+    --bg: #F4F8F7;
+    --surface: #FFFFFF;
+    --surface-2: #EDF4F2;
+    --text: #1A2D2A;
+    --muted: #607D79;
+    --border: #CCE0DC;
+
+    --teal: #0A7A6E;
+    --teal-light: #E3F5F3;
+    --purple: #5B4FCF;
+    --purple-light: #EEEAFF;
+    --amber: #B8710A;
+    --amber-light: #FFF4E0;
+    --red: #C0392B;
+    --red-light: #FDECEA;
+
+    --step-num: #0A7A6E;
+    --done-bg: #E3F5F3;
+    --done-border: #0A7A6E;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0D1F1C;
+      --surface: #142620;
+      --surface-2: #1C3530;
+      --text: #E2EFED;
+      --muted: #89ABA6;
+      --border: #2A4440;
+      --teal-light: #0D2E2A;
+      --purple-light: #1E1A40;
+      --amber-light: #2A1E08;
+      --red-light: #2A0E0B;
+      --done-bg: #0D2E2A;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #0D1F1C;
+    --surface: #142620;
+    --surface-2: #1C3530;
+    --text: #E2EFED;
+    --muted: #89ABA6;
+    --border: #2A4440;
+    --teal-light: #0D2E2A;
+    --purple-light: #1E1A40;
+    --amber-light: #2A1E08;
+    --red-light: #2A0E0B;
+    --done-bg: #0D2E2A;
+  }
+
+  :root[data-theme="light"] {
+    --bg: #F4F8F7;
+    --surface: #FFFFFF;
+    --surface-2: #EDF4F2;
+    --text: #1A2D2A;
+    --muted: #607D79;
+    --border: #CCE0DC;
+    --teal-light: #E3F5F3;
+    --purple-light: #EEEAFF;
+    --amber-light: #FFF4E0;
+    --red-light: #FDECEA;
+    --done-bg: #E3F5F3;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-size: 17px;
+    line-height: 1.6;
+    padding: 24px 16px 80px;
+  }
+
+  .page {
+    max-width: 680px;
+    margin: 0 auto;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    padding: 40px 0 32px;
+  }
+
+  .header-eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 12px;
+  }
+
+  .header h1 {
+    font-size: clamp(28px, 5vw, 40px);
+    font-weight: 800;
+    line-height: 1.15;
+    color: var(--text);
+    text-wrap: balance;
+    margin-bottom: 16px;
+  }
+
+  .header p {
+    font-size: 17px;
+    color: var(--muted);
+    max-width: 480px;
+    margin: 0 auto;
+    text-wrap: balance;
+  }
+
+  /* Progress bar */
+  .progress-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px 22px;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .progress-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .progress-track {
+    flex: 1;
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--teal);
+    border-radius: 4px;
+    transition: width 0.4s ease;
+    width: 0%;
+  }
+
+  .progress-count {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--teal);
+    white-space: nowrap;
+    min-width: 60px;
+    text-align: right;
+  }
+
+  /* Step cards */
+  .step {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 16px;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+  }
+
+  .step.done {
+    background: var(--done-bg);
+    border-color: var(--teal);
+    opacity: 0.85;
+  }
+
+  .step-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 18px;
+    margin-bottom: 20px;
+  }
+
+  .step-num {
+    font-size: 36px;
+    font-weight: 900;
+    color: var(--step-num);
+    line-height: 1;
+    min-width: 44px;
+    opacity: 0.35;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .step.done .step-num {
+    opacity: 0.15;
+  }
+
+  .step-meta {
+    flex: 1;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-bottom: 8px;
+  }
+
+  .badge-you {
+    background: var(--teal-light);
+    color: var(--teal);
+  }
+
+  .badge-claude {
+    background: var(--purple-light);
+    color: var(--purple);
+  }
+
+  .badge-wait {
+    background: var(--amber-light);
+    color: var(--amber);
+  }
+
+  .step-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.25;
+    text-wrap: balance;
+  }
+
+  .step-time {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  /* Checklist */
+  .checklist {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .checklist li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .checklist li .check-box {
+    width: 22px;
+    height: 22px;
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    flex-shrink: 0;
+    margin-top: 1px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    background: var(--surface);
+  }
+
+  .checklist li.checked .check-box {
+    background: var(--teal);
+    border-color: var(--teal);
+  }
+
+  .checklist li.checked .check-box::after {
+    content: '';
+    width: 6px;
+    height: 10px;
+    border: 2px solid white;
+    border-top: none;
+    border-left: none;
+    transform: rotate(45deg) translate(-1px, -1px);
+    display: block;
+  }
+
+  .checklist li .check-text {
+    font-size: 16px;
+    color: var(--text);
+    line-height: 1.5;
+    flex: 1;
+  }
+
+  .checklist li.checked .check-text {
+    color: var(--muted);
+    text-decoration: line-through;
+    text-decoration-color: var(--border);
+  }
+
+  /* Divider in checklist */
+  .checklist-section {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-top: 4px;
+    margin-bottom: 2px;
+    pointer-events: none;
+  }
+
+  /* Info box */
+  .info-box {
+    background: var(--surface-2);
+    border-left: 3px solid var(--teal);
+    border-radius: 0 8px 8px 0;
+    padding: 14px 16px;
+    margin-top: 16px;
+    font-size: 15px;
+    color: var(--muted);
+  }
+
+  .info-box strong {
+    color: var(--text);
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  /* Warning box */
+  .warn-box {
+    background: var(--red-light);
+    border-left: 3px solid var(--red);
+    border-radius: 0 8px 8px 0;
+    padding: 14px 16px;
+    margin-top: 16px;
+    font-size: 15px;
+    color: var(--text);
+  }
+
+  .warn-box .warn-title {
+    font-weight: 700;
+    color: var(--red);
+    margin-bottom: 4px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* Prompt box */
+  .prompt-box {
+    background: var(--surface-2);
+    border: 1.5px solid var(--purple);
+    border-radius: 12px;
+    margin-top: 18px;
+    overflow: hidden;
+  }
+
+  .prompt-header {
+    background: var(--purple);
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 8px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .copy-btn {
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .copy-btn:hover { background: rgba(255,255,255,0.35); }
+
+  .prompt-text {
+    padding: 16px;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* Step divider */
+  .section-label {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: center;
+    padding: 12px 0 8px;
+    opacity: 0.7;
+  }
+
+  /* Common problems */
+  .problems {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 16px;
+  }
+
+  .problems h2 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 18px;
+    color: var(--text);
+  }
+
+  .problem-item {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .problem-item:last-child { border-bottom: none; }
+
+  .problem-q {
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .problem-a {
+    font-size: 15px;
+    color: var(--muted);
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    padding-top: 24px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .progress-fill { transition: none; }
+    .check-box { transition: none; }
+    .copy-btn { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <div class="header-eyebrow">Inte-Run</div>
+    <h1>Getting TestFlight live, one step at a time</h1>
+    <p>Tick each box as you go. Your progress saves automatically.</p>
+  </div>
+
+  <div class="progress-bar">
+    <span class="progress-label">Your progress</span>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <span class="progress-count" id="progressCount">0 / 22</span>
+  </div>
+
+  <!-- STEP 0 -->
+  <div class="step" id="step-0">
+    <div class="step-header">
+      <div class="step-num">0</div>
+      <div class="step-meta">
+        <div class="badge badge-you">👤 Your turn</div>
+        <div class="step-title">One quick decision first</div>
+        <div class="step-time">2 minutes</div>
+      </div>
+    </div>
+    <ul class="checklist">
+      <li data-id="s0-1"><div class="check-box"></div><div class="check-text">TestFlight has two options: <strong>Internal</strong> (up to 100 friends, no Apple approval needed) or <strong>External</strong> (strangers, needs Apple to review first). <strong>Start with Internal — much faster.</strong></div></li>
+      <li data-id="s0-2"><div class="check-box"></div><div class="check-text">Think of 5–10 people to invite first. They just need an iPhone and an email address.</div></li>
+      <li data-id="s0-3"><div class="check-box"></div><div class="check-text">Text them now: <em>"I'm testing my running app — you'll get an email from Apple with a link. Tap it on your phone. Takes 5 minutes."</em></div></li>
+    </ul>
+    <div class="info-box">
+      <strong>One thing at a time</strong>
+      Do Internal first. External testers and strangers come later, once it's working.
+    </div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="section-label">First, set things up</div>
+  <div class="step" id="step-1">
+    <div class="step-header">
+      <div class="step-num">1</div>
+      <div class="step-meta">
+        <div class="badge badge-you">👤 Your turn</div>
+        <div class="step-title">Create the app in Apple's system</div>
+        <div class="step-time">About 10 minutes</div>
+      </div>
+    </div>
+    <ul class="checklist">
+      <li data-id="s1-1"><div class="check-box"></div><div class="check-text">On your Mac or phone, go to <strong>appstoreconnect.apple.com</strong></div></li>
+      <li data-id="s1-2"><div class="check-box"></div><div class="check-text">Sign in with your Apple Developer account (the one you paid the £99 for)</div></li>
+      <li data-id="s1-3"><div class="check-box"></div><div class="check-text">Click <strong>My Apps</strong> at the top</div></li>
+      <li data-id="s1-4"><div class="check-box"></div><div class="check-text">Click the <strong>+</strong> button in the top-left corner → choose <strong>New App</strong></div></li>
+      <li data-id="s1-5"><div class="check-box"></div><div class="check-text">Fill in these fields exactly:
+        <br>• <strong>Platforms:</strong> tick iOS
+        <br>• <strong>Name:</strong> Inte-Run
+        <br>• <strong>Primary language:</strong> English (UK)
+        <br>• <strong>Bundle ID:</strong> pick <code>com.interun.app</code> from the list
+        <br>• <strong>SKU:</strong> type <code>interun-ios</code>
+        <br>• <strong>User Access:</strong> Full Access
+      </div></li>
+      <li data-id="s1-6"><div class="check-box"></div><div class="check-text">Click <strong>Create</strong></div></li>
+    </ul>
+    <div class="info-box">
+      <strong>Bundle ID not in the list?</strong>
+      Click the small link that says "Register a new Bundle ID" and type <code>com.interun.app</code> exactly. Then come back and choose it.
+    </div>
+    <div class="warn-box">
+      <div class="warn-title">✋ Don't fill anything else in</div>
+      You don't need App Store screenshots, descriptions, or pricing yet. Leave it all blank. The only job here is creating the record.
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step" id="step-2">
+    <div class="step-header">
+      <div class="step-num">2</div>
+      <div class="step-meta">
+        <div class="badge badge-claude">🤖 Ask Claude</div>
+        <div class="step-title">Build the app and send it to Apple</div>
+        <div class="step-time">About 20 minutes (Claude does the work)</div>
+      </div>
+    </div>
+    <ul class="checklist">
+      <li data-id="s2-1"><div class="check-box"></div><div class="check-text">Open a new Claude chat on your Mac</div></li>
+      <li data-id="s2-2"><div class="check-box"></div><div class="check-text">Copy the message in the box below and paste it in</div></li>
+      <li data-id="s2-3"><div class="check-box"></div><div class="check-text">Wait — Claude will build the app and upload it. It'll tell you a build number like <em>"350"</em> when done.</div></li>
+      <li data-id="s2-4"><div class="check-box"></div><div class="check-text">Write down that build number — you'll need it in step 4 to check everything worked</div></li>
+    </ul>
+    <div class="prompt-box">
+      <div class="prompt-header">
+        Copy this message into Claude
+        <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+      </div>
+      <div class="prompt-text" id="prompt1">Please build Inte-Run for TestFlight and upload it to App Store Connect.
+I'm following TESTFLIGHT.md step 2. Do all of this and stop after step (g):
+
+(a) cd /Users/adampalmer/Developer/InteRun
+(b) Confirm the working tree is clean with git status. If it isn't, stop and ask me before doing anything else.
+(c) Regenerate the Xcode project: python3 ios/make-project.py
+(d) Build the app:
+    node web/app.ts
+    git checkout -- docs/voices/
+    xcodebuild -project ios/InteRun.xcodeproj -scheme InteRun -configuration Release -destination 'generic/platform=iOS' -allowProvisioningUpdates -archivePath /tmp/InteRun.xcarchive archive
+(e) Export the .ipa:
+    xcodebuild -exportArchive -archivePath /tmp/InteRun.xcarchive -exportOptionsPlist ios/ExportOptions.plist -exportPath /tmp/InteRun-ipa -allowProvisioningUpdates
+(f) Upload using Transporter. Drag /tmp/InteRun-ipa/InteRun.ipa into Transporter, sign in with my Apple ID and click Deliver. Wait for the green tick.
+(g) Tell me the exact build number (from step c output).
+
+Rules: If any step fails, stop and tell me the exact error message. Do not guess past it.
+</div>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="section-label">Then, wait for Apple</div>
+  <div class="step" id="step-3">
+    <div class="step-header">
+      <div class="step-num">3</div>
+      <div class="step-meta">
+        <div class="badge badge-wait">⏳ Just wait</div>
+        <div class="step-title">Apple checks the build automatically</div>
+        <div class="step-time">30–60 minutes — go make a cup of tea</div>
+      </div>
+    </div>
+    <ul class="checklist">
+      <li data-id="s3-1"><div class="check-box"></div><div class="check-text">In App Store Connect, click <strong>Inte-Run</strong> → then <strong>TestFlight</strong> at the top</div></li>
+      <li data-id="s3-2"><div class="check-box"></div><div class="check-text">You'll see your build with a yellow <strong>Processing</strong> dot. This is normal — Apple is scanning it automatically.</div></li>
+      <li data-id="s3-3"><div class="check-box"></div><div class="check-text">When the dot turns green, Apple emails you. The email asks about encryption. Answer: <strong>"No, my app doesn't use encryption"</strong> (HTTPS is exempted, you don't need to worry about it).</div></li>
+      <li data-id="s3-4"><div class="check-box"></div><div class="check-text">The build should now say <strong>"Ready to Test"</strong> — not "Missing Compliance"</div></li>
+    </ul>
+    <div class="info-box">
+      <strong>Still saying "Processing" after an hour?</strong>
+      Check your email — Apple usually sends a message if something went wrong. The subject line will say what the problem is.
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="section-label">Now, install it yourself first</div>
+  <div class="step" id="step-4">
+    <div class="step-header">
+      <div class="step-num">4</div>
+      <div class="step-meta">
+        <div class="badge badge-you">👤 Your turn</div>
+        <div class="step-title">Set yourself up as a tester and install the app</div>
+        <div class="step-time">About 10 minutes</div>
+      </div>
+    </div>
+    <ul class="checklist">
+      <li class="checklist-section">In App Store Connect on your Mac:</li>
+      <li data-id="s4-1"><div class="check-box"></div><div class="check-text">Go to <strong>Inte-Run → TestFlight → Internal Testing</strong></div></li>
+      <li data-id="s4-2"><div class="check-box"></div><div class="check-text">Click <strong>Create New Group</strong> → name it <em>Owner + close friends</em> → tick <strong>Enable automatic distribution</strong> → click Create</div></li>
+      <li data-id="s4-3"><div class="check-box"></div><div class="check-text">On the group page: click <strong>Add Testers</strong> → tick your own name</div></li>
+      <li data-id="s4-4"><div class="check-box"></div><div class="check-text">In the Builds section: click <strong>+</strong> and add the build you just uploaded</div></li>
+      <li class="checklist-section">On your iPhone:</li>
+      <li data-id="s4-5"><div class="check-box"></div><div class="check-text">Install the <strong>TestFlight app</strong> from the App Store if you don't have it already</div></li>
+      <li data-id="s4-6"><div class="check-box"></div><div class="check-text">Wait for the email from Apple that says <em>"You have been invited to test Inte-Run"</em></div></li>
+      <li data-id="s4-7"><div class="check-box"></div><div class="check-text">Tap <strong>View in TestFlight</strong> in the email → tap <strong>Install</strong></div></li>
+      <li data-id="s4-8"><div class="check-box"></div><div class="check-text">Open the app → go to <strong>Support → Your data → This version</strong> → confirm the build number matches what Claude told you</div></li>
+    </ul>
+    <div class="warn-box">
+      <div class="warn-title">⚠️ If you still have the Xcode version on your phone</div>
+      Delete it first. Long press → Remove App → Delete. Your data is safe — it will be there when you reinstall via TestFlight (same bundle ID).
+    </div>
+  </div>
+
+  <!-- STEP 5 -->
+  <div class="section-label">Then, invite your testers</div>
+  <div class="step" id="step-5">
+    <div class="step-header">
+      <div class="step-num">5</div>
+      <div class="step-meta">
+        <div class="badge badge-you">👤 Your turn</div>
+        <div class="step-title">Invite your friends</div>
+        <div class="step-time">5 minutes — only do this once step 4 worked for you</div>
+      </div>
+    </div>
+    <ul class="checklist">
+      <li data-id="s5-1"><div class="check-box"></div><div class="check-text">In App Store Connect → <strong>Users and Access</strong> → click <strong>+</strong> → add each person's email → give them <strong>App Manager</strong> role → tick access to <strong>Inte-Run only</strong></div></li>
+      <li data-id="s5-2"><div class="check-box"></div><div class="check-text">Back in <strong>TestFlight → Internal Testing → your group</strong> → click <strong>Add Testers</strong> → tick their names</div></li>
+      <li data-id="s5-3"><div class="check-box"></div><div class="check-text">Text each person: <em>"Check your email for an invite from Apple — install TestFlight first, then open the invite on your phone and tap Install."</em></div></li>
+      <li data-id="s5-4"><div class="check-box"></div><div class="check-text">Wait for each tester to confirm they got in</div></li>
+    </ul>
+  </div>
+
+  <!-- STEP 6 -->
+  <div class="step" id="step-6">
+    <div class="step-header">
+      <div class="step-num">6</div>
+      <div class="step-meta">
+        <div class="badge badge-you">👤 Your turn</div>
+        <div class="step-title">Apple Watch — it installs itself</div>
+        <div class="step-time">2 minutes — just pass on a message</div>
+      </div>
+    </div>
+    <ul class="checklist">
+      <li data-id="s6-1"><div class="check-box"></div><div class="check-text">Tell any tester with an Apple Watch: <em>"Open the Watch app on your iPhone, scroll down to Available Apps, find Inte-Run and tap Install."</em></div></li>
+      <li data-id="s6-2"><div class="check-box"></div><div class="check-text">That's it — the watch app is already inside the phone app. Nothing separate to do.</div></li>
+    </ul>
+    <div class="info-box">
+      <strong>Watch app missing for a tester?</strong>
+      Two things to check: their Watch must be running watchOS 10 or newer, and their iPhone must be paired to the Watch (the Watch app on iPhone opens without an error).
+    </div>
+  </div>
+
+  <!-- STEP 7 -->
+  <div class="section-label">Ongoing — sending future updates</div>
+  <div class="step" id="step-7">
+    <div class="step-header">
+      <div class="step-num">7</div>
+      <div class="step-meta">
+        <div class="badge badge-claude">🤖 Ask Claude</div>
+        <div class="step-title">Every time you want to send an update</div>
+        <div class="step-time">Claude does it — testers get it automatically</div>
+      </div>
+    </div>
+    <ul class="checklist">
+      <li data-id="s7-1"><div class="check-box"></div><div class="check-text">Open a new Claude chat on your Mac and paste the message below</div></li>
+      <li data-id="s7-2"><div class="check-box"></div><div class="check-text">Claude builds it and uploads it. Testers get a notification automatically — they don't need to do anything.</div></li>
+    </ul>
+    <div class="prompt-box">
+      <div class="prompt-header">
+        Copy this message into Claude for future updates
+        <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+      </div>
+      <div class="prompt-text" id="prompt2">Please cut a new TestFlight build. Follow TESTFLIGHT.md step 2's build commands (c through f). Then tell me the new build number.
+
+The tester group has automatic distribution turned on — I do NOT need to add the build to the group by hand. Everyone gets it as soon as Apple finishes processing (about 30 minutes).</div>
+    </div>
+  </div>
+
+  <!-- Common Problems -->
+  <div class="section-label">If something goes wrong</div>
+  <div class="problems">
+    <h2>Common problems and what to do</h2>
+    <div class="problem-item">
+      <div class="problem-q">My build isn't showing up in App Store Connect</div>
+      <div class="problem-a">Wait 15 more minutes. If still nothing, check your email — Apple sends a message if the upload failed, and it names exactly what went wrong.</div>
+    </div>
+    <div class="problem-item">
+      <div class="problem-q">A tester says the invitation email never arrived</div>
+      <div class="problem-a">Double-check the email address you typed. Ask them to search their spam for emails from apple.com. You can resend invitations from the TestFlight page.</div>
+    </div>
+    <div class="problem-item">
+      <div class="problem-q">It says the app has expired</div>
+      <div class="problem-a">TestFlight builds expire after 90 days. Just ask Claude to build again (step 7 above) and everyone gets the new version automatically.</div>
+    </div>
+    <div class="problem-item">
+      <div class="problem-q">The coach isn't speaking or the map isn't showing</div>
+      <div class="problem-a">Usually permissions weren't granted. Tell the tester to open iPhone Settings → scroll to Inte-Run → make sure Location says "While Using" and that Notifications are on.</div>
+    </div>
+    <div class="problem-item">
+      <div class="problem-q">Something is broken and testers are complaining</div>
+      <div class="problem-a">In App Store Connect → TestFlight, find the broken build and click Expire. Nobody new will get it. Then ask Claude to fix and build again.</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <p>Tap each checkbox as you go — your progress saves in your browser.</p>
+    <br>
+    <p style="opacity:0.6">Inte-Run · Internal TestFlight Guide · August 2026</p>
+  </div>
+
+</div>
+
+<script>
+  const STORAGE_KEY = 'interun-testflight-checks';
+
+  function getState() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+    catch { return {}; }
+  }
+
+  function saveState(state) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+    catch {}
+  }
+
+  function getAllCheckboxes() {
+    return document.querySelectorAll('.checklist li[data-id]');
+  }
+
+  function updateProgress() {
+    const all = getAllCheckboxes();
+    const done = document.querySelectorAll('.checklist li[data-id].checked');
+    const total = all.length;
+    const count = done.length;
+    const pct = total ? Math.round(count / total * 100) : 0;
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressCount').textContent = count + ' / ' + total;
+  }
+
+  function updateStepDone() {
+    document.querySelectorAll('.step').forEach(step => {
+      const items = step.querySelectorAll('.checklist li[data-id]');
+      if (!items.length) return;
+      const allDone = Array.from(items).every(li => li.classList.contains('checked'));
+      step.classList.toggle('done', allDone);
+    });
+  }
+
+  function applyState() {
+    const state = getState();
+    getAllCheckboxes().forEach(li => {
+      const id = li.dataset.id;
+      if (state[id]) li.classList.add('checked');
+      else li.classList.remove('checked');
+    });
+    updateProgress();
+    updateStepDone();
+  }
+
+  function toggleItem(li) {
+    const id = li.dataset.id;
+    const state = getState();
+    state[id] = !li.classList.contains('checked');
+    saveState(state);
+    li.classList.toggle('checked');
+    updateProgress();
+    updateStepDone();
+  }
+
+  document.querySelectorAll('.checklist li[data-id]').forEach(li => {
+    li.addEventListener('click', () => toggleItem(li));
+  });
+
+  function copyPrompt(btn) {
+    const box = btn.closest('.prompt-box');
+    const text = box.querySelector('.prompt-text').textContent;
+    navigator.clipboard.writeText(text.trim()).then(() => {
+      const orig = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = orig, 1800);
+    });
+  }
+
+  applyState();
+</script>
+</body>
+</html>

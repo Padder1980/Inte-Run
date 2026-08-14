@@ -10639,7 +10639,7 @@ function viewSetup() {
     '<input class="sel num" id="s_2km" value="' + (p.twoKmS ? fmtTimeFull(p.twoKmS) : "") + '" placeholder="e.g. 8:00" inputmode="numeric"><div class="mas-hint" id="masHint"></div>' +
     '<p class="q-hint" style="margin:10px 0 4px">Haven\\'t done one?</p>' +
     '<button class="mini-btn wide-btn" id="s_trial_sched" type="button">Schedule one now</button>' +
-    '<div id="trialSchedPick" style="' + (draft.trialWant === "1" ? "" : "display:none;") + 'margin-top:10px"><div class="q" style="margin:0"><label>Which day this week?</label><select class="sel" id="s_trialday" style="max-width:200px">' + wizTrialDayOpts().map((d) => '<option value="' + d.iso + '">' + d.label + '</option>').join("") + '</select></div></div>' +
+    '<div id="trialSchedPick" style="' + (draft.trialWant === "1" ? "" : "display:none;") + 'margin-top:10px"><div class="q" style="margin:0"><label>Which day?</label><input class="sel" id="s_trialday" type="date" style="max-width:200px" value="' + (draft.trialIso || todayIso()) + '" min="' + todayIso() + '" max="' + trialMaxIso() + '"></div></div>' +
     '</div>' +
     '</div>';
 
@@ -11289,14 +11289,16 @@ function wizTrialDayOpts() {
   }
   return out;
 }
+// The far edge of the trial-date calendar: eight weeks out. The retest cadence is ~4 weeks, so this
+// is generous headroom while still stopping an absurd far-future pick that would land in no plan week.
+function trialMaxIso() { return isoAdd(todayIso(), 56).toISOString().slice(0, 10); }
 function wizTrialOfferHtml() {
   const on = draft.trialWant === "1";
-  const opts = wizTrialDayOpts();
-  const sel = draft.trialIso || opts[0].iso;
-  const days = opts.map((d) => '<option value="' + d.iso + '"' + (d.iso === sel ? " selected" : "") + '>' + d.label + '</option>').join("");
-  return '<div class="q"><label>Schedule a 2 km time trial this week? <span class="q-hint">a hard, evenly paced 2 km calibrates every pace we prescribe</span></label>' +
+  const sel = draft.trialIso || wizTrialDayOpts()[0].iso;
+  return '<div class="q"><label>Schedule a 2 km time trial? <span class="q-hint">a hard, evenly paced 2 km calibrates every pace we prescribe</span></label>' +
     seg("trialWant", [["1", "Yes"], ["0", "No"]], on ? "1" : "0") + '</div>' +
-    (on ? '<div class="q"><label>Which day?</label><select class="sel" id="s_trialday" style="max-width:200px">' + days + '</select></div>' : "");
+    // A native date input opens the OS calendar picker; min today, max eight weeks out.
+    (on ? '<div class="q"><label>Which day?</label><input class="sel" id="s_trialday" type="date" style="max-width:200px" value="' + sel + '" min="' + todayIso() + '" max="' + trialMaxIso() + '"></div>' : "");
 }
 
 function wizBody(id, p, st) {
@@ -11580,15 +11582,16 @@ function renderExtras() {
     const cur = COACH.cfg.coach;
     body.innerHTML = '<div class="wz-coaches">' + RC.COACH_IDS.map((id) => {
       const co = RC.COACHES[id], sel = cur === id;
-      return '<button class="coachcard' + (sel ? " on" : "") + '" data-extracoach="' + id + '" type="button">' +
+      // ⚠️ A DIV, not a <button> — a real button cannot legally nest the Preview control
+      // (button-in-button), and the settings picker this mirrors is a div for the same reason.
+      return '<div class="coachcard' + (sel ? " on" : "") + '" data-extracoach="' + id + '" role="button" tabindex="0">' +
         '<div class="cc-name">' + esc(co.name) + '</div>' +
-        '<div class="cc-tag">' + esc(co.tagline) + '</div></button>';
+        '<div class="cc-tag">' + esc(co.tagline) + '</div>' +
+        '<span class="cc-preview" data-preview="' + id + '" role="button" tabindex="0">' + ICON.play + ' Preview</span></div>';
     }).join("") + '</div>';
-    body.querySelectorAll("[data-extracoach]").forEach((el) => el.onclick = () => {
-      COACH.cfg.coach = el.dataset.extracoach; COACH.cfg.enabled = true; saveCoachCfg();
-      try { coachUnlock(); coachLoadManifest(); } catch (e) {}
-      body.querySelectorAll(".coachcard").forEach((c) => c.classList.toggle("on", c === el));
-    });
+    // Card selects; Preview pill plays a sample. The wiring lives in wireExtrasCoaches (below) so this
+    // function stays inside the 4000-char window test/onboarding-wizard.test.ts reads its branches from.
+    wireExtrasCoaches(body);
     btns.innerHTML = '<button class="guide-skip" id="extrasSkipCoach">Skip</button><button class="guide-next" id="extrasCoachNext">Next</button>';
     $("extrasSkipCoach").onclick = () => { EXTRAS.step = "why"; renderExtras(); };
     $("extrasCoachNext").onclick = () => { EXTRAS.step = "why"; renderExtras(); };
@@ -11607,6 +11610,26 @@ function closeExtras() {
   EXTRAS = null;
   // Now the session-shorthand walkthrough can fire (it was gated on our popup being open).
   try { if (state.tab === "today" && !state.screen) maybeAutoGuide(); } catch (e) {}
+}
+// The popup's coach cards: a tap on the card picks that coach; a tap on its Preview pill plays a
+// sample without selecting it (stopPropagation, and the card handler ignores taps that land on the
+// pill) — the same split wireCoachSettings uses on the settings screen. Kept out of renderExtras so
+// that function stays compact for its window-based test.
+function wireExtrasCoaches(body) {
+  body.querySelectorAll("[data-extracoach]").forEach((el) => {
+    const pick = () => {
+      COACH.cfg.coach = el.dataset.extracoach; COACH.cfg.enabled = true; saveCoachCfg();
+      try { coachUnlock(); coachLoadManifest(); } catch (e) {}
+      body.querySelectorAll(".coachcard").forEach((c) => c.classList.toggle("on", c === el));
+    };
+    el.onclick = (e) => { if (e.target.closest("[data-preview]")) return; pick(); };
+    el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } };
+  });
+  body.querySelectorAll("[data-preview]").forEach((el) => {
+    const go = (e) => { if (e) e.stopPropagation(); coachUnlock(); coachLoadManifest().then(() => coachPreview(el.dataset.preview)); };
+    el.onclick = go;
+    el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(e); } };
+  });
 }
 
 // ============ LIVE SESSION (in-app) ========================================

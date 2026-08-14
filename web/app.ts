@@ -11485,6 +11485,78 @@ function findGoodTrialDay(preferredIso) {
   }
   return preferredIso;
 }
+// The primary RUN sitting on a given date, as { week (1-based), sess (the RAW session moveSession
+// acts on), day }, or null. Dates are mapped through PLAN's week starts; the session comes from RAW,
+// because PLAN.weeks is a display summary with no movable session objects.
+function runOnIso(iso) {
+  if (!PLAN || !PLAN.weeks || !RAW || !RAW.weeks) return null;
+  for (let wi = 0; wi < PLAN.weeks.length; wi++) {
+    for (let d = 0; d < 7; d++) {
+      if (isoAdd(PLAN.weeks[wi].startIso, d).toISOString().slice(0, 10) !== iso) continue;
+      const raw = RAW.weeks[wi];
+      const sess = raw && raw.sessions.find((s) => PRIMARY_TYPES[s.type] && effDay(s) === d);
+      return sess ? { week: wi + 1, sess: sess, day: d } : null;
+    }
+  }
+  return null;
+}
+// The nearest run-free day in a week for a run being displaced by the trial: skips every day that
+// already holds another run and the day the trial will take, and searches outward from the trial's
+// day so the run moves as little as possible. Null when the week has no free day at all.
+function freeDayForRun(wi, runSess, trialDay) {
+  const wk = RAW.weeks[wi]; if (!wk) return null;
+  const busy = {};
+  wk.sessions.forEach((s) => { if (s.id !== runSess.id && PRIMARY_TYPES[s.type]) busy[effDay(s)] = 1; });
+  busy[trialDay] = 1;
+  for (const off of [1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6]) {
+    const d = trialDay + off;
+    if (d >= 0 && d <= 6 && !busy[d]) return d;
+  }
+  return null;
+}
+// Full weekday name for an ISO date, UTC-safe: the whole app computes dates in UTC (see todayIso/
+// isoAdd), and a local parse would name the wrong day for half the year.
+function isoWeekday(iso) {
+  return ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][new Date(iso + "T00:00:00Z").getUTCDay()];
+}
+// The trial-date picker changed. With a real plan (a returning runner editing their profile) a pick
+// that lands on a day already holding a run ASKS FIRST, then — on confirm — the run is moved to a free
+// day so the 2 km can take the slot, exactly as the owner asked. ⚠️ The move itself is DEFERRED to the
+// save (doSaveProfile), where it sits after the undo snapshot so Undo puts the run back; here we only
+// record the intent and, until confirmed, leave the field on its previous day. No plan yet (first-run
+// setup / wizard) means no reliable runs to read, so we just accept the pick and let findGoodTrialDay
+// resolve any clash at save, as before.
+function onTrialDayPick(input) {
+  const iso = input.value;
+  const clash = (profile && profile.personalized) ? runOnIso(iso) : null;
+  if (!clash) { draft.trialIso = iso; draft.trialMoveClash = 0; return; }
+  const label = (SESSION_LABEL[clash.sess.type] || clash.sess.type).toLowerCase();
+  const fd = freeDayForRun(clash.week - 1, clash.sess, clash.day);
+  const freeIso = fd != null ? isoAdd(PLAN.weeks[clash.week - 1].startIso, fd).toISOString().slice(0, 10) : null;
+  input.value = draft.trialIso || todayIso();   // revert the field until the move is confirmed
+  const where = freeIso ? "to " + isoWeekday(freeIso) : "to a free day";
+  confirmSheet("Move your run?",
+    "That day already has your " + label + ". We\\u2019ll move it " + where + " so your 2 km time trial can take that day.",
+    "Move it \\u0026 schedule the 2 km",
+    () => { draft.trialIso = iso; draft.trialMoveClash = 1; input.value = iso; });
+}
+// Commit the scheduled trial from the draft. Shared by wizardFinish and doSaveProfile so the two can
+// never drift. When the runner confirmed a clash-move (draft.trialMoveClash — only set in the profile,
+// where a real plan exists), the run on the chosen day is moved out and the 2 km takes the exact day;
+// otherwise findGoodTrialDay resolves any clash by moving the trial instead, as before. ⚠️ Call this
+// AFTER the plan is rebuilt and, in doSaveProfile, after the undo snapshot — moveSession commits to the
+// live plan and Undo relies on that snapshot to restore the run.
+function commitScheduledTrial() {
+  let tIso = draft.trialIso;
+  if (draft.trialMoveClash) {
+    const clash = runOnIso(tIso);
+    const fd = clash ? freeDayForRun(clash.week - 1, clash.sess, clash.day) : null;
+    if (clash && fd != null) moveSession(clash.week, clash.sess, fd);
+  } else {
+    tIso = findGoodTrialDay(tIso);
+  }
+  SCHEDULED_TRIAL = { iso: tIso, createdIso: todayIso() }; saveScheduledTrial();
+}
 // Build the plan from every collected answer and land on Today. The same sequence doSaveProfile uses,
 // minus the edit-only impact preview and undo toast (a first run has no prior plan to weigh or undo).
 function wizardFinish() {
@@ -11505,10 +11577,7 @@ function wizardFinish() {
   // Today can surface a card on that date (see scheduledTrialOn); the card opens the existing
   // trial-run flow.
   try {
-    if (draft.trialWant === "1" && draft.trialIso) {
-      SCHEDULED_TRIAL = { iso: findGoodTrialDay(draft.trialIso), createdIso: todayIso() };
-      saveScheduledTrial();
-    }
+    if (draft.trialWant === "1" && draft.trialIso) commitScheduledTrial();
   } catch (e) {}
   draft = {}; state.wizErr = null; state.wizStep = 0;
   state.screen = null; state.tab = "today"; state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
@@ -11522,9 +11591,11 @@ function wireWizard() {
   const next = $("wizNext"); if (next) next.onclick = wizNext;
   const back = $("wizBack"); if (back) back.onclick = wizBack;
   document.querySelectorAll("[data-wizdays]").forEach((b) => b.onclick = () => { draft.days = b.dataset.wizdays; state.wizErr = null; render(); });
-  // The trial-day picker is a plain <select>: capture its value into the draft so wizardFinish can
+  // The trial-day picker is a native date input: capture its value into the draft so wizardFinish can
   // commit it. Not an s_-prefixed field (those flow through wizFieldVal); the trial is its own store.
-  const trialDay = $("s_trialday"); if (trialDay) { if (!draft.trialIso) draft.trialIso = trialDay.value; trialDay.onchange = () => { draft.trialIso = trialDay.value; }; }
+  // onTrialDayPick is shared with the profile, but its clash prompt is gated on a real plan, so here
+  // (first run, no plan yet) it simply records the pick.
+  const trialDay = $("s_trialday"); if (trialDay) { if (!draft.trialIso) draft.trialIso = trialDay.value; trialDay.onchange = () => onTrialDayPick(trialDay); }
 }
 
 // The after-Start popup: "want to set up your voice coach and motivation now, or later?" — same visual
@@ -15345,7 +15416,7 @@ function wire() {
   const km1 = $("s_2km");
   if (km1) { bindTimeInput(km1); km1.addEventListener("input", refreshMasHint); refreshMasHint(); }
   const trialSched = $("s_trial_sched"); if (trialSched) trialSched.onclick = () => { const pick = $("trialSchedPick"); if (!pick) return; const show = pick.style.display === "none"; pick.style.display = show ? "" : "none"; draft.trialWant = show ? "1" : "0"; if (show && $("s_trialday")) draft.trialIso = draft.trialIso || $("s_trialday").value; };
-  const trialDay2 = $("s_trialday"); if (trialDay2) { if (!draft.trialIso) draft.trialIso = trialDay2.value; trialDay2.onchange = () => { draft.trialIso = trialDay2.value; }; }
+  const trialDay2 = $("s_trialday"); if (trialDay2) { if (!draft.trialIso) draft.trialIso = trialDay2.value; trialDay2.onchange = () => onTrialDayPick(trialDay2); }
   if (document.querySelector('[data-set="status"]')) syncStatus();
   // Avatar upload
   const avatarFile = $("s_avatar_file");
@@ -15386,8 +15457,10 @@ function wire() {
     // already done today.
     const keptTicks = todayTicks();
     profile = pf; adoptPlan(out); computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; seedDone(); restoreTicks(keptTicks); saveProfileStore(); renderAvatar();
+    // ⚠️ After the undo snapshot above: if the runner confirmed a clash-move, commitScheduledTrial
+    // moves the run on the live plan, and Undo relies on that snapshot to put it back.
     const scheduledNewTrial = draft.trialWant === "1" && !!draft.trialIso;
-    if (scheduledNewTrial) { SCHEDULED_TRIAL = { iso: findGoodTrialDay(draft.trialIso), createdIso: todayIso() }; saveScheduledTrial(); }
+    if (scheduledNewTrial) commitScheduledTrial();
     // ⚠️ The draft is now sticky across navigation, so SAVING has to be what releases it — otherwise
     // the answers a runner just committed are re-restored over the top of the profile they built.
     draft = {};

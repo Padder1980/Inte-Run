@@ -80,7 +80,11 @@ test("Start my plan opens the extras popup (coach + motivation, now or later)", 
   // the setup screen. The pages are named on EXTRAS.step; assert both are handled and the final saves.
   assert.match(render, /step === "coach"/, "the coach page inside the popup is gone");
   assert.match(render, /step === "why"/, "the why page inside the popup is gone");
-  assert.match(render, /COACH\.cfg\.coach = /, "picking a coach in the popup no longer saves it");
+  // The coach cards' select+preview wiring lives in wireExtrasCoaches (so renderExtras stays inside the
+  // window this test reads); renderExtras calls it, and picking a coach there still saves the choice.
+  assert.match(render, /wireExtrasCoaches\(body\)/, "renderExtras no longer wires its coach cards");
+  assert.match(fn("wireExtrasCoaches"), /COACH\.cfg\.coach = /, "picking a coach in the popup no longer saves it");
+  assert.match(fn("wireExtrasCoaches"), /coachPreview\(/, "the popup coach cards have no working Preview");
   // The why page reuses the profile's whyRowsHtml/wireWhyInputs so answers persist to WHY on change.
   assert.match(render, /whyRowsHtml\("xw_"\)/, "the popup's why page no longer uses the shared whyRowsHtml");
   // ⚠️ The auto-guide ("Understanding your sessions") must stand aside while the extras popup is up,
@@ -113,7 +117,11 @@ test("the trial day is moved if the adjacent plan sessions are hard", () => {
   // findGoodTrialDay must exist and be called inside wizardFinish.
   assert.match(html, /function findGoodTrialDay\(/, "findGoodTrialDay is missing");
   const finish = fn("wizardFinish");
-  assert.match(finish, /findGoodTrialDay\(draft\.trialIso\)/, "wizardFinish does not call findGoodTrialDay");
+  // The trial-commit logic moved into commitScheduledTrial (shared with doSaveProfile so the two can't
+  // drift); wizardFinish calls it, and for a wizard pick — which never sets a clash-move — it still
+  // resolves the day through findGoodTrialDay.
+  assert.match(finish, /commitScheduledTrial\(\)/, "wizardFinish does not commit the scheduled trial");
+  assert.match(fn("commitScheduledTrial"), /findGoodTrialDay\(tIso\)/, "the scheduled trial is not resolved through findGoodTrialDay");
   // The helper must check ALL THREE days — the trial day must be free of plan sessions, AND
   // neither neighbour should be a hard session.
   const helper = fn("findGoodTrialDay");
@@ -122,6 +130,32 @@ test("the trial day is moved if the adjacent plan sessions are hard", () => {
   assert.match(helper, /effortOn.*isoAdd.*1/, "findGoodTrialDay does not check the day after the trial");
   // It must prefer the original date when all three conditions are met.
   assert.match(helper, /if \(isGoodDay\(preferredIso\)\) return preferredIso/, "findGoodTrialDay does not short-circuit on the original day");
+});
+
+test("a trial dropped on a day that has a run asks first, then moves the RUN out — owner's rule", () => {
+  // The clash prompt is gated on a real plan: a returning runner editing their profile. First-run
+  // setup / the wizard has no plan yet, so onTrialDayPick just records the pick and findGoodTrialDay
+  // resolves any clash at save, as before.
+  const pick = fn("onTrialDayPick");
+  assert.ok(pick.length > 100, "onTrialDayPick is missing");
+  assert.match(pick, /profile && profile\.personalized/, "the clash prompt is not gated on a real plan");
+  assert.match(pick, /runOnIso\(/, "onTrialDayPick does not look for a run on the chosen day");
+  assert.match(pick, /confirmSheet\(/, "onTrialDayPick moves things without asking first");
+  assert.match(pick, /draft\.trialMoveClash = 1/, "confirming the prompt does not record the move intent");
+  // The profile date picker is wired to it.
+  assert.match(html, /trialDay2\.onchange = \(\) => onTrialDayPick\(trialDay2\)/,
+    "the profile trial picker is not wired to onTrialDayPick");
+  // On commit, a confirmed clash moves the RUN (not the trial); with no confirmed clash it falls back
+  // to moving the trial via findGoodTrialDay.
+  const commit = fn("commitScheduledTrial");
+  assert.match(commit, /if \(draft\.trialMoveClash\)/, "commitScheduledTrial ignores the confirmed move");
+  assert.match(commit, /moveSession\(clash\.week, clash\.sess/, "commitScheduledTrial does not move the clashing run out");
+  assert.match(commit, /findGoodTrialDay\(tIso\)/, "commitScheduledTrial drops the no-clash fallback");
+  // ⚠️ UNDO-SAFE: the run-move must run AFTER doSaveProfile's undo snapshot (which captures
+  // dayOverride), or Undo cannot put the run back in its slot.
+  const save = fn("doSaveProfile");
+  const snap = save.indexOf("undoSnap = {"), move = save.indexOf("commitScheduledTrial()");
+  assert.ok(snap > 0 && move > snap, "the run is moved before the undo snapshot — Undo would not restore it");
 });
 
 test("⚠️ the trial lands on a day with no RUN — strength and mobility do not block it", () => {

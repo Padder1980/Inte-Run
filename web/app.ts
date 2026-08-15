@@ -5553,7 +5553,7 @@ function startPlanDrag(x, y, btn) {
   ghost.classList.add("cal-ghost", "plan-ghost");
   ghost.style.width = r.width + "px";
   document.body.appendChild(ghost);
-  DRAG = { wk: wk, sess: sess, card: btn, ghost: ghost, dx: x - r.left, dy: y - r.top, target: null, targetEl: null, isPlan: true };
+  DRAG = { wk: wk, sess: sess, card: btn, ghost: ghost, dx: x - r.left, dy: y - r.top, target: null, targetEl: null, isPlan: true, px: x, py: y, scroller: $("view"), raf: 0 };
   btn.classList.add("cal-lifted");
   document.body.classList.add("cal-dragging");
   moveGhost(x, y);
@@ -5562,13 +5562,12 @@ function startPlanDrag(x, y, btn) {
   window.addEventListener("pointerup", planDragEnd);
   window.addEventListener("pointercancel", planDragCancel);
   window.addEventListener("touchmove", calDragBlockScroll, { passive: false });
+  DRAG.raf = requestAnimationFrame(planDragScroll);
 }
-function planDragMove(e) {
+function planDragAim(x, y) {
   if (!DRAG || !DRAG.isPlan) return;
-  e.preventDefault();
-  moveGhost(e.clientX, e.clientY);
   DRAG.ghost.style.display = "none";
-  const under = document.elementFromPoint(e.clientX, e.clientY);
+  const under = document.elementFromPoint(x, y);
   DRAG.ghost.style.display = "";
   const row = under && under.closest ? under.closest("[data-pday]") : null;
   if (DRAG.targetEl && DRAG.targetEl !== row) DRAG.targetEl.classList.remove("plan-target");
@@ -5581,12 +5580,39 @@ function planDragMove(e) {
     DRAG.targetEl = null; DRAG.target = null;
   }
 }
+function planDragMove(e) {
+  if (!DRAG || !DRAG.isPlan) return;
+  e.preventDefault();
+  DRAG.px = e.clientX; DRAG.py = e.clientY;
+  moveGhost(e.clientX, e.clientY);
+  planDragAim(e.clientX, e.clientY);
+}
+// A plan week is a tall list, so the row you want is often off screen when you pick one up.
+// Holding near either edge scrolls the list and re-aims under the stationary finger.
+function planDragScroll() {
+  if (!DRAG || !DRAG.isPlan) return;
+  const sc = DRAG.scroller;
+  if (sc) {
+    const b = sc.getBoundingClientRect();
+    const band = 64, max = 7;
+    let dy = 0;
+    if (DRAG.py < b.top + band) dy = -Math.ceil(Math.min(max, (b.top + band - DRAG.py) / band * max));
+    else if (DRAG.py > b.bottom - band) dy = Math.ceil(Math.min(max, (DRAG.py - (b.bottom - band)) / band * max));
+    if (dy) {
+      const was = sc.scrollTop;
+      sc.scrollTop += dy;
+      if (sc.scrollTop !== was) planDragAim(DRAG.px, DRAG.py);
+    }
+  }
+  DRAG.raf = requestAnimationFrame(planDragScroll);
+}
 function planDragTeardown() {
   window.removeEventListener("pointermove", planDragMove);
   window.removeEventListener("pointerup", planDragEnd);
   window.removeEventListener("pointercancel", planDragCancel);
   window.removeEventListener("touchmove", calDragBlockScroll);
   if (DRAG) {
+    if (DRAG.raf) cancelAnimationFrame(DRAG.raf);
     if (DRAG.targetEl) DRAG.targetEl.classList.remove("plan-target");
     if (DRAG.ghost) DRAG.ghost.remove();
     if (DRAG.card) DRAG.card.classList.remove("cal-lifted");

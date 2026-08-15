@@ -3167,7 +3167,81 @@ function shoeUncreditRun(run) {
   } catch (e) {}
 }
 function loadRuns() { try { return JSON.parse(localStorage.getItem("interun_runs") || "[]"); } catch (e) { return []; } }
-function saveRuns() { try { localStorage.setItem("interun_runs", JSON.stringify(state.logged.slice(0, 50))); } catch (e) {} }
+function saveRuns() {
+  // The runs are the real data and are written FIRST, in their own try. A failure to keep the
+  // history must never cost somebody the run they just finished.
+  try { localStorage.setItem("interun_runs", JSON.stringify(state.logged.slice(0, 50))); } catch (e) {}
+  try { syncHist(); } catch (e) {}
+}
+
+/**
+ * THE PERMANENT RUN HISTORY -- interun_hist_v1.
+ *
+ * saveRuns() keeps 50 runs because a run carries its GPS route and its heart-rate series, about
+ * 1.7 KB each. The ROUTE is what costs; the FACT of the run is four small values. So the facts are
+ * kept here forever and everything that counts, totals, streaks or charts reads THIS, never
+ * state.logged -- which at four runs a week reaches back only about twelve weeks.
+ *
+ * Measured: ~80 bytes a row, so five years at four runs a week is about 83 KB.
+ *
+ * The entire point is that a row OUTLIVES its run. syncHist merges and never deletes, so once a run
+ * ages past the cap its row stays and a year of graph keeps its shape.
+ *
+ * It is written INSIDE saveRuns rather than at the fourteen call sites, so a fifteenth save path
+ * cannot be added that forgets to record the run.
+ *
+ * It travels in the backup by construction -- dataView discovers keys by the interun_ prefix -- and
+ * that is correct, unlike the map cache: this is data the runner cannot regenerate.
+ */
+function loadHist() {
+  try { const a = JSON.parse(localStorage.getItem("interun_hist_v1") || "[]"); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+}
+function saveHist(rows) { try { localStorage.setItem("interun_hist_v1", JSON.stringify(rows)); } catch (e) {} }
+/**
+ * Merge every loaded run into the permanent history. Existing rows are REFRESHED rather than
+ * skipped, because a run genuinely changes after it is first saved -- a treadmill distance is typed
+ * in afterwards, and applyTreadmillDistance edits the record in place.
+ *
+ * Rows whose run has since aged out of the capped store are left alone. That is not an oversight.
+ *
+ * On the first run after this shipped the store is empty and state.logged holds up to 50 runs, so
+ * the backfill happens here with no separate migration.
+ */
+function syncHist() {
+  // ⚠️ THE IN-MEMORY COPY, not loadHist(). Readers run on every render, and re-parsing a store that
+  // grows to a thousand rows on each one is a cost that climbs with how long somebody has used the
+  // app -- the exact people this store exists for.
+  const rows = state.hist || (state.hist = loadHist());
+  const at = Object.create(null);
+  for (let i = 0; i < rows.length; i++) if (rows[i] && rows[i].i) at[rows[i].i] = i;
+  const src = state.logged || [];
+  let dirty = false;
+  for (let i = 0; i < src.length; i++) {
+    const r = src[i];
+    if (!r || !r.id || !r.dateIso) continue;
+    const km = Math.round((Number(r.distKm) || 0) * 100) / 100;
+    const sec = Math.round(Number(r.sec) || 0);
+    const ty = String(r.type || "");
+    const j = at[r.id];
+    if (j == null) { at[r.id] = rows.length; rows.push({ i: r.id, d: r.dateIso, k: km, s: sec, t: ty }); dirty = true; continue; }
+    const w = rows[j];
+    if (w.d !== r.dateIso || w.k !== km || w.s !== sec || w.t !== ty) { w.d = r.dateIso; w.k = km; w.s = sec; w.t = ty; dirty = true; }
+  }
+  // Newest first, matching state.logged, so every reader can stop early.
+  if (dirty) { rows.sort((a, b) => (a.d < b.d ? 1 : a.d > b.d ? -1 : 0)); saveHist(rows); }
+  return rows;
+}
+/**
+ * ⚠️ DELETING A RUN MUST DELETE ITS ROW, and this is the one place merging cannot cover.
+ * Without it a deleted run keeps counting toward every total and streak forever, which is worse
+ * than the cap this store exists to fix. Undo needs no partner call: the run goes back into
+ * state.logged and the next syncHist merges it straight back in.
+ */
+function histForget(run) {
+  if (!run || !run.id) return;
+  state.hist = (state.hist || loadHist()).filter((w) => w && w.i !== run.id);
+  saveHist(state.hist);
+}
 
 // Turn a profile into engine outputs. Throws if the goal can't be planned (e.g. race too soon).
 function applyProfile(pf) {
@@ -3397,7 +3471,7 @@ function planDefaultWeek() {
   return PLAN.defaultWeekIndex;
 }
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: planDefaultWeek(), actTab: "workouts", logFilter: "all", supportQ: "", openGuide: null, setupFocus: null, supportFrom: null, logFilterOpen: false, logAll: false, support: null, logged: loadRuns(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK, addOpen: false };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: planDefaultWeek(), actTab: "workouts", logFilter: "all", supportQ: "", openGuide: null, setupFocus: null, supportFrom: null, logFilterOpen: false, logAll: false, support: null, logged: loadRuns(), hist: loadHist(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK, addOpen: false };
 // Effective day index for a session, honouring any user reschedule. Works for raw sessions
 // (dayOfWeek) and summary sessions (dayIndex), keyed by the shared session id.
 function loadDayOverride() { try { return JSON.parse(localStorage.getItem("interun_dayov_v1") || "{}") || {}; } catch (e) { return {}; } }
@@ -7453,6 +7527,9 @@ function deleteRun(idx) {
   // ⚠️ AND TAKE THE DISTANCE BACK OFF THE SHOE, or the rack only ever climbs and the one number that
   // says "replace these" becomes fiction after the first mistaken entry.
   shoeUncreditRun(run);
+  // ⚠️ And out of the permanent history, which merging alone would never remove. Undo needs no
+  // partner call here -- the run returns to state.logged and the next syncHist re-adds its row.
+  histForget(run);
   saveRuns();
   clearTrainFlag();
   render();
@@ -7579,16 +7656,22 @@ function logConsistency() {
  * zero every Monday morning until the first run of the week -- so a runner with four months of
  * consistency would open the app on a Monday and be told nothing. It breaks when a whole week passes
  * with no run, which is what a streak actually means.
+ *
+ * ⚠️ IT READS THE PERMANENT HISTORY, NOT state.logged, AND THAT WAS A REAL DEFECT. Counted from the
+ * capped 50 runs this got SHORTER THE MORE CONSISTENTLY SOMEBODY RAN: a forty-week streak displayed
+ * as twelve, and a runner going out seven days a week topped out near seven weeks -- the number
+ * meant to reward consistency was reduced by it. Nothing threw; the figure was simply wrong, and
+ * wrong in the direction that punishes the best behaviour.
  */
 function logStreakWeeks() {
-  const runs = (state.logged || []).filter((r) => r && r.dateIso);
+  const runs = (state.hist || []).filter((r) => r && r.d);
   if (!runs.length) return 0;
   const wk = new Set();
   for (const r of runs) {
-    const p = r.dateIso.split("-").map(Number);
+    const p = r.d.split("-").map(Number);
     const d = new Date(Date.UTC(p[0], (p[1] || 1) - 1, p[2] || 1));
     const dow = (d.getUTCDay() + 6) % 7;
-    wk.add(isoAdd(r.dateIso, -dow).toISOString().slice(0, 10));
+    wk.add(isoAdd(r.d, -dow).toISOString().slice(0, 10));
   }
   let cursor = logWeekStartIso();
   if (!wk.has(cursor)) cursor = isoAdd(cursor, -7).toISOString().slice(0, 10);

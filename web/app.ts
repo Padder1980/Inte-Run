@@ -3170,7 +3170,17 @@ function runDateLabelIso(iso) {
   if (!(m >= 0 && m < 12)) return "";
   return d + " " + MON_SHORT[m] + (y === new Date().getFullYear() ? "" : " " + y);
 }
-function futureIso(days) { const d = new Date(); d.setDate(d.getDate() + days); return d.toISOString().slice(0, 10); }
+/**
+ * A date N days from today.
+ * ⚠️ BUILT FROM todayIso + isoAdd, WHICH ARE UTC. It used to read
+ *   new Date(); d.setDate(d.getDate() + days); d.toISOString()
+ * which mixes LOCAL date arithmetic with a UTC read — the same shape as the week-boundary bug this
+ * project already shipped. setDate keeps the local wall time while the offset changes underneath it,
+ * so crossing a clock change inside the requested span moves the answer by a day. Its caller is the
+ * watch's upcoming-week payload, where a day out means the wrist is handed the wrong session.
+ * The rule is in CLAUDE.md: anything computing a date must be UTC, because todayIso and isoAdd are.
+ */
+function futureIso(days) { return isoAdd(todayIso(), days).toISOString().slice(0, 10); }
 function fmtTimeFull(s) { s = Math.round(s); const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), x = s%60; const p = (n) => String(n).padStart(2,"0"); return h>0 ? h+":"+p(m)+":"+p(x) : m+":"+p(x); }
 
 // An example runner to start from — until you make it yours.
@@ -15465,11 +15475,16 @@ function coachWatchCard() {
 // pace and effort evidence is strong enough to act on, with four guards that each cost a shipped bug
 // (direction sanity, anchor stamping, per-kind muting, one voice). This card FRAMES that answer on a
 // weekly beat and adds the retest offer; it re-derives nothing.
-function reviewWeekStartIso() {
-  const d = new Date(); const dow = (d.getDay() + 6) % 7;   // Monday = 0
-  d.setDate(d.getDate() - dow);
-  return d.toISOString().slice(0, 10);
-}
+/**
+ * The Monday this week started on, for the weekly review's answered-state key.
+ * ⚠️ IT DELEGATES RATHER THAN REPEATING THE SUM. This used to be its own copy, built from local
+ * getDay/setDate and read back with toISOString — the exact local/UTC mix that put the Logbook's week
+ * boundary a day early for the whole of British Summer Time. That one is recorded as fixed in
+ * CLAUDE.md; this second copy was never touched and kept the fault, and it decides whether a runner
+ * has already answered this week's review. logWeekStartIso is UTC throughout and is guarded by a
+ * 400-day sweep, so there is one definition of when a week starts and only one thing to keep right.
+ */
+function reviewWeekStartIso() { return logWeekStartIso(); }
 function loadReviewSeen() { try { return localStorage.getItem("interun_review_v1") || ""; } catch (e) { return ""; } }
 function dismissWeeklyReview() {
   try { localStorage.setItem("interun_review_v1", reviewWeekStartIso()); } catch (e) {}

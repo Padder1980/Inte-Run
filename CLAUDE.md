@@ -546,13 +546,51 @@ writes them anywhere, so the answers do not survive leaving the screen. `test/si
 fails on saved / stored / we keep / remembered. A consent line that overstates what is kept is worse
 than none — it is the sentence a worried runner reads most carefully.
 
-⚠️ **A HUB CARD NAMED IN NO GROUP STILL APPEARS**, under "More". A hub that silently drops an entry
-somebody adds later is worse than a flat one, because nothing looks wrong.
+⚠️ **A HUB CARD NAMED IN NO GROUP DOES NOT APPEAR AT ALL. THIS FILE CLAIMED THE OPPOSITE FOR MONTHS**
+— it promised a "More" catch-all, and there has never been one. `viewSupport` renders exactly Alfie,
+`HUB_CHECKINS`, `HUB_LEARN`, `HUB_TOOLS` and the Safety footer, so an entry added to `SUPPORT_HUB`
+without naming a group ships as an unreachable page with nothing looking wrong. Corrected 2026-08-15
+and guarded by `test/support-hub.test.ts`… which is to say `test/support-tools.test.ts`, whose first
+test fails on any hub id that no group names.
+⚠️ **`why`, `connect`, `shoes` and `data` are ungrouped ON PURPOSE** — they are rows on the Profile
+screen, where a thing about the runner belongs, and a code comment records that `why` was moved there
+deliberately. They are the reason the guard carries a named exemption list and then checks each of
+those four is genuinely reachable from Profile, rather than demanding every entry be grouped.
 
-### THE LOGBOOK'S TOTALS ARE BOUNDED BY THE 50-RUN CAP (2026-08-08)
+### THE LOGBOOK'S TOTALS ARE NO LONGER BOUNDED BY THE 50-RUN CAP (rewritten 2026-08-15)
 
-⚠️ `saveRuns()` slices to 50, so an "all time" figure is a lie the moment somebody runs fifty-one
-times. The third column says **"Last 50 runs"** once the cap binds. Week and month are always inside it.
+⚠️ **THE CAP IS STILL 50 RUNS, BUT THE FACTS OF EVERY RUN ARE NOW KEPT FOREVER.** `saveRuns()` still
+slices `interun_runs` to 50, because a run carries its GPS route and heart-rate series (~1.7 KB). It
+also calls `syncHist()`, which merges each run into **`interun_hist_v1`** — one ~63-byte row of
+`{i,d,k,s,t,e}` (id, date, km, seconds, type, elevation), **never capped**. Five years at four runs a
+week is about 65 KB. `logTotals`, `logWeekBuckets` and `logStreakWeeks` all read `state.hist`.
+- ⚠️ **It is written INSIDE `saveRuns()`, not at its fourteen call sites**, so a fifteenth cannot
+  forget. The runs are written FIRST, in their own `try` — losing the history must never cost
+  somebody the run they just finished.
+- ⚠️ **`deleteRun` must call `histForget(run)`**; merging never deletes, so without it a deleted run
+  counts toward every total forever. Undo needs no partner call — the run returns to `state.logged`
+  and the next merge re-adds it.
+- ⚠️ **`state.hist` is the in-memory copy and readers must use it.** Re-parsing a thousand-row store
+  on every render costs most for the people who have used the app longest.
+- ⚠️ **THE OLD "Last 50 runs" THIRD COLUMN DESCRIBED HERE HAD ALREADY BEEN REMOVED** before this was
+  written, leaving only an orphaned `.lb-cs` CSS class. Both facts in that sentence were stale.
+
+⚠️ **`logStreakWeeks()` READ THE CAPPED STORE AND THEREFORE GOT SHORTER THE MORE CONSISTENTLY SOMEBODY
+RAN.** Measured against a genuine 40-week streak: it displayed **11 weeks**, and a runner going out
+seven days a week topped out near seven. The one number whose job is to reward consistency was being
+reduced by it, silently. Fixed 2026-08-15; `test/run-history.test.ts` proves the streak does not
+depend on `state.logged` at all.
+
+⚠️ **TWO SCREENS MUST REFUSE TO INVENT A REST DAY, and the store being uncapped does not remove the
+need.** History still starts when the runner did. The month calendar will not page back past the
+first recorded run, and Progress captions any range that reaches further back than the records do —
+otherwise a flat line reads as months of not running rather than months of no data.
+
+⚠️ **THE TRAINING LOG ONLY MAKES A RUN TAPPABLE IF ITS FULL RECORD SURVIVES.** History is uncapped but
+`state.logged` is still 50, so on a real training year most days describe a run whose map and splits
+are gone: measured on an eight-month fixture, **148 dots, 50 openable, 98 landing on "Run not
+found."** Those days keep their distance and are `aria-disabled` spans, never buttons — the same rule
+`test/design-system.test.ts` already enforces on session rows.
 
 ⚠️ **CONSISTENCY IS NEVER TAKEN FROM `state.done`.** `seedDone()` rebuilds it at every boot by marking
 every non-rest session dated before today as done, run or not — so a figure from there reads 100% for
@@ -992,6 +1030,83 @@ and Reduce Motion turns the animation off but keeps the jump.
 ⚠️ **`web/voices/` IS STALE ON THIS MAC — 4 coaches against `docs/voices/`'s 10** (measured 2026-08-10).
 So the documented clobber is not hypothetical here: every `node web/app.ts` overwrites the committed audio,
 and `git checkout -- docs/voices/` after each build is mandatory, not cautionary.
+
+## SUPPORT › TOOLS, AND THREE NEW PAGES (2026-08-15)
+
+`HUB_TOOLS` is a third hub group beside `HUB_CHECKINS` and `HUB_LEARN`, holding **Training zones**,
+**Pace calculator** and **Measurements**. See the corrected note above about ungrouped cards before
+adding a fourth.
+
+**Training zones** exists because ⚠️ **`profile.maxHr` was READ IN SIX PLACES AND WRITTEN IN NONE.**
+`maxHrEstimate()` has always preferred a measured ceiling over Tanaka's `208 − 0.7 × age`, and the
+zones panel on every run told the runner to "add your measured max heart rate in your profile" — a
+field that existed nowhere. The owner was offered `220 − age` (his ask) and kept Tanaka.
+- ⚠️ **`maxHr` is deliberately NOT in `DEFAULT_PROFILE`** — the `weeklyVolumeKm` lesson. A default in
+  every stored profile is an answer nobody gave, and this one governs the wrist's zone colours and
+  the coach's 92% safety cue.
+- ⚠️ **Saving calls `syncWatch()`**, or the two halves of one product judge the same heartbeat
+  differently — the split `maxHrEstimate()` was written to end.
+- ⚠️ **Out of range is REFUSED, not clamped.** A typo of 1740 silently becoming 230 is a ceiling the
+  runner never chose. Clearing the field deletes the key rather than storing 0.
+- The page says WHICH of the two it is showing: a zone table with no provenance reads as a
+  measurement when for almost everybody it is arithmetic on a date of birth.
+
+**Pace calculator** — distance, time and pace, any two giving the third, in km or miles.
+⚠️ **A PACE TARGET IS FLOORED, NEVER ROUNDED, AND THAT IS CORRECTNESS, NOT FORMATTING.** A half
+marathon in 1:45 needs 298.6 s/km; rounded to 4:59 and held exactly it finishes in **1:45:08**, so the
+calculator would hand back a pace that misses the time it was asked for. Over a marathon the same
+half-second is 21 seconds. ⚠️ The miles option does **not** reopen the units decision — nothing here is
+stored, read by the engine or shown elsewhere, and a test asserts it cannot touch `localStorage` or
+the profile.
+
+**Measurements** — °C/°F only, stored as `interun_units_v1` following the `interun_theme_v1`
+precedent rather than the profile.
+⚠️ **EVERYTHING STAYS CELSIUS INTERNALLY.** The forecast is fetched in Celsius, every threshold in
+`weather.ts` is Celsius (18/23/28/33), and the warm-up shortens itself above 24 °C. `fmtTemp`
+converts at the moment of display and nowhere else; a test runs the engine under both settings and
+asserts identical severity, penalty and advice.
+⚠️ **`fmtTemp` ROUNDS ONCE, AFTER CONVERTING.** Rounding the Celsius first shows 54 °F for 12.4 °C and
+55 °F for 12.5 °C — a whole degree invented by the order of operations.
+⚠️ **This fixed the documented duplicate temperature too, and they were one fault.** The sheet read
+`12° · Mild · 12°C, wind 14 km/h` because the engine's `summary` bakes the temperature AND its unit
+into prose. `assessConditions` now also returns **`tempWord`** (unit-free) and the app composes its
+own line. `summary` is kept and documented as **deliberately unrendered** — do not "tidy" the app back
+onto it.
+⚠️ **DISTANCE IS STILL METRIC, and the page carries NO explanation of why** (owner, 2026-08-15). The
+first version printed two paragraphs justifying the scope on a screen somebody opened to press one
+button. The constraint is real — ~105 render sites, ~150 stored `distKm` references and two 1000 m
+split algorithms — and it belongs here, not there.
+
+## THE CSS TOKEN GUARD, AND WHY THE RATCHETS WERE BLIND TO IT (2026-08-15)
+
+⚠️ **AN UNDECLARED CUSTOM PROPERTY INVALIDATES THE WHOLE DECLARATION, SILENTLY.** `var(--r-sm)` was
+invented and used four times — **two of them in the plan drag-and-drop that had already shipped in
+build 373**, where it left the drag highlight and the floating card with square corners. It passed the
+build, the typecheck, 573 tests and a screenshot review, because "slightly less rounded than intended"
+is not something an eye catches. Chasing it found `--wc`, used three times in the weather CSS and
+declared nowhere, which had made the bullet dots on the weather advice invisible.
+
+The radius and type ratchets count **literal** off-ladder values, so they are structurally incapable
+of seeing this. `test/design-system.test.ts` now asserts every bare `var()` resolves.
+⚠️ **DECLARATIONS ARE SCANNED ACROSS THE WHOLE PAGE, USES ONLY IN THE STYLESHEET** — nine tokens
+(`--hc`, `--phase`, `--rc`, `--p` and friends) are legitimately set per element as inline
+`style="--hc: …"`, and a stylesheet-only scan reports every one of them as missing.
+
+## TWO MORE LOCAL/UTC DATE FAULTS, FOUND BY SWEEPING (2026-08-15)
+
+⚠️ **THIS FILE RECORDED THE BST WEEK-BOUNDARY BUG AS FIXED, AND TWO MORE COPIES OF THE SAME SHAPE WERE
+STILL LIVE.** `futureIso` (which feeds the watch's upcoming-week payload — a day out means the wrist
+is handed the wrong session) and `reviewWeekStartIso` (which decides whether the weekly review has
+already been answered) both mutated a Date with LOCAL setters and read it back with `toISOString()`.
+`futureIso` now delegates to `isoAdd(todayIso(), …)`; `reviewWeekStartIso` now **calls
+`logWeekStartIso()`**, so there is one definition of when a week starts.
+
+⚠️ **THE SWEEP THAT FINDS THEM IS DERIVED, AND ITS FIRST VERSION WAS TOO BROAD.** Forbidding every
+local getter beside a `toISOString` flagged `buildReminderSchedule` and `runStravaPayload`, which are
+both **correct and documented** — a reminder is set against the clock on the wall, and Strava's
+`start_date_local` must be local or every British summer run lands an hour early in the runner's own
+log. Stated precisely — *never build an ISO date from a Date mutated with local setters* — the guard
+needs no exemption list at all, which is what stops it going stale.
 
 ## Deploy & links
 

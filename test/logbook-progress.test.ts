@@ -45,6 +45,50 @@ test("week boundaries are built with the UTC helpers", () => {
   }
 });
 
+/**
+ * ⚠️ NO ISO DATE MAY BE BUILT FROM A LOCALLY-MUTATED Date. DERIVED, NOT LISTED.
+ *
+ * This project fixed the local/UTC mix once in logWeekStartIso and wrote it up as done — and two
+ * more copies of the same shape were still live on 2026-08-15: futureIso, which feeds the watch's
+ * upcoming-week payload, and reviewWeekStartIso, which decides whether the weekly review has already
+ * been answered. Both were found by sweeping, not by reading, which is the whole argument for a
+ * derived guard: a hand-written list of "date functions" cannot contain the one somebody adds next.
+ *
+ * ⚠️ AND THE FIRST VERSION OF THIS SWEEP WAS TOO BROAD. Forbidding every local getter beside a
+ * toISOString flagged buildReminderSchedule and runStravaPayload, which are both CORRECT and both
+ * documented: a reminder is set against the clock on the wall, and Strava's start_date_local must be
+ * local or every British summer run lands an hour early in the runner's own log. The precise fault is
+ * narrower — mutating a Date with local setters and then reading it back as an ISO date — and stated
+ * that way the sweep needs no exemption list, which is what stops it going stale.
+ */
+test("no ISO date is built from a Date mutated in local time", () => {
+  const html = page();
+  const names = [...new Set([...html.matchAll(/^function ([A-Za-z_$][\w$]*)\(/gm)].map((m) => m[1]!))];
+  assert.ok(names.length > 100, "only " + names.length + " functions found — the scan is broken");
+  const bad: string[] = [];
+  for (const n of names) {
+    const at = html.indexOf("function " + n + "(");
+    const rel = html.slice(at + 1).indexOf("\nfunction ");
+    const body = (rel > 0 ? html.slice(at, at + 1 + rel) : html.slice(at, at + 4000))
+      .replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    if (!body.includes("toISOString")) continue;
+    // setUTCDate and friends are the correct forms and must not match.
+    if (/\.(setDate|setMonth|setFullYear|setHours)\(/.test(body)) bad.push(n);
+  }
+  assert.deepEqual(bad, [], "these build an ISO date from a locally-mutated Date, which moves it a day across a clock change: " + bad.join(", "));
+});
+
+test("there is one definition of when a week starts", () => {
+  const html = page();
+  const at = html.indexOf("function reviewWeekStartIso(");
+  assert.ok(at > 0, "reviewWeekStartIso is missing");
+  const src = html.slice(at, at + 220).replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  // ⚠️ It used to carry its own copy of the sum, in local time, and therefore kept the fault after
+  // logWeekStartIso was fixed. Two definitions of a week boundary is one too many.
+  assert.ok(/logWeekStartIso\(\)/.test(src), "reviewWeekStartIso must delegate rather than repeat the calculation");
+  assert.ok(!/getDay\(\)/.test(src), "it must not compute the day of week itself");
+});
+
 test("the trend chart's y axis starts at zero", () => {
   const src = fnOf("logTrendSvg");
   // ⚠️ Auto-scaling to the data's own minimum turns a steady 20–22 km month into a mountain range,

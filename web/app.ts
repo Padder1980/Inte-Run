@@ -13404,16 +13404,36 @@ function startSession(sess, opts) {
 // True while a session is under way (started, not yet finished) — the app locks onto the live
 // screen during this window so a stray tap can't abandon the run.
 function liveRunning() { return !!(LIVE && LIVE.started && !LIVE.done); }
-// Announce a fresh whole-kilometre split (spoken + logged) as the runner crosses it.
-function checkSplits() {
+/**
+ * Announce a fresh whole-kilometre split (spoken + logged) as the runner crosses it.
+ *
+ * ⚠️ atMs IS THE MOMENT THE BOUNDARY WAS ACTUALLY CROSSED, WHICH IS NOT ALWAYS NOW. While the phone
+ * is in a pocket iOS suspends the web view and CoreLocation's fixes pile up, arriving in a batch the
+ * moment the runner looks at the screen. Called with no argument this used to stamp the whole backlog
+ * with the replay time — so ten quiet minutes collapsed into one instant, which is the data Strava
+ * builds its pace and splits from. onGpsPos now passes each fix's own elapsed time.
+ */
+function checkSplits(atMs) {
   if (!LIVE || LIVE.mode == null) return;
   const km = Math.floor(LIVE.dist / 1000);
   if (km <= LIVE.kmDone) return;
+  const now = (typeof atMs === "number" && isFinite(atMs)) ? Math.max(LIVE.lastKmMs, atMs) : liveNowMs();
+  // ⚠️ A REPLAYED BATCH CAN CROSS SEVERAL KILOMETRES AT ONCE, and this used to record ONE split for
+  // the jump and skip the rest — so a runner's splits table simply lost kilometres 4, 5 and 6, with
+  // kilometre 7 carrying the whole stretch as its time. Every boundary is now recorded.
+  //
+  // ⚠️ AND THE INTERMEDIATE ONES ARE MARKED est. Dividing the elapsed evenly across them is an
+  // estimate, not a measurement — this project's own rule is never to fabricate the missing half —
+  // so they are flagged, and runAnalysis must not judge a runner against a number it invented.
+  // In practice onGpsPos calls this per credited fix, so a multi-kilometre jump only happens when a
+  // single fix crosses more than one boundary, which needs a gap of several minutes.
+  const crossed = km - LIVE.kmDone;
+  const each = (now - LIVE.lastKmMs) / 1000 / crossed;
+  for (let k = LIVE.kmDone + 1; k < km; k++) LIVE.splits.push({ km: k, sec: each, est: true });
+  const splitSec = each;
   LIVE.kmDone = km;
-  const now = liveNowMs();
-  const splitSec = (now - LIVE.lastKmMs) / 1000;
   LIVE.lastKmMs = now;
-  LIVE.splits.push({ km, sec: splitSec });
+  LIVE.splits.push(crossed > 1 ? { km: km, sec: each, est: true } : { km: km, sec: splitSec });
   // The coach speaks a milestone line (routed from this split cue); the exact split time stays in the
   // on-screen log and overview, so the audio stays concise rather than reading numbers aloud each km.
   liveCue({ kind: "split", atMs: now, message: km + " km · " + fmtPace(splitSec) + " /km split" });
@@ -13432,6 +13452,27 @@ function liveElapsedMs() {
 }
 // The runtime clock: virtual for the simulator, wall-clock for a real GPS run.
 function liveNowMs() { return LIVE.mode === "sim" ? LIVE.vms : liveElapsedMs(); }
+/**
+ * How far into the run a GPS fix actually happened, in ms — not when it was handed to us.
+ *
+ * ⚠️ DERIVED BY SUBTRACTING THE FIX'S AGE FROM THE CURRENT ELAPSED, rather than from LIVE.startMs
+ * directly, so it inherits liveElapsedMs's pause handling for free: a runner who stops at a crossing
+ * still gets no straight line through the junction. A live fix has an age of about zero and comes out
+ * exactly where it always did, so nothing changes for the ordinary case.
+ *
+ * ⚠️ MONOTONE, because a route whose times go backwards is worse than one with them bunched: it makes
+ * a negative split out of nothing, and Strava would read the reversal as a pause.
+ */
+function gpsFixElapsedMs(pos) {
+  const nowMs = Math.max(0, liveElapsedMs());
+  const ts = pos && pos.timestamp;
+  if (typeof ts !== "number" || !isFinite(ts)) return nowMs;
+  const ageMs = Date.now() - ts;
+  if (!(ageMs > 1500)) return nowMs;   // live delivery — the age is delivery jitter, not a backlog
+  const at = Math.max(0, nowMs - ageMs);
+  const lastT = (LIVE.route && LIVE.route.length) ? LIVE.route[LIVE.route.length - 1].t * 1000 : 0;
+  return Math.max(at, lastT);
+}
 // Keep the screen awake during a run where the platform supports it.
 function requestWakeLock() {
   try { if (navigator.wakeLock && navigator.wakeLock.request) navigator.wakeLock.request("screen").then((w) => { if (LIVE) LIVE.wakeLock = w; }).catch(() => {}); } catch (e) {}
@@ -13640,6 +13681,10 @@ function pedoFillGap() {
   p.credited += walked;
   p.mark = p.metres;
   p.markAt = Date.now();
+  // ⚠️ A GAP FILL CAN CROSS A KILOMETRE, AND FORGETTING THIS LOST THE SPLIT ENTIRELY. This is the one
+  // path that adds distance without a GPS fix behind it, so nothing else here would have noticed the
+  // boundary — the runner would simply never see that kilometre in their splits. Found by a test.
+  checkSplits();
 }
 function onGpsPos(pos) {
   if (!LIVE || LIVE.mode !== "gps") return;
@@ -13661,16 +13706,20 @@ function onGpsPos(pos) {
   D.seen++;
   if (acc != null && acc > D.maxAcc) D.maxAcc = Math.round(acc);
   if (!good) { D.badAcc++; return; }
-  // ⚠️ A FIX CAN BE OLD, AND NOTHING USED TO LOOK. Both iOS and the browser hand back a REMEMBERED
-  // position when tracking starts — sometimes minutes stale and a long way away — which anchors a run
-  // to where the runner was earlier and credits the jump back as their first distance. The shim
-  // ignores the maximumAge we ask for, so this is the only place the age is ever checked.
-  if (typeof pos.timestamp === "number" && isFinite(pos.timestamp)) {
-    const age = Date.now() - pos.timestamp;
-    if (age > 30000) { D.stale++; return; }
-  }
   if (LIVE.rt.getStatus() !== "active") { LIVE.anchorLat = c.latitude; LIVE.anchorLon = c.longitude; return; }
-  if (LIVE.anchorLat == null) { LIVE.anchorLat = c.latitude; LIVE.anchorLon = c.longitude; D.still++; return; }
+  // ⚠️ THE STALE GATE APPLIES ONLY WHILE THERE IS NO ANCHOR, AND SCOPING IT COST A REGRESSION TO FIND.
+  // Both iOS and the browser hand back a REMEMBERED position when tracking starts — minutes old and
+  // possibly a long way away — and seeding the anchor from it credits the journey back as the runner's
+  // first distance. That is a START problem.
+  //
+  // Applied to EVERY fix, as it first was, it also rejected the whole replayed backlog: iOS suspends
+  // the web view while the phone is pocketed, so those fixes are legitimately minutes old by the time
+  // JS sees them, and a pocketed run would have recorded nothing at all. Two of this pass's own fixes
+  // fighting each other; a test found it, reading the code did not.
+  if (LIVE.anchorLat == null) {
+    if (typeof pos.timestamp === "number" && isFinite(pos.timestamp) && Date.now() - pos.timestamp > 30000) { D.stale++; return; }
+    LIVE.anchorLat = c.latitude; LIVE.anchorLon = c.longitude; D.still++; return;
+  }
   // Displacement from the last point we credited — the leash.
   const net = haversine(LIVE.anchorLat, LIVE.anchorLon, c.latitude, c.longitude);
   // acc is a believable number by here — the gate above returned on anything else. Reading c.accuracy
@@ -13698,7 +13747,19 @@ function onGpsPos(pos) {
   // \u26a0\ufe0f liveElapsedMs(), NOT Date.now() minus a start -- it already subtracts paused time, so a
   // runner who stops at a crossing does not get a straight line through the junction at walking pace.
   // "LIVE.startedMs" does not exist; the field is LIVE.startMs and using it raw would count pauses.
-  LIVE.route.push({ lat: c.latitude, lng: c.longitude, t: Math.max(0, Math.round(liveElapsedMs() / 1000)) });
+  //
+  // ⚠️ AND IT IS THE FIX'S OWN CLOCK, NOT THE MOMENT IT WAS PROCESSED. iOS suspends the web view while
+  // the phone is pocketed, so fixes pile up and arrive in a batch when the runner next looks — and
+  // stamping them on arrival gave every point in that batch the SAME time. Ten quiet minutes collapsed
+  // into one instant, in exactly the field Strava reads to work out pace, moving time and splits.
+  // The whole point of storing a time per point was to avoid a fabricated even run; a collapsed batch
+  // is the same lie by a different route.
+  const fixMs = gpsFixElapsedMs(pos);
+  LIVE.route.push({ lat: c.latitude, lng: c.longitude, t: Math.max(0, Math.round(fixMs / 1000)) });
+  // ⚠️ CHECKED PER CREDITED FIX, NOT ONLY ON THE UI TICK. During a replay the tick runs once for the
+  // whole backlog, so a batch spanning two kilometres recorded ONE split and silently dropped the
+  // other. Here each fix crosses its own boundary, at its own time.
+  checkSplits(fixMs);
   LIVE.anchorLat = c.latitude; LIVE.anchorLon = c.longitude;
   LIVE.lastLat = c.latitude; LIVE.lastLon = c.longitude;
   // Accumulate elevation gain from the device's altitude, when it reports one (often it doesn't).
@@ -13910,19 +13971,27 @@ function runAnalysis(run) {
   // MOST of the kilometre must sit inside the prescribed stretch. A half-kilometre tolerance either
   // side let the kilometre that STRADDLES the warm-up boundary be scored, and that one genuinely
   // mixes two paces — it was the single most common false verdict left after the window went in.
-  const judged = (km) => {
+  const judged = (s) => {
+    // ⚠️ AN ESTIMATED SPLIT IS NEVER JUDGED. When the phone is pocketed and a replayed batch crosses
+    // more than one kilometre boundary at once, the intervening splits are the elapsed stretch divided
+    // evenly — an estimate, not a measurement, and flagged est at the point it is made. Scoring a
+    // runner "14s fast" against a number the app invented is exactly the false verdict this window
+    // already exists to prevent. "none" renders as an unjudged row.
+    if (s.est) return false;
     if (!win) return true;
-    const ov = Math.min(km * 1000, win.e) - Math.max((km - 1) * 1000, win.s);
+    const ov = Math.min(s.km * 1000, win.e) - Math.max((s.km - 1) * 1000, win.s);
     return ov >= 500;
   };
   const rows = splits.map((s) => {
     let verdict = "none", delta = 0;
-    if (band && judged(s.km)) {
+    if (band && judged(s)) {
       if (s.sec < band.minSecPerKm) { verdict = "fast"; delta = s.sec - band.minSecPerKm; }
       else if (s.sec > band.maxSecPerKm) { verdict = "slow"; delta = s.sec - band.maxSecPerKm; }
       else verdict = "in";
     }
-    return { km: s.km, sec: s.sec, verdict: verdict, delta: delta, judged: !!(band && judged(s.km)) };
+    // ⚠️ judged(s), NOT judged(s.km) — the second argument shape changed when estimated splits were
+    // added, and a number has no .est, so every estimated split would have reported itself judged.
+    return { km: s.km, sec: s.sec, verdict: verdict, delta: delta, judged: !!(band && judged(s)), est: !!s.est };
   });
   const secs = rows.map((r) => r.sec);
   const n = secs.length;
@@ -14008,7 +14077,12 @@ function splitsVsTargetHtml(a) {
   const rows = a.rows.map((r) => {
     const w = 30 + 70 * (a.slowest === a.fastest ? 1 : (a.slowest - r.sec) / ((a.slowest - a.fastest) || 1));
     const cls = r.verdict === "in" ? "in" : r.verdict === "none" ? "" : "out";
-    const tag = r.verdict === "in" ? "on target"
+    // ⚠️ AN ESTIMATED SPLIT SAYS SO. Its time is the elapsed stretch divided evenly across kilometres
+    // the phone slept through, so the number is real arithmetic on a real total but it is not a
+    // measurement of that kilometre. Printing it bare, in a column of measured ones, is the quiet
+    // fabrication this project refuses everywhere else.
+    const tag = r.est ? "estimated"
+      : r.verdict === "in" ? "on target"
       : r.verdict === "fast" ? Math.abs(r.delta) + "s fast"
       : r.verdict === "slow" ? r.delta + "s slow" : "";
     return '<div class="sv-row"><span class="sv-k">' + r.km + '</span>' +

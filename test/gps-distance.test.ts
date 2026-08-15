@@ -61,9 +61,9 @@ type Opts = {
  * one millisecond and the 20-second window can never open.
  */
 function run(o: Opts) {
-  const src = lift(["haversine", "onGpsPos"]);
+  const src = lift(["haversine", "onGpsPos", "gpsFixElapsedMs", "checkSplits"]);
   const LIVE: any = {
-    mode: "gps", dist: 0, route: [], elevGain: 0,
+    mode: "gps", dist: 0, route: [], elevGain: 0, splits: [], kmDone: 0, lastKmMs: 0,
     lastLat: null, lastLon: null, lastAlt: null, devSpeed: null, acc: null,
     rt: { getStatus: () => "active" },
   };
@@ -73,7 +73,11 @@ function run(o: Opts) {
   // same clock the app uses. liveElapsedMs subtracts paused time; this fake mirrors that with no
   // pauses, which is what these fixtures replay.
   const liveElapsedMs = () => FakeDate.now() - (LIVE.startMs || 0) - (LIVE.pausedMs || 0);
-  const onGpsPos = new Function("LIVE", "Date", "liveElapsedMs", src + "; return onGpsPos;")(LIVE, FakeDate, liveElapsedMs);
+  const liveNowMs = () => liveElapsedMs();
+  const liveCue = () => {};
+  const fmtPace = (x: number) => String(Math.round(x));
+  const onGpsPos = new Function("LIVE", "Date", "liveElapsedMs", "liveNowMs", "liveCue", "fmtPace",
+    src + "; return onGpsPos;")(LIVE, FakeDate, liveElapsedMs, liveNowMs, liveCue, fmtPace);
   const M_PER_DEG = 111320;
   let travelled = 0;
   for (let i = 0; i < o.seconds; i++) {
@@ -168,16 +172,20 @@ test("distance is gated on DISPLACEMENT, never on the speed the device claims", 
  * where the runner was earlier and credit the journey back as their first distance.
  */
 function feed(fixes: any[]) {
-  const src = lift(["haversine", "onGpsPos"]);
+  const src = lift(["haversine", "onGpsPos", "gpsFixElapsedMs", "checkSplits"]);
   const LIVE: any = {
-    mode: "gps", dist: 0, route: [], elevGain: 0,
+    mode: "gps", dist: 0, route: [], elevGain: 0, splits: [], kmDone: 0, lastKmMs: 0,
     lastLat: null, lastLon: null, lastAlt: null, devSpeed: null, acc: null,
     rt: { getStatus: () => "active" },
   };
   let clock = 1_760_000_000_000;
   const FakeDate = { now: () => clock };
   const liveElapsedMs = () => FakeDate.now() - (LIVE.startMs || 0) - (LIVE.pausedMs || 0);
-  const onGpsPos = new Function("LIVE", "Date", "liveElapsedMs", src + "; return onGpsPos;")(LIVE, FakeDate, liveElapsedMs);
+  const liveNowMs = () => liveElapsedMs();
+  const liveCue = () => {};
+  const fmtPace = (x: number) => String(Math.round(x));
+  const onGpsPos = new Function("LIVE", "Date", "liveElapsedMs", "liveNowMs", "liveCue", "fmtPace",
+    src + "; return onGpsPos;")(LIVE, FakeDate, liveElapsedMs, liveNowMs, liveCue, fmtPace);
   for (const f of fixes) { clock += 1000; onGpsPos(f); }
   return { metres: LIVE.dist, points: LIVE.route.length, diag: LIVE.gpsDiag, acc: LIVE.acc, now: clock };
 }
@@ -204,17 +212,30 @@ test("a fix with no usable accuracy credits nothing and never moves the anchor",
   assert.equal(r.acc, 8, "an invalid reading must not overwrite the accuracy shown to the runner");
 });
 
-test("a remembered fix from before the run is refused", () => {
+test("a remembered fix cannot seed the run, and cannot credit distance", () => {
   const M = 111320;
   const now = 1_760_000_001_000;
-  const r = feed([
+  // ⚠️ THE GATE IS SCOPED TO SEEDING, and that scoping is deliberate — applied to every fix it also
+  // threw away the replayed backlog from a pocketed phone, which is legitimately minutes old.
+  // Case one: the very first fix is iOS's remembered position. It must not become the anchor.
+  const seed = feed([
+    at(53.48 + 500 / M, { timestamp: now - 600_000 }),   // 10 minutes old, half a km away
     at(53.48, { timestamp: now }),
-    // iOS's cached position: 10 minutes old, half a kilometre away.
-    at(53.48 + 500 / M, { timestamp: now - 600_000 }),
-    at(53.48 + 20 / M, { timestamp: now + 4000 }),
+    at(53.48 + 20 / M, { timestamp: now + 1000 }),
   ]);
-  assert.ok(r.metres > 15 && r.metres < 30, "a stale fix was credited: " + Math.round(r.metres) + " m");
-  assert.equal(r.diag.stale, 1, "the stale fix must be counted");
+  assert.equal(seed.diag.stale, 1, "the remembered fix was allowed to seed the anchor");
+  assert.ok(seed.metres > 15 && seed.metres < 30,
+    "the run should have started from the real position: " + Math.round(seed.metres) + " m");
+
+  // Case two: a remembered fix arrives MID-run. It is no longer age-gated, so the spike rule has to
+  // hold the line — and it must credit nothing, which is the guarantee that actually matters.
+  const mid = feed([
+    at(53.48, { timestamp: now }),
+    at(53.48 + 20 / M, { timestamp: now + 1000 }),
+    at(53.48 + 500 / M, { timestamp: now - 600_000 }),   // the ghost
+  ]);
+  assert.ok(mid.metres < 30, "a remembered fix credited phantom distance: " + Math.round(mid.metres) + " m");
+  assert.ok(mid.diag.spike >= 1, "the spike rule did not catch the ghost");
 });
 
 test("a fix with no timestamp is still accepted — the browser is not required to send one", () => {
@@ -287,9 +308,9 @@ test("the watch reads the fused HealthKit distance rather than only its own GPS 
  * a genuine gap once, and it refuses a reading no runner could produce.
  */
 function pedoHarness() {
-  const src = lift(["haversine", "onGpsPos", "pedoFillGap"]);
+  const src = lift(["haversine", "onGpsPos", "pedoFillGap", "gpsFixElapsedMs", "checkSplits"]);
   const LIVE: any = {
-    mode: "gps", dist: 0, route: [], elevGain: 0, lastFixAt: null,
+    mode: "gps", dist: 0, route: [], elevGain: 0, splits: [], kmDone: 0, lastKmMs: 0, lastFixAt: null,
     lastLat: null, lastLon: null, lastAlt: null, devSpeed: null, acc: null,
     pedo: { metres: 0, steps: 0, credited: 0, capped: 0 },
     rt: { getStatus: () => "active" },
@@ -297,8 +318,11 @@ function pedoHarness() {
   let clock = 1_760_000_000_000;
   const FakeDate = { now: () => clock };
   const liveElapsedMs = () => FakeDate.now() - (LIVE.startMs || 0) - (LIVE.pausedMs || 0);
-  const fns = new Function("LIVE", "Date", "liveElapsedMs",
-    src + "; return { onGpsPos: onGpsPos, pedoFillGap: pedoFillGap };")(LIVE, FakeDate, liveElapsedMs);
+  const liveNowMs = () => liveElapsedMs();
+  const liveCue = () => {};
+  const fmtPace = (x: number) => String(Math.round(x));
+  const fns = new Function("LIVE", "Date", "liveElapsedMs", "liveNowMs", "liveCue", "fmtPace",
+    src + "; return { onGpsPos: onGpsPos, pedoFillGap: pedoFillGap };")(LIVE, FakeDate, liveElapsedMs, liveNowMs, liveCue, fmtPace);
   const M = 111320;
   return {
     LIVE,
@@ -373,4 +397,119 @@ test("the native side declares why it wants motion data", () => {
   assert.match(swift, /isStepCountingAvailable/, "hardware availability is not checked");
   // distance is an OPTIONAL on CMPedometerData; treating a missing one as zero says "stopped moving".
   assert.match(swift, /data\.distance\?\.doubleValue/, "the optional distance is not handled safely");
+});
+
+/**
+ * ⚠️ FAULT FIVE FROM THE AUDIT: A REPLAYED BATCH COLLAPSED IN TIME.
+ *
+ * iOS suspends the web view while the phone is in a pocket, so CoreLocation's fixes pile up and arrive
+ * together the moment the runner looks at the screen. Route points were stamped with the elapsed time
+ * AT THAT MOMENT, so every point in the batch got the same one — ten quiet minutes became an instant,
+ * in exactly the field Strava reads to derive pace, moving time and splits.
+ *
+ * Splits were worse: they were only checked on the UI tick, which runs once for the whole backlog, so
+ * a batch crossing two kilometre boundaries recorded ONE split and silently dropped the other.
+ */
+function replayHarness() {
+  const src = lift(["haversine", "onGpsPos", "gpsFixElapsedMs", "checkSplits"]);
+  const LIVE: any = {
+    mode: "gps", dist: 0, route: [], elevGain: 0, splits: [], kmDone: 0, lastKmMs: 0,
+    startMs: 0, pausedMs: 0, lastLat: null, lastLon: null, lastAlt: null, devSpeed: null, acc: null,
+    rt: { getStatus: () => "active" },
+  };
+  let clock = 1_760_000_000_000;
+  LIVE.startMs = clock;
+  const FakeDate = { now: () => clock };
+  const liveElapsedMs = () => FakeDate.now() - LIVE.startMs - LIVE.pausedMs;
+  const liveNowMs = () => liveElapsedMs();
+  const liveCue = () => {};
+  const fmtPace = (x: number) => String(Math.round(x));
+  const onGpsPos = new Function("LIVE", "Date", "liveElapsedMs", "liveNowMs", "liveCue", "fmtPace",
+    src + "; return onGpsPos;")(LIVE, FakeDate, liveElapsedMs, liveNowMs, liveCue, fmtPace);
+  const M = 111320;
+  return {
+    LIVE,
+    tick: (ms: number) => { clock += ms; },
+    /** A fix that HAPPENED `agoMs` ago and is only being delivered now — a replayed backlog. */
+    fix: (metresNorth: number, agoMs = 0) => onGpsPos({
+      coords: { latitude: 53.48 + metresNorth / M, longitude: -2.24, accuracy: 8, speed: 3, altitude: null },
+      timestamp: clock - agoMs,
+    }),
+  };
+}
+
+test("a replayed backlog keeps each point's own time instead of collapsing to one", () => {
+  const h = replayHarness();
+  h.tick(1000); h.fix(0);
+  // The phone goes in a pocket for five minutes. The fixes happened 300s, 200s and 100s ago; all
+  // three are handed over at once, now.
+  h.tick(300000);
+  h.fix(150, 300000); h.fix(300, 200000); h.fix(450, 100000);
+  const times = h.LIVE.route.map((p: any) => p.t);
+  assert.equal(new Set(times).size, times.length,
+    "every point in the batch got the same time — the run collapsed to an instant: " + JSON.stringify(times));
+  // ⚠️ And they must be in order. A route whose times go backwards invents a negative split, and
+  // Strava reads the reversal as a pause.
+  for (let i = 1; i < times.length; i++) {
+    assert.ok(times[i] >= times[i - 1], "route times went backwards: " + JSON.stringify(times));
+  }
+  // The oldest replayed fix should sit far earlier than the newest, not beside it.
+  // Three fixes that happened 300s, 200s and 100s before delivery must span ~200s, not 0.
+  assert.ok(times[times.length - 1] - times[0] > 150,
+    "the batch spans only " + (times[times.length - 1] - times[0]) + "s of a five-minute stretch");
+});
+
+test("a live fix is unaffected — its time is where it always was", () => {
+  const h = replayHarness();
+  h.tick(1000); h.fix(0);
+  h.tick(1000); h.fix(20);
+  h.tick(1000); h.fix(40);
+  const times = h.LIVE.route.map((p: any) => p.t);
+  // ⚠️ Guards the fix against overreach: the ordinary case must not move. Delivery jitter of a second
+  // or so is not a backlog, and treating it as one would drift every point on every normal run.
+  // ⚠️ The FIRST fix seeds the anchor and creates no point; only credited ones do.
+  assert.deepEqual(times, [2, 3], "a live run's point times changed: " + JSON.stringify(times));
+});
+
+test("a stretch that crosses two kilometres at once records both, and marks them estimated", () => {
+  // ⚠️ A single credited GPS fix can never do this — the 200 m spike gate forbids it. The path that
+  // genuinely can is the pedometer filling a long blackout, which adds the whole stretch in one go.
+  const src = lift(["haversine", "onGpsPos", "pedoFillGap", "gpsFixElapsedMs", "checkSplits"]);
+  const LIVE: any = {
+    mode: "gps", dist: 900, route: [], elevGain: 0, splits: [], kmDone: 0, lastKmMs: 0,
+    startMs: 0, pausedMs: 0, lastFixAt: null,
+    pedo: { metres: 900, steps: 0, credited: 0, capped: 0, mark: 900, markAt: 0 },
+    rt: { getStatus: () => "active" },
+  };
+  let clock = 1_760_000_000_000;
+  LIVE.startMs = clock; LIVE.pedo.markAt = clock; LIVE.lastFixAt = clock;
+  const FakeDate = { now: () => clock };
+  const liveElapsedMs = () => FakeDate.now() - LIVE.startMs - LIVE.pausedMs;
+  const liveNowMs = () => liveElapsedMs();
+  const liveCue = () => {};
+  const fmtPace = (x: number) => String(Math.round(x));
+  const fns = new Function("LIVE", "Date", "liveElapsedMs", "liveNowMs", "liveCue", "fmtPace",
+    src + "; return { pedoFillGap: pedoFillGap };")(LIVE, FakeDate, liveElapsedMs, liveNowMs, liveCue, fmtPace);
+
+  // Six minutes in a tunnel; the pedometer records 1200 m, carrying the run from 0.9 km past 2 km.
+  clock += 360000;
+  LIVE.pedo.metres = 2100;
+  fns.pedoFillGap();
+
+  const kms = LIVE.splits.map((s: any) => s.km);
+  assert.deepEqual(kms, [1, 2], "kilometres were skipped when a gap fill crossed them: " + JSON.stringify(kms));
+  // ⚠️ Both are estimates — the elapsed stretch divided evenly — and must say so, because runAnalysis
+  // would otherwise score the runner against a number the app invented.
+  assert.ok(LIVE.splits.every((s: any) => s.est), "a split the app estimated is not flagged");
+});
+
+test("an estimated split is never judged against the target band", () => {
+  const html = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
+  const at = html.indexOf("const judged = (s) =>");
+  assert.ok(at > 0, "runAnalysis no longer gates judging on the split itself");
+  const src = html.slice(at, at + 1200).replace(/^\s*\/\/.*$/gm, "");
+  assert.match(src, /if \(s\.est\) return false/, "an estimated split is being scored as if measured");
+  // ⚠️ And the runner is told. Printing an invented time bare, in a column of measured ones, is the
+  // quiet fabrication this project refuses everywhere else.
+  assert.match(html, /r\.est \? "estimated"/, "an estimated split is not labelled in the splits table");
 });

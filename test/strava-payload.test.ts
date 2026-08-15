@@ -124,10 +124,22 @@ test("⚠️ the start time is taken from the run, never from now", () => {
 
 test("⚠️ route points are timed at source, and the time survives ingest", () => {
   const html = page();
-  // ⚠️ Recorded with liveElapsedMs, which subtracts paused time — Date.now() minus a start would put
-  // a straight line through the junction a runner waited at, at walking pace.
-  assert.match(html, /LIVE\.route\.push\(\{ lat: c\.latitude, lng: c\.longitude, t: Math\.max\(0, Math\.round\(liveElapsedMs\(\) \/ 1000\)\) \}\)/,
+  // ⚠️ Recorded through gpsFixElapsedMs, which subtracts paused time (it derives from liveElapsedMs)
+  // AND uses the fix's own clock rather than the moment it was processed. Date.now() minus a start
+  // would put a straight line through the junction a runner waited at, at walking pace.
+  assert.match(html, /LIVE\.route\.push\(\{ lat: c\.latitude, lng: c\.longitude, t: Math\.max\(0, Math\.round\(fixMs \/ 1000\)\) \}\)/,
     "GPS points are not stamped with the elapsed time");
+  // ⚠️ AND THE STAMP IS THE FIX'S OWN, NOT THE MOMENT IT ARRIVED. iOS suspends the web view while the
+  // phone is pocketed, so fixes pile up and land in a batch — stamping on arrival gave every point in
+  // that batch the SAME time, collapsing ten quiet minutes into one instant. That is precisely the
+  // field Strava reads to derive pace, moving time and splits, so the collapse is the same fabricated
+  // even run this test exists to prevent, arriving by a different route.
+  const gf = html.indexOf("function gpsFixElapsedMs(");
+  assert.ok(gf > 0, "the fix's own clock is no longer used for route points");
+  const src = html.slice(gf, html.indexOf("\nfunction ", gf + 10)).replace(/^\s*\/\/.*$/gm, "");
+  assert.match(src, /pos\.timestamp/, "the fix's timestamp is not read");
+  assert.match(src, /liveElapsedMs\(\)/, "paused time is no longer subtracted");
+  assert.match(src, /Math\.max\(at, lastT\)/, "route times must be monotone — a reversal reads as a pause to Strava");
   // ⚠️ normalizeRoute runs on every ingest, so an unknown field is stripped there unless carried
   // deliberately — and the loss would only show up as an upload with no pace in it.
   const at = html.indexOf("function normalizeRoute(");

@@ -2969,21 +2969,22 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .lt-xl { text-anchor: middle; }
 .lw-more { width: 100%; margin-top: var(--s2); padding: 11px; border-radius: var(--r-pill);
   border: 1px solid var(--line); background: transparent; color: var(--ink); font-size: var(--t-meta); font-weight: 700; }
-.lb-tiles { display: flex; gap: var(--s2); margin-top: var(--s2); }
-.lb-tile { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: var(--s3);
-  text-align: left; align-items: stretch; }
-.lb-th { display: flex; align-items: center; justify-content: space-between; font-size: var(--t-card);
+.lb-one { display: flex; flex-direction: column; gap: var(--s2); padding: var(--s3); margin-top: var(--s2);
+  text-align: left; align-items: stretch; width: 100%; }
+.lb-oh { display: flex; align-items: center; justify-content: space-between; font-size: var(--t-card);
   font-weight: 800; color: var(--ink); }
-.lb-flame { display: flex; align-items: center; justify-content: center; position: relative; margin: 4px 0; }
-.lb-flame svg { width: 54px; height: 54px; color: var(--ink-faint); }
-.lb-fn { position: absolute; font-size: var(--t-card); font-weight: 800; color: var(--surface); }
-.lb-tf { font-size: var(--t-meta); font-weight: 700; color: var(--ink-soft); text-align: center; }
-.tl-mini { display: flex; flex-direction: column; gap: 5px; margin-top: 2px; }
+.lb-orow { display: flex; align-items: center; gap: var(--s3); }
+.lb-flame { display: flex; align-items: center; justify-content: center; position: relative; flex: none; }
+.lb-flame svg { width: 44px; height: 44px; color: var(--ink-faint); }
+.lb-fn { position: absolute; font-size: var(--t-meta); font-weight: 800; color: var(--surface); }
+.lb-ostreak { font-size: var(--t-label); color: var(--ink-faint); line-height: 1.3; flex: none; }
+.lb-ostreak b { color: var(--ink); font-size: var(--t-meta); }
+.tl-mini { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0; }
 .tl-lab { display: flex; justify-content: space-between; font-size: var(--t-label); color: var(--ink-faint); }
 .tl-lab b { color: var(--ink); }
-.tl-week { display: flex; justify-content: space-between; }
+.tl-week { display: flex; justify-content: space-between; align-items: center; }
 .tl-d { width: 6px; height: 6px; border-radius: var(--r-pill); background: var(--ink-faint); opacity: .45; }
-.tl-d.on { background: var(--build); opacity: 1; width: 10px; height: 10px; margin: -2px 0; }
+.tl-d.on { opacity: 1; width: 10px; height: 10px; }
 .tl-d.fut { opacity: .18; }
 .pg-card { padding: var(--s3); }
 .pg-cl { font-size: var(--t-meta); color: var(--ink-soft); }
@@ -3012,6 +3013,19 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .sc-c.on svg { width: 15px; height: 15px; }
 .sc-c.now { box-shadow: inset 0 0 0 1.5px var(--accent); }
 .sc-c.fut { opacity: .35; }
+.sc-hm { display: flex; flex-direction: column; align-items: center; line-height: 1.25; }
+.sc-hm b { font-size: var(--t-meta); font-weight: 600; color: var(--ink-faint); }
+/* A day that was run: tinted in its kind's colour, with the kind's own icon and the date kept. */
+.sc-c.ran { background: color-mix(in srgb, var(--rk) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rk) 45%, transparent); color: var(--ink);
+  flex-direction: column; gap: 0; border: 0; padding: 0; }
+.sc-c.ran .sc-n { font-size: var(--t-label); font-weight: 700; line-height: 1; }
+.sc-c.ran svg { width: 15px; height: 15px; color: var(--rk); }
+.sc-c.ran.old { opacity: .55; cursor: default; }
+.sc-legend { display: flex; gap: var(--s3); flex-wrap: wrap; margin-top: var(--s3);
+  padding-top: var(--s2); border-top: 1px solid var(--line); font-size: var(--t-label); color: var(--ink-soft); }
+.sc-lg { display: flex; align-items: center; gap: 6px; }
+.sc-lg i { width: 8px; height: 8px; border-radius: var(--r-pill); display: block; }
 .tg-card { padding: var(--s2) var(--s3); }
 .tg-row { padding: var(--s2) 0; border-bottom: 1px solid var(--line); }
 .tg-row:last-child { border-bottom: 0; }
@@ -7897,101 +7911,110 @@ function progressView() {
     '</div>' + short;
 }
 /**
- * THE STREAK CALENDAR — one month of active days.
+ * THE TRAINING LOG — one month at a time, with what KIND of run each day was, then the weeks below.
  *
- * ⚠️ IT REFUSES TO PAGE BACK BEFORE THE FIRST RECORDED RUN. Scrolled past that, every day draws blank
- * and a blank day means "you rested" — so the calendar would be inventing rest days out of an absence
- * of records. That was the specific reason a scrolling calendar was blocked before the history store,
- * and the guard has to stay even now that the store is uncapped.
- */
-function streakCalendarView() {
-  const cur = state.streakMon || todayIso().slice(0, 7);
-  const y = Number(cur.slice(0, 4)), m = Number(cur.slice(5, 7));
-  const first = cur + "-01";
-  const dim = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  const lead = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7;
-  const ran = new Set((state.hist || []).filter((r) => r && r.d && r.d.slice(0, 7) === cur).map((r) => r.d));
-  const oldest = (state.hist || []).length ? state.hist[state.hist.length - 1].d : todayIso();
-  const canBack = first > oldest;
-  const canFwd = cur < todayIso().slice(0, 7);
-  const MON_FULL = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-  let cells = "";
-  for (let i = 0; i < lead; i++) cells += '<span class="sc-c sc-pad"></span>';
-  for (let d = 1; d <= dim; d++) {
-    const iso = cur + "-" + String(d).padStart(2, "0");
-    const on = ran.has(iso), today = iso === todayIso(), future = iso > todayIso();
-    cells += '<span class="sc-c' + (on ? " on" : "") + (today ? " now" : "") + (future ? " fut" : "") + '">' +
-      (on ? ICON.rEasy : String(d)) + '</span>';
-  }
-  return '<button class="backbtn" id="scBack">‹ Logbook</button>' +
-    '<div class="card sc-card">' +
-      // ⚠️ SINGLE-QUOTED. Writing this as \" collapses to a bare " in the emitted JS and kills the
-      // whole page silently — the build still exits 0. This file's own rules say to prefer single
-      // quotes when the HTML carries double ones, and this is why.
-      '<div class="sc-h"><button class="sc-nav" id="scPrev"' + (canBack ? "" : ' disabled aria-disabled="true"') + '>‹</button>' +
-        '<span>' + MON_FULL[m - 1] + ' ' + y + '</span>' +
-        '<button class="sc-nav" id="scNext"' + (canFwd ? "" : ' disabled aria-disabled="true"') + '>›</button></div>' +
-      '<div class="sc-stats"><div class="lw-cell"><div class="lw-cl">Your streak</div><div class="lw-cv num">' +
-        logStreakWeeks() + ' <span class="lw-u">' + (logStreakWeeks() === 1 ? "week" : "weeks") + '</span></div></div>' +
-        '<div class="lw-cell"><div class="lw-cl">Runs this month</div><div class="lw-cv num">' + ran.size + '</div></div></div>' +
-      '<div class="sc-dow">' + ["M","T","W","T","F","S","S"].map((x) => '<span>' + x + '</span>').join("") + '</div>' +
-      '<div class="sc-grid">' + cells + '</div>' +
-    '</div>' +
-    (canBack ? "" : '<div class="pg-note">This is as far back as your records go.</div>');
-}
-/**
- * THE TRAINING LOG — a week per row, a dot per day, newest first.
+ * ⚠️ ONE DESTINATION, NOT TWO (owner, 2026-08-15). Streaks and the training log were separate screens
+ * answering the same question — "have I been running, and how?" — so the runner had to visit both to
+ * assemble one answer. The streak is now a stat on this page rather than a place to go.
  *
- * ⚠️ A DOT CARRIES data-runid, WHICH IS THE HANDLE. An index into state.logged is not: the array is
- * unshifted whenever a watch run arrives, and filtering breaks it a second way. wire() already binds
- * every [data-runid], so tapping a dot opens that exact run's card with no new plumbing.
- * ⚠️ A day with more than one run shows the FIRST by id — two runs on one day is one dot, and the
- * total on the right is the honest figure for the row.
+ * ⚠️ IT REFUSES TO PAGE BACK BEFORE THE FIRST RECORDED RUN. Past that every day draws blank, and a
+ * blank day on a calendar means "you rested" — so it would be inventing rest days out of an absence
+ * of records. That was the reason a scrolling calendar could not be built before the history store,
+ * and the guard stays now the store is uncapped, because the store still starts when the runner did.
  *
- * ⚠️ ONLY A RUN THAT STILL HAS ITS FULL RECORD IS A BUTTON. The history is uncapped but state.logged
- * is still 50, so on a real training year MOST dots describe a run whose map and splits are gone.
- * Measured on an eight-month fixture: 148 dots, 50 openable, and the other 98 all landed on
- * "Run not found." — a dead end two thirds of the time, for runs the same screen is showing a real
- * distance for. An unopenable day is a span with aria-disabled, never a button that does nothing,
- * which is the rule test/design-system.test.ts already enforces on session rows.
+ * ⚠️ CONSISTENCY HERE IS RUNS PER WEEK, WHICH IS NOT logConsistency(). That function answers "how
+ * much of this week's PLAN did you do" and belongs on a week. This is a plain rate over a month and
+ * needs no plan at all, so it still reads honestly for somebody running without one.
  */
 function trainingLogView() {
-  const weeks = logWeekBuckets(Math.max(8, Math.min(52, state.tlWeeks || 12))).slice().reverse();
+  const cur = state.streakMon || todayIso().slice(0, 7);
+  const y = Number(cur.slice(0, 4)), m = Number(cur.slice(5, 7));
+  const dim = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const lead = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7;
+  const mt = logTotals(cur + "-01", cur + "-" + String(dim).padStart(2, "0"));
   const byDay = Object.create(null);
   for (const r of (state.hist || [])) if (r && r.d && !byDay[r.d]) byDay[r.d] = r;
   const openable = new Set((state.logged || []).map((r) => r && r.id).filter(Boolean));
+  const oldest = (state.hist || []).length ? state.hist[state.hist.length - 1].d : todayIso();
+  const canBack = cur + "-01" > oldest.slice(0, 7) + "-01";
+  const canFwd = cur < todayIso().slice(0, 7);
+  const MON_FULL = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+  // Runs per week over the part of the month that has actually happened.
+  const lastDay = cur === todayIso().slice(0, 7) ? Number(todayIso().slice(8, 10)) : dim;
+  const perWeek = lastDay > 0 ? Math.round((mt.runs / (lastDay / 7)) * 10) / 10 : 0;
+
+  let cells = "";
+  for (let i = 0; i < lead; i++) cells += '<span class="sc-c sc-pad"></span>';
   let anyClosed = false;
+  for (let d = 1; d <= dim; d++) {
+    const iso = cur + "-" + String(d).padStart(2, "0");
+    const run = byDay[iso], today = iso === todayIso(), future = iso > todayIso();
+    const cls = "sc-c" + (today ? " now" : "") + (future ? " fut" : "");
+    if (!run) { cells += '<span class="' + cls + '">' + d + '</span>'; continue; }
+    const kind = runKind(run.t);
+    const label = esc(runDateLabelIso(iso)) + ", " + (Math.round(run.k * 10) / 10) + " km, " + kind.lab;
+    const inner = '<b class="sc-n">' + d + '</b>' + ICON[kind.ic];
+    if (openable.has(run.i)) {
+      cells += '<button class="' + cls + ' ran" data-runid="' + esc(run.i) + '" style="--rk:' + kind.c + '" aria-label="' + label + '">' + inner + '</button>';
+    } else {
+      // ⚠️ Shown, but not a button. Its distance is true; its map and splits aged out of the 50-run
+      // store, and a tap would land on "Run not found."
+      anyClosed = true;
+      cells += '<span class="' + cls + ' ran old" style="--rk:' + kind.c + '" aria-disabled="true" title="' + label + ' — details no longer stored">' + inner + '</span>';
+    }
+  }
+
+  const weeks = logWeekBuckets(Math.max(8, Math.min(52, state.tlWeeks || 12))).slice().reverse();
   const rows = weeks.map((w) => {
-    let cells = "";
+    let wc = "";
     for (let d = 0; d < 7; d++) {
       const iso = isoAdd(w.start, d).toISOString().slice(0, 10);
-      const run = byDay[iso];
-      const future = iso > todayIso();
+      const run = byDay[iso], future = iso > todayIso();
       if (run) {
-        const km = Math.round(run.k * 10) / 10;
-        const when = esc(runDateLabelIso(iso));
-        if (openable.has(run.i)) {
-          cells += '<button class="tg-c on" data-runid="' + esc(run.i) + '" aria-label="' + when + ', ' + km + ' km">' +
-            '<span class="num">' + km + '</span></button>';
-        } else {
-          anyClosed = true;
-          cells += '<span class="tg-c on tg-old" aria-disabled="true" title="' + when + ', ' + km + ' km — details no longer stored">' +
-            '<span class="num">' + km + '</span></span>';
-        }
+        const km = Math.round(run.k * 10) / 10, kind = runKind(run.t);
+        const lab = esc(runDateLabelIso(iso)) + ", " + km + " km";
+        wc += openable.has(run.i)
+          ? '<button class="tg-c on" data-runid="' + esc(run.i) + '" style="background:' + kind.c + '" aria-label="' + lab + '"><span class="num">' + km + '</span></button>'
+          : '<span class="tg-c on tg-old" style="background:' + kind.c + '" aria-disabled="true" title="' + lab + ' — details no longer stored"><span class="num">' + km + '</span></span>';
       } else {
-        cells += '<span class="tg-c' + (future ? " fut" : "") + '"></span>';
+        wc += '<span class="tg-c' + (future ? " fut" : "") + '"></span>';
       }
     }
-    return '<div class="tg-row"><div class="tg-rh"><span>' + esc(runDateLabelIso(w.start)) + ' – ' +
+    return '<div class="tg-row"><div class="tg-rh"><span>' + esc(runDateLabelIso(w.start)) + ' \u2013 ' +
       esc(runDateLabelIso(w.end)) + '</span><b class="num">' + (Math.round(w.km * 10) / 10) + ' km</b></div>' +
-      '<div class="tg-week">' + cells + '</div></div>';
+      '<div class="tg-week">' + wc + '</div></div>';
   }).join("");
-  return '<button class="backbtn" id="tgBack">‹ Logbook</button>' +
-    '<h2 class="sec" style="margin-top:0">Training log</h2>' +
+
+  const legend = [["Easy", "var(--eff-easy)"], ["Quality", "var(--eff-hard)"], ["Long", "var(--taper)"]]
+    .map((x) => '<span class="sc-lg"><i style="background:' + x[1] + '"></i>' + x[0] + '</span>').join("");
+
+  return '<button class="backbtn" id="tgBack">\u2039 Logbook</button>' +
+    '<div class="card sc-card">' +
+      '<div class="sc-h"><button class="sc-nav" id="scPrev"' + (canBack ? "" : ' disabled aria-disabled="true"') + '>\u2039</button>' +
+        '<span class="sc-hm">' + MON_FULL[m - 1] + ' ' + y +
+          '<b>' + mt.runs + (mt.runs === 1 ? " run" : " runs") + ' \u00b7 ' + (Math.round(mt.km * 10) / 10) + ' km</b></span>' +
+        '<button class="sc-nav" id="scNext"' + (canFwd ? "" : ' disabled aria-disabled="true"') + '>\u203a</button></div>' +
+      '<div class="sc-stats">' +
+        '<div class="lw-cell"><div class="lw-cl">Consistency</div><div class="lw-cv num">' + perWeek + ' <span class="lw-u">runs/week</span></div></div>' +
+        '<div class="lw-cell"><div class="lw-cl">Current streak</div><div class="lw-cv num">' + logStreakWeeks() +
+          ' <span class="lw-u">' + (logStreakWeeks() === 1 ? "week" : "weeks") + '</span></div></div>' +
+      '</div>' +
+      '<div class="sc-dow">' + ["M","T","W","T","F","S","S"].map((x) => '<span>' + x + '</span>').join("") + '</div>' +
+      '<div class="sc-grid">' + cells + '</div>' +
+      '<div class="sc-legend">' + legend + '</div>' +
+      // ⚠️ streakRow MOVED HERE RATHER THAN BEING DELETED. Taking the streak out of the month
+      // snapshot left this function with zero callers — dead code, which is this project's most
+      // repeated trap — and silently dropped the earned quote it carries. The streak lives on this
+      // page now, so its own explanation belongs on this page too.
+      streakRow(logStreakWeeks()) +
+    '</div>' +
+    (canBack ? "" : '<div class="pg-note">This is as far back as your records go.</div>') +
+    '<div class="pf-sec"><span>Week by week</span></div>' +
     '<div class="tg-dow">' + ["M","T","W","T","F","S","S"].map((x) => '<span>' + x + '</span>').join("") + '</div>' +
     '<div class="card tg-card">' + rows + '</div>' +
     '<div class="pg-note">Tap a run to open it.' +
-      (anyClosed ? ' The paler ones are older than your last fifty runs — their distance is kept, but the map and splits are not.' : '') +
+      (anyClosed ? ' The paler ones are older than your last fifty runs \u2014 their distance is kept, but the map and splits are not.' : '') +
       '</div>';
 }
 /**
@@ -8085,7 +8108,12 @@ function fmtDur(sec) {
   const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60);
   return h ? h + 'h <span class="lw-u">' + m + 'm</span>' : m + ' <span class="lw-u">min</span>';
 }
-/** The Streaks and Training Log tiles, side by side under the week card. */
+/**
+ * ONE tile, not two (owner, 2026-08-15). Streaks and the training log were separate destinations
+ * answering the same question — "have I been running?" — so a runner had to visit both to get one
+ * answer. They are now a single calendar, and this tile previews it: the streak, and the last two
+ * weeks of days.
+ */
 function logTiles() {
   const streak = logStreakWeeks();
   const wk = logWeekBuckets(2);
@@ -8093,26 +8121,41 @@ function logTiles() {
     const days = [];
     for (let d = 0; d < 7; d++) {
       const iso = isoAdd(w.start, d).toISOString().slice(0, 10);
-      const ran = (state.hist || []).some((r) => r && r.d === iso);
+      const run = (state.hist || []).find((r) => r && r.d === iso);
       const future = iso > todayIso();
-      days.push('<span class="tl-d' + (ran ? " on" : "") + (future ? " fut" : "") + '"></span>');
+      days.push('<span class="tl-d' + (run ? " on" : "") + (future ? " fut" : "") + '"' +
+        (run ? ' style="background:' + runKindColour(run.t) + '"' : '') + '></span>');
     }
     return '<div class="tl-week">' + days.join("") + '</div>';
   };
-  return '<div class="lb-tiles">' +
-    '<button class="card lb-tile" id="lgStreak">' +
-      '<span class="lb-th">Streaks<span class="sd-chev" aria-hidden="true">›</span></span>' +
+  return '<button class="card lb-one" id="lgTraining">' +
+    '<span class="lb-oh">Training log<span class="sd-chev" aria-hidden="true">›</span></span>' +
+    '<span class="lb-orow">' +
       '<span class="lb-flame">' + ICON.flame + '<span class="lb-fn num">' + streak + '</span></span>' +
-      '<span class="lb-tf">' + (streak === 1 ? "Week" : "Weeks") + '</span>' +
-    '</button>' +
-    '<button class="card lb-tile" id="lgTraining">' +
-      '<span class="lb-th">Training log<span class="sd-chev" aria-hidden="true">›</span></span>' +
-      '<span class="tl-mini"><span class="tl-lab">This week<b class="num">' + (Math.round(wk[1].km * 10) / 10) + ' km</b></span>' +
+      '<span class="lb-ostreak">' + (streak === 1 ? "week" : "weeks") + '<br><b>in a row</b></span>' +
+      '<span class="tl-mini">' +
+        '<span class="tl-lab">This week<b class="num">' + (Math.round(wk[1].km * 10) / 10) + ' km</b></span>' +
         dots(wk[1]) + dots(wk[0]) +
-        '<span class="tl-lab">Last week<b class="num">' + (Math.round(wk[0].km * 10) / 10) + ' km</b></span></span>' +
-    '</button>' +
-    '</div>';
+        '<span class="tl-lab">Last week<b class="num">' + (Math.round(wk[0].km * 10) / 10) + ' km</b></span>' +
+      '</span>' +
+    '</span></button>';
 }
+/**
+ * The three kinds a runner actually distinguishes on a calendar, from the session type.
+ * ⚠️ THREE BUCKETS, NOT THE ENGINE'S NINE TYPES. A legend with nine colours is not a legend, and the
+ * question this calendar answers is "was that day easy, hard, or the long one?".
+ */
+const RUN_KIND = {
+  long: { k: "long", lab: "Long", c: "var(--taper)", ic: "rLong" },
+  threshold: { k: "quality", lab: "Quality", c: "var(--eff-hard)", ic: "rTempo" },
+  vo2: { k: "quality", lab: "Quality", c: "var(--eff-hard)", ic: "rIntervals" },
+  "race-specific": { k: "quality", lab: "Quality", c: "var(--eff-hard)", ic: "rIntervals" },
+  race: { k: "quality", lab: "Quality", c: "var(--eff-hard)", ic: "rRace" },
+  strides: { k: "quality", lab: "Quality", c: "var(--eff-hard)", ic: "rStrides" },
+  recovery: { k: "easy", lab: "Easy", c: "var(--eff-easy)", ic: "rRecovery" },
+};
+function runKind(type) { return RUN_KIND[type] || { k: "easy", lab: "Easy", c: "var(--eff-easy)", ic: "rEasy" }; }
+function runKindColour(type) { return runKind(type).c; }
 /**
  * The month you are looking at, summarised before any of its runs are listed.
  * \u26a0\ufe0f ONE PERIOD, NOT THREE COLUMNS OF DIFFERENT PERIODS. The first version showed this week,
@@ -8122,24 +8165,26 @@ function logTiles() {
 function logbookSnapshot() {
   const from = todayIso().slice(0, 7) + "-01";
   const t = logTotals(from);
-  const streak = logStreakWeeks();
+  const cons = logConsistency();
   // The full month name, not the three-letter one -- this is a heading, not a chart axis.
   const MON_FULL = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   const mon = MON_FULL[Number(todayIso().slice(5, 7)) - 1] || "";
-  const cell = (lab, val) => '<div class="lb-cell"><div class="lb-cl">' + esc(lab) + '</div>' +
-    '<div class="lb-cv num">' + val + '</div></div>';
+  const cell = (lab, val, sub) => '<div class="lb-cell"><div class="lb-cl">' + esc(lab) + '</div>' +
+    '<div class="lb-cv num">' + val + '</div>' + (sub ? '<div class="lb-cs">' + esc(sub) + '</div>' : '') + '</div>';
   return '<div class="pf-sec"><span>' + esc(mon) + '</span>' +
       '<button class="pf-edit" id="lbFilterBtn" aria-expanded="' + (state.logFilterOpen ? "true" : "false") + '">Filter</button></div>' +
     (state.logFilterOpen ? logbookFilters() : "") +
     '<div class="card lb-snap"><div class="lb-grid">' +
       cell(t.runs + (t.runs === 1 ? " run" : " runs"), (t.km ? t.km.toFixed(1) : "0") + '<small>km</small>') +
       cell("Time", t.sec ? fmtTimeFull(Math.round(t.sec)).replace(/^(\\d+):(\\d\\d):\\d\\d$/, "$1h $2m").replace(/^(\\d+):(\\d\\d)$/, "$1m") : "\u2014") +
-      // \u26a0\ufe0f "3 weeks" is weeks in a row with a run in them, not a percentage of a plan. It says
-      // what it counted underneath, because a bare number invites the reader to invent a meaning.
-      cell("Consistency", streak ? streak + (streak === 1 ? " week" : " weeks") : "\u2014") +
-    '</div>' +
-    streakRow(streak) +
-    '</div>';
+      // \u26a0\ufe0f THIS CELL SPENT MONTHS SHOWING THE WRONG THING. It was labelled "Consistency" and
+      // rendered logStreakWeeks() -- weeks in a row -- while logConsistency(), which answers the
+      // question the label asks and has its own test, sat in the file with ZERO CALLERS. The guard
+      // passed the whole time because it asserts on that function's SOURCE, and source cannot tell
+      // you nobody runs it. Now it renders the real figure, and the streak lives in its own tile
+      // rather than being repeated three times on one screen.
+      cell("Consistency", cons ? cons.done + " of " + cons.prescribed : "\u2014", cons ? "runs done this week" : "no plan this week") +
+    '</div></div>';
 }
 /**
  * A flame for every week of the streak, and a line to keep it going.
@@ -15991,9 +16036,9 @@ function render() {
   }
   // The three Logbook destinations. They keep the Logbook tab lit, because that is where they came
   // from and where their back button returns to.
-  if (state.screen === "progress" || state.screen === "streaks" || state.screen === "traininglog") {
-    $("topTitle").textContent = state.screen === "progress" ? "Progress" : state.screen === "streaks" ? "Streaks" : "Training log";
-    v.innerHTML = state.screen === "progress" ? progressView() : state.screen === "streaks" ? streakCalendarView() : trainingLogView();
+  if (state.screen === "progress" || state.screen === "traininglog") {
+    $("topTitle").textContent = state.screen === "progress" ? "Progress" : "Training log";
+    v.innerHTML = state.screen === "progress" ? progressView() : trainingLogView();
     v.scrollTop = keepScroll;
     // ⚠️ LIT EXPLICITLY. The nav is normally synced from state.tab at the end of render(), which these
     // branches return before reaching — so without this the previous tab stays lit and a runner deep
@@ -16243,9 +16288,8 @@ function wire() {
   const lgBack = () => { state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); };
   const bind = (id, fn) => { const el = $(id); if (el) el.onclick = fn; };
   bind("lgProgress", () => lgTo("progress"));
-  bind("lgStreak", () => { state.streakMon = todayIso().slice(0, 7); lgTo("streaks"); });
-  bind("lgTraining", () => lgTo("traininglog"));
-  bind("pgBack", lgBack); bind("scBack", lgBack); bind("tgBack", lgBack);
+  bind("lgTraining", () => { state.streakMon = todayIso().slice(0, 7); lgTo("traininglog"); });
+  bind("pgBack", lgBack); bind("tgBack", lgBack);
   document.querySelectorAll("[data-prog]").forEach((b) => b.onclick = () => { state.progRange = b.dataset.prog; render(); });
   // ⚠️ Month paging is CLAMPED at the first recorded run. Past it every day draws blank, and a blank
   // day on this calendar means "you rested" — so it would be inventing rest days from an absence of

@@ -34,7 +34,7 @@ test("every total and chart reads the permanent history, never the capped runs",
 });
 
 test("week boundaries are built with the UTC helpers", () => {
-  for (const fn of ["logWeekBuckets", "dayDiff", "trainingLogView", "streakCalendarView"]) {
+  for (const fn of ["logWeekBuckets", "dayDiff", "trainingLogView"]) {
     const src = fnOf(fn);
     // ⚠️ new Date(iso + "T00:00:00") parses as LOCAL midnight, so toISOString() hands back the
     // PREVIOUS day for the whole of British Summer Time. This project shipped that once already and
@@ -73,8 +73,8 @@ test("dots are addressed by run id, never by list position", () => {
   assert.ok(!/data-runidx/.test(src), "never address a run by index");
 });
 
-test("the streak calendar cannot page back before the first recorded run", () => {
-  const view = fnOf("streakCalendarView");
+test("the calendar cannot page back before the first recorded run", () => {
+  const view = fnOf("trainingLogView");
   // ⚠️ Past the first record every day draws blank, and a blank day on this calendar means "you
   // rested". Scrolling further would be inventing rest days out of an absence of records — the exact
   // reason a scrolling calendar was refused before the history store existed.
@@ -96,9 +96,9 @@ test("Progress says when its range reaches back further than the records do", ()
   assert.ok(/not because you did not run/.test(src), "an empty stretch must be explained, not left to imply idleness");
 });
 
-test("the three Logbook destinations light the Logbook tab", () => {
+test("the two Logbook destinations light the Logbook tab", () => {
   const html = page();
-  const at = html.indexOf('state.screen === "progress" || state.screen === "streaks"');
+  const at = html.indexOf('state.screen === "progress" || state.screen === "traininglog"');
   assert.ok(at > 0, "the Logbook destination router is missing");
   const src = html.slice(at, at + 1100);
   // ⚠️ The nav is normally synced from state.tab at the very end of render(), which these branches

@@ -2927,14 +2927,17 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 /* Training zones (Support > Tools). Every size on the type ladder, so the page scales with the
    phone's text-size setting. */
 .zr-card { padding: var(--s3); }
-.zr-lead { font-size: var(--t-meta); color: var(--ink-soft); margin-bottom: var(--s2); }
-.zr-hint { font-size: var(--t-label); color: var(--ink-faint); margin-top: 6px; }
-.zr-hint.zr-bad { color: var(--rest); font-weight: 700; }
-.zr-acts { display: flex; gap: 8px; margin-top: var(--s2); flex-wrap: wrap; }
-.zr-acts > button { flex: 1; min-width: 132px; }
-.zr-src { font-size: var(--t-meta); color: var(--ink-soft); margin: var(--s2) var(--s1); }
-.zr-src.zr-warn { color: var(--ink); background: color-mix(in srgb, var(--ease) 12%, transparent);
-  border-radius: var(--r-ctl); padding: var(--s2); margin: var(--s2) 0; }
+/* ⚠️ NO min-height. Reserving a line for the out-of-range message left a permanent empty gap under
+   the field that reads as a layout bug. It is empty almost always; a small nudge on the rare invalid
+   keystroke is the cheaper of the two. :empty collapses the margin too. */
+.zr-hint { font-size: var(--t-label); color: var(--rest); font-weight: 700; margin-top: 6px; }
+.zr-hint:empty { margin-top: 0; }
+.zr-auto { display: flex; align-items: center; justify-content: space-between; gap: var(--s2);
+  margin-top: var(--s3); padding-top: var(--s2); border-top: 1px solid var(--line);
+  font-size: var(--t-card); font-weight: 700; color: var(--ink); }
+/* Auto on: the number is shown but is not the runner's to type. It must LOOK unavailable, or a
+   field that silently ignores typing reads as a broken app rather than a switched-off one. */
+.pc-in:disabled { color: var(--ink-faint); background: var(--surface-2); }
 .zr-zones { padding: var(--s2) var(--s3); }
 .zr-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
 .zr-row:last-child { border-bottom: 0; }
@@ -2943,8 +2946,6 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .zr-n b { font-size: var(--t-card); color: var(--ink); font-weight: 700; }
 .zr-b { font-size: var(--t-card); font-weight: 700; color: var(--ink); white-space: nowrap; }
 .zr-p { font-size: var(--t-label); color: var(--ink-faint); width: 38px; text-align: right; flex: none; }
-.zr-note { font-size: var(--t-meta); color: var(--ink-soft); margin-top: var(--s2); padding: 0 var(--s1); }
-.zr-note.zr-quiet { color: var(--ink-faint); }
 
 /* Logbook: this week, the trend, the two tiles, and their three destinations. */
 .lw-card { padding: var(--s3); }
@@ -8869,48 +8870,28 @@ function unitsView() {
 function zonesView() {
   const ceil = maxHrEstimate();
   const measured = Number(profile.maxHr) || 0;
-  const isMeasured = measured >= 120 && measured <= 230;
-  const age = Number(profile.age) || 0;
-  const canEstimate = age >= 10 && age <= 100;
+  const auto = !(measured >= 120 && measured <= 230);
   const rows = HR_ZONE_FLOOR.map((f, i) => {
     const lo = Math.round(ceil * f);
     const hi = i === 4 ? null : Math.round(ceil * HR_ZONE_FLOOR[i + 1]) - 1;
     return '<div class="hz-row zr-row"><span class="hz-bar" style="background:var(--hz' + (i + 1) + ')"></span>' +
       '<span class="zr-n">Zone ' + (i + 1) + '<b>' + HR_ZONE_NAME[i] + '</b></span>' +
-      '<span class="zr-b num">' + (ceil ? (lo + (hi ? '–' + hi : '–max')) : '—') + '</span>' +
+      '<span class="zr-b num">' + (ceil ? (lo + (hi ? '\u2013' + hi : '\u2013max')) : '\u2014') + '</span>' +
       '<span class="zr-p num">' + Math.round(f * 100) + '%</span></div>';
   }).join("");
-  // ⚠️ Say WHERE the number came from. A zone table with no provenance reads as a measurement of the
-  // runner, when for almost everybody it is arithmetic on their date of birth.
-  const src = !ceil
-    ? '<div class="zr-src zr-warn">No ceiling yet — add your age in your profile, or type a measured maximum below. Until then the app will not judge your effort by heart rate at all.</div>'
-    : isMeasured
-      ? '<div class="zr-src">From the maximum <b>you measured</b>. Nothing is estimated.</div>'
-      : '<div class="zr-src">Estimated from your age (' + age + ') as <b>208 − 0.7 × age</b>. It is a starting point, not a measurement — real maximums vary by about ±10 beats either side of any formula.</div>';
   return '<h2 class="sec" style="margin-top:0">Training zones</h2>' +
     '<div class="card zr-card">' +
-      '<div class="zr-lead">Every zone below is worked out from one number: your maximum heart rate.</div>' +
       '<div class="q"><label for="zrMax">Maximum heart rate</label>' +
-        '<div class="pc-row"><div class="pc-n pc-wide"><input id="zrMax" class="pc-in num" type="number" inputmode="numeric" min="120" max="230" ' +
-          'placeholder="' + (canEstimate ? String(Math.round(208 - 0.7 * age)) : "—") + '" value="' + (isMeasured ? measured : "") + '">' +
+        '<div class="pc-row"><div class="pc-n pc-wide">' +
+          '<input id="zrMax" class="pc-in num" type="number" inputmode="numeric" min="120" max="230" ' +
+            'value="' + (ceil || "") + '"' + (auto ? ' disabled' : '') + '>' +
           '<span class="pc-nl">beats per minute</span></div></div>' +
-        '<div class="zr-hint" id="zrHint">Leave it blank to use the estimate. Anything outside 120–230 is ignored rather than believed.</div></div>' +
-      // ⚠️ .primary / .bk-btn2 are the app's real pair, as used by the Shoe Rack. .btn and .ghost were
-      // invented and styled by nothing — the same invented-identifier trap that shipped a profile
-      // button pointing at #saveSetup, which built, typechecked, passed everything and did nothing.
-      '<div class="zr-acts"><button class="primary" id="zrSave">Save</button>' +
-        (isMeasured ? '<button class="bk-btn2" id="zrClear">Use the estimate</button>' : '') + '</div>' +
+        '<div class="zr-hint" id="zrHint"></div></div>' +
+      '<div class="zr-auto"><span>Auto-calculate</span>' +
+        '<button class="rm-switch' + (auto ? " on" : "") + '" id="zrAuto" role="switch" aria-checked="' + (auto ? "true" : "false") +
+          '" aria-label="Work out my maximum heart rate from my age"><span class="rm-knob"></span></button></div>' +
     '</div>' +
-    src +
-    '<div class="card zr-zones">' + rows + '</div>' +
-    '<div class="zr-note"><b>How to find your real maximum.</b> Not from a formula and not from a single hard run — ' +
-      'the highest number your watch has ever shown is usually a dropout or a spike, not a heartbeat. It takes a ' +
-      'deliberate maximal test, and those are hard enough that they are worth doing with a coach, or after a check ' +
-      'with your GP if you have any heart condition, are on medication that affects heart rate, or have not trained ' +
-      'in a long time.</div>' +
-    '<div class="zr-note zr-quiet">Zones move with heat, tiredness, caffeine, illness and altitude, and they drift ' +
-      'upward within a single long run. That is why this app plans by <b>pace and effort</b> and treats heart rate ' +
-      'as something that confirms a session rather than something that sets it.</div>';
+    '<div class="card zr-zones">' + rows + '</div>';
 }
 /**
  * THE PACE CALCULATOR — Support › Tools.
@@ -16335,28 +16316,44 @@ function wire() {
     if (val === null) delete profile.maxHr; else profile.maxHr = val;
     saveProfileStore();
     try { syncWatch(); } catch (e) {}
+  };
+  const zrAuto = $("zrAuto");
+  if (zrAuto) zrAuto.onclick = () => {
+    // ⚠️ aria-checked IS THE STATE BEFORE THE TAP, NOT AFTER IT. Written the other way round the
+    // whole toggle was inert: auto-on, tapped, committed null, stayed auto-on. Nothing threw and the
+    // switch even animated — only the field staying disabled gave it away.
+    const wasAuto = zrAuto.getAttribute("aria-checked") === "true";
+    // Turning auto OFF adopts the number already on screen, so the zones do not jump and the runner
+    // edits from where they were. Turning it ON drops the override and goes back to the age estimate.
+    zrCommit(wasAuto ? (maxHrEstimate() || 180) : null);
     render();
   };
   const zrMax = $("zrMax");
-  if (zrMax) {
-    const save = $("zrSave");
-    if (save) save.onclick = () => {
-      const raw = String(zrMax.value || "").trim();
-      const hint = $("zrHint");
-      if (raw === "") { zrCommit(null); toast("Using the estimate from your age"); return; }
-      const n = Number(raw);
-      // ⚠️ REFUSE OUT OF RANGE RATHER THAN CLAMPING IT. A typo of 1740 clamped to 230 is a number the
-      // runner never chose, silently governing the wrist and the safety cue from then on.
-      if (!(n >= 120 && n <= 230)) {
-        if (hint) { hint.textContent = "That is outside 120–230 bpm, so it has not been saved. Check the number."; hint.classList.add("zr-bad"); }
-        return;
-      }
-      zrCommit(Math.round(n));
-      toast("Maximum heart rate saved");
-    };
-    const clear = $("zrClear");
-    if (clear) clear.onclick = () => { zrCommit(null); toast("Back to the estimate from your age"); };
-  }
+  if (zrMax) zrMax.oninput = () => {
+    const hint = $("zrHint");
+    const n = Number(String(zrMax.value || "").trim());
+    // ⚠️ REFUSED, NOT CLAMPED, and not saved until it is plausible. A typo of 1740 clamped to 230
+    // is a ceiling the runner never chose, silently governing the wrist and the safety cue from then
+    // on. Out of range simply does not commit, and the zones below keep their last good values.
+    if (!(n >= 120 && n <= 230)) { if (hint) hint.textContent = "Between 120 and 230."; return; }
+    if (hint) hint.textContent = "";
+    zrCommit(Math.round(n));
+    // Repaint the zone rows in place. ⚠️ NOT render() — that rebuilds the input under the finger
+    // typing into it and captures the caret, which is the trap the Support search field already paid
+    // for once.
+    const host = document.querySelector(".zr-zones");
+    if (host) {
+      const ceil = maxHrEstimate();
+      host.innerHTML = HR_ZONE_FLOOR.map((f, i) => {
+        const lo = Math.round(ceil * f);
+        const hi = i === 4 ? null : Math.round(ceil * HR_ZONE_FLOOR[i + 1]) - 1;
+        return '<div class="hz-row zr-row"><span class="hz-bar" style="background:var(--hz' + (i + 1) + ')"></span>' +
+          '<span class="zr-n">Zone ' + (i + 1) + '<b>' + HR_ZONE_NAME[i] + '</b></span>' +
+          '<span class="zr-b num">' + (lo + (hi ? '\u2013' + hi : '\u2013max')) + '</span>' +
+          '<span class="zr-p num">' + Math.round(f * 100) + '%</span></div>';
+      }).join("");
+    }
+  };
   // The pace calculator. ⚠️ NOTHING HERE CALLS render() — see the note on paceCalcView. The segmented
   // buttons change which questions are asked, so they DO rebuild the card; the number fields never do,
   // because that would rebuild the box under the finger typing into it.

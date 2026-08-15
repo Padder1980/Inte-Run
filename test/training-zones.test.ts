@@ -51,8 +51,8 @@ test("saving the ceiling reaches the watch", () => {
 
 test("an out-of-range maximum is refused, never clamped", () => {
   const html = page();
-  const at = html.indexOf('const raw = String(zrMax.value');
-  assert.ok(at > 0, "the save handler is missing");
+  const at = html.indexOf("if (zrMax) zrMax.oninput");
+  assert.ok(at > 0, "the max-HR input handler is missing");
   const src = html.slice(at, at + 900).replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
   assert.ok(/n >= 120 && n <= 230/.test(src), "the range check is missing");
   // ⚠️ A typo of 1740 clamped to 230 is a number the runner never chose, silently governing the wrist
@@ -81,27 +81,37 @@ test("the page reads the app's zone ladder instead of defining a second one", ()
   assert.ok(!/0\.5\s*,\s*0\.6/.test(src), "the boundaries must not be re-listed here");
 });
 
-test("the page says where the number came from", () => {
-  const src = fnOf("zonesView");
-  // ⚠️ A zone table with no provenance reads as a measurement of the runner, when for almost everybody
-  // it is arithmetic on their date of birth. This project already fixed exactly this on the
-  // Performance screen: "a number with no date reads as a measurement of today".
-  assert.ok(/208/.test(src) && /age/i.test(src), "an estimated ceiling must name the formula and the age it used");
-  assert.ok(/you measured/i.test(src), "a measured ceiling must say so, so the two are distinguishable");
-  // And it must not claim the estimate is precise.
-  assert.ok(/starting point|not a measurement|vary/i.test(src), "the estimate must be hedged — real maximums vary widely");
+test("auto-calculate is one toggle, and it commits the state it is moving TO", () => {
+  const html = page();
+  const view = fnOf("zonesView");
+  // ⚠️ ONE TOGGLE, NOT TWO BUTTONS (owner, 2026-08-15). Save / "Use the estimate" made a single
+  // either-or choice look like two actions, and the page carried three paragraphs explaining itself.
+  assert.ok(/id="zrAuto"/.test(view), "the auto-calculate switch is missing");
+  assert.ok(/role="switch"/.test(view), "it must be a real switch for assistive tech");
+  assert.ok(!/zrSave|zrClear/.test(view), "the old two-button pair must be gone");
+  // With auto on the field shows the estimate but is not the runner's to type.
+  assert.ok(/disabled/.test(view), "the field must be disabled while auto-calculate is on");
+
+  const at = html.indexOf("if (zrAuto) zrAuto.onclick");
+  assert.ok(at > 0, "the toggle handler is missing");
+  const h = html.slice(at, at + 700).replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  // ⚠️ aria-checked IS THE STATE BEFORE THE TAP. Written the other way round the toggle was inert:
+  // auto-on, tapped, committed null, stayed auto-on. Nothing threw and the switch still animated —
+  // only the field staying disabled gave it away, and only because it was tested.
+  assert.ok(/wasAuto/.test(h), "the handler must name the pre-tap state rather than reading it twice");
+  assert.ok(/wasAuto \? \(maxHrEstimate\(\)[^)]*\|\| \d+\) : null/.test(h),
+    "turning auto OFF must adopt the number on screen; turning it ON must clear the override");
 });
 
 test("every id the zones page wires actually exists in its markup", () => {
   const html = page();
   const view = fnOf("zonesView");
   const at = html.indexOf("const zrCommit");
-  const wiring = html.slice(at, at + 1400);
+  const wiring = html.slice(at, at + 2600);
   // ⚠️ The invented-identifier trap, third outing in this project: a profile button once clicked
   // #saveSetup, which is nowhere in the app. It built, typechecked, passed everything and did nothing.
-  for (const id of ["zrMax", "zrSave", "zrHint"]) {
+  for (const id of ["zrMax", "zrAuto", "zrHint"]) {
     assert.ok(view.includes('id="' + id + '"'), id + " is wired but never rendered");
     assert.ok(wiring.includes(id), id + " is rendered but never wired");
   }
-  assert.ok(view.includes('id="zrClear"'), "zrClear is wired but never rendered");
 });

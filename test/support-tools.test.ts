@@ -69,7 +69,12 @@ test("the Tools group is rendered by viewSupport", () => {
   const at = html.indexOf("function viewSupport(");
   const src = html.slice(at, at + 2600);
   assert.ok(/HUB_TOOLS\.map/.test(src), "HUB_TOOLS is declared but viewSupport never renders it");
-  assert.ok(src.indexOf("HUB_TOOLS") > src.indexOf("HUB_LEARN"), "Tools should follow Learn on the hub");
+  // ⚠️ TOOLS COMES FIRST, DIRECTLY UNDER ALFIE (owner, 2026-08-15). It shipped below Learn and was
+  // moved: these are the things somebody comes to Support to USE rather than to read, so they are the
+  // shortest errand on the screen and belong where the eye already is.
+  assert.ok(src.indexOf("HUB_TOOLS") < src.indexOf("HUB_CHECKINS"), "Tools must sit above Private check-ins");
+  assert.ok(src.indexOf("HUB_TOOLS") < src.indexOf("HUB_LEARN"), "Tools must sit above Learn");
+  assert.ok(src.indexOf("alf-feat") < src.indexOf("HUB_TOOLS"), "Alfie stays above Tools");
 });
 
 test("a pace target is floored, never rounded", () => {

@@ -8763,12 +8763,15 @@ function viewSupport() {
         '<span class="alf-fd">' + esc(alfie ? alfie.d : "") + '</span>' +
         '<span class="ui-pill watch">AI coach \u00b7 not medical</span></span>' +
       '<span class="sd-chev" aria-hidden="true">\u203A</span></button>' +
+    // ⚠️ TOOLS SITS DIRECTLY UNDER ALFIE (owner, 2026-08-15). These are the things somebody comes here
+    // to USE rather than to read, so they are the shortest errand on the screen and go where the eye
+    // already is. The check-ins and the guides are longer visits and can wait a scroll.
+    '<div class="pf-sec"><span>Tools</span></div>' +
+    '<div class="card pf-card">' + HUB_TOOLS.map(by).filter(Boolean).map(hubRow).join("") + '</div>' +
     '<div class="pf-sec"><span>Private check-ins</span><span class="hub-cav">Not a diagnosis</span></div>' +
     '<div class="hub">' + HUB_CHECKINS.map(by).filter(Boolean).map(hubCard).join("") + '</div>' +
     '<div class="pf-sec"><span>Learn</span></div>' +
     '<div class="card pf-card">' + HUB_LEARN.map(by).filter(Boolean).map(hubRow).join("") + '</div>' +
-    '<div class="pf-sec"><span>Tools</span></div>' +
-    '<div class="card pf-card">' + HUB_TOOLS.map(by).filter(Boolean).map(hubRow).join("") + '</div>' +
     '<button class="hub-safety" data-hub="safety">' +
       '<span class="hub-sb"><span class="hub-st">Safety, privacy &amp; human help</span>' +
       '<span class="hub-sd">Medical boundaries \u00b7 your data \u00b7 who to contact</span></span>' +

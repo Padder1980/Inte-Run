@@ -3867,6 +3867,28 @@ function wmoLabel(code) {
   if (code >= 95) return "Thunderstorm";
   return "Cloudy";
 }
+/**
+ * TEMPERATURE UNITS — interun_units_v1.
+ *
+ * ⚠️ A DISPLAY PREFERENCE, SO IT IS NOT ON THE PROFILE. It follows interun_theme_v1: the profile
+ * holds answers that shape the plan, and a default sitting in every stored profile is an answer
+ * nobody gave — the lesson weeklyVolumeKm taught this project. Nothing here reaches the engine.
+ *
+ * ⚠️ EVERYTHING STAYS °C INTERNALLY. The forecast is fetched in Celsius, every threshold in
+ * weather.ts is Celsius (18/23/28/33), and the warm-up's own rules read temperatureC. This converts
+ * at the moment of DISPLAY and nowhere else, so a runner choosing Fahrenheit cannot move a single
+ * training decision.
+ */
+function tempUnit() { try { return localStorage.getItem("interun_units_v1") === "f" ? "f" : "c"; } catch (e) { return "c"; } }
+function setTempUnit(u) { try { localStorage.setItem("interun_units_v1", u === "f" ? "f" : "c"); } catch (e) {} }
+/** A temperature for reading, in whichever unit was chosen. Rounded once, at the end. */
+function fmtTemp(tempC, withUnit) {
+  const c = Number(tempC);
+  if (!Number.isFinite(c)) return "—";
+  const f = tempUnit() === "f";
+  const v = Math.round(f ? c * 9 / 5 + 32 : c);
+  return v + "°" + (withUnit ? (f ? "F" : "C") : "");
+}
 function wmoIcon(code, windKph) {
   if ((code >= 71 && code <= 77) || (code >= 85 && code <= 86)) return "wxSnow";
   if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95) return "wxRain";
@@ -3914,7 +3936,7 @@ function conditionsSquare(session) {
   return '<button class="tsq" id="condSq" style="--sqc:' + c + '">' +
     '<div class="tsq-ic">' + ICON[w.iconKey] + '</div>' +
     '<div class="tsq-k">Conditions' + (w.live ? ' · live' : ' · example') + '</div>' +
-    '<div class="tsq-v">' + w.tempC + '° · ' + w.label + '</div>' +
+    '<div class="tsq-v">' + fmtTemp(w.tempC, false) + ' · ' + w.label + '</div>' +
     '<div class="tsq-sub">' + sub + '</div></button>';
 }
 /**
@@ -3954,7 +3976,12 @@ function weatherSheetHtml() {
     ? '<div class="wx-src live"><span class="dot"></span>Live forecast · ' + w.windKph + ' km/h wind · ' + w.humidityPct + '% humidity</div>'
     : (WX_FETCHING ? '<div class="wx-src">Reading your local forecast…</div>' : '<div class="wx-src">Sample conditions · <button class="wx-loc" id="wxUseLoc">Use my location</button></div>');
   return '<div class="sd-type" style="--sc:' + c + '">Conditions' + (w.live ? ' · live' : ' · example') + '</div>' +
-    '<div class="sd-title">' + w.tempC + '° · ' + imp.summary + '</div>' +
+    // ⚠️ COMPOSED HERE RATHER THAN USING imp.summary, which fixes a duplicate AND the units in one
+    // move. The engine's summary already contains the temperature, so the old line read
+    // "12° · Mild · 12°C, wind 14 km/h" — the same number twice, the second time in a unit the
+    // runner may not have chosen. tempWord carries the word with no units baked into it.
+    '<div class="sd-title">' + esc(imp.tempWord) + ' · ' + fmtTemp(w.tempC, true) +
+      ', wind ' + Math.round(w.windKph) + ' km/h</div>' +
     source +
     '<div class="sd-chips"><span class="chip">' + esc(imp.headline) + '</span>' + (imp.effortBased ? '<span class="chip rpe">Run by effort</span>' : '') + pen + '</div>' +
     '<ul class="wx-points" style="margin:8px 0 4px">' + imp.points.map((p) => '<li>' + p + '</li>').join("") + '</ul>' +
@@ -8059,6 +8086,8 @@ const SUPPORT_HUB = [
   // what they want to know is what pace gets them under four hours.
   { id: "pace", ic: "timer", c: "var(--accent)", t: "Pace calculator", d: "What pace gets you the finish time you want.", interactive: false,
     kw: "pace calculator calculate speed split splits target goal time finish time how fast 5k 10k half marathon race predict per km per mile min/km min/mile sub 20 sub 40 sub 90 sub 2 sub 3 sub 4 negative" },
+  { id: "units", ic: "wxSun", c: "var(--peak)", t: "Measurements", d: "Whether temperatures read in Celsius or Fahrenheit.", interactive: false,
+    kw: "units unit measurement measurements celsius fahrenheit centigrade temperature degrees metric imperial km miles kilometres kilometers distance" },
   { id: "zones", ic: "gauge", c: "var(--rest)", t: "Training zones", d: "Your heart-rate zones, and the number they come from.", interactive: false,
     kw: "heart rate zones zone hr bpm max heart rate maximum threshold anaerobic aerobic tempo endurance recovery zone 1 2 3 4 5 karvonen tanaka 220 minus age chest strap watch effort intensity" },
 ];
@@ -8305,7 +8334,7 @@ const HUB_LEARN = ["understand", "strength", "guides"];
  * where a thing about the runner belongs. They are the reason the guard lists exemptions by name
  * rather than demanding every entry be grouped.
  */
-const HUB_TOOLS = ["zones", "pace"];
+const HUB_TOOLS = ["zones", "pace", "units"];
 function viewSupport() {
   if (state.support) return supportDetail(state.support);
   if ((state.supportQ || "").trim()) return supportSearchHtml();
@@ -8375,6 +8404,35 @@ function safetyView() {
     '<div class="card sf-c"><div class="subhead" style="margin-top:0">A human, not an app</div>' +
       '<p>Nothing here replaces a coach who can watch you run, or a clinician who can examine you. If ' +
       'something feels wrong and the app is telling you it is fine, believe yourself.</p></div>';
+}
+/**
+ * MEASUREMENTS — Support › Tools.
+ *
+ * ⚠️ TEMPERATURE ONLY, AND THE PAGE SAYS SO RATHER THAN QUIETLY OMITTING DISTANCE. The owner asked
+ * for km/miles too and was shown what it costs: distance is not a label problem here. Runs are STORED
+ * as kilometre numbers (distKm and friends, ~150 references), both the phone and the watch cut splits
+ * at 1000 m, and ~105 places render a km literal. A toggle that changed only the labels would put
+ * mile captions on kilometre splits, which is worse than staying metric. He chose to do it properly,
+ * separately. Until then this page tells the runner where they stand instead of leaving a gap.
+ */
+function unitsView() {
+  const f = tempUnit() === "f";
+  const sample = 12;
+  const btn = (u, label) => '<button type="button" class="' + ((u === "f") === f ? "on" : "") + '" data-unitset="' + u + '">' + label + '</button>';
+  return '<h2 class="sec" style="margin-top:0">Measurements</h2>' +
+    '<div class="card zr-card">' +
+      '<div class="q"><label id="unTempL">Temperature</label>' +
+        '<div class="seg pc-seg">' + btn("c", "Celsius") + btn("f", "Fahrenheit") + '</div>' +
+        '<div class="zr-hint">Today’s conditions and the weather notes read in this. A mild ' +
+          fmtTemp(sample, true) + ' day, for example.</div></div>' +
+    '</div>' +
+    '<div class="zr-note"><b>Distance stays in kilometres for now.</b> Changing it properly means more ' +
+      'than swapping the labels — your runs are stored in kilometres, and both the phone and the watch ' +
+      'measure a split every kilometre. Half-doing it would put mile labels on kilometre splits, which ' +
+      'is worse than leaving it. It is on the list as its own piece of work.</div>' +
+    '<div class="zr-note zr-quiet">Changing this only changes what you read. Every training decision the ' +
+      'app makes about heat — shortening a warm-up, easing a hard session — is worked out in Celsius ' +
+      'underneath and does not move.</div>';
 }
 /**
  * TRAINING ZONES — Support › Tools.
@@ -8552,6 +8610,7 @@ function supportDetail(id) {
   if (id === "data") return back + dataView();
   if (id === "pace") return back + paceCalcView();
   if (id === "zones") return back + zonesView();
+  if (id === "units") return back + unitsView();
   return back + guidesView();
 }
 // ---- Strength & mobility library -------------------------------------------
@@ -15809,6 +15868,11 @@ function wire() {
     const still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     try { t.scrollIntoView({ block: "start", behavior: still ? "auto" : "smooth" }); } catch (e) { t.scrollIntoView(); }
     const h = t.querySelector(".fg-sech"); if (h) h.focus({ preventScroll: true });
+  });
+  document.querySelectorAll("[data-unitset]").forEach((b) => b.onclick = () => {
+    if ((tempUnit() === "f") === (b.dataset.unitset === "f")) return;
+    setTempUnit(b.dataset.unitset);
+    render();
   });
   // Training zones. ⚠️ SAVING MUST REACH THE WRIST. The watch colours its heart by zone from the
   // maxHr in its payload and the coach's safety cue fires above 92% of the same number, so a profile

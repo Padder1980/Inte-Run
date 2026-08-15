@@ -17,7 +17,19 @@ export type Conditions = {
 export type Severity = "none" | "mild" | "moderate" | "high" | "severe";
 
 export type WeatherImpact = {
+  /**
+   * A metric one-liner, e.g. "Mild · 12°C, wind 14 km/h".
+   * ⚠️ THE APP DELIBERATELY DOES NOT RENDER THIS, and that is not an oversight to tidy away. It bakes
+   * °C and km/h into prose, so a runner who has chosen Fahrenheit would be shown Celsius inside it.
+   * The app composes its own line from `tempWord` plus the numbers, in whichever units were chosen.
+   * Kept because it is a correct, useful summary for any caller that wants metric.
+   */
   summary: string;
+  /**
+   * The temperature in a word — "Freezing", "Mild", "Warm" and so on — with NO units in it, so a
+   * caller can pair it with a temperature it has formatted itself.
+   */
+  tempWord: string;
   severity: Severity;
   /** True when today's session is best run by effort rather than pace. */
   effortBased: boolean;
@@ -125,9 +137,10 @@ export function assessConditions(input: Conditions): WeatherImpact {
   );
 
   const headline = buildHeadline(severity, heat, wind, cold, isQuality, effortBased);
-  const summary = `${tempWord(tempC, feels)} · ${Math.round(tempC)}°C, wind ${Math.round(windKph)} km/h`;
+  const word = tempWord(tempC, feels);
+  const summary = `${word} · ${Math.round(tempC)}°C, wind ${Math.round(windKph)} km/h`;
 
-  return { summary, severity, effortBased, headline, pacePenaltySecPerKm: pacePenalty, points };
+  return { summary, tempWord: word, severity, effortBased, headline, pacePenaltySecPerKm: pacePenalty, points };
 }
 
 function buildHeadline(severity: Severity, heat: Severity, wind: Severity, cold: Severity, isQuality: boolean, effortBased: boolean): string {

@@ -706,16 +706,16 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 .guide-body { font-size: 13.5px; color: var(--ink-soft); } .guide-body p { margin: 0 0 10px; }
 
 /* Weather card */
-.wx { border-left: 4px solid var(--wc); }
+.wx { border-left: 4px solid var(--accent); }
 .wx-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .wx-sum { font-size: 12.5px; color: var(--ink-faint); font-weight: 600; }
 .wx-head { font-size: 15px; font-weight: 650; letter-spacing: -.01em; margin-top: 3px; }
-.wx-badge { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #fff; background: var(--wc); border-radius: 999px; padding: 3px 9px; white-space: nowrap; flex: none; }
+.wx-badge { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #fff; background: var(--accent); border-radius: 999px; padding: 3px 9px; white-space: nowrap; flex: none; }
 .wx-penrow { margin-top: 8px; }
 .wx-pen { font-family: var(--fig); font-size: 12px; color: var(--eff-hard); background: color-mix(in srgb, var(--eff-hard) 10%, transparent); border: 1px solid color-mix(in srgb, var(--eff-hard) 30%, var(--line)); border-radius: 6px; padding: 2px 8px; }
 .wx-points { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 7px; }
 .wx-points li { display: grid; grid-template-columns: 15px 1fr; gap: 8px; font-size: 13px; color: var(--ink-soft); }
-.wx-points li::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--wc); margin-top: 6px; }
+.wx-points li::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-top: 6px; }
 .wx-foot { margin-top: 11px; } .wx-note { font-size: 11px; color: var(--ink-faint); font-style: italic; }
 .wx-seg { margin-top: 10px; }
 .wx-seg button { font-size: 12px; padding: 5px 10px; }
@@ -1803,8 +1803,8 @@ button.cn-row { cursor: pointer; }
 .cal-ghost { position: fixed; z-index: 300; margin: 0; pointer-events: none; background: var(--surface); border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); box-shadow: 0 16px 34px -14px rgba(4,26,22,.5); transform: scale(1.04) rotate(1.4deg); }
 .cal-day.cal-target { background: color-mix(in srgb, var(--accent) 11%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 12px; }
 body.cal-dragging { overscroll-behavior: none; cursor: grabbing; }
-.plan-target { background: color-mix(in srgb, var(--accent) 11%, transparent) !important; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 50%, transparent); border-radius: var(--r-sm); }
-.plan-ghost { border-radius: var(--r-sm); transform: scale(1.03) rotate(-0.8deg); }
+.plan-target { background: color-mix(in srgb, var(--accent) 11%, transparent) !important; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 50%, transparent); border-radius: var(--r-ctl); }
+.plan-ghost { border-radius: var(--r-ctl); transform: scale(1.03) rotate(-0.8deg); }
 /* Post-run debrief: the coach's read of the session, not just its numbers. */
 .debrief { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 8%, var(--surface)), var(--surface) 62%); border-color: color-mix(in srgb, var(--accent) 24%, var(--line)); }
 .db-head { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: var(--ink); }
@@ -2908,7 +2908,7 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .pc-n { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 0; }
 .pc-n.pc-wide { align-items: stretch; }
 .pc-in { width: 100%; text-align: center; font-size: var(--t-card); font-weight: 700; padding: 10px 6px;
-  border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); }
+  border: 1px solid var(--line); border-radius: var(--r-ctl); background: var(--surface); color: var(--ink); }
 .pc-in:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .pc-nl { font-size: var(--t-label); color: var(--ink-faint); margin-top: 4px; }
 .pc-sep { font-size: var(--t-card); font-weight: 700; color: var(--ink-faint); padding-top: 10px; }
@@ -2923,6 +2923,28 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .pc-cap { font-size: var(--t-meta); color: var(--ink-soft); margin-top: 10px; }
 .pc-none { font-size: var(--t-meta); color: var(--ink-faint); padding: var(--s2) 0; }
 .pc-note { font-size: var(--t-meta); color: var(--ink-faint); margin-top: var(--s2); padding: 0 var(--s1); }
+
+/* Training zones (Support > Tools). Every size on the type ladder, so the page scales with the
+   phone's text-size setting. */
+.zr-card { padding: var(--s3); }
+.zr-lead { font-size: var(--t-meta); color: var(--ink-soft); margin-bottom: var(--s2); }
+.zr-hint { font-size: var(--t-label); color: var(--ink-faint); margin-top: 6px; }
+.zr-hint.zr-bad { color: var(--rest); font-weight: 700; }
+.zr-acts { display: flex; gap: 8px; margin-top: var(--s2); flex-wrap: wrap; }
+.zr-acts > button { flex: 1; min-width: 132px; }
+.zr-src { font-size: var(--t-meta); color: var(--ink-soft); margin: var(--s2) var(--s1); }
+.zr-src.zr-warn { color: var(--ink); background: color-mix(in srgb, var(--ease) 12%, transparent);
+  border-radius: var(--r-ctl); padding: var(--s2); margin: var(--s2) 0; }
+.zr-zones { padding: var(--s2) var(--s3); }
+.zr-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.zr-row:last-child { border-bottom: 0; }
+.zr-row .hz-bar { width: 4px; height: 26px; border-radius: var(--r-pill); flex: none; }
+.zr-n { flex: 1; font-size: var(--t-label); color: var(--ink-faint); display: flex; flex-direction: column; min-width: 0; }
+.zr-n b { font-size: var(--t-card); color: var(--ink); font-weight: 700; }
+.zr-b { font-size: var(--t-card); font-weight: 700; color: var(--ink); white-space: nowrap; }
+.zr-p { font-size: var(--t-label); color: var(--ink-faint); width: 38px; text-align: right; flex: none; }
+.zr-note { font-size: var(--t-meta); color: var(--ink-soft); margin-top: var(--s2); padding: 0 var(--s1); }
+.zr-note.zr-quiet { color: var(--ink-faint); }
 </style>
 </head>
 <body>
@@ -8037,6 +8059,8 @@ const SUPPORT_HUB = [
   // what they want to know is what pace gets them under four hours.
   { id: "pace", ic: "timer", c: "var(--accent)", t: "Pace calculator", d: "What pace gets you the finish time you want.", interactive: false,
     kw: "pace calculator calculate speed split splits target goal time finish time how fast 5k 10k half marathon race predict per km per mile min/km min/mile sub 20 sub 40 sub 90 sub 2 sub 3 sub 4 negative" },
+  { id: "zones", ic: "gauge", c: "var(--rest)", t: "Training zones", d: "Your heart-rate zones, and the number they come from.", interactive: false,
+    kw: "heart rate zones zone hr bpm max heart rate maximum threshold anaerobic aerobic tempo endurance recovery zone 1 2 3 4 5 karvonen tanaka 220 minus age chest strap watch effort intensity" },
 ];
 /**
  * \u26a0\ufe0f GROUPED BY WHAT YOU CAME FOR, NOT BY WHAT IT IS MADE OF. Eleven undifferentiated cards
@@ -8281,7 +8305,7 @@ const HUB_LEARN = ["understand", "strength", "guides"];
  * where a thing about the runner belongs. They are the reason the guard lists exemptions by name
  * rather than demanding every entry be grouped.
  */
-const HUB_TOOLS = ["pace"];
+const HUB_TOOLS = ["zones", "pace"];
 function viewSupport() {
   if (state.support) return supportDetail(state.support);
   if ((state.supportQ || "").trim()) return supportSearchHtml();
@@ -8351,6 +8375,73 @@ function safetyView() {
     '<div class="card sf-c"><div class="subhead" style="margin-top:0">A human, not an app</div>' +
       '<p>Nothing here replaces a coach who can watch you run, or a clinician who can examine you. If ' +
       'something feels wrong and the app is telling you it is fine, believe yourself.</p></div>';
+}
+/**
+ * TRAINING ZONES — Support › Tools.
+ *
+ * ⚠️ THIS PAGE EXISTS BECAUSE profile.maxHr WAS READ IN SIX PLACES AND WRITTEN IN NONE. maxHrEstimate()
+ * has always preferred a measured value over the age estimate, the zones panel on every run told the
+ * runner to "add your measured max heart rate in your profile", and there was no such field anywhere
+ * in the app. The promise was live; the field was not.
+ *
+ * ⚠️ maxHr IS DELIBERATELY ABSENT FROM DEFAULT_PROFILE, and that is the same lesson weeklyVolumeKm
+ * taught this project the hard way: a default sitting in every stored profile is an answer nobody
+ * gave, and it silently reshapes the app for people who never opened this screen. Absent means
+ * unanswered, and maxHrEstimate() already falls back to age when it is.
+ *
+ * ⚠️ SAVING MUST SYNC THE WATCH. The wrist colours its heart by zone from the maxHr in its payload,
+ * and the coach's safety cue fires above 92% of the same number. Writing the profile without
+ * syncNativeReminders/syncWatch leaves the two halves of one product judging the same heartbeat
+ * differently — exactly the split maxHrEstimate() was written to end.
+ *
+ * The zone boundaries are NOT redefined here. HR_ZONE_FLOOR is the app's copy and this reads it, so a
+ * change to the ladder moves this page with it rather than leaving a second table to drift.
+ */
+function zonesView() {
+  const ceil = maxHrEstimate();
+  const measured = Number(profile.maxHr) || 0;
+  const isMeasured = measured >= 120 && measured <= 230;
+  const age = Number(profile.age) || 0;
+  const canEstimate = age >= 10 && age <= 100;
+  const rows = HR_ZONE_FLOOR.map((f, i) => {
+    const lo = Math.round(ceil * f);
+    const hi = i === 4 ? null : Math.round(ceil * HR_ZONE_FLOOR[i + 1]) - 1;
+    return '<div class="hz-row zr-row"><span class="hz-bar" style="background:var(--hz' + (i + 1) + ')"></span>' +
+      '<span class="zr-n">Zone ' + (i + 1) + '<b>' + HR_ZONE_NAME[i] + '</b></span>' +
+      '<span class="zr-b num">' + (ceil ? (lo + (hi ? '–' + hi : '–max')) : '—') + '</span>' +
+      '<span class="zr-p num">' + Math.round(f * 100) + '%</span></div>';
+  }).join("");
+  // ⚠️ Say WHERE the number came from. A zone table with no provenance reads as a measurement of the
+  // runner, when for almost everybody it is arithmetic on their date of birth.
+  const src = !ceil
+    ? '<div class="zr-src zr-warn">No ceiling yet — add your age in your profile, or type a measured maximum below. Until then the app will not judge your effort by heart rate at all.</div>'
+    : isMeasured
+      ? '<div class="zr-src">From the maximum <b>you measured</b>. Nothing is estimated.</div>'
+      : '<div class="zr-src">Estimated from your age (' + age + ') as <b>208 − 0.7 × age</b>. It is a starting point, not a measurement — real maximums vary by about ±10 beats either side of any formula.</div>';
+  return '<h2 class="sec" style="margin-top:0">Training zones</h2>' +
+    '<div class="card zr-card">' +
+      '<div class="zr-lead">Every zone below is worked out from one number: your maximum heart rate.</div>' +
+      '<div class="q"><label for="zrMax">Maximum heart rate</label>' +
+        '<div class="pc-row"><div class="pc-n pc-wide"><input id="zrMax" class="pc-in num" type="number" inputmode="numeric" min="120" max="230" ' +
+          'placeholder="' + (canEstimate ? String(Math.round(208 - 0.7 * age)) : "—") + '" value="' + (isMeasured ? measured : "") + '">' +
+          '<span class="pc-nl">beats per minute</span></div></div>' +
+        '<div class="zr-hint" id="zrHint">Leave it blank to use the estimate. Anything outside 120–230 is ignored rather than believed.</div></div>' +
+      // ⚠️ .primary / .bk-btn2 are the app's real pair, as used by the Shoe Rack. .btn and .ghost were
+      // invented and styled by nothing — the same invented-identifier trap that shipped a profile
+      // button pointing at #saveSetup, which built, typechecked, passed everything and did nothing.
+      '<div class="zr-acts"><button class="primary" id="zrSave">Save</button>' +
+        (isMeasured ? '<button class="bk-btn2" id="zrClear">Use the estimate</button>' : '') + '</div>' +
+    '</div>' +
+    src +
+    '<div class="card zr-zones">' + rows + '</div>' +
+    '<div class="zr-note"><b>How to find your real maximum.</b> Not from a formula and not from a single hard run — ' +
+      'the highest number your watch has ever shown is usually a dropout or a spike, not a heartbeat. It takes a ' +
+      'deliberate maximal test, and those are hard enough that they are worth doing with a coach, or after a check ' +
+      'with your GP if you have any heart condition, are on medication that affects heart rate, or have not trained ' +
+      'in a long time.</div>' +
+    '<div class="zr-note zr-quiet">Zones move with heat, tiredness, caffeine, illness and altitude, and they drift ' +
+      'upward within a single long run. That is why this app plans by <b>pace and effort</b> and treats heart rate ' +
+      'as something that confirms a session rather than something that sets it.</div>';
 }
 /**
  * THE PACE CALCULATOR — Support › Tools.
@@ -8460,6 +8551,7 @@ function supportDetail(id) {
   if (id === "shoes") return back + shoeRackView();
   if (id === "data") return back + dataView();
   if (id === "pace") return back + paceCalcView();
+  if (id === "zones") return back + zonesView();
   return back + guidesView();
 }
 // ---- Strength & mobility library -------------------------------------------
@@ -15718,6 +15810,35 @@ function wire() {
     try { t.scrollIntoView({ block: "start", behavior: still ? "auto" : "smooth" }); } catch (e) { t.scrollIntoView(); }
     const h = t.querySelector(".fg-sech"); if (h) h.focus({ preventScroll: true });
   });
+  // Training zones. ⚠️ SAVING MUST REACH THE WRIST. The watch colours its heart by zone from the
+  // maxHr in its payload and the coach's safety cue fires above 92% of the same number, so a profile
+  // write alone leaves the two halves of one product judging the same heartbeat differently.
+  const zrCommit = (val) => {
+    if (val === null) delete profile.maxHr; else profile.maxHr = val;
+    saveProfileStore();
+    try { syncWatch(); } catch (e) {}
+    render();
+  };
+  const zrMax = $("zrMax");
+  if (zrMax) {
+    const save = $("zrSave");
+    if (save) save.onclick = () => {
+      const raw = String(zrMax.value || "").trim();
+      const hint = $("zrHint");
+      if (raw === "") { zrCommit(null); toast("Using the estimate from your age"); return; }
+      const n = Number(raw);
+      // ⚠️ REFUSE OUT OF RANGE RATHER THAN CLAMPING IT. A typo of 1740 clamped to 230 is a number the
+      // runner never chose, silently governing the wrist and the safety cue from then on.
+      if (!(n >= 120 && n <= 230)) {
+        if (hint) { hint.textContent = "That is outside 120–230 bpm, so it has not been saved. Check the number."; hint.classList.add("zr-bad"); }
+        return;
+      }
+      zrCommit(Math.round(n));
+      toast("Maximum heart rate saved");
+    };
+    const clear = $("zrClear");
+    if (clear) clear.onclick = () => { zrCommit(null); toast("Back to the estimate from your age"); };
+  }
   // The pace calculator. ⚠️ NOTHING HERE CALLS render() — see the note on paceCalcView. The segmented
   // buttons change which questions are asked, so they DO rebuild the card; the number fields never do,
   // because that would rebuild the box under the finger typing into it.

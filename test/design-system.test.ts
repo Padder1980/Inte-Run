@@ -68,6 +68,35 @@ test("⚠️ off-ladder radii do not increase", () => {
     `off-ladder radii rose to ${found.length} (ceiling ${RADIUS_CEILING}). Use var(--r-hero|--r-card|--r-ctl|--r-pill).`);
 });
 
+/**
+ * ⚠️ EVERY var(--…) IN THE STYLESHEET MUST RESOLVE TO A DECLARED TOKEN.
+ *
+ * The two ratchets above count LITERAL off-ladder values, so they are structurally blind to the
+ * opposite mistake: reaching for a token that does not exist. An undefined custom property makes the
+ * whole declaration invalid at computed-value time, so the property silently falls back to its
+ * initial value and nothing anywhere reports it.
+ *
+ * Found the hard way on 2026-08-15: var(--r-sm) was invented and used four times — twice in the plan
+ * drag-and-drop that had already SHIPPED TO TESTFLIGHT, where it left the drag highlight and the
+ * floating card with square corners. It passed the build, the typecheck, 573 tests and a screenshot
+ * review, because "slightly less rounded than intended" is not something an eye catches.
+ */
+test("⚠️ every custom property used in the stylesheet is declared", () => {
+  const s = sheet();
+  // ⚠️ DECLARATIONS ARE SCANNED ACROSS THE WHOLE PAGE, USES ONLY IN THE STYLESHEET. Nine tokens
+  // (--hc, --phase, --rc, --p and friends) are legitimately set per element as inline
+  // style="--hc: …" in the markup, so a stylesheet-only scan reports every one of them as missing
+  // and the guard is useless. The first version of this test did exactly that.
+  const declared = new Set([...css().matchAll(/(--[a-z0-9-]+)\s*:/gi)].map((m) => m[1]!.toLowerCase()));
+  assert.ok(declared.size > 40, `only ${declared.size} tokens declared — the scan is broken`);
+  const used = new Set([...s.matchAll(/var\(\s*(--[a-z0-9-]+)/gi)].map((m) => m[1]!.toLowerCase()));
+  assert.ok(used.size > 30, `only ${used.size} tokens used — the scan is broken`);
+  // A var() with a fallback — var(--x, 10px) — is deliberate and legal, so only bare uses are faults.
+  const bare = new Set([...s.matchAll(/var\(\s*(--[a-z0-9-]+)\s*\)/gi)].map((m) => m[1]!.toLowerCase()));
+  const missing = [...bare].filter((t) => !declared.has(t));
+  assert.deepEqual(missing, [], `used but never declared, so the declaration is silently dropped: ${missing.join(", ")}`);
+});
+
 test("⚠️ off-ladder font sizes do not increase", () => {
   const s = sheet();
   const onLadder = new Set(["32px", "24px", "20px", "17px", "15px", "13px", "11px"]);

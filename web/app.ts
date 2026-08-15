@@ -1803,6 +1803,8 @@ button.cn-row { cursor: pointer; }
 .cal-ghost { position: fixed; z-index: 300; margin: 0; pointer-events: none; background: var(--surface); border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); box-shadow: 0 16px 34px -14px rgba(4,26,22,.5); transform: scale(1.04) rotate(1.4deg); }
 .cal-day.cal-target { background: color-mix(in srgb, var(--accent) 11%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 12px; }
 body.cal-dragging { overscroll-behavior: none; cursor: grabbing; }
+.plan-target { background: color-mix(in srgb, var(--accent) 11%, transparent) !important; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 50%, transparent); border-radius: var(--r-sm); }
+.plan-ghost { border-radius: var(--r-sm); transform: scale(1.03) rotate(-0.8deg); }
 /* Post-run debrief: the coach's read of the session, not just its numbers. */
 .debrief { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 8%, var(--surface)), var(--surface) 62%); border-color: color-mix(in srgb, var(--accent) 24%, var(--line)); }
 .db-head { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: var(--ink); }
@@ -5519,6 +5521,92 @@ function calDragEnd() {
   }
 }
 function calDragCancel() { calDragTeardown(); DRAG = null; CAL_DRAGGED = true; }
+
+// ---- Drag a session row on the Plan page to another day of the same week ----------------------
+// Same engine path as the calendar drag (moveSession, effDay, dayOverride) so swaps, watch sync
+// and reminders all come for free. Cross-week moves are refused for the same reason as on the
+// calendar: weeks are training structures, not arbitrary buckets.
+function wirePlanDrag() {
+  const host = $("weekDetail"); if (!host) return;
+  host.querySelectorAll("button.ui-row[data-pday][data-oweek]").forEach((btn) => {
+    if (btn.dataset.plandragwired) return;
+    btn.dataset.plandragwired = "1";
+    btn.addEventListener("pointerdown", (ev) => {
+      if (DRAG || ev.button) return;
+      const x0 = ev.clientX, y0 = ev.clientY;
+      const t = setTimeout(() => { cleanup(); startPlanDrag(x0, y0, btn); }, 320);
+      const onMove = (e) => { if (Math.abs(e.clientX - x0) > 9 || Math.abs(e.clientY - y0) > 9) cleanup(); };
+      const cleanup = () => { clearTimeout(t); btn.removeEventListener("pointermove", onMove); btn.removeEventListener("pointerup", cleanup); btn.removeEventListener("pointercancel", cleanup); };
+      btn.addEventListener("pointermove", onMove);
+      btn.addEventListener("pointerup", cleanup);
+      btn.addEventListener("pointercancel", cleanup);
+    });
+  });
+}
+function startPlanDrag(x, y, btn) {
+  const wk = Number(btn.dataset.oweek);
+  const week = PLAN.weeks[wk - 1];
+  const sess = week && week.sessions.find((ss) => ss.id === btn.dataset.oid);
+  if (!sess) return;
+  const r = btn.getBoundingClientRect();
+  const ghost = btn.cloneNode(true);
+  ghost.classList.add("cal-ghost", "plan-ghost");
+  ghost.style.width = r.width + "px";
+  document.body.appendChild(ghost);
+  DRAG = { wk: wk, sess: sess, card: btn, ghost: ghost, dx: x - r.left, dy: y - r.top, target: null, targetEl: null, isPlan: true };
+  btn.classList.add("cal-lifted");
+  document.body.classList.add("cal-dragging");
+  moveGhost(x, y);
+  haptic("lift");
+  window.addEventListener("pointermove", planDragMove, { passive: false });
+  window.addEventListener("pointerup", planDragEnd);
+  window.addEventListener("pointercancel", planDragCancel);
+  window.addEventListener("touchmove", calDragBlockScroll, { passive: false });
+}
+function planDragMove(e) {
+  if (!DRAG || !DRAG.isPlan) return;
+  e.preventDefault();
+  moveGhost(e.clientX, e.clientY);
+  DRAG.ghost.style.display = "none";
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  DRAG.ghost.style.display = "";
+  const row = under && under.closest ? under.closest("[data-pday]") : null;
+  if (DRAG.targetEl && DRAG.targetEl !== row) DRAG.targetEl.classList.remove("plan-target");
+  if (row && row !== DRAG.card) {
+    const di = Number(row.dataset.pday);
+    if (DRAG.target !== di) haptic("tick");
+    row.classList.add("plan-target");
+    DRAG.targetEl = row; DRAG.target = di;
+  } else {
+    DRAG.targetEl = null; DRAG.target = null;
+  }
+}
+function planDragTeardown() {
+  window.removeEventListener("pointermove", planDragMove);
+  window.removeEventListener("pointerup", planDragEnd);
+  window.removeEventListener("pointercancel", planDragCancel);
+  window.removeEventListener("touchmove", calDragBlockScroll);
+  if (DRAG) {
+    if (DRAG.targetEl) DRAG.targetEl.classList.remove("plan-target");
+    if (DRAG.ghost) DRAG.ghost.remove();
+    if (DRAG.card) DRAG.card.classList.remove("cal-lifted");
+  }
+  document.body.classList.remove("cal-dragging");
+}
+function planDragEnd() {
+  if (!DRAG || !DRAG.isPlan) return;
+  const d = DRAG;
+  planDragTeardown();
+  DRAG = null;
+  CAL_DRAGGED = true;
+  if (d.target != null && d.target !== effDay(d.sess)) {
+    moveSession(d.wk, d.sess, d.target);
+    haptic("success");
+    render();
+  }
+}
+function planDragCancel() { if (!DRAG || !DRAG.isPlan) return; planDragTeardown(); DRAG = null; CAL_DRAGGED = true; }
+
 function viewCalendar() {
   const back = '<button class="backbtn" id="calBack">‹ Back</button>';
   const todayIsoStr = todayIso();
@@ -6458,6 +6546,7 @@ function wireSessionTaps() {
     const wk = Number(b.dataset.oweek);
     openSessionSheet(rawSessionById(wk, b.dataset.oid), wk);
   });
+  wirePlanDrag();
 }
 
 // ---- Add-a-session: pick a runnable session from a list and put it on today's date ----------------
@@ -7251,7 +7340,7 @@ function weekDetail() {
     if (!list || !list.length) {
       return uiSessionRow({ day: dn.slice(0, 3).toUpperCase(), title: "Rest", meta: "Recovery",
         colour: "var(--eff-none)", status: past ? "disabled" : "optional",
-        addDay: past ? null : riso });
+        addDay: past ? null : riso, pday: di });
     }
     return list.map((s) => {
       const done = !!state.done[doneKey(w.index, s)];
@@ -7263,7 +7352,7 @@ function weekDetail() {
         .filter(Boolean).join(" \u00b7 ");
       return uiSessionRow({ day: dn.slice(0, 3).toUpperCase(), title: s.title, meta: meta,
         colour: "var(--eff-" + s.effort + ")", status: status,
-        open: { week: w.index, id: s.id } });
+        open: { week: w.index, id: s.id }, pday: di });
     }).join("");
   }).join("");
   // \u26a0\ufe0f AN OPEN WEEK HAD NO WAY BACK. Every other week was a tappable summary; the one you had
@@ -9217,6 +9306,7 @@ function uiSessionRow(o) {
   const st = UI_ROW_STATUS[o.status] || UI_ROW_STATUS.future;
   const dis = o.status === "disabled";
   return '<' + (dis ? "div" : "button") + ' class="ui-row ' + st.cls + '"' +
+    (o.pday != null ? ' data-pday="' + o.pday + '"' : '') +
     (dis ? ' aria-disabled="true"'
       // ⚠️ Sessions are opened by the app's own delegated handler, which reads these three attributes.
       // A bespoke click handler here would be a second way to do the same thing, and the two drift.

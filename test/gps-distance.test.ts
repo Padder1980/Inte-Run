@@ -273,3 +273,104 @@ test("the watch reads the fused HealthKit distance rather than only its own GPS 
   assert.match(reset, /gpsDistanceMetres = 0/, "reset must clear the GPS fallback or run two starts mid-run");
   assert.match(reset, /adoptedHealthKitDistance = false/, "reset must clear the adoption flag");
 });
+
+/**
+ * ⚠️ FAULT THREE FROM THE AUDIT, and the biggest addition: THE STEP COUNTER.
+ *
+ * Every iPhone has a motion chip that counts steps and estimates distance from stride length, which
+ * iOS calibrates against GPS over time. It is most of why the big running apps agree with each other,
+ * and this app used none of it.
+ *
+ * It is a GAP FILLER, never a second opinion. GPS measures the ground actually covered; the pedometer
+ * infers distance from strides. Blending them continuously means two numbers arguing all run. These
+ * tests pin the three things that make that safe: it credits nothing while GPS is working, it credits
+ * a genuine gap once, and it refuses a reading no runner could produce.
+ */
+function pedoHarness() {
+  const src = lift(["haversine", "onGpsPos", "pedoFillGap"]);
+  const LIVE: any = {
+    mode: "gps", dist: 0, route: [], elevGain: 0, lastFixAt: null,
+    lastLat: null, lastLon: null, lastAlt: null, devSpeed: null, acc: null,
+    pedo: { metres: 0, steps: 0, credited: 0, capped: 0 },
+    rt: { getStatus: () => "active" },
+  };
+  let clock = 1_760_000_000_000;
+  const FakeDate = { now: () => clock };
+  const liveElapsedMs = () => FakeDate.now() - (LIVE.startMs || 0) - (LIVE.pausedMs || 0);
+  const fns = new Function("LIVE", "Date", "liveElapsedMs",
+    src + "; return { onGpsPos: onGpsPos, pedoFillGap: pedoFillGap };")(LIVE, FakeDate, liveElapsedMs);
+  const M = 111320;
+  return {
+    LIVE,
+    tick: (ms: number) => { clock += ms; },
+    gps: (metresNorth: number) => {
+      LIVE.lastFixAt = LIVE.lastFixAt == null ? clock : LIVE.lastFixAt;
+      fns.onGpsPos({ coords: { latitude: 53.48 + metresNorth / M, longitude: -2.24, accuracy: 8, speed: 3, altitude: null } });
+    },
+    steps: (cumulativeMetres: number) => { LIVE.pedo.metres = cumulativeMetres; fns.pedoFillGap(); },
+  };
+}
+
+test("the step counter adds nothing while GPS is working", () => {
+  const h = pedoHarness();
+  h.gps(0); h.tick(1000);
+  for (let i = 1; i <= 20; i++) { h.gps(i * 20); h.tick(1000); h.steps(i * 20); }
+  // ⚠️ THE FAILURE THAT WOULD MATTER MOST: every metre counted twice, once by each source.
+  assert.equal(Math.round(h.LIVE.pedo.credited), 0, "the pedometer double-counted ground GPS had already credited");
+  assert.ok(h.LIVE.dist > 350 && h.LIVE.dist < 420, "GPS distance is wrong: " + Math.round(h.LIVE.dist));
+});
+
+test("a real GPS blackout is filled once, and only for the gap", () => {
+  const h = pedoHarness();
+  // ⚠️ The pedometer counts THROUGHOUT, including while GPS is working — it does not switch on when
+  // GPS fails. The first version of this fixture left it at zero during the GPS phase, so the gap it
+  // then measured included ground GPS had already credited. A harness that does not mirror the real
+  // device tests the wrong thing, and here it would have hidden double-counting rather than caught it.
+  h.gps(0); h.steps(0); h.tick(1000); h.gps(20); h.steps(20);
+  const before = h.LIVE.dist;
+  // Into a tunnel: no fixes for 60 s, during which the pedometer reaches 200 m — 180 m of new ground.
+  h.tick(60000);
+  h.steps(200);
+  const filled = h.LIVE.pedo.credited;
+  assert.ok(filled > 150 && filled < 200, "the blackout was not filled correctly: " + Math.round(filled));
+  assert.ok(h.LIVE.dist > before + 150, "the filled distance never reached the total");
+  // ⚠️ And it must not keep paying for the same stretch on every later update.
+  h.tick(1000); h.steps(200);
+  assert.equal(Math.round(h.LIVE.pedo.credited), Math.round(filled), "the same gap was credited twice");
+});
+
+test("a pedometer reading no runner could produce is refused, not banked", () => {
+  const h = pedoHarness();
+  h.gps(0); h.tick(1000); h.gps(20);
+  const before = h.LIVE.dist;
+  // 30 s of silence, and the pedometer claims 900 m — 30 m/s, which is a car.
+  h.tick(30000);
+  h.steps(900);
+  assert.equal(h.LIVE.dist, before, "an impossible pedometer reading was added to the run");
+  assert.equal(h.LIVE.pedo.capped, 1, "the refusal must be counted, not silent");
+});
+
+test("the step counter is optional everywhere it is used", () => {
+  const html = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
+  // ⚠️ There is no pedometer in a browser, and the PWA must simply carry on without one.
+  assert.match(html, /function pedoAvailable\(/, "the availability guard is missing");
+  assert.match(html, /if \(pedoAvailable\(\)\) pedoPost\("start"\)/, "the counter is started unguarded");
+  assert.match(html, /if \(pedoAvailable\(\)\) pedoPost\("stop"\)/, "the counter is stopped unguarded");
+  // ⚠️ Left running it is a battery drain nothing reads, and the next run opens with a stale baseline.
+  const stop = html.slice(html.indexOf("function stopLive("), html.indexOf("function stopLive(") + 1400);
+  assert.match(stop, /pedoPost\("stop"\)/, "stopLive does not stop the pedometer");
+  // And its contribution must be visible, or a filler doing nothing and one doing too much look alike.
+  assert.match(html, /function pedoDiagLine\(/, "the pedometer contribution is not surfaced");
+  assert.match(html, /pedoDiagLine\(\),/, "pedoDiagLine is defined but never shown in Your data");
+});
+
+test("the native side declares why it wants motion data", () => {
+  const plist = readFileSync(new URL("../ios/InteRun-Info.plist", import.meta.url), "utf8");
+  // ⚠️ Without NSMotionUsageDescription iOS TERMINATES the app on first access — it does not merely
+  // refuse. This entry is load-bearing, not paperwork.
+  assert.match(plist, /NSMotionUsageDescription/, "the motion permission string is missing — the app will be killed on first use");
+  const swift = readFileSync(new URL("../ios/InteRun/PedometerService.swift", import.meta.url), "utf8");
+  assert.match(swift, /isStepCountingAvailable/, "hardware availability is not checked");
+  // distance is an OPTIONAL on CMPedometerData; treating a missing one as zero says "stopped moving".
+  assert.match(swift, /data\.distance\?\.doubleValue/, "the optional distance is not handled safely");
+});

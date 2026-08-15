@@ -9832,6 +9832,7 @@ function viewportDiagLines() {
       // credited = fixes that added distance. A run with seen high and credited 0 is the first fault
       // returning; still 0 with a stationary phone is the second.
       gpsDiagLine(),
+      pedoDiagLine(),
       coachDiagLine(),
       notifDiagLine(),
     ];
@@ -9890,6 +9891,20 @@ function gpsDiagLine() {
     " \u00b7 spikes " + d.spike + " \u00b7 worst acc " + d.maxAcc + "m";
 }
 let GPS_DIAG_LAST = null;
+let PEDO_DIAG_LAST = null;
+/**
+ * What the step counter contributed. \u26a0\ufe0f It has to be visible, because a gap filler that quietly does
+ * nothing and one that is quietly doing too much look identical from a distance total \u2014 and this is
+ * the only number that tells them apart.
+ */
+function pedoDiagLine() {
+  const p = (LIVE && LIVE.pedo) || PEDO_DIAG_LAST;
+  if (!pedoAvailable()) return "steps: not available on this device";
+  if (!p) return "steps: no run recorded yet";
+  if (p.off) return "steps: the phone reports no step counter";
+  return "steps: " + (p.steps || 0) + " \u00b7 filled " + Math.round(p.credited || 0) + "m of GPS gaps" +
+    ((p.capped || 0) ? " \u00b7 refused " + p.capped + " implausible" : "");
+}
 function viewportDiag() { return viewportDiagLines().join(" \u00b7 "); }
 function probeInsets() {
   const one = (side) => {
@@ -13474,6 +13489,10 @@ function startGps(pos) {
   LIVE.rt.start(0).forEach(liveCue);
   coachNativeSchedule();
   LIVE.watchId = navigator.geolocation.watchPosition(onGpsPos, () => {}, { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
+  LIVE.lastFixAt = Date.now();
+  // The step counter, for the stretches GPS will miss. Absent in a browser, which is why every use of
+  // it is guarded rather than assumed — the web app simply carries on without it.
+  if (pedoAvailable()) pedoPost("start");
   if (!LIVE.ui) LIVE.ui = setInterval(gpsUiTick, 250);
   renderLiveNow();
 }
@@ -13561,6 +13580,67 @@ function startSim() {
  * in both directions and a screenshot of "0.00 km" looks identical to a screenshot of "0.14 km standing
  * still" — the next report needs to carry numbers, exactly as the keyboard diagnostics do.
  */
+/**
+ * THE STEP COUNTER — the gap filler, and the app's first use of the phone's motion chip.
+ *
+ * ⚠️ IT NEVER COMPETES WITH GPS, AND THAT RESTRAINT IS THE DESIGN. GPS measures the ground actually
+ * covered; the pedometer counts strides and infers distance from a stride length iOS calibrates
+ * against GPS over time. Blending them continuously means two numbers arguing for the whole run and a
+ * distance that lurches whenever the weighting moves. This credits the pedometer ONLY across stretches
+ * where GPS has gone quiet for longer than a runner could plausibly stand still — under trees, between
+ * tall buildings, in a tunnel — which is precisely where distance is lost today, and nowhere else.
+ *
+ * ⚠️ AND IT CANNOT RUN AWAY. Credit is capped at what the elapsed gap could contain at a fast running
+ * pace, so a pedometer that miscounts (arm swing at a bus stop, a phone jostled in a bag) cannot add
+ * kilometres. Anything beyond the cap is dropped and counted, not quietly banked.
+ */
+function pedoAvailable() {
+  try { return !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.interunPedometer); } catch (e) { return false; }
+}
+function pedoPost(action) {
+  try { window.webkit.messageHandlers.interunPedometer.postMessage({ action: action }); } catch (e) {}
+}
+window.__interunPedometer = function (d) {
+  try {
+    if (!LIVE || !d) return;
+    if (d.available === false) { LIVE.pedo = { off: true }; return; }
+    const p = LIVE.pedo || (LIVE.pedo = { metres: 0, steps: 0, credited: 0, capped: 0 });
+    if (p.off) return;
+    if (typeof d.metres === "number" && isFinite(d.metres) && d.metres >= 0) p.metres = d.metres;
+    if (typeof d.steps === "number" && isFinite(d.steps)) p.steps = d.steps;
+    if (typeof d.cadence === "number" && isFinite(d.cadence) && d.cadence > 0) LIVE.cadence = Math.round(d.cadence);
+    pedoFillGap();
+  } catch (e) {}
+};
+/**
+ * Credit the pedometer for a stretch GPS has missed.
+ * ⚠️ THE GAP IS MEASURED FROM THE LAST CREDITED FIX, NOT THE LAST FIX SEEN. A run under trees receives
+ * plenty of fixes; they are simply too vague to trust, and it is exactly then that the distance stops
+ * advancing. Measuring "time since we last believed something" is the condition that matters.
+ */
+function pedoFillGap() {
+  const p = LIVE && LIVE.pedo;
+  if (!p || p.off || LIVE.mode !== "gps") return;
+  if (!LIVE.rt || LIVE.rt.getStatus() !== "active") { p.mark = p.metres; p.markAt = Date.now(); return; }
+  if (p.mark == null) { p.mark = p.metres; p.markAt = Date.now(); return; }
+  const quietMs = Date.now() - (LIVE.lastFixAt || p.markAt);
+  // Under 20 s of silence is an ordinary gap between fixes, or a runner genuinely standing still.
+  // ⚠️ THE BASELINE MOVES FORWARD WHILE GPS IS HEALTHY, AND LEAVING THAT OUT WAS A REAL BUG. Snapping
+  // it only at the instant of a GPS credit is not enough: pedometer updates arrive on their own
+  // schedule, so a reading that lands a moment after a credit describes ground GPS has already paid
+  // for — and the next blackout would bill for it a second time. Caught by a test, not by reading it.
+  if (quietMs < 20000) { p.mark = p.metres; p.markAt = Date.now(); return; }
+  const walked = p.metres - p.mark;
+  if (!(walked > 0)) { p.markAt = Date.now(); return; }
+  // ⚠️ 6 m/s is faster than almost anyone runs. A pedometer reading beyond that for the elapsed gap is
+  // miscounting, not sprinting, and is refused rather than trusted.
+  const cap = (Date.now() - p.markAt) / 1000 * 6;
+  if (walked > cap) { p.capped++; p.mark = p.metres; p.markAt = Date.now(); return; }
+  LIVE.dist += walked;
+  p.credited += walked;
+  p.mark = p.metres;
+  p.markAt = Date.now();
+}
 function onGpsPos(pos) {
   if (!LIVE || LIVE.mode !== "gps") return;
   const c = pos.coords;
@@ -13601,6 +13681,12 @@ function onGpsPos(pos) {
   // Cheap veto: when the device DOES insist it is stationary, believe that much.
   if (LIVE.devSpeed != null && LIVE.devSpeed <= 0.35) { D.still++; return; }
   D.credited++;
+  // ⚠️ STAMPED ON BELIEF, NOT ON ARRIVAL. The step counter fills stretches where GPS has gone quiet,
+  // and under trees plenty of fixes still arrive — they are simply too vague to credit. Stamping this
+  // when a fix merely turns up would hide exactly the gap the pedometer exists to cover.
+  LIVE.lastFixAt = Date.now();
+  // The pedometer's own baseline moves with it, so a stretch GPS did credit can never be paid twice.
+  if (LIVE.pedo && !LIVE.pedo.off) { LIVE.pedo.mark = LIVE.pedo.metres; LIVE.pedo.markAt = LIVE.lastFixAt; }
   LIVE.dist += net;
   // \u26a0\ufe0f AND WHEN. A route of bare coordinates cannot become a Strava activity: without a time
   // on each point there is no pace, no moving time and no splits, and the only way to supply them
@@ -15015,6 +15101,11 @@ function stopLive() {
   // Keep the GPS accounting after LIVE is torn down, so Support › Your data can still answer "what did
   // GPS actually do on that run?" an hour later.
   if (LIVE.gpsDiag) GPS_DIAG_LAST = LIVE.gpsDiag;
+  if (LIVE.pedo) PEDO_DIAG_LAST = LIVE.pedo;
+  // ⚠️ ALWAYS STOPPED, on every exit from a run — finished, discarded, or walked away from. A pedometer
+  // left counting is a battery drain with nothing reading it, and its next run would open with a
+  // baseline from the last one.
+  if (pedoAvailable()) pedoPost("stop");
   clearCountIn();
   endLiveActivity();
   if (LIVE.timer) { clearInterval(LIVE.timer); LIVE.timer = null; }

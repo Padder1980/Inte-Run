@@ -90,6 +90,12 @@ struct WebHost: UIViewRepresentable {
 
         config.userContentController.add(HapticService(), name: HapticService.messageName)
 
+        // The step counter. See PedometerService: it fills the stretches where GPS goes quiet, and
+        // gives the app a cadence it has never been able to show.
+        let pedometer = PedometerService(webView: webView)
+        context.coordinator.pedometer = pedometer
+        config.userContentController.add(pedometer, name: PedometerService.messageName)
+
         // The coach's voice while the phone is locked. See CoachAudioService: the page owns what is said
         // and when, but its own timer stops the moment iOS suspends the web content process.
         // ⚠️ The SHARED instance: WatchBridge plays wrist-driven cues through it, and the bridge
@@ -163,6 +169,10 @@ struct WebHost: UIViewRepresentable {
         var coachAudio: CoachAudioService?
         /// Owns the CLLocationManager for the lifetime of the web view. See `LocationService.swift`.
         var location: LocationService?
+        /// Owns the CMPedometer. ⚠️ Strong, for the same reason as coachAudio above: the message
+        /// handler is held weakly by WKUserContentController, so without an owner here ARC collects it
+        /// and the step counter silently stops delivering.
+        var pedometer: PedometerService?
         /// Pins the web view's own scroll view at zero — see the note where it is installed.
         var scrollPin: NSKeyValueObservation?
 

@@ -2945,6 +2945,85 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .zr-p { font-size: var(--t-label); color: var(--ink-faint); width: 38px; text-align: right; flex: none; }
 .zr-note { font-size: var(--t-meta); color: var(--ink-soft); margin-top: var(--s2); padding: 0 var(--s1); }
 .zr-note.zr-quiet { color: var(--ink-faint); }
+
+/* Logbook: this week, the trend, the two tiles, and their three destinations. */
+.lw-card { padding: var(--s3); }
+.lw-h { font-size: var(--t-section); font-weight: 800; letter-spacing: -.01em; }
+.lw-cells, .pg-cells { display: flex; gap: var(--s3); margin-top: var(--s2); flex-wrap: wrap; }
+.pg-cells { margin-top: var(--s3); padding-top: var(--s2); border-top: 1px solid var(--line); }
+.lw-cell { min-width: 76px; }
+.lw-cl { font-size: var(--t-label); color: var(--ink-faint); }
+.lw-cv { font-size: var(--t-hero); font-weight: 800; color: var(--ink); line-height: 1.15; }
+.lw-u { font-size: var(--t-meta); font-weight: 700; color: var(--ink-soft); }
+.lw-sub { font-size: var(--t-meta); color: var(--ink-faint); margin-top: var(--s3); }
+.lt-svg { width: 100%; height: auto; display: block; margin-top: 4px; overflow: visible; }
+.lt-area { fill: color-mix(in srgb, var(--accent) 18%, transparent); }
+.lt-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.lt-dot { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
+.lt-dot.now { fill: var(--accent); }
+.lt-grid { stroke: var(--ink-faint); stroke-width: .5; opacity: .35; }
+/* ⚠️ On the ladder, not a bespoke 9px. The ratchet caught it, and it is right to: an off-ladder size
+   is one that does not grow for somebody using large text, and a chart axis is exactly where that
+   matters. --t-label is 11px, which is legible inside the viewBox at this scale. */
+.lt-yl, .lt-xl { fill: var(--ink-faint); font-size: var(--t-label); font-family: var(--sans); }
+.lt-xl { text-anchor: middle; }
+.lw-more { width: 100%; margin-top: var(--s2); padding: 11px; border-radius: var(--r-pill);
+  border: 1px solid var(--line); background: transparent; color: var(--ink); font-size: var(--t-meta); font-weight: 700; }
+.lb-tiles { display: flex; gap: var(--s2); margin-top: var(--s2); }
+.lb-tile { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: var(--s3);
+  text-align: left; align-items: stretch; }
+.lb-th { display: flex; align-items: center; justify-content: space-between; font-size: var(--t-card);
+  font-weight: 800; color: var(--ink); }
+.lb-flame { display: flex; align-items: center; justify-content: center; position: relative; margin: 4px 0; }
+.lb-flame svg { width: 54px; height: 54px; color: var(--ink-faint); }
+.lb-fn { position: absolute; font-size: var(--t-card); font-weight: 800; color: var(--surface); }
+.lb-tf { font-size: var(--t-meta); font-weight: 700; color: var(--ink-soft); text-align: center; }
+.tl-mini { display: flex; flex-direction: column; gap: 5px; margin-top: 2px; }
+.tl-lab { display: flex; justify-content: space-between; font-size: var(--t-label); color: var(--ink-faint); }
+.tl-lab b { color: var(--ink); }
+.tl-week { display: flex; justify-content: space-between; }
+.tl-d { width: 6px; height: 6px; border-radius: var(--r-pill); background: var(--ink-faint); opacity: .45; }
+.tl-d.on { background: var(--build); opacity: 1; width: 10px; height: 10px; margin: -2px 0; }
+.tl-d.fut { opacity: .18; }
+.pg-card { padding: var(--s3); }
+.pg-cl { font-size: var(--t-meta); color: var(--ink-soft); }
+.pg-big { font-size: var(--t-display); font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
+.pg-range { font-size: var(--t-label); color: var(--ink-faint); }
+.pg-cmp { display: flex; align-items: baseline; gap: 6px; font-size: var(--t-meta); margin-top: 6px; color: var(--ink-faint); }
+.pg-cmp b { font-weight: 800; }
+.pg-cmp.up b { color: var(--build); }
+.pg-cmp.down b { color: var(--peak); }
+.pg-chips { margin-top: var(--s2); flex-wrap: wrap; }
+.pg-note { font-size: var(--t-meta); color: var(--ink-faint); margin-top: var(--s2); padding: 0 var(--s1); }
+.sc-card { padding: var(--s3); }
+.sc-h { display: flex; align-items: center; justify-content: space-between; font-size: var(--t-card); font-weight: 800; }
+.sc-nav { min-width: var(--tap); min-height: var(--tap); border: 0; background: transparent; color: var(--accent);
+  font-size: var(--t-section); font-weight: 800; border-radius: var(--r-pill); }
+.sc-nav[disabled] { color: var(--ink-faint); opacity: .4; }
+.sc-stats { display: flex; gap: var(--s3); margin: var(--s2) 0; }
+.sc-dow, .tg-dow { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center;
+  font-size: var(--t-label); color: var(--ink-faint); font-weight: 700; }
+.tg-dow { padding: 0 var(--s3); margin-bottom: 4px; }
+.sc-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-top: 5px; }
+.sc-c { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: var(--r-pill);
+  font-size: var(--t-meta); color: var(--ink-soft); background: var(--surface-2); }
+.sc-c.sc-pad { background: transparent; }
+.sc-c.on { background: var(--ink); color: var(--bg); }
+.sc-c.on svg { width: 15px; height: 15px; }
+.sc-c.now { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.sc-c.fut { opacity: .35; }
+.tg-card { padding: var(--s2) var(--s3); }
+.tg-row { padding: var(--s2) 0; border-bottom: 1px solid var(--line); }
+.tg-row:last-child { border-bottom: 0; }
+.tg-rh { display: flex; justify-content: space-between; font-size: var(--t-label); color: var(--ink-faint); margin-bottom: 6px; }
+.tg-rh b { color: var(--ink); }
+.tg-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; align-items: center; justify-items: center; }
+.tg-c { width: 7px; height: 7px; border-radius: var(--r-pill); background: var(--ink-faint); opacity: .4; border: 0; padding: 0; }
+.tg-c.fut { opacity: .15; }
+.tg-c.on { width: 100%; max-width: 42px; height: 34px; opacity: 1; background: var(--build); color: #fff;
+  font-size: var(--t-label); font-weight: 800; display: flex; align-items: center; justify-content: center; }
+/* A run whose full record has aged out: still true, still shown, but not pretending to be tappable. */
+.tg-c.tg-old { background: color-mix(in srgb, var(--build) 34%, transparent); color: var(--ink-soft); cursor: default; }
 </style>
 </head>
 <body>
@@ -3270,10 +3349,11 @@ function syncHist() {
     const km = Math.round((Number(r.distKm) || 0) * 100) / 100;
     const sec = Math.round(Number(r.sec) || 0);
     const ty = String(r.type || "");
+    const el = Math.round(Number(r.elevGain) || 0);
     const j = at[r.id];
-    if (j == null) { at[r.id] = rows.length; rows.push({ i: r.id, d: r.dateIso, k: km, s: sec, t: ty }); dirty = true; continue; }
+    if (j == null) { at[r.id] = rows.length; rows.push({ i: r.id, d: r.dateIso, k: km, s: sec, t: ty, e: el }); dirty = true; continue; }
     const w = rows[j];
-    if (w.d !== r.dateIso || w.k !== km || w.s !== sec || w.t !== ty) { w.d = r.dateIso; w.k = km; w.s = sec; w.t = ty; dirty = true; }
+    if (w.d !== r.dateIso || w.k !== km || w.s !== sec || w.t !== ty || w.e !== el) { w.d = r.dateIso; w.k = km; w.s = sec; w.t = ty; w.e = el; dirty = true; }
   }
   // Newest first, matching state.logged, so every reader can stop early.
   if (dirty) { rows.sort((a, b) => (a.d < b.d ? 1 : a.d > b.d ? -1 : 0)); saveHist(rows); }
@@ -7660,7 +7740,7 @@ function viewActivities() {
     const none = !shown.length
       ? '<div class="lb-none">Nothing logged of that kind yet. <button class="lb-clear" id="lbClear">Show every run</button></div>'
       : "";
-    return tabs + logbookSnapshot() + progressSnapshot() +
+    return tabs + logWeekCard() + logTiles() + logbookSnapshot() + progressSnapshot() +
       '<div class="pf-sec"><span>Recent runs</span>' +
       (shown.length > 6 ? '<button class="pf-edit" id="lgAll">' + (state.logAll ? "Show less" : "View all") + '</button>' : "") +
       '</div>' +
@@ -7693,13 +7773,23 @@ function logWeekStartIso() {
   const dow = (new Date(Date.UTC(p[0], (p[1] || 1) - 1, p[2] || 1)).getUTCDay() + 6) % 7;
   return isoAdd(iso, -dow).toISOString().slice(0, 10);
 }
-function logTotals(fromIso) {
-  let runs = 0, km = 0, sec = 0;
-  for (const r of (state.logged || [])) {
-    if (!r || !r.dateIso || (fromIso && r.dateIso < fromIso)) continue;
-    runs++; km += Number(r.distKm) || 0; sec += Number(r.sec) || 0;
+/**
+ * Totals over a date range, from the PERMANENT HISTORY.
+ *
+ * ⚠️ IT USED TO READ state.logged AND WAS THEREFORE CAPPED AT 50 RUNS, which is why the doc comment
+ * above still warns that an all-time figure is a lie past your fifty-first run. That is no longer
+ * true: interun_hist_v1 keeps every run, so any range is answerable and none of them need a caveat.
+ * toIso is inclusive, so a caller asking for one calendar month gets that month.
+ */
+function logTotals(fromIso, toIso) {
+  let runs = 0, km = 0, sec = 0, elev = 0;
+  for (const r of (state.hist || [])) {
+    if (!r || !r.d) continue;
+    if (fromIso && r.d < fromIso) continue;
+    if (toIso && r.d > toIso) continue;
+    runs++; km += Number(r.k) || 0; sec += Number(r.s) || 0; elev += Number(r.e) || 0;
   }
-  return { runs: runs, km: km, sec: sec };
+  return { runs: runs, km: km, sec: sec, elev: elev };
 }
 /**
  * How much of this week's plan has actually been run.
@@ -7753,6 +7843,275 @@ function logStreakWeeks() {
   let n = 0;
   while (wk.has(cursor)) { n++; cursor = isoAdd(cursor, -7).toISOString().slice(0, 10); }
   return n;
+}
+/**
+ * PROGRESS — the fuller chart, with ranges.
+ *
+ * ⚠️ EVERY RANGE HERE IS ONLY HONEST BECAUSE THE HISTORY IS UNCAPPED. Against the old 50-run store,
+ * 1Y needed about 208 runs and held 24% of them, so the earlier months would have drawn as ZERO —
+ * indistinguishable from months somebody chose not to run. A blank week must mean a blank week.
+ *
+ * ⚠️ AND IT STILL SAYS WHERE ITS DATA STARTS. History only reaches back to whenever the runner
+ * started using the app, so a 1Y view for somebody two months in is mostly empty; the caption names
+ * the first run rather than letting the flat line imply idleness.
+ */
+const PROG_RANGES = [
+  { k: "7d", lab: "7D", days: 7 }, { k: "1m", lab: "1M", days: 30 }, { k: "3m", lab: "3M", days: 91 },
+  { k: "6m", lab: "6M", days: 182 }, { k: "ytd", lab: "YTD", days: 0 }, { k: "1y", lab: "1Y", days: 365 },
+];
+function progressView() {
+  const key = state.progRange || "3m";
+  const r = PROG_RANGES.find((x) => x.k === key) || PROG_RANGES[2];
+  const today = todayIso();
+  const from = r.k === "ytd" ? today.slice(0, 4) + "-01-01" : isoAdd(today, -(r.days - 1)).toISOString().slice(0, 10);
+  const t = logTotals(from, today);
+  // The same span again, immediately before, so the comparison is like for like.
+  const span = dayDiff(from, today) + 1;
+  const prev = logTotals(isoAdd(from, -span).toISOString().slice(0, 10), isoAdd(from, -1).toISOString().slice(0, 10));
+  const delta = prev.km > 0 ? Math.round(((t.km - prev.km) / prev.km) * 100) : null;
+  const oldest = (state.hist || []).length ? state.hist[state.hist.length - 1].d : null;
+  const weeks = Math.max(4, Math.min(52, Math.ceil(span / 7)));
+  const chips = PROG_RANGES.map((x) =>
+    '<button type="button" class="' + (x.k === key ? "on" : "") + '" data-prog="' + x.k + '">' + x.lab + '</button>').join("");
+  const cmp = delta == null
+    ? '<div class="pg-cmp">Nothing in the period before this to compare with.</div>'
+    : '<div class="pg-cmp ' + (delta >= 0 ? "up" : "down") + '"><b>' + (delta >= 0 ? "▲" : "▼") + ' ' + Math.abs(delta) + '%</b>' +
+      '<span>vs the ' + (span >= 60 ? Math.round(span / 30) + ' months' : span + ' days') + ' before</span></div>';
+  const short = oldest && oldest > from
+    ? '<div class="pg-note">Your history starts on ' + esc(runDateLabelIso(oldest)) + ', so anything before that is blank because there is no record — not because you did not run.</div>'
+    : "";
+  return '<button class="backbtn" id="pgBack">‹ Logbook</button>' +
+    '<h2 class="sec" style="margin-top:0">Progress</h2>' +
+    '<div class="card pg-card">' +
+      '<div class="pg-cl">Total distance</div>' +
+      '<div class="pg-big num">' + (Math.round(t.km * 10) / 10) + ' <span class="lw-u">km</span></div>' +
+      '<div class="pg-range">' + esc(runDateLabelIso(from)) + ' – ' + esc(runDateLabelIso(today)) + '</div>' +
+      cmp +
+      logTrendSvg(logWeekBuckets(weeks)) +
+      '<div class="seg pc-seg pg-chips">' + chips + '</div>' +
+      '<div class="pg-cells">' +
+        '<div class="lw-cell"><div class="lw-cl">Runs</div><div class="lw-cv num">' + t.runs + '</div></div>' +
+        '<div class="lw-cell"><div class="lw-cl">Time</div><div class="lw-cv num">' + fmtDur(t.sec) + '</div></div>' +
+        '<div class="lw-cell"><div class="lw-cl">Elev gain</div><div class="lw-cv num">' + t.elev + ' <span class="lw-u">m</span></div></div>' +
+      '</div>' +
+    '</div>' + short;
+}
+/**
+ * THE STREAK CALENDAR — one month of active days.
+ *
+ * ⚠️ IT REFUSES TO PAGE BACK BEFORE THE FIRST RECORDED RUN. Scrolled past that, every day draws blank
+ * and a blank day means "you rested" — so the calendar would be inventing rest days out of an absence
+ * of records. That was the specific reason a scrolling calendar was blocked before the history store,
+ * and the guard has to stay even now that the store is uncapped.
+ */
+function streakCalendarView() {
+  const cur = state.streakMon || todayIso().slice(0, 7);
+  const y = Number(cur.slice(0, 4)), m = Number(cur.slice(5, 7));
+  const first = cur + "-01";
+  const dim = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const lead = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7;
+  const ran = new Set((state.hist || []).filter((r) => r && r.d && r.d.slice(0, 7) === cur).map((r) => r.d));
+  const oldest = (state.hist || []).length ? state.hist[state.hist.length - 1].d : todayIso();
+  const canBack = first > oldest;
+  const canFwd = cur < todayIso().slice(0, 7);
+  const MON_FULL = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  let cells = "";
+  for (let i = 0; i < lead; i++) cells += '<span class="sc-c sc-pad"></span>';
+  for (let d = 1; d <= dim; d++) {
+    const iso = cur + "-" + String(d).padStart(2, "0");
+    const on = ran.has(iso), today = iso === todayIso(), future = iso > todayIso();
+    cells += '<span class="sc-c' + (on ? " on" : "") + (today ? " now" : "") + (future ? " fut" : "") + '">' +
+      (on ? ICON.rEasy : String(d)) + '</span>';
+  }
+  return '<button class="backbtn" id="scBack">‹ Logbook</button>' +
+    '<div class="card sc-card">' +
+      // ⚠️ SINGLE-QUOTED. Writing this as \" collapses to a bare " in the emitted JS and kills the
+      // whole page silently — the build still exits 0. This file's own rules say to prefer single
+      // quotes when the HTML carries double ones, and this is why.
+      '<div class="sc-h"><button class="sc-nav" id="scPrev"' + (canBack ? "" : ' disabled aria-disabled="true"') + '>‹</button>' +
+        '<span>' + MON_FULL[m - 1] + ' ' + y + '</span>' +
+        '<button class="sc-nav" id="scNext"' + (canFwd ? "" : ' disabled aria-disabled="true"') + '>›</button></div>' +
+      '<div class="sc-stats"><div class="lw-cell"><div class="lw-cl">Your streak</div><div class="lw-cv num">' +
+        logStreakWeeks() + ' <span class="lw-u">' + (logStreakWeeks() === 1 ? "week" : "weeks") + '</span></div></div>' +
+        '<div class="lw-cell"><div class="lw-cl">Runs this month</div><div class="lw-cv num">' + ran.size + '</div></div></div>' +
+      '<div class="sc-dow">' + ["M","T","W","T","F","S","S"].map((x) => '<span>' + x + '</span>').join("") + '</div>' +
+      '<div class="sc-grid">' + cells + '</div>' +
+    '</div>' +
+    (canBack ? "" : '<div class="pg-note">This is as far back as your records go.</div>');
+}
+/**
+ * THE TRAINING LOG — a week per row, a dot per day, newest first.
+ *
+ * ⚠️ A DOT CARRIES data-runid, WHICH IS THE HANDLE. An index into state.logged is not: the array is
+ * unshifted whenever a watch run arrives, and filtering breaks it a second way. wire() already binds
+ * every [data-runid], so tapping a dot opens that exact run's card with no new plumbing.
+ * ⚠️ A day with more than one run shows the FIRST by id — two runs on one day is one dot, and the
+ * total on the right is the honest figure for the row.
+ *
+ * ⚠️ ONLY A RUN THAT STILL HAS ITS FULL RECORD IS A BUTTON. The history is uncapped but state.logged
+ * is still 50, so on a real training year MOST dots describe a run whose map and splits are gone.
+ * Measured on an eight-month fixture: 148 dots, 50 openable, and the other 98 all landed on
+ * "Run not found." — a dead end two thirds of the time, for runs the same screen is showing a real
+ * distance for. An unopenable day is a span with aria-disabled, never a button that does nothing,
+ * which is the rule test/design-system.test.ts already enforces on session rows.
+ */
+function trainingLogView() {
+  const weeks = logWeekBuckets(Math.max(8, Math.min(52, state.tlWeeks || 12))).slice().reverse();
+  const byDay = Object.create(null);
+  for (const r of (state.hist || [])) if (r && r.d && !byDay[r.d]) byDay[r.d] = r;
+  const openable = new Set((state.logged || []).map((r) => r && r.id).filter(Boolean));
+  let anyClosed = false;
+  const rows = weeks.map((w) => {
+    let cells = "";
+    for (let d = 0; d < 7; d++) {
+      const iso = isoAdd(w.start, d).toISOString().slice(0, 10);
+      const run = byDay[iso];
+      const future = iso > todayIso();
+      if (run) {
+        const km = Math.round(run.k * 10) / 10;
+        const when = esc(runDateLabelIso(iso));
+        if (openable.has(run.i)) {
+          cells += '<button class="tg-c on" data-runid="' + esc(run.i) + '" aria-label="' + when + ', ' + km + ' km">' +
+            '<span class="num">' + km + '</span></button>';
+        } else {
+          anyClosed = true;
+          cells += '<span class="tg-c on tg-old" aria-disabled="true" title="' + when + ', ' + km + ' km — details no longer stored">' +
+            '<span class="num">' + km + '</span></span>';
+        }
+      } else {
+        cells += '<span class="tg-c' + (future ? " fut" : "") + '"></span>';
+      }
+    }
+    return '<div class="tg-row"><div class="tg-rh"><span>' + esc(runDateLabelIso(w.start)) + ' – ' +
+      esc(runDateLabelIso(w.end)) + '</span><b class="num">' + (Math.round(w.km * 10) / 10) + ' km</b></div>' +
+      '<div class="tg-week">' + cells + '</div></div>';
+  }).join("");
+  return '<button class="backbtn" id="tgBack">‹ Logbook</button>' +
+    '<h2 class="sec" style="margin-top:0">Training log</h2>' +
+    '<div class="tg-dow">' + ["M","T","W","T","F","S","S"].map((x) => '<span>' + x + '</span>').join("") + '</div>' +
+    '<div class="card tg-card">' + rows + '</div>' +
+    '<div class="pg-note">Tap a run to open it.' +
+      (anyClosed ? ' The paler ones are older than your last fifty runs — their distance is kept, but the map and splits are not.' : '') +
+      '</div>';
+}
+/**
+ * Weekly buckets from the permanent history, newest LAST so a chart reads left to right.
+ * ⚠️ EVERY BOUNDARY COMES FROM isoAdd + logWeekStartIso, WHICH ARE UTC. Building one with
+ * new Date(iso + "T00:00:00") puts the week edge a day early for the whole of British Summer Time,
+ * which this project has already shipped once — and the symptom was a Monday "this week" total that
+ * quietly included Sunday's long run, the biggest of the week, so it looked right nearly every time.
+ */
+function logWeekBuckets(n) {
+  const start = logWeekStartIso();
+  const weeks = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const s = isoAdd(start, -i * 7).toISOString().slice(0, 10);
+    weeks.push({ start: s, end: isoAdd(s, 6).toISOString().slice(0, 10), km: 0, sec: 0, runs: 0 });
+  }
+  const first = weeks[0].start;
+  for (const r of (state.hist || [])) {
+    if (!r || !r.d || r.d < first) continue;
+    const idx = Math.floor(dayDiff(first, r.d) / 7);
+    const w = weeks[idx];
+    if (!w) continue;
+    w.km += Number(r.k) || 0; w.sec += Number(r.s) || 0; w.runs++;
+  }
+  return weeks;
+}
+/** Whole days between two ISO dates, UTC. */
+function dayDiff(aIso, bIso) {
+  const p = (s) => { const x = s.split("-").map(Number); return Date.UTC(x[0], (x[1] || 1) - 1, x[2] || 1); };
+  return Math.round((p(bIso) - p(aIso)) / 86400000);
+}
+/**
+ * A trend line over weekly distance. Area + line + dots, matching the shape the owner sent.
+ * ⚠️ THE Y AXIS STARTS AT ZERO. A chart auto-scaled to its own minimum makes a flat 20-22 km month
+ * look like a mountain range, which is the opposite of what somebody checking their consistency needs.
+ */
+function logTrendSvg(weeks) {
+  const W = 320, H = 118, L = 4, R = 34, T = 8, B = 18;
+  const peak = Math.max(1, ...weeks.map((w) => w.km));
+  // A round-ish ceiling so the gridline label is a number a person would say.
+  const step = peak <= 10 ? 5 : peak <= 30 ? 10 : peak <= 60 ? 20 : 50;
+  const top = Math.ceil(peak / step) * step;
+  const x = (i) => L + (i * (W - L - R)) / Math.max(1, weeks.length - 1);
+  const y = (v) => T + (H - T - B) * (1 - v / top);
+  const pts = weeks.map((w, i) => x(i) + "," + y(w.km));
+  const area = "M" + x(0) + "," + y(0) + " L" + pts.join(" L") + " L" + x(weeks.length - 1) + "," + y(0) + " Z";
+  const dots = weeks.map((w, i) =>
+    '<circle cx="' + x(i) + '" cy="' + y(w.km) + '" r="' + (i === weeks.length - 1 ? 4 : 2.6) + '" class="lt-dot' + (i === weeks.length - 1 ? " now" : "") + '"/>').join("");
+  // Month initials under the first week of each month, so the axis is readable without crowding.
+  const MON = ["J","F","M","A","M","J","J","A","S","O","N","D"];
+  let lastMon = -1;
+  const labels = weeks.map((w, i) => {
+    const m = Number(w.start.slice(5, 7)) - 1;
+    if (m === lastMon) return "";
+    lastMon = m;
+    return '<text x="' + x(i) + '" y="' + (H - 4) + '" class="lt-xl">' + MON[m] + '</text>';
+  }).join("");
+  return '<svg class="lt-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Weekly distance over the past ' + weeks.length + ' weeks">' +
+    '<line x1="' + L + '" y1="' + y(top) + '" x2="' + (W - R) + '" y2="' + y(top) + '" class="lt-grid"/>' +
+    '<line x1="' + L + '" y1="' + y(0) + '" x2="' + (W - R) + '" y2="' + y(0) + '" class="lt-grid"/>' +
+    '<text x="' + (W - R + 5) + '" y="' + (y(top) + 4) + '" class="lt-yl">' + top + ' km</text>' +
+    '<text x="' + (W - R + 5) + '" y="' + (y(0) + 4) + '" class="lt-yl">0</text>' +
+    '<path d="' + area + '" class="lt-area"/>' +
+    '<polyline points="' + pts.join(" ") + '" class="lt-line"/>' + dots + labels + '</svg>';
+}
+/**
+ * "This week" — the card the owner's reference opens with.
+ * ⚠️ Elevation comes from the history's own field, so it is not capped either. A run recorded before
+ * that field existed reports 0 rather than nothing, which is why the tile is only shown when the week
+ * actually has some.
+ */
+function logWeekCard() {
+  const t = logTotals(logWeekStartIso());
+  const weeks = logWeekBuckets(12);
+  const cell = (lab, val) => '<div class="lw-cell"><div class="lw-cl">' + lab + '</div><div class="lw-cv num">' + val + '</div></div>';
+  return '<div class="card lw-card">' +
+    '<div class="lw-h">This week</div>' +
+    '<div class="lw-cells">' +
+      cell("Distance", (Math.round(t.km * 10) / 10) + ' <span class="lw-u">km</span>') +
+      cell("Time", fmtDur(t.sec)) +
+      cell("Elev gain", t.elev + ' <span class="lw-u">m</span>') +
+    '</div>' +
+    '<div class="lw-sub">Past 12 weeks</div>' +
+    logTrendSvg(weeks) +
+    '<button class="lw-more" id="lgProgress">See more of your progress</button>' +
+    '</div>';
+}
+/** Hours and minutes, the way a week's training reads. */
+function fmtDur(sec) {
+  const s = Math.max(0, Math.round(Number(sec) || 0));
+  const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60);
+  return h ? h + 'h <span class="lw-u">' + m + 'm</span>' : m + ' <span class="lw-u">min</span>';
+}
+/** The Streaks and Training Log tiles, side by side under the week card. */
+function logTiles() {
+  const streak = logStreakWeeks();
+  const wk = logWeekBuckets(2);
+  const dots = (w) => {
+    const days = [];
+    for (let d = 0; d < 7; d++) {
+      const iso = isoAdd(w.start, d).toISOString().slice(0, 10);
+      const ran = (state.hist || []).some((r) => r && r.d === iso);
+      const future = iso > todayIso();
+      days.push('<span class="tl-d' + (ran ? " on" : "") + (future ? " fut" : "") + '"></span>');
+    }
+    return '<div class="tl-week">' + days.join("") + '</div>';
+  };
+  return '<div class="lb-tiles">' +
+    '<button class="card lb-tile" id="lgStreak">' +
+      '<span class="lb-th">Streaks<span class="sd-chev" aria-hidden="true">›</span></span>' +
+      '<span class="lb-flame">' + ICON.flame + '<span class="lb-fn num">' + streak + '</span></span>' +
+      '<span class="lb-tf">' + (streak === 1 ? "Week" : "Weeks") + '</span>' +
+    '</button>' +
+    '<button class="card lb-tile" id="lgTraining">' +
+      '<span class="lb-th">Training log<span class="sd-chev" aria-hidden="true">›</span></span>' +
+      '<span class="tl-mini"><span class="tl-lab">This week<b class="num">' + (Math.round(wk[1].km * 10) / 10) + ' km</b></span>' +
+        dots(wk[1]) + dots(wk[0]) +
+        '<span class="tl-lab">Last week<b class="num">' + (Math.round(wk[0].km * 10) / 10) + ' km</b></span></span>' +
+    '</button>' +
+    '</div>';
 }
 /**
  * The month you are looking at, summarised before any of its runs are listed.
@@ -15630,6 +15989,19 @@ function render() {
     wire();
     return;
   }
+  // The three Logbook destinations. They keep the Logbook tab lit, because that is where they came
+  // from and where their back button returns to.
+  if (state.screen === "progress" || state.screen === "streaks" || state.screen === "traininglog") {
+    $("topTitle").textContent = state.screen === "progress" ? "Progress" : state.screen === "streaks" ? "Streaks" : "Training log";
+    v.innerHTML = state.screen === "progress" ? progressView() : state.screen === "streaks" ? streakCalendarView() : trainingLogView();
+    v.scrollTop = keepScroll;
+    // ⚠️ LIT EXPLICITLY. The nav is normally synced from state.tab at the end of render(), which these
+    // branches return before reaching — so without this the previous tab stays lit and a runner deep
+    // in their training log is told they are on Today. Caught by looking at the screen, not by a test.
+    document.querySelectorAll(".navbtn").forEach((b) => b.classList.toggle("on", b.dataset.tab === "activities"));
+    wire();
+    return;
+  }
   if (state.screen === "profile") {
     $("topTitle").textContent = "Profile & settings";
     v.innerHTML = viewProfile();
@@ -15865,6 +16237,32 @@ function wire() {
     const still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     try { t.scrollIntoView({ block: "start", behavior: still ? "auto" : "smooth" }); } catch (e) { t.scrollIntoView(); }
     const h = t.querySelector(".fg-sech"); if (h) h.focus({ preventScroll: true });
+  });
+  // ---- Logbook: the week card, the two tiles, and their three destinations -------------------
+  const lgTo = (screen) => { state.screen = screen; render(); };
+  const lgBack = () => { state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); };
+  const bind = (id, fn) => { const el = $(id); if (el) el.onclick = fn; };
+  bind("lgProgress", () => lgTo("progress"));
+  bind("lgStreak", () => { state.streakMon = todayIso().slice(0, 7); lgTo("streaks"); });
+  bind("lgTraining", () => lgTo("traininglog"));
+  bind("pgBack", lgBack); bind("scBack", lgBack); bind("tgBack", lgBack);
+  document.querySelectorAll("[data-prog]").forEach((b) => b.onclick = () => { state.progRange = b.dataset.prog; render(); });
+  // ⚠️ Month paging is CLAMPED at the first recorded run. Past it every day draws blank, and a blank
+  // day on this calendar means "you rested" — so it would be inventing rest days from an absence of
+  // records. The buttons are disabled there; this is the second gate, in case one is ever missed.
+  bind("scPrev", () => {
+    const cur = state.streakMon || todayIso().slice(0, 7);
+    const oldest = (state.hist || []).length ? state.hist[state.hist.length - 1].d : todayIso();
+    const prev = isoAdd(cur + "-01", -1).toISOString().slice(0, 7);
+    if (prev + "-01" < oldest.slice(0, 7) + "-01") return;
+    state.streakMon = prev; render();
+  });
+  bind("scNext", () => {
+    const cur = state.streakMon || todayIso().slice(0, 7);
+    if (cur >= todayIso().slice(0, 7)) return;
+    const p = cur.split("-").map(Number);
+    state.streakMon = new Date(Date.UTC(p[0], p[1], 1)).toISOString().slice(0, 7);
+    render();
   });
   document.querySelectorAll("[data-unitset]").forEach((b) => b.onclick = () => {
     if ((tempUnit() === "f") === (b.dataset.unitset === "f")) return;

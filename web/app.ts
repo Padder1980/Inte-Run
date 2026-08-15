@@ -8408,12 +8408,16 @@ function safetyView() {
 /**
  * MEASUREMENTS — Support › Tools.
  *
- * ⚠️ TEMPERATURE ONLY, AND THE PAGE SAYS SO RATHER THAN QUIETLY OMITTING DISTANCE. The owner asked
- * for km/miles too and was shown what it costs: distance is not a label problem here. Runs are STORED
- * as kilometre numbers (distKm and friends, ~150 references), both the phone and the watch cut splits
- * at 1000 m, and ~105 places render a km literal. A toggle that changed only the labels would put
- * mile captions on kilometre splits, which is worse than staying metric. He chose to do it properly,
- * separately. Until then this page tells the runner where they stand instead of leaving a gap.
+ * ⚠️ TEMPERATURE ONLY. The owner asked for km/miles too and chose, once shown the cost, to do
+ * distance properly and separately: runs are STORED as kilometre numbers (distKm and friends, ~150
+ * references), both the phone and the watch cut splits at 1000 m, and ~105 places render a km
+ * literal. A toggle that changed only the labels would put mile captions on kilometre splits.
+ *
+ * ⚠️ THE PAGE DELIBERATELY CARRIES NO EXPLANATION OF THAT (owner, 2026-08-15). The first version
+ * printed two paragraphs under the toggle justifying the scope and reassuring that the heat rules
+ * stay Celsius underneath. That is reasoning about the build, on a settings screen, where the runner
+ * came to press one button. The constraint is real and lives here in the source; it is not the
+ * runner's problem. Do not reinstate it on the page.
  */
 function unitsView() {
   const f = tempUnit() === "f";
@@ -8425,14 +8429,7 @@ function unitsView() {
         '<div class="seg pc-seg">' + btn("c", "Celsius") + btn("f", "Fahrenheit") + '</div>' +
         '<div class="zr-hint">Today’s conditions and the weather notes read in this. A mild ' +
           fmtTemp(sample, true) + ' day, for example.</div></div>' +
-    '</div>' +
-    '<div class="zr-note"><b>Distance stays in kilometres for now.</b> Changing it properly means more ' +
-      'than swapping the labels — your runs are stored in kilometres, and both the phone and the watch ' +
-      'measure a split every kilometre. Half-doing it would put mile labels on kilometre splits, which ' +
-      'is worse than leaving it. It is on the list as its own piece of work.</div>' +
-    '<div class="zr-note zr-quiet">Changing this only changes what you read. Every training decision the ' +
-      'app makes about heat — shortening a warm-up, easing a hard session — is worked out in Celsius ' +
-      'underneath and does not move.</div>';
+    '</div>';
 }
 /**
  * TRAINING ZONES — Support › Tools.

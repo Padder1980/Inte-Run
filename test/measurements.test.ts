@@ -88,16 +88,20 @@ test("fmtTemp converts correctly and rounds once", () => {
   assert.equal(rounds, 1, "fmtTemp should round exactly once, after converting");
 });
 
-test("the page says distance is still metric rather than omitting it", () => {
+test("the settings page stays a settings page", () => {
   const html = page();
   const at = html.indexOf("function unitsView(");
   assert.ok(at > 0, "unitsView is missing");
   const rel = html.slice(at + 1).search(/\n(function |const |let |\/\*\*)/);
-  const src = html.slice(at, rel > 0 ? at + 1 + rel : at + 4000);
-  // ⚠️ The owner asked for km/miles. Shipping the page with no mention of distance would read as the
-  // request having been forgotten; saying where it stands is the honest half-answer.
-  assert.ok(/kilometre|kilometres/i.test(src), "the page must say what distance currently does");
-  assert.ok(/split/i.test(src), "it should say why — the splits are the reason a label swap is not enough");
-  // And it must not claim the training maths changes with the toggle.
-  assert.ok(/Celsius/.test(src), "it should say the heat rules stay in Celsius underneath");
+  const src = html.slice(at, rel > 0 ? at + 1 + rel : at + 4000)
+    .replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  // ⚠️ THE FIRST VERSION EXPLAINED ITSELF AND THE OWNER CUT IT (2026-08-15). Two paragraphs under the
+  // toggle justified why distance is still metric and reassured that the heat rules stay Celsius
+  // underneath — reasoning about the build, on a screen somebody opened to press one button. The
+  // constraint is real and documented in the source; it is not the runner's problem to read.
+  assert.ok(!/stays in kilometres|own piece of work|underneath/i.test(src),
+    "the scope explanation was deliberately removed — do not reinstate it on the page");
+  // It should still be a working toggle with a legible example, which is all it needs to be.
+  assert.ok(/data-unitset/.test(src), "the toggle must still be there");
+  assert.ok(/fmtTemp\(/.test(src), "the example temperature must follow the setting");
 });

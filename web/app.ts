@@ -2897,6 +2897,32 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .wz-extras-body .why-row:first-child { margin-top: 0; }
 .wz-extras-body .why-q { display: block; font-size: var(--t-meta); font-weight: 700; color: var(--ink); margin-bottom: 4px; }
 .wz-extras-body .why-hint { font-size: var(--t-label); color: var(--ink-faint); margin-top: 4px; }
+
+/* Pace calculator (Support > Tools). On the type ladder throughout, so it scales with the phone's
+   text-size setting. ⚠️ The number inputs are var(--t-card) = 17px: under 16px iOS auto-zooms on
+   focus and pinch is disabled, so the runner can never zoom back out. Do not shrink them. */
+.pc-card { padding: var(--s3); }
+.pc-seg { margin-top: 6px; }
+.pc-race { flex-wrap: wrap; }
+.pc-row { display: flex; align-items: flex-start; gap: 8px; margin-top: 6px; }
+.pc-n { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 0; }
+.pc-n.pc-wide { align-items: stretch; }
+.pc-in { width: 100%; text-align: center; font-size: var(--t-card); font-weight: 700; padding: 10px 6px;
+  border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); }
+.pc-in:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.pc-nl { font-size: var(--t-label); color: var(--ink-faint); margin-top: 4px; }
+.pc-sep { font-size: var(--t-card); font-weight: 700; color: var(--ink-faint); padding-top: 10px; }
+.pc-per { font-size: var(--t-meta); color: var(--ink-soft); padding-top: 12px; white-space: nowrap; }
+.pc-out { text-align: center; padding: var(--s4) var(--s3); }
+/* ⚠️ var(--t-display), not a bespoke 40px. The ratchet in test/design-system.test.ts caught this on
+   its first build, which is exactly its job: an off-ladder size does not scale with the phone's
+   text-size setting, so the one number on the screen would have been the one that never grew. */
+.pc-big { font-size: var(--t-display); font-weight: 800; line-height: 1.05; color: var(--accent); letter-spacing: -.02em; }
+.pc-u { font-size: var(--t-meta); color: var(--ink-soft); margin-top: 2px; }
+.pc-alt { font-size: var(--t-meta); color: var(--ink-faint); margin-top: 8px; }
+.pc-cap { font-size: var(--t-meta); color: var(--ink-soft); margin-top: 10px; }
+.pc-none { font-size: var(--t-meta); color: var(--ink-faint); padding: var(--s2) 0; }
+.pc-note { font-size: var(--t-meta); color: var(--ink-faint); margin-top: var(--s2); padding: 0 var(--s1); }
 </style>
 </head>
 <body>
@@ -8007,6 +8033,10 @@ const SUPPORT_HUB = [
   // Phase 3 builds that screen — this is the honest interim home, not the intended one.
   { id: "shoes", ic: "rEasy", c: "var(--eff-easy)", t: "Shoe rack", d: "Track the mileage in your trainers and see when they are due.", interactive: false },
   { id: "data", ic: "share", c: "var(--steady)", t: "Your data", d: "Back it up, or move it to another device.", interactive: false },
+  // ⚠️ kw IS SEARCH-ONLY, same reasoning as the two guides above: nobody types "pace calculator" when
+  // what they want to know is what pace gets them under four hours.
+  { id: "pace", ic: "timer", c: "var(--accent)", t: "Pace calculator", d: "What pace gets you the finish time you want.", interactive: false,
+    kw: "pace calculator calculate speed split splits target goal time finish time how fast 5k 10k half marathon race predict per km per mile min/km min/mile sub 20 sub 40 sub 90 sub 2 sub 3 sub 4 negative" },
 ];
 /**
  * \u26a0\ufe0f GROUPED BY WHAT YOU CAME FOR, NOT BY WHAT IT IS MADE OF. Eleven undifferentiated cards
@@ -8239,6 +8269,19 @@ const HUB_CHECKINS = ["redflags", "reds", "female"];
 // \u26a0\ufe0f "why" IS NOT HERE ANY MORE -- it moved to the profile, under Motivation, beside the other
 // answers that shape the plan. It is a thing about the runner, not an article to read.
 const HUB_LEARN = ["understand", "strength", "guides"];
+/**
+ * Tools — the things you come here to USE rather than to read.
+ *
+ * ⚠️ A CARD NAMED IN NO GROUP DOES NOT APPEAR AT ALL, and CLAUDE.md was wrong about this for months:
+ * it promised a "More" catch-all that has never existed in viewSupport. There is no safety net, so
+ * adding to SUPPORT_HUB without adding to a group here ships an unreachable page with nothing looking
+ * broken. test/support-hub.test.ts now fails on any hub id that no group names.
+ *
+ * ⚠️ why / connect / shoes / data are DELIBERATELY not in any group — they live on the Profile screen,
+ * where a thing about the runner belongs. They are the reason the guard lists exemptions by name
+ * rather than demanding every entry be grouped.
+ */
+const HUB_TOOLS = ["pace"];
 function viewSupport() {
   if (state.support) return supportDetail(state.support);
   if ((state.supportQ || "").trim()) return supportSearchHtml();
@@ -8256,6 +8299,8 @@ function viewSupport() {
     '<div class="hub">' + HUB_CHECKINS.map(by).filter(Boolean).map(hubCard).join("") + '</div>' +
     '<div class="pf-sec"><span>Learn</span></div>' +
     '<div class="card pf-card">' + HUB_LEARN.map(by).filter(Boolean).map(hubRow).join("") + '</div>' +
+    '<div class="pf-sec"><span>Tools</span></div>' +
+    '<div class="card pf-card">' + HUB_TOOLS.map(by).filter(Boolean).map(hubRow).join("") + '</div>' +
     '<button class="hub-safety" data-hub="safety">' +
       '<span class="hub-sb"><span class="hub-st">Safety, privacy &amp; human help</span>' +
       '<span class="hub-sd">Medical boundaries \u00b7 your data \u00b7 who to contact</span></span>' +
@@ -8307,6 +8352,97 @@ function safetyView() {
       '<p>Nothing here replaces a coach who can watch you run, or a clinician who can examine you. If ' +
       'something feels wrong and the app is telling you it is fine, believe yourself.</p></div>';
 }
+/**
+ * THE PACE CALCULATOR — Support › Tools.
+ *
+ * Three questions, one piece of arithmetic: distance, time and pace, any two giving the third.
+ * The owner asked for "what pace do I need to run this race in this time", which is the default;
+ * the other two directions are the same sum rearranged and cost nothing to offer.
+ *
+ * ⚠️ IT OFFERS MILES, AND THAT DOES NOT REOPEN THE UNITS DECISION. The app stays metric because a
+ * distance toggle would have to reach ~105 display sites, the stored km values and the 1000 m split
+ * logic on both phone and watch. Nothing here is stored, read by the engine or shown anywhere else —
+ * it is a calculator, and plenty of British races are measured in miles. Keep it that way: no part of
+ * this may write to profile or to localStorage.
+ *
+ * ⚠️ IT NEVER CALLS render(). Re-rendering on a keystroke rebuilds the input under the runner's
+ * finger and captures the caret — a trap this project already paid for once on the Support search
+ * field. Every handler writes into #pcOut alone and touches nothing else.
+ */
+const RACE_KM = { "5k": 5, "10k": 10, half: 21.0975, marathon: 42.195 };
+const MI_KM = 1.609344;
+const PACECALC = { mode: "pace", race: "half", dist: 21.0975, unit: "km", h: 1, m: 45, s: 0, pm: 5, ps: 0 };
+/** Distance in km, whatever unit is showing. One conversion, so the three directions cannot disagree. */
+function pcKm() { const d = Number(PACECALC.dist) || 0; return PACECALC.unit === "mi" ? d * MI_KM : d; }
+/** Seconds per KM from the pace boxes, which are per whichever unit is showing. */
+function pcPaceSecPerKm() {
+  const s = (Number(PACECALC.pm) || 0) * 60 + (Number(PACECALC.ps) || 0);
+  return PACECALC.unit === "mi" ? s / MI_KM : s;
+}
+function pcTotalSec() { return (Number(PACECALC.h) || 0) * 3600 + (Number(PACECALC.m) || 0) * 60 + (Number(PACECALC.s) || 0); }
+/** Returns null when the inputs cannot answer the question — the caller says so rather than printing a 0. */
+function paceCalcCompute() {
+  const km = pcKm(), total = pcTotalSec(), per = pcPaceSecPerKm();
+  if (PACECALC.mode === "pace") return km > 0 && total > 0 ? { kind: "pace", perKm: total / km } : null;
+  if (PACECALC.mode === "time") return km > 0 && per > 0 ? { kind: "time", sec: per * km } : null;
+  return per > 0 && total > 0 ? { kind: "dist", km: total / per } : null;
+}
+function paceCalcResultHtml() {
+  const r = paceCalcCompute();
+  const unit = PACECALC.unit === "mi" ? "mi" : "km";
+  if (!r) {
+    const need = PACECALC.mode === "pace" ? "a distance and a time" : PACECALC.mode === "time" ? "a distance and a pace" : "a pace and a time";
+    return '<div class="pc-none">Enter ' + need + ' to see the answer.</div>';
+  }
+  if (r.kind === "pace") {
+    // ⚠️ A PACE TARGET IS FLOORED, NEVER ROUNDED, and the difference is whether the runner hits their
+    // goal. A half marathon in 1:45 needs 298.6 s/km; rounded to 4:59 and held exactly it finishes in
+    // 1:45:08 — the calculator would be handing back a pace that misses the time it was asked for.
+    // Over a marathon the same half-second is 21 seconds lost. Flooring can only ever finish early.
+    const shown = Math.floor(PACECALC.unit === "mi" ? r.perKm * MI_KM : r.perKm);
+    // The other unit is given underneath because a runner planning a race often has one number in
+    // their head and meets the other one on the course markers.
+    const other = Math.floor(PACECALC.unit === "mi" ? r.perKm : r.perKm * MI_KM);
+    return '<div class="pc-big num">' + fmtPace(shown) + '</div><div class="pc-u">min / ' + unit + '</div>' +
+      '<div class="pc-alt num">' + fmtPace(other) + ' min / ' + (PACECALC.unit === "mi" ? "km" : "mi") + '</div>' +
+      '<div class="pc-cap">The pace you would need to hold the whole way.</div>';
+  }
+  if (r.kind === "time") {
+    return '<div class="pc-big num">' + fmtTimeFull(Math.round(r.sec)) + '</div><div class="pc-u">finish time</div>' +
+      '<div class="pc-cap">Holding that pace for the whole distance.</div>';
+  }
+  const shown = PACECALC.unit === "mi" ? r.km / MI_KM : r.km;
+  return '<div class="pc-big num">' + (Math.round(shown * 100) / 100) + '</div><div class="pc-u">' + unit + '</div>' +
+    '<div class="pc-cap">How far that pace carries you in that time.</div>';
+}
+function paceCalcView() {
+  const p = PACECALC;
+  const seg = (name, opts) => '<div class="seg pc-seg">' + opts.map((o) =>
+    '<button type="button" class="' + (p[name] === o[0] ? "on" : "") + '" data-pcset="' + name + '" data-pcval="' + o[0] + '">' + o[1] + '</button>').join("") + '</div>';
+  const num = (name, label, max) => '<div class="pc-n"><input id="pc_' + name + '" class="pc-in num" type="number" inputmode="numeric" min="0"' +
+    (max ? ' max="' + max + '"' : '') + ' value="' + p[name] + '" data-pcnum="' + name + '"><span class="pc-nl">' + label + '</span></div>';
+  const needDist = p.mode !== "dist", needTime = p.mode !== "time", needPace = p.mode !== "pace";
+  return '<h2 class="sec" style="margin-top:0">Pace calculator</h2>' +
+    '<div class="card pc-card">' +
+      '<div class="q"><label id="pcModeL">I want to work out my…</label>' +
+        seg("mode", [["pace", "Pace"], ["time", "Finish time"], ["dist", "Distance"]]) + '</div>' +
+      '<div class="q"><label id="pcUnitL">Measured in</label>' +
+        seg("unit", [["km", "Kilometres"], ["mi", "Miles"]]) + '</div>' +
+      (needDist ? '<div class="q"><label id="pcRaceL">Distance</label>' +
+        '<div class="seg pc-seg pc-race">' + [["5k", "5K"], ["10k", "10K"], ["half", "Half"], ["marathon", "Marathon"], ["custom", "Other"]].map((o) =>
+          '<button type="button" class="' + (p.race === o[0] ? "on" : "") + '" data-pcrace="' + o[0] + '">' + o[1] + '</button>').join("") + '</div>' +
+        '<div class="pc-row"><div class="pc-n pc-wide"><input id="pc_dist" class="pc-in num" type="number" inputmode="decimal" min="0" step="0.01" value="' +
+          (Math.round(p.dist * 10000) / 10000) + '" data-pcnum="dist"><span class="pc-nl">' + (p.unit === "mi" ? "miles" : "kilometres") + '</span></div></div></div>' : '') +
+      (needTime ? '<div class="q"><label id="pcTimeL">Time</label><div class="pc-row">' +
+        num("h", "hours") + '<span class="pc-sep">:</span>' + num("m", "minutes", 59) + '<span class="pc-sep">:</span>' + num("s", "seconds", 59) + '</div></div>' : '') +
+      (needPace ? '<div class="q"><label id="pcPaceL">Pace</label><div class="pc-row">' +
+        num("pm", "minutes", 59) + '<span class="pc-sep">:</span>' + num("ps", "seconds", 59) +
+        '<span class="pc-per">per ' + (p.unit === "mi" ? "mile" : "km") + '</span></div></div>' : '') +
+    '</div>' +
+    '<div class="card pc-out" id="pcOut">' + paceCalcResultHtml() + '</div>' +
+    '<div class="pc-note">Even pacing, on a flat course. Hills, heat and a fast first mile all move it — ' +
+      'which is why this is a target to plan around rather than a prediction.</div>';
+}
 function supportDetail(id) {
   // \u26a0\ufe0f BACK MEANS WHERE YOU CAME FROM. Apps & devices, Shoes, Your data and Safety are all
   // Support screens, so opening one from the profile and pressing back dumped the runner into the
@@ -8323,6 +8459,7 @@ function supportDetail(id) {
   if (id === "connect") return back + connectView();
   if (id === "shoes") return back + shoeRackView();
   if (id === "data") return back + dataView();
+  if (id === "pace") return back + paceCalcView();
   return back + guidesView();
 }
 // ---- Strength & mobility library -------------------------------------------
@@ -15580,6 +15717,34 @@ function wire() {
     const still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     try { t.scrollIntoView({ block: "start", behavior: still ? "auto" : "smooth" }); } catch (e) { t.scrollIntoView(); }
     const h = t.querySelector(".fg-sech"); if (h) h.focus({ preventScroll: true });
+  });
+  // The pace calculator. ⚠️ NOTHING HERE CALLS render() — see the note on paceCalcView. The segmented
+  // buttons change which questions are asked, so they DO rebuild the card; the number fields never do,
+  // because that would rebuild the box under the finger typing into it.
+  const pcPaint = () => { const o = $("pcOut"); if (o) o.innerHTML = paceCalcResultHtml(); };
+  const pcRebuild = () => { const v = $("view"); if (!v) return; v.innerHTML = supportDetail("pace"); wire(); };
+  document.querySelectorAll("[data-pcnum]").forEach((n) => n.oninput = () => {
+    const k = n.dataset.pcnum;
+    PACECALC[k] = n.value === "" ? 0 : Number(n.value);
+    // Typing a distance by hand means it is no longer one of the presets, and saying so is the only
+    // way the chips stop claiming a race the number no longer matches.
+    if (k === "dist") { const was = PACECALC.race; PACECALC.race = "custom"; if (was !== "custom") { const c = document.querySelector(".pc-race .on"); if (c) c.classList.remove("on"); const o = document.querySelector('[data-pcrace="custom"]'); if (o) o.classList.add("on"); } }
+    pcPaint();
+  });
+  document.querySelectorAll("[data-pcset]").forEach((b) => b.onclick = () => {
+    const k = b.dataset.pcset, v = b.dataset.pcval;
+    if (PACECALC[k] === v) return;
+    // ⚠️ Switching unit CONVERTS the distance rather than reinterpreting the number. Leaving 21.0975
+    // in the box and relabelling it "miles" silently turns a half marathon into a 34 km race.
+    if (k === "unit") PACECALC.dist = v === "mi" ? PACECALC.dist / MI_KM : PACECALC.dist * MI_KM;
+    PACECALC[k] = v;
+    pcRebuild();
+  });
+  document.querySelectorAll("[data-pcrace]").forEach((b) => b.onclick = () => {
+    const r = b.dataset.pcrace;
+    PACECALC.race = r;
+    if (RACE_KM[r]) PACECALC.dist = PACECALC.unit === "mi" ? RACE_KM[r] / MI_KM : RACE_KM[r];
+    pcRebuild();
   });
   document.querySelectorAll('[data-chk="rf"]').forEach((c) => c.onchange = runRf);
   document.querySelectorAll('[data-chk="reds"]').forEach((c) => c.onchange = runReds);

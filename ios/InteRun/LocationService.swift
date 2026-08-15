@@ -27,6 +27,15 @@ final class LocationService: NSObject {
     private var buffer: [[String: Any]] = []
     private var watching = false
     private var wantsOneShot = false
+    /// How old a fix may be and still be believed. iOS delivers a cached position on start, and a
+    /// backlog replayed after a suspension is legitimately a few seconds old by the time it arrives —
+    /// so this has to tolerate real lag while rejecting the minutes-old one that starts a run in the
+    /// wrong place. Counted, not silently discarded: see `dropped`.
+    private let staleFixSeconds: TimeInterval = 30
+    /// Fixes refused as invalid or stale, surfaced to the page for Support › Your data. A silent drop
+    /// and a GPS that never delivers look identical from the outside, which is how the last distance
+    /// fault went unexplained for a week.
+    private(set) var dropped = 0
 
     init(webView: WKWebView?) {
         self.webView = webView
@@ -84,7 +93,12 @@ final class LocationService: NSObject {
         guard let data = try? JSONSerialization.data(withJSONObject: buffer),
               let json = String(data: data, encoding: .utf8) else { buffer.removeAll(); return }
         buffer.removeAll()
-        webView.evaluateJavaScript("window.__interunGeo && window.__interunGeo.deliver(\(json));")
+        // ⚠️ The refusal count travels with the batch. A fix dropped here is invisible to the page's
+        // own gpsDiag counters, and "the GPS is refusing everything" and "the GPS is delivering
+        // nothing" look identical from the outside — which is exactly how the last distance fault
+        // went a week without an explanation. Support › Your data reads this.
+        webView.evaluateJavaScript(
+            "window.__interunGeo && (window.__interunGeo.dropped = \(dropped), window.__interunGeo.deliver(\(json)));")
     }
 
     private func report(code: Int, message: String) {
@@ -96,11 +110,23 @@ final class LocationService: NSObject {
 extension LocationService: CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         for loc in locations {
+            // ⚠️ A NEGATIVE horizontalAccuracy MEANS THE COORDINATES ARE INVALID — CoreLocation is
+            // telling us it could not work out where the phone is, and lat/lon are meaningless. These
+            // used to be forwarded with accuracy: null (the Web API's "unknown"), and onGpsPos treats
+            // unknown accuracy as GOOD and gives it the TIGHTEST leash — so the one kind of fix the
+            // system explicitly disowns was the kind trusted most, and it could both credit distance
+            // and move the anchor to a garbage position. Dropped at source: there is no position here
+            // to pass on, in any unit, to any caller.
+            if loc.horizontalAccuracy < 0 { dropped += 1; continue }
+            // ⚠️ AND A FIX CAN BE OLD. iOS hands back a REMEMBERED position the moment tracking starts
+            // — sometimes minutes stale and a long way away — which is what anchors a run to where you
+            // were earlier and credits the jump back as your first distance. Nothing downstream reads
+            // the timestamp, so the age check has to live here.
+            if loc.timestamp.timeIntervalSinceNow < -staleFixSeconds { dropped += 1; continue }
             buffer.append([
                 "lat": loc.coordinate.latitude,
                 "lon": loc.coordinate.longitude,
-                // A negative CoreLocation accuracy means "invalid"; the Web API says null.
-                "acc": loc.horizontalAccuracy >= 0 ? loc.horizontalAccuracy : NSNull(),
+                "acc": loc.horizontalAccuracy,
                 "alt": loc.verticalAccuracy >= 0 ? loc.altitude : NSNull(),
                 "altAcc": loc.verticalAccuracy >= 0 ? loc.verticalAccuracy : NSNull(),
                 "speed": loc.speed >= 0 ? loc.speed : NSNull(),

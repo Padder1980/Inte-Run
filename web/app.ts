@@ -9879,8 +9879,15 @@ function coachDiagLine() {
 function gpsDiagLine() {
   const d = (LIVE && LIVE.gpsDiag) || GPS_DIAG_LAST;
   if (!d) return "gps: no run recorded yet";
+  // \u26a0\ufe0f REFUSALS ARE COUNTED SEPARATELY FROM SILENCE. "stale" is a fix older than 30s (iOS and the
+  // browser both hand back a remembered position at the start of tracking); "invalid" is counted on
+  // the NATIVE side, because those never reach this function at all \u2014 and without it, a GPS refusing
+  // everything and a GPS delivering nothing read identically.
+  const nativeDropped = (function () { try { return window.__interunGeo && window.__interunGeo.dropped; } catch (e) { return null; } })();
   return "gps: fixes " + d.seen + " \u00b7 credited " + d.credited + " \u00b7 not-moved " + d.still +
-    " \u00b7 vague " + d.badAcc + " \u00b7 spikes " + d.spike + " \u00b7 worst acc " + d.maxAcc + "m";
+    " \u00b7 vague " + d.badAcc + " \u00b7 stale " + (d.stale || 0) +
+    (nativeDropped ? " \u00b7 invalid " + nativeDropped : "") +
+    " \u00b7 spikes " + d.spike + " \u00b7 worst acc " + d.maxAcc + "m";
 }
 let GPS_DIAG_LAST = null;
 function viewportDiag() { return viewportDiagLines().join(" \u00b7 "); }
@@ -13556,18 +13563,39 @@ function startSim() {
  */
 function onGpsPos(pos) {
   if (!LIVE || LIVE.mode !== "gps") return;
-  const c = pos.coords; LIVE.acc = c.accuracy;
-  const good = c.accuracy == null || c.accuracy <= 35;
+  const c = pos.coords;
+  // ⚠️ UNKNOWN ACCURACY IS NOT GOOD ACCURACY, AND READING IT AS SUCH WAS A REAL DEFECT. The Web API
+  // requires accuracy to be a positive number, so null or negative only ever means "this position is
+  // invalid". It used to pass the gate AND take the tightest leash (max(10, null || 8) = 10), so the
+  // one kind of fix the system explicitly disowns was the kind trusted most — able to credit distance
+  // and to move the anchor to a garbage position. The native side now drops these at source; this is
+  // the second gate, and the one that also covers the web app.
+  const acc = (typeof c.accuracy === "number" && isFinite(c.accuracy) && c.accuracy >= 0) ? c.accuracy : null;
+  const good = acc != null && acc <= 35;
+  // Only a believable number reaches the "GPS · ±N m" readout; an invalid fix leaves the last one up
+  // rather than replacing it with a nonsense figure.
+  if (acc != null) LIVE.acc = acc;
   LIVE.devSpeed = (c.speed != null && isFinite(c.speed) && c.speed >= 0) ? c.speed : null;
-  const D = LIVE.gpsDiag || (LIVE.gpsDiag = { seen: 0, badAcc: 0, still: 0, spike: 0, credited: 0, maxAcc: 0 });
+  const D = LIVE.gpsDiag || (LIVE.gpsDiag = { seen: 0, badAcc: 0, still: 0, spike: 0, credited: 0, maxAcc: 0, stale: 0 });
+  if (D.stale == null) D.stale = 0;
   D.seen++;
-  if (c.accuracy != null && c.accuracy > D.maxAcc) D.maxAcc = Math.round(c.accuracy);
+  if (acc != null && acc > D.maxAcc) D.maxAcc = Math.round(acc);
   if (!good) { D.badAcc++; return; }
+  // ⚠️ A FIX CAN BE OLD, AND NOTHING USED TO LOOK. Both iOS and the browser hand back a REMEMBERED
+  // position when tracking starts — sometimes minutes stale and a long way away — which anchors a run
+  // to where the runner was earlier and credits the jump back as their first distance. The shim
+  // ignores the maximumAge we ask for, so this is the only place the age is ever checked.
+  if (typeof pos.timestamp === "number" && isFinite(pos.timestamp)) {
+    const age = Date.now() - pos.timestamp;
+    if (age > 30000) { D.stale++; return; }
+  }
   if (LIVE.rt.getStatus() !== "active") { LIVE.anchorLat = c.latitude; LIVE.anchorLon = c.longitude; return; }
   if (LIVE.anchorLat == null) { LIVE.anchorLat = c.latitude; LIVE.anchorLon = c.longitude; D.still++; return; }
   // Displacement from the last point we credited — the leash.
   const net = haversine(LIVE.anchorLat, LIVE.anchorLon, c.latitude, c.longitude);
-  const leash = Math.max(10, c.accuracy || 8);
+  // acc is a believable number by here — the gate above returned on anything else. Reading c.accuracy
+  // instead handed an invalid fix the TIGHTEST possible leash, which is the fault this pass removes.
+  const leash = Math.max(10, acc);
   if (net <= leash) { D.still++; return; }
   if (net > 200) { D.spike++; LIVE.anchorLat = c.latitude; LIVE.anchorLon = c.longitude; return; }
   // Cheap veto: when the device DOES insist it is stationary, believe that much.

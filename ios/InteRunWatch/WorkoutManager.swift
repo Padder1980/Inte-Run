@@ -20,7 +20,25 @@ final class WorkoutManager: NSObject, ObservableObject {
     @Published private(set) var countdown: Int?
     private var countdownTimer: Timer?
     @Published private(set) var elapsed: TimeInterval = 0
+    /// The distance the runner sees, and the one every split, payload and export is built from.
+    /// ⚠️ IT IS NO LONGER ALWAYS OUR OWN SUM — see `adoptedHealthKitDistance` below.
     @Published private(set) var distanceMetres: Double = 0
+    /// Our own GPS accumulation, kept running whatever the displayed source is, so that a HealthKit
+    /// figure which never arrives (permission refused, an indoor session, a delayed first sample)
+    /// falls back to something rather than to zero.
+    private var gpsDistanceMetres: Double = 0
+    /// ⚠️ APPLE'S OWN FUSED FIGURE, AND IT WAS BEING COLLECTED AND THROWN AWAY. The live workout
+    /// builder already gathers `distanceWalkingRunning` — GPS blended with wrist motion, calibrated
+    /// per-runner, and the number the built-in Workout app shows — and the delegate below read only
+    /// heart rate and calories from it. Meanwhile the displayed distance came from summing raw GPS
+    /// deltas, which is the very pattern the phone's own code documents as running ~73% long under
+    /// jitter. Worse, HealthKit's figure is what gets SAVED to the workout, so the distance in Apple
+    /// Health and the distance on screen did not have to agree.
+    ///
+    /// Once a positive HealthKit sample arrives it becomes the source and stays the source. The
+    /// correction at that moment is a few metres, because the first sample lands within seconds of
+    /// the workout starting.
+    private var adoptedHealthKitDistance = false
     @Published private(set) var heartRate: Double = 0
     /// Smoothed from recent GPS, in seconds per km. Nil until moving.
     @Published private(set) var paceSecPerKm: Double?
@@ -183,6 +201,12 @@ final class WorkoutManager: NSObject, ObservableObject {
         phase = .idle
         elapsed = 0
         distanceMetres = 0
+        // ⚠️ BOTH OF THESE MUST CLEAR TOO. WorkoutManager is a @StateObject and outlives a run, so a
+        // second run in one app session inherits whatever the first left behind — the documented
+        // reason reset() exists at all. A stale adoption flag would leave run two showing run one's
+        // total until HealthKit's first sample landed.
+        gpsDistanceMetres = 0
+        adoptedHealthKitDistance = false
         heartRate = 0
         avgHeartRate = 0
         activeCalories = 0
@@ -815,10 +839,14 @@ extension WorkoutManager: CLLocationManagerDelegate {
                 }
                 if let previous = lastLocation {
                     let step = loc.distance(from: previous)
-                    if step > 1.0 && step < 80 { distanceMetres += step; movedThisBatch = true }
+                    if step > 1.0 && step < 80 { gpsDistanceMetres += step; movedThisBatch = true }
                 }
                 lastLocation = loc
             }
+            // ⚠️ ONLY DRIVE THE DISPLAY WHILE HEALTHKIT IS SILENT. Once its fused figure has arrived
+            // it owns the number; writing our sum over it here would undo the whole point on the very
+            // next fix, and the two would fight for the rest of the run.
+            if !adoptedHealthKitDistance { distanceMetres = gpsDistanceMetres }
             // Prefer the device's own speed when it reports one; it is far steadier than
             // differentiating positions. A KNOWN standstill clears the pace — leaving the last
             // good pace in place made auto-pause blind, because "moving" read stale data forever.
@@ -890,6 +918,20 @@ extension WorkoutManager: HKLiveWorkoutBuilderDelegate {
             } else if quantityType == HKQuantityType(.activeEnergyBurned) {
                 let kcal = stats.sumQuantity()?.doubleValue(for: .kilocalorie()) ?? 0
                 Task { @MainActor in self.activeCalories = kcal }
+            } else if quantityType == HKQuantityType(.distanceWalkingRunning) {
+                // ⚠️ THIS BRANCH DID NOT EXIST, AND THAT WAS THE FAULT. The data source has always
+                // collected this type; nothing read it. It is a CUMULATIVE sum from the start of the
+                // workout, so it is assigned, never added to.
+                let metres = stats.sumQuantity()?.doubleValue(for: .meter()) ?? 0
+                guard metres > 0 else { continue }
+                Task { @MainActor in
+                    self.adoptedHealthKitDistance = true
+                    // ⚠️ NEVER BACKWARDS. A distance that decreases mid-run is worse than one that is
+                    // slightly wrong: it reads as the app losing the run. HealthKit's sum can lag our
+                    // own by a sample, so take the greater and let it catch up.
+                    if metres > self.distanceMetres { self.distanceMetres = metres }
+                    self.recordSplits()
+                }
             }
         }
     }

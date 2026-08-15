@@ -153,3 +153,123 @@ test("distance is gated on DISPLACEMENT, never on the speed the device claims", 
   assert.ok(!/const floor = LIVE\.devSpeed != null \? 0\.3/.test(body),
     "the speed-trusting floor is back; a stationary phone will invent distance again");
 });
+
+/**
+ * ⚠️ FAULT FOUR, found by auditing against what iOS running apps actually do (2026-08-15).
+ *
+ * A NEGATIVE OR MISSING accuracy MEANS THE POSITION IS INVALID — CoreLocation saying it could not work
+ * out where the phone is, so the coordinates are meaningless. The native shim converted that to the Web
+ * API's null, and onGpsPos read `c.accuracy == null` as GOOD, then handed it `Math.max(10, null || 8)`
+ * — the TIGHTEST leash available. The one kind of fix the system explicitly disowns was the kind
+ * trusted most, free to credit distance and to move the anchor onto a garbage position.
+ *
+ * AND NOTHING EVER LOOKED AT HOW OLD A FIX WAS. Both iOS and the browser return a REMEMBERED position
+ * the moment tracking starts; the shim discards the maximumAge the page asks for, so a run could anchor
+ * where the runner was earlier and credit the journey back as their first distance.
+ */
+function feed(fixes: any[]) {
+  const src = lift(["haversine", "onGpsPos"]);
+  const LIVE: any = {
+    mode: "gps", dist: 0, route: [], elevGain: 0,
+    lastLat: null, lastLon: null, lastAlt: null, devSpeed: null, acc: null,
+    rt: { getStatus: () => "active" },
+  };
+  let clock = 1_760_000_000_000;
+  const FakeDate = { now: () => clock };
+  const liveElapsedMs = () => FakeDate.now() - (LIVE.startMs || 0) - (LIVE.pausedMs || 0);
+  const onGpsPos = new Function("LIVE", "Date", "liveElapsedMs", src + "; return onGpsPos;")(LIVE, FakeDate, liveElapsedMs);
+  for (const f of fixes) { clock += 1000; onGpsPos(f); }
+  return { metres: LIVE.dist, points: LIVE.route.length, diag: LIVE.gpsDiag, acc: LIVE.acc, now: clock };
+}
+const at = (lat: number, o: any = {}) => ({
+  coords: { latitude: lat, longitude: -2.24, accuracy: o.accuracy === undefined ? 8 : o.accuracy,
+            speed: o.speed === undefined ? 2 : o.speed, altitude: null },
+  timestamp: o.timestamp,
+});
+
+test("a fix with no usable accuracy credits nothing and never moves the anchor", () => {
+  const M = 111320;
+  // Start somewhere real, then a burst of INVALID fixes 500 m away, then back to the real position.
+  const r = feed([
+    at(53.48),
+    at(53.48 + 500 / M, { accuracy: null }),
+    at(53.48 + 500 / M, { accuracy: -1 }),
+    at(53.48 + 500 / M, { accuracy: NaN }),
+    at(53.48 + 20 / M),
+  ]);
+  // Only the last, valid, 20 m step may count. If any invalid fix were believed the anchor would have
+  // teleported and this would read in the hundreds of metres.
+  assert.ok(r.metres > 15 && r.metres < 30, "invalid fixes were believed: " + Math.round(r.metres) + " m");
+  assert.equal(r.diag.badAcc, 3, "invalid fixes must be counted as vague, not silently swallowed");
+  assert.equal(r.acc, 8, "an invalid reading must not overwrite the accuracy shown to the runner");
+});
+
+test("a remembered fix from before the run is refused", () => {
+  const M = 111320;
+  const now = 1_760_000_001_000;
+  const r = feed([
+    at(53.48, { timestamp: now }),
+    // iOS's cached position: 10 minutes old, half a kilometre away.
+    at(53.48 + 500 / M, { timestamp: now - 600_000 }),
+    at(53.48 + 20 / M, { timestamp: now + 4000 }),
+  ]);
+  assert.ok(r.metres > 15 && r.metres < 30, "a stale fix was credited: " + Math.round(r.metres) + " m");
+  assert.equal(r.diag.stale, 1, "the stale fix must be counted");
+});
+
+test("a fix with no timestamp is still accepted — the browser is not required to send one", () => {
+  const M = 111320;
+  // ⚠️ Guards the fix against overreach. The PWA path and the test harness both omit the timestamp,
+  // and refusing those would record 0.00 km for every web run — fault one, reintroduced by the cure.
+  const r = feed([at(53.48), at(53.48 + 20 / M), at(53.48 + 40 / M)]);
+  assert.ok(r.metres > 30, "fixes without a timestamp must still count: " + Math.round(r.metres) + " m");
+  assert.equal(r.diag.stale, 0);
+});
+
+test("the native side refuses invalid and stale fixes before they reach the page", () => {
+  const swift = readFileSync(new URL("../ios/InteRun/LocationService.swift", import.meta.url), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  assert.match(swift, /horizontalAccuracy < 0/, "invalid fixes are still forwarded to the page");
+  assert.match(swift, /timeIntervalSinceNow < -staleFixSeconds/, "stale fixes are still forwarded to the page");
+  // ⚠️ A refusal must be COUNTABLE. A GPS refusing everything and a GPS delivering nothing look
+  // identical from the outside, which is how the last distance fault went a week without an explanation.
+  assert.match(swift, /dropped \+= 1/, "refusals are not counted");
+  assert.match(swift, /__interunGeo\.dropped/, "the refusal count never reaches the page");
+});
+
+/**
+ * ⚠️ FAULT FIVE, same audit: THE WATCH COLLECTED APPLE'S OWN FUSED DISTANCE AND THREW IT AWAY.
+ *
+ * `HKLiveWorkoutDataSource` has always gathered `distanceWalkingRunning` — GPS blended with wrist
+ * motion, calibrated per-runner, the number the built-in Workout app shows — and the builder delegate
+ * read only heart rate and calories from it. The displayed distance came from summing raw CLLocation
+ * deltas instead: the exact pattern measured at 73% long under jitter in the tests above.
+ *
+ * It also meant the distance SAVED to Apple Health (HealthKit's own) and the distance shown in the app
+ * (ours) did not have to agree about the same run.
+ */
+test("the watch reads the fused HealthKit distance rather than only its own GPS sum", () => {
+  const src = readFileSync(new URL("../ios/InteRunWatch/WorkoutManager.swift", import.meta.url), "utf8");
+  const bare = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "").replace(/^\s*\/\/\/.*$/gm, "");
+
+  // It must be collected AND read. It was always collected; being read is the fix.
+  assert.match(bare, /HKQuantityType\(\.distanceWalkingRunning\)/, "the type is no longer collected");
+  const delegate = bare.slice(bare.indexOf("didCollectDataOf collectedTypes"));
+  assert.match(delegate, /quantityType == HKQuantityType\(\.distanceWalkingRunning\)/,
+    "the builder delegate ignores distance again — Apple's fused figure is being discarded");
+
+  // ⚠️ CUMULATIVE, so assigned and never added to. `+=` here would double-count every sample.
+  assert.ok(!/self\.distanceMetres \+= /.test(delegate), "HealthKit's distance is cumulative and must not be accumulated");
+  // ⚠️ AND NEVER BACKWARDS. A distance that decreases mid-run reads as the app losing the run.
+  assert.match(delegate, /metres > self\.distanceMetres/, "the distance must never be allowed to go backwards");
+
+  // The GPS sum must survive as the fallback for when HealthKit never delivers.
+  assert.match(bare, /gpsDistanceMetres \+= step/, "the GPS fallback accumulation is gone");
+  assert.match(bare, /if !adoptedHealthKitDistance \{ distanceMetres = gpsDistanceMetres \}/,
+    "the GPS sum must drive the display only while HealthKit is silent");
+
+  // ⚠️ WorkoutManager outlives a run (@StateObject), so run two inherits whatever run one left.
+  const reset = bare.slice(bare.indexOf("func reset()"), bare.indexOf("func reset()") + 900);
+  assert.match(reset, /gpsDistanceMetres = 0/, "reset must clear the GPS fallback or run two starts mid-run");
+  assert.match(reset, /adoptedHealthKitDistance = false/, "reset must clear the adoption flag");
+});

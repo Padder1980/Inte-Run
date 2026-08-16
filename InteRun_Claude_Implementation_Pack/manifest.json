@@ -1,0 +1,53 @@
+{
+  "package": "Inte-Run Post-Run Debrief",
+  "version": "1.0.0",
+  "date": "2026-08-16",
+  "purpose": "Claude Code implementation source for exact replication of the approved post-run debrief",
+  "authority_order": [
+    "CLAUDE.md",
+    "references/*.png for visible design",
+    "POST_RUN_DEBRIEF_SPEC.md for behaviour and states",
+    "existing Inte-Run design system and feature behaviour",
+    "VISUAL_ACCEPTANCE_CHECKLIST.md for completion"
+  ],
+  "only_approved_visual_substitution": "Replace the teal placeholder HR-zone bars in the analysis reference with the existing Inte-Run canonical Zone 1-5 colours. Reuse the existing token/component source; do not add new zone hex values.",
+  "reference_canvas": {
+    "width_px": 450,
+    "height_px": 954,
+    "comparison_rule": "Render at the same canvas size or scale both images proportionally before overlay comparison."
+  },
+  "files": [
+    {
+      "path": "CLAUDE.md",
+      "role": "binding_contract"
+    },
+    {
+      "path": "POST_RUN_DEBRIEF_SPEC.md",
+      "role": "detailed_specification"
+    },
+    {
+      "path": "VISUAL_ACCEPTANCE_CHECKLIST.md",
+      "role": "release_gate"
+    },
+    {
+      "path": "START_PROMPT.txt",
+      "role": "ready_to_paste_initial_instruction"
+    },
+    {
+      "path": "references/01-map-hero-target.png",
+      "role": "authoritative_visual_target_zero_scroll",
+      "sha256": "45179e7a19d9fac02e9c0cc7aae419e23283115803fc734804070b61c07120a2"
+    },
+    {
+      "path": "references/02-coach-debrief-target.png",
+      "role": "authoritative_visual_target_coaching_state",
+      "sha256": "7d14294a093e81fd2569a40683c6206012d2d3a228ed13f967d4e84166139711"
+    },
+    {
+      "path": "references/03-run-analysis-target.png",
+      "role": "authoritative_visual_target_analysis_state",
+      "sha256": "419c370a51489bdb941c60cc5197ea524a54f4933bd5d2ca756f68478d64beb7",
+      "warning": "HR-zone bar colours are placeholders and must be replaced through the existing Inte-Run Zone 1-5 colour source."
+    }
+  ]
+}

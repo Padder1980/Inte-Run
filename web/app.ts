@@ -3039,6 +3039,43 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
   font-size: var(--t-label); font-weight: 800; display: flex; align-items: center; justify-content: center; }
 /* A run whose full record has aged out: still true, still shown, but not pretending to be tappable. */
 .tg-c.tg-old { background: color-mix(in srgb, var(--build) 34%, transparent); color: var(--ink-soft); cursor: default; }
+/* Adapt for heat. */
+.heat-card { padding: var(--s3); border-left: 4px solid var(--peak); }
+.heat-h { display: flex; align-items: center; gap: 8px; font-size: var(--t-card); font-weight: 800; color: var(--ink); }
+.heat-h svg { width: 20px; height: 20px; color: var(--peak); }
+.heat-b { font-size: var(--t-meta); color: var(--ink-soft); margin-top: 6px; }
+.heat-acts { display: flex; gap: 8px; margin-top: var(--s2); flex-wrap: wrap; }
+.heat-acts > button { flex: 1; min-width: 140px; }
+.heat-sub { font-size: var(--t-label); color: var(--ink-faint); margin-top: var(--s3); font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em; }
+.heat-strip { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0 4px; -webkit-overflow-scrolling: touch; }
+.heat-hr { flex: none; min-width: var(--tap); padding: 8px 6px; border-radius: var(--r-ctl); border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink); display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.heat-hrt { font-size: var(--t-label); color: var(--ink-faint); font-weight: 700; }
+.heat-hrd { font-size: var(--t-meta); font-weight: 800; }
+.heat-hr.ok  { background: color-mix(in srgb, var(--eff-easy) 14%, transparent); }
+.heat-hr.warm { background: color-mix(in srgb, var(--ease) 16%, transparent); }
+.heat-hr.hot { background: color-mix(in srgb, var(--rest) 16%, transparent); }
+.heat-hr.on { box-shadow: inset 0 0 0 2px var(--accent); }
+.heat-diff { margin-top: var(--s2); }
+.heat-dh { font-size: var(--t-meta); color: var(--ink-soft); margin-bottom: 6px; }
+.heat-dh b { color: var(--ink); }
+.heat-row { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line);
+  font-size: var(--t-meta); }
+.heat-row:last-child { border-bottom: 0; }
+.heat-lab { color: var(--ink-soft); flex: 1; min-width: 0; }
+.heat-p { white-space: nowrap; color: var(--ink); }
+.heat-p s { color: var(--ink-faint); }
+.heat-row.heat-none .heat-p { color: var(--ink-faint); }
+.heat-warn { margin-top: var(--s2); padding: var(--s2); border-radius: var(--r-ctl); font-size: var(--t-meta);
+  background: color-mix(in srgb, var(--rest) 12%, transparent); color: var(--ink); }
+.heat-warn.heat-ok { background: color-mix(in srgb, var(--eff-easy) 14%, transparent); }
+.heat-note { font-size: var(--t-label); color: var(--ink-faint); margin-top: var(--s3); }
+.heat-chip { display: flex; align-items: center; gap: 7px; width: 100%; margin-top: var(--s2); padding: 9px 12px;
+  border-radius: var(--r-pill); border: 1px solid var(--line); background: color-mix(in srgb, var(--peak) 10%, transparent);
+  color: var(--ink); font-size: var(--t-meta); font-weight: 700; }
+.heat-chip svg { width: 16px; height: 16px; color: var(--peak); flex: none; }
+.heat-chip .heat-x { margin-left: auto; color: var(--accent); font-weight: 700; }
 </style>
 </head>
 <body>
@@ -3624,12 +3661,54 @@ function planDefaultWeek() {
   return PLAN.defaultWeekIndex;
 }
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: planDefaultWeek(), actTab: "workouts", logFilter: "all", supportQ: "", openGuide: null, setupFocus: null, supportFrom: null, logFilterOpen: false, logAll: false, support: null, logged: loadRuns(), hist: loadHist(), weather: "hot", wx: null, wxHours: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK, addOpen: false };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: planDefaultWeek(), actTab: "workouts", logFilter: "all", supportQ: "", openGuide: null, setupFocus: null, supportFrom: null, logFilterOpen: false, logAll: false, support: null, logged: loadRuns(), hist: loadHist(), weather: "hot", wx: null, wxHours: null, heatAdapt: loadHeatAdapt(), heatHour: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK, addOpen: false };
 // Effective day index for a session, honouring any user reschedule. Works for raw sessions
 // (dayOfWeek) and summary sessions (dayIndex), keyed by the shared session id.
 function loadDayOverride() { try { return JSON.parse(localStorage.getItem("interun_dayov_v1") || "{}") || {}; } catch (e) { return {}; } }
 function saveDayOverride() { try { Object.keys(state.dayOverride).length ? localStorage.setItem("interun_dayov_v1", JSON.stringify(state.dayOverride)) : localStorage.removeItem("interun_dayov_v1"); } catch (e) {} }
 function effDay(s) { const o = state.dayOverride[s.id]; return o != null ? o : (s.dayOfWeek != null ? s.dayOfWeek : s.dayIndex); }
+
+/**
+ * HEAT ADAPTATION — the runner's DECISION, never the adapted session.
+ *
+ * ⚠️ WHAT IS STORED IS "this session, adapted for this hour", AND STORING ANYTHING MORE WOULD BE A
+ * BUG. addExtra states the rule for the same reason: "a library pick stores its FORMAT ID, not its
+ * steps… storing baked steps would freeze old paces into the logbook." An adapted session built from
+ * today's paces and written to disk would still be quoting them a month after a re-anchor. So the
+ * decision persists and the paces are re-derived from the CURRENT plan every single render.
+ *
+ * Shape: { sessionId: { day: "2026-08-17", hour: 14 } }, mirroring dayOverride's flat id-keyed map,
+ * applied through the one accessor below and never by mutating a session.
+ */
+function loadHeatAdapt() { try { return JSON.parse(localStorage.getItem("interun_heat_v1") || "{}") || {}; } catch (e) { return {}; } }
+function saveHeatAdapt() { try { Object.keys(state.heatAdapt).length ? localStorage.setItem("interun_heat_v1", JSON.stringify(state.heatAdapt)) : localStorage.removeItem("interun_heat_v1"); } catch (e) {} }
+/** Declined-for-today, so a "keep as planned" is not re-asked every render. Cleared by the date changing. */
+function loadHeatDeclined() { try { return JSON.parse(localStorage.getItem("interun_heatno_v1") || "{}") || {}; } catch (e) { return {}; } }
+function saveHeatDeclined(m) { try { localStorage.setItem("interun_heatno_v1", JSON.stringify(m)); } catch (e) {} }
+
+/** The stored decision for a session, or null. */
+function heatChoice(s) { return (s && state.heatAdapt[s.id]) || null; }
+
+/**
+ * The session as the runner should actually run it — adapted when they accepted an adaptation.
+ *
+ * ⚠️ EVERY SURFACE MUST GO THROUGH THIS OR THEY DISAGREE. The sheet would show adapted paces while
+ * the live run counted the original ones, or the wrist would run a session the phone was not
+ * describing. It is deliberately cheap and total: no choice stored, or no forecast to price it
+ * from, and it hands back exactly what it was given.
+ */
+function heatApplied(s) {
+  try {
+    const c = heatChoice(s);
+    if (!c) return s;
+    const row = hourAt(c.day, c.hour);
+    if (!row) return s;                      // forecast gone (a reload, a new day) — never guess
+    const imp = RC.assessConditions(conditionsAtHour(row, s));
+    if (!imp || !(imp.paceFactor > 1)) return s;
+    const out = RC.adaptSessionForHeat(s, imp.paceFactor);
+    return out && out.changedSteps ? out.session : s;
+  } catch (e) { return s; }
+}
 // Sessions the runner actually goes out and RUNS — the ones that get a Start button, reach the
 // watch, and can be rescheduled. "race" is in: race day is a run, it is trackable, and the whole
 // plan exists to reach it. ("race-specific" is a rehearsal in training, not the race.)
@@ -3887,12 +3966,15 @@ function todayNextUp() {
  * "one question a week" — five stacked above the prescription is how the next meaningful event ended
  * up below the fold. The rest still render, further down, where they can be read rather than skipped.
  */
+// ⚠️ HEAT SITS LAST IN THE ORDER, DELIBERATELY. A pace-change flag is about work already done and a
+// retest answers a question about the runner now; heat is about the next hour and can wait behind
+// both. It is also the only one of the four that expires on its own, so losing a day costs nothing.
+function todayCards() { return [trainFlagBanner(), weeklyReviewCard(), fitSuggestBanner(), autoPaceBanner(), heatCard()]; }
 function todayAttention() {
-  const all = [trainFlagBanner(), weeklyReviewCard(), fitSuggestBanner(), autoPaceBanner()];
-  return all.find((x) => x && x.trim()) || "";
+  return todayCards().find((x) => x && x.trim()) || "";
 }
 function todayBelowAttention() {
-  const all = [trainFlagBanner(), weeklyReviewCard(), fitSuggestBanner(), autoPaceBanner()];
+  const all = todayCards();
   const first = all.findIndex((x) => x && x.trim());
   return all.filter((x, i) => i !== first && x && x.trim()).join("");
 }
@@ -3928,6 +4010,12 @@ function viewToday() {
       open: { week: curWeek().index, id: nxt.sess.id } }) + '</div>' : "";
   return mirror + banner + todayAttention() + greeting + weekStrip() +
     (mirror || liveRunning() ? "" : uiDecisionHero(dec)) +
+    // ⚠️ DIRECTLY UNDER THE HERO, AND THE FIRST PLACEMENT WAS DEAD CODE. It was appended to a local
+    // cta string that this screen does not render — the hero builds its own button through
+    // uiDecisionHero — so the chip existed, was correct, and appeared nowhere. Exactly the
+    // computed-and-discarded trap this project keeps paying for, caught only by looking at the DOM.
+    // Here because it is the last thing read before going out, and the only way to undo the change.
+    (mirror || liveRunning() || !sess ? "" : heatChipHtml(sess)) +
     nextUp +
     '<div class="ui-section">What to know today</div>' +
     '<div class="tsq-row">' + conditionsSquare(sess) + feelSquare() + '</div>' +
@@ -4502,6 +4590,11 @@ window.__interunWatch = { status: function (paired, installed) {
 // conversion serves both today's session and the week ahead — the watch needs the week so it can
 // start a run on its own, without the phone app being open.
 function watchSessionPayload(s, iso) {
+  // ⚠️ THE WRIST MUST RUN WHAT THE PHONE IS DESCRIBING. The payload reads pace bands straight off the
+  // session, so adapting here reaches the watch with no schema change — but omitting it would leave
+  // the two halves of one product prescribing different paces for the same run, which is the exact
+  // split maxHrEstimate() exists to prevent, in a different field.
+  s = heatApplied(s);
   if (!s) return null;
   const band = plannedPaceBandOf(s);
   const rband = plannedRpeBandOf(s);
@@ -6932,6 +7025,9 @@ function wireSheet() {
   const sdAdd = $("sdAdd"); if (sdAdd) sdAdd.onclick = () => { const iso = sheetSessionIso(); closeSheet(); openAddSessionSheet(iso); };
 }
 function openSessionSheet(sess, week) {
+  // Adapted before anything is rendered, so the steps, the paces and the duration chip all describe
+  // the session the runner is actually about to do.
+  sess = heatApplied(sess);
   if (!sess) return;
   ensureSheet();
   SHEET_CTX = { sess, week: week || state.planWeek || 1 };
@@ -13512,6 +13608,10 @@ function withGeneratedWarmup(sess) {
   return out;
 }
 function startSession(sess, opts) {
+  // ⚠️ APPLIED BEFORE withGeneratedWarmup, not after. The warm-up builder INHERITS the pace of the
+  // existing warm-up step, so adapting afterwards would leave a generated warm-up quoting the
+  // original band while every other step carried the adapted one.
+  sess = heatApplied(sess);
   const base = (sess && sess.steps) ? sess : rawToday();
   const s = withGeneratedWarmup(base);
   LIVE = { session: s, rt: new RC.LiveSession(s), mode: null, acquiring: false, gpsErr: null,
@@ -15628,6 +15728,135 @@ function maybeAutoPaceCalibrate(type, avgPaceSec, distKm, ctx) {
   savePaceNotice();
   return true;
 }
+/**
+ * ADAPT FOR HEAT — the card, the hour picker, and the before/after.
+ *
+ * ⚠️ IT PROPOSES; IT NEVER IMPOSES. Standing instruction, 2026-08-03: "the app may observe and it may
+ * propose; it may never change a pace, a plan or a target on its own. Every suggestion ends in a
+ * choice the runner makes, and declining is a first-class answer that is remembered rather than
+ * re-asked tomorrow." Nothing here writes a decision until the runner taps Adapt.
+ */
+const HEAT_MIN_FACTOR = 1.015;   // under ~1.5% the adaptation is smaller than the noise in anyone's pacing
+
+/** Today's session, if there is exactly one runnable thing to adapt. */
+function heatTargetSession() {
+  try {
+    if (!TODAY_IN_PLAN) return null;
+    const list = rawSessionsForIso(todayIso()).filter((x) => PRIMARY_TYPES[x.type]);
+    return list.length === 1 ? list[0] : null;
+  } catch (e) { return null; }
+}
+/** The worst hour still ahead today, and what it would cost — or null when there is nothing to say. */
+function heatWorstHour(sess) {
+  const rows = hoursFor(null);
+  if (!rows.length || !sess) return null;
+  let worst = null;
+  for (const r of rows) {
+    const imp = RC.assessConditions(conditionsAtHour(r, sess));
+    if (!worst || imp.paceFactor > worst.imp.paceFactor) worst = { row: r, imp: imp };
+  }
+  return worst;
+}
+function heatDeclinedToday(sess) {
+  const m = loadHeatDeclined();
+  return sess && m[sess.id] === todayIso();
+}
+function heatCard() {
+  const sess = heatTargetSession();
+  if (!sess) return "";
+  // Already decided — the chip lives on the session, not as an attention card.
+  if (heatChoice(sess) || heatDeclinedToday(sess)) return "";
+  const worst = heatWorstHour(sess);
+  if (!worst || worst.imp.paceFactor < HEAT_MIN_FACTOR) return "";
+  // ⚠️ A SESSION WITH NO PACE TARGETS IS NEVER OFFERED ONE. Hill reps carry no pace by design, and
+  // strength work has none either — offering to "adjust your paces" on those promises a change the
+  // app cannot make, and the accept would land on a session identical to the one before it.
+  let probe;
+  try { probe = RC.adaptSessionForHeat(sess, worst.imp.paceFactor); } catch (e) { return ""; }
+  if (!probe || !probe.changedSteps) return "";
+  const pct = Math.round((worst.imp.paceFactor - 1) * 1000) / 10;
+  const hot = fmtTemp(worst.row.tempC, true);
+  return '<div class="card heat-card">' +
+    '<div class="heat-h">' + ICON.wxSun + '<span>Adapt for heat</span></div>' +
+    '<div class="heat-b">Up to <b>' + hot + '</b> today. Holding your planned paces in that would be ' +
+      'harder than this session is meant to be — about <b>' + pct + '% harder</b> at the peak.</div>' +
+    '<div class="heat-acts"><button class="primary" id="heatOpen">Adjust my paces</button>' +
+      '<button class="bk-btn2" id="heatNo">Keep as planned</button></div>' +
+    '</div>';
+}
+/** The sheet: pick the hour, see exactly what changes, accept or don't. */
+function heatSheetHtml() {
+  const sess = heatTargetSession();
+  if (!sess) return '<div class="sd-title">Nothing to adapt today.</div>';
+  const rows = hoursFor(null);
+  if (!rows.length) return '<div class="sd-title">No forecast for the rest of today.</div>';
+  const pick = state.heatHour != null ? state.heatHour : (heatWorstHour(sess) || {}).row;
+  const chosen = typeof pick === "number" ? hourAt(null, pick) : pick;
+  const imp = RC.assessConditions(conditionsAtHour(chosen, sess));
+  const adapted = RC.adaptSessionForHeat(sess, imp.paceFactor);
+
+  const strip = rows.map((r) => {
+    const i = RC.assessConditions(conditionsAtHour(r, sess));
+    const on = chosen && r.hour === chosen.hour;
+    // Colour by what it would cost, so the cool hours read as the easy choice at a glance.
+    const sev = i.paceFactor >= 1.04 ? "hot" : i.paceFactor >= 1.02 ? "warm" : "ok";
+    return '<button class="heat-hr ' + sev + (on ? " on" : "") + '" data-heathr="' + r.hour + '">' +
+      '<span class="heat-hrt">' + String(r.hour).padStart(2, "0") + '</span>' +
+      '<span class="heat-hrd num">' + fmtTemp(r.tempC, false) + '</span></button>';
+  }).join("");
+
+  // ⚠️ THE BEFORE/AFTER IS BUILT FROM THE TWO SESSIONS, NOT FROM THE FACTOR. Printing "everything 3%
+  // slower" would be a claim about steps the runner cannot see; showing each band struck through and
+  // replaced is checkable, and it makes the steps with NO pace visibly untouched rather than silently
+  // absent.
+  const rowsHtml = sess.steps.map((st, i) => {
+    const to = adapted.session.steps[i];
+    if (!st.targetPaceSecPerKm) {
+      return '<div class="heat-row heat-none"><span class="heat-lab">' + esc(st.display || st.label) + '</span>' +
+        '<span class="heat-p">by effort</span></div>';
+    }
+    const a = fmtPace(st.targetPaceSecPerKm.minSecPerKm) + "–" + fmtPace(st.targetPaceSecPerKm.maxSecPerKm);
+    const b = fmtPace(to.targetPaceSecPerKm.minSecPerKm) + "–" + fmtPace(to.targetPaceSecPerKm.maxSecPerKm);
+    return '<div class="heat-row"><span class="heat-lab">' + esc(st.display || st.label) + '</span>' +
+      '<span class="heat-p"><s class="num">' + a + '</s> <b class="num">' + b + '</b></span></div>';
+  }).join("");
+
+  const wasMin = Math.round((sess.estimatedDurationSeconds || 0) / 60);
+  const nowMin = Math.round((adapted.session.estimatedDurationSeconds || 0) / 60);
+  const pct = Math.round((imp.paceFactor - 1) * 1000) / 10;
+
+  return '<div class="sd-type" style="--sc:var(--peak)">Adapt for heat</div>' +
+    '<div class="sd-title">' + esc(imp.tempWord) + ' · ' + fmtTemp(chosen.tempC, true) + ' at ' +
+      String(chosen.hour).padStart(2, "0") + ':00</div>' +
+    '<div class="heat-sub">When will you run?</div>' +
+    '<div class="heat-strip">' + strip + '</div>' +
+    (imp.beyondModel
+      // ⚠️ Past the model's own data. Offering a number here would be an extrapolation wearing the
+      // app's confidence, so it declines to give one and says what to do instead.
+      ? '<div class="heat-warn">That is hotter than this app will put a pace to. Move the session to a ' +
+        'cooler hour if you can, or take it indoors — and if you do go out, run it entirely by feel.</div>'
+      : pct < 0.5
+        ? '<div class="heat-warn heat-ok">At that hour the heat costs you almost nothing. Run it as planned.</div>'
+        : '<div class="heat-diff"><div class="heat-dh">About <b>' + pct + '% slower</b> for the same effort' +
+          (nowMin > wasMin ? ' · <b>' + wasMin + '</b> → <b>' + nowMin + ' min</b>' : '') + '</div>' +
+          rowsHtml + '</div>' +
+          '<div class="heat-acts"><button class="primary" id="heatDo">Adapt this session</button>' +
+          '<button class="bk-btn2" id="heatKeep">Keep as planned</button></div>') +
+    // ⚠️ EFFORT, NOT BENEFIT. The evidence supports "this slower pace is the same effort your planned
+    // pace would be in cool air". It does not support "you will get the same training out of it",
+    // which is what the competitor claims.
+    '<div class="heat-note">Slowing down in heat keeps the session at <b>the effort it was designed ' +
+      'for</b>. Your effort targets do not change — only the pace it takes to reach them.</div>';
+}
+/** The chip on an adapted session, and the way back out of it. */
+function heatChipHtml(sess) {
+  const c = heatChoice(sess);
+  if (!c) return "";
+  const row = hourAt(c.day, c.hour);
+  return '<button class="heat-chip" id="heatClearBtn">' + ICON.wxSun +
+    '<span>Adapted for heat' + (row ? ' · ' + fmtTemp(row.tempC, true) + ' at ' + String(c.hour).padStart(2, "0") + ':00' : '') + '</span>' +
+    '<span class="heat-x">Clear</span></button>';
+}
 function autoPaceBanner() {
   const a = state.paceNotice; if (!a) return "";
   return '<div class="fit-banner up"><div class="fb-ic">' + ICON.gauge + '</div>' +
@@ -16621,6 +16850,53 @@ function wire() {
     state.streakMon = new Date(Date.UTC(p[0], p[1], 1)).toISOString().slice(0, 7);
     render();
   });
+  // ---- Adapt for heat -------------------------------------------------------------------------
+  const heatSheet = () => { ensureSheet(); SHEET_CTX = null; $("sheetBody").innerHTML = heatSheetHtml(); wire(); $("sheetOv").classList.add("on"); };
+  const heatOpen = $("heatOpen");
+  if (heatOpen) heatOpen.onclick = () => { state.heatHour = null; heatSheet(); };
+  const heatNo = $("heatNo");
+  if (heatNo) heatNo.onclick = () => {
+    // ⚠️ A DECLINE IS REMEMBERED, per the standing instruction — but only for TODAY. The weather is
+    // a different question tomorrow, so unlike a pace flag this must not be muted indefinitely.
+    const sess = heatTargetSession(); if (!sess) return;
+    const m = loadHeatDeclined(); m[sess.id] = todayIso(); saveHeatDeclined(m);
+    render();
+  };
+  document.querySelectorAll("[data-heathr]").forEach((b) => b.onclick = () => {
+    state.heatHour = Number(b.dataset.heathr);
+    $("sheetBody").innerHTML = heatSheetHtml(); wire();
+  });
+  const heatDo = $("heatDo");
+  if (heatDo) heatDo.onclick = () => {
+    const sess = heatTargetSession(); if (!sess) return;
+    const rows = hoursFor(null);
+    const hour = state.heatHour != null ? state.heatHour : ((heatWorstHour(sess) || {}).row || rows[0]).hour;
+    const now = new Date();
+    const day = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");
+    state.heatAdapt[sess.id] = { day: day, hour: hour };
+    saveHeatAdapt();
+    // ⚠️ THE WRIST GETS THE NEW PACES IMMEDIATELY. The competitor tells its users to force-quit their
+    // watch app to pick these up; there is no reason for that here, and a watch quietly running the
+    // original targets after the runner accepted an adaptation is the worst outcome of the feature.
+    try { syncWatch(); } catch (e) {}
+    try { syncNativeReminders(); } catch (e) {}
+    closeSheet();
+    toast("Paces adapted for the heat");
+    render();
+  };
+  const heatKeep = $("heatKeep");
+  if (heatKeep) heatKeep.onclick = () => {
+    const sess = heatTargetSession(); if (sess) { const m = loadHeatDeclined(); m[sess.id] = todayIso(); saveHeatDeclined(m); }
+    closeSheet(); render();
+  };
+  const heatClear = $("heatClearBtn");
+  if (heatClear) heatClear.onclick = () => {
+    const sess = heatTargetSession(); if (!sess) return;
+    delete state.heatAdapt[sess.id];
+    saveHeatAdapt();
+    try { syncWatch(); } catch (e) {}
+    render();
+  };
   document.querySelectorAll("[data-unitset]").forEach((b) => b.onclick = () => {
     if ((tempUnit() === "f") === (b.dataset.unitset === "f")) return;
     setTempUnit(b.dataset.unitset);

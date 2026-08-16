@@ -12936,6 +12936,7 @@ const COACH = {
   // told them apart. seq is the token a stitched sentence holds while it owns the element;
   // pendingNums is a pace readout waiting for the coach to finish their own line first.
   seq: 0, pendingNums: null, numT: 0, native: false,
+  sectionHalfKey: "", lastHalfwayAt: -999,
 };
 function coachEnabled() { return !!(COACH.cfg && COACH.cfg.enabled); }
 function saveCoachCfg() { try { localStorage.setItem(COACH_STORE, JSON.stringify(COACH.cfg)); } catch (e) {} }
@@ -13155,6 +13156,9 @@ function coachResetSession(keepAudio) {
   COACH.paceSince = 0; COACH.paceWas = ""; COACH.lastPaceCueAt = -999; COACH.paceCorrectionPending = false;
   COACH.whyDone = false; COACH.whyShown = null; COACH.lastKeepGoingAt = -999;
   COACH.settleDone = false; COACH.lastTechAt = -999; COACH.highEffortSince = 0;
+  // ⚠️ RESET WITH THE REST, or the second run of an app session starts believing it has already
+  // called the midpoint of section one. Same trap coachResetSession exists for.
+  COACH.sectionHalfKey = ""; COACH.lastHalfwayAt = -999;
   if (!keepAudio) coachStop();
 }
 // Map a live step to the right trigger when it begins.
@@ -13164,6 +13168,12 @@ function coachResetSession(keepAudio) {
 // cannot drift apart again; StepView now carries the field.
 function coachStepTrigger(step, sessionType) {
   const stepKind = step.kind, stepRpeMin = (step.targetRpe && step.targetRpe.min) || 0;
+  // ⚠️ A STRENGTH SESSION IS ONE STEADY STEP WITH NO PACE, so by kind alone it is indistinguishable
+  // from a tempo run and it was being handed "tempo-start" or "easy-settle" — a running cue over a
+  // set of squats. Its own lines have existed and been recorded for all nine coaches since the
+  // catalogue was written and nothing ever fired them, because the branch below never asks what
+  // KIND of session this is before deciding what kind of step it is looking at. Type first.
+  if (sessionType === "strength") return stepKind === "warmup" ? "warmup-start" : "strength-start";
   // ⚠️ THE STRIDES BLOCK SPEAKS ONCE. It is now ten steps — five strides and five walk backs — and
   // a cue on each boundary is a coach talking over every acceleration for six minutes. The first
   // one introduces the block; after that the runner knows what they are doing.
@@ -13420,16 +13430,97 @@ window.__interunCoachPlayed = function (id) {
     if (p) RC.markPlayed(p, liveNowMs() / 1000, COACH.history);
   } catch (e) {}
 };
+// Is this session measured in kilometres or in minutes? THE LONGEST STEP DECIDES.
+//
+// ⚠️ A SESSION HAS NO SINGLE GATE — ITS STEPS DO, and they can disagree. A custom six-kilometre run
+// is one distance-gated body, sometimes with a duration-gated strides block bolted on; an interval
+// session is a warm-up in minutes around reps in metres. Asking "are they ALL distance" calls the
+// six-kilometre-plus-strides run a time session, which is exactly the case this exists for. Asking
+// "is ANY of them distance" calls the interval session a distance session, and its warm-up and
+// cool-down carry no distance target at all, so halfway would land in the wrong place.
+//
+// The longest step is what the session IS. It is the piece the runner would name if asked what they
+// were doing, and it is the piece whose gate the title was written from.
+function sessionDistanceDriven(sess) {
+  const steps = (sess && sess.steps) || [];
+  let best = null, bestSecs = -1;
+  steps.forEach((st) => {
+    const secs = stepSecs(st);
+    if (secs > bestSecs) { bestSecs = secs; best = st; }
+  });
+  return !!(best && best.distanceMeters != null && best.durationSeconds == null);
+}
+function sessionHalfwayReached(snap) {
+  const sess = LIVE.session;
+  if (sessionDistanceDriven(sess)) {
+    const totalM = sess.estimatedDistanceMeters || 0;
+    // No distance target means nothing to be half of — fall back to the clock rather than guess.
+    if (totalM > 0) return (snap.distanceMeters || 0) >= totalM * 0.5;
+  }
+  return snap.elapsedSeconds >= (sess.estimatedDurationSeconds || 0) * 0.5;
+}
+
+// Halfway through the SECTION the runner is in — the lap-level version of the cue above.
+//
+// ⚠️ snap.stepProgress IS ALREADY MEASURED IN THE STEP'S OWN GATE (see session-runtime: distance
+// for a distance-bound step, the clock for a timed one), so this needs no unit logic of its own and
+// cannot disagree with the progress bar the runner is looking at.
+//
+// ⚠️ THE SPECIFIC CUE WINS. A hard rep and a threshold block already have lines written for exactly
+// this moment — interval-work and threshold-hold — which sat dormant for months because nothing
+// fired them. Firing a generic "halfway through this section" alongside them would be two lines for
+// one moment; the generic one covers everything they do not.
+function coachSectionHalfwayTrigger(step, sessionType) {
+  if (step.kind === "rep") return "interval-work";
+  if (step.kind === "steady" && (sessionType === "threshold" || sessionType === "race-specific")) return "threshold-hold";
+  return "section-halfway";
+}
+function coachSectionTick(snap, type, nowSec) {
+  const st = snap.step;
+  if (!st) return;
+  // ⚠️ A ONE-SECTION SESSION HAS NO SECTIONS. Its midpoint IS the session midpoint, and saying both
+  // would be the same sentence twice, seconds apart, on a plain easy run.
+  if (!(st.total > 1)) return;
+  // Nothing that is not the work: a warm-up, a jog down, the recovery between reps and the walk back
+  // after a stride are all places where being told you are half done is noise.
+  if (st.kind === "warmup" || st.kind === "cooldown" || st.kind === "recovery") return;
+  if (st.display === "Walk back" || st.display === "Stride") return;
+  // ⚠️ LONG ENOUGH TO HAVE A MIDDLE. Sixty seconds of hard running does not need a progress report a
+  // quarter of the way through the sentence, and a set of short reps would otherwise turn the coach
+  // into a metronome. Judged in the step's own gate, so neither unit is guessed at.
+  const longEnough = (st.targetSeconds || 0) >= 240 || (st.targetMeters || 0) >= 800;
+  if (!longEnough) return;
+  const key = String(st.index) + ":" + String(st.repeatIndex || 0);
+  if (COACH.sectionHalfKey === key) return;
+  if ((snap.stepProgress || 0) < 0.5) return;
+  COACH.sectionHalfKey = key;
+  // ⚠️ NEVER ON TOP OF THE SESSION HALFWAY. On a two-section run the two midpoints can fall within
+  // seconds of each other, and "you're halfway through" followed immediately by "halfway through
+  // this section" is the coach contradicting itself about what it is counting.
+  if (nowSec - (COACH.lastHalfwayAt || -999) < 45) return;
+  coachTrigger(coachSectionHalfwayTrigger(st, type), type, nowSec);
+}
 function coachTick(snap) {
   if (!coachEnabled() || !LIVE || !LIVE.started || LIVE.done) return;
   const t = LIVE.session.type, nowSec = (LIVE.mode === "sim" ? LIVE.vms : liveElapsedMs()) / 1000;
   coachPaceTick(snap, t, nowSec);
   coachWhyTick(snap, t, nowSec);
   const target = (LIVE.session.estimatedDurationSeconds || 0);
-  // Halfway (by planned duration, once).
-  if (!COACH.halfwayDone && target > 120 && snap.elapsedSeconds >= target * 0.5) {
-    COACH.halfwayDone = true; coachTrigger("halfway", t, nowSec);
+  // Halfway, measured in whatever the session is actually MEASURED IN, once.
+  //
+  // ⚠️ IT WAS ALWAYS THE CLOCK, AND FOR A RUN ASKED FOR IN KILOMETRES THAT IS THE WRONG HALF. Owner,
+  // 2026-08-16: "based on distance if its a session measured by distance or time if its a session
+  // driven by minutes". Someone who dialled six kilometres and is running slower than planned would
+  // have been told they were halfway well before three kilometres — the same class of mistake as a
+  // distance session ending on a stopwatch, which is the fault reported from the same run.
+  //
+  // ⚠️ THE LENGTH GATE STAYS ON THE CLOCK ON PURPOSE. "Is this session long enough to have a
+  // halfway worth announcing" is a question about time, and 120s is the judgement that already
+  // shipped. Converting it to a distance would need a pace, which is the thing that varies.
+  if (!COACH.halfwayDone && target > 120 && sessionHalfwayReached(snap)) {
+    COACH.halfwayDone = true; COACH.lastHalfwayAt = nowSec; coachTrigger("halfway", t, nowSec);
   }
+  coachSectionTick(snap, t, nowSec);
   // Final effort — entering the last step (unless it's a cool-down), once.
   if (!COACH.finalDone && snap.step && snap.step.total > 1 && snap.step.index === snap.step.total - 1 && snap.step.kind !== "cooldown") {
     COACH.finalDone = true; coachTrigger("final-effort", t, nowSec);

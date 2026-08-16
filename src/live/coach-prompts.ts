@@ -120,6 +120,7 @@ export type PromptTrigger =
   | "strength-start"      // strength / mobility session begins
   | "technique"           // running-form cue
   | "halfway"             // halfway through the session
+  | "section-halfway"     // halfway through the current section, when no more specific cue fits
   | "milestone-distance"  // a distance/time milestone passed
   | "final-effort"        // the last stretch / last rep
   | "cooldown-start"      // a cool-down step begins
@@ -351,6 +352,37 @@ export const PROMPTS: PromptDef[] = [
   // — Halfway ----------------------------------------------------------------
   { id: "halfway_1", trigger: "halfway", text: "You're halfway through. Hold your form and keep working.", priority: P_KEY, interrupt: false, minRepeatSec: ONESHOT, sessionTypes: "all" },
   { id: "halfway_2", trigger: "halfway", text: "Halfway done, and looking strong. Stay with it.", priority: P_KEY, interrupt: false, minRepeatSec: ONESHOT, sessionTypes: "all" },
+
+  // — Halfway through the SECTION the runner is currently in -------------------
+  //
+  // ⚠️ THE GENERIC ONE, AND IT IS DELIBERATELY THE LAST RESORT. A hard rep gets `interval-work` and
+  // a threshold block gets `threshold-hold` — both already written for exactly this moment, both
+  // dormant until 2026-08-16 because nothing fired them. Adding a third line that also means "you
+  // are midway through this piece" would have them competing for one moment. So this covers what
+  // those two do not: the long easy body of a run, a progression block, a steady leg of a long run.
+  //
+  // ⚠️ NOT ONE-SHOT, because a session has several sections — but the repeat gap is long enough that
+  // a set of short reps cannot turn it into a metronome, and the caller has its own length floor.
+  { id: "section_half_1", trigger: "section-halfway", text: "Halfway through this section. Settle in and hold it.", priority: P_INFO, interrupt: false, minRepeatSec: 180, sessionTypes: "all",
+    variants: {
+      pacer: "Halfway through this section. Same effort the rest of the way.",
+      motivator: "Halfway! Second half is where it counts.",
+      technician: "Midpoint of this section. Check your posture and hold the rhythm.",
+      spark: "Halfway — keep it ticking over.",
+      steady: "You're halfway through this part. No need to change anything.",
+      storyteller: "Halfway through this stretch. The rest of it is yours.",
+      commentator: "That's the midpoint of this section — he settles into it nicely.",
+      sportsman: "Halfway. Keep her lit." } },
+  { id: "section_half_2", trigger: "section-halfway", text: "You're at the midpoint of this one. Keep it honest.", priority: P_INFO, interrupt: false, minRepeatSec: 180, sessionTypes: "all",
+    variants: {
+      pacer: "Midpoint. Hold the same effort to the end of it.",
+      motivator: "Halfway there — finish this one strong!",
+      technician: "Half of this section done. Keep the cadence where it is.",
+      spark: "Half done. Nice and smooth from here.",
+      steady: "Halfway. Carry on just as you are.",
+      storyteller: "The middle of this section. Steady on to the far side.",
+      commentator: "Halfway through this one, and the rhythm looks good.",
+      sportsman: "That's half of it. Same again now." } },
 
   // — Pace against the prescribed band ---------------------------------------
   // No numbers anywhere: these are pre-generated clips, so a coach can never say "eight seconds

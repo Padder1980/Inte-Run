@@ -3976,6 +3976,94 @@ shared `<audio>` element, which has no session management, four unsynchronised w
 this change) a permanent `error` handler wired straight to the device voice. Two audio systems, and
 the one that had been audited was not the one he was hearing.
 
+## HALFWAY, AND THREE MOMENTS THAT HAD NEVER FIRED (owner, 2026-08-16)
+
+Asked for after reading a generated inventory of every line the coach can say
+(`voice-dev` → `~/Desktop/InteRun-coach-lines.md`, regenerate with `node /tmp/gen-cue-doc.mjs`).
+
+### ⚠️ THREE MOMENTS HAD LINES, HAD AUDIO FOR ALL NINE COACHES, AND NOTHING PLAYED THEM
+
+`threshold-hold`, `interval-work` and `strength-start` — six prompts, 54 recorded clips, dead since
+the catalogue was written. **Nothing failed and nothing was missing**; no code path ever passed those
+strings to `coachTrigger`. Found by asking, for every trigger in the union type, whether its name
+appears anywhere in `web/app.ts`, `session-runtime.ts` or `WorkoutManager.swift` — worth re-running
+after adding any trigger, because the catalogue compiles perfectly either way.
+⚠️ **`fragment` and `countdown` answer that sweep with a false negative** — they are played by clip
+id, not by trigger — so read the result, do not automate on it.
+
+⚠️ **`strength-start` COULD NOT FIRE BY CONSTRUCTION.** A strength session is one `steady` step at
+RPE 6–7 with no pace and no distance, which is indistinguishable from a tempo run *by kind*, and
+`coachStepTrigger` branched on kind before it ever asked what kind of SESSION it was in. So a set of
+squats got "settle into your tempo". The session type is now checked first, and a test pins the
+ordering — checking the kind first is the whole bug, so "it contains the string" is not enough.
+
+### THE SESSION'S HALFWAY IS MEASURED IN THE SESSION'S OWN CURRENCY
+
+*"based on distance if its a session measured by distance or time if its a session driven by
+minutes"*. It was always the clock (`snap.elapsedSeconds >= target * 0.5`), so the runner who dialled
+a kilometre and walked it was told they were halfway a long way short of 500 m — the same class of
+error as that run ending on a stopwatch, from the same reported session.
+
+⚠️ **A SESSION HAS NO GATE; ITS STEPS DO, AND THEY DISAGREE. THE LONGEST STEP DECIDES.** Both obvious
+rules are wrong, and each is wrong on a real session:
+- *"all steps distance-gated"* → a 6 km run **with a strides block** is not all-distance, and that is
+  precisely the case this exists for.
+- *"any step distance-gated"* → an interval session's 6 × 1 km makes it a distance session, but its
+  warm-up and cool-down carry no distance at all, so halfway lands in the wrong place.
+
+The longest step is what the session IS — the piece a runner would name if asked what they were
+doing, and the piece the title was written from.
+⚠️ **THE LENGTH GATE STAYS ON THE CLOCK** (`target > 120`). "Is this long enough to have a halfway
+worth announcing" is a question about time; converting it to a distance needs a pace, which is the
+thing that varies. Only *what is measured* changed.
+⚠️ **No distance total → fall back to the clock**, never guess.
+
+### HALFWAY THROUGH THIS SECTION — AND IT TURNED ON TWO OF THE THREE BY ITSELF
+
+⚠️ **`threshold-hold` AND `interval-work` ALREADY WERE THIS CUE.** "Mid-block hold" and "mid-rep
+hold-on" are the same moment for hard work, written months ago. So `coachSectionHalfwayTrigger`
+routes a `rep` to `interval-work`, a `steady` block in threshold/race-specific to `threshold-hold`,
+and everything else to the new `section-halfway`. Adding a generic line *alongside* them would have
+been two lines competing for one moment; instead the generic one covers only what they do not.
+
+⚠️ **`snap.stepProgress` IS ALREADY MEASURED IN THE STEP'S OWN GATE** (distance for a distance-bound
+step, the clock for a timed one — see `session-runtime.ts`), so this needed no unit logic of its own
+and cannot disagree with the progress bar the runner is looking at. Feature 1 needed new logic
+because a *session* has no gate; feature 2 did not because a *step* does.
+
+Every guard below is a place it would otherwise be noise, and all are tested:
+- ⚠️ **`st.total > 1`.** A one-section session's midpoint IS the session midpoint — the same sentence
+  twice, seconds apart, on a plain easy run.
+- ⚠️ **Keyed on `index + ":" + repeatIndex`.** Keyed on index alone, a set of six long reps announces
+  the first and is silent through the other five: they share a step index.
+- ⚠️ **Long enough to have a middle:** ≥ 240 s or ≥ 800 m, judged in the step's own gate. Without it
+  a set of short reps turns the coach into a metronome.
+- ⚠️ **Never within 45 s of the session halfway.** On a two-section run the midpoints can be seconds
+  apart, and "you're halfway through" then "halfway through this section" is the coach contradicting
+  itself about what it is counting.
+- ⚠️ **Reset in `coachResetSession`,** or run two of an app session starts believing section one is
+  already done.
+
+### ⚠️ REGENERATING AUDIO ON THIS MAC — THE DOCUMENTED CLOBBER WAS REAL AND IS NOW RESOLVED
+
+`web/voices/` held **244 clips across 4 coaches** against `docs/voices/`'s **1305 across 9**, exactly
+as this file warned. The safe order, and it matters:
+1. **`rsync -a --delete docs/voices/ web/voices/` FIRST.** `docs/` is the committed truth; the build
+   mirrors web → docs, so generating against a stale local copy and building destroys the rest.
+   Doing this also brings the manifest's hashes across, which is what makes step 3 cheap.
+2. `node voice-dev/dump-catalogue.ts`
+3. `python3 voice-dev/generate-elevenlabs.py` — **with NO `--coach`**, or the manifest rebuild loops
+   over the filtered list and strips every other coach. The hash gate then generated **exactly the 18
+   new clips (856 characters)** and left the two `HAND_AUTHORED` ones alone.
+4. `node web/app.ts` — and **do NOT `git checkout -- docs/voices/` this time.** That restore is right
+   after an accidental clobber and wrong after a deliberate regeneration.
+5. Verify: `git status --short docs/voices/` should show **only the new files plus the manifest**.
+
+⚠️ **`voice-dev/venv-el` WAS A SYMLINK TO ITSELF** ("too many levels of symbolic links"). Recreated.
+⚠️ **The manifest rebuild needs `soundfile`**, which is not stdlib — and the script imports it *after*
+generating, so a missing dependency spends the API credit, writes the clips, and then dies before
+writing the manifest. Install it first; a second run is otherwise needed and pays twice.
+
 ## OPEN BUGS (confirmed on real hardware, 2026-07-29)
 
 ### 1. Coach audio when the phone is locked or pocketed — FIXED 2026-08-08, unproven on hardware

@@ -6,55 +6,55 @@
    "id": "guide",
    "name": "The Guide",
    "voice": "Holly",
-   "bytes": 3837999
+   "bytes": 3922753
   },
   {
    "id": "pacer",
    "name": "The Pacer",
    "voice": "Philip",
-   "bytes": 2782854
+   "bytes": 2848510
   },
   {
    "id": "motivator",
    "name": "The Motivator",
    "voice": "Hope",
-   "bytes": 2703209
+   "bytes": 2754284
   },
   {
    "id": "technician",
    "name": "The Technician",
    "voice": "Lucy",
-   "bytes": 2721367
+   "bytes": 2789232
   },
   {
    "id": "spark",
    "name": "The Spark",
    "voice": "Axell",
-   "bytes": 3099707
+   "bytes": 3149936
   },
   {
    "id": "steady",
    "name": "The Steady",
    "voice": "Robert Mitchell",
-   "bytes": 2506906
+   "bytes": 2553420
   },
   {
    "id": "storyteller",
    "name": "The Storyteller",
    "voice": "Nathaniel C",
-   "bytes": 2864926
+   "bytes": 2929251
   },
   {
    "id": "commentator",
    "name": "The Commentator",
    "voice": "British Football Announcer",
-   "bytes": 2658637
+   "bytes": 2727775
   },
   {
    "id": "sportsman",
    "name": "The Sportsman",
    "voice": "Irish Sportsman",
-   "bytes": 2543272
+   "bytes": 2578513
   }
  ],
  "clips": [
@@ -337,6 +337,26 @@
    "duration": 3.21,
    "bytes": 40785,
    "hash": "b130be36613cde9a"
+  },
+  {
+   "id": "section_half_1",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "section-halfway",
+   "file": "voices/guide/section_half_1.mp3",
+   "duration": 4.2,
+   "bytes": 47407,
+   "hash": "da7c88e6879cf97a"
+  },
+  {
+   "id": "section_half_2",
+   "coach": "guide",
+   "voice": "Holly",
+   "trigger": "section-halfway",
+   "file": "voices/guide/section_half_2.mp3",
+   "duration": 3.28,
+   "bytes": 37347,
+   "hash": "19fa486ceeeec962"
   },
   {
    "id": "pace_behind_1",
@@ -1789,6 +1809,26 @@
    "hash": "728a5a1ea7a3bd2e"
   },
   {
+   "id": "section_half_1",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "section-halfway",
+   "file": "voices/pacer/section_half_1.mp3",
+   "duration": 3.0,
+   "bytes": 34186,
+   "hash": "804ec03e21b27871"
+  },
+  {
+   "id": "section_half_2",
+   "coach": "pacer",
+   "voice": "Philip",
+   "trigger": "section-halfway",
+   "file": "voices/pacer/section_half_2.mp3",
+   "duration": 2.74,
+   "bytes": 31470,
+   "hash": "34ee649fe77212f0"
+  },
+  {
    "id": "pace_behind_1",
    "coach": "pacer",
    "voice": "Philip",
@@ -3237,6 +3277,26 @@
    "duration": 2.71,
    "bytes": 31174,
    "hash": "9b332a12b434c40a"
+  },
+  {
+   "id": "section_half_1",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "section-halfway",
+   "file": "voices/motivator/section_half_1.mp3",
+   "duration": 2.11,
+   "bytes": 25916,
+   "hash": "2d9f186eeb406409"
+  },
+  {
+   "id": "section_half_2",
+   "coach": "motivator",
+   "voice": "Hope",
+   "trigger": "section-halfway",
+   "file": "voices/motivator/section_half_2.mp3",
+   "duration": 2.18,
+   "bytes": 25159,
+   "hash": "1b5d5729e53c10a6"
   },
   {
    "id": "pace_behind_1",
@@ -4689,6 +4749,26 @@
    "hash": "a68d75160c7146c7"
   },
   {
+   "id": "section_half_1",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "section-halfway",
+   "file": "voices/technician/section_half_1.mp3",
+   "duration": 3.05,
+   "bytes": 35511,
+   "hash": "0e3806ec0037d02f"
+  },
+  {
+   "id": "section_half_2",
+   "coach": "technician",
+   "voice": "Lucy",
+   "trigger": "section-halfway",
+   "file": "voices/technician/section_half_2.mp3",
+   "duration": 2.85,
+   "bytes": 32354,
+   "hash": "3d57f1c2b8ad6e8f"
+  },
+  {
    "id": "pace_behind_1",
    "coach": "technician",
    "voice": "Lucy",
@@ -6137,6 +6217,26 @@
    "duration": 2.52,
    "bytes": 37091,
    "hash": "aebdc2dfea0e7fa9"
+  },
+  {
+   "id": "section_half_1",
+   "coach": "spark",
+   "voice": "Axell",
+   "trigger": "section-halfway",
+   "file": "voices/spark/section_half_1.mp3",
+   "duration": 1.76,
+   "bytes": 24098,
+   "hash": "6b7aaa3b1624c746"
+  },
+  {
+   "id": "section_half_2",
+   "coach": "spark",
+   "voice": "Axell",
+   "trigger": "section-halfway",
+   "file": "voices/spark/section_half_2.mp3",
+   "duration": 1.93,
+   "bytes": 26131,
+   "hash": "7be1d7ad2cee2308"
   },
   {
    "id": "pace_behind_1",
@@ -7589,6 +7689,26 @@
    "hash": "3e05538dab7d42a0"
   },
   {
+   "id": "section_half_1",
+   "coach": "steady",
+   "voice": "Robert Mitchell",
+   "trigger": "section-halfway",
+   "file": "voices/steady/section_half_1.mp3",
+   "duration": 2.22,
+   "bytes": 26073,
+   "hash": "83467e7b2dc6654f"
+  },
+  {
+   "id": "section_half_2",
+   "coach": "steady",
+   "voice": "Robert Mitchell",
+   "trigger": "section-halfway",
+   "file": "voices/steady/section_half_2.mp3",
+   "duration": 1.88,
+   "bytes": 20441,
+   "hash": "efaf950fe16495c6"
+  },
+  {
    "id": "pace_behind_1",
    "coach": "steady",
    "voice": "Robert Mitchell",
@@ -9037,6 +9157,26 @@
    "duration": 3.1,
    "bytes": 32281,
    "hash": "0808af3ff4e23a14"
+  },
+  {
+   "id": "section_half_1",
+   "coach": "storyteller",
+   "voice": "Nathaniel C",
+   "trigger": "section-halfway",
+   "file": "voices/storyteller/section_half_1.mp3",
+   "duration": 3.03,
+   "bytes": 32516,
+   "hash": "a0e4418340e887ba"
+  },
+  {
+   "id": "section_half_2",
+   "coach": "storyteller",
+   "voice": "Nathaniel C",
+   "trigger": "section-halfway",
+   "file": "voices/storyteller/section_half_2.mp3",
+   "duration": 2.86,
+   "bytes": 31809,
+   "hash": "afbffeef854450c2"
   },
   {
    "id": "pace_behind_1",
@@ -10489,6 +10629,26 @@
    "hash": "0b8dec2ebc7e3535"
   },
   {
+   "id": "section_half_1",
+   "coach": "commentator",
+   "voice": "British Football Announcer",
+   "trigger": "section-halfway",
+   "file": "voices/commentator/section_half_1.mp3",
+   "duration": 3.59,
+   "bytes": 36946,
+   "hash": "2f0cd5088936b6aa"
+  },
+  {
+   "id": "section_half_2",
+   "coach": "commentator",
+   "voice": "British Football Announcer",
+   "trigger": "section-halfway",
+   "file": "voices/commentator/section_half_2.mp3",
+   "duration": 3.28,
+   "bytes": 32192,
+   "hash": "4e3748da18aa4d1f"
+  },
+  {
    "id": "pace_behind_1",
    "coach": "commentator",
    "voice": "British Football Announcer",
@@ -11939,6 +12099,26 @@
    "hash": "6c95bcd36c5f44ea"
   },
   {
+   "id": "section_half_1",
+   "coach": "sportsman",
+   "voice": "Irish Sportsman",
+   "trigger": "section-halfway",
+   "file": "voices/sportsman/section_half_1.mp3",
+   "duration": 1.42,
+   "bytes": 16182,
+   "hash": "3a8aa6087d9a6c7c"
+  },
+  {
+   "id": "section_half_2",
+   "coach": "sportsman",
+   "voice": "Irish Sportsman",
+   "trigger": "section-halfway",
+   "file": "voices/sportsman/section_half_2.mp3",
+   "duration": 1.55,
+   "bytes": 19059,
+   "hash": "dbd74c7f6119bc71"
+  },
+  {
    "id": "pace_behind_1",
    "coach": "sportsman",
    "voice": "Irish Sportsman",
@@ -13109,5 +13289,5 @@
    "hash": "6afc2957dc5d2876"
   }
  ],
- "totalBytes": 25718877
+ "totalBytes": 26253674
 }

@@ -497,6 +497,38 @@
       }
     },
     {
+      "id": "section_half_1",
+      "text": "Halfway through this section. Settle in and hold it.",
+      "trigger": "section-halfway",
+      "byCoach": {
+        "guide": "Halfway through this section. Settle in and hold it.",
+        "pacer": "Halfway through this section. Same effort the rest of the way.",
+        "motivator": "Halfway! Second half is where it counts.",
+        "technician": "Midpoint of this section. Check your posture and hold the rhythm.",
+        "spark": "Halfway — keep it ticking over.",
+        "steady": "You're halfway through this part. No need to change anything.",
+        "storyteller": "Halfway through this stretch. The rest of it is yours.",
+        "commentator": "That's the midpoint of this section — he settles into it nicely.",
+        "sportsman": "Halfway. Keep her lit."
+      }
+    },
+    {
+      "id": "section_half_2",
+      "text": "You're at the midpoint of this one. Keep it honest.",
+      "trigger": "section-halfway",
+      "byCoach": {
+        "guide": "You're at the midpoint of this one. Keep it honest.",
+        "pacer": "Midpoint. Hold the same effort to the end of it.",
+        "motivator": "Halfway there — finish this one strong!",
+        "technician": "Half of this section done. Keep the cadence where it is.",
+        "spark": "Half done. Nice and smooth from here.",
+        "steady": "Halfway. Carry on just as you are.",
+        "storyteller": "The middle of this section. Steady on to the far side.",
+        "commentator": "Halfway through this one, and the rhythm looks good.",
+        "sportsman": "That's half of it. Same again now."
+      }
+    },
+    {
       "id": "pace_behind_1",
       "text": "You've drifted a little under pace. Gently find that rhythm again.",
       "trigger": "pace-behind",

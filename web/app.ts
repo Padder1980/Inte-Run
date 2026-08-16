@@ -12935,13 +12935,84 @@ const COACH = {
   // and the permanent "error" listener all reach the same element, and until 2026-08-16 nothing
   // told them apart. seq is the token a stitched sentence holds while it owns the element;
   // pendingNums is a pace readout waiting for the coach to finish their own line first.
-  seq: 0, pendingNums: null, numT: 0,
+  seq: 0, pendingNums: null, numT: 0, native: false,
 };
 function coachEnabled() { return !!(COACH.cfg && COACH.cfg.enabled); }
 function saveCoachCfg() { try { localStorage.setItem(COACH_STORE, JSON.stringify(COACH.cfg)); } catch (e) {} }
+// ⚠️ IN THE NATIVE APP THE COACH IS PLAYED BY SWIFT, AND THAT IS ABOUT THE RUNNER'S MUSIC, NOT ABOUT
+// THE LOCK SCREEN. Reported from a real session on 2026-08-16: every time the coach spoke, the music
+// stopped and had to be restarted by hand. WebKit manages the shared AVAudioSession for its own
+// <audio> elements and sets plain playback with NO options, dropping the duck/mix this app configures
+// at launch — so a cue becomes an exclusive session that INTERRUPTS whatever else is sounding, and it
+// is never deactivated, so nothing tells the music app it may resume.
+//
+// So when the bridge exists, this returns a SHIM with the same surface as an <audio> element and
+// Swift does the playing, through the session the app owns and releases properly. Everything above it
+// — the priority queue, the stitched pace sentence, the tail trim, the pause checks — is untouched
+// and cannot drift, because there is still exactly one set of that logic and it lives here.
+//
+// ⚠️ IT MUST DEGRADE, NOT DISAPPEAR. In a browser, in the PWA, and in any build whose Swift predates
+// this, there is no handler and the real element is used exactly as before. A failure reported back
+// from Swift also falls through to the ordinary error path, so a runner never gets silence because a
+// clip could not be found in the bundle.
+function coachNativeAudioBridge() {
+  try {
+    const h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.interunCoachAudio;
+    return (h && h.postMessage) ? h : null;
+  } catch (e) { return null; }
+}
+function coachNativeAudioShim(bridge) {
+  let token = 0;
+  const shim = {
+    src: "", volume: 1, currentTime: 0, paused: true, ended: true, preload: "",
+    onended: null, muted: false,
+    _ended: [], _error: [],
+    addEventListener: function (ev, fn) { if (ev === "ended") shim._ended.push(fn); else if (ev === "error") shim._error.push(fn); },
+    play: function () {
+      shim.paused = false; shim.ended = false; shim.currentTime = 0.01;
+      token = (token % 1000000) + 1;
+      shim._token = token;
+      // ⚠️ A WATCHDOG, BECAUSE AN ANSWER THAT NEVER COMES WOULD WEDGE THE COACH FOR THE WHOLE RUN.
+      // Swift replies through evaluateJavaScript, and this file already records that
+      // evaluateJavaScript does nothing at all against a suspended web content process and reports
+      // no error for it. Without this, one lost reply leaves COACH.current set forever and every
+      // later cue is treated as an interruption of a line that finished minutes ago.
+      // ⚠️ A CEILING, NOT A SCHEDULE — unlike the 2600ms constant this change exists to remove.
+      // Nothing in the catalogue is close to fifteen seconds, so it can only fire on a lost reply.
+      clearTimeout(shim._wd);
+      const mine = token;
+      shim._wd = setTimeout(function () { shim._finish(mine, true); }, 15000);
+      try { bridge.postMessage({ action: "playPage", file: String(shim.src), volume: Number(shim.volume) || 1, token: token }); }
+      catch (e) { return { catch: function (f) { f(e); return { catch: function () {} }; } }; }
+      return { catch: function () { return { catch: function () {} }; } };
+    },
+    pause: function () {
+      shim.paused = true; shim._token = 0; clearTimeout(shim._wd);
+      try { bridge.postMessage({ action: "stopPage" }); } catch (e) {}
+    },
+    _finish: function (tok, ok) {
+      // A late answer for a clip we have already moved past must be ignored, or one slow fragment
+      // would advance the sentence twice. This also makes the watchdog harmless when the real answer
+      // arrives first: whichever gets here first clears the token and the other is dropped.
+      if (!tok || tok !== shim._token) return;
+      clearTimeout(shim._wd);
+      shim._token = 0; shim.paused = true; shim.ended = true;
+      if (ok) { const cb = shim.onended; if (cb) cb(); shim._ended.slice().forEach(function (f) { f(); }); }
+      else { shim._error.slice().forEach(function (f) { f(); }); }
+    },
+    _token: 0, _wd: 0,
+  };
+  window.__interunCoachClipEnded = function (tok, ok) { try { shim._finish(tok, !!ok); } catch (e) {} };
+  return shim;
+}
 function coachAudioEl() {
-  if (!COACH.audio) { COACH.audio = new Audio(); COACH.audio.preload = "auto";
-    COACH.audio.addEventListener("ended", coachOnEnded); COACH.audio.addEventListener("error", coachFail); }
+  if (!COACH.audio) {
+    const bridge = coachNativeAudioBridge();
+    COACH.native = !!bridge;
+    COACH.audio = bridge ? coachNativeAudioShim(bridge) : new Audio();
+    COACH.audio.preload = "auto";
+    COACH.audio.addEventListener("ended", coachOnEnded); COACH.audio.addEventListener("error", coachFail);
+  }
   return COACH.audio;
 }
 // Load the clip manifest once. Absent (artifact / not yet deployed) => fallback mode, never an error.
@@ -12984,7 +13055,13 @@ function coachPersonalPrompts(trigger) {
 }
 // Unlock audio inside a user gesture (iOS blocks playback until then).
 function coachUnlock() {
-  if (COACH.unlocked) return; const a = coachAudioEl();
+  if (COACH.unlocked) return;
+  const a = coachAudioEl();
+  // ⚠️ THERE IS NOTHING TO UNLOCK WHEN SWIFT IS PLAYING, and doing it anyway is actively harmful:
+  // the silent clip below is a data: URI, which the native player would look for in the app bundle,
+  // fail to find, and report as a failure — landing straight in coachFail, which speaks the current
+  // prompt in the device voice. An unlock step would have produced a robot voice at the start tap.
+  if (COACH.native) { COACH.unlocked = true; return; }
   try { a.muted = true; a.src = "data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCA"; const p = a.play();
     if (p && p.then) p.then(() => { a.pause(); a.muted = false; COACH.unlocked = true; }).catch(() => { a.muted = false; }); else { COACH.unlocked = true; a.muted = false; } } catch (e) {}
 }

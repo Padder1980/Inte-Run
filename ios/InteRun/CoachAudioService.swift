@@ -95,10 +95,20 @@ final class CoachAudioService: NSObject, WKScriptMessageHandler, AVAudioPlayerDe
         SelfCheck.logger.notice("coach audio \(what, privacy: .public)")
         save()
     }
+    /// What the audio session actually looked like when the last clip started. See the note in
+    /// playFile: this is the difference between this app owning the session and WebKit having taken it.
+    private var dSessOpts = "-"
+    private func describeOptions(_ o: AVAudioSession.CategoryOptions) -> String {
+        var parts: [String] = []
+        if o.contains(.duckOthers) { parts.append("duck") }
+        if o.contains(.mixWithOthers) { parts.append("mix") }
+        if o.contains(.interruptSpokenAudioAndMixWithOthers) { parts.append("interruptSpoken") }
+        return parts.isEmpty ? "none" : parts.joined(separator: "+")
+    }
     private func statusLine() -> String {
         "sched \(dScheduled) . played \(dFired) . stale \(dStale) . missing \(dMissing)"
             + " . failed \(dFailed) . wrist \(dWatchOK)/\(dWatchOK + dWatchMiss)"
-            + " . interrupts \(dInterrupt) . map \(cueMap.count) . last: \(dLast)"
+            + " . interrupts \(dInterrupt) . session \(dSessOpts) . map \(cueMap.count) . last: \(dLast)"
     }
     private func save() {
         let line = statusLine()
@@ -290,6 +300,33 @@ final class CoachAudioService: NSObject, WKScriptMessageHandler, AVAudioPlayerDe
             let rawDesc = rawMap.map { String(describing: type(of: $0)) } ?? "absent"
             note("cuemap received: raw \(rawDesc), \(parsedMap.count) triggers")
             SelfCheck.logger.notice("coach cuemap keys=[\(parsedMap.keys.sorted().joined(separator: ","), privacy: .public)]")
+        case "playPage":
+            // ⚠️ THE PAGE'S OWN <audio> ELEMENT IS WHAT WAS STOPPING THE RUNNER'S MUSIC. Reported from a
+            // real session on 2026-08-16, and corrected by the owner after a first wrong diagnosis: it
+            // was the COACH's recorded voice that killed the music, not the device voice.
+            //
+            // WebKit manages the shared AVAudioSession itself. When an <audio> element starts, it sets
+            // the category to plain `.playback` with NO options — clearing the `.duckOthers` /
+            // `.mixWithOthers` this app configures at launch — which turns a cue into an exclusive
+            // playback session that INTERRUPTS whatever else is sounding. And it never deactivates, so
+            // nothing tells the music app it may resume. The runner has to go and press play.
+            //
+            // So a foreground cue is played HERE now, through the session this app owns: activated per
+            // sentence, and released with `.notifyOthersOnDeactivation`, which is the thing that brings
+            // the music back up by itself. The page keeps every decision — which clip, when, in what
+            // order — and hands over only the playing of it.
+            //
+            // ⚠️ ONE FILE PER CALL, DELIBERATELY. The page already sequences a stitched pace sentence
+            // with its own 25ms tail trim, and moving that logic here would be a second copy of it —
+            // the exact fix-one-builder-not-the-other trap this file has been bitten by twice. The
+            // deactivate is debounced instead, so five fragments duck the music once, not five times.
+            if let file = body["file"] as? String {
+                let token = (body["token"] as? Int) ?? 0
+                let vol = Float((body["volume"] as? Double) ?? 1)
+                pagePlay(file: file, volume: vol, token: token)
+            }
+        case "stopPage":
+            stopPagePlayback()
         case "clearSchedule":
             // ⚠️ THE PHONE'S SCHEDULE ONLY. This used to also empty `cueMap`, which belongs to the
             // WRIST path — and it was not a theoretical overlap: `stopLive()` posts this, and every
@@ -351,7 +388,7 @@ final class CoachAudioService: NSObject, WKScriptMessageHandler, AVAudioPlayerDe
     /// Play one clip by its manifest-relative path. Shared by the scheduled phone cues and the
     /// wrist-driven ones, so a change to how clips are found cannot fix one and miss the other.
     @discardableResult
-    private func playFile(_ file: String) -> Bool {
+    private func playFile(_ file: String, volume: Float = 1) -> Bool {
         guard let base = Bundle.main.resourceURL else { return false }
         let url = base.appendingPathComponent("web/").appendingPathComponent(file)
         let exists = FileManager.default.fileExists(atPath: url.path)
@@ -359,13 +396,23 @@ final class CoachAudioService: NSObject, WKScriptMessageHandler, AVAudioPlayerDe
         guard exists else {
             dMissing += 1; note("missing clip \(file)"); return false
         }
-        // ⚠️ ACTIVATE PER CLIP. AVFoundation activates implicitly, but doing it explicitly is the only
-        // way to find out whether it WORKED — and after an interruption or a process wake it may not.
-        do { try AVAudioSession.sharedInstance().setActive(true) }
+        // ⚠️ RE-ASSERT THE CATEGORY BEFORE EVERY CLIP, AND RECORD WHAT IT WAS. WebKit manages the
+        // shared session for its own <audio> elements and sets plain `.playback` with NO options,
+        // which drops the `.duckOthers`/`.mixWithOthers` configured at launch and makes a cue
+        // interrupt the runner's music outright. Once the page hands its clips over to this service
+        // that should stop happening — but "should" is what produced a wrong diagnosis on
+        // 2026-08-16, so `dSessOpts` carries the options actually in force when a clip starts and
+        // Support › Your data prints it. A reading of `none` here is somebody else owning the
+        // session; `duck+mix` is this app owning it.
+        let sess = AVAudioSession.sharedInstance()
+        dSessOpts = describeOptions(sess.categoryOptions)
+        if sess.category != .playback || sess.categoryOptions.isEmpty { configureSession() }
+        do { try sess.setActive(true) }
         catch { dFailed += 1; note("activate failed [\(appStateWord)]: \(error.localizedDescription)"); return false }
         do {
             let p = try AVAudioPlayer(contentsOf: url)
             p.delegate = self
+            p.volume = max(0, min(1, volume))
             p.prepareToPlay()
             // ⚠️ HONOUR THE RETURN. It was discarded, so a play that produced no sound was
             // indistinguishable from one that did: the cue was marked spent, the page was told it had
@@ -385,13 +432,71 @@ final class CoachAudioService: NSObject, WKScriptMessageHandler, AVAudioPlayerDe
         }
     }
 
+    // ---- playing on the page's behalf, in the foreground -------------------------------------
+
+    /// The token of the clip the page is currently waiting on, and the pending release of the audio
+    /// session. Both exist so a stitched sentence reads as ONE piece of speech to the rest of iOS.
+    private var pageToken = 0
+    private var pageRelease: DispatchWorkItem?
+
+    /// Play one clip for the page and tell it when the clip is done, so its own sequencing carries on
+    /// exactly as it does in a browser. Returns nothing: a failure is reported to the page, which
+    /// falls back to its own <audio> element rather than the runner getting silence.
+    private func pagePlay(file: String, volume: Float, token: Int) {
+        // A new clip cancels a pending release — this is what coalesces the fragments of one sentence
+        // into a single duck of the runner's music instead of five.
+        pageRelease?.cancel(); pageRelease = nil
+        pageToken = token
+        player?.delegate = nil          // the outgoing clip must not report an end the page has moved past
+        player?.stop()
+        player = nil
+        guard playFile(file, volume: volume) else { pageDone(token, false); return }
+    }
+
+    /// Stop anything playing for the page and release the session at once — the runner has paused,
+    /// finished, or a higher-priority cue has taken over.
+    private func stopPagePlayback() {
+        pageRelease?.cancel(); pageRelease = nil
+        player?.delegate = nil
+        player?.stop()
+        player = nil
+        releaseSession()
+    }
+
+    /// ⚠️ `.notifyOthersOnDeactivation` IS THE WHOLE POINT OF THIS FUNCTION. Without it the music app
+    /// is never told it may come back up, and the runner's audio stays down until something else
+    /// happens to reactivate it — which, on a run, is nothing.
+    private func releaseSession() {
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
+    /// Tell the page a clip finished (or failed), so its "ended"/"error" paths run as they always have.
+    private func pageDone(_ token: Int, _ ok: Bool) {
+        webView?.evaluateJavaScript(
+            "window.__interunCoachClipEnded && window.__interunCoachClipEnded(\(token), \(ok ? "true" : "false"));",
+            completionHandler: nil)
+    }
+
     /// ⚠️ DEACTIVATE WHEN THE CLIP ENDS — this is what stops the ducking outliving the sentence.
     /// `.notifyOthersOnDeactivation` is what tells the music app it may come back up; without it the
     /// runner's audio stays quiet until something else happens to reactivate it.
     func audioPlayerDidFinishPlaying(_ p: AVAudioPlayer, successfully flag: Bool) {
         guard p === player else { return }
         player = nil
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        let token = pageToken
+        if token != 0 {
+            pageToken = 0
+            pageDone(token, flag)
+            // ⚠️ HELD BRIEFLY, NOT RELEASED HERE. The next fragment of a stitched sentence arrives a
+            // few milliseconds later; deactivating between each one would duck and unduck the runner's
+            // music five times in four seconds, which is more distracting than the cue itself. A clip
+            // that really is the last one releases 700ms later, which is inaudible.
+            let w = DispatchWorkItem { [weak self] in self?.releaseSession() }
+            pageRelease = w
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7, execute: w)
+            return
+        }
+        releaseSession()
     }
 
     /// ⚠️ ONE PLAY PATH, NOT TWO. This used to be a second, near-identical copy of `playFile` — same

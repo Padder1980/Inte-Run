@@ -3900,18 +3900,54 @@ audio and correctly true either way.
 the speech start before the clip ended"* — **the overlap is simultaneous**, both beginning in the same
 tick, so the obvious phrasing measures nothing and reports clean.
 
-### ⚠️ THE MUSIC IS EXPECTED TO FOLLOW, AND THAT IS A PREDICTION, NOT A FIX
+### ⚠️ THE MUSIC: I PREDICTED THE WRONG CAUSE, AND THE OWNER CORRECTED IT IN FIVE WORDS
 
 *"Everytime the coach spoke it was knocking my music off and I needed to go back into the music app
-and press play again"* — note **every time the coach spoke**, which is exactly how often the device
-voice was firing. `CoachAudioService.configureSession()` sets `.playback` with `.duckOthers,
-.interruptSpokenAudioAndMixWithOthers` at launch (verified: called from `init`, line 145), and that
-combination **ducks** music rather than stopping it. What hard-stops it is the Web Speech API: iOS
-backs `speechSynthesis` with `AVSpeechSynthesizer`, which takes the session and does not hand it back.
-So the spurious robot voice is the strong candidate, and removing it should remove this too.
-⚠️ **Unproven, and it must be confirmed on a real run before the Road Map records it.** If music still
-stops with the coach speaking normally, the remaining suspect is the page `<audio>` element itself and
-that needs a native change, not a web one.
+and press play again"*. I attributed this to the spurious device voice — the reasoning being that iOS
+backs `speechSynthesis` with `AVSpeechSynthesizer`, which takes the session and does not hand it back,
+and that the robot was firing on exactly the cadence he described. He answered: **"it wasn't the robot
+voice knocking the music off it was the real coach voice."** That single fact rules the whole theory
+out, because the recorded clips play through a completely different mechanism.
+
+⚠️ **THE CAUSE IS THAT WEBKIT OWNS THE AUDIO SESSION FOR THE PAGE'S `<audio>` ELEMENT, AND SETS IT
+BADLY.** `CoachAudioService.configureSession()` sets `.playback` with `.duckOthers,
+.interruptSpokenAudioAndMixWithOthers` at launch (verified: called from `init`) — and `.duckOthers`
+implicitly sets `.mixWithOthers`, so the app's own configuration **ducks** music and is correct. But
+WebKit manages the shared `AVAudioSession` for media elements it owns, and for a playing `<audio>` it
+sets plain `.playback` with **no options at all**. That clears the duck/mix, which makes a cue an
+exclusive session that INTERRUPTS other audio — and WebKit never deactivates, so nothing ever tells
+the music app it may resume. Hence: stops dead, every cue, and has to be restarted by hand.
+
+**The fix is that Swift plays the coach in the FOREGROUND too, not only when backgrounded.**
+`coachAudioEl()` returns a **shim with the same surface as an `<audio>` element** when
+`window.webkit.messageHandlers.interunCoachAudio` exists, so every decision — the priority queue, the
+stitched pace sentence, the tail trim, the pause checks — stays in the page and there is still exactly
+one copy of it. Swift plays one clip per call and reports the end back through
+`window.__interunCoachClipEnded`.
+- ⚠️ **ONE FILE PER CALL, DELIBERATELY.** Moving the sequencing into Swift would be a second copy of
+  it, which is the fix-one-builder-not-the-other trap this file has been bitten by three times.
+- ⚠️ **THE DEACTIVATE IS DEBOUNCED BY 700ms**, so the five fragments of a pace sentence duck the
+  runner's music once rather than five times. `.notifyOthersOnDeactivation` is the flag that actually
+  brings it back up.
+- ⚠️ **THE SILENT UNLOCK CLIP MUST NOT BE HANDED OVER.** It is a `data:` URI; Swift would look for it
+  in the bundle, fail, and report a failure — which lands in `coachFail` and speaks the current prompt
+  in the device voice. An unlock step would have produced a robot voice at every start tap.
+- ⚠️ **A REPLY THAT NEVER ARRIVES WOULD WEDGE THE COACH FOR THE WHOLE RUN.** Swift answers via
+  `evaluateJavaScript`, which this file already records doing nothing against a suspended content
+  process and reporting no error for it. One lost reply leaves `COACH.current` set forever and every
+  later cue is discarded as an interruption of a line that finished minutes ago. A 15-second watchdog
+  releases it — a ceiling, not a schedule, unlike the 2600ms constant above.
+- ⚠️ **IT DEGRADES RATHER THAN DISAPPEARING.** No handler (a browser, the PWA, any build whose Swift
+  predates this) uses the real element exactly as before, and a failure reported from Swift falls
+  through to the ordinary error path.
+
+⚠️ **THIS ONE IS NATIVE, SO IT DOES NOT TRAVEL OVER THE AIR.** Everything else in this section is in
+`docs/index.html` and reaches a phone on the next launch; this needs a rebuild.
+
+⚠️ **`dSessOpts` NOW RECORDS WHO OWNED THE SESSION WHEN THE CLIP STARTED**, printed in
+Support › Your data as `session duck+mix` or `session none`. **`none` is somebody else holding it;
+`duck+mix` is this app.** It exists because a wrong diagnosis was argued confidently once already
+today, and a stopped music track looks identical whatever took the session.
 
 ### ⚠️ THE NATIVE HARDENING WAS ALL ON THE OTHER PATH
 

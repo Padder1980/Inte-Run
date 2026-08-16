@@ -238,3 +238,181 @@ test("no fixed wait is left anywhere in the pace readout path", () => {
   assert.match(src, /clip\.duration/, "the fallback timer must be derived from the clip, not a constant");
   assert.match(src, /pendingNums/, "the readout must be queued behind the coach's own line");
 });
+
+// ---- the native transport ----------------------------------------------------------------------
+
+/**
+ * ⚠️ IN THE NATIVE APP SWIFT PLAYS THE CLIPS, AND THAT IS ABOUT THE RUNNER'S MUSIC. WebKit manages
+ * the shared AVAudioSession for its own <audio> elements and sets plain playback with NO options,
+ * dropping the duck/mix this app configures at launch — so a cue interrupts whatever else is playing
+ * and, because WebKit never deactivates, nothing tells the music app it may resume. Reported from a
+ * real run on 2026-08-16, and specifically NOT the device voice: "it wasn't the robot voice knocking
+ * the music off it was the real coach voice."
+ *
+ * The whole point of doing it as a SHIM is that the sequencing logic above it does not change, so
+ * these run the identical scenario through the bridge and demand the identical result.
+ */
+function playPaceCueNative(opts: { curSecPerKm: number; minSecPerKm: number; maxSecPerKm: number; promptId: string }) {
+  const html = readFileSync(PAGE, "utf8");
+  const manifest = JSON.parse(readFileSync(MANIFEST, "utf8"));
+  const byKey: Record<string, any> = {};
+  manifest.clips.forEach((c: any) => { byKey[c.coach + "/" + c.id] = c; });
+
+  let now = 0, nextId = 1;
+  let timers: { id: number; at: number; fn: () => void }[] = [];
+  const setTimeoutV = (fn: () => void, ms?: number) => { const id = nextId++; timers.push({ id, at: now + (ms || 0), fn }); return id; };
+  const clearTimeoutV = (id: number) => { timers = timers.filter((t) => t.id !== id); };
+
+  const heard: Heard[] = [];
+  const said: Said[] = [];
+  const posted: any[] = [];
+  const win: any = {};
+  // Stand in for Swift: accept a file, play it for its real length, then call back on the token.
+  let cur: { token: number; file: string; startedAt: number; dur: number } | null = null;
+  const bridge = {
+    postMessage(msg: any) {
+      posted.push(msg);
+      if (msg.action === "stopPage") { cur = null; return; }
+      if (msg.action !== "playPage") return;
+      if (cur) {
+        // A new clip while one is sounding is an interruption, exactly as on the element.
+        heard.push({ id: String(cur.file).split("/").pop()!.replace(".mp3", ""), playedMs: now - cur.startedAt, fullMs: cur.dur, cut: (now - cur.startedAt) < cur.dur - 40, at: now });
+      }
+      const clip = manifest.clips.find((c: any) => c.file === msg.file);
+      const dur = clip ? Math.round(clip.duration * 1000) : 0;
+      if (!clip) { const t = msg.token; setTimeoutV(() => win.__interunCoachClipEnded(t, false), 1); cur = null; return; }
+      cur = { token: msg.token, file: msg.file, startedAt: now, dur };
+      const mine = cur;
+      setTimeoutV(() => {
+        if (cur !== mine) return;
+        heard.push({ id: String(mine.file).split("/").pop()!.replace(".mp3", ""), playedMs: mine.dur, fullMs: mine.dur, cut: false, at: now });
+        cur = null;
+        win.__interunCoachClipEnded(mine.token, true);
+      }, dur);
+    },
+  };
+  win.webkit = { messageHandlers: { interunCoachAudio: bridge } };
+
+  const env: Record<string, any> = {
+    COACH: {
+      cfg: { enabled: true, coach: "guide", volume: 1, frequency: "normal" },
+      manifest, ready: true, byKey,
+      audio: null, current: null, queue: [], unlocked: false,
+      history: {}, personal: null, personalTried: "",
+      seq: 0, pendingNums: null, numT: 0, native: false,
+    },
+    LIVE: { done: false, pauseStart: 0 },
+    VOICE_AVAILABLE: true,
+    Audio: function () { throw new Error("the real <audio> element must not be used in the native app"); },
+    speak: (t: string) => said.push({ text: t, at: now }),
+    stopSpeech: () => {},
+    setTimeout: setTimeoutV, clearTimeout: clearTimeoutV,
+    window: win,
+    Math, JSON, Object, String, Number, Error,
+  };
+  const NATIVE_NAMES = NAMES.concat(["coachNativeAudioBridge", "coachNativeAudioShim", "coachUnlock"]);
+  const src = NATIVE_NAMES.map((n) => lift(html, n)).join("\n");
+  const keys = Object.keys(env);
+  const api = new Function(...keys, src + "; return {" + NATIVE_NAMES.join(",") + "};")(...keys.map((k) => env[k]));
+
+  api.coachUnlock();
+  const tooFast = opts.curSecPerKm < opts.minSecPerKm;
+  const snap = { currentPaceSecPerKm: opts.curSecPerKm, step: { targetPace: { minSecPerKm: opts.minSecPerKm, maxSecPerKm: opts.maxSecPerKm } } };
+  api.coachPlay({ id: opts.promptId, text: "Ease into it. You are a little behind target pace.", priority: 40 });
+  api.speakPaceNumbers(snap, tooFast);
+  for (;;) {
+    const due = timers.filter((t) => t.at <= 60000).sort((a, b) => a.at - b.at)[0];
+    if (!due) break;
+    timers = timers.filter((t) => t !== due);
+    now = due.at; due.fn();
+  }
+  return { heard, said, posted, env, expected: api.paceSentenceIds(opts.curSecPerKm, snap.step.targetPace, tooFast) as string[] };
+}
+
+test("in the native app every clip goes to Swift, and none to an <audio> element", () => {
+  // The fake Audio() constructor throws, so any fall-through to the page element fails this outright.
+  const r = playPaceCueNative({ curSecPerKm: 532, minSecPerKm: 360, maxSecPerKm: 400, promptId: "pace_behind_1" });
+  assert.equal(r.env.COACH.native, true, "the bridge was present but not detected");
+  const plays = r.posted.filter((m) => m.action === "playPage");
+  assert.equal(plays.length, 1 + r.expected.length, "not every clip was handed over: " + JSON.stringify(r.posted));
+  for (const m of plays) assert.match(m.file, /^voices\//, "a non-clip was sent to the native player: " + m.file);
+  // ⚠️ EVERY CALL NEEDS ITS OWN TOKEN. A late answer for a clip already moved past would otherwise
+  // advance the sentence twice, which is the fragment-boundary fault in a different disguise.
+  assert.equal(new Set(plays.map((m) => m.token)).size, plays.length, "tokens are not unique");
+});
+
+test("the silent unlock clip is never handed to the native player", () => {
+  // ⚠️ It is a data: URI. Swift would look for it in the app bundle, fail, and report a failure —
+  // which lands in coachFail and speaks the current prompt in the device voice. An unlock step would
+  // have produced a robot voice at the start tap, on every run.
+  const r = playPaceCueNative({ curSecPerKm: 532, minSecPerKm: 360, maxSecPerKm: 400, promptId: "pace_behind_1" });
+  for (const m of r.posted) assert.ok(!/^data:/.test(String(m.file || "")), "the unlock clip reached Swift");
+});
+
+test("the native path behaves exactly as the browser one does", () => {
+  const web = playPaceCue({ curSecPerKm: 532, minSecPerKm: 360, maxSecPerKm: 400, promptId: "pace_behind_1" });
+  const nat = playPaceCueNative({ curSecPerKm: 532, minSecPerKm: 360, maxSecPerKm: 400, promptId: "pace_behind_1" });
+  assert.deepEqual(nat.heard.map((h) => h.id), web.heard.map((h) => h.id), "a different sentence came out");
+  assert.deepEqual(nat.heard.filter((h) => h.cut), [], "a clip was cut off on the native path");
+  assert.deepEqual(nat.said, [], "the device voice spoke on the native path");
+});
+
+test("stopping the coach tells Swift to stop too", () => {
+  const html = readFileSync(PAGE, "utf8");
+  // ⚠️ coachStop pauses the element; on the shim that must reach the native player, or a clip keeps
+  // sounding after the runner has paused or finished and the audio session is never released.
+  const shim = lift(html, "coachNativeAudioShim").replace(/^\s*\/\/.*$/gm, "");
+  assert.match(shim, /action: "stopPage"/, "pausing the shim does not stop the native player");
+  assert.match(lift(html, "coachStop"), /pause\(\)/, "coachStop no longer pauses the element");
+});
+
+test("a reply that never arrives does not wedge the coach for the rest of the run", () => {
+  // ⚠️ Swift answers through evaluateJavaScript, which this project has already recorded doing
+  // NOTHING against a suspended web content process and reporting no error for it. One lost reply
+  // would otherwise leave COACH.current set forever, and every later cue would be discarded as an
+  // interruption of a line that finished minutes ago — a coach that goes quiet after one sentence.
+  const html = readFileSync(PAGE, "utf8");
+  let now = 0, nextId = 1;
+  let timers: { id: number; at: number; fn: () => void }[] = [];
+  const env: Record<string, any> = {
+    setTimeout: (fn: () => void, ms?: number) => { const id = nextId++; timers.push({ id, at: now + (ms || 0), fn }); return id; },
+    clearTimeout: (id: number) => { timers = timers.filter((t) => t.id !== id); },
+    String, Number, Math, Object,
+    window: {} as any,
+  };
+  const src = lift(html, "coachNativeAudioShim");
+  const make = new Function(...Object.keys(env), src + "; return coachNativeAudioShim;")(...Object.keys(env).map((k) => env[k]));
+  // A bridge that swallows everything — the lost-reply case exactly.
+  const shim = make({ postMessage() {} });
+  let ended = 0;
+  shim.addEventListener("ended", () => { ended++; });
+  shim.src = "voices/guide/pace_behind_1.mp3";
+  shim.play();
+  assert.equal(ended, 0, "it must not report an end before the clip could have finished");
+
+  for (;;) {
+    const due = timers.filter((t) => t.at <= 60000).sort((a, b) => a.at - b.at)[0];
+    if (!due) break;
+    timers = timers.filter((t) => t !== due);
+    now = due.at; due.fn();
+  }
+  assert.equal(ended, 1, "the watchdog never released the coach");
+  assert.ok(now >= 6000, "it gave up after only " + now + "ms — long enough to cut a real clip short");
+
+  // And a real answer must win, leaving nothing for the watchdog to double-fire on.
+  const posted: any[] = [];
+  const shim2 = make({ postMessage: (m: any) => posted.push(m) });
+  let ended2 = 0;
+  shim2.addEventListener("ended", () => { ended2++; });
+  shim2.src = "voices/guide/min_8.mp3";
+  shim2.play();
+  env.window.__interunCoachClipEnded(posted[0].token, true);
+  assert.equal(ended2, 1);
+  for (;;) {
+    const due = timers.filter((t) => t.at <= 60000).sort((a, b) => a.at - b.at)[0];
+    if (!due) break;
+    timers = timers.filter((t) => t !== due);
+    now = due.at; due.fn();
+  }
+  assert.equal(ended2, 1, "the watchdog fired on top of a clip that had already reported");
+});

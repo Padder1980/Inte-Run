@@ -4084,6 +4084,33 @@ as this file warned. The safe order, and it matters:
 generating, so a missing dependency spends the API credit, writes the clips, and then dies before
 writing the manifest. Install it first; a second run is otherwise needed and pays twice.
 
+### ⚠️ TWO FULL-WIDTH BUTTONS PUT SIDE BY SIDE ARE NOT A PAIR
+
+*"those button look clunky and are different sizes"* (owner, 2026-08-16, of the heat card). They were.
+`.primary` and `.bk-btn2` were both written for a **full-width stacked** button, so each carries its
+own `margin-top` (**16px against 9px** — that alone stops the tops lining up inside a flex row), its
+own padding, its own radius, and **only one of them has a border**. `.heat-acts > button { flex: 1 }`
+made them the same width and disguised nothing else.
+
+`.act-pair` + `.ap-yes` / `.ap-no` is one box with two fills, used by both heat rows.
+⚠️ **THE BORDER IS THE ONE THAT BITES.** A 1px border on one of two side-by-side buttons makes it 2px
+taller for free, and padding cannot compensate without the two drifting apart the next time either is
+touched. Both declare `border: 1px solid transparent`; only the colour differs.
+⚠️ **`.ap-yes`/`.ap-no` MAY SET COLOUR AND NOTHING ELSE** — the guard fails on padding, min-height,
+radius, font-size or margin in either, because that is the mechanism by which a pair comes apart.
+⚠️ **It also reached the 44px tap target**, which neither original did in this row.
+⚠️ **`.heat-acts` was DELETED, not left unused** — an orphaned rule is what the next person copies.
+Measured after: both buttons **170 × 44, tops aligned**, in light and dark. Five deliberate re-breaks
+were each watched failing the guard.
+
+⚠️ **THE PORT SQUATTER FIRED, EXACTLY AS THIS FILE WARNS.** A leftover `http.server` from an earlier
+session held the port, the new one exited into a log, and the first check read the OLD build — the
+giveaway was `act-pair` appearing **0 times** in a page that demonstrably contained it. `lsof` first,
+then `curl | grep` for a symbol you just added, before believing anything on screen.
+⚠️ **AND A `data-theme` WRAPPER DIV DOES NOT SWITCH THE THEME.** The blocks are `:root[data-theme=…]`,
+so a side-by-side "light vs dark" harness renders two identical LIGHT panels and looks like proof.
+Set `document.documentElement.dataset.theme` and screenshot twice.
+
 ## OPEN BUGS (confirmed on real hardware, 2026-07-29)
 
 ### 1. Coach audio when the phone is locked or pocketed — FIXED 2026-08-08, unproven on hardware

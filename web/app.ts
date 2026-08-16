@@ -3044,8 +3044,38 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .heat-h { display: flex; align-items: center; gap: 8px; font-size: var(--t-card); font-weight: 800; color: var(--ink); }
 .heat-h svg { width: 20px; height: 20px; color: var(--peak); }
 .heat-b { font-size: var(--t-meta); color: var(--ink-soft); margin-top: 6px; }
-.heat-acts { display: flex; gap: 8px; margin-top: var(--s2); flex-wrap: wrap; }
-.heat-acts > button { flex: 1; min-width: 140px; }
+/* A PAIR OF ACTIONS, BUILT AS ONE BOX WITH TWO FILLS.
+   The heat card put .primary next to .bk-btn2 and they came out visibly mismatched — the owner's
+   words, 2026-08-16: "those button look clunky and are different sizes". They were: both classes
+   were written for a FULL-WIDTH STACKED button, so each carries its own margin-top (16px against
+   9px, which alone stops the tops lining up), its own padding, its own radius, and only one of them
+   has a border. Setting flex: 1 made them the same width and nothing else.
+   ⚠️ THE SECONDARY'S BORDER IS MATCHED BY A TRANSPARENT ONE ON THE PRIMARY. A 1px border on one of
+   two side-by-side buttons makes it 2px taller for free, and no amount of padding-tweaking fixes
+   that without the two drifting apart again the next time either is touched. Same box, same border
+   width, same radius, same min-height — the only difference between them is what fills them. */
+.act-pair { display: flex; gap: var(--s2); margin-top: var(--s3); }
+.act-pair > button {
+  flex: 1 1 0; min-width: 0; min-height: var(--tap);
+  display: flex; align-items: center; justify-content: center; gap: var(--s2);
+  margin: 0; padding: 0 var(--s3);
+  font: inherit; font-size: var(--t-body); font-weight: 600;
+  border: 1px solid transparent; border-radius: var(--r-ctl);
+  cursor: pointer; text-align: center;
+  transition: transform .12s ease, filter .12s ease, background .12s ease;
+}
+.act-pair > button:active { transform: translateY(1px); }
+.act-pair > .ap-yes { color: var(--accent-ink); background: var(--accent); font-weight: 650; }
+.act-pair > .ap-yes:hover { filter: brightness(1.04); }
+.act-pair > .ap-no { color: var(--ink); background: var(--surface-2); border-color: var(--line); }
+.act-pair > .ap-no:hover { background: var(--surface); }
+/* ⚠️ WRAPS ONLY WHEN THE WORDS GENUINELY WILL NOT FIT — at the top of the Dynamic Type range, or on
+   a 320px screen. Wrapping by default is what produced two buttons of different widths on a screen
+   with room for both. Once stacked they are still one box each, so they stay identical. */
+@media (max-width: 340px) {
+  .act-pair { flex-wrap: wrap; }
+  .act-pair > button { flex-basis: 100%; }
+}
 .heat-sub { font-size: var(--t-label); color: var(--ink-faint); margin-top: var(--s3); font-weight: 700;
   text-transform: uppercase; letter-spacing: .06em; }
 .heat-strip { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0 4px; -webkit-overflow-scrolling: touch; }
@@ -16047,8 +16077,8 @@ function heatCard() {
     '<div class="heat-h">' + ICON.wxSun + '<span>Adapt for heat</span></div>' +
     '<div class="heat-b">Up to <b>' + hot + '</b> today. Holding your planned paces in that would be ' +
       'harder than this session is meant to be — about <b>' + pct + '% harder</b> at the peak.</div>' +
-    '<div class="heat-acts"><button class="primary" id="heatOpen">Adjust my paces</button>' +
-      '<button class="bk-btn2" id="heatNo">Keep as planned</button></div>' +
+    '<div class="act-pair"><button class="ap-yes" id="heatOpen">Adjust my paces</button>' +
+      '<button class="ap-no" id="heatNo">Keep as planned</button></div>' +
     '</div>';
 }
 /** The sheet: pick the hour, see exactly what changes, accept or don't. */
@@ -16107,8 +16137,8 @@ function heatSheetHtml() {
         : '<div class="heat-diff"><div class="heat-dh">About <b>' + pct + '% slower</b> for the same effort' +
           (nowMin > wasMin ? ' · <b>' + wasMin + '</b> → <b>' + nowMin + ' min</b>' : '') + '</div>' +
           rowsHtml + '</div>' +
-          '<div class="heat-acts"><button class="primary" id="heatDo">Adapt this session</button>' +
-          '<button class="bk-btn2" id="heatKeep">Keep as planned</button></div>') +
+          '<div class="act-pair"><button class="ap-yes" id="heatDo">Adapt this session</button>' +
+          '<button class="ap-no" id="heatKeep">Keep as planned</button></div>') +
     // ⚠️ EFFORT, NOT BENEFIT. The evidence supports "this slower pace is the same effort your planned
     // pace would be in cool air". It does not support "you will get the same training out of it",
     // which is what the competitor claims.

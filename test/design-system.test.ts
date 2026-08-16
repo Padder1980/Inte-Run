@@ -494,3 +494,42 @@ test("⚠️ the session is staged, and Start does not scroll away", () => {
     assert.ok(whyShort.includes(t + ":") || whyShort.includes('"' + t + '"'), "no Why line for " + t);
   }
 });
+
+test("a paired action row is one box with two fills", () => {
+  // ⚠️ THE HEAT CARD PUT .primary NEXT TO .bk-btn2 AND THEY CAME OUT VISIBLY DIFFERENT SIZES —
+  // owner, 2026-08-16: "those button look clunky and are different sizes". Both classes were written
+  // for a FULL-WIDTH STACKED button, so each carried its own margin-top (16px against 9px, which by
+  // itself stops the tops lining up), its own padding and radius, and only one of them had a border.
+  // `flex: 1` made them the same width and hid nothing else.
+  const html = css();
+  const at = html.indexOf(".act-pair > button {");
+  assert.ok(at > 0, "the paired-action rule is missing");
+  const rule = html.slice(at, html.indexOf("}", at));
+
+  // ⚠️ THE BORDER IS THE ONE THAT BITES. A 1px border on only one of two side-by-side buttons makes
+  // it 2px taller for nothing, and padding cannot compensate without the two drifting apart again
+  // the next time either is touched. Both declare the same border width; only the colour differs.
+  assert.match(rule, /border:\s*1px solid transparent/,
+    "the shared box must declare a border, so the secondary's does not make it taller");
+  assert.match(rule, /min-height:\s*var\(--tap\)/, "a paired action must still be a 44px tap target");
+  assert.match(rule, /margin:\s*0/, "a stacked button's own margin must be cleared, or the tops disagree");
+
+  // Everything that decides the box comes from the ladders, so the pair scales with Dynamic Type.
+  for (const [prop, token] of [["border-radius", "--r-ctl"], ["font-size", "--t-body"]] as const) {
+    assert.ok(rule.includes(prop + ": var(" + token + ")"),
+      prop + " must come from " + token + ", not a literal");
+  }
+
+  // The two fills differ and nothing else does: whatever ap-yes/ap-no set must be colour only.
+  for (const cls of ["ap-yes", "ap-no"]) {
+    const i = html.indexOf(".act-pair > ." + cls + " {");
+    assert.ok(i > 0, "." + cls + " is missing");
+    const decls = html.slice(i, html.indexOf("}", i));
+    assert.ok(!/padding|min-height|border-radius|font-size|margin/.test(decls),
+      "." + cls + " changes the BOX, not just the fill — that is how the pair drifts: " + decls);
+  }
+
+  // ⚠️ The class it replaced must be gone, not merely unused. An orphaned .heat-acts sitting in the
+  // stylesheet is what the next person copies.
+  assert.ok(!html.includes("heat-acts"), "the superseded .heat-acts rule is still in the page");
+});

@@ -47,7 +47,19 @@ const api = new Function(
 
 const { buildCustomSession, builderCanUseDistance, builderKmFromMinutes, builderMinutesFromKm } = api;
 
-const secs = (s: any) => (s.steps || []).reduce((a: number, x: any) => a + (x.durationSeconds || 0), 0);
+// ⚠️ DERIVED, NOT SUMMED — and after 2026-08-16 that is the only honest way to ask how long one of
+// these sessions is. A DISTANCE ask now produces a distance-GATED step: `distanceMeters` set and
+// `durationSeconds` deliberately absent, because the live runtime ends a step on the clock whenever
+// both are present. That is what made a custom "1 km" finish at 0.59 km when the owner walked it —
+// the kilometre had been converted to 5:14 at build time and the stopwatch won. Summing
+// `durationSeconds` therefore reads ZERO for exactly the sessions these tests exist to check, so it
+// mirrors the app's own `stepSecs`: a clock if there is one, otherwise distance over target pace.
+const stepSeconds = (x: any) =>
+  x.durationSeconds ? x.durationSeconds
+    : (x.distanceMeters && x.targetPaceSecPerKm)
+      ? Math.round(x.distanceMeters / 1000 * (x.targetPaceSecPerKm.minSecPerKm + x.targetPaceSecPerKm.maxSecPerKm) / 2)
+      : 0;
+const secs = (s: any) => (s.steps || []).reduce((a: number, x: any) => a + stepSeconds(x), 0);
 /** The distance the app itself prints on the chip. */
 const km = (s: any) => (s.estimatedDistanceMeters || 0) / 1000;
 
@@ -118,6 +130,37 @@ test("switching units is lossless in both directions", () => {
   }
 });
 
+test("a distance ask ends on the distance, not on a stopwatch", () => {
+  // ⚠️ THE FAULT THIS FILE EXISTED FOR AND NEVER CHECKED. Every test here measured the session's
+  // SHAPE — its length, its title, its monotonicity — and all of them passed while the thing the
+  // runner asked for could not happen. The live runtime's rule is `distanceMeters != null &&
+  // durationSeconds == null`; a step carrying both is timed. So "1 km" was converted to however
+  // long a kilometre ought to take at the runner's planned pace, and the session ended when that
+  // clock ran out. Reported from a real outing on 2026-08-16: asked for 1 km, walked it, and the
+  // app declared the session complete at 0.59 km.
+  //
+  // Asserted on the CONDITION THE RUNTIME TESTS, not on the presence of a distance — the old code
+  // set distanceMeters on nothing here, but a future one that sets both would read as fixed and
+  // behave exactly as before.
+  for (const type of ["easy", "long", "recovery"]) {
+    if (!REP[type]) continue;
+    for (const want of [1, 3, 6]) {
+      const s = buildCustomSession({ id: "t", type, unit: "dist", distKm: want, durMin: 40 });
+      const gated = (s.steps || []).filter((x: any) => x.distanceMeters != null && x.durationSeconds == null);
+      assert.ok(gated.length, type + " " + want + " km: no step ends on a distance — the run is on a clock");
+      const m = gated.reduce((a: number, x: any) => a + x.distanceMeters, 0);
+      // The fixed steps carry their own ground, so the gated body is the remainder, never more.
+      assert.ok(m > 0 && m <= want * 1000 + 1,
+        type + " " + want + " km: gated body is " + m + " m");
+    }
+  }
+  // ...and the minutes side must NOT be gated on distance, or dialling 40' would end early or late
+  // depending on how fast the runner happened to be going.
+  const timed = buildCustomSession({ id: "t", type: "easy", unit: "time", distKm: null, durMin: 40 });
+  const gatedTimed = (timed.steps || []).filter((x: any) => x.distanceMeters != null && x.durationSeconds == null);
+  assert.deepEqual(gatedTimed, [], "a minutes ask must run on the clock it names");
+});
+
 test("dialling a bigger distance always gives a bigger run", () => {
   // Monotonicity, because the conversion subtracts the fixed steps' distance and a sign error there
   // would still produce plausible-looking single values.
@@ -141,7 +184,7 @@ test("an absurdly short ask still leaves real running in it", () => {
   const s = buildCustomSession({ id: "t", type: "easy", unit: "dist", distKm: 0.2, durMin: 40 });
   const running = (s.steps || []).filter((x: any) => x.targetPaceSecPerKm || x.distanceMeters);
   assert.ok(running.length, "a 0.2 km ask produced no running at all");
-  const runSec = running.reduce((a: number, x: any) => a + (x.durationSeconds || 0), 0);
+  const runSec = running.reduce((a: number, x: any) => a + stepSeconds(x), 0);
   assert.ok(runSec >= 240, "only " + runSec + "s of running left in a 0.2 km ask");
 });
 

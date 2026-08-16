@@ -5232,19 +5232,30 @@ function coachSaySequence(ids, onFail) {
   // silence untouched, so it clipped words and kept the gap. Trim the audio, not the playback.
   const TAIL_TRIM_MS = 25;
   let t = 0;
+  // A STITCHED SENTENCE OWNS THE ELEMENT UNTIL IT FINISHES, and this token is how the other three
+  // writers know. coachOnEnded and coachFail are PERMANENT listeners on the same shared audio
+  // element, so before this every fragment boundary ALSO ran the ordinary end-of-prompt path --
+  // nulling COACH.current and starting whatever was queued on top of the half-spoken sentence --
+  // and every src reassignment could fire "error", which spoke the whole line again in the device
+  // voice while the fragments were still playing. That is the two-voices fault reported on
+  // 2026-08-16, and it is why these are tokens rather than a boolean: a later cue takes the
+  // element by bumping seq, and this sequence stops rather than fighting it.
+  const mine = ++COACH.seq;
+  const release = () => { a.onended = null; clearTimeout(t); if (COACH.seq === mine) COACH.seq = 0; };
   const next = () => {
     clearTimeout(t);
-    if (i >= clips.length) { a.onended = null; return; }
+    if (COACH.seq !== mine) return;                 // something more important took the element
+    if (i >= clips.length) { release(); return; }
     // A pause, a finish or a higher-priority cue mid-sentence stops it rather than talking over.
-    if (!LIVE || LIVE.done || LIVE.pauseStart) { a.onended = null; return; }
+    if (!LIVE || LIVE.done || LIVE.pauseStart) { release(); return; }
     const clip = clips[i++];
     try {
       a.src = clip.file; a.volume = Math.max(0, Math.min(1, COACH.cfg.volume)); a.currentTime = 0;
-      const pr = a.play(); if (pr && pr.catch) pr.catch(() => { a.onended = null; if (onFail) onFail(); });
+      const pr = a.play(); if (pr && pr.catch) pr.catch(() => { release(); if (onFail) onFail(); });
       // Schedule the follower from the clip's known length rather than from its end event.
       const ms = Math.max(140, Math.round((clip.duration || 0.6) * 1000) - TAIL_TRIM_MS);
       t = setTimeout(next, ms);
-    } catch (e) { a.onended = null; if (onFail) onFail(); }
+    } catch (e) { release(); if (onFail) onFail(); }
   };
   a.onended = next;
   next();
@@ -7171,6 +7182,9 @@ function buildCustomSession(e) {
     // So: subtract the distance the FIXED steps (warm-up, strides, cool-down) already cover, and size
     // the steady body to cover the remainder.
     let wanted = (e.durMin || Math.round(rep.estimatedDurationSeconds / 60)) * 60;
+    // ⚠️ HELD OUTSIDE THE BLOCK because the steady step needs it. See the note at the push below:
+    // asking for a distance and being given a stopwatch is the fault this exists to fix.
+    let askedBodyM = 0;
     if (e.distKm > 0) {
       const midPace = (st) => (st.targetPaceSecPerKm ? (st.targetPaceSecPerKm.minSecPerKm + st.targetPaceSecPerKm.maxSecPerKm) / 2 : 0);
       const body = rep.steps.filter((st) => st.kind === "steady" && st.targetPaceSecPerKm);
@@ -7186,6 +7200,7 @@ function buildCustomSession(e) {
         // A floor of 1 km of steady running, so an absurdly short ask cannot produce a warm-up and
         // nothing else — the same spirit as the 300s floor the scaling below already applies.
         const bodyM = Math.max(1000, e.distKm * 1000 - fixedM);
+        askedBodyM = bodyM;
         wanted = Math.round(bodyM / 1000 * secPerKm) + fixedSec;
       }
     }
@@ -7194,7 +7209,28 @@ function buildCustomSession(e) {
       // Scale the steady body; keep warm-up, strides/pickups and cool-down exactly as designed.
       const fixedSecs = rep.steps.reduce((s, st) => s + (st.kind === "steady" ? 0 : stepSecs(st)), 0);
       const scale = Math.max(300, wanted - fixedSecs) / steadySecs;
-      rep.steps.forEach((st) => push(st.kind === "steady" ? Object.assign({}, st, { durationSeconds: Math.max(60, Math.round((st.durationSeconds || 0) * scale)) }) : Object.assign({}, st)));
+      // ⚠️ A DISTANCE ASK MUST PRODUCE A DISTANCE-GATED STEP, AND IT DID NOT. The runtime's rule is
+      // distanceMeters != null AND durationSeconds == null, so a step carrying both ends on the
+      // CLOCK. This branch used to convert "1 km" into however long a kilometre should take at the
+      // runner's planned pace and set only a duration — so a custom 1 km ended after that many
+      // seconds whatever ground had been covered. Reported from a real outing: asked for 1 km,
+      // walked it, and the app declared the session complete at 0.59 km.
+      //
+      // Now the steady body carries the DISTANCE and no clock, so it ends at the distance asked for,
+      // at any pace. The duration estimate is still shown — plannedStepSeconds derives it from the
+      // distance and the target pace — it simply no longer decides when the step is over.
+      const nSteady = rep.steps.filter((st) => st.kind === "steady").length || 1;
+      rep.steps.forEach((st) => {
+        if (st.kind !== "steady") { push(Object.assign({}, st)); return; }
+        if (askedBodyM > 0) {
+          const share = Math.round(askedBodyM / nSteady);
+          const out = Object.assign({}, st, { distanceMeters: share });
+          delete out.durationSeconds;
+          push(out);
+          return;
+        }
+        push(Object.assign({}, st, { durationSeconds: Math.max(60, Math.round((st.durationSeconds || 0) * scale)) }));
+      });
     } else {
       // Run-walk style: repeat the run/walk cycle to fill the chosen time.
       const run = rep.steps.find((st) => st.kind === "rep");
@@ -12895,6 +12931,11 @@ const COACH = {
   paceSince: 0, paceWas: "", lastPaceCueAt: -999, paceCorrectionPending: false,
   whyDone: false, whyShown: null, lastKeepGoingAt: -999,
   personal: null, personalTried: "",
+  // ONE <audio> ELEMENT, FOUR WRITERS. coachPlay, coachSaySequence, the permanent "ended" listener
+  // and the permanent "error" listener all reach the same element, and until 2026-08-16 nothing
+  // told them apart. seq is the token a stitched sentence holds while it owns the element;
+  // pendingNums is a pace readout waiting for the coach to finish their own line first.
+  seq: 0, pendingNums: null, numT: 0,
 };
 function coachEnabled() { return !!(COACH.cfg && COACH.cfg.enabled); }
 function saveCoachCfg() { try { localStorage.setItem(COACH_STORE, JSON.stringify(COACH.cfg)); } catch (e) {} }
@@ -12978,6 +13019,11 @@ function coachTrigger(trigger, sessionType, nowSec) {
 }
 function coachPlay(prompt) {
   COACH.current = prompt;
+  // A NEW CUE TAKES THE ELEMENT. Releasing the token stops any stitched sentence still in flight
+  // rather than letting the two fight over src, and drops a pace readout that was waiting on the
+  // line this one has just replaced -- those numbers describe a moment that has passed.
+  // ⚠️ Safe to do here because coachPaceTick fires the cue FIRST and registers the numbers after.
+  COACH.seq = 0; COACH.pendingNums = null; clearTimeout(COACH.numT);
   const clip = coachClip(prompt.id), a = coachAudioEl();
   if (clip) {
     try { a.src = clip.file; a.volume = Math.max(0, Math.min(1, COACH.cfg.volume)); a.currentTime = 0;
@@ -12990,17 +13036,32 @@ function coachPlay(prompt) {
 // sandboxed artifact, or before the coach has downloaded), then advances the queue. Guarded so a
 // play() rejection and an "error" event for the same clip never double-speak.
 function coachFail() {
+  // A STITCHED SENTENCE HANDLES ITS OWN FAILURES, and this guard is the difference between one
+  // voice and two. Reassigning src mid-playback raises "error" on the load being abandoned, and
+  // COACH.current is still the pace prompt at that moment -- so without this the device voice read
+  // the entire coach line out loud over the top of the numbers being stitched.
+  if (COACH.seq) return;
   const p = COACH.current; COACH.current = null;
   if (p && VOICE_AVAILABLE && coachEnabled()) speak(p.text);
   coachDequeue();
 }
-function coachOnEnded() { COACH.current = null; coachDequeue(); }
+function coachOnEnded() {
+  if (COACH.seq) return;                  // a fragment boundary, not the end of a prompt
+  COACH.current = null;
+  // The pace numbers wait here for the coach to finish their own sentence -- see speakPaceNumbers.
+  if (coachFlushNumbers()) return;
+  coachDequeue();
+}
 function coachDequeue() {
   const next = COACH.queue.shift();
   if (next) { COACH.current = next; coachPlay(next); }
 }
 function coachStop() {
   COACH.queue = []; COACH.current = null;
+  // Both of these outlive the audio element's own state, so stopping the coach has to reach them
+  // too: a pace readout still pending when a run is paused or finished would arrive seconds later
+  // over silence, in the device voice, describing a run that is no longer happening.
+  COACH.seq = 0; COACH.pendingNums = null; clearTimeout(COACH.numT);
   try { if (COACH.audio) { COACH.audio.pause(); } } catch (e) {}
   stopSpeech();
 }
@@ -13080,13 +13141,43 @@ function speakPaceNumbers(snap, tooFast) {
   const edge = tooFast ? band.maxSecPerKm : band.minSecPerKm;
   const text = paceWords(cur) + ". Target " + paceWords(edge) + ".";
   const ids = paceSentenceIds(cur, band, tooFast);
+  // ⚠️ THIS WAITED A FIXED 2600ms AND THE COMMENT ABOVE HAS ALWAYS CLAIMED OTHERWISE. Measured
+  // against the shipped audio on 2026-08-16, SEVEN OF THE NINE pace clips for the default coach run
+  // longer than that -- pace_ahead_2 is 5.28s, pace_behind_1 is 4.92s -- so the numbers reassigned
+  // src on the shared element while the coach was still mid-sentence. That is the "kept missing
+  // words out of its sentences" fault, and every correction cue was affected, every time.
+  // The numbers now leave when the line genuinely ends (coachOnEnded -> coachFlushNumbers).
+  COACH.pendingNums = { ids: ids, text: text, tries: 0 };
   clearTimeout(COACH.numT);
-  COACH.numT = setTimeout(() => {
-    // The run may have paused, finished or moved on while the clip played — say nothing then.
-    if (!LIVE || LIVE.done || LIVE.pauseStart) return;
-    // The coach's own voice first choice; the device voice only if a fragment is missing.
-    coachSaySequence(ids, () => speak(text));
-  }, 2600);
+  // ⚠️ A CEILING, NOT THE SCHEDULE. It only catches a clip whose "ended" never arrives -- a blocked
+  // play, a cache miss, a cue that was never a recorded clip at all. Derived from the clip actually
+  // playing rather than a constant, which is the mistake being fixed.
+  const clip = COACH.current ? coachClip(COACH.current.id) : null;
+  COACH.numT = setTimeout(coachFlushNumbers, clip ? Math.round((clip.duration || 3) * 1000) + 1200 : 700);
+}
+// Say the pace numbers, once the coach has finished their own line. Returns true when it took the
+// pending readout, so coachOnEnded can tell "handled" from "nothing waiting".
+function coachFlushNumbers() {
+  const pend = COACH.pendingNums;
+  if (!pend) return false;
+  clearTimeout(COACH.numT);
+  // The run may have paused, finished or moved on while the clip played — say nothing then.
+  if (!LIVE || LIVE.done || LIVE.pauseStart) { COACH.pendingNums = null; return false; }
+  // ⚠️ NEVER OVER A CLIP THAT IS STILL SOUNDING. The ceiling above can fire early if a clip's
+  // manifest duration is short of the file, and the device voice talking across the coach is the
+  // worst version of the fault this whole change exists to remove. Bounded, so a stuck element
+  // cannot re-arm forever: after about four seconds of waiting the readout is simply dropped.
+  const a = COACH.audio;
+  if (a && !a.paused && !a.ended && a.currentTime > 0 && pend.tries < 10) {
+    pend.tries++;
+    COACH.numT = setTimeout(coachFlushNumbers, 400);
+    return true;
+  }
+  COACH.pendingNums = null;
+  if (pend.tries >= 10) return false;
+  // The coach's own voice first choice; the device voice only if a fragment is missing.
+  coachSaySequence(pend.ids, () => speak(pend.text));
+  return true;
 }
 // The runner's own reason, at most once per run, and only where it earns its place: deep into a
 // long run, or entering the closing third of a hard session. Rarity is the whole point.

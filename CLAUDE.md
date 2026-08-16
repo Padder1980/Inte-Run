@@ -3827,6 +3827,101 @@ watch-simulator run, and a green build proves nothing about a rounded bezel.
 Total for the day: four. The build's exit code is the only reliable signal — `node --check` will happily
 pass on a stale `web/app.html` while the browser serves the previous build.
 
+## FOUR FAULTS FROM ONE REAL SESSION (owner, 2026-08-16) — THREE WERE TWO CAUSES
+
+He ran a custom 1 km from his phone and reported four things. **Two of them were the same defect, a
+third is almost certainly a consequence of it, and the fourth was unrelated.** All the fixes are
+web-only, so they reach a phone over the air on the next launch — no rebuild.
+
+### ⚠️ A DISTANCE ASK WAS CONVERTED TO A STOPWATCH AT BUILD TIME
+
+*"it completed the session far too early (before 1km)"* — and then, crucially, *"I was walking not
+running"*, which is what identified it. `buildCustomSession` turned "1 km" into however long a
+kilometre ought to take at the runner's planned pace (`wanted = bodyM / 1000 * secPerKm + fixedSec`)
+and set a DURATION. The live runtime's gate is `isDistanceGated(step)` = `distanceMeters != null &&
+durationSeconds == null`, so a step carrying both ends on the clock. Walking at 8:52/km against a
+5:14 budget, the app declared the session complete at **0.59 km**.
+
+⚠️ **THE PLAN'S OWN SESSIONS WERE NEVER AFFECTED** — measured on a real plan, **0 of 487 steps carry
+both fields** (62 distance-only, 425 duration-only). The fault is confined to the custom builder,
+which is the one place a step was assembled by hand rather than by the session library.
+
+⚠️ **`test/session-builder-distance.test.ts` HAD TWELVE TESTS AND ELEVEN OF THEM PASSED WITH THE BUG
+LIVE** (watched, by reverting the fix). Every one measured the session's SHAPE — its length, its
+title, its monotonicity, its training distance — and not one asked the question the runner asks: does
+it stop where I told it to. The new guard asserts on **the condition the runtime tests**, not on the
+presence of a distance, because the old code set `distanceMeters` on nothing here and a future
+version setting both would read as fixed while behaving exactly as before.
+
+⚠️ **AND THE FIX BROKE THE FILE'S OWN MEASURING INSTRUMENT, WHICH IS NOT THE SAME AS BREAKING THE
+CODE.** `secs()` summed `durationSeconds`, so the moment a body step became distance-gated it read a
+20-minute run as **0.0′** and three tests failed. The helper now derives exactly as the app's
+`stepSecs` does — a clock if there is one, otherwise distance over target pace. Changing an assertion
+to make a fix pass is the trap; changing a ruler that can no longer see the thing it measures is not,
+and the difference is whether every assertion keeps its full force. They do: re-broken, only the new
+one fails.
+
+### ⚠️ ONE `<audio>` ELEMENT, FOUR WRITERS, AND NOTHING TOLD THEM APART
+
+*"the voice coach was competing with the computer voice"* and *"the selected voice coach kept missing
+words out of it's sentences"* are **one defect**. `speakPaceNumbers` waited a **fixed 2600ms** before
+stitching the pace numbers onto the same shared element — while the function's own comment claimed,
+and had always claimed, that it *"waits for the clip to finish rather than talking over it"*.
+
+⚠️ **MEASURED AGAINST THE SHIPPED AUDIO: SEVEN OF THE NINE PACE CLIPS FOR THE DEFAULT COACH ARE
+LONGER THAN 2600ms**, and **all six corrections** are — `pace_ahead_2` 5.28s, `pace_behind_1` 4.92s,
+`pace_behind_2` 4.78s, `pace_ahead_3` 4.40s, `pace_ahead_1` 4.16s, `pace_behind_3` 3.03s. So every
+pace correction, every time, was cut off mid-word. There is no constant that is both long enough for
+the longest clip and short enough to feel like a follow-on; the schedule has to come from the clip.
+
+⚠️ **AND THE CUT ITSELF PRODUCED THE SECOND VOICE.** Reassigning `src` mid-playback raises `error` on
+the load being abandoned — and `coachFail` is a PERMANENT `addEventListener` on that element. It read
+`COACH.current`, still holding the pace prompt, and read **the entire line out loud in the device
+voice** over the fragments. `coachOnEnded` is permanent in the same way and nulled `COACH.current` at
+every fragment boundary, starting whatever was queued on top of a half-spoken sentence.
+
+The fix is a token, `COACH.seq`, held by a stitched sentence while it owns the element, plus
+`COACH.pendingNums`, a readout that waits for the coach's own line to genuinely end (`coachOnEnded` →
+`coachFlushNumbers`). The remaining timer is a **ceiling derived from the clip actually playing**, not
+a constant, for the case where `ended` never arrives.
+- ⚠️ **`coachStop` must clear all three** or a readout pending when a run is paused or finished
+  arrives seconds later over silence, describing a run that has stopped.
+- ⚠️ **`coachPlay` releases the token**, so a genuinely new cue takes the element instead of fighting
+  it — safe only because `coachPaceTick` fires the cue FIRST and registers the numbers after.
+- ⚠️ **The fragment bank was NOT the problem** and was checked before anything was changed: the guide
+  has `min_2`–`min_20` and a complete `num_0`–`num_59`. The missing words were the truncation.
+
+⚠️ **`test/coach-audio-sequencing.test.ts` DRIVES THE REAL FUNCTIONS AGAINST THE REAL MANIFEST** with
+a fake element on a virtual clock that records every clip stopped before its own end. Asserting on
+the source would only pin the shape of today's fix. **Seven of its eight guards fail against the
+build he ran that morning**; the eighth is the clip-length measurement, which is a fact about the
+audio and correctly true either way.
+⚠️ Its overlap check asks *"was there audio still to come when the device voice started"*, not *"did
+the speech start before the clip ended"* — **the overlap is simultaneous**, both beginning in the same
+tick, so the obvious phrasing measures nothing and reports clean.
+
+### ⚠️ THE MUSIC IS EXPECTED TO FOLLOW, AND THAT IS A PREDICTION, NOT A FIX
+
+*"Everytime the coach spoke it was knocking my music off and I needed to go back into the music app
+and press play again"* — note **every time the coach spoke**, which is exactly how often the device
+voice was firing. `CoachAudioService.configureSession()` sets `.playback` with `.duckOthers,
+.interruptSpokenAudioAndMixWithOthers` at launch (verified: called from `init`, line 145), and that
+combination **ducks** music rather than stopping it. What hard-stops it is the Web Speech API: iOS
+backs `speechSynthesis` with `AVSpeechSynthesizer`, which takes the session and does not hand it back.
+So the spurious robot voice is the strong candidate, and removing it should remove this too.
+⚠️ **Unproven, and it must be confirmed on a real run before the Road Map records it.** If music still
+stops with the coach speaking normally, the remaining suspect is the page `<audio>` element itself and
+that needs a native change, not a web one.
+
+### ⚠️ THE NATIVE HARDENING WAS ALL ON THE OTHER PATH
+
+Worth knowing before diagnosing the next audio report: every fix in the 2026-08-08 coach-audio work
+landed on `CoachAudioService`, which is gated `guard UIApplication.shared.applicationState ==
+.background`. **On a screen-on phone run none of it runs at all** — every cue comes from the page's
+shared `<audio>` element, which has no session management, four unsynchronised writers, and (until
+this change) a permanent `error` handler wired straight to the device voice. Two audio systems, and
+the one that had been audited was not the one he was hearing.
+
 ## OPEN BUGS (confirmed on real hardware, 2026-07-29)
 
 ### 1. Coach audio when the phone is locked or pocketed — FIXED 2026-08-08, unproven on hardware

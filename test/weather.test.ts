@@ -6,14 +6,14 @@ test("cool, calm conditions need no adjustment", () => {
   const r = assessConditions({ tempC: 12, humidityPct: 55, windKph: 8, sessionType: "threshold" });
   assert.equal(r.severity, "none");
   assert.equal(r.effortBased, false);
-  assert.equal(r.pacePenaltySecPerKm, undefined);
+  assert.equal(r.paceFactor, 1, "no heat, so no pace effect");
 });
 
 test("a hot, humid threshold session switches to effort with a pace penalty", () => {
   const r = assessConditions({ tempC: 30, humidityPct: 75, windKph: 8, sessionType: "threshold" });
   assert.ok(["high", "severe"].includes(r.severity));
   assert.equal(r.effortBased, true);
-  assert.ok((r.pacePenaltySecPerKm ?? 0) > 0);
+  assert.ok(r.paceFactor > 1, "heat should slow the same effort");
   assert.match(r.points.join(" "), /effort/i);
   assert.match(r.points.join(" "), /humid/i);
 });
@@ -39,7 +39,7 @@ test("strong wind on intervals becomes effort-based with headwind strategy", () 
 test("cold prompts a longer warm-up but no pace penalty", () => {
   const r = assessConditions({ tempC: 1, humidityPct: 70, windKph: 10, sessionType: "easy" });
   assert.match(r.points.join(" "), /warm up longer|layer/i);
-  assert.equal(r.pacePenaltySecPerKm, undefined);
+  assert.equal(r.paceFactor, 1, "no heat, so no pace effect");
 });
 
 test("the summary describes the conditions plainly", () => {

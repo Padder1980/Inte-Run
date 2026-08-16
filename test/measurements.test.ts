@@ -23,7 +23,7 @@ test("choosing Fahrenheit cannot change a single training decision", () => {
   const a = assessConditions(c);
   const b = assessConditions(c);
   assert.equal(a.severity, b.severity);
-  assert.equal(a.pacePenaltySecPerKm, b.pacePenaltySecPerKm);
+  assert.equal(a.paceFactor, b.paceFactor);
   assert.equal(a.effortBased, b.effortBased);
   // The engine takes tempC and nothing else — it has no notion of a display unit, and must not gain
   // one. This asserts the shape rather than the value: a `unit` parameter appearing here is the

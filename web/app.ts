@@ -3994,6 +3994,31 @@ function fmtTemp(tempC, withUnit) {
   const v = Math.round(f ? c * 9 / 5 + 32 : c);
   return v + "°" + (withUnit ? (f ? "F" : "C") : "");
 }
+/**
+ * The heat slowdown in seconds per km, for THIS runner.
+ *
+ * ⚠️ THE ENGINE RETURNS A MULTIPLIER, NOT A NUMBER OF SECONDS, AND THAT IS THE WHOLE FIX. The old
+ * value was a flat s/km handed to everybody, which is 14% of a 3:30/km runner's pace and 7% of a
+ * 7:00/km runner's — the same weather, twice as punishing to the faster one. Seconds only mean
+ * something once you know whose pace they are seconds of, so the conversion belongs here, where the
+ * runner's own easy band is in reach, and not in an engine that has never heard of them.
+ *
+ * Returns 0 when there is no effect or no pace to measure against.
+ */
+function heatSecPerKm(imp, paceSecPerKm) {
+  if (!imp || !(imp.paceFactor > 1)) return 0;
+  const base = Number(paceSecPerKm) || easyPaceRef();
+  if (!(base > 0)) return 0;
+  return Math.round(base * (imp.paceFactor - 1));
+}
+/** The runner's own easy pace, as the reference a general "how much slower" figure is quoted against. */
+function easyPaceRef() {
+  try {
+    const e = RAW && RAW.paces && RAW.paces.easy;
+    if (e && e.minSecPerKm && e.maxSecPerKm) return (e.minSecPerKm + e.maxSecPerKm) / 2;
+  } catch (err) {}
+  return 0;
+}
 function wmoIcon(code, windKph) {
   if ((code >= 71 && code <= 77) || (code >= 85 && code <= 86)) return "wxSnow";
   if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95) return "wxRain";
@@ -4037,7 +4062,9 @@ function conditionsSquare(session) {
   const w = activeWeather();
   const imp = currentConditions(session);
   const c = SEV_COLOR[imp.severity];
-  const sub = imp.effortBased ? "Run by effort today" : imp.pacePenaltySecPerKm ? "≈ +" + imp.pacePenaltySecPerKm + "s/km" : "Good to run";
+  // Seconds derived from the runner's OWN pace — see heatSecPerKm. A flat number was the fault.
+  const heatSec = heatSecPerKm(imp);
+  const sub = imp.effortBased ? "Run by effort today" : heatSec ? "≈ +" + heatSec + "s/km" : "Good to run";
   return '<button class="tsq" id="condSq" style="--sqc:' + c + '">' +
     '<div class="tsq-ic">' + ICON[w.iconKey] + '</div>' +
     '<div class="tsq-k">Conditions' + (w.live ? ' · live' : ' · example') + '</div>' +
@@ -4075,7 +4102,8 @@ function weatherSheetHtml() {
   const w = activeWeather();
   const imp = currentConditions(sess);
   const c = SEV_COLOR[imp.severity];
-  const pen = imp.pacePenaltySecPerKm ? '<span class="chip rpe">≈ +' + imp.pacePenaltySecPerKm + 's/km at the same effort</span>' : "";
+  const penSec = heatSecPerKm(imp);
+  const pen = penSec ? '<span class="chip rpe">≈ +' + penSec + 's/km for the same effort</span>' : "";
   const presetBtns = Object.keys(WEATHER_PRESETS).map((k) => '<button data-weather="' + k + '"' + (!state.wx && k === state.weather ? ' class="on"' : '') + '>' + WEATHER_PRESETS[k].label + '</button>').join("");
   const source = w.live
     ? '<div class="wx-src live"><span class="dot"></span>Live forecast · ' + w.windKph + ' km/h wind · ' + w.humidityPct + '% humidity</div>'
@@ -5457,7 +5485,7 @@ function alfieIntents() {
     { k: ["heat", "hot", "humid", "warm weather"], a: () => {
       let imp; try { imp = currentConditions(selectedSession()); } catch (e) { imp = null; }
       return "<p>Heat makes the same pace cost more \\u2014 that\\u2019s physiology, not weakness. <b>Run by effort</b> and let the pace be whatever it is.</p>" +
-        (imp ? "<p>Right now Inte-Run rates conditions as <b>" + esc(imp.headline) + "</b>." + (imp.pacePenaltySecPerKm ? " Expect around <b>+" + imp.pacePenaltySecPerKm + "s/km</b> at the same effort." : "") + "</p>" : "") +
+        (imp ? "<p>Right now Inte-Run rates conditions as <b>" + esc(imp.headline) + "</b>." + (heatSecPerKm(imp) ? " Expect around <b>+" + heatSecPerKm(imp) + "s/km</b> for the same effort." : "") + "</p>" : "") +
         "<p>Go earlier or later in the day, take fluid with some sodium in it \\u2014 without over-drinking, since sodium doesn\\u2019t make excess fluid safe \\u2014 and give yourself 10\\u201314 days to acclimatise.</p>";
     } },
     { k: ["cold", "winter", "ice", "dark"], a: () => "<p>Cold running is mostly a kit problem: layer up, cover extremities, and be seen \\u2014 lights and reflective gear.</p><p>Warm up a bit longer than usual, and on ice shorten your stride and slow down. A missed session beats a fall.</p>" },

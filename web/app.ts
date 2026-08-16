@@ -3054,6 +3054,179 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
    two side-by-side buttons makes it 2px taller for free, and no amount of padding-tweaking fixes
    that without the two drifting apart again the next time either is touched. Same box, same border
    width, same radius, same min-height — the only difference between them is what fills them. */
+/* ===== THE POST-RUN DEBRIEF (Logbook run page) ================================================
+   ⚠️ THE SCREEN OWNS THE WHOLE VIEWPORT. #view carries 16px of padding for every other screen and
+   the hero has to reach the edges, so the padding is removed here and re-applied by .rd-sheet. The
+   global top bar and bottom nav are hidden by html.rd-open, which render() sets from one place. */
+html.rd-open .topbar, html.rd-open .bottomnav { display: none; }
+html.rd-open .view { padding: 0; }
+
+.rd-nav { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: var(--s3);
+  padding: calc(8px + env(safe-area-inset-top, 0px)) var(--s3) 8px; min-height: var(--tap); }
+/* The material is a SEPARATE layer so its opacity can be driven from scroll without fading the
+   controls sitting on top of it. Fading the whole bar would take the back button with it. */
+.rd-nav-bg { position: absolute; inset: 0; opacity: 0; pointer-events: none;
+  background: color-mix(in srgb, var(--bg) 86%, transparent); backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line); }
+.rd-ic { position: relative; z-index: 1; flex: 0 0 auto; width: var(--tap); height: var(--tap);
+  display: flex; align-items: center; justify-content: center; padding: 0; margin: 0;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r-pill);
+  cursor: pointer; box-shadow: var(--shadow); }
+.rd-glyph { font-size: var(--t-section); line-height: 1; font-weight: 500; }
+.rd-glyph-dots { font-size: var(--t-hero); letter-spacing: 0; }
+.rd-nav-t { position: relative; z-index: 1; flex: 1 1 auto; text-align: center; font-size: var(--t-card);
+  font-weight: 600; opacity: 0; transition: opacity .12s linear; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.rd-hero { position: relative; margin-top: calc(-1 * (var(--tap) + 16px + env(safe-area-inset-top, 0px)));
+  height: 49dvh; min-height: 260px; overflow: hidden; }
+.rd-map { position: absolute; inset: 0; }
+.rd-map svg, .rd-map img, .rd-map canvas { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* ⚠️ THE BLEND IS WHAT REMOVES THE CARD EDGE. Without it the map stops on a hard line and the hero
+   reads as a picture in a box, which is the single thing the design is most insistent about. */
+.rd-fade { position: absolute; left: 0; right: 0; bottom: 0; height: 96px; pointer-events: none;
+  background: linear-gradient(to bottom, transparent 0%, var(--bg) 92%); }
+.rd-noroute { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: var(--s2); color: var(--ink-faint); background: var(--surface-2); }
+.rd-noroute svg { width: 28px; height: 28px; }
+.rd-privtag { position: absolute; left: var(--s4); bottom: 92px; font-size: var(--t-label);
+  letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint); }
+
+.rd-sheet { position: relative; z-index: 2; margin-top: -24px; padding: 0 20px 96px; }
+.rd-title { margin: 0 0 var(--s4); }
+.rd-h1 { display: flex; align-items: center; gap: var(--s2); margin: 0; font-size: var(--t-display);
+  font-weight: 700; letter-spacing: -.02em; text-wrap: balance; }
+.rd-tick { display: inline-flex; width: 26px; height: 26px; align-items: center; justify-content: center;
+  border-radius: var(--r-pill); border: 1.5px solid var(--brass); color: var(--brass); flex: 0 0 auto; }
+.rd-tick svg { width: 15px; height: 15px; }
+.rd-cue { margin-top: 2px; font-size: var(--t-section); font-weight: 650; color: var(--accent); }
+.rd-cue-caution { color: var(--ease); }
+.rd-cue-insufficientData { color: var(--ink-faint); }
+
+.rd-metrics { background: var(--surface); border-radius: var(--r-hero); box-shadow: var(--shadow); overflow: hidden; }
+.rd-s1row { display: grid; grid-template-columns: repeat(3, 1fr); padding: var(--s4) var(--s2); }
+.rd-s1 { text-align: center; }
+.rd-s1v { font-size: var(--t-hero); font-weight: 700; letter-spacing: -.02em; }
+.rd-s1k { margin-top: 2px; font-size: var(--t-label); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); }
+.rd-u { margin-left: 3px; font-size: var(--t-meta); font-weight: 500; color: var(--ink-faint); }
+.rd-s2grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s4) var(--s2);
+  padding: var(--s4) var(--s3) var(--s5); border-top: 1px solid var(--line); }
+.rd-s2v { display: flex; align-items: center; gap: 6px; font-size: var(--t-card); font-weight: 650; }
+.rd-s2v svg { width: 16px; height: 16px; flex: 0 0 auto; color: var(--ink-soft); }
+.rd-s2k { margin-top: 2px; font-size: var(--t-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint); }
+
+.rd-sec { margin: var(--s6) 0 var(--s3); font-size: var(--t-section); font-weight: 700; letter-spacing: -.01em; }
+.rd-verdict { padding: var(--s4); border-radius: var(--r-card);
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent); }
+.rd-v-caution { background: color-mix(in srgb, var(--ease) 8%, var(--surface)); border-color: color-mix(in srgb, var(--ease) 22%, transparent); }
+.rd-v-insufficientData { background: var(--surface); border-color: var(--line); }
+.rd-vhead { display: flex; align-items: center; gap: var(--s3); }
+.rd-vic { display: inline-flex; width: 32px; height: 32px; flex: 0 0 auto; align-items: center; justify-content: center;
+  border-radius: var(--r-pill); background: var(--brass); color: var(--surface); }
+.rd-v-caution .rd-vic { background: var(--ease); }
+.rd-v-insufficientData .rd-vic { background: var(--ink-faint); }
+.rd-vic svg { width: 17px; height: 17px; }
+.rd-vh { font-size: var(--t-section); font-weight: 700; color: var(--accent); letter-spacing: -.01em; }
+.rd-v-caution .rd-vh { color: var(--ease); }
+.rd-v-insufficientData .rd-vh { color: var(--ink); }
+.rd-vb { margin: var(--s3) 0 0; font-size: var(--t-card); line-height: 1.5; color: var(--ink-soft); }
+.rd-chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); margin-top: var(--s4); }
+.rd-chip { padding: var(--s3); border-radius: var(--r-ctl); background: color-mix(in srgb, var(--bg) 70%, var(--surface)); }
+.rd-chipv { font-size: var(--t-card); font-weight: 700; color: var(--accent); }
+.rd-v-caution .rd-chipv { color: var(--ease); }
+.rd-chipk { margin-top: 1px; font-size: var(--t-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint); }
+
+.rd-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s3); }
+.rd-list li { display: flex; align-items: flex-start; gap: var(--s3); font-size: var(--t-card); line-height: 1.4; }
+.rd-li-ic { flex: 0 0 auto; display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center;
+  border-radius: var(--r-pill); border: 1.5px solid currentColor; margin-top: 1px; }
+.rd-li-ic svg { width: 12px; height: 12px; }
+.rd-li-ok { color: var(--accent); }
+.rd-li-watch { color: var(--ease); }
+
+.rd-plan { padding: var(--s4); border-radius: var(--r-card); background: var(--surface); box-shadow: var(--shadow); }
+.rd-plan-p { font-size: var(--t-body); line-height: 1.5; color: var(--ink-soft); }
+.rd-cmp-h, .rd-cmp { display: grid; grid-template-columns: 1fr auto auto; gap: var(--s3); align-items: baseline; }
+.rd-cmp-h { margin-top: var(--s3); padding-bottom: 6px; border-bottom: 1px solid var(--line);
+  font-size: var(--t-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint); }
+.rd-cmp-h span:nth-child(2), .rd-cmp-h span:nth-child(3), .rd-cmp-a, .rd-cmp-b { text-align: right; min-width: 84px; }
+.rd-cmp { padding: var(--s3) 0 0; font-size: var(--t-body); }
+.rd-cmp-k { color: var(--ink-soft); }
+.rd-cmp-b { font-weight: 650; }
+
+.rd-next { display: flex; width: 100%; min-height: var(--tap); align-items: center; justify-content: center; gap: var(--s2);
+  margin: var(--s5) 0 0; padding: 0 var(--s4); font: inherit; font-size: var(--t-card); font-weight: 650;
+  color: var(--accent-ink); background: var(--accent); border: 1px solid transparent; border-radius: var(--r-pill); cursor: pointer; }
+.rd-next svg { width: 18px; height: 18px; }
+.rd-next:active { transform: translateY(1px); }
+
+.rd-tabs { display: flex; gap: 0; padding: 4px; border-radius: var(--r-pill); background: var(--surface-2); border: 1px solid var(--line); }
+/* ⚠️ THE HIT AREA GROWS, NOT THE BOX — the same rule the rest of the app follows. A 44px-tall pill
+   makes the tab bar visibly heavier than the design, so the control stays 38px and an invisible
+   ::after extends the tappable region to the 44pt minimum. */
+.rd-tab { position: relative; flex: 1 1 0; min-height: 38px; padding: 0 var(--s2); font: inherit; font-size: var(--t-body); font-weight: 600;
+  color: var(--ink-soft); background: transparent; border: 0; border-radius: var(--r-pill); cursor: pointer; }
+.rd-tab::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: var(--tap); transform: translateY(-50%); }
+.rd-tab.on { color: var(--accent-ink); background: var(--accent); font-weight: 650; }
+.rd-tabbody { margin-top: var(--s3); }
+.rd-panel { padding: var(--s4); border-radius: var(--r-card); background: var(--surface); box-shadow: var(--shadow); margin-bottom: var(--s3); }
+.rd-panel-h { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3); margin-bottom: var(--s3); }
+.rd-panel-t { font-size: var(--t-card); font-weight: 700; }
+.rd-panel-v { font-size: var(--t-body); color: var(--ink-soft); }
+.rd-panel-v b { font-size: var(--t-card); color: var(--ink); }
+.rd-empty { font-size: var(--t-body); color: var(--ink-faint); }
+.rd-interp { margin-top: var(--s2); font-size: var(--t-body); line-height: 1.5; color: var(--ink-soft); }
+.rd-trend { font-size: var(--t-card); line-height: 1.5; }
+/* The textual equivalent of every chart. Visible, not hidden — it is useful to everyone, and a
+   summary only screen readers get is a summary nobody checks. */
+.rd-sr { margin-top: var(--s2); font-size: var(--t-meta); color: var(--ink-faint); line-height: 1.45; }
+
+/* ⚠️ ZONE COLOUR COMES FROM --hz1..--hz5 VIA .hz-bar > i, EXACTLY AS Support > Training zones does.
+   Nothing here sets a zone colour; this rule only sets the SHAPE of the row. */
+.rd-zones { display: flex; flex-direction: column; gap: var(--s3); }
+.rd-zrow { display: grid; grid-template-columns: 26px 62px 1fr 42px 34px; gap: var(--s2); align-items: center; font-size: var(--t-meta); }
+.rd-zn { font-weight: 650; }
+.rd-zr { color: var(--ink-faint); }
+.rd-zbar { height: 10px; border-radius: var(--r-pill); background: var(--surface-2); overflow: hidden; }
+.rd-zt, .rd-zp { text-align: right; color: var(--ink-soft); }
+
+.rd-adv { margin-top: var(--s5); border-top: 1px solid var(--line); }
+.rd-acc { border-bottom: 1px solid var(--line); }
+.rd-acc-h { display: flex; width: 100%; min-height: var(--tap); align-items: center; gap: var(--s3);
+  padding: var(--s3) 0; margin: 0; font: inherit; font-size: var(--t-card); font-weight: 600;
+  color: var(--ink); background: transparent; border: 0; cursor: pointer; text-align: left; }
+.rd-acc-ic { display: inline-flex; flex: 0 0 auto; color: var(--ink-soft); }
+.rd-acc-ic svg { width: 19px; height: 19px; }
+.rd-acc-t { flex: 1 1 auto; }
+.rd-acc-c { display: inline-flex; color: var(--ink-faint); transition: transform .16s ease; }
+.rd-acc-c svg { width: 18px; height: 18px; }
+.rd-acc-h[aria-expanded="true"] .rd-acc-c { transform: rotate(180deg); }
+.rd-acc-b { padding: 0 0 var(--s4); font-size: var(--t-body); line-height: 1.55; color: var(--ink-soft); }
+.rd-acc-b p { margin: 0; }
+
+.rd-meta { border-radius: var(--r-card); background: var(--surface); box-shadow: var(--shadow); overflow: hidden; }
+.rd-meta-r { display: flex; width: 100%; min-height: var(--tap); align-items: center; gap: var(--s3);
+  padding: var(--s3) var(--s4); margin: 0; font: inherit; font-size: var(--t-body); color: var(--ink);
+  background: transparent; border: 0; border-bottom: 1px solid var(--line); text-align: left; }
+.rd-meta-r:last-child { border-bottom: 0; }
+button.rd-meta-r { cursor: pointer; }
+.rd-meta-ic { display: inline-flex; flex: 0 0 auto; color: var(--ink-soft); }
+.rd-meta-ic svg { width: 17px; height: 17px; }
+.rd-meta-k { flex: 1 1 auto; color: var(--ink-soft); }
+.rd-meta-v { font-weight: 600; }
+.rd-meta-c { display: inline-flex; color: var(--ink-faint); transform: rotate(-90deg); }
+.rd-meta-c svg { width: 15px; height: 15px; }
+
+.rd-share { display: flex; width: 100%; min-height: var(--tap); align-items: center; justify-content: center; gap: var(--s2);
+  margin: var(--s5) 0 0; padding: 0 var(--s4); font: inherit; font-size: var(--t-card); font-weight: 600;
+  color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-pill); cursor: pointer; }
+.rd-share svg { width: 18px; height: 18px; }
+
+/* ⚠️ REDUCE MOTION KEEPS THE CROSSFADE AND DROPS THE MOVEMENT. Removing the fade as well would leave
+   the map sitting over the coaching content, so this narrows the travel rather than freezing it. */
+@media (prefers-reduced-motion: reduce) {
+  .rd-map { transform: none !important; }
+}
+
 .act-pair { display: flex; gap: var(--s2); margin-top: var(--s3); }
 .act-pair > button {
   flex: 1 1 0; min-width: 0; min-height: var(--tap);
@@ -8586,14 +8759,31 @@ function logMonthHead(r) {
 function viewRunDetail() {
   const run = viewedRun();
   if (!run) return '<button class="backbtn" id="runBack">\u2039 Logbook</button><div class="card">Run not found.</div>';
-  // The title and date now live on the map card inside runOverviewHtml, so both screens carry them
-  // and neither prints them twice.
-  return '<button class="backbtn" id="runBack">\u2039 Logbook</button>' +
-    runOverviewHtml(run) +
-    // \u26a0\ufe0f The effort question used to exist ONLY on the finish screen, so a rating skipped in the
-    // moment could never be given afterwards \u2014 and that rating is half the evidence the adaptive
-    // flags engine runs on. Asking it here too costs nothing and feeds the coach.
-    rpeAskHtml(run);
+  const a = runAnalysis(run);
+  const v = runVerdict(run, a);
+  // \u26a0\ufe0f THE ORDER IS THE CONTRACT. Route, metrics, verdict, evidence, plan, next action, analysis,
+  // advanced, details, share \u2014 coaching before Share, shoes, source and notes, because the screen
+  // exists to say what the run MEANT rather than to list what it recorded.
+  return rdNavHtml(run) +
+    rdHeroHtml(run) +
+    '<div class="rd-sheet">' +
+      rdTitleHtml(run, v) +
+      rdMetricsHtml(run, a) +
+      rdVerdictHtml(run, a, v) +
+      rdEvidenceHtml(run, a, v) +
+      rdPlanHtml(run, a) +
+      rdNextHtml(run) +
+      rdKeyStatsHtml(run) +
+      rdAnalysisHtml(run, a) +
+      rdAdvancedHtml(run, a) +
+      // \u26a0\ufe0f The effort question used to exist ONLY on the finish screen, so a rating skipped in the
+      // moment could never be given afterwards \u2014 and that rating is half the evidence the adaptive
+      // flags engine runs on. Asking it here too costs nothing and feeds the coach.
+      rpeAskHtml(run) +
+      rdMetaHtml(run) +
+      rdShareHtml(run) +
+      stretchOfferHtml() +
+    '</div>';
 }
 // Aggregate all logged strength sets by exercise, in plan order (week = a session instance).
 function strengthHistory() {
@@ -14167,7 +14357,17 @@ window.__interunPedometer = function (d) {
     if (p.off) return;
     if (typeof d.metres === "number" && isFinite(d.metres) && d.metres >= 0) p.metres = d.metres;
     if (typeof d.steps === "number" && isFinite(d.steps)) p.steps = d.steps;
-    if (typeof d.cadence === "number" && isFinite(d.cadence) && d.cadence > 0) LIVE.cadence = Math.round(d.cadence);
+    // ⚠️ ACCUMULATED, NOT JUST HELD. The live value is the last reading and was never saved, so the
+    // debrief could not show cadence for any run ever recorded. An average needs a running total,
+    // and it is built the same way avgHr is — deliberately, so the two cannot disagree about what
+    // counts as a sample.
+    // ⚠️ PAUSED TIME IS SKIPPED, the same rule the heart-rate zone totals follow. Standing at a
+    // crossing still produces pedometer callbacks, and counting them drags the average toward a
+    // cadence the runner never ran at.
+    if (typeof d.cadence === "number" && isFinite(d.cadence) && d.cadence > 0) {
+      LIVE.cadence = Math.round(d.cadence);
+      if (!LIVE.pauseStart) { LIVE.cadSum = (LIVE.cadSum || 0) + d.cadence; LIVE.cadN = (LIVE.cadN || 0) + 1; }
+    }
     pedoFillGap();
   } catch (e) {}
 };
@@ -14890,6 +15090,427 @@ function openRunStat(kind) {
   $("sheetBody").innerHTML = body;
   $("sheetOv").classList.add("on");
 }
+/* =================================================================================================
+ * THE POST-RUN DEBRIEF — Logbook run page (commissioned pack, 2026-08-16)
+ *
+ * Order is a contract, not a preference: Route, metrics, verdict, evidence, plan/actual, next
+ * action, analysis, advanced, metadata, share. The coaching comes before Share, shoes, notes and
+ * source, because the point of the screen is what the run MEANT, not what it recorded.
+ *
+ * ⚠️ THE LOGBOOK ONLY, BY THE OWNER'S DECISION — AND THE CONTENT IS STILL BUILT ONCE. This file's
+ * standing rule is that the finish screen and the Logbook must never disagree about the same run,
+ * which is why one builder served both. Splitting the PRESENTATION reopens that risk, so every
+ * judgement here comes from runAnalysis and runVerdict, which the finish screen's own debrief
+ * paragraphs read too. The two screens differ in how they are laid out and in nothing else.
+ *
+ * ⚠️ EVERY HEART-RATE COLOUR COMES FROM --hz1..--hz5 AND THE SHARED .hz-bar COMPONENT. Those tokens
+ * are declared in all four theme blocks and are the same source Support > Training zones uses. The
+ * teal placeholder bars in the supplied reference are NOT reproduced; no local zone hex exists here.
+ * ============================================================================================== */
+
+/* ---- privacy ------------------------------------------------------------------------------- */
+// ⚠️ REDACTION TRIMS THE LINE, IT DOES NOT JUST HIDE THE PINS. Removing the two markers while
+// leaving the polyline running to the runner's front door protects nothing at all — the shape still
+// ends where they live. Points within PRIV_RADIUS_M of each end are dropped.
+const PRIV_STORE = "interun_privacy_v1";
+const PRIV_RADIUS_M = 250;
+function loadPrivacy() {
+  try { const r = JSON.parse(localStorage.getItem(PRIV_STORE) || "null"); if (r && typeof r === "object") return r; } catch (e) {}
+  return { ends: false, map: false };
+}
+let PRIVACY = loadPrivacy();
+function savePrivacy() { try { localStorage.setItem(PRIV_STORE, JSON.stringify(PRIVACY)); } catch (e) {} }
+/** Metres between two {lat,lng} points — the same haversine the live tracker uses. */
+function rdMetresBetween(a, b) {
+  const R = 6371000, t = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * t, dLng = (b.lng - a.lng) * t;
+  const la1 = a.lat * t, la2 = b.lat * t;
+  const h = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+/** A copy of the route with both ends trimmed. Returns null when nothing meaningful is left. */
+function redactRouteEnds(route, metres) {
+  if (!Array.isArray(route) || route.length < 3) return null;
+  const r = metres || PRIV_RADIUS_M;
+  let s = 0, e = route.length - 1;
+  while (s < e && rdMetresBetween(route[0], route[s]) < r) s++;
+  while (e > s && rdMetresBetween(route[route.length - 1], route[e]) < r) e--;
+  const out = route.slice(s, e + 1);
+  return out.length >= 2 ? out : null;
+}
+/**
+ * The route as this screen is allowed to draw it.
+ * Returns {route, redacted, hidden} — hidden means show no map at all.
+ * ⚠️ ONE DECISION, USED BY THE HERO AND THE SHARE CARD. Two copies of this would be a private route
+ * on screen and an unredacted one in the picture the runner posts, which is the worst possible way
+ * for a privacy feature to fail.
+ */
+function runRoutePresentation(run, override) {
+  const p = override || PRIVACY;
+  const raw = Array.isArray(run && run.route) ? run.route : null;
+  if (!raw || raw.length < 2) return { route: null, redacted: false, hidden: false };
+  if (p.map) return { route: null, redacted: true, hidden: true };
+  if (!p.ends) return { route: raw, redacted: false, hidden: false };
+  const cut = redactRouteEnds(raw, PRIV_RADIUS_M);
+  return cut ? { route: cut, redacted: true, hidden: false } : { route: null, redacted: true, hidden: true };
+}
+
+/* ---- the verdict --------------------------------------------------------------------------- */
+/**
+ * What the run MEANT, from evidence the activity actually carries.
+ *
+ * ⚠️ PRECEDENCE IS THE FEATURE, and it is the order the pack specifies: discomfort first, then
+ * whether the session was completed, then whether it hit its intensity target, then whether the
+ * numbers and the runner's own effort rating agree. Pace is the LAST thing consulted, which is what
+ * stops the classic failure of congratulating somebody for running an easy day too hard.
+ *
+ * ⚠️ NO DIAGNOSIS, EVER, and hedged language for anything inferred. One activity cannot show
+ * injury, illness, dehydration or overtraining, and this must never imply otherwise.
+ */
+function runVerdict(run, a) {
+  const pct = a.n ? Math.round(a.inBand / a.n * 100) : null;
+  const band = a.band, rband = a.rband, rpe = a.rpe;
+  const easy = run.type === "easy" || run.type === "recovery" || run.type === "long";
+  const chips = [];
+  if (pct != null && a.n >= 2) chips.push({ v: pct + "%", k: "In range" });
+  if (rpe) chips.push({ v: "RPE " + rpe + "/10", k: rpe <= 3 ? "Feels easy" : rpe <= 6 ? "Moderate" : rpe <= 8 ? "Hard" : "Very hard" });
+  if (run.avgHr) chips.push({ v: Math.round(run.avgHr), u: "bpm", k: "Avg HR" });
+
+  // 1 — discomfort overrides everything, including a technically excellent run.
+  if (run.pain) {
+    return { state: "caution", headline: "Let's look after that",
+      body: ["You logged some discomfort on this one, so that comes first.",
+             "Keep the next few days easy and see whether it settles.",
+             "If it changes how you run, stop and check the injury guide."],
+      chips: chips.slice(0, 3), well: [], watch: ["You reported discomfort during or after this run"] };
+  }
+  // 2 — not enough clean evidence to judge. Say so rather than inventing a verdict.
+  if (!a.n) {
+    return { state: "insufficientData", headline: "Logged",
+      body: ["There are no kilometre splits on this one, so there is nothing to judge the pace against.",
+             "The time and distance are recorded and still count towards your week."],
+      chips: chips.slice(0, 3), well: [], watch: [] };
+  }
+  if (!band) {
+    return { state: "insufficientData", headline: "A run by feel",
+      body: ["This one had no prescribed pace, so there is no target to measure it against.",
+             "It still counts as time on your feet."],
+      chips: chips.slice(0, 3), well: rdWell(run, a), watch: [] };
+  }
+  // 3 — adherence to the intensity the session was FOR.
+  const wellList = rdWell(run, a);
+  const watchList = [];
+  // ⚠️ Running an easy day hard is a fault, not an achievement, however good the pace looks.
+  if (easy && a.fast > a.n / 2) {
+    watchList.push("Most kilometres came in quicker than the easy band");
+    return { state: "caution", headline: "Quicker than the brief",
+      body: ["This was meant to be an easy run and most of it came in faster than the band.",
+             "Easy days work by staying easy — the hard days are where the gains are meant to hurt.",
+             "Try holding the slower end next time."],
+      chips: chips.slice(0, 3), well: [], watch: watchList };
+  }
+  if (pct >= 70) {
+    if (rpe && rband && rpe > rband.max + 1) {
+      // 4 — the data and the runner disagree. Name it rather than picking a side.
+      watchList.push("It felt harder than the pace suggests");
+      return { state: "partial", headline: "On pace, but it cost you",
+        body: ["You held the target pace well.",
+               "You rated it harder than this session is meant to feel, which can happen with heat, tiredness or a busy week.",
+               "If the next one feels the same, the paces may need a look."],
+        chips: chips.slice(0, 3), well: wellList.slice(0, 3), watch: watchList };
+    }
+    return { state: "achieved", headline: "Steady and controlled",
+      body: ["You kept a consistent pace and your effort stayed where this session wanted it.",
+             "Good aerobic work."],
+      chips: chips.slice(0, 3), well: wellList.slice(0, 3), watch: [] };
+  }
+  if (pct >= 40) {
+    if (a.slow > a.fast) watchList.push("A number of kilometres drifted under the target pace");
+    else watchList.push("A number of kilometres came in above the target pace");
+    return { state: "partial", headline: "Some of it landed",
+      body: ["Part of this run sat in the target band and part of it did not.",
+             "Terrain, wind and traffic all move a pace around, so one session like this is not a pattern."],
+      chips: chips.slice(0, 3), well: wellList.slice(0, 2), watch: watchList };
+  }
+  watchList.push(a.slow > a.fast ? "Most kilometres were slower than the target" : "Most kilometres were quicker than the target");
+  return { state: "partial", headline: "Off the brief today",
+    body: ["Most of this one sat outside the pace it was set at.",
+           "That is worth noticing rather than worrying about — one run does not change a plan."],
+    chips: chips.slice(0, 3), well: wellList.slice(0, 1), watch: watchList };
+}
+/** Up to three things that genuinely went well, each tied to a real measurement. */
+function rdWell(run, a) {
+  const out = [];
+  if (a.n >= 3 && a.slowest - a.fastest <= 25) out.push("Pace was even throughout");
+  if (a.band && a.inBand >= Math.ceil(a.n * 0.7)) out.push("Most kilometres sat inside the target band");
+  if (a.shiftSec > 8) out.push("You finished quicker than you started");
+  const ceil = maxHrEstimate();
+  if (run.avgHr && ceil && run.avgHr < ceil * 0.75 && (run.type === "easy" || run.type === "long" || run.type === "recovery")) {
+    out.push("Heart rate stayed comfortably low");
+  }
+  if (a.elevGain >= 80) out.push("You climbed " + a.elevGain + " m and kept it together");
+  return out.slice(0, 3);
+}
+
+/* ---- the pieces ---------------------------------------------------------------------------- */
+function rdHeroHtml(run) {
+  const pres = runRoutePresentation(run);
+  const inner = pres.hidden || !pres.route
+    ? '<div class="rd-noroute">' + ICON.timer + '<span>' +
+        (pres.hidden ? "Map hidden" : run.indoor ? "Indoor session" : "No route recorded") + '</span></div>'
+    : routeMapSvg(pres.route);
+  return '<div class="rd-hero" id="rdHero">' +
+    '<div class="rd-map" id="rdMap" data-route="' + (pres.route ? "1" : "0") + '">' + inner + '</div>' +
+    '<div class="rd-fade"></div>' +
+    (pres.redacted ? '<div class="rd-privtag">Start and finish hidden</div>' : "") +
+    '</div>';
+}
+function rdNavHtml(run) {
+  return '<div class="rd-nav" id="rdNav">' +
+    '<div class="rd-nav-bg" id="rdNavBg"></div>' +
+    '<button class="rd-ic" id="runBack" aria-label="Back to Logbook"><span class="rd-glyph">\u2190</span></button>' +
+    '<div class="rd-nav-t" id="rdNavT">' + esc(run.t || "Run") + '</div>' +
+    '<button class="rd-ic" id="rdMore" aria-label="More options"><span class="rd-glyph rd-glyph-dots">\u22ef</span></button>' +
+    '</div>';
+}
+function rdTitleHtml(run, v) {
+  const tick = v.state === "achieved" ? '<span class="rd-tick" aria-hidden="true">' + ICON.check + '</span>' : "";
+  return '<div class="rd-title"><h1 class="rd-h1">' + esc(run.t || "Run") + tick + '</h1>' +
+    '<div class="rd-cue rd-cue-' + v.state + '">' + esc(rdCue(v.state)) + '</div></div>';
+}
+function rdCue(state) {
+  return state === "achieved" ? "Nailed the brief"
+    : state === "partial" ? "Partly on target"
+    : state === "caution" ? "Worth a look"
+    : "Logged";
+}
+function rdMetricsHtml(run, a) {
+  // ⚠️ THREE PRIMARY, THEN UP TO SIX SECONDARY, AND A MISSING VALUE IS OMITTED RATHER THAN ZEROED.
+  // A confident "0 m" reads as a measurement; an absent tile reads as an absence, which is the truth.
+  const sec = [];
+  const push = (icon, v, u, k) => sec.push('<div class="rd-s2"><div class="rd-s2v">' + icon +
+    '<b class="num">' + v + '</b>' + (u ? '<span class="rd-u">' + u + '</span>' : "") + '</div>' +
+    '<div class="rd-s2k">' + k + '</div></div>');
+  if (run.elevGain > 0) push(ICON.trendUp, Math.round(run.elevGain), "m", "Elevation gain");
+  if (run.avgHr) push(ICON.heart, Math.round(run.avgHr), "bpm", "Avg HR");
+  if (run.cadence) push(ICON.rEasy, Math.round(run.cadence), "spm", "Cadence");
+  if (run.kcal) push(ICON.flame, Math.round(run.kcal), "", "Calories");
+  if (run.maxHr) push(ICON.heart, Math.round(run.maxHr), "bpm", "Max HR");
+  if (run.rpe) push(ICON.gauge, run.rpe + "/10", "", "RPE");
+  return '<div class="rd-metrics">' +
+    '<div class="rd-s1row">' +
+      '<div class="rd-s1"><div class="rd-s1v num">' + esc(String(run.dist || "").replace(" km", "")) + '<span class="rd-u">km</span></div><div class="rd-s1k">Distance</div></div>' +
+      '<div class="rd-s1"><div class="rd-s1v num">' + esc(run.time || "—") + '</div><div class="rd-s1k">Time</div></div>' +
+      '<div class="rd-s1"><div class="rd-s1v num">' + esc(String(run.pace || "—").replace(" /km", "")) + '<span class="rd-u">/km</span></div><div class="rd-s1k">Avg pace</div></div>' +
+    '</div>' +
+    (sec.length ? '<div class="rd-s2grid">' + sec.slice(0, 6).join("") + '</div>' : "") +
+    '</div>';
+}
+function rdVerdictHtml(run, a, v) {
+  const chips = v.chips.map((c) => '<div class="rd-chip"><div class="rd-chipv num">' + esc(String(c.v)) +
+    (c.u ? '<span class="rd-u">' + c.u + '</span>' : "") + '</div><div class="rd-chipk">' + esc(c.k) + '</div></div>').join("");
+  return '<h2 class="rd-sec">Coach’s debrief</h2>' +
+    '<div class="rd-verdict rd-v-' + v.state + '">' +
+      '<div class="rd-vhead"><span class="rd-vic" aria-hidden="true">' + rdVerdictIcon(v.state) + '</span>' +
+        '<span class="rd-vh">' + esc(v.headline) + '</span></div>' +
+      '<p class="rd-vb">' + v.body.map(esc).join(" ") + '</p>' +
+      (chips ? '<div class="rd-chips">' + chips + '</div>' : "") +
+    '</div>';
+}
+function rdVerdictIcon(state) {
+  return state === "achieved" ? ICON.check : state === "caution" ? ICON.gauge : ICON.guide;
+}
+function rdEvidenceHtml(run, a, v) {
+  let out = "";
+  if (v.well.length) {
+    out += '<h2 class="rd-sec">What went well</h2><ul class="rd-list">' +
+      v.well.map((t) => '<li><span class="rd-li-ic rd-li-ok" aria-hidden="true">' + ICON.check + '</span>' + esc(t) + '</li>').join("") + '</ul>';
+  }
+  // ⚠️ OMITTED ENTIRELY when there is no supported caution. A "watch next time" that appears after
+  // every run is a heading with nothing behind it, and it teaches the runner to skip the section
+  // that matters on the day it is real.
+  if (v.watch.length) {
+    out += '<h2 class="rd-sec">Watch next time</h2><ul class="rd-list">' +
+      v.watch.map((t) => '<li><span class="rd-li-ic rd-li-watch" aria-hidden="true">' + ICON.gauge + '</span>' + esc(t) + '</li>').join("") + '</ul>';
+  }
+  return out;
+}
+function rdPlanHtml(run, a) {
+  // Lead with what the session was FOR. An unplanned run gets no invented target.
+  if (!run.steps) {
+    return '<h2 class="rd-sec">Plan</h2><div class="rd-plan"><div class="rd-plan-p">' +
+      'This was a free run — there was no prescribed session to compare it with.</div></div>';
+  }
+  const rows = [];
+  if (a.band) {
+    rows.push(['Target pace', fmtPace(a.band.min) + '–' + fmtPace(a.band.max) + ' /km',
+      a.workPaceSec ? fmtPace(a.workPaceSec) + ' /km' : "—"]);
+  }
+  if (a.rband) rows.push(['Intended effort', 'RPE ' + a.rband.min + '–' + a.rband.max, a.rpe ? 'RPE ' + a.rpe : 'Not recorded']);
+  const body = rows.map((r) => '<div class="rd-cmp"><span class="rd-cmp-k">' + esc(r[0]) + '</span>' +
+    '<span class="rd-cmp-a num">' + esc(r[1]) + '</span><span class="rd-cmp-b num">' + esc(r[2]) + '</span></div>').join("");
+  return '<h2 class="rd-sec">What the plan asked for</h2>' +
+    '<div class="rd-plan"><div class="rd-plan-p">' + esc(run.steps) + '</div>' +
+      (body ? '<div class="rd-cmp-h"><span></span><span>Planned</span><span>Actual</span></div>' + body : "") +
+    '</div>';
+}
+function rdNextHtml(run) {
+  // ⚠️ ONE primary coaching action, and it must be a thing the app can genuinely do. "View next run"
+  // opens the next session in the plan; the app cannot compose a new one from here, so it does not
+  // offer to. Share is not a coaching action and does not appear until after the analysis.
+  return '<button class="rd-next" id="rdNext">' + ICON.cal + ' View next run</button>';
+}
+/**
+ * The three headline numbers again, under the action.
+ * ⚠️ NOT A SECOND SOURCE OF TRUTH — it reads the same fields as the summary at the top, so the two
+ * cannot disagree. It exists because by this point the runner has scrolled past the map and the
+ * metrics, and the coaching above it is easier to weigh with the numbers back in view.
+ */
+function rdKeyStatsHtml(run) {
+  return '<h2 class="rd-sec">Key stats</h2>' +
+    '<div class="rd-metrics"><div class="rd-s1row">' +
+      '<div class="rd-s1"><div class="rd-s1v num">' + esc(String(run.dist || "").replace(" km", "")) + '<span class="rd-u">km</span></div><div class="rd-s1k">Distance</div></div>' +
+      '<div class="rd-s1"><div class="rd-s1v num">' + esc(run.time || "—") + '</div><div class="rd-s1k">Time</div></div>' +
+      '<div class="rd-s1"><div class="rd-s1v num">' + esc(String(run.pace || "—").replace(" /km", "")) + '<span class="rd-u">/km</span></div><div class="rd-s1k">Avg pace</div></div>' +
+    '</div></div>';
+}
+function rdAnalysisHtml(run, a) {
+  const tab = state.rdTab || "overview";
+  const btn = (id, label) => '<button class="rd-tab' + (tab === id ? " on" : "") + '" data-rdtab="' + id +
+    '" role="tab" aria-selected="' + (tab === id ? "true" : "false") + '">' + label + '</button>';
+  return '<h2 class="rd-sec">Run analysis</h2>' +
+    '<div class="rd-tabs" role="tablist">' + btn("overview", "Overview") + btn("splits", "Splits") + btn("trends", "Trends") + '</div>' +
+    '<div class="rd-tabbody" id="rdTabBody">' + rdTabBodyHtml(run, a, tab) + '</div>';
+}
+function rdTabBodyHtml(run, a, tab) {
+  if (tab === "splits") return rdSplitsHtml(run, a);
+  if (tab === "trends") return rdTrendsHtml(run, a);
+  return rdOverviewHtml(run, a);
+}
+function rdOverviewHtml(run, a) {
+  const chart = a.n ? '<div class="rd-panel"><div class="rd-panel-h"><span class="rd-panel-t">Pace <span class="rd-u">min / km</span></span>' +
+      '<span class="rd-panel-v">Avg <b class="num">' + esc(String(run.pace || "").replace(" /km", "")) + '</b><span class="rd-u">/km</span></span></div>' +
+      paceChartSvg(a) + '</div>'
+    : '<div class="rd-panel"><div class="rd-empty">No kilometre splits were recorded for this run.</div></div>';
+  return chart + rdZonesHtml(run) + rdInterpretHtml(run, a);
+}
+/**
+ * Heart-rate zone distribution.
+ * ⚠️ THE COLOURS ARE --hz1..--hz5 THROUGH THE SHARED .hz-bar COMPONENT — the same source as
+ * Support > Training zones and the same boundaries (HR_ZONE_FLOOR). No zone colour is defined here.
+ */
+function rdZonesHtml(run) {
+  const ceil = maxHrEstimate();
+  const zs = Array.isArray(run.zoneSec) ? run.zoneSec.map((s) => Math.max(0, Math.round(Number(s) || 0))) : null;
+  const total = zs ? zs.reduce((x, y) => x + y, 0) : 0;
+  if (!zs || total <= 30) return "";
+  if (!ceil) return '<div class="rd-panel"><div class="rd-empty">Add your age or measured maximum heart rate in your profile and these become zones.</div></div>';
+  // Highest zone first, so the row order matches how a runner reads intensity.
+  const rows = [4, 3, 2, 1, 0].map((i) => {
+    const lo = Math.round(ceil * HR_ZONE_FLOOR[i]);
+    const hi = i === 4 ? null : Math.round(ceil * HR_ZONE_FLOOR[i + 1]) - 1;
+    const pct = Math.round(zs[i] / total * 100);
+    return '<div class="rd-zrow"><span class="rd-zn">Z' + (i + 1) + '</span>' +
+      '<span class="rd-zr num">' + (i === 0 ? "< " + (hi + 1) : hi ? lo + "–" + hi : "> " + lo) + '</span>' +
+      '<span class="hz-bar rd-zbar"><i style="width:' + Math.max(pct > 0 ? 2 : 0, pct) + '%;--hz:var(--hz' + (i + 1) + ')"></i></span>' +
+      '<span class="rd-zt num">' + fmtPace(zs[i]) + '</span>' +
+      '<span class="rd-zp num">' + pct + '%</span></div>';
+  }).join("");
+  return '<div class="rd-panel"><div class="rd-panel-h"><span class="rd-panel-t">Heart rate zones <span class="rd-u">bpm</span></span>' +
+    (run.avgHr ? '<span class="rd-panel-v"><b class="num">' + Math.round(run.avgHr) + '</b><span class="rd-u">bpm avg</span></span>' : "") +
+    '</div><div class="rd-zones">' + rows + '</div>' +
+    '<div class="rd-sr">' + esc(rdZoneSummary(zs, total, ceil)) + '</div></div>';
+}
+/** The textual equivalent every chart needs — also what a screen reader is given. */
+function rdZoneSummary(zs, total, ceil) {
+  let bi = 0; for (let i = 1; i < zs.length; i++) if (zs[i] > zs[bi]) bi = i;
+  return "Most of this run, " + Math.round(zs[bi] / total * 100) + "%, was spent in zone " + (bi + 1) +
+    " (" + HR_ZONE_NAME[bi].toLowerCase() + ").";
+}
+function rdInterpretHtml(run, a) {
+  const t = rdInterpretation(run, a);
+  return t ? '<div class="rd-interp">' + esc(t) + '</div>' : "";
+}
+function rdInterpretation(run, a) {
+  if (!a.n) return "";
+  if (a.n >= 3 && a.slowest - a.fastest <= 25) return "Your kilometres were within a few seconds of each other, which is what a controlled run looks like.";
+  if (a.shiftSec > 12) return "You ran the back half quicker than the front half.";
+  if (a.shiftSec < -20) return "The pace drifted as the run went on, which is normal on a long or hot one.";
+  return "Pace varied through this run — terrain and wind move it around more than effort does.";
+}
+function rdSplitsHtml(run, a) {
+  if (!a.n) return '<div class="rd-panel"><div class="rd-empty">No splits were recorded for this run.</div></div>';
+  return '<div class="rd-panel">' + splitsVsTargetHtml(a) + '</div>';
+}
+function rdTrendsHtml(run, a) {
+  // ⚠️ COMPARABLE SESSIONS, NOT A NOVELTY SCORE. Runs of the same TYPE are the only fair comparison;
+  // measuring an easy run against an interval session says nothing about either.
+  const same = (state.logged || []).filter((r) => r.type === run.type && r.avgPaceSec > 0 && r.id !== run.id).slice(0, 6);
+  if (!same.length) {
+    return '<div class="rd-panel"><div class="rd-empty">Once you have logged a few more ' +
+      esc((SESSION_LABEL[run.type] || "similar").toLowerCase()) + ' sessions, they will be compared here.</div></div>';
+  }
+  const mean = Math.round(same.reduce((x, r) => x + r.avgPaceSec, 0) / same.length);
+  const d = (run.avgPaceSec || 0) - mean;
+  const word = Math.abs(d) < 5 ? "about the same as" : d < 0 ? Math.abs(d) + "s/km quicker than" : d + "s/km slower than";
+  return '<div class="rd-panel"><div class="rd-panel-h"><span class="rd-panel-t">Compared with your recent ' +
+    esc((SESSION_LABEL[run.type] || "similar").toLowerCase()) + ' runs</span></div>' +
+    '<div class="rd-trend"><b class="num">' + fmtPace(run.avgPaceSec || 0) + '</b> /km this run, ' + esc(word) +
+    ' your last ' + same.length + '.</div>' +
+    '<div class="rd-sr">Average of your last ' + same.length + ' comparable runs: ' + fmtPace(mean) + ' per kilometre.</div></div>';
+}
+/**
+ * Elevation, cadence and form — collapsed, and genuinely not built until opened.
+ * ⚠️ LAZY FOR A REASON: an expanded chart on a screen nobody scrolled to is work done for nothing,
+ * and this project already measured the cost of drawing maps that were never looked at.
+ */
+function rdAdvancedHtml(run, a) {
+  const rows = [
+    { id: "elev", icon: ICON.trendUp, label: "Elevation" },
+    { id: "cad", icon: ICON.rEasy, label: "Cadence" },
+    { id: "form", icon: ICON.rIntervals, label: "Power & form" },
+  ];
+  return '<div class="rd-adv">' + rows.map((r) =>
+    '<div class="rd-acc"><button class="rd-acc-h" data-rdacc="' + r.id + '" aria-expanded="false">' +
+      '<span class="rd-acc-ic" aria-hidden="true">' + r.icon + '</span>' +
+      '<span class="rd-acc-t">' + r.label + '</span>' +
+      '<span class="rd-acc-c" aria-hidden="true">' + ICON.chevDown + '</span></button>' +
+      '<div class="rd-acc-b" id="rdAcc_' + r.id + '" hidden></div></div>').join("") + '</div>';
+}
+/** Built on first expansion only. */
+function rdAdvancedBody(id, run, a) {
+  if (id === "elev") {
+    return run.elevGain > 0
+      ? '<p>You climbed about <b class="num">' + Math.round(run.elevGain) + '</b> m over this run. Climbing costs pace, so a hilly route sitting outside its band is usually the hill talking rather than the effort.</p>'
+      : '<p>No elevation was recorded for this run.</p>';
+  }
+  if (id === "cad") {
+    return run.cadence
+      ? '<p>Average cadence was <b class="num">' + Math.round(run.cadence) + '</b> steps per minute. Cadence is worth watching over months, not runs — and only nudged if it is very low.</p>'
+      : '<p>Cadence was not recorded for this run. It needs the phone on you and motion access allowed.</p>';
+  }
+  return '<p>Running power and form metrics are not recorded by Inte-Run. Nothing here is estimated from your pace, because a number invented from another number is not a measurement.</p>';
+}
+function rdMetaHtml(run) {
+  const rows = [];
+  const row = (icon, k, v, act) => rows.push('<' + (act ? "button" : "div") + ' class="rd-meta-r"' +
+    (act ? ' data-rdmeta="' + act + '"' : "") + '><span class="rd-meta-ic" aria-hidden="true">' + icon + '</span>' +
+    '<span class="rd-meta-k">' + k + '</span><span class="rd-meta-v">' + v + '</span>' +
+    (act ? '<span class="rd-meta-c" aria-hidden="true">' + ICON.chevDown + '</span>' : "") + '</' + (act ? "button" : "div") + '>');
+  const sid = runShoeChoice(run);
+  const shoe = (loadShoes().find((x) => x.id === sid) || {}).name || "";
+  row(ICON.rEasy, "Shoes", shoe ? esc(shoe) : "Not set", "shoe");
+  row(ICON.phone, "Source", run.sim ? "Simulated" : run.watch ? "Apple Watch" : "This iPhone", null);
+  row(ICON.person, "Route privacy", PRIVACY.map ? "Map hidden" : PRIVACY.ends ? "Start and finish hidden" : "Full route", "priv");
+  row(ICON.phone, "Stored", "On this iPhone", null);
+  return '<h2 class="rd-sec">Details</h2><div class="rd-meta">' + rows.join("") + '</div>' + runNoteHtml(run);
+}
+function rdShareHtml(run) {
+  // ⚠️ ONE ENTRY POINT. Strava is a destination inside the share sheet, not a second primary button
+  // competing with it — and the existing upload path is unchanged behind it.
+  return '<button class="rd-share" id="rdShare">' + ICON.share + ' Share this run</button>';
+}
+
 function runOverviewHtml(run) {
   const a = runAnalysis(run);
   const sc = run.type ? "var(--eff-" + effortOf({ type: run.type, intensity: run.type === "vo2" || run.type === "threshold" || run.type === "race-specific" ? "hard" : undefined }) + ")" : "var(--accent)";
@@ -15743,6 +16364,10 @@ function liveRunRecord(sm) {
     anchor: profile.recentTimeS, pmodel: PACE_MODEL_VERSION,
     avgHr: LIVE.hrN ? Math.round(LIVE.hrSum / LIVE.hrN) : null,
     maxHr: LIVE.hrMax || null,
+    // ⚠️ null, NEVER 0, and that is the whole reason this field can be added safely. Every run
+    // recorded before today has no cadence at all, and a stored zero would render as a measurement
+    // of a runner standing still. The debrief omits the tile when this is absent.
+    cadence: LIVE.cadN ? Math.round(LIVE.cadSum / LIVE.cadN) : null,
     hrSeries: hrSeriesOrNull(LIVE.hrSeries),
     zoneSec: (LIVE.zoneSec && LIVE.zoneSec.some((s) => s > 0)) ? LIVE.zoneSec.slice() : null,
     steps: sessionStepText(LIVE.session),
@@ -16774,6 +17399,11 @@ function render() {
   // hand for the add-a-session drawer; a third instance is a class, not a coincidence.
   // The key is what makes it a DIFFERENT SCREEN, not what makes it different content: a Logbook
   // sub-tab is a navigation and still resets, a filter within one is not.
+  // ⚠️ SET FROM ONE PLACE, EVERY RENDER, so it can never be left behind. The run debrief hides the
+  // global top bar and bottom nav and takes the viewport's padding for its full-bleed hero; toggling
+  // that on entry and clearing it on exit would leave the app chromeless the first time an exit path
+  // was forgotten, and there are a dozen ways off this screen.
+  document.documentElement.classList.toggle("rd-open", state.screen === "runview");
   const scrollKey = [state.tab, state.screen, state.support, state.actTab, state.viewRunId, state.wizStep].join("|");
   const keepScroll = scrollKey === LAST_SCROLL_KEY ? v.scrollTop : 0;
   LAST_SCROLL_KEY = scrollKey;
@@ -16956,6 +17586,138 @@ function viewEnter(v) {
   void v.offsetWidth;
   v.classList.add("view-in");
 }
+/**
+ * The debrief's live behaviour: the reversible map transition, the analysis tabs, the lazy
+ * accordions, privacy and the single share entry.
+ *
+ * ⚠️ THE MAP FADE IS DRIVEN BY THE SCROLL POSITION, NOT BY A TRIGGERED ANIMATION. Scrolling back up
+ * restores it at exactly the same offsets because the same interpolation runs in both directions —
+ * there is no "has faded" flag anywhere, and there must never be one, or the map can never come back.
+ */
+function wireRunDebrief() {
+  const hero = $("rdHero"); if (!hero) return;
+  const map = $("rdMap"), navBg = $("rdNavBg"), navT = $("rdNavT"), v = $("view");
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const apply = () => {
+    const y = v.scrollTop;
+    // The pack's own interpolation. Reduce Motion keeps a crossfade and drops the travel and scale.
+    const progress = Math.max(0, Math.min(1, (y - 48) / (reduce ? 140 : 220)));
+    if (map) {
+      map.style.opacity = String(1 - progress);
+      map.style.transform = reduce ? "" :
+        "translateY(" + (y * 0.22).toFixed(1) + "px) scale(" + (1 + 0.025 * progress).toFixed(4) + ")";
+      // ⚠️ REMOVED FROM HIT TESTING AND FROM THE ACCESSIBILITY TREE once it is substantially hidden.
+      // A ghost map still catching taps under the coaching text is worse than no map at all.
+      const gone = progress >= 0.82;
+      map.style.pointerEvents = gone ? "none" : "";
+      if (gone) map.setAttribute("aria-hidden", "true"); else map.removeAttribute("aria-hidden");
+    }
+    if (navBg) navBg.style.opacity = String(progress);
+    if (navT) navT.style.opacity = String(progress);
+  };
+  apply();
+  v.removeEventListener("scroll", RD_SCROLL);
+  RD_SCROLL = apply;
+  v.addEventListener("scroll", RD_SCROLL, { passive: true });
+
+  // Analysis tabs. Only the body is rebuilt, so the page does not jump under the finger.
+  document.querySelectorAll("[data-rdtab]").forEach((b) => {
+    b.onclick = () => {
+      state.rdTab = b.getAttribute("data-rdtab");
+      const run = viewedRun(); if (!run) return;
+      const body = $("rdTabBody");
+      if (body) body.innerHTML = rdTabBodyHtml(run, runAnalysis(run), state.rdTab);
+      document.querySelectorAll("[data-rdtab]").forEach((x) => {
+        const on = x.getAttribute("data-rdtab") === state.rdTab;
+        x.classList.toggle("on", on); x.setAttribute("aria-selected", on ? "true" : "false");
+      });
+    };
+  });
+
+  // ⚠️ BUILT ON FIRST OPEN, not on render. Collapsed content that is composed anyway is work done
+  // for a panel nobody looked at, which is exactly what "lazy" is supposed to prevent.
+  document.querySelectorAll("[data-rdacc]").forEach((b) => {
+    b.onclick = () => {
+      const id = b.getAttribute("data-rdacc"), body = $("rdAcc_" + id);
+      if (!body) return;
+      const open = b.getAttribute("aria-expanded") === "true";
+      if (!open && !body.innerHTML) {
+        const run = viewedRun(); if (run) body.innerHTML = rdAdvancedBody(id, run, runAnalysis(run));
+      }
+      b.setAttribute("aria-expanded", open ? "false" : "true");
+      body.hidden = open;
+    };
+  });
+
+  const next = $("rdNext");
+  if (next) next.onclick = () => { state.screen = null; state.tab = "today"; render(); };
+
+  const share = $("rdShare");
+  if (share) share.onclick = () => openRunShareSheet(viewedRun());
+
+  document.querySelectorAll("[data-rdmeta]").forEach((b) => {
+    b.onclick = () => {
+      const what = b.getAttribute("data-rdmeta");
+      if (what === "priv") openPrivacySheet();
+      else if (what === "shoe") { state.screen = null; state.tab = "profile"; state.support = "shoes"; render(); }
+    };
+  });
+}
+let RD_SCROLL = null;
+/**
+ * ONE share entry point, with Strava as a destination inside it.
+ * ⚠️ THE EXISTING UPLOAD PATH IS UNCHANGED — this only stops Strava being a second primary button
+ * competing with Share on the page itself, which is what the design forbids.
+ */
+function openRunShareSheet(run) {
+  if (!run) return;
+  const pres = runRoutePresentation(run);
+  const strava = stravaRunButtonHtml(run);
+  ensureSheet(); SHEET_CTX = null;
+  $("sheetBody").innerHTML = '<div class="sh-h">Share this run</div>' +
+    '<p class="rd-plan-p">' + (pres.hidden ? "Your map is hidden, so the card will show your numbers only."
+      : pres.redacted ? "Your start and finish are hidden on the shared card."
+      : "The shared card shows your full route.") + '</p>' +
+    '<div class="rd-privopts">' +
+      rdPrivToggle("ends", "Hide start and finish", PRIVACY.ends) +
+      rdPrivToggle("map", "Hide the map entirely", PRIVACY.map) +
+    '</div>' +
+    '<button class="primary" id="shareRun">' + ICON.share + ' Share my run</button>' +
+    (strava || '<p class="rd-sr">Connect Strava in Profile to send runs there.</p>');
+  $("sheetOv").classList.add("on");
+  wireSheetShare(run);
+}
+function rdPrivToggle(key, label, on) {
+  return '<div class="zr-auto"><span>' + label + '</span>' +
+    '<button class="rm-switch' + (on ? " on" : "") + '" data-rdpriv="' + key + '" role="switch" aria-checked="' +
+      (on ? "true" : "false") + '" aria-label="' + esc(label) + '"><span class="rm-knob"></span></button></div>';
+}
+function openPrivacySheet() {
+  ensureSheet(); SHEET_CTX = null;
+  $("sheetBody").innerHTML = '<div class="sh-h">Route privacy</div>' +
+    '<p class="rd-plan-p">This applies to the map on this screen and to anything you share. ' +
+    'Hiding the start and finish trims the first and last few hundred metres of the line, rather than ' +
+    'just removing the pins — a line that still ends at your door is not private.</p>' +
+    '<div class="rd-privopts">' +
+      rdPrivToggle("ends", "Hide start and finish", PRIVACY.ends) +
+      rdPrivToggle("map", "Hide the map entirely", PRIVACY.map) +
+    '</div>';
+  $("sheetOv").classList.add("on");
+  wireSheetShare(null);
+}
+function wireSheetShare(run) {
+  document.querySelectorAll("[data-rdpriv]").forEach((b) => {
+    b.onclick = () => {
+      // ⚠️ aria-checked is the state BEFORE the tap. Reading it as the state AFTER is a fault this
+      // project already shipped once, on the training-zones toggle, where it made the control inert.
+      const key = b.getAttribute("data-rdpriv"), was = b.getAttribute("aria-checked") === "true";
+      PRIVACY[key] = !was; savePrivacy();
+      closeSheet(); render();
+    };
+  });
+  const sr = $("shareRun");
+  if (sr && run) { sr.onclick = doShareRun; prepareShareCard(run); }
+}
 function wire() {
   document.querySelectorAll("[data-seg]").forEach((seg) => seg.querySelectorAll("button").forEach((b) => b.onclick = () => {
     const f = seg.dataset.seg; const v = b.dataset.v;
@@ -17058,6 +17820,14 @@ function wire() {
   });
   wireSwipes();
   const runBack = $("runBack"); if (runBack) runBack.onclick = () => { state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); };
+  // ⚠️ THE HERO UPGRADES TO REAL TILES THE SAME WAY THE OLD MAP CARD DID. Drawing only the SVG
+  // polyline would give a route floating on a blank panel — the reference's whole first impression is
+  // the route ON A MAP, and buildOverviewMap is the one function that fetches and caches those tiles.
+  const rdMap = $("rdMap");
+  if (rdMap && rdMap.getAttribute("data-route") === "1") {
+    const r = viewedRun(); if (r) buildOverviewMap(rdMap, runRoutePresentation(r).route);
+  }
+  wireRunDebrief();
   const shareRun = $("shareRun"); if (shareRun) { shareRun.onclick = doShareRun; prepareShareCard(currentOverviewRun()); }
   // Strava sits in runOverviewHtml beside Share, so this one wiring serves the finish screen and the
   // Logbook's detail view alike. ⚠️ The callback re-renders rather than patching the button: the state

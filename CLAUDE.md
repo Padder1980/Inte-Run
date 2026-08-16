@@ -4111,6 +4111,60 @@ then `curl | grep` for a symbol you just added, before believing anything on scr
 so a side-by-side "light vs dark" harness renders two identical LIGHT panels and looks like proof.
 Set `document.documentElement.dataset.theme` and screenshot twice.
 
+## THE POST-RUN DEBRIEF, REBUILT TO A COMMISSIONED PACK (2026-08-16)
+
+`~/Downloads/InteRun_Claude_Implementation_Pack` — a binding contract, a spec, an acceptance
+checklist and three authoritative reference PNGs. Owner's four decisions at preflight: **Logbook page
+only**, wording **"View next run"**, **persist cadence**, **privacy in scope**.
+
+⚠️ **THE PACK IS WRITTEN FOR A NATIVE SwiftUI APP AND THIS DEBRIEF IS WEB.** Most of it translates
+(offset-driven opacity, gradient blend, sticky header, one scroll owner). Three things do not, and
+they are recorded as deviations rather than quietly satisfied: MapKit snapshots (we use the existing
+cached raster composite), Dynamic Type to Accessibility 2 (`--tscale` is clamped 1.0–1.3 because the
+app is full of fixed-height controls), and a feature flag (the project has no such mechanism).
+
+⚠️ **THE FINISH SCREEN AND THE LOGBOOK NOW LOOK DIFFERENT, AND THE CONTENT IS STILL BUILT ONCE.** The
+standing rule is that the two must never disagree about the same run. Splitting the presentation
+reopens exactly that risk, so both read `runAnalysis` and the same stored fields; only the layout
+differs. `runOverviewHtml` is untouched and still serves `viewLiveComplete`.
+
+⚠️ **THE ZONE COLOURS ARE `--hz1..--hz5` VIA THE SHARED `.hz-bar` COMPONENT** — the same source as
+Support › Training zones, the same `HR_ZONE_FLOOR` boundaries and the same `maxHrEstimate()` ceiling.
+The reference's teal placeholder bars are not reproduced and no zone hex exists in the debrief. The
+token name is **built from the loop index**, so there is no literal `--hz3` to grep for — which is
+stronger than five literals, because a hand-written list of five can list four. `test/run-debrief.test.ts`
+asserts the construction, and three deliberate re-breaks (a local hex, an accent fallback, deleting
+`--hz3` from one theme block) were each watched failing the blocker guards.
+
+⚠️ **REDACTION TRIMS THE LINE; IT DOES NOT HIDE THE PINS.** A polyline still ending at the runner's
+front door is not private however many markers are removed. `redactRouteEnds` drops points within
+250 m of each end — measured on the fixture, the start moved 254 m and the end 267 m. And the hero,
+the tile loader and the share sheet all call **one** `runRoutePresentation`, because two copies would
+mean a redacted map on screen and a full one in the picture that gets posted.
+
+⚠️ **CADENCE WAS RECEIVED AND NEVER SAVED,** so no run in the store has ever carried it and the
+reference's cadence tile could not have been filled by any real run. It is accumulated like `avgHr`
+(paused time skipped, the zone-totals rule) and stored as **null, never 0** — a stored zero renders
+as a measurement of somebody standing still.
+
+⚠️ **MY OWN FIXTURE'S `pband` SHAPE WAS WRONG AND IT LOOKED LIKE A PRODUCT DEFECT.** The real field is
+a `PaceRange` (`{minSecPerKm, maxSecPerKm}`); I seeded `{min, max}`, every chart coordinate became
+NaN, and the pace panel rendered as six dots with no line. Same trap this file already records: a
+plain probe has no typechecking, so it can feed the app a shape no caller can produce. Check the shape
+before believing a rendering fault.
+
+⚠️ **THE BAND-GAP IMAGE COMPARISON IS CONFOUNDED BY CONTENT AND MUST NOT BE QUOTED AS A VERDICT.**
+`tools/debrief-diff.py` finds text bands and compares gaps between them — but the build's bands are
+not the same ELEMENTS as the reference's (different wording, an extra plan section, two "what went
+well" items against three), so band *i* is often a different thing in each. It is useful for spotting
+gross geometry error and useless as a pass/fail number. The transition, by contrast, IS checkable and
+matches the pack's formula exactly: opacity 1 to 48pt, 0.49 at 160pt, 0 and hit-testing off at 268pt,
+reversible at identical offsets in both directions.
+
+`tools/debrief-shots.mjs` captures the three states headlessly at the reference's 450×954 canvas.
+⚠️ It emulates a **44pt status bar**, which the reference PNGs include and a headless viewport does
+not — without it every landmark reads 44px high and the systematic error hides the real ones.
+
 ## OPEN BUGS (confirmed on real hardware, 2026-07-29)
 
 ### 1. Coach audio when the phone is locked or pocketed — FIXED 2026-08-08, unproven on hardware

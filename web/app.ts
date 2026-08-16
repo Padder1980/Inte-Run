@@ -3624,7 +3624,7 @@ function planDefaultWeek() {
   return PLAN.defaultWeekIndex;
 }
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: planDefaultWeek(), actTab: "workouts", logFilter: "all", supportQ: "", openGuide: null, setupFocus: null, supportFrom: null, logFilterOpen: false, logAll: false, support: null, logged: loadRuns(), hist: loadHist(), weather: "hot", wx: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK, addOpen: false };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: planDefaultWeek(), actTab: "workouts", logFilter: "all", supportQ: "", openGuide: null, setupFocus: null, supportFrom: null, logFilterOpen: false, logAll: false, support: null, logged: loadRuns(), hist: loadHist(), weather: "hot", wx: null, wxHours: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK, addOpen: false };
 // Effective day index for a session, honouring any user reschedule. Works for raw sessions
 // (dayOfWeek) and summary sessions (dayIndex), keyed by the shared session id.
 function loadDayOverride() { try { return JSON.parse(localStorage.getItem("interun_dayov_v1") || "{}") || {}; } catch (e) { return {}; } }
@@ -3937,11 +3937,13 @@ function viewToday() {
     todayBelowAttention();
 }
 const WEATHER_PRESETS = {
-  mild: { label: "Mild", tempC: 12, humidityPct: 55, windKph: 8 },
-  warm: { label: "Warm", tempC: 22, humidityPct: 60, windKph: 10 },
-  hot: { label: "Hot & humid", tempC: 30, humidityPct: 75, windKph: 8 },
-  windy: { label: "Windy", tempC: 14, humidityPct: 55, windKph: 42 },
-  cold: { label: "Cold", tempC: 1, humidityPct: 70, windKph: 16 },
+  // Dew points are the ones those temperature/humidity pairs actually imply, so a previewed preset
+  // and a live forecast at the same numbers reach the same answer.
+  mild: { label: "Mild", tempC: 12, humidityPct: 55, windKph: 8, dewPointC: 3 },
+  warm: { label: "Warm", tempC: 22, humidityPct: 60, windKph: 10, dewPointC: 14 },
+  hot: { label: "Hot & humid", tempC: 30, humidityPct: 75, windKph: 8, dewPointC: 25 },
+  windy: { label: "Windy", tempC: 14, humidityPct: 55, windKph: 42, dewPointC: 5 },
+  cold: { label: "Cold", tempC: 1, humidityPct: 70, windKph: 16, dewPointC: -4 },
 };
 const SEV_COLOR = { none: "var(--ready)", mild: "var(--steady)", moderate: "var(--ease)", high: "var(--eff-hard)", severe: "var(--rest)" };
 const WX_ICON = { mild: "wxCloud", warm: "wxSun", hot: "wxSun", windy: "wxWind", cold: "wxSnow" };
@@ -3950,11 +3952,21 @@ const WX_ICON = { mild: "wxCloud", warm: "wxSun", hot: "wxSun", windy: "wxWind",
 function activeWeather() {
   if (state.wx) return state.wx;
   const p = WEATHER_PRESETS[state.weather];
-  return { tempC: p.tempC, humidityPct: p.humidityPct, windKph: p.windKph, label: p.label, iconKey: WX_ICON[state.weather], live: false };
+  return { tempC: p.tempC, humidityPct: p.humidityPct, windKph: p.windKph, dewPointC: p.dewPointC, label: p.label, iconKey: WX_ICON[state.weather], live: false };
 }
 function currentConditions(session) {
   const w = activeWeather();
-  return RC.assessConditions({ tempC: w.tempC, humidityPct: w.humidityPct, windKph: w.windKph, sessionType: (session && session.type) || "easy" });
+  // ⚠️ DEW POINT AND DURATION ARE MODEL INPUTS NOW, and dropping them here would have quietly left
+  // the heat factor running on defaults — humidity-derived dew point and a notional hour — while the
+  // forecast was sitting in state.wx with the real numbers in it. The engine would not have
+  // complained; it would just have been answering a slightly different question from the one asked.
+  const secs = session && session.estimatedDurationSeconds;
+  return RC.assessConditions({
+    tempC: w.tempC, humidityPct: w.humidityPct, windKph: w.windKph,
+    dewPointC: Number.isFinite(w.dewPointC) ? w.dewPointC : undefined,
+    sessionType: (session && session.type) || "easy",
+    minutes: secs ? Math.round(secs / 60) : 60,
+  });
 }
 // ---- Live local weather (Open-Meteo, no key, CORS-friendly) ----------------
 // Blocked inside the Claude artifact sandbox (external fetch), where it silently falls back to the
@@ -4027,6 +4039,76 @@ function wmoIcon(code, windKph) {
   return "wxCloud";
 }
 let WX_FETCHING = false;
+/**
+ * THE HOURLY FORECAST — the thing that makes adapting for heat honest rather than a guess.
+ *
+ * Open-Meteo returns parallel arrays: time plus one array per field. Zipped here into one row per
+ * hour so nothing downstream has to index four arrays in step and hope they stayed aligned.
+ *
+ * ⚠️ TIMES ARE LOCAL, BECAUSE THE URL ASKS FOR timezone=auto. They arrive as "2026-08-16T14:00" with
+ * no zone suffix, which is exactly what we want to show somebody — "2pm" means 2pm where they are.
+ * ⚠️ SO THEY MUST NOT GO THROUGH isoAdd OR todayIso, which are UTC by design and correctly so. This
+ * is the one place in the app where a local wall-clock string is the right thing to hold, and mixing
+ * the two is the fault this project has now shipped three times. They are kept as opaque strings,
+ * compared as strings, and never converted.
+ */
+function parseHourly(h) {
+  if (!h || !Array.isArray(h.time)) return null;
+  const num = (a, i) => (Array.isArray(a) && Number.isFinite(a[i]) ? a[i] : null);
+  const out = [];
+  for (let i = 0; i < h.time.length; i++) {
+    const t = h.temperature_2m ? num(h.temperature_2m, i) : null;
+    if (t == null) continue;
+    out.push({
+      iso: String(h.time[i]),                       // local wall clock, e.g. "2026-08-16T14:00"
+      hour: Number(String(h.time[i]).slice(11, 13)),
+      day: String(h.time[i]).slice(0, 10),
+      tempC: t,
+      humidityPct: num(h.relative_humidity_2m, i),
+      dewPointC: num(h.dew_point_2m, i),
+      windKph: num(h.wind_speed_10m, i) || 0,
+      code: num(h.weather_code, i),
+    });
+  }
+  return out.length ? out : null;
+}
+/**
+ * The forecast rows for one local date, from the next whole hour onward when that date is today.
+ * ⚠️ PAST HOURS ARE DROPPED. Offering to adapt a session for 6am at four in the afternoon is not a
+ * choice, it is a trap — and the app would then hold a stored decision keyed to weather that already
+ * happened. "Today" here means the runner's local date, taken from the same clock the forecast used.
+ */
+function hoursFor(dayIso) {
+  const rows = state.wxHours;
+  if (!rows || !rows.length) return [];
+  const now = new Date();
+  const localToday = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");
+  const day = dayIso || localToday;
+  return rows.filter((r) => r.day === day && (day > localToday || r.hour >= now.getHours()));
+}
+/** The forecast row nearest a given local hour on a given day, or null when we have no forecast. */
+function hourAt(dayIso, hour) {
+  const rows = hoursFor(dayIso);
+  if (!rows.length) return null;
+  let best = rows[0];
+  for (const r of rows) if (Math.abs(r.hour - hour) < Math.abs(best.hour - hour)) best = r;
+  return best;
+}
+/** An hour's row turned into the shape assessConditions wants, carrying the session's own length. */
+function conditionsAtHour(row, session) {
+  if (!row) return null;
+  const secs = session && session.estimatedDurationSeconds;
+  return {
+    tempC: row.tempC,
+    humidityPct: row.humidityPct == null ? 60 : row.humidityPct,
+    dewPointC: row.dewPointC == null ? undefined : row.dewPointC,
+    windKph: row.windKph,
+    sessionType: (session && session.type) || "easy",
+    // ⚠️ Duration is part of the model, not decoration: heat accumulates, so the same air costs a
+    // two-hour long run appreciably more than a twenty-minute jog.
+    minutes: secs ? Math.round(secs / 60) : 60,
+  };
+}
 function fetchWeather(force) {
   if (WX_FETCHING || (state.wx && !force)) return;
   if (!(typeof navigator !== "undefined" && "geolocation" in navigator)) return;
@@ -4047,10 +4129,21 @@ function fetchWeather(force) {
   WX_FETCHING = true;
   navigator.geolocation.getCurrentPosition((pos) => {
     const la = pos.coords.latitude.toFixed(3), lo = pos.coords.longitude.toFixed(3);
-    const url = "https://api.open-meteo.com/v1/forecast?latitude=" + la + "&longitude=" + lo + "&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&wind_speed_unit=kmh&timezone=auto";
+    // ⚠️ hourly, AND dew point on both. The heat pace model wants dew point rather than a humidity
+    // percentage — 70% at 10°C and 70% at 30°C are completely different runs — and it wants the
+    // conditions AT THE HOUR SOMEBODY WILL RUN, not the conditions while they are reading the screen.
+    // Two days, so a hot session can be flagged the evening before rather than only on the morning.
+    const url = "https://api.open-meteo.com/v1/forecast?latitude=" + la + "&longitude=" + lo +
+      "&current=temperature_2m,relative_humidity_2m,dew_point_2m,wind_speed_10m,weather_code" +
+      "&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,wind_speed_10m,weather_code" +
+      "&forecast_days=2&wind_speed_unit=kmh&timezone=auto";
     fetch(url).then((r) => r.ok ? r.json() : Promise.reject(r.status)).then((d) => {
       const c = d && d.current; if (!c) throw new Error("no data");
-      state.wx = { tempC: Math.round(c.temperature_2m), humidityPct: Math.round(c.relative_humidity_2m), windKph: Math.round(c.wind_speed_10m), code: c.weather_code, label: wmoLabel(c.weather_code), iconKey: wmoIcon(c.weather_code, c.wind_speed_10m), live: true, at: Date.now() };
+      state.wx = { tempC: Math.round(c.temperature_2m), humidityPct: Math.round(c.relative_humidity_2m),
+        dewPointC: Number.isFinite(c.dew_point_2m) ? Math.round(c.dew_point_2m) : undefined,
+        windKph: Math.round(c.wind_speed_10m), code: c.weather_code, label: wmoLabel(c.weather_code),
+        iconKey: wmoIcon(c.weather_code, c.wind_speed_10m), live: true, at: Date.now() };
+      state.wxHours = parseHourly(d && d.hourly);
       WX_FETCHING = false;
       if (WX_SHEET_OPEN) { $("sheetBody").innerHTML = weatherSheetHtml(); wireWeatherSheet(); }
       else if (state.tab === "today" && !state.screen) render();

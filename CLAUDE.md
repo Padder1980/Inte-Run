@@ -3405,8 +3405,28 @@ xcodebuild -exportArchive -archivePath /tmp/InteRun.xcarchive \
   -exportOptionsPlist ios/ExportOptions.plist -exportPath /tmp/InteRun-ipa \
   -allowProvisioningUpdates
 ```
-Then upload the `.ipa` with Transporter, or `xcrun altool`/`notarytool` with an App Store Connect
-API key. The app record has to exist in App Store Connect first (same bundle id, `com.interun.app`).
+⚠️ **UPLOADING NEEDS NO API KEY, NO TRANSPORTER AND NO APP-SPECIFIC PASSWORD — `xcodebuild` USES
+XCODE'S OWN SIGNED-IN ACCOUNT.** Add `<key>destination</key><string>upload</string>` to a copy of
+`ExportOptions.plist` and the export IS the upload:
+
+```bash
+cp ios/ExportOptions.plist /tmp/ExportOptions-upload.plist
+/usr/libexec/PlistBuddy -c "Add :destination string upload" /tmp/ExportOptions-upload.plist
+xcodebuild -exportArchive -archivePath /tmp/InteRun.xcarchive \
+  -exportOptionsPlist /tmp/ExportOptions-upload.plist -exportPath /tmp/InteRun-upload \
+  -allowProvisioningUpdates
+```
+
+⚠️ **I TOLD THE OWNER THIS WAS IMPOSSIBLE ON THIS MAC, AND IT WAS NOT** (2026-08-16). The reasoning
+looked sound — no `.p8` in `~/.appstoreconnect/private_keys/`, `xcrun altool --list-apps` refusing
+with an authentication error, no `Transporter.app` — and every one of those observations was true and
+irrelevant. **`-allowProvisioningUpdates` had been succeeding all along, which is proof of an
+authenticated App Store Connect session in Xcode**; that same session uploads. Check what already
+works before concluding a thing cannot be done, and treat a succeeding command as evidence.
+
+The app record has to exist in App Store Connect first (same bundle id, `com.interun.app`).
+⚠️ **Adding the build to a tester group is still a manual step in App Store Connect**, unless the
+internal group has automatic distribution switched on.
 
 ⚠️ **THE BUILD NUMBER NOW COMES FROM THE COMMIT COUNT** (`build_number()` in `make-project.py`),
 floored at 36. App Store Connect **rejects a second upload carrying a build number it has already

@@ -12955,8 +12955,16 @@ function saveCoachCfg() { try { localStorage.setItem(COACH_STORE, JSON.stringify
 // this, there is no handler and the real element is used exactly as before. A failure reported back
 // from Swift also falls through to the ordinary error path, so a runner never gets silence because a
 // clip could not be found in the bundle.
+// ⚠️ GATED ON A CAPABILITY FLAG, NOT ON THE HANDLER EXISTING, AND THE DIFFERENCE IS A SILENT COACH.
+// The interunCoachAudio message handler has been registered since the locked-phone work, so the
+// usual window.webkit.messageHandlers guard is satisfied by builds that have never heard of
+// playPage -- they fall through the switch default and discard it. And docs/index.html travels OVER
+// THE AIR while Swift does not, so this page reaches phones running older native code within a
+// launch or two: every clip would be handed over, none played, no reply sent, and the coach would
+// say nothing for a whole run. WebHost sets the flag; only a build that can actually play gets used.
 function coachNativeAudioBridge() {
   try {
+    if (!window.__interunCoachNativePlay) return null;
     const h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.interunCoachAudio;
     return (h && h.postMessage) ? h : null;
   } catch (e) { return null; }

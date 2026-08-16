@@ -3944,6 +3944,24 @@ one copy of it. Swift plays one clip per call and reports the end back through
 ⚠️ **THIS ONE IS NATIVE, SO IT DOES NOT TRAVEL OVER THE AIR.** Everything else in this section is in
 `docs/index.html` and reaches a phone on the next launch; this needs a rebuild.
 
+### ⚠️⚠️ AND THAT ASYMMETRY NEARLY SHIPPED A SILENT COACH — THE OTA TRAP HAS A SECOND HALF
+
+`CLAUDE.md` has said since the OTA work that a page needing a new native bridge "degrades gracefully
+(it guards `window.webkit.messageHandlers.*`)". **That is only true when the HANDLER is new.** Here it
+was not: `interunCoachAudio` has been registered since the locked-phone work, so the guard passed on
+every existing build — which then falls through `default: break` on an action it has never heard of
+and **silently discards it**. The page would have handed over every clip, none would have played,
+no reply would have come back, and the coach would have said nothing for an entire run. The page half
+was **already pushed to `main`** when this was spotted, so it was minutes from reaching the owner's
+own phone, which is running the previous build.
+
+**The gate is a CAPABILITY FLAG** — `window.__interunCoachNativePlay`, injected by `WebHost` at
+document start — and `coachNativeAudioBridge()` requires it. An old build sets nothing, gets `null`,
+and uses its `<audio>` element exactly as before.
+⚠️ **Bump the flag when the CONTRACT changes; never widen it back to a handler-exists check.**
+⚠️ **The general rule, which is what this cost:** an OTA page may only ask the native side for
+something new behind a flag the native side itself sets. A message-handler name is not a version.
+
 ⚠️ **`dSessOpts` NOW RECORDS WHO OWNED THE SESSION WHEN THE CLIP STARTED**, printed in
 Support › Your data as `session duck+mix` or `session none`. **`none` is somebody else holding it;
 `duck+mix` is this app.** It exists because a wrong diagnosis was argued confidently once already

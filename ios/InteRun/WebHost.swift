@@ -46,6 +46,16 @@ struct WebHost: UIViewRepresentable {
         config.userContentController.addUserScript(WKUserScript(
             source: "window.__interunLiveActivity = \"\(status)\";"
                   + "window.__interunCoachAudio = \"\(coachStatus)\";"
+                  // ⚠️ A CAPABILITY FLAG, AND CHECKING THE MESSAGE HANDLER IS NOT ENOUGH. The page
+                  // hands its coach clips to Swift only when it can see this. The obvious guard —
+                  // does window.webkit.messageHandlers.interunCoachAudio exist — is WRONG here,
+                  // because that handler has existed since the locked-phone work and older builds
+                  // simply fall through `default: break` on an action they have never heard of. And
+                  // `docs/index.html` updates OVER THE AIR while Swift does not, so the page asking
+                  // for playPage would reach phones whose native side silently discards it: every
+                  // clip handed over, none played, no reply, and a coach that says nothing all run.
+                  // Bump this when the contract changes; never widen it to a handler-exists check.
+                  + "window.__interunCoachNativePlay = 1;"
                   + WebUpdateService.shared.diagnosticJS
                   + tokenJS,
             injectionTime: .atDocumentStart, forMainFrameOnly: true))

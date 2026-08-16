@@ -292,6 +292,7 @@ function playPaceCueNative(opts: { curSecPerKm: number; minSecPerKm: number; max
     },
   };
   win.webkit = { messageHandlers: { interunCoachAudio: bridge } };
+  win.__interunCoachNativePlay = 1;
 
   const env: Record<string, any> = {
     COACH: {
@@ -415,4 +416,34 @@ test("a reply that never arrives does not wedge the coach for the rest of the ru
     now = due.at; due.fn();
   }
   assert.equal(ended2, 1, "the watchdog fired on top of a clip that had already reported");
+});
+
+test("an older native build is never handed clips it cannot play", () => {
+  // ⚠️ THE HAZARD THAT MAKES THIS GATE A CAPABILITY FLAG RATHER THAN A HANDLER CHECK. The page
+  // updates OVER THE AIR; Swift does not. `interunCoachAudio` has been a registered message handler
+  // since the locked-phone work, so a handler-exists guard is satisfied by a build that falls
+  // through `default: break` on playPage — every clip handed over, none played, no reply, and a
+  // coach silent for the whole run. Pushing this page without the flag would have done exactly that
+  // to the build already on the owner's phone.
+  const html = readFileSync(PAGE, "utf8");
+  const src = lift(html, "coachNativeAudioBridge");
+  assert.match(src, /__interunCoachNativePlay/, "the bridge is gated on the handler alone");
+
+  let posted = 0;
+  const env: Record<string, any> = {
+    window: { webkit: { messageHandlers: { interunCoachAudio: { postMessage: () => { posted++; } } } } },
+  };
+  const fn = new Function("window", src + "; return coachNativeAudioBridge;")(env.window);
+  assert.equal(fn(), null, "an old build with the handler but no flag was treated as capable");
+  env.window.__interunCoachNativePlay = 1;
+  assert.ok(fn(), "a build that sets the flag must be used");
+  assert.equal(posted, 0, "detection must not post anything");
+});
+
+test("the native app declares the capability it just gained", () => {
+  const swift = readFileSync(new URL("../ios/InteRun/WebHost.swift", import.meta.url), "utf8");
+  assert.match(swift, /window\.__interunCoachNativePlay = 1;/, "WebHost no longer declares the flag");
+  const service = readFileSync(new URL("../ios/InteRun/CoachAudioService.swift", import.meta.url), "utf8");
+  assert.match(service, /case "playPage":/, "the flag is declared but the action is not handled");
+  assert.match(service, /case "stopPage":/, "stopPage is not handled, so a pause leaves a clip sounding");
 });

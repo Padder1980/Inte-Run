@@ -47,10 +47,10 @@ function harness(nowHour: number, days: string[]) {
   const state: any = { wxHours: null };
   // A fixed local clock, so "which hours are left today" is deterministic.
   const base = new Date(2026, 7, 16, nowHour, 0, 0);
-  class FakeDate extends Date {
-    constructor(...a: any[]) { super(...(a.length ? (a as []) : [base.getTime()])); }
-    static now() { return base.getTime(); }
-  }
+  // A fixed local clock. Only `new Date()` and Date.now() are used by the code under test, so this
+  // stays deliberately small rather than subclassing Date and fighting its overload signatures.
+  const FakeDate: any = function () { return new Date(base.getTime()); };
+  FakeDate.now = () => base.getTime();
   const fns = new Function("state", "Date",
     src + "; return { parseHourly, hoursFor, hourAt, conditionsAtHour };")(state, FakeDate);
   state.wxHours = fns.parseHourly(forecast(days));

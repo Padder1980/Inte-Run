@@ -3179,11 +3179,22 @@ html.rd-open .view { padding: 0; }
 
 .rd-plan { padding: var(--s4); border-radius: var(--r-card); background: var(--surface); box-shadow: var(--shadow); }
 .rd-plan-p { font-size: var(--t-body); line-height: 1.5; color: var(--ink-soft); }
-.rd-step { display: flex; align-items: baseline; gap: var(--s2); padding: 5px 0; font-size: var(--t-body); }
+/* ⚠️ THIS ROW PUSHED THE WHOLE PAGE SIDEWAYS. A real prescription's target line reads
+   "36 min · 6.3 km · 5:28–5:58/km · RPE 2–3" — long, and it was flex: 0 0 auto, which means it
+   will not shrink. The row grew past the viewport, and because #view is the scroller the ENTIRE
+   screen gained a horizontal scroll: headings clipped on the left, the overflow button off the
+   right. Nothing about the row looked wrong; the page moved.
+   ⚠️ min-width: 0 ON EVERY FLEX CHILD. A flex item defaults to min-width:auto and refuses to
+   shrink below its content, which is the same trap .view's min-height:0 exists for elsewhere in
+   this file. The targets take their own line, because they are a list of numbers and wrapping them
+   mid-list reads worse than a second row. */
+.rd-step { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--s2);
+  padding: 5px 0; font-size: var(--t-body); }
 .rd-step-tag { flex: 0 0 auto; min-width: 58px; font-size: var(--t-label); letter-spacing: .06em;
   text-transform: uppercase; color: var(--ink-faint); }
-.rd-step-l { flex: 1 1 auto; color: var(--ink); }
-.rd-step-t { flex: 0 0 auto; color: var(--ink-soft); }
+.rd-step-l { flex: 1 1 140px; min-width: 0; color: var(--ink); overflow-wrap: anywhere; }
+.rd-step-t { flex: 1 1 100%; min-width: 0; padding-left: calc(58px + var(--s2));
+  color: var(--ink-soft); overflow-wrap: anywhere; }
 .rd-cmp-h, .rd-cmp { display: grid; grid-template-columns: 1fr auto auto; gap: var(--s3); align-items: baseline; }
 .rd-cmp-h { margin-top: var(--s3); padding-bottom: 6px; border-bottom: 1px solid var(--line);
   font-size: var(--t-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint); }

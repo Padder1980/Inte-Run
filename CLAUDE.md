@@ -345,6 +345,18 @@ one-render cache exists to prevent.
 unrestricted `pk.` token shipped in a client is a token anyone can extract and spend. The honest
 options are: accept CARTO in the app, or keep Mapbox for the shared card only. Not decided.
 
+⚠️ **AND THE FIX FOR THOSE PUSHED THE WHOLE PAGE SIDEWAYS.** Rendering `run.steps` as rows put a
+real target line — *"36 min · 6.3 km · 5:28–5:58/km · RPE 2–3"* — in a flex child set `flex: 0 0
+auto`, which will not shrink. The row grew past the viewport and, because `#view` is the scroll
+owner, the ENTIRE SCREEN gained a horizontal scroll: headings clipped on the left, the overflow
+button off the right, the page drifting as it was touched. Nothing in the row looked wrong — the page
+moved. ⚠️ **A flex item defaults to `min-width: auto` and refuses to shrink below its content**, the
+same trap `.view`'s `min-height: 0` exists for elsewhere in this file.
+⚠️ **THE HARNESS MISSED IT BECAUSE THE FIXTURE WAS TOO KIND.** It carried a short `"5:20–6:10 /km"`
+target, which fits — so the layout was verified against a prescription no plan actually produces. A
+fixture must carry the LONGEST REAL VALUE, not a tidy one, or it certifies a layout that only works
+on made-up data.
+
 ⚠️ **TWO PLAN-CARD FAULTS THAT BOTH PRINTED THEMSELVES ONTO THE SCREEN.** `rdPlanHtml` read
 `a.band.min`/`.max` — the band is a `PaceRange` (`minSecPerKm`/`maxSecPerKm`), so it rendered
 **"NaN:NaN–NaN:NaN /km"**; and it escaped `run.steps` as if it were a sentence when

@@ -448,3 +448,31 @@ test("the route and the basemap appear as one", () => {
   assert.match(b, /container\.classList\.add\("ov-ready"\);\n\s*\}\)\.catch\(\(\) => \{ container\.classList\.add\("ov-ready"\); \}\)/,
     "the reveal does not happen when the tiles fail");
 });
+
+test("a real prescription row cannot push the page sideways", () => {
+  // ⚠️ IT DID. A real target line reads "36 min · 6.3 km · 5:28–5:58/km · RPE 2–3", and the row was
+  // laid out with flex: 0 0 auto on it — which means it will not shrink. The row grew past the
+  // viewport, and because #view is the scroll owner the WHOLE SCREEN gained a horizontal scroll:
+  // headings clipped on the left, the overflow button off the right. Nothing in the row looked
+  // wrong; the page moved.
+  //
+  // ⚠️ AND THE HARNESS MISSED IT BECAUSE THE FIXTURE WAS TOO KIND — a short "5:20–6:10 /km" target
+  // fits, so the layout was verified against a prescription no plan produces. Fixtures have to carry
+  // the longest real value, not a tidy one.
+  const html = page();
+  for (const [sel, need] of [
+    [".rd-step ", /flex-wrap: wrap/],
+    [".rd-step-l ", /min-width: 0/],
+    [".rd-step-t ", /min-width: 0/],
+  ] as const) {
+    const at = html.indexOf(sel + "{");
+    assert.ok(at > 0, sel + "is missing");
+    const rule = html.slice(at, html.indexOf("}", at));
+    assert.match(rule, need, sel + "can still refuse to shrink: " + rule.trim());
+  }
+  // ⚠️ A flex item defaults to min-width:auto and will not shrink below its content — the same trap
+  // .view's min-height:0 exists for elsewhere in this file.
+  const t = html.slice(html.indexOf(".rd-step-t {"), html.indexOf("}", html.indexOf(".rd-step-t {")));
+  assert.ok(!/flex: 0 0 auto/.test(t), "the target line is back to refusing to shrink");
+  assert.match(t, /overflow-wrap: anywhere/, "a single long token could still overflow");
+});

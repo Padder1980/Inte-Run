@@ -822,15 +822,15 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 .ov-mapcv { display: block; width: 100%; height: auto; }
 .ov-mapov { position: absolute; inset: 0; }
 .ov-mapov .routemap { width: 100%; height: 100%; }
-.ov-mapov .rt-line { stroke-width: 6; }
+.ov-mapov .rt-line { stroke-width: 4.2; }
 .ov-attr { position: absolute; left: 10px; bottom: 7px; font-size: 10px; color: rgba(255,255,255,.45); text-shadow: 0 1px 2px rgba(0,0,0,.5); pointer-events: none; }
 /* Light (Voyager) overview map: give the route a dark casing so the bright-green line reads on streets */
-.ov-light .ov-mapov .rt-line { stroke-width: 7; }
+.ov-light .ov-mapov .rt-line { stroke-width: 4.9; }
 .ov-light .ov-attr { color: rgba(20,44,36,.62); text-shadow: 0 1px 1px rgba(255,255,255,.7); }
 .routemap { display: block; width: 100%; height: auto; }
 /* The route: one colour, the brand teal. A soft shadow keeps it legible on pale streets without
    being a second colour. */
-.rt-line { fill: none; stroke: #16b7a4; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 2px rgba(4,26,22,.45)); }
+.rt-line { fill: none; stroke: #16b7a4; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 2px rgba(4,26,22,.45)); }
 .rt-none { padding: 26px 16px; text-align: center; font-size: 13px; color: var(--ink-faint); }
 /* The post-run debrief: one scroll, map first. Three columns, and the tile count varies with what
    was actually measured (elevation only on a phone run, heart rate only with a watch), so the last
@@ -14794,7 +14794,7 @@ function buildOverviewMap(container, route, pw, ph) {
     container.innerHTML = "";
     container.appendChild(cv);
     container.appendChild(el('<div class="ov-mapov">' + overlay + '</div>'));
-    container.appendChild(el('<div class="ov-attr">' + esc(mapAttribution(MAP_STYLE_RUN)) + '</div>'));
+    container.appendChild(el('<div class="ov-attr">' + esc(mapAttributionFor(md.prov)) + '</div>'));
   }).catch(() => {});
 }
 // Superseded by splitsVsTargetHtml, which judges each kilometre against the band the plan set
@@ -15959,8 +15959,15 @@ function mapboxToken() {
  * OpenStreetMap and CARTO. Shipping the wrong one is a breach whichever way round it is, so it is
  * derived from the same provider decision that chose the tiles rather than typed twice.
  */
-function mapAttribution(styles) {
-  return mapProviderFor(styles).kind === "mapbox"
+function mapAttribution(styles) { return mapAttributionFor(mapProviderFor(styles)); }
+/**
+ * ⚠️ CREDIT WHO ACTUALLY SERVED THE TILES, NOT WHO WE WOULD HAVE PREFERRED. Attribution is a licence
+ * term and it differs by provider — Mapbox requires Mapbox + OpenStreetMap, CARTO requires
+ * OpenStreetMap + CARTO. Since a refused Mapbox token falls back to CARTO, asking mapProviderFor at
+ * render time names a provider that served nothing and omits the one that did.
+ */
+function mapAttributionFor(prov) {
+  return prov && prov.kind === "mapbox"
     ? "\u00a9 Mapbox \u00a9 OpenStreetMap"
     : "\u00a9 OpenStreetMap contributors \u00a9 CARTO";
 }
@@ -16111,7 +16118,10 @@ function routeMapFor(route, pw, ph, styles, forceCarto) {
         g.fillStyle = "#eef1ee"; g.fillRect(0, 0, pw, ph);
         md.tiles.forEach((t) => { try { g.drawImage(t.img, t.dx, t.dy, MAP_TILE, MAP_TILE); } catch (e) {} });
         // Hand the caller a usable map first; storing it must never delay the screen.
-        const out = { image: cv, proj: md.proj };
+        // ⚠️ prov rides along because attribution is a LICENCE TERM and differs by provider. The
+        // caller cannot ask mapProviderFor: that answers who we would PREFER, and a refused Mapbox
+        // token now falls back to CARTO, so the two disagree exactly when it matters.
+        const out = { image: cv, proj: md.proj, prov: prov };
         try {
           cv.toBlob((b) => { if (b) mapCachePut(key, b, md); },
             "image/webp", 0.8);
@@ -16119,6 +16129,7 @@ function routeMapFor(route, pw, ph, styles, forceCarto) {
         return out;
       });
     })
+    .then((out) => (out && !out.prov ? Object.assign({}, out, { prov: prov }) : out))
     .catch((err) => {
       if (prov.kind === "mapbox" && !forceCarto) {
         MAPDIAG.why = "mapbox refused; drew the free map instead";

@@ -345,6 +345,17 @@ one-render cache exists to prevent.
 unrestricted `pk.` token shipped in a client is a token anyone can extract and spend. The honest
 options are: accept CARTO in the app, or keep Mapbox for the shared card only. Not decided.
 
+⚠️ **THE CARTO FALLBACK CREDITED MAPBOX OVER CARTO'S TILES, AND ATTRIBUTION IS A LICENCE TERM.**
+`mapAttribution` asks `mapProviderFor`, which answers *who we would prefer* — fine while that was the
+only answer, wrong the moment a refused Mapbox token started falling back. The owner's screenshot
+showed "© Mapbox © OpenStreetMap" under a map Mapbox had served nothing of, with CARTO left out.
+`routeMapFor` now carries the provider it actually used back on its result and the caller reads that;
+`mapAttributionFor(prov)` holds the two strings and `mapAttribution(styles)` delegates to it. The
+guard was restated to assert the invariant and re-broken by crediting the preference again.
+⚠️ **A FIX THAT ADDS A FALLBACK ADDS A WAY FOR EVERY DERIVED FACT TO GO STALE.** The attribution was
+correct for as long as there was only one possible provider; nothing about it changed, and it became
+a licence breach anyway. Anything else derived from `mapProviderFor` at render time is suspect.
+
 ⚠️ **THE ROUTE LINE CAME OUT STRETCHED, AND IT WAS TWO TRANSFORMS OVER ONE PICTURE.**
 `buildOverviewMap` always composited **700×420** whatever asked for it; the debrief hero is nearly
 square (measured 440×467 on a 16 Pro Max). The canvas then COVERED its box — cropped, scale 1.11 —

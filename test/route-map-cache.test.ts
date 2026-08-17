@@ -199,14 +199,27 @@ test("⚠️ the cache key includes the PROVIDER, not an object", () => {
 test("⚠️ attribution follows the provider — it is a licence term, not decoration", () => {
   // Mapbox's terms require Mapbox and OpenStreetMap credited on the map; CARTO's require OpenStreetMap
   // and CARTO. Shipping the wrong one is a breach whichever way round it is.
-  const fn = lift("mapAttribution");
+  const fn = lift("mapAttributionFor");
   assert.match(fn, /Mapbox/, "no Mapbox attribution exists");
   assert.match(fn, /CARTO/, "the CARTO attribution has been dropped");
-  assert.match(fn, /mapProviderFor/, "attribution is not derived from the provider actually in use");
+  assert.match(fn, /prov && prov\.kind === "mapbox"/, "attribution is not derived from a provider");
+  // ⚠️ AND IT MUST BE THE PROVIDER THAT ACTUALLY SERVED, NOT THE ONE WE WOULD PREFER. Since a refused
+  // Mapbox token falls back to CARTO, mapProviderFor answers the wrong question at render time — it
+  // shipped "© Mapbox" over CARTO's tiles, naming a provider that served nothing and omitting the one
+  // that did. routeMapFor carries the provider it used back on the result; the caller reads that.
   const html = app();
-  // Both surfaces must ask for it rather than carrying a hardcoded string.
-  assert.equal((html.match(/mapAttribution\(/g) || []).length, 3,
-    "a surface still prints a hardcoded attribution (expected: the definition plus both call sites)");
+  assert.match(html, /const out = \{ image: cv, proj: md\.proj, prov: prov \}/,
+    "routeMapFor does not report which provider actually drew");
+  const builder = lift("buildOverviewMap");
+  assert.match(builder, /mapAttributionFor\(md\.prov\)/,
+    "the run card credits a preference rather than the provider that served it");
+  assert.ok(!/mapAttribution\(MAP_STYLE_RUN\)/.test(builder),
+    "the run card is back to asking who we would have preferred");
+  // Neither surface may carry a hardcoded string.
+  for (const s of ["Mapbox \u00a9 OpenStreetMap", "OpenStreetMap contributors \u00a9 CARTO"]) {
+    const n = (html.match(new RegExp(s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length;
+    assert.equal(n, 1, "the attribution string \"" + s + "\" appears " + n + " times; it must live in one function");
+  }
 });
 
 test("the share card stays DARK on both providers", () => {

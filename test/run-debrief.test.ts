@@ -382,3 +382,20 @@ test("the sheet owns the vertical rhythm, so no block brings its own", () => {
       sel + " sets its own vertical margin, which the sheet is supposed to own: " + rule.trim());
   }
 });
+
+test("both route markers take their size from one number", () => {
+  // ⚠️ THEY MUST STAY THE SAME SIZE AS EACH OTHER, and two independent literals is exactly how the
+  // heat card's two buttons drifted apart — a mismatch invisible until the pair sat side by side.
+  // Measured after halving them: both render 17px wide on a 440pt viewport.
+  const html = page();
+  assert.match(html, /const RT_MARK_R = /, "the marker size is not a shared constant");
+  assert.match(html, /const RT_MARK_RING = /, "the ring size is not a shared constant");
+  for (const fn of ["routeLogoMark", "routeFinishMark"]) {
+    const src = lift(fn);
+    assert.match(src, /const R = r \* RT_MARK_R;/, fn + " sizes itself from its own literal");
+    assert.match(src, /r \* RT_MARK_RING/, fn + " draws its ring from its own literal");
+    // Any bare multiplier here is a second source of truth waiting to disagree with the first.
+    const stray = (src.match(/r \* 0\.\d+/g) || []).filter((m) => !/RT_MARK/.test(m));
+    assert.deepEqual(stray, [], fn + " still has hard-coded sizes: " + stray.join(", "));
+  }
+});

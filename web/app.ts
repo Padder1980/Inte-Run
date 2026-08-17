@@ -14696,6 +14696,16 @@ function routeMapSvg(route, proj, vbW, vbH) {
 let RT_LOGO_N = 0;
 let RT_LOGO_ID = "";
 let RT_CLIP_ID = "";
+/**
+ * Marker size, as a multiple of the route's own dot radius, and the white ring around it.
+ *
+ * ⚠️ ONE NUMBER, SHARED BY BOTH MARKERS. The start and the finish must stay the same size as each
+ * other; two independent literals is exactly how the heat card's two buttons drifted apart, and the
+ * mismatch there was invisible until they were put side by side. Halved from 1.55/0.34 on the
+ * owner's request, 2026-08-17 — the first pair were legible but sat too heavily on the map.
+ */
+const RT_MARK_R = 0.775;
+const RT_MARK_RING = 0.17;
 function routeLogoDefs() {
   RT_LOGO_N++;
   RT_LOGO_ID = "rtlg" + RT_LOGO_N;
@@ -14716,7 +14726,7 @@ function routeLogoDefs() {
  * entirely if the first ever leaves the DOM.
  */
 function routeFinishMark(cx, cy, r) {
-  const R = r * 1.55;
+  const R = r * RT_MARK_R;
   const cell = R / 2;
   let sq = "";
   for (let i = 0; i < 4; i++) {
@@ -14728,19 +14738,18 @@ function routeFinishMark(cx, cy, r) {
   }
   return '<g class="rt-finish" transform="translate(' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')">' +
     '<clipPath id="' + RT_CLIP_ID + '"><circle r="' + R.toFixed(1) + '"/></clipPath>' +
-    '<circle r="' + (R + r * 0.34).toFixed(1) + '" fill="#fff"/>' +
+    '<circle r="' + (R + r * RT_MARK_RING).toFixed(1) + '" fill="#fff"/>' +
     '<circle r="' + R.toFixed(1) + '" fill="#fff"/>' +
     '<g clip-path="url(#' + RT_CLIP_ID + ')">' + sq + '</g>' +
-    '<circle r="' + R.toFixed(1) + '" fill="none" stroke="#0b2a24" stroke-width="' + (r * 0.22).toFixed(2) + '"/>' +
+    '<circle r="' + R.toFixed(1) + '" fill="none" stroke="#0b2a24" stroke-width="' + (R * 0.14).toFixed(2) + '"/>' +
     '</g>';
 }
 function routeLogoMark(cx, cy, r) {
-  // A touch larger than the plain dot it replaces: a mark the size of a 9px dot is a smudge.
-  const R = r * 1.55;
+  const R = r * RT_MARK_R;
   // The mark's figure spans x 35..93 and y 26..88 in its own 120 box, centred near (64, 57).
   const k = R / 46;
   return '<g class="rt-logo" transform="translate(' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')">' +
-    '<circle r="' + (R + r * 0.34).toFixed(1) + '" fill="#fff"/>' +
+    '<circle r="' + (R + r * RT_MARK_RING).toFixed(1) + '" fill="#fff"/>' +
     '<circle r="' + R.toFixed(1) + '" fill="url(#' + RT_LOGO_ID + ')"/>' +
     '<g transform="scale(' + k.toFixed(4) + ') translate(-64 -57)">' +
       '<circle cx="82" cy="37" r="11" fill="#fff"/>' +

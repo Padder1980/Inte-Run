@@ -345,6 +345,35 @@ one-render cache exists to prevent.
 unrestricted `pk.` token shipped in a client is a token anyone can extract and spend. The honest
 options are: accept CARTO in the app, or keep Mapbox for the shared card only. Not decided.
 
+### THE RECAP STORY (owner's request after a Runna screen recording, 2026-08-17)
+
+Four panels the runner swipes through from a route thumbnail on the debrief: the route drawing
+itself, the kilometres as bars, the coach's read, and a share card ending in Share / Maybe later.
+
+⚠️ **NO PANEL COMPUTES A FACT OF ITS OWN.** They read `runAnalysis`, `runVerdict`,
+`routeMapFraming` and `runRoutePresentation` — the same sources the screen behind them uses — so the
+story and the debrief can never tell the runner two different things about one run, and the story
+inherits route privacy for free.
+
+⚠️ **THE SPLIT BARS ARE SCALED ACROSS THE RANGE, NOT FROM ZERO.** A well-run easy session has every
+kilometre within a few seconds; measured from zero every bar comes out the same length and the panel
+says nothing — which is exactly what a *consistent* run should be most able to show. Shortest bar is
+40% so the slowest kilometre still reads as a bar. Measured on a real six-kilometre run:
+51 / 84 / 40 / 67 / 56 / 100%.
+
+⚠️ **THE LAST PANEL DOES NOT AUTO-ADVANCE.** It ends in a choice, and a screen that closes itself
+while somebody is deciding has decided for them.
+
+⚠️ **THE TAP ZONES SIT BELOW THE BUTTONS.** A full-width invisible "next" over a panel carrying real
+actions eats every tap on Share — the control looks live and does the wrong thing, which is the
+dead-button class this file already records twice. Guarded by comparing the two z-indexes.
+
+⚠️ **IT IS AN OFFER.** It opens from a tap and never appears on its own after a run; a recap that
+interrupts is one people learn to dismiss without reading. A test asserts exactly one caller.
+
+⚠️ **`pathLength="1"` ON THE ROUTE PATH** is what lets one dash length draw any route in. It changes
+nothing for the static maps and removes the need to measure each path at runtime.
+
 ⚠️ **AND THE FIX FOR THOSE PUSHED THE WHOLE PAGE SIDEWAYS.** Rendering `run.steps` as rows put a
 real target line — *"36 min · 6.3 km · 5:28–5:58/km · RPE 2–3"* — in a flex child set `flex: 0 0
 auto`, which will not shrink. The row grew past the viewport and, because `#view` is the scroll

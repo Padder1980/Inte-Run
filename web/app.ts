@@ -3049,6 +3049,97 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
    two side-by-side buttons makes it 2px taller for free, and no amount of padding-tweaking fixes
    that without the two drifting apart again the next time either is touched. Same box, same border
    width, same radius, same min-height — the only difference between them is what fills them. */
+
+/* ===== THE RECAP STORY ==========================================================================
+   ⚠️ ONE OWNER PER ANIMATED PROPERTY, which is the lesson the hero's two opacity layers already
+   paid for. Each panel animates via a single .in class added a frame after it is inserted; nothing
+   here writes an inline style that a class then tries to override. */
+.rd-storychip { display: block; width: 88px; height: 88px; padding: 0; margin: 0;
+  background: #0b1a17; border: 1px solid var(--line); border-radius: var(--r-card);
+  overflow: hidden; cursor: pointer; }
+.rd-storychip-m { display: block; width: 100%; height: 100%; }
+.rd-storychip svg { width: 100%; height: 100%; display: block; }
+
+.story-ov { position: fixed; inset: 0; z-index: 90; display: none; background: #06110e; color: #fff; }
+.story-ov.on { display: block; }
+.story-top { position: absolute; left: 0; right: 0; top: 0; z-index: 3;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) var(--s4) 0; }
+.story-bars { display: flex; gap: 4px; }
+.story-bar { flex: 1 1 0; height: 3px; border-radius: var(--r-pill); background: rgba(255,255,255,.26); overflow: hidden; }
+.story-bar i { display: block; width: 0; height: 100%; background: #fff; }
+.story-bar.done i { width: 100%; }
+.story-bar.live i { width: 100%; transition: width 4.2s linear; }
+@media (prefers-reduced-motion: reduce) { .story-bar.live i { transition: none; } }
+.story-head { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) 0; }
+.story-mark { display: block; width: 28px; height: 28px; flex: 0 0 auto; }
+.story-mark svg { width: 100%; height: 100%; }
+.story-h { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.story-h b { font-size: var(--t-body); font-weight: 650; }
+.story-h i { font-style: normal; font-size: var(--t-meta); color: rgba(255,255,255,.62); }
+.story-x { flex: 0 0 auto; width: var(--tap); height: var(--tap); padding: 0; margin: 0;
+  font: inherit; font-size: var(--t-hero); line-height: 1; color: #fff;
+  background: none; border: 0; cursor: pointer; }
+
+.story-stage { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  padding: calc(96px + env(safe-area-inset-top, 0px)) var(--s5) calc(40px + env(safe-area-inset-bottom, 0px)); }
+/* ⚠️ THE TAP ZONES SIT ABOVE THE PANEL BUT BELOW ITS BUTTONS — the last panel has real actions on it,
+   and a full-width invisible "next" over them would swallow every tap on Share. */
+.story-tap { position: absolute; top: 0; bottom: 0; width: 34%; z-index: 2;
+  background: none; border: 0; padding: 0; margin: 0; cursor: pointer; }
+.story-prev { left: 0; }
+.story-next { right: 0; width: 66%; }
+.story-p { position: relative; z-index: 4; width: 100%; max-width: 360px;
+  opacity: 0; transform: translateY(8px); }
+.story-p.in { opacity: 1; transform: none; transition: opacity .45s ease, transform .45s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .story-p { transform: none; }
+  .story-p.in { transition: opacity .2s linear; }
+}
+
+.story-map { width: 100%; }
+.story-map svg { width: 100%; height: auto; display: block; }
+/* The route draws itself. pathLength normalises every route to 1, so one dash length works for all. */
+.story-route .rt-line { stroke: #16b7a4; stroke-width: 4; filter: none;
+  stroke-dasharray: 1; stroke-dashoffset: 1; }
+.story-route.in .rt-line { stroke-dashoffset: 0; transition: stroke-dashoffset 2.1s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .story-route .rt-line { stroke-dashoffset: 0; }
+  .story-route.in .rt-line { transition: none; }
+}
+.story-cap { margin-top: var(--s5); text-align: center; font-size: var(--t-section); }
+.story-cap b { font-size: var(--t-display); font-weight: 700; }
+.story-cap span { display: block; margin-top: 4px; font-size: var(--t-body); color: rgba(255,255,255,.62); }
+
+.story-splits { display: flex; flex-direction: column; gap: var(--s2); }
+.story-split { display: flex; align-items: center; gap: var(--s3); font-size: var(--t-body); }
+.story-km { flex: 0 0 auto; width: 18px; color: rgba(255,255,255,.62); }
+.story-split i { flex: 1 1 auto; height: 26px; border-radius: var(--r-ctl);
+  background: linear-gradient(90deg, #16b7a4, #0a6f64); width: 0; }
+.story-p.in .story-split i { width: var(--w); transition: width .7s ease-out var(--d); }
+@media (prefers-reduced-motion: reduce) { .story-p.in .story-split i { transition: none; } }
+.story-t { flex: 0 0 auto; width: 48px; text-align: right; font-weight: 650; }
+.story-sub { margin-top: var(--s4); font-size: var(--t-body); color: rgba(255,255,255,.62); text-align: center; }
+.story-big { font-size: var(--t-display); font-weight: 700; text-align: center; }
+.story-verdict { font-size: var(--t-display); font-weight: 700; line-height: 1.15; text-wrap: balance; text-align: center; }
+
+.story-cardin { padding: var(--s5); border-radius: var(--r-hero);
+  background: linear-gradient(160deg, #0f3b34, #06110e); border: 1px solid rgba(255,255,255,.10); }
+.story-cardh b { display: block; font-size: var(--t-section); font-weight: 700; }
+.story-cardh span { display: block; margin-top: 2px; font-size: var(--t-meta); color: rgba(255,255,255,.62); }
+.story-cardmap { margin: var(--s4) 0; }
+.story-cardmap svg { width: 100%; height: auto; display: block; }
+.story-cardmap .rt-line { stroke: rgba(255,255,255,.92); stroke-width: 3; filter: none; }
+.story-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); }
+.story-stk { display: block; font-size: var(--t-label); letter-spacing: .06em; text-transform: uppercase;
+  color: rgba(255,255,255,.55); }
+.story-stv { display: block; margin-top: 2px; font-size: var(--t-card); font-weight: 700; }
+.story-stv i { font-style: normal; margin-left: 2px; font-size: var(--t-meta); font-weight: 500; color: rgba(255,255,255,.62); }
+.story-acts { position: relative; z-index: 5; display: flex; gap: var(--s2); margin-top: var(--s5); }
+.story-acts > button { flex: 1 1 0; min-height: var(--tap); border-radius: var(--r-pill);
+  font: inherit; font-size: var(--t-card); font-weight: 600; cursor: pointer; border: 1px solid transparent; }
+.story-share { color: var(--accent-ink); background: #16b7a4; font-weight: 650; }
+.story-later { color: #fff; background: transparent; border-color: rgba(255,255,255,.28); }
+
 /* ===== THE POST-RUN DEBRIEF (Logbook run page) ================================================
    ⚠️ THE SCREEN OWNS THE WHOLE VIEWPORT. #view carries 16px of padding for every other screen and
    the hero has to reach the edges, so the padding is removed here and re-applied by .rd-sheet. The
@@ -8820,6 +8911,7 @@ function viewRunDetail() {
     '<div class="rd-sheet">' +
       rdTitleHtml(run, v) +
       rdIdentityHtml(run) +
+      rdStoryChipHtml(run) +
       rdMetricsHtml(run, a) +
       rdVerdictHtml(run, a, v) +
       rdEvidenceHtml(run, a, v) +
@@ -14697,7 +14789,9 @@ function routeMapSvg(route, proj, vbW, vbH) {
   const s = xy(route[0]), e = xy(route[route.length - 1]);
   return '<svg class="routemap" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
     routeLogoDefs() +
-    '<path class="rt-line" d="' + d + '"/>' +
+    // pathLength normalises every route to 1 so the story's draw-in animation needs one dash length
+    // rather than measuring each path — and it changes nothing for the static maps.
+    '<path class="rt-line" pathLength="1" d="' + d + '"/>' +
     routeLogoMark(s[0], s[1], r) +
     routeFinishMark(e[0], e[1], r) + '</svg>';
 }
@@ -15776,6 +15870,138 @@ function rdMetaHtml(run) {
   row(ICON.person, "Route privacy", PRIVACY.map ? "Map hidden" : PRIVACY.ends ? "Start and finish hidden" : "Full route", "priv");
   row(ICON.phone, "Stored", "On this iPhone", null);
   return '<h2 class="rd-sec">Details</h2><div class="rd-meta">' + rows.join("") + '</div>' + runNoteHtml(run);
+}
+/* ---- the recap story ------------------------------------------------------------------------
+ * Four panels you swipe through, ending on something worth posting: the route drawing itself, the
+ * kilometres as bars, the coach's read, and the share card.
+ *
+ * ⚠️ EVERY PANEL IS BUILT FROM WHAT THE DEBRIEF ALREADY KNOWS — runAnalysis for the splits,
+ * runVerdict for the read, routeMapFraming for the route. Nothing here computes a fact of its own,
+ * so the story and the screen behind it can never tell the runner two different things.
+ *
+ * ⚠️ IT IS AN OFFER, NOT A GATE. It opens from a thumbnail the runner taps; it never appears on its
+ * own after a run, and closing it costs nothing. A recap that interrupts is a recap people learn to
+ * dismiss without reading.
+ */
+const STORY = { i: 0, n: 4, timer: 0, run: null, a: null, v: null };
+const STORY_MS = 4200;
+
+function rdStoryChipHtml(run) {
+  const pres = runRoutePresentation(run);
+  if (!pres.route) return "";
+  // A small dark thumbnail of the route — the same shape the last panel ends on, so the button
+  // looks like what it opens.
+  const W = 96, H = 96;
+  return '<button class="rd-storychip" id="rdStory" aria-label="Watch a recap of this run">' +
+    '<span class="rd-storychip-m">' + routeMapSvg(pres.route, routeMapFraming(pres.route, W, H).proj, W, H) + '</span>' +
+    '</button>';
+}
+function openRunStory(run) {
+  if (!run) return;
+  const a = runAnalysis(run);
+  STORY.run = run; STORY.a = a; STORY.v = runVerdict(run, a); STORY.i = 0;
+  let ov = $("storyOv");
+  if (!ov) {
+    ov = el('<div class="story-ov" id="storyOv" role="dialog" aria-modal="true" aria-label="Run recap"></div>');
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = storyShellHtml();
+  ov.classList.add("on");
+  wireStory();
+  storyShow(0);
+}
+function storyShellHtml() {
+  const bars = [];
+  for (let i = 0; i < STORY.n; i++) bars.push('<span class="story-bar"><i></i></span>');
+  const run = STORY.run;
+  return '<div class="story-top">' +
+      '<div class="story-bars">' + bars.join("") + '</div>' +
+      '<div class="story-head">' +
+        '<span class="story-mark">' + BRAND_SVG + '</span>' +
+        '<span class="story-h"><b>' + esc(run.t || "Run") + '</b><i>' + esc(rdWhenText(run) || "") + '</i></span>' +
+        '<button class="story-x" id="storyX" aria-label="Close recap">\u00d7</button>' +
+      '</div></div>' +
+    '<div class="story-stage" id="storyStage"></div>' +
+    '<button class="story-tap story-prev" id="storyPrev" aria-label="Previous"></button>' +
+    '<button class="story-tap story-next" id="storyNext" aria-label="Next"></button>';
+}
+/** The panels. Index 3 is the one that ends in an action, so it never auto-advances away. */
+function storyPanelHtml(i) {
+  const run = STORY.run, a = STORY.a, v = STORY.v;
+  if (i === 0) {
+    const pres = runRoutePresentation(run);
+    const W = 320, H = 420;
+    return '<div class="story-p story-route">' +
+      (pres.route ? '<div class="story-map">' + routeMapSvg(pres.route, routeMapFraming(pres.route, W, H).proj, W, H) + '</div>' : "") +
+      '<div class="story-cap"><b class="num">' + esc(String(run.dist || "").replace(" km", "")) + '</b> km' +
+        (run.place ? '<span>' + esc(run.place) + '</span>' : "") + '</div></div>';
+  }
+  if (i === 1) {
+    if (!a.n) return '<div class="story-p"><div class="story-big">' + esc(run.time || "") + '</div>' +
+      '<div class="story-sub">No kilometre splits were recorded for this run.</div></div>';
+    // ⚠️ SCALED ACROSS THE RANGE, NOT FROM ZERO. A well-run easy session has every kilometre within a
+    // few seconds, so bars measured from zero all come out the same length and the panel says
+    // nothing — which is exactly what a consistent run should be MOST able to show. The shortest bar
+    // is 40% so the slowest kilometre still reads as a bar rather than a stub.
+    const secs = a.rows.map((r) => r.sec);
+    const slow = Math.max.apply(null, secs), quick = Math.min.apply(null, secs);
+    const span = Math.max(1, slow - quick);
+    const rows = a.rows.map((r, k) =>
+      '<div class="story-split" style="--w:' + Math.round(40 + 60 * (r.sec - quick) / span) + '%;--d:' + (k * 90) + 'ms">' +
+        '<span class="story-km">' + r.km + '</span><i></i>' +
+        '<span class="story-t num">' + fmtPace(r.sec) + '</span></div>').join("");
+    return '<div class="story-p"><div class="story-splits">' + rows + '</div>' +
+      '<div class="story-sub">Your kilometres, slowest bar longest.</div></div>';
+  }
+  if (i === 2) {
+    return '<div class="story-p"><div class="story-verdict">' + esc(v.headline) + '</div>' +
+      '<div class="story-sub">' + esc(v.body[0] || "") + '</div></div>';
+  }
+  const pres = runRoutePresentation(run);
+  const W = 200, H = 200;
+  const stat = (k, val, u) => '<div class="story-st"><span class="story-stk">' + k + '</span>' +
+    '<span class="story-stv num">' + esc(String(val)) + (u ? '<i>' + u + '</i>' : "") + '</span></div>';
+  return '<div class="story-p story-card"><div class="story-cardin">' +
+      '<div class="story-cardh"><b>' + esc(run.t || "Run") + '</b>' +
+        (run.place ? '<span>' + esc(run.place) + '</span>' : "") + '</div>' +
+      (pres.route ? '<div class="story-cardmap">' + routeMapSvg(pres.route, routeMapFraming(pres.route, W, H).proj, W, H) + '</div>' : "") +
+      '<div class="story-stats">' +
+        stat("Distance", String(run.dist || "").replace(" km", ""), "km") +
+        stat("Time", run.time || "—", "") +
+        stat("Pace", String(run.pace || "").replace(" /km", ""), "/km") +
+      '</div></div>' +
+    '<div class="story-acts"><button class="ap-yes story-share" id="storyShare">Share</button>' +
+      '<button class="ap-no story-later" id="storyLater">Maybe later</button></div></div>';
+}
+function storyShow(i) {
+  STORY.i = Math.max(0, Math.min(STORY.n - 1, i));
+  const stage = $("storyStage"); if (!stage) return;
+  stage.innerHTML = storyPanelHtml(STORY.i);
+  // The route draws itself in; the bars grow. Both are one class added on the next frame, so the
+  // transition has a from-state to run from.
+  requestAnimationFrame(() => { const p = stage.querySelector(".story-p"); if (p) p.classList.add("in"); });
+  document.querySelectorAll(".story-bar").forEach((b, k) => {
+    b.classList.toggle("done", k < STORY.i);
+    b.classList.toggle("live", k === STORY.i);
+  });
+  clearTimeout(STORY.timer);
+  // ⚠️ THE LAST PANEL DOES NOT AUTO-ADVANCE. It ends in a choice, and a screen that closes itself
+  // while somebody is deciding is a screen that decides for them.
+  if (STORY.i < STORY.n - 1) STORY.timer = setTimeout(() => storyShow(STORY.i + 1), STORY_MS);
+  const sh = $("storyShare"); if (sh) sh.onclick = () => { closeRunStory(); openRunShareSheet(STORY.run); };
+  const lt = $("storyLater"); if (lt) lt.onclick = closeRunStory;
+}
+function closeRunStory() {
+  clearTimeout(STORY.timer);
+  const ov = $("storyOv"); if (ov) { ov.classList.remove("on"); ov.innerHTML = ""; }
+}
+function wireStory() {
+  const x = $("storyX"); if (x) x.onclick = closeRunStory;
+  const nx = $("storyNext"); if (nx) nx.onclick = () => {
+    if (STORY.i >= STORY.n - 1) return closeRunStory();
+    storyShow(STORY.i + 1);
+  };
+  const pv = $("storyPrev"); if (pv) pv.onclick = () => storyShow(STORY.i - 1);
 }
 function rdShareHtml(run) {
   // ⚠️ ONE ENTRY POINT. Strava is a destination inside the share sheet, not a second primary button
@@ -18017,6 +18243,9 @@ function wireRunDebrief() {
   // action does not belong beside the coaching.
   const more = $("rdMore");
   if (more) more.onclick = () => openRunMoreSheet(viewedRun());
+
+  const story = $("rdStory");
+  if (story) story.onclick = () => openRunStory(viewedRun());
 
   document.querySelectorAll("[data-rdmeta]").forEach((b) => {
     b.onclick = () => {

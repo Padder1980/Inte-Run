@@ -491,3 +491,66 @@ test("View next run opens the plan, not Today", () => {
   assert.match(handler, /state\.tab = "plan"/, "the next-run action does not open the plan");
   assert.ok(!/state\.tab = "today"/.test(handler), "it still goes to Today");
 });
+
+// ---- the recap story -----------------------------------------------------------------------------
+
+test("every story panel is built from what the debrief already knows", () => {
+  // ⚠️ NOTHING HERE COMPUTES A FACT OF ITS OWN. The story and the screen behind it must never tell
+  // the runner two different things about the same run, so the panels read runAnalysis, runVerdict
+  // and routeMapFraming — the same sources the debrief itself uses.
+  const fn = lift("openRunStory");
+  assert.match(fn, /runAnalysis\(run\)/, "the story recomputes rather than reusing the analysis");
+  assert.match(fn, /runVerdict\(run, a\)/, "the story writes its own verdict");
+  const panels = lift("storyPanelHtml");
+  assert.match(panels, /routeMapFraming\(/, "the story frames the route its own way");
+  assert.match(panels, /runRoutePresentation\(run\)/, "the story ignores route privacy");
+});
+
+test("the split bars are scaled across the range, not from zero", () => {
+  // ⚠️ A well-run easy session has every kilometre within a few seconds. Measured from zero every bar
+  // comes out the same length and the panel says nothing — which is exactly what a consistent run
+  // should be MOST able to show. Measured on a real six-kilometre run: 51/84/40/67/56/100%.
+  const fn = lift("storyPanelHtml");
+  assert.match(fn, /40 \+ 60 \* \(r\.sec - quick\) \/ span/, "the bars are not scaled across the range");
+  assert.ok(!/r\.sec \/ slow \* 100/.test(fn), "the bars are back to measuring from zero");
+});
+
+test("the last panel does not close itself while somebody is deciding", () => {
+  // ⚠️ It ends in a choice — Share or Maybe later. A panel that auto-advances off a decision makes
+  // the decision for them.
+  const fn = lift("storyShow");
+  assert.match(fn, /if \(STORY\.i < STORY\.n - 1\) STORY\.timer = setTimeout/,
+    "the final panel still auto-advances");
+  assert.match(fn, /clearTimeout\(STORY\.timer\)/, "advancing does not cancel the previous timer");
+});
+
+test("the story is an offer, not something that happens to you", () => {
+  // ⚠️ It opens from a thumbnail the runner taps. It must never appear on its own after a run: a
+  // recap that interrupts is one people learn to dismiss without reading.
+  const html = page();
+  assert.match(lift("wireRunDebrief"), /\$\("rdStory"\)/, "the story has no entry point");
+  const auto = (html.match(/openRunStory\(/g) || []).length;
+  assert.equal(auto, 2, "openRunStory should be defined once and called from exactly one tap handler");
+  // Share hands off to the existing sheet rather than growing a second share path.
+  assert.match(lift("storyShow"), /openRunShareSheet\(STORY\.run\)/, "the story has its own share flow");
+});
+
+test("the tap zones cannot swallow the buttons on the last panel", () => {
+  // ⚠️ A full-width invisible "next" over a panel that has real actions on it eats every tap on
+  // Share — the control would look live and do the wrong thing, which is the dead-button class of
+  // defect this file already records twice.
+  const html = page();
+  const tap = html.slice(html.indexOf(".story-tap {"), html.indexOf("}", html.indexOf(".story-tap {")));
+  const acts = html.slice(html.indexOf(".story-acts {"), html.indexOf("}", html.indexOf(".story-acts {")));
+  const z = (s: string) => Number((s.match(/z-index:\s*(\d+)/) || [])[1] || 0);
+  assert.ok(z(acts) > z(tap), "the actions sit under the tap zones (" + z(acts) + " vs " + z(tap) + ")");
+});
+
+test("Reduce Motion removes the drawing, not the story", () => {
+  const html = page();
+  for (const sel of [".story-route.in .rt-line", ".story-p.in .story-split i", ".story-bar.live i"]) {
+    assert.ok(html.includes(sel), "missing animated rule: " + sel);
+  }
+  const rm = html.match(/@media \(prefers-reduced-motion: reduce\) \{[^}]*story[^}]*\}/g) || [];
+  assert.ok(rm.length >= 3, "Reduce Motion does not cover the story animations (" + rm.length + " blocks)");
+});

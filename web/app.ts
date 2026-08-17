@@ -17998,7 +17998,10 @@ function wireRunDebrief() {
   });
 
   const next = $("rdNext");
-  if (next) next.onclick = () => { state.screen = null; state.tab = "today"; render(); };
+  // ⚠️ THE PLAN, NOT TODAY. "View next run" is about what comes NEXT, and Today is by definition the
+  // session that has just been run — so it landed the runner back on the thing they had just
+  // finished. The plan is where the sessions ahead of them are.
+  if (next) next.onclick = () => { state.screen = null; state.tab = "plan"; render(); };
 
   const share = $("rdShare");
   if (share) share.onclick = () => openRunShareSheet(viewedRun());

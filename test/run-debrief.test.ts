@@ -476,3 +476,18 @@ test("a real prescription row cannot push the page sideways", () => {
   assert.ok(!/flex: 0 0 auto/.test(t), "the target line is back to refusing to shrink");
   assert.match(t, /overflow-wrap: anywhere/, "a single long token could still overflow");
 });
+
+test("View next run opens the plan, not Today", () => {
+  // ⚠️ Today is by definition the session that has just been run, so sending the runner there after
+  // a debrief lands them back on the thing they have just finished. The sessions AHEAD of them are
+  // on the plan.
+  // ⚠️ COMMENTS STRIPPED BEFORE SLICING. A character window is not a statement: the explanation
+  // above this handler is longer than the window was, so the code it was meant to check fell outside
+  // it and the guard failed on correct code. This project has recorded the same trap three times.
+  const fn = lift("wireRunDebrief").replace(/^\s*\/\/.*$/gm, "");
+  const at = fn.indexOf('$("rdNext")');
+  assert.ok(at > 0, "the next-run action is not wired");
+  const handler = fn.slice(at, at + 200);
+  assert.match(handler, /state\.tab = "plan"/, "the next-run action does not open the plan");
+  assert.ok(!/state\.tab = "today"/.test(handler), "it still goes to Today");
+});

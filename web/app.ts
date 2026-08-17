@@ -3054,11 +3054,9 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
    ⚠️ ONE OWNER PER ANIMATED PROPERTY, which is the lesson the hero's two opacity layers already
    paid for. Each panel animates via a single .in class added a frame after it is inserted; nothing
    here writes an inline style that a class then tries to override. */
-.rd-storychip { display: block; width: 88px; height: 88px; padding: 0; margin: 0;
-  background: #0b1a17; border: 1px solid var(--line); border-radius: var(--r-card);
-  overflow: hidden; cursor: pointer; }
-.rd-storychip-m { display: block; width: 100%; height: 100%; }
-.rd-storychip svg { width: 100%; height: 100%; display: block; }
+.rd-id-story { padding: 0; background: none; border: 0; cursor: pointer; text-align: left; font: inherit; }
+.rd-id-story .rd-id-ic { color: var(--accent); }
+.rd-id-story .rd-id-t { color: var(--accent); }
 
 .story-ov { position: fixed; inset: 0; z-index: 90; display: none; background: #06110e; color: #fff; }
 .story-ov.on { display: block; }
@@ -3068,7 +3066,7 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .story-bar { flex: 1 1 0; height: 3px; border-radius: var(--r-pill); background: rgba(255,255,255,.26); overflow: hidden; }
 .story-bar i { display: block; width: 0; height: 100%; background: #fff; }
 .story-bar.done i { width: 100%; }
-.story-bar.live i { width: 100%; transition: width 4.2s linear; }
+.story-bar.live i { width: 100%; transition: width 4.6s linear; }
 @media (prefers-reduced-motion: reduce) { .story-bar.live i { transition: none; } }
 .story-head { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) 0; }
 .story-mark { display: block; width: 28px; height: 28px; flex: 0 0 auto; }
@@ -3080,60 +3078,89 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
   font: inherit; font-size: var(--t-hero); line-height: 1; color: #fff;
   background: none; border: 0; cursor: pointer; }
 
-.story-stage { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  padding: calc(96px + env(safe-area-inset-top, 0px)) var(--s5) calc(40px + env(safe-area-inset-bottom, 0px)); }
+.story-stage { position: absolute; inset: 0; }
 /* ⚠️ THE TAP ZONES SIT ABOVE THE PANEL BUT BELOW ITS BUTTONS — the last panel has real actions on it,
    and a full-width invisible "next" over them would swallow every tap on Share. */
 .story-tap { position: absolute; top: 0; bottom: 0; width: 34%; z-index: 2;
   background: none; border: 0; padding: 0; margin: 0; cursor: pointer; }
 .story-prev { left: 0; }
 .story-next { right: 0; width: 66%; }
-.story-p { position: relative; z-index: 4; width: 100%; max-width: 360px;
-  opacity: 0; transform: translateY(8px); }
-.story-p.in { opacity: 1; transform: none; transition: opacity .45s ease, transform .45s ease; }
-@media (prefers-reduced-motion: reduce) {
-  .story-p { transform: none; }
-  .story-p.in { transition: opacity .2s linear; }
-}
+/* ⚠️ FULL-BLEED. The first version centred a 360px box on black and read as a dialog rather than a
+   moment. The visual owns the screen; the words sit over a fade at the bottom. */
+.story-p { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column;
+  justify-content: flex-end; opacity: 0; }
+.story-p.in { opacity: 1; transition: opacity .4s ease; }
+/* ⚠️ THE MOOD FOLLOWS THE VERDICT rather than being one fixed colour. An "ease off" panel glowing
+   the same triumphant green as a perfect one is the screen disagreeing with its own words. */
+.story-ov { --story-a: #16b7a4; --story-b: #0a6f64; }
+.story-ov.mood-caution { --story-a: #eb9748; --story-b: #8a4a1c; }
+.story-ov.mood-insufficientData { --story-a: #5b6b64; --story-b: #26332e; }
+.story-p::before { content: ""; position: absolute; inset: 0; z-index: -2;
+  background: radial-gradient(120% 80% at 70% 12%, var(--story-a) 0%, var(--story-b) 46%, #06110e 100%); }
+.story-p::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 62%; z-index: -1;
+  background: linear-gradient(to bottom, transparent, #06110e 82%); pointer-events: none; }
+.story-route::before { background: #06110e; }
 
-.story-map { width: 100%; }
-.story-map svg { width: 100%; height: auto; display: block; }
-/* The route draws itself. pathLength normalises every route to 1, so one dash length works for all. */
-.story-route .rt-line { stroke: #16b7a4; stroke-width: 4; filter: none;
+.story-map { position: absolute; inset: 0; z-index: -1; }
+.story-map svg { width: 100%; height: 100%; display: block; }
+.story-route .rt-line { stroke: #16b7a4; stroke-width: 5; filter: none;
   stroke-dasharray: 1; stroke-dashoffset: 1; }
-.story-route.in .rt-line { stroke-dashoffset: 0; transition: stroke-dashoffset 2.1s ease-out; }
+.story-route.in .rt-line { stroke-dashoffset: 0; transition: stroke-dashoffset 2.2s ease-out; }
 @media (prefers-reduced-motion: reduce) {
   .story-route .rt-line { stroke-dashoffset: 0; }
   .story-route.in .rt-line { transition: none; }
 }
-.story-cap { margin-top: var(--s5); text-align: center; font-size: var(--t-section); }
-.story-cap b { font-size: var(--t-display); font-weight: 700; }
-.story-cap span { display: block; margin-top: 4px; font-size: var(--t-body); color: rgba(255,255,255,.62); }
+.story-hstats { position: absolute; left: 0; right: 0; z-index: 2;
+  top: calc(96px + env(safe-area-inset-top, 0px)); display: grid; grid-template-columns: repeat(3, 1fr);
+  padding: 0 var(--s5); text-align: center; }
+.story-hsk { display: block; font-size: var(--t-label); letter-spacing: .06em; text-transform: uppercase;
+  color: rgba(255,255,255,.58); }
+.story-hsv { display: block; margin-top: 2px; font-size: var(--t-hero); font-weight: 700; }
+.story-hsv i { font-style: normal; margin-left: 2px; font-size: var(--t-meta); font-weight: 500; color: rgba(255,255,255,.62); }
 
-.story-splits { display: flex; flex-direction: column; gap: var(--s2); }
-.story-split { display: flex; align-items: center; gap: var(--s3); font-size: var(--t-body); }
-.story-km { flex: 0 0 auto; width: 18px; color: rgba(255,255,255,.62); }
-.story-split i { flex: 1 1 auto; height: 26px; border-radius: var(--r-ctl);
-  background: linear-gradient(90deg, #16b7a4, #0a6f64); width: 0; }
-.story-p.in .story-split i { width: var(--w); transition: width .7s ease-out var(--d); }
-@media (prefers-reduced-motion: reduce) { .story-p.in .story-split i { transition: none; } }
-.story-t { flex: 0 0 auto; width: 48px; text-align: right; font-weight: 650; }
-.story-sub { margin-top: var(--s4); font-size: var(--t-body); color: rgba(255,255,255,.62); text-align: center; }
-.story-big { font-size: var(--t-display); font-weight: 700; text-align: center; }
-.story-verdict { font-size: var(--t-display); font-weight: 700; line-height: 1.15; text-wrap: balance; text-align: center; }
+/* ⚠️ THE STATEMENT LEADS AND THE QUALIFIER FOLLOWS IT QUIETLY — the structure that makes the
+   reference's panels read as coaching rather than as a readout. Left-aligned, because a centred
+   sentence of this length is harder to scan. */
+.story-say { position: relative; z-index: 2; padding: 0 var(--s5) calc(46px + env(safe-area-inset-bottom, 0px)); }
+.story-big { font-size: var(--t-hero); font-weight: 700; line-height: 1.22; text-wrap: balance; }
+.story-sub { margin-top: var(--s2); font-size: var(--t-body); color: rgba(255,255,255,.62); }
 
-.story-cardin { padding: var(--s5); border-radius: var(--r-hero);
-  background: linear-gradient(160deg, #0f3b34, #06110e); border: 1px solid rgba(255,255,255,.10); }
-.story-cardh b { display: block; font-size: var(--t-section); font-weight: 700; }
-.story-cardh span { display: block; margin-top: 2px; font-size: var(--t-meta); color: rgba(255,255,255,.62); }
+.story-splits { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 7px;
+  padding: calc(104px + env(safe-area-inset-top, 0px)) var(--s5) var(--s5); margin-top: auto; }
+.story-split { position: relative; display: flex; align-items: center; justify-content: space-between;
+  min-height: 44px; padding: 0 var(--s4); border-radius: var(--r-ctl); width: 0;
+  background: rgba(255,255,255,.20); font-size: var(--t-body); font-weight: 600; white-space: nowrap; }
+.story-split.ok { background: rgba(255,255,255,.34); }
+.story-p.in .story-split { width: var(--w); transition: width .65s ease-out var(--d); }
+@media (prefers-reduced-motion: reduce) { .story-p.in .story-split { transition: none; } }
+.story-km { color: rgba(255,255,255,.78); }
+.story-t { font-weight: 700; }
+
+.story-hr { position: relative; z-index: 2; margin-top: auto;
+  padding: calc(110px + env(safe-area-inset-top, 0px)) var(--s5) 0; }
+.story-hrsvg { width: 100%; height: auto; display: block; overflow: visible; }
+.story-hrfill { fill: rgba(255,255,255,.16); }
+.story-hrline { fill: none; stroke: #fff; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.story-hrdot { fill: #fff; }
+.story-ax { fill: rgba(255,255,255,.62); font-size: 11px; font-family: var(--fig); }
+.story-axl { stroke: rgba(255,255,255,.32); stroke-width: 1; }
+
+.story-card { justify-content: center; padding: calc(92px + env(safe-area-inset-top, 0px)) var(--s5)
+  calc(28px + env(safe-area-inset-bottom, 0px)); }
+.story-cardin { position: relative; z-index: 2; padding: var(--s5); border-radius: var(--r-hero);
+  background: linear-gradient(155deg, var(--story-a), var(--story-b)); overflow: hidden; }
+.story-cardmark { position: absolute; top: var(--s4); right: var(--s4); width: 26px; height: 26px; opacity: .85; }
+.story-cardmark svg { width: 100%; height: 100%; }
+.story-cardh b { display: block; font-size: var(--t-section); font-weight: 700; padding-right: 34px; }
+.story-cardh span { display: block; margin-top: 2px; font-size: var(--t-meta); color: rgba(255,255,255,.72); }
 .story-cardmap { margin: var(--s4) 0; }
 .story-cardmap svg { width: 100%; height: auto; display: block; }
-.story-cardmap .rt-line { stroke: rgba(255,255,255,.92); stroke-width: 3; filter: none; }
-.story-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); }
+.story-cardmap .rt-line { stroke: rgba(255,255,255,.94); stroke-width: 3; filter: none; }
+.story-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s4) var(--s2); }
 .story-stk { display: block; font-size: var(--t-label); letter-spacing: .06em; text-transform: uppercase;
-  color: rgba(255,255,255,.55); }
+  color: rgba(255,255,255,.66); }
 .story-stv { display: block; margin-top: 2px; font-size: var(--t-card); font-weight: 700; }
-.story-stv i { font-style: normal; margin-left: 2px; font-size: var(--t-meta); font-weight: 500; color: rgba(255,255,255,.62); }
+.story-stv i { font-style: normal; margin-left: 2px; font-size: var(--t-meta); font-weight: 500; color: rgba(255,255,255,.72); }
 .story-acts { position: relative; z-index: 5; display: flex; gap: var(--s2); margin-top: var(--s5); }
 .story-acts > button { flex: 1 1 0; min-height: var(--tap); border-radius: var(--r-pill);
   font: inherit; font-size: var(--t-card); font-weight: 600; cursor: pointer; border: 1px solid transparent; }
@@ -8911,7 +8938,6 @@ function viewRunDetail() {
     '<div class="rd-sheet">' +
       rdTitleHtml(run, v) +
       rdIdentityHtml(run) +
-      rdStoryChipHtml(run) +
       rdMetricsHtml(run, a) +
       rdVerdictHtml(run, a, v) +
       rdEvidenceHtml(run, a, v) +
@@ -15600,7 +15626,8 @@ function rdIdentityHtml(run) {
     rows.push('<a class="rd-id-r rd-id-strava" href="https://www.strava.com/activities/' + esc(run.strava.id) +
       '" target="_blank" rel="noopener"><span class="rd-id-ic">' + RD_STRAVA + '</span><span class="rd-id-t">View on Strava</span></a>');
   }
-  return '<div class="rd-identity">' + rows.join("") + '</div>';
+  rows.push(rdStoryChipHtml(run));
+  return '<div class="rd-identity">' + rows.filter(Boolean).join("") + '</div>';
 }
 /**
  * Where the run happened, in words. Looked up once and kept on the run for ever after.
@@ -15884,28 +15911,44 @@ function rdMetaHtml(run) {
  * dismiss without reading.
  */
 const STORY = { i: 0, n: 4, timer: 0, run: null, a: null, v: null };
-const STORY_MS = 4200;
+/** ⚠️ The heart-rate panel exists only when there is a series to draw. A panel that says "no data"
+ *  is a panel nobody wanted; the story is shorter instead, which nobody notices. */
+function storyPanelCount(run) {
+  const hasHr = run && run.avgHr && Array.isArray(run.hrSeries) && run.hrSeries.length >= 3;
+  return hasHr ? 5 : 4;
+}
+const STORY_MS = 4600;   // must equal the .story-bar.live transition, or the bar lies about the wait
 
+/**
+ * ⚠️ A ROW, NOT A TILE. The first version was an 88px dark thumbnail sitting on a light page, and the
+ * owner's verdict was "cheap and nasty and far too dominating" — correct on both counts: it was the
+ * heaviest object on a screen whose whole point is that the coaching leads. This is the same shape
+ * as the rest of the identity block, so it reads as one more fact about the run rather than a
+ * competing advert for a feature.
+ */
 function rdStoryChipHtml(run) {
   const pres = runRoutePresentation(run);
   if (!pres.route) return "";
-  // A small dark thumbnail of the route — the same shape the last panel ends on, so the button
-  // looks like what it opens.
-  const W = 96, H = 96;
-  return '<button class="rd-storychip" id="rdStory" aria-label="Watch a recap of this run">' +
-    '<span class="rd-storychip-m">' + routeMapSvg(pres.route, routeMapFraming(pres.route, W, H).proj, W, H) + '</span>' +
-    '</button>';
+  return '<button class="rd-id-r rd-id-story" id="rdStory">' +
+    '<span class="rd-id-ic">' + RD_PLAY + '</span>' +
+    '<span class="rd-id-t">Watch the recap</span></button>';
 }
+const RD_PLAY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10 8.5 16 12l-6 3.5Z" fill="currentColor"/></svg>';
 function openRunStory(run) {
   if (!run) return;
   const a = runAnalysis(run);
   STORY.run = run; STORY.a = a; STORY.v = runVerdict(run, a); STORY.i = 0;
+  STORY.n = storyPanelCount(run);
   let ov = $("storyOv");
   if (!ov) {
     ov = el('<div class="story-ov" id="storyOv" role="dialog" aria-modal="true" aria-label="Run recap"></div>');
     document.body.appendChild(ov);
   }
   ov.innerHTML = storyShellHtml();
+  // ⚠️ APPLIED, NOT JUST DECLARED. A palette defined and never set is the computed-and-discarded trap
+  // this project records four times; the caution mood exists so a cautious verdict does not glow the
+  // same triumphant green as a perfect run.
+  ov.className = "story-ov mood-" + STORY.v.state;
   ov.classList.add("on");
   wireStory();
   storyShow(0);
@@ -15925,53 +15968,115 @@ function storyShellHtml() {
     '<button class="story-tap story-prev" id="storyPrev" aria-label="Previous"></button>' +
     '<button class="story-tap story-next" id="storyNext" aria-label="Next"></button>';
 }
-/** The panels. Index 3 is the one that ends in an action, so it never auto-advances away. */
+/**
+ * The panels.
+ *
+ * ⚠️ EACH ONE IS A STATEMENT WITH ITS EVIDENCE ABOVE IT — the shape the reference uses and the reason
+ * its panels read rather than merely display. A number on its own is a readout; a number under a
+ * sentence that says what it means is coaching, which is what this app is for.
+ *
+ * ⚠️ FULL-BLEED, NOT A CARD IN THE MIDDLE. The first version centred a 360px box on black and looked
+ * like a dialog. The visual is the whole screen; the words sit over a fade at the bottom.
+ */
+function storyStatement(big, sub) {
+  return '<div class="story-say"><div class="story-big">' + esc(big) + '</div>' +
+    (sub ? '<div class="story-sub">' + esc(sub) + '</div>' : "") + '</div>';
+}
 function storyPanelHtml(i) {
   const run = STORY.run, a = STORY.a, v = STORY.v;
+  const pres = runRoutePresentation(run);
   if (i === 0) {
-    const pres = runRoutePresentation(run);
-    const W = 320, H = 420;
+    // The route on its own map, with the three numbers that answer "what was this run".
+    const W = 380, H = 760;
+    const stat = (k, val, u) => '<div class="story-hs"><span class="story-hsk">' + k + '</span>' +
+      '<span class="story-hsv num">' + esc(String(val)) + (u ? '<i>' + u + '</i>' : "") + '</span></div>';
     return '<div class="story-p story-route">' +
       (pres.route ? '<div class="story-map">' + routeMapSvg(pres.route, routeMapFraming(pres.route, W, H).proj, W, H) + '</div>' : "") +
-      '<div class="story-cap"><b class="num">' + esc(String(run.dist || "").replace(" km", "")) + '</b> km' +
-        (run.place ? '<span>' + esc(run.place) + '</span>' : "") + '</div></div>';
+      '<div class="story-hstats">' +
+        stat("Distance", String(run.dist || "").replace(" km", ""), "km") +
+        stat("Time", run.time || "\u2014", "") +
+        stat("Pace", String(run.pace || "").replace(" /km", ""), "/km") +
+      '</div>' +
+      storyStatement(run.t || "Your run", run.place || rdWhenText(run) || "") + '</div>';
   }
   if (i === 1) {
-    if (!a.n) return '<div class="story-p"><div class="story-big">' + esc(run.time || "") + '</div>' +
-      '<div class="story-sub">No kilometre splits were recorded for this run.</div></div>';
-    // ⚠️ SCALED ACROSS THE RANGE, NOT FROM ZERO. A well-run easy session has every kilometre within a
-    // few seconds, so bars measured from zero all come out the same length and the panel says
-    // nothing — which is exactly what a consistent run should be MOST able to show. The shortest bar
-    // is 40% so the slowest kilometre still reads as a bar rather than a stub.
+    if (!a.n) {
+      return '<div class="story-p">' + storyStatement("You were out for " + (run.time || ""),
+        "No kilometre splits were recorded for this one.") + '</div>';
+    }
+    // ⚠️ FASTER IS LONGER. The reference draws it this way and it is the right way round: a longer
+    // bar reading as a quicker kilometre needs no legend, where "slowest bar longest" has to be
+    // explained in a caption — which is what the first version did.
     const secs = a.rows.map((r) => r.sec);
     const slow = Math.max.apply(null, secs), quick = Math.min.apply(null, secs);
     const span = Math.max(1, slow - quick);
-    const rows = a.rows.map((r, k) =>
-      '<div class="story-split" style="--w:' + Math.round(40 + 60 * (r.sec - quick) / span) + '%;--d:' + (k * 90) + 'ms">' +
-        '<span class="story-km">' + r.km + '</span><i></i>' +
-        '<span class="story-t num">' + fmtPace(r.sec) + '</span></div>').join("");
+    const last = a.rows.length - 1;
+    const rows = a.rows.map((r, k) => {
+      // ⚠️ The final kilometre is usually a PART one; labelling it "6" when it was 510 m overstates
+      // it. The reference labels it by its distance, which is the honest thing to print.
+      const partial = k === last && run.distKm > 0 && (run.distKm - Math.floor(run.distKm)) > 0.08;
+      const label = partial ? (Math.round((run.distKm - Math.floor(run.distKm)) * 100) / 100).toFixed(2) : String(r.km);
+      return '<div class="story-split' + (r.verdict === "in" ? " ok" : "") +
+        '" style="--w:' + Math.round(46 + 54 * (slow - r.sec) / span) + '%;--d:' + (k * 85) + 'ms">' +
+        '<span class="story-km">' + esc(label) + '</span>' +
+        '<span class="story-t num">' + fmtPace(r.sec) + '</span></div>';
+    }).join("");
+    const inBand = a.band ? a.inBand + " of " + a.n + " kilometres inside the target band." : "";
     return '<div class="story-p"><div class="story-splits">' + rows + '</div>' +
-      '<div class="story-sub">Your kilometres, slowest bar longest.</div></div>';
+      storyStatement("You ran " + (run.dist || "") + " at an average of " + (run.pace || ""),
+        inBand || "Longer bar, quicker kilometre.") + '</div>';
   }
-  if (i === 2) {
-    return '<div class="story-p"><div class="story-verdict">' + esc(v.headline) + '</div>' +
-      '<div class="story-sub">' + esc(v.body[0] || "") + '</div></div>';
+  if (i === 2 && run.avgHr) {
+    return '<div class="story-p"><div class="story-hr">' + storyHrSvg(run) + '</div>' +
+      storyStatement("Your average heart rate was " + Math.round(run.avgHr) + " bpm",
+        run.maxHr ? "Reaching a max of " + Math.round(run.maxHr) + " bpm" : "") + '</div>';
   }
-  const pres = runRoutePresentation(run);
-  const W = 200, H = 200;
+  if (i === STORY.n - 2) {
+    return '<div class="story-p story-verdictp">' +
+      storyStatement(v.headline, v.body[0] || "") + '</div>';
+  }
+  const W = 220, H = 220;
   const stat = (k, val, u) => '<div class="story-st"><span class="story-stk">' + k + '</span>' +
     '<span class="story-stv num">' + esc(String(val)) + (u ? '<i>' + u + '</i>' : "") + '</span></div>';
+  const extra = [];
+  if (run.avgHr) extra.push(stat("Heart rate", Math.round(run.avgHr), "bpm"));
+  if (run.elevGain > 0) extra.push(stat("Elevation", Math.round(run.elevGain), "m"));
+  if (run.cadence) extra.push(stat("Cadence", Math.round(run.cadence), "spm"));
   return '<div class="story-p story-card"><div class="story-cardin">' +
       '<div class="story-cardh"><b>' + esc(run.t || "Run") + '</b>' +
         (run.place ? '<span>' + esc(run.place) + '</span>' : "") + '</div>' +
       (pres.route ? '<div class="story-cardmap">' + routeMapSvg(pres.route, routeMapFraming(pres.route, W, H).proj, W, H) + '</div>' : "") +
       '<div class="story-stats">' +
         stat("Distance", String(run.dist || "").replace(" km", ""), "km") +
-        stat("Time", run.time || "—", "") +
         stat("Pace", String(run.pace || "").replace(" /km", ""), "/km") +
-      '</div></div>' +
-    '<div class="story-acts"><button class="ap-yes story-share" id="storyShare">Share</button>' +
-      '<button class="ap-no story-later" id="storyLater">Maybe later</button></div></div>';
+        stat("Time", run.time || "\u2014", "") +
+        extra.join("") +
+      '</div>' +
+      '<span class="story-cardmark">' + BRAND_SVG + '</span>' +
+    '</div>' +
+    '<div class="story-acts"><button class="story-share" id="storyShare">Share</button>' +
+      '<button class="story-later" id="storyLater">Maybe later</button></div></div>';
+}
+/** Heart rate as a filled area, with the axis labelled — a chart, not a decoration. */
+function storyHrSvg(run) {
+  const series = Array.isArray(run.hrSeries) ? run.hrSeries.filter((p) => p && p.length === 2) : [];
+  const W = 320, H = 300;
+  if (series.length < 3) return "";
+  const bpm = series.map((p) => p[1]);
+  const lo = Math.min.apply(null, bpm), hi = Math.max.apply(null, bpm);
+  const pad = Math.max(6, (hi - lo) * 0.25);
+  const y0 = lo - pad, y1 = hi + pad;
+  const mx = series[series.length - 1][0] || 1;
+  const X = (m) => (m / mx) * W, Y = (b) => H - ((b - y0) / (y1 - y0)) * H;
+  const d = series.map((p, k) => (k ? "L" : "M") + X(p[0]).toFixed(1) + " " + Y(p[1]).toFixed(1)).join(" ");
+  const ticks = [Math.round(y1), Math.round((y0 + y1) / 2), Math.round(y0)]
+    .map((b) => '<text x="0" y="' + (Y(b) - 4).toFixed(1) + '" class="story-ax">' + b + 'bpm</text>' +
+      '<line x1="0" y1="' + Y(b).toFixed(1) + '" x2="18" y2="' + Y(b).toFixed(1) + '" class="story-axl"/>').join("");
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" class="story-hrsvg" role="img" aria-label="Heart rate across the run">' +
+    '<path class="story-hrfill" d="' + d + ' L ' + W + ' ' + H + ' L 0 ' + H + ' Z"/>' +
+    '<path class="story-hrline" d="' + d + '"/>' +
+    '<circle class="story-hrdot" cx="' + X(series[series.length - 1][0]).toFixed(1) + '" cy="' +
+      Y(series[series.length - 1][1]).toFixed(1) + '" r="5"/>' + ticks + '</svg>';
 }
 function storyShow(i) {
   STORY.i = Math.max(0, Math.min(STORY.n - 1, i));

@@ -511,8 +511,13 @@ test("the split bars are scaled across the range, not from zero", () => {
   // comes out the same length and the panel says nothing — which is exactly what a consistent run
   // should be MOST able to show. Measured on a real six-kilometre run: 51/84/40/67/56/100%.
   const fn = lift("storyPanelHtml");
-  assert.match(fn, /40 \+ 60 \* \(r\.sec - quick\) \/ span/, "the bars are not scaled across the range");
+  // ⚠️ AND FASTER IS LONGER. A longer bar reading as a quicker kilometre needs no legend; the first
+  // version had it the other way round and needed a caption to explain itself, which is a sign the
+  // picture was not carrying its own meaning.
+  assert.match(fn, /46 \+ 54 \* \(slow - r\.sec\) \/ span/, "the bars are not scaled across the range, fastest longest");
   assert.ok(!/r\.sec \/ slow \* 100/.test(fn), "the bars are back to measuring from zero");
+  // ⚠️ The final kilometre is usually a PART one; labelling it by index overstates it.
+  assert.match(fn, /run\.distKm - Math\.floor\(run\.distKm\)/, "a partial last kilometre is labelled as a whole one");
 });
 
 test("the last panel does not close itself while somebody is deciding", () => {
@@ -548,7 +553,7 @@ test("the tap zones cannot swallow the buttons on the last panel", () => {
 
 test("Reduce Motion removes the drawing, not the story", () => {
   const html = page();
-  for (const sel of [".story-route.in .rt-line", ".story-p.in .story-split i", ".story-bar.live i"]) {
+  for (const sel of [".story-route.in .rt-line", ".story-p.in .story-split", ".story-bar.live i"]) {
     assert.ok(html.includes(sel), "missing animated rule: " + sel);
   }
   const rm = html.match(/@media \(prefers-reduced-motion: reduce\) \{[^}]*story[^}]*\}/g) || [];

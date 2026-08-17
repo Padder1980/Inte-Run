@@ -3080,7 +3080,9 @@ html.rd-open .view { padding: 0; }
 .rd-hero { position: relative; margin-top: calc(-1 * (var(--tap) + 16px + env(safe-area-inset-top, 0px)));
   height: 49dvh; min-height: 260px; overflow: hidden; }
 .rd-map { position: absolute; inset: 0; }
-.rd-map svg, .rd-map img, .rd-map canvas { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* The composite is now made at the hero's own aspect, so nothing needs cropping or stretching —
+   object-fit here would only paper over a mismatch that should not exist. */
+.rd-map svg, .rd-map img, .rd-map canvas { width: 100%; height: 100%; display: block; }
 /* ⚠️ THE BLEND IS WHAT REMOVES THE CARD EDGE. Without it the map stops on a hard line and the hero
    reads as a picture in a box, which is the single thing the design is most insistent about. */
 .rd-fade { position: absolute; left: 0; right: 0; bottom: 0; height: 96px; pointer-events: none;
@@ -14653,18 +14655,35 @@ function routeMapSvg(route, proj, vbW, vbH) {
 const OVMAP_W = 700, OVMAP_H = 420;
 // Enhance an .ov-map container with a real street map behind the route (async). If tiles can't load
 // (offline / sandbox), the marching-ants fallback already in the container stays.
-function buildOverviewMap(container, route) {
+/**
+ * @param pw,ph  Optional pixel size to composite at. Defaults to the legacy card's 700x420.
+ *
+ * ⚠️ THE MAP MUST BE COMPOSITED AT THE SHAPE OF THE BOX IT GOES IN. The debrief hero is nearly
+ * square (440x467 on a 16 Pro Max) and this used to hand back a 700x420 image whatever asked for it.
+ * The canvas then covered its box — cropped, scale 1.11 — while the route overlay, whose SVG carries
+ * preserveAspectRatio="none", STRETCHED to fill the same box at scale 0.63. Two different transforms
+ * over one picture: the line came out squashed sideways and pulled vertically, and it no longer sat
+ * on the streets it was run on. Reported as "slightly stretched or distorted", which it was.
+ *
+ * ⚠️ THE SIZE IS QUANTISED TO 20px BECAUSE IT IS PART OF THE CACHE KEY. Keyed on the raw measurement,
+ * every device width and every rotation would mint its own stored picture, and MAPCACHE_MAX would
+ * evict real entries to hold near-duplicates of one run.
+ */
+function buildOverviewMap(container, route, pw, ph) {
   if (!container || !route || route.length < 2) return;
-  routeMapFor(route, OVMAP_W, OVMAP_H, MAP_STYLE_RUN).then((md) => {
+  const q = (n) => Math.max(120, Math.round(n / 20) * 20);
+  const W = pw > 0 && ph > 0 ? q(pw) : OVMAP_W;
+  const H = pw > 0 && ph > 0 ? q(ph) : OVMAP_H;
+  routeMapFor(route, W, H, MAP_STYLE_RUN).then((md) => {
     if (!container.isConnected) return;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const cv = document.createElement("canvas"); cv.width = OVMAP_W * dpr; cv.height = OVMAP_H * dpr;
+    const cv = document.createElement("canvas"); cv.width = W * dpr; cv.height = H * dpr;
     cv.className = "ov-mapcv";
     const g = cv.getContext("2d"); g.scale(dpr, dpr);
-    g.fillStyle = "#eef1ee"; g.fillRect(0, 0, OVMAP_W, OVMAP_H);
+    g.fillStyle = "#eef1ee"; g.fillRect(0, 0, W, H);
     // One image now, cached or freshly composited — the caller cannot tell which, which is the point.
-    try { g.drawImage(md.image, 0, 0, OVMAP_W, OVMAP_H); } catch (e) {}
-    const overlay = routeMapSvg(route, md.proj, OVMAP_W, OVMAP_H);
+    try { g.drawImage(md.image, 0, 0, W, H); } catch (e) {}
+    const overlay = routeMapSvg(route, md.proj, W, H);
     container.classList.add("ov-light");
     container.innerHTML = "";
     container.appendChild(cv);
@@ -17928,7 +17947,10 @@ function wire() {
   // the route ON A MAP, and buildOverviewMap is the one function that fetches and caches those tiles.
   const rdMap = $("rdMap");
   if (rdMap && rdMap.getAttribute("data-route") === "1") {
-    const r = viewedRun(); if (r) buildOverviewMap(rdMap, runRoutePresentation(r).route);
+    const r = viewedRun();
+    // Measured after the markup is in the document, so the hero's real box is known.
+    const b = rdMap.getBoundingClientRect();
+    if (r) buildOverviewMap(rdMap, runRoutePresentation(r).route, b.width, b.height);
   }
   wireRunDebrief();
   const shareRun = $("shareRun"); if (shareRun) { shareRun.onclick = doShareRun; prepareShareCard(currentOverviewRun()); }

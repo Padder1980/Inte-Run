@@ -273,3 +273,26 @@ test("the overflow offers the run's own actions, and delete leaves the screen", 
   // before an action that is already reversible.
   assert.match(lift("deleteRun"), /toastUndo/, "delete is no longer undoable, so it now needs a confirm step");
 });
+
+test("the hero map is composited at the hero's own shape, not a fixed 700x420", () => {
+  // ⚠️ THE ROUTE CAME OUT STRETCHED, AND IT WAS TWO TRANSFORMS OVER ONE PICTURE. The composite was
+  // always 700x420 (wide); the hero is nearly square. The canvas then COVERED its box — cropped,
+  // scale 1.11 — while the route overlay, whose SVG carries preserveAspectRatio="none", STRETCHED to
+  // fill the same box at scale 0.63. Squashed sideways, pulled vertically, and off the streets.
+  // Matching the aspect at composite time is what removes both, rather than hiding one behind
+  // object-fit.
+  const fn = lift("buildOverviewMap");
+  assert.match(fn, /function buildOverviewMap\(container, route, pw, ph\)/,
+    "the compositor cannot be asked for a size");
+  assert.ok(!/OVMAP_W \* dpr|drawImage\(md\.image, 0, 0, OVMAP_W/.test(fn),
+    "the canvas is still hard-wired to the legacy card size");
+  assert.match(fn, /routeMapSvg\(route, md\.proj, W, H\)/,
+    "the route overlay is drawn at a different size from the map underneath");
+  // ⚠️ QUANTISED, because the size is part of the cache key — keyed on a raw measurement, every
+  // device width and every rotation mints its own stored picture and evicts real ones.
+  assert.match(fn, /Math\.round\(n \/ 20\) \* 20/, "the requested size is not quantised for the cache key");
+
+  const caller = lift("wire");
+  assert.match(caller, /buildOverviewMap\(rdMap, runRoutePresentation\(r\)\.route, b\.width, b\.height\)/,
+    "the hero does not pass its measured box");
+});

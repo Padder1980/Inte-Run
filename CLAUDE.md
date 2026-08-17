@@ -345,6 +345,20 @@ one-render cache exists to prevent.
 unrestricted `pk.` token shipped in a client is a token anyone can extract and spend. The honest
 options are: accept CARTO in the app, or keep Mapbox for the shared card only. Not decided.
 
+⚠️ **THE ROUTE LINE CAME OUT STRETCHED, AND IT WAS TWO TRANSFORMS OVER ONE PICTURE.**
+`buildOverviewMap` always composited **700×420** whatever asked for it; the debrief hero is nearly
+square (measured 440×467 on a 16 Pro Max). The canvas then COVERED its box — cropped, scale 1.11 —
+while the route overlay, whose SVG carries `preserveAspectRatio="none"`, STRETCHED to fill the same
+box at scale **0.63**. Squashed sideways, pulled vertically, and no longer on the streets it was run
+on. Reported by the owner as "slightly stretched or distorted", which is exactly what it was.
+The compositor now takes a size and the hero passes its measured box, so both scale ×1.00 and nothing
+needs cropping or stretching. ⚠️ **The size is QUANTISED to 20px because it is part of the cache key**
+— keyed on a raw measurement, every device width and every rotation would mint its own stored picture
+and `MAPCACHE_MAX` would evict real entries to hold near-duplicates of one run.
+⚠️ **`object-fit` was removed rather than kept as a safety net.** It does nothing for an inline SVG,
+so it was only ever hiding half of the mismatch — and a rule that papers over one of two disagreeing
+transforms makes the next one harder to see.
+
 ⚠️ **THE OVERFLOW BUTTON SHIPPED WIRED TO NOTHING, AND NO EXISTING GUARD COULD SEE IT.** `rdMore`
 rendered, sat in the top-right corner where every iOS app puts its actions, and did nothing at all —
 reported within the hour. The id-must-resolve guard proves an id EXISTS; it cannot prove a control is

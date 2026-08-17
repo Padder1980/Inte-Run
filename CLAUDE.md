@@ -345,6 +345,25 @@ one-render cache exists to prevent.
 unrestricted `pk.` token shipped in a client is a token anyone can extract and spend. The honest
 options are: accept CARTO in the app, or keep Mapbox for the shared card only. Not decided.
 
+⚠️ **TWO PLAN-CARD FAULTS THAT BOTH PRINTED THEMSELVES ONTO THE SCREEN.** `rdPlanHtml` read
+`a.band.min`/`.max` — the band is a `PaceRange` (`minSecPerKm`/`maxSecPerKm`), so it rendered
+**"NaN:NaN–NaN:NaN /km"**; and it escaped `run.steps` as if it were a sentence when
+`sessionStepText` stores an ARRAY OF ROWS, so it rendered **"[object Object]"**. Every other reader
+in the file already had the band right — this was the only new one, and it is the *same* shape
+mistake that had silently broken the screenshot fixture earlier the same night. ⚠️ **Check the shape
+before writing the reader**, not after the screen shows it.
+
+⚠️ **TWO THINGS OWNED ONE OPACITY, AND THE REVEAL SILENTLY LOST.** The route is arithmetic and
+instant; the tiles take a second or two — so each appearing as it became ready read as two events
+where the runner sees one thing. The fix was a class-based reveal on the hero, and it did nothing:
+`wireRunDebrief` writes `.rd-map`'s opacity **inline** on every scroll frame, and inline beats a
+class. Measured, the visible result was decided by whichever ran last.
+⚠️ **AND IT CANNOT BE SOLVED BY TRANSITIONING THE SCROLL OPACITY** — that has to track the finger
+with no easing, which is the pack's explicit requirement. So the hero is two layers: `.rd-map` owns
+the scroll fade (inline), `.rd-mapin` owns the arrival reveal (class + transition). One owner each.
+⚠️ **THE REVEAL MUST ALSO FIRE ON FAILURE**, or a phone with no signal holds a permanently blank hero
+instead of showing the route by itself. `buildOverviewMap` sets the class from both paths.
+
 ⚠️ **THE ROUTE JUMPED WHEN THE MAP ARRIVED, BECAUSE TWO FRAMINGS DISAGREED.** The hero painted the
 route immediately using `routeMapSvg` with NO projection — which fits the line to its own bounding
 box — and `buildOverviewMap` then replaced it a second or two later with the Mercator-framed version

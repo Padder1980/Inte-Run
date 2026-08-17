@@ -293,8 +293,10 @@ test("the hero map is composited at the hero's own shape, not a fixed 700x420", 
   assert.match(fn, /Math\.round\(n \/ 20\) \* 20/, "the requested size is not quantised for the cache key");
 
   const caller = lift("wire");
-  assert.match(caller, /buildOverviewMap\(rdMap, rt, b\.width, b\.height\)/,
+  // The compositor is handed the INNER layer now — see the two-layer note in the reveal test.
+  assert.match(caller, /buildOverviewMap\(inner, rt, b\.width, b\.height\)/,
     "the hero does not pass its measured box");
+  assert.match(caller, /\$\("rdMapIn"\) \|\| rdMap/, "there is no fallback if the inner layer is missing");
   // ⚠️ AND THE PLACEHOLDER MUST BE FRAMED THE SAME WAY. Framing the route by its own bounding box
   // while tiles load, then replacing it with the Mercator-framed version, is what made the line jump
   // from large to small a second after the screen opened.
@@ -406,4 +408,43 @@ test("both route markers take their size from one number", () => {
     const stray = (src.match(/r \* 0\.\d+/g) || []).filter((m) => !/RT_MARK/.test(m));
     assert.deepEqual(stray, [], fn + " still has hard-coded sizes: " + stray.join(", "));
   }
+});
+
+test("the plan comparison reads the band's real fields and renders its real shape", () => {
+  const fn = lift("rdPlanHtml");
+  // ⚠️ THE BAND IS A PaceRange — minSecPerKm / maxSecPerKm — NOT the {min,max} shape rband uses.
+  // Reading the wrong one printed "NaN:NaN–NaN:NaN /km" on a real run. Every other reader in the
+  // file already had it right; this was the only new one, and it is the same shape mistake that
+  // broke the screenshot fixture earlier the same night.
+  assert.match(fn, /a\.band\.minSecPerKm/, "the target pace reads the wrong band field");
+  assert.match(fn, /a\.band\.maxSecPerKm/, "the target pace reads the wrong band field");
+  assert.ok(!/a\.band\.min\b|a\.band\.max\b/.test(fn), "the {min,max} shape is still being read");
+  // ⚠️ run.steps is an ARRAY OF ROWS ({tag, lab, tgt, rec}), not a sentence. Escaping it printed
+  // "[object Object]" straight onto the screen.
+  assert.ok(!/esc\(run\.steps\)/.test(fn), "run.steps is being rendered as a string");
+  assert.match(fn, /r\.tag/, "the prescription rows are not rendered");
+  assert.match(fn, /r\.lab/, "the prescription rows are not rendered");
+});
+
+test("the route and the basemap appear as one", () => {
+  // ⚠️ The route is arithmetic and instant; the tiles take a second or two. Revealing each as it
+  // became ready meant a bare line on an empty panel with the map catching up underneath — two
+  // events where the runner sees one thing happening.
+  const html = page();
+  // ⚠️ TWO LAYERS, BECAUSE TWO THINGS OWN AN OPACITY HERE AND THEY CANNOT SHARE ONE ELEMENT. The
+  // scroll transition writes .rd-map's opacity INLINE every frame; the reveal wants a transitioned
+  // class. Inline always wins, so putting both on one element left the reveal dead and the visible
+  // result decided by whichever ran last. It cannot be solved by transitioning the scroll opacity
+  // either — that has to track the finger with no easing at all.
+  assert.match(html, /\.rd-mapin \{ position: absolute; inset: 0; opacity: 0; \}/,
+    "the hero is not held until the map is ready");
+  assert.match(html, /\.rd-mapin\.ov-ready \{ opacity: 1; transition: opacity/, "there is no reveal");
+  assert.ok(!/\.rd-map \{[^}]*opacity: 0/.test(html),
+    "the reveal is back on the same element the scroll handler writes inline");
+  assert.match(lift("wireRunDebrief"), /map\.style\.opacity/, "the scroll fade no longer owns .rd-map");
+  // ⚠️ AND IT MUST REVEAL ON FAILURE TOO, or a phone with no signal gets a permanently blank hero
+  // instead of the route on its own.
+  const b = lift("buildOverviewMap");
+  assert.match(b, /container\.classList\.add\("ov-ready"\);\n\s*\}\)\.catch\(\(\) => \{ container\.classList\.add\("ov-ready"\); \}\)/,
+    "the reveal does not happen when the tiles fail");
 });

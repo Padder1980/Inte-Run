@@ -3074,7 +3074,16 @@ html.rd-open .view { padding: 0; }
 
 .rd-hero { position: relative; margin-top: calc(-1 * (var(--tap) + 16px + env(safe-area-inset-top, 0px)));
   height: 49dvh; min-height: 260px; overflow: hidden; }
+/* ⚠️ THE ROUTE AND THE BASEMAP ARRIVE TOGETHER. The route can be drawn instantly (it is arithmetic)
+   and the tiles take a second or two, so showing each as it became ready meant a bare line appearing
+   on an empty panel and the map catching up underneath it — two events where the runner sees one
+   thing happening. The hero holds until the map is composited, then both fade in as one picture.
+   ⚠️ AND IT MUST REVEAL ON FAILURE TOO, or a phone with no signal gets a permanently blank hero
+   rather than the route on its own. buildOverviewMap sets the class from both paths. */
 .rd-map { position: absolute; inset: 0; }
+.rd-mapin { position: absolute; inset: 0; opacity: 0; }
+.rd-mapin.ov-ready { opacity: 1; transition: opacity .32s ease; }
+@media (prefers-reduced-motion: reduce) { .rd-mapin.ov-ready { transition: none; } }
 /* The composite is now made at the hero's own aspect, so nothing needs cropping or stretching —
    object-fit here would only paper over a mismatch that should not exist. */
 .rd-map svg, .rd-map img, .rd-map canvas { width: 100%; height: 100%; display: block; }
@@ -3170,6 +3179,11 @@ html.rd-open .view { padding: 0; }
 
 .rd-plan { padding: var(--s4); border-radius: var(--r-card); background: var(--surface); box-shadow: var(--shadow); }
 .rd-plan-p { font-size: var(--t-body); line-height: 1.5; color: var(--ink-soft); }
+.rd-step { display: flex; align-items: baseline; gap: var(--s2); padding: 5px 0; font-size: var(--t-body); }
+.rd-step-tag { flex: 0 0 auto; min-width: 58px; font-size: var(--t-label); letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ink-faint); }
+.rd-step-l { flex: 1 1 auto; color: var(--ink); }
+.rd-step-t { flex: 0 0 auto; color: var(--ink-soft); }
 .rd-cmp-h, .rd-cmp { display: grid; grid-template-columns: 1fr auto auto; gap: var(--s3); align-items: baseline; }
 .rd-cmp-h { margin-top: var(--s3); padding-bottom: 6px; border-bottom: 1px solid var(--line);
   font-size: var(--t-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint); }
@@ -14795,7 +14809,8 @@ function buildOverviewMap(container, route, pw, ph) {
     container.appendChild(cv);
     container.appendChild(el('<div class="ov-mapov">' + overlay + '</div>'));
     container.appendChild(el('<div class="ov-attr">' + esc(mapAttributionFor(md.prov)) + '</div>'));
-  }).catch(() => {});
+    container.classList.add("ov-ready");
+  }).catch(() => { container.classList.add("ov-ready"); });
 }
 // Superseded by splitsVsTargetHtml, which judges each kilometre against the band the plan set
 // rather than against the run's own fastest. Kept only until nothing references it.
@@ -15402,8 +15417,14 @@ function rdHeroHtml(run) {
     ? '<div class="rd-noroute">' + ICON.timer + '<span>' +
         (pres.hidden ? "Map hidden" : run.indoor ? "Indoor session" : "No route recorded") + '</span></div>'
     : "";
+  // ⚠️ TWO LAYERS BECAUSE TWO THINGS OWN AN OPACITY HERE, AND THEY CANNOT SHARE ONE ELEMENT. The
+  // scroll transition writes .rd-map's opacity INLINE on every frame; the arrival reveal wants a
+  // transitioned class. Inline always wins, so putting both on one element left the reveal dead and
+  // the visible result decided by whichever ran last. It also cannot be solved by transitioning the
+  // scroll opacity — that has to track the finger with no easing at all.
   return '<div class="rd-hero" id="rdHero">' +
-    '<div class="rd-map" id="rdMap" data-route="' + (pres.route ? "1" : "0") + '">' + inner + '</div>' +
+    '<div class="rd-map" id="rdMap" data-route="' + (pres.route ? "1" : "0") + '">' +
+      '<div class="rd-mapin" id="rdMapIn">' + inner + '</div></div>' +
     '<div class="rd-fade"></div>' +
     (pres.redacted ? '<div class="rd-privtag">Start and finish hidden</div>' : "") +
     '</div>';
@@ -15572,14 +15593,25 @@ function rdPlanHtml(run, a) {
   }
   const rows = [];
   if (a.band) {
-    rows.push(['Target pace', fmtPace(a.band.min) + '–' + fmtPace(a.band.max) + ' /km',
+    // ⚠️ minSecPerKm / maxSecPerKm. The band is a PaceRange, not the {min,max} shape rband uses, and
+    // reading the wrong one prints NaN:NaN-NaN:NaN — which is what shipped. Every other reader in
+    // this file already had it right; this was the only new one.
+    rows.push(['Target pace', fmtPace(a.band.minSecPerKm) + '–' + fmtPace(a.band.maxSecPerKm) + ' /km',
       a.workPaceSec ? fmtPace(a.workPaceSec) + ' /km' : "—"]);
   }
   if (a.rband) rows.push(['Intended effort', 'RPE ' + a.rband.min + '–' + a.rband.max, a.rpe ? 'RPE ' + a.rpe : 'Not recorded']);
   const body = rows.map((r) => '<div class="rd-cmp"><span class="rd-cmp-k">' + esc(r[0]) + '</span>' +
     '<span class="rd-cmp-a num">' + esc(r[1]) + '</span><span class="rd-cmp-b num">' + esc(r[2]) + '</span></div>').join("");
+  // ⚠️ run.steps IS AN ARRAY OF ROWS ({tag, lab, tgt, rec}), NOT A SENTENCE. sessionStepText stores
+  // the prescription as structured rows so the logbook can lay it out; esc()-ing it printed
+  // "[object Object]". The rows are rendered the way runDescriptionHtml already renders them.
+  const steps = (run.steps || []).map((r) =>
+    '<div class="rd-step"><span class="rd-step-tag">' + esc(r.tag) + '</span>' +
+      '<span class="rd-step-l">' + esc(r.lab) + '</span>' +
+      (r.tgt ? '<span class="rd-step-t num">' + esc(r.tgt) + '</span>' : "") +
+    '</div>').join("");
   return '<h2 class="rd-sec">What the plan asked for</h2>' +
-    '<div class="rd-plan"><div class="rd-plan-p">' + esc(run.steps) + '</div>' +
+    '<div class="rd-plan">' + steps +
       (body ? '<div class="rd-cmp-h"><span></span><span>Planned</span><span>Actual</span></div>' + body : "") +
     '</div>';
 }
@@ -18178,8 +18210,9 @@ function wire() {
       // The route, framed exactly as the tiles will frame it, drawn before any of them arrive.
       const q = (n) => Math.max(120, Math.round(n / 20) * 20);
       const W = q(b.width), H = q(b.height);
-      rdMap.innerHTML = '<div class="ov-mapov">' + routeMapSvg(rt, routeMapFraming(rt, W, H).proj, W, H) + '</div>';
-      buildOverviewMap(rdMap, rt, b.width, b.height);
+      const inner = $("rdMapIn") || rdMap;
+      inner.innerHTML = '<div class="ov-mapov">' + routeMapSvg(rt, routeMapFraming(rt, W, H).proj, W, H) + '</div>';
+      buildOverviewMap(inner, rt, b.width, b.height);
     }
   }
   try { runPlaceLookup(viewedRun()); } catch (e) {}

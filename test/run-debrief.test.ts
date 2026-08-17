@@ -338,3 +338,29 @@ test("View on Strava appears only when the run genuinely reached Strava", () => 
     "the link would appear on runs that were never uploaded");
   assert.match(fn, /strava\.com\/activities\//, "the link does not point at the activity");
 });
+
+test("the sheet owns the vertical rhythm, so no block brings its own", () => {
+  // ⚠️ MEASURED, NOT ARGUED: the share button and the stretch card sat 0px apart — touching — while
+  // other joins were 24px. The screen mixes purpose-built .rd-* sections with three legacy .card
+  // elements borrowed whole from the old debrief (notes, the effort question, the stretch offer),
+  // and each brought whatever margin it carried in the list context it was written for.
+  const html = page();
+  const at = html.indexOf(".rd-sheet > * { margin-top:");
+  assert.ok(at > 0, "the sheet does not set a default gap for its children");
+  for (const rule of [
+    '.rd-sheet > *:first-child { margin-top: 0; }',
+    '.rd-sheet > .rd-sec { margin: var(--s6) 0 0; }',
+    '.rd-sheet > .rd-sec + * { margin-top: var(--s3); }',
+    '.rd-sheet > .card { margin-bottom: 0; }',
+  ]) assert.ok(html.includes(rule), "missing spacing rule: " + rule);
+
+  // ⚠️ And the blocks must NOT re-introduce their own. A margin here and a margin there is exactly
+  // how the 0px join happened, and it cannot be seen by reading either rule alone.
+  for (const sel of [".rd-next", ".rd-share", ".rd-adv", ".rd-identity", ".rd-title"]) {
+    const i = html.indexOf(sel + " {");
+    assert.ok(i > 0, sel + " is missing");
+    const rule = html.slice(i, html.indexOf("}", i));
+    assert.ok(!/margin(-top)?:\s*var\(--s[45]\)/.test(rule),
+      sel + " sets its own vertical margin, which the sheet is supposed to own: " + rule.trim());
+  }
+});

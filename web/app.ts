@@ -3093,8 +3093,24 @@ html.rd-open .view { padding: 0; }
 .rd-privtag { position: absolute; left: var(--s4); bottom: 92px; font-size: var(--t-label);
   letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint); }
 
+/* ⚠️ THE SHEET OWNS THE VERTICAL RHYTHM, NOT THE INDIVIDUAL BLOCKS. This screen mixes purpose-built
+   .rd-* sections with three legacy .card elements borrowed whole from the old debrief (notes, the
+   effort question, the stretch offer), and each brought whatever margin it happened to carry in the
+   list context it was written for. The result was measurable rather than arguable: the share button
+   and the stretch card sat 0px apart, touching, while other joins were 24px. One rule here means a
+   block added later cannot introduce a new spacing by accident.
+   ⚠️ A HEADING HUGS THE THING IT LABELS. A single uniform gap would float every "Details" and
+   "Coach's debrief" equidistant between the section above and its own content, which reads as the
+   heading belonging to neither. */
 .rd-sheet { position: relative; z-index: 2; margin-top: -24px; padding: 0 20px 96px; }
-.rd-title { margin: 0 0 var(--s4); }
+.rd-sheet > * { margin-top: var(--s5); }
+.rd-sheet > *:first-child { margin-top: 0; }
+.rd-sheet > .rd-sec { margin: var(--s6) 0 0; }
+.rd-sheet > .rd-sec + * { margin-top: var(--s3); }
+.rd-sheet > .rd-title + .rd-identity { margin-top: var(--s3); }
+/* The borrowed cards keep their own look and give up their own spacing. */
+.rd-sheet > .card { margin-bottom: 0; }
+.rd-title { margin: 0; }
 .rd-h1 { display: flex; align-items: center; gap: var(--s2); margin: 0; font-size: var(--t-display);
   font-weight: 700; letter-spacing: -.02em; text-wrap: balance; }
 .rd-tick { display: inline-flex; width: 26px; height: 26px; align-items: center; justify-content: center;
@@ -3104,7 +3120,7 @@ html.rd-open .view { padding: 0; }
 .rd-cue-caution { color: var(--ease); }
 .rd-cue-insufficientData { color: var(--ink-faint); }
 
-.rd-identity { display: flex; flex-direction: column; gap: 6px; margin: 0 0 var(--s4); }
+.rd-identity { display: flex; flex-direction: column; gap: 6px; }
 .rd-id-r { display: flex; align-items: center; gap: var(--s2); font-size: var(--t-body);
   color: var(--ink-soft); text-decoration: none; min-height: 24px; }
 .rd-id-dot { width: 14px; height: 14px; flex: 0 0 auto; border-radius: var(--r-pill); }
@@ -3128,7 +3144,7 @@ html.rd-open .view { padding: 0; }
 .rd-s2v svg { width: 16px; height: 16px; flex: 0 0 auto; color: var(--ink-soft); }
 .rd-s2k { margin-top: 2px; font-size: var(--t-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint); }
 
-.rd-sec { margin: var(--s6) 0 var(--s3); font-size: var(--t-section); font-weight: 700; letter-spacing: -.01em; }
+.rd-sec { font-size: var(--t-section); font-weight: 700; letter-spacing: -.01em; }
 .rd-verdict { padding: var(--s4); border-radius: var(--r-card);
   background: color-mix(in srgb, var(--accent) 7%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent); }
 .rd-v-caution { background: color-mix(in srgb, var(--ease) 8%, var(--surface)); border-color: color-mix(in srgb, var(--ease) 22%, transparent); }
@@ -3168,7 +3184,7 @@ html.rd-open .view { padding: 0; }
 .rd-cmp-b { font-weight: 650; }
 
 .rd-next { display: flex; width: 100%; min-height: var(--tap); align-items: center; justify-content: center; gap: var(--s2);
-  margin: var(--s5) 0 0; padding: 0 var(--s4); font: inherit; font-size: var(--t-card); font-weight: 650;
+  padding: 0 var(--s4); font: inherit; font-size: var(--t-card); font-weight: 650;
   color: var(--accent-ink); background: var(--accent); border: 1px solid transparent; border-radius: var(--r-pill); cursor: pointer; }
 .rd-next svg { width: 18px; height: 18px; }
 .rd-next:active { transform: translateY(1px); }
@@ -3203,7 +3219,7 @@ html.rd-open .view { padding: 0; }
 .rd-zbar { height: 10px; border-radius: var(--r-pill); background: var(--surface-2); overflow: hidden; }
 .rd-zt, .rd-zp { text-align: right; color: var(--ink-soft); }
 
-.rd-adv { margin-top: var(--s5); border-top: 1px solid var(--line); }
+.rd-adv { border-top: 1px solid var(--line); }
 .rd-acc { border-bottom: 1px solid var(--line); }
 .rd-acc-h { display: flex; width: 100%; min-height: var(--tap); align-items: center; gap: var(--s3);
   padding: var(--s3) 0; margin: 0; font: inherit; font-size: var(--t-card); font-weight: 600;
@@ -3232,7 +3248,7 @@ button.rd-meta-r { cursor: pointer; }
 
 .rd-danger .rd-meta-k, .rd-danger .rd-meta-ic { color: var(--rest); }
 .rd-share { display: flex; width: 100%; min-height: var(--tap); align-items: center; justify-content: center; gap: var(--s2);
-  margin: var(--s5) 0 0; padding: 0 var(--s4); font: inherit; font-size: var(--t-card); font-weight: 600;
+  padding: 0 var(--s4); font: inherit; font-size: var(--t-card); font-weight: 600;
   color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-pill); cursor: pointer; }
 .rd-share svg { width: 18px; height: 18px; }
 

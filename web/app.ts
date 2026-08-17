@@ -10307,6 +10307,7 @@ function viewportDiagLines() {
       gpsDiagLine(),
       pedoDiagLine(),
       coachDiagLine(),
+      mapDiagLine(),
       notifDiagLine(),
     ];
   } catch (e) { return ["diag unavailable"]; }
@@ -10344,6 +10345,18 @@ function notifDiagLine() {
 // What the native coach player has actually done. A silent coach looks identical whatever the cause —
 // an empty cue map, a suspended page, a refused audio session, a missing clip — and until this line
 // existed there was no way to tell them apart from a runner's report.
+// ⚠️ THE MAP FAILED SILENTLY FOR ITS WHOLE LIFE. buildOverviewMap ends in a bare .catch(() => {}),
+// so a route drawn on a blank panel looked identical whether the tiles were refused, the network was
+// down, or the phone was offline — and the fallback is designed to look deliberate, which is exactly
+// what stopped anyone noticing. Same precedent as __kbDiag, LIVE.gpsDiag and the coach line.
+function mapDiagLine() {
+  try {
+    const tok = mapboxToken();
+    return "map: " + (tok ? "mapbox" : "carto") + " · tiles " + MAPDIAG.cors + " cors / " +
+      MAPDIAG.tainted + " plain / " + MAPDIAG.failed + " failed of " + MAPDIAG.tried +
+      " · " + MAPDIAG.why;
+  } catch (e) { return "map: unknown"; }
+}
 function coachDiagLine() {
   try {
     const v = window.__interunCoachAudio;
@@ -15665,12 +15678,27 @@ function drawInsightIcon(g, cx, cy, r) {
 const MAP_TILE = 256, MAP_W = 984, MAP_H = 576;
 function mercX(lng, z) { return (lng + 180) / 360 * MAP_TILE * Math.pow(2, z); }
 function mercY(lat, z) { const s = Math.sin(lat * Math.PI / 180); return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * MAP_TILE * Math.pow(2, z); }
-function loadTileImage(url) {
+// ⚠️ A CORS TILE LOAD CAN FAIL PURELY BECAUSE OF THE PAGE'S ORIGIN, and in the native app the page
+// is served from interun://app rather than an http(s) origin. Reported 2026-08-17: the route drew
+// but no basemap appeared behind it, on a build where the browser showed the map perfectly.
+//
+// So the CORS attempt comes first, because that is what keeps the canvas readable and therefore
+// keeps the ONE-RENDER MAP CACHE working — the thing that makes a paid tile provider affordable at
+// all. If it fails, a second attempt without crossOrigin still draws: the canvas is then tainted, so
+// toBlob refuses and nothing is cached, but a map that costs a re-fetch beats no map.
+//
+// ⚠️ THE UNCACHED RETRY IS ALLOWED ON CARTO ONLY. CARTO tiles are free; Mapbox tiles are billed per
+// request, and an uncacheable Mapbox map would re-fetch every time a run was opened — which is
+// precisely the bill the cache was built to prevent. On Mapbox it fails visibly and says why.
+const MAPDIAG = { tried: 0, cors: 0, tainted: 0, failed: 0, why: "no map drawn yet" };
+function loadTileImage(url, allowTainted) {
   return new Promise((res, rej) => {
-    const img = new Image(); img.crossOrigin = "anonymous";
+    MAPDIAG.tried++;
+    const img = new Image();
+    if (!allowTainted) img.crossOrigin = "anonymous";
     const to = setTimeout(() => rej(new Error("timeout")), 6000);
-    img.onload = () => { clearTimeout(to); res(img); };
-    img.onerror = () => { clearTimeout(to); rej(new Error("err")); };
+    img.onload = () => { clearTimeout(to); if (allowTainted) MAPDIAG.tainted++; else MAPDIAG.cors++; res(img); };
+    img.onerror = () => { clearTimeout(to); rej(new Error(allowTainted ? "err" : "cors")); };
     img.src = url;
   });
 }
@@ -15887,10 +15915,20 @@ function loadRouteMap(route, pw, ph, prov) {
         specs.push({ url: url, dx: tx * MAP_TILE - originX, dy: ty * MAP_TILE - originY });
       }
     if (!specs.length || specs.length > 40) return reject(new Error("tile count"));
-    Promise.all(specs.map((s) => loadTileImage(s.url).then((img) => ({ img, dx: s.dx, dy: s.dy }))))
-      .then((tiles) => resolve({ tiles, z: z, originX: originX, originY: originY,
-        proj: (p) => [mercX(p.lng, z) - originX, mercY(p.lat, z) - originY] }))
-      .catch(reject);
+    const fetchAll = (allowTainted) =>
+      Promise.all(specs.map((sp) => loadTileImage(sp.url, allowTainted).then((img) => ({ img, dx: sp.dx, dy: sp.dy }))));
+    const done = (tiles) => resolve({ tiles, z: z, originX: originX, originY: originY,
+      proj: (p) => [mercX(p.lng, z) - originX, mercY(p.lat, z) - originY] });
+    fetchAll(false).then((tiles) => { MAPDIAG.why = "ok, cached"; done(tiles); }).catch((e) => {
+      // ⚠️ ONLY CARTO MAY RETRY WITHOUT CORS. See loadTileImage: an uncacheable Mapbox map re-fetches
+      // billed tiles on every view, which is the bill the cache exists to prevent.
+      if (prov.kind !== "carto") {
+        MAPDIAG.failed++; MAPDIAG.why = "mapbox tiles refused (" + (e && e.message) + "); not retried, it would be uncacheable and billed";
+        return reject(e);
+      }
+      fetchAll(true).then((tiles) => { MAPDIAG.why = "drawn without CORS, so not cached"; done(tiles); })
+        .catch((e2) => { MAPDIAG.failed++; MAPDIAG.why = "tiles failed (" + (e2 && e2.message) + ")"; reject(e2); });
+    });
   });
 }
 function drawMapPanel(g, run, mx, my, mw, mh, mapData) {

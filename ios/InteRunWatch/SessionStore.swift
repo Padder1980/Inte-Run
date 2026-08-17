@@ -19,6 +19,10 @@ struct PlannedStep: Codable, Equatable, Identifiable {
     var paceHigh: Int?
     var repIndex: Int?
     var repCount: Int?
+    /// The phone marks work steps (the engine's isWorkStep: a rep, or floor effort RPE 6+) so the
+    /// wrist's easy-run pace leniency cannot mis-read a long run's goal-pace block — kind "steady" —
+    /// as easy running. Optional: payloads from older phone builds simply leave it nil.
+    var work: Bool?
 
     var id: String { "\(label)|\(kind)|\(seconds ?? 0)|\(metres ?? 0)|\(repIndex ?? 0)" }
 

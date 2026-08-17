@@ -153,7 +153,10 @@ test("distance is gated on DISPLACEMENT, never on the speed the device claims", 
   const at = html.indexOf("function onGpsPos(");
   const body = html.slice(at, html.indexOf("function currentGpsPace", at));
   assert.match(body, /const leash = /, "the anchor leash is gone — distance is being credited per fix again");
-  assert.match(body, /LIVE\.dist \+= net/, "distance is summing per-fix steps again, which inflates it by tens of percent");
+  // The credit starts life as the NET displacement and may only ever be trimmed (pedometer tab,
+  // device-speed cap) — never replaced by a per-fix sum, which inflates by tens of percent.
+  assert.match(body, /let credit = net/, "the credit no longer derives from net displacement");
+  assert.match(body, /LIVE\.dist \+= credit/, "distance is summing per-fix steps again, which inflates it by tens of percent");
   assert.ok(!/const floor = LIVE\.devSpeed != null \? 0\.3/.test(body),
     "the speed-trusting floor is back; a stationary phone will invent distance again");
 });
@@ -198,12 +201,15 @@ const at = (lat: number, o: any = {}) => ({
 test("a fix with no usable accuracy credits nothing and never moves the anchor", () => {
   const M = 111320;
   // Start somewhere real, then a burst of INVALID fixes 500 m away, then back to the real position.
+  // ⚠️ The valid step's speed matches its displacement (20 m over the 4 s the burst lasted = 5 m/s).
+  // The fixture used to claim 2 m/s while moving 20 m/s-equivalent — a pair no phone produces — and
+  // the speed-consistency cap rightly trims impossible pairs, so the kind fixture hid the mechanism.
   const r = feed([
     at(53.48),
     at(53.48 + 500 / M, { accuracy: null }),
     at(53.48 + 500 / M, { accuracy: -1 }),
     at(53.48 + 500 / M, { accuracy: NaN }),
-    at(53.48 + 20 / M),
+    at(53.48 + 20 / M, { speed: 5 }),
   ]);
   // Only the last, valid, 20 m step may count. If any invalid fix were believed the anchor would have
   // teleported and this would read in the hundreds of metres.
@@ -218,10 +224,12 @@ test("a remembered fix cannot seed the run, and cannot credit distance", () => {
   // ⚠️ THE GATE IS SCOPED TO SEEDING, and that scoping is deliberate — applied to every fix it also
   // threw away the replayed backlog from a pocketed phone, which is legitimately minutes old.
   // Case one: the very first fix is iOS's remembered position. It must not become the anchor.
+  // 20 m in 8 s at the default 2 m/s device speed — a pair a real phone can produce; the old 20 m in
+  // one second contradicted its own claimed speed and the consistency cap trims exactly that.
   const seed = feed([
     at(53.48 + 500 / M, { timestamp: now - 600_000 }),   // 10 minutes old, half a km away
     at(53.48, { timestamp: now }),
-    at(53.48 + 20 / M, { timestamp: now + 1000 }),
+    at(53.48 + 20 / M, { timestamp: now + 8000 }),
   ]);
   assert.equal(seed.diag.stale, 1, "the remembered fix was allowed to seed the anchor");
   assert.ok(seed.metres > 15 && seed.metres < 30,
@@ -242,7 +250,9 @@ test("a fix with no timestamp is still accepted — the browser is not required 
   const M = 111320;
   // ⚠️ Guards the fix against overreach. The PWA path and the test harness both omit the timestamp,
   // and refusing those would record 0.00 km for every web run — fault one, reintroduced by the cure.
-  const r = feed([at(53.48), at(53.48 + 20 / M), at(53.48 + 40 / M)]);
+  // No speed either — browsers routinely omit both, and with devSpeed unknown the consistency cap
+  // must stand aside rather than zeroing the run.
+  const r = feed([at(53.48, { speed: -1 }), at(53.48 + 20 / M, { speed: -1 }), at(53.48 + 40 / M, { speed: -1 })]);
   assert.ok(r.metres > 30, "fixes without a timestamp must still count: " + Math.round(r.metres) + " m");
   assert.equal(r.diag.stale, 0);
 });
@@ -337,8 +347,10 @@ function pedoHarness() {
 
 test("the step counter adds nothing while GPS is working", () => {
   const h = pedoHarness();
-  h.gps(0); h.tick(1000);
-  for (let i = 1; i <= 20; i++) { h.gps(i * 20); h.tick(1000); h.steps(i * 20); }
+  // 20 m every 6 s ≈ 3.3 m/s, consistent with the harness's claimed 3 m/s — the old 20 m-per-second
+  // fixture contradicted its own device speed and the consistency cap trims exactly such pairs.
+  h.gps(0); h.tick(6000);
+  for (let i = 1; i <= 20; i++) { h.gps(i * 20); h.tick(6000); h.steps(i * 20); }
   // ⚠️ THE FAILURE THAT WOULD MATTER MOST: every metre counted twice, once by each source.
   assert.equal(Math.round(h.LIVE.pedo.credited), 0, "the pedometer double-counted ground GPS had already credited");
   assert.ok(h.LIVE.dist > 350 && h.LIVE.dist < 420, "GPS distance is wrong: " + Math.round(h.LIVE.dist));
@@ -512,4 +524,120 @@ test("an estimated split is never judged against the target band", () => {
   // ⚠️ And the runner is told. Printing an invented time bare, in a column of measured ones, is the
   // quiet fabrication this project refuses everywhere else.
   assert.match(html, /r\.est \? "estimated"/, "an estimated split is not labelled in the splits table");
+});
+
+/**
+ * ⚠️ THE 2026-08-17 WALKING INFLATION, reproduced and pinned. The owner walked a 1 km custom session
+ * with the badge reading ±2 m and the app credited 0.28 km for ~0.19 km walked (+46%) — his CURRENT
+ * pace (device speed, 11:37/km) was right while AVERAGE (credited distance ÷ time, 8:03/km) was not.
+ * Measured cause: the anchor seeds from the FIRST good fix, GPS then converges to truth, and the whole
+ * correction — anything up to the 200 m spike gate — was credited as ground. Two guards hold the fix:
+ * an early large displacement RE-SEEDS instead of crediting (the settle window), and a credit can
+ * never exceed what the device's own Doppler speed says was coverable in the time (the speed cap).
+ * Every scenario here is deterministic; the tolerances come from the measured probe matrix.
+ */
+function settleHarness() {
+  const src = lift(["haversine", "onGpsPos", "pedoFillGap", "gpsFixElapsedMs", "checkSplits"]);
+  const LIVE: any = {
+    mode: "gps", dist: 0, route: [], elevGain: 0, splits: [], kmDone: 0, lastKmMs: 0, lastFixAt: null,
+    lastLat: null, lastLon: null, lastAlt: null, devSpeed: null, acc: null,
+    pedo: { metres: 0, steps: 0, credited: 0, capped: 0 },
+    rt: { getStatus: () => "active" },
+  };
+  let clock = 1_760_000_000_000;
+  LIVE.startMs = clock;                      // the settle window measures from the run's own start
+  const FakeDate = { now: () => clock };
+  const liveElapsedMs = () => FakeDate.now() - (LIVE.startMs || 0) - (LIVE.pausedMs || 0);
+  const liveNowMs = () => liveElapsedMs();
+  const liveCue = () => {};
+  const fmtPace = (x: number) => String(Math.round(x));
+  const fns = new Function("LIVE", "Date", "liveElapsedMs", "liveNowMs", "liveCue", "fmtPace",
+    src + "; return { onGpsPos: onGpsPos, pedoFillGap: pedoFillGap };")(LIVE, FakeDate, liveElapsedMs, liveNowMs, liveCue, fmtPace);
+  const M = 111320;
+  return {
+    LIVE,
+    tick: (ms: number) => { clock += ms; },
+    fix: (northM: number, o: any = {}) => fns.onGpsPos({
+      coords: { latitude: 53.48 + northM / M, longitude: -2.24,
+                accuracy: o.acc === undefined ? 5 : o.acc,
+                speed: o.speed === undefined ? 1.4 : o.speed, altitude: null },
+      timestamp: clock,
+    }),
+    steps: (cumulativeMetres: number) => { LIVE.pedo.metres = cumulativeMetres; fns.pedoFillGap(); },
+  };
+}
+
+test("the owner's walk: a start-settle correction is re-seeded, never credited", () => {
+  const h = settleHarness();
+  // The first fix lands 90 m from where the runner actually is — the receiver still settling, with a
+  // confidently-claimed ±5 m. It seeds the anchor because nothing can know better yet.
+  h.fix(90);
+  // From the next second GPS has converged: fixes track the true walk at 1.4 m/s from zero.
+  for (let t = 1; t <= 134; t++) { h.tick(1000); h.fix(t * 1.4); }
+  const truth = 134 * 1.4;
+  assert.ok(h.LIVE.gpsDiag.reseeds >= 1,
+    "the 90 m settle correction was not re-seeded — it was credited as walked distance");
+  assert.ok(h.LIVE.dist < truth * 1.08,
+    `the walk credited ${Math.round(h.LIVE.dist)} m for ${Math.round(truth)} m walked — the +46% defect is back`);
+  assert.ok(h.LIVE.dist > truth * 0.78,
+    `the settle fix is eating honest distance: ${Math.round(h.LIVE.dist)} m of ${Math.round(truth)} m`);
+});
+
+test("the settle is caught even when the device reports no speed at all", () => {
+  // ⚠️ THE ROW THAT JUSTIFIES THE RE-SEED RULE. With Doppler speed absent the speed cap is disabled
+  // entirely, so the settle window is the ONLY thing standing between the correction and the total.
+  const h = settleHarness();
+  h.fix(90, { speed: -1 });
+  for (let t = 1; t <= 134; t++) { h.tick(1000); h.fix(t * 1.4, { speed: -1 }); }
+  const truth = 134 * 1.4;
+  assert.ok(h.LIVE.dist < truth * 1.08,
+    `with no device speed the settle was credited again: ${Math.round(h.LIVE.dist)} m for ${Math.round(truth)} m`);
+  assert.ok(h.LIVE.dist > truth * 0.78, "the no-speed walk lost honest distance");
+});
+
+test("a mid-run lurch under the spike gate is capped by the device's own speed", () => {
+  const h = settleHarness();
+  // A healthy minute of walking first, so the settle window (45 s) has closed.
+  for (let t = 1; t <= 60; t++) { h.tick(1000); h.fix(t * 1.4); }
+  const before = h.LIVE.dist;
+  // Then the receiver lurches 120 m sideways in one second — under the 200 m spike gate, far beyond
+  // what 1.4 m/s can cover. The old code credited all of it.
+  h.tick(1000);
+  h.fix(61 * 1.4 + 120);
+  assert.ok(h.LIVE.dist - before < 10,
+    `a 120 m receiver lurch credited ${Math.round(h.LIVE.dist - before)} m in one second at walking speed`);
+  assert.ok(h.LIVE.gpsDiag.capped >= 1, "the trim must be counted, or the next report cannot see it");
+});
+
+test("ground the pedometer filled is not billed again when GPS recovers", () => {
+  const h = settleHarness();
+  // A healthy walking start, pedometer tracking alongside.
+  for (let t = 1; t <= 60; t++) { h.tick(1000); h.fix(t * 1.4); if (t % 5 === 0) h.steps(t * 1.4); }
+  const beforeGap = h.LIVE.dist;
+  // 120 s under a bridge: no fixes at all, the pedometer keeps counting the real ground.
+  for (let t = 65; t <= 180; t += 5) { h.tick(5000); h.steps(t * 1.4); }
+  const paidByPedo = h.LIVE.pedo.credited;
+  assert.ok(paidByPedo > 100, "the blackout was not filled by the pedometer: " + Math.round(paidByPedo) + " m");
+  // GPS recovers exactly where the runner really is. Its net displacement from the pre-gap anchor
+  // covers the SAME stretch the pedometer just paid for — measured +17% per two-minute blackout when
+  // this was billed twice.
+  h.tick(4000);
+  h.fix(184 * 1.4);
+  const truth = 184 * 1.4;
+  assert.ok(h.LIVE.dist < truth * 1.10,
+    `the blackout was billed twice: ${Math.round(h.LIVE.dist)} m credited for ${Math.round(truth)} m walked`);
+  assert.ok(h.LIVE.dist > beforeGap + 80, "the recovery credited nothing at all — the gap's ground was lost");
+});
+
+test("an honest runner is still credited nearly everything (the 2026-08-04 rule holds)", () => {
+  // ⚠️ THE GUARD THE FIXES MUST NEVER BREAK: under-crediting a real runner is the defect the anchor
+  // design exists to prevent. Consistent 3.3 m/s with matching device speed, five minutes.
+  const h = settleHarness();
+  h.fix(0, { speed: 3.3 });
+  for (let t = 1; t <= 300; t++) { h.tick(1000); h.fix(t * 3.3, { speed: 3.3 }); }
+  const truth = 300 * 3.3;
+  assert.ok(h.LIVE.dist > truth * 0.95,
+    `an honest 3.3 m/s runner lost distance: ${Math.round(h.LIVE.dist)} m of ${Math.round(truth)} m`);
+  assert.ok(h.LIVE.dist < truth * 1.03, "an honest runner is over-credited");
+  assert.equal(h.LIVE.gpsDiag.capped, 0, "the speed cap trimmed a physically consistent run");
 });

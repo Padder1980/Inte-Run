@@ -5518,6 +5518,13 @@ function watchSessionPayload(s, iso) {
       o.paceHigh = Math.round(st.targetPaceSecPerKm.maxSecPerKm);
     }
     if (st.repeatIndex) { o.repIndex = st.repeatIndex; o.repCount = st.repeatCount || 0; }
+    // ⚠️ WHETHER THIS STEP IS WORK, decided ONCE, by the engine's own predicate (a rep, or a step
+    // whose floor effort is RPE 6+ — isWorkStep in session-runtime). The wrist needs it for the
+    // easy-run pace leniency: gate by step KIND alone and a long run's goal-pace block (a steady
+    // step at RPE 6+) loses its slow-side correction on the wrist while the phone still gives one —
+    // two halves of one product disagreeing about the same moment, the split this payload's own
+    // header warns about.
+    if (st.kind === "rep" || (st.targetRpe && st.targetRpe.min >= 6)) o.work = true;
     return o;
   });
   return out;
@@ -11078,7 +11085,12 @@ function gpsDiagLine() {
   return "gps: fixes " + d.seen + " \u00b7 credited " + d.credited + " \u00b7 not-moved " + d.still +
     " \u00b7 vague " + d.badAcc + " \u00b7 stale " + (d.stale || 0) +
     (nativeDropped ? " \u00b7 invalid " + nativeDropped : "") +
-    " \u00b7 spikes " + d.spike + " \u00b7 worst acc " + d.maxAcc + "m";
+    " \u00b7 spikes " + d.spike +
+    // The 2026-08-17 walking-inflation counters: early settle corrections re-seeded without credit,
+    // credits trimmed by the device-speed cap. Nonzero reseeds at every start is NORMAL (that is the
+    // settle being caught); a large capped count mid-run is the thing to report.
+    " \u00b7 reseeds " + (d.reseeds || 0) + " \u00b7 capped " + (d.capped || 0) +
+    " \u00b7 worst acc " + d.maxAcc + "m";
 }
 let GPS_DIAG_LAST = null;
 let PEDO_DIAG_LAST = null;
@@ -14143,6 +14155,16 @@ function coachPaceTick(snap, type, nowSec) {
   if (nowSec - COACH.lastPaceCueAt < PACE_QUIET_SEC) return;
   // "On pace" is only worth saying as a RECOVERY - after we asked for a correction and got it.
   if (st === "on" && !COACH.paceCorrectionPending) return;
+  // ⚠️ THE VOICE HONOURS THE ENGINE'S OWN RULE: running easy slower than the band is fine. The
+  // runtime's paceMessage has said so since it was written (a slow verdict on a non-work step logs
+  // nothing) while this layer nagged anyway — the owner's walk got a spoken "pick it up" every 100
+  // seconds on a session whose own log stayed quiet. Work is the engine's isWorkStep predicate:
+  // a rep, or a step whose floor effort is RPE 6+. Return BEFORE the quiet-window stamp, so a
+  // suppressed nudge does not push back a later legitimate cue.
+  if (st === "slow") {
+    const stp = snap && snap.step;
+    if (!(stp && (stp.kind === "rep" || (stp.targetRpe && stp.targetRpe.min >= 6)))) return;
+  }
   COACH.lastPaceCueAt = nowSec;
   COACH.paceCorrectionPending = (st !== "on");
   coachTrigger(st === "fast" ? "pace-ahead" : st === "slow" ? "pace-behind" : "pace-on", type, nowSec);
@@ -14169,6 +14191,10 @@ function speakPaceNumbers(snap, tooFast) {
   const cur = snap && snap.currentPaceSecPerKm;
   const band = snap && snap.step && snap.step.targetPace;
   if (!cur || !band || !band.minSecPerKm || !band.maxSecPerKm) return;
+  // ⚠️ NEVER SAY A NUMBER NO HUMAN COULD RUN. This is the last gate before a fabricated pace is
+  // spoken aloud in the coach's own voice — the upstream culls should have caught it, but a wrong
+  // instruction clip is recoverable and "2 minutes 13 per kilometre" said to a walker is not.
+  if (cur < 150) return;
   if (!VOICE_AVAILABLE) return;
   const edge = tooFast ? band.maxSecPerKm : band.minSecPerKm;
   const text = paceWords(cur) + ". Target " + paceWords(edge) + ".";
@@ -14268,10 +14294,15 @@ function coachNativeAvailable() {
  * their wordings all live here, so the native side cannot resolve a trigger without it.
  * ⚠️ Every trigger the wrist can send must be in this list, or that cue is the one that goes quiet —
  * the list is taken from the speakOnPhone call sites in WorkoutManager/WorkoutVoice.
+ * ⚠️ Two entries are AHEAD of the wrist rather than taken from it: "keep-going" and
+ * "milestone-distance" have clips in the map and no wrist sender yet (the wrist's keepGoing
+ * synthesises directly — wiring it through the phone is an open decision with the owner, because
+ * its personalised variant speaks a NAME and no shared clip can). Listed so the day they are wired
+ * the audio already works; do not read their presence as proof of a sender.
  */
 const WATCH_CUE_TRIGGERS = ["session-start", "session-complete", "paused", "resumed",
   "warmup-start", "interval-start", "recovery-start", "cooldown-start", "easy-settle",
-  "tempo-start", "long-run-settle", "milestone-distance", "keep-going"];
+  "tempo-start", "long-run-settle", "milestone-distance", "keep-going", "halfway"];
 function coachPushWatchCueMap(type) {
   if (!COACH.manifest || !coachEnabled()) return;
   const map = {};
@@ -15114,6 +15145,9 @@ function pedoFillGap() {
   if (walked > cap) { p.capped++; p.mark = p.metres; p.markAt = Date.now(); return; }
   LIVE.dist += walked;
   p.credited += walked;
+  // The tab the next GPS credit settles — see the double-pay note in onGpsPos. Without it, the
+  // recovery fix's net displacement from the pre-gap anchor billed this same stretch a second time.
+  LIVE.pedoPaid = (LIVE.pedoPaid || 0) + walked;
   p.mark = p.metres;
   p.markAt = Date.now();
   // ⚠️ A GAP FILL CAN CROSS A KILOMETRE, AND FORGETTING THIS LOST THE SPLIT ENTIRELY. This is the one
@@ -15136,12 +15170,17 @@ function onGpsPos(pos) {
   // rather than replacing it with a nonsense figure.
   if (acc != null) LIVE.acc = acc;
   LIVE.devSpeed = (c.speed != null && isFinite(c.speed) && c.speed >= 0) ? c.speed : null;
-  const D = LIVE.gpsDiag || (LIVE.gpsDiag = { seen: 0, badAcc: 0, still: 0, spike: 0, credited: 0, maxAcc: 0, stale: 0 });
+  const D = LIVE.gpsDiag || (LIVE.gpsDiag = { seen: 0, badAcc: 0, still: 0, spike: 0, credited: 0, maxAcc: 0, stale: 0, reseeds: 0, capped: 0 });
   if (D.stale == null) D.stale = 0;
+  if (D.reseeds == null) D.reseeds = 0;
+  if (D.capped == null) D.capped = 0;
   D.seen++;
   if (acc != null && acc > D.maxAcc) D.maxAcc = Math.round(acc);
   if (!good) { D.badAcc++; return; }
-  if (LIVE.rt.getStatus() !== "active") { LIVE.anchorLat = c.latitude; LIVE.anchorLon = c.longitude; return; }
+  // The fix's OWN clock, for the speed-consistency cap below. iOS replays a pocketed backlog in one
+  // burst, so Date.now() here would make every interval in the batch read as zero.
+  const fixTs = (typeof pos.timestamp === "number" && isFinite(pos.timestamp)) ? pos.timestamp : Date.now();
+  if (LIVE.rt.getStatus() !== "active") { LIVE.anchorLat = c.latitude; LIVE.anchorLon = c.longitude; LIVE.anchorTs = fixTs; return; }
   // ⚠️ THE STALE GATE APPLIES ONLY WHILE THERE IS NO ANCHOR, AND SCOPING IT COST A REGRESSION TO FIND.
   // Both iOS and the browser hand back a REMEMBERED position when tracking starts — minutes old and
   // possibly a long way away — and seeding the anchor from it credits the journey back as the runner's
@@ -15153,7 +15192,7 @@ function onGpsPos(pos) {
   // fighting each other; a test found it, reading the code did not.
   if (LIVE.anchorLat == null) {
     if (typeof pos.timestamp === "number" && isFinite(pos.timestamp) && Date.now() - pos.timestamp > 30000) { D.stale++; return; }
-    LIVE.anchorLat = c.latitude; LIVE.anchorLon = c.longitude; D.still++; return;
+    LIVE.anchorLat = c.latitude; LIVE.anchorLon = c.longitude; LIVE.anchorTs = fixTs; LIVE.pedoPaid = 0; D.still++; return;
   }
   // Displacement from the last point we credited — the leash.
   const net = haversine(LIVE.anchorLat, LIVE.anchorLon, c.latitude, c.longitude);
@@ -15161,7 +15200,22 @@ function onGpsPos(pos) {
   // instead handed an invalid fix the TIGHTEST possible leash, which is the fault this pass removes.
   const leash = Math.max(10, acc);
   if (net <= leash) { D.still++; return; }
-  if (net > 200) { D.spike++; LIVE.anchorLat = c.latitude; LIVE.anchorLon = c.longitude; return; }
+  // ⚠️ THE START IS WHERE GPS LIES BIGGEST, AND IT USED TO BE PAID IN FULL. The first fix seeds the
+  // anchor while the receiver is still settling; when it converges to truth the whole correction —
+  // measured at ~90 m on the owner's own walk, anything up to the 200 m spike gate — was credited as
+  // ground covered. That one lump explained nearly all of a walk recorded 46% long, and divided by
+  // one 250 ms tick it is also the impossibly-fast "pace" behind the wrong-direction cue at 0:00.
+  // Early in a run, a displacement far beyond the leash is a correction, not a sprint: re-seed the
+  // anchor there and credit nothing. Measured: the owner's scenario went +42.4% → −4.6%, honest
+  // runner starts lose at most a leash's worth. After 45 s the receiver has settled and the ordinary
+  // spike gate takes over. liveElapsedMs, not wall time — a pocketed start is covered separately by
+  // the 30 s stale gate above, measured equivalent to a fix-timestamp clock on every probe row.
+  if (liveElapsedMs() < 45000 && net > Math.max(2 * leash, 30)) {
+    D.reseeds++;
+    LIVE.anchorLat = c.latitude; LIVE.anchorLon = c.longitude; LIVE.anchorTs = fixTs; LIVE.pedoPaid = 0;
+    return;
+  }
+  if (net > 200) { D.spike++; LIVE.anchorLat = c.latitude; LIVE.anchorLon = c.longitude; LIVE.anchorTs = fixTs; LIVE.pedoPaid = 0; return; }
   // Cheap veto: when the device DOES insist it is stationary, believe that much.
   if (LIVE.devSpeed != null && LIVE.devSpeed <= 0.35) { D.still++; return; }
   D.credited++;
@@ -15171,7 +15225,26 @@ function onGpsPos(pos) {
   LIVE.lastFixAt = Date.now();
   // The pedometer's own baseline moves with it, so a stretch GPS did credit can never be paid twice.
   if (LIVE.pedo && !LIVE.pedo.off) { LIVE.pedo.mark = LIVE.pedo.metres; LIVE.pedo.markAt = LIVE.lastFixAt; }
-  LIVE.dist += net;
+  let credit = net;
+  // ⚠️ GROUND THE PEDOMETER ALREADY PAID FOR IS NOT PAID AGAIN. pedoFillGap credits a GPS blackout
+  // but never told the anchor, so the recovery fix's net displacement — the SAME stretch — was
+  // credited on top: measured +17% on a two-minute blackout. The gap-fill now runs a tab
+  // (LIVE.pedoPaid) and the next GPS credit settles it; every anchor re-seed clears the tab instead,
+  // because a discarded displacement overlaps no future credit.
+  if (LIVE.pedoPaid > 0) { credit = Math.max(0, credit - LIVE.pedoPaid); LIVE.pedoPaid = 0; }
+  // ⚠️ THE DEVICE'S OWN SPEED CAPS THE CREDIT. Doppler speed is measured independently of position,
+  // so over the interval since the anchor was set the runner cannot have covered much more than
+  // speed × time — a displacement beyond that (×1.5 for headroom) is the receiver moving, not the
+  // runner. This is what catches a settle correction that arrives with the walker mid-stride, and it
+  // is why the anchor carries a timestamp at all. dt from the FIX clocks, never Date.now(): a
+  // pocketed backlog replays in one burst, and wall time would read every interval in it as zero.
+  // devSpeed null (Doppler dropout) disables the cap rather than zeroing the distance.
+  const dtS = (fixTs - (LIVE.anchorTs || fixTs)) / 1000;
+  if (LIVE.devSpeed != null && LIVE.devSpeed > 0.35 && dtS > 0 && dtS < 900) {
+    const spdCap = LIVE.devSpeed * dtS * 1.5;
+    if (credit > spdCap) { credit = spdCap; D.capped++; }
+  }
+  LIVE.dist += credit;
   // \u26a0\ufe0f AND WHEN. A route of bare coordinates cannot become a Strava activity: without a time
   // on each point there is no pace, no moving time and no splits, and the only way to supply them
   // afterwards is to spread the total evenly across the points -- which draws a perfectly even run
@@ -15195,7 +15268,7 @@ function onGpsPos(pos) {
   // whole backlog, so a batch spanning two kilometres recorded ONE split and silently dropped the
   // other. Here each fix crosses its own boundary, at its own time.
   checkSplits(fixMs);
-  LIVE.anchorLat = c.latitude; LIVE.anchorLon = c.longitude;
+  LIVE.anchorLat = c.latitude; LIVE.anchorLon = c.longitude; LIVE.anchorTs = fixTs;
   LIVE.lastLat = c.latitude; LIVE.lastLon = c.longitude;
   // Accumulate elevation gain from the device's altitude, when it reports one (often it doesn't).
   if (c.altitude != null && isFinite(c.altitude)) {
@@ -15218,6 +15291,12 @@ function gpsUiTick() {
   LIVE.win.push({ t: at, d: LIVE.dist });
   while (LIVE.win.length > 1 && at - LIVE.win[0].t > 12000) LIVE.win.shift();
   let cur = currentGpsPace(at); if (cur && cur > 1200) cur = null; // slower than 20:00/km ⇒ stopped
+  // ⚠️ THE FAST SIDE NEEDS A CULL TOO. 150 s/km is 6.67 m/s — beyond any pace this app prescribes
+  // (interval bands bottom out ~180-205 s/km) — so a faster reading is a settle lump or a Doppler
+  // glitch, not a runner. It used to sail through, fire "you're ahead of easy pace" at a WALKER,
+  // and get read out as the numbers. Same rule as the engine's PACE_PLAUSIBLE_MIN; the cost is the
+  // current-pace display blanking during a genuinely superhuman burst, mirroring the slow cull.
+  if (cur && cur < 150) cur = null;
   LIVE.curPace = cur;
   if (LIVE.rt.getStatus() === "active") {
     const t = { atMs: at, distanceMeters: LIVE.dist };

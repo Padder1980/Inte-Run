@@ -86,6 +86,40 @@ export type LiveSnapshot = {
 /** Pace within this many sec/km of the band still counts as "on target" (avoids jitter). */
 const PACE_TOLERANCE = 6;
 
+/**
+ * ⚠️ NO PACE FASTER THAN THIS IS BELIEVED (sec/km). 150 s/km is 6.67 m/s — faster than any pace this
+ * app ever prescribes (the fastest generated interval bands bottom out around 180-205 s/km), so a
+ * derived pace below it is arithmetic on garbage, not a runner. The real case, measured 2026-08-17:
+ * GPS settling at the start of a run credited a ~90 m correction in one lump, one 250 ms tick divided
+ * by it gave "2.8 s/km", the verdict came out "fast", and a WALKER slower than their band was told
+ * "Ease back — you're ahead of easy pace" at 0:00 with fabricated numbers behind it. There has always
+ * been a slow-side cull (a derived pace slower than 20:00/km reads as stopped); this is its missing
+ * fast-side twin. Strides carry no target band, so no verdict exists for them to lose.
+ */
+const PACE_PLAUSIBLE_MIN = 150;
+
+/**
+ * ⚠️ A HELD PACE EXPIRES. rollingPace holds the previous value whenever a sample brings no new
+ * distance (leash-quantised GPS crediting means MOST ticks bring none), which is right for a few
+ * seconds and wrong forever: a value held indefinitely lets one bad reading — or one real reading
+ * from before a tunnel — drive verdicts minutes later. Measured: a garbage-fast settle reading held
+ * this way kept paceStatus "fast" for 25 s and put a fabricated correction in the coach's own
+ * recorded voice at t=20.3 s. 15 s matches the phone UI's own "no fresh evidence → show —" design.
+ */
+const PACE_STALE_MS = 15000;
+
+/**
+ * ⚠️ PACE VERDICTS NEED EVIDENCE BEFORE THEY EXIST AT ALL. The start of a run is exactly where the
+ * device is least trustworthy — GPS settling happens at 0 m and 0 s by definition — so no pace
+ * verdict (cue or snapshot) is issued until the session has both ~30 s of active time AND ~100 m of
+ * credited distance. A treadmill run credits no distance and never had pace verdicts; a real runner
+ * at 3-5 m/s clears 100 m in 20-33 s, so the elapsed arm decides and the wait is barely visible.
+ * Every generated quality session opens with a band-less warm-up step, so in practice the grace
+ * elapses long before the first banded work step.
+ */
+const PACE_GRACE_MS = 30000;
+const PACE_GRACE_METERS = 100;
+
 function isDistanceGated(step: WorkoutStep): boolean {
   return step.distanceMeters != null && step.durationSeconds == null;
 }
@@ -168,6 +202,8 @@ export class LiveSession {
   private lastPaceSampleActiveMs = 0;
   private lastPaceSampleDistanceM = 0;
   private currentPace?: number;
+  /** Active-time stamp of the last BELIEVED pace (device-reported or a plausible derivation). */
+  private paceAdoptedActiveMs = 0;
   private stepPaceStatus: PaceStatus = "none";
 
   private lastCue?: Cue;
@@ -267,12 +303,35 @@ export class LiveSession {
     }
 
     // Pace: prefer a device-reported value, else derive a rolling pace since the last sample.
-    this.currentPace = t.paceSecPerKm ?? this.rollingPace(activeMs);
+    //
+    // ⚠️ A DERIVATION IS ADOPTED ONLY IF A HUMAN COULD RUN IT. GPS distance arrives in leash-sized
+    // lumps (~10-90 m at a time), so a lump divided by one short tick is not a pace, it is
+    // arithmetic noise — measured at 2.8-25 s/km on real traces. The old code adopted it, and the
+    // old rollingPace then HELD it forever through the dMeters<=0 branch, so one settle lump kept
+    // paceStatus "fast" for 25 s and spoke a fabricated correction in the coach's recorded voice.
+    // Now: implausible derivations are refused (the previous believed pace holds instead), every
+    // adoption is stamped, and a held value expires after PACE_STALE_MS with nothing fresh behind
+    // it. ⚠️ NO MINIMUM-WINDOW GATE — the baselines below reset on EVERY sample, so a "derive only
+    // over ≥3 s" rule can never be satisfied at any sub-3 s tick cadence and silently kills all
+    // pace coaching for simulated runs (measured: the 200 ms sim tick went from a correct verdict
+    // to none, permanently, and the suite could not see it).
+    if (t.paceSecPerKm != null) {
+      this.currentPace = t.paceSecPerKm;
+      this.paceAdoptedActiveMs = activeMs;
+    } else {
+      const derived = this.rollingPace(activeMs);
+      if (derived != null && derived >= PACE_PLAUSIBLE_MIN) {
+        this.currentPace = derived;
+        this.paceAdoptedActiveMs = activeMs;
+      } else if (this.currentPace != null && activeMs - this.paceAdoptedActiveMs > PACE_STALE_MS) {
+        this.currentPace = undefined;
+      }
+    }
     this.lastPaceSampleActiveMs = activeMs;
     this.lastPaceSampleDistanceM = this.distanceM;
 
     const step = this.steps[this.stepIndex];
-    if (step && this.currentPace != null) {
+    if (step && this.currentPace != null && this.paceGraceOver(activeMs)) {
       const status = paceVsBand(this.currentPace, step.targetPaceSecPerKm);
       if (status !== "none" && status !== this.stepPaceStatus) {
         this.stepPaceStatus = status;
@@ -283,11 +342,17 @@ export class LiveSession {
     return cues;
   }
 
+  /** Raw pace derivation since the last sample — no holding; the caller owns what to believe. */
   private rollingPace(activeMs: number): number | undefined {
     const dSec = (activeMs - this.lastPaceSampleActiveMs) / 1000;
     const dMeters = this.distanceM - this.lastPaceSampleDistanceM;
-    if (dSec <= 0 || dMeters <= 0) return this.currentPace;
+    if (dSec <= 0 || dMeters <= 0) return undefined;
     return dSec / metresToKm(dMeters);
+  }
+
+  /** No pace verdict exists until the run has shown real evidence — see PACE_GRACE_MS. */
+  private paceGraceOver(activeMs: number): boolean {
+    return activeMs >= PACE_GRACE_MS && this.distanceM >= PACE_GRACE_METERS;
   }
 
   private stepStartCue(atMs: number): Cue {
@@ -337,7 +402,7 @@ export class LiveSession {
     const lapDistanceM = this.distanceM - this.stepBaselineDistanceM;
     const lapPace =
       lapDistanceM > 0 ? stepElapsedSeconds / metresToKm(lapDistanceM) : undefined;
-    const paceStatus = step && this.currentPace != null
+    const paceStatus = step && this.currentPace != null && this.paceGraceOver(activeMs)
       ? paceVsBand(this.currentPace, step.targetPaceSecPerKm)
       : "none";
 

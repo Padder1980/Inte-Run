@@ -163,9 +163,12 @@ final class WorkoutVoice {
     /// verified off-device.
     static func spokenPace(_ secPerKm: Int) -> String {
         let m = secPerKm / 60, s = secPerKm % 60
+        // Grammar mirrors the phone's paceWords (web/app.ts) exactly — one product, one wording.
+        // "1 minutes 1" was real output before the singular rule.
+        let unit = m == 1 ? "minute" : "minutes"
         if m <= 0 { return "\(s) seconds" }
-        if s == 0 { return "\(m) minutes" }
-        return "\(m) minutes \(s)"
+        if s == 0 { return "\(m) \(unit)" }
+        return "\(m) \(unit) \(s)"
     }
 
     /// The why moment: once per run, late on, in a session long enough for it to mean something.

@@ -42,6 +42,28 @@ final class WorkoutManager: NSObject, ObservableObject {
     @Published private(set) var heartRate: Double = 0
     /// Smoothed from recent GPS, in seconds per km. Nil until moving.
     @Published private(set) var paceSecPerKm: Double?
+    /// When `paceSecPerKm` was last written by a real fix — the heartRateAt precedent. HealthKit and
+    /// CoreLocation both simply stop delivering rather than saying so, and a value nobody refreshed
+    /// reads exactly like a current one. ⚠️ 8 s, deliberately SHORTER than the 10 s auto-pause
+    /// still-threshold, and autoPauseTick keeps reading the RAW field — a stale-pace nil must never
+    /// be what starts the auto-pause clock.
+    private var paceAt: Date?
+    private let paceFreshSec: TimeInterval = 8
+    var paceIsFresh: Bool { paceAt.map { Date().timeIntervalSince($0) <= paceFreshSec } ?? false }
+    /// A short trailing window of pace samples, so a SPOKEN number is the last ~10 s rather than the
+    /// single fix that happened to coincide with the cue — measured, quoting one fix at the biased
+    /// moment a hold expires ran ~37 s/km wide of the truth; the window mean halves that. The
+    /// VERDICT stays on the instantaneous value: its own 6 s hold is already the smoothing for the
+    /// decision, and lagging the decision would be a different (worse) trade.
+    private var paceWindow: [(at: Date, p: Double)] = []
+    /// Halfway is announced once per run, in the session's own currency — see the ticker.
+    private var halfwaySpoken = false
+    var spokenPaceQuote: Double? {
+        let cut = Date().addingTimeInterval(-10)
+        let recent = paceWindow.filter { $0.at > cut }
+        guard !recent.isEmpty else { return paceIsFresh ? paceSecPerKm : nil }
+        return recent.map { $0.p }.reduce(0, +) / Double(recent.count)
+    }
     @Published private(set) var stepIndex = 0
     /// Where the current step began, so its own progress is measured from there.
     @Published private(set) var stepStartElapsed: TimeInterval = 0
@@ -151,7 +173,11 @@ final class WorkoutManager: NSObject, ObservableObject {
 
     var paceVerdict: PaceVerdict {
         guard let band = targetBand else { return .noTarget }
-        guard let p = paceSecPerKm, p.isFinite, p > 0 else { return .noSignal }
+        // ⚠️ A PACE NOBODY REFRESHED IS NOT A SIGNAL. Under trees the fixes stop but the last value
+        // stays put, so the wrist spent GPS dropouts confidently judging — and quoting, out loud —
+        // a number from before the trees. Same mechanism as heartRateAt: measured there, a loose
+        // strap fabricated two thirds of an hour-long trace. Stale reads as FINDING GPS and silence.
+        guard paceIsFresh, let p = paceSecPerKm, p.isFinite, p > 0 else { return .noSignal }
         // A few seconds either side is noise, not a coaching moment.
         let slack = 5.0
         if p < Double(band.low) - slack { return .tooFast }
@@ -165,8 +191,21 @@ final class WorkoutManager: NSObject, ObservableObject {
         case .noSignal: return "FINDING GPS"
         case .tooFast: return "EASE OFF"
         case .good: return "GOOD PACE"
-        case .tooSlow: return "PICK IT UP"
+        case .tooSlow: return slowIsFine ? "SLOWER IS FINE" : "PICK IT UP"
         }
+    }
+
+    /// Running slower than the band on a low-intensity session is FINE — the plan's own engine has
+    /// said so since it was written (its pace log stays quiet there), while the wrist nagged anyway:
+    /// measured on the owner's 2026-08-17 walk, sixteen spoken "Speed up a little" corrections on one
+    /// easy kilometre. Work keeps its correction: a rep by kind, or a step the PAYLOAD marks as work
+    /// (the engine's own isWorkStep — RPE 6+ — decided once on the phone and carried per step, so a
+    /// long run's goal-pace block is still coached even though its kind is "steady").
+    /// ⚠️ Too FAST is never fine and is untouched by this.
+    var slowIsFine: Bool {
+        guard ["easy", "long", "recovery"].contains(plan?.type ?? "") else { return false }
+        guard let st = currentStep else { return true }
+        return st.kind != "rep" && st.work != true
     }
 
     private let healthStore = HKHealthStore()
@@ -227,6 +266,9 @@ final class WorkoutManager: NSObject, ObservableObject {
         lastSplitMetre = 0
         lastSplitElapsed = 0
         lastLocation = nil
+        paceAt = nil
+        paceWindow = []
+        halfwaySpoken = false
         stillSince = nil
         movingSince = nil
         autoPaused = false
@@ -387,13 +429,29 @@ final class WorkoutManager: NSObject, ObservableObject {
                     self.elapsed = Date().timeIntervalSince(started) - self.pausedAccum
                     self.accumulateZone(0.5)
                     self.advanceStepIfDue()
+                    // The window feeding the SPOKEN quote — the verdict below stays instantaneous.
+                    if let p = self.paceSecPerKm, self.paceIsFresh { self.paceWindow.append((Date(), p)) }
+                    if self.paceWindow.count > 40 { self.paceWindow.removeFirst(self.paceWindow.count - 40) }
                     // Pace corrections are the wrist's own voice, WITH the numbers — the owner's
                     // spec ("your current pace is…, your target pace is…") can never come from a
                     // recorded clip, so unlike the step cues these are not forwarded to the phone.
+                    // ⚠️ The quote is the ~10 s window mean, not the fix of the moment; and a slow
+                    // verdict on a low-intensity session is treated as "ok" (see slowIsFine) — that
+                    // resets the hold too, so easing back onto pace never triggers a late nag.
                     switch self.paceVerdict {
-                    case .tooFast: self.voice?.paceCue("fast", currentSecPerKm: self.paceSecPerKm, band: self.targetBand)
-                    case .tooSlow: self.voice?.paceCue("slow", currentSecPerKm: self.paceSecPerKm, band: self.targetBand)
+                    case .tooFast: self.voice?.paceCue("fast", currentSecPerKm: self.spokenPaceQuote, band: self.targetBand)
+                    case .tooSlow where !self.slowIsFine:
+                        self.voice?.paceCue("slow", currentSecPerKm: self.spokenPaceQuote, band: self.targetBand)
                     default: self.voice?.paceCue("ok", currentSecPerKm: nil, band: nil)
+                    }
+                    // Halfway, measured in the session's own currency — sessionProgress is
+                    // distance-led for a distance session, time-led otherwise, the same rule the
+                    // phone follows. Recorded clip via the phone when it can answer; the fallback
+                    // is deliberate silence, never a robot, matching the no-robot-encouragement rule.
+                    if !self.halfwaySpoken, self.targetSeconds > 120,
+                       let prog = self.sessionProgress, prog >= 0.5 {
+                        self.halfwaySpoken = true
+                        _ = self.speakOnPhone("halfway")
                     }
                     let target = self.targetSeconds
                     self.voice?.whyMoment(elapsed: self.elapsed, target: target, hard: self.isHardSession)
@@ -790,7 +848,11 @@ final class WorkoutManager: NSObject, ObservableObject {
 
     var paceText: String {
         guard let p = paceSecPerKm, p.isFinite, p > 0, p < 3600 else { return "--:--" }
-        return String(format: "%d:%02d", Int(p) / 60, Int(p) % 60)
+        // Rounded, not truncated, so the screen and the spoken sentence always name the same second
+        // (the voice rounds — 697.6 was printed 11:37 and spoken "11 minutes 38", which reads as the
+        // coach getting the runner's own number wrong).
+        let s = Int(p.rounded())
+        return String(format: "%d:%02d", s / 60, s % 60)
     }
 
     var elapsedText: String {
@@ -851,9 +913,9 @@ extension WorkoutManager: CLLocationManagerDelegate {
             // differentiating positions. A KNOWN standstill clears the pace — leaving the last
             // good pace in place made auto-pause blind, because "moving" read stale data forever.
             let sp = usable.last?.speed ?? -1
-            if sp > 0.5 { paceSecPerKm = 1000 / sp }
-            else if sp >= 0 { paceSecPerKm = nil }
-            else if !movedThisBatch { paceSecPerKm = nil }
+            if sp > 0.5 { paceSecPerKm = 1000 / sp; paceAt = Date() }
+            else if sp >= 0 { paceSecPerKm = nil; paceAt = nil }
+            else if !movedThisBatch { paceSecPerKm = nil; paceAt = nil }
             recordSplits()
             // Downsampled, and only when the runner actually moved. Recording a point per fix
             // regardless drew a map out of standing-still drift — the numbers said 0.02 km and the

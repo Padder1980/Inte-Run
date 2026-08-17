@@ -4175,6 +4175,96 @@ shared `<audio>` element, which has no session management, four unsynchronised w
 this change) a permanent `error` handler wired straight to the device voice. Two audio systems, and
 the one that had been audited was not the one he was hearing.
 
+## THE WALK THAT CONVICTED THE GPS START (owner's report, 2026-08-17 — four findings, two causes)
+
+He walked a 1 km custom session, phone in hand, badge reading ±2 m: credited **0.28 km for ~0.19 km
+walked (+46%)**, CURRENT pace right (11:37, from Doppler speed) while AVERAGE read 8:03 (credited
+distance ÷ time), and the cue log said **"Ease back — you're ahead of easy pace" at 0:00** to a runner
+SLOWER than the band. Root-caused by a measured workflow (synthetic traces through the REAL lifted
+onGpsPos, 300 seeds/row) then adversarially cross-checked; suite 755 → **769**, eleven deliberate
+re-breaks all caught.
+
+⚠️ **THE START SETTLE WAS ~ALL OF IT.** The anchor seeds from the FIRST good fix; when the receiver
+converges the whole correction (anything ≤ the 200 m spike gate) was credited as ground. Modelled: a
+90 m jump-settle reproduces his outing at +42.4% vs the observed +46.1%. First-passage bias at the
+leash largely TELESCOPES away (≲3%); wander 0–7%; curve chords −1 to −3%. And that same lump divided
+by one 250 ms tick is a "2.8 s/km pace" — the wrong-direction cue at 0:00 and the fabricated numbers
+are the SAME defect as the distance.
+
+**The shipped combo, each part justified by a row only it fixes** (owner scenario +42.4% → −4.6%; all
+honest-runner rows within −0.5…+2.8%):
+- **A2 re-seed:** in the first 45 s (liveElapsedMs), a displacement > max(2·leash, 30 m) RE-SEEDS the
+  anchor and credits nothing. ⚠️ Its justifying row is a settle with **devSpeed null** — the cap below
+  is disabled there, so without A2 that walk stays +42.5%.
+- **D speed cap:** credit ≤ devSpeed × dt × 1.5, dt from **fix timestamps** (LIVE.anchorTs, stamped at
+  every anchor write — a pocketed backlog replays in one burst and wall time reads every interval as
+  zero). devSpeed null disables the cap rather than zeroing distance.
+- **P pedo tab:** pedoFillGap runs a tab (LIVE.pedoPaid) and the next GPS credit settles it —
+  the recovery fix's net from the pre-gap anchor covered the SAME stretch the pedometer just paid
+  (measured +17% per 120 s blackout). Every anchor re-seed CLEARS the tab.
+- Diag: `reseeds` / `capped` in gpsDiagLine. Nonzero reseeds at a start is NORMAL.
+
+⚠️ **CANDIDATE "CREDIT NET MINUS A NOISE ALLOWANCE" MUST NEVER SHIP** — measured −21.7% on a ±5 walk
+and −39.6% on a ±14 run (the crossing bias telescopes on its own, so the subtraction banks as pure
+under-count), and it does not even fix the settle (+33%). It is the 2026-08-04 defect, 10× the
+tolerance, wearing a fix's clothes.
+
+⚠️ **THREE OF THIS AREA'S OWN FIXTURES MOVED 20 m/s WHILE CLAIMING 2–3 m/s** — pairs no phone
+produces, so they never exercised the speed↔displacement relationship and the new cap "broke" them.
+Made physically consistent, intent preserved. Same fixture-too-kind trap as the debrief's target line.
+
+**The pace verdict now has to be EARNED (engine, session-runtime.ts):**
+- **PACE_PLAUSIBLE_MIN 150 s/km** — a derivation faster than any prescribed band (fastest rep bands
+  ~180–205) is arithmetic on a lump, refused, previous value held. The fast-side twin of the >1200
+  cull; mirrored in gpsUiTick (`cur < 150 → null`) and as a last gate in speakPaceNumbers.
+- **A held pace EXPIRES after 15 s** — rollingPace's old dMeters≤0 branch held one bad reading
+  forever; measured, it kept "fast" alive 25 s and spoke a fabricated "2 minutes 13" in the RECORDED
+  coach voice at t=20.3 s.
+- **Grace: no verdict until 30 s AND 100 m.** ⚠️ Its discriminating case is a PLAUSIBLE-looking
+  device pace (a 160 s/km Doppler glitch at 0.5 s) — my grace re-break sailed past the settle-lump
+  test because the plausibility floor double-covers it; the guard had to gain that fixture before the
+  re-break failed. A guard whose scenario is double-covered discriminates nothing.
+- ⚠️ **NO MINIMUM-WINDOW GATE, EVER**: update() resets the pace baselines every sample, so "derive
+  only over ≥3 s" is unsatisfiable at any sub-3 s cadence and silently kills all pace coaching for
+  SIMULATED runs (200 ms distance-only ticks) — measured, with the suite green because every pace
+  test set reportPace. `a simulated run's 200 ms distance-only ticks still earn a verdict` now pins it.
+
+⚠️ **THE VOICE LAYER IGNORED THE ENGINE'S OWN EASY-SLOW RULE FOR MONTHS AND THE RUNNER HEARD THE
+DISAGREEMENT.** paceMessage has always stayed quiet about slow+non-work ("running easy slower than
+the band is fine") while coachPaceTick spoke pace-behind every 100 s — his walk got corrections from
+a layer whose own log stayed silent. Now suppressed BEFORE the quiet-window stamp (a suppressed nudge
+must not push back a later legitimate cue); work = the engine's isWorkStep (rep, or targetRpe.min ≥ 6
+— a threshold block is `steady`, so kind alone is the wrong gate).
+
+### The watch-run "robot voice" verdict, and the wrist set (Swift — REBUILD REQUIRED, none of it OTA)
+
+⚠️ **ON A ONE-STEP EASY WRIST RUN, EVERY MID-RUN CUE IS THE PACE CORRECTION, WHICH IS SYNTHESISED BY
+THE OWNER'S OWN 2026-07-31 SPEC** (full sentence with numbers — no clip can say a digit). The cue map
+measured healthy (9/13 triggers, 19 files, never cleared, pushed from both start paths). So "the
+robot took over" was mostly the designed correction NAGGING A WALKER sixteen times. What ships:
+- **slowIsFine** (WorkoutManager): easy/long/recovery + non-work step → tooSlow speaks nothing,
+  screen says "SLOWER IS FINE". Too fast is untouched. ⚠️ The work bit rides ON THE PAYLOAD
+  (`PlannedStep.work`, set by the phone from isWorkStep) so a long run's goal-pace block — kind
+  `steady` — keeps its correction; gate by kind and the two halves of the product disagree again.
+- **The spoken quote is a ~10 s window mean** (verdict stays instantaneous — its 6 s hold is the
+  decision's smoothing). Quoting the single fix at the biased cue moment measured ~37 s/km wide.
+- **paceAt freshness (8 s, deliberately under the 10 s auto-pause still-threshold; autoPauseTick
+  reads the RAW field)** — the heartRateAt precedent: stale pace read as FINDING GPS + silence, never
+  a 45 s-old number quoted as now.
+- **spokenPace grammar mirrors the phone's paceWords** ("1 minutes 1" was real output); paceText now
+  ROUNDS so screen and sentence name the same second.
+- **Halfway reached the wrist** (sessionProgress is already measured in the session's own gate;
+  trigger `halfway` added to WATCH_CUE_TRIGGERS; fallback is deliberate silence, never a robot).
+- ⚠️ WATCH_CUE_TRIGGERS' comment now admits `keep-going`/`milestone-distance` are AHEAD of the wrist
+  (clips in the map, no sender) — the old comment claimed the list was taken from call sites, false.
+
+**Still the owner's**: (a) wrist FAST-side corrections as recorded no-number nudges would reverse his
+2026-07-31 numbers spec — not shipped without him; (b) wiring keep-going through speakOnPhone (its
+personalised variant speaks a NAME and must stay wrist-side or route via the personal pack); (c) the
+hardware diagnostic that settles the pocketed-phone native player: one MULTI-step wrist run, phone
+pocketed, ended from the wrist, then read Support › Your data's `coach:` line — map 0 = stale
+build/empty map, failed>0 = refused session, wrist N/N healthy = working as designed.
+
 ## HALFWAY, AND THREE MOMENTS THAT HAD NEVER FIRED (owner, 2026-08-16)
 
 Asked for after reading a generated inventory of every line the coach can say

@@ -3055,7 +3055,26 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
    paid for. Each panel animates via a single .in class added a frame after it is inserted; nothing
    here writes an inline style that a class then tries to override. */
 .rd-id-story { padding: 0; background: none; border: 0; cursor: pointer; text-align: left; font: inherit; }
-.rd-id-story .rd-id-ic { color: var(--accent); }
+/* ⚠️ THE RECAP ICON IS RED AND IT BREATHES (owner, 2026-08-17). In the accent teal it read as a
+   fourth link in a column of three, when it is the only thing on this screen that plays. Red is the
+   app's own --rest, not a new colour: measured 5.11:1 on white, 4.50:1 on the light canvas and
+   6.56:1 in dark, so it clears the 3:1 a graphic needs and the 4.5:1 text needs as well, which
+   matters because it sits directly beside a label.
+   ⚠️ ONE OWNER FOR THE COLOUR. This rule replaces the accent declaration rather than following it —
+   a second rule setting the same property is how the debrief's hero opacity ended up decided by
+   whichever ran last.
+   The pulse copies .rm-attn (the reminder bell) exactly: a ring that breathes outward, so nothing
+   moves or resizes and the row's layout is untouched. border-radius matches the glyph, which is a
+   circle, or the ring would square off around a round icon.
+   ⚠️ THE GLOBAL REDUCE-MOTION RULE KILLS TRANSITIONS ONLY, so an animation needs its own opt-out —
+   and the opt-out keeps the red, because the colour carries the meaning and only the motion is the
+   accessibility cost. */
+.rd-id-story .rd-id-ic { color: var(--rest); border-radius: 50%; animation: recappulse 2.4s ease-in-out infinite; }
+@keyframes recappulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--rest) 50%, transparent); }
+  50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--rest) 0%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) { .rd-id-story .rd-id-ic { animation: none; } }
 .rd-id-story .rd-id-t { color: var(--accent); }
 
 .story-ov { position: fixed; inset: 0; z-index: 90; display: none; background: #06110e; color: #fff; }

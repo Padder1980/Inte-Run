@@ -3104,6 +3104,18 @@ html.rd-open .view { padding: 0; }
 .rd-cue-caution { color: var(--ease); }
 .rd-cue-insufficientData { color: var(--ink-faint); }
 
+.rd-identity { display: flex; flex-direction: column; gap: 6px; margin: 0 0 var(--s4); }
+.rd-id-r { display: flex; align-items: center; gap: var(--s2); font-size: var(--t-body);
+  color: var(--ink-soft); text-decoration: none; min-height: 24px; }
+.rd-id-dot { width: 14px; height: 14px; flex: 0 0 auto; border-radius: var(--r-pill); }
+.rd-id-ic { display: inline-flex; width: 18px; height: 18px; flex: 0 0 auto; color: var(--ink-faint); }
+.rd-id-ic svg { width: 100%; height: 100%; }
+.rd-id-t { color: var(--ink); font-weight: 600; }
+.rd-id-s { color: var(--ink-faint); }
+/* ⚠️ Strava's orange, used ONLY to make a link out to Strava identifiable — which is the one use
+   their brand guidelines permit. It is never a surface, never the accent, never on our own logo. */
+.rd-id-strava .rd-id-ic { color: #fc5200; }
+.rd-id-strava .rd-id-t { color: var(--accent); }
 .rd-metrics { background: var(--surface); border-radius: var(--r-hero); box-shadow: var(--shadow); overflow: hidden; }
 .rd-s1row { display: grid; grid-template-columns: repeat(3, 1fr); padding: var(--s4) var(--s2); }
 .rd-s1 { text-align: center; }
@@ -8771,6 +8783,7 @@ function viewRunDetail() {
     rdHeroHtml(run) +
     '<div class="rd-sheet">' +
       rdTitleHtml(run, v) +
+      rdIdentityHtml(run) +
       rdMetricsHtml(run, a) +
       rdVerdictHtml(run, a, v) +
       rdEvidenceHtml(run, a, v) +
@@ -14647,9 +14660,48 @@ function routeMapSvg(route, proj, vbW, vbH) {
   const d = route.map((p, i) => (i ? "L" : "M") + xy(p).map((n) => n.toFixed(1)).join(" ")).join(" ");
   const s = xy(route[0]), e = xy(route[route.length - 1]);
   return '<svg class="routemap" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
+    routeLogoDefs() +
     '<path class="rt-line" d="' + d + '"/>' +
-    '<circle class="rt-start" cx="' + s[0].toFixed(1) + '" cy="' + s[1].toFixed(1) + '" r="' + r + '"/>' +
+    routeLogoMark(s[0], s[1], r) +
     '<circle class="rt-end" cx="' + e[0].toFixed(1) + '" cy="' + e[1].toFixed(1) + '" r="' + r + '"/></svg>';
+}
+/**
+ * The brand mark as the start marker on a route.
+ *
+ * ⚠️ THE GLYPH IS RE-DRAWN HERE RATHER THAN THE WHOLE BRAND_MARK BEING SCALED DOWN. BRAND_MARK is a
+ * rounded-square app icon: dropped into a circular marker it reads as a tiny logo in a box in a
+ * circle. What belongs on a map pin is the mark's own figure — the dot and the two strokes — on a
+ * disc, which is the same identity without the packaging.
+ *
+ * ⚠️ THE GRADIENT ID IS UNIQUE PER DOCUMENT AND MUST STAY THAT WAY. Two route maps on one screen
+ * (the Logbook list) sharing an id means the second one silently adopts the first's gradient, and if
+ * the first is ever removed from the DOM the second loses its fill entirely.
+ *
+ * ⚠️ The route SVG carries preserveAspectRatio="none", so anything drawn in it is stretched by
+ * whatever the container's aspect is. That is exactly nothing for the debrief hero, which now
+ * composites at its own shape — but a small thumbnail in a differently-shaped box will lean the mark
+ * slightly, in the same proportion as it already leans the route.
+ */
+let RT_LOGO_N = 0;
+let RT_LOGO_ID = "";
+function routeLogoDefs() {
+  RT_LOGO_ID = "rtlg" + (++RT_LOGO_N);
+  return '<defs><linearGradient id="' + RT_LOGO_ID + '" x1="0" y1="0" x2="1" y2="1">' +
+    '<stop offset="0" stop-color="#16b7a4"/><stop offset="1" stop-color="#0a6f64"/></linearGradient></defs>';
+}
+function routeLogoMark(cx, cy, r) {
+  // A touch larger than the plain dot it replaces: a mark the size of a 9px dot is a smudge.
+  const R = r * 1.55;
+  // The mark's figure spans x 35..93 and y 26..88 in its own 120 box, centred near (64, 57).
+  const k = R / 46;
+  return '<g class="rt-logo" transform="translate(' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')">' +
+    '<circle r="' + (R + r * 0.34).toFixed(1) + '" fill="#fff"/>' +
+    '<circle r="' + R.toFixed(1) + '" fill="url(#' + RT_LOGO_ID + ')"/>' +
+    '<g transform="scale(' + k.toFixed(4) + ') translate(-64 -57)">' +
+      '<circle cx="82" cy="37" r="11" fill="#fff"/>' +
+      '<path d="M35 88 L57 45 L71 45 L49 88 Z" fill="#fff"/>' +
+      '<path d="M57 88 L79 45 L93 45 L71 88 Z" fill="#fff" opacity=".62"/>' +
+    '</g></g>';
 }
 // Overview map size (CSS px) — canvas backing store is DPR-scaled for crispness.
 const OVMAP_W = 700, OVMAP_H = 420;
@@ -15316,6 +15368,92 @@ function rdCue(state) {
     : state === "partial" ? "Partly on target"
     : state === "caution" ? "Worth a look"
     : "Logged";
+}
+/* ---- who / when / where -------------------------------------------------------------------- */
+/**
+ * The run's identity: what kind of session, when, where, and a way out to Strava.
+ *
+ * ⚠️ THE TIME IS SHOWN ONLY WHEN IT IS REAL. runStartMs falls back to 09:00 on the run's date when
+ * the id carries no timestamp — every watch run, whose id is a UUID — and that fallback exists for
+ * Strava's start_date_local, where something must be sent. Printing it here would put an invented
+ * "at 09:00" on a run somebody did at six in the evening, in the one block whose whole job is to say
+ * which run this was.
+ */
+function runStartMsKnown(run) {
+  const fromId = Number(String((run && run.id) || "").replace("run-", ""));
+  if (isFinite(fromId) && fromId > 1e12) return fromId - (Number(run.sec) || 0) * 1000;
+  return null;
+}
+const RD_MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function rdWhenText(run) {
+  const ms = runStartMsKnown(run);
+  if (ms) {
+    const d = new Date(ms);
+    const hh = String(d.getHours()).padStart(2, "0"), mm = String(d.getMinutes()).padStart(2, "0");
+    return d.getDate() + " " + RD_MONTHS[d.getMonth()] + " " + d.getFullYear() + " at " + hh + ":" + mm;
+  }
+  if (run.dateIso) {
+    const p = String(run.dateIso).split("-");
+    return Number(p[2]) + " " + RD_MONTHS[Number(p[1]) - 1] + " " + p[0];
+  }
+  return "";
+}
+const RD_PIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>';
+const RD_STRAVA = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.4 2 3.6 13.3h3.4L9.4 8.6l2.4 4.7h3.4L9.4 2Zm5.6 11.3-1.7 3.3-1.7-3.3H9l4.3 8.4 4.3-8.4h-2.6Z"/></svg>';
+function rdIdentityHtml(run) {
+  const rows = [];
+  const chip = run.type ? '<span class="rd-id-dot" style="background:var(--eff-' +
+    effortOf({ type: run.type, intensity: run.type === "vo2" || run.type === "threshold" || run.type === "race-specific" ? "hard" : undefined }) + ')"></span>' : "";
+  rows.push('<div class="rd-id-r">' + chip + '<span class="rd-id-t">' +
+    esc(SESSION_LABEL[run.type] || "Run") + '</span><span class="rd-id-s">· ' + esc(run.dist || "") + '</span></div>');
+  const when = rdWhenText(run);
+  if (when) rows.push('<div class="rd-id-r"><span class="rd-id-ic">' + ICON.cal + '</span><span class="rd-id-t">' + esc(when) + '</span></div>');
+  const place = run.place;
+  if (place) rows.push('<div class="rd-id-r"><span class="rd-id-ic">' + RD_PIN + '</span><span class="rd-id-t">' + esc(place) + '</span></div>');
+  // ⚠️ ONLY WHEN THE RUN GENUINELY REACHED STRAVA. The activity id is already stored by the upload;
+  // offering the link on a run that was never sent would be a dead end wearing Strava's colours.
+  if (run.strava && run.strava.state === "done" && run.strava.id) {
+    rows.push('<a class="rd-id-r rd-id-strava" href="https://www.strava.com/activities/' + esc(run.strava.id) +
+      '" target="_blank" rel="noopener"><span class="rd-id-ic">' + RD_STRAVA + '</span><span class="rd-id-t">View on Strava</span></a>');
+  }
+  return '<div class="rd-identity">' + rows.join("") + '</div>';
+}
+/**
+ * Where the run happened, in words. Looked up once and kept on the run for ever after.
+ *
+ * ⚠️ THE MIDPOINT IS GEOCODED, NOT THE START. The start of a run is very often somebody's front
+ * door, and this app has just been given a control for hiding exactly that — sending those precise
+ * coordinates to a third party to get a town name back would quietly contradict it. The middle of
+ * the route answers "where was this run" just as well and points at nobody's house.
+ *
+ * ⚠️ ONE REQUEST PER RUN, EVER, AND SILENT ON FAILURE. Nominatim is a free service run on donated
+ * capacity and its usage policy rules out bulk lookups; the result is stored on the run so a run
+ * opened a hundred times asks once. No network, no service, a sea of ocean — the row is simply absent.
+ */
+function runPlaceLookup(run) {
+  if (!run || run.place || run.placeTried) return;
+  const route = Array.isArray(run.route) ? run.route : null;
+  if (!route || route.length < 2) return;
+  run.placeTried = 1;
+  const mid = route[Math.floor(route.length / 2)];
+  if (!mid || !isFinite(mid.lat) || !isFinite(mid.lng)) return;
+  const url = "https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=12&addressdetails=1&lat=" +
+    encodeURIComponent(mid.lat.toFixed(4)) + "&lon=" + encodeURIComponent(mid.lng.toFixed(4));
+  fetch(url, { headers: { "Accept": "application/json" } })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((j) => {
+      const a = (j && j.address) || null;
+      if (!a) return;
+      const town = a.city || a.town || a.village || a.suburb || a.county || "";
+      const region = a.state || a.county || "";
+      const country = a.country || "";
+      const name = [town, region, country].filter((x, i, arr) => x && arr.indexOf(x) === i).join(", ");
+      if (!name) return;
+      run.place = name;
+      try { saveRuns(); } catch (e) {}
+      if (state.screen === "runview" && state.viewRunId === run.id) render();
+    })
+    .catch(() => {});
 }
 function rdMetricsHtml(run, a) {
   // ⚠️ THREE PRIMARY, THEN UP TO SIX SECONDARY, AND A MISSING VALUE IS OMITTED RATHER THAN ZEROED.
@@ -17952,6 +18090,7 @@ function wire() {
     const b = rdMap.getBoundingClientRect();
     if (r) buildOverviewMap(rdMap, runRoutePresentation(r).route, b.width, b.height);
   }
+  try { runPlaceLookup(viewedRun()); } catch (e) {}
   wireRunDebrief();
   const shareRun = $("shareRun"); if (shareRun) { shareRun.onclick = doShareRun; prepareShareCard(currentOverviewRun()); }
   // Strava sits in runOverviewHtml beside Share, so this one wiring serves the finish screen and the

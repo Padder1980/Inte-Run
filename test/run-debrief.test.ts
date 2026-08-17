@@ -296,3 +296,45 @@ test("the hero map is composited at the hero's own shape, not a fixed 700x420", 
   assert.match(caller, /buildOverviewMap\(rdMap, runRoutePresentation\(r\)\.route, b\.width, b\.height\)/,
     "the hero does not pass its measured box");
 });
+
+test("the start marker is the brand mark, drawn per-map so gradients cannot collide", () => {
+  const fn = lift("routeMapSvg");
+  assert.match(fn, /routeLogoMark\(/, "the start marker is not the brand mark");
+  assert.ok(!/class="rt-start"/.test(fn), "the plain start dot is still being drawn");
+  // ⚠️ Two route maps on one screen (the Logbook list) sharing a gradient id means the second
+  // silently adopts the first's fill — and loses it entirely if the first leaves the DOM.
+  assert.match(lift("routeLogoDefs"), /\+\+RT_LOGO_N/, "the gradient id is not unique per map");
+});
+
+test("the run's identity block never invents a time", () => {
+  // ⚠️ runStartMs falls back to 09:00 on the run's date when the id carries no timestamp — every
+  // watch run, whose id is a UUID. That fallback exists for Strava's start_date_local, where
+  // something must be sent. Printing it here would put an invented "at 09:00" on a run done in the
+  // evening, in the one block whose job is to say which run this was.
+  const known = lift("runStartMsKnown");
+  assert.ok(!/09:00|dateIso \+ "T/.test(known), "the known-time helper inherited the 09:00 fallback");
+  assert.match(known, /return null/, "it must be able to say the time is unknown");
+  const when = lift("rdWhenText");
+  assert.match(when, /runStartMsKnown\(/, "the block reads the fallback-free time");
+  assert.ok(!/runStartMs\(/.test(when), "the block reads the fabricating helper");
+});
+
+test("the place lookup geocodes the middle of the route, not the start", () => {
+  // ⚠️ The start of a run is very often somebody's front door, and this screen has just been given a
+  // control for hiding exactly that. Sending those precise coordinates to a third party for a town
+  // name would quietly contradict it.
+  const fn = lift("runPlaceLookup");
+  assert.match(fn, /route\[Math\.floor\(route\.length \/ 2\)\]/, "it geocodes an endpoint");
+  assert.ok(!/route\[0\]|route\[route\.length - 1\]/.test(fn), "an endpoint is being sent to the geocoder");
+  // Once per run, ever — the result is stored and the attempt is remembered even when it fails.
+  assert.match(fn, /run\.placeTried/, "a failed lookup would be retried on every open");
+  assert.match(fn, /\.catch\(\(\) => \{\}\)/, "a geocoder outage must not surface as an error");
+  assert.match(fn, /toFixed\(4\)/, "full-precision coordinates are being sent when four places is a town");
+});
+
+test("View on Strava appears only when the run genuinely reached Strava", () => {
+  const fn = lift("rdIdentityHtml");
+  assert.match(fn, /run\.strava\.state === "done" && run\.strava\.id/,
+    "the link would appear on runs that were never uploaded");
+  assert.match(fn, /strava\.com\/activities\//, "the link does not point at the activity");
+});

@@ -141,7 +141,15 @@ test("there is exactly ONE tile source, and ONE place naming the styles", () => 
   assert.match(html, /const MAP_STYLE_RUN = /, "the run card's style is not named in one place");
   assert.match(html, /const MAP_STYLE_SHARE = /, "the share card's style is not named in one place");
   // Both consumers go through the cache, or one of them still bills per view.
-  assert.equal((html.match(/routeMapFor\(/g) || []).length, 3,
+  // ⚠️ THE SELF-RECURSIVE CALL IS NOT A CONSUMER. routeMapFor re-enters itself once when a refused
+  // Mapbox token falls back to CARTO, and it does so precisely SO THAT the cache key is re-derived
+  // for the provider that actually drew — falling back deeper down would file a CARTO image under a
+  // mapbox key. Counting raw occurrences would have forced that worse design to keep a number at 3.
+  // The invariant is "every CONSUMER goes through the cache", so the recursion is excluded by name.
+  const calls = (html.match(/routeMapFor\(/g) || []).length;
+  const selfCalls = (lift("routeMapFor").match(/routeMapFor\(/g) || []).length - 1;  // minus its own signature
+  assert.equal(selfCalls, 1, "expected exactly one fallback re-entry inside routeMapFor");
+  assert.equal(calls - selfCalls, 3,
     "a map consumer is bypassing the cache (expected: the definition plus both call sites)");
   assert.equal((html.match(/loadRouteMap\(/g) || []).length, 2,
     "loadRouteMap has a caller other than routeMapFor — that one re-fetches tiles on every view");

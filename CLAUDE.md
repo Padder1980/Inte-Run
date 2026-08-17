@@ -326,9 +326,30 @@ every style. The run card and share card would have shared one cache entry, whic
 winning, presenting as the share card rendering the wrong map at the wrong size with nothing to point
 at. The provider is resolved ONCE in `routeMapFor` and the key is `kind + ":" + style`.
 
-⚠️ **STILL OPEN: a URL-restricted token will very likely be REFUSED in the native app**, which is not
-a web page and serves itself from `interun://app`. Mapbox restrictions check the requesting URL. That
-needs its own answer before the App Store — probably a second, differently-restricted token.
+✅ **CONFIRMED AND ANSWERED, 2026-08-17.** It was not "very likely" — it is what happens. The owner's
+phone reported `map: mapbox · 0 cors / 0 plain / 2 failed of 20 · mapbox tiles refused (CORS)`: every
+tile refused, on every run, for as long as a Mapbox token has been on that device. A URL-restricted
+token checks the REQUESTING URL and the native app is not a web page — `interun://app` matches no
+restriction that can be written.
+
+**The answer is that `routeMapFor` falls back to the surface's CARTO style when Mapbox is refused.**
+Every surface already names one, for the no-token case. It costs the Outdoors basemap — trails and
+contours, the reason Mapbox was chosen at all — and keeps a real map that is free and cacheable.
+⚠️ **THE FALLBACK RE-ENTERS `routeMapFor` SO THE CACHE KEY IS RE-DERIVED.** Falling back further down
+would file a CARTO image under a mapbox key, which is the same class of fault that function's own
+comment records catching once already.
+⚠️ **AND IT ONLY EVER FALLS TOWARDS THE FREE PROVIDER.** A refused Mapbox load is never retried as an
+uncacheable Mapbox load: that would re-fetch billed tiles on every view, which is the exact bill the
+one-render cache exists to prevent.
+⚠️ **A SECOND, UNRESTRICTED TOKEN IS STILL THE ONLY WAY TO KEEP OUTDOORS IN THE APP** — and an
+unrestricted `pk.` token shipped in a client is a token anyone can extract and spend. The honest
+options are: accept CARTO in the app, or keep Mapbox for the shared card only. Not decided.
+
+⚠️ **THE MAP FAILED SILENTLY FOR ITS ENTIRE LIFE, AND THAT IS WHY THIS TOOK MONTHS TO SURFACE.**
+`buildOverviewMap` ends in a bare `.catch(() => {})`, and the fallback — a route drawn on a plain
+panel — is designed to look deliberate. On a small card nobody questioned it; the moment the debrief
+made it a full-bleed hero it was obvious. `mapDiagLine()` in Support › Your data now reports the
+provider, how many tiles loaded with CORS, how many without, how many failed, and why.
 
 **The swap-point:** `MAP_STYLE_RUN` and `MAP_STYLE_SHARE` are the only two places a style is named, and
 `loadRouteMap` builds the only tile URL in the app. They differ on purpose — the little map on a

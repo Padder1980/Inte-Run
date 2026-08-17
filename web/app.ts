@@ -15855,13 +15855,30 @@ function routeMapKey(route, pw, ph, style) {
  * cached size does not depend on which device happened to draw it first.
  */
 const MAPCACHE_SS = 2;
-function routeMapFor(route, pw, ph, styles) {
+/**
+ * ⚠️ A REFUSED MAPBOX TOKEN FALLS BACK TO CARTO RATHER THAN SHOWING NOTHING. Confirmed on the
+ * owner's phone 2026-08-17: "map: mapbox · 0 cors / 0 plain / 2 failed of 20 · refused (CORS)".
+ * This is the open question this file has carried since the provider move — a URL-restricted Mapbox
+ * token checks the REQUESTING URL, and the native app is not a web page: it serves itself from
+ * interun://app, which matches no URL restriction, so every tile is refused.
+ *
+ * Each surface already names a CARTO style beside its Mapbox one, for exactly the no-token case.
+ * Using it when the token is refused costs the Outdoors basemap (trails and contours, which is why
+ * Mapbox was chosen) and keeps a real map, free and cacheable. The alternative on offer was a route
+ * floating on a blank panel.
+ *
+ * ⚠️ THE FALLBACK RE-ENTERS THROUGH THIS FUNCTION SO THE CACHE KEY IS RE-DERIVED. Falling back
+ * inside loadRouteMap would store a CARTO image under a mapbox key — the same class of fault this
+ * function's own comment below records catching once already.
+ */
+function routeMapFor(route, pw, ph, styles, forceCarto) {
   // ⚠️ RESOLVE THE PROVIDER ONCE, HERE, and key on the RESOLVED name. styles is now an object with a
   // name per provider, and passing it straight to routeMapKey would stringify it to "[object Object]"
   // — identical for every style, so the run card and the share card would silently share one cache
   // entry and whichever drew first would win. It would have looked like the share card rendering the
   // wrong map at the wrong size, with nothing to point at.
-  const prov = mapProviderFor(styles || MAP_STYLE_SHARE);
+  const st = styles || MAP_STYLE_SHARE;
+  const prov = forceCarto ? { kind: "carto", style: st.carto, token: "" } : mapProviderFor(st);
   const key = routeMapKey(route, pw, ph, prov.kind + ":" + prov.style);
   const fromBlob = (blob, z, ox, oy) => new Promise((resolve, reject) => {
     const url = URL.createObjectURL(blob), img = new Image();
@@ -15889,6 +15906,13 @@ function routeMapFor(route, pw, ph, styles) {
         } catch (e) {}
         return out;
       });
+    })
+    .catch((err) => {
+      if (prov.kind === "mapbox" && !forceCarto) {
+        MAPDIAG.why = "mapbox refused; drew the free map instead";
+        return routeMapFor(route, pw, ph, st, true);
+      }
+      throw err;
     });
 }
 function loadRouteMap(route, pw, ph, prov) {
@@ -15923,7 +15947,7 @@ function loadRouteMap(route, pw, ph, prov) {
       // ⚠️ ONLY CARTO MAY RETRY WITHOUT CORS. See loadTileImage: an uncacheable Mapbox map re-fetches
       // billed tiles on every view, which is the bill the cache exists to prevent.
       if (prov.kind !== "carto") {
-        MAPDIAG.failed++; MAPDIAG.why = "mapbox tiles refused (" + (e && e.message) + "); not retried, it would be uncacheable and billed";
+        MAPDIAG.failed++; MAPDIAG.why = "mapbox tiles refused (" + (e && e.message) + ")";
         return reject(e);
       }
       fetchAll(true).then((tiles) => { MAPDIAG.why = "drawn without CORS, so not cached"; done(tiles); })

@@ -345,6 +345,19 @@ one-render cache exists to prevent.
 unrestricted `pk.` token shipped in a client is a token anyone can extract and spend. The honest
 options are: accept CARTO in the app, or keep Mapbox for the shared card only. Not decided.
 
+⚠️ **THE ROUTE JUMPED WHEN THE MAP ARRIVED, BECAUSE TWO FRAMINGS DISAGREED.** The hero painted the
+route immediately using `routeMapSvg` with NO projection — which fits the line to its own bounding
+box — and `buildOverviewMap` then replaced it a second or two later with the Mercator-framed version
+at the map's zoom. Measured from the owner's screen recording: at 0.4s the line filled the hero and
+ran off the top; at 2.0s it was less than half the size and in a different place.
+`routeMapFraming(route, pw, ph)` is now the one definition of how a route is framed — pure
+arithmetic, no network — used by `loadRouteMap` and by the placeholder, which `wire()` draws once it
+can measure the box. Measured after: **0px of movement** when the tiles land.
+⚠️ **THE PLACEHOLDER CANNOT BE DRAWN IN `rdHeroHtml`.** Before layout the only framing available is
+the bounding-box fit, which is the wrong one — so the hero renders an empty map and `wire()` fills it.
+⚠️ **THE QUANTISED SIZE MUST MATCH IN BOTH PLACES** (`Math.round(n / 20) * 20`), or the placeholder is
+framed for one size and the tiles for another, and the jump comes back smaller and harder to see.
+
 ⚠️ **THE CARTO FALLBACK CREDITED MAPBOX OVER CARTO'S TILES, AND ATTRIBUTION IS A LICENCE TERM.**
 `mapAttribution` asks `mapProviderFor`, which answers *who we would prefer* — fine while that was the
 only answer, wrong the moment a refused Mapbox token started falling back. The owner's screenshot

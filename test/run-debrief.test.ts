@@ -293,8 +293,16 @@ test("the hero map is composited at the hero's own shape, not a fixed 700x420", 
   assert.match(fn, /Math\.round\(n \/ 20\) \* 20/, "the requested size is not quantised for the cache key");
 
   const caller = lift("wire");
-  assert.match(caller, /buildOverviewMap\(rdMap, runRoutePresentation\(r\)\.route, b\.width, b\.height\)/,
+  assert.match(caller, /buildOverviewMap\(rdMap, rt, b\.width, b\.height\)/,
     "the hero does not pass its measured box");
+  // ⚠️ AND THE PLACEHOLDER MUST BE FRAMED THE SAME WAY. Framing the route by its own bounding box
+  // while tiles load, then replacing it with the Mercator-framed version, is what made the line jump
+  // from large to small a second after the screen opened.
+  assert.match(caller, /routeMapFraming\(rt, W, H\)\.proj/,
+    "the placeholder route is not drawn in the map's own framing");
+  const load = lift("loadRouteMap");
+  assert.match(load, /routeMapFraming\(route, pw, ph\)/,
+    "the tiled map computes its own framing, so the two can drift apart again");
 });
 
 test("the start marker is the brand mark, drawn per-map so gradients cannot collide", () => {

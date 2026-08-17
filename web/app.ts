@@ -15394,10 +15394,14 @@ function rdWell(run, a) {
 /* ---- the pieces ---------------------------------------------------------------------------- */
 function rdHeroHtml(run) {
   const pres = runRoutePresentation(run);
+  // ⚠️ EMPTY UNTIL wire() CAN MEASURE THE BOX. Drawing the route here means framing it by its own
+  // bounding box — the only framing available before layout — and the map then re-frames it in
+  // Mercator a second later, which is the jump. wire() knows the real size and can use the map's own
+  // framing immediately, so the line lands once and stays put.
   const inner = pres.hidden || !pres.route
     ? '<div class="rd-noroute">' + ICON.timer + '<span>' +
         (pres.hidden ? "Map hidden" : run.indoor ? "Indoor session" : "No route recorded") + '</span></div>'
-    : routeMapSvg(pres.route);
+    : "";
   return '<div class="rd-hero" id="rdHero">' +
     '<div class="rd-map" id="rdMap" data-route="' + (pres.route ? "1" : "0") + '">' + inner + '</div>' +
     '<div class="rd-fade"></div>' +
@@ -16138,16 +16142,32 @@ function routeMapFor(route, pw, ph, styles, forceCarto) {
       throw err;
     });
 }
+/**
+ * How a route is framed on a map of a given size: the zoom, the pixel origin and the projection.
+ *
+ * ⚠️ EXTRACTED SO THE PLACEHOLDER AND THE REAL MAP CANNOT FRAME THE ROUTE DIFFERENTLY. Before this,
+ * the hero drew the route fitted to its own bounding box while tiles were loading, then replaced it
+ * with the Mercator-framed version a second or two later — so the line visibly jumped from large to
+ * small and moved position as the map arrived. Reported as "that jumpy effect". No network here:
+ * this is pure arithmetic, so the placeholder can be drawn in the map's own framing instantly.
+ */
+function routeMapFraming(route, pw, ph) {
+  const lats = route.map((p) => p.lat), lngs = route.map((p) => p.lng);
+  const minLa = Math.min(...lats), maxLa = Math.max(...lats), minLo = Math.min(...lngs), maxLo = Math.max(...lngs);
+  const pad = Math.min(64, pw * 0.1);
+  let z = 18;
+  for (; z >= 3; z--) { if (mercX(maxLo, z) - mercX(minLo, z) <= pw - 2 * pad && mercY(minLa, z) - mercY(maxLa, z) <= ph - 2 * pad) break; }
+  const originX = mercX((minLo + maxLo) / 2, z) - pw / 2, originY = mercY((minLa + maxLa) / 2, z) - ph / 2;
+  return { z: z, originX: originX, originY: originY,
+    proj: (p) => [mercX(p.lng, z) - originX, mercY(p.lat, z) - originY] };
+}
 function loadRouteMap(route, pw, ph, prov) {
   pw = pw || MAP_W; ph = ph || MAP_H;
   prov = prov || mapProviderFor(MAP_STYLE_SHARE);
   return new Promise((resolve, reject) => {
     if (!route || route.length < 2) return reject(new Error("no route"));
-    const lats = route.map((p) => p.lat), lngs = route.map((p) => p.lng);
-    const minLa = Math.min(...lats), maxLa = Math.max(...lats), minLo = Math.min(...lngs), maxLo = Math.max(...lngs);
-    const pad = Math.min(64, pw * 0.1); let z = 18;
-    for (; z >= 3; z--) { if (mercX(maxLo, z) - mercX(minLo, z) <= pw - 2 * pad && mercY(minLa, z) - mercY(maxLa, z) <= ph - 2 * pad) break; }
-    const originX = mercX((minLo + maxLo) / 2, z) - pw / 2, originY = mercY((minLa + maxLa) / 2, z) - ph / 2;
+    const fr = routeMapFraming(route, pw, ph);
+    const z = fr.z, originX = fr.originX, originY = fr.originY;
     const n = Math.pow(2, z), specs = [];
     for (let tx = Math.floor(originX / MAP_TILE); tx <= Math.floor((originX + pw) / MAP_TILE); tx++)
       for (let ty = Math.floor(originY / MAP_TILE); ty <= Math.floor((originY + ph) / MAP_TILE); ty++) {
@@ -18153,7 +18173,14 @@ function wire() {
     const r = viewedRun();
     // Measured after the markup is in the document, so the hero's real box is known.
     const b = rdMap.getBoundingClientRect();
-    if (r) buildOverviewMap(rdMap, runRoutePresentation(r).route, b.width, b.height);
+    const rt = r ? runRoutePresentation(r).route : null;
+    if (rt && b.width > 0) {
+      // The route, framed exactly as the tiles will frame it, drawn before any of them arrive.
+      const q = (n) => Math.max(120, Math.round(n / 20) * 20);
+      const W = q(b.width), H = q(b.height);
+      rdMap.innerHTML = '<div class="ov-mapov">' + routeMapSvg(rt, routeMapFraming(rt, W, H).proj, W, H) + '</div>';
+      buildOverviewMap(rdMap, rt, b.width, b.height);
+    }
   }
   try { runPlaceLookup(viewedRun()); } catch (e) {}
   wireRunDebrief();

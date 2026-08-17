@@ -3216,6 +3216,7 @@ button.rd-meta-r { cursor: pointer; }
 .rd-meta-c { display: inline-flex; color: var(--ink-faint); transform: rotate(-90deg); }
 .rd-meta-c svg { width: 15px; height: 15px; }
 
+.rd-danger .rd-meta-k, .rd-danger .rd-meta-ic { color: var(--rest); }
 .rd-share { display: flex; width: 100%; min-height: var(--tap); align-items: center; justify-content: center; gap: var(--s2);
   margin: var(--s5) 0 0; padding: 0 var(--s4); font: inherit; font-size: var(--t-card); font-weight: 600;
   color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-pill); cursor: pointer; }
@@ -17717,6 +17718,18 @@ function wireRunDebrief() {
   const share = $("rdShare");
   if (share) share.onclick = () => openRunShareSheet(viewedRun());
 
+  // ⚠️ THE OVERFLOW WAS DRAWN AND WIRED TO NOTHING. It shipped as a button that looked live, sat in
+  // the top-right corner where every iOS app puts its actions, and did nothing at all when tapped —
+  // reported within the hour. The id-must-resolve guard only proves an id EXISTS; nothing proved a control
+  // does anything, which is why test/run-debrief.test.ts now sweeps every button in this screen for
+  // a handler.
+  //
+  // It holds the actions that belong to the RUN rather than to the reading of it: sharing, who can
+  // see the route, and deleting. Delete is here and not in the body on purpose — a destructive
+  // action does not belong beside the coaching.
+  const more = $("rdMore");
+  if (more) more.onclick = () => openRunMoreSheet(viewedRun());
+
   document.querySelectorAll("[data-rdmeta]").forEach((b) => {
     b.onclick = () => {
       const what = b.getAttribute("data-rdmeta");
@@ -17748,6 +17761,34 @@ function openRunShareSheet(run) {
     (strava || '<p class="rd-sr">Connect Strava in Profile to send runs there.</p>');
   $("sheetOv").classList.add("on");
   wireSheetShare(run);
+}
+/** The run's own actions. Share and privacy repeat what is further down the page; delete is only here. */
+function openRunMoreSheet(run) {
+  if (!run) return;
+  ensureSheet(); SHEET_CTX = null;
+  $("sheetBody").innerHTML = '<div class="sh-h">' + esc(run.t || "Run") + '</div>' +
+    '<div class="rd-meta">' +
+      '<button class="rd-meta-r" id="rdMoreShare"><span class="rd-meta-ic" aria-hidden="true">' + ICON.share + '</span>' +
+        '<span class="rd-meta-k">Share this run</span><span class="rd-meta-c" aria-hidden="true">' + ICON.chevDown + '</span></button>' +
+      '<button class="rd-meta-r" id="rdMorePriv"><span class="rd-meta-ic" aria-hidden="true">' + ICON.person + '</span>' +
+        '<span class="rd-meta-k">Route privacy</span><span class="rd-meta-v">' +
+        (PRIVACY.map ? "Map hidden" : PRIVACY.ends ? "Ends hidden" : "Full route") + '</span>' +
+        '<span class="rd-meta-c" aria-hidden="true">' + ICON.chevDown + '</span></button>' +
+      '<button class="rd-meta-r rd-danger" id="rdMoreDel"><span class="rd-meta-ic" aria-hidden="true">' + ICON.trash + '</span>' +
+        '<span class="rd-meta-k">Delete this run</span></button>' +
+    '</div>';
+  $("sheetOv").classList.add("on");
+  const sh = $("rdMoreShare"); if (sh) sh.onclick = () => { closeSheet(); openRunShareSheet(run); };
+  const pv = $("rdMorePriv"); if (pv) pv.onclick = () => { closeSheet(); openPrivacySheet(); };
+  const dl = $("rdMoreDel");
+  if (dl) dl.onclick = () => {
+    // ⚠️ STRAIGHT BACK TO THE LOGBOOK. deleteRun re-renders, and this screen resolves its run by id —
+    // staying here would land on "Run not found." deleteRun's own undo toast is the safety net, so
+    // there is no second confirmation to tap through.
+    closeSheet();
+    state.screen = null; state.tab = "activities"; state.actTab = "workouts";
+    deleteRunById(run.id);
+  };
 }
 function rdPrivToggle(key, label, on) {
   return '<div class="zr-auto"><span>' + label + '</span>' +

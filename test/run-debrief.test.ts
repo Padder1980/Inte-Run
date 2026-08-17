@@ -230,3 +230,46 @@ test("tap targets reach 44pt, including the ones that stay visually smaller", ()
     assert.match(rule, /(min-)?height: var\(--tap\)/, sel + " does not reach the 44pt minimum");
   }
 });
+
+test("every control in the debrief actually does something", () => {
+  // ⚠️ THE OVERFLOW BUTTON SHIPPED WIRED TO NOTHING. It rendered, it sat in the top-right where every
+  // iOS app puts its actions, and tapping it did nothing at all — reported within the hour of the
+  // rebuild going live. The existing $("id")-must-resolve guard proves an id EXISTS; it cannot prove
+  // a control is connected to anything, and "looks live, is inert" is its own class of defect that
+  // this project has now shipped twice (the profile confirm button clicked a #saveSetup that was
+  // nowhere in the app).
+  //
+  // So: collect every id="…" the debrief renders on a <button>, and require each to be reachable
+  // from a handler — either by its own id or through a data- attribute sweep.
+  const html = page();
+  const scope = [lift("rdNavHtml"), lift("rdNextHtml"), lift("rdShareHtml"), lift("rdMetaHtml"),
+    lift("rdAnalysisHtml"), lift("rdAdvancedHtml"), lift("openRunShareSheet"), lift("openRunMoreSheet"),
+    lift("openPrivacySheet")].join("\n");
+  const ids = [...scope.matchAll(/<button[^>]*id="([a-zA-Z0-9_]+)"/g)].map((m) => m[1]!);
+  assert.ok(ids.length >= 5, "expected several buttons, found " + ids.length);
+  const wiring = lift("wireRunDebrief") + lift("openRunShareSheet") + lift("openRunMoreSheet") +
+    lift("openPrivacySheet") + lift("wireSheetShare") + lift("wire");
+  const dead = ids.filter((id) => !new RegExp('\\$\\("' + id + '"\\)').test(wiring));
+  assert.deepEqual(dead, [], "these render as buttons and nothing wires them: " + dead.join(", "));
+
+  // The attribute-driven controls need their sweep to exist too.
+  for (const attr of ["data-rdtab", "data-rdacc", "data-rdmeta", "data-rdpriv"]) {
+    assert.ok(new RegExp('querySelectorAll\\("\\[' + attr + '\\]"\\)').test(wiring),
+      attr + " is rendered but never swept for handlers");
+  }
+});
+
+test("the overflow offers the run's own actions, and delete leaves the screen", () => {
+  const fn = lift("openRunMoreSheet");
+  assert.match(fn, /Share this run/);
+  assert.match(fn, /Route privacy/);
+  assert.match(fn, /Delete this run/);
+  // ⚠️ deleteRun re-renders, and this screen resolves its run BY ID — deleting while still on it
+  // would land the runner on "Run not found." rather than back in the Logbook.
+  const nav = fn.indexOf('state.screen = null');
+  const del = fn.indexOf("deleteRunById");
+  assert.ok(nav > 0 && del > nav, "the screen must be left before the run is deleted");
+  // ⚠️ deleteRun already raises an undo toast; a second confirmation would be a dialog to dismiss
+  // before an action that is already reversible.
+  assert.match(lift("deleteRun"), /toastUndo/, "delete is no longer undoable, so it now needs a confirm step");
+});

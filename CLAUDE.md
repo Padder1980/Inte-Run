@@ -345,6 +345,21 @@ one-render cache exists to prevent.
 unrestricted `pk.` token shipped in a client is a token anyone can extract and spend. The honest
 options are: accept CARTO in the app, or keep Mapbox for the shared card only. Not decided.
 
+⚠️ **THE OVERFLOW BUTTON SHIPPED WIRED TO NOTHING, AND NO EXISTING GUARD COULD SEE IT.** `rdMore`
+rendered, sat in the top-right corner where every iOS app puts its actions, and did nothing at all —
+reported within the hour. The id-must-resolve guard proves an id EXISTS; it cannot prove a control is
+connected to anything, and "looks live, is inert" is its own class of defect this project has now
+shipped twice (the profile confirm button clicked a `#saveSetup` that was nowhere in the app).
+`test/run-debrief.test.ts` now collects every `id=` rendered on a `<button>` by the debrief and
+requires each to be reached by a handler, plus the four `data-` sweeps. Re-broken by unwiring it.
+⚠️ **And writing that guard's comment tripped the id guard on the literal it quotes** — the fifth
+firing of that trap. The remedy is to reword the comment; stripping comments was tried, measured and
+reverted years-equivalent ago because the regex ate real markup.
+⚠️ **Delete lives in the overflow and leaves the screen BEFORE deleting.** This screen resolves its
+run by id, so deleting while still on it lands the runner on "Run not found." rather than the Logbook.
+No confirmation dialog: `deleteRun` already raises an undo toast, and a dialog before a reversible
+action is a tap for nothing.
+
 ⚠️ **THE MAP FAILED SILENTLY FOR ITS ENTIRE LIFE, AND THAT IS WHY THIS TOOK MONTHS TO SURFACE.**
 `buildOverviewMap` ends in a bare `.catch(() => {})`, and the fallback — a route drawn on a plain
 panel — is designed to look deliberate. On a small card nobody questioned it; the moment the debrief

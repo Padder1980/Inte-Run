@@ -301,9 +301,27 @@ test("the start marker is the brand mark, drawn per-map so gradients cannot coll
   const fn = lift("routeMapSvg");
   assert.match(fn, /routeLogoMark\(/, "the start marker is not the brand mark");
   assert.ok(!/class="rt-start"/.test(fn), "the plain start dot is still being drawn");
-  // ⚠️ Two route maps on one screen (the Logbook list) sharing a gradient id means the second
-  // silently adopts the first's fill — and loses it entirely if the first leaves the DOM.
-  assert.match(lift("routeLogoDefs"), /\+\+RT_LOGO_N/, "the gradient id is not unique per map");
+  assert.match(fn, /routeFinishMark\(/, "the finish marker is not the chequered disc");
+  assert.ok(!/class="rt-end"/.test(fn), "the plain finish ring is still being drawn");
+  // ⚠️ Two route maps on one screen (the Logbook list) sharing a gradient or clip id means the second
+  // silently adopts the first's geometry — and loses its fill, or is clipped away entirely, if the
+  // first leaves the DOM. Asserted as the INVARIANT (the counter moves, both ids derive from it)
+  // rather than as one spelling of the increment, which is what this pinned before and it broke on a
+  // refactor that changed nothing about the behaviour.
+  const defs = lift("routeLogoDefs");
+  assert.match(defs, /RT_LOGO_N\s*\+\+|\+\+\s*RT_LOGO_N/, "the per-map counter never advances");
+  assert.match(defs, /RT_LOGO_ID = "rtlg" \+ RT_LOGO_N|"rtlg" \+ \(\+\+RT_LOGO_N\)/, "the gradient id is not derived from the counter");
+  assert.match(defs, /RT_CLIP_ID = "rtcl" \+ RT_LOGO_N/, "the clip id is not derived from the counter");
+});
+
+test("the finish marker reads as a finish at the size it is actually drawn", () => {
+  // ⚠️ A CHEQUERED DISC, NOT A FLAG ON A POLE. The marker is about 22px across on screen; a pole
+  // with a rectangle on it resolves to a smudge with a stick, which is worse than the plain ring it
+  // replaces. The chequer carries the meaning; the flag's outline is the part that does not survive.
+  const fn = lift("routeFinishMark");
+  assert.match(fn, /\(i \+ j\) % 2/, "the chequer pattern is not generated");
+  assert.match(fn, /clip-path="url\(#' \+ RT_CLIP_ID/, "the chequer is not clipped to the disc");
+  assert.ok(!/#fc5200|var\(--accent\)/.test(fn), "the finish marker should not compete with the brand or Strava colour");
 });
 
 test("the run's identity block never invents a time", () => {

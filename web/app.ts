@@ -823,19 +823,14 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 .ov-mapov { position: absolute; inset: 0; }
 .ov-mapov .routemap { width: 100%; height: 100%; }
 .ov-mapov .rt-line { stroke-width: 6; }
-.ov-mapov .rt-start, .ov-mapov .rt-end { stroke-width: 4; }
 .ov-attr { position: absolute; left: 10px; bottom: 7px; font-size: 10px; color: rgba(255,255,255,.45); text-shadow: 0 1px 2px rgba(0,0,0,.5); pointer-events: none; }
 /* Light (Voyager) overview map: give the route a dark casing so the bright-green line reads on streets */
 .ov-light .ov-mapov .rt-line { stroke-width: 7; }
-.ov-light .ov-mapov .rt-start { fill: #17c98f; stroke: #fff; stroke-width: 4.5; }
-.ov-light .ov-mapov .rt-end { fill: #fff; stroke: #062e25; stroke-width: 5; }
 .ov-light .ov-attr { color: rgba(20,44,36,.62); text-shadow: 0 1px 1px rgba(255,255,255,.7); }
 .routemap { display: block; width: 100%; height: auto; }
 /* The route: one colour, the brand teal. A soft shadow keeps it legible on pale streets without
    being a second colour. */
 .rt-line { fill: none; stroke: #16b7a4; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 2px rgba(4,26,22,.45)); }
-.rt-start { fill: var(--accent); stroke: #fff; stroke-width: 2.5; }
-.rt-end { fill: #fff; stroke: var(--accent); stroke-width: 3.5; }
 .rt-none { padding: 26px 16px; text-align: center; font-size: 13px; color: var(--ink-faint); }
 /* The post-run debrief: one scroll, map first. Three columns, and the tile count varies with what
    was actually measured (elevation only on a phone run, heart rate only with a watch), so the last
@@ -14679,7 +14674,7 @@ function routeMapSvg(route, proj, vbW, vbH) {
     routeLogoDefs() +
     '<path class="rt-line" d="' + d + '"/>' +
     routeLogoMark(s[0], s[1], r) +
-    '<circle class="rt-end" cx="' + e[0].toFixed(1) + '" cy="' + e[1].toFixed(1) + '" r="' + r + '"/></svg>';
+    routeFinishMark(e[0], e[1], r) + '</svg>';
 }
 /**
  * The brand mark as the start marker on a route.
@@ -14700,10 +14695,44 @@ function routeMapSvg(route, proj, vbW, vbH) {
  */
 let RT_LOGO_N = 0;
 let RT_LOGO_ID = "";
+let RT_CLIP_ID = "";
 function routeLogoDefs() {
-  RT_LOGO_ID = "rtlg" + (++RT_LOGO_N);
+  RT_LOGO_N++;
+  RT_LOGO_ID = "rtlg" + RT_LOGO_N;
+  RT_CLIP_ID = "rtcl" + RT_LOGO_N;
   return '<defs><linearGradient id="' + RT_LOGO_ID + '" x1="0" y1="0" x2="1" y2="1">' +
     '<stop offset="0" stop-color="#16b7a4"/><stop offset="1" stop-color="#0a6f64"/></linearGradient></defs>';
+}
+/**
+ * The finish marker: a chequered disc.
+ *
+ * ⚠️ A CHEQUERED DISC, NOT A FLAG ON A POLE. At this size the marker is about 22px across on screen,
+ * and a pole with a rectangle on it resolves to a smudge with a stick — unreadable, and worse than
+ * the plain ring it replaces. The chequer pattern is what carries the meaning "finish"; the flag's
+ * outline is the part that does not survive being small.
+ *
+ * ⚠️ THE CLIP PATH ID IS UNIQUE PER MAP, for the same reason the gradient's is. Two route maps on one
+ * screen sharing a clip id means the second is clipped by the first's geometry — and clipped away
+ * entirely if the first ever leaves the DOM.
+ */
+function routeFinishMark(cx, cy, r) {
+  const R = r * 1.55;
+  const cell = R / 2;
+  let sq = "";
+  for (let i = 0; i < 4; i++) {
+    for (let j = 0; j < 4; j++) {
+      if ((i + j) % 2) continue;
+      sq += '<rect x="' + (-R + i * cell).toFixed(2) + '" y="' + (-R + j * cell).toFixed(2) +
+        '" width="' + cell.toFixed(2) + '" height="' + cell.toFixed(2) + '" fill="#0b2a24"/>';
+    }
+  }
+  return '<g class="rt-finish" transform="translate(' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')">' +
+    '<clipPath id="' + RT_CLIP_ID + '"><circle r="' + R.toFixed(1) + '"/></clipPath>' +
+    '<circle r="' + (R + r * 0.34).toFixed(1) + '" fill="#fff"/>' +
+    '<circle r="' + R.toFixed(1) + '" fill="#fff"/>' +
+    '<g clip-path="url(#' + RT_CLIP_ID + ')">' + sq + '</g>' +
+    '<circle r="' + R.toFixed(1) + '" fill="none" stroke="#0b2a24" stroke-width="' + (r * 0.22).toFixed(2) + '"/>' +
+    '</g>';
 }
 function routeLogoMark(cx, cy, r) {
   // A touch larger than the plain dot it replaces: a mark the size of a 9px dot is a smudge.

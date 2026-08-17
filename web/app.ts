@@ -3066,30 +3066,63 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .story-bar { flex: 1 1 0; height: 3px; border-radius: var(--r-pill); background: rgba(255,255,255,.26); overflow: hidden; }
 .story-bar i { display: block; width: 0; height: 100%; background: #fff; }
 .story-bar.done i { width: 100%; }
-.story-bar.live i { width: 100%; transition: width 4.6s linear; }
+/* THE WAIT IS PER PANEL, AND THE BAR CANNOT LIE ABOUT IT. Every panel used to get the same 4600ms,
+   which is wrong in both directions: the route needs time to finish drawing and a one-line statement
+   does not. JS owns the NUMBER (storyPanelMs, set as --story-dur on the overlay) and CSS still owns
+   the animated property, so there is exactly one place the duration is decided. */
+.story-bar.live i { width: 100%; transition: width var(--story-dur, 4.6s) linear; }
 @media (prefers-reduced-motion: reduce) { .story-bar.live i { transition: none; } }
 .story-head { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) 0; }
 .story-mark { display: block; width: 28px; height: 28px; flex: 0 0 auto; }
 .story-mark svg { width: 100%; height: 100%; }
 .story-h { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
 .story-h b { font-size: var(--t-body); font-weight: 650; }
-.story-h i { font-style: normal; font-size: var(--t-meta); color: rgba(255,255,255,.62); }
+/* .84, not .62 — the header sits on the teal gradient, where .62 white measured 2.93:1. */
+.story-h i { font-style: normal; font-size: var(--t-meta); color: rgba(255,255,255,.84); }
 .story-x { flex: 0 0 auto; width: var(--tap); height: var(--tap); padding: 0; margin: 0;
   font: inherit; font-size: var(--t-hero); line-height: 1; color: #fff;
   background: none; border: 0; cursor: pointer; }
 
 .story-stage { position: absolute; inset: 0; }
-/* ⚠️ THE TAP ZONES SIT ABOVE THE PANEL BUT BELOW ITS BUTTONS — the last panel has real actions on it,
-   and a full-width invisible "next" over them would swallow every tap on Share. */
+/* ⚠️ THE TAP ZONES MUST NOT REACH THE LAST PANEL'S BUTTONS, AND A HIGHER z-index ON THE BUTTONS DOES
+   NOT ACHIEVE IT. .story-p is its own stacking context (it carries a filter for the cross-dissolve),
+   so .story-acts's z-index is sorted INSIDE the panel and can never outrank a zone that is a sibling
+   of the stage. Measured before this: elementFromPoint over every 6px of #storyShare returned
+   storyPrev or storyNext and never the button — the Share control was 100% dead while the stylesheet
+   said 5 > 2 and the test that "guarded" it compared exactly those two integers.
+   The zones are therefore SHORTENED on the last panel, which is geometry rather than paint order, so
+   nothing about a stacking context can undo it. Prev/Next still work above the buttons.
+   ⚠️ AND THE NUMBER IS MEASURED FROM THE BUTTONS, NOT WRITTEN DOWN HERE. This was a literal 132px, which
+   stopped the zones 36-45px short: elementFromPoint over #storyShare returned storyNext or storyPrev for
+   84 of 97 swept points, so 9-13% of the Share button was live at the default text size — and the fault
+   eased at LARGER text (89% live at --tscale 1.3) because the card grows and pushes the actions down, so
+   it was worst at the setting almost everybody uses. No constant can hold across the type scale, the safe
+   area and a card whose height depends on how many stat tiles the run has. storyTapStop publishes the
+   real distance; the fallback below is only for the frame before it is measured. */
 .story-tap { position: absolute; top: 0; bottom: 0; width: 34%; z-index: 2;
   background: none; border: 0; padding: 0; margin: 0; cursor: pointer; }
+.story-ov.st-last .story-tap { bottom: var(--story-tapstop, calc(190px + env(safe-area-inset-bottom, 0px))); }
 .story-prev { left: 0; }
 .story-next { right: 0; width: 66%; }
 /* ⚠️ FULL-BLEED. The first version centred a 360px box on black and read as a dialog rather than a
    moment. The visual owns the screen; the words sit over a fade at the bottom. */
+/* ⚠️ THE PANELS CROSS-DISSOLVE THROUGH A BLUR, WHICH IS WHAT MAKES THIS ONE MOVING PICTURE RATHER
+   THAN A SLIDESHOW. Measured on the reference: edge energy over a cut falls from 3.64 to 1.77 and
+   resolves back over ~1.5s — the outgoing panel goes soft BEFORE it goes. A plain .4s opacity fade
+   (what shipped) measured as an instant step, 2.54 → 1.55 in one frame.
+   ⚠️ THE OUTGOING PANEL IS KEPT IN THE DOM FOR THE DURATION (storyShow adds .out, appends the new
+   panel and removes the old one on a timer) — replacing stage.innerHTML outright means there is
+   nothing left to blur out, so only half the dissolve would exist. */
 .story-p { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column;
-  justify-content: flex-end; opacity: 0; }
-.story-p.in { opacity: 1; transition: opacity .4s ease; }
+  justify-content: flex-end; opacity: 0; filter: blur(14px); transform: scale(1.04); }
+.story-p.in { opacity: 1; filter: blur(0px); transform: scale(1);
+  transition: opacity .5s ease, filter .62s ease, transform .62s ease; }
+.story-p.out { opacity: 0; filter: blur(16px); transform: scale(.985); pointer-events: none;
+  transition: opacity .46s ease, filter .46s ease, transform .46s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .story-p, .story-p.in, .story-p.out { filter: none; transform: none; }
+  .story-p.in { transition: opacity .2s linear; }
+}
 /* ⚠️ THE MOOD FOLLOWS THE VERDICT rather than being one fixed colour. An "ease off" panel glowing
    the same triumphant green as a perfect one is the screen disagreeing with its own words. */
 .story-ov { --story-a: #16b7a4; --story-b: #0a6f64; }
@@ -3101,71 +3134,572 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
   background: linear-gradient(to bottom, transparent, #06110e 82%); pointer-events: none; }
 .story-route::before { background: #06110e; }
 
-.story-map { position: absolute; inset: 0; z-index: -1; }
+/* ⚠️ THE MAP SITS ABOVE THE PANEL'S OWN BOTTOM SCRIM, NOT UNDER IT. Both were z-index -1 and a
+   ::after paints after element children, so the scrim covered the lower half of the route: measured
+   along the line, the brand teal #16b7a4 rendered as (21,159,139) at the top and (17,110,96) two
+   thirds down — a 31% luminance loss — and the chequered finish marker read grey. The statement still
+   needs a ground to sit on, so the route panel gets its OWN short scrim inside the map, low enough
+   that it only covers the padding the words already occupy. */
+.story-map { position: absolute; inset: 0; z-index: 0; }
 .story-map svg { width: 100%; height: 100%; display: block; }
+.story-mapcv { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; }
+/* The tiles fade in UNDER a line that is already drawing itself. The debrief hero holds until both
+   are ready because its line appears instantly; here the draw-in IS the panel, so waiting on the
+   network would spend the whole panel on a static picture. One framing either way — the overlay is
+   drawn with routeMapFraming at the same measured size routeMapFor is asked for, which is the same
+   arithmetic, so the line cannot move when the map lands. */
+.story-map.ov-ready .story-mapcv { opacity: 1; transition: opacity .45s ease; }
+.story-mapov { position: absolute; inset: 0; }
+.story-route .story-map::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0;
+  height: 30%; pointer-events: none;
+  background: linear-gradient(to bottom, transparent, rgba(6,17,14,.94) 92%); }
+/* Attribution is a LICENCE TERM, not decoration, and it differs by provider — so it is rendered from
+   the provider that actually served the tiles. It sits in the padding below the statement text. */
+.story-attr { position: absolute; z-index: 2; left: var(--s5);
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  font-size: var(--t-label); color: rgba(255,255,255,.6); }
+/* ⚠️ THE DASH LENGTH IS MEASURED, NOT NORMALISED. This relied on routeMapSvg's pathLength="1" and the
+   SVG carries preserveAspectRatio="none", so the normalisation did not survive the non-uniform scale:
+   dasharray:1 was applied as one USER UNIT and the route drew as a few dozen 1px stubs — measured as
+   five disconnected fragments in the only frame of the draw that existed. storyRouteDraw sets --rl
+   from getTotalLength(); the class still owns stroke-dashoffset, so there is one owner of the
+   animated property and the custom property is only data. */
 .story-route .rt-line { stroke: #16b7a4; stroke-width: 5; filter: none;
-  stroke-dasharray: 1; stroke-dashoffset: 1; }
-.story-route.in .rt-line { stroke-dashoffset: 0; transition: stroke-dashoffset 2.2s ease-out; }
+  stroke-dasharray: var(--rl, none); stroke-dashoffset: var(--rl, 0); }
+.story-route.in .rt-line { stroke-dashoffset: 0; transition: stroke-dashoffset 3.4s linear; }
+/* The leading head dot, moved along the path by storyRouteDraw. LINEAR on both sides deliberately:
+   an eased line with a linear dot (or the reverse) is a dot that lags its own line. */
+.story-rthead { fill: #fff; }
 @media (prefers-reduced-motion: reduce) {
-  .story-route .rt-line { stroke-dashoffset: 0; }
+  .story-route .rt-line { stroke-dasharray: none; stroke-dashoffset: 0; }
   .story-route.in .rt-line { transition: none; }
+  .story-rthead { display: none; }
 }
 .story-hstats { position: absolute; left: 0; right: 0; z-index: 2;
   top: calc(96px + env(safe-area-inset-top, 0px)); display: grid; grid-template-columns: repeat(3, 1fr);
   padding: 0 var(--s5); text-align: center; }
+/* ⚠️ .88, NOT .78 — MEASURED. On the route panel these labels sit on flat black and .78 was ample; the
+   verdict panel now puts them on the radial glow's own peak, where .78 measured 2.10:1. See the scrim on
+   .story-verdictp .story-bandc::before, which is the other half of the same fix. */
 .story-hsk { display: block; font-size: var(--t-label); letter-spacing: .06em; text-transform: uppercase;
-  color: rgba(255,255,255,.58); }
+  color: rgba(255,255,255,.88); }
 .story-hsv { display: block; margin-top: 2px; font-size: var(--t-hero); font-weight: 700; }
-.story-hsv i { font-style: normal; margin-left: 2px; font-size: var(--t-meta); font-weight: 500; color: rgba(255,255,255,.62); }
+.story-hsv i { font-style: normal; margin-left: 2px; font-size: var(--t-meta); font-weight: 500; color: rgba(255,255,255,.88); }
 
 /* ⚠️ THE STATEMENT LEADS AND THE QUALIFIER FOLLOWS IT QUIETLY — the structure that makes the
    reference's panels read as coaching rather than as a readout. Left-aligned, because a centred
    sentence of this length is harder to scan. */
 .story-say { position: relative; z-index: 2; padding: 0 var(--s5) calc(46px + env(safe-area-inset-bottom, 0px)); }
 .story-big { font-size: var(--t-hero); font-weight: 700; line-height: 1.22; text-wrap: balance; }
-.story-sub { margin-top: var(--s2); font-size: var(--t-body); color: rgba(255,255,255,.62); }
+.story-sub { margin-top: var(--s2); font-size: var(--t-body); color: rgba(255,255,255,.78); }
+/* ⚠️ A PANEL CAN HOLD MORE THAN ONE BEAT, and the reference's longest chapter holds three: the chart
+   stays and the SENTENCE changes. Only .story-say is replaced, never the chart — re-rendering would
+   restart every bar's width transition, which reads as the panel starting again. */
+@keyframes storySay { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.story-say.sy-in, .story-sayb.sy-in { animation: storySay .44s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .story-say.sy-in, .story-sayb.sy-in { animation: none; } }
+/* ⚠️ EVERY BEAT IN ONE GRID CELL, so the cell is as tall as the TALLEST beat for the panel's whole life and
+   no landmark can move when the words change. See storySayStack for the measurement that forced this: the
+   verdict panel's jolt was cured by top-anchoring, but the splits panel bottom-anchors its statement and its
+   beat 2 changes the headline too, so a rewrapped headline moved its own top by 22.5px at --tscale 1.0 and
+   29.2px at 1.3. Anchoring cannot fix that one without moving its statement 107px up the screen.
+   ⚠️ visibility, NOT opacity: with opacity every beat stays in the accessibility tree and a screen reader
+   reads all of them at once — on the verdict panel, one headline twice with two different bodies. */
+.story-saystack { display: grid; }
+.story-sayb { grid-area: 1 / 1; visibility: hidden; }
+.story-sayb.on { visibility: visible; }
 
-.story-splits { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 7px;
-  padding: calc(104px + env(safe-area-inset-top, 0px)) var(--s5) var(--s5); margin-top: auto; }
-.story-split { position: relative; display: flex; align-items: center; justify-content: space-between;
-  min-height: 44px; padding: 0 var(--s4); border-radius: var(--r-ctl); width: 0;
+/* ⚠️ A FIXED BAND DIVIDED BY THE ROWS, WHICH IS WHAT THE REFERENCE DOES — one lap fills the band and
+   twenty thin down, instead of a 44px pill floating in 500px of empty gradient. Measured before this:
+   from twelve splits the first kilometres were pushed under the header and off the top of the screen
+   (21 splits put NINE of them off-screen, and .story-p has no scroller to recover them). */
+/* ⚠️ THE CHART SITS HIGH AND THE STATEMENT AT THE BOTTOM, which is where the reference puts them
+   (measured there: bars y143–545 of 825, statement below y657). Bottom-aligning the band left the
+   empty half ABOVE the chart and pushed the bars onto the words. */
+.story-splitsp { justify-content: flex-start; }
+.story-splitsp .story-say { margin-top: auto; }
+/* ⚠️ 60dvh, NOT 50. The gap between the bottom of the chart and the statement was the largest
+   featureless band on the panel — 149px, 18.4% of its height, starting at 66% — which reads as a layout
+   hole rather than as breathing room (every reference panel's largest band sits below the text, in the
+   safe area). The chart takes the space instead; measured after, the remaining gap is 100px at 73%, and
+   it is not empty by accident — the average pill hangs into it. */
+.story-splits { position: relative; z-index: 2; height: 60dvh;
+  margin-top: calc(88px + env(safe-area-inset-top, 0px)); padding: 0 var(--s5) var(--s4); }
+/* ⚠️ ONE KILOMETRE GETS NO SPLITS PANEL AT ALL — see storyPanelKinds, and this is the third answer to
+   that case rather than a tweak to the second. It was a single 402x289px bar (a lone bar has nothing to
+   be read against), then an 8px rail with a 3px tick — and MEASURED on the shipped build, the rail left
+   the panel's first element at y569.5 of 825: 69% of the screen empty above the one graphic on it,
+   which is half again worse than the 46% void the verdict rebuild exists to remove, and the rail is the
+   very thing that rebuild's own header condemns as reading like a disabled iOS slider.
+   ⚠️ THE ANSWER IS THAT THE PANEL HAS NOTHING LEFT TO SAY, NOT THAT IT NEEDS A BETTER GRAPHIC. The
+   VERDICT panel two beats later already charts a single kilometre properly — a filled lane, the marker
+   in or out of it, both band paces plated and the mean pill — so drawing that here would be the same
+   picture twice in one story, which is what this rebuild removes. And storySplitView's own note records
+   that a one-split statement adds nothing the route panel has not already printed. */
+.story-splitsin { position: relative; height: 100%; display: flex; flex-direction: column; gap: 7px; }
+.story-split { position: relative; flex: 1 1 0; min-height: 12px; overflow: hidden;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 var(--s4); border-radius: var(--r-ctl); width: 0;
   background: rgba(255,255,255,.20); font-size: var(--t-body); font-weight: 600; white-space: nowrap; }
-.story-split.ok { background: rgba(255,255,255,.34); }
+/* ⚠️ AN IN-BAND KILOMETRE INVERTS, AND SAYS SO IN A WORD. It used to be a .20 → .34 alpha step with
+   white text either way — a 0.14 difference in fill, which is exactly the hedging-by-colour this
+   project's own session rows are tested for not doing. */
+.story-split.ok { background: rgba(247,249,251,.94); color: #06110e; }
+.story-split.ok .story-km, .story-split.ok .story-vd { color: rgba(6,17,14,.7); }
+/* An ESTIMATED split is a number the app divided out of elapsed time, not one it measured. It is
+   already excluded from the scale and from every verdict; it must look different too. */
+.story-split.est { background: rgba(255,255,255,.12); border: 1px dashed rgba(255,255,255,.45); }
+/* ⚠️ THE SECOND BEAT'S HIGHLIGHT WORKS BY DIMMING THE OTHERS, WHICH IS WHAT THE REFERENCE DOES (its
+   bars drop to about 40% while the highlighted one stays). Brightening one row cannot work here: on a
+   well-run session every row is already in band and therefore already near-white, so a brighter white
+   is invisible — measured on a six-kilometre fixture where all six rows were .ok. */
+.story-p.beat-hi .story-split { opacity: .42; transition: opacity .4s ease; }
+.story-p.beat-hi .story-split.hi { opacity: 1; }
+.story-split.hi { background: #f7f9fb; color: #06110e; }
+.story-split.hi .story-km, .story-split.hi .story-vd { color: rgba(6,17,14,.72); }
 .story-p.in .story-split { width: var(--w); transition: width .65s ease-out var(--d); }
 @media (prefers-reduced-motion: reduce) { .story-p.in .story-split { transition: none; } }
-.story-km { color: rgba(255,255,255,.78); }
+.story-km { color: rgba(255,255,255,.82); }
 .story-t { font-weight: 700; }
+.story-rt { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
+.story-vd { font-size: var(--t-label); font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: rgba(255,255,255,.82); }
+/* ⚠️ THE AVERAGE LINE IS PLACED BY THE SAME FUNCTION THAT SIZES THE BARS. That shared derivation is
+   the whole point: it is what tells the runner which kilometres sat above and below the mean, and if
+   the two were computed separately they could disagree and the picture would mean nothing. */
+.story-avgl { position: absolute; top: -4px; bottom: -4px; left: var(--x); width: 0;
+  border-left: 1px dashed rgba(255,255,255,.8); pointer-events: none; }
+/* ⚠️ THE PILL HANGS BELOW THE LINE, NOT ABOVE IT. Above, it landed in the header — measured at
+   --tscale 1.3 it sat on top of the close button, because the chart's own top is only a few pixels
+   under the app bar. Below there is real empty space between the chart and the statement.
+   ⚠️ AND IT IS CENTRED ON THE LINE ONLY WHEN THE LINE IS NOT NEAR THE EDGE, WHICH IT USUALLY IS — an
+   absolute scale puts the average around 90% of the width, where a centred pill hangs off the screen. */
+.story-avgl.end .story-avgp { transform: translate(calc(-100% - 5px), 118%); }
+.story-avgp { position: absolute; left: 0; bottom: 0; transform: translate(-50%, 118%);
+  padding: 2px var(--s2); border-radius: var(--r-pill); background: rgba(247,249,251,.94);
+  color: #06110e; font-size: var(--t-label); font-weight: 700; white-space: nowrap; }
+/* ⚠️ THE 8px RAIL AND ITS THREE ROWS ARE DELETED, NOT LEFT UNUSED. It was demoted here from the verdict
+   panel, and demoting it only moved the fault: measured, it left the one-split splits panel 69% empty
+   with a grey stripe and a 3px tick as the sole graphic on the screen. That panel is now not shown at
+   all (storyPanelKinds), so nothing calls the rail — and an orphaned rule is what the next person
+   copies, which is the lesson the paired heat buttons already paid for (their superseded class was
+   deleted rather than left behind, and a guard sweeps the page for its name — so it is not written here). The one thing it did well, naming the band's
+   two paces where the band actually is, is what storyBandSvg's plated labels now do on the chart. */
 
-.story-hr { position: relative; z-index: 2; margin-top: auto;
-  padding: calc(110px + env(safe-area-inset-top, 0px)) var(--s5) 0; }
+/* ===== THE VERDICT PANEL: EVERY KILOMETRE AGAINST THE BAND ========================================
+   ⚠️ MEASURED, AND THIS IS THE FAULT IT REPLACES. The panel's first element started at y452.7 of an
+   825px panel — 377px, 46% of the screen, of empty gradient, with everything real crushed into the
+   bottom 45% and the coaching headline LAST, 15px off the panel edge. Its only graphic was an 8px rail
+   with a .42 grey band and a 3px tick, which on a half-empty screen reads as a disabled iOS slider
+   rather than a data graphic, and there was no colour anywhere on it.
+   ⚠️ THE MECHANISM IS THE ONE THE HR PANEL ALREADY PROVES ON THIS EXACT SURFACE. .story-hrp puts its
+   chart absolutely from under the header and lets the words sit over its own bottom fade; measured
+   across ten reference frames (026/030/037/045/055/070/078/085/095/100, all 380x825) every story panel
+   is built the same way — identity header to 13%, a hero graphic from ~17-21% down to ~67%, the
+   statement at 71-85%, slack below. Nothing is ever bottom-anchored and no panel has an empty top half.
+   ⚠️ THE 8px RAIL IS NOW DELETED, AND DEMOTING IT FIRST WAS THE MISTAKE. This block used to say it had
+   been kept for the one-split splits panel — measured there, it left THAT panel 69% empty as its only
+   graphic, i.e. half again worse than the 46% recorded above. The object was never the honest amount of
+   picture for one kilometre; this chart is, and it draws a single kilometre as a lane with one marker.
+   A fault moved to a quieter screen is still shipped. */
+/* ⚠️ TOP-ANCHORED, WITH ALL THE SLACK BELOW THE STATEMENT — and this is the structural cure for the
+   measured 22px inter-beat jolt, not merely a tidier layout. .story-p is justify-content: flex-end, so
+   tiles, strip, lines and statement were ALL bottom-anchored; storyBeats("verdict") returns two beats
+   sharing one headline and differing only in .story-sub, so when beat 2's body rewrapped from two lines
+   to one the whole stack slid DOWN by exactly one 22.5px line. Pinning every flow row to a fixed offset
+   from the panel TOP and collecting 100% of the free space below the last row makes that impossible for
+   ANY copy — a sub that rewraps grows the bottom slack and moves nothing.
+   ⚠️ DO NOT "SIMPLIFY" THIS INTO A min-height ON .story-sub. That reserves room for exactly today's
+   two-line worst case and fails silently the first time a body wraps to three. */
+.story-verdictp { --band-top: calc(208px + env(safe-area-inset-top, 0px));
+  justify-content: flex-start;
+  padding-top: calc(var(--band-top) + 40dvh + var(--s2)); }
+.story-verdictp .story-say { margin-bottom: auto; }
+/* ⚠️ THE ROUTE PANEL ALWAYS HAS EXACTLY THREE TILES; THIS PANEL OFTEN HAS ONE. runVerdict builds its chips
+   from what the run carries, so a run with no RPE and no heart rate has a single chip — and in a fixed
+   three-column grid that one chip sits centred in the LEFT THIRD of the screen, reading as two missing
+   tiles rather than as one fact. Measured on a one-kilometre run: one chip, 110.7px wide, at x=24 of 380.
+   Flex with an equal basis is identical at three and centred at one. */
+/* ⚠️ NATURAL WIDTHS, SPREAD — not three equal columns, and not a fixed three-column grid either.
+   The route panel always has exactly three tiles of similar width (a distance, a time, a pace) so
+   repeat(3, 1fr) is right there. runVerdict builds THESE from whatever the run carries, so there may be
+   one, and their strings are wildly uneven: measured, a single chip sat centred in the LEFT THIRD of the
+   screen, reading as two tiles that had failed to load, and at --tscale 1.3 the widest of the three —
+   "RPE 3/10" — did not fit its equal 126px share and wrapped, putting "3/10" on its own line against the
+   caption below. space-around with an auto basis centres one chip, spreads three, and lets the wide one
+   take the width it needs from the narrow one beside it. */
+.story-verdictp .story-hstats { display: flex; justify-content: space-around; gap: var(--s3); }
+.story-verdictp .story-hs { flex: 0 1 auto; min-width: 0; }
+/* ⚠️ THESE THREE ARE EVIDENCE, NOT THE HEADLINE, AND AT var(--t-hero) THEY WERE BOTH. .story-big is
+   var(--t-hero) too, so the chips were set at exactly the size of the coaching sentence they support —
+   and that sentence is the panel's whole payoff and the one thing a competitor's recap structurally
+   cannot produce, so it has to lead.
+   ⚠️ IT IS ALSO A COLLISION FIX MEASURED AT --tscale 1.3. .story-hstats is absolutely positioned at
+   top: 96px with no height, so its content grows DOWNWARD into whatever sits below — which on this panel
+   is the caption at 174px. At 32px x 1.3 the chip "RPE 3/10" does not fit its 126px column, wrapped to
+   two lines, and "3/10" was drawn straight across the middle of "AGAINST THE PACE THIS SESSION ASKED
+   FOR". At var(--t-section) it fits on one line at 1.3, and even wrapped it clears the caption.
+   ⚠️ SCOPED, because the route panel's distance/time/pace ARE its heroes over a full-bleed map, that
+   panel has nothing at 174px to collide with, and the critic lists it as holding up. */
+.story-verdictp .story-hsv { font-size: var(--t-section); }
+/* The caption sits between the three chips and the chart, in the voice the deleted rail's own label had. */
+.story-bandlab { position: absolute; left: 0; right: 0; z-index: 2;
+  top: calc(186px + env(safe-area-inset-top, 0px));
+  padding: 0 var(--s5); font-size: var(--t-label); letter-spacing: .06em;
+  text-transform: uppercase; color: rgba(255,255,255,.88); }
+/* ⚠️ THE HEIGHT IS dvh AND THE viewBox IS FIXED, WHICH IS WHY THE SVG CARRIES
+   preserveAspectRatio="none" AND EVERY STROKE CARRIES vector-effect. That pair is what makes the box
+   and the drawing independent, so the flow padding above (which is computed from the same 40dvh) and
+   the chart can never drift apart on a taller or shorter phone. */
+.story-bandc { position: absolute; left: 0; right: 0; z-index: 1;
+  top: var(--band-top); height: 40dvh; }
+/* ⚠️ A SCRIM OVER THE PANEL'S BRIGHTEST BAND, AND IT IS A CONTRAST FIX MEASURED FROM RENDERED PIXELS.
+   .story-p::before is a radial glow centred at 70% 12% — right where this panel now puts its three chips and
+   its caption — and the peak is far too light for small white text. Measured across the caption's own row on
+   the built page: white at .78 runs 4.84:1 at x=40 and 2.26:1 at x=220, and the chip labels 4.68:1 down to
+   2.10:1. Even fully opaque white on that peak is 3.62:1. Moving this panel's content up under the header is
+   what put text there, so this comes with it.
+   ⚠️ THE OTHER PANELS DO NOT NEED IT AND DO NOT GET IT: the route panel replaces the radial with flat black,
+   and the splits and HR panels cover the same band with their own charts. This is the only panel with small
+   text on the bare glow, which is why the scrim is scoped to it and hangs off the chart's own top rather
+   than being a third layer on .story-p.
+   ⚠️ IT REACHES 34px INTO THE CHART so the fade lands in the plot's empty top margin (T=26) instead of in the
+   caption — a fade that ends where the text is dims half of it and reads as a smear. Measured after: the
+   caption is 5.16:1 at the very peak and the chip labels 5.4:1.
+   ⚠️ STILL OPEN AND NOT MINE TO FIX HERE: .story-h i, the persistent header's date line, measures 2.42:1 on
+   that same peak on EVERY panel of the recap, and its own comment records choosing .84 over .62 on a
+   measurement taken somewhere darker. Reported rather than changed, because it is shared by five panels. */
+.story-verdictp .story-bandc::before { content: ""; position: absolute; left: 0; right: 0;
+  top: calc(var(--band-top) * -1); height: calc(var(--band-top) + 34px); pointer-events: none;
+  background: linear-gradient(to bottom, rgba(6,17,14,.44) 0%, rgba(6,17,14,.44) 84%, transparent 100%); }
+.story-bandsvg { width: 100%; height: 100%; display: block; }
+/* ⚠️ NO SCRIM OVER THIS CHART, AND THAT IS ARITHMETIC RATHER THAN TASTE. The HR chart needs one
+   because the statement is drawn ON it; here the flow content starts BELOW the chart (the padding-top
+   above is band-top + the chart's own height), so a fade would protect nothing — and it would land
+   squarely on the kilometre labels, which sit at 96% of the plot. A 44% fade reaching .94 black at 88%
+   renders an rgba(255,255,255,.8) label at that height all but invisible: it would wash out the one
+   datum that names which kilometre is which. There is also no hard edge to soften, because the chart
+   has no ground of its own — it is a transparent overlay on the panel's gradient. */
+.story-bnd { fill: color-mix(in srgb, var(--story-eff) 30%, transparent); }
+.story-bnde { stroke: var(--story-eff); stroke-opacity: .92; stroke-width: 1.5; }
+/* ⚠️ THE PLATE IS A CONTRAST FIX, NOT DECORATION, AND IT IS MEASURED. See storyBandSvg: bare white bold
+   11px on the panel's own radial gradient measured 4.14:1 where the gradient is brightest and 4.77:1 inside
+   the lane — one under AA and the other fragile, because which of the two a label gets depends on the run's
+   data. Over this plate it is 10.4:1 wherever the lane lands. */
+.story-bndplate { fill: rgba(6,17,14,.62); }
+.story-bndax { fill: #fff; font-size: var(--t-label); font-weight: 700; font-family: var(--fig); }
+.story-bnl { fill: none; stroke: #fff; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round;
+  stroke-dasharray: var(--rl, none); stroke-dashoffset: var(--rl, 0); }
+.story-bnx { fill: rgba(255,255,255,.8); font-size: var(--t-label); font-family: var(--fig); }
+/* ⚠️ NEVER BY COLOUR ALONE, AND HERE IT IS A TRIPLE. An in-band kilometre is white AND inside the
+   filled lane AND has no stem; an out-of-band one is coloured AND outside the lane AND carries a stem
+   whose length IS the size of the miss AND a white ring. Any one of the three can be read on its own,
+   and the legend below the chart says all of it in words. */
+/* ⚠️ MARKERS ARE RECTS, NEVER CIRCLES. preserveAspectRatio="none" scales the two axes differently, so
+   a circle would render as an ellipse whose eccentricity depends on the phone's height. And every
+   stroked element in here carries non-scaling-stroke for the same reason — a hairline that thickens
+   with the viewport is not a hairline. */
+.story-bmk, .story-bmk.est, .story-bmk.nj, .story-bmk.out, .story-bmk.hi, .story-bnl, .story-bnde,
+.story-bnavl { vector-effect: non-scaling-stroke; }
+/* ⚠️ .plain AND .in PAINT THE SAME AND MEAN DIFFERENT THINGS, which is why they are two classes. .in is a
+   kilometre that was judged and sat inside the lane; .plain is a run nobody set a target for, so there is
+   nothing to be inside. Folding them together would let a future change to the in-band mark silently
+   restyle every bandless run as though it had passed something. */
+.story-bmk.in, .story-bmk.plain { fill: #f7f9fb; }
+.story-bmk.fast { fill: var(--eff-hard); }
+.story-bmk.slow { fill: var(--eff-moderate); }
+/* An ESTIMATED kilometre is a number the app divided out of elapsed time, not one it measured, and an
+   UNJUDGED one was measured outside the prescribed stretch. Neither was scored against the band, so
+   neither may look as though it was — both take the dashed hollow language .story-split.est owns. */
+.story-bmk.est, .story-bmk.nj { fill: none; stroke: rgba(255,255,255,.7); stroke-width: 1.5;
+  stroke-dasharray: 3 3; }
+/* The ring is what stops the reading depending on the marker's own contrast against a mid-teal lane
+   (measured ~2.2:1 on --eff-moderate), which is the ground an out-of-band marker sits nearest to. */
+.story-bmk.out { stroke: #fff; stroke-width: 1.5; }
+/* ⚠️ THE STEM GROWS OUT OF THE LANE EDGE, NOT OUT OF THIN AIR, so transform-origin is bottom for a
+   quicker kilometre (which is drawn ABOVE the lane) and top for a slower one. The default centre
+   origin grows it in both directions from its own middle, which reads as an object appearing rather
+   than a miss being measured. transform-box: fill-box makes the origin the rect's own box in a
+   viewBox that preserveAspectRatio="none" is scaling anisotropically. */
+.story-bstem { fill: color-mix(in srgb, var(--story-eff) 52%, #fff); opacity: .5;
+  transform-box: fill-box; }
+.story-bstem.up { transform-origin: bottom; }
+.story-bstem.down { transform-origin: top; }
+.story-bnavl { stroke: rgba(255,255,255,.72); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.story-bncb { fill: rgba(247,249,251,.94); }
+.story-bnct { fill: #06110e; font-size: var(--t-label); font-weight: 700; font-family: var(--fig); }
+/* Only the states that actually occur in the run — a single-item legend on an all-in-band run, which
+   is the same rule storySplitView applies to its per-row words. */
+/* ⚠️ THE FULL-BLEED PANEL'S GUTTER IS SCOPED TO THE PANEL. The share card uses this same legend when its
+   per-block pace labels have been dropped, and there it sits INSIDE .story-cardin's own 24px padding — so an
+   unscoped padding would indent it twice and it would no longer line up with the bars it keys. */
+.story-bnlg { position: relative; z-index: 2; display: flex; flex-wrap: wrap; gap: var(--s1) var(--s3);
+  margin-top: var(--s2); font-size: var(--t-label);
+  letter-spacing: .04em; line-height: 1.3; text-transform: uppercase; color: rgba(255,255,255,.82); }
+.story-verdictp .story-bnlg { padding: 0 var(--s5); margin-top: 0; margin-bottom: var(--s3); }
+.story-bnlg span { display: inline-flex; align-items: center; }
+.story-bnlg i { width: 10px; height: 10px; border-radius: var(--r-ctl); display: inline-block;
+  margin-right: var(--s1); }
+.story-bnlg .lg-in { background: #f7f9fb; }
+.story-bnlg .lg-fast { background: var(--eff-hard); }
+.story-bnlg .lg-slow { background: var(--eff-moderate); }
+.story-bnlg .lg-est, .story-bnlg .lg-nj { background: transparent;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.7); }
+/* ⚠️ WITH NO HERO THERE IS NOTHING TO ANCHOR TO — AND BOTTOM-ANCHORING IT WAS WRONG BY THIS PANEL'S OWN
+   MEASURED STANDARD. A run with no splits at all (a treadmill effort logged by time) has nothing to
+   chart, so the chips, the evidence and the statement were pushed to the floor: measured on that path,
+   564-632px of the 825px panel — 68-77% — was one unbroken empty band down the whole top of the screen,
+   against a rule three comments above that says nothing is ever bottom-anchored and no panel has an
+   empty top half. Centred, the same content leaves 34% at the top and 34% below, so the largest void is
+   halved and no single band is a majority of the screen. Inventing a graphic instead was the other
+   option and it is refused: there is no kilometre to plot, and a picture of nothing is worse than space.
+   Set as a class from JS, never derived with :not(:has(…)) — a :has() that fails to match produces a
+   top-anchored panel with a hole in it and nothing to see. */
+.story-verdictp.no-hero { justify-content: center; padding-top: 0; }
+.story-verdictp.no-hero .story-say { margin-bottom: 0; }
+.story-verdictp.no-hero .story-hstats { position: relative; top: auto; padding-bottom: var(--s4); }
+/* The run's own three numbers, said once — see storyPanelHtml's no-hero branch. They are evidence like the
+   chips beside them, not the panel's headline, so they take the same size and a tighter gap below. */
+.story-verdictp.no-hero .story-hfacts { padding-bottom: var(--s3); }
+/* ⚠️ AND ITS STATEMENT DROPS THE 46px OF SAFE-AREA PADDING, because centred content that carries dead
+   space at the bottom is not centred — the padding belongs to a statement sitting ON the panel floor. */
+.story-verdictp.no-hero .story-say { padding-bottom: var(--s4); }
+/* ⚠️ THE EVIDENCE LIST IS THE ROW THAT YIELDS, AND IT NOW YIELDS A WHOLE LINE AT A TIME. At --tscale 1.3
+   something has to give, and it must be a line of evidence rather than the chart being crushed below its
+   floor or the statement running off the panel — but overflow alone cuts wherever the box ends, and
+   measured at 1.3 it sliced a coaching sentence horizontally THROUGH ITS GLYPHS ("…drifted under the
+   target pace" cut by 12.5px) and left another line 79px gone with nothing to say so. storyFit removes
+   whole lines from the end until the rest fit, which is what "degrades cleanly" has to mean; this
+   overflow stays as the belt-and-braces for the frame before that runs.
+   min-height: 0 is load-bearing: a flex item defaults to min-height: auto and refuses to shrink below
+   its content, which is the same trap .view already needed it for. */
+.story-verdictp .story-vlist { min-height: 0; overflow: hidden; }
+.story-bnd, .story-bnde, .story-bndax, .story-bndplate { opacity: 0; }
+.story-p.in .story-bnd, .story-p.in .story-bnde, .story-p.in .story-bndax,
+.story-p.in .story-bndplate { opacity: 1; transition: opacity .7s ease .15s; }
+.story-p.in .story-bnl { stroke-dashoffset: 0; transition: stroke-dashoffset 2.4s linear; }
+.story-bmk, .story-bnx { opacity: 0; transform: translateY(6px); }
+.story-p.in .story-bmk, .story-p.in .story-bnx { opacity: 1; transform: none;
+  transition: opacity .38s ease var(--d), transform .38s ease var(--d); }
+.story-bstem { transform: scaleY(0); }
+.story-p.in .story-bstem { transform: scaleY(1); transition: transform .5s ease-out var(--d); }
+.story-bnavl, .story-bncb, .story-bnct { opacity: 0; }
+.story-p.in .story-bnavl, .story-p.in .story-bncb, .story-p.in .story-bnct {
+  opacity: 1; transition: opacity .5s ease 2.2s; }
+.story-bnlg { opacity: 0; }
+.story-p.in .story-bnlg { opacity: 1; transition: opacity .4s ease 1.1s; }
+/* Beat 2 flips one out-of-band kilometre solid and dims the rest — the reference's own device between
+   frames 070 and 078. It must come AFTER the .story-p.in rules above: the two selectors have equal
+   specificity, so order is what decides. */
+.story-p.beat-hi .story-bmk { opacity: .4; transition: opacity .4s ease; }
+.story-p.beat-hi .story-bmk.hi { opacity: 1; }
+.story-bmk.hi { stroke: #fff; stroke-width: 2; }
+@media (prefers-reduced-motion: reduce) {
+  .story-bnl { stroke-dasharray: none; stroke-dashoffset: 0; }
+  .story-bnd, .story-bnde, .story-bndax, .story-bndplate, .story-bmk, .story-bnx, .story-bstem,
+  .story-bnavl, .story-bncb, .story-bnct, .story-bnlg { opacity: 1; transition: none; }
+  .story-bmk, .story-bnx { transform: none; }
+  .story-bstem { transform: scaleY(1); }
+}
+
+/* ⚠️ FULL-BLEED, AND THE LABELS LIVE INSIDE THE viewBox. The chart used to stop 24px short of both
+   edges, which drew a straight-edged grey rectangle sitting on the gradient; the reference bleeds to
+   x=0 and x=379 and dissolves into the background. Room for the labels is reserved in the SVG's own
+   geometry, not with CSS padding — padding would inset the picture again. */
+/* ⚠️ IT FILLS THE PANEL FROM UNDER THE HEADER DOWN BEHIND THE TEXT, which is what the reference does
+   (its ink spans 69.6% of the frame). In flow with margin-top: auto the chart was pinned to the bottom
+   and used 39.9% of the panel starting at the vertical MIDPOINT, so over half the screen above it was
+   bare gradient. Absolute, from below the header, with the statement over its own scrim on top. */
+.story-hrp .story-hr { position: absolute; left: 0; right: 0; z-index: 1; margin: 0; padding: 0;
+  top: calc(104px + env(safe-area-inset-top, 0px)); }
+/* The statement needs a ground to sit on and the panel's own bottom scrim is BELOW this layer, exactly
+   as it is on the route panel — so the chart carries its own, low enough to only cover the words. */
+.story-hrp .story-hr::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 46%;
+  pointer-events: none; background: linear-gradient(to bottom, transparent, rgba(6,17,14,.94) 88%); }
 .story-hrsvg { width: 100%; height: auto; display: block; overflow: visible; }
-.story-hrfill { fill: rgba(255,255,255,.16); }
-.story-hrline { fill: none; stroke: #fff; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+/* The fill's gradient is a presentation ATTRIBUTE in the markup, not a CSS fill — a CSS fill would
+   override the attribute and take the fade with it. Only the reveal lives here. */
+.story-hrfill { opacity: 0; }
+.story-p.in .story-hrfill { opacity: 1; transition: opacity 1.2s ease .45s; }
+.story-hrline { fill: none; stroke: #fff; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round;
+  stroke-dasharray: var(--rl, none); stroke-dashoffset: var(--rl, 0); }
+.story-p.in .story-hrline { stroke-dashoffset: 0; transition: stroke-dashoffset 2.2s linear; }
+.story-hrdot, .story-hrchip { opacity: 0; }
+.story-p.in .story-hrdot, .story-p.in .story-hrchip { opacity: 1; transition: opacity .5s ease 2s; }
+@media (prefers-reduced-motion: reduce) {
+  .story-hrline { stroke-dasharray: none; stroke-dashoffset: 0; }
+  .story-hrfill, .story-hrdot, .story-hrchip { opacity: 1; }
+}
 .story-hrdot { fill: #fff; }
-.story-ax { fill: rgba(255,255,255,.62); font-size: 11px; font-family: var(--fig); }
-.story-axl { stroke: rgba(255,255,255,.32); stroke-width: 1; }
+.story-hrcb { fill: rgba(247,249,251,.94); }
+.story-hrct { fill: #06110e; font-size: 11px; font-weight: 700; font-family: var(--fig); }
+.story-ax { fill: rgba(255,255,255,.92); font-size: 11px; font-weight: 600; font-family: var(--fig); }
+/* The peak rule is dashed and quiet; the average is a solid line the eye follows to its pill. */
+.story-axl { stroke: rgba(255,255,255,.34); stroke-width: 1; stroke-dasharray: 3 4; }
+.story-hravl { stroke: rgba(255,255,255,.72); stroke-width: 1.5; }
 
-.story-card { justify-content: center; padding: calc(92px + env(safe-area-inset-top, 0px)) var(--s5)
+/* The coach's read gets its own evidence — the three chips runVerdict already builds, plus one thing
+   that went well and one to watch. It was the only panel in either app with no visual at all: 745 of
+   825 measured pixels of height were empty gradient under two lines of text. */
+.story-vlist { position: relative; z-index: 2; padding: 0 var(--s5) var(--s4);
+  display: flex; flex-direction: column; gap: var(--s2); }
+.story-vl { display: flex; gap: var(--s2); align-items: flex-start;
+  font-size: var(--t-body); color: rgba(255,255,255,.88); }
+.story-vl span:first-child { flex: 0 0 auto; font-weight: 700; }
+
+/* ⚠️ THE HEADROOM IS THE HEADER'S OWN MEASURED HEIGHT, NOT 92px. A constant cannot know it: the story
+   header is two lines of type plus a 28px mark, so it grows with --tscale, and measured at 1.3 its bottom
+   edge sits at y107 while this padding still reserved 92 — so a tall card began 15px UNDERNEATH the
+   identity header, which is z-index 3 and drew straight over the run's own title. storyShow publishes the
+   measurement as --story-hdr on the overlay (the same JS-owns-the-number, CSS-owns-the-property split the
+   progress bar's duration already uses); 92px is the fallback for the frame before it is measured. */
+.story-card { justify-content: center;
+  padding: calc(var(--story-hdr, 92px) + var(--s2)) var(--s5)
   calc(28px + env(safe-area-inset-bottom, 0px)); }
-.story-cardin { position: relative; z-index: 2; padding: var(--s5); border-radius: var(--r-hero);
-  background: linear-gradient(155deg, var(--story-a), var(--story-b)); overflow: hidden; }
+/* ⚠️ THE CARD GROUND IS DARKENED RATHER THAN THE TEXT BEING LIFTED, because white IS the text here.
+   Measured on the old teal pair, by painting the gradient and reading the rendered pixels under each
+   element's real box: the place name 2.13:1, the stat labels 2.75:1, the stat values 4.46:1 — every
+   one under AA, on the one surface that gets posted in public. Mixed toward the story's own black it
+   is 6.4:1 at the lightest corner with pure white, and the translucent labels clear 4.5:1. */
+/* ⚠️ THE VERTICAL PADDING IS 16, NOT 24, AND THE BUDGET DECIDED IT. See .story-cardev: measured with
+   scrollHeight against clientHeight — the only measurement that can see this — a 21-kilometre run's card at
+   --tscale 1.3 was still CLIPPED by 7px after three other reductions, because that card carries a place line,
+   six stat tiles, a 22-column split row AND the colour key that replaces its pace labels. 16px of top and
+   bottom padding buys 16px back and still reads as a card; the 24px side padding is what sets the content
+   column, so it stays. */
+.story-cardin { position: relative; z-index: 2; padding: var(--s4) var(--s5); border-radius: var(--r-hero);
+  background: linear-gradient(155deg, color-mix(in srgb, var(--story-a) 54%, #06110e),
+    color-mix(in srgb, var(--story-b) 70%, #06110e)); overflow: hidden; }
+/* Provenance, from the run's own record — what session this was. Deliberately not a plan week: that
+   would have to be re-derived from a plan which may have been rebuilt since, and a card that says
+   "week 3" when the plan no longer agrees is worse than one that says nothing. */
+.story-cardplan { display: inline-block; margin-bottom: var(--s2); padding: 3px var(--s2);
+  border-radius: var(--r-pill); background: rgba(255,255,255,.2);
+  font-size: var(--t-label); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+/* The kilometres as a row of columns: HEIGHT from pace, WIDTH from the split's own distance, so a
+   part-kilometre is visibly a part one.
+   ⚠️ THE 132px CAP MISREAD THE REFERENCE BY A FACTOR OF TWO AND IS GONE. Its comment justified itself
+   with "the reference's bars are ~40px wide" — measured on reference frame 125, each of THEIR six
+   blocks is ~42px and the row spans the whole 267px content column. Ours drew six 21.2px capsules in
+   132px of a 284px column, left-aligned, with 152px (54%) of empty card beside them, at heights
+   46.3/51/51/52/51.5/52 under a var(--r-pill) radius that swallowed a 1.7px spread completely. Six
+   identical pale capsules occupying half a row is a loading skeleton, which is what the critic saw.
+   ⚠️ AND THE REFERENCE'S OWN BLOCKS ENCODE ALMOST NOTHING IN HEIGHT EITHER (measured 49/54/54/55/55/55
+   — 6px of spread over 55 for an 18s pace range). What makes theirs read as a deliberate motif rather
+   than a skeleton is that the blocks are wide rounded rectangles filling the card AND that its other
+   card variant prints the pace under each one. Both, then: full width, and labelled. */
+/* ⚠️ EVERY GAP ON THIS CARD IS SET BY THE HEIGHT BUDGET, NOT BY TASTE. .story-card is a flex column with
+   justify-content: center, so .story-cardin is a flex ITEM and shrinks when the column is too short — and it
+   carries overflow: hidden, so it does not overflow visibly, it CLIPS. Measured at --tscale 1.3 on the
+   reference run, the additions on this card (full-width labelled splits, the target line, the date) pushed it
+   62px past the 705px available and the bottom stat row was cut through the middle of its values, which is
+   the documented past fault at this exact spot. These four reductions plus dropping the RPE eyebrow buy it
+   back. Anything added here must be measured at 1.0 AND 1.3 on the six-tile case before it is believed.
+   ⚠️ AND THE WORST CASE IS NOT THE REFERENCE RUN — it is a 21-kilometre one, which carries a place line, six
+   stat tiles, a 22-column split row and the colour key that replaces its pace labels. Measured at --tscale
+   1.3 that card came to exactly 705.0 of the 705px available: fitting, with NOTHING spare, which is one
+   rounding away from clipping again. These three further reductions take it to 691 and the reference run's
+   card to 569, so the measured margin is 14px rather than zero. */
+.story-cardev { margin-bottom: var(--s2); }
+.story-cardsplits { display: flex; align-items: flex-end; gap: var(--s1); --track: 48px; }
+.story-cardsp { flex: 0 1 auto; min-width: 2px; display: flex; flex-direction: column;
+  justify-content: flex-end; }
+.story-cardsp > i { display: block; border-radius: var(--r-ctl);
+  height: calc(var(--track) * var(--h) / 100); }
+/* ⚠️ NOT var(--r-pill). At 44px wide and 60 tall a 999px radius is a capsule again, and the height
+   difference disappears into the corners — which is the defect. The reference's own block radius
+   measures ~10px; var(--r-ctl) is 12 and on the ladder. */
+/* ⚠️ AND ABOVE TEN KILOMETRES var(--r-ctl) IS ITSELF THE CAPSULE, WHICH IS THE SAME DEFECT AT HIGHER n —
+   on the distances most likely to be posted. Measured on a 21-kilometre run: 22 columns 9.7px wide under
+   a 12px radius, so the corner exceeded HALF the column and every block rendered as a pill with its
+   40.8-48px height spread swallowed, exactly the "identical pale capsules" reading the 132px cap was
+   removed for. The corner is squared off instead of shrunk to some new number: at the reference's own
+   ratio (~10px on a 42px block, a quarter of the width) a 9.7px block wants 2.4px, which is visually
+   nothing — so nothing is what it gets, and no off-ladder radius is invented to say so.
+   ⚠️ THE THRESHOLD IS DERIVED, NOT PICKED: storyCardSplitsHtml asks whether the modelled column is at
+   least TWICE var(--r-ctl), which is the exact condition for the corner to fit. */
+.story-cardsplits.sq > .story-cardsp > i { border-radius: 0; }
+.story-cardsp > u { display: block; text-decoration: none; margin-top: var(--s1);
+  font-size: var(--t-label); font-weight: 600; line-height: 1.2; text-align: center;
+  font-family: var(--fig); color: rgba(255,255,255,.86); }
+/* Verdict colour, the same semantics as the verdict panel's markers, so one glance at the posted card
+   and one at the panel agree about the same run. */
+/* ⚠️ .in AND .plain PAINT THE SAME AND MEAN DIFFERENT THINGS — the same pairing the chart's markers use.
+   .in is a kilometre judged and found inside the band; .plain is a run nobody set a target for, so there is
+   nothing to be inside. Two classes so a future change to the in-band fill cannot silently restyle every
+   bandless run as though it had passed something. */
+.story-cardsp.in > i, .story-cardsp.plain > i { background: rgba(247,249,251,.9); }
+.story-cardsp.fast > i { background: color-mix(in srgb, var(--eff-hard) 82%, #fff); }
+.story-cardsp.slow > i { background: color-mix(in srgb, var(--eff-moderate) 82%, #fff); }
+/* ⚠️ box-shadow: inset, NEVER border. A 1px border makes the estimated column 2px taller than its
+   neighbours for free and the bottoms stop aligning — the identical defect .act-pair already records,
+   where a border on one of two side-by-side controls broke the pair. */
+.story-cardsp.est > i { background: rgba(255,255,255,.22);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.5); }
+.story-cardsp.est > u { color: rgba(255,255,255,.6); }
+/* ⚠️ THE ONE SENTENCE NO COMPETITOR'S SHARE CARD CAN PRINT, and without it the coloured fills above are
+   decoration. Built from the band and the analysis the card already holds — nothing new is computed.
+   Absent entirely when there is no band: never "0 of 6". */
+.story-cardtgt { margin-top: var(--s1); font-size: var(--t-label); font-weight: 600;
+  letter-spacing: .04em; line-height: 1.3; text-transform: uppercase; color: rgba(255,255,255,.86); }
 .story-cardmark { position: absolute; top: var(--s4); right: var(--s4); width: 26px; height: 26px; opacity: .85; }
 .story-cardmark svg { width: 100%; height: 100%; }
 .story-cardh b { display: block; font-size: var(--t-section); font-weight: 700; padding-right: 34px; }
-.story-cardh span { display: block; margin-top: 2px; font-size: var(--t-meta); color: rgba(255,255,255,.72); }
-.story-cardmap { margin: var(--s4) 0; }
+/* ⚠️ ONE LINE, BELT AND BRACES. The town is taken as the place's first component precisely so this fits, but
+   a long town name plus a long date must still not wrap: this line sits directly under the card's heaviest
+   type on a card whose height is measured to the pixel, and a second line there costs 18px at the default
+   text size and 23px at --tscale 1.3. */
+.story-cardh span { display: block; margin-top: 2px; font-size: var(--t-meta); color: rgba(255,255,255,.86);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* ⚠️ CENTRED, AND AS WIDE AS THE ROUTE'S OWN SHAPE ASKS FOR — storyCardMapFit sets the inline width. A
+   fixed full-width landscape box drew a portrait route as a ~30px sliver adrift in a large empty area. */
+/* ⚠️ AND ON THIS ONE THE CRITIC'S FACTOR-OF-TWO RUNS THE OTHER WAY, WHICH IS WHY storyCardMapFit IS
+   NOT TOUCHED. Measured: the reference's own card route trace is 42x168 inside its 267px content
+   column — 16% of the width, with 225px of empty card beside it. Ours is 59.6x177 inside 284, i.e.
+   21%: ALREADY WIDER AND TALLER THAN THEIRS. The run is a there-and-back up a river path at roughly
+   5.6:1 portrait and routeMapFraming fits the whole route in the box, so no box width can make that
+   route wide — "matching the reference" here would make it worse, and raising the 176 height allowance
+   is the one change that risks the documented past fault of the card clipping its own stat values.
+   So the dead 225px beside it is FILLED instead, which is what the reference does in its other card
+   layout (frame 140 carries an elevation sparkline and a pace sparkline in exactly that band). */
+/* ⚠️ AND THIS BAND IS THE ROW THAT YIELDS WHEN THE CARD RUNS OUT OF HEIGHT — see storyFit. Both graphics
+   in it are drawn width-first (the map's wrapper takes a percentage and its svg is height: auto; the mini
+   chart's is the same), so narrowing the band shortens it by exactly the same factor and NOTHING is
+   cropped, distorted or dropped. That is why it yields before any words do: a route drawn 14% smaller
+   still says where you ran, whereas the alternative measured at --tscale 1.3 was the bottom stat row cut
+   through the middle of its own values. --cardband-w is set by JS only when the measurement demands it. */
+.story-cardband { display: flex; align-items: center; justify-content: center; gap: var(--s4);
+  margin: var(--s2) 0; max-width: var(--cardband-w, 100%); margin-inline: auto; }
+.story-cardmap { flex: 0 0 auto; margin: 0; }
 .story-cardmap svg { width: 100%; height: auto; display: block; }
+/* ⚠️ ONE DERIVATION AT TWO SCALES. This renders storyBandSvg's own geometry at card size, so the story
+   panel and the posted card cannot disagree about the same run — the filled lane and the white pace
+   line and nothing else. No markers (at 168 units wide they merge into one another), no axis labels,
+   no mean pill: the line against the lane is the whole message at this size. */
+/* ⚠️ ROUNDED AND CLIPPED. The lane bleeds to its own box's edges, which is right on the full-bleed panel
+   (it reaches the screen) and reads as an unfinished grey rectangle on a card, where the box is inset.
+   The corner is the split row's own var(--r-ctl), so the two evidence graphics on the card match. */
+.story-cardmini { flex: 1 1 auto; min-width: 0; border-radius: var(--r-ctl); overflow: hidden; }
+.story-cardmini svg { width: 100%; height: auto; display: block; }
 .story-cardmap .rt-line { stroke: rgba(255,255,255,.94); stroke-width: 3; filter: none; }
-.story-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s4) var(--s2); }
+/* ⚠️ NO START AND FINISH MARKERS AT CARD SIZE. They are drawn from the route's own dot radius, which the
+   card's small box makes about as big as the line is long — measured, the drawing read as two badges and
+   a stub. The reference's card draws the line alone. They stay on the full-bleed route panel, where the
+   map is the whole screen and they are the right size. */
+.story-cardmap .rt-logo, .story-cardmap .rt-finish { display: none; }
+.story-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2) var(--s2); }
 .story-stk { display: block; font-size: var(--t-label); letter-spacing: .06em; text-transform: uppercase;
-  color: rgba(255,255,255,.66); }
+  color: rgba(255,255,255,.86); }
 .story-stv { display: block; margin-top: 2px; font-size: var(--t-card); font-weight: 700; }
-.story-stv i { font-style: normal; margin-left: 2px; font-size: var(--t-meta); font-weight: 500; color: rgba(255,255,255,.72); }
-.story-acts { position: relative; z-index: 5; display: flex; gap: var(--s2); margin-top: var(--s5); }
-.story-acts > button { flex: 1 1 0; min-height: var(--tap); border-radius: var(--r-pill);
+.story-stv i { font-style: normal; margin-left: 2px; font-size: var(--t-meta); font-weight: 500; color: rgba(255,255,255,.86); }
+/* ⚠️ ONE PRIMARY AND ONE TEXT LINK, STACKED. Side by side they were two buttons of equal weight
+   competing for the same decision, and the saturated teal one sat on a teal panel. */
+.story-acts { position: relative; z-index: 5; display: flex; flex-direction: column; gap: var(--s2);
+  margin-top: var(--s4); }
+.story-acts > button { width: 100%; min-height: var(--tap); border-radius: var(--r-pill);
   font: inherit; font-size: var(--t-card); font-weight: 600; cursor: pointer; border: 1px solid transparent; }
-.story-share { color: var(--accent-ink); background: #16b7a4; font-weight: 650; }
-.story-later { color: #fff; background: transparent; border-color: rgba(255,255,255,.28); }
+.story-share { color: #06110e; background: #f2f6f5; font-weight: 700; }
+.story-later { color: rgba(255,255,255,.88); background: transparent; border-color: transparent; }
 
 /* ===== THE POST-RUN DEBRIEF (Logbook run page) ================================================
    ⚠️ THE SCREEN OWNS THE WHOLE VIEWPORT. #view carries 16px of padding for every other screen and
@@ -15457,7 +15991,13 @@ function runVerdict(run, a) {
   const band = a.band, rband = a.rband, rpe = a.rpe;
   const easy = run.type === "easy" || run.type === "recovery" || run.type === "long";
   const chips = [];
-  if (pct != null && a.n >= 2) chips.push({ v: pct + "%", k: "In range" });
+  // ⚠️ NO BAND MEANS NO RANGE TO BE IN, AND THIS CHIP SAID "In range 0%" ON EVERY BANDLESS RUN. runAnalysis
+  // counts inBand as the rows whose verdict is "in", and with no band no row can have one — so a run nobody
+  // set a target for was accused of missing it entirely, in the largest type on the verdict panel. Found
+  // while rebuilding that panel, where it became the only thing on the screen; it reaches the debrief's own
+  // chips too, so fixing it here fixes both. The verdict's own headline for that run is already "A run by
+  // feel" and its body says there was no target, so the chip was contradicting the sentence beside it.
+  if (pct != null && a.n >= 2 && band) chips.push({ v: pct + "%", k: "In range" });
   if (rpe) chips.push({ v: "RPE " + rpe + "/10", k: rpe <= 3 ? "Feels easy" : rpe <= 6 ? "Moderate" : rpe <= 8 ? "Hard" : "Very hard" });
   if (run.avgHr) chips.push({ v: Math.round(run.avgHr), u: "bpm", k: "Avg HR" });
 
@@ -15910,14 +16450,120 @@ function rdMetaHtml(run) {
  * own after a run, and closing it costs nothing. A recap that interrupts is a recap people learn to
  * dismiss without reading.
  */
-const STORY = { i: 0, n: 4, timer: 0, run: null, a: null, v: null };
-/** ⚠️ The heart-rate panel exists only when there is a series to draw. A panel that says "no data"
- *  is a panel nobody wanted; the story is shorter instead, which nobody notices. */
-function storyPanelCount(run) {
-  const hasHr = run && run.avgHr && Array.isArray(run.hrSeries) && run.hrSeries.length >= 3;
-  return hasHr ? 5 : 4;
+const STORY = { i: 0, b: 0, n: 4, timer: 0, beatTimer: 0, run: null, a: null, v: null,
+  kinds: [], beats: [], w: 380, h: 760, headTok: 0 };
+/**
+ * WHICH PANELS THIS RUN GETS — one predicate per panel, in one place.
+ *
+ * ⚠️ THE COUNT AND THE CONTENT MUST BE DECIDED BY THE SAME CODE. They were not: the count required
+ * avgHr AND a three-point series, while the panel itself was gated on avgHr alone. A run with an
+ * average heart rate and no usable series — which is EVERY treadmill run with a companion watch, and
+ * every run logged before hrSeries existed — got four bars, and the HR branch then won the index the
+ * verdict panel was computed at. So the coach's read, the whole point of the feature, was dropped and
+ * replaced by an empty chart. Nothing looked wrong: the bar count was a correct four.
+ *
+ * ⚠️ A PANEL WITH NOTHING IN IT IS NOT SHOWN AT ALL. "No kilometre splits were recorded" is a panel
+ * nobody wanted; the story is one beat shorter instead, which nobody notices.
+ *
+ * ⚠️ AND THE ROUTE PANEL WAS THE ONE EXCEPTION TO THAT RULE, unconditionally first. A treadmill run
+ * records a real clock and deliberately no route, so its first panel was a black screen reading
+ * "DISTANCE / km" and "PACE / /km" — orphaned units with no values. It was unreachable only because
+ * rdStoryChipHtml withheld the whole recap when there was no route, which cost every treadmill runner
+ * the splits, the heart rate and the coach's read as well; and Route privacy set to "Map hidden" made
+ * the chip vanish with no explanation, though not one of the other four panels carries a location.
+ * Both halves are one fault: the CHIP asks whether there is a recap, and the PANEL asks whether there
+ * is a map, and they are different questions.
+ *
+ * ⚠️ ONE MEASURED KILOMETRE GETS NO SPLITS PANEL, AND THAT IS THE THIRD ANSWER TO THIS CASE. A lone bar
+ * can only mislead (it has nothing to be read against), so it became an 8px rail — and the rail left
+ * the panel MEASURED 69% empty, its first element at y569.5 of 825, with a grey stripe and a 3px tick
+ * as the only graphic on the screen. That is worse than the 46% void the verdict rebuild exists to
+ * remove, and it is the exact object that rebuild's own header condemns as a disabled iOS slider.
+ * ⚠️ THE VERDICT PANEL ALREADY DRAWS THAT KILOMETRE, PROPERLY — a filled lane, the marker in or out of
+ * it, both band paces plated, the mean pill. So there is nothing left for a splits panel to add: giving
+ * it the same chart would be one picture twice in one story, and storySplitView's own note records that
+ * a one-split statement only repeats the pace the route panel has already printed. The story is one
+ * beat shorter, which is the rule this file already applies to a panel with nothing in it.
+ */
+function storyPanelKinds(run, a) {
+  const kinds = [];
+  if (runRoutePresentation(run).route) kinds.push("route");
+  if (a && a.n > 1) kinds.push("splits");
+  if (storyHasHr(run)) kinds.push("hr");
+  kinds.push("verdict", "card");
+  return kinds;
 }
-const STORY_MS = 4600;   // must equal the .story-bar.live transition, or the bar lies about the wait
+function storyHasHr(run) {
+  return !!(run && run.avgHr && storyHrPoints(run).length >= 3);
+}
+function storyPanelCount(run) { return storyPanelKinds(run, runAnalysis(run)).length; }
+/** How long a stride's worth of drawing takes, shared by the CSS transition and the head dot. */
+const STORY_DRAW_MS = 3400;
+/**
+ * HOW LONG EACH PANEL HOLDS, AND WHAT IT SAYS WHILE IT DOES.
+ *
+ * ⚠️ EVERY PANEL USED TO GET EXACTLY 4600ms, WHICH IS WRONG IN BOTH DIRECTIONS. The route has to
+ * finish drawing itself; a two-line statement does not need five seconds. Measured on the reference,
+ * its five chapters run 6.0 / 6.8 / 21.2 / 8.4 / 2.4s — proportional to what is in them.
+ *
+ * ⚠️ AND A CHAPTER CAN HOLD MORE THAN ONE BEAT. The reference's splits chapter states the average,
+ * then draws the average line, then flips its fastest bar white under a new sentence — the chart
+ * stays put and the WORDS move. Each beat carries its own ms, and the panel's total is their sum, so
+ * the progress bar and the wait are derived from one number and cannot disagree.
+ */
+function storyBeats(kind) {
+  const run = STORY.run, a = STORY.a, v = STORY.v;
+  if (kind === "route") {
+    // ⚠️ THE STATEMENT SLOT IS NOT A SECOND COPY OF THE HEADER. It said run.t over
+    // run.place || rdWhenText(run) — and the persistent header two hundred pixels above it says
+    // exactly run.t over rdWhenText(run), so with no place recorded the panel printed the same two
+    // lines twice, ~690px apart, and spent its one sentence saying nothing. The place is the one fact
+    // the header does not carry; with no place there is nothing to add, and the reference's own route
+    // chapter carries the identity header and no bottom statement either.
+    return [{ ms: STORY_DRAW_MS + 2200, big: run.place || "", sub: "" }];
+  }
+  if (kind === "splits") {
+    const sv = storySplitView(a, run);
+    const beats = [{ ms: 4200 + 260 * sv.shown.length, big: sv.big, sub: sv.sub }];
+    // ⚠️ THE SECOND BEAT ONLY EXISTS WHEN IT HAS SOMETHING TO SAY, and only when the row it points at
+    // is one of the rows on screen. "Your quickest kilometre" beside a bar nobody can see is worse
+    // than no second beat.
+    if (sv.hi >= 0 && a.slowest > a.fastest) {
+      beats.push({ ms: 4400, hi: sv.hi,
+        big: "Kilometre " + sv.hiKm + " was your quickest at " + fmtPace(a.fastest) + " /km",
+        sub: fmtPace(a.slowest - a.fastest) + " faster than your slowest" });
+    }
+    return beats;
+  }
+  if (kind === "hr") {
+    // ⚠️ THE MAX IN THE SENTENCE IS THE MAX THE PICTURE DRAWS. This quoted run.maxHr while the chart's
+    // top axis label was the SMOOTHED peak, so the two disagreed by 5–6 bpm on every run with a series
+    // (measured: axis "147 bpm" under a sentence reading "Reaching a max of 152 bpm"), which is exactly
+    // the two-different-things this feature's own header forbids. storyHrPeak is the one answer, and
+    // storyHrSvg rules and labels its axis at the same number.
+    const hp = storyHrPeak(run);
+    return [{ ms: 5200, big: "Your average heart rate was " + Math.round(run.avgHr) + " bpm",
+      sub: hp > Math.round(run.avgHr) ? "Reaching a max of " + hp + " bpm" : "" }];
+  }
+  if (kind === "verdict") {
+    const beats = [{ ms: 4600, big: v.headline, sub: v.body[0] || "" }];
+    if (v.body[1]) {
+      // ⚠️ BEAT 2 CHANGES THE PICTURE AS WELL AS THE WORDS, which is what the reference does between its
+      // frames 070 and 078 (one row goes solid while the rest drop to about 40%). Without it the second
+      // beat of this panel is a sentence swap on a static chart, and the panel stops moving half way
+      // through. It points at the first kilometre that missed the band, because that is the one the
+      // second sentence is usually about; with every kilometre in band there is nothing to single out.
+      const miss = a && a.rows ? a.rows.findIndex((r) => !r.est && (r.verdict === "fast" || r.verdict === "slow")) : -1;
+      beats.push({ ms: 4600, big: v.headline, sub: v.body[1],
+        hi: miss, hisel: ".story-bmk" });
+    }
+    return beats;
+  }
+  return [{ ms: 0, big: "", sub: "" }];   // the card decides nothing for the runner
+}
+function storyPanelMs(kind) {
+  return storyBeats(kind).reduce((x, b) => x + b.ms, 0);
+}
 
 /**
  * ⚠️ A ROW, NOT A TILE. The first version was an 88px dark thumbnail sitting on a light page, and the
@@ -15927,8 +16573,12 @@ const STORY_MS = 4600;   // must equal the .story-bar.live transition, or the ba
  * competing advert for a feature.
  */
 function rdStoryChipHtml(run) {
-  const pres = runRoutePresentation(run);
-  if (!pres.route) return "";
+  // ⚠️ IT IS NOT GATED ON A ROUTE ANY MORE. It was, and that silently removed the whole recap from
+  // every treadmill run and from anybody whose Route privacy is set to "Map hidden" — with no
+  // explanation, because a chip that is not rendered cannot say why. The splits, the heart rate, the
+  // coach's read and the share card carry no location data at all, and storyPanelKinds now drops the
+  // route PANEL by itself when there is no map to draw.
+  if (!run) return "";
   return '<button class="rd-id-r rd-id-story" id="rdStory">' +
     '<span class="rd-id-ic">' + RD_PLAY + '</span>' +
     '<span class="rd-id-t">Watch the recap</span></button>';
@@ -15937,8 +16587,10 @@ const RD_PLAY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 function openRunStory(run) {
   if (!run) return;
   const a = runAnalysis(run);
-  STORY.run = run; STORY.a = a; STORY.v = runVerdict(run, a); STORY.i = 0;
-  STORY.n = storyPanelCount(run);
+  STORY.run = run; STORY.a = a; STORY.v = runVerdict(run, a); STORY.i = 0; STORY.b = 0;
+  // ⚠️ ONE LIST, so a panel that is not shown can never displace the one after it.
+  STORY.kinds = storyPanelKinds(run, a);
+  STORY.n = STORY.kinds.length;
   let ov = $("storyOv");
   if (!ov) {
     ov = el('<div class="story-ov" id="storyOv" role="dialog" aria-modal="true" aria-label="Run recap"></div>');
@@ -15978,127 +16630,1229 @@ function storyShellHtml() {
  * ⚠️ FULL-BLEED, NOT A CARD IN THE MIDDLE. The first version centred a 360px box on black and looked
  * like a dialog. The visual is the whole screen; the words sit over a fade at the bottom.
  */
-function storyStatement(big, sub) {
-  return '<div class="story-say"><div class="story-big">' + esc(big) + '</div>' +
-    (sub ? '<div class="story-sub">' + esc(sub) + '</div>' : "") + '</div>';
+function storySayInner(big, sub) {
+  return '<div class="story-big">' + esc(big) + '</div>' +
+    (sub ? '<div class="story-sub">' + esc(sub) + '</div>' : "");
+}
+/**
+ * EVERY BEAT OF THIS PANEL, RENDERED AT ONCE IN ONE GRID CELL.
+ *
+ * ⚠️ THIS IS THE STRUCTURAL CURE FOR THE INTER-BEAT JOLT, AND MEASURING IT FOUND THE FAULT STILL LIVE ON A
+ * SECOND PANEL. The verdict panel's 22px shift was fixed by top-anchoring it, which pins every landmark
+ * above the statement — measured 0.0px across sixteen fixture/theme/scale combinations. But the SPLITS panel
+ * bottom-anchors its statement on margin-top: auto, and its beat 2 changes the headline as well as the
+ * sub, so a headline that rewraps moves its own top: measured 22.5px at --tscale 1.0 and 29.2px at 1.3, on
+ * five of eight fixtures. Same defect, different panel, and anchoring cannot fix it there without moving
+ * that panel's statement 107px up the screen — which would redesign a panel the critic lists as holding up.
+ *
+ * Rendering all the beats into one grid cell makes the cell as tall as the TALLEST beat for the panel's whole
+ * life, so no landmark can move for any copy, under either anchoring, with no constant to go stale and no
+ * line clamp truncating a coaching sentence.
+ *
+ * ⚠️ visibility, NOT opacity. With opacity every beat stays in the accessibility tree and a screen reader
+ * reads all of them at once, which on the verdict panel is the same headline twice with two different bodies.
+ *
+ * ⚠️ NO SENTENCE MEANS NO BOX. The route panel has nothing to add to the header unless the run carries a
+ * place, and an empty .story-say is bottom padding pretending to be a statement.
+ */
+function storySayStack(beats) {
+  const bs = (beats || []).filter((b) => b && (b.big || b.sub));
+  if (!bs.length) return "";
+  return '<div class="story-say story-saystack">' + bs.map((b, i) =>
+    '<div class="story-sayb' + (i ? "" : " on") + '">' + storySayInner(b.big, b.sub) + '</div>').join("") +
+    '</div>';
+}
+/**
+ * HOW LONG A BAR IS, AND WHY THE SCALE IS ABSOLUTE.
+ *
+ * ⚠️ NORMALISING TO THE RUN'S OWN MIN AND MAX MADE THE PICTURE MEAN NOTHING. The old formula spent the
+ * whole 46–100% range on whatever spread the run happened to have, so two kilometres one second apart
+ * drew 100% and 46% — identical to two ninety seconds apart — and a metronomic run was drawn as a
+ * wildly varying one. Worse, ONE split (the owner's own 1.01 km run) pinned the single bar at the
+ * SHORTEST length the scale can produce, under a caption reading "longer bar, quicker kilometre".
+ *
+ * Proportional to the pace DEFICIT against the quickest kilometre keeps the property that matters —
+ * the same pace always draws the same length, in any run, so the average line has something honest to
+ * be read against — and it is measured against the reference rather than picked.
+ *
+ * ⚠️ THE GAIN IS 2, AND IT IS THE DIFFERENCE BETWEEN A PICTURE AND SIX IDENTICAL LOZENGES. A plain
+ * speed ratio (quick / sec) is what shipped, and on the reference's own splits — 351 337 336 333 334
+ * 333 — it drew 94.9 / 98.8 / 99.1 / 100 / 99.7 / 100 %: measured in the DOM, three of the six bars
+ * were pixel-identical and the visible spread was 5.1% of the bar. The reference's own frame, same
+ * data, measures 291–326px of 380, i.e. min/max 0.893 — almost exactly twice the spread, and
+ * 100 - 2 * 100 * (351-333)/333 = 89.2 reproduces it. So the deficit is drawn at 2x, which is a
+ * measurement of the thing being copied, not a taste setting.
+ *
+ * ⚠️ AND IT STAYS SELF-CONTAINED — no module constant in the body. The bar scale is lifted out of the
+ * built page and RUN by test/run-debrief.test.ts (twice: on its own, and inside storySplitView), because
+ * matching its source is what let the previous wrong formula through. A function that closes over a
+ * constant cannot be lifted, and the gain of 2 is stated above and asserted by measurement below.
+ */
+function storyBarPct(sec, quick) {
+  if (!(sec > 0) || !(quick > 0)) return 100;
+  return Math.max(24, Math.min(100, Math.round(100 - 2 * 100 * (sec - quick) / quick)));
+}
+/** At most this many rows: the panel is a fixed band, and past this they are too thin to read. */
+const STORY_SPLIT_MAX = 10;
+/**
+ * The splits panel's data, decided once so the bars, the average line and both statements agree.
+ *
+ * ⚠️ THE ROWS ARE CAPPED AND THE CAP IS STATED. Measured at 375x812 on the old panel: from twelve
+ * splits the first rows were pushed under the header, and a 21-split half marathon put NINE of its
+ * kilometres off the top of the screen — with no scroller anywhere to recover them, so the panel
+ * simply lost them. A sample that keeps the quickest and the slowest and says what it is showing is
+ * honest; silently dropping the first nine kilometres is not.
+ *
+ * ⚠️ AN ESTIMATED SPLIT NEVER SETS THE SCALE. It is elapsed time divided across kilometres the phone
+ * slept through, so letting it be the quickest would rescale every measured bar against a number the
+ * app invented.
+ */
+function storySplitView(a, run) {
+  const all = a.rows.map((r, k) => ({ r: r, k: k }));
+  const measured = all.filter((x) => !x.r.est);
+  const pool = measured.length ? measured : all;
+  const quick = Math.min.apply(null, pool.map((x) => x.r.sec));
+  const slowIdx = pool.reduce((b, x) => (x.r.sec > b.r.sec ? x : b), pool[0]).k;
+  const quickIdx = pool.reduce((b, x) => (x.r.sec < b.r.sec ? x : b), pool[0]).k;
+  let shown = all, note = "";
+  if (all.length > STORY_SPLIT_MAX) {
+    const keep = {};
+    keep[0] = 1; keep[all.length - 1] = 1; keep[quickIdx] = 1; keep[slowIdx] = 1;
+    for (let s = 0; s < STORY_SPLIT_MAX; s++) {
+      if (Object.keys(keep).length >= STORY_SPLIT_MAX) break;
+      keep[Math.round(s * (all.length - 1) / (STORY_SPLIT_MAX - 1))] = 1;
+    }
+    shown = all.filter((x) => keep[x.k]).slice(0, STORY_SPLIT_MAX);
+    note = "Showing " + shown.length + " of " + all.length + " kilometres, quickest and slowest included.";
+  }
+  const floorKm = Math.floor(run.distKm > 0 ? run.distKm : 0);
+  const rows = shown.map((x) => {
+    // ⚠️ THE LABEL IS KEYED ON THE ROW, NOT ON THE RUN'S TOTAL. Splits are only ever recorded at whole
+    // kilometre boundaries, so the old test — (run.distKm - floor(run.distKm)) > 0.08 — fired on a
+    // COMPLETE kilometre: a 5.60 km run with five splits relabelled kilometre 5 as "0.60" and printed
+    // its full-kilometre pace beside it, while the real final 600 m appeared nowhere. The debrief's own
+    // splits table, two taps away, still called it 5.
+    const partial = run.distKm > 0 && x.r.km > floorKm;
+    const label = partial
+      ? (Math.round((run.distKm - floorKm) * 100) / 100).toFixed(2)
+      : String(x.r.km);
+    return { r: x.r, label: label, partial: partial, pct: storyBarPct(x.r.sec, quick) };
+  });
+  // ⚠️ THE AVERAGE IS THE RUN'S OWN AVERAGE, THE ONE THE STATEMENT PRINTS. It was the unweighted mean
+  // of the rows on screen, and that disagreed with the headline forty pixels above it in two different
+  // ways. On any run not ending on a whole kilometre the 0.51 km partial counted as a full one
+  // (measured: pill 5:37 against a headline of 5:38, run total 338.29 s/km). And once sampling kicks in
+  // — every run over 10 km — the mean was taken over ten rows deliberately chosen to include the
+  // slowest kilometre: measured on a 21-split half marathon, pill 5:13 against a statement of 5:09.
+  // run.avgPaceSec is what run.pace is formatted from, so the picture and the sentence now agree by
+  // construction rather than by luck.
+  const mean = (function () {
+    if (run && run.avgPaceSec > 0) return Math.round(run.avgPaceSec);
+    if (run && run.sec > 0 && run.distKm > 0.05) return Math.round(run.sec / run.distKm);
+    const m = shown.filter((x) => !x.r.est).map((x) => x.r.sec);
+    return m.length ? Math.round(m.reduce((s, v) => s + v, 0) / m.length) : 0;
+  })();
+  // The highlight beat may only point at a row that is on screen.
+  let hi = -1;
+  if (rows.length >= 3) for (let k = 0; k < shown.length; k++) if (shown[k].k === quickIdx) hi = k;
+  const kmWord = a.n === 1 ? "kilometre" : "kilometres";
+  const inBand = a.band ? a.inBand + " of " + a.n + " " + kmWord + " inside the target band." : "";
+  // ⚠️ THERE IS NO ONE-SPLIT WORDING HERE ANY MORE, AND ITS REMOVAL IS THE POINT. It quoted the lone
+  // kilometre because repeating "you ran 1.01 km at 10:21" two panels after the route panel printed
+  // both numbers adds nothing — and that reasoning finishes the job: with one kilometre this panel is
+  // not built at all (storyPanelKinds), so the wording had no reachable caller and a dead branch here
+  // is how the rail it sat above went on being wrong for a release.
+  const big = "You ran " + (run.dist || "") + " at an average of " + (run.pace || "");
+  // ⚠️ THE PER-ROW WORD ONLY EARNS ITS SPACE WHEN THE ROWS DISAGREE. Six identical "✓ IN BAND" chips
+  // above a qualifier reading "6 of 6 kilometres inside the target band" states one fact seven times
+  // and flattens the panel's hierarchy — the reference's rows carry the pace and nothing else. When
+  // the kilometres DO differ the word is the information, and it still may not be carried by colour
+  // alone, which is the rule this project's session rows are already tested for.
+  const verdicts = {};
+  shown.forEach((x) => { if (!x.r.est) verdicts[x.r.verdict] = 1; });
+  const mixed = Object.keys(verdicts).length > 1;
+  return { shown: rows, mean: mean, quick: quick, hi: hi, mixed: mixed,
+    hiKm: hi >= 0 ? rows[hi].r.km : 0, big: big, note: note,
+    sub: note || inBand || "Each bar is a kilometre; the dotted line is your average." };
+}
+/**
+ * A number with its unit, or NOTHING AT ALL.
+ *
+ * ⚠️ A UNIT WITH NO VALUE IS WORSE THAN A MISSING TILE. A treadmill run records a real clock and
+ * deliberately no distance, and both the route panel and the share card printed the labels and the
+ * units regardless: "DISTANCE / km" and "PACE / /km" with nothing between them. The debrief's own
+ * stat tiles have followed this rule since they were built — a tile appears when there is something
+ * true to put in it, because a confident "0 m" reads as a measurement rather than an absence.
+ */
+function storyStatTile(k, val, u, cls) {
+  const s = String(val == null ? "" : val).trim();
+  if (!s || s === "—") return "";
+  return '<div class="' + (cls || "story-hs") + '"><span class="' + (cls ? "story-stk" : "story-hsk") + '">' +
+    esc(k) + '</span><span class="' + (cls ? "story-stv" : "story-hsv") + ' num">' + esc(s) +
+    (u ? '<i>' + esc(u) + '</i>' : "") + '</span></div>';
 }
 function storyPanelHtml(i) {
   const run = STORY.run, a = STORY.a, v = STORY.v;
+  const kind = STORY.kinds[i] || "card";
   const pres = runRoutePresentation(run);
-  if (i === 0) {
-    // The route on its own map, with the three numbers that answer "what was this run".
-    const W = 380, H = 760;
-    const stat = (k, val, u) => '<div class="story-hs"><span class="story-hsk">' + k + '</span>' +
-      '<span class="story-hsv num">' + esc(String(val)) + (u ? '<i>' + u + '</i>' : "") + '</span></div>';
+  const beat = storyBeats(kind)[0] || { big: "", sub: "" };
+  if (kind === "route") {
+    // The route drawing itself over a real dark basemap, with the three numbers that answer "what was
+    // this run". storyShow composites the tiles behind it as soon as they arrive.
+    // ⚠️ THE SIZE IS THE STAGE'S OWN MEASURED SIZE, quantised to 20px because it is part of the tile
+    // cache key. Hardcoded 380x760 stretched the viewBox 8.6% anisotropically on the owner's phone —
+    // the exact fault buildOverviewMap's own comment records fixing on the debrief hero, where the
+    // line stopped sitting on the streets it was run on.
+    const W = STORY.w, H = STORY.h;
+    const stat = storyStatTile;
+    // ⚠️ NO id ON THE MAP CONTAINER, AND THAT IS THE FIX RATHER THAN A TIDY-UP. storyShow used to look
+    // it up with a document-wide getElementById while the outgoing panel is deliberately left in the DOM
+    // for 520ms — so two elements carried that id, the lookup returned the OUTGOING one, and buildStoryMap
+    // composited the tiles and the attribution into the node about to be removed. Measured on a real tap:
+    // the live panel ended with no canvas, no attribution and no recovery, ever, and the tiles were still
+    // fetched and thrown away, which on Mapbox is billable. It is found by class now, inside the panel
+    // storyShow has just built.
     return '<div class="story-p story-route">' +
-      (pres.route ? '<div class="story-map">' + routeMapSvg(pres.route, routeMapFraming(pres.route, W, H).proj, W, H) + '</div>' : "") +
+      (pres.route ? '<div class="story-map"><div class="story-mapov">' +
+        routeMapSvg(pres.route, routeMapFraming(pres.route, W, H).proj, W, H) + '</div></div>' : "") +
       '<div class="story-hstats">' +
         stat("Distance", String(run.dist || "").replace(" km", ""), "km") +
-        stat("Time", run.time || "\u2014", "") +
+        stat("Time", run.time || "", "") +
         stat("Pace", String(run.pace || "").replace(" /km", ""), "/km") +
       '</div>' +
-      storyStatement(run.t || "Your run", run.place || rdWhenText(run) || "") + '</div>';
+      storySayStack(storyBeats(kind)) + '</div>';
   }
-  if (i === 1) {
-    if (!a.n) {
-      return '<div class="story-p">' + storyStatement("You were out for " + (run.time || ""),
-        "No kilometre splits were recorded for this one.") + '</div>';
-    }
-    // ⚠️ FASTER IS LONGER. The reference draws it this way and it is the right way round: a longer
-    // bar reading as a quicker kilometre needs no legend, where "slowest bar longest" has to be
-    // explained in a caption — which is what the first version did.
-    const secs = a.rows.map((r) => r.sec);
-    const slow = Math.max.apply(null, secs), quick = Math.min.apply(null, secs);
-    const span = Math.max(1, slow - quick);
-    const last = a.rows.length - 1;
-    const rows = a.rows.map((r, k) => {
-      // ⚠️ The final kilometre is usually a PART one; labelling it "6" when it was 510 m overstates
-      // it. The reference labels it by its distance, which is the honest thing to print.
-      const partial = k === last && run.distKm > 0 && (run.distKm - Math.floor(run.distKm)) > 0.08;
-      const label = partial ? (Math.round((run.distKm - Math.floor(run.distKm)) * 100) / 100).toFixed(2) : String(r.km);
-      return '<div class="story-split' + (r.verdict === "in" ? " ok" : "") +
-        '" style="--w:' + Math.round(46 + 54 * (slow - r.sec) / span) + '%;--d:' + (k * 85) + 'ms">' +
-        '<span class="story-km">' + esc(label) + '</span>' +
-        '<span class="story-t num">' + fmtPace(r.sec) + '</span></div>';
+  if (kind === "splits") {
+    const sv = storySplitView(a, run);
+    // ⚠️ THERE IS NO ONE-SPLIT BRANCH HERE ANY MORE — storyPanelKinds does not build this panel for a
+    // single kilometre at all, and the verdict panel charts that kilometre against its band. A branch
+    // kept "for safety" would be a screen nobody can reach, which is how the rail survived being wrong.
+    const rows = sv.shown.map((row, k) => {
+      const cls = "story-split" + (row.r.verdict === "in" ? " ok" : "") + (row.r.est ? " est" : "");
+      // ⚠️ THE STATE IS A WORD, NOT A STEP IN ALPHA — but only where the rows disagree. See
+      // storySplitView: on a session where every kilometre is in band the qualifier says so once, and
+      // repeating it on all six rows says the same thing seven times.
+      const word = row.r.est ? "est"
+        : !sv.mixed ? ""
+        : row.r.verdict === "in" ? "✓ in band"
+        : row.r.verdict === "fast" ? "quick"
+        : row.r.verdict === "slow" ? "slow" : "";
+      return '<div class="' + cls + '" style="--w:' + row.pct + '%;--d:' + (Math.min(k, 8) * 85) + 'ms">' +
+        '<span class="story-km">' + esc(row.label) + (row.partial ? " km" : "") + '</span>' +
+        '<span class="story-rt"><span class="story-t num">' + fmtPace(row.r.sec) + '</span>' +
+        (word ? '<span class="story-vd">' + word + '</span>' : "") + '</span></div>';
     }).join("");
-    const inBand = a.band ? a.inBand + " of " + a.n + " kilometres inside the target band." : "";
-    return '<div class="story-p"><div class="story-splits">' + rows + '</div>' +
-      storyStatement("You ran " + (run.dist || "") + " at an average of " + (run.pace || ""),
-        inBand || "Longer bar, quicker kilometre.") + '</div>';
+    // ⚠️ THE AVERAGE LINE IS PLACED BY THE SAME FUNCTION THAT SIZES THE BARS. That shared derivation is
+    // the point rather than the decoration: it is what tells the runner which kilometres sat above and
+    // below the mean, and computed separately the two could disagree and the picture would be a lie.
+    // ⚠️ AND IT IS CLAMPED ONTO THE BARS. The average is by definition slower than the quickest
+    // kilometre, so on the old ratio scale it computed to 99% and rendered past the right-hand end of
+    // the track — a line beside the chart rather than across it, which cannot show anything about which
+    // kilometres sat above or below it.
+    const avgX = Math.max(6, Math.min(96, storyBarPct(sv.mean, sv.quick)));
+    const avg = sv.mean > 0 && sv.shown.length >= 2
+      ? '<div class="story-avgl' + (avgX >= 72 ? " end" : "") + '" style="--x:' + avgX + '%">' +
+        '<span class="story-avgp">' + fmtPace(sv.mean) + ' /km</span></div>'
+      : "";
+    return '<div class="story-p story-splitsp"><div class="story-splits">' +
+        '<div class="story-splitsin">' + rows + avg + '</div></div>' +
+      storySayStack(storyBeats(kind)) + '</div>';
   }
-  if (i === 2 && run.avgHr) {
-    return '<div class="story-p"><div class="story-hr">' + storyHrSvg(run) + '</div>' +
-      storyStatement("Your average heart rate was " + Math.round(run.avgHr) + " bpm",
-        run.maxHr ? "Reaching a max of " + Math.round(run.maxHr) + " bpm" : "") + '</div>';
+  if (kind === "hr") {
+    return '<div class="story-p story-hrp"><div class="story-hr">' + storyHrSvg(run) + '</div>' +
+      storySayStack(storyBeats(kind)) + '</div>';
   }
-  if (i === STORY.n - 2) {
-    return '<div class="story-p story-verdictp">' +
-      storyStatement(v.headline, v.body[0] || "") + '</div>';
+  if (kind === "verdict") {
+    // ⚠️ THE COACH'S READ GETS THE EVIDENCE IT ALREADY OWNED. runVerdict builds chips — in-range
+    // percentage, RPE with a word, average heart rate — and well/watch lists, and the story read NONE
+    // of them, which is why this was the only panel in either app with no visual at all: two lines of
+    // text at the bottom of an empty gradient, 745 of 825 measured pixels of it.
+    const tiles = (v.chips || []).slice(0, 3).map((c) =>
+      '<div class="story-hs"><span class="story-hsk">' + esc(c.k) + '</span>' +
+      '<span class="story-hsv num">' + esc(String(c.v)) +
+      (c.u ? '<i>' + esc(c.u) + '</i>' : "") + '</span></div>').join("");
+    // ⚠️ WATCH FIRST, AND AT MOST ONE well LINE — because the chart above now SAYS the well lines. Two of
+    // each shipped when the panel's only graphic was an 8px rail; with a filled lane and a marker per
+    // kilometre on the screen directly above it, "Pace was even throughout" and "Most kilometres sat
+    // inside the target band" are the picture restated in words, and a panel that says the same thing
+    // twice is what this rebuild exists to remove. The watch line is the one thing a chart is blind to,
+    // so it leads and is never displaced. One well line survives so a run with nothing to watch still
+    // has a fact in words rather than only a graphic.
+    const lines = [];
+    (v.watch || []).slice(0, 3).forEach((w) =>
+      lines.push('<div class="story-vl"><span>!</span><span>' + esc(w) + '</span></div>'));
+    (v.well || []).slice(0, 1).forEach((w) =>
+      lines.push('<div class="story-vl"><span>✓</span><span>' + esc(w) + '</span></div>'));
+    // ⚠️ THE SESSION'S OWN EFFORT COLOUR, from the RPE band the flags engine already judges the run on.
+    // Only the three --eff-* tokens are used; no colour is invented, and none is named in this file.
+    const eff = !a.rband ? "moderate" : a.rband.max <= 4 ? "easy" : a.rband.max <= 6 ? "moderate" : "hard";
+    const style = ' style="--story-eff: var(--eff-' + eff + ')"';
+    const hero = storyBandSvg(a);
+    if (!hero) {
+      // ⚠️ THE ONLY CASE LEFT HERE IS A RUN WITH NO SPLITS AT ALL — the insufficientData verdict — and there
+      // is genuinely nothing to draw: no kilometres to plot and no pace to place in a band either, so the
+      // rail would render nothing too and calling it would be the computed-and-discarded trap. One measured
+      // kilometre and a run with no prescribed pace are BOTH charted now; requiring two of each is what put
+      // a 402px and a 507px void back on those two paths.
+      // The panel is CENTRED with it (see the CSS): bottom-anchoring left 68-77% of the screen as one empty
+      // band down the top, which is worse than the void this rebuild removed, and top-anchoring would put
+      // the same hole in the middle instead. Centred, no single band is a majority of the panel.
+      // ⚠️ AND THE RUN'S OWN THREE NUMBERS APPEAR HERE WHEN NOTHING ELSE IN THE STORY CARRIES THEM. A run
+      // with no splits is normally a treadmill effort, which has no route either — so the story is verdict
+      // then card, and distance/time/pace were printed on neither until the very last panel. This is the
+      // only panel in the story that can be reached without them being said once. Gated on the ROUTE PANEL'S
+      // ABSENCE rather than on run.indoor, because the fault is "nobody has said this yet" and the route
+      // panel is what usually says it; with a route present these three would be the same fact twice, two
+      // beats apart, which is what this rebuild exists to remove.
+      const facts = (STORY.kinds || []).indexOf("route") >= 0 ? "" :
+        storyStatTile("Distance", String(run.dist || "").replace(" km", ""), "km") +
+        storyStatTile("Time", run.time || "", "") +
+        storyStatTile("Pace", String(run.pace || "").replace(" /km", ""), "/km");
+      return '<div class="story-p story-verdictp no-hero"' + style + '>' +
+        (facts ? '<div class="story-hstats story-hfacts">' + facts + '</div>' : "") +
+        (tiles ? '<div class="story-hstats">' + tiles + '</div>' : "") +
+        (lines.length ? '<div class="story-vlist">' + lines.join("") + '</div>' : "") +
+        storySayStack(storyBeats(kind)) + '</div>';
+    }
+    // ⚠️ THE CAPTION MUST NOT PROMISE A TARGET THAT DID NOT EXIST. A bandless run is drawn as its own pace
+    // line, and saying "against the pace this session asked for" above it would invent a prescription.
+    const cap = a.band ? "Against the pace this session asked for" : "Your pace across the run";
+    return '<div class="story-p story-verdictp"' + style + '>' +
+      (tiles ? '<div class="story-hstats">' + tiles + '</div>' : "") +
+      '<span class="story-bandlab">' + cap + '</span>' +
+      '<div class="story-bandc">' + hero + '</div>' +
+      storyBandLegendHtml(a) +
+      (lines.length ? '<div class="story-vlist">' + lines.join("") + '</div>' : "") +
+      storySayStack(storyBeats(kind)) + '</div>';
   }
-  const W = 220, H = 220;
-  const stat = (k, val, u) => '<div class="story-st"><span class="story-stk">' + k + '</span>' +
-    '<span class="story-stv num">' + esc(String(val)) + (u ? '<i>' + u + '</i>' : "") + '</span></div>';
+  // ⚠️ THE MAP BOX TAKES THE ROUTE'S OWN SHAPE. It was a fixed landscape 260x150, and a there-and-back
+  // up a river path is 5.6:1 PORTRAIT — measured on the reference fixture, the route came out a ~30px
+  // sliver adrift in the middle of a large empty rectangle, which is the opposite of "worth posting".
+  // No cap on the box height helps, because a 5.6:1 route in a 260-wide box can only ever be 26px
+  // across; the box has to become portrait too, and then be narrowed on the card so it does not grow
+  // the card past the panel and clip its own stat values (a real, documented past fault here).
+  const cfr = pres.route ? routeMapFraming(pres.route, 260, 176) : null;
+  const fit = cfr ? storyCardMapFit(pres.route.map(cfr.proj)) : null;
+  const cproj = cfr && fit ? (pt) => { const q = cfr.proj(pt); return [q[0] - fit.x, q[1] - fit.y]; } : null;
+  const stat = (k, val, u) => storyStatTile(k, val, u, "story-st");
   const extra = [];
   if (run.avgHr) extra.push(stat("Heart rate", Math.round(run.avgHr), "bpm"));
   if (run.elevGain > 0) extra.push(stat("Elevation", Math.round(run.elevGain), "m"));
   if (run.cadence) extra.push(stat("Cadence", Math.round(run.cadence), "spm"));
-  return '<div class="story-p story-card"><div class="story-cardin">' +
+  // ⚠️ THE PLAN CHIP GOES WHEN THE TITLE ALREADY SAYS IT. "EASY RUN" directly above "5.5km Easy Run" is
+  // one fact twice, in the two heaviest pieces of type on the card.
+  // ⚠️ AND THE SLOT IS NOT BACKFILLED WITH THE RPE, WHICH THE HEIGHT BUDGET DECIDED RATHER THAN TASTE. It was
+  // — the reference carries an eyebrow on every card and ours is suppressed on most runs, so the effort
+  // rating looked like a free way to fill it. Measured, it is not free: the chip plus its margin is 30px at
+  // --tscale 1.0 and 36px at 1.3, and at 1.3 the card was already 62px past the space available, clipping
+  // its own bottom stat row. Between an eyebrow and the runner's heart rate being legible, the numbers win.
+  // The three additions kept in its place — full-width labelled splits, the target line, the date — each say
+  // something about the run that the RPE chip does not.
+  const label = run.type && SESSION_LABEL[run.type] ? SESSION_LABEL[run.type] : "";
+  const dupLabel = !!label && String(run.t || "").toLowerCase().indexOf(label.toLowerCase()) >= 0;
+  const eyebrow = label && !dupLabel ? label : "";
+  // ⚠️ TOWN · DATE, ON ONE LINE, AND THE TOWN IS GATED ON ROUTE PRIVACY.
+  // ⚠️ AND run.place IS DERIVED AFTER ALL — I asserted here that it "cannot be", on the reasoning that
+  // reverse geocoding is a network call and this page ships with no external network assets. Wrong:
+  // runPlaceLookup reverse-geocodes the route's midpoint through nominatim once per run and caches the
+  // answer onto the record. So a place is the NORMAL case for any run with a route, not the exception, and
+  // that changes the design rather than just the comment — the strings it returns are long
+  // ("Hartlepool, England, United Kingdom", 34 characters), which wrapped this line to two lines at the
+  // default text size and would take three at --tscale 1.3, on a card already measured to the pixel.
+  // ⚠️ SO THE CARD TAKES THE FIRST COMPONENT ONLY. The town IS the location on something posted to people
+  // who know where the runner lives, and "England, United Kingdom" beside it is the same fact twice at the
+  // cost of a wrapped line. The debrief screen still shows the full string, where there is room for it.
+  // The date is what the card lacks either way, and rdWhenText rather than runDateLabelIso because the time
+  // of day is what makes a posted card read as a record.
+  // ⚠️ A RUNNER WHO SET Route privacy TO "Map hidden" ASKED NOT TO SAY WHERE THEY WERE, and printing
+  // their town on a public card would be a privacy regression introduced BY this fix. Ends-redaction does
+  // not gate it — that hides home, not the town.
+  const when = rdWhenText(run) || "";
+  const place = run.place && !pres.hidden ? String(run.place).split(",")[0].trim() : "";
+  const sub = place ? (when ? place + " · " + when : place) : when;
+  // ⚠️ THE DEAD 225px BESIDE THE PORTRAIT ROUTE IS FILLED, NOT THE ROUTE STRETCHED. See the CSS: the
+  // reference's own card route is a NARROWER fraction of its column than ours, so widening is not the
+  // fix and raising storyCardMapFit's height allowance risks the card clipping its own stat values. A
+  // landscape route (pct > 52) already IS the graphic and takes the whole column with no companion.
+  const mini = a && a.n >= 2 && (!fit || fit.pct <= 52)
+    ? storyBandSvg(a, fit ? { w: 168, h: 132, T: 8, B: 8, LP: 4, RP: 8, bare: true }
+                         : { w: 284, h: 132, T: 8, B: 8, LP: 4, RP: 8, bare: true })
+    : "";
+  const band = fit || mini
+    ? '<div class="story-cardband">' +
+      (fit ? '<div class="story-cardmap" style="width:' + fit.pct + '%">' +
+        routeMapSvg(pres.route, cproj, fit.w, fit.h) + '</div>' : "") +
+      (mini ? '<div class="story-cardmini">' + mini + '</div>' : "") + '</div>'
+    : "";
+  // ⚠️ THE ONE SENTENCE NO COMPETITOR'S CARD CAN PRINT, and it is what makes the bar colours above mean
+  // something rather than decorate. Built from a.band, a.inBand and a.n — nothing new is computed.
+  // Absent entirely when there is no band, so it can never read "0 of 6".
+  const tgt = a && a.band && a.n >= 1
+    ? '<div class="story-cardtgt">Target ' + fmtPace(a.band.minSecPerKm) + '–' +
+      fmtPace(a.band.maxSecPerKm) + ' /km · ' + a.inBand + ' of ' + a.n + ' on target</div>'
+    : "";
+  // ⚠️ ONE BLOCK OWNS THE GAP BELOW THE EVIDENCE, so a card with no band (no target line) does not lose
+  // the space under its bars, and a card with one does not gain twice. Doing this with :has(+ …) would
+  // work until it silently did not, and this project already records :has as a silent-failure surface.
+  const rowsHtml = storyCardSplitsHtml(a, run);
+  // ⚠️ NEVER BY COLOUR ALONE, AND ON THE CARD THE PACE LABELS ARE NORMALLY WHAT SATISFIES IT: every block
+  // prints its own pace and the target line directly beneath prints the band, so any block can be read
+  // without seeing its colour at all. That path closes the moment the labels are dropped, so the legend
+  // appears exactly there. Printing it alongside the labels would state a third time what the label and the
+  // target line already say between them.
+  // ⚠️ THE GATE IS THE SAME PREDICATE THE ROW ITSELF USES, not a second copy of the number 8 — and the first
+  // version of this line was gated on a.mixed, which on runAnalysis means "the session mixed running and
+  // walking" (!!run.pmix) and NOT "the kilometres disagree". That second meaning belongs to
+  // storySplitView's own mixed. Two different questions, one name: exactly the data-wk trap this project
+  // already records.
+  const key = a && !storyCardLabelsFit(a.n) ? storyBandLegendHtml(a) : "";
+  const evid = rowsHtml || tgt ? '<div class="story-cardev">' + rowsHtml + tgt + key + '</div>' : "";
+  const ceff = !a || !a.rband ? "moderate" : a.rband.max <= 4 ? "easy" : a.rband.max <= 6 ? "moderate" : "hard";
+  return '<div class="story-p story-card" style="--story-eff: var(--eff-' + ceff + ')"><div class="story-cardin">' +
+      (eyebrow ? '<span class="story-cardplan">' + esc(eyebrow) + '</span>' : "") +
       '<div class="story-cardh"><b>' + esc(run.t || "Run") + '</b>' +
-        (run.place ? '<span>' + esc(run.place) + '</span>' : "") + '</div>' +
-      (pres.route ? '<div class="story-cardmap">' + routeMapSvg(pres.route, routeMapFraming(pres.route, W, H).proj, W, H) + '</div>' : "") +
+        (sub ? '<span>' + esc(sub) + '</span>' : "") + '</div>' +
+      band + evid +
       '<div class="story-stats">' +
         stat("Distance", String(run.dist || "").replace(" km", ""), "km") +
         stat("Pace", String(run.pace || "").replace(" /km", ""), "/km") +
-        stat("Time", run.time || "\u2014", "") +
+        stat("Time", run.time || "", "") +
         extra.join("") +
       '</div>' +
       '<span class="story-cardmark">' + BRAND_SVG + '</span>' +
     '</div>' +
-    '<div class="story-acts"><button class="story-share" id="storyShare">Share</button>' +
+    '<div class="story-acts"><button class="story-share" id="storyShare">Share my run</button>' +
       '<button class="story-later" id="storyLater">Maybe later</button></div></div>';
 }
-/** Heart rate as a filled area, with the axis labelled — a chart, not a decoration. */
+/**
+ * THE SHARE CARD'S MAP BOX, HUGGING THE ROUTE THAT IS IN IT.
+ *
+ * ⚠️ A FIXED LANDSCAPE BOX CANNOT HOLD A PORTRAIT ROUTE. routeMapFraming fits the whole route inside
+ * whatever box it is given, so a 5.6:1 north-south route in a 260x150 box was drawn ~26px wide with the
+ * rest of the box empty — a sliver adrift in a large empty area, which is the opposite of "worth
+ * posting". Capping the box height does not help: in a 260-wide box that route can only ever be 26px
+ * across, so the BOX has to become portrait too.
+ *
+ * ⚠️ AND THE BOX IS THE ROUTE'S DRAWN EXTENT, NOT THE ROUTE'S ASPECT. Shaping the box from the
+ * latitude/longitude aspect still left the drawing at 59% of its own box, because routeMapFraming picks
+ * an INTEGER zoom and so undershoots by up to a factor of two. Framing at a generous size and then
+ * cropping the viewBox to what was actually drawn removes the quantisation waste entirely, with no
+ * distortion: the projection is untouched and only the window onto it changes.
+ *
+ * The pct it returns is the width the wrapper takes on the card, which is what stops a tall box growing
+ * the card past the panel and clipping its own stat values (a real, documented past fault here). 279 is
+ * the card's measured content width at 375px, and 176 the tallest map band the layout allows.
+ *
+ * ⚠️ SELF-CONTAINED AND FED PROJECTED POINTS, so test/run-debrief.test.ts can lift it out of the built
+ * page and RUN it — the same reason storyBarPct holds no module constant.
+ */
+function storyCardMapFit(pts) {
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  const minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+  const minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+  const pad = 10;
+  const w = Math.max(20, maxX - minX) + pad * 2, h = Math.max(20, maxY - minY) + pad * 2;
+  const pct = Math.max(14, Math.min(100, Math.round(100 * Math.min(279, 176 * w / h) / 279)));
+  return { x: minX - pad, y: minY - pad, w: Math.round(w), h: Math.round(h), pct: pct };
+}
+/**
+ * EVERY KILOMETRE AGAINST THE BAND THE SESSION ASKED FOR — the verdict panel's hero graphic, and the
+ * one thing a competitor's recap structurally cannot draw, because it does not know what the run was
+ * FOR.
+ *
+ * ⚠️ IT REPLACES AN 8px RAIL ON A HALF-EMPTY SCREEN. Measured on the shipped build: the verdict panel's
+ * first element began at y452.7 of an 825px panel — 377px, 46%, of empty gradient — and its only
+ * graphic was a grey stripe with a 3px tick, which reads as a disabled iOS slider. This fills
+ * y96 → y526, 52.1% of the panel, against the reference's own measured hero bands of 46.5-50.8%, and it
+ * carries three chips and a caption theirs does not.
+ *
+ * ⚠️ SLOWER IS LOWER, THE SAME DIRECTION AS paceChartSvg, so the debrief's own chart and this recap
+ * cannot contradict each other about which way is faster.
+ *
+ * ⚠️ THE RP INSET IS LOAD-BEARING, and it is the same class of fault as the HR panel's clipped end dot:
+ * without it the last kilometre's 12-unit marker box runs to x=380 and is half cut off by the viewport
+ * (.story-bandsvg fills its box, and the marker is at the very edge of the viewBox).
+ *
+ * ⚠️ THE LANE CAN NEVER COLLAPSE, WHICH IS THE DEFECT THE DELETED 8px RAIL SHIPPED ONCE. There the
+ * scale stretched to include a 10:21/km against a 5:20-6:00 band and drew it at 81% of a rail labelled
+ * with the band's own two ends, reading as comfortably inside it. Here the scale still shows every
+ * kilometre — nothing is ever clipped or hidden — but the span is capped at twelve band widths, so the
+ * lane always occupies at least 1/12 of the plot and is always a visible filled region rather than a
+ * hairline. Past that cap a marker is pinned to the plot edge with a full-length stem, which reads as
+ * "off the bottom of this chart" rather than as a pace inside the band.
+ *
+ * ⚠️ SELF-CONTAINED — no module constant in the body, so test/run-debrief.test.ts can lift it out of the
+ * BUILT page and run it, which is the only way the scale can be checked against an outlier fixture
+ * rather than eyeballed on one screenshot. Same reason storyBarPct holds none.
+ *
+ * ⚠️ AND NO COLOUR IS NAMED HERE. Every story builder sits inside the debrief's no-hex blocker scope, so
+ * the fills live in the stylesheet and this emits class names only. --story-eff is set on the panel root
+ * from the session's own effort band.
+ *
+ * opt is the CARD's smaller rendering of the SAME derivation — the filled lane and the pace line and
+ * nothing else, so the story panel and the posted card can never disagree about one run.
+ */
+function storyBandSvg(a, opt) {
+  // ⚠️ ONE KILOMETRE AND NO BAND ARE BOTH DRAWABLE, AND REQUIRING TWO-OF-EACH PUT THE VOID STRAIGHT BACK.
+  // Measured on the degenerate path: a one-split run left 402px (48.7%) of the panel empty and a run with no
+  // prescribed pace left 507px (61.4%) — worse than the 46% this whole rebuild exists to remove. Neither is
+  // actually unplottable:
+  //  • ONE kilometre against a band is a lane with a single marker in or out of it, which is exactly what
+  //    the 8px rail said and says it far better — the owner's 10:21/km lands well below a filled lane with
+  //    a long stem, instead of at 81% of a rail labelled with the band's own two ends.
+  //  • NO band is still a run: the pace line and the mean are honest without a lane to judge them against,
+  //    and the caption says so instead of implying a target that did not exist.
+  // What is genuinely unplottable is a run with no splits at all, and that is the only case left to fall
+  // back on.
+  if (!a || !(a.n >= 1) || !(a.fastest > 0) || !(a.slowest > 0)) return "";
+  const o = opt || {};
+  const W = o.w || 380, H = o.h || 340;
+  const T = o.T != null ? o.T : 26, B = o.B != null ? o.B : 40;
+  const LP = o.LP != null ? o.LP : 18, RP = o.RP != null ? o.RP : 18;
+  const bare = !!o.bare;
+  const ih = H - T - B;
+  const bd = a.band || null;
+  const bmin = bd ? bd.minSecPerKm : 0, bmax = bd ? bd.maxSecPerKm : 0;
+  const bw = Math.max(1, bmax - bmin);
+  let lo = bd ? Math.min(a.fastest, bmin) : a.fastest;
+  let hi = bd ? Math.max(a.slowest, bmax) : a.slowest;
+  // ⚠️ A TIGHTER PAD WITH NO BAND, and it is not a taste setting: with a lane to sit in, the padding is
+  // what stops the lane touching the frame, so it is measured against the whole spread; with no lane the
+  // only thing on the plot is the line, and 22% of a small spread flattens it to a horizontal stripe.
+  const pad = bd ? Math.max(12, (hi - lo) * 0.22) : Math.max(5, (hi - lo) * 0.12);
+  lo -= pad; hi += pad;
+  // THE LANE FLOOR. See the header: the span may never exceed twelve band widths, or the lane the whole
+  // picture is read against becomes a hairline. No band, no lane, nothing to protect.
+  if (bd && hi - lo > bw * 12) { const mid = (bmin + bmax) / 2; lo = mid - bw * 6; hi = mid + bw * 6; }
+  const span = Math.max(1, hi - lo);
+  const Y = (sec) => T + ih * ((sec - lo) / span);
+  const Yc = (sec) => Math.max(T + 5, Math.min(T + ih - 5, Y(sec)));
+  // ⚠️ THE AVERAGE IS DECIDED BEFORE THE GEOMETRY, BECAUSE ITS PILL OWNS A GUTTER. workPaceSec is the
+  // mean of the kilometres the band applies to and is the number the coach's read is made of; with no
+  // band there are no judged kilometres, so it is null — and falling back to the run's own average is
+  // what stops this chart and the splits panel forty pixels of one story apart disagreeing about
+  // whether the run has a reference pace at all.
+  const wp = a.workPaceSec || a.avgPaceSec || 0;
+  const drawMean = !bare && wp > lo && wp < hi;
+  // ⚠️ THE PILL GETS A GUTTER OF ITS OWN RATHER THAN BEING PAINTED OVER THE DATA, and that is the fix
+  // for a measured collision: as the last thing pushed, a 94%-opaque 54x22 pill at the right-hand end of
+  // the mean line covered kilometre markers 18 and 19 of a 21-kilometre run (two kilometres unreadable,
+  // merged into one white blob at 2x) and sat on the pace line itself. Every alternative was worse — a
+  // marker drawn on top of it puts a datum through the digits, which is the fault the deleted rail's
+  // caption already shipped, and searching for a clear slot cannot succeed on a run whose mean is
+  // central. So the DATA stops short of the pill's column, exactly as paceChartSvg reserves a left
+  // gutter for its own axis labels, and the lane still bleeds the full width behind it.
+  const gut = drawMean ? 62 : 0;
+  const iw = W - LP - RP - gut;
+  const X = (i) => LP + (a.n === 1 ? iw / 2 : iw * (i / (a.n - 1)));
+  const yTop = Y(bmin), yBot = Y(bmax), lane = Math.max(6, yBot - yTop);
+  const parts = [];
+  // ⚠️ A LABEL MAY NEVER COVER A DATUM, AND THIS IS THE THIRD TIME THAT RULE HAS COST SOMETHING HERE
+  // (the rail's marker through the digits of "10:21"; a stem across a band plate; the mean pill over two
+  // kilometres). Every marker records its box; a plate then takes whichever side of the plot is clear of
+  // them and of the labels already placed, instead of being pinned to the left and hoping.
+  const boxes = [];
+  const clearAt = (x, y, w, h) => !boxes.some((b) =>
+    x + w > b.x && x < b.x + b.w && y + h > b.y && y < b.y + b.h);
+  // ⚠️ A PLATE MAY SLIDE ALONG ITS OWN LINE, WHICH IS WHY A TWO-SIDED CHOICE IS NOT ENOUGH. It labels a
+  // rule that spans the full width, so any x on that rule names the same thing — and measured on a
+  // 21-kilometre fixture BOTH ends were taken at once (a marker under the left, the mean pill under the
+  // right), so a left-or-right pick fell back onto the marker and hid a kilometre anyway. The two ends are
+  // tried first because hugging an edge is what a label should look like; the sweep is the fallback, and
+  // the left edge is the last resort when the run genuinely leaves nowhere clear.
+  const pickX = (y, w, h) => {
+    const cands = [8, W - 8 - w];
+    for (let x = 34; x < W - 8 - w; x += 26) cands.push(x);
+    let at = cands.filter((x) => clearAt(x, y, w, h))[0];
+    if (at == null) at = 8;
+    boxes.push({ x: at, y: y, w: w, h: h });
+    return at;
+  };
+  // ⚠️ THE PLATED PACES ARE PLACED LATE, because paint order decides which of two marks is
+  // readable and this project has already paid for getting it wrong twice: the deleted rail's caption and
+  // its marker shared a row and the 3px white marker was drawn straight through the digits of "10:21",
+  // and a stem starts at the lane edge — exactly where these labels sit — so on a run whose first
+  // kilometre missed the band the stem crossed the plate. Labels go on top of REGIONS; but a label may
+  // not cover a DATUM, which is why the marker boxes are recorded and pickX consults them.
+  // Each entry is [baseline, text]; the SIDE is chosen once the markers are on the plot.
+  let plateAt = [];
+  // 1 — THE BAND AS A FILLED REGION, bleeding both edges. This is the whole point: what the session
+  // asked for is an area the run either sat in or did not, not a grey stripe beside it.
+  if (bd) {
+    parts.push('<rect class="story-bnd" x="0" y="' + yTop.toFixed(1) + '" width="' + W +
+      '" height="' + lane.toFixed(1) + '"/>');
+    parts.push('<line class="story-bnde" x1="0" y1="' + yTop.toFixed(1) + '" x2="' + W + '" y2="' + yTop.toFixed(1) + '"/>');
+    parts.push('<line class="story-bnde" x1="0" y1="' + yBot.toFixed(1) + '" x2="' + W + '" y2="' + yBot.toFixed(1) + '"/>');
+  }
+  // 2 — THE MEAN'S RULE, EARLY AND UNDER EVERY DATUM. It used to be pushed last, in one group with its
+  // own pill: measured, the dashed rule was drawn across kilometre markers and straight through a band
+  // plate's digits. A reference line is an annotation on the plot, not a reading taken from it, so it
+  // goes under the markers, the pace line and the plates and lets all three stay legible on top of it.
+  // Its pill is still last, in the gutter reserved above.
+  const meanY = drawMean ? Y(wp) : 0;
+  const meanX = W - 8 - 54;
+  if (drawMean) {
+    // ⚠️ THE PILL'S BOX IS RESERVED NOW AND DRAWN LAST. Its place is fixed (the gutter is its own), so a
+    // plate looking for a clear side has to know it is coming — reserved afterwards, a plate pushed off
+    // the left by a marker could land in the gutter and be painted over by the pill.
+    boxes.push({ x: meanX, y: meanY - 11, w: 54, h: 22 });
+    parts.push('<line class="story-bnavl" x1="0" y1="' + meanY.toFixed(1) + '" x2="' +
+      (meanX - 4) + '" y2="' + meanY.toFixed(1) + '"/>');
+  }
+  if (!bare && bd) {
+    // 3 — the band's two paces, each beside the edge it names. ⚠️ INSIDE THE LANE ONLY WHEN THE LANE HAS
+    // ROOM FOR BOTH: below 34 units the two labels sit on top of each other, which is exactly how the
+    // deleted rail's two end labels came apart. Outside, they still hug their own edge.
+    // ⚠️ AND EACH SITS ON ITS OWN PLATE, WHICH IS A CONTRAST FIX MEASURED FROM RENDERED PIXELS. As bare
+    // white bold 11px they were read against whatever the panel's radial gradient happened to be behind
+    // them, and the gradient's own brightness is not a constant: measured on a one-kilometre run, where the
+    // lane sits high and the label lands on the brightest teal, pure white on (15,140,126) is 4.14:1 —
+    // under AA, and 11px bold is nowhere near large-text size. Inside the lane it measured 4.77:1, which
+    // passes and is fragile for the same reason: the lane's position depends on the data, so the same label
+    // passes on one run and fails on the next. The plate makes it independent of the ground (measured
+    // 10.4:1) and it is the plated-pill device .story-hrchip and the mean already use, so the two numbers
+    // that label a line on this chart now speak one language instead of two.
+    // ⚠️ 42, AND THE NUMBER IS DERIVED FROM THE PLATE RATHER THAN PICKED. A plate spans its baseline − 12 to
+    // baseline + 5, so inside the lane they occupy yTop+3..yTop+20 and yBot−18..yBot−1: they clear each other
+    // only while lane > 38. Written as 34 — the height of the TEXT, from before the plates existed — a lane
+    // between 34 and 38 units put them 3 units apart, which measured as two pills touching on the mixed
+    // fixture at --tscale 1.3. 42 leaves 4 units of gap; below it they go outside and still hug their own edge.
+    const roomy = lane >= 42;
+    plateAt = [[roomy ? yTop + 15 : yTop - 6, fmtPace(bmin)], [roomy ? yBot - 6 : yBot + 15, fmtPace(bmax)]];
+    // 4 — THE STEM, sized as the magnitude of the miss and grown out of the lane edge. On a genuinely
+    // bad session the lane is a small part of the plot and the stems run most of it, so the picture
+    // says what the sentence says instead of merely tinting a dot.
+    const colW = a.n > 1 ? iw / (a.n - 1) : iw;
+    const sw = Math.min(14, colW * 0.34);
+    a.rows.forEach((r, i) => {
+      if (r.est || r.verdict === "in" || !(r.sec > 0)) return;
+      const y = Yc(r.sec);
+      const up = y < yTop;
+      const from = up ? yTop : yBot;
+      const h = up ? from - y : y - from;
+      if (!(h > 0.5)) return;
+      parts.push('<rect class="story-bstem ' + (up ? "up" : "down") + '" x="' + (X(i) - sw / 2).toFixed(1) +
+        '" y="' + (up ? y : from).toFixed(1) + '" width="' + sw.toFixed(1) + '" height="' + h.toFixed(1) +
+        '" rx="2" style="--d:' + (Math.min(i, 9) * 90) + 'ms"/>');
+    });
+  }
+  // 5 — the pace line through every kilometre. ⚠️ A SINGLE POINT IS NOT A LINE and an SVG polyline with one
+  // pair draws nothing at all, so it is skipped rather than emitted empty: on a one-kilometre run the lane
+  // and its one marker are the whole picture.
+  const fb = (r) => Yc(r.sec > 0 ? r.sec : a.workPaceSec || bmin || a.fastest);
+  if (a.n >= 2) {
+    const pts = a.rows.map((r, i) => X(i).toFixed(1) + "," + fb(r).toFixed(1));
+    parts.push('<polyline class="story-bnl" points="' + pts.join(" ") + '"/>');
+  }
+  if (!bare) {
+    // 6 — one marker per kilometre. RECTS, never circles: preserveAspectRatio="none" would render a
+    // circle as an ellipse whose shape depends on the phone's height.
+    // ⚠️ SIX STATES, NOT FOUR. runAnalysis marks a row "none" both when it was measured outside the
+    // prescribed stretch of the session AND when there was no band to judge it against at all, and those
+    // are different things: the first is a kilometre that went unscored, the second is a whole run nobody
+    // set a target for. An unscored kilometre takes the hollow dashed language .story-split.est owns; a
+    // run with no band gets plain solid marks, because a chart of hollow dashes end to end reads as
+    // twenty-one faults rather than as a run drawn without a target.
+    a.rows.forEach((r, i) => {
+      const out = r.verdict === "fast" || r.verdict === "slow";
+      const cls = !bd ? "plain" : r.est ? "est" : r.verdict === "in" ? "in" : r.verdict === "fast" ? "fast"
+        : r.verdict === "slow" ? "slow" : "nj";
+      const y = fb(r);
+      boxes.push({ x: X(i) - 6, y: y - 6, w: 12, h: 12 });
+      parts.push('<rect class="story-bmk ' + cls + (out ? " out" : "") + '" x="' + (X(i) - 6).toFixed(1) +
+        '" y="' + (y - 6).toFixed(1) + '" width="12" height="12" rx="4" style="--d:' +
+        (Math.min(i, 9) * 90) + 'ms"/>');
+    });
+    // 7 — which kilometre is which, halved past eight exactly as paceChartSvg does.
+    a.rows.forEach((r, i) => {
+      if (a.n > 8 && i % 2) return;
+      parts.push('<text class="story-bnx" x="' + X(i).toFixed(1) + '" y="' + (H - 12) +
+        '" text-anchor="middle" style="--d:' + (Math.min(i, 9) * 90) + 'ms">' + r.km + '</text>');
+    });
+    // ⚠️ A RUN WITH NO PRESCRIBED PACE STILL NEEDS A VERTICAL SCALE, AND paceChartSvg RECORDS THIS EXACT
+    // FIX FOR ITSELF: "A SHAPE WITH NO SCALE MEANS NOTHING… you could not tell whether that dip was two
+    // seconds or two minutes." Both plated labels here were inside the band branch, so a bandless run got
+    // a bare polyline with kilometre numbers along the bottom and nothing whatever on the y axis —
+    // measured on a six-kilometre free run: lane false, plates 0, mean pill false. Its quickest and
+    // slowest kilometres are the honest ends of the scale, and they sit in the plot's own top and bottom
+    // padding, clear of the two markers they name.
+    if (!bd) plateAt = [[Y(a.fastest) - 8, fmtPace(a.fastest)], [Y(a.slowest) + 19, fmtPace(a.slowest)]];
+    // 8 — the paces that label the scale, on top of the regions and the stems, and never on a marker.
+    plates = plateAt.map((p) => {
+      const x = pickX(p[0] - 12, 40, 17);
+      return '<rect class="story-bndplate" x="' + x + '" y="' + (p[0] - 12).toFixed(1) +
+        '" width="40" height="17" rx="8"/>' +
+        '<text class="story-bndax" x="' + (x + 6) + '" y="' + p[0].toFixed(1) + '">' + p[1] + '</text>';
+    }).join("");
+    parts.push(plates);
+    // 9 — THE MEAN'S PILL, as the same plated pill .story-hrchip uses, so the two chart panels speak one
+    // language. It is the last thing drawn and it sits in the gutter the geometry reserved for it, so
+    // being last can no longer cost a kilometre its marker.
+    if (drawMean) {
+      parts.push('<rect class="story-bncb" x="' + meanX + '" y="' + (meanY - 11).toFixed(1) +
+        '" width="54" height="22" rx="11"/>' +
+        '<text class="story-bnct" x="' + (meanX + 27) + '" y="' + (meanY + 4).toFixed(1) +
+        '" text-anchor="middle">' + fmtPace(wp) + '</text>');
+    }
+  }
+  // ⚠️ THE SCREEN READER GETS THE SAME NUMBERS THE PICTURE IS MADE OF, not a description of a chart — and
+  // with no band it must not describe a target band, which is the whole point of the caption changing too.
+  const lab = bd
+    ? "Every kilometre against the target band: " + a.inBand + " of " + a.n + " kilometres inside " +
+      fmtPace(bmin) + " to " + fmtPace(bmax) + " per kilometre"
+    : "Pace across the run: " + a.n + " kilometres from " + fmtPace(a.fastest) + " to " +
+      fmtPace(a.slowest) + " per kilometre, no target set";
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" class="story-bandsvg" preserveAspectRatio="none" ' +
+    'role="img" aria-label="' + esc(lab) + '">' + parts.join("") + '</svg>';
+}
+/**
+ * WHAT THE MARKS MEAN, IN WORDS — and only the ones this run actually contains.
+ *
+ * ⚠️ NEVER BY COLOUR ALONE is the rule, and a fixed four-item key breaks the OTHER half of it: six
+ * kilometres all in band under a legend naming three states the run does not have says three false
+ * things to make one true one legible. Derived from the rows, exactly as storySplitView derives whether
+ * its per-row word is worth printing at all — on a clean session this is a single item.
+ */
+function storyBandLegendHtml(a) {
+  // ⚠️ NO BAND, NO LEGEND. With nothing to judge against, every mark is the same plain mark, and a key
+  // reading "Not judged" beside twenty-one of them describes the app's own silence as if it were a fault of
+  // the run's. The caption already says there was no target.
+  if (!a || !a.band || !a.rows || !a.rows.length) return "";
+  const seen = {};
+  a.rows.forEach((r) => { seen[r.est ? "est" : r.verdict === "none" ? "nj" : r.verdict] = 1; });
+  const words = [["in", "In band"], ["fast", "Quicker"], ["slow", "Slower"],
+    ["est", "Estimated"], ["nj", "Not judged"]];
+  const items = words.filter((w) => seen[w[0]])
+    .map((w) => '<span><i class="lg-' + w[0] + '"></i>' + w[1] + '</span>');
+  return items.length ? '<div class="story-bnlg">' + items.join("") + '</div>' : "";
+}
+/* ⚠️ THE BAND-RAIL BUILDER IS GONE, AND IT IS A DELETION RATHER THAN A DEMOTION — the second time this
+   object has been moved instead of answered. (Its name is deliberately not written here: a guard that
+   sweeps the build for the dead identifier would trip on the comment explaining its absence, which this
+   project has already paid for four times.) It was the verdict panel's only graphic (an 8px rail with a
+   .42 grey band and a 3px tick, which on a half-empty screen reads as a disabled iOS slider), was
+   demoted to the one-split splits panel, and measured there it left that panel 69% empty with itself as
+   the sole graphic: worse than the 46% void it was demoted to get out of. storyBandSvg answers both
+   cases properly — one kilometre against a band is a filled lane with the marker in or out of it, with
+   both band paces plated where the band actually is — and storyPanelKinds no longer builds a splits
+   panel for a single kilometre, so nothing was left calling this. */
+/**
+ * The kilometres as columns on the share card: HEIGHT from pace, WIDTH from the split's own distance,
+ * so a part-kilometre is visibly a part one — EDGE TO EDGE, with its pace printed under it and its
+ * verdict in its fill.
+ *
+ * ⚠️ THE OLD ROW WAS CAPPED AT 132px INSIDE A 284px COLUMN AND THAT CAP MISREAD THE REFERENCE BY A
+ * FACTOR OF TWO. Its comment reasoned "the reference's bars are ~40px wide" — measured on reference
+ * frame 125, each of THEIR six blocks is ~42px and the row spans the entire 267px content column. Ours
+ * drew 21.2/21.2/21.2/21.2/21.2/10.8 px wide at 46.3/51/51/52/51.5/52 tall under a var(--r-pill) radius,
+ * so five of the six were within 1.7px of each other with the difference lost in the corners: six
+ * identical pale capsules in half a row, which is a loading skeleton.
+ *
+ * ⚠️ AND THE REFERENCE'S OWN HEIGHTS ENCODE ALMOST NOTHING EITHER (49/54/54/55/55/55 for an 18s range).
+ * What stops theirs reading as a skeleton is the width, the squarer corner and — in its other card
+ * variant — the PACE PRINTED UNDER EACH BLOCK. So the labels are the fix as much as the width is: the
+ * row means something even when the heights are close.
+ *
+ * ⚠️ THE LABEL GATE IS ARITHMETIC, NOT A ROUND NUMBER — see storyCardLabelsFit.
+ */
+/**
+ * HOW WIDE ONE BLOCK OF THE CARD'S SPLIT ROW IS — the model both of the predicates below are read off,
+ * so a decision about the row can never be a second copy of a number.
+ *
+ * 284 is the card's measured content column at 375px and the gap is var(--s1) = 4: six columns are 44px,
+ * eight 32.5, nine 28.4, twenty-two 9.7. Verified against the rendered DOM at n=6 (47.9) and n=21 (9.7).
+ */
+function storyCardBlockW(n) { return (284 - 4 * Math.max(0, n - 1)) / Math.max(1, n); }
+/**
+ * DO THE PER-BLOCK PACE LABELS FIT?
+ *
+ * A "4:38" at var(--t-label) needs about 26px, which at --tscale 1.3 becomes 34.
+ *
+ * ⚠️ ONE DEFINITION, BECAUSE TWO CALLERS NEED THE SAME ANSWER. The row prints the labels and the card
+ * decides whether to print a colour key instead of them, and a second copy of the number 8 is how those two
+ * come apart — the row losing its labels while the key stays absent is a card read only by colour.
+ */
+function storyCardLabelsFit(n) { return n <= 8; }
+/**
+ * DOES var(--r-ctl) STILL FIT IN THE CORNER, or is it a capsule?
+ *
+ * ⚠️ A RADIUS WIDER THAN HALF THE BOX IS A CAPSULE WHATEVER IT IS CALLED, and that is the defect the
+ * card's 132px cap was removed for, reproduced at higher n: measured at 21 splits, 9.7px columns under a
+ * 12px radius, with the whole 40.8-48px height spread lost in the corners and no pace labels left either.
+ * Twice the token is the exact condition, so this is arithmetic on the ladder rather than a second
+ * threshold to keep in step with the first.
+ */
+function storyCardCornerFits(n) { return storyCardBlockW(n) >= 24; }
+function storyCardSplitsHtml(a, run) {
+  if (!a || a.n < 2) return "";
+  const pool = a.rows.filter((r) => !r.est);
+  const quick = Math.min.apply(null, (pool.length ? pool : a.rows).map((r) => r.sec));
+  const floorKm = Math.floor(run.distKm > 0 ? run.distKm : 0);
+  const total = a.rows.reduce((x, r) => x + (run.distKm > 0 && r.km > floorKm ? Math.max(0.15, run.distKm - floorKm) : 1), 0);
+  const lab = storyCardLabelsFit(a.rows.length);
+  const bars = a.rows.map((r) => {
+    const part = run.distKm > 0 && r.km > floorKm ? Math.max(0.15, run.distKm - floorKm) : 1;
+    // The same states, the same words and the same fills as the verdict panel's markers, so one glance at the
+    // posted card and one at the panel agree about the same run.
+    // ⚠️ A BANDLESS RUN IS "plain", NOT "est", AND THE FIRST VERSION GOT THIS WRONG ON THE CARD ONLY.
+    // runAnalysis marks every row "none" when there is no band, and folding that into est drew a run nobody
+    // set a target for as four hollow dashed columns with dimmed labels — which says "the app estimated
+    // these", of kilometres it measured, on the one surface that gets posted in public. The chart had already
+    // been given a plain state for exactly this; the card had not, so the two disagreed about the same run.
+    const cls = !a.band ? "plain" : r.est ? "est" : r.verdict === "in" ? "in" : r.verdict === "fast" ? "fast"
+      : r.verdict === "slow" ? "slow" : "est";
+    return '<span class="story-cardsp ' + cls + '" style="flex-basis:' +
+      (100 * part / total).toFixed(2) + '%;--h:' + storyBarPct(r.sec, quick) + '">' +
+      '<i></i>' + (lab ? '<u>' + fmtPace(r.sec) + '</u>' : "") + '</span>';
+  }).join("");
+  // ⚠️ .sq IS THE CORNER, NOT A DENSITY STYLE — see storyCardCornerFits. Without it the row above ten
+  // kilometres is a line of identical pale capsules, which is the reading this row was rebuilt to end.
+  return '<div class="story-cardsplits' + (storyCardCornerFits(a.rows.length) ? "" : " sq") + '">' +
+    bars + '</div>';
+}
+/**
+ * The heart-rate series, cleaned and SMOOTHED.
+ *
+ * ⚠️ RAW IT DRAWS AS A SEISMOGRAPH RATHER THAN AN EFFORT. A ten-minute run is ~125 samples across a
+ * 380-unit viewBox — one spike every three units — and the reference's curve is heavily smoothed with
+ * no stroke at all in its settled state. A rolling mean keeps every real rise and fall and loses the
+ * per-sample noise, which is the only thing the runner cannot act on.
+ *
+ * ⚠️ AND IT IS THE ONE PREDICATE FOR WHETHER THE HR PANEL EXISTS AT ALL — storyHasHr calls this, so
+ * the panel count and the panel content can never disagree about it.
+ */
+function storyHrPoints(run) {
+  const raw = Array.isArray(run && run.hrSeries)
+    ? run.hrSeries.filter((p) => p && p.length === 2 && isFinite(p[0]) && isFinite(p[1]))
+    : [];
+  if (raw.length < 3) return [];
+  const half = raw.length >= 40 ? 2 : 1;
+  return raw.map((p, i) => {
+    let s = 0, n = 0;
+    for (let k = i - half; k <= i + half; k++) if (raw[k]) { s += raw[k][1]; n++; }
+    return [p[0], s / n];
+  });
+}
+/**
+ * THE RUN'S PEAK HEART RATE, DECIDED ONCE.
+ *
+ * ⚠️ THE SMOOTHED SERIES AND run.maxHr ARE DIFFERENT NUMBERS AND BOTH ARE REAL. storyHrPoints applies a
+ * rolling mean, which by construction reads lower than the peak beat; run.maxHr comes from the watch's
+ * own accumulator and is the honest maximum, and the series is thinned to 160 points, which can drop the
+ * true peak. So the panel's axis and the panel's sentence quoted two different maximums (measured 147
+ * against 152, and 148 against 153) — one function answers it for both, and it can only ever be the
+ * larger of the two, so the frame always contains the trace.
+ */
+function storyHrPeak(run) {
+  const s = storyHrPoints(run);
+  const trace = s.length ? Math.max.apply(null, s.map((p) => p[1])) : 0;
+  return Math.round(Math.max(run && run.maxHr > 0 ? run.maxHr : 0, trace));
+}
+/**
+ * Heart rate as a filled field that bleeds to both edges.
+ *
+ * ⚠️ TWO RULES, AND NEITHER OF THEM IS AN EXTREME OF THE SERIES. It drew a tick at the series maximum
+ * and one at the series MINIMUM — and the trace touches its own minimum by construction, so the line ran
+ * straight through the lower label and struck the text out (measured, 13 of 400 sampled points of the
+ * path inside the label's box, at both series lengths). The two numbers worth a rule are the two the
+ * panel's own sentence states: the peak, which is above the whole trace and so can never be crossed, and
+ * the average, whose label is a plated pill the trace passes behind.
+ *
+ * ⚠️ THE FRAME IS TALL BECAUSE THE PANEL IS. At 380x300 the chart used 40% of the panel and started at
+ * the vertical midpoint, leaving the whole upper half bare gradient; the reference's fills 69.6% of the
+ * frame, from under the header down behind the text.
+ */
 function storyHrSvg(run) {
-  const series = Array.isArray(run.hrSeries) ? run.hrSeries.filter((p) => p && p.length === 2) : [];
-  const W = 320, H = 300;
+  const series = storyHrPoints(run);
   if (series.length < 3) return "";
+  const W = 380, H = 620, T = 26, B = 10;
+  const ih = H - T - B;
   const bpm = series.map((p) => p[1]);
-  const lo = Math.min.apply(null, bpm), hi = Math.max.apply(null, bpm);
-  const pad = Math.max(6, (hi - lo) * 0.25);
+  const avg = run.avgHr > 0 ? Math.round(run.avgHr) : 0;
+  const peak = storyHrPeak(run);
+  const lo = Math.min.apply(null, avg ? bpm.concat([avg]) : bpm);
+  const hi = Math.max.apply(null, peak ? bpm.concat([peak]) : bpm);
+  const pad = Math.max(6, (hi - lo) * 0.16);
   const y0 = lo - pad, y1 = hi + pad;
   const mx = series[series.length - 1][0] || 1;
-  const X = (m) => (m / mx) * W, Y = (b) => H - ((b - y0) / (y1 - y0)) * H;
+  // ⚠️ THE PLOT STOPS SHORT OF THE RIGHT EDGE, AND SHRINKING IT IS THE ONLY FIX AVAILABLE. Measured, the
+  // end dot's centre sat at x=380 with r=5 and the average chip's right edge at 374 — both cut in half by
+  // the VIEWPORT. .story-hrsvg carries overflow: visible, so the clip is not at the SVG's own boundary
+  // and no overflow rule can move it: overflow: hidden would slice the dot rather than shift it. After
+  // this the dot centre is 366 (9px clear) and the chip's right edge 360 (20px clear). The reference
+  // carries 48px of clearance on its own end dot; 9 is the least that clears the viewport without
+  // pulling the trace visibly short of the edge it is supposed to bleed into.
+  const RPAD = 14;
+  const X = (m) => (m / mx) * (W - RPAD);
+  const Y = (b) => T + ih - ((b - y0) / (y1 - y0)) * ih;
+  const base = T + ih;
   const d = series.map((p, k) => (k ? "L" : "M") + X(p[0]).toFixed(1) + " " + Y(p[1]).toFixed(1)).join(" ");
-  const ticks = [Math.round(y1), Math.round((y0 + y1) / 2), Math.round(y0)]
-    .map((b) => '<text x="0" y="' + (Y(b) - 4).toFixed(1) + '" class="story-ax">' + b + 'bpm</text>' +
-      '<line x1="0" y1="' + Y(b).toFixed(1) + '" x2="18" y2="' + Y(b).toFixed(1) + '" class="story-axl"/>').join("");
+  // The peak rule, labelled above itself — it sits above every point of the trace, so nothing can cross
+  // the text.
+  const tick = (b, cap) => '<line x1="0" y1="' + Y(b).toFixed(1) + '" x2="' + W + '" y2="' + Y(b).toFixed(1) +
+    '" class="story-axl"/><text x="4" y="' + (Y(b) - 7).toFixed(1) + '" class="story-ax">' +
+    cap + Math.round(b) + ' bpm</text>';
+  const peakRule = peak > y0 && peak < y1 ? tick(peak, "Peak ") : "";
+  // The average, as a full-width rule with a plated pill at the end of it — the reference's own answer,
+  // and the number in the panel's headline had appeared nowhere in its picture.
+  // ⚠️ THE CHIP MOVES IN BY THE SAME RPAD AS THE DATA, BUT THE PEAK RULE ABOVE KEEPS x2 = W. A rule reads
+  // as a rule when it bleeds; only the DATA needs the inset.
+  const chip = avg > y0 && avg < y1
+    ? '<g class="story-hrchip"><line x1="0" y1="' + Y(avg).toFixed(1) + '" x2="' + (W - 58 - RPAD) +
+      '" y2="' + Y(avg).toFixed(1) + '" class="story-hravl"/>' +
+      '<rect class="story-hrcb" x="' + (W - 56 - RPAD) + '" y="' + (Y(avg) - 11).toFixed(1) +
+      '" width="50" height="22" rx="11"/><text class="story-hrct" x="' + (W - 31 - RPAD) + '" y="' +
+      (Y(avg) + 4).toFixed(1) + '" text-anchor="middle">' + avg + ' bpm</text></g>'
+    : "";
   return '<svg viewBox="0 0 ' + W + ' ' + H + '" class="story-hrsvg" role="img" aria-label="Heart rate across the run">' +
-    '<path class="story-hrfill" d="' + d + ' L ' + W + ' ' + H + ' L 0 ' + H + ' Z"/>' +
+    // The fade uses currentColor rather than a literal white: the debrief may not define colours of
+    // its own (test/run-debrief.test.ts sweeps for exactly that), and .story-ov already sets it.
+    '<defs><linearGradient id="storyhrg" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0" stop-color="currentColor" stop-opacity=".22"/>' +
+      '<stop offset="1" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>' +
+    // ⚠️ THE FILL STILL BLEEDS TO x=380 EVEN THOUGH THE DATA STOPS AT 366, and it needs a SHOULDER to do
+    // it: closing straight from the last point to the bottom-right corner draws a 14px diagonal wedge
+    // under the end of the trace, which reads as the run's last stretch collapsing. Level across, then
+    // down.
+    '<path class="story-hrfill" fill="url(#storyhrg)" d="' + d +
+      ' L ' + W + ' ' + Y(series[series.length - 1][1]).toFixed(1) +
+      ' L ' + W + ' ' + base + ' L 0 ' + base + ' Z"/>' +
     '<path class="story-hrline" d="' + d + '"/>' +
     '<circle class="story-hrdot" cx="' + X(series[series.length - 1][0]).toFixed(1) + '" cy="' +
-      Y(series[series.length - 1][1]).toFixed(1) + '" r="5"/>' + ticks + '</svg>';
+      Y(series[series.length - 1][1]).toFixed(1) + '" r="5"/>' +
+    peakRule + chip + '</svg>';
+}
+function storyReduceMotion() {
+  try { return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); }
+  catch (e) { return false; }
+}
+function storyNow() {
+  try { return performance.now(); } catch (e) { return Date.now(); }
+}
+/**
+ * PUBLISH A PATH'S MEASURED LENGTH SO CSS CAN DRAW IT IN.
+ *
+ * ⚠️ pathLength="1" DID NOT SURVIVE THE NON-UNIFORM SCALE. routeMapSvg carries
+ * preserveAspectRatio="none", and with the normalisation ignored a stroke-dasharray of 1 was applied as
+ * ONE USER UNIT — so the route rendered as dozens of 1px stubs, measured as five disconnected
+ * fragments in the only frame of the draw-in that ever existed. getTotalLength() is transform
+ * independent. The custom property is DATA; the class still owns stroke-dashoffset.
+ */
+function storyDashSetup(path) {
+  if (!path) return 0;
+  let len = 0;
+  try { len = path.getTotalLength(); } catch (e) { len = 0; }
+  if (len > 0) path.style.setProperty("--rl", len.toFixed(1));
+  return len;
+}
+/**
+ * The route draws itself in, led by a head dot — which is most of why the reference reads as "your run
+ * replaying" rather than "a line appearing".
+ *
+ * ⚠️ LINEAR ON BOTH SIDES, DELIBERATELY. The dash is transitioned by CSS and the dot is moved by JS; an
+ * eased line with a linear dot (or the reverse) is a dot that visibly lags its own line.
+ * ⚠️ THE TOKEN, NOT isConnected ALONE, IS WHAT STOPS IT. A panel that is blurring out is still
+ * connected for half a second, and two loops driving two dots is a flicker with no owner.
+ */
+function storyRouteDraw(panel) {
+  // ⚠️ THE ROUTE PANEL ONLY. The share card holds a route map too, so this ran on it — and the head dot
+  // it appends is left wherever the animation was when the panel changed (the token stops the loop but
+  // nothing shrinks the dot), which put a stray white blob in the middle of the card's route. Visible in
+  // the card screenshot, and only visible at all once the start and finish markers were hidden.
+  if (!panel || !panel.classList.contains("story-route")) return;
+  const line = panel.querySelector(".rt-line");
+  const len = storyDashSetup(line);
+  STORY.headTok++;
+  if (!len || storyReduceMotion()) return;
+  const svg = line.ownerSVGElement || line.parentNode;
+  if (!svg || !svg.insertAdjacentHTML) return;
+  svg.insertAdjacentHTML("beforeend", '<circle class="story-rthead" r="6" cx="-99" cy="-99"/>');
+  const head = svg.querySelector(".story-rthead");
+  if (!head) return;
+  const tok = STORY.headTok, t0 = storyNow();
+  const step = () => {
+    if (tok !== STORY.headTok || !panel.isConnected) return;
+    const t = Math.min(1, (storyNow() - t0) / STORY_DRAW_MS);
+    try {
+      const pt = line.getPointAtLength(len * t);
+      head.setAttribute("cx", pt.x.toFixed(1));
+      head.setAttribute("cy", pt.y.toFixed(1));
+    } catch (e) { return; }
+    if (t < 1) requestAnimationFrame(step);
+    else head.setAttribute("r", "0");
+  };
+  requestAnimationFrame(step);
+}
+/**
+ * THE STORY'S ROUTE PANEL GETS REAL TILES, and they are the DARK ones.
+ *
+ * ⚠️ IT CANNOT REUSE buildOverviewMap: that hardcodes MAP_STYLE_RUN (the pale Outdoors basemap), paints
+ * an #eef1ee backing and adds .ov-light — all three correct for the debrief hero and all three wrong on
+ * a black full-bleed panel. Everything else is deliberately the same shape, including going through
+ * routeMapFor so the IndexedDB tile cache serves a re-watched recap for nothing.
+ *
+ * ⚠️ ONE FRAMING, AND IT IS THE ONE ALREADY ON SCREEN. The overlay is drawn by storyPanelHtml with
+ * routeMapFraming at the same measured size this asks routeMapFor for — the same arithmetic
+ * loadRouteMap itself uses — so the line cannot jump when the tiles land. The tiles fade in UNDER a
+ * line that is already drawing: waiting for the network the way the hero does would spend the whole
+ * panel on a static picture, and the draw-in is the panel.
+ *
+ * ⚠️ AND IT MUST FAIL SILENTLY. No signal, no token, a refused tile — the route on the flat panel is
+ * exactly what shipped before this, so a failure costs the basemap and nothing else.
+ */
+function buildStoryMap(container, route, pw, ph) {
+  if (!container || !route || route.length < 2) return;
+  // ⚠️ ONE BUILD PER CONTAINER. Two calls in flight for the same key composited into the same node, and
+  // the observed result was a map band of flat #06110e with the route floating on nothing — a failure
+  // that looks exactly like a missing basemap and is swallowed by the catch below. Only reachable by
+  // re-entering the panel while the tile cache is cold, which the harness managed by accident.
+  if (container.__storyMap) return;
+  container.__storyMap = true;
+  const q = (n) => Math.max(120, Math.round(n / 20) * 20);
+  const W = q(pw > 0 ? pw : 380), H = q(ph > 0 ? ph : 760);
+  routeMapFor(route, W, H, MAP_STYLE_SHARE).then((md) => {
+    if (!container.isConnected) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const cv = document.createElement("canvas");
+    cv.width = W * dpr; cv.height = H * dpr; cv.className = "story-mapcv";
+    const g = cv.getContext("2d"); g.scale(dpr, dpr);
+    // ⚠️ NO BACKING FILL. buildOverviewMap paints #eef1ee under its tiles because its container has
+    // nothing behind it; here the panel is already .story-route::before's flat black, so an opaque
+    // backing would only be a second definition of the same colour — and the debrief is not allowed
+    // to define colours of its own.
+    try { g.drawImage(md.image, 0, 0, W, H); } catch (e) {}
+    container.insertBefore(cv, container.firstChild);
+    // Attribution is a LICENCE TERM and it differs by provider, so it comes from the provider that
+    // actually served the tiles rather than the one we would have preferred.
+    container.appendChild(el('<div class="story-attr">' + esc(mapAttributionFor(md.prov)) + '</div>'));
+    container.classList.add("ov-ready");
+  }).catch(() => {});
+}
+/**
+ * WHAT A PANEL SHEDS WHEN IT DOES NOT FIT — MEASURED, NOT BUDGETED.
+ *
+ * ⚠️ EVERY HAND-KEPT HEIGHT BUDGET ON THE SHARE CARD HAS GONE STALE, AND THE LAST ONE'S OWN COMMENT WAS
+ * WRONG WHEN IT WAS WRITTEN. It recorded "the measured margin is 14px rather than zero" — measured now,
+ * every card reports content EXACTLY equal to its box at --tscale 1.0 (no margin at all), and the worst
+ * reachable card at 1.3 (a 21-kilometre race with a place line, a wrapping title, six stat tiles, a
+ * 22-column split row and the colour key) is 64px PAST its box, with the bottom stat row cut through the
+ * middle of Heart rate / Elevation / Cadence. The reference card that budget was measured on suppresses
+ * its eyebrow chip because its own title contains the session label; a race titled "Half Marathon" does
+ * not, so the chip the budget assumed away is emitted and costs 31px at 1.0 and 35 at 1.3.
+ *
+ * ⚠️ SO NOTHING HERE IS A CONSTANT TO KEEP IN STEP WITH THE COPY. It asks the one question that can see
+ * the fault (scrollHeight against clientHeight, inside .story-cardin's overflow: hidden) and sheds in a
+ * stated order until the answer is no, so any future addition is absorbed instead of clipping the numbers.
+ *
+ * ⚠️ THE ORDER IS BY WHAT IS LOST, and the colour key is deliberately not in it: it is what satisfies
+ * never-by-colour-alone once the per-block pace labels have been dropped, so it may only ever go WITH the
+ * row it keys. First the eyebrow (provenance the title usually repeats), then the picture band (smaller,
+ * losing nothing), then the split row and its key together (the mini chart still carries the kilometres).
+ */
+function storyFit(p) {
+  // ⚠️ WHOLE LINES, NOT A CLIPPED ONE. .story-vlist yields by design at --tscale 1.3, but overflow cuts
+  // wherever the box ends: measured, a coaching sentence was sliced horizontally through its glyphs and
+  // the line below it vanished with nothing to say so. Dropping from the END keeps the watch line, which
+  // runVerdict puts first because it is the one thing the chart above cannot show.
+  const list = p.querySelector(".story-vlist");
+  if (list) {
+    let guard = 8;
+    while (guard-- > 0 && list.children.length > 0 && list.scrollHeight - list.clientHeight > 1) {
+      list.removeChild(list.lastElementChild);
+    }
+    if (!list.children.length && list.parentNode) list.parentNode.removeChild(list);
+  }
+  const ci = p.querySelector(".story-cardin");
+  if (!ci) return;
+  const over = () => ci.scrollHeight - ci.clientHeight > 0;
+  if (!over()) return;
+  const chip = ci.querySelector(".story-cardplan");
+  if (chip) { chip.parentNode.removeChild(chip); if (!over()) return; }
+  const band = ci.querySelector(".story-cardband");
+  if (band) {
+    const steps = [86, 74, 64];
+    for (let k = 0; k < steps.length; k++) {
+      band.style.setProperty("--cardband-w", steps[k] + "%");
+      if (!over()) return;
+    }
+  }
+  // The row and its key are one unit: the key exists only to read the row's colours.
+  const row = ci.querySelector(".story-cardsplits");
+  if (row) {
+    const key = ci.querySelector(".story-cardev .story-bnlg");
+    if (key) key.parentNode.removeChild(key);
+    row.parentNode.removeChild(row);
+  }
 }
 function storyShow(i) {
   STORY.i = Math.max(0, Math.min(STORY.n - 1, i));
+  STORY.b = 0;
   const stage = $("storyStage"); if (!stage) return;
-  stage.innerHTML = storyPanelHtml(STORY.i);
-  // The route draws itself in; the bars grow. Both are one class added on the next frame, so the
-  // transition has a from-state to run from.
-  requestAnimationFrame(() => { const p = stage.querySelector(".story-p"); if (p) p.classList.add("in"); });
-  document.querySelectorAll(".story-bar").forEach((b, k) => {
+  const ov = $("storyOv");
+  // ⚠️ MEASURED, AND QUANTISED TO 20px BECAUSE IT IS PART OF THE TILE CACHE KEY. Keyed on the raw
+  // measurement, every device width would mint its own stored picture of the same run.
+  const box = stage.getBoundingClientRect();
+  if (box.width > 20 && box.height > 20) {
+    STORY.w = Math.round(box.width / 20) * 20;
+    STORY.h = Math.round(box.height / 20) * 20;
+  }
+  const kind = STORY.kinds[STORY.i] || "card";
+  STORY.beats = storyBeats(kind);
+  const total = STORY.beats.reduce((x, b) => x + b.ms, 0);
+  // ⚠️ JS OWNS THE NUMBER, CSS OWNS THE PROPERTY. One duration drives the wait and the progress bar,
+  // so the bar cannot lie about how long the panel is going to hold.
+  if (ov) ov.style.setProperty("--story-dur", total + "ms");
+  // The outgoing panel softens before it goes, so a cut reads as one moving picture rather than a
+  // slideshow. It has to stay in the DOM for that, which is why this appends instead of replacing.
+  const old = stage.querySelector(".story-p:not(.out)");
+  if (old) {
+    old.classList.remove("in");
+    old.classList.add("out");
+    setTimeout(() => { if (old.parentNode) old.parentNode.removeChild(old); }, 520);
+  }
+  // ⚠️ THE HEADER'S REAL HEIGHT, PUBLISHED BEFORE THE PANEL IS BUILT. .story-card reserved a constant
+  // 92px for it, and at --tscale 1.3 the header measures 107 — so a tall card started underneath the
+  // title of the run it is a card of. Read here rather than once at open, because a text-size change is
+  // only ever noticed on returning to the app and every panel show is a fresh measurement for free.
+  const top = document.querySelector(".story-top");
+  if (ov && top) {
+    const tb = top.getBoundingClientRect().height;
+    if (tb > 20) ov.style.setProperty("--story-hdr", Math.round(tb) + "px");
+  }
+  const p = el(storyPanelHtml(STORY.i));
+  stage.appendChild(p);
+  storyDashSetup(p.querySelector(".story-hrline"));
+  // ⚠️ THE SAME PUBLISHER, NOT A SECOND ONE, AND IT MUST STAY ABOVE THE REFLOW BELOW. The verdict
+  // chart's pace line draws itself in from a measured length exactly as the HR trace does; published
+  // after void p.offsetWidth the transition never starts and the line simply appears, which is the
+  // measured failure the comment below records for the route.
+  storyDashSetup(p.querySelector(".story-bnl"));
+  storyRouteDraw(p);
+  // ⚠️ MEASURED AND TRIMMED BEFORE THE PANEL IS SHOWN, and above the reflow below on purpose: the panel
+  // is in the DOM and laid out, so scrollHeight is already true, and doing it here means the runner never
+  // sees a row appear and then leave. See storyFit for what it sheds and why nothing here is a constant.
+  storyFit(p);
+  // ⚠️ A REFLOW, NOT A rAF, AND IT MUST COME AFTER THE DASH IS PUBLISHED. A single requestAnimationFrame
+  // is not a style flush in WebKit: the initial and final computed styles collapse into one recalc and
+  // no transition starts at all — measured, the route "drew" inside one 0.4s frame. This is the same
+  // remove-read-add pattern .view-in already needs.
+  void p.offsetWidth;
+  p.classList.add("in");
+  // ⚠️ FOUND INSIDE THE PANEL THIS CALL JUST BUILT, NEVER BY id. It used to be a document-wide
+  // getElementById, and the cross-dissolve deliberately leaves the outgoing panel in the DOM for 520ms —
+  // so two elements carried that id, the lookup returned the OUTGOING one, and the basemap plus attribution
+  // were composited into the node removed half a second later. Tapping the left third on the first panel
+  // (which clamps back to panel 0 and re-renders it) therefore destroyed the basemap permanently:
+  // measured, canvas false / ov-ready false / attribution false at +1.5s, +4s and +9s, with the tiles
+  // fetched and thrown away — billable on Mapbox. The same trap killed both buttons on the last panel.
+  if (kind === "route") {
+    const pres = runRoutePresentation(STORY.run);
+    if (pres.route) buildStoryMap(p.querySelector(".story-map"), pres.route, STORY.w, STORY.h);
+  }
+  // ⚠️ THE BARS NEED A FROM-STATE TOO. Adding .live in the same tick they were created left bar 0 at
+  // 100% for the whole of panel 0 (measured: 82.75px of an 83px track at 20ms), and stepping BACK left
+  // the bar full for a panel that had just restarted.
+  const bars = Array.prototype.slice.call(document.querySelectorAll(".story-bar"));
+  bars.forEach((b) => b.classList.remove("done", "live"));
+  if (bars.length) void bars[0].offsetWidth;
+  bars.forEach((b, k) => {
     b.classList.toggle("done", k < STORY.i);
     b.classList.toggle("live", k === STORY.i);
   });
+  // ⚠️ THE TAP ZONES ARE SHORTENED ON THE LAST PANEL, WHICH IS THE ONE WITH REAL BUTTONS ON IT. A
+  // higher z-index on .story-acts cannot do this: .story-p carries a filter, so it is its own stacking
+  // context and the actions are sorted INSIDE it while the zones are siblings of the stage. Measured
+  // before this, every point on #storyShare returned storyPrev or storyNext — the button was dead.
+  if (ov) ov.classList.toggle("st-last", STORY.i === STORY.n - 1);
+  storyTapStop(ov, p);
   clearTimeout(STORY.timer);
+  clearTimeout(STORY.beatTimer);
+  if (STORY.beats.length > 1) STORY.beatTimer = setTimeout(() => storyBeat(1), STORY.beats[0].ms);
   // ⚠️ THE LAST PANEL DOES NOT AUTO-ADVANCE. It ends in a choice, and a screen that closes itself
   // while somebody is deciding is a screen that decides for them.
-  if (STORY.i < STORY.n - 1) STORY.timer = setTimeout(() => storyShow(STORY.i + 1), STORY_MS);
-  const sh = $("storyShare"); if (sh) sh.onclick = () => { closeRunStory(); openRunShareSheet(STORY.run); };
-  const lt = $("storyLater"); if (lt) lt.onclick = closeRunStory;
+  if (STORY.i < STORY.n - 1) STORY.timer = setTimeout(() => storyShow(STORY.i + 1), total);
+  // ⚠️ THE PANEL'S OWN BUTTONS, NOT THE DOCUMENT'S. Both were resolved by a document-wide id lookup, and
+  // while the outgoing panel is still dissolving there are two of each — so after any Previous-then-Next
+  // inside that 520ms window the handlers were attached to the card being REMOVED and the visible Share
+  // button had no onclick at all. Measured: two Share buttons in the DOM, getElementById returning the
+  // outgoing one, and a click on the visible button opening nothing. That is the entire point of the
+  // last panel, silently gone.
+  const sh = p.querySelector(".story-share");
+  if (sh) sh.onclick = () => { closeRunStory(); openRunShareSheet(STORY.run); };
+  const lt = p.querySelector(".story-later");
+  if (lt) lt.onclick = closeRunStory;
+}
+/**
+ * WHERE THE TAP ZONES HAVE TO STOP, MEASURED FROM THE BUTTONS THEMSELVES.
+ *
+ * ⚠️ A CONSTANT CANNOT KNOW THIS, AND THE CONSTANT THAT SHIPPED WAS WRONG. The zones were stopped at
+ * 132px from the bottom while .story-acts starts 168–177px up — so 36–45px of the Share button was still
+ * covered, and elementFromPoint swept over it returned storyNext or storyPrev for 84 of 97 points: 9–13%
+ * of the button was live at the default text size. It got BETTER at larger text (89% at --tscale 1.3)
+ * because the card grows and pushes the actions down, so the failure was worst at the setting almost
+ * everybody uses, and no single number can hold across the type scale, the safe area and a card whose
+ * height depends on how many stat tiles the run has.
+ *
+ * ⚠️ MEASURED IN LAYOUT COORDINATES (offsetTop), NOT FROM getBoundingClientRect. This runs in the same
+ * tick the panel is given .in, so it is mid-transform — scale(1.04) about the panel's centre reports the
+ * actions about 11px LOWER than they settle, and a rect-based measurement quietly spends the whole safety
+ * margin on that. offsetTop is untransformed, so the 12px below is a real 12px.
+ */
+function storyTapStop(ov, panel) {
+  if (!ov) return;
+  const acts = panel && panel.querySelector(".story-acts");
+  if (!acts) { ov.style.removeProperty("--story-tapstop"); return; }
+  const host = panel.offsetParent;
+  const h = (host && host.clientHeight) || window.innerHeight || 0;
+  const top = (acts.offsetTop || 0) + (panel.offsetTop || 0);
+  if (!(h > 0) || !(top > 0) || top >= h) return;
+  ov.style.setProperty("--story-tapstop", Math.max(120, Math.round(h - top + 12)) + "px");
+}
+/**
+ * THE NEXT BEAT OF THE PANEL ALREADY ON SCREEN.
+ *
+ * ⚠️ ONLY THE SENTENCE IS REPLACED. Re-rendering the panel would restart every bar's width transition,
+ * which reads as the chart starting again — and the reference's whole trick here is that the picture
+ * holds still while the words move on.
+ */
+function storyBeat(k) {
+  const b = (STORY.beats || [])[k];
+  if (!b) return;
+  STORY.b = k;
+  const stage = $("storyStage"); if (!stage) return;
+  const p = stage.querySelector(".story-p:not(.out)"); if (!p) return;
+  // ⚠️ THE BEATS ARE ALL ALREADY IN THE DOM, STACKED IN ONE GRID CELL, so this reveals one instead of
+  // rewriting the box. See storySayStack: rewriting it made the box's height follow the beat's own copy, and
+  // on the splits panel — where the statement is bottom-anchored — a headline that rewrapped moved its own
+  // top by a measured 22.5px at --tscale 1.0 and 29.2px at 1.3.
+  const say = p.querySelector(".story-say");
+  const bl = say ? Array.prototype.slice.call(say.querySelectorAll(".story-sayb")) : [];
+  const cur = bl[k];
+  if (cur) {
+    bl.forEach((n) => n.classList.remove("on", "sy-in"));
+    void cur.offsetWidth;
+    cur.classList.add("on", "sy-in");
+  }
+  if (b.hi != null && b.hi >= 0) {
+    // ⚠️ ONE PARAMETER, NOT A COMMA SELECTOR. Two panels now carry a highlightable mark — the splits
+    // panel's rows and the verdict chart's kilometre markers — and ".story-split, .story-bmk" would
+    // interleave two node types in document order, so an index meant for one would land on the other.
+    const row = p.querySelectorAll(b.hisel || ".story-split")[b.hi];
+    // The others dim; brightening one row cannot read on a session whose every row is already in band.
+    if (row) { row.classList.add("hi"); p.classList.add("beat-hi"); }
+  }
+  if (k + 1 < STORY.beats.length) STORY.beatTimer = setTimeout(() => storyBeat(k + 1), b.ms);
 }
 function closeRunStory() {
   clearTimeout(STORY.timer);
-  const ov = $("storyOv"); if (ov) { ov.classList.remove("on"); ov.innerHTML = ""; }
+  clearTimeout(STORY.beatTimer);
+  STORY.headTok++;   // any running head-dot loop belongs to a story that is gone
+  const ov = $("storyOv");
+  if (ov) {
+    ov.classList.remove("on", "st-last");
+    ov.style.removeProperty("--story-tapstop");
+    ov.innerHTML = "";
+  }
 }
 function wireStory() {
   const x = $("storyX"); if (x) x.onclick = closeRunStory;

@@ -345,6 +345,51 @@ one-render cache exists to prevent.
 unrestricted `pk.` token shipped in a client is a token anyone can extract and spend. The honest
 options are: accept CARTO in the app, or keep Mapbox for the shared card only. Not decided.
 
+### THE RECAP REBUILT AGAINST THE REFERENCE (2026-08-17, two judged workflows)
+
+The owner's verdict on the first cut: *"I do not like the icon for the story at all it looks cheap and
+nasty and far too dominating"* and, after a second look, *"it still isn't working as it should be… I'm
+not settling for worse, I want to strive to be better than them."* Two multi-agent workflows followed:
+**66 findings, 14 blockers**, then a three-way judged redesign of the two panels a critic still
+refused. Suite went 716 → **755**; `test/run-debrief.test.ts` holds **78 guards**.
+
+⚠️ **THE WORST FAULT WAS INVISIBLE FROM A SCREENSHOT: TWO ELEMENTS SHARED ONE id.** `storyShow` keeps
+the outgoing panel in the DOM for 520 ms for the cross-dissolve, so `$("storyShare")` and
+`$("storyMap")` resolved to the **OUTGOING** node. Consequences: the Share button on the final card had
+**no handler at all**, and tapping back on panel 0 destroyed the basemap for good (tiles still fetched
+and thrown away — billable on Mapbox). Fixed by scoping every lookup to the panel just built
+(`p.querySelector(...)`) and deleting the ids. ⚠️ **A DOM kept for a transition is a DOM with duplicate
+ids; `$()` is unsafe inside it.** I then fell into the same trap in my own verification probe.
+
+⚠️ **AN 8px RAIL WAS MOVED TWICE AND SHOULD HAVE BEEN DELETED.** It read as a disabled iOS slider. The
+verdict panel now carries `storyBandSvg` — the target band as a **filled lane**, a pace line, a marker
+per kilometre coloured by verdict, stems sized by the miss, the mean on a plate, and a legend **in
+words**. Measured: first element y452.7 → **y96**, non-text graphic 8px → **442px (53.6%)**,
+inter-beat jolt 22px → **0.0px**. This is the one thing the competitor structurally cannot show.
+
+⚠️ **"46% EMPTY" WAS NOT THE FLOOR — THE FIRST FIX PUT IT BACK ON DEGENERATE RUNS.** One split measured
+**69%** empty and no-band **61%**, both worse than the defect being fixed. A layout verified only on a
+good run is not verified. The one-split panel is now gone entirely (`storyPanelKinds` gates on
+`a.n > 1`) because the verdict chart already draws a single kilometre honestly.
+
+⚠️ **CONTRAST MEASURED FROM RENDERED PIXELS FOUND 2.10–2.91:1** where the radial gradient peaks — even
+opaque white is 3.62:1 there. Fixed to 5.27–9.24:1. ⚠️ **`.story-h i`, the header date, still measures
+2.42:1 on that peak and is NOT fixed** — five panels share it and it predates this work.
+
+⚠️ **MEASURING A FLEX ITEM'S BOX CANNOT SEE CLIPPING.** `.story-cardin` has `overflow: hidden` and
+reported 705.0/705 with 14px genuinely cut. Only `scrollHeight` vs `clientHeight` showed it.
+`storyFit()` now sheds content in a stated order — eyebrow, then picture band, then the split row —
+after measuring the header's **real** height (92px assumed vs 107 measured).
+
+⚠️ **A GUARD PINNED THE DEFECT ITSELF, TWICE.** The split-bar test *required* the old
+`46 + 54 * (slow - r.sec) / span` and was satisfied while one split rendered at 46%; the tap-zone test
+compared z-indexes from **different stacking contexts** and could never fail. Both restated to the
+mechanism. **36 deliberate re-breaks across the two workflows; 35 caught first time.**
+
+⚠️ **THE `python3 -c` ONE-LINER FOR node --check IN MY WORKFLOW BRIEFS IS A SILENT NO-OP** —
+`if not open(...).write(b)` is always false, so it prints nothing and reads as "all OK". Use the loop
+form in the Commands section above.
+
 ### THE RECAP STORY (owner's request after a Runna screen recording, 2026-08-17)
 
 Four panels the runner swipes through from a route thumbnail on the debrief: the route drawing

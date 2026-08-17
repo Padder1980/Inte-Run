@@ -149,8 +149,11 @@ test("there is exactly ONE tile source, and ONE place naming the styles", () => 
   const calls = (html.match(/routeMapFor\(/g) || []).length;
   const selfCalls = (lift("routeMapFor").match(/routeMapFor\(/g) || []).length - 1;  // minus its own signature
   assert.equal(selfCalls, 1, "expected exactly one fallback re-entry inside routeMapFor");
-  assert.equal(calls - selfCalls, 3,
-    "a map consumer is bypassing the cache (expected: the definition plus both call sites)");
+  // ⚠️ FOUR, NOT THREE, SINCE 2026-08-17: buildStoryMap (the recap's route panel) is a third consumer.
+  // The invariant is unchanged — every consumer goes through routeMapFor, so a re-watched recap costs
+  // no tiles — and the number is only the count of consumers that satisfy it.
+  assert.equal(calls - selfCalls, 4,
+    "a map consumer is bypassing the cache (expected: the definition plus all three call sites)");
   assert.equal((html.match(/loadRouteMap\(/g) || []).length, 2,
     "loadRouteMap has a caller other than routeMapFor — that one re-fetches tiles on every view");
 });

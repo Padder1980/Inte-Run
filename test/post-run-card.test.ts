@@ -31,7 +31,7 @@ function lift(name: string) {
 }
 const NAMES = ["isRunWalkShape", "plannedStepMeters", "paceWindowOf", "paceStampFor", "runWorkPace",
   "isStrideStep", "withGeneratedWarmup", "plannedPaceBandOf",
-  "plannedRpeBandOf", "runAnalysis", "splitsVsTargetHtml", "debriefParagraphs", "esc", "fmtPace",
+  "plannedRpeBandOf", "runAnalysis", "runEvidenceConfidence", "splitsVsTargetHtml", "debriefParagraphs", "esc", "fmtPace",
   "fmtSec", "spanText", "workLabel", "stepTargetText", "stepChips", "structureRows", "sessionStepText"];
 const M: any = new Function("warmupCardFor", "PACE_MODEL_VERSION",
   NAMES.map(lift).join(";\n") + "; return {" + NAMES.join(",") + "};")(

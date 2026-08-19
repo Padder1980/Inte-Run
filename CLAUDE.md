@@ -4175,6 +4175,68 @@ shared `<audio>` element, which has no session management, four unsynchronised w
 this change) a permanent `error` handler wired straight to the device voice. Two audio systems, and
 the one that had been audited was not the one he was hearing.
 
+## THE SHARE STUDIO, REBUILT TO A COMMISSIONED CONTRACT (2026-08-18/19)
+
+The owner supplied `InteRun_Share_Studio_Claude_Pack` — a binding contract with four authoritative 9:16
+reference PNGs, template contracts, an editor spec and a release gate. ⚠️ **ITS "existing weak output
+that must not survive" LIST DESCRIBES THE PREVIOUS BUILD'S OUTPUT ALMOST ITEM BY ITEM** (card-within-
+card framing, an outer border, neon glow, a route stranded in empty space). So the visual layer was
+replaced and the plumbing kept. Four templates: **The Moment**, **The Execution**, **The Route
+Poster**, **The Progression**, at exactly **1080×1920** and **1080×1350** (reflowed, never cropped).
+
+**The owner's three rulings** (`scratchpad/share/DECISIONS.md`, binding): conservative centre-person
+exclusion instead of Vision — **which is what keeps the whole feature shippable over the air**; The
+Execution **restricted** to sessions judgeable against the 1000 m splits that exist; **per-run** share
+privacy starting safe, so the global PRIVACY that governs already-recorded debrief maps is untouched.
+
+⚠️ **THEN HE AMENDED THE CONTRACT, AND THE AMENDMENT IS THE BETTER DESIGN.** Verbatim: *"screenshot
+one shows the full picture of the person behind, where the others seem to cut the person off (I want
+the full picture to be in view....the data and text should always be just an overlay)"*. The pack's own
+sections 2 and 4 ask for a "lower panel [that] blends into deep ink"; measured, that panel was **flat
+(pixel sd 0.00) below 52%, and the photograph was simply gone**. Now the photo reaches the last row on
+every photo template (pass-through 12.4–14.4%) and one **gradient** scrim carries legibility — which is
+what the pack's own shared visual language asked for all along ("subtle photo scrims, not opaque
+cards"). The Moment was already correct and is byte-identical: **0 of 1920 rows changed**.
+⚠️ **THE SCRIM IS SOLVED, NOT CHOSEN.** `shareScrimFade` derives the fade from the content block's own
+height, so one function serves four layouts; alpha is solved per text tier against the measured ground
+and **clamped below 1 so an opaque lower section is structurally unrequestable**. On a white photograph
+it legitimately solves deep — that is the honest answer, not a bug.
+⚠️ **THE CHART AND THE LADDER NEEDED THEIR OWN ANSWER**, because a tint over a photograph is not a
+ground: every mark on the target band carries a **deep keyline** (the device `shareRouteDraw` already
+used), and the ladder's track is **two passes** — fix the ground inside the bar, then lighten it — so
+the track reads the same grey whatever is behind it.
+
+⚠️ **I REPORTED A DEFECT THAT DID NOT EXIST.** I told the owner the grey boxes behind "/KM" and "M"
+were opaque plates. They were the **synthetic test figure's legs showing through the scrim**, identical
+before and after. Look at the before/after render before believing a visual diagnosis of a card drawn
+over a test image.
+
+### What the preflight found, and it is the more valuable half
+
+Ten contract assumptions did not hold. The four that were safety-relevant:
+- ⚠️ **`run.pain` was read in three places and WRITTEN NOWHERE** — `runVerdict`'s highest-precedence
+  branch was unreachable, and the card's only rule for keeping a private disclosure off a shared image
+  guarded a field nothing sets.
+- ⚠️ **NO confidence signal existed anywhere.** The contract feared a false celebration; the real risk
+  was inverted and worse — a GPS-mangled run uppercased into a false **accusation** on a picture that
+  leaves the phone. `runEvidenceConfidence` now exists at the source.
+- ⚠️ **Hidden start/finish defaulted OFF**, so a first-time sharer exported a polyline ending at their
+  front door.
+- ⚠️ **`BRAND_MARK` had no `xmlns`**, so the real vector silently failed to load as a data URI — one
+  attribute between the true logo being usable in an export and not.
+
+Also established, each with a measurement: **`navigator.share({files})` DOES work under
+`interun://app`** (a code comment asserting otherwise was false, and that path had been live and
+unexamined); **no Vision, and `FaceDetector` is `undefined`** in WKWebView; **no Photos purpose strings
+— a probe app was KILLED by TCC**, not refused; **no feature flag and no analytics** exist at all; **no
+per-rep data** is persisted, which is why The Execution is restricted; **canvas has no tabular
+numerals**; and **both design ratchets sit exactly on their ceilings with zero headroom**, so one
+literal radius or font-size in new CSS fails the suite.
+
+⚠️ **STILL NATIVE-ONLY, SO IT WAITS FOR AN XCODE BUILD:** saving straight to Photos and the camera
+branch of the picker (`NSPhotoLibraryAddUsageDescription`, `NSCameraUsageDescription`). Until then the
+system share sheet plus the existing download path is the compliant fallback the spec permits.
+
 ## THE WALK THAT CONVICTED THE GPS START (owner's report, 2026-08-17 — four findings, two causes)
 
 He walked a 1 km custom session, phone in hand, badge reading ±2 m: credited **0.28 km for ~0.19 km

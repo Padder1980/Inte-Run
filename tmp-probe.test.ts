@@ -15,7 +15,7 @@ function lift(name: string) {
   throw new Error("unbalanced " + name);
 }
 const src = [
-  lift("runAnalysis"), lift("paceChartSvg"), lift("splitsVsTargetHtml"),
+  lift("runAnalysis"), lift("runEvidenceConfidence"), lift("paceChartSvg"), lift("splitsVsTargetHtml"),
   lift("debriefParagraphs"), lift("runDebrief"), lift("plannedPaceBandOf"),
   lift("isRunWalkShape"), lift("plannedRpeBandOf"),
 ].join(";\n");

@@ -26,6 +26,20 @@ function lift(name: string): string {
   throw new Error("unbalanced braces in " + name);
 }
 /** Everything the debrief adds, as one scope — used for sweeps that must cover all of it. */
+/**
+ * The shared secondary-metric ladder, as a runnable function.
+ * ⚠️ The array is a const, not a function, so lift() cannot reach it — it is sliced to its own closing
+ * bracket and evaluated beside runMetricLadder, which is the only thing that reads it.
+ */
+function metricLadder(): (run: any, forShare?: boolean) => any[] {
+  const html = page();
+  const at = html.indexOf("const RUN_METRIC_LADDER = [");
+  assert.ok(at >= 0, "RUN_METRIC_LADDER is not in the build");
+  const end = html.indexOf("\n];", at);
+  assert.ok(end > at, "RUN_METRIC_LADDER's closing bracket moved");
+  return new Function(html.slice(at, end + 3) + "\n" + lift("runMetricLadder") +
+    "\nreturn runMetricLadder;")() as (run: any, forShare?: boolean) => any[];
+}
 function debriefScope(): string {
   const s = src();
   const a = s.indexOf("THE POST-RUN DEBRIEF — Logbook run page");
@@ -99,7 +113,11 @@ test("there is exactly one share entry and Strava is inside it", () => {
   const view = lift("viewRunDetail");
   assert.equal((view.match(/rdShareHtml\(/g) || []).length, 1, "more than one share entry point");
   assert.ok(!/stravaRunButtonHtml/.test(view), "Strava is a second button on the page");
-  assert.match(lift("openRunShareSheet"), /stravaRunButtonHtml/, "Strava is missing from the share sheet");
+  // ⚠️ FOLLOW THE DELEGATION RATHER THAN PINNING THE OLD SHEET. openRunShareSheet now opens the share
+  // studio, so the flow is both functions; asserting only on the delegator would pass on any body at
+  // all. The invariant is unchanged: Strava is a destination inside the one share flow.
+  const flow = lift("openRunShareSheet") + lift("shareStudioHtml");
+  assert.match(flow, /stravaRunButtonHtml/, "Strava is missing from the share flow");
 });
 
 // ---- the verdict ---------------------------------------------------------------------------------
@@ -141,12 +159,27 @@ test("an unplanned run gets no invented target", () => {
 
 test("a missing metric is omitted, never shown as zero", () => {
   // ⚠️ A confident "0 m" reads as a measurement. Absence is the truth and an absent tile says it.
-  const fn = lift("rdMetricsHtml");
-  for (const [field, label] of [["run.elevGain > 0", "Elevation"], ["run.avgHr", "Avg HR"],
-                                 ["run.cadence", "Cadence"], ["run.kcal", "Calories"],
-                                 ["run.maxHr", "Max HR"], ["run.rpe", "RPE"]]) {
-    assert.ok(fn.includes("if (" + field + ")"), label + " is not gated on having a value");
-  }
+  //
+  // ⚠️ RESTATED 2026-08-18, BECAUSE THE MECHANISM MOVED AND THE INVARIANT DID NOT. The six gates were
+  // six literal `if` statements inside rdMetricsHtml, which is exactly why the share card had none of
+  // them — its ledger carried distance, time and pace and could not reach the relevance ordering the
+  // debrief had all along. They now live in RUN_METRIC_LADDER, read by both surfaces, so the two cannot
+  // disagree about the third number on a run.
+  //
+  // ⚠️ AND IT ASSERTS BY RUNNING THE LADDER RATHER THAN BY MATCHING SPELLINGS, which is strictly
+  // stronger: a hand-written list of six things to look for can list five, and this project has been
+  // caught by that twice. Watched failing with the elevGain > 0 test loosened to a truthiness check.
+  assert.match(lift("rdMetricsHtml"), /runMetricLadder\(run, false\)/,
+    "the debrief has gone back to carrying its own gates");
+  const rung = metricLadder();
+  assert.deepEqual(rung({}), [], "a run with nothing to show still produces tiles");
+  // The two fields both builders store as 0 rather than null, plus the four that are correctly nulled.
+  assert.deepEqual(rung({ elevGain: 0, avgHr: 0, cadence: 0, kcal: 0, maxHr: 0, rpe: 0 }), [],
+    "a zero is being rendered as a measurement");
+  // Every rung is reachable, in the documented order, so none of them is dead.
+  const all = rung({ elevGain: 11, avgHr: 148, cadence: 158, kcal: 402, maxHr: 163, rpe: 3 });
+  assert.deepEqual(all.map((m: any) => m.key), ["elev", "avgHr", "cadence", "kcal", "maxHr", "rpe"]);
+  assert.deepEqual(all.map((m: any) => m.v), ["11", "148", "158", "402", "163", "3/10"]);
 });
 
 test("cadence is persisted, or the tile could never appear", () => {
@@ -204,9 +237,51 @@ test("the hero and the share card make the same privacy decision", () => {
   // runner posts — the worst possible way for a privacy feature to fail.
   const html = page();
   const uses = (html.match(/runRoutePresentation\(/g) || []).length;
-  assert.ok(uses >= 3, "expected the hero, the share sheet and the tile loader to share one decision");
+  assert.ok(uses >= 3, "expected the hero, the share card and the tile loader to share one decision");
   assert.match(lift("rdHeroHtml"), /runRoutePresentation\(/, "the hero does not apply privacy");
-  assert.match(lift("openRunShareSheet"), /runRoutePresentation\(/, "the share sheet does not apply privacy");
+  // ⚠️ RESTATED 2026-08-18, BECAUSE THE OLD VERSION PASSED ON A LIVE LEAK. It asserted that
+  // openRunShareSheet mentions runRoutePresentation — which it did, to write the sentence explaining
+  // what the card would show — while the card itself drew run.route RAW, so both privacy switches
+  // produced a byte-identical picture with the runner's front door on it. The mechanism is that the
+  // renderer cannot reach the run at all: it takes a model whose route field is already resolved.
+  // ⚠️ NOTHING COMPARES THE TWO EXPORTED PICTURES. This comment used to claim a test file proved the
+  // pixels differ, and that file has never existed — a claimed guard is worse than an admitted gap,
+  // because the next person reads it and stops looking. What IS pinned is the structure below.
+  assert.match(lift("shareCardModel"), /runRoutePresentation\(/, "the share card does not apply privacy");
+  // ⚠️ RESTATED AGAIN 2026-08-18 (phase 2): DERIVED, NOT A HAND-WRITTEN LIST OF FIVE NAMES. The list
+  // named cardRoute and cardPhoto, which no longer exist — so the very first rename made this guard
+  // ERROR rather than fail, and the obvious repair is to edit the names, which is how a list quietly
+  // stops covering the code it was written for. The invariant is that NOTHING the renderer reaches can
+  // see the run, so the closure of everything drawShareCard calls is walked and every member checked.
+  // A new sub-renderer added later is inside it by construction.
+  const html2 = page();
+  const seen = new Set<string>();
+  const queue = ["drawShareCard"];
+  while (queue.length) {
+    const name = queue.shift()!;
+    if (seen.has(name)) continue;
+    seen.add(name);
+    const body = lift(name);
+    assert.ok(!/\brun\./.test(body), name + " reads the run directly, so it can bypass the privacy decision");
+    for (const m of body.matchAll(/\b((?:card|share|draw)[A-Za-z0-9_]*)\s*\(/g)) {
+      const cand = m[1]!;
+      if (!seen.has(cand) && html2.includes("function " + cand + "(")) queue.push(cand);
+    }
+  }
+  // The walk has to have actually gone somewhere, or a renderer that stopped calling anything would
+  // pass by drawing nothing at all.
+  assert.ok(seen.size >= 8, "the renderer closure collapsed to " + seen.size + ": " + [...seen].join(", "));
+  // ⚠️ RESTATED A THIRD TIME 2026-08-19 (phase 4), FOR THE SAME REASON IT WAS RESTATED THE FIRST TWO.
+  // It named cardLedger and cardLane — the interim composition and its chart — and both were deleted the
+  // moment The Execution and The Progression were built, so the guard ERRORED on a correct change and
+  // the obvious repair was again to edit the names. The invariant is that the walk reaches EVERY
+  // template renderer, so the set is derived from the build: any function named share*Card is one, and
+  // a fifth template is inside the guard the day it is written.
+  const cards = [...new Set([...html2.matchAll(/function (share[A-Za-z0-9]*Card)\(/g)].map((x) => x[1]!))];
+  assert.ok(cards.length >= 4, "the renderer has " + cards.length + " template cards; four are expected");
+  for (const must of cards.concat(["sharePhotoDraw", "shareRouteDraw"])) {
+    assert.ok(seen.has(must), must + " is not reachable from drawShareCard, so the guard is not covering it");
+  }
 });
 
 // ---- accessibility ----------------------------------------------------------------------------------
@@ -248,7 +323,7 @@ test("every control in the debrief actually does something", () => {
   const ids = [...scope.matchAll(/<button[^>]*id="([a-zA-Z0-9_]+)"/g)].map((m) => m[1]!);
   assert.ok(ids.length >= 5, "expected several buttons, found " + ids.length);
   const wiring = lift("wireRunDebrief") + lift("openRunShareSheet") + lift("openRunMoreSheet") +
-    lift("openPrivacySheet") + lift("wireSheetShare") + lift("wire");
+    lift("openPrivacySheet") + lift("wirePrivacyToggles") + lift("wire");
   const dead = ids.filter((id) => !new RegExp('\\$\\("' + id + '"\\)').test(wiring));
   assert.deepEqual(dead, [], "these render as buttons and nothing wires them: " + dead.join(", "));
 

@@ -112,14 +112,27 @@ test("⚠️ nothing is sent to Strava on its own, and nothing is offered that c
   // stravaMaybeAutoSend does not mention its own name, so a line-by-line check rejected the very path
   // it was written to allow. Ask whether each call site sits inside that function instead.
   const optIn = fn("stravaMaybeAutoSend");
+  // ⚠️ A THIRD ACCOUNTED PATH SINCE 2026-08-18, AND IT IS STILL A TAP. The share studio renders its own
+  // Send-to-Strava button — on the Logbook debrief it is the ONLY route to Strava — and that button was
+  // reached by nothing at all, because render() is what wires the id and opening the studio does not
+  // render. Its handler is delegated, so the call does not sit on an .onclick line and this sweep saw an
+  // unaccounted caller. The invariant is unchanged: a send is a tap the runner made, or the setting they
+  // switched on. What is asserted below is that the studio's call is downstream of resolving the tapped
+  // node to the Strava button, which is what makes it a tap rather than a third automatic path.
+  const studio = fn("studioClick");
   const callers = html.split("\n")
     .map((l) => l.trim())
     .filter((l) => l.includes("stravaSendRun(") && !l.startsWith("function stravaSendRun"));
-  assert.ok(callers.length >= 2, "expected at least the button and the opt-in path to call it");
+  assert.ok(callers.length >= 3, "expected the two buttons and the opt-in path to call it");
   for (const l of callers)
-    assert.ok(l.includes("stvSend.onclick") || optIn.includes(l),
-      "an upload is triggered from somewhere that is neither the button nor the opt-in path: " + l.slice(0, 100));
+    assert.ok(l.includes("stvSend.onclick") || optIn.includes(l) || studio.includes(l),
+      "an upload is triggered from somewhere that is neither a button nor the opt-in path: " + l.slice(0, 100));
   assert.match(html, /stvSend\.onclick = \(\) => stravaSendRun/, "the send button is not what triggers a send");
+  assert.match(studio, /closest\("#stvSend, #stvCheck"\)[\s\S]*?stravaSendRun\(STUDIO\.run/,
+    "the studio sends without first resolving the tap to its own Strava button");
+  // ⚠️ AND IT SENDS THE RUN THE STUDIO HOLDS, not the one on the screen behind the overlay.
+  assert.ok(!/stravaSendRun\(currentOverviewRun\(\)/.test(studio),
+    "the studio re-resolves the run from the screen behind it");
 });
 
 test("⚠️ automatic sending is opt-in, forward-only, and never a simulated run", () => {

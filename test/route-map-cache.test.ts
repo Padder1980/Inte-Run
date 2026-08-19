@@ -149,11 +149,14 @@ test("there is exactly ONE tile source, and ONE place naming the styles", () => 
   const calls = (html.match(/routeMapFor\(/g) || []).length;
   const selfCalls = (lift("routeMapFor").match(/routeMapFor\(/g) || []).length - 1;  // minus its own signature
   assert.equal(selfCalls, 1, "expected exactly one fallback re-entry inside routeMapFor");
-  // ⚠️ FOUR, NOT THREE, SINCE 2026-08-17: buildStoryMap (the recap's route panel) is a third consumer.
-  // The invariant is unchanged — every consumer goes through routeMapFor, so a re-watched recap costs
-  // no tiles — and the number is only the count of consumers that satisfy it.
-  assert.equal(calls - selfCalls, 4,
-    "a map consumer is bypassing the cache (expected: the definition plus all three call sites)");
+  // ⚠️ THREE SINCE 2026-08-18, AND IT WENT DOWN BECAUSE A CONSUMER STOPPED NEEDING TILES AT ALL. The
+  // share card now draws its route as geometry, so it fetches nothing, cannot be CORS-tainted (which
+  // would make toBlob refuse and silently lose the runner's photograph) and costs nothing per share.
+  // The invariant is UNCHANGED — every consumer that wants a basemap goes through routeMapFor, so no
+  // surface re-fetches tiles per view — and the number is only the count of consumers that satisfy it.
+  // Do not weaken this to <=: the guarantee is that there are no OTHER callers, not that there are few.
+  assert.equal(calls - selfCalls, 3,
+    "a map consumer is bypassing the cache (expected: the definition plus both remaining call sites)");
   assert.equal((html.match(/loadRouteMap\(/g) || []).length, 2,
     "loadRouteMap has a caller other than routeMapFor — that one re-fetches tiles on every view");
 });

@@ -125,9 +125,15 @@ test("⚠️ double-tap cannot zoom the app, on any element", () => {
   assert.match(style, /\.crop-stage \{ touch-action: none; \}/, "the avatar cropper lost its own gestures");
   assert.match(style, /\.swipe-face \{[^}]*touch-action: pan-y/, "a swipeable run row lost vertical panning");
   // Nothing may set touch-action: none on a scroller, or the screen stops scrolling entirely.
+  // ⚠️ TWO SURFACES ARE ALLOWED IT, AND NEITHER IS A SCROLLER — that is the invariant, not the count.
+  // Both are fixed-height framing stages that drive their own drag and pinch: the avatar cropper, and
+  // the share studio's card preview. Each also has to be named in the document-wide gesture* guard,
+  // or a pinch there zooms the PAGE and pinch-to-zoom is off, so the runner can never zoom back.
   const nones = [...new Set([...style.matchAll(/([^\s{}]+) \{[^}]*touch-action: none/g)].map((m) => m[1]))];
-  assert.deepEqual(nones, [".crop-stage"],
-    "something other than the cropper disables touch entirely: " + nones.join(", "));
+  assert.deepEqual(nones, [".crop-stage", ".sst-stage"],
+    "something other than the two framing stages disables touch entirely: " + nones.join(", "));
+  assert.match(css, /closest\("\.crop-stage, \.sst-stage"\)/,
+    "a stage that sets touch-action: none is not exempted from the pinch suppressor, so pinching it zooms the page");
 });
 
 test("⚠️ the native app locks zoom after every navigation, not just at launch", () => {

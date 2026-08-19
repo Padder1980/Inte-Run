@@ -57,7 +57,19 @@ for (const anat of STRETCH_ANAT_IDS) {
 
 // Inte-Run brand mark — an original glyph: a teal badge holding a forward-striding runner (head dot +
 // two motion bars leaning into the run). Not derived from any other app's logo.
-const BRAND_MARK = `<svg viewBox="0 0 120 120" width="104" height="104" role="img" aria-label="Inte-Run">
+//
+// ⚠️ THE xmlns IS LOAD-BEARING EVEN THOUGH INLINE SVG DOES NOT NEED IT. Inside an HTML document the
+// parser knows this is SVG from the tag name, so the attribute is redundant on screen — but the moment
+// the same string is handed to new Image() through a data: URI it is parsed as a standalone document,
+// and without the namespace declaration it is not SVG at all: the load fails and onerror fires. So the
+// canonical vector could not be composited into anything, and the only route to the logo in an exported
+// picture was to re-draw it by hand in canvas paths, which is how the exported card's badge came to
+// carry a gradient, a glow and a gloss the real mark does not have. Measured before and after
+// (scratchpad/share/work/mark.mjs): as authored { ok: false }; with the attribute
+// { ok: true, w: 104, h: 104 }, tainted: false, and toBlob("image/jpeg", 0.92) still returns bytes —
+// which is the property that matters, because a tainted canvas makes toBlob throw and the runner
+// silently loses their photograph.
+const BRAND_MARK = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="104" height="104" role="img" aria-label="Inte-Run">
   <defs><linearGradient id="brandg" x1="0" y1="0" x2="1" y2="1">
     <stop offset="0" stop-color="#16b7a4"/><stop offset="1" stop-color="#0a6f64"/></linearGradient></defs>
   <rect x="8" y="8" width="104" height="104" rx="30" fill="url(#brandg)"/>
@@ -1637,6 +1649,22 @@ html.kbup .sheet-ov { padding-bottom: var(--kbh, 0px); }
 .rm-row input[type="time"] { font: inherit; font-size: 16px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; }
 .rm-row input[type="time"]:disabled { opacity: .5; }
 .rm-switch { position: relative; width: 46px; height: 28px; flex: 0 0 auto; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2); cursor: pointer; padding: 0; transition: background .15s ease, border-color .15s ease; }
+/* ⚠️ THE HIT AREA GROWS, NOT THE BOX — the rule the Phase 4 accessibility pass used everywhere else and
+   this control was missed by. Measured 46x28 with no expander, against the 44px --tap floor, in all
+   nine places it is used. Growing the switch itself would relayout every row that carries one.
+   ⚠️ VERTICAL ONLY (-8px 0), because the box is already 46px wide and only the height is short. An
+   all-round inset widens it to 62px, where two switches in a row of their own could start catching
+   taps meant for the label beside them.
+   ⚠️ AND z-index IS WHAT MAKES IT WORK DOWNWARD. Without it the expander is painted before the NEXT
+   row in document order, so the row underneath covers the lower part of it.
+   ⚠️ -9px, NOT -8px, AND THAT IS NOT A ROUNDING CHOICE. inset is resolved against the containing
+   block, which for an absolutely positioned child is the PADDING box — and this switch has a 1px
+   border, so the padding box is 26px tall, not 28. At -8 the hit area measured 42px and quietly
+   missed the floor it was added to reach; at -9 it is exactly 44. Measured by binary-searching the
+   boundary with elementFromPoint, not by trusting the declaration. The rows are 12px apart, so 9
+   still leaves 5px between one switch's hit area and the next. */
+.rm-switch { z-index: 1; }
+.rm-switch::after { content: ""; position: absolute; inset: -9px 0; border-radius: 999px; }
 .rm-switch.on { background: var(--accent); border-color: var(--accent); }
 .rm-knob { position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .15s ease; }
 .rm-switch.on .rm-knob { transform: translateX(18px); }
@@ -4001,6 +4029,69 @@ button.rd-meta-r { cursor: pointer; }
   color: var(--ink); font-size: var(--t-meta); font-weight: 700; }
 .heat-chip svg { width: 16px; height: 16px; color: var(--peak); flex: none; }
 .heat-chip .heat-x { margin-left: auto; color: var(--accent); font-weight: 700; }
+/* ---- the share studio ---------------------------------------------------------------------------
+   A full-screen editor, not a bottom sheet: a 9:16 card cannot be previewed usefully in one.
+   Tokens and ladders only — both design ratchets are at their ceiling with zero headroom, so one
+   literal radius or font-size here fails the suite. */
+.sst-ov { position: fixed; inset: 0; z-index: 92; display: none; background: var(--bg); color: var(--ink); }
+.sst-ov.on { display: flex; flex-direction: column; }
+.sst-bar { position: relative; display: flex; align-items: center; flex: none;
+  min-height: var(--tap); padding: calc(var(--s2) + env(safe-area-inset-top, 0px)) var(--s3) var(--s2);
+  border-bottom: 1px solid var(--line); background: var(--surface); }
+.sst-bar .sst-t { position: absolute; left: 0; right: 0; text-align: center; pointer-events: none;
+  font-size: var(--t-card); font-weight: 700; color: var(--ink); }
+.sst-cancel { position: relative; z-index: 1; display: inline-flex; align-items: center;
+  min-height: var(--tap); padding: 0 var(--s2); border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: var(--t-body); font-weight: 600; color: var(--accent); }
+.sst-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: var(--s3) var(--s4) calc(var(--s6) + env(safe-area-inset-bottom, 0px)); }
+/* ⚠️ AN OFF-SCREEN PROBE, BECAUSE JS CANNOT READ env(). studioStageHeight has to know how much of the
+   bottom of the screen the home indicator owns, or it grows the stage until the photo button sits
+   flush against the very edge of the viewport — visible in a headless browser where the inset is 0,
+   and under the indicator on the phone, in the strip iOS reserves for its own swipe. Reading it back
+   out of a custom property does not work (an unregistered property hands back the unresolved env()
+   token) and deriving it from .sst-body's padding would silently go wrong the day that padding
+   changed. The same off-screen-probe answer the text scale already uses. Out of flow, so it measures
+   the inset without occupying it. */
+.sst-safe { position: absolute; bottom: 0; left: 0; width: 0; height: env(safe-area-inset-bottom, 0px); }
+/* ⚠️ NO HEIGHT HERE AT ALL — studioStageHeight OWNS IT, and a second owner is the bug. The height is
+   derived from the stage's own WIDTH and the aspect being previewed, so the card the runner is framing
+   a photograph in fills the screen sideways instead of leaving 42% of the stage empty either side
+   (measured at the first attempt's 44dvh: a 9:16 card 231px wide on a 430pt screen, 53.7% of it).
+   A max-height in here silently clamped the derived value — at 640px the story card stopped 67px short
+   of the room it had on a 430x932 screen, which is the two-owners fault this file records elsewhere as
+   two things owning one opacity. min-height is a FLOOR, not a size: it is all that is left if a
+   measurement ever comes back zero, and there is no canvas at all without studioMount having run. */
+.sst-stagewrap { min-height: 210px; margin-bottom: var(--s2); }
+/* ⚠️ THIS IS THE SECOND SELECTOR THE DOCUMENT-WIDE PINCH SUPPRESSOR EXEMPTS (see the gesture guard
+   near buildNav). Both must stay listed there, or a two-finger pinch on the preview zooms the PAGE
+   and, because pinch-to-zoom is off, the runner can never zoom back out. */
+.sst-stage { position: relative; height: 100%; display: flex; align-items: center; justify-content: center;
+  touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+.sst-stage:active { cursor: grabbing; }
+.sst-cv { display: block; border-radius: var(--r-card);
+  box-shadow: 0 18px 48px color-mix(in srgb, var(--accent) 22%, transparent); }
+.sst-busy { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+  border-radius: var(--r-card); background: color-mix(in srgb, var(--bg) 55%, transparent); }
+.sst-busy.on { display: flex; }
+.sst-busy::after { content: ""; width: 26px; height: 26px; border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--accent) 30%, transparent); border-top-color: var(--accent);
+  animation: sstspin .8s linear infinite; }
+@keyframes sstspin { to { transform: rotate(360deg); } }
+/* ⚠️ ITS OWN OPT-OUT. The global reduce-motion rule kills transitions only, so a keyframe animation
+   needs one of these or it keeps spinning for somebody who asked for less movement. */
+@media (prefers-reduced-motion: reduce) { .sst-busy::after { animation: none; } }
+.sst-hint { font-size: var(--t-label); color: var(--ink-faint); text-align: center; margin-bottom: var(--s3); }
+.sst-chips { display: flex; gap: var(--s2); }
+.sst-chip { flex: 1; justify-content: center; min-height: var(--tap); font-size: var(--t-meta);
+  cursor: pointer; color: var(--ink-soft); }
+.sst-chip.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+.sst-note { font-size: var(--t-label); color: var(--ink-faint); margin: var(--s1) 0 0; }
+.sst-why { min-height: var(--t-label); font-size: var(--t-label); color: var(--ink-faint);
+  text-align: center; margin-top: var(--s2); }
+.sst-off { opacity: .55; }
+.sst-strava { margin-top: var(--s4); padding-top: var(--s4); border-top: 1px solid var(--line); }
+.sst-sr { font-size: var(--t-label); color: var(--ink-faint); margin: var(--s2) 0 0; text-align: center; }
 </style>
 </head>
 <body>
@@ -11038,6 +11129,7 @@ function viewportDiagLines() {
       pedoDiagLine(),
       coachDiagLine(),
       mapDiagLine(),
+      photoDiagLine(),
       notifDiagLine(),
     ];
   } catch (e) { return ["diag unavailable"]; }
@@ -15637,6 +15729,11 @@ function runAnalysis(run) {
     slow: rows.filter((r) => r.verdict === "slow").length,
     fastest: n ? Math.min.apply(null, secs) : 0,
     slowest: n ? Math.max.apply(null, secs) : 0,
+    // ⚠️ HOW MUCH OF THIS RUN WAS ACTUALLY MEASURED, AS A COUNT SEPARATE FROM HOW IT WAS RUN. inBand,
+    // fast and slow are all subsets of the judged rows, so nothing downstream could tell "0 in band"
+    // (ran outside the target) from "0 judged" (nothing to compare) — and those two need opposite words.
+    judgedN: rows.filter((r) => r.judged).length,
+    estN: rows.filter((r) => r.est).length,
     rpe: run.rpe || null, rband: run.rband || null,
     elevGain: Math.round(run.elevGain || 0), avgHr: run.avgHr || null,
     avgPaceSec: run.avgPaceSec || 0,
@@ -15663,9 +15760,73 @@ function runAnalysis(run) {
     a.shiftSec = Math.round(head - tail);          // positive = finished faster
     a.progressive = a.shiftSec >= 8;
     a.faded = a.shiftSec <= -12;
+    // ⚠️ THE TWO MEANS AND THE THIRD'S SIZE ARE NOW CARRIED, not only their difference. The share
+    // card's progression claim has to say WHAT the close averaged ("Final 3 km averaged 5:34/km"),
+    // and the only alternative was for the renderer to re-slice the splits and take its own mean —
+    // a second derivation of a fact this function already computes, which is how one run comes to
+    // be described two different ways on two screens. Nothing rendered today reads them.
+    a.thirdN = k;
+    a.headSec = Math.round(head);
+    a.tailSec = Math.round(tail);
   }
   if (n >= 2) a.spread = a.slowest - a.fastest;
+  // ⚠️ COMPUTED HERE, ONCE, AND CARRIED. Every screen that says anything about this run reads this
+  // object, so a second derivation somewhere else is two answers to "how sure are we?".
+  a.confidence = runEvidenceConfidence(run, a);
   return a;
+}
+/**
+ * HOW MUCH THE PACE EVIDENCE IS WORTH — "high", "medium" or "low".
+ *
+ * ⚠️ IT IS A FACT ABOUT THE MEASUREMENT, NOT ABOUT THE RUNNING. A perfectly executed session measured
+ * through a tunnel and a shambles measured in the open both deserve honest words, and they are not the
+ * same words. Nothing here looks at whether the run was good.
+ *
+ * ⚠️ WHY THIS EXISTS AT ALL, MEASURED. Six kilometres, every split dead centre of the band, every one
+ * flagged est because the phone was pocketed and iOS suspended the web view: judged() rightly refuses to
+ * score an estimate, so inBand came out 0 while n was 6, pct computed as 0%, and the ladder fell through
+ * to its last branch — "Off the brief today", "Most kilometres were quicker than the target" — about a
+ * run in which the app had measured NOT ONE kilometre. The commissioned brief's fear was a false
+ * celebration; the real defect is the opposite and worse, a false ACCUSATION, and the share studio would
+ * have set it in capitals on a picture that leaves the phone. The same run with the flags removed returns
+ * "Steady and controlled".
+ *
+ * ⚠️ EVERY BOUND IS A MECHANISM OR A ZERO, NOT A TASTE. This project's own history says a threshold
+ * chosen because it felt right is a threshold that guards nothing.
+ *
+ * ⚠️ AND "NOT JUDGED" IS NOT THE SAME AS "NOT MEASURED". A threshold session's warm-up kilometres sit
+ * outside pwin and are deliberately unscored — that is the window working, not evidence going missing —
+ * so the ratio judgedN/n is NOT a quality signal and is not used as one. Only est splits and the
+ * receiver's own stamp say something failed.
+ */
+function runEvidenceConfidence(run, a) {
+  // No target, or a target and not one kilometre it could be applied to: there is no pace claim to make.
+  if (!a.band || !a.judgedN) return "low";
+  // At least as many kilometres invented as measured. The verdict would be describing the estimate.
+  if (a.estN >= a.judgedN) return "low";
+  // Fewer than three measured kilometres is an anecdote, not a pattern — the same floor rdWell uses
+  // before it will call a pace "even" and the story panel uses before it will draw a ladder.
+  if (a.judgedN < 3) return "medium";
+  // Part of the run is an estimate. The claim can still be made; it has to say so.
+  if (a.estN > 0) return "medium";
+  // ⚠️ THE RECEIVER'S OWN STAMP CAN ONLY EVER DEMOTE high TO medium, WHICH IS THE POINT. It is absent on
+  // every watch run, every treadmill run and every run recorded before it existed, and both bounds below
+  // are weaker evidence than an est flag — so the worst a badly chosen one can do is hedge a card that
+  // would otherwise have been confident. It can never suppress a verdict.
+  const q = run && run.gpsq;
+  if (q) {
+    const distM = (Number(run.distKm) || 0) * 1000;
+    // Step-counted ground. pedoFillGap only pays out after 20 s of GPS silence, so any material figure
+    // is a real blackout: 5% of a six-kilometre run is 300 m, which moves a split boundary by a third
+    // of a kilometre — and the boundaries are what the splits ARE.
+    if (distM > 0 && q.pedoM >= distM * 0.05) return "medium";
+    // The opening never settled. Re-seeds are confined to the first 45 seconds and credit nothing, so
+    // this cannot distort a total — it says kilometre one was cut from a moving reference.
+    // ⚠️ FIVE IS NOT MEASURED AGAINST FIELD DATA and is deliberately on the weak side: a healthy start
+    // produces one or two. If it proves noisy the honest fix is to raise it, not to widen what it does.
+    if (q.reseeds >= 5) return "medium";
+  }
+  return "high";
 }
 // A pace line with the prescribed band drawn behind it. Faster is higher, the way runners read it.
 function paceChartSvg(a) {
@@ -16037,6 +16198,77 @@ function loadPrivacy() {
 }
 let PRIVACY = loadPrivacy();
 function savePrivacy() { try { localStorage.setItem(PRIV_STORE, JSON.stringify(PRIVACY)); } catch (e) {} }
+
+/* ---- per-run share privacy ------------------------------------------------------------------ */
+/**
+ * WHAT ONE PARTICULAR RUN IS ALLOWED TO SAY IN A PICTURE — SEPARATE FROM WHAT THE DEBRIEF SHOWS.
+ *
+ * ⚠️ THE OWNER'S RULING (2026-08-18): per-run, hidden start and finish on by default the first time a
+ * route is enabled for THAT run, WITHOUT changing the global PRIVACY that governs the debrief map for
+ * runs already recorded. The alternative was flipping PRIVACY.ends to true, which would retroactively
+ * trim the map on the debrief screen of every run every existing runner has ever logged — a global
+ * default change dressed up as a share-card fix.
+ *
+ * ⚠️ ABSENT MEANS NEVER TOUCHED, AND THAT DEFAULTS TO THE SAFE ANSWER. There is no "first enabled" flag
+ * to keep, because the absence of a record IS that state: a run nobody has adjusted redacts its ends. A
+ * runner who deliberately turns it off writes a record, and their choice sticks for that run.
+ *
+ * ⚠️ THE GLOBAL IS A FLOOR, NEVER A CEILING — THE SHARE CAN ONLY BE MORE PRIVATE THAN THE DEBRIEF. Both
+ * route terms are OR-ed with PRIVACY, so a runner who has hidden their route on screen cannot be handed
+ * a card that shows it. Written as an override instead of a floor, a stored { ends: false } would have
+ * un-redacted a card for somebody whose whole app is set to redact, which is a privacy regression
+ * against today's behaviour rather than the improvement this is meant to be.
+ *
+ * ⚠️ AND loc AND date ARE SHARE-ONLY ON PURPOSE. Neither has a global equivalent, and inventing one
+ * would put a gate on the debrief's own identity row — a screen the contract explicitly forbids changing.
+ * The card is the surface that leaves the phone; that is where the two controls belong.
+ *
+ * ⚠️ BOUNDED, BECAUSE IT IS KEYED ON RUN IDS AND THOSE KEEP COMING. interun_runs holds 50 runs and
+ * interun_hist_v1 is uncapped, so a store keyed by run id and never pruned grows for ever. Records for
+ * runs that are no longer in the store are dropped first, then the oldest, and losing one costs a runner
+ * nothing worse than the safe default returning.
+ */
+const SHARE_PRIV_STORE = "interun_shareprivacy_v1";
+const SHARE_PRIV_MAX = 60;
+function loadSharePriv() {
+  try { const r = JSON.parse(localStorage.getItem(SHARE_PRIV_STORE) || "null"); if (r && typeof r === "object") return r; } catch (e) {}
+  return {};
+}
+let SHAREPRIV = loadSharePriv();
+function saveSharePriv() {
+  try {
+    let keys = Object.keys(SHAREPRIV);
+    if (keys.length > SHARE_PRIV_MAX) {
+      const live = {};
+      for (const r of (state.logged || [])) if (r && r.id) live[r.id] = 1;
+      for (const k of keys) if (!live[k] && Object.keys(SHAREPRIV).length > SHARE_PRIV_MAX) delete SHAREPRIV[k];
+      keys = Object.keys(SHAREPRIV);
+      // Object key order is insertion order for non-numeric string keys, so the front of this list is
+      // the oldest record. Run ids are timestamps or UUIDs, never array indices.
+      for (let i = 0; i < keys.length - SHARE_PRIV_MAX; i++) delete SHAREPRIV[keys[i]];
+    }
+    localStorage.setItem(SHARE_PRIV_STORE, JSON.stringify(SHAREPRIV));
+  } catch (e) {}
+}
+/** The four decisions actually applied to this run's card. Shape-compatible with runRoutePresentation's override. */
+function sharePrivacyFor(run) {
+  const own = (run && run.id && SHAREPRIV[run.id]) || null;
+  const ends = own && typeof own.ends === "boolean" ? own.ends : true;
+  return {
+    ends: !!(PRIVACY.ends || ends),
+    map: !!(PRIVACY.map || (own && own.map)),
+    loc: !!(own && own.loc),
+    date: !!(own && own.date),
+  };
+}
+/** True when the global setting is forcing this switch on, so the studio can say so rather than look inert. */
+function sharePrivacyLocked(key) { return key === "ends" ? !!PRIVACY.ends : key === "map" ? !!PRIVACY.map : false; }
+function setSharePrivacy(run, key, val) {
+  if (!run || !run.id) return;
+  const rec = SHAREPRIV[run.id] || (SHAREPRIV[run.id] = {});
+  rec[key] = !!val;
+  saveSharePriv();
+}
 /** Metres between two {lat,lng} points — the same haversine the live tracker uses. */
 function rdMetresBetween(a, b) {
   const R = 6371000, t = Math.PI / 180;
@@ -16085,7 +16317,18 @@ function runRoutePresentation(run, override) {
  * injury, illness, dehydration or overtraining, and this must never imply otherwise.
  */
 function runVerdict(run, a) {
-  const pct = a.n ? Math.round(a.inBand / a.n * 100) : null;
+  // ⚠️ null WHEN NOTHING WAS JUDGED, AND THAT ONE WORD IS THE FIX FOR A MEASURED FALSE ACCUSATION.
+  // inBand can only count rows the band was actually applied to, so with judgedN at 0 this arithmetic
+  // returned a confident 0% — which then walked the whole ladder down to "Off the brief today · most
+  // kilometres were quicker than the target" for a run where the app had measured none of them, and
+  // pushed "In range 0%" into the largest type on the verdict panel. Exactly the fault the bandless case
+  // already carried and was already fixed for; this is the second way in. As null it fails both >= tests
+  // and the chip's own pct != null guard, so one change closes both without touching either threshold —
+  // no run that HAS judged kilometres sees any difference at all.
+  const pct = (a.n && a.judgedN) ? Math.round(a.inBand / a.n * 100) : null;
+  // ⚠️ ONE VALUE, READ FROM THE ANALYSIS, PUT ON EVERY BRANCH. The card gates its capitalised claim on
+  // this, so a branch that shipped without it would be read as "high" by omission.
+  const conf = a.confidence || "low";
   const band = a.band, rband = a.rband, rpe = a.rpe;
   const easy = run.type === "easy" || run.type === "recovery" || run.type === "long";
   const chips = [];
@@ -16101,7 +16344,7 @@ function runVerdict(run, a) {
 
   // 1 — discomfort overrides everything, including a technically excellent run.
   if (run.pain) {
-    return { state: "caution", headline: "Let's look after that",
+    return { confidence: conf, state: "caution", headline: "Let's look after that",
       body: ["You logged some discomfort on this one, so that comes first.",
              "Keep the next few days easy and see whether it settles.",
              "If it changes how you run, stop and check the injury guide."],
@@ -16109,16 +16352,44 @@ function runVerdict(run, a) {
   }
   // 2 — not enough clean evidence to judge. Say so rather than inventing a verdict.
   if (!a.n) {
-    return { state: "insufficientData", headline: "Logged",
+    return { confidence: conf, state: "insufficientData", headline: "Logged",
       body: ["There are no kilometre splits on this one, so there is nothing to judge the pace against.",
              "The time and distance are recorded and still count towards your week."],
       chips: chips.slice(0, 3), well: [], watch: [] };
   }
   if (!band) {
-    return { state: "insufficientData", headline: "A run by feel",
+    return { confidence: conf, state: "insufficientData", headline: "A run by feel",
       body: ["This one had no prescribed pace, so there is no target to measure it against.",
              "It still counts as time on your feet."],
       chips: chips.slice(0, 3), well: rdWell(run, a), watch: [] };
+  }
+  // 2c — THERE WAS A TARGET, THERE ARE SPLITS, AND NOT ONE OF THEM COULD BE MEASURED AGAINST IT.
+  //
+  // ⚠️ THIS BRANCH REPLACES A MEASURED FALSE ACCUSATION, and it is the reason pct is null above rather
+  // than 0. Six kilometres run dead centre of the band with the phone in a pocket produce six est
+  // splits; judged() rightly refuses to score an estimate, so inBand is 0, and every pace branch below
+  // reads that as "outside the target" rather than "outside our knowledge". The runner was told most of
+  // their kilometres were quicker than the target when the app had measured none of them.
+  //
+  // ⚠️ IT SITS ABOVE THE PACE LADDER AND BELOW THE TWO EXISTING insufficientData BRANCHES, which is
+  // where its evidence lives: it is a statement about measurement, exactly like "no splits" and "no
+  // band", and it must be reached before anything that reads a count of in-band kilometres. Nothing
+  // below could fire anyway — fast, slow and inBand are all subsets of the judged rows — so the ladder's
+  // own outcomes are untouched for every run that HAS a judged kilometre.
+  //
+  // ⚠️ AND IT SAYS WHICH OF THE TWO THINGS HAPPENED. "The phone lost track" and "none of it fell inside
+  // the prescribed stretch" are different facts with different answers, and a single vague sentence
+  // would leave a runner unable to tell a signal problem from a session they misread.
+  if (!a.judgedN) {
+    return { confidence: conf, state: "insufficientData", headline: "Logged, not measured",
+      body: a.estN
+        ? ["Your phone lost track for part of this one, so its kilometre splits are estimates rather than measurements.",
+           "There is nothing here that can honestly be judged against the target pace, so this run is recorded and left at that.",
+           "The time and distance still count towards your week."]
+        : ["None of the kilometres fell inside the stretch this session prescribed a pace for, so there is nothing to measure against it.",
+           "The time and distance are recorded and still count towards your week."],
+      chips: chips.slice(0, 3), well: rdWell(run, a),
+      watch: a.estN ? ["Some kilometres were estimated while the signal was lost"] : [] };
   }
   // 3 — adherence to the intensity the session was FOR.
   const wellList = rdWell(run, a);
@@ -16126,7 +16397,7 @@ function runVerdict(run, a) {
   // ⚠️ Running an easy day hard is a fault, not an achievement, however good the pace looks.
   if (easy && a.fast > a.n / 2) {
     watchList.push("Most kilometres came in quicker than the easy band");
-    return { state: "caution", headline: "Quicker than the brief",
+    return { confidence: conf, state: "caution", headline: "Quicker than the brief",
       body: ["This was meant to be an easy run and most of it came in faster than the band.",
              "Easy days work by staying easy — the hard days are where the gains are meant to hurt.",
              "Try holding the slower end next time."],
@@ -16136,13 +16407,13 @@ function runVerdict(run, a) {
     if (rpe && rband && rpe > rband.max + 1) {
       // 4 — the data and the runner disagree. Name it rather than picking a side.
       watchList.push("It felt harder than the pace suggests");
-      return { state: "partial", headline: "On pace, but it cost you",
+      return { confidence: conf, state: "partial", headline: "On pace, but it cost you",
         body: ["You held the target pace well.",
                "You rated it harder than this session is meant to feel, which can happen with heat, tiredness or a busy week.",
                "If the next one feels the same, the paces may need a look."],
         chips: chips.slice(0, 3), well: wellList.slice(0, 3), watch: watchList };
     }
-    return { state: "achieved", headline: "Steady and controlled",
+    return { confidence: conf, state: "achieved", headline: "Steady and controlled",
       body: ["You kept a consistent pace and your effort stayed where this session wanted it.",
              "Good aerobic work."],
       chips: chips.slice(0, 3), well: wellList.slice(0, 3), watch: [] };
@@ -16150,13 +16421,13 @@ function runVerdict(run, a) {
   if (pct >= 40) {
     if (a.slow > a.fast) watchList.push("A number of kilometres drifted under the target pace");
     else watchList.push("A number of kilometres came in above the target pace");
-    return { state: "partial", headline: "Some of it landed",
+    return { confidence: conf, state: "partial", headline: "Some of it landed",
       body: ["Part of this run sat in the target band and part of it did not.",
              "Terrain, wind and traffic all move a pace around, so one session like this is not a pattern."],
       chips: chips.slice(0, 3), well: wellList.slice(0, 2), watch: watchList };
   }
   watchList.push(a.slow > a.fast ? "Most kilometres were slower than the target" : "Most kilometres were quicker than the target");
-  return { state: "partial", headline: "Off the brief today",
+  return { confidence: conf, state: "partial", headline: "Off the brief today",
     body: ["Most of this one sat outside the pace it was set at.",
            "That is worth noticing rather than worrying about — one run does not change a plan."],
     chips: chips.slice(0, 3), well: wellList.slice(0, 1), watch: watchList };
@@ -16233,18 +16504,34 @@ function runStartMsKnown(run) {
   return null;
 }
 const RD_MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-function rdWhenText(run) {
+/**
+ * THE DATE WITHOUT THE TIME OF DAY.
+ *
+ * ⚠️ THE SHARE CARD WANTS THIS AND rdWhenText, WHICH IS WHY IT IS SPLIT RATHER THAN COPIED. Both
+ * references print a date and neither prints a clock time, and that is the right call for a picture
+ * that leaves the phone: the date says when the run happened, the time of day says when this person
+ * leaves their house. One month table and one ordering serve both.
+ */
+function rdDateText(run) {
   const ms = runStartMsKnown(run);
   if (ms) {
     const d = new Date(ms);
-    const hh = String(d.getHours()).padStart(2, "0"), mm = String(d.getMinutes()).padStart(2, "0");
-    return d.getDate() + " " + RD_MONTHS[d.getMonth()] + " " + d.getFullYear() + " at " + hh + ":" + mm;
+    return d.getDate() + " " + RD_MONTHS[d.getMonth()] + " " + d.getFullYear();
   }
   if (run.dateIso) {
     const p = String(run.dateIso).split("-");
     return Number(p[2]) + " " + RD_MONTHS[Number(p[1]) - 1] + " " + p[0];
   }
   return "";
+}
+function rdWhenText(run) {
+  const day = rdDateText(run);
+  const ms = runStartMsKnown(run);
+  if (day && ms) {
+    const d = new Date(ms);
+    return day + " at " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  }
+  return day;
 }
 const RD_PIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>';
 const RD_STRAVA = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.4 2 3.6 13.3h3.4L9.4 8.6l2.4 4.7h3.4L9.4 2Zm5.6 11.3-1.7 3.3-1.7-3.3H9l4.3 8.4 4.3-8.4h-2.6Z"/></svg>';
@@ -16304,19 +16591,64 @@ function runPlaceLookup(run) {
     })
     .catch(() => {});
 }
+/**
+ * THE SECONDARY-METRIC RELEVANCE LADDER — ONE ORDERED LIST, READ BY THE DEBRIEF AND BY THE SHARE CARD.
+ *
+ * ⚠️ IT WAS SIX if STATEMENTS INSIDE rdMetricsHtml, WHICH IS WHY THE CARD HAD NONE OF THEM. The card's
+ * ledger carried distance, time and pace and stopped, so the commissioned brief's "time, average pace
+ * and elevation; if elevation is unavailable use average HR, cadence or calories according to existing
+ * relevance rules" was describing a ladder that existed and could not be reached. Two copies of an
+ * ordering is two answers to "what is the third number on this run", and the debrief is the one the
+ * runner checks the card against.
+ *
+ * ⚠️ EVERY ENTRY IS GATED ON HAVING A VALUE, AND NONE OF THEM MAY RETURN ZERO. elevGain is stored as 0
+ * rather than null by both builders, so it needs the > 0 test the readers have always applied; cadence
+ * is phone-only (the wrist sends no such key at all) and calories are watch-only (liveRunRecord never
+ * sets them), so a run is normally missing at least one of the two whatever it was recorded on. A
+ * confident "0 m" reads as a measurement of a flat run; an absent tile reads as an absence, which is
+ * the truth.
+ *
+ * ⚠️ RPE IS share: false, AND THAT IS A SAFETY RULE RATHER THAN AN EDITORIAL ONE. The effort rating is
+ * something the runner told the app about themselves, in the same class as their why, a check-in answer
+ * and now the discomfort question — none of which reaches a picture that leaves the phone. It stays on
+ * the debrief, where it belongs, and the flag is what stops the card's "take the next available metric"
+ * rule quietly publishing it the day a run has no elevation, heart rate, cadence or calories.
+ *
+ * ⚠️ THE ICON IS A NAME, LOOKED UP AT RENDER TIME. ICON is declared far below this list in the emitted
+ * script; holding the markup here would capture undefined and draw six empty slots in silence, which is
+ * exactly how ICON.search once shipped as a blank square.
+ */
+const RUN_METRIC_LADDER = [
+  { key: "elev",    icon: "trendUp", u: "m",   k: "Elevation gain", short: "ELEV",     share: true,
+    get: (run) => (run.elevGain > 0 ? Math.round(run.elevGain) : null) },
+  { key: "avgHr",   icon: "heart",   u: "bpm", k: "Avg HR",         short: "AVG HR",   share: true,
+    get: (run) => (run.avgHr ? Math.round(run.avgHr) : null) },
+  { key: "cadence", icon: "rEasy",   u: "spm", k: "Cadence",        short: "CADENCE",  share: true,
+    get: (run) => (run.cadence ? Math.round(run.cadence) : null) },
+  { key: "kcal",    icon: "flame",   u: "",    k: "Calories",       short: "CALORIES", share: true,
+    get: (run) => (run.kcal ? Math.round(run.kcal) : null) },
+  { key: "maxHr",   icon: "heart",   u: "bpm", k: "Max HR",         short: "MAX HR",   share: true,
+    get: (run) => (run.maxHr ? Math.round(run.maxHr) : null) },
+  { key: "rpe",     icon: "gauge",   u: "",    k: "RPE",            short: "RPE",      share: false,
+    get: (run) => (run.rpe ? run.rpe + "/10" : null) },
+];
+/** The ladder resolved against one run: only the rungs that have a value, in order. */
+function runMetricLadder(run, forShare) {
+  const out = [];
+  for (const m of RUN_METRIC_LADDER) {
+    if (forShare && !m.share) continue;
+    const v = m.get(run || {});
+    if (v == null || v === "") continue;
+    out.push({ key: m.key, icon: m.icon, v: String(v), u: m.u, k: m.k, short: m.short });
+  }
+  return out;
+}
 function rdMetricsHtml(run, a) {
-  // ⚠️ THREE PRIMARY, THEN UP TO SIX SECONDARY, AND A MISSING VALUE IS OMITTED RATHER THAN ZEROED.
-  // A confident "0 m" reads as a measurement; an absent tile reads as an absence, which is the truth.
-  const sec = [];
-  const push = (icon, v, u, k) => sec.push('<div class="rd-s2"><div class="rd-s2v">' + icon +
-    '<b class="num">' + v + '</b>' + (u ? '<span class="rd-u">' + u + '</span>' : "") + '</div>' +
-    '<div class="rd-s2k">' + k + '</div></div>');
-  if (run.elevGain > 0) push(ICON.trendUp, Math.round(run.elevGain), "m", "Elevation gain");
-  if (run.avgHr) push(ICON.heart, Math.round(run.avgHr), "bpm", "Avg HR");
-  if (run.cadence) push(ICON.rEasy, Math.round(run.cadence), "spm", "Cadence");
-  if (run.kcal) push(ICON.flame, Math.round(run.kcal), "", "Calories");
-  if (run.maxHr) push(ICON.heart, Math.round(run.maxHr), "bpm", "Max HR");
-  if (run.rpe) push(ICON.gauge, run.rpe + "/10", "", "RPE");
+  // ⚠️ THREE PRIMARY, THEN UP TO SIX SECONDARY, FROM THE SHARED LADDER — see RUN_METRIC_LADDER.
+  const sec = runMetricLadder(run, false).map((m) =>
+    '<div class="rd-s2"><div class="rd-s2v">' + (ICON[m.icon] || "") +
+    '<b class="num">' + m.v + '</b>' + (m.u ? '<span class="rd-u">' + m.u + '</span>' : "") + '</div>' +
+    '<div class="rd-s2k">' + m.k + '</div></div>');
   return '<div class="rd-metrics">' +
     '<div class="rd-s1row">' +
       '<div class="rd-s1"><div class="rd-s1v num">' + esc(String(run.dist || "").replace(" km", "")) + '<span class="rd-u">km</span></div><div class="rd-s1k">Distance</div></div>' +
@@ -16692,6 +17024,9 @@ function openRunStory(run) {
   let ov = $("storyOv");
   if (!ov) {
     ov = el('<div class="story-ov" id="storyOv" role="dialog" aria-modal="true" aria-label="Run recap"></div>');
+    // ⚠️ ONE LISTENER, ON THE NODE THAT OUTLIVES EVERY OPEN. The panels are replaced on every beat, so
+    // a handler attached to a panel is a handler that lasts one swipe.
+    ov.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); closeRunStory(); } });
     document.body.appendChild(ov);
   }
   ov.innerHTML = storyShellHtml();
@@ -16702,6 +17037,12 @@ function openRunStory(run) {
   ov.classList.add("on");
   wireStory();
   storyShow(0);
+  // ⚠️ THE SAME THREE PARTS THE STUDIO NEEDS, from the same helper — focus in, focus back, everything
+  // else inert. This overlay has claimed aria-modal="true" since it was built and kept none of them:
+  // measured, activeElement stayed BODY, Escape did nothing, and .app kept 24 reachable controls behind
+  // a dialog assistive tech had been told to treat as the whole screen. Close is the one control on
+  // every panel, so it is where focus lands; the tap zones are next in order after it.
+  overlayModal(ov, true, "#storyX");
 }
 function storyShellHtml() {
   const bars = [];
@@ -17947,6 +18288,9 @@ function closeRunStory() {
   STORY.headTok++;   // any running head-dot loop belongs to a story that is gone
   const ov = $("storyOv");
   if (ov) {
+    // ⚠️ BEFORE THE MARKUP GOES. Restoring focus after innerHTML is cleared would be restoring it from
+    // a node that is no longer connected, which lands the runner on BODY.
+    overlayModal(ov, false, "");
     ov.classList.remove("on", "st-last");
     ov.style.removeProperty("--story-tapstop");
     ov.innerHTML = "";
@@ -18003,24 +18347,284 @@ function stretchOfferHtml() {
     '<span class="str-offer-go">' + ICON.chevDown + '</span></button>';
 }
 // ---- Shareable branded run card -------------------------------------------
+/**
+ * THE FINISH SCREEN'S RUN, IN ONE PLACE.
+ *
+ * ⚠️ liveRunRecord IS THE ONLY BUILDER OF A PHONE RUN'S RECORD AND THIS IS THE ONLY WAY TO ASK FOR
+ * IT. viewLiveComplete resolved this correctly and currentOverviewRun hand-built a NINE-FIELD object
+ * of its own — so the debrief on the finish screen read the full record while the share card two
+ * inches above it read a stub with no pband, no dateIso and no place. Measured on one saved run at
+ * one instant: the debrief said "Steady and controlled, 6 of 6 on target" and the card said "LOGGED"
+ * with no target lane, no date and a caption that dropped the count. Exactly the two-builders,
+ * two-answers fault this screen's own comment records fixing in 2026-08-02, arrived at from the
+ * other end — the stub was harmless while the card printed fixed praise keyed on session type, and
+ * became a contradiction the moment the card started reading runAnalysis.
+ */
+function liveCompleteRun(sm) {
+  if (!sm) return null;
+  return (sm.saved && sm.runId && state.logged.filter((r) => r.id === sm.runId)[0]) || liveRunRecord(sm);
+}
 // The run whose overview is on screen right now (completion screen or Activities detail).
 function currentOverviewRun() {
   if (state.screen === "runview") return viewedRun();
-  if (LIVE && LIVE.summary) { const sm = LIVE.summary; return { t: LIVE.session.title, d: runDateLabel(), dist: sm.distKm + " km", time: sm.time, pace: (sm.pace || "—") + " /km", route: sm.route, splits: sm.splits, elevGain: sm.elevGain || 0, type: sm.type }; }
+  if (LIVE && LIVE.summary) return liveCompleteRun(LIVE.summary);
   return null;
 }
 const FF = "-apple-system, system-ui, Roboto, Arial, sans-serif";
-const TEAL = "#38ffbe", TEALW = "#16b7a4";
-const SHARE_INSIGHT = {
-  easy: "Easy effort. Aerobic fitness building exactly as planned.",
-  recovery: "Gentle shakeout done. Recovery is where you adapt and grow.",
-  long: "Time on feet banked. Endurance and durability are growing.",
-  steady: "Strong steady effort. Aerobic power building nicely.",
-  threshold: "Threshold work done. Your sustainable pace is climbing.",
-  vo2: "Hard intervals in the bag. Top-end fitness is sharpening.",
-  "race-specific": "Race-pace rehearsed. You're sharpening for the day.",
-  strides: "Easy miles plus fast strides — economy and pop building.",
+/**
+ * THE SHARE CARD'S PALETTE — THE APP'S OWN DARK TOKENS, AS LITERALS, ON PURPOSE.
+ *
+ * ⚠️ A CANVAS CANNOT USE var() IN fillStyle, AND THE FAILURE IS SILENT. Measured in current Chrome:
+ * getComputedStyle().getPropertyValue("--accent") does return "#32c8b2", but assigning
+ * fillStyle = "var(--accent)" is IGNORED — the previous colour stays, with no error and no throw. So
+ * the card commits to literals, exactly as MAP_STYLE_SHARE already commits to a dark style, and
+ * test/share-render.test.ts pins each literal against the [data-theme="dark"] block so the two cannot
+ * drift. An earlier version of this comment claimed such a test existed when it never had.
+ *
+ * ⚠️ DARK IN BOTH THEMES, DELIBERATELY. Resolving the LIVE theme would export a light card for a
+ * runner whose phone is in light mode, and every reference the card is built to is deep ink.
+ *
+ * ⚠️ THE ACCENT IS --accent, NOT THE NEON THIS CARD USED TO CARRY. The four reference cards were
+ * sampled and their accent measures #3bc8b2 / #36c2a8: CIE-Lab dE 1.2 and 3.3 from --accent dark
+ * #32c8b2, and dE 31.3 from the near-fluorescent mint the card shipped with — a different colour,
+ * not a shade of the same one. (That literal is deliberately not written out here: the guard sweeps the
+ * whole build for it, and this is the seventh time a comment quoting a forbidden string has failed its
+ * own test. The remedy this project has settled on is to reword the comment.) The pill fill in the first reference measures #32b7a2 and the progression bars
+ * #37c4a9, both of which are --accent within a rounding error.
+ *
+ * ⚠️ THE FAINT TIER IS --ink-faint AND NOT --eff-none. #6f7d76 on this ground computes at 4.45:1 —
+ * just under AA — where --ink-faint #8a9a92 is 6.50:1. Both look like "muted sage grey"; only one of
+ * them is readable, and the card is the one surface that leaves the phone.
+ *
+ * ⚠️ AND NO ALPHA IS EVER APPLIED TO TYPE. Hierarchy comes from size and weight, never from
+ * lightness, because a dimmed glyph is the first thing to fail when the card is a thumbnail in a feed.
+ */
+const SHARE_INK = {
+  ground: "#06110e",        // --bg dark
+  ink: "#ffffff",           // the references' primary text measures literally #ffffff
+  inkSoft: "#aab8b2",       // --ink-soft dark, 9.33:1 on the ground
+  inkFaint: "#8a9a92",      // --ink-faint dark, 6.50:1 on the ground
+  accent: "#32c8b2",        // --accent dark
+  accentInk: "#06231f",     // --accent-ink dark, 7.92:1 on the accent
+  brass: "#d6ae67",         // --brass DARK, in both themes: the light value is 3.47:1 here
+  fast: "#e6ac3e",          // --eff-moderate dark
+  slow: "#e56f49",          // --eff-hard dark
+  unjudged: "#8a9a92",      // see the faint-tier note: never --eff-none as type
+  // ⚠️ .28, WHICH IS THE MEAN OF ALL FOUR REFERENCES' OWN DIVIDERS RATHER THAN ONE OF THEM. Backing the
+  // alpha out of each measured line and the ground beside it: 01 → 0.385, 02 → 0.297, 03 → 0.191,
+  // 04 → 0.20, mean 0.27 — and the two PHOTO cards are the two high ones, which is the same conclusion
+  // arrived at from the other end. At the .14 this shipped with the line came out under every one of the
+  // eight dividers those four cards draw. A first pass at .20 was measured too and was still under on a
+  // saturated ground (1.39:1 on blue), because a white line lifts an already-saturated channel less.
+  hair: "rgba(255,255,255,.28)",
+  track: "rgba(255,255,255,.09)",
+  // The route's keyline: a deep ink rather than pure black, so it reads as an edge on the poster
+  // ground as well as doing the real work on a bright photograph.
+  keyline: "rgba(2,10,8,.82)",
+  // The verdict's own colour. null = no colour at all; "Logged" is the ABSENCE of a verdict.
+  state: { achieved: "#32c8b2", partial: "#e6ac3e", caution: "#e56f49", insufficientData: null },
 };
+/**
+ * THE TYPE LADDER, MEASURED OFF THE FOUR REFERENCES RATHER THAN CHOSEN.
+ *
+ * Every rung carries the reference it came from. Cap heights were read from the rendered PNGs
+ * (941x1672) and divided by 0.714, SF Pro's cap-height ratio, then scaled by 1080/941.
+ *
+ * ⚠️ THESE ARE EXPORT-GEOMETRY SIZES AND THE APP'S --t-* LADDER CANNOT REACH THEM. That is the spec's
+ * own position ("exported-card typography follows fixed, tested output geometry") and it means the
+ * type ratchet in test/design-system.test.ts is structurally blind to them — a canvas font is not CSS.
+ * test/share-render.test.ts counts them instead, so a fifteenth rung cannot arrive unnoticed.
+ *
+ * ⚠️ A TEMPLATE PICKS RUNGS; IT DOES NOT INVENT SIZES. The references disagree about which rung the
+ * distance hero takes (248 with no title above it, 124 with one) and agree about the rungs themselves.
+ */
+const SHARE_TYPE = {
+  mega: 248,      // the moment, distance hero (measured 257)
+  display: 124,   // the execution, verdict (125); the route poster, distance hero (125)
+  title: 104,     // the route poster, session title (106)
+  headline: 96,   // the progression, headline (96)
+  value: 84,      // metric values: 85 / 82 / 80 across three references
+  bigUnit: 50,    // the route poster, KM beside the hero (50)
+  row: 36,        // the progression, a split ladder row (37)
+  lead: 34,       // the evidence / interpretation sentence (36 / 35 / 30)
+  eyebrow: 33,    // activity + location (33 / 34 / 32)
+  sub: 30,        // section labels: SPLITS (30); metric units (30)
+  pill: 27,       // the verdict badge's own text
+  label: 25,      // metric labels, chart axis labels (25.8)
+  meta: 24,       // date, target line, poster meta (24)
+  foot: 19,       // BUILT WITH INTE-RUN (18)
+};
+/**
+ * ⚠️ THE FEED IS A REFLOW, AND ONLY THE BIG RUNGS MOVE. A 4:5 canvas is 570px shorter with the same
+ * content, so the headline scale tightens — but shrinking a 24px label at export size buys 4px of
+ * height and costs legibility at the one moment the card is read as a thumbnail. Rungs at or below
+ * SHARE_TYPE.row are identical in both aspects, deliberately.
+ */
+const SHARE_TYPE_FEED = { mega: 0.78, display: 0.80, title: 0.82, headline: 0.82, value: 0.88, bigUnit: 0.88 };
+function shareTypeSize(role, aspect) {
+  const base = SHARE_TYPE[role];
+  if (!base) return 0;
+  const k = aspect === "feed" ? (SHARE_TYPE_FEED[role] || 1) : 1;
+  return Math.round(base * k);
+}
+/** Tracking, in px, for the letter-spaced rungs. The references letter-space every uppercase run. */
+const SHARE_TRACK = { eyebrow: 3.4, label: 2.6, meta: 3.0, pill: 2.4, foot: 2.2, sub: 2.6 };
+function shareFont(weight, size) { return weight + " " + Math.round(size) + "px " + FF; }
+/** #rrggbb at an alpha, for a pill's fill and border. Canvas has no colour arithmetic. */
+function cardAlpha(hex, a) {
+  const h = String(hex).replace("#", "");
+  return "rgba(" + parseInt(h.slice(0, 2), 16) + "," + parseInt(h.slice(2, 4), 16) + "," +
+    parseInt(h.slice(4, 6), 16) + "," + a + ")";
+}
+/** What lsText WOULD measure, without drawing it. The pill has to be sized before it is filled. */
+function cardLsWidth(g, text, sp) {
+  let t = 0;
+  for (const ch of String(text)) t += g.measureText(ch).width + sp;
+  return Math.max(0, t - sp);
+}
+/**
+ * DIGIT COLUMNS THAT DO NOT JITTER — IMPOSED BY HAND, BECAUSE THE FONT CANNOT BE ASKED.
+ *
+ * ⚠️ THIS IS NOT font-variant-numeric AND MUST NOT BE DESCRIBED AS TABULAR FIGURES. ctx.font takes
+ * the CSS font shorthand, which has no font-variant-numeric slot, and Chrome exposes no separate
+ * property for it — measured: "fontVariantNumeric" is not a property of CanvasRenderingContext2D at
+ * all. So the app's on-screen .num class cannot reach the export.
+ *
+ * ⚠️ AND IT IS VISIBLE, NOT COSMETIC. Measured at 800 84px on this stack, a "1" is 41.34px wide and
+ * an "8" is 55.90px — 14.56px, a third of a digit. A three-column metric row therefore shifts
+ * sideways depending on which run is being shared, and "31:04" and "11:11" do not occupy the same
+ * width. What this does is give every digit the widest digit's advance and centre it in that slot,
+ * which is what a tabular face does; non-digits keep their natural advance.
+ */
+function shareFigAdvance(g) {
+  let w = 0;
+  for (let d = 0; d <= 9; d++) w = Math.max(w, g.measureText(String(d)).width);
+  return w;
+}
+function shareFigWidth(g, text) {
+  const adv = shareFigAdvance(g);
+  let t = 0;
+  for (const ch of String(text)) t += /[0-9]/.test(ch) ? adv : g.measureText(ch).width;
+  return t;
+}
+function shareFig(g, text, x, y, align) {
+  const adv = shareFigAdvance(g), total = shareFigWidth(g, text);
+  let cx = align === "center" ? x - total / 2 : align === "right" ? x - total : x;
+  const prev = g.textAlign; g.textAlign = "left";
+  for (const ch of String(text)) {
+    if (/[0-9]/.test(ch)) {
+      g.fillText(ch, cx + (adv - g.measureText(ch).width) / 2, y);
+      cx += adv;
+    } else { g.fillText(ch, cx, y); cx += g.measureText(ch).width; }
+  }
+  g.textAlign = prev;
+  return total;
+}
+/**
+ * ANY STRING, AT THE LARGEST RUNG THAT FITS A MEASURED BOX — WRAPPING BEFORE IT OVERFLOWS.
+ *
+ * It replaced a title-only version and keeps its behaviour exactly: try one line all the way down to
+ * the floor first, and only then wrap. That order matters and was measured — wrapping as soon as the
+ * top size overflows moved 25 of a real plan's 142 session titles onto two lines that had always
+ * fitted on one.
+ *
+ * @param opt { max, min, step, weight, lines, lh }
+ * ⚠️ IT IS A TOTAL FUNCTION. An unbreakable string at the floor is ellipsised to the box rather than
+ * drawn past it, because the alternative is a word cut in half by the canvas edge — and now that there
+ * is no frame to clip it, past the edge means gone.
+ */
+function shareFit(g, text, boxW, opt) {
+  opt = opt || {};
+  const max = opt.max || SHARE_TYPE.title, min = opt.min || Math.round(max * 0.5);
+  const step = opt.step || 2, weight = opt.weight || 800, maxLines = opt.lines || 2;
+  const lhK = opt.lh || 1.06;
+  const s0 = String(text == null ? "" : text);
+  for (let s = max; s >= min; s -= step) {
+    g.font = shareFont(weight, s);
+    if (g.measureText(s0).width <= boxW) return { size: s, lines: [s0], lh: Math.round(s * lhK) };
+  }
+  if (maxLines > 1) {
+    const words = s0.split(" ");
+    for (let s = max; s >= min; s -= step) {
+      g.font = shareFont(weight, s);
+      const lines = []; let line = "";
+      for (const w of words) {
+        const t = line ? line + " " + w : w;
+        if (g.measureText(t).width > boxW && line) { lines.push(line); line = w; } else line = t;
+      }
+      if (line) lines.push(line);
+      if (lines.length <= maxLines && lines.every((l) => g.measureText(l).width <= boxW))
+        return { size: s, lines: lines, lh: Math.round(s * lhK) };
+    }
+  }
+  g.font = shareFont(weight, min);
+  let t = s0;
+  while (t.length > 1 && g.measureText(t + "\\u2026").width > boxW) t = t.slice(0, -1);
+  return { size: min, lines: [t + "\\u2026"], lh: Math.round(min * lhK) };
+}
+/**
+ * THE CARD'S GEOMETRY, DERIVED FROM WHERE THE CONTENT MUST END.
+ *
+ * ⚠️ BOT IS THE PLATFORM'S OWN UI ZONE, NOT A MARGIN WE CHOSE. A 9:16 story puts a reply bar under
+ * the card, so 285px at the BOTTOM is reserved; a 4:5 feed post carries no overlay and needs only a
+ * margin. CB is the content bottom, and anything drawn below it is cropped clean off in a story —
+ * which is where the headline numbers sat before this.
+ *
+ * ⚠️ TOP IS NOT THE SAME RESERVE AND IS DELIBERATELY SMALLER THAN 285. A story's own profile row sits
+ * over the top of the card, and a photograph bleeding under it is what a full-bleed photo card is
+ * for — but a ROUTE drawn up there would be half covered, so the photo-less route box starts at TOP.
+ * An earlier comment here claimed 285 was reserved "at each end"; measured, the first ink on a
+ * photo-less story card was at y=241, inside a reserve that did not exist.
+ *
+ * ⚠️ THERE IS NO FRAME ANY MORE, AND FB WENT WITH IT. The card used to clip everything to a 24px
+ * inset rounded rect and then stroke a 2.5px teal border with a 14px glow around it, closing 48px
+ * under the content — so on a story the exported picture was a rounded neon-piped panel with a 237px
+ * dark band beneath it (measured from the real export: last ink y1684, frame bottom y1683). That is
+ * the "bordered card floating inside the exported card" the brief forbids outright, and the constants
+ * that positioned it (FB here, FH in drawShareCard) are gone rather than set to zero.
+ *
+ * ⚠️ SAFE IS THE PLATFORM'S REGION, AND IT IS NOT THE SAME THING AS THE MARGIN. The brief asks for
+ * critical content inside x 64-1016, y 120-1680 on a story; below that line is the QUIET band, where
+ * a date or a footer may sit and a number may not. On a feed post there is no overlay, so the quiet
+ * band is just a margin. Carried on the geometry so a template cannot re-derive it differently.
+ *
+ * ⚠️ LT IS CB MINUS THE LEDGER'S OWN HEIGHT, NEVER A FRACTION OF H. Measured with LT = H / 2: at 4:5
+ * the verdict pill and the brand mark land on the photograph (four and nine distinct contrast values
+ * across the fixtures instead of one apiece), and at 1:1 the wordmark falls to 1.04:1 — invisible.
+ * The ledger's content is a fixed height; a fraction shrinks with H and the content does not.
+ *
+ * ⚠️ 1:1 IS NOT OFFERED. Measured, it leaves the photograph 32.3% of the card, which is not a photo
+ * card. Two aspects is also the thing a restyle cannot buy: the card is never cropped through a
+ * number in either destination.
+ */
+const CARD_W = 1080, CARD_M = 64;
+/**
+ * ⚠️ THE GEOMETRY NO LONGER DEPENDS ON THE CONTENT AT ALL, AND THAT IS WHAT REPLACED THE LEDGER. It
+ * used to take a lane kind and a measured title and answer LT — the top of a fixed-height block whose
+ * height changed with what was in it — so four callers each had to derive the same thing the same way
+ * or frame the photograph against a region it was not drawn into. Every template now builds its own
+ * stack bottom-up from safe.y1 and hands its own blockTop to the veil, so there is nothing left to
+ * agree about: the canvas is the canvas, and cardLayout, cardLaneKind, cardLedgerH, CARD_LEDGER,
+ * CARD_CHART_H, CARD_LANE_H, the tx title-growth mechanism and the single measuring context all went
+ * with it.
+ */
+function cardGeom(aspect) {
+  const feed = aspect === "feed";
+  const H = feed ? 1350 : 1920, BOT = feed ? 72 : 285, CB = H - BOT;
+  return { W: CARD_W, H: H, BOT: BOT, CB: CB, TOP: feed ? 96 : 285,
+    M: CARD_M, CW: CARD_W - 2 * CARD_M,
+    aspect: feed ? "feed" : "story",
+    // The brief's own numbers for a story; a feed post carries no platform overlay, so the top and
+    // bottom reserves collapse to the same margin the sides use.
+    safe: { x0: CARD_M, x1: CARD_W - CARD_M, y0: feed ? CARD_M : 120, y1: feed ? H - CARD_M : 1680 },
+  };
+}
+/**
+ * THE CANVAS'S OWN SIZE — the one thing everything asks for, model or no model.
+ * ⚠️ ONE PLACE DECIDES 1920 VERSUS 1350. cardGeom is where a 1:1 option would go, and this is the name
+ * the rest of the file uses; they must never answer differently, so this defers rather than repeating.
+ */
+function shareCanvasGeom(aspect) { return cardGeom(aspect); }
 function rr(g, x, y, w, h, r) {
   if (g.roundRect) { g.beginPath(); g.roundRect(x, y, w, h, r); return; }
   g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
@@ -18033,90 +18637,57 @@ function lsText(g, text, x, y, sp, align) {
   for (const ch of text) { g.fillText(ch, cx, y); cx += g.measureText(ch).width + sp; }
   g.textAlign = prev; return total;
 }
-function wrapLines(g, text, maxW) {
-  const words = text.split(" "), lines = []; let line = "";
-  for (const w of words) { const t = line ? line + " " + w : w; if (g.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; }
-  if (line) lines.push(line); return lines;
+/**
+ * THE WORDMARK, WHICH IS THE APP'S OWN AND IS NOT AN IMAGE.
+ *
+ * ⚠️ THE INTE-RUN WORDMARK HAS NEVER BEEN AN ASSET. It is system-font text split into two coloured
+ * runs — "Inte-" in the ink and "Run" in the accent — which is what the app's own header draws and
+ * what all four references show at the top left. Drawing it here from the same two colours IS using
+ * the real wordmark; there is no file to load and nothing to trace off a PNG.
+ *
+ * ⚠️ THE HAND-DRAWN CANVAS BADGE IS GONE. drawBrandBadge re-drew the brand mark in canvas paths with a
+ * gradient, a drop glow and a gloss highlight that the canonical vector does not have — a second
+ * definition of the logo, in the one place it is most public, and it had already drifted. None of the
+ * four references puts a badge on the card at all. If a template ever wants the mark, the route is
+ * shareMarkImage(), which rasterises the real BRAND_SVG.
+ */
+function shareWordmark(g, x, y, size, align) {
+  g.font = shareFont(800, size);
+  const w1 = g.measureText("Inte-").width, w2 = g.measureText("Run").width;
+  const left = align === "right" ? x - (w1 + w2) : align === "center" ? x - (w1 + w2) / 2 : x;
+  g.fillStyle = SHARE_INK.ink; g.fillText("Inte-", left, y);
+  g.fillStyle = SHARE_INK.accent; g.fillText("Run", left + w1, y);
+  return w1 + w2;
 }
-function drawBrandBadge(g, x, y, size) {
-  g.save(); g.translate(x, y); g.scale(size / 120, size / 120);
-  g.save(); rr(g, 8, 8, 104, 104, 30); g.shadowColor = "rgba(22,183,164,.55)"; g.shadowBlur = 26; g.shadowOffsetY = 8;
-  const grad = g.createLinearGradient(8, 8, 112, 112); grad.addColorStop(0, "#1cc7b2"); grad.addColorStop(1, "#0a6f64");
-  g.fillStyle = grad; g.fill(); g.restore();
-  const gloss = g.createLinearGradient(0, 8, 0, 70); gloss.addColorStop(0, "rgba(255,255,255,.22)"); gloss.addColorStop(1, "rgba(255,255,255,0)");
-  g.save(); rr(g, 8, 8, 104, 104, 30); g.clip(); g.fillStyle = gloss; g.fillRect(8, 8, 104, 62); g.restore();
-  g.fillStyle = "#fff"; g.beginPath(); g.arc(82, 37, 11, 0, 7); g.fill();
-  g.beginPath(); g.moveTo(35, 88); g.lineTo(57, 45); g.lineTo(71, 45); g.lineTo(49, 88); g.closePath(); g.fill();
-  g.globalAlpha = .62; g.beginPath(); g.moveTo(57, 88); g.lineTo(79, 45); g.lineTo(93, 45); g.lineTo(71, 88); g.closePath(); g.fill(); g.globalAlpha = 1;
-  g.restore();
+/** The measure-only twin, so a scrim can be sized before the glyphs are drawn. */
+function shareWordmarkWidth(g, size) {
+  g.font = shareFont(800, size);
+  return g.measureText("Inte-").width + g.measureText("Run").width;
 }
-// Neon glowing route in the reference style: soft glow + bright core gradient, target-ring markers.
-// proj (optional) maps a lat/lng to panel pixels so the line aligns with a real map underneath;
-// without it we fit the route to the panel with a simple equirectangular projection.
-function drawRouteGlow(g, route, x, y, w, h, proj) {
-  if (!route || route.length < 2) {
-    g.fillStyle = "rgba(200,255,240,.4)"; g.textAlign = "center"; g.font = "500 30px " + FF;
-    g.fillText("No route recorded for this run", x + w / 2, y + h / 2); g.textAlign = "left"; return;
+/**
+ * THE REAL VECTOR, RASTERISED ONCE, FOR ANYTHING THAT WANTS THE MARK RATHER THAN THE WORDMARK.
+ *
+ * ⚠️ IT RESOLVES ASYNCHRONOUSLY AND A CARD MUST NEVER WAIT FOR IT. Returns the decoded Image or null;
+ * the first call starts the decode and every later one gets the result. A card drawn before it lands
+ * simply has no mark, which is why no template may depend on it for anything load-bearing.
+ * ⚠️ AND IT MUST NOT TAINT THE CANVAS. Measured (scratchpad/share/work/mark.mjs): an SVG data URI with
+ * the xmlns present loads, draws, leaves canvas.toBlob working, and origin-clean is preserved — which
+ * is the property that matters, because a tainted canvas makes toBlob throw and the runner silently
+ * loses the photograph they just chose.
+ */
+let SHARE_MARK = null;
+function shareMarkImage() {
+  if (SHARE_MARK === null) {
+    SHARE_MARK = { img: null };
+    try {
+      const im = new Image();
+      im.onload = () => { SHARE_MARK.img = im; };
+      im.onerror = () => { PHOTODIAG.err = "brand mark failed to decode"; };
+      im.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(BRAND_SVG);
+    } catch (e) { PHOTODIAG.err = "brand mark: " + (e && e.message); }
   }
-  let P;
-  if (proj) { P = route.map(proj); }
-  else {
-    const lats = route.map((p) => p.lat), lngs = route.map((p) => p.lng);
-    const minLa = Math.min(...lats), maxLa = Math.max(...lats), minLo = Math.min(...lngs), maxLo = Math.max(...lngs);
-    const cxf = Math.cos((minLa + maxLa) / 2 * Math.PI / 180) || 1, pad = 96;
-    const spanLo = Math.max(1e-9, (maxLo - minLo) * cxf), spanLa = Math.max(1e-9, maxLa - minLa);
-    const scale = Math.min((w - 2 * pad) / spanLo, (h - 2 * pad) / spanLa);
-    const ox = x + (w - spanLo * scale) / 2, oy = y + (h - spanLa * scale) / 2;
-    P = route.map((p) => [ox + (p.lng - minLo) * cxf * scale, oy + (maxLa - p.lat) * scale]);
-  }
-  const grad = g.createLinearGradient(0, y, 0, y + h); grad.addColorStop(0, "#3dffb0"); grad.addColorStop(1, "#a7ffd8");
-  g.lineJoin = "round"; g.lineCap = "round";
-  const trace = () => { g.beginPath(); P.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); };
-  g.save(); g.shadowColor = "rgba(45,255,170,.9)"; g.shadowBlur = 36;
-  trace(); g.strokeStyle = grad; g.lineWidth = 11; g.stroke(); g.shadowBlur = 22; g.stroke(); g.restore();
-  trace(); g.strokeStyle = "#eafff5"; g.lineWidth = 4.5; g.stroke();
-  const s = P[0], e = P[P.length - 1];
-  g.strokeStyle = "rgba(56,255,190,.45)"; g.lineWidth = 3;
-  g.beginPath(); g.arc(s[0], s[1], 24, 0, 7); g.stroke();
-  g.globalAlpha = .5; g.beginPath(); g.arc(s[0], s[1], 38, 0, 7); g.stroke(); g.globalAlpha = 1;
-  g.save(); g.shadowColor = "rgba(45,255,170,.9)"; g.shadowBlur = 18; g.fillStyle = "#2effb0"; g.beginPath(); g.arc(s[0], s[1], 12, 0, 7); g.fill(); g.restore();
-  g.fillStyle = "#06181a"; g.beginPath(); g.arc(s[0], s[1], 5.5, 0, 7); g.fill();
-  g.save(); g.shadowColor = "rgba(45,255,170,.9)"; g.shadowBlur = 20; g.fillStyle = "#6bffca"; g.beginPath(); g.arc(e[0], e[1], 14, 0, 7); g.fill(); g.restore();
-  g.lineWidth = 5; g.strokeStyle = "#fff"; g.beginPath(); g.arc(e[0], e[1], 14, 0, 7); g.stroke();
-  const chip = (px, py, txt) => {
-    g.font = "700 22px " + FF; const tw = g.measureText(txt).width, cw = tw + 34, ch = 42;
-    let cxp = Math.max(x + 14, Math.min(px - cw / 2, x + w - cw - 14));
-    let cyp = Math.max(y + 14, Math.min(py, y + h - ch - 14));
-    rr(g, cxp, cyp, cw, ch, 11); g.fillStyle = "rgba(6,22,20,.82)"; g.fill(); g.lineWidth = 2; g.strokeStyle = "rgba(56,255,190,.55)"; g.stroke();
-    g.fillStyle = "#c9fff0"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(txt, cxp + cw / 2, cyp + ch / 2 + 1); g.textAlign = "left"; g.textBaseline = "alphabetic";
-  };
-  chip(s[0], s[1] - 66, "START"); chip(e[0], e[1] - 66, "FINISH");
+  return SHARE_MARK.img;
 }
-function drawStatIcon(g, kind, cx, cy) {
-  g.strokeStyle = TEAL; g.fillStyle = TEAL; g.lineWidth = 3; g.lineCap = "round"; g.lineJoin = "round";
-  if (kind === 0) { // distance / route
-    g.beginPath(); g.arc(cx - 9, cy - 7, 5, 0, 7); g.stroke();
-    g.beginPath(); g.moveTo(cx - 9, cy - 2); g.quadraticCurveTo(cx + 16, cy - 6, cx + 7, cy + 11); g.stroke();
-    g.beginPath(); g.arc(cx + 7, cy + 11, 3.5, 0, 7); g.fill();
-  } else if (kind === 1) { // clock
-    g.beginPath(); g.arc(cx, cy, 13, 0, 7); g.stroke();
-    g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx, cy - 8); g.moveTo(cx, cy); g.lineTo(cx + 6, cy + 3); g.stroke();
-  } else { // speedometer
-    g.beginPath(); g.arc(cx, cy + 4, 13, Math.PI * 1.12, Math.PI * 1.88); g.stroke();
-    g.beginPath(); g.moveTo(cx, cy + 4); g.lineTo(cx + 9, cy - 6); g.stroke();
-    g.beginPath(); g.arc(cx, cy + 4, 2.6, 0, 7); g.fill();
-  }
-}
-function drawInsightIcon(g, cx, cy, r) {
-  g.strokeStyle = TEAL; g.fillStyle = TEAL; g.lineWidth = 2.5;
-  g.beginPath(); g.arc(cx, cy, r, 0, 7); g.stroke();
-  const n = [[0, -r * 0.5], [-r * 0.42, r * 0.18], [r * 0.42, r * 0.18], [0, r * 0.02]];
-  g.beginPath();
-  g.moveTo(cx + n[1][0], cy + n[1][1]); g.lineTo(cx + n[3][0], cy + n[3][1]); g.lineTo(cx + n[0][0], cy + n[0][1]);
-  g.moveTo(cx + n[3][0], cy + n[3][1]); g.lineTo(cx + n[2][0], cy + n[2][1]); g.stroke();
-  n.forEach((p) => { g.beginPath(); g.arc(cx + p[0], cy + p[1], 3, 0, 7); g.fill(); });
-}
-// ---- Real map tiles (Web Mercator) for the share card ----------------------
 const MAP_TILE = 256, MAP_W = 984, MAP_H = 576;
 function mercX(lng, z) { return (lng + 180) / 360 * MAP_TILE * Math.pow(2, z); }
 function mercY(lat, z) { const s = Math.sin(lat * Math.PI / 180); return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * MAP_TILE * Math.pow(2, z); }
@@ -18187,14 +18758,12 @@ function mapboxToken() {
  * The attribution line, which is a LICENCE REQUIREMENT and not decoration — and it differs by
  * provider. Mapbox's terms require Mapbox and OpenStreetMap to be credited on the map; CARTO's require
  * OpenStreetMap and CARTO. Shipping the wrong one is a breach whichever way round it is, so it is
- * derived from the same provider decision that chose the tiles rather than typed twice.
- */
-function mapAttribution(styles) { return mapAttributionFor(mapProviderFor(styles)); }
-/**
- * ⚠️ CREDIT WHO ACTUALLY SERVED THE TILES, NOT WHO WE WOULD HAVE PREFERRED. Attribution is a licence
- * term and it differs by provider — Mapbox requires Mapbox + OpenStreetMap, CARTO requires
- * OpenStreetMap + CARTO. Since a refused Mapbox token falls back to CARTO, asking mapProviderFor at
- * render time names a provider that served nothing and omits the one that did.
+ * derived once, from the same provider decision that chose the tiles, rather than typed twice.
+ *
+ * ⚠️ CREDIT WHO ACTUALLY SERVED THE TILES, NOT WHO WE WOULD HAVE PREFERRED. Since a refused Mapbox
+ * token falls back to CARTO, asking mapProviderFor at render time names a provider that served nothing
+ * and omits the one that did — which is why the provider rides back on the result and the caller passes
+ * it in here. That is the whole reason this takes a provider and not a style.
  */
 function mapAttributionFor(prov) {
   return prov && prov.kind === "mapbox"
@@ -18424,123 +18993,3270 @@ function loadRouteMap(route, pw, ph, prov) {
     });
   });
 }
-function drawMapPanel(g, run, mx, my, mw, mh, mapData) {
-  rr(g, mx, my, mw, mh, 30); g.fillStyle = "#0a1714"; g.fill();
-  g.save(); rr(g, mx, my, mw, mh, 30); g.clip();
-  if (mapData) {
-    try { g.drawImage(mapData.image, mx, my, mw, mh); } catch (e) {}
-    g.fillStyle = "rgba(4,16,13,.4)"; g.fillRect(mx, my, mw, mh); // dim map for route contrast
-    drawRouteGlow(g, run.route, mx, my, mw, mh, (p) => { const q = mapData.proj(p); return [mx + q[0], my + q[1]]; });
-  } else {
-    g.strokeStyle = "rgba(120,160,150,.06)"; g.lineWidth = 2;
-    for (let i = 0; i < 9; i++) { const yy = my + (i + .5) * mh / 9; g.beginPath(); g.moveTo(mx, yy + Math.sin(i * 1.3) * 14); g.lineTo(mx + mw, yy + Math.cos(i) * 14); g.stroke(); }
-    for (let i = 0; i < 6; i++) { const xx = mx + (i + .5) * mw / 6; g.beginPath(); g.moveTo(xx, my); g.lineTo(xx + (i % 2 ? 26 : -26), my + mh); g.stroke(); }
-    drawRouteGlow(g, run.route, mx, my, mw, mh, null);
-  }
-  g.restore();
-  rr(g, mx, my, mw, mh, 30); g.lineWidth = 2; g.strokeStyle = "rgba(61,255,176,.5)"; g.stroke();
-  let corner = null;
-  if (run.elevGain && run.elevGain >= 1) corner = { k: "ELEVATION GAIN", v: "+" + run.elevGain + "m" };
-  else if (run.splits && run.splits.length) corner = { k: "FASTEST KM", v: fmtPace(Math.min.apply(null, run.splits.map((s) => s.sec))) };
-  if (corner) {
-    g.textAlign = "right"; g.fillStyle = "#eafff5"; g.font = "800 34px " + FF; g.fillText(corner.v, mx + mw - 34, my + mh - 56);
-    g.fillStyle = "rgba(190,215,205,.6)"; g.font = "600 19px " + FF; lsText(g, corner.k, mx + mw - 34, my + mh - 28, 1.5, "right"); g.textAlign = "left";
-  }
-  if (mapData) { g.textAlign = "left"; g.fillStyle = "rgba(200,220,210,.32)"; g.font = "500 15px " + FF; g.fillText(mapAttribution(MAP_STYLE_SHARE), mx + 22, my + mh - 20); }
+/* ---- THE SHARE CARD -----------------------------------------------------------------------------
+ * A photograph the runner chose, full bleed, with the run's facts over it and the session measured
+ * against the target it was set — the one thing a competitor structurally cannot print.
+ *
+ * ⚠️ THE LEGIBILITY USED TO BE STRUCTURAL AND IS NOW MEASURED, AND THAT REVERSAL IS THE BRIEF'S CALL,
+ * NOT AN OVERSIGHT. This renderer's own comment used to argue that no text should ever sit over bare
+ * photograph — the picture stopped short, an opaque ledger carried every glyph, and twelve text
+ * elements each returned exactly one contrast ratio over twelve hostile photographs, so there was
+ * nothing to get wrong on the thirteenth. It also required a 24px inset, a rounded clip and a neon
+ * border, which is the card-within-card the brief forbids. The brief overrules it outright ("sample or
+ * estimate background luminance behind text and apply a local scrim/keyline when contrast is
+ * inadequate"), so the invariant has to be re-established by measurement rather than by construction:
+ * see shareVeilPlan, and the eight-photograph table in the phase report.
+ *
+ * ⚠️ THE RENDERER CANNOT SEE THE RUN. It takes a MODEL from shareCardModel, whose route field is
+ * already the privacy-resolved one from runRoutePresentation. Before this the card drew run.route
+ * raw, so "hide start and finish" and "hide the map entirely" both produced a byte-identical card
+ * under a sheet sentence promising otherwise — a posted picture with the runner's front door on it.
+ * Taking the model rather than the run is what makes that unrepeatable rather than merely fixed.
+ *
+ * ⚠️ NO TILES. The route is geometry, so the canvas can never be CORS-tainted (toBlob would refuse,
+ * and the runner would silently lose the photograph they had just chosen) and a shared card costs no
+ * billed tiles at all. The price is the basemap, which is a real loss and the first thing somebody who
+ * liked the old card will notice.
+ */
+// ---- rectangles, which are how every collision question is asked ---------------------------------
+function shareRect(x, y, w, h) { return { x: x, y: y, w: w, h: h }; }
+function shareRectPad(r, p) { return shareRect(r.x - p, r.y - p, r.w + 2 * p, r.h + 2 * p); }
+/** The overlapping AREA, in px^2 — not a boolean, because a scorer needs to prefer the smaller sin. */
+function shareRectOverlap(a, b) {
+  if (!a || !b) return 0;
+  const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+  const h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+  return w > 0 && h > 0 ? w * h : 0;
 }
-// Draw the whole card; mapData (optional) puts the route over a real map instead of the grid.
-function buildShareCanvasCore(run, mapData) {
-  const W = 1080, H = 1556, c = document.createElement("canvas"); c.width = W; c.height = H;
+function shareRectInside(inner, outer) {
+  return inner.x >= outer.x && inner.y >= outer.y &&
+    inner.x + inner.w <= outer.x + outer.w && inner.y + inner.h <= outer.y + outer.h;
+}
+/**
+ * WHERE THE WHOLE SOURCE PHOTOGRAPH LANDS ON THE CANVAS — THE CROP TRANSFORM, AS DATA.
+ *
+ * ⚠️ THE BOX EXTENDS BEYOND THE CANVAS ON PURPOSE, AND THAT IS THE POINT OF RETURNING IT. Everything
+ * downstream — the subject exclusion, the luminance probe, a future undo — needs to map a point in the
+ * SOURCE image to a point on the card, and a clipped box cannot answer that. Nothing here clips.
+ *
+ * ⚠️ FRAMING IS A FRACTION, WHICH CLAMPS BY CONSTRUCTION. ox 0 shows the left edge, 1 the right, 0.5
+ * centres — and because dw is never smaller than W the photograph always covers the canvas, so no
+ * ground can show through however far the runner drags it.
+ */
+function sharePhotoBox(p, W, H) {
+  const k = Math.max(W / p.w, H / p.h) * (p.k || 1);
+  const dw = p.w * k, dh = p.h * k;
+  return { x: (W - dw) * (p.ox == null ? 0.5 : p.ox), y: (H - dh) * (p.oy == null ? 0.5 : p.oy),
+    w: dw, h: dh, k: k };
+}
+/** A point in source-normalised coordinates (0..1 of the original photograph) to canvas px. */
+function sharePhotoNorm(box, u, v) { return [box.x + u * box.w, box.y + v * box.h]; }
+/**
+ * THE PHOTOGRAPH, FULL BLEED, EDGE TO EDGE.
+ *
+ * ⚠️ THE WHOLE CANVAS, NOT A REGION OF IT. This used to be handed LT — the top of the ledger — and
+ * covered only the part of the card above it, which is what made the picture stop short and left the
+ * lower half a flat plate. Full bleed means the box is the canvas, and what happens over the lower part
+ * of the picture is a veil rather than an absence of picture.
+ *
+ * ⚠️ NO UNIFYING TINT. A flat rgba veil over the whole photograph was here for "cohesion" and it is
+ * exactly the arbitrary treatment the brief rejects: it flattens a good photograph to buy nothing,
+ * because the only place a tint is needed is under type, and there it is solved rather than assumed.
+ */
+function sharePhotoDraw(g, p, gm) {
+  const box = sharePhotoBox(p, gm.W, gm.H);
+  g.save(); g.beginPath(); g.rect(0, 0, gm.W, gm.H); g.clip();
+  try { g.drawImage(p.bitmap, box.x, box.y, box.w, box.h); } catch (e) {}
+  g.restore();
+  return box;
+}
+/**
+ * THE CONSERVATIVE PERSON, IN THE ABSENCE OF A DETECTOR.
+ *
+ * The owner's ruling (2026-08-18) is the spec's own fallback rather than Apple Vision: no native
+ * detector, so the whole feature ships over the air. The spec's words are "if detection fails, use
+ * conservative centre-person exclusion and never silently cover a face".
+ *
+ * ⚠️ TWO RECTANGLES, NOT ONE, BECAUSE THE BRIEF DRAWS THE LINE IN TWO PLACES. "Text, route and charts
+ * must never cover the athlete's face; avoid the torso where a viable alternative exists." A face is a
+ * HARD exclusion and a body is a PENALTY, so they cannot be the same rectangle with the same weight.
+ *
+ * ⚠️ THE FRACTIONS ARE OF THE SOURCE PHOTOGRAPH AND ARE MAPPED THROUGH THE CROP, which is what makes
+ * this worth having at all: pan the picture left and the exclusion travels with it, so a runner who
+ * has framed themselves off-centre is still protected. Read the other way round — a rectangle fixed to
+ * the CANVAS centre — it would guard empty sky the moment the photograph was moved.
+ *
+ * ⚠️ AND IT ASSUMES THE PERSON IS CENTRED IN THE ORIGINAL FRAME, which is the assumption a photograph
+ * of a runner satisfies and is stated here rather than hidden: it is the reason this is a floor on
+ * safety rather than a measurement of it.
+ */
+/**
+ * ⚠️ THE FACE BOX IS THE HEAD, NOT THE WHOLE UPPER HALF, AND THE FIRST CUT GOT THAT WRONG. Written as
+ * 0.26-0.74 wide by 0.00-0.42 tall it vetoed every candidate zone on an ordinary centred portrait —
+ * measured, all four — so the over-photo route was structurally unreachable and the placement system
+ * was dead code that looked alive. A head occupies about the middle 40% of a frame and the top third of
+ * it; the shoulders and torso below are the BODY box, which is a penalty rather than a veto. Widening
+ * the veto until nothing can pass is not caution, it is the feature not existing.
+ */
+/**
+ * ⚠️ AND THE FRACTIONS ARE READ OFF THE REFERENCE, NOT GUESSED. In 01-the-moment the runner occupies
+ * x 0.20 to 0.74 of the finished card and his head x 0.32 to 0.53 — so a torso box of the middle 0.48
+ * of the SOURCE (which a cover crop widens to about 0.64 of the canvas) matches a real photograph,
+ * while the head box stays deliberately wider than a real head because it is the one that may never be
+ * crossed. Written at 0.18-0.82 the torso box spanned 83% of the canvas and vetoed all four candidate
+ * zones on the very photograph the reference uses, which is a safety rule that has eaten the feature.
+ */
+const SHARE_SUBJECT = {
+  face: { u0: 0.30, u1: 0.70, v0: 0.00, v1: 0.30 },
+  body: { u0: 0.26, u1: 0.74, v0: 0.15, v1: 1.00 },
+  pad: 0.03,
+};
+/**
+ * ⚠️ AND A SUBSTANTIAL TORSO OVERLAP IS A VETO TOO, WHICH IS THE TWO SENTENCES OF THE BRIEF RECONCILED.
+ * "Avoid the torso where a viable alternative exists" makes it a preference; "never draw through the
+ * athlete" makes it a limit. So it costs score up to this fraction of the zone's area and refuses
+ * beyond it.
+ */
+const SHARE_ZONE_SOFT_VETO = 0.35;
+/** The narrowest column worth fitting a route into, and the widest worth taking, as fractions of W. */
+const SHARE_ZONE_MIN_W = 0.16, SHARE_ZONE_MAX_W = 0.46;
+function shareSubjectZones(box, gm) {
+  const one = (f) => {
+    const a = sharePhotoNorm(box, f.u0 - SHARE_SUBJECT.pad, f.v0 - SHARE_SUBJECT.pad);
+    const b = sharePhotoNorm(box, f.u1 + SHARE_SUBJECT.pad, f.v1 + SHARE_SUBJECT.pad);
+    // Clipped to the canvas: a zone that is half off the card cannot be collided with off it.
+    const x0 = Math.max(0, a[0]), y0 = Math.max(0, a[1]);
+    const x1 = Math.min(gm.W, b[0]), y1 = Math.min(gm.H, b[1]);
+    return shareRect(x0, y0, Math.max(0, x1 - x0), Math.max(0, y1 - y0));
+  };
+  return { face: one(SHARE_SUBJECT.face), body: one(SHARE_SUBJECT.body) };
+}
+/**
+ * WHERE AN OPTIONAL ROUTE MAY SIT OVER A PHOTOGRAPH — AND WHEN THE ANSWER IS NOWHERE.
+ *
+ * The brief names four candidates and asks for each to be scored against face/person rectangles, text
+ * bounds and edge padding, with the highest taken.
+ *
+ * ⚠️ RETURNING null IS A REAL ANSWER AND THE MOST IMPORTANT ONE. "If no safe photo zone exists, hide
+ * the over-photo route and expose the Route Poster template instead; never draw through the athlete."
+ * A scorer that always answers picks the least-bad place to cross somebody's face.
+ *
+ * ⚠️ THE FACE IS A VETO, NOT A DEDUCTION. Any overlap at all disqualifies a zone. Weighing it heavily
+ * instead would let a large clear area outvote a small crossing of somebody's face, which is exactly
+ * the trade the brief forbids being made.
+ */
+const SHARE_ROUTE_ZONES = ["upper-right", "upper-left", "middle-right", "middle-left"];
+/**
+ * ⚠️ A ZONE IS THE FREE COLUMN BESIDE THE OBSTACLES, NOT A FIXED SQUARE. The first version returned a
+ * square sized off the canvas and then asked whether anything was in the way, which is backwards: on a
+ * portrait photograph the clear space beside a runner is a TALL NARROW strip, and that is exactly what
+ * the reference card uses (measured on 01-the-moment: 219px wide by 545 tall at 1080, a 1:2.5 column,
+ * where a square of the same width would have been a quarter of the area). Deriving the column from the
+ * obstacles means a wide gap yields a wide zone and a narrow one yields a narrow zone, and the route
+ * itself is fitted inside whatever comes back with its own aspect preserved.
+ * ⚠️ RETURNS null WHEN THE COLUMN IS TOO NARROW TO BE A PICTURE, rather than a sliver nothing can be
+ * drawn in.
+ */
+function shareZoneRect(id, gm, top, bottom, hard) {
+  const M = gm.M, avail = bottom - top;
+  const right = /right$/.test(id);
+  const y = /^upper/.test(id) ? top : top + Math.round(avail * 0.24);
+  const h = Math.round(avail * (/^upper/.test(id) ? 0.46 : 0.52));
+  let x0 = M, x1 = gm.W - M;
+  for (const r of (hard || [])) {
+    // Only an obstacle that shares vertical space with the band can narrow it.
+    if (r.y + r.h <= y || r.y >= y + h) continue;
+    if (right) x0 = Math.max(x0, Math.min(x1, r.x + r.w));
+    else x1 = Math.min(x1, Math.max(x0, r.x));
+  }
+  if (right) x0 = Math.max(x0, x1 - Math.round(gm.W * SHARE_ZONE_MAX_W));
+  else x1 = Math.min(x1, x0 + Math.round(gm.W * SHARE_ZONE_MAX_W));
+  if (x1 - x0 < gm.W * SHARE_ZONE_MIN_W) return null;
+  return shareRect(x0, y, x1 - x0, h);
+}
+function shareZoneScore(rect, gm, hard, soft) {
+  if (!rect) return -1;
+  if (!shareRectInside(rect, shareRect(gm.M, gm.safe.y0, gm.W - 2 * gm.M, gm.safe.y1 - gm.safe.y0))) return -1;
+  for (const h of hard) if (shareRectOverlap(rect, h) > 0) return -1;
+  const area = Math.max(1, rect.w * rect.h);
+  let pen = 0;
+  for (const s of soft) pen += shareRectOverlap(rect, s) / area;
+  if (pen > SHARE_ZONE_SOFT_VETO) return -1;
+  return 1 - Math.min(1, pen);
+}
+/**
+ * @param opt { photoBox, textRects, top, bottom, prefer }
+ * ⚠️ THE TEXT BOUNDS ARE HARD TOO. A route through the distance hero is not a route, it is a mess, and
+ * the reference cards place it in the empty quarter precisely because that is where nothing else is.
+ */
+function shareRoutePlacement(gm, opt) {
+  opt = opt || {};
+  const top = opt.top == null ? gm.safe.y0 : opt.top;
+  const bottom = opt.bottom == null ? gm.safe.y1 : opt.bottom;
+  const sub = opt.photoBox ? shareSubjectZones(opt.photoBox, gm) : null;
+  const hard = (opt.textRects || []).slice();
+  if (sub) hard.push(sub.face);
+  const soft = sub ? [sub.body] : [];
+  let best = null;
+  for (const id of SHARE_ROUTE_ZONES) {
+    const rect = shareZoneRect(id, gm, top, bottom, hard);
+    const sc = shareZoneScore(rect, gm, hard, soft);
+    if (sc < 0) continue;
+    // ⚠️ TIES GO TO THE EARLIER CANDIDATE, so the order in SHARE_ROUTE_ZONES is the brief's stated
+    // preference and not an accident of iteration. Upper-right first, as every reference shows.
+    if (!best || sc > best.score + 1e-9) best = { id: id, rect: rect, score: sc };
+  }
+  return best;
+}
+// ---- luminance, and the minimum treatment that clears the bar ------------------------------------
+/**
+ * ⚠️⚠️ THE GROUND IS THREE CHANNELS, AND FLATTENING IT TO ONE UNDER-SCRIMS EVERY SATURATED PHOTOGRAPH.
+ *
+ * This whole section used to carry the ground as a single weighted-average BYTE and linearise it
+ * afterwards. Because linearisation is convex, the average of the encoded channels linearised after the
+ * fact is always at or below the average of the linearised channels — equal for a neutral, and lower for
+ * everything else. So the solver believed a coloured ground was DARKER than it is and applied less
+ * treatment than the target needed, one-directionally, for every photograph that is not grey.
+ *
+ * ⚠️ IT WAS NOT MARGINAL. Solved against a saturated red ground the old model asked for NO scrim at all,
+ * and the three type tiers then measured 4.00 / 1.94 / 1.91 against a 4.5 bar; magenta gave 3.51 / 1.71 /
+ * 1.68; pure green 8.14 / 3.96 / 3.89. A red brick wall, a red vest, a red barrier or a magenta sign
+ * behind a runner is an ordinary photograph. Rendered, The Progression over a flat red ground failed 20
+ * of its 22 text elements.
+ *
+ * ⚠️ AND NO EXISTING GUARD COULD SEE IT, because every one of them built its probe with
+ * new Uint8ClampedArray(...).fill(lum) — R=G=B, the exact family of values for which the old model is
+ * correct. The guards sweep a colour cube now. This project's documented guard-blind-to-the-new-input
+ * trap, firing again in the one place a scalar looked obviously sufficient.
+ *
+ * ⚠️ THE ASYMMETRY WAS THE TELL: shareRelLum linearised the FOREGROUND per channel and always got it
+ * right. Only the ground was flattened. One function does the arithmetic for both now.
+ */
+function shareLin255(v) {
+  const s = Math.max(0, Math.min(255, v)) / 255;
+  return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+}
+/**
+ * A 256-entry table of the same curve, for the per-pixel loop only.
+ * ⚠️ LAZY AND let, NOT A TOP-LEVEL const. A const initialiser that calls a share function is the
+ * declaration-order trap this file records paying for once already (SHARE_LADDER reading a constant
+ * written three hundred lines below it built a blank page with every check green).
+ */
+let SHARE_LIN_LUT = null;
+function shareLinLut() {
+  if (!SHARE_LIN_LUT) {
+    SHARE_LIN_LUT = new Float64Array(256);
+    for (let i = 0; i < 256; i++) SHARE_LIN_LUT[i] = shareLin255(i);
+  }
+  return SHARE_LIN_LUT;
+}
+/**
+ * ⚠️ THE CHANNEL WEIGHTS EXIST ONCE, AND THAT IS THE GUARD THAT KEEPS THIS FIXED. Written out a second
+ * time is exactly how the ground came to be averaged in the encoded space while the foreground was
+ * linearised properly — two copies of the same three numbers, doing two different things.
+ * test/share-render.test.ts counts the literals across the whole renderer and requires one each.
+ */
+const SHARE_LUMW = [0.2126, 0.7152, 0.0722];
+/** WCAG relative luminance of an [r,g,b] triple. */
+function shareRelLumRGB(c) {
+  return SHARE_LUMW[0] * shareLin255(c[0]) + SHARE_LUMW[1] * shareLin255(c[1]) +
+    SHARE_LUMW[2] * shareLin255(c[2]);
+}
+/** #rrggbb to an [r,g,b] byte triple. */
+function shareHexRGB(hex) {
+  const h = String(hex).replace("#", "");
+  return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+}
+/** WCAG relative luminance of an #rrggbb. */
+function shareRelLum(hex) { return shareRelLumRGB(shareHexRGB(hex)); }
+/** Relative luminance of a single grey byte. A grey genuinely IS [v,v,v]; nothing else is. */
+function shareLumOfByte(v) { return shareRelLumRGB([v, v, v]); }
+/** A ground as three channels. A bare number is accepted as the grey it actually is, and nothing more. */
+function shareGroundRGB(v) {
+  return Array.isArray(v) ? [v[0], v[1], v[2]] : [v, v, v];
+}
+function shareRatio(la, lb) {
+  const hi = Math.max(la, lb), lo = Math.min(la, lb);
+  return (hi + 0.05) / (lo + 0.05);
+}
+/**
+ * HOW BRIGHT THE GROUND UNDER A BLOCK IS — FROM A COMPOSITE, AT A FIXED SIZE, SO IT CANNOT DISAGREE
+ * WITH ITSELF.
+ *
+ * ⚠️ THE PROBE IS 1/10 SCALE AND THAT IS WHAT MAKES THE PREVIEW TRUTHFUL. The preview draws at S=0.5
+ * and the export at S=1, and a statistic taken off each of those canvases is not the same number — a
+ * half-scale draw has already averaged 2x2 blocks. Deciding the scrim from the canvas in front of you
+ * would mean the runner approving a picture and the file getting a different one. So the photograph is
+ * composited through the SAME sharePhotoBox transform into one cached 108x192 canvas and the statistic
+ * comes off that: identical for both, and cheap enough to re-run on every frame of a pinch.
+ *
+ * ⚠️ max, NOT A PERCENTILE, ON A 1/10 PROBE. Each probe pixel is already the mean of about a hundred
+ * export pixels, so its maximum behaves like a high percentile of the real thing rather than like a
+ * single specular highlight. Measured across the eight hostile photographs, probe-max tracked the real
+ * export's 97th percentile to within a few luma units, and using the probe's own p97 instead let two
+ * of the eight land under the target once verified at full size.
+ *
+ * ⚠️ AND IT CANNOT THROW A CARD AWAY. getImageData refuses on a canvas that has drawn a cross-origin
+ * image; a photograph the runner chose is same-origin so this should never fire, but if it ever does
+ * the answer is 255 — the brightest possible ground, which asks for the strongest treatment. Failing
+ * towards illegible text is not an option available here.
+ */
+let SHARE_LPROBE = null, SHARE_LPROBE_KEY = "";
+const SHARE_PROBE_W = 108;
+function shareLumaProbe(photo, gm) {
+  if (!photo || !photo.bitmap) return null;
+  const H = Math.round(SHARE_PROBE_W * gm.H / gm.W);
+  const key = [photo.id, photo.ox, photo.oy, photo.k, gm.W, gm.H].join(":");
+  if (SHARE_LPROBE_KEY === key && SHARE_LPROBE) return SHARE_LPROBE;
+  let data = null;
+  try {
+    const c = document.createElement("canvas");
+    c.width = SHARE_PROBE_W; c.height = H;
+    const q = c.getContext("2d");
+    q.fillStyle = SHARE_INK.ground; q.fillRect(0, 0, SHARE_PROBE_W, H);
+    const box = sharePhotoBox(photo, SHARE_PROBE_W, H);
+    q.drawImage(photo.bitmap, box.x, box.y, box.w, box.h);
+    data = q.getImageData(0, 0, SHARE_PROBE_W, H).data;
+  } catch (e) { PHOTODIAG.err = "luma probe: " + (e && e.message); }
+  SHARE_LPROBE_KEY = key;
+  SHARE_LPROBE = { w: SHARE_PROBE_W, h: H, data: data };
+  return SHARE_LPROBE;
+}
+/**
+ * THE BRIGHTEST GROUND THE PROBE SEES UNDER A CARD-SPACE RECT, AS AN [r,g,b]; WHITE WHEN IT CANNOT LOOK.
+ *
+ * ⚠️ BRIGHTEST BY TRUE RELATIVE LUMINANCE, AND IT RETURNS THAT PIXEL'S OWN COLOUR. Ranking by a
+ * weighted byte average and returning a byte is the defect described at the top of this section: the
+ * winner is picked on the wrong statistic AND arrives with its chroma thrown away, so the solver cannot
+ * recover it. Both halves matter — on a magenta ground the old sampler answered byte 73, which is a dark
+ * grey, for a colour whose real luminance is that of a mid grey.
+ *
+ * ⚠️ AND WHITE, NOT BLACK, IS THE ANSWER WHEN getImageData REFUSES. That is the brightest ground there
+ * is, so it asks for the strongest treatment; failing towards illegible text on a picture that has
+ * already left the phone is not an option available here.
+ */
+function shareGroundUnder(probe, gm, rect) {
+  if (!probe || !probe.data) return [255, 255, 255];
+  const sx = probe.w / gm.W, sy = probe.h / gm.H;
+  const x0 = Math.max(0, Math.floor(rect.x * sx)), x1 = Math.min(probe.w, Math.ceil((rect.x + rect.w) * sx));
+  const y0 = Math.max(0, Math.floor(rect.y * sy)), y1 = Math.min(probe.h, Math.ceil((rect.y + rect.h) * sy));
+  const lut = shareLinLut();
+  let best = -1, out = null;
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+    const i = (y * probe.w + x) * 4;
+    const l = SHARE_LUMW[0] * lut[probe.data[i]] + SHARE_LUMW[1] * lut[probe.data[i + 1]] +
+      SHARE_LUMW[2] * lut[probe.data[i + 2]];
+    if (l > best) { best = l; out = [probe.data[i], probe.data[i + 1], probe.data[i + 2]]; }
+  }
+  return out || [255, 255, 255];
+}
+/**
+ * THE SMALLEST VEIL ALPHA THAT CLEARS THE RATIO — SOLVED, NOT TUNED.
+ *
+ * Canvas composites source-over in the encoded space, channel by channel, so a veil of alpha a over a
+ * ground [r,g,b] gives a*ink_c + (1-a)*ground_c and its luminance is read off the RESULT. Walking a in
+ * 2% steps and stopping at the first that clears is exact enough for a value that is then verified from
+ * the rendered pixels, and it cannot oscillate the way a closed-form inverse does when the ink itself is
+ * not black.
+ *
+ * ⚠️ 2% STEPS ARE ALSO WHY THE PREVIEW AND THE EXPORT AGREE. The probe is shared, so the input is
+ * identical; quantising the output means a one-unit wobble in a future probe cannot move the picture.
+ *
+ * ⚠️ AND THE TARGET IS PER-COLOUR. White on a snow photograph needs 0.58 to reach 4.5:1 and the accent
+ * needs 0.78 for the same ratio, because the accent is a mid-tone. One alpha for both would either
+ * over-darken the picture or under-serve the teal.
+ *
+ * ⚠️ THE MEASURED COST OF DOING IT PROPERLY IS SMALL, WHICH IS WHY NO PANEL AND NO NEW CAP IS NEEDED.
+ * The hungriest colour over pure magenta solves 0.54 against the flattened model's 0.06; over pure white
+ * nothing moved at all, because white is a neutral. Every ground tested lands inside SHARE_SCRIM.max, so
+ * the photograph still shows through at every row of copy.
+ */
+function shareVeilAlphaFor(fgHex, ground, target) {
+  const fg = shareRelLum(fgHex), ic = shareHexRGB(SHARE_INK.ground), gc = shareGroundRGB(ground);
+  for (let a = 0; a <= 1.0001; a += 0.02) {
+    // ⚠️ PER CHANNEL, BECAUSE THAT IS WHAT CANVAS DOES. source-over composites each channel on its own
+    // and luminance is only recoverable afterwards; compositing a luma average instead is the defect
+    // documented at the top of this section.
+    const b = [a * ic[0] + (1 - a) * gc[0], a * ic[1] + (1 - a) * gc[1], a * ic[2] + (1 - a) * gc[2]];
+    if (shareRatio(fg, shareRelLumRGB(b)) >= target) return Math.min(1, Math.round(a * 50) / 50);
+  }
+  return 1;
+}
+/**
+ * THE ONE SCRIM — AND WHY EVERY PHOTO TEMPLATE NOW SHARES IT.
+ *
+ * ⚠️ THE OWNER AMENDED THE CONTRACT ON 2026-08-19, AND THE AMENDMENT OUTRANKS TWO LINES OF THE PACK.
+ * His words: the first card "shows the full picture of the person behind, where the others seem to cut
+ * the person off (I want the full picture to be in view....the data and text should always be just an
+ * overlay)". TEMPLATE_CONTRACTS asks The Execution's "lower section" and The Progression's "lower panel"
+ * to blend into deep ink, and measured off references 02 and 04 that is literally what they do: below
+ * the blend the ground is a FLAT luma 13-14 with a standard deviation of 0.5 — no photograph surviving
+ * at all — where reference 01 keeps 15-35 with a deviation of 3-7.6 the whole way down. So the two
+ * data-led templates were built to the pack and cut the runner in half at 52%/50%. They no longer do.
+ *
+ * ⚠️ THE CAP IS THE AMENDMENT MADE STRUCTURAL. No caller can ask for an opaque lower section any more,
+ * because the solved alpha is clamped below 1 in the ONE place it is solved — a rule enforced per
+ * template is a rule the fifth template forgets. There is no "opaque" kind left to pass.
+ *
+ * ⚠️ AND THE CAP COSTS NOTHING MEASURABLE. Solved against a pure-white photograph the hungriest colour
+ * on any of these cards needs 0.78, and the deepest end stop 0.90 — both inside the cap, so no card in
+ * the family is darker or lighter by one byte for its presence. It is a floor under the photograph, not
+ * a change to the picture.
+ *
+ * @param spec { blockTop, fade, colours:[{hex,target}] }
+ *
+ * ⚠️ THE ALPHA IS SOLVED AT THE TOP OF THE BLOCK, WHERE THE SCRIM IS WEAKEST, and the gradient only
+ * grows below it — so every row of copy sits on at least the ratio that was solved for. Solving at the
+ * middle or the mean would leave the first line, which is the largest and the most read, underserved.
+ *
+ * ⚠️ AND shareGroundUnder ANSWERS THE BRIGHTEST PIXEL IN THE WHOLE BLOCK, NOT THE MEAN, which is what
+ * makes one alpha safe for a split-luminance photograph. A mean would serve the dark half and abandon
+ * the bright one, and "bright bottom, dark top" is an ordinary sunset.
+ */
+const SHARE_VEIL_STEPS = ["none", "veil", "scrim", "deep"];
+/**
+ * ⚠️ THE FADE IS SIZED FROM WHERE THE CONTENT ACTUALLY STARTS, so one function serves four different
+ * layouts. A third of the block's own height: The Moment's block is 830px tall and earns 282, The
+ * Execution's 922px earns 313, a 4:5 reflow's shorter block earns less. Written as a constant it was
+ * 280 on one template and 320 on two others with nothing deciding which, and a fifth template would
+ * have had to pick one by eye.
+ */
+/**
+ * ⚠️ knee: THE SOLVED ALPHA ARRIVES 10px ABOVE THE FIRST LINE, NOT EXACTLY ON IT.
+ *
+ * The alpha is solved for the block and the gradient's middle stop used to sit exactly on the topmost
+ * glyph box — so the promise "every row of copy sits on at least the ratio solved for" was true at the
+ * very first pixel row and nowhere above it, with no margin at all. Measured on the eyebrow, which is the
+ * element that starts the block: at its exact cap-height box it read 4.52 against a 4.5 target, and with
+ * the 6px halo any pixel measurement needs in order to find ground between letterforms, 4.31. There is no
+ * glyph in that difference — but a knife-edge equality is not a legibility guarantee, and the probe is a
+ * tenth-scale average, so the real ground under a glyph can be a shade brighter than the number solved
+ * against. 10px is the 6px of halo plus 4px of margin; it costs ten rows of very slightly deeper scrim
+ * above the copy and nothing else.
+ */
+const SHARE_SCRIM = { fadeK: 0.34, fadeMin: 200, fadeMax: 360, max: 0.92, endK: 0.55, knee: 10 };
+function shareScrimFade(gm, blockTop) {
+  const block = Math.max(0, gm.H - blockTop);
+  return Math.round(Math.max(SHARE_SCRIM.fadeMin,
+    Math.min(SHARE_SCRIM.fadeMax, block * SHARE_SCRIM.fadeK)));
+}
+function shareVeilPlan(probe, gm, spec) {
+  const blockTop = spec.blockTop;
+  const fade = spec.fade == null ? shareScrimFade(gm, blockTop) : spec.fade;
+  const rect = shareRect(0, blockTop, gm.W, Math.max(1, gm.H - blockTop));
+  const ground = shareGroundUnder(probe, gm, rect);
+  let a = 0;
+  for (const c of spec.colours || []) a = Math.max(a, shareVeilAlphaFor(c.hex, ground, c.target));
+  a = Math.min(SHARE_SCRIM.max, a);
+  // The step is a NAME for how hard the treatment had to work, so a report can say "this photograph
+  // needed a deep scrim" rather than printing an alpha nobody can interpret.
+  const step = a <= 0.001 ? "none" : a <= 0.55 ? "veil" : a <= 0.82 ? "scrim" : "deep";
+  return { kind: a <= 0.001 ? "none" : "veil", step: step, a: a,
+    end: Math.min(SHARE_SCRIM.max, a + (1 - a) * SHARE_SCRIM.endK),
+    ground: ground, lum: shareRelLumRGB(ground), fadeTop: blockTop - fade, blockTop: blockTop };
+}
+/**
+ * ⚠️ THREE STOPS, MONOTONE, AND THE MIDDLE ONE IS THE CONTRACT. 0 where the fade begins, the solved
+ * alpha a little ABOVE the top of the copy, and more below it. A two-stop gradient from the fade to the
+ * canvas bottom puts only a fraction of the solved alpha under the first line.
+ *
+ * ⚠️ THE STOP SITS AT blockTop - SHARE_SCRIM.knee, SO THE FIRST LINE HAS MARGIN RATHER THAN EQUALITY.
+ * See the knee's own note: on the stop it read 4.52 against a 4.5 target at the glyph box and 4.31 with a
+ * measurement halo, which is a promise that happens to be true rather than one that is kept.
+ *
+ * ⚠️ A GRADIENT AND NOTHING ELSE. There used to be a second pass here — a flat rectangle of ground from
+ * the block's top to the canvas bottom whenever the alpha reached 1 — and that rectangle IS the panel
+ * the owner's amendment removes. It is gone rather than merely unreachable, because an unreachable
+ * branch is what the next template copies.
+ */
+function shareVeilDraw(g, gm, plan) {
+  if (!plan || plan.kind === "none") return;
+  const top = Math.max(0, plan.fadeTop);
+  const bt = plan.blockTop - SHARE_SCRIM.knee;
+  if (bt <= top) return;
+  const grad = g.createLinearGradient(0, top, 0, gm.H);
+  const at = (bt - top) / Math.max(1, gm.H - top);
+  grad.addColorStop(0, cardAlpha(SHARE_INK.ground, 0));
+  grad.addColorStop(Math.min(0.999, Math.max(0.001, at)), cardAlpha(SHARE_INK.ground, plan.a));
+  grad.addColorStop(1, cardAlpha(SHARE_INK.ground, plan.end));
+  g.fillStyle = grad; g.fillRect(0, top, gm.W, gm.H - top);
+}
+/**
+ * THE THREE TYPE TIERS EVERY PHOTO TEMPLATE'S BLOCK SETS, AND WHY THE LIST IS NOT ONE SHARED CONSTANT.
+ *
+ * ⚠️ A TEMPLATE SOLVES FOR THE COLOURS IT ACTUALLY DRAWS, AND THE DIFFERENCE IS TEN POINTS OF SOMEBODY'S
+ * PHOTOGRAPH. The faint tier needs alpha 0.88 on a white ground where the soft tier needs 0.78, so
+ * handing every template a list containing both darkens The Moment and The Progression by ten points to
+ * serve a colour neither of them sets. The Execution does set it — the target range at the right end of
+ * its chart label — so it adds it, by name, at the call site.
+ */
+function shareScrimText() {
+  return [{ hex: SHARE_INK.ink, target: 4.5 }, { hex: SHARE_INK.accent, target: 4.5 },
+    { hex: SHARE_INK.inkSoft, target: 4.5 }];
+}
+/**
+ * THE ONE ENTRY POINT. Solve, draw, and hand the plan back so the caller can report what it cost.
+ *
+ * ⚠️ EVERY PHOTO TEMPLATE GOES THROUGH HERE AND NONE OF THEM PASSES A FADE. That is what stops the
+ * three layouts drifting apart again: the geometry each one wants is derived from its own block top by
+ * shareScrimFade, so there is no per-template number to get wrong.
+ */
+function sharePhotoScrim(g, gm, probe, blockTop, colours) {
+  const plan = shareVeilPlan(probe, gm, { blockTop: blockTop, colours: colours });
+  shareVeilDraw(g, gm, plan);
+  return plan;
+}
+/**
+ * A LOCAL SCRIM FOR ONE SMALL THING AT THE TOP — the wordmark, over whatever the photograph puts there.
+ * ⚠️ A GRADIENT, NEVER A PLATE. The brief's shared visual language is explicit: "subtle photo scrims,
+ * not opaque cards". So this darkens a band from the top edge and fades out; on a dark photograph it
+ * resolves to nothing at all, which is what every reference shows.
+ *
+ * ⚠️ THE SOLVED ALPHA HAS TO BE DELIVERED ACROSS THE WHOLE RECT, AND THE FIRST VERSION OF THIS DID NOT
+ * DELIVER IT. Its middle stop sat at 0.62 of the band with 0.72 of the alpha, so over the wordmark the
+ * gradient was carrying 0.58 where 0.78 had been solved for. Measured from the rendered export on a
+ * white photograph: the ground under the glyphs came out at byte 114.7 instead of 64, white held at
+ * 4.77:1 and the ACCENT — the "Run" half of the wordmark — fell to 2.28:1. Solving correctly and then
+ * drawing something weaker is worse than not solving at all, because the number in the report is right.
+ * So the last stop above the rect's own bottom edge IS the solved alpha, and everything above it is
+ * stronger; the fade to nothing happens entirely below the copy.
+ */
+function shareTopScrim(g, gm, probe, rect, colours) {
+  const ground = shareGroundUnder(probe, gm, rect);
+  let a = 0;
+  for (const c of colours) a = Math.max(a, shareVeilAlphaFor(c.hex, ground, c.target));
+  const step = a <= 0.001 ? "none" : a <= 0.55 ? "veil" : a <= 0.82 ? "scrim" : "deep";
+  if (a <= 0.001) return { a: 0, step: step, ground: ground };
+  const foot = rect.y + rect.h + Math.round(gm.H * 0.06);
+  const at = Math.min(0.999, Math.max(0.001, (rect.y + rect.h) / foot));
+  const grad = g.createLinearGradient(0, 0, 0, foot);
+  grad.addColorStop(0, cardAlpha(SHARE_INK.ground, Math.min(0.98, a * 1.06)));
+  grad.addColorStop(at, cardAlpha(SHARE_INK.ground, a));
+  grad.addColorStop(1, cardAlpha(SHARE_INK.ground, 0));
+  g.fillStyle = grad; g.fillRect(0, 0, gm.W, foot);
+  return { a: a, step: step, ground: ground };
+}
+// ---- the ground, and the poster's texture --------------------------------------------------------
+/** Matte, edge to edge, no radial glows. The references' ground is one flat deep ink. */
+function shareGroundFill(g, gm) { g.fillStyle = SHARE_INK.ground; g.fillRect(0, 0, gm.W, gm.H); }
+/**
+ * THE ROUTE POSTER'S TOPOGRAPHIC TEXTURE, GENERATED HERE, FROM NOTHING.
+ *
+ * Contours of a value-noise field, traced by marching squares at evenly spaced levels. It is real
+ * topography in the sense that matters — closed nested loops that never cross — and it is not a map:
+ * there are no roads, no labels, no coastlines and no place it could be mistaken for.
+ *
+ * ⚠️ SUBTLE IS A MEASURED PROPERTY, NOT AN INTENTION. The reference poster's ground sits at luma 10
+ * and its contour lines reach luma 34, which is a contrast ratio of 1.23:1 — visible as texture at
+ * arm's length and invisible as pattern. The stroke alpha here is set to land in that band and
+ * test/share-render.test.ts pins the ratio, because "subtle" is exactly the adjective that drifts.
+ *
+ * ⚠️ ONE FIXED SEED, SO THE PREVIEW AND THE EXPORT ARE THE SAME PICTURE. A per-run seed would look
+ * nicer and would have to enter shareCardKey; a random one would change under the runner's hands
+ * between the preview they approved and the file they got.
+ *
+ * ⚠️ AND IT IS CACHED, BECAUSE IT IS NOT CHEAP. About 300k cell tests at 1080x1920; drawn every frame
+ * of a pinch that is a stutter, drawn once it is nothing. Keyed on the canvas size, which is the only
+ * thing it depends on.
+ */
+const SHARE_TOPO = { seed: 20260818, cells: 7, levels: 13, alpha: 0.13, lw: 1.15 };
+let SHARE_TOPO_C = null, SHARE_TOPO_KEY = "";
+function shareTopoField(gx, gy, seed) {
+  // A hash-based value noise: deterministic, no allocation, and no call to the platform's random
+  // number source — the guard sweeps this function for one, so it is named rather than written.
+  // ⚠️ Math.imul, NOT *, AND >>> RATHER THAN >>. Written with an ordinary multiply and a 64-bit-looking
+  // constant this function returned ZERO for every input and the whole texture drew nothing: the seed
+  // term evaluated to 2.92e25, a float whose low bits do not exist, so ToInt32 of it is 0 and the two
+  // coordinate terms were then discarded with it. Measured before the fix: 0 inked pixels of 2,073,600
+  // and a ground that was exactly flat, which looks IDENTICAL to a texture that is merely subtle. That
+  // is the whole reason the subtlety is asserted as a ratio band with a floor and not just a ceiling.
+  const h = (x, y) => {
+    let n = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(seed, 2246822519);
+    n = Math.imul(n ^ (n >>> 13), 1274126177);
+    return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+  };
+  const smooth = (t) => t * t * (3 - 2 * t);
+  const octave = (x, y, f) => {
+    const px = x * f, py = y * f;
+    const x0 = Math.floor(px), y0 = Math.floor(py);
+    const tx = smooth(px - x0), ty = smooth(py - y0);
+    const a = h(x0, y0), b = h(x0 + 1, y0), c = h(x0, y0 + 1), d = h(x0 + 1, y0 + 1);
+    return (a + (b - a) * tx) * (1 - ty) + (c + (d - c) * tx) * ty;
+  };
+  return 0.55 * octave(gx, gy, 0.055) + 0.30 * octave(gx, gy, 0.13) + 0.15 * octave(gx, gy, 0.31);
+}
+function shareTopoCanvas(W, H) {
+  const key = W + "x" + H;
+  if (SHARE_TOPO_KEY === key && SHARE_TOPO_C) return SHARE_TOPO_C;
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
   const g = c.getContext("2d");
-  g.fillStyle = "#04100d"; g.fillRect(0, 0, W, H);
-  const glowAt = (gx, gy, rad, a) => { const rg = g.createRadialGradient(gx, gy, 0, gx, gy, rad); rg.addColorStop(0, "rgba(30,180,150," + a + ")"); rg.addColorStop(1, "rgba(30,180,150,0)"); g.fillStyle = rg; g.fillRect(0, 0, W, H); };
-  glowAt(180, 200, 620, .18); glowAt(W - 150, 260, 560, .12); glowAt(W / 2, H - 120, 720, .08);
-  // Panel frame — bright green neon piping with a soft glow
-  g.save(); rr(g, 20, 20, W - 40, H - 40, 46); g.fillStyle = "rgba(255,255,255,.015)"; g.fill();
-  g.shadowColor = "rgba(61,255,176,.5)"; g.shadowBlur = 12; g.lineWidth = 2.5; g.strokeStyle = "rgba(72,255,184,.7)"; g.stroke(); g.restore();
-  g.textBaseline = "alphabetic"; g.textAlign = "left";
-  drawBrandBadge(g, 56, 92, 116);
-  // ⚠️ Two-tone wordmark, drawn in two halves so each gets its own colour — and therefore invisible
-  // to a search-and-replace on the brand name. Keep the hyphen on the FIRST half and measure the same
-  // string you drew, or "Run" lands on top of it.
-  g.font = "800 62px " + FF; g.fillStyle = "#fff"; g.fillText("Inte-", 196, 178);
-  const iw = g.measureText("Inte-").width; g.fillStyle = TEAL; g.fillText("Run", 196 + iw, 178);
-  g.fillStyle = "rgba(160,200,190,.65)"; g.font = "600 20px " + FF; lsText(g, "THE INTELLIGENT TRAINING COMPANION", 198, 210, 2.5, "left");
-  g.fillStyle = TEAL; g.font = "600 26px " + FF; g.textAlign = "right"; g.fillText("#RunWithInte-Run", W - 56, 150); g.textAlign = "left";
-  const title = (run.t || "My run").toUpperCase(); let ts = 90; g.font = "800 " + ts + "px " + FF;
-  while (g.measureText(title).width > W - 130 && ts > 44) { ts -= 2; g.font = "800 " + ts + "px " + FF; }
-  g.fillStyle = "#fff"; g.fillText(title, 56, 322);
-  rr(g, 58, 348, 96, 7, 4); g.fillStyle = TEAL; g.fill();
-  g.font = "600 28px " + FF; const dparts = (run.d || "").toUpperCase().split("·");
-  g.fillStyle = "rgba(190,215,205,.7)"; g.fillText(dparts[0].trim(), 58, 410);
-  if (dparts[1]) { const dw = g.measureText(dparts[0].trim() + "  ").width; g.fillStyle = TEAL; g.fillText("· " + dparts[1].trim(), 58 + dw, 410); }
-  drawMapPanel(g, run, 48, 452, MAP_W, MAP_H, mapData);
-  // Stat cards
-  const mx = 48, dParts = (run.dist || "0 km").split(" "), pParts = (run.pace || "— /km").split(" ");
-  const stats = [
-    { icon: 0, label: "DISTANCE", val: dParts[0], unit: (dParts[1] || "km").toUpperCase() },
-    { icon: 1, label: "DURATION", val: run.time || "0:00", unit: "MIN" },
-    { icon: 2, label: "AVG PACE", val: pParts[0], unit: (pParts[1] || "/km").toUpperCase() },
-  ];
-  const sy = 1064, sh = 236, gap = 22, sw = (MAP_W - 2 * gap) / 3;
-  stats.forEach((st, i) => {
-    const sxp = mx + i * (sw + gap);
-    rr(g, sxp, sy, sw, sh, 24); g.fillStyle = "rgba(255,255,255,.03)"; g.fill(); g.lineWidth = 1.5; g.strokeStyle = "rgba(61,255,176,.4)"; g.stroke();
-    drawStatIcon(g, st.icon, sxp + 42, sy + 52);
-    g.fillStyle = "rgba(180,210,200,.75)"; g.font = "700 20px " + FF; lsText(g, st.label, sxp + 74, sy + 60, 1.5, "left");
-    g.strokeStyle = "rgba(61,255,176,.3)"; g.lineWidth = 1.5; g.beginPath(); g.moveTo(sxp + 30, sy + 84); g.lineTo(sxp + sw - 30, sy + 84); g.stroke();
-    g.fillStyle = "#fff"; g.font = "800 72px " + FF; g.fillText(st.val, sxp + 32, sy + 170);
-    g.fillStyle = TEAL; g.font = "700 28px " + FF; g.fillText(st.unit, sxp + 32, sy + 208);
-  });
-  // Insight card
-  const iy = 1330, ih = 178;
-  rr(g, mx, iy, MAP_W, ih, 24); g.fillStyle = "rgba(255,255,255,.03)"; g.fill(); g.lineWidth = 1.5; g.strokeStyle = "rgba(61,255,176,.42)"; g.stroke();
-  drawInsightIcon(g, mx + 92, iy + ih / 2, 40);
-  g.fillStyle = TEAL; g.font = "700 22px " + FF; lsText(g, "INTERUN INSIGHT", mx + 168, iy + 56, 2, "left");
-  const insight = SHARE_INSIGHT[run.type] || SHARE_INSIGHT.easy;
-  g.fillStyle = "#eef7f3"; g.font = "600 36px " + FF;
-  wrapLines(g, insight, MAP_W - 168 - 90).slice(0, 2).forEach((ln, i) => g.fillText(ln, mx + 168, iy + 100 + i * 46));
-  g.fillStyle = "rgba(61,255,176,.24)"; g.font = "800 150px Georgia, " + FF; g.fillText("\\u201D", mx + MAP_W - 96, iy + 120);
+  const cs = SHARE_TOPO.cells, cols = Math.ceil(W / cs) + 1, rows = Math.ceil(H / cs) + 1;
+  const f = new Float32Array(cols * rows);
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) f[j * cols + i] = shareTopoField(i, j, SHARE_TOPO.seed);
+  g.strokeStyle = cardAlpha(SHARE_INK.inkSoft, SHARE_TOPO.alpha);
+  g.lineWidth = SHARE_TOPO.lw; g.lineCap = "round"; g.lineJoin = "round";
+  g.beginPath();
+  for (let L = 1; L <= SHARE_TOPO.levels; L++) {
+    const lv = L / (SHARE_TOPO.levels + 1);
+    for (let j = 0; j < rows - 1; j++) for (let i = 0; i < cols - 1; i++) {
+      const a = f[j * cols + i], b = f[j * cols + i + 1], d = f[(j + 1) * cols + i + 1], e = f[(j + 1) * cols + i];
+      const m = (a > lv ? 1 : 0) | (b > lv ? 2 : 0) | (d > lv ? 4 : 0) | (e > lv ? 8 : 0);
+      if (m === 0 || m === 15) continue;
+      const x = i * cs, y = j * cs;
+      const t = (p, q) => (lv - p) / ((q - p) || 1e-9);
+      const N = [x + cs * t(a, b), y], E = [x + cs, y + cs * t(b, d)];
+      const S = [x + cs * t(e, d), y + cs], Wd = [x, y + cs * t(a, e)];
+      const seg = (p, q) => { g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); };
+      if (m === 1 || m === 14) seg(Wd, N);
+      else if (m === 2 || m === 13) seg(N, E);
+      else if (m === 3 || m === 12) seg(Wd, E);
+      else if (m === 4 || m === 11) seg(E, S);
+      else if (m === 6 || m === 9) seg(N, S);
+      else if (m === 7 || m === 8) seg(Wd, S);
+      else if (m === 5) { seg(Wd, N); seg(E, S); }
+      else if (m === 10) { seg(N, E); seg(Wd, S); }
+    }
+  }
+  g.stroke();
+  SHARE_TOPO_KEY = key; SHARE_TOPO_C = c;
   return c;
 }
-function buildShareCanvasSync(run) { return buildShareCanvasCore(run, null); }
-function buildShareCanvasWithMap(run) { return routeMapFor(run.route, MAP_W, MAP_H, MAP_STYLE_SHARE).then((md) => buildShareCanvasCore(run, md)); }
-function canvasToPngFile(canvas, name) {
-  const dataUrl = canvas.toDataURL("image/png");
-  const b64 = dataUrl.split(",")[1], bin = atob(b64), arr = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-  return new File([arr], name, { type: "image/png" });
+function shareTopoDraw(g, gm) {
+  try { g.drawImage(shareTopoCanvas(gm.W, gm.H), 0, 0); }
+  catch (e) { PHOTODIAG.err = "topo: " + (e && e.message); }
 }
-function shareCaption(run) { return "I completed a run with Inte-Run \\uD83C\\uDFC3 \\u2014 " + run.dist + " in " + run.time + "."; }
-// Identity of a run for share-cache purposes.
-function shareKey(run) { return (run.t || "") + "|" + (run.d || "") + "|" + (run.dist || "") + "|" + ((run.route && run.route.length) || 0); }
-let SHARE = { key: null, file: null };
-// Pre-build the (map) card when the overview appears, so the tap can share it synchronously (iOS).
-function prepareShareCard(run) {
-  if (!run) return; const key = shareKey(run);
-  if (SHARE.key === key && SHARE.file) return;
-  SHARE = { key: null, file: null };
-  buildShareCanvasWithMap(run).then((canvas) => { try { SHARE = { key, file: canvasToPngFile(canvas, "interun-run.png") }; } catch (e) {} }).catch(() => {});
+// ---- the route ----------------------------------------------------------------------------------
+/**
+ * THE ROUTE, PROJECTED TO A LOCAL PLANE AND NORMALISED — ORIENTATION AND ASPECT KEPT.
+ *
+ * ⚠️ THE LONGITUDE SPAN IS CORRECTED BY cos(latitude) OR THE SHAPE IS WRONG, and at Durham's 54.8
+ * degrees that is a factor of 0.577 — a route drawn without it is stretched sideways by nearly a
+ * factor of two. One scale is then applied to both axes, so the run's own proportions survive.
+ *
+ * ⚠️ NOTHING IS ROTATED TO FILL THE BOX. The brief says so outright, and a rotated route is a
+ * different run: the runner knows the shape of their own loop.
+ */
+function shareRouteProject(route, rect, padFrac) {
+  if (!route || route.length < 2) return null;
+  const lats = route.map((p) => p.lat), lngs = route.map((p) => p.lng);
+  const minLa = Math.min.apply(null, lats), maxLa = Math.max.apply(null, lats);
+  const minLo = Math.min.apply(null, lngs), maxLo = Math.max.apply(null, lngs);
+  const cxf = Math.cos((minLa + maxLa) / 2 * Math.PI / 180) || 1;
+  const spanLo = Math.max(1e-9, (maxLo - minLo) * cxf), spanLa = Math.max(1e-9, maxLa - minLa);
+  const pad = Math.round(Math.min(rect.w, rect.h) * (padFrac == null ? 0.09 : padFrac));
+  const sc = Math.min((rect.w - 2 * pad) / spanLo, (rect.h - 2 * pad) / spanLa);
+  const ox = rect.x + (rect.w - spanLo * sc) / 2, oy = rect.y + (rect.h - spanLa * sc) / 2;
+  return { pts: route.map((p) => [ox + (p.lng - minLo) * cxf * sc, oy + (maxLa - p.lat) * sc]),
+    pad: pad, sc: sc,
+    box: shareRect(ox, oy, spanLo * sc, spanLa * sc) };
 }
-function doShareRun() {
-  const run = currentOverviewRun(); if (!run) return;
-  // Use the pre-built card with the real map if it's ready; otherwise build the instant grid card.
-  let file = (SHARE.key === shareKey(run) && SHARE.file) ? SHARE.file : null;
-  if (!file) { try { file = canvasToPngFile(buildShareCanvasSync(run), "interun-run.png"); } catch (e) { file = null; } }
-  const caption = shareCaption(run);
-  const canShareFile = file && navigator.canShare && navigator.canShare({ files: [file] });
-  if (canShareFile) {
-    navigator.share({ files: [file], text: caption, title: "Inte-Run" }).catch(() => {});
-  } else if (navigator.share) {
-    navigator.share({ text: caption, title: "Inte-Run" }).catch(() => downloadShareCard(file, run));
-  } else {
-    downloadShareCard(file, run);
+/**
+ * Douglas-Peucker, with the tolerance in OUTPUT pixels.
+ * ⚠️ "SIMPLIFY ONLY ENOUGH FOR OUTPUT SCALE", so the tolerance is a fraction of a pixel at the size
+ * the line is actually drawn — a route thinned in degrees loses recognisable corners on a small inset
+ * and keeps invisible noise on a full-bleed poster. Both endpoints always survive: they carry the
+ * markers, and a redacted route's endpoints are the thing the runner chose to keep.
+ */
+function shareRouteSimplify(pts, tol) {
+  if (!pts || pts.length < 3 || !(tol > 0)) return pts || [];
+  const keep = new Uint8Array(pts.length); keep[0] = 1; keep[pts.length - 1] = 1;
+  const stack = [[0, pts.length - 1]];
+  while (stack.length) {
+    const seg = stack.pop(), a = seg[0], b = seg[1];
+    if (b <= a + 1) continue;
+    const ax = pts[a][0], ay = pts[a][1], bx = pts[b][0], by = pts[b][1];
+    const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
+    let worst = -1, at = -1;
+    for (let i = a + 1; i < b; i++) {
+      const px = pts[i][0] - ax, py = pts[i][1] - ay;
+      const d = len2 ? Math.abs(px * dy - py * dx) / Math.sqrt(len2) : Math.sqrt(px * px + py * py);
+      if (d > worst) { worst = d; at = i; }
+    }
+    if (worst > tol) { keep[at] = 1; stack.push([a, at]); stack.push([at, b]); }
+  }
+  const out = [];
+  for (let i = 0; i < pts.length; i++) if (keep[i]) out.push(pts[i]);
+  return out;
+}
+function shareRoutePath(g, pts) {
+  g.beginPath();
+  for (let i = 0; i < pts.length; i++) i ? g.lineTo(pts[i][0], pts[i][1]) : g.moveTo(pts[i][0], pts[i][1]);
+}
+/**
+ * THE ROUTE AS THE BRIEF DESCRIBES IT: warm white, a thin deep keyline, small accent markers, round
+ * caps and joins, and NO GLOW.
+ *
+ * ⚠️ THE KEYLINE IS THE CONTRAST TREATMENT FOR A LINE, WHICH IS WHY A ROUTE OVER A PHOTOGRAPH NEEDS NO
+ * SCRIM. A white stroke on snow disappears; the same stroke with a deep edge under it does not, and it
+ * costs no darkening of the picture. Measured off the reference poster: the core is white and there is
+ * a one-pixel near-black edge either side of it.
+ *
+ * ⚠️ THE GLOW IS GONE AND SO IS THE PLATE IT SAT ON. This used to stroke a teal gradient twice with a
+ * shadowBlur of three times the line width and then lay a white core over it, on a rounded panel
+ * filled rgba(4,16,13,0.82) — a neon line on an opaque card on a photograph, which is three of the
+ * brief's named defects in one element.
+ *
+ * ⚠️ THE MARKERS ARE THE REFERENCE'S THREE RINGS, IN RATIO, so they stay legible at every size: white
+ * to the outside, accent, then the ground as a pupil. Measured on the reference at 1080 scale, radius
+ * 23 with the accent from 9.2 to 17.2 — 0.75 and 0.40 of the outer radius.
+ *
+ * ⚠️ AND THE KEYLINE'S WIDTH IS A CALLER'S DECISION, BECAUSE ON A WHITE GROUND THE DEFAULT IS TOO THIN.
+ * Measured on the white hostile photograph: a 6px warm-white core with a 2px deep edge either side
+ * reads as a hollow outline rather than as a line, because the core has vanished into the picture and
+ * only the edge survives. keyK is the edge as a fraction of the core; the adaptive callers raise it when
+ * the sampled ground under the chosen zone is bright, which is the same measure-rather-than-assume rule
+ * the veil follows. Left alone it is the value every existing caller already got.
+ */
+function shareRouteDraw(g, route, rect, opt) {
+  opt = opt || {};
+  const pr = shareRouteProject(route, rect, opt.padFrac);
+  if (!pr) return null;
+  // ⚠️ SCALED FROM THE ROUTE'S OWN DRAWN SIZE, NOT FROM THE BOX IT WAS OFFERED. Written as
+  // min(rect.w, rect.h) / 44 it read the WIDTH of a tall narrow zone, which is the one dimension the
+  // route barely uses: measured, the same rule gave a 952x731 poster a 16px stroke — 40% heavier than
+  // the reference's 11.5 — and a 182x375 over-photo column a 4px one, spindly against the reference's
+  // 8 to 9. The route's projected bounding box is what the eye actually judges the weight against, and
+  // one rule off it lands both inside a pixel of the reference.
+  // ⚠️ STILL CAPPED AT BOTH ENDS. Uncapped, a huge poster's stroke goes fat and gummy and the shape
+  // stops being a route; unfloored, a small inset draws a hairline that vanishes at social compression.
+  const lw = opt.lw || Math.min(15, Math.max(3.5, Math.round(Math.max(pr.box.w, pr.box.h) / 56)));
+  const pts = shareRouteSimplify(pr.pts, Math.max(0.35, lw * 0.16));
+  g.save();
+  g.lineJoin = "round"; g.lineCap = "round";
+  shareRoutePath(g, pts);
+  g.strokeStyle = SHARE_INK.keyline;
+  g.lineWidth = lw + Math.max(2, lw * (opt.keyK == null ? 0.30 : opt.keyK)) * 2; g.stroke();
+  shareRoutePath(g, pts);
+  g.strokeStyle = opt.stroke || SHARE_INK.ink; g.lineWidth = lw; g.stroke();
+  if (opt.markers !== false) {
+    const R = Math.max(7, Math.min(24, lw * 1.55));
+    const ring = (p) => {
+      g.fillStyle = SHARE_INK.keyline; g.beginPath(); g.arc(p[0], p[1], R + Math.max(1.5, R * 0.10), 0, 7); g.fill();
+      g.fillStyle = SHARE_INK.ink; g.beginPath(); g.arc(p[0], p[1], R, 0, 7); g.fill();
+      g.fillStyle = SHARE_INK.accent; g.beginPath(); g.arc(p[0], p[1], R * 0.75, 0, 7); g.fill();
+      g.fillStyle = SHARE_INK.ground; g.beginPath(); g.arc(p[0], p[1], R * 0.40, 0, 7); g.fill();
+    };
+    ring(pts[0]); ring(pts[pts.length - 1]);
+  }
+  g.restore();
+  return { box: pr.box, n: pts.length, lw: lw };
+}
+// ---- the templates ------------------------------------------------------------------------------
+/**
+ * TWO OF THE BRIEF'S FOUR TEMPLATES: THE MOMENT (reference 01) AND THE ROUTE POSTER (reference 03).
+ *
+ * Both are built on the shared layer above and nothing else — one geometry, one type ladder, one
+ * palette, one route renderer, one contrast solver — which is what makes them read as one family
+ * rather than as two designs that happen to share a logo.
+ *
+ * ⚠️ EVERY STACK IS BUILT UPWARD FROM THE BRIEF'S OWN BOTTOM LINE, AND THAT IS WHAT MAKES A MISSING ROW
+ * SAFE. Each of the brief's fallbacks is a subtraction — "omit coaching badge/evidence and move the hero
+ * block down", "otherwise omit and rebalance to two columns", "omit ROUTE 018" — and a top-down stack
+ * cannot obey them without a second set of numbers for every combination of what is present. Built
+ * upward, a row that is not there is simply not there and everything above it settles lower.
+ *
+ * ⚠️ AND THE BOTTOM LINE IS THE BRIEF'S y1680, NOT THE REFERENCES' OWN. Measured off both PNGs, scaled
+ * to 1080: the metric labels sit at baseline 1734 on The Moment and 1754 on the poster, with the date at
+ * 1850 and the footer at 1841. Three of those four are below the region the brief reserves for critical
+ * content. A quiet date or footer is the brief's own named exception; a metric label is not. So both
+ * lower blocks sit 60-85px higher than the reference and only the quiet lines stay where it puts them.
+ *
+ * ⚠️ NO TEMPLATE COMPUTES A FACT. Everything drawn is a field of the model, and shareCardModel reads
+ * runAnalysis, runVerdict and runRoutePresentation — so the debrief, the recap and the card can never
+ * tell the runner two different things about one run.
+ */
+/** SF Pro's cap and figure heights as fractions of the em: how tall a line of type actually is. */
+const SHARE_CAP = 0.714, SHARE_FIG = 0.72;
+/**
+ * THE QUIET LINE — the date on The Moment, the footer on the poster — AND THE ROOM THE STACK OWES IT.
+ *
+ * ⚠️ A STORY HAS A 240px QUIET BAND BELOW THE CRITICAL REGION AND A FEED POST HAS 64. Anchored to the
+ * canvas bottom in both, and with the block anchored to safe.y1 in both, the feed poster's footer landed
+ * 23px under the metric labels at the same left margin: measured, "TIME" with "BUILT WITH INTE-RUN"
+ * directly beneath it, which reads as a fourth column heading rather than as a footer. So on a feed the
+ * block gives the quiet line its own band, and on a story the platform's own reserve already is one.
+ */
+const SHARE_QUIET = { up: 70, upFeed: 36, gap: 46 };
+function shareQuietPlan(gm, size) {
+  const feed = gm.aspect === "feed";
+  return { base: gm.H - (feed ? SHARE_QUIET.upFeed : SHARE_QUIET.up),
+    reserve: feed ? Math.round(size * SHARE_CAP) + SHARE_QUIET.gap : 0 };
+}
+/**
+ * A LETTER-SPACED RUN AT THE LARGEST LISTED SIZE THAT FITS, SHORTENED AT THE FLOOR.
+ *
+ * shareFit is the twin for ordinary sentences; this exists because every uppercase run on these cards is
+ * tracked, and cardLsWidth is the only honest measure of a tracked one — g.measureText under-reads it by
+ * one advance per character. Total, for the same reason shareFit is: a forty-character place name
+ * shortens rather than running off the canvas, and there is no longer a frame to clip it.
+ */
+function shareLsFit(g, text, boxW, opt) {
+  opt = opt || {};
+  const max = opt.max, min = opt.min == null ? Math.round(max * 0.7) : opt.min;
+  const weight = opt.weight || 800, sp = opt.track || 0;
+  const s0 = String(text == null ? "" : text);
+  for (let s = max; s >= min; s -= 1) {
+    g.font = shareFont(weight, s);
+    const w = cardLsWidth(g, s0, sp);
+    if (w <= boxW) return { size: s, text: s0, w: w, track: sp };
+  }
+  g.font = shareFont(weight, min);
+  let t = s0;
+  while (t.length > 1 && cardLsWidth(g, t + "\\u2026", sp) > boxW) t = t.slice(0, -1);
+  t = t + "\\u2026";
+  return { size: min, text: t, w: cardLsWidth(g, t, sp), track: sp };
+}
+/**
+ * THE WORDMARK'S OWN GEOMETRY, MEASURED ONCE, BEFORE ANYTHING IS PLACED AGAINST IT.
+ *
+ * ⚠️ THE ORDERING IS THE WHOLE REASON THIS IS A FUNCTION. An upper-left candidate zone scored against a
+ * rectangle that did not exist yet puts the route through the logo — the collision most obvious to
+ * everybody except the scorer. Returning the rect means the route, the scrim and the poster's own field
+ * all ask the same question of the same numbers.
+ */
+function shareWordmarkPlan(g, gm) {
+  const size = shareTypeSize("meta", gm.aspect) + 11;
+  const y = gm.safe.y0 + Math.round(size * 0.78);
+  return { size: size, y: y, rect: shareRect(gm.M, y - size, shareWordmarkWidth(g, size), size * 1.25) };
+}
+/**
+ * WHAT THE HERO NUMBER IS — THE DISTANCE, AND WHERE THERE IS NONE, THE CLOCK.
+ *
+ * ⚠️ NEVER 0.00. A treadmill run — and every outdoor run whose GPS was refused, since gpsFallback lands
+ * in startIndoor — records a real clock and deliberately no distance. The hero is the largest thing on
+ * the card, and "0.00" there is a confident measurement of standing still on the one surface that leaves
+ * the phone. The clock is the honest hero for those runs; the metric row then drops the duplicate,
+ * because a number printed twice is one of the brief's own named defects.
+ */
+function shareHeroFor(m) {
+  if (m.distance > 0) return { key: "dist", v: m.distance.toFixed(2), u: "KM" };
+  const t = (m.metrics || []).filter((x) => x.key === "time")[0];
+  return t ? { key: "time", v: t.v, u: t.u } : null;
+}
+/**
+ * ⚠️ A CLOCK CARRIES NO UNIT, AND BOTH REFERENCES AGREE. "31:04 MIN" reads as a number of minutes when
+ * it is minutes and seconds, and neither reference prints one. The unit survives for an hours-long run,
+ * where fmtPace answers "92:14" and the reader genuinely needs telling — which is the one case the
+ * model's own HRS flag exists for.
+ */
+function shareMetricUnit(x) {
+  return (x.key === "time" && x.u === "MIN") ? { key: x.key, v: x.v, u: "", k: x.k } : x;
+}
+/** The supporting row: the model's own ladder, minus whatever the hero has already said. */
+function shareMetricsFor(m, hero) {
+  return (m.metrics || []).filter((x) => !hero || x.key !== hero.key).map(shareMetricUnit);
+}
+/**
+ * THE COACHING BADGE — the debrief's verdict, in the verdict's own colour, with the words carrying the
+ * meaning so colour is never the only signal.
+ *
+ * ⚠️ IT IS ONLY EVER REACHED WHEN m.pill IS NON-NULL, which is the model's pain / insufficient-data /
+ * low-confidence gate and the safety rule of this whole feature. A template may not draw a badge from
+ * m.verdict directly; the gate is not in here and must not be duplicated in here.
+ *
+ * ⚠️ THE TICK IS DRAWN FOR "achieved" AND FOR NOTHING ELSE. A check mark beside OFF THE BRIEF TODAY is a
+ * lie told by an icon, and the reference's tick sits beside its best-case verdict.
+ *
+ * ⚠️ FILLED, WITH DARK TEXT, AND accentInk CLEARS AA ON ALL THREE REACHABLE STATES: computed, 7.92:1 on
+ * the accent, 8.09:1 on the moderate amber and 5.32:1 on the hard orange. A fill is its own contrast
+ * treatment, so the badge needs nothing from the veil — where the bordered pill the ledger drew was the
+ * one element that vanished against a bright photograph.
+ */
+const SHARE_BADGE = { hK: 2.45, padX: 22, tickW: 0.62, tickGap: 0.46 };
+function shareBadgePlan(g, m, size, boxW) {
+  const tick = m.pill.state === "achieved", sp = SHARE_TRACK.pill;
+  const floor = Math.max(15, Math.round(size * 0.7));
+  let s = size, tw = 0, w = 0;
+  for (; s >= floor; s -= 1) {
+    g.font = shareFont(800, s);
+    tw = cardLsWidth(g, m.pill.text, sp);
+    w = Math.round(tw + SHARE_BADGE.padX * 2 + (tick ? s * (SHARE_BADGE.tickW + SHARE_BADGE.tickGap) : 0));
+    if (w <= boxW) break;
+  }
+  return { size: s, w: Math.min(w, boxW), h: Math.round(s * SHARE_BADGE.hK), tick: tick, track: sp, textW: tw };
+}
+function shareTick(g, cx, cy, s, col) {
+  g.save();
+  g.strokeStyle = col; g.lineWidth = Math.max(2.5, s * 0.135);
+  g.lineCap = "round"; g.lineJoin = "round";
+  g.beginPath();
+  g.moveTo(cx - s * 0.30, cy + s * 0.02);
+  g.lineTo(cx - s * 0.06, cy + s * 0.25);
+  g.lineTo(cx + s * 0.32, cy - s * 0.27);
+  g.stroke();
+  g.restore();
+}
+function shareBadgeDraw(g, m, plan, x, top) {
+  const col = SHARE_INK.state[m.pill.state];
+  // ⚠️ NO COLOUR, NO BADGE — AND THE FALLBACK THAT USED TO BE HERE WAS A DEEP PLATE 92% OPAQUE OVER THE
+  // PHOTOGRAPH. It could never draw (shareCardModel answers pill: null for insufficientData and for a
+  // low-confidence verdict, which are the only states with no colour), and an unreachable opaque card is
+  // still the pattern the next template copies — the owner's amendment is that the data is an overlay on
+  // the picture, so the one legibility system is the scrim and nothing gets a plate of its own.
+  if (!col) return;
+  const mid = top + plan.h / 2;
+  rr(g, x, top, plan.w, plan.h, Math.round(plan.h / 2));
+  g.fillStyle = col; g.fill();
+  const fg = SHARE_INK.accentInk;
+  let tx = x + SHARE_BADGE.padX;
+  if (plan.tick) {
+    shareTick(g, tx + plan.size * SHARE_BADGE.tickW / 2, mid, plan.size * 0.72, fg);
+    tx += plan.size * (SHARE_BADGE.tickW + SHARE_BADGE.tickGap);
+  }
+  g.font = shareFont(800, plan.size); g.fillStyle = fg;
+  lsText(g, m.pill.text, tx, mid + Math.round(plan.size * SHARE_CAP * 0.5), plan.track, "left");
+}
+/**
+ * THE SUPPORTING NUMBERS AS ONE ROW, SHARED BY BOTH TEMPLATES.
+ *
+ * ⚠️ THE COLUMN WIDTH COMES FROM HOW MANY THERE ARE, never from a literal three. The brief's own
+ * fallback is "otherwise omit and rebalance to two columns", and a treadmill run reaches ONE — the
+ * ledger's hardcoded divisor left the survivors in a third of the card each with a gap where the
+ * invented number used to be.
+ */
+function shareMetricPlan(g, gm, mets) {
+  const cols = Math.max(1, mets.length), gut = 24;
+  return { cols: cols, gut: gut, w: (gm.CW - gut * (cols - 1)) / cols,
+    valueS: shareTypeSize("value", gm.aspect), unitS: shareTypeSize("sub", gm.aspect),
+    labelS: shareTypeSize("label", gm.aspect) };
+}
+function shareMetricDraw(g, gm, mets, P, yValue, yLabel, labelInk) {
+  for (let i = 0; i < mets.length; i++) {
+    const st = mets[i], x = gm.M + i * (P.w + P.gut);
+    g.font = shareFont(700, P.unitS);
+    const uw = st.u ? g.measureText(st.u).width + 10 : 0;
+    const mw = st.mid ? g.measureText(" " + st.mid + " ").width : 0;
+    // ⚠️ THE VALUE'S BUDGET IS DERIVED FROM ITS OWN UNIT AND ITS OWN COLUMN, so an hours-long run
+    // shrinks its number rather than running the unit off the end of the column.
+    let vs = P.valueS;
+    g.font = shareFont(800, vs);
+    const figs = () => shareFigWidth(g, st.v) + (st.v2 ? shareFigWidth(g, st.v2) : 0);
+    while (figs() + mw + uw > P.w - 6 && vs > Math.round(P.valueS * 0.55)) { vs -= 2; g.font = shareFont(800, vs); }
+    let cx = x;
+    g.fillStyle = SHARE_INK.ink;
+    cx += shareFig(g, st.v, cx, yValue, "left");
+    // A small connective word between two figures — the poster's "6 OF 6" — set down a rung and in the
+    // faint tier, so the two numbers stay the thing the eye lands on.
+    if (st.mid) {
+      g.font = shareFont(700, P.unitS); g.fillStyle = SHARE_INK.inkFaint;
+      g.fillText(" " + st.mid + " ", cx, yValue); cx += mw;
+      g.font = shareFont(800, vs); g.fillStyle = SHARE_INK.ink;
+      cx += shareFig(g, st.v2, cx, yValue, "left");
+    }
+    if (st.u) { g.font = shareFont(700, P.unitS); g.fillStyle = SHARE_INK.accent; g.fillText(st.u, cx + 10, yValue); }
+    g.font = shareFont(700, P.labelS); g.fillStyle = labelInk;
+    lsText(g, st.k, x, yLabel, SHARE_TRACK.label, "left");
   }
 }
-function downloadShareCard(file, run) {
-  if (!file) { try { file = canvasToPngFile(buildShareCanvasSync(run), "interun-run.png"); } catch (e) { return; } }
-  const url = URL.createObjectURL(file); const a = document.createElement("a"); a.href = url; a.download = "interun-run.png";
-  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+/**
+ * ONE HAIRLINE, DRAWN ONE WAY, WHEREVER A DIVIDER CLARIFIES STRUCTURE.
+ *
+ * ⚠️ ALL FOUR REFERENCES CARRY TWO OF THESE AND OURS WAS FAINTER THAN EVERY ONE OF THEM. Measured by
+ * taking the MEDIAN luminance down each column of the metric band (a hairline runs the whole height; a
+ * glyph does not), each reference has exactly two 2-3px verticals at a third and two thirds of the
+ * content width, and against the ground beside them they measure 01: 3.73 and 4.18, 02: 2.63 and 2.68,
+ * 03: 1.71 and 1.85, 04: 1.97 and 1.71. Ours measured 1.05 to 1.53 — under all eight, and on a bright
+ * or busy photograph simply not there. The divider is authentic to the design, so it is not a candidate
+ * for deletion; it was under-drawn. ⚠️ AND IT WAS FOUND BY A MEDIAN-DOWN-THE-COLUMN SWEEP, not by eye:
+ * a two-pixel line at 1.2:1 is not something anyone spots in a screenshot, which is why it survived a
+ * whole build.
+ *
+ * ⚠️ AND A HIGHER ALPHA ALONE CANNOT FIX IT, WHICH IS WHY THERE IS A DEEP LINE BESIDE IT. The scrim
+ * guarantees the ground's LUMINANCE is low enough for the soft tier, not its channels — so on a scrimmed
+ * red ground a white line at 20% computes to 1.33:1 where on a neutral one it is 1.77:1. A light line
+ * with a deep line alongside reads on either: the ground cannot be close to both at once.
+ *
+ * ⚠️⚠️ BESIDE IT, NOT BEHIND IT — AND THE CONCENTRIC VERSION WAS BUILT, MEASURED AND REJECTED. The chart's
+ * keyline is one wider stroke of the same path, which works there because every mark it protects is
+ * OPAQUE: an opaque colour does not care what is underneath it. A 20% line does. Drawn concentrically the
+ * light stroke composited over the deep stroke instead of over the photograph, and the pair came out at
+ * 1.33:1 — measured, on snow, no better than the single under-drawn line it replaced, with the light
+ * line's whole contribution cancelled by the thing meant to protect it. ⚠️ A KEYLINE IS NOT A UNIVERSAL
+ * DEVICE; IT IS A DEVICE FOR OPAQUE MARKS.
+ *
+ * ⚠️ AND THE PAIR IS 3px OVERALL, WHICH IS ONE POINT ON A PHONE. On a dark photograph the deep half is
+ * invisible and it reads as the light hairline every reference draws; on a bright or saturated one the
+ * light half recedes and it reads as a deep one. It is never two lines at once, because the ground can
+ * only be at one end.
+ *
+ * ⚠️ ONE FUNCTION, BECAUSE THE POSTER HAD ITS OWN COPY OF THE STROKE AND THAT IS HOW THE TWO DRIFT. It
+ * drew SHARE_INK.hair at lineWidth 1.5 inline, so raising the alpha here would have left the poster's
+ * horizontal rule at the old weight with nothing to notice.
+ */
+const SHARE_HAIR = { w: 1.5 };
+function shareHairline(g, x0, y0, x1, y1) {
+  // The pair is centred on the line asked for, so nothing moves when the deep half is added or removed.
+  const vert = Math.abs(x1 - x0) < Math.abs(y1 - y0);
+  const o = SHARE_HAIR.w / 2, dx = vert ? o : 0, dy = vert ? 0 : o;
+  g.lineCap = "butt"; g.lineWidth = SHARE_HAIR.w;
+  g.beginPath(); g.moveTo(x0 - dx, y0 - dy); g.lineTo(x1 - dx, y1 - dy);
+  g.strokeStyle = SHARE_INK.keyline; g.stroke();
+  g.beginPath(); g.moveTo(x0 + dx, y0 + dy); g.lineTo(x1 + dx, y1 + dy);
+  g.strokeStyle = SHARE_INK.hair; g.stroke();
+}
+/** The hairlines between columns, struck from the row's own measured top and bottom. */
+function shareMetricRules(g, gm, mets, P, top, bottom) {
+  for (let i = 1; i < mets.length; i++) {
+    const x = gm.M + i * (P.w + P.gut) - P.gut / 2;
+    shareHairline(g, x, top, x, bottom);
+  }
+}
+/**
+ * ── 1. THE MOMENT ────────────────────────────────────────────────────────────────────────────────
+ *
+ * The photograph carries the moment and the copy proves the run: activity and place, the distance as
+ * the hero, the coach's verdict, one fact behind it, three supporting numbers, and the date.
+ *
+ * ⚠️ THE GAPS ARE MEASURED OFF THE REFERENCE, NOT CHOSEN, and they are named for what they separate.
+ * Read at 1080 from 01-the-moment-target.png: label baseline to value baseline 42, value figure top to
+ * evidence baseline 70, evidence cap top to badge bottom 31, badge top to hero baseline 46, hero figure
+ * top to eyebrow baseline 40.
+ *
+ * ⚠️ THEY DO NOT SCALE WITH THE ASPECT, AND THAT IS WHAT DELIVERS THE FEED REFLOW. The type tightens
+ * (SHARE_TYPE_FEED moves only the big rungs) while the structural gaps hold, so on a 1080x1350 canvas
+ * the same block occupies a LARGER share of a shorter card — which is the brief's "reduce photographic
+ * share of the canvas" in the only direction it can honestly be delivered. Measured: the lower block is
+ * 30.3% of a story and 39.6% of a feed post.
+ */
+const MOMENT_GAP = { labelToValue: 42, valueToEvidence: 70, evidenceToBadge: 31, badgeToHero: 46,
+  heroToEyebrow: 40 };
+function shareMomentPlan(g, m, gm) {
+  const A = gm.aspect;
+  const hero = shareHeroFor(m);
+  const mets = shareMetricsFor(m, hero);
+  const P = shareMetricPlan(g, gm, mets);
+  const badge = m.pill ? shareBadgePlan(g, m, shareTypeSize("pill", A), gm.CW) : null;
+  // ⚠️ THE EVIDENCE RIDES WITH THE BADGE. "No evidence-backed verdict: omit coaching badge/evidence" is
+  // one instruction and not two, and a bare measurement standing where a verdict was is read as one.
+  const evidTxt = badge && m.verdict ? String(m.verdict.evidenceLine || "") : "";
+  const evid = evidTxt ? shareFit(g, evidTxt, gm.CW, { max: shareTypeSize("lead", A),
+    min: shareTypeSize("meta", A), step: 1, weight: 600, lines: 2, lh: 1.26 }) : null;
+  const eyeTxt = [String(m.sessionLabel || "").toUpperCase(), String(m.coarseLocation || "").toUpperCase()]
+    .filter(Boolean).join(" \\u00b7 ");
+  const eye = eyeTxt ? shareLsFit(g, eyeTxt, gm.CW, { max: shareTypeSize("eyebrow", A),
+    min: shareTypeSize("meta", A), weight: 800, track: SHARE_TRACK.eyebrow }) : null;
+  // ⚠️ EVERY BOX IS COLLECTED AS A RECT, because the route is scored against all of them. The reference
+  // puts the route in the empty quarter precisely because that is where nothing else is.
+  const rects = [];
+  const quiet = shareQuietPlan(gm, shareTypeSize("meta", A));
+  const labelBase = gm.safe.y1 - 8 - quiet.reserve;
+  const valueBase = labelBase - MOMENT_GAP.labelToValue;
+  const rowTop = valueBase - Math.round(P.valueS * SHARE_FIG);
+  if (mets.length) rects.push(shareRect(gm.M, rowTop, gm.CW, labelBase + 12 - rowTop));
+  let y = mets.length ? rowTop : labelBase;
+  let evidBase = 0;
+  if (evid) {
+    evidBase = y - MOMENT_GAP.valueToEvidence;
+    const t = evidBase - Math.round(evid.size * SHARE_CAP) - (evid.lines.length - 1) * evid.lh;
+    rects.push(shareRect(gm.M, t, gm.CW, evidBase + 10 - t));
+    y = t;
+  }
+  let badgeTop = 0;
+  if (badge) {
+    badgeTop = y - MOMENT_GAP.evidenceToBadge - badge.h;
+    rects.push(shareRect(gm.M, badgeTop, badge.w, badge.h));
+    y = badgeTop;
+  }
+  // The hero and its unit share one budget, so a two-figure distance and a clock both fit beside KM.
+  const heroU = shareTypeSize("value", A);
+  const heroMax = shareTypeSize("mega", A);
+  let heroS = heroMax, heroW = 0;
+  if (hero) {
+    for (; heroS >= Math.round(heroMax * 0.6); heroS -= 4) {
+      g.font = shareFont(800, heroS);
+      const vw = shareFigWidth(g, hero.v);
+      g.font = shareFont(800, heroU);
+      heroW = vw + (hero.u ? g.measureText(hero.u).width + Math.round(heroS * 0.06) : 0);
+      if (heroW <= gm.CW) break;
+    }
+  }
+  const heroBase = hero ? y - MOMENT_GAP.badgeToHero : y;
+  const heroTop = hero ? heroBase - Math.round(heroS * SHARE_FIG) : y;
+  if (hero) rects.push(shareRect(gm.M, heroTop, heroW, heroBase + 10 - heroTop));
+  y = heroTop;
+  const eyeBase = eye ? y - MOMENT_GAP.heroToEyebrow : y;
+  const eyeTop = eye ? eyeBase - Math.round(eye.size * SHARE_CAP) : y;
+  if (eye) rects.push(shareRect(gm.M, eyeTop, eye.w, eyeBase + 8 - eyeTop));
+  // ⚠️ THE DATE IS THE BRIEF'S OWN QUIET EXCEPTION and sits below the critical region, where the
+  // reference puts it, right-aligned to the same margin the block starts from.
+  const dateBase = quiet.base;
+  const date = m.dateLabel ? shareLsFit(g, String(m.dateLabel).toUpperCase(), Math.round(gm.CW * 0.62),
+    { max: shareTypeSize("meta", A), min: shareTypeSize("foot", A), weight: 700, track: SHARE_TRACK.meta }) : null;
+  if (date) rects.push(shareRect(gm.safe.x1 - date.w, dateBase - Math.round(date.size * SHARE_CAP),
+    date.w, Math.round(date.size * 1.3)));
+  return { hero: hero, heroS: heroS, heroU: heroU, heroBase: heroBase, heroTop: heroTop, heroW: heroW,
+    eye: eye, eyeBase: eyeBase, badge: badge, badgeTop: badgeTop, evid: evid, evidBase: evidBase,
+    mets: mets, P: P, valueBase: valueBase, labelBase: labelBase, rowTop: rowTop,
+    date: date, dateBase: dateBase, blockTop: eyeTop, rects: rects };
+}
+function shareMomentCard(g, m, gm, probe, wm, box) {
+  const p = shareMomentPlan(g, m, gm);
+  // ⚠️ THE ONE SCRIM, WHICH THIS TEMPLATE HAS ALWAYS USED AND THE OTHER TWO NOW SHARE. The reference
+  // shows the photograph continuing behind the hero — the runner's own legs are visible through the
+  // digits — and the brief's shared visual language asks for "subtle photo scrims, not opaque cards".
+  // The alpha is solved from the sampled ground for every colour the block sets, at the TOP of the block
+  // where the scrim is weakest, and grows below it.
+  // ⚠️ AND THE LABEL TIER IS inkSoft HERE, WHERE THE POSTER USES inkFaint — see shareScrimText.
+  const plan = sharePhotoScrim(g, gm, probe, p.blockTop, shareScrimText());
+  // ⚠️ SCORED AGAINST EVERY PIECE OF COPY, NOT AGAINST THE WORDMARK ALONE, and drawn after the veil so
+  // a zone that dips into the fade stays crisp rather than being dimmed with the picture.
+  if (m.route) {
+    const zone = shareRoutePlacement(gm, { photoBox: box, top: gm.safe.y0, bottom: p.blockTop - 32,
+      textRects: [shareRectPad(wm.rect, 20)].concat(p.rects) });
+    // ⚠️ THE KEYLINE IS THICKENED WHERE THE PICTURE IS BRIGHT, from the same probe the veil uses. On the
+    // white ground the default 2px edge left the route reading as a hollow outline; a bright sky is the
+    // commonest thing in the upper-right corner of a running photograph, which is where the highest
+    // scoring zone usually is.
+    if (zone) {
+      // ⚠️ JUDGED ON TRUE LUMINANCE, NOT ON A LUMA BYTE, for the reason at the top of the luminance
+      // section: a saturated ground reads far darker as a weighted byte than it is. Mid grey is the
+      // threshold and it is written as one, so the comparison means the same thing for any colour.
+      const bright = shareRelLumRGB(shareGroundUnder(probe, gm, zone.rect)) > shareLumOfByte(150);
+      shareRouteDraw(g, m.route, zone.rect, { padFrac: 0.06, keyK: bright ? 0.55 : 0.30 });
+    }
+  }
+  shareTopScrim(g, gm, probe, wm.rect,
+    [{ hex: SHARE_INK.ink, target: 4.5 }, { hex: SHARE_INK.accent, target: 4.5 }]);
+  shareWordmark(g, gm.M, wm.y, wm.size, "left");
+  if (p.eye) {
+    g.font = shareFont(800, p.eye.size); g.fillStyle = SHARE_INK.accent;
+    lsText(g, p.eye.text, gm.M, p.eyeBase, p.eye.track, "left");
+  }
+  if (p.hero) {
+    g.font = shareFont(800, p.heroS); g.fillStyle = SHARE_INK.ink;
+    const vw = shareFig(g, p.hero.v, gm.M, p.heroBase, "left");
+    if (p.hero.u) {
+      g.font = shareFont(800, p.heroU); g.fillStyle = SHARE_INK.accent;
+      g.fillText(p.hero.u, gm.M + vw + Math.round(p.heroS * 0.06), p.heroBase);
+    }
+  }
+  if (p.badge) shareBadgeDraw(g, m, p.badge, gm.M, p.badgeTop);
+  if (p.evid) {
+    g.font = shareFont(600, p.evid.size); g.fillStyle = SHARE_INK.ink;
+    p.evid.lines.forEach((ln, i) =>
+      g.fillText(ln, gm.M, p.evidBase - (p.evid.lines.length - 1 - i) * p.evid.lh));
+  }
+  if (p.mets.length) {
+    shareMetricRules(g, gm, p.mets, p.P, p.rowTop - 12, p.labelBase + 12);
+    shareMetricDraw(g, gm, p.mets, p.P, p.valueBase, p.labelBase, SHARE_INK.inkSoft);
+  }
+  if (p.date) {
+    g.font = shareFont(700, p.date.size); g.fillStyle = SHARE_INK.inkSoft;
+    lsText(g, p.date.text, gm.safe.x1, p.dateBase, p.date.track, "right");
+  }
+}
+/**
+ * ── 3. THE ROUTE POSTER ──────────────────────────────────────────────────────────────────────────
+ *
+ * Photo-free, and the route is the artwork: the matte deep-ink ground with its topographic texture, the
+ * run drawn large in the central field, then a lower block of verdict, title, place and date, the
+ * distance hero, three numbers and a quiet footer.
+ *
+ * ⚠️ THE GAPS ARE MEASURED OFF 03-the-route-poster-target.png at 1080, same as The Moment's: label
+ * baseline to value baseline 39, value figure top to the hairline 22, hairline to hero baseline 48, hero
+ * figure top to the accent rule 29, rule to meta baseline 35, meta cap top to title baseline 28, title
+ * cap top to the verdict eyebrow 29.
+ *
+ * ⚠️ THE ROUTE FIELD IS SMALLER THAN THE REFERENCE'S AND BOTH REASONS ARE THE BRIEF'S OWN. Its route
+ * bounding box is 997px tall in a field of about 1075, i.e. roughly 3.6% padding — below the 8-10% the
+ * brief asks for — and its lower block starts at y1270 where honouring y1680 for the metric labels puts
+ * ours at about y1185. Measured, ours draws 797px against the reference's 997. Filling the field is
+ * worth having; inventing room by ignoring two stated numbers is not.
+ *
+ * ⚠️ ROUTE 018 IS OMITTED. "an optional local activity sequence label only if the product has a truthful
+ * equivalent. Otherwise omit it; do not fabricate route numbers." There is no per-route sequence
+ * anywhere in this app — a run's id is a millisecond timestamp or a UUID, and interun_hist_v1 holds no
+ * route at all — so there is nothing true to print in that corner and nothing is printed.
+ */
+const POSTER_GAP = { labelToValue: 39, valueToHair: 22, hairToHero: 48, heroToTag: 29, tagToMeta: 35,
+  metaToTitle: 28, titleToEyebrow: 29, blockToField: 30 };
+/** The brief's own 8-10%, at the tighter end so the run fills as much of the field as it is allowed. */
+const SHARE_POSTER_PAD = 0.08;
+/** The short accent rule above the hero, measured off the reference at 107 x 3. */
+const POSTER_TAG = { w: 108, h: 4 };
+/**
+ * ⚠️ THE POSTER'S THIRD NUMBER IS THE ADHERENCE, WHICH IS THE ONE THING A MAP APP CANNOT PRINT — and it
+ * is only printed when there is an honest one. m.adherence exists when the target was applied to at
+ * least one measured kilometre, and the badge's own gate is required with it, so a run whose judgement
+ * rests mostly on estimated splits states its elevation instead of a confident count.
+ */
+function sharePosterMetrics(m, hero) {
+  const out = shareMetricsFor(m, hero);
+  if (m.adherence && m.pill) {
+    return out.slice(0, 2).concat([{ key: "onTarget", v: String(m.adherence.inBand), mid: "OF",
+      v2: String(m.adherence.judged), u: "", k: "KM ON TARGET" }]);
+  }
+  return out;
+}
+function sharePosterPlan(g, m, gm, wm) {
+  const A = gm.aspect;
+  const hero = shareHeroFor(m);
+  const mets = sharePosterMetrics(m, hero);
+  const P = shareMetricPlan(g, gm, mets);
+  const quiet = shareQuietPlan(gm, shareTypeSize("foot", A));
+  const labelBase = gm.safe.y1 - 8 - quiet.reserve;
+  const valueBase = labelBase - POSTER_GAP.labelToValue;
+  const rowTop = valueBase - Math.round(P.valueS * SHARE_FIG);
+  const hairY = rowTop - POSTER_GAP.valueToHair;
+  const heroU = shareTypeSize("bigUnit", A);
+  const heroMax = shareTypeSize("display", A);
+  let heroS = heroMax, heroW = 0;
+  if (hero) {
+    for (; heroS >= Math.round(heroMax * 0.6); heroS -= 2) {
+      g.font = shareFont(800, heroS);
+      const vw = shareFigWidth(g, hero.v);
+      g.font = shareFont(800, heroU);
+      heroW = vw + (hero.u ? g.measureText(hero.u).width + Math.round(heroS * 0.09) : 0);
+      if (heroW <= gm.CW) break;
+    }
+  }
+  const heroBase = hairY - POSTER_GAP.hairToHero;
+  const heroTop = heroBase - Math.round(heroS * SHARE_FIG);
+  const tagY = heroTop - POSTER_GAP.heroToTag;
+  const metaTxt = [String(m.coarseLocation || "").toUpperCase(), String(m.dateLabel || "").toUpperCase()]
+    .filter(Boolean).join(" \\u00b7 ");
+  const meta = metaTxt ? shareLsFit(g, metaTxt, gm.CW, { max: shareTypeSize("meta", A),
+    min: shareTypeSize("foot", A), weight: 700, track: SHARE_TRACK.meta }) : null;
+  const metaBase = meta ? tagY - POSTER_GAP.tagToMeta : tagY;
+  const metaTop = meta ? metaBase - Math.round(meta.size * SHARE_CAP) : tagY;
+  // ⚠️ TWO LINES AT MOST AND A FLOOR WELL BELOW THE RUNG, because these are titles the generator writes:
+  // the worst of a real plan's 142 is "MONA FARTLEK: 2 x (90/60/30/15 HARD, EQUAL FLOAT)".
+  const title = shareFit(g, String(m.title || ""), gm.CW, { max: shareTypeSize("title", A),
+    min: Math.round(shareTypeSize("title", A) * 0.42), step: 2, weight: 800, lines: 2, lh: 1.04 });
+  const titleBase = metaTop - POSTER_GAP.metaToTitle;
+  const titleTop = titleBase - Math.round(title.size * SHARE_CAP) - (title.lines.length - 1) * title.lh;
+  const eye = m.pill ? shareLsFit(g, m.pill.text, gm.CW, { max: shareTypeSize("meta", A),
+    min: shareTypeSize("foot", A), weight: 800, track: SHARE_TRACK.eyebrow }) : null;
+  const eyeBase = eye ? titleTop - POSTER_GAP.titleToEyebrow : titleTop;
+  const eyeTop = eye ? eyeBase - Math.round(eye.size * SHARE_CAP) : titleTop;
+  // ⚠️ THE FIELD STARTS BELOW THE WORDMARK, NEVER AT THE CANVAS EDGE. The route is the subject, so it
+  // takes the brief's critical region rather than the story's deeper TOP reserve — but a line drawn
+  // through the logo is a collision whichever of the two owns the space.
+  const rTop = Math.max(gm.safe.y0, Math.round(wm.rect.y + wm.rect.h) + 36);
+  const field = shareRect(gm.M, rTop, gm.CW, Math.max(120, eyeTop - POSTER_GAP.blockToField - rTop));
+  const footBase = quiet.base;
+  return { hero: hero, heroS: heroS, heroU: heroU, heroBase: heroBase, heroTop: heroTop, heroW: heroW,
+    mets: mets, P: P, valueBase: valueBase, labelBase: labelBase, rowTop: rowTop, hairY: hairY,
+    tagY: tagY, meta: meta, metaBase: metaBase, title: title, titleBase: titleBase,
+    eye: eye, eyeBase: eyeBase, blockTop: eyeTop, field: field, footBase: footBase };
+}
+function sharePosterCard(g, m, gm, wm) {
+  const p = sharePosterPlan(g, m, gm, wm);
+  // ⚠️ THE GEOMETRY IS ALREADY THE PRIVACY-RESOLVED ONE. runRoutePresentation trims the points within
+  // 250 m of each end BEFORE this, so hidden start and finish is applied before normalisation exactly as
+  // the brief requires — the shape drawn and centred is the shape that survived, not a full route with
+  // its ends painted over. And when nothing survives, there is no route here and nothing is drawn: a
+  // decorative squiggle in an empty field is the one thing the spec forbids outright.
+  if (m.route) shareRouteDraw(g, m.route, p.field, { padFrac: SHARE_POSTER_PAD });
+  // ⚠️ NO TOP SCRIM ON THIS ONE. There is no photograph, and shareGroundUnder answers white when it cannot
+  // look — which is the right answer when it decides legibility over an unknown picture and the wrong
+  // one on a flat ground it can see is dark. Solved from 255 it would paint a dark band across the top
+  // of the poster to protect type that already measures 19:1.
+  shareWordmark(g, gm.M, wm.y, wm.size, "left");
+  if (p.eye) {
+    g.font = shareFont(800, p.eye.size); g.fillStyle = SHARE_INK.accent;
+    lsText(g, p.eye.text, gm.M, p.eyeBase, p.eye.track, "left");
+  }
+  g.font = shareFont(800, p.title.size); g.fillStyle = SHARE_INK.ink;
+  p.title.lines.forEach((ln, i) =>
+    g.fillText(ln, gm.M, p.titleBase - (p.title.lines.length - 1 - i) * p.title.lh));
+  if (p.meta) {
+    g.font = shareFont(700, p.meta.size); g.fillStyle = SHARE_INK.inkFaint;
+    lsText(g, p.meta.text, gm.M, p.metaBase, p.meta.track, "left");
+  }
+  g.fillStyle = SHARE_INK.accent;
+  g.fillRect(gm.M, p.tagY, POSTER_TAG.w, POSTER_TAG.h);
+  if (p.hero) {
+    g.font = shareFont(800, p.heroS); g.fillStyle = SHARE_INK.ink;
+    const vw = shareFig(g, p.hero.v, gm.M, p.heroBase, "left");
+    if (p.hero.u) {
+      g.font = shareFont(800, p.heroU); g.fillStyle = SHARE_INK.accent;
+      g.fillText(p.hero.u, gm.M + vw + Math.round(p.heroS * 0.09), p.heroBase);
+    }
+  }
+  shareHairline(g, gm.M, p.hairY, gm.safe.x1, p.hairY);
+  if (p.mets.length) {
+    shareMetricRules(g, gm, p.mets, p.P, p.rowTop - 12, p.labelBase + 12);
+    shareMetricDraw(g, gm, p.mets, p.P, p.valueBase, p.labelBase, SHARE_INK.inkFaint);
+  }
+  // ⚠️ A CREDIT LINE, NOT A SECOND WORDMARK. shareWordmark is the logo's only owner and it is at the top
+  // of this card; this is the brief's own quiet footer, set in the same caps-and-tracking as every other
+  // small label here, with the brand half in the accent as the reference shows.
+  g.font = shareFont(700, shareTypeSize("foot", gm.aspect));
+  g.fillStyle = SHARE_INK.inkFaint;
+  const fw = lsText(g, "BUILT WITH ", gm.M, p.footBase, SHARE_TRACK.foot, "left");
+  g.fillStyle = SHARE_INK.accent;
+  lsText(g, "INTE-RUN", gm.M + fw + SHARE_TRACK.foot, p.footBase, SHARE_TRACK.foot, "left");
+}
+/**
+ * THE THREE NUMBERS A DATA-LED CARD PRINTS — distance, time, average pace.
+ *
+ * ⚠️ IT IS NOT The Moment'S TRIO AND THE REFERENCES ARE EXPLICIT ABOUT IT. On 01 the distance IS the
+ * hero, so the row underneath drops it and climbs the shared metric ladder for a third number (time,
+ * pace, elevation). On 02 and 04 the hero is the verdict or the progression headline, so the distance
+ * has nowhere else to be said and the row carries it: read off both references, the three columns are
+ * distance, time and average pace in that order. One template's row is not the other's.
+ *
+ * ⚠️ AND IT GOES THROUGH shareMetricUnit LIKE EVERY OTHER ROW, so the clock loses its unit. Neither
+ * reference prints one beside the time, and a unit of minutes over minutes-and-seconds is wrong rather
+ * than terse.
+ */
+function shareRowMetrics(m) { return (m.stats || []).slice(0, 3).map(shareMetricUnit); }
+/**
+ * HOW MUCH OF THE CARD STAYS UNOBSTRUCTED PHOTOGRAPH, ON A STORY.
+ *
+ * ⚠️ SINCE THE OWNER'S AMENDMENT THIS IS NOT WHERE THE PHOTOGRAPH ENDS — IT NEVER ENDS. Every photo
+ * template runs the picture to all four edges and overlays the data; this pair of numbers says how much
+ * of it is left CLEAR of copy, which is a different and still-required promise.
+ *
+ * ⚠️ THESE ARE THE CONTRACT'S OWN NUMBERS, one per template: The Execution's "upper 52-58% remains
+ * photographic and uncluttered" and The Progression's "upper half remains an unobstructed photograph".
+ * They are the FLOOR under the first ink of the lower block, so the block is built bottom-up from the
+ * safe region and then one element gives way until the floor is cleared — the verdict's point size on
+ * The Execution, the ladder's row pitch on The Progression. Neither is a taste decision; both are the
+ * single degree of freedom left once the type is on the ladder and the gaps are measured.
+ *
+ * ⚠️ STORY ONLY, AND THAT IS THE BRIEF'S OWN INSTRUCTION FOR THE FEED. "Reduce photographic share of
+ * the canvas, tighten headline scale, shorten optional evidence, and preserve all essential metrics" —
+ * a 4:5 canvas is 570px shorter with the same content to carry, so holding 52% there would mean
+ * shrinking the verdict to nothing. Measured on the reference data: the photograph is 52.0% of a story
+ * and 40.7% of a feed post.
+ */
+const SHARE_PHOTO_FLOOR = { execution: 0.52, progression: 0.50 };
+function sharePhotoFloor(gm, id) {
+  // ⚠️ CEIL, NOT ROUND. 1920 x 0.52 is 998.4, and a floor rounded DOWN to 998 delivers 51.98% — under the
+  // number it exists to hold, and a guard written as "at least 52%" then fails on correct code. One pixel,
+  // and it is the difference between honouring the contract's figure and missing it.
+  return gm.aspect === "feed" ? 0 : Math.ceil(gm.H * (SHARE_PHOTO_FLOOR[id] || 0.5));
+}
+/**
+ * THE LARGEST FIT THAT ALSO OBEYS A HEIGHT, not only a width.
+ *
+ * ⚠️ shareFit ANSWERS "WHAT FITS ACROSS", AND ON THESE TWO TEMPLATES THAT IS NOT THE BINDING
+ * CONSTRAINT. The Execution's verdict fits 952px at its top rung on two lines and still overruns the
+ * vertical budget by 90px, so a width-only fit produces a block that eats into the photograph. This
+ * asks the same question with the room stated, and falls back to shareFit's own total-function answer
+ * when even the floor is too tall — which is reported rather than hidden (see the plan's photoFrac).
+ */
+function shareFitToRoom(g, text, boxW, roomH, opt) {
+  const step = opt.step || 2;
+  for (let mx = opt.max; mx >= opt.min; mx -= step) {
+    const f = shareFit(g, text, boxW, { max: mx, min: mx, step: step, weight: opt.weight,
+      lines: opt.lines, lh: opt.lh });
+    if (Math.round(f.size * SHARE_CAP) + (f.lines.length - 1) * f.lh <= roomH) return f;
+  }
+  // ⚠️ THE SMALLEST, NOT THE LARGEST. shareFit(g, text, boxW, opt) answers the biggest size that fits the
+  // WIDTH, which is the one thing already known not to fit the height — so the total-function fallback has
+  // to be the floor. Unreachable on both templates as they stand (the story's verdict has 166px of room
+  // against a 49px floor and a feed post holds no photographic floor at all), which is exactly why it
+  // would go unnoticed.
+  return shareFit(g, text, boxW, { max: opt.min, min: opt.min, step: step, weight: opt.weight,
+    lines: opt.lines, lh: opt.lh });
+}
+/**
+ * ── 2. THE EXECUTION ─────────────────────────────────────────────────────────────────────────────
+ *
+ * Did the session do what it was set to do. The photograph runs the whole canvas and the evidence is an
+ * overlay on it, deepening toward the bottom edge: what the session was and where, the coach's verdict,
+ * the one fact behind it, the run's own kilometres drawn against the band they were prescribed at, and
+ * the three numbers.
+ *
+ * ⚠️ ITS EYEBROW IS THE SESSION TITLE, NOT THE SESSION KIND, AND The Moment'S IS THE OTHER WAY ROUND.
+ * Measured off the two references: 01 reads "EASY RUN . HARTLEPOOL" and 02 reads "36' EASY RUN .
+ * DURHAM". Both strings are on the model and they are not interchangeable — sessionLabel is the kind of
+ * session, title is the plan's own name for this instance. A card about EXECUTION names the thing that
+ * was prescribed.
+ *
+ * ⚠️ THE GAPS ARE MEASURED OFF 02-the-execution-target.png at 1080, and every one is named for what it
+ * separates: metric label baseline to value baseline 40, axis baseline to value figure top 109 (see
+ * axisToValue), lane bottom to axis cap top 21, chart label baseline to lane top 24, chart label cap top
+ * to sentence baseline 53, sentence cap top to verdict baseline 37, verdict cap top to eyebrow baseline
+ * 41.
+ *
+ * ⚠️ axisToValue IS 62 WHERE THE REFERENCE MEASURES 109, AND THE 47px DIFFERENCE IS A WHOLE ROW THIS
+ * DESIGN DOES NOT DRAW. The reference puts "TARGET 5:20-6:10/KM" on its own line between the axis and
+ * the metrics; ours states the band at the RIGHT END OF THE CHART LABEL, on the same baseline as "PACE
+ * AGAINST TARGET". Both axes are still labelled — that is the point of the row — and the band is stated
+ * a second time in the evidence sentence above, because shareEvidenceLine already carries it.
+ *
+ * ⚠️ AND THE ROW HAD TO GO SOMEWHERE. Measured, the reference's block is 748px tall from its eyebrow's
+ * cap top to its metric labels' baseline, and it fits only because it runs to y1755 — 75px past the
+ * y1680 the same brief asks critical content to stay inside. The other three templates hold 1680. So
+ * one of the two numbers had to give, and giving up a caption whose fact is printed twice elsewhere
+ * costs less than either putting the metric row under a platform's reply bar or letting the photograph
+ * fall below the 52% the same section requires.
+ */
+/**
+ * THE ACTIVITY LINE — what the run was, and where — WITH THE PLACE AS THE PART THAT GIVES WAY.
+ *
+ * ⚠️ A TRUNCATED PLACE READS AS A BUG AND A DROPPED ONE READS AS A DECISION. Measured on a real plan's
+ * longest non-repetition title: "GEARED RUN: EASY -> STEADY -> TEMPO -> EASY" plus a place is 53
+ * characters, which does not fit 952px even at the eyebrow's floor size — so shareLsFit ellipsised the
+ * END of the run, and the card shipped an eyebrow finishing "... EQUAL FLOAT) . HAR...". Half a town name
+ * is worse than no town name. When the pair cannot be set at any listed size the place goes and the
+ * session's own name gets the whole width.
+ *
+ * ⚠️ THE HEAD IS DIFFERENT ON THE TWO TEMPLATES AND THAT IS THE CALLER'S BUSINESS. The Execution names
+ * the session TITLE, because it is a card about executing a prescription; The Progression and The Moment
+ * name the session KIND. Both references show their own; this only decides how the pair is fitted.
+ */
+function shareEyebrow(g, gm, head, place) {
+  const h = String(head || "").trim();
+  const pl = String(place || "").toUpperCase().trim();
+  const full = [h, pl].filter(Boolean).join(" \\u00b7 ");
+  if (!full) return null;
+  const opt = { max: shareTypeSize("eyebrow", gm.aspect), min: shareTypeSize("meta", gm.aspect),
+    weight: 800, track: SHARE_TRACK.eyebrow };
+  let eye = shareLsFit(g, full, gm.CW, opt);
+  if (eye && eye.text !== full && pl && h) eye = shareLsFit(g, h, gm.CW, opt);
+  return eye;
+}
+const EXEC_GAP = { labelToValue: 40, axisToValue: 62, chartToAxis: 21, labelToChart: 24,
+  sentenceToLabel: 53, verdictToSentence: 37, eyebrowToVerdict: 41 };
+/**
+ * THE TARGET-BAND CHART — the prescribed band as a filled lane, this run's kilometres plotted in it.
+ *
+ * ⚠️ FASTER IS HIGHER, AND IT IS TESTED. Seconds per kilometre run DOWNWARD as a number and UPWARD as
+ * a performance, so a chart plotted naively on the raw value puts the best kilometre at the bottom.
+ * Y(sec) maps the fastest end of the scale to the smallest y, which is how every pace chart in this app
+ * already draws — paceChartSvg's own comment says "faster is higher, the way runners read it".
+ *
+ * ⚠️ POSITION IS THE PRIMARY ENCODING AND SHAPE IS THE SECOND, so colour is never the only signal:
+ * a kilometre inside the band is a filled ring, one quicker than the band is a triangle pointing the way
+ * it missed (up, because it went faster), one slower is a triangle pointing down, and one the target
+ * could not be applied to is a hollow ring with no fill at all. The brief asks for "the canonical
+ * positive colour plus shape" and for "an accessible visual difference" on the misses; a shape that
+ * points in the direction of the miss is that difference and it also says which way.
+ *
+ * ⚠️ THE MISS HAS A LENGTH. A stem from the band's own edge to the marker is what makes fourteen seconds
+ * quick visible as a distance rather than only as a hue.
+ *
+ * ⚠️ THE SCALE IS PADDED FROM THE SPAN, NOT BY A CONSTANT, so a session run inside a tight band still
+ * shows the band as a lane with room either side rather than as a bar filling the whole box — and a
+ * session with a big miss still shows the band as a lane rather than as a hairline.
+ *
+ * ⚠️ THE MARKER SHRINKS WITH DENSITY. At 11px radius six kilometres read as rings and forty-two read as
+ * one continuous sausage; derived from the spacing so a marathon's chart is still a chart.
+ */
+/**
+ * ⚠️ AND ONCE THE PHOTOGRAPH RUNS TO THE BOTTOM EDGE, EVERY MARK ON THIS CHART CARRIES A KEYLINE.
+ *
+ * The owner's amendment leaves the chart standing on whatever the runner photographed, softened by the
+ * scrim but not replaced by it — so a mark's contrast can no longer be reasoned about from the ground
+ * alone. A deep keyline under each stroke and around each marker answers that once, for any ground, at
+ * no cost to the picture: it is the treatment shareRouteDraw has always used on the route over a photo,
+ * and the brief's own words for it are "a crisp keyline and start/end markers, not neon glow".
+ *
+ * ⚠️ IT IS A KEYLINE, NOT A SHADOW AND NOT A GLOW. One deeper stroke of the same path, two pixels wider
+ * on each side, drawn first. No blur, no offset, nothing that reads as a drop shadow — the two things
+ * the brief names as the wrong way to fix exactly this.
+ *
+ * ⚠️ AND IT IS WHAT LETS THE LANE STAY A TINT. Measured, the alternative was knocking the photograph
+ * down inside the band by two thirds so the marks had somewhere dark to sit, which is a panel over the
+ * picture wearing a chart's name. With the keylines the lane tint can stay at the reference's own
+ * subtlety (measured off 02: interior 1.36:1 against the ground, edge 1.80:1) and the photograph shows
+ * through the band the way it shows through the hero on The Moment.
+ *
+ * ⚠️ TWO MEASURED FIGURES THAT LOOK LIKE FAILURES AND ARE NOT, RECORDED SO THEY ARE NOT RE-CHASED.
+ *
+ * 1. THE LANE'S TINT DISAPPEARS AGAINST FOUR OF FORTY GROUNDS — 1.01:1 on a brick wall, 1.03 on a crowd,
+ *    1.06 and 1.09 on a busy dark one; median 1.34, which is reference 02's own figure. A fixed tint over
+ *    an arbitrary photograph cannot be guaranteed a ratio, and the answer is not to deepen it: the BAND
+ *    is defined by its two edges, which measure 4.17-7.38:1 across every ground tested, and by the axis
+ *    labels under it. The tint is a nicety on top of a boundary that is already there. Deepening it far
+ *    enough to guarantee 1.1:1 on any photograph means a lane dark enough to be a panel, which is the
+ *    thing the owner's amendment removes.
+ *
+ * 2. A MISS MARKER MEASURES 2.79:1 AGAINST THE BAND'S OWN TINT AND 3.38:1 AGAINST THE PHOTOGRAPH, and it
+ *    is the second number the scrim is responsible for. A kilometre a second outside the band draws its
+ *    marker one pixel below the band's edge, with its stem running up into the lane — so a box drawn
+ *    round the marker reaches into the tint, which is 1.6x the luminance of the scrimmed photograph
+ *    beside it. Solving the scrim against the TINTED ground instead would take the alpha from 0.80 to
+ *    0.86 on every Execution card, bright photograph or not, to lift one marker's contrast against a
+ *    decoration by two tenths. The marker is delimited by its own deep keyline, it carries a shape and a
+ *    direction as well as a colour (guarded), and its stem is what connects it to the band deliberately.
+ */
+/**
+ * ⚠️ lineA IS 1 BECAUSE THE REFERENCE'S LINE IS OPAQUE WHITE, MEASURED. Sampled across 23 columns of
+ * 02-the-execution-target between two markers, its peak is rgb(251,253,252) — warm-white, not a
+ * translucent grey. It shipped here at 0.62, which over a photograph is a line 52 RGB units off white
+ * and reads as smoke; with the keyline underneath it, opaque is crisper and closer to the target.
+ */
+/**
+ * ⚠️ triW IS THE MISS TRIANGLE'S HALF-WIDTH AS A MULTIPLE OF THE MARKER RADIUS, AND IT IS NAMED BECAUSE
+ * TWO PLACES NEED IT. shareChartMarker draws the triangle 1.05r wide and shareBandChart insets the plot
+ * by the widest mark plus its keyline; written as a literal in one and forgotten in the other, the miss
+ * markers hung a pixel past the contract's safe region while the on-target ones did not — which is a
+ * defect that only appears on the runs that missed.
+ */
+const SHARE_CHART = { plotH: 86, padK: 0.2, padMin: 8, mr: 11, mrMin: 4, mrK: 0.36, pupil: 0.41,
+  line: 3, edge: 2.5, tint: 0.18, edgeA: 0.85, laneR: 10, axisGap: 18, key: 2, lineA: 1, triW: 1.05 };
+/** The keyline pass: the same path, wider and deeper, so the coloured pass reads on any photograph. */
+function shareChartKey(g, lw) {
+  g.strokeStyle = SHARE_INK.keyline; g.lineWidth = lw + SHARE_CHART.key * 2; g.stroke();
+}
+function shareChartMarker(g, kind, px, py, r, col) {
+  if (kind === "fast" || kind === "slow") {
+    const up = kind === "fast", h = r * 1.22, hw = r * SHARE_CHART.triW;
+    g.beginPath();
+    g.moveTo(px, py + (up ? -h : h));
+    g.lineTo(px + hw, py + (up ? h * 0.72 : -h * 0.72));
+    g.lineTo(px - hw, py + (up ? h * 0.72 : -h * 0.72));
+    g.closePath();
+    g.lineJoin = "round";
+    shareChartKey(g, 0);
+    g.fillStyle = col; g.fill();
+    return;
+  }
+  if (kind === "in") {
+    g.beginPath(); g.arc(px, py, r, 0, 7);
+    shareChartKey(g, 0);
+    g.fillStyle = col; g.fill();
+    // A ground-coloured pupil, so two markers that touch still read as two rings rather than a blob.
+    g.fillStyle = SHARE_INK.ground; g.beginPath(); g.arc(px, py, r * SHARE_CHART.pupil, 0, 7); g.fill();
+    return;
+  }
+  // Unjudged: an outline and no fill. The band was never applied to this kilometre, and a filled
+  // marker in any colour claims it was.
+  const lw = Math.max(2, r * 0.28);
+  g.beginPath(); g.arc(px, py, r * 0.82, 0, 7);
+  shareChartKey(g, lw);
+  g.strokeStyle = col; g.lineWidth = lw; g.stroke();
+}
+function shareBandChart(g, m, x, y, w, h) {
+  const b = m.band, rows = m.rows || [];
+  const lo0 = Math.min(m.fastest, b.minSecPerKm), hi0 = Math.max(m.slowest, b.maxSecPerKm);
+  const pad = Math.max(SHARE_CHART.padMin, (hi0 - lo0) * SHARE_CHART.padK);
+  const lo = lo0 - pad, hi = hi0 + pad;
+  const Y = (sec) => y + (sec - lo) / (hi - lo) * h;
+  const span = rows.length > 1 ? w / (rows.length - 1) : w;
+  const r = Math.max(SHARE_CHART.mrMin, Math.min(SHARE_CHART.mr, span * SHARE_CHART.mrK));
+  /**
+   * ⚠️ THE MARKS ARE INSET BY THEIR OWN RADIUS PLUS THEIR KEYLINE, SO THE CHART'S INK STAYS INSIDE THE
+   * CONTRACT'S SAFE REGION. The band, which is aligned with the copy above it, spans the full content
+   * width; the first and last MARKER used to be centred on that same edge, so their outer rim and its
+   * keyline hung 13px past it. Measured on the built card, ink bounds x[53,1026] against a stated
+   * x 64-1016 — over on both sides, and over on the right where reference 02 is not: its own chart ink
+   * measures 58.5-1005.4 in 1080-space, inside the right margin by 10px.
+   * ⚠️ THE INSET IS THE WIDEST MARK'S OWN HALF-WIDTH, NOT THE RADIUS. A miss triangle is r * triW wide
+   * and its keyline adds another key on top, so an inset of r + key left the miss markers a pixel over the
+   * margin while every on-target card measured clean — a defect visible only on the runs that missed.
+   * ⚠️ r IS TAKEN FROM THE UN-INSET SPAN, deliberately. Insetting shortens the run of markers, which can
+   * only make the derived radius smaller — so solving them together would need an iteration to save at
+   * most a pixel, and a marker radius that depends on itself is worse than a marker one pixel wide.
+   * ⚠️ AND IT IS CLAMPED TO A QUARTER OF THE WIDTH, so a two-point chart on a narrow reflow cannot invert
+   * its own plot.
+   */
+  const inset = Math.min(w / 4, r * SHARE_CHART.triW + SHARE_CHART.key);
+  const px0 = x + inset, pw = Math.max(1, w - inset * 2);
+  const X = (i) => rows.length > 1 ? px0 + i / (rows.length - 1) * pw : px0 + pw / 2;
+  const yFast = Y(b.minSecPerKm), ySlow = Y(b.maxSecPerKm);
+  rr(g, x, yFast, w, Math.max(6, ySlow - yFast), SHARE_CHART.laneR);
+  g.fillStyle = cardAlpha(SHARE_INK.accent, SHARE_CHART.tint); g.fill();
+  // ⚠️ THE CAP IS SET EXPLICITLY. Canvas state persists across every draw on this card, so a round cap
+  // left behind by the route or the pace line would extend each band edge past the margin by half its
+  // keyline — the same overhang this inset exists to remove, arriving from somewhere else.
+  g.lineCap = "butt";
+  [yFast, ySlow].forEach((yy) => {
+    g.beginPath(); g.moveTo(x, yy); g.lineTo(x + w, yy);
+    shareChartKey(g, SHARE_CHART.edge);
+    g.strokeStyle = cardAlpha(SHARE_INK.accent, SHARE_CHART.edgeA);
+    g.lineWidth = SHARE_CHART.edge; g.stroke();
+  });
+  if (rows.length > 1) {
+    g.lineJoin = "round"; g.lineCap = "round";
+    g.beginPath();
+    rows.forEach((rw, i) => i ? g.lineTo(X(i), Y(rw.sec)) : g.moveTo(X(i), Y(rw.sec)));
+    shareChartKey(g, SHARE_CHART.line);
+    g.strokeStyle = cardAlpha(SHARE_INK.ink, SHARE_CHART.lineA);
+    g.lineWidth = SHARE_CHART.line; g.stroke();
+  }
+  rows.forEach((rw, i) => {
+    const px = X(i), py = Y(rw.sec);
+    const col = rw.verdict === "in" ? SHARE_INK.accent : rw.verdict === "fast" ? SHARE_INK.fast
+      : rw.verdict === "slow" ? SHARE_INK.slow : SHARE_INK.unjudged;
+    if (rw.verdict === "fast" || rw.verdict === "slow") {
+      g.lineCap = "butt";
+      g.beginPath(); g.moveTo(px, rw.verdict === "fast" ? yFast : ySlow); g.lineTo(px, py);
+      shareChartKey(g, SHARE_CHART.line);
+      g.strokeStyle = col; g.lineWidth = SHARE_CHART.line; g.stroke();
+    }
+    shareChartMarker(g, rw.verdict, px, py, r, col);
+  });
+  return { r: r, lo: lo, hi: hi, yFast: yFast, ySlow: ySlow, X: X, Y: Y };
+}
+/**
+ * WHICH KILOMETRES GET AN AXIS LABEL — every one that fits, thinned when they do not.
+ *
+ * ⚠️ AN UNLABELLED CHART IS ONE OF THE BRIEF'S NAMED DEFECTS, AND SO IS A COLLIDING ONE. Six labels
+ * across 952px is what the reference shows; forty-two is a marathon, and at 23px of spacing they
+ * overprint into a smear. The step is derived from the widest label actually measured rather than from a
+ * count, so it holds at any type size and in either aspect.
+ *
+ * ⚠️ THE FIRST AND LAST ARE ALWAYS LABELLED. A thinned axis whose right end is unlabelled leaves the
+ * reader unable to say how long the run was, which is the one thing the axis is for. When the last would
+ * land too close to the previous kept tick it REPLACES it rather than being added beside it.
+ */
+function shareAxisKeep(g, rows, w, size, track) {
+  if (!rows.length) return [];
+  g.font = shareFont(700, size);
+  let widest = 0;
+  for (const rw of rows) widest = Math.max(widest, cardLsWidth(g, rw.km + "KM", track));
+  const span = rows.length > 1 ? w / (rows.length - 1) : w;
+  const step = Math.max(1, Math.ceil((widest + SHARE_CHART.axisGap) / Math.max(1, span)));
+  const keep = [];
+  for (let i = 0; i < rows.length; i += step) keep.push(i);
+  const last = rows.length - 1;
+  if (keep[keep.length - 1] !== last) {
+    if (keep.length > 1 && last - keep[keep.length - 1] < step) keep[keep.length - 1] = last;
+    else keep.push(last);
+  }
+  return keep;
+}
+function shareExecutionPlan(g, m, gm) {
+  const A = gm.aspect;
+  const mets = shareRowMetrics(m);
+  const P = shareMetricPlan(g, gm, mets);
+  const quiet = shareQuietPlan(gm, shareTypeSize("meta", A));
+  const labelBase = gm.safe.y1 - 8 - quiet.reserve;
+  const valueBase = labelBase - EXEC_GAP.labelToValue;
+  const rowTop = valueBase - Math.round(P.valueS * SHARE_FIG);
+  // The axis and the chart's own label share one rung: they are the two ends of the same graphic.
+  const axisS = shareTypeSize("label", A), axisCap = Math.round(axisS * SHARE_CAP);
+  const axisBase = rowTop - EXEC_GAP.axisToValue;
+  const chartBottom = axisBase - axisCap - EXEC_GAP.chartToAxis;
+  const chartTop = chartBottom - SHARE_CHART.plotH;
+  const capBase = chartTop - EXEC_GAP.labelToChart;
+  const capTop = capBase - axisCap;
+  const bandTxt = m.band ? "TARGET " + fmtPace(m.band.minSecPerKm) + "\\u2013" +
+    fmtPace(m.band.maxSecPerKm) + "/KM" : "";
+  const capL = shareLsFit(g, "PACE AGAINST TARGET", gm.CW, { max: axisS, min: axisS, weight: 700,
+    track: SHARE_TRACK.label });
+  // ⚠️ THE RANGE IS DROPPED RATHER THAN OVERPRINTED. It is stated in the evidence sentence above as
+  // well, so losing it here costs a repetition; letting the two runs collide costs the row.
+  const capR = bandTxt ? shareLsFit(g, bandTxt, gm.CW - capL.w - 40, { max: axisS,
+    min: Math.round(axisS * 0.8), weight: 700, track: SHARE_TRACK.label }) : null;
+  const capRok = !!(capR && capL.w + 40 + capR.w <= gm.CW);
+  const sentTxt = String((m.verdict && m.verdict.evidenceLine) || "");
+  const sent = sentTxt ? shareFit(g, sentTxt, gm.CW, { max: shareTypeSize("lead", A),
+    min: shareTypeSize("meta", A), step: 1, weight: 600, lines: 2, lh: 1.26 }) : null;
+  const sentBase = sent ? capTop - EXEC_GAP.sentenceToLabel : capTop;
+  const sentTop = sent ? sentBase - Math.round(sent.size * SHARE_CAP) - (sent.lines.length - 1) * sent.lh
+    : capTop;
+  const verdBase = sentTop - EXEC_GAP.verdictToSentence;
+  // The session TITLE here, not the kind — see shareEyebrow, and the note at the top of this template.
+  const eye = shareEyebrow(g, gm, m.title, m.coarseLocation);
+  const eyeCap = eye ? Math.round(eye.size * SHARE_CAP) : 0;
+  const floorY = sharePhotoFloor(gm, "execution");
+  // ⚠️ THE ROOM RESERVES THE EYEBROW'S RUNG, NOT THE SIZE IT HAPPENED TO FIT AT. Measured, a long
+  // session title shrinks the eyebrow, which frees four pixels, which lets the verdict grow a rung — so
+  // the same run rendered with a longer place name came out with a visibly different headline size. The
+  // reservation is the ladder's own cap height, so the verdict's size depends on the canvas and the
+  // headline alone; a shorter eyebrow simply leaves the block a few pixels lower, which is more
+  // photograph and can only help.
+  const eyeRungCap = eye ? Math.round(shareTypeSize("eyebrow", A) * SHARE_CAP) : 0;
+  const room = verdBase - (floorY + eyeRungCap + (eye ? EXEC_GAP.eyebrowToVerdict : 0));
+  const vmax = shareTypeSize("display", A);
+  const verd = m.pill ? shareFitToRoom(g, m.pill.text, gm.CW, Math.max(40, room),
+    { max: vmax, min: Math.round(vmax * 0.55), step: 2, weight: 800, lines: 2, lh: 0.945 }) : null;
+  const verdTop = verd ? verdBase - Math.round(verd.size * SHARE_CAP) - (verd.lines.length - 1) * verd.lh
+    : sentTop;
+  const eyeBase = eye ? verdTop - EXEC_GAP.eyebrowToVerdict : verdTop;
+  const eyeTop = eye ? eyeBase - eyeCap : verdTop;
+  const date = m.dateLabel ? shareLsFit(g, String(m.dateLabel).toUpperCase(), Math.round(gm.CW * 0.62),
+    { max: shareTypeSize("meta", A), min: shareTypeSize("foot", A), weight: 700,
+      track: SHARE_TRACK.meta }) : null;
+  return { mets: mets, P: P, labelBase: labelBase, valueBase: valueBase, rowTop: rowTop,
+    axisS: axisS, axisBase: axisBase, chartTop: chartTop, chartBottom: chartBottom,
+    capL: capL, capR: capRok ? capR : null, capBase: capBase,
+    sent: sent, sentBase: sentBase, verd: verd, verdBase: verdBase,
+    eye: eye, eyeBase: eyeBase, blockTop: eyeTop,
+    date: date, dateBase: quiet.base, photoFrac: eyeTop / gm.H };
+}
+function shareExecutionCard(g, m, gm, probe, wm) {
+  const p = shareExecutionPlan(g, m, gm);
+  // ⚠️ THE SAME SCRIM The Moment USES, AND TWO MORE COLOURS BECAUSE THIS TEMPLATE DRAWS TWO MORE THINGS.
+  // This card used to take an opaque lower section, which is what the owner's amendment removes; now the
+  // photograph runs to the bottom edge and the alpha is solved additionally for the two miss colours,
+  // which are the only marks on any of these cards that are neither white nor teal. Solving for the type
+  // alone left an orange-red "slower than target" marker at 2.31:1 on a bright photograph.
+  // ⚠️ AND THE MISS COLOURS ARE ASKED FOR 3.2, NOT 4.5. They are non-text graphics, where the standard
+  // asks 3:1; 3.2 is that with a fifth of a point of margin against the 2% quantisation in the solver,
+  // and asking 4.5 of a mid-tone orange would darken every bright photograph for no readable gain.
+  //
+  // ⚠️ THE FAINT TIER WAS ASKED FOR HERE AND IS NOT ANY MORE, AND IT WAS COSTING TEN POINTS OF SOMEBODY'S
+  // PHOTOGRAPH ON EVERY EXECUTION CARD. Measured against a white ground: this list solved 0.88 where The
+  // Moment's and The Progression's solved 0.78, so the one template the owner's amendment was reported
+  // against kept the LEAST of its picture — 13.4% of the subject surviving the block against 20.8% and
+  // 21.7%. The cause was one element, the target range at the right end of the chart caption, and the
+  // answer is to set it a tier brighter rather than to darken the whole card for it: inkSoft is already
+  // solved for by shareScrimText, so the list drops to 0.80 and the family is uniform to two points.
+  // ⚠️ THE ALTERNATIVE — SOLVE FOR THE MISS COLOURS ONLY WHEN A MISS EXISTS — WAS REJECTED. It would make
+  // the scrim's depth depend on the run's RESULT, so two cards of the same photograph would be different
+  // shades and the runner could read the verdict off how dark their picture came out.
+  // ⚠️ AND NOTHING ON A PHOTO CARD SETS THE FAINT TIER NOW, which is what makes that testable rather than
+  // remembered: the poster keeps it (flat ground, 6.50:1 by arithmetic) and the three photo templates do
+  // not use it at all.
+  sharePhotoScrim(g, gm, probe, p.blockTop, shareScrimText().concat(
+    [{ hex: SHARE_INK.fast, target: 3.2 }, { hex: SHARE_INK.slow, target: 3.2 }]));
+  shareTopScrim(g, gm, probe, wm.rect,
+    [{ hex: SHARE_INK.ink, target: 4.5 }, { hex: SHARE_INK.accent, target: 4.5 }]);
+  shareWordmark(g, gm.M, wm.y, wm.size, "left");
+  if (p.eye) {
+    g.font = shareFont(800, p.eye.size); g.fillStyle = SHARE_INK.accent;
+    lsText(g, p.eye.text, gm.M, p.eyeBase, p.eye.track, "left");
+  }
+  if (p.verd) {
+    g.font = shareFont(800, p.verd.size); g.fillStyle = SHARE_INK.ink;
+    p.verd.lines.forEach((ln, i) =>
+      g.fillText(ln, gm.M, p.verdBase - (p.verd.lines.length - 1 - i) * p.verd.lh));
+  }
+  if (p.sent) {
+    g.font = shareFont(600, p.sent.size); g.fillStyle = SHARE_INK.inkSoft;
+    p.sent.lines.forEach((ln, i) =>
+      g.fillText(ln, gm.M, p.sentBase - (p.sent.lines.length - 1 - i) * p.sent.lh));
+  }
+  g.font = shareFont(700, p.capL.size); g.fillStyle = SHARE_INK.accent;
+  lsText(g, p.capL.text, gm.M, p.capBase, p.capL.track, "left");
+  if (p.capR) {
+    // ⚠️ THE SOFT TIER, NOT THE FAINT ONE, AND IT IS A COMPOSITION DECISION MADE BY MEASUREMENT. See the
+    // scrim note above: the faint tier is the hungriest colour in the family and this was the only
+    // element on any photo card setting it. Reference 02 has no target-range label at all — its chart
+    // caption is teal on the left and empty on the right (measured: no ink above luma 0.08 right of x400
+    // on that row) — so this element has no reference tier to honour, and a chart with no band labelled
+    // is one of the brief's own named defects. It stays quieter than the accent caption beside it.
+    g.font = shareFont(700, p.capR.size); g.fillStyle = SHARE_INK.inkSoft;
+    lsText(g, p.capR.text, gm.safe.x1, p.capBase, p.capR.track, "right");
+  }
+  const rows = m.rows || [];
+  if (m.band && rows.length) {
+    const ch = shareBandChart(g, m, gm.M, p.chartTop, gm.CW, SHARE_CHART.plotH);
+    const keep = shareAxisKeep(g, rows, gm.CW, p.axisS, SHARE_TRACK.label);
+    g.font = shareFont(700, p.axisS); g.fillStyle = SHARE_INK.inkSoft;
+    keep.forEach((i) => {
+      // ⚠️ CLAMPED TO THE MARGINS. Centring the first and last labels on their markers would hang half
+      // of each off the content width, which on a full-bleed card means off the canvas.
+      const cx = ch.X(i), t = rows[i].km + "KM", tw = cardLsWidth(g, t, SHARE_TRACK.label);
+      const at = Math.min(gm.safe.x1 - tw / 2, Math.max(gm.M + tw / 2, cx));
+      lsText(g, t, at, p.axisBase, SHARE_TRACK.label, "center");
+    });
+  }
+  if (p.mets.length) {
+    shareMetricRules(g, gm, p.mets, p.P, p.rowTop - 12, p.labelBase + 12);
+    shareMetricDraw(g, gm, p.mets, p.P, p.valueBase, p.labelBase, SHARE_INK.inkSoft);
+  }
+  if (p.date) {
+    g.font = shareFont(700, p.date.size); g.fillStyle = SHARE_INK.inkSoft;
+    lsText(g, p.date.text, gm.safe.x1, p.dateBase, p.date.track, "right");
+  }
+}
+/**
+ * ── 4. THE PROGRESSION ───────────────────────────────────────────────────────────────────────────
+ *
+ * The splits as one story: what kind of run and where, what the evidence says about how it went, the
+ * fact behind that, then the kilometres as a ladder, the three numbers and the date.
+ *
+ * ⚠️ THE HEADLINE IS A CLAIM AND IT IS EARNED ELSEWHERE. shareProgressionClaim is the only place that
+ * decides whether there is one; when there is not, the eyebrow is followed straight by the ladder and
+ * the block simply starts lower down the card. "Otherwise the neutral line or nothing" is the brief's
+ * own instruction and nothing is a real answer.
+ *
+ * ⚠️ THE GAPS ARE MEASURED OFF 04-the-progression-target.png at 1080: metric label baseline to value
+ * baseline 47, last ladder baseline to value figure top 77, SPLITS baseline to first row cap top 31,
+ * interpretation cap top to SPLITS baseline 54, headline cap top to interpretation baseline 35, eyebrow
+ * baseline to headline cap top 38, row pitch 55.5.
+ *
+ * ⚠️ TWO OF THEM ARE TIGHTENED AND BOTH ARE STATED. labelToValue is 40 rather than 47 because the
+ * metric row is ONE component shared with The Execution, and giving the same row a different label gap
+ * per template is drift rather than design. ladderToValue is 58 rather than 77 because the reference's
+ * block runs to y1738 where this one holds the brief's own y1680 — the same 75px this family gives up
+ * on all four templates.
+ *
+ * ⚠️ AND THE REFERENCE'S SIXTH ROW IS NOT BUILT. "FINAL 0.51 KM . 5:33/KM" is a pace for the part
+ * kilometre after the last whole one, and nothing anywhere in this app stores it: both devices cut
+ * splits at 1000 m boundaries and the leftover is not recorded. It could be arithmetic — the run's
+ * total time less the sum of the splits, over the distance less their count — and that is exactly the
+ * fact this renderer is forbidden to invent. So the ladder is whole kilometres, and a 5.51 km run shows
+ * five rows rather than six.
+ */
+const PROG_GAP = { labelToValue: 40, ladderToValue: 58, splitsToLadder: 28, interpToSplits: 46,
+  headlineToInterp: 34, eyebrowToHeadline: 38 };
+/**
+ * THE SPLIT LADDER'S OWN GEOMETRY, MEASURED OFF THE REFERENCE AS FRACTIONS OF THE CONTENT WIDTH.
+ *
+ * Read at 1080: the identity starts at x62, the pace is right-aligned at about x455, and the bar runs
+ * from x490 to x1021 — so 0.41 and 0.448 of a 952px content width, with the track ending on the margin.
+ * Held as fractions so the 4:5 reflow keeps the same proportions rather than the same pixels.
+ *
+ * ⚠️ minSpan IS rdWell'S OWN 25 SECONDS, NOT A NUMBER CHOSEN HERE. "Bars share one honest scale based
+ * on the displayed range with a minimum visible range to avoid exaggerating tiny differences": without
+ * a floor under the range, a runner whose kilometres are two seconds apart gets a chart that says they
+ * fell apart, because the fastest bar is full and the slowest is stubby. With the floor, two seconds
+ * looks like two seconds. The same 25 is what the debrief already uses before it will say a pace was
+ * even throughout, so the two surfaces cannot disagree about what "even" means.
+ *
+ * ⚠️ minBar IS THE REFERENCE'S OWN SHORTEST BAR, measured at 184px of a 531px track: 0.347. A slowest
+ * kilometre that draws as nothing is a row with a length missing rather than a short length.
+ */
+/**
+ * WHEN A PACE COUNTS AS EVEN — rdWell's own threshold, in one place, read by two things.
+ *
+ * ⚠️ IT IS DECLARED HERE AND NOT BESIDE shareProgressionClaim, AND THE REASON IS A REAL FAULT THIS
+ * FILE HAS ALREADY PAID FOR ONCE. SHARE_LADDER reads it, and SHARE_LADDER is a top-level const some
+ * three hundred lines EARLIER than the claim function — so declared down there it was in its temporal
+ * dead zone when the ladder was built, the whole script block threw on load, and the app rendered a
+ * blank page. The build exited 0, node --check on the emitted script passed (the syntax is perfectly
+ * valid), tsc was clean and all 851 tests passed, because the test sandbox emits the constants in its
+ * own order. A const must be declared above every top-level const that reads it.
+ */
+const SHARE_EVEN_SPREAD_S = 25;
+/**
+ * ⚠️ THE TRACK IS TWO PASSES, AND THAT IS WHAT MAKES IT THE SAME LENGTH OF GREY ON ANY PHOTOGRAPH.
+ *
+ * Reference 04 draws the track as a flat grey at luma 34 on a flat ink ground — 1.23:1, just enough to
+ * see where a bar ENDS. Once the owner's amendment leaves a photograph running behind the ladder, one
+ * pass of white at 20% is 59 on a dark photograph and 90 on a bright one, and at 90 the accent bar
+ * against its own track measures 2.87:1 — under the 3:1 a chart needs. Two passes fix the ground first
+ * (ground at 92%, INSIDE the 16px bar and nowhere else) and then lighten it (ink at 24%), so the track
+ * is 72-76 whatever is behind it while the ground beside it ranges 8 to 51.
+ *
+ * ⚠️ AND THE FIRST ATTEMPT AT THOSE TWO NUMBERS WAS MEASURED AND REJECTED. At 0.80/0.13 the track lands
+ * at 52 and the scrimmed ground under a bright photograph lands at 51 — measured on a 42-kilometre run
+ * over a white ground, track 0.03435 against ground 0.03444, a ratio of 1.00:1. The bar was perfectly
+ * legible and the TRACK was invisible, so there was no way to read a bar as a fraction of anything. The
+ * pair only works when the track is reliably lighter than the brightest ground the scrim allows under it.
+ *
+ * ⚠️ IT IS THE CHART'S OWN GRAPHIC, NOT A SCRIM BEHIND TYPE. Nothing is set over it; the identity and
+ * the pace sit to its left on the open photograph, carried by the one scrim like every other line of
+ * copy. Sixteen pixels of a bar is the picture the reference draws — a full-width plate under the block
+ * is the thing that went.
+ */
+const SHARE_LADDER = { max: 6, pitch: 56, minPitch: 44, minSpan: SHARE_EVEN_SPREAD_S, minBar: 0.35,
+  timeK: 0.41, barK: 0.448, barH: 16, trackA: 0.24, trackInk: 0.92 };
+/**
+ * THE ROWS — every measured kilometre when there are six or fewer, and equal blocks of them when there
+ * are more.
+ *
+ * ⚠️ "NEVER SILENTLY CHERRY-PICK THE BEST SPLITS" IS THE RULE, AND THE WAY THIS OBEYS IT IS THAT
+ * MEMBERSHIP IS A FUNCTION OF POSITION ALONE. No row is chosen for being fast or slow, nothing is
+ * dropped for being inconvenient, every kilometre belongs to exactly one row, and shuffling the paces
+ * cannot change which row a kilometre lands in. The brief offers four summary strategies; this is
+ * "evenly sampled splits" taken as blocks rather than as a sample, so a marathon's 42 kilometres become
+ * six seven-kilometre means and none of them is thrown away.
+ *
+ * ⚠️ THE REMAINDER GOES TO THE EARLIEST BLOCKS, deliberately, so the CLOSE of the run is described by
+ * the tightest blocks — which is where a progression claim is made and where the reader looks last.
+ *
+ * ⚠️ AN ESTIMATED SPLIT IS NOT A COMPARABLE ONE. It is the elapsed stretch divided evenly across the
+ * kilometres the phone missed, so every bar drawn from one is the same length by construction: three of
+ * them would draw a flat, confident, invented progression. They are excluded, and the row identities are
+ * the real kilometre numbers, so a gap in the numbering is visible rather than papered over.
+ */
+function shareLadderRows(m) {
+  const src = (m.splits || []).filter((r) => r && r.sec > 0 && !r.est);
+  if (src.length <= SHARE_LADDER.max) {
+    return src.map((r) => ({ label: r.km + " KM", sec: r.sec, members: [r.km] }));
+  }
+  const g = SHARE_LADDER.max, base = Math.floor(src.length / g), extra = src.length % g;
+  const out = [];
+  let i = 0;
+  for (let b = 0; b < g; b++) {
+    const n = base + (b < extra ? 1 : 0);
+    const part = src.slice(i, i + n);
+    i += n;
+    const sec = Math.round(part.reduce((x, r) => x + r.sec, 0) / part.length);
+    out.push({ label: part[0].km + (n > 1 ? "\\u2013" + part[n - 1].km : "") + " KM", sec: sec,
+      members: part.map((r) => r.km) });
+  }
+  return out;
+}
+/** One honest scale across the displayed rows, with the minimum visible range applied. */
+function shareLadderScale(rows) {
+  const secs = rows.map((r) => r.sec);
+  let lo = secs.length ? Math.min.apply(null, secs) : 0;
+  let hi = secs.length ? Math.max.apply(null, secs) : 1;
+  if (hi - lo < SHARE_LADDER.minSpan) {
+    const mid = (lo + hi) / 2;
+    lo = mid - SHARE_LADDER.minSpan / 2; hi = mid + SHARE_LADDER.minSpan / 2;
+  }
+  const span = Math.max(1, hi - lo);
+  // ⚠️ CLAMPED, THOUGH NOTHING SHOULD ASK OUTSIDE THE RANGE. lo and hi come from the displayed rows, so a
+  // fraction outside 0..1 is unreachable by construction — and a bar drawn past the end of its own track
+  // is the kind of thing that only shows up on the one run nobody tested, so the total function is here
+  // rather than at the one call site.
+  return { lo: lo, hi: hi,
+    frac: (sec) => Math.max(0, Math.min(1,
+      SHARE_LADDER.minBar + (1 - SHARE_LADDER.minBar) * (hi - sec) / span)) };
+}
+function shareProgressionPlan(g, m, gm) {
+  const A = gm.aspect;
+  const mets = shareRowMetrics(m);
+  const P = shareMetricPlan(g, gm, mets);
+  const quiet = shareQuietPlan(gm, shareTypeSize("meta", A));
+  const labelBase = gm.safe.y1 - 8 - quiet.reserve;
+  const valueBase = labelBase - PROG_GAP.labelToValue;
+  const rowTop = valueBase - Math.round(P.valueS * SHARE_FIG);
+  const rows = shareLadderRows(m);
+  const rowS = shareTypeSize("row", A), rowCap = Math.round(rowS * SHARE_CAP);
+  const lastBase = rowTop - PROG_GAP.ladderToValue;
+  const secS = shareTypeSize("sub", A), secCap = Math.round(secS * SHARE_CAP);
+  // The session KIND here, as 01 and 04 both show — the plan's own title is The Execution's line.
+  const eye = shareEyebrow(g, gm, String(m.sessionLabel || "").toUpperCase(), m.coarseLocation);
+  const eyeCap = eye ? Math.round(eye.size * SHARE_CAP) : 0;
+  const claim = m.progression || null;
+  const hmax = shareTypeSize("headline", A);
+  const head = claim ? shareFit(g, claim.claim, gm.CW, { max: hmax, min: Math.round(hmax * 0.6),
+    step: 2, weight: 800, lines: 2, lh: 0.94 }) : null;
+  const interp = claim && claim.evidence ? shareFit(g, claim.evidence, gm.CW,
+    { max: shareTypeSize("lead", A), min: shareTypeSize("meta", A), step: 1, weight: 600, lines: 2,
+      lh: 1.26 }) : null;
+  // Everything above the ladder is a fixed height; the ladder's PITCH is what gives way to hold the
+  // photographic floor, because it is the only continuous quantity left once the type is on the ladder.
+  const secBlock = rows.length ? secCap + PROG_GAP.splitsToLadder : 0;
+  const interpBlock = interp
+    ? Math.round(interp.size * SHARE_CAP) + (interp.lines.length - 1) * interp.lh +
+      PROG_GAP.interpToSplits : 0;
+  const headBlock = head
+    ? Math.round(head.size * SHARE_CAP) + (head.lines.length - 1) * head.lh +
+      (interp ? PROG_GAP.headlineToInterp : PROG_GAP.interpToSplits) : 0;
+  const eyeBlock = eye ? eyeCap + (head ? PROG_GAP.eyebrowToHeadline : PROG_GAP.interpToSplits) : 0;
+  const aboveH = secBlock + interpBlock + headBlock + eyeBlock;
+  const floorY = sharePhotoFloor(gm, "progression");
+  const roomForPitch = lastBase - rowCap - aboveH - floorY;
+  const pitch = rows.length > 1
+    ? Math.max(SHARE_LADDER.minPitch, Math.min(SHARE_LADDER.pitch,
+        Math.floor(roomForPitch / (rows.length - 1))))
+    : SHARE_LADDER.pitch;
+  const firstBase = lastBase - (Math.max(0, rows.length - 1)) * pitch;
+  const ladderTop = firstBase - rowCap;
+  const secBase = rows.length ? ladderTop - PROG_GAP.splitsToLadder : ladderTop;
+  const secTop = rows.length ? secBase - secCap : ladderTop;
+  const interpBase = interp ? secTop - PROG_GAP.interpToSplits : secTop;
+  const interpTop = interp
+    ? interpBase - Math.round(interp.size * SHARE_CAP) - (interp.lines.length - 1) * interp.lh
+    : secTop;
+  const headBase = head ? interpTop - (interp ? PROG_GAP.headlineToInterp : PROG_GAP.interpToSplits)
+    : interpTop;
+  const headTop = head
+    ? headBase - Math.round(head.size * SHARE_CAP) - (head.lines.length - 1) * head.lh : interpTop;
+  const eyeBase = eye ? headTop - (head ? PROG_GAP.eyebrowToHeadline : PROG_GAP.interpToSplits)
+    : headTop;
+  const eyeTop = eye ? eyeBase - eyeCap : headTop;
+  const date = m.dateLabel ? shareLsFit(g, String(m.dateLabel).toUpperCase(), Math.round(gm.CW * 0.62),
+    { max: shareTypeSize("meta", A), min: shareTypeSize("foot", A), weight: 700,
+      track: SHARE_TRACK.meta }) : null;
+  return { mets: mets, P: P, labelBase: labelBase, valueBase: valueBase, rowTop: rowTop,
+    rows: rows, rowS: rowS, pitch: pitch, firstBase: firstBase, lastBase: lastBase,
+    scale: shareLadderScale(rows),
+    barX: gm.M + Math.round(gm.CW * SHARE_LADDER.barK), timeX: gm.M + Math.round(gm.CW * SHARE_LADDER.timeK),
+    secS: secS, secBase: secBase, interp: interp, interpBase: interpBase,
+    head: head, headBase: headBase, eye: eye, eyeBase: eyeBase, blockTop: eyeTop,
+    date: date, dateBase: quiet.base, photoFrac: eyeTop / gm.H };
+}
+function shareProgressionCard(g, m, gm, probe, wm) {
+  const p = shareProgressionPlan(g, m, gm);
+  // ⚠️ THE SAME SCRIM, AND ONLY THE THREE TYPE TIERS. This template's one graphic is the ladder, whose
+  // bar is the accent and whose track is solved against the accent by construction (see the track's own
+  // note), so there is no fourth colour to ask for and no reason to darken a photograph for one.
+  sharePhotoScrim(g, gm, probe, p.blockTop, shareScrimText());
+  shareTopScrim(g, gm, probe, wm.rect,
+    [{ hex: SHARE_INK.ink, target: 4.5 }, { hex: SHARE_INK.accent, target: 4.5 }]);
+  shareWordmark(g, gm.M, wm.y, wm.size, "left");
+  if (p.eye) {
+    g.font = shareFont(800, p.eye.size); g.fillStyle = SHARE_INK.accent;
+    lsText(g, p.eye.text, gm.M, p.eyeBase, p.eye.track, "left");
+  }
+  if (p.head) {
+    g.font = shareFont(800, p.head.size); g.fillStyle = SHARE_INK.ink;
+    p.head.lines.forEach((ln, i) =>
+      g.fillText(ln, gm.M, p.headBase - (p.head.lines.length - 1 - i) * p.head.lh));
+  }
+  if (p.interp) {
+    g.font = shareFont(600, p.interp.size); g.fillStyle = SHARE_INK.inkSoft;
+    p.interp.lines.forEach((ln, i) =>
+      g.fillText(ln, gm.M, p.interpBase - (p.interp.lines.length - 1 - i) * p.interp.lh));
+  }
+  if (p.rows.length) {
+    g.font = shareFont(700, p.secS); g.fillStyle = SHARE_INK.accent;
+    lsText(g, "SPLITS", gm.M, p.secBase, SHARE_TRACK.sub, "left");
+    const trackW = gm.safe.x1 - p.barX, bh = SHARE_LADDER.barH, r = bh / 2;
+    p.rows.forEach((rw, i) => {
+      const base = p.firstBase + i * p.pitch;
+      // ⚠️ THE IDENTITY IS THE SOFTER TIER AND THE PACE IS THE BRIGHTEST, because the pace is the fact
+      // and the identity is its label. Both clear AA on the flat ground the veil leaves here.
+      g.font = shareFont(700, p.rowS); g.fillStyle = SHARE_INK.inkSoft;
+      lsText(g, rw.label, gm.M, base, SHARE_TRACK.label, "left");
+      g.font = shareFont(800, p.rowS); g.fillStyle = SHARE_INK.ink;
+      shareFig(g, fmtPace(rw.sec), p.timeX, base, "right");
+      const cy = base - Math.round(p.rowS * SHARE_CAP * 0.46);
+      // ⚠️ TWO PASSES OVER ONE PATH — see SHARE_LADDER. Fix the ground inside the bar, then lighten it,
+      // so the track is the same grey on a snowfield as on dark wood and the accent bar always reads.
+      rr(g, p.barX, cy - bh / 2, trackW, bh, r);
+      g.fillStyle = cardAlpha(SHARE_INK.ground, SHARE_LADDER.trackInk); g.fill();
+      rr(g, p.barX, cy - bh / 2, trackW, bh, r);
+      g.fillStyle = cardAlpha(SHARE_INK.ink, SHARE_LADDER.trackA); g.fill();
+      const w = Math.max(bh, Math.round(trackW * p.scale.frac(rw.sec)));
+      rr(g, p.barX, cy - bh / 2, w, bh, r);
+      g.fillStyle = SHARE_INK.accent; g.fill();
+    });
+  }
+  if (p.mets.length) {
+    shareMetricRules(g, gm, p.mets, p.P, p.rowTop - 12, p.labelBase + 12);
+    shareMetricDraw(g, gm, p.mets, p.P, p.valueBase, p.labelBase, SHARE_INK.inkSoft);
+  }
+  if (p.date) {
+    g.font = shareFont(700, p.date.size); g.fillStyle = SHARE_INK.inkSoft;
+    lsText(g, p.date.text, gm.safe.x1, p.dateBase, p.date.track, "right");
+  }
+}
+/**
+ * THE STATE WITH NO TEMPLATE — no photograph, and no route to make a poster from.
+ *
+ * ⚠️ IT REPLACES THE OLD LEDGER CARD, WHICH IS THE COMPOSITION THE BRIEF EXISTS TO REMOVE. Reached by a
+ * treadmill run, or any run whose GPS was refused, the moment the studio opens and before a photograph
+ * is chosen: the three photo templates need one and the poster needs a route. Drawing the old card there
+ * would keep exactly the framing, the empty upper region and the em-dash pace the brief names as defects.
+ *
+ * ⚠️ AND IT IS NOT AN EXPORT. prepareShareCard refuses to encode a card with no template, so this is a
+ * preview state only — which is why it may carry an instruction, where an exported picture may not.
+ * The spec's own words for this state are "show photo templates with tasteful placeholder CTA, never
+ * stripes/blank corruption".
+ *
+ * ⚠️ IT PRINTS NO MEASUREMENTS. A placeholder carrying the run's distance and pace looks like a
+ * finished card that has lost its photograph, and the runner would reasonably try to share it.
+ */
+function sharePlaceholderCard(g, m, gm, wm) {
+  const A = gm.aspect;
+  shareWordmark(g, gm.M, wm.y, wm.size, "left");
+  const mid = Math.round(gm.H * 0.46);
+  const eye = shareLsFit(g, "ADD A PHOTO", gm.CW, { max: shareTypeSize("sub", A),
+    min: shareTypeSize("meta", A), weight: 800, track: SHARE_TRACK.eyebrow });
+  g.font = shareFont(800, eye.size); g.fillStyle = SHARE_INK.accent;
+  lsText(g, eye.text, gm.W / 2, mid, eye.track, "center");
+  const body = shareFit(g, "Choose a photograph and your card is built from it.",
+    Math.round(gm.CW * 0.86), { max: shareTypeSize("lead", A), min: shareTypeSize("meta", A),
+      step: 1, weight: 600, lines: 3, lh: 1.3 });
+  g.font = shareFont(600, body.size); g.fillStyle = SHARE_INK.inkSoft;
+  const prev = g.textAlign; g.textAlign = "center";
+  body.lines.forEach((ln, i) =>
+    g.fillText(ln, gm.W / 2, mid + 54 + i * body.lh));
+  g.textAlign = prev;
+}
+/**
+ * THE WHOLE CARD, AT A SCALE.
+ *
+ * ⚠️ A SCALE, NOT A TARGET BOX. A renderer that reflows for its container is two layouts, which is
+ * the two-disagreeing-transforms fault that stretched the debrief hero. One coordinate system,
+ * multiplied — so the 0.5x preview on screen is the same picture as the 1x file, guaranteed.
+ */
+function drawShareCard(g, m, S) {
+  const gm = shareCanvasGeom(m.aspect);
+  g.save();
+  g.scale(S, S);
+  g.textBaseline = "alphabetic"; g.textAlign = "left";
+  // ⚠️ THE ONLY THING BETWEEN THE CANVAS EDGE AND THE PICTURE IS NOTHING AT ALL. No inset, no clip, no
+  // rounded corner, no stroked border and no radial glows: a matte ground, then the photograph over all
+  // of it. The frame that used to live here is described in cardGeom's note, and the reason it went is
+  // that it was the brief's first named defect.
+  shareGroundFill(g, gm);
+  const box = m.photo ? sharePhotoDraw(g, m.photo, gm) : null;
+  if (!m.photo) shareTopoDraw(g, gm);
+  const probe = m.photo ? shareLumaProbe(m.photo, gm) : null;
+  // ⚠️ THE WORDMARK IS AT THE TOP, OVER THE PICTURE, WHICH IS WHERE ALL FOUR REFERENCES PUT IT — and its
+  // rectangle is measured HERE, before any template runs, because every template scores something
+  // against it. It used to sit inside the ledger because over a picture its contrast varied with the
+  // photograph (measured 14.96 to 19.32:1, against a constant 19.35:1 on the plate); the brief overrules
+  // that, so the constant is replaced by a solved scrim rather than by a hope.
+  const wm = shareWordmarkPlan(g, gm);
+  // ⚠️ ONE DISPATCH, AND THE TEMPLATE IS THE MODEL'S ANSWER RATHER THAN THE RUNNER'S ASK.
+  // shareTemplateFor has already refused a template this run cannot honestly fill, so nothing here has
+  // to re-check eligibility — and if it did, the two answers could disagree.
+  if (m.template === "moment") shareMomentCard(g, m, gm, probe, wm, box);
+  else if (m.template === "execution") shareExecutionCard(g, m, gm, probe, wm);
+  else if (m.template === "progression") shareProgressionCard(g, m, gm, probe, wm);
+  else if (m.template === "route") sharePosterCard(g, m, gm, wm);
+  // ⚠️ NULL IS REACHABLE AND IT IS NOT AN ERROR: a treadmill run with no photograph chosen yet fits no
+  // template at all. It gets the placeholder, never the composition the brief exists to remove.
+  else sharePlaceholderCard(g, m, gm, wm);
+  g.restore();
+}
+/**
+ * EVERY FACT THE CARD PRINTS, GATHERED FROM THE SOURCES THE DEBRIEF AND THE RECAP ALREADY READ.
+ *
+ * ⚠️ NOTHING HERE COMPUTES A FACT OF ITS OWN, so the three surfaces can never tell the runner two
+ * different things about one run.
+ *
+ * ⚠️ THIS REPLACED SHARE_INSIGHT, WHICH PRINTED FIXED PRAISE KEYED ONLY ON SESSION TYPE. An easy run
+ * was congratulated with "aerobic fitness building exactly as planned" whether it hit its band or ran
+ * a minute a kilometre too quick, which breaks this project's own no-unconditional-praise rule on its
+ * most public surface. There is no type table here at all, so the fault cannot come back by adding a
+ * row — and the unhandled type ("race", which fell through to the easy string) is fixed by
+ * construction rather than by remembering it.
+ */
+const SHARE_MODEL_VERSION = 1;
+/** The four approved templates, in the order the default falls through them. */
+const SHARE_TEMPLATES = ["moment", "execution", "progression", "route"];
+const SHARE_TEMPLATE_LABEL = {
+  moment: "The Moment", execution: "The Execution",
+  progression: "The Progression", route: "The Route Poster",
+};
+const SHARE_NEEDS_PHOTO = "Choose a photo to use this one.";
+/**
+ * WHICH TEMPLATES THIS RUN CAN HONESTLY FILL, AND FOR THE OTHERS, WHY NOT IN WORDS.
+ *
+ * ⚠️ A REASON IN WORDS, NOT A GREYED-OUT TILE. This project has shipped the looks-live-does-nothing
+ * defect three times, and its own remedy is written into studioRouteHtml: a disabled control states the
+ * reason, because dimming it on its own tells the runner the app is broken.
+ *
+ * ⚠️ THE EXECUTION IS RESTRICTED BY THE OWNER'S RULING (2026-08-18): eligible only for sessions whose
+ * target can be judged against the splits that actually exist, which are 1000 m cuts. An interval or
+ * rep session HAS no kilometre target — paceStampFor deliberately answers pband: null, pmix: "reps"
+ * for exactly those, because the engine already holds that a kilometre split of an interval session
+ * means nothing when it contains reps and jog recoveries in the same thousand metres. Nothing per-rep
+ * is persisted on any stored run, on either device. So the template is hidden and says why. Drawing it
+ * would mean either inventing a band or labelling kilometre splits as repetitions, and both are the
+ * fabrication this project refuses elsewhere (a total time spread across untimed route points, an
+ * estimated split scored as measured).
+ *
+ * ⚠️ "COMPARABLE" SPLITS ARE MEASURED ONES. The Progression's whole claim is that one part of the run
+ * differed from another, and an estimated split is the elapsed stretch divided evenly — every bar drawn
+ * from one is the same length by construction, so three of them would draw a flat, confident, invented
+ * progression.
+ *
+ * ⚠️ AND THE ROUTE TEST IS THE POST-PRIVACY GEOMETRY, never run.route. A route hidden by the runner's
+ * own switch, or trimmed until fewer than two points survive, is a route the poster cannot be built
+ * from — and asking run.route instead is how a template would offer itself and then draw nothing.
+ */
+function shareTemplateStates(run, a, pres, opt) {
+  const photo = !!(opt && opt.photo);
+  const hasRoute = !!(pres && pres.route && pres.route.length >= 2 && !pres.hidden);
+  const measured = (a.rows || []).filter((r) => !r.est).length;
+  const out = {};
+  out.moment = photo ? { ok: true, why: "" } : { ok: false, why: SHARE_NEEDS_PHOTO };
+  out.execution = !photo ? { ok: false, why: SHARE_NEEDS_PHOTO }
+    : a.mixKind === "reps"
+      ? { ok: false, why: "This session is repetitions. Inte-Run records whole-kilometre splits, and a kilometre of reps and jog recoveries has no target to be judged against — so there is nothing true to draw." }
+    : !a.band ? { ok: false, why: "This run had no prescribed pace, so there is no target to show against it." }
+    : a.judgedN < 2 ? { ok: false, why: "Too few kilometres could be measured against the target for a chart to mean anything." }
+    : { ok: true, why: "" };
+  out.progression = !photo ? { ok: false, why: SHARE_NEEDS_PHOTO }
+    : measured < 3
+      ? { ok: false, why: a.estN
+          ? "This needs three measured kilometres. Some of this run was estimated while the signal was lost, so there are not three to compare."
+          : "This needs at least three kilometre splits to compare." }
+      : { ok: true, why: "" };
+  out.route = hasRoute ? { ok: true, why: "" }
+    : { ok: false, why: (pres && pres.hidden) ? "Your route is hidden for this card, so there is nothing to draw."
+        : run && run.indoor ? "This was an indoor session, so no route was recorded."
+        : "No route was recorded for this run." };
+  return out;
+}
+/** The template actually used: the asked-for one when it is eligible, else the first that is, else none. */
+function shareTemplateFor(states, asked) {
+  if (asked && states[asked] && states[asked].ok) return asked;
+  for (const id of SHARE_TEMPLATES) if (states[id] && states[id].ok) return id;
+  return null;
+}
+/**
+ * ONE FACT, FROM THE MEASUREMENT, UNDER THE VERDICT.
+ *
+ * ⚠️ THE DENOMINATOR IS judgedN, NOT n. A threshold session's warm-up and cool-down kilometres sit
+ * outside the prescribed window and are deliberately unscored, so "5 of 8 inside the band" reads as
+ * three failures when three of them were never being judged. The kilometres the target applied to are
+ * the only honest denominator, and the estimated ones are named separately rather than folded in.
+ */
+function shareEvidenceLine(a) {
+  if (!a || !a.band || !a.judgedN) return "";
+  const band = fmtPace(a.band.minSecPerKm) + "\\u2013" + fmtPace(a.band.maxSecPerKm) + "/km";
+  let s = a.inBand + " of " + a.judgedN + (a.judgedN === a.n ? " km" : " measured km") + " inside " + band;
+  // ⚠️ THE ARITHMETIC CLOSES: judged + estimated + outside-the-window = every split on the run. Without
+  // the remainder the line and the badge above it disagree in public — the badge's percentage is taken
+  // over every kilometre, so a session whose work was flawless but whose warm-up sits outside the
+  // prescribed stretch reads "5 of 5 measured km inside the band" under "SOME OF IT LANDED" with nothing
+  // to explain the gap. Naming what happened to the rest is what makes the pair coherent, and it is a
+  // fact rather than a hedge.
+  const parts = [];
+  if (a.estN) parts.push(a.estN + " estimated");
+  const outside = a.n - a.judgedN - a.estN;
+  if (outside > 0) parts.push(outside + " outside the target stretch");
+  if (parts.length) s += " \\u00b7 " + parts.join(", ");
+  return s;
+}
+/**
+ * THE PROGRESSION CLAIM, AND THE TWO GATES THAT DECIDE WHETHER THERE IS ONE AT ALL.
+ *
+ * The contract allows exactly two headlines here and forbids inventing a third: FINISHED STRONG "only
+ * when the existing analysis/debrief evidence supports a faster closing segment after accounting for
+ * the session type and available data", and CONSISTENT THROUGHOUT "only when variability thresholds are
+ * met". Anything else is no claim, and no claim is a valid answer — the template then opens on its
+ * split ladder, exactly as The Moment omits its badge when there is no verdict to put in it.
+ *
+ * ⚠️ EVERY INPUT IS runAnalysis'S OWN. progressive is shiftSec >= 8 over the first third against the
+ * last third, which is more honest than first-against-last on a route with a hill in it, and it is
+ * already what rdWell reads before it will say "you finished quicker than you started". spread is
+ * slowest - fastest. tailSec is the closing third's mean. Nothing is re-derived here.
+ *
+ * ⚠️ THE EVENNESS THRESHOLD IS rdWell'S OWN 25 SECONDS, taken from the same place rather than chosen,
+ * so the debrief cannot say "pace was even throughout" while the card declines to.
+ *
+ * ⚠️ A REPS SESSION GETS NO CLAIM IN EITHER DIRECTION, and that is the same reasoning the owner's
+ * ruling applies to The Execution. A kilometre of an interval session contains repetitions and jog
+ * recoveries in one thousand metres, so "the last third was quicker" measures where the reps happened
+ * to fall, not how the run progressed — and "consistent throughout" is worse still about a session
+ * whose whole design is to vary.
+ *
+ * ⚠️ AND A caution VERDICT CANNOT CARRY "FINISHED STRONG". Branch 4 of runVerdict is an easy run in
+ * which most kilometres came in quicker than the brief; congratulating the runner for the finish while
+ * the debrief tells them they ran the session too hard is the app speaking with two voices about one
+ * run, which is the fault the pill's own headline rule exists to prevent.
+ *
+ * ⚠️ LOW CONFIDENCE MEANS NO CLAIM. An estimated split is the elapsed stretch divided evenly, so a
+ * progression drawn from estimates is a progression the app invented.
+ *
+ * ⚠️ THE NEUTRAL LINE SURVIVES A WITHHELD VERDICT, AND THAT ASYMMETRY IS DELIBERATE. On a pain-flagged
+ * run shareCardModel answers pill: null, so The Moment and The Execution correctly print no badge — and
+ * this template still prints CONSISTENT THROUGHOUT. The two are not the same kind of sentence. The badge
+ * is the debrief's VERDICT on the session, which the app has declined to give and which would publish
+ * something the runner disclosed in confidence; this is an OBSERVATION about the spread of the splits,
+ * which the contract sanctions on its own terms ("use a neutral approved line such as CONSISTENT
+ * THROUGHOUT only when variability thresholds are met") and which says nothing about how the run felt or
+ * whether it was any good. The directional claim IS gated on the verdict — v.state !== "caution", and a
+ * pain flag is exactly what produces caution — so the one headline that could read as praise is already
+ * unreachable there. A neutral fact is not a high-confidence claim from low-confidence data; the
+ * low-confidence gates above are a.confidence and a.estN, and both still apply.
+ *
+ * ⚠️⚠️ EVENNESS IS TESTED FIRST, AND THAT DELIBERATELY DISAGREES WITH REFERENCE 04 ON REFERENCE 04'S
+ * OWN DATA. Its headline is FINISHED STRONG over splits of 5:51, 5:37, 5:36, 5:33, 5:34 and a final
+ * part kilometre at 5:33 — where the LAST kilometre (5:34) is slower than the fourth (5:33), the whole
+ * spread is eighteen seconds, and the only thing making the first third slower than the last is a
+ * single slow opening kilometre. That is a run settling down, not a run closing hard, and
+ * first-third-against-last-third calls every ordinary easy run progressive for exactly that reason.
+ * The contract's own copy rule is the tie-breaker and it points the other way: "If evidence does not
+ * support a directional claim, use a neutral approved line such as CONSISTENT THROUGHOUT only when
+ * variability thresholds are met." The threshold IS met here, so the neutral line is the true one, and
+ * FINISHED STRONG is left for a run that genuinely varied and finished at the quick end of its own
+ * range. The references are the authority on hierarchy, composition and tone; they are a mock, not a
+ * dataset, and this is the one place their headline and their numbers do not agree.
+ */
+function shareProgressionClaim(a, v) {
+  if (!a || !v || a.confidence === "low" || a.mixKind === "reps") return null;
+  // ⚠️ EVERY KILOMETRE IN THE CLAIM HAS TO HAVE BEEN MEASURED, WHICH IS STRICTER THAN THE BADGE'S OWN
+  // GATE AND CORRECTLY SO. This claim is about the SHAPE of the run kilometre by kilometre, and an
+  // estimated split is the elapsed stretch divided evenly — so both spread and the closing third can
+  // be arithmetic on a number the app invented. Measured on a five-kilometre run with one estimated
+  // split: confidence is "medium" (the badge is drawn, rightly), and the ladder beneath the headline
+  // showed FOUR rows while the headline counted five. The claim and the evidence under it have to be
+  // about the same kilometres.
+  if (a.estN) return null;
+  if (a.n >= 3 && a.spread != null && a.spread <= SHARE_EVEN_SPREAD_S) {
+    return { claim: "CONSISTENT THROUGHOUT",
+      evidence: "All " + a.n + " kilometres within " + a.spread +
+        (a.spread === 1 ? " second" : " seconds") + " of each other" };
+  }
+  // ⚠️ PROGRESSIVE IS NOT ENOUGH ON ITS OWN, AND THE CASE THAT PROVED IT IS MEASURED. Splits of 6:12,
+  // 5:37, 5:05, 5:33, 6:01: the first third is 11 seconds slower than the last, so shiftSec passes and
+  // the card said FINISHED STRONG with the evidence "Final kilometre at 6:01/km" — the second SLOWEST
+  // kilometre of a run whose quickest was 5:05. Finishing strong means closing at the quick end of your
+  // own range, so the closing third must sit in the faster half of the range this run actually covered.
+  // No tunable fraction: the midpoint of the run's own fastest and slowest is the whole rule.
+  const quickHalf = a.fastest && a.slowest ? (a.fastest + a.slowest) / 2 : null;
+  if (a.progressive && a.thirdN && a.tailSec && v.state !== "caution"
+      && quickHalf != null && a.tailSec <= quickHalf) {
+    // ⚠️ THE COUNT IS THE REAL ONE AND IT CAN BE ONE. thirdN is floor(n / 3), so a five-kilometre run
+    // compares its last kilometre against its first — and printing that as "final 1 km averaged" is
+    // both ungrammatical and quietly overstates the sample. Named for what it is instead.
+    return { claim: "FINISHED STRONG",
+      evidence: a.thirdN === 1 ? "Final kilometre at " + fmtPace(a.tailSec) + "/km"
+        : "Final " + a.thirdN + " km averaged " + fmtPace(a.tailSec) + "/km" };
+  }
+  return null;
+}
+/**
+ * THE EXPORT'S FILENAME — NON-SENSITIVE, AND IT HONOURS THE DATE SWITCH.
+ *
+ * ⚠️ EVERY EXPORT USED THE SAME FIXED NAME, so two runs saved to the same folder collided and the
+ * runner's own file manager decided which survived.
+ *
+ * ⚠️ AND HIDING THE DATE ON THE CARD MUST HIDE IT HERE TOO. The spec's own rule is that hidden
+ * metadata may not appear in accessibility labels, filenames, EXIF or analytics — a card with no date
+ * on it, saved as InteRun-2026-08-18-Easy-Run.jpg, leaks exactly what the switch was flipped to hide.
+ *
+ * ⚠️ THE DISTANCE IS THE COLLISION BREAKER, AND IT IS NOT SENSITIVE — it is the largest number printed
+ * on the card. The obvious discriminator, the run's own id, is a millisecond timestamp: that would put
+ * the time of day into the filename of a card whose date the runner may have just hidden.
+ */
+function shareFileName(m) {
+  const kind = String((m && m.sessionLabel) || "Run").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const date = (m && m.completedAt && !(m.privacy && m.privacy.date)) ? String(m.completedAt).slice(0, 10) : "";
+  const dist = (m && m.distance > 0) ? m.distance.toFixed(2) + "km" : "";
+  return ["InteRun", date, kind || "Run", dist].filter(Boolean).join("-") + ".jpg";
+}
+function shareCardModel(run, opt) {
+  opt = opt || {};
+  const a = runAnalysis(run), v = runVerdict(run, a);
+  // ⚠️ THE PER-RUN SHARE PRIVACY IS PASSED AS THE OVERRIDE runRoutePresentation ALREADY TAKES, so there
+  // is still exactly ONE privacy decision rather than a second one beside it. It reads as a FLOOR over
+  // the global — see sharePrivacyFor — so this card can be more private than the debrief and never less.
+  const sp = sharePrivacyFor(run);
+  const pres = runRoutePresentation(run, sp);
+  const hasLane = !!(a.band && a.n);
+  // ⚠️ THE TOWN, NOT THE FULL STRING, AND GATED ON THE MAP BEING SHOWN AT ALL — the same rule
+  // rdIdentityHtml follows, for the reasons recorded there. Ends-redaction does not gate it: that
+  // hides a door, not a town. run.place also arrives ASYNCHRONOUSLY from runPlaceLookup, which is
+  // why it has to be part of the cache key.
+  // ⚠️ AND NOW ALSO ON ITS OWN SWITCH. Until this, the only way to withhold the town was to hide the
+  // whole route, so a runner who wanted the shape of their run shown but not the place could not say so.
+  const place = (run.place && !pres.hidden && !sp.loc) ? String(run.place).split(",")[0].trim() : "";
+  const when = sp.date ? "" : rdWhenText(run);
+  const dp = String(run.dist || "0 km").split(" "), pp = String(run.pace || "— /km").split(" ");
+  const hrs = String(run.time || "").split(":").length > 2;
+  const states = shareTemplateStates(run, a, pres, opt);
+  const distKm = Number(run.distKm) > 0 ? Number(run.distKm) : (parseFloat(dp[0]) > 0 ? parseFloat(dp[0]) : 0);
+  // ⚠️ THE THREE SUPPORTING NUMBERS, AND THE THIRD ONE IS THE SHARED LADDER'S TOP RUNG — see
+  // RUN_METRIC_LADDER. The brief asks for time, average pace and elevation, falling back through
+  // average HR, cadence and calories "according to existing relevance rules"; those rules existed
+  // inside the debrief and the card could not reach them. Absent rungs simply do not appear, so a
+  // treadmill run reflows to two columns rather than printing a pace of zero.
+  const metrics = [];
+  if (run.time) metrics.push({ key: "time", v: run.time, u: hrs ? "HRS" : "MIN", k: "TIME" });
+  if (Number(run.avgPaceSec) > 0) metrics.push({ key: "pace", v: pp[0], u: (pp[1] || "/km").toUpperCase(), k: "AVG PACE" });
+  const third = runMetricLadder(run, true)[0];
+  if (third) metrics.push({ key: third.key, v: third.v, u: String(third.u || "").toUpperCase(), k: third.short });
+  // ⚠️ THE TEMPLATE IS RESOLVED ONCE, HERE, because two fields below depend on which one it is and a
+  // second call to shareTemplateFor could answer differently the day its tie-breaking changes.
+  const tmpl = shareTemplateFor(states, opt.template);
+  return {
+    // ---- the contract's serialisable view model ------------------------------------------------
+    schemaVersion: SHARE_MODEL_VERSION,
+    activityId: run.id || "",
+    sessionType: run.type || "",
+    // ⚠️ TWO DIFFERENT STRINGS AND THEY ARE NOT INTERCHANGEABLE. sessionLabel is the canonical human
+    // name for the KIND of session (SESSION_LABEL, "Easy run"); sessionTitle is the plan's own title
+    // for this instance ("40' easy + strides"). The reference cards show the kind.
+    sessionLabel: SESSION_LABEL[run.type] || "Run",
+    sessionTitle: run.t || "",
+    // ⚠️ ABSENT RATHER THAN INVENTED. runStartMsKnown returns null for every watch run, whose id is a
+    // UUID — runStartMs's 09:00 fallback exists for Strava, where something must be sent, and printing
+    // it here would put a time of day on a run nobody recorded one for.
+    // ⚠️ AND IT IS THE INSTANT THE RUN FINISHED, NOT THE INSTANT IT STARTED, BECAUSE THE FILENAME IS CUT
+    // FROM IT. runStartMsKnown answers id minus the duration, deliberately: the id is stamped when the
+    // finish screen renders, and rdWhenText wants to print the time the runner set off. Adding the
+    // duration back recovers the id itself — which is the SAME clock reading dateIso was taken from, one
+    // line above it in liveRunRecord — so this field's UTC date and the run's own dateIso can never name
+    // two different days. Without that, a run finishing just after midnight UTC printed one date on the
+    // card and carried the day before in its filename: the local-versus-UTC fault this project has
+    // already fixed three times (the BST week boundary, futureIso, reviewWeekStartIso).
+    completedAt: (function () {
+      if (sp.date) return "";
+      const ms = runStartMsKnown(run);
+      if (ms) return new Date(ms + (Number(run.sec) || 0) * 1000).toISOString();
+      return run.dateIso || "";
+    })(),
+    coarseLocation: place || undefined,
+    // ⚠️ THE LITERAL "metric", BY THE OWNER'S OWN DECISION (2026-08-15) AND RECORDED AS A DEVIATION.
+    // Runs are stored as kilometre numbers, both devices cut splits at 1000 m, and ~105 sites render a
+    // km literal — a units branch on the card alone would print mile captions over kilometre splits,
+    // which is the exact failure that decision was made to avoid.
+    units: "metric",
+    distance: distKm > 0 ? distKm : undefined,
+    durationSeconds: Number(run.sec) > 0 ? Number(run.sec) : undefined,
+    averagePace: Number(run.avgPaceSec) > 0 ? Number(run.avgPaceSec) : undefined,
+    // Stored as 0 rather than null by both builders, so it needs the > 0 gate every reader applies.
+    elevationGain: Number(run.elevGain) > 0 ? Math.round(run.elevGain) : undefined,
+    averageHeartRate: run.avgHr ? Math.round(run.avgHr) : undefined,
+    cadence: run.cadence ? Math.round(run.cadence) : undefined,
+    calories: run.kcal ? Math.round(run.kcal) : undefined,
+    // ⚠️ pband IS {minSecPerKm,maxSecPerKm} AND rband IS {min,max}. Two different shapes for two
+    // different things, and unifying them is how "NaN:NaN–NaN:NaN /km" once shipped. Named apart.
+    target: a.band ? {
+      paceMinSecPerKm: a.band.minSecPerKm, paceMaxSecPerKm: a.band.maxSecPerKm,
+      windowStartM: run.pwin ? run.pwin.s : undefined, windowEndM: run.pwin ? run.pwin.e : undefined,
+      mix: run.pmix || undefined,
+      rpeMin: a.rband ? a.rband.min : undefined, rpeMax: a.rband ? a.rband.max : undefined,
+    } : undefined,
+    splits: a.rows,
+    verdict: {
+      status: v.state, shortTitle: String(v.headline || rdCue(v.state)).toUpperCase(),
+      evidenceLine: shareEvidenceLine(a), confidence: v.confidence,
+    },
+    // ⚠️ THE ADHERENCE COUNT, WITH runAnalysis'S OWN DENOMINATOR AND NOT run.splits.length. judgedN is
+    // the kilometres the target was actually applied to: a threshold session's warm-up and cool-down sit
+    // outside the prescribed window and are deliberately unscored, and an estimated split is refused
+    // outright. "5 of 8" where three were never being judged reads as three failures. Absent rather than
+    // zero when nothing could be judged, so a template cannot print a confident nought.
+    adherence: a.judgedN ? { inBand: a.inBand, judged: a.judgedN } : undefined,
+    // ⚠️ verifiedMilestone IS DELIBERATELY NEVER SET, AND THE CHROME-GOLD TREATMENT IS NOT BUILT. There
+    // is no personal-best model anywhere in the app: a.fastest and a.slowest are the fastest and slowest
+    // kilometre WITHIN one run, and interun_hist_v1 holds no splits, route or target. A gold hairline
+    // gated on a field nothing writes is decoration, which is the one thing the brief forbids it being.
+    privacy: { route: !sp.map, ends: sp.ends, location: sp.loc, date: sp.date },
+    template: tmpl,
+    eligibility: states,
+    metrics: metrics,
+    // ---- what the current renderer reads ------------------------------------------------------
+    aspect: opt.aspect === "feed" ? "feed" : "story",
+    title: String(run.t || "My run").toUpperCase(),
+    meta: [place, when].filter(Boolean).join(" \\u00b7 "),
+    // ⚠️ THE DATE ALONE, FOR THE TEMPLATES, AND IT HONOURS THE SAME SWITCH meta DOES. rdWhenText adds a
+    // time of day when one is recoverable; both references show a date and no clock, and the filename
+    // rule already established that a hidden date may not leak by another route.
+    dateLabel: sp.date ? "" : rdDateText(run),
+    // ⚠️ A PAIN-FLAGGED RUN PRINTS NO VERDICT AT ALL. runVerdict rightly answers "caution" there, and
+    // printing it publishes something the runner told the app in confidence. This is a rule the card
+    // needs and the debrief does not, because the card leaves the phone — and nothing else disclosed
+    // privately (the effort rating, their why, a check-in answer) reaches it either.
+    //
+    // ⚠️ THE HEADLINE, NOT rdCue. rdCue collapses runVerdict's five outcomes into four words, and one
+    // of the collapses is a flat self-contradiction on the card: "partial" covers everything under
+    // 70%, so a run measured at 0 of 6 printed PARTLY ON TARGET 400px above its own sentence reading
+    // "0 of 6 kilometres on target". Measured, all-slow 0/6 and 3/6 returned the identical pill.
+    // The headline already separates them ("Off the brief today" against "Some of it landed"), it is
+    // the debrief's own words for the same run, and on the card the pill is the only verdict text
+    // there is — so it has to carry the whole verdict rather than a rounded-off version of it.
+    //
+    // ⚠️ AND NOW ALSO SUPPRESSED WHEN THE EVIDENCE CANNOT CARRY A CLAIM — IN EITHER DIRECTION. Two
+    // gates, and they catch different runs. insufficientData means there was nothing to judge, so
+    // "LOGGED" or "A RUN BY FEEL" in capitals over a photograph is a verdict-shaped badge with no
+    // verdict in it. confidence "low" means there WAS a judgement but most of what it rests on was
+    // invented: measured, six kilometres run dead centre of the band with the phone pocketed produced
+    // OFF THE BRIEF TODAY on a picture that leaves the phone, and the same evidence at half strength
+    // (two measured kilometres, two estimated) still reaches a real pace branch. The brief's rule is
+    // "low-confidence verdicts do not become celebratory claims"; the accusing direction is the one
+    // that actually happens, and it is worse.
+    pill: (run.pain || v.state === "insufficientData" || v.confidence === "low")
+      ? null : { state: v.state, text: String(v.headline || rdCue(v.state)).toUpperCase() },
+    // ⚠️ A DISTANCE NOBODY MEASURED IS NOT PRINTED AS 0.00. A treadmill run — and every outdoor run
+    // whose GPS was refused, since gpsFallback lands in startIndoor — records a real clock and
+    // deliberately no distance, and "0.00 KM" at 84px was the first thing on the old ledger: a
+    // confident measurement of standing still, on the one surface that leaves the phone. The debrief
+    // shows the same zero and gets away with it because the "Distance from the treadmill" card sits
+    // directly above explaining why; a posted card has no such context.
+    //
+    // ⚠️ THIS IS THE DATA-LED TEMPLATES' ROW, READ BY The Execution AND The Progression through
+    // shareRowMetrics — both references print exactly distance, time and average pace under a card
+    // whose hero is the verdict or the headline rather than the distance. It is NOT The Moment's
+    // trio: that one drops whatever the hero has already said and climbs the shared metric ladder
+    // for a third. Two rows because two templates ask different questions, not by oversight.
+    //
+    // ⚠️ EVERY ENTRY CARRIES A key, so shareMetricUnit can find the clock. Without one, the run's
+    // time ships under a unit of MIN — minutes and seconds labelled as minutes, which neither
+    // reference prints and which the shared metric row already knew not to draw.
+    stats: [
+      // ⚠️ EITHER FIELD COUNTS. distKm is the number and dist is the string, and a record that
+      // carries only the string is still a run with a distance — gating on distKm alone would have
+      // silently dropped the headline number from any run stored before it existed.
+      (Number(run.distKm) > 0 || parseFloat(dp[0]) > 0)
+        ? { key: "dist", v: dp[0], u: (dp[1] || "km").toUpperCase(), k: "DISTANCE" } : null,
+      run.time ? { key: "time", v: run.time, u: hrs ? "HRS" : "MIN", k: "TIME" } : null,
+      // ⚠️ AND THE PACE IS GATED THE WAY metrics GATES IT. pp[0] is an em-dash on a treadmill run, so
+      // an ungated row printed a column headed AVG PACE with a dash in it: the brief's "missing metric:
+      // omit and reflow" answered with a placeholder instead.
+      Number(run.avgPaceSec) > 0
+        ? { key: "pace", v: pp[0], u: (pp[1] || "/km").toUpperCase(), k: "AVG PACE" } : null,
+    ].filter(Boolean),
+    // ⚠️ THE PROGRESSION CLAIM, OR NOTHING — see shareProgressionClaim for all four gates. Absent is
+    // the normal case, and The Progression renders without a headline when it is: the contract's own
+    // "otherwise the neutral line or nothing".
+    progression: shareProgressionClaim(a, v) || undefined,
+    band: hasLane ? a.band : null, rows: hasLane ? a.rows : [],
+    n: a.n, inBand: a.inBand, fastest: a.fastest, slowest: a.slowest,
+    // ⚠️ ALREADY REDACTED, AND THE ONLY ROUTE THE RENDERER EVER SEES.
+    // ⚠️ AND ON THE POSTER IT IS NOT OPTIONAL, BECAUSE IT IS THE TEMPLATE. shareRouteOn() defaults to
+    // "off when a photograph has been chosen", which is the right default for The Moment's small inset
+    // and would hand the Route Poster an empty ground. Privacy still wins either way: pres.route is
+    // already null when the runner has hidden the map, and shareTemplateStates then makes the poster
+    // ineligible rather than letting it offer itself and draw nothing.
+    route: ((tmpl === "route" || opt.routeOn) && pres.route) ? pres.route : null,
+    // ⚠️ THE POSTER IS PHOTO-FREE BY DEFINITION, SO IT IS HANDED NO PHOTOGRAPH RATHER THAN TRUSTED TO
+    // IGNORE ONE. Two things downstream are gated on m.photo — the topographic ground and the luminance
+    // probe — and a poster drawn with a photograph in the model would have the picture and neither the
+    // texture nor a solved veil. Deciding it here means there is one gate rather than three.
+    photo: tmpl === "route" ? null : (opt.photo || null),
+  };
+}
+function shareCardCanvas(m, S) {
+  const gm = shareCanvasGeom(m.aspect);
+  const c = document.createElement("canvas");
+  c.width = Math.round(gm.W * S); c.height = Math.round(gm.H * S);
+  drawShareCard(c.getContext("2d"), m, S);
+  return c;
+}
+/**
+ * ⚠️ toBlob, NEVER toDataURL. toDataURL is base64 out, atob back, then a per-byte Uint8Array copy —
+ * synchronous, and three transient full-size allocations for a 1080x1920 card. The map cache already
+ * uses toBlob for exactly this reason.
+ * ⚠️ AND JPEG FOR BOTH GROUNDS. Measured at 1080x1920: the photo card is 186 KB as JPEG against
+ * 273 KB as PNG, and the NO-photo card is 158 KB against 1,437 KB — the three radial gradients make
+ * PNG nine times larger, which inverts the usual "PNG for flat art" rule.
+ */
+function canvasToShareFile(canvas, name) {
+  return new Promise((resolve, reject) => {
+    try {
+      canvas.toBlob((b) => b ? resolve(new File([b], name, { type: "image/jpeg" }))
+        : reject(new Error("encoder returned nothing")), "image/jpeg", 0.92);
+    } catch (e) { reject(e); }
+  });
+}
+/**
+ * THE CAPTION IS DERIVED TOO, and the hashtag lives here rather than on the artwork.
+ */
+function shareCaption(run) {
+  const a = runAnalysis(run);
+  let s = String(run.t || "Run") + " — " + (run.dist || "") + " in " + (run.time || "");
+  if (a.band && a.n) s += ", " + a.inBand + " of " + a.n + " on target";
+  return s + ". #RunWithInteRun";
+}
+/**
+ * WHAT THE RUNNER WOULD SEE AS A DIFFERENT PICTURE.
+ *
+ * ⚠️ EVERY VISIBLE DECISION IS IN HERE AND NOTHING INVISIBLE IS. The old key was title|date|distance|
+ * routeLength, which cannot tell a photo card from a photo-less one — so choosing a photograph and
+ * tapping Share handed over the pre-built card WITHOUT it, and a second photograph handed over the
+ * first. It presents as "the photo sometimes doesn't apply" and is unreproducible until you know a
+ * cache exists at all.
+ */
+function shareKey(run) { return (run.t || "") + "|" + (run.d || "") + "|" + (run.dist || "") + "|" + ((run.route && run.route.length) || 0); }
+function shareCardKey(run) {
+  const ph = SPHOTO ? SPHOTO.id + ":" + SPHOTO.ox.toFixed(3) + ":" + SPHOTO.oy.toFixed(3) + ":" + SPHOTO.k.toFixed(3) : "none";
+  let st = "none";
+  // ⚠️ THE CONFIDENCE RIDES WITH THE STATE, because it decides whether the verdict badge is drawn at
+  // all — and nothing else in this key would move if it changed.
+  try {
+    const v = runVerdict(run, runAnalysis(run));
+    st = run.pain ? "pain" : v.state + ":" + v.confidence;
+  } catch (e) {}
+  // ⚠️ THE PER-RUN SWITCHES, ALL FOUR OF THEM, AND THE TEMPLATE. This function's own header records that
+  // a key missing a visible decision handed over the pre-built card WITHOUT the runner's photograph, and
+  // that the fault is unreproducible until you know a cache exists. Location and date now change what
+  // the picture says, and the template changes the picture entirely.
+  const sp = sharePrivacyFor(run);
+  const pv = (sp.map ? "m" : "") + (sp.ends ? "e" : "") + (sp.loc ? "l" : "") + (sp.date ? "d" : "");
+  return shareKey(run) + "|" + pv +
+    "|" + ph + "|" + SCARD.aspect + "|" + (shareRouteOn() ? "r" : "") + "|" + st + "|" + (run.place || "") +
+    "|" + (SCARD.template || "");
+}
+/**
+ * THE PHOTOGRAPH IS SESSION-ONLY, HELD HERE AND NOWHERE ELSE.
+ *
+ * ⚠️ IT NEVER REACHES localStorage, AND THAT IS THREE PROBLEMS SOLVED AT ONCE: a 186 KB card against
+ * a ~5 MB per-origin budget shared with interun_runs (which is where the runner's whole training
+ * history lives), a backup export that discovers its keys by prefix and would carry it, and the
+ * ordering question of when to purge one. If cards ever have to survive a launch, IndexedDB beside
+ * MAPCACHE is the shape — where every failure is already silent and harmless and exports exclude it
+ * by construction.
+ */
+let SPHOTO = null, SPHOTO_SEQ = 0;
+// ⚠️ template IS THE RUNNER'S ASK, NOT THE ANSWER. shareTemplateFor decides what is actually drawn,
+// because a template can stop being eligible under the runner's own hands — removing the photograph
+// while The Progression is selected, or hiding the route while The Route Poster is.
+let SCARD = { aspect: "story", template: null, routeOn: null, key: null, file: null, pending: 0 };
+// ⚠️ A NULL routeOn MEANS "DECIDE FROM THE PHOTOGRAPH", not "off". A photo card wants the route as a
+// small inset or not at all; a photo-less card is the route.
+function shareRouteOn() { return SCARD.routeOn == null ? !SPHOTO : !!SCARD.routeOn; }
+function shareCardOpts() { return { aspect: SCARD.aspect, template: SCARD.template, routeOn: shareRouteOn(), photo: SPHOTO }; }
+const PHOTODIAG = { picked: 0, decoded: "", scaled: "", ms: 0, bytes: 0, encMs: 0, err: "", canShareFiles: null };
+/**
+ * Build and encode the card into the cache.
+ *
+ * ⚠️ THIS EXISTS BECAUSE iOS ONLY HONOURS navigator.share INSIDE THE USER GESTURE. The file has to
+ * already exist when the tap happens, so anything async in the tap handler loses the gesture and the
+ * share silently does nothing. Do not move the encode into doShareRun.
+ * ⚠️ AND THE DRAW IS INSIDE THE try. A run with no route used to throw synchronously, past the
+ * promise's own .catch, and took the rest of wire() down with it.
+ */
+function prepareShareCard(run) {
+  if (!run) return Promise.resolve(null);
+  const key = shareCardKey(run);
+  if (SCARD.key === key && SCARD.file) return Promise.resolve(SCARD.file);
+  SCARD.key = null; SCARD.file = null;
+  const tok = ++SCARD.pending;
+  let c = null, m = null;
+  // ⚠️ THE MODEL IS HELD, NOT REBUILT, because the filename is derived from it — and a second call
+  // would resolve run.place, the privacy switches and the template a second time, so the name could
+  // describe a different card from the bytes beside it.
+  try { m = shareCardModel(run, shareCardOpts()); }
+  catch (e) { PHOTODIAG.err = "model: " + (e && e.message); return Promise.resolve(null); }
+  // ⚠️ NO TEMPLATE MEANS NOTHING HONEST TO ENCODE, AND THE PREVIEW SAYS SO IN WORDS. A treadmill run
+  // with no photograph chosen yet fits none of the four: the three photo templates need one and the
+  // poster needs a route. sharePlaceholderCard draws the studio's own "add a photo" state, and a
+  // placeholder carrying an instruction must never become a file somebody posts — so the export is
+  // refused here rather than filtered later, and studioBusy keeps Share and Save disabled with the
+  // reason on screen.
+  if (!m.template) { PHOTODIAG.err = "no template: choose a photo"; return Promise.resolve(null); }
+  try { c = shareCardCanvas(m, 1); }
+  catch (e) { PHOTODIAG.err = "draw: " + (e && e.message); return Promise.resolve(null); }
+  const t0 = shareNow();
+  return canvasToShareFile(c, shareFileName(m)).then((f) => {
+    // A newer request has superseded this one; its answer is the current picture, not ours.
+    if (tok !== SCARD.pending) return null;
+    SCARD.key = key; SCARD.file = f;
+    PHOTODIAG.bytes = f.size; PHOTODIAG.encMs = Math.round(shareNow() - t0);
+    PHOTODIAG.err = "";
+    return f;
+  }).catch((e) => { PHOTODIAG.err = "encode: " + (e && e.message); return null; });
+}
+function shareNow() { try { return performance.now(); } catch (e) { return Date.now(); } }
+/**
+ * ⚠️ THE RUN IS PASSED IN, NEVER RE-RESOLVED. Share read currentOverviewRun() while Save beside it
+ * read STUDIO.run, so the two buttons on one row could resolve different runs — and the failure is
+ * silent, because a mismatched run misses SCARD.key, file comes back null, and the tap degrades to a
+ * text-only share with the runner's photograph quietly dropped. Same reasoning as viewRunId replacing
+ * viewRunIdx: the thing you act on is handed to you, not looked up again.
+ */
+function doShareRun(run) {
+  run = run || currentOverviewRun(); if (!run) return;
+  const file = (SCARD.key === shareCardKey(run) && SCARD.file) ? SCARD.file : null;
+  const caption = shareCaption(run);
+  const canFiles = !!(file && navigator.canShare && navigator.canShare({ files: [file] }));
+  PHOTODIAG.canShareFiles = canFiles;
+  if (canFiles) { navigator.share({ files: [file], text: caption, title: "Inte-Run" }).catch(() => {}); return; }
+  // ⚠️ TWO DIFFERENT FAILURES NEEDING TWO DIFFERENT ANSWERS, and only one of them is the gesture
+  // rule. In a browser navigator.share exists and the gesture is spent the moment anything async
+  // happens, so a cold cache shares TEXT — which succeeds, and is honest. In the native app
+  // navigator.share does not exist under interun://app at all, so there is no gesture to lose and
+  // the download path (an <a download>, a WKDownload, then the system share sheet) is correct.
+  if (navigator.share) { navigator.share({ text: caption, title: "Inte-Run" }).catch(() => {}); return; }
+  saveShareCard(run);
+}
+function saveShareCard(run) {
+  const go = (f) => {
+    if (!f) return;
+    const url = URL.createObjectURL(f), a = document.createElement("a");
+    a.href = url; a.download = f.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  if (SCARD.key === shareCardKey(run) && SCARD.file) return go(SCARD.file);
+  prepareShareCard(run).then(go);
+}
+function photoDiagLine() {
+  try {
+    const d = PHOTODIAG;
+    return "photo: secure=" + (window.isSecureContext ? "y" : "n") +
+      " canShareFiles=" + (d.canShareFiles == null ? "?" : d.canShareFiles ? "y" : "n") +
+      " picked=" + d.picked + " decoded=" + (d.decoded || "-") + " scaled=" + (d.scaled || "-") +
+      " decode=" + d.ms + "ms enc=" + (d.bytes ? Math.round(d.bytes / 1024) + "KB/" + d.encMs + "ms" : "-") +
+      (d.err ? " err=" + d.err : "");
+  } catch (e) { return "photo: unknown"; }
+}
+
+/* ---- THE SHARE STUDIO ---------------------------------------------------------------------------
+ * ⚠️ NOT A BOTTOM SHEET. The object being previewed is 9:16; in a sheet it is either postage-stamp
+ * sized or its controls are off screen. This is the recap's full-screen shell, reused.
+ *
+ * ⚠️ AND EVERY CONTROL IS FOUND ON THE STUDIO ROOT, NEVER BY $() AND NEVER BY id. The recap keeps its
+ * outgoing panel in the DOM through the cross-dissolve, which is how two nodes came to carry one id
+ * and the Share button on its last panel ended up with no handler at all. Nothing here renders an id.
+ *
+ * ⚠️ THE PREVIEW IS THE REAL CANVAS THE FILE IS ENCODED FROM, at S = 0.5, scaled by CSS. Not a mock:
+ * a preview that is a different renderer is a preview that can be wrong.
+ */
+let STUDIO = null;
+/**
+ * ⚠️ aria-modal="true" IS A PROMISE ABOUT WHAT ELSE IS REACHABLE, AND IT HAS TO BE KEPT. Measured with
+ * the studio open and the attribute set: document.activeElement was still BODY, Escape on the overlay
+ * and on the document left it open, 24 focusable controls remained in #view behind it, and .app was
+ * not inert. So assistive tech was told to ignore everything outside a dialog that focus had never
+ * entered — a screen-reader user parked in content their own AT has been told does not exist — while a
+ * keyboard user tabbed 26 times through the debrief before reaching Cancel, and could activate the
+ * back arrow behind the card they were editing. Three parts, none optional: focus goes in, focus comes
+ * back, and everything else is genuinely inert while it is up.
+ *
+ * ⚠️ AND IT IS ONE HELPER BECAUSE THE RECAP MADE THE SAME PROMISE AND KEPT NONE OF IT EITHER. That
+ * overlay is also role="dialog" aria-modal="true", also appended to document.body, and measured
+ * identically: focus never entered it, Escape did nothing, .app stayed live behind it. Two full-screen
+ * dialogs, one set of rules — written twice they drift, and the second copy is the one nobody measures.
+ *
+ * ⚠️ THE RETURN NODE IS PARKED ON THE OVERLAY, NOT IN A SHARED VARIABLE. The recap's own Share button
+ * closes the recap and opens the studio, so two overlays hand focus over in one gesture; a single slot
+ * would have the second open overwrite the first's answer and drop the runner somewhere they never were.
+ *
+ * ⚠️ NEVER CAPTURE A NODE INSIDE THE OVERLAY. Re-opening without closing would remember the Cancel
+ * button as the place to return to, and closing would then focus a node that no longer exists.
+ */
+function overlayModal(ov, on, firstSel) {
+  const app = document.querySelector(".app");
+  // The overlay is a sibling of .app on document.body, so inerting .app cannot reach the overlay.
+  if (app) { try { app.inert = !!on; } catch (e) {} }
+  if (on) {
+    const was = document.activeElement;
+    if (was && !ov.contains(was)) ov.modalReturn = was;
+    // The && is not decoration: querySelector("") THROWS, and the close path passes no selector.
+    const first = firstSel && ov.querySelector(firstSel);
+    // preventScroll, or moving focus scrolls the panel the runner has not looked at yet.
+    if (first) { try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); } }
+  } else {
+    const back = ov.modalReturn;
+    ov.modalReturn = null;
+    if (back && back.isConnected) { try { back.focus({ preventScroll: true }); } catch (e) {} }
+  }
+}
+function openShareStudio(run) {
+  if (!run) return;
+  let ov = document.getElementById("shareStudio");
+  if (!ov) {
+    ov = el('<div class="sst-ov" id="shareStudio" role="dialog" aria-modal="true" aria-label="Share your run"></div>');
+    // ⚠️ ONE LISTENER, ON THE NODE THAT OUTLIVES EVERY OPEN. Wiring Escape inside studioWire would add
+    // a fresh handler on every aspect change, which is how a keydown ends up firing four times.
+    ov.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); closeShareStudio(); } });
+    // ⚠️ AND THE CLICKS ARE DELEGATED ONTO THE SAME NODE, WHICH IS WHAT MAKES THE PANEL WORK AT ALL.
+    // studioSync REBUILDS the photo row, the route row and the Strava row from their builders on every
+    // change — and it runs once at open, immediately after the wiring — so a handler assigned to those
+    // buttons node-by-node was thrown away before the runner could reach it. Measured: "Add a photo"
+    // had no onclick and tapping it reached the file input ZERO times, "Remove photo" the same, and
+    // "Show my route" left SCARD.routeOn null with aria-checked unmoved. The entire photograph feature
+    // was unreachable through the interface, on a screen whose two static switches worked perfectly —
+    // which is why it read as finished. Delegation cannot go stale when a section is rebuilt.
+    ov.addEventListener("click", studioClick);
+    // ⚠️ AND THE PREVIEW HAS TO BE RE-FITTED WHEN THE VIEWPORT CHANGES SIZE, or it keeps the width it
+    // was measured at. Measured on the old height-driven build too, so this is not new — but the card
+    // is now sized from the width, so a stale one is wronger: narrowed from 430pt to 320pt the canvas
+    // stayed 383px wide inside a 288px stage and the panel gained 32px of horizontal scroll. On the
+    // same window as the listeners above, so exactly one exists however many times the studio opens;
+    // guarded on STUDIO because the overlay outlives it, and on the size actually having changed so a
+    // resize that is only iOS moving its own chrome does not redraw the card under a moving finger.
+    window.addEventListener("resize", () => {
+      if (!STUDIO) return;
+      const w = window.innerWidth, h = window.innerHeight;
+      if (STUDIO.vw === w && STUDIO.vh === h) return;
+      STUDIO.vw = w; STUDIO.vh = h;
+      studioMount();
+    });
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = shareStudioHtml(run);
+  ov.classList.add("on");
+  STUDIO = { run: run, root: ov, canvas: null, drag: null, timer: 0, busy: false,
+             vw: window.innerWidth, vh: window.innerHeight };
+  studioWire();
+  // ⚠️ MEASURED ONLY AFTER .on, AND ONLY AFTER THE CONTROL ROWS EXIST. While the overlay is hidden
+  // every box measures 0, and a fallback constant is what made the avatar cropper save an off-centre
+  // crop. studioSync fills the photo row and THEN mounts, which is the order studioStageHeight needs
+  // to measure the room below the stage; a bare studioMount before it measured an empty row and sized
+  // the stage from a reserve that was about to grow. Nothing between here and the runner's first tap
+  // paints, so there is one mount and no flicker. studioWire binds the stage, not the canvas, so it
+  // does not care which of the two runs first.
+  studioSync();
+  overlayModal(ov, true, '[data-sst="cancel"]');
+}
+function closeShareStudio() {
+  if (STUDIO) { clearTimeout(STUDIO.timer); }
+  const ov = document.getElementById("shareStudio");
+  if (ov) { overlayModal(ov, false, ""); ov.classList.remove("on"); ov.innerHTML = ""; }
+  // ⚠️ THE PHOTOGRAPH GOES WITH THE STUDIO. Session-only is the whole storage decision above, and a
+  // bitmap left resident is a bitmap redrawn by the finish screen's own Share button.
+  if (SPHOTO && SPHOTO.bitmap && SPHOTO.bitmap.close) { try { SPHOTO.bitmap.close(); } catch (e) {} }
+  SPHOTO = null; SCARD.routeOn = null; SCARD.key = null; SCARD.file = null;
+  STUDIO = null;
+}
+function shareStudioHtml(run) {
+  const strava = stravaRunButtonHtml(run);
+  return '<div class="sst-bar">' +
+      '<button class="sst-cancel" data-sst="cancel">Cancel</button>' +
+      '<div class="sst-t">Share your run</div>' +
+    '</div>' +
+    '<div class="sst-body">' +
+      '<div class="sst-stagewrap"><div class="sst-stage" data-sst-stage>' +
+        '<div class="sst-busy" data-sst-busy></div></div></div>' +
+      '<div class="sst-hint" data-sst-hint></div>' +
+      '<div class="ui-eyebrow">Shape</div>' +
+      '<div class="sst-chips">' +
+        '<button class="ui-pill sst-chip" data-sst-aspect="story">Story 9:16</button>' +
+        '<button class="ui-pill sst-chip" data-sst-aspect="feed">Feed 4:5</button>' +
+      '</div>' +
+      '<div class="ui-eyebrow">Photo</div>' +
+      '<div data-sst-photo></div>' +
+      // ⚠️ display:none, THE WAY THE OTHER THREE PICKERS IN THIS APP DO IT. Left unstyled it renders
+      // as the browser's own grey "Choose file / No file chosen" control — measured 303x24 at full
+      // opacity in both themes, sitting under the button that exists to replace it, and it was the
+      // whole reason the panel overflowed (28px of overflow with it, 3px without). It also carried
+      // aria-hidden, which is the wrong way round: hidden from assistive tech, visible to eyes.
+      // A display:none input is out of the accessibility tree and the tab order already.
+      '<input type="file" accept="image/*" style="display:none" data-sst-file>' +
+      '<div class="ui-eyebrow">On the card</div>' +
+      '<div data-sst-route></div>' +
+      '<div data-sst-priv></div>' +
+      '<div class="act-pair">' +
+        '<button class="ap-yes" data-sst="share">Share</button>' +
+        '<button class="ap-no" data-sst="save">Save to device</button>' +
+      '</div>' +
+      '<div class="sst-why" data-sst-why></div>' +
+      // ⚠️ THE WRAPPER IS CONDITIONAL AND ITS CONTENTS ARE REBUILT. It carries a top border and a
+      // rule of its own, so rendering it empty for the far more common not-connected runner draws a
+      // divider under nothing — but its INSIDE has to be re-derived after a send, or the button still
+      // reads "Send to Strava" once the run is on Strava. stravaRunButtonHtml is the one place that
+      // state is written, exactly as the finish screen's own comment requires.
+      (strava ? '<div class="sst-strava" data-sst-strava>' + strava +
+        '<p class="sst-sr">Sends the run itself, not this card.</p></div>' : "") +
+    '</div>' +
+    // The home-indicator probe, a SIBLING of the scroller rather than inside it. See .sst-safe:
+    // studioStageHeight measures it because JS cannot read env(). Out of flow either way, but outside
+    // the scroller there is no question of it contributing to anything scrollable.
+    '<i class="sst-safe" data-sst-safe aria-hidden="true"></i>';
+}
+/**
+ * WHAT THIS ONE CARD IS ALLOWED TO SAY — FOUR SWITCHES, PER RUN.
+ *
+ * ⚠️ REBUILT BY studioSync, WHICH IS WHY IT IS A BUILDER RATHER THAN INLINE MARKUP. The locked state
+ * and its sentence depend on the global setting, and the whole point of the block is that its state can
+ * change under the runner's hands.
+ *
+ * ⚠️ IT SAYS WHOSE SETTING IT IS. These switches govern the picture; the map on the run's own page
+ * follows the global Route privacy sheet, and a runner who cannot tell which of the two they just
+ * changed has not been given a privacy control, they have been given a puzzle.
+ *
+ * ⚠️ AND A GLOBALLY HIDDEN ROUTE CANNOT BE TURNED BACK ON HERE. The global is a floor, so the switch is
+ * genuinely disabled and says where to change it — not silently ignored on tap, which is the
+ * looks-live-does-nothing class this project has shipped three times, and which studioRouteHtml already
+ * records the remedy for.
+ */
+function studioPrivHtml(run) {
+  const sp = sharePrivacyFor(run);
+  return studioSwitch("ends", "Hide start and finish", sp.ends) +
+    studioSwitch("map", "Hide the route entirely", sp.map) +
+    studioSwitch("loc", "Hide the place", sp.loc) +
+    studioSwitch("date", "Hide the date", sp.date) +
+    '<p class="sst-note">These apply to this card only. The map on the run\\u2019s own page follows Route privacy there.</p>';
+}
+// ⚠️ data-sstpriv, NOT data-rdpriv. The sheet's own sweep for that attribute is document-wide and
+// would rebind these to "close the sheet and re-render", which loses the preview redraw — the exact
+// collision data-wk already caused between the plan chart and the workout library.
+function studioSwitch(key, label, on) {
+  const locked = sharePrivacyLocked(key) && on;
+  return '<div class="zr-auto' + (locked ? " sst-off" : "") + '"><span>' + esc(label) + '</span>' +
+    '<button class="rm-switch' + (on ? " on" : "") + '" data-sstpriv="' + key + '" role="switch"' +
+    (locked ? ' aria-disabled="true" disabled' : "") +
+    ' aria-checked="' + (on ? "true" : "false") +
+    '" aria-label="' + esc(label) + '"><span class="rm-knob"></span></button></div>' +
+    (locked ? '<p class="sst-note">Your Route privacy setting hides this on every run. Change it on the run\\u2019s own page.</p>' : "");
+}
+function studioPhotoHtml() {
+  return SPHOTO
+    ? '<div class="act-pair"><button class="ap-yes" data-sst="pick">Change photo</button>' +
+      '<button class="ap-no" data-sst="drop">Remove photo</button></div>'
+    : '<button class="mini-btn wide-btn" data-sst="pick">Add a photo</button>';
+}
+function studioRouteHtml(run) {
+  const hidden = runRoutePresentation(run).hidden;
+  const has = !!(run.route && run.route.length > 1);
+  const on = shareRouteOn() && !hidden && has;
+  const off = hidden || !has;
+  // ⚠️ A DISABLED CONTROL STATES ITS REASON IN WORDS. Greying it out on its own tells the runner the
+  // app is broken; the sentence tells them which switch below changes it.
+  const why = !has ? "No route was recorded for this run."
+    : hidden ? "Hidden by your route privacy setting below." : "";
+  // ⚠️ AND IT MUST ALSO LOOK AND BEHAVE DISABLED. Measured with the route hidden: aria-disabled was
+  // set, opacity was 1, the class was unchanged and the disabled property was false — a switch
+  // visually identical to the two live ones beside it, whose handler returned early on the tap. That
+  // is the looks-live-does-nothing class this project has shipped twice (#saveSetup, rdMore), and the
+  // sentence underneath does not fix the control. .sst-off is the same dimming Share and Save already
+  // use while encoding; disabled is what actually stops the tap, so the early return is a belt to it.
+  return '<div class="zr-auto' + (off ? " sst-off" : "") + '"><span>Show my route</span>' +
+    '<button class="rm-switch' + (on ? " on" : "") + '" data-sst="route" role="switch"' +
+    (off ? ' aria-disabled="true" disabled' : "") +
+    ' aria-checked="' + (on ? "true" : "false") + '" aria-label="Show my route"><span class="rm-knob"></span></button></div>' +
+    (why ? '<p class="sst-note">' + why + '</p>' : "");
+}
+/**
+ * HOW TALL THE STAGE IS, DERIVED FROM HOW WIDE IT IS — CAPPED BY THE ROOM THE PHOTO BUTTON NEEDS.
+ *
+ * ⚠️ THE THING BEING EDITED WAS THE SMALLEST THING ON THE SCREEN. Sized by height, the stage left the
+ * 9:16 card at 70.7% of a 430pt screen and 57.8% of a 320pt one, with 47px of empty stage either side,
+ * while three rows of switches under it got the full width — and the runner is dragging a photograph
+ * around inside that box. Width-driven it measures 89.3% and 56% of those two screens.
+ *
+ * ⚠️ AND A PURE WIDTH FIT IS REFUTED BY MEASUREMENT, WHICH IS WHY THERE IS A CAP. Taken to the full
+ * width on a 390pt screen the story card is 358x636 and pushes "Add a photo" to y=843 on an 844pt
+ * viewport — the entry point of the whole photograph feature, one pixel below the fold, discoverable
+ * only by scrolling a panel that looks finished. That trades a cosmetic complaint for the
+ * looks-finished-does-nothing class this project has shipped twice. So the height is whichever is
+ * SMALLER: what the width allows, or what leaves the photo row on screen.
+ *
+ * ⚠️ MEASURED IN offsetTop, NEVER getBoundingClientRect. The panel is a scroller: a viewport-relative
+ * measurement makes the stage grow every time the runner scrolls down, because the wrap's top goes
+ * negative while the room below appears to increase. offsetTop is layout position inside the overlay
+ * (which is position: fixed, so it is the offsetParent), and it does not move when the panel scrolls.
+ *
+ * ⚠️ THE RESERVE IS MEASURED, NOT A CONSTANT, so it is right at every text scale. --tscale grows the
+ * eyebrow and the button, and a hardcoded reserve would put the photo row back under the fold for
+ * exactly the runner who most needs to see it. It has to run AFTER studioSync has filled the photo
+ * row, which is why open() ends in studioSync and not in a bare mount.
+ */
+function studioStageHeight(st, gm) {
+  const wrap = st.parentNode;
+  if (!wrap || !wrap.classList || !wrap.classList.contains("sst-stagewrap")) return;
+  const availW = st.clientWidth;
+  if (!availW) return;   // hidden: leave the CSS floor alone rather than latching a zero
+  const keep = STUDIO.root.querySelector("[data-sst-photo]");
+  const below = keep ? Math.max(0, keep.offsetTop + keep.offsetHeight - (wrap.offsetTop + wrap.offsetHeight)) : 0;
+  const safe = STUDIO.root.querySelector("[data-sst-safe]");
+  const room = (window.innerHeight || 0) - wrap.offsetTop - below - (safe ? safe.offsetHeight : 0);
+  const h = Math.max(210, Math.min(availW * gm.H / gm.W, room));
+  wrap.style.height = Math.round(h) + "px";
+}
+/** Put the real canvas in the stage. Called on open and whenever the aspect changes its shape. */
+function studioMount() {
+  const st = STUDIO.root.querySelector("[data-sst-stage]"); if (!st) return;
+  const m = shareCardModel(STUDIO.run, shareCardOpts());
+  const gm = shareCanvasGeom(m.aspect);
+  studioStageHeight(st, gm);
+  if (!STUDIO.canvas) {
+    STUDIO.canvas = document.createElement("canvas");
+    STUDIO.canvas.className = "sst-cv";
+    st.insertBefore(STUDIO.canvas, st.firstChild);
+  }
+  // ⚠️ S = 0.5 IS A MEMORY DECISION, NOT A SPEED ONE. A full draw measures under three milliseconds;
+  // the backing store is 2.07 MB of RGBA at a half against 8.3 MB at full size, and that buffer is
+  // redrawn on every frame of a pinch.
+  STUDIO.canvas.width = Math.round(gm.W * 0.5);
+  STUDIO.canvas.height = Math.round(gm.H * 0.5);
+  // ⚠️ THE DISPLAY SIZE IS SET FROM THE MEASURED STAGE, NOT LEFT TO width:100%. The two aspects have
+  // different shapes, so a percentage width makes the taller one overflow its box and the shorter one
+  // leave a hole. clientWidth/clientHeight are the content box, and this only runs once the overlay
+  // has .on — measured while it is hidden they read 0, which is what made the avatar cropper save an
+  // off-centre crop.
+  const bw = st.clientWidth || 320, bh = st.clientHeight || 380;
+  const k = Math.min(bw / gm.W, bh / gm.H);
+  STUDIO.canvas.style.width = Math.round(gm.W * k) + "px";
+  STUDIO.canvas.style.height = Math.round(gm.H * k) + "px";
+  studioPaint("high");
+}
+function studioPaint(quality) {
+  if (!STUDIO || !STUDIO.canvas) return;
+  const g = STUDIO.canvas.getContext("2d");
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(0, 0, STUDIO.canvas.width, STUDIO.canvas.height);
+  g.imageSmoothingEnabled = true;
+  g.imageSmoothingQuality = quality || "high";
+  try { drawShareCard(g, shareCardModel(STUDIO.run, shareCardOpts()), 0.5); }
+  catch (e) { PHOTODIAG.err = "preview: " + (e && e.message); }
+}
+/** Redraw the panel's controls, repaint the preview, and re-arm the export. */
+function studioSync() {
+  if (!STUDIO) return;
+  const root = STUDIO.root;
+  root.querySelectorAll("[data-sst-aspect]").forEach((b) => {
+    b.classList.toggle("on", b.getAttribute("data-sst-aspect") === SCARD.aspect);
+    b.setAttribute("aria-pressed", b.getAttribute("data-sst-aspect") === SCARD.aspect ? "true" : "false");
+  });
+  const ph = root.querySelector("[data-sst-photo]"); if (ph) ph.innerHTML = studioPhotoHtml();
+  const rt = root.querySelector("[data-sst-route]"); if (rt) rt.innerHTML = studioRouteHtml(STUDIO.run);
+  const sv = root.querySelector("[data-sst-strava]");
+  if (sv) sv.innerHTML = stravaRunButtonHtml(STUDIO.run) +
+    '<p class="sst-sr">Sends the run itself, not this card.</p>';
+  // ⚠️ REBUILT FROM ITS BUILDER, NOT PATCHED IN PLACE. The old loop only re-toggled the classes, which
+  // was enough while the two switches were static markup reading a global — it cannot produce the
+  // locked row or its sentence, and it cannot tell one run's record from another's.
+  const pvr = root.querySelector("[data-sst-priv]"); if (pvr) pvr.innerHTML = studioPrivHtml(STUDIO.run);
+  const hint = root.querySelector("[data-sst-hint]");
+  if (hint) hint.textContent = SPHOTO ? "Drag to move your photo, pinch to zoom. Double-tap to reset."
+    : "Add a photo and it becomes the background.";
+  studioMount();
+  studioStale();
+}
+/**
+ * ⚠️ SHARE AND SAVE ARE DISABLED WITH THEIR REASON IN WORDS WHILE THE FILE IS BEING BUILT, because
+ * the tap cannot wait for it — see prepareShareCard. A live-looking button that does nothing is the
+ * defect class this project has shipped twice.
+ */
+function studioStale() {
+  if (!STUDIO) return;
+  clearTimeout(STUDIO.timer);
+  studioBusy(true);
+  // 350ms of idle, so dragging a photograph does not encode a card per frame.
+  STUDIO.timer = setTimeout(() => {
+    if (!STUDIO) return;
+    // ⚠️ THE ANSWER DECIDES WHETHER THE BUTTONS COME BACK, because null is not always a failure. With
+    // no photograph and no route there is no eligible template and prepareShareCard deliberately
+    // refuses; re-arming Share on that is the looks-live-does-nothing defect this project has shipped
+    // three times, and the runner would meet it as a Share button that silently posts text.
+    prepareShareCard(STUDIO.run).then((f) => studioBusy(f ? false : "blocked"));
+  }, 350);
+}
+function studioBusy(on) {
+  if (!STUDIO) return;
+  STUDIO.busy = !!on;
+  const root = STUDIO.root;
+  root.querySelectorAll('[data-sst="share"], [data-sst="save"]').forEach((b) => {
+    b.disabled = !!on;
+    b.classList.toggle("sst-off", !!on);
+  });
+  const busy = root.querySelector("[data-sst-busy]");
+  if (busy) busy.classList.toggle("on", on === true);
+  const why = root.querySelector("[data-sst-why]");
+  if (why) {
+    why.textContent = on === "blocked" ? "Add a photo and your card is ready to share."
+      : on ? "Building your card…" : "";
+  }
+}
+/**
+ * EVERY TAP IN THE STUDIO, RESOLVED FROM THE NODE THAT WAS HIT.
+ *
+ * ⚠️ ONE DELEGATED LISTENER, NOT A HANDLER PER BUTTON — see the note where it is attached. Three of
+ * the panel's rows are rebuilt from their builders by studioSync, so a handler put on those buttons is
+ * gone by the time the runner reaches them.
+ *
+ * ⚠️ closest, NOT e.target. Every one of these controls has a child — the switches hold a knob, the
+ * buttons hold an icon — so the node the pointer actually lands on is usually the child, and reading
+ * the attribute off e.target answers null for most of the surface.
+ */
+function studioClick(e) {
+  if (!STUDIO) return;
+  const t = e.target && e.target.closest ? e.target : null;
+  if (!t) return;
+  const act = t.closest("[data-sst]");
+  if (act) {
+    const what = act.getAttribute("data-sst");
+    if (what === "cancel") return closeShareStudio();
+    if (what === "pick") return studioPick();
+    if (what === "drop") {
+      if (SPHOTO && SPHOTO.bitmap && SPHOTO.bitmap.close) { try { SPHOTO.bitmap.close(); } catch (err) {} }
+      SPHOTO = null; SCARD.routeOn = null; return studioSync();
+    }
+    if (what === "route") {
+      // ⚠️ aria-checked is the state BEFORE the tap; reading it as the state after is a fault this
+      // project already shipped once, on the training-zones toggle, where it made the control inert.
+      // The aria-disabled test is a belt to the disabled property, which stops the tap arriving at all.
+      if (act.getAttribute("aria-disabled") === "true") return;
+      SCARD.routeOn = act.getAttribute("aria-checked") !== "true";
+      return studioSync();
+    }
+    // ⚠️ THE RUN THE STUDIO WAS OPENED WITH, at both. Share used to re-resolve through the screen's
+    // own resolver while Save beside it read STUDIO.run, so one row could act on two different runs.
+    if (what === "share") return doShareRun(STUDIO.run);
+    if (what === "save") return saveShareCard(STUDIO.run);
+    return;
+  }
+  const asp = t.closest("[data-sst-aspect]");
+  if (asp) { SCARD.aspect = asp.getAttribute("data-sst-aspect"); return studioSync(); }
+  const pv = t.closest("[data-sstpriv]");
+  if (pv) {
+    // ⚠️ THE GLOBAL FLOOR IS DISABLED, AND THE EARLY RETURN IS A BELT TO IT. Same pairing as the route
+    // switch above: disabled stops the tap arriving, aria-disabled is checked in case it does.
+    if (pv.getAttribute("aria-disabled") === "true") return;
+    // ⚠️ aria-checked is the state BEFORE the tap. Reading it as the state after is a fault this project
+    // already shipped once, on the training-zones toggle, where it made the control inert.
+    // ⚠️ AND IT WRITES THE PER-RUN RECORD, NOT THE GLOBAL PRIVACY. It used to write PRIVACY and then
+    // render() the screen behind, on the reasoning that the debrief map shows the same route. Per the
+    // owner's ruling these are this CARD's settings: the debrief keeps the global, so there is nothing
+    // behind the overlay for them to change and re-rendering it would be a promise the switch no longer
+    // keeps. The floor in sharePrivacyFor is what keeps the two from contradicting each other.
+    setSharePrivacy(STUDIO.run, pv.getAttribute("data-sstpriv"), pv.getAttribute("aria-checked") !== "true");
+    studioSync();
+    return;
+  }
+  // ⚠️ SEND TO STRAVA IS WIRED HERE BECAUSE THE STUDIO IS WHERE IT IS RENDERED, and it was reached by
+  // nothing at all. wire() picks it up by id on every render — but opening the studio does not render,
+  // so a connected runner met a full-width primary button reading "Send to Strava" with no handler on
+  // it: measured onclick null, and on the Logbook debrief the studio is the ONLY route to Strava.
+  // ⚠️ AND IT SENDS THE STUDIO'S OWN RUN. The render-time copy resolves the run from the screen
+  // BEHIND the overlay — the same re-resolve that had Share and Save disagreeing one row above.
+  const stv = t.closest("#stvSend, #stvCheck");
+  if (stv && !stv.disabled) {
+    const done = () => { try { render(); } catch (err) {} studioSync(); };
+    if (stv.id === "stvSend") stravaSendRun(STUDIO.run, done);
+    else stravaCheckPending(STUDIO.run, done);
+  }
+}
+/** The per-open wiring: the nodes that live exactly as long as one open of the studio. */
+function studioWire() {
+  const root = STUDIO.root;
+  // ⚠️ THE INPUT IS NOT REBUILT BY studioSync, so a property assignment is right here — and change is
+  // not a click, so it cannot ride on the delegated listener.
+  const inp = root.querySelector("[data-sst-file]");
+  if (inp) inp.onchange = () => { const f = inp.files && inp.files[0]; if (f) studioTake(f); };
+  studioGestures();
+}
+function studioPick() {
+  const inp = STUDIO && STUDIO.root.querySelector("[data-sst-file]");
+  // Clearing the value first, or picking the same file twice never fires change.
+  if (inp) { inp.value = ""; inp.click(); }
+}
+/**
+ * DECODING A PICKED PHOTOGRAPH.
+ *
+ * ⚠️ THE LONG SIDE IS CAPPED AT 2160 — twice the card's width, the fixed-2x rule the map cache
+ * already follows. What matters is not the peak of the decode (which is one full decode either way)
+ * but what stays RESIDENT: a 4032x3024 photograph is 46.5 MB of RGBA, and that is the buffer scaled
+ * down again on every frame of a pinch. A WKWebView over its memory footprint is jetsammed with no
+ * exception and nothing in the console.
+ *
+ * ⚠️ NO imageOrientation OPTION IS PASSED. The default is from-image, which is what applies the EXIF
+ * rotation; passing "none" was measured not to disable it, and would only be a way to draw every
+ * portrait photograph on its side the day a browser started honouring it. The width and height are
+ * therefore read off the DECODED bitmap, post-rotation, which is what drawImage honours.
+ *
+ * ⚠️ BOTH ERROR HOOKS, ALWAYS. The avatar picker next door has neither reader.onerror nor
+ * img.onerror, so a photograph it cannot read leaves it silently doing nothing — indistinguishable
+ * from a dead button.
+ */
+function shareDecodePhoto(file) {
+  const cap = 2160;
+  const viaBitmap = () => {
+    if (!window.createImageBitmap) return Promise.reject(new Error("no createImageBitmap"));
+    return createImageBitmap(file);
+  };
+  const viaImg = () => new Promise((resolve, reject) => {
+    const rd = new FileReader();
+    rd.onerror = () => reject(new Error("file unreadable"));
+    rd.onload = () => {
+      const im = new Image();
+      im.onerror = () => reject(new Error("image undecodable"));
+      im.onload = () => resolve(im);
+      im.src = rd.result;
+    };
+    rd.readAsDataURL(file);
+  });
+  return viaBitmap().catch(viaImg).then((src) => {
+    const w0 = src.width || src.naturalWidth, h0 = src.height || src.naturalHeight;
+    if (!(w0 > 0 && h0 > 0)) throw new Error("no dimensions");
+    PHOTODIAG.decoded = w0 + "x" + h0;
+    const long = Math.max(w0, h0);
+    if (long <= cap) { PHOTODIAG.scaled = "no"; return { bitmap: src, w: w0, h: h0 }; }
+    const k = cap / long, w = Math.round(w0 * k), h = Math.round(h0 * k);
+    const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+    const cg = cv.getContext("2d");
+    cg.imageSmoothingEnabled = true; cg.imageSmoothingQuality = "high";
+    cg.drawImage(src, 0, 0, w, h);
+    if (src.close) { try { src.close(); } catch (e) {} }
+    PHOTODIAG.scaled = w + "x" + h;
+    return { bitmap: cv, w: w, h: h };
+  });
+}
+function studioTake(file) {
+  if (!STUDIO) return;
+  // ⚠️ onchange can fire seconds before the bytes arrive (an iCloud download), so the card is marked
+  // stale and the actions disabled the instant a file is named, not when it decodes.
+  PHOTODIAG.picked++; PHOTODIAG.err = "";
+  studioBusy(true);
+  const t0 = shareNow();
+  shareDecodePhoto(file).then((p) => {
+    if (!STUDIO) return;
+    if (SPHOTO && SPHOTO.bitmap && SPHOTO.bitmap.close) { try { SPHOTO.bitmap.close(); } catch (e) {} }
+    PHOTODIAG.ms = Math.round(shareNow() - t0);
+    SPHOTO = { bitmap: p.bitmap, w: p.w, h: p.h, id: ++SPHOTO_SEQ, ox: 0.5, oy: 0.5, k: 1 };
+    SCARD.routeOn = null;
+    studioSync();
+  }).catch((e) => {
+    PHOTODIAG.err = "decode: " + (e && e.message);
+    if (!STUDIO) return;
+    // ⚠️ THE CARD IS LEFT EXACTLY AS IT WAS AND THE FAILURE IS SAID OUT LOUD. Never a blank slot.
+    studioBusy(false);
+    const why = STUDIO.root.querySelector("[data-sst-why]");
+    if (why) why.textContent = "That photo could not be read — try another one.";
+  });
+}
+/**
+ * REPOSITIONING HAPPENS ON THE PREVIEW ITSELF — better than the reference, which crops in a separate
+ * step: the type is already on the card while you frame it, so you can see whether the horizon lands
+ * across the title.
+ *
+ * ⚠️ THE STAGE MUST BE EXEMPTED FROM THE DOCUMENT-WIDE PINCH SUPPRESSOR (see the gesture guard near
+ * buildNav). Anywhere else a two-finger pinch zooms the PAGE, and because pinch-to-zoom is disabled
+ * the runner can never zoom back out.
+ */
+function studioGestures() {
+  const st = STUDIO.root.querySelector("[data-sst-stage]"); if (!st) return;
+  const pts = new Map();
+  let startDist = 0, startK = 1, lastX = 0, lastY = 0, safari = false, lastTap = 0;
+  const cardX = () => CARD_W / Math.max(1, st.clientWidth);
+  const geom = () => {
+    const m = shareCardModel(STUDIO.run, shareCardOpts());
+    return shareCanvasGeom(m.aspect);
+  };
+  const slack = () => {
+    const gm = geom(), p = SPHOTO;
+    // ⚠️ gm.H, NOT THE LEDGER'S TOP, AND THIS WAS WRONG UNTIL THE LEDGER WENT. sharePhotoBox covers the
+    // WHOLE canvas — the photograph has been full bleed since the frame was removed — while this
+    // computed its slack against LT, the top of a block that stopped 960px down a 1920px story. So a
+    // drag moved the picture by twice what the finger did on the vertical axis and the anchored pinch
+    // walked away from the fingers. Nothing threw and nothing looked broken in a screenshot; deleting
+    // LT is what made it impossible to keep.
+    const k = Math.max(gm.W / p.w, gm.H / p.h) * p.k;
+    return { gm: gm, kt: k, dw: p.w * k, dh: p.h * k };
+  };
+  const paint = (q) => { studioPaint(q); };
+  const pan = (dx, dy) => {
+    if (!SPHOTO) return;
+    const s = slack(), f = cardX();
+    const hx = s.gm.W - s.dw, hy = s.gm.H - s.dh;
+    if (Math.abs(hx) > 1) SPHOTO.ox = Math.min(1, Math.max(0, SPHOTO.ox + dx * f / hx));
+    if (Math.abs(hy) > 1) SPHOTO.oy = Math.min(1, Math.max(0, SPHOTO.oy + dy * f / hy));
+    paint("low");
+  };
+  // Anchored zoom: whatever sits under the fingers stays under them, the same maths the avatar
+  // cropper uses — without it a pinch feels detached from the picture.
+  const zoomAbout = (kNew, sx, sy) => {
+    if (!SPHOTO) return;
+    const f = cardX(), before = slack();
+    const cx = sx * f, cy = sy * f;
+    const x0 = (before.gm.W - before.dw) * SPHOTO.ox, y0 = (before.gm.H - before.dh) * SPHOTO.oy;
+    const u = (cx - x0) / before.kt, v = (cy - y0) / before.kt;
+    SPHOTO.k = Math.min(4, Math.max(1, kNew));
+    const after = slack();
+    const hx = after.gm.W - after.dw, hy = after.gm.H - after.dh;
+    if (Math.abs(hx) > 1) SPHOTO.ox = Math.min(1, Math.max(0, (cx - u * after.kt) / hx));
+    if (Math.abs(hy) > 1) SPHOTO.oy = Math.min(1, Math.max(0, (cy - v * after.kt) / hy));
+    paint("low");
+  };
+  const toStage = (cx, cy) => { const r = st.getBoundingClientRect(); return { x: cx - r.left, y: cy - r.top }; };
+  st.onpointerdown = (e) => {
+    if (!SPHOTO || pts.size >= 2) return;
+    try { st.setPointerCapture(e.pointerId); } catch (err) {}
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 1) { lastX = e.clientX; lastY = e.clientY; }
+    else {
+      const a = Array.from(pts.values());
+      startDist = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) || 1;
+      startK = SPHOTO.k;
+    }
+  };
+  st.onpointermove = (e) => {
+    if (!SPHOTO || !pts.has(e.pointerId) || safari) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size >= 2) {
+      const a = Array.from(pts.values());
+      const d = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) || 1;
+      const mid = toStage((a[0].x + a[1].x) / 2, (a[0].y + a[1].y) / 2);
+      zoomAbout(startK * (d / startDist), mid.x, mid.y);
+      return;
+    }
+    pan(e.clientX - lastX, e.clientY - lastY);
+    lastX = e.clientX; lastY = e.clientY;
+  };
+  const up = (e) => {
+    pts.delete(e.pointerId);
+    try { st.releasePointerCapture(e.pointerId); } catch (err) {}
+    // Lifting one finger of a pinch: re-seat the drag origin on the finger still down, or the next
+    // move applies a huge stale delta and the photo jumps.
+    if (pts.size === 1) { const r = Array.from(pts.values())[0]; lastX = r.x; lastY = r.y; }
+    if (pts.size < 2) startDist = 0;
+    if (!pts.size && SPHOTO) { paint("high"); studioStale(); }
+  };
+  st.onpointerup = up; st.onpointercancel = up;
+  st.addEventListener("gesturestart", (e) => { e.preventDefault(); safari = true; startK = SPHOTO ? SPHOTO.k : 1; }, { passive: false });
+  st.addEventListener("gesturechange", (e) => {
+    e.preventDefault();
+    const mid = toStage(e.clientX, e.clientY);
+    zoomAbout(startK * (e.scale || 1), mid.x, mid.y);
+  }, { passive: false });
+  st.addEventListener("gestureend", (e) => {
+    e.preventDefault(); safari = false; pts.clear(); startDist = 0;
+    if (SPHOTO) { paint("high"); studioStale(); }
+  }, { passive: false });
+  st.addEventListener("wheel", (e) => {
+    if (!SPHOTO) return;
+    e.preventDefault();
+    const at = toStage(e.clientX, e.clientY);
+    zoomAbout(SPHOTO.k * (1 - (e.deltaY * (e.ctrlKey ? 0.01 : 0.0022))), at.x, at.y);
+    paint("high"); studioStale();
+  }, { passive: false });
+  st.addEventListener("click", () => {
+    const now = Date.now();
+    if (SPHOTO && now - lastTap < 320) { SPHOTO.ox = 0.5; SPHOTO.oy = 0.5; SPHOTO.k = 1; paint("high"); studioStale(); }
+    lastTap = now;
+  });
 }
 // The one question the intelligent coach needs after every run: how hard did that feel?
 // ⚠️ Takes the band from the record when it has one. It used to read plannedRpeBandOf(LIVE.session)
@@ -18557,7 +22273,44 @@ function rpeAskHtml(sm) {
     : "1 = very easy \\u00b7 10 = flat out" + (band ? " \\u00b7 planned: " + band.min + "\\u2013" + band.max : "");
   return '<div class="card rpe-ask"><div class="subhead" style="margin-top:0">How hard did that feel?</div>' +
     '<div class="rpe-row">' + chips.join("") + '</div>' +
-    '<div class="rpe-note">' + picked + '</div></div>';
+    '<div class="rpe-note">' + picked + '</div>' +
+    painAskHtml(sm) + '</div>';
+}
+/**
+ * THE ONE ANSWER THAT OUTRANKS THE PACE — AND UNTIL NOW NOTHING WROTE IT.
+ *
+ * ⚠️ run.pain WAS READ IN THREE PLACES AND WRITTEN IN NONE. runVerdict's first and highest-precedence
+ * branch (discomfort before completion, before adherence, before effort) was unreachable, and the share
+ * card's only rule for keeping a privately-disclosed problem off a picture that leaves the phone was
+ * guarding a field nothing set. That is the computed-and-discarded trap this project has now met five
+ * times (CLASS, MASTERS, PLAN.notes, #typePreview, refreshTypePreview) sitting in a safety position,
+ * where the failure mode is not an empty panel but a run somebody was hurting on being congratulated.
+ *
+ * ⚠️ IT IS ASKED HERE BECAUSE THIS IS THE ONE BLOCK THAT ALREADY ASKS THE RUNNER ABOUT THIS RUN. The
+ * app has two other notions of discomfort and neither can answer for a run: state.subj.soreness is a
+ * MORNING readiness answer about today, is not persisted against anything, and mapping it here would
+ * make every run on a stiff day report as painful — an inference, not a disclosure; and the injury
+ * guide is a symptom-led route with no run attached. Reading either would be the app deciding what the
+ * runner disclosed.
+ *
+ * ⚠️ THREE STATES, NOT TWO, AND THAT IS THE weeklyVolumeKm LESSON. Absent means never asked; false
+ * means asked and answered no. Pre-selecting "No" would put an answer nobody gave on every run in the
+ * store, and every run recorded before today is correctly absent rather than silently fine.
+ *
+ * ⚠️ AND IT CHANGES NOTHING FOR ANY RUN ALREADY RECORDED. The field can only arrive by a tap, so no
+ * existing debrief moves — which is what makes reaching into runVerdict's coaching output safe here.
+ */
+function painAskHtml(sm) {
+  const answered = !!sm && typeof sm.pain === "boolean";
+  const hurt = !!(sm && sm.pain);
+  const btn = (val, label) => {
+    const on = answered && hurt === val;
+    return '<button data-pain="' + (val ? "1" : "0") + '"' + (on ? ' class="on"' : "") +
+      ' aria-pressed="' + (on ? "true" : "false") + '">' + label + '</button>';
+  };
+  return '<div class="zr-auto"><span>Did anything hurt?</span>' +
+    '<div class="seg">' + btn(false, "No") + btn(true, "Yes") + '</div></div>' +
+    (hurt ? '<div class="rpe-note">Noted \\u2014 that comes first in the read below, and it stays off anything you share.</div>' : "");
 }
 function viewLiveComplete() {
   const sm = LIVE.summary || { distKm: "0.00", time: "0:00", pace: "—", saved: false, route: [], splits: [] };
@@ -18570,7 +22323,9 @@ function viewLiveComplete() {
   // minute later and every one of them appeared. Two builders, two answers, and the wrong one was
   // on the screen that matters most. Once saved we show the actual record; before that, the same
   // shape from the same builder.
-  const run = (sm.saved && sm.runId && state.logged.filter((r) => r.id === sm.runId)[0]) || liveRunRecord(sm);
+  // ⚠️ liveCompleteRun IS THE ONE RESOLVER, so wire()'s share button and this screen's debrief cannot
+  // be handed two different objects for one run — see the note on that function.
+  const run = liveCompleteRun(sm);
   const controls = sm.saved
     ? '<div class="live-controls"><button class="primary" id="lDone">' + ICON.check + ' View in your logbook</button></div>'
     : '<div class="live-controls two"><button class="ctrl" id="lDiscard">Discard</button><button class="primary" id="lSave">' + ICON.check + ' Save session</button></div>';
@@ -18890,6 +22645,10 @@ function liveRunRecord(sm) {
     // exactly when someone writes one — had nowhere to go and was thrown away by the Save that
     // followed, under a hint promising it would be kept.
     rpe: sm.rpe || null, note: sm.note || undefined,
+    // ⚠️ THE SAME ROUTE AS rpe AND note, AND undefined WHEN UNANSWERED RATHER THAN false. Absent means
+    // the runner was never asked; false means they were and said no. See painAskHtml on why the
+    // difference is the whole safety of reaching into runVerdict's first branch.
+    pain: typeof sm.pain === "boolean" ? sm.pain : undefined,
     pband: paceStampFor(LIVE.session).pband, rband: plannedRpeBandOf(LIVE.session),
     pwin: paceStampFor(LIVE.session).pwin, pmix: paceStampFor(LIVE.session).pmix,
     anchor: profile.recentTimeS, pmodel: PACE_MODEL_VERSION,
@@ -18900,10 +22659,40 @@ function liveRunRecord(sm) {
     // of a runner standing still. The debrief omits the tile when this is absent.
     cadence: LIVE.cadN ? Math.round(LIVE.cadSum / LIVE.cadN) : null,
     hrSeries: hrSeriesOrNull(LIVE.hrSeries),
+    gpsq: liveGpsQuality(),
     zoneSec: (LIVE.zoneSec && LIVE.zoneSec.some((s) => s > 0)) ? LIVE.zoneSec.slice() : null,
     steps: sessionStepText(LIVE.session),
     sim: LIVE.mode === "sim" || undefined,
   };
+}
+/**
+ * WHAT THE RECEIVER ACTUALLY DID, KEPT ON THE RUN — TWO NUMBERS, AND ONLY WHEN THERE IS SOMETHING TO SAY.
+ *
+ * ⚠️ LIVE.gpsDiag AND LIVE.pedo ARE TORN DOWN WITH THE SESSION. stopLive parks them in GPS_DIAG_LAST /
+ * PEDO_DIAG_LAST so Support › Your data can still answer "what did GPS do on that run?" an hour later —
+ * but those are the LAST run's, globally, so nothing on a stored run could say how well it was measured.
+ * Two of the three signals a verdict's confidence depends on lived only in that global and vanished on
+ * the next run.
+ *
+ * ⚠️ ABSENT MEANS UNKNOWN, NEVER GOOD AND NEVER BAD. Every run recorded before today carries nothing
+ * here, as does every watch run (the wrist sends neither figure) and every treadmill run (no receiver to
+ * report on). runEvidenceConfidence therefore reads it only to LOWER a verdict it has already decided is
+ * clean, so a missing stamp cannot invent either a problem or a reassurance.
+ *
+ * ⚠️ TWO FIELDS, NOT THE WHOLE DIAGNOSTIC. seen/badAcc/still/spike/stale/maxAcc/capped are for reading
+ * on a support screen; these two are the ones that change what the run MEANS. A ~63-byte-per-run store
+ * is not the place to keep telemetry nobody reads.
+ */
+function liveGpsQuality() {
+  if (!LIVE || LIVE.mode !== "gps") return undefined;
+  const d = LIVE.gpsDiag || {}, p = LIVE.pedo || {};
+  const q = {};
+  // Ground the pedometer paid for because GPS had gone quiet for 20 s or more: step-counted, not measured.
+  if (p.credited > 0) q.pedoM = Math.round(p.credited);
+  // Anchor re-seeds during the opening settle. Each one credits no distance at all, so this does not
+  // corrupt a total — it says the receiver had not settled when the first kilometre was being cut.
+  if (d.reseeds > 0) q.reseeds = d.reseeds;
+  return Object.keys(q).length ? q : undefined;
 }
 function runDateLabel() {
   const d = new Date(), M = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -20187,7 +23976,7 @@ function wireRunDebrief() {
   if (next) next.onclick = () => { state.screen = null; state.tab = "plan"; render(); };
 
   const share = $("rdShare");
-  if (share) share.onclick = () => openRunShareSheet(viewedRun());
+  if (share) share.onclick = () => openShareStudio(viewedRun());
 
   // ⚠️ THE OVERFLOW WAS DRAWN AND WIRED TO NOTHING. It shipped as a button that looked live, sat in
   // the top-right corner where every iOS app puts its actions, and did nothing at all when tapped —
@@ -20218,24 +24007,7 @@ let RD_SCROLL = null;
  * ⚠️ THE EXISTING UPLOAD PATH IS UNCHANGED — this only stops Strava being a second primary button
  * competing with Share on the page itself, which is what the design forbids.
  */
-function openRunShareSheet(run) {
-  if (!run) return;
-  const pres = runRoutePresentation(run);
-  const strava = stravaRunButtonHtml(run);
-  ensureSheet(); SHEET_CTX = null;
-  $("sheetBody").innerHTML = '<div class="sh-h">Share this run</div>' +
-    '<p class="rd-plan-p">' + (pres.hidden ? "Your map is hidden, so the card will show your numbers only."
-      : pres.redacted ? "Your start and finish are hidden on the shared card."
-      : "The shared card shows your full route.") + '</p>' +
-    '<div class="rd-privopts">' +
-      rdPrivToggle("ends", "Hide start and finish", PRIVACY.ends) +
-      rdPrivToggle("map", "Hide the map entirely", PRIVACY.map) +
-    '</div>' +
-    '<button class="primary" id="shareRun">' + ICON.share + ' Share my run</button>' +
-    (strava || '<p class="rd-sr">Connect Strava in Profile to send runs there.</p>');
-  $("sheetOv").classList.add("on");
-  wireSheetShare(run);
-}
+function openRunShareSheet(run) { openShareStudio(run); }
 /** The run's own actions. Share and privacy repeat what is further down the page; delete is only here. */
 function openRunMoreSheet(run) {
   if (!run) return;
@@ -20280,9 +24052,15 @@ function openPrivacySheet() {
       rdPrivToggle("map", "Hide the map entirely", PRIVACY.map) +
     '</div>';
   $("sheetOv").classList.add("on");
-  wireSheetShare(null);
+  wirePrivacyToggles();
 }
-function wireSheetShare(run) {
+/**
+ * ⚠️ NAMED FOR WHAT IT DOES. It was wireSheetShare(run) and wired the sheet's Share button; the studio
+ * replaced that sheet, so the button and the only statement that read the parameter both went and it
+ * was left wiring privacy toggles under a name promising otherwise, taking an argument its one caller
+ * passed as null.
+ */
+function wirePrivacyToggles() {
   document.querySelectorAll("[data-rdpriv]").forEach((b) => {
     b.onclick = () => {
       // ⚠️ aria-checked is the state BEFORE the tap. Reading it as the state AFTER is a fault this
@@ -20292,8 +24070,6 @@ function wireSheetShare(run) {
       closeSheet(); render();
     };
   });
-  const sr = $("shareRun");
-  if (sr && run) { sr.onclick = doShareRun; prepareShareCard(run); }
 }
 function wire() {
   document.querySelectorAll("[data-seg]").forEach((seg) => seg.querySelectorAll("button").forEach((b) => b.onclick = () => {
@@ -20417,14 +24193,23 @@ function wire() {
   }
   try { runPlaceLookup(viewedRun()); } catch (e) {}
   wireRunDebrief();
-  const shareRun = $("shareRun"); if (shareRun) { shareRun.onclick = doShareRun; prepareShareCard(currentOverviewRun()); }
-  // Strava sits in runOverviewHtml beside Share, so this one wiring serves the finish screen and the
-  // Logbook's detail view alike. ⚠️ The callback re-renders rather than patching the button: the state
-  // it has to show (sending / on Strava / still processing / failed with a reason) is built in one
-  // place, and a second copy of that logic here is how the two screens start disagreeing.
-  const stvSend = $("stvSend");
+  // ⚠️ ONE SHARE FLOW, FROM BOTH SCREENS. This button used to call doShareRun directly, so the minute
+  // after a run — the likeliest moment anybody shares — was the one screen with no photograph, no
+  // shape choice, no preview and no Save to device. The Logbook had all four. Same run, same studio.
+  const shareRun = $("shareRun");
+  if (shareRun) shareRun.onclick = () => openShareStudio(currentOverviewRun());
+  // Strava sits in runOverviewHtml beside Share, which is the FINISH screen. ⚠️ The Logbook's detail
+  // view no longer renders it — there it lives inside the share studio, which is not rendered by
+  // render() and wires its own copy (see studioClick). So while the studio is open over the finish
+  // screen there are briefly two #stvSend nodes, and these lookups are scoped to .app so this one can
+  // never reach into the overlay and re-point it at the run on the screen behind.
+  // ⚠️ The callback re-renders rather than patching the button: the state it has to show (sending / on
+  // Strava / still processing / failed with a reason) is built in one place, and a second copy of that
+  // logic here is how the two screens start disagreeing.
+  const appRoot = document.querySelector(".app") || document;
+  const stvSend = appRoot.querySelector("#stvSend");
   if (stvSend && !stvSend.disabled) stvSend.onclick = () => stravaSendRun(currentOverviewRun(), render);
-  const stvCheck = $("stvCheck");
+  const stvCheck = appRoot.querySelector("#stvCheck");
   if (stvCheck) stvCheck.onclick = () => stravaCheckPending(currentOverviewRun(), render);
   // The stretch offer sits in runOverviewHtml, so this one wiring serves the finish screen and the
   // Logbook's detail view alike — the same reason the offer itself lives in that one builder.
@@ -20916,6 +24701,29 @@ function wire() {
     }
     render();
   });
+  // ⚠️ THE SAME TWO PATHS AS data-rpe, AND FOR THE SAME REASONS — see painAskHtml. In the Logbook the
+  // record IS the target; on the finish screen the answer parks on LIVE.summary and rides out through
+  // liveRunRecord, and is written through afterwards if the runner saved first.
+  // ⚠️ maybeTrainingFlags IS DELIBERATELY NOT CALLED. The flags engine judges pace against the band and
+  // effort against the RPE band; it has no discomfort term, so calling it here would re-run the
+  // adaptive check on unchanged evidence and could raise a banner the runner's tap had nothing to do
+  // with. Discomfort reaches the coaching through runVerdict's own precedence, which is where the pack
+  // put it.
+  document.querySelectorAll("[data-pain]").forEach((c) => c.onclick = () => {
+    const val = c.dataset.pain === "1";
+    if (state.screen === "runview") {
+      const lg = viewedRun();
+      if (lg) { lg.pain = val; saveRuns(); render(); }
+      return;
+    }
+    const sm = LIVE && LIVE.summary; if (!sm) return;
+    sm.pain = val;
+    if (sm.saved) {
+      const lg = (state.logged || []).find((r) => r.id === sm.runId);
+      if (lg) { lg.pain = val; saveRuns(); }
+    }
+    render();
+  });
   const lSave = $("lSave"); if (lSave) lSave.onclick = () => { saveLiveSession(); render(); };
   const tmSet = $("tmSet"); if (tmSet) tmSet.onclick = () => {
     const raw = ($("tmDist").value || "").trim().replace(",", ".");
@@ -21190,7 +24998,7 @@ seedDone();
 // The avatar cropper is the one place a pinch is wanted, and it drives its own zoom from these same
 // events - so it is excluded here rather than fighting for them.
 (function () {
-  const wanted = (t) => !!(t && t.closest && t.closest(".crop-stage"));
+  const wanted = (t) => !!(t && t.closest && t.closest(".crop-stage, .sst-stage"));
   ["gesturestart", "gesturechange", "gestureend"].forEach((n) => {
     document.addEventListener(n, (e) => { if (!wanted(e.target)) e.preventDefault(); }, { passive: false });
   });

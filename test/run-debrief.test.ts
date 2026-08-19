@@ -113,11 +113,45 @@ test("there is exactly one share entry and Strava is inside it", () => {
   const view = lift("viewRunDetail");
   assert.equal((view.match(/rdShareHtml\(/g) || []).length, 1, "more than one share entry point");
   assert.ok(!/stravaRunButtonHtml/.test(view), "Strava is a second button on the page");
-  // ⚠️ FOLLOW THE DELEGATION RATHER THAN PINNING THE OLD SHEET. openRunShareSheet now opens the share
-  // studio, so the flow is both functions; asserting only on the delegator would pass on any body at
-  // all. The invariant is unchanged: Strava is a destination inside the one share flow.
-  const flow = lift("openRunShareSheet") + lift("shareStudioHtml");
+  // ⚠️ FOLLOW THE DELEGATION RATHER THAN PINNING THE OLD SHEET. openRunShareSheet opens the share
+  // studio, which now hands its destinations to one sheet of its own — so the flow is four functions,
+  // and asserting only on the delegator would pass on any body at all. The invariant is unchanged:
+  // Strava is a destination inside the one share flow, and there is exactly one such flow.
+  const flow = ["openRunShareSheet", "shareStudioHtml", "studioSheetHtml", "studioDestHtml"].map(lift).join("\n");
   assert.match(flow, /stravaRunButtonHtml/, "Strava is missing from the share flow");
+  // ⚠️ AND THE CHAIN IS ASSERTED LINK BY LINK, or the string above could sit in a builder nothing calls —
+  // which is the computed-and-discarded trap this project has met six times.
+  assert.match(lift("openRunShareSheet"), /openShareStudio\(/, "the one share entry no longer opens the studio");
+  assert.match(lift("shareStudioHtml"), /data-sst-sheetin/, "the studio renders no sheet for its destinations");
+  assert.match(lift("studioSheetHtml"), /"dest"/, "the sheet dispatch does not know about the destinations");
+  assert.match(lift("studioDestHtml"), /stravaRunButtonHtml/, "the destination sheet does not offer Strava");
+  assert.match(lift("studioClick"), /studioSheet\("dest"\)/, "nothing opens the destination sheet");
+  // ⚠️ ONE SYSTEM-COMPATIBLE FALLBACK IS ALWAYS OFFERED AND NO THIRD-PARTY APP IS NAMED AS A DESTINATION.
+  // The spec forbids hard-coding apps as guaranteed installed, and there is no LSApplicationQueriesSchemes
+  // entry in the app's plist — so a row labelled with any of these would be a button that cannot work
+  // until somebody rebuilds in Xcode. Strava is the exception the spec allows because the existing
+  // product already uploads there, and it sends the run rather than the picture.
+  // ⚠️ THE ROW LABELS ARE WHAT IS SWEPT, NOT THE WHOLE BUILDER, AND THE FIRST VERSION OF THIS CHECK WAS
+  // CAUGHT BY ITS OWN RE-BREAK. It looked for URL schemes ("instagram:", "fb://") and a row reading
+  // "Instagram Story" sailed past — while the sheet legitimately NAMES Instagram and WhatsApp in its
+  // explanatory note, which is the honest sentence telling the runner where their apps actually are. So a
+  // whole-text sweep is both too weak and too strong. What must hold is that no DESTINATION is a named
+  // third-party app: the labels are the destinations.
+  const dest = lift("studioDestHtml");
+  const labels = [...dest.matchAll(/<b>([^<]+)<\/b>/g)].map((m) => m[1]!);
+  assert.ok(labels.length >= 2, "the destination sheet has no labelled rows: " + labels.join(", "));
+  const named = labels.filter((l) =>
+    /instagram|whatsapp|facebook|twitter|snapchat|tiktok|messenger|threads/i.test(l));
+  assert.deepEqual(named, [],
+    "a destination row is a named third-party app, which cannot be guaranteed installed: " + named.join(", "));
+  // A URL scheme for one is forbidden outright — there is no LSApplicationQueriesSchemes entry, so it
+  // could not work until somebody rebuilds in Xcode, and it would fail silently.
+  for (const scheme of ["instagram:", "instagram-stories", "fb://", "whatsapp:", "twitter:", "snapchat:"]) {
+    assert.ok(!dest.toLowerCase().includes(scheme),
+      "the destination sheet opens a third-party app by URL scheme: " + scheme);
+  }
+  assert.match(dest, /data-sst="share"/, "the system share sheet fallback is missing");
+  assert.match(dest, /data-sst="save"/, "saving to the device is missing");
 });
 
 // ---- the verdict ---------------------------------------------------------------------------------

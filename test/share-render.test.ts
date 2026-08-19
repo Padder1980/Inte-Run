@@ -85,7 +85,11 @@ const CONSTS = ["SHARE_INK", "SHARE_TYPE", "SHARE_TYPE_FEED", "SHARE_TRACK", "SH
   "SHARE_ROUTE_ZONES", "SHARE_TOPO", "SHARE_VEIL_STEPS", "SHARE_PROBE_W", "FF",
   "SHARE_ZONE_SOFT_VETO", "SHARE_BADGE", "SHARE_QUIET", "MOMENT_GAP", "POSTER_GAP", "POSTER_TAG",
   "SHARE_POSTER_PAD", "EXEC_GAP", "PROG_GAP", "SHARE_CHART", "SHARE_PHOTO_FLOOR",
-  "SHARE_EVEN_SPREAD_S", "SHARE_LADDER", "SHARE_SCRIM", "SHARE_LUMW", "SHARE_HAIR"];
+  "SHARE_EVEN_SPREAD_S", "SHARE_LADDER", "SHARE_SCRIM", "SHARE_LUMW", "SHARE_HAIR", "SHARE_BLUR",
+  "SHARE_SCRIM_MARGIN",
+  // the square's four reductions, plus the one table that decides a canvas height
+  "SHARE_ASPECTS", "SHARE_ASPECT_H", "SHARE_TYPE_SQ", "SHARE_GAP_SQ", "SHARE_METRIC_CAP",
+  "SHARE_LADDER_MAX", "SHARE_CHART_SQ_H"];
 /**
  * ⚠️ THREE OF THE CARD'S CONSTANTS SHARE ONE STATEMENT — `const CARD_W = 1080, CARD_M = 64, ...` — so
  * liftConst cannot find them by their own name. Lifted by the statement's FIRST declarator and named
@@ -99,6 +103,7 @@ const FNS = ["shareFont", "shareTypeSize", "cardAlpha", "cardLsWidth", "shareFig
   "shareFit", "shareFitToRoom", "cardGeom", "shareCanvasGeom",
   "shareRect", "shareRectPad", "shareRectOverlap", "shareRectInside",
   "sharePhotoBox", "sharePhotoNorm", "sharePhotoDraw", "shareSubjectZones",
+  "shareBoxLeavesGap", "shareBlurBg", "sharePhotoCompose",
   "shareZoneRect", "shareZoneScore", "shareRoutePlacement",
   "shareLin255", "shareLinLut", "shareRelLumRGB", "shareHexRGB", "shareGroundRGB",
   "shareRelLum", "shareLumOfByte", "shareRatio", "shareGroundUnder", "shareVeilAlphaFor",
@@ -115,7 +120,12 @@ const FNS = ["shareFont", "shareTypeSize", "cardAlpha", "cardLsWidth", "shareFig
   "shareRowMetrics", "sharePhotoFloor", "shareChartMarker", "shareBandChart", "shareAxisKeep",
   "shareExecutionPlan", "shareExecutionCard", "shareLadderRows", "shareLadderScale", "shareChartKey",
   "shareProgressionPlan", "shareProgressionCard", "sharePlaceholderCard", "fmtPace",
-  "shareProgressionClaim", "shareEyebrow"];
+  "shareProgressionClaim", "shareEyebrow",
+  // ⚠️ THIS LIST IS HAND-WRITTEN AND IT WENT STALE THE MOMENT cardGeom GAINED shareAspect — 63 tests in
+  // this file threw ReferenceError at once. That is the acceptable kind of stale: it fails loudly rather
+  // than quietly measuring less, which is why the list survives here while the byte gate's closure is
+  // derived. Adding a share* function that another lifted one calls means adding it here too.
+  "shareAspect", "shareGaps", "shareMetricCap", "shareLadderMax", "shareChartH"];
 
 /**
  * A RECORDING 2D CONTEXT. Every call and every style assignment is appended to a log, so a drawing
@@ -194,6 +204,7 @@ function env(): Env {
     "let SHARE_LPROBE = null, SHARE_LPROBE_KEY = \"\";\n" +
     "let SHARE_LIN_LUT = null;\n" +
     "let SHARE_TOPO_C = null, SHARE_TOPO_KEY = \"\";\n" +
+    "let SHARE_BLUR_C = null, SHARE_BLUR_KEY = \"\";\n" +
     "let CARD_MEASURE = null;\n" +
     "function cardMeasureCtx() { if (!CARD_MEASURE) CARD_MEASURE = __mk(); return CARD_MEASURE; }\n" +
     FNS.map(lift).join("\n") + "\n" +
@@ -373,34 +384,115 @@ test("BLOCKER: the frame, its clip, its neon border and the radial glows are gon
   assert.ok(seen.size >= 8, "the renderer closure collapsed to " + seen.size);
 });
 
-test("the photograph covers the whole canvas, at every source shape and every crop", () => {
-  // ⚠️ THIS IS WHAT FULL BLEED MEANS ARITHMETICALLY. The box is allowed to hang off the canvas; what it
-  // may never do is leave a gap, at any aspect, zoom or pan.
+/** The five source shapes the fit ruling has to survive, plus what each one is here to catch. */
+const FIT_SHAPES: [number, number, string][] = [
+  [1200, 1800, "3:4 portrait, the ordinary phone photograph"],
+  [2400, 1200, "4:3 landscape, the widest ordinary case"],
+  [1500, 1500, "1:1 square"],
+  [4000, 640, "a very wide panorama"],
+  [640, 4000, "a very tall panorama, taller than 9:16"],
+];
+
+test("FILL covers the whole canvas, at every source shape and every crop", () => {
+  // ⚠️ THIS IS WHAT COVER MEANS ARITHMETICALLY, AND IT IS NOW THE OPT-IN RATHER THAN THE DEFAULT. The
+  // box is allowed to hang off the canvas; what it may never do is leave a gap, at any aspect, zoom or
+  // pan. Read the contain test below for what the DEFAULT promises instead.
   const E = env();
-  for (const aspect of ["story", "feed"]) {
+  for (const aspect of ["story", "feed", "square"]) {
     const gm = E.shareCanvasGeom(aspect);
-    const shapes: [number, number][] = [[1200, 1800], [2400, 1200], [1500, 1500], [640, 4000], [4000, 640]];
-    for (const [w, h] of shapes) {
+    for (const [w, h, why] of FIT_SHAPES) {
       for (const ox of [0, 0.5, 1]) for (const oy of [0, 0.5, 1]) for (const k of [1, 1.6, 3]) {
-        const b = E.sharePhotoBox({ w, h, ox, oy, k }, gm.W, gm.H);
+        const b = E.sharePhotoBox({ w, h, ox, oy, k, fill: true }, gm.W, gm.H);
         assert.ok(b.x <= 0.001 && b.y <= 0.001 && b.x + b.w >= gm.W - 0.001 && b.y + b.h >= gm.H - 0.001,
-          "a gap at " + aspect + " " + w + "x" + h + " ox" + ox + " oy" + oy + " k" + k +
+          "a gap at " + aspect + " " + why + " ox" + ox + " oy" + oy + " k" + k +
           " -> " + JSON.stringify(b));
+        assert.equal(E.shareBoxLeavesGap(b, gm.W, gm.H), false, "fill reports a gap: " + why);
         // The source's own proportions survive: no distortion, ever.
         assert.ok(Math.abs((b.w / b.h) - (w / h)) < 1e-9, "the photograph is being distorted");
       }
     }
   }
-  // And the draw clips to the canvas, not to a region of it.
+  // ⚠️ AND FILL MODE STILL DRAWS EXACTLY ONE IMAGE AND TINTS NOTHING. A flat veil over all of the
+  // picture was here for cohesion and is the arbitrary treatment the brief rejects. This is the
+  // assertion the surround must not be allowed to weaken: it can only ever paint where the photograph
+  // does not reach, so on a card with no gap there is nothing for it to do.
   const ctx = E.ctx();
   const gm = E.shareCanvasGeom("story");
-  E.sharePhotoDraw(ctx, { w: 1200, h: 1800, ox: 0.5, oy: 0.5, k: 1, bitmap: {} }, gm);
-  const rect = ctx.calls("rect")[0];
-  assert.deepEqual(rect, ["rect", 0, 0, 1080, 1920], "the photograph is clipped to less than the canvas");
+  E.sharePhotoDraw(ctx, { w: 1200, h: 1800, ox: 0.5, oy: 0.5, k: 1, fill: true, bitmap: {} }, gm);
+  assert.deepEqual(ctx.calls("rect")[0], ["rect", 0, 0, 1080, 1920],
+    "the photograph is clipped to less than the canvas");
   assert.equal(ctx.calls("drawImage").length, 1, "the photograph was not drawn once");
-  // ⚠️ AND NO UNIFYING TINT OVER THE WHOLE PICTURE. A flat veil over all of it was here for cohesion and
-  // is the arbitrary treatment the brief rejects: it flattens a good photograph to buy nothing.
   assert.equal(ctx.calls("fillRect").length, 0, "the photograph is still being tinted edge to edge");
+});
+
+test("BLOCKER: the DEFAULT shows the whole photograph, and the card is still filled edge to edge", () => {
+  // ⚠️ THE OWNER'S RULING OF 2026-08-19, AS ARITHMETIC: "i want the full photo the user uploads to be
+  // shown". So at the default zoom every row and column of the source lands inside the canvas — the box
+  // is INSIDE the card rather than hanging off it — and no pan can push any of it out, because an axis
+  // with slack is centred and ignores the fraction entirely.
+  const E = env();
+  for (const aspect of ["story", "feed", "square"]) {
+    const gm = E.shareCanvasGeom(aspect);
+    for (const [w, h, why] of FIT_SHAPES) {
+      for (const ox of [0, 0.5, 1]) for (const oy of [0, 0.5, 1]) {
+        const b = E.sharePhotoBox({ w, h, ox, oy, k: 1 }, gm.W, gm.H);
+        assert.ok(b.x >= -0.001 && b.y >= -0.001 && b.x + b.w <= gm.W + 0.001 && b.y + b.h <= gm.H + 0.001,
+          "the photograph is being cut off at " + aspect + " " + why + " ox" + ox + " oy" + oy +
+          " -> " + JSON.stringify(b));
+        assert.ok(Math.abs((b.w / b.h) - (w / h)) < 1e-9, "the photograph is being distorted");
+        // It is the LARGEST such fit: one axis touches an edge, or the picture is needlessly small.
+        assert.ok(Math.abs(b.w - gm.W) < 0.001 || Math.abs(b.h - gm.H) < 0.001,
+          "contain is not the largest fit at " + why + ": " + JSON.stringify(b));
+        // ⚠️ AND A CONTAINED AXIS IS CENTRED WHATEVER THE FRACTION SAYS. Without this the drag inverts,
+        // because the sign of the slack is the opposite of the cover case.
+        const mid = E.sharePhotoBox({ w, h, ox: 0.5, oy: 0.5, k: 1 }, gm.W, gm.H);
+        if (b.w < gm.W - 0.5) assert.ok(Math.abs(b.x - mid.x) < 0.001, "a contained x honoured the pan");
+        if (b.h < gm.H - 0.5) assert.ok(Math.abs(b.y - mid.y) < 0.001, "a contained y honoured the pan");
+      }
+      // ⚠️ ZOOMING PAST THE FIT CROPS, WHICH IS THE RUNNER'S OWN CHOICE AND THE POINT OF LEAVING PINCH
+      // ON — but it does NOT always reach cover, and the first version of this guard asserted that it
+      // did. Measured into a story card, the zoom needed to cover is 1.19x for a 3:4 portrait, 3.56x for
+      // 4:3 landscape, 1.78x for a square and 3.52x for a 9:21 tower — all inside the 4x pinch clamp —
+      // and 11.1x for a 3:1 panorama, which is not. So the honest claim is that the surround shrinks
+      // monotonically as the runner zooms; a panorama on a 9:16 card is what the Fill toggle answers in
+      // one tap, and the fill test above proves that it does.
+      let prev = Infinity;
+      for (const k of [1, 1.5, 2, 3, 4]) {
+        const z = E.sharePhotoBox({ w, h, ox: 0.5, oy: 0.5, k }, gm.W, gm.H);
+        const gap = gm.W * gm.H - Math.min(gm.W, z.w) * Math.min(gm.H, z.h);
+        assert.ok(gap < prev - 0.001 || gap <= 0.001,
+          "zooming did not reveal more of the card at " + why + " k" + k + ": " + gap + " vs " + prev);
+        prev = gap;
+      }
+      if (Math.max(w / h, h / w) < 4) {
+        assert.equal(E.shareBoxLeavesGap(E.sharePhotoBox({ w, h, ox: 0.5, oy: 0.5, k: 4 }, gm.W, gm.H),
+          gm.W, gm.H), false, "a 4x zoom in contain mode still leaves a gap at " + why);
+      }
+    }
+  }
+  // ⚠️ THE GAP IS FILLED BY A BLURRED COPY OF THE SAME PHOTOGRAPH, AND THE ORDER IS THE WHOLE POINT:
+  // surround, then the veil that darkens it, then the photograph ON TOP. Reversed, the veil would land
+  // on the runner's picture — which is the one thing the ruling forbids.
+  const ctx = E.ctx();
+  const gm = E.shareCanvasGeom("story");
+  E.sharePhotoDraw(ctx, { w: 1200, h: 1800, ox: 0.5, oy: 0.5, k: 1, id: "t1", bitmap: {} }, gm);
+  const order = ctx.log.map((e: any[]) => e[0]).filter((n: string) => n === "drawImage" || n === "fillRect");
+  assert.deepEqual(order, ["drawImage", "fillRect", "drawImage"],
+    "the surround, its veil and the photograph are not drawn in that order: " + JSON.stringify(order));
+  const veil = ctx.log.filter((e: any[]) => e[0] === "fillStyle").map((e: any[]) => e[1]);
+  assert.ok(veil.some((v: string) => /^rgba\(6,17,14,0\.\d+\)$/.test(v)),
+    "the surround is veiled with something other than the card's own ground: " + JSON.stringify(veil));
+  assert.ok(E.SHARE_BLUR.veil > 0 && E.SHARE_BLUR.veil < 1, "the surround's veil is opaque or absent");
+  // ⚠️ AND THE SURROUND IS A BLUR, NOT A PLAIN ENLARGEMENT. It is built by drawing the photograph small
+  // and then doubling it up; a single step would show its own interpolation, and no step at all would
+  // put a sharp copy of the picture behind the picture.
+  const small = ctx.log.filter((e: any[]) => e[0] === "drawImage").length;
+  assert.ok(small >= 1, "nothing was drawn");
+  const bg = env();
+  const bc = bg.shareBlurBg({ w: 1200, h: 1800, id: "b1", bitmap: {} }, gm);
+  assert.equal(bc.width, bg.SHARE_BLUR.w, "the cached surround is not at the documented size");
+  assert.ok(bg.SHARE_BLUR.tiny * 4 < bg.SHARE_BLUR.w,
+    "the surround is enlarged in too few steps to be a blur");
 });
 
 // ---- the conservative person ---------------------------------------------------------------------
@@ -408,12 +500,34 @@ test("the photograph covers the whole canvas, at every source shape and every cr
 test("the subject exclusion is two zones and it TRAVELS with the crop", () => {
   // ⚠️ READ OFF THE CANVAS CENTRE INSTEAD, IT WOULD GUARD EMPTY SKY the moment the runner panned their
   // photograph — which is the only reason a conservative rectangle is worth having at all.
+  // ⚠️ THE PAN IS DEMONSTRATED IN FILL MODE BECAUSE A CONTAINED AXIS CANNOT BE PANNED AT ALL. Written
+  // against the default it measured nothing and passed: a 4:3 source in a 9:16 card has horizontal slack,
+  // so sharePhotoBox centres it and ox is ignored — the zone correctly did not move, and the guard read
+  // that as the exclusion travelling. The claim has to be made where travel is possible.
   const E = env();
   const gm = E.shareCanvasGeom("story");
-  const mid = E.shareSubjectZones(E.sharePhotoBox({ w: 2400, h: 1200, ox: 0.5, oy: 0.5, k: 1 }, gm.W, gm.H), gm);
-  const left = E.shareSubjectZones(E.sharePhotoBox({ w: 2400, h: 1200, ox: 0, oy: 0.5, k: 1 }, gm.W, gm.H), gm);
+  const mid = E.shareSubjectZones(E.sharePhotoBox({ w: 2400, h: 1200, ox: 0.5, oy: 0.5, k: 1, fill: true }, gm.W, gm.H), gm);
+  const left = E.shareSubjectZones(E.sharePhotoBox({ w: 2400, h: 1200, ox: 0, oy: 0.5, k: 1, fill: true }, gm.W, gm.H), gm);
   assert.ok(left.face.x > mid.face.x + 200,
     "the face zone did not move when the photograph did: " + mid.face.x + " -> " + left.face.x);
+  // ⚠️ AND IT IS RECOMPUTED PER FIT MODE RATHER THAN INHERITED, which is the fit ruling's own
+  // consequence for safety: contain puts the subject HIGHER and SMALLER on the card, so a rectangle
+  // carried over from the cover fit would guard the wrong band of somebody's photograph.
+  const whole = E.shareSubjectZones(E.sharePhotoBox({ w: 2400, h: 1200, ox: 0.5, oy: 0.5, k: 1 }, gm.W, gm.H), gm);
+  assert.ok(whole.body.h < mid.body.h - 50,
+    "the body zone is the same height in both fit modes: " + whole.body.h + " vs " + mid.body.h);
+  assert.ok(whole.face.h < mid.face.h - 20,
+    "the face zone is the same height in both fit modes: " + whole.face.h + " vs " + mid.face.h);
+  // ⚠️ IT MOVES, AND WHICH WAY IT MOVES DEPENDS ON THE SHAPE — so this asserts displacement rather than
+  // a direction. The brief predicted "higher and smaller"; measured, a 4:3 source in a 9:16 card goes
+  // LOWER under contain, because the picture is centred in a tall card while the cover crop was pinned
+  // to its top edge (face base y634 under fill, y868 under contain). "Smaller" holds everywhere and
+  // "higher" does not, so a guard written to the prediction would have been wrong in the other
+  // direction on a portrait source.
+  const cy = (z: any) => z.y + z.h / 2;
+  assert.ok(Math.abs(cy(whole.face) - cy(mid.face)) > 50,
+    "the face zone did not move between the fit modes: " + cy(mid.face) + " -> " + cy(whole.face));
+  assert.ok(whole.face.w > 0 && whole.body.w > 0, "a contain-mode subject zone is empty");
   assert.ok(mid.face.w > 0 && mid.face.h > 0 && mid.body.w > 0, "a subject zone is empty");
   // The face is inside the body's horizontal span and above its base: two rectangles, one person.
   assert.ok(E.SHARE_SUBJECT.face.u0 > E.SHARE_SUBJECT.body.u0, "the face zone is wider than the body");
@@ -528,13 +642,23 @@ test("BLOCKER: the solved veil alpha reaches its ratio over a COLOURED ground, n
           hex + " target " + target + " on ground " + gc.join(",") + ": alpha " + a +
           " delivers " + got.toFixed(2));
         if (got / target < worst / target) { worst = got; worstAt = hex + " on " + gc.join(","); }
-        // And it is the MINIMUM: one step less must miss.
+        // ⚠️ AND IT IS THE MINIMUM FOR THE TARGET IT AIMS AT, WHICH IS THE TARGET TIMES THE MARGIN. The
+        // solver deliberately overshoots the requested ratio by SHARE_SCRIM_MARGIN, because the ground it
+        // is handed is a tenth-scale average — see that constant's note. Written against the RAW target
+        // this read as "the alpha is not minimal" the moment the margin arrived, which is the ruler no
+        // longer measuring the thing rather than a fault.
+        const aim = target * E.SHARE_SCRIM_MARGIN;
         if (a > 0) {
           const less = Math.max(0, a - 0.02);
           const w = rat(fg, trueLum([0, 1, 2].map((i) => less * ink[i]! + (1 - less) * gc[i]!)));
-          assert.ok(w < target + 0.35, "the alpha is not minimal for " + hex + " target " + target +
+          assert.ok(w < aim + 0.35, "the alpha is not minimal for " + hex + " aim " + aim.toFixed(2) +
             " ground " + gc.join(","));
         }
+        // ⚠️ AND THE MARGIN IS DELIVERED, not merely asked for: measured from rendered pixels the eyebrow
+        // sat at 4.41 against a 4.5 target before it existed, so a solver that quietly dropped it would
+        // pass every other guard in this file.
+        assert.ok(got >= aim - 0.02 || a >= 1, hex + " on " + gc.join(",") + ": alpha " + a +
+          " delivers " + got.toFixed(2) + " against an aim of " + aim.toFixed(2));
       }
     }
   }
@@ -715,8 +839,16 @@ test("BLOCKER: the scrim is a gradient and nothing else, at every COLOUR a photo
   // is one byte different for its presence.
   const white = { w: 4, h: 7, data: new Uint8ClampedArray(4 * 7 * 4).fill(255) };
   const worst = E.shareVeilPlan(white, gm, { blockTop: 1200, colours: hungry });
-  assert.ok(worst.a < E.SHARE_SCRIM.max - 0.02, "a white photograph is being clamped rather than solved: " +
+  assert.ok(worst.a < E.SHARE_SCRIM.max, "a white photograph is being clamped rather than solved: " +
     worst.a + " against a cap of " + E.SHARE_SCRIM.max);
+  // ⚠️ AND THE HEADROOM IS NOW 0.02, WHICH IS A REAL CONSTRAINT AND IS RECORDED HERE RATHER THAN
+  // DISCOVERED LATER. The hungriest colour on a pure-white photograph needed 0.78 before the scrim
+  // margin existed and needs 0.90 with it, against a cap of 0.92 — so the margin cannot be raised again
+  // without the CLAMP deciding the answer instead of the solver, and the clamp cannot be lowered at all.
+  // The pair is what this asserts: raise either and one of these two numbers moves into the other.
+  assert.ok(worst.a >= 0.88 && worst.a <= 0.90,
+    "the solved alpha on a white photograph is " + worst.a + ", not the measured 0.90 — the scrim " +
+    "margin or the ink tiers have moved, and the 0.02 of headroom under the cap has to be re-measured");
   // There is no kind left that asks for an opaque lower section.
   assert.ok(!/opaque/.test(lift("shareVeilPlan")), "shareVeilPlan still honours an opaque request");
   assert.ok(!/fillRect/.test(lift("shareVeilDraw").replace(/g\.fillStyle = grad; g\.fillRect[^;]*;/, "")),
@@ -804,6 +936,31 @@ test("the top scrim is a gradient rather than a plate, and vanishes on a dark ph
   const none = E.shareTopScrim(dark, gm, { w: 4, h: 7, data: new Uint8ClampedArray(112).fill(6) }, rect, cols);
   assert.equal(none.a, 0, "a dark photograph is being scrimmed anyway");
   assert.equal(dark.log.length, 0, "the scrim drew on a photograph that needed none");
+  // ⚠️ AND IT IS SOLVED ACROSS THE STRIP IT PAINTS, NOT ACROSS THE WORDMARK'S OWN 146px. That shipped a
+  // 2.09:1 on the brand mark: a probe cell is an average of about a hundred export pixels, so a dark
+  // field with pure-white specks reads dark in the three or four cells the wordmark's rect covers and no
+  // scrim is drawn at all — while a glyph sitting on a speck is set on white. Found at 1:1, where a
+  // contained portrait leaves the wordmark straddling the picture's own left edge, and it was never a
+  // square defect: the identical rect on a feed post passed only because twelve cells fell on the
+  // picture and one of them happened to catch a highlight.
+  //
+  // The mechanism, stated so it cannot regress: with the ground bright ONLY outside the wordmark's own
+  // columns, a rect-width sample sees nothing and a full-width sample sees it.
+  const w = 40, h = 20;
+  const edgeBright = new Uint8ClampedArray(w * h * 4).fill(6);
+  for (let y = 0; y < h; y++) for (let x = 30; x < w; x++) {
+    const i = (y * w + x) * 4;
+    edgeBright[i] = edgeBright[i + 1] = edgeBright[i + 2] = 252; edgeBright[i + 3] = 255;
+  }
+  const far = E.ctx();
+  const seen = E.shareTopScrim(far, gm, { w, h, data: edgeBright }, E.shareRect(64, 120, 200, 44), cols);
+  assert.ok(seen.a > 0,
+    "the top scrim is solved from the wordmark's own rect, so a highlight elsewhere in the band it " +
+    "paints across is invisible to it — which is the 2.09:1 defect");
+  // and the source says so: the sample is the canvas width, not the rect's
+  const src = lift("shareTopScrim").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  assert.match(src, /shareRect\(0, rect\.y, gm\.W, rect\.h\)/,
+    "the top scrim no longer samples the full width of the band it paints");
 });
 
 // ---- text ----------------------------------------------------------------------------------------
@@ -1235,7 +1392,7 @@ test("BLOCKER: The Moment's whole hierarchy is inside the brief's critical regio
     ["long verdict", fakeModel({ pill: { state: "partial", text: "ON PACE, BUT IT COST YOU" } })],
     ["wrapped evidence", fakeModel({ verdict: { status: "partial", confidence: "medium", shortTitle: "X", evidenceLine: "3 of 5 measured km inside 5:20-5:50/km · 2 estimated, 1 outside the target stretch" } })],
   ];
-  for (const aspect of ["story", "feed"]) {
+  for (const aspect of ["story", "feed", "square"]) {
     const gm = E.shareCanvasGeom(aspect);
     const crit = E.shareRect(gm.safe.x0, gm.safe.y0, gm.safe.x1 - gm.safe.x0, gm.safe.y1 - gm.safe.y0);
     for (const [label, m] of cases) {
@@ -1437,7 +1594,7 @@ test("BLOCKER: the poster's route field takes the brief's 8-10% internal padding
   const g = E.ctx();
   assert.ok(E.SHARE_POSTER_PAD >= 0.08 && E.SHARE_POSTER_PAD <= 0.10,
     "the poster's padding left the brief's band: " + E.SHARE_POSTER_PAD);
-  for (const aspect of ["story", "feed"]) {
+  for (const aspect of ["story", "feed", "square"]) {
     const gm = E.shareCanvasGeom(aspect);
     const wm = E.shareWordmarkPlan(g, gm);
     const p = E.sharePosterPlan(g, fakeModel({ template: "route", photo: null }), gm, wm);
@@ -1512,7 +1669,7 @@ test("BLOCKER: the poster's hierarchy is inside the critical region and nothing 
     ["one split", fakeModel({ template: "route", photo: null, adherence: { inBand: 1, judged: 1 } })],
     ["no place or date", fakeModel({ template: "route", photo: null, coarseLocation: undefined, dateLabel: "" })],
   ];
-  for (const aspect of ["story", "feed"]) {
+  for (const aspect of ["story", "feed", "square"]) {
     const gm = E.shareCanvasGeom(aspect);
     const crit = E.shareRect(gm.safe.x0, gm.safe.y0, gm.safe.x1 - gm.safe.x0, gm.safe.y1 - gm.safe.y0);
     for (const [label, m] of cases) {
@@ -1578,6 +1735,64 @@ test("the feed is a reflow: the type tightens and the block takes a bigger share
       " feed " + out.feed.share.toFixed(3));
     assert.equal(out.feed.mets, out.story.mets, tmpl + ": the feed lost a metric");
   }
+});
+
+test("BLOCKER: the square is a compact poster, and the primary outcome is never what gives way", () => {
+  // ⚠️ THE CONTRACT'S TWO SQUARE-SPECIFIC RULES, AND THE SECOND ONE IS THE ONE WORTH GUARDING: "Recompose
+  // to a compact poster; allow two metrics rather than crushing three" and "Never hide the primary
+  // distance/session outcome to retain secondary data". The first is checkable as arithmetic; the second
+  // is the rule a future tightening would break, because the hero and the verdict are the biggest things
+  // on their cards and therefore the most tempting to shed.
+  const E = env();
+  const g = E.ctx();
+  const out: Record<string, any> = {};
+  for (const aspect of ["story", "feed", "square"]) {
+    const gm = E.shareCanvasGeom(aspect);
+    const mm = fakeModel({ aspect }), pm = fakeModel({ template: "route", photo: null, aspect });
+    const p = E.shareMomentPlan(g, mm, gm);
+    const po = E.sharePosterPlan(g, pm, gm, E.shareWordmarkPlan(g, gm));
+    const ex = E.shareExecutionPlan(g, execModel({ aspect }), gm);
+    const pr = E.shareProgressionPlan(g, progModel({ aspect,
+      splits: rows(Array.from({ length: 11 }, (_, i) => 330 + (i % 3) * 7)) }), gm);
+    out[aspect] = { H: gm.H,
+      momentClear: p.blockTop / gm.H, momentHero: p.heroS, momentMets: p.mets.length,
+      posterClear: po.blockTop / gm.H, posterHero: po.heroS, posterMets: po.mets.length,
+      execClear: ex.blockTop / gm.H, execVerd: ex.verd && ex.verd.size, execMets: ex.mets.length,
+      progClear: pr.blockTop / gm.H, progHead: pr.head && pr.head.size, progRows: pr.rows.length,
+      progMets: pr.mets.length };
+  }
+  const q = out.square, st = out.story;
+  // ⚠️ NEVER HIDDEN. The distance hero, the verdict and the progression headline all still exist and all
+  // still carry a real point size — a reflow that dropped one to keep a metric column would be the
+  // contract's own named failure.
+  assert.ok(q.momentHero > 0, "The Moment's distance hero disappeared on a square");
+  assert.ok(q.posterHero > 0, "The Route Poster's distance hero disappeared on a square");
+  assert.ok(q.execVerd > 0, "The Execution's verdict disappeared on a square");
+  assert.ok(q.progHead > 0, "The Progression's headline disappeared on a square");
+  // ⚠️ AND THE HERO IS STILL THE BIGGEST THING ON THE CARD. It can tighten; it may not stop being the
+  // hero, which is what "never hide the primary outcome" means once nothing is literally absent.
+  assert.ok(q.momentHero > E.shareTypeSize("value", "square"),
+    "the square's distance hero is no larger than a metric value, so it is no longer the hero");
+  // COMPACT: two metric columns, a shorter ladder, and a smaller share of the card given to the block
+  // than the sum of the parts would take at the story's own rungs.
+  assert.equal(q.momentMets, 2, "the square carries " + q.momentMets + " metric columns");
+  assert.equal(q.execMets, 2);
+  assert.equal(q.posterMets, 2);
+  assert.equal(q.progMets, 2);
+  assert.equal(st.momentMets, 3, "the story lost a metric column, which is not this shape's business");
+  assert.ok(q.progRows < st.progRows,
+    "the square's ladder is as long as the story's: " + q.progRows + " rows");
+  // ⚠️ AND EVERY TEMPLATE STILL LEAVES A REAL PHOTOGRAPH. Measured on the reference data: 51.7% on The
+  // Moment, 43.1% on The Execution, 42.2% on The Progression and 59.0% on the poster. The bar is 0.38 —
+  // below every measured value and above the 33.6 / 21.4 / 20.0 / 43.7% the same content produces at the
+  // story's own rungs and gaps, so it discriminates against the reflow being turned off.
+  for (const k of ["momentClear", "execClear", "progClear", "posterClear"]) {
+    assert.ok(q[k] > 0.38, "the square's " + k + " is only " + (q[k] * 100).toFixed(1) +
+      "% of the card, which is the story layout on a short canvas rather than a recomposition");
+  }
+  // and the type tightened further than the feed did, monotonically
+  assert.ok(q.momentHero < out.feed.momentHero && out.feed.momentHero < st.momentHero,
+    "the hero is not monotone across the three shapes");
 });
 
 test("every number on both templates goes through the digit-column primitive", () => {
@@ -2011,7 +2226,7 @@ test("BLOCKER: the whole hierarchy of both templates is inside the critical regi
     ["progression wrapped claim", progModel({ progression: { claim: "CONSISTENT THROUGHOUT",
       evidence: "All 42 kilometres within 24 seconds of each other, which is the tightest block of the plan" } })],
   ];
-  for (const aspect of ["story", "feed"]) {
+  for (const aspect of ["story", "feed", "square"]) {
     const gm = E.shareCanvasGeom(aspect);
     for (const [label, base] of cases) {
       const m = { ...base, aspect: aspect };

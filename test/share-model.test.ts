@@ -57,13 +57,14 @@ function liftConst(name: string): string {
 
 const CONSTS = ["SHARE_MODEL_VERSION", "SHARE_TEMPLATES", "SHARE_TEMPLATE_LABEL", "SHARE_NEEDS_PHOTO",
   "RUN_METRIC_LADDER", "RD_MONTHS", "PRIV_RADIUS_M", "SHARE_PRIV_STORE", "SHARE_PRIV_MAX",
-  "SHARE_EVEN_SPREAD_S"];
+  "SHARE_EVEN_SPREAD_S", "SHARE_METRIC_MAX", "SHARE_CROP0", "SHARE_ASPECTS"];
 const FNS = ["fmtPace", "rdCue", "rdWell", "runEvidenceConfidence", "runAnalysis", "runVerdict",
   "rdMetresBetween", "redactRouteEnds", "runRoutePresentation", "loadSharePriv", "saveSharePriv",
   "sharePrivacyFor", "sharePrivacyLocked", "setSharePrivacy", "runMetricLadder", "runStartMsKnown",
   "rdWhenText", "rdDateText", "shareTemplateStates", "shareTemplateFor", "shareEvidenceLine", "shareFileName",
-  "shareProgressionClaim",
-  "shareCardModel", "shareKey", "shareRouteOn", "shareCardOpts", "shareCardKey"];
+  "shareProgressionClaim", "shareMetricPool", "shareMetricsChosen",
+  "shareCropKey", "shareCropRead", "shareCropWrite", "sharePhotoView", "shareCropSig",
+  "shareCardModel", "shareKey", "shareRouteOn", "shareCardOpts", "shareCardKey", "shareAspect"];
 
 /** A stand-in for the browser's localStorage: enough for the per-run privacy store to be exercised. */
 function fakeStore() {
@@ -96,9 +97,10 @@ function env(): Env {
     'let PRIVACY = { ends: false, map: false };\n' +
     'let SHAREPRIV = {};\n' +
     'let SPHOTO = null;\n' +
-    'let SCARD = { aspect: "story", template: null, routeOn: null, key: null, file: null, pending: 0 };\n' +
+    'let SCARD = { aspect: "story", template: null, routeOn: null, key: null, file: null, pending: 0, metrics: null };\n' +
     FNS.map(lift).join("\n") + "\n" +
     "return { " + FNS.join(", ") + ", RUN_METRIC_LADDER, SHARE_TEMPLATES, SHARE_MODEL_VERSION," +
+    " SHARE_METRIC_MAX, SHARE_CROP0," +
     " setPrivacy: (p) => { PRIVACY = p; }," +
     " setSharePrivStore: (s) => { SHAREPRIV = s; }, getSharePrivStore: () => SHAREPRIV," +
     " setPhoto: (p) => { SPHOTO = p; }, setCard: (c) => { SCARD = c; }, getCard: () => SCARD };";
@@ -196,7 +198,15 @@ const intervalRun = () => refRun({
   splits: [{ km: 1, sec: 420 }, { km: 2, sec: 400 }, { km: 3, sec: 410 }, { km: 4, sec: 405 }],
 });
 
-const PHOTO = { id: "p1", ox: 0.5, oy: 0.5, k: 1, bitmap: null };
+/**
+ * ⚠️ THE FRAMING IS NO LONGER ON THE PHOTOGRAPH — IT IS A MAP KEYED BY (template, aspect). One shared
+ * {ox, oy, k} silently reframed the runner's picture when they switched shape or style, so the geometry
+ * moved into SPHOTO.crops and the model hands each card its own view of the same bitmap. A fixture
+ * carrying ox/oy/k here would be a fixture no picker produces.
+ */
+const PHOTO = { id: "p1", bitmap: null, w: 1200, h: 1800, crops: {} as Record<string, any> };
+const photo = (crops?: Record<string, any>) =>
+  ({ id: "p1", bitmap: null, w: 1200, h: 1800, crops: crops || {} });
 
 // ---- the verdict's confidence --------------------------------------------------------------------
 
@@ -447,8 +457,115 @@ test("the three supporting metrics reflow rather than print a value nobody measu
   // release and teach the runner two different orders for the same run.
   assert.match(lift("rdMetricsHtml"), /runMetricLadder\(run, false\)/,
     "the debrief no longer reads the shared ladder, so the card and the screen can drift");
-  assert.match(lift("shareCardModel"), /runMetricLadder\(run, true\)/,
-    "the card no longer reads the shared ladder");
+  // ⚠️ THE CARD READS IT THROUGH shareMetricPool NOW, AND THE CHAIN IS WHAT IS ASSERTED. The metrics
+  // editor needed the whole pool rather than its head, so the ladder climb moved one function outwards —
+  // and there are two links to keep: the pool must be the ladder, and the model must go through the
+  // pool. Pinning the model's own text alone would pass the day somebody gave the picker its own list.
+  assert.match(lift("shareMetricPool"), /runMetricLadder\(run, true\)/,
+    "the card's metric pool no longer reads the shared ladder");
+  assert.match(lift("shareMetricsChosen"), /shareMetricPool\(run\)/,
+    "the chosen metrics no longer come from the pool");
+  assert.match(lift("shareCardModel"), /shareMetricsChosen\(run, opt\.metrics\)/,
+    "the model builds its metric row by hand again instead of asking the pool");
+  // ⚠️ AND RPE IS UNREACHABLE THROUGH THE POOL, which is the safety half of the same chain. The effort
+  // rating is something the runner told the app about themselves; the picker offering it would publish
+  // it. Measured on a run carrying one: it is in the debrief's ladder and absent from the card's.
+  const withRpe = refRun({ rpe: 7 });
+  assert.ok(E.runMetricLadder(withRpe, false).some((x: any) => x.key === "rpe"),
+    "the debrief lost the effort rating");
+  assert.ok(!E.shareMetricPool(withRpe).some((x: any) => x.key === "rpe"),
+    "the share card's metric picker offers the runner's own effort rating");
+});
+
+test("BLOCKER: the metric picker offers only what the run recorded, at most three, never fewer than one", () => {
+  // ⚠️ THE DEFAULT IS THE POOL'S HEAD, AND THAT IS WHY THE VERIFIED RENDERS ARE UNCHANGED. A runner who
+  // never opens the tool must get a byte-identical card to the one the reference comparison was signed
+  // off against, so the picker changes WHICH three, never the ordering or the drawing.
+  const E = env();
+  const run = refRun();
+  const pool = E.shareMetricPool(run).map((x: any) => x.key);
+  assert.deepEqual(E.shareMetricsChosen(run, null).map((x: any) => x.key), pool.slice(0, 3),
+    "the default is no longer the pool's own head");
+  assert.equal(E.SHARE_METRIC_MAX, 3);
+  // A pick is honoured, in the order it is given, and capped.
+  assert.deepEqual(E.shareMetricsChosen(run, ["elev", "avgHr"]).map((x: any) => x.key), ["elev", "avgHr"]);
+  assert.deepEqual(E.shareMetricsChosen(run, ["time", "pace", "elev", "avgHr"]).map((x: any) => x.key).length, 3,
+    "more than three numbers reached the row");
+  // ⚠️ A KEY WITH NO VALUE IS DROPPED, NEVER PRINTED EMPTY, and a pick that survives to nothing falls
+  // back to the default rather than rendering a card with no row at all. "Never display missing data as
+  // zero" has to hold for whatever a caller hands the model, not only for what the studio can produce.
+  const flat = refRun({ elevGain: 0, avgHr: null, maxHr: null, cadence: null, kcal: null });
+  assert.deepEqual(E.shareMetricsChosen(flat, ["elev", "time"]).map((x: any) => x.key), ["time"],
+    "a metric the run never recorded reached the row");
+  assert.deepEqual(E.shareMetricsChosen(flat, ["elev", "cadence"]).map((x: any) => x.key),
+    E.shareMetricsChosen(flat, null).map((x: any) => x.key),
+    "a pick that survives to nothing left the card with no supporting numbers");
+  // And the pick is a visible decision, so it has to move the cache key or Share hands over the old card.
+  E.setPhoto(photo());
+  E.setCard({ aspect: "story", template: "moment", routeOn: true, key: null, file: null, pending: 0, metrics: null });
+  const before = E.shareCardKey(run);
+  E.setCard({ aspect: "story", template: "moment", routeOn: true, key: null, file: null, pending: 0,
+    metrics: ["time", "pace", "avgHr"] });
+  assert.notEqual(E.shareCardKey(run), before, "changing the chosen numbers does not invalidate the cache");
+});
+
+test("BLOCKER: the framing is kept per template AND per aspect", () => {
+  // ⚠️ THE DEFECT THIS FIXES, IN ONE SENTENCE: one shared {ox, oy, k} meant switching Story to Feed, or
+  // The Moment to The Progression, silently reframed the runner's photograph — and it could not be
+  // otherwise, because the two shapes crop along different edges and the four templates put their type in
+  // four different places.
+  const E = env();
+  const run = refRun();
+  assert.equal(E.shareCropKey("moment", "story"), "moment:story");
+  assert.notEqual(E.shareCropKey("moment", "story"), E.shareCropKey("moment", "feed"));
+  assert.notEqual(E.shareCropKey("moment", "story"), E.shareCropKey("progression", "story"));
+  // ⚠️ THREE SHAPES NOW, AND THE SQUARE WOULD HAVE BEEN THE SILENT ONE. The key used to read
+  // (aspect === "feed" ? "feed" : "story"), so a square shared the story's slot: framing a photograph on
+  // a square moved it on the story too, and there was nothing to undo it with. Twelve slots, all
+  // distinct, is the claim — a count alone is satisfied by four aliases of three.
+  const keys = ["moment", "execution", "progression", "route"]
+    .flatMap((t) => ["story", "feed", "square"].map((a) => E.shareCropKey(t, a)));
+  assert.equal(new Set(keys).size, 12, "two framing slots collide: " + keys.join(", "));
+  assert.equal(E.shareCropKey("moment", "square"), "moment:square");
+  // and an unknown shape still lands on the story's slot rather than minting one of its own
+  assert.equal(E.shareCropKey("moment", "portrait"), "moment:story");
+  // A framing set on one slot does not reach any other.
+  const p = photo({ "moment:story": { ox: 0.2, oy: 0.8, k: 2.5 } });
+  E.setPhoto(p);
+  const a = E.shareCardModel(run, { aspect: "story", template: "moment", photo: p });
+  assert.equal(a.photo.ox, 0.2); assert.equal(a.photo.oy, 0.8); assert.equal(a.photo.k, 2.5);
+  const b = E.shareCardModel(run, { aspect: "feed", template: "moment", photo: p });
+  assert.deepEqual([b.photo.ox, b.photo.oy, b.photo.k], [0.5, 0.5, 1],
+    "the feed post inherited the story's framing");
+  const c = E.shareCardModel(run, { aspect: "story", template: "progression", photo: p });
+  assert.deepEqual([c.photo.ox, c.photo.oy, c.photo.k], [0.5, 0.5, 1],
+    "a second template inherited the first one's framing");
+  const sq = E.shareCardModel(run, { aspect: "square", template: "moment", photo: p });
+  assert.deepEqual([sq.photo.ox, sq.photo.oy, sq.photo.k], [0.5, 0.5, 1],
+    "the square inherited the story's framing");
+  // ⚠️ AND THE MODEL MAY NOT CREATE A SLOT. It is called on every preview frame and on every encode, so a
+  // read that lazily wrote would fill the store with entries nothing has edited.
+  assert.deepEqual(Object.keys(p.crops), ["moment:story"], "reading a framing created one");
+  // ⚠️ AND THE FIT IS PART OF THE FRAMING, SO IT PERSISTS PER SHAPE TOO. A runner who turns Fill on for a
+  // square panorama has not asked for their story card to be cropped as well.
+  E.shareCropWrite("moment", "square").fill = true;
+  assert.equal(E.shareCardModel(run, { aspect: "square", template: "moment", photo: p }).photo.fill, true);
+  assert.equal(E.shareCardModel(run, { aspect: "story", template: "moment", photo: p }).photo.fill, false,
+    "turning Fill on for a square turned it on for the story too");
+  assert.equal(E.shareCardModel(run, { aspect: "feed", template: "moment", photo: p }).photo.fill, false);
+  // shareCropWrite is the editing path, and it is the one that creates.
+  const made = E.shareCropWrite("route", "feed");
+  assert.deepEqual([made.ox, made.oy, made.k], [0.5, 0.5, 1]);
+  assert.ok(Object.keys(p.crops).indexOf("route:feed") >= 0, "the editing path did not create its slot");
+  // ⚠️ SHARE_CROP0 IS SHARED, SO NOTHING MAY WRITE THROUGH IT. A renderer treating m.photo as scratch
+  // space would otherwise move every untouched card's default framing at once.
+  assert.notEqual(b.photo, E.SHARE_CROP0);
+  assert.deepEqual([E.SHARE_CROP0.ox, E.SHARE_CROP0.oy, E.SHARE_CROP0.k], [0.5, 0.5, 1]);
+  // Every framing is in the cache key, or an export hands over the previous crop.
+  E.setCard({ aspect: "story", template: "moment", routeOn: true, key: null, file: null, pending: 0, metrics: null });
+  const k0 = E.shareCardKey(run);
+  E.shareCropWrite("moment", "story").ox = 0.31;
+  assert.notEqual(E.shareCardKey(run), k0, "moving the framing does not invalidate the cache");
 });
 
 test("a watch run maps without a per-source branch, except where the data genuinely differs", () => {
@@ -866,8 +983,12 @@ test("BLOCKER: the poster is handed no photograph and a route that is not option
   assert.equal(poster.photo, null, "the poster was handed a photograph");
   assert.ok(poster.route && poster.route.length >= 2, "the poster was handed no route");
   // The Moment with the same options keeps the photograph and honours the route switch.
+  // ⚠️ THE SAME BITMAP, NOT THE SAME OBJECT. sharePhotoView hands each card a fresh view carrying that
+  // card's own framing, so identity is the wrong invariant now — what matters is that the picture
+  // survives and that nothing downstream can write back through it into the store.
   const moment = E.shareCardModel(run, { aspect: "story", template: "moment", routeOn: false, photo: PHOTO });
-  assert.equal(moment.photo, PHOTO, "The Moment lost its photograph");
+  assert.ok(moment.photo && moment.photo.id === PHOTO.id, "The Moment lost its photograph");
+  assert.notEqual(moment.photo, PHOTO, "the card was handed the store's own photograph object to write through");
   assert.equal(moment.route, null, "The Moment ignored the route switch");
   // ⚠️ AND PRIVACY STILL WINS OVER THE FORCED ROUTE. Hiding the map makes the poster ineligible rather
   // than letting it offer itself and draw nothing.

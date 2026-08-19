@@ -4066,13 +4066,120 @@ button.rd-meta-r { cursor: pointer; }
 /* ⚠️ THIS IS THE SECOND SELECTOR THE DOCUMENT-WIDE PINCH SUPPRESSOR EXEMPTS (see the gesture guard
    near buildNav). Both must stay listed there, or a two-finger pinch on the preview zooms the PAGE
    and, because pinch-to-zoom is off, the runner can never zoom back out. */
-.sst-stage { position: relative; height: 100%; display: flex; align-items: center; justify-content: center;
-  touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+.sst-stage { position: relative; height: 100%; overflow: hidden;
+  user-select: none; -webkit-user-select: none; cursor: grab;
+  /* ⚠️ pan-y IN BROWSE MODE AND THE MODE CLASS TAKES BOTH AXES WHILE FRAMING, AND THAT PAIRING IS THE
+     WHOLE GESTURE DESIGN. The stage is most of the viewport, so refusing every touch here would mean the
+     runner cannot scroll the panel by dragging on the only large thing on the screen. pan-y hands
+     vertical drags to the browser and keeps horizontal ones for the carousel; while a photograph is being
+     framed both axes belong to the photograph. */
+  touch-action: pan-y; }
+.sst-stage.sst-editing { touch-action: none; }
 .sst-stage:active { cursor: grabbing; }
-.sst-cv { display: block; border-radius: var(--r-card);
-  box-shadow: 0 18px 48px color-mix(in srgb, var(--accent) 22%, transparent); }
+/* ⚠️ THE TRACK IS width: 100% OF THE STAGE SO THE SLIDES' PERCENTAGE BASIS RESOLVES AGAINST THE STAGE,
+   not against their own content. Three slides at 86% overflow it on purpose and the stage clips them —
+   that overflow IS the adjacent-card peek the brief asks for. */
+.sst-track { position: absolute; inset: 0; display: flex; width: 100%; will-change: transform;
+  transition: transform .3s cubic-bezier(.22, .61, .36, 1); }
+/* Applied while a finger is down, so the card tracks the finger with no easing between frames. */
+.sst-track.sst-nom { transition: none; }
+/* ⚠️ REDUCE MOTION GETS ITS OWN RULE RATHER THAN RELYING ON THE GLOBAL ONE. The global block is what
+   catches component transitions today, but the carousel is the one animation on this screen a runner
+   who asked for less movement would notice most, and a rule of its own cannot be lost to a future
+   change in the global selector list. The page still changes; it changes instantly. */
+@media (prefers-reduced-motion: reduce) { .sst-track { transition: none; } }
+/* ⚠️ THE SLIDE IS THE CARD'S OWN WIDTH, PUBLISHED BY studioStageHeight, AND THE 86% IS ONLY A FALLBACK.
+   It has to be, because the card is not always as wide as SST_SLIDE allows: on a short screen the height
+   cap binds first and the card comes out narrower. Left at a flat 86% the slide stayed wide while the card
+   shrank inside it, so the neighbour's CARD was pushed past the edge of the stage while its empty slide
+   sat in the gutter — measured on a 320x568 screen: the card 49% of the stage, the neighbour's near edge
+   33px past the right edge, no peek at all and half the stage empty. That is the exact fault this design
+   exists to remove, reappearing on the smallest supported screen. Slide == card means the gutters ALWAYS
+   hold the neighbours, whatever binds. */
+.sst-slide { flex: 0 0 var(--sstslide, 86%); height: 100%;
+  display: flex; align-items: center; justify-content: center; }
+.sst-cv { display: block; border-radius: var(--r-card); }
+/* ⚠️ THE LIFT IS ON THE SELECTED CARD ONLY. Three cards each carrying it put two coloured halos into
+   the gutters, which reads as the neighbours being as important as the thing being edited. */
+.sst-slide.on .sst-cv { box-shadow: 0 18px 48px color-mix(in srgb, var(--accent) 22%, transparent); }
+.sst-slide:not(.on) .sst-cv { opacity: .45; }
+/* ---- the carousel's position row, which doubles as the framing controls -------------------------- */
+.sst-pos { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s2); }
+.sst-arrow { flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: var(--tap); height: var(--tap); padding: 0; font: inherit; font-size: var(--t-card);
+  font-weight: 700; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r-pill); cursor: pointer; }
+/* ⚠️ .55, NOT .4, AND THE NUMBER CAME OFF A SCREENSHOT. At .4 the glyph measured 3.49:1 in dark and
+   2.57:1 in light — a control faint enough to read as absent rather than unavailable. It is a pure
+   affordance with an accessible name, so it is exempt from the text floor; 3:1 is the non-text floor and
+   this clears it in both themes. */
+.sst-arrow[disabled] { opacity: .55; cursor: default; }
+.sst-wide { width: auto; min-width: var(--tap); padding: 0 var(--s3);
+  font-size: var(--t-meta); font-weight: 650; color: var(--accent); }
+.sst-posmid { flex: 1; min-width: 0; text-align: center; }
+.sst-dots { display: flex; gap: var(--s1); align-items: center; justify-content: center; margin-bottom: 3px; }
+.sst-dot { width: 6px; height: 6px; border-radius: var(--r-pill);
+  background: var(--ink-faint); opacity: .4; transition: width .2s ease, opacity .2s ease; }
+.sst-dot.on { width: 18px; background: var(--accent); opacity: 1; }
+.sst-posname { font-size: var(--t-meta); font-weight: 700; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sst-poscount { font-size: var(--t-label); color: var(--ink-faint); }
+/* ---- the five compact tools ---------------------------------------------------------------------- */
+.sst-tools { display: flex; gap: var(--s1); margin-top: var(--s3); }
+.sst-tool { flex: 1 1 0; min-width: 0; min-height: var(--tap); padding: 0 2px;
+  display: flex; align-items: center; justify-content: center;
+  font: inherit; font-size: var(--t-label); font-weight: 750; letter-spacing: .02em;
+  color: var(--ink-soft); background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r-ctl); cursor: pointer; }
+.sst-tool.set { color: var(--accent); }
+.sst-tool.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+/* ---- a tool's own sheet, inside the studio rather than in the app's sheet layer ------------------- */
+/* ⚠️ INSIDE THE OVERLAY, NOT #sheetOv. The app's sheet lives outside .app, but overlayModal makes .app
+   inert while the studio is up and the studio itself is a sibling of it — a sheet raised through the
+   normal machinery would render behind an overlay that covers the whole screen. */
+.sst-sheet { position: absolute; inset: 0; z-index: 2; display: none;
+  align-items: flex-end; background: color-mix(in srgb, var(--ink) 45%, transparent); }
+.sst-sheet.on { display: flex; }
+.sst-sheetin { width: 100%; max-height: 78%; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  background: var(--surface); border-top: 1px solid var(--line);
+  border-top-left-radius: var(--r-hero); border-top-right-radius: var(--r-hero);
+  padding: var(--s4) var(--s4) calc(var(--s5) + env(safe-area-inset-bottom, 0px)); }
+.sst-sheeth { display: flex; align-items: center; justify-content: space-between; gap: var(--s2);
+  margin-bottom: var(--s3); }
+.sst-sheeth h3 { margin: 0; font-size: var(--t-card); font-weight: 750; color: var(--ink); }
+.sst-done { flex: none; min-height: var(--tap); padding: 0 var(--s2); border: 0; background: none;
+  font: inherit; font-size: var(--t-body); font-weight: 650; color: var(--accent); cursor: pointer; }
+/* ---- the rows a sheet holds ---------------------------------------------------------------------- */
+.sst-rows { display: flex; flex-direction: column; gap: var(--s2); }
+.sst-row { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%;
+  min-height: var(--tap); padding: var(--s3); margin: 0; text-align: left;
+  font: inherit; color: var(--ink); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: var(--r-ctl); cursor: pointer; }
+.sst-row.on { border-color: var(--accent); }
+.sst-row b { font-size: var(--t-body); font-weight: 700; }
+.sst-row span { font-size: var(--t-label); color: var(--ink-faint); }
+.sst-mets { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.sst-met { min-height: var(--tap); padding: 0 var(--s3); font: inherit; font-size: var(--t-meta);
+  font-weight: 650; color: var(--ink-soft); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: var(--r-pill); cursor: pointer; }
+.sst-met.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+/* ⚠️ A CONTROL THAT CANNOT BE USED IS MARKED WITH A DASHED EDGE, NOT DIMMED, AND THAT IS A MEASUREMENT
+   RATHER THAN A PREFERENCE. Both of these carried .sst-off (opacity .55) and were measured FROM RENDERED
+   PIXELS: the ineligible style row's REASON came out 2.55:1 in dark and 2.13:1 in light, and a disabled
+   metric chip 3.25:1 and 2.46:1. The reason is the most important sentence in that row — it is the whole
+   purpose of showing a style this run cannot have — and a chip's label is the name of a number, not an
+   affordance. Both were unreadable. Opacity on an ancestor cannot be seen in any declared colour, which
+   is why this had to be read off a screenshot; and a dashed edge says "not available" without touching
+   the ink, which also keeps colour from being the only signal. */
+.sst-row[aria-disabled="true"], .sst-met[aria-disabled="true"] {
+  cursor: default; background: transparent; border-style: dashed; }
+.sst-row[aria-disabled="true"] b { color: var(--ink-soft); font-weight: 650; }
+.sst-met[aria-disabled="true"] { color: var(--ink-faint); }
+/* ⚠️ NO RADIUS: IT COVERS THE STAGE, NOT A CARD. It used to sit over a single canvas and matched its
+   corners; over a carousel it spans the gutters too, and a card radius on a full-bleed box rounds nothing
+   the eye can find. The stage clips it either way. */
 .sst-busy { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
-  border-radius: var(--r-card); background: color-mix(in srgb, var(--bg) 55%, transparent); }
+  background: color-mix(in srgb, var(--bg) 55%, transparent); }
 .sst-busy.on { display: flex; }
 .sst-busy::after { content: ""; width: 26px; height: 26px; border-radius: 50%;
   border: 3px solid color-mix(in srgb, var(--accent) 30%, transparent); border-top-color: var(--accent);
@@ -4081,7 +4188,11 @@ button.rd-meta-r { cursor: pointer; }
 /* ⚠️ ITS OWN OPT-OUT. The global reduce-motion rule kills transitions only, so a keyframe animation
    needs one of these or it keeps spinning for somebody who asked for less movement. */
 @media (prefers-reduced-motion: reduce) { .sst-busy::after { animation: none; } }
-.sst-hint { font-size: var(--t-label); color: var(--ink-faint); text-align: center; margin-bottom: var(--s3); }
+/* ⚠️ THE OLD .sst-hint RULE WAS DELETED RATHER THAN LEFT UNUSED. Its sentence moved into the position
+   row, which is the only row that can say "drag to move" at the moment dragging means that — and an
+   orphaned rule is the one the next person copies, which is why the heat card's superseded wrapper class
+   was removed by name and is asserted absent. Do not quote that class name here: the guard that keeps it
+   out of the stylesheet sweeps for the literal, and this file's comments are inside the sweep. */
 .sst-chips { display: flex; gap: var(--s2); }
 .sst-chip { flex: 1; justify-content: center; min-height: var(--tap); font-size: var(--t-meta);
   cursor: pointer; color: var(--ink-soft); }
@@ -18461,11 +18572,67 @@ const SHARE_TYPE = {
  * SHARE_TYPE.row are identical in both aspects, deliberately.
  */
 const SHARE_TYPE_FEED = { mega: 0.78, display: 0.80, title: 0.82, headline: 0.82, value: 0.88, bigUnit: 0.88 };
+/**
+ * ⚠️ A SQUARE IS A RECOMPOSITION, NOT A THIRD SCALE FACTOR, AND THE MEASUREMENT SAYS SO. The contract's
+ * own words are "Recompose to a compact poster; allow two metrics rather than crushing three" and "do
+ * not merely crop or uniformly scale the 9:16 design". Reverted one at a time and re-measured, the clear
+ * photograph on a square card reads (moment / execution / progression / poster):
+ *
+ *   all four reductions in place       51.7 / 43.1 / 42.2 / 59.0 %
+ *   these rungs left at the feed's     47.1 / 38.7 / 40.8 / 55.4 %
+ *   the ladder left at six rows        51.7 / 43.1 / 31.9 / 59.0 %
+ *   none of them, gaps at 1.0          33.6 / 21.4 / 20.0 / 43.7 %
+ *
+ * That last row is the story layout dropped onto a 1080-tall canvas, which is what cardGeom's note used
+ * to quote as the reason 1:1 could not work: a fifth of the card left as photograph on two of the four.
+ *
+ * ⚠️ AND THE SMALL RUNGS DO NOT MOVE HERE EITHER, for the same reason they do not move on a feed post:
+ * a square card is read at feed size, and buying four pixels of height by setting a 24px label at 22
+ * costs legibility at the one moment the card is a thumbnail. Rungs at or below SHARE_TYPE.row are
+ * identical in all three aspects, deliberately.
+ */
+const SHARE_TYPE_SQ = { mega: 0.56, display: 0.62, title: 0.64, headline: 0.64, value: 0.72,
+  bigUnit: 0.72 };
 function shareTypeSize(role, aspect) {
   const base = SHARE_TYPE[role];
   if (!base) return 0;
-  const k = aspect === "feed" ? (SHARE_TYPE_FEED[role] || 1) : 1;
+  const k = aspect === "feed" ? (SHARE_TYPE_FEED[role] || 1)
+    : aspect === "square" ? (SHARE_TYPE_SQ[role] || 1) : 1;
   return Math.round(base * k);
+}
+/**
+ * THE MEASURED GAPS, CLOSED FOR A SQUARE — ONE SCALE, APPLIED TO ALL FOUR TEMPLATES' OWN TABLES.
+ *
+ * ⚠️ EVERY GAP CONSTANT IN THIS SECTION IS A MEASUREMENT OFF A 9:16 REFERENCE, so a square cannot keep
+ * them: the four tables total 400-500px of deliberate air, which is nearly half a 1080-tall canvas
+ * before a single glyph is set. Scaling them is what makes the block compact rather than shrinking the
+ * type until the card is a caption.
+ *
+ * ⚠️ IT IS A SCALE ON THE TABLE, NOT FOUR NEW TABLES. Four square-specific gap tables would be four
+ * more places for the story's own numbers to drift out of, and this file has already recorded a fix
+ * applied to one builder and not its twin three times over.
+ *
+ * ⚠️ 0.64 WAS SWEPT AND THEN LOOKED AT, WHICH IS THE ONLY WAY TO SETTLE A NUMBER ABOUT AIR. Clear
+ * photograph across 0.55 / 0.60 / 0.64 / 0.70 / 0.75, all four templates:
+ *
+ *   moment       54.0  52.6  51.7  50.2  48.7 %
+ *   execution    45.7  44.2  43.1  41.2  39.5 %
+ *   progression  44.6  43.1  42.2  40.5  39.0 %
+ *   poster       61.5  60.1  59.0  57.5  56.1 %
+ *
+ * Monotone and gentle, and no type size changes anywhere across that range — so the trade is air against
+ * picture and nothing else, and the numbers alone cannot choose. Rendered over a real scene and compared:
+ * at 0.55 The Progression's last ladder row closes on the metric values beneath it and its interpretation
+ * line on the SPLITS heading above; at 0.75 the block climbs into the subject — the eyebrow lands on the
+ * runner's chest — for 3.0 points less photograph on The Moment. 0.64 keeps the family's rhythm and the
+ * subject clear.
+ */
+const SHARE_GAP_SQ = 0.64;
+function shareGaps(G, aspect) {
+  if (aspect !== "square") return G;
+  const out = {};
+  for (const k in G) out[k] = Math.round(G[k] * SHARE_GAP_SQ);
+  return out;
 }
 /** Tracking, in px, for the letter-spaced rungs. The references letter-space every uppercase run. */
 const SHARE_TRACK = { eyebrow: 3.4, label: 2.6, meta: 3.0, pill: 2.4, foot: 2.2, sub: 2.6 };
@@ -18565,16 +18732,12 @@ function shareFit(g, text, boxW, opt) {
 /**
  * THE CARD'S GEOMETRY, DERIVED FROM WHERE THE CONTENT MUST END.
  *
- * ⚠️ BOT IS THE PLATFORM'S OWN UI ZONE, NOT A MARGIN WE CHOSE. A 9:16 story puts a reply bar under
- * the card, so 285px at the BOTTOM is reserved; a 4:5 feed post carries no overlay and needs only a
- * margin. CB is the content bottom, and anything drawn below it is cropped clean off in a story —
- * which is where the headline numbers sat before this.
- *
- * ⚠️ TOP IS NOT THE SAME RESERVE AND IS DELIBERATELY SMALLER THAN 285. A story's own profile row sits
- * over the top of the card, and a photograph bleeding under it is what a full-bleed photo card is
- * for — but a ROUTE drawn up there would be half covered, so the photo-less route box starts at TOP.
- * An earlier comment here claimed 285 was reserved "at each end"; measured, the first ink on a
- * photo-less story card was at y=241, inside a reserve that did not exist.
+ * ⚠️ BOT, CB AND TOP ARE GONE, AND THEY WERE DEAD FOR A WHILE BEFORE THAT. They were the removed
+ * ledger's reserves — the platform UI zone at the bottom of a story and the smaller one at the top —
+ * and once every template started building its own stack bottom-up from safe.y1 nothing read any of
+ * the three. Deleted rather than carried, because adding a 1:1 aspect meant inventing three more
+ * numbers nobody reads, and an unread number is what the next template copies. The safe object
+ * carries the platform's regions and is read by every template.
  *
  * ⚠️ THERE IS NO FRAME ANY MORE, AND FB WENT WITH IT. The card used to clip everything to a 24px
  * inset rounded rect and then stroke a 2.5px teal border with a 14px glow around it, closing 48px
@@ -18593,9 +18756,17 @@ function shareFit(g, text, boxW, opt) {
  * across the fixtures instead of one apiece), and at 1:1 the wordmark falls to 1.04:1 — invisible.
  * The ledger's content is a fixed height; a fraction shrinks with H and the content does not.
  *
- * ⚠️ 1:1 IS NOT OFFERED. Measured, it leaves the photograph 32.3% of the card, which is not a photo
- * card. Two aspects is also the thing a restyle cannot buy: the card is never cropped through a
- * number in either destination.
+ * ⚠️ 1:1 IS OFFERED NOW, AND THE MEASUREMENT THIS COMMENT USED TO QUOTE AGAINST IT IS STILL TRUE OF
+ * WHAT IT MEASURED. "It leaves the photograph 32.3% of the card" was the STORY LAYOUT dropped onto a
+ * 1080-tall canvas — the same type at the same rungs, the same three metrics, the same six-row ladder,
+ * with 840px less to put them in. That is precisely what the contract forbids ("Recompose to a compact
+ * poster", "do not merely crop or uniformly scale the 9:16 design"), so the number was evidence that
+ * a scale is not a reflow rather than evidence that the shape cannot work. Square gets its own type
+ * scale, two metrics instead of three and a shorter ladder; see SHARE_TYPE_SQ, shareMetricCap and
+ * SHARE_LADDER_MAX. Measured after recomposing, the clear photograph on a square card is 51.7% on The
+ * Moment, 43.1% on The Execution, 42.2% on The Progression and 59.0% on the poster — against 33.6 /
+ * 21.4 / 20.0 / 43.7% for the same content at the story's own rungs and gaps, which is what "1:1 leaves
+ * the photograph a third of the card" was really measuring.
  */
 const CARD_W = 1080, CARD_M = 64;
 /**
@@ -18608,15 +18779,25 @@ const CARD_W = 1080, CARD_M = 64;
  * CARD_CHART_H, CARD_LANE_H, the tx title-growth mechanism and the single measuring context all went
  * with it.
  */
+/**
+ * ⚠️ THE THREE HEIGHTS LIVE HERE AND NOWHERE ELSE, AND shareAspect IS THE ONLY VALIDATOR. Every other
+ * reader in the file compares against the string this returns, so an unknown aspect has to land on
+ * "story" in ONE place — spelled out at four call sites it is four chances for a typo to render a
+ * story-shaped card under a square label.
+ */
+const SHARE_ASPECTS = ["story", "feed", "square"];
+const SHARE_ASPECT_H = { story: 1920, feed: 1350, square: 1080 };
+function shareAspect(a) { return SHARE_ASPECTS.indexOf(a) > 0 ? a : "story"; }
 function cardGeom(aspect) {
-  const feed = aspect === "feed";
-  const H = feed ? 1350 : 1920, BOT = feed ? 72 : 285, CB = H - BOT;
-  return { W: CARD_W, H: H, BOT: BOT, CB: CB, TOP: feed ? 96 : 285,
+  const a = shareAspect(aspect);
+  const story = a === "story";
+  const H = SHARE_ASPECT_H[a];
+  return { W: CARD_W, H: H,
     M: CARD_M, CW: CARD_W - 2 * CARD_M,
-    aspect: feed ? "feed" : "story",
-    // The brief's own numbers for a story; a feed post carries no platform overlay, so the top and
-    // bottom reserves collapse to the same margin the sides use.
-    safe: { x0: CARD_M, x1: CARD_W - CARD_M, y0: feed ? CARD_M : 120, y1: feed ? H - CARD_M : 1680 },
+    aspect: a,
+    // The brief's own numbers for a story; a feed post and a square carry no platform overlay, so the
+    // top and bottom reserves collapse to the same margin the sides use.
+    safe: { x0: CARD_M, x1: CARD_W - CARD_M, y0: story ? 120 : CARD_M, y1: story ? 1680 : H - CARD_M },
   };
 }
 /**
@@ -19040,17 +19221,212 @@ function shareRectInside(inner, outer) {
  * SOURCE image to a point on the card, and a clipped box cannot answer that. Nothing here clips.
  *
  * ⚠️ FRAMING IS A FRACTION, WHICH CLAMPS BY CONSTRUCTION. ox 0 shows the left edge, 1 the right, 0.5
- * centres — and because dw is never smaller than W the photograph always covers the canvas, so no
- * ground can show through however far the runner drags it.
+ * centres.
+ *
+ * ⚠️ CONTAIN IS THE DEFAULT AND FILL IS THE OPT-IN — the owner's ruling of 2026-08-19, verbatim: "I
+ * dont really want the photo cutting off ... i want the full photo the user uploads to be shown". So the
+ * base scale is the SMALLER of the two ratios, which is the largest scale at which the whole photograph
+ * still fits, and nothing of it is ever discarded without the runner asking for it. p.fill restores the
+ * cover fit this shipped with, which crops the edges. The space contain leaves is not empty — see
+ * shareBlurBg for what fills it.
+ *
+ * ⚠️ AN AXIS WITH SLACK IS CENTRED, AND WITHOUT THAT RULE THE DRAG INVERTS. (W - dw) is NEGATIVE under
+ * cover and POSITIVE under contain, so one fraction cannot mean the same thing in both modes: read as a
+ * pan, the same finger movement would push the picture left in one and right in the other. Centring
+ * whichever axis has room also keeps the two blurred bands equal, which is most of what makes the
+ * result read as deliberate rather than as a photograph that has slipped. Pinch past the fit and the
+ * axis overflows again, at which point it pans exactly as it always did — which is the whole point of
+ * leaving zoom alive in contain mode.
  */
 function sharePhotoBox(p, W, H) {
-  const k = Math.max(W / p.w, H / p.h) * (p.k || 1);
+  const kx = W / p.w, ky = H / p.h;
+  const k = (p.fill ? Math.max(kx, ky) : Math.min(kx, ky)) * (p.k || 1);
   const dw = p.w * k, dh = p.h * k;
-  return { x: (W - dw) * (p.ox == null ? 0.5 : p.ox), y: (H - dh) * (p.oy == null ? 0.5 : p.oy),
-    w: dw, h: dh, k: k };
+  const fx = dw >= W ? (p.ox == null ? 0.5 : p.ox) : 0.5;
+  const fy = dh >= H ? (p.oy == null ? 0.5 : p.oy) : 0.5;
+  return { x: (W - dw) * fx, y: (H - dh) * fy, w: dw, h: dh, k: k, fill: !!p.fill };
 }
 /** A point in source-normalised coordinates (0..1 of the original photograph) to canvas px. */
 function sharePhotoNorm(box, u, v) { return [box.x + u * box.w, box.y + v * box.h]; }
+/**
+ * IS ANY OF THE CARD LEFT UNCOVERED BY THE PHOTOGRAPH? — ASKED OF THE BOX, NEVER OF THE MODE.
+ *
+ * ⚠️ THE BOX, NOT p.fill, BECAUSE A ZOOMED CONTAIN COVERS. Keyed on the mode instead, the surround
+ * would be built, veiled and drawn underneath a photograph that has been pinched past the fit and hides
+ * every pixel of it — work for nothing, and a cached bitmap held for something nobody can see. Read the
+ * other way round it is also the only correct question: what matters is whether there is a gap.
+ */
+function shareBoxLeavesGap(box, W, H) {
+  return box.x > 0.5 || box.y > 0.5 || box.x + box.w < W - 0.5 || box.y + box.h < H - 0.5;
+}
+/**
+ * THE BLURRED EXTENSION — WHAT FILLS THE CARD WHERE THE WHOLE PHOTOGRAPH DOES NOT REACH.
+ *
+ * ⚠️ NOT BARS, AND NOT A FLAT BLOCK. A 9:16 card is far taller than a phone photograph, so showing all
+ * of one leaves real space; the owner accepted "a subtle fade" and refused the picture being cut, and
+ * letterbox bars answer neither. The space carries a heavily blurred, darkened enlargement of the SAME
+ * photograph, so the card still reads edge to edge and the surround always belongs to the picture in
+ * front of it. It is also the one treatment that cannot be accused of being arbitrary: it contains no
+ * information that is not already in the photograph.
+ *
+ * ⚠️ NO CanvasRenderingContext2D.filter. It is a recent Safari addition and this app runs in a WKWebView
+ * on whatever iOS the runner is on, so a blur built on it is a blur that silently does not happen on an
+ * older phone — and a sharp enlargement behind a photograph reads as a rendering fault rather than as a
+ * missing effect. A downscale followed by a chain of doubling upscales is a blur every canvas
+ * implementation has always had.
+ *
+ * ⚠️ IT IS DOUBLED UP RATHER THAN ENLARGED IN ONE STEP. A single 14-to-216 bilinear enlargement shows
+ * its own interpolation as diamonds; doubling costs four draws of a few kilobytes each.
+ *
+ * ⚠️⚠️ AND THE BAND IS THE PHOTOGRAPH'S OWN EDGE, REFLECTED — WHICH IS THE DIFFERENCE BETWEEN THIS
+ * READING AS A DESIGN AND READING AS A FALLBACK. The first cut built the surround as a blurred cover
+ * crop of the whole picture, and measured on a real scene that puts a HARD COLOURED LINE across the
+ * card: a cover crop of a 3:4 photograph shows its vertical MIDDLE, so on a sunset the band above the
+ * picture came out muddy brown while the picture's own top row is deep blue sky. Seen at full size it
+ * reads exactly like a letterbox bar somebody has filled with the wrong colour — and no amount of extra
+ * blur fixes it, because the fault is the COLOUR at the seam and not the sharpness. Chasing blur
+ * strength first (24 down to 4) improved the smudge and left the line untouched.
+ * The band now mirrors the strip of the photograph it touches, so at the seam the two are the same
+ * colour BY CONSTRUCTION, and the picture appears to fade outwards into its own tone. The cover crop
+ * survives underneath only as a base that guarantees every pixel is painted.
+ *
+ * ⚠️ MIRRORED, NOT REPEATED, AND NOT SIMPLY STRETCHED FROM THE EDGE. A repeat puts the photograph's far
+ * edge against its near one, which is a second seam; a stretch of rows 0..s meets the picture at row s
+ * rather than at row 0, which is the same discontinuity a little smaller. Reflection is the only mapping
+ * that is continuous at the join, which is why it is what image processing pads with.
+ *
+ * ⚠️ CACHED AT ONE SMALL SIZE, KEYED ON (photograph, card geometry) AND NOTHING ELSE — so it is built
+ * once per aspect and then reused by every frame of a drag, by both neighbour cards and by the luminance
+ * probe. Keyed on the framing as well it would be rebuilt on every pointermove; stored at full card size
+ * it would be 8.3 MB of resident RGBA, which is the allocation that gets a web view jetsammed.
+ *
+ * ⚠️ AND LEAVING THE FRAMING OUT OF THE KEY IS ALSO WHY IT LOOKS RIGHT: the surround holds still while
+ * the photograph moves inside it. It can only be seen at all on an axis with slack, and on such an axis
+ * sharePhotoBox centres the picture, so there is nothing for it to track — and the reflection is taken
+ * against the CONTAIN box, which is where the picture sits whenever any of the surround is visible.
+ */
+// ⚠️ tiny IS THE BLUR RADIUS, AS A FRACTION OF THE CARD, AND 9 IS MEASURED RATHER THAN CHOSEN. Swept
+// 24 / 16 / 14 / 12 / 11 / 10 / 9 / 8 / 7 / 6 / 5 / 4 against a synthetic scene carrying a runner, and
+// looked at each: at 24 the reflected figure is legible in the band as a dark oval floating above his
+// real head, which is the "arbitrary blur block" the brief names as a defect; by 9 it is a soft field
+// with no readable form, and below 7 it flattens towards one colour and stops looking like the
+// photograph at all. The worst case is the 3:1 panorama, where the surround is 81% of the card.
+const SHARE_BLUR = { w: 216, tiny: 9, spread: 1.16, veil: 0.46 };
+let SHARE_BLUR_C = null, SHARE_BLUR_KEY = "";
+function shareBlurBg(p, gm) {
+  const key = p.id + ":" + gm.W + "x" + gm.H;
+  if (SHARE_BLUR_KEY === key && SHARE_BLUR_C) return SHARE_BLUR_C;
+  let out = null;
+  try {
+    const tw = SHARE_BLUR.tiny, th = Math.max(2, Math.round(tw * gm.H / gm.W));
+    let cur = document.createElement("canvas");
+    cur.width = tw; cur.height = th;
+    const g0 = cur.getContext("2d");
+    g0.imageSmoothingEnabled = true; g0.imageSmoothingQuality = "high";
+    // ⚠️ THE BASE IS A COVER FIT AND IT IS ONLY A BASE. Its job is that no pixel of the surround is ever
+    // unpainted — a rounded tiny height can leave a sliver the reflections do not reach, and an unpainted
+    // sliver enlarges into a hard edge of nothing. Everything visible is drawn over it.
+    const cb = sharePhotoBox({ w: p.w, h: p.h, k: SHARE_BLUR.spread, fill: true }, tw, th);
+    g0.drawImage(p.bitmap, cb.x, cb.y, cb.w, cb.h);
+    // Where the picture itself sits, which is what the reflections have to be continuous with.
+    // ⚠️ THE CARD'S BOX SCALED DOWN, NOT A FRESH FIT INSIDE THE TINY CANVAS. th is ROUNDED, so a fit
+    // computed here can land its slack on the other axis from the card's — and a reflection on the wrong
+    // axis is a reflection that guarantees nothing. Scaling the real box cannot disagree with it.
+    const sc = tw / gm.W;
+    const bc = sharePhotoBox({ w: p.w, h: p.h, k: 1 }, gm.W, gm.H);
+    const b = { x: bc.x * sc, y: bc.y * sc, w: bc.w * sc, h: bc.h * sc };
+    // ⚠️ A TRUE 1:1 REFLECTION, WHICH MEANS THE STRIP IS AS DEEP AS THE BAND — AND A FIXED FRACTION OF
+    // THE PICTURE IS WRONG BY EXACTLY THE AMOUNT THAT SHOWED. Written as 45% of the photograph, 720
+    // source rows were squashed into a 3px band, so the tiny pixel touching the seam was the mean of the
+    // top 229 rows: blue sky averaged with brown cloud, against a picture whose own first row is deep
+    // blue. Reflection padding is only continuous when it is not scaled, so the strip's depth comes from
+    // the band divided by the contain scale.
+    // ⚠️ CLAMPED TO THE PICTURE, and when the clamp binds the reflection IS squashed — a 3:1 panorama on
+    // a 9:16 card leaves a band four times the photograph's own height, and there is no honest mapping
+    // for that. It is stated rather than hidden.
+    const kc = bc.h / p.h;
+    const sh = Math.max(1, Math.min(p.h, Math.round(bc.y / kc)));
+    const sw = Math.max(1, Math.min(p.w, Math.round(bc.x / kc)));
+    // Each reflection spans the FULL tiny width or height, so the corners are painted too.
+    if (b.y > 0.01) {
+      g0.save(); g0.translate(0, b.y); g0.scale(1, -1);
+      g0.drawImage(p.bitmap, 0, 0, p.w, sh, 0, 0, tw, b.y);
+      g0.restore();
+      const below = th - (b.y + b.h);
+      if (below > 0.01) {
+        g0.save(); g0.translate(0, b.y + b.h); g0.scale(1, -1);
+        g0.drawImage(p.bitmap, 0, p.h - sh, p.w, sh, 0, -below, tw, below);
+        g0.restore();
+      }
+    }
+    if (b.x > 0.01) {
+      g0.save(); g0.translate(b.x, 0); g0.scale(-1, 1);
+      g0.drawImage(p.bitmap, 0, 0, sw, p.h, 0, 0, b.x, th);
+      g0.restore();
+      const right = tw - (b.x + b.w);
+      if (right > 0.01) {
+        g0.save(); g0.translate(b.x + b.w, 0); g0.scale(-1, 1);
+        g0.drawImage(p.bitmap, p.w - sw, 0, sw, p.h, -right, 0, right, th);
+        g0.restore();
+      }
+    }
+    // And the picture itself, so the blur near the seam mixes the right two colours rather than the
+    // reflection against the cover base.
+    g0.drawImage(p.bitmap, b.x, b.y, b.w, b.h);
+    while (cur.width < SHARE_BLUR.w) {
+      const n = document.createElement("canvas");
+      n.width = Math.min(SHARE_BLUR.w, cur.width * 2);
+      n.height = Math.max(2, Math.round(n.width * gm.H / gm.W));
+      const gn = n.getContext("2d");
+      gn.imageSmoothingEnabled = true; gn.imageSmoothingQuality = "high";
+      gn.drawImage(cur, 0, 0, n.width, n.height);
+      cur = n;
+    }
+    out = cur;
+  } catch (e) { PHOTODIAG.err = "blur: " + (e && e.message); }
+  SHARE_BLUR_KEY = key; SHARE_BLUR_C = out;
+  return out;
+}
+/**
+ * THE PHOTOGRAPH ONTO A CARD-SHAPED SURFACE — THE ONE COMPOSITE, USED BY THE CARD AND BY THE PROBE.
+ *
+ * ⚠️ ONE FUNCTION, BECAUSE THE PROBE HAS TO SEE WHAT THE CARD SEES. The scrim is solved from a
+ * tenth-scale composite, and in contain mode the ground under the copy is frequently the blurred
+ * surround rather than the photograph's own lower half — a blurred bright sky is still a bright ground.
+ * A probe that composited only the photograph would solve the scrim against a ground that is not there,
+ * and the runner would approve a picture whose file reads differently.
+ *
+ * ⚠️ THE VEIL COVERS THE WHOLE SURFACE AND THE PHOTOGRAPH GOES ON TOP OF IT, so the surround is
+ * darkened and the picture itself is untouched. Veiling only the bands would mean enumerating them,
+ * which is four rectangles across two orientations to get wrong — and getting one wrong would darken a
+ * strip of somebody's photograph.
+ *
+ * ⚠️ gm IS THE CARD GEOMETRY EVEN WHEN W AND H ARE THE PROBE'S, and that is what lets one cached
+ * surround serve both: the blur is a property of the photograph and the aspect, not of the surface it
+ * lands on.
+ *
+ * ⚠️ THE SMOOTHING IS SET ONLY AROUND THE ENLARGEMENT, INSIDE ITS OWN save/restore. Setting it for the
+ * photograph too would change every card that has no gap at all — every fill-mode export — for a
+ * setting only the surround needs.
+ */
+function sharePhotoCompose(g, p, W, H, gm) {
+  const box = sharePhotoBox(p, W, H);
+  g.save(); g.beginPath(); g.rect(0, 0, W, H); g.clip();
+  if (shareBoxLeavesGap(box, W, H)) {
+    const bg = shareBlurBg(p, gm);
+    if (bg) {
+      g.save();
+      g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
+      try { g.drawImage(bg, 0, 0, W, H); } catch (e) {}
+      g.restore();
+      g.fillStyle = cardAlpha(SHARE_INK.ground, SHARE_BLUR.veil);
+      g.fillRect(0, 0, W, H);
+    }
+  }
+  try { g.drawImage(p.bitmap, box.x, box.y, box.w, box.h); } catch (e) {}
+  g.restore();
+  return box;
+}
 /**
  * THE PHOTOGRAPH, FULL BLEED, EDGE TO EDGE.
  *
@@ -19059,17 +19435,17 @@ function sharePhotoNorm(box, u, v) { return [box.x + u * box.w, box.y + v * box.
  * lower half a flat plate. Full bleed means the box is the canvas, and what happens over the lower part
  * of the picture is a veil rather than an absence of picture.
  *
- * ⚠️ NO UNIFYING TINT. A flat rgba veil over the whole photograph was here for "cohesion" and it is
- * exactly the arbitrary treatment the brief rejects: it flattens a good photograph to buy nothing,
- * because the only place a tint is needed is under type, and there it is solved rather than assumed.
+ * ⚠️ FULL BLEED IS NOW DELIVERED BY THE COMPOSITE, NOT BY CROPPING THE PICTURE TO FIT. Under the
+ * owner's photo-fit ruling the photograph is shown whole by default, so it is the blurred surround that
+ * reaches the edges where the picture does not. Edge to edge is still the rule; what changed is that it
+ * is no longer paid for out of the runner's photograph.
+ *
+ * ⚠️ NO UNIFYING TINT OVER THE PICTURE. A flat rgba veil over the whole photograph was here for
+ * "cohesion" and it is exactly the arbitrary treatment the brief rejects: it flattens a good photograph
+ * to buy nothing, because the only place a tint is needed is under type, and there it is solved rather
+ * than assumed. The surround's veil is a different claim — it darkens what is NOT the photograph.
  */
-function sharePhotoDraw(g, p, gm) {
-  const box = sharePhotoBox(p, gm.W, gm.H);
-  g.save(); g.beginPath(); g.rect(0, 0, gm.W, gm.H); g.clip();
-  try { g.drawImage(p.bitmap, box.x, box.y, box.w, box.h); } catch (e) {}
-  g.restore();
-  return box;
-}
+function sharePhotoDraw(g, p, gm) { return sharePhotoCompose(g, p, gm.W, gm.H, gm); }
 /**
  * THE CONSERVATIVE PERSON, IN THE ABSENCE OF A DETECTOR.
  *
@@ -19306,7 +19682,10 @@ const SHARE_PROBE_W = 108;
 function shareLumaProbe(photo, gm) {
   if (!photo || !photo.bitmap) return null;
   const H = Math.round(SHARE_PROBE_W * gm.H / gm.W);
-  const key = [photo.id, photo.ox, photo.oy, photo.k, gm.W, gm.H].join(":");
+  // ⚠️ THE FIT MODE IS IN THE KEY. It changes the ground under every line of copy on the card — in
+  // contain mode most of that ground is the blurred surround — so a key without it would answer a
+  // stale scrim for the first frame after the toggle, which is the frame the runner judges it by.
+  const key = [photo.id, photo.ox, photo.oy, photo.k, photo.fill ? "fill" : "whole", gm.W, gm.H].join(":");
   if (SHARE_LPROBE_KEY === key && SHARE_LPROBE) return SHARE_LPROBE;
   let data = null;
   try {
@@ -19314,8 +19693,9 @@ function shareLumaProbe(photo, gm) {
     c.width = SHARE_PROBE_W; c.height = H;
     const q = c.getContext("2d");
     q.fillStyle = SHARE_INK.ground; q.fillRect(0, 0, SHARE_PROBE_W, H);
-    const box = sharePhotoBox(photo, SHARE_PROBE_W, H);
-    q.drawImage(photo.bitmap, box.x, box.y, box.w, box.h);
+    // ⚠️ gm, NOT THE PROBE'S OWN SIZE, as the composite's third pair: the surround is cached against the
+    // CARD's geometry so the probe and the card share one bitmap instead of thrashing two.
+    sharePhotoCompose(q, photo, SHARE_PROBE_W, H, gm);
     data = q.getImageData(0, 0, SHARE_PROBE_W, H).data;
   } catch (e) { PHOTODIAG.err = "luma probe: " + (e && e.message); }
   SHARE_LPROBE_KEY = key;
@@ -19371,8 +19751,21 @@ function shareGroundUnder(probe, gm, rect) {
  * nothing moved at all, because white is a neutral. Every ground tested lands inside SHARE_SCRIM.max, so
  * the photograph still shows through at every row of copy.
  */
+/**
+ * ⚠️ IT SOLVES ABOVE THE TARGET, BY THE ESTIMATOR'S OWN MEASURED ERROR, AND A KNIFE-EDGE EQUALITY IS
+ * WHY. The ground is read from a tenth-scale probe, so the number solved against is an average of about
+ * a hundred export pixels and the real ground under a glyph can be a shade brighter. Solving exactly at
+ * 4.5 therefore delivers "about 4.5", which is a promise that happens to be true rather than one that is
+ * kept — measured, the eyebrow came out at 4.52 and 4.53 across the hostile grounds before the photo-fit
+ * work, and at **4.41** afterwards on one of them, because contain mode changes the ground the probe
+ * averages. The fix is not to accept 4.41 and it is not to re-solve per template: it is to stop asking
+ * for equality. 1.10 puts the measured floor at 4.72 across 276 renders, and the cost is a few points of
+ * alpha on the small number of photographs bright enough to need any.
+ */
+const SHARE_SCRIM_MARGIN = 1.10;
 function shareVeilAlphaFor(fgHex, ground, target) {
   const fg = shareRelLum(fgHex), ic = shareHexRGB(SHARE_INK.ground), gc = shareGroundRGB(ground);
+  target = target * SHARE_SCRIM_MARGIN;
   for (let a = 0; a <= 1.0001; a += 0.02) {
     // ⚠️ PER CHANNEL, BECAUSE THAT IS WHAT CANVAS DOES. source-over composites each channel on its own
     // and luminance is only recoverable afterwards; compositing a luma average instead is the defect
@@ -19521,8 +19914,42 @@ function sharePhotoScrim(g, gm, probe, blockTop, colours) {
  * So the last stop above the rect's own bottom edge IS the solved alpha, and everything above it is
  * stronger; the fade to nothing happens entirely below the copy.
  */
+/**
+ * ⚠️ A SCRIM PAINTED ACROSS THE WHOLE WIDTH MUST BE SOLVED ACROSS THE WHOLE WIDTH, AND SOLVING IT FROM
+ * THE WORDMARK'S OWN 146px RECT SHIPPED A 2.09:1 ON THE BRAND MARK.
+ *
+ * Found at 1:1, and it was never a square defect — it is this sampler's oldest fragility, which the
+ * square merely arranged to expose. In contain mode a portrait photograph on a square card is inset
+ * 180px from each side, so the wordmark BEGINS in the blurred surround and crosses into the sharp
+ * picture: "Inte-" lands on the dark band (measured 18.64:1) and "Run" straddles the seam. Over the
+ * SPARK ground — a dark field of 3px pure-white specks, built precisely to defeat a probe-solved
+ * scrim — the brightest of the three or four probe cells that fell on the picture averaged those specks
+ * away, the solver was handed 13/21/20, no scrim was drawn at all, and the accent half of the wordmark
+ * came out at 2.09:1 against a glyph sitting on a white speck.
+ *
+ * ⚠️ THE SAME 146px SAMPLE PASSED ON A FEED POST AND FAILED ON A SQUARE BY LUCK, WHICH IS THE REAL
+ * FINDING. Identical rect, identical ground, identical probe: the feed's picture starts 90px in so
+ * twelve probe cells fell on it and one of them caught a speck (255/255/255, alpha 0.6/0.8, 5.19:1);
+ * the square's starts 180px in so only three or four did and none caught one. A guard that depends on
+ * how many cells happened to land on a highlight is not a guard.
+ *
+ * ⚠️ SO THE SAMPLE IS NOW THE STRIP THE SCRIM ACTUALLY COVERS, edge to edge at the wordmark's own
+ * height. It is the same probe and the same solver — no new pixels are read and nothing is allocated —
+ * and it can only ever raise the sampled ground, so the change is one-way towards more protection. It
+ * also removes the luck: the sample goes from about fifteen probe cells to the full width of them.
+ *
+ * ⚠️ IT COSTS SOME PICTURE ON A PHOTOGRAPH THAT IS BRIGHT WHERE NO TYPE SITS, and that is the deliberate
+ * trade rather than an oversight — a bright right-hand sky now darkens a top-left wordmark's band too.
+ * The alternative is a scrim whose strength depends on which 13% of the strip the wordmark happens to
+ * occupy, which is what produced the 2.09. Measured over the thirteen hostile grounds, four templates,
+ * three aspects and both fit modes — 4472 measured glyph runs — 66 of them move and every single one
+ * moves UP; four grounds are affected at all, and the story's and feed post's own contrast floors are
+ * unchanged at 4.96 and 4.93. The square's contain-mode floor goes 2.09 to 4.73, and nothing anywhere
+ * is under 4.5.
+ */
 function shareTopScrim(g, gm, probe, rect, colours) {
-  const ground = shareGroundUnder(probe, gm, rect);
+  const band = shareRect(0, rect.y, gm.W, rect.h);
+  const ground = shareGroundUnder(probe, gm, band);
   let a = 0;
   for (const c of colours) a = Math.max(a, shareVeilAlphaFor(c.hex, ground, c.target));
   const step = a <= 0.001 ? "none" : a <= 0.55 ? "veil" : a <= 0.82 ? "scrim" : "deep";
@@ -19779,9 +20206,14 @@ const SHARE_CAP = 0.714, SHARE_FIG = 0.72;
  */
 const SHARE_QUIET = { up: 70, upFeed: 36, gap: 46 };
 function shareQuietPlan(gm, size) {
-  const feed = gm.aspect === "feed";
-  return { base: gm.H - (feed ? SHARE_QUIET.upFeed : SHARE_QUIET.up),
-    reserve: feed ? Math.round(size * SHARE_CAP) + SHARE_QUIET.gap : 0 };
+  // ⚠️ THE TEST IS "IS THIS A STORY", NOT "IS THIS A FEED POST". A square carries no platform overlay
+  // either, so it needs the same own-band treatment a feed post does — written the other way round, the
+  // square inherited the story's 240px reserve as its footer band and the date sat 24px under the
+  // metric labels, which is the collision this function exists to prevent.
+  const story = gm.aspect === "story";
+  const gap = gm.aspect === "square" ? Math.round(SHARE_QUIET.gap * SHARE_GAP_SQ) : SHARE_QUIET.gap;
+  return { base: gm.H - (story ? SHARE_QUIET.up : SHARE_QUIET.upFeed),
+    reserve: story ? 0 : Math.round(size * SHARE_CAP) + gap };
 }
 /**
  * A LETTER-SPACED RUN AT THE LARGEST LISTED SIZE THAT FITS, SHORTENED AT THE FLOOR.
@@ -19843,9 +20275,31 @@ function shareHeroFor(m) {
 function shareMetricUnit(x) {
   return (x.key === "time" && x.u === "MIN") ? { key: x.key, v: x.v, u: "", k: x.k } : x;
 }
+/**
+ * HOW MANY SUPPORTING NUMBERS A SHAPE CARRIES.
+ *
+ * ⚠️ TWO ON A SQUARE IS THE CONTRACT'S OWN INSTRUCTION, verbatim: "allow two metrics rather than
+ * crushing three" — and it buys WIDTH, not height, which is the opposite of what I assumed and had
+ * written here. Measured: capping the row changes the clear photograph by 0.0 points on every template,
+ * because a metric row is exactly as tall with two columns as with three. What it changes is the column:
+ * (952 - 2 x 24) / 3 = 301px against (952 - 24) / 2 = 464px. "Crushing" is a statement about the
+ * horizontal, and so is the fix.
+ *
+ * ⚠️ IT IS A RENDER CAP, NOT A CHANGE TO WHAT THE RUNNER CHOSE. SCARD.metrics keeps all three, so
+ * switching to a square and back restores the third rather than forgetting it — the same reasoning the
+ * per-(template, aspect) framing store already follows. studioMetricsHtml says so in words while a
+ * square is selected, because a chip that is on and does not appear is the looks-live class of defect.
+ *
+ * ⚠️ AND IT IS NEVER THE HERO THAT GIVES WAY. "Never hide the primary distance/session outcome to
+ * retain secondary data" — the hero is chosen before this is applied and is not in this row at all, so
+ * the cap can only ever drop a supporting number.
+ */
+const SHARE_METRIC_CAP = { square: 2 };
+function shareMetricCap(aspect) { return SHARE_METRIC_CAP[aspect] || 3; }
 /** The supporting row: the model's own ladder, minus whatever the hero has already said. */
 function shareMetricsFor(m, hero) {
-  return (m.metrics || []).filter((x) => !hero || x.key !== hero.key).map(shareMetricUnit);
+  return (m.metrics || []).filter((x) => !hero || x.key !== hero.key)
+    .slice(0, shareMetricCap(m.aspect)).map(shareMetricUnit);
 }
 /**
  * THE COACHING BADGE — the debrief's verdict, in the verdict's own colour, with the words carrying the
@@ -20022,6 +20476,7 @@ function shareMetricRules(g, gm, mets, P, top, bottom) {
 const MOMENT_GAP = { labelToValue: 42, valueToEvidence: 70, evidenceToBadge: 31, badgeToHero: 46,
   heroToEyebrow: 40 };
 function shareMomentPlan(g, m, gm) {
+  const GAP = shareGaps(MOMENT_GAP, gm.aspect);
   const A = gm.aspect;
   const hero = shareHeroFor(m);
   const mets = shareMetricsFor(m, hero);
@@ -20041,20 +20496,20 @@ function shareMomentPlan(g, m, gm) {
   const rects = [];
   const quiet = shareQuietPlan(gm, shareTypeSize("meta", A));
   const labelBase = gm.safe.y1 - 8 - quiet.reserve;
-  const valueBase = labelBase - MOMENT_GAP.labelToValue;
+  const valueBase = labelBase - GAP.labelToValue;
   const rowTop = valueBase - Math.round(P.valueS * SHARE_FIG);
   if (mets.length) rects.push(shareRect(gm.M, rowTop, gm.CW, labelBase + 12 - rowTop));
   let y = mets.length ? rowTop : labelBase;
   let evidBase = 0;
   if (evid) {
-    evidBase = y - MOMENT_GAP.valueToEvidence;
+    evidBase = y - GAP.valueToEvidence;
     const t = evidBase - Math.round(evid.size * SHARE_CAP) - (evid.lines.length - 1) * evid.lh;
     rects.push(shareRect(gm.M, t, gm.CW, evidBase + 10 - t));
     y = t;
   }
   let badgeTop = 0;
   if (badge) {
-    badgeTop = y - MOMENT_GAP.evidenceToBadge - badge.h;
+    badgeTop = y - GAP.evidenceToBadge - badge.h;
     rects.push(shareRect(gm.M, badgeTop, badge.w, badge.h));
     y = badgeTop;
   }
@@ -20071,11 +20526,11 @@ function shareMomentPlan(g, m, gm) {
       if (heroW <= gm.CW) break;
     }
   }
-  const heroBase = hero ? y - MOMENT_GAP.badgeToHero : y;
+  const heroBase = hero ? y - GAP.badgeToHero : y;
   const heroTop = hero ? heroBase - Math.round(heroS * SHARE_FIG) : y;
   if (hero) rects.push(shareRect(gm.M, heroTop, heroW, heroBase + 10 - heroTop));
   y = heroTop;
-  const eyeBase = eye ? y - MOMENT_GAP.heroToEyebrow : y;
+  const eyeBase = eye ? y - GAP.heroToEyebrow : y;
   const eyeTop = eye ? eyeBase - Math.round(eye.size * SHARE_CAP) : y;
   if (eye) rects.push(shareRect(gm.M, eyeTop, eye.w, eyeBase + 8 - eyeTop));
   // ⚠️ THE DATE IS THE BRIEF'S OWN QUIET EXCEPTION and sits below the critical region, where the
@@ -20181,24 +20636,38 @@ const POSTER_TAG = { w: 108, h: 4 };
  * least one measured kilometre, and the badge's own gate is required with it, so a run whose judgement
  * rests mostly on estimated splits states its elevation instead of a confident count.
  */
+/**
+ * ⚠️ THE ADHERENCE COLUMN IS ADDED AFTER THE CAP, SO IT HAS TO RE-APPLY IT. shareMetricsFor already
+ * answers two on a square; appending "5 OF 6 KM ON TARGET" to that made three, and the poster was the
+ * one template that quietly kept its story-shaped row — measured, 3 columns on a 1080-tall card while
+ * the other three had reflowed to 2. It is the same fix-one-builder-not-the-other trap this file records
+ * three times over, and the cap is applied to the FINISHED row rather than to its ingredients.
+ *
+ * ⚠️ AND THE ADHERENCE COLUMN IS THE ONE THAT SURVIVES, NOT THE ONE THAT GOES. It is the only number in
+ * the row that says anything about whether the run did what it was set to do, which on a card whose
+ * headline is the distance is the nearest thing to the session outcome — and the contract's rule for a
+ * square is that secondary data gives way to the outcome, never the other way round.
+ */
 function sharePosterMetrics(m, hero) {
+  const cap = shareMetricCap(m.aspect);
   const out = shareMetricsFor(m, hero);
   if (m.adherence && m.pill) {
-    return out.slice(0, 2).concat([{ key: "onTarget", v: String(m.adherence.inBand), mid: "OF",
-      v2: String(m.adherence.judged), u: "", k: "KM ON TARGET" }]);
+    return out.slice(0, Math.max(0, cap - 1)).concat([{ key: "onTarget", v: String(m.adherence.inBand),
+      mid: "OF", v2: String(m.adherence.judged), u: "", k: "KM ON TARGET" }]);
   }
-  return out;
+  return out.slice(0, cap);
 }
 function sharePosterPlan(g, m, gm, wm) {
+  const GAP = shareGaps(POSTER_GAP, gm.aspect);
   const A = gm.aspect;
   const hero = shareHeroFor(m);
   const mets = sharePosterMetrics(m, hero);
   const P = shareMetricPlan(g, gm, mets);
   const quiet = shareQuietPlan(gm, shareTypeSize("foot", A));
   const labelBase = gm.safe.y1 - 8 - quiet.reserve;
-  const valueBase = labelBase - POSTER_GAP.labelToValue;
+  const valueBase = labelBase - GAP.labelToValue;
   const rowTop = valueBase - Math.round(P.valueS * SHARE_FIG);
-  const hairY = rowTop - POSTER_GAP.valueToHair;
+  const hairY = rowTop - GAP.valueToHair;
   const heroU = shareTypeSize("bigUnit", A);
   const heroMax = shareTypeSize("display", A);
   let heroS = heroMax, heroW = 0;
@@ -20211,30 +20680,30 @@ function sharePosterPlan(g, m, gm, wm) {
       if (heroW <= gm.CW) break;
     }
   }
-  const heroBase = hairY - POSTER_GAP.hairToHero;
+  const heroBase = hairY - GAP.hairToHero;
   const heroTop = heroBase - Math.round(heroS * SHARE_FIG);
-  const tagY = heroTop - POSTER_GAP.heroToTag;
+  const tagY = heroTop - GAP.heroToTag;
   const metaTxt = [String(m.coarseLocation || "").toUpperCase(), String(m.dateLabel || "").toUpperCase()]
     .filter(Boolean).join(" \\u00b7 ");
   const meta = metaTxt ? shareLsFit(g, metaTxt, gm.CW, { max: shareTypeSize("meta", A),
     min: shareTypeSize("foot", A), weight: 700, track: SHARE_TRACK.meta }) : null;
-  const metaBase = meta ? tagY - POSTER_GAP.tagToMeta : tagY;
+  const metaBase = meta ? tagY - GAP.tagToMeta : tagY;
   const metaTop = meta ? metaBase - Math.round(meta.size * SHARE_CAP) : tagY;
   // ⚠️ TWO LINES AT MOST AND A FLOOR WELL BELOW THE RUNG, because these are titles the generator writes:
   // the worst of a real plan's 142 is "MONA FARTLEK: 2 x (90/60/30/15 HARD, EQUAL FLOAT)".
   const title = shareFit(g, String(m.title || ""), gm.CW, { max: shareTypeSize("title", A),
     min: Math.round(shareTypeSize("title", A) * 0.42), step: 2, weight: 800, lines: 2, lh: 1.04 });
-  const titleBase = metaTop - POSTER_GAP.metaToTitle;
+  const titleBase = metaTop - GAP.metaToTitle;
   const titleTop = titleBase - Math.round(title.size * SHARE_CAP) - (title.lines.length - 1) * title.lh;
   const eye = m.pill ? shareLsFit(g, m.pill.text, gm.CW, { max: shareTypeSize("meta", A),
     min: shareTypeSize("foot", A), weight: 800, track: SHARE_TRACK.eyebrow }) : null;
-  const eyeBase = eye ? titleTop - POSTER_GAP.titleToEyebrow : titleTop;
+  const eyeBase = eye ? titleTop - GAP.titleToEyebrow : titleTop;
   const eyeTop = eye ? eyeBase - Math.round(eye.size * SHARE_CAP) : titleTop;
   // ⚠️ THE FIELD STARTS BELOW THE WORDMARK, NEVER AT THE CANVAS EDGE. The route is the subject, so it
   // takes the brief's critical region rather than the story's deeper TOP reserve — but a line drawn
   // through the logo is a collision whichever of the two owns the space.
   const rTop = Math.max(gm.safe.y0, Math.round(wm.rect.y + wm.rect.h) + 36);
-  const field = shareRect(gm.M, rTop, gm.CW, Math.max(120, eyeTop - POSTER_GAP.blockToField - rTop));
+  const field = shareRect(gm.M, rTop, gm.CW, Math.max(120, eyeTop - GAP.blockToField - rTop));
   const footBase = quiet.base;
   return { hero: hero, heroS: heroS, heroU: heroU, heroBase: heroBase, heroTop: heroTop, heroW: heroW,
     mets: mets, P: P, valueBase: valueBase, labelBase: labelBase, rowTop: rowTop, hairY: hairY,
@@ -20302,7 +20771,9 @@ function sharePosterCard(g, m, gm, wm) {
  * reference prints one beside the time, and a unit of minutes over minutes-and-seconds is wrong rather
  * than terse.
  */
-function shareRowMetrics(m) { return (m.stats || []).slice(0, 3).map(shareMetricUnit); }
+function shareRowMetrics(m) {
+  return (m.stats || []).slice(0, shareMetricCap(m.aspect)).map(shareMetricUnit);
+}
 /**
  * HOW MUCH OF THE CARD STAYS UNOBSTRUCTED PHOTOGRAPH, ON A STORY.
  *
@@ -20317,18 +20788,25 @@ function shareRowMetrics(m) { return (m.stats || []).slice(0, 3).map(shareMetric
  * The Execution, the ladder's row pitch on The Progression. Neither is a taste decision; both are the
  * single degree of freedom left once the type is on the ladder and the gaps are measured.
  *
- * ⚠️ STORY ONLY, AND THAT IS THE BRIEF'S OWN INSTRUCTION FOR THE FEED. "Reduce photographic share of
- * the canvas, tighten headline scale, shorten optional evidence, and preserve all essential metrics" —
- * a 4:5 canvas is 570px shorter with the same content to carry, so holding 52% there would mean
- * shrinking the verdict to nothing. Measured on the reference data: the photograph is 52.0% of a story
- * and 40.7% of a feed post.
+ * ⚠️ STORY ONLY, AND THAT IS THE BRIEF'S OWN INSTRUCTION FOR THE OTHER TWO. "Reduce photographic share
+ * of the canvas, tighten headline scale, shorten optional evidence, and preserve all essential metrics"
+ * — a 4:5 canvas is 570px shorter with the same content to carry and a square is 840px shorter, so
+ * holding 52% there would mean shrinking the verdict to nothing. Measured on the reference data: the
+ * clear photograph on The Execution is 52.0% of a story, 40.7% of a feed post and 43.1% of a square.
+ *
+ * ⚠️ THE TEST IS "IS THIS A STORY", NOT "IS THIS A FEED POST", and it was the other way round until the
+ * square arrived. Written as "feed means no floor", a square inherited the STORY's floor — 50% of 1080
+ * is 540, which a recomposed block clears anyway, so it looked harmless and was not: The Execution's
+ * verdict is sized by the room left above that floor, so the square's headline was solved against a
+ * constraint that belongs to a canvas 840px taller. An unknown aspect must land where the geometry lands
+ * it, which is what shareAspect exists for.
  */
 const SHARE_PHOTO_FLOOR = { execution: 0.52, progression: 0.50 };
 function sharePhotoFloor(gm, id) {
   // ⚠️ CEIL, NOT ROUND. 1920 x 0.52 is 998.4, and a floor rounded DOWN to 998 delivers 51.98% — under the
   // number it exists to hold, and a guard written as "at least 52%" then fails on correct code. One pixel,
   // and it is the difference between honouring the contract's figure and missing it.
-  return gm.aspect === "feed" ? 0 : Math.ceil(gm.H * (SHARE_PHOTO_FLOOR[id] || 0.5));
+  return gm.aspect === "story" ? Math.ceil(gm.H * (SHARE_PHOTO_FLOOR[id] || 0.5)) : 0;
 }
 /**
  * THE LARGEST FIT THAT ALSO OBEYS A HEIGHT, not only a width.
@@ -20492,6 +20970,17 @@ const EXEC_GAP = { labelToValue: 40, axisToValue: 62, chartToAxis: 21, labelToCh
  */
 const SHARE_CHART = { plotH: 86, padK: 0.2, padMin: 8, mr: 11, mrMin: 4, mrK: 0.36, pupil: 0.41,
   line: 3, edge: 2.5, tint: 0.18, edgeA: 0.85, laneR: 10, axisGap: 18, key: 2, lineA: 1, triW: 1.05 };
+/**
+ * ⚠️ THE PLOT IS SHORTER ON A SQUARE AND THE MARKERS ARE NOT. Everything else about this chart derives
+ * from the plot's own height — the band's padding, the marker radius, the stem length — so 64px is the
+ * one number that has to move, and it moves once. The 22px it gives back is 2.0% of a 1080-tall card,
+ * and it comes out of the chart rather than out of the picture: a chart is the evidence on this
+ * template, so it may get smaller but it may not get thinner. Looked at over three scenes at 64: the
+ * band is still a lane with room either side, the markers still read as rings and triangles, and the
+ * miss stems are still a visible length.
+ */
+const SHARE_CHART_SQ_H = 64;
+function shareChartH(aspect) { return aspect === "square" ? SHARE_CHART_SQ_H : SHARE_CHART.plotH; }
 /** The keyline pass: the same path, wider and deeper, so the coloured pass reads on any photograph. */
 function shareChartKey(g, lw) {
   g.strokeStyle = SHARE_INK.keyline; g.lineWidth = lw + SHARE_CHART.key * 2; g.stroke();
@@ -20615,19 +21104,20 @@ function shareAxisKeep(g, rows, w, size, track) {
   return keep;
 }
 function shareExecutionPlan(g, m, gm) {
+  const GAP = shareGaps(EXEC_GAP, gm.aspect);
   const A = gm.aspect;
   const mets = shareRowMetrics(m);
   const P = shareMetricPlan(g, gm, mets);
   const quiet = shareQuietPlan(gm, shareTypeSize("meta", A));
   const labelBase = gm.safe.y1 - 8 - quiet.reserve;
-  const valueBase = labelBase - EXEC_GAP.labelToValue;
+  const valueBase = labelBase - GAP.labelToValue;
   const rowTop = valueBase - Math.round(P.valueS * SHARE_FIG);
   // The axis and the chart's own label share one rung: they are the two ends of the same graphic.
   const axisS = shareTypeSize("label", A), axisCap = Math.round(axisS * SHARE_CAP);
-  const axisBase = rowTop - EXEC_GAP.axisToValue;
-  const chartBottom = axisBase - axisCap - EXEC_GAP.chartToAxis;
-  const chartTop = chartBottom - SHARE_CHART.plotH;
-  const capBase = chartTop - EXEC_GAP.labelToChart;
+  const axisBase = rowTop - GAP.axisToValue;
+  const chartBottom = axisBase - axisCap - GAP.chartToAxis;
+  const chartTop = chartBottom - shareChartH(A);
+  const capBase = chartTop - GAP.labelToChart;
   const capTop = capBase - axisCap;
   const bandTxt = m.band ? "TARGET " + fmtPace(m.band.minSecPerKm) + "\\u2013" +
     fmtPace(m.band.maxSecPerKm) + "/KM" : "";
@@ -20641,10 +21131,10 @@ function shareExecutionPlan(g, m, gm) {
   const sentTxt = String((m.verdict && m.verdict.evidenceLine) || "");
   const sent = sentTxt ? shareFit(g, sentTxt, gm.CW, { max: shareTypeSize("lead", A),
     min: shareTypeSize("meta", A), step: 1, weight: 600, lines: 2, lh: 1.26 }) : null;
-  const sentBase = sent ? capTop - EXEC_GAP.sentenceToLabel : capTop;
+  const sentBase = sent ? capTop - GAP.sentenceToLabel : capTop;
   const sentTop = sent ? sentBase - Math.round(sent.size * SHARE_CAP) - (sent.lines.length - 1) * sent.lh
     : capTop;
-  const verdBase = sentTop - EXEC_GAP.verdictToSentence;
+  const verdBase = sentTop - GAP.verdictToSentence;
   // The session TITLE here, not the kind — see shareEyebrow, and the note at the top of this template.
   const eye = shareEyebrow(g, gm, m.title, m.coarseLocation);
   const eyeCap = eye ? Math.round(eye.size * SHARE_CAP) : 0;
@@ -20656,13 +21146,13 @@ function shareExecutionPlan(g, m, gm) {
   // headline alone; a shorter eyebrow simply leaves the block a few pixels lower, which is more
   // photograph and can only help.
   const eyeRungCap = eye ? Math.round(shareTypeSize("eyebrow", A) * SHARE_CAP) : 0;
-  const room = verdBase - (floorY + eyeRungCap + (eye ? EXEC_GAP.eyebrowToVerdict : 0));
+  const room = verdBase - (floorY + eyeRungCap + (eye ? GAP.eyebrowToVerdict : 0));
   const vmax = shareTypeSize("display", A);
   const verd = m.pill ? shareFitToRoom(g, m.pill.text, gm.CW, Math.max(40, room),
     { max: vmax, min: Math.round(vmax * 0.55), step: 2, weight: 800, lines: 2, lh: 0.945 }) : null;
   const verdTop = verd ? verdBase - Math.round(verd.size * SHARE_CAP) - (verd.lines.length - 1) * verd.lh
     : sentTop;
-  const eyeBase = eye ? verdTop - EXEC_GAP.eyebrowToVerdict : verdTop;
+  const eyeBase = eye ? verdTop - GAP.eyebrowToVerdict : verdTop;
   const eyeTop = eye ? eyeBase - eyeCap : verdTop;
   const date = m.dateLabel ? shareLsFit(g, String(m.dateLabel).toUpperCase(), Math.round(gm.CW * 0.62),
     { max: shareTypeSize("meta", A), min: shareTypeSize("foot", A), weight: 700,
@@ -20731,7 +21221,7 @@ function shareExecutionCard(g, m, gm, probe, wm) {
   }
   const rows = m.rows || [];
   if (m.band && rows.length) {
-    const ch = shareBandChart(g, m, gm.M, p.chartTop, gm.CW, SHARE_CHART.plotH);
+    const ch = shareBandChart(g, m, gm.M, p.chartTop, gm.CW, shareChartH(gm.aspect));
     const keep = shareAxisKeep(g, rows, gm.CW, p.axisS, SHARE_TRACK.label);
     g.font = shareFont(700, p.axisS); g.fillStyle = SHARE_INK.inkSoft;
     keep.forEach((i) => {
@@ -20835,6 +21325,19 @@ const SHARE_EVEN_SPREAD_S = 25;
 const SHARE_LADDER = { max: 6, pitch: 56, minPitch: 44, minSpan: SHARE_EVEN_SPREAD_S, minBar: 0.35,
   timeK: 0.41, barK: 0.448, barH: 16, trackA: 0.24, trackInk: 0.92 };
 /**
+ * ⚠️ FOUR ROWS ON A SQUARE, AND THIS IS THE SINGLE BIGGEST OF THE FOUR REDUCTIONS. Measured by leaving
+ * it at six and re-rendering: The Progression's clear photograph is 31.9% at six rows and 42.2% at four
+ * — 10.3 points, more than the type scale and the gaps put together buy on that template. The pitch is
+ * NOT what gives way here; it stays at SHARE_LADDER.pitch (56) in both cases, so the ladder simply grows
+ * downward into the picture.
+ *
+ * ⚠️ AND FEWER ROWS IS STILL EVERY KILOMETRE. The block strategy in shareLadderRows means four rows
+ * describe the same run in wider blocks — never a subset of it — so nothing is dropped and nothing is
+ * cherry-picked, which is that function's own stated rule.
+ */
+const SHARE_LADDER_MAX = { square: 4 };
+function shareLadderMax(aspect) { return SHARE_LADDER_MAX[aspect] || SHARE_LADDER.max; }
+/**
  * THE ROWS — every measured kilometre when there are six or fewer, and equal blocks of them when there
  * are more.
  *
@@ -20855,10 +21358,11 @@ const SHARE_LADDER = { max: 6, pitch: 56, minPitch: 44, minSpan: SHARE_EVEN_SPRE
  */
 function shareLadderRows(m) {
   const src = (m.splits || []).filter((r) => r && r.sec > 0 && !r.est);
-  if (src.length <= SHARE_LADDER.max) {
+  const max = shareLadderMax(m.aspect);
+  if (src.length <= max) {
     return src.map((r) => ({ label: r.km + " KM", sec: r.sec, members: [r.km] }));
   }
-  const g = SHARE_LADDER.max, base = Math.floor(src.length / g), extra = src.length % g;
+  const g = max, base = Math.floor(src.length / g), extra = src.length % g;
   const out = [];
   let i = 0;
   for (let b = 0; b < g; b++) {
@@ -20890,16 +21394,17 @@ function shareLadderScale(rows) {
       SHARE_LADDER.minBar + (1 - SHARE_LADDER.minBar) * (hi - sec) / span)) };
 }
 function shareProgressionPlan(g, m, gm) {
+  const GAP = shareGaps(PROG_GAP, gm.aspect);
   const A = gm.aspect;
   const mets = shareRowMetrics(m);
   const P = shareMetricPlan(g, gm, mets);
   const quiet = shareQuietPlan(gm, shareTypeSize("meta", A));
   const labelBase = gm.safe.y1 - 8 - quiet.reserve;
-  const valueBase = labelBase - PROG_GAP.labelToValue;
+  const valueBase = labelBase - GAP.labelToValue;
   const rowTop = valueBase - Math.round(P.valueS * SHARE_FIG);
   const rows = shareLadderRows(m);
   const rowS = shareTypeSize("row", A), rowCap = Math.round(rowS * SHARE_CAP);
-  const lastBase = rowTop - PROG_GAP.ladderToValue;
+  const lastBase = rowTop - GAP.ladderToValue;
   const secS = shareTypeSize("sub", A), secCap = Math.round(secS * SHARE_CAP);
   // The session KIND here, as 01 and 04 both show — the plan's own title is The Execution's line.
   const eye = shareEyebrow(g, gm, String(m.sessionLabel || "").toUpperCase(), m.coarseLocation);
@@ -20913,14 +21418,14 @@ function shareProgressionPlan(g, m, gm) {
       lh: 1.26 }) : null;
   // Everything above the ladder is a fixed height; the ladder's PITCH is what gives way to hold the
   // photographic floor, because it is the only continuous quantity left once the type is on the ladder.
-  const secBlock = rows.length ? secCap + PROG_GAP.splitsToLadder : 0;
+  const secBlock = rows.length ? secCap + GAP.splitsToLadder : 0;
   const interpBlock = interp
     ? Math.round(interp.size * SHARE_CAP) + (interp.lines.length - 1) * interp.lh +
-      PROG_GAP.interpToSplits : 0;
+      GAP.interpToSplits : 0;
   const headBlock = head
     ? Math.round(head.size * SHARE_CAP) + (head.lines.length - 1) * head.lh +
-      (interp ? PROG_GAP.headlineToInterp : PROG_GAP.interpToSplits) : 0;
-  const eyeBlock = eye ? eyeCap + (head ? PROG_GAP.eyebrowToHeadline : PROG_GAP.interpToSplits) : 0;
+      (interp ? GAP.headlineToInterp : GAP.interpToSplits) : 0;
+  const eyeBlock = eye ? eyeCap + (head ? GAP.eyebrowToHeadline : GAP.interpToSplits) : 0;
   const aboveH = secBlock + interpBlock + headBlock + eyeBlock;
   const floorY = sharePhotoFloor(gm, "progression");
   const roomForPitch = lastBase - rowCap - aboveH - floorY;
@@ -20930,17 +21435,17 @@ function shareProgressionPlan(g, m, gm) {
     : SHARE_LADDER.pitch;
   const firstBase = lastBase - (Math.max(0, rows.length - 1)) * pitch;
   const ladderTop = firstBase - rowCap;
-  const secBase = rows.length ? ladderTop - PROG_GAP.splitsToLadder : ladderTop;
+  const secBase = rows.length ? ladderTop - GAP.splitsToLadder : ladderTop;
   const secTop = rows.length ? secBase - secCap : ladderTop;
-  const interpBase = interp ? secTop - PROG_GAP.interpToSplits : secTop;
+  const interpBase = interp ? secTop - GAP.interpToSplits : secTop;
   const interpTop = interp
     ? interpBase - Math.round(interp.size * SHARE_CAP) - (interp.lines.length - 1) * interp.lh
     : secTop;
-  const headBase = head ? interpTop - (interp ? PROG_GAP.headlineToInterp : PROG_GAP.interpToSplits)
+  const headBase = head ? interpTop - (interp ? GAP.headlineToInterp : GAP.interpToSplits)
     : interpTop;
   const headTop = head
     ? headBase - Math.round(head.size * SHARE_CAP) - (head.lines.length - 1) * head.lh : interpTop;
-  const eyeBase = eye ? headTop - (head ? PROG_GAP.eyebrowToHeadline : PROG_GAP.interpToSplits)
+  const eyeBase = eye ? headTop - (head ? GAP.eyebrowToHeadline : GAP.interpToSplits)
     : headTop;
   const eyeTop = eye ? eyeBase - eyeCap : headTop;
   const date = m.dateLabel ? shareLsFit(g, String(m.dateLabel).toUpperCase(), Math.round(gm.CW * 0.62),
@@ -21292,6 +21797,54 @@ function shareFileName(m) {
   const dist = (m && m.distance > 0) ? m.distance.toFixed(2) + "km" : "";
   return ["InteRun", date, kind || "Run", dist].filter(Boolean).join("-") + ".jpg";
 }
+/**
+ * EVERY NUMBER THIS RUN COULD PUT IN THE SUPPORTING ROW, IN THE ORDER A TEMPLATE WOULD REACH FOR THEM.
+ *
+ * ⚠️ THE FIRST THREE OF THIS LIST ARE EXACTLY WHAT SHIPPED, and that is deliberate: the default is the
+ * pool's own head, so a runner who never opens the Metrics tool gets a byte-identical card to the one
+ * the reference comparison was signed off against. The picker changes which three, never the ordering
+ * or the drawing.
+ *
+ * ⚠️ IT CLIMBS runMetricLadder(run, true), SO RPE IS STRUCTURALLY UNREACHABLE. That flag is a safety
+ * rule rather than an editorial one — the effort rating is something the runner told the app about
+ * themselves, in the same class as their why and a check-in answer, and none of those reaches a picture
+ * that leaves the phone. A picker built from its own list would be one edit away from offering it.
+ *
+ * ⚠️ AND EVERY ENTRY IS ALREADY GATED ON HAVING A VALUE, so the tool can only ever offer numbers this
+ * run actually recorded. "Never display missing data as zero" is answered by the pool being short.
+ */
+function shareMetricPool(run) {
+  run = run || {};
+  const pp = String(run.pace || "\\u2014 /km").split(" ");
+  const hrs = String(run.time || "").split(":").length > 2;
+  const out = [];
+  if (run.time) out.push({ key: "time", v: run.time, u: hrs ? "HRS" : "MIN", k: "TIME" });
+  if (Number(run.avgPaceSec) > 0) out.push({ key: "pace", v: pp[0], u: (pp[1] || "/km").toUpperCase(), k: "AVG PACE" });
+  for (const m of runMetricLadder(run, true)) {
+    out.push({ key: m.key, v: m.v, u: String(m.u || "").toUpperCase(), k: m.short });
+  }
+  return out;
+}
+/** The most numbers any of the four templates prints in its supporting row. */
+const SHARE_METRIC_MAX = 3;
+/**
+ * The row this card actually gets: the runner's pick where there is one, the pool's head where there
+ * is not.
+ *
+ * ⚠️ A KEY THAT NO LONGER HAS A VALUE IS DROPPED RATHER THAN PRINTED EMPTY, and a pick that survives to
+ * nothing falls back to the default rather than rendering a card with no row. Neither is reachable
+ * through the studio today — the run cannot change under the picker — but the model is called with
+ * whatever a caller hands it, and "omit and reflow, never show zero" has to hold for all of them.
+ */
+function shareMetricsChosen(run, keys) {
+  const pool = shareMetricPool(run);
+  if (keys && keys.length) {
+    const pick = [];
+    for (const k of keys) { const m = pool.filter((x) => x.key === k)[0]; if (m) pick.push(m); }
+    if (pick.length) return pick.slice(0, SHARE_METRIC_MAX);
+  }
+  return pool.slice(0, SHARE_METRIC_MAX);
+}
 function shareCardModel(run, opt) {
   opt = opt || {};
   const a = runAnalysis(run), v = runVerdict(run, a);
@@ -21314,15 +21867,11 @@ function shareCardModel(run, opt) {
   const states = shareTemplateStates(run, a, pres, opt);
   const distKm = Number(run.distKm) > 0 ? Number(run.distKm) : (parseFloat(dp[0]) > 0 ? parseFloat(dp[0]) : 0);
   // ⚠️ THE THREE SUPPORTING NUMBERS, AND THE THIRD ONE IS THE SHARED LADDER'S TOP RUNG — see
-  // RUN_METRIC_LADDER. The brief asks for time, average pace and elevation, falling back through
-  // average HR, cadence and calories "according to existing relevance rules"; those rules existed
-  // inside the debrief and the card could not reach them. Absent rungs simply do not appear, so a
-  // treadmill run reflows to two columns rather than printing a pace of zero.
-  const metrics = [];
-  if (run.time) metrics.push({ key: "time", v: run.time, u: hrs ? "HRS" : "MIN", k: "TIME" });
-  if (Number(run.avgPaceSec) > 0) metrics.push({ key: "pace", v: pp[0], u: (pp[1] || "/km").toUpperCase(), k: "AVG PACE" });
-  const third = runMetricLadder(run, true)[0];
-  if (third) metrics.push({ key: third.key, v: third.v, u: String(third.u || "").toUpperCase(), k: third.short });
+  // RUN_METRIC_LADDER and shareMetricPool. The brief asks for time, average pace and elevation, falling
+  // back through average HR, cadence and calories "according to existing relevance rules"; those rules
+  // existed inside the debrief and the card could not reach them. Absent rungs simply do not appear, so
+  // a treadmill run reflows to two columns rather than printing a pace of zero.
+  const metrics = shareMetricsChosen(run, opt.metrics);
   // ⚠️ THE TEMPLATE IS RESOLVED ONCE, HERE, because two fields below depend on which one it is and a
   // second call to shareTemplateFor could answer differently the day its tie-breaking changes.
   const tmpl = shareTemplateFor(states, opt.template);
@@ -21395,7 +21944,7 @@ function shareCardModel(run, opt) {
     eligibility: states,
     metrics: metrics,
     // ---- what the current renderer reads ------------------------------------------------------
-    aspect: opt.aspect === "feed" ? "feed" : "story",
+    aspect: shareAspect(opt.aspect),
     title: String(run.t || "My run").toUpperCase(),
     meta: [place, when].filter(Boolean).join(" \\u00b7 "),
     // ⚠️ THE DATE ALONE, FOR THE TEMPLATES, AND IT HONOURS THE SAME SWITCH meta DOES. rdWhenText adds a
@@ -21472,7 +22021,10 @@ function shareCardModel(run, opt) {
     // IGNORE ONE. Two things downstream are gated on m.photo — the topographic ground and the luminance
     // probe — and a poster drawn with a photograph in the model would have the picture and neither the
     // texture nor a solved veil. Deciding it here means there is one gate rather than three.
-    photo: tmpl === "route" ? null : (opt.photo || null),
+    // ⚠️ AND IT CARRIES THIS CARD'S OWN FRAMING, resolved against the template just decided above — see
+    // sharePhotoView. Handing over the raw photograph is what made one crop serve every template and
+    // both aspects, so switching shape silently reframed the runner's picture.
+    photo: tmpl === "route" ? null : sharePhotoView(opt.photo, tmpl, opt.aspect),
   };
 }
 function shareCardCanvas(m, S) {
@@ -21517,8 +22069,24 @@ function shareCaption(run) {
  * cache exists at all.
  */
 function shareKey(run) { return (run.t || "") + "|" + (run.d || "") + "|" + (run.dist || "") + "|" + ((run.route && run.route.length) || 0); }
+/**
+ * EVERY FRAMING THE RUNNER HAS SET, IN ONE STRING.
+ *
+ * ⚠️ ALL OF THEM, NOT ONLY THE VISIBLE ONE, AND THAT IS THE CHEAP-AND-PROVABLY-SAFE CHOICE. The crop is
+ * now indexed by (template, aspect), so naming only the current slot would mean resolving the template
+ * here — a second composition of the three functions shareCardModel already composes, and a chance for
+ * the two to disagree about which card is being keyed. Serialising the whole map can only ever
+ * invalidate MORE than necessary, never less, and in practice never more: only the slot on screen can
+ * be edited, so exactly one entry moves per gesture.
+ */
+function shareCropSig() {
+  const c = (SPHOTO && SPHOTO.crops) || {};
+  return Object.keys(c).sort().map((k) =>
+    k + "=" + c[k].ox.toFixed(3) + "," + c[k].oy.toFixed(3) + "," + c[k].k.toFixed(3) +
+    "," + (c[k].fill ? "fill" : "whole")).join(";");
+}
 function shareCardKey(run) {
-  const ph = SPHOTO ? SPHOTO.id + ":" + SPHOTO.ox.toFixed(3) + ":" + SPHOTO.oy.toFixed(3) + ":" + SPHOTO.k.toFixed(3) : "none";
+  const ph = SPHOTO ? SPHOTO.id + ":" + shareCropSig() : "none";
   let st = "none";
   // ⚠️ THE CONFIDENCE RIDES WITH THE STATE, because it decides whether the verdict badge is drawn at
   // all — and nothing else in this key would move if it changed.
@@ -21534,7 +22102,10 @@ function shareCardKey(run) {
   const pv = (sp.map ? "m" : "") + (sp.ends ? "e" : "") + (sp.loc ? "l" : "") + (sp.date ? "d" : "");
   return shareKey(run) + "|" + pv +
     "|" + ph + "|" + SCARD.aspect + "|" + (shareRouteOn() ? "r" : "") + "|" + st + "|" + (run.place || "") +
-    "|" + (SCARD.template || "");
+    // ⚠️ AND THE CHOSEN NUMBERS. The metrics editor changes which three the supporting row prints, which
+    // is a visible decision — left out, a runner who swapped elevation for heart rate and tapped Share
+    // handed over the previous card, which is the same silent staleness this function's header records.
+    "|" + (SCARD.template || "") + "|" + (SCARD.metrics || []).join(",");
 }
 /**
  * THE PHOTOGRAPH IS SESSION-ONLY, HELD HERE AND NOWHERE ELSE.
@@ -21550,11 +22121,58 @@ let SPHOTO = null, SPHOTO_SEQ = 0;
 // ⚠️ template IS THE RUNNER'S ASK, NOT THE ANSWER. shareTemplateFor decides what is actually drawn,
 // because a template can stop being eligible under the runner's own hands — removing the photograph
 // while The Progression is selected, or hiding the route while The Route Poster is.
-let SCARD = { aspect: "story", template: null, routeOn: null, key: null, file: null, pending: 0 };
+// ⚠️ metrics IS null UNTIL THE RUNNER PICKS, AND null IS NOT AN EMPTY LIST. Absent means "the template's
+// own default three", which is the weeklyVolumeKm lesson applied to a picker: an empty array stored on
+// open would be an answer nobody gave, and it would have to mean something.
+let SCARD = { aspect: "story", template: null, routeOn: null, key: null, file: null, pending: 0, metrics: null };
 // ⚠️ A NULL routeOn MEANS "DECIDE FROM THE PHOTOGRAPH", not "off". A photo card wants the route as a
 // small inset or not at all; a photo-less card is the route.
 function shareRouteOn() { return SCARD.routeOn == null ? !SPHOTO : !!SCARD.routeOn; }
-function shareCardOpts() { return { aspect: SCARD.aspect, template: SCARD.template, routeOn: shareRouteOn(), photo: SPHOTO }; }
+function shareCardOpts() {
+  return { aspect: SCARD.aspect, template: SCARD.template, routeOn: shareRouteOn(),
+           photo: SPHOTO, metrics: SCARD.metrics };
+}
+/**
+ * ONE PHOTOGRAPH, ONE FRAMING PER CARD IT CAN APPEAR ON.
+ *
+ * ⚠️ A SINGLE {ox, oy, k} SHARED BY EVERY TEMPLATE AND BOTH ASPECTS SILENTLY REFRAMED THE RUNNER'S
+ * PHOTOGRAPH. It could not be otherwise: a 9:16 story and a 4:5 feed post crop the same picture along
+ * different edges, so a horizon placed carefully on one lands somewhere else on the other, and the four
+ * templates put their type in four different places, so the space a face has to stay clear of moves too.
+ * Switching Story to Feed to see what it looked like therefore destroyed the framing you had just set,
+ * with nothing to undo it — the spec asks for this in as many words ("Persist crop/zoom separately for
+ * each aspect ratio and photo template").
+ *
+ * ⚠️ THE KEY IS THE RESOLVED TEMPLATE, NEVER THE RUNNER'S ASK. shareTemplateFor can refuse the ask, so a
+ * slot keyed on the ask would be written by a card that is not the card on screen.
+ *
+ * ⚠️ AND THE POSTER HAS NO SLOT BY CONSTRUCTION, because shareCardModel hands it no photograph at all.
+ * shareCropKey still answers for it rather than throwing, so nothing has to remember the exception.
+ */
+const SHARE_CROP0 = { ox: 0.5, oy: 0.5, k: 1, fill: false };
+function shareCropKey(tmpl, aspect) { return (tmpl || "none") + ":" + shareAspect(aspect); }
+/** The framing this card is drawn with. Read-only: absent means centred and unzoomed. */
+function shareCropRead(tmpl, aspect) {
+  const c = SPHOTO && SPHOTO.crops && SPHOTO.crops[shareCropKey(tmpl, aspect)];
+  return c || SHARE_CROP0;
+}
+/** The framing this card is EDITED through, created on first touch. */
+function shareCropWrite(tmpl, aspect) {
+  if (!SPHOTO) return null;
+  const k = shareCropKey(tmpl, aspect);
+  return SPHOTO.crops[k] || (SPHOTO.crops[k] = { ox: 0.5, oy: 0.5, k: 1, fill: false });
+}
+/**
+ * The photograph as ONE card sees it: the same bitmap, this card's own framing.
+ * ⚠️ A FRESH OBJECT, so a renderer cannot write through to the store, and SHARE_CROP0 cannot be mutated
+ * into a new default by anything that treats m.photo as scratch space.
+ */
+function sharePhotoView(photo, tmpl, aspect) {
+  if (!photo) return null;
+  const c = shareCropRead(tmpl, aspect);
+  return { bitmap: photo.bitmap, w: photo.w, h: photo.h, id: photo.id,
+    ox: c.ox, oy: c.oy, k: c.k, fill: !!c.fill };
+}
 const PHOTODIAG = { picked: 0, decoded: "", scaled: "", ms: 0, bytes: 0, encMs: 0, err: "", canShareFiles: null };
 /**
  * Build and encode the card into the cache.
@@ -21674,13 +22292,24 @@ let STUDIO = null;
  *
  * ⚠️ NEVER CAPTURE A NODE INSIDE THE OVERLAY. Re-opening without closing would remember the Cancel
  * button as the place to return to, and closing would then focus a node that no longer exists.
+ *
+ * ⚠️ behind IS WHAT MADE THIS SERVE THREE DIALOGS RATHER THAN TWO. A tool sheet inside the studio has
+ * exactly the same three obligations — focus goes in, focus comes back, everything else is genuinely
+ * inert — but the thing to inert is the studio's own panel, not .app, which is inert already. Passing it
+ * in beats a fourth copy of the rules, which is the drift this function's own header records.
+ *
+ * ⚠️ AND THE RETURN NODE IS READ BEFORE ANYTHING IS INERTED, WHICH IS A FIX. Making an element inert
+ * while it holds focus blurs it, so reading document.activeElement afterwards answered BODY and the
+ * runner was returned to the top of the document instead of to the control they opened the dialog from.
+ * It went unnoticed because an iOS tap does not focus a button, so activeElement was usually BODY
+ * anyway — a keyboard or switch-control user is the one who met it.
  */
-function overlayModal(ov, on, firstSel) {
-  const app = document.querySelector(".app");
+function overlayModal(ov, on, firstSel, behind) {
+  const app = behind || document.querySelector(".app");
+  const was = on ? document.activeElement : null;
   // The overlay is a sibling of .app on document.body, so inerting .app cannot reach the overlay.
   if (app) { try { app.inert = !!on; } catch (e) {} }
   if (on) {
-    const was = document.activeElement;
     if (was && !ov.contains(was)) ov.modalReturn = was;
     // The && is not decoration: querySelector("") THROWS, and the close path passes no selector.
     const first = firstSel && ov.querySelector(firstSel);
@@ -21699,7 +22328,16 @@ function openShareStudio(run) {
     ov = el('<div class="sst-ov" id="shareStudio" role="dialog" aria-modal="true" aria-label="Share your run"></div>');
     // ⚠️ ONE LISTENER, ON THE NODE THAT OUTLIVES EVERY OPEN. Wiring Escape inside studioWire would add
     // a fresh handler on every aspect change, which is how a keydown ends up firing four times.
-    ov.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); closeShareStudio(); } });
+    // ⚠️ AND IT UNWINDS ONE LAYER AT A TIME. Escape closing the whole studio from inside a tool sheet
+    // throws away every edit to answer "shut this panel", which is the one thing the key is for; and
+    // while a photograph is being framed it is the way out of a mode, not out of the editor.
+    ov.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      if (STUDIO && STUDIO.sheet) return studioSheet(null);
+      if (STUDIO && STUDIO.edit) return studioEdit(false);
+      closeShareStudio();
+    });
     // ⚠️ AND THE CLICKS ARE DELEGATED ONTO THE SAME NODE, WHICH IS WHAT MAKES THE PANEL WORK AT ALL.
     // studioSync REBUILDS the photo row, the route row and the Strava row from their builders on every
     // change — and it runs once at open, immediately after the wiring — so a handler assigned to those
@@ -21728,7 +22366,11 @@ function openShareStudio(run) {
   ov.innerHTML = shareStudioHtml(run);
   ov.classList.add("on");
   STUDIO = { run: run, root: ov, canvas: null, drag: null, timer: 0, busy: false,
-             vw: window.innerWidth, vh: window.innerHeight };
+             vw: window.innerWidth, vh: window.innerHeight,
+             // The carousel: which templates are offered, which one is showing, and the slide nodes.
+             model: null, order: [], cards: [], idx: 0, slides: [], slideKey: "",
+             // Framing mode, the open tool sheet, and one session's worth of framing history.
+             edit: false, sheet: null, undo: [] };
   studioWire();
   // ⚠️ MEASURED ONLY AFTER .on, AND ONLY AFTER THE CONTROL ROWS EXIST. While the overlay is hidden
   // every box measures 0, and a fallback constant is what made the avatar cropper save an off-centre
@@ -21748,52 +22390,164 @@ function closeShareStudio() {
   // bitmap left resident is a bitmap redrawn by the finish screen's own Share button.
   if (SPHOTO && SPHOTO.bitmap && SPHOTO.bitmap.close) { try { SPHOTO.bitmap.close(); } catch (e) {} }
   SPHOTO = null; SCARD.routeOn = null; SCARD.key = null; SCARD.file = null;
+  // ⚠️ THE TEMPLATE AND THE CHOSEN NUMBERS GO WITH IT, because the spec's own rule is that a metric pick
+  // persists "for that card export, not globally" — and the template is resolved from a run's own
+  // eligibility, so carrying last run's ask into the next one is an ask that may make no sense there.
+  SCARD.template = null; SCARD.metrics = null;
   STUDIO = null;
 }
+/**
+ * THE PRIMARY SCREEN, AND EVERYTHING ELSE IS A SHEET.
+ *
+ * ⚠️ THE SPEC FORBIDS THE SHAPE THIS REPLACED IN AS MANY WORDS: "Do not show all toggles in one long
+ * settings page while shrinking the preview to a postage stamp." The old panel put the shape chips, the
+ * photo buttons, the route switch, four privacy switches and the Strava block in one scroller under the
+ * card, so the thing being edited competed for height with nine controls that are each looked at once.
+ * The five tools named by the spec — Photo, Route, Metrics, Style, Privacy — each open a sheet over the
+ * preview instead, which costs one tap and buys the whole viewport.
+ *
+ * ⚠️ THE FILE INPUT IS OUTSIDE .sst-body, AND THAT IS NOT TIDINESS. A sheet makes the panel behind it
+ * inert (see studioSheet), and "Change photo" lives IN a sheet — so an input inside the panel would be
+ * inert at the exact moment the runner asks for the picker. It stays display:none, the way the other
+ * three pickers in this app do it, for the reasons the old comment recorded: unstyled it renders as the
+ * browser's own grey control, and aria-hidden on a visible input is the wrong way round.
+ */
 function shareStudioHtml(run) {
-  const strava = stravaRunButtonHtml(run);
   return '<div class="sst-bar">' +
       '<button class="sst-cancel" data-sst="cancel">Cancel</button>' +
       '<div class="sst-t">Share your run</div>' +
     '</div>' +
-    '<div class="sst-body">' +
-      '<div class="sst-stagewrap"><div class="sst-stage" data-sst-stage>' +
+    '<div class="sst-body" data-sst-panel>' +
+      '<div class="sst-stagewrap"><div class="sst-stage" data-sst-stage role="img" aria-label="Your card">' +
+        '<div class="sst-track" data-sst-track></div>' +
         '<div class="sst-busy" data-sst-busy></div></div></div>' +
-      '<div class="sst-hint" data-sst-hint></div>' +
-      '<div class="ui-eyebrow">Shape</div>' +
-      '<div class="sst-chips">' +
+      '<div class="sst-pos" data-sst-pos></div>' +
+      '<div class="sst-chips" role="group" aria-label="Card shape">' +
         '<button class="ui-pill sst-chip" data-sst-aspect="story">Story 9:16</button>' +
         '<button class="ui-pill sst-chip" data-sst-aspect="feed">Feed 4:5</button>' +
+        '<button class="ui-pill sst-chip" data-sst-aspect="square">Square 1:1</button>' +
       '</div>' +
-      '<div class="ui-eyebrow">Photo</div>' +
-      '<div data-sst-photo></div>' +
-      // ⚠️ display:none, THE WAY THE OTHER THREE PICKERS IN THIS APP DO IT. Left unstyled it renders
-      // as the browser's own grey "Choose file / No file chosen" control — measured 303x24 at full
-      // opacity in both themes, sitting under the button that exists to replace it, and it was the
-      // whole reason the panel overflowed (28px of overflow with it, 3px without). It also carried
-      // aria-hidden, which is the wrong way round: hidden from assistive tech, visible to eyes.
-      // A display:none input is out of the accessibility tree and the tab order already.
-      '<input type="file" accept="image/*" style="display:none" data-sst-file>' +
-      '<div class="ui-eyebrow">On the card</div>' +
-      '<div data-sst-route></div>' +
-      '<div data-sst-priv></div>' +
-      '<div class="act-pair">' +
-        '<button class="ap-yes" data-sst="share">Share</button>' +
-        '<button class="ap-no" data-sst="save">Save to device</button>' +
+      '<div class="sst-tools" role="group" aria-label="Edit tools" data-sst-tools></div>' +
+      // ⚠️ THIS BLOCK IS WHAT studioStageHeight KEEPS ON SCREEN, so it is one node with a hook on it.
+      // The old measurement anchored on the photo row, which has moved into a sheet — and a reserve
+      // measured against something that is no longer on the primary screen is a reserve of zero.
+      '<div data-sst-keep>' +
+        '<div class="act-pair"><button class="ap-yes" data-sst="dest">Share this card</button></div>' +
+        '<div class="sst-why" data-sst-why aria-live="polite"></div>' +
       '</div>' +
-      '<div class="sst-why" data-sst-why></div>' +
-      // ⚠️ THE WRAPPER IS CONDITIONAL AND ITS CONTENTS ARE REBUILT. It carries a top border and a
-      // rule of its own, so rendering it empty for the far more common not-connected runner draws a
-      // divider under nothing — but its INSIDE has to be re-derived after a send, or the button still
-      // reads "Send to Strava" once the run is on Strava. stravaRunButtonHtml is the one place that
-      // state is written, exactly as the finish screen's own comment requires.
-      (strava ? '<div class="sst-strava" data-sst-strava>' + strava +
-        '<p class="sst-sr">Sends the run itself, not this card.</p></div>' : "") +
+    '</div>' +
+    '<input type="file" accept="image/*" style="display:none" data-sst-file>' +
+    '<div class="sst-sheet" data-sst-sheet>' +
+      '<div class="sst-sheetin" data-sst-sheetin role="group" aria-label="Options"></div>' +
     '</div>' +
     // The home-indicator probe, a SIBLING of the scroller rather than inside it. See .sst-safe:
     // studioStageHeight measures it because JS cannot read env(). Out of flow either way, but outside
     // the scroller there is no question of it contributing to anything scrollable.
     '<i class="sst-safe" data-sst-safe aria-hidden="true"></i>';
+}
+/** The slide is 86% of the stage, so about 6% of each neighbour shows in the gutters. */
+const SST_SLIDE = 0.86;
+/**
+ * ⚠️ THREE LIVE CANVASES, AND THE NEIGHBOURS ARE DRAWN SMALLER FOR THE SAME REASON THE CURRENT ONE IS
+ * DRAWN AT A HALF. The backing store is what stays resident: a story card is 2.07 MB of RGBA at 0.5 and
+ * 0.92 MB at a third, so peeking costs 1.84 MB rather than 4.15 MB. A neighbour occupies about 6% of the
+ * stage until a finger starts moving, and it is remounted at the full preview scale the moment it
+ * becomes the selected card, so the softness is never on the card being edited.
+ */
+const SST_CUR = 0.5, SST_NEIGH = 1 / 3;
+/** How far a swipe has to travel before it counts as a page turn. */
+const SST_PAGE_FRAC = 0.22;
+/**
+ * ⚠️ BOUNDED, BECAUSE A DRAG IS A CONTINUOUS GESTURE AND EVERY ONE OF THEM PUSHES. Twelve is far more
+ * than a runner reaches for and cannot grow without limit inside one open of the studio; the whole stack
+ * dies with the studio, as the photograph itself does.
+ */
+const SST_UNDO_MAX = 12;
+const SST_TOOLS = [
+  { id: "photo", label: "Photo", title: "Photo" },
+  { id: "route", label: "Route", title: "The route on this card" },
+  { id: "metrics", label: "Metrics", title: "Which numbers" },
+  { id: "style", label: "Style", title: "Card style" },
+  { id: "privacy", label: "Privacy", title: "What this card says" },
+];
+const SST_SHEET_TITLE = { dest: "Where would you like it?" };
+/**
+ * THE POSITION ROW — WHICH CARD OF HOW MANY, IN WORDS AND IN DOTS, OR THE FRAMING CONTROLS.
+ *
+ * ⚠️ ONE ROW WITH TWO STATES RATHER THAN TWO ROWS. While a photograph is being framed the carousel is
+ * not pageable — a horizontal drag means "move the picture" — so a live-looking pair of arrows there
+ * would be the looks-live-does-nothing defect this project has shipped three times. The row becomes what
+ * it can honestly offer: undo, what the gestures do, and the way out.
+ *
+ * ⚠️ THE DOTS ARE aria-hidden AND THE COUNT IS THE REAL ANNOUNCEMENT. A screen reader given six unnamed
+ * dots learns nothing; "The Moment, 1 of 3" is the page position the spec asks to be clear.
+ */
+function studioPosHtml() {
+  if (STUDIO.edit) {
+    const noUndo = !STUDIO.undo.length;
+    return '<button class="sst-arrow sst-wide" data-sst="undo"' + (noUndo ? " disabled" : "") +
+        ' aria-label="Undo the last move">Undo</button>' +
+      '<div class="sst-posmid"><div class="sst-posname">Framing your photo</div>' +
+        '<div class="sst-poscount">Drag to move, pinch to zoom</div></div>' +
+      '<button class="sst-arrow sst-wide" data-sst="editoff">Done</button>';
+  }
+  const n = STUDIO.order.length, i = STUDIO.idx;
+  const name = n ? (SHARE_TEMPLATE_LABEL[STUDIO.order[i]] || "") : "No card yet";
+  const count = n > 1 ? (i + 1) + " of " + n + " styles" : n === 1 ? "The only style this run fits"
+    : "Add a photo to choose a style";
+  const dots = [];
+  for (let d = 0; d < n; d++) dots.push('<i class="sst-dot' + (d === i ? " on" : "") + '"></i>');
+  return '<button class="sst-arrow" data-sst="prev"' + (i <= 0 ? " disabled" : "") +
+      ' aria-label="Previous card style">\\u2039</button>' +
+    '<div class="sst-posmid">' +
+      (n > 1 ? '<div class="sst-dots" aria-hidden="true">' + dots.join("") + '</div>' : "") +
+      '<div class="sst-posname">' + esc(name) + '</div>' +
+      '<div class="sst-poscount">' + esc(count) + '</div>' +
+    '</div>' +
+    '<button class="sst-arrow" data-sst="next"' + (i >= n - 1 ? " disabled" : "") +
+      ' aria-label="Next card style">\\u203a</button>';
+}
+/** Which tools are holding a choice the runner made, so the row shows where they have been. */
+function studioToolSet(id) {
+  if (id === "photo") return !!SPHOTO;
+  if (id === "metrics") return !!(SCARD.metrics && SCARD.metrics.length);
+  if (id === "route") return SCARD.routeOn != null;
+  return false;
+}
+function studioToolsHtml() {
+  return SST_TOOLS.map((t) =>
+    '<button class="sst-tool' + (STUDIO.sheet === t.id ? " on" : "") +
+      (studioToolSet(t.id) ? " set" : "") + '" data-ssttool="' + t.id + '"' +
+      ' aria-expanded="' + (STUDIO.sheet === t.id ? "true" : "false") + '">' + esc(t.label) + '</button>').join("");
+}
+/**
+ * WHAT A SCREEN READER IS TOLD THE CARD SAYS.
+ *
+ * ⚠️ IT IS BUILT FROM THE MODEL, WHICH IS WHAT MAKES IT SAFE. Every privacy switch has already been
+ * applied by the time these fields exist — dateLabel is empty when the date is hidden, coarseLocation
+ * absent when the place is, pill null on a pain-flagged run — so the spec's rule that hidden metadata
+ * may not appear in an accessibility label is kept by construction rather than by a second set of gates.
+ * A label assembled from the RUN would have leaked all three.
+ *
+ * ⚠️ THE THREE NUMBERS COME FROM stats, NOT FROM metrics. stats is distance, time and average pace: the
+ * canonical facts of the run, unaffected by which supporting numbers the Metrics tool has chosen. Read
+ * from metrics, deselecting the clock would have removed the run's duration from the description of a
+ * card that still prints it.
+ */
+function shareAriaSummary(m) {
+  const bits = [];
+  bits.push(SHARE_TEMPLATE_LABEL[m.template] || "No card yet \\u2014 add a photo");
+  bits.push(m.aspect === "feed" ? "Feed, four by five"
+    : m.aspect === "square" ? "Square, one by one" : "Story, nine by sixteen");
+  if (m.sessionLabel) bits.push(m.sessionLabel);
+  if (m.coarseLocation) bits.push(m.coarseLocation);
+  if (m.dateLabel) bits.push(m.dateLabel);
+  for (const s of (m.stats || [])) bits.push(s.k.toLowerCase() + " " + s.v + " " + (s.u || "").toLowerCase());
+  if (m.pill) bits.push(m.pill.text);
+  if (m.progression) bits.push(m.progression.claim);
+  bits.push(m.route ? ("route drawn" + (m.privacy && m.privacy.ends ? ", start and finish hidden" : ""))
+    : "no route on this card");
+  return bits.filter(Boolean).join(". ") + ".";
 }
 /**
  * WHAT THIS ONE CARD IS ALLOWED TO SAY — FOUR SWITCHES, PER RUN.
@@ -21831,11 +22585,32 @@ function studioSwitch(key, label, on) {
     '" aria-label="' + esc(label) + '"><span class="rm-knob"></span></button></div>' +
     (locked ? '<p class="sst-note">Your Route privacy setting hides this on every run. Change it on the run\\u2019s own page.</p>' : "");
 }
+/**
+ * ⚠️ Reset AND Undo ARE ONLY RENDERED WHEN THERE IS A PHOTOGRAPH TO FRAME, and Undo is genuinely
+ * disabled with nothing on the stack. The spec asks for "Undo/Reset for manual photo and layout
+ * changes"; two controls that exist while there is nothing to undo are two dead buttons.
+ */
 function studioPhotoHtml() {
-  return SPHOTO
-    ? '<div class="act-pair"><button class="ap-yes" data-sst="pick">Change photo</button>' +
-      '<button class="ap-no" data-sst="drop">Remove photo</button></div>'
-    : '<button class="mini-btn wide-btn" data-sst="pick">Add a photo</button>';
+  if (!SPHOTO) return '<button class="mini-btn wide-btn" data-sst="pick">Add a photo</button>';
+  const noUndo = !(STUDIO && STUDIO.undo.length);
+  // ⚠️ THE STATE IS READ FROM THE SLOT THIS CARD IS DRAWN WITH, not from a variable of its own. The fit
+  // is per (template, aspect), so a switch holding its own copy would show the previous card's answer
+  // for one render after every swipe — and a switch that disagrees with the picture beside it is worse
+  // than no switch.
+  const fit = shareCropRead(STUDIO && STUDIO.model && STUDIO.model.template, SCARD.aspect);
+  const fill = !!fit.fill;
+  return '<div class="act-pair"><button class="ap-yes" data-sst="pick">Change photo</button>' +
+    '<button class="ap-no" data-sst="drop">Remove photo</button></div>' +
+    '<div class="zr-auto"><span>Fill the card</span>' +
+    '<button class="rm-switch' + (fill ? " on" : "") + '" data-sst="fit" role="switch"' +
+    ' aria-checked="' + (fill ? "true" : "false") +
+    '" aria-label="Fill the card"><span class="rm-knob"></span></button></div>' +
+    '<p class="sst-note">Off, your whole photo is shown and a soft blurred copy of it fills the rest of ' +
+    'the card. On, it is zoomed to the edges, which crops the sides.</p>' +
+    '<div class="act-pair"><button class="ap-no" data-sst="reset">Reset framing</button>' +
+    '<button class="ap-no" data-sst="undo"' + (noUndo ? " disabled" : "") + '>Undo last move</button></div>' +
+    '<p class="sst-note">Drag the card to move your photo, pinch to zoom, double-tap to reset. ' +
+    'Each style and each shape keeps its own framing, so switching one never disturbs another.</p>';
 }
 function studioRouteHtml(run) {
   const hidden = runRoutePresentation(run).hidden;
@@ -21856,10 +22631,181 @@ function studioRouteHtml(run) {
     '<button class="rm-switch' + (on ? " on" : "") + '" data-sst="route" role="switch"' +
     (off ? ' aria-disabled="true" disabled' : "") +
     ' aria-checked="' + (on ? "true" : "false") + '" aria-label="Show my route"><span class="rm-knob"></span></button></div>' +
-    (why ? '<p class="sst-note">' + why + '</p>' : "");
+    (why ? '<p class="sst-note">' + why + '</p>' : "") +
+    // ⚠️ THE POSTER IGNORES THIS SWITCH, AND IT SAYS SO RATHER THAN LOOKING BROKEN. shareCardModel draws
+    // the route whenever the template IS the route, because a poster with the route switched off is an
+    // empty ground; a switch reading "off" over a card that plainly shows a route is the app
+    // contradicting itself about what the runner just asked for.
+    (STUDIO && STUDIO.model && STUDIO.model.template === "route"
+      ? '<p class="sst-note">On The Route Poster the route is the card, so it is always drawn. This switch decides the small inset on the photo styles.</p>' : "");
 }
 /**
- * HOW TALL THE STAGE IS, DERIVED FROM HOW WIDE IT IS — CAPPED BY THE ROOM THE PHOTO BUTTON NEEDS.
+ * WHICH NUMBERS THIS CARD CARRIES — ONLY THE ONES THE RUN ACTUALLY RECORDED, AT MOST THREE.
+ *
+ * ⚠️ THE CHIPS THAT CANNOT BE TAPPED ARE DISABLED RATHER THAN REFUSED ON TAP. With three already chosen
+ * the fourth cannot go on, and with one left it cannot come off — and a chip that accepts the tap and
+ * then does nothing is the defect class this project has shipped three times. The rule is also stated in
+ * words above them, because a disabled control on its own tells the runner the app is broken.
+ *
+ * ⚠️ THE POOL IS shareMetricPool, SO RPE IS UNREACHABLE. See that function: the effort rating is
+ * something the runner told the app about themselves and it never reaches a picture that leaves the phone.
+ *
+ * ⚠️ AND TWO OF THE FOUR TEMPLATES DO NOT USE THIS ROW AT ALL, WHICH IS SAID PLAINLY. The Execution and
+ * The Progression print distance, time and average pace under a hero that is the verdict or the
+ * progression headline — read straight off references 02 and 04, and recorded at shareRowMetrics. Letting
+ * the picker appear to govern them would be a control that looks live over a card it cannot change.
+ */
+function studioMetricsHtml(run) {
+  const pool = shareMetricPool(run);
+  const chosen = shareMetricsChosen(run, SCARD.metrics).map((x) => x.key);
+  const full = chosen.length >= SHARE_METRIC_MAX, last = chosen.length <= 1;
+  const chips = pool.map((m) => {
+    const on = chosen.indexOf(m.key) >= 0;
+    const dead = on ? last : full;
+    return '<button class="sst-met' + (on ? " on" : "") + '" data-sstmet="' + m.key + '"' +
+      (dead ? ' aria-disabled="true" disabled' : "") + ' aria-pressed="' + (on ? "true" : "false") + '">' +
+      esc(m.k) + " " + esc(m.v) + (m.u ? " " + esc(m.u.toLowerCase()) : "") + '</button>';
+  });
+  const tmpl = STUDIO && STUDIO.model ? STUDIO.model.template : null;
+  const fixed = tmpl === "execution" || tmpl === "progression";
+  // ⚠️ A CHIP THAT IS ON AND DOES NOT APPEAR NEEDS SAYING OUT LOUD. The square carries two numbers by
+  // the contract's own instruction, and the third is KEPT rather than forgotten — so the honest line is
+  // that it comes back on the other two shapes, not that it was refused.
+  const cap = shareMetricCap(SCARD.aspect);
+  const capped = cap < SHARE_METRIC_MAX && chosen.length > cap;
+  return '<p class="sst-note">Up to ' + SHARE_METRIC_MAX + ', and only what this run recorded. ' +
+      'This card keeps them for this export only.</p>' +
+    (capped ? '<p class="sst-note">A square card carries ' + cap +
+      ', so the last one waits for Story or Feed rather than being dropped.</p>' : "") +
+    '<div class="sst-mets" data-sst-mets>' + (chips.length ? chips.join("") :
+      '<p class="sst-note">This run recorded no supporting numbers, so the card shows its distance alone.</p>') + '</div>' +
+    (SCARD.metrics && SCARD.metrics.length
+      ? '<div class="act-pair"><button class="ap-no" data-sst="metdef">Back to the usual three</button></div>' : "") +
+    (fixed ? '<p class="sst-note">' + esc(SHARE_TEMPLATE_LABEL[tmpl]) + ' prints distance, time and average pace, ' +
+      'because its headline is the verdict rather than the distance. Your pick applies to The Moment and The Route Poster.</p>' : "");
+}
+/**
+ * EVERY STYLE, INCLUDING THE ONES THIS RUN CANNOT HAVE AND WHY NOT.
+ *
+ * ⚠️ THE CAROUSEL CARRIES THE ELIGIBLE ONES; THIS CARRIES ALL FOUR. Both halves of the spec's own
+ * instruction — "ineligible templates are hidden or clearly explain what is required" — rather than one:
+ * a swipe through a card that cannot be drawn is a dead page, and hiding a style with no explanation
+ * anywhere means a runner never learns that The Route Poster exists or that a photograph would unlock
+ * three of them. Hidden from the swipe, stated here.
+ *
+ * ⚠️ AN INELIGIBLE ROW IS A div WITH aria-disabled, NEVER A BUTTON. That is the rule
+ * test/design-system.test.ts already enforces on plan session rows, for this exact reason: a button that
+ * silently does nothing is worse than a row that plainly cannot be chosen.
+ */
+function studioStyleHtml() {
+  const m = STUDIO.model, st = (m && m.eligibility) || {};
+  const rows = SHARE_TEMPLATES.map((id) => {
+    const s = st[id] || { ok: false, why: "" };
+    const name = esc(SHARE_TEMPLATE_LABEL[id]);
+    if (!s.ok) {
+      return '<div class="sst-row" aria-disabled="true"><b>' + name + '</b>' +
+        '<span>' + esc(s.why || "Not available for this run.") + '</span></div>';
+    }
+    const sel = m && m.template === id;
+    return '<button class="sst-row' + (sel ? " on" : "") + '" data-ssttmpl="' + id + '"' +
+      ' aria-pressed="' + (sel ? "true" : "false") + '"><b>' + name + '</b>' +
+      '<span>' + esc(SHARE_TEMPLATE_BLURB[id]) + (sel ? " \\u00b7 Showing now" : "") + '</span></button>';
+  });
+  return '<div class="sst-rows">' + rows.join("") + '</div>';
+}
+/** One line each, so a name on its own does not have to carry what the card is for. */
+const SHARE_TEMPLATE_BLURB = {
+  moment: "Your photograph, the distance, and the coach's read.",
+  execution: "How the run went against the pace it was set.",
+  progression: "Your kilometres as a ladder, and what they show.",
+  route: "The shape of the run as the artwork. No photograph.",
+};
+/**
+ * ONE DESTINATION SHEET, AND NOT ONE THIRD-PARTY APP IS NAMED AS A DESTINATION.
+ *
+ * ⚠️ INSTAGRAM IS DELIBERATELY ABSENT AND THE SHEET SAYS WHERE IT IS. A direct Instagram Story handoff
+ * needs a URL scheme in LSApplicationQueriesSchemes and there is no such entry in the app's plist, so a
+ * row labelled "Instagram Story" would be a button that cannot work until somebody rebuilds in Xcode —
+ * and the spec's own rule is "do not hard-code third-party apps as guaranteed installed destinations.
+ * Keep one system-compatible fallback." The system share sheet is that fallback, it is always offered,
+ * and the note tells the runner their apps are inside it rather than leaving them to wonder.
+ *
+ * ⚠️ STRAVA IS OFFERED ONLY WHERE THE EXISTING PRODUCT ALREADY ALLOWS IT, and it is the SAME builder the
+ * finish screen uses (stravaRunButtonHtml), which returns nothing at all for a runner who is not
+ * connected. Nothing here decides whether Strava is available; it asks.
+ *
+ * ⚠️ AND IT SENDS THE RUN, NOT THE PICTURE. Strava's API takes an activity; the caption under the row
+ * says so, because a destination sheet that quietly means something different by "send" is a trap.
+ */
+function studioDestHtml(run) {
+  const strava = stravaRunButtonHtml(run);
+  return '<div class="sst-rows">' +
+      '<button class="sst-row" data-sst="share"><b>Apps and messages</b>' +
+        '<span>Opens your phone\\u2019s own share sheet.</span></button>' +
+      '<button class="sst-row" data-sst="save"><b>Save to device</b>' +
+        '<span>Keeps the picture, then send it whenever you like.</span></button>' +
+    '</div>' +
+    (strava ? '<div class="sst-strava" data-sst-strava>' + strava +
+      '<p class="sst-sr">Sends the run itself, not this card.</p></div>' : "") +
+    '<p class="sst-note">Instagram, WhatsApp and the rest live inside your phone\\u2019s own share sheet \\u2014 ' +
+    'Inte-Run does not assume any of them are installed.</p>';
+}
+/**
+ * The sheet a tool opens, or the destinations. One dispatch, so a new tool cannot forget its header.
+ *
+ * ⚠️ EVERY BODY IS AN EMPTY HOOK FILLED BY studioSyncRows, NOT MARKUP WRITTEN HERE. Its state can change
+ * while the sheet is open — turning the route off makes the poster ineligible, so the Style list has to
+ * restate itself — and a builder called once at open cannot say so. It also means there is exactly one
+ * place each row is produced, which is why the delegated click handler can never go stale against it.
+ */
+function studioSheetHtml(id) {
+  const t = SST_TOOLS.filter((x) => x.id === id)[0];
+  const title = (t && t.title) || SST_SHEET_TITLE[id] || "Options";
+  const body = id === "photo" ? '<div data-sst-photo></div>'
+    : id === "route" ? '<div data-sst-route></div>'
+    : id === "metrics" ? '<div data-sst-metwrap></div>'
+    : id === "style" ? '<div data-sst-stylewrap></div>'
+    : id === "privacy" ? '<div data-sst-priv></div>'
+    : id === "dest" ? '<div data-sst-destwrap></div>'
+    : "";
+  return '<div class="sst-sheeth"><h3>' + esc(title) + '</h3>' +
+    '<button class="sst-done" data-sst="sheetoff">Done</button></div>' + body;
+}
+/**
+ * OPEN OR CLOSE A SHEET.
+ *
+ * ⚠️ THE PANEL BEHIND IT IS MADE INERT, THROUGH THE SAME HELPER THE TWO FULL-SCREEN DIALOGS USE. A sheet
+ * that only paints over the panel leaves every control under it in the tab order, so a keyboard user
+ * tabs straight out of the sheet into the carousel arrows they can no longer see — which is the promise
+ * overlayModal exists to keep, and writing a second copy of the rules here is how the first two drifted.
+ */
+function studioSheet(id) {
+  if (!STUDIO) return;
+  const root = STUDIO.root;
+  const sh = root.querySelector("[data-sst-sheet]"), inn = root.querySelector("[data-sst-sheetin]");
+  const panel = root.querySelector("[data-sst-panel]");
+  if (!sh || !inn) return;
+  // ⚠️ FRAMING AND A SHEET CANNOT BOTH BE ON. The gestures belong to the photograph while framing, and
+  // the sheet covers the card they act on.
+  if (id && STUDIO.edit) studioEdit(false);
+  STUDIO.sheet = id || null;
+  if (id) {
+    inn.innerHTML = studioSheetHtml(id);
+    const t = SST_TOOLS.filter((x) => x.id === id)[0];
+    inn.setAttribute("aria-label", (t && t.title) || SST_SHEET_TITLE[id] || "Options");
+    sh.classList.add("on");
+    studioSyncRows();
+    overlayModal(sh, true, ".sst-done", panel);
+  } else {
+    sh.classList.remove("on");
+    overlayModal(sh, false, "", panel);
+    inn.innerHTML = "";
+  }
+  const tools = root.querySelector("[data-sst-tools]");
+  if (tools) tools.innerHTML = studioToolsHtml();
+}
+/**
+ * HOW TALL THE STAGE IS, DERIVED FROM HOW WIDE IT IS — CAPPED BY THE ROOM THE PRIMARY ACTION NEEDS.
  *
  * ⚠️ THE THING BEING EDITED WAS THE SMALLEST THING ON THE SCREEN. Sized by height, the stage left the
  * 9:16 card at 70.7% of a 430pt screen and 57.8% of a 320pt one, with 47px of empty stage either side,
@@ -21888,60 +22834,143 @@ function studioStageHeight(st, gm) {
   if (!wrap || !wrap.classList || !wrap.classList.contains("sst-stagewrap")) return;
   const availW = st.clientWidth;
   if (!availW) return;   // hidden: leave the CSS floor alone rather than latching a zero
-  const keep = STUDIO.root.querySelector("[data-sst-photo]");
+  // ⚠️ THE CARD IS SST_SLIDE OF THE STAGE, NOT ALL OF IT, and the height has to follow or the wrap is
+  // taller than the card it holds and the peeking neighbours sit in a band of empty stage. The gutters
+  // are where the adjacent cards show; they are not slack.
+  const cardW = availW * SST_SLIDE;
+  const keep = STUDIO.root.querySelector("[data-sst-keep]");
   const below = keep ? Math.max(0, keep.offsetTop + keep.offsetHeight - (wrap.offsetTop + wrap.offsetHeight)) : 0;
   const safe = STUDIO.root.querySelector("[data-sst-safe]");
   const room = (window.innerHeight || 0) - wrap.offsetTop - below - (safe ? safe.offsetHeight : 0);
-  const h = Math.max(210, Math.min(availW * gm.H / gm.W, room));
+  const h = Math.max(210, Math.min(cardW * gm.H / gm.W, room));
   wrap.style.height = Math.round(h) + "px";
+  // ⚠️ AND THE SLIDE IS PUBLISHED FROM THE CARD'S REAL WIDTH — see .sst-slide for the measurement. When
+  // the height cap binds, the card is narrower than SST_SLIDE allowed; a slide left at the allowance
+  // pushes the neighbour's card off the stage and leaves its empty half in the gutter. Deriving the slide
+  // from the card is what keeps the peek on every screen, and it is not circular: the allowance decides
+  // the height, the height decides the real width, and the real width decides the slide.
+  STUDIO.slideW = Math.min(cardW, h * gm.W / gm.H);
+  st.style.setProperty("--sstslide", Math.round(STUDIO.slideW) + "px");
 }
-/** Put the real canvas in the stage. Called on open and whenever the aspect changes its shape. */
+/**
+ * WHICH TEMPLATE EACH SLIDE DRAWS, IN THE MODEL'S OWN ORDER.
+ * ⚠️ null IS A REAL ENTRY AND NOT AN ERROR: a treadmill run with no photograph chosen yet fits none of
+ * the four, and the stage still has to show something — sharePlaceholderCard, which says what is missing.
+ */
+function studioCards() { return STUDIO.order.length ? STUDIO.order.slice() : [null]; }
+/** The model for ONE slide. The template is asked for explicitly, so a neighbour draws itself. */
+function studioModelFor(tmpl) {
+  const o = shareCardOpts(); o.template = tmpl;
+  return shareCardModel(STUDIO.run, o);
+}
+/**
+ * BUILD THE SLIDES, SIZE THEM, AND DRAW THE THREE THAT CAN BE SEEN.
+ *
+ * ⚠️ ONLY THE SELECTED CARD AND ITS TWO NEIGHBOURS HOLD A CANVAS. Four story cards at the preview scale
+ * would be 8.3 MB of resident RGBA on a device whose web view is jetsammed without warning when it goes
+ * over; the ones out of reach are dropped and their backing store zeroed, because removing a node does
+ * not free the bitmap it held until the collector gets to it.
+ *
+ * ⚠️ AND THE DISPLAY SIZE COMES FROM THE SLIDE, NOT THE STAGE. The slide is the box the card lives in;
+ * measuring the stage would size every card to the full width and the peek would disappear.
+ */
 function studioMount() {
-  const st = STUDIO.root.querySelector("[data-sst-stage]"); if (!st) return;
-  const m = shareCardModel(STUDIO.run, shareCardOpts());
-  const gm = shareCanvasGeom(m.aspect);
+  const root = STUDIO.root;
+  const st = root.querySelector("[data-sst-stage]"), tr = root.querySelector("[data-sst-track]");
+  if (!st || !tr) return;
+  const gm = shareCanvasGeom(SCARD.aspect);
   studioStageHeight(st, gm);
-  if (!STUDIO.canvas) {
-    STUDIO.canvas = document.createElement("canvas");
-    STUDIO.canvas.className = "sst-cv";
-    st.insertBefore(STUDIO.canvas, st.firstChild);
+  const cards = STUDIO.cards;
+  const key = cards.map((c) => c || "none").join(",");
+  if (STUDIO.slideKey !== key) {
+    STUDIO.slideKey = key;
+    tr.innerHTML = "";
+    STUDIO.slides = cards.map(() => { const d = el('<div class="sst-slide"></div>'); tr.appendChild(d); return d; });
   }
-  // ⚠️ S = 0.5 IS A MEMORY DECISION, NOT A SPEED ONE. A full draw measures under three milliseconds;
-  // the backing store is 2.07 MB of RGBA at a half against 8.3 MB at full size, and that buffer is
-  // redrawn on every frame of a pinch.
-  STUDIO.canvas.width = Math.round(gm.W * 0.5);
-  STUDIO.canvas.height = Math.round(gm.H * 0.5);
-  // ⚠️ THE DISPLAY SIZE IS SET FROM THE MEASURED STAGE, NOT LEFT TO width:100%. The two aspects have
-  // different shapes, so a percentage width makes the taller one overflow its box and the shorter one
-  // leave a hole. clientWidth/clientHeight are the content box, and this only runs once the overlay
-  // has .on — measured while it is hidden they read 0, which is what made the avatar cropper save an
-  // off-centre crop.
-  const bw = st.clientWidth || 320, bh = st.clientHeight || 380;
-  const k = Math.min(bw / gm.W, bh / gm.H);
-  STUDIO.canvas.style.width = Math.round(gm.W * k) + "px";
-  STUDIO.canvas.style.height = Math.round(gm.H * k) + "px";
-  studioPaint("high");
+  for (let i = 0; i < STUDIO.slides.length; i++) {
+    const slide = STUDIO.slides[i];
+    slide.classList.toggle("on", i === STUDIO.idx);
+    const cv = slide.querySelector("canvas");
+    if (Math.abs(i - STUDIO.idx) > 1) {
+      if (cv) { cv.width = 0; cv.height = 0; cv.remove(); }
+      continue;
+    }
+    const c = cv || el('<canvas class="sst-cv"></canvas>');
+    if (!cv) slide.appendChild(c);
+    const S = i === STUDIO.idx ? SST_CUR : SST_NEIGH;
+    c.width = Math.round(gm.W * S); c.height = Math.round(gm.H * S);
+    const bw = slide.clientWidth || Math.round((st.clientWidth || 320) * SST_SLIDE);
+    const bh = slide.clientHeight || 380;
+    const k = Math.min(bw / gm.W, bh / gm.H);
+    c.style.width = Math.round(gm.W * k) + "px";
+    c.style.height = Math.round(gm.H * k) + "px";
+    studioPaintSlide(i, "high");
+  }
+  STUDIO.canvas = STUDIO.slides[STUDIO.idx] ? STUDIO.slides[STUDIO.idx].querySelector("canvas") : null;
+  studioTrackPos(0);
 }
-function studioPaint(quality) {
-  if (!STUDIO || !STUDIO.canvas) return;
-  const g = STUDIO.canvas.getContext("2d");
+/**
+ * ⚠️ THE SCALE IS READ BACK OFF THE CANVAS RATHER THAN PASSED IN. The neighbours and the selected card
+ * are drawn at different scales and studioMount is the only thing that decides which; a second constant
+ * here would put a half-scale drawing into a third-scale buffer the day the selection moves.
+ */
+function studioPaintSlide(i, quality) {
+  if (!STUDIO || !STUDIO.slides[i]) return;
+  const cv = STUDIO.slides[i].querySelector("canvas"); if (!cv || !cv.width) return;
+  const gm = shareCanvasGeom(SCARD.aspect);
+  const S = cv.width / gm.W;
+  const g = cv.getContext("2d");
   g.setTransform(1, 0, 0, 1, 0, 0);
-  g.clearRect(0, 0, STUDIO.canvas.width, STUDIO.canvas.height);
+  g.clearRect(0, 0, cv.width, cv.height);
   g.imageSmoothingEnabled = true;
   g.imageSmoothingQuality = quality || "high";
-  try { drawShareCard(g, shareCardModel(STUDIO.run, shareCardOpts()), 0.5); }
+  try { drawShareCard(g, studioModelFor(STUDIO.cards[i]), S); }
   catch (e) { PHOTODIAG.err = "preview: " + (e && e.message); }
 }
-/** Redraw the panel's controls, repaint the preview, and re-arm the export. */
-function studioSync() {
+/** Repaint the card being edited. The neighbours cannot change under a gesture. */
+function studioPaint(quality) { if (STUDIO) studioPaintSlide(STUDIO.idx, quality); }
+/**
+ * WHERE THE TRACK SITS: the selected slide centred in the stage, plus however far a finger has dragged.
+ * ⚠️ THE MATHS IS IN PIXELS, NOT PERCENTAGES, because a drag is measured in pixels and mixing the two is
+ * how a carousel ends up a few pixels off centre at every position but the first.
+ */
+function studioTrackPos(drag) {
   if (!STUDIO) return;
   const root = STUDIO.root;
-  root.querySelectorAll("[data-sst-aspect]").forEach((b) => {
-    b.classList.toggle("on", b.getAttribute("data-sst-aspect") === SCARD.aspect);
-    b.setAttribute("aria-pressed", b.getAttribute("data-sst-aspect") === SCARD.aspect ? "true" : "false");
-  });
+  const st = root.querySelector("[data-sst-stage]"), tr = root.querySelector("[data-sst-track]");
+  if (!st || !tr) return;
+  // ⚠️ THE SAME SLIDE WIDTH THE CSS IS USING, not a second derivation of it. Computed here from
+  // SST_SLIDE while studioStageHeight published the card's real width, the transform and the layout would
+  // disagree by however much the height cap took off — the card would sit off centre at every position
+  // but the first, which is the mixing-percentages-with-pixels fault this function's own note warns of.
+  const w = st.clientWidth || 1, slideW = STUDIO.slideW || w * SST_SLIDE;
+  tr.style.transform = "translateX(" + Math.round(w / 2 - (STUDIO.idx + 0.5) * slideW + (drag || 0)) + "px)";
+}
+/**
+ * Rebuild every row a sheet owns, so opening one does not re-mount the carousel and changing anything
+ * cannot leave a row describing the previous state.
+ *
+ * ⚠️ EACH HOOK IS GUARDED, because only one sheet is ever mounted: five of these six find nothing on any
+ * given call, which is exactly right and is why the guards are not defensive clutter.
+ * ⚠️ AND THE STRAVA WRAPPER IS INSIDE THE DESTINATION BODY, so it is rebuilt by the line above it — the
+ * separate lookup stays because stravaRunButtonHtml is the one place that button's state is written and
+ * a send has to be able to re-derive it without rebuilding the sheet under the runner's finger.
+ */
+function studioSyncRows() {
+  if (!STUDIO) return;
+  const root = STUDIO.root;
+  // ⚠️ FOCUS IS PUT BACK ON THE CONTROL THAT WAS JUST USED. Every row here is rebuilt from its builder on
+  // every change, which is what stops one going stale — but it also destroys the node the runner is
+  // standing on, and a keyboard or switch-control user toggling a metric chip was dropped onto BODY with
+  // the panel behind them inert. The same answer the Support search field uses for its caret: remember
+  // what it was, restore it after. Every attribute named here is one this file writes itself, so the
+  // value can never contain a quote.
+  const back = studioFocusSig(document.activeElement);
   const ph = root.querySelector("[data-sst-photo]"); if (ph) ph.innerHTML = studioPhotoHtml();
   const rt = root.querySelector("[data-sst-route]"); if (rt) rt.innerHTML = studioRouteHtml(STUDIO.run);
+  const mw = root.querySelector("[data-sst-metwrap]"); if (mw) mw.innerHTML = studioMetricsHtml(STUDIO.run);
+  const yw = root.querySelector("[data-sst-stylewrap]"); if (yw) yw.innerHTML = studioStyleHtml();
+  const dw = root.querySelector("[data-sst-destwrap]"); if (dw) dw.innerHTML = studioDestHtml(STUDIO.run);
   const sv = root.querySelector("[data-sst-strava]");
   if (sv) sv.innerHTML = stravaRunButtonHtml(STUDIO.run) +
     '<p class="sst-sr">Sends the run itself, not this card.</p>';
@@ -21949,11 +22978,84 @@ function studioSync() {
   // was enough while the two switches were static markup reading a global — it cannot produce the
   // locked row or its sentence, and it cannot tell one run's record from another's.
   const pvr = root.querySelector("[data-sst-priv]"); if (pvr) pvr.innerHTML = studioPrivHtml(STUDIO.run);
-  const hint = root.querySelector("[data-sst-hint]");
-  if (hint) hint.textContent = SPHOTO ? "Drag to move your photo, pinch to zoom. Double-tap to reset."
-    : "Add a photo and it becomes the background.";
+  if (back) {
+    const n = root.querySelector("[" + back.a + '="' + back.v + '"]');
+    if (n && n.focus && !n.disabled) { try { n.focus({ preventScroll: true }); } catch (e) {} }
+  }
+}
+/** Which of this file's own action attributes a node carries, so focus can be found again after a rebuild. */
+const SST_FOCUS_ATTRS = ["data-sstmet", "data-ssttmpl", "data-sstpriv", "data-ssttool", "data-sst"];
+function studioFocusSig(node) {
+  if (!node || !node.getAttribute) return null;
+  for (const a of SST_FOCUS_ATTRS) {
+    const v = node.getAttribute(a);
+    if (v) return { a: a, v: v };
+  }
+  return null;
+}
+/**
+ * REDRAW EVERYTHING THE STATE DECIDES, REPAINT THE PREVIEW, AND RE-ARM THE EXPORT.
+ *
+ * ⚠️ THE CAROUSEL'S CONTENTS ARE THE MODEL'S OWN ELIGIBILITY, taken from the model the card is drawn
+ * from rather than derived a second time. shareTemplateStates needs a run analysis and a route
+ * presentation; composing those again here would be a second answer to "which templates can this run
+ * have", and the two could disagree about a card that is already on screen.
+ *
+ * ⚠️ AND THE INDEX IS DERIVED FROM WHAT IS ACTUALLY DRAWN, never held on its own. A template can stop
+ * being eligible under the runner's own hands — removing the photograph while The Progression is
+ * selected — and shareTemplateFor then falls through to the first one that works. An index kept
+ * independently would point at a card nobody is looking at, so the dots, the name and the gestures would
+ * all describe a different card from the one on the stage.
+ */
+function studioSync() {
+  if (!STUDIO) return;
+  const root = STUDIO.root;
+  const m = shareCardModel(STUDIO.run, shareCardOpts());
+  STUDIO.model = m;
+  STUDIO.order = SHARE_TEMPLATES.filter((id) => m.eligibility[id] && m.eligibility[id].ok);
+  STUDIO.cards = studioCards();
+  STUDIO.idx = Math.max(0, STUDIO.cards.indexOf(m.template));
+  // ⚠️ THE ASK IS NOT OVERWRITTEN WITH THE ANSWER, AND THAT IS A FIX RATHER THAN AN OMISSION. Writing it
+  // back looked tidy — the key would then always name the drawn card — and it turned a fall-through into
+  // a choice. Measured: opening the studio on a run with a route and no photograph leaves only The Route
+  // Poster eligible, so the answer is "route"; written back, ADDING a photograph then kept the poster
+  // selected and the runner had to page three cards back to reach The Moment, which the contract calls
+  // "the default, most broadly useful card". A template nobody picked is not an ask, and the cache key
+  // does not need one: eligibility is decided by the photograph, the route and the analysis, and all
+  // three are already in the key, so the answer is derivable from what is there.
+  // ⚠️ FRAMING CANNOT SURVIVE THE PHOTOGRAPH IT WAS FRAMING. Removing it mid-gesture would leave the
+  // stage in a mode whose gestures do nothing and whose Done button is the only way out.
+  if (STUDIO.edit && !m.photo) studioEdit(false);
+  root.querySelectorAll("[data-sst-aspect]").forEach((b) => {
+    b.classList.toggle("on", b.getAttribute("data-sst-aspect") === SCARD.aspect);
+    b.setAttribute("aria-pressed", b.getAttribute("data-sst-aspect") === SCARD.aspect ? "true" : "false");
+  });
+  const pos = root.querySelector("[data-sst-pos]"); if (pos) pos.innerHTML = studioPosHtml();
+  const tools = root.querySelector("[data-sst-tools]"); if (tools) tools.innerHTML = studioToolsHtml();
+  const st = root.querySelector("[data-sst-stage]");
+  if (st) st.setAttribute("aria-label", shareAriaSummary(m));
+  studioSyncRows();
   studioMount();
   studioStale();
+}
+/**
+ * PAGE THE CAROUSEL.
+ *
+ * ⚠️ IT GOES THROUGH studioSync RATHER THAN NUDGING THE INDEX, so the selected template, the framing slot
+ * the gestures write to, the aria summary, the metrics note and the export are all re-derived from one
+ * model. Moving the index and repainting would leave every one of those describing the previous card.
+ */
+function studioGo(delta) {
+  if (!STUDIO || !STUDIO.order.length) return;
+  const next = Math.min(STUDIO.order.length - 1, Math.max(0, STUDIO.idx + delta));
+  if (next === STUDIO.idx) return studioTrackPos(0);
+  studioSelectTemplate(STUDIO.order[next]);
+}
+/** Select a template by id. The one path both the carousel and the Style sheet take. */
+function studioSelectTemplate(id) {
+  if (!STUDIO || !id) return;
+  SCARD.template = id;
+  studioSync();
 }
 /**
  * ⚠️ SHARE AND SAVE ARE DISABLED WITH THEIR REASON IN WORDS WHILE THE FILE IS BEING BUILT, because
@@ -21978,7 +23080,10 @@ function studioBusy(on) {
   if (!STUDIO) return;
   STUDIO.busy = !!on;
   const root = STUDIO.root;
-  root.querySelectorAll('[data-sst="share"], [data-sst="save"]').forEach((b) => {
+  // ⚠️ THE PRIMARY ACTION IS IN THIS SET TOO, AND IT HAS TO BE. It is the only way to the destinations
+  // now, so leaving it live while the file is being built opens a sheet whose every row is dead — the
+  // looks-live-does-nothing defect moved one tap further in rather than removed.
+  root.querySelectorAll('[data-sst="share"], [data-sst="save"], [data-sst="dest"]').forEach((b) => {
     b.disabled = !!on;
     b.classList.toggle("sst-off", !!on);
   });
@@ -22012,7 +23117,10 @@ function studioClick(e) {
     if (what === "pick") return studioPick();
     if (what === "drop") {
       if (SPHOTO && SPHOTO.bitmap && SPHOTO.bitmap.close) { try { SPHOTO.bitmap.close(); } catch (err) {} }
-      SPHOTO = null; SCARD.routeOn = null; return studioSync();
+      // ⚠️ THE FRAMING HISTORY GOES WITH THE PHOTOGRAPH IT DESCRIBED. An undo entry naming a slot of a
+      // picture that is gone would restore a framing for nothing, and the next photograph would inherit
+      // an Undo button offering to move it somewhere its previous occupant once sat.
+      SPHOTO = null; SCARD.routeOn = null; STUDIO.undo = []; return studioSync();
     }
     if (what === "route") {
       // ⚠️ aria-checked is the state BEFORE the tap; reading it as the state after is a fault this
@@ -22022,13 +23130,46 @@ function studioClick(e) {
       SCARD.routeOn = act.getAttribute("aria-checked") !== "true";
       return studioSync();
     }
+    if (what === "prev") return studioGo(-1);
+    if (what === "next") return studioGo(1);
+    if (what === "editoff") return studioEdit(false);
+    if (what === "reset") return studioCropReset();
+    if (what === "fit") return studioCropFit();
+    if (what === "undo") return studioCropUndo();
+    if (what === "metdef") { SCARD.metrics = null; return studioSync(); }
+    if (what === "dest") return studioSheet("dest");
+    if (what === "sheetoff") return studioSheet(null);
     // ⚠️ THE RUN THE STUDIO WAS OPENED WITH, at both. Share used to re-resolve through the screen's
     // own resolver while Save beside it read STUDIO.run, so one row could act on two different runs.
-    if (what === "share") return doShareRun(STUDIO.run);
-    if (what === "save") return saveShareCard(STUDIO.run);
+    // ⚠️ AND THE SHEET IS DISMISSED FIRST, because both hand off to the system and iOS raises its own
+    // sheet over ours: coming back to a destination list still sitting over the card reads as the tap
+    // having failed, and Save leaves it up over a download that has already happened.
+    if (what === "share") { studioSheet(null); return doShareRun(STUDIO.run); }
+    if (what === "save") { studioSheet(null); return saveShareCard(STUDIO.run); }
     return;
   }
+  const tool = t.closest("[data-ssttool]");
+  if (tool) {
+    const id = tool.getAttribute("data-ssttool");
+    // Tapping the open tool closes it, which is what an aria-expanded control is expected to do.
+    return studioSheet(STUDIO.sheet === id ? null : id);
+  }
+  const tmpl = t.closest("[data-ssttmpl]");
+  if (tmpl) {
+    if (tmpl.getAttribute("aria-disabled") === "true") return;
+    return studioSelectTemplate(tmpl.getAttribute("data-ssttmpl"));
+  }
+  const met = t.closest("[data-sstmet]");
+  if (met) {
+    // ⚠️ THE CAP AND THE FLOOR ARE ENFORCED BY DISABLING THE CHIP, so this is the belt: disabled stops
+    // the tap arriving, aria-disabled is checked in case it does. Same pairing as the two switches.
+    if (met.getAttribute("aria-disabled") === "true") return;
+    return studioMetricToggle(met.getAttribute("data-sstmet"));
+  }
   const asp = t.closest("[data-sst-aspect]");
+  // ⚠️ THE FRAMING SLOT IS PER ASPECT, so changing shape does not touch the framing set for the other —
+  // studioSync re-derives m.photo through sharePhotoView and the card reframes itself to whatever this
+  // shape was last left at, or to centred if it has never been touched.
   if (asp) { SCARD.aspect = asp.getAttribute("data-sst-aspect"); return studioSync(); }
   const pv = t.closest("[data-sstpriv]");
   if (pv) {
@@ -22057,7 +23198,116 @@ function studioClick(e) {
     const done = () => { try { render(); } catch (err) {} studioSync(); };
     if (stv.id === "stvSend") stravaSendRun(STUDIO.run, done);
     else stravaCheckPending(STUDIO.run, done);
+    return;
   }
+  // ⚠️ THE SCRIM DISMISSES, AND THE EXCLUSION IS WHAT MAKES IT SAFE. closest matches the sheet for every
+  // click INSIDE it too, so without naming the inner panel a tap on a note, a heading or the gap between
+  // two rows would close the sheet under the runner's finger.
+  if (t.closest("[data-sst-sheet]") && !t.closest("[data-sst-sheetin]")) studioSheet(null);
+}
+/**
+ * FRAMING MODE ON OR OFF.
+ *
+ * ⚠️ THE SPEC RESOLVES A GESTURE COLLISION HERE AND IT IS WORTH SPELLING OUT. A horizontal drag on the
+ * preview cannot mean both "move my photograph" and "show me the next style", and the spec picks the
+ * answer: "Tapping the preview enters edit mode without changing the selected template." So a tap is the
+ * mode switch, the carousel owns the drag until it happens, and the photograph owns it afterwards. A
+ * pinch is unambiguous either way and enters the mode by itself.
+ *
+ * ⚠️ AND THE MODE CLASS IS WHAT TAKES touch-action BACK. Without it the browser keeps vertical drags for
+ * scrolling and framing would only ever move a picture sideways.
+ */
+function studioEdit(on) {
+  if (!STUDIO) return;
+  const want = !!on && !!(STUDIO.model && STUDIO.model.photo);
+  if (STUDIO.edit === want) return;
+  STUDIO.edit = want;
+  const st = STUDIO.root.querySelector("[data-sst-stage]");
+  if (st) st.classList.toggle("sst-editing", want);
+  const pos = STUDIO.root.querySelector("[data-sst-pos]");
+  if (pos) pos.innerHTML = studioPosHtml();
+}
+/**
+ * THE FRAMING HISTORY.
+ *
+ * ⚠️ ONE ENTRY PER GESTURE, NOT PER FRAME. A drag fires dozens of pointermove events and each one moves
+ * the picture, so pushing on the change would make Undo a way of replaying a swipe one pixel at a time.
+ * studioCropArm is called once when a finger goes down and does nothing until the finger lifts again.
+ *
+ * ⚠️ AND THE ENTRY NAMES ITS SLOT. The crop is per template and per aspect now, so an undo that restored
+ * "the current framing" would apply one card's history to whichever card happened to be showing.
+ */
+function studioCropArm() {
+  if (!STUDIO || !SPHOTO) return;
+  const tmpl = STUDIO.model && STUDIO.model.template;
+  const c = shareCropWrite(tmpl, SCARD.aspect); if (!c) return;
+  // ⚠️ THE FIT IS PART OF THE FRAMING, SO IT IS PART OF THE UNDO. Left out, Undo would restore a pan
+  // and a zoom onto whichever fit happened to be current — a state the runner was never in.
+  STUDIO.undo.push({ key: shareCropKey(tmpl, SCARD.aspect), ox: c.ox, oy: c.oy, k: c.k, fill: !!c.fill });
+  while (STUDIO.undo.length > SST_UNDO_MAX) STUDIO.undo.shift();
+}
+function studioCropUndo() {
+  if (!STUDIO || !SPHOTO || !STUDIO.undo.length) return;
+  const e = STUDIO.undo.pop();
+  const c = SPHOTO.crops[e.key];
+  if (c) { c.ox = e.ox; c.oy = e.oy; c.k = e.k; c.fill = !!e.fill; }
+  studioSync();
+}
+/**
+ * Back to centred and unzoomed, for THIS card only, and undoable like any other move.
+ *
+ * ⚠️ IT DOES NOT TOUCH THE FIT, AND THE DIFFERENCE IS THAT ONE OF THE TWO IS A NAMED MODE. Pan and zoom
+ * are things a finger did to this card; Fill is a switch the runner threw in the Photo tool and can see
+ * the state of. This is also reached by a double-tap on the card, so folding the fit in would mean a
+ * gesture on the photograph silently flipping a switch in a sheet that is not open.
+ */
+function studioCropReset() {
+  if (!STUDIO || !SPHOTO) return;
+  studioCropArm();
+  const c = shareCropWrite(STUDIO.model && STUDIO.model.template, SCARD.aspect);
+  if (c) { c.ox = 0.5; c.oy = 0.5; c.k = 1; }
+  studioSync();
+}
+/**
+ * WHOLE PHOTOGRAPH, OR FILL THE CARD AND CROP THE EDGES.
+ *
+ * ⚠️ IT WRITES THE SLOT, SO IT IS PER (TEMPLATE, ASPECT) LIKE EVERY OTHER PART OF THE FRAMING. A story
+ * and a feed post leave slack on different edges and the four templates put their type in four different
+ * places, so one shared answer would be wrong on three of them — the same reasoning that put pan and
+ * zoom in the slot in the first place.
+ * ⚠️ AND IT ARMS THE UNDO BEFORE IT MOVES, exactly as a drag does: the spec asks for Undo over "manual
+ * photo and layout changes", and this is the largest one available.
+ */
+function studioCropFit() {
+  if (!STUDIO || !SPHOTO) return;
+  studioCropArm();
+  const c = shareCropWrite(STUDIO.model && STUDIO.model.template, SCARD.aspect);
+  // ⚠️ THE ZOOM GOES BACK TO THE FIT WITH IT. k is a multiple of whichever base scale is in force, so a
+  // card left at k 2.4 under contain is a card cropped harder than cover the instant Fill comes on —
+  // the runner asks to see more of their photograph and sees less of it.
+  if (c) { c.fill = !c.fill; c.k = 1; c.ox = 0.5; c.oy = 0.5; }
+  studioSync();
+}
+/**
+ * TURN ONE SUPPORTING NUMBER ON OR OFF.
+ *
+ * ⚠️ THE RESULT IS HELD IN THE POOL'S OWN ORDER, NOT IN TAP ORDER. The pool order is the relevance
+ * ladder both references were read from — time, then average pace, then the first rung the run has — so
+ * a row assembled in the order the runner happened to tap would print the same three numbers in a
+ * different arrangement on two otherwise identical cards.
+ *
+ * ⚠️ AND IT ONLY EVER RUNS ON AN ENABLED CHIP. The cap and the floor are expressed by disabling chips in
+ * studioMetricsHtml, so this cannot be the place a tap is silently refused.
+ */
+function studioMetricToggle(key) {
+  if (!STUDIO || !key) return;
+  const pool = shareMetricPool(STUDIO.run).map((x) => x.key);
+  const cur = shareMetricsChosen(STUDIO.run, SCARD.metrics).map((x) => x.key);
+  const at = cur.indexOf(key);
+  if (at >= 0) { if (cur.length <= 1) return; cur.splice(at, 1); }
+  else { if (cur.length >= SHARE_METRIC_MAX) return; cur.push(key); }
+  SCARD.metrics = pool.filter((k) => cur.indexOf(k) >= 0);
+  studioSync();
 }
 /** The per-open wiring: the nodes that live exactly as long as one open of the studio. */
 function studioWire() {
@@ -22130,13 +23380,24 @@ function studioTake(file) {
   // stale and the actions disabled the instant a file is named, not when it decodes.
   PHOTODIAG.picked++; PHOTODIAG.err = "";
   studioBusy(true);
-  const t0 = shareNow();
+  const t0 = shareNow(), had = !!SPHOTO;
   shareDecodePhoto(file).then((p) => {
     if (!STUDIO) return;
     if (SPHOTO && SPHOTO.bitmap && SPHOTO.bitmap.close) { try { SPHOTO.bitmap.close(); } catch (e) {} }
     PHOTODIAG.ms = Math.round(shareNow() - t0);
-    SPHOTO = { bitmap: p.bitmap, w: p.w, h: p.h, id: ++SPHOTO_SEQ, ox: 0.5, oy: 0.5, k: 1 };
-    SCARD.routeOn = null;
+    // ⚠️ A NEW PHOTOGRAPH ARRIVES WITH NO FRAMING AT ALL, WHICH IS THE SPEC'S "resets invalid crop
+    // geometry". An offset and a zoom describe where a subject sits in ONE picture; carried across to a
+    // different photograph of a different shape they are not a framing the runner chose, they are an
+    // arbitrary crop of somebody else's composition. The undo history goes with them, because every
+    // entry describes the picture that has just been replaced.
+    SPHOTO = { bitmap: p.bitmap, w: p.w, h: p.h, id: ++SPHOTO_SEQ, crops: {} };
+    STUDIO.undo = [];
+    // ⚠️ AND THE TEMPLATE IS DELIBERATELY UNTOUCHED — "Replacing the photo preserves the chosen
+    // template". SCARD.template survives, and studioSync only moves off it if this run cannot fill it.
+    // ⚠️ THE ROUTE DECISION IS RESET ONLY WHEN THERE WAS NO PHOTOGRAPH BEFORE. null means "decide from
+    // the photograph", which is the right default at the moment one arrives; once the runner has turned
+    // the inset on by hand, swapping the picture is not a reason to turn it off again behind them.
+    if (!had) SCARD.routeOn = null;
     studioSync();
   }).catch((e) => {
     PHOTODIAG.err = "decode: " + (e && e.message);
@@ -22160,12 +23421,21 @@ function studioGestures() {
   const st = STUDIO.root.querySelector("[data-sst-stage]"); if (!st) return;
   const pts = new Map();
   let startDist = 0, startK = 1, lastX = 0, lastY = 0, safari = false, lastTap = 0;
-  const cardX = () => CARD_W / Math.max(1, st.clientWidth);
-  const geom = () => {
-    const m = shareCardModel(STUDIO.run, shareCardOpts());
-    return shareCanvasGeom(m.aspect);
-  };
-  const slack = () => {
+  let mode = "", downX = 0, downY = 0, downT = 0, dragX = 0, armed = false, wheelAt = 0;
+  // ⚠️ THE CARD'S REAL WIDTH, PUBLISHED BY studioStageHeight — not the allowance. On a short screen the
+  // height cap takes the card in and a drag scaled to the allowance moves the picture further than the
+  // finger; the fallback exists only for the frame before the first measurement.
+  const cardW = () => Math.max(1, STUDIO.slideW || (st.clientWidth || 1) * SST_SLIDE);
+  // ⚠️ THE CARD IS NO LONGER THE STAGE, SO THE FINGER-TO-CANVAS SCALE IS OFF THE CARD. Left at the stage
+  // width every drag moved the photograph 86% as far as the finger, and the anchored pinch drifted away
+  // from the fingers — the same class of fault as computing slack against the retired ledger top.
+  const cardX = () => CARD_W / cardW();
+  // ⚠️ THE FRAMING SLOT, NOT SPHOTO. The crop is per template and per aspect now, so writing SPHOTO.ox
+  // would move a framing that no card reads and leave the one on screen untouched.
+  const crop = () => shareCropWrite(STUDIO.model && STUDIO.model.template, SCARD.aspect);
+  const framing = () => !!(SPHOTO && STUDIO.edit && STUDIO.model && STUDIO.model.photo);
+  const geom = () => shareCanvasGeom(SCARD.aspect);
+  const slack = (c) => {
     const gm = geom(), p = SPHOTO;
     // ⚠️ gm.H, NOT THE LEDGER'S TOP, AND THIS WAS WRONG UNTIL THE LEDGER WENT. sharePhotoBox covers the
     // WHOLE canvas — the photograph has been full bleed since the frame was removed — while this
@@ -22173,90 +23443,194 @@ function studioGestures() {
     // drag moved the picture by twice what the finger did on the vertical axis and the anchored pinch
     // walked away from the fingers. Nothing threw and nothing looked broken in a screenshot; deleting
     // LT is what made it impossible to keep.
-    const k = Math.max(gm.W / p.w, gm.H / p.h) * p.k;
-    return { gm: gm, kt: k, dw: p.w * k, dh: p.h * k };
+    // ⚠️ AND IT ASKS sharePhotoBox RATHER THAN COPYING ITS ARITHMETIC, WHICH IS THE SAME LESSON AGAIN.
+    // This re-derived the cover scale by hand, and the photo-fit ruling gave that copy two fresh ways to
+    // be wrong: under contain the base scale is the MINIMUM of the two ratios, and an axis with slack is
+    // centred rather than panned. One derivation, so a gesture and the picture cannot disagree.
+    const b = sharePhotoBox({ w: p.w, h: p.h, ox: c.ox, oy: c.oy, k: c.k, fill: !!c.fill }, gm.W, gm.H);
+    return { gm: gm, kt: b.k, dw: b.w, dh: b.h, x: b.x, y: b.y };
   };
   const paint = (q) => { studioPaint(q); };
   const pan = (dx, dy) => {
-    if (!SPHOTO) return;
-    const s = slack(), f = cardX();
+    const c = crop(); if (!c) return;
+    const s = slack(c), f = cardX();
+    // ⚠️ ONLY AN OVERFLOWING AXIS PANS, WHICH IS WHY THIS IS hx < -1 AND NOT abs(hx) > 1. A contained
+    // axis has POSITIVE slack and sharePhotoBox centres it, so writing a fraction there would move
+    // nothing while the finger travelled — and if the box ever honoured it, it would move the picture the
+    // wrong way, because the sign of the slack is the opposite of the cover case.
     const hx = s.gm.W - s.dw, hy = s.gm.H - s.dh;
-    if (Math.abs(hx) > 1) SPHOTO.ox = Math.min(1, Math.max(0, SPHOTO.ox + dx * f / hx));
-    if (Math.abs(hy) > 1) SPHOTO.oy = Math.min(1, Math.max(0, SPHOTO.oy + dy * f / hy));
+    if (hx < -1) c.ox = Math.min(1, Math.max(0, c.ox + dx * f / hx));
+    if (hy < -1) c.oy = Math.min(1, Math.max(0, c.oy + dy * f / hy));
     paint("low");
   };
   // Anchored zoom: whatever sits under the fingers stays under them, the same maths the avatar
   // cropper uses — without it a pinch feels detached from the picture.
   const zoomAbout = (kNew, sx, sy) => {
-    if (!SPHOTO) return;
-    const f = cardX(), before = slack();
-    const cx = sx * f, cy = sy * f;
-    const x0 = (before.gm.W - before.dw) * SPHOTO.ox, y0 = (before.gm.H - before.dh) * SPHOTO.oy;
-    const u = (cx - x0) / before.kt, v = (cy - y0) / before.kt;
-    SPHOTO.k = Math.min(4, Math.max(1, kNew));
-    const after = slack();
+    const c = crop(); if (!c) return;
+    const f = cardX(), before = slack(c);
+    // The pointer is measured against the STAGE; the card is centred inside it, so the gutter on the
+    // left has to come off before the position means anything in card space.
+    const gut = ((st.clientWidth || 1) - cardW()) / 2;
+    const cx = (sx - gut) * f, cy = sy * f;
+    // ⚠️ THE BOX'S OWN ORIGIN, NOT slack × ox. Under contain a centred axis ignores the fraction
+    // entirely, so multiplying the slack by it answers a corner the picture is not at — and every
+    // subsequent frame of the pinch would be anchored to that wrong point.
+    const u = (cx - before.x) / before.kt, v = (cy - before.y) / before.kt;
+    c.k = Math.min(4, Math.max(1, kNew));
+    const after = slack(c);
     const hx = after.gm.W - after.dw, hy = after.gm.H - after.dh;
-    if (Math.abs(hx) > 1) SPHOTO.ox = Math.min(1, Math.max(0, (cx - u * after.kt) / hx));
-    if (Math.abs(hy) > 1) SPHOTO.oy = Math.min(1, Math.max(0, (cy - v * after.kt) / hy));
+    if (hx < -1) c.ox = Math.min(1, Math.max(0, (cx - u * after.kt) / hx));
+    if (hy < -1) c.oy = Math.min(1, Math.max(0, (cy - v * after.kt) / hy));
     paint("low");
   };
   const toStage = (cx, cy) => { const r = st.getBoundingClientRect(); return { x: cx - r.left, y: cy - r.top }; };
+  /** Let go of a swipe: turn the page if it travelled far enough, otherwise slide back. */
+  const settle = () => {
+    const tr = STUDIO.root.querySelector("[data-sst-track]");
+    if (tr) tr.classList.remove("sst-nom");
+    const w = cardW(), d = dragX;
+    dragX = 0;
+    if (d < -w * SST_PAGE_FRAC) return studioGo(1);
+    if (d > w * SST_PAGE_FRAC) return studioGo(-1);
+    studioTrackPos(0);
+  };
+  const arm = () => { if (!armed) { studioCropArm(); armed = true; } };
   st.onpointerdown = (e) => {
-    if (!SPHOTO || pts.size >= 2) return;
+    if (pts.size >= 2) return;
     try { st.setPointerCapture(e.pointerId); } catch (err) {}
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pts.size === 1) { lastX = e.clientX; lastY = e.clientY; }
-    else {
-      const a = Array.from(pts.values());
-      startDist = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) || 1;
-      startK = SPHOTO.k;
+    if (pts.size === 1) {
+      lastX = downX = e.clientX; lastY = downY = e.clientY; downT = Date.now();
+      mode = framing() ? "frame" : "cara";
+      dragX = 0; armed = false;
+      // ⚠️ THE UNDO ENTRY IS TAKEN HERE, ONCE, BEFORE A SINGLE PIXEL MOVES. Pushing on the change would
+      // make Undo replay a drag one pointermove at a time.
+      if (mode === "frame") arm();
+    } else {
+      // ⚠️ A SECOND FINGER MEANS ZOOM WHATEVER MODE WE WERE IN, AND IT ENTERS THE MODE BY ITSELF. A pinch
+      // cannot be confused with a page turn, so demanding a tap first would refuse a gesture whose
+      // meaning is unambiguous — and it would refuse it silently, which is worse.
+      if (SPHOTO && STUDIO.model && STUDIO.model.photo) {
+        if (!STUDIO.edit) studioEdit(true);
+        if (mode !== "frame") { dragX = 0; studioTrackPos(0); }
+        mode = "frame";
+        arm();
+        const c = crop();
+        const a = Array.from(pts.values());
+        startDist = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) || 1;
+        startK = c ? c.k : 1;
+      }
     }
   };
   st.onpointermove = (e) => {
-    if (!SPHOTO || !pts.has(e.pointerId) || safari) return;
+    if (!pts.has(e.pointerId) || safari) return;
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pts.size >= 2) {
+    if (pts.size >= 2 && mode === "frame") {
       const a = Array.from(pts.values());
       const d = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) || 1;
       const mid = toStage((a[0].x + a[1].x) / 2, (a[0].y + a[1].y) / 2);
       zoomAbout(startK * (d / startDist), mid.x, mid.y);
       return;
     }
-    pan(e.clientX - lastX, e.clientY - lastY);
-    lastX = e.clientX; lastY = e.clientY;
+    if (pts.size !== 1) return;
+    if (mode === "frame") {
+      pan(e.clientX - lastX, e.clientY - lastY);
+      lastX = e.clientX; lastY = e.clientY;
+      return;
+    }
+    // ⚠️ THE CAROUSEL ONLY TAKES OVER ONCE THE GESTURE IS PLAINLY HORIZONTAL. touch-action: pan-y means
+    // the browser is deciding at the same time; if it decides first we get a pointercancel and do
+    // nothing, which is exactly right. Committing on the first move in either direction would fight it.
+    const dx = e.clientX - downX, dy = e.clientY - downY;
+    if (mode === "cara" && Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+    if (mode === "cara" && Math.abs(dy) > Math.abs(dx)) { mode = "scroll"; return; }
+    if (mode === "scroll") return;
+    const tr = STUDIO.root.querySelector("[data-sst-track]");
+    if (tr) tr.classList.add("sst-nom");
+    // ⚠️ THE ENDS RESIST RATHER THAN REFUSE. A first or last card that does not move at all under the
+    // finger reads as a broken gesture; a third of the travel says "there is nothing that way".
+    const n = STUDIO.order.length;
+    const over = (dx > 0 && STUDIO.idx <= 0) || (dx < 0 && STUDIO.idx >= n - 1);
+    dragX = over ? dx / 3 : dx;
+    studioTrackPos(dragX);
   };
   const up = (e) => {
+    const wasFrame = mode === "frame", wasCara = mode === "cara";
     pts.delete(e.pointerId);
     try { st.releasePointerCapture(e.pointerId); } catch (err) {}
     // Lifting one finger of a pinch: re-seat the drag origin on the finger still down, or the next
     // move applies a huge stale delta and the photo jumps.
     if (pts.size === 1) { const r = Array.from(pts.values())[0]; lastX = r.x; lastY = r.y; }
     if (pts.size < 2) startDist = 0;
-    if (!pts.size && SPHOTO) { paint("high"); studioStale(); }
+    if (pts.size) return;
+    mode = "";
+    // ⚠️ AN ARMED UNDO ENTRY THAT NOTHING MOVED IS DISCARDED, or a tap in framing mode leaves an Undo
+    // button offering to restore the state the picture is already in. armed says whether THIS gesture
+    // pushed, so nothing can pop an earlier runner's move.
+    if (armed) {
+      const c = crop(), last = STUDIO.undo[STUDIO.undo.length - 1];
+      if (c && last && last.ox === c.ox && last.oy === c.oy && last.k === c.k) STUDIO.undo.pop();
+      armed = false;
+      // ⚠️ AND THE ROW IS RESTATED, or Undo stays greyed out after the first drag that gave it something
+      // to do. studioStale re-arms the export and touches nothing the runner can see.
+      const pos = STUDIO.root.querySelector("[data-sst-pos]");
+      if (pos) pos.innerHTML = studioPosHtml();
+    }
+    // ⚠️ A TAP IS DETECTED BEFORE THE MODE IS CONSULTED, because it means the same thing in both. Read
+    // inside the carousel branch alone, a tap while already framing could never reach the double-tap
+    // reset — every gesture in framing mode starts in mode "frame".
+    if (Math.hypot(e.clientX - downX, e.clientY - downY) < 8 && Date.now() - downT < 400) {
+      const now = Date.now();
+      // ⚠️ THE TAP ALWAYS LEADS SOMEWHERE. Framing when this card carries a photograph; a second tap
+      // inside 320ms resets the framing; and on a card with no photograph it opens the Photo tool rather
+      // than doing nothing at all, which is the discoverability the old panel got from having the button
+      // permanently on screen.
+      if (STUDIO.edit && now - lastTap < 320) studioCropReset();
+      else if (STUDIO.model && STUDIO.model.photo) studioEdit(true);
+      else studioSheet("photo");
+      lastTap = now;
+      dragX = 0; studioTrackPos(0);
+      return;
+    }
+    if (wasFrame) { paint("high"); studioStale(); return; }
+    if (wasCara) settle();
   };
   st.onpointerup = up; st.onpointercancel = up;
-  st.addEventListener("gesturestart", (e) => { e.preventDefault(); safari = true; startK = SPHOTO ? SPHOTO.k : 1; }, { passive: false });
+  // ⚠️ SAFARI'S OWN gesture* EVENTS ARE THE ONLY PINCH THE DOCUMENT-WIDE SUPPRESSOR LEAVES US, and they
+  // arrive without any pointerdown pair, so this path enters framing mode on its own.
+  st.addEventListener("gesturestart", (e) => {
+    e.preventDefault(); safari = true;
+    if (SPHOTO && STUDIO.model && STUDIO.model.photo) {
+      studioEdit(true); mode = "frame"; armed = false; arm();
+    }
+    const c = crop(); startK = c ? c.k : 1;
+  }, { passive: false });
   st.addEventListener("gesturechange", (e) => {
     e.preventDefault();
+    if (mode !== "frame") return;
     const mid = toStage(e.clientX, e.clientY);
     zoomAbout(startK * (e.scale || 1), mid.x, mid.y);
   }, { passive: false });
   st.addEventListener("gestureend", (e) => {
     e.preventDefault(); safari = false; pts.clear(); startDist = 0;
-    if (SPHOTO) { paint("high"); studioStale(); }
+    if (mode === "frame") { paint("high"); studioStale(); }
+    mode = ""; armed = false;
   }, { passive: false });
   st.addEventListener("wheel", (e) => {
-    if (!SPHOTO) return;
+    if (!SPHOTO || !(STUDIO.model && STUDIO.model.photo)) return;
     e.preventDefault();
+    studioEdit(true);
+    const c = crop(); if (!c) return;
+    // ⚠️ ONE UNDO ENTRY PER BURST OF WHEEL EVENTS, NOT ONE PER NOTCH. A trackpad emits dozens, and armed
+    // cannot help here because a wheel has no pointerup to close the gesture — so the burst is closed by
+    // a gap in time instead. Without it a single two-finger zoom fills the whole stack and Undo becomes
+    // a way of stepping back through the zoom a notch at a time.
+    if (Date.now() - wheelAt > 400) { armed = false; arm(); }
+    wheelAt = Date.now();
     const at = toStage(e.clientX, e.clientY);
-    zoomAbout(SPHOTO.k * (1 - (e.deltaY * (e.ctrlKey ? 0.01 : 0.0022))), at.x, at.y);
+    zoomAbout(c.k * (1 - (e.deltaY * (e.ctrlKey ? 0.01 : 0.0022))), at.x, at.y);
     paint("high"); studioStale();
   }, { passive: false });
-  st.addEventListener("click", () => {
-    const now = Date.now();
-    if (SPHOTO && now - lastTap < 320) { SPHOTO.ox = 0.5; SPHOTO.oy = 0.5; SPHOTO.k = 1; paint("high"); studioStale(); }
-    lastTap = now;
-  });
 }
 // The one question the intelligent coach needs after every run: how hard did that feel?
 // ⚠️ Takes the band from the record when it has one. It used to read plannedRpeBandOf(LIVE.session)

@@ -127,11 +127,19 @@ test("⚠️ double-tap cannot zoom the app, on any element", () => {
   // Nothing may set touch-action: none on a scroller, or the screen stops scrolling entirely.
   // ⚠️ TWO SURFACES ARE ALLOWED IT, AND NEITHER IS A SCROLLER — that is the invariant, not the count.
   // Both are fixed-height framing stages that drive their own drag and pinch: the avatar cropper, and
-  // the share studio's card preview. Each also has to be named in the document-wide gesture* guard,
-  // or a pinch there zooms the PAGE and pinch-to-zoom is off, so the runner can never zoom back.
+  // the share studio's card preview WHILE A PHOTOGRAPH IS BEING FRAMED. Each also has to be named in the
+  // document-wide gesture* guard, or a pinch there zooms the PAGE and pinch-to-zoom is off, so the runner
+  // can never zoom back.
+  // ⚠️ THE STUDIO'S STAGE TAKES BOTH AXES ONLY IN ITS EDITING STATE, and that is the carousel's doing: the
+  // stage grew to most of the viewport, so a bare none there means a vertical drag on the biggest thing
+  // on the screen scrolls nothing. In browse mode it is pan-y — the browser keeps vertical, the carousel
+  // takes horizontal — and the mode class claims both back for the photograph. A rule that took both
+  // unconditionally would be the regression this line now catches.
   const nones = [...new Set([...style.matchAll(/([^\s{}]+) \{[^}]*touch-action: none/g)].map((m) => m[1]))];
-  assert.deepEqual(nones, [".crop-stage", ".sst-stage"],
+  assert.deepEqual(nones, [".crop-stage", ".sst-stage.sst-editing"],
     "something other than the two framing stages disables touch entirely: " + nones.join(", "));
+  assert.match(style, /\.sst-stage \{[^}]*touch-action: pan-y/,
+    "the studio's stage no longer leaves vertical drags to the browser, so the panel cannot be scrolled from it");
   assert.match(css, /closest\("\.crop-stage, \.sst-stage"\)/,
     "a stage that sets touch-action: none is not exempted from the pinch suppressor, so pinching it zooms the page");
 });

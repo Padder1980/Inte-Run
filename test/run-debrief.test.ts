@@ -137,9 +137,15 @@ test("there is exactly one share entry and Strava is inside it", () => {
   // explanatory note, which is the honest sentence telling the runner where their apps actually are. So a
   // whole-text sweep is both too weak and too strong. What must hold is that no DESTINATION is a named
   // third-party app: the labels are the destinations.
+  // ⚠️ THE LABELS MOVED WHEN THE SHEET TOOK THE OWNER'S SHAPE (2026-08-20) — a row of tiles and a
+  // full-width primary rather than two stacked rows — so they are no longer inside a <b>. Read from the
+  // tile builder's own third argument and from the primary's text, which is where a destination's name
+  // lives now; a destination added any other way carries no accessible name and fails the studio's own
+  // sweep instead.
   const dest = lift("studioDestHtml");
-  const labels = [...dest.matchAll(/<b>([^<]+)<\/b>/g)].map((m) => m[1]!);
-  assert.ok(labels.length >= 2, "the destination sheet has no labelled rows: " + labels.join(", "));
+  const labels = [...dest.matchAll(/studioDestTile\("[a-z]+", [^,]+, "([^"]+)"\)/g)].map((m) => m[1]!)
+    .concat([...dest.matchAll(/<\/span>([A-Z][^<']*)<\/button>/g)].map((m) => m[1]!.trim()));
+  assert.ok(labels.length >= 3, "the destination sheet has no labelled destinations: " + labels.join(", "));
   const named = labels.filter((l) =>
     /instagram|whatsapp|facebook|twitter|snapchat|tiktok|messenger|threads/i.test(l));
   assert.deepEqual(named, [],
@@ -150,8 +156,14 @@ test("there is exactly one share entry and Strava is inside it", () => {
     assert.ok(!dest.toLowerCase().includes(scheme),
       "the destination sheet opens a third-party app by URL scheme: " + scheme);
   }
-  assert.match(dest, /data-sst="share"/, "the system share sheet fallback is missing");
-  assert.match(dest, /data-sst="save"/, "saving to the device is missing");
+  // ⚠️ THE ACTIONS ARE COLLECTED FROM BOTH SHAPES A DESTINATION CAN TAKE — a tile and the primary — so
+  // moving one from one shape to the other cannot make this guard stop looking. The system share sheet is
+  // the spec's required "one system-compatible fallback"; without it the sheet would be a list of things
+  // this app happens to support and nothing for the apps it cannot name.
+  const acts = [...dest.matchAll(/studioDestTile\("([a-z]+)"/g)].map((m) => m[1]!)
+    .concat([...dest.matchAll(/data-sst="([a-z]+)"/g)].map((m) => m[1]!));
+  assert.ok(acts.includes("share"), "the system share sheet fallback is missing: " + acts.join(", "));
+  assert.ok(acts.includes("save"), "saving to the device is missing: " + acts.join(", "));
 });
 
 // ---- the verdict ---------------------------------------------------------------------------------

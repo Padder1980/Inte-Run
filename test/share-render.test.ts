@@ -86,7 +86,7 @@ const CONSTS = ["SHARE_INK", "SHARE_TYPE", "SHARE_TYPE_FEED", "SHARE_TRACK", "SH
   "SHARE_ZONE_PEN", "SHARE_ZONE_MIN_H", "SHARE_BADGE", "SHARE_QUIET", "MOMENT_GAP", "POSTER_GAP", "POSTER_TAG",
   "SHARE_POSTER_PAD", "EXEC_GAP", "PROG_GAP", "SHARE_CHART", "SHARE_PHOTO_FLOOR",
   "SHARE_EVEN_SPREAD_S", "SHARE_LADDER", "SHARE_SCRIM", "SHARE_LUMW", "SHARE_HAIR", "SHARE_BLUR",
-  "SHARE_SCRIM_MARGIN",
+  "SHARE_SCRIM_MARGIN", "SHARE_EFFORT", "SHARE_GROUND", "SHARE_WM_EDGE",
   // the one table that decides a canvas height, and the two shapes there are
   "SHARE_ASPECTS", "SHARE_ASPECT_H", "SHARE_METRIC_MAX"];
 /**
@@ -104,14 +104,15 @@ const FNS = ["shareFont", "shareTypeSize", "cardAlpha", "cardLsWidth", "shareFig
   "sharePhotoBox", "sharePhotoNorm", "sharePhotoDraw", "shareSubjectZones",
   "shareBoxLeavesGap", "shareBlurBg", "sharePhotoCompose",
   "shareZoneRect", "shareZoneScore", "shareRouteFallback", "shareRoutePlacement",
-  "shareLin255", "shareLinLut", "shareRelLumRGB", "shareHexRGB", "shareGroundRGB",
+  "shareLin255", "shareLinLut", "shareRelLumRGB", "shareHexRGB", "shareGroundRGB", "shareRectGroundRGB",
   "shareRelLum", "shareLumOfByte", "shareRatio", "shareGroundUnder", "shareVeilAlphaFor",
   "shareVeilPlan", "shareVeilDraw", "shareScrimFade", "shareScrimText", "sharePhotoScrim",
-  "shareTopScrim", "shareGroundFill", "shareTopoField",
+  "shareGroundFill", "shareTopoField", "shareEffortHex", "shareHexHSL", "shareHSLHex",
+  "shareGroundStops", "shareGroundPaint", "shareQuietInk", "shareTopoDraw", "shareTopoCanvas",
   "shareRouteProject", "shareRouteSimplify", "shareRoutePath", "shareRouteDraw",
   "shareWordmark", "shareWordmarkWidth", "lsText", "rr",
   // the templates
-  "shareQuietPlan", "shareLsFit", "shareWordmarkPlan", "shareHeroFor", "shareMetricUnit",
+  "shareQuietPlan", "shareLsFit", "shareWordmarkPlan", "shareHeroFor", "shareMetricUnit", "shareFieldRoute",
   "shareMetricsFor", "shareBadgePlan", "shareTick", "shareBadgeDraw", "shareMetricPlan",
   "shareMetricDraw", "shareHairline", "shareMark", "shareMetricRules", "shareMomentPlan", "shareMomentCard",
   "sharePosterMetrics", "sharePosterPlan", "sharePosterCard",
@@ -153,12 +154,12 @@ function recCtx() {
     calls: (name: string) => log.filter((e) => e[0] === name),
   };
   for (const m of ["save", "restore", "beginPath", "moveTo", "lineTo", "arc", "arcTo", "closePath",
-    "fill", "stroke", "fillRect", "clip", "rect", "roundRect", "fillText", "drawImage", "scale",
+    "fill", "stroke", "fillRect", "clip", "rect", "roundRect", "fillText", "strokeText", "drawImage", "scale",
     "translate", "setTransform", "clearRect"]) {
     ctx[m] = (...a: any[]) => { log.push([m, ...a]); };
   }
   for (const p of ["fillStyle", "strokeStyle", "lineWidth", "lineCap", "lineJoin", "textAlign",
-    "textBaseline", "globalAlpha", "shadowColor", "shadowBlur", "shadowOffsetY", "filter",
+    "textBaseline", "globalAlpha", "shadowColor", "shadowBlur", "shadowOffsetX", "shadowOffsetY", "filter",
     "imageSmoothingEnabled", "imageSmoothingQuality"]) {
     let v: any = p === "shadowBlur" ? 0 : p === "shadowColor" ? "rgba(0,0,0,0)" : "";
     Object.defineProperty(ctx, p, {
@@ -208,11 +209,67 @@ function env(): Env {
     "function cardMeasureCtx() { if (!CARD_MEASURE) CARD_MEASURE = __mk(); return CARD_MEASURE; }\n" +
     FNS.map(lift).join("\n") + "\n" +
     "return { " + FNS.join(", ") + ", " + CONSTS.concat(EXTRA).join(", ") + ", cardMeasureCtx };";
+  // ⚠️ EVERY OFFSCREEN CANVAS IS KEPT, AND ITS CONTEXT IS STABLE PER CANVAS. The texture and the blur
+  // both draw into one of these and then drawImage it, so without a handle on the inner context there is
+  // no way to assert what they actually stroked — only what their source looks like, which house rule
+  // says proves a string exists and never that anything reaches it. getContext returning a FRESH
+  // recorder each call also threw the log away for anything asking for it twice.
+  const made: any[] = [];
   const out = new Function("__mk", "PHOTODIAG", "document", body)(
     recCtx, { err: "" },
-    { createElement: () => ({ width: 0, height: 0, getContext: () => recCtx() }) },
+    { createElement: () => {
+      const cx = recCtx();
+      const c: any = { width: 0, height: 0, getContext: () => cx, ctx: cx };
+      made.push(c);
+      return c;
+    } },
   ) as Env;
   out.ctx = recCtx;
+  out.made = made;
+  return out;
+}
+
+/** The token values as the built stylesheet declares them in the data-theme="dark" block. */
+function darkThemeTokens(): Record<string, string> {
+  const html = page();
+  const at = html.indexOf(':root[data-theme="dark"]');
+  assert.ok(at > 0, "the data-theme dark block is missing");
+  const block = html.slice(at, at + 2400);
+  const out: Record<string, string> = {};
+  for (const m of block.matchAll(/(--[a-z0-9-]+):\s*([^;]+);/g)) out[m[1]!] = m[2]!.trim();
+  return out;
+}
+
+/**
+ * THE APP'S OWN EFFORT-COLOUR LANGUAGE, EXECUTED — the one mapping and the three surfaces that read it.
+ * ⚠️ NOT lifted into env(): none of this is the renderer, and mixing it in would let a card guard pass
+ * because an app table happened to be present.
+ */
+type EffEnv = { [k: string]: any };
+function effEnv(): EffEnv {
+  const names = ["SESSION_EFFORT", "RUN_TYPES", "RUN_KIND", "EFFORT_WORD", "PRIMARY_TYPES"];
+  const fns = ["sessionEffort", "effortVar", "effortOf", "runEffort", "runTypeEff", "runKind",
+    "runKindColour", "logCalendarLegend"];
+  const body = constOrder(names).map(liftConst).join("\n") + "\n" + fns.map(lift).join("\n") +
+    "\nreturn { " + names.concat(fns).join(", ") + " };";
+  return new Function(body)() as EffEnv;
+}
+
+/** Every member of SessionType, read out of the engine's own union rather than listed here. */
+function sessionTypes(): string[] {
+  // ⚠️ COMMENTS FIRST, AND THE MEMBER PATTERN TAKES DIGITS. Written the obvious way this read NINE of the
+  // twelve: "vo2" does not match [a-z-]+, and the doc comment on "race" contains a semicolon ("on race
+  // day; with a Wednesday race"), so slicing to the first one stopped the union two members early. A
+  // derived collection that silently under-collects is a guard over the wrong set.
+  const src = readFileSync(new URL("../src/domain/types.ts", import.meta.url), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const at = src.indexOf("export type SessionType =");
+  assert.ok(at > 0, "SessionType is not in src/domain/types.ts");
+  const decl = src.slice(at, src.indexOf(";", at));
+  const out = [...decl.matchAll(/\|\s*"([a-z0-9-]+)"/g)].map((m) => m[1]!);
+  assert.ok(out.length >= 12, "SessionType parsed as only " + out.length + " members: " + out.join(", "));
+  assert.ok(out.includes("vo2") && out.includes("race") && out.includes("rest"),
+    "the union parse is missing members: " + out.join(", "));
   return out;
 }
 
@@ -375,10 +432,23 @@ test("BLOCKER: the frame, its clip, its neon border and the radial glows are gon
     if (seen.has(name)) continue;
     seen.add(name);
     const b = lift(name);
-    // ⚠️ NO EXEMPTION AT ALL ANY MORE, AND THAT IS A TIGHTENING. There used to be exactly one — the
-    // withdrawn transparent output's glyph halo, which had no ground to be legible against and so needed
-    // the spec's own "local scrim/keyline". Both remaining outputs put a solved scrim or the matte ground
-    // under every mark, so nothing in the renderer may set a shadow and the sweep needs no named case.
+    // ⚠️ ONE EXEMPTION, AND IT IS THE SPEC'S OWN "local scrim/keyline" RATHER THAN A LOOSENING. The fade
+    // across the top of the card is gone at the owner's instruction (2026-08-20), so the wordmark carries
+    // its own edge — and an edge needs a halo under it to survive a field of white specks, which is the
+    // ground that produced the recorded 2.09:1. The exemption is therefore stated as the two properties
+    // that make a halo not a glow, and both are asserted rather than assumed: the shadow colour must be a
+    // DEEP ink, and it must be paired with a keyline stroke. A bright shadow or a shadow with no keyline
+    // under it is exactly the neon the brief forbids, and either one still fails here.
+    if (name === "shareWordmark") {
+      assert.match(b, /shadowColor = SHARE_WM_EDGE\.halo/,
+        "the wordmark's halo is no longer the named deep one");
+      assert.match(b, /strokeStyle = SHARE_INK\.keyline/,
+        "the wordmark sets a shadow with no keyline under it, which is a glow");
+      const halo = liftConst("SHARE_WM_EDGE");
+      assert.match(halo, /halo: "rgba\(2, ?10, ?8/,
+        "the halo is not the route's own deep ink: " + halo);
+      continue;
+    }
     assert.ok(!/shadowBlur|shadowColor/.test(b), name + " sets a shadow, so the card glows");
     for (const m of b.matchAll(/\b((?:card|share|draw)[A-Za-z0-9_]*)\s*\(/g)) {
       const c = m[1]!;
@@ -802,10 +872,17 @@ test("BLOCKER: the ground is sampled as a colour, and the brightest one by TRUE 
   assert.match(lift("shareLumaProbe"), /catch/, "the probe has no failure path at all");
   // A bare number is the grey it actually is, and nothing in the renderer may hand one over.
   assert.deepEqual(E.shareGroundRGB(200), [200, 200, 200], "a grey ground is not a grey triple");
-  for (const fn of ["shareVeilPlan", "shareTopScrim"]) {
+  // ⚠️ ONE READER OF THE SAMPLER NOW, WHERE THERE WERE TWO. The wordmark's band used to be sampled and
+  // solved as well; the fade across the top is gone at the owner's instruction and the wordmark carries a
+  // keyline, which needs no sample at all — that is the point of it, since the 2.09:1 defect was a sample
+  // that missed. So this sweep names the scrim that remains, and a second sampler arriving later has to
+  // be added here deliberately.
+  for (const fn of ["shareVeilPlan"]) {
     assert.match(lift(fn), /shareGroundUnder\(probe, gm,/,
       fn + " no longer takes its ground from the sampler");
   }
+  assert.ok(!/shareGroundUnder/.test(lift("shareWordmark") + lift("shareWordmarkPlan")),
+    "the wordmark is sampling the ground again; its whole point is that it does not need to");
 });
 
 test("BLOCKER: the copy's first line sits on MORE than the solved alpha, not exactly on it", () => {
@@ -976,71 +1053,380 @@ test("the route's keyline is thickened on a bright ground, judged on luminance a
   // thing for a neutral and the right thing for a colour.
   const cl = closure("drawShareCard");
   const body = cl.get("shareMomentCard")!;
-  assert.match(body, /shareRelLumRGB\(shareGroundUnder\(probe, gm, zone\.rect\)\) > shareLumOfByte\(150\)/,
+  assert.match(body, /shareRelLumRGB\(shareRectGroundRGB\(m, probe, gm, zone\.rect\)\) > shareLumOfByte\(150\)/,
     "the route's keyline decision is not taken on true luminance");
   const E = env();
+  // ⚠️ AND IT ASKS THE GROUND THIS CARD ACTUALLY HAS. shareGroundUnder answers WHITE when it cannot look,
+  // which is the right failure for a photograph we hold and cannot sample and the wrong answer for a card
+  // that has no photograph at all — so with no probe every no-photo card thickened the keyline for a
+  // bright ground whose lightest pixel is lightness 0.125. Measured through the real function: the easy
+  // ground reads far below mid grey, and white reads far above it.
+  const noPhoto = E.shareRectGroundRGB({ effort: "easy" }, null, E.cardGeom("story"), { x: 0, y: 0, w: 100, h: 100 });
+  assert.ok(E.shareRelLumRGB(noPhoto) < E.shareLumOfByte(150),
+    "a no-photo card's own ground is being read as bright: " + noPhoto.join(","));
+  assert.deepEqual(E.shareRectGroundRGB({ effort: "" }, null, E.cardGeom("story"), { x: 0, y: 0, w: 10, h: 10 }),
+    E.shareHexRGB(E.SHARE_INK.ground), "a card with no effort colour is not reading the plain ink ground");
   // Cyan is genuinely brighter than mid grey; pure blue is genuinely darker. A byte model says both are
   // dark, which is how a route over a bright sky came out as a hollow outline.
   assert.ok(E.shareRelLumRGB([0, 255, 255]) > E.shareLumOfByte(150), "cyan is being read as a dark ground");
   assert.ok(E.shareRelLumRGB([0, 0, 255]) < E.shareLumOfByte(150), "pure blue is being read as a bright ground");
 });
 
-test("the top scrim is a gradient rather than a plate, and vanishes on a dark photograph", () => {
+// ---- the session's own colour as a ground (owner, ruling 7) --------------------------------------
+
+test("BLOCKER: the ground's three colours ARE the app's own effort tokens, read out of the stylesheet", () => {
+  // ⚠️⚠️ THIS IS THE GUARD A COMMENT IN web/app.ts CLAIMED FOR A DAY WHILE NO SUCH GUARD EXISTED — the
+  // second time a comment in this area has promised a test that was never written (the first is recorded
+  // in the palette test above). Proven by re-break before it was believed: SHARE_EFFORT.easy set to a
+  // blue built clean and passed 960 tests, so the card could paint an easy run blue while the Logbook
+  // rail, the plan dot and the debrief chip all painted it --eff-easy teal.
+  // ⚠️ AND IT READS BOTH DARK DECLARATIONS. CLAUDE.md records that FOUR places declare these tokens and
+  // that a change applied to three leaves the fourth stale — which one a runner gets depends on their OS
+  // setting, so it reproduces for some people and not others. The card is a dark design in both themes,
+  // so the two dark declarations are the two that decide it, and they must agree with each other first.
   const E = env();
-  const gm = E.cardGeom("story");
-  const rect = E.shareRect(64, 120, 200, 44);
-  const cols = [{ hex: E.SHARE_INK.ink, target: 4.5 }, { hex: E.SHARE_INK.accent, target: 4.5 }];
-  const bright = E.ctx();
-  const got = E.shareTopScrim(bright, gm, { w: 4, h: 7, data: new Uint8ClampedArray(112).fill(250) }, rect, cols);
-  assert.ok(got.a > 0, "a white photograph earned no scrim behind the wordmark");
-  assert.equal(bright.calls("fillRect").length, 1, "the scrim is not one band");
-  assert.equal(bright.log.filter((e: any[]) => e[0] === "stop").length, 3, "the scrim is not a gradient");
-  const stops = bright.log.filter((e: any[]) => e[0] === "stop");
-  assert.match(String(stops[2][2]), /,0\)$/, "the scrim does not fade out, so it is a plate");
-  // ⚠️ AND THE SOLVED ALPHA MUST BE REACHED BY THE BOTTOM OF THE RECT, not somewhere below it. The
-  // first version of this put its middle stop at 0.62 of the band carrying 0.72 of the alpha, so over
-  // the wordmark the gradient delivered 0.58 where 0.78 had been solved — measured from the export, the
-  // accent half of the logo came out at 2.28:1 while the report said the ratio had been met. Solving
-  // correctly and then drawing something weaker is worse than not solving at all.
-  const foot = rect.y + rect.h + Math.round(gm.H * 0.06);
-  assert.ok(stops[1][1] <= (rect.y + rect.h) / foot + 1e-9,
-    "the solved alpha is not reached until below the copy: stop at " + stops[1][1] +
-    " against " + ((rect.y + rect.h) / foot).toFixed(4));
-  const alphaOf = (c: string) => parseFloat(String(c).split(",").pop()!.replace(")", ""));
-  assert.ok(alphaOf(stops[0][2]) >= alphaOf(stops[1][2]), "the scrim is weaker at the very top edge");
-  assert.ok(Math.abs(alphaOf(stops[1][2]) - got.a) < 1e-6, "the middle stop is not the solved alpha");
-  const dark = E.ctx();
-  const none = E.shareTopScrim(dark, gm, { w: 4, h: 7, data: new Uint8ClampedArray(112).fill(6) }, rect, cols);
-  assert.equal(none.a, 0, "a dark photograph is being scrimmed anyway");
-  assert.equal(dark.log.length, 0, "the scrim drew on a photograph that needed none");
-  // ⚠️ AND IT IS SOLVED ACROSS THE STRIP IT PAINTS, NOT ACROSS THE WORDMARK'S OWN 146px. That shipped a
-  // 2.09:1 on the brand mark: a probe cell is an average of about a hundred export pixels, so a dark
-  // field with pure-white specks reads dark in the three or four cells the wordmark's rect covers and no
-  // scrim is drawn at all — while a glyph sitting on a speck is set on white. Found at 1:1, where a
-  // contained portrait leaves the wordmark straddling the picture's own left edge, and it was never a
-  // square defect: the identical rect on a feed post passed only because twelve cells fell on the
-  // picture and one of them happened to catch a highlight.
-  //
-  // The mechanism, stated so it cannot regress: with the ground bright ONLY outside the wordmark's own
-  // columns, a rect-width sample sees nothing and a full-width sample sees it.
-  const w = 40, h = 20;
-  const edgeBright = new Uint8ClampedArray(w * h * 4).fill(6);
-  for (let y = 0; y < h; y++) for (let x = 30; x < w; x++) {
-    const i = (y * w + x) * 4;
-    edgeBright[i] = edgeBright[i + 1] = edgeBright[i + 2] = 252; edgeBright[i + 3] = 255;
+  const media = darkTokens(), attr = darkThemeTokens();
+  const pairs: [string, string][] = [["easy", "--eff-easy"], ["moderate", "--eff-moderate"], ["hard", "--eff-hard"]];
+  for (const [band, tok] of pairs) {
+    assert.ok(media[tok], "the dark media block does not declare " + tok);
+    assert.equal(attr[tok], media[tok],
+      "the two dark declarations of " + tok + " disagree: " + media[tok] + " vs " + attr[tok]);
+    assert.equal(E.SHARE_EFFORT[band], media[tok],
+      "SHARE_EFFORT." + band + " is " + E.SHARE_EFFORT[band] + " but " + tok + " is " + media[tok]);
   }
-  const far = E.ctx();
-  const seen = E.shareTopScrim(far, gm, { w, h, data: edgeBright }, E.shareRect(64, 120, 200, 44), cols);
-  assert.ok(seen.a > 0,
-    "the top scrim is solved from the wordmark's own rect, so a highlight elsewhere in the band it " +
-    "paints across is invisible to it — which is the 2.09:1 defect");
-  // and the source says so: the sample is the canvas width, not the rect's
-  const src = lift("shareTopScrim").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-  assert.match(src, /shareRect\(0, rect\.y, gm\.W, rect\.h\)/,
-    "the top scrim no longer samples the full width of the band it paints");
+  // ⚠️ THREE BANDS, THREE DISTINCT COLOURS. A table whose members happen to be equal is a family with one
+  // card in it, which is the shape a copy-paste produces.
+  assert.deepEqual(Object.keys(E.SHARE_EFFORT).sort(), ["easy", "hard", "moderate"],
+    "SHARE_EFFORT no longer holds exactly the three bands a run can be");
+  assert.equal(new Set(Object.values(E.SHARE_EFFORT)).size, 3, "two of the three grounds are the same colour");
+  // ⚠️ AND EACH BAND RESOLVES TO ITS OWN COLOUR. Re-broken as `return effort ? SHARE_EFFORT.hard : null`,
+  // which paints every easy run as a hard one and which nothing caught.
+  for (const [band] of pairs) {
+    assert.equal(E.shareEffortHex(band), E.SHARE_EFFORT[band],
+      "shareEffortHex(" + band + ") answers " + E.shareEffortHex(band) + ", not that band's own colour");
+  }
+  // ⚠️ "none" IS NOT A GROUND. --eff-none is a desaturated sage grey and effortOf answers it only for a
+  // rest or mobility day, neither of which is a run; forcing it through the derivation would turn "we do
+  // not know what this session was" into a confident green.
+  for (const absent of ["none", "", null, undefined, "moderat"]) {
+    assert.equal(E.shareEffortHex(absent as any), null, "an unknown effort band became a ground: " + absent);
+  }
+  // ⚠️ AND THE TWO LITERAL COPIES OF #e6ac3e AND #e56f49 IN THIS FILE'S OWN PALETTE MUST STAY EQUAL.
+  // SHARE_INK.fast/slow are the chart's out-of-band marks and SHARE_EFFORT.moderate/hard are the
+  // grounds; both are pinned to the same token above, so this is implied — stating it means a change
+  // that moves one of them fails HERE, naming the pair, rather than in whichever token guard runs first.
+  assert.equal(E.SHARE_INK.fast, E.SHARE_EFFORT.moderate,
+    "the chart's 'fast' mark and the moderate ground are two spellings of one token and have drifted");
+  assert.equal(E.SHARE_INK.slow, E.SHARE_EFFORT.hard,
+    "the chart's 'slow' mark and the hard ground are two spellings of one token and have drifted");
 });
 
-// ---- text ----------------------------------------------------------------------------------------
+test("BLOCKER: the app's two effort readers ANSWER from the one mapping, not merely mention it", () => {
+  // ⚠️ THREE OF TWENTY-FIVE RE-BREAKS ESCAPED WITH THIS ONE ROOT CAUSE, and the third was the previous
+  // round's exact defect restored: effortOf and runEffort could be reverted to HEAD's intensity-keyed
+  // branching — which is what painted a tempo rust — and the whole suite stayed green, because the
+  // mapping was guarded where it is DECLARED and not where it is READ. A table nobody is forced to read
+  // is a suggestion.
+  //
+  // So this asserts BEHAVIOUR over the derived collection: for every member of the SessionType union,
+  // both readers must return exactly what sessionEffort returns. A reader that re-derives the answer
+  // from intensity, from a step's RPE, or from its own list cannot agree across all twelve.
+  const A = effEnv();
+  const types = sessionTypes();
+  assert.ok(types.length >= 10, "the SessionType union no longer parses: " + types.length);
+  for (const t of types) {
+    const want = A.sessionEffort(t);
+    assert.equal(A.effortOf({ type: t }), want,
+      "effortOf disagrees with the one mapping for " + t + ": " + A.effortOf({ type: t }) + " vs " + want);
+    assert.equal(A.runEffort({ type: t }), want,
+      "runEffort disagrees with the one mapping for " + t + ": " + A.runEffort({ type: t }) + " vs " + want);
+  }
+  // ⚠️ AND NEITHER READER MAY CARRY A SECOND OPINION TO FALL BACK ON. An intensity- or RPE-keyed branch
+  // that happens to agree today is the same defect one library change away from returning.
+  for (const name of ["effortOf", "runEffort"]) {
+    const src = lift(name);
+    assert.ok(!/intensity|targetRpe|RUN_HARD/.test(src),
+      name + " decides an effort itself instead of asking the one mapping: " + src.trim());
+  }
+});
+
+test("BLOCKER: one session type has ONE effort colour, everywhere in the app", () => {
+  // ⚠️ THE OWNER'S OWN EXAMPLE WAS THE ONE THAT WAS WRONG. "an easy run is teale, a tempo is yellow etc"
+  // — and a tempo had three colours at once: the Add-a-session grid drew it --eff-moderate, the
+  // training-log calendar drew it --eff-hard, and the card's new ground drew it --eff-hard because its
+  // own list of hard types named threshold. He taps the amber tile, runs it, gets a rust card.
+  // ⚠️ THE SESSION TYPES ARE READ OUT OF THE ENGINE'S OWN UNION, not listed here — a hand-written list is
+  // how a mapping comes to be missing the one type nobody remembered (this project has shipped that twice:
+  // "race-specific" omitted from one reader, "race" omitted from all three).
+  const A = effEnv(), E = env();
+  const types = sessionTypes();
+  for (const t of types) {
+    assert.ok(A.SESSION_EFFORT[t], "SESSION_EFFORT has no row for the session type " + t);
+  }
+  assert.deepEqual(Object.keys(A.SESSION_EFFORT).sort(), types.slice().sort(),
+    "SESSION_EFFORT and SessionType have drifted apart");
+  // The owner's decision, and the two it is not.
+  assert.equal(A.sessionEffort("threshold"), "moderate", "a tempo is not the moderate band");
+  for (const t of ["vo2", "race-specific", "race"]) {
+    assert.equal(A.sessionEffort(t), "hard", t + " is not the hard band");
+  }
+  for (const t of ["easy", "long", "recovery", "strides"]) {
+    assert.equal(A.sessionEffort(t), "easy", t + " is not the easy band");
+  }
+  // ⚠️ EVERY --eff-* COLOUR IN THE GRID AND THE CALENDAR COMES FROM THE MAPPING. Neither table is
+  // required to be all-effort — the grid deliberately keeps four identity accents so seven tiles stay
+  // tellable apart, and the calendar's long bucket is an identity — but anything WEARING an effort
+  // colour must be wearing the right one, which is the drift that produced the defect.
+  for (const r of A.RUN_TYPES) {
+    if (!/--eff-/.test(r.c)) continue;
+    assert.equal(r.c, A.effortVar(A.sessionEffort(r.t)),
+      "the Add-a-session tile for " + r.t + " is " + r.c + " and its effort colour is " +
+      A.effortVar(A.sessionEffort(r.t)));
+  }
+  assert.ok(A.RUN_TYPES.some((r: any) => /--eff-/.test(r.c)), "no grid tile carries an effort colour at all");
+  for (const t of Object.keys(A.RUN_KIND)) {
+    const k = A.RUN_KIND[t];
+    if (k.k === "long") { assert.equal(k.c, "var(--taper)", "the long bucket lost its identity accent"); continue; }
+    assert.equal(k.c, A.effortVar(A.sessionEffort(t)),
+      "the calendar dot for " + t + " is " + k.c + " and its effort colour is " + A.effortVar(A.sessionEffort(t)));
+  }
+  assert.equal(A.runKindColour("threshold"), "var(--eff-moderate)", "a tempo dot on the calendar is not amber");
+  assert.equal(A.runKindColour("qwerty"), A.effortVar(A.sessionEffort("qwerty")), "the default bucket left the mapping");
+  // ⚠️ AND THE CALENDAR'S LEGEND NAMES EVERY COLOUR A DOT CAN BE, AND NOTHING ELSE. It was three
+  // hand-written pairs and one of them went stale the moment a tempo became amber: it promised
+  // "Quality" in --eff-hard over a grid drawing --eff-moderate.
+  const legend = A.logCalendarLegend();
+  const drawn = new Set<string>(Object.keys(A.RUN_KIND).map((t) => A.RUN_KIND[t].c)
+    .concat([A.runKindColour("easy")]));
+  assert.deepEqual(new Set(legend.map((x: any) => x[1])), drawn,
+    "the legend and the dots disagree: legend " + legend.map((x: any) => x[1]).join(",") +
+    " vs dots " + [...drawn].join(","));
+  assert.equal(legend.length, new Set(legend.map((x: any) => x[1])).size, "the legend repeats a colour");
+  for (const row of legend) assert.ok(row[0] && !/undefined/.test(String(row[0])), "a legend row has no word: " + row);
+  // ⚠️ THE CARD IS THE FOURTH READER AND IT MUST AGREE. This is the finding in one line.
+  assert.equal(E.shareEffortHex(A.sessionEffort("threshold")), darkTokens()["--eff-moderate"],
+    "a tempo card's ground is not the amber token");
+  assert.equal(E.shareEffortHex(A.sessionEffort("vo2")), darkTokens()["--eff-hard"]);
+  assert.equal(E.shareEffortHex(A.sessionEffort("easy")), darkTokens()["--eff-easy"]);
+  // ⚠️ AND THE MIDDLE OF THE FAMILY MUST BE REACHABLE BY A RUN SOMEBODY CAN ACTUALLY LOG. Before this,
+  // "moderate" was reached only by strength and cross-training, and PRIMARY_TYPES cannot start either —
+  // so the amber ground was undrawable and the derivation's whole legibility argument was about a card
+  // no runner could produce.
+  const loggable = Object.keys(A.PRIMARY_TYPES);
+  for (const band of ["easy", "moderate", "hard"]) {
+    assert.ok(loggable.some((t) => A.sessionEffort(t) === band),
+      "no run a runner can start resolves to the " + band + " ground: " + loggable.join(","));
+  }
+});
+
+test("BLOCKER: the session ground is dark enough for every text tier, on all three colours", () => {
+  // ⚠️ SHARE_GROUND.lTop GOVERNS LEGIBILITY AND NOTHING WAS CHECKING IT. Re-broken from 0.125 to 0.30:
+  // build clean, 960 tests green, and a card whose small type measures 2.57:1 ships. The comment beside
+  // it also claimed the honest ceiling was 0.145-0.165 when --ink-faint is already under AA at 0.145.
+  // ⚠️ MEASURED AGAINST THE TOP STOP, which is the lightest the ground gets anywhere on the card and so
+  // the pixel the tightest tier really does land on (the wordmark and the eyebrow are up there).
+  const E = env();
+  const tiers = ["inkFaint", "inkSoft", "accent", "ink"];
+  let worst = 99, worstAt = "";
+  for (const band of ["easy", "moderate", "hard"]) {
+    const stops = E.shareGroundStops(E.SHARE_EFFORT[band]);
+    assert.equal(stops.length, 2, "a session ground is not two stops");
+    // Deepens downward, which is the gesture the photo cards' solved scrim makes.
+    assert.ok(E.shareRelLum(stops[1]) < E.shareRelLum(stops[0]),
+      band + "'s ground does not deepen towards the block");
+    // ⚠️ AND IT KEEPS THE TOKEN'S HUE, which is the whole reason the derivation is done in HSL. A ground
+    // mixed towards the ink in sRGB comes out olive, and a flat grey would pass every ratio below while
+    // saying nothing about the run.
+    // ⚠️ THE TOLERANCE IS 2.5 DEGREES BECAUSE 8-BIT QUANTISATION AT THIS LIGHTNESS IS THE FLOOR, not
+    // because the derivation is sloppy. Measured: the top stops drift 0.19-0.61 degrees and the bottom
+    // stops 1.33-1.75, because #1d1607 has only 22 levels between its brightest and dimmest channel.
+    // Written at 1.5 this failed on correct code.
+    for (const st of stops) {
+      assert.ok(Math.abs(E.shareHexHSL(st).h - E.shareHexHSL(E.SHARE_EFFORT[band]).h) < 2.5,
+        band + "'s ground has lost the token's hue: " + st);
+      assert.ok(E.shareHexHSL(st).s > 0.3, band + "'s ground has lost its chroma: " + st);
+    }
+    for (const k of tiers) {
+      const r = E.shareRatio(E.shareRelLum(E.SHARE_INK[k]), E.shareRelLum(stops[0]));
+      if (r < worst) { worst = r; worstAt = band + "/" + k; }
+      assert.ok(r >= 4.5, "SHARE_INK." + k + " measures " + r.toFixed(2) + ":1 on the " + band +
+        " ground's top stop — raise of SHARE_GROUND.lTop takes the type under AA");
+    }
+  }
+  // ⚠️ THE MEASURED SWEEP, QUOTED SO A FUTURE CHANGE HAS TO FACE IT. --ink-faint on the EASY ground (the
+  // tightest of the nine) runs 5.17 : 4.70 : 4.25 : 3.81 : 3.42 across lTop 0.105 / 0.125 / 0.145 / 0.165
+  // / 0.185, and 1.79 at 0.30. So 0.145 is already under AA, the ceiling is between 0.125 and 0.145, and
+  // the shipped value carries 0.20 of margin on the tightest tier there is.
+  assert.ok(worst > 4.6 && worst < 4.9, "the tightest tier now measures " + worst.toFixed(2) +
+    ":1 at " + worstAt + ", where 0.125 measured 4.70 — SHARE_GROUND has moved");
+});
+
+test("BLOCKER: the topographic contours carry the session's colour, and the plain ink ground is unchanged", () => {
+  // ⚠️ THE OWNER ASKED FOR THE TEXTURE TO SURVIVE AND IT IS ALSO WHERE THE CHROMA COMES FROM — the ground
+  // itself cannot be lifted far enough to read as a hue without taking --ink-faint under 4.5:1. Re-broken
+  // as `const tok = SHARE_INK.inkSoft`, which silently returns the whole family to grey contours over
+  // three barely-different deep grounds, and which nothing caught.
+  // ⚠️ ASSERTED ON WHAT IT STROKED, NOT ON ITS SOURCE. The texture draws into an offscreen canvas and
+  // then drawImages it, so the claim is read off that canvas's own recorded strokeStyle.
+  const E = env();
+  const gm = E.cardGeom("story");
+  const seen: string[] = [];
+  for (const band of ["easy", "moderate", "hard"]) {
+    const before = E.made.length;
+    E.shareTopoDraw(E.ctx(), gm, E.SHARE_EFFORT[band]);
+    assert.equal(E.made.length, before + 1,
+      "the " + band + " texture reused a cached canvas — the stroke colour is not in shareTopoCanvas's key, " +
+      "so two grounds share one picture and whichever drew first wins");
+    const strokes = E.made[E.made.length - 1].ctx.log.filter((l: any[]) => l[0] === "strokeStyle").map((l: any[]) => l[1]);
+    assert.deepEqual(strokes, [E.cardAlpha(E.SHARE_EFFORT[band], E.SHARE_TOPO.alpha)],
+      "the " + band + " contours were stroked " + strokes.join(",") + ", not in that session's own colour");
+    seen.push(strokes[0]);
+  }
+  assert.equal(new Set(seen).size, 3, "two of the three grounds drew identically coloured contours");
+  // ⚠️ AND WITH NO SESSION COLOUR IT IS EXACTLY WHAT IT ALWAYS WAS: --ink-soft at the same alpha, so a run
+  // with no type draws the poster it has always drawn.
+  const before = E.made.length;
+  E.shareTopoDraw(E.ctx(), gm, null);
+  const plain = E.made[E.made.length - 1].ctx.log.filter((l: any[]) => l[0] === "strokeStyle").map((l: any[]) => l[1]);
+  assert.deepEqual(plain, [E.cardAlpha(E.SHARE_INK.inkSoft, E.SHARE_TOPO.alpha)],
+    "a card with no session colour no longer draws the ink contours it always did: " + plain.join(","));
+  assert.ok(E.made.length === before + 1);
+  // The cache still works for a repeat of the same colour, which is what keeps a pinch from stuttering.
+  const n = E.made.length;
+  E.shareTopoDraw(E.ctx(), gm, null);
+  assert.equal(E.made.length, n, "the texture is regenerated on every draw");
+});
+
+test("BLOCKER: the ground itself is the session's colour, and no effort means the flat ink it always was", () => {
+  // ⚠️ THE null PATH MUST BE BYTE-FOR-BYTE WHAT shareGroundFill ALWAYS PAINTED, which is what makes the
+  // change provable: an export with no effort is unchanged and an export with one is not.
+  const E = env();
+  const gm = E.cardGeom("story");
+  const g1 = E.ctx(); E.shareGroundPaint(g1, gm, null);
+  const g2 = E.ctx(); E.shareGroundFill(g2, gm);
+  assert.deepEqual(g1.log, g2.log, "a card with no session colour no longer paints the plain ink ground");
+  for (const band of ["easy", "moderate", "hard"]) {
+    const g = E.ctx(); E.shareGroundPaint(g, gm, E.SHARE_EFFORT[band]);
+    const stops = g.log.filter((l: any[]) => l[0] === "stop").map((l: any[]) => l[1] + ":" + l[2]);
+    assert.deepEqual(stops, ["0:" + E.shareGroundStops(E.SHARE_EFFORT[band])[0],
+      "1:" + E.shareGroundStops(E.SHARE_EFFORT[band])[1]],
+      band + " did not paint its own two stops: " + stops.join(" "));
+    const rects = g.log.filter((l: any[]) => l[0] === "fillRect");
+    assert.deepEqual(rects, [["fillRect", 0, 0, gm.W, gm.H]], band + " does not fill the whole canvas");
+  }
+});
+
+test("BLOCKER: a photo-less data template puts the route in its own upper field, and a photo card is untouched", () => {
+  // ⚠️ MEASURED BEFORE IT WAS ADDED. With no photograph The Execution and The Progression put 44.4% and
+  // 42.4% of a story card into ONE continuous ink-free band, and their second quarter measured a
+  // per-quarter luminance sd of 0.0121 against the byte gate's own 0.012 emptiness bar. After: 26.1% and
+  // 25.1%. The Moment has always drawn its route in exactly that space, so this removed a difference
+  // between the templates rather than adding a variant.
+  // ⚠️ AND EVERY PHOTO CARD IS UNTOUCHED DOWN TO THE BYTE, proved by hash across both trees: all 36
+  // captured exports identical. The gate is `probe`, which is the presence of a photograph.
+  // ⚠️ ISOLATED AGAINST THE SAME CARD WITH NO ROUTE, not against the photo card. Comparing the two
+  // COMPOSITIONS measures every other difference a photograph makes as well — written that way the
+  // difference was 6 path segments and read as "the field route is not reaching it" on working code.
+  const E = env();
+  const gm = E.cardGeom("story");
+  const photo = { w: 1200, h: 1800, ox: 0.5, oy: 0.5, k: 1, id: "p", bitmap: {} };
+  const probe = { w: 4, h: 7, data: new Uint8ClampedArray(4 * 7 * 4).fill(250) };
+  const paths = (build: any, over: any, pr: any) => {
+    const g = E.ctx();
+    const m = build(over);
+    const fn = m.template === "execution" ? E.shareExecutionCard : E.shareProgressionCard;
+    fn(g, m, gm, pr, E.shareWordmarkPlan(g, gm, pr ? 1 : 0));
+    return g.log.filter((l: any[]) => l[0] === "lineTo").map((l: any[]) => l[2] as number);
+  };
+  for (const build of [execModel, progModel]) {
+    const name = build === execModel ? "execution" : "progression";
+    const gp = E.ctx();
+    const plan = name === "execution" ? E.shareExecutionPlan(gp, build({ photo: null }), gm)
+      : E.shareProgressionPlan(gp, build({ photo: null }), gm);
+    const bare0 = paths(build, { route: null, photo: null }, null);
+    const bare1 = paths(build, { route: REF_ROUTE, photo: null }, null);
+    assert.ok(bare1.length > bare0.length, name + " with no photograph draws the same path with a route " +
+      "as without one (" + bare1.length + " vs " + bare0.length + " lineTo) — the field route is not reaching it");
+    // ⚠️ THE ROUTE IS DRAWN FIRST, SO THE EXTRA PATH IS THE PREFIX. Taking it as the SUFFIX read the
+    // splits ladder's own geometry and reported the field route as reaching y1684 on working code.
+    const extra = bare1.slice(0, bare1.length - bare0.length);
+    assert.ok(extra.length > 0);
+    assert.ok(Math.max.apply(null, extra) < plan.blockTop - 32,
+      name + "'s field route reaches y" + Math.max.apply(null, extra) + ", inside a block that starts at y" + plan.blockTop);
+    assert.ok(Math.min.apply(null, extra) >= gm.safe.y0,
+      name + "'s field route starts above the safe region");
+    // ⚠️ AND WITH A PHOTOGRAPH IT IS THE SAME PICTURE WITH OR WITHOUT A ROUTE, which is the untouched half.
+    assert.deepEqual(paths(build, { route: REF_ROUTE, photo: photo }, probe),
+      paths(build, { route: null, photo: photo }, probe),
+      name + " drew a route over a photograph, which changes every photo card the gate has signed off");
+  }
+  // ⚠️ AND ITS THREE REFUSALS, EACH A REAL CASE: a photograph (the field IS the picture), no route at all
+  // (a treadmill run, or one whose GPS was refused), and a route the runner has hidden — shareCardModel
+  // sends m.route null for that last one, which is the same test.
+  const noDraw = (probeArg: any, r: any) => {
+    const g = E.ctx();
+    E.shareFieldRoute(g, { route: r, effort: "easy" }, gm, probeArg, E.shareWordmarkPlan(g, gm, 0), 1200);
+    return g.log.filter((l: any[]) => l[0] === "lineTo" || l[0] === "stroke").length;
+  };
+  assert.equal(noDraw(probe, REF_ROUTE), 0, "a card with a photograph drew a second route in its field");
+  assert.equal(noDraw(null, null), 0, "a run with no route drew one anyway");
+  assert.ok(noDraw(null, REF_ROUTE) > 0, "a photo-less card with a route drew nothing");
+});
+
+test("BLOCKER: the wordmark carries a keyline instead of a fade, and it is a keyline not a plate", () => {
+  // ⚠️ THIS TEST REPLACED THE TOP SCRIM'S, AND THE INVARIANT IT PROTECTS IS THE SAME ONE. The owner asked
+  // for the fade across the top of the card to go (2026-08-20); the recorded defect it existed for was the
+  // accent half of the wordmark measuring 2.09:1 over a field of white specks, because the scrim's alpha
+  // was solved from a tenth-scale probe that averaged the specks away. A keyline cannot be defeated that
+  // way — it does not sample the ground at all — so what is asserted here is that the treatment is a
+  // STROKE UNDER THE GLYPHS and never a filled band, and that its three layers are in the one order that
+  // works.
+  const E = env();
+  const gm = E.cardGeom("story");
+  // With no photograph there is no treatment: the family's own grounds measure 11.0 to 19.4:1 on the
+  // wordmark, so an edge there is cost with no benefit.
+  const flat = E.ctx();
+  E.shareWordmark(flat, gm.M, 140, 35, "left", 0);
+  assert.equal(flat.calls("strokeText").length, 0, "the wordmark is keylined on a ground that needs none");
+  assert.equal(flat.calls("fillText").length, 2, "the wordmark is not its two coloured runs");
+  assert.equal(flat.calls("fillRect").length, 0, "the wordmark drew a band");
+  // With one, both runs are stroked BEFORE either is filled.
+  const over = E.ctx();
+  E.shareWordmark(over, gm.M, 140, 35, "left", 1);
+  assert.equal(over.calls("fillRect").length, 0, "the wordmark's treatment is a plate, not a keyline");
+  const order = over.log.filter((e: any[]) => e[0] === "strokeText" || e[0] === "fillText")
+    .map((e: any[]) => e[0]);
+  assert.deepEqual(order, ["strokeText", "strokeText", "fillText", "fillText"],
+    "the keyline of one run can bite into the fill of the other: " + order.join(","));
+  // ⚠️ AND THE HALO IS CARRIED BY THE STROKE, NOT BY THE FILL, WHICH IS WHAT PUTS IT UNDER THE KEYLINE.
+  // Measured on the sticker that first used this device: with the halo painted over the keyline only 0.55
+  // of the keyline survives, and strengthening the halo then made the type WORSE. The tell is the state of
+  // shadowBlur at the moment each draw call is made.
+  const at = (kind: string) => {
+    const i = over.log.findIndex((e: any[]) => e[0] === kind);
+    return over.log.slice(0, i).filter((e: any[]) => e[0] === "shadowBlur").pop();
+  };
+  const atStroke = at("strokeText"), atFill = at("fillText");
+  assert.ok(atStroke && Number(atStroke[1]) > 0, "the keyline stroke carries no halo");
+  // ⚠️ AND BY THE TIME THE FILL RUNS THE HALO IS BACK OFF, which is what leaves it above both other layers.
+  assert.ok(atFill && Number(atFill[1]) === 0, "the fill is carrying the halo, so it lands over the keyline");
+  // The stroke is wider than a hairline at the wordmark's real size, or the edge cannot be seen.
+  const lws = over.log.filter((e: any[]) => e[0] === "lineWidth").map((e: any[]) => Number(e[1]));
+  const lw = Math.max(...lws);
+  assert.ok(lw >= E.SHARE_WM_EDGE.keyMin, "the keyline is thinner than its own floor: " + lw);
+  assert.ok(lw >= 35 * E.SHARE_WM_EDGE.key - 1e-9, "the keyline no longer scales with the glyph: " + lw);
+  // ⚠️ THE BLUR IS SCALED BY THE DRAW SCALE, because Chrome does not scale shadowBlur by the transform —
+  // a preview at half scale would otherwise carry twice the halo the export does.
+  const half = E.ctx();
+  E.shareWordmark(half, gm.M, 140, 35, "left", 0.5);
+  const hb = half.log.filter((e: any[]) => e[0] === "shadowBlur").map((e: any[]) => Number(e[1]))
+    .filter((v: number) => v > 0);
+  assert.ok(hb.length && Math.abs(hb[0] - E.SHARE_WM_EDGE.blur * 0.5) < 1e-9,
+    "the halo does not track the draw scale: " + JSON.stringify(hb));
+  // And the context is left as it was found, or every later draw on the same canvas inherits an edge.
+  const after = over.log.filter((e: any[]) => e[0] === "shadowBlur" || e[0] === "shadowColor");
+  assert.ok(after.length >= 4, "the treatment does not restore what it changed: " + after.length);
+});
 
 test("BLOCKER: digits occupy one column, and the build does not claim tabular figures", () => {
   // ⚠️ MEASURED IN THE REAL RENDERER: at 800 84px a "1" is 41.34px and an "8" is 55.90px, so a metric
@@ -1288,8 +1674,9 @@ test("the renderer uses the shared layer rather than a second copy of it", () =>
   // invariant was never "these strings are in this function", it is "the shipped card reaches these".
   const cl = closure("drawShareCard");
   const all = [...cl.values()].join("\n");
-  for (const fn of ["shareGroundFill", "sharePhotoDraw", "shareLumaProbe", "shareVeilPlan",
-    "shareVeilDraw", "shareTopScrim", "shareWordmark", "shareRoutePlacement", "shareRouteDraw",
+  for (const fn of ["shareGroundFill", "shareGroundPaint", "shareEffortHex", "sharePhotoDraw",
+    "shareLumaProbe", "shareVeilPlan",
+    "shareVeilDraw", "shareWordmark", "shareRoutePlacement", "shareRouteDraw",
     "shareTopoDraw", "shareWordmarkPlan", "shareMomentCard", "sharePosterCard"]) {
     assert.ok(all.includes(fn + "("), "the renderer does not use " + fn);
   }
@@ -1682,17 +2069,33 @@ test("BLOCKER: The Route Poster is photo-OPTIONAL, and draws no fake route eithe
   const poster = lift("sharePosterCard");
   assert.match(poster, /sharePhotoScrim\(g, gm, probe,/,
     "the poster composites a photograph without the shared solved scrim");
-  assert.match(poster, /shareTopScrim\(g, gm, probe, wm\.rect,/,
-    "the poster's wordmark is unprotected over a photograph");
+  // ⚠️ THE WORDMARK'S PROTECTION IS NOW ITS OWN EDGE, AND THE CLAIM IS ASSERTED OVER EVERY TEMPLATE
+  // RATHER THAN THIS ONE. The fade across the top of the card is gone (owner, 2026-08-20) and five
+  // templates draw the wordmark; a sixth written without the edge would ship the recorded 2.09:1 defect on
+  // one card only, so the sweep is derived from every call site in the build instead of naming the poster.
+  // ⚠️ THE DECLARATION IS NOT A CALL SITE, and the first version of this sweep counted it — so it reported
+  // the parameter list as a wordmark drawn with no edge. Excluded by the keyword in front of it.
+  const wmCalls = [...appScript().matchAll(/(function )?shareWordmark\(g, [^)]*\)/g)]
+    .filter((m) => !m[1]).map((m) => m[0]);
+  assert.ok(wmCalls.length >= 5, "only " + wmCalls.length + " wordmark call sites found");
+  for (const c of wmCalls) {
+    assert.match(c, /wm\.edge\)$/, "a wordmark is drawn without the plan's own edge: " + c);
+  }
+  assert.match(lift("shareDrawBody"), /shareWordmarkPlan\(g, gm, probe \? S : 0\)/,
+    "the edge is no longer decided once, from the presence of a photograph");
   // ⚠️ AND ITS FAINTEST TIER IS LIFTED WHEN THERE IS A PICTURE, from ONE variable read by the solver AND
   // by every fill. Measured against a white ground the faint tier solves alpha 0.88 where the soft tier
   // solves 0.78, so asking for it costs ten points of somebody's photograph — and on a solved scrim the
   // soft tier is what the rest of the family already sets for these rungs. A palette that disagreed with
   // the scrim solved for it is the whole class of defect the solver exists to prevent.
-  assert.match(poster, /const quiet = m\.photo \? SHARE_INK\.inkSoft : SHARE_INK\.inkFaint;/,
+  assert.match(poster, /const quiet = shareQuietInk\(m\);/,
     "the poster's quiet tier is not one derivation");
-  assert.equal((poster.match(/SHARE_INK\.inkFaint/g) || []).length, 1,
-    "the poster still sets the faint tier somewhere other than that one derivation");
+  // ⚠️ ZERO NOW, BECAUSE THE DERIVATION MOVED OUT OF THIS TEMPLATE. It used to be the poster's own
+  // conditional and the count of 1 was what stopped a second copy appearing beside it; the rule is
+  // shareQuietInk's, so the poster may not name the tier at all — which is the stronger claim, and the
+  // tier's own reachability is asserted where the rule lives.
+  assert.equal((poster.match(/SHARE_INK\.inkFaint/g) || []).length, 0,
+    "the poster names the faint tier directly instead of asking shareQuietInk for it");
   assert.ok((poster.match(/\bquiet\b/g) || []).length >= 4,
     "the derived tier is not read by every rung that used to name the faint one");
 });
@@ -2410,8 +2813,18 @@ test("BLOCKER: no photo template covers its photograph, and the block's own colo
       "colour on any of these cards; the poster keeps it because its ground is flat");
     assert.ok(!asked(name).includes("inkFaint"), name + " solves the scrim for the faint tier");
   }
-  assert.ok(draws("sharePosterCard").includes("inkFaint"),
-    "the poster has stopped using the faint tier, so the tier is now unused and should be removed");
+  // ⚠️ THE POSTER REACHES THE FAINT TIER THROUGH ONE SHARED RULE NOW, NOT BY NAMING IT. shareQuietInk
+  // steps the quietest tier UP to --ink-soft whenever the ground is not the plain deep ink — a photograph
+  // or a session colour — because measured from rendered pixels --ink-faint is 6.50:1 on #06110e and
+  // 3.83:1 on the easy session ground. So the assertion is that the tier is still REACHABLE and that the
+  // condition is the ground rather than a list of templates; a tier nothing can reach is dead code, and a
+  // condition written as a list is one a third kind of ground gets left out of.
+  const quiet = lift("shareQuietInk");
+  assert.match(quiet, /SHARE_INK\.inkFaint/, "the faint tier is now unreachable and should be removed");
+  assert.match(quiet, /m\.photo \|\| shareEffortHex\(m\.effort\)/,
+    "the quiet tier's lift no longer asks about the ground: " + quiet);
+  assert.match(lift("sharePosterCard"), /shareQuietInk\(m\)/,
+    "the poster is naming a tier instead of asking for the quiet one");
   assert.deepEqual(asked("shareExecutionCard").sort(), ["accent", "fast", "ink", "inkSoft", "slow"],
     "The Execution's colour list changed; it is the three type tiers plus the two miss colours");
   // ⚠️ AND THE PICTURE IS DRAWN ONCE, FOR THE WHOLE CANVAS, BEFORE ANY TEMPLATE RUNS — so no template can
@@ -2462,7 +2875,7 @@ test("BLOCKER: nothing draws a plate behind type — the chart's own two graphic
   // ⚠️ ONE NAMED EXEMPTION, AND IT IS SIXTEEN PIXELS TALL. The split ladder's track fixes the ground
   // inside its own bar so the accent reads on a snowfield as on dark wood — reference 04 draws that track
   // as a flat grey. Everything else at this alpha is a gradient stop, which is the scrim.
-  const plates = found.filter(([where, v]) => v >= 0.5 && !/shareVeilDraw|shareTopScrim/.test(where));
+  const plates = found.filter(([where, v]) => v >= 0.5 && !/shareVeilDraw/.test(where));
   assert.deepEqual(plates.map((p) => p[0]), ["shareProgressionCard:SHARE_LADDER.trackInk"],
     "a near-opaque ground fill outside the scrim and the ladder track: " + JSON.stringify(plates));
   // And the badge draws nothing at all when it has no colour of its own.
@@ -2482,8 +2895,13 @@ test("BLOCKER: nothing draws a plate behind type — the chart's own two graphic
     const fn = m.template === "execution" ? E.shareExecutionCard : E.shareProgressionCard;
     fn(ctx, m, gm, probe, wm);
     const rects = ctx.calls("fillRect");
-    assert.equal(rects.length, 2, m.template + " drew " + rects.length +
-      " full rects; the scrim and the wordmark's own top scrim are the only two allowed");
+    // ⚠️ ONE, WHERE IT USED TO BE TWO, AND THE SECOND ONE GOING IS THE POINT OF THE CHANGE. The fade
+    // across the top of the card was the other full-width rect; the owner asked for it to go
+    // (2026-08-20) and the wordmark carries a keyline instead, which strokes glyphs rather than filling
+    // a band. So the block's own solved scrim is the only full-width fill a template may draw, and a
+    // second one coming back — under any name — fails here.
+    assert.equal(rects.length, 1, m.template + " drew " + rects.length +
+      " full rects; the block's own solved scrim is the only one allowed");
     for (const r of rects) {
       assert.ok(r[3] === gm.W, m.template + ": a rect narrower than the canvas is a panel: " + JSON.stringify(r));
     }
@@ -2857,8 +3275,15 @@ test("BLOCKER: no colour in the renderer is a literal — every one comes from t
     // cardAlpha is the primitive that TAKES a hex, so its own signature is the one place the word may
     // appear. Every caller has to hand it a token.
     if (name !== "cardAlpha") {
+      // ⚠️ A PALETTE MEMBER OR A LOCAL, AND THE LOCAL IS SAFE BECAUSE OF THE TWO SWEEPS ABOVE IT RATHER
+      // THAN BY ASSUMPTION. Requiring the literal text SHARE_INK was a proxy for "this colour came from
+      // the palette", and it stopped being true when the ground gained a second table: the contour lines
+      // are stroked in the SESSION's colour, which arrives as a resolved value rather than as a member
+      // expression. What actually protects this file is that no function body may contain a hex or an
+      // rgb()/hsl() literal at all — asserted two lines up — so a local can only ever hold something the
+      // palette produced. Both tables are pinned to the stylesheet's own tokens elsewhere.
       for (const m of b.matchAll(/cardAlpha\(([^,]+),/g)) {
-        assert.match(m[1]!.trim(), /^SHARE_INK\./,
+        assert.match(m[1]!.trim(), /^(?:SHARE_INK\.|SHARE_EFFORT\[|[a-z][A-Za-z0-9_]*$)/,
           name + " takes something other than a palette token to an alpha: " + m[1]);
       }
     }

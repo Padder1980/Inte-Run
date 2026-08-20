@@ -4184,6 +4184,18 @@ shared `<audio>` element, which has no session management, four unsynchronised w
 this change) a permanent `error` handler wired straight to the device voice. Two audio systems, and
 the one that had been audited was not the one he was hearing.
 
+### ⚠️ A MAPPING GUARDED WHERE IT IS DECLARED IS NOT GUARDED (2026-08-20)
+
+Ruling 7's "one session-to-effort-colour mapping" was asserted at `SESSION_EFFORT`, the table. Three of
+twenty-five re-breaks escaped with that single root cause, and the third was **the owner's own defect
+restored**: `effortOf` and `runEffort` could be reverted to the intensity-keyed branching that painted a
+tempo rust, and the whole suite stayed green. **A table nobody is forced to read is a suggestion.**
+The guard now asserts BEHAVIOUR at the two readers — for every member of the SessionType union, both
+must return exactly what `sessionEffort` returns — plus that neither carries a second opinion
+(`intensity`, `targetRpe`, a hard-list) to fall back on. All three breaks caught.
+⚠️ **The general rule: guard the READERS, not the declaration.** A derived collection proves the table is
+complete; only a behavioural check proves anything consults it.
+
 ## THE SHARE STUDIO, REBUILT TO A COMMISSIONED CONTRACT (2026-08-18/19)
 
 The owner supplied `InteRun_Share_Studio_Claude_Pack` — a binding contract with four authoritative 9:16
@@ -4193,8 +4205,8 @@ card framing, an outer border, neon glow, a route stranded in empty space). So t
 replaced and the plumbing kept. Four templates: **The Moment**, **The Execution**, **The Route
 Poster**, **The Progression**, at exactly **1080×1920** and **1080×1350** (reflowed, never cropped).
 
-⚠️⚠️ **READ THE LAST SUBSECTION OF THIS CHAPTER FIRST — "TWO OUTPUTS ONLY, AND A PHOTOGRAPH ON EVERY
-CARD" (2026-08-20).** Everything below it about **Square 1:1** and the **transparent sticker** describes
+⚠️⚠️ **READ THE LAST TWO SUBSECTIONS OF THIS CHAPTER FIRST — "TWO OUTPUTS ONLY, AND A PHOTOGRAPH ON
+EVERY CARD" and "THE SESSION'S OWN COLOUR, THE DESTINATIONS ROW, AND NO TOP FADE" (both 2026-08-20).** Everything below it about **Square 1:1** and the **transparent sticker** describes
 outputs that were built, measured, signed off and then WITHDRAWN by the owner. Those passages are kept
 because the findings they record are still true and still useful — the reflow lesson, the seam
 measurement, the guards that could not fail — but the shapes themselves are gone from the code and from
@@ -5461,6 +5473,207 @@ millisecond each; the file passed alone four times and the whole suite passed th
 headless-browser dependency is pre-existing and my changes to that file were removals, so this is very
 probably a CDP timing artefact under parallel load — but it is not proven, and a release gate that flakes
 is worth someone's attention.
+
+### THE SESSION'S OWN COLOUR, THE DESTINATIONS ROW, AND NO TOP FADE (owner, ruling 7, 2026-08-20)
+
+Verbatim: *"Two other changes, if they decide not to add a photo, the background needs to be the same
+colour as the run that they've done, e.g. an easy run is teale, a tempo is yellow etc..... Also the
+options to share straight to their socials need to appear like the attached image. Also, i don't want
+the fade at the top of the card. again, i dont mind if there is something that sits underneath the
+Inte-Run logo"*
+
+⚠️⚠️ **THE FIRST CUT OF THIS SHIPPED THE CODE AND NOT ONE GUARD, AND THAT IS THE LESSON OF THE WHOLE
+SECTION.** Suite went 960 → 960. An adversarial verifier then applied **eleven deliberate breaks and
+five landed silently**: every easy run painted as a hard one; the easy colour changed to a blue; the
+Copy-caption tile unwired; the ground's lightness moved from 0.125 to 0.30 (small type at **2.57:1**);
+and the topographic contours losing the session colour. Those five are exactly the claims part 1 is
+about. Suite is now **966**; every guard below was watched failing against a re-break before it was
+believed, and the verifier's own eleven were repeated against the finished tree.
+
+⚠️ **AND A COMMENT CLAIMED A GUARD THAT DID NOT EXIST — THE SECOND TIME IN THIS AREA.** The note above
+`SHARE_EFFORT` stated that `test/share-render.test.ts` "parses these three out of the stylesheet's own
+`data-theme="dark"` block and asserts they match". No such assertion existed; the derived token table
+there covers `SHARE_INK` only. `test/share-render.test.ts` records the first occurrence eight lines
+above its own palette guard ("an earlier version of the renderer's comment claimed a test file pinned
+them when no such file had ever existed"). **The guard now exists**, over all three effort colours, and
+it reads **both** dark declarations — the `prefers-color-scheme` block and the `data-theme="dark"` block
+— because this file already records that FOUR places declare these tokens and that a change applied to
+three leaves the fourth stale.
+
+### ONE SESSION-TO-EFFORT-COLOUR MAPPING, AND A TEMPO IS AMBER
+
+⚠️ **THE OWNER'S OWN EXAMPLE WAS THE ONE THE CARD GOT WRONG.** "a tempo is yellow" — and a tempo had
+three colours at once: the **Add-a-session grid** he taps drew `--eff-moderate` (amber), the
+**training-log calendar** drew `--eff-hard` (rust), and the **card's new ground** drew rust as well
+because `runEffort` carried its own list of hard types with "threshold" in it. Tap the amber tile, run
+it, get a rust card of it.
+
+`SESSION_EFFORT` + `sessionEffort(type)` is the single truth, keyed on the session TYPE, and
+`effortVar(effort)` is the one place an `--eff-*` name is built. `effortOf` (planned sessions),
+`runEffort` (logged runs), `RUN_TYPES` (the grid), `RUN_KIND` (the calendar) and the card all resolve
+through it. **Threshold is `moderate` — the owner's decision, and also what the engine already said:**
+`src/plan/session-templates.ts` assembles a threshold session at intensity moderate, so the plan dot has
+always been amber; it was the two type-keyed readers that invented a rust one.
+
+| session type | loggable run? | effort | card ground | Add-a-session tile | calendar dot | plan dot / Logbook rail |
+|---|---|---|---|---|---|---|
+| easy | yes | easy | `#4cb98a` | `--eff-easy` | `--eff-easy` | `--eff-easy` |
+| long | yes | easy | `#4cb98a` | `--taper` | `--taper` | `--eff-easy` |
+| recovery | yes | easy | `#4cb98a` | `--steady` | `--eff-easy` | `--eff-easy` |
+| **threshold** | yes | **moderate** | **`#e6ac3e`** | **`--eff-moderate`** | **`--eff-moderate`** | **`--eff-moderate`** |
+| vo2 | yes | hard | `#e56f49` | `--eff-hard` | `--eff-hard` | `--eff-hard` |
+| strides | yes | easy | `#4cb98a` | `--build` | `--eff-easy` | `--eff-easy` |
+| race-specific | yes | hard | `#e56f49` | `--rest` | `--eff-hard` | `--eff-hard` |
+| race | yes | hard | `#e56f49` | (not in grid) | `--eff-hard` | `--eff-hard` |
+| strength | no | moderate | `#e6ac3e` | (not in grid) | (default) | `--eff-moderate` |
+| cross-training | no | moderate | `#e6ac3e` | (not in grid) | (default) | `--eff-moderate` |
+| mobility | no | none | plain ink | (not in grid) | (default) | `--eff-none` |
+| rest | no | none | plain ink | (not in grid) | (default) | `--eff-none` |
+
+⚠️ **KEYED ON TYPE, NOT ON THE `intensity` FIELD, AND THAT IS WHAT MAKES IT ONE MAPPING.** A logged run
+stores its type and throws the intensity away — `liveRunRecord` never keeps it — so a mapping that read
+intensity could answer for a planned session and not for the run of that session, which is exactly how
+the rail and the chip came to disagree. The one case that MOVED is **`race-specific`**: the generator
+calls it moderate, every type-keyed reader in the app already called it hard, and hard is what it now is
+everywhere. A rehearsal at goal race pace is not the same afternoon as a tempo.
+
+⚠️ **THE MIDDLE OF THE THREE-COLOUR FAMILY WAS PREVIOUSLY UNREACHABLE.** "moderate" was reached only by
+strength and cross-training, and `PRIMARY_TYPES` cannot start either — so the amber ground was undrawable
+and the derivation's whole legibility argument was about a card no runner could produce. Guarded: every
+one of the three bands must be reachable from some member of `PRIMARY_TYPES`.
+
+⚠️ **FOUR OF THE SEVEN GRID TILES KEEP A DELIBERATE IDENTITY ACCENT AND THAT IS NOT DRIFT.** Recovery,
+the long run and easy + strides are all EASY by effort, so an effort-coloured grid is four identical teal
+tiles and a picker that cannot be picked from. The rule is not "everything is an effort colour" — it is
+that anything WEARING one must be wearing the right one, which is what the guard sweeps for.
+
+⚠️ **THE CALENDAR'S LEGEND IS DERIVED FROM `RUN_KIND`, BECAUSE IT WENT STALE THE MOMENT A TEMPO BECAME
+AMBER.** It was three hand-written pairs promising "Quality → `--eff-hard`" over a grid drawing
+`--eff-moderate`. `logCalendarLegend()` lists every distinct colour a dot can actually be, exactly once:
+**Easy / Long / Tempo / Hard**. The bucket word (`lab`) and the colour (`c`) are two different sentences
+— `k`/`lab` answer "which of the three kinds of day was that", `c` answers "how hard was it" — and
+`long` keeps `--taper` because picking the long run out of the other easy days is the whole point of that
+bucket.
+
+⚠️ **`RUN_HARD_TYPES` IS GONE, AND `test/share-model.test.ts`'S CONST LIST FAILING LOUDLY IS HOW THAT
+WAS NOTICED** rather than left behind as a second list of hard types beside the mapping.
+
+### THE PHOTOGRAPH GATE IS GONE FROM EVERY TEMPLATE — AND RULING 6 HAD RECORDED THIS AS DONE
+
+⚠️ **`shareTemplateStates` STILL REFUSED THREE OF THE FOUR WITHOUT A PHOTOGRAPH, so ruling 7 part 1
+reached ONE CARD OF FOUR.** Measured through the real editor at 430×932: a run with a route and no
+photograph rendered **1 slide**. `DECISIONS.md` filed this clause under "RULING 6 IS IMPLEMENTED — all
+three parts are in", which it was not. After: **4 slides**, all four Style rows enabled `<button>`s, The
+Moment the default (the pack's own "default, most broadly useful card"), page overflow 0.
+
+⚠️ **THE GATES ARE NOW FACTS ABOUT THE RUN, AND THE MOMENT'S IS THAT THERE IS A HEADLINE.** A distance,
+or failing that a time — which is what `shareHeroFor` needs. The Execution still needs a judgeable band,
+The Progression three measured splits, the poster a route. **No reason string anywhere may ask for a
+photograph**, swept over five run shapes with and without one.
+
+⚠️ **AND `template: null` IS STILL REACHABLE, BUT IT TAKES A RUN THAT FAILS ALL FOUR GATES.** Written
+with only the headline removed the test measured **"execution"** — The Execution and The Progression are
+gated on the SPLITS, not on the hero. So `sharePlaceholderCard` survives as a total-function safety net
+and its copy changed: it used to say **"ADD A PHOTO"**, which would now be a lie on a card family where
+a photograph is optional everywhere. It says what is actually missing.
+
+⚠️ **AND `SHARE_TEMPLATE_BLURB.moment` PROMISED A PHOTOGRAPH TOO** — *"Your photograph, the distance,
+and the coach's read"* — which a runner with no photo would read as an instruction to go and find a
+picker they no longer need.
+
+### THE EMPTY FIELD WAS REAL, MEASURED, AND FIXED WITH THE ROUTE
+
+The earlier deviation said a photo-free version of the three photo templates "would leave the upper half
+empty". That was true when written, and the session ground plus the contours answers most of it — but not
+all of it. ⚠️ **MEASURED ON A STORY CARD WITH NO PHOTOGRAPH: The Execution put 44.4% and The Progression
+42.4% of the canvas into ONE continuous ink-free band, with a second-quarter luminance sd of 0.0121
+against the byte gate's own 0.012 emptiness bar** — i.e. on the line this project already drew once, in
+the workflow that rebuilt the recap over "46% empty".
+
+`shareFieldRoute` draws the route in that field **when there is no photograph**, which is exactly what
+The Moment has always done — so this removed a difference between the templates rather than adding a
+variant. After: **26.1% and 25.1%**.
+- ⚠️ **GATED ON `probe`, WHICH IS THE PRESENCE OF A PHOTOGRAPH, AND THE PHOTO CARDS ARE UNTOUCHED DOWN TO
+  THE BYTE.** Proved by hash across both trees: **all 36 captured exports identical**.
+- ⚠️ **NO PLAN CHANGE WAS NEEDED**, because the scored region stops 32 px above the block top, so the
+  only copy inside it is the wordmark.
+- ⚠️ **IT DOES NOTHING FOR A RUN WITH NEITHER A PHOTOGRAPH NOR A ROUTE** — a treadmill run, a refused
+  GPS, a hidden route. That field stays a plain coloured ground and it is stated rather than papered
+  over: there is nothing true left to put there.
+
+⚠️ **THE PER-QUARTER sd METRIC IS CALIBRATED FOR PHOTOGRAPHS AND SHOULD NOT BE READ AS A VERDICT HERE.**
+Its 0.012 bar was set from "the quietest quarter the app actually draws measures 0.0228", and every card
+measured then carried a photograph. A quarter of matte ground is *supposed* to be low-variance — that is
+what a ground is — and the texture is genuinely there (**13.08–13.27% of ground pixels differ from a flat
+gradient of the same colour**). The quietest no-photo quarter is still **0.0121**, on The Moment's feed
+card, and the byte gate does not capture these cards at all. Reported, not tuned.
+
+### WHAT THE COLOURS AND THE TYPE MEASURE, FROM RENDERED PIXELS
+
+72 no-photo renders (4 templates × 2 aspects × 9 session types, **0 skipped**), each text tier read as
+its exact fully-opaque glyph colour against a ground-only twin of the same card at the same coordinates:
+
+| tier | worst across every no-photo card | where |
+|---|---|---|
+| `ink` | 11.04:1 | easy / moment / story |
+| `inkSoft` | 5.97:1 | easy / progression / feed |
+| `accent` | **5.28:1** | easy / moment / story |
+| `inkFaint` | **5.23:1** | no type / route / story |
+
+Ground stops measured `[13,50,34]→[9,33,23]` easy, `[50,37,13]→[35,26,8]` moderate,
+`[50,22,13]→[35,16,9]` hard. Nothing under 4.5 anywhere.
+
+⚠️ **`SHARE_GROUND.lTop`'S STATED CEILING WAS WRONG AND IS NOW GUARDED BY ARITHMETIC.** The comment
+claimed "the honest ceiling is between 0.145 and 0.165". Re-derived against the FAINTEST tier on the
+ground's own top stop, `--ink-faint` runs **5.17 : 4.70 : 4.25 : 3.86 : 3.53** across lTop 0.105 / 0.125
+/ 0.145 / 0.165 / 0.185 and **1.79 at 0.30** — so **0.145 is already under AA** and the real ceiling is
+between 0.125 and 0.145. The shipped 0.125 carries 0.20 of margin on the tightest tier there is. The
+guard drives `shareGroundStops` through the real ratio arithmetic for all three colours and every tier.
+⚠️ **Its hue tolerance is 2.5° because 8-bit quantisation at this lightness is the floor** — the bottom
+stops drift 1.33–1.75° since `#1d1607` has 22 levels between its brightest and dimmest channel. Written
+at 1.5° the guard failed on correct code.
+
+⚠️ **THE CONTOUR GUARD IS ASSERTED ON WHAT WAS STROKED, NOT ON THE SOURCE.** The texture draws into an
+offscreen canvas and then `drawImage`s it, so `env()` now keeps every created canvas with a stable
+recording context. That also catches the second break in the same place: if the stroke colour ever leaves
+`shareTopoCanvas`'s cache key, two grounds share one picture and whichever drew first wins.
+
+⚠️ **`shareGroundUnder` ANSWERS WHITE WHEN IT CANNOT LOOK, AND THAT IS WRONG FOR A CARD WITH NO
+PHOTOGRAPH.** Right for a picture we hold and cannot sample (fail towards protecting the ink), wrong
+where the ground is known exactly — left unfixed, every no-photo card thickened the route's deep keyline
+to its bright-ground weight over a ground whose lightest pixel is lightness 0.125. `shareRectGroundRGB`
+is the one answer to "what is under this rect", and it reads the top stop because that is the brightest
+the ground gets anywhere on the card.
+
+### THE DESTINATIONS GUARD PROVED THE DISPATCH *MENTIONED* AN ACTION, WHICH IS NOT HANDLING IT
+
+The row's shape was confirmed sound by re-break. Its guard was not. `test/share-studio.test.ts`'s
+"every control is reached by its delegated handler" BLOCKER matched `=== "<action>"` in `studioClick`, so
+replacing the Copy-caption branch with a bare `return;` passed — the looks-live-is-inert class this
+project has shipped three times (`rdMore`, `#saveSetup`, the profile confirm button). It now bounds each
+branch to **its own statement** and requires it to reach a function that exists in the app script.
+- ⚠️ **THE OBVIOUS SLICE IS THE COLLECTION-TOO-WIDE TRAP.** From this action's test to the next one, the
+  LAST branch's slice runs to the end of `studioClick` — which contains the tool, template, metric,
+  aspect and privacy families and their calls, so an emptied final branch is "handled" by somebody else's
+  code. A block closes at its matching brace, a one-liner at its own semicolon.
+- ⚠️⚠️ **AND THE ACTION LIST ITSELF HAD A HOLE, WHICH IS WHY THE FIRST RESTATEMENT STILL DID NOT CATCH
+  IT.** `studioDestTile` writes `data-sst="' + action + '"`, so **`share` and `caption` appeared in no
+  literal attribute anywhere** — the derived set held fourteen actions and neither of those two. The
+  sweep now enumerates the builder's own call sites, asserts there is exactly ONE builder writing a
+  computed `data-sst` (a second one forces this list to be updated), and asserts the builder still writes
+  its first argument into the attribute. **A guard over a collection is only as good as the collection.**
+- ⚠️ The function-name set is bounded to the app's own `<script>` block, not the whole page: the built
+  page carries the MINIFIED engine, so a whole-page set contains dozens of one-letter names and a branch
+  calling any of them would count as handled.
+
+### The eleven re-breaks, repeated against the finished tree
+
+(see the phase report for the table; the five that used to escape are the five listed at the top of this
+section, and every one of them now fails a named guard)
+
+⚠️ **THE BACKTICK RULE FIRED ONCE MORE, IN A COMMENT** — `` `intensity: "moderate"` `` inside the new
+mapping's note. The build failed outright, which is the good outcome, and it is the only reason to keep
+reading the build's exit code before trusting anything after it.
 
 ## THE WALK THAT CONVICTED THE GPS START (owner's report, 2026-08-17 — four findings, two causes)
 

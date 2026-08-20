@@ -412,11 +412,18 @@ test("BLOCKER: no photograph means no scrim, which is not the same test as an un
   // solved from 255 the alpha comes back near its cap and a dark gradient is painted across the lower
   // half of a matte ground, to protect type that already measures 19:1 on it. probe === null is a card
   // with no picture; probe.data === null is a card whose picture tainted the canvas.
-  for (const n of ["sharePhotoScrim", "shareTopScrim"]) {
+  // ⚠️ ONE SCRIM NOW, WHERE THERE WERE TWO. The fade across the top of the card went at the owner's
+  // instruction (2026-08-20) and the wordmark carries a keyline instead — which needs no probe at all, so
+  // it cannot be solved from a white ground by mistake. The block's own scrim keeps the gate.
+  for (const n of ["sharePhotoScrim"]) {
     const b = code(lift(n));
     assert.match(b, /if \(!probe\) return/,
       n + " does not refuse a card with no photograph, so a scrim is solved from a white ground");
   }
+  // ⚠️ AND THE WORDMARK'S TREATMENT IS GATED ON THE SAME FACT, resolved once in shareDrawBody: a card with
+  // no photograph gets no edge, because on the family's own grounds the wordmark measures 11.0 to 19.4:1.
+  assert.match(code(lift("shareDrawBody")), /shareWordmarkPlan\(g, gm, probe \? S : 0\)/,
+    "the wordmark's edge is no longer decided from the presence of a photograph");
   // and the fail-towards-white rule is intact for a photograph that cannot be READ
   assert.match(code(lift("shareGroundUnder")), /if \(!probe \|\| !probe\.data\) return \[255, 255, 255\]/,
     "the sampler no longer fails towards the strongest treatment when it cannot see the photograph");
@@ -424,7 +431,7 @@ test("BLOCKER: no photograph means no scrim, which is not the same test as an un
   // used to omit both calls by hand because it never had a photograph; four call sites each remembering
   // to check is four chances for the fifth to forget.
   const poster = code(lift("sharePosterCard"));
-  for (const n of ["sharePhotoScrim", "shareTopScrim"]) {
+  for (const n of ["sharePhotoScrim"]) {
     assert.ok(poster.includes(n + "(g, gm, probe"),
       "the poster does not go through " + n + ", so its photograph is composited without a solved scrim");
   }
@@ -433,7 +440,15 @@ test("BLOCKER: no photograph means no scrim, which is not the same test as an un
   assert.match(bodyFn, /if \(!m\.photo\) shareTopoDraw/,
     "the matte topographic ground is no longer gated on there being no photograph, so it is either " +
     "drawn under a picture that hides it or over one that it washes out");
-  assert.match(bodyFn, /shareGroundFill\(g, gm\)/, "nothing fills the ground any more");
+  // ⚠️ AND THE GROUND IS PAINTED THROUGH THE ONE PAINTER, WHICH DECIDES BETWEEN THE SESSION'S OWN COLOUR
+  // AND THE FAMILY'S PLAIN INK. Asserting shareGroundFill by name here stopped being the invariant when the
+  // owner asked for the no-photo ground to carry the session's colour (2026-08-20): the fill is now the
+  // null branch of shareGroundPaint, so a card that reached it directly would be a second ground decision.
+  assert.match(bodyFn, /shareGroundPaint\(g, gm, ground\)/, "nothing paints the ground any more");
+  assert.match(bodyFn, /const ground = m\.photo \? null : shareEffortHex\(m\.effort\)/,
+    "the ground is no longer resolved once for both the fill and the contour lines");
+  assert.match(code(lift("shareGroundPaint")), /if \(!hex\) return shareGroundFill\(g, gm\)/,
+    "a card with no session colour no longer gets exactly the ground it has always had");
 });
 
 test("BLOCKER: the shorter shapes recompose rather than scaling — the safe region is not the story's, scaled", () => {

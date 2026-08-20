@@ -800,8 +800,12 @@ async function capture(): Promise<Gate> {
         bandMin: m.band && m.band.minSecPerKm, n: m.n, inBand: m.inBand }; })()`);
 
     // ---- and the one card that must never become a file ---------------------------------------
+    // ⚠️ REACHING THAT STATE TAKES A RUN THAT FAILS ALL FOUR GATES, and since ruling 7 a missing
+    // photograph is not one of them. Written as "no route, no photo" this probe measured a perfectly good
+    // Moment card: the three data templates are gated on the SPLITS and the hero, not on the picture.
     const refused = await S.ev(`(() => { globalThis.SHAREPRIV = {};
-      const m = CARD.shareCardModel(${JSON.stringify(gateRun({ route: null }))},
+      const m = CARD.shareCardModel(${JSON.stringify(gateRun({ route: null, splits: [], distKm: 0,
+        dist: "0 km", time: "", sec: 0, pband: null, pwin: null }))},
         ${opts("story", null, false)});
       return { placeholder: m.template == null, reason: (m.eligibility && m.eligibility.moment || {}).why || '' }; })()`);
 

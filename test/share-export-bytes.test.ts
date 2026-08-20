@@ -549,13 +549,18 @@ test("the missing-data states are distinct where they should be, and identical w
 });
 
 test("BLOCKER: the card with no eligible template cannot become a file at all", () => {
-  // ⚠️ THE PLACEHOLDER CARRIES AN INSTRUCTION AND MUST NEVER BE SOMETHING SOMEBODY POSTS. A treadmill
-  // run with no photograph chosen fits none of the four templates: the three photo ones need a
-  // photograph and the poster needs a route. The model answers null, and the export path refuses.
+  // ⚠️ THE PLACEHOLDER CARRIES A SENTENCE AND MUST NEVER BE SOMETHING SOMEBODY POSTS. Its trigger changed
+  // with ruling 7: a missing photograph no longer refuses anything, so the only run that fits none of the
+  // four is one carrying neither a distance nor a time nor a split nor a route. The model answers null and
+  // the export path refuses.
   assert.equal(G.refused.placeholder, true,
-    "a run with no route and no photograph still resolved to a template");
-  assert.match(G.refused.reason, /photo/i,
+    "a run with no distance, no time, no splits and no route still resolved to a template");
+  assert.match(G.refused.reason, /distance/i,
     "the editor gives no reason in words for the missing template: " + JSON.stringify(G.refused.reason));
+  // ⚠️ AND THE REASON MAY NOT ASK FOR A PHOTOGRAPH, which is what it used to say — a card that refuses
+  // itself and blames a missing picture sends the runner to add one and nothing changes.
+  assert.ok(!/photo/i.test(G.refused.reason),
+    "the refusal still blames a missing photograph: " + JSON.stringify(G.refused.reason));
 });
 
 test("the capture is quick enough to keep in the suite, and it left its evidence on disk", () => {

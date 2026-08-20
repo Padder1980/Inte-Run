@@ -819,7 +819,7 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 .dn-stat .dn-k { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); margin-top: 2px; }
 /* Run overview: route map (brand-colour marching-ants line) + stats + splits */
 .ov-map-card { padding: 0; overflow: hidden; }
-/* \u26a0\ufe0f THE DEBRIEF'S BLOCKS WERE TOUCHING. .card carries no bottom margin — every screen adds
+/* ⚠️ THE DEBRIEF'S BLOCKS WERE TOUCHING. .card carries no bottom margin — every screen adds
    its own rhythm, and this one never did, so the cards butted together separated only by their own
    1px borders. Measured before the fix, the gaps down the screen read 70, 0, 0, 0, 0, 12, 0: one
    chasm under the share button, one lonely 12, and the rest flush. That is what "the blocks don't
@@ -895,7 +895,7 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 .wu-note { font-size: 11.5px; color: var(--ink-faint); margin-top: 4px; line-height: 1.4; }
 .wk-review .wr-cta { display: flex; gap: 8px; margin-top: 12px; }
 .wk-review .wr-cta button { flex: 1; }
-/* \u26a0\ufe0f A PAIR OF BUTTONS SIDE BY SIDE MUST BE THE SAME BUTTON. .ctrl and .primary are separate
+/* ⚠️ A PAIR OF BUTTONS SIDE BY SIDE MUST BE THE SAME BUTTON. .ctrl and .primary are separate
    components with their own metrics -- 14px against 15px, different padding, and .primary carries a
    margin-top of its own for when it stands alone at the foot of a card. Put them in a row and the
    accented one comes out taller AND pushed down, which reads as the app not knowing which it means.
@@ -1411,7 +1411,7 @@ html.kbup .sheet-ov { padding-bottom: var(--kbh, 0px); }
   border-color: color-mix(in srgb, var(--line) 85%, var(--accent)); border-radius: 18px;
   box-shadow: var(--shadow), inset 0 1px 0 color-mix(in srgb, var(--ink) 3%, transparent);
 }
-/* \u26a0\ufe0f TARGETED BY CLASS, NOT BY POSITION. These were "> div:first-child" and
+/* ⚠️ TARGETED BY CLASS, NOT BY POSITION. These were "> div:first-child" and
    "> div:nth-child(2)", which addressed the week heading and subtitle only because #weekDetail held
    exactly one week. It now holds the whole list, so the positional rules landed on whichever week
    happened to be first -- and the second one stopped matching at all, because a summary row is a
@@ -1842,7 +1842,7 @@ body.cal-dragging { overscroll-behavior: none; cursor: grabbing; }
 .db-body p:last-child { margin-bottom: 0; }
 .db-body p:first-child { color: var(--ink); font-weight: 500; }
 /* Pace against the prescribed band */
-/* \u26a0\ufe0f AN SVG WITH NO HEIGHT SCALES TO ITS ASPECT RATIO. The viewBox is 320x132, so at phone
+/* ⚠️ AN SVG WITH NO HEIGHT SCALES TO ITS ASPECT RATIO. The viewBox is 320x132, so at phone
    width this became a ~330px tall block with three points floating in the middle of it. Capped, and
    the SVG told to fill rather than preserve its ratio, so a three-split run and a twenty-split run
    occupy the same sensible band of the screen. */
@@ -2018,14 +2018,14 @@ body.has-live-pill #view { padding-top: 46px; }
    zoom itself; pinch is blocked in JS (see the gesture guard) because iOS ignores both
    user-scalable=no and touch-action for pinch. The avatar cropper opts back in.
 
-   \u26a0\ufe0f ON EVERY ELEMENT, BECAUSE touch-action DOES NOT INHERIT. This was set on html and body
+   ⚠️ ON EVERY ELEMENT, BECAUSE touch-action DOES NOT INHERIT. This was set on html and body
    alone, which governs only the taps that land on html or body themselves -- so a double tap on a
    card, a row, a stat tile or an input hit an element with the default value and iOS zoomed the page
    to fit whatever box was under the finger. That is why the zoom was inconsistent: it scales to the
    tapped element, so a small tile zoomed far more than a wide card, which reads as a random bug
    rather than a missing rule. The comment two lines up claimed this was "handled by touch-action in
    CSS" and it was not.
-   \u26a0\ufe0f manipulation STILL ALLOWS PINCH and scrolling -- it removes double-tap zoom and the
+   ⚠️ manipulation STILL ALLOWS PINCH and scrolling -- it removes double-tap zoom and the
    300ms tap delay, nothing else. So the two deliberate exceptions below keep working, and both are
    class selectors, which outrank the universal one whatever the order. */
 html, body { touch-action: manipulation; }
@@ -2165,7 +2165,7 @@ input, select, textarea { font-size: 16px; }
   /* Screen gutter, per the brief's 20-24px. */
   --gutter: 20px;
   /* Type: seven steps. Display, page hero, section, card title, body, metadata, label.
-     \u26a0\ufe0f THE LADDER IS THE SCALING MECHANISM, and that is the point of having had one. Every
+     ⚠️ THE LADDER IS THE SCALING MECHANISM, and that is the point of having had one. Every
      size is px, so the app honoured the phone's own text-size setting nowhere at all -- and making
      443 individual font sizes responsive is exactly the kind of "looks mechanical" sweep this
      project's history says goes wrong. Scaling the seven TOKENS instead means every screen already
@@ -2303,7 +2303,7 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .sd-stage summary { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) var(--s4); cursor: pointer; min-height: var(--tap); }
 .sd-stage summary::-webkit-details-marker { display: none; }
 .sd-sn { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--surface-2); color: var(--ink-soft); font-size: var(--t-meta); font-weight: 750; display: flex; align-items: center; justify-content: center; }
-/* \u26a0\ufe0f A FIXED DARK INK, not white and not --ink. The six effort colours span a light-mode coral
+/* ⚠️ A FIXED DARK INK, not white and not --ink. The six effort colours span a light-mode coral
    and a dark-mode mint; white clears 4.5:1 on none of them, and --ink flips with the theme while the
    circle behind it does not. Dark ink clears 5.9:1 on the worst of the six. */
 .sd-sn { color: #04120e !important; }
@@ -2335,7 +2335,7 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 /* The consent line on every health check-in. */
 .ci-consent { margin-bottom: var(--s3); padding: var(--s3); background: var(--surface-2); border-radius: var(--r-ctl); font-size: var(--t-meta); line-height: 1.5; color: var(--ink-soft); }
 .tp-card { padding: var(--s3) var(--s4); margin: var(--s3) 0; }
-/* \u26a0\ufe0f A 44px HIT AREA WITHOUT A 44px BOX. --tap is the design system's minimum, and measured,
+/* ⚠️ A 44px HIT AREA WITHOUT A 44px BOX. --tap is the design system's minimum, and measured,
    these all sat under it: the top-bar icon buttons (36), the back button (20), Alfie's suggestion
    chips (35), the logbook filters (34), a calendar tick (24) and the profile's segmented buttons
    (38). Growing them would relayout the top bar and every segmented control; expanding the hit area
@@ -2350,7 +2350,7 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 /* A screen arriving. 180ms, inside the brief's 160-220ms; the global reduce-motion rule neutralises it. */
 @keyframes viewIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .view-in { animation: viewIn .18s cubic-bezier(.2, .7, .3, 1) both; }
-/* \u26a0\ufe0f display:none, NOT removal. Every field stays in the DOM because draftFromForm() reads
+/* ⚠️ display:none, NOT removal. Every field stays in the DOM because draftFromForm() reads
    its values straight out of it -- a form that genuinely omitted the other sections would read them
    as blank and write those blanks over the profile. */
 .setup-off { display: none !important; }
@@ -2360,7 +2360,7 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 /* The open week's heading doubles as its close control. */
 .wk-close { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); width: 100%; text-align: left; padding: 0; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; min-height: var(--tap); }
 .wk-cx { transform: rotate(-90deg); }
-/* \u26a0\ufe0f The 2 km trial button sat at 239px under a full-width field, so the pair read as two
+/* ⚠️ The 2 km trial button sat at 239px under a full-width field, so the pair read as two
    different-sized controls rather than one question. It matches the input it belongs to now. */
 .mini-btn.wide-btn { display: flex; width: 100%; justify-content: center; min-height: var(--tap); font-size: var(--t-body); border-radius: var(--r-ctl); }
 /* Profile & settings: inspect first. */
@@ -2454,11 +2454,11 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 /* Logbook rows: compact and date-aware. */
 .lg-list { padding: 0 var(--s4); }
 .lg-row { display: flex; align-items: center; gap: var(--s3); width: 100%; text-align: left; min-height: 62px; padding: var(--s3) 0; background: var(--surface); border: 0; border-bottom: 1px solid var(--line); color: inherit; font: inherit; cursor: pointer; }
-/* \u26a0\ufe0f EVERY ROW IS THE LAST CHILD OF ITS OWN SWIPE WRAPPER, so ".lg-row:last-child" matched
+/* ⚠️ EVERY ROW IS THE LAST CHILD OF ITS OWN SWIPE WRAPPER, so ".lg-row:last-child" matched
    ALL of them and removed every separator in the list. The wrapper is the thing to count, not the
    row inside it -- the same "position is not a name" mistake as the plan week card, in reverse. */
 .lg-list .swipe:last-child .lg-row { border-bottom: 0; }
-/* \u26a0\ufe0f The delete panel sits BEHIND each row and kept its rounded corners from when a run was
+/* ⚠️ The delete panel sits BEHIND each row and kept its rounded corners from when a run was
    a free-standing card. In a joined list those corners showed as faint arcs down the right-hand edge
    of every row -- decoration from a component that is no longer there. */
 .lg-list .swipe { background: var(--surface); border-radius: 0; }
@@ -2501,7 +2501,7 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .wk-sum.cur .wk-n { background: var(--accent); color: var(--accent-ink); }
 .wk-b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .wk-t { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; font-size: var(--t-body); font-weight: 700; color: var(--ink); }
-/* \u26a0\ufe0f THE BADGE IS A WORD, NOT A COLOUR. An absorb week is a diagonal hatch on the chart and a
+/* ⚠️ THE BADGE IS A WORD, NOT A COLOUR. An absorb week is a diagonal hatch on the chart and a
    taper is a hue; both are the weeks a runner most needs to see coming. */
 .wk-tag { font-size: var(--t-label); font-weight: 750; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-soft); background: var(--surface-2); border-radius: var(--r-pill); padding: 2px var(--s2); }
 .wk-tag.cur { background: var(--accent); color: var(--accent-ink); }
@@ -4218,6 +4218,34 @@ button.rd-meta-r { cursor: pointer; }
   text-align: center; margin-top: var(--s2); }
 .sst-off { opacity: .55; }
 .sst-strava { margin-top: var(--s4); padding-top: var(--s4); border-top: 1px solid var(--line); }
+/* ---- the destinations, in the shape the owner asked for --------------------------------------------
+   A horizontal row of labelled tiles, then a full-width primary with a settings affordance beside it
+   (owner, 2026-08-20). ⚠️ THE TILES ARE ONLY THE THINGS THIS APP CAN GENUINELY DO — see studioDestHtml
+   for why there is no Instagram tile and what would make one honest. */
+.sst-dests { display: flex; gap: var(--s2); }
+.sst-dest { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: var(--s1); min-height: var(--tap); padding: var(--s3) var(--s2);
+  margin: 0; font: inherit; font-size: var(--t-label); font-weight: 650; line-height: 1.25;
+  text-align: center; color: var(--ink); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: var(--r-ctl); cursor: pointer; }
+.sst-di { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px;
+  color: var(--accent); }
+.sst-di svg { width: 100%; height: 100%; }
+/* ⚠️ ONE BOX WITH TWO FILLS, AND EVERY DIMENSION IS DECLARED ON BOTH. This project has already shipped
+   the fault where two buttons put side by side each carried their own margin, padding and border and so
+   came out different sizes — the heat card's Yes/No pair. Both of these declare a border so neither is a
+   pixel taller for free, stretch makes them one height, and the gear is exactly one tap target. */
+.sst-prim { display: flex; align-items: stretch; gap: var(--s2); margin-top: var(--s4); }
+.sst-save { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; gap: var(--s2);
+  min-height: var(--tap); padding: 0 var(--s3); margin: 0; font: inherit; font-size: var(--t-body);
+  font-weight: 700; color: var(--accent-ink); background: var(--accent);
+  border: 1px solid var(--accent); border-radius: var(--r-ctl); cursor: pointer; }
+.sst-save .sst-di { width: 22px; height: 22px; color: var(--accent-ink); }
+.sst-cog { flex: 0 0 auto; width: var(--tap); min-height: var(--tap); display: flex;
+  align-items: center; justify-content: center; padding: 0; margin: 0; color: var(--ink-soft);
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-ctl);
+  cursor: pointer; }
+.sst-cog svg { width: 22px; height: 22px; }
 .sst-sr { font-size: var(--t-label); color: var(--ink-faint); margin: var(--s2) 0 0; text-align: center; }
 </style>
 </head>
@@ -4439,7 +4467,7 @@ function shoeCreditRun(run, preferId) {
   try {
     if (!run || !(Number(run.distKm) > 0) || run.shoeId) return;
     const list = loadShoes();
-    // \u26a0\ufe0f WHAT THEY SAID THEY WORE BEATS WHATEVER IS MARKED ACTIVE. Without this the rack only
+    // ⚠️ WHAT THEY SAID THEY WORE BEATS WHATEVER IS MARKED ACTIVE. Without this the rack only
     // ever counted the active pair, so a runner who owns two and swaps between them had one number
     // climbing and one frozen -- and the one number that says "replace these" was wrong for both.
     const sh = preferId ? list.find((x) => x.id === preferId) : list.find((x) => x.active && !x.retiredIso);
@@ -4463,7 +4491,7 @@ function shoeRecreditRun(run) {
 }
 /**
  * Move a logged run onto a different pair, or off shoes entirely.
- * \u26a0\ufe0f THE DISTANCE MOVES WITH IT, both ways. Setting run.shoeId alone would leave the old pair
+ * ⚠️ THE DISTANCE MOVES WITH IT, both ways. Setting run.shoeId alone would leave the old pair
  * carrying kilometres it never ran and the new pair short by the same amount -- two wrong numbers
  * from one tap, and the rack exists to answer exactly one question: when do I replace these.
  */
@@ -4671,7 +4699,7 @@ let PLAN, RAW, FITNESS, CLASS, MASTERS;
  * the day's ticks, dropped every session the runner had moved, and pushed the new schedule to iOS
  * and to the watch, with no warning and nothing to go back to.
  *
- * \u26a0\ufe0f applyProfile() IS PURE; adoptPlan()/recompute() COMMIT. They are one line apart and the
+ * ⚠️ applyProfile() IS PURE; adoptPlan()/recompute() COMMIT. They are one line apart and the
  * familiar one is the committing one -- and adoptPlan fires syncNativeReminders() and syncWatch()
  * inside try/catch, so building a preview with it would push a plan the runner has not accepted to
  * the notification scheduler and to the wrist, where it becomes what the watch runs from when it
@@ -4698,7 +4726,7 @@ function profileImpact(pf) {
     return w ? w.sessions.filter((x) => PRIMARY_TYPES[x.type]).length : null;
   };
   cmp("Runs in a typical week", PLAN ? runDays(PLAN) : null, runDays(out.plan), (v) => String(Math.round(v)));
-  // \u26a0\ufe0f THE ONE NOBODY WOULD THINK TO WARN ABOUT, and the reason this screen needed an undo at
+  // ⚠️ THE ONE NOBODY WOULD THINK TO WARN ABOUT, and the reason this screen needed an undo at
   // all. seedDone() prunes state.dayOverride of every session id the new plan does not contain, and
   // PERSISTS the prune. Those are the runner's OWN reschedules, made on a different screen entirely
   // (the session sheet's "Move to another day"). They were deleted before any toast could appear.
@@ -4710,13 +4738,13 @@ function profileImpact(pf) {
 function profileImpactHtml(imp) {
   if (!imp) return "";
   if (imp.none) {
-    return '<div class="pi-none">Nothing about your plan changes \u2014 the answers you edited do not ' +
+    return '<div class="pi-none">Nothing about your plan changes — the answers you edited do not ' +
       'affect how it is built. Saving is safe.</div>';
   }
   const rows = imp.rows.map((r) =>
     '<div class="pi-row"><span class="pi-l">' + esc(r.label) + '</span>' +
     '<span class="pi-v"><s>' + esc(r.was) + '</s> <b>' + esc(r.now) + '</b></span></div>').join("");
-  // \u26a0\ufe0f Said in words, before it happens, because it cannot be undone by rebuilding the plan.
+  // ⚠️ Said in words, before it happens, because it cannot be undone by rebuilding the plan.
   const lost = imp.lost
     ? '<div class="pi-warn"><b>' + imp.lost + (imp.lost === 1 ? " session you moved" : " sessions you moved") +
       '</b> to a different day will go back to where the plan put them.</div>'
@@ -4726,12 +4754,12 @@ function profileImpactHtml(imp) {
 let PROFILE_CONFIRMED = false;
 /**
  * The preview sheet. Its button is the only thing that commits.
- * \u26a0\ufe0f A ONE-SHOT FLAG, cleared the instant doSaveProfile reads it. Left set, the NEXT edit
+ * ⚠️ A ONE-SHOT FLAG, cleared the instant doSaveProfile reads it. Left set, the NEXT edit
  * would save silently -- which is exactly the behaviour this change exists to remove, reintroduced
  * by a variable nobody would think to look at.
  */
 function openProfilePreview(pf, imp) {
-  // \u26a0\ufe0f THE PREVIEW AND THE EDIT FORM SHARE ONE SHEET, so showing the preview destroys the
+  // ⚠️ THE PREVIEW AND THE EDIT FORM SHARE ONE SHEET, so showing the preview destroys the
   // form -- and the confirm button then clicked a #saveProfile that was no longer in the document.
   // Capture what was typed, remember which topic was open, and put the form back on confirm.
   const editing = PROFILE_EDIT_OPEN ? (state.setupFocus || null) : false;
@@ -4751,7 +4779,7 @@ function openProfilePreview(pf, imp) {
     PROFILE_CONFIRMED = true;
     if (editing !== false) { openProfileEdit(editing); }
     else closeSheet();
-    // \u26a0\ufe0f #saveProfile, and doSaveProfile is a CLOSURE inside wire() so it cannot be called
+    // ⚠️ #saveProfile, and doSaveProfile is a CLOSURE inside wire() so it cannot be called
     // from here. The first version clicked "#saveSetup", which does not exist anywhere in the app --
     // it built, typechecked, passed every test, and the confirm button silently did nothing.
     const save = $("saveProfile"); if (save) save.click();
@@ -4915,7 +4943,50 @@ function renderReadiness() {
     '<div class="body">' + reasons + '<div class="reassure">' + r.reassurance + '</div></div></div>' +
     '<div class="watch"><span class="wl">From your watch</span><span class="c" style="font-size:12px;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:3px 9px">Slept ' + watch.sleepHours + ' h</span><span class="c" style="font-size:12px;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:3px 9px">Resting HR normal</span></div>';
 }
-function effortOf(s) { if (s.type === "rest" || s.type === "mobility") return "none"; if (s.type === "strength" || s.type === "cross-training") return "moderate"; if (s.intensity === "hard") return "hard"; if (s.intensity === "moderate") return "moderate"; return "easy"; }
+/**
+ * THE ONE SESSION-TO-EFFORT-COLOUR MAPPING, AND EVERY SURFACE THAT PAINTS AN --eff-* COLOUR READS IT.
+ *
+ * ⚠️ THERE WERE THREE DERIVATIONS AND THEY DISAGREED ON THE OWNER\u2019S OWN EXAMPLE. He said "an easy run
+ * is teale, a tempo is yellow etc" \u2014 and the app had a tempo three colours at once: the Add-a-session
+ * grid (RUN_TYPES) drew it AMBER, the training-log calendar (RUN_KIND) drew it RUST, and the share card\u2019s
+ * new session ground drew it RUST as well because its own list of hard types named "threshold". A runner
+ * taps the amber tile, runs it, and gets a rust card of it. So the mapping exists once, here, keyed on the
+ * session TYPE, and RUN_TYPES, RUN_KIND, the plan dot, the Logbook rail, the debrief chip and the card all
+ * resolve through it. Two of them cannot drift apart again because there is no second table to edit.
+ *
+ * ⚠️ THRESHOLD IS MODERATE \u2014 THE OWNER\u2019S DECISION, AND ALSO WHAT THE ENGINE ALREADY SAID. The generator
+ * assembles a threshold session with an intensity of moderate (src/plan/session-templates.ts), so the plan
+ * dot has always been amber; it was the two readers keyed on type that invented a rust one. "Comfortably
+ * hard, held with rhythm" is the grid\u2019s own blurb for it, and comfortably hard is not the same band as
+ * an interval session at 5 km pace.
+ *
+ * ⚠️ IT IS KEYED ON TYPE, NOT ON THE INTENSITY FIELD, AND THAT IS WHAT MAKES IT ONE MAPPING NOT TWO. A
+ * logged run stores its type and throws the intensity away \u2014 liveRunRecord never keeps it \u2014 so a mapping
+ * that read intensity could answer for a planned session and not for the run of that session, which is
+ * exactly how the Logbook rail and the debrief chip came to disagree. One key both sides genuinely have.
+ * The one case that moves is race-specific: the generator calls it moderate, every type-keyed reader in
+ * the app already called it hard, and hard is what it now is everywhere. A rehearsal AT GOAL RACE PACE is
+ * not the same afternoon as a tempo.
+ *
+ * ⚠️ ITS FALLBACK IS "easy", WHICH IS WHERE A RUN WITH NO TYPE LANDS. Callers that want to say something
+ * else about a missing type still guard on the type itself \u2014 shareCardModel does, so a run with no type
+ * gets the family\u2019s plain ink ground rather than a confident teal \u2014 and that keeps this a mapping rather
+ * than a policy.
+ */
+const SESSION_EFFORT = {
+  easy: "easy", long: "easy", recovery: "easy", strides: "easy",
+  threshold: "moderate", strength: "moderate", "cross-training": "moderate",
+  vo2: "hard", "race-specific": "hard", race: "hard",
+  rest: "none", mobility: "none",
+};
+/** The effort band of a session type. Total; anything unknown is easy running. */
+function sessionEffort(type) { return SESSION_EFFORT[type] || "easy"; }
+/** The one place an --eff-* custom property name is built, so a typo cannot become four typos. */
+function effortVar(effort) { return "var(--eff-" + effort + ")"; }
+/** A PLANNED session\u2019s effort band. */
+function effortOf(s) { return sessionEffort(s && s.type); }
+/** A LOGGED run\u2019s effort band \u2014 the same answer, from the same table. */
+function runEffort(run) { return sessionEffort(run && run.type); }
 function paceOf(s) { const rep = s.steps.find((st) => st.kind === "rep" && st.targetPaceSecPerKm); const steady = s.steps.find((st) => st.kind === "steady" && st.targetPaceSecPerKm); const quality = s.type === "threshold" || s.type === "vo2" || s.type === "race-specific"; const p = quality ? (rep || steady) : (steady || rep); if (!p) return null; return fmtPace(p.targetPaceSecPerKm.minSecPerKm) + "–" + fmtPace(p.targetPaceSecPerKm.maxSecPerKm) + "/km"; }
 function rpeOf(s) { let band = s.targetRpe; if (!band) { const w = s.steps.filter((st) => st.targetRpe); if (w.length) band = { min: Math.min.apply(null, w.map((x) => x.targetRpe.min)), max: Math.max.apply(null, w.map((x) => x.targetRpe.max)) }; } return band ? band.min + "–" + band.max : null; }
 // The week the top calendar strip is currently showing. selWeek is a 0-based array index into
@@ -5595,7 +5666,7 @@ function notifyToday(slot) {
   if (s.distKm) bits.push(s.distKm + " km");
   const more = list.length > 1 ? " (+" + (list.length - 1) + " more)" : "";
   const q = randomQuote();
-  const quote = "\\u201C" + q[0] + "\\u201D" + (q[1] ? " \\u2014 " + q[1] : "");
+  const quote = "\\u201C" + q[0] + "\\u201D" + (q[1] ? " \— " + q[1] : "");
   markFired(slot);
   showNotif("Today: " + s.title + more, { body: (bits.length ? bits.join(" \\u00b7 ") + "\\n" : "") + quote, tag: "interun-session-" + today + "-" + slot, icon: "./icon-192.png", badge: "./icon-192.png", data: { url: "./" } });
 }
@@ -5637,7 +5708,7 @@ function buildReminderSchedule() {
         y: when.getFullYear(), mo: when.getMonth() + 1, d: when.getDate(),
         h: when.getHours(), mi: when.getMinutes(),
         title: "Today: " + s.title + more,
-        body: (bits.length ? bits.join(" \\u00b7 ") + "\\n" : "") + "\\u201C" + q[0] + "\\u201D" + (q[1] ? " \\u2014 " + q[1] : ""),
+        body: (bits.length ? bits.join(" \\u00b7 ") + "\\n" : "") + "\\u201C" + q[0] + "\\u201D" + (q[1] ? " \— " + q[1] : ""),
       });
     }
   }
@@ -5825,12 +5896,12 @@ function normalizeSplits(splits) {
 /**
  * A run as Strava will accept it.
  *
- * \u26a0\ufe0f TWO SHAPES, AND WHICH ONE IS DECIDED BY THE DATA, NOT THE SESSION TYPE. A run with a
+ * ⚠️ TWO SHAPES, AND WHICH ONE IS DECIDED BY THE DATA, NOT THE SESSION TYPE. A run with a
  * timed route becomes a GPX file, which Strava turns into a map, splits and pace. A run without one
  * -- a treadmill session, a run where GPS was refused, or anything recorded before this app started
  * stamping times -- has no trace to send, so it goes as a MANUAL activity carrying the real totals.
  *
- * \u26a0\ufe0f WHAT IT WILL NOT DO IS INVENT THE MISSING HALF. The obvious way to make an old run into
+ * ⚠️ WHAT IT WILL NOT DO IS INVENT THE MISSING HALF. The obvious way to make an old run into
  * a GPX is to spread its total time evenly across the points it does have. That draws a perfectly
  * even run that never happened, in somebody else's training log, under their name. This app already
  * refuses to fabricate: a simulated run is stamped sim:true and skipped by every adaptive check, and
@@ -5858,11 +5929,11 @@ function runStravaPayload(run) {
              elapsedSec: Math.round(Number(run.sec) || 0),
              trainer: !(run.route && run.route.length) };
   }
-  // \u26a0\ufe0f DOUBLED BACKSLASHES. Written singly this shipped as /.d{3}Z$/ and matched nothing, so
+  // ⚠️ DOUBLED BACKSLASHES. Written singly this shipped as /.d{3}Z$/ and matched nothing, so
   // every timestamp kept its milliseconds. Seventh firing of this file's own escaping rule today.
   const iso = (sec) => new Date(startMs + sec * 1000).toISOString().replace(/\\.\\d{3}Z$/, "Z");
 
-  // \u26a0\ufe0f HEART RATE IS PAIRED WITH DISTANCE, NOT TIME. hrSeries is [metres, bpm] on purpose -- on a time
+  // ⚠️ HEART RATE IS PAIRED WITH DISTANCE, NOT TIME. hrSeries is [metres, bpm] on purpose -- on a time
   // axis every pause is a plateau -- so putting it on a trackpoint means walking the route's OWN
   // cumulative distance and reading the series at that point. Nothing new is inferred; this is the
   // same pairing the in-app chart already draws from.
@@ -5875,7 +5946,7 @@ function runStravaPayload(run) {
   };
   const hrs = (run && Array.isArray(run.hrSeries) ? run.hrSeries : [])
     .filter((s) => Array.isArray(s) && isFinite(Number(s[0])) && Number(s[1]) > 0);
-  // \u26a0\ufe0f A DROPOUT IS NOT INTERPOLATED ACROSS. HealthKit simply stops delivering when the watch loses
+  // ⚠️ A DROPOUT IS NOT INTERPOLATED ACROSS. HealthKit simply stops delivering when the watch loses
   // skin contact, so a wide gap between samples is missing evidence, not a slow change -- and drawing
   // a smooth line through it would put a fabricated steady effort into somebody's training log. The
   // app's own chart leaves that gap for the same reason. Samples land every ~5s, so 400 m apart is far
@@ -5922,7 +5993,7 @@ function runStravaPayload(run) {
 }
 /**
  * When the run began, in real time.
- * \u26a0\ufe0f A run stores its DATE and its duration, not its start instant -- so for anything but
+ * ⚠️ A run stores its DATE and its duration, not its start instant -- so for anything but
  * today the honest answer is that day at a sensible hour rather than a precise lie. Phone runs carry
  * the milliseconds in their id ("run-1723...") which is exact, so that is preferred wherever present.
  */
@@ -5940,7 +6011,7 @@ function normalizeRoute(route) {
     if (Array.isArray(p)) { la = Number(p[0]); lo = Number(p[1]); }
     else if (p && typeof p === "object") { la = Number(p.lat); lo = Number(p.lng); }
     else continue;
-    // \u26a0\ufe0f CARRY THE TIME THROUGH. This function runs on every ingest, so dropping an unknown
+    // ⚠️ CARRY THE TIME THROUGH. This function runs on every ingest, so dropping an unknown
     // field here would silently strip the timestamps off every watch run and every repaired run --
     // and the loss would only show up as a Strava upload with no pace in it.
     if (isFinite(la) && isFinite(lo) && (la !== 0 || lo !== 0)) {
@@ -5972,7 +6043,7 @@ function migrateRunRoutes() {
     }
     // "today" was written into the caption of every watch run, permanently. There is no way back to
     // the real date for those, but the id carries the milliseconds for phone runs.
-    // \u26a0\ufe0f A RUN WITHOUT AN ID CANNOT BE ADDRESSED ONCE THE LIST IS FILTERED. The rows used to
+    // ⚠️ A RUN WITHOUT AN ID CANNOT BE ADDRESSED ONCE THE LIST IS FILTERED. The rows used to
     // carry their ARRAY INDEX, which this file already documents as "not a handle" -- and grouping or
     // filtering the list breaks that in a second way, because position in the rendered list stops
     // matching position in state.logged. Backfilled from the date so an old run keeps a handle.
@@ -6023,11 +6094,11 @@ function ingestWatchRun(run) {
   // field left the caption reading a date the run cannot have happened on.
   const runIso = iso > todayIso() ? todayIso() : iso;
   state.logged.unshift({
-    // \u26a0\ufe0f the caption used to be dayLabelIso(), which literally writes the word "today" \u2014 so a wrist run was
+    // ⚠️ the caption used to be dayLabelIso(), which literally writes the word "today" — so a wrist run was
     // still captioned "today" a fortnight later, forever, because nothing ever recomputed it. The
     // date is stored as a real one now and the caption is derived from it at render time.
     id: run.id, t: title, d: runDateLabelIso(runIso), dateIso: runIso, dist: distKm.toFixed(2) + " km",
-    time: fmtPace(sec), pace: avgPaceSec ? fmtPace(avgPaceSec) + " /km" : "\u2014",
+    time: fmtPace(sec), pace: avgPaceSec ? fmtPace(avgPaceSec) + " /km" : "—",
     distKm: Number(distKm.toFixed(2)), sec: sec, avgPaceSec: avgPaceSec,
     route: normalizeRoute(run.route), splits: normalizeSplits(run.splits),
     elevGain: Math.round(Number(run.elevGain) || 0),
@@ -6460,7 +6531,7 @@ function viewWatchLive() {
   }
   const L = WATCH_LIVE;
   const paused = L.state === "paused";
-  const pace = (v) => (v > 0 ? fmtPace(v) : "\u2014");
+  const pace = (v) => (v > 0 ? fmtPace(v) : "—");
   const big = (k, v, sub, id) => '<div class="wf-big"><div class="wf-v num"' + (id ? ' id="' + id + '"' : "") + '>' + v + (sub ? '<small>' + sub + '</small>' : "") + '</div><div class="wf-k">' + k + '</div></div>';
   const small = (k, v) => '<div class="wf-s"><div class="wf-sv num">' + v + '</div><div class="wf-k">' + k + '</div></div>';
   return '<button class="backbtn" id="wlBack">\u2039 Back</button>' +
@@ -6471,13 +6542,13 @@ function viewWatchLive() {
     '<div class="wf-hero">' + big("Elapsed", fmtPace(watchLiveSec()), "", "wlElapsed") +
       big("Distance", (Number(L.distKm) || 0).toFixed(2), " km") + '</div>' +
     '<div class="wf-grid">' + small("Current", pace(L.paceSec)) + small("Lap", pace(L.lapPaceSec)) +
-      small("Average", pace(L.avgPaceSec)) + small("Heart", L.hr ? L.hr + " bpm" : "\u2014") + '</div>' +
+      small("Average", pace(L.avgPaceSec)) + small("Heart", L.hr ? L.hr + " bpm" : "—") + '</div>' +
     '</div>' +
     '<div class="wl-controls">' +
       '<button class="wl-btn" id="wlPause">' + (paused ? ICON.play + " Resume" : "\u2016 Pause") + '</button>' +
       '<button class="wl-btn wl-stop" id="wlStop">Finish run</button>' +
     '</div>' +
-    '<div class="card"><div class="bk-md">Your watch is recording this run. These control it from here \u2014 the run itself, and everything it logs, stays on your wrist.</div></div>';
+    '<div class="card"><div class="bk-md">Your watch is recording this run. These control it from here — the run itself, and everything it logs, stays on your wrist.</div></div>';
 }
 // The mirror card. Numbers only, plus a plain statement of where the run is being recorded -- a
 // runner glancing at their phone should never have to wonder which device is the real one.
@@ -6485,7 +6556,7 @@ function watchLiveCard() {
   if (!watchLiveActive()) return "";
   const L = WATCH_LIVE;
   const paused = L.state === "paused";
-  const pace = (v) => (v > 0 ? fmtPace(v) : "\u2014");
+  const pace = (v) => (v > 0 ? fmtPace(v) : "—");
   const stat = (k, v) => '<div class="wl-stat"><div class="wl-v num">' + v + '</div><div class="wl-k">' + k + '</div></div>';
   return '<div class="card wl-card' + (paused ? " wl-paused" : "") + '">' +
     '<div class="wl-head"><span class="wl-dot"></span>' +
@@ -6503,7 +6574,7 @@ function watchLiveCard() {
     '<div class="wl-stats wl-sub">' +
       stat("Lap", pace(L.lapPaceSec)) +
       stat("Average", pace(L.avgPaceSec)) +
-      stat("Heart", L.hr ? L.hr + " bpm" : "\u2014") +
+      stat("Heart", L.hr ? L.hr + " bpm" : "—") +
     '</div>' +
     '<div class="wl-foot">Your watch is recording this run. It will appear in your Logbook when you finish.</div></div>';
 }
@@ -6602,7 +6673,7 @@ function buildSessionsIcs() {
       if (s.durMin) bits.push(s.durMin + " min");
       if (s.distKm) bits.push(s.distKm + " km");
       if (s.pace) bits.push(s.pace);
-      lines.push("BEGIN:VEVENT", "UID:interun-" + wk.index + "-" + (s.id || (icsDate(dt) + "-" + s.type)) + "@interun.app", "DTSTAMP:" + stamp, "DTSTART;VALUE=DATE:" + icsDate(dt), "SUMMARY:" + icsEsc("Inte-Run \\u2014 " + s.title), "DESCRIPTION:" + icsEsc(bits.join(" \\u00b7 ") || "Training session"), "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(s.title), "TRIGGER;RELATED=START:" + trig, "END:VALARM", "END:VEVENT");
+      lines.push("BEGIN:VEVENT", "UID:interun-" + wk.index + "-" + (s.id || (icsDate(dt) + "-" + s.type)) + "@interun.app", "DTSTAMP:" + stamp, "DTSTART;VALUE=DATE:" + icsDate(dt), "SUMMARY:" + icsEsc("Inte-Run \— " + s.title), "DESCRIPTION:" + icsEsc(bits.join(" \\u00b7 ") || "Training session"), "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(s.title), "TRIGGER;RELATED=START:" + trig, "END:VALARM", "END:VEVENT");
     });
   });
   lines.push("END:VCALENDAR");
@@ -6627,17 +6698,17 @@ function shareIcs() { try { navigator.share({ files: [icsFile()], title: "Inte-R
 function remindersSheetHtml() {
   const perm = notifPerm(), supported = notifSupported(), on = REMIND.enabled && perm === "granted";
   const note = !supported
-    ? "Your browser can\\u2019t show notifications here \\u2014 add Inte-Run to your Home Screen, or just use the calendar below."
-    : perm === "denied" ? "Notifications are blocked for this site in your settings \\u2014 allow them there, then switch this on." : "";
+    ? "Your browser can\\u2019t show notifications here \— add Inte-Run to your Home Screen, or just use the calendar below."
+    : perm === "denied" ? "Notifications are blocked for this site in your settings \— allow them there, then switch this on." : "";
   const toggle = '<button class="rm-switch' + (on ? " on" : "") + '" id="rmToggle" role="switch" aria-checked="' + (on ? "true" : "false") + '" aria-label="Toggle session reminders"><span class="rm-knob"></span></button>';
   // Second reminder later in the day: an add link until set, then a time row with a remove.
   const second = !on ? "" : (REMIND.time2
     ? '<div class="rm-row"><label for="rmTime2">Second reminder</label><span style="display:flex;align-items:center;gap:8px"><input type="time" id="rmTime2" value="' + REMIND.time2 + '"><button class="rm-x" id="rmTime2Rm" aria-label="Remove second reminder">\\u2715</button></span></div>'
     : '<button class="rm-addtime" id="rmTime2Add">\\uFF0B Add a second reminder later in the day</button>');
-  const noThanks = REMIND.decided ? "" : '<button class="rm-nothanks" id="rmNo">\\uD83D\\uDD15 No thanks \\u2014 I don\\u2019t want reminders</button>';
+  const noThanks = REMIND.decided ? "" : '<button class="rm-nothanks" id="rmNo">\\uD83D\\uDD15 No thanks \— I don\\u2019t want reminders</button>';
   return '<div class="sd-type" style="--sc:var(--accent)">Session reminders</div>' +
     '<div class="sd-title">Get reminded on session days</div>' +
-    '<div class="rm-row"><div><b>' + (NATIVE_NOTIFY ? 'Session reminders' : 'In-app notifications') + '</b><div class="sd-desc" style="margin:2px 0 0">A nudge \\u2014 with a motivational quote \\u2014 on the days you have a session.</div></div>' + toggle + '</div>' +
+    '<div class="rm-row"><div><b>' + (NATIVE_NOTIFY ? 'Session reminders' : 'In-app notifications') + '</b><div class="sd-desc" style="margin:2px 0 0">A nudge \— with a motivational quote \— on the days you have a session.</div></div>' + toggle + '</div>' +
     '<div class="rm-row"><label for="rmTime">Reminder time</label><input type="time" id="rmTime" value="' + REMIND.time + '"' + (on ? "" : " disabled") + '></div>' +
     second +
     (note ? '<div class="sd-desc" style="margin-top:8px">' + note + '</div>' : "") +
@@ -6646,13 +6717,13 @@ function remindersSheetHtml() {
     // iOS itself holds the schedule. Telling app users their reminders are unreliable would be a lie.
     '<div class="sd-desc" style="margin-top:10px;font-size:12.5px;color:var(--ink-faint)">' + (NATIVE_NOTIFY
       ? 'Your phone holds these reminders, so they arrive whether or not Inte-Run is open. You can also add every session to your calendar below.'
-      : 'A web app can only notify reliably while it\\u2019s open (or added to your Home Screen). For an alert that reaches you with Inte-Run closed, add your sessions to your calendar below \\u2014 it works on any phone.') + '</div>' +
+      : 'A web app can only notify reliably while it\\u2019s open (or added to your Home Screen). For an alert that reaches you with Inte-Run closed, add your sessions to your calendar below \— it works on any phone.') + '</div>' +
     '<div class="sd-move" style="margin-top:14px"><div class="sd-move-h">Add sessions to your calendar</div>' +
-    '<div class="sd-desc" style="margin:2px 0 10px">Adds every planned session. Your phone asks <b>which calendar</b> to put them in, so choose the account you want there \\u2014 Google, iCloud or Outlook. Inte-Run never sees your password.</div>' +
+    '<div class="sd-desc" style="margin:2px 0 10px">Adds every planned session. Your phone asks <b>which calendar</b> to put them in, so choose the account you want there \— Google, iCloud or Outlook. Inte-Run never sees your password.</div>' +
     '<button class="primary" id="rmIcs" style="width:100%">' + ICON.cal + ' Add to my calendar</button>' +
-    (canShareFiles() ? '<button class="rm-alt" id="rmShare">Send the file somewhere else \\u2014 email it, or AirDrop it to a computer</button>' : "") +
+    (canShareFiles() ? '<button class="rm-alt" id="rmShare">Send the file somewhere else \— email it, or AirDrop it to a computer</button>' : "") +
     '<div class="sd-move-n" id="rmCalNote"></div>' +
-    '<div class="rm-desk"><b>Using Google Calendar or Outlook?</b> Their phone apps <b>can\\u2019t</b> import a calendar file \\u2014 that only works on a computer. Easiest on a phone: tap <b>Add to my calendar</b> above and pick your Google/Outlook account when your phone asks. To import on a computer instead:' +
+    '<div class="rm-desk"><b>Using Google Calendar or Outlook?</b> Their phone apps <b>can\\u2019t</b> import a calendar file \— that only works on a computer. Easiest on a phone: tap <b>Add to my calendar</b> above and pick your Google/Outlook account when your phone asks. To import on a computer instead:' +
     '<div class="rm-links"><button data-cal="google">Google Calendar \\u2192 Settings \\u2192 Import</button><button data-cal="outlook">Outlook \\u2192 Add calendar \\u2192 Upload from file</button></div></div></div>' +
     (supported && perm === "granted" ? '<button class="rm-test" id="rmTest">Send a test notification</button>' : "");
 }
@@ -6680,8 +6751,8 @@ function wireRemindersSheet() {
     downloadIcs();
     const n = $("rmCalNote");
     if (n) n.textContent = isPhone()
-      ? "Saved as interun-sessions.ics. Open it (Downloads, or the banner your browser just showed) and your phone\\u2019s calendar will offer to add every session \\u2014 that\\u2019s where you choose which account/calendar they go into."
-      : "Downloaded interun-sessions.ics \\u2014 open it to add the sessions to this computer\\u2019s calendar, or import it into Google/Outlook below.";
+      ? "Saved as interun-sessions.ics. Open it (Downloads, or the banner your browser just showed) and your phone\\u2019s calendar will offer to add every session \— that\\u2019s where you choose which account/calendar they go into."
+      : "Downloaded interun-sessions.ics \— open it to add the sessions to this computer\\u2019s calendar, or import it into Google/Outlook below.";
   };
   const share = $("rmShare"); if (share) share.onclick = shareIcs;
   // Google/Outlook import is a COMPUTER-only feature — their phone apps can't import a calendar
@@ -6690,7 +6761,7 @@ function wireRemindersSheet() {
     const kind = b.dataset.cal, name = kind === "google" ? "Google Calendar" : "Outlook";
     const n = $("rmCalNote");
     if (isPhone()) {
-      if (n) n.textContent = name + " can only import a calendar file on a computer \\u2014 its phone app has no import. Either tap \\u201cAdd to my calendar\\u201d above and pick your " + (kind === "google" ? "Google" : "Outlook") + " account when your phone asks, or send the file to your computer and import it there.";
+      if (n) n.textContent = name + " can only import a calendar file on a computer \— its phone app has no import. Either tap \\u201cAdd to my calendar\\u201d above and pick your " + (kind === "google" ? "Google" : "Outlook") + " account when your phone asks, or send the file to your computer and import it there.";
       return;
     }
     downloadIcs();
@@ -6699,14 +6770,14 @@ function wireRemindersSheet() {
   });
   const test = $("rmTest"); if (test) test.onclick = () => {
     const q = randomQuote();
-    const body = "This is how your session reminders will look.\\n\\u201C" + q[0] + "\\u201D" + (q[1] ? " \\u2014 " + q[1] : "");
+    const body = "This is how your session reminders will look.\\n\\u201C" + q[0] + "\\u201D" + (q[1] ? " \— " + q[1] : "");
     // ⚠️ In the native app the web Notification API does not exist (and the service worker is disabled
     // under interun://), so showNotif is inert there — the button looked broken exactly where the real
     // reminders live. Route the test through the OS bridge; it arrives in a few seconds without
     // touching the scheduled reminders, so a runner can confirm delivery works before trusting it.
     if (NATIVE_NOTIFY) { nativeNotify("test", { title: "Inte-Run test reminder", body: body }); }
     else { showNotif("Inte-Run test reminder", { body: body, tag: "interun-test", icon: "./icon-192.png", data: { url: "./" } }); }
-    const n = $("rmCalNote"); if (n && NATIVE_NOTIFY) n.textContent = "Test reminder sent \\u2014 it should arrive in a few seconds.";
+    const n = $("rmCalNote"); if (n && NATIVE_NOTIFY) n.textContent = "Test reminder sent \— it should arrive in a few seconds.";
   };
 }
 
@@ -6715,7 +6786,7 @@ function wireRemindersSheet() {
 // running-knowledge base, entirely on-device — no network, no key, works offline. A remote brain can
 // be plugged in later (see alfieRemote below): the UI, the plan-context layer and the safety routing
 // are shared, so switching backends changes nothing the user sees.
-const ALFIE_GREETING = "Hi, I\\u2019m Alfie \\u2014 your running coach in the app. Ask me anything about your plan, your paces, or running in general.";
+const ALFIE_GREETING = "Hi, I\\u2019m Alfie \— your running coach in the app. Ask me anything about your plan, your paces, or running in general.";
 const ALFIE_CHIPS = ["What\\u2019s my next session?", "How\\u2019s my week looking?", "What pace should I run easy?", "Should I run if I\\u2019m sore?", "What is a threshold run?", "How far away is my race?"];
 function alfieCfg() { try { return JSON.parse(localStorage.getItem("interun_alfie_v1") || "null") || { proxy: "" }; } catch (e) { return { proxy: "" }; } }
 function alfieSaveCfg(c) { try { localStorage.setItem("interun_alfie_v1", JSON.stringify(c)); } catch (e) {} }
@@ -6761,7 +6832,7 @@ function alfieSessionLine(s) {
   if (s.durMin) bits.push(s.durMin + " min");
   if (s.distKm) bits.push(s.distKm + " km");
   if (s.pace) bits.push(s.pace);
-  return "<b>" + esc(s.title) + "</b>" + (bits.length ? " \\u2014 " + bits.join(" \\u00b7 ") : "");
+  return "<b>" + esc(s.title) + "</b>" + (bits.length ? " \— " + bits.join(" \\u00b7 ") : "");
 }
 // The next session dated today or later, with how many days away it is.
 function alfieNextSession() {
@@ -6824,29 +6895,29 @@ function alfieIntents() {
   return [
     { k: ["sore", "should i run", "tired", "fatigued", "heavy legs", "rest day today", "skip"], a: () => {
       let r; try { r = RC.assessReadiness(readinessInput()); } catch (e) { r = null; }
-      return "<p>" + "<b>Mild awareness that stays stable</b>, does not change your stride and is no worse later or the next morning can be monitored on easy running. <b>Pain that sharpens, grows, causes a limp, or sits sharply on a bone is a stop signal.</b> In the first 72 hours after a fresh sprain or strain, none of this applies \u2014 follow Support \u2192 <i>Injury &amp; symptoms</i> instead." + "</p>" +
+      return "<p>" + "<b>Mild awareness that stays stable</b>, does not change your stride and is no worse later or the next morning can be monitored on easy running. <b>Pain that sharpens, grows, causes a limp, or sits sharply on a bone is a stop signal.</b> In the first 72 hours after a fresh sprain or strain, none of this applies — follow Support \u2192 <i>Injury &amp; symptoms</i> instead." + "</p>" +
         (r ? "<p>From your latest check-in, Inte-Run rates you <b>" + esc(r.headline) + "</b>. " + esc(r.recommendation) + "</p>" : "") +
         "<p>A good rule: if you\\u2019re unsure, run the <b>easy</b> version. Swapping a hard session for an easy one costs you almost nothing; training through a real injury costs weeks.</p>" +
         "<p class=\\"alf-dim\\">Tap \\u201cHow you feel\\u201d on Today to update your check-in.</p>";
     } },
     { k: ["heat", "hot", "humid", "warm weather"], a: () => {
       let imp; try { imp = currentConditions(selectedSession()); } catch (e) { imp = null; }
-      return "<p>Heat makes the same pace cost more \\u2014 that\\u2019s physiology, not weakness. <b>Run by effort</b> and let the pace be whatever it is.</p>" +
+      return "<p>Heat makes the same pace cost more \— that\\u2019s physiology, not weakness. <b>Run by effort</b> and let the pace be whatever it is.</p>" +
         (imp ? "<p>Right now Inte-Run rates conditions as <b>" + esc(imp.headline) + "</b>." + (heatSecPerKm(imp) ? " Expect around <b>+" + heatSecPerKm(imp) + "s/km</b> for the same effort." : "") + "</p>" : "") +
-        "<p>Go earlier or later in the day, take fluid with some sodium in it \\u2014 without over-drinking, since sodium doesn\\u2019t make excess fluid safe \\u2014 and give yourself 10\\u201314 days to acclimatise.</p>";
+        "<p>Go earlier or later in the day, take fluid with some sodium in it \— without over-drinking, since sodium doesn\\u2019t make excess fluid safe \— and give yourself 10\\u201314 days to acclimatise.</p>";
     } },
-    { k: ["cold", "winter", "ice", "dark"], a: () => "<p>Cold running is mostly a kit problem: layer up, cover extremities, and be seen \\u2014 lights and reflective gear.</p><p>Warm up a bit longer than usual, and on ice shorten your stride and slow down. A missed session beats a fall.</p>" },
-    { k: ["injur", "hurt", "pain", "niggle", "ache"], a: () => "<p>The line worth holding: <b>Mild awareness that stays stable</b>, does not change your stride and is no worse later or the next morning can be monitored on easy running. <b>Pain that sharpens, grows, causes a limp, or sits sharply on a bone is a stop signal.</b> In the first 72 hours after a fresh sprain or strain, none of this applies \u2014 follow Support \u2192 <i>Injury &amp; symptoms</i> instead.</p><p>Swelling, night pain, or pain that\\u2019s getting worse week to week all mean stop and get assessed.</p><p>Taking three days off early is almost always cheaper than taking six weeks off later.</p><p class=\\"alf-dim\\">Support \\u2192 <i>Injury &amp; symptoms</i> has a step-by-step guide for a fresh sprain or strain, starting with the signs that need help today.</p>" },
+    { k: ["cold", "winter", "ice", "dark"], a: () => "<p>Cold running is mostly a kit problem: layer up, cover extremities, and be seen \— lights and reflective gear.</p><p>Warm up a bit longer than usual, and on ice shorten your stride and slow down. A missed session beats a fall.</p>" },
+    { k: ["injur", "hurt", "pain", "niggle", "ache"], a: () => "<p>The line worth holding: <b>Mild awareness that stays stable</b>, does not change your stride and is no worse later or the next morning can be monitored on easy running. <b>Pain that sharpens, grows, causes a limp, or sits sharply on a bone is a stop signal.</b> In the first 72 hours after a fresh sprain or strain, none of this applies — follow Support \u2192 <i>Injury &amp; symptoms</i> instead.</p><p>Swelling, night pain, or pain that\\u2019s getting worse week to week all mean stop and get assessed.</p><p>Taking three days off early is almost always cheaper than taking six weeks off later.</p><p class=\\"alf-dim\\">Support \\u2192 <i>Injury &amp; symptoms</i> has a step-by-step guide for a fresh sprain or strain, starting with the signs that need help today.</p>" },
     { k: ["next session", "next run", "what's next", "whats next", "next workout"], a: () => {
       const n = alfieNextSession();
-      if (!n) return "<p>There\\u2019s nothing left scheduled in your plan \\u2014 nice work getting through it.</p>";
+      if (!n) return "<p>There\\u2019s nothing left scheduled in your plan \— nice work getting through it.</p>";
       const when = n.days === 0 ? "Today" : n.days === 1 ? "Tomorrow" : "In " + n.days + " days (" + dmon(isoAdd(n.iso, 0)) + ")";
       return "<p><b>" + when + "</b></p><ul class=\\"alf-ul\\">" + n.list.map((s) => "<li>" + alfieSessionLine(s) + "</li>").join("") + "</ul>" +
         "<p class=\\"alf-dim\\">Open Today to see the full breakdown, or start it from the session card.</p>";
     } },
     { k: ["today", "session today", "run today", "training today"], a: () => {
       const list = sessionsForIso(todayIso());
-      if (!list.length) return "<p>Today is a <b>rest day</b> \\u2014 recovery is part of the plan. Easy walking, mobility or a stretch is plenty.</p>";
+      if (!list.length) return "<p>Today is a <b>rest day</b> \— recovery is part of the plan. Easy walking, mobility or a stretch is plenty.</p>";
       return "<p>Today you\\u2019ve got:</p><ul class=\\"alf-ul\\">" + list.map((s) => "<li>" + alfieSessionLine(s) + "</li>").join("") + "</ul>";
     } },
     { k: ["tomorrow"], a: () => {
@@ -6858,59 +6929,59 @@ function alfieIntents() {
     { k: ["this week", "my week", "week looking", "week look", "weekly"], a: () => {
       const done = wk.sessions.filter((s) => s.type !== "rest" && state.done[doneKey(wk.index, s)]).length;
       const total = wk.sessions.filter((s) => s.type !== "rest").length;
-      return "<p><b>Week " + wk.index + "</b> \\u2014 " + esc(String(wk.phase || "")) + (wk.isDeload ? " (deload)" : "") + ", " + wk.distanceKm.toFixed(1) + " km planned across " + total + " sessions. You\\u2019ve ticked off " + done + ".</p>" +
+      return "<p><b>Week " + wk.index + "</b> \— " + esc(String(wk.phase || "")) + (wk.isDeload ? " (deload)" : "") + ", " + wk.distanceKm.toFixed(1) + " km planned across " + total + " sessions. You\\u2019ve ticked off " + done + ".</p>" +
         (wk.focus ? "<p>Focus this week: " + esc(wk.focus) + "</p>" : "") +
         "<p class=\\"alf-dim\\">The Today screen shows what\\u2019s still to come this week.</p>";
     } },
     { k: ["deload", "easier week", "why is this week", "recovery week"], a: () => {
-      return "<p>A <b>deload</b> is a deliberately lighter week \\u2014 usually a ~20\\u201330% drop in volume.</p>" +
+      return "<p>A <b>deload</b> is a deliberately lighter week \— usually a ~20\\u201330% drop in volume.</p>" +
         "<p>Fitness isn\\u2019t built by the training itself, it\\u2019s built while you <i>absorb</i> it. Backing off lets the previous weeks land, drops accumulated fatigue, and keeps injury risk down.</p>" +
-        "<p>" + (wk.isDeload ? "You\\u2019re in a deload right now (week " + wk.index + ") \\u2014 keep the easy runs genuinely easy." : "This week (week " + wk.index + ") isn\\u2019t a deload \\u2014 your plan schedules them periodically.") + "</p>";
+        "<p>" + (wk.isDeload ? "You\\u2019re in a deload right now (week " + wk.index + ") \— keep the easy runs genuinely easy." : "This week (week " + wk.index + ") isn\\u2019t a deload \— your plan schedules them periodically.") + "</p>";
     } },
     { k: ["phase", "base", "build phase", "peak", "taper"], a: () => {
       return "<p>Your plan moves through phases, and you\\u2019re currently in <b>" + esc(String(wk.phase || "base")) + "</b> (week " + wk.index + ").</p>" +
-        "<ul class=\\"alf-ul\\"><li><b>Base</b> \\u2014 build aerobic engine and durability, mostly easy running.</li>" +
-        "<li><b>Build</b> \\u2014 add quality: threshold and intervals sharpen your speed at aerobic cost.</li>" +
-        "<li><b>Peak</b> \\u2014 the hardest, most race-specific work.</li>" +
-        "<li><b>Taper</b> \\u2014 volume drops, intensity stays: you arrive fresh, not flat.</li></ul>";
+        "<ul class=\\"alf-ul\\"><li><b>Base</b> \— build aerobic engine and durability, mostly easy running.</li>" +
+        "<li><b>Build</b> \— add quality: threshold and intervals sharpen your speed at aerobic cost.</li>" +
+        "<li><b>Peak</b> \— the hardest, most race-specific work.</li>" +
+        "<li><b>Taper</b> \— volume drops, intensity stays: you arrive fresh, not flat.</li></ul>";
     } },
     { k: ["pace", "how fast", "what speed", "how quick"], a: () => {
       const rows = [];
-      if (p.easy) rows.push("<li><b>Easy</b> " + esc(p.easy) + " \\u2014 conversational. Most of your running.</li>");
-      if (p.threshold) rows.push("<li><b>Threshold</b> " + esc(p.threshold) + " \\u2014 comfortably hard, about an hour-race effort.</li>");
+      if (p.easy) rows.push("<li><b>Easy</b> " + esc(p.easy) + " \— conversational. Most of your running.</li>");
+      if (p.threshold) rows.push("<li><b>Threshold</b> " + esc(p.threshold) + " \— comfortably hard, about an hour-race effort.</li>");
       if (p.goal) rows.push("<li><b>Goal race pace</b> " + esc(p.goal) + "</li>");
       return "<p>These come from your current fitness, so they\\u2019re yours, not a generic table:</p><ul class=\\"alf-ul\\">" + rows.join("") + "</ul>" +
-        "<p>If a pace feels wrong on the day, run by <b>effort</b> \\u2014 heat, hills, wind and fatigue all move the number.</p>";
+        "<p>If a pace feels wrong on the day, run by <b>effort</b> \— heat, hills, wind and fatigue all move the number.</p>";
     } },
     { k: ["race", "goal", "how long until", "how far away", "race day", "countdown"], a: () => {
       const f = alfieRaceFacts();
-      const when = f.daysAway == null ? "" : f.daysAway < 0 ? " \\u2014 that date has passed." : f.daysAway === 0 ? " \\u2014 that\\u2019s <b>today</b>." : " \\u2014 <b>" + f.daysAway + " days</b> away (about " + f.weeksAway + " weeks).";
+      const when = f.daysAway == null ? "" : f.daysAway < 0 ? " \— that date has passed." : f.daysAway === 0 ? " \— that\\u2019s <b>today</b>." : " \— <b>" + f.daysAway + " days</b> away (about " + f.weeksAway + " weeks).";
       return "<p>You\\u2019re training for <b>" + esc(f.race) + "</b>" + (f.target ? " with a target of <b>" + esc(f.target) + "</b>" : "") + (f.date ? ", on " + esc(f.date) : "") + when + "</p>" +
         "<p class=\\"alf-dim\\">The Plan tab shows the whole block and how the weeks build.</p>";
     } },
-    { k: ["easy run", "what is easy", "easy pace mean", "conversational"], a: () => "<p>An <b>easy run</b> is the backbone of the plan \\u2014 most of your weekly running should be here.</p><p>It should feel genuinely comfortable: you could hold a conversation" + (p.easy ? ", around " + esc(p.easy) : "") + ". If you\\u2019re breathing hard, you\\u2019re going too fast.</p><p>Running easy is what lets you run <i>often</i>, and frequency is what builds the aerobic engine. Most runners\\u2019 easy days are too fast and their hard days too soft.</p>" },
-    { k: ["threshold", "tempo", "comfortably hard"], a: () => "<p><b>Threshold</b> (or tempo) running sits right at the effort you could hold for about an hour \\u2014 \\u201ccomfortably hard\\u201d" + (p.threshold ? ", around " + esc(p.threshold) : "") + ".</p><p>It trains your body to clear lactate as fast as it produces it, which raises the pace you can sustain before things fall apart. It\\u2019s the single most valuable session type for most distance runners.</p><p>Done right you finish thinking you could have gone a bit longer \\u2014 not wrecked.</p>" },
-    { k: ["interval", "vo2", "reps", "track session", "speed work"], a: () => "<p><b>Intervals</b> are short, hard efforts with recovery between \\u2014 typically 3\\u20135 minutes at close to your fastest sustainable effort.</p><p>They push your VO\\u2082 max: the ceiling on how much oxygen you can use. That ceiling makes every slower pace feel easier.</p><p>They cost a lot of recovery, which is why the plan uses them sparingly and surrounds them with easy days.</p>" },
-    { k: ["long run", "why long"], a: () => "<p>The <b>long run</b> builds durability \\u2014 holding form and economy when you\\u2019re tired.</p><p>Run it easy. The value is in the time on your feet, not the pace. Going too hard on a long run mostly buys you fatigue that damages the rest of the week.</p><p>Fuel it if it\\u2019s over ~75 minutes.</p>" },
-    { k: ["strides", "hill sprint"], a: () => "<p><b>Strides</b> are short accelerations \\u2014 around 20 seconds \\u2014 run relaxed and fast, with full recovery.</p><p>They\\u2019re not a workout; they\\u2019re maintenance for your top-end mechanics. They keep you feeling springy without adding meaningful fatigue.</p>" },
-    { k: ["recovery run", "what is recovery"], a: () => "<p>A <b>recovery run</b> is deliberately very easy and short \\u2014 slower than your normal easy pace.</p><p>Its job is to move blood through tired legs, not to build fitness. If it feels like effort, walk some of it or take the day off entirely.</p>" },
-    { k: ["strength", "gym", "weights", "lifting"], a: () => "<p>Heavy <b>strength training</b> twice a week is one of the best-evidenced things a runner can do \\u2014 it improves running economy and cuts injury risk, and it won\\u2019t make you bulky at these volumes.</p><p>Think squats, single-leg work, calf raises and hip strength. Low reps, challenging load. Put it on a quality day or after an easy run, not the day before a hard session.</p>" },
-    { k: ["fuel", "nutrition", "eat", "gel", "carb"], a: () => "<p>Under ~75 minutes you generally don\\u2019t need fuel mid-run if you started fed. A small amount can help a hard effort approaching an hour, but it\\u2019s optional.</p><p>Beyond that it scales with the run: about <b>30\\u201360 g of carbohydrate an hour</b> up to two and a half hours, and <b>60\\u201390 g</b> past that. A marathon-pace long run is the dress rehearsal \\u2014 same band, but use the exact products and timings you plan to race on.</p><p>Above about 60 g an hour, <b>mixed sugars</b> (glucose or maltodextrin and fructose) absorb better than one type alone. Gut symptoms have several causes though \\u2014 high intakes, concentrated products, heat, pace and fluid balance \\u2014 so build up gradually and practise it.</p><p>Gel counts are an estimate: <b>check the label, products vary</b>. Think in grams an hour and split it across drink, chews and food.</p><p>Open any long session and I\\u2019ll print the numbers for that specific run.</p><p>Day to day, the bigger lever is simply <b>eating enough</b>. Under-fuelling is the most common reason training stops working.</p>" },
-    { k: ["hydrat", "drink", "water", "electrolyte"], a: () => "<p>Drink to thirst on most runs \\u2014 it\\u2019s a better guide than a fixed schedule.</p><p>On long or hot runs, use a fluid plan you\\u2019ve practised and consider <b>sodium</b> (a sports drink or electrolyte tab) to replace what you sweat out.</p><p><b>Don\\u2019t over-drink water or sports drink.</b> Sodium doesn\\u2019t make excess fluid safe \\u2014 drinking beyond your losses on a long effort can push your blood sodium dangerously low, and you should never finish a run heavier than you started.</p>" },
-    { k: ["sleep", "recover", "rest"], a: () => "<p><b>Sleep is the most powerful recovery tool you have</b> \\u2014 more than any supplement, gadget or protocol.</p><p>Consistent 7\\u20139 hours does more for your training than an extra session would. When life squeezes your sleep, that\\u2019s the week to take the easy option in training, not the hard one.</p>" },
-    { k: ["taper", "before the race", "race week"], a: () => "<p><b>Tapering</b> means cutting volume while keeping some intensity \\u2014 typically over the final 1\\u20133 weeks depending on the distance.</p><p>You keep the sharpness and shed the fatigue. Feeling twitchy, heavy-legged or doubtful during a taper is completely normal \\u2014 resist the urge to \\u201ctest\\u201d your fitness.</p>" },
-    { k: ["missed", "behind", "skipped a", "fell off", "catch up"], a: () => "<p>Missing sessions is normal and it doesn\\u2019t undo your training.</p><p><b>Don\\u2019t try to make them up.</b> Cramming two hard sessions together is how a missed week turns into an injured month. Just rejoin the plan where it is today.</p><p>If you\\u2019ve missed more than a couple of weeks, ease back in \\u2014 drop the intensity for a few runs before picking the plan back up.</p>" },
-    { k: ["shoe", "trainers", "footwear", "carbon plate"], a: () => "<p>The best shoe is the one that feels right on your foot \\u2014 comfort predicts injury risk better than any category or claim.</p><p>Rotating two pairs is a reasonable habit. Replace them when the midsole feels dead rather than at a fixed mileage.</p>" },
-    { k: ["cadence", "form", "technique", "footstrike", "posture"], a: () => "<p>Don\\u2019t overhaul your <b>form</b> \\u2014 it\\u2019s largely self-optimising, and forced changes usually just move the load somewhere less prepared for it.</p><p>The things worth cueing: run tall, stay relaxed, and avoid heavy over-striding out in front of you. If your cadence is very low, nudging it up slightly can shorten your stride naturally.</p><p>Strength work changes form more reliably than thinking about form does.</p>" },
-    { k: ["cross train", "cycling", "swim", "elliptical"], a: () => "<p><b>Cross-training</b> is excellent when you can\\u2019t run \\u2014 cycling, swimming and the elliptical keep the aerobic engine going with far less impact.</p><p>It isn\\u2019t a like-for-like replacement for running specificity, but during injury or heavy weeks it protects most of your fitness.</p>" },
-    { k: ["warm up", "warmup", "cool down", "stretch"], a: () => "<p><b>Warm up</b> before quality: easy jogging, then some dynamic movement, then a few strides. It matters much more before intervals than before an easy run.</p><p><b>Cool down</b> with a few easy minutes. Long static stretching after running is largely optional \\u2014 do it if you enjoy it.</p>" },
+    { k: ["easy run", "what is easy", "easy pace mean", "conversational"], a: () => "<p>An <b>easy run</b> is the backbone of the plan \— most of your weekly running should be here.</p><p>It should feel genuinely comfortable: you could hold a conversation" + (p.easy ? ", around " + esc(p.easy) : "") + ". If you\\u2019re breathing hard, you\\u2019re going too fast.</p><p>Running easy is what lets you run <i>often</i>, and frequency is what builds the aerobic engine. Most runners\\u2019 easy days are too fast and their hard days too soft.</p>" },
+    { k: ["threshold", "tempo", "comfortably hard"], a: () => "<p><b>Threshold</b> (or tempo) running sits right at the effort you could hold for about an hour \— \\u201ccomfortably hard\\u201d" + (p.threshold ? ", around " + esc(p.threshold) : "") + ".</p><p>It trains your body to clear lactate as fast as it produces it, which raises the pace you can sustain before things fall apart. It\\u2019s the single most valuable session type for most distance runners.</p><p>Done right you finish thinking you could have gone a bit longer \— not wrecked.</p>" },
+    { k: ["interval", "vo2", "reps", "track session", "speed work"], a: () => "<p><b>Intervals</b> are short, hard efforts with recovery between \— typically 3\\u20135 minutes at close to your fastest sustainable effort.</p><p>They push your VO\\u2082 max: the ceiling on how much oxygen you can use. That ceiling makes every slower pace feel easier.</p><p>They cost a lot of recovery, which is why the plan uses them sparingly and surrounds them with easy days.</p>" },
+    { k: ["long run", "why long"], a: () => "<p>The <b>long run</b> builds durability \— holding form and economy when you\\u2019re tired.</p><p>Run it easy. The value is in the time on your feet, not the pace. Going too hard on a long run mostly buys you fatigue that damages the rest of the week.</p><p>Fuel it if it\\u2019s over ~75 minutes.</p>" },
+    { k: ["strides", "hill sprint"], a: () => "<p><b>Strides</b> are short accelerations \— around 20 seconds \— run relaxed and fast, with full recovery.</p><p>They\\u2019re not a workout; they\\u2019re maintenance for your top-end mechanics. They keep you feeling springy without adding meaningful fatigue.</p>" },
+    { k: ["recovery run", "what is recovery"], a: () => "<p>A <b>recovery run</b> is deliberately very easy and short \— slower than your normal easy pace.</p><p>Its job is to move blood through tired legs, not to build fitness. If it feels like effort, walk some of it or take the day off entirely.</p>" },
+    { k: ["strength", "gym", "weights", "lifting"], a: () => "<p>Heavy <b>strength training</b> twice a week is one of the best-evidenced things a runner can do \— it improves running economy and cuts injury risk, and it won\\u2019t make you bulky at these volumes.</p><p>Think squats, single-leg work, calf raises and hip strength. Low reps, challenging load. Put it on a quality day or after an easy run, not the day before a hard session.</p>" },
+    { k: ["fuel", "nutrition", "eat", "gel", "carb"], a: () => "<p>Under ~75 minutes you generally don\\u2019t need fuel mid-run if you started fed. A small amount can help a hard effort approaching an hour, but it\\u2019s optional.</p><p>Beyond that it scales with the run: about <b>30\\u201360 g of carbohydrate an hour</b> up to two and a half hours, and <b>60\\u201390 g</b> past that. A marathon-pace long run is the dress rehearsal \— same band, but use the exact products and timings you plan to race on.</p><p>Above about 60 g an hour, <b>mixed sugars</b> (glucose or maltodextrin and fructose) absorb better than one type alone. Gut symptoms have several causes though \— high intakes, concentrated products, heat, pace and fluid balance \— so build up gradually and practise it.</p><p>Gel counts are an estimate: <b>check the label, products vary</b>. Think in grams an hour and split it across drink, chews and food.</p><p>Open any long session and I\\u2019ll print the numbers for that specific run.</p><p>Day to day, the bigger lever is simply <b>eating enough</b>. Under-fuelling is the most common reason training stops working.</p>" },
+    { k: ["hydrat", "drink", "water", "electrolyte"], a: () => "<p>Drink to thirst on most runs \— it\\u2019s a better guide than a fixed schedule.</p><p>On long or hot runs, use a fluid plan you\\u2019ve practised and consider <b>sodium</b> (a sports drink or electrolyte tab) to replace what you sweat out.</p><p><b>Don\\u2019t over-drink water or sports drink.</b> Sodium doesn\\u2019t make excess fluid safe \— drinking beyond your losses on a long effort can push your blood sodium dangerously low, and you should never finish a run heavier than you started.</p>" },
+    { k: ["sleep", "recover", "rest"], a: () => "<p><b>Sleep is the most powerful recovery tool you have</b> \— more than any supplement, gadget or protocol.</p><p>Consistent 7\\u20139 hours does more for your training than an extra session would. When life squeezes your sleep, that\\u2019s the week to take the easy option in training, not the hard one.</p>" },
+    { k: ["taper", "before the race", "race week"], a: () => "<p><b>Tapering</b> means cutting volume while keeping some intensity \— typically over the final 1\\u20133 weeks depending on the distance.</p><p>You keep the sharpness and shed the fatigue. Feeling twitchy, heavy-legged or doubtful during a taper is completely normal \— resist the urge to \\u201ctest\\u201d your fitness.</p>" },
+    { k: ["missed", "behind", "skipped a", "fell off", "catch up"], a: () => "<p>Missing sessions is normal and it doesn\\u2019t undo your training.</p><p><b>Don\\u2019t try to make them up.</b> Cramming two hard sessions together is how a missed week turns into an injured month. Just rejoin the plan where it is today.</p><p>If you\\u2019ve missed more than a couple of weeks, ease back in \— drop the intensity for a few runs before picking the plan back up.</p>" },
+    { k: ["shoe", "trainers", "footwear", "carbon plate"], a: () => "<p>The best shoe is the one that feels right on your foot \— comfort predicts injury risk better than any category or claim.</p><p>Rotating two pairs is a reasonable habit. Replace them when the midsole feels dead rather than at a fixed mileage.</p>" },
+    { k: ["cadence", "form", "technique", "footstrike", "posture"], a: () => "<p>Don\\u2019t overhaul your <b>form</b> \— it\\u2019s largely self-optimising, and forced changes usually just move the load somewhere less prepared for it.</p><p>The things worth cueing: run tall, stay relaxed, and avoid heavy over-striding out in front of you. If your cadence is very low, nudging it up slightly can shorten your stride naturally.</p><p>Strength work changes form more reliably than thinking about form does.</p>" },
+    { k: ["cross train", "cycling", "swim", "elliptical"], a: () => "<p><b>Cross-training</b> is excellent when you can\\u2019t run \— cycling, swimming and the elliptical keep the aerobic engine going with far less impact.</p><p>It isn\\u2019t a like-for-like replacement for running specificity, but during injury or heavy weeks it protects most of your fitness.</p>" },
+    { k: ["warm up", "warmup", "cool down", "stretch"], a: () => "<p><b>Warm up</b> before quality: easy jogging, then some dynamic movement, then a few strides. It matters much more before intervals than before an easy run.</p><p><b>Cool down</b> with a few easy minutes. Long static stretching after running is largely optional \— do it if you enjoy it.</p>" },
     { k: ["how am i doing", "progress", "improving", "getting fitter"], a: () => {
       const runs = (state.logged || []).length;
-      return "<p>" + (runs ? "You\\u2019ve logged <b>" + runs + "</b> run" + (runs === 1 ? "" : "s") + " in the app so far." : "You haven\\u2019t logged a run in the app yet \\u2014 once you do, Performance will start showing trends.") + "</p>" +
+      return "<p>" + (runs ? "You\\u2019ve logged <b>" + runs + "</b> run" + (runs === 1 ? "" : "s") + " in the app so far." : "You haven\\u2019t logged a run in the app yet \— once you do, Performance will start showing trends.") + "</p>" +
         "<p>The honest signals of progress are: the same pace at a lower effort, easier recovery between sessions, and consistency over months. Week-to-week fluctuations are mostly noise.</p>" +
         "<p class=\\"alf-dim\\">Activities \\u2192 Performance shows your trends and bests.</p>";
     } },
-    { k: ["who are you", "what are you", "what can you", "help me with", "alfie"], a: () => "<p>I\\u2019m <b>Alfie</b>, built into Inte-Run. I can see your plan, so I can answer things like:</p><ul class=\\"alf-ul\\"><li>What\\u2019s my next session, and how should it feel?</li><li>What pace should I run this at?</li><li>Why is this week easier?</li><li>Should I run if I\\u2019m sore or it\\u2019s hot?</li><li>General running, training and fitness questions.</li></ul><p>I\\u2019m not a doctor \\u2014 for pain or health symptoms I\\u2019ll point you to proper help.</p>" },
+    { k: ["who are you", "what are you", "what can you", "help me with", "alfie"], a: () => "<p>I\\u2019m <b>Alfie</b>, built into Inte-Run. I can see your plan, so I can answer things like:</p><ul class=\\"alf-ul\\"><li>What\\u2019s my next session, and how should it feel?</li><li>What pace should I run this at?</li><li>Why is this week easier?</li><li>Should I run if I\\u2019m sore or it\\u2019s hot?</li><li>General running, training and fitness questions.</li></ul><p>I\\u2019m not a doctor \— for pain or health symptoms I\\u2019ll point you to proper help.</p>" },
   ];
 }
 function alfieLocalAnswer(question) {
@@ -6923,7 +6994,7 @@ function alfieLocalAnswer(question) {
     if (intents[i].k.some((w) => q.indexOf(w) !== -1)) return intents[i].a();
   }
   return "<p>I\\u2019m not sure I\\u2019ve got a good answer for that one yet.</p>" +
-    "<p>I\\u2019m strongest on <b>your plan</b> (next session, paces, why a week looks the way it does) and the <b>fundamentals</b> \\u2014 easy running, threshold, intervals, long runs, strength, fuelling, heat, sleep, tapering and niggles.</p>" +
+    "<p>I\\u2019m strongest on <b>your plan</b> (next session, paces, why a week looks the way it does) and the <b>fundamentals</b> \— easy running, threshold, intervals, long runs, strength, fuelling, heat, sleep, tapering and niggles.</p>" +
     "<p class=\\"alf-dim\\">Try rephrasing, or tap one of the suggestions.</p>";
 }
 // ---- Optional remote brain -------------------------------------------------
@@ -6973,8 +7044,8 @@ function alfieAsk(text) {
     ALFIE_MSGS.push({ role: "alfie", html: html });
     alfieSaveMsgs(); alfieRenderLog();
   };
-  const local = () => { try { return alfieLocalAnswer(t); } catch (e) { return "<p>Something went wrong finding that answer \\u2014 try asking a different way.</p>"; } };
-  // \u26a0\ufe0f SCREEN FOR RED FLAGS BEFORE DISPATCHING ANYWHERE. alfieRedFlags lives inside
+  const local = () => { try { return alfieLocalAnswer(t); } catch (e) { return "<p>Something went wrong finding that answer \— try asking a different way.</p>"; } };
+  // ⚠️ SCREEN FOR RED FLAGS BEFORE DISPATCHING ANYWHERE. alfieRedFlags lives inside
   // alfieLocalAnswer, which the remote path only reaches on FAILURE -- so with a proxy configured, a
   // runner typing "chest pain" got a language model's reply and no escalation at all. The whole point
   // of the screener is that it does not depend on a model choosing to escalate. It runs first now, and
@@ -6992,7 +7063,7 @@ function alfieAsk(text) {
 function viewAlfie() {
   const chips = ALFIE_CHIPS.map((c) => '<button class="alf-chip" data-alfq="' + esc(c) + '">' + c + "</button>").join("");
   return '<button class="backbtn" id="alfBack">\\u2039 Back</button>' +
-    '<div class="alf-head"><div class="alf-hero">' + ICON.alfie + '</div><div><div class="alf-name">Ask Alfie</div><div class="alf-sub">Your coach \\u2014 knows your plan</div></div></div>' +
+    '<div class="alf-head"><div class="alf-hero">' + ICON.alfie + '</div><div><div class="alf-name">Ask Alfie</div><div class="alf-sub">Your coach \— knows your plan</div></div></div>' +
     alfieLimits() +
     '<div class="alf-log" id="alfieLog"></div>' +
     '<div class="alf-chips">' + chips + "</div>" +
@@ -7001,12 +7072,12 @@ function viewAlfie() {
 /**
  * What Alfie is, and what it is not - above the log, before anything is asked.
  *
- * \u26a0\ufe0f IT MUST SIT OUTSIDE #alfieLog. alfieRenderLog() rebuilds that element on every message
+ * ⚠️ IT MUST SIT OUTSIDE #alfieLog. alfieRenderLog() rebuilds that element on every message
  * and .alf-log is a scroller pinned to its own bottom, so a label placed inside it is destroyed by
  * the first question - the exact moment the brief criterion is about ("Ask Alfie's limits are
  * visible BEFORE the first question").
  *
- * \u26a0\ufe0f AND THE ESCALATION ROUTE IS A BUTTON, NOT A SENTENCE. The red-flag screener could only
+ * ⚠️ AND THE ESCALATION ROUTE IS A BUTTON, NOT A SENTENCE. The red-flag screener could only
  * be reached by typing a symptom AT Alfie and having it recognised, so a runner worried about their
  * knee had no way to find it deliberately. The machinery was complete, good, and invisible.
  */
@@ -7018,7 +7089,7 @@ function alfieLimits() {
     '<div class="alf-limb">' +
       '<p><b>It knows your plan.</b> Your next session, your paces, the phase you are in and how far off your race is, plus a store of running knowledge.</p>' +
       '<p><b>It answers on this phone.</b> Nothing you type is sent anywhere, and it works with no signal.</p>' +
-      '<p><b>It is not a doctor or a physiotherapist</b>, and it cannot examine you. For pain, injury or anything that feels wrong, use the symptom check-in \u2014 it is built from published warning signs and will tell you plainly when to see somebody.</p>' +
+      '<p><b>It is not a doctor or a physiotherapist</b>, and it cannot examine you. For pain, injury or anything that feels wrong, use the symptom check-in — it is built from published warning signs and will tell you plainly when to see somebody.</p>' +
       '<button class="alf-esc" id="alfEsc">Check a symptom \u203a</button>' +
     '</div></details>';
 }
@@ -7387,7 +7458,7 @@ function structureRows(steps, plain) {
       let cue = String(first.blockCue || "");
       if (!cue) {
         const lastLab = String(block[block.length - 1].label || "");
-        const dash = lastLab.indexOf("\\u2014");
+        const dash = lastLab.indexOf("\—");
         cue = dash >= 0 ? lastLab.slice(dash + 1).trim() : "";
       }
       const lab = block.length + " \\u00d7 " + workLabel(block[0]) + " strides" + (cue ? ", " + cue : "");
@@ -7798,7 +7869,7 @@ function stretchPlay() {
       T.i++;
       if (T.i >= T.holds.length) { stretchPause(); T.left = 0; strPaint(RC.stretchTotalSeconds()); stretchFinish(); return; }
       T.left = T.holds[T.i].seconds;
-      // \u26a0\ufe0f haptic(), NOT navigator.vibrate. WKWebView has no vibrate API at all, so calling
+      // ⚠️ haptic(), NOT navigator.vibrate. WKWebView has no vibrate API at all, so calling
       // it raw is silent in the native app -- which is where the runner actually is. The bridge in
       // haptic() is the only path that reaches a real generator.
       haptic("lift");
@@ -7868,18 +7939,18 @@ let SHEET_CTX = null;
 // study found a standard warm-up helped the fitter group and did nothing for the low-fitness one.
 // The daily check-in, as a 1-5 readiness score. ⚠️ Only ever used to REDUCE — a good day must not
 // unlock a bigger warm-up, which is the direction an app talks someone into more work.
-// \u26a0\ufe0f THERE IS NO #readySlot IN THE MARKUP. This handler is bound on every render to any
+// ⚠️ THERE IS NO #readySlot IN THE MARKUP. This handler is bound on every render to any
 // [data-seg] element; the live check-in happens to use data-fseg, so it has never fired -- but the
 // moment anything uses the perfectly natural data-seg attribute it dereferences null and takes the
 // render with it. Guarded rather than deleted, because renderReadiness is the honest fallback if the
 // slot is ever added back.
 function readySlotPaint() { const el = $("readySlot"); if (el) el.innerHTML = renderReadiness(); }
 function readinessScore() {
-  // \u26a0\ufe0f "some" IS NOT A VALUE THIS APP EVER WRITES. The check-in offers none / mild / moderate
+  // ⚠️ "some" IS NOT A VALUE THIS APP EVER WRITES. The check-in offers none / mild / moderate
   // / high (the engine's own vocabulary, src/readiness/readiness.ts), so the branch was unreachable
   // and a runner answering SORE scored exactly the same as one answering FINE -- the question was on
   // screen, was answered honestly, and changed nothing.
-  // \u26a0\ufe0f AND THE BASE WAS 4 WITH NO POSITIVE TERM, so 5 was unreachable: a four-point scale
+  // ⚠️ AND THE BASE WAS 4 WITH NO POSITIVE TERM, so 5 was unreachable: a four-point scale
   // printed as n/5, which is the same false precision the owner's "whole numbers" ruling rejected in
   // the mockup's 7.6/10. CLAUDE.md's claim of "exactly five reachable values" was describing intent,
   // not the code. Base 5 with four honest soreness steps makes all five reachable, and makes
@@ -8079,14 +8150,14 @@ function mainSubtitle(list) {
   const reps = list.filter((st) => st.kind === "rep").length;
   if (reps > 1) return reps + " repetitions with recoveries";
   const longest = list.slice().sort((a, b) => stepSecs(b) - stepSecs(a))[0];
-  return longest && longest.label ? String(longest.label).split(" \u2014 ")[0].slice(0, 60) : "The work";
+  return longest && longest.label ? String(longest.label).split(" — ")[0].slice(0, 60) : "The work";
 }
 /**
  * Why this session — one line, with the reasoning a tap away.
  * The brief asks for rationale to be OPTIONAL, "for runners who want the science". These are the same
  * words that used to open the sheet in full; what changed is that they no longer sit ahead of the
  * thing the runner opened the sheet to read.
- * \u26a0\ufe0f The short line is keyed on the session TYPE and the body is the session's own description --
+ * ⚠️ The short line is keyed on the session TYPE and the body is the session's own description --
  * neither is written here. Inventing a rationale would put a claim in front of the runner that the
  * plan cannot stand behind.
  */
@@ -8217,9 +8288,9 @@ function wireSessionTaps() {
 // Quality types (threshold, intervals, race pace) are deliberately NOT invented — if the plan
 // hasn't introduced them yet, the runner isn't ready for them.
 const ADD_ALWAYS = {
-  recovery: { scale: 0.6, title: "Recovery run", desc: "Shorter and gentler than your usual easy session \\u2014 for the day after something hard." },
+  recovery: { scale: 0.6, title: "Recovery run", desc: "Shorter and gentler than your usual easy session \— for the day after something hard." },
   easy: { scale: 1, title: "Easy run", desc: "Your everyday session at conversational effort." },
-  long: { scale: 1.6, title: "Long run", desc: "A longer version of your easy session \\u2014 durability comes from time on your feet." },
+  long: { scale: 1.6, title: "Long run", desc: "A longer version of your easy session \— durability comes from time on your feet." },
 };
 function sessionLibrary() {
   const order = ["easy", "recovery", "long", "strides", "threshold", "vo2", "race-specific"];
@@ -8418,7 +8489,7 @@ function buildCustomSession(e) {
     // distance run titled in minutes would rename itself after a fitness re-anchor.
     title: (e.distKm > 0 ? (Math.round(e.distKm * 10) / 10) + " km " : mins + "\\u2032 ") +
       (SESSION_LABEL[e.type] || e.type).toLowerCase() +
-      (usesReps && e.reps ? " \\u2014 " + e.reps + " reps" : "") + " (custom)",
+      (usesReps && e.reps ? " \— " + e.reps + " reps" : "") + " (custom)",
     estimatedDurationSeconds: total, estimatedDistanceMeters: dist ? Math.round(dist) : rep.estimatedDistanceMeters,
     trainingDistanceMeters: dist ? Math.round(train) : rep.trainingDistanceMeters,
     steps: steps.length ? steps : rep.steps,
@@ -8547,12 +8618,32 @@ function repCountOf(s) { const r = s.steps.filter((st) => st.kind === "rep"); re
 // generator itself schedules, so a hand-picked session is the same evidence-based session, at the
 // same paces, judged by the same debrief. A second hand-written catalogue would drift within a
 // release and quietly teach different paces.
+/**
+ * A GRID TILE WHOSE ACCENT IS THE SESSION’S OWN EFFORT COLOUR, DERIVED FROM THE ONE MAPPING.
+ *
+ * ⚠️ THIS EXISTS SO THE TYPE AND THE COLOUR CANNOT BE TYPED APART. The grid used to hand-write
+ * a colour of var(--eff-moderate) beside a type of threshold, which was right, while the training-log
+ * calendar hand-wrote var(--eff-hard) beside the same type, which was wrong — and nothing could see the
+ * disagreement because neither knew the other existed. An entry built here takes its colour from
+ * sessionEffort(t) and there is nothing left to disagree with.
+ */
+function runTypeEff(t, label, icon, blurb) {
+  return { t: t, label: label, icon: icon, c: effortVar(sessionEffort(t)), blurb: blurb };
+}
+/**
+ * ⚠️ FOUR OF THE SEVEN TILES CARRY A DELIBERATE IDENTITY ACCENT INSTEAD, AND THAT IS NOT DRIFT.
+ * This grid’s job is to make seven tiles tellable apart at a glance; recovery, the long run and easy +
+ * strides are all EASY by effort, so an effort-coloured grid would be four identical teal tiles and a
+ * picker that cannot be picked from. So the rule is not "everything is an effort colour" — it is that
+ * anything WEARING an effort colour must be wearing the right one, which test/share-render.test.ts
+ * asserts by sweeping this list for --eff-* against sessionEffort.
+ */
 const RUN_TYPES = [
-  { t: "easy", label: "Easy Run", icon: "rEasy", c: "var(--eff-easy)", blurb: "Conversational. Most of your running." },
+  runTypeEff("easy", "Easy Run", "rEasy", "Conversational. Most of your running."),
   { t: "recovery", label: "Recovery", icon: "rRecovery", c: "var(--steady)", blurb: "Shorter and gentler — the day after something hard." },
   { t: "long", label: "Long Run", icon: "rLong", c: "var(--taper)", blurb: "Time on your feet builds durability." },
-  { t: "threshold", label: "Tempo", icon: "rTempo", c: "var(--eff-moderate)", blurb: "Comfortably hard, held with rhythm." },
-  { t: "vo2", label: "Intervals", icon: "rIntervals", c: "var(--eff-hard)", blurb: "Short and fast, with recoveries." },
+  runTypeEff("threshold", "Tempo", "rTempo", "Comfortably hard, held with rhythm."),
+  runTypeEff("vo2", "Intervals", "rIntervals", "Short and fast, with recoveries."),
   { t: "race-specific", label: "Race Pace", icon: "rRace", c: "var(--rest)", blurb: "Rehearse the pace you want on the day." },
   { t: "strides", label: "Easy + Strides", icon: "rStrides", c: "var(--build)", blurb: "An easy run with relaxed fast bursts." },
 ];
@@ -8865,7 +8956,7 @@ function viewPlan() {
   const phaseNames = PHASE_NAME;
   const phaseSeq = ["base", "build", "peak", "taper"];
   const phasesInPlan = phaseSeq.filter((ph) => PLAN.weeks.some((w) => w.phase === ph));
-  // \u26a0\ufe0f THE LEGEND NAMES WHERE EACH PHASE IS, not just what colour it is. The brief asks for
+  // ⚠️ THE LEGEND NAMES WHERE EACH PHASE IS, not just what colour it is. The brief asks for
   // "text labels, not colour alone", and a swatch reading "Build" only helps if you can then match
   // that colour to a bar -- which is the exact task colour-blind and low-vision runners cannot do,
   // and which nobody enjoys. The week range is the label the colour was standing in for.
@@ -8931,7 +9022,7 @@ function viewPlan() {
  * question". Before this the Plan screen showed the chart and then exactly ONE week, so the only way
  * to find out what week nine looked like was to hunt for its bar and tap it.
  *
- * \u26a0\ufe0f A SUMMARY SAYS WHAT KIND OF WEEK IT IS, IN WORDS. An absorb week is drawn on the chart
+ * ⚠️ A SUMMARY SAYS WHAT KIND OF WEEK IT IS, IN WORDS. An absorb week is drawn on the chart
  * with a diagonal hatch and nothing else; the taper by colour alone. Both are exactly the weeks a
  * runner most needs to recognise in advance, and both were unreadable without tapping. Deload, taper
  * and race week now carry the word.
@@ -8975,7 +9066,7 @@ function wireWeekList() {
   document.querySelectorAll("[data-weekclose]").forEach((b) => b.onclick = () => selectPlanWeek(0));
   document.querySelectorAll("[data-weeksel]").forEach((b) => b.onclick = () => {
     selectPlanWeek(Number(b.dataset.weeksel));
-    // \u26a0\ufe0f Bring the week the runner just opened back under their thumb. Collapsing the week
+    // ⚠️ Bring the week the runner just opened back under their thumb. Collapsing the week
     // above it moves everything up by the height of a whole expanded card, so without this the tap
     // appears to scroll the page somewhere unrelated.
     const el = document.querySelector('.wk-open');
@@ -9000,7 +9091,7 @@ function weekDetail() {
   const w = PLAN.weeks.find((x) => x.index === state.planWeek) || PLAN.weeks[0];
   const byDay = {};
   w.sessions.filter((s) => s.type !== "rest").forEach((s) => { const d = effDay(s); (byDay[d] = byDay[d] || []).push(s); });
-  // \u26a0\ufe0f CURRENT_WEEK IS A 0-BASED ARRAY INDEX AND w.index IS 1-BASED. Compared directly, this
+  // ⚠️ CURRENT_WEEK IS A 0-BASED ARRAY INDEX AND w.index IS 1-BASED. Compared directly, this
   // marked the week AFTER the current one as current -- and in week 1 (CURRENT_WEEK === 0) nothing
   // matched at all, so "Next" never appeared for a runner in their first week. curWeekNo() exists to
   // convert and is the only correct reader. Gated on TODAY_IN_PLAN because curWeekNo() falls back to
@@ -9038,14 +9129,14 @@ function weekDetail() {
         open: { week: w.index, id: s.id }, pday: di });
     }).join("");
   }).join("");
-  // \u26a0\ufe0f AN OPEN WEEK HAD NO WAY BACK. Every other week was a tappable summary; the one you had
+  // ⚠️ AN OPEN WEEK HAD NO WAY BACK. Every other week was a tappable summary; the one you had
   // opened was the only row on the screen you could not act on, so the list could be expanded and
   // never collapsed. Its heading is the control now.
   return '<button class="wk-close" data-weekclose="1" aria-expanded="true">' +
       '<span class="ui-hero-t">Week ' + w.index + '</span>' +
       '<span class="sd-chev wk-cx" aria-hidden="true">\u203A</span></button>' +
     '<div class="ui-sub wk-osub">' + esc(PHASE_NAME[w.phase] || w.phase) + (w.isDeload ? " \u00b7 absorb week" : "") +
-      // \u26a0\ufe0f WeekView carries distanceKm, NOT plannedDistanceMeters -- that name is the engine's
+      // ⚠️ WeekView carries distanceKm, NOT plannedDistanceMeters -- that name is the engine's
       // PlannedWeek field and does not survive weekView(). Reading it gave undefined, so the week's
       // mileage never once appeared on this line. There is no type checking inside the template
       // literal to catch a field that does not exist.
@@ -9147,7 +9238,7 @@ function viewActivities() {
     }
     const shown = logbookFiltered();
     LOG_MONTH = "";
-    // \u26a0\ufe0f COMPACT, DATE-AWARE ROWS. "Use compact rows so history remains scannable" -- the old
+    // ⚠️ COMPACT, DATE-AWARE ROWS. "Use compact rows so history remains scannable" -- the old
     // card carried a three-column stat block each, so four runs filled the screen and the date was
     // buried inside. Date on the left, effort colour down the edge, pace on the right.
     const list = shown.map((a) => {
@@ -9158,7 +9249,7 @@ function viewActivities() {
         '<button class="swipe-del" data-delrun="' + rid + '" aria-label="Delete this run">' + ICON.trash + '<span>Delete</span></button>' +
         '<button class="lg-row swipe-face" data-runid="' + rid + '">' +
           '<span class="lg-d">' + esc(dt) + '</span>' +
-          '<span class="lg-bar" style="background:var(--eff-' + effortOf({ type: a.type, intensity: a.type === "vo2" || a.type === "threshold" ? "hard" : "" }) + ')"></span>' +
+          '<span class="lg-bar" style="background:var(--eff-' + runEffort(a) + ')"></span>' +
           '<span class="lg-b"><span class="lg-t">' + esc(a.t) + '</span>' +
             '<span class="lg-m">' + esc(meta) + '</span></span>' +
           '<span class="lg-p num">' + esc(String(a.pace || "").replace(" /km", "/km")) + '</span>' +
@@ -9186,13 +9277,13 @@ function viewActivities() {
 /**
  * The Logbook's period totals, consistency and filters.
  *
- * \u26a0\ufe0f THE STORE IS CAPPED AT 50 RUNS (saveRuns slices to 50), so an "all time" total is a lie
+ * ⚠️ THE STORE IS CAPPED AT 50 RUNS (saveRuns slices to 50), so an "all time" total is a lie
  * the moment somebody has run fifty-one times. This week and this month are always inside the cap for
  * any realistic runner; the all-logged figure says "your last 50 runs" the moment the cap binds, which
  * is the honest form of the same number rather than a wrong one.
  */
 function logWeekStartIso() {
-  // \u26a0\ufe0f ENTIRELY IN UTC, because todayIso() and isoAdd() are. new Date(iso + "T00:00:00") has
+  // ⚠️ ENTIRELY IN UTC, because todayIso() and isoAdd() are. new Date(iso + "T00:00:00") has
   // no Z, so it parses as LOCAL midnight; calling toISOString() on it then hands back the PREVIOUS
   // day for the whole of British Summer Time. That put the week boundary one day early for half the
   // year -- so on a Monday the "this week" total silently included Sunday's long run, which is the
@@ -9221,7 +9312,7 @@ function logTotals(fromIso, toIso) {
 }
 /**
  * How much of this week's plan has actually been run.
- * \u26a0\ufe0f NEVER FROM state.done. That object is rebuilt at every boot by seedDone(), which marks
+ * ⚠️ NEVER FROM state.done. That object is rebuilt at every boot by seedDone(), which marks
  * every non-rest session dated before today as done whether or not anybody ran it -- so a consistency
  * figure taken from it would read 100% for a runner who has not run at all. Logged runs against the
  * prescription in RAW.weeks is the only honest pair, and addDayEvidence already does it this way.
@@ -9245,7 +9336,7 @@ function logConsistency() {
 }
 /**
  * How many weeks in a row you have run at least once, counting back from this week or last.
- * \u26a0\ufe0f LAST WEEK COUNTS AS THE START. Measured from THIS week only, the number collapses to
+ * ⚠️ LAST WEEK COUNTS AS THE START. Measured from THIS week only, the number collapses to
  * zero every Monday morning until the first run of the week -- so a runner with four months of
  * consistency would open the app on a Monday and be told nothing. It breaks when a whole week passes
  * with no run, which is what a streak actually means.
@@ -9400,7 +9491,7 @@ function trainingLogView() {
       '<div class="tg-week">' + wc + '</div></div>';
   }).join("");
 
-  const legend = [["Easy", "var(--eff-easy)"], ["Quality", "var(--eff-hard)"], ["Long", "var(--taper)"]]
+  const legend = logCalendarLegend()
     .map((x) => '<span class="sc-lg"><i style="background:' + x[1] + '"></i>' + x[0] + '</span>').join("");
 
   return '<button class="backbtn" id="tgBack">\u2039 Logbook</button>' +
@@ -9428,7 +9519,7 @@ function trainingLogView() {
     '<div class="tg-dow">' + ["M","T","W","T","F","S","S"].map((x) => '<span>' + x + '</span>').join("") + '</div>' +
     '<div class="card tg-card">' + rows + '</div>' +
     '<div class="pg-note">Tap a run to open it.' +
-      (anyClosed ? ' The paler ones are older than your last fifty runs \u2014 their distance is kept, but the map and splits are not.' : '') +
+      (anyClosed ? ' The paler ones are older than your last fifty runs — their distance is kept, but the map and splits are not.' : '') +
       '</div>';
 }
 /**
@@ -9559,20 +9650,52 @@ function logTiles() {
  * ⚠️ THREE BUCKETS, NOT THE ENGINE'S NINE TYPES. A legend with nine colours is not a legend, and the
  * question this calendar answers is "was that day easy, hard, or the long one?".
  */
+/**
+ * ⚠️ THE BUCKET IS THE WORD; THE COLOUR IS THE EFFORT, AND THEY ARE TWO DIFFERENT SENTENCES.
+ * The k and lab fields answer "which of the three kinds of day was that", which is what the filters and
+ * the aria-label need. The c field answers "how hard was it", which is what a coloured dot on a calendar
+ * means to anybody looking at it — so it comes from sessionEffort and nowhere else. Hand-written it said
+ * --eff-hard for a threshold session while the Add-a-session tile for the same type said --eff-moderate:
+ * one run, two colours, in two screens a tap apart.
+ * ⚠️ THE long ROW KEEPS --taper, DELIBERATELY. A long run\u2019s effort IS easy — the Logbook rail
+ * draws it teal — and the entire point of this calendar\u2019s third bucket is to pick it out from the other
+ * easy days. That is an identity, not an effort, and the legend below names it as one.
+ */
 const RUN_KIND = {
   long: { k: "long", lab: "Long", c: "var(--taper)", ic: "rLong" },
-  threshold: { k: "quality", lab: "Quality", c: "var(--eff-hard)", ic: "rTempo" },
-  vo2: { k: "quality", lab: "Quality", c: "var(--eff-hard)", ic: "rIntervals" },
-  "race-specific": { k: "quality", lab: "Quality", c: "var(--eff-hard)", ic: "rIntervals" },
-  race: { k: "quality", lab: "Quality", c: "var(--eff-hard)", ic: "rRace" },
-  strides: { k: "quality", lab: "Quality", c: "var(--eff-hard)", ic: "rStrides" },
-  recovery: { k: "easy", lab: "Easy", c: "var(--eff-easy)", ic: "rRecovery" },
+  threshold: { k: "quality", lab: "Quality", c: effortVar(sessionEffort("threshold")), ic: "rTempo" },
+  vo2: { k: "quality", lab: "Quality", c: effortVar(sessionEffort("vo2")), ic: "rIntervals" },
+  "race-specific": { k: "quality", lab: "Quality", c: effortVar(sessionEffort("race-specific")), ic: "rIntervals" },
+  race: { k: "quality", lab: "Quality", c: effortVar(sessionEffort("race")), ic: "rRace" },
+  strides: { k: "quality", lab: "Quality", c: effortVar(sessionEffort("strides")), ic: "rStrides" },
+  recovery: { k: "easy", lab: "Easy", c: effortVar(sessionEffort("recovery")), ic: "rRecovery" },
 };
-function runKind(type) { return RUN_KIND[type] || { k: "easy", lab: "Easy", c: "var(--eff-easy)", ic: "rEasy" }; }
+function runKind(type) { return RUN_KIND[type] || { k: "easy", lab: "Easy", c: effortVar(sessionEffort("easy")), ic: "rEasy" }; }
 function runKindColour(type) { return runKind(type).c; }
+/** The word for an effort band, where a legend has to name a colour rather than a session. */
+const EFFORT_WORD = { easy: "Easy", moderate: "Tempo", hard: "Hard" };
+/**
+ * THE MONTH CALENDAR\u2019S LEGEND, DERIVED FROM RUN_KIND SO IT CANNOT CLAIM A COLOUR THE DOTS DO NOT DRAW.
+ *
+ * ⚠️ IT WAS THREE HAND-WRITTEN PAIRS AND ONE OF THEM WENT STALE THE MOMENT A TEMPO BECAME AMBER \u2014
+ * "Quality \u2192 --eff-hard" while a threshold dot on the grid above it was drawing --eff-moderate. A legend
+ * that is wrong about one of its three swatches is worse than no legend, because the runner trusts it.
+ * Built from the table, it lists every distinct colour a dot can actually be, exactly once, in the order
+ * the table declares them.
+ */
+function logCalendarLegend() {
+  const out = [], seen = {};
+  const add = (word, c) => { if (!seen[c]) { seen[c] = 1; out.push([word, c]); } };
+  add(EFFORT_WORD[sessionEffort("easy")], runKindColour("easy"));
+  for (const t of Object.keys(RUN_KIND)) {
+    const k = RUN_KIND[t];
+    add(k.k === "long" ? k.lab : EFFORT_WORD[sessionEffort(t)], k.c);
+  }
+  return out;
+}
 /**
  * The month you are looking at, summarised before any of its runs are listed.
- * \u26a0\ufe0f ONE PERIOD, NOT THREE COLUMNS OF DIFFERENT PERIODS. The first version showed this week,
+ * ⚠️ ONE PERIOD, NOT THREE COLUMNS OF DIFFERENT PERIODS. The first version showed this week,
  * this month and all-logged side by side, which asks the reader to work out which one answers their
  * question. The mockup's shape is better: name the period, then summarise it.
  */
@@ -9590,30 +9713,30 @@ function logbookSnapshot() {
     (state.logFilterOpen ? logbookFilters() : "") +
     '<div class="card lb-snap"><div class="lb-grid">' +
       cell(t.runs + (t.runs === 1 ? " run" : " runs"), (t.km ? t.km.toFixed(1) : "0") + '<small>km</small>') +
-      cell("Time", t.sec ? fmtTimeFull(Math.round(t.sec)).replace(/^(\\d+):(\\d\\d):\\d\\d$/, "$1h $2m").replace(/^(\\d+):(\\d\\d)$/, "$1m") : "\u2014") +
-      // \u26a0\ufe0f THIS CELL SPENT MONTHS SHOWING THE WRONG THING. It was labelled "Consistency" and
+      cell("Time", t.sec ? fmtTimeFull(Math.round(t.sec)).replace(/^(\\d+):(\\d\\d):\\d\\d$/, "$1h $2m").replace(/^(\\d+):(\\d\\d)$/, "$1m") : "—") +
+      // ⚠️ THIS CELL SPENT MONTHS SHOWING THE WRONG THING. It was labelled "Consistency" and
       // rendered logStreakWeeks() -- weeks in a row -- while logConsistency(), which answers the
       // question the label asks and has its own test, sat in the file with ZERO CALLERS. The guard
       // passed the whole time because it asserts on that function's SOURCE, and source cannot tell
       // you nobody runs it. Now it renders the real figure, and the streak lives in its own tile
       // rather than being repeated three times on one screen.
-      cell("Consistency", cons ? cons.done + " of " + cons.prescribed : "\u2014", cons ? "runs done this week" : "no plan this week") +
+      cell("Consistency", cons ? cons.done + " of " + cons.prescribed : "—", cons ? "runs done this week" : "no plan this week") +
     '</div></div>';
 }
 /**
  * A flame for every week of the streak, and a line to keep it going.
  *
- * \u26a0\ufe0f ONE FLAME PER WEEK, COUNTED, NOT A DECORATION. Five flames means five weeks; the number
+ * ⚠️ ONE FLAME PER WEEK, COUNTED, NOT A DECORATION. Five flames means five weeks; the number
  * stays beside them so the picture can be checked against something. Past twelve it stops drawing
  * and says the number instead -- a row of thirty flames is a smear, not an achievement.
  *
- * \u26a0\ufe0f AND THE QUOTE IS EARNED, WHICH IS THE ONLY REASON IT IS HERE. This app has a rule against
+ * ⚠️ AND THE QUOTE IS EARNED, WHICH IS THE ONLY REASON IT IS HERE. This app has a rule against
  * praise that arrives whatever you did -- it is why the post-run debrief gives a bad session an
  * honest read. A streak is the one thing on this screen the runner unambiguously did, so encouraging
  * them to protect it is not flattery. It appears only from two weeks; congratulating somebody on a
  * single week is the empty praise the rule exists to prevent.
  *
- * \u26a0\ufe0f THE QUOTE IS PICKED BY WEEK, NOT AT RANDOM. randomQuote() would hand out a different one
+ * ⚠️ THE QUOTE IS PICKED BY WEEK, NOT AT RANDOM. randomQuote() would hand out a different one
  * on every render -- and this screen re-renders on a filter tap, a delete, a swipe -- so the quote
  * would flicker while the runner was reading it.
  */
@@ -9632,12 +9755,12 @@ function streakRow(streak) {
 /**
  * "Interpret comparable runs and state the evidence behind the insight."
  *
- * \u26a0\ufe0f COMPARABLE MEANS THE SAME KIND OF RUN, and that is the whole reason this can be honest.
+ * ⚠️ COMPARABLE MEANS THE SAME KIND OF RUN, and that is the whole reason this can be honest.
  * Comparing every run's pace would report a "gain" whenever the plan happened to schedule more easy
  * running -- a change in the PLAN read as a change in the RUNNER. Easy runs only, split into an older
  * half and a newer half, and it says how many runs it looked at.
  *
- * \u26a0\ufe0f AND IT REFUSES RATHER THAN GUESSES. Under six easy runs, or a difference under 3 s/km,
+ * ⚠️ AND IT REFUSES RATHER THAN GUESSES. Under six easy runs, or a difference under 3 s/km,
  * there is nothing here worth a headline -- a snapshot that always finds something is one nobody can
  * trust the day it finds something real.
  */
@@ -9688,7 +9811,7 @@ function logbookFilters() {
 }
 /**
  * A month heading, emitted when the run below it starts a new month.
- * \u26a0\ufe0f state.logged IS INSERTION-ORDERED, NOT DATE-SORTED -- a watch run arriving late is
+ * ⚠️ state.logged IS INSERTION-ORDERED, NOT DATE-SORTED -- a watch run arriving late is
  * unshifted to the front whatever day it happened. So this tracks the last month it EMITTED rather
  * than comparing with the previous row, and a list that jumps back and forth still reads correctly.
  */
@@ -9708,8 +9831,8 @@ function viewRunDetail() {
   if (!run) return '<button class="backbtn" id="runBack">\u2039 Logbook</button><div class="card">Run not found.</div>';
   const a = runAnalysis(run);
   const v = runVerdict(run, a);
-  // \u26a0\ufe0f THE ORDER IS THE CONTRACT. Route, metrics, verdict, evidence, plan, next action, analysis,
-  // advanced, details, share \u2014 coaching before Share, shoes, source and notes, because the screen
+  // ⚠️ THE ORDER IS THE CONTRACT. Route, metrics, verdict, evidence, plan, next action, analysis,
+  // advanced, details, share — coaching before Share, shoes, source and notes, because the screen
   // exists to say what the run MEANT rather than to list what it recorded.
   return rdNavHtml(run) +
     rdHeroHtml(run) +
@@ -9724,8 +9847,8 @@ function viewRunDetail() {
       rdKeyStatsHtml(run) +
       rdAnalysisHtml(run, a) +
       rdAdvancedHtml(run, a) +
-      // \u26a0\ufe0f The effort question used to exist ONLY on the finish screen, so a rating skipped in the
-      // moment could never be given afterwards \u2014 and that rating is half the evidence the adaptive
+      // ⚠️ The effort question used to exist ONLY on the finish screen, so a rating skipped in the
+      // moment could never be given afterwards — and that rating is half the evidence the adaptive
       // flags engine runs on. Asking it here too costs nothing and feeds the coach.
       rpeAskHtml(run) +
       rdMetaHtml(run) +
@@ -9795,7 +9918,7 @@ function dimLevel(vo2) { return vo2 < 40 ? 1 : vo2 < 50 ? 2 : vo2 < 60 ? 3 : 4; 
  * .confidence/.method; RC.rangeText exists to format exactly that and had ZERO callers; and
  * FITNESS.summary is a ready-made honest provenance sentence rendered nowhere.
  *
- * \u26a0\ufe0f A NUMBER WITH NO DATE READS AS A MEASUREMENT OF TODAY. All three dimensions come from
+ * ⚠️ A NUMBER WITH NO DATE READS AS A MEASUREMENT OF TODAY. All three dimensions come from
  * ONE input -- the 5 km time typed into setup, or a 2 km trial -- so the meter labelled "endurance
  * base" only ever moves when that input changes, however much training has happened in between.
  * Saying so is the whole difference between an estimate and a claim.
@@ -9807,7 +9930,7 @@ function perfSource() {
     return { what: "your two kilometre trial", when: String(t0.completedAt).slice(0, 10), seeded: false };
   }
   if (profile.twoKmS > 0) return { what: "your two kilometre trial", when: null, seeded: false };
-  // \u26a0\ufe0f A SEEDED ANCHOR IS NOT EVIDENCE. buildProfileFromDraft seeds recentTimeS for a
+  // ⚠️ A SEEDED ANCHOR IS NOT EVIDENCE. buildProfileFromDraft seeds recentTimeS for a
   // beginner and sets noRecent -- a 5 km time nobody ran. This app already refuses to raise adaptive
   // flags off a seeded anchor for exactly that reason; printing a fitness estimate from one as
   // though it were measured is the same mistake somewhere else.
@@ -9841,26 +9964,26 @@ function viewPerformance() {
   const t = FITNESS.thresholdSpeed, a = FITNESS.aerobicCapacity, d = FITNESS.durability;
   const lvl = dimLevel(a.value);
   const words = { 1: "Building your base", 2: "A solid base", 3: "Strong endurance", 4: "Very strong endurance" };
-  // \u26a0\ufe0f ONE ACTION, AND IT IS A REAL ONE. Both numbers move only when the input behind them
+  // ⚠️ ONE ACTION, AND IT IS A REAL ONE. Both numbers move only when the input behind them
   // moves, and a two kilometre trial is the single thing a runner can do about that. startTrialFlow
   // already exists, so this is a route to something built, not a new promise.
   const pace = perfInsight({
     label: "Your strong, steady pace", value: fmtPace(t.value), unit: "/km", est: t,
-    // \u26a0\ufe0f thresholdSpeed's low/high are SECONDS PER KILOMETRE, not a speed, so low is the
+    // ⚠️ thresholdSpeed's low/high are SECONDS PER KILOMETRE, not a speed, so low is the
     // faster end. Written high-first it printed "5:21-5:09", a range running backwards.
     range: (t.low && t.high) ? fmtPace(t.low) + "\u2013" + fmtPace(t.high) + " /km" : null,
-    meaning: "The pace you could hold for a long, hard effort \u2014 roughly an hour, flat out.",
+    meaning: "The pace you could hold for a long, hard effort — roughly an hour, flat out.",
     implication: "It is what your threshold and tempo sessions are built around.",
     action: "Record a two kilometre trial", actionId: "perfTrial",
   });
   const rt = RC.rangeText(a, 0);
   const base = perfInsight({
     label: "Endurance base", value: words[lvl] || words[1], est: a,
-    range: rt && rt !== "\u2014" ? rt + " ml/kg/min" : null,
-    meaning: "How big your aerobic engine is \u2014 the ceiling your easy running raises.",
+    range: rt && rt !== "—" ? rt + " ml/kg/min" : null,
+    meaning: "How big your aerobic engine is — the ceiling your easy running raises.",
     implication: "It moves slowly, over months, and mostly from time on your feet.",
   });
-  // \u26a0\ufe0f THE THIRD ONE IS PERMANENTLY EMPTY AND NOW SAYS SO. durability.confidence is always
+  // ⚠️ THE THIRD ONE IS PERMANENTLY EMPTY AND NOW SAYS SO. durability.confidence is always
   // "none" because nothing in this app computes it, and the old copy -- "We will learn this from your
   // long runs" -- was a promise it never keeps. An empty state that admits what is missing is honest;
   // one that promises is a lie with a deadline on it.
@@ -9868,7 +9991,7 @@ function viewPerformance() {
     ? uiCoachNote({ tone: "unavailable",
         observation: "We cannot tell yet how well you hold pace late in a long run.",
         implication: "Working that out means comparing your pace across the second half of a long run with the first, and Inte-Run does not calculate it today.",
-        evidence: "Not estimated \u2014 there is no method behind it yet, rather than not enough data." })
+        evidence: "Not estimated — there is no method behind it yet, rather than not enough data." })
     : perfInsight({ label: "Strength when tired", value: "Holds pace well", est: d,
         meaning: "How well you hold pace late in long runs." });
   // FITNESS.summary is the engine's own honest one-liner, and it was rendered nowhere.
@@ -9912,7 +10035,7 @@ const SUPPORT_HUB = [
   { id: "female", ic: "flower", c: "var(--taper)", t: "Women's health", d: "Symptom-informed prompts — periods, postpartum, more.", interactive: true },
   { id: "strength", ic: "dumbbell", c: "var(--build)", t: "Strength & mobility", d: "Why strength matters, and how to fit it in.", interactive: false },
   { id: "guides", ic: "book", c: "var(--accent)", t: "Training guides", d: "Plain-English answers grounded in the research.", interactive: false },
-  { id: "why", ic: "heart", c: "var(--rest)", t: "Your why", d: "The reasons behind the running \u2014 for the hard miles.", interactive: false },
+  { id: "why", ic: "heart", c: "var(--rest)", t: "Your why", d: "The reasons behind the running — for the hard miles.", interactive: false },
   { id: "connect", ic: "devices", c: "var(--base)", t: "Connected apps & devices", d: "Your watch, health apps and calendars.", interactive: false },
   // ⚠️ Lives here for now. The design brief and its mockup put shoes under Profile > Connections, and
   // Phase 3 builds that screen — this is the honest interim home, not the intended one.
@@ -9928,7 +10051,7 @@ const SUPPORT_HUB = [
     kw: "heart rate zones zone hr bpm max heart rate maximum threshold anaerobic aerobic tempo endurance recovery zone 1 2 3 4 5 karvonen tanaka 220 minus age chest strap watch effort intensity" },
 ];
 /**
- * \u26a0\ufe0f GROUPED BY WHAT YOU CAME FOR, NOT BY WHAT IT IS MADE OF. Eleven undifferentiated cards
+ * ⚠️ GROUPED BY WHAT YOU CAME FOR, NOT BY WHAT IT IS MADE OF. Eleven undifferentiated cards
  * put "Ask Alfie" and "Your data" at the same level, so the health check-ins -- the ones somebody
  * arrives at worried and in a hurry -- were three tiles down a flat grid with nothing to aim at.
  * The order is deliberate: coaching first because it is what most visits want, health second because
@@ -9942,12 +10065,12 @@ const SUPPORT_HUB = [
  * goal was set to was to open every question you had ever answered, on a screen where a stray tap on
  * Save rebuilds the plan. Reading and editing were the same act.
  *
- * \u26a0\ufe0f THE FORM IS NOT REPLACED, IT IS MOVED BEHIND THIS. Every question still exists and is
+ * ⚠️ THE FORM IS NOT REPLACED, IT IS MOVED BEHIND THIS. Every question still exists and is
  * still the one place it is answered -- this page is a summary with a way in, which is what the owner
  * asked for ("all of the current questions can still sit behind the proposed new design"). Nothing
  * about the plan-building path changed, so nothing about it can have broken.
  *
- * \u26a0\ufe0f NO PREMIUM BADGE, THOUGH THE MOCKUP HAS ONE. The owner cut subscriptions explicitly --
+ * ⚠️ NO PREMIUM BADGE, THOUGH THE MOCKUP HAS ONE. The owner cut subscriptions explicitly --
  * "thats not something we are doing (yet)" -- and CLAUDE.md records "do not reinstate it from the
  * mockup". A badge for a tier that does not exist is a promise the app cannot keep.
  */
@@ -9968,7 +10091,7 @@ function profPlanStatus() {
     (wk ? " \u00b7 Week " + wk + " of " + total : " \u00b7 " + total + " weeks");
 }
 function profFitness() {
-  // \u26a0\ufe0f THE SAME HONESTY AS THE PERFORMANCE CARDS. A seeded beginner has a 5 km time nobody
+  // ⚠️ THE SAME HONESTY AS THE PERFORMANCE CARDS. A seeded beginner has a 5 km time nobody
   // ran; printing it here as "Current fitness" would be the app quoting a result back at somebody who
   // never produced it, on the screen where they would most reasonably believe it.
   if (profile.twoKmS > 0) return "2 km \u00b7 " + fmtTimeFull(profile.twoKmS);
@@ -9977,7 +10100,7 @@ function profFitness() {
   return "5 km \u00b7 " + fmtTimeFull(profile.recentTimeS) + (profile.fitSrc === "predicted" ? " (estimated)" : "");
 }
 /**
- * \u26a0\ufe0f COUNTED, NOT QUOTED. The four answers are the runner's own words about why they run --
+ * ⚠️ COUNTED, NOT QUOTED. The four answers are the runner's own words about why they run --
  * putting one of them on a settings row, in a summary of everything else, cheapens it. How many they
  * have written is the honest thing to show at this size.
  */
@@ -9991,7 +10114,7 @@ function profContext() {
 }
 /**
  * The draft the setup form is built from.
- * \u26a0\ufe0f THE OVERLAY FORGOT THIS AND THE FAILURE WAS UNRECOGNISABLE. render()'s setup branch
+ * ⚠️ THE OVERLAY FORGOT THIS AND THE FAILURE WAS UNRECOGNISABLE. render()'s setup branch
  * seeded the draft inline; openProfileEdit renders the same form and did not, so draft.days and
  * draft.status were undefined, the generator was handed a plan with no days per week, and it died
  * deep inside with "Cannot read properties of undefined (reading 'build')" -- which doSaveProfile
@@ -10007,12 +10130,12 @@ let PROFILE_EDIT_OPEN = false;
 /**
  * One profile answer, edited in a sheet over the profile page.
  *
- * \u26a0\ufe0f THE WHOLE FORM GOES INTO THE SHEET, with the other sections hidden -- exactly as it did
+ * ⚠️ THE WHOLE FORM GOES INTO THE SHEET, with the other sections hidden -- exactly as it did
  * on the full screen, and for the same reason: draftFromForm() reads its values straight out of the
  * DOM, so a sheet holding only the focused section would read every other field as blank and write
  * those blanks over the profile.
  *
- * \u26a0\ufe0f wire() BINDS THE SETUP HANDLERS ON ELEMENT PRESENCE, NOT ON state.screen -- every one is
+ * ⚠️ wire() BINDS THE SETUP HANDLERS ON ELEMENT PRESENCE, NOT ON state.screen -- every one is
  * guarded with "if (el)". That is the only reason the form works here at all, and it is worth knowing
  * before anybody "tidies" those guards into a screen check.
  */
@@ -10027,7 +10150,7 @@ function openProfileEdit(topic) {
   $("sheetOv").classList.add("on");
   PROFILE_EDIT_OPEN = true;
   wire();
-  // \u26a0\ufe0f The why answers write through their own handler, not through draftFromForm -- without
+  // ⚠️ The why answers write through their own handler, not through draftFromForm -- without
   // this, typing one in the overlay would look accepted and save nothing.
   wireWhyInputs(null);
 }
@@ -10043,7 +10166,7 @@ function viewProfile() {
   const remind = remindStateLabel();
   const themeSet = (function () { try { return localStorage.getItem("interun_theme_v1"); } catch (e) { return null; } })();
   return '<div class="pf-id">' +
-      // \u26a0\ufe0f THE PICTURE WAS A DIV. It looks exactly like the thing you tap to change your photo
+      // ⚠️ THE PICTURE WAS A DIV. It looks exactly like the thing you tap to change your photo
       // -- a photo, in a circle, at the top of your profile -- and it did nothing at all.
       '<button class="pf-av" data-pf="setup:you" aria-label="Change your photo or name">' + avatarInner(profile) + '</button>' +
       '<div class="pf-idb"><button class="pf-name" data-pf="setup:you">' + esc(profile.name || "Your profile") + '</button>' +
@@ -10079,7 +10202,7 @@ function viewProfile() {
  * the build; a client-side index over them needs no backend" -- and he was right, except that they
  * are better than markup: GUIDES and SUPPORT_HUB are both DATA, so the index is a filter.
  *
- * \u26a0\ufe0f IT SEARCHES THE BODY, NOT JUST THE TITLES. Somebody typing "shin splints" or "gel" is
+ * ⚠️ IT SEARCHES THE BODY, NOT JUST THE TITLES. Somebody typing "shin splints" or "gel" is
  * not looking for an article called that -- they are looking for the paragraph that mentions it, and
  * a title-only search returns nothing and teaches them the search does not work.
  */
@@ -10110,7 +10233,7 @@ function supportSearch(q) {
 }
 function supportSearchHtml() {
   const q = state.supportQ || "";
-  // \u26a0\ufe0f 16px MINIMUM ON A FOCUSABLE FIELD. Below it iOS auto-zooms on focus, and because
+  // ⚠️ 16px MINIMUM ON A FOCUSABLE FIELD. Below it iOS auto-zooms on focus, and because
   // pinch is deliberately disabled the runner can never zoom back out -- the app stays scaled for
   // every screen after it. test/ios-input-zoom.test.ts scans for exactly this.
   const box = '<div class="sup-search"><span class="sup-si" aria-hidden="true">' + (ICON.search || "") + '</span>' +
@@ -10121,7 +10244,7 @@ function supportSearchHtml() {
   const hits = supportSearch(q);
   if (!hits.length) {
     return box + '<div class="sup-none">Nothing matches <b>' + esc(q.trim()) + '</b>. ' +
-      'Try a shorter word \u2014 or <button class="lb-clear" id="supAskAlfie">ask Alfie</button>, which can answer against your own plan.</div>';
+      'Try a shorter word — or <button class="lb-clear" id="supAskAlfie">ask Alfie</button>, which can answer against your own plan.</div>';
   }
   return box + '<div class="sup-res">' + hits.map((h) =>
     '<button class="sup-r" data-supres="' + esc(h.kind) + ':' + esc(h.id) + '">' +
@@ -10133,14 +10256,14 @@ function supportSearchHtml() {
  * The Support hub, to the owner's mockup: search, Alfie as a feature card, the private check-ins
  * together under their own caveat, then Learn, then one destination for safety and privacy.
  *
- * \u26a0\ufe0f THE "NOT MEDICAL" LABEL IS ON THE CARD, NOT ONLY BEHIND IT. It was inside the Alfie
+ * ⚠️ THE "NOT MEDICAL" LABEL IS ON THE CARD, NOT ONLY BEHIND IT. It was inside the Alfie
  * screen, which meant it was visible only once you had already decided to go and ask it something.
  * On the hub it is visible while you are deciding.
  *
- * \u26a0\ufe0f THE CHECK-INS CARRY "NOT A DIAGNOSIS" AT SECTION LEVEL, which is the honest scope: it
+ * ⚠️ THE CHECK-INS CARRY "NOT A DIAGNOSIS" AT SECTION LEVEL, which is the honest scope: it
  * is true of all three, and repeating it on each card makes it wallpaper.
  *
- * \u26a0\ufe0f SHOES AND DEVICES ARE NOT HERE ANY MORE. They moved to Profile > Connections, which is
+ * ⚠️ SHOES AND DEVICES ARE NOT HERE ANY MORE. They moved to Profile > Connections, which is
  * where the brief always put them and where CLAUDE.md recorded this hub as their "honest interim
  * home, not the intended one".
  */
@@ -10155,7 +10278,7 @@ function hubRow(h) {
     '<span class="sd-chev" aria-hidden="true">\u203A</span></button>';
 }
 const HUB_CHECKINS = ["redflags", "reds", "female"];
-// \u26a0\ufe0f "why" IS NOT HERE ANY MORE -- it moved to the profile, under Motivation, beside the other
+// ⚠️ "why" IS NOT HERE ANY MORE -- it moved to the profile, under Motivation, beside the other
 // answers that shape the plan. It is a thing about the runner, not an article to read.
 const HUB_LEARN = ["understand", "strength", "guides"];
 /**
@@ -10201,7 +10324,7 @@ function viewSupport() {
 /**
  * Safety, privacy and human help -- one destination, and every sentence in it checked against the code.
  *
- * \u26a0\ufe0f THIS PAGE IS THE EASIEST IN THE APP TO WRITE DISHONESTLY, because everything on it sounds
+ * ⚠️ THIS PAGE IS THE EASIEST IN THE APP TO WRITE DISHONESTLY, because everything on it sounds
  * reassuring whether or not it is true. Every claim below was verified: localStorage is the only
  * store (dataView discovers backup keys by the interun_/rc_ prefix); Alfie answers on-device unless a
  * proxy is configured, which nothing ships configured; the check-in answers are read out of the DOM
@@ -10215,12 +10338,12 @@ function safetyView() {
     '<div class="card sf-c"><div class="subhead" style="margin-top:0">What this app is not</div>' +
       '<p>Inte-Run is a training companion. It is <b>not a doctor, a physiotherapist or a dietitian</b>, ' +
       'and it cannot examine you. Its check-ins are built from published warning signs and are there to ' +
-      'help you decide <i>whether to go and see somebody</i> \u2014 they are not a diagnosis and cannot be one.</p>' +
+      'help you decide <i>whether to go and see somebody</i> — they are not a diagnosis and cannot be one.</p>' +
       '<p>Ask Alfie is an <b>AI coach</b>. It knows your plan and a store of running knowledge. It can be ' +
       'wrong, and it is not medical advice.</p></div>' +
     '<div class="card sf-c"><div class="subhead" style="margin-top:0">When to stop and get help</div>' +
       '<p>Chest pain, fainting, a sudden severe headache, or an injury you cannot walk on: stop and get ' +
-      'medical help now \u2014 do not use an app to decide.</p>' +
+      'medical help now — do not use an app to decide.</p>' +
       '<p>Pain that sharpens as you run, changes how you move, or wakes you at night is worth a ' +
       'professional\u2019s opinion rather than another week of guessing.</p>' +
       '<button class="perf-a" data-hub="redflags">Check a symptom \u203a</button></div>' +
@@ -10232,7 +10355,7 @@ function safetyView() {
       (proxy
         ? '<p><b>Ask Alfie sends your question off this phone.</b> It goes to Inte-Run\u2019s own server, ' +
           'which asks an AI to answer it. Your question, a short summary of your plan and the last few ' +
-          'messages go with it \u2014 never your name, your location, or your check-in answers. Inte-Run ' +
+          'messages go with it — never your name, your location, or your check-in answers. Inte-Run ' +
           'does not store any of it.</p>' +
           '<p>If that server cannot be reached, Alfie answers on this phone instead, from what it already ' +
           'knows about running and about your plan.</p>'
@@ -10300,7 +10423,7 @@ function zonesView() {
     const hi = i === 4 ? null : Math.round(ceil * HR_ZONE_FLOOR[i + 1]) - 1;
     return '<div class="hz-row zr-row"><span class="hz-bar" style="background:var(--hz' + (i + 1) + ')"></span>' +
       '<span class="zr-n">Zone ' + (i + 1) + '<b>' + HR_ZONE_NAME[i] + '</b></span>' +
-      '<span class="zr-b num">' + (ceil ? (lo + (hi ? '\u2013' + hi : '\u2013max')) : '\u2014') + '</span>' +
+      '<span class="zr-b num">' + (ceil ? (lo + (hi ? '\u2013' + hi : '\u2013max')) : '—') + '</span>' +
       '<span class="zr-p num">' + Math.round(f * 100) + '%</span></div>';
   }).join("");
   return '<h2 class="sec" style="margin-top:0">Training zones</h2>' +
@@ -10409,7 +10532,7 @@ function paceCalcView() {
       'which is why this is a target to plan around rather than a prediction.</div>';
 }
 function supportDetail(id) {
-  // \u26a0\ufe0f BACK MEANS WHERE YOU CAME FROM. Apps & devices, Shoes, Your data and Safety are all
+  // ⚠️ BACK MEANS WHERE YOU CAME FROM. Apps & devices, Shoes, Your data and Safety are all
   // Support screens, so opening one from the profile and pressing back dumped the runner into the
   // Support hub -- a tab they had not been near. The origin is remembered rather than assumed.
   const fromProfile = state.supportFrom === "profile";
@@ -10488,7 +10611,7 @@ function strengthView() {
   }).join("");
   return '<div class="lib-hero"><div class="lib-eyebrow">Strength &amp; mobility</div>' +
     '<h2 class="lib-title">Two sessions a week is enough</h2>' +
-    '<p class="lib-lead">Heavy strength training is one of the best-evidenced ways to improve running economy and cut injury risk \\u2014 and at these volumes it won\\u2019t make you bulky or leave you too sore to run.</p></div>' +
+    '<p class="lib-lead">Heavy strength training is one of the best-evidenced ways to improve running economy and cut injury risk \— and at these volumes it won\\u2019t make you bulky or leave you too sore to run.</p></div>' +
     '<div class="card lib-facts">' +
     '<div class="lf"><b>2\\u00d7 a week</b><span>Enough to get nearly all the benefit</span></div>' +
     '<div class="lf"><b>4\\u20136 reps</b><span>Heavy and controlled beats high-rep burn</span></div>' +
@@ -10497,68 +10620,68 @@ function strengthView() {
     '<div class="lib-note">Tap any movement to watch it.</div>' +
     groups +
     '<div class="card guide-body" style="margin-top:14px"><div class="subhead" style="margin-top:0">How to build a session</div>' +
-    '<p>Pick <b>one from each group</b> \\u2014 a squat, a hinge, a single-leg movement, calves and core. Six exercises, three sets each, about 40 minutes.</p>' +
+    '<p>Pick <b>one from each group</b> \— a squat, a hinge, a single-leg movement, calves and core. Six exercises, three sets each, about 40 minutes.</p>' +
     '<p><b>Go heavy enough that the last rep is genuinely hard</b>, but never to failure. If you can do ten, it\\u2019s too light: add weight rather than reps.</p>' +
-    '<p>Progress by adding a little load every week or two. When you stop being able to, hold that weight for a few weeks \\u2014 consistency beats constant increases.</p></div>' +
+    '<p>Progress by adding a little load every week or two. When you stop being able to, hold that weight for a few weeks \— consistency beats constant increases.</p></div>' +
     '<div class="card guide-body" style="margin-top:12px"><div class="subhead" style="margin-top:0">Mobility, honestly</div>' +
-    '<p>Mobility is about keeping the range you actually need \\u2014 not being able to do the splits.</p>' +
+    '<p>Mobility is about keeping the range you actually need \— not being able to do the splits.</p>' +
     '<p><b>Before a run:</b> move, don\\u2019t hold. Leg swings, walking lunges, a few strides. Dynamic work primes you; long static stretching before a session can briefly dull power output.</p>' +
-    '<p><b>After:</b> stretch if you enjoy it. The evidence that it prevents injury or soreness is weak \\u2014 the honest reason to do it is that it feels good.</p>' +
-    '<p><b>If something is genuinely tight</b> \\u2014 hips from sitting, calves from ramping up \\u2014 that\\u2019s worth 5 focused minutes most days. Little and often beats one long session.</p></div>';
+    '<p><b>After:</b> stretch if you enjoy it. The evidence that it prevents injury or soreness is weak \— the honest reason to do it is that it feels good.</p>' +
+    '<p><b>If something is genuinely tight</b> \— hips from sitting, calves from ramping up \— that\\u2019s worth 5 focused minutes most days. Little and often beats one long session.</p></div>';
 }
 // ---- Training guides --------------------------------------------------------
 // Expandable plain-English explainers. Deliberately opinionated: a guide that says "it depends"
 // everywhere is useless to a runner deciding what to do this evening.
 const GUIDES = [
   { t: "Why most of your running should feel easy", k: "easy", d: "The 80:20 idea, and why running easy is the hard part", b: [
-    "The single most common mistake in distance running is running the easy days too hard and the hard days too soft. Everything ends up somewhere in the middle \\u2014 tiring enough to accumulate fatigue, never stimulating enough to drive adaptation.",
+    "The single most common mistake in distance running is running the easy days too hard and the hard days too soft. Everything ends up somewhere in the middle \— tiring enough to accumulate fatigue, never stimulating enough to drive adaptation.",
     "Most successful endurance athletes spend roughly <b>80% of their running at genuinely easy effort</b> and about 20% at real intensity. The easy running is not filler: it builds the aerobic engine, capillary density and mitochondria that make every faster pace possible.",
-    "The test is conversational. If you can't speak in full sentences, you're not running easy \\u2014 slow down, even if the pace feels embarrassing. Ego is the main obstacle here, not fitness.",
-    "<b>Why it works:</b> easy running lets you run more often. Frequency \\u2014 not any single heroic session \\u2014 is what builds durability over months.",
+    "The test is conversational. If you can't speak in full sentences, you're not running easy \— slow down, even if the pace feels embarrassing. Ego is the main obstacle here, not fitness.",
+    "<b>Why it works:</b> easy running lets you run more often. Frequency \— not any single heroic session \— is what builds durability over months.",
   ] },
   { t: "Threshold: the most valuable session you'll do", k: "threshold", d: "Comfortably hard, and why it raises your sustainable pace", b: [
-    "Threshold is the effort you could hold for roughly an hour \\u2014 \\u201ccomfortably hard\\u201d. You're working, but not fighting.",
+    "Threshold is the effort you could hold for roughly an hour \— \\u201ccomfortably hard\\u201d. You're working, but not fighting.",
     "At this intensity your body produces and clears lactate at about the same rate. Training here <b>raises the pace at which that balance tips</b>, which directly raises the speed you can sustain in a race.",
-    "It's the highest-value session for most distance runners because it delivers a large adaptation for relatively modest fatigue cost \\u2014 unlike intervals, you can do it regularly.",
-    "<b>Getting it right:</b> finish thinking you could have managed a bit more. If the last rep is a survival effort, it was too fast \\u2014 that's a VO\\u2082 session by accident.",
+    "It's the highest-value session for most distance runners because it delivers a large adaptation for relatively modest fatigue cost \— unlike intervals, you can do it regularly.",
+    "<b>Getting it right:</b> finish thinking you could have managed a bit more. If the last rep is a survival effort, it was too fast \— that's a VO\\u2082 session by accident.",
   ] },
   { t: "Intervals and VO\\u2082 max", k: "vo2", d: "Short, hard, and used sparingly for a reason", b: [
-    "Intervals are hard efforts \\u2014 typically 3\\u20135 minutes \\u2014 with recovery between, run close to the fastest pace you could sustain for about ten minutes.",
+    "Intervals are hard efforts \— typically 3\\u20135 minutes \— with recovery between, run close to the fastest pace you could sustain for about ten minutes.",
     "They push <b>VO\\u2082 max</b>: the ceiling on how much oxygen you can use. Raising the ceiling makes every slower pace feel easier underneath it.",
     "They're also expensive. A hard interval session costs days of recovery, which is why a good plan uses them sparingly and surrounds them with easy running.",
-    "<b>Getting it right:</b> every rep should look the same. If the last one is much slower than the first, you started too fast \\u2014 that's a pacing failure, not toughness.",
+    "<b>Getting it right:</b> every rep should look the same. If the last one is much slower than the first, you started too fast \— that's a pacing failure, not toughness.",
   ] },
   { t: "The long run", k: "long", d: "Time on your feet, and why pace is not the point", b: [
     "The long run builds <b>durability</b>: holding form, economy and fuelling when you're tired. It's the session that most directly rehearses what a race actually demands.",
     "Run it easy. The adaptation comes from the duration, not the speed. Racing your long run mostly buys fatigue that damages the rest of the week.",
-    "Build it gradually \\u2014 adding a few minutes at a time is plenty. It should be a comfortable chunk of your weekly volume, not a heroic one-off.",
+    "Build it gradually \— adding a few minutes at a time is plenty. It should be a comfortable chunk of your weekly volume, not a heroic one-off.",
     "<b>Over about 75 minutes,</b> take fuel on board and practise the drinks and gels you plan to use on race day. Your gut adapts with training, just like your legs.",
   ] },
   { t: "Tapering for a race", k: "taper", d: "Cut volume, keep intensity, arrive fresh", b: [
     "A taper reduces volume while <b>keeping some intensity</b>, typically across the final one to three weeks depending on the distance.",
-    "Dropping intensity as well as volume is the classic mistake \\u2014 it leaves you flat rather than fresh. Keep the sharpness, lose the fatigue.",
+    "Dropping intensity as well as volume is the classic mistake \— it leaves you flat rather than fresh. Keep the sharpness, lose the fatigue.",
     "Feeling heavy-legged, twitchy or doubtful mid-taper is completely normal and not a sign of lost fitness. Fitness built over months doesn't disappear in ten days.",
     "<b>Resist testing yourself.</b> A hard session late in the taper can only confirm what you already know or cost you the race.",
   ] },
   { t: "Fuelling and hydration", k: "fuel", d: "What to take, when, and the mistake most runners make", b: [
-    "Under about 75 minutes you generally don't need fuel during a run if you started fed \\u2014 you have enough stored carbohydrate. A small amount can help a hard effort approaching an hour, but it's optional.",
-    "Beyond that the dose scales with the run: roughly <b>30\\u201360 g of carbohydrate an hour</b> up to about two and a half hours, and <b>60\\u201390 g</b> beyond it. A marathon-pace long run is the dress rehearsal \\u2014 same band, but use the exact products and timings you plan to race on.",
-    "<b>Above about 60 g an hour, mixed sugars absorb better</b> than one type alone (glucose or maltodextrin <i>and</i> fructose). Gut symptoms have several causes though \\u2014 high intakes, concentrated products, heat, pace and fluid balance all contribute \\u2014 so build up gradually and practise.",
+    "Under about 75 minutes you generally don't need fuel during a run if you started fed \— you have enough stored carbohydrate. A small amount can help a hard effort approaching an hour, but it's optional.",
+    "Beyond that the dose scales with the run: roughly <b>30\\u201360 g of carbohydrate an hour</b> up to about two and a half hours, and <b>60\\u201390 g</b> beyond it. A marathon-pace long run is the dress rehearsal \— same band, but use the exact products and timings you plan to race on.",
+    "<b>Above about 60 g an hour, mixed sugars absorb better</b> than one type alone (glucose or maltodextrin <i>and</i> fructose). Gut symptoms have several causes though \— high intakes, concentrated products, heat, pace and fluid balance all contribute \— so build up gradually and practise.",
     "Gel counts are only ever an estimate: <b>check the label, because products vary</b> from about 20 to 30 g. Think in grams an hour, and split it across drink, chews and food if that's easier.",
-    "Drink to thirst on most runs. On long or hot ones use a fluid plan you've practised and consider <b>sodium</b> to replace what you sweat out \\u2014 but don't over-drink water <i>or</i> sports drink, because sodium doesn't make excess fluid safe.",
+    "Drink to thirst on most runs. On long or hot ones use a fluid plan you've practised and consider <b>sodium</b> to replace what you sweat out \— but don't over-drink water <i>or</i> sports drink, because sodium doesn't make excess fluid safe.",
     "<b>The bigger lever is day-to-day:</b> under-eating is the most common reason training stops working. Fuelling enough is a performance decision, not an indulgence.",
   ] },
   { t: "Recovery, sleep and rest days", k: "recovery", d: "Where the adaptation actually happens", b: [
     "You don't get fitter during training. You get fitter <b>recovering from it</b>. The session is the stimulus; the adaptation happens afterwards.",
-    "<b>Sleep is the most powerful recovery tool available</b> \\u2014 more than any supplement, gadget or protocol. Consistent 7\\u20139 hours does more for your running than an extra session.",
+    "<b>Sleep is the most powerful recovery tool available</b> \— more than any supplement, gadget or protocol. Consistent 7\\u20139 hours does more for your running than an extra session.",
     "Rest days are training. Taking them is what allows the hard days to be genuinely hard.",
-    "When life squeezes your sleep or stress spikes, that's the week to take the easy option in training \\u2014 not the week to prove something.",
+    "When life squeezes your sleep or stress spikes, that's the week to take the easy option in training \— not the week to prove something.",
   ] },
   { t: "Niggles, aches and when to stop", k: "niggles", d: "The line between discomfort and injury", b: [
-    "<b>Mild awareness that stays stable</b>, does not change your stride and is no worse later or the next morning can be monitored on easy running. <b>Pain that sharpens, grows, causes a limp, or sits sharply on a bone is a stop signal.</b> In the first 72 hours after a fresh sprain or strain, none of this applies \u2014 follow Support \u2192 <i>Injury &amp; symptoms</i> instead.",
+    "<b>Mild awareness that stays stable</b>, does not change your stride and is no worse later or the next morning can be monitored on easy running. <b>Pain that sharpens, grows, causes a limp, or sits sharply on a bone is a stop signal.</b> In the first 72 hours after a fresh sprain or strain, none of this applies — follow Support \u2192 <i>Injury &amp; symptoms</i> instead.",
     "Swelling, pain at night, or pain getting worse week on week all mean stop and get assessed properly.",
     "Taking three days off early is almost always cheaper than taking six weeks off later. Runners are consistently bad at this trade.",
-    "<b>This app is not a diagnosis.</b> Support \\u2192 <i>Injury &amp; symptoms</i> walks you through a fresh sprain or strain and lists the signs that need seeing today \\u2014 and a physiotherapist or GP beats any app when something hurts.",
+    "<b>This app is not a diagnosis.</b> Support \\u2192 <i>Injury &amp; symptoms</i> walks you through a fresh sprain or strain and lists the signs that need seeing today \— and a physiotherapist or GP beats any app when something hurts.",
   ] },
 ];
 // ---- Your data: backup, restore, and moving between devices -----------------------------------
@@ -10638,7 +10761,7 @@ function applyBackup(obj) {
   try {
     backupKeys().forEach((k) => localStorage.removeItem(k));
     Object.keys(obj.data).forEach((k) => localStorage.setItem(k, obj.data[k]));
-  } catch (e) { return "Couldn\\u2019t save the backup \\u2014 this device may be out of storage."; }
+  } catch (e) { return "Couldn\\u2019t save the backup \— this device may be out of storage."; }
   return "";
 }
 function backupFilename() { return "interun-backup-" + todayIso() + ".json"; }
@@ -10699,8 +10822,8 @@ function confirmRestore(obj) {
     '<div class="sd-title">' + (replacing ? "Replace everything on this device?" : "Restore this backup?") + '</div>' +
     '<div class="bk-box"><div class="bk-lab">From the backup' + (when ? " \\u00b7 " + when : "") + '</div><div class="bk-val">' + summaryLine(incoming) + '</div></div>' +
     (replacing
-      ? '<div class="bk-box warn"><div class="bk-lab">Already on this device \\u2014 will be replaced</div><div class="bk-val">' + summaryLine(current) + '</div></div>' +
-        '<div class="sd-desc" style="margin-top:10px">Restoring replaces what is here rather than merging \\u2014 merging two histories would create duplicate runs. Export what is on this device first if you want to keep it.</div>' +
+      ? '<div class="bk-box warn"><div class="bk-lab">Already on this device \— will be replaced</div><div class="bk-val">' + summaryLine(current) + '</div></div>' +
+        '<div class="sd-desc" style="margin-top:10px">Restoring replaces what is here rather than merging \— merging two histories would create duplicate runs. Export what is on this device first if you want to keep it.</div>' +
         '<button class="bk-btn2" id="bkSaveFirst">Export this device\\u2019s data first</button>'
       : '<div class="sd-desc" style="margin-top:10px">There\\u2019s nothing on this device yet, so nothing will be lost.</div>') +
     '<button class="primary" id="bkGo" style="width:100%;margin-top:12px">' + (replacing ? "Replace with the backup" : "Restore") + '</button>' +
@@ -10740,9 +10863,9 @@ function whyRowsHtml(idPrefix) {
   return rows + '<div class="why-row"><label class="why-q" for="' + idPrefix + 'name">Is there one person behind all this?</label>' +
     '<input class="sel" id="' + idPrefix + 'name" data-whyname="1" value="' + esc(nm) + '" placeholder="Their first name\u2026" maxlength="24">' +
     '<div class="why-hint" id="' + idPrefix + 'namehint">' + (spoken
-      ? 'Your coach can say <b>' + esc(COACH.personal.name || nm) + '</b> out loud \u2014 this build has their voice pack.'
+      ? 'Your coach can say <b>' + esc(COACH.personal.name || nm) + '</b> out loud — this build has their voice pack.'
       : nm
-        ? 'We\u2019ll put their name on screen at the hard moments. Saying a name aloud needs a voice pack recorded for it, and this build has none for ' + esc(nm) + ' \u2014 so the coach uses the name-free line.'
+        ? 'We\u2019ll put their name on screen at the hard moments. Saying a name aloud needs a voice pack recorded for it, and this build has none for ' + esc(nm) + ' — so the coach uses the name-free line.'
         : 'Optional. Used at the hardest point of a long run, and nowhere else.') + '</div></div>';
 }
 function whyView() {
@@ -10750,11 +10873,11 @@ function whyView() {
   const n = whyAnswered().length;
   const nm = whyName();
   return '<div class="card"><div class="subhead" style="margin-top:0">Your why</div>' +
-    '<div class="bk-md">On a long or hard run, when it starts to bite, your coach will bring one of these back to you. Answer as many or as few as you like \u2014 blanks are simply never used.</div>' +
+    '<div class="bk-md">On a long or hard run, when it starts to bite, your coach will bring one of these back to you. Answer as many or as few as you like — blanks are simply never used.</div>' +
     rows +
     '<div class="why-count">' + (n ? n + " of " + WHY_QUESTIONS.length + " answered" : "Nothing answered yet") + '</div></div>' +
     '<div class="card"><div class="subhead" style="margin-top:0">Where these go</div>' +
-    '<div class="bk-md">Nowhere. They live on this device with the rest of your data, travel in your backups, and are never uploaded \u2014 Inte-Run has no server. On your watch they can be read aloud; on the phone your coach invokes them and the words appear on screen.</div></div>';
+    '<div class="bk-md">Nowhere. They live on this device with the rest of your data, travel in your backups, and are never uploaded — Inte-Run has no server. On your watch they can be read aloud; on the phone your coach invokes them and the words appear on screen.</div></div>';
 }
 function wireWhyInputs(onNameChange) {
   document.querySelectorAll("[data-why]").forEach((el) => {
@@ -10973,7 +11096,7 @@ function stravaSendRun(run, onDone) {
     else run.strava = { state: "error", msg: String(j.error || "Strava could not be reached.") };
     finish();
   }).catch(() => {
-    run.strava = { state: "error", msg: "No connection \\u2014 try again when you are back online." };
+    run.strava = { state: "error", msg: "No connection \— try again when you are back online." };
     finish();
   });
 }
@@ -11035,7 +11158,7 @@ function stravaRunButtonHtml(run) {
     return '<button class="primary share-btn" id="stvSend" disabled>Sending to Strava\\u2026</button>';
   }
   if (s.state === "pending") {
-    return '<button class="primary share-btn" id="stvCheck">' + ICON.share + ' Strava is still processing it \\u2014 check now</button>';
+    return '<button class="primary share-btn" id="stvCheck">' + ICON.share + ' Strava is still processing it \— check now</button>';
   }
   const err = s.state === "error" ? '<div class="stv-err">' + esc(s.msg || "") + '</div>' : "";
   return '<button class="primary share-btn" id="stvSend">' + ICON.share + ' ' +
@@ -11051,7 +11174,7 @@ function stravaSheetHtml() {
   const waiting = !!cfg.pending && Date.now() - Number(cfg.pending) < 600000;
   let body;
   if (!base) {
-    body = '<div class="bk-md">Strava needs Inte-Run\\u2019s own small server to hold the connection \\u2014 the ' +
+    body = '<div class="bk-md">Strava needs Inte-Run\\u2019s own small server to hold the connection \— the ' +
       'password that authorises it can never sit inside an app, where anyone could read it.</div>' +
       (stravaDevMode()
         ? '<input id="stvUrl" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" ' +
@@ -11071,7 +11194,7 @@ function stravaSheetHtml() {
       '<button class="rm-switch' + (on ? " on" : "") + '" id="stvAuto" role="switch" aria-checked="' + (on ? "true" : "false") +
       '" aria-label="Send new runs to Strava automatically"><span class="rm-knob"></span></button></div>' +
       '<div class="bk-md" style="margin-top:8px">' + (on
-        ? 'Only runs you finish from now on \\u2014 your existing runs stay where they are unless you send them yourself.'
+        ? 'Only runs you finish from now on \— your existing runs stay where they are unless you send them yourself.'
         : 'Off, so nothing goes across unless you tap Send on a run.') + '</div>' +
       '<div class="bk-md" style="margin-top:12px">Inte-Run can only <b>add</b> activities. It cannot read your ' +
       'Strava history, and it never sees your Strava password.</div>' +
@@ -11079,15 +11202,15 @@ function stravaSheetHtml() {
   } else if (waiting) {
     body = '<div class="bk-box"><div class="bk-val">Waiting for Strava</div>' +
       '<div class="bk-md" style="margin-top:4px">Finish giving permission in the browser, then come back here.</div></div>' +
-      '<button class="primary" id="stvCheckLink" style="width:100%;margin-top:12px">I\\u2019ve done that \\u2014 check now</button>' +
+      '<button class="primary" id="stvCheckLink" style="width:100%;margin-top:12px">I\\u2019ve done that \— check now</button>' +
       '<button class="bk-btn2" id="stvRetry">Start again</button>';
   } else {
     body = '<div class="bk-md">Send your finished runs to Strava, so your training log stays where your ' +
-      'friends can see it. Inte-Run asks for one permission \\u2014 to add activities \\u2014 and nothing else: it ' +
+      'friends can see it. Inte-Run asks for one permission \— to add activities \— and nothing else: it ' +
       'cannot read your Strava history and never sees your Strava password.</div>' +
       '<button class="primary" id="stvGo" style="width:100%;margin-top:14px">Connect to Strava</button>' +
       '<div class="bk-md" style="margin-top:10px;line-height:1.45">Opens Strava in your browser. Runs are only ' +
-      'sent when you tap Send on a run \\u2014 nothing goes across on its own.</div>';
+      'sent when you tap Send on a run \— nothing goes across on its own.</div>';
   }
   return '<div id="stvSheet"></div><div class="sd-type" style="--sc:var(--accent)">Apps</div>' +
     '<div class="sd-title">Strava</div>' + body;
@@ -11140,7 +11263,7 @@ function connectView() {
   if (!native) { watchNote = "Pairs through the Inte-Run iPhone app."; watchBadge = "Needs the app"; watchCls = "soon"; }
   else if (!WATCH_STATUS) { watchNote = "Checking with your phone\u2026"; watchBadge = "\u2026"; watchCls = "soon"; }
   else if (WATCH_STATUS.installed) { watchNote = "Today\u2019s session syncs to your wrist; finished runs come back to the Logbook."; watchBadge = "Connected"; watchCls = "ok"; }
-  else if (WATCH_STATUS.paired) { watchNote = "Watch paired \u2014 install Inte-Run from the Watch app on your iPhone."; watchBadge = "Not installed"; watchCls = "soon"; }
+  else if (WATCH_STATUS.paired) { watchNote = "Watch paired — install Inte-Run from the Watch app on your iPhone."; watchBadge = "Not installed"; watchCls = "soon"; }
   else { watchNote = "No Apple Watch is paired with this iPhone."; watchBadge = "No watch"; watchCls = "soon"; }
 
   // Strava. ⚠️ A "Planned" row stays untappable for anyone who has no server, which is every tester —
@@ -11158,17 +11281,17 @@ function connectView() {
   return '<div class="card">' +
     '<div class="cn-sec">Watches</div>' +
     row(ICON.devices, "Apple Watch", watchNote, watchBadge, watchCls, null) +
-    row(ICON.devices, "Garmin, Coros & others", "On the road map \u2014 arrives with the App Store release.", "Planned", "soon", null) +
+    row(ICON.devices, "Garmin, Coros & others", "On the road map — arrives with the App Store release.", "Planned", "soon", null) +
     '<div class="cn-sec">Apps</div>' +
     row(ICON.heart, "Apple Health", native
       ? "Watch runs save to Health automatically and count towards your rings."
-      : "Works with the Inte-Run iPhone app \u2014 watch runs save to Health.", native ? "Automatic" : "Needs the app", native ? "ok" : "soon", null) +
+      : "Works with the Inte-Run iPhone app — watch runs save to Health.", native ? "Automatic" : "Needs the app", native ? "ok" : "soon", null) +
     row(ICON.share, "Strava", stvNote, stvBadge, stvCls, (stvSetUp || stravaDevMode()) ? "strava" : null) +
     '<div class="cn-sec">Calendars</div>' +
     row(ICON.plan, "Apple, Google & Outlook", "Put every planned session in your calendar, with a morning alert.", "Ready", "ok", "cal") +
     '</div>' +
     '<div class="card"><div class="subhead" style="margin-top:0">Why so few toggles?</div>' +
-    '<div class="bk-md">Inte-Run runs entirely on your devices \u2014 there\u2019s no Inte-Run server for other apps to talk to yet. The connections above are the ones that genuinely work today; the planned ones are listed so you know they\u2019re coming, not to look busy.</div></div>';
+    '<div class="bk-md">Inte-Run runs entirely on your devices — there\u2019s no Inte-Run server for other apps to talk to yet. The connections above are the ones that genuinely work today; the planned ones are listed so you know they\u2019re coming, not to look busy.</div></div>';
 }
 function wireConnectView() {
   if (!document.querySelector(".cn-row")) return;
@@ -11184,8 +11307,8 @@ function wireConnectView() {
 // boxing the web app inside system bands and no CSS in this file can reach them — the Home Screen
 // icon carries settings frozen at the moment it was added, and needs removing and re-adding.
 // Every number needed to settle where the app actually sits, because the symptom (a band of dead
-// background above or below the app) looks identical whether the LAYOUT VIEWPORT is short \u2014 which no
-// CSS inside the page can fix \u2014 or the SHELL is short inside a correct viewport, which is ours.
+// background above or below the app) looks identical whether the LAYOUT VIEWPORT is short — which no
+// CSS inside the page can fix — or the SHELL is short inside a correct viewport, which is ours.
 // The fixed-probe line is the one that separates them: a position:fixed inset:0 element always
 // covers the layout viewport exactly, so its height IS the viewport, whatever anything else claims.
 function viewportDiagLines() {
@@ -11215,26 +11338,26 @@ function viewportDiagLines() {
       "iOS " + ver + " \u00b7 " + (standalone ? "standalone" : "browser") + " \u00b7 dpr " + (window.devicePixelRatio || 1),
       "screen " + screen.width + "\u00d7" + screen.height + " \u00b7 page " + de.clientWidth + "\u00d7" + de.clientHeight,
       "inner " + window.innerWidth + "\u00d7" + window.innerHeight +
-        " \u00b7 vv " + (vv ? Math.round(vv.width) + "\u00d7" + Math.round(vv.height) + " @" + Math.round(vv.offsetTop) : "\u2014"),
+        " \u00b7 vv " + (vv ? Math.round(vv.width) + "\u00d7" + Math.round(vv.height) + " @" + Math.round(vv.offsetTop) : "—"),
       "insets t" + ins.top + " r" + ins.right + " b" + ins.bottom + " l" + ins.left + " \u00b7 vvh " + vvh,
-      // \u26a0\ufe0f getBoundingClientRect is VIEWPORT-relative, so this always reads 0..height however the
+      // ⚠️ getBoundingClientRect is VIEWPORT-relative, so this always reads 0..height however the
       // viewport is placed on the screen. It gives the viewport HEIGHT and says nothing about its
-      // POSITION \u2014 and position is the whole question when 62pt is missing. screenY is what locates
+      // POSITION — and position is the whole question when 62pt is missing. screenY is what locates
       // it: 0 means the viewport starts at the top of the screen, so the missing height is stranded
       // at the BOTTOM; 62 means iOS has placed it below the status bar, which is what we want.
       "fixed inset:0 \u2192 " + Math.round(pr.top) + ".." + Math.round(pr.bottom) + " h" + Math.round(pr.height),
       "screenY " + (typeof window.screenY === "number" ? window.screenY : "?") +
         " \u00b7 outer " + window.outerWidth + "\u00d7" + window.outerHeight,
-      // \u26a0\ufe0f Plain English, because the state that decides everything here is INVISIBLE. iOS reads
+      // ⚠️ Plain English, because the state that decides everything here is INVISIBLE. iOS reads
       // apple-mobile-web-app-status-bar-style ONCE, when the icon is added to the Home Screen, and
-      // never again \u2014 so shipping a change to it does nothing until the icon is re-added, which looks
+      // never again — so shipping a change to it does nothing until the icon is re-added, which looks
       // exactly like the fix having failed. With no viewport-fit=cover the safe-area insets are 0
       // either way, so they cannot tell the two apart. screenY can: the viewport starts at the top of
       // the screen under black-translucent, and below the status bar under default.
       standalone
         ? (window.screenY === 0
             ? "launch chrome: EDGE-TO-EDGE (up to date)"
-            : "launch chrome: INSET \u2014 delete and re-add the Home Screen icon")
+            : "launch chrome: INSET — delete and re-add the Home Screen icon")
         : "launch chrome: n/a in a browser tab",
       "app " + rect(".app") + " \u00b7 bar " + rect(".topbar"),
       "nav " + rect(".bottomnav"),
@@ -11290,7 +11413,7 @@ function notifDiagLine() {
   } catch (e) { return "reminders: unknown"; }
 }
 // The last run's GPS accounting. Kept on LIVE while a run is live, then stamped onto the saved run so it
-// survives the session \u2014 a report that arrives an hour later still carries its numbers.
+// survives the session — a report that arrives an hour later still carries its numbers.
 // What the native coach player has actually done. A silent coach looks identical whatever the cause —
 // an empty cue map, a suspended page, a refused audio session, a missing clip — and until this line
 // existed there was no way to tell them apart from a runner's report.
@@ -11315,9 +11438,9 @@ function coachDiagLine() {
 function gpsDiagLine() {
   const d = (LIVE && LIVE.gpsDiag) || GPS_DIAG_LAST;
   if (!d) return "gps: no run recorded yet";
-  // \u26a0\ufe0f REFUSALS ARE COUNTED SEPARATELY FROM SILENCE. "stale" is a fix older than 30s (iOS and the
+  // ⚠️ REFUSALS ARE COUNTED SEPARATELY FROM SILENCE. "stale" is a fix older than 30s (iOS and the
   // browser both hand back a remembered position at the start of tracking); "invalid" is counted on
-  // the NATIVE side, because those never reach this function at all \u2014 and without it, a GPS refusing
+  // the NATIVE side, because those never reach this function at all — and without it, a GPS refusing
   // everything and a GPS delivering nothing read identically.
   const nativeDropped = (function () { try { return window.__interunGeo && window.__interunGeo.dropped; } catch (e) { return null; } })();
   return "gps: fixes " + d.seen + " \u00b7 credited " + d.credited + " \u00b7 not-moved " + d.still +
@@ -11333,8 +11456,8 @@ function gpsDiagLine() {
 let GPS_DIAG_LAST = null;
 let PEDO_DIAG_LAST = null;
 /**
- * What the step counter contributed. \u26a0\ufe0f It has to be visible, because a gap filler that quietly does
- * nothing and one that is quietly doing too much look identical from a distance total \u2014 and this is
+ * What the step counter contributed. ⚠️ It has to be visible, because a gap filler that quietly does
+ * nothing and one that is quietly doing too much look identical from a distance total — and this is
  * the only number that tells them apart.
  */
 function pedoDiagLine() {
@@ -11381,7 +11504,7 @@ function mapTokenCard() {
   const prov = mapProviderFor(MAP_STYLE_RUN);
   const injected = (function () { try { return typeof window.__interunMapboxToken === "string"; } catch (e) { return false; } })();
   const state = prov.kind === "mapbox"
-    ? '<div class="bk-val">Mapbox \u2014 Outdoors</div><div class="bk-lab" style="margin-top:4px">Trails, footpaths and contour lines' +
+    ? '<div class="bk-val">Mapbox — Outdoors</div><div class="bk-lab" style="margin-top:4px">Trails, footpaths and contour lines' +
       (injected ? " \u00b7 from this build" : " \u00b7 from the token below") + '</div>'
     : '<div class="bk-val">Standard maps</div><div class="bk-lab" style="margin-top:4px">Free, no account. Paste a Mapbox token below to switch.</div>';
   return '<div class="card"><div class="subhead" style="margin-top:0">Maps</div>' +
@@ -11493,8 +11616,8 @@ function wireMapToken() {
     // ⚠️ A SECRET TOKEN IS REFUSED, and told about. sk. tokens can read and write the account; one
     // pasted into a client is a real exposure, and silently ignoring it would leave him believing it
     // had worked.
-    if (t.indexOf("sk.") === 0) { if (msg) msg.textContent = "That is a secret token (sk.). Use a public one (pk.) \u2014 a secret token must never go in an app."; return; }
-    if (t && t.indexOf("pk.") !== 0) { if (msg) msg.textContent = "That does not look like a Mapbox token \u2014 they begin with pk."; return; }
+    if (t.indexOf("sk.") === 0) { if (msg) msg.textContent = "That is a secret token (sk.). Use a public one (pk.) — a secret token must never go in an app."; return; }
+    if (t && t.indexOf("pk.") !== 0) { if (msg) msg.textContent = "That does not look like a Mapbox token — they begin with pk."; return; }
     try { if (t) localStorage.setItem("interun_mapbox_v1", t); else localStorage.removeItem("interun_mapbox_v1"); } catch (e) {}
     if (msg) msg.textContent = t ? "Saved. Your next run\u2019s map will use Mapbox Outdoors." : "Back to the standard maps.";
     render();
@@ -11613,12 +11736,12 @@ function uiReadinessTile(o) {
   const state = o.state || "steady";
   if (state === "incomplete") {
     return '<section class="ui-tile incomplete"><div class="ui-tile-k">Ready?</div>' +
-      '<div class="ui-tile-v">\u2014</div><div class="ui-tile-l">Answer two quick questions</div></section>';
+      '<div class="ui-tile-v">—</div><div class="ui-tile-l">Answer two quick questions</div></section>';
   }
   const LAB = { ready: "Ready", steady: "Steady", reduced: "Take it easy", conflict: "Mixed signals", stale: "Steady" };
   return '<section class="ui-tile ' + state + '">' +
     '<div class="ui-tile-k">Ready</div>' +
-    '<div class="ui-tile-v num">' + (o.score != null ? Math.round(o.score) : "\u2014") + '<span>/5</span></div>' +
+    '<div class="ui-tile-v num">' + (o.score != null ? Math.round(o.score) : "—") + '<span>/5</span></div>' +
     '<div class="ui-tile-l">' + esc(LAB[state] || "Steady") + '</div>' +
     (o.contributor ? '<div class="ui-tile-c">' + esc(o.contributor) + '</div>' : "") +
     // ⚠️ A stale reading says when it was taken. An old number presented as current is worse than none.
@@ -11736,7 +11859,7 @@ function shoeRackView() {
       '<span>' + pct + '%</span></div><div><div class="sr-atth">Worth keeping an eye on</div>' +
       '<div class="sr-attn">' + esc(worn.name || "Trainers") + '</div>' +
       '<div class="shoe-intro">' + (total >= target
-        ? "These have passed the distance you set for them. Shoes do not fail on a date \u2014 go by how they feel underfoot, and by the tread."
+        ? "These have passed the distance you set for them. Shoes do not fail on a date — go by how they feel underfoot, and by the tread."
         : (Math.round(target - total) + " km to go. Worth starting to notice how they feel, and how the tread is wearing.")) +
       '</div></div></div>';
   }
@@ -11745,7 +11868,7 @@ function shoeRackView() {
   // cushioning changes with use; "replace them to avoid injury" is not supported by the evidence and
   // must never appear. A test fails on either omission.
   const footer = '<div class="shoe-intro" style="margin:18px 4px 0">Most road shoes are built for somewhere ' +
-    'between 500 and 800 km, and trail or carbon-plated shoes differ. It is a reminder, not a rule \u2014 ' +
+    'between 500 and 800 km, and trail or carbon-plated shoes differ. It is a reminder, not a rule — ' +
     'set whatever distance suits each pair, and go by how they feel underfoot.</div>';
   return '<div class="sr-eyebrow">Your running gear</div>' +
     '<h2 class="sr-title">Shoe rack</h2>' + strip + hero + rack + mileage + attention + footer +
@@ -11786,8 +11909,8 @@ function dataView() {
   const bytes = JSON.stringify(collectBackup()).length;
   const size = bytes > 1024 ? Math.round(bytes / 1024) + " KB" : bytes + " bytes";
   const move = inNativeApp()
-    ? '<div class="bk-move"><div class="bk-mh">Moving over from the web version?</div><div class="bk-md">Open Inte-Run in your browser, go to <b>Support \\u203a Your data</b>, and export a backup. Send it to this phone \\u2014 AirDrop, Files or email all work \\u2014 then tap <b>Restore</b> below and pick the file.</div></div>'
-    : '<div class="bk-move"><div class="bk-mh">Moving to the iPhone app?</div><div class="bk-md">Your runs don\\u2019t travel automatically \\u2014 the app is a separate place on your phone and can\\u2019t reach into your browser\\u2019s storage. Export a backup here, then open the app and go to <b>Support \\u203a Your data \\u203a Restore</b>.</div></div>';
+    ? '<div class="bk-move"><div class="bk-mh">Moving over from the web version?</div><div class="bk-md">Open Inte-Run in your browser, go to <b>Support \\u203a Your data</b>, and export a backup. Send it to this phone \— AirDrop, Files or email all work \— then tap <b>Restore</b> below and pick the file.</div></div>'
+    : '<div class="bk-move"><div class="bk-mh">Moving to the iPhone app?</div><div class="bk-md">Your runs don\\u2019t travel automatically \— the app is a separate place on your phone and can\\u2019t reach into your browser\\u2019s storage. Export a backup here, then open the app and go to <b>Support \\u203a Your data \\u203a Restore</b>.</div></div>';
   return '<div class="card">' +
     '<div class="subhead" style="margin-top:0">On this device</div>' +
     '<div class="bk-box"><div class="bk-val">' + summaryLine(cur) + '</div><div class="bk-lab" style="margin-top:4px">' + cur.keys + " items \\u00b7 " + size + '</div></div>' +
@@ -11807,15 +11930,15 @@ function dataView() {
     ).join("") +
     (webUpdateLine() ? '<div class="bk-lab num" style="margin-top:3px;font-size:11px;line-height:1.35">' + esc(webUpdateLine()) + '</div>' : "") + '</div>' +
     '<div class="bk-md" style="margin-top:8px">' + (inNativeApp()
-      ? "The app now keeps itself up to date: on launch it checks for a newer web version and, if there is one, switches to it from the next launch \u2014 so screen, layout and wording changes arrive without a rebuild. Changes to the app\u2019s native parts (GPS, notifications, the watch) still need one. The web-layer line above shows which copy is running."
-      : "Added to your Home Screen? It caches a copy. If an update seems missing, close it fully (swipe it away from the app switcher) and reopen \u2014 twice if needed.") + '</div></div>' +
+      ? "The app now keeps itself up to date: on launch it checks for a newer web version and, if there is one, switches to it from the next launch — so screen, layout and wording changes arrive without a rebuild. Changes to the app\u2019s native parts (GPS, notifications, the watch) still need one. The web-layer line above shows which copy is running."
+      : "Added to your Home Screen? It caches a copy. If an update seems missing, close it fully (swipe it away from the app switcher) and reopen — twice if needed.") + '</div></div>' +
     (inNativeApp() ? '<div class="card"><div class="subhead" style="margin-top:0">Live Activity</div>' +
       '<div class="bk-box"><div class="bk-val" style="font-size:14px">' + esc(liveActivityStatus()) + '</div>' +
       '<div class="bk-lab" style="margin-top:4px">Last attempt</div></div>' +
-      '<div class="bk-md" style="margin-top:8px">The lock-screen card that tracks a run. iOS asks permission the first time one is shown \u2014 if this says <b>allowed=false</b>, turn Live Activities on for Inte-Run in Settings.</div></div>' : "") +
+      '<div class="bk-md" style="margin-top:8px">The lock-screen card that tracks a run. iOS asks permission the first time one is shown — if this says <b>allowed=false</b>, turn Live Activities on for Inte-Run in Settings.</div></div>' : "") +
     '<div class="card">' + move + '</div>' +
     '<div class="card"><div class="subhead" style="margin-top:0">What a backup holds</div>' +
-    '<div class="bk-md">Your profile and goal, your plan, every logged run with its route and splits, your coach and reminder choices, and anything you\\u2019ve told Alfie. It\\u2019s a plain file on your device \\u2014 nothing is uploaded anywhere, because Inte-Run has no server to upload it to.</div></div>';
+    '<div class="bk-md">Your profile and goal, your plan, every logged run with its route and splits, your coach and reminder choices, and anything you\\u2019ve told Alfie. It\\u2019s a plain file on your device \— nothing is uploaded anywhere, because Inte-Run has no server to upload it to.</div></div>';
 }
 function wireDataView() {
   wireShoeRack();
@@ -11829,17 +11952,17 @@ function wireDataView() {
 }
 function guidesView() {
   const cards = GUIDES.map((g) =>
-    // \u26a0\ufe0f KEYED ON THE SLUG, NOT THE ARRAY INDEX. The accordion toggle is element-scoped so
+    // ⚠️ KEYED ON THE SLUG, NOT THE ARRAY INDEX. The accordion toggle is element-scoped so
     // it survives either way, but an index cannot name an article to arrive at from a search result.
     '<div class="gd' + (state.openGuide === g.k ? " on" : "") + '" data-gd="' + esc(g.k) + '"><button class="gd-h"><span class="gd-t">' + g.t + '</span>' +
     '<span class="gd-d">' + g.d + '</span><span class="gd-arr">\\u203a</span></button>' +
     '<div class="gd-b">' + g.b.map((p) => "<p>" + p + "</p>").join("") + '</div></div>').join("");
   return '<div class="lib-hero"><div class="lib-eyebrow">Training guides</div>' +
     '<h2 class="lib-title">The ideas behind your plan</h2>' +
-    '<p class="lib-lead">Short, plain-English explanations of what each kind of session is for \\u2014 grounded in mainstream endurance-running evidence, and opinionated where the evidence is clear.</p></div>' +
+    '<p class="lib-lead">Short, plain-English explanations of what each kind of session is for \— grounded in mainstream endurance-running evidence, and opinionated where the evidence is clear.</p></div>' +
     '<div class="gd-list">' + cards + '</div>' +
     '<div class="card guide-body" style="margin-top:14px"><div class="subhead" style="margin-top:0">Want this applied to you?</div>' +
-    '<p>These guides are general. <b>Ask Alfie</b> can answer the same questions against <i>your</i> plan \\u2014 your paces, your week, your race.</p>' +
+    '<p>These guides are general. <b>Ask Alfie</b> can answer the same questions against <i>your</i> plan \— your paces, your week, your race.</p>' +
     '<button class="mini-btn" id="guidesAlfie" style="margin-top:10px">' + ICON.alfie + ' Ask Alfie</button></div>';
 }
 const FLAGS_PHYS = { "chest-pain":"Chest pain or pressure","collapse-or-fainting":"Fainting or collapse","severe-breathlessness":"Severe breathlessness","neurological":"Confusion, severe headache, weakness","bone-pain":"Pinpoint bone pain","rapidly-worsening-pain":"Pain worsening quickly" };
@@ -11878,17 +12001,17 @@ function understandView() {
 }
 /**
  * What happens to a check-in answer. Shown on all three screeners.
- * \u26a0\ufe0f THE WORDING IS TRUE, AND CHECKING THAT WAS THE WORK. "Saved on this device" would have
+ * ⚠️ THE WORDING IS TRUE, AND CHECKING THAT WAS THE WORK. "Saved on this device" would have
  * been FALSE: chkValues() reads the boxes straight out of the DOM and nothing writes them anywhere,
  * so the answers do not survive leaving the screen. A consent line that overstates what is kept is
  * worse than none, because it is the sentence a worried runner reads most carefully.
  */
 function checkinConsent() {
   return '<div class="ci-consent">Your answers stay on this phone. Nothing is sent anywhere, ' +
-    'and nothing is kept \u2014 leave this screen and they are gone.</div>';
+    'and nothing is kept — leave this screen and they are gone.</div>';
 }
 function EMERGENCY_BANNER() {
-  return '<div class="promise"><span><b>In an emergency</b>, do not use an app \u2014 call your local emergency number.</span></div>';
+  return '<div class="promise"><span><b>In an emergency</b>, do not use an app — call your local emergency number.</span></div>';
 }
 /**
  * Support > Private check-ins > Injury & symptoms.
@@ -12734,7 +12857,7 @@ const DAY_NAMES_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", 
 function dayOpts(sel) { const s = sel != null ? Number(sel) : 6; return DAY_NAMES_FULL.map((d, i) => '<option value="' + i + '"' + (i === s ? " selected" : "") + '>' + d + '</option>').join(""); }
 function seg(name, opts, val) { return '<div class="seg" data-set="' + name + '">' + opts.map((o) => '<button data-v="' + o[0] + '"' + (String(o[0]) === String(val) ? ' class="on"' : '') + '>' + o[1] + '</button>').join("") + '</div>'; }
 // ---- Name & profile picture ----------------------------------------------
-// \u26a0\ufe0f QUOTES TOO. This escaped only & < > while user-controlled text already reached HTML
+// ⚠️ QUOTES TOO. This escaped only & < > while user-controlled text already reached HTML
 // ATTRIBUTE position through it: the four "your why" answers (120 characters of free text each), the
 // why name, and the shoe name. A double quote in any of them closed the attribute early and the rest
 // of the value became markup -- so a runner whose shoe is called 5" Racer lost the row. In text
@@ -12904,7 +13027,7 @@ function returnKind(p) {
   if (v === "injury" || v === "break") return v;
   return v ? "break" : "0";
 }
-// \u26a0\ufe0f THE NUMBER ARGUMENT IS KEPT AND IGNORED. Every call site passes one, and the sections
+// ⚠️ THE NUMBER ARGUMENT IS KEPT AND IGNORED. Every call site passes one, and the sections
 // are no longer a numbered sequence -- they are named topics reached one at a time from the profile
 // page, where "3" means nothing. Removing the parameter instead would touch seven call sites for no
 // gain and make the diff harder to read than the change it carries.
@@ -12991,13 +13114,13 @@ function viewSetup() {
   const secGoal = goalCardInner(p.status || "regular", { dist: p.goalDist, date: p.raceDate, target: fmtTimeFull(p.targetS) });
 
   // 4 · A few details
-  // \u26a0\ufe0f THE FORM'S SECTIONS NOW MATCH THE PROFILE PAGE'S ROWS, which is what makes a scoped
+  // ⚠️ THE FORM'S SECTIONS NOW MATCH THE PROFILE PAGE'S ROWS, which is what makes a scoped
   // edit coherent: tapping "Training rhythm" opens a section CALLED Training rhythm, not five
   // questions borrowed out of "A few details". The old section 4 held both rhythm and context, so
   // the two rows either shared a screen or the split had to be invented per-question.
   const secRhythm =
     '<div class="q" style="margin-top:0"><label>How many days a week will you run? <span class="q-hint">we\\u2019ll shape the plan around this</span></label>' + seg("days", [["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]], draft.days != null ? draft.days : p.daysPerWeek) + '</div>' +
-    '<div class="q" id="volQ"><label>Roughly how far do you run in a normal week? <span class="q-hint">km \\u2014 so we can build on what you already do</span></label><input class="sel" id="s_volume" type="number" inputmode="numeric" min="0" max="250" step="5" style="max-width:140px" value="' + (p.volKm || "") + '" placeholder="e.g. 40"><div class="q-hint" style="margin-top:5px">Leave it blank if you are not sure \\u2014 we\\u2019ll use a sensible default for your goal.</div></div>' +
+    '<div class="q" id="volQ"><label>Roughly how far do you run in a normal week? <span class="q-hint">km \— so we can build on what you already do</span></label><input class="sel" id="s_volume" type="number" inputmode="numeric" min="0" max="250" step="5" style="max-width:140px" value="' + (p.volKm || "") + '" placeholder="e.g. 40"><div class="q-hint" style="margin-top:5px">Leave it blank if you are not sure \— we\\u2019ll use a sensible default for your goal.</div></div>' +
     '<div class="q"><label>Which day suits your long run? <span class="q-hint">we\\u2019ll build the week around it</span></label><select class="sel" id="s_longday" style="max-width:200px">' + dayOpts(p.longRunDay) + '</select></div>' +
     '<div class="q"><label>When do you want to start? <span class="q-hint">a mid-week start gives a shorter first week</span></label><input class="sel" id="s_startdate" type="date" value="' + (p.startDateIso || todayIso()) + '" min="' + todayIso() + '"></div>' +
     '<div class="q"><label>Include strength &amp; conditioning?</label>' + seg("strength", [["1","Yes"],["0","No"]], p.strength?"1":"0") + '</div>';
@@ -13011,7 +13134,7 @@ function viewSetup() {
   const secContext =
     '<div class="q" style="margin-top:0"><label>Age</label><select class="sel" id="s_age" style="max-width:140px">' + ageOpts(p.age) + '</select></div>' +
     '<div class="q"><label>Sex <span class="q-hint">helps tailor advice</span></label><select class="sel" id="s_sex" style="max-width:200px"><option value=""' + (!p.sex?" selected":"") + '>Prefer not to say</option><option value="female"' + (p.sex==="female"?" selected":"") + '>Female</option><option value="male"' + (p.sex==="male"?" selected":"") + '>Male</option></select></div>' +
-    // \u26a0\ufe0f THIS CONTAINER DID NOT EXIST, so refreshTypePreview -- wired to three call sites,
+    // ⚠️ THIS CONTAINER DID NOT EXIST, so refreshTypePreview -- wired to three call sites,
     // including oninput on the two fields right above -- computed the runner\'s classification and
     // their masters status on every keystroke and then returned at "if (!tp) return". The same
     // computed-and-discarded trap as CLASS, MASTERS and PLAN.notes, and in fact it IS those two: this
@@ -13034,7 +13157,7 @@ function viewSetup() {
     setupSection(5, "Current context", "Anything that changes what your body will take", secContext) +
     setupSection(6, "Voice coaching", "Your spoken running coach", coachSettingsHtml()) +
     setupSection(7, "Motivation", "The reasons behind the plan",
-      '<div class="bk-md" style="margin:0 0 14px">Training gets hard long before race day. Tell us what this is really for, and deep into a long run \u2014 when it starts to bite \u2014 your coach will bring it back to you in your own words. Every one of these is optional; blanks are simply never used.</div>' +
+      '<div class="bk-md" style="margin:0 0 14px">Training gets hard long before race day. Tell us what this is really for, and deep into a long run — when it starts to bite — your coach will bring it back to you in your own words. Every one of these is optional; blanks are simply never used.</div>' +
       whyRowsHtml("su_why_")) +
     '<div class="err" id="setupErr" style="display:none;color:var(--rest);font-size:13px;margin:14px 2px 0;font-weight:600"></div>' +
     '<button class="primary" id="saveProfile">' + (p.personalized ? "Update my plan" : "Build my plan") + '</button>' +
@@ -13049,7 +13172,7 @@ function viewSetup() {
  * live behind the chevron....at the moment they all live behind each one." Right -- a summary row
  * that opens six sections is a summary row that has not saved anybody anything.
  *
- * \u26a0\ufe0f THE WHOLE FORM IS STILL RENDERED; THE IRRELEVANT QUESTIONS ARE HIDDEN. That is not
+ * ⚠️ THE WHOLE FORM IS STILL RENDERED; THE IRRELEVANT QUESTIONS ARE HIDDEN. That is not
  * laziness, it is the only safe shape. draftFromForm() reads its values straight out of the DOM --
  * $("s_dist").value, $("s_date").value and so on -- so a form that genuinely omitted the other
  * sections would read those fields as absent and write blanks over them. Editing your goal would
@@ -13057,7 +13180,7 @@ function viewSetup() {
  * around the gap. display:none keeps every field readable, so the save path cannot tell the
  * difference and nothing about it had to change.
  *
- * \u26a0\ufe0f BY QUESTION, NOT BY SECTION. Training rhythm and current context both live in section 4
+ * ⚠️ BY QUESTION, NOT BY SECTION. Training rhythm and current context both live in section 4
  * of the form, so focusing a whole section would put eight questions behind "Current context", which
  * has one. The topics below name fields; the pass finds whichever .q contains them.
  */
@@ -13081,7 +13204,7 @@ function applySetupFocus() {
   document.querySelectorAll(".q").forEach((q) => { if (!owns(q)) q.classList.add("setup-off"); });
   // A wrapper that is not a .q but holds the fields (the runner block, the volume question).
   document.querySelectorAll("#statusRunnerBlock").forEach((b) => { if (!owns(b)) b.classList.add("setup-off"); });
-  // \u26a0\ufe0f THE VOICE SECTION HAS NO .q WRAPPERS AT ALL -- it is a coach picker and a drawer -- so
+  // ⚠️ THE VOICE SECTION HAS NO .q WRAPPERS AT ALL -- it is a coach picker and a drawer -- so
   // the .q sweep above neither hides nor keeps it. Its card is judged on its own contents below.
   // Then any section card with nothing left showing, plus the intro and the closing note.
   document.querySelectorAll(".setup-card, #goalCard").forEach((c) => {
@@ -13090,10 +13213,10 @@ function applySetupFocus() {
     }
   });
   document.querySelectorAll(".setup-intro, .setup-foot").forEach((e) => e.classList.add("setup-off"));
-  // \u26a0\ufe0f AND SAY WHAT IS NOT ON SCREEN. A form showing one question, with a button reading
+  // ⚠️ AND SAY WHAT IS NOT ON SCREEN. A form showing one question, with a button reading
   // "Update my plan", looks like it is about to save only that -- when it saves everything, exactly
   // as it always did. The runner is told their other answers are untouched rather than left to guess.
-  // \u26a0\ufe0f WHEREVER THE FORM IS, NOT ALWAYS #view. Once a scoped edit opened in a sheet this
+  // ⚠️ WHEREVER THE FORM IS, NOT ALWAYS #view. Once a scoped edit opened in a sheet this
   // looked for the first visible section inside #view, found none, and silently skipped the header --
   // so "Editing / Your other answers stay exactly as they are" never appeared in the overlay, which
   // is now the main way anybody edits one answer. The sentence that says the rest is untouched was
@@ -13126,7 +13249,7 @@ function wizFieldVal(id) {
 }
 function draftFromForm() {
   const mmss = (s) => /^\\d{1,2}:[0-5]\\d$/.test(s) || /^\\d{1,2}:[0-5]\\d:[0-5]\\d$/.test(s);
-  // \u26a0\ufe0f ON THE VERY FIRST RUN, THE UNANSWERED QUESTIONS ARE ANSWERED BY DEFAULTS, SILENTLY.
+  // ⚠️ ON THE VERY FIRST RUN, THE UNANSWERED QUESTIONS ARE ANSWERED BY DEFAULTS, SILENTLY.
   // draft.status falls back to "regular" and draft.days to the DEFAULT_PROFILE value, so somebody who
   // scrolled past the two questions that shape the whole plan -- what kind of runner they are, and
   // how many days a week they run -- got a plan built for a five-day regular runner and no hint that
@@ -13241,7 +13364,7 @@ function draftFromForm() {
  */
 function captureSetupFields() {
   if (!draft.__f) draft.__f = {};
-  // \u26a0\ufe0f NOT SCOPED TO #view. The form is rendered into a sheet when one answer is edited from
+  // ⚠️ NOT SCOPED TO #view. The form is rendered into a sheet when one answer is edited from
   // the profile page, and a capture that only looks inside #view finds nothing there -- so the typed
   // values were lost the moment the confirm sheet replaced the form.
   document.querySelectorAll('[id^="s_"]').forEach((el) => {
@@ -13437,7 +13560,7 @@ const STATUS_OPTS = [
   ["new", "Just getting started", "New to running, or coming back after a long break. We\\'ll build with walk\\u2013run."],
   ["building", "Building the habit", "I can jog 20\\u201330 minutes non-stop. Focused on being consistent."],
   ["regular", "Regular runner", "I run 3\\u20135\\u00d7 a week and can finish a 10K or half comfortably."],
-  ["competitive", "Competitive", "High weekly mileage \\u2014 I race and chase time goals."],
+  ["competitive", "Competitive", "High weekly mileage \— I race and chase time goals."],
 ];
 function isBeginnerStatus(st) { return st === "new" || st === "building"; }
 // Is the weekly-mileage question currently hidden? Asked of the DOM rather than recomputed from
@@ -13462,7 +13585,7 @@ function goalCardInner(status, cur) {
   if (cfg.time) {
     h += '<div class="q"><label>Target time <span class="q-hint">just type the numbers</span></label><input class="sel num" id="s_target" value="' + cur.target + '" inputmode="numeric"></div>';
   } else {
-    h += '<div class="q"><div class="mas-hint">No time pressure \\u2014 we\\u2019ll build you up to comfortably finish it. You can set a time goal once you\\u2019re there.</div></div>';
+    h += '<div class="q"><div class="mas-hint">No time pressure \— we\\u2019ll build you up to comfortably finish it. You can set a time goal once you\\u2019re there.</div></div>';
   }
   h += '<div class="q"><label>' + (cfg.time ? "Race date" : "Target date") + '</label><input class="sel" id="s_date" type="date" value="' + cur.date + '"></div>';
   return h;
@@ -13504,11 +13627,11 @@ function syncStatus() {
       target: $("s_target") ? $("s_target").value : fmtTimeFull(profile.targetS),
     };
     gb.innerHTML = goalCardInner(st, cur);
-    // \u26a0\ufe0f RE-LINK. This block is rebuilt after wire() has run, so the labels inside it were
+    // ⚠️ RE-LINK. This block is rebuilt after wire() has run, so the labels inside it were
     // still floating -- which is why "Your race", "Target time" and "Race date" stayed unnamed while
     // the static questions above them were fixed. Anything that replaces form markup must re-link.
     linkFormLabels();
-    // \u26a0\ufe0f AND RE-APPLY THE FOCUS. This block is rebuilt after applySetupFocus has run, so its
+    // ⚠️ AND RE-APPLY THE FOCUS. This block is rebuilt after applySetupFocus has run, so its
     // three questions came back visible in every topic -- "Your race / Target time / Race date"
     // appeared above Current context, Training rhythm and Current fitness alike. Exactly the same
     // trap as the labels above, two lines apart, and it had to be fixed twice because anything that
@@ -13651,7 +13774,7 @@ function wizBody(id, p, st) {
     // the existing wire() bindings pick them up unchanged — the avatar cropper, the file input, and
     // the name capture all fire without a second wiring path. draft.avatar carries a chosen photo
     // through subsequent steps (avatarInner reads it from draft first, then profile).
-    return '<p class="wz-lead">A photo and what to call you. Both are optional \\u2014 you can skip them and set them later.</p>' +
+    return '<p class="wz-lead">A photo and what to call you. Both are optional \— you can skip them and set them later.</p>' +
       '<div class="avatar-row"><div class="avatar-pic" id="avatarPic">' + avatarInner({ avatar: draft.avatar || p.avatar || "", name: wizFieldVal("s_name") || p.name || "" }) + '</div>' +
       '<div><button class="avatar-cta" id="avatarBtn" type="button">' + ((draft.avatar || p.avatar) ? "Change photo" : "\\uD83D\\uDCF7 Add photo") + '</button><div class="avatar-hint">Shows in your top-bar icon.</div></div></div>' +
       '<input type="file" id="s_avatar_file" accept="image/*" aria-label="Choose a profile photo" style="display:none">' +
@@ -13674,12 +13797,12 @@ function wizBody(id, p, st) {
     }
     const fs = draft.fitsrc || "recent";
     return '<p class="wz-lead">This sets every pace in your plan.</p>' +
-      '<div class="q"><label>Your 5 km time \\u2014 recent or an estimate?</label>' + seg("fitsrc", [["recent", "Recent"], ["predicted", "Predicted"]], fs) + '</div>' +
+      '<div class="q"><label>Your 5 km time \— recent or an estimate?</label>' + seg("fitsrc", [["recent", "Recent"], ["predicted", "Predicted"]], fs) + '</div>' +
       '<div class="q" id="fitTimeWrap"><label id="fitTimeLbl"><span class="lblmain">' + (fs === "predicted" ? "Your predicted 5 km time" : "Your recent 5 km time") + '</span> <span class="q-hint">just type the numbers</span></label><input class="sel num" id="s_rectime" value="' + esc(wizFieldVal("s_rectime")) + '" placeholder="e.g. 25:00" inputmode="numeric"></div>' +
       wizTrialOfferHtml();
   }
   if (id === "volume") {
-    return '<p class="wz-lead">So we can build on what you already do. Leave it blank if you\\u2019re not sure \\u2014 we\\u2019ll use a sensible default for your goal.</p>' +
+    return '<p class="wz-lead">So we can build on what you already do. Leave it blank if you\\u2019re not sure \— we\\u2019ll use a sensible default for your goal.</p>' +
       '<div class="q"><label>Roughly how far in a normal week? <span class="q-hint">km</span></label><input class="sel" id="s_volume" type="number" inputmode="numeric" min="0" max="250" step="5" style="max-width:160px" value="' + esc(wizFieldVal("s_volume")) + '" placeholder="e.g. 40"></div>';
   }
   if (id === "details") {
@@ -13691,7 +13814,7 @@ function wizBody(id, p, st) {
   }
   if (id === "plan") {
     const vars = wizVariants();
-    if (!vars.length) return '<p class="wz-lead">We couldn\\u2019t build a plan from those answers \\u2014 go back and check your goal date is far enough ahead.</p>';
+    if (!vars.length) return '<p class="wz-lead">We couldn\\u2019t build a plan from those answers \— go back and check your goal date is far enough ahead.</p>';
     if (!draft.days) { const r = vars.find((v) => v.rec) || vars[Math.floor(vars.length / 2)]; if (r) draft.days = String(r.days); }
     const sel = Number(draft.days), minDays = vars[0].days;
     const cards = vars.map((v) => {
@@ -13704,7 +13827,7 @@ function wizBody(id, p, st) {
         '<div class="wz-plan-h">' + v.days + ' runs / week</div>' +
         '<div class="wz-plan-meta">' + v.weeks + ' weeks \\u00b7 peak ' + v.peak + ' km</div></button>';
     }).join("");
-    return '<p class="wz-lead">Each is a real plan we\\u2019ve built for you. Pick the rhythm that fits your week \\u2014 you can change it later.</p><div class="wz-plans">' + cards + '</div>';
+    return '<p class="wz-lead">Each is a real plan we\\u2019ve built for you. Pick the rhythm that fits your week \— you can change it later.</p><div class="wz-plans">' + cards + '</div>';
   }
   if (id === "schedule") {
     const ldRaw = wizFieldVal("s_longday");
@@ -13991,7 +14114,7 @@ function renderExtras() {
     $("extrasOk").onclick = closeExtras;
   } else if (step === "coach") {
     h.textContent = "Choose your coach";
-    b.textContent = "The voice you\\u2019ll hear on runs. Preview a couple and pick one that lands \\u2014 you can change it any time.";
+    b.textContent = "The voice you\\u2019ll hear on runs. Preview a couple and pick one that lands \— you can change it any time.";
     // Reuse the same coach cards the settings picker uses, so a coach added later shows up here too.
     // Volume, frequency and the notes stay on the settings page — this is the identity choice only.
     const cur = COACH.cfg.coach;
@@ -14012,7 +14135,7 @@ function renderExtras() {
     $("extrasCoachNext").onclick = () => { EXTRAS.step = "why"; renderExtras(); };
   } else if (step === "why") {
     h.textContent = "Your why";
-    b.textContent = "One line for each \\u2014 skip anything that\\u2019s not you. On a hard run your coach will bring one of these back to you in your own words.";
+    b.textContent = "One line for each \— skip anything that\\u2019s not you. On a hard run your coach will bring one of these back to you in your own words.";
     body.innerHTML = whyRowsHtml("xw_");   // reuses the same builder the profile screen uses
     try { wireWhyInputs(null); } catch (e) {}   // WHY is persisted on change by this helper
     btns.innerHTML = '<button class="guide-next" id="extrasWhyDone">Done</button>';
@@ -14829,11 +14952,11 @@ function startWhereHtml(sess) {
     '<span class="sw-b"><span class="sw-n">' + name + (badge ? '<span class="sw-badge">' + badge + '</span>' : "") + '</span>' +
     '<span class="sw-d">' + note + '</span></span><span class="arr">\u203a</span></button>';
   const watchRow = watchAvailable()
-    ? row("watch", ICON.watch, "My Apple Watch", "Recorded on your wrist \u2014 your phone can stay at home.")
+    ? row("watch", ICON.watch, "My Apple Watch", "Recorded on your wrist — your phone can stay at home.")
     : (NATIVE_WATCH
         ? '<div class="sw-row sw-off"><span class="sw-ic">' + ICON.watch + '</span><span class="sw-b"><span class="sw-n">My Apple Watch</span>' +
           '<span class="sw-d">' + (WATCH_STATUS && WATCH_STATUS.paired
-            ? "Paired, but Inte-Run isn\u2019t installed on it yet \u2014 add it in the Watch app."
+            ? "Paired, but Inte-Run isn\u2019t installed on it yet — add it in the Watch app."
             : "No Apple Watch paired with this iPhone.") + '</span></span></div>'
         : "");
   return '<div class="sheet-h">Where shall we record this?</div>' +
@@ -14841,7 +14964,7 @@ function startWhereHtml(sess) {
     '<div class="sw-list">' + watchRow +
       row("phone", ICON.phone, "This iPhone",
         watchAvailable()
-          ? "GPS, pace, route and your coach here \u2014 your watch joins in with live numbers and heart rate."
+          ? "GPS, pace, route and your coach here — your watch joins in with live numbers and heart rate."
           : "GPS, pace and route recorded here. Keep the phone with you.",
         "recommended") +
       row("treadmill", ICON.treadmill, "Treadmill", "Indoors, timed by the clock. Add the distance from the machine when you finish.") +
@@ -14903,7 +15026,7 @@ function startOnWatch(sess, opts) {
       session: payload || undefined,
     });
     toast((opts && opts.fromPhone)
-      ? "Recording on your watch \u2014 follow along here"
+      ? "Recording on your watch — follow along here"
       : "Opening Inte-Run on your watch\u2026");
     // One count, one start. The phone counts in — it has the voices — and only on "go" does the
     // watch begin. Two independent three-second counts is how the clocks ended up a second apart.
@@ -14924,7 +15047,7 @@ window.__interunWatchStart = function (ok, reason) {
   WATCH_LIVE_PENDING = false;
   clearCountIn();
   if (state.screen === "watchlive" && !watchLiveActive()) { state.screen = null; }
-  toast(reason || "Couldn\u2019t start your watch \u2014 open Inte-Run on it and press start.");
+  toast(reason || "Couldn\u2019t start your watch — open Inte-Run on it and press start.");
   render();
 };
 // Put the GENERATED warm-up into the session you actually run.
@@ -14985,8 +15108,8 @@ function withGeneratedWarmup(sess) {
       const lastCue = String(p.effort).replace(/^the last one( or two)? /, "");
       for (let i = 1; i <= p.strides; i++) {
         steps.push({ kind: "warmup", display: "Stride", repeatIndex: i, repeatCount: p.strides,
-          label: "Stride " + i + " of " + p.strides + " \\u2014 " +
-            (i === p.strides ? lastCue : "relaxed and progressive, tall and quick \\u2014 a build, not a sprint"),
+          label: "Stride " + i + " of " + p.strides + " \— " +
+            (i === p.strides ? lastCue : "relaxed and progressive, tall and quick \— a build, not a sprint"),
           // ⚠️ THE WHOLE BLOCK'S INSTRUCTION, KEPT INTACT, because the per-step label CANNOT be
           // reversed back into it. lastCue deliberately drops "the last one (or two)" — that lead-in
           // reads wrong on the very stride it describes — and the written brief was then rebuilt from
@@ -15001,7 +15124,7 @@ function withGeneratedWarmup(sess) {
         // 10k effort and the next thing that happens is the first repetition. It is also what keeps
         // the arithmetic exact: strides × (seconds + walk) is strides × 75, as before.
         steps.push({ kind: "warmup", display: "Walk back", durationSeconds: walkSec,
-          label: "Walk back \\u2014 easy until your breathing is back", targetRpe: { min: 1, max: 2 } });
+          label: "Walk back \— easy until your breathing is back", targetRpe: { min: 1, max: 2 } });
       }
     } else if (p.phase === "transition" && !w.embedded) {
       steps.push({ kind: "warmup", display: "Settle", label: "Settle — " + p.instruction,
@@ -15483,14 +15606,14 @@ function onGpsPos(pos) {
     if (credit > spdCap) { credit = spdCap; D.capped++; }
   }
   LIVE.dist += credit;
-  // \u26a0\ufe0f AND WHEN. A route of bare coordinates cannot become a Strava activity: without a time
+  // ⚠️ AND WHEN. A route of bare coordinates cannot become a Strava activity: without a time
   // on each point there is no pace, no moving time and no splits, and the only way to supply them
   // afterwards is to spread the total evenly across the points -- which draws a perfectly even run
   // that never happened. This app refuses to fabricate data elsewhere (a simulated run is stamped
   // sim:true and skipped by every adaptive check) and it will not start here.
   // Stored as SECONDS SINCE THE RUN STARTED, not a full timestamp: the route is already the largest
   // field on a run, and a small integer per point costs a fraction of a 13-digit one.
-  // \u26a0\ufe0f liveElapsedMs(), NOT Date.now() minus a start -- it already subtracts paused time, so a
+  // ⚠️ liveElapsedMs(), NOT Date.now() minus a start -- it already subtracts paused time, so a
   // runner who stops at a crossing does not get a straight line through the junction at walking pace.
   // "LIVE.startedMs" does not exist; the field is LIVE.startMs and using it raw would count pauses.
   //
@@ -15962,7 +16085,7 @@ function paceChartSvg(a) {
   const iw = W - L - R, ih = H - T - B;
   let lo = a.fastest, hi = a.slowest;
   if (a.band) { lo = Math.min(lo, a.band.minSecPerKm); hi = Math.max(hi, a.band.maxSecPerKm); }
-  // \u26a0\ufe0f THE PADDING EXISTS TO KEEP THE TARGET BAND IN FRAME. With no band there is nothing to
+  // ⚠️ THE PADDING EXISTS TO KEEP THE TARGET BAND IN FRAME. With no band there is nothing to
   // keep in frame, and 25% either side left the line using under a quarter of the chart's height.
   const pad = a.band ? Math.max(12, (hi - lo) * 0.25) : Math.max(5, (hi - lo) * 0.12);
   lo -= pad; hi += pad;
@@ -15975,7 +16098,7 @@ function paceChartSvg(a) {
     out += '<text x="' + (L - 5) + '" y="' + (yTop + 3).toFixed(1) + '" class="pc-ax">' + fmtPace(a.band.minSecPerKm) + '</text>';
     out += '<text x="' + (L - 5) + '" y="' + (yBot + 3).toFixed(1) + '" class="pc-ax">' + fmtPace(a.band.maxSecPerKm) + '</text>';
   }
-  // \u26a0\ufe0f A SHAPE WITH NO SCALE MEANS NOTHING. The y labels were drawn only inside the band
+  // ⚠️ A SHAPE WITH NO SCALE MEANS NOTHING. The y labels were drawn only inside the band
   // branch, so a run by feel got a line floating in an empty box -- you could not tell whether that
   // dip was two seconds or two minutes, and 34px of gutter sat reserved for labels nobody drew.
   if (!a.band) {
@@ -16017,10 +16140,10 @@ function splitsVsTargetHtml(a) {
     ? '<div class="sv-legend">Target <b>' + fmtPace(a.band.minSecPerKm) + "\\u2013" + fmtPace(a.band.maxSecPerKm) + '</b>/km \\u00b7 ' + a.inBand + ' of ' + a.n + ' on target</div>'
     : a.mixed
     ? '<div class="sv-legend">' + (a.mixKind === "walk"
-        ? "This one alternates running and walking, so each kilometre mixes the two \\u2014 there is no single pace to hold it to. The running itself had a target."
-        : "The efforts and their recoveries share each kilometre, so a split averages the two \\u2014 there is no single pace to hold it to. Each repetition had a target.") + '</div>'
-    : '<div class="sv-legend">This session had no set pace \\u2014 judged on feel.</div>';
-  // \u26a0\ufe0f THE HEADING FOLLOWS THE SAME FACT THE BODY DOES. "Splits vs target" sat directly above
+        ? "This one alternates running and walking, so each kilometre mixes the two \— there is no single pace to hold it to. The running itself had a target."
+        : "The efforts and their recoveries share each kilometre, so a split averages the two \— there is no single pace to hold it to. Each repetition had a target.") + '</div>'
+    : '<div class="sv-legend">This session had no set pace \— judged on feel.</div>';
+  // ⚠️ THE HEADING FOLLOWS THE SAME FACT THE BODY DOES. "Splits vs target" sat directly above
   // "This session had no set pace -- judged on feel", so the card contradicted itself in two lines.
   const title = a.band ? "Splits vs target" : "Your splits";
   return '<div class="card"><div class="subhead" style="margin-top:0">' + title + '</div>' + head + rows + '</div>';
@@ -16033,11 +16156,11 @@ function debriefParagraphs(run, a) {
 
   if (a.band && a.n) {
     if (a.inBand === a.n) {
-      p.push("Every kilometre landed inside the target band. That is the hardest part of this session and you did it \\u2014 controlled running is a skill, and it shows here.");
+      p.push("Every kilometre landed inside the target band. That is the hardest part of this session and you did it \— controlled running is a skill, and it shows here.");
     } else if (a.inBand >= Math.ceil(a.n * 0.6)) {
       p.push(kmWord(a.inBand) + " of " + a.n + " sat inside the target band, so the shape of the session was right even where the pace wandered.");
     } else if (a.fast > a.slow) {
-      p.push("Most of this one ran quicker than the plan asked \\u2014 " + kmWord(a.fast) + " under the band. It feels productive, but on an easy session the cost lands on the days that are meant to be hard.");
+      p.push("Most of this one ran quicker than the plan asked \— " + kmWord(a.fast) + " under the band. It feels productive, but on an easy session the cost lands on the days that are meant to be hard.");
     } else if (a.slow > 0) {
       p.push(kmWord(a.slow) + " came in slower than the band. Worth knowing whether that was the legs, the route, or the weather before reading anything into it.");
     }
@@ -16045,23 +16168,23 @@ function debriefParagraphs(run, a) {
     // ⚠️ NOT "a run by feel". These sessions are prescribed to the second; it is the KILOMETRE that
     // cannot judge them, because each one contains both the work and the recovery between it.
     p.push(a.mixKind === "walk"
-      ? "Running and walking in the same kilometre means a split cannot say much \\u2014 what matters here is that the running stayed easy enough to talk through, and that you got round the whole set."
-      : "Efforts and recoveries land in the same kilometre here, so a split averages the two and cannot tell you much \\u2014 the repetitions themselves are what this session was about.");
+      ? "Running and walking in the same kilometre means a split cannot say much \— what matters here is that the running stayed easy enough to talk through, and that you got round the whole set."
+      : "Efforts and recoveries land in the same kilometre here, so a split averages the two and cannot tell you much \— the repetitions themselves are what this session was about.");
   } else if (a.n) {
-    p.push("A run by feel, so there is no band to judge it against \\u2014 but the splits are here if you want to see how it flowed.");
+    p.push("A run by feel, so there is no band to judge it against \— but the splits are here if you want to see how it flowed.");
   }
 
   if (a.progressive) {
     p.push("You finished faster than you started, by about " + a.shiftSec + " seconds a kilometre. Starting steady and letting the pace come to you is exactly the habit that makes long runs work.");
   } else if (a.faded) {
-    p.push("The pace drifted off by roughly " + Math.abs(a.shiftSec) + " seconds a kilometre towards the end. That usually means the opening was a shade quick rather than that you ran out of fitness \\u2014 try setting off slower than feels right next time.");
+    p.push("The pace drifted off by roughly " + Math.abs(a.shiftSec) + " seconds a kilometre towards the end. That usually means the opening was a shade quick rather than that you ran out of fitness \— try setting off slower than feels right next time.");
   }
 
   if (a.rpe && a.rband) {
     if (a.rpe > a.rband.max) {
       p.push("You rated it " + a.rpe + " out of 10 when it was meant to feel about " + a.rband.min + "\\u2013" + a.rband.max + ". One session like that is just a day; if it happens again we will look at the plan.");
     } else if (a.rpe < a.rband.min) {
-      p.push("It felt easier than intended \\u2014 " + a.rpe + " against a planned " + a.rband.min + "\\u2013" + a.rband.max + ". Keep that in your pocket; it is the sort of thing that says a step up is coming.");
+      p.push("It felt easier than intended \— " + a.rpe + " against a planned " + a.rband.min + "\\u2013" + a.rband.max + ". Keep that in your pocket; it is the sort of thing that says a step up is coming.");
     } else {
       // ⚠️ ONLY CLAIM PACE AGREEMENT WHEN A PACE WAS ACTUALLY JUDGED. This line fired on every run
       // whose effort landed in band, including runs with no pace band at all — a free run, a
@@ -16110,7 +16233,7 @@ function runDebrief(run, pre) {
  * otherwise it is not there." Before this the screen stacked a pace chart, a splits table and a
  * heart-rate panel whether or not anybody wanted them, each a slab to scroll past to reach the notes.
  *
- * \u26a0\ufe0f A STAT IS ONLY TAPPABLE WHEN THERE IS SOMETHING BEHIND IT. A chevron that opens an empty
+ * ⚠️ A STAT IS ONLY TAPPABLE WHEN THERE IS SOMETHING BEHIND IT. A chevron that opens an empty
  * sheet is worse than a plain number, so availability is computed from the run rather than assumed:
  * under two splits there is no pace detail, and with no beats and no zones there is no heart detail.
  */
@@ -16243,7 +16366,7 @@ function runNoteHtml(run) {
 // what you read thirty seconds after a run is exactly what you read a month later.
 /**
  * Which trainers this run was in.
- * \u26a0\ufe0f ON AN UNSAVED RUN THE CHOICE PARKS ON LIVE.summary, exactly as the note and the effort
+ * ⚠️ ON AN UNSAVED RUN THE CHOICE PARKS ON LIVE.summary, exactly as the note and the effort
  * rating do. liveRunRecord rebuilds the record on every render of the finish screen, so anything
  * written onto the record itself is gone by the next tick -- and the runner would have picked their
  * shoes, watched it stick, and saved a run credited to the wrong pair.
@@ -16259,7 +16382,7 @@ function runShoeHtml(run) {
   const list = loadShoes().filter((x) => !x.retiredIso);
   if (!list.length) {
     return '<div class="card sh-pick"><div class="ui-eyebrow">Trainers</div>' +
-      '<p class="sh-none">No trainers in your rack yet \u2014 add a pair and every run you log will count towards them.</p>' +
+      '<p class="sh-none">No trainers in your rack yet — add a pair and every run you log will count towards them.</p>' +
       '<button class="perf-a" id="shoeAdd">Open the shoe rack \u203a</button></div>';
   }
   const cur = runShoeChoice(run);
@@ -16279,7 +16402,7 @@ function openRunStat(kind) {
   if (!run) return;
   const a = runAnalysis(run);
   let body = "";
-  // \u26a0\ufe0f NO HEADING OF MY OWN. Both panels already carry one, so adding an eyebrow above them
+  // ⚠️ NO HEADING OF MY OWN. Both panels already carry one, so adding an eyebrow above them
   // printed "HEART RATE" twice, one above the other. The chart is the exception -- it has never had a
   // heading of its own, so it keeps the card that used to supply it.
   if (kind === "pace") {
@@ -16665,7 +16788,7 @@ const RD_STRAVA = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.4 2 
 function rdIdentityHtml(run) {
   const rows = [];
   const chip = run.type ? '<span class="rd-id-dot" style="background:var(--eff-' +
-    effortOf({ type: run.type, intensity: run.type === "vo2" || run.type === "threshold" || run.type === "race-specific" ? "hard" : undefined }) + ')"></span>' : "";
+    runEffort(run) + ')"></span>' : "";
   rows.push('<div class="rd-id-r">' + chip + '<span class="rd-id-t">' +
     esc(SESSION_LABEL[run.type] || "Run") + '</span><span class="rd-id-s">· ' + esc(run.dist || "") + '</span></div>');
   const when = rdWhenText(run);
@@ -18439,7 +18562,7 @@ function rdShareHtml(run) {
 
 function runOverviewHtml(run) {
   const a = runAnalysis(run);
-  const sc = run.type ? "var(--eff-" + effortOf({ type: run.type, intensity: run.type === "vo2" || run.type === "threshold" || run.type === "race-specific" ? "hard" : undefined }) + ")" : "var(--accent)";
+  const sc = run.type ? "var(--eff-" + runEffort(run) + ")" : "var(--accent)";
   const head = (run.t || run.d)
     ? '<div class="ov-head">' + (run.t ? '<div class="ov-t">' + esc(run.t) + '</div>' : "") +
         '<div class="ov-meta">' +
@@ -18451,7 +18574,7 @@ function runOverviewHtml(run) {
     head + ovStatsHtml(run, a) + '</div>' +
     '<button class="primary share-btn" id="shareRun">' + ICON.share + ' Share my run</button>' +
     stravaRunButtonHtml(run) +
-    // \u26a0\ufe0f THE PACE CHART, THE SPLITS AND THE HEART-RATE PANEL NO LONGER STACK HERE. Each is
+    // ⚠️ THE PACE CHART, THE SPLITS AND THE HEART-RATE PANEL NO LONGER STACK HERE. Each is
     // reached by tapping the stat it belongs to. What is left is his list: share, the written
     // debrief, the stretch offer, what the plan asked for, trainers, notes, effort.
     runDebrief(run, a) +
@@ -18832,10 +18955,61 @@ function lsText(g, text, x, y, sp, align) {
  * four references puts a badge on the card at all. If a template ever wants the mark, the route is
  * shareMarkImage(), which rasterises the real BRAND_SVG.
  */
-function shareWordmark(g, x, y, size, align) {
+/**
+ * THE WORDMARK'S OWN TREATMENT, WHICH IS WHAT REPLACED THE FADE ACROSS THE TOP OF THE CARD.
+ *
+ * The owner, 2026-08-20: "i don't want the fade at the top of the card. again, i dont mind if there is
+ * something that sits underneath the Inte-Run logo". So the full-width top scrim is gone and the only
+ * thing left in that band carries its own edge.
+ *
+ * ⚠️ THIS REOPENS A MEASURED DEFECT AND IT HAD TO BE MEASURED AGAIN. The scrim was made full width
+ * precisely because the accent half of the wordmark measured 2.09:1 over a field of small white specks:
+ * the alpha was solved from a tenth-scale probe, the specks averaged away, no scrim was drawn at all,
+ * and a glyph landed on white. A narrower rect is not the answer — it passed on one aspect and failed on
+ * another purely by luck of which probe cells caught a highlight. A KEYLINE is the answer, because it
+ * does not depend on sampling the ground at all: the glyph is defined by its own edge, so there is
+ * nothing for a probe to get wrong.
+ *
+ * ⚠️ IT IS A KEYLINE AND A HALO, NEVER A PLATE. A plate behind the wordmark is a scrim the width of the
+ * wordmark, which is the thing being removed. This is the device shareRouteDraw has always used for the
+ * route line and shareChartMarker for the chart's marks — a deep ink outline under warm-white — recovered
+ * from the transparent sticker's own type treatment, which needed exactly this for exactly this reason.
+ *
+ * ⚠️ THE STACK IS HALO, KEYLINE, GLYPH, AND GETTING THAT ORDER WRONG COSTS THE KEYLINE A THIRD OF ITS
+ * STRENGTH. Measured on the sticker: with the halo painted over the keyline, strengthening the halo made
+ * the type WORSE (0.45 to 0.75 took the small type's edge contrast 5.45 to 4.69), which is what two
+ * fighting effects look like. There the fill went first and the keyline was composited UNDER it with
+ * destination-over; here the canvas is opaque — a photograph — so destination-over would paint the
+ * keyline behind the picture and it would not exist. Stroking FIRST and filling over it produces the
+ * identical stack, because a shadow is cast behind its own shape within one operation: the halo lands
+ * under the keyline, and the fill lands over both.
+ *
+ * ⚠️ BOTH RUNS ARE STROKED BEFORE EITHER IS FILLED. "Inte-" and "Run" are drawn as two runs, so
+ * stroking and filling each in turn would let the R's keyline bite into the hyphen's right-hand edge —
+ * the same one-character-at-a-time hazard the sticker's note records.
+ *
+ * ⚠️ AND THE BLUR IS SCALED BY THE DRAW SCALE. Chrome does not scale shadowBlur by the current
+ * transform, so a preview drawn at half scale would carry twice the halo the export does — and the
+ * preview is the thing the runner approves.
+ */
+const SHARE_WM_EDGE = { key: 0.13, keyMin: 3, halo: "rgba(2,10,8,.45)", blur: 9 };
+function shareWordmark(g, x, y, size, align, edge) {
   g.font = shareFont(800, size);
   const w1 = g.measureText("Inte-").width, w2 = g.measureText("Run").width;
   const left = align === "right" ? x - (w1 + w2) : align === "center" ? x - (w1 + w2) / 2 : x;
+  if (edge > 0) {
+    const sc = g.shadowColor, sb = g.shadowBlur, ss = g.strokeStyle;
+    const lw = g.lineWidth, lj = g.lineJoin, lc = g.lineCap;
+    g.shadowColor = SHARE_WM_EDGE.halo; g.shadowBlur = SHARE_WM_EDGE.blur * edge;
+    g.shadowOffsetX = 0; g.shadowOffsetY = 0;
+    g.strokeStyle = SHARE_INK.keyline;
+    g.lineWidth = Math.max(SHARE_WM_EDGE.keyMin, size * SHARE_WM_EDGE.key);
+    g.lineJoin = "round"; g.lineCap = "round";
+    g.strokeText("Inte-", left, y);
+    g.strokeText("Run", left + w1, y);
+    g.shadowColor = sc; g.shadowBlur = sb; g.strokeStyle = ss;
+    g.lineWidth = lw; g.lineJoin = lj; g.lineCap = lc;
+  }
   g.fillStyle = SHARE_INK.ink; g.fillText("Inte-", left, y);
   g.fillStyle = SHARE_INK.accent; g.fillText("Run", left + w1, y);
   return w1 + w2;
@@ -19708,6 +19882,21 @@ function shareLumOfByte(v) { return shareRelLumRGB([v, v, v]); }
 function shareGroundRGB(v) {
   return Array.isArray(v) ? [v[0], v[1], v[2]] : [v, v, v];
 }
+/**
+ * THE GROUND UNDER A RECT, WHICHEVER GROUND THIS CARD ACTUALLY HAS.
+ *
+ * ⚠️ shareGroundUnder ANSWERS WHITE WHEN IT CANNOT LOOK, and that is right for a photograph we hold but
+ * cannot sample — fail towards protecting the ink — and wrong for a card that has no photograph at all,
+ * where the ground is known exactly. Left unfixed, every no-photo card thickened the route\u2019s deep
+ * keyline to its bright-ground weight over a ground whose lightest pixel is 0.125.
+ * ⚠️ THE TOP STOP, NOT THE STOP AT THE RECT\u2019S OWN y. It is the brightest the ground gets anywhere on the
+ * card, so reading it is the conservative answer, and it cannot go stale against a change of gradient.
+ */
+function shareRectGroundRGB(m, probe, gm, rect) {
+  if (probe) return shareGroundUnder(probe, gm, rect);
+  const hex = shareEffortHex(m && m.effort);
+  return shareHexRGB(hex ? shareGroundStops(hex)[0] : SHARE_INK.ground);
+}
 function shareRatio(la, lb) {
   const hi = Math.max(la, lb), lo = Math.min(la, lb);
   return (hi + 0.05) / (lo + 0.05);
@@ -19979,62 +20168,126 @@ function sharePhotoScrim(g, gm, probe, blockTop, colours) {
  * So the last stop above the rect's own bottom edge IS the solved alpha, and everything above it is
  * stronger; the fade to nothing happens entirely below the copy.
  */
-/**
- * ⚠️ A SCRIM PAINTED ACROSS THE WHOLE WIDTH MUST BE SOLVED ACROSS THE WHOLE WIDTH, AND SOLVING IT FROM
- * THE WORDMARK'S OWN 146px RECT SHIPPED A 2.09:1 ON THE BRAND MARK.
- *
- * Found at 1:1, and it was never a square defect — it is this sampler's oldest fragility, which the
- * square merely arranged to expose. In contain mode a portrait photograph on a square card is inset
- * 180px from each side, so the wordmark BEGINS in the blurred surround and crosses into the sharp
- * picture: "Inte-" lands on the dark band (measured 18.64:1) and "Run" straddles the seam. Over the
- * SPARK ground — a dark field of 3px pure-white specks, built precisely to defeat a probe-solved
- * scrim — the brightest of the three or four probe cells that fell on the picture averaged those specks
- * away, the solver was handed 13/21/20, no scrim was drawn at all, and the accent half of the wordmark
- * came out at 2.09:1 against a glyph sitting on a white speck.
- *
- * ⚠️ THE SAME 146px SAMPLE PASSED ON A FEED POST AND FAILED ON A SQUARE BY LUCK, WHICH IS THE REAL
- * FINDING. Identical rect, identical ground, identical probe: the feed's picture starts 90px in so
- * twelve probe cells fell on it and one of them caught a speck (255/255/255, alpha 0.6/0.8, 5.19:1);
- * the square's starts 180px in so only three or four did and none caught one. A guard that depends on
- * how many cells happened to land on a highlight is not a guard.
- *
- * ⚠️ SO THE SAMPLE IS NOW THE STRIP THE SCRIM ACTUALLY COVERS, edge to edge at the wordmark's own
- * height. It is the same probe and the same solver — no new pixels are read and nothing is allocated —
- * and it can only ever raise the sampled ground, so the change is one-way towards more protection. It
- * also removes the luck: the sample goes from about fifteen probe cells to the full width of them.
- *
- * ⚠️ IT COSTS SOME PICTURE ON A PHOTOGRAPH THAT IS BRIGHT WHERE NO TYPE SITS, and that is the deliberate
- * trade rather than an oversight — a bright right-hand sky now darkens a top-left wordmark's band too.
- * The alternative is a scrim whose strength depends on which 13% of the strip the wordmark happens to
- * occupy, which is what produced the 2.09. Measured over the thirteen hostile grounds, four templates,
- * three aspects and both fit modes — 4472 measured glyph runs — 66 of them move and every single one
- * moves UP; four grounds are affected at all, and the story's and feed post's own contrast floors are
- * unchanged at 4.96 and 4.93. The square's contain-mode floor goes 2.09 to 4.73, and nothing anywhere
- * is under 4.5.
- */
-function shareTopScrim(g, gm, probe, rect, colours) {
-  // ⚠️ THE SAME GATE AS sharePhotoScrim, FOR THE SAME REASON, AND IT LIVES IN THE FUNCTION RATHER THAN
-  // AT THE CALL SITES. The poster used to omit this call by hand because it never had a photograph; now
-  // that it can have one it calls it like the rest, and the flat-ground case is answered here once.
-  if (!probe) return { a: 0, step: "none", ground: null };
-  const band = shareRect(0, rect.y, gm.W, rect.h);
-  const ground = shareGroundUnder(probe, gm, band);
-  let a = 0;
-  for (const c of colours) a = Math.max(a, shareVeilAlphaFor(c.hex, ground, c.target));
-  const step = a <= 0.001 ? "none" : a <= 0.55 ? "veil" : a <= 0.82 ? "scrim" : "deep";
-  if (a <= 0.001) return { a: 0, step: step, ground: ground };
-  const foot = rect.y + rect.h + Math.round(gm.H * 0.06);
-  const at = Math.min(0.999, Math.max(0.001, (rect.y + rect.h) / foot));
-  const grad = g.createLinearGradient(0, 0, 0, foot);
-  grad.addColorStop(0, cardAlpha(SHARE_INK.ground, Math.min(0.98, a * 1.06)));
-  grad.addColorStop(at, cardAlpha(SHARE_INK.ground, a));
-  grad.addColorStop(1, cardAlpha(SHARE_INK.ground, 0));
-  g.fillStyle = grad; g.fillRect(0, 0, gm.W, foot);
-  return { a: a, step: step, ground: ground };
-}
 // ---- the ground, and the poster's texture --------------------------------------------------------
 /** Matte, edge to edge, no radial glows. The references' ground is one flat deep ink. */
 function shareGroundFill(g, gm) { g.fillStyle = SHARE_INK.ground; g.fillRect(0, 0, gm.W, gm.H); }
+/**
+ * THE SESSION'S OWN COLOUR, AS A GROUND (owner, 2026-08-20).
+ *
+ * "if they decide not to add a photo, the background needs to be the same colour as the run that
+ * they've done, e.g. an easy run is teale, a tempo is yellow etc". So a card with no photograph stops
+ * being one flat deep ink for every run and carries the effort colour the rest of the app already uses
+ * for that session.
+ *
+ * ⚠️ THE COLOURS ARE THE APP'S OWN TOKENS AND NOTHING HERE INVENTS ONE. --eff-easy, --eff-moderate and
+ * --eff-hard, at their DARK values, because this card is a dark design in both themes — SHARE_INK is
+ * already the dark token set throughout, and an export whose colour depended on the phone's theme would
+ * hand two runners different pictures of the same run. Which of the three a run gets is decided by
+ * runEffort, the same one mapping the Logbook row and the debrief chip read, so the card and the app can
+ * never disagree about what kind of session it was.
+ * ⚠️ CANVAS CANNOT READ A CUSTOM PROPERTY, so the value has to exist here as text: there is no
+ * getComputedStyle to ask, the export must not vary with the phone\u2019s theme, and the export harness runs
+ * the renderer in a page with no stylesheet at all. What stops the copy drifting is that
+ * test/share-render.test.ts parses --eff-easy, --eff-moderate and --eff-hard out of the stylesheet
+ * ITSELF — out of BOTH dark declarations, the prefers-color-scheme block and the data-theme="dark"
+ * block, which this project has already been bitten by treating as one — and asserts all three against
+ * these three. It was shipped for a day with a comment claiming that guard while none existed, which is
+ * the second time a comment in this area has promised a test that was never written; the guard now
+ * exists and was watched failing with SHARE_EFFORT.easy set to a blue.
+ *
+ * ⚠️ AND "none" IS DELIBERATELY ABSENT. effortOf answers "none" only for a rest or mobility day, neither
+ * of which is a run that can be logged or shared, and --eff-none is a desaturated sage grey — forcing it
+ * through the derivation below would turn "we do not know what this session was" into a confident green.
+ * A run with no type at all keeps the family's matte ink ground, unchanged, which is what it has always
+ * had.
+ */
+const SHARE_EFFORT = { easy: "#4cb98a", moderate: "#e6ac3e", hard: "#e56f49" };
+/** The effort colour a model's session gets, or null for the plain ink ground. */
+function shareEffortHex(effort) { return SHARE_EFFORT[effort] || null; }
+/**
+ * HEX TO HSL AND BACK, WHICH IS THE ONLY SPACE THE DERIVATION BELOW CAN BE WRITTEN IN.
+ *
+ * ⚠️ A PLAIN sRGB MIX TOWARDS THE INK GROUND WAS TRIED FIRST AND IT MOVES THE HUE. #06110e has more
+ * green in it than red, so mixing a warm amber into it at any strength drags the result towards olive:
+ * measured, --eff-moderate at an 18% mix comes out rgb(46,45,23), whose red and green channels are one
+ * unit apart — a colour with no hue left to read. Preserving the hue and imposing a lightness is the
+ * whole point, and that is an HSL operation.
+ */
+function shareHexHSL(hex) {
+  const c = shareHexRGB(hex).map((v) => v / 255);
+  const mx = Math.max(c[0], c[1], c[2]), mn = Math.min(c[0], c[1], c[2]);
+  const l = (mx + mn) / 2, d = mx - mn;
+  if (d < 1e-9) return { h: 0, s: 0, l: l };
+  const sat = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+  let h;
+  if (mx === c[0]) h = ((c[1] - c[2]) / d + (c[1] < c[2] ? 6 : 0));
+  else if (mx === c[1]) h = (c[2] - c[0]) / d + 2;
+  else h = (c[0] - c[1]) / d + 4;
+  return { h: h * 60, s: sat, l: l };
+}
+function shareHSLHex(h, sat, l) {
+  const c = (1 - Math.abs(2 * l - 1)) * sat, hp = ((h % 360) + 360) % 360 / 60;
+  const x = c * (1 - Math.abs((hp % 2) - 1)), m = l - c / 2;
+  const t = hp < 1 ? [c, x, 0] : hp < 2 ? [x, c, 0] : hp < 3 ? [0, c, x]
+    : hp < 4 ? [0, x, c] : hp < 5 ? [x, 0, c] : [c, 0, x];
+  const b = t.map((v) => Math.max(0, Math.min(255, Math.round((v + m) * 255))));
+  return "#" + b.map((v) => (v < 16 ? "0" : "") + v.toString(16)).join("");
+}
+/**
+ * THE GROUND'S OWN NUMBERS, AND EVERY ONE OF THEM IS A MEASUREMENT.
+ *
+ * ⚠️ A FLAT FILL OF A SATURATED COLOUR IS NOT A DESIGN, AND IT IS ALSO NOT LEGIBLE. --eff-moderate is
+ * #e6ac3e: warm-white type on it measures 1.13:1, and the faint metric-label tier 1.35:1. The card would
+ * be unreadable and it would not look like this family. So the hue is kept and the LIGHTNESS is imposed,
+ * which is what turns "the colour of the run" into a ground the existing type ladder can stand on.
+ *
+ * ⚠️ ONE SATURATION FOR ALL THREE, SO HUE IS THE ONLY THING THAT VARIES BETWEEN THE CARDS. The three
+ * tokens sit at 44%, 77% and 75% saturation; carried through, an easy card would read as a noticeably
+ * duller object than a tempo one, and the family is meant to differ in what the run WAS rather than in
+ * how vivid the design is.
+ *
+ * ⚠️ THE GRADIENT IS VERTICAL AND DEEPENS DOWNWARD, WHICH IS THE SAME GESTURE THE PHOTO CARDS MAKE.
+ * Every template puts its information block at the bottom, and on a photograph that block sits on a
+ * solved gradient scrim — so a ground that deepens towards it is the flat-ground answer to the same
+ * problem, and the two grounds then read as one family rather than as two designs. It is a linear
+ * gradient, not a radial glow: this file's own ground rule and the brief both forbid those.
+ *
+ * ⚠️ 0.125 AT THE TOP IS A MEASURED CEILING, NOT A TASTE — AND THE CEILING IS TIGHTER THAN THIS COMMENT
+ * FIRST CLAIMED. It said the honest ceiling was between 0.145 and 0.165; re-derived against the FAINTEST
+ * tier (--ink-faint, the metric labels) on the ground\u2019s own top stop, --ink-faint runs
+ * 5.17 : 4.70 : 4.25 : 3.86 : 3.53 across 0.105 / 0.125 / 0.145 / 0.165 / 0.185, so 0.145 is ALREADY
+ * under AA and the real ceiling sits between 0.125 and 0.145. The shipped value carries 0.20 of margin
+ * on the tightest tier there is, which is exactly why it is the shipped value.
+ * ⚠️ AND IT IS GUARDED RATHER THAN REMEMBERED. test/share-render.test.ts drives shareGroundStops through
+ * the real ratio arithmetic for all three effort colours and every text tier, so raising this constant
+ * fails a test instead of quietly shipping small type at 2.57:1 — which is what 0.30 measures, and what
+ * passed 960 green before the guard existed.
+ *
+ * ⚠️ AND A TEMPO CARD CANNOT BE MADE TO READ AS LITERALLY YELLOW. #e6ac3e at a lightness this type ladder
+ * can stand on is a deep bronze; carrying warm-white type on the token itself measures 1.13:1. The card
+ * says "this was a tempo" by hue, which is what the app's own colour language says everywhere else.
+ */
+const SHARE_GROUND = { lTop: 0.125, lBot: 0.072, sat: 0.60 };
+/** The two stops of a session ground, hue kept, lightness and saturation imposed. */
+function shareGroundStops(hex) {
+  const c = shareHexHSL(hex);
+  return [shareHSLHex(c.h, SHARE_GROUND.sat, SHARE_GROUND.lTop),
+    shareHSLHex(c.h, SHARE_GROUND.sat, SHARE_GROUND.lBot)];
+}
+/**
+ * ⚠️ NULL PAINTS EXACTLY WHAT shareGroundFill ALWAYS PAINTED, BYTE FOR BYTE. A run with no session type
+ * is the one case that reaches it, and it must keep the ground it has always had rather than acquiring a
+ * gradient nobody asked for — which is also what makes the change provable: an export with no effort is
+ * unchanged and an export with one is not.
+ */
+function shareGroundPaint(g, gm, hex) {
+  if (!hex) return shareGroundFill(g, gm);
+  const st = shareGroundStops(hex);
+  const grad = g.createLinearGradient(0, 0, 0, gm.H);
+  grad.addColorStop(0, st[0]);
+  grad.addColorStop(1, st[1]);
+  g.fillStyle = grad; g.fillRect(0, 0, gm.W, gm.H);
+}
 /**
  * THE ROUTE POSTER'S TOPOGRAPHIC TEXTURE, GENERATED HERE, FROM NOTHING.
  *
@@ -20081,8 +20334,13 @@ function shareTopoField(gx, gy, seed) {
   };
   return 0.55 * octave(gx, gy, 0.055) + 0.30 * octave(gx, gy, 0.13) + 0.15 * octave(gx, gy, 0.31);
 }
-function shareTopoCanvas(W, H) {
-  const key = W + "x" + H;
+function shareTopoCanvas(W, H, stroke) {
+  // ⚠️ THE STROKE COLOUR IS PART OF THE KEY, AND LEAVING IT OUT IS THE [object Object] FAULT THIS FILE
+  // ALREADY RECORDS CATCHING ONCE. The contour lines carry the session's colour now, so a runner who
+  // opened an easy run and then a tempo one would have been handed the first card's teal contours over
+  // the second card's amber ground for the rest of the session — one cache entry, whichever drew first
+  // winning, and nothing anywhere to point at.
+  const key = W + "x" + H + "|" + stroke;
   if (SHARE_TOPO_KEY === key && SHARE_TOPO_C) return SHARE_TOPO_C;
   const c = document.createElement("canvas");
   c.width = W; c.height = H;
@@ -20090,7 +20348,7 @@ function shareTopoCanvas(W, H) {
   const cs = SHARE_TOPO.cells, cols = Math.ceil(W / cs) + 1, rows = Math.ceil(H / cs) + 1;
   const f = new Float32Array(cols * rows);
   for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) f[j * cols + i] = shareTopoField(i, j, SHARE_TOPO.seed);
-  g.strokeStyle = cardAlpha(SHARE_INK.inkSoft, SHARE_TOPO.alpha);
+  g.strokeStyle = stroke;
   g.lineWidth = SHARE_TOPO.lw; g.lineCap = "round"; g.lineJoin = "round";
   g.beginPath();
   for (let L = 1; L <= SHARE_TOPO.levels; L++) {
@@ -20118,8 +20376,33 @@ function shareTopoCanvas(W, H) {
   SHARE_TOPO_KEY = key; SHARE_TOPO_C = c;
   return c;
 }
-function shareTopoDraw(g, gm) {
-  try { g.drawImage(shareTopoCanvas(gm.W, gm.H), 0, 0); }
+/**
+ * ⚠️ THE CONTOURS CARRY THE SESSION'S COLOUR, AND THAT IS WHERE THE CHROMA COMES FROM. The ground itself
+ * cannot be lifted far enough to read as a hue without taking the faintest type tier under 4.5:1 (see
+ * SHARE_GROUND) — but a field of several hundred thin session-coloured lines over a deep ground of the
+ * same hue reads unmistakably as that colour, at a fraction of the luminance a paler fill would cost. It
+ * also makes the texture MEAN something rather than being ornament, which is the answer to the owner's
+ * "the topographic texture should survive": it does not merely survive, it is now the thing doing the
+ * work.
+ *
+ * ⚠️ AND IT IS SHARE_TOPO.alpha, THE SAME 0.13 THE INK CONTOURS HAVE ALWAYS USED, RATHER THAN A SECOND
+ * CONSTANT. Swept 0.10 / 0.13 / 0.16 / 0.20 / 0.26 and looked at each: the CHROMA barely moves across
+ * that whole range, because the hue is carried by the ground and the lines are thin — what moves is the
+ * lightest ground pixel a glyph can land on, and with it the tightest text tier. Measured on the easy
+ * ground, the accent runs 5.57 : 5.28 : 4.99 : 4.65 : 4.15 across those five, so 0.26 is under AA and
+ * 0.20 has almost no margin. At 0.13 the line-to-ground ratio comes out 1.20 to 1.28:1 on the three
+ * grounds against the reference poster's own 1.23:1, so the texture is exactly as subtle as it has always
+ * been and only its hue has changed — which is why there is no new number here to drift.
+ *
+ * ⚠️ AND WITH NO SESSION COLOUR IT IS EXACTLY WHAT IT ALWAYS WAS — --ink-soft at SHARE_TOPO.alpha, so the
+ * poster a run with no type draws is unchanged down to the byte.
+ */
+function shareTopoDraw(g, gm, hex) {
+  // ⚠️ NAMED, BECAUSE BOTH BRANCHES ARE PALETTE TOKENS AND THE GUARD HAS TO BE ABLE TO SAY SO. SHARE_INK
+  // and SHARE_EFFORT are the two tables; nothing else may reach a stroke on this card.
+  const tok = hex || SHARE_INK.inkSoft;
+  const stroke = cardAlpha(tok, SHARE_TOPO.alpha);
+  try { g.drawImage(shareTopoCanvas(gm.W, gm.H, stroke), 0, 0); }
   catch (e) { PHOTODIAG.err = "topo: " + (e && e.message); }
 }
 // ---- the route ----------------------------------------------------------------------------------
@@ -20316,10 +20599,21 @@ function shareLsFit(g, text, boxW, opt) {
  * everybody except the scorer. Returning the rect means the route, the scrim and the poster's own field
  * all ask the same question of the same numbers.
  */
-function shareWordmarkPlan(g, gm) {
+/**
+ * ⚠️ THE EDGE DECISION IS MADE ONCE, HERE, AND TRAVELS ON THE PLAN. Five templates draw the wordmark and
+ * every one of them would otherwise have to remember the same two-part condition; a fifth that forgot it
+ * would ship an untreated wordmark over a photograph, which is the 2.09:1 defect coming back on one
+ * template only. The value is the DRAW SCALE, because the halo needs it — see shareWordmark.
+ *
+ * ⚠️ AND IT IS OFF WHEN THERE IS NO PHOTOGRAPH. On the family's own grounds the wordmark measures 11.0
+ * to 19.4:1, so a keyline there buys nothing and slightly fattens the mark; the treatment exists for a
+ * ground the card cannot know, which is exactly the photograph case the probe is the presence test for.
+ */
+function shareWordmarkPlan(g, gm, edge) {
   const size = shareTypeSize("meta", gm.aspect) + 11;
   const y = gm.safe.y0 + Math.round(size * 0.78);
-  return { size: size, y: y, rect: shareRect(gm.M, y - size, shareWordmarkWidth(g, size), size * 1.25) };
+  return { size: size, y: y, edge: edge || 0,
+    rect: shareRect(gm.M, y - size, shareWordmarkWidth(g, size), size * 1.25) };
 }
 /**
  * WHAT THE HERO NUMBER IS — THE DISTANCE, AND WHERE THERE IS NONE, THE CLOCK.
@@ -20448,9 +20742,14 @@ function shareMetricDraw(g, gm, mets, P, yValue, yLabel, labelInk) {
     g.fillStyle = SHARE_INK.ink;
     cx += shareFig(g, st.v, cx, yValue, "left");
     // A small connective word between two figures — the poster's "6 OF 6" — set down a rung and in the
-    // faint tier, so the two numbers stay the thing the eye lands on.
+    // same quiet tier as the label under it, so the two numbers stay the thing the eye lands on.
+    // ⚠️ IT USED TO BE --ink-faint OUTRIGHT AND THAT WAS THE LAST TIER NOBODY GUARANTEED. shareScrimText
+    // solves the photo scrim for ink, accent and --ink-soft and has never named --ink-faint, so on a
+    // photograph this one word sat outside the solve; and on a session ground --ink-faint measures 3.83:1.
+    // Taking the caller's own quiet tier settles both at once — it is the colour of the label directly
+    // beneath it, which is the same role, so there was never a reason for a second answer here.
     if (st.mid) {
-      g.font = shareFont(700, P.unitS); g.fillStyle = SHARE_INK.inkFaint;
+      g.font = shareFont(700, P.unitS); g.fillStyle = labelInk;
       g.fillText(" " + st.mid + " ", cx, yValue); cx += mw;
       g.font = shareFont(800, vs); g.fillStyle = SHARE_INK.ink;
       cx += shareFig(g, st.v2, cx, yValue, "left");
@@ -20635,13 +20934,11 @@ function shareMomentCard(g, m, gm, probe, wm, box) {
       // ⚠️ JUDGED ON TRUE LUMINANCE, NOT ON A LUMA BYTE, for the reason at the top of the luminance
       // section: a saturated ground reads far darker as a weighted byte than it is. Mid grey is the
       // threshold and it is written as one, so the comparison means the same thing for any colour.
-      const bright = shareRelLumRGB(shareGroundUnder(probe, gm, zone.rect)) > shareLumOfByte(150);
+      const bright = shareRelLumRGB(shareRectGroundRGB(m, probe, gm, zone.rect)) > shareLumOfByte(150);
       shareRouteDraw(g, m.route, zone.rect, { padFrac: 0.06, keyK: bright ? 0.55 : 0.30 });
     }
   }
-  shareTopScrim(g, gm, probe, wm.rect,
-    [{ hex: SHARE_INK.ink, target: 4.5 }, { hex: SHARE_INK.accent, target: 4.5 }]);
-  shareWordmark(g, gm.M, wm.y, wm.size, "left");
+  shareWordmark(g, gm.M, wm.y, wm.size, "left", wm.edge);
   if (p.eye) {
     g.font = shareFont(800, p.eye.size); g.fillStyle = SHARE_INK.accent;
     lsText(g, p.eye.text, gm.M, p.eyeBase, p.eye.track, "left");
@@ -20792,9 +21089,26 @@ function sharePosterPlan(g, m, gm, wm) {
  * derivation read twice, because a palette that disagrees with the scrim solved for it is the whole
  * class of defect the solver exists to prevent.
  */
+/**
+ * THE QUIETEST TIER, WHICH IS LIFTED WHENEVER THE GROUND UNDER IT IS NOT THE PLAIN DEEP INK.
+ *
+ * ⚠️ --ink-faint IS 6.50:1 ON #06110e AND 3.83:1 ON A SESSION GROUND, MEASURED FROM RENDERED PIXELS.
+ * The session ground is lighter than the ink one by design, and its contour lines are lighter again —
+ * measured, the worst pixel under a faint glyph on the easy ground is #164230, not the #0d3323 the
+ * gradient stop names. So the tier that was comfortable on the matte ink ground is under AA on the
+ * coloured one, and the answer is the one this card already used for a photograph: step up to
+ * --ink-soft, which measures 5.35 to 6.74 across the three grounds.
+ *
+ * ⚠️ ONE RULE, ONE OWNER, AND THE CONDITION IS "IS THE GROUND KNOWN TO BE DEEP" RATHER THAN A LIST OF
+ * CASES. Written as two conditions at the call site it would be right until a third kind of ground
+ * arrived, and the failure is a tier that measures 3.8:1 on a picture that leaves the phone.
+ */
+function shareQuietInk(m) {
+  return (m.photo || shareEffortHex(m.effort)) ? SHARE_INK.inkSoft : SHARE_INK.inkFaint;
+}
 function sharePosterCard(g, m, gm, probe, wm) {
   const p = sharePosterPlan(g, m, gm, wm);
-  const quiet = m.photo ? SHARE_INK.inkSoft : SHARE_INK.inkFaint;
+  const quiet = shareQuietInk(m);
   // ⚠️ THE SCRIM COMES BEFORE THE ROUTE, so a route that dips into the fade stays crisp rather than
   // being dimmed with the picture — the ordering The Moment's own note records. With no photograph
   // sharePhotoScrim draws nothing at all: probe is null, which is not the same test as "the photograph
@@ -20817,12 +21131,7 @@ function sharePosterCard(g, m, gm, probe, wm) {
     shareRouteDraw(g, m.route, p.field,
       { padFrac: SHARE_POSTER_PAD, keyK: bright ? 0.55 : 0.30 });
   }
-  // ⚠️ AND THE TOP SCRIM IS THE FAMILY'S, GATED ON THE PROBE RATHER THAN ON THE TEMPLATE. It used to be
-  // absent from here by hand because there was never a photograph to protect the wordmark from; the gate
-  // now lives inside shareTopScrim, so a flat ground still gets nothing drawn.
-  shareTopScrim(g, gm, probe, wm.rect,
-    [{ hex: SHARE_INK.ink, target: 4.5 }, { hex: SHARE_INK.accent, target: 4.5 }]);
-  shareWordmark(g, gm.M, wm.y, wm.size, "left");
+  shareWordmark(g, gm.M, wm.y, wm.size, "left", wm.edge);
   if (p.eye) {
     g.font = shareFont(800, p.eye.size); g.fillStyle = SHARE_INK.accent;
     lsText(g, p.eye.text, gm.M, p.eyeBase, p.eye.track, "left");
@@ -21266,6 +21575,37 @@ function shareExecutionPlan(g, m, gm) {
     eye: eye, eyeBase: eyeBase, blockTop: eyeTop,
     date: date, dateBase: quiet.base, photoFrac: eyeTop / gm.H };
 }
+/**
+ * THE ROUTE IN A DATA TEMPLATE\u2019S OWN UPPER FIELD, AND ONLY WHERE THERE IS NO PHOTOGRAPH.
+ *
+ * ⚠️ MEASURED, NOT ADDED FOR DECORATION. With no photograph The Execution and The Progression put
+ * 44.4% and 42.4% of a story card into ONE continuous ink-free band, and their second quarter measured a
+ * per-quarter luminance sd of 0.0121 against the byte gate\u2019s own 0.012 emptiness bar — i.e. exactly on
+ * the line this project already drew once, in the workflow that rebuilt the recap over "46% empty". The
+ * route is the one true thing available to put there, and The Moment has always put it in the identical
+ * space, so this removes a difference between the templates rather than adding a variant.
+ *
+ * ⚠️ GATED ON THERE BEING NO PHOTOGRAPH, so every photo card is untouched down to the byte. Over a
+ * picture that field IS the picture, and the owner\u2019s ruling that the route may cross a photograph is
+ * already honoured by The Moment; giving the other two a second route over a photograph would change
+ * what a photo card looks like, which is not what this is for.
+ *
+ * ⚠️ THE ONLY TEXT IN THE REGION IS THE WORDMARK, which is why no plan change is needed. The scored
+ * region stops 32px above the block top, so every line of copy and every chart is already outside it.
+ *
+ * ⚠️ AND IT DOES NOTHING FOR A RUN WITH NEITHER A PHOTOGRAPH NOR A ROUTE — a treadmill run, or one whose
+ * GPS was refused, or one whose route the runner has hidden. That field stays a plain coloured ground,
+ * and it is stated rather than papered over: there is nothing true left to put there, and inventing
+ * something is what this project refuses everywhere else.
+ */
+function shareFieldRoute(g, m, gm, probe, wm, blockTop) {
+  if (probe || !m.route) return;
+  const zone = shareRoutePlacement(gm, { photoBox: null, top: gm.safe.y0, bottom: blockTop - 32,
+    textRects: [shareRectPad(wm.rect, 20)] });
+  if (!zone) return;
+  const bright = shareRelLumRGB(shareRectGroundRGB(m, probe, gm, zone.rect)) > shareLumOfByte(150);
+  shareRouteDraw(g, m.route, zone.rect, { padFrac: 0.06, keyK: bright ? 0.55 : 0.30 });
+}
 function shareExecutionCard(g, m, gm, probe, wm) {
   const p = shareExecutionPlan(g, m, gm);
   // ⚠️ THE SAME SCRIM The Moment USES, AND TWO MORE COLOURS BECAUSE THIS TEMPLATE DRAWS TWO MORE THINGS.
@@ -21292,9 +21632,8 @@ function shareExecutionCard(g, m, gm, probe, wm) {
   // not use it at all.
   sharePhotoScrim(g, gm, probe, p.blockTop, shareScrimText().concat(
     [{ hex: SHARE_INK.fast, target: 3.2 }, { hex: SHARE_INK.slow, target: 3.2 }]));
-  shareTopScrim(g, gm, probe, wm.rect,
-    [{ hex: SHARE_INK.ink, target: 4.5 }, { hex: SHARE_INK.accent, target: 4.5 }]);
-  shareWordmark(g, gm.M, wm.y, wm.size, "left");
+  shareFieldRoute(g, m, gm, probe, wm, p.blockTop);
+  shareWordmark(g, gm.M, wm.y, wm.size, "left", wm.edge);
   if (p.eye) {
     g.font = shareFont(800, p.eye.size); g.fillStyle = SHARE_INK.accent;
     lsText(g, p.eye.text, gm.M, p.eyeBase, p.eye.track, "left");
@@ -21567,9 +21906,8 @@ function shareProgressionCard(g, m, gm, probe, wm) {
   // bar is the accent and whose track is solved against the accent by construction (see the track's own
   // note), so there is no fourth colour to ask for and no reason to darken a photograph for one.
   sharePhotoScrim(g, gm, probe, p.blockTop, shareScrimText());
-  shareTopScrim(g, gm, probe, wm.rect,
-    [{ hex: SHARE_INK.ink, target: 4.5 }, { hex: SHARE_INK.accent, target: 4.5 }]);
-  shareWordmark(g, gm.M, wm.y, wm.size, "left");
+  shareFieldRoute(g, m, gm, probe, wm, p.blockTop);
+  shareWordmark(g, gm.M, wm.y, wm.size, "left", wm.edge);
   if (p.eye) {
     g.font = shareFont(800, p.eye.size); g.fillStyle = SHARE_INK.accent;
     lsText(g, p.eye.text, gm.M, p.eyeBase, p.eye.track, "left");
@@ -21618,30 +21956,32 @@ function shareProgressionCard(g, m, gm, probe, wm) {
   }
 }
 /**
- * THE STATE WITH NO TEMPLATE — no photograph, and no route to make a poster from.
+ * THE STATE WITH NO TEMPLATE — A TOTAL-FUNCTION SAFETY NET, AND NO LONGER THE "ADD A PHOTO" STATE.
  *
- * ⚠️ IT REPLACES THE OLD LEDGER CARD, WHICH IS THE COMPOSITION THE BRIEF EXISTS TO REMOVE. Reached by a
- * treadmill run, or any run whose GPS was refused, the moment the studio opens and before a photograph
- * is chosen: the three photo templates need one and the poster needs a route. Drawing the old card there
- * would keep exactly the framing, the empty upper region and the em-dash pace the brief names as defects.
+ * ⚠️ ITS OLD TRIGGER IS GONE. It used to be what a treadmill run met before a photograph was chosen,
+ * because the three photo templates were refused without one; ruling 7 removed that gate, so the only
+ * way to reach here now is a run carrying NEITHER a distance NOR a time — which the ingest gate on both
+ * devices already refuses, so in practice nobody sees it. It is kept rather than deleted for the same
+ * reason BEGINNER_LONG_KM keeps its marathon row: shareTemplateFor is allowed to answer null and
+ * something has to be drawn if it ever does. What is NOT kept is its old copy, which told the runner to
+ * add a photograph — an instruction that would now be a lie, because a photograph is optional on every
+ * card in the family.
  *
- * ⚠️ AND IT IS NOT AN EXPORT. prepareShareCard refuses to encode a card with no template, so this is a
- * preview state only — which is why it may carry an instruction, where an exported picture may not.
- * The spec's own words for this state are "show photo templates with tasteful placeholder CTA, never
- * stripes/blank corruption".
+ * ⚠️ IT IS NOT AN EXPORT. prepareShareCard refuses to encode a card with no template, so this is a
+ * preview state only — which is why it may carry a sentence, where an exported picture may not.
  *
- * ⚠️ IT PRINTS NO MEASUREMENTS. A placeholder carrying the run's distance and pace looks like a
- * finished card that has lost its photograph, and the runner would reasonably try to share it.
+ * ⚠️ IT PRINTS NO MEASUREMENTS, because there are none: a run with no distance and no time is exactly
+ * the run this state is for.
  */
 function sharePlaceholderCard(g, m, gm, wm) {
   const A = gm.aspect;
-  shareWordmark(g, gm.M, wm.y, wm.size, "left");
+  shareWordmark(g, gm.M, wm.y, wm.size, "left", wm.edge);
   const mid = Math.round(gm.H * 0.46);
-  const eye = shareLsFit(g, "ADD A PHOTO", gm.CW, { max: shareTypeSize("sub", A),
+  const eye = shareLsFit(g, "NOTHING TO SHOW", gm.CW, { max: shareTypeSize("sub", A),
     min: shareTypeSize("meta", A), weight: 800, track: SHARE_TRACK.eyebrow });
   g.font = shareFont(800, eye.size); g.fillStyle = SHARE_INK.accent;
   lsText(g, eye.text, gm.W / 2, mid, eye.track, "center");
-  const body = shareFit(g, "Choose a photograph and your card is built from it.",
+  const body = shareFit(g, "This run recorded no distance and no time, so there is nothing to build a card from.",
     Math.round(gm.CW * 0.86), { max: shareTypeSize("lead", A), min: shareTypeSize("meta", A),
       step: 1, weight: 600, lines: 3, lh: 1.3 });
   g.font = shareFont(600, body.size); g.fillStyle = SHARE_INK.inkSoft;
@@ -21674,20 +22014,26 @@ function shareDrawBody(g, m, gm, S) {
   // rounded corner, no stroked border and no radial glows: a matte ground, then the photograph over all
   // of it. The frame that used to live here is described in cardGeom's note, and the reason it went is
   // that it was the brief's first named defect.
-  shareGroundFill(g, gm);
+  // ⚠️ AND WITH NO PHOTOGRAPH THE GROUND IS THE SESSION'S OWN COLOUR (owner, 2026-08-20). Resolved ONCE
+  // here, so the fill and the contour lines that sit on it can never be handed two different answers —
+  // and null when there IS a photograph, which paints the same flat ink under it as it always did.
+  const ground = m.photo ? null : shareEffortHex(m.effort);
+  shareGroundPaint(g, gm, ground);
   const box = m.photo ? sharePhotoDraw(g, m.photo, gm) : null;
   // ⚠️ THE TOPOGRAPHIC TEXTURE IS THE GROUND'S OWN TREATMENT AND IT IS FOR A CARD WITH NO PHOTOGRAPH ON
   // IT — including The Route Poster's, which now takes a photograph when the runner gives it one. Drawn
   // under a picture it is invisible; drawn over one it would be a full-canvas translucent wash, which is
   // a scrim wearing a texture.
-  if (!m.photo) shareTopoDraw(g, gm);
+  if (!m.photo) shareTopoDraw(g, gm, ground);
   const probe = m.photo ? shareLumaProbe(m.photo, gm) : null;
   // ⚠️ THE WORDMARK IS AT THE TOP, OVER THE PICTURE, WHICH IS WHERE ALL FOUR REFERENCES PUT IT — and its
   // rectangle is measured HERE, before any template runs, because every template scores something
   // against it. It used to sit inside the ledger because over a picture its contrast varied with the
   // photograph (measured 14.96 to 19.32:1, against a constant 19.35:1 on the plate); the brief overrules
-  // that, so the constant is replaced by a solved scrim rather than by a hope.
-  const wm = shareWordmarkPlan(g, gm);
+  // that, so the constant is replaced by the glyphs' own keyline rather than by a hope.
+  // ⚠️ AND THE PRESENCE OF A PROBE IS THE PRESENCE OF A PHOTOGRAPH, which is the only case the treatment
+  // is for. It is the same test the scrim that used to be here was gated on.
+  const wm = shareWordmarkPlan(g, gm, probe ? S : 0);
   // ⚠️ ONE DISPATCH, AND THE TEMPLATE IS THE MODEL'S ANSWER RATHER THAN THE RUNNER'S ASK.
   // shareTemplateFor has already refused a template this run cannot honestly fill, so nothing here has
   // to re-check eligibility — and if it did, the two answers could disagree.
@@ -21719,7 +22065,6 @@ const SHARE_TEMPLATE_LABEL = {
   moment: "The Moment", execution: "The Execution",
   progression: "The Progression", route: "The Route Poster",
 };
-const SHARE_NEEDS_PHOTO = "Choose a photo to use this one.";
 /**
  * WHICH TEMPLATES THIS RUN CAN HONESTLY FILL, AND FOR THE OTHERS, WHY NOT IN WORDS.
  *
@@ -21747,19 +22092,28 @@ const SHARE_NEEDS_PHOTO = "Choose a photo to use this one.";
  * from — and asking run.route instead is how a template would offer itself and then draw nothing.
  */
 function shareTemplateStates(run, a, pres, opt) {
-  const photo = !!(opt && opt.photo);
   const hasRoute = !!(pres && pres.route && pres.route.length >= 2 && !pres.hidden);
   const measured = (a.rows || []).filter((r) => !r.est).length;
   const out = {};
-  out.moment = photo ? { ok: true, why: "" } : { ok: false, why: SHARE_NEEDS_PHOTO };
-  out.execution = !photo ? { ok: false, why: SHARE_NEEDS_PHOTO }
-    : a.mixKind === "reps"
+  // ⚠️⚠️ A PHOTOGRAPH IS NO LONGER A CONDITION OF ANY TEMPLATE (owner, ruling 7, 2026-08-20). Three of
+  // the four used to be refused outright without one, so a runner who added no photograph was offered a
+  // single card — the poster — and the session-colour ground the owner had just asked for reached one
+  // template of four. The reason that gate was defensible before is that the upper half of a photo
+  // template with no photograph was empty; it is not empty now, because the ground IS the session\u2019s
+  // colour and the topographic contours carry it. So the gates below are the ones about the RUN.
+  // ⚠️ AND THE MOMENT\u2019S OWN GATE IS THAT THERE IS A HEADLINE FACT TO PRINT, which is what
+  // shareHeroFor needs: a distance, or failing that a time. Nothing else on it can be absent — the
+  // metrics row reflows, the route is optional and the ground draws itself.
+  const headline = Number(run && run.distKm) > 0 || parseFloat(String((run && run.dist) || "0")) > 0 ||
+    /\\d/.test(String((run && run.time) || ""));
+  out.moment = headline ? { ok: true, why: "" }
+    : { ok: false, why: "This run recorded neither a distance nor a time, so there is no headline to build a card from." };
+  out.execution = a.mixKind === "reps"
       ? { ok: false, why: "This session is repetitions. Inte-Run records whole-kilometre splits, and a kilometre of reps and jog recoveries has no target to be judged against — so there is nothing true to draw." }
     : !a.band ? { ok: false, why: "This run had no prescribed pace, so there is no target to show against it." }
     : a.judgedN < 2 ? { ok: false, why: "Too few kilometres could be measured against the target for a chart to mean anything." }
     : { ok: true, why: "" };
-  out.progression = !photo ? { ok: false, why: SHARE_NEEDS_PHOTO }
-    : measured < 3
+  out.progression = measured < 3
       ? { ok: false, why: a.estN
           ? "This needs three measured kilometres. Some of this run was estimated while the signal was lost, so there are not three to compare."
           : "This needs at least three kilometre splits to compare." }
@@ -21931,7 +22285,7 @@ function shareFileName(m) {
  */
 function shareMetricPool(run) {
   run = run || {};
-  const pp = String(run.pace || "\\u2014 /km").split(" ");
+  const pp = String(run.pace || "\— /km").split(" ");
   const hrs = String(run.time || "").split(":").length > 2;
   const out = [];
   if (run.time) out.push({ key: "time", v: run.time, u: hrs ? "HRS" : "MIN", k: "TIME" });
@@ -21996,6 +22350,11 @@ function shareCardModel(run, opt) {
     schemaVersion: SHARE_MODEL_VERSION,
     activityId: run.id || "",
     sessionType: run.type || "",
+    // ⚠️ THE SESSION'S EFFORT BAND, FROM THE ONE MAPPING THE REST OF THE APP READS (runEffort), because
+    // with no photograph the whole ground is this colour and the card must not be the fourth place that
+    // decides what kind of session a run was. Empty when the run carries no type at all, which is what
+    // sends shareEffortHex to null and the card back to the family's plain ink ground.
+    effort: run.type ? runEffort(run) : "",
     // ⚠️ TWO DIFFERENT STRINGS AND THEY ARE NOT INTERCHANGEABLE. sessionLabel is the canonical human
     // name for the KIND of session (SESSION_LABEL, "Easy run"); sessionTitle is the plan's own title
     // for this instance ("40' easy + strides"). The reference cards show the kind.
@@ -22319,13 +22678,13 @@ function prepareShareCard(run) {
   // describe a different card from the bytes beside it.
   try { m = shareCardModel(run, shareCardOpts()); }
   catch (e) { PHOTODIAG.err = "model: " + (e && e.message); return Promise.resolve(null); }
-  // ⚠️ NO TEMPLATE MEANS NOTHING HONEST TO ENCODE, AND THE PREVIEW SAYS SO IN WORDS. A treadmill run
-  // with no photograph chosen yet fits none of the four: the three photo templates need one and the
-  // poster needs a route. sharePlaceholderCard draws the studio's own "add a photo" state, and a
-  // placeholder carrying an instruction must never become a file somebody posts — so the export is
-  // refused here rather than filtered later, and studioBusy keeps Share and Save disabled with the
-  // reason on screen.
-  if (!m.template) { PHOTODIAG.err = "no template: choose a photo"; return Promise.resolve(null); }
+  // ⚠️ NO TEMPLATE MEANS NOTHING HONEST TO ENCODE, AND THE PREVIEW SAYS SO IN WORDS. Since ruling 7 a
+  // photograph gates nothing, so the only run that fits none of the four is one carrying neither a
+  // distance nor a time — which both ingest paths already refuse. The refusal stays because
+  // shareTemplateFor is allowed to answer null and a placeholder carrying a sentence must never become
+  // a file somebody posts: it is refused here rather than filtered later, and studioBusy keeps Share and
+  // Save disabled with the reason on screen.
+  if (!m.template) { PHOTODIAG.err = "no template: this run has no distance and no time"; return Promise.resolve(null); }
   try { c = shareCardCanvas(m, 1); }
   catch (e) { PHOTODIAG.err = "draw: " + (e && e.message); return Promise.resolve(null); }
   const t0 = shareNow();
@@ -22669,7 +23028,7 @@ function studioToolsHtml() {
  */
 function shareAriaSummary(m) {
   const bits = [];
-  bits.push(SHARE_TEMPLATE_LABEL[m.template] || "No card yet \\u2014 add a photo");
+  bits.push(SHARE_TEMPLATE_LABEL[m.template] || "No card for this run");
   bits.push(m.aspect === "feed" ? "Feed, four by five" : "Story, nine by sixteen");
   if (m.sessionLabel) bits.push(m.sessionLabel);
   if (m.coarseLocation) bits.push(m.coarseLocation);
@@ -22847,9 +23206,16 @@ function studioStyleHtml() {
   });
   return '<div class="sst-rows">' + rows.join("") + '</div>';
 }
-/** One line each, so a name on its own does not have to carry what the card is for. */
+/**
+ * One line each, so a name on its own does not have to carry what the card is for.
+ * ⚠️ NONE OF THEM MAY PROMISE A PHOTOGRAPH. The Moment\u2019s line read "Your photograph, the distance, and
+ * the coach\u2019s read", which was true while three of the four were refused without one and became a
+ * quiet lie the moment ruling 7 removed that gate — a runner with no photograph would read it and go
+ * looking for a picker they do not need. Each line now says what the card shows, and the ground is
+ * named where it is part of the answer.
+ */
 const SHARE_TEMPLATE_BLURB = {
-  moment: "Your photograph, the distance, and the coach's read.",
+  moment: "The distance and the coach's read, on your photo or the session's own colour.",
   execution: "How the run went against the pace it was set.",
   progression: "Your kilometres as a ladder, and what they show.",
   route: "The shape of the run as the artwork, on your photo or on its own.",
@@ -22870,18 +23236,102 @@ const SHARE_TEMPLATE_BLURB = {
  *
  * ⚠️ AND IT SENDS THE RUN, NOT THE PICTURE. Strava's API takes an activity; the caption under the row
  * says so, because a destination sheet that quietly means something different by "send" is a trap.
+ *
+ * ⚠️ THE SHAPE IS THE OWNER'S (2026-08-20): "the options to share straight to their socials need to
+ * appear like the attached image" — a horizontal row of labelled destination tiles, then a full-width
+ * primary Save to device with a settings affordance beside it. What is NOT his reference's is the
+ * CONTENT of the row, and that is the honesty limit rather than an omission: his reference paints
+ * Instagram and WhatsApp tiles, and this app cannot detect whether either is installed nor hand a story
+ * to one. Two tiles is what we can genuinely do.
+ *
+ * ⚠️ WHAT WOULD BECOME A REAL DIRECT HANDOFF AFTER A REBUILD, stated so nobody has to work it out
+ * again: an "Instagram Story" tile needs the instagram-stories scheme in LSApplicationQueriesSchemes (to
+ * ask whether it is there at all) plus that scheme's own share/pasteboard handoff, and "Save to
+ * Photos" as distinct from saving a file needs NSPhotoLibraryAddUsageDescription. Both are Info.plist
+ * entries and an Xcode build; neither travels over the air. Until then the system sheet reaches every
+ * one of them and the note under the row says so.
+ *
+ * ⚠️ COPY CAPTION IS A REAL DESTINATION, AND IT IS THE USEFUL HALF OF POSTING TO AN APP WE CANNOT REACH.
+ * The clipboard is the one place this app can put text with no plist entry and no permission, and
+ * shareCaption already composes the sentence the finish screen sends with a picture — so the runner who
+ * is about to open Instagram by hand has the words waiting for them. It is not a stand-in for a tile we
+ * cannot build; it is a thing the app can do.
+ *
+ * ⚠️ THE GEAR OPENS THE PRIVACY TOOL RATHER THAN A NEW SCREEN. "What am I comfortable sharing?" is the
+ * spec's own third question and it already has a surface; a settings affordance that opens a second
+ * copy of it is two places to change one thing.
+ *
+ * ⚠️ AND STRAVA IS NOT A TILE, DELIBERATELY. stravaRunButtonHtml carries five states — idle, sending,
+ * pending, error, done-with-a-link — and a tile would be a second copy of that state machine, which is
+ * the fix-one-builder-and-not-the-other fault this file records shipping three times. It keeps its own
+ * full-width row and its own caption, which is also the honest presentation for the one destination here
+ * that receives the RUN instead of the picture.
  */
+/**
+ * ⚠️ THREE GLYPHS THAT DO NOT EXIST IN ICON, DECLARED HERE BECAUSE THIS IS THE ONLY SCREEN THAT WANTS
+ * THEM. ICON is the app's navigation and content vocabulary; a download arrow, a clipboard and a gear
+ * belong to one sheet, and putting them in the shared table would invite a second screen to reach for a
+ * glyph nobody chose for it.
+ */
+const SST_GLYPH = {
+  save: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M4 20h16"/></svg>',
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M15 5.5A2.5 2.5 0 0 0 12.5 3h-7A2.5 2.5 0 0 0 3 5.5v7A2.5 2.5 0 0 0 5.5 15"/></svg>',
+  cog: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.6v2.3M12 19.1v2.3M4.4 4.4l1.7 1.7M17.9 17.9l1.7 1.7M2.6 12h2.3M19.1 12h2.3M4.4 19.6l1.7-1.7M17.9 6.1l1.7-1.7"/></svg>',
+};
+/** One tile builder, so a second destination cannot arrive with a different shape or no label. */
+/**
+ * COPY THE CAPTION, AND SAY SO ON THE TILE ITSELF.
+ *
+ * ⚠️ A CLIPBOARD WRITE IS INVISIBLE, SO THE CONTROL HAS TO REPORT. Every other destination here hands off
+ * to something that puts a screen up; this one changes nothing the runner can see, and a button that
+ * silently succeeds is indistinguishable from one that silently failed — which is the looks-live-does-
+ * nothing class this project has shipped twice. The label becomes "Copied" for a moment and goes back.
+ *
+ * ⚠️ AND IT REPORTS THE FAILURE TOO. navigator.clipboard needs a secure context and the API is absent in
+ * some web views; the promise can also be rejected outright. Either way the tile says "Not copied" rather
+ * than pretending, which is the whole reason this is a destination we are willing to offer.
+ *
+ * ⚠️ THE TIMER IS KEYED ON THE NODE, so two taps in quick succession cannot leave the label stuck on
+ * "Copied" — the second tap clears the first one's restore.
+ */
+let SST_COPY_T = 0;
+function studioCopyCaption(btn) {
+  const lab = btn && btn.querySelector(".sst-dl");
+  const say = (msg) => {
+    if (!lab) return;
+    lab.textContent = msg;
+    if (SST_COPY_T) clearTimeout(SST_COPY_T);
+    SST_COPY_T = setTimeout(() => { lab.textContent = "Copy caption"; SST_COPY_T = 0; }, 1800);
+  };
+  const text = shareCaption(STUDIO.run);
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => say("Copied"), () => say("Not copied"));
+      return;
+    }
+  } catch (e) { /* fall through to the honest failure below */ }
+  say("Not copied");
+}
+function studioDestTile(action, glyph, label) {
+  return '<button class="sst-dest" data-sst="' + action + '">' +
+    '<span class="sst-di" aria-hidden="true">' + glyph + '</span>' +
+    '<span class="sst-dl">' + label + '</span></button>';
+}
 function studioDestHtml(run) {
   const strava = stravaRunButtonHtml(run);
-  return '<div class="sst-rows">' +
-      '<button class="sst-row" data-sst="share"><b>Apps and messages</b>' +
-        '<span>Opens your phone\\u2019s own share sheet.</span></button>' +
-      '<button class="sst-row" data-sst="save"><b>Save to device</b>' +
-        '<span>Keeps the picture, then send it whenever you like.</span></button>' +
+  return '<div class="sst-dests" role="group" aria-label="Where to send this card">' +
+      studioDestTile("share", ICON.share, "Share sheet") +
+      studioDestTile("caption", SST_GLYPH.copy, "Copy caption") +
     '</div>' +
     (strava ? '<div class="sst-strava" data-sst-strava>' + strava +
       '<p class="sst-sr">Sends the run itself, not this card.</p></div>' : "") +
-    '<p class="sst-note">Instagram, WhatsApp and the rest live inside your phone\\u2019s own share sheet \\u2014 ' +
+    '<div class="sst-prim">' +
+      '<button class="sst-save" data-sst="save">' +
+        '<span class="sst-di" aria-hidden="true">' + SST_GLYPH.save + '</span>Save to device</button>' +
+      '<button class="sst-cog" data-ssttool="privacy" aria-label="What this card shares">' +
+        SST_GLYPH.cog + '</button>' +
+    '</div>' +
+    '<p class="sst-note">Instagram, WhatsApp and the rest live inside your phone\u2019s own share sheet \— ' +
     'Inte-Run does not assume any of them are installed.</p>';
 }
 /**
@@ -23017,8 +23467,9 @@ function studioStageHeight(st, fr) {
 }
 /**
  * WHICH TEMPLATE EACH SLIDE DRAWS, IN THE MODEL'S OWN ORDER.
- * ⚠️ null IS A REAL ENTRY AND NOT AN ERROR: a treadmill run with no photograph chosen yet fits none of
- * the four, and the stage still has to show something — sharePlaceholderCard, which says what is missing.
+ * ⚠️ null IS A REAL ENTRY AND NOT AN ERROR: shareTemplateFor is allowed to answer it, and the stage still
+ * has to show something — sharePlaceholderCard. Since ruling 7 no photograph is required by any of the
+ * four, so reaching it needs a run with neither a distance nor a time.
  */
 function studioCards() { return STUDIO.order.length ? STUDIO.order.slice() : [null]; }
 /** The model for ONE slide. The template is asked for explicitly, so a neighbour draws itself. */
@@ -23331,6 +23782,11 @@ function studioClick(e) {
     // having failed, and Save leaves it up over a download that has already happened.
     if (what === "share") { studioSheet(null); return doShareRun(STUDIO.run); }
     if (what === "save") { studioSheet(null); return saveShareCard(STUDIO.run); }
+    // ⚠️ THE SHEET STAYS UP FOR THE CLIPBOARD, WHICH IS THE OPPOSITE OF THE TWO ABOVE AND FOR THE SAME
+    // REASON. Those two hand off to the system, which raises its own sheet over ours; this one hands off
+    // to nothing visible, so dismissing would leave the runner with no evidence anything happened. The
+    // tile reports for itself instead, and it is the only feedback there is.
+    if (what === "caption") return studioCopyCaption(act);
     return;
   }
   const tool = t.closest("[data-ssttool]");
@@ -23828,7 +24284,7 @@ function rpeAskHtml(sm) {
     chips.push('<button class="rpe-chip' + (sm.rpe === i ? " on" : "") + '" data-rpe="' + i + '">' + i + '</button>');
   }
   const picked = sm.rpe
-    ? (band ? (sm.rpe > band.max ? "Harder than planned \\u2014 noted." : sm.rpe < band.min ? "Easier than planned \\u2014 noted." : "Right where it should be.") : "Noted.")
+    ? (band ? (sm.rpe > band.max ? "Harder than planned \— noted." : sm.rpe < band.min ? "Easier than planned \— noted." : "Right where it should be.") : "Noted.")
     : "1 = very easy \\u00b7 10 = flat out" + (band ? " \\u00b7 planned: " + band.min + "\\u2013" + band.max : "");
   return '<div class="card rpe-ask"><div class="subhead" style="margin-top:0">How hard did that feel?</div>' +
     '<div class="rpe-row">' + chips.join("") + '</div>' +
@@ -23869,7 +24325,7 @@ function painAskHtml(sm) {
   };
   return '<div class="zr-auto"><span>Did anything hurt?</span>' +
     '<div class="seg">' + btn(false, "No") + btn(true, "Yes") + '</div></div>' +
-    (hurt ? '<div class="rpe-note">Noted \\u2014 that comes first in the read below, and it stays off anything you share.</div>' : "");
+    (hurt ? '<div class="rpe-note">Noted \— that comes first in the read below, and it stays off anything you share.</div>' : "");
 }
 function viewLiveComplete() {
   const sm = LIVE.summary || { distKm: "0.00", time: "0:00", pace: "—", saved: false, route: [], splits: [] };
@@ -23908,9 +24364,9 @@ function treadmillDistanceHtml(sm) {
   return '<div class="card tm-ask"><div class="subhead" style="margin-top:0">' +
     (denied ? 'How far did you go?' : 'Distance from the treadmill') + '</div>' +
     '<div class="bk-md">' + (denied
-      ? 'This run was timed but not tracked \u2014 your phone could not get a GPS signal, so there is no distance or route for it. If you know how far you went, put it in and your pace, splits and plan all stay right.<br><br>If you meant to record the route, check that Inte-Run is allowed to use your location in <b>Settings \u203a Privacy &amp; Security \u203a Location Services</b>.'
+      ? 'This run was timed but not tracked — your phone could not get a GPS signal, so there is no distance or route for it. If you know how far you went, put it in and your pace, splits and plan all stay right.<br><br>If you meant to record the route, check that Inte-Run is allowed to use your location in <b>Settings \u203a Privacy &amp; Security \u203a Location Services</b>.'
       : 'Your phone can\u2019t measure distance indoors, so we haven\u2019t guessed. Type what the machine says and your pace, splits and plan all stay right.') +
-    // \u26a0\ufe0f THIS LINE HAD NO + AND EVERYTHING BELOW IT WAS UNREACHABLE. Automatic semicolon
+    // ⚠️ THIS LINE HAD NO + AND EVERYTHING BELOW IT WAS UNREACHABLE. Automatic semicolon
     // insertion ended the return statement here, so the card rendered its heading and paragraph and
     // then stopped: no distance box, no button, no note. Every treadmill run AND every outdoor run
     // that failed to get GPS (gpsFallback lands in startIndoor) could never have its distance added,
@@ -23920,7 +24376,7 @@ function treadmillDistanceHtml(sm) {
     '</div>' +
     '<div class="tm-row"><input class="sel num" id="tmDist" inputmode="decimal" placeholder="e.g. 8.05" value="' + (set ? esc(sm.distKm) : "") + '">' +
     '<span class="tm-unit">km</span><button class="mini-btn" id="tmSet">' + (set ? "Update" : "Add distance") + '</button></div>' +
-    '<div class="tm-note" id="tmNote">' + (set ? "Pace recalculated from " + esc(sm.distKm) + " km." : "Leave it blank and this is logged by time alone \u2014 which still counts.") + '</div></div>';
+    '<div class="tm-note" id="tmNote">' + (set ? "Pace recalculated from " + esc(sm.distKm) + " km." : "Leave it blank and this is logged by time alone — which still counts.") + '</div></div>';
 }
 // Applying it recomputes everything derived from distance, so the run is exactly as if it had been
 // measured. Splits are deliberately NOT invented: even pacing is an assumption, not a measurement.
@@ -23929,7 +24385,7 @@ function applyTreadmillDistance(km) {
   const sm = LIVE.summary;
   sm.distKm = km > 0 ? km.toFixed(2) : "0.00";
   sm.avgPaceSec = km > 0 ? Math.round(sm.sec / km) : 0;
-  sm.pace = sm.avgPaceSec ? fmtPace(sm.avgPaceSec) : "\u2014";
+  sm.pace = sm.avgPaceSec ? fmtPace(sm.avgPaceSec) : "—";
   sm.meaningful = km > 0.05 || sm.sec >= 120;
   LIVE.dist = km * 1000;
   if (sm.saved) {
@@ -23937,7 +24393,7 @@ function applyTreadmillDistance(km) {
     const r = state.logged.find((x) => x.id === sm.runId);
     if (r) {
       r.dist = sm.distKm + " km"; r.distKm = Number(sm.distKm); r.avgPaceSec = sm.avgPaceSec;
-      r.pace = sm.avgPaceSec ? fmtPace(sm.avgPaceSec) + " /km" : "\u2014";
+      r.pace = sm.avgPaceSec ? fmtPace(sm.avgPaceSec) + " /km" : "—";
       saveRuns();
     }
   }
@@ -24051,7 +24507,7 @@ function liveUpdate(snap) {
     // the same identifier three times in two lines on the smallest card in the app.
     const heading = step.display
       ? String(step.label).replace(
-          new RegExp("^" + step.display + "(\\\\s+\\\\d+\\\\s+of\\\\s+\\\\d+)?\\\\s*[\\\\u2014\\\\u2013-]\\\\s*", "i"), "")
+          new RegExp("^" + step.display + "(\\\\s+\\\\d+\\\\s+of\\\\s+\\\\d+)?\\\\s*[\\\—\\\\u2013-]\\\\s*", "i"), "")
       : step.label;
     // ⚠️ THE SEGMENT CLOCK — his request, and it answers the question the total elapsed cannot:
     // "how much of THIS is left?". It restarts at 0:00 at every section boundary. The engine already
@@ -24393,7 +24849,7 @@ function saveLiveSession() {
   if (sm.meaningful) {
     // ⚠️ Credited BEFORE the record is stored, so the shoeId is stamped on the copy that gets saved.
     const rec = liveRunRecord(sm);
-    // \u26a0\ufe0f The pair chosen on the finish screen parks on LIVE.summary, like the note and the
+    // ⚠️ The pair chosen on the finish screen parks on LIVE.summary, like the note and the
     // effort rating, because liveRunRecord rebuilds the record on every render.
     shoeCreditRun(rec, LIVE && LIVE.summary ? LIVE.summary.shoeId : null);
     state.logged.unshift(rec);
@@ -24477,9 +24933,9 @@ function openPacePrompt(onSkip) {
     '<div class="sd-type" style="--sc:var(--accent)">Easy pace</div>' +
     '<div class="sd-title">Add your easy pace?</div>' +
     '<div class="sd-desc">You\\u2019ve left it blank. If you know a pace you can comfortably hold a conversation at, adding it now scales every session to your real ability from day one.</div>' +
-    '<div class="sd-desc" style="margin-top:8px">Happy to leave it? That\\u2019s fine \\u2014 we\\u2019ll start you gently and set your paces automatically from your first run.</div>' +
+    '<div class="sd-desc" style="margin-top:8px">Happy to leave it? That\\u2019s fine \— we\\u2019ll start you gently and set your paces automatically from your first run.</div>' +
     '<button class="primary" id="paceAdd" style="width:100%;margin-top:14px">Add it now</button>' +
-    '<button class="rm-nothanks" id="paceSkip">No \\u2014 work it out from my first run</button>';
+    '<button class="rm-nothanks" id="paceSkip">No \— work it out from my first run</button>';
   $("paceAdd").onclick = () => { closeSheet(); const el = $("s_easypace"); if (el) { el.scrollIntoView({ block: "center" }); el.focus(); } };
   $("paceSkip").onclick = () => { closeSheet(); onSkip(); };
   $("sheetOv").classList.add("on");
@@ -24661,8 +25117,8 @@ function heatChipHtml(sess) {
 function autoPaceBanner() {
   const a = state.paceNotice; if (!a) return "";
   return '<div class="fit-banner up"><div class="fb-ic">' + ICON.gauge + '</div>' +
-    '<div class="fb-main"><div class="fb-h">Your paces are set \\u2014 from your first run</div>' +
-    '<div class="fb-b">You left your easy pace blank, so we took it from your <b>' + esc(a.sess) + '</b>: <b>' + fmtPace(a.easy) + '/km</b>. Every session from here \\u2014 easy, long and quality \\u2014 has been rescaled to that. Change it any time in your profile.</div>' +
+    '<div class="fb-main"><div class="fb-h">Your paces are set \— from your first run</div>' +
+    '<div class="fb-b">You left your easy pace blank, so we took it from your <b>' + esc(a.sess) + '</b>: <b>' + fmtPace(a.easy) + '/km</b>. Every session from here \— easy, long and quality \— has been rescaled to that. Change it any time in your profile.</div>' +
     '<div class="fb-actions"><button class="fb-yes" id="apOk">Got it</button><button class="fb-no" id="apEdit">Adjust it</button></div></div></div>';
 }
 // ---- Training flags: the multi-run "intelligent coach" ---------------------------------------
@@ -24782,8 +25238,8 @@ function coachWatchCard() {
     const usable = flagObservations().filter((o) =>
       (o.avgPaceSecPerKm && o.plannedPaceSecPerKm) || (o.reportedRpe && o.plannedRpe));
     if (!usable.length) body = "Nothing logged against this plan yet. Record a run and I\\u2019ll start checking your pace and effort against what it asked for.";
-    else if (usable.length === 1) body = "Watching <b>1 run</b> so far. I look for the same thing twice before suggesting anything \\u2014 one odd run is just a day.";
-    else body = "Watching your last <b>" + usable.length + " runs</b> \\u2014 pace and effort are both tracking the plan. I\\u2019ll say something the moment they aren\\u2019t.";
+    else if (usable.length === 1) body = "Watching <b>1 run</b> so far. I look for the same thing twice before suggesting anything \— one odd run is just a day.";
+    else body = "Watching your last <b>" + usable.length + " runs</b> \— pace and effort are both tracking the plan. I\\u2019ll say something the moment they aren\\u2019t.";
   }
   return '<div class="cw"><span class="cw-ic">' + ICON.gauge + '</span><span class="cw-b">' +
     // ⚠️ "YOUR COACH IS WATCHING" IS GONE. The brief: surveillance language "can reduce trust,
@@ -24941,7 +25397,7 @@ function trainFlagBanner() {
   if (tf.suggestion.action === "advice-easy-days") {
     return '<div class="fit-banner up"><div class="fb-ic">' + ICON.gauge + '</div>' +
       '<div class="fb-main"><div class="fb-h">Your easy days are creeping too fast</div>' +
-      '<div class="fb-b">' + evidence + ' Running quicker than planned <i>and</i> finding it harder is the classic sign of overcooked easy days. The fix isn\\u2019t new paces \\u2014 it\\u2019s running the easy sessions at their easy pace.</div>' +
+      '<div class="fb-b">' + evidence + ' Running quicker than planned <i>and</i> finding it harder is the classic sign of overcooked easy days. The fix isn\\u2019t new paces \— it\\u2019s running the easy sessions at their easy pace.</div>' +
       '<div class="fb-actions"><button class="fb-yes" id="tfOk">Got it</button></div></div></div>';
   }
   const s = tf.suggestion;
@@ -24960,14 +25416,14 @@ function trainFlagBanner() {
 let LABEL_N = 0;
 /**
  * Connect every form label to the field it names.
- * \u26a0\ufe0f THIRTEEN OF THEM WERE FLOATING. The setup form is built as
+ * ⚠️ THIRTEEN OF THEM WERE FLOATING. The setup form is built as
  * <div class="q"><label>Age</label><select id="s_age">...</select></div> -- a label that is a SIBLING
  * of its field with no "for" attribute, so a screen reader reads an unlabelled combo box and says
  * about what it is for. It is the most form-heavy screen in the app and the one a runner meets first.
- * \u26a0\ufe0f DONE AT RUNTIME, NOT BY EDITING THIRTEEN CALL SITES. A pass over the rendered markup
+ * ⚠️ DONE AT RUNTIME, NOT BY EDITING THIRTEEN CALL SITES. A pass over the rendered markup
  * cannot drift, and it covers every question added later for free -- which thirteen hand edits and a
  * convention nobody remembers would not.
- * \u26a0\ufe0f AND A SEGMENTED CONTROL HAS NO FIELD TO POINT AT: it is a row of buttons. Those get a
+ * ⚠️ AND A SEGMENTED CONTROL HAS NO FIELD TO POINT AT: it is a row of buttons. Those get a
  * group role and aria-labelledby instead, or the label is announced for nothing.
  */
 function linkFormLabels() {
@@ -24981,7 +25437,7 @@ function linkFormLabels() {
       lab.setAttribute("for", f.id);
       return;
     }
-    // \u26a0\ufe0f FOUR GROUP SHAPES, NOT ONE. Segmented controls, checkbox lists, the status card
+    // ⚠️ FOUR GROUP SHAPES, NOT ONE. Segmented controls, checkbox lists, the status card
     // grid and the coach picker are all "a label naming several controls", and a selector listing
     // only the first two left the two biggest questions on the screen -- what kind of runner you are,
     // and which coach speaks to you -- announced as unlabelled buttons.
@@ -25087,7 +25543,7 @@ function showWelcomeBack() {
     '<div class="welcome-mark">' + BRAND_SVG + '</div>' +
     '<h1 class="welcome-h">' + welcomeBackName() + ' \\uD83D\\uDC4B</h1>' +
     '<p class="wb-quote">\\u201C' + esc(q[0]) + '\\u201D</p>' +
-    (q[1] ? '<p class="wb-by">\\u2014 ' + esc(q[1]) + '</p>' : '') +
+    (q[1] ? '<p class="wb-by">\— ' + esc(q[1]) + '</p>' : '') +
     '<button class="welcome-cta wb-cta" id="wbGo">Let\\u2019s go \\u2192</button>' +
     '</div></div>');
   document.body.appendChild(ov);
@@ -25135,29 +25591,29 @@ function parseGuide(title) {
     if (w === "\\u00D7") { tokens.push({ text: w, plain: true }); return; }
     let step = null;
     if (/^\\d+$/.test(w) && hasReps && !rec) {
-      step = { label: "How many", body: "Repeat the main effort this many times \\u2014 here, " + w + (Number(w) === 1 ? " rep." : " reps.") };
+      step = { label: "How many", body: "Repeat the main effort this many times \— here, " + w + (Number(w) === 1 ? " rep." : " reps.") };
     } else if (/^\\d+[\\u2032]$/.test(w)) { // minutes, e.g. 8'
       const mins = w.replace("\\u2032", "");
       step = rec
-        ? { label: "Recovery", body: "Easy recovery between efforts \\u2014 " + mins + " minute" + (mins === "1" ? "" : "s") + " of gentle jogging." }
+        ? { label: "Recovery", body: "Easy recovery between efforts \— " + mins + " minute" + (mins === "1" ? "" : "s") + " of gentle jogging." }
         : hasReps
-          ? { label: "Each effort", body: "How long each effort lasts \\u2014 " + mins + " minute" + (mins === "1" ? "" : "s") + ". (\\u2032 means minutes, \\u2033 means seconds.)" }
-          : { label: "Duration", body: "How long to run for \\u2014 " + mins + " minutes at the effort shown. (\\u2032 means minutes.)" };
+          ? { label: "Each effort", body: "How long each effort lasts \— " + mins + " minute" + (mins === "1" ? "" : "s") + ". (\\u2032 means minutes, \\u2033 means seconds.)" }
+          : { label: "Duration", body: "How long to run for \— " + mins + " minutes at the effort shown. (\\u2032 means minutes.)" };
     } else if (/^\\d+[\\u2033]$/.test(w)) { // seconds, e.g. 90"
       const secs = w.replace("\\u2033", "");
       step = rec
-        ? { label: "Recovery", body: "A short easy recovery \\u2014 " + secs + " seconds. (\\u2033 means seconds.)" }
-        : { label: "Each effort", body: "A short, sharp effort \\u2014 " + secs + " seconds. (\\u2033 means seconds.)" };
+        ? { label: "Recovery", body: "A short easy recovery \— " + secs + " seconds. (\\u2033 means seconds.)" }
+        : { label: "Each effort", body: "A short, sharp effort \— " + secs + " seconds. (\\u2033 means seconds.)" };
     } else if (/^\\d+(?:\\.\\d+)?\\s?(?:miles?|km|m)$/i.test(w)) { // distance, e.g. 800m, 1 mile
       step = rec
         ? { label: "Recovery", body: "Recover over " + w + " of easy jogging." }
-        : { label: "Each effort", body: "How far each effort covers \\u2014 " + w + "." };
+        : { label: "Each effort", body: "How far each effort covers \— " + w + "." };
     } else {
       const key = w.toLowerCase().replace(/[^a-z0-9]/g, "");
       const hintKey = EFFORT_HINT[key] ? key : (key.startsWith("vo") ? "vo2" : null);
       if (hintKey && !usedEffort && !rec) {
         usedEffort = true;
-        step = { label: "The effort", body: "The pace or effort for the work \\u2014 \\u201C" + w + "\\u201D: " + EFFORT_HINT[hintKey] };
+        step = { label: "The effort", body: "The pace or effort for the work \— \\u201C" + w + "\\u201D: " + EFFORT_HINT[hintKey] };
       }
     }
     tokens.push({ text: w, step });
@@ -25236,7 +25692,7 @@ function maybeAutoGuide() {
 }
 
 // ---- Router ---------------------------------------------------------------
-// \u26a0\ufe0f TWO STRINGS, NOT ONE. TITLES feeds the screen heading AND the bottom-nav label, so
+// ⚠️ TWO STRINGS, NOT ONE. TITLES feeds the screen heading AND the bottom-nav label, so
 // renaming Support to "Support & guidance" for the header truncated the tab to "Support & gui...".
 // A tab label has about eight characters; a heading has a screen.
 const TITLES = { today: "Today", plan: "Your Plan", activities: "Logbook", community: "Community", support: "Support & guidance" };
@@ -25270,7 +25726,7 @@ function renderUnlessTyping() {
 let LAST_SCROLL_KEY = null;
 function render() {
   const v = $("view");
-  // \u26a0\ufe0f A RENDER OF THE SAME SCREEN KEEPS ITS SCROLL POSITION. Every branch below ends with a
+  // ⚠️ A RENDER OF THE SAME SCREEN KEEPS ITS SCROLL POSITION. Every branch below ends with a
   // scroll to the top, which is right when the runner has NAVIGATED somewhere and wrong every other
   // time -- and "every other time" is any in-page control that repaints: rating an effort, picking a
   // pair of trainers, changing a filter. Each threw the runner back to the top of a long screen,
@@ -25417,27 +25873,27 @@ function render() {
 }
 /**
  * The arrival of a screen, 180 ms.
- * \u26a0\ufe0f CONTENT-PRESERVING MEANS NOTHING MOVES THAT THE RUNNER IS READING. It fades and rises
+ * ⚠️ CONTENT-PRESERVING MEANS NOTHING MOVES THAT THE RUNNER IS READING. It fades and rises
  * four pixels -- no slide, no scale, nothing that reflows -- so text is legible throughout rather
  * than arriving from off-screen. The brief asks for 160-220 ms; 180 sits in the middle.
- * \u26a0\ufe0f THE CLASS IS REMOVED BEFORE IT IS ADDED, with a reflow read between. Without that, a
+ * ⚠️ THE CLASS IS REMOVED BEFORE IT IS ADDED, with a reflow read between. Without that, a
  * second render inside the animation window finds the class already present, the browser does not
  * restart the animation, and the screen simply appears -- which is most tab switches, because render()
  * is called from many paths.
- * \u26a0\ufe0f Reduce Motion is handled globally (one rule for the whole stylesheet, so a new animation
+ * ⚠️ Reduce Motion is handled globally (one rule for the whole stylesheet, so a new animation
  * cannot forget it), which is why there is no media query here.
  */
 /**
  * Publish the reader's own text-size preference as --tscale.
  *
- * \u26a0\ufe0f MEASURED FROM font: -apple-system-body, WHICH IS THE ONE THING THAT TRACKS DYNAMIC TYPE
+ * ⚠️ MEASURED FROM font: -apple-system-body, WHICH IS THE ONE THING THAT TRACKS DYNAMIC TYPE
  * INSIDE A WKWebView. Nothing else does: rem follows the page, not the phone, and there is no API to
  * ask. The probe is rendered off-screen, measured once at boot and again whenever the app returns to
  * the front -- iOS does not notify a web view when the setting changes, so coming back is the only
  * moment we can catch it. In a desktop browser it lands on that browser's own default size instead,
  * which is the right answer there too.
  *
- * \u26a0\ufe0f CLAMPED TO 1.0-1.3, AND THAT IS A LIMITATION, NOT A CHOICE I LIKE. This app is full of
+ * ⚠️ CLAMPED TO 1.0-1.3, AND THAT IS A LIMITATION, NOT A CHOICE I LIKE. This app is full of
  * fixed-height controls -- a 44px tap target, a bottom nav, a live-session hero -- so an unclamped
  * 235% would overlap them rather than reflow. Shipping a broken layout at the largest setting is
  * worse than shipping a partial improvement at the common ones, and the range below the cap covers
@@ -25636,7 +26092,7 @@ function wire() {
     if (f === "dayType") { state.dayType = v; render(); return; }
     state.subj[f] = v; seg.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); readySlotPaint();
   }));
-  // \u26a0\ufe0f SCOPED TO THE CHART. data-wk names two unrelated things: a WEEK NUMBER on the plan
+  // ⚠️ SCOPED TO THE CHART. data-wk names two unrelated things: a WEEK NUMBER on the plan
   // chart's bars, and a workout FORMAT ID (a string, "vo2-10x1") on the add-a-session sheet's library
   // rows. The sheet binds its own handler scoped to #sheetBody, but this one was unscoped and both use
   // .onclick, so whichever ran last won. #sheetOv lives outside #view and survives a render, so any
@@ -25647,7 +26103,7 @@ function wire() {
   wireWeekList();
   centerPlanWeek();
   document.querySelectorAll("[data-at]").forEach((b) => b.onclick = () => { state.actTab = b.dataset.at; render(); });
-  // \u26a0\ufe0f BY ID, NOT BY POSITION. The index was already "not a handle" because state.logged is
+  // ⚠️ BY ID, NOT BY POSITION. The index was already "not a handle" because state.logged is
   // unshifted whenever a watch run arrives; filtering the list breaks it a second way, because
   // position in the RENDERED list stopped matching position in the array the moment a filter existed.
   document.querySelectorAll("[data-runid]").forEach((b) => b.onclick = () => {
@@ -25671,11 +26127,11 @@ function wire() {
     const id = b.dataset.runshoe || null;
     const run = state.screen === "runview" ? viewedRun() : null;
     if (run) shoeAssignRun(run, id);
-    // \u26a0\ufe0f An UNSAVED run has nothing to move yet -- the credit happens once, at save. Parking
+    // ⚠️ An UNSAVED run has nothing to move yet -- the credit happens once, at save. Parking
     // the choice is the whole mechanism; assigning here would credit a run that may never be saved.
     else if (LIVE && LIVE.summary) LIVE.summary.shoeId = id;
     haptic("tap");
-    // \u26a0\ufe0f REPAINT THE CARD, DO NOT render(). Every render branch sets #view.scrollTop = 0 --
+    // ⚠️ REPAINT THE CARD, DO NOT render(). Every render branch sets #view.scrollTop = 0 --
     // deliberately, so switching tabs starts at the top -- so a full render threw the runner back to
     // the map every time they picked a pair, on a card that sits most of a screen down. Nothing else
     // on this screen depends on which trainers were worn, so the card is the only thing to redraw.
@@ -25689,16 +26145,16 @@ function wire() {
   const pt = $("perfTrial"); if (pt) pt.onclick = startTrialFlow;
   linkFormLabels();
   syncTextScale();
-  // \u26a0\ufe0f EVERY DESTINATION HERE ALREADY EXISTS. This page is a way in to screens the app
+  // ⚠️ EVERY DESTINATION HERE ALREADY EXISTS. This page is a way in to screens the app
   // already has, not a set of new ones -- which is what keeps it a summary rather than a rewrite.
   document.querySelectorAll("[data-pf]").forEach((b) => b.onclick = () => {
     const to = b.dataset.pf;
-    // \u26a0\ufe0f A ROW OPENS AN OVERLAY, NOT A PAGE. Editing one answer and then having to find your
+    // ⚠️ A ROW OPENS AN OVERLAY, NOT A PAGE. Editing one answer and then having to find your
     // way back to the profile is the navigation this page exists to remove. The Edit link still opens
     // the whole form as a screen, because that is a sit-down job rather than a glance.
     if (to.indexOf("setup:") === 0) { openProfileEdit(to.split(":")[1]); return; }
     if (to === "setup") { state.setupFocus = null; state.screen = "setup"; render(); return; }
-    // \u26a0\ufe0f BOTH OF THESE WERE INVENTED FIRST TIME ROUND -- "toggleTheme" and "openRemindSheet"
+    // ⚠️ BOTH OF THESE WERE INVENTED FIRST TIME ROUND -- "toggleTheme" and "openRemindSheet"
     // exist nowhere in the app. The real ones are the inline handler on #themeBtn and
     // openRemindersSheet(). Clicking the real button rather than copying its body means there stays
     // exactly one implementation of what changing the theme does.
@@ -25710,7 +26166,7 @@ function wire() {
   });
   const sq = $("supQ");
   if (sq) {
-    // \u26a0\ufe0f RE-RENDER ON INPUT MEANS THE FIELD IS REBUILT UNDER THE RUNNER'S FINGER, so the
+    // ⚠️ RE-RENDER ON INPUT MEANS THE FIELD IS REBUILT UNDER THE RUNNER'S FINGER, so the
     // caret has to be put back or every keystroke jumps it to the front. Same class of bug as the
     // run-note debounce documented in CLAUDE.md: keep the value, restore the position.
     sq.oninput = () => {
@@ -26025,18 +26481,18 @@ function wire() {
   };
   function doSaveProfile() {
     let pf; try { pf = draftFromForm(); } catch (e) { const er = $("setupErr"); er.style.display = "block"; er.textContent = e.message; return; }
-    // \u26a0\ufe0f SHOW IT FIRST. Save used to rebuild every week, clear the day's ticks, drop every
+    // ⚠️ SHOW IT FIRST. Save used to rebuild every week, clear the day's ticks, drop every
     // session the runner had moved and push the new schedule to iOS and the watch, on one tap with no
     // warning. The preview is computed with applyProfile, which is pure; nothing is committed until
     // the sheet's own button is pressed.
-    // \u26a0\ufe0f CLEAR THE LAST COMPLAINT. It stayed on screen beside a working preview sheet, so a
+    // ⚠️ CLEAR THE LAST COMPLAINT. It stayed on screen beside a working preview sheet, so a
     // runner who had just fixed the thing it named was still being told about it.
     const erOk = $("setupErr"); if (erOk) { erOk.style.display = "none"; erOk.textContent = ""; }
     const imp = profileImpact(pf);
     if (imp && !PROFILE_CONFIRMED) { openProfilePreview(pf, imp); return; }
     PROFILE_CONFIRMED = false;
     let out; try { out = applyProfile(pf); } catch (e) { const er = $("setupErr"); er.style.display = "block"; er.textContent = "That goal can't be planned yet — try a race date further out."; return; }
-    // \u26a0\ufe0f SNAPSHOT BEFORE THE REBUILD, NOT AFTER. seedDone() prunes state.dayOverride and
+    // ⚠️ SNAPSHOT BEFORE THE REBUILD, NOT AFTER. seedDone() prunes state.dayOverride and
     // PERSISTS the prune, so by the time a toast appears those reschedules are already gone from
     // disk. An undo that restores only the profile object -- the obvious implementation, and the one
     // existing toastUndo precedent models -- would hand back a plan with the runner's own moves
@@ -26044,7 +26500,7 @@ function wire() {
     const undoSnap = { profile: JSON.parse(JSON.stringify(profile || {})),
                        dayOverride: JSON.parse(JSON.stringify(state.dayOverride || {})),
                        ticks: todayTicks() };
-    // \u26a0\ufe0f AND THIS IS THE ONE REBUILD PATH THAT NEVER RESTORED TODAY'S TICKS. Every other one
+    // ⚠️ AND THIS IS THE ONE REBUILD PATH THAT NEVER RESTORED TODAY'S TICKS. Every other one
     // (the flag banner, the retest, the add-a-day offer) brackets seedDone with todayTicks/
     // restoreTicks; this one did not, so editing your profile silently un-ticked the run you had
     // already done today.
@@ -26057,7 +26513,7 @@ function wire() {
     // ⚠️ The draft is now sticky across navigation, so SAVING has to be what releases it — otherwise
     // the answers a runner just committed are re-restored over the top of the profile they built.
     draft = {};
-    // \u26a0\ufe0f COMING BACK TO WHERE YOU STARTED. Saving from the profile overlay used to land the
+    // ⚠️ COMING BACK TO WHERE YOU STARTED. Saving from the profile overlay used to land the
     // runner on the Plan tab, which is the right destination for first-run setup and disorienting for
     // somebody who just corrected their age.
     const fromSheet = PROFILE_EDIT_OPEN;
@@ -26289,7 +26745,7 @@ function wire() {
     const km = Number(raw);
     const note = $("tmNote");
     if (raw === "") { applyTreadmillDistance(0); return; }
-    if (!isFinite(km) || km <= 0 || km > 200) { if (note) note.textContent = "That doesn\u2019t look like a distance in kilometres \u2014 try something like 8.05."; return; }
+    if (!isFinite(km) || km <= 0 || km > 200) { if (note) note.textContent = "That doesn\u2019t look like a distance in kilometres — try something like 8.05."; return; }
     applyTreadmillDistance(km);
   };
   const lDiscard = $("lDiscard"); if (lDiscard) lDiscard.onclick = () => { coachStop(); stopSpeech(); LIVE = null; state.screen = null; state.tab = "today"; render(); };
@@ -26705,7 +27161,7 @@ if (existsSync(voicesSrc)) {
   cpSync(voicesSrc, join(docsDir, "voices"), { recursive: true });
   console.log("Mirrored coach audio to docs/voices");
 } else {
-  console.log("No web/voices yet \u2014 run: node voice-dev/dump-catalogue.ts && voice-dev/venv/bin/python voice-dev/generate.py");
+  console.log("No web/voices yet — run: node voice-dev/dump-catalogue.ts && voice-dev/venv/bin/python voice-dev/generate.py");
 }
 // Personal packs (a coach speaking a real person's name) are generated for one runner and are
 // gitignored on both sides, so this only ever copies what exists on this machine. Absent everywhere

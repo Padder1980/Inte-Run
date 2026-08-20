@@ -55,16 +55,25 @@ function liftConst(name: string): string {
   throw new Error("unterminated const " + name);
 }
 
-const CONSTS = ["SHARE_MODEL_VERSION", "SHARE_TEMPLATES", "SHARE_TEMPLATE_LABEL", "SHARE_NEEDS_PHOTO",
+const CONSTS = ["SHARE_MODEL_VERSION", "SHARE_TEMPLATES", "SHARE_TEMPLATE_LABEL",
   "RUN_METRIC_LADDER", "RD_MONTHS", "PRIV_RADIUS_M", "SHARE_PRIV_STORE", "SHARE_PRIV_MAX",
-  "SHARE_EVEN_SPREAD_S", "SHARE_METRIC_MAX", "SHARE_CROP0", "SHARE_ASPECTS", "SHARE_EXPORT"];
+  "SHARE_EVEN_SPREAD_S", "SHARE_METRIC_MAX", "SHARE_CROP0", "SHARE_ASPECTS", "SHARE_EXPORT",
+  // ⚠️ SHARE_NEEDS_PHOTO AND RUN_HARD_TYPES ARE BOTH GONE FROM THE APP, and this list failing loudly is
+  // how that was noticed rather than left behind. The first was the reason three of the four templates
+  // refused a run with no photograph, which ruling 7 removed; the second was a second list of hard
+  // session types beside SESSION_EFFORT, which is the drift that put a rust ground under a tempo.
+  "SESSION_EFFORT"];
 const FNS = ["fmtPace", "rdCue", "rdWell", "runEvidenceConfidence", "runAnalysis", "runVerdict",
   "rdMetresBetween", "redactRouteEnds", "runRoutePresentation", "loadSharePriv", "saveSharePriv",
   "sharePrivacyFor", "sharePrivacyLocked", "setSharePrivacy", "runMetricLadder", "runStartMsKnown",
   "rdWhenText", "rdDateText", "shareTemplateStates", "shareTemplateFor", "shareEvidenceLine", "shareFileName",
   "shareProgressionClaim", "shareMetricPool", "shareMetricsChosen",
   "shareCropKey", "shareCropRead", "shareCropWrite", "sharePhotoView", "shareCropSig",
-  "shareCardModel", "shareKey", "shareRouteOn", "shareCardOpts", "shareCardKey", "shareAspect"];
+  "shareCardModel", "shareKey", "shareRouteOn", "shareCardOpts", "shareCardKey", "shareAspect",
+  // ⚠️ THE ONE MAPPING FROM A RUN TO ITS EFFORT BAND, AND effortOf UNDER IT. The card's ground is the
+  // session's own colour when there is no photograph, and it must be the SAME answer the Logbook row and
+  // the debrief chip give — so the model reads runEffort rather than reconstructing the intensity here.
+  "runEffort", "effortOf", "sessionEffort"];
 
 /** A stand-in for the browser's localStorage: enough for the per-run privacy store to be exercised. */
 function fakeStore() {
@@ -654,20 +663,49 @@ test("BLOCKER: every ineligible template says what it needs, in words", () => {
   }
 });
 
-test("the three photo templates need a photo, and the poster does not", () => {
+test("BLOCKER: no template is gated on a photograph, and every gate is a fact about the run", () => {
+  // ⚠️⚠️ THIS TEST USED TO ASSERT THE OPPOSITE, AND THE OWNER OVERRULED IT (ruling 7, 2026-08-20). It
+  // required moment, execution and progression to be REFUSED without a photograph, which is what limited
+  // the session-colour ground he had just asked for to one template of four: a runner who added no
+  // photograph was offered a single card. The reason that gate was once defensible is that the upper half
+  // of a photo template with no photograph was empty; the session ground and its contour lines fill it
+  // now, so the gate had nothing left to protect.
+  // ⚠️ IT IS RESTATED RATHER THAN DELETED, AND THE NEW CLAIM IS STRICTLY STRONGER: eligibility must be
+  // IDENTICAL with and without a photograph. A one-directional check ("all four are offered with no
+  // photograph") would pass while a photograph secretly made a template ineligible; deepEqual on the
+  // whole answer cannot.
   const E = env();
   const states = (run: any, photo: any) =>
     E.shareTemplateStates(run, E.runAnalysis(run), E.runRoutePresentation(run, E.sharePrivacyFor(run)), { photo });
   const noPhoto = states(refRun(), null);
-  for (const id of ["moment", "execution", "progression"]) {
-    assert.equal(noPhoto[id].ok, false, id + " is offered with no photograph");
-    assert.match(noPhoto[id].why, /photo/i, id + " does not say a photo is what it needs");
-  }
-  assert.equal(noPhoto.route.ok, true, "the photo-free poster is hidden when there is no photograph");
-  const withPhoto = states(refRun(), PHOTO);
   for (const id of ["moment", "execution", "progression", "route"]) {
-    assert.equal(withPhoto[id].ok, true, id + " is hidden for the pack's own reference run");
+    assert.equal(noPhoto[id].ok, true, id + " is refused for the pack's own reference run with no photograph");
   }
+  assert.deepEqual(noPhoto, states(refRun(), PHOTO),
+    "a photograph changes which templates this run can fill");
+  // ⚠️ AND NO REASON ANYWHERE MAY ASK FOR A PHOTOGRAPH, on any run, which is what stops the gate coming
+  // back for one template. Swept over every run shape the fixtures carry, both with and without a photo.
+  const runs: [string, any][] = [["reference", refRun()], ["treadmill", treadmillRun()],
+    ["interval", intervalRun()], ["no band", refRun({ pband: null, pwin: null, pmix: null })],
+    ["two splits", refRun({ splits: [{ km: 1, sec: 300 }, { km: 2, sec: 302 }] })]];
+  for (const [name, run] of runs) {
+    for (const photo of [null, PHOTO]) {
+      const st = states(run, photo);
+      for (const id of ["moment", "execution", "progression", "route"]) {
+        assert.ok(!/photo/i.test(st[id].why || ""),
+          name + "/" + id + " still asks for a photograph: " + st[id].why);
+      }
+    }
+    // ⚠️ AND THE MOMENT IS ALWAYS DRAWABLE FOR A RUN THE APP WOULD STORE, because its only gate is that
+    // there is a headline fact — a distance, or failing that a time. A treadmill run has a time.
+    assert.equal(states(run, null).moment.ok, true, name + " cannot draw The Moment");
+  }
+  // ⚠️ THE MOMENT'S GATE IS REAL, THOUGH, AND THIS IS THE ONE RUN THAT TRIPS IT: neither a distance nor a
+  // time is the only way any template is refused now, and it is what keeps template: null reachable.
+  const empty = refRun({ distKm: 0, dist: "0 km", time: "" });
+  const st = states(empty, PHOTO);
+  assert.equal(st.moment.ok, false, "a run with no distance and no time is still offered a headline card");
+  assert.match(st.moment.why, /distance/i, "the reason does not name what is missing: " + st.moment.why);
 });
 
 test("BLOCKER: The Execution is hidden for a repetition session, and says why", () => {
@@ -737,12 +775,14 @@ test("BLOCKER: eligibility cannot be relaxed by the SHAPE, only by the run", () 
     assert.deepEqual(shot, E.shareTemplateStates(run, a, pres, { photo: photo(), aspect: "story" }),
       aspect + " answers a different eligibility from a story card for the same run with a photograph");
   }
-  // ⚠️ AND THE GATE STILL BITES WHERE THE PACK PUTS IT. The relaxation being removed must not have taken
-  // the requirement with it: the three photo templates are the photograph, and they say so.
-  const bare = E.shareTemplateStates(run, a, pres, { photo: null, aspect: "feed" });
-  for (const t of ["moment", "execution", "progression"]) {
-    assert.equal(bare[t].ok, false, t + " no longer needs a photograph at all");
-    assert.match(bare[t].why, /photo/i, t + " does not say a photograph is what it needs");
+  // ⚠️ AND SINCE RULING 7 THE PHOTOGRAPH DOES NOT BITE AT ALL, WHICH MAKES THIS CLAIM SHARPER RATHER
+  // THAN WEAKER: the answer may not depend on the aspect OR on the picture, so one comparison covers
+  // both axes at once. The requirement it replaces — that three templates demand a photograph — is the
+  // one the owner removed, and the test above is where its replacement lives.
+  for (const aspect of E.SHARE_ASPECTS) {
+    assert.deepEqual(E.shareTemplateStates(run, a, pres, { photo: null, aspect: aspect }),
+      E.shareTemplateStates(run, a, pres, { photo: photo(), aspect: "story" }),
+      aspect + " answers a different eligibility depending on the shape or the photograph");
   }
 });
 
@@ -772,8 +812,21 @@ test("the template falls through to one that can be drawn", () => {
   const E = env();
   const model = (run: any, opt: any) => E.shareCardModel(run, opt);
   assert.equal(model(refRun(), { photo: PHOTO }).template, "moment", "The Moment is not the default");
-  assert.equal(model(refRun(), {}).template, "route", "with no photo the poster is not suggested");
-  assert.equal(model(treadmillRun(), {}).template, null, "a template is chosen that cannot be drawn");
+  // ⚠️ AND IT IS THE DEFAULT WITH NO PHOTOGRAPH TOO, WHICH IS THE CHANGE RULING 7 MADE. This line used to
+  // require the POSTER here, because moment/execution/progression were refused without a picture — so the
+  // pack's own "default, most broadly useful card" was unreachable for anybody who did not add one.
+  assert.equal(model(refRun(), {}).template, "moment", "with no photo the default is not The Moment");
+  // ⚠️ A TREADMILL RUN NOW GETS A CARD RATHER THAN THE PLACEHOLDER: no route, no photograph, and The
+  // Moment still draws it on the session ground. Only a run with neither a distance nor a time reaches
+  // null, which is what keeps sharePlaceholderCard reachable at all.
+  assert.equal(model(treadmillRun(), {}).template, "moment", "a treadmill run is left with no card");
+  // ⚠️ AND REACHING null NOW TAKES A RUN THAT FAILS ALL FOUR GATES, WHICH IS WORTH KNOWING BEFORE
+  // ASSERTING IT. Written with only the headline removed this line measured "execution": The Execution
+  // and The Progression are gated on the SPLITS, not on the hero, so a run with no distance and no time
+  // but five measured kilometres still fills them. The placeholder is for a record with nothing in it.
+  assert.equal(model(refRun({ distKm: 0, dist: "0 km", time: "", splits: [], route: [],
+    pband: null, pwin: null, pmix: null }), { photo: PHOTO }).template, null,
+    "a run with no distance, no time, no splits and no route is given a template it cannot fill");
   // An asked-for template that has become ineligible does not survive.
   assert.equal(model(intervalRun(), { photo: PHOTO, template: "execution" }).template, "moment",
     "an ineligible template stays selected");

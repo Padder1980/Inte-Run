@@ -18,6 +18,24 @@ import { readFileSync } from "node:fs";
 const page = () => readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
 const css = () => { const h = page(); return h.slice(h.indexOf("<style>"), h.indexOf("</style>")); };
 
+/**
+ * THE APP'S OWN SCRIPT BLOCK, NOT THE WHOLE PAGE.
+ * ⚠️ The built page also carries the MINIFIED engine, whose functions are renamed to one and two
+ * letters — so a set of "function names in the build" taken from the whole page would contain dozens of
+ * one-letter names and a dispatch branch calling any of them would count as handled. Bounded to the
+ * block that declares studioClick, the same fix test/share-render.test.ts records making for lift().
+ */
+let APP_SRC: string | null = null;
+function appScript(): string {
+  if (APP_SRC) return APP_SRC;
+  const html = page();
+  const marker = html.indexOf("function studioClick(");
+  assert.ok(marker > 0, "studioClick is not in the build");
+  const open = html.lastIndexOf("<script>", marker), close = html.indexOf("</script>", marker);
+  assert.ok(open >= 0 && close > open, "the app's own script block could not be bounded");
+  APP_SRC = html.slice(open + 8, close);
+  return APP_SRC;
+}
 /** Lift a function out of the built page, brace-matched. */
 function lift(name: string): string {
   const html = page();
@@ -55,6 +73,34 @@ function rule(sel: string): string {
 const nocomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
 /**
+ * ONE dispatch BRANCH, BOUNDED TO ITS OWN STATEMENT.
+ *
+ * ⚠️ THE OBVIOUS SLICE — from this action's test to the next one — IS THE COLLECTION-TOO-WIDE TRAP. The
+ * LAST branch's slice then runs to the end of studioClick, which contains the tool, template, metric,
+ * aspect and privacy families and their calls: an emptied final branch would be "handled" by somebody
+ * else's code. So the statement is closed properly: a block to its matching brace, a one-liner to its
+ * own semicolon.
+ */
+function studioBranch(handler: string, action: string): string {
+  const key = 'what === "' + action + '"';
+  const at = handler.indexOf(key);
+  assert.ok(at >= 0, "studioClick never names " + action);
+  let i = handler.indexOf(")", at + key.length) + 1;
+  while (/\s/.test(handler[i]!)) i++;
+  if (handler[i] === "{") {
+    let d = 0;
+    for (let j = i; j < handler.length; j++) {
+      if (handler[j] === "{") d++;
+      else if (handler[j] === "}") { d--; if (!d) return handler.slice(i, j + 1); }
+    }
+    throw new Error("unbalanced branch for " + action);
+  }
+  const end = handler.indexOf(";", i);
+  assert.ok(end > i, "unterminated branch for " + action);
+  return handler.slice(i, end + 1);
+}
+
+/**
  * Every builder that renders a control into the studio — the primary screen AND the five tool sheets.
  * ⚠️ THIS LIST IS THE WHOLE POINT OF THE FIRST SWEEP, so it has to include the sheets. The controls
  * moved off the primary screen into sheets during Build 2; a list that still named only the panel would
@@ -62,7 +108,7 @@ const nocomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s
  */
 const STUDIO_BUILDERS = ["shareStudioHtml", "studioPhotoHtml", "studioRouteHtml", "studioPosHtml",
   "studioToolsHtml", "studioMetricsHtml", "studioStyleHtml", "studioDestHtml", "studioSheetHtml",
-  "studioPrivHtml", "studioSwitch"];
+  "studioPrivHtml", "studioSwitch", "studioDestTile"];
 const studioMarkup = () => STUDIO_BUILDERS.map(lift).join("\n");
 
 // ---- the controls are reachable at all ------------------------------------------------------------
@@ -76,11 +122,43 @@ test("BLOCKER: every control the studio renders is reached by its delegated hand
   // interface while the two switches in the STATIC part of the panel worked perfectly, which is exactly
   // why it read as finished. Delegation cannot go stale when a section is rebuilt.
   const src = nocomment(studioMarkup());
-  const actions = [...new Set([...src.matchAll(/data-sst="([a-z0-9]+)"/g)].map((m) => m[1]!))];
-  assert.ok(actions.length >= 12, "expected the studio's actions, found " + actions.join(", "));
+  // ⚠️⚠️ THE ATTRIBUTE IS SOMETIMES STRING-BUILT, AND A LITERAL-ONLY SWEEP MISSED THE WHOLE DESTINATIONS
+  // ROW. studioDestTile writes data-sst="' + action + '", so "share" and "caption" appeared in no literal
+  // attribute anywhere — the derived list held fourteen actions and neither of those two. That is why the
+  // first restatement of the mechanism guard below STILL did not catch the emptied Copy-caption branch: a
+  // guard over a collection is only as good as the collection, and this collection had a hole in it.
+  const literal = [...src.matchAll(/data-sst="([a-z0-9]+)"/g)].map((m) => m[1]!);
+  const dyn = src.match(/data-sst="'\s*\+/g) || [];
+  assert.equal(dyn.length, 1, "there are now " + dyn.length + " builders writing a computed data-sst, and " +
+    "this sweep only knows how to enumerate studioDestTile's — add the new one or its controls go unchecked");
+  assert.match(nocomment(lift("studioDestTile")), /data-sst="' \+ action \+ '"/,
+    "studioDestTile no longer writes its first argument into data-sst, so the call-site sweep below is measuring nothing");
+  const built = [...src.matchAll(/studioDestTile\("([a-z0-9]+)"/g)].map((m) => m[1]!);
+  assert.ok(built.length >= 2, "studioDestTile's own call sites were not found: " + built.join(", "));
+  const actions = [...new Set(literal.concat(built))];
+  for (const must of ["share", "caption", "save"]) {
+    assert.ok(actions.includes(must), "the destinations row's " + must + " tile is not in the swept set");
+  }
+  assert.ok(actions.length >= 16, "expected the studio's actions, found " + actions.join(", "));
   const handler = nocomment(lift("studioClick"));
   const dead = actions.filter((a) => !new RegExp('=== "' + a + '"').test(handler));
   assert.deepEqual(dead, [], "these render in the studio and studioClick never names them: " + dead.join(", "));
+  // ⚠️⚠️ AND NAMING AN ACTION IS NOT HANDLING IT. As written above, this guard asserted only that the
+  // dispatch MENTIONS the action — so replacing the Copy-caption branch's body with a bare `return;`
+  // passed 960 tests with a tile that looked live and did nothing, which is the exact class CLAUDE.md
+  // records shipping three times (rdMore, #saveSetup, the profile confirm button). The claim is now the
+  // MECHANISM: each branch must reach at least one function that exists in the app, and the branch is
+  // bounded to its own statement so a call further down the dispatch cannot stand in for it.
+  const fnNames = new Set([...appScript().matchAll(/\bfunction ([A-Za-z_$][\w$]*)\s*\(/g)].map((m) => m[1]!));
+  assert.ok(fnNames.has("studioSync") && fnNames.has("studioCopyCaption"),
+    "the app's function names were not collected, so this sweep would pass on anything");
+  for (const a of actions) {
+    const body = studioBranch(handler, a);
+    const called = [...body.matchAll(/(^|[^.\w$])([A-Za-z_$][\w$]*)\s*\(/g)].map((m) => m[2]!)
+      .filter((n) => fnNames.has(n));
+    assert.ok(called.length > 0,
+      'the "' + a + '" branch of studioClick reaches no function that exists in the app: ' + body.trim());
+  }
   // ⚠️ AND EVERY OTHER ATTRIBUTE FAMILY TOO. The carousel, the tool row, the template list, the metric
   // chips, the aspect chips and the privacy switches are each addressed by their own attribute; a sweep
   // that only knew data-sst would have missed five whole families of control.
@@ -653,10 +731,29 @@ test("BLOCKER: the metric chips express the cap and the floor by disabling, neve
 
 test("BLOCKER: there is one destination sheet, and the primary action is dead while the file is not ready", () => {
   const dest = lift("studioDestHtml");
-  assert.match(dest, /data-sst="share"/, "the system share sheet is not offered");
-  assert.match(dest, /data-sst="save"/, "saving to the device is not offered");
+  // ⚠️ THE SHEET TOOK THE OWNER'S SHAPE ON 2026-08-20 — a horizontal row of labelled destination tiles,
+  // then a full-width primary with a settings affordance beside it — so a destination is now either a tile
+  // or the primary. Collected from both, because a guard that looks for one shape stops looking the day a
+  // destination moves to the other.
+  const acts = [...dest.matchAll(/studioDestTile\("([a-z]+)"/g)].map((m) => m[1]!)
+    .concat([...dest.matchAll(/data-sst="([a-z]+)"/g)].map((m) => m[1]!));
+  assert.ok(acts.includes("share"), "the system share sheet is not offered: " + acts.join(", "));
+  assert.ok(acts.includes("save"), "saving to the device is not offered: " + acts.join(", "));
   assert.match(dest, /stravaRunButtonHtml/, "Strava is not offered where the product allows it");
   assert.match(dest, /own share sheet/, "the sheet does not say where a runner's other apps are");
+  // ⚠️ THE SHAPE ITSELF, ASSERTED: a tile row, a full-width primary and one settings affordance. Without
+  // this the destinations could revert to a stacked list and every other assertion here would still pass.
+  assert.match(dest, /class="sst-dests"/, "the destinations are not a row of tiles");
+  assert.match(dest, /class="sst-prim"/, "there is no full-width primary row");
+  assert.match(dest, /class="sst-save" data-sst="save"/, "Save to device is not the primary");
+  assert.match(dest, /class="sst-cog" data-ssttool="privacy" aria-label="/,
+    "the settings affordance beside the primary is missing, unlabelled, or leads nowhere real");
+  // Every tile carries a visible label, which is its accessible name; the glyph beside it is hidden.
+  const tiles = [...dest.matchAll(/studioDestTile\("([a-z]+)", ([^,]+), "([^"]+)"\)/g)];
+  assert.ok(tiles.length >= 2, "fewer than two destination tiles: " + tiles.length);
+  for (const t of tiles) assert.ok(t[3]!.trim().length >= 4, "a tile has no readable label: " + t[0]);
+  assert.match(lift("studioDestTile"), /aria-hidden="true"/,
+    "a tile's glyph is not hidden from a screen reader, so its name is read twice");
   // ⚠️ THE PRIMARY ACTION IS IN THE DISABLED SET TOO. It is the only way to the destinations now, so
   // leaving it live while the file is being built opens a sheet whose every row is dead — the
   // looks-live-does-nothing defect moved one tap further in rather than removed.

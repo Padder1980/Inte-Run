@@ -57,15 +57,14 @@ function liftConst(name: string): string {
 
 const CONSTS = ["SHARE_MODEL_VERSION", "SHARE_TEMPLATES", "SHARE_TEMPLATE_LABEL", "SHARE_NEEDS_PHOTO",
   "RUN_METRIC_LADDER", "RD_MONTHS", "PRIV_RADIUS_M", "SHARE_PRIV_STORE", "SHARE_PRIV_MAX",
-  "SHARE_EVEN_SPREAD_S", "SHARE_METRIC_MAX", "SHARE_CROP0", "SHARE_ASPECTS", "SHARE_ASPECT_FAMILY"];
+  "SHARE_EVEN_SPREAD_S", "SHARE_METRIC_MAX", "SHARE_CROP0", "SHARE_ASPECTS", "SHARE_EXPORT"];
 const FNS = ["fmtPace", "rdCue", "rdWell", "runEvidenceConfidence", "runAnalysis", "runVerdict",
   "rdMetresBetween", "redactRouteEnds", "runRoutePresentation", "loadSharePriv", "saveSharePriv",
   "sharePrivacyFor", "sharePrivacyLocked", "setSharePrivacy", "runMetricLadder", "runStartMsKnown",
   "rdWhenText", "rdDateText", "shareTemplateStates", "shareTemplateFor", "shareEvidenceLine", "shareFileName",
   "shareProgressionClaim", "shareMetricPool", "shareMetricsChosen",
   "shareCropKey", "shareCropRead", "shareCropWrite", "sharePhotoView", "shareCropSig",
-  "shareCardModel", "shareKey", "shareRouteOn", "shareCardOpts", "shareCardKey", "shareAspect",
-  "shareAspectFamily", "shareExportSpec"];
+  "shareCardModel", "shareKey", "shareRouteOn", "shareCardOpts", "shareCardKey", "shareAspect"];
 
 /** A stand-in for the browser's localStorage: enough for the per-run privacy store to be exercised. */
 function fakeStore() {
@@ -101,7 +100,7 @@ function env(): Env {
     'let SCARD = { aspect: "story", template: null, routeOn: null, key: null, file: null, pending: 0, metrics: null };\n' +
     FNS.map(lift).join("\n") + "\n" +
     "return { " + FNS.join(", ") + ", RUN_METRIC_LADDER, SHARE_TEMPLATES, SHARE_MODEL_VERSION," +
-    " SHARE_METRIC_MAX, SHARE_CROP0," +
+    " SHARE_METRIC_MAX, SHARE_CROP0, SHARE_ASPECTS, SHARE_EXPORT," +
     " setPrivacy: (p) => { PRIVACY = p; }," +
     " setSharePrivStore: (s) => { SHAREPRIV = s; }, getSharePrivStore: () => SHAREPRIV," +
     " setPhoto: (p) => { SPHOTO = p; }, setCard: (c) => { SCARD = c; }, getCard: () => SCARD };";
@@ -520,14 +519,12 @@ test("BLOCKER: the framing is kept per template AND per aspect", () => {
   assert.equal(E.shareCropKey("moment", "story"), "moment:story");
   assert.notEqual(E.shareCropKey("moment", "story"), E.shareCropKey("moment", "feed"));
   assert.notEqual(E.shareCropKey("moment", "story"), E.shareCropKey("progression", "story"));
-  // ⚠️ THREE SHAPES NOW, AND THE SQUARE WOULD HAVE BEEN THE SILENT ONE. The key used to read
-  // (aspect === "feed" ? "feed" : "story"), so a square shared the story's slot: framing a photograph on
-  // a square moved it on the story too, and there was nothing to undo it with. Twelve slots, all
+  // ⚠️ ONE SLOT PER (TEMPLATE, ASPECT), AND A SHARED SLOT IS THE FAULT THIS GUARDS. Eight slots, all
   // distinct, is the claim — a count alone is satisfied by four aliases of three.
   const keys = ["moment", "execution", "progression", "route"]
-    .flatMap((t) => ["story", "feed", "square"].map((a) => E.shareCropKey(t, a)));
-  assert.equal(new Set(keys).size, 12, "two framing slots collide: " + keys.join(", "));
-  assert.equal(E.shareCropKey("moment", "square"), "moment:square");
+    .flatMap((t) => ["story", "feed"].map((a) => E.shareCropKey(t, a)));
+  assert.equal(new Set(keys).size, 8, "two framing slots collide: " + keys.join(", "));
+  assert.equal(E.shareCropKey("moment", "feed"), "moment:feed");
   // and an unknown shape still lands on the story's slot rather than minting one of its own
   assert.equal(E.shareCropKey("moment", "portrait"), "moment:story");
   // A framing set on one slot does not reach any other.
@@ -541,19 +538,15 @@ test("BLOCKER: the framing is kept per template AND per aspect", () => {
   const c = E.shareCardModel(run, { aspect: "story", template: "progression", photo: p });
   assert.deepEqual([c.photo.ox, c.photo.oy, c.photo.k], [0.5, 0.5, 1],
     "a second template inherited the first one's framing");
-  const sq = E.shareCardModel(run, { aspect: "square", template: "moment", photo: p });
-  assert.deepEqual([sq.photo.ox, sq.photo.oy, sq.photo.k], [0.5, 0.5, 1],
-    "the square inherited the story's framing");
   // ⚠️ AND THE MODEL MAY NOT CREATE A SLOT. It is called on every preview frame and on every encode, so a
   // read that lazily wrote would fill the store with entries nothing has edited.
   assert.deepEqual(Object.keys(p.crops), ["moment:story"], "reading a framing created one");
   // ⚠️ AND THE FIT IS PART OF THE FRAMING, SO IT PERSISTS PER SHAPE TOO. A runner who turns Fill on for a
-  // square panorama has not asked for their story card to be cropped as well.
-  E.shareCropWrite("moment", "square").fill = true;
-  assert.equal(E.shareCardModel(run, { aspect: "square", template: "moment", photo: p }).photo.fill, true);
+  // panorama on the feed has not asked for their story card to be cropped as well.
+  E.shareCropWrite("moment", "feed").fill = true;
+  assert.equal(E.shareCardModel(run, { aspect: "feed", template: "moment", photo: p }).photo.fill, true);
   assert.equal(E.shareCardModel(run, { aspect: "story", template: "moment", photo: p }).photo.fill, false,
-    "turning Fill on for a square turned it on for the story too");
-  assert.equal(E.shareCardModel(run, { aspect: "feed", template: "moment", photo: p }).photo.fill, false);
+    "turning Fill on for the feed turned it on for the story too");
   // shareCropWrite is the editing path, and it is the one that creates.
   const made = E.shareCropWrite("route", "feed");
   assert.deepEqual([made.ox, made.oy, made.k], [0.5, 0.5, 1]);
@@ -727,62 +720,52 @@ test("The Route Poster asks the post-privacy geometry, never run.route", () => {
   assert.match(lift("shareTemplateStates"), /pres\.route/, "eligibility reads the raw route again");
 });
 
-test("BLOCKER: a sticker needs no photograph, and it never carries one", () => {
-  // ⚠️ THE PHOTOGRAPH GATE IS NOT MERELY UNNECESSARY ON A STICKER, IT IS BACKWARDS. The three photo
-  // templates are gated because their composition IS the picture; strip the picture and what is left is
-  // the data card, which is exactly what a transparent sticker is for. Written without the relaxation,
-  // choosing Sticker leaves only The Route Poster eligible and a treadmill run has no sticker at all —
-  // which is the one output every run should be able to produce.
+test("BLOCKER: eligibility cannot be relaxed by the SHAPE, only by the run", () => {
+  // ⚠️ THE PHOTOGRAPH GATE WAS ASPECT-DEPENDENT FOR A DAY AND IS NOT ANY MORE. The withdrawn transparent
+  // output carried no photograph by construction, so it relaxed the gate for three templates — and while
+  // that was true of it, it was also the one thing in this function that could make the same run offer
+  // different templates depending on which chip was selected. Both shapes are photo-carrying now, so the
+  // answer must not depend on the aspect at all: what a run can honestly say is a fact about the RUN.
   const E = env();
   const run = refRun();
   const a = E.runAnalysis(run), pres = E.runRoutePresentation(run, E.sharePrivacyFor(run));
-  const st = E.shareTemplateStates(run, a, pres, { photo: null, aspect: "sticker" });
-  for (const t of ["moment", "execution", "progression"]) {
-    assert.equal(st[t].ok, true, t + " is refused on a sticker for want of a photograph");
+  for (const aspect of E.SHARE_ASPECTS) {
+    const bare = E.shareTemplateStates(run, a, pres, { photo: null, aspect: aspect });
+    const shot = E.shareTemplateStates(run, a, pres, { photo: photo(), aspect: aspect });
+    assert.deepEqual(bare, E.shareTemplateStates(run, a, pres, { photo: null, aspect: "story" }),
+      aspect + " answers a different eligibility from a story card for the same run and no photograph");
+    assert.deepEqual(shot, E.shareTemplateStates(run, a, pres, { photo: photo(), aspect: "story" }),
+      aspect + " answers a different eligibility from a story card for the same run with a photograph");
   }
-  // and the three fixed shapes still require one, so the relaxation is scoped to the sticker alone
-  const st2 = E.shareTemplateStates(run, a, pres, { photo: null, aspect: "story" });
+  // ⚠️ AND THE GATE STILL BITES WHERE THE PACK PUTS IT. The relaxation being removed must not have taken
+  // the requirement with it: the three photo templates are the photograph, and they say so.
+  const bare = E.shareTemplateStates(run, a, pres, { photo: null, aspect: "feed" });
   for (const t of ["moment", "execution", "progression"]) {
-    assert.equal(st2[t].ok, false, t + " no longer needs a photograph on a story card");
+    assert.equal(bare[t].ok, false, t + " no longer needs a photograph at all");
+    assert.match(bare[t].why, /photo/i, t + " does not say a photograph is what it needs");
   }
-  // ⚠️ AND EVERY OTHER REASON STILL APPLIES. The relaxation is about the photograph and nothing else:
-  // an interval session has no kilometre target to be judged against whatever shape it is exported at.
-  const iv = intervalRun();
-  const stIv = E.shareTemplateStates(iv, E.runAnalysis(iv),
-    E.runRoutePresentation(iv, E.sharePrivacyFor(iv)), { photo: null, aspect: "sticker" });
-  assert.equal(stIv.execution.ok, false, "The Execution is offered on an interval session's sticker");
-  assert.match(stIv.execution.why, /repetitions/i);
-  // ⚠️ AND THE MODEL HANDS A STICKER NO PHOTOGRAPH EVEN WHEN ONE IS SUPPLIED. Three things downstream
-  // are gated on m.photo — the luminance probe, the scrim and the photo box — so a sticker drawn with a
-  // photograph in the model would composite the runner's picture into a file whose whole promise is that
-  // it has no background.
-  E.setPhoto(photo());
-  const m = E.shareCardModel(run, { aspect: "sticker", template: "moment", photo: photo() });
-  assert.equal(m.photo, null, "a sticker's model carries a photograph");
-  assert.equal(m.aspect, "sticker");
-  const m2 = E.shareCardModel(run, { aspect: "story", template: "moment", photo: photo() });
-  assert.ok(m2.photo, "a story card lost its photograph, so the gate is not scoped to the sticker");
 });
 
-test("BLOCKER: the route is on by default on a sticker, because a sticker has no photograph", () => {
-  // ⚠️ THE TEST IS "DOES THIS CARD CARRY A PHOTOGRAPH", NOT "HAS ONE BEEN CHOSEN". Written as !SPHOTO
-  // alone, a runner who had picked a picture and then switched to Sticker got a data card with the route
-  // switched off by a decision about a photograph that is not on it.
+test("BLOCKER: the poster is handed the photograph the runner chose, on every shape", () => {
+  // ⚠️ THE OWNER'S RULING OF 2026-08-20 REVERSES THE PACK ON THIS ONE TEMPLATE: "I want them to be able
+  // to add a photo to any of the cards that you have created". The pack calls the poster "route-led,
+  // photo-free" and the model used to hand it null by name. There must now be NO per-template branch at
+  // all, or the next template added inherits whichever half was written first.
   const E = env();
-  E.setPhoto(photo());
-  E.setCard({ aspect: "story", template: null, routeOn: null, key: null, file: null, pending: 0, metrics: null });
-  assert.equal(E.shareRouteOn(), false, "a photo card defaults to the route being off");
-  E.setCard({ aspect: "sticker", template: null, routeOn: null, key: null, file: null, pending: 0, metrics: null });
-  // ⚠️ THE MESSAGE HERE SAID THE OPPOSITE OF THE ASSERTION. A sticker carries no photograph, so there is
-  // nothing for the route to compete with and the default is ON.
-  assert.equal(E.shareRouteOn(), true,
-    "a sticker no longer defaults to the route being ON, though it has no photograph to compete with");
-  // and an explicit answer still wins in both directions
-  E.setCard({ aspect: "sticker", template: null, routeOn: false, key: null, file: null, pending: 0, metrics: null });
-  assert.equal(E.shareRouteOn(), false, "an explicit no is overridden on a sticker");
-  E.setPhoto(null);
-  E.setCard({ aspect: "story", template: null, routeOn: null, key: null, file: null, pending: 0, metrics: null });
-  assert.equal(E.shareRouteOn(), true, "a card with no photograph at all lost its route");
+  const run = refRun();
+  for (const aspect of E.SHARE_ASPECTS) {
+    for (const t of ["moment", "execution", "progression", "route"]) {
+      const m = E.shareCardModel(run, { aspect: aspect, template: t, photo: photo() });
+      assert.ok(m.photo && m.photo.id === photo().id,
+        t + " on a " + aspect + " card was not handed the runner's photograph");
+    }
+    // ⚠️ AND PHOTO-OPTIONAL MEANS THE MATTE GROUND SURVIVES. With no picture the poster still draws, and
+    // m.photo has to be absent rather than an empty view, because shareDrawBody's topographic ground and
+    // the whole luminance solver are gated on exactly that field.
+    const bare = E.shareCardModel(run, { aspect: aspect, template: "route", photo: null });
+    assert.equal(bare.photo, null, "a poster with no photograph carries a photo field anyway");
+    assert.equal(bare.template, "route");
+  }
 });
 
 test("the template falls through to one that can be drawn", () => {
@@ -951,9 +934,16 @@ test("BLOCKER: the export filename is non-sensitive and honours the date switch"
   assert.equal(name(treadmillRun()), "InteRun-2026-08-18-Easy-run.jpg", "a zero distance is in the name");
   // And the export path actually uses it, from the model it drew.
   const prep = lift("prepareShareCard");
-  assert.match(prep, /canvasToShareFile\(c, shareFileName\(m\), shareExportSpec\(m\)\)/,
-    "the export is still a fixed filename, or its format no longer comes from the same model");
+  assert.match(prep, /canvasToShareFile\(c, shareFileName\(m\)\)/,
+    "the export is still a fixed filename, or the name no longer comes from the model that drew it");
   assert.ok(!/interun-run\.jpg/.test(page()), "the old fixed filename is still in the build");
+  // ⚠️ AND THE NAME'S EXTENSION IS THE ENCODER'S OWN, NOT A LITERAL BESIDE IT. Named separately the two
+  // agree until somebody adds a second format, and the failure is a file whose name says one thing and
+  // whose bytes say another — invisible to a dimension test and to a pixel test alike.
+  assert.match(lift("shareFileName"), /SHARE_EXPORT\.ext/,
+    "the filename's extension is written out rather than taken from the encoder's own record");
+  assert.equal(E.SHARE_EXPORT.ext, "jpg");
+  assert.equal(E.SHARE_EXPORT.mime, "image/jpeg");
 });
 
 // ---- the brand mark ------------------------------------------------------------------------------
@@ -1030,17 +1020,16 @@ test("BLOCKER: the card's date carries no time of day, and the switch still hide
   assert.ok(!/2026/.test(E.shareFileName(hidden)), "the date survived in the filename");
 });
 
-test("BLOCKER: the poster is handed no photograph and a route that is not optional", () => {
-  // ⚠️ TWO FIELDS THE TEMPLATE MUST NOT HAVE TO DECIDE FOR ITSELF. The poster is photo-free by
-  // definition, and the topographic ground and the luminance probe are both gated on m.photo — so a
-  // poster carrying a photograph in its model would get the picture and neither the texture nor a solved
-  // veil. And shareRouteOn() defaults to "off when a photograph has been chosen", which is right for The
-  // Moment's small inset and would hand the poster an empty ground under a distance hero.
+test("BLOCKER: the poster's route is not optional, whatever the switch says", () => {
+  // ⚠️ ONE FIELD THE TEMPLATE MUST NOT HAVE TO DECIDE FOR ITSELF. shareRouteOn() defaults to "off when a
+  // photograph has been chosen", which is right for The Moment's small inset and would hand the poster an
+  // empty field under a distance hero — the route IS the poster, so the model forces it there.
+  // ⚠️ AND ITS PHOTOGRAPH IS NO LONGER FORCED TO null: see the poster's own photo test above for the
+  // owner's ruling. What is asserted here is the route, which that ruling did not touch.
   const E = env();
   const run = refRun();
   const poster = E.shareCardModel(run, { aspect: "story", template: "route", routeOn: false, photo: PHOTO });
   assert.equal(poster.template, "route");
-  assert.equal(poster.photo, null, "the poster was handed a photograph");
   assert.ok(poster.route && poster.route.length >= 2, "the poster was handed no route");
   // The Moment with the same options keeps the photograph and honours the route switch.
   // ⚠️ THE SAME BITMAP, NOT THE SAME OBJECT. sharePhotoView hands each card a fresh view carrying that

@@ -147,7 +147,12 @@ test("BLOCKER: the sharing step stays unticked while a blocked item is still blo
   /**
    * ⚠️ ONLY VERIFIABLY-DONE WORK IS TICKED — the page's own standing rule, and a wrongly-ticked step
    * destroys its value. Saving straight to the camera roll needs an Xcode build and a real device, so
-   * `pc-share` must appear in NO dated batch. `pc-sticker` is ticked because the sticker itself is done.
+   * `pc-share` must appear in NO dated batch.
+   * ⚠️ AND A BATCH IS NEVER EDITED, EVEN WHEN THE OWNER WITHDRAWS THE FEATURE IT TICKED. `pc-sticker`
+   * stays ticked because the work it names genuinely happened; progress lives in HIS browser's
+   * localStorage, so un-ticking it here would do nothing on his phone and would rewrite the record of
+   * what was built. What changes when a feature is withdrawn is the step's own DETAIL, which has to say
+   * so — a map that still describes a button he asked us to remove is a map that misinforms him.
    */
   const rm = read("docs/roadmap/index.html");
   const at = rm.indexOf("var BATCHES = ");
@@ -155,7 +160,22 @@ test("BLOCKER: the sharing step stays unticked while a blocked item is still blo
   const batches = rm.slice(at, rm.indexOf("};", at));
   assert.ok(!/"pc-share"/.test(batches),
     "pc-share is ticked while Save to Photos is still blocked on a native build nobody has made");
-  assert.match(batches, /"pc-sticker"/, "pc-sticker is done and measured but is not ticked in any batch");
+  assert.match(batches, /"pc-sticker"/,
+    "pc-sticker was built and measured, so its batch stays; a withdrawn feature is recorded in the " +
+    "step's detail rather than by editing history nobody's browser would re-read");
+  /**
+   * ⚠️ AND THE WITHDRAWAL IS STATED WHERE HE READS IT — WHICH IS A CLAIM ABOUT POSITION, NOT ABOUT A
+   * WORD BEING PRESENT SOMEWHERE. Written as "the detail matches /removed|withdrawn/" this guard was
+   * satisfied by the ORIGINAL prose: the step already explained why the sticker "is not simply the same
+   * card with the photo removed". Watched — the break deleted the whole withdrawal sentence and the
+   * guard passed. A note that a feature is gone, buried three hundred words inside a paragraph
+   * describing it as live, is the misinformation rather than the remedy.
+   */
+  const st = rm.slice(rm.indexOf('data-id="pc-sticker"'));
+  const detail = st.slice(st.indexOf('class="st-d"'), st.indexOf("</div></div></div>"));
+  assert.match(detail.slice(0, 200), /asked for this one to go/,
+    "the sticker step does not OPEN by saying the owner asked for it to be removed, so a reader meets a " +
+    "description of a live button first: " + JSON.stringify(detail.slice(0, 200)));
   // Every id a batch names has to be a step that exists, or the tick lands on nothing at all.
   const ids = new Set(Array.from(rm.matchAll(/data-id="([^"]+)"/g)).map((x) => x[1]!));
   for (const x of batches.matchAll(/"([a-z0-9-]+)"\s*[,\]]/g)) {

@@ -66,13 +66,12 @@ function recCtx() {
   return ctx;
 }
 const FNS = ["sharePhotoBox", "sharePhotoNorm", "shareBoxLeavesGap", "shareBlurBg",
-  "sharePhotoCompose", "sharePhotoDraw", "shareSubjectZones", "cardGeom", "shareGeomAt",
-  "shareAspectFamily", "shareCanvasGeom",
+  "sharePhotoCompose", "sharePhotoDraw", "shareSubjectZones", "cardGeom",
   "shareRect", "cardAlpha", "shareCropKey", "shareCropRead", "shareAspect"];
 // ⚠️ CARD_W AND CARD_M SHARE ONE STATEMENT WITH cardGeom's other constants, so liftConst finds
 // them by the statement's FIRST declarator and they are named separately for the return.
 const CONSTS = ["SHARE_INK", "SHARE_BLUR", "SHARE_SUBJECT", "SHARE_CROP0", "CARD_W",
-  "SHARE_ASPECTS", "SHARE_ASPECT_H", "SHARE_ASPECT_FAMILY"];
+  "SHARE_ASPECTS", "SHARE_ASPECT_H"];
 const EXTRA = ["CARD_M"];
 function env(): Env {
   // ⚠️ THE CANVAS STUB'S width AND height MUST BE WRITABLE, because shareBlurBg's doubling chain reads
@@ -117,8 +116,8 @@ test("BLOCKER: contain is the DEFAULT and fill is the opt-in, at every shape and
   // a call site passing fill:false, which would pass whichever way round the default sat.
   const E = env();
   assert.equal(E.SHARE_CROP0.fill, false, "the untouched framing slot asks to crop the photograph");
-  for (const aspect of ["story", "feed", "square"]) {
-    const gm = E.shareCanvasGeom(aspect);
+  for (const aspect of ["story", "feed"]) {
+    const gm = E.cardGeom(aspect);
     for (const [why, w, h] of SHAPES) {
       const bare = E.sharePhotoBox({ w, h, k: 1 }, gm.W, gm.H);
       const whole = E.sharePhotoBox({ w, h, k: 1, fill: false }, gm.W, gm.H);
@@ -153,8 +152,8 @@ test("BLOCKER: an axis with slack is CENTRED, so the drag can never invert", () 
   // left in one mode and right in the other. Measured as "the fraction changes nothing on an axis with
   // room", which is the property the gesture code relies on.
   const E = env();
-  for (const aspect of ["story", "feed", "square"]) {
-    const gm = E.shareCanvasGeom(aspect);
+  for (const aspect of ["story", "feed"]) {
+    const gm = E.cardGeom(aspect);
     for (const [why, w, h] of SHAPES) {
       const mid = E.sharePhotoBox({ w, h, ox: 0.5, oy: 0.5, k: 1 }, gm.W, gm.H);
       for (const ox of [0, 0.25, 1]) for (const oy of [0, 0.25, 1]) {
@@ -203,7 +202,7 @@ test("BLOCKER: the gesture code asks sharePhotoBox rather than carrying a second
 
 test("BLOCKER: the gap is filled by a blurred reflection of the photograph, drawn UNDER it", () => {
   const E = env();
-  const gm = E.shareCanvasGeom("story");
+  const gm = E.cardGeom("story");
   const ctx = E.ctx();
   E.sharePhotoDraw(ctx, { w: 1600, h: 1200, ox: 0.5, oy: 0.5, k: 1, id: "t1", bitmap: {} }, gm);
   const order = ctx.log.map((e: any[]) => e[0]).filter((n: string) => n === "drawImage" || n === "fillRect");
@@ -226,8 +225,8 @@ test("BLOCKER: a card with NO gap draws one image and tints nothing", () => {
   // the surround may only ever paint where the photograph does not reach, so on a covered card there is
   // nothing for it to do and every fill-mode export is unchanged by its existence.
   const E = env();
-  for (const aspect of ["story", "feed", "square"]) {
-    const gm = E.shareCanvasGeom(aspect);
+  for (const aspect of ["story", "feed"]) {
+    const gm = E.cardGeom(aspect);
     for (const [why, w, h] of SHAPES) {
       const ctx = E.ctx();
       E.sharePhotoDraw(ctx, { w, h, ox: 0.5, oy: 0.5, k: 1, fill: true, id: "f" + w, bitmap: {} }, gm);
@@ -235,7 +234,7 @@ test("BLOCKER: a card with NO gap draws one image and tints nothing", () => {
       assert.equal(ctx.calls("fillRect").length, 0, why + " " + aspect + ": the photograph is being tinted");
     }
     // And a contain that has been zoomed past the fit is a covered card too.
-    const gm2 = E.shareCanvasGeom(aspect);
+    const gm2 = E.cardGeom(aspect);
     const ctx2 = E.ctx();
     E.sharePhotoDraw(ctx2, { w: 1200, h: 1600, ox: 0.5, oy: 0.5, k: 4, id: "z", bitmap: {} }, gm2);
     assert.equal(ctx2.calls("fillRect").length, 0,
@@ -248,7 +247,7 @@ test("BLOCKER: the gap is decided by the BOX, never by the mode", () => {
   // pinched past the fit that hides every pixel of it — work for nothing, and a cached bitmap held for
   // something nobody can see.
   const E = env();
-  const gm = E.shareCanvasGeom("story");
+  const gm = E.cardGeom("story");
   assert.ok(!/\bp\.fill\b/.test(nocomment(lift("shareBoxLeavesGap"))),
     "the gap test reads the fit mode instead of the box");
   assert.ok(!/\.fill\b/.test(nocomment(lift("sharePhotoCompose")).replace(/fillStyle|fillRect/g, "")),
@@ -274,7 +273,7 @@ test("BLOCKER: the surround is REFLECTED at the seam, and mirrored rather than r
   // both reflection branches switched off at `if (false)`, because the dead code still contains the
   // string. A source grep cannot tell live code from dead code; a recorded draw can.
   const E0 = env();
-  const gmS = E0.shareCanvasGeom("story");
+  const gmS = E0.cardGeom("story");
   E0.shareBlurBg({ w: 1600, h: 1200, id: "refl-v", bitmap: {} }, gmS);
   const tinyV = E0.canvases[0].getContext("2d").log;
   const flipsV = tinyV.filter((e: any[]) => e[0] === "scale" && e[1] === 1 && e[2] === -1);
@@ -289,7 +288,7 @@ test("BLOCKER: the surround is REFLECTED at the seam, and mirrored rather than r
   assert.ok(stripsV.some((e: any[]) => e[3] === 0), "no reflection is taken from the photograph's top edge");
   assert.ok(stripsV.some((e: any[]) => e[3] > 0), "no reflection is taken from the photograph's bottom edge");
   const E1 = env();
-  E1.shareBlurBg({ w: 900, h: 2100, id: "refl-h", bitmap: {} }, E1.shareCanvasGeom("story"));
+  E1.shareBlurBg({ w: 900, h: 2100, id: "refl-h", bitmap: {} }, E1.cardGeom("story"));
   const tinyH = E1.canvases[0].getContext("2d").log;
   const flipsH = tinyH.filter((e: any[]) => e[0] === "scale" && e[1] === -1 && e[2] === 1);
   assert.equal(flipsH.length, 2, "a horizontally letterboxed surround made " + flipsH.length +
@@ -341,7 +340,7 @@ test("BLOCKER: the surround is computed once per (photograph, aspect), not per f
   // finger. Measured through the real editor: 40 drag frames rebuild it zero times, and the cached
   // bitmap is the same object afterwards.
   const E = env();
-  const gm = E.shareCanvasGeom("story");
+  const gm = E.cardGeom("story");
   const p = { w: 1200, h: 1600, id: "cache-1", bitmap: {} };
   const first = E.shareBlurBg(p, gm);
   assert.ok(first, "the surround was not built at all");
@@ -353,7 +352,7 @@ test("BLOCKER: the surround is computed once per (photograph, aspect), not per f
   assert.equal(E.shareBlurBg({ ...p, fill: true }, gm), first,
     "the surround was rebuilt when the fit mode changed");
   // A different aspect and a different photograph both must.
-  assert.notEqual(E.shareBlurBg(p, E.shareCanvasGeom("feed")), first,
+  assert.notEqual(E.shareBlurBg(p, E.cardGeom("feed")), first,
     "the surround survived a change of aspect, so one bitmap is serving two card shapes");
   const back = E.shareBlurBg(p, gm);
   assert.notEqual(E.shareBlurBg({ ...p, id: "cache-2" }, gm), back,
@@ -376,8 +375,8 @@ test("BLOCKER: the subject exclusion and the route zone are recomputed per fit m
   // 4:3 source in a 9:16 card goes LOWER under contain, because the picture is centred in a tall card
   // while the cover crop was pinned to its top edge. "Smaller" holds everywhere; "higher" does not.
   const E = env();
-  for (const aspect of ["story", "feed", "square"]) {
-    const gm = E.shareCanvasGeom(aspect);
+  for (const aspect of ["story", "feed"]) {
+    const gm = E.cardGeom(aspect);
     for (const [why, w, h] of SHAPES) {
       const whole = E.shareSubjectZones(E.sharePhotoBox({ w, h, k: 1 }, gm.W, gm.H), gm);
       const fill = E.shareSubjectZones(E.sharePhotoBox({ w, h, k: 1, fill: true }, gm.W, gm.H), gm);

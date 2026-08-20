@@ -4193,6 +4193,13 @@ card framing, an outer border, neon glow, a route stranded in empty space). So t
 replaced and the plumbing kept. Four templates: **The Moment**, **The Execution**, **The Route
 Poster**, **The Progression**, at exactly **1080×1920** and **1080×1350** (reflowed, never cropped).
 
+⚠️⚠️ **READ THE LAST SUBSECTION OF THIS CHAPTER FIRST — "TWO OUTPUTS ONLY, AND A PHOTOGRAPH ON EVERY
+CARD" (2026-08-20).** Everything below it about **Square 1:1** and the **transparent sticker** describes
+outputs that were built, measured, signed off and then WITHDRAWN by the owner. Those passages are kept
+because the findings they record are still true and still useful — the reflow lesson, the seam
+measurement, the guards that could not fail — but the shapes themselves are gone from the code and from
+the editor. Two outputs: Story 9:16 and Feed 4:5.
+
 **The owner's three rulings** (`scratchpad/share/DECISIONS.md`, binding): conservative centre-person
 exclusion instead of Vision — **which is what keeps the whole feature shippable over the air**; The
 Execution **restricted** to sessions judgeable against the 1000 m splits that exist; **per-run** share
@@ -5316,6 +5323,144 @@ JPEG SOF walker and PNG chunk reader: **16 story 1080×1920, 16 feed 1080×1350,
 8-bit 3-channel; four stickers **1020×1044 / 1020×720 / 1020×730 / 1014×1188**, bit depth 8, colour type
 6, every CRC valid, no `tEXt`/`iTXt`/`zTXt`/`eXIf` — the derived sticker sizes are **unchanged** by the
 keylines, because the marks sit well inside the ink bounding box.
+
+### TWO OUTPUTS ONLY, AND A PHOTOGRAPH ON EVERY CARD (owner, ruling 6, 2026-08-20)
+
+Verbatim: *"I want them to be able to add a photo to any of the cards that you have created, it doesn't
+matter if the route line sits over the top of their photo. get rid of the 2 options ive circled...i only
+want the two options if story and feed"*. Three binding changes; suite 977 → **960** (every removed test
+belonged to a withdrawn output — accounted for below), 32 deliberate re-breaks, 31 caught first time.
+
+⚠️ **SQUARE 1:1 AND THE TRANSPARENT STICKER ARE GONE, AND GONE FROM `SHARE_ASPECTS` RATHER THAN FROM THE
+CHIP ROW.** A chip removed while `shareAspect` still validated the name leaves two renderers reachable
+through a stored `SCARD.aspect` with nothing on screen to reach them — the computed-and-discarded trap
+this file records four times over. **Square was the pack's OPTIONAL third format** ("Support Square 1:1
+if the existing renderer can do so"), so dropping it is compliant; **the sticker was his own addition of
+2026-08-19**, so dropping it returns to the pack exactly. Neither is a regression to apologise for.
+
+**What was deleted, and it is more than the two renderers.** `SHARE_STICKER`, `shareStickerH`,
+`shareStickerBox`, `shareStickerGeom`, `shareStickerField`, `shareStickerBandTop`, `shareStickerPatch`,
+`SHARE_WM_CLEAR`, `CARD_MEASURE`/`cardMeasureCtx`, `shareFontPx`, `SHARE_TYPE_SQ`, `SHARE_GAP_SQ` +
+`shareGaps`, `SHARE_METRIC_CAP` + `shareMetricCap`, `SHARE_LADDER_MAX` + `shareLadderMax`,
+`SHARE_CHART_SQ_H` + `shareChartH`, `SHARE_ASPECT_FAMILY` + `shareAspectFamily`, `SHARE_ASPECT_LABEL`,
+`shareExportSpec`, `shareCanvasGeom`, `shareGeomAt`, `studioFrameOf`, `studioSlideGeom`,
+`SHARE_ZONE_SOFT_VETO`, `SHARE_INK.hairAlpha`, the `.sst-alpha` chequer rule, and `pngChunks` in the test
+harness. Plus four fields off the geometry record — **`OW`/`OH`/`ox`/`oy`, which were the sticker's
+crop-to-its-own-ink machinery and are identities for a fixed shape**, and `family`/`sticker` with them.
+`test/share-export.test.ts` sweeps the whole app script for all of them by name.
+⚠️ **AN IDENTITY FIELD IS THE ONE THE NEXT READER BELIEVES MEANS SOMETHING**, which is why they went
+rather than being left as a solved generalisation.
+⚠️ **AND THE ORPHAN SWEEP FOUND ONE I HAD MADE MYSELF** — `SHARE_ASPECT_LABEL`, whose only reader was the
+metrics sheet's "this shape carries two" sentence. It found `SHARE_VEIL_STEPS` too and that one is NOT
+dead: a test reads it as the vocabulary the veil plan's `step` must belong to. Verify a dead-code claim
+before acting on it (this file already records deleting a `void OW` line on a verifier's word).
+⚠️ **AND `.sst-hint` CAME BACK AS A FALSE POSITIVE from the comment recording its own deletion** — the
+fifth firing of the guard-tripping-on-its-own-prose trap, this time in my sweep rather than in a test.
+
+⚠️ **THE ONE FINDING THAT SURVIVES THE SQUARE IS WORTH KEEPING: A SHORTER CANVAS NEEDS THE BIG RUNGS
+TIGHTENED AND THE SMALL ONES LEFT ALONE.** "1:1 leaves the photograph 32.3% of the card" was the story
+layout dropped onto a 1080-tall canvas; recomposed properly it measured 51.7 / 43.1 / 42.2 / 59.0%. So
+the number was evidence that a scale is not a reflow, not that a shape cannot work — and it is exactly
+what `SHARE_TYPE_FEED` does for the feed post. Measured too, and kept in the source: **the two-metric cap
+bought WIDTH, not height** (0.0 points of clear photograph on every template; 301px per column against
+464px), so if a shorter shape is ever wanted again that is the lever.
+
+### THE ROUTE POSTER IS PHOTO-OPTIONAL NOW, AND THE PACK IS OVERRIDDEN ON THAT LINE
+
+The pack calls it *"route-led, photo-free"* and `shareCardModel` handed it `null` **by name**. His
+instruction wins, so there is no per-template photograph gate at all — every template is handed whatever
+the runner chose, and `shareDrawBody`'s `!m.photo` gate is what keeps the matte topographic ground for a
+poster with no picture. It composites through the same `sharePhotoDraw`, the same blurred surround, the
+same Fill switch and the same ONE gradient scrim as the other three.
+
+⚠️ **ITS FAINTEST TIER IS LIFTED TO THE SOFT ONE WHEN THERE IS A PHOTOGRAPH, FROM ONE VARIABLE READ BY
+THE SOLVER AND BY EVERY FILL.** This is The Execution's own finding applied here: against a white ground
+the faint tier solves alpha 0.88 where the soft tier solves 0.78, so asking for it costs **ten points of
+somebody's photograph on this template alone** — and on a solved scrim the soft tier is what the rest of
+the family already sets for exactly these rungs (place, date, metric labels, footer). On the matte ground
+the faint tier is right and cheap (6.50:1 by arithmetic) and stays. A palette that disagrees with the
+scrim solved for it is the whole class of defect the solver exists to prevent, so it is `const quiet =
+m.photo ? SHARE_INK.inkSoft : SHARE_INK.inkFaint` and a guard counts the remaining `inkFaint` reads.
+
+⚠️ **MEASURED FROM RENDERED PIXELS, 304 READINGS — the poster's copy over ten grounds (white, black,
+saturated red/green/magenta, a spark field built to defeat a probe-solved scrim, three real scenes, and
+the matte), both aspects, both fit modes, eight text elements each. Worst 5.11:1; nothing under 4.5.**
+Method deliberately neither the app's own probe nor the byte gate's: 99th-percentile ink against
+15th-percentile ground inside each element's own planned box.
+
+⚠️ **AND THE DECISIVE REGRESSION CHECK IS A HASH ACROSS BOTH TREES, NOT AN ARGUMENT.** Eighteen exports
+built from a deterministic in-page picture, hashed at HEAD and here: **14 identical, 4 changed, and the
+four are exactly the poster WITH a photograph.** Before, its three rows collapsed to one hash because it
+ignored the picture; after, whole / fill / bare are three distinct pictures. Every photo template and the
+bare poster are byte-for-byte unmoved — which is the proof that removing the raised hairline alpha and
+the mark keyline touched nothing, since both were gated on `gm.sticker`.
+
+### THE ROUTE MAY SIT OVER THE PHOTOGRAPH — THE SCORER IS A PREFERENCE, NOT A VETO
+
+⚠️⚠️ **THIS IS WHY HIS SCREENSHOT HAD NO ROUTE ON IT AT ALL.** The conservative centre-person exclusion
+was a hard veto, so on a photograph where it reached every candidate column the switch read "show my
+route" over a card with no route — the looks-live-does-nothing defect, arrived at by a safety rule eating
+the feature. **Measured, with the old veto re-implemented rather than remembered: refused 6 of 20** ⚠️ (the implementer reported 8; an independent replay of the same sweep measures 6, and 6 is what its own following sentence implies — the reproducible figure is the one recorded)
+(5 source shapes × 2 aspects × 2 fit modes). **Now: placed 20 of 20.**
+
+⚠️ **REMOVING THE VETO ALONE WOULD NOT HAVE FIXED IT, AND THAT IS THE HALF WORTH KNOWING.** Two things
+could refuse a route and only one was the scorer: `shareZoneRect` returns null when the free column
+beside the obstacles is narrower than `SHARE_ZONE_MIN_W`, so on a wide source enlarged to cover, the
+assumed face spans the whole canvas width and **all four candidates come back null before anything is
+scored**. `shareRouteFallback` is the band itself — full content width between the copy above and the
+block below — reached only when the four preferred columns have all failed. Measured: 6 of the 20 land
+there, and they are exactly the zero-clear-column cases.
+
+⚠️ **THE SCORING STAYS, AND KEEPING IT IS NOT OPTIONAL.** He said a route over the photograph is fine; he
+did not ask for one drawn through somebody's face when a clearer placement is free. So the face still
+NARROWS the candidate columns (which is how the tall clear strip beside a runner becomes a candidate at
+all — 219×545 on reference 01) while no longer being able to refuse one. **14 of the 20 placements land
+completely clear of the assumed face**, and where any clear column exists it is always taken.
+⚠️ **`SHARE_ZONE_PEN.face` IS 2.2 AND BIGGER THAN 1 ON PURPOSE.** At exactly 1 a fully covered face scores
+0, the same as a fully covered torso, so a candidate crossing a face could tie with one crossing a chest
+and win on iteration order. At 2.2 the face is always the worse trade at equal coverage.
+⚠️ **TEXT IS STILL HARD, AND THAT IS A DIFFERENT RULE.** "Over the photograph" is what he asked for; a
+route through the distance hero is not a route, it is a mess. `-1` now means only two things: outside the
+safe region, or crossing the card's own copy. And the fallback can still return null — on HEIGHT, which
+is a statement about the card's geometry rather than about somebody's photograph.
+
+⚠️ **ONE OF THE OLD GUARDS' OWN FIXTURES COULD NEVER HAVE SEEN THIS.** "A face that fills the frame is
+the same refusal by the other route" used a 1000×1000 source at k=9, which maps the face band entirely
+above the canvas and clips it to **height 0** — so the assertion under it was vacuous. Restated with a
+fixture whose assumed face genuinely spans the card width, and the guard asserts that the fixture does
+so before relying on it.
+
+### WHAT THE TEST SUITE LOST, ITEM BY ITEM — AND TWO GUARDS I DESTROYED BY ACCIDENT
+
+977 → **960**. Every one of the 17 is accounted for: `share-export` −7 (the sticker's fourth-output
+guard, the family-lookup sweep, the sticker route band, and the five square-recomposition guards, against
+one new withdrawn-machinery sweep), `share-export-bytes` −9 (the eight sticker guards plus the sticker
+sRGB one), `share-studio` −1 (three editor guards about shapes that no longer exist, replaced by two).
+`share-render` and `share-model` are unchanged in count, with three route-placement guards where there
+were two and a new poster-photograph guard where the old poster-has-no-photograph one was.
+
+⚠️⚠️ **AND I DESTROYED TWO UNRELATED GUARDS BY SLICING A TEST FILE FROM ONE `test(` TO ANOTHER.** The
+range from "all four outputs are offered" to the Photo-tool test also contained *"rebuilding a sheet's
+rows puts focus back on the control that was used"* and *"the switch component reaches the 44px tap
+floor by growing its hit area"* — nothing to do with shapes. It presented only as a count: 28 → 25 where
+I had made one net deletion. **Recovered from `git show HEAD:` and re-run.** The lesson is the same one
+this file already records for `git checkout`: **when removing tests, diff the TITLE LIST before and after
+and account for every line**, because a slice between two anchors takes whatever sits between them.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc clean
+apart from the one pre-existing `test/onboarding-wizard.test.ts` Date error, **960/960 · 0 fail**, both
+ratchets unchanged on their ceilings (**143 of 235 radii, 322 of 442 font sizes** — the deleted CSS was
+`background-*` only, so neither total moved and neither ceiling could be lowered). Export dimensions
+re-read from the produced bytes with an independently written SOF walker: **18 exports, all exactly
+1080×1920 / 1080×1350, 8-bit 3-channel, ICC present, no APP1/EXIF, every filename `.jpg`.** Every
+eligibility reason string produced by the state that produces it — nine distinct strings, all still true.
+
+⚠️ **ONE FLAKE OBSERVED AND NOT REPRODUCED, REPORTED RATHER THAN EXPLAINED AWAY.** In one full-suite run
+of five, three browser-backed privacy tests in `test/share-export-bytes.test.ts` failed in under a
+millisecond each; the file passed alone four times and the whole suite passed the other four. The gate's
+headless-browser dependency is pre-existing and my changes to that file were removals, so this is very
+probably a CDP timing artefact under parallel load — but it is not proven, and a release gate that flakes
+is worth someone's attention.
 
 ## THE WALK THAT CONVICTED THE GPS START (owner's report, 2026-08-17 — four findings, two causes)
 

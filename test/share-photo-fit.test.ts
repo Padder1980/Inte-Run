@@ -66,12 +66,13 @@ function recCtx() {
   return ctx;
 }
 const FNS = ["sharePhotoBox", "sharePhotoNorm", "shareBoxLeavesGap", "shareBlurBg",
-  "sharePhotoCompose", "sharePhotoDraw", "shareSubjectZones", "cardGeom", "shareCanvasGeom",
+  "sharePhotoCompose", "sharePhotoDraw", "shareSubjectZones", "cardGeom", "shareGeomAt",
+  "shareAspectFamily", "shareCanvasGeom",
   "shareRect", "cardAlpha", "shareCropKey", "shareCropRead", "shareAspect"];
 // ⚠️ CARD_W AND CARD_M SHARE ONE STATEMENT WITH cardGeom's other constants, so liftConst finds
 // them by the statement's FIRST declarator and they are named separately for the return.
 const CONSTS = ["SHARE_INK", "SHARE_BLUR", "SHARE_SUBJECT", "SHARE_CROP0", "CARD_W",
-  "SHARE_ASPECTS", "SHARE_ASPECT_H"];
+  "SHARE_ASPECTS", "SHARE_ASPECT_H", "SHARE_ASPECT_FAMILY"];
 const EXTRA = ["CARD_M"];
 function env(): Env {
   // ⚠️ THE CANVAS STUB'S width AND height MUST BE WRITABLE, because shareBlurBg's doubling chain reads

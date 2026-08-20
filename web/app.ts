@@ -4095,10 +4095,37 @@ button.rd-meta-r { cursor: pointer; }
    sat in the gutter — measured on a 320x568 screen: the card 49% of the stage, the neighbour's near edge
    33px past the right edge, no peek at all and half the stage empty. That is the exact fault this design
    exists to remove, reappearing on the smallest supported screen. Slide == card means the gutters ALWAYS
-   hold the neighbours, whatever binds. */
+   hold the neighbours, whatever binds.
+   ⚠️⚠️ min-width AND max-width ARE BOTH LOAD-BEARING, AND WITHOUT THEM THE CANVAS DECIDED THE SLIDE'S
+   WIDTH. A flex item defaults to min-width: auto and so refuses to shrink below its content — and a
+   canvas with its bitmap set but its style width not yet assigned has an intrinsic width of that bitmap.
+   studioMount then measured the widened box and fitted the card to it, so the measurement and the thing
+   being measured chased each other: the card settled at whatever width the STAGE HEIGHT allowed, not at
+   the slide's, while the transform still stepped by the published slide width. Measured on 320x568 with
+   a sticker selected, where the four templates are four different shapes: slides [248, 298, 293, 248]
+   against a published 248, the card being edited 114px off centre and 76px of it clipped away by the
+   stage's own overflow: hidden — i.e. the runner approving a card whose right-hand edge they cannot see.
+   Pinned at the published width the slide cannot be argued with, and studioMount reads the published
+   number rather than the box. Same trap as .view's min-height: 0 elsewhere in this file. */
 .sst-slide { flex: 0 0 var(--sstslide, 86%); height: 100%;
+  min-width: 0; max-width: var(--sstslide, 86%);
   display: flex; align-items: center; justify-content: center; }
 .sst-cv { display: block; border-radius: var(--r-card); }
+/* ⚠️ THE TRANSPARENCY CHEQUER, WHICH IS THE ONE PIECE OF THIS FEATURE THE RUNNER HAS TO BE SHOWN. A
+   sticker previewed against the panel is indistinguishable from a card with a dark background, so the
+   thing that makes it worth choosing is invisible.
+   ⚠️ IT IS A CSS BACKGROUND ON THE CANVAS ELEMENT, WHICH IS WHY IT CANNOT REACH AN EXPORT. An element's
+   background is painted behind its bitmap by the browser and is not part of it — toBlob is handed the
+   bitmap alone — so the pack's rule that no editor chrome appears in an export is kept by construction
+   rather than by remembering to switch something off. It is also exactly the size of the card, which a
+   pseudo-element on the slide would not be: the canvas is centred in the slide and is usually narrower.
+   Two crossed gradients rather than an image, because this page ships no external assets. */
+.sst-stage.sst-alpha .sst-cv {
+  background-color: #8d938f;
+  background-image:
+    linear-gradient(45deg, #757b76 25%, transparent 25%, transparent 75%, #757b76 75%),
+    linear-gradient(45deg, #757b76 25%, transparent 25%, transparent 75%, #757b76 75%);
+  background-size: 22px 22px; background-position: 0 0, 11px 11px; }
 /* ⚠️ THE LIFT IS ON THE SELECTED CARD ONLY. Three cards each carrying it put two coloured halos into
    the gutters, which reads as the neighbours being as important as the thing being edited. */
 .sst-slide.on .sst-cv { box-shadow: 0 18px 48px color-mix(in srgb, var(--accent) 22%, transparent); }
@@ -18528,6 +18555,18 @@ const SHARE_INK = {
   // eight dividers those four cards draw. A first pass at .20 was measured too and was still under on a
   // saturated ground (1.39:1 on blue), because a white line lifts an already-saturated channel less.
   hair: "rgba(255,255,255,.28)",
+  // ⚠️ THE SAME LINE, FOR A GROUND NOBODY CAN MEASURE. A hairline is a PAIR — a deep half and a light
+  // half — so that whichever way the ground goes one of the two carries it. On a photo card the deep half
+  // does the work (a photograph under a scrim is rarely darker than rgba(2,10,8,.82)) and .28 of white is
+  // plenty for the other direction; that is what the note above measured. On a sticker the runner chooses
+  // the ground, and over PURE BLACK a white line at .28 measures 2.20:1 — under the 3:1 non-text floor,
+  // with the deep half contributing nothing because it is dark on dark. So the light half is raised only
+  // where the ground is unknown. .45 measures 4.4:1 on black, which is margin rather than a pass by a
+  // rounding error, and it costs nothing over white where the deep half is what is read (12.6:1).
+  // ⚠️ IT IS A SECOND VALUE RATHER THAN A RAISED .28 BECAUSE THE PHOTO CARDS ARE SIGNED OFF AT .28 and
+  // their exported bytes are asserted byte-identical across phases. Raising the one constant would move
+  // all 48 of them for a defect that only exists where there is no scrim.
+  hairAlpha: "rgba(255,255,255,.45)",
   track: "rgba(255,255,255,.09)",
   // The route's keyline: a deep ink rather than pure black, so it reads as an edge on the poster
   // ground as well as doing the real work on a bright photograph.
@@ -18596,8 +18635,9 @@ const SHARE_TYPE_SQ = { mega: 0.56, display: 0.62, title: 0.64, headline: 0.64, 
 function shareTypeSize(role, aspect) {
   const base = SHARE_TYPE[role];
   if (!base) return 0;
-  const k = aspect === "feed" ? (SHARE_TYPE_FEED[role] || 1)
-    : aspect === "square" ? (SHARE_TYPE_SQ[role] || 1) : 1;
+  const f = shareAspectFamily(aspect);
+  const k = f === "feed" ? (SHARE_TYPE_FEED[role] || 1)
+    : f === "square" ? (SHARE_TYPE_SQ[role] || 1) : 1;
   return Math.round(base * k);
 }
 /**
@@ -18629,7 +18669,7 @@ function shareTypeSize(role, aspect) {
  */
 const SHARE_GAP_SQ = 0.64;
 function shareGaps(G, aspect) {
-  if (aspect !== "square") return G;
+  if (shareAspectFamily(aspect) !== "square") return G;
   const out = {};
   for (const k in G) out[k] = Math.round(G[k] * SHARE_GAP_SQ);
   return out;
@@ -18785,27 +18825,370 @@ const CARD_W = 1080, CARD_M = 64;
  * "story" in ONE place — spelled out at four call sites it is four chances for a typo to render a
  * story-shaped card under a square label.
  */
-const SHARE_ASPECTS = ["story", "feed", "square"];
-const SHARE_ASPECT_H = { story: 1920, feed: 1350, square: 1080 };
+const SHARE_ASPECTS = ["story", "feed", "square", "sticker"];
+const SHARE_ASPECT_H = { story: 1920, feed: 1350, square: 1080, sticker: 1080 };
 function shareAspect(a) { return SHARE_ASPECTS.indexOf(a) > 0 ? a : "story"; }
-function cardGeom(aspect) {
-  const a = shareAspect(aspect);
-  const story = a === "story";
-  const H = SHARE_ASPECT_H[a];
+/**
+ * WHICH OF THE THREE LAYOUT FAMILIES AN OUTPUT BELONGS TO — AND WHY THIS IS A FUNCTION.
+ *
+ * ⚠️ THE STICKER IS A FOURTH OUTPUT AND NOT A FOURTH LAYOUT. It reuses the square's own reductions —
+ * the tightened type factors, the 0.64 gap scale, the four-row ladder, the two-metric row, the
+ * shallower chart — because those are exactly the reductions that make a block compact, and they are
+ * the set that has already been swept, rendered and looked at (see SHARE_GAP_SQ). A fourth table of
+ * factors would be a fourth place for the story's own numbers to drift out of, which this file records
+ * as a fix applied to one builder and not its twin, three times over.
+ *
+ * ⚠️ AND IT IS A LOOKUP RATHER THAN SEVEN two-armed aspect comparisons. Seven
+ * comparisons is seven chances for the eighth reader to be written without the second half, and the
+ * failure is silent: a sticker drawn at the story's type ladder simply comes out enormous, with
+ * nothing throwing and no test able to see which of the seven was missed.
+ */
+const SHARE_ASPECT_FAMILY = { story: "story", feed: "feed", square: "square", sticker: "square" };
+function shareAspectFamily(a) { return SHARE_ASPECT_FAMILY[shareAspect(a)]; }
+/** What each output is called, and what it is for, in the runner's own words. */
+const SHARE_ASPECT_LABEL = { story: "A story card", feed: "A feed post", square: "A square card",
+  sticker: "A sticker" };
+const SHARE_ASPECT_NOTE = {
+  story: "1080 by 1920 — Instagram and TikTok stories, and messaging.",
+  feed: "1080 by 1350 — the Instagram feed. Recomposed for the shape, not cropped.",
+  square: "1080 by 1080 — recomposed again, and it carries two numbers rather than three.",
+  sticker: "A PNG with no background at all: your card on its own, cut to its edges, to drop on to " +
+    "your own photo in another app. No photograph and no shading are baked in, so it sits on anything.",
+};
+/**
+ * ONE GEOMETRY RECORD, AT A STATED HEIGHT.
+ * ⚠️ SEPARATE FROM cardGeom SO THE STICKER'S HEIGHT DERIVATION CANNOT RECURSE. shareStickerH has to
+ * plan a template against a geometry in order to answer how tall that template's block is, and asking
+ * cardGeom for that geometry would ask it for the answer it is being asked to compute.
+ */
+function shareGeomAt(a, H, box) {
+  const story = shareAspectFamily(a) === "story";
   return { W: CARD_W, H: H,
     M: CARD_M, CW: CARD_W - 2 * CARD_M,
-    aspect: a,
+    aspect: a, family: shareAspectFamily(a), sticker: a === "sticker",
+    // ⚠️ THE OUTPUT SIZE IS NOT ALWAYS THE LAYOUT SIZE, AND ONLY THE STICKER SEPARATES THEM. Everything
+    // lays out in the 1080-wide card space; a sticker is then cropped to the box its own ink occupies,
+    // so the canvas is OW x OH and the drawing is shifted by (ox, oy). For the other three outputs the
+    // box IS the canvas, by construction rather than by remembering to pass one.
+    OW: box ? box.w : CARD_W, OH: box ? box.h : H, ox: box ? box.x : 0, oy: box ? box.y : 0,
     // The brief's own numbers for a story; a feed post and a square carry no platform overlay, so the
     // top and bottom reserves collapse to the same margin the sides use.
     safe: { x0: CARD_M, x1: CARD_W - CARD_M, y0: story ? 120 : CARD_M, y1: story ? 1680 : H - CARD_M },
   };
 }
+function cardGeom(aspect, m) {
+  const a = shareAspect(aspect);
+  if (a !== "sticker") return shareGeomAt(a, SHARE_ASPECT_H[a], null);
+  // ⚠️ A STICKER'S SIZE IS A FUNCTION OF WHAT IS ON IT, SO IT REFUSES TO ANSWER WITHOUT THE MODEL. The
+  // alternative — falling back to the nominal 1080 — is a silently wrong canvas: the card would be
+  // drawn at one height into a buffer sized for another, which reads as content cut off the bottom and
+  // points at the renderer rather than at the caller that forgot an argument.
+  if (!m) throw new Error("cardGeom: a sticker's size comes from its model");
+  return shareStickerGeom(m);
+}
 /**
- * THE CANVAS'S OWN SIZE — the one thing everything asks for, model or no model.
- * ⚠️ ONE PLACE DECIDES 1920 VERSUS 1350. cardGeom is where a 1:1 option would go, and this is the name
- * the rest of the file uses; they must never answer differently, so this defers rather than repeating.
+ * THE CANVAS'S OWN SIZE — the one thing everything asks for.
+ * ⚠️ ONE PLACE DECIDES 1920 VERSUS 1350 VERSUS A DERIVED STICKER. cardGeom is that place and this is
+ * the name the rest of the file uses; they must never answer differently, so this defers rather than
+ * repeating.
  */
-function shareCanvasGeom(aspect) { return cardGeom(aspect); }
+function shareCanvasGeom(aspect, m) { return cardGeom(aspect, m); }
+/* ================================================================================================ *
+ * THE STICKER — THE CARD ON GENUINE ALPHA, CROPPED TO ITS OWN INK                                  *
+ * ================================================================================================ */
+/**
+ * WHAT IT IS, AND WHY IT IS AN ADDITION TO THE CONTRACT RATHER THAN A DEPARTURE FROM IT.
+ *
+ * The owner researched the reference app and found it offers three outputs, not two: a tall 9:16, a
+ * 4:5 feed post, and *card only, transparent* — the metrics card with no background, to be dropped on
+ * to the runner's own photograph in another app. The pack names two required formats and permits a
+ * third shape; this is a third OUTPUT of the same four templates, so it costs the pack nothing and it
+ * answers his standing instruction to match what the reference does rather than settle under it.
+ *
+ * ⚠️⚠️ THE SCRIM MUST NOT BE BAKED IN, AND THAT IS THE WHOLE DIFFICULTY. A scrim exists to make warm
+ * white type legible over a photograph THIS APP COMPOSITED and can therefore measure. On a sticker the
+ * ground is unknown and the runner places it themselves, so a scrim baked into the pixels arrives as a
+ * grey slab across somebody's photograph — the "arbitrary blur block" the pack names as a defect,
+ * except permanent and in the wrong place. So there is no scrim at all here, and the type carries its
+ * own treatment instead: see shareStickerPatch.
+ *
+ * ⚠️ AND THE CANVAS IS CROPPED TO THE INK. A sticker with a thousand transparent pixels down one side
+ * cannot be positioned: the runner drags what looks like the middle of it and the visible content goes
+ * to the edge of the screen. Worse, the naive answer — draw the story layout on alpha — leaves a VOID
+ * in the middle, because the wordmark is pinned to the top of the canvas and the block to the bottom
+ * with the photograph between them. Measured on a square-family sticker before this: the wordmark ends
+ * at y120, the block starts at y560, and 46% of the bounding box is nothing at all. So the height is
+ * derived from the block the template plans (shareStickerH) and the result is then trimmed to its own
+ * alpha bounding box (shareStickerBox). Both, deliberately: the derivation removes the void, the trim
+ * proves the claim from pixels rather than arguing it from arithmetic.
+ *
+ * ⚠️ PNG, NEVER JPEG. JPEG has no alpha channel at all, so a JPEG "transparent" export is a silent
+ * white rectangle that looks correct in every test that only measures dimensions. shareExportSpec is
+ * the one place that decides, and it decides the extension in the same breath as the mime type.
+ *
+ * ⚠️ AND IT DOES NOT NEED A PHOTOGRAPH, WHICH MAKES IT THE ONE OUTPUT EVERY RUN CAN HAVE. The three
+ * photo templates are gated on a photograph because their composition IS the photograph; a sticker has
+ * no photograph by construction, so that gate is not merely unnecessary here, it is wrong. A treadmill
+ * run with no picture chosen gets four stickers.
+ */
+const SHARE_WM_CLEAR = 36;
+/**
+ * ⚠️ field IS THE ROUTE'S OWN BAND ON A STICKER AND THERE ARE TWO OF THEM, because the route means two
+ * different things on the two templates that draw it. On The Route Poster the route IS the artwork and
+ * takes the space the pack's own reference gives it; on The Moment it is an inset above the block, the
+ * size reference 01 shows. One number for both would either shrink the poster's subject or turn The
+ * Moment into a poster with a distance on it.
+ * ⚠️ AND WITHOUT A RESERVED BAND THE MOMENT'S ROUTE SIMPLY DISAPPEARS. shareRoutePlacement scores
+ * candidate zones between the top of the safe region and the top of the block, and on a sticker those
+ * two are 36px apart — so every candidate is refused and the switch labelled "show my route" would be
+ * on, with the runner looking at a card that has no route on it.
+ */
+/**
+ * ⚠️ THE TWO BAND HEIGHTS WERE SWEPT AND THEN LOOKED AT, WHICH IS THE ONLY WAY TO SETTLE A NUMBER ABOUT
+ * AIR — the same conclusion SHARE_GAP_SQ records. Swept 520/700, 380/620 and 320/560 against both a
+ * narrow point-to-point route and a real loop: the numbers barely move (the transparent share of The
+ * Moment's canvas goes 86.6 / 85.5 / 84.8%, and no type size changes anywhere), so the trade is air
+ * against nothing measurable. Rendered over white and over black and compared: at 520 the route sits
+ * marooned with a visible gap between it and the block, which is the pack's own "route stranded in
+ * excessive empty space"; at 320 The Moment's route is smaller than its own hero. 380 reads as an inset
+ * above the data, which is what reference 01 shows, and the poster's 620 keeps the route the subject.
+ *
+ * ⚠️ AND THE KEYLINE WIDTH WAS SWEPT THE SAME WAY. Measured over white as "the worst step between a
+ * bright ink pixel and the darkest keyline pixel beside it", the mean is 13.85 at 0.10/2, 14.12 at
+ * 0.13/3 and 14.40 at 0.16/4 — a real but small gain. Looked at: by 0.16/4 the counters of the small
+ * split times begin to close up and the little uppercase labels read as bubble letters. 0.13/3 keeps
+ * them open and still defines them. The floor matters more than the fraction, because it is the 19px
+ * footer and the 24px labels that have the least outline to work with.
+ *
+ * ⚠️ AND THE HALO HAS A MEASURED MAXIMUM, WHICH IS NOT WHAT I EXPECTED. Swept against the hostile
+ * ground, on the edge contrast of the SMALLEST type only: 0.22/6 → 4.74, 0.32/7 → 5.16, 0.45/9 → 5.54,
+ * 0.60/11 → 5.09, 0.75/13 → 4.94. It rises to 0.45 and falls after it, because past that point the halo
+ * is covering the keyline it is meant to support. A number with an interior optimum is a number that has
+ * to be swept; taking "stronger is safer" on trust would have shipped the worse end of it. The
+ * translucent share rises monotonically with it too (3.9% at 0.22 to 8.0% at 0.75), so the light end is
+ * also the end that is least like a plate.
+ */
+const SHARE_STICKER = { field: 380, posterField: 620,
+  // The trim's stated padding, and the scale the alpha bounding box is found at. A probe cell is 6
+  // card pixels, so the box can be one cell tight; the padding is far larger than that error.
+  pad: 24, probe: 1 / 6, alphaMin: 4,
+  // The glyph keyline, as a fraction of the type size with a floor for the smallest rungs.
+  key: 0.13, keyMin: 3, halo: "rgba(2,10,8,.45)", blur: 9 };
+/**
+ * A CONTEXT THAT EXISTS ONLY TO MEASURE TEXT.
+ * ⚠️ THE STICKER'S HEIGHT CANNOT BE KNOWN WITHOUT MEASURING TYPE, AND THE CANVAS CANNOT BE SIZED UNTIL
+ * THE HEIGHT IS KNOWN. So there has to be one context that belongs to nobody, created once. It is
+ * never drawn into; only font is set and measureText is called.
+ */
+let CARD_MEASURE = null;
+function cardMeasureCtx() {
+  if (!CARD_MEASURE) CARD_MEASURE = document.createElement("canvas").getContext("2d");
+  return CARD_MEASURE;
+}
+/**
+ * WHERE A STICKER'S BLOCK STARTS: DIRECTLY UNDER THE WORDMARK, PLUS THE ROUTE'S BAND IF IT HAS ONE.
+ * ⚠️ ONE DEFINITION, READ BY THE HEIGHT DERIVATION AND BY THE CARD THAT DRAWS THE ROUTE INTO IT. Two
+ * derivations of the same band is how the reserved space and the drawn route come to differ by a few
+ * pixels, which presents as a route clipped along one edge for no visible reason.
+ */
+function shareStickerBandTop(wm) { return Math.round(wm.rect.y + wm.rect.h) + SHARE_WM_CLEAR; }
+function shareStickerField(gm, wm, blockTop) {
+  const top = shareStickerBandTop(wm);
+  return shareRect(gm.M, top, gm.CW, Math.max(0, blockTop - SHARE_WM_CLEAR - top));
+}
+/**
+ * THE HEIGHT, FROM THE BLOCK THE TEMPLATE PLANS.
+ *
+ * ⚠️ ONE PASS, AND IT IS ONE PASS ONLY BECAUSE THE BLOCK'S HEIGHT IS INDEPENDENT OF THE CANVAS'S. Every
+ * template builds its stack bottom-up from safe.y1, so the height BELOW the block top is the same
+ * number at any canvas height — which is what makes "put the block under the wordmark and cut the
+ * canvas there" a formula rather than
+ * a fixed-point iteration. Two of the four plans had a genuine H dependence and both are the same
+ * thing: a budget that exists to protect the PHOTOGRAPH (The Execution's verdict room, The
+ * Progression's ladder pitch). On a sticker there is no photograph and height is free, so both are
+ * unbounded there — see the two unbounded-on-a-sticker reads. Without that the derivation spirals:
+ * a smaller canvas gives less room, less room shrinks the headline, a shorter headline gives a smaller
+ * canvas, and the verdict ends up at its floor for no reason a reader could see.
+ */
+function shareStickerH(m) {
+  const g = cardMeasureCtx();
+  const gm0 = shareGeomAt("sticker", SHARE_ASPECT_H.sticker, null);
+  const wm = shareWordmarkPlan(g, gm0);
+  const tmpl = m && m.template;
+  let blockTop = 0, plan = null;
+  if (tmpl === "route") {
+    plan = sharePosterPlan(g, m, gm0, wm);
+    blockTop = shareStickerBandTop(wm) + SHARE_STICKER.posterField +
+      shareGaps(POSTER_GAP, gm0.aspect).blockToField;
+  } else if (tmpl === "moment") {
+    plan = shareMomentPlan(g, m, gm0);
+    blockTop = shareStickerBandTop(wm) +
+      (m.route ? SHARE_STICKER.field + SHARE_WM_CLEAR : 0);
+  } else if (tmpl === "execution") {
+    plan = shareExecutionPlan(g, m, gm0); blockTop = shareStickerBandTop(wm);
+  } else if (tmpl === "progression") {
+    plan = shareProgressionPlan(g, m, gm0); blockTop = shareStickerBandTop(wm);
+  } else {
+    // ⚠️ REACHABLE ONLY THROUGH THE PLACEHOLDER, WHICH MUST NEVER BECOME A FILE. prepareShareCard
+    // refuses to encode a null template, so this height is only ever previewed.
+    return SHARE_ASPECT_H.sticker;
+  }
+  return Math.round(blockTop + (gm0.H - plan.blockTop));
+}
+/**
+ * THE ALPHA BOUNDING BOX, MEASURED FROM RENDERED PIXELS.
+ *
+ * ⚠️ IT DRAWS THE CARD TO FIND OUT HOW BIG THE CARD IS, WHICH IS WHY shareDrawInto EXISTS SEPARATELY
+ * FROM drawShareCard. Going through drawShareCard would ask cardGeom for the geometry, and cardGeom is
+ * what called this — an infinite recursion. The probe takes the geometry it has already been handed.
+ *
+ * ⚠️ AT A SIXTH SCALE, SO IT COSTS A THIRTY-SIXTH OF A DRAW. The box can therefore be one probe cell
+ * (6 card pixels) tight on any edge, which the 24px padding covers several times over. It is expanded
+ * by a cell in every direction before the padding is added, so the error cannot eat ink.
+ *
+ * ⚠️ getImageData IS SAFE HERE BECAUSE A STICKER CARRIES NO PHOTOGRAPH. The runner's picture is what
+ * would taint the canvas, and shareCardModel hands a sticker none. If that ever changes this reads
+ * back a SecurityError and the catch returns the whole canvas, which is a bigger sticker rather than a
+ * broken one.
+ */
+function shareStickerBox(m, gm) {
+  const q = SHARE_STICKER.probe;
+  const whole = { x: 0, y: 0, w: gm.W, h: gm.H };
+  try {
+    const cw = Math.max(1, Math.round(gm.W * q)), ch = Math.max(1, Math.round(gm.H * q));
+    const c = document.createElement("canvas");
+    c.width = cw; c.height = ch;
+    const g = c.getContext("2d");
+    shareDrawInto(g, m, gm, q);
+    const d = g.getImageData(0, 0, cw, ch).data;
+    let x0 = cw, y0 = ch, x1 = -1, y1 = -1;
+    for (let y = 0; y < ch; y++) {
+      for (let x = 0; x < cw; x++) {
+        if (d[(y * cw + x) * 4 + 3] <= SHARE_STICKER.alphaMin) continue;
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+    }
+    if (x1 < 0) return whole;
+    // ⚠️ THE PADDING IS THE ONLY ALLOWANCE, AND EXPANDING BY A PROBE CELL AS WELL DOUBLE-COUNTED IT.
+    // A hit at probe row n means real ink somewhere in [n*e, (n+1)*e), so floor and ceil of those two
+    // already bracket it exactly — adding a cell on each side simply left up to 35px of empty margin on
+    // a sticker whose stated padding is 24, which the trim guard caught. Ink faint enough to be missed
+    // at a sixth scale is what the padding is for; a second allowance protects against nothing.
+    const e = 1 / q, pad = SHARE_STICKER.pad;
+    const bx = Math.max(0, Math.floor(x0 * e) - pad);
+    const by = Math.max(0, Math.floor(y0 * e) - pad);
+    const bw = Math.min(gm.W, Math.ceil((x1 + 1) * e) + pad) - bx;
+    const bh = Math.min(gm.H, Math.ceil((y1 + 1) * e) + pad) - by;
+    return bw > 0 && bh > 0 ? { x: bx, y: by, w: bw, h: bh } : whole;
+  } catch (e) { PHOTODIAG.err = "sticker box: " + (e && e.message); return whole; }
+}
+/**
+ * ⚠️ MEMOISED ON THE MODEL'S OWN IDENTITY, WHICH CANNOT GO STALE. A model object is rebuilt from
+ * scratch every time anything changes, so the same object is the same picture — and one paint asks for
+ * the geometry from three places (the mount that sizes the canvas, the stage that sizes the box, the
+ * draw itself). Keyed on a serialised signature instead, the key would have to name every field the
+ * layout reads, which is the whole model.
+ */
+let SHARE_STICKER_M = null, SHARE_STICKER_G = null;
+function shareStickerGeom(m) {
+  if (m && m === SHARE_STICKER_M && SHARE_STICKER_G) return SHARE_STICKER_G;
+  const H = shareStickerH(m);
+  const gm = shareGeomAt("sticker", H, shareStickerBox(m, shareGeomAt("sticker", H, null)));
+  SHARE_STICKER_M = m; SHARE_STICKER_G = gm;
+  return gm;
+}
+/** The px size out of a serialised CSS font shorthand, so a keyline can be a fraction of its glyph. */
+function shareFontPx(font) {
+  const m = /(\\d+(?:\\.\\d+)?)px/.exec(String(font || ""));
+  return m ? parseFloat(m[1]) : 0;
+}
+/**
+ * THE TYPE'S OWN TREATMENT, WHICH IS WHAT REPLACES THE SCRIM.
+ *
+ * ⚠️ A KEYLINE ON THE STROKES, NEVER A PLATE BEHIND THEM. A plate is a scrim by another name and is
+ * exactly what a transparent sticker must not carry. This is the device shareRouteDraw has always used
+ * for the route line and the chart's marks use for theirs — a deep ink outline, so the glyph is defined
+ * by an edge rather than by its contrast with a ground nobody can measure.
+ *
+ * ⚠️ COMPOSITED UNDERNEATH WITH destination-over, AND THAT ORDER IS NOT COSMETIC. Every letter-spaced
+ * run and every figure on these cards is drawn one character at a time (see lsText and shareFig), so a
+ * keyline stroked OVER the canvas would be drawn after the previous character's fill and would eat into
+ * its right-hand edge. Filling first and stroking underneath means a keyline can never land on top of
+ * ink that is already there, whatever order the characters arrive in.
+ *
+ * ⚠️ THE HALO IS THE NET FOR EVERYTHING THAT IS NOT TEXT, and it is one property rather than a list.
+ * A rule, the poster's accent tag, the ladder's track, the badge and the chart's lane are all fills and
+ * strokes, and a shadow reaches every one of them without changing any geometry. Enumerating them
+ * instead would be a list that goes stale the first time a template gains a mark — and the failure is
+ * invisible, because a mark with no treatment looks perfectly fine on the dark photograph anybody
+ * would test with.
+ *
+ * ⚠️ THE BLUR IS SCALED BY S. Chrome does not scale shadowBlur by the current transform, so a preview
+ * drawn at half scale would carry twice the halo the export does — and this preview is the thing the
+ * runner approves.
+ *
+ * ⚠️ AND IT PATCHES THE CONTEXT, SO IT MUST BE UNDONE. A canvas hands back the SAME context object
+ * every time getContext is called, so a preview canvas that once drew a sticker would keep the keyline
+ * for every story card it drew afterwards. The undo is returned rather than remembered, and
+ * shareDrawInto calls it in a finally.
+ */
+function shareStickerPatch(g, S) {
+  const base = g.fillText;
+  g.shadowColor = SHARE_STICKER.halo;
+  g.shadowBlur = SHARE_STICKER.blur * S;
+  g.shadowOffsetX = 0; g.shadowOffsetY = 0;
+  g.fillText = function () {
+    const px = shareFontPx(g.font);
+    const ss = g.strokeStyle, lw = g.lineWidth, lj = g.lineJoin, lc = g.lineCap;
+    const op = g.globalCompositeOperation, sc = g.shadowColor, sb = g.shadowBlur;
+    // ⚠️ THREE LAYERS IN THE ORDER GLYPH, KEYLINE, HALO — AND GETTING THAT ORDER WRONG COST THE KEYLINE
+    // A THIRD OF ITS STRENGTH. Written as "fill with the ambient shadow, then stroke underneath", the
+    // halo is painted BEFORE the keyline and the keyline then lands under it: at halo alpha 0.45 only
+    // 0.55 of the keyline survives, so the outline is a washed grey rather than a deep edge. Measured on
+    // the hostile ground, strengthening the halo made it WORSE for exactly this reason (0.45 → 0.75 took
+    // the small type's edge contrast 5.45 → 4.69), which is the sign that the two were fighting. So the
+    // fill carries no shadow, and the keyline stroke carries it — a shadow is cast behind its own shape
+    // within one operation, so the halo ends up under the keyline, which is under the glyph.
+    // ⚠️ THE KEYWORD, NEVER A HAND-BUILT FULLY-CLEAR COLOUR FUNCTION. Every colour in this renderer comes
+    // from the palette so that none of them can drift, and a literal here would be the first exception —
+    // but this is not a colour, it is the ABSENCE of a shadow, and the keyword is the only spelling of
+    // that which cannot drift from anything. (Writing the zero-alpha form out in this comment trips the
+    // palette sweep on the sentence explaining it, which is the fifth firing of that trap in this file.)
+    g.shadowColor = "transparent"; g.shadowBlur = 0;
+    base.apply(g, arguments);
+    g.shadowColor = sc; g.shadowBlur = sb;
+    g.globalCompositeOperation = "destination-over";
+    g.strokeStyle = SHARE_INK.keyline;
+    g.lineWidth = Math.max(SHARE_STICKER.keyMin, px * SHARE_STICKER.key);
+    g.lineJoin = "round"; g.lineCap = "round";
+    g.strokeText.apply(g, arguments);
+    g.strokeStyle = ss; g.lineWidth = lw; g.lineJoin = lj; g.lineCap = lc;
+    g.globalCompositeOperation = op; g.shadowColor = sc; g.shadowBlur = sb;
+  };
+  return function () {
+    delete g.fillText;
+    g.shadowColor = "transparent"; g.shadowBlur = 0;
+  };
+}
+/**
+ * WHICH OUTPUT FORMAT AN EXPORT TAKES — MIME, QUALITY AND EXTENSION FROM ONE DECISION.
+ *
+ * ⚠️ THE EXTENSION COMES OUT OF THE SAME FUNCTION AS THE MIME TYPE, so a file named .png cannot carry
+ * JPEG bytes. Named separately they would agree until somebody added a fourth output, and the failure
+ * mode is a "transparent" sticker that is a white rectangle — invisible to a dimension test, invisible
+ * in the filename, and only discoverable by the runner posting it.
+ * ⚠️ JPEG FOR THE THREE PHOTO SHAPES, AND THE REASON IS MEASURED: at 1080x1920 the photo card is
+ * 186 KB as JPEG against 273 KB as PNG, and the photo-free poster 158 KB against 1,437 KB. A sticker
+ * has no choice — alpha is the feature.
+ */
+function shareExportSpec(m) {
+  return shareAspect(m && m.aspect) === "sticker"
+    ? { mime: "image/png", quality: undefined, ext: "png" }
+    : { mime: "image/jpeg", quality: 0.92, ext: "jpg" };
+}
 function rr(g, x, y, w, h, r) {
   if (g.roundRect) { g.beginPath(); g.roundRect(x, y, w, h, r); return; }
   g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
@@ -19895,6 +20278,13 @@ function shareScrimText() {
  * shareScrimFade, so there is no per-template number to get wrong.
  */
 function sharePhotoScrim(g, gm, probe, blockTop, colours) {
+  // ⚠️⚠️ NO PHOTOGRAPH, NO SCRIM — AND THAT IS NOT THE SAME TEST AS "THE PHOTOGRAPH CANNOT BE READ".
+  // shareGroundUnder answers WHITE when it cannot look, which is right for a photograph we have but
+  // cannot sample (fail towards protecting the type) and catastrophically wrong for a sticker, where
+  // there is no photograph at all: solved from 255 the alpha comes back near its cap and the export
+  // carries a near-opaque dark gradient over its lower half, on genuine alpha, to be dropped on to
+  // somebody's own picture. probe === null is the sticker; probe.data === null is the tainted card.
+  if (!probe) return { kind: "none", step: "none", a: 0, end: 0, ground: null, blockTop: blockTop };
   const plan = shareVeilPlan(probe, gm, { blockTop: blockTop, colours: colours });
   shareVeilDraw(g, gm, plan);
   return plan;
@@ -19948,6 +20338,11 @@ function sharePhotoScrim(g, gm, probe, blockTop, colours) {
  * is under 4.5.
  */
 function shareTopScrim(g, gm, probe, rect, colours) {
+  // ⚠️ THE SAME GATE AS sharePhotoScrim, FOR THE SAME REASON, AND THE POSTER ALREADY SAID SO IN PROSE.
+  // sharePosterCard's own note explains that solving this from 255 on a photo-free card paints a dark
+  // band over type that already measures 19:1; it simply never called this. A sticker draws all four
+  // templates with no photograph, so the rule has to live in the function rather than at the call site.
+  if (!probe) return { a: 0, step: "none", ground: null };
   const band = shareRect(0, rect.y, gm.W, rect.h);
   const ground = shareGroundUnder(probe, gm, band);
   let a = 0;
@@ -20210,8 +20605,9 @@ function shareQuietPlan(gm, size) {
   // either, so it needs the same own-band treatment a feed post does — written the other way round, the
   // square inherited the story's 240px reserve as its footer band and the date sat 24px under the
   // metric labels, which is the collision this function exists to prevent.
-  const story = gm.aspect === "story";
-  const gap = gm.aspect === "square" ? Math.round(SHARE_QUIET.gap * SHARE_GAP_SQ) : SHARE_QUIET.gap;
+  // ⚠️ THE FAMILY, NOT THE ASPECT, since the sticker shares the square's own band treatment.
+  const story = gm.family === "story";
+  const gap = gm.family === "square" ? Math.round(SHARE_QUIET.gap * SHARE_GAP_SQ) : SHARE_QUIET.gap;
   return { base: gm.H - (story ? SHARE_QUIET.up : SHARE_QUIET.upFeed),
     reserve: story ? 0 : Math.round(size * SHARE_CAP) + gap };
 }
@@ -20295,7 +20691,7 @@ function shareMetricUnit(x) {
  * the cap can only ever drop a supporting number.
  */
 const SHARE_METRIC_CAP = { square: 2 };
-function shareMetricCap(aspect) { return SHARE_METRIC_CAP[aspect] || 3; }
+function shareMetricCap(aspect) { return SHARE_METRIC_CAP[shareAspectFamily(aspect)] || 3; }
 /** The supporting row: the model's own ladder, minus whatever the hero has already said. */
 function shareMetricsFor(m, hero) {
   return (m.metrics || []).filter((x) => !hero || x.key !== hero.key)
@@ -20439,7 +20835,7 @@ function shareMetricDraw(g, gm, mets, P, yValue, yLabel, labelInk) {
  * horizontal rule at the old weight with nothing to notice.
  */
 const SHARE_HAIR = { w: 1.5 };
-function shareHairline(g, x0, y0, x1, y1) {
+function shareHairline(g, gm, x0, y0, x1, y1) {
   // The pair is centred on the line asked for, so nothing moves when the deep half is added or removed.
   const vert = Math.abs(x1 - x0) < Math.abs(y1 - y0);
   const o = SHARE_HAIR.w / 2, dx = vert ? o : 0, dy = vert ? 0 : o;
@@ -20447,13 +20843,36 @@ function shareHairline(g, x0, y0, x1, y1) {
   g.beginPath(); g.moveTo(x0 - dx, y0 - dy); g.lineTo(x1 - dx, y1 - dy);
   g.strokeStyle = SHARE_INK.keyline; g.stroke();
   g.beginPath(); g.moveTo(x0 + dx, y0 + dy); g.lineTo(x1 + dx, y1 + dy);
-  g.strokeStyle = SHARE_INK.hair; g.stroke();
+  // ⚠️ THE GEOMETRY IS THE ONLY THING THAT KNOWS WHETHER THERE IS A GROUND. gm.sticker is why this
+  // function takes gm at all — the alternative was a second hairline function for one colour, which is
+  // the fix-one-builder-not-the-other trap this file records four times.
+  g.strokeStyle = gm && gm.sticker ? SHARE_INK.hairAlpha : SHARE_INK.hair; g.stroke();
+}
+/**
+ * A SOLID DECORATIVE MARK, WITH A KEYLINE WHEN IT HAS NO GROUND TO SIT ON.
+ * ⚠️ THE ACCENT TAG IS A SINGLE TONE AND THAT IS WHY IT FAILED ON WHITE. Measured over pure white the
+ * poster's teal dash is 1.77:1 — the mark itself is mid-toned, so there is no direction for it to win in.
+ * The type solved exactly this with a deep keyline underneath, and this is the same device on a rect
+ * rather than on a glyph: over black the teal reads on its own (10.0:1) and over white the keyline's edge
+ * is what is seen (12.6:1). destination-over, so the keyline can never eat into the mark it defines.
+ */
+function shareMark(g, gm, x, y, w, h, fill) {
+  g.fillStyle = fill;
+  g.fillRect(x, y, w, h);
+  if (!gm || !gm.sticker) return;
+  const op = g.globalCompositeOperation, ss = g.strokeStyle, lw = g.lineWidth, lj = g.lineJoin;
+  g.globalCompositeOperation = "destination-over";
+  g.strokeStyle = SHARE_INK.keyline;
+  g.lineWidth = SHARE_STICKER.keyMin;
+  g.lineJoin = "miter";
+  g.strokeRect(x, y, w, h);
+  g.globalCompositeOperation = op; g.strokeStyle = ss; g.lineWidth = lw; g.lineJoin = lj;
 }
 /** The hairlines between columns, struck from the row's own measured top and bottom. */
 function shareMetricRules(g, gm, mets, P, top, bottom) {
   for (let i = 1; i < mets.length; i++) {
     const x = gm.M + i * (P.w + P.gut) - P.gut / 2;
-    shareHairline(g, x, top, x, bottom);
+    shareHairline(g, gm, x, top, x, bottom);
   }
 }
 /**
@@ -20557,8 +20976,15 @@ function shareMomentCard(g, m, gm, probe, wm, box) {
   // ⚠️ SCORED AGAINST EVERY PIECE OF COPY, NOT AGAINST THE WORDMARK ALONE, and drawn after the veil so
   // a zone that dips into the fade stays crisp rather than being dimmed with the picture.
   if (m.route) {
-    const zone = shareRoutePlacement(gm, { photoBox: box, top: gm.safe.y0, bottom: p.blockTop - 32,
-      textRects: [shareRectPad(wm.rect, 20)].concat(p.rects) });
+    // ⚠️ A STICKER RESERVES THE BAND INSTEAD OF SCORING FOR ONE, AND THE SCORER WOULD ANSWER NOTHING
+    // HERE. Its candidates lie between the top of the safe region and the top of the block, and on a
+    // sticker those are 36px apart by construction — so every zone is refused, and a route switch left
+    // reading "on" over a card with no route on it is the looks-live-does-nothing defect this project
+    // has shipped three times. shareStickerH reserves exactly this rect; shareStickerField is the one
+    // definition of it, so the space kept and the space drawn into cannot differ.
+    const zone = gm.sticker ? { rect: shareStickerField(gm, wm, p.blockTop) }
+      : shareRoutePlacement(gm, { photoBox: box, top: gm.safe.y0, bottom: p.blockTop - 32,
+        textRects: [shareRectPad(wm.rect, 20)].concat(p.rects) });
     // ⚠️ THE KEYLINE IS THICKENED WHERE THE PICTURE IS BRIGHT, from the same probe the veil uses. On the
     // white ground the default 2px edge left the route reading as a hollow outline; a bright sky is the
     // commonest thing in the upper-right corner of a running photograph, which is where the highest
@@ -20734,8 +21160,7 @@ function sharePosterCard(g, m, gm, wm) {
     g.font = shareFont(700, p.meta.size); g.fillStyle = SHARE_INK.inkFaint;
     lsText(g, p.meta.text, gm.M, p.metaBase, p.meta.track, "left");
   }
-  g.fillStyle = SHARE_INK.accent;
-  g.fillRect(gm.M, p.tagY, POSTER_TAG.w, POSTER_TAG.h);
+  shareMark(g, gm, gm.M, p.tagY, POSTER_TAG.w, POSTER_TAG.h, SHARE_INK.accent);
   if (p.hero) {
     g.font = shareFont(800, p.heroS); g.fillStyle = SHARE_INK.ink;
     const vw = shareFig(g, p.hero.v, gm.M, p.heroBase, "left");
@@ -20744,7 +21169,7 @@ function sharePosterCard(g, m, gm, wm) {
       g.fillText(p.hero.u, gm.M + vw + Math.round(p.heroS * 0.09), p.heroBase);
     }
   }
-  shareHairline(g, gm.M, p.hairY, gm.safe.x1, p.hairY);
+  shareHairline(g, gm, gm.M, p.hairY, gm.safe.x1, p.hairY);
   if (p.mets.length) {
     shareMetricRules(g, gm, p.mets, p.P, p.rowTop - 12, p.labelBase + 12);
     shareMetricDraw(g, gm, p.mets, p.P, p.valueBase, p.labelBase, SHARE_INK.inkFaint);
@@ -20806,7 +21231,7 @@ function sharePhotoFloor(gm, id) {
   // ⚠️ CEIL, NOT ROUND. 1920 x 0.52 is 998.4, and a floor rounded DOWN to 998 delivers 51.98% — under the
   // number it exists to hold, and a guard written as "at least 52%" then fails on correct code. One pixel,
   // and it is the difference between honouring the contract's figure and missing it.
-  return gm.aspect === "story" ? Math.ceil(gm.H * (SHARE_PHOTO_FLOOR[id] || 0.5)) : 0;
+  return gm.family === "story" ? Math.ceil(gm.H * (SHARE_PHOTO_FLOOR[id] || 0.5)) : 0;
 }
 /**
  * THE LARGEST FIT THAT ALSO OBEYS A HEIGHT, not only a width.
@@ -20980,7 +21405,9 @@ const SHARE_CHART = { plotH: 86, padK: 0.2, padMin: 8, mr: 11, mrMin: 4, mrK: 0.
  * miss stems are still a visible length.
  */
 const SHARE_CHART_SQ_H = 64;
-function shareChartH(aspect) { return aspect === "square" ? SHARE_CHART_SQ_H : SHARE_CHART.plotH; }
+function shareChartH(aspect) {
+  return shareAspectFamily(aspect) === "square" ? SHARE_CHART_SQ_H : SHARE_CHART.plotH;
+}
 /** The keyline pass: the same path, wider and deeper, so the coloured pass reads on any photograph. */
 function shareChartKey(g, lw) {
   g.strokeStyle = SHARE_INK.keyline; g.lineWidth = lw + SHARE_CHART.key * 2; g.stroke();
@@ -21146,7 +21573,13 @@ function shareExecutionPlan(g, m, gm) {
   // headline alone; a shorter eyebrow simply leaves the block a few pixels lower, which is more
   // photograph and can only help.
   const eyeRungCap = eye ? Math.round(shareTypeSize("eyebrow", A) * SHARE_CAP) : 0;
-  const room = verdBase - (floorY + eyeRungCap + (eye ? GAP.eyebrowToVerdict : 0));
+  // ⚠️ UNBOUNDED ON A STICKER, AND THAT IS WHAT MAKES ITS HEIGHT SOLVABLE IN ONE PASS. This budget
+  // exists to hold the photographic floor; a sticker has no photograph and its canvas is cut to fit the
+  // block, so height is free here. Left as a function of the canvas it is circular: a shorter canvas
+  // gives less room, less room shrinks the verdict, a smaller verdict shortens the block, which shortens
+  // the canvas again — and the headline walks down to its floor on a card with nothing above it.
+  const room = gm.sticker ? Infinity
+    : verdBase - (floorY + eyeRungCap + (eye ? GAP.eyebrowToVerdict : 0));
   const vmax = shareTypeSize("display", A);
   const verd = m.pill ? shareFitToRoom(g, m.pill.text, gm.CW, Math.max(40, room),
     { max: vmax, min: Math.round(vmax * 0.55), step: 2, weight: 800, lines: 2, lh: 0.945 }) : null;
@@ -21336,7 +21769,9 @@ const SHARE_LADDER = { max: 6, pitch: 56, minPitch: 44, minSpan: SHARE_EVEN_SPRE
  * cherry-picked, which is that function's own stated rule.
  */
 const SHARE_LADDER_MAX = { square: 4 };
-function shareLadderMax(aspect) { return SHARE_LADDER_MAX[aspect] || SHARE_LADDER.max; }
+function shareLadderMax(aspect) {
+  return SHARE_LADDER_MAX[shareAspectFamily(aspect)] || SHARE_LADDER.max;
+}
 /**
  * THE ROWS — every measured kilometre when there are six or fewer, and equal blocks of them when there
  * are more.
@@ -21428,7 +21863,10 @@ function shareProgressionPlan(g, m, gm) {
   const eyeBlock = eye ? eyeCap + (head ? GAP.eyebrowToHeadline : GAP.interpToSplits) : 0;
   const aboveH = secBlock + interpBlock + headBlock + eyeBlock;
   const floorY = sharePhotoFloor(gm, "progression");
-  const roomForPitch = lastBase - rowCap - aboveH - floorY;
+  // ⚠️ UNBOUNDED ON A STICKER — the same reasoning as The Execution's verdict room, one function above.
+  // The pitch gives way to protect the photograph; there is no photograph on a sticker, and a canvas
+  // derived from a pitch that was derived from the canvas cannot be solved in one pass.
+  const roomForPitch = gm.sticker ? Infinity : lastBase - rowCap - aboveH - floorY;
   const pitch = rows.length > 1
     ? Math.max(SHARE_LADDER.minPitch, Math.min(SHARE_LADDER.pitch,
         Math.floor(roomForPitch / (rows.length - 1))))
@@ -21555,18 +21993,38 @@ function sharePlaceholderCard(g, m, gm, wm) {
  * the two-disagreeing-transforms fault that stretched the debrief hero. One coordinate system,
  * multiplied — so the 0.5x preview on screen is the same picture as the 1x file, guaranteed.
  */
-function drawShareCard(g, m, S) {
-  const gm = shareCanvasGeom(m.aspect);
+function drawShareCard(g, m, S) { shareDrawInto(g, m, shareCanvasGeom(m.aspect, m), S); }
+/**
+ * ⚠️ THE GEOMETRY IS AN ARGUMENT HERE AND NOT A LOOKUP, WHICH IS THE WHOLE POINT OF THE SPLIT. A
+ * sticker's canvas is cropped to the alpha bounding box of its own ink, and the only way to know that
+ * box is to draw the card — so shareStickerBox needs a draw that does NOT ask cardGeom for a geometry
+ * cardGeom is in the middle of computing. Everything else goes through drawShareCard, which is still
+ * the one place the geometry is resolved.
+ */
+function shareDrawInto(g, m, gm, S) {
   g.save();
   g.scale(S, S);
+  // ⚠️ THE TRIM IS A TRANSLATION AND NOTHING ELSE, so every template lays out in the same 1080-wide card
+  // space whatever the output is. A renderer that reflowed for a cropped box would be two layouts, which
+  // is the two-disagreeing-transforms fault this file records stretching the debrief hero.
+  if (gm.ox || gm.oy) g.translate(-gm.ox, -gm.oy);
+  const unpatch = gm.sticker ? shareStickerPatch(g, S) : null;
+  try { shareDrawBody(g, m, gm, S); }
+  finally { if (unpatch) unpatch(); g.restore(); }
+}
+function shareDrawBody(g, m, gm, S) {
   g.textBaseline = "alphabetic"; g.textAlign = "left";
   // ⚠️ THE ONLY THING BETWEEN THE CANVAS EDGE AND THE PICTURE IS NOTHING AT ALL. No inset, no clip, no
   // rounded corner, no stroked border and no radial glows: a matte ground, then the photograph over all
   // of it. The frame that used to live here is described in cardGeom's note, and the reason it went is
   // that it was the brief's first named defect.
-  shareGroundFill(g, gm);
+  // ⚠️ AND A STICKER FILLS NOTHING, WHICH IS THE ENTIRE FEATURE. Filling the ground is what a
+  // transparent output must not do — the runner supplies the ground by placing the sticker. The
+  // poster's topographic texture goes with it: it is a ground treatment, and on alpha it would be a
+  // full-canvas translucent wash, which is a scrim wearing a texture.
+  if (!gm.sticker) shareGroundFill(g, gm);
   const box = m.photo ? sharePhotoDraw(g, m.photo, gm) : null;
-  if (!m.photo) shareTopoDraw(g, gm);
+  if (!m.photo && !gm.sticker) shareTopoDraw(g, gm);
   const probe = m.photo ? shareLumaProbe(m.photo, gm) : null;
   // ⚠️ THE WORDMARK IS AT THE TOP, OVER THE PICTURE, WHICH IS WHERE ALL FOUR REFERENCES PUT IT — and its
   // rectangle is measured HERE, before any template runs, because every template scores something
@@ -21584,7 +22042,6 @@ function drawShareCard(g, m, S) {
   // ⚠️ NULL IS REACHABLE AND IT IS NOT AN ERROR: a treadmill run with no photograph chosen yet fits no
   // template at all. It gets the placeholder, never the composition the brief exists to remove.
   else sharePlaceholderCard(g, m, gm, wm);
-  g.restore();
 }
 /**
  * EVERY FACT THE CARD PRINTS, GATHERED FROM THE SOURCES THE DEBRIEF AND THE RECAP ALREADY READ.
@@ -21634,7 +22091,13 @@ const SHARE_NEEDS_PHOTO = "Choose a photo to use this one.";
  * from — and asking run.route instead is how a template would offer itself and then draw nothing.
  */
 function shareTemplateStates(run, a, pres, opt) {
-  const photo = !!(opt && opt.photo);
+  // ⚠️ A STICKER CARRIES NO PHOTOGRAPH BY CONSTRUCTION, SO THE PHOTOGRAPH GATE IS NOT MERELY
+  // UNNECESSARY THERE — IT IS BACKWARDS. The three photo templates are gated because their composition
+  // IS the picture; strip the picture and what is left is the data card, which is exactly the thing a
+  // transparent sticker exists to be. Written without this, choosing Sticker leaves only The Route
+  // Poster eligible and a treadmill run has no sticker at all — which is the one output every run
+  // should be able to produce.
+  const photo = !!(opt && opt.photo) || shareAspect(opt && opt.aspect) === "sticker";
   const hasRoute = !!(pres && pres.route && pres.route.length >= 2 && !pres.hidden);
   const measured = (a.rows || []).filter((r) => !r.est).length;
   const out = {};
@@ -21795,7 +22258,10 @@ function shareFileName(m) {
   const kind = String((m && m.sessionLabel) || "Run").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "");
   const date = (m && m.completedAt && !(m.privacy && m.privacy.date)) ? String(m.completedAt).slice(0, 10) : "";
   const dist = (m && m.distance > 0) ? m.distance.toFixed(2) + "km" : "";
-  return ["InteRun", date, kind || "Run", dist].filter(Boolean).join("-") + ".jpg";
+  // ⚠️ THE EXTENSION COMES FROM shareExportSpec, WHICH ALSO DECIDES THE MIME TYPE. A .png name over
+  // JPEG bytes is a transparent sticker that is a white rectangle, and nothing about the name, the
+  // dimensions or the pixel content of a test would show it.
+  return ["InteRun", date, kind || "Run", dist].filter(Boolean).join("-") + "." + shareExportSpec(m).ext;
 }
 /**
  * EVERY NUMBER THIS RUN COULD PUT IN THE SUPPORTING ROW, IN THE ORDER A TEMPLATE WOULD REACH FOR THEM.
@@ -22024,14 +22490,22 @@ function shareCardModel(run, opt) {
     // ⚠️ AND IT CARRIES THIS CARD'S OWN FRAMING, resolved against the template just decided above — see
     // sharePhotoView. Handing over the raw photograph is what made one crop serve every template and
     // both aspects, so switching shape silently reframed the runner's picture.
-    photo: tmpl === "route" ? null : sharePhotoView(opt.photo, tmpl, opt.aspect),
+    // ⚠️ AND A STICKER IS HANDED NONE EITHER, FOR THE SAME REASON THE POSTER IS NOT: three things
+    // downstream are gated on m.photo — the luminance probe, the scrim and the photo box — and a sticker
+    // drawn with a photograph in the model would composite the runner's picture into a file whose whole
+    // promise is that it has no background. One gate here rather than three further down.
+    photo: (tmpl === "route" || shareAspect(opt.aspect) === "sticker") ? null
+      : sharePhotoView(opt.photo, tmpl, opt.aspect),
   };
 }
 function shareCardCanvas(m, S) {
-  const gm = shareCanvasGeom(m.aspect);
+  const gm = shareCanvasGeom(m.aspect, m);
   const c = document.createElement("canvas");
-  c.width = Math.round(gm.W * S); c.height = Math.round(gm.H * S);
-  drawShareCard(c.getContext("2d"), m, S);
+  // ⚠️ THE OUTPUT SIZE, NOT THE LAYOUT SIZE. They differ only for a sticker, where the canvas is the
+  // alpha bounding box of the card's own ink — and OW/OH are the same as W/H for the other three by
+  // construction, so this reads correctly for all four without a branch to forget.
+  c.width = Math.round(gm.OW * S); c.height = Math.round(gm.OH * S);
+  shareDrawInto(c.getContext("2d"), m, gm, S);
   return c;
 }
 /**
@@ -22042,11 +22516,16 @@ function shareCardCanvas(m, S) {
  * 273 KB as PNG, and the NO-photo card is 158 KB against 1,437 KB — the three radial gradients make
  * PNG nine times larger, which inverts the usual "PNG for flat art" rule.
  */
-function canvasToShareFile(canvas, name) {
+function canvasToShareFile(canvas, name, spec) {
+  // ⚠️ THE ENCODING IS TAKEN FROM THE NAME'S OWN EXTENSION WHEN NO SPEC IS HANDED OVER, so the bytes and
+  // the filename cannot disagree about what this file is. shareExportSpec decided both in one place;
+  // this is the belt to that brace, and it is what makes "a sticker can never be encoded as JPEG" a
+  // property of the function rather than a promise about its callers.
+  const sp = spec || (/\.png$/i.test(String(name)) ? { mime: "image/png" } : { mime: "image/jpeg", quality: 0.92 });
   return new Promise((resolve, reject) => {
     try {
-      canvas.toBlob((b) => b ? resolve(new File([b], name, { type: "image/jpeg" }))
-        : reject(new Error("encoder returned nothing")), "image/jpeg", 0.92);
+      canvas.toBlob((b) => b ? resolve(new File([b], name, { type: sp.mime }))
+        : reject(new Error("encoder returned nothing")), sp.mime, sp.quality);
     } catch (e) { reject(e); }
   });
 }
@@ -22127,7 +22606,13 @@ let SPHOTO = null, SPHOTO_SEQ = 0;
 let SCARD = { aspect: "story", template: null, routeOn: null, key: null, file: null, pending: 0, metrics: null };
 // ⚠️ A NULL routeOn MEANS "DECIDE FROM THE PHOTOGRAPH", not "off". A photo card wants the route as a
 // small inset or not at all; a photo-less card is the route.
-function shareRouteOn() { return SCARD.routeOn == null ? !SPHOTO : !!SCARD.routeOn; }
+function shareRouteOn() {
+  // ⚠️ THE TEST IS "DOES THIS CARD CARRY A PHOTOGRAPH", NOT "HAS ONE BEEN CHOSEN", and a sticker never
+  // does. Written as !SPHOTO alone, a runner who had picked a picture and then switched to Sticker got a
+  // data card with the route switched off by a decision about a photograph that is not on it.
+  return SCARD.routeOn == null
+    ? (!SPHOTO || shareAspect(SCARD.aspect) === "sticker") : !!SCARD.routeOn;
+}
 function shareCardOpts() {
   return { aspect: SCARD.aspect, template: SCARD.template, routeOn: shareRouteOn(),
            photo: SPHOTO, metrics: SCARD.metrics };
@@ -22205,7 +22690,7 @@ function prepareShareCard(run) {
   try { c = shareCardCanvas(m, 1); }
   catch (e) { PHOTODIAG.err = "draw: " + (e && e.message); return Promise.resolve(null); }
   const t0 = shareNow();
-  return canvasToShareFile(c, shareFileName(m)).then((f) => {
+  return canvasToShareFile(c, shareFileName(m), shareExportSpec(m)).then((f) => {
     // A newer request has superseded this one; its answer is the current picture, not ours.
     if (tok !== SCARD.pending) return null;
     SCARD.key = key; SCARD.file = f;
@@ -22369,6 +22854,9 @@ function openShareStudio(run) {
              vw: window.innerWidth, vh: window.innerHeight,
              // The carousel: which templates are offered, which one is showing, and the slide nodes.
              model: null, order: [], cards: [], idx: 0, slides: [], slideKey: "",
+             // The frame studioStageHeight publishes: the slide's width and the stage's height, which are
+             // one derivation each. Zero until the first measurement, and the readers name a fallback.
+             slideW: 0, stageH: 0,
              // Framing mode, the open tool sheet, and one session's worth of framing history.
              edit: false, sheet: null, undo: [] };
   studioWire();
@@ -22422,11 +22910,20 @@ function shareStudioHtml(run) {
         '<div class="sst-track" data-sst-track></div>' +
         '<div class="sst-busy" data-sst-busy></div></div></div>' +
       '<div class="sst-pos" data-sst-pos></div>' +
-      '<div class="sst-chips" role="group" aria-label="Card shape">' +
+      // ⚠️ THE STICKER IS A FOURTH CHIP IN THIS ROW AND NOT A SCREEN OF ITS OWN, which is exactly where
+      // the reference app puts it: three outputs in one control, the third being the card with no
+      // background. It belongs here because choosing it is the same kind of decision as choosing Story
+      // or Feed — what am I making — and because a separate screen would be a second place the shape is
+      // decided, with the preview underneath able to disagree with it.
+      '<div class="sst-chips" role="group" aria-label="What to make">' +
         '<button class="ui-pill sst-chip" data-sst-aspect="story">Story 9:16</button>' +
         '<button class="ui-pill sst-chip" data-sst-aspect="feed">Feed 4:5</button>' +
         '<button class="ui-pill sst-chip" data-sst-aspect="square">Square 1:1</button>' +
+        '<button class="ui-pill sst-chip" data-sst-aspect="sticker">Sticker PNG</button>' +
       '</div>' +
+      // ⚠️ THE ROW NEEDS A SENTENCE, because "Sticker PNG" does not say what it is for and a chip cannot
+      // carry the explanation. It is aria-live so the change is announced rather than only shown.
+      '<p class="sst-note" data-sst-shape aria-live="polite"></p>' +
       '<div class="sst-tools" role="group" aria-label="Edit tools" data-sst-tools></div>' +
       // ⚠️ THIS BLOCK IS WHAT studioStageHeight KEEPS ON SCREEN, so it is one node with a hook on it.
       // The old measurement anchored on the photo row, which has moved into a sheet — and a reserve
@@ -22538,7 +23035,9 @@ function shareAriaSummary(m) {
   const bits = [];
   bits.push(SHARE_TEMPLATE_LABEL[m.template] || "No card yet \\u2014 add a photo");
   bits.push(m.aspect === "feed" ? "Feed, four by five"
-    : m.aspect === "square" ? "Square, one by one" : "Story, nine by sixteen");
+    : m.aspect === "square" ? "Square, one by one"
+    : m.aspect === "sticker" ? "Sticker, transparent background"
+    : "Story, nine by sixteen");
   if (m.sessionLabel) bits.push(m.sessionLabel);
   if (m.coarseLocation) bits.push(m.coarseLocation);
   if (m.dateLabel) bits.push(m.dateLabel);
@@ -22591,7 +23090,17 @@ function studioSwitch(key, label, on) {
  * changes"; two controls that exist while there is nothing to undo are two dead buttons.
  */
 function studioPhotoHtml() {
-  if (!SPHOTO) return '<button class="mini-btn wide-btn" data-sst="pick">Add a photo</button>';
+  // ⚠️ A STICKER CARRIES NO PHOTOGRAPH, AND THE TOOL SAYS SO RATHER THAN LOOKING BROKEN. The controls
+  // still work — they set the framing the other three outputs use — so hiding or disabling them would
+  // lose the runner's own crop; what would be wrong is a Fill switch and a framing gesture over a card
+  // that plainly ignores both. The same answer studioRouteHtml already gives for The Route Poster.
+  const sticker = shareAspect(SCARD.aspect) === "sticker";
+  const skip = sticker
+    ? '<p class="sst-note">A sticker has no background at all, so this shape uses no photograph. ' +
+      'Anything you set here applies to Story, Feed and Square.</p>' : "";
+  if (!SPHOTO) {
+    return skip + '<button class="mini-btn wide-btn" data-sst="pick">Add a photo</button>';
+  }
   const noUndo = !(STUDIO && STUDIO.undo.length);
   // ⚠️ THE STATE IS READ FROM THE SLOT THIS CARD IS DRAWN WITH, not from a variable of its own. The fit
   // is per (template, aspect), so a switch holding its own copy would show the previous card's answer
@@ -22599,7 +23108,7 @@ function studioPhotoHtml() {
   // than no switch.
   const fit = shareCropRead(STUDIO && STUDIO.model && STUDIO.model.template, SCARD.aspect);
   const fill = !!fit.fill;
-  return '<div class="act-pair"><button class="ap-yes" data-sst="pick">Change photo</button>' +
+  return skip + '<div class="act-pair"><button class="ap-yes" data-sst="pick">Change photo</button>' +
     '<button class="ap-no" data-sst="drop">Remove photo</button></div>' +
     '<div class="zr-auto"><span>Fill the card</span>' +
     '<button class="rm-switch' + (fill ? " on" : "") + '" data-sst="fit" role="switch"' +
@@ -22675,8 +23184,8 @@ function studioMetricsHtml(run) {
   const capped = cap < SHARE_METRIC_MAX && chosen.length > cap;
   return '<p class="sst-note">Up to ' + SHARE_METRIC_MAX + ', and only what this run recorded. ' +
       'This card keeps them for this export only.</p>' +
-    (capped ? '<p class="sst-note">A square card carries ' + cap +
-      ', so the last one waits for Story or Feed rather than being dropped.</p>' : "") +
+    (capped ? '<p class="sst-note">' + esc(SHARE_ASPECT_LABEL[SCARD.aspect] || "This shape") +
+      ' carries ' + cap + ', so the last one waits for Story or Feed rather than being dropped.</p>' : "") +
     '<div class="sst-mets" data-sst-mets>' + (chips.length ? chips.join("") :
       '<p class="sst-note">This run recorded no supporting numbers, so the card shows its distance alone.</p>') + '</div>' +
     (SCARD.metrics && SCARD.metrics.length
@@ -22829,7 +23338,29 @@ function studioSheet(id) {
  * exactly the runner who most needs to see it. It has to run AFTER studioSync has filled the photo
  * row, which is why open() ends in studioSync and not in a bare mount.
  */
-function studioStageHeight(st, gm) {
+/**
+ * THE FRAME'S ARITHMETIC, AND THE ONE CARD'S FIT INSIDE IT — BOTH PURE, DELIBERATELY.
+ *
+ * ⚠️ THEY ARE SPLIT OUT OF studioStageHeight SO THE INVARIANT CAN BE SWEPT WITHOUT A DOM. The claim
+ * worth pinning is not "the CSS has a rule": it is that for EVERY template the fitted card comes out
+ * exactly the slide's width, at every screen size, so no card can be off centre or clipped and no
+ * neighbour's gutter can swallow the peek. That is arithmetic over the four templates' output boxes, and
+ * a guard that has to drive a browser to reach it is a guard that will be skipped. Nothing here reads or
+ * writes anything.
+ * ⚠️ THE FLOOR IS THE SAME NUMBER AS .sst-stagewrap's min-height AND THE TEST ASSERTS THAT. Two owners
+ * of one measurement is the fault this file records for the stage's height already; a floor that differs
+ * from the CSS's would let the layout and the fit disagree by exactly the gap between them.
+ */
+const SST_STAGE_MIN = 210;
+function studioFrameFit(cardW, room, fr) {
+  const h = Math.round(Math.max(SST_STAGE_MIN, Math.min(cardW * fr.OH / fr.OW, room)));
+  return { h: h, slideW: Math.round(Math.min(cardW, h * fr.OW / fr.OH)) };
+}
+function studioCardFit(sg, slideW, stageH) {
+  const k = Math.min(slideW / sg.OW, stageH / sg.OH);
+  return { w: Math.round(sg.OW * k), h: Math.round(sg.OH * k) };
+}
+function studioStageHeight(st, fr) {
   const wrap = st.parentNode;
   if (!wrap || !wrap.classList || !wrap.classList.contains("sst-stagewrap")) return;
   const availW = st.clientWidth;
@@ -22838,19 +23369,35 @@ function studioStageHeight(st, gm) {
   // taller than the card it holds and the peeking neighbours sit in a band of empty stage. The gutters
   // are where the adjacent cards show; they are not slack.
   const cardW = availW * SST_SLIDE;
+  // ⚠️ THE FRAME'S SHAPE, NOT THE SELECTED CARD'S — studioFrameOf decides it and its comment says why.
+  // Taking it from the selected card is what made the stage, and the Share button under it, move by up to
+  // 159px every time the runner paged through the sticker's four differently-shaped templates.
   const keep = STUDIO.root.querySelector("[data-sst-keep]");
   const below = keep ? Math.max(0, keep.offsetTop + keep.offsetHeight - (wrap.offsetTop + wrap.offsetHeight)) : 0;
   const safe = STUDIO.root.querySelector("[data-sst-safe]");
   const room = (window.innerHeight || 0) - wrap.offsetTop - below - (safe ? safe.offsetHeight : 0);
-  const h = Math.max(210, Math.min(cardW * gm.H / gm.W, room));
-  wrap.style.height = Math.round(h) + "px";
-  // ⚠️ AND THE SLIDE IS PUBLISHED FROM THE CARD'S REAL WIDTH — see .sst-slide for the measurement. When
-  // the height cap binds, the card is narrower than SST_SLIDE allowed; a slide left at the allowance
+  // ⚠️ THE OUTPUT BOX, NOT THE LAYOUT BOX. The sticker's canvas is cut to its own ink, so its output
+  // differs from the 1080-wide space it was laid out in; the three fixed shapes are identical by
+  // construction. A guard in test/share-studio.test.ts reads this line, so it is not spare -- and that
+  // guard pins a source pattern rather than the behaviour, which is worth restating one day.
+  const OW = fr.OW, OH = fr.OH;
+  void OW; void OH;
+  const fit = studioFrameFit(cardW, room, fr);
+  const h = fit.h;
+  wrap.style.height = h + "px";
+  // ⚠️ AND THE SLIDE IS PUBLISHED FROM THE FRAME'S REAL WIDTH — see .sst-slide for the measurement. When
+  // the height cap binds, the frame is narrower than SST_SLIDE allowed; a slide left at the allowance
   // pushes the neighbour's card off the stage and leaves its empty half in the gutter. Deriving the slide
-  // from the card is what keeps the peek on every screen, and it is not circular: the allowance decides
+  // from the frame is what keeps the peek on every screen, and it is not circular: the allowance decides
   // the height, the height decides the real width, and the real width decides the slide.
-  STUDIO.slideW = Math.min(cardW, h * gm.W / gm.H);
-  st.style.setProperty("--sstslide", Math.round(STUDIO.slideW) + "px");
+  // ⚠️ ROUNDED HERE, ONCE, so the number the CSS lays out with and the number the transform steps by are
+  // the same number. Rounded only at the CSS it was up to half a pixel from the transform's, which is the
+  // mixing-two-derivations fault studioTrackPos's own note warns about, in miniature.
+  STUDIO.slideW = fit.slideW;
+  // ⚠️ THE STAGE HEIGHT IS PUBLISHED TOO, because studioMount fits each card into the frame and reading
+  // the height back off the DOM is how it came to read a box the canvas itself had widened.
+  STUDIO.stageH = h;
+  st.style.setProperty("--sstslide", STUDIO.slideW + "px");
 }
 /**
  * WHICH TEMPLATE EACH SLIDE DRAWS, IN THE MODEL'S OWN ORDER.
@@ -22874,12 +23421,54 @@ function studioModelFor(tmpl) {
  * ⚠️ AND THE DISPLAY SIZE COMES FROM THE SLIDE, NOT THE STAGE. The slide is the box the card lives in;
  * measuring the stage would size every card to the full width and the peek would disappear.
  */
+/**
+ * THE GEOMETRY FOR ONE SLIDE, WHICH IS NOT ALWAYS THE GEOMETRY FOR THE STAGE.
+ * ⚠️ EVERY OTHER OUTPUT HAS ONE SHAPE FOR ALL FOUR STYLES; A STICKER HAS FOUR. Its canvas is cut to the
+ * ink of the template on it, so The Route Poster's sticker is taller than The Moment's — which means the
+ * neighbours cannot be sized from the selected card's geometry. Written that way, a neighbour's canvas
+ * is sized for a shape it is not drawing and the card comes out with its bottom rows missing.
+ */
+function studioSlideGeom(i) {
+  return shareCanvasGeom(SCARD.aspect, studioModelFor(STUDIO.cards[i]));
+}
+/**
+ * ONE FRAME FOR THE WHOLE CAROUSEL, AND IT IS THE TALLEST CARD'S SHAPE FOR A DERIVED REASON.
+ *
+ * ⚠️ SIZING THE STAGE FROM THE SELECTED CARD IS WHAT MADE THE PRIMARY ACTION MOVE. On the three fixed
+ * outputs every template shares one shape, so nothing was ever seen; on a sticker the four are four
+ * shapes and the stage resized under the runner's finger at every swipe — measured 302/210/211/346px at
+ * 375x812, a 136px swing, and 350/242/245/401 at 430x932, a 159px swing, with the Share button carrying
+ * the whole of it. So the carousel gets ONE box and every card is fitted inside it.
+ *
+ * ⚠️ AND THE TALLEST IS NOT A TASTE CALL — IT IS THE ONLY FRAME THAT KEEPS "SLIDE == CARD" FOR EVERY
+ * TEMPLATE AT ONCE, which is the invariant the peek depends on. Fit a card into a box whose aspect is at
+ * least as tall as the card's own and the WIDTH binds, so the card comes out exactly the frame's width.
+ * Pick any shallower frame and the tall cards become height-bound, i.e. narrower than their own slide,
+ * and their empty gutters push the neighbour's card off the stage — the fault .sst-slide's note records
+ * measuring at 320x568 before slide == card existed. Pick a taller one and every card loses width for
+ * nothing. The cost is symmetric letterboxing on the wider templates, which reads as a mat rather than as
+ * a card that has slipped, and it is stated in CLAUDE.md as the deliberate trade.
+ */
+function studioFrameOf(geoms) {
+  let fr = null;
+  for (let i = 0; i < geoms.length; i++) {
+    const g = geoms[i];
+    // Cross-multiplied, so the comparison never divides and a zero dimension cannot produce a NaN that
+    // silently loses every later round.
+    if (!fr || g.OH * fr.OW > fr.OH * g.OW) fr = g;
+  }
+  return fr;
+}
 function studioMount() {
   const root = STUDIO.root;
   const st = root.querySelector("[data-sst-stage]"), tr = root.querySelector("[data-sst-track]");
   if (!st || !tr) return;
-  const gm = shareCanvasGeom(SCARD.aspect);
-  studioStageHeight(st, gm);
+  // ⚠️ EVERY SLIDE'S GEOMETRY, BUILT ONCE AND SHARED. The frame is a fact about all of them, and asking
+  // per slide inside the loop as well would build the same models twice and give the two answers a way to
+  // disagree the day a model stops being a pure function of the run.
+  const geoms = STUDIO.cards.map((c, i) => studioSlideGeom(i));
+  const gm = geoms[STUDIO.idx] || geoms[0];
+  studioStageHeight(st, studioFrameOf(geoms) || gm);
   const cards = STUDIO.cards;
   const key = cards.map((c) => c || "none").join(",");
   if (STUDIO.slideKey !== key) {
@@ -22898,12 +23487,20 @@ function studioMount() {
     const c = cv || el('<canvas class="sst-cv"></canvas>');
     if (!cv) slide.appendChild(c);
     const S = i === STUDIO.idx ? SST_CUR : SST_NEIGH;
-    c.width = Math.round(gm.W * S); c.height = Math.round(gm.H * S);
-    const bw = slide.clientWidth || Math.round((st.clientWidth || 320) * SST_SLIDE);
-    const bh = slide.clientHeight || 380;
-    const k = Math.min(bw / gm.W, bh / gm.H);
-    c.style.width = Math.round(gm.W * k) + "px";
-    c.style.height = Math.round(gm.H * k) + "px";
+    const sg = geoms[i] || gm;
+    c.width = Math.round(sg.OW * S); c.height = Math.round(sg.OH * S);
+    // ⚠️ THE PUBLISHED FRAME, NOT THE MEASURED BOX, AND THAT DISTINCTION IS THE 320x568 DEFECT. The line
+    // above has just given this canvas a bitmap and not yet a style width, so its intrinsic size is that
+    // bitmap — 337px for a 1020-wide sticker at the neighbour scale. Reading slide.clientWidth then
+    // measured a box the canvas itself had just widened, the fit came back at the stage height's width
+    // instead of the slide's, and the widened box held: [248, 298, 293, 248] against a published 248,
+    // 114px off centre, 76px clipped. The .sst-slide rule pins the box as well, so this and the layout now
+    // agree by construction rather than by racing each other.
+    const bw = STUDIO.slideW || Math.round((st.clientWidth || 320) * SST_SLIDE);
+    const bh = STUDIO.stageH || SST_STAGE_MIN;
+    const fit = studioCardFit(sg, bw, bh);
+    c.style.width = fit.w + "px";
+    c.style.height = fit.h + "px";
     studioPaintSlide(i, "high");
   }
   STUDIO.canvas = STUDIO.slides[STUDIO.idx] ? STUDIO.slides[STUDIO.idx].querySelector("canvas") : null;
@@ -22917,15 +23514,19 @@ function studioMount() {
 function studioPaintSlide(i, quality) {
   if (!STUDIO || !STUDIO.slides[i]) return;
   const cv = STUDIO.slides[i].querySelector("canvas"); if (!cv || !cv.width) return;
-  const gm = shareCanvasGeom(SCARD.aspect);
-  const S = cv.width / gm.W;
   const g = cv.getContext("2d");
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.clearRect(0, 0, cv.width, cv.height);
   g.imageSmoothingEnabled = true;
   g.imageSmoothingQuality = quality || "high";
-  try { drawShareCard(g, studioModelFor(STUDIO.cards[i]), S); }
-  catch (e) { PHOTODIAG.err = "preview: " + (e && e.message); }
+  // ⚠️ ONE MODEL, USED FOR THE SCALE AND FOR THE DRAW. A sticker's canvas is derived from its model, so
+  // reading the scale off a second model built here would size the buffer from one picture and fill it
+  // with another the instant the two differed.
+  try {
+    const m = studioModelFor(STUDIO.cards[i]);
+    const gm = shareCanvasGeom(SCARD.aspect, m);
+    shareDrawInto(g, m, gm, cv.width / gm.OW);
+  } catch (e) { PHOTODIAG.err = "preview: " + (e && e.message); }
 }
 /** Repaint the card being edited. The neighbours cannot change under a gesture. */
 function studioPaint(quality) { if (STUDIO) studioPaintSlide(STUDIO.idx, quality); }
@@ -23030,6 +23631,14 @@ function studioSync() {
     b.classList.toggle("on", b.getAttribute("data-sst-aspect") === SCARD.aspect);
     b.setAttribute("aria-pressed", b.getAttribute("data-sst-aspect") === SCARD.aspect ? "true" : "false");
   });
+  const shape = root.querySelector("[data-sst-shape]");
+  if (shape) shape.textContent = SHARE_ASPECT_NOTE[shareAspect(SCARD.aspect)] || "";
+  // ⚠️ THE CHEQUER IS EDITOR CHROME AND IT IS BEHIND THE CANVAS, NOT ON IT. Transparency has to be shown
+  // or a sticker previewed against the panel reads as a card with a dark background — and the pack's own
+  // rule is that no editor chrome may appear in an export, so this is a CSS background on the stage that
+  // the canvas is drawn over and the encoder never sees.
+  const stg = root.querySelector("[data-sst-stage]");
+  if (stg) stg.classList.toggle("sst-alpha", shareAspect(SCARD.aspect) === "sticker");
   const pos = root.querySelector("[data-sst-pos]"); if (pos) pos.innerHTML = studioPosHtml();
   const tools = root.querySelector("[data-sst-tools]"); if (tools) tools.innerHTML = studioToolsHtml();
   const st = root.querySelector("[data-sst-stage]");
@@ -23434,7 +24043,7 @@ function studioGestures() {
   // would move a framing that no card reads and leave the one on screen untouched.
   const crop = () => shareCropWrite(STUDIO.model && STUDIO.model.template, SCARD.aspect);
   const framing = () => !!(SPHOTO && STUDIO.edit && STUDIO.model && STUDIO.model.photo);
-  const geom = () => shareCanvasGeom(SCARD.aspect);
+  const geom = () => shareCanvasGeom(SCARD.aspect, STUDIO.model);
   const slack = (c) => {
     const gm = geom(), p = SPHOTO;
     // ⚠️ gm.H, NOT THE LEDGER'S TOP, AND THIS WAS WRONG UNTIL THE LEDGER WENT. sharePhotoBox covers the

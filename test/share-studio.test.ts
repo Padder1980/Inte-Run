@@ -341,14 +341,23 @@ test("BLOCKER: the preview stays dominant, the neighbours peek, and the position
     "the CSS slide fallback and SST_SLIDE disagree, so the peek and the height start from different numbers");
   const h = lift("studioStageHeight");
   assert.match(h, /availW \* SST_SLIDE/, "the stage height is derived from the stage width, not the card's");
-  assert.match(h, /cardW \* gm\.H \/ gm\.W/, "the stage height is not the card's aspect");
-  // ⚠️ AND THE SLIDE FOLLOWS THE CARD'S REAL WIDTH, NOT THE ALLOWANCE. On a short screen the height cap
-  // binds first and the card comes out narrower than SST_SLIDE allowed; a slide left at the allowance
-  // pushed the neighbour's CARD past the edge of the stage while its empty half sat in the gutter —
-  // measured on 320x568, the card at 49% of the stage with no peek at all and half the stage empty, which
-  // is the fault this design exists to remove reappearing on the smallest supported screen.
-  assert.match(h, /STUDIO\.slideW = Math\.min\(cardW, h \* gm\.W \/ gm\.H\)/,
-    "the slide is not narrowed to the card, so the peek disappears whenever the height cap binds");
+  // ⚠️ THE OUTPUT BOX, NOT THE LAYOUT BOX, since the sticker's canvas is cut to its own ink. They are
+  // the same for the three fixed shapes by construction, so reading OW/OH is right for all four and a
+  // W/H read would size the stage for a card the runner is not about to post.
+  assert.match(h, /const OW = fr\.OW, OH = fr\.OH/,
+    "the stage no longer measures the OUTPUT box, so a trimmed card is framed by its layout box");
+  // ⚠️ AND THE FRAME FOLLOWS ITS REAL WIDTH, NOT THE ALLOWANCE. On a short screen the height cap binds
+  // first and the frame comes out narrower than SST_SLIDE allowed; a slide left at the allowance pushed
+  // the neighbour's CARD past the edge of the stage while its empty half sat in the gutter — measured on
+  // 320x568, the card at 49% of the stage with no peek at all and half the stage empty, which is the
+  // fault this design exists to remove reappearing on the smallest supported screen. The arithmetic is
+  // studioFrameFit's and is swept in its own test; what this pins is that the stage USES it.
+  assert.match(h, /const fit = studioFrameFit\(cardW, room, fr\)/,
+    "the stage height derives the frame a second time instead of asking for it");
+  assert.match(h, /STUDIO\.slideW = fit\.slideW/,
+    "the slide is not narrowed to the frame, so the peek disappears whenever the height cap binds");
+  assert.match(h, /STUDIO\.stageH = h/,
+    "the stage height is not published, so studioMount has to measure a box the canvas can widen");
   assert.match(h, /setProperty\("--sstslide"/, "the measured slide width never reaches the layout");
   // ⚠️ ONE SLIDE WIDTH, READ BY THE TRANSFORM AND BY THE DRAG SCALE. Two derivations of it put the card
   // off centre at every position but the first, and made a drag move the picture further than the finger.
@@ -390,13 +399,124 @@ test("BLOCKER: only three cards hold a canvas, and the neighbours are drawn smal
   assert.match(mount, /cv\.width = 0; cv\.height = 0; cv\.remove\(\)/,
     "an out-of-reach canvas is removed without zeroing its backing store, which does not free the bitmap");
   assert.match(mount, /i === STUDIO\.idx \? SST_CUR : SST_NEIGH/, "the two scales are no longer applied per slide");
-  // ⚠️ THE DISPLAY SIZE COMES FROM THE SLIDE, NOT THE STAGE. The slide is the box the card lives in;
-  // measuring the stage would size every card to the full width and the peek would disappear.
-  assert.match(mount, /slide\.clientWidth/, "the card is sized from the stage, so the peek collapses");
+  // ⚠️ THE DISPLAY SIZE COMES FROM THE PUBLISHED FRAME, NEVER FROM A MEASURED BOX, AND THAT IS THE
+  // 320x568 DEFECT. A canvas whose bitmap is set but whose style width is not yet assigned has an
+  // intrinsic width of that bitmap — 337px for a 1020-wide sticker at the neighbour scale — so reading
+  // slide.clientWidth measured a box the canvas had just widened and fitted the card to it. Measured with
+  // a sticker selected: slides [248, 298, 293, 248] against a published 248, the selected card 114px off
+  // centre and 76px of it clipped away by the stage's overflow: hidden. Fixed and re-measured: 0px
+  // clipped, 1px worst centre error, every slide exactly the published width, across 96 combinations of
+  // output, template, viewport and theme.
+  assert.match(mount, /const bw = STUDIO\.slideW \|\|/,
+    "the card is sized from a measured box the canvas itself can widen, so the fit chases its own input");
+  assert.match(mount, /const bh = STUDIO\.stageH \|\|/, "the card's height comes from a measured box, not the frame");
+  assert.ok(!/slide\.client(Width|Height)/.test(nocomment(mount)),
+    "studioMount still measures the slide, which is the feedback loop that clipped the card at 320x568");
   // ⚠️ AND THE SCALE IS READ BACK OFF THE CANVAS RATHER THAN PASSED IN, so a half-scale drawing can never
   // land in a third-scale buffer the day the selection moves.
-  assert.match(lift("studioPaintSlide"), /const S = cv\.width \/ gm\.W/,
+  // ⚠️ AND ONE MODEL DECIDES BOTH THE BUFFER AND THE DRAWING. A sticker's canvas is derived from its
+  // model, so a second model built for the scale could size the buffer from one picture and fill it with
+  // another; the guard is that the scale is read off the canvas against the SAME geometry the draw uses.
+  const paint = nocomment(lift("studioPaintSlide"));
+  assert.match(paint, /const m = studioModelFor\(STUDIO\.cards\[i\]\)/,
+    "the paint no longer builds one model for the slide");
+  assert.match(paint, /shareDrawInto\(g, m, gm, cv\.width \/ gm\.OW\)/,
     "the paint takes a scale of its own instead of the one the canvas was actually sized at");
+  assert.match(mount, /const geoms = STUDIO\.cards\.map\(/,
+    "the slides' geometries are not built together, so the frame and the fit can be told two different shapes");
+  // ⚠️ AND THE STAGE IS SIZED FROM THE FRAME, NOT FROM THE SELECTED CARD. The arithmetic below is swept in
+  // its own test; this is the one line that decides whether the sweep is describing the app or a function
+  // nothing calls, which is the dead-code trap this file records for `scale(1, -1)`.
+  assert.match(mount, /studioStageHeight\(st, studioFrameOf\(geoms\) \|\| gm\)/,
+    "the stage is sized from the selected card again, so the Share button moves as the runner pages");
+  assert.match(mount, /const sg = geoms\[i\] \|\| gm/,
+    "the neighbours are sized from the selected card's geometry, which a sticker does not share");
+});
+
+test("BLOCKER: every card comes out exactly the slide's width, at every screen size", () => {
+  /**
+   * ⚠️ THIS IS THE INVARIANT ONLY THE STICKER COULD EVER VIOLATE, AND IT DID. The three fixed outputs
+   * give all four templates one shape, so "the card is as wide as its slide" held by construction and
+   * nothing was measuring it. A sticker's canvas is cut to its own ink, so its four templates are four
+   * shapes (aspect 0.98 / 1.42 / 1.40 / 0.85) — and a frame taken from the SELECTED card left the others
+   * either clipped or stranded in a gutter, plus a stage that resized under the runner's finger.
+   *
+   * ⚠️ SWEPT, AND SWEPT OVER THE SMALL SIZES. Measured live, the fault was 0px at 430x932 and 76px at
+   * 320x568: a sweep run only at the comfortable size cannot see it. Every point here is a real stage
+   * width and a real room from the live editor at 320x568 / 375x812 / 430x932, plus the case where the
+   * 210px floor binds, which is what 320x568 does.
+   */
+  const src = page();
+  const F = new Function(liftConst("SST_STAGE_MIN") + "\n" + lift("studioFrameOf") + "\n" +
+    lift("studioFrameFit") + "\n" + lift("studioCardFit") +
+    "\nreturn { studioFrameOf, studioFrameFit, studioCardFit, SST_STAGE_MIN };")() as any;
+  // ⚠️ THE FLOOR IS DECLARED TWICE — once in JS and once as .sst-stagewrap's min-height — and two owners
+  // of one measurement is a documented fault in this very function. So they are compared rather than
+  // trusted: a layout floor above the fit's would let a card be fitted for a stage shorter than the one
+  // it is drawn in, which is clipping with nothing in the code to point at.
+  const jsMin = Number(/const SST_STAGE_MIN = (\d+)/.exec(src)?.[1]);
+  const cssMin = Number(/min-height:\s*(\d+)px/.exec(rule(".sst-stagewrap"))?.[1]);
+  assert.equal(jsMin, cssMin, "the fit's floor and .sst-stagewrap's min-height are different numbers");
+  assert.equal(F.SST_STAGE_MIN, jsMin, "SST_STAGE_MIN did not lift");
+
+  /**
+   * ⚠️ SYNTHETIC SHAPE SETS AS WELL AS THE REAL FOUR, BECAUSE A FIXTURE OF TODAY'S FOUR PROVES ONLY
+   * TODAY. The stickers' sizes are derived from their own ink, so they move whenever the type or a band
+   * moves; the property being pinned holds for ANY collection of output boxes, so the sweep says so. The
+   * `sticker` row is the set the build actually produced (1020x1044 / 1020x720 / 1020x730 / 1014x1188,
+   * read from the exported PNGs' IHDRs) and `wild` is deliberately worse than anything the renderer can
+   * make, so a future template cannot arrive outside what has been checked.
+   */
+  const OUTPUTS: Record<string, number[][]> = {
+    story: [[1080, 1920], [1080, 1920], [1080, 1920], [1080, 1920]],
+    feed: [[1080, 1350], [1080, 1350], [1080, 1350], [1080, 1350]],
+    square: [[1080, 1080], [1080, 1080], [1080, 1080], [1080, 1080]],
+    sticker: [[1020, 1044], [1020, 720], [1020, 730], [1014, 1188]],
+    wild: [[1080, 360], [1080, 3240], [900, 900], [1080, 1201]],
+    pair: [[1014, 1188], [1020, 720]],
+    one: [[1020, 730]],
+  };
+  const geo = (wh: number[]) => ({ OW: wh[0], OH: wh[1] });
+  // (stage width, room) as measured live. 320x568's room is under the floor, which is the binding case.
+  const SCREENS = [[288, 190], [288, 210], [343, 620], [398, 700], [398, 401], [288, 500]];
+  let worstSpread = 0, worstOver = 0, rows = 0;
+  for (const name of Object.keys(OUTPUTS)) {
+    for (const [availW, room] of SCREENS) {
+      const geoms = OUTPUTS[name]!.map(geo);
+      const fr = F.studioFrameOf(geoms);
+      const fit = F.studioFrameFit(availW! * 0.86, room!, fr);
+      // ⚠️ THE FRAME DOES NOT DEPEND ON WHICH CARD IS SELECTED. That is the whole of the no-swing claim,
+      // and it is asserted by re-deriving from every rotation of the list rather than from the order the
+      // editor happens to hold.
+      for (let r = 0; r < geoms.length; r++) {
+        const rot = geoms.slice(r).concat(geoms.slice(0, r));
+        const f2 = F.studioFrameFit(availW! * 0.86, room!, F.studioFrameOf(rot));
+        assert.deepEqual(f2, fit, name + " at " + availW + "x" + room +
+          ": the frame moves with the selection, so the stage and the Share button under it move as the runner pages");
+      }
+      for (let i = 0; i < geoms.length; i++) {
+        const c = F.studioCardFit(geoms[i], fit.slideW, fit.h);
+        rows++;
+        worstSpread = Math.max(worstSpread, Math.abs(c.w - fit.slideW));
+        worstOver = Math.max(worstOver, c.w - fit.slideW, c.h - fit.h);
+        assert.equal(c.w, fit.slideW,
+          name + " card " + i + " at stage " + availW + "/room " + room + ": the card is " + c.w +
+          " in a " + fit.slideW + " slide — a card narrower than its slide loses the peek, a card wider is clipped");
+        assert.ok(c.h <= fit.h,
+          name + " card " + i + ": " + c.h + " tall in a " + fit.h + " stage, so its bottom rows are cut off");
+      }
+    }
+  }
+  assert.equal(worstSpread, 0, "some card is not its slide's width");
+  assert.ok(worstOver <= 0, "some card overflows the frame");
+  assert.equal(rows, 138, "the sweep no longer covers every shape set at every screen");
+  // ⚠️ AND THE CSS PINS THE BOX SO THE CANVAS CANNOT ARGUE WITH IT. A flex item defaults to
+  // min-width: auto and refuses to shrink below its content; that is what let the canvas's own intrinsic
+  // bitmap width widen the slide in the first place, and it is a second, independent way for the fit
+  // above to be told a width nobody published.
+  const sl = rule(".sst-slide");
+  assert.match(sl, /min-width: 0/, "the slide can still be widened by its own content");
+  assert.match(sl, /max-width: var\(--sstslide, 86%\)/, "the slide has no ceiling, so a wide canvas widens it");
 });
 
 test("BLOCKER: the carousel's motion is off for a runner who asked for less of it", () => {
@@ -661,17 +781,24 @@ test("BLOCKER: the preview is described in words, from the model, with nothing h
     "the preview's description is never updated, so it describes the card it opened on");
 });
 
-test("BLOCKER: all three shapes are offered, wired and announced, and the square says what it drops", () => {
+test("BLOCKER: all four outputs are offered, wired and announced, and each says what it is", () => {
   // ⚠️ THE SPEC NAMES THE CONTROL AND ITS THREE OPTIONS: "Aspect control: STORY 9:16, FEED 4:5, optional
   // SQUARE 1:1". The square became non-optional for this app the moment the byte gate proved the required
   // two, which is the condition the contract attaches to it.
+  // ⚠️ AND THE FOURTH IS THE STICKER, WHICH IS AN ADDITION RATHER THAN A DEPARTURE (DECISIONS.md,
+  // 2026-08-19). It sits in THIS row because choosing it is the same kind of decision — what am I making
+  // — and because a screen of its own would be a second place the output is decided, with the preview
+  // underneath able to disagree with it.
   const html = lift("shareStudioHtml");
   const chips = [...html.matchAll(/data-sst-aspect="([a-z]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(chips, ["story", "feed", "square"],
-    "the shape row offers " + chips.join(", ") + " rather than all three");
+  assert.deepEqual(chips, ["story", "feed", "square", "sticker"],
+    "the output row offers " + chips.join(", ") + " rather than all four");
   // ⚠️ AND EACH CHIP SAYS ITS RATIO. "Square" alone does not tell a runner what they are about to export,
-  // and the exported pixels are the one thing the whole control decides.
-  for (const [aspect, label] of [["story", "9:16"], ["feed", "4:5"], ["square", "1:1"]] as [string, string][]) {
+  // and the exported pixels are the one thing the whole control decides. The sticker has no ratio to
+  // state — its size comes from its own ink — so it states its FORMAT, which is the fact that matters:
+  // a PNG is the only thing that can carry transparency.
+  for (const [aspect, label] of [["story", "9:16"], ["feed", "4:5"], ["square", "1:1"],
+    ["sticker", "PNG"]] as [string, string][]) {
     const at = html.indexOf('data-sst-aspect="' + aspect + '"');
     assert.ok(at > 0, "no chip for " + aspect);
     assert.ok(html.slice(at, at + 120).includes(label),
@@ -691,17 +818,35 @@ test("BLOCKER: all three shapes are offered, wired and announced, and the square
   // card announced itself as a story — which is worse than saying nothing, because it is wrong about the
   // one thing the runner cannot see.
   const aria = nocomment(lift("shareAriaSummary"));
-  for (const word of ["Story", "Feed", "Square"]) {
+  for (const word of ["Story", "Feed", "Square", "Sticker"]) {
     assert.ok(aria.includes(word), "the preview summary never says " + word);
   }
   assert.match(aria, /one by one/, "the square is announced as a ratio a screen reader cannot read out");
+  assert.match(aria, /transparent background/,
+    "the sticker is announced without the one property that distinguishes it");
+  // ⚠️ THE ROW CARRIES A SENTENCE PER OUTPUT, because "Sticker PNG" does not say what it is for and a
+  // chip cannot carry the explanation. All four are stated, so the row cannot describe three of them.
+  const note = liftConst("SHARE_ASPECT_NOTE");
+  for (const a of ["story", "feed", "square", "sticker"]) {
+    assert.ok(new RegExp(a + ":").test(note), "no note for " + a + " in the output row");
+  }
+  assert.match(note, /no background/, "the sticker's note never says it has no background");
+  assert.match(sync, /\[data-sst-shape\]/, "the output note is never filled in");
+  assert.match(sync, /SHARE_ASPECT_NOTE\[shareAspect\(SCARD\.aspect\)\]/,
+    "the note is not resolved through the one aspect validator");
   // ⚠️ AND THE METRIC SHEET SAYS THE THIRD NUMBER IS KEPT RATHER THAN REFUSED. A chip that is on and does
   // not appear on the card is the same looks-live fault in the other direction, and the honest line is
   // that it comes back on the other two shapes.
   const mets = nocomment(lift("studioMetricsHtml"));
   assert.match(mets, /shareMetricCap\(SCARD\.aspect\)/,
     "the metrics sheet does not know a square carries fewer numbers");
-  assert.match(mets, /square card carries/, "the sheet never explains the square's cap");
+  // ⚠️ THE WORDING IS DERIVED FROM THE OUTPUT, NOT HARDCODED AS "a square card". Two shapes now share
+  // the square's two-metric cap — the square and the sticker — so a sentence naming only one of them is
+  // wrong on the other, about a chip the runner can see is on.
+  assert.match(mets, /SHARE_ASPECT_LABEL\[SCARD\.aspect\]/,
+    "the sheet names one shape by hand rather than the output it is describing");
+  assert.match(liftConst("SHARE_ASPECT_LABEL"), /sticker: "A sticker"/,
+    "the sticker has no name for that sentence to use");
   assert.match(mets, /rather than being dropped/,
     "the sheet implies the third number is discarded, which it is not");
   // ⚠️ AND THE NOTE HAS TO BE REACHABLE, WHICH A TEXT SWEEP CANNOT SEE. Re-broken by changing the gate to
@@ -754,4 +899,55 @@ test("the switch component reaches the 44px tap floor by growing its hit area", 
   // ⚠️ z-index IS WHAT MAKES IT WORK DOWNWARD: without it the next row in document order paints over
   // the lower half of the expander, and the bottom 8px of every switch stops answering.
   assert.match(c, /\.rm-switch \{ z-index: 1; \}/, "the expander is painted under the following row");
+});
+
+test("BLOCKER: the transparency chequer is editor chrome that cannot reach an export", () => {
+  // ⚠️ A STICKER PREVIEWED AGAINST THE PANEL IS INDISTINGUISHABLE FROM A CARD WITH A DARK BACKGROUND, so
+  // the thing that makes it worth choosing is invisible until transparency is SHOWN. And the pack forbids
+  // any editor chrome in an export in as many words.
+  // ⚠️ THE GUARD IS THAT IT IS A CSS BACKGROUND ON THE CANVAS ELEMENT. An element's background is painted
+  // behind its bitmap by the browser and is not part of it — toBlob is handed the bitmap alone — so the
+  // rule is kept by construction rather than by remembering to switch something off. A pseudo-element on
+  // the slide would also never reach the export but would be the wrong SIZE: the canvas is centred in
+  // its slide and is usually narrower, so the chequer would extend past the card.
+  const css = page();
+  const at = css.indexOf(".sst-stage.sst-alpha .sst-cv");
+  assert.ok(at > 0, "there is no transparency chequer for the sticker preview");
+  const decl = css.slice(at, css.indexOf("}", at));
+  assert.match(decl, /background-image:/, "the chequer is not a background image");
+  assert.match(decl, /linear-gradient/, "the chequer is not built from gradients, so it needs an asset");
+  assert.match(decl, /background-size:/, "the chequer has no cell size, so it is a flat fill");
+  assert.ok(!/::before|::after|content:/.test(decl),
+    "the chequer is a pseudo-element, which is not sized to the card");
+  // and nothing in the renderer draws one, which is the half a CSS check cannot see
+  const src = nocomment(page());
+  assert.ok(!/sst-alpha/.test(nocomment(lift("shareDrawBody"))),
+    "the renderer knows about the chequer, so it could bake one in");
+  // toggled from the one aspect validator, so it cannot show on a shape that is not transparent
+  const sync = nocomment(lift("studioSync"));
+  assert.match(sync, /classList\.toggle\("sst-alpha", shareAspect\(SCARD\.aspect\) === "sticker"\)/,
+    "the chequer is not toggled from the resolved output, so it can show under an opaque card");
+  assert.ok(src.length > 0);
+});
+
+test("BLOCKER: the Photo tool says a sticker uses no photograph, and keeps its controls live", () => {
+  // ⚠️ A CONTROL THAT LOOKS LIVE OVER A CARD IT CANNOT CHANGE IS THE DEFECT THIS PROJECT HAS SHIPPED
+  // THREE TIMES, and the answer here is the one studioRouteHtml already gives for The Route Poster: say
+  // it in words. The controls stay live because they set the framing the OTHER three outputs use —
+  // hiding or disabling them would lose the runner's own crop.
+  const ph = nocomment(lift("studioPhotoHtml"));
+  assert.match(ph, /shareAspect\(SCARD\.aspect\) === "sticker"/,
+    "the Photo tool does not know which output it is describing");
+  assert.match(ph, /no background at all/, "the Photo tool never says why the photograph is unused");
+  assert.match(ph, /Story, Feed and Square/,
+    "the note does not say where the framing still applies, so it reads as the controls being broken");
+  // ⚠️ AND THE NOTE HAS TO APPEAR IN BOTH STATES OF THAT BUILDER. It returns early when no photograph
+  // has been chosen, and that is exactly the state a sticker is most likely to be used in.
+  assert.match(ph, /return skip \+ '<button class="mini-btn wide-btn" data-sst="pick">/,
+    "the no-photo branch of the Photo tool drops the sticker note");
+  assert.match(ph, /return skip \+ '<div class="act-pair">/,
+    "the has-photo branch of the Photo tool drops the sticker note");
+  // and nothing is disabled by it: the Fill switch and the framing buttons are still reachable
+  assert.ok(!/sticker[\s\S]{0,200}disabled/.test(ph),
+    "the Photo tool disables a control on a sticker, which loses the framing for the other three shapes");
 });

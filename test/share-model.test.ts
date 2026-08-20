@@ -57,14 +57,15 @@ function liftConst(name: string): string {
 
 const CONSTS = ["SHARE_MODEL_VERSION", "SHARE_TEMPLATES", "SHARE_TEMPLATE_LABEL", "SHARE_NEEDS_PHOTO",
   "RUN_METRIC_LADDER", "RD_MONTHS", "PRIV_RADIUS_M", "SHARE_PRIV_STORE", "SHARE_PRIV_MAX",
-  "SHARE_EVEN_SPREAD_S", "SHARE_METRIC_MAX", "SHARE_CROP0", "SHARE_ASPECTS"];
+  "SHARE_EVEN_SPREAD_S", "SHARE_METRIC_MAX", "SHARE_CROP0", "SHARE_ASPECTS", "SHARE_ASPECT_FAMILY"];
 const FNS = ["fmtPace", "rdCue", "rdWell", "runEvidenceConfidence", "runAnalysis", "runVerdict",
   "rdMetresBetween", "redactRouteEnds", "runRoutePresentation", "loadSharePriv", "saveSharePriv",
   "sharePrivacyFor", "sharePrivacyLocked", "setSharePrivacy", "runMetricLadder", "runStartMsKnown",
   "rdWhenText", "rdDateText", "shareTemplateStates", "shareTemplateFor", "shareEvidenceLine", "shareFileName",
   "shareProgressionClaim", "shareMetricPool", "shareMetricsChosen",
   "shareCropKey", "shareCropRead", "shareCropWrite", "sharePhotoView", "shareCropSig",
-  "shareCardModel", "shareKey", "shareRouteOn", "shareCardOpts", "shareCardKey", "shareAspect"];
+  "shareCardModel", "shareKey", "shareRouteOn", "shareCardOpts", "shareCardKey", "shareAspect",
+  "shareAspectFamily", "shareExportSpec"];
 
 /** A stand-in for the browser's localStorage: enough for the per-run privacy store to be exercised. */
 function fakeStore() {
@@ -726,6 +727,64 @@ test("The Route Poster asks the post-privacy geometry, never run.route", () => {
   assert.match(lift("shareTemplateStates"), /pres\.route/, "eligibility reads the raw route again");
 });
 
+test("BLOCKER: a sticker needs no photograph, and it never carries one", () => {
+  // ⚠️ THE PHOTOGRAPH GATE IS NOT MERELY UNNECESSARY ON A STICKER, IT IS BACKWARDS. The three photo
+  // templates are gated because their composition IS the picture; strip the picture and what is left is
+  // the data card, which is exactly what a transparent sticker is for. Written without the relaxation,
+  // choosing Sticker leaves only The Route Poster eligible and a treadmill run has no sticker at all —
+  // which is the one output every run should be able to produce.
+  const E = env();
+  const run = refRun();
+  const a = E.runAnalysis(run), pres = E.runRoutePresentation(run, E.sharePrivacyFor(run));
+  const st = E.shareTemplateStates(run, a, pres, { photo: null, aspect: "sticker" });
+  for (const t of ["moment", "execution", "progression"]) {
+    assert.equal(st[t].ok, true, t + " is refused on a sticker for want of a photograph");
+  }
+  // and the three fixed shapes still require one, so the relaxation is scoped to the sticker alone
+  const st2 = E.shareTemplateStates(run, a, pres, { photo: null, aspect: "story" });
+  for (const t of ["moment", "execution", "progression"]) {
+    assert.equal(st2[t].ok, false, t + " no longer needs a photograph on a story card");
+  }
+  // ⚠️ AND EVERY OTHER REASON STILL APPLIES. The relaxation is about the photograph and nothing else:
+  // an interval session has no kilometre target to be judged against whatever shape it is exported at.
+  const iv = intervalRun();
+  const stIv = E.shareTemplateStates(iv, E.runAnalysis(iv),
+    E.runRoutePresentation(iv, E.sharePrivacyFor(iv)), { photo: null, aspect: "sticker" });
+  assert.equal(stIv.execution.ok, false, "The Execution is offered on an interval session's sticker");
+  assert.match(stIv.execution.why, /repetitions/i);
+  // ⚠️ AND THE MODEL HANDS A STICKER NO PHOTOGRAPH EVEN WHEN ONE IS SUPPLIED. Three things downstream
+  // are gated on m.photo — the luminance probe, the scrim and the photo box — so a sticker drawn with a
+  // photograph in the model would composite the runner's picture into a file whose whole promise is that
+  // it has no background.
+  E.setPhoto(photo());
+  const m = E.shareCardModel(run, { aspect: "sticker", template: "moment", photo: photo() });
+  assert.equal(m.photo, null, "a sticker's model carries a photograph");
+  assert.equal(m.aspect, "sticker");
+  const m2 = E.shareCardModel(run, { aspect: "story", template: "moment", photo: photo() });
+  assert.ok(m2.photo, "a story card lost its photograph, so the gate is not scoped to the sticker");
+});
+
+test("BLOCKER: the route is on by default on a sticker, because a sticker has no photograph", () => {
+  // ⚠️ THE TEST IS "DOES THIS CARD CARRY A PHOTOGRAPH", NOT "HAS ONE BEEN CHOSEN". Written as !SPHOTO
+  // alone, a runner who had picked a picture and then switched to Sticker got a data card with the route
+  // switched off by a decision about a photograph that is not on it.
+  const E = env();
+  E.setPhoto(photo());
+  E.setCard({ aspect: "story", template: null, routeOn: null, key: null, file: null, pending: 0, metrics: null });
+  assert.equal(E.shareRouteOn(), false, "a photo card defaults to the route being off");
+  E.setCard({ aspect: "sticker", template: null, routeOn: null, key: null, file: null, pending: 0, metrics: null });
+  // ⚠️ THE MESSAGE HERE SAID THE OPPOSITE OF THE ASSERTION. A sticker carries no photograph, so there is
+  // nothing for the route to compete with and the default is ON.
+  assert.equal(E.shareRouteOn(), true,
+    "a sticker no longer defaults to the route being ON, though it has no photograph to compete with");
+  // and an explicit answer still wins in both directions
+  E.setCard({ aspect: "sticker", template: null, routeOn: false, key: null, file: null, pending: 0, metrics: null });
+  assert.equal(E.shareRouteOn(), false, "an explicit no is overridden on a sticker");
+  E.setPhoto(null);
+  E.setCard({ aspect: "story", template: null, routeOn: null, key: null, file: null, pending: 0, metrics: null });
+  assert.equal(E.shareRouteOn(), true, "a card with no photograph at all lost its route");
+});
+
 test("the template falls through to one that can be drawn", () => {
   const E = env();
   const model = (run: any, opt: any) => E.shareCardModel(run, opt);
@@ -892,7 +951,8 @@ test("BLOCKER: the export filename is non-sensitive and honours the date switch"
   assert.equal(name(treadmillRun()), "InteRun-2026-08-18-Easy-run.jpg", "a zero distance is in the name");
   // And the export path actually uses it, from the model it drew.
   const prep = lift("prepareShareCard");
-  assert.match(prep, /canvasToShareFile\(c, shareFileName\(m\)\)/, "the export is still a fixed filename");
+  assert.match(prep, /canvasToShareFile\(c, shareFileName\(m\), shareExportSpec\(m\)\)/,
+    "the export is still a fixed filename, or its format no longer comes from the same model");
   assert.ok(!/interun-run\.jpg/.test(page()), "the old fixed filename is still in the build");
 });
 

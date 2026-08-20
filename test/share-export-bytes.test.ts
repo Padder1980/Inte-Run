@@ -1,7 +1,11 @@
 import { test, before } from "node:test";
 import assert from "node:assert/strict";
-import { gate, evidenceDir, imageSize, imageKind, jpegSegments, jpegQuantTables, iccInfo,
-  exifInfo, sha, GATE_CASES, GATE_ASPECTS, type Gate } from "./share-export-harness.ts";
+import { readFileSync } from "node:fs";
+import { gate, evidenceDir, imageSize, imageKind, pngSize, jpegSegments, jpegQuantTables, iccInfo,
+  exifInfo, sha, GATE_CASES, GATE_ASPECTS, type Gate, pngChunks} from "./share-export-harness.ts";
+
+/** The app's own source, for the constants a byte-level claim has to be stated against. */
+const appSrc = () => readFileSync(new URL("../web/app.ts", import.meta.url), "utf8");
 
 /**
  * SECTION G OF THE RELEASE GATE — THE PRODUCED BYTES.
@@ -237,7 +241,31 @@ test("BLOCKER: the quality read out of the quantisation tables is inside the spe
   }
 });
 
-test("BLOCKER: every export embeds an sRGB profile, so the colours survive leaving the phone", () => {
+const STICKER_TEMPLATES = ["moment", "execution", "progression", "route"];
+test("BLOCKER: no sticker PNG carries a claim that overrides sRGB", () => {
+  // ⚠️ THE COLOUR GUARD BELOW SKIPS EVERY PNG, and for a day its title said "every export embeds an
+  // sRGB profile" while the four stickers carry no profile at all. My first repair added a PNG branch
+  // to that test's own loop, and it COULD NEVER RUN: the sticker is deliberately not a member of
+  // GATE_ASPECTS (its size is its own ink, so every dimension claim that list drives is inapplicable),
+  // so it never appears in shots(). Two re-breaks both passed, which is what exposed it. The stickers
+  // live in their own capture map, so the claim about them belongs in its own test that reaches them.
+  //
+  // What matters for a sticker is not that it SAYS sRGB — an untagged PNG is read as sRGB everywhere —
+  // but that it makes no CONFLICTING claim. A canvas change that started emitting iCCP with a
+  // Display-P3 profile, or a gAMA/cHRM pair, would silently shift the runner's colours on a platform
+  // that trusts the tag.
+  for (const t of STICKER_TEMPLATES) {
+    const s = G.stickers.get(t)!;
+    assert.equal(imageKind(s.bytes), "png", t + " sticker is not a PNG, so it cannot carry alpha at all");
+    const chunks = pngChunks(s.bytes);
+    assert.ok(!chunks.includes("iCCP"),
+      t + " sticker embeds an ICC profile, so it may not be read as sRGB: " + chunks.join(","));
+    assert.ok(!chunks.includes("cHRM") && !chunks.includes("gAMA"),
+      t + " sticker carries chromaticity or gamma chunks that override the sRGB reading: " + chunks.join(","));
+  }
+});
+
+test("BLOCKER: no export can be read as a wide gamut, and every JPEG says sRGB in a profile", () => {
   // The spec asks for sRGB. An untagged file is interpreted by whatever opens it, and a Display-P3
   // one posted to a platform that assumes sRGB comes back oversaturated — so the honest check is that
   // the file SAYS what it is, in a profile a reader will find.
@@ -562,4 +590,276 @@ test("the capture is quick enough to keep in the suite, and it left its evidence
   // seconds, share the capture further rather than dropping cases from it.
   assert.ok(G.ms < 60000, "the capture took " + G.ms + "ms, which is too slow to keep everyone running it");
   assert.ok(evidenceDir().length > 0);
+});
+
+/* ================================================================================================ *
+ * THE STICKER — THE FOURTH OUTPUT, ON GENUINE ALPHA                                                *
+ *                                                                                                  *
+ * Added for the owner's own research (DECISIONS.md, 2026-08-19): the reference app offers a third   *
+ * output, "card only, transparent", and his standing instruction is to match it rather than settle  *
+ * under it. Four ways this ships broken, and each of the four has a guard below that measures the   *
+ * produced bytes or the produced pixels rather than the code's intentions.                          *
+ * ================================================================================================ */
+
+
+test("BLOCKER: every sticker is a PNG with a real alpha channel, and no JPEG path exists", () => {
+  // ⚠️ JPEG HAS NO ALPHA CHANNEL AT ALL, so a JPEG "transparent" export is a silent white rectangle —
+  // correct dimensions, correct filename, correct-looking preview, and useless. Read from the IHDR
+  // rather than from the call site: colour type 6 is truecolour WITH alpha, 2 is truecolour without.
+  for (const t of STICKER_TEMPLATES) {
+    const s = G.stickers.get(t)!;
+    assert.ok(s, "no sticker was captured for " + t);
+    assert.equal(imageKind(s.bytes), "png", t + " sticker is not a PNG: " + imageKind(s.bytes));
+    assert.deepEqual([...s.bytes.subarray(12, 16)].map((b) => String.fromCharCode(b)).join(""), "IHDR",
+      t + " sticker has no IHDR where a PNG must have one");
+    assert.equal(s.bytes[24], 8, t + " sticker is not 8 bits per channel");
+    assert.equal(s.bytes[25], 6, t + " sticker's PNG colour type is " + s.bytes[25] +
+      "; 6 (truecolour with alpha) is the only one that can carry transparency");
+    assert.equal(s.type, "image/png", t + " sticker's File carries type " + s.type);
+    assert.match(s.file, /\.png$/, t + " sticker's filename is " + s.file);
+    assert.equal(pngSize(s.bytes)![0], s.canvas[0], t + " sticker's IHDR width disagrees with its canvas");
+    assert.equal(pngSize(s.bytes)![1], s.canvas[1], t + " sticker's IHDR height disagrees with its canvas");
+  }
+});
+
+test("BLOCKER: every mark on a sticker clears the 3:1 non-text floor on white AND on black", () => {
+  /**
+   * ⚠️ THE TYPE GUARD BELOW CANNOT SEE A MARK NOBODY PLANNED, AND THREE OF THEM WERE UNDER THE FLOOR.
+   * It measures the planned text boxes, so it is blind to ornament: measured by connected component
+   * against the ground each one sits on, the poster's teal accent dash read **1.60:1 over pure white**
+   * and the vertical metric divider and the poster's horizontal rule **2.26:1 over pure black** — the
+   * latter on all four stickers. Nothing reported them, because a decorative rule is in no plan.
+   *
+   * ⚠️ SO THE SWEEP IS DERIVED FROM THE PIXELS, NOT FROM A LIST OF MARKS. It finds every connected
+   * component of "there is ink here" and measures it against white and black, which covers a mark added
+   * next year for free. Measured after the fix: 0 of 236 readings under 3:1, worst 4.43:1.
+   *
+   * ⚠️ AND IT TAKES THE BETTER OF THE TWO DIRECTIONS, WHICH IS NOT A LOOSENING. Every mark here is a pair
+   * — a light half and a deep half — precisely because the ground is unknown; on black the light half is
+   * what is seen and on white the deep half is. Requiring BOTH halves to clear the floor would condemn
+   * the two-tone design the whole sticker depends on, including its type.
+   */
+  let worst = Infinity, worstAt = "", n = 0;
+  const under: string[] = [];
+  for (const t of STICKER_TEMPLATES) {
+    const s = G.stickers.get(t)!;
+    assert.ok(s.marks && s.marks.length >= 20, t + " sticker's component sweep found " +
+      (s.marks ? s.marks.length : 0) + " marks; a sweep that reports clean against nothing is the " +
+      "failure mode this whole file is about");
+    for (const m of s.marks) {
+      n++;
+      if (m.best < worst) { worst = m.best; worstAt = t + "/" + m.ground + "/" + JSON.stringify(m.box); }
+      if (m.best < 3) under.push(t + "/" + m.ground + " " + JSON.stringify(m.box) + " " + m.n + "px " + m.best + ":1");
+    }
+    // ⚠️ BOTH GROUNDS HAVE TO BE PRESENT. Half the readings missing is a sweep that measured white twice.
+    for (const gr of ["white", "black"]) {
+      assert.ok(s.marks.some((m) => m.ground === gr), t + " sticker was never measured over " + gr);
+    }
+  }
+  assert.deepEqual(under, [], "marks under the 3:1 non-text floor: " + under.join("; "));
+  assert.ok(worst >= 3, "the weakest mark anywhere is " + worst + ":1 at " + worstAt);
+  assert.ok(n >= 200, "only " + n + " readings; the sweep has stopped covering the four templates");
+});
+
+test("BLOCKER: the band a sticker RESERVES for its route is the band the real plan draws into", () => {
+  /**
+   * ⚠️ THIS IS THE HALF OF THE CLAIM THAT ARITHMETIC ALONE CANNOT MAKE. `shareStickerH` sets the
+   * reservation against the NOMINAL canvas (it has to — it is computing the canvas), and the card is then
+   * planned against the DERIVED one. Those are two different geometries, so "the space set aside equals
+   * the space drawn into" is a real statement about real models here, where in the pure test it collapses
+   * into blockTop cancelling itself out. A disagreement of a few pixels presents as a route clipped along
+   * one edge for no visible reason, which is the fault the design exists to prevent.
+   */
+  const SS = /const SHARE_STICKER = \{([\s\S]*?)\};/.exec(appSrc())![1]!;
+  const field = Number(/field: (\d+)/.exec(SS)![1]);
+  const posterField = Number(/posterField: (\d+)/.exec(SS)![1]);
+  const wmClear = Number(/const SHARE_WM_CLEAR = (\d+)/.exec(appSrc())![1]);
+  for (const [t, want] of [["moment", field], ["route", posterField]] as [string, number][]) {
+    const s = G.stickers.get(t)!;
+    assert.ok(s.field, t + " sticker's plan hands the card no route band at all, so the switch reading " +
+      "'show my route' is over a card with no route on it");
+    assert.equal(s.field!.h, want, t + " sticker reserved " + want + "px for its route and its plan draws " +
+      "into " + s.field!.h + "px — the reservation and the drawing are two derivations that have drifted");
+    assert.equal(s.field!.y, s.bandTop, t + " sticker's route band starts at y" + s.field!.y +
+      " against a band top of y" + s.bandTop + ", so it no longer sits directly under the wordmark");
+    // The band must be inside the trimmed canvas, or the route is drawn where the export does not reach.
+    const [ox, oy] = s.trim, [cw, ch] = s.canvas;
+    assert.ok(s.field!.y >= oy && s.field!.y + s.field!.h <= oy + ch,
+      t + " sticker's route band (" + s.field!.y + ".." + (s.field!.y + s.field!.h) + ") falls outside " +
+      "the trimmed canvas (" + oy + ".." + (oy + ch) + "), so part of the route is cropped away");
+    assert.ok(s.field!.x >= ox && s.field!.x + s.field!.w <= ox + cw,
+      t + " sticker's route band is horizontally outside the trimmed canvas");
+  }
+  // The two templates that carry no band must not reserve one; a reserved band nothing draws into is
+  // empty space in the middle of the card, which is the void the height derivation exists to remove.
+  for (const t of ["execution", "progression"]) {
+    assert.equal(G.stickers.get(t)!.field, null,
+      t + " sticker reserves a route band, and nothing draws into it");
+  }
+  assert.ok(wmClear > 0, "SHARE_WM_CLEAR is zero, so the band and the wordmark touch");
+});
+
+test("BLOCKER: most of a sticker is genuinely transparent, and it is trimmed to its own ink", () => {
+  // ⚠️ TWO CLAIMS THAT SOUND LIKE ONE. "Transparent" is about the alpha channel carrying zeroes;
+  // "trimmed" is about where the ink starts. A card drawn on alpha and left at 1080x1920 passes the
+  // first and fails the second, and it is the second that decides whether the sticker can be
+  // positioned: a runner drags what looks like the middle of it and the visible part goes off screen.
+  const pad = 24, cell = 6;              // SHARE_STICKER.pad and one probe cell, both stated there
+  for (const t of STICKER_TEMPLATES) {
+    const s = G.stickers.get(t)!;
+    assert.ok(s.clear > 0.6, t + " sticker is only " + (s.clear * 100).toFixed(1) +
+      "% fully transparent; measured 64.7-87.4% across the four, so anything under 60% means a ground " +
+      "or a scrim has been filled in");
+    assert.ok(s.canvas[1] < s.layout[1], t + " sticker's canvas (" + s.canvas.join("x") +
+      ") is not shorter than its layout box (" + s.layout.join("x") + "), so nothing was trimmed");
+    /**
+     * ⚠️⚠️ THIS GUARD WAS ONE-SIDED AND THEREFORE COULD NOT SEE THE FAULT IT NAMES. `edge[side]` is the
+     * gap from the canvas edge to the nearest ink, so it measures OVER-trimming and nothing else: a
+     * sticker whose ink has been CUT has a gap of zero, the smallest value there is, and a ceiling on it
+     * passes. Watched: a break that computed the box correctly and then shrank it 40px on every side
+     * sailed through here and was caught only incidentally, by an unrelated transparent-share bound with
+     * 1.9 points of headroom. The title claimed the sticker "is trimmed to its own ink"; the assertion
+     * proved only that it is not trimmed too loosely.
+     *
+     * So there are now three claims, and the third is the load-bearing one:
+     *   (a) not too loose — the nearest ink is inside the stated padding;
+     *   (b) not flush — no ink at all on the outermost row or column, which is what a clipped edge looks
+     *       like from the bytes and costs nothing to ask;
+     *   (c) NOTHING LOST — the trim box contains the UNTRIMMED card's own full-resolution alpha bounding
+     *       box. Only (c) can fail when ink is thrown away, and it needs a render that was not trimmed,
+     *       which is why the harness draws one.
+     */
+    // ⚠️ (c) IS ASSERTED FIRST, DELIBERATELY. node's assert throws on the first failure, and every break
+    // that loses ink ALSO puts ink on the outermost row — so with the cheap floor first, the strong claim
+    // never ran and its message never appeared. Measured: an over-trim of 40px a side, and a probe that
+    // ignores faint ink, were both reported as "ink on the outermost top row" and the containment claim
+    // was never reached. Ordered this way the failure names the defect ("32px of the card has been cut
+    // off the left") rather than its symptom, and the strong claim is demonstrably the one that fires.
+    const [ox, oy] = s.trim, [cw, ch] = s.canvas;
+    const k = s.ink;
+    assert.ok(k.x1 >= k.x0 && k.y1 >= k.y0, t + " sticker's untrimmed render carries no ink at all: " +
+      JSON.stringify(k) + " — the measurement is broken, not the trim");
+    assert.ok(k.x0 >= ox, t + " sticker's trim starts at x" + ox + " and its leftmost ink is at x" + k.x0 +
+      ": " + (ox - k.x0) + "px of the card has been cut off the left");
+    assert.ok(k.y0 >= oy, t + " sticker's trim starts at y" + oy + " and its topmost ink is at y" + k.y0 +
+      ": " + (oy - k.y0) + "px of the card has been cut off the top");
+    assert.ok(k.x1 <= ox + cw - 1, t + " sticker's trim ends at x" + (ox + cw - 1) + " and its rightmost " +
+      "ink is at x" + k.x1 + ": " + (k.x1 - (ox + cw - 1)) + "px has been cut off the right");
+    assert.ok(k.y1 <= oy + ch - 1, t + " sticker's trim ends at y" + (oy + ch - 1) + " and its lowest " +
+      "ink is at y" + k.y1 + ": " + (k.y1 - (oy + ch - 1)) + "px has been cut off the bottom");
+    for (const side of ["top", "right", "bottom", "left"] as const) {
+      assert.ok(s.edge[side] <= pad + cell + 1,
+        t + " sticker has " + s.edge[side] + "px of empty margin on the " + side +
+        ", against a stated padding of " + pad + "px plus one " + cell + "px probe cell");
+      assert.ok(s.edge[side] >= 1,
+        t + " sticker has ink on its outermost " + side + " row/column, which is what a clipped edge " +
+        "looks like — the trim is meant to leave " + pad + "px of padding round the ink, not touch it");
+    }
+  }
+});
+
+test("BLOCKER: no scrim is baked into a sticker, measured against one that is", () => {
+  // ⚠️ A SCRIM'S WHOLE JOB IS LEGIBILITY OVER A PHOTOGRAPH WE COMPOSITED AND CAN MEASURE. On a sticker
+  // the ground is unknown and the runner places it, so a baked scrim lands as a grey slab across their
+  // photograph. The trap is that the app's own sampler answers WHITE when it cannot see a photograph,
+  // which asks for the strongest treatment there is — so this is a real defect one missing gate away.
+  // ⚠️ THE BAR IS A CONTROL, NOT A NUMBER I LIKED. G.stickerControl is the same card with a scrim
+  // deliberately painted on: measured 56.7% translucent-dark and a 681-row full-width band. The
+  // shipped stickers measure 4.8-14.8% and 0-9 rows, so the bar sits an order of magnitude below the
+  // control and well above what the real cards draw.
+  const ctrl = G.stickerControl;
+  assert.ok(ctrl.transDark > 0.4, "the control did not paint a scrim, so it proves nothing: " +
+    JSON.stringify(ctrl));
+  assert.ok(ctrl.tdBand > 400, "the control's scrim is not a full-width band: " + JSON.stringify(ctrl));
+  for (const t of STICKER_TEMPLATES) {
+    const s = G.stickers.get(t)!;
+    assert.ok(s.transDark < ctrl.transDark / 3,
+      t + " sticker is " + (s.transDark * 100).toFixed(1) + "% translucent-dark against the scrimmed " +
+      "control's " + (ctrl.transDark * 100).toFixed(1) + "%, which is close enough to be one");
+    assert.ok(s.tdBand <= 40, t + " sticker carries a " + s.tdBand + "-row band that is more than half " +
+      "covered by translucent dark pixels; the control's is " + ctrl.tdBand + " rows. The chart lane and " +
+      "the ladder track are the only bands the templates draw and they measure 0-9 rows");
+  }
+});
+
+test("BLOCKER: the type survives an unknown ground, over white and over black", () => {
+  // ⚠️ MEASURED FROM RENDERED PIXELS AFTER COMPOSITING, which is the only way this can be seen. Warm
+  // white type is invisible against its ground on a white photograph — 1.00:1, correctly — so the thing
+  // that makes it readable is the keyline, and the honest measurement is the glyph's core against the
+  // keyline immediately around it. Both numbers are asserted: the ink against the ground, and the ink
+  // against its own edge.
+  // ⚠️ THE BADGE IS NOT A GLYPH AND IS EXCLUDED BY NAME. It is a filled pill, so "the core against the
+  // partial-alpha pixels inside the same box" measures its own antialiased rim and answers 1.01 — which
+  // is a fact about a rounded rectangle and not about legibility.
+  for (const t of STICKER_TEMPLATES) {
+    const s = G.stickers.get(t)!;
+    assert.ok(s.legibility.length >= 8,
+      t + " sticker reported only " + s.legibility.length + " measured elements");
+    for (const r of s.legibility) {
+      if (r.el === "badge") continue;
+      if (r.ground === "black") {
+        // On black every tier is a light ink on a dark ground and stands on its own.
+        assert.ok(r.vsGround >= 4.5, t + "/" + r.el + " measures " + r.vsGround +
+          ":1 against a black placement; the floor is 4.5 and the measured range is 7.12-21.0");
+      } else {
+        assert.ok(r.vsRing != null && r.vsRing >= 3.4,
+          t + "/" + r.el + " measures " + r.vsRing + ":1 against its own keyline over a white " +
+          "placement; the measured range is 3.60-15.62 and the weakest is the poster's faint-tier meta " +
+          "line at its smallest rung");
+      }
+    }
+  }
+  // and the weakest reading anywhere is stated, so a regression that halves it cannot pass as noise
+  const worst = Math.min(...STICKER_TEMPLATES.flatMap((t) =>
+    G.stickers.get(t)!.legibility.filter((r) => r.ground === "white" && r.el !== "badge" && r.vsRing != null)
+      .map((r) => r.vsRing!)));
+  assert.ok(worst >= 3.4 && worst <= 6,
+    "the weakest core-against-keyline reading over white is " + worst + "; it measured 3.60, and a value " +
+    "far above that band means the measurement stopped finding the keyline rather than that it improved");
+});
+
+test("BLOCKER: a sticker's height is derived from its block, and the block does not depend on the canvas", () => {
+  // ⚠️ THE ONE-PASS DERIVATION RESTS ENTIRELY ON THIS. Two of the four plans sized an element against a
+  // budget measured from the canvas — The Execution's verdict room and The Progression's ladder pitch,
+  // both of which exist to protect the photograph — so a canvas derived from the block was derived from
+  // the canvas. The spiral it produces is silent: a smaller canvas gives less room, less room shrinks
+  // the headline, and the verdict settles at its floor looking like somebody's design decision.
+  for (const r of G.stickerInvariance) {
+    // ⚠️ THE SWEEP INCLUDES THE HEIGHT THE STICKER ACTUALLY COMES OUT AT, AND WITHOUT IT THIS GUARD
+    // MISSED BOTH REAL DEFECTS. Watched: reverting either unbounded read left the four nominal canvases
+    // agreeing, because every one of them was roomy enough for the verdict to take its top rung. The
+    // binding height is the derived one — 751px for The Execution — so it is in the list, along with two
+    // smaller points, and a value that only holds where nothing is tight holds nothing.
+    assert.equal(new Set(r.blockHeights).size, 1,
+      r.template + "'s block is " + r.blockHeights.join("/") + "px tall across canvases of " +
+      "400/500/700/" + r.derivedH + "/1080/1350/1920, so the sticker's height cannot be solved in one pass");
+    assert.ok(r.derivedH > r.blockHeights[0]!,
+      r.template + "'s derived canvas (" + r.derivedH + ") is not taller than its own block (" +
+      r.blockHeights[0] + "), so there is no room for the wordmark above it");
+  }
+  // The Moment reserves a route band and The Route Poster a larger one, so those two are the tall pair.
+  const by: Record<string, number> = {};
+  for (const r of G.stickerInvariance) by[r.template] = r.derivedH;
+  assert.ok(by.route! > by.execution! && by.moment! > by.execution!,
+    "the two templates that draw a route are not the taller ones: " + JSON.stringify(by));
+});
+
+test("a sticker carries no metadata and no editor chrome, and the four are four different pictures", () => {
+  for (const t of STICKER_TEMPLATES) {
+    const s = G.stickers.get(t)!;
+    assert.equal(exifInfo(s.bytes).app1, false, t + " sticker carries an Exif block");
+    // A PNG has no APP1; the useful check is that nothing looks like an embedded profile or text chunk
+    // carrying location. iTXt/tEXt/zTXt are the three PNG text chunks.
+    for (const chunk of ["tEXt", "iTXt", "zTXt", "eXIf"]) {
+      assert.equal(s.bytes.includes(Buffer.from(chunk, "latin1")), false,
+        t + " sticker carries a " + chunk + " chunk");
+    }
+  }
+  // ⚠️ THIS IS A SANITY CHECK, NOT THE DISPATCH GUARD, AND SAYING SO IS THE POINT. Watched: rewiring the
+  // progression branch to shareMomentCard left all four hashes different, because the two templates are
+  // handed DIFFERENT models (one climbs the metric ladder, the other prints the run's three canonical
+  // stats) — so the result is a different wrong picture rather than a duplicate. The dispatch's one-to-one
+  // mapping is asserted where it lives, in test/share-export.test.ts.
+  const shas = STICKER_TEMPLATES.map((t) => sha(G.stickers.get(t)!.bytes));
+  assert.equal(new Set(shas).size, 4, "two sticker templates produced the same bytes: " + shas.join(", "));
 });

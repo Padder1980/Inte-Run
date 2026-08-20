@@ -4830,15 +4830,492 @@ distorted across shapes. The route is a thin line and the title is a thick one, 
 is a **row profile** — bands whose per-row pixel count is small are the route. Same class of confounding
 as `tools/debrief-diff.py`.
 
-**The eleven BLOCKED items, and none of them is closeable from here.** Save to Photos and the camera
-branch (`NSPhotoLibraryAddUsageDescription` / `NSCameraUsageDescription` are absent and a probe app was
-killed by TCC — native, needs Xcode); real-device photo pick, system share and Instagram Story handoff
-(no device); Vision face detection (**the owner ruled for the conservative fallback** — a deviation, not
-a pass); the feature flag and rollback (no such mechanism exists; the OTA channel plus the bundle floor
-is the nearest equivalent); locale-aware units (metric only, by ruling); and tabular numerals (canvas
-has none — a uniform digit advance is imposed by hand instead, and the build deliberately does not claim
-the feature). ⚠️ **A blocked required item means the feature is not complete**, and that is why
-`pc-share` on the Road Map stays unticked.
+**The FIVE BLOCKED checklist items, and none of them is closeable from here.** (1) Save to Photos and
+the camera branch (`NSPhotoLibraryAddUsageDescription` / `NSCameraUsageDescription` are absent and a
+probe app was killed by TCC — native, needs Xcode); (2) real-device photo pick, system share and
+Instagram Story handoff (no device); (3) Vision face detection (**the owner ruled for the conservative
+fallback** — a deviation, not a pass); (4) the feature flag and rollback (no such mechanism exists; the
+OTA channel plus the bundle floor is the nearest equivalent); (5) locale-aware units (metric only, by
+ruling). ⚠️ **A blocked required item means the feature is not complete**, and that is why `pc-share` on
+the Road Map stays unticked.
+⚠️ **AND THIS PARAGRAPH SAID "ELEVEN" FOR A DAY, TWO PARAGRAPHS BELOW ITS OWN CORRECTION TO FIVE — the
+same fault, in the same section, surviving the fix for it.** The count was corrected where it was
+introduced and left stale where it was repeated, which is what makes a miscount durable: a reader
+believes whichever copy they reach first. **Tabular numerals is NOT one of the five** — it is a
+non-checklist deviation (canvas has none; a uniform digit advance is imposed by hand and the build
+deliberately does not claim the feature), and folding it and the Evidence table's own rows into the
+figure is exactly how "eleven" was arrived at both times. Fixed 2026-08-20 by the verification phase,
+which found the same stale figure in the Road Map's hero paragraph as well.
+
+### THE TRANSPARENT STICKER — A FOURTH OUTPUT, FROM THE OWNER'S OWN RESEARCH (2026-08-19)
+
+He researched the reference app and reported it offers three outputs, not two: *"Card Only (Transparent):
+Saves your metrics card without any background so you can overlay it manually as a sticker."* Under his
+standing instruction — *"I want to at least match what they do in terms of UI and UX. I'm not settling for
+worse"* — that is an **addition to the pack rather than a departure from it**: a third output of the same
+four templates, so it costs the contract nothing. Suite 955 → **969**; 38 deliberate re-breaks, 34 caught
+first time, and all four misses were informative.
+
+**It is a fourth chip in the SAME row as Story, Feed and Square** ("Sticker PNG"), which is exactly where
+the reference puts it. A screen of its own would be a second place the output is decided, with the preview
+underneath able to disagree with it. Measured through the real editor: chip → chequer on → note filled →
+canvas 1020×1044 → `prepareShareCard` hands back `InteRun-2026-08-17-Easy-run-6.31km.png`, `image/png`,
+282 KB, zero console errors, no horizontal page scroll at 375×812 in both themes.
+
+⚠️⚠️ **THE SCRIM MUST NOT BE BAKED IN, AND THE APP'S OWN SAMPLER MAKES THAT A LIVE DEFECT ONE GATE AWAY.**
+`shareGroundUnder` answers **white** when it cannot look — right for a photograph we have but cannot sample
+(fail towards protecting the type) and catastrophic where there is no photograph at all: solved from 255 the
+alpha comes back near its 0.92 cap and the export carries a near-opaque dark gradient over its lower half,
+on genuine alpha, to be dropped onto somebody's own picture. **`probe === null` is the sticker;
+`probe.data === null` is the tainted card**, and the two must not share an answer. Gated inside
+`sharePhotoScrim` and `shareTopScrim` rather than at the call sites, because all four templates draw with no
+photograph here. **Measured against a control** — the same card with a scrim deliberately painted on:
+translucent-dark share **4.9–15.2% against the control's 56.6%**, and the widest full-width translucent-dark
+band **0–9 rows against 677**. The 9 rows are The Execution's target-band lane and the 6 are The
+Progression's ladder track, both designed marks.
+
+⚠️ **THE NAIVE VERSION LEAVES A VOID IN THE MIDDLE, NOT A MARGIN ROUND THE EDGE.** Drawing the story layout
+on alpha pins the wordmark to the top and the block to the bottom with the photograph's space between them:
+measured before the fix, the wordmark ends at y120, the block starts at y560 and **46% of the bounding box
+is nothing at all**. So the height is **derived from the block the template plans** and the result is then
+trimmed to its own alpha bounding box. Both, deliberately: the derivation removes the void, the trim proves
+the claim from pixels rather than arguing it from arithmetic.
+
+⚠️ **ONE PASS, AND IT IS ONE PASS ONLY BECAUSE TWO PLANS WERE MADE CANVAS-INDEPENDENT.** Every template
+builds bottom-up from `safe.y1`, so the height below the block top is the same at any canvas — except that
+The Execution's verdict room and The Progression's ladder pitch were budgets measured **from the canvas**,
+because both exist to protect the photograph. A sticker has no photograph and its height is free, so both
+are unbounded there. Without that the derivation spirals: a smaller canvas gives less room, less room
+shrinks the headline, and the verdict settles at its floor looking like somebody's design decision.
+⚠️ **AND THE GUARD FOR IT MISSED BOTH DEFECTS ON THE FIRST ATTEMPT.** It swept 700/1080/1350/1920 — every
+one of them roomy enough for the verdict to take its top rung — so reverting either read left it green. The
+binding height is **the one the sticker comes out at** (751px for The Execution), which is now in the sweep
+along with two smaller points. **A sweep whose points are all on the comfortable side of a constraint cannot
+see the constraint.**
+
+⚠️ **THE TYPE'S OWN TREATMENT IS A KEYLINE, NEVER A PLATE — AND IT IS COMPOSITED UNDERNEATH.** A plate is a
+scrim by another name. This is the device `shareRouteDraw` and the chart's marks have always used: a deep
+ink outline, so a glyph is defined by an edge rather than by contrast with a ground nobody can measure.
+`destination-over` is load-bearing: every letter-spaced run and every figure on these cards is drawn one
+character at a time, so a keyline stroked OVER the canvas would be drawn after the previous character's fill
+and would eat into its right-hand edge.
+⚠️ **THE THREE LAYERS GO GLYPH, KEYLINE, HALO, AND THE OBVIOUS ORDER COST THE KEYLINE A THIRD OF ITS
+STRENGTH.** Written as "fill with the ambient shadow, then stroke underneath", the halo is painted before
+the keyline and the keyline lands under it — at halo alpha 0.45 only 0.55 of it survives. **The sign was
+that strengthening the halo made things WORSE** (0.45 → 0.75 took the small type's edge contrast 5.45 →
+4.69), which is what a pair of fighting effects looks like. Now the fill carries no shadow and the keyline
+stroke carries it, so the halo ends up beneath the keyline.
+⚠️ **THE HALO HAS A MEASURED INTERIOR OPTIMUM**: 0.22/6 → 4.74, 0.32/7 → 5.16, **0.45/9 → 5.54**, 0.60/11 →
+5.09, 0.75/13 → 4.94. "Stronger is safer" would have shipped the worse end of it. The translucent share
+rises monotonically with it (3.9% → 8.0%), so the light end is also the end least like a plate.
+
+**LEGIBILITY, FROM RENDERED PIXELS, 31 ELEMENTS × 2 GROUNDS.** Over **black** every tier stands on its own:
+**7.12:1 (the poster's faint meta line) to 21.0:1**. Over **white** warm-white type is 1.00:1 against its
+ground *by construction* — which is why the honest measurement is the glyph core against its own keyline:
+**3.60:1 to 15.62:1, median 14.88**. The weakest is the poster's `inkFaint` meta line at its smallest rung
+(2.95:1 against the raw white, 3.60:1 against its keyline) and it is reported rather than hidden. Composited
+onto three scenes and looked at, mean edge contrast: bright **6.50–7.77**, dark **9.03–10.10**, busy
+**7.73–9.04**.
+⚠️ **THE "WORST PIXEL" FORM OF THAT METRIC IS AN ANTI-ALIASING ARTEFACT AND MUST NOT BE QUOTED AS A
+VERDICT.** Its first version took every opaque pixel and looked 6px out, which lands inside the same glyph
+for anything bigger than a caption — 1.00:1 on all twelve composites, reading as catastrophic failure of a
+card that plainly reads. Restricted to edge pixels it still bottoms out at 1.00 where two adjacent ink
+elements meet. **The mean is the meaningful figure; the per-element table is the load-bearing one.**
+
+⚠️ **PNG, AND THE EXTENSION COMES OUT OF THE SAME FUNCTION AS THE MIME TYPE.** JPEG has no alpha channel at
+all, so a JPEG "transparent" export is a silent white rectangle — correct dimensions, correct filename,
+correct-looking preview. `shareExportSpec(m)` decides mime, quality and extension together;
+`canvasToShareFile` takes them from it, with the name's own `.png` as the belt. Verified from the IHDR:
+**8-bit, colour type 6 (truecolour with alpha)** on all four, and no `tEXt`/`iTXt`/`zTXt`/`eXIf` chunk.
+
+⚠️ **IT NEEDS NO PHOTOGRAPH, WHICH MAKES IT THE ONE OUTPUT EVERY RUN CAN HAVE — and the photograph gate was
+BACKWARDS here, not merely unnecessary.** The three photo templates are gated because their composition IS
+the picture; strip the picture and what is left is the data card, which is what a sticker is for. Written
+without the relaxation, choosing Sticker leaves only The Route Poster eligible and a treadmill run has no
+sticker at all. Every OTHER reason still applies: an interval session's Execution is refused whatever shape
+it is exported at. And `shareCardModel` hands a sticker **no photograph even when one is supplied**, because
+three things downstream are gated on `m.photo`.
+
+⚠️ **THE ROUTE NEEDS A RESERVED BAND OR IT SIMPLY DISAPPEARS.** `shareRoutePlacement` scores candidates
+between the top of the safe region and the top of the block, and on a sticker those are **36px apart by
+construction** — so every candidate is refused and the switch reading "show my route" would be on over a
+card with no route on it. `shareStickerField` is the ONE definition of that band, read by the height
+derivation and by the card that draws into it. Two derivations is how the reserved space and the drawn route
+come to differ by a few pixels, which presents as a route clipped along one edge for no reason.
+
+⚠️ **THE TWO BAND HEIGHTS AND THE KEYLINE WIDTH WERE SWEPT AND THEN LOOKED AT.** Bands 520/700, 380/620,
+320/560: the numbers barely move (transparent share 86.6 / 85.5 / 84.8%, no type size changes anywhere), so
+it is air against nothing measurable — **at 520 the route sits marooned above the block** (the pack's own
+"route stranded in excessive empty space"), at 320 The Moment's route is smaller than its own hero.
+**380/620.** Keyline 0.10/2 → mean 13.85, 0.13/3 → 14.12, 0.16/4 → 14.40 — a real but small gain, and by
+0.16/4 the counters of the small split times close up. **0.13/3**, and the FLOOR matters more than the
+fraction because it is the 19px footer that has least outline to work with.
+
+⚠️ **THE STICKER IS THE SQUARE'S LAYOUT FAMILY, NAMED ONCE.** `shareAspectFamily` is a lookup rather than
+seven two-armed comparisons: seven is seven chances for the eighth reader to be written without the second
+half, and the failure is silent — a sticker drawn at the story's type ladder simply comes out enormous. The
+guard is **derived from the five square-family tables**, so a sixth cannot arrive unguarded.
+
+⚠️ **`cardGeom("sticker")` THROWS WITHOUT A MODEL.** Its size is a function of what is on it, so a caller
+that forgets would otherwise get the nominal 1080 — a card drawn at one height into a buffer sized for
+another, which reads as content cut off the bottom and points at the renderer rather than the caller. Three
+call sites had to learn it: `shareCardCanvas`, `studioPaintSlide` and `studioMount`, the last of which needs
+a **per-slide** geometry because a sticker's four templates are four different shapes.
+
+⚠️ **THE OUTPUT SIZE IS NOT THE LAYOUT SIZE, AND ONLY THE STICKER SEPARATES THEM.** `gm.OW/OH/ox/oy` are
+`W/H/0/0` for the other three by construction, so every canvas-sizing site reads correctly for all four
+without a branch to forget; the trim is applied as a **translation**, so every template still lays out in
+the same 1080-wide space. A renderer that reflowed for a cropped box would be two layouts, which is the
+two-disagreeing-transforms fault that stretched the debrief hero.
+
+⚠️ **THE TRANSPARENCY CHEQUER IS A CSS BACKGROUND ON THE CANVAS ELEMENT.** An element's background is
+painted behind its bitmap and is not part of it — `toBlob` is handed the bitmap alone — so the pack's rule
+that no editor chrome appears in an export is kept by construction. A pseudo-element on the slide would also
+never reach the export but would be the wrong SIZE: the canvas is centred in its slide and is usually
+narrower.
+
+⚠️ **THE TRIM'S PADDING WAS DOUBLE-COUNTED AND THE GUARD CAUGHT IT.** A hit at probe row *n* means real ink
+in `[n·e, (n+1)·e)`, so floor and ceil already bracket it — expanding by a cell as well left **33px of empty
+margin on a sticker whose stated padding is 24**. Ink faint enough to be missed at a sixth scale is what the
+padding is for; a second allowance protects against nothing.
+
+**Produced, measured:** The Moment **1020×1044** (83.5% fully transparent), The Execution **1020×720**
+(64.0%), The Progression **1020×730** (64.9%), The Route Poster **1014×1188** (87.1%); 240–344 KB. Every
+privacy state changes the picture: ends shown 61 route points → ends hidden 46 → route hidden 0, and Hide
+location and Hide date each move the bytes on their own.
+
+⚠️ **THREE MISSES IN THE RE-BREAK RUN WERE MINE, NOT THE GUARDS'.** Two were the invariance sweep above; the
+third aimed a break at the wrong test file. The fourth was a claim a hash cannot make: **rewiring the
+progression branch to `shareMomentCard` left all four sticker hashes different**, because the two templates
+are handed different models, so the result is a different *wrong* picture rather than a duplicate. Exactly
+the trap this file already records for the dispatch — the one-to-one mapping is asserted where it lives, and
+the four-different-pictures line now says out loud that it is a sanity check and not that.
+
+⚠️ **AND THE BACKTICK RULE FIRED, PLUS THE COMMENT-QUOTING-A-FORBIDDEN-STRING TRAP.** A comment containing
+backticks failed the build outright (the good outcome). Then a comment explaining why the shadow is switched
+off with the `transparent` keyword **quoted the zero-alpha colour function it exists to avoid**, and the
+palette sweep flagged the sentence rather than the code. Fifth firing.
+
+**Still open, and not mine to close:** saving straight to Photos still needs `NSPhotoLibraryAddUsageDescription`
+and an Xcode build, so a sticker reaches the camera roll through the system share sheet for now. The Road Map
+step `pc-share` therefore stays **unticked**; `pc-sticker` is ticked.
+
+### THE STICKER, VERIFIED INDEPENDENTLY (2026-08-20) — AND ONE FINDING THE BUILD DID NOT REPORT
+
+Re-measured without reusing the build's numbers: my own PNG decoder (stdlib zlib + all five scanline
+filter reconstructions) and JPEG SOF/APPn/EXIF walker, my own connected-component legibility method,
+and a live drive of the real editor. **969/969, 0 fail**; build exit 0, `docs/voices/` clean,
+`node --check` OK on all three emitted blocks, tsc clean apart from the one pre-existing
+`test/onboarding-wizard.test.ts` Date error.
+
+⚠️⚠️ **THE DECISIVE CHECK IS THAT THE 48 PRE-EXISTING EXPORTS ARE BYTE-FOR-BYTE IDENTICAL.** Captured
+the same 48 photo cards from the pre-sticker tree (`git stash`, rebuild, capture, restore) and from
+this one and compared sha256: **48 of 48 identical, 0 changed.** That is a stronger statement than any
+re-measured floor, because the gradient scrim, the whole-photo default and the Fill crop are all baked
+into those bytes — if any had moved, a hash would have moved. ⚠️ **The pre-sticker tree has no
+`shareExportSpec`**, so a probe spanning both trees must call whichever contract the tree it is
+measuring actually has; a single-contract probe throws on one side and reads as a defect.
+
+**Re-derived from the artefacts, my parsers:** 16 story **1080×1920**, 16 feed **1080×1350**, 16 square
+**1080×1080**, every one from its own SOF header; all 48 carry an ICC whose description is literally
+`sRGB`; **zero APP1/EXIF/GPS in any of the 48**, from a source photograph my parser confirms carries a
+GPS IFD. Four stickers **1020×1044 / 1020×720 / 1020×730 / 1014×1188**, PNG **bit depth 8, colour type
+6**, every CRC valid, **no `tEXt`/`iTXt`/`zTXt`/`eXIf`**, trim margins 21–25px against a stated pad of
+24. Fully transparent (alpha exactly 0): **82.6 / 61.9 / 62.6 / 86.3%**.
+⚠️ **THOSE ARE A POINT OR TWO UNDER THE BUILD'S 83.5 / 64.0 / 64.9 / 87.1% AND NEITHER IS WRONG** — mine
+counts alpha **exactly** 0, the build's counts a near-zero threshold, and the gap is the outermost ring
+of the glyph halo. Any "transparent share" figure in this section is metric-dependent, so quote it with
+its definition or not at all; the claim that carries weight is the **coverage** measurement below.
+
+⚠️ **AND THE ALPHA-CLAMP HEADROOM IS NOT GUARDED BY ANY TEST AS A NUMBER — it had to be re-derived, and
+it comes out at exactly 0.0200** (hungriest tiers on a pure-white photograph solve to **0.9000** against
+`SHARE_SCRIM.max` 0.92). Every text tier clears 4.5 on a 432-case sweep (8 hostile grounds × 3 aspects ×
+6 tiers × 3 block positions): worst text tier **4.87**, consistent with the recorded 4.93/4.98 floors
+measured a different way. `fast`/`slow` are marks with a 3.2 target and deliver 3.51/3.47.
+⚠️ **MY FIRST RUN OF THAT PROBE REPORTED ZERO HEADROOM AND IT WAS THE PROBE.** `shareVeilPlan`'s
+`colours` is an array of `{hex, target}` OBJECTS; I passed bare hex strings, so it read `undefined` for
+both fields and returned the cap for all 288 cases — against a committed test asserting 0.88–0.90 that
+passes. Third firing in this area of *a plain probe has no typechecking, so it can feed the renderer a
+shape no caller can produce and the result reads as a product defect*. **Check the argument shape before
+believing a sweep that disagrees with a green test.**
+
+⚠️ **NO BAKED SCRIM — BUT MY FIRST METRIC CONFLATED THE TREATMENT WITH THE DEFECT.** Counting
+translucent-dark pixels read **27.7%** on The Execution where the build reported 15.2%, because a dark
+translucent pixel is exactly what the glyph halo IS. A scrim is not "some dark translucent pixels", it
+is a region that covers the card whether or not there is anything to protect there — so the
+discriminating measurement is per-row **coverage**. Measured: The Moment has **no row even 50% covered**;
+every full-width covered band on the other three was located and identified as a designed mark — The
+Execution's target-band lane (72 rows, **teal**, rgb 32/112/100 at alpha 0.44), The Progression's ladder
+track, the Route Poster's divider rule above its metrics row. Rendered the alpha channel as a picture to
+settle it; a number cannot tell a lane from a wash.
+
+⚠️ **ONE FINDING THE BUILD DID NOT REPORT: THREE DECORATIVE RULES FALL UNDER THE 3:1 NON-TEXT FLOOR, each
+on one of the two extreme grounds.** The build reported the accent tag (2.09, no keyline) and stopped
+there. Measured by connected component, core against the ring just outside it: the poster's short **teal
+accent dash 1.77:1 on white**; the **vertical metric-column divider 2.20:1 on black**; the poster's
+**full-width horizontal rule 2.20:1 on black**. **No datum is lost** — all three are dividers and
+ornament, and every text component measures ≥8.33 on white and ≥7.12 on black (that 7.12 is the poster's
+faint meta line, matching the build's own figure exactly). So this is cosmetic: on a white photo the teal
+dash nearly vanishes, on a black one the two rules do. Worth a keyline on the rules if it is ever
+reported; not worth reopening the type treatment, which measures excellently on both grounds.
+⚠️ **THE "WORST PIXEL" FORM OF THIS METRIC REMAINS UNQUOTABLE** — restricted to component rings it still
+bottoms out where two adjacent ink elements touch, which is a fact about anti-aliasing.
+
+**The live editor, driven at 430×932 in both themes at all four shapes:** `documentElement` and `body`
+horizontal overflow **0 in all 8 combinations**, and **0 again with each of the five tool sheets open**
+(48 readings). **39 distinct buttons** enumerated from the live DOM across shapes, sheets and themes,
+**0 not reached by a handler**, all via an attribute family the delegated listener reads; 6 are disabled
+and correctly still reached (they decline). Exports through the real editor: 1080×1920 / 1080×1350 /
+1080×1080 `image/jpeg` `.jpg`, and **1020×1044 `image/png` `.png`** — the extension follows the mime.
+⚠️ **MY SHEET MEASUREMENTS WERE VACUOUS ON THE FIRST RUN.** The studio's sheet is `.sst-sheet.on`
+/ `[data-sst-sheet]`, not the app's `.sheet-ov.on`; my selector matched nothing, so the overflow sweep
+measured an empty node set and printed "none" for every case, and the button sweep found **13** where
+there are 39. A check that reports clean against nothing is the failure mode this file is mostly about,
+and the tell was a suspiciously round "none" plus a button count too small for the screen. **Confirm a
+sweep found real nodes before believing what it says about them.**
+
+⚠️ **THE PORT SQUATTER FIRED AGAIN — 8899 WAS STILL HELD** by a `http.server` from an earlier session.
+`lsof` first, then `curl … | grep` for a symbol only the new build contains (`shareStickerPatch`,
+`shareAspectFamily`), before believing anything on screen. Both done here.
+
+**On the pack's own prohibition, stated rather than glossed.** `CLAUDE.md` in the pack forbids copying
+"Runna branding, logo, points, **stickers** or exact layouts". What ships is a transparent-PNG **export
+of our own four templates** — a file format capability the owner asked for by name after researching what
+the reference offers — not their sticker artwork, wording or layout. The prohibition is about copying
+their design; this is our card with its background removed. Recorded here because the two sentences sit
+close enough together that a later reader deserves to see the distinction drawn deliberately.
+
+**Deviations, unchanged and restated:** the sticker is an **ADDITION to the pack, not a departure** —
+the owner's own words, *"Card Only (Transparent): Saves your metrics card without any background so you
+can overlay it manually as a sticker"*, under his standing instruction *"I want to at least match what
+they do in terms of UI and UX. I'm not settling for worse, I want to strive to be better than them"*.
+It has **no fixed pixel size** by design, so section G's exact-dimension guards do not apply to it and it
+is deliberately not a member of `GATE_ASPECTS`; it is **PNG, not the spec's JPEG 0.90–0.94**, because
+alpha is the feature; it **reuses the square's layout family** (4 ladder rows, 2 metric columns); and its
+route is an inset in a reserved band rather than a scored zone. **The five BLOCKED checklist items are
+unchanged by this work** — Save to Photos, the real-device pass, Vision, the feature flag and locale
+units — and **the Road Map's `pc-share` therefore stays UNTICKED until a real device confirms it**.
+`pc-sticker` is ticked because the sticker itself is done and measured; the camera roll is what is not.
+
+### ⚠️ I DESTROYED EIGHT COMMITTED-NOWHERE GUARDS WITH `git checkout` (2026-08-20)
+
+Undoing a deliberate re-break, I ran `git checkout -- test/share-export-bytes.test.ts
+test/share-export-harness.ts`. Both files held UNCOMMITTED work — the sticker phase's own additions —
+so the checkout reverted them to HEAD and took **eight guards** with it. The suite went 976 → 968 and
+the loss was invisible except as a count. Recovered from a verifier's re-break tree copy under
+`scratchpad/share/stconfirm/rbtree/test/`, which existed only by luck.
+⚠️ **NEVER `git checkout` A FILE TO UNDO A RE-BREAK. Copy it to /tmp first and copy it back.** This file
+already warned that a `git checkout` during parallel work silently discarded another change; this is the
+same fault committed deliberately, by me, on my own work.
+
+⚠️ **AND THE "DEAD" CONST WAS NOT DEAD.** A verifier graded `const OW = fr.OW, OH = fr.OH` in
+`studioStageHeight` a nit and I deleted it on that word alone. `test/share-studio.test.ts` reads that
+exact line to prove the stage frames the OUTPUT box rather than the 1080-wide layout box. Restored, with
+`void OW; void OH;` so its purpose is legible — and recorded here that the guard pins a SOURCE PATTERN
+rather than the behaviour, which is a weakness worth restating one day. Verify a dead-code claim before
+acting on it.
+
+### ⚠️ A GUARD I WROTE TO FIX A GUARD THAT COULD NOT FAIL, ALSO COULD NOT FAIL
+
+`BLOCKER: every export embeds an sRGB profile` skipped every PNG (`if (imageKind !== "jpeg") continue`),
+so the four sticker exports sailed through a claim that is false for them — they carry no profile at
+all. My repair added a PNG branch **to that test's own loop**, and it could never run: the sticker is
+deliberately **not** a member of `GATE_ASPECTS` (its size is its own ink, so every dimension claim that
+list drives is inapplicable), so it never appears in `shots()`. **Two re-breaks both passed**, which is
+the only reason it was caught.
+The claim now lives in its own test over `G.stickers`, the map the stickers actually reach, and asserts
+what matters for a PNG: not that it SAYS sRGB (an untagged PNG is read as sRGB everywhere) but that it
+carries no CONFLICTING claim — no `iCCP`, no `gAMA`/`cHRM`. Both re-breaks caught.
+⚠️ **A GUARD OVER A COLLECTION IS ONLY AS GOOD AS THE COLLECTION.** Ask what the loop actually contains
+before believing the assertion inside it, and re-break rather than reading.
+
+### THE STICKER'S ELEVEN FINDINGS, WORKED (2026-08-20) — AND TWO OF THE THREE MAJORS WERE DOCUMENTS
+
+Two verifiers attacked the transparent sticker and produced eleven findings. Suite 969 → **976**;
+every new and restated guard was re-broken and watched failing before it was believed.
+⚠️ **NO TOTAL IS QUOTED HERE ON PURPOSE.** The fixer's report said 29 and this file said 26, and a
+re-break count is narrative rather than derivable — so it is exactly the two-copies-of-one-number
+fault the release-gate figures guard was just built to prevent, in a place no guard can reach. State
+the practice, not a tally nobody can recount. The decisive measurement is that **all 48 photo exports are
+byte-for-byte identical** before and after (sha256, captured from both trees) and **exactly the four
+stickers moved** — every change here is gated on `gm.sticker`, and that is asserted rather than argued.
+
+⚠️⚠️ **THE ONE THAT MATTERED WAS INVISIBLE AT 430×932 AND 76px WIDE AT 320×568.** A sticker's canvas is
+cut to its own ink, so its four templates are **four different shapes** (aspect 0.98 / 1.42 / 1.40 /
+0.85) — the first output in this app where that is true. `studioStageHeight` sized the stage from the
+SELECTED card and `studioMount` then fitted each canvas to `slide.clientWidth`. Two faults compounded:
+1. **`.sst-slide` had no `min-width: 0`**, so — a flex item refusing to shrink below its content — the
+   slide was widened by its own canvas. And a canvas whose **bitmap is set but whose style width is not
+   yet assigned has an intrinsic width of that bitmap**: 337px for a 1020-wide sticker at the neighbour
+   scale.
+2. **`bw` was then read from that widened box**, so the fit chased its own input and settled at whatever
+   the STAGE HEIGHT allowed rather than at the slide's width. Self-sustaining: identical after a forced
+   second mount, so arithmetic and not stale layout.
+
+Measured live at 320×568 with a sticker selected: slides **[248, 298, 293, 248]** against a published
+248, the card being edited **115px off centre with 75px of it clipped** by the stage's own
+`overflow: hidden` — i.e. the runner tapping Share on a card whose right-hand edge they cannot see.
+Every fixed output measured 0–1px off centre and 0px clipped at every width, which is why nothing had
+ever seen it.
+
+⚠️ **THE FIX IS ONE FRAME FOR THE WHOLE CAROUSEL, AND THE TALLEST CARD'S SHAPE IS NOT A TASTE CALL.**
+It is the **only** frame aspect that keeps "slide == card" for every template at once, which is the
+invariant the peek depends on: fit a card into a box at least as tall as its own aspect and the WIDTH
+binds, so the card comes out exactly the frame's width. Anything shallower makes the tall cards
+height-bound — narrower than their own slide, gutters swallowing the neighbour's card, which is the
+fault `.sst-slide`'s note already records measuring at 320×568. Anything taller costs every card width
+for nothing. The cost is symmetric letterboxing on the wider templates, which reads as a mat.
+
+**Measured, before → after, over 96 combinations (4 outputs × 4 templates × 3 viewports × 2 themes):**
+| | before | after |
+|---|---|---|
+| worst centre error | 115px | **1px** |
+| worst clipped | 75px | **0px** |
+| slide-width spread within one carousel | 114px | **0px** |
+| stage-height swing while paging | 159px | **0px** |
+| Share-button swing while paging | 159px | **0px** |
+| smallest neighbour peek | **0px** | 24px |
+| page horizontal overflow | 0 | 0 |
+
+⚠️ **THE JUMPING PREVIEW WAS THE SAME DEFECT AND IS FIXED BY THE SAME CHANGE.** `studioStageHeight` was
+re-run per template, so the stage was 302/210/211/346 at 375×812 and 350/242/245/401 at 430×932 — the
+Share button carrying the whole 136–159px under the runner's thumb. Now one frame per carousel: 346 and
+401, unchanged across all four templates.
+
+⚠️ **AND THE ARITHMETIC WAS SPLIT OUT AS TWO PURE FUNCTIONS SO THE INVARIANT CAN BE SWEPT WITHOUT A DOM.**
+`studioFrameFit(cardW, room, fr)` and `studioCardFit(sg, slideW, stageH)`. The guard sweeps **138
+card/screen pairs** — the four real sticker sizes, the three fixed outputs, a deliberately wilder set
+than the renderer can produce, plus a two-template and a one-template carousel — and asserts every card
+comes out exactly `slideW` wide and no taller than the stage, AND that the frame is identical under every
+rotation of the list (which is the no-swing claim, stated so it cannot be satisfied by the order the
+editor happens to hold). ⚠️ **`SST_STAGE_MIN` and `.sst-stagewrap`'s `min-height` are the same number and
+the test compares them** — two owners of one measurement is a fault this very function already records.
+
+⚠️ **A GUARD RUN ONLY AT THE COMFORTABLE SIZE CANNOT SEE THIS.** 0px at 430×932, 76px at 320×568. Same
+lesson as the sticker-height sweep whose four points were all roomy enough for the verdict to take its
+top rung.
+
+### THE FIGURES IN TWO DOCUMENTS ARE NOW DERIVED, NOT RETYPED
+
+⚠️ **THE RELEASE-GATE COUNT HAD BEEN WRONG IN THREE PLACES AND WAS FIXED IN ONE AT A TIME.** "63 of 74,
+eleven blocked" → corrected to "67 items: 62 PASS, 5 BLOCKED" → and then still said **"eleven"**
+ninety-four lines later in the same section, two paragraphs below its own correction; while
+`docs/roadmap/index.html` — the page the owner reads to know where the project is — carried the stale
+pair in its **hero** and the corrected pair in the step detail four paragraphs below. A cold session, and
+the owner, believe whichever copy they reach first.
+
+**The durable fix is `test/release-gate-figures.test.ts`, and nothing in it is retyped.** The TOTAL is
+counted from the gate's own `- [ ]` lines (A5 B7 C8 D8 E7 F8 G9 H7 I8 = **67**, and the per-section
+working recorded in CLAUDE.md is compared against the count rather than trusted); the PASS/BLOCKED/FAIL
+split must add up to it; the blocked paragraph's spelled word must equal `spell(blocked)` **and**
+enumerate exactly that many `(n)` items; and the Road Map's own spelled-out sentences must spell those
+figures, **computed** — with every OTHER spelled number in the "…checks" shape forbidden anywhere on the
+page, which is what catches a second stale copy.
+
+⚠️ **`SHARE_STUDIO_RELEASE_GATE.md` IS NOW COMMITTED, VERBATIM, FOR EXACTLY THIS REASON.** Left in the
+supplied pack directory the count would depend on a file outside the repo, so the guard would have to
+skip when it was absent — and a gate that vanishes when its instrument is missing reports a release as
+verified having verified nothing.
+
+⚠️ **THE SWEEP'S FIRST TWO VERSIONS FAILED ON CORRECT PROSE.** A bare `"<word> of the"` flagged the
+ordinary English *"one of the two"* elsewhere on the page; scoped to `"…checks"` but unanchored, `two`
+matched inside **sixty-two** and condemned the corrected sentence. It carries a `(?<![a-z-])` lookbehind
+now, and it was re-broken against the real stale text (`"sixty-three of the seventy-four checks"`), not
+against an invented one. Nine doc re-breaks, all caught.
+
+⚠️ **`pc-share` STAYS UNTICKED and a guard now says so**: it is ticked in no dated batch while Save to
+Photos is still blocked on a native build, every batch id must name a step that exists on the page, and
+`pc-sticker` must be ticked because the sticker itself is done and measured.
+
+### THREE DECORATIVE RULES UNDER THE 3:1 NON-TEXT FLOOR — FIXED, NOT WAIVED
+
+Measured by **connected component against the ground each one sits on**, over pure white and pure black:
+| mark | before | after |
+|---|---|---|
+| Route Poster's teal accent dash, over **white** | **1.60:1** | 12.11:1 |
+| vertical metric-column divider, over **black** (all four stickers) | **2.26:1** | 4.43:1 |
+| Route Poster's full-width rule above its metrics, over **black** | **2.26:1** | 4.43:1 |
+
+⚠️ **THE HAIRLINE WAS ALREADY A PAIR AND ITS LIGHT HALF WAS SIMPLY TUNED FOR A DIFFERENT PROBLEM.** A
+divider is a deep half (`keyline`, `rgba(2,10,8,.82)`) plus a light half (`hair`, `rgba(255,255,255,.28)`)
+so that whichever way the ground goes one of the two carries it. On a photo card, under a scrim, .28 is
+plenty and the note beside it records how it was measured off the four references. On a **sticker** there
+is no scrim: .28 of white over pure black is 2.26:1, and the deep half contributes nothing because it is
+dark on dark. `SHARE_INK.hairAlpha` (.45) is used only where `gm.sticker`.
+⚠️ **A SECOND VALUE, NOT A RAISED .28** — raising the one constant would move all 48 signed-off photo
+exports for a defect that exists only without a scrim. Verified: 48 of 48 identical, only the 4 stickers
+moved. And the floor is **arithmetic, not taste**: white at alpha *a* over black has relative luminance
+`((a+0.055)/1.055)^2.4`, so 3:1 needs a ≥ 0.349; .45 is margin.
+
+⚠️ **THE ACCENT DASH IS A SINGLE TONE, SO NO ALPHA COULD SAVE IT.** A mid-toned mark has no direction to
+win in — lighter fails on white, darker fails on black. What it needed was an **edge**, which is the
+device the type already uses. `shareMark` fills the rect and, on a sticker only, strokes the one keyline
+underneath with `destination-over` (over the top it would eat into the mark it defines). Teal on black
+reads on its own at 10.0:1; on white the keyline's edge is what is seen.
+
+⚠️ **AND THE GUARD IS DERIVED FROM PIXELS, BECAUSE THE EXISTING ONE STRUCTURALLY COULD NOT SEE THESE.**
+The legibility gate measures the planned TEXT boxes, and a decorative rule is in no plan — which is
+exactly why the build reported one such case and stopped. The byte gate now runs a connected-component
+sweep over the alpha channel and measures every component against white and black: **0 of 236 readings
+under 3:1, worst 4.43:1** (5 under before). Cost 0.3 s. It takes the **better of the two directions**,
+which is not a loosening: every mark here is a pair by design, and requiring both halves to clear the
+floor would condemn the type as well.
+
+### FOUR OF OUR OWN CHECKS COULD NOT DO WHAT THEY CLAIMED
+
+⚠️ **THE TRIM GUARD WAS ONE-SIDED, SO IT COULD SEE TOO MUCH MARGIN AND NEVER TOO LITTLE.** `edge[side]`
+is the gap from the canvas edge to the nearest ink, so an over-trimmed sticker's gap is **zero — the
+smallest value there is — and a ceiling on it passes.** Watched: a break that computed the box correctly
+and then shrank it 40px a side sailed through and was caught only incidentally, by an unrelated
+transparent-share bound with 1.9 points of headroom. Three claims now: not too loose, **no ink on the
+outermost row or column**, and — the load-bearing one — **the trim box contains the UNTRIMMED card's own
+full-resolution alpha bounding box**, which needs a render that was not trimmed and is the only form of
+the claim that can fail when ink is lost.
+⚠️ **AND THE ORDER OF THOSE THREE MATTERS, WHICH TOOK A RE-BREAK TO NOTICE.** node's assert throws on the
+first failure and every ink-losing break ALSO puts ink on the outermost row, so with the cheap floor
+first the strong claim never ran and its message never appeared: two different breaks were both reported
+as *"ink on the outermost top row"*. Containment is asserted first, so a failure now names the defect
+(*"11px of the card has been cut off the left"*) rather than its symptom.
+⚠️ **The pad-0 re-break also settled the padding's own justification from measurement**: at `pad: 0` the
+trim loses **3px** of real ink, i.e. ink faint enough to be missed at the 1/6 probe genuinely exists.
+
+⚠️ **THE "TWO DERIVATIONS OF ONE BAND" GUARD ASSERTED ARITHMETIC TRUE BY CONSTRUCTION.**
+`blockTop` was built in the test as `bandTop + field + CLEAR` and `shareStickerField` answers
+`blockTop - CLEAR - top`, so the two cancel and **no single-sided edit can make them differ** — an
+attempt to break it by changing `posterField` moved both sides together and was correctly not caught.
+What is falsifiable is the SHAPE of the derivation: the band's height must track the block top
+one-for-one, so a re-derivation returning `SHARE_STICKER.field` as a height of its own — which is the
+two-derivations fault the title names — returns a constant and fails. Plus a real-model check in the byte
+gate, where the reservation is computed against the NOMINAL canvas and the plan against the DERIVED one,
+so their agreement is a genuine statement: **moment 380px, poster 620px, reserved == drawn**, and the
+band must lie inside the trimmed canvas. Both re-broken by drifting the reservation 36px and 7px.
+
+⚠️ **TWO ASSERTION MESSAGES STATED THE OPPOSITE OF WHAT THEY ASSERTED** — *"an unknown output does not
+land on the default"* on a line requiring that it does, and *"a sticker defaults to the route being off"*
+on a line requiring it ON. A message is read at the exact moment somebody is deciding whether the guard
+is wrong or the code is, and one that reads backwards argues for the wrong answer. Reworded and each
+watched printing the corrected text. ⚠️ **The unknown-aspect line cannot be broken on its own**, because
+`shareAspect`'s `indexOf(a) > 0` fallback is the same branch that maps index-0 `"story"` — so a break
+fires on whichever assertion comes first. Stated rather than dressed up as an independent guard.
+
+### Refuted, with the measurement
+
+⚠️ **"THE ROUTE POSTER STRANDS ITS ROUTE IN A LANDSCAPE BAND" IS NOT A DEFECT AND WAS ALREADY GRADED A
+NIT BY ITS OWN FINDER.** Aspect preservation is a spec requirement, the sliver fixture is the worst case
+by construction, and the same finding records a realistic loop filling 57% of the band's width. Nothing
+changed, deliberately.
+
+⚠️ **"web/app.html AND docs/index.html CARRY A NEW BUILD STAMP" IS THE DOCUMENTED BUILD STEP, NOT A
+DIFF TO EXPLAIN.** `BUILD_STAMP` is `new Date().toISOString().slice(0, 16)`, so any build rewrites it.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc clean
+apart from the one pre-existing `test/onboarding-wizard.test.ts` Date error, **976/976 · 0 fail**, both
+ratchets still on their ceilings (143 radii, 322 font sizes — the new CSS is `min-width`/`max-width`,
+neither of which is on either ladder). Re-read from the produced bytes with an independently written
+JPEG SOF walker and PNG chunk reader: **16 story 1080×1920, 16 feed 1080×1350, 16 square 1080×1080**, all
+8-bit 3-channel; four stickers **1020×1044 / 1020×720 / 1020×730 / 1014×1188**, bit depth 8, colour type
+6, every CRC valid, no `tEXt`/`iTXt`/`zTXt`/`eXIf` — the derived sticker sizes are **unchanged** by the
+keylines, because the marks sit well inside the ink bounding box.
 
 ## THE WALK THAT CONVICTED THE GPS START (owner's report, 2026-08-17 — four findings, two causes)
 

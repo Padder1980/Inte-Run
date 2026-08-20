@@ -235,6 +235,25 @@ export function jpegQuantTables(buf: Buffer): number[][] {
 }
 export type IccInfo = { present: boolean; space?: string; pcs?: string; klass?: string; desc?: string; size?: number };
 /** The embedded colour profile, from the APP2 ICC_PROFILE segment. */
+/**
+ * The PNG chunk types present, in order. PNG carries colour intent in its own chunks (iCCP for an
+ * embedded profile, sRGB for the standard-space flag) rather than in a JPEG APP2 segment, so a
+ * JPEG-only colour check is structurally blind to a PNG export.
+ */
+export function pngChunks(buf: Buffer): string[] {
+  if (imageKind(buf) !== "png") return [];
+  const out: string[] = [];
+  let i = 8;
+  while (i + 8 <= buf.length) {
+    const len = buf.readUInt32BE(i);
+    const type = buf.subarray(i + 4, i + 8).toString("latin1");
+    out.push(type);
+    if (type === "IEND") break;
+    i += 12 + len;
+  }
+  return out;
+}
+
 export function iccInfo(buf: Buffer): IccInfo {
   const segs = jpegSegments(buf);
   if (!segs) return { present: false };
@@ -364,10 +383,13 @@ function readdirSafe(p: string): string[] {
   try { return readdirSync(p); } catch (e) { return []; }
 }
 
-type Session = { ev: (expr: string, awaitP?: boolean) => Promise<any>;
+export type Session = { ev: (expr: string, awaitP?: boolean) => Promise<any>;
   metrics: (w: number, h: number, dpr: number) => Promise<void>; close: () => void };
 
-async function openBrowser(): Promise<Session> {
+/** ⚠️ EXPORTED SO A MEASUREMENT PROBE CAN USE THE SAME BROWSER AND THE SAME LIFT AS THE GATE. Two ways
+ * of getting the renderer into a browser is two things to keep in step, and the second one is the one
+ * nobody updates. */
+export async function openBrowser(): Promise<Session> {
   const bin = findBrowser();
   if (!bin) {
     throw new Error(
@@ -604,9 +626,28 @@ export type Shot = {
 };
 export type PrivacyShot = { label: string; sha: string; routeN: number; file: string; sig: number[];
   completedAt: string; place: string; dateLabel: string };
+export type StickerShot = {
+  template: string; bytes: Buffer; file: string; type: string;
+  canvas: [number, number]; layout: [number, number]; trim: [number, number];
+  clear: number; partial: number; opaque: number; transDark: number; tdBand: number;
+  edge: { top: number; right: number; bottom: number; left: number };
+  legibility: { el: string; ground: string; vsGround: number; vsRing: number | null }[];
+  /** The UNTRIMMED card's alpha bounding box, at full resolution: what the trim must contain. */
+  ink: { x0: number; y0: number; x1: number; y1: number; uw: number; uh: number };
+  /** Every ink component measured against pure white and pure black: the non-text contrast floor. */
+  marks: { ground: string; n: number; box: number[]; best: number }[];
+  /** The route's reserved band as the REAL plan hands it to the card, and where the band must start. */
+  field: { x: number; y: number; w: number; h: number } | null;
+  bandTop: number;
+};
 export type Gate = {
   lifted: Lifted;
   shots: Map<string, Shot>;
+  stickers: Map<string, StickerShot>;
+  /** The same card with a scrim deliberately painted on: the control the no-scrim claim is set against. */
+  stickerControl: { transDark: number; tdBand: number };
+  /** The block's own height, measured at four different nominal canvases. */
+  stickerInvariance: { template: string; blockHeights: number[]; derivedH: number }[];
   quality: { q: number; tables: number[][] }[];
   sourcePhoto: { bytes: Buffer; exif: ExifInfo };
   dprShots: { label: string; sha: string; size: [number, number] | null }[];
@@ -667,7 +708,10 @@ async function capture(): Promise<Gate> {
       CARD.__setPhoto(opts.photo ? Object.assign({ crops: crops }, opts.photo) : null);
       const m = CARD.shareCardModel(run, opts);
       const c = CARD.shareCardCanvas(m, 1);
-      const f = await CARD.canvasToShareFile(c, CARD.shareFileName(m));
+      // ⚠️ THE SPEC IS PASSED, EXACTLY AS prepareShareCard PASSES IT. Left off, canvasToShareFile falls
+      // back to reading the extension off the name — which happens to give the right answer, so the gate
+      // would pass while never exercising the path the app takes.
+      const f = await CARD.canvasToShareFile(c, CARD.shareFileName(m), CARD.shareExportSpec(m));
       const u = new Uint8Array(await f.arrayBuffer());
       let s = ''; for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]);
       // A coarse luminance signature, computed from the CANVAS rather than from the encoded bytes, so
@@ -770,6 +814,295 @@ async function capture(): Promise<Gate> {
         completedAt: r.completedAt, place: r.place, dateLabel: r.dateLabel });
     }
 
+    // ---- THE STICKER: the fourth output, on genuine alpha ------------------------------------
+    /**
+     * ⚠️ NOT A FOURTH ENTRY IN GATE_ASPECTS, AND THAT IS DELIBERATE. Every claim that list drives is
+     * about a fixed canvas that is a REFLOW of the story — an exact pixel size, a JPEG quality, an
+     * ICC profile, a crop-versus-scale residual. A sticker has none of those properties: its size is
+     * derived from its own ink, it is a PNG, and it is not a reflow of anything. Folding it in would
+     * make four existing guards answer "not applicable" for one member of the list, which is how a
+     * guard stops guarding.
+     */
+    await S.ev(`globalThis.shootSticker = async function (run, tmpl) {
+      globalThis.SHAREPRIV = {};
+      CARD.__setPhoto(null);
+      const m = CARD.shareCardModel(run, { aspect: 'sticker', template: tmpl, routeOn: true,
+        metrics: null, photo: null });
+      const gm = CARD.shareCanvasGeom(m.aspect, m);
+      const c = CARD.shareCardCanvas(m, 1);
+      const f = await CARD.canvasToShareFile(c, CARD.shareFileName(m), CARD.shareExportSpec(m));
+      const u = new Uint8Array(await f.arrayBuffer());
+      let s = ''; for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]);
+      const px = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      const N = c.width * c.height, cw2 = c.width, ch2 = c.height;
+      let clear = 0, opaque = 0, partial = 0, td = 0;
+      const tdRow = [];
+      for (let y = 0; y < c.height; y++) {
+        let n = 0;
+        for (let x = 0; x < c.width; x++) {
+          const o = (y * c.width + x) * 4, a = px[o + 3] / 255;
+          if (a <= 0.004) clear++; else if (a >= 0.996) opaque++; else partial++;
+          if (a >= 0.08 && a <= 0.92) {
+            const l = (0.2126 * px[o] + 0.7152 * px[o + 1] + 0.0722 * px[o + 2]) / 255;
+            if (l < 0.30) { td++; n++; }
+          }
+        }
+        tdRow.push(n / c.width);
+      }
+      let band = 0, cur = 0;
+      for (const r of tdRow) { cur = r >= 0.5 ? cur + 1 : 0; if (cur > band) band = cur; }
+      // How close the nearest ink comes to each edge: the trim is only tight if this is small.
+      const A = function (x, y) { return px[(y * c.width + x) * 4 + 3]; };
+      let top = c.height, bottom = c.height, left = c.width, right = c.width;
+      for (let y = 0; y < c.height; y++) { let hit = false;
+        for (let x = 0; x < c.width; x++) if (A(x, y) > 4) { hit = true; break; }
+        if (hit) { top = y; break; } }
+      for (let y = c.height - 1; y >= 0; y--) { let hit = false;
+        for (let x = 0; x < c.width; x++) if (A(x, y) > 4) { hit = true; break; }
+        if (hit) { bottom = c.height - 1 - y; break; } }
+      for (let x = 0; x < c.width; x++) { let hit = false;
+        for (let y = 0; y < c.height; y++) if (A(x, y) > 4) { hit = true; break; }
+        if (hit) { left = x; break; } }
+      for (let x = c.width - 1; x >= 0; x--) { let hit = false;
+        for (let y = 0; y < c.height; y++) if (A(x, y) > 4) { hit = true; break; }
+        if (hit) { right = c.width - 1 - x; break; } }
+      // ---- legibility, from rendered pixels, over a pure white and a pure black placement -----
+      const REL = function (v) { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+      const lum = function (r, g2, b) { return 0.2126 * REL(r) + 0.7152 * REL(g2) + 0.0722 * REL(b); };
+      const ratio = function (a, b) { const hi = Math.max(a, b), lo = Math.min(a, b); return (hi + 0.05) / (lo + 0.05); };
+      const mg = document.createElement('canvas').getContext('2d');
+      const wm = CARD.shareWordmarkPlan(mg, gm);
+      const boxes = [{ name: 'wordmark', r: wm.rect }];
+      const CAP = 0.714;
+      // ⚠️ THE ROUTE'S RESERVED BAND, FROM THE REAL PLAN, so a test can compare the space shareStickerH
+      // set aside with the rect the card is handed. Those two are computed against DIFFERENT geometries —
+      // the reservation against the nominal canvas, the plan against the derived one — so their agreement
+      // is a real claim about real models rather than arithmetic that cannot disagree with itself.
+      let fieldRect = null;
+      if (tmpl === 'moment') {
+        const p = CARD.shareMomentPlan(mg, m, gm);
+        if (p.eye) boxes.push({ name: 'eyebrow', r: { x: gm.M, y: p.eyeBase - p.eye.size * CAP, w: p.eye.w, h: p.eye.size * CAP } });
+        if (p.hero) boxes.push({ name: 'hero', r: { x: gm.M, y: p.heroTop, w: p.heroW, h: p.heroBase - p.heroTop } });
+        if (p.evid) boxes.push({ name: 'evidence', r: { x: gm.M, y: p.evidBase - p.evid.size * CAP, w: gm.CW, h: p.evid.size * CAP } });
+        if (p.mets.length) boxes.push({ name: 'metric-label', r: { x: gm.M, y: p.labelBase - p.P.labelS * CAP, w: p.P.w, h: p.P.labelS * CAP } });
+        if (p.date) boxes.push({ name: 'date', r: { x: gm.safe.x1 - p.date.w, y: p.dateBase - p.date.size * CAP, w: p.date.w, h: p.date.size * CAP } });
+        if (m.route) { fieldRect = CARD.shareStickerField(gm, wm, p.blockTop); boxes.push({ name: 'route', r: fieldRect }); }
+      } else if (tmpl === 'execution') {
+        const p = CARD.shareExecutionPlan(mg, m, gm);
+        if (p.verd) boxes.push({ name: 'verdict', r: { x: gm.M, y: p.verdBase - p.verd.size * CAP, w: gm.CW, h: p.verd.size * CAP } });
+        if (p.sent) boxes.push({ name: 'evidence', r: { x: gm.M, y: p.sentBase - p.sent.size * CAP, w: gm.CW, h: p.sent.size * CAP } });
+        boxes.push({ name: 'chart', r: { x: gm.M, y: p.chartTop, w: gm.CW, h: p.chartBottom - p.chartTop } });
+        boxes.push({ name: 'metric-label', r: { x: gm.M, y: p.labelBase - p.P.labelS * CAP, w: p.P.w, h: p.P.labelS * CAP } });
+      } else if (tmpl === 'progression') {
+        const p = CARD.shareProgressionPlan(mg, m, gm);
+        if (p.head) boxes.push({ name: 'headline', r: { x: gm.M, y: p.headBase - p.head.size * CAP, w: gm.CW, h: p.head.size * CAP } });
+        if (p.interp) boxes.push({ name: 'evidence', r: { x: gm.M, y: p.interpBase - p.interp.size * CAP, w: gm.CW, h: p.interp.size * CAP } });
+        boxes.push({ name: 'ladder', r: { x: gm.M, y: p.firstBase - p.rowS, w: gm.CW, h: p.lastBase - p.firstBase + p.rowS } });
+      } else {
+        const p = CARD.sharePosterPlan(mg, m, gm, wm);
+        boxes.push({ name: 'title', r: { x: gm.M, y: p.titleBase - p.title.size * CAP, w: gm.CW, h: p.title.size * CAP } });
+        if (p.meta) boxes.push({ name: 'meta', r: { x: gm.M, y: p.metaBase - p.meta.size * CAP, w: p.meta.w, h: p.meta.size * CAP } });
+        if (p.hero) boxes.push({ name: 'hero', r: { x: gm.M, y: p.heroTop, w: p.heroW, h: p.heroBase - p.heroTop } });
+        boxes.push({ name: 'footer', r: { x: gm.M, y: p.footBase - 19 * CAP, w: 320, h: 19 * CAP } });
+        fieldRect = p.field;
+        boxes.push({ name: 'route', r: fieldRect });
+      }
+      const legibility = [];
+      for (const ground of [[255, 255, 255, 'white'], [0, 0, 0, 'black']]) {
+        const cc = document.createElement('canvas');
+        cc.width = c.width; cc.height = c.height;
+        const g = cc.getContext('2d');
+        g.fillStyle = 'rgb(' + ground[0] + ',' + ground[1] + ',' + ground[2] + ')';
+        g.fillRect(0, 0, cc.width, cc.height);
+        g.drawImage(c, 0, 0);
+        const comp = g.getImageData(0, 0, cc.width, cc.height).data;
+        const gLum = lum(ground[0], ground[1], ground[2]);
+        for (const b of boxes) {
+          const x0 = Math.max(0, Math.floor(b.r.x - gm.ox)), y0 = Math.max(0, Math.floor(b.r.y - gm.oy));
+          const x1 = Math.min(cc.width, Math.ceil(b.r.x - gm.ox + b.r.w));
+          const y1 = Math.min(cc.height, Math.ceil(b.r.y - gm.oy + b.r.h));
+          const core = [], ring = [];
+          for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+            const o = (y * cc.width + x) * 4, a = px[o + 3];
+            const l = lum(comp[o], comp[o + 1], comp[o + 2]);
+            if (a >= 250) core.push(l); else if (a >= 40) ring.push(l);
+          }
+          if (!core.length) continue;
+          core.sort(function (p, q) { return p - q; });
+          ring.sort(function (p, q) { return p - q; });
+          const c90 = core[Math.floor(core.length * 0.9)];
+          legibility.push({ el: b.name, ground: ground[3],
+            vsGround: Math.round(ratio(c90, gLum) * 100) / 100,
+            vsRing: ring.length ? Math.round(ratio(c90, ring[Math.floor(ring.length * 0.1)]) * 100) / 100 : null });
+        }
+      }
+      // ---- EVERY INK COMPONENT AGAINST THE GROUND IT SITS ON, OVER WHITE AND OVER BLACK ---------
+      // ⚠️ THE TYPE MEASUREMENT ABOVE IS PER PLANNED ELEMENT, SO IT CANNOT SEE A MARK NOBODY PLANNED.
+      // Three decorative rules — the poster's teal accent dash, the vertical metric divider and the
+      // poster's horizontal rule — sat under the 3:1 non-text floor on one of the two extreme grounds and
+      // were reported by no guard at all, because none of them is a text box in that list. This sweep is
+      // DERIVED: it finds the connected components of "there is ink here" and measures each against the
+      // ground around it, so a mark added later is covered without anybody remembering to add it.
+      // ⚠️ AND IT TAKES THE BETTER OF THE TWO DIRECTIONS. Every mark on this card is a PAIR — a light
+      // half and a deep half — because on an unknown ground only one of the two can be read; requiring
+      // both to clear the floor would condemn the design the sticker is built on.
+      const A8 = new Uint8Array(cw2 * ch2);
+      for (let i = 0; i < cw2 * ch2; i++) A8[i] = px[i * 4 + 3] >= 40 ? 1 : 0;
+      const lab = new Int32Array(cw2 * ch2).fill(-1);
+      const stack = new Int32Array(cw2 * ch2);
+      const parts = [];
+      for (let i = 0; i < cw2 * ch2; i++) {
+        if (!A8[i] || lab[i] >= 0) continue;
+        const id = parts.length;
+        let sp = 0; stack[sp++] = i; lab[i] = id;
+        const cells = [];
+        let bx0 = cw2, bx1 = -1, by0 = ch2, by1 = -1;
+        while (sp) {
+          const q = stack[--sp], x = q % cw2, y = (q - x) / cw2;
+          cells.push(q);
+          if (x < bx0) bx0 = x; if (x > bx1) bx1 = x;
+          if (y < by0) by0 = y; if (y > by1) by1 = y;
+          if (x > 0 && A8[q - 1] && lab[q - 1] < 0) { lab[q - 1] = id; stack[sp++] = q - 1; }
+          if (x < cw2 - 1 && A8[q + 1] && lab[q + 1] < 0) { lab[q + 1] = id; stack[sp++] = q + 1; }
+          if (y > 0 && A8[q - cw2] && lab[q - cw2] < 0) { lab[q - cw2] = id; stack[sp++] = q - cw2; }
+          if (y < ch2 - 1 && A8[q + cw2] && lab[q + cw2] < 0) { lab[q + cw2] = id; stack[sp++] = q + cw2; }
+        }
+        if (cells.length >= 24) parts.push({ cells: cells, box: [bx0, by0, bx1 - bx0 + 1, by1 - by0 + 1] });
+      }
+      const marks = [];
+      for (const ground of [[255, 255, 255, 'white'], [0, 0, 0, 'black']]) {
+        const mc2 = document.createElement('canvas'); mc2.width = cw2; mc2.height = ch2;
+        const g2 = mc2.getContext('2d');
+        g2.fillStyle = 'rgb(' + ground[0] + ',' + ground[1] + ',' + ground[2] + ')';
+        g2.fillRect(0, 0, cw2, ch2);
+        g2.drawImage(c, 0, 0);
+        const cm = g2.getImageData(0, 0, cw2, ch2).data;
+        const gl = lum(ground[0], ground[1], ground[2]);
+        for (const k of parts) {
+          const core = [];
+          for (const q of k.cells) core.push(lum(cm[q * 4], cm[q * 4 + 1], cm[q * 4 + 2]));
+          core.sort(function (a2, b2) { return a2 - b2; });
+          const hi = core[Math.floor(core.length * 0.9)], lo = core[Math.floor(core.length * 0.1)];
+          marks.push({ ground: ground[3], n: k.cells.length, box: k.box,
+            best: Math.round(Math.max(ratio(hi, gl), ratio(lo, gl)) * 100) / 100 });
+        }
+      }
+      // ---- THE UNTRIMMED CARD'S OWN ALPHA BOUNDING BOX, AT FULL RESOLUTION -----------------------
+      // ⚠️ THIS IS THE ONLY FORM OF "TRIMMED TO ITS OWN INK" THAT CAN FAIL WHEN INK IS LOST. The edge
+      // measurements above are one-sided: a gap from the canvas edge to the nearest ink is ZERO on a
+      // sticker that has been over-trimmed, which is the smallest value there is, so a ceiling on them
+      // passes the clipped case. The claim has to be that the trim box CONTAINS the ink — and the ink's
+      // extent can only be known from a render that was not trimmed.
+      // ⚠️ AND IT IS MEASURED AT FULL RESOLUTION, NOT AT THE 1/6 PROBE THE TRIM ITSELF USES. Measuring
+      // it at the probe's own scale would compare a decision with itself; faint ink the probe misses is
+      // exactly what the 24px padding exists to cover, and this is what proves it does.
+      const gmU = CARD.shareGeomAt('sticker', CARD.shareStickerH(m), null);
+      const cu = document.createElement('canvas');
+      cu.width = gmU.OW; cu.height = gmU.OH;
+      CARD.shareDrawInto(cu.getContext('2d'), m, gmU, 1);
+      const up = cu.getContext('2d').getImageData(0, 0, cu.width, cu.height).data;
+      let ux0 = -1, uy0 = -1, ux1 = -1, uy1 = -1;
+      for (let y = 0; y < cu.height; y++) for (let x = 0; x < cu.width; x++) {
+        if (up[(y * cu.width + x) * 4 + 3] <= 0) continue;
+        if (ux0 < 0 || x < ux0) ux0 = x;
+        if (ux1 < 0 || x > ux1) ux1 = x;
+        if (uy0 < 0) uy0 = y;
+        uy1 = y;
+      }
+      return { cw: c.width, ch: c.height, lw: gm.W, lh: gm.H, ox: gm.ox, oy: gm.oy,
+        name: f.name, type: f.type, b64: btoa(s),
+        clear: clear / N, opaque: opaque / N, partial: partial / N, transDark: td / N, tdBand: band,
+        edge: { top: top, right: right, bottom: bottom, left: left }, legibility: legibility,
+        marks: marks,
+        field: fieldRect ? { x: fieldRect.x, y: fieldRect.y, w: fieldRect.w, h: fieldRect.h } : null,
+        bandTop: CARD.shareStickerBandTop(wm),
+        ink: { x0: ux0, y0: uy0, x1: ux1, y1: uy1, uw: cu.width, uh: cu.height } };
+    }; 'ok'`);
+
+    const stickers = new Map<string, StickerShot>();
+    for (const t of ["moment", "execution", "progression", "route"]) {
+      const r = await S.ev(`shootSticker(${JSON.stringify(gateRun())}, ${JSON.stringify(t)})`, true);
+      stickers.set(t, { template: t, bytes: Buffer.from(r.b64, "base64"), file: r.name, type: r.type,
+        canvas: [r.cw, r.ch], layout: [r.lw, r.lh], trim: [r.ox, r.oy],
+        clear: r.clear, partial: r.partial, opaque: r.opaque, transDark: r.transDark, tdBand: r.tdBand,
+        edge: r.edge, legibility: r.legibility, ink: r.ink, marks: r.marks, field: r.field,
+        bandTop: r.bandTop });
+    }
+
+    /**
+     * ⚠️ THE CONTROL IS THE SAME CARD WITH A SCRIM DELIBERATELY PAINTED ON, because "no baked scrim" is
+     * a claim that needs something to be compared against. A threshold picked by taste is the trap this
+     * file already records twice — an empty-quarter bar set at 0.004 against a real floor of 0.0228, and
+     * a reflow residual only believable because two forbidden artefacts were built to measure it. There
+     * is no production seam that can draw this: the control is synthetic, which is the point.
+     */
+    const sctrl = await S.ev(`(() => {
+      globalThis.SHAREPRIV = {};
+      CARD.__setPhoto(null);
+      const m = CARD.shareCardModel(${JSON.stringify(gateRun())},
+        { aspect: 'sticker', template: 'moment', routeOn: true, metrics: null, photo: null });
+      const c = CARD.shareCardCanvas(m, 1);
+      const g = c.getContext('2d');
+      const grad = g.createLinearGradient(0, c.height * 0.32, 0, c.height);
+      grad.addColorStop(0, 'rgba(6,17,14,0)');
+      grad.addColorStop(0.45, 'rgba(6,17,14,0.78)');
+      grad.addColorStop(1, 'rgba(6,17,14,0.9)');
+      g.globalCompositeOperation = 'destination-over';
+      g.fillStyle = grad; g.fillRect(0, 0, c.width, c.height);
+      const px = g.getImageData(0, 0, c.width, c.height).data;
+      let td = 0; const tdRow = [];
+      for (let y = 0; y < c.height; y++) {
+        let n = 0;
+        for (let x = 0; x < c.width; x++) {
+          const o = (y * c.width + x) * 4, a = px[o + 3] / 255;
+          if (a >= 0.08 && a <= 0.92) {
+            const l = (0.2126 * px[o] + 0.7152 * px[o + 1] + 0.0722 * px[o + 2]) / 255;
+            if (l < 0.30) { td++; n++; }
+          }
+        }
+        tdRow.push(n / c.width);
+      }
+      let band = 0, cur = 0;
+      for (const r of tdRow) { cur = r >= 0.5 ? cur + 1 : 0; if (cur > band) band = cur; }
+      return { transDark: td / (c.width * c.height), tdBand: band };
+    })()`);
+
+    /**
+     * ⚠️ THE ONE-PASS HEIGHT DERIVATION RESTS ON THE BLOCK BEING THE SAME HEIGHT AT ANY CANVAS, so that
+     * is measured rather than argued. Two of the four plans genuinely depended on the canvas until the
+     * two unbounded-on-a-sticker reads went in, and the failure they produce is a headline that walks
+     * down to its floor — which looks like a design choice, not a bug.
+     */
+    const sinv = await S.ev(`(() => {
+      globalThis.SHAREPRIV = {};
+      CARD.__setPhoto(null);
+      const out = [];
+      const mg = document.createElement('canvas').getContext('2d');
+      for (const t of ['moment', 'execution', 'progression', 'route']) {
+        const m = CARD.shareCardModel(${JSON.stringify(gateRun())},
+          { aspect: 'sticker', template: t, routeOn: true, metrics: null, photo: null });
+        // ⚠️ THE DERIVED HEIGHT IS IN THE SWEEP, AND LEAVING IT OUT MADE THIS GUARD MISS THE REAL
+        // DEFECT. Watched: reverting either unbounded-on-a-sticker read left this test green, because
+        // 700/1080/1350/1920 are all roomy enough for the verdict to take its top rung — and the height
+        // that actually binds is the one the sticker comes out at (751 for The Execution). A sweep whose
+        // points are all on the comfortable side of a constraint cannot see the constraint.
+        const derived = CARD.shareStickerH(m);
+        const hs = [];
+        const at = function (H) {
+          const gm = CARD.shareGeomAt('sticker', H, null);
+          const wm = CARD.shareWordmarkPlan(mg, gm);
+          const p = t === 'moment' ? CARD.shareMomentPlan(mg, m, gm)
+            : t === 'execution' ? CARD.shareExecutionPlan(mg, m, gm)
+            : t === 'progression' ? CARD.shareProgressionPlan(mg, m, gm)
+            : CARD.sharePosterPlan(mg, m, gm, wm);
+          return H - p.blockTop;
+        };
+        for (const H of [400, 500, 700, derived, 1080, 1350, 1920]) hs.push(at(H));
+        out.push({ template: t, blockHeights: hs, derivedH: derived });
+      }
+      return out;
+    })()`);
+
     // ---- a self-check on the lift, so a mis-stubbed harness cannot pass quietly ---------------
     const modelProbe = await S.ev(`(() => { globalThis.SHAREPRIV = {};
       const m = CARD.shareCardModel(${JSON.stringify(gateRun())}, ${opts("story", null, false)});
@@ -787,7 +1120,10 @@ async function capture(): Promise<Gate> {
         ${opts("story", null, false)});
       return { placeholder: m.template == null, reason: (m.eligibility && m.eligibility.moment || {}).why || '' }; })()`);
 
-    const g: Gate = { lifted, shots, quality, dprShots, privacyShots, modelProbe, refused,
+    const g: Gate = { lifted, shots, stickers,
+      stickerControl: { transDark: sctrl.transDark, tdBand: sctrl.tdBand },
+      stickerInvariance: sinv,
+      quality, dprShots, privacyShots, modelProbe, refused,
       sourcePhoto: { bytes: withGps, exif: exifInfo(withGps) }, ms: Date.now() - t0 };
     writeEvidence(g);
     return g;
@@ -811,10 +1147,18 @@ function writeEvidence(g: Gate): void {
     for (const s of g.shots.values()) {
       writeFileSync(EVIDENCE + s.key.replace(/\//g, "-") + ".jpg", s.bytes);
     }
+    // ⚠️ .png FOR THE STICKERS, NOT .jpg. Writing PNG bytes under a .jpg name is exactly the confusion
+    // this whole output exists to avoid, and the evidence is the thing a human opens.
+    for (const s of g.stickers.values()) writeFileSync(EVIDENCE + "sticker-" + s.template + ".png", s.bytes);
     writeFileSync(EVIDENCE + "source-photo-with-gps.jpg", g.sourcePhoto.bytes);
     writeFileSync(EVIDENCE + "index.json", JSON.stringify({
       generated: new Date().toISOString(), ms: g.ms,
       lifted: { functions: g.lifted.fns.length, constStatements: g.lifted.consts },
+      stickers: [...g.stickers.values()].map((s) => ({ template: s.template, canvas: s.canvas,
+        layout: s.layout, kind: imageKind(s.bytes), bytes: s.bytes.length, file: s.file,
+        clear: Number(s.clear.toFixed(4)), transDark: Number(s.transDark.toFixed(5)), tdBand: s.tdBand,
+        edge: s.edge, sha: sha(s.bytes) })),
+      stickerControl: g.stickerControl,
       shots: [...g.shots.values()].map((s) => ({ key: s.key, drawn: s.drawn, size: imageSize(s.bytes),
         kind: imageKind(s.bytes), bytes: s.bytes.length, file: s.file, ink: Number(s.ink.toFixed(3)),
         icc: iccInfo(s.bytes).desc, exif: exifInfo(s.bytes).app1, sha: sha(s.bytes) })),

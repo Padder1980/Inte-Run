@@ -89,7 +89,9 @@ const CONSTS = ["SHARE_INK", "SHARE_TYPE", "SHARE_TYPE_FEED", "SHARE_TRACK", "SH
   "SHARE_SCRIM_MARGIN",
   // the square's four reductions, plus the one table that decides a canvas height
   "SHARE_ASPECTS", "SHARE_ASPECT_H", "SHARE_TYPE_SQ", "SHARE_GAP_SQ", "SHARE_METRIC_CAP",
-  "SHARE_LADDER_MAX", "SHARE_CHART_SQ_H"];
+  "SHARE_LADDER_MAX", "SHARE_CHART_SQ_H",
+  // the fourth output, and the family lookup that gives it the square's own reductions
+  "SHARE_ASPECT_FAMILY", "SHARE_WM_CLEAR", "SHARE_STICKER"];
 /**
  * ⚠️ THREE OF THE CARD'S CONSTANTS SHARE ONE STATEMENT — `const CARD_W = 1080, CARD_M = 64, ...` — so
  * liftConst cannot find them by their own name. Lifted by the statement's FIRST declarator and named
@@ -100,7 +102,9 @@ const STMTS: [string, string[]][] = [["CARD_W", ["CARD_W", "CARD_M"]],
   ["SHARE_CAP", ["SHARE_CAP", "SHARE_FIG"]]];
 const EXTRA = STMTS.flatMap((s) => s[1]);
 const FNS = ["shareFont", "shareTypeSize", "cardAlpha", "cardLsWidth", "shareFigAdvance", "shareFigWidth", "shareFig",
-  "shareFit", "shareFitToRoom", "cardGeom", "shareCanvasGeom",
+  "shareFit", "shareFitToRoom", "cardGeom", "shareGeomAt", "shareAspectFamily", "shareCanvasGeom",
+  "shareStickerBandTop", "shareStickerField", "shareStickerH", "shareStickerGeom", "shareStickerBox",
+  "shareFontPx", "shareStickerPatch", "shareExportSpec", "shareDrawInto", "shareDrawBody",
   "shareRect", "shareRectPad", "shareRectOverlap", "shareRectInside",
   "sharePhotoBox", "sharePhotoNorm", "sharePhotoDraw", "shareSubjectZones",
   "shareBoxLeavesGap", "shareBlurBg", "sharePhotoCompose",
@@ -114,7 +118,7 @@ const FNS = ["shareFont", "shareTypeSize", "cardAlpha", "cardLsWidth", "shareFig
   // the templates
   "shareQuietPlan", "shareLsFit", "shareWordmarkPlan", "shareHeroFor", "shareMetricUnit",
   "shareMetricsFor", "shareBadgePlan", "shareTick", "shareBadgeDraw", "shareMetricPlan",
-  "shareMetricDraw", "shareHairline", "shareMetricRules", "shareMomentPlan", "shareMomentCard",
+  "shareMetricDraw", "shareHairline", "shareMark", "shareMetricRules", "shareMomentPlan", "shareMomentCard",
   "sharePosterMetrics", "sharePosterPlan", "sharePosterCard",
   // phase 4: the two data-led templates, and the state with no template at all
   "shareRowMetrics", "sharePhotoFloor", "shareChartMarker", "shareBandChart", "shareAxisKeep",
@@ -339,7 +343,11 @@ test("BLOCKER: an export is exactly 1080x1920 or exactly 1080x1350, and one plac
   for (const fn of ["shareCardCanvas", "prepareShareCard", "canvasToShareFile", "drawShareCard"]) {
     assert.ok(!/devicePixelRatio/.test(lift(fn)), fn + " reads devicePixelRatio");
   }
-  assert.match(lift("shareCardCanvas"), /Math\.round\(gm\.W \* S\)/, "the export size is not the geometry times the scale");
+  // ⚠️ THE OUTPUT BOX, NOT THE LAYOUT BOX. They are the same for the three fixed shapes by construction;
+  // a sticker's canvas is the alpha bounding box of its own ink, and reading W/H there would size the
+  // buffer for the layout space the card is composed in rather than for the picture that leaves the phone.
+  assert.match(lift("shareCardCanvas"), /Math\.round\(gm\.OW \* S\)/, "the export size is not the geometry times the scale");
+  assert.match(lift("shareCardCanvas"), /Math\.round\(gm\.OH \* S\)/, "the export height is not the geometry times the scale");
   assert.match(lift("prepareShareCard"), /shareCardCanvas\(m, 1\)/, "the exported file is not built at 1x");
 });
 
@@ -375,6 +383,13 @@ test("BLOCKER: the frame, its clip, its neon border and the radial glows are gon
     if (seen.has(name)) continue;
     seen.add(name);
     const b = lift(name);
+    // ⚠️ ONE FUNCTION MAY SET A SHADOW, AND IT IS NAMED RATHER THAN PATTERN-MATCHED. The forbidden thing
+    // is a glow — a light or coloured bloom on the ground, the border or the route. A sticker has no
+    // ground to be legible against, so the spec's own section 4 asks for exactly this: "apply a local
+    // scrim/keyline when contrast is inadequate". Exempting it is therefore narrowing the guard to what
+    // it was written for, and the exemption comes with four assertions of its own below, which is a
+    // stronger statement about that function than "no shadow" was.
+    if (name === "shareStickerPatch") continue;
     assert.ok(!/shadowBlur|shadowColor/.test(b), name + " sets a shadow, so the card glows");
     for (const m of b.matchAll(/\b((?:card|share|draw)[A-Za-z0-9_]*)\s*\(/g)) {
       const c = m[1]!;
@@ -382,6 +397,30 @@ test("BLOCKER: the frame, its clip, its neon border and the radial glows are gon
     }
   }
   assert.ok(seen.size >= 8, "the renderer closure collapsed to " + seen.size);
+  assert.ok(seen.has("shareStickerPatch"),
+    "the sticker's glyph treatment is no longer in the renderer's closure, so the exemption above is " +
+    "exempting nothing and a shadow could arrive there unseen");
+  // ⚠️ AND WHAT THAT ONE SHADOW IS ALLOWED TO BE: dark, from the palette's own keyline family, with NO
+  // offset (a halo, never a drop shadow, which would read as a cheap bevel), and a bounded radius. A
+  // glow is a light bloom; this is the opposite of one, and these four lines are what say so.
+  const patch = lift("shareStickerPatch");
+  assert.match(patch, /g\.shadowColor = SHARE_STICKER\.halo/, "the halo is not the stated one");
+  assert.match(patch, /g\.shadowOffsetX = 0; g\.shadowOffsetY = 0/,
+    "the sticker's shadow is offset, which is a drop shadow rather than a halo");
+  const E2 = env();
+  const halo = E2.SHARE_STICKER.halo as string;
+  const rgba = /^rgba\((\d+),\s*(\d+),\s*(\d+),\s*(\.?[0-9.]+)\)$/.exec(halo);
+  assert.ok(rgba, "the halo is not a plain rgba: " + halo);
+  assert.ok(Number(rgba![1]) + Number(rgba![2]) + Number(rgba![3]) < 60,
+    "the halo is not a deep ink, so it is a glow: " + halo);
+  assert.ok(Number(rgba![4]) <= 0.5, "the halo's alpha is " + rgba![4] + "; over 0.5 it becomes a plate");
+  assert.ok(E2.SHARE_STICKER.blur > 0 && E2.SHARE_STICKER.blur <= 14,
+    "the halo's radius is " + E2.SHARE_STICKER.blur + "px, which is a bloom rather than an edge");
+  // and it is only ever installed for a sticker
+  assert.match(lift("shareDrawInto"), /gm\.sticker \? shareStickerPatch\(g, S\) : null/,
+    "the glyph treatment is installed for outputs that have a ground of their own");
+  assert.match(lift("shareDrawInto"), /finally \{ if \(unpatch\) unpatch\(\)/,
+    "the patch is not undone, so a canvas that once drew a sticker keeps the keyline for every card after");
 });
 
 /** The five source shapes the fit ruling has to survive, plus what each one is here to catch. */
@@ -1217,8 +1256,11 @@ test("the renderer uses the shared layer rather than a second copy of it", () =>
     assert.ok(all.includes(fn + "("), "the renderer does not use " + fn);
   }
   // The texture belongs to the photo-free ground only: a photograph must not have contours over it.
-  const draw = lift("drawShareCard");
-  assert.match(draw, /if \(!m\.photo\) shareTopoDraw/, "the topographic texture is not gated on there being no photo");
+  const draw = lift("shareDrawBody");
+  const gm = { sticker: false };
+  assert.ok(gm.sticker === false);
+  assert.match(draw, /!m\.photo && !gm\.sticker\) shareTopoDraw/,
+    "the topographic texture is not gated on there being no photo AND not being a transparent sticker");
   // ⚠️ THE WORDMARK'S RECT IS MEASURED BEFORE ANY TEMPLATE RUNS, and every template that places a route
   // hands it over as an obstacle. Stated as the ordering it protects rather than as one call site, so
   // moving the placement into another template cannot quietly drop it.
@@ -1575,7 +1617,8 @@ test("BLOCKER: The Route Poster draws no photograph and no fake route", () => {
   // ⚠️ AND THE GROUND IS THE TOPOGRAPHIC ONE, which is gated in drawShareCard on there being no photo —
   // so the model has to hand the poster a null photo or the poster gets a picture and no texture.
   const model = lift("shareCardModel");
-  assert.match(model, /photo: tmpl === "route" \? null/, "the poster is not handed a null photograph");
+  assert.match(model, /tmpl === "route" \|\| shareAspect\(opt\.aspect\) === "sticker"\) \? null/,
+    "the poster is not handed a null photograph");
   // ⚠️ AND ITS ROUTE IS FORCED ON. shareRouteOn defaults to off when a photograph exists, which would
   // leave the poster an empty ground under a distance hero.
   assert.match(model, /tmpl === "route" \|\| opt\.routeOn/, "the poster's route is still optional");
@@ -2260,7 +2303,9 @@ test("BLOCKER: the state with no eligible template is a deliberate placeholder, 
   // and before a photograph is chosen. It used to fall through to the old ledger — the card-within-a-card
   // framing, the empty upper region and the em-dash pace the brief names as defects.
   const html = page();
-  const draw = lift("drawShareCard");
+  // ⚠️ THE DISPATCH LIVES IN shareDrawBody, WHICH IS THE ONE LAYOUT ENGINE. drawShareCard is now the
+  // entry that resolves the geometry; the branch that decides which of the four is drawn is one level in.
+  const draw = lift("shareDrawBody");
   assert.match(draw, /sharePlaceholderCard\(/, "a model with no template still falls through to something else");
   assert.ok(!/shareLedgerCard|cardLedger\(|cardLane\(|cardTitleLines\(/.test(html),
     "the interim ledger composition survives in the build");
@@ -2365,7 +2410,7 @@ test("BLOCKER: no photo template covers its photograph, and the block's own colo
   // ⚠️ AND THE PICTURE IS DRAWN ONCE, FOR THE WHOLE CANVAS, BEFORE ANY TEMPLATE RUNS — so no template can
   // arrange for less of it. Asserted on the ORDER, because a photo drawn after the dispatch would cover
   // the copy instead of sitting under it.
-  const root = cl.get("drawShareCard")!;
+  const root = cl.get("shareDrawBody")!;
   const atPhoto = root.indexOf("sharePhotoDraw(g, m.photo, gm)");
   assert.ok(atPhoto > 0, "the photograph is no longer drawn for the whole canvas");
   assert.ok(atPhoto < root.indexOf('m.template === "moment"'),
@@ -2593,7 +2638,7 @@ test("BLOCKER: the metric divider is a bevel, not a translucent line on a deep o
   const E = env();
   const src = lift("shareHairline");
   const ctx = E.ctx();
-  E.shareHairline(ctx, 400, 100, 400, 300);
+  E.shareHairline(ctx, { sticker: false }, 400, 100, 400, 300);
   const paths: any[] = [];
   let cur: any = null;
   for (const e of ctx.log) {
@@ -2609,6 +2654,27 @@ test("BLOCKER: the metric divider is a bevel, not a translucent line on a deep o
     "the pair is not centred on the line asked for: " + xs.join(","));
   assert.equal(paths[0].style, E.SHARE_INK.keyline, "the deep half is not the keyline colour");
   assert.equal(paths[1].style, E.SHARE_INK.hair, "the light half is not the hairline colour");
+  /**
+   * ⚠️ AND ON A STICKER THE LIGHT HALF IS THE STRONGER ONE, BECAUSE THERE IS NO GROUND TO MEASURE. The
+   * pair's whole design is that whichever way the ground goes, one half carries the line — but .28 of
+   * white over PURE BLACK measures 2.26:1 (measured, on all four stickers), and the deep half contributes
+   * nothing there because it is dark on dark. A photo card always has a scrim, so it keeps .28 and its
+   * exported bytes are unmoved; a sticker's ground is whatever the runner drops it on.
+   * ⚠️ THE GEOMETRY DECIDES, so there is one hairline rather than two — and the alternative, raising the
+   * single .28, would have moved all 48 signed-off photo exports for a defect that only exists without a
+   * scrim.
+   */
+  const sctx = E.ctx();
+  E.shareHairline(sctx, { sticker: true }, 400, 100, 400, 300);
+  const styles = sctx.log.filter((e: any[]) => e[0] === "strokeStyle").map((e: any[]) => e[1]);
+  assert.deepEqual(styles, [E.SHARE_INK.keyline, E.SHARE_INK.hairAlpha],
+    "a sticker's hairline is not deep-half plus the stronger light half: " + styles.join(","));
+  const aS = parseFloat((/,\s*(\.?[0-9]*\.?[0-9]+)\)/.exec(E.SHARE_INK.hairAlpha) || ["", "0"])[1]!);
+  // The floor is arithmetic, not taste: white at alpha a over black has relative luminance
+  // ((a+0.055)/1.055)^2.4, and 3:1 against black needs that to reach 0.10, i.e. a >= 0.349. Measured
+  // after: 4.43:1, and 0 of the 118 ink components on the four stickers under 3:1 (5 before).
+  assert.ok(aS >= 0.36, "a sticker's hairline alpha is " + aS + ", which cannot clear 3:1 on pure black");
+  assert.ok(aS > 0.28, "the sticker's light half is no stronger than the photo card's");
   const w = ctx.log.filter((e: any[]) => e[0] === "lineWidth").map((e: any[]) => e[1]);
   assert.deepEqual([...new Set(w)], [E.SHARE_HAIR.w],
     "the two halves are different widths, which makes them a rule rather than a hairline: " + w.join(","));
@@ -2626,10 +2692,24 @@ test("BLOCKER: the metric divider is a bevel, not a translucent line on a deep o
     assert.ok(!/SHARE_INK\.hair/.test(clean), name + " strokes the hairline colour itself instead of " +
       "going through shareHairline, which is how the two weights drift apart");
   }
-  assert.match(lift("shareMetricRules"), /shareHairline\(g, x, top, x, bottom\)/,
-    "the metric dividers no longer go through the one hairline");
-  assert.match(lift("sharePosterCard"), /shareHairline\(g, gm\.M, p\.hairY, gm\.safe\.x1, p\.hairY\)/,
-    "the poster's rule no longer goes through the one hairline");
+  assert.match(lift("shareMetricRules"), /shareHairline\(g, gm, x, top, x, bottom\)/,
+    "the metric dividers no longer go through the one hairline, or no longer hand it the geometry");
+  assert.match(lift("sharePosterCard"), /shareHairline\(g, gm, gm\.M, p\.hairY, gm\.safe\.x1, p\.hairY\)/,
+    "the poster's rule no longer goes through the one hairline, or no longer hands it the geometry");
+  /**
+   * ⚠️ THE ACCENT DASH IS A SINGLE TONE AND SO HAD NO DIRECTION TO WIN IN: measured 1.60:1 over pure
+   * white. A mid-toned mark cannot be fixed by making it lighter or darker, only by giving it an EDGE,
+   * which is the same device the type already uses. shareMark is that, on a rect.
+   */
+  const pc = lift("sharePosterCard");
+  assert.match(pc, /shareMark\(g, gm, gm\.M, p\.tagY, POSTER_TAG\.w, POSTER_TAG\.h, SHARE_INK\.accent\)/,
+    "the poster's accent tag fills a rect itself, so it has no keyline on a ground nobody can measure");
+  const mk = lift("shareMark").replace(/\/\/[^\n]*/g, "").replace(/\/\*[\s\S]*?\*\//g, "");
+  assert.match(mk, /if \(!gm \|\| !gm\.sticker\) return;/,
+    "shareMark keylines every mark, which changes the photo cards it must not touch");
+  assert.match(mk, /destination-over/,
+    "the keyline is stroked over the mark, so it eats into the mark it is meant to define");
+  assert.match(mk, /SHARE_INK\.keyline/, "the mark's edge is not the one keyline colour");
 });
 
 test("BLOCKER: the ladder's track is two passes, so it is the same grey on any photograph", () => {
@@ -2787,6 +2867,17 @@ test("BLOCKER: no colour in the renderer is a literal — every one comes from t
         assert.match(m[1]!.trim(), /^SHARE_INK\./,
           name + " takes something other than a palette token to an alpha: " + m[1]);
       }
+    }
+  }
+  // ⚠️ AND THE ONE COLOUR WORD THAT IS NOT A TOKEN IS "transparent", WHICH IS NOT A COLOUR. It appears
+  // only to switch a shadow OFF, and it cannot drift from anything — an rgba(0,0,0,0) in its place would
+  // be the first hand-built value in the renderer and the sweep above rightly refused it. Named here so
+  // the exception is one word in one place rather than a hole in the sweep.
+  for (const [name, b] of cl) {
+    for (const m of b.matchAll(/"(transparent|white|black|red|[a-z]{3,12})"/g)) {
+      if (m[1] !== "transparent") continue;
+      assert.match(b, /shadowColor = "transparent"/,
+        name + " uses the transparent keyword for something other than switching a shadow off");
     }
   }
   // And the palette itself is where every literal lives, which is what makes the sweep above safe.

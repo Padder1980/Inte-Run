@@ -45,6 +45,21 @@ export type WeatherImpact = {
    */
   tempWord: string;
   severity: Severity;
+  /**
+   * WHICH OF THE THREE IS SETTING `severity` — heat, wind or cold — or "none" when nothing is.
+   *
+   * ⚠️ IT EXISTS BECAUSE THREE PLACES WERE ANSWERING IT SEPARATELY AND ONE OF THEM WAS WRONG. The
+   * headline derived a `lead` of its own; the app's conditions square derived nothing and simply
+   * named heat; and the "no pace to adjust" line keyed its word on `cold`, which is not the driver —
+   * so a 6 °C day in a 25 kph wind was severity "moderate" from the WIND and the copy read "Hot
+   * out", one line under a headline reading "Breezy — expect to work harder into the wind". Measured
+   * over 21,120 non-run cases: "Hot out" fired 10,240 times, 1,120 of them at 12 °C or below.
+   *
+   * ⚠️ "none" IS NOT A FOURTH CONDITION, it is the absence of one, and it is spelled out rather than
+   * left as a meaningless "heat" on a perfect day — the tie-break in the derivation favours heat, so
+   * a caller reading the driver on a calm 12 °C morning would otherwise be told the heat is in charge.
+   */
+  driver: ConditionsDriver;
   /** True when today's session is best run by effort rather than pace. */
   effortBased: boolean;
   headline: string;
@@ -78,8 +93,48 @@ export type WeatherImpact = {
 const RANK: Record<Severity, number> = { none: 0, mild: 1, moderate: 2, high: 3, severe: 4 };
 const worst = (a: Severity, b: Severity): Severity => (RANK[a] >= RANK[b] ? a : b);
 
-const QUALITY = new Set<SessionType>(["threshold", "vo2", "race-specific"]);
-const RUN = new Set<SessionType>(["threshold", "vo2", "race-specific", "easy", "long", "recovery", "strides"]);
+export type ConditionsDriver = "none" | "heat" | "wind" | "cold";
+
+/**
+ * WHAT IS ACTUALLY DRIVING THESE CONDITIONS — the one derivation, read by the headline, by the
+ * "no pace to adjust" line and (through `WeatherImpact.driver`) by the app's conditions square.
+ *
+ * ⚠️ `severity` IS `worst(worst(heat, wind), cold)`, so it can be set by ANY of the three, and copy
+ * keyed on one of them is copy that is wrong whenever another one is in charge. Heat wins ties
+ * deliberately: at equal severity heat is the one that changes what a runner should do to the
+ * session, wind only changes how it will feel.
+ */
+function driverOf(severity: Severity, heat: Severity, wind: Severity, cold: Severity): ConditionsDriver {
+  if (severity === "none") return "none";
+  if (RANK[heat] >= RANK[wind] && RANK[heat] >= RANK[cold]) return "heat";
+  return RANK[wind] >= RANK[cold] ? "wind" : "cold";
+}
+
+const QUALITY = new Set<SessionType>(["threshold", "vo2", "race-specific", "race"]);
+/**
+ * The sessions this model has anything to say about — the ones run at a pace.
+ *
+ * ⚠️ "race" WAS MISSING, AND IT SILENCED THE HEAT CARD ON THE ONE DAY THE PLAN EXISTS FOR. This set
+ * and the app's own `PRIMARY_TYPES` must agree about what a run is, and they did not: driven through
+ * a real plan's race day at 33 °C, `paceFactor` came back exactly 1.0000, `effortBased` false, and
+ * points[0] read "Near-ideal conditions — run to your planned paces" — so `heatWorstHour` never
+ * cleared `HEAT_MIN_FACTOR`, `heatCard()` returned "", and the runner was offered nothing before a
+ * race in severe heat. `adaptSessionForHeat(race, 1.04)` changes two steps, so the adaptation had
+ * always worked; only this set stopped it being reachable.
+ *
+ * ⚠️ THE GUARD IS `test/heat-custom.test.ts`, "BLOCKER: every runnable type the app has is a run to
+ * the weather model", which DERIVES the assertion from the app's own `PRIMARY_TYPES` rather than
+ * adding a "race" case — so the next type added cannot repeat this. An earlier version of this
+ * comment gave the address as `test/weather.test.ts`, which contains no such assertion; the trap is
+ * recorded twice in CLAUDE.md, and it is how somebody comes to delete the real guard believing it
+ * lives somewhere else. If you move the guard, move this sentence with it.
+ *
+ * ⚠️ AND IT IS IN `QUALITY` TOO, which is the honest classification: a goal race is the session
+ * whose entire point is a pace target, so it gets the "run these by effort, not the clock" advice and
+ * the reschedule warning rather than an easy run's "just slow down and go by feel". It is an OFFER
+ * either way — nothing here changes a target, and declining is remembered for the day.
+ */
+const RUN = new Set<SessionType>(["threshold", "vo2", "race-specific", "race", "easy", "long", "recovery", "strides"]);
 
 /**
  * Dew point from temperature and relative humidity — the Magnus approximation.
@@ -189,6 +244,7 @@ export function assessConditions(input: Conditions): WeatherImpact {
   const wind = windSeverity(windKph);
   const cold: Severity = tempC < 0 ? "moderate" : tempC < 6 ? "mild" : "none";
   const severity = worst(worst(heat, wind), cold);
+  const driver = driverOf(severity, heat, wind, cold);
 
   const isQuality = QUALITY.has(sessionType);
   const isRun = RUN.has(sessionType);
@@ -245,7 +301,41 @@ export function assessConditions(input: Conditions): WeatherImpact {
     if (cold === "moderate") points.push("Cover your extremities — the first efforts will feel harder, so build in gradually.");
   }
 
-  if (points.length === 0) points.push("Near-ideal conditions — run to your planned paces.");
+  // ⚠️ A NON-RUN MUST NOT BE TOLD THE CONDITIONS ARE NEAR-IDEAL WHEN THEY ARE SEVERE. `severity` and
+  // `headline` are computed for every session type — correctly, because it really is 33 °C whatever
+  // the runner is doing — while `paceFactor` and every point above are gated on `isRun`. So a
+  // mobility or strength day in Rhodes produced severity "severe" and the headline "It's very hot —
+  // take it easy and prioritise staying cool" WITH "Near-ideal conditions — run to your planned
+  // paces" one line under it, and the conditions square painted red over the words "Good to run".
+  // That is what the owner met on Today: his own plan slot that day was a mobility session.
+  //
+  // The fix is the truthful half rather than gating the severity: the weather is what it is, and a
+  // red tile on a hot day is right even for a session with no pace in it — what was wrong was
+  // claiming the conditions are fine. There is no pace to adjust here, and the copy says so.
+  //
+  // ⚠️ AND THE WORD IS THE DRIVER'S, NOT THE TEMPERATURE'S — THE FIRST VERSION OF THIS LINE COMMITTED
+  // THE SAME FAULT IT WAS FIXING. It read `cold === "none" ? "Hot" : "Cold"`, and `cold` is not what
+  // set the severity: measured over 21,120 non-run cases, "Hot out" fired 10,240 times, 1,120 of
+  // them at 12 °C or below and the coldest at 6 °C, sitting one line under "Breezy — expect to work
+  // harder into the wind". `driver` is the same answer the headline is built from, so the two
+  // sentences on that card cannot name different weather.
+  //
+  // ⚠️ THERE IS NO COLD BRANCH, AND ITS ABSENCE IS DELIBERATE RATHER THAN AN OMISSION. Any cold at
+  // all — `RANK[cold] >= RANK.mild`, i.e. below 6 °C — pushes its own point above, and that block is
+  // NOT gated on `isRun`, so a non-run on a cold day already has something true to read and never
+  // reaches this fallback. The first version carried a "Cold out" string anyway; swept over the same
+  // 21,120 cases it fired 0 times — a dead branch, the computed-and-discarded trap. Deleted rather
+  // than made reachable, because making it reachable would mean removing the cold advice that is
+  // already better than it. `driver === "cold"` is therefore unreachable HERE and the `else` is
+  // never taken by cold; `test/heat-custom.test.ts` proves the exhaustion by sweeping the grid.
+  if (points.length === 0) {
+    const noPace = !isRun && RANK[severity] >= RANK.moderate;
+    points.push(noPace
+      ? (driver === "wind"
+          ? "Windy out, and this session has no pace to adjust — find somewhere sheltered for it, or take it indoors."
+          : "Hot out, and this session has no pace to adjust — find somewhere comfortable for it and drink to thirst.")
+      : "Near-ideal conditions — run to your planned paces.");
+  }
 
   const effortBased = isRun && (
     RANK[heat] >= RANK.high ||
@@ -254,22 +344,26 @@ export function assessConditions(input: Conditions): WeatherImpact {
     (isQuality && RANK[wind] >= RANK.moderate)
   );
 
-  const headline = buildHeadline(severity, heat, wind, cold, isQuality, effortBased);
+  const headline = buildHeadline(severity, driver, heat, wind, cold, isQuality, effortBased);
   const word = tempWord(tempC, feels);
   const summary = `${word} · ${Math.round(tempC)}°C, wind ${Math.round(windKph)} km/h`;
 
-  return { summary, tempWord: word, severity, effortBased, headline, paceFactor, beyondModel, points };
+  return { summary, tempWord: word, severity, driver, effortBased, headline, paceFactor, beyondModel, points };
 }
 
-function buildHeadline(severity: Severity, heat: Severity, wind: Severity, cold: Severity, isQuality: boolean, effortBased: boolean): string {
+/**
+ * ⚠️ IT TAKES THE DRIVER RATHER THAN DERIVING ITS OWN `lead`. The two derivations were identical and
+ * that is exactly the danger: the copy below and the "no pace to adjust" line above must name the
+ * same weather, and a second copy of the rule is how they came to disagree in the first place.
+ */
+function buildHeadline(severity: Severity, driver: ConditionsDriver, heat: Severity, wind: Severity, cold: Severity, isQuality: boolean, effortBased: boolean): string {
   if (severity === "none") return "Good conditions for today's run.";
-  const lead = RANK[heat] >= RANK[wind] && RANK[heat] >= RANK[cold] ? "heat" : RANK[wind] >= RANK[cold] ? "wind" : "cold";
-  if (lead === "heat") {
+  if (driver === "heat") {
     if (heat === "severe") return isQuality ? "Too hot for chasing paces — run by effort, or reschedule the hard work." : "It's very hot — take it easy and prioritise staying cool.";
     if (effortBased) return "Warm enough to run by effort today, not the clock.";
     return "A bit warm — stay hydrated and don't force the pace.";
   }
-  if (lead === "wind") {
+  if (driver === "wind") {
     if (wind === "severe") return "Strong wind — judge effort over pace, or pick a sheltered route.";
     return effortBased ? "Windy — run these by effort, not pace." : "Breezy — expect to work harder into the wind.";
   }

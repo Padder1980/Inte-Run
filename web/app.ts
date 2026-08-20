@@ -2905,7 +2905,11 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .wz-extras-card { max-width: 420px; }
 /* ⚠️ dvh, not vh — on iOS Safari 1vh is the LARGEST viewport height (with URL bar hidden), so a
    44vh cap becomes 44% of the TALLER viewport and the popup body pushes past the visible screen
-   when the URL bar is showing. Enforced by test/ios-viewport.test.ts. */
+   when the URL bar is showing.
+   ⚠️ THIS USED TO CLAIM "Enforced by test/ios-viewport.test.ts", A FILE THAT HAS NEVER EXISTED, and
+   nothing enforced it at all — the third outing of that trap in this repository. The guard now exists
+   and is in test/ios-input-zoom.test.ts, which already owns the dvh-versus-percent distinction for
+   the shell. If you move it, move this sentence with it. */
 .wz-extras-body { max-height: 44dvh; overflow-y: auto; margin-top: 10px; }
 .wz-extras-body:empty { display: none; }
 .wz-coaches { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -4029,6 +4033,23 @@ button.rd-meta-r { cursor: pointer; }
   color: var(--ink); font-size: var(--t-meta); font-weight: 700; }
 .heat-chip svg { width: 16px; height: 16px; color: var(--peak); flex: none; }
 .heat-chip .heat-x { margin-left: auto; color: var(--accent); font-weight: 700; }
+/* A paused adaptation is not an adaptation. It reads as a WARNING rather than as a live badge,
+   because the paces on the card behind it are the planned ones. */
+.heat-chip-stale { background: color-mix(in srgb, var(--ease) 14%, transparent); }
+.heat-chip-stale svg { color: var(--ease); }
+/* ---- the heat block on the briefing card ------------------------------------------------------
+   His ask: "the adaption for heat message needs to come on the race briefing card when they click
+   view session". It sits above the steps, because it is what explains their paces. Tokens and
+   ladders only — both design ratchets are at their ceiling with zero headroom. */
+.heat-block { margin: var(--s2) 0 var(--s3); padding: var(--s3); border-radius: var(--r-card);
+  border: 1px solid var(--line); border-left: 4px solid var(--peak);
+  background: color-mix(in srgb, var(--peak) 8%, transparent); }
+.heat-block.heat-stale { border-left-color: var(--ease); background: color-mix(in srgb, var(--ease) 10%, transparent); }
+.heat-block.heat-stale .heat-h svg { color: var(--ease); }
+.heat-block.heat-noforecast { border-left-color: var(--ink-faint); background: color-mix(in srgb, var(--ink-faint) 8%, transparent); }
+.heat-block.heat-noforecast .heat-h svg { color: var(--ink-soft); }
+.heat-block .heat-b b { color: var(--ink); }
+.heat-block .act-pair { margin-top: var(--s2); }
 /* ---- the share studio ---------------------------------------------------------------------------
    A full-screen editor, not a bottom sheet: a 9:16 card cannot be previewed usefully in one.
    Tokens and ladders only — both design ratchets are at their ceiling with zero headroom, so one
@@ -4912,6 +4933,27 @@ function seedDone() {
   let ovChanged = false;
   Object.keys(state.dayOverride).forEach((k) => { if (!liveIds[k]) { delete state.dayOverride[k]; ovChanged = true; } });
   if (ovChanged) saveDayOverride();
+  // ⚠️ HEAT DECISIONS NEED THE SAME PRUNE, AND THEY NEED IT MORE. A planned session's id is
+  // deterministic across rebuilds; an EXTRA's is "x<seq>-<epoch>", unique per add and gone the moment
+  // the runner removes it or the day passes. Now that a custom run can carry a heat decision, every
+  // one of them would otherwise sit in interun_heat_v1 for ever — and that is localStorage, which is
+  // where the runs live. A stale entry is inert (it is keyed by day and hour, so hourAt returns null)
+  // but unbounded growth in that store is not something to leave running.
+  // ⚠️ IT MUST KEEP TODAY'S EXTRAS, or accepting an adaptation on a custom run and then re-rendering
+  // would delete the decision that had just been made.
+  // ⚠️ AND THE CATCH LOGS. EXTRA is declared with a let statement well below this function, so if the top-level
+  // seedDone() call is ever moved above it the read throws a temporal-dead-zone ReferenceError — and
+  // a silent catch around a prune means the prune quietly never happens, which is the documented
+  // shape of the addDayOffer defect (two invented function names swallowed by a try/catch and shipped
+  // as a permanent no-op). test/heat-custom.test.ts asserts the ordering as well.
+  let heatChanged = false;
+  try {
+    const alive = {};
+    PLAN.weeks.forEach((wk) => wk.sessions.forEach((s) => { alive[s.id] = 1; }));
+    EXTRA.forEach((e) => { alive[e.id] = 1; });
+    Object.keys(state.heatAdapt).forEach((k) => { if (!alive[k]) { delete state.heatAdapt[k]; heatChanged = true; } });
+  } catch (e) { try { console.warn("heat prune skipped", e); } catch (e2) {} }
+  if (heatChanged) saveHeatAdapt();
   const today = todayIso();
   PLAN.weeks.forEach((wk) => wk.sessions.forEach((s) => {
     if (s.type === "rest") return;
@@ -5229,10 +5271,10 @@ function viewToday() {
     // uiDecisionHero — so the chip existed, was correct, and appeared nowhere. Exactly the
     // computed-and-discarded trap this project keeps paying for, caught only by looking at the DOM.
     // Here because it is the last thing read before going out, and the only way to undo the change.
-    (mirror || liveRunning() || !sess ? "" : heatChipHtml(sess)) +
+    (mirror || liveRunning() ? "" : heatChipHtml(conditionsSession())) +
     nextUp +
     '<div class="ui-section">What to know today</div>' +
-    '<div class="tsq-row">' + conditionsSquare(sess) + feelSquare() + '</div>' +
+    '<div class="tsq-row">' + conditionsSquare() + feelSquare() + '</div>' +
     coachWatchCard() +
     addedTodayBlock() +
     weeklyOverview() +
@@ -5341,6 +5383,11 @@ function wmoIcon(code, windKph) {
   return "wxCloud";
 }
 let WX_FETCHING = false;
+// ⚠️ WHAT THE LAST FORECAST ATTEMPT DID, BECAUSE BOTH FAILURE PATHS WERE EMPTY. fetchWeather's
+// Its .catch and its geolocation error callback both recorded nothing at
+// all, so roaming, patchy hotel wifi, or a "Don't Allow" tapped once at some point in the past
+// produced no message anywhere in the app and no way to tell them apart. Surfaced by wxDiagLine.
+let WX_LAST = "";
 /**
  * THE HOURLY FORECAST — the thing that makes adapting for heat honest rather than a guess.
  *
@@ -5446,20 +5493,62 @@ function fetchWeather(force) {
         windKph: Math.round(c.wind_speed_10m), code: c.weather_code, label: wmoLabel(c.weather_code),
         iconKey: wmoIcon(c.weather_code, c.wind_speed_10m), live: true, at: Date.now() };
       state.wxHours = parseHourly(d && d.hourly);
+      WX_LAST = "ok · " + (state.wxHours || []).length + " hours";
       WX_FETCHING = false;
       if (WX_SHEET_OPEN) { $("sheetBody").innerHTML = weatherSheetHtml(); wireWeatherSheet(); }
       else if (state.tab === "today" && !state.screen) render();
-    }).catch(() => { WX_FETCHING = false; });
-  }, () => { WX_FETCHING = false; }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 });
+    }).catch((e) => {
+      // ⚠️ NOT SILENT ANY MORE. Offline, a captive portal, a rate limit and a bad response all landed
+      // here and all left the app looking as though the feature did not exist.
+      WX_LAST = "forecast fetch failed (" + (e && e.message ? e.message : String(e)) + ")";
+      WX_FETCHING = false;
+      if (WX_SHEET_OPEN) { $("sheetBody").innerHTML = weatherSheetHtml(); wireWeatherSheet(); }
+    });
+  }, (err) => {
+    // ⚠️ A REFUSED LOCATION IS STICKY AND CAN ONLY BE UNDONE IN iOS SETTINGS, so naming it is the
+    // difference between a runner fixing it and reporting "the heat thing does nothing".
+    const code = err && err.code;
+    WX_LAST = code === 1 ? "location refused (change it in Settings)"
+      : code === 2 ? "location unavailable" : code === 3 ? "location timed out" : "location failed";
+    WX_FETCHING = false;
+    if (WX_SHEET_OPEN) { $("sheetBody").innerHTML = weatherSheetHtml(); wireWeatherSheet(); }
+  }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 });
 }
 // ---- Today's two summary squares ------------------------------------------
-function conditionsSquare(session) {
+/**
+ * THE WORD ON THIS SQUARE CANNOT CONTRADICT THE COLOUR IT IS PAINTED IN.
+ *
+ * ⚠️ IT DID, AND IT IS WHAT THE OWNER MET IN RHODES. The tile is painted from imp.severity while
+ * the sub-line was effortBased ? … : heatSec ? … : "Good to run" — three tests, none of which is
+ * the severity. A mobility session at 33 °C is severity "severe" with effortBased false and
+ * heatSec 0 (there is no pace to slow), so the square was painted SEVERE and read
+ * **"Good to run"**: measured, "Conditions · live 33° · Clear Good to run". A moderate WIND on an
+ * ordinary easy run reached it the same way — amber tile, "Good to run".
+ *
+ * ⚠️ THE FIX IS THE SAME SHAPE AS feelSquare'S OWN RULE, ten lines below, which this app already
+ * wrote down: readiness is kept "separate from the weather so that 'good to go' can never sit beside
+ * a heat warning and contradict it". So "Good to run" is now gated on the severity being under
+ * moderate — the point at which the tile stops being a calm colour — and above that the square names
+ * what is driving it, from the engine's OWN driver rather than a second derivation here.
+ *
+ * ⚠️ AND IT TAKES NO SESSION. It used to be handed one by its caller, which is how the square came to
+ * price the plan's mobility session while the heat card below priced the run the runner had actually
+ * added. A convention that a caller must pass the right thing is a convention somebody breaks: the
+ * resolver is INSIDE, so there is no argument to get wrong. Same reasoning as weatherSheetHtml, which
+ * resolves its own.
+ */
+function conditionsSquare() {
+  const session = conditionsSession();
   const w = activeWeather();
   const imp = currentConditions(session);
   const c = SEV_COLOR[imp.severity];
   // Seconds derived from the runner's OWN pace — see heatSecPerKm. A flat number was the fault.
   const heatSec = heatSecPerKm(imp);
-  const sub = imp.effortBased ? "Run by effort today" : heatSec ? "≈ +" + heatSec + "s/km" : "Good to run";
+  const rough = imp.severity === "moderate" || imp.severity === "high" || imp.severity === "severe";
+  const sub = imp.effortBased ? "Run by effort today"
+    : heatSec ? "≈ +" + heatSec + "s/km"
+    : rough ? (imp.driver === "wind" ? "Windy out today" : imp.driver === "cold" ? "Cold out today" : "Hot out today")
+    : "Good to run";
   return '<button class="tsq" id="condSq" style="--sqc:' + c + '">' +
     '<div class="tsq-ic">' + ICON[w.iconKey] + '</div>' +
     '<div class="tsq-k">Conditions' + (w.live ? ' · live' : ' · example') + '</div>' +
@@ -5493,7 +5582,9 @@ function feelSquare() {
 }
 // ---- Detail sheets for conditions & readiness -----------------------------
 function weatherSheetHtml() {
-  const sess = selectedSession();
+  // ⚠️ THE SAME SESSION THE SQUARE PRICES, or tapping the square opens a sheet about a different
+  // run — see conditionsSession().
+  const sess = conditionsSession();
   const w = activeWeather();
   const imp = currentConditions(sess);
   const c = SEV_COLOR[imp.severity];
@@ -8230,6 +8321,11 @@ function sessionSheetHtml(sess, week) {
   return '<div class="sd-type" style="--sc:' + sc + '">' + (SESSION_LABEL[sess.type] || sess.type) + '</div>' +
     '<div class="sd-title">' + esc(sess.title) + '</div>' +
     '<div class="sd-chips">' + chips.join("") + '</div>' +
+    // ⚠️ ABOVE THE STEPS, BECAUSE IT EXPLAINS THEM. openSessionSheet has already run heatApplied, so
+    // every band below this line is the adapted one — the block is the only thing on the card that
+    // says why. Put it under the steps and the runner reads a set of numbers they cannot account for
+    // and then, if they scroll far enough, the reason.
+    heatBlockHtml(sess) +
     body +
     whyThisSession(sess) +
     fuelHtml(sess) +
@@ -8245,6 +8341,10 @@ function ensureSheet() {
   $("sheetOv").onclick = (e) => { if (e.target === $("sheetOv")) closeSheet(); };
 }
 function wireSheet() {
+  // ⚠️ THE HEAT BLOCK LIVES ON THIS SHEET, SO THIS SHEET HAS TO WIRE IT. openSessionSheet calls
+  // wireSheet(), not wire(), and the heat handlers used to sit only inside wire() — so the block
+  // rendered with both of its buttons doing nothing whatsoever.
+  wireHeatControls();
   document.querySelectorAll("[data-moveto]").forEach((b) => b.onclick = () => {
     if (!SHEET_CTX) return;
     moveSession(SHEET_CTX.week, SHEET_CTX.sess, Number(b.dataset.moveto));
@@ -8292,10 +8392,72 @@ const ADD_ALWAYS = {
   easy: { scale: 1, title: "Easy run", desc: "Your everyday session at conversational effort." },
   long: { scale: 1.6, title: "Long run", desc: "A longer version of your easy session \— durability comes from time on your feet." },
 };
+// ⚠️ POSITION IS NOT A NAME, AND THIS IS THE DEFECT THE OWNER PHOTOGRAPHED IN RHODES. The
+// representative used to be the FIRST session of each type the walk below reached — and SessionType
+// "easy" covers FOUR DIFFERENT GEARS: a plain easy run, a MODERATE run (typed "easy" on purpose, so
+// one 45' run is not re-bucketed and does not drop a build week under the pyramidal easy floor —
+// moderateRun says exactly that in the engine), an easy \→ moderate progression, and a beginner
+// run-walk. So "the first easy-typed session in the plan" was a coin toss between two gears:
+// measured over 640 reachable plans it landed on the easy band in 400 and on the AEROBIC band in
+// 240, and his screenshot is one of the 240 — "2 km easy run (custom)" titled over
+// "Moderate \— quicker than easy, still comfortable" at a band 29\–41 s/km faster than his own easy
+// one. Same fault on Easy + Strides, whose blurb promises "relaxed fast bursts" and which delivered
+// easy + maximal HILL SPRINTS in 320 of 320 plans that offer the type.
+//
+// So the representative is chosen by FITNESS FOR THE LABEL. This is the gear each addable type's own
+// grid label promises.
+// ⚠️ THE QUALITY TYPES ARE DELIBERATELY ABSENT. "Tempo" and "Intervals" name a FAMILY, not a gear —
+// the pool legitimately spans cruise intervals at CV, a continuous tempo at threshold, true tempo,
+// and effort-only Kenyan hills with no pace at all — and the runner picks the format from the
+// workout list. There is no single band that is the right answer, so they keep first-match, which
+// this scoring reproduces exactly (every candidate scores 0, so the first one is never displaced).
+const REP_GEAR = { easy: "easy", long: "easy", recovery: "recovery", strides: "easy" };
+function bandKey(b) { return b ? b.minSecPerKm + "-" + b.maxSecPerKm : null; }
+/**
+ * How well one session answers to its own type's label. Higher wins; ties keep plan order, so this
+ * can only ever REPLACE a worse candidate and can never return nothing — which matters, because
+ * runTypesAvailable gates the type grid on extraRep and a representative that came back null once
+ * froze the whole add-session sheet with BUILDER already mutated.
+ */
+function repScore(s, want) {
+  if (!want) return 0;
+  const body = (s.steps || []).filter((st) => st.kind !== "warmup" && st.kind !== "cooldown");
+  if (!body.length) return 0;
+  const work = body.filter((st) => st.kind !== "recovery");
+  let longest = null;
+  body.forEach((st) => {
+    if (!st.targetPaceSecPerKm) return;
+    const n = st.durationSeconds || st.distanceMeters || 0;
+    if (!longest || n > (longest.durationSeconds || longest.distanceMeters || 0)) longest = st;
+  });
+  let sc = 0;
+  // The session IS that gear: the piece the runner spends most of it in sits at the named band.
+  // ⚠️ THIS TERM IS THE FALLBACK ORDERING AND NOTHING THE GENERATOR PRODUCES TODAY REACHES IT.
+  // Measured over 960 easy / 720 long / 480 recovery plan-and-type pairs, EVERY one of them has a
+  // candidate that is purely at its named gear, so the +2 term below always decides; and strides
+  // never has one, so there the +1 term decides. It is kept, and guarded by a constructed plan
+  // rather than a swept one, because what it orders is the case where no candidate is pure — and
+  // "whichever session the walk reached first" is the exact answer this whole function exists to
+  // stop being given. Deleting it would put that answer back for a plan shape nobody can rule out.
+  if (longest && bandKey(longest.targetPaceSecPerKm) === want) sc += 4;
+  // ...and nothing else is mixed in. This is what rules out "easy \→ moderate finish" for a plain
+  // easy ask. ⚠️ It must count UNPACED work against a candidate too, or an effort-only hill sprint
+  // scores as "plain" for having no band to disagree with — which is how hill sprints beat strides.
+  if (work.length && work.every((st) => bandKey(st.targetPaceSecPerKm) === want)) sc += 2;
+  // Every piece of work has a band to aim at. That is the whole of the strides/hill-sprints
+  // distinction: relaxed strides run at repetition pace, hill sprints carry no pace by design.
+  if (work.length && work.every((st) => !!st.targetPaceSecPerKm)) sc += 1;
+  return sc;
+}
 function sessionLibrary() {
   const order = ["easy", "recovery", "long", "strides", "threshold", "vo2", "race-specific"];
-  const byType = {};
-  RAW.weeks.forEach((wk) => wk.sessions.forEach((s) => { if (PRIMARY_TYPES[s.type] && !byType[s.type]) byType[s.type] = s; }));
+  const byType = {}, byScore = {};
+  const paces = (RAW && RAW.paces) || {};
+  RAW.weeks.forEach((wk) => wk.sessions.forEach((s) => {
+    if (!PRIMARY_TYPES[s.type]) return;
+    const sc = repScore(s, REP_GEAR[s.type] ? bandKey(paces[REP_GEAR[s.type]]) : null);
+    if (!byType[s.type] || sc > byScore[s.type]) { byType[s.type] = s; byScore[s.type] = sc; }
+  }));
   const base = byType.easy || byType.long || byType.recovery;
   if (base) Object.keys(ADD_ALWAYS).forEach((t) => {
     if (byType[t]) return;
@@ -10287,7 +10449,10 @@ const HUB_LEARN = ["understand", "strength", "guides"];
  * ⚠️ A CARD NAMED IN NO GROUP DOES NOT APPEAR AT ALL, and CLAUDE.md was wrong about this for months:
  * it promised a "More" catch-all that has never existed in viewSupport. There is no safety net, so
  * adding to SUPPORT_HUB without adding to a group here ships an unreachable page with nothing looking
- * broken. test/support-hub.test.ts now fails on any hub id that no group names.
+ * broken. ⚠️ THE GUARD IS test/support-tools.test.ts ("every Support hub card is reachable from the
+ * hub, or deliberately lives on Profile") — this comment gave the address as test/support-hub.test.ts,
+ * a file that has never existed, which is how somebody comes to delete the real guard believing it
+ * lives elsewhere. CLAUDE.md had already recorded the slip; the comment had not been corrected.
  *
  * ⚠️ why / connect / shoes / data are DELIBERATELY not in any group — they live on the Profile screen,
  * where a thing about the runner belongs. They are the reason the guard lists exemptions by name
@@ -11381,6 +11546,7 @@ function viewportDiagLines() {
       mapDiagLine(),
       photoDiagLine(),
       notifDiagLine(),
+      wxDiagLine(),
     ];
   } catch (e) { return ["diag unavailable"]; }
 }
@@ -11402,6 +11568,35 @@ function webUpdateLine() {
   if (u.channel === "ota" && u.bundle) s += " (built-in " + u.bundle + ")";
   if (u.check) s += " \\u00b7 check: " + u.check;
   return s;
+}
+/**
+ * WHETHER THERE IS A FORECAST AT ALL, AND WHAT THE LAST ATTEMPT DID.
+ *
+ * ⚠️ THIS LINE IS THE WHOLE REASON THE RHODES REPORT WAS UNANSWERABLE. state.wxHours has three
+ * references in the app — initialised null, read by hoursFor, written by fetchWeather's success
+ * handler — and it is never persisted. Everything heat-related is gated on it. Both of fetchWeather's
+ * failure paths were EMPTY, there was no forecast line among the six diagnostics, and the conditions
+ * square happily falls back to the built-in 30 °C preset — so a missing forecast and a missing
+ * feature are indistinguishable from a runner's phone, which is exactly the report we got.
+ *
+ * "hours 0" with a warm preset is the state he was in. "refused" is a tapped Don't Allow, which is
+ * sticky and can only be undone in iOS Settings. Same precedent as __kbDiag, LIVE.gpsDiag and the
+ * coach line: instrument the thing whose failure is invisible.
+ */
+function wxDiagLine() {
+  try {
+    const rows = (state.wxHours || []);
+    const days = {};
+    rows.forEach((r) => { days[r.day] = (days[r.day] || 0) + 1; });
+    const dayList = Object.keys(days).sort();
+    const ahead = hoursFor(null).length;
+    let s = "forecast: " + (state.wx ? "live" : "preset " + state.weather) +
+      " · " + rows.length + " hours" + (dayList.length ? " over " + dayList.length + " days" : "") +
+      " · " + ahead + " left today";
+    if (state.wx && state.wx.at) s += " · fetched " + Math.round((Date.now() - state.wx.at) / 60000) + "m ago";
+    s += " · last " + (WX_LAST || (WX_FETCHING ? "fetching" : "never asked"));
+    return s;
+  } catch (e) { return "forecast: unknown"; }
 }
 function notifDiagLine() {
   try {
@@ -11465,7 +11660,25 @@ function pedoDiagLine() {
   if (!pedoAvailable()) return "steps: not available on this device";
   if (!p) return "steps: no run recorded yet";
   if (p.off) return "steps: the phone reports no step counter";
+  // \u26a0\ufe0f "filled" ALONE CANNOT TELL A GAP FILLER THAT DID NOTHING FROM ONE THAT DID IT TWICE, and that
+  // is exactly what it failed to show on the owner's Rhodes run: a large fill is what a tunnel looks
+  // like AND what a screen lock looks like. "settled" is the number that separates them \u2014 metres the
+  // pedometer billed which real GPS credit later covered. Settled ~= filled means GPS was never dark
+  // and our own buffer was holding the fixes (a lock); settled ~= 0 means the gap was genuine (a
+  // tunnel) and the fill was the feature working. Measured on a 20-minute lock, filled 3549 m /
+  // settled 3549 m; on a two-minute tunnel, filled 321 m / settled 9 m.
+  //
+  // \u26a0\ufe0f "written off" is the third state and it must be visible too: the pedometer measures the PATH
+  // and GPS the CHORD, so a bend, a lap or an out-and-back legitimately leaves metres owing that no
+  // fix can pay. A large figure there is a run full of tight turns, not a fault.
+  // \u26a0\ufe0f THE NUMBER OF TOP-UPS IS THE THIRD HALF OF THE SAME STORY: one big fill is a tunnel recovering,
+  // hundreds of small ones are a replayed backlog. It costs a word and it is the difference between
+  // reading the line and guessing at it.
   return "steps: " + (p.steps || 0) + " \u00b7 filled " + Math.round(p.credited || 0) + "m of GPS gaps" +
+    " in " + (p.fills || 0) + " top-ups" +
+    " \u00b7 settled " + Math.round(p.settled || 0) + "m" +
+    " \u00b7 written off " + Math.round(p.writtenOff || 0) + "m" +
+    ((LIVE && LIVE.pedoPaid > 0) ? " \u00b7 owing " + Math.round(LIVE.pedoPaid) + "m" : "") +
     ((p.capped || 0) ? " \u00b7 refused " + p.capped + " implausible" : "");
 }
 function viewportDiag() { return viewportDiagLines().join(" \u00b7 "); }
@@ -15234,7 +15447,18 @@ function checkSplits(atMs) {
   if (!LIVE || LIVE.mode == null) return;
   const km = Math.floor(LIVE.dist / 1000);
   if (km <= LIVE.kmDone) return;
-  const now = (typeof atMs === "number" && isFinite(atMs)) ? Math.max(LIVE.lastKmMs, atMs) : liveNowMs();
+  const supplied = (typeof atMs === "number" && isFinite(atMs)) ? atMs : liveNowMs();
+  const now = Math.max(LIVE.lastKmMs, supplied);
+  // ⚠️ WHEN THE CLAMP BINDS, THE DURATION IS UNKNOWABLE — AND IT USED TO BE RECORDED AS ZERO SECONDS.
+  // Two callers, two clocks: pedoFillGap stamps the wall clock (correct for its own event, which is
+  // happening now) while onGpsPos stamps each fix's own clock (correct for a replayed backlog, which
+  // happened minutes ago). During a screen lock those are up to twenty minutes apart, so a gap-fill
+  // pushed lastKmMs to the unlock moment and every replayed boundary after it clamped to the same
+  // instant: measured on a 20-minute lock, splits of 353s 333s 334s 0s 0s 0s 136s — three kilometres
+  // logged at no time at all. The clamp is right (a split can never run backwards); recording the
+  // collapse as a measurement was not. est is this app's own flag for a boundary it can place but not
+  // time, and judged() in runAnalysis already refuses to score one.
+  const unknown = supplied < LIVE.lastKmMs;
   // ⚠️ A REPLAYED BATCH CAN CROSS SEVERAL KILOMETRES AT ONCE, and this used to record ONE split for
   // the jump and skip the rest — so a runner's splits table simply lost kilometres 4, 5 and 6, with
   // kilometre 7 carrying the whole stretch as its time. Every boundary is now recorded.
@@ -15246,14 +15470,20 @@ function checkSplits(atMs) {
   // single fix crosses more than one boundary, which needs a gap of several minutes.
   const crossed = km - LIVE.kmDone;
   const each = (now - LIVE.lastKmMs) / 1000 / crossed;
+  const est = crossed > 1 || unknown;
   for (let k = LIVE.kmDone + 1; k < km; k++) LIVE.splits.push({ km: k, sec: each, est: true });
   const splitSec = each;
   LIVE.kmDone = km;
   LIVE.lastKmMs = now;
-  LIVE.splits.push(crossed > 1 ? { km: km, sec: each, est: true } : { km: km, sec: splitSec });
+  LIVE.splits.push(est ? { km: km, sec: each, est: true } : { km: km, sec: splitSec });
   // The coach speaks a milestone line (routed from this split cue); the exact split time stays in the
   // on-screen log and overview, so the audio stays concise rather than reading numbers aloud each km.
-  liveCue({ kind: "split", atMs: now, message: km + " km · " + fmtPace(splitSec) + " /km split" });
+  //
+  // ⚠️ AND IT DOES NOT READ OUT A TIME IT DOES NOT HAVE. fmtPace(0) is "0:00", so the collapse above
+  // announced "4 km · 0:00 /km split" — a figure no runner has ever run, spoken aloud, at the exact
+  // moment they are least able to check it.
+  liveCue({ kind: "split", atMs: now,
+            message: km + " km" + (splitSec > 0 ? " · " + fmtPace(splitSec) + " /km split" : " · split time not measured") });
 }
 // Great-circle distance between two lat/lon points, in metres.
 function haversine(lat1, lon1, lat2, lon2) {
@@ -15506,15 +15736,39 @@ function pedoFillGap() {
   if (walked > cap) { p.capped++; p.mark = p.metres; p.markAt = Date.now(); return; }
   LIVE.dist += walked;
   p.credited += walked;
-  // The tab the next GPS credit settles — see the double-pay note in onGpsPos. Without it, the
-  // recovery fix's net displacement from the pre-gap anchor billed this same stretch a second time.
+  p.fills = (p.fills || 0) + 1;
+  // The tab GPS credit settles — see the double-pay note in onGpsPos. Without it, the recovery fix's
+  // net displacement from the pre-gap anchor billed this same stretch a second time.
+  //
+  // ⚠️ AND THE TAB CARRIES THE MOMENT ITS BILLING REACHES UP TO, WHICH IS WHAT BOUNDS IT. Without a
+  // time on the debt it can only be settled "by whatever GPS credits next", and a blackout the runner
+  // LOOPED through leaves a debt no recovery fix can pay (a lap back to the start has a chord of
+  // nearly zero) — so it followed them into honest running and deleted it. Measured on a 360-degree
+  // loop through a one-minute blackout: the whole next minute credited 51 m of 180.
   LIVE.pedoPaid = (LIVE.pedoPaid || 0) + walked;
+  LIVE.pedoUntil = Date.now();
   p.mark = p.metres;
   p.markAt = Date.now();
+  // ⚠️ THE PACE WINDOW IS TOLD, TOO. It is a window over CREDIT events, and this is the one path that
+  // credits ground with no GPS fix behind it — leaving it out would divide a stretch the pedometer
+  // paid for by a span that does not include it. Measured with this line deleted: the derived pace is
+  // NULL for the whole of a blackout, because currentGpsPace trims to a single entry and reports
+  // nothing. Guarded behaviourally by "the gap filler tells the pace window", which samples the pace
+  // at the blackout's midpoint — a source grep could only ever prove the call was written.
+  //
+  // ⚠️ THE SECOND ARGUMENT IS EQUIVALENT TO SEVERAL OTHERS AND THAT IS WORTH KNOWING: at a steady fill
+  // rate, marking LIVE.dist - walked instead gives byte-identical output over 60 cases, because
+  // consecutive differences then carry the PREVIOUS fill's amount and the two are the same number.
+  // The running total is nonetheless the right thing to record — it is what the window means.
+  paceMark(liveNowMs(), LIVE.dist);
   // ⚠️ A GAP FILL CAN CROSS A KILOMETRE, AND FORGETTING THIS LOST THE SPLIT ENTIRELY. This is the one
   // path that adds distance without a GPS fix behind it, so nothing else here would have noticed the
   // boundary — the runner would simply never see that kilometre in their splits. Found by a test.
-  checkSplits();
+  //
+  // ⚠️ PASSED EXPLICITLY, so both callers of checkSplits are visibly on a clock. Left to the default
+  // this path stamped the wall clock while onGpsPos stamps the fix's own clock, and during a screen
+  // lock those are up to twenty minutes apart.
+  checkSplits(liveNowMs());
 }
 function onGpsPos(pos) {
   if (!LIVE || LIVE.mode !== "gps") return;
@@ -15589,10 +15843,74 @@ function onGpsPos(pos) {
   let credit = net;
   // ⚠️ GROUND THE PEDOMETER ALREADY PAID FOR IS NOT PAID AGAIN. pedoFillGap credits a GPS blackout
   // but never told the anchor, so the recovery fix's net displacement — the SAME stretch — was
-  // credited on top: measured +17% on a two-minute blackout. The gap-fill now runs a tab
-  // (LIVE.pedoPaid) and the next GPS credit settles it; every anchor re-seed clears the tab instead,
-  // because a discarded displacement overlaps no future credit.
-  if (LIVE.pedoPaid > 0) { credit = Math.max(0, credit - LIVE.pedoPaid); LIVE.pedoPaid = 0; }
+  // credited on top: measured +17% on a two-minute blackout. The gap-fill runs a tab (LIVE.pedoPaid)
+  // and GPS credit settles it; every anchor re-seed clears the tab instead, because a discarded
+  // displacement overlaps no future credit.
+  //
+  // ⚠️⚠️ THE TAB IS A RUNNING BALANCE, NOT A ONE-SHOT VOUCHER, AND THAT DISTINCTION IS THE WHOLE OF
+  // THE OWNER'S RHODES REPORT. Cleared by the FIRST credited fix, it settles a tunnel correctly — one
+  // recovery fix whose net displacement covers the entire gap — and settles nothing at all when the
+  // gap was a SCREEN LOCK. LocationService BUFFERS fixes while the app is not active and replays them
+  // on didBecomeActive, so the stretch comes back as hundreds of small fixes: a 3552 m tab was
+  // discharged against one ~3 m fix and the other ~3549 m of backlog was credited in full, on top of
+  // ground the pedometer had already been paid for. Measured on a 20-minute lock at 3 m/s: 3600 m
+  // covered, 7136 m recorded, +89%.
+  //
+  // ⚠️ AND THE BALANCE IS BOUNDED BY THE TIME IT BILLED FOR, which is what stops it eating honest
+  // ground. The pedometer measures the PATH; GPS measures the CHORD between two fixes. Where the path
+  // is longer — a bend, a lap, an out-and-back — a balance is left owing that no fix covering that
+  // stretch can pay. A fix whose interval STARTS after the billed window is covering new ground, so
+  // whatever is still owing is path-minus-chord and is written off rather than carried forward.
+  // Measured on a 360-degree loop through a one-minute blackout, unbounded against bounded:
+  // -26.6% against -9.9%, and the following honest minute credited 51 m of 180 against 171 of 180.
+  if (LIVE.pedoPaid > 0) {
+    const owedUntil = LIVE.pedoUntil || 0;
+    const owedFrom = LIVE.anchorTs || fixTs;
+    if (owedFrom >= owedUntil) {
+      if (LIVE.pedo) LIVE.pedo.writtenOff = (LIVE.pedo.writtenOff || 0) + LIVE.pedoPaid;
+      LIVE.pedoPaid = 0;
+    } else {
+      // Only the part of THIS fix that lies inside the billed window can settle the debt. A degenerate
+      // or reversed interval cannot be apportioned, so it settles in full — the safe direction, since
+      // the fault being removed is double-crediting.
+      //
+      // ⚠️ THE FRACTION IS SMALL BUT IT IS NOT DECORATION, AND AN EARLIER REVIEW RECORDED IT AS HAVING
+      // NO OBSERVABLE FAILURE MODE. Measured properly over 46 cases with it forced to 1: SIX move —
+      // three dark tunnels at 3 m/s (whole-run error 0.07-0.12 points worse, and the settled/written-off
+      // split goes 7/2 to 9/0) and three bends (0.13-0.26 points worse, worst on a 180-degree bend).
+      // Forcing it to 1 over-settles, i.e. under-credits, which is the direction that loses honest
+      // ground on a curved blackout — the exact fault the time bound exists to prevent. Keep it.
+      const owedSpan = fixTs - owedFrom;
+      const owedFrac = owedSpan > 0 ? Math.min(1, (owedUntil - owedFrom) / owedSpan) : 1;
+      const settle = Math.min(credit * owedFrac, LIVE.pedoPaid);
+      credit -= settle;
+      LIVE.pedoPaid -= settle;
+      if (LIVE.pedo) LIVE.pedo.settled = (LIVE.pedo.settled || 0) + settle;
+      // ⚠️ A SETTLEMENT IS A CORRECTION TO A TOTAL, NOT MOVEMENT OVER THE PACE WINDOW'S OWN INTERVAL,
+      // AND MARKING IT AS ONE FABRICATES SPEED. What survives a settle is the ground the pedometer did
+      // NOT bill — for a blackout, the first twenty seconds of it, before the fill starts — and it
+      // lands in a single window entry against the few seconds since the last one. Traced on a WALKER
+      // (which is what the owner was doing when he reported this) through a two-minute dark tunnel: the
+      // window read 714 s/km all through the blackout, correct and fed by the pedometer, and then
+      // 276 / 260 / 243 / 225 / 205 / 183 / 159 s/km over the six seconds after it — 25.8 m of honest
+      // correction divided by a five-second span. A fabricated 2:39/km read out to somebody walking,
+      // and it fired "ease back" at them. So the window is reset to the corrected total and the
+      // derivation restarts from there: one second of "—" instead of six of arithmetic on a lump.
+      //
+      // ⚠️ MEASURED OVER 43 CASES, and the cost is stated rather than buried: wrong-direction cues fall
+      // in eight cases (every screen lock and every dark tunnel at walking pace) and RISE by one in two
+      // (a 60-second dark tunnel at 3 m/s, and a 270-degree bend through one), where the shorter
+      // baseline left after the reset makes a later lump more visible. Net eight removed, two added.
+      // The four screen-lock cases at 1.4 m/s go from a fabricated 151-165 s/km to the true 715.
+      //
+      // ⚠️ THE settle > 0 GUARD IS UNFALSIFIABLE AND IS RECORDED AS SUCH so nobody "verifies" it by
+      // deleting it: this branch is only entered with a positive debt, and settle is positive
+      // whenever the credit is, so resetting unconditionally here is byte-identical across 60 cases.
+      // It is kept because it names the condition the reset is FOR — a correction landed — rather than
+      // leaving that to be inferred from where the line happens to sit.
+      if (settle > 0 && LIVE.win) LIVE.win.length = 0;
+    }
+  }
   // ⚠️ THE DEVICE'S OWN SPEED CAPS THE CREDIT. Doppler speed is measured independently of position,
   // so over the interval since the anchor was set the runner cannot have covered much more than
   // speed × time — a displacement beyond that (×1.5 for headroom) is the receiver moving, not the
@@ -15606,6 +15924,12 @@ function onGpsPos(pos) {
     if (credit > spdCap) { credit = spdCap; D.capped++; }
   }
   LIVE.dist += credit;
+  // ⚠️ THE PACE WINDOW IS A WINDOW OVER CREDITS, so it is told here rather than on the UI tick. The
+  // fix's own clock, for the same reason the route point below carries it: a replayed backlog stamped
+  // on arrival collapses into one instant, and a pace derived across that instant is arithmetic on a
+  // lump. gpsFixElapsedMs is hoisted above the credit for this; fixMs is the same value.
+  const fixMs = gpsFixElapsedMs(pos);
+  paceMark(fixMs, LIVE.dist);
   // ⚠️ AND WHEN. A route of bare coordinates cannot become a Strava activity: without a time
   // on each point there is no pace, no moving time and no splits, and the only way to supply them
   // afterwards is to spread the total evenly across the points -- which draws a perfectly even run
@@ -15623,7 +15947,6 @@ function onGpsPos(pos) {
   // into one instant, in exactly the field Strava reads to work out pace, moving time and splits.
   // The whole point of storing a time per point was to avoid a fabricated even run; a collapsed batch
   // is the same lie by a different route.
-  const fixMs = gpsFixElapsedMs(pos);
   LIVE.route.push({ lat: c.latitude, lng: c.longitude, t: Math.max(0, Math.round(fixMs / 1000)) });
   // ⚠️ CHECKED PER CREDITED FIX, NOT ONLY ON THE UI TICK. During a replay the tick runs once for the
   // whole backlog, so a batch spanning two kilometres recorded ONE split and silently dropped the
@@ -15637,19 +15960,55 @@ function onGpsPos(pos) {
     LIVE.lastAlt = c.altitude;
   }
 }
+/**
+ * Record a stretch of ground the run has just been credited for, at the moment it was covered.
+ *
+ * ⚠️ THE PACE WINDOW IS A WINDOW OVER CREDITS, NOT OVER UI TICKS, AND THAT IS THE WHOLE POINT OF IT.
+ * Distance does not arrive smoothly: the anchor credits one leash at a time (10-14 m), so pushed on a
+ * 250 ms tick the numerator moves in steps while the denominator moves continuously, and the two
+ * describe different stretches of ground. Measured on a healthy 3 m/s run with no Doppler, true pace
+ * 334 s/km: the tick-aligned window derived p5 297 / p95 458 — a spread of forty per cent against a
+ * target band five per cent wide — and fired "Ease back, you are ahead of easy pace" fifty-nine times
+ * at a runner who was dead on target. Marked on credits, the same run derives 323 / 335 / 346 and
+ * fires once. Both ends of a credit-aligned window are the same event, so the quantisation cancels.
+ */
+function paceMark(atMs, dist) {
+  if (!LIVE || !LIVE.win) return;
+  LIVE.win.push({ t: atMs, d: dist });
+  // Trimmed here as well as on the tick: a replayed backlog credits hundreds of fixes with no tick
+  // between them, and an untrimmed window would hold every one of them.
+  while (LIVE.win.length > 1 && atMs - LIVE.win[0].t > 12000) LIVE.win.shift();
+}
 // Current pace: trust the device's own speed when it's a real running speed; otherwise derive it
 // from distance covered over a trailing ~12s window. When neither shows meaningful movement we
 // report null → the UI shows "—" instead of a frozen or absurd number.
 function currentGpsPace(atMs) {
   if (LIVE.devSpeed != null && LIVE.devSpeed > 0.7) return 1000 / LIVE.devSpeed;
-  const w0 = LIVE.win[0];
-  if (w0) { const dM = LIVE.dist - w0.d, dS = (atMs - w0.t) / 1000; if (dM > 8 && dS > 2) return dS / (dM / 1000); }
+  const w0 = LIVE.win[0], wN = LIVE.win[LIVE.win.length - 1];
+  // ⚠️ BOTH ENDS COME FROM THE WINDOW, so the metres and the seconds describe one stretch. Reading
+  // the far end as "now" is what reintroduces the quantisation, because "now" advances between
+  // credits while the distance does not.
+  //
+  // ⚠️ A RUNNER WHO STOPS MUST LOSE THEIR PACE, and it is the TRIM that delivers that, not a freshness
+  // test here. Measuring seconds to the last credit rather than to now would otherwise hold the last
+  // pace for ever — the frozen number this function's own contract rules out. Both trims (the UI
+  // tick's and paceMark's) drop everything older than twelve seconds and always leave at least one
+  // entry, so a standstill collapses the window to a single point and this condition is what reports
+  // it. An explicit freshness check was written here first and REMOVED after a re-break proved it
+  // could never fire: the trim had already done the work, and a line that cannot fail is a line the
+  // next reader trusts for nothing.
+  if (w0 && wN && wN !== w0) {
+    const dM = wN.d - w0.d, dS = (wN.t - w0.t) / 1000;
+    if (dM > 8 && dS > 2) return dS / (dM / 1000);
+  }
   return null;
 }
 function gpsUiTick() {
   if (!LIVE || LIVE.mode !== "gps") return;
   const at = liveElapsedMs();
-  LIVE.win.push({ t: at, d: LIVE.dist });
+  // ⚠️ THE TICK TRIMS THE PACE WINDOW BUT NO LONGER FEEDS IT — paceMark does, on every credit. Pushing
+  // here as well would put a tick-aligned entry back in beside the credit-aligned ones and hand the
+  // derivation the mismatched pair it exists to avoid.
   while (LIVE.win.length > 1 && at - LIVE.win[0].t > 12000) LIVE.win.shift();
   let cur = currentGpsPace(at); if (cur && cur > 1200) cur = null; // slower than 20:00/km ⇒ stopped
   // ⚠️ THE FAST SIDE NEEDS A CULL TOO. 150 s/km is 6.67 m/s — beyond any pace this app prescribes
@@ -24995,12 +25354,107 @@ function maybeAutoPaceCalibrate(type, avgPaceSec, distKm, ctx) {
  */
 const HEAT_MIN_FACTOR = 1.015;   // under ~1.5% the adaptation is smaller than the noise in anyone's pacing
 
-/** Today's session, if there is exactly one runnable thing to adapt. */
+/**
+ * Everything runnable on a date: the plan's own sessions AND anything the runner added.
+ *
+ * ⚠️ THE EXTRAS WERE THE WHOLE OF THE OWNER'S RHODES REPORT. The adaptation machinery already reached
+ * a custom run — openSessionSheet, startSession and watchSessionPayload all call heatApplied — but
+ * heatApplied is gated on a DECISION, and the only writer of that map resolved its session through
+ * heatTargetSession, which read rawSessionsForIso and never consulted EXTRA. So there was no code
+ * path in the app that could write a heat decision for a custom run: measured with a custom 30′ easy
+ * run added on a 33 °C day, heatTargetSession() → null, heatCard() → "" and heatChoice(custom) →
+ * null, while at the same moment assessConditions returned paceFactor 1.0268, severity "severe" and
+ * adaptSessionForHeat changed a step. The adaptation applied and was unreachable.
+ *
+ * ⚠️ TODAY_IN_PLAN IS DELIBERATELY NOT CHECKED. rawSessionsForIso already answers [] for a date
+ * outside the plan, and an extra is exactly what somebody adds on a day their plan has nothing on —
+ * which is the holiday this was reported from. Gating on it would have kept the fix out of the case
+ * it was written for.
+ */
+function heatCandidates(iso) {
+  const out = [];
+  try { rawSessionsForIso(iso).forEach((s) => { if (PRIMARY_TYPES[s.type]) out.push(s); }); } catch (e) {}
+  try {
+    extrasOn(iso).forEach((e) => {
+      const s = extraSession(e);
+      if (s && PRIMARY_TYPES[s.type]) out.push(s);
+    });
+  } catch (e) {}
+  return out;
+}
+/**
+ * The session the CONDITIONS surfaces price — the square on Today, its sheet, and the heat chip.
+ *
+ * ⚠️ IT MUST BE THE SAME SESSION THE HEAT CARD PRICES, OR ONE CONTROL ON TODAY CONTRADICTS ANOTHER
+ * TWO INCHES AWAY. sessionsOnSelectedDay() reads RAW.weeks and has never consulted EXTRA, so on a
+ * 33 °C day whose plan held only a mobility session with a custom 2 km easy run added, it answered
+ * the MOBILITY session — the sheet read "this session has no pace to adjust" while the heat card and
+ * the heat block on the same screen said "about 2.3% harder" and offered to adapt it. Measured:
+ * sessionsOnSelectedDay() -> ["mobility/w1-d3-mobility"], heatCandidates(today) -> ["easy/x0-…"].
+ *
+ * ⚠️ ONE CANDIDATE LIST, ONE ORDER. heatCandidates is the single source — the plan's sessions
+ * then the extras, filtered to what is runnable — and this takes its head. heatTargetSession picks
+ * the costliest from the SAME list, so the two can differ only on a day carrying two runs, where both
+ * surfaces still agree that the conditions cost pace.
+ *
+ * ⚠️ IT DOES NOT REPLACE sessionsOnSelectedDay, AND THAT IS DELIBERATE. That function feeds the
+ * hero card, whose data-oid is resolved against RAW.weeks — an extra's id resolves nowhere there,
+ * so folding extras into it would make the day's hero a tap that lands on nothing, and the extras
+ * already have their own card ("Added today") below. The conditions surfaces are the ones that must
+ * agree with the heat machinery, and they are the ones changed.
+ *
+ * ⚠️ FALLS BACK TO THE PLAN'S OWN SESSION, so swiping the week strip still prices the day on
+ * screen; on a day that is not today there are no extras to find and this collapses to
+ * selectedSession() exactly.
+ */
+function conditionsSession() {
+  try {
+    const list = heatCandidates(selectedDayIso());
+    if (list.length) return list[0];
+  } catch (e) {}
+  return selectedSession();
+}
+/**
+ * The session on the runner's plate that this id names — UNADAPTED.
+ *
+ * ⚠️ RESOLVING BY ID IS LOAD-BEARING, NOT TIDINESS. openSessionSheet stores the session it renders
+ * AFTER heatApplied, so SHEET_CTX.sess is the already-slowed copy: build the before/after from that
+ * and both columns read the same band and the sheet would claim the adaptation changes nothing.
+ * Every heat control therefore carries the session id it was rendered for and comes back here.
+ */
+function heatSessById(id) {
+  if (!id) return null;
+  try {
+    const ex = EXTRA.find((e) => e.id === id);
+    if (ex) return extraSession(ex);
+    for (let wi = 0; wi < RAW.weeks.length; wi++) {
+      const s = (RAW.weeks[wi].sessions || []).find((x) => x.id === id);
+      if (s) return s;
+    }
+  } catch (e) {}
+  return null;
+}
+/**
+ * The session today's heat CARD should speak about.
+ *
+ * ⚠️ IT NO LONGER REFUSES WHEN THERE ARE TWO. The old rule was "exactly one runnable planned session
+ * or nothing", and it went quiet on any day carrying a plan session plus an added run — the exact day
+ * this feature is for. It now names the one the heat would cost the most, which is derived rather
+ * than arbitrary, and every OTHER session of the day is still reachable through the heat block in its
+ * own briefing card. Nothing is unreachable and nothing is picked by position.
+ */
 function heatTargetSession() {
   try {
-    if (!TODAY_IN_PLAN) return null;
-    const list = rawSessionsForIso(todayIso()).filter((x) => PRIMARY_TYPES[x.type]);
-    return list.length === 1 ? list[0] : null;
+    const list = heatCandidates(todayIso())
+      .filter((s) => !heatChoice(s) && !heatDeclinedToday(s));
+    if (!list.length) return null;
+    let best = null, bf = 0;
+    for (const s of list) {
+      const w = heatWorstHour(s);
+      const f = w ? w.imp.paceFactor : 0;
+      if (f > bf) { bf = f; best = s; }
+    }
+    return best || list[0];
   } catch (e) { return null; }
 }
 /** The worst hour still ahead today, and what it would cost — or null when there is nothing to say. */
@@ -25018,32 +25472,142 @@ function heatDeclinedToday(sess) {
   const m = loadHeatDeclined();
   return sess && m[sess.id] === todayIso();
 }
+/**
+ * Can this session be offered an adaptation at all, and what would it cost?
+ *
+ * ⚠️ A SESSION WITH NO PACE TARGETS IS NEVER OFFERED ONE. Hill reps carry no pace by design, and
+ * strength work has none either — offering to "adjust your paces" on those promises a change the app
+ * cannot make, and the accept would land on a session identical to the one before it.
+ * ⚠️ ONE ANSWER, READ BY THE TODAY CARD AND BY THE BRIEFING CARD. Two copies of this test is how the
+ * card offers something the sheet then refuses, which is a control that looks live and is not.
+ */
+function heatOffer(sess) {
+  if (!sess || !PRIMARY_TYPES[sess.type]) return null;
+  const worst = heatWorstHour(sess);
+  if (!worst || worst.imp.paceFactor < HEAT_MIN_FACTOR) return null;
+  let probe;
+  try { probe = RC.adaptSessionForHeat(sess, worst.imp.paceFactor); } catch (e) { return null; }
+  if (!probe || !probe.changedSteps) return null;
+  return { row: worst.row, imp: worst.imp, pct: Math.round((worst.imp.paceFactor - 1) * 1000) / 10 };
+}
 function heatCard() {
   const sess = heatTargetSession();
   if (!sess) return "";
-  // Already decided — the chip lives on the session, not as an attention card.
+  // Already decided — the chip lives on the session, not as an attention card. (heatTargetSession
+  // filters these out; kept here because heatCard is also the definition of "is there an offer".)
   if (heatChoice(sess) || heatDeclinedToday(sess)) return "";
-  const worst = heatWorstHour(sess);
-  if (!worst || worst.imp.paceFactor < HEAT_MIN_FACTOR) return "";
-  // ⚠️ A SESSION WITH NO PACE TARGETS IS NEVER OFFERED ONE. Hill reps carry no pace by design, and
-  // strength work has none either — offering to "adjust your paces" on those promises a change the
-  // app cannot make, and the accept would land on a session identical to the one before it.
-  let probe;
-  try { probe = RC.adaptSessionForHeat(sess, worst.imp.paceFactor); } catch (e) { return ""; }
-  if (!probe || !probe.changedSteps) return "";
-  const pct = Math.round((worst.imp.paceFactor - 1) * 1000) / 10;
-  const hot = fmtTemp(worst.row.tempC, true);
+  const off = heatOffer(sess);
+  if (!off) return "";
+  const hot = fmtTemp(off.row.tempC, true);
   return '<div class="card heat-card">' +
     '<div class="heat-h">' + ICON.wxSun + '<span>Adapt for heat</span></div>' +
     '<div class="heat-b">Up to <b>' + hot + '</b> today. Holding your planned paces in that would be ' +
-      'harder than this session is meant to be — about <b>' + pct + '% harder</b> at the peak.</div>' +
-    '<div class="act-pair"><button class="ap-yes" id="heatOpen">Adjust my paces</button>' +
-      '<button class="ap-no" id="heatNo">Keep as planned</button></div>' +
+      'harder than <b>' + esc(sess.title) + '</b> is meant to be — about <b>' + off.pct +
+      '% harder</b> at the peak.</div>' +
+    '<div class="act-pair"><button class="ap-yes" data-heatopen="' + esc(sess.id) + '">Adjust my paces</button>' +
+      '<button class="ap-no" data-heatno="' + esc(sess.id) + '">Keep as planned</button></div>' +
     '</div>';
 }
-/** The sheet: pick the hour, see exactly what changes, accept or don't. */
-function heatSheetHtml() {
-  const sess = heatTargetSession();
+/**
+ * THE HEAT BLOCK ON THE BRIEFING CARD — his ask, verbatim: "the adaption for heat message needs to
+ * come on the race briefing card when they click view session".
+ *
+ * ⚠️ THE SHEET ALREADY SHOWED THE ADAPTED PACES AND SAID NOTHING ABOUT WHY. openSessionSheet runs
+ * heatApplied before rendering, so every band on that card was already the slowed one — measured, the
+ * sheet's HTML matched none of /heat/i, /hot/i, /°/, /by effort/i, /conditions/i, /weather/i or
+ * /adapt/i, for a planned session and for a custom one alike. The numbers were correct and
+ * unexplained, which is indistinguishable from the numbers being wrong.
+ *
+ * ⚠️ ALL FOUR STATES SHIP TOGETHER OR THIS BECOMES ANOTHER SILENT SURFACE. A block that only appears
+ * when everything worked is exactly the shape of the defect being fixed:
+ *   1. a decision is in force  → what it is, what it changed, and the way out;
+ *   2. no decision and it is hot enough to matter → the offer;
+ *   3. a decision stored but no forecast to price it from → say the PLANNED paces are in force;
+ *   4. no hourly forecast at all, on conditions that say heat matters → say we could not price it.
+ * ⚠️ State 4 is why he saw nothing. state.wxHours is fetched into memory and never persisted, and
+ * both of fetchWeather's failure paths were empty — so roaming, hotel wifi or one "Don't Allow" left
+ * a screen that says "run by effort today" from the built-in preset above a heat card that was
+ * structurally unable to appear.
+ *
+ * ⚠️ IT PROPOSES; IT NEVER IMPOSES. Standing instruction, 2026-08-03. Every state ends in a choice
+ * the runner makes, and a decline is remembered for the day rather than re-asked on the next render.
+ */
+function heatBlockHtml(sess) {
+  if (!sess || !PRIMARY_TYPES[sess.type]) return "";
+  // ⚠️ TODAY ONLY, AND WITHOUT THIS THE BLOCK IS A NEW DEFECT RATHER THAN A FIX. Every input it has is
+  // about today: hoursFor(null) is today's remaining hours, a decision is keyed by day, and
+  // heatDeclinedToday is scoped to the date. Measured on the build without this gate, opening the
+  // briefing card for w4-d0-easy — a session THREE WEEKS AWAY — offered "Up to 33 °C before you run …
+  // about 2.6% harder", priced entirely from today's forecast. The Plan screen and the calendar open
+  // these sheets constantly.
+  // ⚠️ ASKED AS "is this on today's plate", through the one definition of that, so an extra dated
+  // tomorrow is excluded by the same test as a planned session next month.
+  try { if (!heatCandidates(todayIso()).some((c) => c.id === sess.id)) return ""; } catch (e) { return ""; }
+  const wrap = (cls, inner) => '<div class="heat-block ' + cls + '">' +
+    '<div class="heat-h">' + ICON.wxSun + '<span>Heat</span></div>' + inner + '</div>';
+  const c = heatChoice(sess);
+  if (c) {
+    const row = hourAt(c.day, c.hour);
+    // STATE 3. ⚠️ heatApplied hands back the ORIGINAL session when it cannot price the decision, so
+    // the runner is on their planned paces — and the chip used to keep asserting "Adapted for heat"
+    // over them. Measured: band back to 6:02–6:25 from 6:12–6:35 and the watch payload byte-identical
+    // to no decision at all. Not guessing the paces is right; asserting a change that is not
+    // happening is not.
+    if (!row) return wrap("heat-stale",
+      '<div class="heat-b">You adapted this session for the heat, but there is no forecast on this ' +
+      'device to price it from right now — so <b>your planned paces are in force</b>. Open Conditions ' +
+      'on Today to fetch one, or run it by effort.</div>' +
+      '<div class="act-pair"><button class="ap-yes" data-heatopen="' + esc(sess.id) + '">Try again</button>' +
+      '<button class="ap-no" data-heatclear="' + esc(sess.id) + '">Clear it</button></div>');
+    // STATE 1.
+    const imp = RC.assessConditions(conditionsAtHour(row, sess));
+    const pct = Math.round((imp.paceFactor - 1) * 1000) / 10;
+    return wrap("heat-on",
+      '<div class="heat-b">Adapted for <b>' + fmtTemp(row.tempC, true) + ' at ' +
+        String(c.hour).padStart(2, "0") + ':00</b>. Every pace below is about <b>' + pct +
+        '% slower</b> than planned, which is the same effort in that air. Your effort targets have ' +
+        'not moved.</div>' +
+      '<div class="act-pair"><button class="ap-yes" data-heatopen="' + esc(sess.id) + '">Change the hour</button>' +
+      '<button class="ap-no" data-heatclear="' + esc(sess.id) + '">Back to planned</button></div>');
+  }
+  const off = heatOffer(sess);
+  if (off) {
+    // STATE 2.
+    const declined = heatDeclinedToday(sess);
+    return wrap("heat-offer",
+      '<div class="heat-b">Up to <b>' + fmtTemp(off.row.tempC, true) + '</b> before you run. Holding ' +
+        'the paces below in that would be about <b>' + off.pct + '% harder</b> than this session is ' +
+        'meant to be.' + (declined ? ' You said keep as planned today \— that still stands.' : '') + '</div>' +
+      '<div class="act-pair"><button class="ap-yes" data-heatopen="' + esc(sess.id) + '">Adjust my paces</button>' +
+      '<button class="ap-no" data-heatno="' + esc(sess.id) + '">Keep as planned</button></div>');
+  }
+  // STATE 4 — no hourly forecast, and the conditions we DO have say the heat matters. Gated on that,
+  // because a "we have no forecast" line on every session sheet on a cold day in February is nagging.
+  if (!hoursFor(null).length) {
+    const w = activeWeather();
+    let imp;
+    try { imp = currentConditions(sess); } catch (e) { imp = null; }
+    if (!imp || !(imp.paceFactor >= HEAT_MIN_FACTOR)) return "";
+    return wrap("heat-noforecast",
+      '<div class="heat-b">' + esc(imp.tempWord) + ' at <b>' + fmtTemp(w.tempC, true) + '</b>' +
+        (w.live ? "" : " (a sample, not your local forecast)") + ', which normally costs about <b>' +
+        (Math.round((imp.paceFactor - 1) * 1000) / 10) + '%</b> for the same effort \— but there is no ' +
+        'hour-by-hour forecast on this device, so the app will not put a number on <i>your</i> run. ' +
+        'Fetch one, or run this by effort rather than by the clock.</div>' +
+      '<div class="act-pair"><button class="ap-yes" data-heatfetch="1">Get my local forecast</button>' +
+      '<button class="ap-no" data-heateffort="1">Run it by effort</button></div>');
+  }
+  return "";
+}
+/**
+ * The sheet: pick the hour, see exactly what changes, accept or don't.
+ *
+ * ⚠️ IT TAKES THE SESSION, IT DOES NOT RE-DERIVE IT. Every control that opens this sheet carries the
+ * id it was rendered for and resolves it through heatSessById, so the sheet is about the run the
+ * runner tapped — which is what makes a custom run adaptable at all, and what stops a day carrying
+ * two runs from adapting whichever one this function happened to pick.
+ */
+function heatSheetHtml(sess) {
   if (!sess) return '<div class="sd-title">Nothing to adapt today.</div>';
   const rows = hoursFor(null);
   if (!rows.length) return '<div class="sd-title">No forecast for the rest of today.</div>';
@@ -25057,7 +25621,8 @@ function heatSheetHtml() {
     const on = chosen && r.hour === chosen.hour;
     // Colour by what it would cost, so the cool hours read as the easy choice at a glance.
     const sev = i.paceFactor >= 1.04 ? "hot" : i.paceFactor >= 1.02 ? "warm" : "ok";
-    return '<button class="heat-hr ' + sev + (on ? " on" : "") + '" data-heathr="' + r.hour + '">' +
+    return '<button class="heat-hr ' + sev + (on ? " on" : "") + '" data-heathr="' + r.hour +
+      '" data-heatsess="' + esc(sess.id) + '">' +
       '<span class="heat-hrt">' + String(r.hour).padStart(2, "0") + '</span>' +
       '<span class="heat-hrd num">' + fmtTemp(r.tempC, false) + '</span></button>';
   }).join("");
@@ -25085,7 +25650,7 @@ function heatSheetHtml() {
   return '<div class="sd-type" style="--sc:var(--peak)">Adapt for heat</div>' +
     '<div class="sd-title">' + esc(imp.tempWord) + ' · ' + fmtTemp(chosen.tempC, true) + ' at ' +
       String(chosen.hour).padStart(2, "0") + ':00</div>' +
-    '<div class="heat-sub">When will you run?</div>' +
+    '<div class="heat-sub">' + esc(sess.title) + ' \u2014 when will you run it?</div>' +
     '<div class="heat-strip">' + strip + '</div>' +
     (imp.beyondModel
       // ⚠️ Past the model's own data. Offering a number here would be an extrapolation wearing the
@@ -25097,8 +25662,8 @@ function heatSheetHtml() {
         : '<div class="heat-diff"><div class="heat-dh">About <b>' + pct + '% slower</b> for the same effort' +
           (nowMin > wasMin ? ' · <b>' + wasMin + '</b> → <b>' + nowMin + ' min</b>' : '') + '</div>' +
           rowsHtml + '</div>' +
-          '<div class="act-pair"><button class="ap-yes" id="heatDo">Adapt this session</button>' +
-          '<button class="ap-no" id="heatKeep">Keep as planned</button></div>') +
+          '<div class="act-pair"><button class="ap-yes" data-heatdo="' + esc(sess.id) + '">Adapt this session</button>' +
+          '<button class="ap-no" data-heatkeep="' + esc(sess.id) + '">Keep as planned</button></div>') +
     // ⚠️ EFFORT, NOT BENEFIT. The evidence supports "this slower pace is the same effort your planned
     // pace would be in cool air". It does not support "you will get the same training out of it",
     // which is what the competitor claims.
@@ -25110,7 +25675,16 @@ function heatChipHtml(sess) {
   const c = heatChoice(sess);
   if (!c) return "";
   const row = hourAt(c.day, c.hour);
-  return '<button class="heat-chip" id="heatClearBtn">' + ICON.wxSun +
+  // ⚠️ THE CHIP CARRIES ITS OWN SESSION ID. Its handler used to call heatTargetSession(), which
+  // answers "the one thing worth offering today" — a different question, and on a day with a planned
+  // run and an added one it could clear the decision on the OTHER session while the chip the runner
+  // tapped stayed lit.
+  // ⚠️ AND IT NO LONGER CLAIMS AN ADAPTATION THAT IS NOT IN FORCE. heatApplied hands back the
+  // original session when there is no forecast to price the decision from, so "Adapted for heat" over
+  // planned paces was a badge asserting a change the app had silently stopped making.
+  if (!hourAt(c.day, c.hour)) return '<button class="heat-chip heat-chip-stale" data-heatclear="' + esc(sess.id) + '">' + ICON.wxSun +
+    '<span>Heat adaptation paused \u2014 no forecast</span><span class="heat-x">Clear</span></button>';
+  return '<button class="heat-chip" data-heatclear="' + esc(sess.id) + '">' + ICON.wxSun +
     '<span>Adapted for heat' + (row ? ' · ' + fmtTemp(row.tempC, true) + ' at ' + String(c.hour).padStart(2, "0") + ':00' : '') + '</span>' +
     '<span class="heat-x">Clear</span></button>';
 }
@@ -26086,7 +26660,98 @@ function wirePrivacyToggles() {
     };
   });
 }
+/**
+ * WIRING THE HEAT CONTROLS — a function, because TWO surfaces render them.
+ *
+ * ⚠️⚠️ IT SHIPPED FOR AN HOUR AS DEAD MARKUP AND ONLY THE REAL BROWSER SAW IT. The heat block on the
+ * briefing card rendered perfectly, in both themes, with its two buttons at a full 184x44 — and
+ * wired:false on both, because openSessionSheet calls wireSheet() and this wiring lived inside
+ * wire(). Tapping "Adjust my paces" did nothing at all. That is the rdMore defect exactly: a control
+ * in the place every app puts its actions, looking live, connected to nothing — the third time this
+ * project has shipped it.
+ * ⚠️ AND MY OWN GUARD COULD NOT SEE IT, which is the more useful half. It asserted that the app
+ * script contains a lookup for every id the block renders — true, in a function that never runs for
+ * this surface. A source-text assertion proves a string exists; it can never prove anything reaches
+ * it. test/heat-custom.test.ts now drives openSessionSheet's own wiring path instead.
+ */
+function wireHeatControls() {
+  // ⚠️⚠️ NOT ONE id AMONG THEM, AND THAT IS THE FIX FOR A DEFECT ONLY A REAL BROWSER FOUND. The block
+  // and the Today card render the same offer, so both wanted a button called heatOpen — and with the
+  // card behind the open sheet, TWO ELEMENTS SHARED ONE id. $() is document.getElementById, which
+  // answers the FIRST, so the sheet's own "Adjust my paces" was handed no handler at all: measured in
+  // Chrome, wired:false on a 184x44 button that looked exactly right. CLAUDE.md records the identical
+  // fault in the recap story (storyShare and storyMap resolving to the outgoing panel) and its rule
+  // is exactly this: a DOM holding two copies of a surface is a DOM with duplicate ids, and $() is
+  // unsafe inside it. Every control here is a data- attribute bound by querySelectorAll, so a second
+  // copy of any of them binds too instead of stealing the first one's handler.
+  const heatSheet = (sess) => {
+    if (!sess) return;
+    ensureSheet(); SHEET_CTX = null;
+    $("sheetBody").innerHTML = heatSheetHtml(sess); wire();
+    $("sheetOv").classList.add("on");
+  };
+  // ⚠️ A DECLINE IS REMEMBERED, per the standing instruction — but only for TODAY. The weather is a
+  // different question tomorrow, so unlike a pace flag this must not be muted indefinitely.
+  const heatDecline = (sess, close) => {
+    if (!sess) return;
+    const m = loadHeatDeclined(); m[sess.id] = todayIso(); saveHeatDeclined(m);
+    if (close) closeSheet();
+    render();
+  };
+  document.querySelectorAll("[data-heatopen]").forEach((b) => b.onclick = () => {
+    state.heatHour = null;
+    // ⚠️ NO FORECAST, SO GO AND GET ONE RATHER THAN OPENING AN EMPTY SHEET. This is the stale and
+    // no-forecast path: a sheet reading "No forecast for the rest of today" is a dead end, and the
+    // runner cannot tell it from the feature being broken — which is exactly the report this came from.
+    if (!hoursFor(null).length) { fetchWeather(true); openWeatherSheet(); return; }
+    heatSheet(heatSessById(b.dataset.heatopen));
+  });
+  document.querySelectorAll("[data-heatfetch]").forEach((b) => b.onclick = () => { fetchWeather(true); openWeatherSheet(); });
+  document.querySelectorAll("[data-heateffort]").forEach((b) => b.onclick = () => { openWeatherSheet(); });
+  document.querySelectorAll("[data-heatno]").forEach((b) => b.onclick = () => heatDecline(heatSessById(b.dataset.heatno), !!SHEET_CTX));
+  document.querySelectorAll("[data-heathr]").forEach((b) => b.onclick = () => {
+    state.heatHour = Number(b.dataset.heathr);
+    const sess = heatSessById(b.dataset.heatsess); if (!sess) return;
+    $("sheetBody").innerHTML = heatSheetHtml(sess); wire();
+  });
+  document.querySelectorAll("[data-heatdo]").forEach((b) => b.onclick = () => {
+    const sess = heatSessById(b.dataset.heatdo); if (!sess) return;
+    const rows = hoursFor(null);
+    if (!rows.length) return;
+    const hour = state.heatHour != null ? state.heatHour : ((heatWorstHour(sess) || {}).row || rows[0]).hour;
+    const now = new Date();
+    const day = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");
+    state.heatAdapt[sess.id] = { day: day, hour: hour };
+    saveHeatAdapt();
+    // ⚠️ THE WRIST GETS THE NEW PACES IMMEDIATELY. The competitor tells its users to force-quit their
+    // watch app to pick these up; there is no reason for that here, and a watch quietly running the
+    // original targets after the runner accepted an adaptation is the worst outcome of the feature.
+    try { syncWatch(); } catch (e) {}
+    try { syncNativeReminders(); } catch (e) {}
+    closeSheet();
+    toast("Paces adapted for the heat");
+    render();
+  });
+  document.querySelectorAll("[data-heatkeep]").forEach((b) => b.onclick = () => heatDecline(heatSessById(b.dataset.heatkeep), true));
+  document.querySelectorAll("[data-heatclear]").forEach((b) => b.onclick = () => {
+    const sess = heatSessById(b.dataset.heatclear); if (!sess) return;
+    delete state.heatAdapt[sess.id];
+    saveHeatAdapt();
+    try { syncWatch(); } catch (e) {}
+    try { syncNativeReminders(); } catch (e) {}
+    // ⚠️ A BRIEFING CARD IS REBUILT, NOT LEFT STANDING. Clearing from inside one changes every band
+    // on the card behind the button, so leaving the old markup up would show the adapted paces under a
+    // block that now says nothing is adapted.
+    if (SHEET_CTX && SHEET_CTX.sess && SHEET_CTX.sess.id === sess.id) {
+      SHEET_CTX = { sess: heatApplied(sess), week: SHEET_CTX.week };
+      $("sheetBody").innerHTML = sessionSheetHtml(SHEET_CTX.sess, SHEET_CTX.week);
+      wireSheet();
+    }
+    render();
+  });
+}
 function wire() {
+  wireHeatControls();
   document.querySelectorAll("[data-seg]").forEach((seg) => seg.querySelectorAll("button").forEach((b) => b.onclick = () => {
     const f = seg.dataset.seg; const v = b.dataset.v;
     if (f === "dayType") { state.dayType = v; render(); return; }
@@ -26306,53 +26971,6 @@ function wire() {
     state.streakMon = new Date(Date.UTC(p[0], p[1], 1)).toISOString().slice(0, 7);
     render();
   });
-  // ---- Adapt for heat -------------------------------------------------------------------------
-  const heatSheet = () => { ensureSheet(); SHEET_CTX = null; $("sheetBody").innerHTML = heatSheetHtml(); wire(); $("sheetOv").classList.add("on"); };
-  const heatOpen = $("heatOpen");
-  if (heatOpen) heatOpen.onclick = () => { state.heatHour = null; heatSheet(); };
-  const heatNo = $("heatNo");
-  if (heatNo) heatNo.onclick = () => {
-    // ⚠️ A DECLINE IS REMEMBERED, per the standing instruction — but only for TODAY. The weather is
-    // a different question tomorrow, so unlike a pace flag this must not be muted indefinitely.
-    const sess = heatTargetSession(); if (!sess) return;
-    const m = loadHeatDeclined(); m[sess.id] = todayIso(); saveHeatDeclined(m);
-    render();
-  };
-  document.querySelectorAll("[data-heathr]").forEach((b) => b.onclick = () => {
-    state.heatHour = Number(b.dataset.heathr);
-    $("sheetBody").innerHTML = heatSheetHtml(); wire();
-  });
-  const heatDo = $("heatDo");
-  if (heatDo) heatDo.onclick = () => {
-    const sess = heatTargetSession(); if (!sess) return;
-    const rows = hoursFor(null);
-    const hour = state.heatHour != null ? state.heatHour : ((heatWorstHour(sess) || {}).row || rows[0]).hour;
-    const now = new Date();
-    const day = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");
-    state.heatAdapt[sess.id] = { day: day, hour: hour };
-    saveHeatAdapt();
-    // ⚠️ THE WRIST GETS THE NEW PACES IMMEDIATELY. The competitor tells its users to force-quit their
-    // watch app to pick these up; there is no reason for that here, and a watch quietly running the
-    // original targets after the runner accepted an adaptation is the worst outcome of the feature.
-    try { syncWatch(); } catch (e) {}
-    try { syncNativeReminders(); } catch (e) {}
-    closeSheet();
-    toast("Paces adapted for the heat");
-    render();
-  };
-  const heatKeep = $("heatKeep");
-  if (heatKeep) heatKeep.onclick = () => {
-    const sess = heatTargetSession(); if (sess) { const m = loadHeatDeclined(); m[sess.id] = todayIso(); saveHeatDeclined(m); }
-    closeSheet(); render();
-  };
-  const heatClear = $("heatClearBtn");
-  if (heatClear) heatClear.onclick = () => {
-    const sess = heatTargetSession(); if (!sess) return;
-    delete state.heatAdapt[sess.id];
-    saveHeatAdapt();
-    try { syncWatch(); } catch (e) {}
-    render();
-  };
   document.querySelectorAll("[data-unitset]").forEach((b) => b.onclick = () => {
     if ((tempUnit() === "f") === (b.dataset.unitset === "f")) return;
     setTempUnit(b.dataset.unitset);

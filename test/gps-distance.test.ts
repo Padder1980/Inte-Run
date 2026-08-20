@@ -61,7 +61,7 @@ type Opts = {
  * one millisecond and the 20-second window can never open.
  */
 function run(o: Opts) {
-  const src = lift(["haversine", "onGpsPos", "gpsFixElapsedMs", "checkSplits"]);
+  const src = lift(["haversine", "onGpsPos", "gpsFixElapsedMs", "checkSplits", "paceMark"]);
   const LIVE: any = {
     mode: "gps", dist: 0, route: [], elevGain: 0, splits: [], kmDone: 0, lastKmMs: 0,
     lastLat: null, lastLon: null, lastAlt: null, devSpeed: null, acc: null,
@@ -175,7 +175,7 @@ test("distance is gated on DISPLACEMENT, never on the speed the device claims", 
  * where the runner was earlier and credit the journey back as their first distance.
  */
 function feed(fixes: any[]) {
-  const src = lift(["haversine", "onGpsPos", "gpsFixElapsedMs", "checkSplits"]);
+  const src = lift(["haversine", "onGpsPos", "gpsFixElapsedMs", "checkSplits", "paceMark"]);
   const LIVE: any = {
     mode: "gps", dist: 0, route: [], elevGain: 0, splits: [], kmDone: 0, lastKmMs: 0,
     lastLat: null, lastLon: null, lastAlt: null, devSpeed: null, acc: null,
@@ -318,7 +318,7 @@ test("the watch reads the fused HealthKit distance rather than only its own GPS 
  * a genuine gap once, and it refuses a reading no runner could produce.
  */
 function pedoHarness() {
-  const src = lift(["haversine", "onGpsPos", "pedoFillGap", "gpsFixElapsedMs", "checkSplits"]);
+  const src = lift(["haversine", "onGpsPos", "pedoFillGap", "gpsFixElapsedMs", "checkSplits", "paceMark"]);
   const LIVE: any = {
     mode: "gps", dist: 0, route: [], elevGain: 0, splits: [], kmDone: 0, lastKmMs: 0, lastFixAt: null,
     lastLat: null, lastLon: null, lastAlt: null, devSpeed: null, acc: null,
@@ -423,7 +423,7 @@ test("the native side declares why it wants motion data", () => {
  * a batch crossing two kilometre boundaries recorded ONE split and silently dropped the other.
  */
 function replayHarness() {
-  const src = lift(["haversine", "onGpsPos", "gpsFixElapsedMs", "checkSplits"]);
+  const src = lift(["haversine", "onGpsPos", "gpsFixElapsedMs", "checkSplits", "paceMark"]);
   const LIVE: any = {
     mode: "gps", dist: 0, route: [], elevGain: 0, splits: [], kmDone: 0, lastKmMs: 0,
     startMs: 0, pausedMs: 0, lastLat: null, lastLon: null, lastAlt: null, devSpeed: null, acc: null,
@@ -486,7 +486,7 @@ test("a live fix is unaffected — its time is where it always was", () => {
 test("a stretch that crosses two kilometres at once records both, and marks them estimated", () => {
   // ⚠️ A single credited GPS fix can never do this — the 200 m spike gate forbids it. The path that
   // genuinely can is the pedometer filling a long blackout, which adds the whole stretch in one go.
-  const src = lift(["haversine", "onGpsPos", "pedoFillGap", "gpsFixElapsedMs", "checkSplits"]);
+  const src = lift(["haversine", "onGpsPos", "pedoFillGap", "gpsFixElapsedMs", "checkSplits", "paceMark"]);
   const LIVE: any = {
     mode: "gps", dist: 900, route: [], elevGain: 0, splits: [], kmDone: 0, lastKmMs: 0,
     startMs: 0, pausedMs: 0, lastFixAt: null,
@@ -537,7 +537,7 @@ test("an estimated split is never judged against the target band", () => {
  * Every scenario here is deterministic; the tolerances come from the measured probe matrix.
  */
 function settleHarness() {
-  const src = lift(["haversine", "onGpsPos", "pedoFillGap", "gpsFixElapsedMs", "checkSplits"]);
+  const src = lift(["haversine", "onGpsPos", "pedoFillGap", "gpsFixElapsedMs", "checkSplits", "paceMark"]);
   const LIVE: any = {
     mode: "gps", dist: 0, route: [], elevGain: 0, splits: [], kmDone: 0, lastKmMs: 0, lastFixAt: null,
     lastLat: null, lastLon: null, lastAlt: null, devSpeed: null, acc: null,

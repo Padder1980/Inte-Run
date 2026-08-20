@@ -463,11 +463,18 @@ export function generatePlan(
       Math.max(longFloorMin, Math.min(longCapMin, Math.max(longFloorMin, volumeDriven))),
     );
     const startLong = Math.round(peakLong * (returning ? 0.42 : 0.55));
-    return schedule.map((wp, i) => {
+    // Every week's build inputs, resolved once. The post-condition below has to be able to REBUILD a
+    // week with a longer long run, and it must do so through the same one definition of how a week is
+    // assembled — a second assembly path is how this file's history records two builders drifting
+    // apart (the strides fix that landed in one of them and not the other).
+    const specs = schedule.map((wp, i) => {
       const weekIndex = i + 1;
       const startDateIso = addDays(raceMonday, -(structuredWeeks - weekIndex) * 7);
       if (beginner) {
-        return buildBeginnerWeek(weekIndex, startDateIso, wp, { athlete, goal, paces, returning, longMin: beginnerLongPeakMin }, lastHardWeek, runWalk);
+        // The beginner track's ceiling is its OWN endpoint, `beginnerLongPeakMin`, not `peakLong` —
+        // buildBeginnerWeek never reads peakLong and its ramp is deliberately gentler.
+        return { weekIndex, startDateIso, wp, ceilMin: beginnerLongPeakMin,
+          ctx: { athlete, goal, paces, returning, longMin: beginnerLongPeakMin } as WeekContext };
       }
       // ⚠️ END-ALIGNED: the LAST array entry belongs to race week, whatever got clamped. A short
       // runway clamps the taper (periodization.ts: structuredWeeks - 3), so a 4-week plan has ONE
@@ -488,12 +495,21 @@ export function generatePlan(
         peakLong,
         taperMult,
       );
-      return buildWeek(weekIndex, startDateIso, wp, {
-        athlete, goal, paces, returning, longMin, vScale, taperMult,
-        easyRamp: easyRampFor(wp, weekIndex, easyRampEndWeek),
-        qRefMin,
-      });
+      return { weekIndex, startDateIso, wp, ceilMin: peakLong,
+        ctx: {
+          athlete, goal, paces, returning, longMin, vScale, taperMult,
+          easyRamp: easyRampFor(wp, weekIndex, easyRampEndWeek),
+          qRefMin,
+        } as WeekContext };
     });
+    const buildOne = (i: number, over?: Partial<WeekContext>): PlannedWeek => {
+      const s = specs[i]!;
+      const ctx = over ? { ...s.ctx, ...over } : s.ctx;
+      return beginner
+        ? buildBeginnerWeek(s.weekIndex, s.startDateIso, s.wp, ctx, lastHardWeek, runWalk)
+        : buildWeek(s.weekIndex, s.startDateIso, s.wp, ctx);
+    };
+    return enforceLongRunIsLongest(specs.map((_, i) => buildOne(i)), specs, buildOne);
   };
 
   // ⚠️ SOLVED BY ITERATION, not by a formula. Build unscaled to learn what THIS plan's natural
@@ -673,7 +689,223 @@ type WeekContext = {
    * session happens to be a short one is not a hole in the volume line. See `buildWeek`.
    */
   qRefMin?: number;
+  /**
+   * The long run must be at least this many minutes, whatever the ramp asked for. Written only by
+   * `enforceLongRunIsLongest`; a FLOOR, never a replacement, so it can lengthen a long run and can
+   * never shorten one.
+   */
+  longMinFloor?: number;
+  /**
+   * ...and every OTHER easy run in the week at most this long / this far. The belt for the weeks the
+   * floor above cannot reach: a deload, the taper, and any week already at the plan's own peak long
+   * run. Both rulers, because a slower recovery jog can be longer on the clock while covering less
+   * ground, and a moderate-gear run the reverse.
+   */
+  easyCapMin?: number;
+  easyCapKm?: number;
 };
+
+/**
+ * POST-CONDITION: THE LONG RUN IS THE LONGEST EASY RUN OF ITS WEEK — on the clock AND on the ground.
+ *
+ * ⚠️ It has to be stated as a post-condition, because it was never anybody's job. The long run's
+ * length comes off one ramp (`startLong` → `peakLong`, `longRunMinutes`) and the easy runs' off
+ * another (`EASY_START_FRAC` → 1, `easyRampFor`), the long run is built first, and `buildWeek` never
+ * compares the two numbers. Measured over 112,640 delivered weeks, the long run was not the longest
+ * easy run of its week in 18.09% of them on distance and 16.88% on the clock, rising to 42.20% of
+ * 5 km weeks; and the long run averages 0.704 of its own
+ * plan's peak long run while the easy runs average 0.834 of theirs, and at the 10th percentile
+ * 0.468 against 0.637 — so in the early weeks of a block the long run is STRUCTURALLY allowed to be
+ * the shortest run of the week. `returningFromBreak` starts it at 0.42 instead of 0.55, which makes
+ * it worse for exactly the runner least sure of the plan. Reported from a real 13-week 5 km block:
+ * weeks 1–4 all inverted, weeks 5–14 clean — the first month, where a runner decides whether to
+ * trust the thing at all.
+ *
+ * ⚠️ THE INVARIANT IS ABOUT THE EASY RUNS, NOT EVERY RUN, and that is a coaching statement rather
+ * than a convenience. A threshold session is prescribed by the library at a fixed length with a
+ * warm-up and cool-down on top, and CANNOT move — measured AFTER this fix, a quality session is still
+ * the biggest thing in its week on the whole-outing ruler in 15.56% of weeks and on counted training
+ * distance in 1.19%, and in every one of those cases the offender is a quality session and never an
+ * easy run. No coach calls a 50-minute tempo outing the week's long run.
+ * Satisfying the flat reading would mean either inflating every long run past every tempo session or
+ * shortening the library, and the second is forbidden everywhere else in this file.
+ *
+ * ⚠️ LIFT, NEVER SCALE. `Math.max(1, vScale)` on `peakLong` is one-way on purpose (see `buildAll`),
+ * and this respects it: the lift is clamped to the plan's OWN peak long run, so a week can be raised
+ * toward the destination the plan already chose and never past it.
+ *
+ * ⚠️ A DELOAD AND THE TAPER ARE NEVER LIFTED. Both are deliberately smaller; raising their long run
+ * would undo the cut they exist to make — this file records the taper guard failing at 29% against
+ * its 30% floor when a compensator did exactly that. They get the cap instead.
+ *
+ * ⚠️ THE LADDER IS A RUNNING MAXIMUM, and dropping it is the one change that breaks this silently.
+ * Lifting each week on its own merits makes the long run step BACKWARDS whenever the following week
+ * happens to need less: measured, 3,900 of 50,240 week-to-week transitions went down.
+ *
+ * ⚠️ AND EVERY LIFT IS CLAMPED TO `LONG_LIFT_STEP_MAX` OF THE PREVIOUS NON-EASED LONG RUN, BECAUSE
+ * THE FIRST VERSION OF THIS FUNCTION BUILT A JUMP TAIL THAT HAD NEVER EXISTED. See that constant.
+ */
+/**
+ * THE MOST A LIFT MAY ADD, AS A MULTIPLE OF THE PREVIOUS NON-EASED LONG RUN.
+ *
+ * ⚠️ WITHOUT IT THE FIX BUILT A WEEK-ON-WEEK JUMP TAIL THAT HAD NEVER EXISTED, AND THE EVIDENCE
+ * REPORT'S SINGLE-SESSION GUARDRAIL IS 1.10. Measured on 3,600 plans / 54,600 non-eased non-edge
+ * long-run transitions, unclamped: the >1.25 bucket went 0 -> 33 and the worst transition 1.2250 ->
+ * 1.3220 (`5k / 4 days / 19:00 5 km / recreational / vol=40`, week 3's 59 minutes to week 5's 78 with
+ * a deload between them). The aggregate improved at the same time — over 1.10 went 6.22% -> 4.78% —
+ * which is exactly how a new tail hides: the average gets better while the worst case gets worse.
+ *
+ * ⚠️ IT IS A CLAMP ON THE LIFT, NOT ON THE LONG RUN. `Math.max(natural, prev * step)` — so a week
+ * whose own ramp already wants more than 1.10x keeps it, and nothing here can ever SHORTEN a long run
+ * the plan asked for. That is why the achievable worst case is bounded below by the unfixed engine's
+ * own 1.2250 rather than by 1.10: 477 of those transitions come off the ramp itself and off spanning
+ * a deload, and they are pre-existing. Fixing those means shrinking long runs, which is a different
+ * change with its own costs, and this file forbids reaching for the long run's length lightly.
+ *
+ * ⚠️ THE COST IS PAID BY THE BELT, NOT BY THE INVARIANT. When the clamp binds, the week still needs
+ * its long run to be the longest easy run in it, so `easyCapMin`/`easyCapKm` trim the easy runs
+ * instead — which is why the invariant stays at 0.00% on all three rulers at every clamp value
+ * swept, and why the number below was chosen on the easy-running cost rather than on the jump.
+ *
+ * ⚠️ MEASURED FRONTIER, same 3,600-plan grid. clamp -> (worst jump / transitions over 1.25 / share of
+ * transitions over 1.10 / easy minutes against the unclamped fix). The easy floor is 34 weeks of
+ * 18,624 at EVERY value, by the repo's own unmodified tools/audit-progression.mjs, and the invariant
+ * this whole function exists for is 0.00% on all three rulers at every value too — which is the point:
+ * the belt absorbs the clamp, so choosing a value is not a trade against the invariant.
+ *     none   1.3220 / 33 / 4.78% /  ---
+ *     1.30   1.3000 / 33 / 4.78% / -0.000%
+ *     1.25   1.2500 / 20 / 4.78% / -0.000%
+ *     1.20   1.2250 /  0 / 4.79% / -0.002%
+ *     1.15   1.2250 /  0 / 4.82% / -0.005%
+ *     1.10   1.2250 /  0 / 4.12% / -0.011%
+ *     1.05   1.2250 /  0 / 4.16% / -0.056%
+ * Every clamp from 1.20 down removes the whole new tail. 1.10 is chosen because it is the number the
+ * evidence report states and this file asserts everywhere else, it is the BEST point on the aggregate
+ * as well as the tail (4.12% over the guardrail against the unfixed engine's 6.22% and the unclamped
+ * fix's 4.78%), and it costs a hundredth of a percent of the block's easy running. Guarded by
+ * `test/long-run-longest.test.ts`, which pins the bucket AND the worst case so neither can drift.
+ *
+ * ⚠️ THE ONE COST, STATED: week one lands within 1.10x of the stated mileage in 99.33% of the 2,400
+ * plans that state one, against 99.50% unclamped and 99.96% unfixed, with the WORST case identical to
+ * the unclamped fix at 1.190x. Four plans of 2,400, and the mechanism is the volume fit rather than
+ * this clamp — `buildAll(vScale)` is bisected to a fixed point within 3%, so moving the block's
+ * counted volume by 0.04% can land a few profiles on the neighbouring fixed point.
+ */
+const LONG_LIFT_STEP_MAX = 1.10;
+
+function enforceLongRunIsLongest(
+  weeks: PlannedWeek[],
+  specs: { wp: AnnotatedWeek; ceilMin: number; ctx: WeekContext }[],
+  buildOne: (i: number, over?: Partial<WeekContext>) => PlannedWeek,
+): PlannedWeek[] {
+  let ladder = 0;
+  /** The previous NON-EASED week's delivered long run — what a jump is measured against. */
+  let prevLong = 0;
+  return weeks.map((week, i) => {
+    const spec = specs[i];
+    if (!spec) return week;
+    const eased = spec.wp.isDeload || spec.wp.phase === "taper";
+    let out = week;
+    let floor = 0;
+    // ⚠️ MEASURED AGAINST THE PREVIOUS NON-EASED WEEK, WHICH MAY NOT BE THE PREVIOUS WEEK. The worst
+    // jump the unclamped fix produced spanned a deload (week 3 to week 5), so a clamp that only
+    // looked one week back would have measured against the eased week and let the whole tail through.
+    // Never below the length this week's own ramp already asked for — see LONG_LIFT_STEP_MAX.
+    // ⚠️ THE `Math.max` IS DEFENSIVE AND UNFALSIFIABLE, AND SAYING SO IS THE POINT. Replaced with a
+    // bare `prevLong * LONG_LIFT_STEP_MAX`, the plan is identical across 3,600 plans / 88,800 weeks on
+    // both instruments — because `longMinFloor` is a FLOOR, so a `want` below the week's own natural
+    // length simply never binds and the clamp cannot shorten a long run whatever it is set to. It is
+    // kept because it states the rule the paragraph above promises ("nothing here can ever SHORTEN a
+    // long run the plan asked for") at the place the rule lives, rather than leaving it as a property
+    // of a mechanism two functions away that a future change could quietly remove.
+    const stepCap = prevLong > 0
+      ? Math.max(longRunMinutesOf(week), prevLong * LONG_LIFT_STEP_MAX)
+      : Infinity;
+    if (!eased) {
+      // ⚠️ UP TO THREE PASSES, because raising the long run changes its own SHAPE: a build or peak
+      // long run's race-pace dose is a fraction of its length, so the ground it covers per minute is
+      // not a constant and one pass of arithmetic can land just short.
+      let want = Math.min(spec.ceilMin, ladder, stepCap);
+      for (let pass = 0; pass < 3; pass++) {
+        // ⚠️ "Does this floor bind?" is asked of the long run ACTUALLY DELIVERED, never of
+        // `ctx.longMin`. The two coincide on the main track and do not on the beginner one, where
+        // `longMin` carries the block's ENDPOINT rather than this week's length — written the obvious
+        // way, `want > ctx.longMin` is unsatisfiable for every beginner week and the lift silently
+        // never fires. It measured as a fix that left the beginner track at 7.46%.
+        if (want > floor && want > longRunMinutesOf(out) + 1e-9) {
+          floor = want;
+          out = buildOne(i, { longMinFloor: floor });
+        }
+        const need = longRunNeedsMinutes(out);
+        if (need == null) break;
+        const next = Math.min(spec.ceilMin, stepCap, Math.max(want, need));
+        if (next <= want) break;   // the plan's own peak binds — the cap below finishes the job
+        want = next;
+      }
+      // ⚠️ THE `Math.max` HERE IS DEFENSIVE AND HAS NO OBSERVABLE FAILURE MODE — RECORDED SO NOBODY
+      // "VERIFIES" IT BY DELETING IT. Replaced with a plain assignment, every metric is identical
+      // across 3,600 plans / 88,800 weeks (inversion 0/0/0 on all three rulers, ladder backwards 0,
+      // worst jump identical, easy minutes identical to the minute), because the ramp is monotone on
+      // non-eased weeks anyway. The version that DOES matter — no ladder at all, each week lifted on
+      // its own merits — is caught by "the long-run ladder never steps backwards" and sends 3,900 of
+      // 50,240 transitions downwards. Keep it: it is the correct statement of the invariant, and the
+      // day a future change makes the ramp non-monotone it becomes load-bearing without a code edit.
+      ladder = Math.max(ladder, longRunMinutesOf(out));
+    }
+    // ⚠️ THE BELT RUNS AFTER THIS, AND IT CANNOT CHANGE THE LONG RUN — it only trims the easy runs —
+    // so recording the reference here is safe. It is recorded for non-eased weeks only, which is the
+    // same set the jump is measured over.
+    if (!eased) prevLong = longRunMinutesOf(out);
+    // The belt. An eased week, or a week the ceiling would not let us lift far enough.
+    if (longRunNeedsMinutes(out) != null) {
+      const long = out.sessions.find((s) => s.type === "long")!;
+      out = buildOne(i, {
+        ...(floor ? { longMinFloor: floor } : {}),
+        easyCapMin: sessionMinutes(long),
+        easyCapKm: sessionKm(long),
+      });
+    }
+    return out;
+  });
+}
+
+/** Every easy-effort run a long run is compared against — the whole `easyVariant` pool plus the
+ *  seventh-day recovery jog. `easyRun(p, m, true)` is typed `strides` and `easyHillStrides` likewise,
+ *  so a set naming only `easy` and `recovery` would silently miss two of the four flavours. */
+const AEROBIC_RUN_TYPES = new Set<SessionType>(["easy", "recovery", "strides"]);
+const sessionMinutes = (s: { estimatedDurationSeconds?: number }) => (s.estimatedDurationSeconds ?? 0) / 60;
+/** The WHOLE outing, which is what the runner reads on the session card. For these types it equals
+ *  `trainingDistanceMeters` anyway — measured over 105,984 long runs and 225,614 easy runs, not one
+ *  carries a warm-up or cool-down step since the low-intensity frames were removed. */
+const sessionKm = (s: { estimatedDistanceMeters?: number }) => (s.estimatedDistanceMeters ?? 0) / 1000;
+const longRunMinutesOf = (w: PlannedWeek) => {
+  const long = w.sessions.find((s) => s.type === "long");
+  return long ? sessionMinutes(long) : 0;
+};
+
+/**
+ * How many minutes this week's long run would need in order to be the longest easy run in it on both
+ * rulers — or null when it already is (which includes a week with no long run at all: for a Monday
+ * race `applyRaceDay` turns the previous week's long run into a 20-minute shakeout, and
+ * `applyPartialFirstWeek` can drop it, so "no long run" is a real state and not a miss).
+ *
+ * The distance requirement is expressed as the minutes it implies at THIS long run's own
+ * kilometres-per-minute, because minutes are the only knob the builder takes.
+ */
+function longRunNeedsMinutes(week: PlannedWeek): number | null {
+  const long = week.sessions.find((s) => s.type === "long");
+  if (!long) return null;
+  const others = week.sessions.filter((s) => AEROBIC_RUN_TYPES.has(s.type));
+  if (!others.length) return null;
+  const mins = sessionMinutes(long);
+  const km = sessionKm(long);
+  if (mins <= 0 || km <= 0) return null;
+  const kmPerMin = km / mins;
+  const need = Math.max(
+    ...others.map((s) => Math.max(sessionMinutes(s), sessionKm(s) / kmPerMin)),
+  );
+  return need > mins + 1e-9 ? Math.ceil(need) : null;
+}
 
 function buildWeek(
   index: number,
@@ -795,10 +1027,31 @@ function buildWeek(
     // day — turning a compensation into a bigger swing than the one it set out to remove.
     const share = easyDays.length ? qualityDeficitMin / easyDays.length : 0;
     const adjusted = planned + Math.max(-planned * 0.3, Math.min(planned * 0.3, share));
-    const minutes = Math.max(20, Math.min(95, Math.round(adjusted)));
-    sessions.push(seventh
-      ? recoveryRun(ctx.paces, minutes)
-      : easyVariant(ctx.paces, minutes, index + ei, canStride));
+    let minutes = Math.max(20, Math.min(95, Math.round(adjusted)));
+    const make = (m: number) => (seventh
+      ? recoveryRun(ctx.paces, m)
+      : easyVariant(ctx.paces, m, index + ei, canStride));
+    let built = make(minutes);
+    // ⚠️ MEASURE THE SESSION THAT WAS BUILT, NOT THE MINUTES ASKED FOR. "37′ easy + strides" and
+    // "37′ easy + hill sprints" are LONGER than 37 minutes — the strides and the walk-backs are added
+    // on top (documented at length elsewhere in this file: STRIDES ADD TIME; THE RAISE DOES NOT), and
+    // `moderateRun` covers 1.09x the ground per minute because it runs at threshold + 60 rather than
+    // at easy pace. Measured with the cap applied to the request instead of the result: 5,824 weeks of
+    // 112,640 stay inverted on distance and 887 on the clock, and the flavours are exactly those two.
+    if (ctx.easyCapMin != null || ctx.easyCapKm != null) {
+      const over = () => (ctx.easyCapMin != null && sessionMinutes(built) > ctx.easyCapMin + 1e-9)
+        || (ctx.easyCapKm != null && sessionKm(built) > ctx.easyCapKm + 1e-9);
+      // The 20-minute floor still wins: a capped easy day may become short, never a non-run.
+      // ⚠️ AND THIS PARTICULAR COPY OF IT HAS NO OBSERVABLE FAILURE MODE — recorded so nobody
+      // "verifies" it by deleting it. Lowered to 8, the plan is identical across 3,600 plans / 88,800
+      // weeks on every instrument, because the cap never has to walk down that far: measured over
+      // 241,903 easy / recovery / strides runs, NONE is under 20 minutes and the shortest is exactly
+      // 20.0. The floor that produces that 20.0 is the outer `Math.max(20, …)` on `minutes` above,
+      // which IS load-bearing (drop it and a down-scaled runner's race week produces 11-minute
+      // non-runs). This one is the same rule restated where the loop could otherwise walk past it.
+      while (over() && minutes > 20) built = make(--minutes);
+    }
+    sessions.push(built);
     dayOf.push(d);
   });
 
@@ -1047,6 +1300,8 @@ function beginnerRun(
   ease: boolean,
   flavour: number,
   longPeakMin: number,
+  longMinFloor?: number,
+  capMin?: number,
 ): SessionContent {
   // ⚠️ ONLY THE LONG RUN IS EVENT-AWARE. The midweek runs stay on their original gentle ramp: what a
   // new runner needs on a Tuesday is the habit, and it is the same habit whatever they have entered.
@@ -1074,6 +1329,21 @@ function beginnerRun(
     ? Math.round(geomLerp(openMin, longPeakMin, f))
     : Math.round(lerp(22, 38, f));
   if (ease) minutes = Math.round(minutes * 0.75);
+  // ⚠️ AFTER the ease multiplier, not before: a deload or taper week is meant to be shorter than the
+  // week beside it, and a floor applied first would be scaled straight back out of existence.
+  // `enforceLongRunIsLongest` never asks for a floor on an eased week, so this only ever binds where
+  // the two ramps genuinely crossed. Clamped to the endpoint by the caller, never here.
+  if (long && longMinFloor != null) minutes = Math.max(minutes, Math.round(longMinFloor));
+  // ⚠️ AND THE CAP IS ON MINUTES, NOT ON `f`. Winding the ramp position back bottoms out at
+  // `lerp(22, 38, 0)` = 22 minutes, so on a beginner DELOAD — where the long run is eased to 15 or 16
+  // — the midweek run could not be brought under it and the week stayed inverted whatever was asked.
+  // Measured: every one of the 24 residual beginner weeks was a deload for that reason.
+  // ⚠️ THE FLOOR IS 8, AND IT IS MEASURED RATHER THAN CHOSEN. At 10 the last six inverted beginner
+  // weeks in the whole sweep were an 18:00-5k "beginner" on a 5 km goal, week 4, a DELOAD: an
+  // 11-minute long run beside a "10′ easy + gentle pickups" that BUILDS to 11 minutes and covers
+  // 34 metres more, because the pickups are added on top and run faster than easy. Nine is what closes
+  // it and eight is the margin; measured, nothing in the sweep is ever prescribed below 10 minutes.
+  if (!long && capMin != null) minutes = Math.max(8, Math.min(minutes, Math.floor(capMin)));
   return long ? longRun(paces, minutes) : CONT_FLAVOURS[flavour % CONT_FLAVOURS.length]!(paces, minutes);
 }
 
@@ -1109,13 +1379,33 @@ function buildBeginnerWeek(
   const dayOf: number[] = [];
 
   // The weekly long, gentle session (on the athlete's chosen long-run day).
-  sessions.push(beginnerRun(ctx.paces, f, true, runWalk, ease, 0, ctx.longMin));
+  // ⚠️ THE BEGINNER TRACK HAS THE SAME TWO-RAMPS DEFECT AS THE MAIN ONE, and nobody had measured it:
+  // the long run opens at 45% of its own endpoint while the midweek runs open at a flat 22 minutes,
+  // so a "just getting started" 5 km plan hands out a 21-minute long run beside a 25-minute easy run.
+  // Measured over 4,128 beginner weeks: 7.95% inverted, mean shortfall 2.4 minutes, worst 1.28x.
+  // `longMinFloor` is what `enforceLongRunIsLongest` uses to close it, clamped to this track's own
+  // endpoint — see that function. Run–walk plans are untouched and cannot be affected: every session
+  // in one is typed `easy`, so they contain no long run to be longest.
+  sessions.push(beginnerRun(ctx.paces, f, true, runWalk, ease, 0, ctx.longMin, ctx.longMinFloor));
   dayOf.push(longDay);
 
   // Other easy days — each draws a different flavour, and the set rotates every week.
   const easyDays = BEG_EASY_REL.map((r) => dayRel(longDay, r)).slice(0, runningDays - 1);
   easyDays.forEach((d, ei) => {
-    sessions.push(beginnerRun(ctx.paces, f, false, runWalk, ease, index + ei, ctx.longMin));
+    const make = (cap?: number) => beginnerRun(ctx.paces, f, false, runWalk, ease, index + ei, ctx.longMin, undefined, cap);
+    let built = make();
+    if (ctx.easyCapMin != null || ctx.easyCapKm != null) {
+      // The belt, for the weeks the lift cannot reach: a deload (never lifted, by design), and the
+      // late weeks where the long run already sits at this track's own endpoint — a fast beginner's
+      // 5 km endpoint is ~36 minutes while the midweek ramp arrives at 38. The BUILT session is what
+      // is measured, because `contProgression` and `contPickups` cover more ground per minute than
+      // plain easy running, so the distance ruler can bind while the clock does not.
+      const over = () => (ctx.easyCapMin != null && sessionMinutes(built) > ctx.easyCapMin + 1e-9)
+        || (ctx.easyCapKm != null && sessionKm(built) > ctx.easyCapKm + 1e-9);
+      let cap = Math.min(sessionMinutes(built), ctx.easyCapMin ?? Infinity);
+      while (over() && cap > 8) built = make(--cap);
+    }
+    sessions.push(built);
     dayOf.push(d);
   });
 
@@ -1355,7 +1645,11 @@ function easyVariant(paces: TrainingPaces, minutes: number, idx: number, canStri
  * - Doses respect the week around them: four running days or fewer get the milder caps.
  */
 function longRunFor(wp: AnnotatedWeek, ctx: WeekContext): SessionContent {
-  const min = ctx.longMin;
+  // ⚠️ A FLOOR, applied here rather than by overwriting `longMin`, so the ramp stays the only thing
+  // that decides how long a long run WANTS to be and `enforceLongRunIsLongest` can only ever make one
+  // longer. Every dose below is a fraction of `min`, so the floor scales the work with the run
+  // instead of leaving a lifted long run with a peak-sized block on a base-sized outing.
+  const min = Math.max(ctx.longMin, ctx.longMinFloor ?? 0);
   const phase = wp.phase;
   const dist = ctx.goal.distance;
   if (wp.isDeload || phase === "taper" || phase === "base") return longRun(ctx.paces, min);

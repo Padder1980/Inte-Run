@@ -89,6 +89,19 @@ test("the shell sizes to its own PAGE, and still yields to a keyboard", () => {
     ".app must rest at 100% (its own page); --vvh stays as the inert emergency hook");
   assert.ok(!/\.app \{[^}]*100dvh/.test(STYLE),
     ".app must not size on dvh — it measures the screen, not the page it was given");
+  // ⚠️ AND THE OPPOSITE WHERE A CAP IS A FRACTION OF THE VISIBLE SCREEN. `1vh` on iOS Safari is a
+  // fraction of the LARGEST viewport (URL bar hidden), so a 44vh cap on the extras popup's scroller
+  // becomes 44% of a taller box than the runner can see and the body pushes past the bottom of the
+  // screen while the URL bar is showing. `.app` must not use dvh because it should track the PAGE it
+  // was given; this must, because it is measuring the SCREEN. The rule is which of the two the
+  // element is about, not a blanket preference — the app's own comment claimed a guard in
+  // test/ios-viewport.test.ts, a file that has never existed, so until now nothing checked it.
+  const wz = STYLE.match(/\.wz-extras-body \{[^}]*\}/);
+  assert.ok(wz, ".wz-extras-body has gone — the extras popup's bounded scroller was load-bearing");
+  assert.match(wz![0], /max-height:\s*\d+(?:\.\d+)?dvh/,
+    ".wz-extras-body's cap is not in dvh: " + wz![0]);
+  assert.ok(!/max-height:\s*\d+(?:\.\d+)?vh\b/.test(wz![0]),
+    ".wz-extras-body is capped in bare vh, which on iOS is a fraction of the TALLER viewport: " + wz![0]);
   assert.ok(!/setProperty\("--vvh"/.test(SOURCE),
     "nothing may publish --vvh any more — the v3 keyboard overlays instead of shrinking the shell");
   assert.ok(/setProperty\("--kbh"/.test(SOURCE), "the keyboard height must be published as --kbh");

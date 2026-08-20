@@ -15,6 +15,28 @@ import type { Session } from "../src/domain/types.ts";
 
 const page = () => readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
 
+/**
+ * ONE function's body, bounded by its own braces.
+ *
+ * ⚠️ NOT A CHARACTER WINDOW. `html.slice(at, at + 1800)` is how the "nothing is offered when there is
+ * nothing honest to offer" guard used to read heatCard, and when the two conditions it looks for
+ * moved into a shared heatOffer — one answer, read by the Today card AND by the briefing card, so
+ * they cannot disagree — the window slid over the comment block below instead and the guard failed on
+ * correct code. CLAUDE.md records this trap firing three times in one feature. A window guessed at
+ * 1800 characters either truncates the function or runs into the next one.
+ */
+function fnOf(src: string, name: string): string {
+  const at = src.indexOf("function " + name + "(");
+  assert.ok(at >= 0, "not in the build: " + name);
+  let d = 0;
+  for (let i = src.indexOf("{", at); i < src.length; i++) {
+    if (src[i] === "{") d++;
+    else if (src[i] === "}") { d--; if (!d) return src.slice(at, i + 1); }
+  }
+  throw new Error("unbalanced braces in " + name);
+}
+const nocomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, "");
+
 function sessionOf(steps: any[], extra: any = {}): Session {
   return {
     id: "s1", dayOfWeek: 1, type: "threshold", title: "test", description: "", intensity: "hard",
@@ -137,16 +159,39 @@ test("every surface that shows or runs a session applies the adaptation", () => 
     "the adaptation must be applied before the warm-up is generated");
 });
 
+/**
+ * The whole statement starting at `at`, bounded by its own semicolon at depth zero.
+ * ⚠️ NOT A CHARACTER WINDOW, for the same reason fnOf exists — and not an anchor on a VARIABLE NAME
+ * either. This test used to find the accept handler by `if (heatDo) heatDo.onclick`, and it failed on
+ * correct code the moment every heat control became a data- attribute bound by querySelectorAll (which
+ * it had to, because the Today card and the briefing card render the same offer and two elements
+ * sharing one id left the second one with no handler). A guard anchored on how something is spelled
+ * breaks when the spelling changes for a good reason.
+ */
+function stmtAt(src: string, at: number): string {
+  let d = 0;
+  for (let i = at; i < src.length; i++) {
+    const c = src[i]!;
+    if (c === "(" || c === "{" || c === "[") d++;
+    else if (c === ")" || c === "}" || c === "]") d--;
+    else if (c === ";" && d === 0) return src.slice(at, i + 1);
+  }
+  throw new Error("unterminated statement");
+}
+
 test("accepting reaches the watch", () => {
   const html = page();
-  const at = html.indexOf('if (heatDo) heatDo.onclick');
+  const at = html.indexOf('document.querySelectorAll("[data-heatdo]")');
   assert.ok(at > 0, "the accept handler is missing");
-  const src = html.slice(at, at + 1200).replace(/^\s*\/\/.*$/gm, "");
+  const src = nocomment(stmtAt(html, at));
   // ⚠️ The competitor tells its users to force-quit their watch app to pick adapted paces up. A wrist
   // quietly running the original targets after the runner accepted is the worst outcome of this whole
   // feature, and there is no reason for it here.
   assert.match(src, /syncWatch\(\)/, "accepting must re-sync the watch");
   assert.match(src, /saveHeatAdapt\(\)/, "the decision must be persisted");
+  // And it writes the decision against the session the BUTTON names, not against a re-derived one.
+  assert.match(src, /heatSessById\(b\.dataset\.heatdo\)/,
+    "the accept handler no longer takes its session from the control it was rendered on");
 });
 
 test("a decline is remembered, but only for today", () => {
@@ -161,13 +206,24 @@ test("a decline is remembered, but only for today", () => {
 
 test("nothing is offered when there is nothing honest to offer", () => {
   const html = page();
-  const at = html.indexOf("function heatCard(");
-  const src = html.slice(at, at + 1800).replace(/^\s*\/\/.*$/gm, "");
-  assert.match(src, /HEAT_MIN_FACTOR/, "a trivial adaptation must not be offered");
+  // ⚠️ THERE IS ONE GATE AND BOTH SURFACES GO THROUGH IT. The Today card and the briefing-card block
+  // ask the same question, and two copies of this test is how the card comes to offer something the
+  // sheet then refuses — a control that looks live and is not, which is a defect class this project
+  // has shipped three times. So the conditions are asserted on heatOffer, and both callers are
+  // required to reach it. The BEHAVIOURAL half of this claim — that a 1.005 factor and a pace-free
+  // hill session really do produce no offer — is driven through the real functions in
+  // test/heat-custom.test.ts; a source assertion can only ever prove a string exists.
+  const offer = nocomment(fnOf(html, "heatOffer"));
+  assert.match(offer, /HEAT_MIN_FACTOR/, "a trivial adaptation must not be offered");
   // ⚠️ A hill session has no pace targets, so "adjust your paces" promises a change the app cannot
   // make and the accept would land on a session identical to the one before it.
-  assert.match(src, /changedSteps/, "a session with no paces must not be offered an adaptation");
-  assert.match(src, /heatChoice\(sess\) \|\| heatDeclinedToday\(sess\)/, "an answered card must stop asking");
+  assert.match(offer, /changedSteps/, "a session with no paces must not be offered an adaptation");
+  for (const caller of ["heatCard", "heatBlockHtml"]) {
+    assert.match(nocomment(fnOf(html, caller)), /heatOffer\(/,
+      caller + " no longer asks heatOffer whether there is anything to offer");
+  }
+  assert.match(nocomment(fnOf(html, "heatCard")), /heatChoice\(sess\) \|\| heatDeclinedToday\(sess\)/,
+    "an answered card must stop asking");
 });
 
 test("past the model's range it declines to give a number", () => {

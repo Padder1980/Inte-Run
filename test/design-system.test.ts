@@ -354,8 +354,21 @@ test("⚠️ readiness and the weather are separate tiles", () => {
   const html = css();
   const at = html.indexOf("function viewToday(");
   const body = html.slice(at, html.indexOf("\nfunction ", at + 10));
-  assert.match(body, /conditionsSquare\(sess\) \+ feelSquare\(\)/,
-    "readiness and conditions are no longer two separate tiles");
+  // ⚠️ RESTATED, NOT RELAXED. This was anchored on the literal `conditionsSquare(sess) + feelSquare()`
+  // and had to change when the square started resolving its own session — it was handed one by this
+  // caller, which is how it came to price the plan's mobility slot while the heat card two inches
+  // below priced the run the runner had actually added. The invariant is TWO SEPARATE TILES in one
+  // row, each built by its own builder, and that is what is asserted; the literal was only ever one
+  // spelling of it.
+  assert.match(body, /'<div class="tsq-row">' \+ conditionsSquare\([^)]*\) \+ feelSquare\(\)/,
+    "readiness and conditions are no longer two separate tiles in one row");
+  // ⚠️ AND THE HALF THE BRIEF WAS ACTUALLY ABOUT — "a 'good to go' beside a heat warning" — is a
+  // statement about the WORDS on the square against its own colour, which no source match can make.
+  // It is guarded behaviourally by test/heat-custom.test.ts, "BLOCKER: the conditions square never
+  // says Good to run under a warning colour", which drives the real builder over nine temperatures
+  // and four wind speeds. Named here rather than restated, so the address cannot go stale silently.
+  assert.doesNotMatch(body, /feelSquare\([^)]/,
+    "feelSquare is being handed the weather — the two tiles can now contradict each other");
 });
 
 // ---- Phase 2: Plan -------------------------------------------------------------------------------

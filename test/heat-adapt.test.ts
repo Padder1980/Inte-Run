@@ -218,12 +218,21 @@ test("nothing is offered when there is nothing honest to offer", () => {
   // ⚠️ A hill session has no pace targets, so "adjust your paces" promises a change the app cannot
   // make and the accept would land on a session identical to the one before it.
   assert.match(offer, /changedSteps/, "a session with no paces must not be offered an adaptation");
-  for (const caller of ["heatCard", "heatBlockHtml"]) {
-    assert.match(nocomment(fnOf(html, caller)), /heatOffer\(/,
-      caller + " no longer asks heatOffer whether there is anything to offer");
-  }
-  assert.match(nocomment(fnOf(html, "heatCard")), /heatChoice\(sess\) \|\| heatDeclinedToday\(sess\)/,
-    "an answered card must stop asking");
+  // ⚠️ ONE CALLER NOW, WHERE THERE WERE TWO. heatCard rendered the offer as an attention card at the
+  // top of Today and the owner moved it into the session preview on 2026-08-21 — "I want the adapt for
+  // heat to be within the session preview" — where heatBlockHtml had been showing it all along. The
+  // builder is deleted rather than left unreachable; the invariant it carried is unchanged and is
+  // asserted here of the surviving one.
+  assert.match(nocomment(fnOf(html, "heatBlockHtml")), /heatOffer\(/,
+    "heatBlockHtml no longer asks heatOffer whether there is anything to offer");
+  assert.ok(!/function heatCard\(/.test(html),
+    "heatCard is back; the offer belongs in the session preview, not at the top of Today");
+  // ⚠️ AN ANSWERED OFFER MUST STOP ASKING, and in the block that is a STATE rather than an empty
+  // string: it says what was decided instead of offering again. Asserted as the absence of the offer's
+  // own control on a decided session, which is what the runner would see.
+  const blk = nocomment(fnOf(html, "heatBlockHtml"));
+  assert.match(blk, /heatChoice\(sess\)/, "the block does not consult the decision at all");
+  assert.match(blk, /heatDeclinedToday\(sess\)/, "the block does not consult a decline at all");
 });
 
 test("past the model's range it declines to give a number", () => {

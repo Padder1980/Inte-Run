@@ -131,7 +131,7 @@ type Trace = {
  */
 function run(t: Trace) {
   const src = [
-    lift(["haversine", "checkSplits", "gpsFixElapsedMs", "pedoFillGap", "onGpsPos", "paceMark",
+    lift(["haversine", "checkSplits", "gpsFixElapsedMs", "pedoFillGap", "onGpsPos", "paceMark", "liveDistM",
           "currentGpsPace", "gpsUiTick"]),
     liftPedoEntry(),
   ].join("\n");

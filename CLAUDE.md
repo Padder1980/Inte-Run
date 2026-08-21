@@ -7360,3 +7360,85 @@ Copy this into the first message of a new session on either account (fill in the
 > (never hand-edit `web/app.html`), verified with `npx tsc --noEmit` and `node --test`, then pushed to
 > `main` (GitHub Pages deploys `docs/`). Please `git pull` first, confirm you've read `CLAUDE.md`, and
 > give me a one-line summary of the current status. Today I want to: **______**.
+
+## THE 20-METRE GPS REPORT, AND WHY THE OBVIOUS FIX WOULD HAVE MADE IT WORSE (owner, 2026-08-21)
+
+*"I have done a number gps tests again today over multiple 1km runs.....our app is consistent when
+tracking on either the phone or watch. However, both are 20 metres out from what the runna app tracks
+over that distance. Ours finishes 20 metres after the runna app finishes a 1km segment"*
+
+⚠️ **OUR TOTAL IS NOT WRONG — THE READING LAGS, AND THOSE ARE DIFFERENT DEFECTS WITH DIFFERENT FIXES.**
+Measured over sixty simulated kilometres through the SHIPPED `onGpsPos`, with a filtered receiver
+(correlated error, not the independent per-fix noise an earlier probe used — independent noise inflates
+distance and masks exactly this): accumulated error **−0.25%**, i.e. 2.5 m per km. But at the instant the
+true distance crossed 1000 m the app read **3.5 m short on average, 5.3 m worst**, because the leash only
+commits distance once the runner is further from the anchor than a fix's own noise. At any moment up to a
+leash's worth of real ground is unpaid. That is the shape of his report: our kilometre marker arrives
+after the other app's because our reading is behind, not because our total is short.
+
+⚠️⚠️ **TIGHTENING THE LEASH WAS MEASURED AND REJECTED, AND THE MEASUREMENT IS THE POINT.** A 3 m leash
+reads 0.4 m short instead of 3.5 — and on a stationary phone with no reported speed it invents distance:
+
+| wander, no reported speed | shipped `max(10, acc)` | `max(3, acc*0.5)` |
+|---|---|---|
+| ±4 m, ±8 m | 0.0 m | 0.0 m |
+| **±16 m (under a roof)** | **0.0 m** | **176.8 m** |
+| ±32 m (city canyon) | 270.1 m | 752.5 m |
+| ±64 m | 1300.7 m | 2508.7 m |
+
+Three metres on a clean signal for 177 m of invented distance is the standing-still defect this file
+already records fixing once, bought back. **Do not tighten the leash.**
+⚠️ **AND THAT TABLE IS ALSO THE PROBE'S OWN CALIBRATION.** The standstill check read 0.0 m for every
+variant at first, which is what an instrument that never reaches the credit path also reads. Raising the
+wander until both variants credit hundreds of metres is what proved it can fail.
+
+**What shipped instead: `LIVE.pendM`, the leg the leash has not committed, included in the READING.**
+`liveDistM()` is the one reader (the screen, `checkSplits`, the runtime feed, both saved records); every
+writer still writes only `LIVE.dist`. Lag **3.5 m → 0.52 m**, and the standstill behaviour is identical
+to shipped at every wander from ±4 m to ±64 m — because it is gated on the device itself reporting
+movement (`devSpeed > 0.5`), so a phone on a table accrues nothing.
+- ⚠️ **MONOTONE WITHIN A LEG** (`Math.max(pendM, min(net, leash))`). `net` falls when a fix wanders, and a
+  distance that goes backwards on screen is worse than one that lags. On commit `dist` grows by more than
+  a leash while this resets to zero, so the sum never drops.
+- ⚠️ **CLEARED AT THE MOMENT OF COMMIT**, or the same metres are counted twice.
+- ⚠️ **ONE READER, OR A KILOMETRE MARKER FIRES AT A DISTANCE THE SCREEN NEVER SHOWED.** Reading
+  `LIVE.dist` in some places and `liveDistM()` in others is that defect exactly.
+
+⚠️ **WHICH APP IS RIGHT IS STILL NOT ESTABLISHED, AND THE HONEST ANSWER IS THAT NEITHER IS PROVEN.** Two
+apps disagreeing by 2% over a kilometre says nothing about which one matches the ground without a
+measured truth. Our model says we are within ~4 m at 1 km; the remaining ~16 m of his 20 is therefore
+more likely the other app reading long, but that is an inference, not a measurement. **A 400 m track lap,
+or a mapped kilometre, would settle it** — worth asking for before spending anything more here.
+
+## THE HEAT OFFER MOVED INTO THE SESSION PREVIEW, AND THE DAY'S CARD STOPPED STARTING RUNS (2026-08-21)
+
+*"I want the adapt for heat to be within the session preview and for today's session to be a button that
+enters the session preview rather than an automatic start button"*
+
+⚠️ **IT WAS ALREADY IN THE PREVIEW — `heatBlockHtml`, above the steps, where it explains the bands the
+runner is about to read.** So the card at the top of Today was the same offer made twice, and it was the
+copy that pushed the day's own session below the fold (his screenshot shows exactly that). `heatCard` is
+**deleted**, not left unreachable, because an unreachable builder is what the next screen copies — and its
+own comment claimed it was "also the definition of is there an offer", which was already untrue:
+`heatOffer` is, and both callers used it.
+
+⚠️ **THE DAY'S CARD OPENS THE PREVIEW AND NEVER STARTS A RUN.** There were two branches — Start on a
+runnable session today, View on anything else — and the first is gone. Starting from there skipped the
+one screen that says what the session is, what the heat has done to its paces, and where it will be
+recorded, and put the runner one tap from a live GPS session they had not read. The preview carries its
+own Start (`sdStart`).
+⚠️ **THE `$("id")` GUARD CAUGHT THE LEFTOVER**: the `startSession` handler was still bound to an id
+nothing rendered any more. Sixth outing of the invented-identifier trap, and the first time it has fired
+on a REMOVAL rather than an invention.
+⚠️ **AND SIX GUARDS IN THREE FILES NAMED `heatCard`.** Every one is re-pointed at `heatBlockHtml` rather
+than deleted — same gating, and the block additionally has states for an accepted decision and a stale
+forecast. One had to change its CLAIM as well as its subject: "the card kept asking after a decline"
+asserted an empty string, and the block answers a decided session with a STATE, so it now asserts the
+absence of the offer's own control instead.
+
+⚠️ **STILL OUTSTANDING FROM HIS 2026-08-21 REPORT, AND BOTH ARE SCREEN REBUILDS:** the phone-recorded
+run's START screen (session title with an up-first rail, distance/time/avg pace, an active-shoe chip, a
+GPS signal indicator, map zoom/recentre/mute controls) and its FINISH screen (workout name, description,
+private notes, and a "sync to applications" block with Strava and Apple Health toggles beside Discard and
+Save). Apple Health WRITE does not exist in this app at all — that is an `HKWorkout` save and a new
+entitlement, i.e. native work, not a toggle.

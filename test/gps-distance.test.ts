@@ -61,7 +61,7 @@ type Opts = {
  * one millisecond and the 20-second window can never open.
  */
 function run(o: Opts) {
-  const src = lift(["haversine", "onGpsPos", "gpsFixElapsedMs", "checkSplits", "paceMark"]);
+  const src = lift(["haversine", "onGpsPos", "gpsFixElapsedMs", "checkSplits", "paceMark", "liveDistM"]);
   const LIVE: any = {
     mode: "gps", dist: 0, route: [], elevGain: 0, splits: [], kmDone: 0, lastKmMs: 0,
     lastLat: null, lastLon: null, lastAlt: null, devSpeed: null, acc: null,
@@ -175,7 +175,7 @@ test("distance is gated on DISPLACEMENT, never on the speed the device claims", 
  * where the runner was earlier and credit the journey back as their first distance.
  */
 function feed(fixes: any[]) {
-  const src = lift(["haversine", "onGpsPos", "gpsFixElapsedMs", "checkSplits", "paceMark"]);
+  const src = lift(["haversine", "onGpsPos", "gpsFixElapsedMs", "checkSplits", "paceMark", "liveDistM"]);
   const LIVE: any = {
     mode: "gps", dist: 0, route: [], elevGain: 0, splits: [], kmDone: 0, lastKmMs: 0,
     lastLat: null, lastLon: null, lastAlt: null, devSpeed: null, acc: null,
@@ -318,7 +318,7 @@ test("the watch reads the fused HealthKit distance rather than only its own GPS 
  * a genuine gap once, and it refuses a reading no runner could produce.
  */
 function pedoHarness() {
-  const src = lift(["haversine", "onGpsPos", "pedoFillGap", "gpsFixElapsedMs", "checkSplits", "paceMark"]);
+  const src = lift(["haversine", "onGpsPos", "pedoFillGap", "gpsFixElapsedMs", "checkSplits", "paceMark", "liveDistM"]);
   const LIVE: any = {
     mode: "gps", dist: 0, route: [], elevGain: 0, splits: [], kmDone: 0, lastKmMs: 0, lastFixAt: null,
     lastLat: null, lastLon: null, lastAlt: null, devSpeed: null, acc: null,
@@ -423,7 +423,7 @@ test("the native side declares why it wants motion data", () => {
  * a batch crossing two kilometre boundaries recorded ONE split and silently dropped the other.
  */
 function replayHarness() {
-  const src = lift(["haversine", "onGpsPos", "gpsFixElapsedMs", "checkSplits", "paceMark"]);
+  const src = lift(["haversine", "onGpsPos", "gpsFixElapsedMs", "checkSplits", "paceMark", "liveDistM"]);
   const LIVE: any = {
     mode: "gps", dist: 0, route: [], elevGain: 0, splits: [], kmDone: 0, lastKmMs: 0,
     startMs: 0, pausedMs: 0, lastLat: null, lastLon: null, lastAlt: null, devSpeed: null, acc: null,
@@ -486,7 +486,7 @@ test("a live fix is unaffected — its time is where it always was", () => {
 test("a stretch that crosses two kilometres at once records both, and marks them estimated", () => {
   // ⚠️ A single credited GPS fix can never do this — the 200 m spike gate forbids it. The path that
   // genuinely can is the pedometer filling a long blackout, which adds the whole stretch in one go.
-  const src = lift(["haversine", "onGpsPos", "pedoFillGap", "gpsFixElapsedMs", "checkSplits", "paceMark"]);
+  const src = lift(["haversine", "onGpsPos", "pedoFillGap", "gpsFixElapsedMs", "checkSplits", "paceMark", "liveDistM"]);
   const LIVE: any = {
     mode: "gps", dist: 900, route: [], elevGain: 0, splits: [], kmDone: 0, lastKmMs: 0,
     startMs: 0, pausedMs: 0, lastFixAt: null,
@@ -537,7 +537,7 @@ test("an estimated split is never judged against the target band", () => {
  * Every scenario here is deterministic; the tolerances come from the measured probe matrix.
  */
 function settleHarness() {
-  const src = lift(["haversine", "onGpsPos", "pedoFillGap", "gpsFixElapsedMs", "checkSplits", "paceMark"]);
+  const src = lift(["haversine", "onGpsPos", "pedoFillGap", "gpsFixElapsedMs", "checkSplits", "paceMark", "liveDistM"]);
   const LIVE: any = {
     mode: "gps", dist: 0, route: [], elevGain: 0, splits: [], kmDone: 0, lastKmMs: 0, lastFixAt: null,
     lastLat: null, lastLon: null, lastAlt: null, devSpeed: null, acc: null,
@@ -640,4 +640,88 @@ test("an honest runner is still credited nearly everything (the 2026-08-04 rule 
     `an honest 3.3 m/s runner lost distance: ${Math.round(h.LIVE.dist)} m of ${Math.round(truth)} m`);
   assert.ok(h.LIVE.dist < truth * 1.03, "an honest runner is over-credited");
   assert.equal(h.LIVE.gpsDiag.capped, 0, "the speed cap trimmed a physically consistent run");
+});
+
+test("BLOCKER: the reading includes the leg the leash has not committed, and only while moving", () => {
+  // ⚠️ THE OWNER'S FIELD REPORT, 2026-08-21: "both are 20 metres out from what the runna app tracks
+  // over that distance. Ours finishes 20 metres after the runna app finishes a 1km segment." Our TOTAL
+  // is not wrong — measured over sixty simulated kilometres with a filtered receiver the accumulated
+  // error is -0.25% — but the READING lags, because the leash only commits distance once the runner is
+  // further from the anchor than a fix's own noise. At the instant the true distance crossed 1000 m the
+  // app read 3.5 m short on average. Crediting the pending leg takes that to 0.52 m.
+  //
+  // ⚠️ TIGHTENING THE LEASH INSTEAD WAS MEASURED AND REJECTED, and this guard exists partly to record
+  // it. A 3 m leash reads 0.4 m short on a clean signal and invents 176.8 m on a stationary phone under
+  // a roof at +-16 m of wander, where the shipped leash invents nothing. That is the standing-still
+  // defect this project already fixed once, bought back for three metres.
+  const h = settleHarness();
+  h.fix(0);                                   // seeds the anchor
+  h.tick(1000);
+  // Four metres on, moving: inside the 10 m leash, so nothing is COMMITTED...
+  h.fix(4, { speed: 3 });
+  assert.equal(h.LIVE.dist, 0, "four metres inside the leash was committed, so the leash is not working");
+  // ...but the runner has genuinely covered it, so the READING says so.
+  const pend = h.LIVE.pendM || 0;
+  assert.ok(pend > 3.5 && pend <= 10,
+    "the reading does not include the four metres actually covered: pending " + pend);
+
+  // ⚠️ MONOTONE. A fix that wanders back must not take the reading backwards — a total that goes down
+  // is worse than one that lags, and net genuinely falls when a fix drifts toward the anchor.
+  h.tick(1000);
+  h.fix(2, { speed: 3 });
+  assert.ok((h.LIVE.pendM || 0) >= pend,
+    "the pending leg shrank, so the distance on screen went backwards");
+
+  // ⚠️ AND IT IS CLEARED THE MOMENT ITS GROUND IS COMMITTED, or the same metres are counted twice.
+  // ⚠️ MOVED PAST THE START-SETTLE WINDOW FIRST, and the first version of this guard forgot to. Inside
+  // 45 s a displacement over max(2 x leash, 30) is treated as the receiver converging and re-seeds the
+  // anchor instead of crediting — which is correct, and meant a 30 m step here committed nothing at all
+  // and read as this guard failing.
+  h.tick(50000);
+  h.fix(30, { speed: 3 });
+  assert.ok(h.LIVE.dist > 25, "a clear move past the leash was not committed");
+  assert.equal(h.LIVE.pendM, 0, "the pending leg survived being committed, so it is counted twice");
+});
+
+test("BLOCKER: a stationary phone accrues no pending distance, whatever its jitter", () => {
+  // ⚠️ THIS IS THE WHOLE REASON THE PENDING LEG IS FREE. It is gated on the device reporting real
+  // movement, so the case the leash exists for — a phone on a table, or one under a roof whose fixes
+  // wander — is untouched. Measured against the shipped code at every wander from +-4 m to +-64 m with
+  // no reported speed: identical.
+  for (const speed of [null, 0, 0.2]) {
+    const h = settleHarness();
+    h.fix(0, { speed: speed });
+    for (let i = 0; i < 60; i++) {
+      h.tick(1000);
+      // jitter inside the leash, back and forth, exactly as a stationary receiver produces
+      h.fix(i % 2 ? 6 : -6, { speed: speed, acc: 5 });
+    }
+    assert.equal(h.LIVE.dist, 0, "a stationary phone committed distance at speed " + speed);
+    assert.ok(!(h.LIVE.pendM > 0),
+      "a stationary phone accrued " + h.LIVE.pendM + " m of pending distance at speed " + speed +
+      " — the gate is meant to be the device's own report of movement");
+  }
+});
+
+test("BLOCKER: one reader decides the distance, so the screen and the splits cannot disagree", () => {
+  // ⚠️ READING LIVE.dist IN SOME PLACES AND THE FULL DISTANCE IN OTHERS IS HOW A KILOMETRE MARKER COMES
+  // TO FIRE AT A DISTANCE THE SCREEN NEVER SHOWED. Every writer still writes only LIVE.dist; liveDistM
+  // is the only thing anything reads.
+  const src = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
+  const body = (name: string) => {
+    const at = src.indexOf("function " + name + "(");
+    assert.ok(at > 0, "no function " + name);
+    let d = 0;
+    for (let i = src.indexOf("{", at); i < src.length; i++) {
+      if (src[i] === "{") d++;
+      else if (src[i] === "}") { d--; if (!d) return src.slice(at, i + 1); }
+    }
+    return "";
+  };
+  assert.match(body("checkSplits"), /liveDistM\(\)/,
+    "the split boundary is taken from the committed total, so every kilometre marker lands late");
+  assert.match(body("gpsUiTick"), /liveDistM\(\)/,
+    "the runtime is fed the committed total, so the pace and the cues run behind the runner");
+  assert.match(body("liveDistM"), /LIVE\.pendM/,
+    "the one reader no longer includes the uncommitted leg, so it is the committed total by another name");
 });

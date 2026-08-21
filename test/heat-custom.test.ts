@@ -3,7 +3,7 @@
  *
  * ⚠️ THE OWNER FIELD-TESTED THIS IN RHODES AT 33 °C AND THE FEATURE DID NOTHING. Measured against the
  * build he was carrying, with a custom 2 km easy run added for today: `heatTargetSession()` → null,
- * `heatCard()` → 0 characters, `heatChoice(custom)` → null, `heatApplied(custom) === custom` by object
+ * `heatBlockHtml()` → 0 characters, `heatChoice(custom)` → null, `heatApplied(custom) === custom` by object
  * identity, and the session sheet's own HTML matching NONE of /heat/i, /°/, /by effort/i, /adapt/i,
  * /conditions/i or /weather/i — while at the same moment the engine answered paceFactor 1.0228,
  * severity "severe", and `adaptSessionForHeat` changed a step. **The adaptation applied and was
@@ -80,7 +80,7 @@ const decomment = (s: string) =>
  * list of ninety helpers goes stale the first time one is added, silently measuring a card that is no
  * longer the card.
  */
-const ROOTS = ["heatCandidates", "heatSessById", "heatTargetSession", "heatOffer", "heatCard",
+const ROOTS = ["heatCandidates", "heatSessById", "heatTargetSession", "heatOffer",
   "heatBlockHtml", "heatApplied", "heatChipHtml", "heatSheetHtml", "hoursFor", "hourAt",
   "seedDone", "wxDiagLine", "addExtra", "removeExtra", "sessionSheetHtml",
   // ⚠️ THE CONDITIONS SURFACES ARE PART OF THIS PIPELINE, and leaving them out is how the square came
@@ -312,6 +312,23 @@ function ensurePlannedToday(e: Env): any {
  * carries no runnable plan session — and the guards below hold whether the plan's slot is then a
  * non-run or empty, which is what their re-breaks prove rather than argue.
  */
+/**
+ * THE HEAT OFFER, WHERE THE RUNNER NOW MEETS IT.
+ *
+ * ⚠️ heatCard IS GONE. It rendered an attention card at the top of Today, and the owner moved that offer
+ * into the session preview on 2026-08-21 — "I want the adapt for heat to be within the session preview"
+ * — where heatBlockHtml had been showing it all along. So every claim these tests made about the card is
+ * re-pointed at the block rather than deleted: the gating is the same (heatOffer decides, and the block
+ * is scoped to today by the same heatCandidates test), and the block additionally has states for an
+ * accepted decision and a stale forecast.
+ * ⚠️ IT RESOLVES THE TARGET THE SAME WAY THE CARD DID, so "the offer reaches the runner" is still a
+ * statement about the whole chain rather than about a builder called with a session handed to it.
+ */
+function heatOfferHtml(e: any): string {
+  const t = e.api.heatTargetSession();
+  return t ? e.api.heatBlockHtml(t) : "";
+}
+
 function ensureNoPlannedToday(e: Env): void {
   const st = e.api.__state();
   const d = new Date(e.today + "T00:00:00Z");
@@ -355,8 +372,9 @@ test("BLOCKER: a heat decision can be CREATED for a custom run — the Rhodes de
   // heatCard() → 0 characters, on a day whose only runnable thing was the run he had just added.
   const tgt = e.api.heatTargetSession();
   assert.ok(tgt, "heatTargetSession found nothing to offer on a 33 °C day with a run added");
-  const card = e.api.heatCard();
-  assert.ok(card.length > 0, "the Today heat card is empty on a 33 °C day with a run added");
+  const card = heatOfferHtml(e);
+  assert.ok(card.length > 0,
+    "the heat offer is empty in the session preview on a 33 °C day with a run added");
 
   // ⚠️ AND ACCEPTING MUST ACTUALLY CHANGE THE SESSION. This is the claim heat-adapt.test.ts cannot
   // make: it asserts heatApplied is CALLED, never that a decision exists for it to apply.
@@ -511,7 +529,15 @@ test("BLOCKER: it proposes, it never imposes", () => {
   decl[custom.id] = e.today;
   e.store.setItem("interun_heatno_v1", JSON.stringify(decl));
   assert.equal(e.api.heatDeclinedToday(custom), true, "the decline was not remembered");
-  assert.equal(e.api.heatCard(), "", "the card kept asking after a decline");
+  // ⚠️ ASSERTED ON WHETHER IT STILL ASKS, NOT ON WHETHER IT IS EMPTY. The card returned "" after a
+  // decline; the block it moved into has a state for a decision that has been made, so an empty-string
+  // check would now be a claim about the wrong thing. What must hold is that the runner is not asked
+  // again today — no adjust control, no offer wording.
+  const after = heatOfferHtml(e);
+  assert.ok(!/data-heatopen/.test(after),
+    "the offer kept asking after a decline: " + after.slice(0, 200));
+  assert.ok(!/Adjust my paces/.test(after),
+    "the offer kept its adjust control after a decline: " + after.slice(0, 200));
   // ⚠️ BUT ONLY FOR TODAY. The weather is a different question tomorrow.
   decl[custom.id] = "2020-01-01";
   e.store.setItem("interun_heatno_v1", JSON.stringify(decl));
@@ -870,8 +896,8 @@ test("BLOCKER: the conditions square and the heat card price the SAME session", 
   // The runner-facing invariant: the sheet cannot say there is no pace to adjust while the card
   // offers to adjust one.
   const sheet = text(e.api.weatherSheetHtml());
-  const card = e.api.heatCard();
-  assert.ok(card.length > 0, "the fixture has no heat card, so there is no contradiction to test");
+  const card = heatOfferHtml(e);
+  assert.ok(card.length > 0, "the fixture makes no heat offer, so there is no contradiction to test");
   assert.ok(!/no pace to adjust/i.test(sheet),
     "the Conditions sheet says there is no pace to adjust while the heat card offers to adjust one: " + sheet.slice(0, 240));
   // ⚠️ ASSERTED ON WHAT THE SQUARE SAYS ABOUT A PACE, NOT ON THE ABSENCE OF ONE PHRASE. "Good to run"
@@ -973,7 +999,7 @@ test("BLOCKER: the briefing card's own wiring path binds every control the heat 
   // ⚠️ DERIVED FROM THE BUILDERS, never listed — a sixth control in a fifth state is picked up without
   // anyone remembering to come here. Both builders, because the card and the block share the offer.
   const emitted = new Set<string>();
-  for (const b of ["heatBlockHtml", "heatCard"]) {
+  for (const b of ["heatBlockHtml"]) {
     for (const m of fnBody(b)!.matchAll(/\bdata-(heat[\w-]*)="/g)) emitted.add(m[1]!);
   }
   assert.ok(emitted.size >= 4, "the scan found only " + emitted.size + " controls — it is wrong, not the code");
@@ -988,7 +1014,7 @@ test("BLOCKER: the briefing card's own wiring path binds every control the heat 
   // the DOM behind an open sheet that is two elements sharing one id, where $() (getElementById)
   // answers the first and the second silently gets no handler. CLAUDE.md records the identical fault in
   // the recap story. Attributes bound by querySelectorAll cannot collide this way.
-  for (const b of ["heatBlockHtml", "heatCard", "heatChipHtml", "heatSheetHtml"]) {
+  for (const b of ["heatBlockHtml", "heatChipHtml", "heatSheetHtml"]) {
     const ids = [...fnBody(b)!.matchAll(/\bid="([\w-]+)"/g)].map((m) => m[1]!);
     assert.deepEqual(ids, [],
       b + " renders an id-addressed control (" + ids.join(",") + "); two copies of one surface then " +

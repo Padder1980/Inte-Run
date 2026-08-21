@@ -338,8 +338,12 @@ function companionTick(opts: { snap?: any; live?: any } = {}): any {
   }, opts.snap || {});
   const LIVE = Object.assign({ dist: 2050, kmDone: 2, watchHr: 119, mode: "gps",
     session: { title: "2 km easy run (custom)", type: "easy" } }, opts.live || {});
+  // ⚠️ liveDistM IS LIFTED, NOT STUBBED. It is the one reader of "how far has the runner actually got"
+  // — the committed total plus the leg the leash has not committed yet — and stubbing it here would let
+  // the companion drift from the phone's own screen without this noticing.
   new Function("window", "LIVE", "NATIVE_WATCH", "Math",
-    fnBody("livePausedNow") + "\n" + fnBody("pushToCompanion") + "\npushToCompanion(" + JSON.stringify(snap) + ");")(
+    fnBody("livePausedNow") + "\n" + fnBody("liveDistM") + "\n" + fnBody("pushToCompanion") +
+    "\npushToCompanion(" + JSON.stringify(snap) + ");")(
     win, LIVE, true, Math);
   assert.equal(sent.length, 1, "pushToCompanion posted " + sent.length + " messages");
   return sent[0];

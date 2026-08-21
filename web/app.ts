@@ -5216,8 +5216,13 @@ function todayDecision() {
     headline: sess.title,
     implication: risky && cond.advice ? cond.advice
       : (sess.description ? String(sess.description).split(". ")[0].replace(/\.$/, "") + "." : ""),
-    action: onToday && PRIMARY_TYPES[sess.type] ? "Start session" : "View session",
-    actionId: onToday && PRIMARY_TYPES[sess.type] ? "startSession" : "viewSession",
+    // ⚠️ IT OPENS THE PREVIEW; IT DOES NOT START THE RUN (owner, 2026-08-21): "I want ... today's
+    // session to be a button that enters the session preview rather than an automatic start button".
+    // Starting from here skipped the one screen that says what the session is, what the heat has done
+    // to its paces, and where it will be recorded — and put the runner one tap from a live GPS session
+    // they had not read. The preview carries its own Start.
+    action: "View session",
+    actionId: "viewSession",
   };
 }
 
@@ -5243,7 +5248,15 @@ function todayNextUp() {
 // ⚠️ HEAT SITS LAST IN THE ORDER, DELIBERATELY. A pace-change flag is about work already done and a
 // retest answers a question about the runner now; heat is about the next hour and can wait behind
 // both. It is also the only one of the four that expires on its own, so losing a day costs nothing.
-function todayCards() { return [trainFlagBanner(), weeklyReviewCard(), fitSuggestBanner(), autoPaceBanner(), heatCard()]; }
+/**
+ * ⚠️ THE HEAT CARD IS NOT HERE ANY MORE, AT THE OWNER'S INSTRUCTION (2026-08-21): "I want the adapt for
+ * heat to be within the session preview". It already WAS in the preview — heatBlockHtml, above the
+ * steps, where it explains the bands the runner is about to read — so this was the same offer made
+ * twice, and the copy at the top of Today was the one that pushed the day's session below the fold.
+ * ⚠️ AND IT IS THE PREVIEW COPY THAT SURVIVES, NOT THE OTHER WAY ROUND, because that one sits directly
+ * above the paces it changes. Reached now by opening the session, which is what the day's own card does.
+ */
+function todayCards() { return [trainFlagBanner(), weeklyReviewCard(), fitSuggestBanner(), autoPaceBanner()]; }
 function todayAttention() {
   return todayCards().find((x) => x && x.trim()) || "";
 }
@@ -5269,7 +5282,9 @@ function viewToday() {
   const onToday = TODAY_IN_PLAN && isCurrentWeek() && state.selDay === TODAY_DOW;
   let cta = "";
   if (mirror || liveRunning()) cta = "";
-  else if (sess && onToday && PRIMARY_TYPES[sess.type]) cta = '<button class="primary start-btn" id="startSession">' + ICON.play + ' Start session</button>';
+  // ⚠️ ONE BUTTON, AND IT OPENS THE PREVIEW. There used to be two branches here — Start on a runnable
+  // session today, View on anything else — and the owner removed the first: the day's card is a way in
+  // to the session, not a way past it.
   else if (sess) cta = '<button class="primary start-btn" id="viewSession">' + ICON.play + ' View session</button>';
   // ⚠️ THE ORDER IS THE FEATURE. Decision, then what is next, then what to know, then one note from
   // the coach, then everything optional. The brief's recommended content order, in that order.
@@ -15725,9 +15740,23 @@ function liveRunning() { return !!(LIVE && LIVE.started && !LIVE.done); }
  * with the replay time — so ten quiet minutes collapsed into one instant, which is the data Strava
  * builds its pace and splits from. onGpsPos now passes each fix's own elapsed time.
  */
+/**
+ * THE DISTANCE THE RUNNER HAS ACTUALLY COVERED, committed plus the leg not yet committed.
+ *
+ * ⚠️ ONE READER, SO THE SCREEN, THE SPLITS AND THE SAVED RUN CANNOT DISAGREE. Reading LIVE.dist in some
+ * places and this in others is how a kilometre marker comes to fire at a distance the screen never
+ * showed. LIVE.dist stays the committed total — every writer still writes only that — and this is the
+ * only thing anything reads.
+ * ⚠️ AND IT IS ZERO OUTSIDE A GPS RUN. A treadmill run has no anchor and no pending leg; a simulated
+ * run advances LIVE.dist directly.
+ */
+function liveDistM() {
+  if (!LIVE) return 0;
+  return (LIVE.dist || 0) + (LIVE.pendM || 0);
+}
 function checkSplits(atMs) {
   if (!LIVE || LIVE.mode == null) return;
-  const km = Math.floor(LIVE.dist / 1000);
+  const km = Math.floor(liveDistM() / 1000);
   if (km <= LIVE.kmDone) return;
   const supplied = (typeof atMs === "number" && isFinite(atMs)) ? atMs : liveNowMs();
   const now = Math.max(LIVE.lastKmMs, supplied);
@@ -16096,7 +16125,28 @@ function onGpsPos(pos) {
   // acc is a believable number by here — the gate above returned on anything else. Reading c.accuracy
   // instead handed an invalid fix the TIGHTEST possible leash, which is the fault this pass removes.
   const leash = Math.max(10, acc);
-  if (net <= leash) { D.still++; return; }
+  if (net <= leash) {
+    D.still++;
+    // ⚠️ GROUND COVERED BUT NOT YET COMMITTED, AND WHY THE READING NEEDS IT. The leash only commits
+    // distance once the runner is further from the anchor than a fix's own noise, so at any instant up
+    // to a leash's worth of real ground is unpaid — the reading LAGS the runner. Measured over sixty
+    // simulated kilometres, at the moment the true distance crossed 1000 m the app read 3.5 m short on
+    // average. That is exactly the shape of the owner's field report: our kilometre marker arrives
+    // after the other app's, because our reading is behind rather than because our total is wrong.
+    // ⚠️ IT IS NOT COMMITTED AND THE ANCHOR DOES NOT MOVE, so the noise rejection is untouched.
+    // Measured against the shipped code on a stationary phone with no reported speed: identical at
+    // every wander from +-4 m to +-64 m, because this only ever fires when the device itself says the
+    // runner is moving. Tightening the leash instead was measured and REJECTED — it buys 3 m on a clean
+    // signal and invents 177 m under a roof, which is the standing-still defect this file already
+    // records fixing once.
+    // ⚠️ MONOTONE WITHIN A LEG. Clamped upward only: net can fall as a fix wanders, and a reading that
+    // goes backwards is worse than one that lags. On commit, dist grows by more than a leash while this
+    // resets to zero, so the sum never drops.
+    if (LIVE.devSpeed != null && LIVE.devSpeed > 0.5) {
+      LIVE.pendM = Math.max(LIVE.pendM || 0, Math.min(net, leash));
+    }
+    return;
+  }
   // ⚠️ THE START IS WHERE GPS LIES BIGGEST, AND IT USED TO BE PAID IN FULL. The first fix seeds the
   // anchor while the receiver is still settling; when it converges to truth the whole correction —
   // measured at ~90 m on the owner's own walk, anything up to the 200 m spike gate — was credited as
@@ -16116,6 +16166,7 @@ function onGpsPos(pos) {
   // Cheap veto: when the device DOES insist it is stationary, believe that much.
   if (LIVE.devSpeed != null && LIVE.devSpeed <= 0.35) { D.still++; return; }
   D.credited++;
+  LIVE.pendM = 0;
   // ⚠️ STAMPED ON BELIEF, NOT ON ARRIVAL. The step counter fills stretches where GPS has gone quiet,
   // and under trees plenty of fixes still arrive — they are simply too vague to credit. Stamping this
   // when a fix merely turns up would hide exactly the gap the pedometer exists to cover.
@@ -16301,7 +16352,7 @@ function gpsUiTick() {
   if (cur && cur < 150) cur = null;
   LIVE.curPace = cur;
   if (LIVE.rt.getStatus() === "active") {
-    const t = { atMs: at, distanceMeters: LIVE.dist };
+    const t = { atMs: at, distanceMeters: liveDistM() };
     if (cur) t.paceSecPerKm = cur;
     if (LIVE.watchHr) t.heartRateBpm = LIVE.watchHr;   // real HR, streamed from the wrist
     LIVE.rt.update(t).forEach(liveCue);
@@ -25446,7 +25497,7 @@ function pushLiveActivity(snap, force) {
       title: (LIVE.session && LIVE.session.title) || "Run",
       type: (LIVE.session && LIVE.session.type) || "easy",
       sec: Math.round((snap && snap.elapsedSeconds) || 0),
-      distKm: (LIVE.dist || 0) / 1000,
+      distKm: liveDistM() / 1000,
       paceSec: Math.round((snap && snap.currentPaceSecPerKm) || 0) || undefined,
       // ⚠️ Real heart rate only. LIVE.hr is the SIMULATOR's invention (it idles at 105), and it was
       // leaking onto the lock screen for genuine GPS runs.
@@ -25508,7 +25559,7 @@ function pushToCompanion(snap) {
       // (ruling 7), and the day it exists this is one line. Until then an unread value is what the next
       // reader copies without checking, which is the rule the wrist half applied to paceLow/paceHigh.
       sec: Math.round((snap && snap.elapsedSeconds) || 0),
-      distKm: (LIVE.dist || 0) / 1000,
+      distKm: liveDistM() / 1000,
       paceSec: Math.round((snap && snap.currentPaceSecPerKm) || 0) || 0,
       avgPaceSec: Math.round((snap && snap.averagePaceSecPerKm) || 0) || undefined,
       lapPaceSec: Math.round((snap && snap.lapPaceSecPerKm) || 0) || undefined,
@@ -26086,24 +26137,14 @@ function heatOffer(sess) {
   if (!probe || !probe.changedSteps) return null;
   return { row: worst.row, imp: worst.imp, pct: Math.round((worst.imp.paceFactor - 1) * 1000) / 10 };
 }
-function heatCard() {
-  const sess = heatTargetSession();
-  if (!sess) return "";
-  // Already decided — the chip lives on the session, not as an attention card. (heatTargetSession
-  // filters these out; kept here because heatCard is also the definition of "is there an offer".)
-  if (heatChoice(sess) || heatDeclinedToday(sess)) return "";
-  const off = heatOffer(sess);
-  if (!off) return "";
-  const hot = fmtTemp(off.row.tempC, true);
-  return '<div class="card heat-card">' +
-    '<div class="heat-h">' + ICON.wxSun + '<span>Adapt for heat</span></div>' +
-    '<div class="heat-b">Up to <b>' + hot + '</b> today. Holding your planned paces in that would be ' +
-      'harder than <b>' + esc(sess.title) + '</b> is meant to be — about <b>' + off.pct +
-      '% harder</b> at the peak.</div>' +
-    '<div class="act-pair"><button class="ap-yes" data-heatopen="' + esc(sess.id) + '">Adjust my paces</button>' +
-      '<button class="ap-no" data-heatno="' + esc(sess.id) + '">Keep as planned</button></div>' +
-    '</div>';
-}
+/**
+ * ⚠️ heatCard IS GONE, AND THE DEFINITION IT DOUBLED AS LIVES IN heatOffer. It rendered the attention
+ * card at the top of Today; the owner moved that offer into the session preview on 2026-08-21 ("I want
+ * the adapt for heat to be within the session preview"), where heatBlockHtml had been showing it all
+ * along. Deleted rather than left unreachable, because an unreachable builder is what the next screen
+ * copies — and its own comment claimed it was also "the definition of is there an offer", which was
+ * already untrue: heatOffer is, and both it and heatBlockHtml call that.
+ */
 /**
  * THE HEAT BLOCK ON THE BRIEFING CARD — his ask, verbatim: "the adaption for heat message needs to
  * come on the race briefing card when they click view session".
@@ -27885,7 +27926,9 @@ function wire() {
   const startTrial = $("startTrial"); if (startTrial) startTrial.onclick = beginTrialRun;
   const cancelTrial = $("cancelTrial"); if (cancelTrial) cancelTrial.onclick = () => { state.trialPending = false; render(); };
   // Live session wiring
-  const startBtn = $("startSession"); if (startBtn) startBtn.onclick = () => openStartWhereSheet(null);
+  // ⚠️ NO startSession HANDLER. The day's card opens the preview now (owner, 2026-08-21), and the
+  // preview's own Start is what reaches openStartWhereSheet — so a binding here would be a lookup for
+  // an id nothing renders, which is what the invented-identifier guard exists to catch. It caught this.
   // ⚠️ The decision hero's action on a rest or completed day is PREVIEW, not start — the brief is
   // explicit that a rest day's premium action is reassurance or preview, never a record button.
   const prev = $("todayPreview"); if (prev) prev.onclick = () => {

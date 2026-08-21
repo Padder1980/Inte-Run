@@ -758,7 +758,13 @@ test("BLOCKER: there is one destination sheet, and the primary action is dead wh
   assert.match(dest, /class="sst-cog" data-ssttool="privacy" aria-label="/,
     "the settings affordance beside the primary is missing, unlabelled, or leads nowhere real");
   assert.match(dest, /stravaRunButtonHtml/, "Strava is not offered where the product allows it");
-  assert.match(dest, /own share sheet/, "the sheet does not say where a runner's other apps are");
+  // ⚠️ THE NOTE IS DERIVED NOW, NOT TYPED, so the assertion is about the derivation rather than about a
+  // sentence. With no build-provided capability the note is the old one; with one it names the apps that
+  // open directly and still admits the rest go through the sheet. Either way it must mention the sheet,
+  // because the sheet is always where the rest go.
+  assert.match(dest, /shareDestNote\(\)/, "the note is typed into the markup rather than derived");
+  assert.match(lift("shareDestNote"), /own share sheet/,
+    "no branch of the note says where a runner's other apps are");
   assert.match(lift("studioDestTile"), /aria-hidden="true"/,
     "a tile's glyph is not hidden from a screen reader, so its name is read twice");
   // ⚠️ THE PRIMARY ACTION IS IN THE DISABLED SET TOO, AND SO IS EVERY TILE. Leaving them live while the
@@ -831,15 +837,18 @@ test("BLOCKER: every destination is a tile, every tile is wired, and none of the
   // An unknown id must do nothing rather than falling through to the share sheet.
   assert.match(go, /SST_DEST\.filter\(\(d\) => d\.id === id\)\.length\) return/,
     "an unrecognised data-sstdest reaches the share sheet, so any stray attribute becomes a share button");
-  // ⚠️ AND THE ROUTE IS IN EVERY TILE'S ACCESSIBLE NAME, FROM ONE CONSTANT. Typed into four records it
-  // could be omitted from one, and the one omitted would be the tile that appeared to post directly.
-  assert.match(tile, /esc\(d\.label \+ SST_VIA\)/,
-    "a tile's accessible name is no longer its label plus the shared route clause");
-  const via = /const SST_VIA = "([^"]*)";/.exec(src);
-  assert.ok(via, "SST_VIA is gone, so each tile carries its own copy of the route clause");
-  assert.match(via![1]!, /share sheet/i,
-    "SST_VIA no longer says where a tile actually goes: " + JSON.stringify(via![1]));
-  assert.equal((src.match(/const SST_VIA = /g) || []).length, 1, "there is more than one SST_VIA");
+  // ⚠️ AND THE ROUTE IS IN EVERY TILE'S ACCESSIBLE NAME, FROM ONE FUNCTION. It was one CONSTANT while
+  // every tile opened the share sheet; two of them now open the app itself (owner, 2026-08-21), so a
+  // shared string would tell a screen-reader user the wrong thing about half the row. One resolver, so
+  // it still cannot be omitted from a single tile — and "label in name" holds either way, because the
+  // label is the whole prefix of the spoken name.
+  assert.match(tile, /esc\(d\.label \+ shareAppVia\(d\.id\)\)/,
+    "a tile's accessible name is no longer its label plus the resolved route clause");
+  const via = lift("shareAppVia");
+  assert.match(via, /share sheet/i, "no branch of the route clause names the share sheet");
+  assert.match(via, /opens the app/i, "no branch of the route clause names a direct open");
+  assert.ok(!/const SST_VIA = /.test(src),
+    "the flat SST_VIA constant is back, so half the row will be described wrongly");
   // ⚠️ THE VISIBLE LABEL MUST BE CONTAINED IN THE ACCESSIBLE NAME (WCAG "label in name"), or a
   // voice-control user saying the name they can see does not match the control.
   assert.match(tile, /class="sst-dl">' \+ esc\(d\.label\)/,
@@ -867,9 +876,19 @@ test("BLOCKER: every destination is a tile, every tile is wired, and none of the
   // defect the rest of this row exists to avoid.
   assert.ok(!recs.some((r) => /communit/i.test(r.label + r.id)),
     "Community is a destination tile, and it has no backend to be a destination of");
-  // The note under the row says the same thing the names do, in the runner's own words.
-  assert.match(dest, /cannot post to them directly/,
-    "the row does not say in words that it cannot post directly");
+  // ⚠️ AND THE SCHEME GUARD ABOVE IS STILL RIGHT, WITH THE HANDOFF IN PLACE. The PAGE must never open a
+  // third-party app itself: it hands the card to Swift, which does the open — so the page holds no
+  // scheme, cannot be tricked into opening one by a stray attribute, and a browser build has nothing to
+  // fall over. Where the schemes live is ios/InteRun-Info.plist and ShareAppService.
+  // The note under the row says the same thing the names do, in the runner's own words — and it is
+  // DERIVED now, because "Inte-Run cannot post to them directly" was true of every build until the one
+  // that can. A sentence that overstates the app is the one a reader believes.
+  assert.match(dest, /shareDestNote\(\)/, "the note is typed rather than derived from what is possible");
+  const note = lift("shareDestNote");
+  assert.match(note, /cannot post to them directly/,
+    "the no-capability branch no longer says in words that it cannot post directly");
+  assert.match(note, /posts nothing on your behalf/,
+    "the direct branch does not say that Inte-Run still posts nothing itself");
 });
 
 test("BLOCKER: the destination marks are ours, inline, and each one is distinguishable", () => {
@@ -1139,4 +1158,88 @@ test("BLOCKER: nothing in the editor is a control over a card it cannot change",
   // the app contradicting itself.
   const rt = nocomment(lift("studioRouteHtml"));
   assert.match(rt, /template === "route"/, "the route sheet no longer says the poster ignores the switch");
+});
+
+test("BLOCKER: a destination tile opens the app only when this BUILD can, and says which it is", () => {
+  // The owner, 2026-08-21: "also I want the share to social media buttons to open in the actual apps".
+  // Two of them can be — Instagram Stories through its own URL scheme with the card on the pasteboard,
+  // and Messages through a real composer with the card attached. Nothing else has a sanctioned way to
+  // receive an image, so those tiles open the share sheet where those apps genuinely appear.
+  const src = page();
+  const swift = readFileSync(new URL("../ios/InteRun/ShareAppService.swift", import.meta.url), "utf8");
+
+  // ⚠️ THE CAPABILITY COMES FROM SWIFT AND MUST NEVER BE INFERRED FROM THE MESSAGE HANDLER EXISTING.
+  // docs/index.html updates over the air and Swift does not, so a page asking an older build to open
+  // Instagram has the action discarded by its default branch: a tile that looks live and does nothing,
+  // on a phone whose app looks up to date. That hazard was caught minutes from shipping once already.
+  assert.match(src, /window\.__interunShareApps/,
+    "the page does not read the capability flag, so it cannot know what this build can open");
+  const direct = lift("shareAppIsDirect") + lift("shareAppsDirect");
+  assert.ok(!/messageHandlers\.interunShareApp/.test(direct),
+    "the capability is being inferred from the handler existing, which an older build also has");
+  assert.match(swift, /window\.__interunShareApps = /,
+    "the native side no longer sets the flag the page reads");
+
+  // ⚠️ ONE DISPATCH PLUS ONE CAPABILITY TEST, NEVER A BRANCH PER TILE. Four tiles each deciding for
+  // themselves is four chances for one to be wired to something its own logo does not imply.
+  const dest = lift("studioDest");
+  assert.match(dest, /shareAppIsDirect\(id\)/, "studioDest no longer asks whether the route is direct");
+  assert.match(dest, /doShareRun\(STUDIO\.run\)/, "there is no share-sheet fallback left");
+  for (const d of ["instagram", "whatsapp", "messages", "more"]) {
+    assert.ok(!new RegExp('=== "' + d + '"').test(dest),
+      "studioDest has grown a branch for " + d + "; the point of one dispatch is that it cannot");
+  }
+
+  // ⚠️ A DECLINED HANDOFF FALLS BACK RATHER THAN DYING. Every reason to decline — no bridge, no rendered
+  // card, an unreadable file, a refused open on the far side — has to end at the share sheet.
+  const hand = lift("shareAppHandoff");
+  assert.match(hand, /if \(!bridge\) return false/, "a build with no bridge does not decline the job");
+  assert.match(hand, /if \(!file\) return false/, "an unrendered card does not decline the job");
+  assert.match(hand, /rd\.onerror/, "a failed read leaves the tap dead");
+  assert.match(src, /window\.__interunShareAppResult = function/, "Swift has nothing to answer to");
+  const ack = src.slice(src.indexOf("window.__interunShareAppResult = function"),
+    src.indexOf("function shareAppsDirect"));
+  assert.match(ack, /doShareRun\(STUDIO\.run\)/,
+    "a refused open reports a failure and stops, leaving the runner to find the sheet themselves");
+
+  // ⚠️ AND THE LABELS AND THE NOTE ARE DERIVED FROM THE SAME LIST, so the row cannot promise a direct
+  // post the build cannot make. The old note said "Inte-Run cannot post to them directly", which was
+  // true of every build until this one — a sentence that overstates the app is the one a reader believes.
+  const via = lift("shareAppVia");
+  assert.match(via, /shareAppIsDirect\(id\)/, "the spoken route no longer depends on the capability");
+  const note = lift("shareDestNote");
+  assert.match(note, /shareAppsDirect\(\)/, "the note is typed rather than derived from what is possible");
+  assert.ok(!/cannot post to them directly/.test(lift("studioDestHtml")),
+    "the flat 'cannot post directly' sentence is back in the markup, where it cannot be conditional");
+});
+
+test("BLOCKER: the pasteboard handoff expires, and every declared scheme has a destination", () => {
+  const swift = readFileSync(new URL("../ios/InteRun/ShareAppService.swift", import.meta.url), "utf8");
+  // ⚠️ AN UNEXPIRING PASTEBOARD ITEM LEAVES A PICTURE OF SOMEBODY'S RUN IN THEIR SYSTEM CLIPBOARD, so
+  // the next thing they paste anywhere is that card. Instagram's own documented window is five minutes.
+  assert.match(swift, /expirationDate/,
+    "the card is put on the pasteboard with no expiry, so it outlives the handoff");
+  // ⚠️ AND THE OPEN IS REPORTED FROM ITS COMPLETION, NOT ASSUMED. A refused open would otherwise leave
+  // the page believing the card was handed over.
+  assert.match(swift, /UIApplication\.shared\.open\(url, options: \[:\]\) \{[^}]*ok in/,
+    "the Instagram open does not report whether it actually happened");
+  // ⚠️ BOTH MESSAGE CHECKS. A device can send a text and refuse an attachment, and a composer that
+  // silently drops the picture is worse than a share sheet that keeps it.
+  assert.match(swift, /canSendText\(\)/, "the Messages route does not check it can send at all");
+  assert.match(swift, /canSendAttachments\(\)/,
+    "the Messages route does not check it can attach, so the card can be dropped in silence");
+
+  // ⚠️ EVERY SCHEME DECLARED IN Info.plist MUST BE ONE SOMETHING ASKS ABOUT. A declared query for an app
+  // nothing offers is a declaration with no reader, which this codebase treats as a defect in itself —
+  // fb-messenger-share-api was removed for exactly that.
+  const plist = readFileSync(new URL("../ios/InteRun-Info.plist", import.meta.url), "utf8");
+  const block = plist.slice(plist.indexOf("LSApplicationQueriesSchemes"));
+  const schemes = [...block.slice(0, block.indexOf("</array>")).matchAll(/<string>([^<]+)<\/string>/g)]
+    .map((m) => m[1]!);
+  assert.ok(schemes.length > 0, "no schemes are declared at all");
+  for (const sc of schemes) {
+    assert.ok(swift.includes(sc) || src2Mentions(sc),
+      "the scheme " + sc + " is declared but nothing asks about it: " + schemes.join(", "));
+  }
+  function src2Mentions(sc: string): boolean { return page().includes(sc); }
 });

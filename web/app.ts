@@ -24026,7 +24026,47 @@ const SST_DEST = [
  * quietly claims a direct post; and it is appended by studioDestTile rather than typed into four records,
  * so adding a fifth destination cannot omit it.
  */
-const SST_VIA = " — opens your phone’s share sheet";
+/**
+ * WHICH DESTINATIONS THIS BUILD CAN OPEN DIRECT, AND WHY IT IS A FLAG RATHER THAN A GUESS.
+ *
+ * The owner, 2026-08-21: "also I want the share to social media buttons to open in the actual apps".
+ * Two of them can be — Instagram Stories through its own URL scheme with the card on the pasteboard,
+ * and Messages through a real composer with the card attached. Nothing else has a sanctioned way to
+ * receive an image, so those tiles open the share sheet, where those apps genuinely appear.
+ *
+ * ⚠️ THE LIST COMES FROM SWIFT, WHICH IS THE ONLY THING THAT CAN KNOW. It depends on the schemes
+ * declared in Info.plist AND on what is installed AND on whether this device can attach to a message.
+ * ⚠️ AND IT MUST NEVER BE INFERRED FROM THE MESSAGE HANDLER EXISTING. docs/index.html updates over the
+ * air while Swift does not, so a page that asked an older build to open Instagram would have the action
+ * discarded by its default branch — a tile that looks live and does nothing, on a phone whose app looks up
+ * to date. Same rule, and the same near-miss, as __interunCoachNativePlay.
+ */
+/**
+ * SWIFT'S ANSWER TO A HANDOFF. Installed unconditionally: an older build never calls it, and a build
+ * that does must be able to say the open was refused.
+ * ⚠️ THE FALLBACK IS THE SHARE SHEET, NOT A MESSAGE. Somebody who tapped Instagram wants their card in
+ * Instagram; telling them it did not work and stopping there leaves them to find the sheet themselves.
+ */
+window.__interunShareAppResult = function (ok, detail) {
+  PHOTODIAG.shareApp = (ok ? "ok" : "failed") + " " + String(detail || "");
+  if (ok) return;
+  if (STUDIO) doShareRun(STUDIO.run);
+};
+function shareAppsDirect() {
+  const raw = typeof window !== "undefined" ? window.__interunShareApps : null;
+  if (!raw) return [];
+  return String(raw).split(",").map(function (x) { return x.trim(); }).filter(Boolean);
+}
+function shareAppIsDirect(id) { return shareAppsDirect().indexOf(id) >= 0; }
+/**
+ * ⚠️ THE ROUTE IS NAMED PER TILE, BECAUSE THE TILES NO LONGER ALL DO THE SAME THING. One flat string
+ * was right while every tile opened the sheet; with two of them opening the app itself, a shared suffix
+ * would tell a screen-reader user the wrong thing about half the row — and "label in name" means the
+ * spoken name has to match what the tile actually does.
+ */
+function shareAppVia(id) {
+  return shareAppIsDirect(id) ? " \u2014 opens the app" : " \u2014 opens your phone\u2019s share sheet";
+}
 /** One tile builder, so a second destination cannot arrive with a different shape or no label. */
 /**
  * COPY THE CAPTION, AND SAY SO ON THE TILE ITSELF.
@@ -24070,17 +24110,35 @@ function studioCopyCaption(btn) {
  */
 function studioDestTile(d) {
   return '<button class="sst-dest" data-sstdest="' + esc(d.id) + '" aria-label="' +
-    esc(d.label + SST_VIA) + '">' +
+    esc(d.label + shareAppVia(d.id)) + '">' +
     '<span class="sst-di" aria-hidden="true">' + d.glyph + '</span>' +
     '<span class="sst-dl">' + esc(d.label) + '</span></button>';
+}
+/**
+ * ⚠️ DERIVED FROM THE FLAG, NEVER TYPED. The old sentence said "Inte-Run cannot post to them directly",
+ * which was true of every build until this one — and a sentence that overstates what the app does is the
+ * one a reader believes. Now it names which tiles open the app and admits the rest go through the sheet,
+ * from the same list the tiles themselves are labelled from, so the two cannot disagree.
+ */
+function shareDestNote() {
+  const direct = shareAppsDirect()
+    .map(function (id) { return (SST_DEST.filter(function (d) { return d.id === id; })[0] || {}).label; })
+    .filter(Boolean);
+  if (!direct.length) {
+    return "Every one of these opens your phone\u2019s own share sheet with the card attached. " +
+      "Inte-Run cannot post to them directly, and does not assume any of them are installed.";
+  }
+  const names = direct.length === 1 ? direct[0]
+    : direct.slice(0, -1).join(", ") + " and " + direct[direct.length - 1];
+  return names + " open with the card ready. The rest open your phone\u2019s own share sheet, " +
+    "where those apps appear \u2014 Inte-Run posts nothing on your behalf either way.";
 }
 function studioDestHtml(run) {
   const strava = stravaRunButtonHtml(run);
   return '<div class="sst-dests" role="group" aria-label="Where to send this card">' +
       SST_DEST.map(studioDestTile).join("") +
     '</div>' +
-    '<p class="sst-note">Every one of these opens your phone\u2019s own share sheet with the card ' +
-    'attached. Inte-Run cannot post to them directly, and does not assume any of them are installed.</p>' +
+    '<p class="sst-note">' + esc(shareDestNote()) + '</p>' +
     '<button class="sst-sec" data-sst="caption">' +
       '<span class="sst-di" aria-hidden="true">' + SST_GLYPH.copy + '</span>' +
       '<span class="sst-dl">Copy caption</span></button>' +
@@ -24114,7 +24172,48 @@ function studioDest(id) {
   if (!STUDIO) return;
   if (!SST_DEST.filter((d) => d.id === id).length) return;
   studioSheet(null);
+  // ⚠️ STILL ONE DISPATCH, PLUS ONE CAPABILITY TEST — not a branch per tile. Which route a tile takes is
+  // decided by what THIS BUILD can do, from the flag Swift sets, so the answer is the same for every
+  // tile that shares a capability and there is nothing per-tile to get wrong.
+  if (shareAppIsDirect(id) && shareAppHandoff(id, STUDIO.run)) return;
   return doShareRun(STUDIO.run);
+}
+/**
+ * HANDING THE RENDERED CARD TO A NAMED APP.
+ *
+ * ⚠️ IT RETURNS WHETHER IT TOOK THE JOB, so the one dispatch above can fall through to the share sheet
+ * rather than leaving a tap that did nothing. Every reason to decline is checked here: no bridge, no
+ * rendered card yet, or a file we cannot read.
+ *
+ * ⚠️ THE CARD MUST ALREADY BE RENDERED. SCARD.file is what the preview and Save both use, keyed on the
+ * run and the current options; re-rendering here would mean the app opens with a card built from a
+ * second, later read of the editor's state — which is how Share and Save once acted on two different
+ * runs one row apart.
+ *
+ * ⚠️ AND A FAILURE ON THE FAR SIDE FALLS BACK. Swift answers through __interunShareAppResult; a refused
+ * open, a device that cannot attach, or a missing app all end in the share sheet, because a tile that
+ * reports success over a phone that did nothing is the defect this whole row was rebuilt to avoid.
+ */
+function shareAppHandoff(id, run) {
+  const bridge = (window.webkit && window.webkit.messageHandlers &&
+    window.webkit.messageHandlers.interunShareApp) || null;
+  if (!bridge) return false;
+  const file = (SCARD.key === shareCardKey(run) && SCARD.file) ? SCARD.file : null;
+  if (!file) return false;
+  const rd = new FileReader();
+  rd.onload = function () {
+    const out = String(rd.result || "");
+    const at = out.indexOf(",");
+    if (at < 0) { doShareRun(run); return; }
+    try {
+      bridge.postMessage({ dest: id, name: file.name, data: out.slice(at + 1) });
+    } catch (e) { doShareRun(run); }
+  };
+  // ⚠️ A READ THAT FAILS MUST NOT LEAVE THE TAP DEAD. There is no bridge call to answer for it, so the
+  // fallback has to be raised here.
+  rd.onerror = function () { doShareRun(run); };
+  rd.readAsDataURL(file);
+  return true;
 }
 /**
  * The sheet a tool opens, or the destinations. One dispatch, so a new tool cannot forget its header.

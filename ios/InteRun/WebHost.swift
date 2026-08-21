@@ -56,6 +56,11 @@ struct WebHost: UIViewRepresentable {
                   // clip handed over, none played, no reply, and a coach that says nothing all run.
                   // Bump this when the contract changes; never widen it to a handler-exists check.
                   + "window.__interunCoachNativePlay = 1;"
+                  // Which share destinations this build can open DIRECT. Same rule as the flag above:
+                  // the page must never infer this from the message handler existing, because
+                  // docs/index.html reaches phones whose Swift predates the handler's new actions and
+                  // those are discarded silently — a tile that looks live and does nothing.
+                  + ShareAppService.capabilityJS()
                   + WebUpdateService.shared.diagnosticJS
                   + tokenJS,
             injectionTime: .atDocumentStart, forMainFrameOnly: true))
@@ -125,6 +130,9 @@ struct WebHost: UIViewRepresentable {
         // receives the page's "booted" confirmation that clears the watchdog.
         WebUpdateService.shared.webView = webView
         config.userContentController.add(WebUpdateService.shared, name: WebUpdateService.messageName)
+        // Handing the finished share card straight to Instagram Stories or Messages, rather than to the
+        // share sheet. See ShareAppService for what iOS actually permits per destination.
+        config.userContentController.add(ShareAppService.shared, name: ShareAppService.messageName)
         WebUpdateService.shared.checkForUpdate()
         webView.allowsBackForwardNavigationGestures = false
         webView.scrollView.contentInsetAdjustmentBehavior = .never

@@ -7572,8 +7572,17 @@ first real evidence is a phone run appearing in Fitness with its route and heart
 records what the native side reported, because a missing workout looks identical whatever the cause —
 permission refused, an older build, or a duplicate already there.
 
-⚠️ **AND ADDING A BUILD TO TESTFLIGHT TESTERS STILL CANNOT BE DONE FROM HERE.** `xcodebuild` uploads using
-Xcode's own signed-in session, which does not extend to managing tester groups, and there is no App Store
-Connect API key on this Mac (`~/.appstoreconnect/private_keys/` is empty). Either the owner ticks it in
-App Store Connect, or he creates an API key once and it can be automated from then on. **Do not claim a
-build has been distributed.**
+⚠️ **ADDING A BUILD TO TESTFLIGHT TESTERS NEEDS AN API KEY, AND THE SCRIPT FOR IT IS WRITTEN AND WAITING.**
+`node tools/testflight-distribute.mjs [build] [group]` finds the app by bundle id, finds the build, checks
+it is VALID, picks the internal group by default and POSTs the association. It signs its own ES256 JWT —
+this repo has no runtime deps — and it **fails loudly with the five steps** rather than skipping, because
+a distribution step that silently does nothing reports a build as delivered when it is sitting untouched.
+⚠️ **THE KEY IS THE ONLY MISSING PIECE, AND IT IS DOWNLOADABLE EXACTLY ONCE.** App Store Connect → Users
+and Access → Integrations → App Store Connect API → a key with the **App Manager** role →
+`~/.appstoreconnect/private_keys/AuthKey_<KEYID>.p8`, plus the Issuer ID in `issuer_id.txt` beside it.
+⚠️ **AND EVERYTHING ELSE WAS CHECKED FIRST, BECAUSE THIS FILE ALREADY RECORDS ME WRONGLY DECLARING AN
+UPLOAD IMPOSSIBLE.** Verified absent: any `.p8` anywhere under `~`, fastlane, any keychain item for App
+Store Connect or Transporter, and `xcrun altool`, which refuses without either a JWT or an app-specific
+password. The Claude-in-Chrome extension — which would have driven his own logged-in session — reports
+not connected. So the CLI genuinely cannot do it today, and **an upload is not a distribution: never
+report a build as being with the testers.**

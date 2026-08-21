@@ -4286,6 +4286,90 @@ button.rd-meta-r { cursor: pointer; }
   cursor: pointer; }
 .sst-cog svg { width: 22px; height: 22px; }
 .sst-sr { font-size: var(--t-label); color: var(--ink-faint); margin: var(--s2) 0 0; text-align: center; }
+
+/* ── THE FINISH SCREEN'S NAME AND SYNC BLOCKS (owner's annotated reference, 2026-08-21) ──────────── */
+.lfin { display: block; }
+.lfin-k { display: block; color: var(--ink-faint); font-size: var(--t-label);
+  text-transform: uppercase; letter-spacing: .08em; font-weight: 800; margin-bottom: 6px; }
+/* ⚠️ var(--t-card) IS 17px AND THAT IS DELIBERATE, NOT A ROUNDING. Under 16px iOS zooms the page on
+   focus and pinch is disabled app-wide, so the runner can never zoom back out — see
+   test/ios-input-zoom.test.ts. Do not widen the type ladder to admit 16. */
+.lfin-in { width: 100%; font-size: var(--t-card); font-weight: 700; color: var(--ink);
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-ctl);
+  padding: 11px 12px; }
+.lfin-d { color: var(--ink-soft); font-size: var(--t-body); line-height: 1.45; }
+.lsync { display: flex; align-items: center; gap: 10px; padding: var(--s2) 0; }
+.lsync-ic { display: grid; place-items: center; width: 26px; height: 26px; color: var(--ink-soft); }
+.lsync-ic svg { width: 18px; height: 18px; }
+.lsync-t { flex: 1; font-size: var(--t-card); font-weight: 700; }
+/* ⚠️ THE SWITCH GROWS ITS HIT AREA, NOT ITS BOX — the row's height is set by the label beside it. */
+.lsw { position: relative; width: 46px; height: 28px; border-radius: var(--r-pill);
+  border: 1px solid var(--line); background: var(--surface-2); flex: 0 0 auto; }
+.lsw::after { content: ""; position: absolute; inset: -8px; }
+.lsw-k { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--ink-faint); transition: transform .16s ease, background .16s ease; }
+.lsw.on { background: color-mix(in srgb, var(--accent) 26%, var(--surface-2)); border-color: var(--accent); }
+.lsw.on .lsw-k { transform: translateX(18px); background: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .lsw-k { transition: none; } }
+/* ── THE START SCREEN FOR A PHONE-RECORDED RUN (owner's annotated reference, 2026-08-21) ───────────
+   ⚠️ EVERY LENGTH IS ON THE LADDER (--s*, --r-*, --t-*) or is a deliberate geometric constant. Both
+   design ratchets sit on their ceilings, so one literal radius or font-size here fails the suite. */
+.lst-head { padding: var(--s2) 0 var(--s1); }
+.lst-title { font-size: var(--t-display); font-weight: 800; line-height: 1.1; letter-spacing: -0.01em; }
+.lst-first { margin-top: 6px; color: var(--ink-soft); font-size: var(--t-card); }
+.lst-nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2);
+  padding: var(--s2) 0 var(--s3); border-bottom: 1px solid var(--line); }
+.lst-nums > div { text-align: left; }
+.lst-nums .lv { font-size: var(--t-hero); font-weight: 800; }
+.lst-nums .lk { margin-top: 2px; color: var(--ink-faint); font-size: var(--t-label);
+  text-transform: uppercase; letter-spacing: .08em; }
+/* The map, and the controls that sit on it. A 4:3-ish window so the runner sees the streets around
+   them rather than a letterbox. */
+.lst-map { position: relative; margin: var(--s3) 0; border-radius: var(--r-card); overflow: hidden;
+  background: var(--surface-2); aspect-ratio: 4 / 3; }
+.lst-mapimg { position: absolute; inset: 0; }
+.lst-mapimg canvas, .lst-mapimg img { width: 100%; height: 100%; display: block; }
+/* ⚠️ A DOT, NOT A PIN. The runner is AT the centre of this map by construction (see liveMapFraming),
+   so a pin whose tip is offset from its anchor would say they are somewhere they are not. */
+.lst-me { position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px;
+  border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent),
+  0 1px 4px rgba(0,0,0,.4); }
+.lst-ctrls { position: absolute; right: var(--s2); top: 50%; transform: translateY(-50%);
+  display: grid; gap: 6px; }
+.lst-c { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 88%, transparent); color: var(--ink);
+  font-size: var(--t-card); font-weight: 700; display: grid; place-items: center; position: relative; }
+/* ⚠️ THE HIT AREA GROWS, NOT THE BOX. Growing these to 44px would push the column off the map. */
+.lst-c::after { content: ""; position: absolute; inset: -3px; }
+.lst-c svg { width: 18px; height: 18px; }
+.lst-c.on { border-color: var(--accent); color: var(--accent); }
+/* The signal, bottom-left, where the reference puts it. */
+.gps-sig { position: absolute; left: var(--s2); bottom: var(--s2); display: flex; align-items: center;
+  gap: 6px; padding: 5px 9px; border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--surface) 88%, transparent); border: 1px solid var(--line); }
+.gb-set { display: flex; align-items: flex-end; gap: 2px; height: 12px; }
+/* ⚠️ NO RADIUS ON A THREE-PIXEL BAR. A literal 1px is off the radius ladder and the ratchet is on
+   its ceiling, so it fails the suite — and at this width a rounded end is invisible anyway. */
+.gb { width: 3px; background: var(--ink-faint); opacity: .35; }
+.gb:nth-child(1) { height: 4px; } .gb:nth-child(2) { height: 7px; }
+.gb:nth-child(3) { height: 10px; } .gb:nth-child(4) { height: 12px; }
+.gb.on { opacity: 1; }
+.gps-sig.good .gb.on { background: var(--eff-easy); }
+.gps-sig.ok .gb.on { background: var(--eff-moderate); }
+.gps-sig.poor .gb.on { background: var(--eff-hard); }
+.gb-t { font-size: var(--t-label); color: var(--ink-soft); font-weight: 700; }
+/* The shoes, top-left, so it reads as a property of this run rather than of the map. */
+.live-shoe { position: absolute; left: var(--s2); top: var(--s2); display: flex; align-items: center;
+  gap: 6px; max-width: 62%; padding: 6px 11px; border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--surface) 88%, transparent); border: 1px solid var(--line);
+  color: var(--ink); font-size: var(--t-label); font-weight: 700; }
+.live-shoe svg { width: 15px; height: 15px; flex: 0 0 auto; }
+.live-shoe span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* ⚠️ ATTRIBUTION IS A LICENCE TERM, so it is drawn on the map rather than left to a caption somebody
+   might not add. Its wording comes from the provider that actually served the tiles. */
+.lst-attr { position: absolute; right: var(--s2); bottom: 4px; font-size: var(--t-label);
+  color: var(--ink-faint); background: color-mix(in srgb, var(--surface) 72%, transparent);
+  padding: 1px 6px; border-radius: var(--r-pill); }
 </style>
 </head>
 <body>
@@ -16359,6 +16443,10 @@ function gpsUiTick() {
     checkSplits();
   }
   renderLiveNow();
+  // ⚠️ THE START SCREEN'S MAP IS DRAWN FROM HERE TOO, because the first fix is what makes it drawable
+  // at all — wire() runs before any position exists. drawLiveMap returns immediately once the run has
+  // started, so this costs a running session nothing.
+  drawLiveMap(false);
   pushLiveActivity(LIVE.rt.snapshot(at));
   if (LIVE.rt.getStatus() === "completed") { stopLive(); liveFinish(true); }
 }
@@ -16431,6 +16519,140 @@ function syncLivePill() {
     render();
   };
 }
+/**
+ * THE GPS SIGNAL, AS SOMETHING YOU CAN READ AT A GLANCE.
+ *
+ * ⚠️ FOUR BARS FROM THE ACCURACY THE RECEIVER ITSELF CLAIMS, and the number stays beside them. The
+ * bars are the thing you check before setting off; the metres are what makes the claim falsifiable, and
+ * this project's own history is full of screenshots where a plausible-looking readout hid the fault.
+ * ⚠️ NO BARS UNTIL THERE IS A FIX. An "acquiring" state showing one bar reads as a weak signal rather
+ * than as no signal, and those need different reactions from the runner.
+ */
+function gpsBarsHtml() {
+  const acc = (LIVE && LIVE.mode === "gps" && LIVE.acc != null) ? LIVE.acc : null;
+  const lit = acc == null ? 0 : acc <= 8 ? 4 : acc <= 15 ? 3 : acc <= 25 ? 2 : 1;
+  let bars = "";
+  for (let i = 1; i <= 4; i++) bars += '<i class="gb' + (i <= lit ? " on" : "") + '"></i>';
+  const cls = lit >= 3 ? " good" : lit === 2 ? " ok" : lit === 1 ? " poor" : "";
+  return '<div class="gps-sig' + cls + '" id="gpsSig" aria-label="' + esc(gpsStatusText()) + '">' +
+    '<span class="gb-set">' + bars + '</span><span class="gb-t">' + esc(gpsStatusText()) + '</span></div>';
+}
+/**
+ * THE ACTIVE SHOE, ON THE SCREEN WHERE IT IS STILL POSSIBLE TO CHANGE IT.
+ *
+ * ⚠️ THE MILEAGE IS STAMPED AT SAVE TIME FROM WHATEVER IS ACTIVE THEN, so the moment to set it is
+ * before the run rather than after — which is exactly what the owner's reference puts here. A run saved
+ * against the wrong pair moves real distance onto the wrong shoe, and the Shoe Rack exists to tell
+ * somebody when to retire a pair.
+ * ⚠️ IT SAYS WHAT IS ACTIVE, NEVER JUST "Set active shoe", when there IS one. A chip that reads as an
+ * empty setting when a pair is already chosen invites a tap that changes nothing.
+ */
+function liveShoeChipHtml() {
+  const sh = activeShoe();
+  return '<button class="live-shoe" id="lShoe">' + ICON.rEasy +
+    '<span>' + (sh ? esc(sh.name) : "Set active shoe") + '</span></button>';
+}
+/**
+ * WHERE A PHONE-RECORDED RUN BEGINS.
+ *
+ * Built to the owner's annotated reference (2026-08-21). Top to bottom: the way back, the session's
+ * first step over its title, the three numbers at zero, the map you are standing on with its own
+ * controls, the signal, the shoes, and one Start.
+ *
+ * ⚠️ THE NUMBERS ARE HERE AT ZERO ON PURPOSE. They are the same three the run itself shows, in the same
+ * places, so nothing moves when the run starts — the screen fills in rather than rearranging.
+ * ⚠️ AND THE TREADMILL DOES NOT COME HERE. It has no position to draw, no signal to report and nothing
+ * to recentre; viewLive keeps its own layout for that.
+ */
+/**
+ * DRAWING THE START SCREEN'S MAP, ONCE, WHERE THE RUNNER IS.
+ *
+ * ⚠️ ONE FETCH PER POSITION, ROUNDED TO ABOUT 20 METRES. A fix jitters constantly and this screen can
+ * sit open for minutes; keyed on the raw coordinate it would re-fetch the same picture several times a
+ * second, which on Mapbox is a billed tile each time. The rounded key is also what makes "has anything
+ * changed" answerable without keeping the tiles.
+ * ⚠️ AND EVERY FAILURE IS SILENT AND HARMLESS, as this file's map chapter requires of anything tile-fed:
+ * no signal, a refused token, private browsing — the panel simply stays as it is, and the run starts.
+ * ⚠️ IT DOES NOT FOLLOW THE RUNNER. Once the run starts this screen is gone, and a map that tracked a
+ * moving runner would be a tile fetch every few seconds for the whole session — which is the bill the
+ * one-render rule exists to prevent.
+ */
+function drawLiveMap(force) {
+  if (!LIVE || LIVE.indoor || LIVE.started) return;
+  const el = $("lMap"); if (!el) return;
+  if (LIVE.lastLat == null || LIVE.lastLon == null) return;
+  const z = LIVE.mapZ || LIVE_MAP_Z;
+  const key = Math.round(LIVE.lastLat * 5000) + "," + Math.round(LIVE.lastLon * 5000) + "@" + z;
+  if (!force && LIVE.mapKey === key) return;
+  LIVE.mapKey = key;
+  const box = el.getBoundingClientRect();
+  // ⚠️ MEASURED, NOT ASSUMED, AND ZERO MEANS NOT LAID OUT YET. Fetching against a zero box asks for a
+  // nonsense tile window; the next tick has a real one. This file records the same rule for the avatar
+  // cropper, which saved an off-centre crop by measuring inside a sheet that was not shown.
+  const pw = Math.round(box.width), ph = Math.round(box.height);
+  if (!(pw > 40 && ph > 40)) { LIVE.mapKey = null; return; }
+  liveMapFor(LIVE.lastLat, LIVE.lastLon, z, pw, ph).then((r) => {
+    if (!LIVE || LIVE.started) return;
+    const cur = $("lMap"); if (!cur) return;
+    cur.innerHTML = "";
+    cur.appendChild(r.image);
+    const dot = document.createElement("div"); dot.className = "lst-me"; cur.appendChild(dot);
+    // ⚠️ THE ATTRIBUTION IS THE PROVIDER THAT ACTUALLY SERVED THE TILES, not the one we would prefer.
+    // Crediting Mapbox over CARTO's tiles is a licence breach this file records making once already.
+    const at = document.createElement("div");
+    at.className = "lst-attr"; at.textContent = mapAttributionFor(r.prov);
+    cur.appendChild(at);
+  }).catch(() => { /* the panel stays as it is; the run does not depend on a picture */ });
+}
+/** ⚠️ CLAMPED, because past these the tiles stop being useful: too far in and there is no context, too
+ *  far out and a street is a pixel. Stored on LIVE so it survives a re-render of the screen. */
+function liveMapZoom(d) {
+  if (!LIVE) return;
+  const z = Math.max(LIVE_MAP_Z_MIN, Math.min(LIVE_MAP_Z_MAX, (LIVE.mapZ || LIVE_MAP_Z) + d));
+  LIVE.mapZ = z;
+  drawLiveMap(true);
+}
+function viewLiveStart() {
+  const s = LIVE.session;
+  const first = liveFirstStepText(s);
+  return '<button class="backbtn" id="liveBack">\u2039 Today</button>' +
+    '<div class="lst-head">' +
+      '<div class="ui-eyebrow">Up first</div>' +
+      '<div class="lst-title">' + esc(s.title) + '</div>' +
+      (first ? '<div class="lst-first">' + esc(first) + '</div>' : "") +
+    '</div>' +
+    '<div class="lst-nums">' +
+      '<div><div class="lv num" id="lDist">0.00<small> km</small></div><div class="lk">Distance</div></div>' +
+      '<div><div class="lv num" id="lElapsed">0:00</div><div class="lk" id="lElapsedK">Time</div></div>' +
+      '<div><div class="lv num none" id="lAvg">\u2014</div><div class="lk">Avg pace</div></div>' +
+    '</div>' +
+    '<div class="lst-map" id="lMapWrap">' +
+      '<div class="lst-mapimg" id="lMap"></div>' +
+      liveShoeChipHtml() +
+      gpsBarsHtml() +
+      '<div class="lst-ctrls">' +
+        '<button class="lst-c" id="lZoomIn" aria-label="Zoom in">+</button>' +
+        '<button class="lst-c" id="lZoomOut" aria-label="Zoom out">\u2212</button>' +
+        '<button class="lst-c' + (coachEnabled() ? " on" : "") + '" id="lVoice" aria-label="Toggle voice coaching">' +
+          (coachEnabled() ? ICON.vox : ICON.voxOff) + '</button>' +
+        '<button class="lst-c" id="lRecentre" aria-label="Centre on me">' + ICON.gauge + '</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="live-controls"><button class="primary" id="lStart">' + ICON.play + ' Start</button></div>' +
+    whyLiveHtml();
+}
+/**
+ * THE FIRST THING THE SESSION ASKS FOR, in the runner's own terms.
+ * ⚠️ TAKEN FROM THE DELIVERED STEPS, not from the session's description. withGeneratedWarmup has
+ * already run by the time a run is staged, so the first step here is the first step the run will
+ * actually count through — and on a session whose warm-up was removed that is the work itself.
+ */
+function liveFirstStepText(s) {
+  const st = s && s.steps && s.steps.length ? s.steps[0] : null;
+  if (!st) return "";
+  const label = String(st.display || st.label || "").trim();
+  return label;
+}
 function viewLive() {
   if (LIVE.done) return viewLiveComplete();
   const s = LIVE.session;
@@ -16438,6 +16660,11 @@ function viewLive() {
   const controls = running
     ? '<div class="live-controls two"><button class="ctrl" id="lPause">Pause</button><button class="ctrl danger" id="lFinish">End session</button></div>'
     : '<div class="live-controls"><button class="primary" id="lStart">' + ICON.play + ' Start</button></div>';
+  // ⚠️ THE START SCREEN IS ITS OWN COMPOSITION (owner, 2026-08-21, from an annotated reference): the
+  // session and its first step, the numbers at zero, where you are, how good the signal is, and which
+  // shoes are on your feet. Everything on it is a thing you settle BEFORE you set off; once running,
+  // the screen is the numbers and the controls, which is what the live layout below has always been.
+  if (!running && !LIVE.indoor) return viewLiveStart();
   return '<button class="backbtn" id="liveBack">\u2039 ' + (running ? "Leave this screen" : "Today") + '</button>' +
     '<div class="card live-hero"><div class="live-hero-top"><div class="eyebrow">Live session · <span id="gpsBadge">' + gpsStatusText() + '</span></div>' +
     '<button class="voice-btn' + (coachEnabled() ? ' on' : '') + '" id="lVoice" aria-label="Toggle voice coaching">' + (coachEnabled() ? ICON.vox : ICON.voxOff) + '</button>' +
@@ -19989,6 +20216,8 @@ function loadTileImage(url, allowTainted) {
 // ⚠️ The share card is DARK on both providers and deliberately not Outdoors. That card is a dark
 // branded panel — it paints rgba(4,16,13,.4) over the map and draws light text on top — so a pale
 // outdoors map behind it would be washed out and the text unreadable. Two surfaces, two answers.
+/* The start screen's map: a street-level zoom, and the range the controls may move within. */
+const LIVE_MAP_Z = 15, LIVE_MAP_Z_MIN = 12, LIVE_MAP_Z_MAX = 17;
 const MAP_STYLE_RUN = { mapbox: "outdoors-v12", carto: "rastertiles/voyager" };
 const MAP_STYLE_SHARE = { mapbox: "dark-v11", carto: "dark_all" };
 /**
@@ -20144,7 +20373,17 @@ const MAPCACHE_SS = 2;
  * inside loadRouteMap would store a CARTO image under a mapbox key — the same class of fault this
  * function's own comment below records catching once already.
  */
-function routeMapFor(route, pw, ph, styles, forceCarto) {
+/**
+ * ⚠️ AN EXPLICIT FRAMING MAKES THIS SERVE A POINT AS WELL AS A ROUTE, AND THAT IS WHY THE START
+ * SCREEN'S MAP COMES THROUGH HERE RATHER THAN CALLING loadRouteMap ITSELF. Everything that makes a map
+ * affordable lives in this function — the IndexedDB lookup, the store, the one-way CARTO fallback and
+ * the provider carried back for attribution — and test/route-map-cache.test.ts asserts loadRouteMap has
+ * exactly ONE caller for precisely that reason. It caught this: the live map was a second caller, and a
+ * second caller re-fetches billed tiles on every view.
+ * ⚠️ SO THE LIVE MAP IS CACHED TOO, keyed on the framing rather than on a route it does not have. A
+ * runner who opens the start screen from the same doorstep twice pays for tiles once.
+ */
+function routeMapFor(route, pw, ph, styles, forceCarto, frame) {
   // ⚠️ RESOLVE THE PROVIDER ONCE, HERE, and key on the RESOLVED name. styles is now an object with a
   // name per provider, and passing it straight to routeMapKey would stringify it to "[object Object]"
   // — identical for every style, so the run card and the share card would silently share one cache
@@ -20152,7 +20391,12 @@ function routeMapFor(route, pw, ph, styles, forceCarto) {
   // wrong map at the wrong size, with nothing to point at.
   const st = styles || MAP_STYLE_SHARE;
   const prov = forceCarto ? { kind: "carto", style: st.carto, token: "" } : mapProviderFor(st);
-  const key = routeMapKey(route, pw, ph, prov.kind + ":" + prov.style);
+  // ⚠️ THE FRAMING IS THE KEY WHEN THERE IS NO ROUTE. A point map's identity is where it is centred and
+  // how far in it is zoomed; the pixel origins already carry both, rounded, so nothing else is needed.
+  const key = frame
+    ? "pt|" + frame.z + "|" + Math.round(frame.originX) + "," + Math.round(frame.originY) +
+      "|" + pw + "x" + ph + "|" + prov.kind + ":" + prov.style
+    : routeMapKey(route, pw, ph, prov.kind + ":" + prov.style);
   const fromBlob = (blob, z, ox, oy) => new Promise((resolve, reject) => {
     const url = URL.createObjectURL(blob), img = new Image();
     img.onload = () => { URL.revokeObjectURL(url); resolve({ image: img, proj: (p) => [mercX(p.lng, z) - ox, mercY(p.lat, z) - oy] }); };
@@ -20164,7 +20408,7 @@ function routeMapFor(route, pw, ph, styles, forceCarto) {
     .catch(() => null)
     .then((hit) => {
       if (hit) return hit;
-      return loadRouteMap(route, pw, ph, prov).then((md) => {
+      return loadRouteMap(route, pw, ph, prov, frame).then((md) => {
         const cv = document.createElement("canvas");
         cv.width = pw * MAPCACHE_SS; cv.height = ph * MAPCACHE_SS;
         const g = cv.getContext("2d");
@@ -20187,7 +20431,7 @@ function routeMapFor(route, pw, ph, styles, forceCarto) {
     .catch((err) => {
       if (prov.kind === "mapbox" && !forceCarto) {
         MAPDIAG.why = "mapbox refused; drew the free map instead";
-        return routeMapFor(route, pw, ph, st, true);
+        return routeMapFor(route, pw, ph, st, true, frame);
       }
       throw err;
     });
@@ -20211,12 +20455,47 @@ function routeMapFraming(route, pw, ph) {
   return { z: z, originX: originX, originY: originY,
     proj: (p) => [mercX(p.lng, z) - originX, mercY(p.lat, z) - originY] };
 }
-function loadRouteMap(route, pw, ph, prov) {
+/**
+ * THE MAP ON THE START SCREEN — CENTRED ON WHERE THE RUNNER IS STANDING.
+ *
+ * The owner's annotated reference, 2026-08-21: the screen you meet when you choose to record on the
+ * phone shows the session, the numbers at zero, an active-shoe chip, a GPS signal indicator, and a map
+ * with zoom and recentre controls. This is the map half.
+ *
+ * ⚠️ IT IS A FIXED ZOOM ON A POINT, NOT A FIT TO A ROUTE. There is no route yet — that is the whole
+ * situation — so routeMapFraming has nothing to fit a box to. The pixel origin is the runner's own
+ * Mercator position less half the box, which is what puts them in the middle of it.
+ *
+ * ⚠️ AND THE TILE COST IS BOUNDED ON PURPOSE. This file's map chapter exists because a map re-fetched
+ * on every glance is free on CARTO and BILLED on Mapbox — which is why a run's route is rendered once
+ * and kept. A live map cannot be cached on a route it does not have, so instead: one fetch per view, a
+ * hard refusal above twelve tiles, and the position rounded to about 20 m so a jittering fix does not
+ * re-fetch the same picture. Measured at z15 on a 430x300 box that is 4 to 6 tiles.
+ * ⚠️ IN THE NATIVE APP IT IS FREE WHATEVER THE TOKEN SAYS. A URL-restricted Mapbox token is refused
+ * under interun://app — recorded in this file's own map chapter, confirmed on the owner's phone — so
+ * the app falls back to the surface's CARTO style, which is unbilled. The billed case is a web build
+ * with a working token.
+ */
+function liveMapFraming(lat, lon, z, pw, ph) {
+  return { z: z, originX: mercX(lon, z) - pw / 2, originY: mercY(lat, z) - ph / 2 };
+}
+function liveMapFor(lat, lon, z, pw, ph) {
+  // ⚠️ THROUGH routeMapFor, NOT loadRouteMap. It carries the cache, the one-way CARTO fallback and the
+  // provider used — writing those again here would be a second copy of the only thing keeping a map
+  // affordable, and the guard on loadRouteMap's caller count exists to stop exactly that.
+  return routeMapFor(null, pw, ph, MAP_STYLE_RUN, false, liveMapFraming(lat, lon, z, pw, ph));
+}
+function loadRouteMap(route, pw, ph, prov, frame) {
   pw = pw || MAP_W; ph = ph || MAP_H;
   prov = prov || mapProviderFor(MAP_STYLE_SHARE);
   return new Promise((resolve, reject) => {
-    if (!route || route.length < 2) return reject(new Error("no route"));
-    const fr = routeMapFraming(route, pw, ph);
+    // ⚠️ AN EXPLICIT FRAMING IS HOW A POINT MAP REUSES THIS, and reusing it is the point. The tile URL
+    // for both providers is built below and this file's own comment calls it the only one in the app —
+    // a second loader for the live screen would be a second place a provider swap has to be
+    // remembered. A framing supplied by the caller also lifts the two-point requirement, which exists
+    // only because routeMapFraming cannot fit a box to one coordinate.
+    if (!frame && (!route || route.length < 2)) return reject(new Error("no route"));
+    const fr = frame || routeMapFraming(route, pw, ph);
     const z = fr.z, originX = fr.originX, originY = fr.originY;
     const n = Math.pow(2, z), specs = [];
     for (let tx = Math.floor(originX / MAP_TILE); tx <= Math.floor((originX + pw) / MAP_TILE); tx++)
@@ -25263,6 +25542,75 @@ function painAskHtml(sm) {
     '<div class="seg">' + btn(false, "No") + btn(true, "Yes") + '</div></div>' +
     (hurt ? '<div class="rpe-note">Noted \— that comes first in the read below, and it stays off anything you share.</div>' : "");
 }
+/**
+ * NAMING THE RUN, AND CHOOSING WHERE IT GOES, BEFORE IT IS SAVED.
+ *
+ * From the owner's annotated finish-screen reference (2026-08-21): the run's own name, its description,
+ * private notes, and a "sync to applications" block above Discard and Save.
+ *
+ * ⚠️ THE NAME DEFAULTS TO THE SESSION'S TITLE AND IS EDITABLE, and that distinction is the feature. A
+ * logged run has always carried run.t, taken from the prescription — so the field is not new storage, it
+ * is the first time the runner can change it. Left blank it falls back to the title rather than saving an
+ * empty name, because a run called nothing is unfindable in the Logbook.
+ * ⚠️ IT PARKS ON LIVE.summary UNTIL SAVE, exactly as the note does, and for the same reason: before the
+ * run is in the store there is nothing to write through to, and liveRunRecord is the one builder that
+ * carries it into the record.
+ * ⚠️ AND THE DESCRIPTION IS THE PLAN'S OWN, READ-ONLY. It is what the session asked for; letting the
+ * runner edit it would leave the Logbook describing a run against a prescription that never existed,
+ * which is the snapshot rule run.steps already exists to protect.
+ */
+function liveNameHtml(sm) {
+  if (sm.saved) return "";
+  const v = (LIVE.summary && LIVE.summary.name != null) ? LIVE.summary.name : (LIVE.session.title || "");
+  const desc = LIVE.session && LIVE.session.description ? String(LIVE.session.description) : "";
+  return '<div class="card lfin">' +
+    '<label class="lfin-k" for="runName">Workout name</label>' +
+    '<input class="lfin-in" id="runName" type="text" maxlength="80" value="' + esc(v) + '">' +
+    (desc ? '<div class="lfin-k" style="margin-top:var(--s3)">Description</div>' +
+      '<div class="lfin-d">' + esc(desc) + '</div>' : "") +
+    '</div>';
+}
+/**
+ * WHERE THE RUN GOES WHEN IT IS SAVED.
+ *
+ * ⚠️ ONLY WHAT ACTUALLY WORKS APPEARS. The reference shows Strava and Apple Health side by side; this
+ * app can do the first and cannot do the second at all. Writing to Apple Health is an HKWorkout save
+ * needing a HealthKit share entitlement and native code — a toggle for it would be the
+ * looks-live-is-inert defect this project has shipped three times, on the one screen where a runner
+ * decides whether their run has been recorded anywhere. It is named as not built instead.
+ * ⚠️ AND STRAVA APPEARS ONLY WHEN CONNECTED, for the reason stravaRunButtonHtml already records: a
+ * greyed-out Strava row on every finished run advertises a feature the runner has not set up.
+ * ⚠️ THE SWITCH IS A PREFERENCE THAT PERSISTS, so somebody who always sends to Strava is not asked
+ * every run — and it is read at SAVE time, so turning it off before saving means this run does not go.
+ */
+function liveSyncHtml(sm) {
+  if (sm.saved || !stravaConnected()) return "";
+  const on = stravaAutoSend();
+  return '<div class="card lfin">' +
+    '<div class="lfin-k">Sync to applications</div>' +
+    '<div class="lsync">' +
+      '<span class="lsync-ic">' + ICON.share + '</span>' +
+      '<span class="lsync-t">Strava</span>' +
+      '<button class="lsw' + (on ? " on" : "") + '" id="lStrava" role="switch" aria-checked="' +
+        (on ? "true" : "false") + '" aria-label="Send this run to Strava when you save it">' +
+        '<span class="lsw-k"></span></button>' +
+    '</div>' +
+    '<div class="lfin-d">Apple Health is not built yet, so nothing is written there.</div>' +
+    '</div>';
+}
+/**
+ * ⚠️ THE SETTING ALREADY EXISTED, AND WRITING A SECOND ONE WAS THE MISTAKE. stravaCfg().auto is what
+ * stravaMaybeAutoSend reads at save time, and Connections has had a switch for it since the Strava work
+ * — so a new key here would have given one preference two homes: the finish screen and the Connections
+ * screen would each have shown a switch, and only one of them would have decided anything. That is the
+ * two-answers-to-one-question fault this project keeps paying for.
+ * ⚠️ SO THE FINISH SCREEN'S SWITCH IS THE SAME SWITCH. Turning it off here turns it off there, which is
+ * also the honest behaviour: the runner is choosing whether their runs go to Strava, not whether this
+ * one does — and stravaMaybeAutoSend runs straight after the record is on disk, so a run saved with it
+ * off simply keeps its own "Send to Strava" button.
+ */
+function stravaAutoSend() { return !!stravaCfg().auto; }
+function stravaAutoSet(on) { const c = stravaCfg(); c.auto = !!on; stravaSaveCfg(c); }
 function viewLiveComplete() {
   const sm = LIVE.summary || { distKm: "0.00", time: "0:00", pace: "—", saved: false, route: [], splits: [] };
   // ⚠️ THE FINISH SCREEN MUST SHOW THE SAME RUN THE LOGBOOK WILL. It used to hand-build its own
@@ -25286,6 +25634,8 @@ function viewLiveComplete() {
     (LIVE.indoor ? treadmillDistanceHtml(sm) : "") +
     (sm.meaningful ? rpeAskHtml(sm) : "") +
     runOverviewHtml(run) +
+    liveNameHtml(sm) +
+    liveSyncHtml(sm) +
     controls +
     '<div class="card"><div class="subhead" style="margin-top:0">Coaching cues</div><div class="cuelog" id="lCues"></div></div>';
 }
@@ -25639,7 +25989,13 @@ function liveFinish(complete) {
 // anything off this object's id without stamping the id once at save time instead.
 function liveRunRecord(sm) {
   return {
-    id: "run-" + new Date().getTime(), t: LIVE.session.title, d: runDateLabel(), dateIso: todayIso(),
+    // ⚠️ THE RUNNER'S OWN NAME WINS, AND THE TITLE IS THE FALLBACK. The finish screen lets the run be
+    // renamed (owner's reference, 2026-08-21); it parks on LIVE.summary like the note and the effort
+    // rating do, because this record is rebuilt on every render of that screen. Blank falls back rather
+    // than saving an empty name, which would be unfindable in the Logbook.
+    id: "run-" + new Date().getTime(),
+    t: (sm.name != null && String(sm.name).trim()) ? String(sm.name).trim() : LIVE.session.title,
+    d: runDateLabel(), dateIso: todayIso(),
     dist: sm.distKm + " km", time: sm.time, pace: (sm.pace || "—") + " /km",
     distKm: Number(sm.distKm), sec: sm.sec, avgPaceSec: Math.round(sm.avgPaceSec || 0),
     route: sm.route, splits: sm.splits, elevGain: sm.elevGain || 0, type: sm.type,
@@ -27585,6 +27941,20 @@ function wire() {
     }
     if (saved) saved.textContent = "Save the run first and your note saves with it.";
   };
+  // ⚠️ THE NAME IS KEPT SYNCHRONOUSLY AND ONLY THE DISK WRITE IS DEBOUNCED, which is the rule the note
+  // beside it already follows: holding the text in a timer means any re-render inside that window
+  // rebuilds the field from the old value, and tapping an effort number an inch away re-renders.
+  const runName = $("runName"); if (runName) runName.oninput = () => {
+    const target = viewedRun();
+    if (target) { target.t = runName.value.trim() || target.t; clearTimeout(NOTE_T); NOTE_T = setTimeout(saveRuns, 400); return; }
+    if (LIVE && LIVE.summary) LIVE.summary.name = runName.value;
+  };
+  const lStrava = $("lStrava"); if (lStrava) lStrava.onclick = () => {
+    const on = !stravaAutoSend();
+    stravaAutoSet(on);
+    lStrava.classList.toggle("on", on);
+    lStrava.setAttribute("aria-checked", on ? "true" : "false");
+  };
   const ovMap = $("ovMap"); if (ovMap) { const r = currentOverviewRun(); if (r) buildOverviewMap(ovMap, r.route); }
   document.querySelectorAll("[data-hub]").forEach((b) => b.onclick = () => { if (b.dataset.hub === "alfie") { openAlfie(); return; } state.support = b.dataset.hub; state.supportFrom = null; render(); });
   // Support library pages: play any movement, expand any guide.
@@ -27957,6 +28327,27 @@ function wire() {
     coachStop(); stopLive(); stopSpeech(); state.screen = null; state.tab = "today"; render();
   };
   const lStart = $("lStart"); if (lStart) lStart.onclick = () => runCountIn(beginLive);
+  // ⚠️ AND ONCE HERE, because a fix may already have arrived before this screen was rendered — the
+  // start-where sheet acquires GPS before the run is staged, so LIVE.lastLat is often already set and
+  // no further fix is needed to make the map drawable. Anything geometric belongs in wire(), which is
+  // where the screen exists to be measured; buildNav() runs once at boot with no screen at all.
+  if (LIVE && !LIVE.started && !LIVE.indoor) drawLiveMap(true);
+  // ── the start screen's own controls (owner's annotated reference, 2026-08-21) ───────────────────
+  // ⚠️ EVERY ONE OF THESE IS WIRED, AND THAT IS THE WHOLE REASON THEY ARE HERE RATHER THAN IN THE
+  // MARKUP ALONE. A zoom or a recentre that renders and does nothing is the looks-live-is-inert defect
+  // this project has shipped three times; the id guard proves the ids resolve and cannot prove a
+  // control is connected to anything.
+  // ⚠️ THE SAME ROUTE THE PROFILE ROW USES, not a guess at one. The rack is a support page and its
+  // state is state.support; inventing a state.hub here would have rendered nothing.
+  const lShoe = $("lShoe"); if (lShoe) lShoe.onclick = () => {
+    state.screen = null; state.tab = "profile"; state.support = "shoes"; render();
+  };
+  const lZi = $("lZoomIn"); if (lZi) lZi.onclick = () => liveMapZoom(1);
+  const lZo = $("lZoomOut"); if (lZo) lZo.onclick = () => liveMapZoom(-1);
+  // ⚠️ RECENTRE CLEARS THE ZOOM OVERRIDE AS WELL AS REDRAWING. Its job is "put me back in the middle at
+  // a sensible scale", and a recentre that kept a zoom the runner had wandered away from would leave
+  // them looking at a street they are no longer on.
+  const lRc = $("lRecentre"); if (lRc) lRc.onclick = () => { LIVE.mapZ = null; drawLiveMap(true); };
   const lVoice = $("lVoice"); if (lVoice) lVoice.onclick = () => {
     COACH.cfg.enabled = !COACH.cfg.enabled; saveCoachCfg();
     if (!COACH.cfg.enabled) coachStop(); else { coachUnlock(); coachLoadManifest(); }

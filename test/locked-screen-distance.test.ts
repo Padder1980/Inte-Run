@@ -154,11 +154,16 @@ function run(t: Trace) {
   const elapsed = () => FakeDate.now() - LIVE.startMs - LIVE.pausedMs;
   const noop = () => {};
   const f: any = new Function(
+    // ⚠️ drawLiveMap IS STUBBED, DELIBERATELY, AND IT IS THE ONE UI CALL THAT DESERVES A NOTE. It is
+    // the start screen's position map, which cannot exist in node — and it returns immediately once a
+    // run has started, so a running session never reaches it in the app either. Stubbing it here keeps
+    // this file about distance; whether the map is drawn at the right moment is asserted where the
+    // screen is, not where the metres are.
     "LIVE", "Date", "liveElapsedMs", "liveNowMs", "liveCue", "fmtPace", "renderLiveNow",
-    "pushLiveActivity", "stopLive", "liveFinish",
+    "pushLiveActivity", "stopLive", "liveFinish", "drawLiveMap",
     src + "; return { onGpsPos: onGpsPos, pedoEntry: pedoEntry, gpsUiTick: gpsUiTick };",
   )(LIVE, FakeDate, elapsed, elapsed, (c: any) => cues.push(c), (x: number) => String(Math.round(x)),
-    noop, noop, noop, noop);
+    noop, noop, noop, noop, noop);
   rt.start(0).forEach((c: any) => cues.push(c));
 
   const acc = t.accuracy == null ? 8 : t.accuracy;

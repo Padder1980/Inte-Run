@@ -155,8 +155,14 @@ test("there is exactly ONE tile source, and ONE place naming the styles", () => 
   // The invariant is UNCHANGED — every consumer that wants a basemap goes through routeMapFor, so no
   // surface re-fetches tiles per view — and the number is only the count of consumers that satisfy it.
   // Do not weaken this to <=: the guarantee is that there are no OTHER callers, not that there are few.
-  assert.equal(calls - selfCalls, 3,
-    "a map consumer is bypassing the cache (expected: the definition plus both remaining call sites)");
+  // ⚠️ FOUR SINCE 2026-08-21, AND IT WENT UP BECAUSE A NEW CONSUMER ARRIVED THAT SATISFIES THE RULE.
+  // The start screen for a phone-recorded run draws a map centred on where the runner is standing
+  // (liveMapFor), and it goes through routeMapFor with an explicit framing rather than calling
+  // loadRouteMap itself — so it is cached, it falls back the same one-way to CARTO, and it carries back
+  // the provider that actually served the tiles for its attribution. It was written the other way
+  // first and THIS GUARD CAUGHT IT: a second loadRouteMap caller re-fetches billed tiles per view.
+  assert.equal(calls - selfCalls, 4,
+    "a map consumer is bypassing the cache (expected: the definition plus the three call sites)");
   assert.equal((html.match(/loadRouteMap\(/g) || []).length, 2,
     "loadRouteMap has a caller other than routeMapFor — that one re-fetches tiles on every view");
 });

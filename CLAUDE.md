@@ -7442,3 +7442,68 @@ GPS signal indicator, map zoom/recentre/mute controls) and its FINISH screen (wo
 private notes, and a "sync to applications" block with Strava and Apple Health toggles beside Discard and
 Save). Apple Health WRITE does not exist in this app at all — that is an `HKWorkout` save and a new
 entitlement, i.e. native work, not a toggle.
+
+## THE TWO SCREENS A PHONE-RECORDED RUN BEGINS AND ENDS ON (owner's annotated references, 2026-08-21)
+
+He photographed another app's start screen and drew arrows at what he wanted, then its finish screen:
+*"The second screenshot shows what starts when you select for the run to be recorded on the phone rather
+than the watch (I have drawn a number of things on top of that screenshot for you to review and
+implement) ... The third and forth screenshots are the end screen"*.
+
+**THE START SCREEN — `viewLiveStart`.** `viewLive` already had a not-started state (a hero, "Press start
+when you're ready" and one button); this is its own composition now: the session's first step over its
+title, the three numbers at zero, a map centred on where the runner is standing with zoom / voice /
+recentre on it, the GPS signal as four bars **and** the metres, an active-shoe chip, and one Start.
+- ⚠️ **THE NUMBERS ARE AT ZERO IN THE SAME PLACES THE RUN SHOWS THEM**, so nothing moves when it starts —
+  the screen fills in rather than rearranging.
+- ⚠️ **THE TREADMILL DOES NOT COME HERE** (`!running && !LIVE.indoor`). No position to draw, no signal to
+  report, nothing to recentre.
+- ⚠️ **THE SIGNAL SHOWS NOTHING WHEN THERE IS NO FIX.** One lit bar and no fix are different situations
+  needing different reactions — a weak signal is something to wait out, no signal may mean permission was
+  refused — and the metres stay beside the bars because this project's history is full of plausible
+  readouts that hid the fault.
+- ⚠️ **THE SHOE CHIP IS HERE BECAUSE THE MILEAGE IS STAMPED AT SAVE TIME FROM WHATEVER IS ACTIVE THEN.**
+  Before the run is the moment to set it; a run saved against the wrong pair moves real distance onto the
+  wrong shoe, which is the one thing the Shoe Rack exists to get right.
+
+⚠️⚠️ **THE MAP WAS WRITTEN CALLING `loadRouteMap` DIRECTLY AND `test/route-map-cache.test.ts` CAUGHT IT.**
+That guard asserts the tile fetcher has exactly ONE caller, because a second caller re-fetches billed
+tiles on every view — the bill the whole draw-once design exists to prevent. `routeMapFor` now takes an
+explicit FRAMING, so a point map gets the IndexedDB cache, the one-way CARTO fallback and the provider
+carried back for attribution, all of it unchanged. `liveMapFor` is four lines.
+- ⚠️ **KEYED ON THE FRAMING** (`pt|z|originX,originY|WxH|provider:style`), because a point map's identity
+  is where it is centred and how far in it is zoomed, and the pixel origins already carry both.
+- ⚠️ **IT DOES NOT FOLLOW THE RUNNER**, and `drawLiveMap` returns immediately once `LIVE.started`. A map
+  that tracked a run would be a tile fetch every few seconds for its whole length.
+- ⚠️ **AND THE POSITION IS ROUNDED TO ~20 m IN THE IN-MEMORY KEY.** A fix jitters constantly and this
+  screen can sit open for minutes; keyed on the raw coordinate it re-fetches the same picture several
+  times a second. ⚠️ **The guard for that had to be restated**: asserting `LIVE.mapKey` merely APPEARS in
+  the function is satisfied by the assignment, so deleting the early return that reads it escaped.
+- ⚠️ **THE ATTRIBUTION IS THE PROVIDER THAT SERVED THE TILES** (`mapAttributionFor(r.prov)`), never the
+  one `mapProviderFor` would prefer — the licence breach this file records making once already.
+- ⚠️ **THE CENSUS IN `route-map-cache.test.ts` IS NOW 4, NOT 3**, and it is a census of consumers rather
+  than a cap. `loadRouteMap`'s own caller count stays at 2.
+
+**THE FINISH SCREEN.** It already had the debrief, the notes, Discard and Save; what the reference adds is
+a **workout name**, the session's **description**, and a **sync block**.
+- ⚠️ **THE NAME IS NOT NEW STORAGE.** A run has always carried `run.t` from the prescription; this is the
+  first time it can be changed. Blank falls back to the title — a run called nothing is unfindable in the
+  Logbook — and it parks on `LIVE.summary` until Save, like the note and the effort rating, because
+  `liveRunRecord` rebuilds the record on every render of that screen.
+- ⚠️ **THE DESCRIPTION IS READ-ONLY.** It is what the session ASKED for; letting it be edited would leave
+  the Logbook describing a run against a prescription that never existed, which is what the `run.steps`
+  snapshot rule already protects.
+- ⚠️⚠️ **THE STRAVA SWITCH IS THE SWITCH THAT ALREADY EXISTED, AND WRITING A SECOND ONE WAS THE MISTAKE.**
+  `stravaCfg().auto` is what `stravaMaybeAutoSend` reads at save time and Connections has had a control
+  for it since the Strava work — a new `interun_stravaauto_v1` key would have given one preference two
+  homes with only one of them deciding anything. ⚠️ **And the guard against it first matched its own
+  neighbours' NAMES** (`stravaAutoSend`/`stravaAutoSet` both contain "stravaauto"), reporting the fix as
+  the defect: sixth firing of the guard-trips-on-its-own-vocabulary trap. It matches the KEY now.
+- ⚠️ **APPLE HEALTH IS NAMED AS NOT BUILT RATHER THAN GIVEN A DEAD SWITCH.** Writing to Health is an
+  `HKWorkout` save needing a share entitlement and native code. A toggle for it on the one screen where a
+  runner decides whether their run was recorded anywhere is the worst possible place for an inert control,
+  and this project has shipped that defect three times.
+
+`test/live-screens.test.ts` holds seven guards. **Nine deliberate re-breaks, and two escaped the first
+version of their guard**: the button sweep flagged `#lMapWrap` — a container — as unwired, and the map-key
+guard was a presence check. Both restated and re-broken.

@@ -249,7 +249,6 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .welcome.wb .welcome-h { margin: 18px 0 14px; }
 .wb-quote { font-size: 18px; line-height: 1.5; font-style: italic; color: var(--splash-ink); margin: 0 8px; animation: welIn .65s ease .5s both; }
 .wb-by { font-size: 13px; color: var(--splash-soft); margin: 12px 0 0; animation: welIn .65s ease .5s both; }
-.wb-cta { margin-top: 26px; animation: welIn .65s ease .5s both; }
 /* Session guide overlay (interactive walkthrough of the session shorthand) */
 .guide-ov { position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center; padding: 22px; background: color-mix(in srgb, var(--ink) 72%, transparent); backdrop-filter: blur(5px); opacity: 0; transition: opacity .25s ease; }
 .guide-ov.on { display: flex; opacity: 1; }
@@ -27210,6 +27209,18 @@ const QUOTES = [
 ];
 function randomQuote() { return QUOTES[Math.floor(Math.random() * QUOTES.length)]; }
 function welcomeBackName() { const n = firstName(); return n ? "Welcome back, " + esc(n) : "Welcome back"; }
+/**
+ * HOW LONG THE WELCOME-BACK SCREEN HOLDS BEFORE IT LANDS ON TODAY.
+ *
+ * The owner, 2026-08-21: "I want that screen to last 4 seconds before automatically landing on the today
+ * page. I've decided i don't wan't the user to keep needing to press the lets go button."
+ *
+ * ⚠️ IT IS THE WHOLE LAUNCH THE RUNNER FEELS, NOT THIS NUMBER ALONE. The splash holds 2.2s before this
+ * appears and the cross-fade out takes 0.5s, so a return to the app now takes about 6.7 seconds to reach
+ * Today. That is the cost of the ask, stated here rather than discovered later: this is the constant to
+ * lower if it ever feels long.
+ */
+const WELCOME_BACK_MS = 4000;
 // A brief personalised welcome shown on each return to the app, with a rotating motivational quote.
 function showWelcomeBack() {
   const q = randomQuote();
@@ -27218,15 +27229,30 @@ function showWelcomeBack() {
     '<h1 class="welcome-h">' + welcomeBackName() + ' \\uD83D\\uDC4B</h1>' +
     '<p class="wb-quote">\\u201C' + esc(q[0]) + '\\u201D</p>' +
     (q[1] ? '<p class="wb-by">\— ' + esc(q[1]) + '</p>' : '') +
-    '<button class="welcome-cta wb-cta" id="wbGo">Let\\u2019s go \\u2192</button>' +
     '</div></div>');
   document.body.appendChild(ov);
   ov.classList.add("on");   // opaque, directly under the fading splash — the logo holds; copy welIns
-  syncThemeColor();         // this overlay is dark and waits for a tap; the strip must be dark too
-  let gone = false;
-  const dismiss = () => { if (gone) return; gone = true; ov.classList.add("hide"); syncThemeColor(); setTimeout(() => { ov.remove(); syncThemeColor(); if (state.tab === "today" && !state.screen) maybeAutoGuide(); }, 500); };
-  // Stays up until the user taps "Let's go" — no auto-dismiss, no tap-away.
-  const go = $("wbGo"); if (go) go.onclick = dismiss;
+  // ⚠️ THE STRIP FOLLOWS THIS OVERLAY AT EVERY STEP. iOS paints those 62pt itself and cannot be told to
+  // stop, so the only thing that hides it is matching whatever is on screen — and this sequence now
+  // changes that on a timer rather than on a tap.
+  syncThemeColor();
+  let gone = false, timer = 0;
+  const dismiss = () => {
+    if (gone) return;
+    gone = true;
+    // ⚠️ CLEARED, so nothing runs against a node that has been removed. The gone guard already makes a
+    // second dismissal harmless; this stops the work happening at all.
+    if (timer) { clearTimeout(timer); timer = 0; }
+    ov.classList.add("hide"); syncThemeColor();
+    setTimeout(() => { ov.remove(); syncThemeColor(); if (state.tab === "today" && !state.screen) maybeAutoGuide(); }, 500);
+  };
+  // ⚠️ NO BUTTON, AND THE SCREEN IS STILL TAPPABLE. The owner removed the requirement to press anything,
+  // not the ability to move on — so a tap anywhere skips the wait. Nobody is held for four seconds who
+  // does not want to be, and there is no control left to look at and wonder about.
+  // ⚠️ AND THE TAP TARGET IS THE OVERLAY ITSELF, which is what the capture tools in tools/ now click
+  // instead of the button that used to be here.
+  ov.onclick = dismiss;
+  timer = setTimeout(dismiss, WELCOME_BACK_MS);
 }
 
 // ---- "Understanding your sessions" interactive guide ----------------------

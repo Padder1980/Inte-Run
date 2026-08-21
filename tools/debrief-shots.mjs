@@ -82,7 +82,9 @@ const FIXTURE = `(() => {
 })()`;
 
 const ENTER = `(() => {
-  const go = document.getElementById('wbGo'); if (go) go.click();
+  // The welcome-back screen has no button any more — it self-dismisses after four seconds and a tap
+  // anywhere skips it (owner, 2026-08-21). Clicking the overlay is what the button used to do.
+  const wb = document.getElementById('welcomeback'); if (wb) wb.click();
   document.querySelectorAll('.welcome, .splash').forEach(n => n.remove());
   state.logged = JSON.parse(localStorage.getItem('interun_runs'));
   state.viewRunId = state.logged[0].id;

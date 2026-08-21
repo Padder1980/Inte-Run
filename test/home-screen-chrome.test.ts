@@ -162,3 +162,36 @@ test("--vvh cannot latch at launch, so the nav never floats above a dead strip",
       `--vvh is never re-evaluated on ${ev}, so a stale value can survive`);
   }
 });
+
+test("BLOCKER: the welcome-back screen lands on Today by itself, and needs no button", () => {
+  // The owner, 2026-08-21: "I want that screen to last 4 seconds before automatically landing on the
+  // today page. I've decided i don't wan't the user to keep needing to press the lets go button."
+  const html = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
+  const at = html.indexOf("function showWelcomeBack(");
+  assert.ok(at > 0, "showWelcomeBack is gone");
+  let d = 0, body = "";
+  for (let i = html.indexOf("{", at); i < html.length; i++) {
+    if (html[i] === "{") d++;
+    else if (html[i] === "}") { d--; if (!d) { body = html.slice(at, i + 1); break; } }
+  }
+  // ⚠️ THE TIMER IS THE FEATURE. Without it the screen waits forever for a tap that is no longer
+  // offered, which would strand a returning runner on a quote.
+  assert.match(body, /setTimeout\(dismiss, WELCOME_BACK_MS\)/,
+    "the welcome-back screen no longer dismisses itself, and there is no button left to dismiss it");
+  const ms = /const WELCOME_BACK_MS = (\d+);/.exec(html);
+  assert.ok(ms, "WELCOME_BACK_MS is gone");
+  assert.equal(Number(ms![1]), 4000, "the hold is " + ms![1] + "ms; the owner asked for four seconds");
+  // ⚠️ AND THE BUTTON IS GONE RATHER THAN HIDDEN. A control that is still rendered and merely invisible
+  // is one a screen reader still announces and a keyboard user can still reach.
+  assert.ok(!/id="wbGo"/.test(html), "the Let's go button is back in the markup");
+  assert.ok(!/wb-cta/.test(html), "the button's own style rule survived it, which is what the next screen copies");
+  // ⚠️ THE SCREEN IS STILL TAPPABLE. He removed the requirement to press something, not the ability to
+  // move on — nobody who is impatient should be held for four seconds.
+  assert.match(body, /ov\.onclick = dismiss/, "there is no way to skip the wait");
+  // ⚠️ AND THE TIMER IS CLEARED, so nothing runs against a node that has been removed.
+  assert.match(body, /clearTimeout\(timer\)/, "a skipped wait leaves its timer running");
+  // ⚠️ THE FIRST-RUN WELCOME IS UNTOUCHED, and that is deliberate: its button leads into the setup
+  // wizard, which is a choice rather than a pause. Auto-advancing somebody into a form would be worse
+  // than making them tap.
+  assert.match(html, /id="welcomeGo"/, "the first-run welcome lost its button too, which leads into setup");
+});

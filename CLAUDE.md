@@ -1308,7 +1308,8 @@ needs no exemption list at all, which is what stops it going stale.
 Playwright-core is global at `/opt/node22/lib/node_modules/playwright`; Chromium at
 `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. For anything using the `voices/` files, serve
 `docs/` over HTTP (`python -m http.server`) and load `docs/index.html` — `file://` blocks `fetch`.
-Dismiss the welcome with `#wbGo`; a profile is seeded via `localStorage rc_profile_v1`.
+Dismiss the welcome by clicking `#welcomeback` (it also self-dismisses after 4s — see WELCOME_BACK_MS;
+the `#wbGo` button was removed on 2026-08-21); a profile is seeded via `localStorage rc_profile_v1`.
 
 ## Conventions
 
@@ -7586,3 +7587,39 @@ Store Connect or Transporter, and `xcrun altool`, which refuses without either a
 password. The Claude-in-Chrome extension — which would have driven his own logged-in session — reports
 not connected. So the CLI genuinely cannot do it today, and **an upload is not a distribution: never
 report a build as being with the testers.**
+
+## THE WELCOME-BACK SCREEN LANDS ON TODAY BY ITSELF (owner, 2026-08-21)
+
+*"when the app loads, when the welcome back message comes on with the quote, I want that screen to last 4
+seconds before automatically landing on the today page. I've decided i don't wan't the user to keep
+needing to press the lets go button."*
+
+`WELCOME_BACK_MS = 4000`, a `setTimeout` in `showWelcomeBack`, and the `#wbGo` button is gone.
+**Measured on the served build: the welcome appears at 2.3s, holds 4.6s (4.0 plus the 0.5s cross-fade),
+and Today is up at 6.9s with `state.tab === "today"`.**
+
+⚠️ **THE WHOLE LAUNCH IS WHAT THE RUNNER FEELS, NOT THE 4000.** The splash holds 2.2s before this appears,
+so a return to the app is now ~6.9 seconds to Today where it used to be ~2.5 plus however long the runner
+took to tap. That is the cost of the ask; `WELCOME_BACK_MS` is the one constant to lower if it ever feels
+long, and the figure is written beside it so nobody has to rediscover it.
+
+⚠️ **THE SCREEN IS STILL TAPPABLE, AND THAT IS NOT A CONTRADICTION OF THE ASK.** He removed the
+REQUIREMENT to press something, not the ability to move on — so `ov.onclick = dismiss` skips the wait with
+no control on screen to look at and wonder about. Nobody impatient is held for four seconds.
+
+⚠️ **THE BUTTON IS DELETED, NOT HIDDEN,** and its `.wb-cta` rule went with it. A control that is merely
+invisible is still announced by a screen reader and still reachable by keyboard — and an orphaned style
+rule is what the next screen copies.
+
+⚠️ **THE FIRST-RUN WELCOME IS DELIBERATELY UNTOUCHED.** Its `#welcomeGo` leads into the setup wizard,
+which is a choice rather than a pause; auto-advancing somebody into a form is worse than asking them to
+tap. Guarded, so a future tidy-up cannot make the two consistent by breaking the one that should not
+change.
+
+⚠️ **THE TIMER IS CLEARED ON A TAP**, so nothing runs against a node that has been removed — the `gone`
+flag already made a second dismissal harmless, this stops the work happening at all.
+
+⚠️ **AND THREE OTHER PLACES NAMED `#wbGo`, WHICH IS HOW A REMOVAL BREAKS A HARNESS.**
+`tools/story-shots.mjs`, `tools/debrief-shots.mjs` and this file's own Playwright recipe all clicked that
+button to get past the welcome. All three now click `#welcomeback`, the overlay itself. **Grep for an id
+before deleting it** — the app was clean, the tooling was not.

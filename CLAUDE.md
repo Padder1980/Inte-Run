@@ -7623,3 +7623,112 @@ flag already made a second dismissal harmless, this stops the work happening at 
 `tools/story-shots.mjs`, `tools/debrief-shots.mjs` and this file's own Playwright recipe all clicked that
 button to get past the welcome. All three now click `#welcomeback`, the overlay itself. **Grep for an id
 before deleting it** — the app was clean, the tooling was not.
+
+## THE COMMUNITY TAB, BUILT TO THE COMMISSIONED DESIGN (2026-08-22)
+
+`design_handoff_community_tab` plus `ADDENDUM-1.md`: two panes on a horizontal slider — the runner's own
+profile and runs, and a feed of the runners they follow — a story viewer, three sheets, a plan-journals
+rail and a fourth sheet. Suite 1122 → **1132**.
+
+⚠️⚠️ **EVERY PERSON IN THE DESIGN'S DEMO DATA IS FICTIONAL AND NOT ONE OF THEM SHIPPED.** The prototype
+carries Cormac Byrne, Niamh Doyle, 1,204 followers, 312 following, four posts with likes and comments,
+and five people in each of the follower sheets. There is no backend behind any of it — no accounts, no
+other runners, nothing to follow. Rendering those names to a tester would be fabricated data on a screen
+that looks like a social network, which is the one thing this codebase refuses everywhere else.
+⚠️ **SO WHAT SHIPPED IS THE DESIGN WITH REAL DATA AND THE DESIGN'S OWN EMPTY STATES, WHICH IS NOT A
+NARROWING.** The handoff lists them as required work in as many words — "no posts yet in the grid", "an
+empty feed for a runner following nobody", "an empty comment list", "no stories in the rail (the ring row
+collapses)" — because "the prototype only shows the ideal state, and the system requires all of them".
+`test/community.test.ts` sweeps the build for all twelve names, seven handles and the counts.
+
+**What is real:** posts = runs in the uncapped history; the meta line is the goal, the week and the block
+length off `PLAN`; the chips are best recorded efforts at 5 km / 10 km / half / marathon; the week total is
+`logTotals`; the grid is every recorded run by month with that month's real count and distance; a tile
+opens that run; the story is the runner's own last run with `debriefParagraphs` as its middle slide; Share
+a run lists real logged sessions and Continues into the share studio that already exists.
+
+⚠️ **"BEST", NOT "PB", AND THE WORD IS THE HONEST HALF.** The design's chip reads "PB · 5 km 21:04". A
+personal best is a race result; this is the quickest the app has recorded them covering about that far,
+training runs included. Tolerance is 3% — a 5.4 km run is not a 5 km time.
+⚠️ **NO HANDLE AND NO LOCATION.** The design's meta line carries "@aoife.runs · Cork"; this app stores
+neither, and inventing an @name from a first name or a city from GPS is the app asserting something the
+runner never told it.
+
+⚠️ **A TILE IS THE ROUTE DRAWN AS GEOMETRY, NEVER A BASEMAP.** The design's tiles are photographs and a run
+here has none — it has the shape of where it went. `routeMapSvg` with no projection fits a route to its own
+box, so a tile costs no map tiles: the same call, for the same reason, the share card records ("NO TILES …
+a shared card costs no billed tiles"). **Fifteen tiles of basemap on first open is roughly 120 billed
+tiles.** Guarded by name against `routeMapFor`, `loadRouteMap`, `liveMapFor` and `buildOverviewMap`.
+
+⚠️ **PLAN JOURNALS EXIST BECAUSE THE APP KEPT NO RECORD OF A FINISHED BLOCK.** `adoptPlan` assigns `PLAN`
+outright, so a new goal replaced the old block with no trace — the addendum's five rings could only ever
+have been the demo's five. `journalSync()` now records the block a runner is in and stamps the day it was
+replaced, so the rail is honest today (one ring, which the addendum names as the first-block state) and
+accumulates from here.
+- ⚠️ **INSIDE `adoptPlan`, NOT AT ITS CALLERS**, for the reason that function's own note gives about the
+  open-coded assignment; and inside a `try`, like the two syncs beside it — losing a journal row must
+  never cost somebody their plan.
+- ⚠️ **THE SIGNATURE IS WHAT STOPS A ROW PER BOOT.** `recompute()` re-adopts the same plan every launch.
+- ⚠️ **AND THE AVERAGE IS THE MEAN OF THE RATINGS ACTUALLY GIVEN.** RPE lives on the capped full records
+  and is optional; "—" when nothing was rated, rather than a mean over runs nobody rated.
+
+⚠️⚠️ **`journalSync` RAN AT BOOT AND THREW EVERY TIME, SILENTLY, BECAUSE ITS `const` KEY WAS DECLARED FIVE
+THOUSAND LINES LATER.** `recompute()` is called at module top level, so `adoptPlan` reached `journalSync`,
+`loadJournals` read `JOURNAL_KEY` in its temporal dead zone, and the `try/catch` swallowed the
+ReferenceError. Measured: nothing was ever written on any launch while calling it by hand worked
+perfectly. The same trap `SHARE_LADDER` hit reading `SHARE_EVEN_SPREAD_S`. `JOURNAL_KEY` is declared with
+the other store keys now.
+
+⚠️⚠️ **THE TWO DESIGN SYSTEMS USE THE SAME SIX TYPE SIZES UNDER SWAPPED NAMES, AND EVERY SIZE IN THE NEW
+CSS WAS WRONG BEFORE IT WAS SPOTTED.**
+
+| px | design system | this app |
+|---|---|---|
+| 32 | `--t-display` | `--t-display` |
+| 24 | `--t-title` | `--t-hero` |
+| 20 | `--t-card` | `--t-section` |
+| 17 | `--t-section` | `--t-card` |
+
+Copied by name, a heading specified at 17px renders at 20 and a stat value specified at 20 renders at 17 —
+every heading and number one rung out, in opposite directions, with nothing failing. The undeclared-token
+guard caught only `--t-title`, the one name this app lacks entirely; the other two resolve happily to the
+wrong size. **Translate design tokens by VALUE, never by name.**
+
+⚠️ **`--mark`, `--mark-deep` AND `--signal-*` WERE USED BY THE DESIGN AND DECLARED NOWHERE IN THE APP.**
+Added to `:root` ONLY, and that is deliberate: this file's four-places warning is about tokens whose value
+differs by theme, and these do not — the design system declares them once for the same reason. Four copies
+of one constant is how they come to disagree.
+⚠️ **AND THE SHARE CARD'S NEON BAN HAD TO BE NARROWED FROM "the whole build" TO THE RENDERER.** `#3dffb0`
+is `--signal-2`, which both the design system and the handoff permit on dark media and forbid in UI
+chrome — a full-screen story over a dark route is dark media. What the guard protects is unchanged: the
+card must not paint itself in a neon of its own, so the sweep is `closure("drawShareCard")` plus a check
+that no signal token reaches `SHARE_INK` by name. Both halves re-broken.
+
+⚠️ **THE ALL / VIDEOS TABS ARE DELIBERATELY NOT BUILT.** `liveRunRecord` carries no media field of any
+kind — no photo, no video, no upload path — so a Videos tab would be permanently empty for every runner
+and "All" would be the grid already on screen. Two tabs where one is always empty is worse than no tabs,
+and it is the looks-live-is-inert class this project has shipped three times. About twenty lines the day a
+run can carry media.
+
+⚠️ **`uiSessionRow` HAS NO `attrs` OPTION AND THE SHARE ROWS WERE WRITTEN WITH ONE.** It would have been
+dropped in silence and every row in that sheet would have looked live and done nothing. Its own comment
+says to use the app's delegated handler; `o.id` becomes `data-uirow`, which is that route.
+⚠️ **AND `ui-pill-build` IS NOT A CLASS THIS APP HAS.** The addendum names Pill tones `build` / `done`;
+the app's pill takes a colour as `--pc`, so the invented class would have rendered an unstyled span.
+
+⚠️ **THE STORY TIMER IS STARTED IN THE OPEN HANDLER AND CLEARED ON EVERY EXIT** — which is addendum 1's
+correction to the README, and it was already built that way. The progress bar is a 4.5s keyframe rather
+than a 100ms tick, so it needs no re-render per tick and Reduce Motion turns it off globally while the
+auto-advance still works, exactly as the handoff requires.
+
+**8 deliberate re-breaks, all caught, two only after the guard was restated.** The effort guard asked
+whether `sessionEffort(t.type)` was *mentioned*, which a conditional around it satisfies — watched
+escaping with `(t.type === "threshold") ? "hard" : sessionEffort(t.type)`, which IS the defect. And the
+mark-gradient guard said "story ring only" before the addendum reused that ring for a live block; the
+invariant is the MEANING (live or unseen), so it now also requires a finished block's ring to be the flat
+hairline.
+⚠️ **AND THE RE-BREAK HARNESS CONTAMINATED ITS OWN BASELINE AGAIN.** A keep copy taken during the run held
+a break, so restoring "the good file" restored a broken one and two guards failed on a tree that looked
+clean. Same lesson the sticker phase recorded: **take ONE pristine copy at the start**, never per break.
+And it restores the source without rebuilding, so `web/app.html` was stale for a run — these tests read
+the built page.

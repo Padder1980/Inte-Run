@@ -136,6 +136,16 @@ try{if(location.protocol==='interun:'){var v=document.querySelector('meta[name=v
   --bg: #eef1f1; --surface: #ffffff; --surface-2: #f6f8f8; --line: #dbe1e0;
   --ink: #14201b; --ink-soft: #4c5b55; --ink-faint: #63706a;
   --accent: #0c7b70; --accent-ink: #ffffff;
+  /* ⚠️ THE BRAND MARK AND THE SIGNAL GREENS ARE THEME-INDEPENDENT, WHICH IS WHY THEY ARE HERE ONLY.
+     This file's own warning is that FOUR places define the colour tokens and a change applied to three
+     leaves the fourth stale — but that is about tokens whose VALUE differs by theme. These do not: the
+     design system declares them once in :root, because the mark gradient is the logo's own colour and
+     the signal greens are only ever drawn on dark media. Adding them to the dark blocks as well would
+     be four copies of one constant, which is how they come to disagree.
+     ⚠️ AND --signal-* IS FOR DARK MEDIA ONLY, NEVER UI CHROME. It is bright enough to be unreadable on
+     a light surface and the token's own rule in the design system says so. */
+  --mark: #16b7a4; --mark-deep: #0a6f64;
+  --signal-1: #17c98f; --signal-2: #3dffb0; --signal-3: #a7ffd8;
   --base: #2b9eb3; --build: #5fa83c; --peak: #e0863a; --taper: #7a6fd0;
   --ready: #4b9e2f; --steady: #2b9eb3; --ease: #d98a2a; --rest: #c0442e;
   --brass:#856222; --brass-tint:#f3ead8; --brass-sheen:rgba(255,255,255,.72); --brass-shade:rgba(0,0,0,.04);
@@ -4369,6 +4379,213 @@ button.rd-meta-r { cursor: pointer; }
 .lst-attr { position: absolute; right: var(--s2); bottom: 4px; font-size: var(--t-label);
   color: var(--ink-faint); background: color-mix(in srgb, var(--surface) 72%, transparent);
   padding: 1px 6px; border-radius: var(--r-pill); }
+/* ⚠️⚠️ THE TWO SYSTEMS USE THE SAME SIX TYPE SIZES UNDER SWAPPED NAMES, AND EVERY SIZE IN THE TWO
+   BLOCKS BELOW WAS WRONG BEFORE THIS WAS SPOTTED.
+     design system:  --t-display 32 · --t-title 24 · --t-card 20 · --t-section 17 · body 15 · meta 13 · label 11
+     this app:       --t-display 32 · --t-hero  24 · --t-section 20 · --t-card 17 · body 15 · meta 13 · label 11
+   So the handoff's --t-card (20px) is this app's --t-section, its --t-section (17px) is this app's
+   --t-card, and its --t-title (24px) is --t-hero. Copied across by NAME, a heading specified at 17px
+   renders at 20 and a stat value specified at 20 renders at 17 — every heading and number on the screen
+   off by one rung, in opposite directions, with nothing failing. The undeclared-token guard caught only
+   --t-title, because that is the one name this app does not have at all; the other two resolve happily
+   to the wrong size. Translate design tokens BY VALUE, never by name. */
+/* Plan journals (addendum 1, 2026-08-22) */
+.cj-sec { margin: var(--s5) calc(var(--gutter) * -1) 0; padding: 0 var(--gutter) var(--s1);
+  border-top: 1px solid var(--line); }
+.cj-head { display: flex; align-items: baseline; justify-content: space-between;
+  margin: var(--s3) 0 var(--s2); }
+.cj-head h2 { margin: 0; font-size: var(--t-card); font-weight: 800; letter-spacing: -.01em; }
+.cj-head span { font-size: var(--t-label); font-weight: 600; letter-spacing: .03em;
+  text-transform: uppercase; color: var(--ink-faint); }
+.cj-rail { display: flex; gap: var(--s3); overflow-x: auto; padding-bottom: var(--s1); }
+.cj-ring { flex: none; width: 68px; padding: 0; background: none; border: 0;
+  transition: opacity 160ms ease; }
+.cj-ring:active { opacity: .65; }
+/* ⚠️ THE CONIC RING MEANS LIVE, and the addendum says the reuse of the story ring is deliberate. A
+   finished block is a flat hairline, so the rail reads at a glance. */
+.cj-ring .cj-disc { display: grid; place-items: center; gap: 1px; width: 68px; height: 68px;
+  padding: 2.5px; border-radius: 50%; background: var(--line); box-sizing: border-box; }
+.cj-ring.live .cj-disc { background: conic-gradient(from 210deg, var(--mark) 0%, var(--accent) 38%,
+  var(--mark-deep) 66%, var(--mark) 100%); }
+.cj-disc { position: relative; }
+.cj-disc::before { content: ""; position: absolute; inset: 2.5px; border-radius: 50%;
+  background: var(--surface); border: 2px solid var(--bg); }
+.cj-wk { position: relative; font-size: var(--t-card); font-weight: 800; letter-spacing: -.01em;
+  color: var(--ink-soft); }
+.cj-ring.live .cj-wk { color: var(--accent); }
+.cj-u { position: relative; font-size: var(--t-label); font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--ink-faint); }
+.cj-cap { display: block; margin-top: 6px; font-size: var(--t-label); font-weight: 700;
+  color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The journal sheet */
+.cj-eye { font-size: var(--t-label); font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink-faint); }
+.cj-title { margin: 2px 0 var(--s1); font-size: var(--t-hero); font-weight: 800;
+  letter-spacing: -.02em; }
+.cj-status { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s3); }
+.cj-status .num { font-size: var(--t-meta); color: var(--ink-faint); }
+.cj-status .pill { margin-top: 0; }
+/* ⚠️ ONE BORDERED CONTAINER, NOT FOUR CARDS — the addendum's rule and the design system's. The 1px gap
+   over a --line ground is what draws the dividers without a border per cell. */
+.cj-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line);
+  border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; }
+.cj-cell { background: var(--surface); padding: 12px 14px; }
+.cj-v { display: block; font-size: var(--t-section); font-weight: 800; }
+.cj-k { display: block; font-size: var(--t-label); font-weight: 600; letter-spacing: .03em;
+  text-transform: uppercase; color: var(--ink-faint); }
+/* ── COMMUNITY (commissioned design, 2026-08-21) ───────────────────────────────────────────────────
+   ⚠️ EVERY LENGTH IS ON THE LADDER or is a geometric constant from the handoff (82px avatar, 62px
+   rail ring, 3px grid gap, 4x15px effort bar). Both design ratchets sit on their ceilings, so one
+   literal border-radius or font-size here fails the suite — the handoff's px values map onto the
+   app's own --t-* and --r-* tokens, which is why the two systems share numbers. */
+.cm-wrap { display: flex; flex-direction: column; min-height: 0; }
+/* The segmented slider. The thumb's gloss and its 280ms easing are the design's own. */
+.cm-seg { position: relative; display: grid; grid-template-columns: 1fr 1fr; padding: 4px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-pill);
+  margin-bottom: var(--s3); }
+.cm-seg button { position: relative; z-index: 1; font: inherit; font-size: var(--t-meta);
+  font-weight: 700; padding: 9px 0; background: none; border: 0; color: var(--ink-soft);
+  transition: color 160ms ease; }
+.cm-seg button[aria-selected="true"] { color: var(--accent-ink); }
+.cm-thumb { position: absolute; top: 4px; left: 4px; width: calc(50% - 4px); height: calc(100% - 8px);
+  border-radius: var(--r-pill); transition: transform 280ms cubic-bezier(.2,.8,.3,1);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, #fff) 0%,
+    var(--accent) 60%, color-mix(in srgb, var(--accent) 84%, #000) 100%);
+  box-shadow: 0 1px 0 rgba(255,255,255,.28) inset,
+    0 4px 12px -3px color-mix(in srgb, var(--accent) 55%, transparent); }
+.cm-thumb.r { transform: translateX(100%); }
+/* ⚠️ THE TRACK IS 200% WIDE AND EACH PANE OWNS ITS SCROLL, which is the design's requirement and this
+   app's oldest layout rule: min-height 0 on the flex child, or it refuses to shrink and the PAGE
+   scrolls instead of the pane. */
+.cm-vp { flex: 1; min-height: 0; overflow: hidden; }
+.cm-track { display: flex; width: 200%; height: 100%;
+  transition: transform 320ms cubic-bezier(.2,.8,.3,1); }
+.cm-track.feed { transform: translateX(-50%); }
+.cm-pane { box-sizing: border-box; width: 50%; height: 100%; overflow-y: auto; min-height: 0;
+  padding-bottom: var(--s6); }
+/* Profile head */
+.cm-head { display: flex; align-items: center; gap: var(--s4); }
+.cm-av { position: relative; flex: none; display: grid; place-items: center; width: 82px; height: 82px;
+  padding: 3px; border: 0; border-radius: 50%; background: var(--line); }
+.cm-av-story { background: conic-gradient(from 210deg, var(--mark) 0%, var(--accent) 38%,
+  var(--mark-deep) 66%, var(--mark) 100%); }
+.cm-av img, .cm-init { display: grid; place-items: center; width: 100%; height: 100%;
+  border-radius: 50%; background: var(--surface-2); border: 2px solid var(--bg);
+  object-fit: cover; font-size: var(--t-card); font-weight: 700; color: var(--ink-soft); }
+/* ⚠️ THE BADGE OVERLAPS THE RING'S BOTTOM EDGE ON PURPOSE — the handoff says so in as many words. */
+.cm-story-badge { position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%);
+  font-size: var(--t-label); font-weight: 700; letter-spacing: .03em; color: var(--accent-ink);
+  background: var(--accent); border-radius: var(--r-pill); padding: 2px 8px; }
+.cm-stats { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: var(--s1); text-align: center; }
+.cm-stat { display: block; font: inherit; background: none; border: 0; padding: 0; color: var(--ink);
+  transition: opacity 160ms ease; }
+button.cm-stat:active { opacity: .65; }
+.cm-stat-v { display: block; font-size: var(--t-section); font-weight: 800; }
+.cm-stat-k { display: block; font-size: var(--t-label); font-weight: 600; letter-spacing: .03em;
+  text-transform: uppercase; color: var(--ink-faint); }
+/* Identity */
+.cm-id { margin-top: var(--s3); }
+.cm-name { font-size: var(--t-body); font-weight: 800; letter-spacing: -.01em; }
+.cm-meta { font-size: var(--t-meta); color: var(--ink-faint); }
+.cm-pbs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: var(--s2); }
+.cm-eyebrow { font-size: var(--t-label); font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ink-faint); }
+.cm-chip { font-size: var(--t-meta); background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: var(--r-ctl); padding: 1px 7px; }
+.cm-chip-acc { color: var(--accent-ink); background: var(--accent); border-color: transparent;
+  font-weight: 700; }
+.cm-acts { display: flex; gap: var(--s2); margin-top: var(--s3); }
+.cm-acts .ui-btn { flex: 1; }
+/* Month sections + grid */
+.cm-mhead { display: flex; align-items: baseline; justify-content: space-between;
+  margin: var(--s5) 0 var(--s2); }
+.cm-mhead-n { margin-top: var(--s6); }
+.cm-mhead h2 { margin: 0; font-size: var(--t-card); font-weight: 800; letter-spacing: -.01em; }
+.cm-mhead span { font-size: var(--t-label); font-weight: 600; letter-spacing: .03em;
+  color: var(--ink-faint); }
+.cm-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+/* ⚠️ THE TILE IS SQUARE WITH NO RADIUS, and the grid has no gutter beyond 3px — the handoff is explicit
+   that grid tiles are square and feed media is full-bleed. */
+.cm-tile { position: relative; display: block; aspect-ratio: 1; padding: 0; border: 0;
+  overflow: hidden; background: var(--surface-2); transition: opacity 160ms ease; }
+button.cm-tile:active { opacity: .65; }
+.cm-tile-off { opacity: .55; }
+.cm-art { position: absolute; inset: 0; display: block; }
+.cm-art svg { width: 100%; height: 100%; display: block; }
+.cm-art .rt-none { display: none; }
+/* A run with no route still reads as a tile rather than a hole. */
+.cm-art-none { background: var(--surface-2); }
+.cm-tint { position: absolute; inset: 0;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--ce) 16%, transparent), transparent 60%); }
+.cm-foot { position: absolute; inset: auto 0 0 0; display: flex; align-items: flex-end;
+  justify-content: space-between; gap: var(--s1); padding: 14px 6px 5px; pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(6,17,14,.72)); }
+.cm-foot .num { font-size: var(--t-label); font-weight: 700; color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+.cm-badge { font-size: var(--t-label); font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+/* The stories rail */
+.cm-rail { display: flex; gap: var(--s3); overflow-x: auto; padding: 14px var(--gutter);
+  border-bottom: 1px solid var(--line); }
+.cm-rail-i { flex: none; width: 62px; padding: 0; background: none; border: 0; text-align: center; }
+.cm-rail-ring { display: grid; place-items: center; width: 62px; height: 62px; padding: 2.5px;
+  border-radius: 50%; background: conic-gradient(from 210deg, var(--mark) 0%, var(--accent) 38%,
+    var(--mark-deep) 66%, var(--mark) 100%); }
+.cm-rail-ring img, .cm-rail-ring .cm-init { font-size: var(--t-meta); color: var(--ink-faint); }
+.cm-rail-n { display: block; margin-top: 5px; font-size: var(--t-label); font-weight: 600;
+  color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Empty states — the design's required ones */
+.cm-empty { padding: var(--s5) var(--gutter); text-align: center; }
+.cm-empty-sm { padding: var(--s4) 0; text-align: left; }
+.cm-empty-ic { display: grid; place-items: center; width: 52px; height: 52px; margin: 0 auto var(--s3);
+  border-radius: 50%; background: var(--surface-2); border: 1px solid var(--line);
+  color: var(--ink-faint); }
+.cm-empty-ic svg { width: 24px; height: 24px; }
+.cm-empty h3 { margin: 0 0 6px; font-size: var(--t-card); font-weight: 800; letter-spacing: -.01em; }
+.cm-empty p { margin: 0 0 var(--s2); font-size: var(--t-meta); color: var(--ink-soft);
+  text-wrap: pretty; }
+.cm-empty-q { color: var(--ink-faint); }
+.cm-empty-acts { display: flex; gap: var(--s2); margin-top: var(--s3); }
+.cm-empty-acts .ui-btn { flex: 1; }
+/* Sheet headings */
+.cm-sh { margin: 0 0 2px; font-size: var(--t-card); font-weight: 800; letter-spacing: -.01em; }
+.cm-sub { margin: 0 0 var(--s3); font-size: var(--t-meta); color: var(--ink-faint); }
+/* ⚠️ A WELL, NOT A CARD. The design system forbids a card inside a card; this is a --surface-2 well. */
+.cm-well { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-card);
+  padding: 0 14px; }
+/* The story viewer — full screen inside the app shell */
+.cm-story { position: fixed; inset: 0; z-index: 90; display: flex; flex-direction: column;
+  background: #04100d; animation: cmFade 240ms ease both; }
+@keyframes cmFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.cm-bars { display: flex; gap: var(--s1); padding: 12px 12px 0; }
+.cm-bar { flex: 1; height: 3px; border-radius: var(--r-pill); background: rgba(255,255,255,.28);
+  overflow: hidden; }
+.cm-bar i { display: block; height: 100%; background: #fff; width: 0; }
+.cm-bar.done i { width: 100%; }
+.cm-bar.now i { animation: cmFill 4.5s linear forwards; }
+@keyframes cmFill { from { width: 0; } to { width: 100%; } }
+.cm-shead { display: flex; align-items: center; gap: var(--s3); padding: 12px 14px; }
+.cm-shead .cm-sav { flex: none; width: 32px; height: 32px; border-radius: 50%;
+  background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.3); overflow: hidden; }
+.cm-shead .cm-sav img { width: 100%; height: 100%; object-fit: cover; }
+.cm-sname { font-size: var(--t-meta); font-weight: 700; color: #fff; }
+.cm-swhen { font-size: var(--t-label); color: rgba(255,255,255,.62); }
+.cm-sx { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,.14);
+  border: 1px solid rgba(255,255,255,.28); color: #fff; font-size: var(--t-card); }
+.cm-sbody { position: relative; flex: 1; min-height: 0; padding: 0; border: 0; background: none;
+  overflow: hidden; width: 100%; }
+.cm-sart { position: absolute; inset: 0; display: grid; place-items: center; }
+.cm-sart svg { width: 100%; height: 100%; }
+.cm-scap { position: absolute; inset: auto 0 0 0; padding: 70px 18px 26px; text-align: left;
+  pointer-events: none; background: linear-gradient(180deg, transparent, rgba(4,16,13,.86)); }
+/* ⚠️ THE BRIGHT SIGNAL GREEN IS PERMITTED HERE AND NOWHERE ELSE — it sits on dark media, never in UI
+   chrome, which is the token's own rule and the handoff repeats it. */
+.cm-seye { display: block; font-size: var(--t-label); font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--signal-2); }
+.cm-sline { display: block; margin-top: 6px; font-size: var(--t-section); font-weight: 700;
+  letter-spacing: -.02em; color: #fff; text-wrap: pretty; }
+.cm-sstats { display: block; margin-top: var(--s2); font-size: var(--t-meta); font-weight: 700;
+  color: rgba(255,255,255,.78); }
 </style>
 </head>
 <body>
@@ -4537,6 +4754,16 @@ function saveProfileStore() { try { localStorage.setItem("rc_profile_v1", JSON.s
 // So the shoe carries the total, the run carries a shoeId for provenance, and deleting a run
 // subtracts from the shoe. baseKm is what the runner had already put in them before today.
 const SHOES_KEY = "interun_shoes_v1";
+/**
+ * ⚠️ DECLARED HERE, WITH THE OTHER STORES, BECAUSE journalSync RUNS AT BOOT AND A const DOES NOT HOIST.
+ * It lived beside its own functions in the Community section, five thousand lines further down — and
+ * recompute() is called at module top level, so adoptPlan reached journalSync, loadJournals read this
+ * key in its temporal dead zone, threw a ReferenceError, and the try/catch around it swallowed the lot.
+ * Measured: nothing was ever written, on any launch, while calling journalSync by hand worked perfectly.
+ * The same trap SHARE_LADDER hit reading SHARE_EVEN_SPREAD_S, and the reason share-render.test.ts sorts
+ * its sandbox constants by their real position in the file.
+ */
+const JOURNAL_KEY = "interun_journals_v1";
 // ⚠️ Roughly the range shoe manufacturers themselves quote. It is a REMINDER, NOT A RULE, and the
 // copy must never claim that replacing a shoe on schedule prevents injury — the evidence does not
 // support it, and this app sits beside a RED-S screen where an unsupportable claim costs the
@@ -4913,6 +5140,11 @@ function adoptPlan(out) {
   normalizeWeekStarts();
   try { syncNativeReminders(); } catch (e) {}
   try { syncWatch(); } catch (e) {}
+  // ⚠️ THE BLOCK IS RECORDED HERE, INSIDE adoptPlan, for the reason this function's own note gives about
+  // the assignment: a journal written at only some of the call sites is a block that existed and left no
+  // record because it was adopted by the other path. And inside a try, like the two syncs above — losing
+  // a journal row must never cost somebody their plan.
+  try { journalSync(); } catch (e) {}
 }
 function recompute() { adoptPlan(applyProfile(profile)); }
 // Weeks display on a Monday–Sunday grid, and day indices are Monday-based (0 = Mon). applyProfile can
@@ -10492,9 +10724,622 @@ function viewPerformance() {
 // honest term, and the only one the app now uses, is "2 km performance velocity".
 
 // ============ COMMUNITY ====================================================
-function viewCommunity() {
-  return '<div class="empty-state"><div class="ic">' + ICON.community + '</div><h3>Community is on the way</h3><p>Groups, challenges and cheering each other on — a friendly place to keep you going. We\\'re building it next.</p></div>';
+
+/* ── PLAN JOURNALS (addendum 1, 2026-08-22) ────────────────────────────────────────────────────────
+ * A rail of the runner's training blocks — the current one live, the finished ones behind it — each
+ * ring one periodized block, tappable to a summary. The addendum's own words for why it is rings of
+ * NUMBERS and not pictures: "the number IS the content. This is what keeps the rail from reading as a
+ * social-media highlight reel."
+ *
+ * ⚠️⚠️ THE APP KEPT NO HISTORY OF PAST BLOCKS, AND THAT IS WHY THIS WRITES ONE. adoptPlan assigns PLAN
+ * outright — a new goal replaces the old block with no trace that it existed — so the design's five
+ * rings could only ever have been the demo's five. Rather than render one ring for ever, journalSync
+ * records the block a runner is in, and notes the day it was replaced. So the rail is honest today (one
+ * ring, which the addendum names as the first-block state) and genuinely accumulates from here.
+ * ⚠️ IT IS DERIVED, NEVER AUTHORED. The addendum: "Nothing here is user-authored, so there is no
+ * 'create journal' affordance." Every figure comes from the plan and the run history.
+ */
+function loadJournals() {
+  try { const a = JSON.parse(localStorage.getItem(JOURNAL_KEY) || "[]"); return Array.isArray(a) ? a : []; }
+  catch (e) { return []; }
 }
+function saveJournals(rows) {
+  try { localStorage.setItem(JOURNAL_KEY, JSON.stringify(rows.slice(0, 24))); } catch (e) {}
+}
+/**
+ * A BLOCK'S IDENTITY — the goal it is for, when it starts, and how long it runs.
+ * ⚠️ THE SIGNATURE IS WHAT STOPS A ROW PER BOOT. recompute() re-adopts the same plan on every launch,
+ * so appending on each adoptPlan would grow the rail for ever without the runner doing anything. A row
+ * is only added when the signature CHANGES, which is what "a new block" actually means.
+ */
+function journalSig(pl) {
+  const w = (pl && pl.weeks) || [];
+  return [profile.goalDist || "", w.length ? w[0].startIso : "", w.length].join("|");
+}
+/**
+ * Called at the end of adoptPlan.
+ * ⚠️ INSIDE adoptPlan, NOT AT ITS CALLERS. That function's own note records what happens when the
+ * assignment is open-coded somewhere else — normalizeWeekStarts and the two syncs get skipped — and a
+ * journal written at only some of the call sites is the same class of fault: a block that existed and
+ * left no record because it was adopted by the other path.
+ * ⚠️ AND IT NEVER THROWS INTO adoptPlan. Losing a journal row must never cost somebody their plan, so
+ * the whole thing is inside a try, exactly as syncNativeReminders and syncWatch are.
+ */
+function journalSync() {
+  const w = (PLAN && PLAN.weeks) || [];
+  if (!w.length) return;
+  const sig = journalSig(PLAN);
+  const rows = loadJournals();
+  if (rows.length && rows[0].sig === sig) return;
+  // ⚠️ THE PREVIOUS BLOCK ENDED WHEN IT WAS REPLACED, which is a real date rather than the date its
+  // last week would have fallen on — a block abandoned in week 6 of 20 did not run for 20 weeks.
+  if (rows.length && !rows[0].endedIso) rows[0].endedIso = todayIso();
+  rows.unshift({ sig: sig, goal: profile.goalDist || "", startIso: w[0].startIso,
+    weeks: w.length, endedIso: "" });
+  saveJournals(rows);
+}
+/**
+ * THE RAIL'S ROWS, newest first, each with the figures its sheet shows.
+ *
+ * ⚠️ THE CURRENT BLOCK'S RING SHOWS WEEKS ELAPSED, NOT THE BLOCK LENGTH — the addendum is explicit, and
+ * the length lives in the sheet's "7 / 20" stat. A ring reading 20 on day three would be a promise
+ * rather than a record.
+ * ⚠️ AND THE AVERAGE IS THE AVERAGE OF THE RATINGS ACTUALLY GIVEN. RPE lives on the full run records,
+ * which are capped at fifty, and it is optional anyway — so this is the mean of what the runner
+ * reported, and it is "—" when they reported nothing. Printing a mean over runs that were never rated
+ * would be a number with no evidence behind it.
+ */
+function commJournals() {
+  const rows = loadJournals();
+  const hist = (state.hist || []).filter((r) => r && r.d && Number(r.k) > 0);
+  const full = (state.logged || []);
+  return rows.map((j, idx) => {
+    const live = idx === 0 && !j.endedIso;
+    const lastIso = j.endedIso || isoAdd(j.startIso, j.weeks * 7 - 1).toISOString().slice(0, 10);
+    const inBlock = hist.filter((r) => String(r.d) >= j.startIso && String(r.d) <= lastIso);
+    const km = inBlock.reduce((a, r) => a + (Number(r.k) || 0), 0);
+    const longest = inBlock.reduce((a, r) => Math.max(a, Number(r.s) || 0), 0);
+    const rated = full.filter((r) => r && r.dateIso >= j.startIso && r.dateIso <= lastIso &&
+      Number(r.rpe) > 0);
+    const rpe = rated.length ? (rated.reduce((a, r) => a + Number(r.rpe), 0) / rated.length) : null;
+    const elapsed = live
+      ? Math.max(1, Math.min(j.weeks, CURRENT_WEEK + 1))
+      : Math.max(1, Math.min(j.weeks, Math.ceil((Date.parse(lastIso) - Date.parse(j.startIso)) / 6048e5)));
+    return { id: j.sig, live: live, weeks: j.weeks, elapsed: elapsed,
+      goal: RACE_LABEL[j.goal] || "Training", startIso: j.startIso, endIso: lastIso,
+      km: km, longest: longest, rpe: rpe, runs: inBlock.length };
+  });
+}
+/** The caption under a ring: the goal and the year it ran in, which is how a runner names a block. */
+function journalCaption(j) {
+  return (RACE_LABEL[j.goal] ? j.goal.toUpperCase().replace("K", " km") : j.goal) ||
+    (j.goal + " '" + String(j.startIso).slice(2, 4));
+}
+function commJournalRailHtml() {
+  const js = commJournals();
+  // ⚠️ NO RAIL AT ALL BEFORE THE FIRST PLAN EXISTS — the addendum's own empty state, and the section is
+  // hidden rather than shown empty.
+  if (!js.length) return "";
+  const rings = js.map((j) =>
+    '<button class="cj-ring' + (j.live ? " live" : "") + '" data-cjournal="' + esc(j.id) + '">' +
+      '<span class="cj-disc">' +
+        '<span class="cj-wk num">' + j.elapsed + '</span>' +
+        '<span class="cj-u">WK</span>' +
+      '</span>' +
+      '<span class="cj-cap">' + esc(commJournalName(j)) + '</span>' +
+    '</button>').join("");
+  return '<div class="cj-sec">' +
+    '<div class="cj-head"><h2>Plan journals</h2>' +
+      '<span>' + js.length + (js.length === 1 ? " BLOCK" : " BLOCKS") + '</span></div>' +
+    '<div class="cj-rail">' + rings + '</div>' +
+  '</div>';
+}
+/** "Marathon '26" — the goal and the year, from the block's own start date. */
+function commJournalName(j) {
+  const yr = String(j.startIso).slice(2, 4);
+  return (j.goal || "Training") + " ’" + yr;
+}
+/**
+ * THE JOURNAL SHEET — eyebrow, title, status, the four-stat grid, a coach note and chips.
+ *
+ * ⚠️ THE STAT GRID IS ONE BORDERED CONTAINER, NOT FOUR CARDS. The addendum says so and so does the
+ * design system: never nest a card inside a card.
+ * ⚠️ AND THE COACH NOTE IS DERIVED FROM THE BLOCK'S OWN NUMBERS. The addendum carries authored copy for
+ * each of its five demo blocks; there is no writer here, so the note is built from what the block
+ * actually did — observation then implication, which is the shape uiCoachNote already enforces — and it
+ * says "not enough yet" rather than inventing an insight when the block is days old.
+ */
+function commJournalSheetHtml(id) {
+  const j = commJournals().filter((x) => x.id === id)[0];
+  if (!j) return '<h2 class="cm-sh">Plan journal</h2><p class="cm-sub">That block is no longer stored.</p>';
+  // ⚠️ THE APP'S OWN PILL, WHICH TAKES A COLOUR AS --pc. The addendum names Pill tones "build" and
+  // "done"; there is no ui-pill-build class in this app and a made-up one would have rendered an
+  // unstyled span. --build is the training-phase token for a block in progress, --accent for one
+  // finished, and the WORD carries the meaning either way — colour is never the only signal.
+  const tone = j.live ? "var(--build)" : "var(--accent)";
+  const word = j.live ? "IN PROGRESS" : "COMPLETED";
+  const dates = dmon(new Date(j.startIso + "T00:00:00Z")) + " – " +
+    dmon(new Date(j.endIso + "T00:00:00Z"));
+  const cell = (v, k) => '<div class="cj-cell"><span class="cj-v num">' + v + '</span>' +
+    '<span class="cj-k">' + k + '</span></div>';
+  const grid = '<div class="cj-grid">' +
+    cell(Math.round(j.km) + " km", "Logged") +
+    cell(j.elapsed + " / " + j.weeks, "Weeks") +
+    cell(j.longest ? fmtTimeFull(j.longest) : "—", "Longest run") +
+    cell(j.rpe != null ? "RPE " + (Math.round(j.rpe * 10) / 10) : "—", "Average") +
+  '</div>';
+  return '<div class="cj-eye">Plan journal</div>' +
+    '<h2 class="cj-title">' + esc(commJournalName(j)) + '</h2>' +
+    '<div class="cj-status"><span class="pill" style="--pc: ' + tone + '">' + word + '</span>' +
+      '<span class="num">' + esc(dates) + '</span></div>' +
+    grid +
+    commJournalNote(j) +
+    '<div class="cm-pbs">' + commJournalChips(j) + '</div>' +
+    '<button class="ui-btn" data-cjplan="1">Open the full journal</button>';
+}
+/**
+ * OBSERVATION, THEN IMPLICATION, from the block's own record.
+ * ⚠️ EVERY BRANCH IS A FACT THE BLOCK CAN PROVE. The runs logged against the runs asked for, and the
+ * average effort against the plan's own intent — nothing here reads the runner's mind, and with too
+ * little to say it says that instead.
+ */
+function commJournalNote(j) {
+  let obs = "", imp = "";
+  if (j.runs < 4) {
+    obs = "Only " + j.runs + (j.runs === 1 ? " run" : " runs") + " logged in this block so far.";
+    imp = "There is not enough here yet to tell you anything you do not already know — keep going and " +
+      "this fills in.";
+  } else if (j.rpe != null && j.rpe <= 4) {
+    obs = "You have logged " + j.runs + " runs at an average effort of RPE " +
+      (Math.round(j.rpe * 10) / 10) + ".";
+    imp = "The easy days have stayed easy, which is what lets the hard ones land — the long run can " +
+      "keep progressing from here.";
+  } else if (j.rpe != null && j.rpe >= 6) {
+    obs = "Average reported effort across " + j.runs + " runs is RPE " +
+      (Math.round(j.rpe * 10) / 10) + ".";
+    imp = "That is a hard block by your own rating. Worth watching the easy days are genuinely easy " +
+      "before adding more.";
+  } else {
+    obs = j.runs + " runs and " + Math.round(j.km) + " km logged in this block.";
+    imp = j.live ? "The record is building — the shape of it will tell you more as the block runs on."
+      : "That is the block as it happened, and it is what the next one is planned from.";
+  }
+  return uiCoachNote({ tone: "info", observation: obs, implication: imp });
+}
+/** ⚠️ ACCENT FOR A BEST, QUIET FOR A FACT, and no chip at all where there is nothing true to put in one. */
+function commJournalChips(j) {
+  const out = [];
+  const hist = (state.hist || []).filter((r) => r && r.d >= j.startIso && r.d <= j.endIso);
+  if (hist.length) {
+    const weeks = {};
+    for (const r of hist) {
+      const k = logWeekStartIsoFor(String(r.d));
+      weeks[k] = (weeks[k] || 0) + (Number(r.k) || 0);
+    }
+    const peak = Math.max.apply(null, Object.keys(weeks).map((k) => weeks[k]));
+    if (peak > 0) out.push('<span class="cm-chip cm-chip-acc num">Peak week ' +
+      Math.round(peak) + ' km</span>');
+  }
+  out.push('<span class="cm-chip num">' + j.runs + (j.runs === 1 ? " run" : " runs") + ' logged</span>');
+  return out.join("");
+}
+/** The Monday of the week a given date falls in. ⚠️ UTC, like every other date helper here — a local
+ *  getter would put a Sunday run in the wrong week for half the British year. */
+function logWeekStartIsoFor(iso) {
+  const d = new Date(iso + "T00:00:00Z");
+  const dow = (d.getUTCDay() + 6) % 7;
+  return isoAdd(iso, -dow).toISOString().slice(0, 10);
+}
+
+/* ══ COMMUNITY ═════════════════════════════════════════════════════════════════════════════════════
+ * Built to the commissioned design (design_handoff_community_tab, 2026-08-21): two panes on a
+ * horizontal slider — the runner's own profile and runs, and a feed of the runners they follow — plus
+ * a story viewer and three bottom sheets.
+ *
+ * ⚠️⚠️ EVERY PERSON IN THE DESIGN'S DEMO DATA IS FICTIONAL, AND NOT ONE OF THEM SHIPS. The prototype
+ * carries Cormac Byrne, Niamh Doyle, 1,204 followers and four posts with likes and comments. There is
+ * no backend behind any of it: no accounts, no other runners, nothing to follow. Rendering those names
+ * to a real tester would be fabricated data on a screen that looks like a social network — the one
+ * thing this codebase refuses everywhere else, from a treadmill run storing no route to a wrist run
+ * reaching Strava as a manual activity rather than a GPX with invented times.
+ *
+ * ⚠️ SO WHAT SHIPS IS THE DESIGN, WITH THE RUNNER'S OWN REAL DATA AND THE DESIGN'S OWN EMPTY STATES.
+ * That is not a narrowing: the handoff lists them as required work in as many words — "no posts yet in
+ * the grid", "an empty feed for a runner following nobody", "an empty comment list", "no stories in the
+ * rail (the ring row collapses)" — because "the prototype only shows the ideal state, and the system
+ * requires all of them". Everything on the Your-runs pane is real; the feed is honestly empty until
+ * there is a server for it to read.
+ *
+ * ⚠️ AND THE MEDIA IS THE ROUTE, DRAWN AS GEOMETRY. The design's tiles are photographs, and a run in
+ * this app has none — it has the shape of where it went. routeMapSvg with no projection fits a route to
+ * its own box, so a tile costs NO map tiles at all: the same decision, for the same reason, the share
+ * card records ("NO TILES … a shared card costs no billed tiles"). Fifteen tiles of basemap on first
+ * open would be roughly 120 billed tiles.
+ */
+const COMM_KEY = "interun_community_v1";
+/** Which pane the slider is on, remembered so returning to the tab does not jump. */
+function commView() {
+  try { return localStorage.getItem(COMM_KEY) === "feed" ? "feed" : "mine"; } catch (e) { return "mine"; }
+}
+function commViewSet(v) { try { localStorage.setItem(COMM_KEY, v === "feed" ? "feed" : "mine"); } catch (e) {} }
+
+/**
+ * THE RUNNER, AS THE PROFILE PANE NEEDS THEM — and every field is real or absent.
+ *
+ * ⚠️ NO HANDLE AND NO LOCATION. The design's meta line is "@aoife.runs · Cork · marathon block, week 7
+ * of 20"; this app stores neither a handle nor a place, so those two are simply not printed. Inventing
+ * an @name from somebody's first name, or a city from their GPS, would be the app asserting something
+ * the runner never told it.
+ * ⚠️ THE PLAN POSITION IS REAL, and it is the part of that line that carries the meaning: the goal
+ * distance, the week, and how many weeks the block runs to, all straight off PLAN.
+ */
+function commProfile() {
+  const name = (profile.name || "").trim();
+  const weeks = PLAN && PLAN.weeks ? PLAN.weeks.length : 0;
+  const wk = weeks ? Math.min(weeks, CURRENT_WEEK + 1) : 0;
+  const goal = RACE_LABEL[profile.goalDist] || "";
+  const plan = (goal && weeks) ? goal.toLowerCase() + " block, week " + wk + " of " + weeks : "";
+  return { name: name, initials: initials(name) || "–", avatar: profile.avatar || "", plan: plan };
+}
+/**
+ * THE RUNNER'S BEST RECORDED EFFORT AT EACH CLASSIC DISTANCE.
+ *
+ * ⚠️ "BEST", NOT "PB", AND THE WORD IS THE HONEST HALF. The design's chips read "PB · 5 km 21:04". A
+ * personal best is a race result; this is the quickest the app has ever recorded them covering about
+ * that far, training runs included. Calling that a PB would overstate it on the one screen a runner
+ * might show somebody else — so the chip says Best, and names the distance it was measured over.
+ * ⚠️ AND THE TOLERANCE IS TIGHT. A 5.4 km run is not a 5 km time, so only runs within 3% of the
+ * distance count; anything wider would flatter the number.
+ */
+const COMM_BESTS = [{ km: 5, label: "5 km" }, { km: 10, label: "10 km" },
+  { km: 21.0975, label: "Half" }, { km: 42.195, label: "Marathon" }];
+function commBests() {
+  const rows = (state.hist || []).filter((r) => Number(r.k) > 0 && Number(r.s) > 0);
+  const out = [];
+  for (const b of COMM_BESTS) {
+    let best = null;
+    for (const r of rows) {
+      if (Math.abs(Number(r.k) - b.km) / b.km > 0.03) continue;
+      if (best == null || Number(r.s) < best) best = Number(r.s);
+    }
+    if (best != null) out.push({ label: b.label, time: fmtTimeFull(best) });
+  }
+  return out;
+}
+/**
+ * THE RUNNER'S OWN RUNS, NEWEST FIRST, GROUPED BY THE MONTH THEY HAPPENED IN.
+ *
+ * ⚠️ FROM state.hist, WHICH IS UNCAPPED, NOT FROM state.logged, WHICH IS FIFTY. The whole point of the
+ * history store is that the facts of every run are kept forever; a grid built from the capped store
+ * would quietly stop having a past, and on a real training year it would lose 98 of 148 days.
+ * ⚠️ AND A RUN WHOSE FULL RECORD IS GONE IS STILL A TILE, BUT NOT A BUTTON. This app already refuses to
+ * make a day tappable when its map and splits have been evicted — the training log does exactly this —
+ * because the tap would land on "Run not found."
+ */
+function commMonths() {
+  const rows = (state.hist || []).filter((r) => r && r.d && Number(r.k) > 0)
+    .slice().sort((a, b) => String(b.d).localeCompare(String(a.d)));
+  const byId = {};
+  for (const r of (state.logged || [])) if (r && r.id) byId[r.id] = r;
+  const out = [];
+  for (const r of rows) {
+    const key = String(r.d).slice(0, 7);
+    let g = out.length && out[out.length - 1].key === key ? out[out.length - 1] : null;
+    if (!g) { g = { key: key, label: commMonthLabel(String(r.d)), runs: [], km: 0 }; out.push(g); }
+    g.km += Number(r.k) || 0;
+    g.runs.push({ id: r.i, distKm: Number(r.k), type: r.t, full: byId[r.i] || null });
+  }
+  return out;
+}
+const COMM_MONTHS = ["January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"];
+function commMonthLabel(iso) {
+  const y = String(iso).slice(0, 4), m = Number(String(iso).slice(5, 7));
+  return (COMM_MONTHS[m - 1] || "") + " " + y;
+}
+/**
+ * THE BADGE WORD ON A TILE — the design's own vocabulary, keyed on the session type.
+ * ⚠️ A WORD PLUS A COLOUR, NEVER A COLOUR ALONE, which is this app's rule everywhere a status is shown
+ * and the reason a colour-blind runner can read the grid at all.
+ * ⚠️ AND THE COLOUR COMES FROM sessionEffort, THE ONE MAPPING. Keyed here a second time, a tempo would
+ * be rust on this screen and amber on every other — which is the defect the owner found on 2026-08-20.
+ */
+const COMM_BADGE = { easy: "EASY", long: "LONG", recovery: "RECOVERY", threshold: "TEMPO",
+  vo2: "HARD", strides: "STRIDES", "race-specific": "RACE PACE", race: "RACE" };
+function commTileHtml(t) {
+  const eff = sessionEffort(t.type);
+  const badge = COMM_BADGE[t.type] || "RUN";
+  const route = (t.full && Array.isArray(t.full.route)) ? normalizeRoute(t.full.route) : [];
+  const art = route.length > 1
+    ? '<span class="cm-art">' + routeMapSvg(route, null, 320, 200) + '</span>'
+    : '<span class="cm-art cm-art-none"></span>';
+  const inner = art +
+    '<span class="cm-tint" style="--ce: var(--eff-' + eff + ')"></span>' +
+    '<span class="cm-foot">' +
+      '<span class="num">' + commKm(t.distKm) + '</span>' +
+      '<span class="cm-badge" style="color: var(--eff-' + eff + ')">' + badge + '</span>' +
+    '</span>';
+  return t.full
+    ? '<button class="cm-tile" data-crun="' + esc(String(t.id)) + '">' + inner + '</button>'
+    : '<span class="cm-tile cm-tile-off" aria-disabled="true">' + inner + '</span>';
+}
+function commKm(km) { return (Math.round((Number(km) || 0) * 10) / 10).toFixed(1) + " km"; }
+/**
+ * THE STORY, BUILT FROM THE RUNNER'S OWN LAST RUN.
+ *
+ * ⚠️ THREE SLIDES OF REAL FACTS, NOT THREE AUTHORED CAPTIONS. The design's slides are written copy
+ * ("Out before six. The marina to yourself at that hour."), which no app can generate about somebody's
+ * morning. What it CAN say is what actually happened, and it already writes that: debriefParagraphs is
+ * the coach's read of the run and is the same sentence the debrief shows. So slide one is the run,
+ * slide two is how it was run, slide three is the week — each with the numbers under it.
+ * ⚠️ AND WITH NO RUN THERE IS NO STORY. The ring and the badge are not drawn at all rather than opening
+ * an empty viewer, which is the design's own "no stories in the rail" state.
+ */
+function commStory() {
+  const run = (state.logged || [])[0];
+  if (!run) return null;
+  const wk = logTotals(logWeekStartIso(), todayIso());
+  const slides = [];
+  let read = "";
+  try {
+    const a = runAnalysis(run);
+    const ps = debriefParagraphs(run, a);
+    read = (ps && ps.length) ? String(ps[0]) : "";
+  } catch (e) { read = ""; }
+  slides.push({ line: run.t || "Your last run",
+    stats: [commKm(run.distKm), run.pace || ""].filter(Boolean).join(" · ") });
+  if (read) slides.push({ line: read, stats: [run.rpe ? "RPE " + run.rpe : "",
+    run.avgHr ? run.avgHr + " bpm avg" : ""].filter(Boolean).join(" · ") });
+  slides.push({ line: "That is the week so far.",
+    stats: commKm(wk.km) + " this week · " + wk.runs + (wk.runs === 1 ? " run" : " runs") });
+  return { name: (profile.name || "You"), when: runDateLabelIso(run.dateIso) || "", slides: slides };
+}
+/**
+ * WHERE THE FEED WOULD BE.
+ *
+ * ⚠️ THIS IS THE DESIGN'S OWN REQUIRED STATE, NOT A PLACEHOLDER STANDING IN FOR IT. The handoff asks
+ * for "an empty feed for a runner following nobody"; there is nobody to follow because there is no
+ * server, and saying that plainly is the only honest thing this pane can do today. It says what the
+ * feed will be and what already works instead, and it offers the two things that DO work — the runner's
+ * own runs, and sharing one.
+ * ⚠️ AND IT DOES NOT SAY "COMING SOON" AND STOP. The audit before TestFlight called an unfinished
+ * surface the most visible thing in the app; a state that explains itself and offers the working route
+ * is the difference between an empty room and a closed door.
+ */
+function commFeedHtml() {
+  return '<div class="cm-empty">' +
+    '<div class="cm-empty-ic">' + ICON.community + '</div>' +
+    '<h3>Your feed starts with the people you follow</h3>' +
+    '<p>When runners you follow post a session, it lands here — the run, how it felt, and a word from ' +
+    'you if you want to give one. Nobody is following anybody yet, so there is nothing to show you ' +
+    'rather than something made up.</p>' +
+    '<p class="cm-empty-q">Your own runs are on the other pane, and you can share one from there ' +
+    'today.</p>' +
+    '<div class="cm-empty-acts">' +
+      '<button class="ui-btn" data-cgo="mine">See your runs</button>' +
+      '<button class="ui-btn ui-btn-pri" data-csheet="share">Share a run</button>' +
+    '</div>' +
+  '</div>';
+}
+/** The people sheets. ⚠️ Both are empty for the same one reason, and it is stated once. */
+function commPeopleHtml(kind) {
+  const t = kind === "following" ? "Following" : "Followers";
+  return '<h2 class="cm-sh">' + t + '</h2>' +
+    '<p class="cm-sub">Nobody yet — following runners needs a server Inte-Run does not have.</p>' +
+    '<div class="cm-empty cm-empty-sm">' +
+      '<p>When it exists you will be able to follow the people you actually run with, and see their ' +
+      'sessions here. Until then your training is yours alone, which is not the worst thing.</p>' +
+    '</div>';
+}
+/**
+ * SHARE A RUN — the design's sheet, wired to the share studio that already exists.
+ *
+ * ⚠️ IT LISTS REAL LOGGED SESSIONS AND CONTINUES INTO THE REAL COMPOSER. The design says Continue
+ * "currently closes the sheet — in production it continues to the composer", and this app HAS one: the
+ * share studio, four templates, photograph and all. So the sheet is a picker and Continue is the thing
+ * it was always meant to be.
+ * ⚠️ AND A WELL, NOT A CARD. The design system's rule, quoted in the handoff: never nest a card inside
+ * a card — this container is a --surface-2 well.
+ */
+function commShareHtml() {
+  const runs = (state.logged || []).filter((r) => r && Number(r.distKm) > 0).slice(0, 6);
+  if (!runs.length) {
+    return '<h2 class="cm-sh">Share a run</h2>' +
+      '<p class="cm-sub">Nothing logged yet.</p>' +
+      '<div class="cm-empty cm-empty-sm"><p>Record a run and it will be here, with its splits and its ' +
+      'route ready to go.</p></div>';
+  }
+  const rows = runs.map((r) => {
+    const meta = [r.time || "", commKm(r.distKm), r.rpe ? "RPE " + r.rpe : ""].filter(Boolean).join(" · ");
+    // ⚠️ THROUGH THE COMPONENT'S OWN id OPTION, WHICH BECOMES data-uirow — not an invented attrs
+    // option. uiSessionRow has no such option, so it would have been dropped in silence and every row
+    // in this sheet would have looked live and done nothing. Its own comment says to use the app's
+    // delegated handler rather than a bespoke one, and data-uirow is that route.
+    return uiSessionRow({ day: (runDateLabelIso(r.dateIso) || "").slice(0, 3).toUpperCase(),
+      title: r.t || "Run", meta: meta, status: "done", id: "cshare:" + r.id,
+      colour: "var(--eff-" + runEffort(r) + ")" });
+  }).join("");
+  return '<h2 class="cm-sh">Share a run</h2>' +
+    '<p class="cm-sub">Pick a logged session. The splits and the route come with it.</p>' +
+    '<div class="cm-well">' + rows + '</div>';
+}
+/**
+ * THE COMMUNITY TAB.
+ *
+ * ⚠️ TWO PANES ON ONE TRACK, EACH OWNING ITS OWN SCROLL, and the document never scrolls — which is the
+ * design's requirement and also this app's oldest layout rule (.view is the scroll owner; a flex child
+ * needs min-height: 0 or it refuses to shrink and the PAGE scrolls instead).
+ */
+
+/**
+ * THE STORY VIEWER.
+ *
+ * ⚠️ IT IS NOT A RENDER. Building it into the screen would put a full-screen overlay inside the pane
+ * that scrolls, and every re-render — a tab switch, a background sync — would restart the timer and
+ * the progress bars from the beginning. It is appended to the body like the welcome overlay and the
+ * count-in, both of which are the same shape of thing.
+ *
+ * ⚠️ THE PROGRESS BAR IS A CSS ANIMATION, NOT A 100ms INTERVAL. The design's prototype ticks a state
+ * value forty-five times a slide; a keyframe does the same thing without a re-render per tick, and it
+ * stays in step with the timer because both are 4.5s. Under Reduce Motion the app's global rule turns
+ * the animation off — so the bar simply does not fill, and the handoff's requirement stands: "the story
+ * auto-advance should still work, but without the fades".
+ *
+ * ⚠️ AND THE TIMER IS CLEARED ON EVERY EXIT PATH. A tap, the ✕, the end of the last slide, and leaving
+ * the tab — this app has already paid for an interval that outlived its sheet twice (the stretch player
+ * and the coach's own scheduler).
+ */
+let COMM_STORY_T = 0;
+function commStoryClose() {
+  if (COMM_STORY_T) { clearTimeout(COMM_STORY_T); COMM_STORY_T = 0; }
+  const el = $("cmStory"); if (el) el.remove();
+}
+function openCommStory() {
+  const st = commStory();
+  if (!st || !st.slides.length) return;
+  commStoryClose();
+  let i = 0;
+  const av = profile.avatar
+    ? '<span class="cm-sav"><img src="' + esc(profile.avatar) + '" alt=""></span>'
+    : '<span class="cm-sav"></span>';
+  const draw = () => {
+    const s = st.slides[i];
+    const bars = st.slides.map((_, n) =>
+      '<span class="cm-bar' + (n < i ? " done" : n === i ? " now" : "") + '"><i></i></span>').join("");
+    // ⚠️ THE PICTURE IS THE RUN'S OWN ROUTE, for the same reason the grid tiles are: there is no
+    // photograph, and geometry costs no billed tiles.
+    const run = (state.logged || [])[0];
+    const route = (run && Array.isArray(run.route)) ? normalizeRoute(run.route) : [];
+    const art = route.length > 1
+      ? '<span class="cm-sart">' + routeMapSvg(route, null, 320, 200) + '</span>'
+      : '<span class="cm-sart"></span>';
+    const el = $("cmStory");
+    if (el) el.innerHTML =
+      '<div class="cm-bars">' + bars + '</div>' +
+      '<div class="cm-shead">' + av +
+        '<div style="flex:1;min-width:0">' +
+          '<div class="cm-sname">' + esc(st.name) + '</div>' +
+          '<div class="cm-swhen">' + esc(st.when) + '</div>' +
+        '</div>' +
+        '<button class="cm-sx" id="cmStoryX" aria-label="Close story">✕</button>' +
+      '</div>' +
+      '<button class="cm-sbody" id="cmStoryNext" aria-label="Next">' + art +
+        '<span class="cm-scap">' +
+          '<span class="cm-seye">Story · ' + (i + 1) + ' of ' + st.slides.length + '</span>' +
+          '<span class="cm-sline">' + esc(s.line) + '</span>' +
+          (s.stats ? '<span class="cm-sstats num">' + esc(s.stats) + '</span>' : "") +
+        '</span>' +
+      '</button>';
+    const x = $("cmStoryX"); if (x) x.onclick = (e) => { e.stopPropagation(); commStoryClose(); };
+    const nx = $("cmStoryNext"); if (nx) nx.onclick = () => advance();
+    if (COMM_STORY_T) clearTimeout(COMM_STORY_T);
+    COMM_STORY_T = setTimeout(advance, COMM_STORY_MS);
+  };
+  const advance = () => {
+    i += 1;
+    if (i >= st.slides.length) { commStoryClose(); return; }
+    draw();
+  };
+  const ov = el('<div class="cm-story" id="cmStory"></div>');
+  document.body.appendChild(ov);
+  draw();
+}
+/** 4.5s a slide — the design's own figure, and the same value the progress keyframe uses. */
+const COMM_STORY_MS = 4500;
+/**
+ * Choosing a run in the Share-a-run sheet continues into the composer that already exists.
+ * ⚠️ THE STUDIO, NOT A SECOND COMPOSER. The design says Continue "in production it continues to the
+ * composer"; this app has one, with four templates and a photograph, and building another would be two
+ * places a share card is made.
+ */
+function wireCommShare() {
+  document.querySelectorAll('[data-uirow^="cshare:"]').forEach((b) => b.onclick = () => {
+    const id = String(b.dataset.uirow).slice(7);
+    const run = (state.logged || []).filter((r) => String(r.id) === id)[0];
+    closeSheet();
+    if (run) openShareStudio(run);
+  });
+}
+function viewCommunity() {
+  const v = commView();
+  const p = commProfile();
+  const months = commMonths();
+  const bests = commBests();
+  const wk = logTotals(logWeekStartIso(), todayIso());
+  const posts = (state.hist || []).filter((r) => Number(r.k) > 0).length;
+  const story = commStory();
+
+  const avatar = p.avatar
+    ? '<img src="' + esc(p.avatar) + '" alt="">'
+    : '<span class="cm-init">' + esc(p.initials) + '</span>';
+  // ⚠️ THE RING AND THE BADGE ONLY EXIST IF THERE IS A STORY TO OPEN. An unseen-story ring over nothing
+  // is a control that looks live and does nothing.
+  const ring = story
+    ? '<button class="cm-av cm-av-story" data-cstory="1" aria-label="Open your story">' + avatar +
+        '<span class="cm-story-badge">STORY</span></button>'
+    : '<span class="cm-av">' + avatar + '</span>';
+
+  const stat = (n, label, action) => {
+    const inner = '<span class="cm-stat-v num">' + esc(String(n)) + '</span>' +
+      '<span class="cm-stat-k">' + label + '</span>';
+    return action
+      ? '<button class="cm-stat" data-csheet="' + action + '">' + inner + '</button>'
+      : '<span class="cm-stat">' + inner + '</span>';
+  };
+
+  const chips = bests.map((b) =>
+    '<span class="cm-chip cm-chip-acc num">Best · ' + b.label + ' ' + b.time + '</span>').join("");
+
+  const grid = months.length
+    ? months.map((m, i) =>
+        '<div class="cm-mhead' + (i ? " cm-mhead-n" : "") + '">' +
+          '<h2>' + esc(m.label) + '</h2>' +
+          '<span class="num">' + m.runs.length + (m.runs.length === 1 ? " RUN" : " RUNS") +
+            " · " + Math.round(m.km) + ' KM</span>' +
+        '</div>' +
+        '<div class="cm-grid">' + m.runs.map(commTileHtml).join("") + '</div>').join("")
+    // ⚠️ THE DESIGN'S OWN EMPTY GRID STATE, in its own words.
+    : '<div class="cm-empty cm-empty-sm"><p>Your first run will show up here — with the shape of ' +
+      'where you went, how far, and how hard it was.</p></div>';
+
+  return '<div class="cm-wrap">' +
+    '<div class="cm-seg" role="tablist">' +
+      '<span class="cm-thumb' + (v === "feed" ? " r" : "") + '"></span>' +
+      '<button role="tab" aria-selected="' + (v === "mine") + '" data-cgo="mine">Your runs</button>' +
+      '<button role="tab" aria-selected="' + (v === "feed") + '" data-cgo="feed">Feed</button>' +
+    '</div>' +
+    '<div class="cm-vp"><div class="cm-track' + (v === "feed" ? " feed" : "") + '" id="cmTrack">' +
+      '<section class="cm-pane">' +
+        '<div class="cm-head">' + ring +
+          '<div class="cm-stats">' +
+            stat(posts, "Posts", "") +
+            stat(0, "Followers", "followers") +
+            stat(0, "Following", "following") +
+          '</div>' +
+        '</div>' +
+        '<div class="cm-id">' +
+          (p.name ? '<div class="cm-name">' + esc(p.name) + '</div>' : "") +
+          (p.plan ? '<div class="cm-meta">' + esc(p.plan) + '</div>' : "") +
+          (chips ? '<div class="cm-pbs"><span class="cm-eyebrow">Best efforts</span>' + chips + '</div>' : "") +
+          '<div class="cm-pbs"><span class="cm-chip num">' + commKm(wk.km) + ' this week</span></div>' +
+        '</div>' +
+        '<div class="cm-acts">' +
+          '<button class="ui-btn" data-cedit="1">Edit profile</button>' +
+          '<button class="ui-btn" data-csheet="share">Share a run</button>' +
+        '</div>' +
+        commJournalRailHtml() +
+        grid +
+      '</section>' +
+      '<section class="cm-pane">' +
+        (story ? '<div class="cm-rail"><button class="cm-rail-i" data-cstory="1">' +
+          '<span class="cm-rail-ring">' + avatar + '</span>' +
+          '<span class="cm-rail-n">Your run</span></button></div>' : "") +
+        commFeedHtml() +
+      '</section>' +
+    '</div></div>' +
+  '</div>';
+}
+
 
 // ============ SUPPORT ======================================================
 const SUPPORT_HUB = [
@@ -28095,6 +28940,54 @@ function wire() {
     lStrava.setAttribute("aria-checked", on ? "true" : "false");
   };
   const ovMap = $("ovMap"); if (ovMap) { const r = currentOverviewRun(); if (r) buildOverviewMap(ovMap, r.route); }
+  // ── Community (commissioned design, 2026-08-21) ───────────────────────────────────────────────
+  // ⚠️ EVERY CONTROL ON THAT SCREEN IS BOUND HERE. The id guard proves an id resolves and cannot prove
+  // a control is connected to anything, and a screen built from a design reference is the likeliest
+  // place for a live-looking dead button — this app has shipped that three times.
+  // ⚠️ AND THE PANE IS REMEMBERED, not reset on every render: switching tabs and coming back should
+  // land where the runner left off.
+  document.querySelectorAll("[data-cgo]").forEach((b) => b.onclick = () => {
+    commViewSet(b.dataset.cgo);
+    // ⚠️ THE TRACK IS MOVED IN PLACE RATHER THAN RE-RENDERED, so the 320ms slide is seen. A render
+    // would rebuild both panes and the transform would jump — and it would also throw away each
+    // pane's scroll position, which the design says they each own.
+    const tr = $("cmTrack");
+    if (!tr) { render(); return; }
+    tr.classList.toggle("feed", b.dataset.cgo === "feed");
+    const th = document.querySelector(".cm-thumb");
+    if (th) th.classList.toggle("r", b.dataset.cgo === "feed");
+    document.querySelectorAll(".cm-seg button").forEach((x) =>
+      x.setAttribute("aria-selected", String(x.dataset.cgo === b.dataset.cgo)));
+  });
+  // Edit profile is the profile screen the app already has — not a second editor.
+  document.querySelectorAll("[data-cedit]").forEach((b) => b.onclick = () => {
+    state.screen = null; state.tab = "profile"; state.support = null; render();
+  });
+  document.querySelectorAll("[data-csheet]").forEach((b) => b.onclick = () => {
+    const k = b.dataset.csheet;
+    ensureSheet(); SHEET_CTX = null;
+    $("sheetBody").innerHTML = (k === "share") ? commShareHtml() : commPeopleHtml(k);
+    // ⚠️ WIRED AFTER THE MARKUP IS IN, and only the share sheet has anything to wire — the two people
+    // sheets are empty states with no controls at all, which is the design's own required state.
+    if (k === "share") wireCommShare();
+    $("sheetOv").classList.add("on");
+  });
+  // A tile opens the run it is a picture of. ⚠️ Resolved by ID, never by position: state.logged is
+  // unshifted whenever a watch run arrives, so an index would open a different run.
+  document.querySelectorAll("[data-crun]").forEach((b) => b.onclick = () => {
+    state.viewRunId = b.dataset.crun; state.screen = "run"; render();
+  });
+  document.querySelectorAll("[data-cstory]").forEach((b) => b.onclick = () => openCommStory());
+  document.querySelectorAll("[data-cjournal]").forEach((b) => b.onclick = () => {
+    ensureSheet(); SHEET_CTX = null;
+    $("sheetBody").innerHTML = commJournalSheetHtml(b.dataset.cjournal);
+    // ⚠️ "Open the full journal" goes to the Plan tab, which is where an archived block would live. It
+    // is the nearest true destination today rather than a button that closes the sheet and does nothing.
+    document.querySelectorAll("[data-cjplan]").forEach((x) => x.onclick = () => {
+      closeSheet(); state.screen = null; state.tab = "plan"; render();
+    });
+    $("sheetOv").classList.add("on");
+  });
   document.querySelectorAll("[data-hub]").forEach((b) => b.onclick = () => { if (b.dataset.hub === "alfie") { openAlfie(); return; } state.support = b.dataset.hub; state.supportFrom = null; render(); });
   // Support library pages: play any movement, expand any guide.
   wireExDemos();

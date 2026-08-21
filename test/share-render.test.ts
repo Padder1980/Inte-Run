@@ -304,11 +304,27 @@ test("BLOCKER: every colour the card commits to is the app's own dark token, not
       "SHARE_INK." + key + " is " + E.SHARE_INK[key] + " but " + tok + " is " + T[tok]);
   }
   assert.equal(E.SHARE_INK.ink, "#ffffff", "the references' primary text measures literally #ffffff");
-  // And the neon is gone from the whole build, not merely unused by this object.
+  // ⚠️ AND THE NEON IS GONE FROM THE SHARE RENDERER — WHICH IS NARROWER THAN "the whole build", AND THE
+  // NARROWING IS DELIBERATE. This swept the entire page, which was exact while nothing else could
+  // legitimately hold those values. On 2026-08-21 the Community screen's story viewer arrived and #3dffb0
+  // is --signal-2: the design system declares it, and both the system and the Community handoff permit it
+  // on DARK MEDIA and forbid it in UI chrome — which a full-screen story over a dark route is. A
+  // whole-page ban would have forced that screen off the token its own design names.
+  // ⚠️ WHAT IT PROTECTS IS UNCHANGED. The concern was never the hex existing; it was the SHARE CARD
+  // painting itself in a neon of its own instead of the app's dark tokens. So the sweep is the renderer's
+  // own closure, which is exact, plus a check that no signal token reaches SHARE_INK by another name.
   const html = page();
+  const closureSrc = [...closure("drawShareCard").values()].join("\n");
   for (const dead of ["#38ffbe", "#3dffb0", "rgba(72,255,184", "rgba(56,255,190", "rgba(45,255,170"]) {
-    assert.ok(!html.includes(dead), "the neon palette survives in the build: " + dead);
+    assert.ok(!closureSrc.includes(dead), "the neon palette is back in the share renderer: " + dead);
   }
+  for (const k of Object.keys(E.SHARE_INK)) {
+    assert.ok(!/^#3[8d]ff/i.test(String(E.SHARE_INK[k])),
+      "SHARE_INK." + k + " is a signal green (" + E.SHARE_INK[k] + "); those are for dark media, not the card");
+  }
+  // ⚠️ AND THE SIGNAL TOKENS ARE NOT REACHED BY NAME EITHER, which a hex sweep alone cannot see.
+  assert.ok(!/var\(--signal-/.test(closureSrc),
+    "the share renderer reads a signal token; the card is built from the app's dark tokens");
   // ⚠️ AND THE RENDERER MAY NOT READ THE LIVE THEME. Resolving a token through getComputedStyle would
   // export a LIGHT card for a runner whose phone is in light mode, and every reference the card is built
   // to is deep ink. Measured in the browser: with documentElement's data-theme flipped to light the page

@@ -1,4 +1,5 @@
 import SwiftUI
+import WatchKit
 
 /// The live numbers page of a run — the screen a runner glances at mid-stride, so the one where
 /// legibility matters most.
@@ -45,12 +46,77 @@ struct MetricsPage: View {
     /// that is always wanted and never urgent — you glance at it between efforts, not mid-stride — so
     /// spending the largest type on it was taking the size away from the numbers being read on the move.
     var elapsed: String?
+    /// Which device owns this run, when it is worth saying — one short word shown BEFORE the clock in
+    /// the same reserved strip, so it costs no height at all. Nil for a run recorded on this wrist,
+    /// where there is nothing to disambiguate.
+    ///
+    /// ⚠️ LEADING, NEVER TRAILING. The strip is the topmost line on the display and this page's own
+    /// notes above record losing characters to the top corners twice; the trailing end of the top
+    /// strip is the worst place on the screen to put a word. Left of the clock it sits inside the same
+    /// inset the clock already survives.
+    ///
+    /// ⚠️ It is deliberately NOT folded into `status`. Status replaces the clock, and a mirror screen
+    /// that gave up its clock to say "iPhone" would be trading the number a runner looks at most for a
+    /// fact that does not change.
+    var provenance: (text: String, tint: Color)?
     /// In the runner's own chosen order. The first is the hero.
     var rows: [Row]
     /// Progress through the current step, 0–1. Nil for a run with no structure.
     var stepProgress: Double?
     /// The step's own words, e.g. "2 km at 4:55/km" — context for the progress bar.
     var stepLabel: String?
+
+    // MARK: - The strip watchOS shares with us
+
+    /// The page's own inset from the glass. One owner, because the strip's clock reserve below is
+    /// expressed from the DISPLAY's trailing edge and has to subtract it.
+    private static let edge: CGFloat = 8
+
+    /// ⚠️ THE TRAILING END OF THE TOP STRIP BELONGS TO watchOS, AND NOTHING WAS LEAVING IT ALONE.
+    ///
+    /// The system draws the time in the top-trailing corner, over whatever the app has put there.
+    /// This page's strip filled the whole width and ended in `Spacer(minLength: 0)`, so on the small
+    /// watches the app's own content ran straight under it. Measured by colour separation on five
+    /// real simulators (the app never uses pure white; the system clock is exactly 255,255,255), the
+    /// gap between the app's rightmost ink and the clock's leftmost glyph, in the rows they share:
+    ///
+    ///     size            running        paused ("PAUSED · IPHONE")
+    ///     40mm (162pt)    +3px           −48px
+    ///     41mm (176pt)    +27px          −24px
+    ///     42mm (187pt)    +46px          −5px
+    ///     45mm (198pt)    own line       own line
+    ///     49mm (205pt)    own line       own line
+    ///
+    /// So "PAUSED · IPHO" plus a clock on top of the rest of the word, on three of the five sizes —
+    /// and the +3px is no better: the spacing WITHIN a number is 4–5px, so "23:10" beside "06:19"
+    /// rendered as "23:1006:19", one long number. The owner happens to own the one size where the
+    /// system gives its clock a line of its own.
+    ///
+    /// ⚠️ IT CANNOT BE FIXED BY MOVING DOWN, and that is why this is a width. The page is vertically
+    /// CENTRED, so where the strip lands depends on how tall the content is: the same view puts the
+    /// strip on the clock's row when there are three metrics and below it when the phone has not
+    /// ticked yet. Top-anchoring it instead would raise the FIRST METRIC ROW into the clock's row on
+    /// the big watches, where its label already reaches x=340 of 396. A reserved width is true
+    /// wherever the block happens to sit.
+    ///
+    /// ⚠️ MEASURED, NOT GUESSED, AND IT IS PROPORTIONAL BECAUSE THE THING IT AVOIDS IS. The clock's
+    /// leading edge sits at 0.679 / 0.693 / 0.700 / 0.710 / 0.705 of the display width across those
+    /// five sizes — near enough constant, so a fraction tracks it where a constant would not. This
+    /// fraction plus the page's own `edge` puts the strip's content right edge at 0.66 of the display
+    /// width, which leaves 11–18pt of daylight at every size, including the 40mm that is the smallest
+    /// watch `WATCHOS_DEPLOYMENT_TARGET` admits.
+    ///
+    /// ⚠️ Read from the device rather than passed in. This page is otherwise pure — plain strings, no
+    /// `WorkoutManager` — and a display width is a device constant rather than app state; passing it
+    /// in would make every caller responsible for remembering, which is the convention-somebody-
+    /// breaks trap this project has shipped twice. There is exactly one reader, below.
+    private static let clockReserveFraction: CGFloat = 0.34
+
+    /// The reserve as a trailing inset inside the page's own content box, which `edge` has already
+    /// pulled in from the glass. Total space left to watchOS is therefore this plus `edge`.
+    private static var clockInset: CGFloat {
+        WKInterfaceDevice.current().screenBounds.width * clockReserveFraction
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -76,22 +142,71 @@ struct MetricsPage: View {
             // clock into the top curve. The reference app puts a single word here and nothing else,
             // with the system clock opposite; this carries the run clock in that same strip, which
             // costs no height at all.
+            //
+            // ⚠️⚠️ NOTHING IN THIS STRIP MAY CARRY `.kerning`, AND THE REASON IS THE WHOLE FIX.
+            // A `Text` with custom letter spacing does not honour `minimumScaleFactor` — it
+            // TRUNCATES instead of shrinking. Both of these strings already carried a scale factor
+            // AND a kerning, so the give they were written for had never once worked: measured on a
+            // 40mm watch with the clock's columns reserved, "PAUSED · IPHONE" rendered as
+            // "PAUSED · IPHO…" and "IPHONE" as "IPH…", while the identical view with the kerning
+            // deleted shrank and fitted whole. That is also why the fault this reserve fixes
+            // presented as an OVERPRINT rather than as small text in the first place: given too
+            // little room the strip did not shrink, it ran on under the system clock.
+            // Half a point of tracking is not worth the word.
             HStack(spacing: 6) {
                 if let status {
+                    // ⚠️ ONE LINE, ALWAYS. The strip is reserved at a single line's height precisely so
+                    // the rows below never move; a status long enough to wrap would take a second line
+                    // out of them and push the last metric into the bottom curve. "Paused" always fit,
+                    // so nothing forced it — until the companion started putting the run's provenance
+                    // here ("PAUSED · IPHONE"). Shrinking beats wrapping.
                     Text(status.text.uppercased())
                         .font(.system(size: 13, weight: .heavy))
-                        .kerning(0.6)
+                        .lineLimit(1)
+                        // 0.6, not 0.7. With the clock's own columns reserved, "PAUSED · IPHONE"
+                        // needs 0.72 of its size to fit a 40mm watch — measured — so a 0.7 floor sat
+                        // three points from truncating, and what truncation gives you here is
+                        // "PAUSED · IPHO…", which is the defect this reserve exists to remove
+                        // wearing an ellipsis. The floor costs nothing at any size that fits.
+                        .minimumScaleFactor(0.6)
                         .foregroundStyle(status.tint)
-                } else if let elapsed {
-                    Text(elapsed)
-                        .font(.system(size: 17, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(Brand.ink)
+                } else {
+                    if let p = provenance {
+                        Text(p.text.uppercased())
+                            .font(.system(size: 11, weight: .heavy))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .foregroundStyle(p.tint)
+                    }
+                    if let elapsed {
+                        Text(elapsed)
+                            .font(.system(size: 17, weight: .semibold, design: .rounded))
+                            .monospacedDigit()
+                            .lineLimit(1)
+                            // ⚠️ THE CLOCK HAD NO GIVE AT ALL, and past an hour it needs some: the
+                            // companion renders h:mm:ss, which is 62pt of monospaced digits against
+                            // the 85pt the whole strip gets on a 40mm watch. With nothing to shrink,
+                            // a long run's clock is the one thing that would truncate — and a clock
+                            // reading "1:05:2…" is worse than a small one. It takes the priority so
+                            // the WORD beside it gives way first; the number is what is being read.
+                            .minimumScaleFactor(0.7)
+                            .layoutPriority(1)
+                            .foregroundStyle(Brand.ink)
+                    }
                 }
-                Spacer(minLength: 0)
+                // ⚠️ NO SPACER. There was one, and it cost the word: an HStack shares its width
+                // among the children that can flex, a Spacer flexes without limit, and its share
+                // plus the 6pt of spacing it brought with it left "IPHONE 23:10" rendering as
+                // "IPH… 23:10" on a 40mm watch — measured, 33..173px of ink in a 198px box, i.e.
+                // truncated with room going spare. `.frame(alignment: .leading)` below already
+                // pushes the strip to the leading edge, so the Spacer was never doing anything the
+                // frame was not; taking it out gives the two words the whole strip to negotiate over.
             }
             .frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
             .padding(.leading, 6)
+            // ⚠️ THE ONE READER OF THE RESERVE. See `systemClockReserve` above for the measurements;
+            // without this the strip runs under the system clock on every watch below 45mm.
+            .padding(.trailing, MetricsPage.clockInset)
             .padding(.bottom, 2)
 
 
@@ -117,8 +232,8 @@ struct MetricsPage: View {
         // ⚠️ 8pt, not 2pt. A couple of points buys margin against a corner radius I do not actually
         // know, and costs almost nothing on numbers that are 50pt and 30pt tall. Guessing the exact
         // inset is what failed twice; leaving real headroom is what does not.
-        .padding(.top, 8)
-        .padding(.horizontal, 8)
+        .padding(.top, MetricsPage.edge)
+        .padding(.horizontal, MetricsPage.edge)
         // ⚠️ LIFTED CLEAR OF THE CURVE, not just of the page dots. The lower the text, the further in
         // the rounded glass cuts, so the bottom-most line needs vertical clearance as well as a
         // leading inset — either alone still loses characters.
@@ -147,26 +262,47 @@ struct MetricsPage: View {
         // reading bigger.
         HStack(alignment: .center, spacing: 0) {
             if let ic = r.icon { glyph(ic, size: 22).padding(.trailing, 4) }
+            // ⚠️ THE NUMBER GETS THE WIDTH FIRST, AND WITHOUT THIS IT DID NOT. Measured on a 41mm
+            // watch (176pt wide): "1.42 KM DISTANCE" wants about 177pt of the 160pt available, and
+            // SwiftUI divided the shortfall by shrinking the row's flexible children — so the VALUE
+            // came out as "1...." and a three-digit heart rate as "...". The label losing a couple of
+            // points is invisible; the number losing its digits is the whole screen failing. Same
+            // fault the layout notes above record twice already, one screen size further down.
             Text(r.value)
                 .font(.system(size: 42, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .minimumScaleFactor(0.85)
                 .lineLimit(1)
+                .layoutPriority(2)
                 .foregroundStyle(Brand.accent)
             // The unit rides on the number with no gap, so "3.50KM" reads as one token rather than
-            // two competing things.
+            // two competing things — so it takes the same priority as the number it belongs to.
             if let u = r.unit {
                 Text(u)
                     .font(.system(size: 16, weight: .bold))
+                    .lineLimit(1)
+                    .layoutPriority(2)
                     .foregroundStyle(Brand.ink)
             }
-            Text(wrapped(r.label))
+            // ⚠️ A ONE-WORD CAPTION MUST NOT BREAK, and a flat `lineLimit(2)` let it. Once the number
+            // took priority, "HEART" had the room taken from it instead and SwiftUI split it across
+            // two lines as "HEAR / T" — a caption hyphenated mid-word reads as damage. The two-word
+            // captions carry an explicit newline from `wrapped()`, so the limit follows the string:
+            // two lines only when there really are two words, and shrinking is the give otherwise.
+            let label = wrapped(r.label)
+            Text(label)
                 .font(.system(size: 12, weight: .bold))
-                .kerning(0.2)
+                // ⚠️ NO `.kerning` — SAME MECHANISM AS THE STRIP ABOVE, AND IT WAS COSTING A WORD
+                // HERE TOO. With 0.2pt of tracking this caption did not shrink, it truncated:
+                // measured on a 40mm watch, "DISTANCE" rendered "DISTAN…" beside a number with room
+                // to spare beneath it. The scale factor below has been the intended give since the
+                // page was built and was inert the whole time.
                 .lineSpacing(-2)
                 .foregroundStyle(Brand.ink)
-                .lineLimit(2)
-                .minimumScaleFactor(0.8)
+                .lineLimit(label.contains("\n") ? 2 : 1)
+                // 0.7, not 0.8: a single-word caption ("DISTANCE", "CALORIES") cannot wrap, so
+                // shrinking is the only give it has — and 0.8 was not enough give at 41mm.
+                .minimumScaleFactor(0.7)
                 .padding(.leading, 6)
             Spacer(minLength: 0)
         }

@@ -113,15 +113,13 @@ struct TodayView: View {
                 // The home is TWO swipeable pages, the owner's reference layout: today (with Free
                 // Run always available) and the upcoming week. The companion state replaces the
                 // pager wholesale — a wrist that is only mirroring the phone has no pages to offer.
+                // ⚠️ NO WORDMARK, AND NO OUTER SCROLLER. A phone-recorded run is a RUN, and a run
+                // screen carries no branding on this watch — `WorkoutView` does not either. The
+                // wordmark cost 28pt off the top of a screen the owner photographed with its third
+                // metric row cut off mid-glyph, and the outer ScrollView is what turned a page that
+                // did not fit into a page you had to scroll. CompanionView is its own pager now.
                 if launch.companionOnly {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 8) {
-                            wordmark
-                            CompanionView().environmentObject(store)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 2)
-                    }
+                    CompanionView().environmentObject(store)
                 } else {
                     TabView(selection: $page) {
                         todayPage.tag(0)

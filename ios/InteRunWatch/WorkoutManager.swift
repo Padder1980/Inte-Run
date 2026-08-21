@@ -58,6 +58,41 @@ final class WorkoutManager: NSObject, ObservableObject {
     private var paceWindow: [(at: Date, p: Double)] = []
     /// Halfway is announced once per run, in the session's own currency — see the ticker.
     private var halfwaySpoken = false
+    /// One-shot: the prescription has run out and `end()` has been called for it. See
+    /// `finishPrescribedSession`, and note that this is cleared in `reset()` like every other
+    /// per-run flag — the manager outlives a run.
+    private var autoCompleted = false
+    /// Baseline for deriving pace from DISTANCE when the device will not report a speed. Held in
+    /// running seconds (`elapsed`), so paused time is excluded by construction. See
+    /// `derivePaceIfStale`.
+    private var paceRef: (metres: Double, at: TimeInterval)?
+    /// The derivation's window and its plausibility bounds.
+    ///
+    /// ⚠️ 150 s/km is the phone's own `PACE_PLAUSIBLE_MIN`: a derivation faster than any prescribed
+    /// band is arithmetic on a lump, not a pace. 1800 is 30:00/km, well below a standstill.
+    /// ⚠️ TWO time bounds, not one. Ten metres is covered in about six seconds at running pace and
+    /// about seven at a walk, but a 25:00/km shuffle needs fifteen — so the window EXTENDS to
+    /// `paceDeriveMaxSec` before it concludes the runner has stopped. Concluding it at six seconds
+    /// would clear the pace of every slow runner on every window.
+    ///
+    /// ⚠️⚠️ AND `paceDeriveMaxSec` WAS A THIRD INDEPENDENT NUMBER THAT CONTRADICTED BOTH OF THE
+    /// OTHERS. At a flat 15 it named 25:00/km as the case it existed for and then refused it: ten
+    /// metres at 1500 s/km takes exactly 15.0 s, so the two branches tie and float noise decides
+    /// which one fires. Driven, the derivation returned 1499 for 1499 and NIL for 1500 — the first
+    /// pace it refuses is the one the sentence above promises. And because 1800 needs 18 s, the whole
+    /// 1500–1800 top of the declared plausible band was unreachable: `paceMaxPlausible` claimed a
+    /// range its only writer could not produce.
+    ///
+    /// So the window is now DERIVED from the two constants it has to reconcile — the distance it
+    /// waits for and the slowest pace the model calls plausible — and 25:00/km derives with three
+    /// seconds to spare. It is the CLAMP that was wrong, not the comment. Nothing acts on the
+    /// difference except the display: `autoPauseTick` treats anything slower than 900 s/km as not
+    /// moving, so a 25:00/km shuffle is auto-paused whether its pace reads 25:00 or "--".
+    private static let paceDeriveSec: TimeInterval = 6
+    private static let paceDeriveMetres: Double = 10
+    private static let paceMinPlausible: Double = 150
+    private static let paceMaxPlausible: Double = 1800
+    private static let paceDeriveMaxSec: TimeInterval = paceDeriveMetres / 1000 * paceMaxPlausible
     var spokenPaceQuote: Double? {
         let cut = Date().addingTimeInterval(-10)
         let recent = paceWindow.filter { $0.at > cut }
@@ -119,6 +154,27 @@ final class WorkoutManager: NSObject, ObservableObject {
     /// index 0. Time below 50% is still time on your feet and must not be silently dropped.
     private(set) var maxHeartRate: Double = 0
     private var zoneSeconds: [Double] = [0, 0, 0, 0, 0]
+    /// Cadence, accumulated exactly the way the zone totals and the average heart rate are: sampled
+    /// only while RUNNING, so a runner standing at a crossing cannot drag the average toward a
+    /// cadence they never ran at.
+    ///
+    /// ⚠️ THE WRIST SENT NO CADENCE AT ALL, so the debrief's cadence tile was permanently blank on
+    /// every watch run and the share card lost a rung. The phone has always had one
+    /// (`PedometerService` → `LIVE.cadSum`/`cadN`); the wrist's `summaryPayload` simply had no such
+    /// field. There is no CMPedometer here, so the source is HealthKit's own step count, collected
+    /// by the live workout builder.
+    ///
+    /// ⚠️ TIME-WEIGHTED, i.e. steps banked over the running seconds they were banked in. HealthKit
+    /// delivers `stepCount` in irregular batches, so an unweighted mean of "steps ÷ this window"
+    /// would be dominated by the shortest windows. `avgCadence` is what a runner means by average
+    /// cadence and is the same shape as HealthKit's own average heart rate.
+    private var cadSteps: Double = 0
+    private var cadSeconds: TimeInterval = 0
+    /// HealthKit's CUMULATIVE step total at the last delivery, and the running clock then, so each
+    /// delivery contributes only its own interval. Updated on EVERY delivery — including ones that
+    /// arrive while paused — so a paused stretch is absorbed into the baseline rather than counted.
+    private var lastStepTotal: Double?
+    private var lastStepElapsed: TimeInterval = 0
     /// Metres climbed, accumulated the same way the phone does it, from the fixes we already have.
     private var elevGainM: Double = 0
     private var lastAltitude: Double?
@@ -259,6 +315,13 @@ final class WorkoutManager: NSObject, ObservableObject {
         heartRateAt = nil
         maxHeartRate = 0
         zoneSeconds = [0, 0, 0, 0, 0]
+        // ⚠️ ALL FOUR. Two totals and two baselines: leaving the baselines behind would charge run
+        // two's first interval against run one's last step count, and leaving the totals behind
+        // would report run one's cadence on run two.
+        cadSteps = 0
+        cadSeconds = 0
+        lastStepTotal = nil
+        lastStepElapsed = 0
         elevGainM = 0
         lastAltitude = nil
         routePoints = []
@@ -268,7 +331,11 @@ final class WorkoutManager: NSObject, ObservableObject {
         lastLocation = nil
         paceAt = nil
         paceWindow = []
+        paceRef = nil
         halfwaySpoken = false
+        // ⚠️ A completion flag left set makes run two of an app session start already finished —
+        // the documented reason this whole function exists.
+        autoCompleted = false
         stillSince = nil
         movingSince = nil
         autoPaused = false
@@ -284,17 +351,49 @@ final class WorkoutManager: NSObject, ObservableObject {
         runId = "watch-" + UUID().uuidString
     }
 
+    /// The four beats of the count, as their own cue triggers.
+    ///
+    /// ⚠️ ONE MESSAGE PER BEAT, NOT ONE FOR THE SEQUENCE — this is the whole fix for "the audio
+    /// countdown didn't match the screen countdown and the session had already started before the
+    /// audio countdown fired". The wrist used to send a single `"countdown"` and the PHONE then ran
+    /// its own 0/1/2/3-second schedule from whenever it got round to it, so the two were two
+    /// independent three-second timers started at different moments and the spoken sequence could
+    /// only ever be late. Sent per beat, each beat carries the one-way latency and nothing else, and
+    /// "Go." lands with the clock.
+    ///
+    /// ⚠️ FOUR TRIGGERS, NOT ONE REUSED FOUR TIMES. The phone's native player plays exactly one file
+    /// per call and holds a per-trigger dedupe window, so one shared trigger sent four times would
+    /// speak one number and suppress the other three — and rotate WHICH number across runs.
+    ///
+    /// ⚠️ THE PHONE MUST KNOW THESE NAMES. They have to be in the page's own cue-trigger list and its
+    /// by-id path before any of this is audible; until then the count is carried by the haptics
+    /// alone, which is what it was designed to fall back to and what an out-of-range phone gets
+    /// anyway (`WorkoutVoice.fallback` is deliberately silent for a count — a late "three, two, one"
+    /// is worse than nothing).
+    static let countdownTriggers = ["count-3", "count-2", "count-1", "count-go"]
+
     /// Begin, after a three-second count if the runner has left it on. Each beat taps the wrist, so
     /// it works with the screen down and the phone already in a pocket.
+    ///
+    /// ⚠️ A STATUS SHORTCUT PAST `requestAuthorization` WAS CONSIDERED AND REJECTED. The remaining
+    /// misalignment is `start()`'s HealthKit round trip between the "go" haptic and `begin()` setting
+    /// the clock. Going straight to `begin()` when the share types read `.sharingAuthorized` would
+    /// shave it — and `HKHealthStore.authorizationStatus(for:)` answers ONLY for types the app
+    /// writes, because read permission is deliberately undisclosed. So the shortcut would silently
+    /// never ask for a newly added READ type, and `.stepCount` (cadence) is exactly such a type: the
+    /// cost would be a permanently blank cadence tile with nothing to see. Doing the request early
+    /// instead is no better — it puts iOS's own permission sheet over the count on a first run and
+    /// leaves two requests racing. The round trip is milliseconds when already granted; the seconds
+    /// he heard were the re-based sequence above.
     func startCountingDown() {
         guard WatchSettings.shared.countdown else { return start() }
         guard countdown == nil, phase == .idle else { return }
         countdown = 3
         WKInterfaceDevice.current().play(.start)
-        // The phone says the numbers, in the coach's recorded voice. If it is out of range the
-        // wrist is silent rather than robotic — the haptics still carry the beat, which is what
-        // matters when you are looking at your phone or your shoes.
-        _ = speakOnPhone("countdown")
+        // The phone says the number, in the coach's recorded voice, one beat at a time. If it is out
+        // of range the wrist is silent rather than robotic — the haptics still carry the beat, which
+        // is what matters when you are looking at your phone or your shoes.
+        _ = speakOnPhone(Self.countdownTriggers[0])
         countdownTimer?.invalidate()
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] t in
             Task { @MainActor in
@@ -303,11 +402,16 @@ final class WorkoutManager: NSObject, ObservableObject {
                 if left > 0 {
                     self.countdown = left
                     WKInterfaceDevice.current().play(.click)
+                    // Beat 2 is index 1, beat 1 is index 2 — the number on the screen this instant.
+                    _ = self.speakOnPhone(Self.countdownTriggers[3 - left])
                 } else {
                     t.invalidate()
                     self.countdownTimer = nil
                     self.countdown = nil
                     WKInterfaceDevice.current().play(.success)
+                    // "Go." travels BEFORE start(), so the word and the clock leave together rather
+                    // than the word queueing behind a HealthKit round trip.
+                    _ = self.speakOnPhone(Self.countdownTriggers[3])
                     self.start()
                 }
             }
@@ -339,6 +443,11 @@ final class WorkoutManager: NSObject, ObservableObject {
             HKQuantityType(.heartRate),
             HKQuantityType(.activeEnergyBurned),
             HKQuantityType(.distanceWalkingRunning),
+            // ⚠️ CADENCE. There is no CMPedometer on watchOS, so steps per minute has to come from
+            // HealthKit's own step count — which means asking to READ it. A runner upgrading gets one
+            // extra line in the Health prompt once; without it `avgCadence` is silently nil forever
+            // and the debrief's cadence tile stays as blank as it has always been on wrist runs.
+            HKQuantityType(.stepCount),
         ]
 
         healthStore.requestAuthorization(toShare: share, read: read) { [weak self] ok, error in
@@ -362,7 +471,13 @@ final class WorkoutManager: NSObject, ObservableObject {
         do {
             let s = try HKWorkoutSession(healthStore: healthStore, configuration: config)
             let b = s.associatedWorkoutBuilder()
-            b.dataSource = HKLiveWorkoutDataSource(healthStore: healthStore, workoutConfiguration: config)
+            let source = HKLiveWorkoutDataSource(healthStore: healthStore, workoutConfiguration: config)
+            // ⚠️ ENABLED EXPLICITLY. The default type set for a running configuration carries heart
+            // rate, energy and distance; step count is NOT in it, so the builder would collect
+            // nothing and `didCollectDataOf` would never mention it — a cadence branch reading a type
+            // nobody collects is the computed-and-discarded trap in a new place.
+            source.enableCollection(for: HKQuantityType(.stepCount), predicate: nil)
+            b.dataSource = source
             s.delegate = self
             b.delegate = self
             session = s
@@ -428,7 +543,23 @@ final class WorkoutManager: NSObject, ObservableObject {
                     // the display and then SNAPPED FORWARD on resume, counting the whole pause.
                     self.elapsed = Date().timeIntervalSince(started) - self.pausedAccum
                     self.accumulateZone(0.5)
+                    // ⚠️ Before the step check, so a step that completes this tick is judged against
+                    // the same numbers the runner is looking at.
+                    self.derivePaceIfStale()
                     self.advanceStepIfDue()
+                    // ⚠️ THE PRESCRIPTION MAY HAVE JUST ENDED THE RUN, AND THIS CLOSURE CARRIES ON.
+                    // `advanceStepIfDue` calls `end()` when the last step completes; `end()`
+                    // invalidates the ticker, but the tick already executing runs to its last line.
+                    // Two things then happened by accident rather than by design, both AFTER the
+                    // forced "ended" tick that takes the phone's mirror and the lock-screen card
+                    // down: a trailing non-forced `sendLiveTick()` reporting "running", suppressed
+                    // only by the 2 s send throttle; and `autoPauseTick()`, which reads `phase` —
+                    // still `.running` until HealthKit's teardown completion lands — and can
+                    // therefore `pause()` a session that has just ended, sending a forced "paused"
+                    // tick after the "ended" one. Reachable on a TIMED final step that expires while
+                    // the runner is already standing still. `autoCompleted` is one-shot and cleared
+                    // in `reset()`, so this can never wedge the next run's ticker.
+                    if self.autoCompleted { return }
                     // The window feeding the SPOKEN quote — the verdict below stays instantaneous.
                     if let p = self.paceSecPerKm, self.paceIsFresh { self.paceWindow.append((Date(), p)) }
                     if self.paceWindow.count > 40 { self.paceWindow.removeFirst(self.paceWindow.count - 40) }
@@ -470,6 +601,7 @@ final class WorkoutManager: NSObject, ObservableObject {
         session?.pause()
         phase = .paused
         pauseBegan = Date()
+        paceRef = nil            // and neither must a derivation baseline
         voice?.resetPaceHold()   // a hold accrued before the pause must not survive it
         if !speakOnPhone("paused") { voice?.sayPaused() }
         sendLiveTick(force: true)
@@ -481,6 +613,7 @@ final class WorkoutManager: NSObject, ObservableObject {
         if let began = pauseBegan { pausedAccum += Date().timeIntervalSince(began) }
         pauseBegan = nil
         phase = .running
+        paceRef = nil            // a fresh window from the resume, not one spanning the pause
         // Both ends, deliberately: GPS kept updating pace from WALKING speed during the pause, so
         // without a fresh hold the first post-resume tick could speak a numbered cue quoting the
         // walk, straight over this "resumed" clip. The verdict must re-earn its 6 seconds.
@@ -521,17 +654,51 @@ final class WorkoutManager: NSObject, ObservableObject {
         }
     }
 
-    /// Move to the next step when the current one is complete. A wrist tap marks the change, since
-    /// the runner is not looking at the screen — that is the whole point of it being on a wrist.
+    /// Move to the next step when the current one is complete — and FINISH when there is no next one.
+    /// A wrist tap marks the change, since the runner is not looking at the screen; that is the whole
+    /// point of it being on a wrist.
+    ///
+    /// ⚠️ THE LAST STEP USED TO BE A DEAD END, AND THAT IS WHY A CUSTOM 2 km RAN TO 2.05 km AND KEPT
+    /// GOING. The line here was `guard stepIndex + 1 < steps.count else { return }`, so on the final
+    /// step the whole function returned and nothing else in the watch target ever ended a session:
+    /// the only callers of `end()` were the phone's relayed stop command and the runner's own "End
+    /// session" button. It was never distance-specific — a single TIMED step hung in exactly the same
+    /// way (simulated: a 32′ moderate session ran to 3600 s and 9.4 km without ending). The phone has
+    /// always had this (`src/live/session-runtime.ts`: last step done → status "completed" → the
+    /// finish screen); the wrist never did.
+    ///
+    /// ⚠️ A FREE RUN MUST NOT GAIN AN END, and the guard for it is the `currentStep` bail above:
+    /// `plan` nil → `steps` is `[]` → `currentStep` is nil → we return before anything here can fire.
+    /// A free run has no prescription to finish, so it runs until the runner says otherwise.
     private func advanceStepIfDue() {
         guard let step = currentStep else { return }
         guard let p = step.progress(elapsed: stepElapsed, metresDone: stepMetres), p >= 1 else { return }
-        guard stepIndex + 1 < steps.count else { return }
+        guard stepIndex + 1 < steps.count else { return finishPrescribedSession() }
         stepIndex += 1
         stepStartElapsed = elapsed
         stepStartMetres = distanceMetres
         WKInterfaceDevice.current().play(.notification)
         if let st = currentStep { voice?.announceStep(kind: st.kind, via: self) }
+    }
+
+    /// The prescription is complete: bank the run and show the summary.
+    ///
+    /// ⚠️ IT GOES THROUGH `end()` RATHER THAN SETTING `phase` ITSELF. `end()` does a lot in a fixed
+    /// order — the session-complete cue, a final "ended" tick so the phone's mirror and the
+    /// lock-screen card come down, `sendHome()` BEFORE the HealthKit teardown, then the teardown that
+    /// owns the transition to `.ended`. An auto-complete that assigned `phase = .ended` directly
+    /// would skip `sendHome()` and lose the run.
+    ///
+    /// ⚠️ `autoCompleted` is one-shot and is cleared in `reset()`. The manager outlives a run, so a
+    /// flag left set would make run two of an app session start already finished — the documented
+    /// trap that once had the second run silently dropped.
+    private func finishPrescribedSession() {
+        guard !autoCompleted else { return }
+        autoCompleted = true
+        // A tap of its own before the summary lands: the runner is not looking at the wrist, and the
+        // one thing they want to know at the end of a prescribed session is that it IS the end.
+        WKInterfaceDevice.current().play(.success)
+        end()
     }
 
     /// Skip forward manually — recoveries especially never line up exactly with real terrain.
@@ -569,6 +736,74 @@ final class WorkoutManager: NSObject, ObservableObject {
         guard let z = hrZone else { return }
         let idx = max(0, z - 1)
         if idx < zoneSeconds.count { zoneSeconds[idx] += seconds }
+    }
+
+    /// Bank the steps taken since the last delivery, against the running seconds they were taken in.
+    ///
+    /// ⚠️ THE BASELINES ADVANCE EVEN WHEN THE SAMPLE IS REFUSED (the `defer`), which is what makes a
+    /// pause free: the steps somebody shuffles at a crossing are absorbed into the baseline and the
+    /// next running interval measures only itself. Same rule as `accumulateZone`, which skips paused
+    /// seconds so the zone totals cannot exceed the elapsed time printed beside them.
+    private func tookSteps(_ total: Double) {
+        defer { lastStepTotal = total; lastStepElapsed = elapsed }
+        guard phase == .running, let prev = lastStepTotal else { return }
+        let dSteps = total - prev
+        let dSec = elapsed - lastStepElapsed
+        // A negative delta means HealthKit restated the total; nothing to bank either way.
+        guard dSteps > 0, dSec > 0 else { return }
+        cadSteps += dSteps
+        cadSeconds += dSec
+    }
+
+    /// Average cadence in steps per minute, or nil.
+    ///
+    /// ⚠️ NIL, NEVER ZERO. A stored zero renders as a measurement of somebody standing still, which
+    /// is the rule the phone's own save path already states. Twenty seconds of banked running is the
+    /// floor: below that the figure is one HealthKit batch and says nothing.
+    var avgCadence: Double? {
+        guard cadSeconds >= 20, cadSteps > 0 else { return nil }
+        let spm = cadSteps / (cadSeconds / 60)
+        return spm.isFinite && spm > 0 && spm < 400 ? spm : nil
+    }
+
+    /// Derive pace from DISTANCE when the device will not report a speed.
+    ///
+    /// ⚠️ THIS IS WHY "CURRENT" READ "—" FOR A WHOLE WATCH RUN ON THE PHONE'S MIRROR.
+    /// `paceSecPerKm` had exactly one writer — `CLLocation.speed` in the location delegate — and that
+    /// value is -1 whenever the receiver will not commit to one. The delegate's own branches then read
+    /// `if sp > 0.5 {…} else if sp >= 0 {…} else if !movedThisBatch {…}`, so the case "no speed
+    /// reported AND the runner is moving" assigned nothing at all: the published pace stayed at
+    /// whatever it was, which for a run where speed is never reported is nil from `reset()` onwards.
+    /// No current pace on the wrist, none in the tick, "FINDING GPS" for the whole run, no pace cues,
+    /// and auto-pause blind — all while HealthKit's fused distance advanced perfectly well two lines
+    /// away. The PHONE has always had this fallback (`onGpsPos` derives from displacement when the
+    /// device speed is absent); the wrist never did.
+    ///
+    /// ⚠️ IT ONLY RUNS WHEN THE DEVICE'S OWN FIGURE HAS GONE STALE. Doppler speed is far steadier
+    /// than differentiating positions, so it keeps priority; this fills the gaps it leaves. Measured
+    /// in `elapsed`, which is running time, so a pause contributes no seconds.
+    ///
+    /// ⚠️ AND IT CLEARS THE PACE WHEN THE WINDOW EXPIRES WITH NOTHING IN IT, because that is the only
+    /// thing keeping auto-pause honest here: a derived value that persisted through a standstill would
+    /// mean `autoPauseTick` never saw the runner stop.
+    private func derivePaceIfStale() {
+        guard !paceIsFresh else { paceRef = nil; return }
+        guard let ref = paceRef else { paceRef = (metres: distanceMetres, at: elapsed); return }
+        let dSec = elapsed - ref.at
+        guard dSec >= Self.paceDeriveSec else { return }
+        let dM = distanceMetres - ref.metres
+        if dM >= Self.paceDeriveMetres {
+            paceRef = (metres: distanceMetres, at: elapsed)
+            let derived = dSec / (dM / 1000)
+            guard derived.isFinite, derived >= Self.paceMinPlausible, derived <= Self.paceMaxPlausible
+            else { return }
+            paceSecPerKm = derived
+            paceAt = Date()
+        } else if dSec >= Self.paceDeriveMaxSec {
+            paceRef = (metres: distanceMetres, at: elapsed)
+            paceSecPerKm = nil
+            paceAt = nil
+        }
     }
 
     /// One sample every five seconds of running: dense enough that a two-minute interval has 24
@@ -614,6 +849,10 @@ final class WorkoutManager: NSObject, ObservableObject {
         if maxHeartRate > 0 { out["maxHr"] = maxHeartRate }
         if zoneSeconds.contains(where: { $0 > 0 }) { out["zoneSec"] = zoneSeconds }
         if activeCalories > 0 { out["kcal"] = activeCalories }
+        // ⚠️ Only when there is one. The key is ABSENT rather than 0 for a run that banked no steps,
+        // so the phone stores null and the debrief's tile stays away instead of claiming a measured
+        // zero — the rule the phone's own save path states at its `cadence:` line.
+        if let cad = avgCadence { out["cadence"] = Int(cad.rounded()) }
         let hr = downsampledHrTrack()
         if hr.count >= 4 { out["hrSeries"] = hr }
         if elevGainM > 0 { out["elevGain"] = elevGainM }
@@ -879,6 +1118,9 @@ extension WorkoutManager: CLLocationManagerDelegate {
             if phase == .paused {
                 let sp = usable.last?.speed ?? -1
                 paceSecPerKm = sp > 0.5 ? 1000 / sp : nil
+                // The derivation baseline is held in running seconds; a pause is not one of them, so
+                // it is dropped rather than left to span the pause on the next running tick.
+                paceRef = nil
                 return
             }
 
@@ -912,10 +1154,16 @@ extension WorkoutManager: CLLocationManagerDelegate {
             // Prefer the device's own speed when it reports one; it is far steadier than
             // differentiating positions. A KNOWN standstill clears the pace — leaving the last
             // good pace in place made auto-pause blind, because "moving" read stale data forever.
+            // ⚠️ THE THIRD BRANCH USED TO BE `else if !movedThisBatch`, WHICH LEFT A HOLE: no speed
+            // reported AND the runner moving assigned nothing at all, so the published pace stayed at
+            // whatever it was — nil from reset() for the whole run when the device never reports one.
+            // The gap is filled by derivePaceIfStale() from the ticker rather than here, because the
+            // honest baseline for a displacement derivation is several seconds of running, not one
+            // fix. The baseline is dropped whenever the device answers, so the two never mix.
             let sp = usable.last?.speed ?? -1
-            if sp > 0.5 { paceSecPerKm = 1000 / sp; paceAt = Date() }
-            else if sp >= 0 { paceSecPerKm = nil; paceAt = nil }
-            else if !movedThisBatch { paceSecPerKm = nil; paceAt = nil }
+            if sp > 0.5 { paceSecPerKm = 1000 / sp; paceAt = Date(); paceRef = nil }
+            else if sp >= 0 { paceSecPerKm = nil; paceAt = nil; paceRef = nil }
+            else if !movedThisBatch { paceSecPerKm = nil; paceAt = nil; paceRef = nil }
             recordSplits()
             // Downsampled, and only when the runner actually moved. Recording a point per fix
             // regardless drew a map out of standing-still drift — the numbers said 0.02 km and the
@@ -980,6 +1228,12 @@ extension WorkoutManager: HKLiveWorkoutBuilderDelegate {
             } else if quantityType == HKQuantityType(.activeEnergyBurned) {
                 let kcal = stats.sumQuantity()?.doubleValue(for: .kilocalorie()) ?? 0
                 Task { @MainActor in self.activeCalories = kcal }
+            } else if quantityType == HKQuantityType(.stepCount) {
+                // Cumulative from the start of the workout, like the distance below — so it is a
+                // TOTAL, and only its delta since the last delivery belongs to this interval.
+                let steps = stats.sumQuantity()?.doubleValue(for: .count()) ?? 0
+                guard steps > 0 else { continue }
+                Task { @MainActor in self.tookSteps(steps) }
             } else if quantityType == HKQuantityType(.distanceWalkingRunning) {
                 // ⚠️ THIS BRANCH DID NOT EXIST, AND THAT WAS THE FAULT. The data source has always
                 // collected this type; nothing read it. It is a CUMULATIVE sum from the start of the

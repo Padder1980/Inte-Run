@@ -150,8 +150,26 @@ const ROUTE = (() => {
 const REF_END_MS = Date.UTC(2026, 7, 18, 12, 0, 4);   // the moment the finish screen stamped the id
 const REF_SEC = 1864;
 const REF_ID = "run-" + REF_END_MS;
+const REF_START_MS = REF_END_MS - REF_SEC * 1000;     // when the runner set off
+/**
+ * The date the card will print for that instant, formatted exactly as `rdDateText` formats it.
+ *
+ * WARNING: NOON UTC PROTECTS THE UTC DATE AND THE CARD DOES NOT USE THE UTC DATE. `rdDateText` reads
+ * the start time back out of the run id and formats it with LOCAL getters, so at UTC+14 the reference
+ * run's 11:29 UTC start is 01:29 the following morning and the card correctly says 19 Aug. Two guards
+ * hard-coded "18 Aug 2026" and failed under `TZ=Pacific/Kiritimati` -- a red pair that choosing a
+ * different instant cannot fix, because UTC-11 to UTC+14 is a 25-hour spread and no single instant
+ * falls on one local date everywhere. The claim they make is "the meta line carries the run's date",
+ * not "the date is the 18th", so the expected string is derived the way the code derives it.
+ * House rule: run a date-sensitive test under Kiritimati AND Pago Pago before believing it.
+ */
+const REF_DATE_LABEL = (() => {
+  const d = new Date(REF_START_MS);
+  const mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return d.getDate() + " " + mon[d.getMonth()] + " " + d.getFullYear();
+})();
 const REF_D = (() => {
-  const d = new Date(REF_END_MS - REF_SEC * 1000);    // when the runner set off, in local time
+  const d = new Date(REF_START_MS);                   // in local time, as the card renders it
   return d.getDate() + " Aug · " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
 })();
 
@@ -888,12 +906,12 @@ test("the place and the date are switchable on their own", () => {
   const base = E.shareCardModel(refRun(), { photo: PHOTO });
   assert.equal(base.coarseLocation, "Durham");
   assert.match(base.meta, /Durham/);
-  assert.match(base.meta, /18 Aug 2026/);
+  assert.match(base.meta, new RegExp(REF_DATE_LABEL));
   E.setSharePrivStore({ [REF_ID]: { loc: true } });
   const noLoc = E.shareCardModel(refRun(), { photo: PHOTO });
   assert.equal(noLoc.coarseLocation, undefined, "the place is still on the card");
   assert.ok(!/Durham/.test(JSON.stringify(noLoc)), "the place survives elsewhere in the model");
-  assert.match(noLoc.meta, /18 Aug 2026/, "hiding the place took the date with it");
+  assert.match(noLoc.meta, new RegExp(REF_DATE_LABEL), "hiding the place took the date with it");
   E.setSharePrivStore({ [REF_ID]: { date: true } });
   const noDate = E.shareCardModel(refRun(), { photo: PHOTO });
   assert.equal(noDate.completedAt, "", "the date is still on the card");
@@ -1057,10 +1075,10 @@ test("BLOCKER: the card's date carries no time of day, and the switch still hide
   const E = env();
   const run = refRun();
   const m = E.shareCardModel(run, { aspect: "story", template: "moment", routeOn: true, photo: PHOTO });
-  assert.equal(m.dateLabel, "18 Aug 2026");
+  assert.equal(m.dateLabel, REF_DATE_LABEL);
   assert.ok(!/\d\d:\d\d/.test(m.dateLabel), "a time of day reached the card's date line");
   // rdWhenText still carries the time for the debrief, so the split did not change the other surface.
-  assert.match(E.rdWhenText(run), /18 Aug 2026 at \d\d:\d\d/);
+  assert.match(E.rdWhenText(run), new RegExp(REF_DATE_LABEL + " at \\d\\d:\\d\\d"));
   assert.ok(E.rdWhenText(run).startsWith(E.rdDateText(run)), "the two date strings have drifted apart");
   // A watch run has no recoverable start time, so both answer the stored date and neither invents one.
   assert.equal(E.rdDateText(watchRun()), "18 Aug 2026");

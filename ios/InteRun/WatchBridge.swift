@@ -192,6 +192,28 @@ extension WatchBridge: WCSessionDelegate {
             }
             return
         }
+        // The wrist driving the PHONE's own run — pause, resume, finish — while it is only a
+        // companion. The mirror direction of `watchCommand` (which lets the phone drive a WRIST run)
+        // and, until now, the one that did not exist: a runner recording on their phone had no
+        // controls on their wrist at all.
+        //
+        // ⚠️ FIRE AND FORGET, exactly like the other direction, and for the same reason: a run must
+        // never be ended by a message that only half-arrived. `evaluateJavaScript` does nothing at all
+        // against a suspended web content process and reports no error, so the honest failure is that
+        // the run simply carries on and is finished on the phone.
+        //
+        // ⚠️ THE BUTTONS ONLY APPEAR WHEN THE PAGE SAYS IT CAN ANSWER. The wrist gates its Controls
+        // page on the `control` flag the page puts in its own companion tick, so a page without
+        // `window.__interunWatchControl` never shows a control at all. That is what keeps this from
+        // becoming another button that looks live and does nothing.
+        if let cmd = message["phoneCommand"] as? String,
+           ["pause", "resume", "stop"].contains(cmd) {
+            DispatchQueue.main.async { [weak self] in
+                self?.webView?.evaluateJavaScript(
+                    "window.__interunWatchControl && window.__interunWatchControl(\"\(cmd)\");")
+            }
+            return
+        }
         // The wrist asking the phone to speak. It decides WHEN; we decide what it sounds like, which
         // is the whole point — the recorded coaches live here, not on the watch.
         if let cue = message["cue"] as? String {
@@ -511,9 +533,44 @@ extension WatchBridge: WKScriptMessageHandler {
                               type: (body["type"] as? String) ?? "easy",
                               companion: true)
         case "companionTick":
+            // ⚠️ FORWARD BY KEY LIST, not a cherry-pick. This was `for k in ["sec","distKm","paceSec"]`
+            // — the same fault the `sync` case below already records being fixed, left un-fixed here.
+            // Three numbers reached the wrist while the page computed heart rate, the step and the
+            // paused flag ten lines above, so a phone-recorded run gave the wrist four numbers where a
+            // wrist-recorded run offers nine, and a field added on the page side could not travel
+            // without a matching Swift edit and an Xcode build.
+            //
+            // ⚠️ Absent keys are MEANINGFUL and are simply left out: a run with no watch has no heart
+            // rate, a free run has no step, and the wrist renders "--" for anything it was not sent
+            // rather than a zero. Never a zero — a stored or shown 0 reads as a measurement.
+            //
+            // ⚠️ `control` is a CAPABILITY the page declares about itself, and it is the only thing
+            // that puts pause/resume/finish buttons on the wrist. Old page, no key, no buttons — which
+            // is the point: a control that looks live and does nothing is the defect this project has
+            // shipped twice, and this is the OTA/native asymmetry that would produce it.
+            //
+            // ⚠️ EVERY KEY HERE IS READ BY THE WRIST, AND NOTHING ELSE IS FORWARDED. A first version
+            // also carried elevGain, paceLow and paceHigh against a pace page that does not exist yet
+            // — and an unread value is what the next reader copies without checking. When the wrist
+            // grows a pace page, adding its two keys here is a one-line edit.
+            //
+            // ⚠️⚠️ AND THE CLAIM ABOVE WAS FALSE IN THIS VERY FUNCTION FOR A WHOLE BUILD. A `type`
+            // key was forwarded by a statement of its own, three lines below that sentence: the page
+            // deliberately does not send one (its own comment in `pushToCompanion` says why), and
+            // nothing on the wrist could read it if it did — `SessionStore` reduces `phoneLive` with
+            // `compactMapValues { $0 as? Double }` and names only title/step/paused/control, so a
+            // String would be dropped on arrival. The two guards written to prevent exactly this were
+            // both scoped to the `for k in [...]` literal, so a key added by a separate statement was
+            // invisible to them; they now derive the sent set from EVERY write into `live` and require
+            // each one to be read by a named reader on the wrist. A guard over a collection is only
+            // as good as the collection.
             var live: [String: Any] = [:]
-            for k in ["sec", "distKm", "paceSec"] { if let v = body[k] { live[k] = v } }
+            for k in ["sec", "distKm", "paceSec", "avgPaceSec", "lapPaceSec", "lapNumber",
+                      "kcal", "hr", "stepProgress", "paused", "control"] where body[k] != nil {
+                live[k] = body[k]
+            }
             live["title"] = body["title"] as? String ?? "Run"
+            if let step = body["step"] as? String, !step.isEmpty { live["step"] = step }
             sendToWatch(["phoneLive": live])
         case "endCompanion":
             pendingCompanionStart = false   // a run that ended before the watch woke needs nothing

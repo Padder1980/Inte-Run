@@ -176,6 +176,14 @@ final class SessionStore: NSObject, ObservableObject {
     /// The phone's own run, while the watch is only watching. Nil when the phone is not recording.
     @Published var phoneLive: [String: Double]?
     @Published var phoneLiveTitle: String?
+    /// The step the phone says it is on, when it sends one. A free run sends none.
+    @Published var phoneLiveStep: String?
+    /// ⚠️ A CAPABILITY THE PHONE DECLARES ABOUT ITSELF, and the only thing that puts controls on the
+    /// wrist during a phone-recorded run. A page old enough not to have `__interunWatchControl` sends
+    /// no flag, so the wrist offers no buttons — rather than offering buttons that look live and do
+    /// nothing, which is the defect this project has shipped twice. It lights up on its own the moment
+    /// a newer page is served, with no watch rebuild.
+    @Published var phoneCanControl = false
     /// When the last phone tick arrived, and whether the phone's clock was advancing — so the watch can
     /// FILL the seconds between the phone's ~2s ticks instead of jumping in 2s steps (the phone smooths
     /// its own mirror the same way). Advancing seconds mean running; a repeated value means paused, and
@@ -211,6 +219,22 @@ final class SessionStore: NSObject, ObservableObject {
             // context may still arrive on its own later.
             _ = error
         })
+    }
+
+    /// Drive the PHONE's run from the wrist — pause, resume, finish — while the watch is a companion.
+    ///
+    /// The mirror of the phone's own `watchCommand`, and deliberately the same shape: fire and
+    /// forget. A run must never be ended by a message that only half-arrived, so an undelivered
+    /// command leaves the run going and the runner finishes on the phone.
+    ///
+    /// ⚠️ Only ever called from a control the wrist is showing, and the wrist only shows one when the
+    /// phone has declared `phoneCanControl`. Sending into a page with no handler would be a button
+    /// that looks live and does nothing.
+    func sendPhoneCommand(_ cmd: String) {
+        guard WCSession.isSupported() else { return }
+        let s = WCSession.default
+        guard s.activationState == .activated, s.isReachable else { return }
+        s.sendMessage(["phoneCommand": cmd], replyHandler: nil, errorHandler: { _ in })
     }
 
     /// Sessions still ahead of us, freshest first — yesterday's leftovers are filtered out rather
@@ -332,11 +356,29 @@ extension SessionStore: WCSessionDelegate {
         if let live = message["phoneLive"] as? [String: Any] {
             let nums = live.compactMapValues { $0 as? Double }
             let title = live["title"] as? String
+            let step = live["step"] as? String
+            // ⚠️ Read as a Bool with a numeric fallback. A JS boolean crosses WKScriptMessage and
+            // then WCSession as an NSNumber, and whether `as? Double` accepts a boolean NSNumber has
+            // never been a thing worth relying on. Asking both ways costs nothing and cannot be wrong.
+            let flag: (String) -> Bool = { key in
+                if let b = live[key] as? Bool { return b }
+                if let d = live[key] as? Double { return d != 0 }
+                return false
+            }
+            let paused = flag("paused")
+            let control = flag("control")
+            let hasPaused = live["paused"] != nil
             Task { @MainActor in
                 let prev = self.phoneLive?["sec"]
-                if let newSec = nums["sec"] { self.phoneLiveRunning = prev.map { newSec > $0 } ?? true }
+                // ⚠️ The phone's own flag wins when it sends one; comparing successive `sec` values is
+                // the inference that had to stand in for it, and it cannot tell a paused run from a
+                // dropped tick. Older pages send no flag, so the inference stays as the fallback.
+                if hasPaused { self.phoneLiveRunning = !paused }
+                else if let newSec = nums["sec"] { self.phoneLiveRunning = prev.map { newSec > $0 } ?? true }
                 self.phoneLive = nums
                 self.phoneLiveTitle = title
+                self.phoneLiveStep = step
+                self.phoneCanControl = control
                 self.phoneLiveAt = Date()
             }
             return
@@ -363,7 +405,11 @@ extension SessionStore: WCSessionDelegate {
                 CompanionSession.shared.stop()
                 // Stop the filled clock: without this the interpolation would keep ticking against a
                 // stale arrival time if the companion view lingered.
+                // ⚠️ The step, and the control capability, clear with it — a wrist left showing a
+                // Finish button for a run that has ended is the same class of dead control as one that
+                // was never wired.
                 self.phoneLive = nil; self.phoneLiveTitle = nil; self.phoneLiveRunning = false
+                self.phoneLiveStep = nil; self.phoneCanControl = false
             case "stop": self.onStopRequested?()
             case "pause": self.onPauseRequested?()
             case "resume": self.onResumeRequested?()

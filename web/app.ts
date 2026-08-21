@@ -6209,6 +6209,16 @@ function ingestWatchRun(run) {
     anchor: profile.recentTimeS,
     pmodel: PACE_MODEL_VERSION,
     avgHr: run.avgHr ? Math.round(run.avgHr) : null,
+    // ⚠️ CADENCE WAS PHONE-ONLY, SO THE DEBRIEF'S CADENCE TILE WAS PERMANENTLY BLANK ON EVERY WRIST
+    // RUN and the share card lost a rung — on the recorder that is now the recommended one. The phone
+    // has always had a figure (PedometerService → LIVE.cadSum/cadN); the wrist's summaryPayload had no
+    // such field until it grew one from HealthKit's own step count, and this is the reader for it.
+    //
+    // ⚠️ null, NEVER 0 — the same rule liveRunRecord states beside its own cadence line, and it is the
+    // whole reason this field can be added to an existing store safely. A stored zero renders as a
+    // measurement of somebody standing still; absent means the tile stays away. The wrist omits the key
+    // entirely for a run that banked no steps, so the two halves agree by construction.
+    cadence: run.cadence ? Math.round(run.cadence) : null,
     source: "watch",
   });
   saveRuns();
@@ -6590,6 +6600,18 @@ window.__interunWatchCue = function (trigger, text) {
   // The wrist is counting in; say the numbers here, where the real voices are. No visual — the
   // runner is looking at their watch, and a full-screen count on a phone they are pocketing would
   // be in the way.
+  // ⚠️ ONE BEAT, SPOKEN NOW. The wrist sends count-3 / count-2 / count-1 / count-go as they happen, so
+  // there is nothing to schedule here — scheduling is what made the old sequence late. Handled before
+  // the legacy branch below because they are different messages, not a variant of it.
+  if (WATCH_COUNT_CLIPS[trigger]) {
+    coachUnlock(); const cid = WATCH_COUNT_CLIPS[trigger];
+    coachLoadManifest().then(() => coachSayId(cid));
+    return;
+  }
+  // ⚠️ THE OLD SEQUENCE BRANCH STAYS, and it is not dead code: a watch still running the previous build
+  // sends one "countdown" and nothing else, and an app updated over the air reaches a phone whose watch
+  // has not been rebuilt. It is late, for the reason recorded on WATCH_COUNT_CLIPS — but late is what it
+  // has always been, and silence would be a regression for anyone who has not rebuilt their watch.
   if (trigger === "countdown") { coachUnlock(); coachLoadManifest().then(() => speakCountIn()); return; }
   coachLoadManifest().then(() => {
     const type = (WATCH_LIVE && WATCH_LIVE.type) || "easy";
@@ -6605,6 +6627,63 @@ function watchCommand(cmd) {
   if (!NATIVE_WATCH) return;
   try { window.webkit.messageHandlers.interunWatch.postMessage({ action: "watchCommand", command: cmd }); } catch (e) {}
 }
+/**
+ * Pause or resume the PHONE'S OWN run. ONE definition, and that is the point of it existing.
+ *
+ * ⚠️ THERE ARE NOW TWO CONTROLS THAT DO THIS: the Pause button on the live screen, and the runner's
+ * WRIST, which can drive a phone-recorded run from its Controls page. This body was inline in the
+ * button's click handler; a second copy of it for the wrist is the fix-one-builder-not-the-other trap
+ * that this project has paid for four separate times (easyRun vs withGeneratedWarmup, playFile vs
+ * play(cue:), the session library vs buildWarmup, sharePosterMetrics vs the other three templates).
+ * The resume branch alone clears six fields in a specific order; a hand copy of it would drift.
+ *
+ * ⚠️ IT RETURNS WHETHER ANYTHING CHANGED, so a caller can decide whether to redraw or to re-label,
+ * and a command for a state the run is already in is a no-op rather than a double pause.
+ */
+function livePauseSet(paused) {
+  if (!LIVE || LIVE.done) return false;
+  const st = LIVE.rt.getStatus();
+  if (paused && st === "active") {
+    LIVE.rt.pause(liveNowMs()).forEach(liveCue);
+    if (LIVE.mode === "gps") { LIVE.pauseStart = Date.now(); coachNativePost({ action: "clearSchedule" }); } else { stopLive(); }
+    return true;
+  }
+  if (!paused && st === "paused") {
+    if (LIVE.mode === "gps") { LIVE.pausedMs += Date.now() - LIVE.pauseStart; LIVE.pauseStart = 0; LIVE.lastLat = null; LIVE.win = []; LIVE.devSpeed = null; LIVE.curPace = null; LIVE.rt.resume(liveNowMs()).forEach(liveCue); coachNativeSchedule(); if (!LIVE.ui) LIVE.ui = setInterval(gpsUiTick, 250); }
+    else { LIVE.rt.resume(LIVE.vms).forEach(liveCue); coachNativeSchedule(); startLoop(); }
+    return true;
+  }
+  return false;
+}
+/**
+ * The WRIST driving the phone's run — the mirror of watchCommand above, and until now the direction
+ * that did not exist. A runner recording on their phone had a watch on their wrist with no controls on
+ * it at all, while the phone has been able to pause and finish a WRIST run for months.
+ *
+ * ⚠️ THE WRIST ONLY SHOWS THESE BUTTONS BECAUSE pushToCompanion DECLARES control: true. That flag is
+ * the whole guard against the dead-control class: a watch talking to a page with no handler here would
+ * be a Finish button that looks live and does nothing, which is the defect this project has shipped
+ * twice (rdMore, and the profile confirm clicking a #saveSetup that was nowhere in the app).
+ *
+ * ⚠️ FINISH DOES NOT CONFIRM HERE, AND THAT IS NOT AN OVERSIGHT. The wrist raises its own
+ * confirmationDialog before sending "stop" — exactly as the phone's own wrist view has always done
+ * before ending a watch run — so a second sheet on a phone in a pocket would be a dialog nobody can
+ * answer, on a run the runner has already agreed to end.
+ *
+ * ⚠️ AND THE STATE IS PUSHED BACK IMMEDIATELY, forced past the two-second throttle. Without it the
+ * wrist's own label would keep saying Pause for up to two seconds after the runner pressed it, which
+ * reads as the button having missed.
+ */
+window.__interunWatchControl = function (cmd) {
+  if (!LIVE || LIVE.done) return;
+  if (cmd === "stop") { haptic("success"); liveFinish(false); return; }
+  if (cmd !== "pause" && cmd !== "resume") return;
+  if (!livePauseSet(cmd === "pause")) return;
+  haptic("tap");
+  try { pushLiveActivity(LIVE.rt.snapshot(liveNowMs()), true); } catch (e) {}
+  renderLiveNow();
+  renderUnlessTyping();
+};
 // The full-screen view of a run happening on the wrist. Same information as the card, given the
 // room it deserves, and still read-only: the watch owns the run, so there is nothing to press here
 // except the way back.
@@ -14874,9 +14953,35 @@ function coachNativeAvailable() {
  * its personalised variant speaks a NAME and no shared clip can). Listed so the day they are wired
  * the audio already works; do not read their presence as proof of a sender.
  */
+/**
+ * THE FOUR BEATS OF THE COUNT-IN, EACH AS ITS OWN TRIGGER, MAPPED TO ITS OWN FIXED CLIP.
+ *
+ * ⚠️ THIS IS THE PAGE HALF OF "the audio countdown didn't match the screen countdown and the session
+ * had already started before the audio countdown fired". The wrist used to send ONE "countdown"
+ * message and this page then ran its own 0/1/2/3-second schedule from whenever it got round to it —
+ * two independent three-second timers started at different moments, so the spoken sequence could only
+ * ever be late, and the wrist's clock had already started by the time "Go." was said. The wrist now
+ * sends one message per beat (WorkoutManager.countdownTriggers), so each beat carries only the
+ * one-way latency and "Go." lands with the clock.
+ *
+ * ⚠️ FOUR TRIGGERS, NOT ONE REUSED FOUR TIMES, and this is the half that would look like a fix and be
+ * worse than the bug. CoachAudioService.playWatchCue plays exactly ONE file per call and holds a 20 s
+ * per-trigger dedupe, so a single shared "countdown" sent four times would speak one number and
+ * suppress the other three — and rotate WHICH number across runs, because the rotation index advances.
+ *
+ * ⚠️ BY CLIP ID, NOT THROUGH THE CATALOGUE. There are already four prompts sharing trigger "countdown"
+ * in src/live/coach-prompts.ts; resolving through them would hand beat one whichever of the four the
+ * rotation landed on. These clips are fixed recordings of a fixed word, so the id IS the answer, and
+ * every coach has all four (measured: 9 coaches x 4 clips = 36 in docs/voices/manifest.json).
+ *
+ * ⚠️ AND THE TRIGGER LIST BELOW IS BUILT FROM THIS OBJECT rather than repeating the four names, so a
+ * trigger cannot exist without a clip mapping and a clip mapping cannot exist unreachable.
+ */
+const WATCH_COUNT_CLIPS = { "count-3": "count_3", "count-2": "count_2", "count-1": "count_1", "count-go": "count_go" };
 const WATCH_CUE_TRIGGERS = ["session-start", "session-complete", "paused", "resumed",
   "warmup-start", "interval-start", "recovery-start", "cooldown-start", "easy-settle",
-  "tempo-start", "long-run-settle", "milestone-distance", "keep-going", "halfway"];
+  "tempo-start", "long-run-settle", "milestone-distance", "keep-going", "halfway"]
+  .concat(Object.keys(WATCH_COUNT_CLIPS));
 function coachPushWatchCueMap(type) {
   if (!COACH.manifest || !coachEnabled()) return;
   const map = {};
@@ -14904,6 +15009,13 @@ function coachNativePost(msg) {
 // coach; it just cannot govern a list built in advance.
 function coachScheduledPrompt(trigger, idx, type) {
   try {
+    // ⚠️ THE COUNT-IN BEATS RESOLVE BY CLIP ID AND NEVER THROUGH THE CATALOGUE. Each beat is one fixed
+    // word, so the same file must come back on every call and for every rotation index — which is also
+    // what makes coachPushWatchCueMap's four-deep loop collapse to a single entry for them, exactly the
+    // one file per trigger the native player expects. Going through promptsFor would find the four
+    // prompts that share trigger "countdown" and hand beat one whichever of them the rotation reached.
+    const fixed = WATCH_COUNT_CLIPS[trigger];
+    if (fixed) { const fc = coachClip(fixed); return (fc && fc.file) ? { id: fixed, file: fc.file } : null; }
     // ⚠️ THE TYPE IS A PARAMETER BECAUSE LIVE IS NULL ON THE PATH THAT NEEDS THIS MOST, AND READING
     // IT OFF THE GLOBAL MADE THE ENTIRE WRIST-CUE FIX A NO-OP. Both callers of coachPushWatchCueMap
     // run with LIVE === null by construction: the watch-initiated one is a live-tick handler for a run
@@ -15164,8 +15276,23 @@ function startWhereHtml(sess) {
     '<span class="sw-ic">' + ic + '</span>' +
     '<span class="sw-b"><span class="sw-n">' + name + (badge ? '<span class="sw-badge">' + badge + '</span>' : "") + '</span>' +
     '<span class="sw-d">' + note + '</span></span><span class="arr">\u203a</span></button>';
+  // ⚠️ THE BADGE IS ON THE WATCH ROW, AND THAT IS THE OWNER'S REVERSAL OF 2026-08-21, ON HIS OWN
+  // FIELD EVIDENCE: "Tracking when choosing to record the session on the apple watch is really
+  // accurate (I want this to be the recommended option, not the phone)." It used to sit on the phone.
+  //
+  // ⚠️ AND THE BADGE WAS NEVER THE STRONGEST SIGNAL — THE COPY WAS, AND IT ARGUED THE OTHER WAY.
+  // The phone row read "GPS, pace, route and your coach here", i.e. it sold itself as the richer
+  // option, so moving a nine-pixel badge and leaving that sentence would have recommended one thing
+  // in a chip and the other in a sentence. The clause doing the selling is gone.
+  //
+  // ⚠️ THE WATCH ROW NOW STATES THE COST TOO, because the row's old promise ("your phone can stay at
+  // home") quietly bought the synthesised voice for the whole run: the four recorded coaches only
+  // exist on the phone, and speakOnPhone needs WCSession.isReachable. A recommendation that hides
+  // what it costs is the thing this project refuses to ship.
   const watchRow = watchAvailable()
-    ? row("watch", ICON.watch, "My Apple Watch", "Recorded on your wrist — your phone can stay at home.")
+    ? row("watch", ICON.watch, "My Apple Watch",
+        "Its own GPS and heart rate, straight into Health and your rings. Your coach speaks from your phone, so out of range the watch reads the cues in its own voice.",
+        "recommended")
     : (NATIVE_WATCH
         ? '<div class="sw-row sw-off"><span class="sw-ic">' + ICON.watch + '</span><span class="sw-b"><span class="sw-n">My Apple Watch</span>' +
           '<span class="sw-d">' + (WATCH_STATUS && WATCH_STATUS.paired
@@ -15177,9 +15304,8 @@ function startWhereHtml(sess) {
     '<div class="sw-list">' + watchRow +
       row("phone", ICON.phone, "This iPhone",
         watchAvailable()
-          ? "GPS, pace, route and your coach here — your watch joins in with live numbers and heart rate."
-          : "GPS, pace and route recorded here. Keep the phone with you.",
-        "recommended") +
+          ? "GPS, pace and route recorded here — your watch joins in with live numbers, heart rate and the controls."
+          : "GPS, pace and route recorded here. Keep the phone with you.") +
       row("treadmill", ICON.treadmill, "Treadmill", "Indoors, timed by the clock. Add the distance from the machine when you finish.") +
     '</div>';
 }
@@ -15197,9 +15323,18 @@ function wireStartWhere() {
     const where = b.dataset.startwhere, sess = START_CTX;
     closeSheet();
     if (where === "watch") return startOnWatch(sess);
-    // ⚠️ The PHONE records. This is the owner's stated architecture: the phone controls everything,
-    // and the watch SUPPORTS it — a live display and a heart-rate source, never a second recorder.
-    // "My Apple Watch" above stays as the deliberate opt-in for phone-free wrist recording.
+    // ⚠️ THIS COMMENT USED TO ASSERT THE OPPOSITE ARCHITECTURE AS SETTLED, AND THE OWNER REVERSED IT
+    // ON 2026-08-21. It read "The PHONE records. This is the owner's stated architecture" — his ruling
+    // of 2026-07-29, with "My Apple Watch" above described as the deliberate opt-in. His field test in
+    // Rhodes overturned the premise, not the reasoning: the wrist's tracking measured better than the
+    // phone's, so the watch is the recommended recorder and this branch is the opt-in.
+    //
+    // ⚠️ THE REASONING SURVIVES INTACT AND STILL GOVERNS THIS BRANCH: when the PHONE records, the
+    // watch SUPPORTS it — a live display, a heart-rate source and (since 2026-08-21) the run's
+    // controls, never a second recorder.
+    //
+    // ⚠️ EXACTLY ONE RECORDER EITHER WAY. That part does not change and cannot: two recorders
+    // double-count and log one outing twice.
     startSession(sess, { indoor: where === "treadmill" });
     startWatchCompanion(sess);
     // Already on the live screen by now; count in, then begin. The runner does not have to find a
@@ -17472,7 +17607,14 @@ function rdMetaHtml(run) {
   const sid = runShoeChoice(run);
   const shoe = (loadShoes().find((x) => x.id === sid) || {}).name || "";
   row(ICON.rEasy, "Shoes", shoe ? esc(shoe) : "Not set", "shoe");
-  row(ICON.phone, "Source", run.sim ? "Simulated" : run.watch ? "Apple Watch" : "This iPhone", null);
+  // ⚠️ run.source, NOT run.watch. THIS ROW CALLED EVERY WRIST RUN "This iPhone" FOR AS LONG AS IT HAS
+  // EXISTED, because run.watch was an invented identifier: it appeared exactly once in the whole
+  // file, here, and nothing has ever written it. ingestWatchRun writes source: "watch" and that is
+  // the only source: a run record carries. run.sim IS real, so the row was right about the simulator
+  // and wrong about the one thing the runner most wants confirmed. Same class as #saveSetup, CLASS,
+  // MASTERS and PLAN.notes — computed or read, and never connected — and it becomes visible on every
+  // run the moment the watch is the recommended recorder.
+  row(ICON.phone, "Source", run.sim ? "Simulated" : run.source === "watch" ? "Apple Watch" : "This iPhone", null);
   row(ICON.person, "Route privacy", PRIVACY.map ? "Map hidden" : PRIVACY.ends ? "Start and finish hidden" : "Full route", "priv");
   row(ICON.phone, "Stored", "On this iPhone", null);
   return '<h2 class="rd-sec">Details</h2><div class="rd-meta">' + rows.join("") + '</div>' + runNoteHtml(run);
@@ -24926,21 +25068,74 @@ function pushLiveActivity(snap, force) {
       // leaking onto the lock screen for genuine GPS runs.
       hr: Math.round(LIVE.watchHr || (LIVE.mode === "sim" ? LIVE.hr : 0)) || undefined,
       step: step && step.label ? step.label : undefined,
-      paused: !!LIVE.paused,
+      paused: livePausedNow(snap),
       state: "running",
     });
   } catch (e) {}
 }
+/**
+ * Is the phone's own run paused right now? ONE definition, because three surfaces ask it.
+ *
+ * ⚠️ THIS FUNCTION EXISTS BECAUSE LIVE.paused DID NOT. It was read exactly once in the whole file —
+ * by the lock-screen card above — and written nowhere, so the Live Activity has said "running" through
+ * every pause it has ever seen. Third invented identifier in this area, found by sweeping for siblings
+ * of run.watch, and the one with teeth: the wrist now PREFERS the phone's flag over its own
+ * seconds-not-advancing inference, so forwarding a bare LIVE.paused would have replaced a working
+ * inference with a constant false and reported a paused run as running on both devices.
+ *
+ * ⚠️ THE RUNTIME'S OWN STATUS IS THE ANSWER, NOT LIVE.pauseStart. pauseStart is GPS-mode bookkeeping
+ * for the elapsed clock; rt.pause() is called in every mode, so the status is right everywhere — and
+ * it comes off the SAME snapshot as the numbers beside it, so the flag can never disagree with the
+ * clock it is sent with. The GPS tick keeps running while paused (only stopLive clears LIVE.ui, and a
+ * GPS pause does not call it), so a paused snapshot really is pushed every 250 ms.
+ */
+function livePausedNow(snap) {
+  return !!(snap && snap.status === "paused");
+}
 // The same numbers, to a watch that is only watching.
+//
+// ⚠️ IT USED TO SEND THREE OF THEM, AND THAT IS MOST OF "the watch functionality is far too limited".
+// A wrist-RECORDED run offers nine metrics the runner picks and orders themselves; a phone-recorded run
+// gave the wrist sec, distKm and paceSec — while pushLiveActivity, ten lines above, already computed the
+// heart rate, the step and the paused flag for the lock screen. Everything added here was already in
+// hand; nothing new is measured.
+//
+// ⚠️ AN ABSENT KEY IS MEANINGFUL AND MUST STAY ABSENT. The wrist renders "--" for anything it was not
+// sent and never a zero — a shown 0 reads as a measurement. So kcal is deliberately NOT here: the
+// phone measures no calories on its own (only the watch's own workout does, which is why run.kcal has
+// exactly one writer and it is the wrist's ingest), and sending 0 would put "0 CAL" on the wrist.
+//
+// ⚠️ control IS A CAPABILITY THE PAGE DECLARES ABOUT ITSELF, and it is what puts pause/resume/finish
+// on the wrist. The wrist shows no control until it arrives, so an older page — or an older WATCH, whose
+// forward list does not carry the key — offers no buttons rather than buttons that look live and do
+// nothing. That is the OTA/native asymmetry this project has been bitten by, answered the way the coach
+// bridge answers it: with a flag the sender sets, not a message name the receiver might not know.
 function pushToCompanion(snap) {
   if (!NATIVE_WATCH) return;
+  const step = snap && snap.step;
   try {
     window.webkit.messageHandlers.interunWatch.postMessage({
       action: "companionTick",
       title: (LIVE && LIVE.session && LIVE.session.title) || "Run",
+      // ⚠️ NO type KEY, DELIBERATELY, THOUGH THE BRIDGE WOULD CARRY ONE. Nothing on the wrist reads
+      // it: SessionStore turns phoneLive into [String: Double] and reads title/step/paused/control as
+      // named exceptions, and CompanionView reads only numbers — so a session type would cross two
+      // process boundaries to be discarded. The session's effort COLOUR is the obvious future reader
+      // (ruling 7), and the day it exists this is one line. Until then an unread value is what the next
+      // reader copies without checking, which is the rule the wrist half applied to paceLow/paceHigh.
       sec: Math.round((snap && snap.elapsedSeconds) || 0),
       distKm: (LIVE.dist || 0) / 1000,
       paceSec: Math.round((snap && snap.currentPaceSecPerKm) || 0) || 0,
+      avgPaceSec: Math.round((snap && snap.averagePaceSecPerKm) || 0) || undefined,
+      lapPaceSec: Math.round((snap && snap.lapPaceSecPerKm) || 0) || undefined,
+      // The lap in progress, one-based — the same arithmetic the wrist does for its own runs
+      // (lastSplitMetre / 1000 + 1). LIVE.kmDone is how many whole kilometres are already banked.
+      lapNumber: Math.max(1, Math.round(LIVE.kmDone || 0) + 1),
+      hr: Math.round(LIVE.watchHr || (LIVE.mode === "sim" ? LIVE.hr : 0)) || undefined,
+      stepProgress: (snap && typeof snap.stepProgress === "number") ? snap.stepProgress : undefined,
+      step: step && step.label ? step.label : undefined,
+      paused: livePausedNow(snap),
+      control: true,
     });
   } catch (e) {}
 }
@@ -25037,6 +25232,23 @@ function liveRunRecord(sm) {
     zoneSec: (LIVE.zoneSec && LIVE.zoneSec.some((s) => s > 0)) ? LIVE.zoneSec.slice() : null,
     steps: sessionStepText(LIVE.session),
     sim: LIVE.mode === "sim" || undefined,
+    // ⚠️ THE SECOND INVENTED IDENTIFIER, FOUND BY SWEEPING FOR SIBLINGS OF run.watch. run.indoor was
+    // read in two live places — the debrief's empty-route panel and the share card's route eligibility
+    // — and written by no save path at all, so a treadmill run's debrief said "No route recorded" where
+    // it meant "Indoor session", and the share sheet gave the generic reason instead of the true one.
+    // LIVE.indoor existed all along; it simply never travelled onto the record.
+    //
+    // ⚠️ AND IT IS DELIBERATELY NOT LIVE.indoor ALONE. gpsFallback sets LIVE.indoor on an OUTDOOR run
+    // whose GPS was refused — it borrows the indoor runtime because that is the only mode that records
+    // a real clock without inventing distance — and its own comment says in as many words: mark it as a
+    // failed outdoor run, NOT as a treadmill. Storing the raw flag would put "Indoor session" on a run
+    // somebody did outside, which is the exact confusion that comment exists to prevent. LIVE.gpsDenied
+    // is the discriminator gpsStatusText's sibling already uses.
+    //
+    // ⚠️ undefined WHEN FALSE, like sim beside it: absent means an ordinary outdoor run, and every run
+    // recorded before today is absent. A stored false would be indistinguishable in the readers but
+    // would bloat every record for nothing.
+    indoor: (LIVE.indoor && !LIVE.gpsDenied) || undefined,
   };
 }
 /**
@@ -26286,7 +26498,35 @@ function refreshTodayNavDate() {
 // ⚠️ Kept on ONE LINE with syncTextScale(): a test asserts that pairing, because iOS never tells a web
 // view its text-size setting changed and this listener is the only chance to re-read it.
 function stravaResume() { try { const c = stravaCfg(); if (c.pending && c.key && stravaBase()) stravaRefresh(); } catch (e) {} }
-document.addEventListener("visibilitychange", () => { if (!document.hidden) { refreshTodayNavDate(); syncTextScale(); stravaResume(); } });
+/**
+ * Put the wrist's cue map in Swift's hands at a moment the page is CERTAINLY alive.
+ *
+ * ⚠️ WITHOUT THIS, A RUN STARTED ON THE WRIST WITH THE PHONE ASLEEP HAS NO CUE MAP AT ALL. The map is
+ * pushed from two places: startOnWatch (a foreground tap on the phone) and __interunWatchLive when a new
+ * run id arrives — and that second one is delivered by evaluateJavaScript, which does nothing against a
+ * suspended web content process. So the one path that most needs the native player, a wrist-initiated
+ * run into a pocket, is the one path that could never install its own map. Coming back into view is a
+ * foreground moment by definition, and it is the same reasoning stravaResume above is built on.
+ *
+ * ⚠️ NEVER WHILE A RUN IS LIVE ON EITHER DEVICE. A cuemap post REPLACES the whole map in Swift, so
+ * pushing today's-plan lines over a map built for the session actually running would swap the coach's
+ * wordings mid-run. The guard is the only thing making this safe to do on every foregrounding.
+ *
+ * ⚠️ THE TYPE IS TODAY'S PLAN, WHICH IS A GUESS, AND IT IS STATED AS ONE. A free run is "easy" and a
+ * session started from another day is that day's; __interunWatchLive re-pushes with the run's real type
+ * the moment a tick reaches a live page. The four count-in beats are unaffected either way — they
+ * resolve by clip id, not by session type — so the cue this exists for is exactly the cue it cannot get
+ * wrong.
+ */
+function coachPrimeWatchCueMap() {
+  if (!NATIVE_WATCH || !coachNativeAvailable() || !coachEnabled()) return;
+  if (liveRunning() || watchLiveActive() || WATCH_LIVE_PENDING) return;
+  try {
+    const t = rawToday();
+    coachLoadManifest().then(() => coachPushWatchCueMap(t && t.type));
+  } catch (e) {}
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { refreshTodayNavDate(); syncTextScale(); stravaResume(); coachPrimeWatchCueMap(); } });
 // A repaint that ARRIVES ON ITS OWN — a wrist run landing, a mirror going stale — rather than one the
 // runner asked for. It must never rebuild the plan-setup form: viewSetup() reads every value from the
 // saved profile, so redrawing it discards whatever is half-typed. The runner is mid-sentence; their
@@ -27296,16 +27536,9 @@ function wire() {
     lVoice.classList.toggle("on", coachEnabled()); lVoice.innerHTML = coachEnabled() ? ICON.vox : ICON.voxOff;
   };
   const lPause = $("lPause"); if (lPause) lPause.onclick = () => {
-    const st = LIVE.rt.getStatus();
-    if (st === "active") {
-      LIVE.rt.pause(liveNowMs()).forEach(liveCue);
-      if (LIVE.mode === "gps") { LIVE.pauseStart = Date.now(); coachNativePost({ action: "clearSchedule" }); } else { stopLive(); }
-      lPause.textContent = "Resume";
-    } else if (st === "paused") {
-      if (LIVE.mode === "gps") { LIVE.pausedMs += Date.now() - LIVE.pauseStart; LIVE.pauseStart = 0; LIVE.lastLat = null; LIVE.win = []; LIVE.devSpeed = null; LIVE.curPace = null; LIVE.rt.resume(liveNowMs()).forEach(liveCue); coachNativeSchedule(); if (!LIVE.ui) LIVE.ui = setInterval(gpsUiTick, 250); }
-      else { LIVE.rt.resume(LIVE.vms).forEach(liveCue); coachNativeSchedule(); startLoop(); }
-      lPause.textContent = "Pause";
-    }
+    // The label is decided from the status BEFORE the change, because the call changes it.
+    const wasActive = LIVE.rt.getStatus() === "active";
+    if (livePauseSet(wasActive)) lPause.textContent = wasActive ? "Resume" : "Pause";
   };
   // ⚠️ ENDING A RUN ASKS FIRST. It is the one control here with no undo — a knock while the phone is
   // in your hand, or a mis-tap with cold fingers, ended the session outright and there was no way

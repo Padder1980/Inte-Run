@@ -71,7 +71,17 @@ final class WatchSettings: ObservableObject {
     /// Four also avoids silently deleting a metric he had already chosen. Clamping to three would have
     /// thrown away his AVG PACE on the next launch, which is not a change he asked for.
     static let maxMetrics = 4
-    static let defaultMetrics: [Metric] = [.elapsed, .distance, .currentPace, .lapPace, .avgPace]
+    /// ⚠️ FOUR ENTRIES, AND IT USED TO BE FIVE AGAINST A CAP OF FOUR. The clamp in `init` then fired
+    /// on a FRESH INSTALL, not only on a migrated setting, and silently dropped `.avgPace` — so the
+    /// declared default and the delivered default were different lists and nobody could tell which
+    /// one a screen was showing. Worse, `reset()` assigns this straight through with no clamp, so
+    /// tapping Reset in Settings stored FIVE metrics, past a cap the editor enforces when adding: the
+    /// one control whose whole job is to restore the default was the only way to exceed it.
+    ///
+    /// It is `.avgPace` that goes, because `prefix(maxMetrics)` was already dropping exactly that —
+    /// so this is what every existing install has been rendering, and no runner's screen changes.
+    /// `test/watch-session-end.test.ts` asserts the two numbers cannot drift apart again.
+    static let defaultMetrics: [Metric] = [.elapsed, .distance, .currentPace, .lapPace]
 
     private static let key = "interun_watch_settings_v1"
 

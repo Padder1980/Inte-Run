@@ -219,9 +219,23 @@ function env(tempC = 33): Env {
 
   const api = new Function("localStorage", "RC", "navigator", "console", LIFT.body)(store, RC, {}, console);
   api.__set(view, raw);
+  // ⚠️ THE FORECAST IS KEYED ON THE **LOCAL** DAY, AND SEEDING ONLY THE UTC ONE LEFT SIX GUARDS RED AT
+  // UTC-11. hoursFor(null) builds its day from local getters — deliberately, and it is one of this
+  // repository's documented legitimate exceptions to the UTC rule, because "the remaining hours of
+  // today" is a wall-clock question and Open-Meteo is fetched with the device's own timezone. The
+  // DECISION stores are UTC (todayIso()), so a fixture has to satisfy both. Measured in
+  // TZ=Pacific/Pago_Pago on 2026-08-21: local today is 2026-08-20, the seeded rows were 08-21 and
+  // 08-22, hoursFor matched none, and every heat surface went silent — "the Today heat card is empty on
+  // a 33 °C day with a run added", which reads exactly like the defect this file exists to guard.
+  // ⚠️ CLAUDE.md records the previous phase proving this file across six timezones INCLUDING Pago Pago.
+  // It does not hold today, so either the fixture drifted or that claim was about a different day; the
+  // union below removes the dependency either way.
+  const localDay = (d: Date) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  const wxDays = [...new Set([today, iso(new Date(now.getTime() + 864e5)),
+    localDay(now), localDay(new Date(now.getTime() + 864e5))])];
   const seedForecast = (t: number) => {
     const rows: any[] = [];
-    for (const day of [today, iso(new Date(now.getTime() + 864e5))]) {
+    for (const day of wxDays) {
       for (let h = 0; h < 24; h++) {
         rows.push({ iso: day + "T" + String(h).padStart(2, "0") + ":00", hour: h, day,
           tempC: t, humidityPct: 45, dewPointC: 19, windKph: 20, code: 0 });
@@ -271,6 +285,44 @@ function ensurePlannedToday(e: Env): any {
   const moved = plannedOn(e, e.today);
   assert.ok(moved, "moving a session onto today did not put it there — the fixture is misaligned");
   return moved;
+}
+/**
+ * The MIRROR of ensurePlannedToday: today carries NO planned RUN, but does carry a non-run — which is
+ * exactly the day the owner met the defect on in Rhodes (a plan slot holding only mobility, with a
+ * custom 2 km easy run added).
+ *
+ * ⚠️ THIS FUNCTION EXISTS BECAUSE TWO GUARDS IN THIS FILE WENT RED ONE DAY AFTER THEY WERE WRITTEN,
+ * AND NEITHER WAS A DEFECT. The fixture's plan starts TODAY, so today's slot is whatever the generator
+ * puts on today's weekday: on 2026-08-20 that was a mobility session and the two guards reached their
+ * case; on 2026-08-21 it is a strides run, so the plan's own run became the head candidate and
+ * "declining the custom run silences the card" was simply not true any more. Both failures had ONE
+ * cause and it was the calendar. The file already carried ensurePlannedToday for the opposite need,
+ * which is the tell: the weekday fragility was recognised in one direction and missed in the other.
+ *
+ * ⚠️ IT MOVES SESSIONS THROUGH state.dayOverride, the app's own reschedule mechanism, exactly as
+ * ensurePlannedToday does — so effDay and every reader downstream honour it as they would for a runner
+ * who dragged the session. Splicing the week's array would work too and would be a shape no runner can
+ * produce.
+ *
+ * ⚠️ IT DOES NOT ALSO MOVE A NON-RUN ONTO TODAY, AND THAT WAS TRIED AND MEASURED FIRST. The Rhodes
+ * day had a mobility session sitting there, which is the richer form of the case — but the fixture's
+ * plan starts TODAY, so applyPartialFirstWeek trims week one to today onward and on some weekdays
+ * there is no non-run left in that week to move. Measured on 2026-08-21: week one is exactly
+ * strides / easy / long. So the helper promises only what it can keep on every weekday — that today
+ * carries no runnable plan session — and the guards below hold whether the plan's slot is then a
+ * non-run or empty, which is what their re-breaks prove rather than argue.
+ */
+function ensureNoPlannedToday(e: Env): void {
+  const st = e.api.__state();
+  const d = new Date(e.today + "T00:00:00Z");
+  const away = ((d.getUTCDay() + 6) % 7 + 3) % 7;
+  for (let guard = 0; ; guard++) {
+    const p = plannedOn(e, e.today);
+    if (!p) break;
+    assert.ok(guard < 10, "moving today's planned runs off today did not converge");
+    st.dayOverride[p.id] = away;
+  }
+  assert.equal(plannedOn(e, e.today), null, "today still carries a runnable plan session");
 }
 const text = (h: string) => h.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 const bands = (s: any) => (s.steps || []).filter((st: any) => st.targetPaceSecPerKm)
@@ -446,6 +498,10 @@ test("BLOCKER: it proposes, it never imposes", () => {
   // ⚠️ STANDING INSTRUCTION, 2026-08-03: the app may observe and propose, never change a pace on its
   // own, and declining is remembered rather than re-asked.
   const e = env(33);
+  // ⚠️ heatCard() prices the HEAD of the candidate list, so declining the custom run only silences it
+  // on a day whose plan carries no run of its own. Left to the calendar this held on the Thursday it
+  // was written and broke on the Friday. See ensureNoPlannedToday.
+  ensureNoPlannedToday(e);
   const custom = addRun(e, {});
   // Nothing is applied until a decision exists.
   assert.equal(e.api.heatApplied(custom), custom, "a session was adapted with no decision stored");
@@ -786,6 +842,10 @@ test("BLOCKER: the conditions square and the heat card price the SAME session", 
   // ["easy/x0-…"], so the Conditions sheet said "this session has no pace to adjust" while the heat
   // card two inches below offered "about 2.3% harder".
   const e = env(33);
+  // ⚠️ THE DIVERGENCE ONLY EXISTS ON A DAY WHOSE PLAN HOLDS NO RUN. With a planned run on today both
+  // resolvers answer it and the control below rightly refuses — which is what happened the day after
+  // this was written. See ensureNoPlannedToday.
+  ensureNoPlannedToday(e);
   const st = e.api.__state();
   const d = new Date(e.today + "T00:00:00Z");
   st.selWeek = 0; st.selDay = (d.getUTCDay() + 6) % 7;
@@ -827,7 +887,11 @@ test("BLOCKER: the conditions square and the heat card price the SAME session", 
   // week strip prices a day nobody is looking at.
   const e2 = env(33);
   const st2 = e2.api.__state();
-  st2.selWeek = 0;
+  // ⚠️ WEEK ONE, NOT WEEK ZERO, AND THAT IS THE SAME CALENDAR FRAGILITY AGAIN. The fixture's plan
+  // starts TODAY, so applyPartialFirstWeek trims week zero to the days from today onward: full on a
+  // Monday, three sessions on a Friday (measured 2026-08-21), and the "checked >= 4" floor below then
+  // fails on a guard that has nothing to do with the day of the week. Week one is always whole.
+  st2.selWeek = 1;
   let checked = 0;
   for (let day = 0; day < 7; day++) {
     st2.selDay = day;
@@ -850,7 +914,12 @@ test("BLOCKER: the forecast is diagnosable — a missing one no longer looks lik
   const e = env(33);
   const withIt = e.api.wxDiagLine();
   assert.match(withIt, /forecast:/, "the forecast diagnostic is not labelled");
-  assert.match(withIt, /48 hours/, "it does not say how many hours are held: " + withIt);
+  // ⚠️ DERIVED FROM WHAT WAS SEEDED, NOT TYPED. It was /48 hours/, which is two days of rows — and the
+  // fixture now seeds the union of the UTC and LOCAL days, so at an extreme offset it is three. A typed
+  // constant here would have turned a timezone fix into a second timezone failure.
+  const hours = e.api.__state().wxHours.length;
+  assert.ok(hours >= 48, "the fixture seeded only " + hours + " forecast hours");
+  assert.match(withIt, new RegExp("\\b" + hours + " hours"), "it does not say how many hours are held: " + withIt);
   assert.match(withIt, /live/, "it does not say whether the forecast is live or a preset: " + withIt);
   e.clearForecast();
   const without = e.api.wxDiagLine();

@@ -81,7 +81,11 @@ final class WorkoutVoice {
     func fallback(for trigger: String, text: String?) {
         if let text, !text.isEmpty { say(text); return }
         switch trigger {
-        case "countdown":        return   // the beats have passed; a late "three, two, one" is worse than nothing
+        // ⚠️ THE COUNT IS NEVER SPOKEN HERE, and the four per-beat triggers are named explicitly so a
+        // future change to `default` cannot start a robot counting somebody in. A beat is only worth
+        // saying at the instant it happens, and by the time an ack has told us the phone was silent
+        // that instant has gone; the haptics carry it, which is what they are for.
+        case "countdown", "count-3", "count-2", "count-1", "count-go": return
         case "session-start":    sayStart()
         case "session-complete": sayComplete()
         case "paused":           sayPaused()

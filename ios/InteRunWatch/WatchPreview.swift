@@ -92,7 +92,18 @@ enum WatchPreview {
                 stepProgress: nil,
                 stepLabel: nil)
 
-        // Five metrics, the maximum Settings allows — the tightest the page ever gets.
+        // FIVE rows, which is ONE MORE than Settings can now produce: `maxMetrics` is 4 and both the
+        // run screen and the companion filter the clock out of the rows, so the most a runner can
+        // choose is four. Kept deliberately as the OVERFLOW case — it is what a page too tall for the
+        // glass looks like — but do not read it as "the tightest the page can be asked for", which is
+        // what its old comment claimed and what `companion-four` and `mid-run` actually are.
+        // ⚠️ Measured on this scene: at 40/41/42mm the overflow pushes a metric ROW up into the
+        // system clock's own row and its label prints across it (75-84px of overlap), and at 45/49mm
+        // the block is cut off at the top of the glass. The page is vertically CENTRED, so content
+        // too tall is lost at both ends rather than overflowing visibly at one.
+        // ⚠️ THE TOP STRIP'S CLOCK RESERVE DOES NOT PROTECT THIS. It reserves the columns for the
+        // strip only; a metric row lifted into that band by an overflow is a different fault, and it
+        // is reachable at four rows too (see `companion-four` and `mid-run`).
         case "five-metrics":
             MetricsPage(
                 status: nil,
@@ -200,6 +211,32 @@ enum WatchPreview {
                      currentSec: nil, currentText: "--:--",
                      lap: ("5:41", "LAP PACE"), stepProgress: nil, totalDist: "3.08 KM")
 
+        // ── The companion: the wrist while the PHONE records ──────────────────────────────────
+        // ⚠️ THIS SCREEN HAD NO SCENE AT ALL, WHICH IS WHY THE GAP SURVIVED. WatchPreview exists
+        // precisely so a run screen can be looked at without a run, and the one live screen never
+        // pointed at was the one the owner photographed clipped on an Ultra. The scene number picks
+        // the page, because a screenshot cannot swipe.
+        //
+        // ⚠️ Deliberately awkward values, the same principle as "mid-run": a four-character pace, a
+        // three-digit heart rate, a distance past 1 km, and the LONGEST status the strip can carry
+        // ("PAUSED · IPHONE"). A fixture that only exercises "0:00" and "--" has not been tested.
+        case "companion":          companionScene(1)
+        case "companion-controls": companionScene(0)
+        // The state the owner was actually in: the phone is recording and its page is old enough to
+        // send no `control` flag, so the wrist must offer NO buttons and say where to finish.
+        case "companion-nocontrol": companionScene(0, control: false)
+        case "companion-paused":   companionScene(1, running: false)
+        // Before the first tick lands. Everything reads "--" and the strip says why, rather than a
+        // screen of dashes that looks like the watch has lost the run.
+        case "companion-waiting":  companionScene(1, live: false)
+        // ⚠️ FOUR NON-ELAPSED METRICS, which is the tightest this page can be asked for: the clock is
+        // filtered out of the rows (it lives in the strip), so a runner who picks four metrics NONE of
+        // which is the clock gets four 42pt rows. A first version of this scene passed
+        // `[.elapsed, .distance, .currentPace, .lapPace]` and therefore rendered three rows — a
+        // fixture that could not exercise the case it was named for.
+        case "companion-four":
+            companionScene(1, metrics: [.distance, .currentPace, .lapPace, .heartRate])
+
         // ── Settings ──────────────────────────────────────────────────────────────────────────
         // Four pages; the scene number picks the page, because a screenshot cannot swipe.
         // A fresh SessionStore is safe here: it reads its cache and shows whatever coach is stored,
@@ -266,6 +303,39 @@ enum WatchPreview {
         default:
             Text("Unknown preview scene: \(scene)").font(.caption)
         }
+    }
+
+    /// The companion, seeded exactly as a real `phoneLive` tick arrives.
+    ///
+    /// ⚠️ The store's published fields are set DIRECTLY rather than through `apply()`, the same rule
+    /// the home scenes follow: `apply()` persists to UserDefaults and would leave a fake run haunting
+    /// the simulator's real cache. The metric list goes the same way — through `metricsOverride`, NOT
+    /// by assigning `WatchSettings.shared.metrics`, which persists on `didSet`. Measured with the
+    /// assignment in place: the four-metric scene rewrote the real setting and every scene launched
+    /// after it inherited four metrics, so the paused scene clipped at 41mm for reasons that had
+    /// nothing to do with pausing.
+    @MainActor
+    private static func companionScene(_ page: Int,
+                                       running: Bool = true,
+                                       live: Bool = true,
+                                       control: Bool = true,
+                                       metrics: [WatchSettings.Metric]? = nil) -> some View {
+        let store = SessionStore()
+        store.runnerName = "Adam"
+        store.maxHr = 182
+        if live {
+            store.phoneLive = [
+                "sec": 1386, "distKm": 4.28, "paceSec": 298, "lapPaceSec": 305,
+                "avgPaceSec": 324, "hr": 162, "kcal": 318, "lapNumber": 5, "stepProgress": 0.62,
+            ]
+            store.phoneLiveTitle = "2 km easy run (custom)"
+            store.phoneLiveStep = "Ease in \u{2014} start gently and let the pace come to you"
+            store.phoneLiveAt = Date()
+            store.phoneLiveRunning = running
+            store.phoneCanControl = control
+        }
+        return CompanionView(initialPage: page, metricsOverride: metrics)
+            .environmentObject(store)
     }
 
     @MainActor

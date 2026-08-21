@@ -25583,19 +25583,123 @@ function liveNameHtml(sm) {
  * ⚠️ THE SWITCH IS A PREFERENCE THAT PERSISTS, so somebody who always sends to Strava is not asked
  * every run — and it is read at SAVE time, so turning it off before saving means this run does not go.
  */
+/**
+ * SAVING A RUN TO APPLE HEALTH — the owner's ask, 2026-08-21: "i would like the app to sync with apple
+ * health naturally like all running apps do."
+ *
+ * ⚠️ THE CAPABILITY IS A FLAG THE NATIVE SIDE SETS, never the message handler existing. docs/index.html
+ * updates over the air and Swift does not, so a page asking an older build to write a workout would have
+ * the action discarded by its default branch — a switch the runner turned on, no workout in Health, and
+ * nothing to see. Third time this rule has been load-bearing; the first time it was caught minutes from
+ * shipping.
+ */
+function healthAvailable() {
+  return typeof window !== "undefined" && !!window.__interunHealth &&
+    !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.interunHealth);
+}
+/** ⚠️ ONE KEY, AND IT IS NOT THE STRAVA ONE. Two destinations, two decisions — a runner may well want
+ *  their runs in Health and not on Strava. Defaults to ON where Health exists, because that is what
+ *  "naturally, like all running apps" means: a run appears in Fitness without being asked to. */
+const HEALTH_KEY = "interun_health_v1";
+function healthSyncOn() {
+  if (!healthAvailable()) return false;
+  try { const v = localStorage.getItem(HEALTH_KEY); return v == null ? true : v === "1"; } catch (e) { return true; }
+}
+function healthSyncSet(on) { try { localStorage.setItem(HEALTH_KEY, on ? "1" : "0"); } catch (e) {} }
+/**
+ * HANDING A SAVED RUN TO HEALTH.
+ *
+ * ⚠️⚠️ A WATCH RUN IS NEVER SENT, AND THIS IS THE RULE THAT MATTERS MOST. watchOS already saved it: the
+ * wrist runs a real HKWorkoutSession, so the workout is in Health before the phone has even been told the
+ * run happened. Writing it again gives the runner two workouts for one run — double distance in their
+ * week and double energy in their rings — and the duplicate looks exactly as legitimate as the original.
+ * run.source is "watch" for those, stamped by ingestWatchRun.
+ * ⚠️ AND A SIMULATED RUN IS NEVER SENT EITHER, for the reason every adaptive path already skips it: its
+ * distance is an invention, and this one would land in somebody's medical app.
+ *
+ * ⚠️ THE HEART RATE IS CONVERTED FROM DISTANCE TO TIME HERE, NOT IN SWIFT. hrSeries is [metres, bpm]
+ * because the in-app chart is drawn across the run rather than across the clock — on a time axis every
+ * pause is a plateau — but Health stores a sample at a moment. The route carries both, so walking it
+ * gives each reading its own time; doing this in Swift would be a second copy of arithmetic the Strava
+ * GPX already had to get right.
+ * ⚠️ AND NOTHING IS INTERPOLATED ACROSS A GAP. A wide jump between samples is missing evidence, not a
+ * slow change — the same rule runStravaPayload records for the same series.
+ */
+function healthSendRun(run) {
+  if (!healthAvailable() || !healthSyncOn()) return;
+  if (!run || run.sim) return;
+  if (run.source === "watch") return;
+  const sec = Math.round(Number(run.sec) || 0);
+  const startMs = runStartExactMs(run);
+  // ⚠️ AN UNKNOWN START IS A REFUSAL, NOT A GUESS. runStartMs would answer that date at 09:00, which
+  // would put the workout hours from where it happened in somebody's day — the same trap the Strava GPX
+  // gate closes, and worse here because Health is where a person looks to see what they did when.
+  if (!(sec > 0) || startMs == null) return;
+  const pts = (Array.isArray(run.route) ? run.route : [])
+    .filter((p) => p && isFinite(p.lat) && isFinite(p.lng) && isFinite(p.t));
+  const route = pts.map((p) => [Number(p.lat), Number(p.lng), Number(p.t)]);
+  // The heart-rate series, given times off the route's own cumulative distance.
+  const hr = [];
+  const series = (Array.isArray(run.hrSeries) ? run.hrSeries : [])
+    .filter((x) => Array.isArray(x) && isFinite(Number(x[0])) && Number(x[1]) > 0);
+  if (series.length && pts.length >= 2) {
+    let acc = 0, i = 1;
+    const marks = [{ m: 0, t: pts[0].t }];
+    for (; i < pts.length; i++) {
+      acc += haversine(pts[i - 1].lat, pts[i - 1].lng, pts[i].lat, pts[i].lng);
+      marks.push({ m: acc, t: pts[i].t });
+    }
+    for (const sm of series) {
+      const m = Number(sm[0]);
+      let k = 0;
+      while (k < marks.length - 1 && marks[k + 1].m < m) k++;
+      const t = marks[k].t;
+      if (isFinite(t) && t >= 0 && t <= sec) hr.push([t, Number(sm[1])]);
+    }
+  }
+  try {
+    window.webkit.messageHandlers.interunHealth.postMessage({
+      action: "save", id: String(run.id || ""), startMs: startMs, sec: sec,
+      distKm: Number(run.distKm) || 0, kcal: Number(run.kcal) || 0,
+      indoor: !!run.indoor, route: route, hr: hr,
+    });
+  } catch (e) { /* the run is saved either way; Health is not a precondition */ }
+}
+/** ⚠️ RECORDED WHERE SUPPORT CAN SEE IT, because a missing workout looks identical whatever the cause —
+ *  permission refused, an older build, a duplicate already there. */
+window.__interunHealthResult = function (ok, detail) {
+  PHOTODIAG.health = (ok ? "ok" : "failed") + " " + String(detail || "");
+};
 function liveSyncHtml(sm) {
-  if (sm.saved || !stravaConnected()) return "";
-  const on = stravaAutoSend();
+  if (sm.saved) return "";
+  const rows = [];
+  // ⚠️ STRAVA APPEARS ONLY WHEN CONNECTED, for the reason stravaRunButtonHtml already records: a
+  // greyed-out row on every finished run advertises a feature the runner has not set up.
+  if (stravaConnected()) rows.push(syncRowHtml("lStrava", ICON.share, "Strava", stravaAutoSend(),
+    "Send this run to Strava when you save it"));
+  // ⚠️ AND HEALTH ONLY WHERE IT EXISTS. In a browser, and in any build whose Swift predates this, there
+  // is nothing to write to — and a switch over nothing is the inert control this row was rebuilt to
+  // avoid. Its own absence is the honest state.
+  if (healthAvailable()) rows.push(syncRowHtml("lHealth", ICON.heart, "Apple Health", healthSyncOn(),
+    "Save this run to Apple Health when you save it"));
+  if (!rows.length) return "";
+  // ⚠️ NO "your watch already saved this" NOTE HERE, AND THE REASON IS THAT IT COULD NEVER SHOW. This is
+  // the PHONE's finish screen; a wrist run never reaches it — it is ingested straight into the Logbook by
+  // ingestWatchRun — so the note would have been an explanation of something that cannot happen on the
+  // screen carrying it, gated on a LIVE.summary field nothing sets. Caught before it shipped; the
+  // duplicate rule it was describing is real and lives in healthSendRun, where it can fire.
   return '<div class="card lfin">' +
-    '<div class="lfin-k">Sync to applications</div>' +
-    '<div class="lsync">' +
-      '<span class="lsync-ic">' + ICON.share + '</span>' +
-      '<span class="lsync-t">Strava</span>' +
-      '<button class="lsw' + (on ? " on" : "") + '" id="lStrava" role="switch" aria-checked="' +
-        (on ? "true" : "false") + '" aria-label="Send this run to Strava when you save it">' +
-        '<span class="lsw-k"></span></button>' +
-    '</div>' +
-    '<div class="lfin-d">Apple Health is not built yet, so nothing is written there.</div>' +
+    '<div class="lfin-k">Sync to applications</div>' + rows.join("") +
+    '</div>';
+}
+/** One row builder, so a third destination cannot arrive with a different shape or an unlabelled switch. */
+function syncRowHtml(id, icon, label, on, aria) {
+  return '<div class="lsync">' +
+    '<span class="lsync-ic">' + icon + '</span>' +
+    '<span class="lsync-t">' + esc(label) + '</span>' +
+    '<button class="lsw' + (on ? " on" : "") + '" id="' + id + '" role="switch" aria-checked="' +
+      (on ? "true" : "false") + '" aria-label="' + esc(aria) + '">' +
+      '<span class="lsw-k"></span></button>' +
     '</div>';
 }
 /**
@@ -26219,6 +26323,9 @@ function saveLiveSession() {
     saveRuns();
     // Straight after the run exists on disk, so a failed upload leaves the run saved and retryable.
     stravaMaybeAutoSend(state.logged[0]);
+    // ⚠️ AND THE SAME ORDERING FOR HEALTH, for the same reason: the run is the runner's, and a refused
+    // permission or an older build must never cost them the record of it.
+    healthSendRun(state.logged[0]);
   }
   const wk0 = PLAN.weeks[0]; const dn = DAY_ORDER[LIVE.session.dayOfWeek];
   if (LIVE.completedFull && wk0) { const m = wk0.sessions.find((s) => s.day === dn && s.title === LIVE.session.title); if (m) state.done[doneKey(wk0.index, m)] = true; }
@@ -27948,6 +28055,12 @@ function wire() {
     const target = viewedRun();
     if (target) { target.t = runName.value.trim() || target.t; clearTimeout(NOTE_T); NOTE_T = setTimeout(saveRuns, 400); return; }
     if (LIVE && LIVE.summary) LIVE.summary.name = runName.value;
+  };
+  const lHealth = $("lHealth"); if (lHealth) lHealth.onclick = () => {
+    const on = !healthSyncOn();
+    healthSyncSet(on);
+    lHealth.classList.toggle("on", on);
+    lHealth.setAttribute("aria-checked", on ? "true" : "false");
   };
   const lStrava = $("lStrava"); if (lStrava) lStrava.onclick = () => {
     const on = !stravaAutoSend();

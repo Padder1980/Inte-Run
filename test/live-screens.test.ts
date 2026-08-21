@@ -127,16 +127,78 @@ test("BLOCKER: one Strava preference, and no toggle for something that does not 
   // fix as the defect. Sixth firing of this project's own guard-trips-on-its-own-vocabulary trap.
   assert.ok(!/interun_stravaauto/.test(page()),
     "a second Strava preference key is back in the build, so one setting has two homes");
-  // ⚠️ AND APPLE HEALTH IS NAMED AS NOT BUILT RATHER THAN GIVEN A DEAD SWITCH. Writing to Health is an
-  // HKWorkout save needing an entitlement and native code; a toggle for it on the one screen where a
-  // runner decides whether their run was recorded anywhere is the worst place for an inert control.
+  // ⚠️ EACH ROW APPEARS ONLY WHERE IT CAN ACTUALLY DO SOMETHING. Strava when connected (the reason
+  // stravaRunButtonHtml already records: a greyed-out row advertises a feature nobody set up), Health
+  // where the native side says it can write. A switch over nothing is the inert control this row exists
+  // to avoid, and this file's previous version asserted Health was ABSENT for exactly that reason —
+  // it is built now, so the claim moves from "not offered" to "offered only where it works".
   const sync = fn("liveSyncHtml");
-  assert.match(sync, /Apple Health is not built yet/, "Apple Health is offered without being built");
-  assert.ok(!/id="lHealth"/.test(sync), "there is a control for Apple Health, which does nothing");
-  // ⚠️ AND STRAVA APPEARS ONLY WHEN CONNECTED, for the reason stravaRunButtonHtml already records.
   assert.match(sync, /stravaConnected\(\)/,
     "the sync block offers Strava to somebody who has not connected it");
+  assert.match(sync, /healthAvailable\(\)/,
+    "the sync block offers Apple Health without checking this build can write to it");
+  assert.match(sync, /if \(!rows\.length\) return ""/,
+    "an empty sync block is still drawn, so the card has a heading and nothing under it");
+  // ⚠️ ONE ROW BUILDER, so a third destination cannot arrive with a different shape or an unlabelled
+  // switch — every switch here needs a role and an accessible name to be operable at all.
+  const row = fn("syncRowHtml");
+  assert.match(row, /role="switch"/, "the sync switches are not switches to a screen reader");
+  assert.match(row, /aria-checked/, "a sync switch does not say whether it is on");
+  assert.match(row, /aria-label="' \+ esc\(aria\)/, "a sync switch has no accessible name");
 });
+
+test("BLOCKER: a watch run is never written to Health, because the watch already wrote it", () => {
+  // ⚠️⚠️ THIS IS THE ONE THAT WOULD HURT. watchOS runs a real HKWorkoutSession, so a wrist run is in
+  // Health before the phone has even been told it happened. Writing it again gives the runner TWO
+  // workouts for one run — double distance in their week, double energy in their rings — and the
+  // duplicate looks exactly as legitimate as the original.
+  const send = fn("healthSendRun");
+  assert.match(send, /run\.source === "watch"/,
+    "a wrist run can be written to Health a second time, on top of the one the watch saved");
+  assert.match(send, /run\.sim/, "a simulated run can be written to Health, and its distance is invented");
+  // ⚠️ AND AN UNKNOWN START IS A REFUSAL, NOT A GUESS. runStartMs answers that date at 09:00 when it
+  // does not know, which would put the workout hours from where it happened in somebody's day — worse
+  // here than in a GPX, because Health is where a person looks to see what they did when.
+  assert.match(send, /runStartExactMs\(run\)/, "the workout's start is guessed rather than known");
+  assert.match(send, /startMs == null\) return/, "a run with no known start is written at a made-up time");
+  // ⚠️ AND THE NATIVE SIDE REFUSES A REPEAT TOO. The finish screen allows Save more than once and a
+  // re-render can produce it; HealthKit has no upsert.
+  const swift = readFileSync(new URL("../ios/InteRun/HealthKitService.swift", import.meta.url), "utf8");
+  assert.match(swift, /written\.contains\(id\)/, "the same run can be written to Health twice");
+  assert.match(swift, /HKMetadataKeyExternalUUID/,
+    "the workout carries no id, so a duplicate cannot be identified rather than merely suspected");
+});
+
+test("BLOCKER: Health is asked for at the moment it is needed, and nothing is invented to fill a field", () => {
+  const swift = readFileSync(new URL("../ios/InteRun/HealthKitService.swift", import.meta.url), "utf8");
+  // ⚠️ NOT AT LAUNCH. A Health prompt on first open, before the runner has recorded anything, is a
+  // prompt with no context — and from the app's point of view a refusal is permanent.
+  assert.ok(!/requestAuthorization/.test(fnOfSwift(swift, "capabilityJS")),
+    "authorisation is requested just to answer whether Health exists");
+  assert.match(swift, /func save\([\s\S]{0,1400}?requestAuthorization/,
+    "authorisation is not requested on the save path, so the first write fails");
+  // ⚠️ AND NOTHING IS FABRICATED. No route means no route; no distance means no distance sample. A zero
+  // would be a measurement, and this data goes into somebody's medical app under their name.
+  assert.match(swift, /pts\.count >= 2 else \{ return \}/, "a route is written from fewer than two points");
+  assert.match(swift, /km > 0/, "a zero distance is written to Health as a measurement");
+  assert.match(swift, /locationType = indoor \? \.indoor : \.outdoor/,
+    "an indoor run is filed as an outdoor one, which its own data cannot support");
+  // ⚠️ AND THE PAGE IS TOLD WHAT HAPPENED. A silent failure is indistinguishable from a success, and the
+  // runner would believe their run is in Health when it is not.
+  assert.match(swift, /__interunHealthResult/, "the native side never reports back");
+});
+
+/** Brace-matched body of a Swift declaration, for the assertions above. */
+function fnOfSwift(src: string, name: string): string {
+  const at = src.indexOf(name);
+  if (at < 0) return "";
+  let d = 0;
+  for (let i = src.indexOf("{", at); i < src.length; i++) {
+    if (src[i] === "{") d++;
+    else if (src[i] === "}") { d--; if (!d) return src.slice(at, i + 1); }
+  }
+  return "";
+}
 
 test("BLOCKER: the treadmill does not get the start screen, and neither does a running session", () => {
   // ⚠️ IT HAS NO POSITION TO DRAW, NO SIGNAL TO REPORT AND NOTHING TO RECENTRE. And once the run is

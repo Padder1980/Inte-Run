@@ -7507,3 +7507,73 @@ a **workout name**, the session's **description**, and a **sync block**.
 `test/live-screens.test.ts` holds seven guards. **Nine deliberate re-breaks, and two escaped the first
 version of their guard**: the button sweep flagged `#lMapWrap` — a container — as unwired, and the map-key
 guard was a presence check. Both restated and re-broken.
+
+## APPLE HEALTH: A PHONE RUN IS SAVED AS A REAL WORKOUT (owner, 2026-08-21)
+
+*"i would like the app to sync with apple health naturally like all running apps do."* Naturally means the
+run appears in Health and Fitness the way one recorded by any other running app does — a workout with its
+distance, duration, route and heart rate — rather than a row in this app that Health knows nothing about.
+`ios/InteRun/HealthKitService.swift`, `HKWorkoutBuilder` + `HKWorkoutRouteBuilder`, written at save time.
+
+⚠️⚠️ **ONLY PHONE-RECORDED RUNS ARE WRITTEN, AND THIS IS THE RULE THAT WOULD HURT IF IT WERE MISSING.** A
+wrist run is ALREADY in Health: `WorkoutManager` runs a real `HKWorkoutSession`, so watchOS saves the
+workout before the phone has been told the run happened. Writing it again gives the runner **two workouts
+for one run** — double distance in their week, double energy in their rings — and the duplicate looks
+exactly as legitimate as the original. Gated twice: `healthSendRun` refuses `run.source === "watch"`, and
+the service refuses any id it has already written.
+⚠️ **AND THE NATIVE REFUSAL IS NOT BELT-AND-BRACES FOR ITS OWN SAKE.** HealthKit has no upsert, the finish
+screen allows Save more than once, and a re-render can produce it. The id is stamped into the workout as
+`HKMetadataKeyExternalUUID` as well, so a duplicate is identifiable rather than merely suspected.
+
+⚠️ **AUTHORISATION IS REQUESTED ON THE SAVE PATH, NEVER AT LAUNCH.** A Health prompt on first open, before
+the runner has recorded anything, is a prompt with no context — and from the app's point of view a refusal
+is permanent. `capabilityJS()` answers only whether Health exists on the device and asks for nothing.
+
+⚠️ **NOTHING IS FABRICATED TO FILL A FIELD, and this matters more here than anywhere else in the app
+because the data lands in somebody's medical app under their name.** No route means no route is written
+(fewer than two timed points is a refusal); a zero distance is absent rather than written as a
+measurement; an indoor run declares `.indoor`, because a run with no route claiming to be outdoors is a
+claim its own data cannot support. Same rule as `runStravaPayload`'s never-invent-the-missing-half.
+
+⚠️ **AN UNKNOWN START IS A REFUSAL.** `runStartMs` answers that date at 09:00 when it does not know, and
+Health is precisely where a person looks to see what they did *when* — so `healthSendRun` uses
+`runStartExactMs` and declines on null. Worse than the same fault in a GPX, and the GPX gate already
+closed it.
+
+⚠️ **THE HEART RATE IS CONVERTED FROM DISTANCE TO TIME IN THE PAGE, NOT IN SWIFT.** `hrSeries` is
+`[metres, bpm]` because the in-app chart is drawn across the run rather than the clock — on a time axis
+every pause is a plateau — and Health stores a sample at a moment. The route carries both, so walking it
+gives each reading its own time. Doing it in Swift would be a second copy of arithmetic the Strava GPX
+already had to get right.
+
+⚠️ **THE CONSENT STRING WAS FALSE THE MOMENT THIS SHIPPED, AND CHANGING IT WAS PART OF THE WORK.**
+`NSHealthUpdateUsageDescription` read *"InteRun uses HealthKit only to start a run on your Apple Watch
+from your phone"* — true until now, and the sentence a reviewer reads and a runner consents to. It now
+names what is written, and says that watch runs are not written twice.
+⚠️ **THE ENTITLEMENT NEEDED NOTHING.** `com.apple.developer.healthkit` was already there for
+`startWatchApp`; `com.apple.developer.healthkit.access` is for CLINICAL records and stays empty. Verified
+rather than assumed.
+
+⚠️ **THE FINISH SCREEN'S HEALTH ROW IS A REAL SWITCH NOW, AND ITS OWN KEY.** `interun_health_v1`, separate
+from Strava's — two destinations, two decisions, and a runner may well want Health and not Strava. It
+**defaults ON** where Health exists, because that is what "naturally, like all running apps" means: the
+run appears in Fitness without being asked to.
+⚠️ **AND EACH ROW APPEARS ONLY WHERE IT CAN ACT.** Strava when connected, Health where the native flag
+says this build can write. `test/live-screens.test.ts`'s previous version asserted Health was ABSENT — it
+was not built — so that guard moved from "not offered" to "offered only where it works" rather than being
+deleted.
+⚠️ **A NOTE I WROTE AND REMOVED BEFORE IT SHIPPED**: "your watch already saved this run to Health". It was
+gated on `LIVE.summary.fromWatch`, which nothing sets, on the PHONE's finish screen — which a wrist run
+never reaches, because `ingestWatchRun` puts it straight in the Logbook. An explanation of something that
+cannot happen on the screen carrying it. Seventh outing of the invented-identifier trap.
+
+⚠️ **STILL UNPROVEN ON HARDWARE.** A simulator has no Health data and grants nothing meaningful, so the
+first real evidence is a phone run appearing in Fitness with its route and heart rate. `PHOTODIAG.health`
+records what the native side reported, because a missing workout looks identical whatever the cause —
+permission refused, an older build, or a duplicate already there.
+
+⚠️ **AND ADDING A BUILD TO TESTFLIGHT TESTERS STILL CANNOT BE DONE FROM HERE.** `xcodebuild` uploads using
+Xcode's own signed-in session, which does not extend to managing tester groups, and there is no App Store
+Connect API key on this Mac (`~/.appstoreconnect/private_keys/` is empty). Either the owner ticks it in
+App Store Connect, or he creates an API key once and it can be automated from then on. **Do not claim a
+build has been distributed.**

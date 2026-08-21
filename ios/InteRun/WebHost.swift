@@ -61,6 +61,10 @@ struct WebHost: UIViewRepresentable {
                   // docs/index.html reaches phones whose Swift predates the handler's new actions and
                   // those are discarded silently — a tile that looks live and does nothing.
                   + ShareAppService.capabilityJS()
+                  // Whether this build can write a workout to Health at all. Same rule as the two flags
+                  // above: an over-the-air page must never infer a native capability from a message
+                  // handler existing, because an older build discards the action in silence.
+                  + HealthKitService.capabilityJS()
                   + WebUpdateService.shared.diagnosticJS
                   + tokenJS,
             injectionTime: .atDocumentStart, forMainFrameOnly: true))
@@ -133,6 +137,9 @@ struct WebHost: UIViewRepresentable {
         // Handing the finished share card straight to Instagram Stories or Messages, rather than to the
         // share sheet. See ShareAppService for what iOS actually permits per destination.
         config.userContentController.add(ShareAppService.shared, name: ShareAppService.messageName)
+        // Saving a phone-recorded run to Apple Health as a real workout. See HealthKitService for why a
+        // WATCH run is never written from here.
+        config.userContentController.add(HealthKitService.shared, name: HealthKitService.messageName)
         WebUpdateService.shared.checkForUpdate()
         webView.allowsBackForwardNavigationGestures = false
         webView.scrollView.contentInsetAdjustmentBehavior = .never

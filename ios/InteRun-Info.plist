@@ -25,9 +25,9 @@
 	<key>NSHealthShareUsageDescription</key>
 	<string>InteRun reads your heart rate during a run so it can show it live and save it with the session. It also uses HealthKit to start a run on your Apple Watch from your phone. Your health data stays on your devices and is never sent anywhere.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>InteRun uses HealthKit only to start a run on your Apple Watch from your phone. Your health data stays on your devices.</string>
+	<string>InteRun saves your finished runs to Apple Health as workouts, with their distance, duration, route and heart rate, so they appear in Health and Fitness like a run recorded by any other app. Runs recorded on your Apple Watch are already saved by the watch and are never written twice. It also uses HealthKit to start a run on your Apple Watch from your phone. Your health data stays on your devices and is never sent anywhere by InteRun.</string>
 	<key>NSMotionUsageDescription</key>
-	<string>InteRun uses your phone&apos;s step counter to keep measuring your distance when GPS drops out — under trees, between tall buildings or in a tunnel — and to show your cadence. It stays on your phone and is never sent anywhere.</string>
+	<string>InteRun uses your phone's step counter to keep measuring your distance when GPS drops out — under trees, between tall buildings or in a tunnel — and to show your cadence. It stays on your phone and is never sent anywhere.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>InteRun keeps tracking your run when your phone is locked or in a pocket, so your pace and route stay accurate for the whole session.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

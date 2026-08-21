@@ -427,19 +427,29 @@ test("BLOCKER: the luminance probe composites exactly what the card does, and th
     "the probe composites against its own size, so the surround cache thrashes");
 });
 
-test("BLOCKER: the scrim still cannot be asked for an opaque lower section, and solves above its target", () => {
-  // The owner's earlier amendment: the data and text are an overlay carried by ONE gradient scrim. The
-  // fit ruling changes the GROUND that scrim is solved against, not the rule — so this is re-asserted
-  // here rather than left to the file that predates the surround.
+test("BLOCKER: neither fit mode can put a wash over the photograph, because there is no wash", () => {
+  // ⚠️ THIS GUARD USED TO ASSERT THE SCRIM'S CAP AND ITS SOLVER MARGIN, and both are gone: the owner
+  // removed the gradient outright on 2026-08-21 ("the gradient is worse! I think it's best to just remove
+  // it completely"). The rule it protected — the data and text are an OVERLAY, never a panel — is now
+  // carried by the copy's own keyline, and it is re-asserted here rather than left to the render file
+  // because THIS file owns the fit, and the fit is what decides how much photograph there is to protect.
   const E = env();
   assert.ok(E.SHARE_INK.ground, "the ground token is gone");
-  const scrim = liftConst("SHARE_SCRIM");
-  assert.ok(/max:\s*0\.9[0-9]?/.test(scrim), "the scrim's cap is no longer below 1: " + scrim);
-  const solver = lift("shareVeilAlphaFor");
-  assert.ok(/SHARE_SCRIM_MARGIN/.test(solver),
-    "the solver aims exactly at its target again, which measured 4.41:1 on one hostile ground");
-  const margin = Number((liftConst("SHARE_SCRIM_MARGIN").match(/=\s*([\d.]+)/) || [])[1]);
-  assert.ok(margin > 1 && margin <= 1.2, "the scrim margin is " + margin + ", outside 1..1.2");
+  const src = page();
+  for (const dead of ["SHARE_SCRIM", "SHARE_SCRIM_MARGIN", "shareVeilAlphaFor", "shareVeilPlan",
+    "shareVeilDraw", "sharePhotoScrim"]) {
+    assert.ok(!new RegExp("\\b" + dead + "\\b").test(src),
+      dead + " is back, so a wash can be solved over somebody's photograph again");
+  }
+  // ⚠️ AND THE FIT IS STILL WHAT DECIDES HOW MUCH PICTURE THERE IS. Under contain the surround is a
+  // darkened mirror, which IS a translucent full-canvas fill — legitimately, because it is composited
+  // UNDER the photograph as its mat. Asserted here so that ordering cannot quietly invert.
+  const compose = lift("sharePhotoCompose");
+  const veilAt = compose.indexOf("SHARE_BLUR.veil");
+  const photoAt = compose.lastIndexOf("drawImage");
+  assert.ok(veilAt > 0 && photoAt > veilAt,
+    "the surround's darkening is applied after the photograph is drawn, which makes it a wash over the " +
+    "picture rather than the mat behind it");
 });
 
 /* ================================================================================================ *

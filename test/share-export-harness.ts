@@ -162,11 +162,12 @@ export function liftExportPipeline(): Lifted {
     ordered.join("\n") + "\n" +
     [...fns].map((n) => fnBody(SRC, n)).join("\n") + "\n" +
     "return { " + [...fns].join(", ") + ", __setPhoto: (p) => { SPHOTO = p; }," +
-    // ⚠️ ONE MORE SEAM, AND IT IS THE SAME KIND AS __setPhoto. The scrim's stop count is the field the
-    // fade's A/B turns: with it at 1 the emitted gradient is the straight line that shipped before ruling
-    // 8, because smootherstep sampled at its two endpoints IS a line. No production identifier exists for
-    // a test to poke; the seam is entirely in this file.
-    " __scrim: () => SHARE_SCRIM };";
+    // ⚠️ THE SCRIM SEAM IS GONE WITH THE SCRIM. It exposed SHARE_SCRIM so the fade's stop count could be
+    // turned from 1 (a straight line) to its shipped value, which is how the eased-versus-linear A/B was
+    // measured. The owner removed the gradient outright on 2026-08-21 ("the gradient is worse! I think
+    // it's best to just remove it completely"), so there is no fade to profile and no constant to poke;
+    // the copy carries its own keyline instead and shareTextEdgeArm is what the legibility guards read.
+    " };";
   return { body, fns: [...fns], consts: ordered.length };
 }
 
@@ -629,18 +630,6 @@ export type Gate = {
   privacyShots: PrivacyShot[];
   modelProbe: any;
   refused: { placeholder: boolean; reason: string };
-  /**
-   * THE BOTTOM FADE'S OWN EDGE, MEASURED OFF RENDERED PIXELS (owner, ruling 8 item 4, 2026-08-21).
-   * "the gradient at the bottom of the card ... needs a more natural fade, i can see the line where it
-   * stops on the current one." Each entry is the discrete Laplacian of relative luminance at three lags,
-   * taken at the top row of the fade and inside it, on a flat photograph so nothing in the column is the
-   * picture. `linear` is the same card with SHARE_SCRIM.stops forced to 1, which reproduces the
-   * shipped-before straight line EXACTLY — smootherstep sampled at its two endpoints is a line — so the
-   * comparison is an A/B on one field rather than an appeal to history.
-   */
-  scrimEdge: { ground: string; aspect: string; a: number; fade: number;
-    eased: { lag: number; bnd: number; inner: number }[];
-    linear: { lag: number; bnd: number; inner: number }[] }[];
   ms: number;
 };
 
@@ -826,64 +815,7 @@ async function capture(): Promise<Gate> {
         ${opts("story", null, false)});
       return { placeholder: m.template == null, reason: (m.eligibility && m.eligibility.moment || {}).why || '' }; })()`);
 
-    // ---- the bottom fade's edge, from a rendered column ---------------------------------------
-    // ⚠️ A FLAT PHOTOGRAPH, SO ANY STRUCTURE IN THE COLUMN IS THE SCRIM. On a real picture the fade's edge
-    // has to be separated from the picture's own vertical structure, which is a judgement; on a flat
-    // ground it is the only thing there and the number means one thing.
-    // ⚠️ AND THE PROFILE IS SMOOTHED AND DIFFERENCED AT A LAG, because the fade changes alpha by well
-    // under 1/255 per row: the delivered bytes step in whole units, so a per-row second difference is a
-    // train of quantisation spikes and measures the encoder rather than the edge.
-    await S.ev(`globalThis.scrimProfile = function (hex, aspect, blockTop, stops) {
-      const gm = CARD.cardGeom(aspect), W = gm.W, H = gm.H;
-      const c = document.createElement('canvas'); c.width = W; c.height = H;
-      const g = c.getContext('2d');
-      g.fillStyle = hex; g.fillRect(0, 0, W, H);
-      const pw = 108, ph = Math.round(pw * H / W);
-      const pc = document.createElement('canvas'); pc.width = pw; pc.height = ph;
-      const pg = pc.getContext('2d');
-      pg.fillStyle = hex; pg.fillRect(0, 0, pw, ph);
-      const probe = { w: pw, h: ph, data: pg.getImageData(0, 0, pw, ph).data };
-      const keep = CARD.__scrim().stops;
-      CARD.__scrim().stops = stops;
-      const plan = CARD.shareVeilPlan(probe, gm, { blockTop: blockTop, colours: CARD.shareScrimText() });
-      CARD.shareVeilDraw(g, gm, plan);
-      CARD.__scrim().stops = keep;
-      const px = g.getImageData(0, 0, W, H).data;
-      const lin = new Float64Array(256);
-      for (let i = 0; i < 256; i++) { const v = i / 255;
-        lin[i] = v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
-      const raw = new Float64Array(H);
-      for (let y = 0; y < H; y++) { let sum = 0, n = 0;
-        for (let x = 0; x < W; x += 4) { const o = (y * W + x) * 4;
-          sum += 0.2126 * lin[px[o]] + 0.7152 * lin[px[o + 1]] + 0.0722 * lin[px[o + 2]]; n++; }
-        raw[y] = sum / n; }
-      const r = new Float64Array(H);
-      for (let y = 0; y < H; y++) { let sum = 0, n = 0;
-        for (let j = y - 4; j <= y + 4; j++) if (j >= 0 && j < H) { sum += raw[j]; n++; }
-        r[y] = sum / n; }
-      const top = plan.fadeTop, bt = plan.blockTop - 10, out = [];
-      for (const lag of [4, 8, 16]) {
-        const d2 = function (y) { return r[y + lag] - 2 * r[y] + r[y - lag]; };
-        let bnd = 0;
-        for (let y = top - 1; y <= top + 1; y++) if (Math.abs(d2(y)) > Math.abs(bnd)) bnd = d2(y);
-        let inner = 0;
-        for (let y = top + lag + 2; y <= bt - lag - 2; y++) if (Math.abs(d2(y)) > Math.abs(inner)) inner = d2(y);
-        out.push({ lag: lag, bnd: Math.abs(bnd), inner: Math.abs(inner) });
-      }
-      return { a: plan.a, fade: plan.blockTop - plan.fadeTop, prof: out };
-    }; 'ok'`);
-    const scrimEdge: Gate["scrimEdge"] = [];
-    for (const [ground, hex] of [["white", "#ffffff"], ["mid", "#808080"], ["magenta", "#e015c8"],
-      ["beach", "#d9d2c4"]] as [string, string][]) {
-      for (const [aspect, blockTop] of [["story", 1090], ["feed", 680]] as [string, number][]) {
-        const eased = await S.ev(`scrimProfile("${hex}", "${aspect}", ${blockTop}, CARD.__scrim().stops)`);
-        const linear = await S.ev(`scrimProfile("${hex}", "${aspect}", ${blockTop}, 1)`);
-        scrimEdge.push({ ground, aspect, a: eased.a, fade: eased.fade,
-          eased: eased.prof, linear: linear.prof });
-      }
-    }
-
-    const g: Gate = { lifted, shots, scrimEdge,
+    const g: Gate = { lifted, shots,
       quality, dprShots, privacyShots, modelProbe, refused,
       sourcePhoto: { bytes: withGps, exif: exifInfo(withGps) }, ms: Date.now() - t0 };
     writeEvidence(g);

@@ -19748,6 +19748,100 @@ function lsText(g, text, x, y, sp, align) {
  * preview is the thing the runner approves.
  */
 const SHARE_WM_EDGE = { key: 0.13, keyMin: 3, halo: "rgba(2,10,8,.45)", blur: 9 };
+/**
+ * THE BLOCK'S OWN EDGE — WHAT REPLACED THE FADE AT THE BOTTOM OF THE CARD.
+ *
+ * The owner, 2026-08-21, having seen the halved and eased version on his phone: "the gradient is worse!
+ * I think it's best to just remove it completely". So the scrim over the lower half is gone, and the copy
+ * that stood on it carries its own edge — which is the identical answer he had already accepted at the
+ * TOP of the card ("i'm happy with the no gradient at the top of the card, it looks better"), where
+ * shareWordmark has been doing exactly this since ruling 8.
+ *
+ * ⚠️ ARMED ONCE ON THE CONTEXT, NOT ADDED AT FIFTEEN CALL SITES. The three photo templates draw their
+ * copy through g.fillText and lsText from about fifteen places, so a keyline applied per call site is a
+ * keyline one of them is missing — the fix-one-builder-not-the-other trap this file records six times.
+ * Wrapping fillText for the duration of the dispatch means a template CANNOT be written without it, and
+ * a template added later inherits it with no line of its own.
+ *
+ * ⚠️ STROKE FIRST, FILL OVER, WHICH IS THE ORDER shareWordmark PAID FOR. A shadow is cast behind its own
+ * shape within one operation, so stroking with the halo set puts the halo under the keyline and the fill
+ * over both. Painting the halo with the fill instead makes strengthening it WORSE — measured on the
+ * sticker, 0.45 to 0.75 took the small type's edge contrast 5.45 to 4.69, which is what two fighting
+ * effects look like.
+ *
+ * ⚠️ THE KEYLINE IS CAPPED, AND THE CAP IS WHAT MAKES IT SAFE ON THE HERO. A width proportional to the
+ * font is right for a 19px label and absurd on a 170px distance: at 0.13 the hero would carry a 22px
+ * stroke extending 11px each side, and the hero's digits are drawn ONE AT A TIME at a fixed tabular
+ * advance, so neighbouring numerals would eat into each other. Capped, a big glyph gets a modest outline,
+ * which is all a big glyph needs — the eye reads the edge, not its thickness.
+ *
+ * ⚠️ AND THE BLUR IS SCALED BY THE DRAW SCALE, because Chrome does not scale shadowBlur by the current
+ * transform. Without it the preview the runner approves carries twice the halo the export does.
+ *
+ * ⚠️ IT IS OFF WHEN THERE IS NO PHOTOGRAPH. On the family's own matte grounds every tier already measures
+ * 5.2:1 or better, so an outline there is decoration that would also move 18 signed-off exports.
+ */
+const SHARE_TEXT_EDGE = { key: 0.18, keyMin: 4, keyMax: 10, halo: "rgba(2,10,8,.62)",
+  blurK: 0.12, blurMin: 8, blurMax: 20 };
+/**
+ * IS THE COLOUR ABOUT TO BE FILLED A LIGHT ONE? Relative luminance, so a saturated mid-tone is judged
+ * as the eye judges it rather than by a channel average — the accent teal is light enough to want an
+ * outline over grass, and the badge's deep ink is not.
+ * ⚠️ AN UNPARSEABLE FILL COUNTS AS LIGHT. A gradient or a pattern cannot be measured, and the failure
+ * that matters is light type left with no edge over a bright photograph; a needless outline on dark
+ * type is only ugly.
+ */
+function shareFillIsLight(fill) {
+  const s = String(fill == null ? "" : fill).trim();
+  let r = null, g2 = null, b = null;
+  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(s);
+  if (hex) {
+    const h = hex[1].length === 3 ? hex[1].replace(/./g, function (c) { return c + c; }) : hex[1];
+    r = parseInt(h.slice(0, 2), 16); g2 = parseInt(h.slice(2, 4), 16); b = parseInt(h.slice(4, 6), 16);
+  } else {
+    const m = /^rgba?\\(\\s*(\\d+)[\\s,]+(\\d+)[\\s,]+(\\d+)/i.exec(s);
+    if (m) { r = +m[1]; g2 = +m[2]; b = +m[3]; }
+  }
+  if (r == null) return true;
+  const lin = function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  return 0.2126 * lin(r) + 0.7152 * lin(g2) + 0.0722 * lin(b) > 0.22;
+}
+function shareTextEdgeArm(g, edge) {
+  if (!(edge > 0) || g.__shareEdge) return function () {};
+  const fill = g.fillText.bind(g);
+  g.__shareEdge = true;
+  g.fillText = function (text, x, y, mw) {
+    // ⚠️ THE PIXEL SIZE, NOT THE FIRST NUMBER IN THE STRING. shareFont emits "800 42px ..." — weight
+    // first — so stripping leading non-digits and taking parseFloat reads the WEIGHT: measured, every
+    // glyph on the card came back as 800 and took the capped keyline and the maximum halo whatever its
+    // real size. Match the px value.
+    const size = Number((/(\\d+(?:\\.\\d+)?)px/.exec(String(g.font)) || [])[1]) || 0;
+    // ⚠️ A DEEP KEYLINE ONLY EVER HELPS LIGHT TYPE, AND ON DARK TYPE IT IS PURE HARM. The verdict
+    // badge is deep ink on its own filled teal pill: it already has a ground, so an outline in almost
+    // the same colour as the glyph adds no edge at all and simply thickens every letter — measured by
+    // eye on a bright photograph, the pill read as embossed and blobby where it had been crisp.
+    // ⚠️ DERIVED FROM THE FILL, NOT FROM A LIST OF CALL SITES. Anything drawn dark-on-light — this
+    // pill today, any badge or chip added later — excludes itself with no line of its own, which is
+    // the same reason the arm is on the context rather than at fifteen call sites.
+    if (size > 0 && shareFillIsLight(g.fillStyle)) {
+      const sc = g.shadowColor, sb = g.shadowBlur, sx = g.shadowOffsetX, sy = g.shadowOffsetY;
+      const ss = g.strokeStyle, lw = g.lineWidth, lj = g.lineJoin, lc = g.lineCap;
+      g.shadowColor = SHARE_TEXT_EDGE.halo;
+      g.shadowBlur = Math.min(SHARE_TEXT_EDGE.blurMax,
+        Math.max(SHARE_TEXT_EDGE.blurMin, size * SHARE_TEXT_EDGE.blurK)) * edge;
+      g.shadowOffsetX = 0; g.shadowOffsetY = 0;
+      g.strokeStyle = SHARE_INK.keyline;
+      g.lineWidth = Math.min(SHARE_TEXT_EDGE.keyMax,
+        Math.max(SHARE_TEXT_EDGE.keyMin, size * SHARE_TEXT_EDGE.key));
+      g.lineJoin = "round"; g.lineCap = "round";
+      if (mw == null) g.strokeText(text, x, y); else g.strokeText(text, x, y, mw);
+      g.shadowColor = sc; g.shadowBlur = sb; g.shadowOffsetX = sx; g.shadowOffsetY = sy;
+      g.strokeStyle = ss; g.lineWidth = lw; g.lineJoin = lj; g.lineCap = lc;
+    }
+    if (mw == null) fill(text, x, y); else fill(text, x, y, mw);
+  };
+  return function () { delete g.fillText; g.__shareEdge = false; };
+}
 function shareWordmark(g, x, y, size, align, edge) {
   g.font = shareFont(800, size);
   const w1 = g.measureText("Inte-").width, w2 = g.measureText("Run").width;
@@ -20115,7 +20209,9 @@ function loadRouteMap(route, pw, ph, prov) {
  * border, which is the card-within-card the brief forbids. The brief overrules it outright ("sample or
  * estimate background luminance behind text and apply a local scrim/keyline when contrast is
  * inadequate"), so the invariant has to be re-established by measurement rather than by construction:
- * see shareVeilPlan, and the eight-photograph table in the phase report.
+ * see shareTextEdgeArm, which is where that keyline now lives. ⚠️ THE SCRIM HALF OF THAT SENTENCE IS
+ * GONE (owner, 2026-08-21: "the gradient is worse! I think it's best to just remove it completely"), so
+ * the brief's "scrim/keyline" pair is discharged by the keyline alone and measured as such.
  *
  * ⚠️ THE RENDERER CANNOT SEE THE RUN. It takes a MODEL from shareCardModel, whose route field is
  * already the privacy-resolved one from runRoutePresentation. Before this the card drew run.route
@@ -20732,265 +20828,6 @@ function shareGroundUnder(probe, gm, rect) {
   return out || [255, 255, 255];
 }
 /**
- * THE SMALLEST VEIL ALPHA THAT CLEARS THE RATIO — SOLVED, NOT TUNED.
- *
- * Canvas composites source-over in the encoded space, channel by channel, so a veil of alpha a over a
- * ground [r,g,b] gives a*ink_c + (1-a)*ground_c and its luminance is read off the RESULT. Walking a in
- * 2% steps and stopping at the first that clears is exact enough for a value that is then verified from
- * the rendered pixels, and it cannot oscillate the way a closed-form inverse does when the ink itself is
- * not black.
- *
- * ⚠️ 2% STEPS ARE ALSO WHY THE PREVIEW AND THE EXPORT AGREE. The probe is shared, so the input is
- * identical; quantising the output means a one-unit wobble in a future probe cannot move the picture.
- *
- * ⚠️ AND THE TARGET IS PER-COLOUR. White on a snow photograph needs 0.58 to reach 4.5:1 and the accent
- * needs 0.78 for the same ratio, because the accent is a mid-tone. One alpha for both would either
- * over-darken the picture or under-serve the teal.
- *
- * ⚠️ THE MEASURED COST OF DOING IT PROPERLY IS SMALL, WHICH IS WHY NO PANEL AND NO NEW CAP IS NEEDED.
- * The hungriest colour over pure magenta solves 0.54 against the flattened model's 0.06; over pure white
- * nothing moved at all, because white is a neutral. Every ground tested lands inside SHARE_SCRIM.max, so
- * the photograph still shows through at every row of copy.
- */
-/**
- * ⚠️ IT SOLVES ABOVE THE TARGET, BY THE ESTIMATOR'S OWN MEASURED ERROR, AND A KNIFE-EDGE EQUALITY IS
- * WHY. The ground is read from a tenth-scale probe, so the number solved against is an average of about
- * a hundred export pixels and the real ground under a glyph can be a shade brighter. Solving exactly at
- * 4.5 therefore delivers "about 4.5", which is a promise that happens to be true rather than one that is
- * kept — measured, the eyebrow came out at 4.52 and 4.53 across the hostile grounds before the photo-fit
- * work, and at **4.41** afterwards on one of them, because contain mode changes the ground the probe
- * averages. The fix is not to accept 4.41 and it is not to re-solve per template: it is to stop asking
- * for equality. 1.10 puts the measured floor at 4.72 across 276 renders, and the cost is a few points of
- * alpha on the small number of photographs bright enough to need any.
- */
-const SHARE_SCRIM_MARGIN = 1.10;
-function shareVeilAlphaFor(fgHex, ground, target) {
-  const fg = shareRelLum(fgHex), ic = shareHexRGB(SHARE_INK.ground), gc = shareGroundRGB(ground);
-  target = target * SHARE_SCRIM_MARGIN;
-  for (let a = 0; a <= 1.0001; a += 0.02) {
-    // ⚠️ PER CHANNEL, BECAUSE THAT IS WHAT CANVAS DOES. source-over composites each channel on its own
-    // and luminance is only recoverable afterwards; compositing a luma average instead is the defect
-    // documented at the top of this section.
-    const b = [a * ic[0] + (1 - a) * gc[0], a * ic[1] + (1 - a) * gc[1], a * ic[2] + (1 - a) * gc[2]];
-    if (shareRatio(fg, shareRelLumRGB(b)) >= target) return Math.min(1, Math.round(a * 50) / 50);
-  }
-  return 1;
-}
-/**
- * THE ONE SCRIM — AND WHY EVERY PHOTO TEMPLATE NOW SHARES IT.
- *
- * ⚠️ THE OWNER AMENDED THE CONTRACT ON 2026-08-19, AND THE AMENDMENT OUTRANKS TWO LINES OF THE PACK.
- * His words: the first card "shows the full picture of the person behind, where the others seem to cut
- * the person off (I want the full picture to be in view....the data and text should always be just an
- * overlay)". TEMPLATE_CONTRACTS asks The Execution's "lower section" and The Progression's "lower panel"
- * to blend into deep ink, and measured off references 02 and 04 that is literally what they do: below
- * the blend the ground is a FLAT luma 13-14 with a standard deviation of 0.5 — no photograph surviving
- * at all — where reference 01 keeps 15-35 with a deviation of 3-7.6 the whole way down. So the two
- * data-led templates were built to the pack and cut the runner in half at 52%/50%. They no longer do.
- *
- * ⚠️ THE CAP IS THE AMENDMENT MADE STRUCTURAL. No caller can ask for an opaque lower section any more,
- * because the solved alpha is clamped below 1 in the ONE place it is solved — a rule enforced per
- * template is a rule the fifth template forgets. There is no "opaque" kind left to pass.
- *
- * ⚠️ AND THE CAP COSTS NOTHING MEASURABLE. Solved against a pure-white photograph the hungriest colour
- * on any of these cards needs 0.78, and the deepest end stop 0.90 — both inside the cap, so no card in
- * the family is darker or lighter by one byte for its presence. It is a floor under the photograph, not
- * a change to the picture.
- *
- * @param spec { blockTop, fade, colours:[{hex,target}] }
- *
- * ⚠️ THE ALPHA IS SOLVED AT THE TOP OF THE BLOCK, WHERE THE SCRIM IS WEAKEST, and the gradient only
- * grows below it — so every row of copy sits on at least the ratio that was solved for. Solving at the
- * middle or the mean would leave the first line, which is the largest and the most read, underserved.
- *
- * ⚠️ AND shareGroundUnder ANSWERS THE BRIGHTEST PIXEL IN THE WHOLE BLOCK, NOT THE MEAN, which is what
- * makes one alpha safe for a split-luminance photograph. A mean would serve the dark half and abandon
- * the bright one, and "bright bottom, dark top" is an ordinary sunset.
- */
-const SHARE_VEIL_STEPS = ["none", "veil", "scrim", "deep"];
-/**
- * ⚠️ THE FADE IS SIZED FROM WHERE THE CONTENT ACTUALLY STARTS, so one function serves four different
- * layouts. A third of the block's own height: The Moment's block is 830px tall and earns 282, The
- * Execution's 922px earns 313, a 4:5 reflow's shorter block earns less. Written as a constant it was
- * 280 on one template and 320 on two others with nothing deciding which, and a fifth template would
- * have had to pick one by eye.
- */
-/**
- * ⚠️ knee: THE SOLVED ALPHA ARRIVES 10px ABOVE THE FIRST LINE, NOT EXACTLY ON IT.
- *
- * The alpha is solved for the block and the gradient's middle stop used to sit exactly on the topmost
- * glyph box — so the promise "every row of copy sits on at least the ratio solved for" was true at the
- * very first pixel row and nowhere above it, with no margin at all. Measured on the eyebrow, which is the
- * element that starts the block: at its exact cap-height box it read 4.52 against a 4.5 target, and with
- * the 6px halo any pixel measurement needs in order to find ground between letterforms, 4.31. There is no
- * glyph in that difference — but a knife-edge equality is not a legibility guarantee, and the probe is a
- * tenth-scale average, so the real ground under a glyph can be a shade brighter than the number solved
- * against. 10px is the 6px of halo plus 4px of margin; it costs ten rows of very slightly deeper scrim
- * above the copy and nothing else.
- */
-/**
- * ⚠️ fadeK / fadeMin / fadeMax ARE HALF WHAT THEY WERE (owner, 2026-08-21): "the gradient at the bottom
- * of the card is too high, it needs to be halved in distance". Measured on the eight real block tops the
- * app produces, the fades went 282/312/325/250 (story) and 228/272/291/200 (feed) to 141/156/163/125 and
- * 114/136/146/100 — each within a pixel of exactly half, INCLUDING the two that sat on the clamp, which
- * is why fadeMin halved with the coefficient rather than staying put.
- *
- * ⚠️ AND HALVING IT CANNOT LOWER THE ALPHA UNDER ANY GLYPH, which is what makes it safe. The alpha is
- * solved from the brightest ground inside the BLOCK rect (see shareVeilPlan) and the gradient reaches it
- * at blockTop - knee, ten pixels above the topmost glyph; the fade's length decides only where the ramp
- * BEGINS, all of which is above the copy. Measured over 160 card states (10 hostile grounds x 2 aspects x
- * 4 templates x both fit modes): the solved alpha is identical in 160 of 160, and comparing the FINISHED
- * cards pixel by pixel from blockTop - knee downwards the worst byte anywhere differs by **1**, in 8 of
- * the 160, at 257 bytes of 2,721,600 — gradient-LUT rounding in the tail below the copy, not a change in
- * the picture. Against a ground-only twin of each card the tier floors are unmoved to three decimals:
- * ink 10.349, accent 4.948, inkSoft 5.031, fast 5.093, slow 3.303, nothing under its target either side.
- * ⚠️ AND THE SWEEP MUST GIVE EACH TEMPLATE ITS OWN TIER SET, or it measures colours the card never sets.
- * Applying all six to all four reported inkFaint at 3.508 and "106 readings under target" — inkFaint is
- * in no template's list but The Execution's, exactly as shareScrimText's own note says.
- *
- * ⚠️ stops IS THE EASING'S RESOLUTION AND IT IS MEASURED, NOT PICKED — see shareEase.
- */
-const SHARE_SCRIM = { fadeK: 0.17, fadeMin: 100, fadeMax: 180, max: 0.92, endK: 0.55, knee: 10,
-  stops: 48 };
-/**
- * SMOOTHERSTEP, BECAUSE A LINEAR RAMP TO TRANSPARENT LEAVES A LINE WHERE IT ENDS.
- *
- * ⚠️ THE OWNER'S SECOND HALF OF THE SAME RULING: "i can see the line where it stops on the current one".
- * That is a Mach band and it is a real artefact rather than taste — the eye's lateral inhibition finds the
- * discontinuity in the RATE of change, not in the value, so a ramp that arrives at zero with a non-zero
- * slope draws an edge at the exact row where it stops however gentle the ramp itself is.
- *
- * ⚠️ 6t^5 - 15t^4 + 10t^3, WHOSE FIRST *AND* SECOND DERIVATIVES ARE ZERO AT BOTH ENDS. smoothstep
- * (3t^2 - 2t^3) zeroes only the first, and its curvature is at its MAXIMUM exactly at the boundary — a
- * curvature spike in the middle of a fade is invisible, one at the top of it is the thing being removed.
- *
- * ⚠️ MEASURED FROM RENDERED PIXELS AS BOUNDARY PROMINENCE — the curvature AT the fade's top row
- * divided by the worst curvature anywhere else in the same fade. Worst flat hostile ground, 504 cards:
- * **7.13 before, 1.21 after**, median **5.38 to 0.95**. So the boundary stops being a standout at all,
- * which is precisely what "I can see the line where it stops" describes. The raw profile says the same
- * thing without any metric at all: before, 1000.0 / 1000.0 / 962.2 — a 37.8-unit step inside 4 rows;
- * after, 1000.0 / 1000.0 / 1000.0 / 991.1 / 964.7.
- * ⚠️ AND PROMINENCE IS THE RIGHT RULER BECAUSE IT IS SCALE-FREE, WHICH THE RAW LAPLACIAN IS NOT. An
- * earlier version of this comment claimed the absolute Laplacian at lag 8 went 0.069889 to 0.008898,
- * "7.9x smaller". That was the PROBE reading its own floor: 0.008898 is exactly one 8-bit step at white,
- * it is never the shipped boundary on any of the 32 flat cards (min 0.007224, median 0.034495, max
- * 0.069023), and the tell was that the stop sweep below reported it identically for 12/24/48/96. Measured
- * properly the absolute figure moves 0.072318 to 0.069023, i.e. 1.05x — because the fade is now HALF AS
- * LONG, so its curvature per pixel is 1.76x steeper and an absolute reading is confounded by the very
- * change the ruling asked for. At a lag of 12 the shipped state reads 1.35x WORSE by that measure
- * (0.106108 to 0.143273) for the same reason, which is the trade the next warning states.
- * ⚠️ SO DO NOT RESTORE AN ABSOLUTE THRESHOLD HERE. Two of the three instruments tried on this reported
- * the fix backwards or not at all, and the one that works measures the boundary against its own fade.
- * ⚠️ A POINTWISE SECOND DIFFERENCE CANNOT SEE ANY OF THIS AND THE FIRST TWO INSTRUMENTS DID NOT. The fade
- * changes alpha by well under 1/255 per row, so the delivered bytes step in whole units and a per-row d2
- * is a train of quantisation spikes — measured, the residual on flat white was 0.00099 both before and
- * after, which is one byte smoothed over nine rows. A slope-difference over a +-12px window is no better:
- * 12px is 12% of a halved fade, by which point an eased curve has picked up real slope, and it reported
- * this fix as 1.7x while the boundary itself had gone flat.
- * ⚠️ AND HALVING ALONE WOULD HAVE MADE IT WORSE, WHICH IS WHY THE TWO HALVES OF THE RULING SHIP TOGETHER:
- * the same linear ramp over half the distance measures **0.120783**, 1.7x worse than what he reported
- * seeing. Halve it without easing it and the line he complained about gets sharper.
- *
- * ⚠️ AND IT IS SAMPLED, BECAUSE A CANVAS GRADIENT IS PIECEWISE LINEAR BETWEEN ITS STOPS. Every stop is
- * itself a slope discontinuity, so the curve is only as smooth as the sampling. Swept 8/12/24/48/96, the
- * boundary Laplacian at lag 8 is 0.017749 / 0.008898 / 0.008898 / 0.008898 / 0.008898 and at lag 4 is
- * 0.008898 / 0.008898 / 0.000000 / 0.000000 / 0.000000 — so it CONVERGES AT 24 and 48 is margin bought
- * for nothing (a gradient stop costs no draw call). Below 12 it does not converge: at 8 the boundary is
- * twice the floor, because the first segment is an eighth of the fade long and is a straight line.
- * ⚠️ THE CURVATURE DID NOT VANISH, IT MOVED, and that is the trade rather than a free win. Worst
- * Laplacian INSIDE the fade goes 0.013966 to 0.052023 and the steepest slope anywhere in it 0.008667 to
- * 0.020148 — 2.3x steeper in the middle. That is the point: a steep smooth ramp with no boundary has
- * nothing for the eye to lock onto, and a steeper ramp also bands LESS, because 8-bit banding is visible
- * when each band is wide.
- */
-function shareEase(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
-function shareScrimFade(gm, blockTop) {
-  const block = Math.max(0, gm.H - blockTop);
-  return Math.round(Math.max(SHARE_SCRIM.fadeMin,
-    Math.min(SHARE_SCRIM.fadeMax, block * SHARE_SCRIM.fadeK)));
-}
-function shareVeilPlan(probe, gm, spec) {
-  const blockTop = spec.blockTop;
-  const fade = spec.fade == null ? shareScrimFade(gm, blockTop) : spec.fade;
-  const rect = shareRect(0, blockTop, gm.W, Math.max(1, gm.H - blockTop));
-  const ground = shareGroundUnder(probe, gm, rect);
-  let a = 0;
-  for (const c of spec.colours || []) a = Math.max(a, shareVeilAlphaFor(c.hex, ground, c.target));
-  a = Math.min(SHARE_SCRIM.max, a);
-  // The step is a NAME for how hard the treatment had to work, so a report can say "this photograph
-  // needed a deep scrim" rather than printing an alpha nobody can interpret.
-  const step = a <= 0.001 ? "none" : a <= 0.55 ? "veil" : a <= 0.82 ? "scrim" : "deep";
-  return { kind: a <= 0.001 ? "none" : "veil", step: step, a: a,
-    end: Math.min(SHARE_SCRIM.max, a + (1 - a) * SHARE_SCRIM.endK),
-    ground: ground, lum: shareRelLumRGB(ground), fadeTop: blockTop - fade, blockTop: blockTop };
-}
-/**
- * ⚠️ MONOTONE, AND THE STOP AT THE TOP OF THE COPY IS THE CONTRACT. 0 where the fade begins, the solved
- * alpha a little ABOVE the top of the copy, and more below it. A two-stop gradient from the fade to the
- * canvas bottom puts only a fraction of the solved alpha under the first line.
- * ⚠️ THE FADE IS NO LONGER ONE STRAIGHT LINE BETWEEN THE FIRST TWO OF THEM — see shareEase for why, and
- * note that SHARE_SCRIM.stops = 1 reproduces the old straight line exactly, which is what makes the
- * before/after an A/B on one field rather than an appeal to history.
- *
- * ⚠️ THE STOP SITS AT blockTop - SHARE_SCRIM.knee, SO THE FIRST LINE HAS MARGIN RATHER THAN EQUALITY.
- * See the knee's own note: on the stop it read 4.52 against a 4.5 target at the glyph box and 4.31 with a
- * measurement halo, which is a promise that happens to be true rather than one that is kept.
- *
- * ⚠️ A GRADIENT AND NOTHING ELSE. There used to be a second pass here — a flat rectangle of ground from
- * the block's top to the canvas bottom whenever the alpha reached 1 — and that rectangle IS the panel
- * the owner's amendment removes. It is gone rather than merely unreachable, because an unreachable
- * branch is what the next template copies.
- */
-function shareVeilDraw(g, gm, plan) {
-  if (!plan || plan.kind === "none") return;
-  const top = Math.max(0, plan.fadeTop);
-  const bt = plan.blockTop - SHARE_SCRIM.knee;
-  if (bt <= top) return;
-  const grad = g.createLinearGradient(0, top, 0, gm.H);
-  const at = (bt - top) / Math.max(1, gm.H - top);
-  // ⚠️ THE FADE IS SAMPLED, NOT ONE MIDDLE STOP. A single stop is a straight line from nothing to the
-  // solved alpha, and its upper end is the line the owner reported seeing. See shareEase.
-  for (let i = 0; i <= SHARE_SCRIM.stops; i++) {
-    const t = i / SHARE_SCRIM.stops;
-    grad.addColorStop(Math.min(0.999, t * at), cardAlpha(SHARE_INK.ground, plan.a * shareEase(t)));
-  }
-  grad.addColorStop(1, cardAlpha(SHARE_INK.ground, plan.end));
-  g.fillStyle = grad; g.fillRect(0, top, gm.W, gm.H - top);
-}
-/**
- * THE THREE TYPE TIERS EVERY PHOTO TEMPLATE'S BLOCK SETS, AND WHY THE LIST IS NOT ONE SHARED CONSTANT.
- *
- * ⚠️ A TEMPLATE SOLVES FOR THE COLOURS IT ACTUALLY DRAWS, AND THE DIFFERENCE IS TEN POINTS OF SOMEBODY'S
- * PHOTOGRAPH. The faint tier needs alpha 0.88 on a white ground where the soft tier needs 0.78, so
- * handing every template a list containing both darkens The Moment and The Progression by ten points to
- * serve a colour neither of them sets. The Execution does set it — the target range at the right end of
- * its chart label — so it adds it, by name, at the call site.
- */
-function shareScrimText() {
-  return [{ hex: SHARE_INK.ink, target: 4.5 }, { hex: SHARE_INK.accent, target: 4.5 },
-    { hex: SHARE_INK.inkSoft, target: 4.5 }];
-}
-/**
- * THE ONE ENTRY POINT. Solve, draw, and hand the plan back so the caller can report what it cost.
- *
- * ⚠️ EVERY PHOTO TEMPLATE GOES THROUGH HERE AND NONE OF THEM PASSES A FADE. That is what stops the
- * three layouts drifting apart again: the geometry each one wants is derived from its own block top by
- * shareScrimFade, so there is no per-template number to get wrong.
- */
-function sharePhotoScrim(g, gm, probe, blockTop, colours) {
-  // ⚠️⚠️ NO PHOTOGRAPH, NO SCRIM — AND THAT IS NOT THE SAME TEST AS "THE PHOTOGRAPH CANNOT BE READ".
-  // shareGroundUnder answers WHITE when it cannot look, which is right for a photograph we have but
-  // cannot sample (fail towards protecting the type) and wrong where there is no photograph at all:
-  // solved from 255 the alpha comes back near its cap and a dark gradient is painted over the lower half
-  // of a matte ground to protect type that already measures 19:1 on it. probe === null is a card with no
-  // picture — which every template can now be, since the poster became photo-optional; probe.data ===
-  // null is a card whose picture tainted the canvas.
-  if (!probe) return { kind: "none", step: "none", a: 0, end: 0, ground: null, blockTop: blockTop };
-  const plan = shareVeilPlan(probe, gm, { blockTop: blockTop, colours: colours });
-  shareVeilDraw(g, gm, plan);
-  return plan;
-}
-/**
  * A LOCAL SCRIM FOR ONE SMALL THING AT THE TOP — the wordmark, over whatever the photograph puts there.
  * ⚠️ A GRADIENT, NEVER A PLATE. The brief's shared visual language is explicit: "subtle photo scrims,
  * not opaque cards". So this darkens a band from the top edge and fades out; on a dark photograph it
@@ -21580,9 +21417,10 @@ function shareMetricDraw(g, gm, mets, P, yValue, yLabel, labelInk) {
     cx += shareFig(g, st.v, cx, yValue, "left");
     // A small connective word between two figures — the poster's "6 OF 6" — set down a rung and in the
     // same quiet tier as the label under it, so the two numbers stay the thing the eye lands on.
-    // ⚠️ IT USED TO BE --ink-faint OUTRIGHT AND THAT WAS THE LAST TIER NOBODY GUARANTEED. shareScrimText
-    // solves the photo scrim for ink, accent and --ink-soft and has never named --ink-faint, so on a
+    // ⚠️ IT USED TO BE --ink-faint OUTRIGHT AND THAT WAS THE LAST TIER NOBODY GUARANTEED. Back when a
+    // scrim was solved per colour it named ink, accent and --ink-soft and never --ink-faint, so on a
     // photograph this one word sat outside the solve; and on a session ground --ink-faint measures 3.83:1.
+    // The scrim is gone now and every tier carries its own keyline, but the reasoning below still holds.
     // Taking the caller's own quiet tier settles both at once — it is the colour of the label directly
     // beneath it, which is the same role, so there was never a reason for a second answer here.
     if (st.mid) {
@@ -21756,10 +21594,13 @@ function shareMomentCard(g, m, gm, probe, wm, box) {
   // digits — and the brief's shared visual language asks for "subtle photo scrims, not opaque cards".
   // The alpha is solved from the sampled ground for every colour the block sets, at the TOP of the block
   // where the scrim is weakest, and grows below it.
-  // ⚠️ AND THE LABEL TIER IS inkSoft HERE, WHERE THE POSTER USES inkFaint — see shareScrimText.
-  const plan = sharePhotoScrim(g, gm, probe, p.blockTop, shareScrimText());
-  // ⚠️ SCORED AGAINST EVERY PIECE OF COPY, NOT AGAINST THE WORDMARK ALONE, and drawn after the veil so
-  // a zone that dips into the fade stays crisp rather than being dimmed with the picture.
+  // ⚠️ AND THE LABEL TIER IS inkSoft HERE, WHERE THE POSTER USES inkFaint — see shareQuietInk.
+  // ⚠️ THE SCRIM THAT PARAGRAPH DESCRIBES IS GONE. The owner, 2026-08-21, having seen it halved and
+  // eased on his phone: "the gradient is worse! I think it's best to just remove it completely". The
+  // copy carries its own keyline instead — see shareTextEdgeArm — which is the answer he had already
+  // accepted at the top of the card. Measured over five hostile grounds, median glyph-against-its-own-
+  // edge contrast is 7.87:1 or better on every template.
+  // ⚠️ SCORED AGAINST EVERY PIECE OF COPY, NOT AGAINST THE WORDMARK ALONE.
   if (m.route) {
     const zone = shareRoutePlacement(gm, { photoBox: box, top: gm.safe.y0, bottom: p.blockTop - 32,
       textRects: [shareRectPad(wm.rect, 20)].concat(p.rects) });
@@ -21946,14 +21787,6 @@ function shareQuietInk(m) {
 function sharePosterCard(g, m, gm, probe, wm) {
   const p = sharePosterPlan(g, m, gm, wm);
   const quiet = shareQuietInk(m);
-  // ⚠️ THE SCRIM COMES BEFORE THE ROUTE, so a route that dips into the fade stays crisp rather than
-  // being dimmed with the picture — the ordering The Moment's own note records. With no photograph
-  // sharePhotoScrim draws nothing at all: probe is null, which is not the same test as "the photograph
-  // cannot be sampled", and getting the two confused is what would paint a dark band across a flat
-  // ground to protect type that already measures 19:1.
-  sharePhotoScrim(g, gm, probe, p.blockTop,
-    [{ hex: SHARE_INK.ink, target: 4.5 }, { hex: SHARE_INK.accent, target: 4.5 },
-     { hex: quiet, target: 4.5 }]);
   // ⚠️ THE GEOMETRY IS ALREADY THE PRIVACY-RESOLVED ONE. runRoutePresentation trims the points within
   // 250 m of each end BEFORE this, so hidden start and finish is applied before normalisation exactly as
   // the brief requires — the shape drawn and centred is the shape that survived, not a full route with
@@ -22460,15 +22293,14 @@ function shareExecutionCard(g, m, gm, probe, wm) {
   // against kept the LEAST of its picture — 13.4% of the subject surviving the block against 20.8% and
   // 21.7%. The cause was one element, the target range at the right end of the chart caption, and the
   // answer is to set it a tier brighter rather than to darken the whole card for it: inkSoft is already
-  // solved for by shareScrimText, so the list drops to 0.80 and the family is uniform to two points.
+  // already the brighter tier, so the family stayed uniform to two points. ⚠️ THE SCRIM IT BALANCED IS
+  // GONE (ruling of 2026-08-21) and the tier choice is kept: it was the right call on its own merits.
   // ⚠️ THE ALTERNATIVE — SOLVE FOR THE MISS COLOURS ONLY WHEN A MISS EXISTS — WAS REJECTED. It would make
   // the scrim's depth depend on the run's RESULT, so two cards of the same photograph would be different
   // shades and the runner could read the verdict off how dark their picture came out.
   // ⚠️ AND NOTHING ON A PHOTO CARD SETS THE FAINT TIER NOW, which is what makes that testable rather than
   // remembered: the poster keeps it (flat ground, 6.50:1 by arithmetic) and the three photo templates do
   // not use it at all.
-  sharePhotoScrim(g, gm, probe, p.blockTop, shareScrimText().concat(
-    [{ hex: SHARE_INK.fast, target: 3.2 }, { hex: SHARE_INK.slow, target: 3.2 }]));
   shareFieldRoute(g, m, gm, probe, wm, p.blockTop);
   shareWordmark(g, gm.M, wm.y, wm.size, "left", wm.edge);
   if (p.eye) {
@@ -22742,7 +22574,6 @@ function shareProgressionCard(g, m, gm, probe, wm) {
   // ⚠️ THE SAME SCRIM, AND ONLY THE THREE TYPE TIERS. This template's one graphic is the ladder, whose
   // bar is the accent and whose track is solved against the accent by construction (see the track's own
   // note), so there is no fourth colour to ask for and no reason to darken a photograph for one.
-  sharePhotoScrim(g, gm, probe, p.blockTop, shareScrimText());
   shareFieldRoute(g, m, gm, probe, wm, p.blockTop);
   shareWordmark(g, gm.M, wm.y, wm.size, "left", wm.edge);
   if (p.eye) {
@@ -22874,6 +22705,13 @@ function shareDrawBody(g, m, gm, S) {
   // ⚠️ ONE DISPATCH, AND THE TEMPLATE IS THE MODEL'S ANSWER RATHER THAN THE RUNNER'S ASK.
   // shareTemplateFor has already refused a template this run cannot honestly fill, so nothing here has
   // to re-check eligibility — and if it did, the two answers could disagree.
+  // ⚠️ THE COPY'S EDGE IS ARMED HERE, FOR THE WHOLE DISPATCH, AND DISARMED AFTER IT. See
+  // shareTextEdgeArm: it replaced the scrim over the lower half of the card, and it is armed once
+  // rather than applied at each of the templates' fifteen text call sites so that a template cannot be
+  // written — or added later — without it.
+  // ⚠️ GATED ON THE PROBE, WHICH IS THE PRESENCE OF A PHOTOGRAPH, exactly as the wordmark's edge above
+  // and the scrim before it were. On a matte ground every tier already clears 5.2:1.
+  const disarm = shareTextEdgeArm(g, probe ? S : 0);
   if (m.template === "moment") shareMomentCard(g, m, gm, probe, wm, box);
   else if (m.template === "execution") shareExecutionCard(g, m, gm, probe, wm);
   else if (m.template === "progression") shareProgressionCard(g, m, gm, probe, wm);
@@ -22881,6 +22719,7 @@ function shareDrawBody(g, m, gm, S) {
   // ⚠️ NULL IS REACHABLE AND IT IS NOT AN ERROR: a treadmill run with no photograph chosen yet fits no
   // template at all. It gets the placeholder, never the composition the brief exists to remove.
   else sharePlaceholderCard(g, m, gm, wm);
+  disarm();
 }
 /**
  * EVERY FACT THE CARD PRINTS, GATHERED FROM THE SOURCES THE DEBRIEF AND THE RECAP ALREADY READ.

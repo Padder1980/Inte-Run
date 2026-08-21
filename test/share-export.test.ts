@@ -412,13 +412,16 @@ test("BLOCKER: no photograph means no scrim, which is not the same test as an un
   // solved from 255 the alpha comes back near its cap and a dark gradient is painted across the lower
   // half of a matte ground, to protect type that already measures 19:1 on it. probe === null is a card
   // with no picture; probe.data === null is a card whose picture tainted the canvas.
-  // ⚠️ ONE SCRIM NOW, WHERE THERE WERE TWO. The fade across the top of the card went at the owner's
-  // instruction (2026-08-20) and the wordmark carries a keyline instead — which needs no probe at all, so
-  // it cannot be solved from a white ground by mistake. The block's own scrim keeps the gate.
-  for (const n of ["sharePhotoScrim"]) {
-    const b = code(lift(n));
-    assert.match(b, /if \(!probe\) return/,
-      n + " does not refuse a card with no photograph, so a scrim is solved from a white ground");
+  // ⚠️ NO SCRIM AT ALL NOW, WHERE THERE WERE TWO, AND BOTH REMOVALS WERE THE OWNER'S. The fade across the
+  // top went on 2026-08-20 and the fade across the bottom on 2026-08-21 ("the gradient is worse! I think
+  // it's best to just remove it completely"). So the way a white-sampled ground can no longer paint a
+  // gradient over a matte card is the strongest one available: there is nothing left that solves an alpha
+  // from a sample. The rest of this test still matters — the sampler's fail-towards-white rule is READ by
+  // the route's keyline weight, so getting it wrong now thickens an outline rather than darkening a card.
+  const src2 = page();
+  for (const dead of ["sharePhotoScrim", "shareVeilPlan", "shareVeilDraw", "shareVeilAlphaFor"]) {
+    assert.ok(!new RegExp("\\b" + dead + "\\b").test(src2),
+      dead + " is back, so a scrim can be solved from a white ground again");
   }
   // ⚠️ AND THE WORDMARK'S TREATMENT IS GATED ON THE SAME FACT, resolved once in shareDrawBody: a card with
   // no photograph gets no edge, because on the family's own grounds the wordmark measures 11.0 to 19.4:1.
@@ -427,14 +430,16 @@ test("BLOCKER: no photograph means no scrim, which is not the same test as an un
   // and the fail-towards-white rule is intact for a photograph that cannot be READ
   assert.match(code(lift("shareGroundUnder")), /if \(!probe \|\| !probe\.data\) return \[255, 255, 255\]/,
     "the sampler no longer fails towards the strongest treatment when it cannot see the photograph");
-  // ⚠️ THE GATE IS IN THE FUNCTION, NOT AT THE CALL SITES, AND THAT IS WHAT MAKES IT TESTABLE. The poster
-  // used to omit both calls by hand because it never had a photograph; four call sites each remembering
-  // to check is four chances for the fifth to forget.
-  const poster = code(lift("sharePosterCard"));
-  for (const n of ["sharePhotoScrim"]) {
-    assert.ok(poster.includes(n + "(g, gm, probe"),
-      "the poster does not go through " + n + ", so its photograph is composited without a solved scrim");
-  }
+  // ⚠️ THE GATE IS IN ONE PLACE, NOT AT THE CALL SITES, AND THAT IS STILL WHAT MAKES IT TESTABLE — it has
+  // simply moved. It used to be the scrim's own "if (!probe) return"; with the scrim gone, the one place
+  // that decides whether a card is treated as having a photograph is the dispatch, which resolves the
+  // probe once and hands the same answer to the wordmark's edge and to the copy's.
+  const bodyOnce = code(lift("shareDrawBody"));
+  assert.equal((bodyOnce.match(/shareLumaProbe\(/g) || []).length, 1,
+    "the probe is resolved more than once in the dispatch, so two answers to 'is there a photograph' " +
+    "can disagree");
+  assert.match(bodyOnce, /shareTextEdgeArm\(g, probe \? S : 0\)/,
+    "the copy's edge is no longer decided from that one probe");
   // and the topographic ground is what the poster keeps when there is no picture
   const bodyFn = code(lift("shareDrawBody"));
   assert.match(bodyFn, /if \(!m\.photo\) shareTopoDraw/,

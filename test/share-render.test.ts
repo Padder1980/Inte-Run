@@ -82,11 +82,11 @@ function liftConst(name: string): string {
 }
 
 const CONSTS = ["SHARE_INK", "SHARE_TYPE", "SHARE_TYPE_FEED", "SHARE_TRACK", "SHARE_SUBJECT",
-  "SHARE_ROUTE_ZONES", "SHARE_TOPO", "SHARE_VEIL_STEPS", "SHARE_PROBE_W", "FF",
+  "SHARE_ROUTE_ZONES", "SHARE_TOPO", "SHARE_PROBE_W", "FF",
   "SHARE_ZONE_PEN", "SHARE_ZONE_MIN_H", "SHARE_BADGE", "SHARE_QUIET", "MOMENT_GAP", "POSTER_GAP", "POSTER_TAG",
   "SHARE_POSTER_PAD", "EXEC_GAP", "PROG_GAP", "SHARE_CHART", "SHARE_PHOTO_FLOOR",
-  "SHARE_EVEN_SPREAD_S", "SHARE_LADDER", "SHARE_SCRIM", "SHARE_LUMW", "SHARE_HAIR", "SHARE_BLUR",
-  "SHARE_SCRIM_MARGIN", "SHARE_EFFORT", "SHARE_GROUND", "SHARE_WM_EDGE",
+  "SHARE_EVEN_SPREAD_S", "SHARE_LADDER", "SHARE_LUMW", "SHARE_HAIR", "SHARE_BLUR",
+  "SHARE_EFFORT", "SHARE_GROUND", "SHARE_WM_EDGE", "SHARE_TEXT_EDGE",
   // the one table that decides a canvas height, and the two shapes there are
   "SHARE_ASPECTS", "SHARE_ASPECT_H", "SHARE_METRIC_MAX"];
 /**
@@ -105,8 +105,8 @@ const FNS = ["shareFont", "shareTypeSize", "cardAlpha", "cardLsWidth", "shareFig
   "shareBoxLeavesGap", "shareBlurBg", "sharePhotoCompose",
   "shareZoneRect", "shareZoneScore", "shareRouteFallback", "shareRoutePlacement",
   "shareLin255", "shareLinLut", "shareRelLumRGB", "shareHexRGB", "shareGroundRGB", "shareRectGroundRGB",
-  "shareRelLum", "shareLumOfByte", "shareRatio", "shareGroundUnder", "shareVeilAlphaFor",
-  "shareVeilPlan", "shareVeilDraw", "shareScrimFade", "shareScrimText", "sharePhotoScrim", "shareEase",
+  "shareRelLum", "shareLumOfByte", "shareRatio", "shareGroundUnder",
+  "shareTextEdgeArm", "shareFillIsLight",
   "shareGroundFill", "shareTopoField", "shareEffortHex", "shareHexHSL", "shareHSLHex",
   "shareGroundStops", "shareGroundPaint", "shareQuietInk", "shareTopoDraw", "shareTopoCanvas",
   "shareRouteProject", "shareRouteSimplify", "shareRoutePath", "shareRouteDraw",
@@ -439,14 +439,23 @@ test("BLOCKER: the frame, its clip, its neon border and the radial glows are gon
     // that make a halo not a glow, and both are asserted rather than assumed: the shadow colour must be a
     // DEEP ink, and it must be paired with a keyline stroke. A bright shadow or a shadow with no keyline
     // under it is exactly the neon the brief forbids, and either one still fails here.
-    if (name === "shareWordmark") {
-      assert.match(b, /shadowColor = SHARE_WM_EDGE\.halo/,
-        "the wordmark's halo is no longer the named deep one");
+    // ⚠️ TWO EXEMPTIONS, NOT ONE, AND THEY ARE THE SAME DEVICE AT TWO SCALES. The wordmark's edge
+    // replaced the fade across the TOP of the card (2026-08-20); shareTextEdgeArm's replaced the fade
+    // across the BOTTOM of it (2026-08-21, "the gradient is worse! I think it's best to just remove it
+    // completely"). Both are a keyline with a halo under it, and the exemption is stated as the two
+    // properties that make a halo not a glow rather than as a name: the shadow colour must be a DEEP
+    // ink, and it must be paired with a keyline stroke. A bright shadow, or a shadow with no keyline
+    // under it, is the neon the brief forbids and still fails here.
+    const EDGE: Record<string, string> = { shareWordmark: "SHARE_WM_EDGE", shareTextEdgeArm: "SHARE_TEXT_EDGE" };
+    if (EDGE[name]) {
+      const K = EDGE[name]!;
+      assert.match(b, new RegExp("shadowColor = " + K + "\\.halo"),
+        name + "'s halo is no longer the named deep one");
       assert.match(b, /strokeStyle = SHARE_INK\.keyline/,
-        "the wordmark sets a shadow with no keyline under it, which is a glow");
-      const halo = liftConst("SHARE_WM_EDGE");
+        name + " sets a shadow with no keyline under it, which is a glow");
+      const halo = liftConst(K);
       assert.match(halo, /halo: "rgba\(2, ?10, ?8/,
-        "the halo is not the route's own deep ink: " + halo);
+        K + "'s halo is not the route's own deep ink: " + halo);
       continue;
     }
     assert.ok(!/shadowBlur|shadowColor/.test(b), name + " sets a shadow, so the card glows");
@@ -753,97 +762,6 @@ function hexRGB(hex: string): number[] {
   return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
 }
 
-test("BLOCKER: the solved veil alpha reaches its ratio over a COLOURED ground, not just a grey one", () => {
-  // ⚠️⚠️ THIS TEST'S PREVIOUS VERSION SWEPT SEVEN GREY BYTES AND WAS STRUCTURALLY INCAPABLE OF FAILING.
-  // The solver carried the ground as a weighted-average BYTE and linearised it afterwards, which is exact
-  // for a neutral and one-directionally wrong for everything else — so over a saturated red ground it
-  // asked for NO scrim at all and the three type tiers delivered 4.00 / 1.94 / 1.91 against a 4.5 bar.
-  // Every probe in this file was built with new Uint8ClampedArray(...).fill(lum), i.e. R=G=B: the exact
-  // family of values the wrong model gets right. The guard-blind-to-the-new-input trap, in the one place
-  // a scalar looked obviously sufficient. It sweeps a colour cube now, and the composite is redone here
-  // per channel from first principles rather than through the app's own helper.
-  const E = env();
-  const ink = hexRGB(E.SHARE_INK.ground);
-  const CUBE: number[][] = [];
-  for (const r of [0, 64, 128, 192, 255]) for (const g of [0, 64, 128, 192, 255])
-    for (const b of [0, 64, 128, 192, 255]) CUBE.push([r, g, b]);
-  const tiers = [E.SHARE_INK.ink, E.SHARE_INK.accent, E.SHARE_INK.inkSoft, E.SHARE_INK.inkFaint,
-    E.SHARE_INK.fast, E.SHARE_INK.slow];
-  let worst = 99, worstAt = "";
-  for (const hex of tiers) {
-    const fg = trueLum(hexRGB(hex));
-    for (const target of [3, 3.2, 4.5]) {
-      for (const gc of CUBE) {
-        const a = E.shareVeilAlphaFor(hex, gc, target);
-        const got = rat(fg, trueLum([0, 1, 2].map((i) => a * ink[i]! + (1 - a) * gc[i]!)));
-        // A ceiling is not a failure: inkFaint on the flat ground is 6.50:1 and cannot reach 7 at any
-        // alpha. Pinned to alpha 1 so a solver that simply gives up early still fails.
-        assert.ok(got >= target - 0.02 || a >= 1,
-          hex + " target " + target + " on ground " + gc.join(",") + ": alpha " + a +
-          " delivers " + got.toFixed(2));
-        if (got / target < worst / target) { worst = got; worstAt = hex + " on " + gc.join(","); }
-        // ⚠️ AND IT IS THE MINIMUM FOR THE TARGET IT AIMS AT, WHICH IS THE TARGET TIMES THE MARGIN. The
-        // solver deliberately overshoots the requested ratio by SHARE_SCRIM_MARGIN, because the ground it
-        // is handed is a tenth-scale average — see that constant's note. Written against the RAW target
-        // this read as "the alpha is not minimal" the moment the margin arrived, which is the ruler no
-        // longer measuring the thing rather than a fault.
-        const aim = target * E.SHARE_SCRIM_MARGIN;
-        if (a > 0) {
-          const less = Math.max(0, a - 0.02);
-          const w = rat(fg, trueLum([0, 1, 2].map((i) => less * ink[i]! + (1 - less) * gc[i]!)));
-          assert.ok(w < aim + 0.35, "the alpha is not minimal for " + hex + " aim " + aim.toFixed(2) +
-            " ground " + gc.join(","));
-        }
-        // ⚠️ AND THE MARGIN IS DELIVERED, not merely asked for: measured from rendered pixels the eyebrow
-        // sat at 4.41 against a 4.5 target before it existed, so a solver that quietly dropped it would
-        // pass every other guard in this file.
-        assert.ok(got >= aim - 0.02 || a >= 1, hex + " on " + gc.join(",") + ": alpha " + a +
-          " delivers " + got.toFixed(2) + " against an aim of " + aim.toFixed(2));
-      }
-    }
-  }
-  // ⚠️ AND THE SATURATED CASES ARE NAMED, so a future cube that happens to miss them still fails here.
-  // These are the six the old model refused outright; the alpha it asked for is quoted beside each.
-  const REFUSED: [number[], number][] = [[[255, 0, 0], 0.00], [[255, 0, 255], 0.06], [[0, 0, 255], 0.00],
-    [[0, 255, 0], 0.68], [[178, 58, 42], 0.18], [[255, 140, 0], 0.62]];
-  for (const [gc, old] of REFUSED) {
-    const a = E.shareVeilAlphaFor(E.SHARE_INK.inkSoft, gc, 4.5);
-    const got = rat(trueLum(hexRGB(E.SHARE_INK.inkSoft)),
-      trueLum([0, 1, 2].map((i) => a * ink[i]! + (1 - a) * gc[i]!)));
-    assert.ok(got >= 4.48, "ground " + gc.join(",") + " delivers " + got.toFixed(2));
-    assert.ok(a > old + 0.01, "ground " + gc.join(",") + ": the solver is back to the flattened model, " +
-      "which asked " + old + " and this asks " + a);
-  }
-  // ⚠️ THE WEIGHTS EXIST IN EXACTLY ONE PLACE, which is what stops the two models diverging again — the
-  // ground was averaged in the encoded space while the foreground was linearised properly, and that was
-  // two copies of these three numbers doing two different things.
-  const src = page();
-  const at = src.indexOf("function shareRelLum(");
-  const region = src.slice(src.indexOf("// ---- luminance,"), src.indexOf("function shareVeilPlan("));
-  assert.ok(at > 0 && region.length > 500, "the luminance section moved");
-  for (const w of ["0.2126", "0.7152", "0.0722"]) {
-    const n = (region.match(new RegExp(w.replace(".", "\\."), "g")) || []).length;
-    assert.equal(n, 1, "the channel weight " + w + " appears " + n + " times in the luminance section; " +
-      "one of them is a second luminance model waiting to disagree with SHARE_LUMW");
-  }
-  assert.deepEqual(E.SHARE_LUMW, [0.2126, 0.7152, 0.0722], "SHARE_LUMW is not the WCAG weights");
-  // Monotone in a grey ground, or a brighter photograph could ask for less treatment.
-  let prev = -1;
-  for (let l = 0; l <= 255; l += 5) {
-    const a = E.shareVeilAlphaFor(E.SHARE_INK.ink, [l, l, l], 4.5);
-    assert.ok(a >= prev - 1e-9, "the solver is not monotone in the ground at luma " + l);
-    prev = a;
-  }
-  assert.equal(E.shareVeilAlphaFor(E.SHARE_INK.ink, [0, 0, 0], 4.5), 0, "a black ground is being darkened");
-  // ⚠️ PER-COLOUR, AND THE ACCENT IS THE DEMANDING ONE. It is a mid-tone, so one alpha for both would
-  // either over-darken the picture or under-serve the teal.
-  assert.ok(E.shareVeilAlphaFor(E.SHARE_INK.accent, [236, 236, 236], 4.5) >
-    E.shareVeilAlphaFor(E.SHARE_INK.ink, [236, 236, 236], 4.5),
-    "the accent is being treated as if it were white");
-  assert.ok(worst >= 2.98, "the worst delivered ratio across the cube is " + worst.toFixed(2) +
-    " at " + worstAt);
-});
-
 test("BLOCKER: the ground is sampled as a colour, and the brightest one by TRUE luminance", () => {
   // ⚠️ THE SAMPLER RANKED PIXELS ON A WEIGHTED BYTE AND THEN THREW THE CHROMA AWAY, so the solver could
   // not have recovered it even if it wanted to. On a magenta pixel the old answer was byte 73 — a dark
@@ -872,356 +790,150 @@ test("BLOCKER: the ground is sampled as a colour, and the brightest one by TRUE 
   assert.match(lift("shareLumaProbe"), /catch/, "the probe has no failure path at all");
   // A bare number is the grey it actually is, and nothing in the renderer may hand one over.
   assert.deepEqual(E.shareGroundRGB(200), [200, 200, 200], "a grey ground is not a grey triple");
-  // ⚠️ ONE READER OF THE SAMPLER NOW, WHERE THERE WERE TWO. The wordmark's band used to be sampled and
-  // solved as well; the fade across the top is gone at the owner's instruction and the wordmark carries a
-  // keyline, which needs no sample at all — that is the point of it, since the 2.09:1 defect was a sample
-  // that missed. So this sweep names the scrim that remains, and a second sampler arriving later has to
-  // be added here deliberately.
-  for (const fn of ["shareVeilPlan"]) {
-    assert.match(lift(fn), /shareGroundUnder\(probe, gm,/,
-      fn + " no longer takes its ground from the sampler");
+  // ⚠️ THE SAMPLER HAS NO SCRIM LEFT TO SOLVE, AND ONE READER LEFT THAT IS NOT A SCRIM. The fade across
+  // the top went on 2026-08-20 and the fade across the bottom on 2026-08-21 ("the gradient is worse! I
+  // think it's best to just remove it completely"), so nothing solves an alpha from a sample any more.
+  // What still reads it is the ROUTE, which thickens its keyline over a bright picture — and that is a
+  // keyline decision, not a wash, so it is the right survivor. Named here so a second sampler arriving
+  // later has to be added deliberately.
+  assert.match(lift("shareRectGroundRGB"), /shareGroundUnder\(probe, gm, rect\)/,
+    "the one remaining reader no longer takes its ground from the sampler");
+  // ⚠️ sharePosterCard IS THE SECOND LEGITIMATE READER AND IT IS ALSO A KEYLINE DECISION: it asks how
+  // bright its route field is so the route's own outline can be thickened over a pale sky. Both survivors
+  // are asking "how heavy should this OUTLINE be", never "how dark should this WASH be", which is the
+  // distinction that matters now the scrim is gone.
+  const samplers = ["shareRectGroundRGB", "shareGroundUnder", "sharePosterCard"];
+  for (const [name, body] of closure("drawShareCard")) {
+    if (samplers.includes(name)) continue;
+    assert.ok(!/shareGroundUnder\(/.test(body),
+      name + " samples the ground directly; route it through shareRectGroundRGB or add it to this list");
   }
   assert.ok(!/shareGroundUnder/.test(lift("shareWordmark") + lift("shareWordmarkPlan")),
     "the wordmark is sampling the ground again; its whole point is that it does not need to");
 });
 
-test("BLOCKER: the copy's first line sits on MORE than the solved alpha, not exactly on it", () => {
-  // ⚠️ SOLVE AT THE MIDDLE OR THE MEAN AND THE FIRST LINE — the largest type on the card — IS THE ONE
-  // LEFT UNDERSERVED. Three stops, monotone, with the solved alpha arriving just ABOVE the block's top.
-  //
-  // ⚠️ THIS TEST'S PREVIOUS VERSION PINNED THE STOP'S POSITION TO blockTop, AND THAT WAS A KNIFE EDGE
-  // DRESSED AS A GUARANTEE. Measured on the eyebrow — the element that starts the block — the delivered
-  // ratio was 4.52 against a 4.5 target at its exact cap box and 4.31 with the 6px halo any pixel
-  // measurement needs to find ground between letterforms. Restated to the INVARIANT the promise is
-  // about: interpolate the real gradient at the top of the copy and require it to exceed the alpha that
-  // was solved for. A stop pinned to a position cannot express that; this fails if the knee is removed.
-  const E = env();
-  const gm = E.cardGeom("story");
-  const probe = { w: 4, h: 7, data: new Uint8ClampedArray(4 * 7 * 4).fill(240) };
-  const plan = E.shareVeilPlan(probe, gm, { blockTop: 1200, fade: 280, colours: [{ hex: E.SHARE_INK.ink, target: 4.5 }] });
-  assert.ok(plan.a > 0, "a bright photograph earned no veil");
-  assert.ok(plan.end >= plan.a, "the veil gets weaker further down the card");
-  assert.equal(plan.fadeTop, 920, "the fade does not start where it was asked to");
-  assert.ok(E.SHARE_VEIL_STEPS.includes(plan.step), "the plan's step is not one of the named ones");
-  const ctx = E.ctx();
-  E.shareVeilDraw(ctx, gm, plan);
-  const stops = ctx.log.filter((e: any[]) => e[0] === "stop");
-  // ⚠️ THIS USED TO PIN THE COUNT AT THREE AND THE RULING OF 2026-08-21 BROKE IT — the fade is sampled
-  // now, so the straight line between the first two stops has become a curve. The claim this test is
-  // about is unaffected and is the interpolation below; what is asserted here is the ENDS and the fact
-  // that there is more than a straight line, because a count of three IS the artefact the owner reported
-  // seeing. The count itself belongs to the ease's own guard, which owns SHARE_SCRIM.stops.
-  assert.ok(stops.length > 3, "the veil is a three-stop gradient again, so its fade is one straight line " +
-    "from nothing to the solved alpha — which is the edge ruling 8 removed");
-  assert.equal(stops[0][1], 0, "the gradient does not begin at the top of the fade");
-  assert.equal(stops[stops.length - 1][1], 1, "the gradient does not reach the bottom of the canvas");
-  const alphaOf = (s: string) => parseFloat((/,([0-9.]+)\)$/.exec(String(s)) || ["", "0"])[1]!);
-  const off = stops.map((s: any[]) => s[1] as number), av = stops.map((s: any[]) => alphaOf(s[2]));
-  assert.ok(av[1]! >= av[0]! && av[2]! >= av[1]!, "the gradient is not monotone: " + av.join(","));
-  // The gradient is drawn from fadeTop to the canvas bottom; interpolate it at the top of the copy.
-  const at = (y: number) => {
-    const f = (y - plan.fadeTop) / (gm.H - plan.fadeTop);
-    for (let i = 1; i < off.length; i++) {
-      if (f <= off[i]!) return av[i - 1]! + (av[i]! - av[i - 1]!) * (f - off[i - 1]!) / (off[i]! - off[i - 1]!);
-    }
-    return av[av.length - 1]!;
-  };
-  assert.ok(at(plan.blockTop) > plan.a + 1e-6, "the first line of copy sits on exactly the solved alpha (" +
-    at(plan.blockTop).toFixed(4) + " against " + plan.a + "), so the promise has no margin at all");
-  assert.ok(E.SHARE_SCRIM.knee > 0 && E.SHARE_SCRIM.knee <= 24,
-    "the knee is " + E.SHARE_SCRIM.knee + ": either absent, or deep enough to be a design change");
-  // And it never overshoots: the knee may not push the solved alpha above the deepest stop.
-  assert.ok(at(plan.blockTop) <= plan.end + 1e-6, "the knee has made the copy's top darker than the foot");
-  // A dark photograph earns nothing at all, which is what every reference shows.
-  const dark = { w: 4, h: 7, data: new Uint8ClampedArray(4 * 7 * 4).fill(8) };
-  const none = E.shareVeilPlan(dark, gm, { blockTop: 1200, colours: [{ hex: E.SHARE_INK.ink, target: 4.5 }] });
-  assert.equal(none.kind, "none", "a dark photograph is being veiled anyway");
-  const c2 = E.ctx();
-  E.shareVeilDraw(c2, gm, none);
-  assert.equal(c2.log.length, 0, "a 'none' plan still drew something");
+test("BLOCKER: the copy over a photograph carries its own keyline, and it is armed once", () => {
+  // ⚠️ THIS REPLACES EIGHT GUARDS ON THE SCRIM AND IT IS THE INVERSE OF THEM. The owner, 2026-08-21,
+  // having seen the fade halved and eased on his phone: "the gradient is worse! I think it's best to
+  // just remove it completely". So there is no solved alpha, no fade length and no gradient over the
+  // lower half; the copy is defended by its own edge, which is the answer he had already accepted at
+  // the top of the card ("i'm happy with the no gradient at the top of the card, it looks better").
+  const src = appScript();
+  // ⚠️ ARMED ONCE FOR THE WHOLE DISPATCH, WHICH IS THE POINT. The three photo templates draw their copy
+  // from about fifteen places; a keyline applied per call site is a keyline one of them is missing —
+  // the fix-one-builder-not-the-other trap this project has paid for six times. A template added later
+  // must inherit it with no line of its own.
+  const body = lift("shareDrawBody");
+  assert.match(body, /shareTextEdgeArm\(g, probe \? S : 0\)/,
+    "shareDrawBody no longer arms the copy's edge for the dispatch");
+  assert.match(body, /disarm\(\)/, "the edge is armed and never disarmed, so it leaks past the card");
+  // ⚠️ GATED ON THE PROBE, WHICH IS THE PRESENCE OF A PHOTOGRAPH. On the family's own matte grounds every
+  // tier already clears 5.2:1, and an outline there would move eighteen signed-off exports.
+  const arm = lift("shareTextEdgeArm");
+  assert.match(arm, /!\(edge > 0\)/, "the edge is not switched off when there is no photograph");
+  // ⚠️ STROKE FIRST, FILL OVER. A shadow is cast behind its own shape within one operation, so stroking
+  // with the halo set puts halo under keyline under glyph. Painting the halo with the FILL instead makes
+  // strengthening it worse — measured on the sticker, 0.45 to 0.75 took small type 5.45 to 4.69.
+  assert.ok(arm.indexOf("strokeText") < arm.lastIndexOf("fill("),
+    "the glyph is filled before it is stroked, so the keyline lands on top of it");
+  // ⚠️ AND EVERY SCRIM IDENTIFIER IS GONE RATHER THAN UNREACHABLE, because an unreachable branch is what
+  // the next template copies.
+  for (const dead of ["sharePhotoScrim", "shareVeilDraw", "shareVeilPlan", "shareScrimFade",
+    "shareScrimText", "shareEase", "shareVeilAlphaFor", "SHARE_SCRIM", "SHARE_VEIL_STEPS",
+    "SHARE_SCRIM_MARGIN"]) {
+    assert.ok(!new RegExp("\\b" + dead + "\\b").test(src),
+      dead + " is still in the renderer after the gradient was removed");
+  }
 });
 
-test("BLOCKER: the scrim is a gradient and nothing else, at every COLOUR a photograph can have", () => {
-  // ⚠️ THE OWNER'S AMENDMENT, 2026-08-19, AS A MECHANISM RATHER THAN A HABIT. He asked for "the full
-  // picture to be in view....the data and text should always be just an overlay", so no card may end its
-  // photograph. There used to be a second pass in shareVeilDraw — a flat rectangle of ground from the
-  // block's top to the canvas bottom whenever the alpha reached 1 — and two templates asked for it by
-  // name. Both the branch and the request are gone: the ONLY thing this function may emit is one
-  // gradient-filled rect, whatever the photograph.
-  const E = env();
-  const gm = E.cardGeom("story");
-  assert.ok(E.SHARE_SCRIM.max < 1, "the cap is 1, so a photograph can still be covered completely");
-  const hungry = [E.SHARE_INK.ink, E.SHARE_INK.accent, E.SHARE_INK.inkSoft, E.SHARE_INK.inkFaint]
-    .map((hex) => ({ hex: hex, target: 4.5 }))
-    .concat([{ hex: E.SHARE_INK.fast, target: 3.2 }, { hex: E.SHARE_INK.slow, target: 3.2 }]);
-  // ⚠️ GREYS AND COLOURS. This sweep used to be 52 grey bytes, which is the family the flattened solver
-  // got right, so it could not see the defect that made a magenta photograph carry a 1.68:1 wordmark. It
-  // also asserts the DELIVERED ratio now, recomputed per channel here, rather than only that an alpha
-  // came back inside the cap.
-  const inkRGB = hexRGB(E.SHARE_INK.ground);
-  const cases: number[][] = [];
-  for (let lum = 0; lum <= 255; lum += 5) cases.push([lum, lum, lum]);
-  for (const c of [[255, 0, 0], [255, 0, 255], [0, 255, 0], [0, 0, 255], [0, 255, 255], [255, 255, 0],
-    [178, 58, 42], [216, 255, 20], [224, 21, 200], [255, 140, 0], [120, 20, 160], [20, 200, 120]]) cases.push(c);
-  for (const gc of cases) {
-    const lum = gc.join(",");
-    const probe = { w: 2, h: 1, data: new Uint8ClampedArray([gc[0]!, gc[1]!, gc[2]!, 255, 0, 0, 0, 255]) };
-    const plan = E.shareVeilPlan(probe, gm, { blockTop: 1200, colours: hungry });
-    assert.ok(plan.a <= E.SHARE_SCRIM.max + 1e-9, "luma " + lum + ": the scrim solved " + plan.a +
-      ", over the cap that keeps the photograph visible");
-    assert.ok(plan.end <= E.SHARE_SCRIM.max + 1e-9, "luma " + lum + ": the deepest stop is " + plan.end);
-    assert.ok(plan.a < 1 && plan.end < 1, "luma " + lum + ": the photograph is fully covered somewhere");
-    // The delivered ratio, from the composite this file computes itself.
-    const bg = trueLum([0, 1, 2].map((i) => plan.a * inkRGB[i]! + (1 - plan.a) * gc[i]!));
-    for (const c of hungry) {
-      const got = rat(trueLum(hexRGB(c.hex)), bg);
-      assert.ok(got >= c.target - 0.02 || plan.a >= E.SHARE_SCRIM.max - 1e-9,
-        "ground " + lum + ": " + c.hex + " delivers " + got.toFixed(2) + " against " + c.target);
+test("BLOCKER: no gradient and no wash is constructed over the photograph at all", () => {
+  // ⚠️ THE EXACT FORM OF THE CLAIM, AND WHY IT IS HERE RATHER THAN IN THE BYTE GATE. A pixel version is
+  // confounded by that gate's own fixture — its source photograph is a sky-to-ground gradient whose
+  // lower half measures 0.599 of its upper before anything is drawn over it, so a bar loose enough to
+  // pass the photograph is far too loose to catch a wash. A draw call that never happens cannot be
+  // confounded by a fixture.
+  const E2 = env();
+  const gm = E2.cardGeom("story");
+  const photo = { w: 1200, h: 1800, ox: 0.5, oy: 0.5, k: 1, id: "wash", bitmap: {} };
+  for (const tmpl of ["moment", "execution", "progression", "route"]) {
+    const ctx = recCtx();
+    // The probe cannot be built without pixels, so the photograph is drawn and sampling declines —
+    // which is the no-probe path. That is the STRICTER case for this guard: with no probe there is no
+    // solved alpha to blame, so any gradient found here is unconditional.
+    try { E2.shareDrawBody(ctx, fakeModel({ template: tmpl, photo: photo }), gm, 1); } catch (e) { /* pixels */ }
+    for (const e of ctx.calls("stop")) {
+      // A gradient stop at a non-trivial offset carrying a translucent deep ink is the fade's shape.
+      const col = String(e[2] || "");
+      assert.ok(!/^rgba\(/.test(col) || Number(e[1]) === 0 || Number(e[1]) === 1 ||
+        !/,\s*0?\.[1-9]/.test(col),
+        tmpl + ": a translucent gradient stop at offset " + e[1] + " (" + col + ") is being drawn — " +
+        "the owner removed the fade outright on 2026-08-21");
     }
-    const ctx = E.ctx();
-    E.shareVeilDraw(ctx, gm, plan);
-    const rects = ctx.calls("fillRect");
-    assert.ok(rects.length <= 1, "luma " + lum + ": the scrim drew " + rects.length +
-      " rects, so one of them is a plate over the picture");
-    for (const st of ctx.log.filter((e: any[]) => e[0] === "fillStyle")) {
-      assert.ok(typeof st[1] !== "string" || !/^#|^rgba\(\d+,\d+,\d+,1\)$/.test(String(st[1])),
-        "luma " + lum + ": the scrim filled with the flat colour " + st[1]);
+    // ⚠️ THE FILL IN FORCE **AT** THE RECT, NOT ANY FILL ON THE CARD. The first version of this swept
+    // every fillStyle the template ever set and asked whether any was translucent, which is satisfied by
+    // a translucent pill drawn somewhere else entirely — it failed on The Moment for the badge's own
+    // fill. The log is ordered, so walk it.
+    // ⚠️ A FILL IS ONLY OVER THE PHOTOGRAPH IF NOTHING IS DRAWN OVER IT AFTERWARDS, AND TWO EARLIER
+    // VERSIONS OF THIS GOT IT WRONG IN OPPOSITE DIRECTIONS. Sweeping every fillStyle on the card flagged
+    // the badge's own translucent pill; sweeping everything after the FIRST drawImage flagged the
+    // mirrored surround's darkening (SHARE_BLUR.veil, 0.46), which is composited between the blurred
+    // background and the picture — i.e. it is the mat, not a wash. The sound test is that no image is
+    // drawn after the fill.
+    const lastImage = ctx.log.map((e: any[]) => e[0]).lastIndexOf("drawImage");
+    let fill = "";
+    for (let i = 0; i < ctx.log.length; i++) {
+      const e = ctx.log[i];
+      if (e[0] === "fillStyle") { fill = String(e[1]); continue; }
+      if (e[0] !== "fillRect" || i < lastImage) continue;
+      const w = Number(e[3]), h = Number(e[4]);
+      if (!(w >= gm.W * 0.8 && h >= gm.H * 0.25)) continue;
+      assert.ok(!/^rgba\(/.test(fill),
+        tmpl + ": a translucent " + Math.round(w) + "x" + Math.round(h) + " fill (" + fill +
+        ") covers the photograph — that is the scrim, back again");
     }
   }
-  // ⚠️ AND THE CAP COSTS NOTHING ON A REAL CARD, which is the reason it is safe to have. On the worst
-  // ground there is — pure white — the hungriest colour still solves under it, so no card in the family
-  // is one byte different for its presence.
-  const white = { w: 4, h: 7, data: new Uint8ClampedArray(4 * 7 * 4).fill(255) };
-  const worst = E.shareVeilPlan(white, gm, { blockTop: 1200, colours: hungry });
-  assert.ok(worst.a < E.SHARE_SCRIM.max, "a white photograph is being clamped rather than solved: " +
-    worst.a + " against a cap of " + E.SHARE_SCRIM.max);
-  // ⚠️ AND THE HEADROOM IS NOW 0.02, WHICH IS A REAL CONSTRAINT AND IS RECORDED HERE RATHER THAN
-  // DISCOVERED LATER. The hungriest colour on a pure-white photograph needed 0.78 before the scrim
-  // margin existed and needs 0.90 with it, against a cap of 0.92 — so the margin cannot be raised again
-  // without the CLAMP deciding the answer instead of the solver, and the clamp cannot be lowered at all.
-  // The pair is what this asserts: raise either and one of these two numbers moves into the other.
-  assert.ok(worst.a >= 0.88 && worst.a <= 0.90,
-    "the solved alpha on a white photograph is " + worst.a + ", not the measured 0.90 — the scrim " +
-    "margin or the ink tiers have moved, and the 0.02 of headroom under the cap has to be re-measured");
-  // There is no kind left that asks for an opaque lower section.
-  assert.ok(!/opaque/.test(lift("shareVeilPlan")), "shareVeilPlan still honours an opaque request");
-  assert.ok(!/fillRect/.test(lift("shareVeilDraw").replace(/g\.fillStyle = grad; g\.fillRect[^;]*;/, "")),
-    "shareVeilDraw fills something other than the gradient");
 });
 
-test("BLOCKER: every photo template goes through the one scrim, and none of them names a fade", () => {
-  // ⚠️ THREE LAYOUTS, ONE SYSTEM. The fade used to be a literal — 280 on The Moment and 320 on the other
-  // two, with nothing deciding which — so a fifth template would have picked one by eye. It is derived
-  // from the block's own height now, which is what "sized from where the content starts" means.
-  const cl = closure("drawShareCard");
-  // ⚠️ ALL FOUR NOW, INCLUDING THE POSTER. The owner's ruling of 2026-08-20 made it photo-optional, so it
-  // composites a photograph exactly as the other three do and has to take the same one scrim. It used to
-  // be excluded here BY NAME, which was right while it could not carry a picture and would now be the
-  // one template compositing somebody's photograph with no solved veil at all.
-  for (const name of ["shareMomentCard", "shareExecutionCard", "shareProgressionCard", "sharePosterCard"]) {
-    const b = cl.get(name)!;
-    assert.match(b, /sharePhotoScrim\(g, gm, probe, p\.blockTop,/,
-      name + " does not take the shared scrim, or hands it something other than its own block top");
-    assert.ok(!/shareVeilDraw|shareVeilPlan/.test(b),
-      name + " reaches past sharePhotoScrim into the plan or the draw");
-    assert.ok(!/fade:/.test(b), name + " names a fade of its own");
-    assert.ok(!/kind: "opaque"/.test(b), name + " still asks for an opaque lower section");
-  }
-  // ⚠️ AND A CARD WITH NO PHOTOGRAPH IS STILL NOT SCRIMMED — the gate is inside sharePhotoScrim, on the
-  // probe, rather than at four call sites each remembering to check. shareGroundUnder answers 255 when it
-  // cannot look, so solved from a null probe the poster's matte ground would wear a dark band over type
-  // that already measures 19:1 on it.
-  assert.match(cl.get("sharePhotoScrim")!, /if \(!probe\) return/,
-    "the scrim no longer refuses a card with no photograph, so the matte ground is solved from white");
-  const E = env();
-  const g = E.ctx();
-  // ⚠️ DERIVED, AND THE PROOF IS THAT THE THREE REAL BLOCK TOPS GIVE THREE DIFFERENT FADES. A constant
-  // passes "the fade exists"; only the spread shows it is a function of the layout.
-  const story = E.cardGeom("story"), feed = E.cardGeom("feed");
-  const fades = new Set<number>();
-  for (const [gm, m] of [[story, execModel()], [story, progModel()], [feed, execModel({ aspect: "feed" })],
-    [feed, progModel({ aspect: "feed" })]] as [any, any][]) {
-    const p = m.template === "execution" ? E.shareExecutionPlan(g, m, gm) : E.shareProgressionPlan(g, m, gm);
-    const f = E.shareScrimFade(gm, p.blockTop);
-    fades.add(f);
-    assert.ok(f >= E.SHARE_SCRIM.fadeMin && f <= E.SHARE_SCRIM.fadeMax, "the fade escaped its clamp: " + f);
-    // A block that starts lower down the card has less canvas below it and earns a shorter fade.
-    assert.ok(E.shareScrimFade(gm, p.blockTop + 200) < f,
-      "the fade did not shorten when the block started lower");
-  }
-  assert.ok(fades.size >= 2, "every layout got the same fade, so it is not derived from the block: " +
-    [...fades].join(","));
+test("BLOCKER: a dark fill takes no keyline, because a deep outline on deep type only thickens it", () => {
+  // ⚠️ THE VERDICT BADGE IS DEEP INK ON ITS OWN FILLED TEAL PILL. It already has a ground, so an outline
+  // in nearly the glyph's own colour adds no edge and simply fattens every letter — seen by eye on a
+  // bright photograph, the pill read as embossed where it had been crisp.
+  // ⚠️ DERIVED FROM THE FILL, NOT FROM A LIST OF CALL SITES, so any dark-on-light chip added later
+  // excludes itself with no line of its own.
+  const E2 = env();
+  assert.equal(E2.shareFillIsLight(E2.SHARE_INK.ink), true, "the warm-white ink is not judged light");
+  assert.equal(E2.shareFillIsLight(E2.SHARE_INK.accent), true,
+    "the accent teal is not judged light, so it would lose its outline over grass");
+  assert.equal(E2.shareFillIsLight(E2.SHARE_INK.ground), false,
+    "the deep ground colour is judged light, so the badge's own text would be outlined in its own colour");
+  assert.equal(E2.shareFillIsLight(E2.SHARE_INK.keyline), false, "the keyline colour is judged light");
+  // ⚠️ AN UNPARSEABLE FILL COUNTS AS LIGHT: a gradient cannot be measured, and the failure that matters
+  // is light type left with no edge over a bright photograph.
+  assert.equal(E2.shareFillIsLight(null), true, "an unknown fill defaults to no outline");
+  assert.equal(E2.shareFillIsLight("rgba(255,255,255,0.9)"), true, "an rgba white is not judged light");
 });
 
-/* ================================================================================================ *
- * THE BOTTOM FADE: HALVED, AND EASED SO IT LEAVES NO LINE (owner, ruling 8 item 4, 2026-08-21)      *
- * ================================================================================================ */
-
-test("BLOCKER: the fade is half the length it was, on every block top the app produces", () => {
-  // "the gradient at the bottom of the card is too high, it needs to be halved in distance."
-  // ⚠️ THE COEFFICIENT AND BOTH CLAMPS HALVED TOGETHER, and the clamps are the half that matters. Two of
-  // the eight real fades sat ON the lower clamp before (the poster at both aspects), so halving fadeK and
-  // leaving fadeMin at 200 would have left those two completely unchanged while the other six moved —
-  // the owner's own template, the poster, being one of the two.
-  const E = env();
-  assert.equal(E.SHARE_SCRIM.fadeK, 0.17, "the fade coefficient is no longer half of the 0.34 that shipped");
-  assert.equal(E.SHARE_SCRIM.fadeMin, 100, "the fade floor is no longer half of the 200 that shipped");
-  assert.equal(E.SHARE_SCRIM.fadeMax, 180, "the fade ceiling is no longer half of the 360 that shipped");
-  // ⚠️ AND THE DELIVERED LENGTHS ARE ASSERTED AGAINST THE MEASURED TABLE, not against the arithmetic that
-  // produced them — a check that recomputes fadeK * block would pass with fadeK changed to anything.
-  // Measured on the eight real block tops: story 830/919/957/735 and feed 670/801/856/581.
-  const table: [number, number, number][] = [
-    [1920, 830, 141], [1920, 919, 156], [1920, 957, 163], [1920, 735, 125],
-    [1350, 670, 114], [1350, 801, 136], [1350, 856, 146], [1350, 581, 100]];
-  for (const [H, block, want] of table) {
-    const got = E.shareScrimFade({ H: H, W: 1080 }, H - block);
-    assert.equal(got, want, "a block of " + block + " on a " + H + "-tall card earns a fade of " + got +
-      ", not the measured " + want);
-  }
-  // ⚠️ THE CEILING IS A SAFETY RAIL AND IS NOT REACHED BY ANY REAL LAYOUT, which is true of the 360 it
-  // replaced too — the biggest real fade was 325 of 360 and is now 163 of 180. Asserted so that a future
-  // template landing on it is a deliberate decision rather than a surprise.
-  const real = table.map((t) => t[2]);
-  assert.ok(Math.max(...real) < E.SHARE_SCRIM.fadeMax,
-    "a real layout now sits on the fade ceiling, so the ceiling is deciding the geometry");
-  assert.ok(real.includes(E.SHARE_SCRIM.fadeMin),
-    "no real layout reaches the fade floor any more, so halving the floor was untested");
-});
-
-test("BLOCKER: shareEase arrives at nothing with zero slope AND zero curvature", () => {
-  // ⚠️ THIS IS THE WHOLE FIX. "i can see the line where it stops on the current one" — a Mach band, which
-  // the eye finds from the discontinuity in the RATE of change. A ramp that reaches zero with a non-zero
-  // slope draws an edge at the row where it stops however gentle the ramp is.
-  const E = env();
-  const f = E.shareEase;
-  assert.equal(f(0), 0, "the ease does not start at nothing");
-  assert.equal(f(1), 1, "the ease does not arrive at the solved alpha");
-  // Monotone, so the scrim can never lighten as it goes down.
-  let prev = -1;
-  for (let t = 0; t <= 1.0000001; t += 0.01) { const v = f(t); assert.ok(v >= prev - 1e-12,
-      "the ease is not monotone: f(" + t.toFixed(2) + ") = " + v + " after " + prev); prev = v; }
-  // ⚠️ BOTH DERIVATIVES AT THE TOP, MEASURED NUMERICALLY. smoothstep (3t^2 - 2t^3) passes the first of
-  // these and fails the second, and its curvature is at its MAXIMUM exactly at the boundary — which is
-  // the one place it must not be. Re-broken with smoothstep: f''(0) comes out at 6 and this fails.
-  const h = 1e-4;
-  const d1 = (f(h) - f(0)) / h;
-  const d2 = (f(2 * h) - 2 * f(h) + f(0)) / (h * h);
-  assert.ok(Math.abs(d1) < 1e-6, "the ease leaves the top of the fade with slope " + d1 + ", so it draws a line there");
-  assert.ok(Math.abs(d2) < 1e-2, "the ease leaves the top of the fade with curvature " + d2 +
-    ", which is a Mach band one derivative further out");
-  // And the curvature peak has to be INSIDE the fade, which is the property that makes it invisible.
-  let peakAt = 0, peak = 0;
-  for (let t = 0.02; t <= 0.98; t += 0.005) {
-    const c = Math.abs((f(t + h) - 2 * f(t) + f(t - h)) / (h * h));
-    if (c > peak) { peak = c; peakAt = t; }
-  }
-  assert.ok(peakAt > 0.1 && peakAt < 0.9,
-    "the ease's curvature peaks at t=" + peakAt.toFixed(3) + ", i.e. at an end rather than in the middle");
-});
-
-test("BLOCKER: the fade the gradient actually emits reaches the alpha through the ease, not in a straight line", () => {
-  // ⚠️ ASSERTED ON THE STOPS THE DRAW EMITS, NOT ON ITS SOURCE. A source-text check proves shareEase is
-  // mentioned; only the recorded gradient can say the curve reached the canvas — and the recorder logs
-  // every addColorStop, so the emitted profile is readable exactly as Skia would see it.
-  const E = env();
-  const gm = E.cardGeom("story");
-  const white = { w: 4, h: 7, data: new Uint8ClampedArray(4 * 7 * 4).fill(255) };
-  const plan = E.shareVeilPlan(white, gm, { blockTop: 1090, colours: E.shareScrimText() });
-  const g = E.ctx();
-  E.shareVeilDraw(g, gm, plan);
-  const stops = g.log.filter((e: any[]) => e[0] === "stop")
-    .map((e: any[]) => ({ o: e[1] as number, a: Number(/([\d.]+)\)$/.exec(String(e[2]))?.[1] ?? "0") }));
-  assert.ok(stops.length >= 20, "the fade is emitted as " + stops.length +
-    " stops, so it is still a straight line between two of them");
-  // exactly one rect, and the last stop is the deepest — both pre-existing invariants, restated here
-  // because this test now owns the emitted profile.
-  assert.equal(g.calls("fillRect").length, 1, "the scrim drew more than one rect");
-  assert.ok(stops[0]!.o === 0 && stops[0]!.a === 0, "the fade does not begin at nothing");
-  for (let i = 1; i < stops.length; i++) {
-    assert.ok(stops[i]!.o >= stops[i - 1]!.o - 1e-9 && stops[i]!.a >= stops[i - 1]!.a - 1e-9,
-      "the emitted profile is not monotone at stop " + i);
-  }
-  // ⚠️ THE ONE NUMBER THAT MEANS "NO LINE": the slope of the FIRST segment against the mean slope of the
-  // whole fade. A straight line makes those equal, by definition; the ease makes the first segment a
-  // small fraction of the mean. Measured on the shipped curve at 48 stops: 0.0067. Re-broken by setting
-  // stops to 1, which reproduces the old straight line exactly and takes this to 1.0.
-  const fadeStops = stops.filter((p: { o: number; a: number }) => p.a < plan.a - 1e-9)
-    .concat([stops.filter((p: { o: number; a: number }) => Math.abs(p.a - plan.a) < 1e-9)[0]!]);
-  const top = fadeStops[0]!, second = fadeStops[1]!, end = fadeStops[fadeStops.length - 1]!;
-  const first = (second.a - top.a) / (second.o - top.o);
-  const meanSlope = (end.a - top.a) / (end.o - top.o);
-  const share = first / meanSlope;
-  assert.ok(share < 0.05, "the fade's first segment carries " + share.toFixed(4) +
-    " of its mean slope, so it arrives at nothing in a straight line and draws an edge there");
-  // ⚠️ AND THE ALPHA IT ARRIVES AT IS STILL THE SOLVED ONE. An ease that undershot would be a legibility
-  // change wearing a cosmetic fix.
-  assert.ok(Math.abs(end.a - plan.a) < 1e-9,
-    "the eased fade arrives at " + end.a + " instead of the solved " + plan.a);
-});
-
-test("BLOCKER: the fade's length cannot change the alpha under any glyph", () => {
-  // ⚠️ THIS IS WHY HALVING IT IS SAFE, AND IT IS A CLAIM ABOUT THE MECHANISM RATHER THAN A FLOOR THAT
-  // HAPPENS TO BE HIGH ENOUGH. The alpha is solved from the brightest ground inside the BLOCK rect, and
-  // the gradient reaches it at blockTop - knee, above the topmost glyph — so the fade decides only where
-  // the ramp begins, all of which is above the copy. Measured over 160 real card states: the solved alpha
-  // identical in 160 of 160, and the finished cards differ below the copy by at most one 8-bit unit.
-  const E = env();
-  const gm = E.cardGeom("story");
-  // ⚠️⚠️ THE PROBE IS BANDED, AND A UNIFORM ONE CANNOT SEE THIS AT ALL. Written with a flat ground of one
-  // colour this test PASSED with the solve deliberately moved onto the fade rect instead of the block
-  // rect — the brightest pixel is the same either way, so the rect could grow upwards and change nothing.
-  // The fixture-too-kind trap, in the one test whose whole subject is which rect is sampled. Bright above
-  // the block, dark inside it: now a solve that reaches up into the fade answers a different alpha.
-  const banded = (bright: number[], dark: number[], h: number, split: number) => {
-    const d = new Uint8ClampedArray(4 * h * 4);
-    for (let y = 0; y < h; y++) for (let x = 0; x < 4; x++) {
-      const c = y < split ? bright : dark, o = (y * 4 + x) * 4;
-      d[o] = c[0]!; d[o + 1] = c[1]!; d[o + 2] = c[2]!; d[o + 3] = 255;
-    }
-    return { w: 4, h: h, data: d };
-  };
-  const cases: [string, any][] = [
-    ["flat white", banded([255, 255, 255], [255, 255, 255], 20, 20)],
-    ["flat mid", banded([128, 128, 128], [128, 128, 128], 20, 20)],
-    ["flat magenta", banded([224, 21, 200], [224, 21, 200], 20, 20)],
-    // ⚠️ THE DISCRIMINATING ONE: white above the block, near-black inside it. blockTop 1090 of 1920 lands
-    // at probe row 11.35, so the block rect sees only the dark half while a rect grown up by the fade
-    // reaches the white.
-    ["white sky over dark ground", banded([255, 255, 255], [10, 12, 10], 20, 10)],
-  ];
-  for (const [name, probe] of cases) {
-    const base = E.shareVeilPlan(probe, gm, { blockTop: 1090, colours: E.shareScrimText() });
-    for (const fade of [40, 100, 141, 282, 900]) {
-      const p = E.shareVeilPlan(probe, gm, { blockTop: 1090, fade: fade, colours: E.shareScrimText() });
-      assert.equal(p.a, base.a, "a fade of " + fade + " changed the solved alpha on " + name +
-        ": " + p.a + " against " + base.a);
-      assert.equal(p.end, base.end, "a fade of " + fade + " changed the deepest stop on " + name);
-      assert.equal(p.blockTop, base.blockTop, "a fade of " + fade + " moved the block");
-    }
-  }
-  // ⚠️ AND THE FIXTURE HAS TO BE PROVED CAPABLE OF SEEING THE DIFFERENCE, or the sweep above is vacuous:
-  // sampling the same probe over the fade band really does answer a brighter ground.
-  const split = cases[3]![1];
-  const blockOnly = E.shareGroundUnder(split, gm, E.shareRect(0, 1090, gm.W, gm.H - 1090));
-  const withFade = E.shareGroundUnder(split, gm, E.shareRect(0, 1090 - 900, gm.W, gm.H - 190));
-  assert.ok(E.shareRelLumRGB(withFade) > E.shareRelLumRGB(blockOnly) * 4,
-    "the banded fixture reads the same ground over the block as over the fade, so this test proves nothing");
-  // ⚠️ AND THE STOP THAT DELIVERS THE SOLVED ALPHA IS STILL ABOVE THE FIRST GLYPH, whatever the fade.
-  // Without the knee the promise "every row of copy sits on at least the ratio solved for" is true at one
-  // pixel row and nowhere above it.
-  assert.ok(E.SHARE_SCRIM.knee >= 6,
-    "the knee is " + E.SHARE_SCRIM.knee + "px, which is inside the halo any pixel measurement needs");
-  const gg = E.ctx();
-  const plan = E.shareVeilPlan({ w: 2, h: 1, data: new Uint8ClampedArray(8).fill(255) }, gm,
-    { blockTop: 1090, colours: E.shareScrimText() });
-  E.shareVeilDraw(gg, gm, plan);
-  const stops = gg.log.filter((e: any[]) => e[0] === "stop")
-    .map((e: any[]) => ({ o: e[1] as number, a: Number(/([\d.]+)\)$/.exec(String(e[2]))?.[1] ?? "0") }));
-  const full = stops.filter((p: { o: number; a: number }) => Math.abs(p.a - plan.a) < 1e-9)[0]!;
-  const top = Math.max(0, plan.fadeTop);
-  const yOfFull = top + full.o * (gm.H - top);
-  assert.ok(yOfFull <= plan.blockTop - E.SHARE_SCRIM.knee + 1,
-    "the solved alpha only arrives at y=" + Math.round(yOfFull) + ", below the top of the copy at " + plan.blockTop);
+test("BLOCKER: the keyline is capped, so the hero's tabular digits cannot eat each other", () => {
+  // ⚠️ A WIDTH PROPORTIONAL TO THE FONT IS RIGHT FOR A 19px LABEL AND ABSURD ON A 170px DISTANCE. The
+  // hero's digits are drawn ONE AT A TIME at a fixed tabular advance, so an uncapped 0.18 would put a
+  // 31px stroke extending 15px each side and neighbouring numerals would overlap.
+  const T = env().SHARE_TEXT_EDGE;
+  assert.ok(T.keyMax > 0 && T.keyMax <= 12,
+    "the keyline cap is " + T.keyMax + ": absent, or wide enough to close a numeral's counters");
+  assert.ok(T.keyMin >= 2, "the keyline floor is " + T.keyMin + ", which cannot define a 19px label");
+  assert.ok(T.key * 170 > T.keyMax,
+    "the cap never binds at hero size, so it is not doing anything and the next size change will bite");
+  assert.ok(T.blurMax <= 24, "the halo is wide enough to read as a shadow rather than an edge");
+  // ⚠️ AND THE SIZE IS READ AS THE PIXEL SIZE, NOT THE FIRST NUMBER IN THE FONT STRING. shareFont emits
+  // "800 42px ..." — weight first — so parseFloat of the string reads 800: measured, every glyph on the
+  // card took the capped keyline and the maximum halo whatever its real size.
+  const arm = lift("shareTextEdgeArm");
+  assert.match(arm, /px\/\.exec/,
+    "the font size is no longer matched as a px value, so it is reading the weight");
+  // ⚠️ AND THE REGEX MUST SURVIVE THE TEMPLATE LITERAL. Written with single backslashes it ships as
+  // /(d+(?:.d+)?)px/, matches nothing, and every glyph silently loses its outline — which is exactly
+  // what happened, and is the seventh firing of this project's own escaping rule.
+  assert.match(arm, /\(\\d\+/, "the size regex lost its backslashes in the emitted page");
 });
 
 test("the route's keyline is thickened on a bright ground, judged on luminance and not on a luma byte", () => {
@@ -1853,8 +1565,8 @@ test("the renderer uses the shared layer rather than a second copy of it", () =>
   const cl = closure("drawShareCard");
   const all = [...cl.values()].join("\n");
   for (const fn of ["shareGroundFill", "shareGroundPaint", "shareEffortHex", "sharePhotoDraw",
-    "shareLumaProbe", "shareVeilPlan",
-    "shareVeilDraw", "shareWordmark", "shareRoutePlacement", "shareRouteDraw",
+    "shareLumaProbe", "shareTextEdgeArm",
+    "shareWordmark", "shareRoutePlacement", "shareRouteDraw",
     "shareTopoDraw", "shareWordmarkPlan", "shareMomentCard", "sharePosterCard"]) {
     assert.ok(all.includes(fn + "("), "the renderer does not use " + fn);
   }
@@ -2244,9 +1956,12 @@ test("BLOCKER: The Route Poster is photo-OPTIONAL, and draws no fake route eithe
   const shot = { w: 1200, h: 1800, ox: 0.5, oy: 0.5, k: 1, bitmap: {} };
   E.sharePhotoDraw(g2, shot, gm);
   assert.ok(g2.calls("drawImage").length > 0, "the shared photo path draws nothing");
+  // ⚠️ AND IT NO LONGER GOES THROUGH A SCRIM, BECAUSE THERE IS NOT ONE. The gradient over the lower half
+  // was removed outright on 2026-08-21; what the poster shares with the other three is the ONE dispatch
+  // that arms the copy's keyline, which is asserted where that lives rather than per template.
   const poster = lift("sharePosterCard");
-  assert.match(poster, /sharePhotoScrim\(g, gm, probe,/,
-    "the poster composites a photograph without the shared solved scrim");
+  assert.ok(!/sharePhotoScrim|shareVeilDraw/.test(poster),
+    "the poster is drawing a scrim over the photograph again");
   // ⚠️ THE WORDMARK'S PROTECTION IS NOW ITS OWN EDGE, AND THE CLAIM IS ASSERTED OVER EVERY TEMPLATE
   // RATHER THAN THIS ONE. The fade across the top of the card is gone (owner, 2026-08-20) and five
   // templates draw the wordmark; a sixth written without the edge would ship the recorded 2.09:1 defect on
@@ -2935,101 +2650,40 @@ test("the data-led metric row is the references' own trio, and the clock keeps n
     ({ key: "k" + i, v: String(i), u: "", k: "K" + i })) })).length <= 3, "a fourth metric column reached the row");
 });
 
-test("BLOCKER: no photo template covers its photograph, and the block's own colours are what is solved for", () => {
-  // ⚠️ THE OWNER'S AMENDMENT REPLACED THIS TEST'S OLD ASSERTION, WHICH REQUIRED THE OPPOSITE. It used to
-  // demand kind: "opaque" on these two templates, quoting references 02 and 04 (measured: below their
-  // blend the ground is a flat luma 13-14 with a deviation of 0.5, no photograph surviving). His
-  // instruction outranks that: "I want the full picture to be in view....the data and text should always
-  // be just an overlay". So the assertion is inverted and made specific rather than deleted — the thing
-  // it was protecting, that the ground under the copy is dark enough to read on, is now carried by the
-  // per-colour solve and asserted here as a list each template has to justify.
+test("BLOCKER: no photo template covers its photograph, and none of them can", () => {
+  // ⚠️ THIS TEST HAS NOW BEEN INVERTED TWICE BY THE OWNER, AND BOTH INVERSIONS ARE KEPT IN THE RECORD.
+  // It first demanded kind: "opaque" on these templates, quoting references 02 and 04 (measured: below
+  // their blend the ground is a flat luma 13-14, no photograph surviving). His amendment of 2026-08-19
+  // overruled that — "I want the full picture to be in view....the data and text should always be just
+  // an overlay" — and the guard became "a gradient, and every template solves for the colours it draws".
+  // His ruling of 2026-08-21 removed the gradient as well: "the gradient is worse! I think it's best to
+  // just remove it completely".
+  //
+  // ⚠️ SO THE PER-COLOUR SOLVE HALF IS GONE, NOT BECAUSE IT WAS WRONG BUT BECAUSE THERE IS NOTHING LEFT
+  // TO SOLVE. It existed to give each template the shallowest wash that still cleared 4.5:1 for the
+  // tiers it actually set; with no wash at all, the tiers are defended by their own keyline instead, and
+  // that is asserted where the keyline lives rather than per template.
+  //
+  // What survives is the claim the whole sequence was protecting, in its strongest form yet: a template
+  // may not cover its photograph, and now it has no mechanism to.
   const E = env();
   const cl = closure("drawShareCard");
-  // ⚠️ A TEMPLATE SOLVES FOR THE COLOURS IT DRAWS. The faint tier costs ten points of alpha on a white
-  // ground, so handing it to a template that never sets it darkens somebody's photograph for nothing —
-  // and NOT handing it to the one that does leaves the target range under the bar.
-  const draws = (name: string) => {
+  for (const name of ["shareMomentCard", "shareExecutionCard", "shareProgressionCard", "sharePosterCard"]) {
     const body = cl.get(name)!;
-    return ["ink", "inkSoft", "inkFaint", "accent", "fast", "slow"]
-      .filter((k) => new RegExp("SHARE_INK\\." + k + "\\b").test(body));
-  };
-  const asked = (name: string) => {
-    const body = cl.get(name)!;
-    const at = body.indexOf("sharePhotoScrim(");
-    assert.ok(at > 0, name + " does not call the shared scrim");
-    const arg = body.slice(at, body.indexOf(";", at));
-    const out = ["ink", "accent", "inkSoft"];  // shareScrimText's own three
-    for (const k of ["inkFaint", "fast", "slow"]) {
-      if (new RegExp("hex: SHARE_INK\\." + k + "\\b").test(arg)) out.push(k);
-    }
-    return out;
-  };
-  for (const name of ["shareMomentCard", "shareExecutionCard", "shareProgressionCard"]) {
-    const drawn = draws(name), solved = asked(name);
-    for (const k of drawn) {
-      if (k === "unjudged") continue;
-      assert.ok(solved.includes(k), name + " sets SHARE_INK." + k +
-        " but does not solve the scrim for it, so that colour is unprotected on a bright photograph");
-    }
-    for (const k of solved) {
-      assert.ok(drawn.includes(k), name + " solves the scrim for SHARE_INK." + k +
-        ", which it never draws — that is somebody's photograph darkened for nothing");
-    }
+    assert.ok(!/sharePhotoScrim|shareVeilDraw|shareVeilPlan/.test(body),
+      name + " is drawing a scrim over the photograph again");
+    // ⚠️ AND NOT BY HAND EITHER. A template writing its own translucent full-canvas fill is the same
+    // defect wearing a different name, which is why this asks about the SHAPE rather than the helper.
+    assert.ok(!/fillRect\(0, *0, *gm\.W, *gm\.H\)/.test(body),
+      name + " fills the whole canvas itself, which is a wash however it is written");
   }
-  assert.deepEqual(asked("shareMomentCard").sort(), ["accent", "ink", "inkSoft"],
-    "The Moment's colour list changed; it must not carry the faint tier (see shareScrimText)");
-  // ⚠️ THIS ASSERTION USED TO REQUIRE THE OPPOSITE, AND IT WAS COSTING TEN POINTS OF SOMEBODY'S
-  // PHOTOGRAPH ON EVERY EXECUTION CARD. The faint tier is the hungriest colour in the family — solved
-  // against a white ground it asks 0.88 where the soft tier asks 0.78 — and The Execution set it in
-  // exactly one place, the target range at the right end of the chart caption. Measured, that made the
-  // one template the owner's amendment was reported against keep the LEAST of its picture: 13.4% of the
-  // subject surviving the block against The Moment's 21.7% and The Progression's 20.8%. The element is a
-  // tier brighter now (reference 02 has no target-range label at all, so there was no reference tier to
-  // honour) and the list drops to 0.80. NO photo template may set the faint tier.
-  for (const name of ["shareMomentCard", "shareExecutionCard", "shareProgressionCard"]) {
-    assert.ok(!draws(name).includes("inkFaint"), name + " sets SHARE_INK.inkFaint, which is the hungriest " +
-      "colour on any of these cards; the poster keeps it because its ground is flat");
-    assert.ok(!asked(name).includes("inkFaint"), name + " solves the scrim for the faint tier");
-  }
-  // ⚠️ THE POSTER REACHES THE FAINT TIER THROUGH ONE SHARED RULE NOW, NOT BY NAMING IT. shareQuietInk
-  // steps the quietest tier UP to --ink-soft whenever the ground is not the plain deep ink — a photograph
-  // or a session colour — because measured from rendered pixels --ink-faint is 6.50:1 on #06110e and
-  // 3.83:1 on the easy session ground. So the assertion is that the tier is still REACHABLE and that the
-  // condition is the ground rather than a list of templates; a tier nothing can reach is dead code, and a
-  // condition written as a list is one a third kind of ground gets left out of.
-  const quiet = lift("shareQuietInk");
-  assert.match(quiet, /SHARE_INK\.inkFaint/, "the faint tier is now unreachable and should be removed");
-  assert.match(quiet, /m\.photo \|\| shareEffortHex\(m\.effort\)/,
-    "the quiet tier's lift no longer asks about the ground: " + quiet);
-  assert.match(lift("sharePosterCard"), /shareQuietInk\(m\)/,
-    "the poster is naming a tier instead of asking for the quiet one");
-  assert.deepEqual(asked("shareExecutionCard").sort(), ["accent", "fast", "ink", "inkSoft", "slow"],
-    "The Execution's colour list changed; it is the three type tiers plus the two miss colours");
-  // ⚠️ AND THE PICTURE IS DRAWN ONCE, FOR THE WHOLE CANVAS, BEFORE ANY TEMPLATE RUNS — so no template can
-  // arrange for less of it. Asserted on the ORDER, because a photo drawn after the dispatch would cover
-  // the copy instead of sitting under it.
-  const root = cl.get("shareDrawBody")!;
-  const atPhoto = root.indexOf("sharePhotoDraw(g, m.photo, gm)");
-  assert.ok(atPhoto > 0, "the photograph is no longer drawn for the whole canvas");
-  assert.ok(atPhoto < root.indexOf('m.template === "moment"'),
-    "the photograph is drawn after the template, so it would cover the copy");
-  assert.equal((root.match(/sharePhotoDraw\(/g) || []).length, 1,
-    "the photograph is drawn more than once, so one of them is a region rather than the canvas");
-  // ⚠️ MEASURED FROM PIXELS, and this is the number the amendment is: rendering the SAME card over a
-  // white photograph and over dark wood, the mean luminance of a row 40px above the bottom edge differs
-  // by 6.30 (execution), 11.70 (moment) and 11.62 (progression). Under the old panel it differed by
-  // exactly 0.00, because there was no photograph left there to differ. See work/p5/survive.json.
-  // The plan solves the alpha at the TOP glyph box, not at a baseline — see shareVeilPlan's own note.
-  const gm = E.cardGeom("story");
-  const g = E.ctx();
-  for (const build of [execModel, progModel]) {
-    const m = build();
-    const p = m.template === "execution" ? E.shareExecutionPlan(g, m, gm) : E.shareProgressionPlan(g, m, gm);
-    const boxes = tmplBoxes(E, gm, m).filter((x) => x[0] !== "wordmark" && x[0] !== "date");
-    const top = Math.min(...boxes.map((x) => x[1].y));
-    assert.equal(p.blockTop, top, m.template + ": the scrim is solved at y" + p.blockTop +
-      " but the topmost glyph box starts at y" + top);
-  }
+  // ⚠️ THE PHOTOGRAPH IS STILL DRAWN THROUGH THE ONE SHARED PATH, so a template cannot quietly composite
+  // its own darker copy instead.
+  const drawn = [...cl.keys()].filter((n) => /Card$/.test(n) && /sharePhotoDraw\(/.test(cl.get(n)!));
+  assert.equal(drawn.length, 0,
+    "a template composites the photograph itself rather than taking the shared one: " + drawn.join(", "));
+  assert.match(cl.get("shareDrawBody")!, /sharePhotoDraw\(g, m\.photo, gm\)/,
+    "the shared photo path is gone from the dispatch");
 });
 
 test("BLOCKER: nothing draws a plate behind type — the chart's own two graphics are the only near-opaque fills", () => {
@@ -3073,16 +2727,15 @@ test("BLOCKER: nothing draws a plate behind type — the chart's own two graphic
     const fn = m.template === "execution" ? E.shareExecutionCard : E.shareProgressionCard;
     fn(ctx, m, gm, probe, wm);
     const rects = ctx.calls("fillRect");
-    // ⚠️ ONE, WHERE IT USED TO BE TWO, AND THE SECOND ONE GOING IS THE POINT OF THE CHANGE. The fade
-    // across the top of the card was the other full-width rect; the owner asked for it to go
-    // (2026-08-20) and the wordmark carries a keyline instead, which strokes glyphs rather than filling
-    // a band. So the block's own solved scrim is the only full-width fill a template may draw, and a
-    // second one coming back — under any name — fails here.
-    assert.equal(rects.length, 1, m.template + " drew " + rects.length +
-      " full rects; the block's own solved scrim is the only one allowed");
-    for (const r of rects) {
-      assert.ok(r[3] === gm.W, m.template + ": a rect narrower than the canvas is a panel: " + JSON.stringify(r));
-    }
+    // ⚠️ NONE NOW, WHERE IT WAS TWO AND THEN ONE, AND BOTH REMOVALS WERE THE OWNER'S. The fade across
+    // the top went on 2026-08-20 and the fade across the bottom on 2026-08-21 ("the gradient is worse! I
+    // think it's best to just remove it completely"), each replaced by a keyline that strokes glyphs
+    // rather than filling a band. So a template may now draw NO full-width fill over the picture at all,
+    // which is the strongest form this guard has ever had — and any wash coming back, under any name,
+    // fails here.
+    assert.equal(rects.length, 0, m.template + " drew " + rects.length +
+      " full-width fills over the photograph; there is no scrim any more and none is permitted: " +
+      JSON.stringify(rects));
   }
 });
 

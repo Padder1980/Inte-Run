@@ -5,7 +5,8 @@ import SwiftUI
 /// No map tiles: they need a network the watch may not have mid-run, and the recognisable thing at
 /// the end of a run is the shape of your own route, not the streets underneath it.
 struct RouteMapView: View {
-    let points: [[Double]]   // [latitude, longitude], in order
+    // [latitude, longitude, runningSeconds]; the time is what Strava needs and is unused here.
+    let points: [[Double]]
     var tint: Color = .accentColor
 
     var body: some View {

@@ -4240,18 +4240,36 @@ button.rd-meta-r { cursor: pointer; }
 .sst-off { opacity: .55; }
 .sst-strava { margin-top: var(--s4); padding-top: var(--s4); border-top: 1px solid var(--line); }
 /* ---- the destinations, in the shape the owner asked for --------------------------------------------
-   A horizontal row of labelled tiles, then a full-width primary with a settings affordance beside it
-   (owner, 2026-08-20). ⚠️ THE TILES ARE ONLY THE THINGS THIS APP CAN GENUINELY DO — see studioDestHtml
-   for why there is no Instagram tile and what would make one honest. */
-.sst-dests { display: flex; gap: var(--s2); }
-.sst-dest { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center;
+   A horizontal row of labelled destination tiles, then a full-width primary with a settings affordance
+   beside it (owner, 2026-08-20; the row's content ruled on 2026-08-21). ⚠️ EVERY TILE OPENS THE SYSTEM
+   SHARE SHEET and says so in its accessible name — see studioDestHtml and studioDest. */
+/* ⚠️ IT WRAPS, IT DOES NOT SCROLL, AND THAT IS THE DIFFERENCE BETWEEN NOTHING HIDDEN AND MORE HIDDEN.
+   Measured: at 320px with the text scale at its 1.3 cap the four labels plus their padding need about
+   346px against 288px of sheet, so a single row cannot hold them. A scroller then puts the right-hand
+   tile — which is More, the one honest fallback — half off screen with no cue; wrapping puts it on a
+   second row at full size. flex-grow fills the row it lands on, so at 430px it is one tidy row of four
+   and at 320px/1.3 it is two of two.
+   ⚠️ AND flex-basis IS auto RATHER THAN A NUMBER, so a tile is never narrower than its own label at any
+   text size. A min-width in px would be right for one --tscale and clip the label at the other. */
+.sst-dests { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.sst-dest { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center;
   justify-content: center; gap: var(--s1); min-height: var(--tap); padding: var(--s3) var(--s2);
   margin: 0; font: inherit; font-size: var(--t-label); font-weight: 650; line-height: 1.25;
   text-align: center; color: var(--ink); background: var(--surface-2);
   border: 1px solid var(--line); border-radius: var(--r-ctl); cursor: pointer; }
+.sst-dl { white-space: nowrap; }
 .sst-di { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px;
   color: var(--accent); }
 .sst-di svg { width: 100%; height: 100%; }
+/* ⚠️ THE CLIPBOARD IS FULL WIDTH BECAUSE IT HAS TO REPORT. It is the only control in this sheet that
+   puts nothing on screen, so its label becomes "Copied" or "Not copied" for a moment — and neither fits
+   a tile's width at the top of the text-size range. Same box as a tile otherwise: both declare a border,
+   so neither is a pixel taller for free. */
+.sst-sec { display: flex; align-items: center; justify-content: center; gap: var(--s2); width: 100%;
+  min-height: var(--tap); padding: var(--s2) var(--s3); margin: var(--s2) 0 0; font: inherit;
+  font-size: var(--t-body); font-weight: 650; color: var(--ink); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: var(--r-ctl); cursor: pointer; }
+.sst-sec .sst-di { width: 22px; height: 22px; }
 /* ⚠️ ONE BOX WITH TWO FILLS, AND EVERY DIMENSION IS DECLARED ON BOTH. This project has already shipped
    the fault where two buttons put side by side each carried their own margin, padding and border and so
    came out different sizes — the heat card's Yes/No pair. Both of these declare a border so neither is a
@@ -5999,7 +6017,34 @@ function normalizeSplits(splits) {
  * a treadmill run stores no route rather than a guessed one. Same rule here.
  */
 function runStravaPayload(run) {
-  const pts = (run && Array.isArray(run.route) ? run.route : []).filter((p) => p && isFinite(p.t));
+  // ⚠️ STRICTLY INCREASING, NOT MERELY TIMED, AND TWO POINTS SHARING A SECOND IS THE REASON. A GPX
+  // trackpoint carries whole seconds once iso() strips the milliseconds below, so two points on the
+  // same second are two positions at one instant — an infinite speed between them, in the field Strava
+  // reads to work out pace. The wrist refuses such a fix at source (see routeLastT in the watch's WorkoutManager), but the phone's
+  // own credited fixes are rounded to seconds too and a sprint down a hill can bank two of them inside
+  // one; and every route already in the store predates both rules. Dropping the later point is the
+  // honest answer — the ground is still described by the point that was kept, and nothing is nudged.
+  const seen = [];
+  let lastT = -Infinity;
+  for (const p of (run && Array.isArray(run.route) ? run.route : [])) {
+    if (!p || !isFinite(p.t) || p.t <= lastT) continue;
+    lastT = p.t; seen.push(p);
+  }
+  // ⚠️ A GPX NEEDS A KNOWN START, NOT MERELY A NUMBER, AND THE TWO WERE DECOUPLED. Every
+  // trackpoint's time is written as startMs + t, so an UNKNOWN start does not degrade the upload
+  // gracefully — it places a perfectly good map, with perfectly good splits and pace, at the wrong
+  // time of day in somebody's training log. runStartMs must always answer something (Strava has to be
+  // sent a start), and its fallback is that date at 09:00; measured, a wrist run carrying times but no
+  // startMs uploaded its first trackpoint at 09:00:00Z against a real 06:30:00Z — two and a half
+  // hours out, with nothing about the activity looking wrong.
+  // So the gate is the pair: timed points AND a start the device that was there actually reported. A
+  // manual activity with the right distance and duration is a smaller error than a mapped one at the
+  // wrong hour, and it is the same answer an untimed route already gets.
+  // ⚠️ THIS COSTS NOTHING REAL TODAY, which is why it is a guard rather than a trade: a phone run's
+  // id carries the instant, and a wrist run has sent startMs since the per-point-time change, so the
+  // only records it catches are ones whose route could not have been timed anyway. It exists because a
+  // re-break that deleted startMs from the wrist payload was caught by NOTHING in 1111 tests.
+  const pts = runStartExactMs(run) == null ? [] : seen;
   const startMs = runStartMs(run);
   const name = String(run && run.t ? run.t : "Run");
   const type = run && run.type === "race" ? "Run" : "Run";
@@ -6088,9 +6133,31 @@ function runStravaPayload(run) {
  * today the honest answer is that day at a sensible hour rather than a precise lie. Phone runs carry
  * the milliseconds in their id ("run-1723...") which is exact, so that is preferred wherever present.
  */
-function runStartMs(run) {
+/**
+ * WHEN THE RUN BEGAN, WHEN THE DEVICE THAT WAS THERE ACTUALLY SAID SO — and null when nothing did.
+ *
+ * ⚠️ ONE READER, BECAUSE THE ALTERNATIVE IS TWO ANSWERS TO ONE QUESTION. runStartMs needs a number
+ * whatever happens (Strava must be sent something) and runStartMsKnown needs to know whether that
+ * number is real before printing a time of day; both now ask this, so they cannot come to disagree
+ * about whether the start instant is known.
+ *
+ * ⚠️ A WRIST RUN CARRIES startMs AND A PHONE RUN CARRIES ITS ID, AND NEITHER IS A FALLBACK FOR THE
+ * OTHER. run.id on a phone run is stamped when the finish screen renders, so the start is the id
+ * minus the duration; a wrist run's id is a UUID and cannot answer at all, which is why the watch
+ * began sending the instant alongside the timed route. Runs recorded before that carry neither and
+ * are correctly unknown — they upload as manual activities, which is what a run with no timed points
+ * does anyway.
+ */
+function runStartExactMs(run) {
+  const sent = Number(run && run.startMs);
+  if (isFinite(sent) && sent > 1e12) return sent;
   const fromId = Number(String((run && run.id) || "").replace("run-", ""));
   if (isFinite(fromId) && fromId > 1e12) return fromId - (Number(run.sec) || 0) * 1000;
+  return null;
+}
+function runStartMs(run) {
+  const exact = runStartExactMs(run);
+  if (exact != null) return exact;
   if (run && run.dateIso) return Date.parse(run.dateIso + "T09:00:00Z");
   return Date.now() - (Number(run && run.sec) || 0) * 1000;
 }
@@ -6099,15 +6166,25 @@ function normalizeRoute(route) {
   const out = [];
   for (const p of route) {
     let la, lo;
-    if (Array.isArray(p)) { la = Number(p[0]); lo = Number(p[1]); }
-    else if (p && typeof p === "object") { la = Number(p.lat); lo = Number(p.lng); }
-    else continue;
+    let tt = null;
+    // ⚠️ THE ARRAY BRANCH IS THE WRIST'S SHAPE, AND ITS THIRD ELEMENT IS THE RUN'S OWN RUNNING SECONDS.
+    // Reading only p[0] and p[1] is what made every wrist run reach Strava as a MANUAL activity: the
+    // watch has sent [lat, lng, t] since the per-point-time change, runStravaPayload filters on
+    // isFinite(p.t), and a branch that names two of three fields drops the one nothing else can
+    // reconstruct. Exactly the loss this function's own warning below is about, arriving through the
+    // other branch.
+    if (Array.isArray(p)) {
+      la = Number(p[0]); lo = Number(p[1]);
+      if (p.length > 2 && isFinite(Number(p[2]))) tt = Number(p[2]);
+    } else if (p && typeof p === "object") {
+      la = Number(p.lat); lo = Number(p.lng);
+      if (isFinite(Number(p.t))) tt = Number(p.t);
+    } else continue;
     // ⚠️ CARRY THE TIME THROUGH. This function runs on every ingest, so dropping an unknown
     // field here would silently strip the timestamps off every watch run and every repaired run --
     // and the loss would only show up as a Strava upload with no pace in it.
     if (isFinite(la) && isFinite(lo) && (la !== 0 || lo !== 0)) {
-      const t = (p && typeof p === "object" && isFinite(Number(p.t))) ? Number(p.t) : null;
-      out.push(t == null ? { lat: la, lng: lo } : { lat: la, lng: lo, t: t });
+      out.push(tt == null ? { lat: la, lng: lo } : { lat: la, lng: lo, t: tt });
     }
   }
   return out;
@@ -6120,6 +6197,22 @@ function viewedRun() {
   if (state.viewRunId) { const byId = (state.logged || []).filter((r) => r && r.id === state.viewRunId)[0]; if (byId) return byId; }
   return (state.logged || [])[state.viewRunIdx];
 }
+/**
+ * ⚠️ A WRIST RUN ALREADY TRUNCATED BY THE WATCH'S OLD 600-POINT CAP IS NOT REPAIRED HERE, AND CANNOT
+ * BE. The ground past the first ten minutes was never sent and never stored; there is nothing on the
+ * phone to reconstruct it from, and inventing the rest is what this file refuses to do everywhere
+ * else (a run with no timed points goes to Strava as a manual activity rather than as a fabricated
+ * even trace). So an old wrist run keeps its short line, and only runs recorded from here on span
+ * the whole outing.
+ *
+ * ⚠️ AND THE SURVIVING POINTS ARE DELIBERATELY NOT RE-THINNED TO ROUTE_MAX_POINTS EITHER, even though
+ * that would bring old runs onto the one stored resolution and free roughly 17 KB each (measured
+ * 23.5 KB against 6.1 KB, so about 0.9 MB across a full fifty-run store). Those runs are already
+ * missing most of their route; coarsening the part that is real removes detail from the only ground
+ * they have left, and buys the runner nothing they can see. The migrations that belong here repair a
+ * FALSEHOOD — a route in the wrong shape, splits as bare seconds, a run captioned "today" a fortnight
+ * later. A dense short route is not a lie about itself, so it is left alone.
+ */
 function migrateRunRoutes() {
   let changed = false;
   (state.logged || []).forEach((r) => {
@@ -6189,9 +6282,21 @@ function ingestWatchRun(run) {
     // still captioned "today" a fortnight later, forever, because nothing ever recomputed it. The
     // date is stored as a real one now and the caption is derived from it at render time.
     id: run.id, t: title, d: runDateLabelIso(runIso), dateIso: runIso, dist: distKm.toFixed(2) + " km",
+    // ⚠️ THE INSTANT THE RUN BEGAN, AND IT ONLY MATTERS BECAUSE THE ROUTE NOW CARRIES TIMES. Those
+    // times are seconds since the start, so without the start there is nothing to turn them into —
+    // runStartMs cannot recover one from a UUID and falls back to 09:00 on the run's date, which would
+    // have put every properly mapped wrist run into somebody's Strava feed nine hours from when they
+    // ran it. Absent on an older watch build, whose route carries no times either, so that run stays a
+    // manual activity and nothing has to be guessed.
+    startMs: (isFinite(Number(run.startMs)) && Number(run.startMs) > 1e12) ? Number(run.startMs) : null,
     time: fmtPace(sec), pace: avgPaceSec ? fmtPace(avgPaceSec) + " /km" : "—",
     distKm: Number(distKm.toFixed(2)), sec: sec, avgPaceSec: avgPaceSec,
-    route: normalizeRoute(run.route), splits: normalizeSplits(run.splits),
+    // ⚠️ DOWNSAMPLED HERE TOO, NOT JUST ON THE PHONE'S OWN SAVE PATH. liveRunRecord has always
+    // thinned to ROUTE_MAX_POINTS and this path never did, so a wrist run was stored at four times a
+    // phone run's resolution — the fix-one-commit-point-and-not-the-other trap that this function
+    // already carries two other warnings about (the shoe rack, and Strava). normalizeRoute first,
+    // because the wrist sends bare pairs and downsampling keeps whole points.
+    route: downsampleRoute(normalizeRoute(run.route), ROUTE_MAX_POINTS), splits: normalizeSplits(run.splits),
     elevGain: Math.round(Number(run.elevGain) || 0),
     maxHr: run.maxHr ? Math.round(run.maxHr) : null,
     zoneSec: Array.isArray(run.zoneSec) && run.zoneSec.some((s) => Number(s) > 0) ? run.zoneSec.map((s) => Math.round(Number(s) || 0)) : null,
@@ -6390,6 +6495,48 @@ window.__interunCompanionHR = function (bpm) {
 // than a 320-unit-wide chart can resolve, and the run store holds fifty runs: an unbounded trace
 // would be the only field in the record that grows without limit.
 const HR_SAMPLE_MS = 5000, HR_MAX_POINTS = 160;
+/**
+ * The most route points a STORED run carries, whichever device recorded it.
+ *
+ * ⚠️ THIS IS THE ONE NUMBER THAT DECIDES WHAT THE RUNNER'S STORAGE PAYS FOR, and until now it was
+ * applied to phone runs only: liveRunRecord downsampled to 150 at save while ingestWatchRun called
+ * normalizeRoute alone, so a wrist run went into localStorage at whatever the watch happened to
+ * send. Measured on a synthetic three-hour run, that is 23.5 KB against 6.1 KB — and the store holds
+ * fifty runs, which is where the entire training history lives.
+ *
+ * ⚠️ IT IS NOT A DUPLICATE OF THE WRIST'S OWN CAP AND THE PAIR IS DELIBERATE. WorkoutManager holds
+ * 600 to bound MEMORY and the WatchConnectivity payload while it thins as it goes, not knowing how
+ * long the run will be; this bounds what is KEPT, thinning once with the whole run in hand. Its own
+ * declaration says the same from the other side. Same division as HR_MAX_POINTS, which the wrist
+ * applies on the way out and hrSeriesOrNull applies again here.
+ *
+ * ⚠️ 150 UNTIL A GPX UPLOAD MADE THE STORED LINE THE THING STRAVA MEASURES. A GPX carries no distance
+ * field at all — Strava derives the distance FROM THE POINTS — so whatever this line claims is what
+ * appears in the runner's feed. Measured through the real chain (one credited point per 12 m for a
+ * phone run, the wrist's own thinned output for a wrist one), the stored line as a fraction of the
+ * ground actually covered:
+ *
+ *                              even-150   shape-150   shape-300
+ *   52 laps of a 400 m track      0.755       0.807       0.955
+ *   25 laps of a 400 m track      0.927       0.959       0.988
+ *   800 m park loop x 10 km       0.935       0.969       0.986
+ *   city marathon, 42 km          0.863       0.990       0.991
+ *
+ * The ALGORITHM is the change that matters and it costs nothing: a real road marathon went from
+ * claiming 36.4 km of its own 42.2 to claiming 41.8. The CAP is what buys the lapped sessions, where
+ * ground can only be recovered by spending points per lap — a half marathon on a track was appearing
+ * 5.2 km short and is now 0.9 km short.
+ *
+ * ⚠️ AND THE HONEST ALTERNATIVE WAS MEASURED AND REJECTED. Keeping even spacing and doubling the cap
+ * to 600 costs 1324 KB across a full fifty-run store against 736 KB here, and is WORSE on almost
+ * every shape (0.906 against 0.992 on the hairpin fixture, 0.916 against 0.968 on the mixed one).
+ * Preserving the shape is what recovers ground; more points is what it costs.
+ *
+ * ⚠️ MEASURED COST OF THIS CHANGE: a whole stored run record 9151 -> 15075 bytes, so 447 KB -> 736 KB
+ * across fifty runs. That is the same budget the route-map cache was moved OUT of localStorage to
+ * protect (64 KB x 50 = 3.2 MB, which would have blown it); 0.7 MB does not.
+ */
+const ROUTE_MAX_POINTS = 300;
 // Even thinning that KEEPS THE FIRST AND LAST samples — dropping the last ends the chart before the
 // end of the run, which reads as a short run rather than as a thinned trace.
 function downsampleSeries(series, max) {
@@ -16255,12 +16402,117 @@ function viewLive() {
     whyLiveHtml() +
     '<div class="card"><div class="subhead" style="margin-top:0">Coaching cues</div><div class="cuelog" id="lCues"><div style="color:var(--ink-faint);font-size:13px">Cues will appear as you run.</div></div></div>';
 }
-// Trim a GPS/simulated track to at most ~150 evenly-spaced points for compact storage + a clean map.
+/**
+ * Trim a recorded track to at most ROUTE_MAX_POINTS points, KEEPING THE POINTS WHERE THE ROUTE TURNS.
+ *
+ * ⚠️ THIS USED TO SPREAD THE SURVIVORS EVENLY, AND AN EVEN SAMPLE UNDERSTATES THE GROUND. Every corner
+ * it lands either side of is replaced by the chord across it, and a run is mostly corners: measured on
+ * a 42 km city route, an even 150 points claimed 36.4 km of the 42.2 the runner covered. On a
+ * 52-lap track session it claimed 16.0 km of 21.2. That was invisible for as long as the stored line
+ * was only ever drawn as a picture — the picture looked like the run, roughly — and it stopped being
+ * invisible the moment a run started going to Strava as a GPX, because a GPX has no distance field
+ * and Strava derives the distance from the points themselves.
+ *
+ * ⚠️ IT IS A PRE-EXISTING PHONE DEFECT AS MUCH AS A WRIST ONE, AND THAT IS NOT AN AFTERTHOUGHT: phone
+ * runs have always stored 150 evenly-spread points and have always been eligible for GPX upload, so
+ * every route Inte-Run has ever pushed to Strava has been short by this. Measured, the two devices are
+ * affected within three thousandths of each other (0.863 phone / 0.862 wrist on that marathon).
+ *
+ * ⚠️ THE RANKING IS DOUGLAS-PEUCKER SIGNIFICANCE, NOT VISVALINGAM AREA, AND THE HAIRPIN IS WHY. A
+ * point's significance is how far it sits from the chord its neighbours-at-that-level draw, clamped to
+ * its parent's own value so significance falls monotonically down the tree; the highest-ranked max
+ * points are kept. Visvalingam ranks by the triangle a point makes with its neighbours, which is tiny
+ * at the apex of a 6 m hairpin however far off the chord it sits — measured, it reads 0.607 of the
+ * ground on the hairpin fixture where this reads 0.977.
+ *
+ * ⚠️ BUDGET-EXACT, WHICH PLAIN DOUGLAS-PEUCKER IS NOT. Bisecting a tolerance until the count fits
+ * leaves the budget partly unspent wherever the count jumps (measured, 144 points of an allowed 150 on
+ * the lemniscate fixture, and 0.545 of its ground against 0.568 for the same points chosen by rank).
+ * Ranking spends every point it is given.
+ *
+ * ⚠️ KEEPS THE FIRST AND THE LAST, unconditionally — index 0 and index n-1 are seeded at infinite
+ * significance and re-asserted after the selection, so the stored line always spans the whole run.
+ * That is the property the truncation fix rests on.
+ *
+ * ⚠️ AND IT MOVES WHOLE POINTS, never a rebuilt or averaged one, so a per-point time rides through
+ * untouched. That is what lets a wrist run reach Strava with pace and splits rather than as a manual
+ * entry, and it is asserted rather than assumed.
+ */
 function downsampleRoute(route, max) {
-  max = max || 150;
+  max = max || ROUTE_MAX_POINTS;
   if (!route || route.length <= max) return route ? route.slice() : [];
-  const out = []; const step = (route.length - 1) / (max - 1);
-  for (let i = 0; i < max; i++) out.push(route[Math.round(i * step)]);
+  const n = route.length;
+  // Metres, so a tolerance is a real distance and longitude is not over-weighted at this latitude.
+  const cx = Math.cos((Number(route[0].lat) || 0) * Math.PI / 180) || 1;
+  const X = route.map((p) => (Number(p.lng) || 0) * 111320 * cx);
+  const Y = route.map((p) => (Number(p.lat) || 0) * 111132);
+  const sig = new Float64Array(n);
+  // How deep in the subdivision a point was chosen. Ranks BELOW significance and above the index —
+  // see the sort below, which is where it earns its place.
+  const lvl = new Int32Array(n);
+  sig[0] = Infinity; sig[n - 1] = Infinity;
+  // Iterative, not recursive: a 12,000-point track would be 12,000 frames deep in the worst case and
+  // a blown stack here loses the runner the route of the run they have just finished.
+  const stack = [[0, n - 1, Infinity, 0]];
+  while (stack.length) {
+    const frame = stack.pop(), a = frame[0], b = frame[1], cap = frame[2], depth = frame[3];
+    if (b - a < 2) continue;
+    const ax = X[a], ay = Y[a], vx = X[b] - ax, vy = Y[b] - ay;
+    const L2 = vx * vx + vy * vy;
+    const mid = (a + b) / 2;
+    let worst = -1, at = -1, off = 0;
+    for (let i = a + 1; i < b; i++) {
+      const wx = X[i] - ax, wy = Y[i] - ay;
+      let t = L2 > 0 ? (wx * vx + wy * vy) / L2 : 0;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const d = Math.hypot(X[i] - (ax + t * vx), Y[i] - (ay + t * vy));
+      // ⚠️ A TIE IS BROKEN AT THE MIDDLE OF THE SPAN, AND THAT IS NOT A TIDY-UP. On a genuinely
+      // straight stretch every interior point sits exactly on the chord, so every deviation ties —
+      // and taking the first of them makes the subdivision a chain instead of a tree. Measured on a
+      // straight 10,801-point track: 492 ms of quadratic work, and 299 of the 300 kept points landing
+      // in the FIRST TENTH of the run, which draws the same line and hands Strava a run whose last
+      // three hours are one segment. Splitting in the middle instead is 6 ms and evenly spread.
+      if (d > worst || (d === worst && Math.abs(i - mid) < off)) {
+        worst = d; at = i; off = Math.abs(i - mid);
+      }
+    }
+    if (at < 0) continue;
+    // Clamped to the parent's own significance, so a child can never outrank the point that split it.
+    // Without that the ranking is not a hierarchy and keeping the top N can select a point whose
+    // neighbours were both discarded, which is a line through ground the runner never covered.
+    //
+    // ⚠️ AND IT IS A PRINCIPLE RATHER THAN A MEASURED FAULT, WHICH IS RECORDED HERE SO THAT NOBODY
+    // "VERIFIES" IT BY DELETING IT. Forced to the raw distance, the result is IDENTICAL on eight
+    // route fixtures including a 52-lap track session, a city marathon, 6 m hairpins and a
+    // lemniscate — the only movement anywhere is one fixture's claimed ground going 0.99230 to
+    // 0.99229, one point differently chosen. No test catches its removal and none is claimed to;
+    // it stays because a ranking that is not a hierarchy is one bad route away from selecting an
+    // orphan. This project has already deleted a const on a verifier's word and broken a guard that
+    // read it.
+    sig[at] = Math.min(worst, cap);
+    lvl[at] = depth + 1;
+    stack.push([a, at, sig[at], depth + 1], [at, b, sig[at], depth + 1]);
+  }
+  const order = [];
+  for (let i = 0; i < n; i++) order.push(i);
+  // ⚠️ THREE KEYS, AND THE MIDDLE ONE IS WHAT SPREADS A FEATURELESS STRETCH. Significance decides
+  // first, so geometry always wins; among points that deviate by the SAME amount — which on a straight
+  // stretch is all of them, at zero — the coarser subdivision level wins, and that is the point that
+  // halves the remaining span. The index only breaks a final tie, and it is there so the result is
+  // deterministic: two runs over identical ground must store identical routes, which is what lets the
+  // route-map cache key on the route at all.
+  order.sort((p, q) => (sig[q] - sig[p]) || (lvl[p] - lvl[q]) || (p - q));
+  const keep = new Uint8Array(n);
+  for (let i = 0; i < max; i++) keep[order[i]] = 1;
+  // ⚠️ BELT AND BRACES AT EVERY REACHABLE BUDGET, AND LOAD-BEARING ONLY AT A BUDGET OF ONE. Both ends
+  // are seeded at infinite significance, so they already sort to the top and win any budget of two or
+  // more — measured, removing this line is byte-identical on all eight route fixtures at the shipped
+  // cap. At max 1 it is not: the route comes back as a single point and the END of the run is lost.
+  // No caller asks for one, and that is exactly why it is written down rather than left to be
+  // discovered by deletion.
+  keep[0] = 1; keep[n - 1] = 1;
+  const out = [];
+  for (let i = 0; i < n; i++) if (keep[i]) out.push(route[i]);
   return out;
 }
 // Draw the recorded route as an SVG, in brand colours, with a marching-ants animated line (an accent
@@ -17237,15 +17489,17 @@ function rdCue(state) {
  * The run's identity: what kind of session, when, where, and a way out to Strava.
  *
  * ⚠️ THE TIME IS SHOWN ONLY WHEN IT IS REAL. runStartMs falls back to 09:00 on the run's date when
- * the id carries no timestamp — every watch run, whose id is a UUID — and that fallback exists for
- * Strava's start_date_local, where something must be sent. Printing it here would put an invented
- * "at 09:00" on a run somebody did at six in the evening, in the one block whose whole job is to say
- * which run this was.
+ * nothing carries an instant, and that fallback exists for Strava's start_date_local, where something
+ * must be sent. Printing it here would put an invented "at 09:00" on a run somebody did at six in the
+ * evening, in the one block whose whole job is to say which run this was.
+ *
+ * ⚠️ A WRIST RUN NOW ANSWERS, AND THAT IS THE POINT RATHER THAN A SIDE EFFECT. This used to return
+ * null for every one of them, because their id is a UUID; the watch sends the start instant alongside
+ * the timed route, so the time of day a wrist run prints is measured rather than invented. Runs
+ * recorded before that still return null and still print no time.
  */
 function runStartMsKnown(run) {
-  const fromId = Number(String((run && run.id) || "").replace("run-", ""));
-  if (isFinite(fromId) && fromId > 1e12) return fromId - (Number(run.sec) || 0) * 1000;
-  return null;
+  return runStartExactMs(run);
 }
 const RD_MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 /**
@@ -20574,7 +20828,82 @@ const SHARE_VEIL_STEPS = ["none", "veil", "scrim", "deep"];
  * against. 10px is the 6px of halo plus 4px of margin; it costs ten rows of very slightly deeper scrim
  * above the copy and nothing else.
  */
-const SHARE_SCRIM = { fadeK: 0.34, fadeMin: 200, fadeMax: 360, max: 0.92, endK: 0.55, knee: 10 };
+/**
+ * ⚠️ fadeK / fadeMin / fadeMax ARE HALF WHAT THEY WERE (owner, 2026-08-21): "the gradient at the bottom
+ * of the card is too high, it needs to be halved in distance". Measured on the eight real block tops the
+ * app produces, the fades went 282/312/325/250 (story) and 228/272/291/200 (feed) to 141/156/163/125 and
+ * 114/136/146/100 — each within a pixel of exactly half, INCLUDING the two that sat on the clamp, which
+ * is why fadeMin halved with the coefficient rather than staying put.
+ *
+ * ⚠️ AND HALVING IT CANNOT LOWER THE ALPHA UNDER ANY GLYPH, which is what makes it safe. The alpha is
+ * solved from the brightest ground inside the BLOCK rect (see shareVeilPlan) and the gradient reaches it
+ * at blockTop - knee, ten pixels above the topmost glyph; the fade's length decides only where the ramp
+ * BEGINS, all of which is above the copy. Measured over 160 card states (10 hostile grounds x 2 aspects x
+ * 4 templates x both fit modes): the solved alpha is identical in 160 of 160, and comparing the FINISHED
+ * cards pixel by pixel from blockTop - knee downwards the worst byte anywhere differs by **1**, in 8 of
+ * the 160, at 257 bytes of 2,721,600 — gradient-LUT rounding in the tail below the copy, not a change in
+ * the picture. Against a ground-only twin of each card the tier floors are unmoved to three decimals:
+ * ink 10.349, accent 4.948, inkSoft 5.031, fast 5.093, slow 3.303, nothing under its target either side.
+ * ⚠️ AND THE SWEEP MUST GIVE EACH TEMPLATE ITS OWN TIER SET, or it measures colours the card never sets.
+ * Applying all six to all four reported inkFaint at 3.508 and "106 readings under target" — inkFaint is
+ * in no template's list but The Execution's, exactly as shareScrimText's own note says.
+ *
+ * ⚠️ stops IS THE EASING'S RESOLUTION AND IT IS MEASURED, NOT PICKED — see shareEase.
+ */
+const SHARE_SCRIM = { fadeK: 0.17, fadeMin: 100, fadeMax: 180, max: 0.92, endK: 0.55, knee: 10,
+  stops: 48 };
+/**
+ * SMOOTHERSTEP, BECAUSE A LINEAR RAMP TO TRANSPARENT LEAVES A LINE WHERE IT ENDS.
+ *
+ * ⚠️ THE OWNER'S SECOND HALF OF THE SAME RULING: "i can see the line where it stops on the current one".
+ * That is a Mach band and it is a real artefact rather than taste — the eye's lateral inhibition finds the
+ * discontinuity in the RATE of change, not in the value, so a ramp that arrives at zero with a non-zero
+ * slope draws an edge at the exact row where it stops however gentle the ramp itself is.
+ *
+ * ⚠️ 6t^5 - 15t^4 + 10t^3, WHOSE FIRST *AND* SECOND DERIVATIVES ARE ZERO AT BOTH ENDS. smoothstep
+ * (3t^2 - 2t^3) zeroes only the first, and its curvature is at its MAXIMUM exactly at the boundary — a
+ * curvature spike in the middle of a fade is invisible, one at the top of it is the thing being removed.
+ *
+ * ⚠️ MEASURED FROM RENDERED PIXELS AS BOUNDARY PROMINENCE — the curvature AT the fade's top row
+ * divided by the worst curvature anywhere else in the same fade. Worst flat hostile ground, 504 cards:
+ * **7.13 before, 1.21 after**, median **5.38 to 0.95**. So the boundary stops being a standout at all,
+ * which is precisely what "I can see the line where it stops" describes. The raw profile says the same
+ * thing without any metric at all: before, 1000.0 / 1000.0 / 962.2 — a 37.8-unit step inside 4 rows;
+ * after, 1000.0 / 1000.0 / 1000.0 / 991.1 / 964.7.
+ * ⚠️ AND PROMINENCE IS THE RIGHT RULER BECAUSE IT IS SCALE-FREE, WHICH THE RAW LAPLACIAN IS NOT. An
+ * earlier version of this comment claimed the absolute Laplacian at lag 8 went 0.069889 to 0.008898,
+ * "7.9x smaller". That was the PROBE reading its own floor: 0.008898 is exactly one 8-bit step at white,
+ * it is never the shipped boundary on any of the 32 flat cards (min 0.007224, median 0.034495, max
+ * 0.069023), and the tell was that the stop sweep below reported it identically for 12/24/48/96. Measured
+ * properly the absolute figure moves 0.072318 to 0.069023, i.e. 1.05x — because the fade is now HALF AS
+ * LONG, so its curvature per pixel is 1.76x steeper and an absolute reading is confounded by the very
+ * change the ruling asked for. At a lag of 12 the shipped state reads 1.35x WORSE by that measure
+ * (0.106108 to 0.143273) for the same reason, which is the trade the next warning states.
+ * ⚠️ SO DO NOT RESTORE AN ABSOLUTE THRESHOLD HERE. Two of the three instruments tried on this reported
+ * the fix backwards or not at all, and the one that works measures the boundary against its own fade.
+ * ⚠️ A POINTWISE SECOND DIFFERENCE CANNOT SEE ANY OF THIS AND THE FIRST TWO INSTRUMENTS DID NOT. The fade
+ * changes alpha by well under 1/255 per row, so the delivered bytes step in whole units and a per-row d2
+ * is a train of quantisation spikes — measured, the residual on flat white was 0.00099 both before and
+ * after, which is one byte smoothed over nine rows. A slope-difference over a +-12px window is no better:
+ * 12px is 12% of a halved fade, by which point an eased curve has picked up real slope, and it reported
+ * this fix as 1.7x while the boundary itself had gone flat.
+ * ⚠️ AND HALVING ALONE WOULD HAVE MADE IT WORSE, WHICH IS WHY THE TWO HALVES OF THE RULING SHIP TOGETHER:
+ * the same linear ramp over half the distance measures **0.120783**, 1.7x worse than what he reported
+ * seeing. Halve it without easing it and the line he complained about gets sharper.
+ *
+ * ⚠️ AND IT IS SAMPLED, BECAUSE A CANVAS GRADIENT IS PIECEWISE LINEAR BETWEEN ITS STOPS. Every stop is
+ * itself a slope discontinuity, so the curve is only as smooth as the sampling. Swept 8/12/24/48/96, the
+ * boundary Laplacian at lag 8 is 0.017749 / 0.008898 / 0.008898 / 0.008898 / 0.008898 and at lag 4 is
+ * 0.008898 / 0.008898 / 0.000000 / 0.000000 / 0.000000 — so it CONVERGES AT 24 and 48 is margin bought
+ * for nothing (a gradient stop costs no draw call). Below 12 it does not converge: at 8 the boundary is
+ * twice the floor, because the first segment is an eighth of the fade long and is a straight line.
+ * ⚠️ THE CURVATURE DID NOT VANISH, IT MOVED, and that is the trade rather than a free win. Worst
+ * Laplacian INSIDE the fade goes 0.013966 to 0.052023 and the steepest slope anywhere in it 0.008667 to
+ * 0.020148 — 2.3x steeper in the middle. That is the point: a steep smooth ramp with no boundary has
+ * nothing for the eye to lock onto, and a steeper ramp also bands LESS, because 8-bit banding is visible
+ * when each band is wide.
+ */
+function shareEase(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
 function shareScrimFade(gm, blockTop) {
   const block = Math.max(0, gm.H - blockTop);
   return Math.round(Math.max(SHARE_SCRIM.fadeMin,
@@ -20596,9 +20925,12 @@ function shareVeilPlan(probe, gm, spec) {
     ground: ground, lum: shareRelLumRGB(ground), fadeTop: blockTop - fade, blockTop: blockTop };
 }
 /**
- * ⚠️ THREE STOPS, MONOTONE, AND THE MIDDLE ONE IS THE CONTRACT. 0 where the fade begins, the solved
+ * ⚠️ MONOTONE, AND THE STOP AT THE TOP OF THE COPY IS THE CONTRACT. 0 where the fade begins, the solved
  * alpha a little ABOVE the top of the copy, and more below it. A two-stop gradient from the fade to the
  * canvas bottom puts only a fraction of the solved alpha under the first line.
+ * ⚠️ THE FADE IS NO LONGER ONE STRAIGHT LINE BETWEEN THE FIRST TWO OF THEM — see shareEase for why, and
+ * note that SHARE_SCRIM.stops = 1 reproduces the old straight line exactly, which is what makes the
+ * before/after an A/B on one field rather than an appeal to history.
  *
  * ⚠️ THE STOP SITS AT blockTop - SHARE_SCRIM.knee, SO THE FIRST LINE HAS MARGIN RATHER THAN EQUALITY.
  * See the knee's own note: on the stop it read 4.52 against a 4.5 target at the glyph box and 4.31 with a
@@ -20616,8 +20948,12 @@ function shareVeilDraw(g, gm, plan) {
   if (bt <= top) return;
   const grad = g.createLinearGradient(0, top, 0, gm.H);
   const at = (bt - top) / Math.max(1, gm.H - top);
-  grad.addColorStop(0, cardAlpha(SHARE_INK.ground, 0));
-  grad.addColorStop(Math.min(0.999, Math.max(0.001, at)), cardAlpha(SHARE_INK.ground, plan.a));
+  // ⚠️ THE FADE IS SAMPLED, NOT ONE MIDDLE STOP. A single stop is a straight line from nothing to the
+  // solved alpha, and its upper end is the line the owner reported seeing. See shareEase.
+  for (let i = 0; i <= SHARE_SCRIM.stops; i++) {
+    const t = i / SHARE_SCRIM.stops;
+    grad.addColorStop(Math.min(0.999, t * at), cardAlpha(SHARE_INK.ground, plan.a * shareEase(t)));
+  }
   grad.addColorStop(1, cardAlpha(SHARE_INK.ground, plan.end));
   g.fillStyle = grad; g.fillRect(0, top, gm.W, gm.H - top);
 }
@@ -23740,23 +24076,44 @@ const SHARE_TEMPLATE_BLURB = {
  *
  * ⚠️ THE SHAPE IS THE OWNER'S (2026-08-20): "the options to share straight to their socials need to
  * appear like the attached image" — a horizontal row of labelled destination tiles, then a full-width
- * primary Save to device with a settings affordance beside it. What is NOT his reference's is the
- * CONTENT of the row, and that is the honesty limit rather than an omission: his reference paints
- * Instagram and WhatsApp tiles, and this app cannot detect whether either is installed nor hand a story
- * to one. Two tiles is what we can genuinely do.
+ * primary Save to device with a settings affordance beside it.
  *
- * ⚠️ WHAT WOULD BECOME A REAL DIRECT HANDOFF AFTER A REBUILD, stated so nobody has to work it out
- * again: an "Instagram Story" tile needs the instagram-stories scheme in LSApplicationQueriesSchemes (to
- * ask whether it is there at all) plus that scheme's own share/pasteboard handoff, and "Save to
- * Photos" as distinct from saving a file needs NSPhotoLibraryAddUsageDescription. Both are Info.plist
- * entries and an Xcode build; neither travels over the air. Until then the system sheet reaches every
- * one of them and the note under the row says so.
+ * ⚠️ AND THE ROW'S CONTENT IS HIS TOO, RULED ON 2026-08-21 AFTER THE HARDWARE TEST, WHICH REVERSES WHAT
+ * THIS COMMENT USED TO SAY. "I want the icons to the different social media options like shown in the
+ * screenshot, with the more button allowing the further options that we already have when pressing
+ * share." The previous version carried two tiles and a paragraph explaining that named apps were the
+ * honesty limit. They are not: the limit is on claiming a DIRECT POST, not on naming where a card can go.
+ *
+ * ⚠️ SO EVERY TILE ROUTES TO THE SYSTEM SHARE SHEET, WHERE THAT APP GENUINELY APPEARS, AND EVERY TILE
+ * SAYS SO IN ITS OWN ACCESSIBLE NAME. There is exactly one route in studioDest — not a branch per tile —
+ * so no tile can be wired to something a different tile promises, and SST_VIA is one string rather than
+ * four, so it cannot be omitted from one of them. A logo over a control that does nothing is the
+ * looks-live-is-inert class this project has shipped three times (rdMore, #saveSetup, the profile
+ * confirm button); a logo over a control that opens the sheet the app IS installed in is a signpost.
+ *
+ * ⚠️ WHAT WOULD BECOME A REAL DIRECT HANDOFF AFTER AN XCODE BUILD, stated per tile in SST_DEST's own
+ * "native" field so nobody has to work it out again. LSApplicationQueriesSchemes now carries
+ * instagram-stories, instagram, whatsapp, fb-messenger-share-api and sms, so a native build can at last
+ * ASK whether an app is installed — but asking is not handing off, and the handoff is Swift either way.
+ * ⚠️ AND NO CAPABILITY FLAG WAS ADDED FOR IT. The coach-audio shim is behind window.__interunCoachNativePlay
+ * because the page owns that sequencing and only the playback moved; here the whole handoff is native, so
+ * a flag would gate a branch nothing can reach and this project treats an unreachable branch as a defect
+ * in its own right. The day the Swift exists, the page change is one dispatch and this comment is the spec.
+ *
+ * ⚠️ COMMUNITY IS DELIBERATELY NOT A TILE. His reference's row carries that app's own community feed;
+ * ours is a placeholder tab with no backend at all, so a tile bearing it would go nowhere — which is the
+ * one thing the rest of this row is built to avoid.
  *
  * ⚠️ COPY CAPTION IS A REAL DESTINATION, AND IT IS THE USEFUL HALF OF POSTING TO AN APP WE CANNOT REACH.
  * The clipboard is the one place this app can put text with no plist entry and no permission, and
  * shareCaption already composes the sentence the finish screen sends with a picture — so the runner who
  * is about to open Instagram by hand has the words waiting for them. It is not a stand-in for a tile we
  * cannot build; it is a thing the app can do.
+ * ⚠️ IT LEFT THE TILE ROW WHEN THE ROW BECAME DESTINATIONS, AND THAT IS NOT A DEMOTION. The row now
+ * answers "which app is this going to"; the clipboard answers neither and would be the one tile in four
+ * whose label had to change to report itself — and it does have to report, because a clipboard write is
+ * the only control here that puts nothing on screen. A full-width secondary has room for "Copied" and
+ * "Not copied" at any text size, which a 66px tile does not.
  *
  * ⚠️ THE GEAR OPENS THE PRIVACY TOOL RATHER THAN A NEW SCREEN. "What am I comfortable sharing?" is the
  * spec's own third question and it already has a surface; a settings affordance that opens a second
@@ -23779,6 +24136,58 @@ const SST_GLYPH = {
   copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M15 5.5A2.5 2.5 0 0 0 12.5 3h-7A2.5 2.5 0 0 0 3 5.5v7A2.5 2.5 0 0 0 5.5 15"/></svg>',
   cog: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.6v2.3M12 19.1v2.3M4.4 4.4l1.7 1.7M17.9 17.9l1.7 1.7M2.6 12h2.3M19.1 12h2.3M4.4 19.6l1.7-1.7M17.9 6.1l1.7-1.7"/></svg>',
 };
+/**
+ * THE DESTINATION MARKS — OURS, IN OUR OWN VOCABULARY.
+ *
+ * ⚠️ INLINE, LINE-ART, MONOCHROME, AND NOT ANYBODY ELSE'S ARTWORK. Three constraints decided these
+ * rather than taste. The app ships with NO external network assets, so a remote logo is not available at
+ * all; a third-party logo file embedded as a data URI would be their artwork redistributed inside our
+ * bundle; and every one of these is drawn at the same 24-unit viewBox, the same 1.9 stroke and
+ * currentColor as SST_GLYPH and ICON, so the row reads as one set. No brand colour, no gradient, no
+ * wordmark — a camera, a bubble with a handset, a bubble with three dots, and an ellipsis.
+ *
+ * ⚠️ THE TWO BUBBLES HAD TO BE MADE TO DIFFER. A chat glyph and a messages glyph are the same shape, so
+ * the first cut of this row was two identical marks side by side with only the label to tell them apart —
+ * which is the row's whole job undone. One carries a handset, the other three dots.
+ *
+ * ⚠️ THE SINGLE-POINT PATHS ("M17 7h.01") ARE DOTS, NOT MISTAKES. A round line cap on a zero-length
+ * segment paints a disc of stroke-width diameter; a 1-unit circle at this size renders as a ring instead,
+ * which reads as a second lens on the camera.
+ */
+const SST_DGLYPH = {
+  camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.2" width="17.6" height="17.6" rx="5.2"/><circle cx="12" cy="12" r="4.15"/><path d="M16.9 7.1h.01"/></svg>',
+  handset: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 11.5a8.5 8.5 0 0 1-12.6 7.4l-4.6 1.5 1.5-4.4a8.5 8.5 0 1 1 15.7-4.5z"/><path d="M9.1 8.7c.2 2.9 3.1 5.5 6.1 5.9.7.1 1.2-.5 1.1-1.2l-.2-1-2.2-.6-.7 1a6.6 6.6 0 0 1-2.4-2.4l1-.7-.6-2.2-1-.2c-.7-.1-1.2.5-1.1 1.2z"/></svg>',
+  bubble: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 11.4c0 4.2-3.9 7.5-8.6 7.5-.9 0-1.8-.1-2.6-.3l-4.6 1.8 1.4-3.9a7.2 7.2 0 0 1-2.8-5.1c0-4.2 3.9-7.5 8.6-7.5s8.6 3.3 8.6 7.5z"/><path d="M8.4 11.4h.01M12 11.4h.01M15.6 11.4h.01"/></svg>',
+  ellipsis: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.9"/><path d="M8.2 12h.01M12 12h.01M15.8 12h.01"/></svg>',
+};
+/**
+ * THE DESTINATIONS, AS DATA, WITH THE NATIVE WORK EACH ONE WOULD NEED WRITTEN BESIDE IT.
+ *
+ * ⚠️ ONE RECORD PER TILE AND NO ROUTE FIELD, BECAUSE THERE IS ONLY ONE ROUTE. A per-tile route would be
+ * a per-tile branch in studioDest, and four branches is four chances for one of them to promise something
+ * the others do not do — see studioDest, which has exactly one dispatch on purpose.
+ *
+ * ⚠️ THE "native" FIELD IS DOCUMENTATION AND IT IS ASSERTED TO EXIST. It is the answer to "what would make this a
+ * direct handoff", per tile, so the next person to open Xcode does not have to re-derive it; a test
+ * requires every record to carry one, so a fifth tile cannot arrive without somebody having thought about
+ * what it would take.
+ */
+const SST_DEST = [
+  { id: "instagram", label: "Instagram", glyph: SST_DGLYPH.camera,
+    native: "instagram-stories://share plus the card on UIPasteboard as com.instagram.sharedSticker.backgroundImage; canOpenURL now permitted by LSApplicationQueriesSchemes" },
+  { id: "whatsapp", label: "WhatsApp", glyph: SST_DGLYPH.handset,
+    native: "UIActivityViewController narrowed to the WhatsApp extension, or whatsapp://send after writing the card to a shared container; text-only via whatsapp://send?text= cannot carry the picture" },
+  { id: "messages", label: "Messages", glyph: SST_DGLYPH.bubble,
+    native: "MFMessageComposeViewController with the card as an attachment; sms: carries no image at all" },
+  { id: "more", label: "More", glyph: SST_DGLYPH.ellipsis,
+    native: "none — the system share sheet IS this tile's destination, and it is already what every tile opens" },
+];
+/**
+ * ⚠️ ONE SENTENCE, ONE PLACE. Every tile's accessible name ends with it, so a tile cannot be the one that
+ * quietly claims a direct post; and it is appended by studioDestTile rather than typed into four records,
+ * so adding a fifth destination cannot omit it.
+ */
+const SST_VIA = " — opens your phone’s share sheet";
 /** One tile builder, so a second destination cannot arrive with a different shape or no label. */
 /**
  * COPY THE CAPTION, AND SAY SO ON THE TILE ITSELF.
@@ -23813,17 +24222,29 @@ function studioCopyCaption(btn) {
   } catch (e) { /* fall through to the honest failure below */ }
   say("Not copied");
 }
-function studioDestTile(action, glyph, label) {
-  return '<button class="sst-dest" data-sst="' + action + '">' +
-    '<span class="sst-di" aria-hidden="true">' + glyph + '</span>' +
-    '<span class="sst-dl">' + label + '</span></button>';
+/**
+ * ⚠️ THE VISIBLE LABEL IS THE APP'S NAME AND THE ACCESSIBLE NAME IS THE APP'S NAME PLUS THE ROUTE,
+ * which is the ordering WCAG's "label in name" asks for — a voice-control user saying "tap Instagram"
+ * still matches, and a screen-reader user is told where the tap actually goes.
+ * ⚠️ AND THE GLYPH IS HIDDEN. Without aria-hidden the mark contributes to the name and the tile is
+ * announced twice.
+ */
+function studioDestTile(d) {
+  return '<button class="sst-dest" data-sstdest="' + esc(d.id) + '" aria-label="' +
+    esc(d.label + SST_VIA) + '">' +
+    '<span class="sst-di" aria-hidden="true">' + d.glyph + '</span>' +
+    '<span class="sst-dl">' + esc(d.label) + '</span></button>';
 }
 function studioDestHtml(run) {
   const strava = stravaRunButtonHtml(run);
   return '<div class="sst-dests" role="group" aria-label="Where to send this card">' +
-      studioDestTile("share", ICON.share, "Share sheet") +
-      studioDestTile("caption", SST_GLYPH.copy, "Copy caption") +
+      SST_DEST.map(studioDestTile).join("") +
     '</div>' +
+    '<p class="sst-note">Every one of these opens your phone\u2019s own share sheet with the card ' +
+    'attached. Inte-Run cannot post to them directly, and does not assume any of them are installed.</p>' +
+    '<button class="sst-sec" data-sst="caption">' +
+      '<span class="sst-di" aria-hidden="true">' + SST_GLYPH.copy + '</span>' +
+      '<span class="sst-dl">Copy caption</span></button>' +
     (strava ? '<div class="sst-strava" data-sst-strava>' + strava +
       '<p class="sst-sr">Sends the run itself, not this card.</p></div>' : "") +
     '<div class="sst-prim">' +
@@ -23831,9 +24252,30 @@ function studioDestHtml(run) {
         '<span class="sst-di" aria-hidden="true">' + SST_GLYPH.save + '</span>Save to device</button>' +
       '<button class="sst-cog" data-ssttool="privacy" aria-label="What this card shares">' +
         SST_GLYPH.cog + '</button>' +
-    '</div>' +
-    '<p class="sst-note">Instagram, WhatsApp and the rest live inside your phone\u2019s own share sheet \— ' +
-    'Inte-Run does not assume any of them are installed.</p>';
+    '</div>';
+}
+/**
+ * EVERY DESTINATION TILE, AND EXACTLY ONE ROUTE.
+ *
+ * ⚠️ NO BRANCH PER TILE. Four tiles each dispatching for themselves is four chances for one of them to
+ * be wired to something its own logo does not imply, and a guard over branches can only ever prove that a
+ * branch calls SOMETHING. With one dispatch there is nothing for a tile to disagree with.
+ *
+ * ⚠️ AN UNKNOWN ID DOES NOTHING RATHER THAN FALLING THROUGH TO THE SHEET. A tile is only a
+ * destination because SST_DEST says so; without the lookup, any stray data-sstdest anywhere in the studio
+ * would silently become a share button.
+ *
+ * ⚠️ THE SHEET IS DISMISSED FIRST, for the same reason the primary does it: iOS raises its own sheet
+ * over ours, so coming back to a destination list still sitting over the card reads as the tap having failed.
+ *
+ * ⚠️ AND IT IS THE RUN THE STUDIO WAS OPENED WITH. Re-resolving through the screen's own resolver is
+ * how Share and Save came to act on two different runs one row apart.
+ */
+function studioDest(id) {
+  if (!STUDIO) return;
+  if (!SST_DEST.filter((d) => d.id === id).length) return;
+  studioSheet(null);
+  return doShareRun(STUDIO.run);
 }
 /**
  * The sheet a tool opens, or the destinations. One dispatch, so a new tool cannot forget its header.
@@ -24119,7 +24561,7 @@ function studioSyncRows() {
   }
 }
 /** Which of this file's own action attributes a node carries, so focus can be found again after a rebuild. */
-const SST_FOCUS_ATTRS = ["data-sstmet", "data-ssttmpl", "data-sstpriv", "data-ssttool", "data-sst"];
+const SST_FOCUS_ATTRS = ["data-sstmet", "data-ssttmpl", "data-sstpriv", "data-sstdest", "data-ssttool", "data-sst"];
 function studioFocusSig(node) {
   if (!node || !node.getAttribute) return null;
   for (const a of SST_FOCUS_ATTRS) {
@@ -24220,7 +24662,7 @@ function studioBusy(on) {
   // ⚠️ THE PRIMARY ACTION IS IN THIS SET TOO, AND IT HAS TO BE. It is the only way to the destinations
   // now, so leaving it live while the file is being built opens a sheet whose every row is dead — the
   // looks-live-does-nothing defect moved one tap further in rather than removed.
-  root.querySelectorAll('[data-sst="share"], [data-sst="save"], [data-sst="dest"]').forEach((b) => {
+  root.querySelectorAll('[data-sstdest], [data-sst="save"], [data-sst="dest"]').forEach((b) => {
     b.disabled = !!on;
     b.classList.toggle("sst-off", !!on);
   });
@@ -24276,12 +24718,11 @@ function studioClick(e) {
     if (what === "metdef") { SCARD.metrics = null; return studioSync(); }
     if (what === "dest") return studioSheet("dest");
     if (what === "sheetoff") return studioSheet(null);
-    // ⚠️ THE RUN THE STUDIO WAS OPENED WITH, at both. Share used to re-resolve through the screen's
-    // own resolver while Save beside it read STUDIO.run, so one row could act on two different runs.
-    // ⚠️ AND THE SHEET IS DISMISSED FIRST, because both hand off to the system and iOS raises its own
-    // sheet over ours: coming back to a destination list still sitting over the card reads as the tap
-    // having failed, and Save leaves it up over a download that has already happened.
-    if (what === "share") { studioSheet(null); return doShareRun(STUDIO.run); }
+    // ⚠️ THE RUN THE STUDIO WAS OPENED WITH. This used to re-resolve through the screen's own resolver
+    // while Save beside it read STUDIO.run, so one row could act on two different runs. studioDest, which
+    // now owns every tile in the row, reads the same field for the same reason.
+    // ⚠️ AND THE SHEET IS DISMISSED FIRST, because it hands off to the system and iOS raises its own
+    // sheet over ours: Save leaves the destination list up over a download that has already happened.
     if (what === "save") { studioSheet(null); return saveShareCard(STUDIO.run); }
     // ⚠️ THE SHEET STAYS UP FOR THE CLIPBOARD, WHICH IS THE OPPOSITE OF THE TWO ABOVE AND FOR THE SAME
     // REASON. Those two hand off to the system, which raises its own sheet over ours; this one hands off
@@ -24290,6 +24731,11 @@ function studioClick(e) {
     if (what === "caption") return studioCopyCaption(act);
     return;
   }
+  // ⚠️ THE DESTINATION TILES ARE THEIR OWN ATTRIBUTE FAMILY, exactly as the tools, templates, metric
+  // chips, aspect chips and privacy switches are. Four tiles as four data-sst actions would be four
+  // branches in the dispatch above; one family is one branch, and studioDest holds the single route.
+  const dst = t.closest("[data-sstdest]");
+  if (dst) return studioDest(dst.getAttribute("data-sstdest"));
   const tool = t.closest("[data-ssttool]");
   if (tool) {
     const id = tool.getAttribute("data-ssttool");

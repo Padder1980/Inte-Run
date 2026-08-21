@@ -178,7 +178,60 @@ final class WorkoutManager: NSObject, ObservableObject {
     /// Metres climbed, accumulated the same way the phone does it, from the fixes we already have.
     private var elevGainM: Double = 0
     private var lastAltitude: Double?
+    /// The shape of the run, as `[lat, lng, t]` triples where `t` is the run's own running seconds at
+    /// the moment the fix was taken. Thinned in place, never truncated — see `appendRoutePoint` and
+    /// `thinRoutePoints` below, and read through `route` rather than directly.
+    ///
+    /// ⚠️ THE THIRD ELEMENT IS WHY A WRIST RUN CAN REACH STRAVA AS A REAL ACTIVITY. `runStravaPayload`
+    /// filters on `isFinite(p.t)`, so while these were bare pairs EVERY wrist run went up as a MANUAL
+    /// activity: the right distance and the right duration, and no map, no splits and no pace — which
+    /// is most of why anybody sends a run there at all. See `routeSecondsAt` for what the number means
+    /// and `routeLastT` for the one rule that keeps it usable.
+    ///
+    /// ⚠️ THE CAP USED TO BE `routePoints.count < 600` AT THE APPEND SITE, WHICH SIMPLY STOPPED
+    /// RECORDING. At roughly a fix a second that is ten minutes, so every wrist run longer than that
+    /// stored its first ten minutes and nothing after — and the debrief, the recap and the share card
+    /// each drew that prefix as though it were the whole outing. Measured on a synthetic
+    /// point-to-point three-hour run: the stored line was 1.82 km of 32.65 km of ground, and the
+    /// missing ground sat a mean of 1540 m and a worst of 4134 m away from anything that was kept.
     private(set) var routePoints: [[Double]] = []
+    /// One point is kept per this many credited fixes, and it DOUBLES whenever the buffer is halved.
+    ///
+    /// ⚠️ HALVING THE BUFFER ALONE IS NOT A FIX, AND NEITHER A POINT COUNT NOR A SPAN CAN SEE WHY.
+    /// Fixes keep arriving once a second, so a buffer that is merely halved refills at full rate:
+    /// the surviving old region's spacing doubles at every pass while the newest region stays dense.
+    /// Measured on the same three-hour track, that put 306 of 336 points in the LAST TENTH of the run
+    /// and represented the first tenth with two — the mirror image of the truncation being fixed,
+    /// with a perfect 100% span and a plausible count. Doubling the intake at the same moment makes
+    /// every region converge on one spacing: measured after, 34 points in each tenth of that run and
+    /// a mean deviation from the full-resolution track of 1.53 m.
+    private var routeStride = 1
+    /// Credited fixes since the last one that was kept.
+    private var routeSinceKeep = 0
+    /// The newest credited fix, when the stride did not keep it. Always shown last, by `route`.
+    ///
+    /// ⚠️ WITHOUT THIS THE LINE ENDS BEFORE THE RUN DOES. At a stride of 32 up to 31 fixes at the end
+    /// of a run are skipped, so the drawn route stops up to 90 m short of where the runner actually
+    /// finished. It is the same trap `downsampledHrTrack` already records guarding against —
+    /// "dropping the last one would end the chart before the end of the run, which reads as a shorter
+    /// run rather than as a thinned trace".
+    private var routeTail: [Double]?
+    /// The running seconds carried by the last route point ACCEPTED — kept or provisional.
+    ///
+    /// ⚠️ IT IS A WATERMARK, AND IT IS WHAT MAKES THE PAUSE HANDLING HONEST RATHER THAN A CLAMP. A fix
+    /// is timed against `pausedAccum` as it stands when the fix is PROCESSED, so a fix whose own clock
+    /// predates the end of the last pause has a pause subtracted from it that had not happened when it
+    /// was taken — and comes out EARLIER than the point before it. That is exactly the batch
+    /// CoreLocation delivers on the resume. Refusing a point that cannot be placed strictly after the
+    /// last one drops those, keeps every post-resume fix, and needs no history of the pauses: nothing
+    /// is nudged, nothing is invented, and a point we cannot time is simply not a point.
+    ///
+    /// ⚠️ AND IT IS THE DUPLICATE-TIME CHECK. The times are whole seconds, because that is all a GPX
+    /// trackpoint carries once `runStravaPayload` strips the milliseconds — so two fixes inside one
+    /// second would reach Strava sharing a timestamp, which is an infinite speed between them.
+    ///
+    /// -1, not 0: a run's very first fix is second zero of the run and has to be accepted.
+    private var routeLastT: Double = -1
     private var splits: [Int] = []
     private var lastSplitMetre = 0.0
     private var lastSplitElapsed: TimeInterval = 0
@@ -324,7 +377,17 @@ final class WorkoutManager: NSObject, ObservableObject {
         lastStepElapsed = 0
         elevGainM = 0
         lastAltitude = nil
+        // ⚠️ ALL FOUR. WorkoutManager is a @StateObject and outlives a run, so a stride left at 32
+        // would have run two keeping one fix in thirty-two from its very first minute, and a tail left
+        // behind would put a point from run one at the end of run two's route.
         routePoints = []
+        routeStride = 1
+        routeSinceKeep = 0
+        routeTail = nil
+        // ⚠️ AND THE TIME WATERMARK. Left behind, run two of an app session is refused ENTIRELY — every
+        // one of its fixes is earlier in its own run than run one's last point was in that one, so the
+        // gate in appendRoutePoint declines all of them and the second run records no route at all.
+        routeLastT = -1
         splits = []
         lastSplitMetre = 0
         lastSplitElapsed = 0
@@ -835,10 +898,21 @@ final class WorkoutManager: NSObject, ObservableObject {
             "id": runId,
             "sec": Int(elapsed.rounded()),
             "distKm": (distanceMetres / 1000),
-            "route": routePoints,
+            // ⚠️ `route`, NOT `routePoints`: the newest fix is held provisionally and only the
+            // accessor knows about it, so reading the array here would send the phone a line ending
+            // up to 90 m short of where the run finished. One definition of what the route is.
+            "route": route,
             "splits": splits,
             "source": "watch",
         ]
+        // ⚠️ WHEN THE RUN BEGAN, AND IT TRAVELS WITH THE TIMED ROUTE BECAUSE THE ROUTE IS USELESS
+        // WITHOUT IT. A route point's time is seconds since the start, so the phone needs the start to
+        // turn it into a real instant — and `runStartMs` cannot recover one from a wrist run's id,
+        // which is a UUID. Its documented fallback is 09:00 on the run's date, so a properly mapped
+        // wrist run would have landed in somebody's Strava feed nine hours from when they ran it.
+        // Absent on an older build, where the route carries no times either, so that run stays manual
+        // and nothing has to guess.
+        if let began = startedAt { out["startMs"] = began.timeIntervalSince1970 * 1000 }
         if let p = plan {
             out["title"] = p.title
             out["type"] = p.type
@@ -1082,8 +1156,110 @@ final class WorkoutManager: NSObject, ObservableObject {
         }
     }
 
-    /// The route so far, for drawing.
-    var route: [[Double]] { routePoints }
+    /// The route so far: every point kept, with the newest credited fix last.
+    ///
+    /// ⚠️ ONE DEFINITION, AND `summaryPayload` READS THIS RATHER THAN `routePoints`. The payload used
+    /// to read the array directly, so the provisional tail added below would have shown on the
+    /// watch's own map and been missing from the run the phone stores — two builders of one route,
+    /// which is the fault this project has now shipped four times over.
+    var route: [[Double]] {
+        guard let tail = routeTail else { return routePoints }
+        return routePoints + [tail]
+    }
+
+    /// The most points the wrist will hold.
+    ///
+    /// ⚠️ THIS AND THE PHONE'S OWN CAP ARE A DELIBERATE PAIR AND NEITHER CAN BE DELETED AS A
+    /// DUPLICATE OF THE OTHER. They bound different things:
+    ///
+    ///   • 600 here bounds MEMORY AND THE PAYLOAD. A three-hour run is about 10,800 fixes, and an
+    ///     unbounded array is the one thing on the watch that grows for as long as somebody keeps
+    ///     running; 10,800 pairs is also far more than one `transferUserInfo` should be asked to
+    ///     carry. The wrist thins AS IT GOES and cannot know how long the run will turn out to be, so
+    ///     it keeps headroom — thinning to the phone's 150 in flight would leave a ten-minute run
+    ///     with 150 points when 600 cost nothing, and there is no way to get the detail back.
+    ///   • 150 on the phone (`ROUTE_MAX_POINTS`, applied by `downsampleRoute` at ingest and again on
+    ///     the phone's own save) bounds WHAT IS STORED, because localStorage holds fifty runs and the
+    ///     route is the largest field on one. It thins ONCE, with the whole run in hand, which is why
+    ///     it can afford to be the tighter of the two.
+    ///
+    /// Exactly the division the heart-rate trace already uses: sampled every five seconds here,
+    /// downsampled to 160 on the way out, and re-capped at 160 by the phone at ingest.
+    private static let routeMaxPoints = 600
+
+    /// Running seconds at the instant a fix was TAKEN, which is the number Strava reads to derive
+    /// pace, moving time and splits.
+    ///
+    /// ⚠️ PAUSED TIME IS SUBTRACTED, because otherwise a runner who waits at a crossing gets a
+    /// straight line through the junction at walking pace — the phone's own route push carries the same
+    /// warning against `Date.now()` minus a start, and `elapsed` on this class subtracts `pausedAccum`
+    /// for exactly this reason.
+    ///
+    /// ⚠️ AND IT IS THE FIX'S OWN CLOCK, NOT THE MOMENT IT IS PROCESSED. A batch delivered when the
+    /// watch next gets a moment to breathe would otherwise share one identical time, which is the
+    /// collapsed-batch lie the phone already records fixing: ten quiet minutes as one instant, in the
+    /// one field the whole point of storing a time was to keep honest.
+    ///
+    /// ⚠️ STATIC AND PURE ON PURPOSE, SO IT CAN BE EXECUTED RATHER THAN READ. The pause attribution is
+    /// the whole subtlety of this feature and a source-text guard cannot see it; taking the two pieces
+    /// of state as arguments is what lets `test/watch-route-swift.test.ts` lift this function on its own
+    /// and drive real pauses through it.
+    static func routeSecondsAt(_ when: Date, started: Date?, pausedSoFar: TimeInterval) -> Double {
+        guard let started else { return 0 }
+        // Whole seconds, and ROUNDED rather than truncated: a GPX trackpoint carries no fraction once
+        // the payload strips the milliseconds, so a fraction stored here is a fraction thrown away
+        // later — and the phone's own route push rounds for the same reason.
+        return max(0, (when.timeIntervalSince(started) - pausedSoFar).rounded())
+    }
+
+    /// Where the runner was, and when in the run they were there.
+    ///
+    /// ⚠️ ONE BUILDER, so the shape of a route point is decided in one place. A second call site
+    /// assembling a bare pair by hand would be refused by `appendRoutePoint` and the route would
+    /// silently vanish — the shape and the time have to arrive together or not at all.
+    private func routeSample(_ loc: CLLocation) -> [Double] {
+        return [
+            (loc.coordinate.latitude * 100000).rounded() / 100000,
+            (loc.coordinate.longitude * 100000).rounded() / 100000,
+            Self.routeSecondsAt(loc.timestamp, started: startedAt, pausedSoFar: pausedAccum),
+        ]
+    }
+
+    /// Record a point of the run's shape, thinning rather than truncating when the buffer is full.
+    private func appendRoutePoint(_ pt: [Double]) {
+        // ⚠️ A POINT WE CANNOT PLACE IN TIME IS NOT A POINT. Both halves are load-bearing and neither
+        // is defensive padding: a triple is required because a bare pair would reach Strava inside an
+        // otherwise-timed route and be silently dropped there instead, leaving a map with a hole in it;
+        // and the time must be strictly LATER than the last one accepted, which is what refuses the
+        // mid-pause fixes CoreLocation delivers after a resume and what stops two fixes in one second
+        // sharing a GPX timestamp. See `routeLastT`.
+        guard pt.count >= 3, pt[2] > routeLastT else { return }
+        routeLastT = pt[2]
+        routeSinceKeep += 1
+        // Not this one — but it is the newest ground covered, so it is held as the provisional last
+        // point rather than dropped. See `routeTail`.
+        guard routeSinceKeep >= routeStride else { routeTail = pt; return }
+        routeSinceKeep = 0
+        routeTail = nil
+        if routePoints.count >= Self.routeMaxPoints { thinRoutePoints() }
+        routePoints.append(pt)
+    }
+
+    /// Drop every other point, keeping the FIRST and the LAST, and halve the intake with it.
+    private func thinRoutePoints() {
+        let n = routePoints.count
+        // A guard rather than an assumption: with a cap of two or fewer there is nothing to drop, and
+        // without this the stride would stay at 1 while the array grew past its own bound forever.
+        guard n > 2 else { return }
+        var kept: [[Double]] = []
+        kept.reserveCapacity(n / 2 + 2)
+        for i in stride(from: 0, to: n, by: 2) { kept.append(routePoints[i]) }
+        // The last point only needs adding when the even walk missed it. A newer point is appended
+        // immediately after this returns, so the end of the run is never the thing that is lost.
+        if (n - 1) % 2 != 0 { kept.append(routePoints[n - 1]) }
+        routePoints = kept
+        routeStride *= 2
+    }
 
     var paceText: String {
         guard let p = paceSecPerKm, p.isFinite, p > 0, p < 3600 else { return "--:--" }
@@ -1181,11 +1357,14 @@ extension WorkoutManager: CLLocationManagerDelegate {
                     lastAltitude = fix.altitude
                 }
             }
-            if movedThisBatch, let last = usable.last, routePoints.count < 600 {
-                routePoints.append([
-                    (last.coordinate.latitude * 100000).rounded() / 100000,
-                    (last.coordinate.longitude * 100000).rounded() / 100000,
-                ])
+            // ⚠️ NO COUNT GATE HERE. This used to read `routePoints.count < 600`, which stopped
+            // recording ten minutes into every run. The bound is kept by thinning what is already
+            // held, inside appendRoutePoint, so the line always spans the whole outing.
+            // ⚠️ AND THE POINT CARRIES ITS OWN TIME NOW. Built by `routeSample`, from the fix's own
+            // clock and the pause total in force when the fix is seen — never assembled here, because
+            // a hand-built pair is refused by the append gate and the route disappears in silence.
+            if movedThisBatch, let last = usable.last {
+                appendRoutePoint(routeSample(last))
             }
             if let rb = routeBuilder {
                 Task { try? await rb.insertRouteData(usable) }

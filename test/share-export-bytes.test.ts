@@ -563,6 +563,54 @@ test("BLOCKER: the card with no eligible template cannot become a file at all", 
     "the refusal still blames a missing photograph: " + JSON.stringify(G.refused.reason));
 });
 
+test("BLOCKER: the bottom fade leaves no edge where it begins, measured off rendered pixels", () => {
+  // ⚠️ THE OWNER REPORTED SEEING A LINE: "the gradient at the bottom of the card ... needs a more natural
+  // fade, i can see the line where it stops on the current one." That is a Mach band, which is a real
+  // artefact rather than taste — the eye finds the discontinuity in the RATE of change, so a ramp that
+  // reaches zero with a non-zero slope draws an edge at the row where it stops however gentle the ramp is.
+  //
+  // ⚠️ THIS IS THE PIXEL HALF OF THE GUARD AND IT IS HERE RATHER THAN IN share-render BECAUSE IT NEEDS A
+  // CANVAS. That file asserts the emitted gradient stops, which proves the curve reaches Skia; only a
+  // rendered column can say what Skia then painted.
+  //
+  // ⚠️ AND THE CONTROL IS EXACT. SHARE_SCRIM.stops = 1 makes the fade one straight line — smootherstep
+  // sampled at its two endpoints IS a line — so each row below is the same card, same fade length, same
+  // solved alpha, differing only in whether the fade is eased.
+  assert.ok(G.scrimEdge.length >= 8, "the fade profile was not captured: " + G.scrimEdge.length);
+  const at = (set: { lag: number; bnd: number; inner: number }[], lag: number) =>
+    set.filter((x) => x.lag === lag)[0]!;
+  const rows = G.scrimEdge.map((e) => ({ key: e.ground + "/" + e.aspect, a: e.a, fade: e.fade,
+    eased8: at(e.eased, 8).bnd, linear8: at(e.linear, 8).bnd,
+    eased4: at(e.eased, 4).bnd, easedIn8: at(e.eased, 8).inner, linearIn8: at(e.linear, 8).inner }));
+  for (const r of rows) {
+    assert.ok(r.a > 0.2, r.key + " earned an alpha of " + r.a + ", so there is no fade to measure");
+    // ⚠️ THE ABSOLUTE BAR IS TWO 8-BIT STEPS. One step at white is 0.0089 in relative luminance, and the
+    // eased boundary measures exactly that — i.e. it is as smooth as the encoding can express. Measured
+    // before ruling 8: 0.069889 on the worst flat ground. Re-broken by setting SHARE_SCRIM.stops to 1.
+    assert.ok(r.eased8 <= 0.02, r.key + ": the fade's top row has a Laplacian of " + r.eased8.toFixed(6) +
+      " at lag 8, which is an edge — the shipped-before straight line measured 0.069889 and one 8-bit " +
+      "step at white is 0.008898");
+    assert.ok(r.eased4 <= 0.02, r.key + ": the fade's top row has a Laplacian of " + r.eased4.toFixed(6) +
+      " at lag 4");
+    // ⚠️ AND IT IS MUCH SMALLER THAN THE STRAIGHT LINE ON THE SAME CARD, which is the claim that cannot be
+    // satisfied by a fade that has simply become invisible: the control has to be worse.
+    assert.ok(r.linear8 > r.eased8 * 3, r.key + ": easing the fade only took its boundary from " +
+      r.linear8.toFixed(6) + " to " + r.eased8.toFixed(6) + ", so the ease is not doing the work");
+    // ⚠️ THE CURVATURE DID NOT VANISH, IT MOVED, and that is the trade rather than a free win — asserted
+    // so a future "improvement" that flattens the interior is recognised as having removed the mechanism.
+    assert.ok(r.easedIn8 > r.eased8, r.key + ": the eased fade's interior curvature (" +
+      r.easedIn8.toFixed(6) + ") is not greater than its boundary's (" + r.eased8.toFixed(6) +
+      "), so the curve is not concentrated away from the edge");
+    assert.ok(r.easedIn8 > r.linearIn8, r.key + ": the eased fade carries no more curvature inside " +
+      "itself than a straight line does, which a smootherstep cannot do");
+  }
+  // ⚠️ AND THE HALVED LENGTHS ARE THE ONES THE CARDS ACTUALLY GOT. A fade measured on a length nobody
+  // ships is a measurement of a different card.
+  const fades = [...new Set(rows.map((r) => r.fade))];
+  assert.deepEqual(fades.sort((a, b) => a - b), [114, 141],
+    "the captured fades are not the halved story/feed lengths: " + fades.join(","));
+});
+
 test("the capture is quick enough to keep in the suite, and it left its evidence on disk", () => {
   // ⚠️ A GATE NOBODY WILL RUN IS A GATE THAT DOES NOT EXIST. One browser, one lift, twenty-six exports:
   // measured at about 3.5 seconds against a 70-second suite. If this ever creeps into the tens of

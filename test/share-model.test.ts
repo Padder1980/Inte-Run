@@ -66,6 +66,7 @@ const CONSTS = ["SHARE_MODEL_VERSION", "SHARE_TEMPLATES", "SHARE_TEMPLATE_LABEL"
 const FNS = ["fmtPace", "rdCue", "rdWell", "runEvidenceConfidence", "runAnalysis", "runVerdict",
   "rdMetresBetween", "redactRouteEnds", "runRoutePresentation", "loadSharePriv", "saveSharePriv",
   "sharePrivacyFor", "sharePrivacyLocked", "setSharePrivacy", "runMetricLadder", "runStartMsKnown",
+  "runStartExactMs",
   "rdWhenText", "rdDateText", "shareTemplateStates", "shareTemplateFor", "shareEvidenceLine", "shareFileName",
   "shareProgressionClaim", "shareMetricPool", "shareMetricsChosen",
   "shareCropKey", "shareCropRead", "shareCropWrite", "sharePhotoView", "shareCropSig",

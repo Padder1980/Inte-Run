@@ -128,18 +128,26 @@ test("BLOCKER: every control the studio renders is reached by its delegated hand
   // first restatement of the mechanism guard below STILL did not catch the emptied Copy-caption branch: a
   // guard over a collection is only as good as the collection, and this collection had a hole in it.
   const literal = [...src.matchAll(/data-sst="([a-z0-9]+)"/g)].map((m) => m[1]!);
+  // ⚠️⚠️ AND NOW THERE MUST BE NO COMPUTED data-sst AT ALL, WHICH IS A STRONGER GUARD THAN THE ONE THIS
+  // REPLACES. The destinations row used to build its action string (data-sst="' + action + '"), so "share"
+  // and "caption" appeared in no literal attribute and the derived set had a hole in it — which is why the
+  // emptied Copy-caption branch survived. Ruling 8 turned the destinations into their own attribute family
+  // (data-sstdest, enumerated from SST_DEST further down this file), so nothing here builds a data-sst any
+  // more and the literal enumeration below is PROVABLY complete rather than complete-if-you-remember.
   const dyn = src.match(/data-sst="'\s*\+/g) || [];
-  assert.equal(dyn.length, 1, "there are now " + dyn.length + " builders writing a computed data-sst, and " +
-    "this sweep only knows how to enumerate studioDestTile's — add the new one or its controls go unchecked");
-  assert.match(nocomment(lift("studioDestTile")), /data-sst="' \+ action \+ '"/,
-    "studioDestTile no longer writes its first argument into data-sst, so the call-site sweep below is measuring nothing");
-  const built = [...src.matchAll(/studioDestTile\("([a-z0-9]+)"/g)].map((m) => m[1]!);
-  assert.ok(built.length >= 2, "studioDestTile's own call sites were not found: " + built.join(", "));
-  const actions = [...new Set(literal.concat(built))];
-  for (const must of ["share", "caption", "save"]) {
-    assert.ok(actions.includes(must), "the destinations row's " + must + " tile is not in the swept set");
+  assert.deepEqual(dyn, [], "a builder is writing a computed data-sst again, so the literal sweep below " +
+    "cannot see its controls — either give it its own attribute family or enumerate it here by hand");
+  const actions = [...new Set(literal)];
+  for (const must of ["caption", "save", "dest"]) {
+    assert.ok(actions.includes(must), "the destination sheet's " + must + " control is not in the swept set");
   }
-  assert.ok(actions.length >= 16, "expected the studio's actions, found " + actions.join(", "));
+  // ⚠️ A FLOOR, SO A SWEEP THAT HAS GONE BLIND CANNOT PASS BY FINDING NOTHING. It moved 16 -> 15 when the
+  // destinations left data-sst for their own family (ruling 8), and the four they took with them are
+  // counted in that family's own guard below — so the two together are 19 where they were 16.
+  const destIds = [...appScript().matchAll(/^\s*\{ id: "([a-z]+)", label: "/gm)].map((m) => m[1]!);
+  assert.ok(destIds.length >= 4, "SST_DEST's ids were not found, so the family count below is empty");
+  assert.ok(actions.length + destIds.length >= 19,
+    "expected the studio's controls, found " + actions.concat(destIds).join(", "));
   const handler = nocomment(lift("studioClick"));
   const dead = actions.filter((a) => !new RegExp('=== "' + a + '"').test(handler));
   assert.deepEqual(dead, [], "these render in the studio and studioClick never names them: " + dead.join(", "));
@@ -163,8 +171,10 @@ test("BLOCKER: every control the studio renders is reached by its delegated hand
   // chips, the aspect chips and the privacy switches are each addressed by their own attribute; a sweep
   // that only knew data-sst would have missed five whole families of control.
   const fams = [...new Set([...src.matchAll(/(data-sst(?:[a-z]*|-[a-z]+))="/g)].map((m) => m[1]!))]
-    .filter((a) => /^data-sst(met|tmpl|tool|priv)$|^data-sst-aspect$/.test(a));
-  assert.ok(fams.length >= 5, "expected the studio's attribute families, found " + fams.join(", "));
+    .filter((a) => /^data-sst(met|tmpl|tool|priv|dest)$|^data-sst-aspect$/.test(a));
+  assert.ok(fams.includes("data-sstdest"),
+    "the destination tiles are no longer their own family, so nothing here checks they are wired: " + fams.join(", "));
+  assert.ok(fams.length >= 6, "expected the studio's attribute families, found " + fams.join(", "));
   const unread = fams.filter((a) => !handler.includes("[" + a + "]"));
   assert.deepEqual(unread, [], "these attributes are rendered and studioClick never reads them: " + unread.join(", "));
 });
@@ -249,9 +259,13 @@ test("Share, Save and Strava in the studio all act on the run it was opened with
   // failure is silent, because a mismatched run misses SCARD.key and the tap degrades to a text-only
   // share with the runner's photograph quietly dropped. Same reasoning as viewRunId replacing
   // viewRunIdx: a re-resolved handle is not a handle.
-  const handler = lift("studioClick");
-  assert.match(handler, /doShareRun\(STUDIO\.run\)/, "Share does not act on the studio's own run");
-  assert.match(handler, /saveShareCard\(STUDIO\.run\)/, "Save does not act on the studio's own run");
+  // ⚠️ THE SHARE CALL MOVED INTO studioDest WHEN THE ROW BECAME DESTINATION TILES (ruling 8), so the
+  // scope is both functions — and the invariant is exactly as before. Pinning studioClick alone would now
+  // pass with every tile re-resolving the run from the screen behind the overlay.
+  const handler = lift("studioClick") + "\n" + lift("studioDest");
+  assert.match(lift("studioDest"), /doShareRun\(STUDIO\.run\)/,
+    "the destination tiles do not act on the studio's own run");
+  assert.match(lift("studioClick"), /saveShareCard\(STUDIO\.run\)/, "Save does not act on the studio's own run");
   assert.match(handler, /stravaSendRun\(STUDIO\.run/, "Send to Strava does not act on the studio's own run");
   assert.ok(!/currentOverviewRun\(/.test(handler),
     "the studio re-resolves the run from the screen behind it instead of using the one it holds");
@@ -731,49 +745,166 @@ test("BLOCKER: the metric chips express the cap and the floor by disabling, neve
 
 test("BLOCKER: there is one destination sheet, and the primary action is dead while the file is not ready", () => {
   const dest = lift("studioDestHtml");
-  // ⚠️ THE SHEET TOOK THE OWNER'S SHAPE ON 2026-08-20 — a horizontal row of labelled destination tiles,
-  // then a full-width primary with a settings affordance beside it — so a destination is now either a tile
-  // or the primary. Collected from both, because a guard that looks for one shape stops looking the day a
-  // destination moves to the other.
-  const acts = [...dest.matchAll(/studioDestTile\("([a-z]+)"/g)].map((m) => m[1]!)
-    .concat([...dest.matchAll(/data-sst="([a-z]+)"/g)].map((m) => m[1]!));
-  assert.ok(acts.includes("share"), "the system share sheet is not offered: " + acts.join(", "));
-  assert.ok(acts.includes("save"), "saving to the device is not offered: " + acts.join(", "));
-  assert.match(dest, /stravaRunButtonHtml/, "Strava is not offered where the product allows it");
-  assert.match(dest, /own share sheet/, "the sheet does not say where a runner's other apps are");
-  // ⚠️ THE SHAPE ITSELF, ASSERTED: a tile row, a full-width primary and one settings affordance. Without
-  // this the destinations could revert to a stacked list and every other assertion here would still pass.
+  // ⚠️ THE SHAPE, AND THE ROW'S CONTENT, ARE BOTH THE OWNER'S — the shape from 2026-08-20 and the tiles
+  // from ruling 8 on 2026-08-21: "I want the icons to the different social media options like shown in
+  // the screenshot, with the more button allowing the further options that we already have when pressing
+  // share." So a destination is now a TILE built from SST_DEST, plus the primary and the clipboard.
   assert.match(dest, /class="sst-dests"/, "the destinations are not a row of tiles");
+  assert.match(dest, /SST_DEST\.map\(studioDestTile\)/,
+    "the tile row is no longer built from SST_DEST, so the sweeps below enumerate nothing that ships");
   assert.match(dest, /class="sst-prim"/, "there is no full-width primary row");
   assert.match(dest, /class="sst-save" data-sst="save"/, "Save to device is not the primary");
+  assert.match(dest, /class="sst-sec" data-sst="caption"/, "Copy caption is not offered");
   assert.match(dest, /class="sst-cog" data-ssttool="privacy" aria-label="/,
     "the settings affordance beside the primary is missing, unlabelled, or leads nowhere real");
-  // Every tile carries a visible label, which is its accessible name; the glyph beside it is hidden.
-  const tiles = [...dest.matchAll(/studioDestTile\("([a-z]+)", ([^,]+), "([^"]+)"\)/g)];
-  assert.ok(tiles.length >= 2, "fewer than two destination tiles: " + tiles.length);
-  for (const t of tiles) assert.ok(t[3]!.trim().length >= 4, "a tile has no readable label: " + t[0]);
+  assert.match(dest, /stravaRunButtonHtml/, "Strava is not offered where the product allows it");
+  assert.match(dest, /own share sheet/, "the sheet does not say where a runner's other apps are");
   assert.match(lift("studioDestTile"), /aria-hidden="true"/,
     "a tile's glyph is not hidden from a screen reader, so its name is read twice");
-  // ⚠️ THE PRIMARY ACTION IS IN THE DISABLED SET TOO. It is the only way to the destinations now, so
-  // leaving it live while the file is being built opens a sheet whose every row is dead — the
-  // looks-live-does-nothing defect moved one tap further in rather than removed.
-  assert.match(lift("studioBusy"), /\[data-sst="share"\], \[data-sst="save"\], \[data-sst="dest"\]/,
-    "the primary action stays live while there is no file to share");
+  // ⚠️ THE PRIMARY ACTION IS IN THE DISABLED SET TOO, AND SO IS EVERY TILE. Leaving them live while the
+  // file is being built opens a sheet whose every row is dead — the looks-live-does-nothing defect moved
+  // one tap further in rather than removed.
+  assert.match(lift("studioBusy"), /\[data-sstdest\], \[data-sst="save"\], \[data-sst="dest"\]/,
+    "the destination tiles or the primary stay live while there is no file to share");
   assert.match(lift("studioBusy"), /Add a photo and your card is ready to share/,
     "a blocked export does not say why in words");
-  // ⚠️ AND BOTH DESTINATIONS DISMISS THE SHEET FIRST. iOS raises its own sheet over ours: coming back to
-  // a destination list still sitting over the card reads as the tap having failed.
+  // ⚠️ AND EVERY HANDOFF DISMISSES THE SHEET FIRST. iOS raises its own sheet over ours: coming back to a
+  // destination list still sitting over the card reads as the tap having failed.
   const h = lift("studioClick");
-  assert.match(h, /if \(what === "share"\) \{ studioSheet\(null\); return doShareRun\(STUDIO\.run\); \}/,
-    "sharing leaves the destination sheet up over the system sheet");
   assert.match(h, /if \(what === "save"\) \{ studioSheet\(null\); return saveShareCard\(STUDIO\.run\); \}/,
     "saving leaves the destination sheet up over a download that has already happened");
+  assert.match(nocomment(lift("studioDest")), /studioSheet\(null\);[\s\S]*doShareRun/,
+    "a destination tile leaves the sheet up over the system sheet, or opens it in the wrong order");
   // The scrim dismisses, and the exclusion is what stops a tap on a note closing the sheet.
   assert.match(nocomment(h), /closest\("\[data-sst-sheet\]"\) && !t\.closest\("\[data-sst-sheetin\]"\)/,
     "either the scrim does not dismiss, or a tap anywhere inside the sheet dismisses it");
 });
 
-// ---- the editor's chrome, and the nav behind it ---------------------------------------------------
+/* ---- the destination tiles (owner, ruling 8 item 3, 2026-08-21) --------------------------------- */
+
+/** The destinations, read out of the app rather than listed here, so a fifth cannot arrive unguarded. */
+function destRecords(): { id: string; label: string; glyph: string; native: string }[] {
+  const src = appScript();
+  const at = src.indexOf("const SST_DEST = [");
+  assert.ok(at > 0, "SST_DEST is not in the build");
+  let d = 0, end = -1;
+  for (let i = src.indexOf("[", at); i < src.length; i++) {
+    if (src[i] === "[") d++;
+    else if (src[i] === "]") { d--; if (!d) { end = i + 1; break; } }
+  }
+  assert.ok(end > 0, "SST_DEST is unbalanced");
+  const body = src.slice(src.indexOf("[", at), end);
+  const out: any[] = [];
+  for (const m of body.matchAll(/\{\s*id:\s*"([a-z]+)",\s*label:\s*"([^"]+)",\s*glyph:\s*([A-Z_a-z.]+),\s*\n?\s*native:\s*"([^"]*)"/g)) {
+    out.push({ id: m[1]!, label: m[2]!, glyph: m[3]!, native: m[4]! });
+  }
+  assert.ok(out.length >= 4, "SST_DEST parsed as " + out.length + " records, so this sweep is measuring nothing");
+  assert.equal(out.length, (body.match(/\bid:\s*"/g) || []).length,
+    "a record in SST_DEST does not have the shape this sweep parses, so it would be skipped in silence");
+  return out;
+}
+
+test("BLOCKER: every destination is a tile, every tile is wired, and none of them claims a direct post", () => {
+  // ⚠️⚠️ THIS INVERTS A GUARD THAT SHIPPED THE DAY BEFORE, AND THE INVARIANT IS KEPT RATHER THAN DELETED.
+  // The previous version forbade any destination whose LABEL named a third-party app, on the reasoning
+  // that this app cannot detect whether Instagram is installed. The owner overruled the conclusion, not
+  // the reasoning: "I want the icons to the different social media options like shown in the screenshot."
+  // What was being protected survives and is now specific — a tile may name an app, and if it does it must
+  // OPEN THE SYSTEM SHARE SHEET, where that app genuinely appears, and its accessible name must say so.
+  const recs = destRecords();
+  const dest = nocomment(lift("studioDestHtml"));
+  const tile = nocomment(lift("studioDestTile"));
+  const src = appScript();
+  // The row is built from the records, and the attribute carries the record's own id.
+  assert.match(tile, /data-sstdest="' \+ esc\(d\.id\) \+ '"/,
+    "studioDestTile no longer writes the record's id into data-sstdest, so nothing below is enumerating the real tiles");
+  // ⚠️ ONE ROUTE, ASSERTED AS A COUNT. Four tiles each dispatching for themselves is four chances for one
+  // to be wired to something its logo does not imply, and a per-branch guard can only prove a branch calls
+  // SOMETHING. Re-broken by giving one id its own branch.
+  const go = nocomment(lift("studioDest"));
+  assert.equal((go.match(/doShareRun\(/g) || []).length, 1,
+    "studioDest has more than one handoff, so the tiles no longer provably share one route");
+  assert.ok(!/saveShareCard|stravaSendRun|window\.open|location\.href/.test(go),
+    "studioDest reaches a second destination, so a tile can send somewhere its label does not name");
+  assert.ok(!new RegExp('id === "').test(go) && !/switch\s*\(/.test(go),
+    "studioDest branches on the destination id, so one tile can behave differently from the rest");
+  // An unknown id must do nothing rather than falling through to the share sheet.
+  assert.match(go, /SST_DEST\.filter\(\(d\) => d\.id === id\)\.length\) return/,
+    "an unrecognised data-sstdest reaches the share sheet, so any stray attribute becomes a share button");
+  // ⚠️ AND THE ROUTE IS IN EVERY TILE'S ACCESSIBLE NAME, FROM ONE CONSTANT. Typed into four records it
+  // could be omitted from one, and the one omitted would be the tile that appeared to post directly.
+  assert.match(tile, /esc\(d\.label \+ SST_VIA\)/,
+    "a tile's accessible name is no longer its label plus the shared route clause");
+  const via = /const SST_VIA = "([^"]*)";/.exec(src);
+  assert.ok(via, "SST_VIA is gone, so each tile carries its own copy of the route clause");
+  assert.match(via![1]!, /share sheet/i,
+    "SST_VIA no longer says where a tile actually goes: " + JSON.stringify(via![1]));
+  assert.equal((src.match(/const SST_VIA = /g) || []).length, 1, "there is more than one SST_VIA");
+  // ⚠️ THE VISIBLE LABEL MUST BE CONTAINED IN THE ACCESSIBLE NAME (WCAG "label in name"), or a
+  // voice-control user saying the name they can see does not match the control.
+  assert.match(tile, /class="sst-dl">' \+ esc\(d\.label\)/,
+    "the visible label is no longer the record's label, so it may not be inside the accessible name");
+  // Every record is complete, and every one names the native work a direct handoff would need.
+  for (const r of recs) {
+    assert.ok(r.label.trim().length >= 4, "a destination has no readable label: " + JSON.stringify(r));
+    assert.match(r.glyph, /^SST_DGLYPH\./, r.id + " does not take its mark from the destination glyph set");
+    assert.ok(r.native.length >= 20, r.id + " does not record what would make it a direct handoff: " +
+      JSON.stringify(r.native));
+    // ⚠️ AND NO LABEL MAY PROMISE A POST. "Instagram" is honest; "Post to Instagram Story" is not, because
+    // that is precisely what needs an Xcode build.
+    assert.ok(!/post|story|send to|upload|publish/i.test(r.label),
+      r.id + "'s label promises a direct post, which is exactly what this row cannot do: " + r.label);
+  }
+  // ⚠️ NO URL SCHEME ANYWHERE NEAR THE ROW. A scheme could not work until somebody rebuilds in Xcode, and
+  // it would fail silently. The plist now permits canOpenURL for five of them, which is permission to ASK
+  // and not a handoff.
+  for (const scheme of ["instagram:", "instagram-stories:", "fb://", "whatsapp:", "twitter:", "snapchat:", "sms:"]) {
+    assert.ok(!dest.toLowerCase().includes(scheme) && !go.toLowerCase().includes(scheme),
+      "the destinations open a third-party app by URL scheme: " + scheme);
+  }
+  // ⚠️ COMMUNITY IS DELIBERATELY NOT A TILE. His reference's row carries that app's own community feed;
+  // ours is a placeholder tab with no backend, so a tile bearing it would be the looks-live-is-inert
+  // defect the rest of this row exists to avoid.
+  assert.ok(!recs.some((r) => /communit/i.test(r.label + r.id)),
+    "Community is a destination tile, and it has no backend to be a destination of");
+  // The note under the row says the same thing the names do, in the runner's own words.
+  assert.match(dest, /cannot post to them directly/,
+    "the row does not say in words that it cannot post directly");
+});
+
+test("BLOCKER: the destination marks are ours, inline, and each one is distinguishable", () => {
+  // ⚠️ NO REMOTE ASSET AND NO THIRD-PARTY ARTWORK. The app ships with no external network assets at all,
+  // so a fetched logo is not available; a logo file embedded as a data URI would be somebody else's
+  // artwork redistributed inside our bundle. These are line drawings in the app's own vocabulary.
+  const src = appScript();
+  const at = src.indexOf("const SST_DGLYPH = {");
+  assert.ok(at > 0, "SST_DGLYPH is not in the build");
+  const body = src.slice(at, src.indexOf("\n};", at));
+  const marks = [...body.matchAll(/^\s{2}([a-z]+):\s*'(<svg[\s\S]*?<\/svg>)',$/gm)]
+    .map((m) => ({ name: m[1]!, svg: m[2]! }));
+  assert.ok(marks.length >= 4, "SST_DGLYPH parsed as " + marks.length + " marks: this sweep sees nothing");
+  const glyphs = new Set(destRecords().map((r) => r.glyph.replace("SST_DGLYPH.", "")));
+  for (const g of glyphs) {
+    assert.ok(marks.some((m) => m.name === g), "a tile names the mark " + g + ", which SST_DGLYPH does not have");
+  }
+  for (const m of marks) {
+    assert.match(m.svg, /viewBox="0 0 24 24"/, m.name + " is not on the app's 24-unit grid");
+    assert.match(m.svg, /stroke="currentColor"/, m.name + " does not take its colour from the tile");
+    assert.ok(!/href|xlink|<image|url\(/i.test(m.svg), m.name + " references something outside the page");
+    // ⚠️ NO BRAND COLOUR AND NO GRADIENT: a hex inside one of these is somebody's palette, not ours.
+    assert.ok(!/#[0-9a-f]{3,8}|gradient|rgb\(/i.test(m.svg), m.name + " carries a colour of its own");
+  }
+  // ⚠️ AND THE TWO BUBBLES HAD TO BE MADE TO DIFFER. A chat glyph and a messages glyph are the same
+  // shape, so the first cut of this row was two identical marks with only the label to tell them apart —
+  // the row's whole job undone. Every mark's geometry must be distinct from every other's.
+  const used = marks.filter((m) => glyphs.has(m.name));
+  for (let i = 0; i < used.length; i++) for (let j = i + 1; j < used.length; j++) {
+    const a = used[i]!.svg.replace(/\s+/g, ""), b = used[j]!.svg.replace(/\s+/g, "");
+    assert.notEqual(a, b, used[i]!.name + " and " + used[j]!.name + " are the same drawing");
+    const paths = (x: string) => (x.match(/<(path|rect|circle)/g) || []).length;
+    assert.ok(paths(a) > 0 && paths(b) > 0, "a mark draws nothing at all");
+  }
+});
 
 test("BLOCKER: the studio covers the global bottom navigation while editing", () => {
   // ⚠️ THE SPEC ASKS FOR THE GLOBAL NAV TO BE HIDDEN. It is not hidden by a class — the overlay simply

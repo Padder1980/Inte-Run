@@ -18,7 +18,12 @@ function lift(name: string, extra: Record<string, unknown> = {}): Function {
   assert.ok(at > 0, "no function " + name);
   const end = html.indexOf("\nfunction ", at + 10);
   const src = html.slice(at, end > at ? end : at + 4000);
-  const scope = { esc: (x: unknown) => String(x ?? ""), runStartMs: () => Date.parse("2026-08-09T09:00:00Z"), ...extra };
+  // ⚠️ BOTH START READERS ARE STUBBED, because runStravaPayload asks two different questions of
+  // them: runStartMs for the number to write, runStartExactMs for whether that number is real.
+  // Stubbing only the first would leave the second undefined and every test here would throw.
+  const scope = { esc: (x: unknown) => String(x ?? ""),
+    runStartMs: () => Date.parse("2026-08-09T09:00:00Z"),
+    runStartExactMs: () => Date.parse("2026-08-09T09:00:00Z"), ...extra };
   const keys = Object.keys(scope);
   return new Function(...keys, src + "\nreturn " + name + ";")(...keys.map((k) => (scope as any)[k]));
 }
@@ -112,13 +117,27 @@ test("⚠️ a heart-rate dropout is left as a gap, not interpolated across", ()
 
 test("⚠️ the start time is taken from the run, never from now", () => {
   const html = page();
-  const at = html.indexOf("function runStartMs(");
-  assert.ok(at > 0, "runStartMs is gone");
-  const fn = html.slice(at, html.indexOf("\nfunction ", at + 10));
-  // ⚠️ A phone run's id carries the milliseconds, which is exact; a date-only run gets that day at a
-  // sensible hour rather than a precise lie about a moment nobody recorded.
-  assert.match(fn, /replace\("run-", ""\)/, "the exact start in the run id is ignored");
-  assert.match(fn, /fromId - \(Number\(run\.sec\) \|\| 0\) \* 1000/, "the id is the FINISH time; the start is that minus the duration");
+  const decl = (name: string) => {
+    const at = html.indexOf("function " + name + "(");
+    assert.ok(at > 0, name + " is gone");
+    return html.slice(at, html.indexOf("\nfunction ", at + 10));
+  };
+  // ⚠️ THE EXACT START MOVED INTO runStartExactMs AND runStartMsKnown NOW SHARES IT. Two copies of the
+  // id arithmetic is two answers to "do we know when this run began" — one of which the debrief prints
+  // as a time of day and one of which Strava uploads — and they would have had to learn about the
+  // wrist's new start instant separately.
+  const exact = decl("runStartExactMs");
+  // ⚠️ A phone run's id carries the milliseconds, which is exact.
+  assert.match(exact, /replace\("run-", ""\)/, "the exact start in the run id is ignored");
+  assert.match(exact, /fromId - \(Number\(run\.sec\) \|\| 0\) \* 1000/,
+    "the id is the FINISH time; the start is that minus the duration");
+  // ⚠️ AND A WRIST RUN'S OWN INSTANT, WHICH ITS UUID ID CANNOT CARRY. Without it a properly mapped
+  // wrist run lands in the runner's Strava feed at 09:00 whatever time they actually ran.
+  assert.match(exact, /run\.startMs/, "the instant the watch sends is ignored");
+  const fn = decl("runStartMs");
+  assert.match(fn, /runStartExactMs\(/, "the Strava start no longer asks for the exact one first");
+  // A date-only run gets that day at a sensible hour rather than a precise lie about a moment nobody
+  // recorded — and this is the ONE reader entitled to invent it, because something must be sent.
   assert.match(fn, /run\.dateIso \+ "T09:00:00Z"/, "a dated run has no fallback start");
 });
 
@@ -145,4 +164,31 @@ test("⚠️ route points are timed at source, and the time survives ingest", ()
   const at = html.indexOf("function normalizeRoute(");
   const norm = html.slice(at, html.indexOf("\nfunction ", at + 10));
   assert.match(norm, /isFinite\(Number\(p\.t\)\)/, "normalizeRoute strips the timestamps at ingest");
+});
+
+test("BLOCKER: a timed route with an UNKNOWN start uploads as manual, not as a map at the wrong hour", () => {
+  // ⚠️ THE GATE IS THE PAIR, AND THE TWO USED TO BE DECOUPLED. Every trackpoint is written as
+  // startMs + t, so an unknown start does not degrade the upload gracefully: it puts a perfectly good
+  // map, with perfectly good splits and pace, at the wrong TIME OF DAY in the runner's own log.
+  // runStartMs must always answer something, and its fallback is that date at 09:00 — measured, a
+  // wrist run carrying times but no startMs uploaded its first trackpoint at 09:00:00Z against a real
+  // 06:30:00Z, two and a half hours out, with nothing about the activity looking wrong.
+  //
+  // ⚠️ THIS GUARD EXISTS BECAUSE DELETING startMs FROM THE WRIST PAYLOAD WAS CAUGHT BY NOTHING. A
+  // re-break gated that one field off and the whole suite came back green, while the field is the
+  // newest in the payload and the only thing that makes a wrist run's timed route usable.
+  const known = lift("runStravaPayload") as (r: unknown) => any;
+  assert.equal(known(RUN_WITH_TRACE).kind, "gpx",
+    "a timed route with a known start must still be a real GPX — this guard has broken the good case");
+
+  const unknown = lift("runStravaPayload", { runStartExactMs: () => null }) as (r: unknown) => any;
+  const p = unknown(RUN_WITH_TRACE);
+  assert.equal(p.kind, "manual",
+    "a timed route whose start instant is unknown was uploaded as a GPX: its map is right and its " +
+    "time of day is invented");
+  // ⚠️ AND THE HONEST HALF MUST SURVIVE. Falling back is only defensible because the distance and the
+  // duration are real; a manual activity that lost them would be a worse answer than the wrong hour.
+  assert.equal(p.distanceM, 5020, "the manual fallback lost the run's real distance");
+  assert.equal(p.elapsedSec, 1650, "the manual fallback lost the run's real duration");
+  assert.ok(!p.gpx, "a manual activity must carry no GPX at all");
 });

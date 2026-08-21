@@ -105,7 +105,12 @@ export const treadmillRun = () => ({
   splits: [], route: [], indoor: true, elevGain: 0, avgHr: 141, maxHr: null, cadence: null, kcal: null,
   pband: null, pwin: null, pmix: null, rband: { min: 2, max: 4 }, rpe: 3, steps: [],
 });
-/** A wrist run: a UUID id (so no start time), no cadence, no route timestamps, calories instead. */
+/**
+ * A wrist run FROM BEFORE THE WATCH SENT EITHER (a UUID id, no startMs, no route timestamps), which
+ * is the case that still has to work: a watch on an older build, and every wrist run already stored.
+ * No start time is recoverable from it, so no time of day is printed and it goes to Strava as a
+ * manual activity. A wrist run that DOES carry both is exercised in test/watch-route-thinning.test.ts.
+ */
 export const watchRun = (over: any = {}) => refRunA({
   id: "9E1C3A62-7B41-4E0A-9C77-1D2F0B8A5E33", cadence: null, kcal: 402,
   route: REF_ROUTE.map((p) => ({ lat: p.lat, lng: p.lng })),

@@ -106,7 +106,7 @@ const FNS = ["shareFont", "shareTypeSize", "cardAlpha", "cardLsWidth", "shareFig
   "shareZoneRect", "shareZoneScore", "shareRouteFallback", "shareRoutePlacement",
   "shareLin255", "shareLinLut", "shareRelLumRGB", "shareHexRGB", "shareGroundRGB", "shareRectGroundRGB",
   "shareRelLum", "shareLumOfByte", "shareRatio", "shareGroundUnder", "shareVeilAlphaFor",
-  "shareVeilPlan", "shareVeilDraw", "shareScrimFade", "shareScrimText", "sharePhotoScrim",
+  "shareVeilPlan", "shareVeilDraw", "shareScrimFade", "shareScrimText", "sharePhotoScrim", "shareEase",
   "shareGroundFill", "shareTopoField", "shareEffortHex", "shareHexHSL", "shareHSLHex",
   "shareGroundStops", "shareGroundPaint", "shareQuietInk", "shareTopoDraw", "shareTopoCanvas",
   "shareRouteProject", "shareRouteSimplify", "shareRoutePath", "shareRouteDraw",
@@ -906,8 +906,15 @@ test("BLOCKER: the copy's first line sits on MORE than the solved alpha, not exa
   const ctx = E.ctx();
   E.shareVeilDraw(ctx, gm, plan);
   const stops = ctx.log.filter((e: any[]) => e[0] === "stop");
-  assert.equal(stops.length, 3, "the veil is not a three-stop gradient: " + stops.length);
-  assert.ok(stops[0][1] === 0 && stops[2][1] === 1, "the gradient's ends are not 0 and 1");
+  // ⚠️ THIS USED TO PIN THE COUNT AT THREE AND THE RULING OF 2026-08-21 BROKE IT — the fade is sampled
+  // now, so the straight line between the first two stops has become a curve. The claim this test is
+  // about is unaffected and is the interpolation below; what is asserted here is the ENDS and the fact
+  // that there is more than a straight line, because a count of three IS the artefact the owner reported
+  // seeing. The count itself belongs to the ease's own guard, which owns SHARE_SCRIM.stops.
+  assert.ok(stops.length > 3, "the veil is a three-stop gradient again, so its fade is one straight line " +
+    "from nothing to the solved alpha — which is the edge ruling 8 removed");
+  assert.equal(stops[0][1], 0, "the gradient does not begin at the top of the fade");
+  assert.equal(stops[stops.length - 1][1], 1, "the gradient does not reach the bottom of the canvas");
   const alphaOf = (s: string) => parseFloat((/,([0-9.]+)\)$/.exec(String(s)) || ["", "0"])[1]!);
   const off = stops.map((s: any[]) => s[1] as number), av = stops.map((s: any[]) => alphaOf(s[2]));
   assert.ok(av[1]! >= av[0]! && av[2]! >= av[1]!, "the gradient is not monotone: " + av.join(","));
@@ -1044,6 +1051,177 @@ test("BLOCKER: every photo template goes through the one scrim, and none of them
   }
   assert.ok(fades.size >= 2, "every layout got the same fade, so it is not derived from the block: " +
     [...fades].join(","));
+});
+
+/* ================================================================================================ *
+ * THE BOTTOM FADE: HALVED, AND EASED SO IT LEAVES NO LINE (owner, ruling 8 item 4, 2026-08-21)      *
+ * ================================================================================================ */
+
+test("BLOCKER: the fade is half the length it was, on every block top the app produces", () => {
+  // "the gradient at the bottom of the card is too high, it needs to be halved in distance."
+  // ⚠️ THE COEFFICIENT AND BOTH CLAMPS HALVED TOGETHER, and the clamps are the half that matters. Two of
+  // the eight real fades sat ON the lower clamp before (the poster at both aspects), so halving fadeK and
+  // leaving fadeMin at 200 would have left those two completely unchanged while the other six moved —
+  // the owner's own template, the poster, being one of the two.
+  const E = env();
+  assert.equal(E.SHARE_SCRIM.fadeK, 0.17, "the fade coefficient is no longer half of the 0.34 that shipped");
+  assert.equal(E.SHARE_SCRIM.fadeMin, 100, "the fade floor is no longer half of the 200 that shipped");
+  assert.equal(E.SHARE_SCRIM.fadeMax, 180, "the fade ceiling is no longer half of the 360 that shipped");
+  // ⚠️ AND THE DELIVERED LENGTHS ARE ASSERTED AGAINST THE MEASURED TABLE, not against the arithmetic that
+  // produced them — a check that recomputes fadeK * block would pass with fadeK changed to anything.
+  // Measured on the eight real block tops: story 830/919/957/735 and feed 670/801/856/581.
+  const table: [number, number, number][] = [
+    [1920, 830, 141], [1920, 919, 156], [1920, 957, 163], [1920, 735, 125],
+    [1350, 670, 114], [1350, 801, 136], [1350, 856, 146], [1350, 581, 100]];
+  for (const [H, block, want] of table) {
+    const got = E.shareScrimFade({ H: H, W: 1080 }, H - block);
+    assert.equal(got, want, "a block of " + block + " on a " + H + "-tall card earns a fade of " + got +
+      ", not the measured " + want);
+  }
+  // ⚠️ THE CEILING IS A SAFETY RAIL AND IS NOT REACHED BY ANY REAL LAYOUT, which is true of the 360 it
+  // replaced too — the biggest real fade was 325 of 360 and is now 163 of 180. Asserted so that a future
+  // template landing on it is a deliberate decision rather than a surprise.
+  const real = table.map((t) => t[2]);
+  assert.ok(Math.max(...real) < E.SHARE_SCRIM.fadeMax,
+    "a real layout now sits on the fade ceiling, so the ceiling is deciding the geometry");
+  assert.ok(real.includes(E.SHARE_SCRIM.fadeMin),
+    "no real layout reaches the fade floor any more, so halving the floor was untested");
+});
+
+test("BLOCKER: shareEase arrives at nothing with zero slope AND zero curvature", () => {
+  // ⚠️ THIS IS THE WHOLE FIX. "i can see the line where it stops on the current one" — a Mach band, which
+  // the eye finds from the discontinuity in the RATE of change. A ramp that reaches zero with a non-zero
+  // slope draws an edge at the row where it stops however gentle the ramp is.
+  const E = env();
+  const f = E.shareEase;
+  assert.equal(f(0), 0, "the ease does not start at nothing");
+  assert.equal(f(1), 1, "the ease does not arrive at the solved alpha");
+  // Monotone, so the scrim can never lighten as it goes down.
+  let prev = -1;
+  for (let t = 0; t <= 1.0000001; t += 0.01) { const v = f(t); assert.ok(v >= prev - 1e-12,
+      "the ease is not monotone: f(" + t.toFixed(2) + ") = " + v + " after " + prev); prev = v; }
+  // ⚠️ BOTH DERIVATIVES AT THE TOP, MEASURED NUMERICALLY. smoothstep (3t^2 - 2t^3) passes the first of
+  // these and fails the second, and its curvature is at its MAXIMUM exactly at the boundary — which is
+  // the one place it must not be. Re-broken with smoothstep: f''(0) comes out at 6 and this fails.
+  const h = 1e-4;
+  const d1 = (f(h) - f(0)) / h;
+  const d2 = (f(2 * h) - 2 * f(h) + f(0)) / (h * h);
+  assert.ok(Math.abs(d1) < 1e-6, "the ease leaves the top of the fade with slope " + d1 + ", so it draws a line there");
+  assert.ok(Math.abs(d2) < 1e-2, "the ease leaves the top of the fade with curvature " + d2 +
+    ", which is a Mach band one derivative further out");
+  // And the curvature peak has to be INSIDE the fade, which is the property that makes it invisible.
+  let peakAt = 0, peak = 0;
+  for (let t = 0.02; t <= 0.98; t += 0.005) {
+    const c = Math.abs((f(t + h) - 2 * f(t) + f(t - h)) / (h * h));
+    if (c > peak) { peak = c; peakAt = t; }
+  }
+  assert.ok(peakAt > 0.1 && peakAt < 0.9,
+    "the ease's curvature peaks at t=" + peakAt.toFixed(3) + ", i.e. at an end rather than in the middle");
+});
+
+test("BLOCKER: the fade the gradient actually emits reaches the alpha through the ease, not in a straight line", () => {
+  // ⚠️ ASSERTED ON THE STOPS THE DRAW EMITS, NOT ON ITS SOURCE. A source-text check proves shareEase is
+  // mentioned; only the recorded gradient can say the curve reached the canvas — and the recorder logs
+  // every addColorStop, so the emitted profile is readable exactly as Skia would see it.
+  const E = env();
+  const gm = E.cardGeom("story");
+  const white = { w: 4, h: 7, data: new Uint8ClampedArray(4 * 7 * 4).fill(255) };
+  const plan = E.shareVeilPlan(white, gm, { blockTop: 1090, colours: E.shareScrimText() });
+  const g = E.ctx();
+  E.shareVeilDraw(g, gm, plan);
+  const stops = g.log.filter((e: any[]) => e[0] === "stop")
+    .map((e: any[]) => ({ o: e[1] as number, a: Number(/([\d.]+)\)$/.exec(String(e[2]))?.[1] ?? "0") }));
+  assert.ok(stops.length >= 20, "the fade is emitted as " + stops.length +
+    " stops, so it is still a straight line between two of them");
+  // exactly one rect, and the last stop is the deepest — both pre-existing invariants, restated here
+  // because this test now owns the emitted profile.
+  assert.equal(g.calls("fillRect").length, 1, "the scrim drew more than one rect");
+  assert.ok(stops[0]!.o === 0 && stops[0]!.a === 0, "the fade does not begin at nothing");
+  for (let i = 1; i < stops.length; i++) {
+    assert.ok(stops[i]!.o >= stops[i - 1]!.o - 1e-9 && stops[i]!.a >= stops[i - 1]!.a - 1e-9,
+      "the emitted profile is not monotone at stop " + i);
+  }
+  // ⚠️ THE ONE NUMBER THAT MEANS "NO LINE": the slope of the FIRST segment against the mean slope of the
+  // whole fade. A straight line makes those equal, by definition; the ease makes the first segment a
+  // small fraction of the mean. Measured on the shipped curve at 48 stops: 0.0067. Re-broken by setting
+  // stops to 1, which reproduces the old straight line exactly and takes this to 1.0.
+  const fadeStops = stops.filter((p: { o: number; a: number }) => p.a < plan.a - 1e-9)
+    .concat([stops.filter((p: { o: number; a: number }) => Math.abs(p.a - plan.a) < 1e-9)[0]!]);
+  const top = fadeStops[0]!, second = fadeStops[1]!, end = fadeStops[fadeStops.length - 1]!;
+  const first = (second.a - top.a) / (second.o - top.o);
+  const meanSlope = (end.a - top.a) / (end.o - top.o);
+  const share = first / meanSlope;
+  assert.ok(share < 0.05, "the fade's first segment carries " + share.toFixed(4) +
+    " of its mean slope, so it arrives at nothing in a straight line and draws an edge there");
+  // ⚠️ AND THE ALPHA IT ARRIVES AT IS STILL THE SOLVED ONE. An ease that undershot would be a legibility
+  // change wearing a cosmetic fix.
+  assert.ok(Math.abs(end.a - plan.a) < 1e-9,
+    "the eased fade arrives at " + end.a + " instead of the solved " + plan.a);
+});
+
+test("BLOCKER: the fade's length cannot change the alpha under any glyph", () => {
+  // ⚠️ THIS IS WHY HALVING IT IS SAFE, AND IT IS A CLAIM ABOUT THE MECHANISM RATHER THAN A FLOOR THAT
+  // HAPPENS TO BE HIGH ENOUGH. The alpha is solved from the brightest ground inside the BLOCK rect, and
+  // the gradient reaches it at blockTop - knee, above the topmost glyph — so the fade decides only where
+  // the ramp begins, all of which is above the copy. Measured over 160 real card states: the solved alpha
+  // identical in 160 of 160, and the finished cards differ below the copy by at most one 8-bit unit.
+  const E = env();
+  const gm = E.cardGeom("story");
+  // ⚠️⚠️ THE PROBE IS BANDED, AND A UNIFORM ONE CANNOT SEE THIS AT ALL. Written with a flat ground of one
+  // colour this test PASSED with the solve deliberately moved onto the fade rect instead of the block
+  // rect — the brightest pixel is the same either way, so the rect could grow upwards and change nothing.
+  // The fixture-too-kind trap, in the one test whose whole subject is which rect is sampled. Bright above
+  // the block, dark inside it: now a solve that reaches up into the fade answers a different alpha.
+  const banded = (bright: number[], dark: number[], h: number, split: number) => {
+    const d = new Uint8ClampedArray(4 * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < 4; x++) {
+      const c = y < split ? bright : dark, o = (y * 4 + x) * 4;
+      d[o] = c[0]!; d[o + 1] = c[1]!; d[o + 2] = c[2]!; d[o + 3] = 255;
+    }
+    return { w: 4, h: h, data: d };
+  };
+  const cases: [string, any][] = [
+    ["flat white", banded([255, 255, 255], [255, 255, 255], 20, 20)],
+    ["flat mid", banded([128, 128, 128], [128, 128, 128], 20, 20)],
+    ["flat magenta", banded([224, 21, 200], [224, 21, 200], 20, 20)],
+    // ⚠️ THE DISCRIMINATING ONE: white above the block, near-black inside it. blockTop 1090 of 1920 lands
+    // at probe row 11.35, so the block rect sees only the dark half while a rect grown up by the fade
+    // reaches the white.
+    ["white sky over dark ground", banded([255, 255, 255], [10, 12, 10], 20, 10)],
+  ];
+  for (const [name, probe] of cases) {
+    const base = E.shareVeilPlan(probe, gm, { blockTop: 1090, colours: E.shareScrimText() });
+    for (const fade of [40, 100, 141, 282, 900]) {
+      const p = E.shareVeilPlan(probe, gm, { blockTop: 1090, fade: fade, colours: E.shareScrimText() });
+      assert.equal(p.a, base.a, "a fade of " + fade + " changed the solved alpha on " + name +
+        ": " + p.a + " against " + base.a);
+      assert.equal(p.end, base.end, "a fade of " + fade + " changed the deepest stop on " + name);
+      assert.equal(p.blockTop, base.blockTop, "a fade of " + fade + " moved the block");
+    }
+  }
+  // ⚠️ AND THE FIXTURE HAS TO BE PROVED CAPABLE OF SEEING THE DIFFERENCE, or the sweep above is vacuous:
+  // sampling the same probe over the fade band really does answer a brighter ground.
+  const split = cases[3]![1];
+  const blockOnly = E.shareGroundUnder(split, gm, E.shareRect(0, 1090, gm.W, gm.H - 1090));
+  const withFade = E.shareGroundUnder(split, gm, E.shareRect(0, 1090 - 900, gm.W, gm.H - 190));
+  assert.ok(E.shareRelLumRGB(withFade) > E.shareRelLumRGB(blockOnly) * 4,
+    "the banded fixture reads the same ground over the block as over the fade, so this test proves nothing");
+  // ⚠️ AND THE STOP THAT DELIVERS THE SOLVED ALPHA IS STILL ABOVE THE FIRST GLYPH, whatever the fade.
+  // Without the knee the promise "every row of copy sits on at least the ratio solved for" is true at one
+  // pixel row and nowhere above it.
+  assert.ok(E.SHARE_SCRIM.knee >= 6,
+    "the knee is " + E.SHARE_SCRIM.knee + "px, which is inside the halo any pixel measurement needs");
+  const gg = E.ctx();
+  const plan = E.shareVeilPlan({ w: 2, h: 1, data: new Uint8ClampedArray(8).fill(255) }, gm,
+    { blockTop: 1090, colours: E.shareScrimText() });
+  E.shareVeilDraw(gg, gm, plan);
+  const stops = gg.log.filter((e: any[]) => e[0] === "stop")
+    .map((e: any[]) => ({ o: e[1] as number, a: Number(/([\d.]+)\)$/.exec(String(e[2]))?.[1] ?? "0") }));
+  const full = stops.filter((p: { o: number; a: number }) => Math.abs(p.a - plan.a) < 1e-9)[0]!;
+  const top = Math.max(0, plan.fadeTop);
+  const yOfFull = top + full.o * (gm.H - top);
+  assert.ok(yOfFull <= plan.blockTop - E.SHARE_SCRIM.knee + 1,
+    "the solved alpha only arrives at y=" + Math.round(yOfFull) + ", below the top of the copy at " + plan.blockTop);
 });
 
 test("the route's keyline is thickened on a bright ground, judged on luminance and not on a luma byte", () => {

@@ -126,44 +126,53 @@ test("there is exactly one share entry and Strava is inside it", () => {
   assert.match(lift("studioSheetHtml"), /"dest"/, "the sheet dispatch does not know about the destinations");
   assert.match(lift("studioDestHtml"), /stravaRunButtonHtml/, "the destination sheet does not offer Strava");
   assert.match(lift("studioClick"), /studioSheet\("dest"\)/, "nothing opens the destination sheet");
-  // ⚠️ ONE SYSTEM-COMPATIBLE FALLBACK IS ALWAYS OFFERED AND NO THIRD-PARTY APP IS NAMED AS A DESTINATION.
-  // The spec forbids hard-coding apps as guaranteed installed, and there is no LSApplicationQueriesSchemes
-  // entry in the app's plist — so a row labelled with any of these would be a button that cannot work
-  // until somebody rebuilds in Xcode. Strava is the exception the spec allows because the existing
-  // product already uploads there, and it sends the run rather than the picture.
-  // ⚠️ THE ROW LABELS ARE WHAT IS SWEPT, NOT THE WHOLE BUILDER, AND THE FIRST VERSION OF THIS CHECK WAS
-  // CAUGHT BY ITS OWN RE-BREAK. It looked for URL schemes ("instagram:", "fb://") and a row reading
-  // "Instagram Story" sailed past — while the sheet legitimately NAMES Instagram and WhatsApp in its
-  // explanatory note, which is the honest sentence telling the runner where their apps actually are. So a
-  // whole-text sweep is both too weak and too strong. What must hold is that no DESTINATION is a named
-  // third-party app: the labels are the destinations.
-  // ⚠️ THE LABELS MOVED WHEN THE SHEET TOOK THE OWNER'S SHAPE (2026-08-20) — a row of tiles and a
-  // full-width primary rather than two stacked rows — so they are no longer inside a <b>. Read from the
-  // tile builder's own third argument and from the primary's text, which is where a destination's name
-  // lives now; a destination added any other way carries no accessible name and fails the studio's own
-  // sweep instead.
+  // ⚠️⚠️ THIS CLAUSE IS THE INVERSE OF WHAT IT WAS, AND THE INVARIANT IS KEPT RATHER THAN DELETED.
+  // Until 2026-08-21 it forbade any destination whose label named a third-party app, because the app
+  // cannot detect whether Instagram is installed and cannot hand it a story. The owner overruled the
+  // conclusion and not the reasoning: "I want the icons to the different social media options like shown
+  // in the screenshot, with the more button allowing the further options that we already have when
+  // pressing share." Deleting the assertion would have been the lazy answer. What it was protecting —
+  // that no control may claim something it cannot do — survives, stated the other way round:
+  //   a destination MAY name an app, and if it does it must open the SYSTEM SHARE SHEET, where that app
+  //   genuinely appears, and its accessible name must say so.
+  // The whole-row honesty sweep (one route, no branching per tile, no promise of a post) lives in
+  // test/share-studio.test.ts, which owns the tile builder; what is asserted here is the pack's own
+  // requirement of one system-compatible fallback, and that the named tiles reach it.
   const dest = lift("studioDestHtml");
-  const labels = [...dest.matchAll(/studioDestTile\("[a-z]+", [^,]+, "([^"]+)"\)/g)].map((m) => m[1]!)
-    .concat([...dest.matchAll(/<\/span>([A-Z][^<']*)<\/button>/g)].map((m) => m[1]!.trim()));
-  assert.ok(labels.length >= 3, "the destination sheet has no labelled destinations: " + labels.join(", "));
-  const named = labels.filter((l) =>
-    /instagram|whatsapp|facebook|twitter|snapchat|tiktok|messenger|threads/i.test(l));
-  assert.deepEqual(named, [],
-    "a destination row is a named third-party app, which cannot be guaranteed installed: " + named.join(", "));
-  // A URL scheme for one is forbidden outright — there is no LSApplicationQueriesSchemes entry, so it
-  // could not work until somebody rebuilds in Xcode, and it would fail silently.
+  // ⚠️ BOUNDED TO SST_DEST'S OWN LITERAL. A page-wide sweep for { id: "...", label: "..." } finds the
+  // run-type grid and the tool row too, so it would inflate the set with rows this rule is not about.
+  const html = page();
+  const dAt = html.indexOf("const SST_DEST = [");
+  assert.ok(dAt > 0, "SST_DEST is not in the build");
+  const destLit = html.slice(html.indexOf("[", dAt), html.indexOf("\n];", dAt));
+  const named = [...destLit.matchAll(/\{ id: "([a-z]+)", label: "([^"]+)"/g)].map((m) => ({ id: m[1]!, label: m[2]! }));
+  assert.ok(named.length >= 4, "SST_DEST's records were not found, so this guard is measuring nothing");
+  const thirdParty = named.filter((r) =>
+    /instagram|whatsapp|facebook|twitter|snapchat|tiktok|messenger|threads|message/i.test(r.label));
+  assert.ok(thirdParty.length >= 1,
+    "no destination names an app any more, so the honesty rule below has nothing to protect");
+  // ⚠️ EVERY ONE OF THEM REACHES THE SYSTEM SHEET, AND THERE IS ONE ROUTE FOR ALL OF THEM. Asserted as a
+  // count, because a per-tile branch is how one tile comes to do something its logo does not imply.
+  const go = lift("studioDest");
+  assert.equal((go.match(/doShareRun\(/g) || []).length, 1,
+    "the destination tiles no longer share one route to the system share sheet");
+  assert.match(dest, /SST_DEST\.map\(studioDestTile\)/,
+    "the tile row is not built from SST_DEST, so a named tile could be wired anywhere");
+  // A URL scheme is still forbidden outright. LSApplicationQueriesSchemes now permits canOpenURL for five
+  // of them, which is permission to ASK whether an app is there — the handoff itself is Swift, so a scheme
+  // opened from the page would fail silently until somebody rebuilds in Xcode.
   for (const scheme of ["instagram:", "instagram-stories", "fb://", "whatsapp:", "twitter:", "snapchat:"]) {
-    assert.ok(!dest.toLowerCase().includes(scheme),
+    assert.ok(!dest.toLowerCase().includes(scheme) && !go.toLowerCase().includes(scheme),
       "the destination sheet opens a third-party app by URL scheme: " + scheme);
   }
-  // ⚠️ THE ACTIONS ARE COLLECTED FROM BOTH SHAPES A DESTINATION CAN TAKE — a tile and the primary — so
-  // moving one from one shape to the other cannot make this guard stop looking. The system share sheet is
-  // the spec's required "one system-compatible fallback"; without it the sheet would be a list of things
-  // this app happens to support and nothing for the apps it cannot name.
-  const acts = [...dest.matchAll(/studioDestTile\("([a-z]+)"/g)].map((m) => m[1]!)
+  // ⚠️ THE FALLBACK AND THE PRIMARY ARE COLLECTED FROM EVERY SHAPE A DESTINATION CAN TAKE — a tile id, a
+  // data-sst action — so moving one from one shape to the other cannot make this guard stop looking.
+  const acts = named.map((r) => r.id)
     .concat([...dest.matchAll(/data-sst="([a-z]+)"/g)].map((m) => m[1]!));
-  assert.ok(acts.includes("share"), "the system share sheet fallback is missing: " + acts.join(", "));
+  assert.ok(acts.includes("more"),
+    "there is no catch-all destination, so the apps this app cannot name have nowhere to go: " + acts.join(", "));
   assert.ok(acts.includes("save"), "saving to the device is missing: " + acts.join(", "));
+  assert.ok(acts.includes("caption"), "copying the caption is missing: " + acts.join(", "));
 });
 
 // ---- the verdict ---------------------------------------------------------------------------------
@@ -460,9 +469,22 @@ test("the run's identity block never invents a time", () => {
   // watch run, whose id is a UUID. That fallback exists for Strava's start_date_local, where
   // something must be sent. Printing it here would put an invented "at 09:00" on a run done in the
   // evening, in the one block whose job is to say which run this was.
+  // ⚠️ THE CLAIM MOVED TO runStartExactMs WHEN THE TWO READERS WERE MADE ONE. runStartMsKnown used to
+  // hold its own copy of the id arithmetic; a wrist run then began carrying a real start instant and a
+  // second copy would have had to learn about it separately — two answers to "do we know when this run
+  // began", one of which prints a time and one of which does not. It delegates now, so what has to be
+  // true of it is true of what it delegates to: no 09:00 fallback, and it can still say "unknown".
   const known = lift("runStartMsKnown");
-  assert.ok(!/09:00|dateIso \+ "T/.test(known), "the known-time helper inherited the 09:00 fallback");
-  assert.match(known, /return null/, "it must be able to say the time is unknown");
+  assert.match(known, /runStartExactMs\(/, "the known-time helper no longer reads the exact-start helper");
+  const exact = lift("runStartExactMs");
+  for (const [name, src] of [["runStartMsKnown", known], ["runStartExactMs", exact]] as const) {
+    assert.ok(!/09:00|dateIso \+ "T/.test(src), name + " inherited the 09:00 fallback");
+  }
+  assert.match(exact, /return null/, "it must be able to say the time is unknown");
+  // And the fabricating one still has the fallback, or the split has moved the problem rather than
+  // contained it.
+  assert.match(lift("runStartMs"), /dateIso \+ "T09:00:00Z"/,
+    "runStartMs lost the fallback Strava needs, so an undated run has no start at all");
   const when = lift("rdWhenText");
   assert.match(when, /runStartMsKnown\(/, "the block reads the fallback-free time");
   assert.ok(!/runStartMs\(/.test(when), "the block reads the fabricating helper");

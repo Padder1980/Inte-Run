@@ -32,6 +32,19 @@
 	<string>InteRun keeps tracking your run when your phone is locked or in a pocket, so your pace and route stay accurate for the whole session.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>InteRun uses your location to measure pace, distance and your route while a session is running, including when your phone is locked or in your pocket.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>InteRun uses your camera only when you choose Take Photo while making a share card, so the picture you post is one you just took. Photos are used on the card and never sent anywhere by InteRun.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>InteRun saves a share card to your photo library when you tap Save to device. It only ever adds the card you made.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>InteRun lets you pick one of your own photographs as the background of a share card. The photo is used on the card on this device and is never uploaded by InteRun.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>instagram-stories</string>
+		<string>instagram</string>
+		<string>whatsapp</string>
+		<string>sms</string>
+	</array>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>UIBackgroundModes</key>

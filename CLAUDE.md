@@ -7667,6 +7667,69 @@ end to end in the served build: the switch revealing its picker and remembering 
 a map tile with a real basemap behind it, the story's route holding its exact aspect with round markers,
 and the five share destinations with Inte-Club among them.
 
+### THE INTE-RUN MARK ON THE SHARE TILE, AND A PB IS PICKED RATHER THAN TYPED (2026-08-22, fourth round)
+
+Two faults he found on the phone. Suite 1168 → **1171**; 8 deliberate re-breaks, all caught.
+
+⚠️ **THE CLUB TILE WEARS BRAND_MARK'S OWN GEOMETRY, SCALED.** It was a generic two-figure community glyph;
+his instruction is that the Inte-Run logo belongs there. The dot at (82,37) r11 in the mark's 120 box
+becomes (16.4,7.4) r2.2 in the row's 24 one, and the second slash keeps the **.62** it carries on the
+splash — so a change to the logo shows up as a mismatch in the guard rather than as two versions of the
+mark in one app.
+⚠️ **IN currentColor, NOT THE BRAND GRADIENT.** A gradient-filled app icon dropped into a row of line
+drawings reads as somebody else's logo pasted in, which is the same reason the other four tiles are this
+app's own strokes rather than Instagram's and WhatsApp's real marks.
+⚠️ **AND THE GLYPH GUARD HAD TO ACCEPT A FILL.** It required `stroke="currentColor"` on every mark, which
+rejected this one while it was doing exactly the right thing — the logo is a shape, not a line drawing.
+The invariant is that a mark carries no colour of its own; the hex sweep is what enforces that.
+
+### ⚠️⚠️ THE PB FIELD WAS AN INVENTED MECHANISM, AND THAT IS THE WHOLE LESSON
+
+*"when you're trying to add PB to your profile, it doesn't type as time….maybe it's best if it's scroll
+wheel options for hours: minutes: seconds"* — and his screenshot shows **1751** sitting in the box marked
+red. The field was a bare text input that accepted anything and then rejected it, **while this app has had
+a digits-to-time input since the setup form's own 5 km question**: `fmtDigitsToTime` / `bindTimeInput`
+turn 1751 into 17:51 as you type, and have done for months. Writing a new field rather than using the one
+that exists is the same class as inventing a CSS class or a design token — there was already an answer.
+
+⚠️ **AND HIS SUGGESTION IS BETTER THAN EITHER.** A PB is a number the runner already knows, so the only
+thing typing can add is a way to get it wrong. Three wheels cannot hold an invalid time: there is no error
+state to design, no hint to write, nothing to reject, and `.bad` is gone from the row entirely.
+
+⚠️ **THEY ARE NATIVE `<select>` ELEMENTS, WHICH IS WHAT MAKES THEM WHEELS.** iOS presents a select as its
+own scrolling picker. A hand-rolled wheel is a scroll container pretending to be one, with its own
+momentum, its own snapping and none of the accessibility a real control has for free.
+
+⚠️ **ALL THREE AT ZERO MEANS NOT SET, AND THAT IS WHY IT IS NOT A JOIN.** Without it every distance the
+runner has not filled in reads "0:00" on their profile as a claimed record — four fabricated PBs on the
+one screen somebody might show to another person. And the hours are dropped when zero, so a 5 km reads
+21:04 rather than 0:21:04.
+
+⚠️ **ANYTHING TYPED BEFORE THE WHEELS EXISTED STILL LOADS.** `clubPbParse` accepts both `mm:ss` and
+`h:mm:ss`; a reader that understood only the new form would silently blank somebody's PB. Verified on the
+served page: a stored "21:04" fills 0/21/04 and "1:38:20" fills 1/38/20.
+
+⚠️ **THE ROW IS REPAINTED, NOT THE SCREEN.** A full render would rebuild the wheel the finger is on and
+close the picker mid-spin; the only thing that changed is the value beside it.
+
+⚠️ **THE VALUE IS SHOWN AS WELL AS THE WHEELS**, because three two-digit boxes do not read as a time at a
+glance — and it is exactly what the profile will show, which is the thing being decided.
+
+### ⚠️ AND A THIRD STALE SENTENCE UNDER THE SAME NEW CASE
+
+The note under the destinations read *"Every one of these opens your phone's own share sheet"* — true until
+a tile arrived that opens nothing at all. **Nothing about the sentence changed; the world under it did.**
+That is the third time in this feature: the tile's own accessible name, then this, after the map
+attribution crediting a provider that had served nothing. ⚠️ **BOTH BRANCHES CARRY THE CORRECTION** — the
+note has a native-build form and a web form, and naming the club in one leaves the other lying on exactly
+the builds that are hardest to check.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc clean
+apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1171 pass / 0 fail**, both
+design ratchets unchanged. Driven on the served build: the wheels loading older typed values, hours
+appearing only when non-zero, zeroing clearing rather than claiming 0:00, and the five destinations with
+the Inte-Run mark on the club one.
+
 ## OPEN BUGS (confirmed on real hardware, 2026-07-29)
 
 ### 1. Coach audio when the phone is locked or pocketed — FIXED 2026-08-08, unproven on hardware

@@ -748,9 +748,13 @@ test("BLOCKER: Edit profile is the club's own five fields, not the app's setting
   assert.match(app, /\[data-cedit\][\s\S]{0,120}state\.screen = "clubedit"/,
     "Edit profile does not open the club's own page");
   const e = nocomment(fn("viewClubEdit"));
-  for (const bit of ["ceAvatar", "ceBio", "ceFor", "cePb_", "clubBack"]) {
+  for (const bit of ["ceAvatar", "ceBio", "ceFor", "clubBack"]) {
     assert.ok(e.includes(bit), "the edit page is missing " + bit);
   }
+  // ⚠️ THE PB ROWS MOVED INTO THEIR OWN BUILDER when they became wheels, so the page names that rather
+  // than a field id. Their own behaviour is guarded where the wheels are.
+  assert.match(e, /CLUB_PB_ROWS\.map\(\(r\) => clubPbRowHtml\(r, cp\.pbs\[r\.k\]\)\)/,
+    "the edit page no longer renders a row per distance");
   // ⚠️ THE PICTURE AND THE TRAINERS ARE NOT NEW FIELDS. The avatar has a cropper already; the trainers
   // are the Shoe Rack's active pair, which knows their real mileage. Storing either again gives one fact
   // two homes, and the two disagree the first time somebody changes the other.
@@ -1000,4 +1004,59 @@ test("BLOCKER: every field the club profile can store survives being read back",
   const fallback = (/catch \(e\) \{ return (\{[\s\S]*?\}); \}/.exec(load) || [])[1] || "";
   const gone = [...written].filter((f) => !new RegExp("\\b" + f + ":").test(fallback));
   assert.deepEqual(gone, [], "the parse fallback drops: " + gone.join(", "));
+});
+
+test("BLOCKER: a personal best is picked on wheels, and cannot hold an invalid time", () => {
+  // ⚠️⚠️ THE FAULT WAS AN INVENTED MECHANISM, AND HIS SCREENSHOT SHOWED IT: a bare text field took "1751"
+  // and marked it red, while this app has had a digits-to-time input since the setup form's own 5 km
+  // question (fmtDigitsToTime turns 1751 into 17:51 as you type). Writing a new field instead of using
+  // the one that exists is the same class as inventing a CSS class or a token — there was already an
+  // answer. His suggestion is better than either: a PB is a number the runner already knows, so the only
+  // thing typing can add is a way to get it wrong.
+  const row = nocomment(fn("clubPbRowHtml"));
+  assert.ok(!/<input/.test(row), "the PB row is still a text field, which can hold something that is not a time");
+  assert.match(row, /<select class="ce-w"/, "the PB row has no wheels");
+  // ⚠️ NATIVE SELECTS ARE WHAT MAKE THEM WHEELS — iOS presents one as its own scrolling picker. A
+  // hand-rolled wheel is a scroll container pretending to be one, with none of the accessibility.
+  assert.match(row, /aria-label="' \+ esc\(r\.label \+ " " \+ label\)/, "a wheel is announced without saying which");
+  assert.match(row, /wheel\("h", 10,[\s\S]{0,80}wheel\("m", 60,[\s\S]{0,80}wheel\("s", 60,/,
+    "the three wheels are not hours, minutes and seconds");
+  // ⚠️ ALL THREE AT ZERO MEANS NOT SET. Without it every distance the runner has not filled in reads
+  // "0:00" on their profile as a claimed record — four fabricated PBs on a screen they might show someone.
+  const from = nocomment(fn("clubPbFromWheels"));
+  assert.match(from, /if \(!h && !m && !s\) return ""/, "an untouched row claims 0:00 as a personal best");
+  // ⚠️ AND THE HOURS ARE DROPPED WHEN ZERO, so a 5 km reads 21:04 rather than 0:21:04.
+  assert.match(from, /return h \? h \+ ":" \+ mm \+ ":" \+ ss : mm \+ ":" \+ ss/,
+    "a time under an hour is written with a leading zero hour");
+  // ⚠️ AND ANYTHING TYPED BEFORE THE WHEELS EXISTED STILL LOADS, in either shape — a reader that only
+  // understood the new form would silently blank somebody's PB.
+  const parse = nocomment(fn("clubPbParse"));
+  assert.match(parse, /m\[3\] != null/, "an older mm:ss value is not distinguished from h:mm:ss");
+  assert.match(parse, /Math\.min\(9, Number\(m\[1\]\)\)/, "a stored hour beyond the wheel's range is not clamped");
+  // No error state can exist, so nothing marks one.
+  assert.ok(!/\bbad\b/.test(row + from), "the PB row still carries an invalid state it cannot reach");
+});
+
+test("BLOCKER: the club share tile wears the Inte-Run mark, from the brand mark's own geometry", () => {
+  const app = appBlock();
+  const glyph = (/club: '(<svg[\s\S]*?<\/svg>)'/.exec(app) || [])[1] || "";
+  assert.ok(glyph, "the club tile has no mark at all");
+  // ⚠️ THE BRAND MARK'S OWN SHAPES, scaled from its 120 box to the row's 24 one (x0.2): the dot at
+  // (82,37) r11 becomes (16.4,7.4) r2.2, and the second slash keeps the .62 it carries on the splash.
+  // Derived from BRAND_MARK rather than typed, so a change to the logo is visible as a mismatch here.
+  const brand = (/const BRAND_MARK = `([\s\S]*?)`;/.exec(readFileSync(new URL("../web/app.ts", import.meta.url), "utf8")) || [])[1] || "";
+  const bc = /<circle cx="(\d+)" cy="(\d+)" r="(\d+)"/.exec(brand);
+  assert.ok(bc, "the brand mark has no dot to scale from");
+  const k = 24 / 120;
+  const want = [Number(bc[1]) * k, Number(bc[2]) * k, Number(bc[3]) * k].map((n) => +n.toFixed(2));
+  const gc = /<circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/.exec(glyph);
+  assert.ok(gc, "the club mark has no dot");
+  assert.deepEqual([Number(gc[1]), Number(gc[2]), Number(gc[3])], want,
+    "the club mark's dot is not the brand mark's own, scaled to this grid");
+  assert.match(glyph, /opacity="\.62"/, "the second slash has lost the brand mark's own weighting");
+  // ⚠️ currentColor, NOT THE BRAND GRADIENT. A gradient-filled app icon in a row of line drawings reads
+  // as somebody else's logo pasted in — which is the reason the other tiles are our own strokes rather
+  // than Instagram's and WhatsApp's real marks.
+  assert.match(glyph, /fill="currentColor"/, "the club mark carries a colour of its own");
+  assert.ok(!/linearGradient|#[0-9a-fA-F]{3,6}/.test(glyph), "the club mark carries a hex or a gradient");
 });

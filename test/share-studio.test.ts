@@ -922,7 +922,11 @@ test("BLOCKER: the destination marks are ours, inline, and each one is distingui
   }
   for (const m of marks) {
     assert.match(m.svg, /viewBox="0 0 24 24"/, m.name + " is not on the app's 24-unit grid");
-    assert.match(m.svg, /stroke="currentColor"/, m.name + " does not take its colour from the tile");
+    // ⚠️ STROKED **OR** FILLED, so long as the colour comes from the tile. The invariant is that a mark
+    // carries no colour of its own — the club mark is the Inte-Run logo's own filled geometry, which is a
+    // shape rather than a line drawing, and requiring a stroke rejected it while it was doing exactly the
+    // right thing. What must stay forbidden is a hex, which the sweep below covers.
+    assert.match(m.svg, /(stroke|fill)="currentColor"/, m.name + " does not take its colour from the tile");
     assert.ok(!/href|xlink|<image|url\(/i.test(m.svg), m.name + " references something outside the page");
     // ⚠️ NO BRAND COLOUR AND NO GRADIENT: a hex inside one of these is somebody's palette, not ours.
     assert.ok(!/#[0-9a-f]{3,8}|gradient|rgb\(/i.test(m.svg), m.name + " carries a colour of its own");
@@ -1273,4 +1277,24 @@ test("BLOCKER: every destination's accessible name says what THAT tile does", ()
   const branches = [...via.matchAll(/id === "([a-z]+)"/g)].map((m) => m[1]);
   assert.deepEqual(branches, ["inteclub"],
     "a second destination has its own sentence: " + branches.join(", "));
+});
+
+test("BLOCKER: the note under the row does not claim every tile opens the share sheet", () => {
+  // ⚠️⚠️ THIRD TIME IN THIS FEATURE THAT A DERIVED SENTENCE WENT STALE UNDER A NEW CASE — the tile's own
+  // accessible name and, before that, the map attribution crediting a provider that served nothing. The
+  // note read "Every one of these opens your phone's own share sheet", which was true until a tile
+  // arrived that opens nothing at all. Nothing about the sentence changed; the world under it did.
+  const note = nocomment(lift("shareDestNote"));
+  assert.ok(!/Every one of these/.test(note),
+    "the note still claims every tile opens the share sheet, which Inte-Club does not");
+  assert.match(note, /Inte-Club puts the card straight on your own grid/,
+    "the note does not say what the club tile actually does");
+  // ⚠️ AND BOTH BRANCHES CARRY IT. The note has a native-build form and a web form; naming the club in one
+  // leaves the other lying on exactly the builds that are hardest to check.
+  // ⚠️ THE FUNCTION'S OWN RETURNS, at two spaces or four. Split on every "return " it also caught the one
+  // inside the .map callback, which is somebody else's statement entirely.
+  const branches = [...note.matchAll(/\n {2,4}return ([\s\S]*?);\n/g)].map((m) => m[1]!);
+  assert.ok(branches.length >= 2, "shareDestNote has " + branches.length + " returns; expected both forms");
+  branches.forEach((b, i) => assert.ok(/club/.test(b),
+    "return " + i + " of the note does not name the club tile: " + b.slice(0, 50)));
 });

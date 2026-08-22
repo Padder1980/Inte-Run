@@ -4933,12 +4933,22 @@ button.cm-tile:active { opacity: .65; }
    input costs the feature. minmax(0, 1fr) on the row keeps the field shrinkable, which is the
    grid-overflow trap this app already records: a 1fr track has min-width auto by default. */
 .ce-pbs { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; background: var(--line); }
-.ce-pb { display: flex; align-items: center; gap: var(--s3); padding: var(--s3); background: var(--surface); }
-.ce-pb label { flex: none; width: 6em; font-size: var(--t-meta); color: var(--ink-soft); }
-.ce-pb input { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--line);
+.ce-pb { display: flex; align-items: center; gap: var(--s2); padding: var(--s3); background: var(--surface); }
+.ce-pb-k { flex: none; width: 5.4em; font-size: var(--t-meta); color: var(--ink-soft); }
+/* ⚠️ THREE WHEELS AND TWO COLONS, and the wheels shrink rather than the label. On iOS a select IS a
+   scrolling picker, so this row is the platform's own control three times over — no error state exists. */
+.ce-pb-w { flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; }
+.ce-pb-w i { flex: none; font-style: normal; font-weight: 700; color: var(--ink-faint); }
+.ce-w { flex: 1; min-width: 0; padding: 8px 4px; border: 1px solid var(--line);
   border-radius: var(--r-ctl); background: var(--surface-2); color: var(--ink);
-  font: inherit; font-size: var(--t-card); font-variant-numeric: tabular-nums; text-align: center; }
-.ce-pb input.bad { border-color: var(--rest); }
+  font: inherit; font-size: var(--t-card); font-variant-numeric: tabular-nums; text-align: center;
+  /* ⚠️ THE PLATFORM CHEVRON IS OFF, because three of them in a row reads as three separate questions
+     rather than one time — and the colons between them already say what the row is. */
+  -webkit-appearance: none; appearance: none; text-align-last: center; }
+/* ⚠️ THE VALUE IS SHOWN AS WELL AS THE WHEELS, because three two-digit boxes do not read as a time at a
+   glance — and it is what the profile will actually show, which is the thing the runner is deciding. */
+.ce-pb-v { flex: none; width: 4.6em; text-align: right; font-size: var(--t-card); font-weight: 500;
+  color: var(--ink); }
 
 
 </style>
@@ -12384,10 +12394,7 @@ function viewClubEdit() {
     : '<span class="cm-init">' + esc(p.initials) + '</span>';
   const row = (label, inner) => '<div class="ce-row"><span class="ce-k">' + label + '</span>' +
     '<span class="ce-v">' + inner + '</span></div>';
-  const pbRows = CLUB_PB_ROWS.map((r) =>
-    '<div class="ce-pb"><label for="cePb_' + r.k + '">' + r.label + '</label>' +
-    '<input id="cePb_' + r.k + '" data-cepb="' + r.k + '" inputmode="numeric" ' +
-    'placeholder="—" value="' + esc(clubPbText(cp.pbs[r.k])) + '"></div>').join("");
+  const pbRows = CLUB_PB_ROWS.map((r) => clubPbRowHtml(r, cp.pbs[r.k])).join("");
   return '<div class="ce-wrap">' +
     '<button class="backbtn" id="clubBack">\u2039 Inte-Club</button>' +
     '<div class="ce-avwrap">' +
@@ -12472,17 +12479,22 @@ function wireClubEdit() {
   if (bio) bio.oninput = () => put({ bio: bio.value.slice(0, 220) });
   const fr = $("ceFor");
   if (fr) fr.oninput = () => put({ trainingFor: fr.value.slice(0, 60) });
-  document.querySelectorAll("[data-cepb]").forEach((inp) => {
-    inp.oninput = () => {
+  // ⚠️ WHEELS, NOT A TEXT BOX — his instruction, and the fault behind it was mine. A bespoke field that
+  // took free text let "1751" sit there marked invalid, when the app has had a digits-to-time input since
+  // the setup form. But for a PB the wheels are genuinely the better answer: the runner knows the number,
+  // and there is no invalid state to reach at all.
+  document.querySelectorAll("[data-cepb]").forEach((sel) => {
+    sel.onchange = () => {
+      const k = sel.dataset.cepb;
       const cur = loadClubProf();
       const pbs = Object.assign({}, cur.pbs);
-      pbs[inp.dataset.cepb] = inp.value.trim();
+      pbs[k] = clubPbFromWheels(k);
       saveClubProf(Object.assign(cur, { pbs: pbs }));
-      // ⚠️ THE HINT IS SHOWN, NOT THE VALUE REWRITTEN. Reformatting as they type fights the typing —
-      // "21:0" would become something else before they reached the 4.
-      inp.classList.toggle("bad", !!inp.value.trim() && !clubPbText(inp.value));
+      // ⚠️ THE ROW IS REPAINTED, NOT THE SCREEN. A full render would rebuild the wheel the finger is on
+      // and close the picker mid-spin; the value beside it is the only thing that changed.
+      const out = $("cePbv_" + k);
+      if (out) out.textContent = clubPbFromWheels(k) || "—";
     };
-    inp.onblur = () => { if (inp.value.trim() && !clubPbText(inp.value)) toast("Times look like 21:04."); };
   });
   const shop = $("ceShop");
   // ⚠️ THE URL LIVES ON THE SHOE, not on the club profile — it is a fact about that pair of trainers, so
@@ -12951,6 +12963,77 @@ function clubLibTake() {
         : lost + " could not be read and were left out.");
       openClubEditor(kind, got);
     });
+}
+
+/**
+ * ══ A PERSONAL BEST IS PICKED, NOT TYPED ═══════════════════════════════════════════════════════════
+ * Owner, 2026-08-22: "when you're trying to add PB to your profile, it doesn't type as time….maybe it's
+ * best if it's scroll wheel options for hours: minutes: seconds".
+ *
+ * ⚠️ THE FAULT WAS MINE AND IT WAS AN INVENTED MECHANISM. The field was a bare text input that accepted
+ * anything and then marked it red — so "1751" sat there rejected — while this app has had a
+ * digits-to-time input since the setup form's own 5 km question (fmtDigitsToTime / bindTimeInput, which
+ * turns 1751 into 17:51 as you type). Writing a new field instead of using the one that exists is the
+ * same class as inventing a CSS class or a token: there was already an answer.
+ *
+ * ⚠️ AND HIS SUGGESTION IS BETTER THAN EITHER. A PB is a number the runner already knows, so the only
+ * thing typing can add is a way to get it wrong. Three wheels cannot hold an invalid time at all — there
+ * is no error state to design, no hint to write and nothing to reject.
+ *
+ * ⚠️ THEY ARE NATIVE <select> ELEMENTS, WHICH IS WHAT MAKES THEM WHEELS. iOS presents a select as its own
+ * scrolling picker; a hand-rolled wheel would be a scroll container pretending to be one, with its own
+ * momentum, its own snapping and none of the accessibility a real control has for free.
+ */
+function clubPbRowHtml(r, stored) {
+  const v = clubPbParse(stored);
+  const opts = (n, sel, pad) => {
+    let out = "";
+    for (let i = 0; i < n; i++) {
+      const t = pad ? String(i).padStart(2, "0") : String(i);
+      out += '<option value="' + i + '"' + (i === sel ? " selected" : "") + '>' + t + '</option>';
+    }
+    return out;
+  };
+  const wheel = (part, n, sel, pad, label) =>
+    '<select class="ce-w" data-cepb="' + r.k + '" data-cepbp="' + part + '" ' +
+    'aria-label="' + esc(r.label + " " + label) + '">' + opts(n, sel, pad) + '</select>';
+  return '<div class="ce-pb">' +
+      '<span class="ce-pb-k">' + r.label + '</span>' +
+      '<span class="ce-pb-w">' +
+        // ⚠️ TEN HOURS IS THE CEILING, and it is not arbitrary: a marathon walked slowly is under nine,
+        // and a wheel that runs to 99 is a wheel nobody can reach the useful end of.
+        wheel("h", 10, v.h, false, "hours") + '<i>:</i>' +
+        wheel("m", 60, v.m, true, "minutes") + '<i>:</i>' +
+        wheel("s", 60, v.s, true, "seconds") +
+      '</span>' +
+      '<span class="ce-pb-v num" id="cePbv_' + r.k + '">' + esc(clubPbText(stored) || "—") + '</span>' +
+    '</div>';
+}
+/** ⚠️ ACCEPTS WHAT WAS ALREADY STORED, in either shape. Anything typed before this existed is "mm:ss" or
+ *  "h:mm:ss", and a reader that only understood the new form would silently blank somebody's PB. */
+function clubPbParse(v) {
+  const t = String(v == null ? "" : v).trim();
+  const m = /^(\\d{1,2}):(\\d{2})(?::(\\d{2}))?$/.exec(t);
+  if (!m) return { h: 0, m: 0, s: 0 };
+  return m[3] != null
+    ? { h: Math.min(9, Number(m[1])), m: Number(m[2]), s: Number(m[3]) }
+    : { h: 0, m: Math.min(59, Number(m[1])), s: Number(m[2]) };
+}
+/**
+ * ⚠️ ALL THREE AT ZERO MEANS NOT SET, AND THAT IS THE WHOLE REASON THIS IS NOT JUST A JOIN. Without it
+ * every distance the runner has not filled in would read "0:00" on their profile as a claimed PB — four
+ * fabricated records, on the one screen somebody might show to another person.
+ * ⚠️ AND THE HOURS ARE DROPPED WHEN THEY ARE ZERO, so a 5 km reads 21:04 rather than 0:21:04.
+ */
+function clubPbFromWheels(k) {
+  const get = (part) => {
+    const el2 = document.querySelector('[data-cepb="' + k + '"][data-cepbp="' + part + '"]');
+    return el2 ? Number(el2.value) || 0 : 0;
+  };
+  const h = get("h"), m = get("m"), s = get("s");
+  if (!h && !m && !s) return "";
+  const mm = String(m).padStart(2, "0"), ss = String(s).padStart(2, "0");
+  return h ? h + ":" + mm + ":" + ss : mm + ":" + ss;
 }
 
 /* ── PLAN JOURNALS (addendum 1, 2026-08-22) ────────────────────────────────────────────────────────
@@ -27392,9 +27475,13 @@ const SST_GLYPH = {
  * which reads as a second lens on the camera.
  */
 const SST_DGLYPH = {
-  // ⚠️ THE CLUB'S OWN MARK, which is the two-figure glyph the bottom nav already uses for the tab — so
-  // the tile and the destination it posts to wear the same picture rather than two ideas of the club.
-  club: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.2" r="3.1"/><path d="M3.4 19.2c0-3 2.5-4.8 5.6-4.8s5.6 1.8 5.6 4.8"/><path d="M16.4 5.6a3 3 0 0 1 0 5.6"/><path d="M17.6 14.9c2 .6 3.2 2.1 3.2 4.3"/></svg>',
+  // ⚠️ THE INTE-RUN MARK, NOT A GENERIC COMMUNITY GLYPH — his instruction. It is BRAND_MARK's own
+  // geometry scaled from its 120 box to this row's 24 one (x0.2): the two slashes and the dot, with the
+  // second slash at the same .62 it carries on the splash. Drawn in currentColor rather than the brand
+  // gradient, because a gradient-filled app icon dropped into a row of line drawings reads as somebody
+  // else's logo pasted in — the same reason the other tiles are this app's own strokes rather than
+  // Instagram's and WhatsApp's real marks.
+  club: '<svg viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true"><circle cx="16.4" cy="7.4" r="2.2"/><path d="M7 17.6 11.4 9 14.2 9 9.8 17.6Z"/><path d="M11.4 17.6 15.8 9 18.6 9 14.2 17.6Z" opacity=".62"/></svg>',
   camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.2" width="17.6" height="17.6" rx="5.2"/><circle cx="12" cy="12" r="4.15"/><path d="M16.9 7.1h.01"/></svg>',
   handset: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 11.5a8.5 8.5 0 0 1-12.6 7.4l-4.6 1.5 1.5-4.4a8.5 8.5 0 1 1 15.7-4.5z"/><path d="M9.1 8.7c.2 2.9 3.1 5.5 6.1 5.9.7.1 1.2-.5 1.1-1.2l-.2-1-2.2-.6-.7 1a6.6 6.6 0 0 1-2.4-2.4l1-.7-.6-2.2-1-.2c-.7-.1-1.2.5-1.1 1.2z"/></svg>',
   bubble: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 11.4c0 4.2-3.9 7.5-8.6 7.5-.9 0-1.8-.1-2.6-.3l-4.6 1.8 1.4-3.9a7.2 7.2 0 0 1-2.8-5.1c0-4.2 3.9-7.5 8.6-7.5s8.6 3.3 8.6 7.5z"/><path d="M8.4 11.4h.01M12 11.4h.01M15.6 11.4h.01"/></svg>',
@@ -27533,16 +27620,22 @@ function studioDestTile(d) {
  * from the same list the tiles themselves are labelled from, so the two cannot disagree.
  */
 function shareDestNote() {
+  // ⚠️⚠️ "EVERY ONE OF THESE" STOPPED BEING TRUE THE MOMENT INTE-CLUB ARRIVED, and nothing about the
+  // sentence changed — the third time in this feature that a derived fact went stale because a new case
+  // was added under it (the tile's own accessible name and the map attribution being the other two). The
+  // club tile posts into a store this app owns: no share sheet, no other app, nothing leaving the phone.
+  // So it is named separately, and the sentence about the rest says "the others" rather than "every one".
+  const club = "Inte-Club puts the card straight on your own grid \u2014 nothing leaves your phone. ";
   const direct = shareAppsDirect()
     .map(function (id) { return (SST_DEST.filter(function (d) { return d.id === id; })[0] || {}).label; })
     .filter(Boolean);
   if (!direct.length) {
-    return "Every one of these opens your phone\u2019s own share sheet with the card attached. " +
+    return club + "The others open your phone\u2019s own share sheet with the card attached. " +
       "Inte-Run cannot post to them directly, and does not assume any of them are installed.";
   }
   const names = direct.length === 1 ? direct[0]
     : direct.slice(0, -1).join(", ") + " and " + direct[direct.length - 1];
-  return names + " open with the card ready. The rest open your phone\u2019s own share sheet, " +
+  return club + names + " open with the card ready. The rest open your phone\u2019s own share sheet, " +
     "where those apps appear \u2014 Inte-Run posts nothing on your behalf either way.";
 }
 function studioDestHtml(run) {

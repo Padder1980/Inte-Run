@@ -8237,6 +8237,55 @@ on three of the four sizes. Stated rather than hidden.
 
 ⚠️ **NONE OF THIS HAS BEEN ON THE OWNER'S REAL ULTRA.** Four simulators is not a wrist.
 
+## ⚠️⚠️ A TEMPORAL DEAD ZONE MADE EVERY UPLOADED STORY A BLACK SCREEN (owner, 2026-08-22)
+
+*"when i've saved a video to my story and try to play it, this is what shows"* — with a screenshot of
+nothing at all: the app's own dark, no progress bar, no ✕, no video.
+
+`clubOpenMedia`'s `texts` line read `first.texts` **one line above** `const first = clubSlides(p)[0]`.
+A `const` read before its own declaration throws `ReferenceError` every single time, so the function
+appended a full-screen overlay to the body and then died **before assigning any content to it**. The
+black screen IS the empty overlay.
+
+⚠️ **IT ARRIVED BY AN EDIT, NOT BY BEING WRITTEN THAT WAY.** Moving the crop, trim and texts onto
+`clubSlides` — so a carousel keeps its framing per slide — introduced that declaration BELOW a line
+that already used it. The end-to-end drive recorded for the round before it ("pick → frame → type →
+post → tile → viewer") was true when it was written; the refactor came after.
+
+⚠️ **POSTED TILES WERE NOT AFFECTED, AND SAYING WHICH MATTERS.** `openClubPost` renders its own screen,
+so `clubOpenMedia` has exactly ONE caller — `openClubStories`. A first version of this note claimed both
+paths, which would have sent the next reader looking at the wrong one.
+
+⚠️ **NOTHING IN THIS PROJECT COULD SEE IT.** A dead zone is legal syntax: `node --check` passes, the
+build passes, and the app block's duplicate-top-level-declaration sweep is a different question. **Third
+firing here** — `JOURNAL_KEY` threw at every boot inside a silent `try/catch`, `SHARE_LADDER` read
+`SHARE_EVEN_SPREAD_S` — and the first to reach a runner's screen.
+
+### ⚠️ A STATIC SWEEP FOR THE PATTERN WAS WRITTEN, MEASURED AND REJECTED
+
+Over the whole app script it produced **57 candidates for this one real fault**. The noise is structural
+rather than fixable: a function declared above a `const` it captures is both extremely common and
+perfectly legal, because it is called later. A guard that reports fifty-six false positives is one people
+stop reading, which is this file's own standing rule about ratchets and sweeps.
+
+**So the guard EXECUTES the function.** `test/club-trim.test.ts` lifts `clubOpenMedia` with `clubSlides`
+and `clubKeys` beside it, hands it a fake overlay, and asserts what it drew. A dead zone throws, so the
+test fails loudly and names the line.
+⚠️ **`clubKeys` CALLS `clubSlides`, so lifting them into separate scopes gives the second one a
+ReferenceError of its own** and the test then fails for its own reason rather than the code's. Lift them
+together.
+⚠️ **AND THE SLIDE'S KEY FIELD IS `media`, NOT `key`.** A fixture using the wrong name renders an empty
+slot and reports the viewer as broken when it is the fixture — the fixture-too-kind trap inverted.
+
+**Verified end to end in a real browser afterwards**, not just by the guard: a 180-frame webm recorded
+in the page, posted as a story through the real editor with the window dragged to 3.1–18.1s, then opened
+— `readyState` 4, `currentTime` 5.5 → 7.0 across a second and a half (so genuinely playing, and starting
+inside the trimmed window), the ✕ and Delete present, **zero console errors**, and a screenshot showing
+frame 69 of the clip.
+
+⚠️ **THE BACKTICK RULE FIRED TWICE MORE IN THE COMMENTS EXPLAINING THIS**, both times failing the build
+outright. Running total for this stretch of work: **fourteen**.
+
 ## OPEN BUGS (confirmed on real hardware, 2026-07-29)
 
 ### 1. Coach audio when the phone is locked or pocketed — FIXED 2026-08-08, unproven on hardware

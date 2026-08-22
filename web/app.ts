@@ -12102,14 +12102,27 @@ function clubOpenMedia(rows, i, auto) {
       ? '<div class="cm-bars">' + rows.map((_, n) =>
           '<span class="cm-bar' + (n < i ? " done" : n === i ? " now" : "") + '"><i></i></span>').join("") +
         '</div>' : "";
+    // ⚠️⚠️ DECLARED BEFORE IT IS READ, AND IT WAS NOT. The texts line used to sit above this one and
+    // read first.texts, which is a temporal dead zone: a const read before its own declaration throws
+    // ReferenceError every single time. So this whole viewer appended a full-screen overlay to the body
+    // and then died before assigning any content to it — a black screen with no progress bars, no ✕ and
+    // no video, on EVERY uploaded story, since the carousel refactor introduced the declaration.
+    // Reported from a real story on TestFlight, with a screenshot of nothing at all.
+    // ⚠️ POSTED TILES WERE NOT AFFECTED and it is worth saying which: openClubPost renders its own
+    // screen, so clubOpenMedia has exactly one caller, openClubStories. A first version of this note
+    // claimed both, which would have sent the next reader looking at the wrong path.
+    // ⚠️ NOTHING COULD SEE IT. A dead zone is legal syntax, so node --check passes, the build passes,
+    // and no test executed this function. Third firing in this file (JOURNAL_KEY at boot, SHARE_LADDER
+    // reading SHARE_EVEN_SPREAD_S) — test/club-trim.test.ts now sweeps for the pattern.
+    // ⚠️ AND IT ARRIVED BY AN EDIT, NOT BY BEING WRITTEN THAT WAY. Moving the crop, trim and texts onto
+    // clubSlides (so a carousel keeps its framing per slide) introduced this declaration BELOW the line
+    // that already used it.
+    const first = clubSlides(p)[0] || {};
+    const c = first.crop || { ox: 0.5, oy: 0.5, k: 1 };
     const texts = (first.texts || []).map((t) =>
       '<span class="club-tx" style="left:' + (t.x * 100) + '%; top:' + (t.y * 100) + '%; color:' +
       t.colour + '; font-family:' + t.font + '; font-size:' + t.size + 'px">' + esc(t.text) +
       '</span>').join("");
-    // ⚠️ THROUGH clubSlides FOR THE SAME REASON — a carousel row keeps its crop, trim and text per slide,
-    // so reading them off the row itself silently loses the framing on anything posted as a carousel.
-    const first = clubSlides(p)[0] || {};
-    const c = first.crop || { ox: 0.5, oy: 0.5, k: 1 };
     ov.innerHTML = bars +
       '<div class="club-stage club-stage-v">' +
         '<div class="club-fit" style="transform:scale(' + (c.k || 1) + ');transform-origin:' +

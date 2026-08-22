@@ -279,3 +279,121 @@ test("BLOCKER: the handles' hit areas grow OUTWARD, so the window keeps an inter
   // 14px of handle plus 30px of reach is the 44px this app insists on everywhere else.
   assert.match(css, /\.club-h \{[^}]*width: 14px/, "the handle is no longer 14px, so 30 is the wrong reach");
 });
+
+/* ------------------------------------------------------------------------------------------------
+ * THE STORY AND POST VIEWER ACTUALLY RENDERS.
+ *
+ * The owner, 2026-08-22, with a screenshot of a black screen: *"when i've saved a video to my story and
+ * try to play it, this is what shows"*. No progress bars, no ✕, no video — nothing but the app's own
+ * dark, which is what an appended overlay looks like when the code that fills it never runs.
+ *
+ * ⚠️⚠️ IT WAS A TEMPORAL DEAD ZONE. `clubOpenMedia`'s `texts` line read `first.texts` one line ABOVE
+ * `const first = clubSlides(p)[0]`, and a `const` read before its own declaration throws
+ * `ReferenceError` every single time. So the function appended the overlay to the body and then died
+ * before assigning any content to it — on every uploaded story.
+ * ⚠️ POSTED TILES WERE NOT AFFECTED. `openClubPost` renders its own screen, so `clubOpenMedia` has
+ * exactly ONE caller. Worth naming, because a report of "the viewer is broken" that does not say which
+ * viewer sends the next reader down the wrong path.
+ *
+ * ⚠️ NOTHING COULD SEE IT, AND THAT IS WHY THIS TEST EXECUTES RATHER THAN READS. A dead zone is legal
+ * syntax, so `node --check` passes and the build passes; the app block's duplicate-declaration sweep
+ * cannot see it either. A STATIC sweep for the pattern was written and MEASURED: over the whole app
+ * script it produced 57 candidates for this one real fault, because a function defined above a `const`
+ * it captures is both extremely common and perfectly legal. A guard that reports 56 false positives is
+ * one people stop reading — so the guard is to run the thing.
+ *
+ * ⚠️ THIRD FIRING OF THIS TRAP HERE (`JOURNAL_KEY` threw at every boot inside a silent try/catch;
+ * `SHARE_LADDER` read `SHARE_EVEN_SPREAD_S`), and the first to reach a runner's screen.
+ * ---------------------------------------------------------------------------------------------- */
+
+/** Run the real clubOpenMedia against a fake DOM and hand back what it drew. */
+function openMedia(row: Record<string, unknown>, auto: boolean) {
+  const src = page();
+  const made: { html: string }[] = [];
+  const overlay = {
+    _html: "",
+    set innerHTML(v: string) { this._html = v; made.push({ html: v }); },
+    get innerHTML() { return this._html; },
+    querySelector: () => null,
+    remove() {},
+    classList: { add() {}, remove() {} },
+  };
+  const api = new Function(
+    "el", "document", "clubViewClose", "clubSlides", "clubKeys", "esc", "clubFillMedia",
+    "clubDelete", "render", "toast", "haptic", "$", "setTimeout", "clearTimeout",
+    "CLUB_VIEW_T", "COMM_STORY_MS", "CLUB_STORY_MAX_S",
+    nocomment(fn(src, "clubOpenMedia")) + "\nreturn clubOpenMedia;",
+  )(
+    () => overlay,
+    { body: { appendChild() {} } },
+    () => {},
+    // The real readers, lifted TOGETHER — clubKeys calls clubSlides, so lifting them into separate
+    // scopes gives the second one a ReferenceError of its own and the test fails for its own reason
+    // rather than the code's.
+    new Function("p", nocomment(fn(src, "clubSlides")) + "\n"
+      + nocomment(fn(src, "clubKeys")) + "\nreturn clubSlides(p);"),
+    new Function("p", nocomment(fn(src, "clubSlides")) + "\n"
+      + nocomment(fn(src, "clubKeys")) + "\nreturn clubKeys(p);"),
+    (s: unknown) => String(s == null ? "" : s),
+    () => {}, () => {}, () => {}, () => {}, () => {},
+    () => null,
+    () => 0, () => {},
+    0, 4500, 15,
+  ) as (rows: unknown[], i: number, auto: boolean) => void;
+  api([row], 0, auto);
+  return made.map((m) => m.html);
+}
+
+/** A story row in the shape the store actually holds, carousel-era fields and all. */
+const VIDEO_STORY = {
+  id: "s1", kind: "story", video: true, caption: "Evening one",
+  media: ["blob-key-1"],
+  // ⚠️ THE FIELD IS `media`, NOT `key` — clubKeys reads x.media, and a fixture using the wrong name
+  // renders an empty slot and reports the viewer as broken when it is the fixture.
+  slides: [{ media: "blob-key-1", isVid: true, crop: { ox: 0.4, oy: 0.6, k: 1.2 },
+    trim: { inS: 4.75, outS: 19.75 },
+    texts: [{ x: 0.5, y: 0.3, colour: "#fff", font: "system-ui", size: 28, text: "Sunset" }] }],
+};
+
+test("BLOCKER: opening a video story renders something — it does not throw", () => {
+  // ⚠️ THE WHOLE POINT: a dead zone in here appended a full-screen overlay and then died before
+  // filling it, so the runner met a black screen with no controls on it at all.
+  const drawn = openMedia(VIDEO_STORY, true);
+  assert.equal(drawn.length, 1, "the viewer drew nothing at all");
+  assert.ok(drawn[0]!.length > 200, "the viewer drew almost nothing: " + drawn[0]);
+});
+
+test("BLOCKER: and what it renders is the video, its trim, its crop and its text", () => {
+  const html = openMedia(VIDEO_STORY, true)[0]!;
+  assert.match(html, /data-cvid="1"/, "the media slot is not marked as a video, so no <video> is made");
+  assert.match(html, /data-cmed="blob-key-1"/, "the media slot names no blob, so nothing can fill it");
+  // ⚠️ THROUGH clubSlides: a carousel row keeps its crop and text per slide, so reading them off the
+  // row itself silently loses the framing on anything posted as a carousel.
+  assert.match(html, /scale\(1\.2\)/, "the slide's own zoom was lost");
+  assert.match(html, /transform-origin:40% 60%/, "the slide's own framing was lost");
+  assert.match(html, /class="club-tx"/, "the words typed on the story were lost");
+  assert.match(html, /Sunset/, "the text content was lost");
+  // The chrome the screenshot was missing.
+  assert.match(html, /id="clubVX"/, "no way out of the viewer");
+  assert.match(html, /Evening one/, "the caption was lost");
+});
+
+test("BLOCKER: a photo story renders too, and asks for no video", () => {
+  const photo = { id: "s2", kind: "story", caption: "",
+    media: ["k2"], slides: [{ media: "k2", isVid: false }] };
+  const html = openMedia(photo, true)[0]!;
+  assert.match(html, /data-cvid=""/, "a photo story asked for a video element");
+  assert.match(html, /data-cmed="k2"/);
+});
+
+test("BLOCKER: a row stored BEFORE carousels still opens", () => {
+  // ⚠️ clubSlides is the one reader that understands both shapes. Posts written hours before carousels
+  // existed carry a single key with their crop, trim and texts on the ROW — and those are exactly the
+  // stories a runner already has on their phone.
+  const old = { id: "s3", kind: "story", video: true, caption: "Older",
+    media: "k3", crop: { ox: 0.5, oy: 0.5, k: 1 }, trim: { inS: 0, outS: 12 },
+    texts: [{ x: 0.5, y: 0.5, colour: "#fff", font: "system-ui", size: 24, text: "Then" }] };
+  const html = openMedia(old, true)[0]!;
+  assert.match(html, /data-cmed="k3"/, "an older row's media key was lost");
+  assert.match(html, /Then/, "an older row's text was lost");
+});

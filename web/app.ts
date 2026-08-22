@@ -4764,7 +4764,13 @@ button.cm-tile:active { opacity: .65; }
 .club-h-a { left: 0; border-radius: 12px 0 0 12px; }
 .club-h-b { right: 0; border-radius: 0 12px 12px 0; }
 .club-h i { display: block; width: 2px; height: 16px; border-radius: 999px; background: rgba(4,16,13,.55); }
-.club-h::after { content: ""; position: absolute; top: -8px; bottom: -8px; left: -15px; right: -15px; }
+/* ⚠️ THE HIT AREA GROWS OUTWARD ONLY, AND SYMMETRICAL WAS WRONG THE MOMENT THE WINDOW BECAME
+   DRAGGABLE. At 15px each side these two zones met in the middle of a short selection and left the
+   window with no interior to grab at all — and a short selection is exactly the one a handle cannot
+   move, because dragging an end only slides the window once it is already at the fifteen-second cap.
+   Outward, each handle keeps its 14 + 30 = 44px and the whole visible interior belongs to the move. */
+.club-h-a::after { content: ""; position: absolute; top: -8px; bottom: -8px; left: -30px; right: 0; }
+.club-h-b::after { content: ""; position: absolute; top: -8px; bottom: -8px; left: 0; right: -30px; }
 /* ── The carousel in the editor: dots above the strip, the strip below. */
 .club-dots { display: flex; justify-content: center; gap: 5px; margin-bottom: var(--s2); }
 .club-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.38); }
@@ -11489,8 +11495,20 @@ function wireClubEd() {
       const d = Number(med.duration) || 0;
       if (!d || !isFinite(d)) return;
       sl.dur = d;
-      const cap = S.kind === "story" ? CLUB_STORY_MAX_S : 0;
-      sl.inS = 0; sl.outS = cap ? Math.min(d, cap) : d;
+      // ⚠️⚠️ ONCE, AND THIS LINE THREW AWAY EVERY TRIM THE RUNNER MADE. clubEdDraw rebuilds the
+      // <video> element on every redraw, so a NEW element fires loadedmetadata again — and this reset
+      // the window to the first fifteen seconds each time. Reported: "the tool doesn't allow me to
+      // move to a different section of the video for the 15 second clip, it just keeps jumping back
+      // to the start". It moved under the finger (clubTrimPaint is live) and then snapped back the
+      // instant the drag ended, because the end of a drag redrew.
+      // ⚠️ A FLAG, NOT a test of whether inS is zero. A window a runner deliberately left starting at
+      // zero legitimately reads zero, and re-initialising it would silently drag its END
+      // back out to the cap — undoing a shortened clip rather than a moved one.
+      if (!sl.trimSet) {
+        sl.trimSet = true;
+        const cap = S.kind === "story" ? CLUB_STORY_MAX_S : 0;
+        sl.inS = 0; sl.outS = cap ? Math.min(d, cap) : d;
+      }
       const t = $("clubTrim");
       if (t) { t.outerHTML = clubTrimHtml(S); wireClubTrim(); }
       clubThumbs(sl);
@@ -11561,7 +11579,28 @@ function clubAddMore() {
 }
 function clubVidSeek() {
   const sl = clubSlide(), med = $("clubMed"); if (!sl || !med || !sl.isVid) return;
-  try { med.currentTime = sl.inS; med.play(); } catch (e) {}
+  // ⚠️ play() RETURNS A PROMISE AND A try/catch CANNOT SEE IT REJECT. Seeking straight afterwards
+  // aborts the play request, so every scrub logged an uncaught rejection — harmless to the runner and
+  // a console error all the same, which this app does not ship.
+  try { med.currentTime = sl.inS; const p = med.play(); if (p && p.catch) p.catch(() => {}); } catch (e) {}
+}
+/** Put the preview at one instant and hold it there — for scrubbing while a handle is dragged. */
+function clubVidScrub(t) {
+  const sl = clubSlide(), med = $("clubMed"); if (!sl || !med || !sl.isVid) return;
+  try { med.pause(); med.currentTime = Math.max(0, Math.min(sl.dur || 0, t)); } catch (e) {}
+}
+/**
+ * Refresh what a screen reader reads off the two handles.
+ * ⚠️ SEPARATE FROM clubTrimPaint BECAUSE PAINT RUNS ON EVERY POINTERMOVE. Rewriting an aria-valuetext
+ * sixty times a second is chatter a screen reader has to announce; the value that matters is the one
+ * the finger let go on.
+ */
+function clubTrimAria() {
+  const sl = clubSlide(); if (!sl) return;
+  const film = $("clubFilm"); if (!film) return;
+  const a = film.querySelector('[data-ctrim="a"]'), b = film.querySelector('[data-ctrim="b"]');
+  if (a) a.setAttribute("aria-valuetext", clubClock(sl.inS));
+  if (b) b.setAttribute("aria-valuetext", clubClock(sl.outS));
 }
 function clubVidLoop() {
   const sl = clubSlide(), med = $("clubMed"); if (!sl || !med || !sl.isVid) return;
@@ -12211,7 +12250,9 @@ function clubStripHtml(sl, cap, maxIn) {
       '<div class="club-frs">' + cells + '</div>' +
       '<span class="club-shade" style="left:0; width:' + a.toFixed(2) + '%"></span>' +
       '<span class="club-shade" style="left:' + b.toFixed(2) + '%; right:0"></span>' +
-      '<span class="club-win" style="left:' + a.toFixed(2) + '%; width:' + (b - a).toFixed(2) + '%">' +
+      '<span class="club-win" data-ctrim="w" role="slider" aria-label="Move the selection" ' +
+        'aria-valuetext="' + clubClock(sl.inS) + " to " + clubClock(sl.outS) + '" ' +
+        'style="left:' + a.toFixed(2) + '%; width:' + (b - a).toFixed(2) + '%">' +
         '<span class="club-h club-h-a" data-ctrim="a" role="slider" aria-label="Start" ' +
           'aria-valuetext="' + clubClock(sl.inS) + '"><i></i></span>' +
         '<span class="club-h club-h-b" data-ctrim="b" role="slider" aria-label="End" ' +
@@ -12288,10 +12329,28 @@ function wireClubTrim() {
       const which = h.dataset.ctrim;
       const box = film.getBoundingClientRect();
       try { h.setPointerCapture(ev.pointerId); } catch (e) {}
+      // ⚠️ DRAGGING THE WINDOW MOVES THE WHOLE SELECTION, and it is what he asked for in as many
+      // words: "move to a different section of the video". Two handles can express any window, but
+      // sliding a fifteen-second one later means dragging one end and letting the other follow — which
+      // works and which nobody thinks to try. The middle is where a finger goes.
+      // ⚠️⚠️ BOTH OF THESE ARE READ AT PRESS TIME AND THAT IS LOAD-BEARING. The move handler MUTATES
+      // sl.inS, so computing the new position from the live value compounds every one of the dozen
+      // pointermove events a single gesture produces: measured, a 70px nudge left (about 4.5 s) walked
+      // the window from 9.25 s all the way to 0 and pinned it there. A drag is a displacement from
+      // where the finger went DOWN, not from wherever the last frame left things.
+      const span = sl.outS - sl.inS;
+      const in0 = sl.inS;
+      const at0 = ((ev.clientX - box.left) / Math.max(1, box.width)) * sl.dur;
       const move = (m) => {
         const f = Math.max(0, Math.min(1, (m.clientX - box.left) / Math.max(1, box.width)));
         const t = f * sl.dur;
-        if (which === "a") {
+        if (which === "w") {
+          // Clamped as a PAIR, so the window slides to the edge and stops rather than shrinking
+          // against it — a selection that changes length when you move it is not a move.
+          const want = in0 + (t - at0);
+          sl.inS = Math.max(0, Math.min(want, sl.dur - span));
+          sl.outS = sl.inS + span;
+        } else if (which === "a") {
           sl.inS = Math.max(0, Math.min(t, sl.outS - clubTrimMin(sl.dur)));
           if (sl.outS - sl.inS > cap) sl.outS = sl.inS + cap;
         } else {
@@ -12299,9 +12358,23 @@ function wireClubTrim() {
           if (sl.outS - sl.inS > cap) sl.inS = sl.outS - cap;
         }
         clubTrimPaint();
+        // ⚠️ THE PREVIEW FOLLOWS THE HANDLE, because "move to a different section" is a thing you do
+        // by LOOKING. Scrubbing to the end being dragged is what turns a pair of markers into a
+        // choice you can make; without it the runner is picking a window blind and finding out
+        // afterwards. Paused, not playing — a video chasing a finger is unwatchable.
+        clubVidScrub(which === "b" ? sl.outS : sl.inS);
       };
       h.onpointermove = move;
-      const end = () => { h.onpointermove = null; clubVidSeek(); clubEdDraw(); };
+      // ⚠️⚠️ NO clubEdDraw() HERE, AND THAT IS THE SECOND HALF OF THE SAME FAULT. A full redraw at the
+      // end of a drag rebuilds the <video>, which restarts the load, flickers, and fires
+      // loadedmetadata again — which is what got to reset the window. Nothing needs redrawing: the
+      // strip has been painted live throughout and the labels with it. What the end does is put the
+      // preview back to playing the chosen window, and refresh what a screen reader reads.
+      const end = () => {
+        h.onpointermove = null;
+        clubTrimAria();
+        clubVidLoop();
+      };
       h.onpointerup = end; h.onpointercancel = end;
     };
   });

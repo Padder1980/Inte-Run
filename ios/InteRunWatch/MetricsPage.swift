@@ -213,8 +213,19 @@ struct MetricsPage: View {
             // ⚠️ EVERY ROW THE SAME SIZE, AND ALL OF THEM BIG. There is no hero any more: with three
             // metrics instead of five there is room to make each one readable at arm's length, which
             // is the whole point. A hero among three just makes the other two the small ones again.
+            //
+            // ⚠️⚠️ THE SIZE DEPENDS ON HOW MANY THERE ARE, AND WITHOUT THAT A FOURTH ROW DOES NOT FIT
+            // THE GLASS. Measured at 41mm (176pt): three rows span 30..425 of 430 device pixels — five
+            // to spare, cue and progress bar whole — while four rows are cut at BOTH ends, because the
+            // block is vertically centred. Screenshotted, the top strip's "IPHONE 23:09" had its glyph
+            // tops sliced off, the progress bar was gone entirely, and "HEART" was truncated to "HE…".
+            // ⚠️ IT IS NOT A HERO AND IT IS NOT A GENERAL SHRINK. Three rows — the default, and what
+            // almost everyone runs with — are untouched at 42pt, so nobody's screen changes. A runner
+            // who asks for a fourth number is making their own trade, and getting all four slightly
+            // smaller is the answer that keeps the decision above ("all of them big, none of them a
+            // hero") true at four as well.
             ForEach(rows) { r in
-                metricRow(r)
+                metricRow(r, font: MetricsPage.rowFont(rows.count))
             }
 
             Spacer(minLength: 0)
@@ -249,7 +260,39 @@ struct MetricsPage: View {
     /// on near-black and the labels were `inkFaint` — which is a deliberate hierarchy on a phone at
     /// reading distance and the wrong one on a wrist at arm's length in daylight, where the faint
     /// grey simply disappears and nothing tells you which number you are looking at.
-    private func metricRow(_ r: MetricsPage.Row) -> some View {
+    /// The number's size for a page carrying this many rows, on this watch.
+    ///
+    /// ⚠️⚠️ EVERY NUMBER HERE IS MEASURED ON A SIMULATOR, NOT MODELLED. A first attempt derived the
+    /// size from the page's own overheads arithmetically and disagreed with the screen by six points,
+    /// which means the model was wrong — and a size derived from a wrong model is worse than a table
+    /// whose measurements are written down. Captured from `companion-four` and `mid-run`, reading ink
+    /// in the outermost rows of the screenshot (the block is vertically CENTRED, so content too tall
+    /// is lost at BOTH ends and a box measurement cannot see it):
+    ///
+    ///     four rows at   41mm(215pt)  42mm(223pt)  45mm(242pt)  49mm(251pt)
+    ///     42pt           clipped      clipped      clipped      clipped
+    ///     36pt           clipped      clipped      FITS         FITS
+    ///     30pt           FITS         FITS         FITS         FITS
+    ///
+    /// ⚠️ SO NO WATCH HOLDS FOUR ROWS AT FULL SIZE — the reduction is not a small-screen concession,
+    /// it is what makes a fourth metric possible at all. Before it, four rows sliced the top strip's
+    /// glyphs, truncated "HEART" to "HE…", and lost the progress bar entirely.
+    /// ⚠️ AND THE BIG WATCHES GET THE BIGGER RUNG, which matters because the owner runs an Ultra and
+    /// has twice asked for these numbers to be bigger. Giving his watch the smallest size that fits
+    /// the smallest watch would take 20% off numbers his glass can hold.
+    /// ⚠️ THREE ROWS ARE UNTOUCHED AT 42pt on every size — that is the default and what almost
+    /// everyone runs with, so nobody's screen changes unless they ask for a fourth number.
+    /// ⚠️ FIVE IS DELIBERATELY NOT GIVEN A SIZE OF ITS OWN. `WatchSettings.maxMetrics` is 4 and both
+    /// the run screen and the companion filter the clock out of the rows, so five is unreachable —
+    /// and `WatchPreview`'s `five-metrics` scene exists precisely to show what a page too tall for the
+    /// glass looks like. Sizing it to fit would delete the only fixture that can fail that way.
+    static func rowFont(_ count: Int) -> CGFloat {
+        guard count >= 4 else { return 42 }
+        // The boundary sits between 223pt and 242pt; 230 is the midpoint of the measured gap.
+        return WKInterfaceDevice.current().screenBounds.height >= 230 ? 36 : 30
+    }
+
+    private func metricRow(_ r: MetricsPage.Row, font: CGFloat = 42) -> some View {
         // ⚠️ THE LABEL GOES TO THE RIGHT, WRAPPED ONTO TWO SHORT LINES. This is the whole trick, and
         // it took three wrong attempts to see it. Beside the number on ONE line, the words stole the
         // width and `minimumScaleFactor` silently shrank the digits to 15pt. Underneath, the number
@@ -261,7 +304,9 @@ struct MetricsPage: View {
         // reference app does — "NEXT / LAP", "CUR / PACE" — and why its screen holds more while
         // reading bigger.
         HStack(alignment: .center, spacing: 0) {
-            if let ic = r.icon { glyph(ic, size: 22).padding(.trailing, 4) }
+            // The heart scales with the number beside it, or a 30pt row carries a 22pt glyph that
+            // reads as the biggest thing on the line.
+            if let ic = r.icon { glyph(ic, size: font * 22 / 42).padding(.trailing, 4) }
             // ⚠️ THE NUMBER GETS THE WIDTH FIRST, AND WITHOUT THIS IT DID NOT. Measured on a 41mm
             // watch (176pt wide): "1.42 KM DISTANCE" wants about 177pt of the 160pt available, and
             // SwiftUI divided the shortfall by shrinking the row's flexible children — so the VALUE
@@ -269,7 +314,7 @@ struct MetricsPage: View {
             // points is invisible; the number losing its digits is the whole screen failing. Same
             // fault the layout notes above record twice already, one screen size further down.
             Text(r.value)
-                .font(.system(size: 42, weight: .semibold, design: .rounded))
+                .font(.system(size: font, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .minimumScaleFactor(0.85)
                 .lineLimit(1)
@@ -279,7 +324,7 @@ struct MetricsPage: View {
             // two competing things — so it takes the same priority as the number it belongs to.
             if let u = r.unit {
                 Text(u)
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.system(size: font * 16 / 42, weight: .bold))
                     .lineLimit(1)
                     .layoutPriority(2)
                     .foregroundStyle(Brand.ink)

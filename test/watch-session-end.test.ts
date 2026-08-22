@@ -741,3 +741,132 @@ test("BLOCKER: the tick that ends the run stops there", () => {
     "the ticker's trailing send and auto-pause are no longer downstream of the bail, so the bail " +
     "protects nothing");
 });
+
+/* ------------------------------------------------------------------------------------------------
+ * A FOURTH METRIC FITS THE GLASS.
+ *
+ * From the watch redesign brief (WATCH-REDESIGN.md): *"one number dominates each page; labels are
+ * small and values are big"*, and the note on why the reference's screen "holds more while reading
+ * bigger". InteRun already puts the label beside the number, which is that trick — but every row was
+ * a fixed 42pt, and CLAUDE.md recorded the consequence as measured and NOT fixed: four rows overflow,
+ * and four rows are reachable, because `WatchSettings.maxMetrics` is 4.
+ *
+ * ⚠️ MEASURED ON FOUR SIMULATORS BEFORE AND AFTER, reading ink in the outermost rows of a screenshot
+ * rather than a view's box — the block is vertically CENTRED, so content too tall is lost at BOTH
+ * ends and a box measurement cannot see it. Before: the top strip's "IPHONE 23:09" had its glyph tops
+ * sliced, "HEART" truncated to "HE…", and the progress bar was gone. After: nothing clipped on any of
+ * 41 / 42 / 45 / 49mm, on any of the four reachable scenes.
+ * ---------------------------------------------------------------------------------------------- */
+
+/** Every display height watchOS 10 admits, in points. */
+const WATCH_HEIGHTS: { name: string; pt: number }[] = [
+  { name: "40mm", pt: 197 }, { name: "41mm", pt: 215 }, { name: "42mm", pt: 223 },
+  { name: "44mm", pt: 224 }, { name: "45mm", pt: 242 }, { name: "46mm", pt: 251 },
+  { name: "49mm", pt: 251 },
+];
+
+/** The measured ceilings, lifted OUT OF THE DOC COMMENT so the code and the record cannot drift. */
+function measuredCeilings(): { size: number; fits: Record<string, boolean> }[] {
+  // ⚠️ THE RAW FILE, because read() strips comments and the table IS a comment. That is the point of
+  // it: the measurements are written where somebody changing the constants will see them, and this
+  // guard is what stops the two drifting apart.
+  const src = readFileSync(new URL("../ios/InteRunWatch/MetricsPage.swift", import.meta.url), "utf8");
+  const grid = /four rows at\s+([^\n]*)\n([\s\S]*?)\n\s*\/\/\/\s*\n/.exec(src);
+  assert.ok(grid, "the measured table is no longer in rowFont's doc comment");
+  const cols = [...grid![1]!.matchAll(/(\d+)mm\((\d+)pt\)/g)].map((m) => ({ mm: m[1]!, pt: Number(m[2]) }));
+  assert.ok(cols.length >= 4, "expected at least four measured sizes, found " + cols.length);
+  const rows: { size: number; fits: Record<string, boolean> }[] = [];
+  for (const line of grid![2]!.split("\n")) {
+    const m = /(\d+)pt\s+(.*)$/.exec(line.replace(/^\s*\/\/\/\s*/, ""));
+    if (!m) continue;
+    const verdicts = m[2]!.trim().split(/\s+/);
+    assert.equal(verdicts.length, cols.length,
+      "the table row for " + m[1] + "pt has " + verdicts.length + " verdicts for " + cols.length + " sizes");
+    const fits: Record<string, boolean> = {};
+    cols.forEach((c, i) => { fits[String(c.pt)] = /FITS/i.test(verdicts[i]!); });
+    rows.push({ size: Number(m[1]), fits });
+  }
+  assert.ok(rows.length >= 3, "expected the 42/36/30 rows, found " + rows.length);
+  return rows;
+}
+
+/** Drive the real rowFont: it is arithmetic on two numbers, so the branches can just be read out. */
+function rowFont(count: number, heightPt: number): number {
+  const src = stripComments(read("InteRunWatch/MetricsPage.swift"));
+  const body = /static func rowFont\(_ count: Int\) -> CGFloat \{([\s\S]*?)\n    \}/.exec(src);
+  assert.ok(body, "rowFont is no longer a function of the row count alone");
+  const full = /guard count >= (\d+) else \{ return ([\d.]+) \}/.exec(body![1]!);
+  assert.ok(full, "rowFont no longer short-circuits for the row counts that need no reduction");
+  if (count < Number(full![1])) return Number(full![2]);
+  const split = /screenBounds\.height >= (\d+) \? ([\d.]+) : ([\d.]+)/.exec(body![1]!);
+  assert.ok(split, "rowFont no longer reads the display height, so every watch gets the same rung");
+  return heightPt >= Number(split![1]) ? Number(split![2]) : Number(split![3]);
+}
+
+test("BLOCKER: three rows are untouched on every watch, so nobody's default screen moves", () => {
+  for (const h of WATCH_HEIGHTS) {
+    for (const n of [1, 2, 3]) {
+      assert.equal(rowFont(n, h.pt), 42,
+        n + " rows on a " + h.name + " came out at " + rowFont(n, h.pt) + "pt, not 42");
+    }
+  }
+});
+
+test("BLOCKER: four rows never take a size the glass was measured NOT to hold", () => {
+  // ⚠️ THE CEILING IS THE MEASUREMENT, NOT A JUDGEMENT. Each row of that table was captured from a
+  // real simulator; this asserts the code never asks for a size the table marks as clipped.
+  const table = measuredCeilings();
+  for (const h of WATCH_HEIGHTS) {
+    const got = rowFont(4, h.pt);
+    // The tallest measured size at or below this display, so an unmeasured height inherits the
+    // verdict of the nearest one BELOW it rather than optimistically borrowing a taller screen's.
+    const keys = Object.keys(table[0]!.fits).map(Number).sort((a, b) => a - b);
+    const bucket = keys.filter((k) => k <= h.pt).pop() ?? keys[0]!;
+    const rowFor = table.find((r) => r.size === got);
+    assert.ok(rowFor, "no measurement recorded for " + got + "pt, which is what "
+      + h.name + " is being given");
+    assert.ok(rowFor!.fits[String(bucket)],
+      "four rows at " + got + "pt were measured as CLIPPED on a " + bucket
+      + "pt display, and that is what a " + h.name + " is being given");
+  }
+});
+
+test("BLOCKER: no watch is given a smaller size than it was measured to hold", () => {
+  // The other direction, and it is the one the owner cares about: he runs an Ultra and has twice
+  // asked for these numbers to be bigger, so handing his glass the smallest size that fits the
+  // smallest watch would take 20% off numbers it can hold.
+  const table = measuredCeilings().sort((a, b) => b.size - a.size);
+  for (const h of WATCH_HEIGHTS) {
+    const keys = Object.keys(table[0]!.fits).map(Number).sort((a, b) => a - b);
+    const bucket = keys.filter((k) => k <= h.pt).pop() ?? keys[0]!;
+    const best = table.find((r) => r.fits[String(bucket)]);
+    assert.ok(best, "the table says nothing fits a " + bucket + "pt display");
+    assert.equal(rowFont(4, h.pt), best!.size,
+      h.name + " was measured to hold " + best!.size + "pt and is being given " + rowFont(4, h.pt));
+  }
+});
+
+test("BLOCKER: the reachable maximum really is four, or the table is incomplete", () => {
+  // ⚠️ DERIVED. If maxMetrics ever grows, this table has to grow with it — and the failure without
+  // this guard is silent: the fifth row simply overflows, on the one screen a runner looks at most.
+  const set = stripComments(read("InteRunWatch/WatchSettings.swift"));
+  const m = /static let maxMetrics = (\d+)/.exec(set);
+  assert.ok(m, "maxMetrics is no longer declared");
+  assert.equal(Number(m![1]), 4,
+    "maxMetrics is now " + m![1] + "; MetricsPage.rowFont only has measurements up to four rows");
+});
+
+test("BLOCKER: the number, its unit and its glyph all take the row's size", () => {
+  // A row where only the digits shrink is a row whose unit and heart become the biggest things on
+  // the line — which inverts the value-big / label-small hierarchy the brief is about.
+  const src = stripComments(read("InteRunWatch/MetricsPage.swift"));
+  const row = fn(src, "private func metricRow(_ r: MetricsPage.Row, font: CGFloat = 42) -> some View");
+  assert.match(row, /\.font\(\.system\(size: font, weight: \.semibold, design: \.rounded\)\)/,
+    "the number no longer takes the row's size");
+  assert.match(row, /glyph\(ic, size: font \* 22 \/ 42\)/, "the glyph no longer scales with the row");
+  assert.match(row, /Text\(u\)\s*\n\s*\.font\(\.system\(size: font \* 16 \/ 42/,
+    "the unit no longer scales with the row");
+  // And the caller passes it — a default of 42 makes an unwired call site compile and clip.
+  assert.match(src, /metricRow\(r, font: MetricsPage\.rowFont\(rows\.count\)\)/,
+    "the rows are drawn without being told the size, so the reduction never happens");
+});

@@ -1,6 +1,10 @@
 # Apple Watch UI redesign — brief (opened 2026-07-29)
 
-**Status: not started.** This is a captured brief, not a plan of record. Nothing here is built.
+**Status: DONE, 2026-08-22 — and this line said "not started" for three weeks after it was, which is
+what sent a session looking for work that had already landed.** Read the audit at the foot of this file
+before changing anything: all four of the "suggested order" items below are either built or were
+superseded by the owner's own later decisions, and two of those decisions REVERSE what this brief asks
+for. The reference notes are kept as the record of where the structure came from.
 
 ## Why
 
@@ -122,3 +126,68 @@ structural gap against the reference.
 
 Verify on a real Ultra (the owner has one — screenshots above are from an Ultra, 49mm) and remember
 `xcodebuild` needs `-destination`, never `-sdk`, for this project.
+
+
+---
+
+## AUDIT AGAINST THE CODE — 2026-08-22
+
+Worked item by item. The brief's four suggested steps:
+
+| # | Brief asks for | State |
+|---|---|---|
+| 1 | Home → 2 pages, left-edge session-type colour bar, big name / small subtitle | ✅ **BUILT.** `TodayView` is a `TabView` of `todayPage` / `upcomingPage`; `card(bar:)` draws the edge bar and `typeBar(_:)` maps the engine's own `SessionType` strings to it. |
+| 2 | Active run → value-big / label-small, one dominant number per page | ✅ **BUILT**, and it goes further than the reference: `MetricsPage` puts the label BESIDE the number wrapped onto two short lines, which is the trick that lets the page hold more while reading bigger. ⚠️ **The remaining gap here was the one real defect left, and it is now fixed — see below.** |
+| 3 | Settings → paged groups, each toggle with a one-line explanation | ✅ **BUILT.** `SettingsView` is four pages (`runPage` / `alertsPage` / `audioPage` / `MetricsEditor`), each toggle carrying its own sentence. |
+| 4 | Session detail → 3 pages ending in Start, prescription as sentences | ❌ **SUPERSEDED, TWICE, BY THE OWNER.** One scrollable page, not three (2026-07-31: three pages hide both the step list and the button behind a guess about which way to swipe). And **Start at the TOP, not the foot** — you arrive having already chosen the session, so committing must never require scrolling past detail you may not want. **Do not "finish" step 4.** |
+
+And the brief's five reference groups: the **countdown** is a single 84pt numeral with the session
+name under it and a wrist tap on every beat; the **active run** is five pages, not four (Controls,
+Metrics, Pace, Steps, Now Playing) — the extra one is InteRun's own pace band, which this brief says
+beats the reference and must be kept, and it does (`PacePage`, `PaceView`). `PaceBandView.swift` is
+gone as a file; its design lives on inside `PacePage`.
+
+### ⚠️⚠️ THE ONE THING GENUINELY LEFT WAS A FOURTH METRIC ROW OVERFLOWING THE GLASS
+
+CLAUDE.md had it recorded as measured and NOT fixed, because "the honest fix is to shrink the rows
+when there are four, which is a legibility decision the owner has already been consulted on twice".
+The brief resolves that: *"labels are small and values are big"*, and its own note that the reference
+"holds more while reading bigger". So the answer is all four rows slightly smaller, never a hero.
+
+**Measured on four simulators, `companion-four` / `mid-run` / `paused` / `companion`, reading ink in
+the outermost rows of the screenshot** — the block is vertically centred, so content too tall is lost
+at BOTH ends and a view's box cannot see it:
+
+| four rows at | 41mm (215pt) | 42mm (223pt) | 45mm (242pt) | 49mm (251pt) |
+|---|---|---|---|---|
+| 42pt (as shipped) | clipped | clipped | clipped | clipped |
+| 36pt | clipped | clipped | **fits** | **fits** |
+| 30pt | **fits** | **fits** | fits | fits |
+
+⚠️ **NO WATCH HELD FOUR ROWS AT FULL SIZE**, so this was not a small-screen concession — it is what
+makes a fourth metric possible at all. Before: the top strip's "IPHONE 23:09" had its glyph tops
+sliced, "HEART" truncated to "HE…", and the progress bar was gone entirely. After: `topink = 0` and
+both ends clear on all four sizes, on all four reachable scenes.
+
+⚠️ **THREE ROWS ARE UNTOUCHED AT 42pt EVERYWHERE.** That is the default and what almost everyone runs
+with, so nobody's screen changes unless they ask for a fourth number. Verified: the 3-row scene is
+pixel-identical before and after (`first=30 last=425` of 430 at 41mm).
+
+⚠️ **AND THE BIG WATCHES GET THE BIGGER RUNG (36pt), which is the half that matters to the owner** —
+he runs an Ultra and has twice asked for these numbers to be bigger, so handing his glass the smallest
+size that fits the smallest watch would take 20% off numbers it can hold.
+
+Guarded in `test/watch-session-end.test.ts`, with the measured table **lifted out of `rowFont`'s own
+doc comment** so the code and the record cannot drift, plus a derived check that `maxMetrics` is still
+4 — if it grows, the table has to grow with it, and the failure without that guard is silent.
+
+### Still open on the watch, and not part of this brief
+
+- ⚠️ **Four `.kerning` + `.minimumScaleFactor` pairings remain** (`PacePage` ×3, `StepsPage` ×1),
+  latent rather than broken: shot at 40mm none of them truncates today. Ratcheted at 4 in
+  `test/watch-session-end.test.ts` so the count cannot grow.
+- ⚠️ **`five-metrics` is a fixture for a state no runner can reach** and exists to show what overflow
+  looks like. It still overflows at 41 / 42 / 49mm; at **45mm it is now marginal** (`botink` 3, `last`
+  475 of 484), because five rows at the big-screen rung very nearly fit there. Stated rather than
+  hidden — the fixture does its job on three of the four sizes.
+- ⚠️ **Nothing here has been on the owner's real Ultra.** Four simulators is not a wrist.

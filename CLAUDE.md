@@ -8106,6 +8106,137 @@ re-break** — the easy-run line is *"Just slow down and go by feel — effort m
 Assert the quality phrase AND the absence of the easy-run one; the guard's own title named what it was
 failing to check.
 
+## THE VIDEO TRIM WOULD NOT MOVE (owner, 2026-08-22)
+
+*"when trying to add a story that is a video, the tool doesn't allow me to move to a different section
+of the video for the 15 second clip, it just keeps jumping back to the start"*
+
+Two causes, both arithmetic, both invisible to a source read. Suite 1215 → **1227**; 9 deliberate
+re-breaks, all caught (two after a guard was restated). Web-only, so it reaches his phone on the next
+launch.
+
+⚠️⚠️ **`wireClubEd`'s `onloadedmetadata` RESET THE WINDOW, AND `clubEdDraw` REBUILDS THE `<video>` ON
+EVERY REDRAW.** So a new element fired the handler again and set `inS = 0`, `outS = 15`. And the end of
+every handle drag called `clubEdDraw` — so the window moved under his finger (`clubTrimPaint` is live)
+and snapped back the instant he let go. Exactly what he described.
+- **`sl.trimSet` is the flag**, and it is a flag rather than a test of whether `inS` is zero: a window
+  a runner deliberately left starting at zero legitimately reads zero, and re-initialising it would
+  silently drag its END back out to the cap — undoing a shortened clip rather than a moved one.
+- ⚠️ **AND THE END OF A DRAG NO LONGER REDRAWS AT ALL.** Nothing needs it: the strip is painted in
+  place throughout, labels included. A redraw there rebuilt the video, restarted the load, flickered,
+  and re-ran the metadata handler — which is what got to reset the window in the first place. It now
+  refreshes the two `aria-valuetext`s and puts the preview back to looping the chosen window.
+
+⚠️⚠️ **THE WINDOW DRAG COMPOUNDED, AND ONLY DRIVING IT IN A BROWSER FOUND THAT.** The move handler
+mutates `sl.inS`, so computing the new position from the live value applies the displacement once per
+`pointermove` — a dozen times in one gesture. **Measured over CDP: a 70px nudge left (about 4.5 s)
+walked the window from 9.23 s to 0 and pinned it there.** `in0` is captured at press time; a drag is a
+displacement from where the finger went DOWN. After: 9.23 → **4.77**, exact.
+
+⚠️ **THE WINDOW ITSELF IS NOW DRAGGABLE, and that is what he literally asked for.** Two handles can
+express any window, but sliding a fifteen-second one later means dragging one end and letting the other
+follow — which works, and which nobody thinks to try. Worse, a window SHORTER than the cap cannot be
+moved by a handle at all: dragging an end only slides the other once the span is already at the cap.
+`data-ctrim="w"` on `.club-win`, clamped as a PAIR (`inS` then `outS = inS + span`) so it slides to an
+edge and stops rather than shrinking against it — a selection that changes length when you move it is
+not a move.
+
+⚠️ **THE HANDLES' HIT AREAS NOW GROW OUTWARD ONLY, AND SYMMETRICAL WAS WRONG THE MOMENT THE WINDOW
+BECAME DRAGGABLE.** At `left: -15px; right: -15px` the two zones met in the middle of a short selection
+and left no interior to grab — and a short selection is exactly the one a handle cannot move. Split per
+side (`-30px` outward, `0` inward), each handle keeps its 14 + 30 = 44px and the whole visible interior
+belongs to the move.
+
+⚠️ **THE PREVIEW FOLLOWS THE END BEING DRAGGED** (`clubVidScrub`, paused not playing), because "move to
+a different section" is a thing you do by LOOKING. Without it the runner picks a window blind and finds
+out what is in it afterwards.
+
+⚠️ **`med.play()` RETURNS A PROMISE AND A `try/catch` CANNOT SEE IT REJECT.** Seeking straight after
+aborts the play request, so every scrub logged an uncaught rejection — harmless to the runner and a
+console error all the same. Caught explicitly.
+
+### The guard, and the two versions of it that could not fail
+
+`test/club-trim.test.ts` drives the real `wireClubTrim` against a fake strip whose geometry is known,
+so what is asserted is where the window ENDS UP. Both faults are arithmetic — one a missing flag, the
+other a variable read one line too late — and neither is visible to a source grep.
+⚠️ **THE DISCRIMINATING CLAIM IS THAT THE ANSWER DOES NOT DEPEND ON THE EVENT COUNT.** The compounding
+bug is invisible at one `pointermove` and worst at fifty, so the test runs the same gesture at both and
+requires the same landing place.
+⚠️ **THE DRAG TARGETS ARE DERIVED FROM THE REAL MARKUP, AND A HAND-WRITTEN SET ESCAPED ITS RE-BREAK.**
+With `["a","b","w"]` hardcoded, deleting `data-ctrim="w"` from `.club-win` left the harness still
+offering a "w" node — so the window stopped being draggable in the app and every arithmetic test carried
+on passing. It now calls `clubStripHtml` and pulls the attributes out of the output. A guard over a
+collection is only as good as the collection.
+⚠️ **AND THE ACCESSIBLE-NAME CLAIM HAD TO BE ADDED**: deleting the window's `aria-label` escaped
+everything. Derived over every `data-ctrim` target, so the one added last cannot be the one missed.
+⚠️ **`clubTrimMin` HAD TO BE LIFTED WITH THE CONSTANT IT READS** (`CLUB_TRIM_MIN_S`), or the lifted
+function throws a `ReferenceError` and five guards fail for a reason that is not the code's.
+
+⚠️ **THE BACKTICK RULE FIRED FOR THE TWELFTH TIME**, in my own comment, and the build failed outright —
+which is the good outcome and the reason to read the exit code.
+
+## THE WATCH REDESIGN BRIEF WAS ALREADY DONE — EXCEPT FOR ONE MEASURED DEFECT (2026-08-22)
+
+`WATCH-REDESIGN.md` said **"Status: not started"** for three weeks after it was substantially built,
+which is what sent this session looking for work that had already landed. **The audit is now at the foot
+of that file; read it before touching the watch.** Suite 1227 → **1232**; 8 deliberate re-breaks, all
+caught. Native, so it needs an Xcode build.
+
+Of the brief's four suggested steps: **home** (2 pages, edge colour bar, big name / small subtitle),
+**active run** (value-big / label-small) and **settings** (four paged groups, a sentence under every
+toggle) are all built. **Session detail is deliberately NOT the brief's three pages** — the owner ruled
+twice for one scrollable page with Start at the TOP, and those rulings REVERSE what the brief asks for.
+Do not "finish" step 4.
+
+### ⚠️⚠️ A FOURTH METRIC ROW OVERFLOWED THE GLASS ON EVERY WATCH THERE IS
+
+CLAUDE.md carried this as measured and NOT fixed, "because the honest fix is to shrink the rows when
+there are four, which is a legibility decision the owner has already been consulted on twice". The brief
+settles it: *"labels are small and values are big"*, and its note that the reference "holds more while
+reading bigger". So all four rows get slightly smaller, and there is still no hero.
+
+**Measured on four simulators — `companion-four` / `mid-run` / `paused` / `companion` — by reading ink
+in the outermost rows of a screenshot.** The block is vertically CENTRED, so content too tall is lost at
+BOTH ends and a view's box cannot see it (this file's own rule, and the reason the previous phase's probe
+missed a 52px overprint).
+
+| four rows at | 41mm (215pt) | 42mm (223pt) | 45mm (242pt) | 49mm (251pt) |
+|---|---|---|---|---|
+| 42pt (as shipped) | clipped | clipped | clipped | clipped |
+| 36pt | clipped | clipped | **fits** | **fits** |
+| 30pt | **fits** | **fits** | fits | fits |
+
+⚠️ **SO NO WATCH HELD FOUR ROWS AT FULL SIZE.** This is not a small-screen concession — it is what makes
+a fourth metric possible at all. Before: the top strip's "IPHONE 23:09" had its glyph tops sliced,
+"HEART" truncated to "HE…", and the progress bar was gone entirely. After: `topink = 0` and both ends
+clear on all four sizes across all four reachable scenes.
+
+⚠️ **THREE ROWS ARE UNTOUCHED AT 42pt EVERYWHERE** — the default, and what almost everyone runs with, so
+nobody's screen changes unless they ask for a fourth number. Verified pixel-identical before and after.
+
+⚠️ **AND THE BIG WATCHES GET THE BIGGER RUNG (36pt), which is the half that matters to the owner.** He
+runs an Ultra and has twice asked for these numbers to be bigger; handing his glass the smallest size
+that fits the smallest watch would take 20% off numbers it can hold.
+
+⚠️ **THE FIRST ATTEMPT DERIVED THE SIZE ARITHMETICALLY FROM THE PAGE'S OWN OVERHEADS AND DISAGREED WITH
+THE SCREEN BY SIX POINTS.** A size derived from a wrong model is worse than a table whose measurements
+are written down, so the table ships — inside `rowFont`'s doc comment, where somebody changing the
+constants will see it. ⚠️ **`test/watch-session-end.test.ts` LIFTS THAT TABLE OUT OF THE COMMENT** and
+asserts the code never asks for a size the table marks as clipped, and never gives a watch less than it
+was measured to hold. Editing either half alone fails. Plus a derived check that `maxMetrics` is still 4
+— if it grows, the table must grow with it, and the failure without that guard is silent.
+
+⚠️ **THE UNIT AND THE HEART SCALE WITH THE NUMBER** (`font * 16 / 42`, `font * 22 / 42`). A row where
+only the digits shrink is a row whose unit and heart become the biggest things on the line, which
+inverts the very hierarchy the brief is about.
+
+⚠️ **`five-metrics` IS NOW MARGINAL ON 45mm** (`botink` 3, `last` 475 of 484) because five rows at the
+big-screen rung very nearly fit there. It still overflows at 41 / 42 / 49mm, so the fixture does its job
+on three of the four sizes. Stated rather than hidden.
+
+⚠️ **NONE OF THIS HAS BEEN ON THE OWNER'S REAL ULTRA.** Four simulators is not a wrist.
+
 ## OPEN BUGS (confirmed on real hardware, 2026-07-29)
 
 ### 1. Coach audio when the phone is locked or pocketed — FIXED 2026-08-08, unproven on hardware

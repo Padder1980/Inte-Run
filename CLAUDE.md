@@ -7202,6 +7202,160 @@ reversible at identical offsets in both directions.
 ⚠️ It emulates a **44pt status bar**, which the reference PNGs include and a headless viewport does
 not — without it every landmark reads 44px high and the systematic error hides the real ones.
 
+## COMMUNITY IS NOW INTE-CLUB, AND A RUNNER CAN POST TO IT (owner, 2026-08-22)
+
+His words: *"i want to build the functionality whereby a runner can press the plus button at the top and
+it allows them to add a post or a story etc … The post will allow them to add a video or a photo from
+their own camera roll and the same if they click story … There also needs to be a little plus button on
+the profile picture … that takes them straight into their camera roll on their phone to add a story. Once
+they've selected an image or a video (video's capped at 15 seconds for stories) they need to be allowed
+the functionality to make adjustments like seen in the attached video. **If we don't have that
+functionality already then, please dont tell me it doesn't exist. I want you to start creating that
+functionality becuase i know it is possible.** This section also needs to be changed from being called
+community to 'Inte-Club'."* Suite 1132 → **1148**; 30 deliberate re-breaks, all 30 caught (four only
+after a guard was restated — those four are the useful half, below).
+
+⚠️ **IT IS ALL WEB, SO IT REACHES HIS PHONE ON THE NEXT LAUNCH.** No Swift changed. The camera roll needs
+nothing native: a WKWebView hands a file input accepting images and video straight to the iOS sheet
+(Photo Library / Take Photo / Browse), and the three purpose strings it wants were already added when the
+share card's Take Photo crash was fixed.
+
+**What exists now.** The + in the top bar opens **Create** (Post / Story); both go camera roll → editor →
+posted. The little **+ on the avatar** and **Add** on the stories rail skip Create and go straight to the
+roll for a story. The editor is full-screen media with pan and pinch, on-canvas text (typeface, colour,
+size), a caption, and for a video a **trim**. A post lands in the grid under **Posted**; a story goes in
+the ring and expires after 24 hours. **All / Videos** tabs split the grid. One full-screen player serves
+both.
+
+### ⚠️⚠️ TWO FUNCTIONS OF ONE NAME, AND EVERYTHING PASSED
+
+`fmtClock(seconds)` was written for the trim label while the live run screen has had
+`fmtClock(milliseconds)` — printing tenths — since long before. **Function declarations hoist, so the
+later one won for the whole 30,000-line script**: every trim label rendered a fifteen-second window as
+`0:00.0`, fifteen milliseconds. The build exited 0, `node --check` passed all three emitted blocks, and
+**1132 tests passed**. Renamed to `clubClock`.
+⚠️ **THERE IS NO WARNING FOR THIS ANYWHERE.** One template literal means no linting and no typechecking
+of the runtime JS, and a duplicate top-level declaration is legal JavaScript — not even a strict-mode
+error. `test/community.test.ts` now fails on **any** name declared twice at the top level of the app
+block, scoped to no-leading-whitespace so a nested helper of the same name in two functions is still
+fine. Watched failing against the collision before it was believed.
+
+### The decisions, and the ones that would be undone by a tidy-up
+
+⚠️ **THE BYTES GO IN IndexedDB AND THE ROW IN localStorage, MEDIA FIRST.** localStorage is where the
+entire training history lives and one phone video is tens of megabytes — the route-map cache is in
+IndexedDB for exactly this reason. Measured: a post's row is **312 bytes**. The blob is written FIRST: a
+row pointing at a blob that failed to save is a permanently broken tile, where a blob with no row is
+invisible and swept by the next open.
+
+⚠️ **THE TRIM IS IN AND OUT POINTS, NEVER A RE-ENCODE.** Re-encoding in a web view means decoding every
+frame to a canvas and recording it back — slow on a phone, lossy, and it drops the audio. The clip is
+stored whole and cut at playback, so nothing is degraded and a future export can cut from the original.
+Measured end to end: a 21.97s clip, the window slid to **6.90–21.90**, playhead seeking to 7.1s.
+⚠️ **AND THE CAP IS A TRIM, NOT A REFUSAL.** Rejecting a long clip sends the runner back to Photos to cut
+it. ⚠️ **The cap is the STORY's** — applying it to a post as well would be a rule he did not ask for.
+
+⚠️ **THE TEXT IS TYPED ON THE PICTURE, NOT INTO `prompt()`.** A system dialog cannot show the runner the
+typeface, colour or size they are choosing, and on iOS it is a modal the app does not control. The font
+pills are **set in their own faces** — three labels in one typeface is not a choice you can see.
+⚠️ **AND THE FONT AND COLOUR TOOLS LIVE IN THAT STATE, NOT THE RAIL.** The first cut had them in the
+rail acting on the SELECTED word, so two of the three tools were inert whenever nothing was selected and
+had to answer with a toast explaining themselves. The rail is now Aa plus a delete that only appears
+when there is something to delete.
+⚠️ **THE DIM IS .48 WITH NO BLUR.** At `rgba(4,16,13,.82)` and a 6px blur the picture measured
+effectively black — so the runner was typing onto a dark rectangle, which is exactly what typing on the
+media instead of in a dialog was meant to stop.
+
+⚠️ **A TAP ON A WORD EDITS IT; A DRAG MOVES IT.** Told apart by whether the finger travelled more than
+4px, so one gesture does not mean two things — a word meant to be nudged does not reopen the keyboard,
+and a word meant to be fixed needs no second control.
+
+⚠️ **THE FRAMING IS CLAMPED IN ONE PLACE.** `clubEdFit` derives the slack from the zoom
+(`(1 - 1/k)/2`) and every gesture goes through it; the gesture handler carries no clamp of its own. Two
+would be two answers, and the stored crop would not be the one the runner framed — the
+two-disagreeing-transforms fault that stretched the debrief hero. Verified: at k=2.5 an offset of 9
+clamps to 0.800.
+
+⚠️ **THE + IS ON THE CLUB AND HIDDEN EVERYWHERE ELSE.** A create control in the top bar of every screen
+only means something on one of them. Measured: `display: none` on Today, `flex` on the club.
+⚠️ **AND THE AVATAR'S + IS A SIBLING OF THE RING, NOT A CHILD.** Nested, a tap on the badge bubbles to
+the ring and opens the story viewer instead of the camera roll — a control that looks like one thing and
+does another. Its hit area grows via `::after`, not its box, or it would cover the avatar it sits on.
+
+⚠️ **A REAL UPLOADED STORY WINS OVER THE GENERATED RUN ONE.** The run story exists because there was
+nothing else to put in the ring; once the runner has put something there themselves, showing them the
+app's summary of their last run instead is the app talking over them.
+
+⚠️ **A POST DOES NOT ADVANCE ITSELF AND A VIDEO STORY RUNS FOR ITS OWN TRIMMED LENGTH.** A picture that
+closes while somebody is reading the caption has decided for them; and advancing off a twelve-second clip
+after four and a half is cutting the runner off mid-sentence.
+
+⚠️ **MEDIA IS LOADED AFTER THE RENDER, THROUGH ONE LOADER.** Reading a blob is asynchronous and this app
+renders synchronously from many paths, so a builder that awaited the bytes would be an async render. A
+missing blob shows a hatched cell, never nothing. One object URL per media, cached — a grid re-rendered
+on every tab switch would otherwise mint one per tile per render and hold every video in memory.
+
+⚠️ **THE ALL / VIDEOS TABS ONLY APPEAR ONCE SOMETHING IS POSTED, AND THAT IS WHY THEY EXIST NOW.**
+Addendum 1 asked for them and it was declined at the time: the grid held RUNS, which carry no media, so
+Videos was a tab that could never have a member. Now the split is real. ⚠️ **Under Videos the run tiles
+go** — a run is not a video, and showing them there would be the app calling a route a film of itself.
+
+⚠️ **POSTS COUNTS WHAT WAS POSTED, NOT HOW MANY TIMES THE RUNNER RAN.** Before there was anything to
+post the run count was the only honest thing that number could be; now it would never match the grid
+beneath it.
+
+⚠️ **`.club-stage` IS THE THIRD SURFACE ALLOWED `touch-action: none`, AND THE VIEWER'S IS `pan-y`** so a
+post can still be scrolled past. ⚠️ `.club-tx` carries no `touch-action` of its own: it is computed from
+the element AND its ancestors, so a second declaration there is a second owner — and in the viewer it
+would silently kill the scroll wherever a word happens to lie.
+
+⚠️ **WHAT IS NOT BUILT IS NAMED, NOT OFFERED.** His reference's Create sheet carries Reel, Highlights and
+Live. The sheet says they are next in one sentence; a row that opens nothing is the
+looks-live-does-nothing class this project has shipped three times.
+
+### Four guards that could not fail, and the two traps that produced them
+
+⚠️ **A STRING EXISTING IS NOT SOMETHING READING IT — three of the four were this.** Neutering
+`if (n.dataset.cfilled) return` leaves the assignment two lines below, so a guard matching
+`dataset.cfilled` stayed green with the check dead; same for `cm-med-gone` (still in the `.catch`) and
+`CLUBURL[key]` (still in the assignment). All three now assert the **guard position**, not the mention.
+The fourth matched the first `if (txt)` — which guards the EDIT branch — so turning the ADD branch's
+`else if (txt)` into a bare `else` escaped it; it now slices to the `push` and checks what guards *that*.
+
+⚠️ **A COMPUTED ATTRIBUTE HAS NO LITERAL TO GREP.** `data-cnew="' + id + '"` means no literal
+`data-cnew="post"` exists anywhere, so the first version of that guard failed on correct code. It asserts
+the builder's call sites plus that the builder writes its first argument into the attribute — the same
+answer the share studio's destination sweep needed when `studioDestTile` started computing its
+`data-sst`.
+
+⚠️ **THE COMMENT-QUOTES-WHAT-IT-FORBIDS TRAP FIRED FOR AN EIGHTH TIME.** The code's note explaining why
+it is not a system dialog quotes the very call the guard forbids. `nocomment()` is the remedy this file
+already keeps for it.
+
+⚠️ **THE BACKTICK RULE FIRED, AND SO DID THE REGEX-ESCAPING RULE.** Two backticks in my own comments
+(the build failed outright, which is the good outcome), and `/^video\//` shipped as `/^video\/\//`'s
+opposite — the single backslash was swallowed by the template literal, so the file-type test matched
+nothing. Write `\\/`, not `\/`. Running total for backticks in this run of work: **11**.
+
+⚠️ **TWO INVENTED CSS TOKENS, CAUGHT BY THE TOKEN GUARD.** `--on-accent` (the real one is
+`--accent-ink`) and `--r-sm2` (the radius ladder is `--r-sm` / `card` / `ctl` / `pill` / `hero`). An
+undeclared custom property invalidates the whole declaration silently, which is what that guard exists
+for and it earned its keep on its own feature.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc
+clean apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1148 pass / 0
+fail under UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`** with `CHROME_PATH` set, both design
+ratchets unchanged (143 radii, 322 font sizes), `InteRun` **Release** for `generic/platform=iOS` building
+with 0 errors. Driven end to end in the served build: pick → frame → type → post → tile → viewer, with
+a real 22-second video trimmed and a story swept at 24 hours; `documentElement` and `body` horizontal
+overflow **0**.
+
+⚠️ **STILL TO COME, AND HIS OWN FRAMING OF IT:** *"This is going to be something that we build upon over
+time whereby they can edit their own videos from within the app and post it straight to the club, whilst
+also being able to export those videos for instagram or tiktok."* The trim being points rather than a
+re-encode is what leaves that door open — the original is intact. Reels, highlights and live are named
+on the Create sheet and not built.
+
 ## OPEN BUGS (confirmed on real hardware, 2026-07-29)
 
 ### 1. Coach audio when the phone is locked or pocketed — FIXED 2026-08-08, unproven on hardware

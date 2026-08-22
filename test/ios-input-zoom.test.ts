@@ -148,13 +148,27 @@ test("⚠️ double-tap cannot zoom the app, on any element", () => {
   // on the screen scrolls nothing. In browse mode it is pan-y — the browser keeps vertical, the carousel
   // takes horizontal — and the mode class claims both back for the photograph. A rule that took both
   // unconditionally would be the regression this line now catches.
+  // ⚠️ THE INTE-CLUB EDITOR IS THE THIRD, and for the same reason: a full-screen media stage the runner
+  // pans and pinches to frame what they are about to post. It is not a scroller — the caption field and
+  // the tool rail sit outside it — and the viewer's own stage is pan-y so a post can still be scrolled past.
   const nones = [...new Set([...style.matchAll(/([^\s{}]+) \{[^}]*touch-action: none/g)].map((m) => m[1]))];
-  assert.deepEqual(nones, [".crop-stage", ".sst-stage.sst-editing"],
-    "something other than the two framing stages disables touch entirely: " + nones.join(", "));
+  assert.deepEqual(nones, [".crop-stage", ".sst-stage.sst-editing", ".club-stage"],
+    "something other than the three framing stages disables touch entirely: " + nones.join(", "));
   assert.match(style, /\.sst-stage \{[^}]*touch-action: pan-y/,
     "the studio's stage no longer leaves vertical drags to the browser, so the panel cannot be scrolled from it");
-  assert.match(css, /closest\("\.crop-stage, \.sst-stage"\)/,
-    "a stage that sets touch-action: none is not exempted from the pinch suppressor, so pinching it zooms the page");
+  // ⚠️ DERIVED FROM THE none LIST, NOT A LITERAL. The previous version matched the suppressor's exact
+  // argument string, so it went stale the moment a third stage was added — it kept passing while the new
+  // stage was NOT exempted, which is the one thing it exists to catch. Now every selector that takes
+  // touch-action: none has to name its own base class in the suppressor.
+  // ⚠️ THE SUPPRESSOR'S OWN closest, FOUND BY ITS PREDICATE — not the first closest in 1.6 MB of page,
+  // which is somebody else's and made this check report the cropper as unexempted while it plainly is.
+  const suppressed = (/wanted = \(t\) =>[^\n]*closest\("([^"]+)"\)/.exec(css) || [])[1] || "";
+  assert.ok(suppressed, "the pinch suppressor's exemption list could not be found at all");
+  for (const sel of nones) {
+    const base = sel.split(".").filter(Boolean)[0];
+    assert.ok(suppressed.split(",").some((x) => x.trim() === "." + base),
+      "." + base + " disables touch but is not exempted from the pinch suppressor, so pinching it zooms the page");
+  }
 });
 
 test("⚠️ the native app locks zoom after every navigation, not just at launch", () => {

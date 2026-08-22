@@ -4586,6 +4586,140 @@ button.cm-tile:active { opacity: .65; }
   letter-spacing: -.02em; color: #fff; text-wrap: pretty; }
 .cm-sstats { display: block; margin-top: var(--s2); font-size: var(--t-meta); font-weight: 700;
   color: rgba(255,255,255,.78); }
+/* ══ INTE-CLUB: CREATING, PICKING AND EDITING ═══════════════════════════════════════════════════════
+   The editor is a full-screen surface over the app, so it owns the viewport the way the count-in and
+   the welcome overlay already do rather than living inside the pane that scrolls.
+   ⚠️ THE STAGE IS THE ONLY PLACE touch-action IS OFF, and it must be named in the document-wide
+   gesture suppressor too — otherwise a pinch there zooms the page, and pinch-to-zoom is deliberately
+   disabled app-wide so the runner could never get back. */
+.club-cr { display: flex; align-items: center; gap: var(--s3); width: 100%; min-height: var(--tap);
+  padding: var(--s3); margin-top: var(--s2); border: 1px solid var(--line); border-radius: var(--r-card);
+  background: var(--surface); color: var(--ink); text-align: left; }
+.club-cr:active { opacity: .65; }
+.club-cr-ic { flex: none; display: grid; place-items: center; width: 40px; height: 40px;
+  border-radius: var(--r-ctl); background: var(--surface-2); color: var(--accent); }
+.club-cr-ic svg { width: 22px; height: 22px; }
+.club-cr-b { flex: 1; min-width: 0; }
+.club-cr-t { display: block; font-size: var(--t-card); font-weight: 700; letter-spacing: -.01em; }
+.club-cr-d { display: block; margin-top: 1px; font-size: var(--t-meta); color: var(--ink-soft); }
+.club-ed, .club-view { position: fixed; inset: 0; z-index: 96; display: flex; flex-direction: column;
+  background: #04100d; }
+.club-stage { position: relative; flex: 1; min-height: 0; overflow: hidden; touch-action: none; }
+.club-stage-v { touch-action: pan-y; }
+.club-fit { position: absolute; inset: 0; }
+.club-med, .club-vmed > img, .club-vmed > video, .club-fit > .club-vmed { position: absolute; inset: 0;
+  width: 100%; height: 100%; object-fit: cover; display: block; }
+.club-vmed { position: absolute; inset: 0; }
+.club-txs { position: absolute; inset: 0; pointer-events: none; }
+.club-tx { position: absolute; transform: translate(-50%, -50%); max-width: 84%; padding: 2px 6px;
+  font-weight: 800; line-height: 1.15; text-align: center; text-wrap: balance;
+  /* ⚠️ NO touch-action OF ITS OWN. touch-action is computed from the element AND its ancestors, and the
+     stage this sits inside already takes none — so a second declaration here is a second owner of one
+     behaviour, and in the VIEWER (whose stage is pan-y so a post can be scrolled past) it would silently
+     kill the scroll wherever a word happens to lie. */
+  pointer-events: auto;
+  /* ⚠️ AN EDGE, NOT A PLATE. The share card's own answer: a keyline plus a soft halo, so a word reads
+     on a bright sky and a dark road alike without a grey box behind it. */
+  text-shadow: 0 0 1px rgba(2,10,8,.95), 0 1px 2px rgba(2,10,8,.7), 0 0 14px rgba(2,10,8,.45); }
+.club-tx.on { outline: 1.5px dashed rgba(255,255,255,.75); outline-offset: 3px; }
+.club-x { position: absolute; top: calc(var(--s3) + env(safe-area-inset-top, 0px)); left: var(--s3);
+  z-index: 3; display: grid; place-items: center; width: 38px; height: 38px; border: 0;
+  border-radius: 50%; background: rgba(4,16,13,.55); color: #fff; font-size: var(--t-card); }
+.club-rail { position: absolute; top: calc(var(--s3) + env(safe-area-inset-top, 0px));
+  right: var(--s3); z-index: 3; display: flex; flex-direction: column; gap: var(--s2); }
+.club-t { display: grid; place-items: center; width: 38px; height: 38px; border: 0; border-radius: 50%;
+  background: rgba(4,16,13,.55); color: #fff; font-size: var(--t-card); font-weight: 800; }
+.club-t svg { width: 20px; height: 20px; }
+.club-t.danger { color: var(--rest); }
+/* ⚠️ THE TEXT SURFACE SITS ABOVE THE EDITOR AND ABOVE THE KEYBOARD. --kbh is the app's own published
+   keyboard height, so the tools ride up with it rather than being covered by it — which is the one
+   thing this app's keyboard design says must move. */
+/* ⚠️ .48, NOT .82, AND NO BLUR. Measured on a real photograph at .82 with a 6px blur the picture was
+   effectively black — so the runner was typing onto a dark rectangle, which is exactly what typing on
+   the media instead of in a dialog was meant to stop. The dim exists to make white type legible while
+   the keyboard is up, not to hide the picture the words are being placed on. */
+.club-txed { position: fixed; inset: 0; z-index: 98; display: flex; flex-direction: column;
+  background: rgba(4,16,13,.48); }
+.club-txed-top { display: flex; justify-content: flex-end;
+  padding: calc(var(--s3) + env(safe-area-inset-top, 0px)) var(--s3) 0; }
+.club-txed-done { min-height: var(--tap); padding: 0 var(--s4); border: 0; border-radius: var(--r-ctl);
+  background: var(--accent); color: var(--accent-ink); font-size: var(--t-card); font-weight: 700; }
+.club-txed-mid { flex: 1; min-height: 0; display: grid; place-items: center; padding: var(--s3); }
+.club-txed-in { width: 100%; max-width: 20em; border: 0; background: none; text-align: center;
+  font-weight: 800; line-height: 1.15; resize: none;
+  text-shadow: 0 0 1px rgba(2,10,8,.95), 0 1px 2px rgba(2,10,8,.7), 0 0 14px rgba(2,10,8,.45); }
+.club-txed-in::placeholder { color: rgba(255,255,255,.5); }
+.club-txed-in:focus { outline: none; }
+.club-txed-tools { padding: var(--s3); padding-bottom: calc(var(--s3) + var(--kbh, 0px) + env(safe-area-inset-bottom, 0px)); }
+.club-fps { display: flex; gap: var(--s2); overflow-x: auto; padding-bottom: var(--s2); }
+.club-fp { flex: none; min-height: var(--tap); padding: 0 var(--s3); border: 1px solid rgba(255,255,255,.3);
+  border-radius: var(--r-pill); background: rgba(4,16,13,.5); color: #fff; font-size: var(--t-body);
+  font-weight: 700; }
+.club-fp.on { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.club-cds { display: flex; gap: var(--s2); margin-top: var(--s2); }
+.club-cd { position: relative; width: 30px; height: 30px; border: 2px solid rgba(255,255,255,.5);
+  border-radius: 50%; }
+.club-cd.on { border-color: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,.35); }
+.club-cd::after { content: ""; position: absolute; inset: -7px; border-radius: 50%; }
+.club-sz { display: flex; align-items: center; gap: var(--s3); margin-top: var(--s3); color: #fff;
+  font-size: var(--t-label); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.club-sz input { flex: 1; accent-color: var(--accent); }
+.club-trim { position: absolute; left: var(--s3); right: var(--s3); bottom: 118px; z-index: 3;
+  padding: var(--s2) var(--s3); border-radius: var(--r-card); background: rgba(4,16,13,.62);
+  color: #fff; text-align: center; }
+.club-trim-l, .club-trim-w { display: block; font-size: var(--t-label); font-weight: 650;
+  color: rgba(255,255,255,.8); }
+.club-trim-t { display: block; margin-top: 2px; font-size: var(--t-meta); font-weight: 700; }
+.club-trim input[type=range] { width: 100%; margin-top: var(--s2); accent-color: var(--accent); }
+.club-foot, .club-vfoot { position: relative; z-index: 3; display: flex; gap: var(--s2);
+  padding: var(--s3); padding-bottom: calc(var(--s3) + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, transparent, rgba(4,16,13,.9) 40%); }
+.club-foot { flex-direction: column; }
+/* ⚠️ 17px, NOT 16 — on the type ladder AND above the iOS auto-zoom floor. Below 16 the phone zooms in
+   on focus and pinch is off, so the runner can never zoom back out. */
+.club-cap { width: 100%; min-height: var(--tap); padding: 0 var(--s3); border: 1px solid rgba(255,255,255,.28);
+  border-radius: var(--r-ctl); background: rgba(4,16,13,.6); color: #fff; font-size: var(--t-card); }
+.club-cap::placeholder { color: rgba(255,255,255,.6); }
+.club-send { min-height: var(--tap); border: 0; border-radius: var(--r-ctl); background: var(--accent);
+  color: var(--accent-ink); font-size: var(--t-card); font-weight: 700; }
+.club-send:disabled { opacity: .6; }
+.club-vcap { position: relative; z-index: 3; padding: var(--s3) var(--s3) 0; color: #fff;
+  font-size: var(--t-body); text-wrap: pretty; }
+.club-vfoot .ui-btn { flex: 1; border-color: rgba(255,255,255,.3); background: rgba(4,16,13,.6);
+  color: #fff; }
+/* The avatar's little plus, and the rail's add ring. */
+.cm-avwrap { position: relative; flex: none; }
+.cm-avplus { position: absolute; right: -2px; bottom: -2px; display: grid; place-items: center;
+  width: 26px; height: 26px; border: 2px solid var(--bg); border-radius: 50%; background: var(--accent);
+  color: var(--accent-ink); }
+.cm-avplus svg { width: 14px; height: 14px; }
+/* ⚠️ THE HIT AREA GROWS, NOT THE BOX — the badge is 26px by design and every tappable thing in this app
+   reaches 44. Growing the box would push it over the avatar it sits on. */
+.cm-avplus::after { content: ""; position: absolute; inset: -9px; border-radius: 50%; }
+.cm-rail-add { display: grid; place-items: center; border-style: dashed; color: var(--accent); }
+.cm-rail-add svg { width: 22px; height: 22px; }
+/* All / Videos. */
+.cm-mts { display: grid; grid-template-columns: 1fr 1fr; margin: var(--s4) calc(-1 * var(--s3)) 0;
+  border-top: 1px solid var(--line); }
+.cm-mt { display: flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: var(--tap); border: 0; border-bottom: 2px solid transparent; background: none;
+  color: var(--ink-faint); font-size: var(--t-label); font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; }
+.cm-mt svg { width: 17px; height: 17px; }
+.cm-mt.on { color: var(--ink); border-bottom-color: var(--accent); }
+/* A posted tile: the media fills it, the marker and the caption sit over it. */
+.cm-tile-m { position: relative; overflow: hidden; background: var(--surface-2); }
+.cm-t-med { position: absolute; inset: 0; }
+.cm-t-med > img, .cm-t-med > video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cm-med-gone { background: repeating-linear-gradient(135deg, var(--surface-2) 0 8px, var(--surface) 8px 16px); }
+.cm-t-clip { position: absolute; top: 6px; right: 6px; display: grid; place-items: center;
+  width: 22px; height: 22px; border-radius: var(--r-ctl); background: rgba(4,16,13,.55); color: #fff; }
+.cm-t-clip svg { width: 14px; height: 14px; }
+.cm-t-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 6px 5px;
+  background: linear-gradient(180deg, transparent, rgba(4,16,13,.8)); color: #fff;
+  font-size: var(--t-label); font-weight: 650; text-align: left; overflow: hidden;
+  white-space: nowrap; text-overflow: ellipsis; }
+
 </style>
 </head>
 <body>
@@ -4616,6 +4750,7 @@ button.cm-tile:active { opacity: .65; }
     </div>
     <div class="title" id="topTitle">Today</div>
     <div class="tb-right">
+      <button class="iconbtn" id="clubNewBtn" title="Create" aria-label="Create a post or a story"></button>
       <button class="iconbtn" id="alfieBtn" title="Ask Alfie" aria-label="Ask Alfie"></button>
       <button class="iconbtn" id="calBtn" title="Training calendar" aria-label="Training calendar"></button>
       <button class="iconbtn" id="themeBtn" title="Theme" aria-label="Toggle theme"></button>
@@ -4650,6 +4785,15 @@ const EX_STILL = ${JSON.stringify(exStillData)};
 const ASM_FRAMES = ${JSON.stringify(stretchFrameData)};
 const ICON = {
   chevDown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+  // ⚠️ A PLUS IN A ROUNDED SQUARE, not a bare cross: the club's create control sits in a row of stroked
+  // glyphs and a bare cross reads as a close button, which is the one thing it must never be mistaken for.
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.4" y="3.4" width="17.2" height="17.2" rx="5"/><path d="M12 8.4v7.2M8.4 12h7.2"/></svg>',
+  // The little plus on the avatar, filled so it reads at 18px against a photograph.
+  plusDot: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 6.5v11M6.5 12h11"/></svg>',
+  // A play triangle in a rounded rectangle — the Videos tab, and the marker on a video tile.
+  clip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2.6" y="5.4" width="18.8" height="13.2" rx="3.2"/><path d="M10.4 9.6l4.8 2.8-4.8 2.8z"/></svg>',
+  // A four-square grid — the All tab.
+  grid4: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3.4" y="3.4" width="7.6" height="7.6" rx="1.7"/><rect x="13" y="3.4" width="7.6" height="7.6" rx="1.7"/><rect x="3.4" y="13" width="7.6" height="7.6" rx="1.7"/><rect x="13" y="13" width="7.6" height="7.6" rx="1.7"/></svg>',
   // Run-type marks for the "Build your own run" grid. Simple strokes at the set's own weight — a
   // runner glancing at a colour and a shape should know which card is which without reading.
   rEasy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="15.5" cy="4.6" r="1.9"/><path d="M13 9.2 9.6 11l1.9 3.1L9 21"/><path d="m13 9.2 3.4 1.5 2.3 3.4"/><path d="M11.5 14.1 6.6 15"/></svg>',
@@ -10725,6 +10869,696 @@ function viewPerformance() {
 
 // ============ COMMUNITY ====================================================
 
+
+/* ══ INTE-CLUB: MEDIA ══════════════════════════════════════════════════════════════════════════════
+ * The owner, 2026-08-22: a runner presses the plus and adds a post or a story, from their own camera
+ * roll, with adjustments before it goes up — and "This is going to be something that we build upon
+ * over time whereby they can edit their own videos from within the app and post it straight to the
+ * club, whilst also being able to export those videos for instagram or tiktok".
+ *
+ * ⚠️ THE PICKER IS A FILE INPUT, AND THAT IS NOT A COMPROMISE — IT IS THE iOS PICKER. A WKWebView hands
+ * a file input accepting images and video straight to the system sheet: Photo Library, Take Photo
+ * or Browse. Nothing native is needed to reach the camera roll, which is why this ships today rather
+ * than waiting for Swift. The two purpose strings it needs — camera and photo library — are already in
+ * ios/InteRun-Info.plist, added when the share card's Take Photo crash was fixed.
+ *
+ * ⚠️ THE BYTES GO IN INDEXEDDB AND NEVER IN localStorage. A single phone video is tens of megabytes and
+ * localStorage is where the entire training history lives — the route-map cache is in IndexedDB for
+ * exactly this reason, and its own note says why: 64 KB x 50 runs would blow the quota and take the
+ * runner's runs with it. A post therefore stores an ID, and the blob lives beside the map cache.
+ * ⚠️ AND FOR THE SAME REASON IT IS NOT IN THE BACKUP. dataView discovers backup keys by the interun_
+ * prefix in localStorage, so media is excluded by construction — an export should carry the training,
+ * not a gigabyte of video.
+ */
+const CLUBDB = "interun_club_media_v1", CLUBSTORE = "media";
+function clubDbOpen() {
+  return new Promise((resolve) => {
+    try {
+      if (!window.indexedDB) return resolve(null);
+      const rq = indexedDB.open(CLUBDB, 1);
+      rq.onupgradeneeded = () => {
+        const db = rq.result;
+        if (!db.objectStoreNames.contains(CLUBSTORE)) db.createObjectStore(CLUBSTORE, { keyPath: "k" });
+      };
+      rq.onsuccess = () => resolve(rq.result);
+      rq.onerror = () => resolve(null);
+    } catch (e) { resolve(null); }
+  });
+}
+function clubMediaPut(key, blob, meta) {
+  return clubDbOpen().then((db) => new Promise((resolve) => {
+    if (!db) return resolve(false);
+    try {
+      const tx = db.transaction(CLUBSTORE, "readwrite");
+      tx.objectStore(CLUBSTORE).put({ k: key, blob: blob, type: blob.type,
+        w: (meta && meta.w) || 0, h: (meta && meta.h) || 0, at: Date.now() });
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    } catch (e) { resolve(false); }
+  }));
+}
+function clubMediaGet(key) {
+  return clubDbOpen().then((db) => new Promise((resolve) => {
+    if (!db) return resolve(null);
+    try {
+      const rq = db.transaction(CLUBSTORE, "readonly").objectStore(CLUBSTORE).get(key);
+      rq.onsuccess = () => resolve(rq.result || null);
+      rq.onerror = () => resolve(null);
+    } catch (e) { resolve(null); }
+  }));
+}
+function clubMediaDel(key) {
+  return clubDbOpen().then((db) => new Promise((resolve) => {
+    if (!db) return resolve(false);
+    try {
+      const tx = db.transaction(CLUBSTORE, "readwrite");
+      tx.objectStore(CLUBSTORE).delete(key);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    } catch (e) { resolve(false); }
+  }));
+}
+/**
+ * ⚠️ ONE OBJECT URL PER MEDIA, HELD AND REVOKED. Creating one per render leaks a blob URL every time
+ * the grid redraws — and a grid of videos leaks tens of megabytes of retained blobs, which is the class
+ * of fault that gets a web view jetsammed with nothing in the console. Handed out from a cache, and the
+ * whole lot released when the screen goes.
+ */
+const CLUBURL = {};
+function clubUrl(key) {
+  if (CLUBURL[key]) return Promise.resolve(CLUBURL[key]);
+  return clubMediaGet(key).then((r) => {
+    if (!r || !r.blob) return "";
+    try { CLUBURL[key] = URL.createObjectURL(r.blob); } catch (e) { return ""; }
+    return CLUBURL[key];
+  });
+}
+function clubUrlsRelease() {
+  for (const k of Object.keys(CLUBURL)) { try { URL.revokeObjectURL(CLUBURL[k]); } catch (e) {} delete CLUBURL[k]; }
+}
+
+/* ── The club's own posts and stories ─────────────────────────────────────────────────────────────
+ * ⚠️ METADATA IN localStorage, BYTES IN INDEXEDDB, AND THE TWO CAN GO OUT OF STEP. A post whose blob
+ * has been evicted — a cleared cache, private browsing, a quota refusal — must render as a post that
+ * has lost its picture rather than as a blank tile or a crash, so every reader treats a missing blob as
+ * a normal case. Same rule as a run whose full record has aged out of the fifty.
+ * ⚠️ A STORY EXPIRES AFTER 24 HOURS, which is what a story is. Kept in the store until then and swept
+ * on read, so nothing has to run on a timer.
+ */
+const CLUB_KEY = "interun_club_v1";
+const CLUB_STORY_MS = 24 * 60 * 60 * 1000;
+function clubLoad() {
+  try { const a = JSON.parse(localStorage.getItem(CLUB_KEY) || "[]"); return Array.isArray(a) ? a : []; }
+  catch (e) { return []; }
+}
+function clubSave(rows) { try { localStorage.setItem(CLUB_KEY, JSON.stringify(rows.slice(0, 400))); } catch (e) {} }
+/** Posts, newest first. */
+function clubPosts() { return clubLoad().filter((p) => p && p.kind === "post"); }
+/**
+ * Live stories, newest first — and the expired ones are deleted here, media and all.
+ * ⚠️ THE BLOB GOES WITH THE ROW. Sweeping the metadata and leaving the bytes would fill IndexedDB with
+ * video nothing can reach, which is the worst kind of leak: invisible and permanent.
+ */
+function clubStories() {
+  const now = Date.now();
+  const rows = clubLoad();
+  const live = rows.filter((p) => p && p.kind === "story" && (now - (p.at || 0)) < CLUB_STORY_MS);
+  const dead = rows.filter((p) => p && p.kind === "story" && (now - (p.at || 0)) >= CLUB_STORY_MS);
+  if (dead.length) {
+    dead.forEach((p) => { if (p.media) clubMediaDel(p.media); });
+    clubSave(rows.filter((p) => dead.indexOf(p) < 0));
+  }
+  return live;
+}
+/** ⚠️ THE MEDIA IS DELETED WITH THE POST, for the same reason the story sweep does it. */
+function clubDelete(id) {
+  const rows = clubLoad();
+  const p = rows.filter((x) => x && x.id === id)[0];
+  if (p && p.media) clubMediaDel(p.media);
+  clubSave(rows.filter((x) => x && x.id !== id));
+}
+
+
+/* ══ INTE-CLUB: PICKING AND EDITING ════════════════════════════════════════════════════════════════
+ * The + at the top of the club opens Create; Post and Story both go camera roll → editor → posted. The
+ * little + on the profile picture skips Create and goes straight to the camera roll for a story, which
+ * is what the owner's fourth screenshot shows.
+ *
+ * ⚠️ VIDEO IS CAPPED AT FIFTEEN SECONDS FOR A STORY — his instruction — AND THE CAP IS A TRIM, NOT A
+ * REFUSAL. Rejecting a 40-second clip would send the runner back to the Photos app to cut it; the editor
+ * gives them a window they can slide instead, which is the same answer Instagram gives and the reason
+ * the trim handles exist at all.
+ * ⚠️ AND THE TRIM IS STORED AS IN AND OUT POINTS, NOT RE-ENCODED. Re-encoding video in a web view means
+ * decoding every frame to a canvas and recording it back, which on a phone is slow, lossy and drops
+ * audio. The clip is stored whole with the window beside it, so playback and a future export both cut
+ * from the original — nothing is thrown away and nothing is degraded.
+ */
+const CLUB_STORY_MAX_S = 15;
+/**
+ * THE CAMERA ROLL.
+ * ⚠️ THE INPUT IS CREATED, CLICKED AND DROPPED — never left in the DOM. A file input that persists is
+ * one a later render can re-trigger, and on iOS a stale one silently stops opening the sheet at all.
+ * ⚠️ NO capture ATTRIBUTE. With it, iOS goes straight to the camera and the runner cannot reach the
+ * roll at all; without it they get the sheet with Photo Library, Take Photo and Browse, which is what
+ * was asked for.
+ */
+function clubPick(kind) {
+  const inp = document.createElement("input");
+  inp.type = "file";
+  inp.accept = "image/*,video/*";
+  inp.style.position = "fixed"; inp.style.left = "-9999px";
+  document.body.appendChild(inp);
+  inp.onchange = () => {
+    const f = inp.files && inp.files[0];
+    try { inp.remove(); } catch (e) {}
+    if (f) openClubEditor(kind, f);
+  };
+  inp.click();
+}
+/** Create — the sheet the plus opens. ⚠️ ONLY WHAT THIS APP CAN ACTUALLY DO APPEARS, and what is coming
+ *  is named rather than offered as a dead row: the owner's reference has Reel, Highlights and Live, and
+ *  a row that opens nothing is the defect this project has shipped three times. */
+function clubCreateHtml() {
+  const row = (id, ic, t, d) => '<button class="club-cr" data-cnew="' + id + '">' +
+    '<span class="club-cr-ic">' + ic + '</span>' +
+    '<span class="club-cr-b"><span class="club-cr-t">' + t + '</span>' +
+    '<span class="club-cr-d">' + d + '</span></span><span class="arr">›</span></button>';
+  return '<h2 class="cm-sh">Create</h2>' +
+    '<p class="cm-sub">A photo or a video from your camera roll, with your own words on it.</p>' +
+    row("post", ICON.rEasy, "Post", "Goes on your grid and stays there.") +
+    row("story", ICON.flame, "Story", "Up for 24 hours. Video is trimmed to " + CLUB_STORY_MAX_S + " seconds.") +
+    '<p class="cm-sub" style="margin-top:var(--s3)">Reels, highlights and going live are next — ' +
+    'they are not here yet, so they are not offered.</p>';
+}
+/**
+ * THE EDITOR.
+ *
+ * ⚠️ THE MEDIA IS BEHIND EVERYTHING AND THE CONTROLS FLOAT OVER IT, which is what the owner's recording
+ * shows: full-bleed picture, a rail of tools down the right, the caption at the bottom, and one send.
+ * ⚠️ PAN AND ZOOM ARE THE SHARE STUDIO'S OWN GESTURE MODEL, deliberately — one finger moves, two pinch,
+ * and the framing is a fraction of the box so it clamps by construction. That code already learned that
+ * a slack axis must be centred or the drag inverts, and re-deriving it here would be a second copy.
+ * ⚠️ AND touch-action: none IS ON THE STAGE ONLY WHILE EDITING. The document-wide gesture suppressor
+ * this app installs kills pinch everywhere, so the stage has to be named in it — exactly as the avatar
+ * cropper and the share studio's stage already are.
+ */
+let CLUBED = null;
+function openClubEditor(kind, file) {
+  const isVid = /^video\\//.test(file.type || "");
+  const url = URL.createObjectURL(file);
+  CLUBED = { kind: kind, file: file, url: url, isVid: isVid,
+    ox: 0.5, oy: 0.5, k: 1, texts: [], caption: "", inS: 0, outS: 0, dur: 0, sel: -1 };
+  const ov = el('<div class="club-ed" id="clubEd"></div>');
+  document.body.appendChild(ov);
+  clubEdDraw();
+}
+function clubEdClose() {
+  if (CLUBED) { try { URL.revokeObjectURL(CLUBED.url); } catch (e) {} }
+  CLUBED = null;
+  const e = $("clubEd"); if (e) e.remove();
+  // ⚠️ THE TEXT SURFACE IS A SIBLING OF THE EDITOR, NOT A CHILD — it has to sit above the keyboard, and
+  // the editor's own stage is the thing being typed over. So closing the editor has to remove it too, or
+  // a half-typed word is left floating over the club with nothing behind it.
+  const t = $("clubTxEd"); if (t) t.remove();
+}
+function clubEdDraw() {
+  const S = CLUBED; if (!S) return;
+  const ov = $("clubEd"); if (!ov) return;
+  const media = S.isVid
+    ? '<video class="club-med" id="clubMed" src="' + S.url + '" playsinline muted loop autoplay></video>'
+    : '<img class="club-med" id="clubMed" src="' + S.url + '" alt="">';
+  const texts = S.texts.map((t, i) =>
+    '<span class="club-tx' + (i === S.sel ? " on" : "") + '" data-ctx="' + i + '" style="left:' +
+    (t.x * 100) + '%; top:' + (t.y * 100) + '%; color:' + t.colour + '; font-family:' + t.font +
+    '; font-size:' + t.size + 'px">' + esc(t.text) + '</span>').join("");
+  ov.innerHTML =
+    '<div class="club-stage" id="clubStage">' +
+      '<div class="club-fit" id="clubFit">' + media + '</div>' +
+      '<div class="club-txs" id="clubTxs">' + texts + '</div>' +
+    '</div>' +
+    '<button class="club-x" id="clubX" aria-label="Close">✕</button>' +
+    '<div class="club-rail">' +
+      '<button class="club-t" id="clubAddTx" aria-label="Add text">Aa</button>' +
+      (S.sel >= 0 ? '<button class="club-t danger" id="clubDelTx" aria-label="Delete the selected text">' +
+        ICON.trash + '</button>' : "") +
+    '</div>' +
+    (S.isVid ? clubTrimHtml(S) : "") +
+    '<div class="club-foot">' +
+      '<input class="club-cap" id="clubCap" placeholder="Add a caption…" value="' + esc(S.caption) + '">' +
+      '<button class="club-send" id="clubSend">' +
+        (S.kind === "story" ? "Add to your story" : "Post to the club") + '</button>' +
+    '</div>';
+  wireClubEd();
+}
+/**
+ * THE TRIM, FOR VIDEO.
+ * ⚠️ A STORY'S WINDOW IS FIFTEEN SECONDS WIDE AND SLIDES; A POST'S IS THE WHOLE CLIP. The cap is the
+ * owner's, and applying it to a post as well would be a rule he did not ask for.
+ */
+function clubTrimHtml(S) {
+  const cap = S.kind === "story" ? CLUB_STORY_MAX_S : 0;
+  const dur = S.dur || 0;
+  if (!dur) return '<div class="club-trim" id="clubTrim"><span class="club-trim-w">Reading the clip…</span></div>';
+  if (cap && dur > cap) {
+    const maxIn = Math.max(0, dur - cap);
+    return '<div class="club-trim" id="clubTrim">' +
+      '<span class="club-trim-l">Story clips are ' + cap + ' seconds. Slide to choose which ' + cap + '.</span>' +
+      '<input type="range" id="clubIn" min="0" max="' + maxIn.toFixed(2) + '" step="0.1" value="' +
+        S.inS.toFixed(2) + '">' +
+      '<span class="club-trim-t num">' + clubClock(S.inS) + ' – ' + clubClock(S.inS + cap) + '</span>' +
+    '</div>';
+  }
+  return '<div class="club-trim" id="clubTrim">' +
+    '<span class="club-trim-t num">' + clubClock(dur) + '</span></div>';
+}
+/** ⚠️ clubClock, NOT fmtClock — THAT NAME WAS ALREADY TAKEN AND THE COLLISION WAS SILENT. The live
+ *  run's clubClock(ms) takes MILLISECONDS and prints tenths; this takes SECONDS. Function declarations
+ *  hoist, so the later one won for the whole script and every trim label read "0:00.0 – 0:00.0" — a
+ *  fifteen-second window rendered as fifteen milliseconds. The build, node --check and 1132 tests all
+ *  passed. test/community.test.ts now fails on ANY name declared twice in the app script. */
+function clubClock(s) {
+  s = Math.max(0, Math.round(Number(s) || 0));
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+const CLUB_FONTS = ["var(--sans-stack)", "Georgia, serif", "ui-monospace, monospace"];
+// ⚠️ THE LABEL NAMES THE LOOK, NOT THE FAMILY. "Georgia" tells a runner nothing; "Serif" tells them what
+// they are about to get. The reference's own pills read Typewriter / Pop / Jump for the same reason.
+const CLUB_FONT_LABELS = ["Clean", "Serif", "Typewriter"];
+const CLUB_COLOURS = ["#ffffff", "#ff3b30", "#ffd60a", "var(--accent)", "#0a0a0a"];
+
+/**
+ * WIRING THE EDITOR.
+ *
+ * ⚠️ THE VIDEO'S DURATION IS READ FROM THE ELEMENT, NOT GUESSED, AND THE TRIM CANNOT BE DRAWN UNTIL IT
+ * ARRIVES. A file input hands over bytes and no metadata at all, so a trim rail rendered before
+ * loadedmetadata would be a slider with no range — which is the measure-a-sheet-before-it-is-shown trap
+ * in a new place: it reads zero and a fallback constant then poisons everything downstream.
+ */
+function wireClubEd() {
+  const S = CLUBED; if (!S) return;
+  const stage = $("clubStage"), med = $("clubMed");
+  const x = $("clubX"); if (x) x.onclick = () => { haptic("light"); clubEdClose(); };
+  if (med && S.isVid) {
+    med.onloadedmetadata = () => {
+      const d = Number(med.duration) || 0;
+      if (!d || !isFinite(d)) return;
+      S.dur = d;
+      const cap = S.kind === "story" ? CLUB_STORY_MAX_S : 0;
+      S.inS = 0; S.outS = cap ? Math.min(d, cap) : d;
+      const t = $("clubTrim");
+      if (t) { t.outerHTML = clubTrimHtml(S); wireClubTrim(); }
+      clubVidLoop();
+    };
+    med.onerror = () => { toast("That video could not be read."); };
+  }
+  clubEdFit();
+  if (stage) clubEdGestures(stage);
+  const add = $("clubAddTx");
+  // ⚠️ NOT prompt(). A system dialog takes the runner off their own picture to type into a grey box that
+  // cannot show them the typeface, the colour or the size they are choosing — and on iOS it is a modal
+  // the app does not control. The text is typed ON the media, in the face it will be posted in.
+  if (add) add.onclick = () => clubTextOpen(-1);
+  const del = $("clubDelTx");
+  if (del) del.onclick = () => { S.texts.splice(S.sel, 1); S.sel = -1; haptic("light"); clubEdDraw(); };
+  const txs = $("clubTxs");
+  if (txs) txs.querySelectorAll("[data-ctx]").forEach((n) => {
+    n.onpointerdown = (ev) => clubTextDrag(ev, Number(n.getAttribute("data-ctx")));
+    // ⚠️ A TAP EDITS; A DRAG MOVES. clubTextDrag tells them apart by whether the finger travelled, so
+    // one gesture is not made to mean two things — a word the runner meant to nudge does not reopen the
+    // keyboard, and a word they meant to fix does not need a second control to reach.
+  });
+  const cap = $("clubCap");
+  if (cap) cap.oninput = () => { S.caption = cap.value; };
+  const send = $("clubSend");
+  if (send) send.onclick = () => clubEdPost();
+  wireClubTrim();
+}
+function wireClubTrim() {
+  const S = CLUBED; if (!S) return;
+  const inp = $("clubIn"); if (!inp) return;
+  inp.oninput = () => {
+    S.inS = Number(inp.value) || 0;
+    S.outS = S.inS + CLUB_STORY_MAX_S;
+    const lbl = $("clubTrim");
+    if (lbl) { const t = lbl.querySelector(".club-trim-t"); if (t) t.textContent = clubClock(S.inS) + " – " + clubClock(S.outS); }
+    clubVidSeek();
+  };
+}
+/** ⚠️ PREVIEW THE WINDOW, NOT THE WHOLE CLIP — a story preview that plays the forty seconds the runner
+ *  just trimmed away is a preview of something they are not posting. */
+function clubVidSeek() {
+  const S = CLUBED, med = $("clubMed"); if (!S || !med || !S.isVid) return;
+  try { med.currentTime = S.inS; med.play(); } catch (e) {}
+}
+function clubVidLoop() {
+  const S = CLUBED, med = $("clubMed"); if (!S || !med || !S.isVid) return;
+  med.ontimeupdate = () => {
+    if (!CLUBED) return;
+    if (S.outS > S.inS && med.currentTime >= S.outS - 0.05) clubVidSeek();
+  };
+  clubVidSeek();
+}
+/**
+ * PAN AND ZOOM.
+ * ⚠️ THE FRAMING IS A FRACTION OF THE BOX AND CLAMPED TO IT, so the media can never be dragged off the
+ * stage — the share studio's own model, where a slack axis is centred rather than panned because the
+ * same finger movement otherwise pushes the picture opposite ways in the two fit modes.
+ */
+function clubEdGestures(stage) {
+  let drag = null, pinch = null;
+  const pts = new Map();
+  stage.onpointerdown = (ev) => {
+    if (ev.target && ev.target.closest && ev.target.closest("[data-ctx]")) return;
+    pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    try { stage.setPointerCapture(ev.pointerId); } catch (e) {}
+    if (pts.size === 1) drag = { x: ev.clientX, y: ev.clientY, ox: CLUBED.ox, oy: CLUBED.oy };
+    if (pts.size === 2) {
+      const a = [...pts.values()];
+      pinch = { d: Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) || 1, k: CLUBED.k };
+      drag = null;
+    }
+  };
+  stage.onpointermove = (ev) => {
+    if (!CLUBED || !pts.has(ev.pointerId)) return;
+    pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    const box = stage.getBoundingClientRect();
+    if (pinch && pts.size >= 2) {
+      const a = [...pts.values()];
+      const d = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) || 1;
+      CLUBED.k = Math.max(1, Math.min(4, pinch.k * (d / pinch.d)));
+    } else if (drag) {
+      CLUBED.ox = drag.ox - (ev.clientX - drag.x) / Math.max(1, box.width);
+      CLUBED.oy = drag.oy - (ev.clientY - drag.y) / Math.max(1, box.height);
+    }
+    clubEdFit();
+  };
+  const up = (ev) => { pts.delete(ev.pointerId); if (pts.size < 2) pinch = null; if (!pts.size) drag = null; };
+  stage.onpointerup = up; stage.onpointercancel = up;
+}
+/** ⚠️ ONE PLACE APPLIES THE FRAMING, so the clamp cannot be written twice and disagree — the preview and
+ *  the stored crop are the same numbers. */
+function clubEdFit() {
+  const S = CLUBED; if (!S) return;
+  const fit = $("clubFit"); if (!fit) return;
+  const half = (1 - 1 / S.k) / 2;
+  S.ox = Math.max(0.5 - half, Math.min(0.5 + half, S.ox));
+  S.oy = Math.max(0.5 - half, Math.min(0.5 + half, S.oy));
+  fit.style.transform = "scale(" + S.k.toFixed(3) + ")";
+  fit.style.transformOrigin = (S.ox * 100).toFixed(2) + "% " + (S.oy * 100).toFixed(2) + "%";
+}
+function clubTextDrag(ev, i) {
+  const S = CLUBED; if (!S) return;
+  const t = S.texts[i]; if (!t) return;
+  S.sel = i;
+  const stage = $("clubStage"); if (!stage) return;
+  const box = stage.getBoundingClientRect();
+  const start = { x: ev.clientX, y: ev.clientY, tx: t.x, ty: t.y };
+  const node = ev.currentTarget;
+  ev.preventDefault();
+  try { node.setPointerCapture(ev.pointerId); } catch (e) {}
+  node.onpointermove = (m) => {
+    t.x = Math.max(0.06, Math.min(0.94, start.tx + (m.clientX - start.x) / Math.max(1, box.width)));
+    t.y = Math.max(0.08, Math.min(0.9, start.ty + (m.clientY - start.y) / Math.max(1, box.height)));
+    node.style.left = (t.x * 100) + "%"; node.style.top = (t.y * 100) + "%";
+  };
+  let moved = false;
+  const wrapped = node.onpointermove;
+  node.onpointermove = (m) => {
+    if (Math.abs(m.clientX - start.x) > 4 || Math.abs(m.clientY - start.y) > 4) moved = true;
+    wrapped(m);
+  };
+  const end = () => {
+    node.onpointermove = null;
+    if (!moved) { clubTextOpen(i); return; }
+    clubEdDraw();
+  };
+  node.onpointerup = end; node.onpointercancel = end;
+}
+/**
+ * TYPING ON THE PICTURE.
+ *
+ * ⚠️ THE FONT AND COLOUR CONTROLS LIVE IN THIS STATE, NOT IN THE RAIL, and that is the fix for a real
+ * defect in the first cut: rail buttons that changed the SELECTED word did nothing at all when nothing
+ * was selected, so two of the three tools were inert most of the time and had to answer with a toast
+ * explaining themselves. Here they are always acting on the word being typed.
+ * ⚠️ AND THE PILLS SHOW EACH FACE IN ITSELF. A row reading "Typewriter / Pop / Jump" in one typeface is
+ * three labels; set in their own faces it is a choice you can see before you make it.
+ */
+function clubTextOpen(i) {
+  const S = CLUBED; if (!S) return;
+  const fresh = i < 0;
+  S.draft = fresh
+    ? { text: "", x: 0.5, y: 0.42, colour: CLUB_COLOURS[0], font: CLUB_FONTS[0], size: 34 }
+    : Object.assign({}, S.texts[i]);
+  S.draftAt = fresh ? -1 : i;
+  clubTextDraw();
+}
+function clubTextDraw() {
+  const S = CLUBED; if (!S || !S.draft) return;
+  const d = S.draft;
+  let ov = $("clubTxEd");
+  if (!ov) { ov = el('<div class="club-txed" id="clubTxEd"></div>'); document.body.appendChild(ov); }
+  const pill = (f, lab) => '<button class="club-fp' + (d.font === f ? " on" : "") +
+    '" data-cfont="' + f + '" style="font-family:' + f + '">' + lab + '</button>';
+  const dot = (c) => '<button class="club-cd' + (d.colour === c ? " on" : "") + '" data-ccol="' + c +
+    '" style="background:' + c + '" aria-label="Colour"></button>';
+  ov.innerHTML =
+    '<div class="club-txed-top">' +
+      '<button class="club-txed-done" id="clubTxDone">Done</button>' +
+    '</div>' +
+    '<div class="club-txed-mid">' +
+      '<textarea class="club-txed-in" id="clubTxIn" rows="2" placeholder="Type something" ' +
+        'style="color:' + d.colour + '; font-family:' + d.font + '">' + esc(d.text) + '</textarea>' +
+    '</div>' +
+    '<div class="club-txed-tools">' +
+      '<div class="club-fps">' + CLUB_FONT_LABELS.map((l, n) => pill(CLUB_FONTS[n], l)).join("") + '</div>' +
+      '<div class="club-cds">' + CLUB_COLOURS.map(dot).join("") + '</div>' +
+      '<label class="club-sz"><span>Size</span>' +
+        '<input type="range" id="clubTxSz" min="18" max="64" step="1" value="' + d.size + '"></label>' +
+    '</div>';
+  const ta = $("clubTxIn");
+  if (ta) {
+    ta.oninput = () => { d.text = ta.value; };
+    // ⚠️ FOCUS AFTER THE NODE IS IN THE DOCUMENT AND ONE FRAME LATER. iOS refuses to raise the keyboard
+    // for an element that was not in the tree when focus was called, and this app already records
+    // measuring a sheet before it is shown reading zero for the same reason.
+    setTimeout(() => { try { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } catch (e) {} }, 30);
+  }
+  ov.querySelectorAll("[data-cfont]").forEach((b) => b.onclick = () => {
+    d.font = b.dataset.cfont; clubTextDraw();
+  });
+  ov.querySelectorAll("[data-ccol]").forEach((b) => b.onclick = () => {
+    d.colour = b.dataset.ccol; clubTextDraw();
+  });
+  const sz = $("clubTxSz");
+  if (sz) sz.oninput = () => { d.size = Number(sz.value) || 34; const t = $("clubTxIn"); if (t) t.style.fontSize = d.size + "px"; };
+  if (ta) ta.style.fontSize = d.size + "px";
+  const done = $("clubTxDone");
+  if (done) done.onclick = () => clubTextCommit();
+}
+/** ⚠️ AN EMPTY WORD IS NOT ADDED, AND AN EMPTIED ONE IS REMOVED. Otherwise clearing the box leaves an
+ *  invisible draggable nothing on the picture that can still be selected and cannot be seen. */
+function clubTextCommit() {
+  const S = CLUBED; if (!S) return;
+  const d = S.draft;
+  const e = $("clubTxEd"); if (e) e.remove();
+  S.draft = null;
+  if (!d) return;
+  const txt = String(d.text || "").trim();
+  if (S.draftAt >= 0) {
+    if (txt) { d.text = txt; S.texts[S.draftAt] = d; S.sel = S.draftAt; }
+    else { S.texts.splice(S.draftAt, 1); S.sel = -1; }
+  } else if (txt) {
+    d.text = txt; S.texts.push(d); S.sel = S.texts.length - 1;
+  }
+  S.draftAt = -1;
+  haptic("light");
+  clubEdDraw();
+}
+/**
+ * POSTING.
+ * ⚠️ THE BLOB GOES TO IndexedDB AND THE ROW TO localStorage, AND THE ORDER IS LOAD-BEARING. localStorage
+ * is where this runner's entire training history lives; a 30 MB video written there takes the lot with
+ * it. The row carries the media KEY, so a store that has lost its blobs shows a post with no picture
+ * rather than a post that cannot be read at all.
+ * ⚠️ AND THE MEDIA IS WRITTEN FIRST. A row pointing at a blob that failed to save is a permanent broken
+ * tile; a blob with no row is invisible and swept by the next open.
+ */
+function clubEdPost() {
+  const S = CLUBED; if (!S) return;
+  const key = "m" + Date.now() + "-" + Math.floor(Math.random() * 1e6);
+  const send = $("clubSend"); if (send) { send.disabled = true; send.textContent = "Saving…"; }
+  clubMediaPut(key, S.file, { type: S.isVid ? "video" : "photo" }).then(() => {
+    const rows = clubLoad();
+    rows.unshift({ id: key, kind: S.kind, media: key, video: S.isVid,
+      caption: (S.caption || "").slice(0, 300), at: Date.now(),
+      crop: { ox: +S.ox.toFixed(4), oy: +S.oy.toFixed(4), k: +S.k.toFixed(3) },
+      trim: S.isVid ? { inS: +S.inS.toFixed(2), outS: +S.outS.toFixed(2) } : null,
+      texts: S.texts.slice(0, 8) });
+    clubSave(rows);
+    haptic("success");
+    clubEdClose();
+    state.tab = "community"; state.commView = "runs";
+    render();
+    toast(S.kind === "story" ? "Added to your story." : "Posted to the club.");
+  }).catch(() => {
+    if (send) { send.disabled = false; send.textContent = "Try again"; }
+    toast("That could not be saved on this device.");
+  });
+}
+
+/** Create opens the sheet; a row picks a kind and goes straight to the camera roll. */
+function openClubCreate() {
+  ensureSheet(); SHEET_CTX = null;
+  $("sheetBody").innerHTML = clubCreateHtml();
+  document.querySelectorAll("[data-cnew]").forEach((b) => b.onclick = () => {
+    const kind = b.dataset.cnew;
+    closeSheet();
+    clubPick(kind);
+  });
+  $("sheetOv").classList.add("on");
+}
+/**
+ * WHAT THE RUNNER HAS POSTED, AS TILES.
+ *
+ * ⚠️ THE MEDIA IS LOADED AFTER THE TILE IS ON SCREEN, NOT DURING THE RENDER. Reading a blob out of
+ * IndexedDB is asynchronous, so a builder that waited for it would be an async render — and this app
+ * renders synchronously from many paths. The tile paints as a dark cell and fills in; a post whose blob
+ * has gone shows the cell and its caption rather than a broken image.
+ * ⚠️ AND A VIDEO TILE IS A poster-LESS <video>, muted, preload=metadata. Drawing a frame to a canvas to
+ * make a thumbnail would decode the clip on every render of the grid.
+ */
+function clubTileHtml(p) {
+  const badge = p.video ? '<span class="cm-t-clip">' + ICON.clip + '</span>' : "";
+  const cap = p.caption
+    ? '<span class="cm-t-cap">' + esc(p.caption.slice(0, 60)) + '</span>' : "";
+  return '<button class="cm-tile cm-tile-m" data-cpost="' + esc(p.id) + '">' +
+    '<span class="cm-t-med" data-cmed="' + esc(p.media) + '" data-cvid="' + (p.video ? "1" : "") + '"></span>' +
+    badge + cap + '</button>';
+}
+/** ⚠️ ONE PASS OVER THE DOM AFTER A RENDER, so a tile, a story ring and the viewer all fill in through
+ *  the same path — three loaders would be three places a missing blob is handled differently. */
+function clubFillMedia() {
+  document.querySelectorAll("[data-cmed]").forEach((n) => {
+    if (n.dataset.cfilled) return;
+    const key = n.dataset.cmed; if (!key) return;
+    n.dataset.cfilled = "1";
+    clubUrl(key).then((url) => {
+      if (!url) { n.classList.add("cm-med-gone"); return; }
+      n.innerHTML = n.dataset.cvid
+        ? '<video src="' + url + '" muted playsinline preload="metadata"></video>'
+        : '<img src="' + url + '" alt="">';
+    }).catch(() => n.classList.add("cm-med-gone"));
+  });
+}
+/**
+ * THE ALL / VIDEOS TABS.
+ * ⚠️ THEY ONLY APPEAR WHEN THERE IS SOMETHING TO SPLIT. Before this the grid held runs, which carry no
+ * media at all, so a Videos tab was a tab that could never have a member — the addendum asked for it
+ * and it was declined for exactly that reason. Now that a post can be a video the split is real, and
+ * the tabs appear once the runner has posted anything.
+ * ⚠️ THE LABEL IS ALWAYS VISIBLE — colour is never the only signal, which is the design's own rule.
+ */
+function clubMediaTab() { return state.clubMedia === "video" ? "video" : "all"; }
+function clubTabsHtml() {
+  const t = clubMediaTab();
+  const tab = (id, ic, lab) => '<button class="cm-mt' + (t === id ? " on" : "") + '" data-cmt="' + id +
+    '" aria-selected="' + (t === id) + '" role="tab">' + ic + '<span>' + lab + '</span></button>';
+  return '<div class="cm-mts" role="tablist">' + tab("all", ICON.grid4, "All") +
+    tab("video", ICON.clip, "Videos") + '</div>';
+}
+
+/** The create button belongs to the club and is hidden everywhere else. */
+function syncClubNew() {
+  const b = $("clubNewBtn"); if (!b) return;
+  const on = state.tab === "community" && !state.screen && !state.support;
+  b.style.display = on ? "" : "none";
+}
+/**
+ * ONE FULL-SCREEN PLAYER FOR A STORY AND FOR A POST.
+ *
+ * ⚠️ THE SAME VIEWER, because they are the same thing on screen — media, the runner's words over it, one
+ * way out. Two players would be two places the trim window, the crop and the text overlays are applied,
+ * and they would drift within a release.
+ * ⚠️ A STORY ADVANCES ON A TIMER; A POST DOES NOT. A post is something to look at for as long as the
+ * runner wants, and a picture that closes itself while somebody is reading the caption has decided for
+ * them — the same rule the recap story's last panel already follows.
+ */
+let CLUB_VIEW_T = 0;
+function clubViewClose() {
+  if (CLUB_VIEW_T) { clearTimeout(CLUB_VIEW_T); CLUB_VIEW_T = 0; }
+  const e = $("clubView"); if (e) e.remove();
+}
+function openClubPost(id) { clubOpenMedia(clubPosts().filter((p) => p.id === id), 0, false); }
+function openClubStories() { clubOpenMedia(clubStories(), 0, true); }
+function clubOpenMedia(rows, i, auto) {
+  if (!rows || !rows.length) return;
+  clubViewClose();
+  const ov = el('<div class="club-view" id="clubView"></div>');
+  document.body.appendChild(ov);
+  const draw = () => {
+    const p = rows[i]; if (!p) { clubViewClose(); return; }
+    const bars = auto && rows.length > 1
+      ? '<div class="cm-bars">' + rows.map((_, n) =>
+          '<span class="cm-bar' + (n < i ? " done" : n === i ? " now" : "") + '"><i></i></span>').join("") +
+        '</div>' : "";
+    const texts = (p.texts || []).map((t) =>
+      '<span class="club-tx" style="left:' + (t.x * 100) + '%; top:' + (t.y * 100) + '%; color:' +
+      t.colour + '; font-family:' + t.font + '; font-size:' + t.size + 'px">' + esc(t.text) +
+      '</span>').join("");
+    const c = p.crop || { ox: 0.5, oy: 0.5, k: 1 };
+    ov.innerHTML = bars +
+      '<div class="club-stage club-stage-v">' +
+        '<div class="club-fit" style="transform:scale(' + (c.k || 1) + ');transform-origin:' +
+          ((c.ox != null ? c.ox : 0.5) * 100) + '% ' + ((c.oy != null ? c.oy : 0.5) * 100) + '%">' +
+          '<span class="club-vmed" data-cmed="' + esc(p.media) + '" data-cvid="' +
+            (p.video ? "1" : "") + '"></span>' +
+        '</div>' +
+        '<div class="club-txs">' + texts + '</div>' +
+      '</div>' +
+      '<button class="club-x" id="clubVX" aria-label="Close">✕</button>' +
+      (p.caption ? '<div class="club-vcap">' + esc(p.caption) + '</div>' : "") +
+      '<div class="club-vfoot">' +
+        '<button class="ui-btn" id="clubVDel">Delete</button>' +
+        (auto && rows.length > 1 ? '<button class="ui-btn" id="clubVNext">Next</button>' : "") +
+      '</div>';
+    clubFillMedia();
+    // ⚠️ THE TRIM IS APPLIED AT PLAYBACK, which is what makes storing in/out points rather than
+    // re-encoding honest: the runner sees exactly the window they chose, and the original is intact for
+    // an export later.
+    setTimeout(() => {
+      const vd = ov.querySelector("video");
+      if (vd && p.trim) {
+        vd.currentTime = p.trim.inS || 0;
+        vd.ontimeupdate = () => {
+          if (p.trim.outS > p.trim.inS && vd.currentTime >= p.trim.outS - 0.05) vd.currentTime = p.trim.inS;
+        };
+      }
+      if (vd) { vd.muted = false; vd.loop = true; try { vd.play(); } catch (e) {} }
+    }, 60);
+    const x = $("clubVX"); if (x) x.onclick = () => { haptic("light"); clubViewClose(); };
+    const nx = $("clubVNext"); if (nx) nx.onclick = () => advance();
+    const del = $("clubVDel");
+    if (del) del.onclick = () => {
+      clubDelete(p.id);
+      clubViewClose();
+      render();
+      toast(p.kind === "story" ? "Story removed." : "Post removed.");
+    };
+    if (CLUB_VIEW_T) { clearTimeout(CLUB_VIEW_T); CLUB_VIEW_T = 0; }
+    // ⚠️ A VIDEO STORY RUNS FOR ITS OWN TRIMMED LENGTH, not a flat 4.5s — advancing off a twelve-second
+    // clip after four and a half is cutting the runner off mid-sentence.
+    if (auto) {
+      const ms = (p.video && p.trim && p.trim.outS > p.trim.inS)
+        ? Math.min(CLUB_STORY_MAX_S, p.trim.outS - p.trim.inS) * 1000 + 250
+        : COMM_STORY_MS;
+      CLUB_VIEW_T = setTimeout(advance, ms);
+    }
+  };
+  const advance = () => { i += 1; if (i >= rows.length) { clubViewClose(); return; } draw(); };
+  draw();
+}
+
 /* ── PLAN JOURNALS (addendum 1, 2026-08-22) ────────────────────────────────────────────────────────
  * A rail of the runner's training blocks — the current one live, the finished ones behind it — each
  * ring one periodized block, tappable to a summary. The addendum's own words for why it is rings of
@@ -11266,7 +12100,12 @@ function viewCommunity() {
   const months = commMonths();
   const bests = commBests();
   const wk = logTotals(logWeekStartIso(), todayIso());
-  const posts = (state.hist || []).filter((r) => Number(r.k) > 0).length;
+  const uploads = clubPosts();
+  const stories = clubStories();
+  // ⚠️ POSTS COUNTS WHAT THE RUNNER HAS PUT UP, NOT HOW MANY TIMES THEY HAVE RUN. Before there was
+  // anything to post, the run count was the only honest thing that number could be; now that a post is
+  // a real object, counting runs there would be a figure that never matches the grid beneath it.
+  const posts = uploads.length;
   const story = commStory();
 
   const avatar = p.avatar
@@ -11274,10 +12113,18 @@ function viewCommunity() {
     : '<span class="cm-init">' + esc(p.initials) + '</span>';
   // ⚠️ THE RING AND THE BADGE ONLY EXIST IF THERE IS A STORY TO OPEN. An unseen-story ring over nothing
   // is a control that looks live and does nothing.
-  const ring = story
-    ? '<button class="cm-av cm-av-story" data-cstory="1" aria-label="Open your story">' + avatar +
-        '<span class="cm-story-badge">STORY</span></button>'
-    : '<span class="cm-av">' + avatar + '</span>';
+  // ⚠️ THE RING IS LIVE WHEN THERE IS SOMETHING TO OPEN, and the + is ALWAYS live — it is the owner's
+  // fourth screenshot, and its whole job is to be there when there is no story yet.
+  // ⚠️ THE + IS A SIBLING OF THE RING, NOT A CHILD OF IT. Nested, a tap on the badge would bubble to
+  // the ring and open the story viewer instead of the camera roll — a control that looks like one thing
+  // and does another, which is the defect class this app has shipped three times.
+  const anyStory = stories.length > 0 || !!story;
+  const ring = '<span class="cm-avwrap">' +
+    (anyStory
+      ? '<button class="cm-av cm-av-story" data-cstory="1" aria-label="Open your story">' + avatar + '</button>'
+      : '<span class="cm-av">' + avatar + '</span>') +
+    '<button class="cm-avplus" data-cadd="story" aria-label="Add to your story">' + ICON.plusDot +
+    '</button></span>';
 
   const stat = (n, label, action) => {
     const inner = '<span class="cm-stat-v num">' + esc(String(n)) + '</span>' +
@@ -11290,17 +12137,34 @@ function viewCommunity() {
   const chips = bests.map((b) =>
     '<span class="cm-chip cm-chip-acc num">Best · ' + b.label + ' ' + b.time + '</span>').join("");
 
-  const grid = months.length
+  // ⚠️ TWO KINDS OF TILE IN ONE GRID, AND THE FILTER MEANS DIFFERENT THINGS TO EACH. "Videos" keeps
+  // the posted clips and drops everything else — a run is not a video, so under Videos the run tiles go
+  // rather than being shown as though they were films of themselves.
+  const vidOnly = clubMediaTab() === "video";
+  const shown = vidOnly ? uploads.filter((u) => u.video) : uploads;
+  const tabs = uploads.length ? clubTabsHtml() : "";
+  const upGrid = shown.length
+    ? '<div class="cm-mhead"><h2>Posted</h2><span class="num">' + shown.length +
+      (vidOnly ? (shown.length === 1 ? " VIDEO" : " VIDEOS") : (shown.length === 1 ? " POST" : " POSTS")) +
+      '</span></div><div class="cm-grid">' + shown.map(clubTileHtml).join("") + '</div>'
+    : (vidOnly && uploads.length
+        // ⚠️ THE ADDENDUM'S OWN LINE, and it is the honest one: a quiet sentence beats an empty
+        // three-column area that reads as the app having lost something.
+        ? '<div class="cm-empty cm-empty-sm"><p>No videos yet — anything you film on a run shows up ' +
+          'here.</p></div>' : "");
+  const runGrid = (vidOnly && uploads.length) ? "" : (months.length
     ? months.map((m, i) =>
-        '<div class="cm-mhead' + (i ? " cm-mhead-n" : "") + '">' +
+        '<div class="cm-mhead' + (i || shown.length ? " cm-mhead-n" : "") + '">' +
           '<h2>' + esc(m.label) + '</h2>' +
           '<span class="num">' + m.runs.length + (m.runs.length === 1 ? " RUN" : " RUNS") +
             " · " + Math.round(m.km) + ' KM</span>' +
         '</div>' +
         '<div class="cm-grid">' + m.runs.map(commTileHtml).join("") + '</div>').join("")
     // ⚠️ THE DESIGN'S OWN EMPTY GRID STATE, in its own words.
-    : '<div class="cm-empty cm-empty-sm"><p>Your first run will show up here — with the shape of ' +
-      'where you went, how far, and how hard it was.</p></div>';
+    : (uploads.length ? "" :
+      '<div class="cm-empty cm-empty-sm"><p>Your first run will show up here — with the shape of ' +
+      'where you went, how far, and how hard it was.</p></div>'));
+  const grid = tabs + upGrid + runGrid;
 
   return '<div class="cm-wrap">' +
     '<div class="cm-seg" role="tablist">' +
@@ -11331,9 +12195,16 @@ function viewCommunity() {
         grid +
       '</section>' +
       '<section class="cm-pane">' +
-        (story ? '<div class="cm-rail"><button class="cm-rail-i" data-cstory="1">' +
-          '<span class="cm-rail-ring">' + avatar + '</span>' +
-          '<span class="cm-rail-n">Your run</span></button></div>' : "") +
+        // ⚠️ THE RAIL ALWAYS CARRIES THE ADD BUTTON, and the ring beside it only when there is something
+        // in it. The design's rail is where a story is started from as well as watched.
+        '<div class="cm-rail">' +
+          '<button class="cm-rail-i" data-cadd="story">' +
+            '<span class="cm-rail-ring cm-rail-add">' + ICON.plusDot + '</span>' +
+            '<span class="cm-rail-n">Add</span></button>' +
+          (anyStory ? '<button class="cm-rail-i" data-cstory="1">' +
+            '<span class="cm-rail-ring">' + avatar + '</span>' +
+            '<span class="cm-rail-n">Your story</span></button>' : "") +
+        '</div>' +
         commFeedHtml() +
       '</section>' +
     '</div></div>' +
@@ -28240,8 +29111,8 @@ function maybeAutoGuide() {
 // ⚠️ TWO STRINGS, NOT ONE. TITLES feeds the screen heading AND the bottom-nav label, so
 // renaming Support to "Support & guidance" for the header truncated the tab to "Support & gui...".
 // A tab label has about eight characters; a heading has a screen.
-const TITLES = { today: "Today", plan: "Your Plan", activities: "Logbook", community: "Community", support: "Support & guidance" };
-const NAV_LABEL = { today: "Today", plan: "Plan", activities: "Logbook", community: "Community", support: "Support" };
+const TITLES = { today: "Today", plan: "Your Plan", activities: "Logbook", community: "Inte-Club", support: "Support & guidance" };
+const NAV_LABEL = { today: "Today", plan: "Plan", activities: "Logbook", community: "Inte-Club", support: "Support" };
 // The Today tab shows a live calendar glyph with today's date (drawn in CSS; number injected here).
 function todayNavIcon() {
   return '<span class="nav-date" aria-hidden="true"><span class="nav-date-day num">' + new Date().getDate() + '</span></span>';
@@ -28434,6 +29305,10 @@ function render() {
     return;
   }
   $("topTitle").textContent = state.support ? "Support & guidance" : TITLES[state.tab];
+  // ⚠️ THE CREATE BUTTON IS ONLY ON THE CLUB. Elsewhere it would open a sheet offering to post to a
+  // screen the runner is not on — and a control in the top bar of every screen that only means something
+  // on one of them is a control most taps on it get wrong.
+  syncClubNew();
   if (state.tab === "today") { fetchWeather(); v.innerHTML = viewToday(); maybeAutoGuide(); }
   else if (state.tab === "plan") v.innerHTML = viewPlan();
   else if (state.tab === "activities") v.innerHTML = viewActivities();
@@ -28977,7 +29852,21 @@ function wire() {
   document.querySelectorAll("[data-crun]").forEach((b) => b.onclick = () => {
     state.viewRunId = b.dataset.crun; state.screen = "run"; render();
   });
-  document.querySelectorAll("[data-cstory]").forEach((b) => b.onclick = () => openCommStory());
+  // ⚠️ A REAL UPLOADED STORY WINS OVER THE GENERATED RUN ONE. The run story exists because there was
+  // nothing else to put in the ring; once the runner has put something there themselves, showing them
+  // the app's summary of their last run instead would be the app talking over them.
+  document.querySelectorAll("[data-cstory]").forEach((b) => b.onclick = () => {
+    if (clubStories().length) openClubStories(); else openCommStory();
+  });
+  // The + on the avatar and the Add on the rail both go straight to the camera roll for a story — the
+  // owner's fourth screenshot. No Create sheet in between; that is what the top-bar plus is for.
+  document.querySelectorAll("[data-cadd]").forEach((b) => b.onclick = () => clubPick(b.dataset.cadd));
+  document.querySelectorAll("[data-cmt]").forEach((b) => b.onclick = () => {
+    state.clubMedia = b.dataset.cmt; render();
+  });
+  // A posted tile opens it full screen, the same viewer a story uses — one player, not two.
+  document.querySelectorAll("[data-cpost]").forEach((b) => b.onclick = () => openClubPost(b.dataset.cpost));
+  clubFillMedia();
   document.querySelectorAll("[data-cjournal]").forEach((b) => b.onclick = () => {
     ensureSheet(); SHEET_CTX = null;
     $("sheetBody").innerHTML = commJournalSheetHtml(b.dataset.cjournal);
@@ -29459,7 +30348,7 @@ function buildNav() {
   // ticking — the run silently stopped recording and was then logged with a truncated distance.
   document.querySelectorAll(".navbtn").forEach((b) => b.onclick = () => { if (state.screen === "setup") captureSetupFields(); if (!liveRunning()) { coachStop(); stopLive(); stopSpeech(); } stopTrialRun(); TRIALRUN = null; state.screen = null; state.tab = b.dataset.tab; if (b.dataset.tab !== "support") state.support = null; if (b.dataset.tab === "today") { state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; } render(); });
 }
-$("bellBtn").innerHTML = ICON.bell; $("themeBtn").innerHTML = ICON.theme; $("calBtn").innerHTML = ICON.cal; $("alfieBtn").innerHTML = ICON.alfie; renderAvatar();
+$("bellBtn").innerHTML = ICON.bell; $("themeBtn").innerHTML = ICON.theme; $("calBtn").innerHTML = ICON.cal; $("alfieBtn").innerHTML = ICON.alfie; $("clubNewBtn").innerHTML = ICON.plus; renderAvatar();
 // The strip above a Home Screen web app is painted by iOS, not by us. Since iOS 26 a standalone
 // web app is no longer given the space under the status bar, so apple-mobile-web-app-status-bar-style
 // black-translucent no longer buys the full screen: measured on a 16 Pro Max, screen 956 but page 894,
@@ -29508,6 +30397,7 @@ $("themeBtn").onclick = () => {
 $("profileBtn").onclick = () => { if (liveRunning() || state.screen === "setup") return; stopTrialRun(); state.screen = "profile"; render(); };
 $("calBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); state.screen = "calendar"; render(); };
 $("bellBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); openRemindersSheet(); };
+$("clubNewBtn").onclick = () => { if (liveRunning()) return; openClubCreate(); };
 migrateRunRoutes();
 seedDone();
 // ---- The shell tracks the visible area, keyboard and all -----------------------------------------
@@ -29714,7 +30604,7 @@ seedDone();
 // The avatar cropper is the one place a pinch is wanted, and it drives its own zoom from these same
 // events - so it is excluded here rather than fighting for them.
 (function () {
-  const wanted = (t) => !!(t && t.closest && t.closest(".crop-stage, .sst-stage"));
+  const wanted = (t) => !!(t && t.closest && t.closest(".crop-stage, .sst-stage, .club-stage"));
   ["gesturestart", "gesturechange", "gestureend"].forEach((n) => {
     document.addEventListener(n, (e) => { if (!wanted(e.target)) e.preventDefault(); }, { passive: false });
   });

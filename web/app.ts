@@ -4493,8 +4493,12 @@ button.cm-stat:active { opacity: .65; }
   text-transform: uppercase; color: var(--ink-faint); }
 .cm-chip { font-size: var(--t-meta); background: var(--surface-2); border: 1px solid var(--line);
   border-radius: var(--r-ctl); padding: 1px 7px; }
-.cm-chip-acc { color: var(--accent-ink); background: var(--accent); border-color: transparent;
-  font-weight: 700; }
+/* ⚠️ HIS INSTRUCTION, AND THE SIZE IS TIED TO THE LABEL BESIDE IT: "they need to be the same size as the
+   word TIMES". So the type is --t-label, the same token .cm-eyebrow uses, rather than a size picked by
+   eye — two things that must match should read from one place. White ground, teal edge, teal text. */
+.cm-chip-acc { font-size: var(--t-label); font-weight: 700; letter-spacing: 0;
+  color: var(--accent); background: var(--surface-2); border: 1px solid var(--accent);
+  padding: 2px 8px; }
 /* ⚠️ THE PROFILE ACTIONS ARE FILLED, BORDERLESS AND EQUAL — the reference's own shape, measured off the
    screenshot he sent (three grey pills, no hairline, medium weight). The generic .ui-btn is an outlined
    control built for a form; side by side under an avatar it reads as two form fields, which is what he
@@ -4521,19 +4525,7 @@ button.cm-stat:active { opacity: .65; }
   overflow: hidden; background: var(--surface-2); transition: opacity 160ms ease; }
 button.cm-tile:active { opacity: .65; }
 .cm-tile-off { opacity: .55; }
-.cm-art { position: absolute; inset: 0; display: block; }
-.cm-art svg { width: 100%; height: 100%; display: block; }
-.cm-art .rt-none { display: none; }
 /* A run with no route still reads as a tile rather than a hole. */
-.cm-art-none { background: var(--surface-2); }
-.cm-tint { position: absolute; inset: 0;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--ce) 16%, transparent), transparent 60%); }
-.cm-foot { position: absolute; inset: auto 0 0 0; display: flex; align-items: flex-end;
-  justify-content: space-between; gap: var(--s1); padding: 14px 6px 5px; pointer-events: none;
-  background: linear-gradient(180deg, transparent, rgba(6,17,14,.72)); }
-.cm-foot .num { font-size: var(--t-label); font-weight: 700; color: #fff;
-  text-shadow: 0 1px 2px rgba(0,0,0,.4); }
-.cm-badge { font-size: var(--t-label); font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
 /* The stories rail */
 .cm-rail { display: flex; gap: var(--s3); overflow-x: auto; padding: 14px var(--gutter);
   border-bottom: 1px solid var(--line); }
@@ -4581,7 +4573,12 @@ button.cm-tile:active { opacity: .65; }
 .cm-story { position: fixed; inset: 0; z-index: 90; display: flex; flex-direction: column;
   background: #04100d; animation: cmFade 240ms ease both; }
 @keyframes cmFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-.cm-bars { display: flex; gap: var(--s1); padding: 12px 12px 0; }
+/* ⚠️ THE BARS AND THE HEADER SIT BELOW THE STATUS BAR. Measured on his screenshot: the progress bars ran
+   through the 10:46 and the avatar sat on top of it, because the overlay is position: fixed at inset 0 —
+   which is the whole screen, clock included. Every one of his Instagram examples starts the bars under
+   the time and the battery. env() is the only thing that knows where that line is. */
+.cm-bars { display: flex; gap: var(--s1);
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 12px 0; }
 .cm-bar { flex: 1; height: 3px; border-radius: var(--r-pill); background: rgba(255,255,255,.28);
   overflow: hidden; }
 .cm-bar i { display: block; height: 100%; background: #fff; width: 0; }
@@ -4598,8 +4595,16 @@ button.cm-tile:active { opacity: .65; }
   border: 1px solid rgba(255,255,255,.28); color: #fff; font-size: var(--t-card); }
 .cm-sbody { position: relative; flex: 1; min-height: 0; padding: 0; border: 0; background: none;
   overflow: hidden; width: 100%; }
-.cm-sart { position: absolute; inset: 0; display: grid; place-items: center; }
-.cm-sart svg { width: 100%; height: 100%; }
+/* ⚠️⚠️ THE ROUTE WAS STRETCHED, AND IT IS THE SAME TWO-TRANSFORMS FAULT THIS FILE ALREADY RECORDS ON THE
+   DEBRIEF HERO. routeMapSvg carries preserveAspectRatio="none" — deliberately, because its callers give
+   it a box of the right shape — and a 320x200 drawing forced into a 440x760 story is stretched 2.9x
+   vertically. His screenshot shows exactly that: a route pulled into a thin tall smear.
+   ⚠️ THE FIX IS A BOX OF THE RIGHT SHAPE, not object-fit, which does nothing at all for an inline SVG —
+   the debrief's own note records removing it for that reason rather than keeping it as a safety net. */
+/* ⚠️ THE BOX IS CENTRED AND CARRIES ITS OWN ASPECT FROM THE MARKUP (STORY_ART_W/H), so the stylesheet
+   holds no second copy of a number the drawing already depends on. */
+.cm-sart { position: absolute; inset: 0; margin: auto; max-width: 100%; max-height: 100%; }
+.cm-sart svg { width: 100%; height: 100%; display: block; }
 .cm-scap { position: absolute; inset: auto 0 0 0; padding: 70px 18px 26px; text-align: left;
   pointer-events: none; background: linear-gradient(180deg, transparent, rgba(4,16,13,.86)); }
 /* ⚠️ THE BRIGHT SIGNAL GREEN IS PERMITTED HERE AND NOWHERE ELSE — it sits on dark media, never in UI
@@ -4878,6 +4883,50 @@ button.cm-tile:active { opacity: .65; }
 .ce-h { margin: var(--s5) 0 var(--s2); font-size: var(--t-section); font-weight: 500;
   letter-spacing: -.01em; }
 .ce-note { margin: var(--s2) 0 0; font-size: var(--t-meta); color: var(--ink-soft); line-height: 1.5; }
+/* Choosing what a posted run looks like — on the edit page and in the run's own sheet. */
+.ce-pick { display: block; width: 100%; min-height: var(--tap); padding: var(--s3);
+  border: 0; border-top: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  text-align: left; }
+.ce-pick:first-of-type { border-top: 1px solid var(--line); }
+.ce-pick.on { background: color-mix(in srgb, var(--accent) 9%, var(--surface)); }
+.ce-pick-t { display: block; font-size: var(--t-card); font-weight: 500; letter-spacing: -.01em; }
+.ce-pick.on .ce-pick-t { color: var(--accent); }
+.ce-pick-d { display: block; margin-top: 1px; font-size: var(--t-meta); color: var(--ink-soft); }
+.club-post-btn { width: 100%; margin-top: var(--s2); }
+/* ── The camera roll, drawn inside the app. */
+.club-lib { position: fixed; inset: 0; z-index: 97; display: flex; flex-direction: column;
+  background: var(--bg); }
+.clib-top { display: flex; align-items: center; gap: var(--s2);
+  padding: calc(var(--s3) + env(safe-area-inset-top, 0px)) var(--s3) var(--s3);
+  border-bottom: 1px solid var(--line); }
+.clib-x { display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 0;
+  border-radius: 50%; background: var(--surface-2); color: var(--ink); font-size: var(--t-card); }
+.clib-t { flex: 1; min-width: 0; text-align: center; font-size: var(--t-card); font-weight: 500; }
+.clib-next { min-height: var(--tap); padding: 0 var(--s3); border: 0; border-radius: var(--r-ctl);
+  background: var(--accent); color: var(--accent-ink); font: inherit; font-size: var(--t-body);
+  font-weight: 500; }
+.clib-next:disabled { opacity: .45; }
+/* ⚠️ THE GRID IS THE SCROLLER, NOT THE OVERLAY, so the top bar and the footer stay put while the roll
+   moves under them — and the paging listener has a box whose scrollHeight means something. */
+.clib-grid { flex: 1; min-height: 0; overflow-y: auto; display: grid; gap: 2px;
+  grid-template-columns: repeat(3, 1fr); align-content: start; padding-bottom: var(--s4);
+  -webkit-overflow-scrolling: touch; }
+.clib-c { position: relative; aspect-ratio: 1; padding: 0; border: 0; background: var(--surface-2);
+  overflow: hidden; }
+.clib-c img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.clib-c.on img { transform: scale(.92); transition: transform .12s ease; }
+.clib-load { background: repeating-linear-gradient(135deg, var(--surface-2) 0 8px, var(--surface) 8px 16px); }
+/* The number is the ORDER the post will be in, not a tick. */
+.clib-n { position: absolute; top: 7px; right: 7px; display: grid; place-items: center;
+  width: 22px; height: 22px; border: 1.5px solid rgba(255,255,255,.9); border-radius: 50%;
+  background: rgba(4,16,13,.28); color: #fff; font-size: var(--t-label); font-weight: 700; }
+.clib-n.on { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.clib-dur { position: absolute; bottom: 6px; right: 7px; padding: 1px 5px; border-radius: var(--r-pill);
+  background: rgba(4,16,13,.6); color: #fff; font-size: var(--t-label); font-weight: 700; }
+.clib-foot { display: flex; align-items: center; gap: var(--s3); padding: var(--s3);
+  padding-bottom: calc(var(--s3) + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line); font-size: var(--t-meta); color: var(--ink-soft); }
+.clib-foot span { flex: 1; min-width: 0; }
 /* ⚠️ ONE COLUMN, NOT TWO. Measured on the served page at 400px: two columns each holding a 4.6em label
    and a time field overflowed, and the second column's input was cut off at the screen edge — a field
    the runner can see the label of and not type into. Four rows down the page cost nothing; a clipped
@@ -4963,6 +5012,9 @@ const ICON = {
   // The little plus on the avatar, filled so it reads at 18px against a photograph.
   plusDot: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 6.5v11M6.5 12h11"/></svg>',
   // A play triangle in a rounded rectangle — the Videos tab, and the marker on a video tile.
+  // ⚠️ A TRAINER, NOT A RUNNER. rEasy is a running figure and was standing in for the shoe on the club
+  // profile and the live start screen — a picture of a person where the sentence is about footwear.
+  shoe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.6 16.4h15.2a2.8 2.8 0 0 0 2.8-2.8c0-1.1-.7-2-1.7-2.4l-4.5-1.6-2.2-2.6a1.4 1.4 0 0 0-2.2.1L8.2 9.4H5.4a2.8 2.8 0 0 0-2.8 2.8z"/><path d="M2.6 16.4v1.2a1.4 1.4 0 0 0 1.4 1.4h14.6a2.8 2.8 0 0 0 2.8-2.8"/><path d="m8.2 9.4 2.4 2.1M11.4 8.1l2.3 2M6 12.6l1.9 1.7"/></svg>',
   clip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2.6" y="5.4" width="18.8" height="13.2" rx="3.2"/><path d="M10.4 9.6l4.8 2.8-4.8 2.8z"/></svg>',
   // A four-square grid — the All tab.
   grid4: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3.4" y="3.4" width="7.6" height="7.6" rx="1.7"/><rect x="13" y="3.4" width="7.6" height="7.6" rx="1.7"/><rect x="3.4" y="13" width="7.6" height="7.6" rx="1.7"/><rect x="13" y="13" width="7.6" height="7.6" rx="1.7"/></svg>',
@@ -6990,6 +7042,10 @@ function ingestWatchRun(run) {
   // this project's most-repeated trap — and a runner who records on their watch is exactly the person
   // who expects their runs to appear in Strava without being asked twice.
   stravaMaybeAutoSend(state.logged[0]);
+  // ⚠️ BESIDE THE STRAVA CALL FOR THE SAME REASON, AND THAT REASON IS THE COMMENT ABOVE THIS ONE: a hook
+  // added to the phone's save path and not the wrist's is this project's most-repeated trap, and this is
+  // the one place both arrive. Off unless the runner asked for it, and it never posts the same run twice.
+  clubMaybeAutoPost(state.logged[0]);
   if (planned) {
     const wk = PLAN.weeks.find((w) => w.sessions.indexOf(planned) >= 0);
     if (wk) state.done[doneKey(wk.index, planned)] = true;
@@ -11197,27 +11253,6 @@ function clubDelete(id) {
  * from the original — nothing is thrown away and nothing is degraded.
  */
 const CLUB_STORY_MAX_S = 15;
-/**
- * THE CAMERA ROLL.
- * ⚠️ THE INPUT IS CREATED, CLICKED AND DROPPED — never left in the DOM. A file input that persists is
- * one a later render can re-trigger, and on iOS a stale one silently stops opening the sheet at all.
- * ⚠️ NO capture ATTRIBUTE. With it, iOS goes straight to the camera and the runner cannot reach the
- * roll at all; without it they get the sheet with Photo Library, Take Photo and Browse, which is what
- * was asked for.
- */
-function clubPick(kind) {
-  const inp = document.createElement("input");
-  inp.type = "file";
-  inp.accept = "image/*,video/*";
-  inp.style.position = "fixed"; inp.style.left = "-9999px";
-  document.body.appendChild(inp);
-  inp.onchange = () => {
-    const f = inp.files && inp.files[0];
-    try { inp.remove(); } catch (e) {}
-    if (f) openClubEditor(kind, f);
-  };
-  inp.click();
-}
 /** Create — the sheet the plus opens. ⚠️ ONLY WHAT THIS APP CAN ACTUALLY DO APPEARS, and what is coming
  *  is named rather than offered as a dead row: the owner's reference has Reel, Highlights and Live, and
  *  a row that opens nothing is the defect this project has shipped three times. */
@@ -11743,7 +11778,7 @@ function openClubCreate() {
   document.querySelectorAll("[data-cnew]").forEach((b) => b.onclick = () => {
     const kind = b.dataset.cnew;
     closeSheet();
-    clubPick(kind);
+    clubOpenLibrary(kind);
   });
   $("sheetOv").classList.add("on");
 }
@@ -12265,9 +12300,18 @@ function clubTrimPaint() {
 function loadClubProf() {
   try {
     const raw = JSON.parse(localStorage.getItem(CLUBPROF_KEY) || "{}");
+    // ⚠️⚠️ EVERY FIELD IS NAMED HERE OR IT IS SILENTLY DROPPED ON READ, AND THAT IS A REAL BUG THIS
+    // CAUGHT. The first version returned bio, trainingFor and pbs alone — so autoPost was written
+    // correctly, stored correctly, and thrown away by the very next read: measured, the store held
+    // {"autoPost":true} while clubAuto() answered false and the switch stayed off. A reader that
+    // whitelists is a reader that has to be updated for every new field, and forgetting is silent.
+    // test/community.test.ts now derives the writable fields from the writers and requires each to
+    // survive a round trip.
     return { bio: String(raw.bio || ""), trainingFor: String(raw.trainingFor || ""),
-      pbs: (raw.pbs && typeof raw.pbs === "object") ? raw.pbs : {} };
-  } catch (e) { return { bio: "", trainingFor: "", pbs: {} }; }
+      pbs: (raw.pbs && typeof raw.pbs === "object") ? raw.pbs : {},
+      autoPost: raw.autoPost === true,
+      autoStyle: String(raw.autoStyle || "") };
+  } catch (e) { return { bio: "", trainingFor: "", pbs: {}, autoPost: false, autoStyle: "" }; }
 }
 function saveClubProf(v) {
   try { localStorage.setItem(CLUBPROF_KEY, JSON.stringify(v)); } catch (e) {}
@@ -12373,6 +12417,35 @@ function viewClubEdit() {
       : '<div class="cm-empty cm-empty-sm"><p>Nothing in your Shoe Rack yet. Add a pair and it shows ' +
         'up here with its real mileage.</p>' +
         '<button class="ui-btn" id="ceShoes">Open the Shoe Rack</button></div>') +
+    '<h2 class="ce-h">Your grid</h2>' +
+    '<div class="ce-card">' +
+      '<div class="ce-row"><span class="ce-k">Post every run</span>' +
+        // ⚠️ THE APP'S OWN SWITCH, NOT syncRowHtml. That helper takes five arguments and brings a whole
+        // labelled row with an icon of its own, which would sit inside this row's label and duplicate
+        // it — and calling it with two arguments, as this was written first, renders a row with
+        // "undefined" for its icon and its name. .lsw IS the switch; the row here is already the label.
+        '<span class="ce-v"><button class="lsw' + (clubAuto() ? " on" : "") + '" id="ceAuto" ' +
+          'role="switch" aria-checked="' + (clubAuto() ? "true" : "false") + '" ' +
+          'aria-label="Post every run to your grid"><span class="lsw-k"></span></button>' +
+        '</span></div>' +
+      (clubAuto()
+        // ⚠️ THE STYLE PICKER APPEARS ONLY WHEN THE SWITCH IS ON. His instruction pairs the two: "if
+        // they decide to automatically upload to their own grid, then they need to decide what the grid
+        // image looks like". Off, there is nothing for it to govern — and a control over nothing is the
+        // looks-live-does-nothing class this project has shipped three times.
+        ? CLUB_TILE_STYLES.map((x) =>
+            '<button class="ce-pick' + (clubAutoStyle() === x.id ? " on" : "") + '" data-cstyle="' +
+            x.id + '" aria-pressed="' + (clubAutoStyle() === x.id) + '">' +
+              '<span class="ce-pick-t">' + x.t + '</span>' +
+              '<span class="ce-pick-d">' + x.d + '</span>' +
+            '</button>').join("")
+        : "") +
+    '</div>' +
+    '<p class="ce-note">' + (clubAuto()
+      ? 'Every run you finish from now on goes on your grid, drawn this way. Runs already up there stay ' +
+        'as they are — turning this off later removes nothing.'
+      : 'Nothing goes on your grid unless you put it there. Every run has a Post to Inte-Club button on ' +
+        'its own page.') + '</p>' +
     '<h2 class="ce-h">Personal bests</h2>' +
     '<div class="ce-card ce-pbs">' + pbRows + '</div>' +
     '<p class="ce-note">Fill one in and it appears on your profile. Leave it blank and the profile shows ' +
@@ -12420,6 +12493,20 @@ function wireClubEdit() {
     const hit = all.filter((x) => x.id === sh.id)[0];
     if (hit) { hit.shop = shop.value.trim().slice(0, 200); saveShoes(all); }
   };
+  const auto = $("ceAuto");
+  // ⚠️ THIS ONE DOES RE-RENDER, and that is the exception rather than a slip: the switch reveals or hides
+  // the style picker below it, so the screen genuinely changes shape. The typed fields must not, which is
+  // why they are expression-bodied and this is not.
+  if (auto) auto.onclick = () => {
+    const cur = loadClubProf();
+    saveClubProf(Object.assign(cur, { autoPost: !clubAuto() }));
+    haptic("light"); render();
+  };
+  document.querySelectorAll("[data-cstyle]").forEach((b) => b.onclick = () => {
+    const cur = loadClubProf();
+    saveClubProf(Object.assign(cur, { autoStyle: b.dataset.cstyle }));
+    haptic("light"); render();
+  });
   const av = $("ceAvatar");
   if (av) av.onclick = () => { state.screen = null; state.tab = "profile"; state.support = null; render(); };
   const nm = $("ceName");
@@ -12428,6 +12515,442 @@ function wireClubEdit() {
   if (shoes) shoes.onclick = () => {
     state.screen = null; state.tab = "support"; state.support = "shoes"; render();
   };
+}
+
+
+/**
+ * ══ WHAT GOES ON THE GRID IS THE RUNNER'S DECISION ═════════════════════════════════════════════════
+ * Owner, 2026-08-22: "I want the user to decide what to post on their grid, not for it to be
+ * automatically added (unless they say so in the settings). Also, if this is going to be the case, where
+ * they decide to automatically upload to their own grid, then they need to decide what the grid image
+ * looks like."
+ *
+ * ⚠️ THIS REVERSES WHAT SHIPPED THIS MORNING, AND HE IS RIGHT. The grid was every run the app had ever
+ * recorded, put there by the app — which is a training log wearing a profile's clothes. A grid is
+ * something somebody curates; a log is something that accumulates. The Logbook already is the log.
+ * ⚠️ SO A RUN IS A CANDIDATE, NEVER AN ENTRY. Off by default: he asked for the decision to be his, and a
+ * default that posts for him is the app deciding. Turning it on posts every finished run from then on.
+ * ⚠️ AND NOTHING IS DELETED BY TURNING IT OFF. A run already shared to the grid stays there — the switch
+ * governs what happens NEXT, not a purge of what somebody already chose to show.
+ */
+function clubAuto() { return loadClubProf().autoPost === true; }
+function clubAutoStyle() { const v = loadClubProf().autoStyle; return CLUB_TILE_STYLES.some((x) => x.id === v) ? v : "map"; }
+/**
+ * ⚠️ THE THREE CHOICES ARE THINGS THE APP CAN ACTUALLY DRAW FROM A RUN, and each is honest about what it
+ * shows. "map" is the route over its own streets — the cached basemap, so it costs tiles once. "line" is
+ * the route as geometry on the session's colour, which costs nothing and works with no signal. "card" is
+ * the run's numbers, which is the only one that works for a treadmill run with no route at all.
+ */
+const CLUB_TILE_STYLES = [
+  { id: "map", t: "Route on the map", d: "The streets you ran, drawn once and kept." },
+  { id: "line", t: "Route as a line", d: "Just the shape, on the session's colour." },
+  { id: "card", t: "The numbers", d: "Distance, pace and effort. Works with no route." }
+];
+/**
+ * SHARING A RUN TO THE GRID.
+ * ⚠️ IT WRITES A REAL POST, not a second kind of grid entry. One shape of thing on the grid means one
+ * tile builder, one viewer and one delete — two would drift within a release, which is the
+ * fix-one-builder-not-the-other trap this file records five times.
+ * ⚠️ AND THE PICTURE IS RENDERED AT POST TIME, so what the runner approved is what stays there. Deriving
+ * it on every render would let a later change to the style, the map provider or the route privacy
+ * silently repaint a post somebody already published.
+ */
+function clubPostRun(run, style) {
+  if (!run) return Promise.resolve(false);
+  const kind = CLUB_TILE_STYLES.some((x) => x.id === style) ? style : clubAutoStyle();
+  return clubRunTileBlob(run, kind).then((blob) => {
+    if (!blob) return false;
+    const key = "r" + Date.now() + "-" + Math.floor(Math.random() * 1e6);
+    return clubMediaPut(key, blob, { type: "photo" }).then((ok) => {
+      if (!ok) return false;
+      const rows = clubLoad();
+      // ⚠️ runId IS KEPT so the tile can still open the run it is a picture of, and so the same run is
+      // never posted twice by the automatic path.
+      rows.unshift({ id: key, kind: "post", media: [key], video: false,
+        caption: clubRunCaption(run), at: Date.now(), runId: String(run.id || ""),
+        slides: [{ media: key, crop: null, trim: null, texts: [] }] });
+      clubSave(rows);
+      return true;
+    });
+  }).catch(() => false);
+}
+/** ⚠️ THE RUN'S OWN WORDS, not an invented caption. Its title, its distance and its pace — the three
+ *  things the debrief leads with, so the grid and the run agree. */
+function clubRunCaption(run) {
+  return [run.t || "Run", commKm(run.distKm), run.pace || ""].filter(Boolean).join(" · ");
+}
+function clubRunPosted(run) {
+  const id = String((run && run.id) || "");
+  return !!id && clubLoad().some((p) => p && String(p.runId || "") === id);
+}
+/**
+ * DRAWING THE TILE.
+ * ⚠️ 1080 SQUARE, WHICH IS THE GRID'S OWN SHAPE AND NOT THE SHARE CARD'S. The share card is a 9:16 story
+ * or a 4:5 feed post and carries its own branding; this is a grid cell, and cropping a tall card into a
+ * square is the recomposition the share pack forbids.
+ */
+function clubRunTileBlob(run, kind) {
+  const S = 1080;
+  const cv = document.createElement("canvas"); cv.width = S; cv.height = S;
+  const g = cv.getContext("2d");
+  let route = [];
+  try {
+    const pres = runRoutePresentation(run);
+    route = (pres && pres.route) ? pres.route : normalizeRoute(run.route || []);
+  } catch (e) { route = normalizeRoute(run.route || []); }
+  // ⚠️ FALLS BACK TO THE NUMBERS WHEN THERE IS NO ROUTE, whatever was asked for. A treadmill run has no
+  // route by design and an empty square is worse than the facts of the run.
+  const want = (route.length > 1) ? kind : "card";
+  const eff = runEffort(run);
+  const paint = () => {
+    const done = () => new Promise((res) => cv.toBlob((b) => res(b), "image/jpeg", 0.9));
+    if (want === "card") { clubTileCard(g, S, run, eff); return done(); }
+    if (want === "line") { clubTileLine(g, S, route, eff); return done(); }
+    return routeMapFor(route, S, S, MAP_STYLE_RUN).then((md) => {
+      try { g.drawImage(md.image, 0, 0, S, S); } catch (e) { clubTileLine(g, S, route, eff); return done(); }
+      clubTileRoute(g, S, route, md.proj);
+      clubTileStamp(g, S, run, eff);
+      return done();
+    }).catch(() => { clubTileLine(g, S, route, eff); return done(); });
+  };
+  return paint();
+}
+/** The route as geometry on the session's own colour. */
+function clubTileLine(g, S, route, eff) {
+  const c = getComputedStyle(document.documentElement).getPropertyValue("--eff-" + eff).trim() || "#1d9e75";
+  g.fillStyle = "#04100d"; g.fillRect(0, 0, S, S);
+  const lats = route.map((p) => p.lat), lngs = route.map((p) => p.lng);
+  const minLa = Math.min(...lats), maxLa = Math.max(...lats);
+  const minLo = Math.min(...lngs), maxLo = Math.max(...lngs);
+  const cx = Math.cos((minLa + maxLa) / 2 * Math.PI / 180) || 1;
+  const pad = S * 0.16;
+  const spanLo = Math.max(1e-9, (maxLo - minLo) * cx), spanLa = Math.max(1e-9, maxLa - minLa);
+  const sc = Math.min((S - 2 * pad) / spanLo, (S - 2 * pad) / spanLa);
+  const ox = (S - spanLo * sc) / 2, oy = (S - spanLa * sc) / 2;
+  g.strokeStyle = c; g.lineWidth = S * 0.018; g.lineJoin = "round"; g.lineCap = "round";
+  g.beginPath();
+  route.forEach((p, i) => {
+    const x = ox + (p.lng - minLo) * cx * sc, y = oy + (maxLa - p.lat) * sc;
+    if (i) g.lineTo(x, y); else g.moveTo(x, y);
+  });
+  g.stroke();
+}
+/** The route over the basemap, at the map's own projection. */
+function clubTileRoute(g, S, route, proj) {
+  g.lineJoin = "round"; g.lineCap = "round";
+  // ⚠️ A DEEP KEYLINE UNDER A LIGHT LINE, because a basemap is bright in places and dark in others and a
+  // single-tone line vanishes into one of them. The share card's route uses the same device.
+  [["rgba(2,10,8,.55)", S * 0.026], ["#ffffff", S * 0.014]].forEach(([col, w]) => {
+    g.strokeStyle = col; g.lineWidth = w;
+    g.beginPath();
+    route.forEach((p, i) => { const [x, y] = proj(p); if (i) g.lineTo(x, y); else g.moveTo(x, y); });
+    g.stroke();
+  });
+}
+/** The distance and effort in the corner of a map tile. */
+function clubTileStamp(g, S, run, eff) {
+  // ⚠️ AT THE TOP, NOT THE BOTTOM, AND THAT WAS FOUND BY LOOKING. Baked into the lower corner it sat
+  // directly under the grid cell's own caption strip — two labels stacked, the distance half hidden
+  // behind the app's own gradient. The caption is chrome the app draws over the tile; the stamp belongs
+  // to the picture and has to live where the chrome is not.
+  const grd = g.createLinearGradient(0, 0, 0, S * 0.34);
+  grd.addColorStop(0, "rgba(4,16,13,.72)"); grd.addColorStop(1, "rgba(4,16,13,0)");
+  g.fillStyle = grd; g.fillRect(0, 0, S, S * 0.34);
+  g.textBaseline = "alphabetic";
+  const c = getComputedStyle(document.documentElement).getPropertyValue("--eff-" + eff).trim() || "#1d9e75";
+  g.fillStyle = c;
+  g.font = "700 " + Math.round(S * 0.042) + "px " + CLUB_TILE_FONT;
+  g.fillText((COMM_BADGE[run.type] || "RUN"), S * 0.07, S * 0.105);
+  g.fillStyle = "#fff";
+  g.font = "700 " + Math.round(S * 0.085) + "px " + CLUB_TILE_FONT;
+  g.fillText(commKm(run.distKm), S * 0.07, S * 0.2);
+}
+/** The numbers, for a run with no route. */
+function clubTileCard(g, S, run, eff) {
+  const c = getComputedStyle(document.documentElement).getPropertyValue("--eff-" + eff).trim() || "#1d9e75";
+  const grd = g.createLinearGradient(0, 0, 0, S);
+  grd.addColorStop(0, c); grd.addColorStop(1, "#04100d");
+  g.fillStyle = grd; g.fillRect(0, 0, S, S);
+  g.fillStyle = "rgba(4,16,13,.35)"; g.fillRect(0, 0, S, S);
+  g.fillStyle = "#fff"; g.textAlign = "center";
+  g.font = "700 " + Math.round(S * 0.155) + "px " + CLUB_TILE_FONT;
+  g.fillText(commKm(run.distKm), S / 2, S * 0.5);
+  g.font = "600 " + Math.round(S * 0.05) + "px " + CLUB_TILE_FONT;
+  g.fillStyle = "rgba(255,255,255,.86)";
+  g.fillText([run.time || "", run.pace || ""].filter(Boolean).join("  ·  "), S / 2, S * 0.6);
+  g.font = "700 " + Math.round(S * 0.038) + "px " + CLUB_TILE_FONT;
+  g.fillStyle = "rgba(255,255,255,.72)";
+  g.fillText((COMM_BADGE[run.type] || "RUN"), S / 2, S * 0.68);
+  g.textAlign = "left";
+}
+const CLUB_TILE_FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+
+/**
+ * SHARING THE RENDERED SHARE CARD STRAIGHT TO THE CLUB.
+ *
+ * ⚠️ IT POSTS THE CARD THAT IS ON SCREEN, not a second rendering of the run. prepareShareCard already
+ * holds the exact bytes the other tiles hand out — so what lands on the grid is the card he was looking
+ * at when he tapped, down to the byte, rather than something drawn again from the same inputs and
+ * possibly differing.
+ * ⚠️ AND IT IS THE ORDINARY POST SHAPE, so the grid, the viewer, the delete and the carousel reader all
+ * treat it as what it is. A second kind of grid entry would be a second tile builder.
+ */
+function shareToClub(run) {
+  if (!run) return;
+  prepareShareCard(run).then((file) => {
+    if (!file) { toast("That card could not be made."); return; }
+    const key = "s" + Date.now() + "-" + Math.floor(Math.random() * 1e6);
+    return clubMediaPut(key, file, { type: "photo" }).then((ok) => {
+      if (!ok) { toast("That could not be saved on this device."); return; }
+      const rows = clubLoad();
+      rows.unshift({ id: key, kind: "post", media: [key], video: false,
+        caption: clubRunCaption(run), at: Date.now(), runId: String(run.id || ""),
+        slides: [{ media: key, crop: null, trim: null, texts: [] }] });
+      clubSave(rows);
+      haptic("success");
+      closeShareStudio();
+      state.screen = null; state.tab = "community"; state.commView = "runs";
+      render();
+      toast("Posted to Inte-Club.");
+    });
+  }).catch(() => toast("That could not be saved on this device."));
+}
+/**
+ * POSTING A RUN TO THE GRID FROM THE RUN'S OWN PAGE.
+ * ⚠️ A SHEET, NOT A SILENT POST, because he has to choose what the picture looks like — the same three
+ * choices the automatic setting offers, so the two paths cannot produce different-looking grids.
+ * ⚠️ AND IT SAYS WHEN THE RUN IS ALREADY UP THERE rather than quietly adding a second copy.
+ */
+function openClubPostRunSheet(run) {
+  if (!run) return;
+  ensureSheet(); SHEET_CTX = null;
+  const already = clubRunPosted(run);
+  $("sheetBody").innerHTML =
+    '<h2 class="cm-sh">Post to Inte-Club</h2>' +
+    (already
+      ? '<p class="cm-sub">This run is already on your grid. Posting again adds a second tile.</p>'
+      : '<p class="cm-sub">Pick how it should look. It goes on your grid, and you can delete it any ' +
+        'time.</p>') +
+    CLUB_TILE_STYLES.map((x) =>
+      '<button class="ce-pick" data-cprun="' + x.id + '">' +
+        '<span class="ce-pick-t">' + x.t + '</span>' +
+        '<span class="ce-pick-d">' + x.d + '</span>' +
+      '</button>').join("");
+  document.querySelectorAll("[data-cprun]").forEach((b) => b.onclick = () => {
+    const style = b.dataset.cprun;
+    b.disabled = true;
+    clubPostRun(run, style).then((ok) => {
+      closeSheet();
+      if (!ok) { toast("That could not be saved on this device."); return; }
+      haptic("success");
+      state.screen = null; state.tab = "community"; state.commView = "runs";
+      render();
+      toast("Posted to Inte-Club.");
+    });
+  });
+  $("sheetOv").classList.add("on");
+}
+/**
+ * THE AUTOMATIC PATH.
+ * ⚠️ ONE CALL SITE, AT SAVE, AND ONLY WHEN THE RUNNER ASKED FOR IT. Anything else — a render, a
+ * migration, a re-ingest — would post the same run again, which is why it also checks the run is not
+ * already up there rather than trusting the caller to fire once.
+ * ⚠️ AND IT NEVER SPEAKS UP ON FAILURE. This runs behind a save the runner has already finished; a toast
+ * about a grid picture arriving over the debrief of the run they just did is noise about the wrong thing.
+ */
+function clubMaybeAutoPost(run) {
+  if (!run || !clubAuto()) return;
+  if (clubRunPosted(run)) return;
+  try { clubPostRun(run, clubAutoStyle()); } catch (e) {}
+}
+
+/**
+ * ══ THE CAMERA ROLL, INSIDE THE APP ════════════════════════════════════════════════════════════════
+ * Owner, 2026-08-22: "when the user clicks the create a post, i want the users camera roll to open
+ * inside the app, not come outside the app into the camera roll, that way, it allows the user to select
+ * multiple pictures/videos to post (like it does on instagram)."
+ *
+ * ⚠️ WHAT SHIPPED THIS MORNING WAS THE SYSTEM SHEET, AND HE IS RIGHT THAT IT IS NOT THE SAME THING. A
+ * file input hands the job to iOS: its screen, its chrome, and the app learns nothing about the library.
+ * What Instagram does is enumerate the library itself and draw its own grid. That needs PhotoKit, which
+ * only Swift can reach — so this grid is native underneath and web on top.
+ *
+ * ⚠️ AND THE FILE INPUT IS KEPT AS THE FALLBACK, NOT DELETED. An over-the-air page reaches phones whose
+ * Swift predates PhotoBridge; there the flag is absent and the sheet is what works. Deleting it would
+ * leave those builds with a grid that can never be filled — which is the OTA asymmetry this project has
+ * already nearly shipped a silent coach through.
+ */
+function clubLibraryAvailable() { return !!window.__interunPhotoLibrary && !!clubPhotoBridge(); }
+function clubPhotoBridge() {
+  try { return (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.interunPhotos) || null; }
+  catch (e) { return null; }
+}
+/**
+ * ⚠️ ONE PENDING REPLY PER TOKEN, AND A WATCHDOG ON EVERY ONE. Swift answers through
+ * evaluateJavaScript, which this project already records doing nothing at all against a suspended
+ * content process — so a request with no timeout is a grid that spins for the rest of the run.
+ */
+const CLUBPHOTO = { seq: 0, waiting: {} };
+window.__interunPhotosReply = function (msg) {
+  if (!msg || !msg.token) return;
+  const w = CLUBPHOTO.waiting[msg.token];
+  if (!w) return;
+  delete CLUBPHOTO.waiting[msg.token];
+  clearTimeout(w.t);
+  w.res(msg);
+};
+function clubPhotoAsk(action, extra) {
+  const bridge = clubPhotoBridge();
+  if (!bridge) return Promise.resolve(null);
+  const token = "p" + (++CLUBPHOTO.seq);
+  const payload = Object.assign({ action: action, token: token }, extra || {});
+  return new Promise((res) => {
+    CLUBPHOTO.waiting[token] = { res: res, t: setTimeout(() => {
+      delete CLUBPHOTO.waiting[token];
+      res(null);
+    }, 12000) };
+    try { bridge.postMessage(payload); }
+    catch (e) { delete CLUBPHOTO.waiting[token]; res(null); }
+  });
+}
+/** ⚠️ THE PIXELS COME OVER THE APP'S OWN SCHEME, NOT THROUGH THE BRIDGE. A base64 round trip for a
+ *  thirty-megabyte video is a stall the runner watches; a URL streams and WebKit handles it. */
+function clubPhotoUrl(id, size) {
+  return "/__photo/" + (size === "full" ? "full" : "thumb") + "/" + encodeURIComponent(id);
+}
+/** OPENING THE PICKER. Falls back to the system sheet wherever the grid cannot be drawn. */
+function clubOpenLibrary(kind) {
+  if (!clubLibraryAvailable()) { clubPickMany(kind); return; }
+  CLUBLIB = { kind: kind, items: [], total: 0, chosen: [], status: "", loading: false, done: false };
+  const ov = el('<div class="club-lib" id="clubLib"></div>');
+  document.body.appendChild(ov);
+  clubLibDraw();
+  clubPhotoAsk("status").then((r) => {
+    CLUBLIB.status = (r && r.status) || "";
+    if (CLUBLIB.status === "notDetermined") return clubPhotoAsk("authorize").then((a) => {
+      CLUBLIB.status = (a && a.status) || "";
+    });
+  }).then(() => {
+    clubLibDraw();
+    if (CLUBLIB.status === "authorized" || CLUBLIB.status === "limited") clubLibMore();
+  });
+}
+let CLUBLIB = null;
+function clubLibClose() { CLUBLIB = null; const e = $("clubLib"); if (e) e.remove(); }
+/** ⚠️ PAGED, AND THE PAGE SIZE IS A CONSTANT RATHER THAN THE WHOLE LIBRARY. A ten-year camera roll is
+ *  tens of thousands of assets; asking for all of them is a stall on open for a grid nobody scrolls. */
+const CLUBLIB_PAGE = 90;
+function clubLibMore() {
+  const S = CLUBLIB;
+  if (!S || S.loading || S.done) return;
+  S.loading = true;
+  clubPhotoAsk("list", { offset: S.items.length, limit: CLUBLIB_PAGE }).then((r) => {
+    if (!CLUBLIB || CLUBLIB !== S) return;
+    S.loading = false;
+    if (!r || !r.items) { S.done = true; clubLibDraw(); return; }
+    S.total = r.total || 0;
+    S.items = S.items.concat(r.items);
+    if (!r.items.length || S.items.length >= S.total) S.done = true;
+    clubLibDraw();
+  });
+}
+function clubLibDraw() {
+  const S = CLUBLIB; if (!S) return;
+  const ov = $("clubLib"); if (!ov) return;
+  const n = S.chosen.length;
+  const denied = S.status === "denied" || S.status === "restricted";
+  const cells = S.items.map((it) => {
+    const at = S.chosen.indexOf(it.id);
+    // ⚠️ A NUMBER, NOT A TICK, and it is the ORDER the post will be in. His reference numbers them for
+    // that reason: a carousel has a first picture, and a tick cannot say which.
+    const mark = at >= 0
+      ? '<span class="clib-n on">' + (at + 1) + '</span>'
+      : '<span class="clib-n"></span>';
+    const dur = it.video && it.seconds > 0
+      ? '<span class="clib-dur num">' + clubClock(it.seconds) + '</span>' : "";
+    return '<button class="clib-c' + (at >= 0 ? " on" : "") + '" data-clib="' + esc(it.id) + '">' +
+      '<img loading="lazy" src="' + esc(clubPhotoUrl(it.id, "thumb")) + '" alt="">' +
+      mark + dur + '</button>';
+  }).join("");
+  ov.innerHTML =
+    '<div class="clib-top">' +
+      '<button class="clib-x" id="clibX" aria-label="Close">✕</button>' +
+      '<span class="clib-t">New ' + (S.kind === "story" ? "story" : "post") + '</span>' +
+      '<button class="clib-next" id="clibNext"' + (n ? "" : " disabled") + '>' +
+        (n ? "Next (" + n + ")" : "Next") + '</button>' +
+    '</div>' +
+    (denied
+      // ⚠️ A REFUSAL IS EXPLAINED AND NOT RETRIED. iOS asks once; from the app's side the answer is
+      // permanent, and the only way back is Settings — so say that rather than showing an empty grid.
+      ? '<div class="cm-empty cm-empty-sm"><p>Inte-Run has no access to your photos. You can turn it ' +
+        'on in Settings › Inte-Run › Photos, or pick files instead.</p>' +
+        '<button class="ui-btn" id="clibFallback">Pick files instead</button></div>'
+      : '<div class="clib-grid" id="clibGrid">' + cells +
+        (S.loading ? '<span class="clib-c clib-load"></span>' : "") + '</div>') +
+    (S.status === "limited"
+      // ⚠️ "SELECTED PHOTOS" IS CURATING, NOT REFUSING, so the way to widen it is offered rather than
+      // the grid pretending the library is small.
+      ? '<div class="clib-foot"><span>You have shared some photos with Inte-Run.</span>' +
+        '<button class="ui-btn" id="clibManage">Choose more</button></div>' : "");
+  const x = $("clibX"); if (x) x.onclick = () => { haptic("light"); clubLibClose(); };
+  const fb = $("clibFallback");
+  if (fb) fb.onclick = () => { const k = S.kind; clubLibClose(); clubPickMany(k); };
+  const mg = $("clibManage");
+  if (mg) mg.onclick = () => clubPhotoAsk("manage").then(() => clubPhotoAsk("refresh")).then(() => {
+    if (!CLUBLIB) return;
+    CLUBLIB.items = []; CLUBLIB.done = false; CLUBLIB.chosen = [];
+    clubLibDraw(); clubLibMore();
+  });
+  ov.querySelectorAll("[data-clib]").forEach((b) => b.onclick = () => clubLibToggle(b.dataset.clib));
+  const grid = $("clibGrid");
+  // ⚠️ 600px OF LOOKAHEAD, so the next page is asked for before the runner reaches the bottom. Waiting
+  // for the last row means a visible stop on every scroll.
+  if (grid) grid.onscroll = () => {
+    if (grid.scrollTop + grid.clientHeight > grid.scrollHeight - 600) clubLibMore();
+  };
+  const nx = $("clibNext");
+  if (nx) nx.onclick = () => clubLibTake();
+}
+/** ⚠️ THE CAP IS THE SAME ONE THE EDITOR HOLDS, and a story takes exactly one. */
+function clubLibToggle(id) {
+  const S = CLUBLIB; if (!S) return;
+  const at = S.chosen.indexOf(id);
+  if (at >= 0) { S.chosen.splice(at, 1); haptic("light"); clubLibDraw(); return; }
+  if (S.kind === "story") { S.chosen = [id]; haptic("light"); clubLibDraw(); return; }
+  if (S.chosen.length >= CLUB_MAX_SLIDES) { toast("Up to " + CLUB_MAX_SLIDES + " in one post."); return; }
+  S.chosen.push(id);
+  haptic("light");
+  clubLibDraw();
+}
+/**
+ * ⚠️ THE FULL BYTES ARE FETCHED ONLY FOR WHAT WAS CHOSEN, AND ONLY WHEN NEXT IS TAPPED. Fetching them
+ * as the runner browses would pull every video they scrolled past into memory.
+ * ⚠️ AND A FILE THAT CANNOT BE READ IS DROPPED WITH A COUNT SAID OUT LOUD. An iCloud original that is
+ * not on the device can genuinely fail; going on in silence would post fewer pictures than were picked.
+ */
+function clubLibTake() {
+  const S = CLUBLIB; if (!S || !S.chosen.length) return;
+  const nx = $("clibNext"); if (nx) { nx.disabled = true; nx.textContent = "Loading…"; }
+  const ids = S.chosen.slice();
+  Promise.all(ids.map((id, i) => fetch(clubPhotoUrl(id, "full"))
+    .then((r) => r.ok ? r.blob() : null)
+    .then((b) => {
+      if (!b) return null;
+      const it = S.items.filter((x) => x.id === id)[0] || {};
+      const ext = it.video ? (/quicktime/.test(b.type) ? "mov" : "mp4")
+                           : (/heic/.test(b.type) ? "heic" : "jpg");
+      return new File([b], "roll-" + i + "." + ext, { type: b.type || (it.video ? "video/mp4" : "image/jpeg") });
+    })
+    .catch(() => null))).then((files) => {
+      const got = files.filter(Boolean);
+      const lost = files.length - got.length;
+      const kind = S.kind;
+      clubLibClose();
+      if (!got.length) { toast("Those could not be read from your library."); return; }
+      if (lost) toast(lost === 1 ? "One could not be read and was left out."
+        : lost + " could not be read and were left out.");
+      openClubEditor(kind, got);
+    });
 }
 
 /* ── PLAN JOURNALS (addendum 1, 2026-08-22) ────────────────────────────────────────────────────────
@@ -12711,31 +13234,6 @@ function commBests() {
   }
   return out;
 }
-/**
- * THE RUNNER'S OWN RUNS, NEWEST FIRST, GROUPED BY THE MONTH THEY HAPPENED IN.
- *
- * ⚠️ FROM state.hist, WHICH IS UNCAPPED, NOT FROM state.logged, WHICH IS FIFTY. The whole point of the
- * history store is that the facts of every run are kept forever; a grid built from the capped store
- * would quietly stop having a past, and on a real training year it would lose 98 of 148 days.
- * ⚠️ AND A RUN WHOSE FULL RECORD IS GONE IS STILL A TILE, BUT NOT A BUTTON. This app already refuses to
- * make a day tappable when its map and splits have been evicted — the training log does exactly this —
- * because the tap would land on "Run not found."
- */
-function commMonths() {
-  const rows = (state.hist || []).filter((r) => r && r.d && Number(r.k) > 0)
-    .slice().sort((a, b) => String(b.d).localeCompare(String(a.d)));
-  const byId = {};
-  for (const r of (state.logged || [])) if (r && r.id) byId[r.id] = r;
-  const out = [];
-  for (const r of rows) {
-    const key = String(r.d).slice(0, 7);
-    let g = out.length && out[out.length - 1].key === key ? out[out.length - 1] : null;
-    if (!g) { g = { key: key, label: commMonthLabel(String(r.d)), runs: [], km: 0 }; out.push(g); }
-    g.km += Number(r.k) || 0;
-    g.runs.push({ id: r.i, distKm: Number(r.k), type: r.t, full: byId[r.i] || null });
-  }
-  return out;
-}
 const COMM_MONTHS = ["January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"];
 function commMonthLabel(iso) {
@@ -12751,23 +13249,6 @@ function commMonthLabel(iso) {
  */
 const COMM_BADGE = { easy: "EASY", long: "LONG", recovery: "RECOVERY", threshold: "TEMPO",
   vo2: "HARD", strides: "STRIDES", "race-specific": "RACE PACE", race: "RACE" };
-function commTileHtml(t) {
-  const eff = sessionEffort(t.type);
-  const badge = COMM_BADGE[t.type] || "RUN";
-  const route = (t.full && Array.isArray(t.full.route)) ? normalizeRoute(t.full.route) : [];
-  const art = route.length > 1
-    ? '<span class="cm-art">' + routeMapSvg(route, null, 320, 200) + '</span>'
-    : '<span class="cm-art cm-art-none"></span>';
-  const inner = art +
-    '<span class="cm-tint" style="--ce: var(--eff-' + eff + ')"></span>' +
-    '<span class="cm-foot">' +
-      '<span class="num">' + commKm(t.distKm) + '</span>' +
-      '<span class="cm-badge" style="color: var(--eff-' + eff + ')">' + badge + '</span>' +
-    '</span>';
-  return t.full
-    ? '<button class="cm-tile" data-crun="' + esc(String(t.id)) + '">' + inner + '</button>'
-    : '<span class="cm-tile cm-tile-off" aria-disabled="true">' + inner + '</span>';
-}
 function commKm(km) { return (Math.round((Number(km) || 0) * 10) / 10).toFixed(1) + " km"; }
 /**
  * THE STORY, BUILT FROM THE RUNNER'S OWN LAST RUN.
@@ -12884,7 +13365,15 @@ function openCommStory() {
     const run = (state.logged || [])[0];
     const route = (run && Array.isArray(run.route)) ? normalizeRoute(run.route) : [];
     const art = route.length > 1
-      ? '<span class="cm-sart">' + routeMapSvg(route, null, 320, 200) + '</span>'
+      // ⚠️ FRAMED FOR THE STORY'S OWN SHAPE, AND THE ASPECT IS WRITTEN FROM THE SAME TWO NUMBERS.
+      // routeMapSvg fits a route inside the box it is given while preserving its proportions, so a tall
+      // box gives a tall drawing that fills the frame — at 320x200 the same route sat as a small wide
+      // sketch marooned in a screen of black, which is what his screenshot shows once the stretch is
+      // gone. ⚠️ The inline aspect-ratio comes from the constants rather than the stylesheet, because a
+      // number in the CSS and the same number in the call is two owners of one measurement — the fault
+      // this app already records for .sst-stage's own minimum height.
+      ? '<span class="cm-sart" style="aspect-ratio:' + STORY_ART_W + ' / ' + STORY_ART_H + '">' +
+        routeMapSvg(route, null, STORY_ART_W, STORY_ART_H) + '</span>'
       : '<span class="cm-sart"></span>';
     const el = $("cmStory");
     if (el) el.innerHTML =
@@ -12919,10 +13408,12 @@ function openCommStory() {
 }
 /** 4.5s a slide — the design's own figure, and the same value the progress keyframe uses. */
 const COMM_STORY_MS = 4500;
+/** ⚠️ THE STORY'S OWN SHAPE, roughly 9:16 — the frame a phone story occupies. Read by the call that draws
+ *  the route AND written into the element's aspect-ratio, so the two cannot disagree. */
+const STORY_ART_W = 360, STORY_ART_H = 620;
 function viewCommunity() {
   const v = commView();
   const p = commProfile();
-  const months = commMonths();
   const bests = commBests();
   const wk = logTotals(logWeekStartIso(), todayIso());
   const uploads = clubPosts();
@@ -12969,7 +13460,7 @@ function viewCommunity() {
   const tr = clubTrainers();
   const shopHref = tr ? clubShopHref(tr.shop) : "";
   const trainers = tr
-    ? '<div class="cm-tr">' + ICON.rEasy +
+    ? '<div class="cm-tr">' + ICON.shoe +
         (shopHref
           // ⚠️ rel="noopener noreferrer" AND target — a link the runner typed opens away from the app, and
           // the page it lands on must never be handed a handle back to this one.
@@ -12996,19 +13487,15 @@ function viewCommunity() {
         // three-column area that reads as the app having lost something.
         ? '<div class="cm-empty cm-empty-sm"><p>No videos yet — anything you film on a run shows up ' +
           'here.</p></div>' : "");
-  const runGrid = (vidOnly && uploads.length) ? "" : (months.length
-    ? months.map((m, i) =>
-        '<div class="cm-mhead' + (i || shown.length ? " cm-mhead-n" : "") + '">' +
-          '<h2>' + esc(m.label) + '</h2>' +
-          '<span class="num">' + m.runs.length + (m.runs.length === 1 ? " RUN" : " RUNS") +
-            " · " + Math.round(m.km) + ' KM</span>' +
-        '</div>' +
-        '<div class="cm-grid">' + m.runs.map(commTileHtml).join("") + '</div>').join("")
-    // ⚠️ THE DESIGN'S OWN EMPTY GRID STATE, in its own words.
-    : (uploads.length ? "" :
-      '<div class="cm-empty cm-empty-sm"><p>Your first run will show up here — with the shape of ' +
-      'where you went, how far, and how hard it was.</p></div>'));
-  const grid = tabs + upGrid + runGrid;
+  // ⚠️⚠️ THE GRID IS WHAT HE HAS CHOSEN TO POST, AND NOTHING ELSE. It used to be every run the app had
+  // ever recorded, put there by the app — which is a training log wearing a profile's clothes, and the
+  // Logbook already is the log. His instruction: "I want the user to decide what to post on their grid,
+  // not for it to be automatically added". So the months of runs are gone from here entirely; a run
+  // reaches the grid by being shared to it, from the run's own page or automatically if he asks for that.
+  const grid = tabs + upGrid + (uploads.length ? "" :
+    '<div class="cm-empty cm-empty-sm"><p>Nothing posted yet. Finish a run and you can put it here ' +
+    'from its own page — or turn on automatic posting in Edit profile and every run goes up.</p>' +
+    '<button class="ui-btn" data-cedit="1">Edit profile</button></div>');
 
   return '<div class="cm-wrap">' +
     '<div class="cm-seg" role="tablist">' +
@@ -19113,7 +19600,7 @@ function gpsBarsHtml() {
  */
 function liveShoeChipHtml() {
   const sh = activeShoe();
-  return '<button class="live-shoe" id="lShoe">' + ICON.rEasy +
+  return '<button class="live-shoe" id="lShoe">' + ICON.shoe +
     '<span>' + (sh ? esc(sh.name) : "Set active shoe") + '</span></button>';
 }
 /**
@@ -19367,11 +19854,24 @@ function routeMapSvg(route, proj, vbW, vbH) {
     const lats = route.map((p) => p.lat), lngs = route.map((p) => p.lng);
     const minLa = Math.min(...lats), maxLa = Math.max(...lats), minLo = Math.min(...lngs), maxLo = Math.max(...lngs);
     const cx = Math.cos((minLa + maxLa) / 2 * Math.PI / 180) || 1;
-    W = 320; H = 200; const pad = 20;
+    // ⚠️⚠️ THE BOX IT WAS GIVEN, NOT A HARDCODED 320x200 — AND THIS WAS A REAL, INVISIBLE STRETCH. The
+    // no-projection branch discarded vbW/vbH and always emitted a 320x200 viewBox; with
+    // preserveAspectRatio="none" on the element, any caller whose box was a different shape got the
+    // route pulled to fit. The story was stretched 2.76x vertically and it still LOOKED like a route —
+    // the giveaway was the start and finish markers rendering as tall ovals rather than circles.
+    // ⚠️ EVERY EXISTING CALLER PASSED 320, 200 OR NOTHING, so honouring the arguments is byte-identical
+    // for all of them: the default keeps the old numbers for the one caller that passes none.
+    W = vbW > 0 ? vbW : 320; H = vbH > 0 ? vbH : 200;
+    // ⚠️ THE PADDING SCALES WITH THE BOX. A flat 20 is 10% of a 200-tall drawing and 3% of a 620-tall
+    // one, so a tall frame would have left the route almost touching the edges.
+    const pad = Math.max(8, Math.min(W, H) * 0.0625);
     const spanLo = Math.max(1e-9, (maxLo - minLo) * cx), spanLa = Math.max(1e-9, maxLa - minLa);
     const scale = Math.min((W - 2 * pad) / spanLo, (H - 2 * pad) / spanLa);
     const ox = (W - spanLo * scale) / 2, oy = (H - spanLa * scale) / 2;
-    xy = (p) => [ox + (p.lng - minLo) * cx * scale, oy + (maxLa - p.lat) * scale]; r = 5.5;
+    // ⚠️ AND SO DOES THE MARKER, for the same reason: 5.5 units is a clear circle on a 320-wide drawing
+    // and a speck on a 1080-wide one.
+    xy = (p) => [ox + (p.lng - minLo) * cx * scale, oy + (maxLa - p.lat) * scale];
+    r = Math.max(4, Math.min(W, H) * 0.0172);
   }
   const d = route.map((p, i) => (i ? "L" : "M") + xy(p).map((n) => n.toFixed(1)).join(" ")).join(" ");
   const s = xy(route[0]), e = xy(route[route.length - 1]);
@@ -22170,6 +22670,10 @@ function runOverviewHtml(run) {
   return '<div class="card ov-map-card"><div class="ov-map" id="ovMap">' + routeMapSvg(run.route) + '</div>' +
     head + ovStatsHtml(run, a) + '</div>' +
     '<button class="primary share-btn" id="shareRun">' + ICON.share + ' Share my run</button>' +
+    // ⚠️ THIS IS THE ROUTE HIS RULING CREATES. With the grid no longer filled by the app, a run reaches
+    // it from here — and it says whether it is already up there rather than quietly adding a second tile.
+    '<button class="ui-btn club-post-btn" id="clubPostRun">' + ICON.community + ' ' +
+      (clubRunPosted(run) ? "Already on your grid" : "Post to Inte-Club") + '</button>' +
     stravaRunButtonHtml(run) +
     // ⚠️ THE PACE CHART, THE SPLITS AND THE HEART-RATE PANEL NO LONGER STACK HERE. Each is
     // reached by tapping the stat it belongs to. What is left is his list: share, the written
@@ -26888,6 +27392,9 @@ const SST_GLYPH = {
  * which reads as a second lens on the camera.
  */
 const SST_DGLYPH = {
+  // ⚠️ THE CLUB'S OWN MARK, which is the two-figure glyph the bottom nav already uses for the tab — so
+  // the tile and the destination it posts to wear the same picture rather than two ideas of the club.
+  club: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.2" r="3.1"/><path d="M3.4 19.2c0-3 2.5-4.8 5.6-4.8s5.6 1.8 5.6 4.8"/><path d="M16.4 5.6a3 3 0 0 1 0 5.6"/><path d="M17.6 14.9c2 .6 3.2 2.1 3.2 4.3"/></svg>',
   camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.2" width="17.6" height="17.6" rx="5.2"/><circle cx="12" cy="12" r="4.15"/><path d="M16.9 7.1h.01"/></svg>',
   handset: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 11.5a8.5 8.5 0 0 1-12.6 7.4l-4.6 1.5 1.5-4.4a8.5 8.5 0 1 1 15.7-4.5z"/><path d="M9.1 8.7c.2 2.9 3.1 5.5 6.1 5.9.7.1 1.2-.5 1.1-1.2l-.2-1-2.2-.6-.7 1a6.6 6.6 0 0 1-2.4-2.4l1-.7-.6-2.2-1-.2c-.7-.1-1.2.5-1.1 1.2z"/></svg>',
   bubble: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 11.4c0 4.2-3.9 7.5-8.6 7.5-.9 0-1.8-.1-2.6-.3l-4.6 1.8 1.4-3.9a7.2 7.2 0 0 1-2.8-5.1c0-4.2 3.9-7.5 8.6-7.5s8.6 3.3 8.6 7.5z"/><path d="M8.4 11.4h.01M12 11.4h.01M15.6 11.4h.01"/></svg>',
@@ -26912,6 +27419,12 @@ const SST_DEST = [
     native: "UIActivityViewController narrowed to the WhatsApp extension, or whatsapp://send after writing the card to a shared container; text-only via whatsapp://send?text= cannot carry the picture" },
   { id: "messages", label: "Messages", glyph: SST_DGLYPH.bubble,
     native: "MFMessageComposeViewController with the card as an attachment; sms: carries no image at all" },
+  // ⚠️⚠️ INTE-CLUB IS THE ONE TILE THAT NEEDS NOTHING NATIVE AND CANNOT FAIL. Every other destination
+  // hands a file to somebody else's app; this one writes the card into a store this app owns, so there
+  // is no bridge, no scheme, no permission and no share sheet. It is FIRST for that reason: it is the
+  // only tile that certainly works on every build.
+  { id: "inteclub", label: "Inte-Club", glyph: SST_DGLYPH.club,
+    native: "none — the card is written straight into the club's own store, so this tile needs no bridge at all" },
   { id: "more", label: "More", glyph: SST_DGLYPH.ellipsis,
     native: "none — the system share sheet IS this tile's destination, and it is already what every tile opens" },
 ];
@@ -26959,6 +27472,11 @@ function shareAppIsDirect(id) { return shareAppsDirect().indexOf(id) >= 0; }
  * spoken name has to match what the tile actually does.
  */
 function shareAppVia(id) {
+  // ⚠️⚠️ THE CLUB TILE DOES NOT OPEN A SHARE SHEET, AND SAYING IT DOES WAS A REAL DEFECT — the same class
+  // as the map attribution crediting Mapbox for tiles CARTO had served. This sentence was correct for as
+  // long as every tile ended in the share sheet; adding one that does not made it false, and nothing
+  // about the sentence itself changed. A derived fact goes stale the moment a new case arrives.
+  if (id === "inteclub") return " \u2014 posts to your own grid";
   return shareAppIsDirect(id) ? " \u2014 opens the app" : " \u2014 opens your phone\u2019s share sheet";
 }
 /** One tile builder, so a second destination cannot arrive with a different shape or no label. */
@@ -27069,6 +27587,10 @@ function studioDest(id) {
   // ⚠️ STILL ONE DISPATCH, PLUS ONE CAPABILITY TEST — not a branch per tile. Which route a tile takes is
   // decided by what THIS BUILD can do, from the flag Swift sets, so the answer is the same for every
   // tile that shares a capability and there is nothing per-tile to get wrong.
+  // ⚠️ INTE-CLUB IS ANSWERED BEFORE THE CAPABILITY TEST, because it is not a handoff at all — nothing
+  // leaves the phone and nothing else can serve it. Left to fall through it would open the share sheet,
+  // which is the one thing this tile must not do.
+  if (id === "inteclub") return shareToClub(STUDIO.run);
   if (shareAppIsDirect(id) && shareAppHandoff(id, STUDIO.run)) return;
   return doShareRun(STUDIO.run);
 }
@@ -30618,6 +31140,12 @@ function wire() {
   // shape choice, no preview and no Save to device. The Logbook had all four. Same run, same studio.
   const shareRun = $("shareRun");
   if (shareRun) shareRun.onclick = () => openShareStudio(currentOverviewRun());
+  const cpr = $("clubPostRun");
+  // ⚠️ currentOverviewRun(), THE SAME RESOLVER Share USES ON THE LINE ABOVE. This markup is shared by the
+  // finish screen and the Logbook's detail view, and only one of those has a viewRunId — viewedRun() is
+  // null on the finish screen, so the button would have done nothing on the one screen it is most likely
+  // to be pressed from. Two resolvers for one button is how they come to disagree.
+  if (cpr) cpr.onclick = () => openClubPostRunSheet(currentOverviewRun());
   // Strava sits in runOverviewHtml beside Share, which is the FINISH screen. ⚠️ The Logbook's detail
   // view no longer renders it — there it lives inside the share studio, which is not rendered by
   // render() and wires its own copy (see studioClick). So while the studio is open over the finish
@@ -30707,7 +31235,7 @@ function wire() {
   document.querySelectorAll("[data-cedit]").forEach((b) => b.onclick = () => {
     state.screen = "clubedit"; render();
   });
-  document.querySelectorAll("[data-cnewpost]").forEach((b) => b.onclick = () => clubPickMany("post"));
+  document.querySelectorAll("[data-cnewpost]").forEach((b) => b.onclick = () => clubOpenLibrary("post"));
   const cb = $("clubBack");
   if (cb) cb.onclick = () => { state.screen = null; state.clubPostId = null; render(); };
   if (state.screen === "clubpost") wireClubPostView();
@@ -30736,7 +31264,7 @@ function wire() {
   });
   // The + on the avatar and the Add on the rail both go straight to the camera roll for a story — the
   // owner's fourth screenshot. No Create sheet in between; that is what the top-bar plus is for.
-  document.querySelectorAll("[data-cadd]").forEach((b) => b.onclick = () => clubPick(b.dataset.cadd));
+  document.querySelectorAll("[data-cadd]").forEach((b) => b.onclick = () => clubOpenLibrary(b.dataset.cadd));
   document.querySelectorAll("[data-cmt]").forEach((b) => b.onclick = () => {
     state.clubMedia = b.dataset.cmt; render();
   });

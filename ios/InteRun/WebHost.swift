@@ -65,6 +65,11 @@ struct WebHost: UIViewRepresentable {
                   // above: an over-the-air page must never infer a native capability from a message
                   // handler existing, because an older build discards the action in silence.
                   + HealthKitService.capabilityJS()
+                  // Whether this build can draw the camera roll INSIDE the app. Same rule again: an
+                  // over-the-air page must never infer it from the handler existing, or a phone whose
+                  // Swift predates this file would show an empty grid with no way back to the system
+                  // sheet that does work there.
+                  + PhotoBridge.capabilityJS()
                   + WebUpdateService.shared.diagnosticJS
                   + tokenJS,
             injectionTime: .atDocumentStart, forMainFrameOnly: true))
@@ -140,6 +145,11 @@ struct WebHost: UIViewRepresentable {
         // Saving a phone-recorded run to Apple Health as a real workout. See HealthKitService for why a
         // WATCH run is never written from here.
         config.userContentController.add(HealthKitService.shared, name: HealthKitService.messageName)
+        // The camera roll INSIDE the app — he asked for Instagram's own grid rather than the system
+        // sheet, which means the app enumerates the library itself. See PhotoLibraryService for why a
+        // picker and a grid are different things.
+        PhotoBridge.shared.attach(webView)
+        config.userContentController.add(PhotoBridge.shared, name: PhotoBridge.messageName)
         WebUpdateService.shared.checkForUpdate()
         webView.allowsBackForwardNavigationGestures = false
         webView.scrollView.contentInsetAdjustmentBehavior = .never

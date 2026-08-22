@@ -832,8 +832,22 @@ test("BLOCKER: every destination is a tile, every tile is wired, and none of the
     "studioDest has more than one handoff, so the tiles no longer provably share one route");
   assert.ok(!/saveShareCard|stravaSendRun|window\.open|location\.href/.test(go),
     "studioDest reaches a second destination, so a tile can send somewhere its label does not name");
-  assert.ok(!new RegExp('id === "').test(go) && !/switch\s*\(/.test(go),
-    "studioDest branches on the destination id, so one tile can behave differently from the rest");
+  // ⚠️ EXACTLY ONE ID MAY HAVE A BRANCH, AND IT MUST BE THE CLUB. The rule this protects is that no tile
+  // quietly becomes a destination its logo does not imply — and Inte-Club is not a handoff at all: the
+  // card is written into a store this app owns, so nothing leaves the phone, there is no bridge and no
+  // share sheet. Left to fall through it would open the share sheet, which is the one thing that tile
+  // must not do. Every OTHER id still shares the two routes, which is what the count above proves.
+  const branches = [...go.matchAll(/id === "([a-z]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(branches, ["inteclub"],
+    "studioDest branches on a destination id other than the club, so a tile can behave differently from the rest: " +
+    branches.join(", "));
+  assert.ok(!/switch\s*\(/.test(go), "studioDest dispatches per tile through a switch");
+  assert.match(go, /if \(id === "inteclub"\) return shareToClub/,
+    "the club branch no longer posts to the club");
+  // ⚠️ AND IT IS ANSWERED BEFORE THE CAPABILITY TEST, or a build with the native bridge would try to hand
+  // the card to an app for a destination that is inside this one.
+  assert.ok(go.indexOf('id === "inteclub"') < go.indexOf("shareAppIsDirect"),
+    "the club branch is checked after the app handoff, so a native build tries to hand it to another app");
   // An unknown id must do nothing rather than falling through to the share sheet.
   assert.match(go, /SST_DEST\.filter\(\(d\) => d\.id === id\)\.length\) return/,
     "an unrecognised data-sstdest reaches the share sheet, so any stray attribute becomes a share button");
@@ -1242,4 +1256,21 @@ test("BLOCKER: the pasteboard handoff expires, and every declared scheme has a d
       "the scheme " + sc + " is declared but nothing asks about it: " + schemes.join(", "));
   }
   function src2Mentions(sc: string): boolean { return page().includes(sc); }
+});
+
+test("BLOCKER: every destination's accessible name says what THAT tile does", () => {
+  // ⚠️⚠️ THIS WAS A REAL DEFECT AND IT IS THE SAME CLASS AS THE MAP ATTRIBUTION CREDITING THE WRONG
+  // PROVIDER. One sentence was appended to every tile — "opens your phone's share sheet" — and it was
+  // true for as long as every tile ended there. Adding Inte-Club, which posts into a store this app owns
+  // and opens nothing, made it false; nothing about the sentence changed. A derived fact goes stale the
+  // moment a new case arrives, and the tile that lies is the one a screen-reader user relies on most.
+  const via = nocomment(lift("shareAppVia"));
+  assert.match(via, /if \(id === "inteclub"\) return/,
+    "the club tile is described as opening the share sheet, which it does not do");
+  assert.match(via, /posts to your own grid/, "the club tile does not say where it actually posts");
+  // ⚠️ AND EVERY OTHER TILE STILL SHARES THE TWO SENTENCES, from the capability flag rather than per tile.
+  assert.match(via, /shareAppIsDirect\(id\) \?/, "the remaining tiles no longer share one derivation");
+  const branches = [...via.matchAll(/id === "([a-z]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(branches, ["inteclub"],
+    "a second destination has its own sentence: " + branches.join(", "));
 });

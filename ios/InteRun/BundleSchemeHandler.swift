@@ -45,6 +45,31 @@ final class BundleSchemeHandler: NSObject, WKURLSchemeHandler {
             return
         }
 
+        // ⚠️ THE CAMERA ROLL IS SERVED THROUGH THIS SCHEME, on a path prefix, rather than through a
+        // second handler on a second origin. localStorage is keyed to interun://app, so a photograph
+        // arriving from anywhere else would sit outside everything the app owns — and two handlers is
+        // two places the live-task bookkeeping below has to be right. Checked BEFORE resolve(), which
+        // would otherwise look for a file of that name in the bundle and 404.
+        if let url = task.request.url, url.path.hasPrefix(PhotoBridge.pathPrefix) {
+            PhotoBridge.serve(path: url.path) { data, mime in
+                DispatchQueue.main.async {
+                    guard let data = data else {
+                        self.respond(task, key: key, status: 404, headers: [:], body: Data())
+                        return
+                    }
+                    self.respond(task, key: key, status: 200, headers: [
+                        "Content-Type": mime,
+                        "Content-Length": String(data.count),
+                        // ⚠️ NO-STORE. A photograph is served by identifier, and an identifier outlives
+                        // an edit: crop a picture in Photos and the same identifier now names different
+                        // pixels. A cached copy would show the runner the version before they changed it.
+                        "Cache-Control": "no-store",
+                    ], body: data)
+                }
+            }
+            return
+        }
+
         guard let url = task.request.url, let file = resolve(url) else {
             respond(task, key: key, status: 404, headers: [:], body: Data())
             return

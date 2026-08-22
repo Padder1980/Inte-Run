@@ -161,8 +161,13 @@ test("there is exactly ONE tile source, and ONE place naming the styles", () => 
   // loadRouteMap itself — so it is cached, it falls back the same one-way to CARTO, and it carries back
   // the provider that actually served the tiles for its attribution. It was written the other way
   // first and THIS GUARD CAUGHT IT: a second loadRouteMap caller re-fetches billed tiles per view.
-  assert.equal(calls - selfCalls, 4,
-    "a map consumer is bypassing the cache (expected: the definition plus the three call sites)");
+  // ⚠️ FIVE SINCE 2026-08-22: the Inte-Club grid tile. He asked for a real map behind the route line, and
+  // the reasoning that first refused it was wrong in its second half — "about 120 paid-for map tiles
+  // every time you opened the tab" is only true of an uncached fetch, and this is exactly the cache that
+  // makes it once, ever, keyed on the route. The tile goes through routeMapFor at a single quantised
+  // size, so fifteen runs cost ~120 tiles on first sight and nothing afterwards.
+  assert.equal(calls - selfCalls, 5,
+    "a map consumer is bypassing the cache (expected: the definition plus the four call sites)");
   assert.equal((html.match(/loadRouteMap\(/g) || []).length, 2,
     "loadRouteMap has a caller other than routeMapFor — that one re-fetches tiles on every view");
 });

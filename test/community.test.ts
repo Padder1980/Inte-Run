@@ -32,6 +32,11 @@ function appBlock(): string {
   assert.ok(app, "the app's script block could not be found");
   return app;
 }
+/** ⚠️ SWIFT COMMENTS STRIPPED FOR THE SAME REASON THE PAGE'S ARE. Doc comments in this project explain
+ *  why an API is NOT used, so they quote the very names a guard forbids — PHPickerViewController is
+ *  named in PhotoLibraryService's header explaining why a picker is not a grid. Eleventh firing of that
+ *  trap in this codebase, and the first in Swift. */
+const noswift = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/[\/!]?.*$/gm, "");
 /** The generated stylesheet. */
 function sheetOf(src: string): string {
   const a = src.indexOf("<style>"), b = src.indexOf("</style>", a);
@@ -73,19 +78,21 @@ test("BLOCKER: the feed is the design's own empty state, and says why rather tha
   assert.match(feed, /data-cnewpost="1"/, "the empty feed offers no working action at all");
 });
 
-test("BLOCKER: the runner's own pane is built from real data, and the grid from the UNCAPPED store", () => {
-  // ⚠️ state.hist, NOT state.logged. The history store keeps every run for ever; the capped store keeps
-  // fifty. A grid from the capped one would quietly stop having a past — measured on an eight-month
-  // fixture elsewhere in this suite, 148 days against 50 openable.
-  const months = fn("commMonths");
-  assert.match(months, /state\.hist/, "the month grid is not built from the uncapped history");
-  assert.match(months, /state\.logged/,
-    "the grid never consults the full records, so no tile could ever be openable");
-  // ⚠️ A RUN WHOSE FULL RECORD IS GONE IS A SPAN, NOT A BUTTON — the rule this app already applies to
-  // the training log, because the tap would land on "Run not found."
-  const tile = fn("commTileHtml");
-  assert.match(tile, /t\.full\s*\n?\s*\?/, "a tile is a button whether or not the run can be opened");
-  assert.match(tile, /aria-disabled="true"/, "an unopenable tile is not marked as such");
+test("BLOCKER: the runner's own pane is built from real data, and the grid is what THEY posted", () => {
+  // ⚠️⚠️ RESTATED FOR HIS RULING OF 2026-08-22: "I want the user to decide what to post on their grid,
+  // not for it to be automatically added". The grid used to be every run the app had ever recorded, so
+  // this guard was about reading the UNCAPPED history rather than the capped store. There is no month
+  // grid any more — a run reaches the grid by being posted — so what has to be true instead is that the
+  // grid shows posts and nothing else, and that a run cannot arrive there without being asked for.
+  const v = nocomment(fn("viewCommunity"));
+  assert.match(v, /clubPosts\(\)/, "the grid is not built from what the runner posted");
+  assert.ok(!/commMonths|state\.hist/.test(v), "the grid is still filling itself from the run history");
+  const auto = nocomment(fn("clubMaybeAutoPost"));
+  assert.match(auto, /if \(!run \|\| !clubAuto\(\)\) return/,
+    "runs are posted to the grid whether or not the runner asked for it");
+  assert.match(auto, /clubRunPosted\(run\)/, "the same run can be posted twice by the automatic path");
+  assert.match(nocomment(page()), /function clubAuto\(\) \{ return loadClubProf\(\)\.autoPost === true; \}/,
+    "automatic posting is not off by default, so the app decides rather than the runner");
   // The plan line is real, and the two fields this app does not store are not invented.
   const prof = fn("commProfile");
   assert.match(prof, /CURRENT_WEEK/, "the plan position is not read from the plan");
@@ -93,15 +100,26 @@ test("BLOCKER: the runner's own pane is built from real data, and the grid from 
   assert.ok(!/@/.test(nocomment(prof)), "commProfile is inventing a handle");
 });
 
-test("BLOCKER: a tile is geometry, never a basemap, so the grid costs no billed tiles", () => {
-  // ⚠️ FIFTEEN TILES OF BASEMAP ON FIRST OPEN IS ROUGHLY 120 BILLED TILES. The share card made exactly
-  // this call for exactly this reason ("NO TILES … a shared card costs no billed tiles"), and the
-  // route-map cache exists because a map re-fetched per view is the bill of the whole feature.
-  const tile = fn("commTileHtml");
-  assert.match(tile, /routeMapSvg\(/, "the tile does not draw the route as geometry");
-  for (const bad of ["routeMapFor", "loadRouteMap", "liveMapFor", "buildOverviewMap"]) {
-    assert.ok(!tile.includes(bad), "a grid tile fetches map tiles via " + bad);
-  }
+test("BLOCKER: a posted run's picture is drawn ONCE, at post time, and through the cache", () => {
+  // ⚠️⚠️ THIS INVERTS THE GUARD IT REPLACES, AND THE OLD REASONING WAS HALF WRONG. It said a basemap
+  // behind a grid tile would be "roughly 120 billed tiles on first open" — true — and left the
+  // implication that it would be 120 EVERY time, which is false, and false because of the cache this app
+  // already built: routeMapFor keys on the route and keeps the composite in IndexedDB. He asked for the
+  // map ("there is no map sitting behind the route line....this needs fixing"), and the honest answer is
+  // that it costs tiles once.
+  // ⚠️ AND IT IS BAKED AT POST TIME RATHER THAN DRAWN PER RENDER, which is stronger than the cache: the
+  // picture somebody approved is the picture that stays there, and a later change to the map provider,
+  // the style or the route privacy cannot repaint a post that is already published.
+  const blob = nocomment(fn("clubRunTileBlob"));
+  assert.match(blob, /routeMapFor\(route, S, S, MAP_STYLE_RUN\)/,
+    "the posted picture does not go through the one cached map path");
+  assert.ok(!/loadRouteMap/.test(blob), "the posted picture fetches tiles outside the cache");
+  assert.match(blob, /runRoutePresentation\(run\)/,
+    "the posted picture ignores route privacy, so a hidden start could be published");
+  // ⚠️ AND IT FALLS BACK TO THE NUMBERS WITH NO ROUTE, whatever style was asked for — a treadmill run has
+  // none by design and an empty square is worse than the facts of the run.
+  assert.match(blob, /const want = \(route\.length > 1\) \? kind : "card"/,
+    "a run with no route is drawn as an empty map rather than as its numbers");
   assert.ok(!fn("openCommStory").includes("routeMapFor"), "the story viewer fetches billed map tiles");
 });
 
@@ -112,19 +130,23 @@ test("BLOCKER: the badge word and its colour come from the one effort mapping", 
   // appeared anywhere in the function — which a conditional wrapped around it still satisfies. Watched
   // escaping: `(t.type === "threshold") ? "hard" : sessionEffort(t.type)` passed, and that IS the defect,
   // because a tempo would then be rust here and amber on every other screen.
-  const tile = fn("commTileHtml");
-  const eff = (/const eff = ([^;]+);/.exec(tile) || [])[1];
-  assert.equal(String(eff).trim(), "sessionEffort(t.type)",
-    "the tile decides its own effort colour: " + eff);
-  assert.ok(!/intensity|targetRpe/.test(tile), "the tile carries a second opinion about effort");
-  // ⚠️ AND NO SESSION TYPE IS NAMED IN THE TILE AT ALL, which is what a second opinion looks like.
-  for (const t of ["threshold", "vo2", "race", "recovery"]) {
-    assert.ok(!new RegExp('=== "' + t + '"').test(tile),
-      "the tile branches on the session type " + t + " rather than asking the one mapping");
+  // ⚠️ MOVED WITH ITS SUBJECT: the run tile is drawn at post time now, so the two painters that put an
+  // effort colour and a word on it are what must ask the one mapping.
+  const blob = nocomment(fn("clubRunTileBlob"));
+  const eff = (/const eff = ([^;]+);/.exec(blob) || [])[1];
+  assert.equal(String(eff).trim(), "runEffort(run)",
+    "the posted picture decides its own effort colour: " + eff);
+  for (const f of ["clubTileStamp", "clubTileCard"]) {
+    const src = nocomment(fn(f));
+    assert.ok(!/intensity|targetRpe/.test(src), f + " carries a second opinion about effort");
+    for (const t of ["threshold", "vo2", "race", "recovery"]) {
+      assert.ok(!new RegExp('=== "' + t + '"').test(src),
+        f + " branches on the session type " + t + " rather than asking the one mapping");
+    }
+    // ⚠️ AND A WORD, NEVER A COLOUR ALONE, which is what makes it readable to a colour-blind runner.
+    assert.match(src, /COMM_BADGE\[run\.type\]/, f + " does not take its word from the badge table");
+    assert.match(src, /\|\| "RUN"/, f + " renders no word for a type with no badge");
   }
-  // ⚠️ AND A WORD, NEVER A COLOUR ALONE, which is what makes the grid readable to a colour-blind runner.
-  assert.match(tile, /COMM_BADGE\[t\.type\]/, "the badge word is not from the badge table");
-  assert.match(fn("commTileHtml"), /\|\| "RUN"/, "a session type with no badge word renders no word");
 });
 
 test("BLOCKER: every control on the screen is reached by a handler", () => {
@@ -300,16 +322,28 @@ test("BLOCKER: the create button is on the club and nowhere else", () => {
 });
 
 test("BLOCKER: the camera roll is reached by a file input that is created, clicked and dropped", () => {
-  const p = fn("clubPick");
-  assert.match(p, /inp\.type = "file"/, "the picker is not a file input");
-  assert.match(p, /accept = "image\/\*,video\/\*"/, "the picker does not accept both photos and video");
-  // ⚠️ NO capture ATTRIBUTE. With one, iOS opens the camera directly and the runner cannot reach their
-  // roll at all — which is the opposite of what was asked for.
-  assert.ok(!/capture/.test(p), "the picker forces the camera, so the camera roll is unreachable");
-  // ⚠️ REMOVED AFTER USE. A file input left in the document is one a later render can re-trigger, and on
-  // iOS a stale one silently stops opening the sheet.
+  // ⚠️ THE FALLBACK, NOT THE PRIMARY ROUTE, SINCE HIS 2026-08-22 RULING. He asked for the camera roll
+  // INSIDE the app, which needs PhotoKit and so needs Swift — so the file input is what an over-the-air
+  // page uses on a phone whose native side predates PhotoBridge. It is kept for exactly that reason:
+  // deleting it would leave those builds with a grid that can never be filled.
+  const p = nocomment(fn("clubPickMany"));
+  assert.match(p, /inp\.type = "file"/, "the fallback picker is not a file input");
+  assert.match(p, /accept = "image\/\*,video\/\*"/, "the fallback does not accept both photos and video");
+  assert.ok(!/capture/.test(p), "the fallback forces the camera, so the camera roll is unreachable");
   assert.match(p, /inp\.remove\(\)/, "the file input is left in the document");
-  assert.match(p, /openClubEditor\(kind, f\)/, "picking a file does not open the editor");
+  assert.match(p, /openClubEditor\(kind, files\)/, "picking files does not open the editor");
+  // ⚠️ AND EVERY ENTRY POINT GOES THROUGH THE OPENER, which decides between the two. A caller that
+  // reached the fallback directly would be the one route that never gets the in-app grid.
+  const app = nocomment(page());
+  assert.ok(!/clubPickMany\("post"\)|clubPickMany\(b\.dataset/.test(app),
+    "an entry point reaches the fallback picker directly, bypassing the in-app grid");
+  const open2 = nocomment(fn("clubOpenLibrary"));
+  assert.match(open2, /if \(!clubLibraryAvailable\(\)\) \{ clubPickMany\(kind\); return; \}/,
+    "the opener does not fall back to the system sheet where the grid cannot be drawn");
+  // ⚠️ A CAPABILITY FLAG, NEVER A HANDLER-EXISTS TEST. This project nearly shipped a silent coach that
+  // way: the handler name had existed for weeks while the action behind it had not.
+  assert.match(nocomment(fn("clubLibraryAvailable")), /window\.__interunPhotoLibrary/,
+    "the in-app grid is chosen without asking whether this build can draw it");
 });
 
 test("BLOCKER: both Create rows and the avatar's plus all reach the camera roll", () => {
@@ -327,11 +361,12 @@ test("BLOCKER: both Create rows and the avatar's plus all reach the camera roll"
   assert.match(c, /Reels, highlights and going live are next/, "the unbuilt kinds are neither named nor excluded");
   assert.ok(!/data-cnew="(reel|live|highlight)/.test(c), "an unbuilt kind is offered as a live row");
   const open = fn("openClubCreate");
-  assert.match(open, /clubPick\(kind\)/, "a Create row does not reach the picker");
-  assert.match(open, /closeSheet\(\);\s*\n\s*clubPick/, "the sheet is left open behind the iOS picker");
+  assert.match(open, /clubOpenLibrary\(kind\)/, "a Create row does not reach the picker");
+  assert.match(open, /closeSheet\(\);\s*\n\s*clubOpenLibrary/,
+    "the sheet is left open behind the picker");
   // The avatar's plus and the rail's Add both go straight to a story — no Create sheet in between.
   const wire = nocomment(page());
-  assert.match(wire, /\[data-cadd\][\s\S]{0,160}clubPick\(b\.dataset\.cadd\)/,
+  assert.match(wire, /\[data-cadd\][\s\S]{0,180}clubOpenLibrary\(b\.dataset\.cadd\)/,
     "the avatar plus and the rail Add do not reach the picker");
   const v = fn("viewCommunity");
   assert.match(v, /cm-avplus[\s\S]{0,200}data-cadd="story"/, "the avatar plus does not add a story");
@@ -456,9 +491,11 @@ test("BLOCKER: All and Videos only appear when there is something to split", () 
   assert.match(v, /uploads\.length \? clubTabsHtml\(\) : ""/, "the tabs show with nothing to filter");
   assert.match(v, /vidOnly = clubMediaTab\(\) === "video"/, "the filter is not read from the tab");
   assert.match(v, /uploads\.filter\(\(u\) => u\.video\)/, "Videos does not filter to videos");
-  // ⚠️ UNDER VIDEOS THE RUN TILES GO. A run is not a video, and showing them under that tab would be
-  // the app calling a route drawing a film of itself.
-  assert.match(v, /\(vidOnly && uploads\.length\) \? "" :/, "run tiles survive the Videos filter");
+  // ⚠️ RESTATED: there are no run tiles to filter any more — the grid is posts, so Videos is a filter over
+  // posts alone. What still has to hold is that it filters rather than showing everything, and that a
+  // runner with no videos gets a sentence rather than an empty three-column area.
+  assert.match(v, /shown = vidOnly \? uploads\.filter\(\(u\) => u\.video\) : uploads/,
+    "the Videos tab does not actually filter");
   assert.match(v, /No videos yet/, "a runner with no videos gets an empty three-column area");
   const t = fn("clubTabsHtml");
   // ⚠️ THE LABEL IS ALWAYS VISIBLE — colour is never the only signal, which is the design's own rule.
@@ -765,4 +802,202 @@ test("BLOCKER: a shop link is only ever a plain web address", () => {
   assert.match(nocomment(v), /rel="noopener noreferrer"/,
     "the link hands the page it opens a handle back to the app");
   assert.match(nocomment(v), /\(shopHref\s*\?/, "the name is a link even when no address was given");
+});
+
+/* ══ HIS SEVEN CHANGES OF 2026-08-22 (evening) ══════════════════════════════════════════════════════
+ * The camera roll inside the app, the story's layout, the PB capsules, the trainer icon, Inte-Club on
+ * the share card, the grid being chosen rather than automatic, and a map behind the route.
+ */
+test("BLOCKER: the camera roll is drawn inside the app, and asks for nothing until it is opened", () => {
+  const swift = noswift(readFileSync(new URL("../ios/InteRun/PhotoLibraryService.swift", import.meta.url), "utf8"));
+  const bridge = noswift(readFileSync(new URL("../ios/InteRun/PhotoBridge.swift", import.meta.url), "utf8"));
+  // ⚠️ A PICKER AND A GRID ARE DIFFERENT THINGS, and that distinction is the whole point of the native
+  // side. PHPickerViewController is presented BY THE SYSTEM over the app — somebody else's screen — and
+  // teaches the app nothing about the library. He asked for Instagram's own grid, which means the app
+  // enumerates the library itself.
+  assert.ok(!/PHPickerViewController/.test(swift + bridge),
+    "the native side presents the system picker, which is the screen he asked to replace");
+  assert.match(swift, /PHAsset\.fetchAssets\(with: opts\)/, "the library is never enumerated");
+  // ⚠️ THE FETCH RESULT IS HELD, NOT THE ASSETS. A PHFetchResult is lazy; materialising a ten-year roll
+  // into an array on first call is a stall on open for a grid nobody has scrolled yet.
+  assert.match(swift, /private static var cached: PHFetchResult<PHAsset>\?/,
+    "the fetch result is not held, so every page re-queries the whole library");
+  assert.match(swift, /func page\(offset: Int, limit: Int\)/, "the library is not paged");
+  // ⚠️ PERMISSION IS ASKED FOR ON THE PATH THAT NEEDS IT. A prompt at launch is a prompt with no
+  // context, and from the app's side a refusal is permanent.
+  assert.ok(!/requestAuthorization/.test(noswift(readFileSync(new URL("../ios/InteRun/InteRunApp.swift", import.meta.url), "utf8"))),
+    "the photo permission is requested at launch rather than when the picker is opened");
+  // ⚠️ LIMITED ACCESS IS A FIRST-CLASS ANSWER. Somebody who shared a chosen handful is curating, not
+  // refusing; treating it as a refusal leaves them looking at an empty grid.
+  assert.match(swift, /case \.limited: return "limited"/, "a limited grant is not reported as its own state");
+  assert.match(bridge, /case "manage"/, "there is no way to widen a limited grant");
+  // ⚠️ THE DEGRADED PASS IS IGNORED. PhotoKit answers twice for an iCloud asset and the first is a blur;
+  // replying to it would put a smeared thumbnail in the grid permanently, because the page caches it.
+  assert.match(swift, /PHImageResultIsDegradedKey/, "the blurry first pass is served as the thumbnail");
+});
+
+test("BLOCKER: the pixels come over the app's own scheme, never through the bridge", () => {
+  const bridge = noswift(readFileSync(new URL("../ios/InteRun/PhotoBridge.swift", import.meta.url), "utf8"));
+  const scheme = noswift(readFileSync(new URL("../ios/InteRun/BundleSchemeHandler.swift", import.meta.url), "utf8"));
+  // ⚠️ A BASE64 ROUND TRIP FOR A THIRTY-MEGABYTE VIDEO IS A STALL THE RUNNER WATCHES. The handler answers
+  // with small JSON; the bytes stream over interun://app, which WebKit handles like any other resource.
+  assert.ok(!/base64EncodedString/.test(bridge), "the bytes are base64'd back through evaluateJavaScript");
+  assert.match(bridge, /static let pathPrefix = "\/__photo\/"/, "there is no path for the pixels");
+  // ⚠️ THE APP'S OWN ORIGIN, NOT A SECOND SCHEME. localStorage is keyed to interun://app; a photograph
+  // from anywhere else would sit outside everything the app owns.
+  assert.match(scheme, /url\.path\.hasPrefix\(PhotoBridge\.pathPrefix\)/,
+    "the scheme handler does not serve the photo path");
+  // ⚠️ AND BEFORE resolve(), which would look for a file of that name in the bundle and 404.
+  assert.ok(scheme.indexOf("PhotoBridge.pathPrefix") < scheme.indexOf("let file = resolve(url)"),
+    "the photo path is checked after the bundle lookup, so it always 404s");
+  // ⚠️ NO-STORE: an identifier outlives an edit, so a cached copy shows the version before the crop.
+  assert.match(scheme, /"Cache-Control": "no-store"/, "a photograph is cached under an identifier that can change");
+  // ⚠️ AN UNKNOWN ACTION IS ANSWERED. A page waiting on a reply that never comes is a grid that spins
+  // for the rest of the run — the failure this project already records for the coach's bridge.
+  assert.match(bridge, /default:[\s\S]{0,200}reply\(body, \["error"/, "an unknown action is dropped in silence");
+  // And the page never waits forever either.
+  assert.match(nocomment(fn("clubPhotoAsk")), /setTimeout\(\(\) => \{[\s\S]{0,120}res\(null\);/,
+    "a request with no reply hangs the grid");
+});
+
+test("BLOCKER: the story's chrome clears the status bar and its route is not stretched", () => {
+  const style = sheetOf(page());
+  // ⚠️ MEASURED ON HIS SCREENSHOT: the progress bars ran through the 10:46 and the avatar sat on top of
+  // it, because the overlay is fixed at inset 0 — which is the whole screen, clock included.
+  const bars = /\.cm-bars \{[^}]*\}/.exec(style);
+  assert.ok(bars, "no .cm-bars rule");
+  assert.match(bars[0], /env\(safe-area-inset-top/, "the story's progress bars run through the status bar");
+  // ⚠️ AND THE ROUTE WAS STRETCHED — routeMapSvg carries preserveAspectRatio="none" by design, so a
+  // 320x200 drawing forced into a tall story is pulled almost 3x vertically. The fix is a box of the
+  // right shape; object-fit does nothing at all for an inline SVG.
+  // ⚠️ THE ASPECT COMES FROM THE MARKUP, NOT THE STYLESHEET, and from the same two constants the drawing
+  // is sized with — a number in the CSS and the same number in the call is two owners of one measurement.
+  const story = nocomment(fn("openCommStory"));
+  assert.match(story, /routeMapSvg\(route, null, STORY_ART_W, STORY_ART_H\)/,
+    "the story's route is not drawn at the story's own shape");
+  assert.match(story, /style="aspect-ratio:' \+ STORY_ART_W \+ ' \/ ' \+ STORY_ART_H/,
+    "the box does not carry the same aspect the drawing was made at, so the route is stretched");
+  // ⚠️⚠️ AND THE DRAWING MUST HONOUR THE BOX IT IS GIVEN — asserted by EXECUTING it, because the caller
+  // passing the right size proves nothing about whether it is used. routeMapSvg's no-projection branch
+  // hardcoded a 320x200 viewBox and discarded its arguments, so with preserveAspectRatio="none" every
+  // caller whose box was a different shape got the route pulled to fit: the story was stretched 2.76x
+  // vertically and still looked like a route. Reverting that escaped a guard that only checked the call.
+  // The three helpers it calls only draw markers; stub them so the geometry can be measured on its own.
+  const body = nocomment(fn("routeMapSvg"))
+    .replace(/^function routeMapSvg\(route, proj, vbW, vbH\) \{/, "")
+    .replace(/\}\s*$/, "");
+  const svgOf = (w: number, h: number) => new Function(
+    "route", "proj", "vbW", "vbH", "routeLogoDefs", "routeLogoMark", "routeFinishMark", body
+  )([{ lat: 54.9, lng: -1.6 }, { lat: 54.95, lng: -1.55 }], null, w, h,
+    () => "", () => "", () => "");
+  for (const [w, h] of [[360, 620], [320, 200], [1080, 1080]] as Array<[number, number]>) {
+    const out = svgOf(w, h);
+    assert.match(out, new RegExp('viewBox="0 0 ' + w + ' ' + h + '"'),
+      "routeMapSvg discards the box it was given at " + w + "x" + h + ", so the route is stretched to fit");
+  }
+  const sart = /\.cm-sart \{[^}]*\}/.exec(style);
+  assert.ok(sart, "no .cm-sart rule");
+  assert.ok(!/aspect-ratio/.test(sart[0]),
+    "the stylesheet holds a second copy of the story's aspect, which can drift from the drawing's");
+});
+
+test("BLOCKER: the PB capsules are the size of the label beside them, white with a teal edge", () => {
+  const style = sheetOf(page());
+  const chip = /\.cm-chip-acc \{[^}]*\}/.exec(style);
+  assert.ok(chip, "no .cm-chip-acc rule");
+  // ⚠️ THE SIZE IS TIED TO THE LABEL, NOT PICKED BY EYE: "they need to be the same size as the word
+  // TIMES", so both read --t-label. Two things that must match should come from one place.
+  const eyebrow = /\.cm-eyebrow \{[^}]*\}/.exec(style);
+  assert.ok(eyebrow, "no .cm-eyebrow rule to compare the capsule against");
+  const chipSize = (/font-size: (var\(--t-[a-z]+\))/.exec(chip[0]) || [])[1];
+  const eyeSize = (/font-size: (var\(--t-[a-z]+\))/.exec(eyebrow[0]) || [])[1];
+  assert.equal(chipSize, eyeSize, "the capsule is not the same size as the label beside it");
+  assert.match(chip[0], /color: var\(--accent\)/, "the capsule's text is not teal");
+  assert.match(chip[0], /background: var\(--surface-2\)/, "the capsule is not white");
+  assert.match(chip[0], /border: 1px solid var\(--accent\)/, "the capsule has no teal outline");
+});
+
+test("BLOCKER: the trainers row wears a trainer, not a runner", () => {
+  const app = appBlock();
+  // ⚠️ rEasy IS A RUNNING FIGURE and was standing in for the shoe — a picture of a person where the
+  // sentence is about footwear.
+  assert.match(app, /shoe: '<svg/, "there is no trainer icon at all");
+  assert.match(nocomment(fn("viewCommunity")), /cm-tr">' \+ ICON\.shoe/,
+    "the trainers row still wears the running figure");
+  assert.ok(!/live-shoe" id="lShoe">' \+ ICON\.rEasy/.test(app),
+    "the live start screen's shoe chip still wears the running figure");
+});
+
+test("BLOCKER: Inte-Club is a share destination that needs no bridge and never falls to the sheet", () => {
+  const app = appBlock();
+  assert.match(app, /id: "inteclub", label: "Inte-Club"/, "Inte-Club is not a share destination");
+  const to = nocomment(fn("shareToClub"));
+  // ⚠️ IT POSTS THE CARD THAT IS ON SCREEN, not a second rendering — prepareShareCard already holds the
+  // exact bytes the other tiles hand out, so what lands on the grid is what he was looking at.
+  assert.match(to, /prepareShareCard\(run\)/, "the club tile re-renders the card instead of posting it");
+  assert.ok(!/shareCardCanvas|drawShareCard/.test(to), "the club tile draws its own second card");
+  // ⚠️ AND IT IS THE ORDINARY POST SHAPE, so one tile builder, one viewer and one delete serve it.
+  assert.match(to, /kind: "post", media: \[key\]/, "the club tile writes a second kind of grid entry");
+  assert.match(to, /runId: String\(run\.id/, "the posted card does not remember which run it is of");
+});
+
+test("BLOCKER: a run reaches the grid by being asked for, and the picture is chosen", () => {
+  const app = appBlock();
+  // ⚠️ HIS RULING. Every route to the grid is a decision: a button on the run, or a switch he turned on.
+  assert.match(app, /id="clubPostRun"/, "there is no way to post a run from its own page");
+  const sheet2 = nocomment(fn("openClubPostRunSheet"));
+  assert.match(sheet2, /CLUB_TILE_STYLES\.map/, "the runner cannot choose what the picture looks like");
+  assert.match(sheet2, /clubRunPosted\(run\)/, "a run already on the grid is posted again in silence");
+  // ⚠️ THE SAME THREE CHOICES ON BOTH PATHS, so the automatic and the manual route cannot produce
+  // different-looking grids.
+  const edit = nocomment(fn("viewClubEdit"));
+  assert.match(edit, /CLUB_TILE_STYLES\.map/, "the automatic path offers no choice of picture");
+  assert.match(edit, /clubAuto\(\)\s*\n?\s*\?[\s\S]{0,200}CLUB_TILE_STYLES/,
+    "the style picker shows even when automatic posting is off, so it governs nothing");
+  // ⚠️ ONE CALL SITE AT SAVE, beside the Strava one, because that is the one place the phone and the
+  // wrist both arrive — a hook on one and not the other is this project's most-repeated trap.
+  const calls = (nocomment(app).match(/clubMaybeAutoPost\(/g) || []).length;
+  assert.equal(calls, 2, "clubMaybeAutoPost has " + calls + " mentions; expected its definition and one call");
+  assert.match(nocomment(app), /stravaMaybeAutoSend\(state\.logged\[0\]\);\s*\n[\s\S]{0,400}clubMaybeAutoPost\(state\.logged\[0\]\)/,
+    "the automatic post is not on the shared save path");
+});
+
+test("BLOCKER: every field the club profile can store survives being read back", () => {
+  // ⚠️⚠️ THIS CAUGHT A REAL DEFECT THE MOMENT IT WAS WRITTEN. loadClubProf returned bio, trainingFor and
+  // pbs alone, so autoPost was written correctly, stored correctly, and dropped by the very next read:
+  // measured on the served page, the store held {"autoPost":true} while clubAuto() answered false and the
+  // switch stayed off. A reader that whitelists has to be updated for every new field, and forgetting is
+  // silent — the same shape as the run record's three invented identifiers, from the other direction.
+  //
+  // ⚠️ THE FIELD LIST IS DERIVED FROM THE WRITERS, not typed here. A hand-written list goes stale the
+  // first time somebody adds a setting, which is exactly the failure being guarded.
+  const app = appBlock();
+  // ⚠️ BOTH WRITE SHAPES. Two of the five fields go through the edit page's own put() helper and three
+  // through saveClubProf directly — a sweep that knew only one found three of five and reported the
+  // sweep itself as broken, which is the collection-too-narrow half of this kind of guard.
+  const written = new Set<string>();
+  for (const m of app.matchAll(/saveClubProf\(Object\.assign\(cur, \{ ([a-zA-Z]+):/g)) written.add(m[1]!);
+  // ⚠️ SCOPED TO wireClubEdit, WHERE put() IS DEFINED. Swept over the whole app script it also matched a
+  // put({ k: ... }) belonging to something else entirely and reported "k" as a dropped club field.
+  for (const m of nocomment(fn("wireClubEdit")).matchAll(/put\(\{ ([a-zA-Z]+):/g)) written.add(m[1]!);
+  assert.ok(written.size >= 5,
+    "only " + written.size + " writable fields found (" + [...written].join(", ") +
+    "); the sweep is not reaching every writer");
+  // ⚠️ THE SUCCESS RETURN, NOT THE WHOLE FUNCTION. The catch fallback names every field too, so scanning
+  // the function body was satisfied by the fallback alone — watched escaping with autoPost deleted from
+  // the real return. Each half is checked against its own text.
+  const load = nocomment(fn("loadClubProf"));
+  const ok = (/return (\{[\s\S]*?\});\n\s*\} catch/.exec(load) || [])[1] || "";
+  assert.ok(ok, "the successful return of loadClubProf could not be located");
+  const missing = [...written].filter((f) => !new RegExp("\\b" + f + ":").test(ok));
+  assert.deepEqual(missing, [],
+    "written to the club profile and dropped when it is read back: " + missing.join(", "));
+  // ⚠️ AND THE FALLBACK CARRIES THEM TOO, or a corrupt store silently resets a setting to a value the
+  // runner never chose rather than to its default.
+  // ⚠️ THE OBJECT LITERAL CONTAINS A BRACE OF ITS OWN (pbs: {}), so [^}]* stops inside it — the same
+  // first-brace mistake this file already records making on a field handler. Matched to the end of the
+  // return statement instead.
+  const fallback = (/catch \(e\) \{ return (\{[\s\S]*?\}); \}/.exec(load) || [])[1] || "";
+  const gone = [...written].filter((f) => !new RegExp("\\b" + f + ":").test(fallback));
+  assert.deepEqual(gone, [], "the parse fallback drops: " + gone.join(", "));
 });

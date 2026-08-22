@@ -7515,6 +7515,158 @@ in both themes, every control reached by a handler.
 
 ⚠️ **STILL NOT BUILT, AND NAMED RATHER THAN OFFERED:** reels, highlights and going live.
 
+### HIS SEVEN CHANGES, AND THE ONE THAT NEEDED SWIFT (2026-08-22, third round)
+
+The camera roll inside the app, the story's layout, the PB capsules, the trainer icon, Inte-Club on the
+share card, the grid being chosen rather than automatic, and a map behind the route. Suite 1159 →
+**1168**; 17 deliberate re-breaks, all caught (two after a guard was restated). ⚠️ **THE PICKER IS THE
+ONLY NATIVE PART, so it is inert until an Xcode build — everything else reaches the phone over the air.**
+
+### ⚠️⚠️ A PICKER AND A GRID ARE DIFFERENT THINGS, AND THAT IS WHY THIS NEEDED PhotoKit
+
+*"when the user clicks the create a post, i want the users camera roll to open inside the app, not come
+outside the app into the camera roll."* What shipped that morning was a file input, which hands the job to
+iOS: **its** screen, **its** chrome, and the app learns nothing about the library. `PHPickerViewController`
+is the same thing in Swift. What he is describing is what Instagram does — the app enumerates the library
+itself and draws its own grid — and **nothing in the web layer can do that at all.**
+
+`PhotoLibraryService.swift` + `PhotoBridge.swift`, and the design decisions worth keeping:
+- ⚠️ **THE BYTES DO NOT COME BACK THROUGH `evaluateJavaScript`.** Base64 is a third bigger than the data
+  and has to be built, escaped, parsed and decoded; for a thirty-megabyte video that is a stall the runner
+  watches. The handler answers with small JSON and the pixels stream over **`interun://app/__photo/…`** —
+  the app's OWN scheme, on a path prefix, because `localStorage` is keyed to that origin and a second
+  scheme would put photographs outside everything else with two handlers to keep in step.
+- ⚠️ **CHECKED BEFORE `resolve()`**, which would look for a file of that name in the bundle and 404.
+- ⚠️ **`no-store`, BECAUSE AN IDENTIFIER OUTLIVES AN EDIT.** Crop a picture in Photos and the same
+  identifier names different pixels; a cached copy shows the version before the change.
+- ⚠️ **THE FETCH RESULT IS HELD, NOT THE ASSETS.** A `PHFetchResult` is lazy — materialising a ten-year
+  roll into an array on the first call is a stall on open for a grid nobody has scrolled.
+- ⚠️ **PERMISSION IS ASKED FOR WHEN THE PICKER OPENS, NEVER AT LAUNCH.** A prompt with no context, and
+  from the app's side a refusal is permanent.
+- ⚠️ **LIMITED ACCESS IS A FIRST-CLASS ANSWER, NOT A REFUSAL.** Somebody who shared a chosen handful is
+  curating; the grid offers the system sheet to widen it rather than looking empty. ⚠️ That sheet's
+  selector is ObjC-only on this SDK and is called through the runtime — and if it is absent the reply
+  still comes back, because a request that never answers is a grid that spins for the rest of the run.
+- ⚠️ **THE DEGRADED PASS IS IGNORED.** PhotoKit answers twice for an iCloud asset and the first is a blur;
+  replying to it would put a smeared thumbnail in the grid permanently, because the page caches it.
+- ⚠️ **THE NUMBER ON A CELL IS THE ORDER, NOT A TICK.** A carousel has a first picture and a tick cannot
+  say which.
+- ⚠️ **AND THE FILE INPUT IS KEPT AS THE FALLBACK, NOT DELETED.** An over-the-air page reaches phones whose
+  Swift predates `PhotoBridge`; there the flag is absent and the sheet is what works. Gated on
+  `window.__interunPhotoLibrary` — a capability flag, never a handler-exists test, which is how this
+  project nearly shipped a silent coach.
+
+### ⚠️⚠️ THE STORY'S ROUTE WAS STRETCHED BY A HARDCODED viewBox, AND THE MARKERS WERE THE TELL
+
+Two faults in his screenshot. The progress bars and the avatar ran **through the 10:46**, because the
+overlay is `position: fixed` at inset 0 — the whole screen, clock included; `env(safe-area-inset-top)` is
+the only thing that knows where that line is.
+And the route was pulled into a thin tall smear. The cause was not the CSS: **`routeMapSvg`'s
+no-projection branch discarded `vbW`/`vbH` and always emitted a 320×200 viewBox**, and with
+`preserveAspectRatio="none"` every caller whose box was a different shape got the route stretched to fit.
+The story was pulled **2.76× vertically** — and it still LOOKED like a route.
+⚠️ **THE GIVEAWAY WAS THE START AND FINISH MARKERS RENDERING AS TALL OVALS.** A stretched route is
+plausible; a stretched circle is not. Measured after: marker width/height **1.000**.
+⚠️ **EVERY EXISTING CALLER PASSED 320, 200 OR NOTHING**, so honouring the arguments is byte-identical for
+all of them — the default keeps the old numbers for the one caller that passes none.
+⚠️ **AND THE PADDING AND THE MARKER RADIUS HAD TO SCALE WITH THE BOX.** A flat 20 is 10% of a 200-tall
+drawing and 3% of a 620-tall one; 5.5 units is a clear circle at 320 wide and a speck at 1080.
+⚠️ **REVERTING IT ESCAPED THE FIRST GUARD, which only checked that the CALLER passed the right size.** A
+builder proves a shape exists; only executing it proves the shape is used. The guard runs the real
+function now and reads the viewBox back.
+⚠️ **AND THE ASPECT IS WRITTEN FROM THE SAME TWO CONSTANTS THE DRAWING USES** (`STORY_ART_W/H`), inline on
+the element rather than in the stylesheet — a number in the CSS and the same number in the call is two
+owners of one measurement.
+
+### THE GRID IS WHAT HE POSTS, NOT WHAT THE APP RECORDS
+
+*"I want the user to decide what to post on their grid, not for it to be automatically added (unless they
+say so in the settings)."* **This reverses what shipped that morning, and he is right:** the grid was every
+run the app had ever recorded, put there by the app — a training log wearing a profile's clothes, and the
+Logbook already is the log.
+- ⚠️ **OFF BY DEFAULT.** He asked for the decision to be his; a default that posts for him is the app
+  deciding.
+- ⚠️ **AND NOTHING IS DELETED BY TURNING IT OFF.** A run already on the grid stays; the switch governs
+  what happens next.
+- ⚠️ **THE STYLE PICKER APPEARS ONLY WHEN THE SWITCH IS ON**, because his instruction pairs the two — and
+  a control over nothing is the looks-live-does-nothing class this project has shipped three times.
+- ⚠️ **THE SAME THREE CHOICES ON BOTH PATHS**, so the automatic and the manual route cannot produce
+  different-looking grids.
+- ⚠️ **ONE CALL SITE, BESIDE THE STRAVA ONE**, because that is the one place the phone and the wrist both
+  arrive — a hook on one and not the other is this project's most-repeated trap.
+- ⚠️ **THE PICTURE IS RENDERED AT POST TIME.** What he approved is what stays there; deriving it per render
+  would let a later change to the style, the map provider or the route privacy repaint a published post.
+- ⚠️ **AND IT FALLS BACK TO THE NUMBERS WITH NO ROUTE**, whatever style was asked for — a treadmill run has
+  none by design and an empty square is worse than the facts of the run.
+- ⚠️ **THE BAKED STAMP IS AT THE TOP, AND THAT WAS FOUND BY LOOKING.** In the lower corner it sat directly
+  under the grid cell's own caption strip — two labels stacked, the distance half hidden behind the app's
+  own gradient. The caption is chrome; the stamp belongs to the picture.
+
+⚠️ **`commTileHtml`, `commMonths` AND `commFillMaps` WENT WITH IT, plus their CSS and constants.** A builder
+nothing reaches is the computed-and-discarded trap this file records five times.
+
+### ⚠️ THE MAP BEHIND THE ROUTE — AND THE OLD REASONING WAS HALF WRONG
+
+*"there is no map sitting behind the route line....this needs fixing"*. The guard that refused it said a
+basemap behind fifteen tiles would be "roughly 120 billed tiles every time you opened the tab" — the first
+half is true and **the second half is false, because of the cache this app already built**: `routeMapFor`
+keys on the route and keeps the composite in IndexedDB. It costs ~120 tiles once, ever. Measured on a real
+route: the map tile carries **89 distinct colours against the line-only tile's 27**.
+⚠️ **AND IT GOES THROUGH `routeMapFor`, NEVER `loadRouteMap`** — the census guard is now 5, and it exists
+because a second caller of the fetcher re-fetches billed tiles on every view.
+
+### INTE-CLUB ON THE SHARE CARD, AND THE SENTENCE THAT WENT STALE
+
+⚠️ **IT IS THE ONE TILE THAT NEEDS NOTHING NATIVE AND CANNOT FAIL** — the card goes into a store this app
+owns, so there is no bridge, no scheme, no permission and no share sheet. It posts **the card that is on
+screen**, not a second rendering: `prepareShareCard` already holds the exact bytes the other tiles hand
+out.
+⚠️ **ANSWERED BEFORE THE CAPABILITY TEST**, or a build with the native bridge tries to hand the card to
+another app for a destination that is inside this one.
+⚠️⚠️ **AND ITS ACCESSIBLE NAME SAID "opens your phone's share sheet", WHICH IS THE MAP-ATTRIBUTION FAULT
+AGAIN.** One sentence was appended to every tile and was true for as long as every tile ended there.
+Adding one that does not made it false; **nothing about the sentence changed.** A derived fact goes stale
+the moment a new case arrives, and the tile that lies is the one a screen-reader user relies on most.
+⚠️ **THE ONE-DISPATCH GUARD WAS RESTATED RATHER THAN DELETED**: exactly one id may have a branch, it must
+be `inteclub`, and every other id still shares the two routes.
+
+### ⚠️ A READER THAT WHITELISTS ITS FIELDS DROPS THE NEXT ONE, SILENTLY
+
+`loadClubProf` returned `bio`, `trainingFor` and `pbs` alone, so `autoPost` was written correctly, stored
+correctly, and **thrown away by the very next read**: measured on the served page, the store held
+`{"autoPost":true}` while `clubAuto()` answered false and the switch stayed off. The guard derives the
+writable fields **from the writers** — a hand-written list goes stale the first time somebody adds a
+setting, which is exactly the failure being guarded.
+⚠️ **AND IT HAD TO KNOW BOTH WRITE SHAPES.** Two fields go through the edit page's own `put()` helper and
+three through `saveClubProf` directly; a sweep that knew only one found three of five and reported itself
+as broken. ⚠️ Scoped to `wireClubEdit`, because `put({ k: … })` elsewhere in the app matched too.
+⚠️ **AND IT CHECKS THE SUCCESS RETURN, NOT THE WHOLE FUNCTION** — the catch fallback names every field, so
+scanning the body was satisfied by the fallback alone. Watched escaping.
+
+### The small ones
+
+⚠️ **THE PB CAPSULE'S SIZE IS TIED TO THE LABEL BESIDE IT, NOT PICKED BY EYE:** *"they need to be the same
+size as the word TIMES"*, so both read `--t-label` and the guard compares the two rules rather than pinning
+a number. White ground, teal edge, teal text.
+⚠️ **THE TRAINERS ROW WEARS A TRAINER.** `ICON.rEasy` is a running figure and was standing in for the shoe
+on the club profile and the live start screen — a picture of a person where the sentence is about footwear.
+⚠️ **`.cm-avplus` NEEDED `padding: 0`, AND THAT WAS MEASURED.** The app's global button rule left a 26px
+badge with a 10px content box holding a 14px glyph, and grid resolves a centred item that OVERFLOWS its
+area to start-aligned: 8px on the left, 4px on the right.
+
+### ⚠️ THE COMMENT TRAP FIRED FOR AN ELEVENTH TIME — AND THIS TIME IN SWIFT
+
+`PhotoLibraryService`'s header explains why `PHPickerViewController` is NOT used, so a guard forbidding
+that name found it three times in the very comment defending the design. `noswift()` is the stripper for
+it, matching `nocomment()`'s job on the page.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc clean
+apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1168 pass / 0 fail**, both
+design ratchets unchanged, `InteRun` **Release** for `generic/platform=iOS` building with 0 errors. Driven
+end to end in the served build: the switch revealing its picker and remembering the style, a run posted as
+a map tile with a real basemap behind it, the story's route holding its exact aspect with round markers,
+and the five share destinations with Inte-Club among them.
+
 ## OPEN BUGS (confirmed on real hardware, 2026-07-29)
 
 ### 1. Coach audio when the phone is locked or pocketed — FIXED 2026-08-08, unproven on hardware

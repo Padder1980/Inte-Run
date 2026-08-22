@@ -299,6 +299,12 @@ function ingest(payload: Record<string, unknown>) {
     doneKey: () => "k",
     shoeCreditRun: noop,
     stravaMaybeAutoSend: noop,
+    // ⚠️ STUBBED FOR THE SAME REASON stravaMaybeAutoSend IS: this file exercises what the save path STORES,
+    // and the automatic grid post is a side effect that draws to a canvas node has none of. Its own
+    // behaviour is guarded in test/community.test.ts. ⚠️ It had to be added the moment the call arrived
+    // in saveLiveSession — the lift list is hand-written on purpose, so it fails loudly rather than
+    // quietly measuring less, and these six tests failed with a ReferenceError until it was here.
+    clubMaybeAutoPost: noop,
     maybeAutoPaceCalibrate: () => false,
     maybeTrainingFlags: () => true,
     assessFitnessFromRun: noop,

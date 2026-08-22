@@ -25,6 +25,19 @@ function fn(name: string): string {
   throw new Error(name + " is unbalanced");
 }
 const nocomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+/** The app's own script block — not the bundled engine, which is minified and has its own names. */
+function appBlock(): string {
+  const blocks = [...page().matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1] || "");
+  const app = blocks.reduce((a, b) => (b.length > a.length && b.includes("function viewCommunity(") ? b : a), "");
+  assert.ok(app, "the app's script block could not be found");
+  return app;
+}
+/** The generated stylesheet. */
+function sheetOf(src: string): string {
+  const a = src.indexOf("<style>"), b = src.indexOf("</style>", a);
+  assert.ok(a > 0 && b > a, "the stylesheet could not be found");
+  return src.slice(a, b);
+}
 
 test("BLOCKER: not one of the design's fictional runners reached the build", () => {
   // ⚠️ THE NAMES, THE HANDLES AND THE COUNTS, because each would be a different flavour of the same
@@ -55,7 +68,9 @@ test("BLOCKER: the feed is the design's own empty state, and says why rather tha
   // the most visible thing in the app; a state that explains itself and points at the working route is
   // the difference between an empty room and a closed door.
   assert.match(feed, /data-cgo="mine"/, "the empty feed does not offer the runner their own runs");
-  assert.match(feed, /data-csheet="share"/, "the empty feed does not offer the share flow");
+  // ⚠️ RESTATED: the button became Create a post at his instruction. What matters is unchanged — the
+  // empty state must offer the thing that DOES work rather than only explaining what does not.
+  assert.match(feed, /data-cnewpost="1"/, "the empty feed offers no working action at all");
 });
 
 test("BLOCKER: the runner's own pane is built from real data, and the grid from the UNCAPPED store", () => {
@@ -117,23 +132,32 @@ test("BLOCKER: every control on the screen is reached by a handler", () => {
   // design reference is the likeliest place for a live-looking dead button, and this app has shipped
   // that three times — the debrief's overflow button, the profile confirm, and a share tile.
   const src = page();
-  const screen = fn("viewCommunity") + fn("commFeedHtml") + fn("commShareHtml") + fn("commPeopleHtml");
+  // ⚠️ THE SHARE SHEET IS GONE FROM THIS LIST BECAUSE ITS BUTTON IS. He asked for "Create a post" in
+  // place of "Share a run", so commShareHtml and wireCommShare had no caller left — and a builder
+  // nothing reaches is the computed-and-discarded trap this project has shipped four times, so they
+  // were deleted rather than left. Sharing a run is on the run's own page, which is guarded elsewhere.
+  // The two new sub-screens join the sweep in their place.
+  const screen = fn("viewCommunity") + fn("commFeedHtml") + fn("commPeopleHtml") +
+    fn("clubPostViewHtml") + fn("viewClubEdit");
   const attrs = new Set<string>();
   for (const m of screen.matchAll(/data-(c[a-z]+)="/g)) attrs.add(m[1]!);
   assert.ok(attrs.size >= 4, "the screen renders " + attrs.size + " control families; expected at least four");
   const wiring = nocomment(src);
   for (const a of attrs) {
-    if (a === "cshare") continue;   // the share rows go through uiSessionRow's own data-uirow
-    assert.ok(new RegExp('\\[data-' + a + '\\]').test(wiring),
-      "the screen renders data-" + a + " and nothing ever binds it");
+    // ⚠️ A DELEGATED SELECTOR **OR** A dataset READ. Not every data- attribute is a control: data-cmed
+    // and data-cvid are read by the media loader as dataset properties, where the hyphenated name
+    // appears nowhere at all. Requiring a [data-x] selector for those reports live code as unwired,
+    // which is the collection-too-narrow half of this guard's own lesson.
+    // A bare [data-x] selector, a valued [data-x="..."] one, or a dataset read — all three are real
+    // bindings, and only requiring the first reports live code as unwired.
+    const bound = new RegExp('\\[data-' + a + '[\\]=]').test(wiring) ||
+      new RegExp('dataset\\.' + a + '\\b').test(wiring);
+    assert.ok(bound, "the screen renders data-" + a + " and nothing ever reads it");
   }
-  // ⚠️ AND THE SHARE ROWS GO THROUGH THE COMPONENT'S OWN OPTION. uiSessionRow has no attrs option, so
-  // an invented one would have been dropped in silence and every row in that sheet would have looked
-  // live and done nothing. It was written that way first.
-  assert.match(fn("commShareHtml"), /id: "cshare:"/, "the share rows carry no id to be wired by");
-  assert.match(fn("wireCommShare"), /data-uirow\^="cshare:"/, "nothing binds the share rows");
-  assert.match(fn("wireCommShare"), /openShareStudio\(run\)/,
-    "Continue does not reach the composer the app already has");
+  // ⚠️ AND NEITHER BUILDER SURVIVES AS AN ORPHAN. Deleting the button and leaving the sheet behind is
+  // exactly the trap named above; assert both are gone from the app entirely.
+  assert.ok(!/function commShareHtml/.test(src), "the unreachable share sheet is still in the build");
+  assert.ok(!/function wireCommShare/.test(src), "the unreachable share wiring is still in the build");
 });
 
 test("BLOCKER: the story viewer clears its timer on every exit, and needs a run to exist", () => {
@@ -327,7 +351,8 @@ test("BLOCKER: a story video is trimmed to fifteen seconds, and a post is not", 
   // ⚠️ STORED AS IN AND OUT POINTS. Re-encoding in a web view decodes every frame to a canvas, loses
   // quality and drops the audio; the original is kept whole so a future export can cut from it.
   const post = fn("clubEdPost");
-  assert.match(post, /trim: S\.isVid \? \{ inS:[^}]*outS:/, "the trim is not stored as in and out points");
+  assert.match(post, /trim: x\.sl\.isVid \? \{ inS:[^}]*outS:/,
+    "the trim is not stored as in and out points");
   assert.ok(!/MediaRecorder|captureStream|drawImage/.test(post), "posting re-encodes the video");
 });
 
@@ -346,7 +371,10 @@ test("BLOCKER: the bytes go in IndexedDB and the row in localStorage, media firs
     "the row is saved before the blob, so a failed write leaves a permanently broken tile");
   assert.match(post, /\.catch\(/, "a failed save is silent");
   // The row carries the key, never the bytes.
-  assert.match(post, /media: key/, "the row does not reference the media by key");
+  // ⚠️ ALWAYS A LIST, EVEN FOR ONE. A field that is sometimes a string and sometimes a list is two
+  // shapes for every reader to get right — the normalizeRoute fault twice over.
+  assert.match(post, /media: slides\.map\(\(x\) => x\.key\)/,
+    "the row does not reference its media as a list of keys");
   assert.ok(!/dataURL|toDataURL|readAsDataURL/.test(post), "the bytes are inlined into the row");
 });
 
@@ -385,7 +413,7 @@ test("BLOCKER: the editor's text is typed on the media, not into a system dialog
   // bare "else" escaped it entirely. What matters is that nothing reaches texts.push without the text
   // having survived the trim.
   const commit = nocomment(fn("clubTextCommit"));
-  const pushAt = commit.indexOf("S.texts.push(");
+  const pushAt = commit.indexOf("sl.texts.push(");
   assert.ok(pushAt > 0, "the committed word is never added");
   const guard = commit.slice(0, pushAt);
   assert.match(guard.slice(guard.lastIndexOf("}")), /if \(txt\)/,
@@ -406,7 +434,10 @@ test("BLOCKER: the framing is clamped in one place, and the stored crop is what 
   const f = fn("clubEdFit");
   // ⚠️ THE FRACTION IS CLAMPED TO THE BOX, so the media can never be dragged off the stage — the share
   // studio's own model, where a slack axis is centred rather than panned.
-  assert.match(f, /half = \(1 - 1 \/ S\.k\) \/ 2/, "the clamp is not derived from the zoom");
+  assert.match(f, /half = \(1 - 1 \/ sl\.k\) \/ 2/, "the clamp is not derived from the zoom");
+  // ⚠️ AND EVERY SLIDE OWNS ITS OWN FRAMING. One shared crop across a carousel is the fault the share
+  // studio already records: switching pictures destroyed the framing just set, with nothing to undo it.
+  assert.ok(!/CLUBED\.ox|CLUBED\.k/.test(f), "the framing is shared across the whole carousel");
   assert.match(f, /Math\.max\(0\.5 - half, Math\.min\(0\.5 \+ half/, "the framing is not clamped");
   // ⚠️ ONE PLACE APPLIES IT. Two would be two answers, and the stored crop would not be the one the
   // runner framed — the two-disagreeing-transforms fault that stretched the debrief hero.
@@ -414,7 +445,7 @@ test("BLOCKER: the framing is clamped in one place, and the stored crop is what 
   assert.ok(!/1 - 1 \/ /.test(g), "the gesture handler clamps too, so there are two answers");
   assert.match(g, /clubEdFit\(\)/, "the gesture handler does not go through the one clamp");
   const post = fn("clubEdPost");
-  assert.match(post, /crop: \{ ox: \+S\.ox/, "the framing is not stored with the post");
+  assert.match(post, /crop: \{ ox: \+x\.sl\.ox/, "the framing is not stored with the post");
 });
 
 test("BLOCKER: All and Videos only appear when there is something to split", () => {
@@ -437,17 +468,23 @@ test("BLOCKER: All and Videos only appear when there is something to split", () 
 
 test("BLOCKER: one full-screen player serves a post and a story, and only a story advances itself", () => {
   const src = nocomment(page());
-  assert.match(src, /function openClubPost\(id\) \{ clubOpenMedia\(/, "a post has its own player");
-  assert.match(src, /function openClubStories\(\) \{ clubOpenMedia\(/, "a story has its own player");
+  // ⚠️ RESTATED: a post no longer uses this player at all. His recording showed a scrollable feed, not a
+  // full-screen viewer — a story plays at you and closes itself, a post is read at your own pace.
+  assert.match(src, /function openClubStories\(\) \{ clubOpenMedia\(/, "the story player is gone");
+  assert.ok(!/function openClubPost\(id\) \{ clubOpenMedia\(/.test(src),
+    "a post still opens in the story player, which closes itself while it is being read");
   const v = fn("clubOpenMedia");
   // ⚠️ A POST DOES NOT CLOSE ITSELF. A picture that vanishes while somebody is reading the caption has
   // decided for them — the rule the recap story's last panel already follows.
   assert.match(v, /if \(auto\) \{/, "a post advances itself like a story");
   // ⚠️ A VIDEO STORY RUNS FOR ITS OWN TRIMMED LENGTH, not a flat 4.5s.
-  assert.match(v, /p\.trim\.outS - p\.trim\.inS/, "a video story is cut off after the photo interval");
+  // ⚠️ THROUGH clubSlides — a carousel row keeps its trim per slide, so reading it off the row itself
+  // silently loses it on anything posted as a carousel.
+  assert.match(v, /first\.trim\.outS - first\.trim\.inS/,
+    "a video story is cut off after the photo interval");
   assert.match(v, /Math\.min\(CLUB_STORY_MAX_S/, "a story could run longer than its own cap");
   // ⚠️ THE TRIM IS APPLIED AT PLAYBACK — that is what makes storing points rather than re-encoding honest.
-  assert.match(v, /vd\.currentTime = p\.trim\.inS/, "the trim is not applied when the video plays");
+  assert.match(v, /vd\.currentTime = tr\.inS/, "the trim is not applied when the video plays");
   // ⚠️ THE TIMER IS CLEARED ON EVERY EXIT. This app has paid twice for an interval outliving its sheet.
   const c = fn("clubViewClose");
   assert.match(c, /clearTimeout\(CLUB_VIEW_T\)/, "closing the player leaves its timer running");
@@ -497,8 +534,235 @@ test("BLOCKER: one object URL per media, and they are released", () => {
   const r = fn("clubUrlsRelease");
   assert.match(r, /revokeObjectURL/, "nothing releases the object URLs");
   const c = fn("clubEdClose");
-  assert.match(c, /revokeObjectURL\(CLUBED\.url\)/, "the editor leaks the file it was editing");
+  assert.match(c, /slides\.forEach\(\(sl\) => \{ try \{ URL\.revokeObjectURL\(sl\.url\)/,
+    "the editor leaks the files it was editing");
   // ⚠️ AND THE TEXT SURFACE IS A SIBLING OF THE EDITOR, so closing the editor has to remove it too or a
   // half-typed word is left floating over the club with nothing behind it.
   assert.match(c, /clubTxEd/, "closing the editor leaves the text surface on screen");
+});
+
+/* ══ HIS SIX CHANGES OF 2026-08-22 ══════════════════════════════════════════════════════════════════
+ * The trim as a filmstrip, the + centred, premium profile actions, Instagram-style post opening,
+ * "Create a post" with several pictures or a video, and an Edit profile page.
+ */
+test("BLOCKER: the trim is a filmstrip with a handle at each end, not a slider", () => {
+  // His note: "the 15 second selector needs to look like this so you can see where it starts and ends."
+  // A slider shows a position; only two handles over the clip can show a span.
+  // ⚠️ THE BUILDER **AND** ITS USE. The first version read clubStripHtml alone, so replacing the call to
+  // it with a range input escaped entirely — the strip was still perfect and nothing rendered it. A
+  // builder proves a shape exists; only the caller proves the runner sees it.
+  const trim = nocomment(fn("clubTrimHtml"));
+  assert.match(trim, /clubStripHtml\(sl, cap, maxIn\)/, "the trim does not render the filmstrip");
+  assert.ok(!/input type="range"/.test(trim), "the trim is still a slider, which cannot show a span");
+  const t = nocomment(fn("clubStripHtml"));
+  assert.ok(!/input type="range"/.test(t), "the strip builder falls back to a slider");
+  assert.match(t, /data-ctrim="a"/, "there is no start handle");
+  assert.match(t, /data-ctrim="b"/, "there is no end handle");
+  assert.match(t, /club-fr/, "the clip's own frames are not shown");
+  assert.match(t, /club-shade[\s\S]*club-shade/, "the time outside the window is not dimmed");
+  // ⚠️ THE LABEL NAMES BOTH ENDS AND THE SPAN. "0:09" alone is a position; the runner is choosing a span.
+  assert.match(t, /clubClock\(sl\.inS\)[\s\S]{0,80}clubClock\(sl\.outS\)/,
+    "the label does not name both ends of the window");
+  const w = nocomment(fn("wireClubTrim"));
+  assert.match(w, /which === "a"/, "the two handles are not told apart, so both move the same end");
+  // ⚠️ THE CAP IS APPLIED TO THE HANDLE BEING MOVED, so the far end never jumps under the finger.
+  assert.match(w, /if \(sl\.outS - sl\.inS > cap\) sl\.outS = sl\.inS \+ cap/,
+    "dragging the start can push the window past the cap");
+  assert.match(w, /if \(sl\.outS - sl\.inS > cap\) sl\.inS = sl\.outS - cap/,
+    "dragging the end can push the window past the cap");
+  assert.match(w, /clubTrimPaint\(\)/, "the strip is fully re-rendered mid-drag, which drops the pointer");
+});
+
+test("BLOCKER: the thumbnail video is held, and its cleanup cannot eat the frames", () => {
+  const th = nocomment(fn("clubThumbs"));
+  // ⚠️ WITHOUT A HELD REFERENCE NOT ONE FRAME ARRIVES. A detached media element referenced only by its
+  // own listener is a cycle nothing outside points at, so it can be collected before the load completes.
+  // Measured: the function ran, thumbs became [], and loadeddata never fired at all.
+  assert.match(th, /sl\.thumbVid = v/, "nothing holds the thumbnail video, so it can be collected mid-load");
+  // ⚠️ AND CLEARING src RAISES error. With the handler still attached it fired AFTER all eight frames had
+  // been adopted and reset them to empty — a tidy-up step that undid the work.
+  const idx = th.indexOf("v.removeAttribute");
+  assert.ok(idx > 0, "the element is never released");
+  assert.ok(th.slice(0, idx).includes("v.onerror = null"),
+    "the source is cleared before the handlers come off, so the error it raises wipes the frames");
+  assert.match(th, /v\.onerror = \(\) => \{ if \(!shots\.length\)/,
+    "a late failure still clears frames that were already captured");
+  // ⚠️ AND EVERY SEEK IS BOUNDED, or one that never answers hangs the loop for the life of the editor.
+  assert.match(th, /setTimeout\(\(\) => res\(false\), \d+\)/, "a seek that never answers hangs the strip");
+  assert.match(th, /if \(!await seek\(t\)\) break/, "a timed-out seek is treated as a good frame");
+});
+
+test("BLOCKER: an icon button whose glyph is its whole content sets padding: 0", () => {
+  // ⚠️ MEASURED, NOT GUESSED. The app's global button rule is padding: 1px 6px, so the avatar's plus had
+  // a 10px content box holding a 14px glyph — and grid resolves a centred item that OVERFLOWS its area to
+  // start-aligned: 8px of space on the left, 4px on the right, a 2px lean. Vertically it was symmetric,
+  // which is why it read as leaning rather than as plainly wrong.
+  const style = sheetOf(page());
+  for (const cls of [".cm-avplus", ".club-x", ".club-t"]) {
+    const rule = new RegExp("\\" + cls + " \\{[^}]*\\}").exec(style);
+    assert.ok(rule, "no rule for " + cls);
+    assert.match(rule[0], /padding: 0/, cls + " inherits the global button padding, so its glyph leans");
+  }
+});
+
+test("BLOCKER: the profile actions are one filled pair, and one of them creates a post", () => {
+  const style = sheetOf(page());
+  const act = /\.cm-act \{[^}]*\}/.exec(style);
+  assert.ok(act, "there is no .cm-act rule");
+  // ⚠️ FILLED AND BORDERLESS — the reference's own shape. The generic outlined .ui-btn side by side under
+  // an avatar reads as two form fields, which is what he called not premium enough.
+  assert.match(act[0], /border: 0/, "the profile actions still carry a form control's border");
+  assert.match(act[0], /min-height: var\(--tap\)/, "the profile actions do not reach the tap floor");
+  assert.match(act[0], /flex: 1/, "the two actions are not equal width");
+  const v = fn("viewCommunity");
+  assert.match(v, /class="cm-act" data-cedit="1">Edit profile/, "Edit profile is not one of the pair");
+  // His instruction: the second becomes Create a post.
+  assert.match(v, /data-cnewpost="1">Create a post/, "the second action is not Create a post");
+  // ⚠️ COMMENTS STRIPPED — the code's note explaining the rename quotes the old label. Ninth firing.
+  assert.ok(!/Share a run/.test(nocomment(v)), "the profile still offers Share a run");
+});
+
+test("BLOCKER: Create a post takes several pictures, or one video, never both", () => {
+  const pk = nocomment(fn("clubPickMany"));
+  assert.match(pk, /inp\.multiple = true/, "the picker cannot select more than one");
+  const so = nocomment(fn("clubSortSelection"));
+  // ⚠️ MIXING IS REFUSED RATHER THAN SILENTLY SPLIT. His rule is a carousel of pictures OR a video, so a
+  // selection holding both is two different posts and the app cannot know which was meant.
+  assert.match(so, /vids\.length && pics\.length/, "a mixed selection is not detected at all");
+  assert.match(so, /toast\(/, "items are dropped from a mixed selection with nothing said");
+  assert.match(so, /vids\.length > 1/, "several videos become a carousel of films");
+  assert.match(so, /CLUB_MAX_SLIDES/, "there is no ceiling on how many pictures a post holds");
+  const post = nocomment(fn("clubEdPost"));
+  // ⚠️ EVERY BLOB FIRST, THEN ONE ROW — a row naming a blob that failed to write is a permanently broken
+  // slide in the middle of a carousel.
+  assert.match(post, /Promise\.all\(slides\.map/, "the blobs are not all written before the row");
+  assert.ok(post.indexOf("Promise.all") < post.indexOf("clubSave("),
+    "the row is saved before the media");
+  assert.match(post, /oks\.some\(\(ok\) => !ok\)/, "a failed blob write still writes the row");
+});
+
+test("BLOCKER: one reader understands both post shapes, and every media read goes through it", () => {
+  // ⚠️ media IS ALWAYS A LIST NOW, and posts written before carousels existed carry a single key with
+  // their crop, trim and texts on the row. clubSlides is the one place the old shape is understood.
+  const sl = nocomment(fn("clubSlides"));
+  assert.match(sl, /Array\.isArray\(p\.slides\)/, "the new per-slide shape is not read");
+  assert.match(sl, /Array\.isArray\(p\.media\) \? p\.media : \(p\.media \? \[p\.media\] : \[\]\)/,
+    "a post written before carousels can no longer be opened");
+  assert.match(sl, /i === 0 \? \(p\.crop \|\| null\)/, "an older post loses its framing");
+  // ⚠️ AND NOTHING ELSE READS THE RAW FIELD. esc(["a","b"]) is the string "a,b" — a key nothing holds —
+  // which drew the missing-media hatch on every carousel tile until this was caught on the served page.
+  const app = appBlock();
+  const raw = [...app.matchAll(/esc\(p\.media\)/g)].length;
+  assert.equal(raw, 0, "something still uses the raw media field as if it were a single key");
+  for (const f of ["clubTileHtml", "clubOpenMedia", "clubSharePost"]) {
+    assert.match(nocomment(fn(f)), /clubKeys\(p\)|clubSlides\(p\)/,
+      f + " does not resolve its media through clubSlides");
+  }
+  // The sweep and the delete must remove every key a post holds.
+  assert.match(nocomment(fn("clubStories")), /clubKeys\(p\)\.forEach/,
+    "an expired carousel orphans all but its first video");
+  assert.match(nocomment(fn("clubDelete")), /clubKeys\(p\)\.forEach/,
+    "deleting a carousel orphans all but its first picture");
+});
+
+test("BLOCKER: tapping a post opens a scrollable feed of your own posts, not a story player", () => {
+  // His recording shows a titled screen holding a list, positioned at the post tapped — not a
+  // full-screen viewer. A story plays at you; a post is read at your own pace.
+  const o = nocomment(fn("openClubPost"));
+  assert.match(o, /state\.screen = "clubpost"/, "a post still opens as an overlay");
+  assert.ok(!/clubOpenMedia/.test(o), "a post still goes through the story player");
+  const v = nocomment(fn("clubPostViewHtml"));
+  assert.match(v, /posts\.map/, "only the tapped post is shown, not the feed");
+  assert.match(v, /cp-rail/, "there is no carousel rail");
+  assert.match(v, /cp-dots/, "there are no carousel dots");
+  assert.match(v, /cp-when/, "a post does not carry its date");
+  // ⚠️ NO LIKES AND NO COMMENTS. The reference has both and this app has no server, so a heart would be
+  // a control that looks live and does nothing.
+  assert.ok(!/\blike|\bcomment/i.test(v), "the post view offers likes or comments, which cannot work");
+  // ⚠️ AND A WAY BACK. A titled sub-screen whose only exit is the bottom nav does not return the runner
+  // to where they were.
+  // ⚠️ EVERY RETURN, NOT JUST ONE. A single match anywhere in the function is satisfied while a branch
+  // has quietly lost it — watched escaping with the empty state's back button deleted, which is the
+  // branch a runner with no posts actually reaches.
+  // ⚠️ BOTH EXITS, NAMED. A single match anywhere in the function is satisfied while one branch has
+  // quietly lost the button — watched escaping with the empty state's deleted, which is the branch a
+  // runner with no posts actually reaches. Indentation is not a usable anchor here either: the
+  // per-post return inside the .map callback sits at the same depth as the early one, and that return
+  // correctly has no back button because the button belongs to the screen rather than to each post.
+  const pv = nocomment(fn("clubPostViewHtml"));
+  assert.match(pv, /const back = '<button class="backbtn" id="clubBack"/, "there is no back button to render");
+  assert.match(pv, /return back \+ '<div class="cm-empty/, "the empty post feed has no way back");
+  assert.match(pv, /return back \+ posts\.map/, "the post feed itself has no way back");
+  const style = sheetOf(page());
+  // ⚠️ NATIVE SCROLL-SNAP, not a JS drag: this screen scrolls vertically, and the browser arbitrates the
+  // two axes correctly where a hand-rolled drag has to guess on every move.
+  assert.match(style, /\.cp-rail \{[^}]*scroll-snap-type: x mandatory/,
+    "the carousel is not a native scroll-snap rail");
+  const w = nocomment(fn("wireClubPostView"));
+  assert.match(w, /requestAnimationFrame/, "the feed is positioned before the media has its box");
+});
+
+test("BLOCKER: Edit profile is the club's own five fields, not the app's settings screen", () => {
+  const app = appBlock();
+  // ⚠️ IT USED TO HAND THE RUNNER THE WHOLE PROFILE & SETTINGS SCREEN — units, theme, connections — when
+  // what they tapped was a button under their own avatar.
+  assert.ok(!/\[data-cedit\][\s\S]{0,140}state\.tab = "profile"/.test(app),
+    "Edit profile still opens the app's settings screen");
+  assert.match(app, /\[data-cedit\][\s\S]{0,120}state\.screen = "clubedit"/,
+    "Edit profile does not open the club's own page");
+  const e = nocomment(fn("viewClubEdit"));
+  for (const bit of ["ceAvatar", "ceBio", "ceFor", "cePb_", "clubBack"]) {
+    assert.ok(e.includes(bit), "the edit page is missing " + bit);
+  }
+  // ⚠️ THE PICTURE AND THE TRAINERS ARE NOT NEW FIELDS. The avatar has a cropper already; the trainers
+  // are the Shoe Rack's active pair, which knows their real mileage. Storing either again gives one fact
+  // two homes, and the two disagree the first time somebody changes the other.
+  assert.match(e, /activeShoe\(\)/, "the trainers are stored again rather than read from the Shoe Rack");
+  const w = nocomment(fn("wireClubEdit"));
+  assert.match(w, /hit\.shop = shop\.value/, "the shop link is not stored on the shoe it describes");
+  // ⚠️ EVERY FIELD SAVES AS IT IS TYPED. A Save button has a state where what is on screen is not what is
+  // stored, and this app has paid for that twice.
+  assert.ok(!/id="ceSave"/.test(e), "there is a Save button, so the form can hold unsaved state");
+  // ⚠️ AN EXPRESSION-BODIED ARROW CANNOT RE-RENDER, because it has no room for a second statement — a
+  // stronger claim than any regex over a block body, which my first version got wrong: [^}]* stops at
+  // the first brace, and the object literal being saved contains one, so a handler that DID call
+  // render() sailed straight past it.
+  assert.match(w, /bio\.oninput = \(\) => put\(/, "the bio does not save as a single expression as it is typed");
+  assert.match(w, /fr\.oninput = \(\) => put\(/, "training-for does not save as a single expression");
+  // The two block-bodied handlers are checked by slicing to them and forbidding a re-render inside.
+  const pbStart = w.indexOf('[data-cepb]');
+  const pbEnd = w.indexOf('const shop = ');
+  assert.ok(pbStart > 0 && pbEnd > pbStart, "the PB handlers could not be located");
+  assert.ok(!/render\(/.test(w.slice(pbStart, pbEnd)),
+    "a PB field re-renders the screen as it is typed, so the caret is captured");
+});
+
+test("BLOCKER: a typed PB is refused if it is not a time, and it beats a computed best", () => {
+  const t = nocomment(fn("clubPbText"));
+  // ⚠️ REFUSED, NOT PARSED INTO SECONDS AND PRINTED BACK. A typo of 2104 silently becoming 35 minutes is
+  // a claim the runner never made.
+  assert.match(t, /\\d\{1,2\}:\\d\{2\}/, "any text is accepted as a time");
+  assert.ok(!/parseInt|Number\(/.test(t), "the time is parsed into a number and printed back");
+  const c = nocomment(fn("clubChips"));
+  assert.match(c, /typed[\s\S]{0,80}pb: true/, "a typed time is not marked as a PB");
+  assert.match(c, /best\[r\.label\][\s\S]{0,60}pb: false/, "a computed time is not marked as a best");
+  // ⚠️ TWO WORDS BECAUSE THEY ARE TWO CLAIMS: a PB is a race result; a Best is the quickest the app has
+  // recorded, training runs included. Showing both for one distance would be two answers to one question.
+  const v = fn("viewCommunity");
+  assert.match(v, /b\.pb \? "PB" : "Best"/, "the profile does not distinguish a PB from a best");
+});
+
+test("BLOCKER: a shop link is only ever a plain web address", () => {
+  const h = nocomment(fn("clubShopHref"));
+  // ⚠️ THE ONE PLACE A RUNNER'S OWN TEXT BECOMES SOMETHING THE PHONE WILL ACT ON.
+  assert.match(h, /new URL\(/, "the address is not parsed at all");
+  assert.match(h, /protocol !== "http:" && url\.protocol !== "https:"/,
+    "a non-web scheme can be made clickable");
+  const v = fn("viewCommunity");
+  // ⚠️ COMMENTS STRIPPED. The code's note explaining why the attribute is there quotes the attribute, so
+  // deleting the real one left the guard perfectly happy — watched escaping. Tenth firing of that trap
+  // in this codebase, and the reason nocomment exists.
+  assert.match(nocomment(v), /rel="noopener noreferrer"/,
+    "the link hands the page it opens a handle back to the app");
+  assert.match(nocomment(v), /\(shopHref\s*\?/, "the name is a link even when no address was given");
 });

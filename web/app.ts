@@ -4495,8 +4495,18 @@ button.cm-stat:active { opacity: .65; }
   border-radius: var(--r-ctl); padding: 1px 7px; }
 .cm-chip-acc { color: var(--accent-ink); background: var(--accent); border-color: transparent;
   font-weight: 700; }
-.cm-acts { display: flex; gap: var(--s2); margin-top: var(--s3); }
-.cm-acts .ui-btn { flex: 1; }
+/* ⚠️ THE PROFILE ACTIONS ARE FILLED, BORDERLESS AND EQUAL — the reference's own shape, measured off the
+   screenshot he sent (three grey pills, no hairline, medium weight). The generic .ui-btn is an outlined
+   control built for a form; side by side under an avatar it reads as two form fields, which is what he
+   called not premium enough. Filled surface-2 on the canvas separates them from the page without a
+   border, and one of the two carries the accent because Create a post is the primary act here. */
+.cm-acts { display: flex; gap: var(--s2); margin-top: var(--s4); }
+.cm-act { flex: 1; min-width: 0; min-height: var(--tap); padding: 0 var(--s3); border: 0;
+  border-radius: var(--r-ctl); background: var(--surface-2); color: var(--ink);
+  font-size: var(--t-body); font-weight: 500; letter-spacing: -.01em; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; transition: opacity .12s ease, transform .12s ease; }
+.cm-act:active { opacity: .7; transform: scale(.985); }
+.cm-act-pri { background: var(--accent); color: var(--accent-ink); }
 /* Month sections + grid */
 .cm-mhead { display: flex; align-items: baseline; justify-content: space-between;
   margin: var(--s5) 0 var(--s2); }
@@ -4546,6 +4556,20 @@ button.cm-tile:active { opacity: .65; }
   text-wrap: pretty; }
 .cm-empty-q { color: var(--ink-faint); }
 .cm-empty-acts { display: flex; gap: var(--s2); margin-top: var(--s3); }
+/* ⚠️⚠️ .ui-btn HAD NO BASE RULE AT ALL, so all six of its uses rendered as bare browser buttons —
+   measured 180×22 in the feed's empty state, half the app's own 44px tap floor, with the platform's
+   default chrome. It is the invented-identifier trap in CSS class form, and the third firing in two
+   days after --r-sm2 and ui-pill-build: the design system's real classes are .ui-bar-btn, .ui-pill,
+   .ui-row and friends, and there has never been a .ui-btn. Defined here rather than renamed six call
+   sites, because an outlined secondary button is genuinely what all six want.
+   test/design-system.test.ts now fails on any ui-* class used with no rule behind it. */
+.ui-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: var(--tap); padding: 0 var(--s3); border: 1px solid var(--line);
+  border-radius: var(--r-ctl); background: var(--surface-2); color: var(--ink);
+  font: inherit; font-size: var(--t-body); font-weight: 500; letter-spacing: -.01em;
+  transition: opacity .12s ease, transform .12s ease; }
+.ui-btn:active { opacity: .7; transform: scale(.985); }
+.ui-btn-pri { border-color: transparent; background: var(--accent); color: var(--accent-ink); }
 .cm-empty-acts .ui-btn { flex: 1; }
 /* Sheet headings */
 .cm-sh { margin: 0 0 2px; font-size: var(--t-card); font-weight: 800; letter-spacing: -.01em; }
@@ -4623,12 +4647,13 @@ button.cm-tile:active { opacity: .65; }
   text-shadow: 0 0 1px rgba(2,10,8,.95), 0 1px 2px rgba(2,10,8,.7), 0 0 14px rgba(2,10,8,.45); }
 .club-tx.on { outline: 1.5px dashed rgba(255,255,255,.75); outline-offset: 3px; }
 .club-x { position: absolute; top: calc(var(--s3) + env(safe-area-inset-top, 0px)); left: var(--s3);
-  z-index: 3; display: grid; place-items: center; width: 38px; height: 38px; border: 0;
+  z-index: 3; display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 0;
   border-radius: 50%; background: rgba(4,16,13,.55); color: #fff; font-size: var(--t-card); }
 .club-rail { position: absolute; top: calc(var(--s3) + env(safe-area-inset-top, 0px));
   right: var(--s3); z-index: 3; display: flex; flex-direction: column; gap: var(--s2); }
-.club-t { display: grid; place-items: center; width: 38px; height: 38px; border: 0; border-radius: 50%;
-  background: rgba(4,16,13,.55); color: #fff; font-size: var(--t-card); font-weight: 800; }
+.club-t { display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 0;
+  border-radius: 50%; background: rgba(4,16,13,.55); color: #fff; font-size: var(--t-card);
+  font-weight: 800; }
 .club-t svg { width: 20px; height: 20px; }
 .club-t.danger { color: var(--rest); }
 /* ⚠️ THE TEXT SURFACE SITS ABOVE THE EDITOR AND ABOVE THE KEYBOARD. --kbh is the app's own published
@@ -4689,9 +4714,15 @@ button.cm-tile:active { opacity: .65; }
   color: #fff; }
 /* The avatar's little plus, and the rail's add ring. */
 .cm-avwrap { position: relative; flex: none; }
+/* ⚠️ padding: 0 IS THE FIX FOR THE + SITTING OFF-CENTRE, AND THE CAUSE WAS MEASURED, NOT GUESSED. The
+   app's global button rule sets padding: 1px 6px, which this inherited — so the content box was
+   26 - 4 (borders) - 12 (padding) = 10px wide holding a 14px glyph, and grid resolves a centred item
+   that OVERFLOWS its area to start-aligned. Measured: 8px of space on the left, 4px on the right, a
+   2px visual shift. Vertically it was already symmetric, which is why it read as leaning rather than
+   as plainly wrong. Any icon button whose glyph is its whole content needs this. */
 .cm-avplus { position: absolute; right: -2px; bottom: -2px; display: grid; place-items: center;
-  width: 26px; height: 26px; border: 2px solid var(--bg); border-radius: 50%; background: var(--accent);
-  color: var(--accent-ink); }
+  width: 26px; height: 26px; padding: 0; border: 2px solid var(--bg); border-radius: 50%;
+  background: var(--accent); color: var(--accent-ink); }
 .cm-avplus svg { width: 14px; height: 14px; }
 /* ⚠️ THE HIT AREA GROWS, NOT THE BOX — the badge is 26px by design and every tappable thing in this app
    reaches 44. Growing the box would push it over the avatar it sits on. */
@@ -4719,6 +4750,147 @@ button.cm-tile:active { opacity: .65; }
   background: linear-gradient(180deg, transparent, rgba(4,16,13,.8)); color: #fff;
   font-size: var(--t-label); font-weight: 650; text-align: left; overflow: hidden;
   white-space: nowrap; text-overflow: ellipsis; }
+/* ── The trim filmstrip. His screenshot: the whole clip as frames, a handle at each end, the window
+   outlined and everything outside it dimmed. ⚠️ THE HANDLES ARE 14px WIDE WITH A 44px HIT AREA GROWN BY
+   ::after — a handle you can see is not the same size as a handle a thumb can hold. */
+.club-film { position: relative; height: 52px; margin-top: var(--s2); border-radius: var(--r-ctl);
+  overflow: hidden; touch-action: none; }
+.club-frs { position: absolute; inset: 0; display: flex; }
+.club-fr { flex: 1; min-width: 0; background: #0a1a16 center/cover no-repeat; }
+.club-shade { position: absolute; top: 0; bottom: 0; background: rgba(4,16,13,.66); pointer-events: none; }
+.club-win { position: absolute; top: 0; bottom: 0; border: 2px solid #fff; border-radius: var(--r-ctl); }
+/* ⚠️ THE HANDLES SIT INSIDE THE WINDOW, NOT OUTSIDE IT. Hung on the outer edges they are clipped by the
+   strip's own overflow the moment the window reaches either end — measured, the right-hand handle was
+   cut in half at 0:24 of a 24-second clip, so the runner could see the end of the selection but not
+   grab it. Inside, they are always reachable, which is also what the reference does. */
+/* ⚠️ NO touch-action OF ITS OWN — it is computed from the element and its ancestors, and the strip it
+   sits in already takes none. A second declaration is a second owner of one behaviour. */
+.club-h { position: absolute; top: 0; bottom: 0; width: 14px; display: grid; place-items: center;
+  background: #fff; }
+.club-h-a { left: 0; border-radius: 12px 0 0 12px; }
+.club-h-b { right: 0; border-radius: 0 12px 12px 0; }
+.club-h i { display: block; width: 2px; height: 16px; border-radius: 999px; background: rgba(4,16,13,.55); }
+.club-h::after { content: ""; position: absolute; top: -8px; bottom: -8px; left: -15px; right: -15px; }
+/* ── The carousel in the editor: dots above the strip, the strip below. */
+.club-dots { display: flex; justify-content: center; gap: 5px; margin-bottom: var(--s2); }
+.club-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.38); }
+.club-dot.on { background: #fff; }
+.club-strip { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.club-sl { position: relative; flex: none; width: 52px; height: 52px; padding: 0; border: 2px solid transparent;
+  border-radius: var(--r-ctl); overflow: hidden; background: #0a1a16; }
+.club-sl.on { border-color: #fff; }
+.club-sl > img, .club-sl > video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.club-sl-x { position: absolute; top: 1px; right: 1px; display: grid; place-items: center; width: 18px;
+  height: 18px; border-radius: 50%; background: rgba(4,16,13,.72); color: #fff; font-size: var(--t-label); }
+.club-foot-r { display: flex; align-items: center; gap: var(--s2); }
+.club-foot-r .club-send { flex: 1; }
+.club-add { flex: none; display: grid; place-items: center; width: 44px; height: 44px; padding: 0;
+  border: 1px solid rgba(255,255,255,.3); border-radius: var(--r-ctl); background: rgba(4,16,13,.5);
+  color: #fff; }
+.club-add svg { width: 20px; height: 20px; }
+/* ── The caption step. */
+.club-cap-top { display: flex; align-items: center; gap: var(--s2);
+  padding: calc(var(--s3) + env(safe-area-inset-top, 0px)) var(--s3) var(--s3); }
+.club-cap-back { display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 0;
+  border-radius: 50%; background: rgba(255,255,255,.12); color: #fff; font-size: var(--t-hero); line-height: 1; }
+.club-cap-t { font-size: var(--t-card); font-weight: 700; color: #fff; }
+.club-cap-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 var(--s3); }
+.club-cap-strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: var(--s2); }
+.club-cap-i { flex: none; width: 92px; height: 118px; border-radius: var(--r-ctl); overflow: hidden;
+  background: #0a1a16; }
+.club-cap-i > img, .club-cap-i > video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.club-cap-in { width: 100%; margin-top: var(--s3); padding: var(--s3); border: 1px solid rgba(255,255,255,.22);
+  border-radius: var(--r-card); background: rgba(255,255,255,.06); color: #fff;
+  font-size: var(--t-card); line-height: 1.5; resize: none; }
+.club-cap-in::placeholder { color: rgba(255,255,255,.55); }
+.club-cap-note { margin-top: var(--s2); font-size: var(--t-meta); color: rgba(255,255,255,.66); }
+.club-cap-foot { padding: var(--s3); padding-bottom: calc(var(--s3) + env(safe-area-inset-bottom, 0px)); }
+.club-cap-foot .club-send { width: 100%; }
+/* ── Tapping a post: the feed of your own posts. ⚠️ A SCREEN, so it uses the app's own scroll owner and
+   needs no scroller of its own — nested scrolling is a house rule. */
+.cp-post { padding-bottom: var(--s5); border-bottom: 1px solid var(--line); margin-bottom: var(--s4); }
+.cp-head { display: flex; align-items: center; gap: var(--s2); padding: 0 0 var(--s2); }
+.cp-av { flex: none; width: 34px; height: 34px; border-radius: 50%; overflow: hidden;
+  display: grid; place-items: center; background: var(--surface-2); }
+.cp-av img { width: 100%; height: 100%; object-fit: cover; }
+.cp-who { flex: 1; min-width: 0; font-size: var(--t-body); font-weight: 500; letter-spacing: -.01em;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cp-more { flex: none; display: grid; place-items: center; width: 32px; height: 32px; padding: 0;
+  border: 0; background: none; color: var(--ink-soft); }
+.cp-more svg { width: 18px; height: 18px; }
+.cp-mediawrap { position: relative; margin: 0 calc(-1 * var(--s3)); }
+/* ⚠️ NATIVE SCROLL-SNAP, not a JS drag: this screen scrolls vertically, and the browser arbitrates
+   between the two axes correctly where a hand-rolled drag has to guess on every move. */
+.cp-rail { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.cp-rail::-webkit-scrollbar { display: none; }
+.cp-slide { position: relative; flex: none; width: 100%; aspect-ratio: 4 / 5; scroll-snap-align: center;
+  overflow: hidden; background: var(--surface-2); }
+.cp-fit { position: absolute; inset: 0; }
+.cp-med { position: absolute; inset: 0; }
+.cp-med > img, .cp-med > video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cp-count { position: absolute; top: 10px; right: 10px; padding: 2px 8px; border-radius: var(--r-pill);
+  background: rgba(4,16,13,.6); color: #fff; font-size: var(--t-label); font-weight: 700; }
+.cp-dots { display: flex; justify-content: center; gap: 5px; padding: var(--s2) 0 0; }
+.cp-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--line); }
+.cp-dot.on { background: var(--accent); }
+.cp-acts { display: flex; gap: var(--s3); padding: var(--s2) 0 0; }
+.cp-act { display: inline-flex; align-items: center; gap: 6px; min-height: var(--tap); padding: 0;
+  border: 0; background: none; color: var(--ink-soft); font-size: var(--t-meta); font-weight: 500; }
+.cp-act svg { width: 19px; height: 19px; }
+.cp-cap { margin: var(--s2) 0 0; font-size: var(--t-body); line-height: 1.55; text-wrap: pretty; }
+.cp-cap b { font-weight: 500; }
+.cp-when { margin: 6px 0 0; font-size: var(--t-label); color: var(--ink-faint);
+  text-transform: uppercase; letter-spacing: .03em; }
+/* ── Bio, training-for and trainers on the profile. */
+.cm-bio { margin-top: 2px; font-size: var(--t-body); line-height: 1.5; color: var(--ink);
+  text-wrap: pretty; white-space: pre-wrap; }
+.cm-tr { display: flex; align-items: center; gap: 7px; margin-top: 6px; font-size: var(--t-meta);
+  color: var(--ink-soft); }
+.cm-tr svg { flex: none; width: 17px; height: 17px; color: var(--accent); }
+.cm-tr a { color: var(--accent); text-decoration: none; border-bottom: 1px solid currentColor; }
+.cm-tr-km { margin-left: auto; color: var(--ink-faint); }
+/* ── Edit profile. */
+.ce-wrap { padding-bottom: var(--s6); }
+.ce-avwrap { display: flex; flex-direction: column; align-items: center; gap: var(--s2);
+  padding: var(--s3) 0 var(--s4); }
+.ce-av { width: 82px; height: 82px; }
+.ce-avbtn { min-height: var(--tap); padding: 0 var(--s3); border: 0; background: none;
+  color: var(--accent); font-size: var(--t-body); font-weight: 500; }
+.ce-card { border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface);
+  overflow: hidden; }
+.ce-row { display: flex; align-items: flex-start; gap: var(--s3); padding: var(--s3);
+  border-top: 1px solid var(--line); }
+.ce-row:first-child { border-top: 0; }
+.ce-k { flex: none; width: 8.5em; padding-top: 9px; font-size: var(--t-meta); color: var(--ink-soft); }
+.ce-v { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+/* ⚠️ font: inherit ON EVERY FIELD. A textarea with no family falls back to the browser's own monospace,
+   so the running bio rendered as code — measured on the served page. The app's global input rule sets a
+   size but not a family, and a class beats it on specificity anyway. */
+.ce-v input, .ce-v textarea { flex: 1; min-width: 0; width: 100%; padding: 8px 10px;
+  border: 1px solid var(--line); border-radius: var(--r-ctl); background: var(--surface-2);
+  color: var(--ink); font: inherit; font-size: var(--t-card); line-height: 1.45; }
+.ce-v textarea { resize: none; }
+.ce-v input.bad { border-color: var(--rest); }
+.ce-ro { flex: 1; min-width: 0; padding-top: 9px; font-size: var(--t-card); }
+.ce-sub { padding-top: 9px; font-size: var(--t-meta); color: var(--ink-faint); }
+.ce-lnk { min-height: var(--tap); padding: 0 var(--s2); border: 0; background: none; color: var(--accent);
+  font-size: var(--t-body); font-weight: 500; }
+.ce-h { margin: var(--s5) 0 var(--s2); font-size: var(--t-section); font-weight: 500;
+  letter-spacing: -.01em; }
+.ce-note { margin: var(--s2) 0 0; font-size: var(--t-meta); color: var(--ink-soft); line-height: 1.5; }
+/* ⚠️ ONE COLUMN, NOT TWO. Measured on the served page at 400px: two columns each holding a 4.6em label
+   and a time field overflowed, and the second column's input was cut off at the screen edge — a field
+   the runner can see the label of and not type into. Four rows down the page cost nothing; a clipped
+   input costs the feature. minmax(0, 1fr) on the row keeps the field shrinkable, which is the
+   grid-overflow trap this app already records: a 1fr track has min-width auto by default. */
+.ce-pbs { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; background: var(--line); }
+.ce-pb { display: flex; align-items: center; gap: var(--s3); padding: var(--s3); background: var(--surface); }
+.ce-pb label { flex: none; width: 6em; font-size: var(--t-meta); color: var(--ink-soft); }
+.ce-pb input { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--line);
+  border-radius: var(--r-ctl); background: var(--surface-2); color: var(--ink);
+  font: inherit; font-size: var(--t-card); font-variant-numeric: tabular-nums; text-align: center; }
+.ce-pb input.bad { border-color: var(--rest); }
+
 
 </style>
 </head>
@@ -4908,6 +5080,14 @@ const SHOES_KEY = "interun_shoes_v1";
  * its sandbox constants by their real position in the file.
  */
 const JOURNAL_KEY = "interun_journals_v1";
+/**
+ * ⚠️ DECLARED HERE WITH THE OTHER STORE KEYS, NOT BESIDE THE CODE THAT USES IT. journalSync runs at boot
+ * from inside adoptPlan; its key was first declared five thousand lines later, so the read landed in the
+ * const's temporal dead zone, threw a ReferenceError, and a try/catch swallowed it — nothing was ever
+ * written on any launch while calling it by hand worked perfectly. Same trap as SHARE_LADDER reading
+ * SHARE_EVEN_SPREAD_S. A store key belongs where the store keys are.
+ */
+const CLUBPROF_KEY = "interun_clubprofile_v1";
 // ⚠️ Roughly the range shoe manufacturers themselves quote. It is a REMINDER, NOT A RULE, and the
 // copy must never claim that replacing a shoe on schedule prevents injury — the evidence does not
 // support it, and this app sits beside a RED-S screen where an unsupportable claim costs the
@@ -10985,7 +11165,9 @@ function clubStories() {
   const live = rows.filter((p) => p && p.kind === "story" && (now - (p.at || 0)) < CLUB_STORY_MS);
   const dead = rows.filter((p) => p && p.kind === "story" && (now - (p.at || 0)) >= CLUB_STORY_MS);
   if (dead.length) {
-    dead.forEach((p) => { if (p.media) clubMediaDel(p.media); });
+    // ⚠️ EVERY KEY, not p.media — a carousel holds several and orphaning the rest leaves tens of
+    // megabytes in IndexedDB that nothing references and nothing can reach.
+    dead.forEach((p) => clubKeys(p).forEach((k) => clubMediaDel(k)));
     clubSave(rows.filter((p) => dead.indexOf(p) < 0));
   }
   return live;
@@ -10994,9 +11176,10 @@ function clubStories() {
 function clubDelete(id) {
   const rows = clubLoad();
   const p = rows.filter((x) => x && x.id === id)[0];
-  if (p && p.media) clubMediaDel(p.media);
+  if (p) clubKeys(p).forEach((k) => clubMediaDel(k));
   clubSave(rows.filter((x) => x && x.id !== id));
 }
+
 
 
 /* ══ INTE-CLUB: PICKING AND EDITING ════════════════════════════════════════════════════════════════
@@ -11063,17 +11246,33 @@ function clubCreateHtml() {
  * cropper and the share studio's stage already are.
  */
 let CLUBED = null;
-function openClubEditor(kind, file) {
-  const isVid = /^video\\//.test(file.type || "");
-  const url = URL.createObjectURL(file);
-  CLUBED = { kind: kind, file: file, url: url, isVid: isVid,
-    ox: 0.5, oy: 0.5, k: 1, texts: [], caption: "", inS: 0, outS: 0, dur: 0, sel: -1 };
+/**
+ * ⚠️ THE EDITOR HOLDS A LIST OF SLIDES, AND EVERY SLIDE OWNS ITS OWN FRAMING, TEXT AND TRIM. One shared
+ * crop across a carousel is the fault the share studio already records paying for: switching between
+ * pictures destroyed the framing just set, with nothing to undo it. So the framing is per slide, indexed
+ * by position, exactly as SPHOTO.crops is indexed by (template, aspect).
+ * ⚠️ AND A SINGLE PICK IS A LIST OF ONE, so there is one code path rather than a single-item case and a
+ * carousel case that drift apart.
+ */
+function openClubEditor(kind, files) {
+  const list = clubSortSelection(Array.isArray(files) ? files : [files]);
+  if (!list.length) return;
+  CLUBED = {
+    kind: kind, i: 0, step: "edit", caption: "", sel: -1, draft: null, draftAt: -1,
+    slides: list.map((f) => {
+      const isVid = /^video\\//.test(f.type || "");
+      return { file: f, url: URL.createObjectURL(f), isVid: isVid,
+        ox: 0.5, oy: 0.5, k: 1, texts: [], inS: 0, outS: 0, dur: 0 };
+    })
+  };
   const ov = el('<div class="club-ed" id="clubEd"></div>');
   document.body.appendChild(ov);
   clubEdDraw();
 }
+/** The slide being worked on. Every builder reads through this, so nothing indexes the array by hand. */
+function clubSlide() { return CLUBED ? CLUBED.slides[CLUBED.i] : null; }
 function clubEdClose() {
-  if (CLUBED) { try { URL.revokeObjectURL(CLUBED.url); } catch (e) {} }
+  if (CLUBED) CLUBED.slides.forEach((sl) => { try { URL.revokeObjectURL(sl.url); } catch (e) {} });
   CLUBED = null;
   const e = $("clubEd"); if (e) e.remove();
   // ⚠️ THE TEXT SURFACE IS A SIBLING OF THE EDITOR, NOT A CHILD — it has to sit above the keyboard, and
@@ -11081,16 +11280,44 @@ function clubEdClose() {
   // a half-typed word is left floating over the club with nothing behind it.
   const t = $("clubTxEd"); if (t) t.remove();
 }
+/** ⚠️ REMOVING THE LAST SLIDE CLOSES THE EDITOR rather than leaving a post with nothing in it. */
+function clubEdDrop(i) {
+  const S = CLUBED; if (!S) return;
+  const sl = S.slides[i]; if (!sl) return;
+  try { URL.revokeObjectURL(sl.url); } catch (e) {}
+  S.slides.splice(i, 1);
+  if (!S.slides.length) { clubEdClose(); return; }
+  S.i = Math.min(S.i, S.slides.length - 1);
+  S.sel = -1;
+  haptic("light");
+  clubEdDraw();
+}
 function clubEdDraw() {
   const S = CLUBED; if (!S) return;
   const ov = $("clubEd"); if (!ov) return;
-  const media = S.isVid
-    ? '<video class="club-med" id="clubMed" src="' + S.url + '" playsinline muted loop autoplay></video>'
-    : '<img class="club-med" id="clubMed" src="' + S.url + '" alt="">';
-  const texts = S.texts.map((t, i) =>
+  if (S.step === "caption") { clubCapDraw(); return; }
+  const sl = clubSlide(); if (!sl) return;
+  const media = sl.isVid
+    ? '<video class="club-med" id="clubMed" src="' + sl.url + '" playsinline muted loop autoplay></video>'
+    : '<img class="club-med" id="clubMed" src="' + sl.url + '" alt="">';
+  const texts = sl.texts.map((t, i) =>
     '<span class="club-tx' + (i === S.sel ? " on" : "") + '" data-ctx="' + i + '" style="left:' +
     (t.x * 100) + '%; top:' + (t.y * 100) + '%; color:' + t.colour + '; font-family:' + t.font +
     '; font-size:' + t.size + 'px">' + esc(t.text) + '</span>').join("");
+  // ⚠️ THE DOTS AND THE STRIP ARE TWO DIFFERENT ANSWERS TO ONE QUESTION AND BOTH ARE IN THE REFERENCE:
+  // the dots say where you are in the carousel, the strip lets you jump and lets you remove one.
+  const dots = S.slides.length > 1
+    ? '<div class="club-dots">' + S.slides.map((_, n) =>
+        '<span class="club-dot' + (n === S.i ? " on" : "") + '"></span>').join("") + '</div>' : "";
+  const strip = S.slides.length > 1
+    ? '<div class="club-strip">' + S.slides.map((x, n) =>
+        '<button class="club-sl' + (n === S.i ? " on" : "") + '" data-cslide="' + n + '" ' +
+        'aria-label="Item ' + (n + 1) + ' of ' + S.slides.length + '">' +
+        (x.isVid ? '<video src="' + x.url + '" muted playsinline preload="metadata"></video>'
+                 : '<img src="' + x.url + '" alt="">') +
+        (n === S.i ? '<span class="club-sl-x" data-cdrop="' + n + '" role="button" ' +
+          'aria-label="Remove this item">✕</span>' : "") +
+        '</button>').join("") + '</div>' : "";
   ov.innerHTML =
     '<div class="club-stage" id="clubStage">' +
       '<div class="club-fit" id="clubFit">' + media + '</div>' +
@@ -11102,37 +11329,71 @@ function clubEdDraw() {
       (S.sel >= 0 ? '<button class="club-t danger" id="clubDelTx" aria-label="Delete the selected text">' +
         ICON.trash + '</button>' : "") +
     '</div>' +
-    (S.isVid ? clubTrimHtml(S) : "") +
-    '<div class="club-foot">' +
-      '<input class="club-cap" id="clubCap" placeholder="Add a caption…" value="' + esc(S.caption) + '">' +
-      '<button class="club-send" id="clubSend">' +
-        (S.kind === "story" ? "Add to your story" : "Post to the club") + '</button>' +
+    (sl.isVid ? clubTrimHtml(S) : "") +
+    '<div class="club-foot">' + dots + strip +
+      '<div class="club-foot-r">' +
+        '<button class="club-add" id="clubAddMore" aria-label="Add more from your camera roll">' +
+          ICON.plusDot + '</button>' +
+        '<button class="club-send" id="clubNext">Next</button>' +
+      '</div>' +
     '</div>';
   wireClubEd();
 }
 /**
- * THE TRIM, FOR VIDEO.
- * ⚠️ A STORY'S WINDOW IS FIFTEEN SECONDS WIDE AND SLIDES; A POST'S IS THE WHOLE CLIP. The cap is the
- * owner's, and applying it to a post as well would be a rule he did not ask for.
+ * THE CAPTION STEP — his reference's third screen: the chosen items in a row, the caption, and Share.
+ * ⚠️ IT IS A STEP, NOT A FIELD ON THE EDITOR. On the editor the caption box sat under a full-screen
+ * picture with the keyboard over both, so the runner could not see what they were captioning. Here the
+ * media is a strip at the top and the box has the screen to itself.
  */
+function clubCapDraw() {
+  const S = CLUBED; if (!S) return;
+  const ov = $("clubEd"); if (!ov) return;
+  const strip = S.slides.map((x) =>
+    '<span class="club-cap-i">' +
+      (x.isVid ? '<video src="' + x.url + '" muted playsinline preload="metadata"></video>'
+               : '<img src="' + x.url + '" alt="">') + '</span>').join("");
+  const kindWord = S.kind === "story" ? "your story" : (S.slides[0].isVid ? "your videos" : "your grid");
+  ov.innerHTML =
+    '<div class="club-cap-top">' +
+      '<button class="club-cap-back" id="clubCapBack" aria-label="Back">‹</button>' +
+      '<span class="club-cap-t">New ' + (S.kind === "story" ? "story" : "post") + '</span>' +
+    '</div>' +
+    '<div class="club-cap-body">' +
+      '<div class="club-cap-strip">' + strip + '</div>' +
+      '<textarea class="club-cap-in" id="clubCapIn" rows="4" ' +
+        'placeholder="Write a caption…">' + esc(S.caption) + '</textarea>' +
+      '<p class="club-cap-note">Goes on ' + kindWord +
+        (S.slides.length > 1 ? ', as one post you swipe through' : '') +
+        (S.kind === "story" ? '. Gone after 24 hours.' : '') + '</p>' +
+    '</div>' +
+    '<div class="club-cap-foot">' +
+      '<button class="club-send" id="clubSend">' +
+        (S.kind === "story" ? "Add to your story" : "Share") + '</button>' +
+    '</div>';
+  const back = $("clubCapBack");
+  if (back) back.onclick = () => { S.step = "edit"; clubEdDraw(); };
+  const ta = $("clubCapIn");
+  if (ta) ta.oninput = () => { S.caption = ta.value; };
+  const send = $("clubSend");
+  if (send) send.onclick = () => clubEdPost();
+}
 function clubTrimHtml(S) {
+  const sl = clubSlide() || {};
   const cap = S.kind === "story" ? CLUB_STORY_MAX_S : 0;
-  const dur = S.dur || 0;
+  const dur = sl.dur || 0;
   if (!dur) return '<div class="club-trim" id="clubTrim"><span class="club-trim-w">Reading the clip…</span></div>';
   if (cap && dur > cap) {
     const maxIn = Math.max(0, dur - cap);
     return '<div class="club-trim" id="clubTrim">' +
       '<span class="club-trim-l">Story clips are ' + cap + ' seconds. Slide to choose which ' + cap + '.</span>' +
-      '<input type="range" id="clubIn" min="0" max="' + maxIn.toFixed(2) + '" step="0.1" value="' +
-        S.inS.toFixed(2) + '">' +
-      '<span class="club-trim-t num">' + clubClock(S.inS) + ' – ' + clubClock(S.inS + cap) + '</span>' +
+      clubStripHtml(sl, cap, maxIn) +
     '</div>';
   }
   return '<div class="club-trim" id="clubTrim">' +
     '<span class="club-trim-t num">' + clubClock(dur) + '</span></div>';
 }
 /** ⚠️ clubClock, NOT fmtClock — THAT NAME WAS ALREADY TAKEN AND THE COLLISION WAS SILENT. The live
- *  run's clubClock(ms) takes MILLISECONDS and prints tenths; this takes SECONDS. Function declarations
+ *  run's fmtClock(ms) takes MILLISECONDS and prints tenths; this takes SECONDS. Function declarations
  *  hoist, so the later one won for the whole script and every trim label read "0:00.0 – 0:00.0" — a
  *  fifteen-second window rendered as fifteen milliseconds. The build, node --check and 1132 tests all
  *  passed. test/community.test.ts now fails on ANY name declared twice in the app script. */
@@ -11156,20 +11417,23 @@ const CLUB_COLOURS = ["#ffffff", "#ff3b30", "#ffd60a", "var(--accent)", "#0a0a0a
  */
 function wireClubEd() {
   const S = CLUBED; if (!S) return;
+  const sl = clubSlide(); if (!sl) return;
   const stage = $("clubStage"), med = $("clubMed");
   const x = $("clubX"); if (x) x.onclick = () => { haptic("light"); clubEdClose(); };
-  if (med && S.isVid) {
+  if (med && sl.isVid) {
     med.onloadedmetadata = () => {
       const d = Number(med.duration) || 0;
       if (!d || !isFinite(d)) return;
-      S.dur = d;
+      sl.dur = d;
       const cap = S.kind === "story" ? CLUB_STORY_MAX_S : 0;
-      S.inS = 0; S.outS = cap ? Math.min(d, cap) : d;
+      sl.inS = 0; sl.outS = cap ? Math.min(d, cap) : d;
       const t = $("clubTrim");
       if (t) { t.outerHTML = clubTrimHtml(S); wireClubTrim(); }
+      clubThumbs(sl);
       clubVidLoop();
     };
     med.onerror = () => { toast("That video could not be read."); };
+    if (sl.dur && !sl.thumbs) clubThumbs(sl);
   }
   clubEdFit();
   if (stage) clubEdGestures(stage);
@@ -11179,7 +11443,7 @@ function wireClubEd() {
   // the app does not control. The text is typed ON the media, in the face it will be posted in.
   if (add) add.onclick = () => clubTextOpen(-1);
   const del = $("clubDelTx");
-  if (del) del.onclick = () => { S.texts.splice(S.sel, 1); S.sel = -1; haptic("light"); clubEdDraw(); };
+  if (del) del.onclick = () => { sl.texts.splice(S.sel, 1); S.sel = -1; haptic("light"); clubEdDraw(); };
   const txs = $("clubTxs");
   if (txs) txs.querySelectorAll("[data-ctx]").forEach((n) => {
     n.onpointerdown = (ev) => clubTextDrag(ev, Number(n.getAttribute("data-ctx")));
@@ -11187,34 +11451,60 @@ function wireClubEd() {
     // one gesture is not made to mean two things — a word the runner meant to nudge does not reopen the
     // keyboard, and a word they meant to fix does not need a second control to reach.
   });
-  const cap = $("clubCap");
-  if (cap) cap.oninput = () => { S.caption = cap.value; };
-  const send = $("clubSend");
-  if (send) send.onclick = () => clubEdPost();
+  // The carousel: the strip jumps, the ✕ on the current one removes it.
+  document.querySelectorAll("[data-cslide]").forEach((b) => b.onclick = (ev) => {
+    if (ev.target && ev.target.closest && ev.target.closest("[data-cdrop]")) return;
+    S.i = Number(b.dataset.cslide) || 0; S.sel = -1; clubEdDraw();
+  });
+  document.querySelectorAll("[data-cdrop]").forEach((b) => b.onclick = (ev) => {
+    ev.stopPropagation(); clubEdDrop(Number(b.dataset.cdrop) || 0);
+  });
+  const more = $("clubAddMore");
+  // ⚠️ ADDING MORE APPENDS TO WHAT IS ALREADY CHOSEN rather than starting again — the reference's own +
+  // in the filmstrip, and the whole reason the editor holds a list.
+  if (more) more.onclick = () => clubAddMore();
+  const next = $("clubNext");
+  if (next) next.onclick = () => { S.step = "caption"; S.sel = -1; clubEdDraw(); };
   wireClubTrim();
 }
-function wireClubTrim() {
+/** ⚠️ THE SAME SORT AS THE FIRST PICK, applied to the combined list, so a video cannot be added to a
+ *  carousel of photographs by the back door. */
+function clubAddMore() {
   const S = CLUBED; if (!S) return;
-  const inp = $("clubIn"); if (!inp) return;
-  inp.oninput = () => {
-    S.inS = Number(inp.value) || 0;
-    S.outS = S.inS + CLUB_STORY_MAX_S;
-    const lbl = $("clubTrim");
-    if (lbl) { const t = lbl.querySelector(".club-trim-t"); if (t) t.textContent = clubClock(S.inS) + " – " + clubClock(S.outS); }
-    clubVidSeek();
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = "image/*,video/*"; inp.multiple = true;
+  inp.style.position = "fixed"; inp.style.left = "-9999px";
+  document.body.appendChild(inp);
+  inp.onchange = () => {
+    const files = [...(inp.files || [])];
+    try { inp.remove(); } catch (e) {}
+    if (!files.length) return;
+    const kept = clubSortSelection(S.slides.map((x) => x.file).concat(files));
+    // Slides already open keep their framing; only genuinely new files become new slides.
+    const have = S.slides.map((x) => x.file);
+    const add = kept.filter((f) => have.indexOf(f) < 0).slice(0, CLUB_MAX_SLIDES - S.slides.length);
+    if (!add.length) { toast("Nothing new to add."); return; }
+    add.forEach((f) => {
+      const isVid = /^video\\//.test(f.type || "");
+      S.slides.push({ file: f, url: URL.createObjectURL(f), isVid: isVid,
+        ox: 0.5, oy: 0.5, k: 1, texts: [], inS: 0, outS: 0, dur: 0 });
+    });
+    S.i = S.slides.length - 1; S.sel = -1;
+    haptic("light");
+    clubEdDraw();
   };
+  inp.click();
 }
-/** ⚠️ PREVIEW THE WINDOW, NOT THE WHOLE CLIP — a story preview that plays the forty seconds the runner
- *  just trimmed away is a preview of something they are not posting. */
 function clubVidSeek() {
-  const S = CLUBED, med = $("clubMed"); if (!S || !med || !S.isVid) return;
-  try { med.currentTime = S.inS; med.play(); } catch (e) {}
+  const sl = clubSlide(), med = $("clubMed"); if (!sl || !med || !sl.isVid) return;
+  try { med.currentTime = sl.inS; med.play(); } catch (e) {}
 }
 function clubVidLoop() {
-  const S = CLUBED, med = $("clubMed"); if (!S || !med || !S.isVid) return;
+  const sl = clubSlide(), med = $("clubMed"); if (!sl || !med || !sl.isVid) return;
   med.ontimeupdate = () => {
-    if (!CLUBED) return;
-    if (S.outS > S.inS && med.currentTime >= S.outS - 0.05) clubVidSeek();
+    const cur = clubSlide();
+    if (!cur || cur !== sl) return;
+    if (sl.outS > sl.inS && med.currentTime >= sl.outS - 0.05) clubVidSeek();
   };
   clubVidSeek();
 }
@@ -11229,26 +11519,28 @@ function clubEdGestures(stage) {
   const pts = new Map();
   stage.onpointerdown = (ev) => {
     if (ev.target && ev.target.closest && ev.target.closest("[data-ctx]")) return;
+    const sl = clubSlide(); if (!sl) return;
     pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
     try { stage.setPointerCapture(ev.pointerId); } catch (e) {}
-    if (pts.size === 1) drag = { x: ev.clientX, y: ev.clientY, ox: CLUBED.ox, oy: CLUBED.oy };
+    if (pts.size === 1) drag = { x: ev.clientX, y: ev.clientY, ox: sl.ox, oy: sl.oy };
     if (pts.size === 2) {
       const a = [...pts.values()];
-      pinch = { d: Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) || 1, k: CLUBED.k };
+      pinch = { d: Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) || 1, k: sl.k };
       drag = null;
     }
   };
   stage.onpointermove = (ev) => {
-    if (!CLUBED || !pts.has(ev.pointerId)) return;
+    const sl = clubSlide();
+    if (!sl || !pts.has(ev.pointerId)) return;
     pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
     const box = stage.getBoundingClientRect();
     if (pinch && pts.size >= 2) {
       const a = [...pts.values()];
       const d = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) || 1;
-      CLUBED.k = Math.max(1, Math.min(4, pinch.k * (d / pinch.d)));
+      sl.k = Math.max(1, Math.min(4, pinch.k * (d / pinch.d)));
     } else if (drag) {
-      CLUBED.ox = drag.ox - (ev.clientX - drag.x) / Math.max(1, box.width);
-      CLUBED.oy = drag.oy - (ev.clientY - drag.y) / Math.max(1, box.height);
+      sl.ox = drag.ox - (ev.clientX - drag.x) / Math.max(1, box.width);
+      sl.oy = drag.oy - (ev.clientY - drag.y) / Math.max(1, box.height);
     }
     clubEdFit();
   };
@@ -11258,17 +11550,17 @@ function clubEdGestures(stage) {
 /** ⚠️ ONE PLACE APPLIES THE FRAMING, so the clamp cannot be written twice and disagree — the preview and
  *  the stored crop are the same numbers. */
 function clubEdFit() {
-  const S = CLUBED; if (!S) return;
+  const sl = clubSlide(); if (!sl) return;
   const fit = $("clubFit"); if (!fit) return;
-  const half = (1 - 1 / S.k) / 2;
-  S.ox = Math.max(0.5 - half, Math.min(0.5 + half, S.ox));
-  S.oy = Math.max(0.5 - half, Math.min(0.5 + half, S.oy));
-  fit.style.transform = "scale(" + S.k.toFixed(3) + ")";
-  fit.style.transformOrigin = (S.ox * 100).toFixed(2) + "% " + (S.oy * 100).toFixed(2) + "%";
+  const half = (1 - 1 / sl.k) / 2;
+  sl.ox = Math.max(0.5 - half, Math.min(0.5 + half, sl.ox));
+  sl.oy = Math.max(0.5 - half, Math.min(0.5 + half, sl.oy));
+  fit.style.transform = "scale(" + sl.k.toFixed(3) + ")";
+  fit.style.transformOrigin = (sl.ox * 100).toFixed(2) + "% " + (sl.oy * 100).toFixed(2) + "%";
 }
 function clubTextDrag(ev, i) {
-  const S = CLUBED; if (!S) return;
-  const t = S.texts[i]; if (!t) return;
+  const S = CLUBED, sl = clubSlide(); if (!S || !sl) return;
+  const t = sl.texts[i]; if (!t) return;
   S.sel = i;
   const stage = $("clubStage"); if (!stage) return;
   const box = stage.getBoundingClientRect();
@@ -11305,11 +11597,11 @@ function clubTextDrag(ev, i) {
  * three labels; set in their own faces it is a choice you can see before you make it.
  */
 function clubTextOpen(i) {
-  const S = CLUBED; if (!S) return;
+  const S = CLUBED, sl = clubSlide(); if (!S || !sl) return;
   const fresh = i < 0;
   S.draft = fresh
     ? { text: "", x: 0.5, y: 0.42, colour: CLUB_COLOURS[0], font: CLUB_FONTS[0], size: 34 }
-    : Object.assign({}, S.texts[i]);
+    : Object.assign({}, sl.texts[i]);
   S.draftAt = fresh ? -1 : i;
   clubTextDraw();
 }
@@ -11365,11 +11657,12 @@ function clubTextCommit() {
   S.draft = null;
   if (!d) return;
   const txt = String(d.text || "").trim();
+  const sl = clubSlide(); if (!sl) return;
   if (S.draftAt >= 0) {
-    if (txt) { d.text = txt; S.texts[S.draftAt] = d; S.sel = S.draftAt; }
-    else { S.texts.splice(S.draftAt, 1); S.sel = -1; }
+    if (txt) { d.text = txt; sl.texts[S.draftAt] = d; S.sel = S.draftAt; }
+    else { sl.texts.splice(S.draftAt, 1); S.sel = -1; }
   } else if (txt) {
-    d.text = txt; S.texts.push(d); S.sel = S.texts.length - 1;
+    d.text = txt; sl.texts.push(d); S.sel = sl.texts.length - 1;
   }
   S.draftAt = -1;
   haptic("light");
@@ -11386,26 +11679,62 @@ function clubTextCommit() {
  */
 function clubEdPost() {
   const S = CLUBED; if (!S) return;
-  const key = "m" + Date.now() + "-" + Math.floor(Math.random() * 1e6);
   const send = $("clubSend"); if (send) { send.disabled = true; send.textContent = "Saving…"; }
-  clubMediaPut(key, S.file, { type: S.isVid ? "video" : "photo" }).then(() => {
+  const stamp = Date.now();
+  const slides = S.slides.map((sl, n) => ({
+    sl: sl,
+    key: "m" + stamp + "-" + n + "-" + Math.floor(Math.random() * 1e6)
+  }));
+  // ⚠️ EVERY BLOB FIRST, THEN ONE ROW. A row naming a blob that failed to write is a permanently broken
+  // slide in the middle of a carousel; a blob with no row is invisible and swept by the next open.
+  Promise.all(slides.map((x) => clubMediaPut(x.key, x.sl.file,
+    { type: x.sl.isVid ? "video" : "photo" }))).then((oks) => {
+    if (oks.some((ok) => !ok)) throw new Error("media");
     const rows = clubLoad();
-    rows.unshift({ id: key, kind: S.kind, media: key, video: S.isVid,
-      caption: (S.caption || "").slice(0, 300), at: Date.now(),
-      crop: { ox: +S.ox.toFixed(4), oy: +S.oy.toFixed(4), k: +S.k.toFixed(3) },
-      trim: S.isVid ? { inS: +S.inS.toFixed(2), outS: +S.outS.toFixed(2) } : null,
-      texts: S.texts.slice(0, 8) });
+    rows.unshift({
+      id: slides[0].key, kind: S.kind,
+      // ⚠️ ALWAYS AN ARRAY, EVEN FOR ONE. A field that is sometimes a string and sometimes a list is two
+      // shapes for every reader to get right, which is the normalizeRoute/normalizeSplits fault twice
+      // over. clubSlides() accepts the old single-key rows so anything already posted still opens.
+      media: slides.map((x) => x.key),
+      video: !!slides[0].sl.isVid,
+      caption: (S.caption || "").slice(0, 300), at: stamp,
+      slides: slides.map((x) => ({
+        media: x.key,
+        crop: { ox: +x.sl.ox.toFixed(4), oy: +x.sl.oy.toFixed(4), k: +x.sl.k.toFixed(3) },
+        trim: x.sl.isVid ? { inS: +x.sl.inS.toFixed(2), outS: +x.sl.outS.toFixed(2) } : null,
+        texts: x.sl.texts.slice(0, 8)
+      }))
+    });
     clubSave(rows);
     haptic("success");
     clubEdClose();
-    state.tab = "community"; state.commView = "runs";
+    state.tab = "community"; state.commView = "runs"; state.screen = null;
     render();
-    toast(S.kind === "story" ? "Added to your story." : "Posted to the club.");
+    toast(S.kind === "story" ? "Added to your story."
+      : (slides.length > 1 ? slides.length + " pictures posted." : "Posted to the club."));
   }).catch(() => {
     if (send) { send.disabled = false; send.textContent = "Try again"; }
     toast("That could not be saved on this device.");
   });
 }
+/**
+ * ⚠️ ONE READER FOR A POST'S SLIDES, AND IT ACCEPTS BOTH SHAPES. Posts written before carousels existed
+ * carry media as a single key and their crop, trim and texts on the row itself. Every reader asking this
+ * function means a post from either era opens correctly, and there is one place the old shape is
+ * understood rather than a conditional in the grid, the viewer and the loader.
+ */
+function clubSlides(p) {
+  if (!p) return [];
+  if (Array.isArray(p.slides) && p.slides.length) return p.slides;
+  const keys = Array.isArray(p.media) ? p.media : (p.media ? [p.media] : []);
+  return keys.map((k, i) => ({ media: k,
+    crop: i === 0 ? (p.crop || null) : null,
+    trim: i === 0 ? (p.trim || null) : null,
+    texts: i === 0 ? (p.texts || []) : [] }));
+}
+/** Every media key a post holds — what the sweep deletes, and what the loader fills. */
+function clubKeys(p) { return clubSlides(p).map((x) => x.media).filter(Boolean); }
 
 /** Create opens the sheet; a row picks a kind and goes straight to the camera roll. */
 function openClubCreate() {
@@ -11433,7 +11762,11 @@ function clubTileHtml(p) {
   const cap = p.caption
     ? '<span class="cm-t-cap">' + esc(p.caption.slice(0, 60)) + '</span>' : "";
   return '<button class="cm-tile cm-tile-m" data-cpost="' + esc(p.id) + '">' +
-    '<span class="cm-t-med" data-cmed="' + esc(p.media) + '" data-cvid="' + (p.video ? "1" : "") + '"></span>' +
+    // ⚠️ THE FIRST SLIDE'S KEY, THROUGH clubSlides — p.media is a LIST now, and esc(["a","b"]) is the
+    // string "a,b", a key nothing holds. Measured on the served page: every carousel tile drew the
+    // missing-media hatch. The reason clubSlides exists is that nothing should read the raw field.
+    '<span class="cm-t-med" data-cmed="' + esc(clubKeys(p)[0] || "") + '" data-cvid="' +
+      (p.video ? "1" : "") + '"></span>' +
     badge + cap + '</button>';
 }
 /** ⚠️ ONE PASS OVER THE DOM AFTER A RENDER, so a tile, a story ring and the viewer all fill in through
@@ -11489,7 +11822,162 @@ function clubViewClose() {
   if (CLUB_VIEW_T) { clearTimeout(CLUB_VIEW_T); CLUB_VIEW_T = 0; }
   const e = $("clubView"); if (e) e.remove();
 }
-function openClubPost(id) { clubOpenMedia(clubPosts().filter((p) => p.id === id), 0, false); }
+/**
+ * ══ TAPPING A POST OPENS THE FEED OF YOUR OWN POSTS, STARTING AT THAT ONE ══════════════════════════
+ * Owner, 2026-08-22: "when you click on a post that you have already posted on your grid, it needs to
+ * open like they do on instagram" — with a recording. What that recording shows, frame by frame, is NOT
+ * a full-screen viewer: it is a titled screen ("Posts", the handle underneath, a back chevron) holding a
+ * SCROLLABLE LIST of the runner's own posts, positioned at the one tapped. Each post is a header, the
+ * media, carousel dots, then the caption and the date, and the next post begins below.
+ *
+ * ⚠️ SO IT IS A SCREEN, NOT AN OVERLAY, and that is the whole difference. A story is a thing that plays
+ * at you and closes itself; a post is a thing you read at your own pace and scroll past. Built as an
+ * overlay it would have to reimplement scrolling, and every re-render would jump the runner back to the
+ * top — which is the fault the club's own carousel already records.
+ * ⚠️ AND THERE ARE NO LIKES AND NO COMMENTS. The reference has both and this app has no server, so a
+ * heart here would be a control that looks live and does nothing — the class this project has shipped
+ * three times. What each post carries instead is what genuinely works: share it, or delete it.
+ */
+function openClubPost(id) {
+  state.screen = "clubpost";
+  state.clubPostId = id;
+  render();
+}
+function clubPostViewHtml() {
+  const posts = clubPosts();
+  // ⚠️ THE WAY BACK COMES FIRST, AND IT IS NOT OPTIONAL. This is a titled sub-screen: without it the only
+  // route out is the bottom nav, which does not return the runner to where they were — it re-enters the
+  // club at the top of the grid. The empty case needs it just as much as the full one.
+  const back = '<button class="backbtn" id="clubBack">\u2039 Inte-Club</button>';
+  if (!posts.length) {
+    return back + '<div class="cm-empty cm-empty-sm"><p>Nothing posted yet.</p></div>';
+  }
+  const p = commProfile();
+  const av = p.avatar ? '<img src="' + esc(p.avatar) + '" alt="">'
+    : '<span class="cm-init">' + esc(p.initials) + '</span>';
+  return back + posts.map((post) => {
+    const sl = clubSlides(post);
+    const many = sl.length > 1;
+    const media = sl.map((x, i) =>
+      // ⚠️ NO INDEX ATTRIBUTE. The rail is a native scroll-snap scroller, so the position is read from
+      // scrollLeft — an index nothing consults is what the next reader copies, which is the unread-key
+      // fault this project already records on the watch's companion tick.
+      '<div class="cp-slide">' +
+        '<div class="cp-fit"' + (x.crop
+          ? ' style="transform:scale(' + (x.crop.k || 1) + ');transform-origin:' +
+            ((x.crop.ox != null ? x.crop.ox : 0.5) * 100) + '% ' +
+            ((x.crop.oy != null ? x.crop.oy : 0.5) * 100) + '%"' : "") + '>' +
+          '<span class="cp-med" data-cmed="' + esc(x.media) + '" data-cvid="' +
+            (post.video ? "1" : "") + '"></span>' +
+        '</div>' +
+        (x.texts || []).map((t) =>
+          '<span class="club-tx" style="left:' + (t.x * 100) + '%; top:' + (t.y * 100) +
+          '%; color:' + t.colour + '; font-family:' + t.font + '; font-size:' +
+          Math.round(t.size * 0.62) + 'px">' + esc(t.text) + '</span>').join("") +
+      '</div>').join("");
+    return '<article class="cp-post">' +
+      '<div class="cp-head">' +
+        '<span class="cp-av">' + av + '</span>' +
+        '<span class="cp-who">' + esc(p.name || "You") + '</span>' +
+        '<button class="cp-more" data-cpmore="' + esc(post.id) + '" aria-label="More">' +
+          ICON.chevDown + '</button>' +
+      '</div>' +
+      '<div class="cp-mediawrap">' +
+        '<div class="cp-rail" data-cprail="' + esc(post.id) + '">' + media + '</div>' +
+        (many ? '<span class="cp-count num" data-cpcount="' + esc(post.id) + '">1/' + sl.length +
+          '</span>' : "") +
+      '</div>' +
+      (many ? '<div class="cp-dots" data-cpdots="' + esc(post.id) + '">' + sl.map((_, i) =>
+        '<span class="cp-dot' + (i ? "" : " on") + '"></span>').join("") + '</div>' : "") +
+      '<div class="cp-acts">' +
+        '<button class="cp-act" data-cpshare="' + esc(post.id) + '">' + ICON.share +
+          '<span>Share</span></button>' +
+        '<button class="cp-act" data-cpdel="' + esc(post.id) + '">' + ICON.trash +
+          '<span>Delete</span></button>' +
+      '</div>' +
+      (post.caption ? '<p class="cp-cap"><b>' + esc(p.name || "You") + '</b> ' +
+        esc(post.caption) + '</p>' : "") +
+      '<p class="cp-when">' + esc(clubPostDate(post.at)) + '</p>' +
+    '</article>';
+  }).join("");
+}
+/** ⚠️ A DATE, NOT "2 hours ago". A post keeps its day forever and a relative label goes stale the moment
+ *  it is read; the reference prints a date too once a post is more than a week old. */
+function clubPostDate(ms) {
+  const d = new Date(Number(ms) || 0);
+  if (!isFinite(d.getTime())) return "";
+  return d.getDate() + " " + MONTHS_LONG[d.getMonth()] + " " + d.getFullYear();
+}
+const MONTHS_LONG = ["January", "February", "March", "April", "May", "June", "July", "August",
+  "September", "October", "November", "December"];
+/**
+ * ⚠️ THE CAROUSEL IS A NATIVE SCROLL-SNAP RAIL, NOT A TRANSFORM DRIVEN BY POINTER EVENTS. This screen is
+ * itself a vertical scroller, so a JS-driven horizontal drag has to decide on every move which axis the
+ * finger meant — and getting that wrong makes the page fight the swipe. The browser already arbitrates
+ * between a vertical page scroll and a horizontal scroll-snap child, correctly, on every device.
+ */
+function wireClubPostView() {
+  document.querySelectorAll("[data-cprail]").forEach((rail) => {
+    const id = rail.dataset.cprail;
+    rail.onscroll = () => {
+      const w = rail.clientWidth || 1;
+      const i = Math.round(rail.scrollLeft / w);
+      const dots = document.querySelector('[data-cpdots="' + id + '"]');
+      if (dots) dots.querySelectorAll(".cp-dot").forEach((d, n) => d.classList.toggle("on", n === i));
+      const c = document.querySelector('[data-cpcount="' + id + '"]');
+      if (c) c.textContent = (i + 1) + "/" + rail.children.length;
+    };
+  });
+  document.querySelectorAll("[data-cpshare]").forEach((b) => b.onclick = () => clubSharePost(b.dataset.cpshare));
+  document.querySelectorAll("[data-cpdel]").forEach((b) => b.onclick = () => {
+    clubDelete(b.dataset.cpdel);
+    // ⚠️ LEAVE THE SCREEN IF THAT WAS THE LAST ONE, or the runner is left on a titled page with nothing
+    // on it — the same reason the run debrief leaves before deleting the run it is showing.
+    if (!clubPosts().length) { state.screen = null; }
+    render();
+    toast("Post removed.");
+  });
+  document.querySelectorAll("[data-cpmore]").forEach((b) => b.onclick = () => {
+    const el2 = b.closest(".cp-post");
+    const acts = el2 ? el2.querySelector(".cp-acts") : null;
+    if (acts) acts.classList.toggle("on");
+  });
+  clubFillMedia();
+  // ⚠️ SCROLLED TO THE TAPPED POST AFTER THE MEDIA HAS ITS BOX, not before. A post whose picture has not
+  // arrived is a few pixels tall, so scrolling to it lands on the wrong one — the measure-before-shown
+  // trap this app already records paying for twice.
+  const want = state.clubPostId;
+  if (!want) return;
+  // ⚠️ CLEARED AS SOON AS IT IS USED. Left set, every later render of this screen — deleting a post,
+  // swiping a carousel — would drag the runner back to the post they first tapped.
+  state.clubPostId = null;
+  const go = () => {
+    const target = document.querySelector('[data-cprail="' + want + '"]');
+    if (!target) return;
+    const post = target.closest(".cp-post");
+    const view = $("view");
+    if (post && view) view.scrollTop = post.offsetTop - 8;
+  };
+  requestAnimationFrame(() => requestAnimationFrame(go));
+  setTimeout(go, 350);
+}
+/** Sharing a post hands the picture to the phone's own share sheet — the same route the share card uses. */
+function clubSharePost(id) {
+  const p = clubPosts().filter((x) => x.id === id)[0];
+  if (!p) return;
+  const key = clubKeys(p)[0];
+  if (!key) { toast("Nothing to share."); return; }
+  clubMediaGet(key).then((rec) => {
+    if (!rec || !rec.blob) { toast("That file is no longer on this device."); return; }
+    const ext = /^video\\//.test(rec.type || "") ? "mp4" : "jpg";
+    const file = new File([rec.blob], "InteRun-post." + ext, { type: rec.type || "image/jpeg" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], text: p.caption || "" }).catch(() => {});
+    } else {
+      toast("Sharing is not available on this device.");
+    }
+  }).catch(() => toast("That could not be read."));
+}
 function openClubStories() { clubOpenMedia(clubStories(), 0, true); }
 function clubOpenMedia(rows, i, auto) {
   if (!rows || !rows.length) return;
@@ -11502,16 +11990,19 @@ function clubOpenMedia(rows, i, auto) {
       ? '<div class="cm-bars">' + rows.map((_, n) =>
           '<span class="cm-bar' + (n < i ? " done" : n === i ? " now" : "") + '"><i></i></span>').join("") +
         '</div>' : "";
-    const texts = (p.texts || []).map((t) =>
+    const texts = (first.texts || []).map((t) =>
       '<span class="club-tx" style="left:' + (t.x * 100) + '%; top:' + (t.y * 100) + '%; color:' +
       t.colour + '; font-family:' + t.font + '; font-size:' + t.size + 'px">' + esc(t.text) +
       '</span>').join("");
-    const c = p.crop || { ox: 0.5, oy: 0.5, k: 1 };
+    // ⚠️ THROUGH clubSlides FOR THE SAME REASON — a carousel row keeps its crop, trim and text per slide,
+    // so reading them off the row itself silently loses the framing on anything posted as a carousel.
+    const first = clubSlides(p)[0] || {};
+    const c = first.crop || { ox: 0.5, oy: 0.5, k: 1 };
     ov.innerHTML = bars +
       '<div class="club-stage club-stage-v">' +
         '<div class="club-fit" style="transform:scale(' + (c.k || 1) + ');transform-origin:' +
           ((c.ox != null ? c.ox : 0.5) * 100) + '% ' + ((c.oy != null ? c.oy : 0.5) * 100) + '%">' +
-          '<span class="club-vmed" data-cmed="' + esc(p.media) + '" data-cvid="' +
+          '<span class="club-vmed" data-cmed="' + esc(clubKeys(p)[0] || "") + '" data-cvid="' +
             (p.video ? "1" : "") + '"></span>' +
         '</div>' +
         '<div class="club-txs">' + texts + '</div>' +
@@ -11528,10 +12019,11 @@ function clubOpenMedia(rows, i, auto) {
     // an export later.
     setTimeout(() => {
       const vd = ov.querySelector("video");
-      if (vd && p.trim) {
-        vd.currentTime = p.trim.inS || 0;
+      const tr = first.trim;
+      if (vd && tr) {
+        vd.currentTime = tr.inS || 0;
         vd.ontimeupdate = () => {
-          if (p.trim.outS > p.trim.inS && vd.currentTime >= p.trim.outS - 0.05) vd.currentTime = p.trim.inS;
+          if (tr.outS > tr.inS && vd.currentTime >= tr.outS - 0.05) vd.currentTime = tr.inS;
         };
       }
       if (vd) { vd.muted = false; vd.loop = true; try { vd.play(); } catch (e) {} }
@@ -11549,14 +12041,393 @@ function clubOpenMedia(rows, i, auto) {
     // ⚠️ A VIDEO STORY RUNS FOR ITS OWN TRIMMED LENGTH, not a flat 4.5s — advancing off a twelve-second
     // clip after four and a half is cutting the runner off mid-sentence.
     if (auto) {
-      const ms = (p.video && p.trim && p.trim.outS > p.trim.inS)
-        ? Math.min(CLUB_STORY_MAX_S, p.trim.outS - p.trim.inS) * 1000 + 250
+      const ms = (p.video && first.trim && first.trim.outS > first.trim.inS)
+        ? Math.min(CLUB_STORY_MAX_S, first.trim.outS - first.trim.inS) * 1000 + 250
         : COMM_STORY_MS;
       CLUB_VIEW_T = setTimeout(advance, ms);
     }
   };
   const advance = () => { i += 1; if (i >= rows.length) { clubViewClose(); return; } draw(); };
   draw();
+}
+
+/**
+ * ══ CREATE A POST: SEVERAL PICTURES, OR A VIDEO ═════════════════════════════════════════════════════
+ * Owner, 2026-08-22: "the 'share a run' button just needs to be 'create a post' this will then let you
+ * select a video or picture(s) from your camera roll to post to your main grid for a carousel of
+ * pictures or your videos grid if its a video".
+ *
+ * ⚠️ STEP ONE OF HIS REFERENCE CANNOT BE DRAWN BY US, AND THAT IS A PLATFORM BOUNDARY RATHER THAN A
+ * SHORTCUT. Its first screen is a grid of the runner's own camera roll with selection circles — a web
+ * page cannot enumerate the photo library at all, and it must not: nothing here is allowed to read a
+ * person's photos without them choosing which. What the file input opens IS that screen, drawn by iOS,
+ * with the same multi-select and the same numbered circles. So the app asks for several files and starts
+ * at his step two.
+ * ⚠️ AND multiple IS ON THE INPUT, so the iOS sheet offers Select rather than one tap ending it.
+ */
+function clubPickMany(kind) {
+  const inp = document.createElement("input");
+  inp.type = "file";
+  inp.accept = "image/*,video/*";
+  inp.multiple = true;
+  inp.style.position = "fixed"; inp.style.left = "-9999px";
+  document.body.appendChild(inp);
+  inp.onchange = () => {
+    const files = [...(inp.files || [])];
+    try { inp.remove(); } catch (e) {}
+    if (files.length) openClubEditor(kind, files);
+  };
+  inp.click();
+}
+/**
+ * ⚠️ A CAROUSEL IS PHOTOGRAPHS ONLY, AND MIXING IS REFUSED RATHER THAN SILENTLY SPLIT. His rule is a
+ * carousel of pictures on the main grid OR a video on the videos grid, so a selection holding both is
+ * two different posts and the app cannot know which he meant. It keeps the first kind chosen and says
+ * how many it set aside — silently dropping them would be the app deciding for him.
+ */
+function clubSortSelection(files) {
+  const vids = files.filter((f) => /^video\\//.test(f.type || ""));
+  const pics = files.filter((f) => !/^video\\//.test(f.type || ""));
+  if (vids.length && pics.length) {
+    // Whichever came first in the selection wins, because that is the one he reached for first.
+    const firstIsVideo = /^video\\//.test(files[0].type || "");
+    const keep = firstIsVideo ? vids.slice(0, 1) : pics;
+    const drop = files.length - keep.length;
+    toast(drop === 1 ? "One item set aside — a post is a video, or pictures."
+      : drop + " items set aside — a post is a video, or pictures.");
+    return keep;
+  }
+  // ⚠️ ONE VIDEO PER POST. Several videos is a carousel of films, which is not what he described and
+  // would need a player per slide.
+  if (vids.length > 1) { toast("One video per post — keeping the first."); return vids.slice(0, 1); }
+  return vids.length ? vids : pics.slice(0, CLUB_MAX_SLIDES);
+}
+/** ⚠️ TEN, AND IT IS THE REFERENCE'S OWN LIMIT. Past that the filmstrip stops being pickable and every
+ *  slide is a bitmap held in memory while the editor is open. */
+const CLUB_MAX_SLIDES = 10;
+
+/**
+ * THE TRIM FILMSTRIP — his screenshot, and the reason it had to change.
+ *
+ * The first version was a single slider that slid a fixed fifteen-second window. His note: "the 15
+ * second selector needs to look like this so you can see where it starts and ends." A slider shows a
+ * position; it cannot show a span. A filmstrip of the whole clip with a handle at each end shows both,
+ * against the frames themselves, so the runner picks by what is in the shot rather than by a number.
+ *
+ * ⚠️ BOTH HANDLES MOVE INDEPENDENTLY, AND THE WINDOW MAY BE SHORTER THAN THE CAP. A fixed-width window
+ * gives the second handle nothing to do, and fifteen seconds is a ceiling rather than a length — a
+ * six-second clip of a finish line is a better story than fifteen with nine of nothing.
+ * ⚠️ THE THUMBNAILS ARE DRAWN ONCE PER SLIDE AND CACHED ON IT. Eight seeks and eight canvas draws on
+ * every render, under a dragging finger, is the whole clip decoded several times a second.
+ */
+const CLUB_STRIP_N = 8;
+/** ⚠️ A FLOOR IN SECONDS ALONE LETS THE TWO HANDLES OVERLAP ON A LONG CLIP. One second of a 24-second
+ *  clip is about 29px of strip; of a four-minute clip it is under 3px, so the handles — 14px each —
+ *  would sit on top of each other and neither could be grabbed. The floor is therefore the greater of
+ *  one second and a twentieth of the clip. */
+const CLUB_TRIM_MIN_S = 1;
+function clubTrimMin(dur) { return Math.max(CLUB_TRIM_MIN_S, (Number(dur) || 0) * 0.05); }
+function clubStripHtml(sl, cap, maxIn) {
+  const dur = sl.dur || 0;
+  if (!dur) return '<span class="club-trim-w">Reading the clip…</span>';
+  const a = (sl.inS / dur) * 100, b = (sl.outS / dur) * 100;
+  const cells = (sl.thumbs && sl.thumbs.length)
+    ? sl.thumbs.map((u) => '<span class="club-fr" style="background-image:url(' + u + ')"></span>').join("")
+    : Array.from({ length: CLUB_STRIP_N }, () => '<span class="club-fr"></span>').join("");
+  return '<div class="club-film" id="clubFilm">' +
+      '<div class="club-frs">' + cells + '</div>' +
+      '<span class="club-shade" style="left:0; width:' + a.toFixed(2) + '%"></span>' +
+      '<span class="club-shade" style="left:' + b.toFixed(2) + '%; right:0"></span>' +
+      '<span class="club-win" style="left:' + a.toFixed(2) + '%; width:' + (b - a).toFixed(2) + '%">' +
+        '<span class="club-h club-h-a" data-ctrim="a" role="slider" aria-label="Start" ' +
+          'aria-valuetext="' + clubClock(sl.inS) + '"><i></i></span>' +
+        '<span class="club-h club-h-b" data-ctrim="b" role="slider" aria-label="End" ' +
+          'aria-valuetext="' + clubClock(sl.outS) + '"><i></i></span>' +
+      '</span>' +
+    '</div>' +
+    '<span class="club-trim-t num">' + clubClock(sl.inS) + ' – ' + clubClock(sl.outS) +
+      '  ·  ' + (sl.outS - sl.inS).toFixed(1) + 's</span>';
+}
+/** ⚠️ SEEK, WAIT FOR seeked, THEN DRAW — and the listener is attached BEFORE currentTime is set, or a
+ *  synchronous seek fires before anything is listening and the promise never resolves. */
+function clubThumbs(sl) {
+  if (!sl || sl.thumbs || !sl.isVid || !sl.dur) return;
+  sl.thumbs = [];
+  const v = document.createElement("video");
+  // ⚠️⚠️ THE SLIDE HOLDS THE ELEMENT, AND WITHOUT THAT NOT ONE FRAME EVER ARRIVES. A detached media
+  // element referenced only by its own listener is a cycle nothing outside points at, so Chrome may
+  // collect it before the load completes — measured: the function ran, sl.thumbs became [], and the
+  // loadeddata handler never fired at all, while the identical code awaited on the stack produced all
+  // eight frames. It is not the seeking, the codec or the blob URL; it is that nobody was holding the
+  // video. Cleared at the end, so it lives exactly as long as the work does.
+  sl.thumbVid = v;
+  v.src = sl.url; v.muted = true; v.playsInline = true;
+  const c = document.createElement("canvas");
+  const shots = [];
+  const at = Array.from({ length: CLUB_STRIP_N }, (_, i) => (i + 0.5) * sl.dur / CLUB_STRIP_N);
+  // ⚠️ BOUNDED. With no timeout a single seek that never answers hangs the loop for the life of the
+  // editor, and the strip stays grey with nothing to say why.
+  const seek = (t) => new Promise((res) => {
+    const h = () => { v.removeEventListener("seeked", h); res(true); };
+    v.addEventListener("seeked", h);
+    v.currentTime = Math.min(t, Math.max(0, sl.dur - 0.05));
+    setTimeout(() => res(false), 1500);
+  });
+  v.onloadeddata = async () => {
+    c.width = 96; c.height = Math.max(1, Math.round(96 * v.videoHeight / Math.max(1, v.videoWidth)));
+    const g = c.getContext("2d");
+    for (const t of at) {
+      try {
+        if (!await seek(t)) break;
+        g.drawImage(v, 0, 0, c.width, c.height);
+        shots.push(c.toDataURL("image/jpeg", 0.6));
+      } catch (e) { break; }
+    }
+    // ⚠️ ONLY ADOPT THEM IF THIS SLIDE IS STILL THE ONE BEING EDITED. The runner can page on, or close
+    // the editor, while eight seeks are running — writing into a slide that has gone paints frames from
+    // one clip onto another.
+    if (CLUBED && CLUBED.slides.indexOf(sl) >= 0 && shots.length) {
+      sl.thumbs = shots;
+      if (clubSlide() === sl) clubEdDraw();
+    }
+    // ⚠️⚠️ THE HANDLERS COME OFF BEFORE THE SOURCE DOES, AND WITHOUT THAT THE CLEANUP DESTROYS THE
+    // RESULT. Clearing src raises abort, emptied and then error — so onerror fired AFTER all eight
+    // frames had been adopted and reset sl.thumbs to empty. Measured: eight seeked events, eight
+    // frames, and an empty strip. A tidy-up step that undoes the work is worse than no tidy-up.
+    v.onerror = null; v.onloadeddata = null;
+    try { v.removeAttribute("src"); v.load(); } catch (e) {}
+    sl.thumbVid = null;
+  };
+  // ⚠️ AND A GENUINE FAILURE ONLY CLEARS WHAT WAS NEVER FILLED. Wiping frames already captured because
+  // a later read failed throws away work that succeeded.
+  v.onerror = () => { if (!shots.length) sl.thumbs = []; sl.thumbVid = null; };
+}
+/** Dragging a handle. ⚠️ THE CAP AND THE FLOOR ARE APPLIED TO THE HANDLE BEING MOVED, so the other end
+ *  never jumps — a window that shifts when you meant to shorten it is the drag inverting. */
+function wireClubTrim() {
+  const S = CLUBED; if (!S) return;
+  const sl = clubSlide(); if (!sl || !sl.isVid) return;
+  const film = $("clubFilm"); if (!film) return;
+  const cap = S.kind === "story" ? CLUB_STORY_MAX_S : sl.dur;
+  film.querySelectorAll("[data-ctrim]").forEach((h) => {
+    h.onpointerdown = (ev) => {
+      ev.preventDefault(); ev.stopPropagation();
+      const which = h.dataset.ctrim;
+      const box = film.getBoundingClientRect();
+      try { h.setPointerCapture(ev.pointerId); } catch (e) {}
+      const move = (m) => {
+        const f = Math.max(0, Math.min(1, (m.clientX - box.left) / Math.max(1, box.width)));
+        const t = f * sl.dur;
+        if (which === "a") {
+          sl.inS = Math.max(0, Math.min(t, sl.outS - clubTrimMin(sl.dur)));
+          if (sl.outS - sl.inS > cap) sl.outS = sl.inS + cap;
+        } else {
+          sl.outS = Math.min(sl.dur, Math.max(t, sl.inS + clubTrimMin(sl.dur)));
+          if (sl.outS - sl.inS > cap) sl.inS = sl.outS - cap;
+        }
+        clubTrimPaint();
+      };
+      h.onpointermove = move;
+      const end = () => { h.onpointermove = null; clubVidSeek(); clubEdDraw(); };
+      h.onpointerup = end; h.onpointercancel = end;
+    };
+  });
+}
+/** ⚠️ PAINTED IN PLACE, NOT RE-RENDERED. A full redraw under a dragging finger rebuilds the handle the
+ *  finger is holding, which drops the pointer capture and the drag dies mid-gesture. */
+function clubTrimPaint() {
+  const S = CLUBED, sl = clubSlide(); if (!S || !sl) return;
+  const film = $("clubFilm"); if (!film || !sl.dur) return;
+  const a = (sl.inS / sl.dur) * 100, b = (sl.outS / sl.dur) * 100;
+  const sh = film.querySelectorAll(".club-shade");
+  if (sh[0]) sh[0].style.width = a.toFixed(2) + "%";
+  if (sh[1]) sh[1].style.left = b.toFixed(2) + "%";
+  const win = film.querySelector(".club-win");
+  if (win) { win.style.left = a.toFixed(2) + "%"; win.style.width = (b - a).toFixed(2) + "%"; }
+  const lbl = document.querySelector(".club-trim-t");
+  if (lbl) lbl.textContent = clubClock(sl.inS) + " – " + clubClock(sl.outS) +
+    "  ·  " + (sl.outS - sl.inS).toFixed(1) + "s";
+}
+
+/**
+ * ══ THE CLUB PROFILE, AND EDITING IT ═══════════════════════════════════════════════════════════════
+ * Owner, 2026-08-22, with Instagram's own Edit profile screen attached: "The information you could
+ * change would be: 1. Picture 2. Running Bio 3. Training for 4. Trainers i'm wearing - (hyperlinked if
+ * the user adds the website where they bought them) 5. PB's (This would be blank boxes for 5k,10k,half,
+ * marathon and when the user fills a box with a time, it would appear on the profile)".
+ *
+ * ⚠️ THE PICTURE AND THE TRAINERS ARE NOT NEW FIELDS, AND THAT MATTERS MORE THAN IT SOUNDS. The avatar
+ * is profile.avatar with a cropper already built round it, and the trainers are the Shoe Rack's active
+ * pair — which knows their real mileage and when they are due. Storing either again here would give one
+ * fact two homes, and the two would disagree the first time somebody changed the other one.
+ * ⚠️ SO ONLY THREE THINGS ARE GENUINELY NEW: the bio, what they are training for, and the PBs.
+ */
+function loadClubProf() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(CLUBPROF_KEY) || "{}");
+    return { bio: String(raw.bio || ""), trainingFor: String(raw.trainingFor || ""),
+      pbs: (raw.pbs && typeof raw.pbs === "object") ? raw.pbs : {} };
+  } catch (e) { return { bio: "", trainingFor: "", pbs: {} }; }
+}
+function saveClubProf(v) {
+  try { localStorage.setItem(CLUBPROF_KEY, JSON.stringify(v)); } catch (e) {}
+}
+/**
+ * ⚠️ A TYPED PB BEATS A COMPUTED BEST FOR THAT DISTANCE, AND THE TWO ARE LABELLED DIFFERENTLY. The
+ * profile already shows the quickest the app has recorded the runner covering about that far, labelled
+ * Best — because a personal best is a race result and calling a training run a PB overstates it. A time
+ * the runner types IS their claim about themselves, so it says PB. Showing both for one distance would
+ * be two answers to one question.
+ */
+const CLUB_PB_ROWS = [{ k: "k5", label: "5 km", km: 5 }, { k: "k10", label: "10 km", km: 10 },
+  { k: "half", label: "Half", km: 21.0975 }, { k: "mar", label: "Marathon", km: 42.195 }];
+function clubChips() {
+  const cp = loadClubProf();
+  const best = {};
+  commBests().forEach((b) => { best[b.label] = b.time; });
+  return CLUB_PB_ROWS.map((r) => {
+    const typed = clubPbText(cp.pbs[r.k]);
+    if (typed) return { label: r.label, time: typed, pb: true };
+    if (best[r.label]) return { label: r.label, time: best[r.label], pb: false };
+    return null;
+  }).filter(Boolean);
+}
+/** ⚠️ REFUSED, NOT CLAMPED, and never stored as a number of seconds. A time is what the runner typed;
+ *  parsing it into seconds and printing it back changes "21:4" into something they did not write, and a
+ *  typo of 2104 silently becoming 35 minutes is a claim they never made. */
+function clubPbText(v) {
+  const t = String(v == null ? "" : v).trim();
+  if (!t) return "";
+  return /^\\d{1,2}:\\d{2}(:\\d{2})?$/.test(t) ? t : "";
+}
+/** What the runner is training for. ⚠️ Their own words if they gave any, otherwise the plan's, which the
+ *  app genuinely knows — a blank line here would hide a true fact behind an empty field. */
+function clubTrainingFor() {
+  const cp = loadClubProf();
+  if (cp.trainingFor) return cp.trainingFor;
+  const p = commProfile();
+  return p.plan || "";
+}
+function clubTrainers() {
+  const sh = activeShoe();
+  if (!sh) return null;
+  return { name: sh.name || "My trainers", km: shoeTotalKm(sh), shop: String(sh.shop || "").trim() };
+}
+/** ⚠️ http/https ONLY, AND BUILT WITH encodeURI RATHER THAN INTERPOLATED RAW. A link is the one place a
+ *  runner's own text becomes something the phone will ACT on, so anything that is not a plain web address
+ *  is shown as text instead of made clickable. */
+function clubShopHref(u) {
+  const t = String(u || "").trim();
+  if (!t) return "";
+  const withScheme = /^https?:\\/\\//i.test(t) ? t : "https://" + t;
+  try {
+    const url = new URL(withScheme);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return "";
+    return url.href;
+  } catch (e) { return ""; }
+}
+function clubShopLabel(u) {
+  const h = clubShopHref(u); if (!h) return "";
+  try { return new URL(h).hostname.replace(/^www\\./, ""); } catch (e) { return ""; }
+}
+/** THE EDIT SCREEN. Rows in the reference's own order, and every one of them does something. */
+function viewClubEdit() {
+  const cp = loadClubProf();
+  const p = commProfile();
+  const tr = clubTrainers();
+  const sh = activeShoe();
+  const av = p.avatar ? '<img src="' + esc(p.avatar) + '" alt="">'
+    : '<span class="cm-init">' + esc(p.initials) + '</span>';
+  const row = (label, inner) => '<div class="ce-row"><span class="ce-k">' + label + '</span>' +
+    '<span class="ce-v">' + inner + '</span></div>';
+  const pbRows = CLUB_PB_ROWS.map((r) =>
+    '<div class="ce-pb"><label for="cePb_' + r.k + '">' + r.label + '</label>' +
+    '<input id="cePb_' + r.k + '" data-cepb="' + r.k + '" inputmode="numeric" ' +
+    'placeholder="—" value="' + esc(clubPbText(cp.pbs[r.k])) + '"></div>').join("");
+  return '<div class="ce-wrap">' +
+    '<button class="backbtn" id="clubBack">\u2039 Inte-Club</button>' +
+    '<div class="ce-avwrap">' +
+      '<span class="cm-av ce-av">' + av + '</span>' +
+      '<button class="ce-avbtn" id="ceAvatar">Change picture</button>' +
+    '</div>' +
+    '<div class="ce-card">' +
+      row("Name", '<span class="ce-ro">' + esc(p.name || "Not set") +
+        '</span><button class="ce-lnk" id="ceName">Edit</button>') +
+      row("Running bio", '<textarea id="ceBio" rows="3" maxlength="220" ' +
+        'placeholder="A line about your running.">' + esc(cp.bio) + '</textarea>') +
+      row("Training for", '<input id="ceFor" maxlength="60" placeholder="' +
+        esc(p.plan || "Your next race") + '" value="' + esc(cp.trainingFor) + '">') +
+    '</div>' +
+    '<h2 class="ce-h">Trainers I am wearing</h2>' +
+    (sh
+      ? '<div class="ce-card">' +
+          row("Pair", '<span class="ce-ro">' + esc(tr.name) + '</span>' +
+            '<span class="ce-sub num">' + Math.round(tr.km) + ' km</span>') +
+          row("Where you bought them", '<input id="ceShop" inputmode="url" ' +
+            'placeholder="shop website (optional)" value="' + esc(sh.shop || "") + '">') +
+        '</div>' +
+        '<p class="ce-note">This is whichever pair is active in your Shoe Rack, so its mileage is the ' +
+        'real one. Add a website and the name becomes a link on your profile.</p>'
+      // ⚠️ NOT AN EMPTY BOX. A field for a shoe that does not exist would store a name the Shoe Rack
+      // knows nothing about, and then the mileage beside it would be a blank where a real number lives.
+      : '<div class="cm-empty cm-empty-sm"><p>Nothing in your Shoe Rack yet. Add a pair and it shows ' +
+        'up here with its real mileage.</p>' +
+        '<button class="ui-btn" id="ceShoes">Open the Shoe Rack</button></div>') +
+    '<h2 class="ce-h">Personal bests</h2>' +
+    '<div class="ce-card ce-pbs">' + pbRows + '</div>' +
+    '<p class="ce-note">Fill one in and it appears on your profile. Leave it blank and the profile shows ' +
+    'the quickest the app has recorded you covering that far instead, labelled Best — because a ' +
+    'personal best is a race, and a training run is not.</p>' +
+  '</div>';
+}
+
+/**
+ * WIRING THE EDIT PAGE.
+ * ⚠️ EVERY FIELD SAVES AS IT IS TYPED, AND THERE IS NO SAVE BUTTON. A form with a Save button has a
+ * state where what is on screen is not what is stored, and this app has already paid for that twice —
+ * the run note held in a debounce timer that a re-render threw away, and the profile edits that
+ * "kept reverting" because tapping the avatar re-rendered the form.
+ * ⚠️ AND NOTHING RE-RENDERS ON INPUT. Rebuilding the form under the runner's finger is what captures the
+ * caret and types every character to the front of the box — the Support search field's own lesson.
+ */
+function wireClubEdit() {
+  const put = (patch) => {
+    const cur = loadClubProf();
+    saveClubProf(Object.assign(cur, patch));
+  };
+  const bio = $("ceBio");
+  if (bio) bio.oninput = () => put({ bio: bio.value.slice(0, 220) });
+  const fr = $("ceFor");
+  if (fr) fr.oninput = () => put({ trainingFor: fr.value.slice(0, 60) });
+  document.querySelectorAll("[data-cepb]").forEach((inp) => {
+    inp.oninput = () => {
+      const cur = loadClubProf();
+      const pbs = Object.assign({}, cur.pbs);
+      pbs[inp.dataset.cepb] = inp.value.trim();
+      saveClubProf(Object.assign(cur, { pbs: pbs }));
+      // ⚠️ THE HINT IS SHOWN, NOT THE VALUE REWRITTEN. Reformatting as they type fights the typing —
+      // "21:0" would become something else before they reached the 4.
+      inp.classList.toggle("bad", !!inp.value.trim() && !clubPbText(inp.value));
+    };
+    inp.onblur = () => { if (inp.value.trim() && !clubPbText(inp.value)) toast("Times look like 21:04."); };
+  });
+  const shop = $("ceShop");
+  // ⚠️ THE URL LIVES ON THE SHOE, not on the club profile — it is a fact about that pair of trainers, so
+  // it travels with them when the runner retires them and comes back with a different pair.
+  if (shop) shop.oninput = () => {
+    const sh = activeShoe(); if (!sh) return;
+    const all = loadShoes();
+    const hit = all.filter((x) => x.id === sh.id)[0];
+    if (hit) { hit.shop = shop.value.trim().slice(0, 200); saveShoes(all); }
+  };
+  const av = $("ceAvatar");
+  if (av) av.onclick = () => { state.screen = null; state.tab = "profile"; state.support = null; render(); };
+  const nm = $("ceName");
+  if (nm) nm.onclick = () => { state.screen = null; state.tab = "profile"; state.support = null; render(); };
+  const shoes = $("ceShoes");
+  if (shoes) shoes.onclick = () => {
+    state.screen = null; state.tab = "support"; state.support = "shoes"; render();
+  };
 }
 
 /* ── PLAN JOURNALS (addendum 1, 2026-08-22) ────────────────────────────────────────────────────────
@@ -11951,7 +12822,7 @@ function commFeedHtml() {
     'today.</p>' +
     '<div class="cm-empty-acts">' +
       '<button class="ui-btn" data-cgo="mine">See your runs</button>' +
-      '<button class="ui-btn ui-btn-pri" data-csheet="share">Share a run</button>' +
+      '<button class="ui-btn ui-btn-pri" data-cnewpost="1">Create a post</button>' +
     '</div>' +
   '</div>';
 }
@@ -11964,38 +12835,6 @@ function commPeopleHtml(kind) {
       '<p>When it exists you will be able to follow the people you actually run with, and see their ' +
       'sessions here. Until then your training is yours alone, which is not the worst thing.</p>' +
     '</div>';
-}
-/**
- * SHARE A RUN — the design's sheet, wired to the share studio that already exists.
- *
- * ⚠️ IT LISTS REAL LOGGED SESSIONS AND CONTINUES INTO THE REAL COMPOSER. The design says Continue
- * "currently closes the sheet — in production it continues to the composer", and this app HAS one: the
- * share studio, four templates, photograph and all. So the sheet is a picker and Continue is the thing
- * it was always meant to be.
- * ⚠️ AND A WELL, NOT A CARD. The design system's rule, quoted in the handoff: never nest a card inside
- * a card — this container is a --surface-2 well.
- */
-function commShareHtml() {
-  const runs = (state.logged || []).filter((r) => r && Number(r.distKm) > 0).slice(0, 6);
-  if (!runs.length) {
-    return '<h2 class="cm-sh">Share a run</h2>' +
-      '<p class="cm-sub">Nothing logged yet.</p>' +
-      '<div class="cm-empty cm-empty-sm"><p>Record a run and it will be here, with its splits and its ' +
-      'route ready to go.</p></div>';
-  }
-  const rows = runs.map((r) => {
-    const meta = [r.time || "", commKm(r.distKm), r.rpe ? "RPE " + r.rpe : ""].filter(Boolean).join(" · ");
-    // ⚠️ THROUGH THE COMPONENT'S OWN id OPTION, WHICH BECOMES data-uirow — not an invented attrs
-    // option. uiSessionRow has no such option, so it would have been dropped in silence and every row
-    // in this sheet would have looked live and done nothing. Its own comment says to use the app's
-    // delegated handler rather than a bespoke one, and data-uirow is that route.
-    return uiSessionRow({ day: (runDateLabelIso(r.dateIso) || "").slice(0, 3).toUpperCase(),
-      title: r.t || "Run", meta: meta, status: "done", id: "cshare:" + r.id,
-      colour: "var(--eff-" + runEffort(r) + ")" });
-  }).join("");
-  return '<h2 class="cm-sh">Share a run</h2>' +
-    '<p class="cm-sub">Pick a logged session. The splits and the route come with it.</p>' +
-    '<div class="cm-well">' + rows + '</div>';
 }
 /**
  * THE COMMUNITY TAB.
@@ -12080,20 +12919,6 @@ function openCommStory() {
 }
 /** 4.5s a slide — the design's own figure, and the same value the progress keyframe uses. */
 const COMM_STORY_MS = 4500;
-/**
- * Choosing a run in the Share-a-run sheet continues into the composer that already exists.
- * ⚠️ THE STUDIO, NOT A SECOND COMPOSER. The design says Continue "in production it continues to the
- * composer"; this app has one, with four templates and a photograph, and building another would be two
- * places a share card is made.
- */
-function wireCommShare() {
-  document.querySelectorAll('[data-uirow^="cshare:"]').forEach((b) => b.onclick = () => {
-    const id = String(b.dataset.uirow).slice(7);
-    const run = (state.logged || []).filter((r) => String(r.id) === id)[0];
-    closeSheet();
-    if (run) openShareStudio(run);
-  });
-}
 function viewCommunity() {
   const v = commView();
   const p = commProfile();
@@ -12134,8 +12959,27 @@ function viewCommunity() {
       : '<span class="cm-stat">' + inner + '</span>';
   };
 
-  const chips = bests.map((b) =>
-    '<span class="cm-chip cm-chip-acc num">Best · ' + b.label + ' ' + b.time + '</span>').join("");
+  // ⚠️ A TYPED PB SAYS PB; A COMPUTED ONE SAYS BEST. Two words because they are two different claims —
+  // one is a race result the runner is telling us about, the other is the quickest the app has recorded
+  // them covering about that far, training runs included.
+  const cp = loadClubProf();
+  const chips = clubChips().map((b) =>
+    '<span class="cm-chip cm-chip-acc num">' + (b.pb ? "PB" : "Best") + ' · ' + b.label + ' ' +
+    b.time + '</span>').join("");
+  const tr = clubTrainers();
+  const shopHref = tr ? clubShopHref(tr.shop) : "";
+  const trainers = tr
+    ? '<div class="cm-tr">' + ICON.rEasy +
+        (shopHref
+          // ⚠️ rel="noopener noreferrer" AND target — a link the runner typed opens away from the app, and
+          // the page it lands on must never be handed a handle back to this one.
+          ? '<a href="' + esc(shopHref) + '" target="_blank" rel="noopener noreferrer">' +
+            esc(tr.name) + '</a>'
+          : '<span>' + esc(tr.name) + '</span>') +
+        '<span class="cm-tr-km num">' + Math.round(tr.km) + ' km</span>' +
+      '</div>'
+    : "";
+  const forLine = clubTrainingFor();
 
   // ⚠️ TWO KINDS OF TILE IN ONE GRID, AND THE FILTER MEANS DIFFERENT THINGS TO EACH. "Videos" keeps
   // the posted clips and drops everything else — a run is not a video, so under Videos the run tiles go
@@ -12183,13 +13027,18 @@ function viewCommunity() {
         '</div>' +
         '<div class="cm-id">' +
           (p.name ? '<div class="cm-name">' + esc(p.name) + '</div>' : "") +
-          (p.plan ? '<div class="cm-meta">' + esc(p.plan) + '</div>' : "") +
-          (chips ? '<div class="cm-pbs"><span class="cm-eyebrow">Best efforts</span>' + chips + '</div>' : "") +
+          (cp.bio ? '<div class="cm-bio">' + esc(cp.bio) + '</div>' : "") +
+          (forLine ? '<div class="cm-meta"><b>Training for</b> ' + esc(forLine) + '</div>' : "") +
+          trainers +
+          (chips ? '<div class="cm-pbs"><span class="cm-eyebrow">Times</span>' + chips + '</div>' : "") +
           '<div class="cm-pbs"><span class="cm-chip num">' + commKm(wk.km) + ' this week</span></div>' +
         '</div>' +
         '<div class="cm-acts">' +
-          '<button class="ui-btn" data-cedit="1">Edit profile</button>' +
-          '<button class="ui-btn" data-csheet="share">Share a run</button>' +
+          '<button class="cm-act" data-cedit="1">Edit profile</button>' +
+          // ⚠️ "Create a post", not "Share a run" — his instruction. Sharing a run is not lost: it lives
+          // on the run's own page as "Share my run", which is where it always has, and is the only place
+          // a run can be picked to share from. This button is now about putting something new up.
+          '<button class="cm-act cm-act-pri" data-cnewpost="1">Create a post</button>' +
         '</div>' +
         commJournalRailHtml() +
         grid +
@@ -29282,6 +30131,23 @@ function render() {
     wire();
     return;
   }
+  // ⚠️ THE CLUB'S TWO SUB-SCREENS KEEP THE CLUB TAB LIT, because that is where they came from and where
+  // their back button returns to — the same rule the Logbook's three destinations follow below.
+  if (state.screen === "clubpost" || state.screen === "clubedit") {
+    const isEdit = state.screen === "clubedit";
+    $("topTitle").textContent = isEdit ? "Edit profile" : "Posts";
+    // ⚠️ THROUGH keepScroll LIKE EVERY OTHER BRANCH. A hand-written scroll-to-top here is the defect
+    // this app already records fixing across the whole render: right when the runner has NAVIGATED,
+    // wrong for any repaint of the screen they are already on — and deleting a post repaints this one.
+    // The jump to the tapped post is not in tension with it: state.clubPostId is cleared once used, so
+    // the first render after a tap positions the feed and every later one keeps where the runner is.
+    v.innerHTML = isEdit ? viewClubEdit() : clubPostViewHtml();
+    v.scrollTop = keepScroll;
+    document.querySelectorAll(".navbtn").forEach((b) =>
+      b.classList.toggle("on", b.dataset.tab === "community"));
+    wire();
+    return;
+  }
   // The three Logbook destinations. They keep the Logbook tab lit, because that is where they came
   // from and where their back button returns to.
   if (state.screen === "progress" || state.screen === "traininglog") {
@@ -29834,17 +30700,27 @@ function wire() {
     document.querySelectorAll(".cm-seg button").forEach((x) =>
       x.setAttribute("aria-selected", String(x.dataset.cgo === b.dataset.cgo)));
   });
-  // Edit profile is the profile screen the app already has — not a second editor.
+  // ⚠️ EDIT PROFILE IS THE CLUB'S OWN PAGE NOW, not the app's settings screen. It used to hand the
+  // runner the whole Profile & settings screen — units, theme, connections, the lot — when what they
+  // tapped was a button under their own avatar. The app screen is still there and still reached from
+  // the top-bar avatar; this is the club's five fields.
   document.querySelectorAll("[data-cedit]").forEach((b) => b.onclick = () => {
-    state.screen = null; state.tab = "profile"; state.support = null; render();
+    state.screen = "clubedit"; render();
   });
+  document.querySelectorAll("[data-cnewpost]").forEach((b) => b.onclick = () => clubPickMany("post"));
+  const cb = $("clubBack");
+  if (cb) cb.onclick = () => { state.screen = null; state.clubPostId = null; render(); };
+  if (state.screen === "clubpost") wireClubPostView();
+  if (state.screen === "clubedit") wireClubEdit();
   document.querySelectorAll("[data-csheet]").forEach((b) => b.onclick = () => {
     const k = b.dataset.csheet;
     ensureSheet(); SHEET_CTX = null;
-    $("sheetBody").innerHTML = (k === "share") ? commShareHtml() : commPeopleHtml(k);
-    // ⚠️ WIRED AFTER THE MARKUP IS IN, and only the share sheet has anything to wire — the two people
-    // sheets are empty states with no controls at all, which is the design's own required state.
-    if (k === "share") wireCommShare();
+    // ⚠️ ONLY THE TWO PEOPLE SHEETS REMAIN, and both are empty states with no controls at all — the
+    // design's own required state. The share-a-run sheet went with the button that opened it: he asked
+    // for "Create a post" in its place, and a builder nothing reaches is the computed-and-discarded trap
+    // this project has shipped four times. Sharing a run is not lost — it is on the run's own page as
+    // "Share my run", which is the only place a run can be picked to share from.
+    $("sheetBody").innerHTML = commPeopleHtml(k);
     $("sheetOv").classList.add("on");
   });
   // A tile opens the run it is a picture of. ⚠️ Resolved by ID, never by position: state.logged is
@@ -30604,7 +31480,7 @@ seedDone();
 // The avatar cropper is the one place a pinch is wanted, and it drives its own zoom from these same
 // events - so it is excluded here rather than fighting for them.
 (function () {
-  const wanted = (t) => !!(t && t.closest && t.closest(".crop-stage, .sst-stage, .club-stage"));
+  const wanted = (t) => !!(t && t.closest && t.closest(".crop-stage, .sst-stage, .club-stage, .club-film"));
   ["gesturestart", "gesturechange", "gestureend"].forEach((n) => {
     document.addEventListener(n, (e) => { if (!wanted(e.target)) e.preventDefault(); }, { passive: false });
   });

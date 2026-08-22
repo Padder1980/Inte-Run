@@ -546,3 +546,59 @@ test("a paired action row is one box with two fills", () => {
   // stylesheet is what the next person copies.
   assert.ok(!html.includes("heat-acts"), "the superseded .heat-acts rule is still in the page");
 });
+
+test("⚠️ every ui-* class the app renders has a rule behind it", () => {
+  // ⚠️⚠️ THIS CAUGHT A REAL, INVISIBLE DEFECT: .ui-btn was used in six places and defined nowhere, so
+  // every one of them rendered as a bare browser button — measured 180×22, half the app's own 44px tap
+  // floor, wearing the platform's default chrome. An undefined CLASS is silent in exactly the way an
+  // undeclared custom property is, and the ratchets cannot see either: they count literal values.
+  //
+  // ⚠️ IT IS THE INVENTED-IDENTIFIER TRAP IN CSS FORM, and the third firing in two days — --r-sm2 (the
+  // radius ladder has no such rung) and ui-pill-build (the pill takes a colour as --pc) were the other
+  // two. The design system's real vocabulary is .ui-bar, .ui-pill, .ui-row, .ui-note, .ui-tile and
+  // their parts; anything else is a name somebody assumed.
+  //
+  // ⚠️ SCOPED TO ui-* ON PURPOSE. That prefix IS the shared component vocabulary, so a name in it is a
+  // claim that a component exists. Sweeping every class in the app would flag the hundreds that are
+  // deliberately structural hooks with no styling of their own.
+  const src = css();
+  const style = sheet();
+  const used = new Set<string>();
+  for (const m of src.matchAll(/class="([^"]*\bui-[\w -]*)"/g)) {
+    for (const c of m[1]!.split(/\s+/)) if (/^ui-/.test(c)) used.add(c);
+  }
+  assert.ok(used.size >= 6, "only " + used.size + " ui-* classes found; the sweep is not reaching the markup");
+  // ⚠️ TWO STRONGER FORMULATIONS WERE TRIED AND BOTH FLAGGED CORRECT CODE — worth recording, because
+  // each looks right until it runs. "It must have an UNSCOPED rule of its own" fails on .ui-dot, which
+  // is correctly defined only inside .ui-pill because a dot has no meaning outside one. "Some rule must
+  // PAINT it" fails on .ui-row-mid, which is deliberately nothing but min-width: 0 and flex: 1 — a flex
+  // child that must be allowed to shrink. So the sweep below claims only what is true of every case:
+  // the name must exist somewhere in the stylesheet. That alone catches a wholly invented class, which
+  // is what ui-pill-build was and what the radius ladder's --r-sm2 was in token form.
+  //
+  // ⚠️ AND IT CANNOT CATCH THE .ui-btn CASE ITSELF, which is worth saying plainly rather than implying
+  // otherwise: a scoped ".cm-empty-acts .ui-btn { flex: 1 }" names the class, so deleting the real rule
+  // still passes this half. Watched escaping twice. The tap-floor sweep below is what caught that
+  // defect, because a button with no rule of its own falls back to the platform's 22px height.
+  const missing = [...used].filter((c) => !new RegExp("\\." + c + "(?![\\w-])").test(style));
+  assert.deepEqual(missing, [],
+    "used in the markup and named nowhere in the stylesheet, so it renders as a bare element: " + missing.join(", "));
+
+  // ⚠️ AND A ui-* CLASS ON A BUTTON MUST REACH THE 44px FLOOR. .ui-btn measured 180x22 — the platform's
+  // own default height — which is the half of this defect a "does it have a rule" check cannot see.
+  // A modifier that travels with another ui-* class is exempt: it adjusts colour, not size.
+  const onButtons = new Set<string>();
+  for (const m of src.matchAll(/<button[^>]*class="([^"]*\bui-[\w -]*)"/g)) {
+    const classes = m[1]!.split(/\s+/).filter((c) => /^ui-/.test(c));
+    if (classes.length === 1) onButtons.add(classes[0]!);
+    else classes.forEach((c) => { if (!/-pri$|-alt$/.test(c)) onButtons.add(c); });
+  }
+  const short = [...onButtons].filter((c) => {
+    const re = new RegExp("(^|[},]|\\*/)\\s*([^{}]*\\." + c + "(?![\\w-])[^{]*)\\{([^}]*)\\}", "gm");
+    let m: RegExpExecArray | null, tall = false;
+    while ((m = re.exec(style))) { if (/(min-)?height: var\(--tap\)/.test(m[3]!)) { tall = true; break; } }
+    return !tall;
+  });
+  assert.deepEqual(short, [],
+    "a ui-* class on a button does not reach the tap floor: " + short.join(", "));
+});

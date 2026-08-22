@@ -7356,6 +7356,165 @@ also being able to export those videos for instagram or tiktok."* The trim being
 re-encode is what leaves that door open — the original is intact. Reels, highlights and live are named
 on the Create sheet and not built.
 
+### HIS SIX CHANGES TO INTE-CLUB (2026-08-22, later the same day)
+
+The trim as a filmstrip, the + centred, premium profile actions, Instagram-style post opening, "Create a
+post" with several pictures or a video, and an Edit profile page. Suite 1148 → **1159**; 34 deliberate
+re-breaks, all caught (six only after a guard was restated — those six are the useful half).
+
+⚠️ **BOTH OF HIS RECORDINGS WERE WATCHED FRAME BY FRAME, and one of them settled a design question that
+guessing would have got wrong.** `avconvert --preset Preset960x540` then frames grabbed in a real browser.
+⚠️ **`python3 -m http.server` SERVES NO BYTE RANGES, so a video cannot be SEEKED through it** — every
+grab came back as frame 0 and read exactly like a broken decoder. Play the clip through at
+`playbackRate 8` and capture on `requestAnimationFrame` instead.
+
+### ⚠️⚠️ TAPPING A POST OPENS A SCREEN, NOT AN OVERLAY — AND ONLY THE RECORDING SAYS SO
+
+What his recording shows is a titled screen ("Posts", the handle beneath, a back chevron) holding a
+**scrollable list of his own posts, positioned at the one tapped**: header, media, carousel dots, the
+caption, the date, and the next post below. Not a full-screen viewer. **A story plays at you and closes
+itself; a post is read at your own pace and scrolled past.** Built as an overlay it would have to
+reimplement scrolling, and every re-render would jump to the top.
+⚠️ **NO LIKES AND NO COMMENTS.** The reference has both, this app has no server, and a heart here is a
+control that looks live and does nothing — the class this project has shipped three times. What each post
+carries instead is what works: share it, or delete it.
+⚠️ **THE CAROUSEL IS A NATIVE SCROLL-SNAP RAIL.** This screen scrolls vertically, so a JS drag has to
+decide on every move which axis the finger meant; the browser already arbitrates that correctly.
+⚠️ **AND THE SCROLL GOES THROUGH `keepScroll` LIKE EVERY OTHER BRANCH.** `v.scrollTop = 0` here tripped
+`silent-defects`'s own guard, correctly: right when the runner has NAVIGATED, wrong for any repaint of
+the screen they are on — and deleting a post repaints this one. `state.clubPostId` is cleared once used,
+so the first render after a tap positions the feed and every later one keeps where the runner is.
+
+### THE TRIM IS A FILMSTRIP, AND THREE FAULTS SAT BEHIND ITS THUMBNAILS
+
+His note: *"the 15 second selector needs to look like this so you can see where it starts and ends."* A
+slider shows a POSITION; only two handles over the clip's own frames can show a SPAN.
+⚠️ **BOTH HANDLES MOVE INDEPENDENTLY AND THE WINDOW MAY BE SHORTER THAN THE CAP.** Fifteen seconds is a
+ceiling, not a length — six seconds of a finish line beats fifteen with nine of nothing.
+⚠️⚠️ **NOTHING HELD THE THUMBNAIL VIDEO, AND NOT ONE FRAME EVER ARRIVED.** A detached media element
+referenced only by its own listener is a cycle nothing outside points at, so Chrome may collect it before
+the load completes. Measured: the function ran, `thumbs` became `[]`, and `loadeddata` never fired at all
+— while the identical code awaited on the stack produced all eight frames. It is not the seeking, the
+codec or the blob URL. The slide holds the element now, and releases it when the work is done.
+⚠️⚠️ **THEN THE CLEANUP DESTROYED THE RESULT.** Clearing `src` raises abort, emptied and then **error** —
+so `onerror` fired AFTER all eight frames had been adopted and reset them to empty. Measured: eight
+`seeked` events, eight frames, an empty strip. The handlers come off before the source does, and a
+genuine failure now only clears what was never filled.
+⚠️ **EVERY SEEK IS BOUNDED.** Unbounded, one that never answers hangs the loop for the life of the editor
+and the strip stays grey with nothing to say why.
+⚠️ **THE HANDLES SIT INSIDE THE WINDOW.** Hung on its outer edges they are clipped by the strip's own
+overflow the moment the window reaches either end — measured, the right-hand handle was cut in half at
+0:24 of a 24-second clip, so the end of the selection was visible and ungrabbable.
+⚠️ **AND THE MINIMUM SPAN SCALES WITH THE CLIP.** One second of a 24-second clip is ~29px of strip; of a
+four-minute clip it is under 3px, so two 14px handles would sit on top of each other.
+
+### CREATE A POST: SEVERAL PICTURES, OR A VIDEO
+
+⚠️ **STEP ONE OF HIS REFERENCE CANNOT BE DRAWN BY US, AND THAT IS A PLATFORM BOUNDARY RATHER THAN A
+SHORTCUT.** Its first screen is a grid of his own camera roll with numbered selection circles — a web page
+cannot enumerate the photo library at all, and must not. What `<input multiple>` opens IS that screen,
+drawn by iOS, with the same multi-select. So the app starts at his step two.
+⚠️ **A CAROUSEL IS PHOTOGRAPHS ONLY, AND MIXING IS REFUSED RATHER THAN SILENTLY SPLIT.** His rule is a
+carousel of pictures OR a video, so a selection holding both is two different posts and the app cannot
+know which he meant. It keeps the kind he reached for first and says how many it set aside.
+⚠️ **EVERY SLIDE OWNS ITS OWN FRAMING, TEXT AND TRIM.** One shared crop across a carousel is the fault the
+share studio already records: switching pictures destroyed the framing just set, with nothing to undo it.
+⚠️ **AND A SINGLE PICK IS A LIST OF ONE**, so there is one code path rather than a single-item case and a
+carousel case that drift apart.
+⚠️ **`media` IS ALWAYS A LIST NOW, AND `clubSlides` IS THE ONE PLACE THE OLD SHAPE IS UNDERSTOOD.** Posts
+written hours earlier carry a single key with their crop, trim and texts on the row itself.
+⚠️⚠️ **AND THE TILE BUILDER WAS NOT UPDATED, WHICH THE SERVED PAGE CAUGHT AND NO TEST DID.**
+`esc(["a","b"])` is the string `"a,b"` — a key nothing holds — so every carousel tile drew the
+missing-media hatch. The overlay player read `crop`, `trim` and `texts` off the row the same way. Six
+readers, one fix: nothing reads the raw field.
+
+### THE PROFILE: A CENTRED PLUS, TWO PREMIUM ACTIONS, AND AN EDIT PAGE
+
+⚠️ **THE + WAS OFF-CENTRE BECAUSE OF INHERITED `padding: 1px 6px`, AND THAT WAS MEASURED RATHER THAN
+GUESSED.** The app's global button rule left a 26px badge with a 10px content box holding a 14px glyph —
+and grid resolves a centred item that OVERFLOWS its area to start-aligned: 8px of space on the left, 4px
+on the right. Vertically it was symmetric, which is why it read as leaning rather than as plainly wrong.
+`padding: 0` on any icon button whose glyph is its whole content.
+⚠️ **THE TWO ACTIONS ARE ONE FILLED PAIR.** The generic outlined `.ui-btn` side by side under an avatar
+reads as two form fields, which is what he called not premium enough.
+⚠️⚠️ **AND `.ui-btn` HAD NO BASE RULE AT ALL — ALL SIX USES RENDERED AS BARE BROWSER BUTTONS**, measured
+**180×22**, half this app's own 44px floor, wearing the platform's default chrome. The design system's real
+vocabulary is `.ui-bar-btn`, `.ui-pill`, `.ui-row`, `.ui-note`, `.ui-tile`; there has never been a
+`.ui-btn`. It is the invented-identifier trap in CSS class form and the third firing in two days, after
+`--r-sm2` and `ui-pill-build`.
+
+⚠️ **EDIT PROFILE IS THE CLUB'S OWN PAGE NOW.** It used to hand the runner the whole Profile & settings
+screen — units, theme, connections — when what they tapped was a button under their own avatar.
+⚠️ **THE PICTURE AND THE TRAINERS ARE NOT NEW FIELDS, AND THAT MATTERS MORE THAN IT SOUNDS.** The avatar is
+`profile.avatar` with a cropper already round it; the trainers are the Shoe Rack's active pair, which knows
+their real mileage and when they are due. Storing either again gives one fact two homes, and the two
+disagree the first time somebody changes the other. **Only three things are genuinely new:** the bio, what
+they are training for, and the PBs.
+⚠️ **THE SHOP LINK LIVES ON THE SHOE**, because it is a fact about that pair — it travels with them when
+they are retired and replaced.
+⚠️ **A TYPED PB BEATS A COMPUTED BEST FOR THAT DISTANCE, AND THE TWO ARE LABELLED DIFFERENTLY.** A personal
+best is a race result; the computed one is the quickest the app has recorded that runner covering about
+that far, training runs included. Showing both for one distance would be two answers to one question.
+⚠️ **A PB IS REFUSED IF IT IS NOT A TIME, NEVER PARSED INTO SECONDS AND PRINTED BACK.** A typo of 2104
+silently becoming 35 minutes is a claim the runner never made.
+⚠️ **A SHOP LINK IS ONLY EVER `http`/`https`, BUILT THROUGH `new URL`, WITH `rel="noopener noreferrer"`.**
+It is the one place a runner's own text becomes something the phone will ACT on.
+⚠️ **EVERY FIELD SAVES AS IT IS TYPED AND NOTHING RE-RENDERS ON INPUT.** A Save button has a state where
+what is on screen is not what is stored — paid for twice already — and rebuilding a field under the finger
+captures the caret.
+⚠️ **`font: inherit` ON EVERY FIELD.** A textarea with no family falls back to the browser's monospace, so
+the running bio rendered as code. Measured on the served page.
+⚠️ **AND THE PB GRID IS ONE COLUMN.** Two columns each holding a label and a time field overflowed at
+400px and clipped the second input at the screen edge — a field whose label you can see and cannot type
+into. `minmax(0, 1fr)`, because a `1fr` track has `min-width: auto` by default.
+
+### `commShareHtml` BECAME AN ORPHAN, AND WAS DELETED RATHER THAN LEFT
+
+He asked for "Create a post" in place of "Share a run", which left that sheet and its wiring with no
+caller at all — the computed-and-discarded trap this project has shipped four times. **Sharing a run is
+not lost:** it is on the run's own page as *Share my run*, which is the only place a run can be picked to
+share from. A guard now asserts both builders are gone from the build entirely.
+
+### Six guards that could not fail, and what each was
+
+1. ⚠️ **A BUILDER PROVES A SHAPE EXISTS; ONLY THE CALLER PROVES THE RUNNER SEES IT.** The filmstrip guard
+   read `clubStripHtml` alone, so replacing the CALL to it with a range input escaped — the strip was
+   still perfect and nothing rendered it.
+2. ⚠️ **A SINGLE MATCH ANYWHERE IN A FUNCTION IS SATISFIED WHILE ONE BRANCH HAS LOST IT.** The back-button
+   guard passed with the empty state's deleted — the branch a runner with no posts actually reaches.
+   Indentation was not a usable anchor either: the per-post return inside the `.map` sits at the same
+   depth and correctly has no back button.
+3. ⚠️ **`[^}]*` STOPS AT THE FIRST BRACE**, and the object literal being saved contains one — so a field
+   handler that DID call `render()` sailed past the no-re-render guard.
+4. ⚠️ **A DELEGATED SELECTOR **OR** A `dataset` READ.** `data-cmed` and `data-cvid` are read as dataset
+   properties, where the hyphenated name appears nowhere; and `[data-cpcount]` is only ever used with a
+   value. Requiring a bare `[data-x]` reported live code as unwired.
+5. ⚠️ **THE COMMENT-QUOTES-WHAT-IT-FORBIDS TRAP FIRED TWICE MORE — ninth and tenth.** The rename note
+   quotes "Share a run"; the link note quotes `rel="noopener noreferrer"`. Deleting the real attribute
+   left the guard perfectly happy.
+6. ⚠️ **AND TWO STRONGER FORMULATIONS OF THE `ui-*` GUARD FLAGGED CORRECT CODE.** "It must have an
+   unscoped rule" fails on `.ui-dot`, correctly defined only inside `.ui-pill`; "some rule must PAINT it"
+   fails on `.ui-row-mid`, deliberately nothing but `min-width: 0; flex: 1`. What survives is "the name
+   exists in the stylesheet" — which **cannot** catch the `.ui-btn` case itself, because a scoped
+   override names it. **The tap-floor sweep is what caught that**, and saying so plainly is better than
+   implying the guard is stronger than it is.
+
+⚠️ **THE REGEX-ESCAPING RULE FIRED ON FOUR REGEXES AT ONCE** — `/^video\//`, the PB time pattern,
+`/^https?:\/\//i` and `/^www\./` all shipped with their backslashes eaten, so the file-type test, the time
+validator and the URL parser each matched nothing. Write `\\/`, not `\/`. **Sweep the emitted page, not
+the source**, which is how these were found.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc clean
+apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1159 pass / 0 fail under
+UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`**, both design ratchets unchanged. Driven end to
+end in the served build across light and dark: three photographs picked → framed separately → captioned →
+posted as one carousel → tile → feed with 1/3 counter and dots; a 24-second clip trimmed by both handles
+with eight real frames in the strip; the edit page storing bio, training-for, a shop URL on the shoe and
+two PBs, refusing a non-time; `documentElement` and `body` horizontal overflow **0** on all three screens
+in both themes, every control reached by a handler.
+
+⚠️ **STILL NOT BUILT, AND NAMED RATHER THAN OFFERED:** reels, highlights and going live.
+
 ## OPEN BUGS (confirmed on real hardware, 2026-07-29)
 
 ### 1. Coach audio when the phone is locked or pocketed — FIXED 2026-08-08, unproven on hardware

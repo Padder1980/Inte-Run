@@ -152,8 +152,10 @@ test("⚠️ double-tap cannot zoom the app, on any element", () => {
   // pans and pinches to frame what they are about to post. It is not a scroller — the caption field and
   // the tool rail sit outside it — and the viewer's own stage is pan-y so a post can still be scrolled past.
   const nones = [...new Set([...style.matchAll(/([^\s{}]+) \{[^}]*touch-action: none/g)].map((m) => m[1]))];
-  assert.deepEqual(nones, [".crop-stage", ".sst-stage.sst-editing", ".club-stage"],
-    "something other than the three framing stages disables touch entirely: " + nones.join(", "));
+  // ⚠️ THE TRIM FILMSTRIP IS THE FOURTH, and it is the same kind of thing: a fixed-height surface whose
+  // whole job is a drag along it. Without it, dragging a trim handle scrolls the editor instead.
+  assert.deepEqual(nones, [".crop-stage", ".sst-stage.sst-editing", ".club-stage", ".club-film"],
+    "something other than the four drag surfaces disables touch entirely: " + nones.join(", "));
   assert.match(style, /\.sst-stage \{[^}]*touch-action: pan-y/,
     "the studio's stage no longer leaves vertical drags to the browser, so the panel cannot be scrolled from it");
   // ⚠️ DERIVED FROM THE none LIST, NOT A LITERAL. The previous version matched the suppressor's exact

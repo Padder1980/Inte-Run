@@ -134,6 +134,16 @@ extension LocationService: CLLocationManagerDelegate {
                 "t": loc.timestamp.timeIntervalSince1970 * 1000,
             ])
         }
+        // ⚠️ THE CARD IS TOLD ABOUT THE NEWEST FIX WHETHER OR NOT THE PAGE CAN HEAR ABOUT IT, and that
+        // asymmetry IS the fix: the buffer above exists precisely because the page cannot be reached
+        // right now, which is exactly when the lock screen goes stale. CardDistance adds no distance of
+        // its own — it measures a straight line from the last position the PAGE published — and does
+        // nothing at all until the page has published one.
+        // ⚠️ THE NEWEST, NOT EACH. Replaying a backlog through here would push the card once per fix
+        // for no gain; only where the runner is NOW can move it.
+        if let newest = locations.last, newest.horizontalAccuracy >= 0 {
+            Task { @MainActor in CardDistance.shared.saw(newest) }
+        }
         // Deliver live when the web view can receive it; otherwise let the backlog build and replay.
         if UIApplication.shared.applicationState == .active { flush() }
         if wantsOneShot { wantsOneShot = false }

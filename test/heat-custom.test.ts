@@ -138,7 +138,8 @@ function liftHeat() {
     "return { " + [...fns].join(", ") +
     ", __set: (p, r) => { PLAN = p; RAW = r; }" +
     ", __extra: () => EXTRA" +
-    ", __state: () => state" +
+    ", __state: () => state"
+    + ", __raw: () => RAW" +
     ", __reload: () => { EXTRA = loadExtra(); state.heatAdapt = loadHeatAdapt(); } };";
   return { body, fns: [...fns], consts: ordered.length };
 }
@@ -180,7 +181,14 @@ type Env = {
 
 const LIFT = liftHeat();
 
-function env(tempC = 33): Env {
+/**
+ * @param raceToday when set, the goal race falls on TODAY and the block is a ~13-week plan behind it.
+ *   ⚠️ NEEDED BECAUSE heatBlockHtml IS TODAY-ONLY AND CORRECTLY SO — the forecast is today's, so a
+ *   session months away has nothing to say about the weather. The offer for a race can only be seen
+ *   on the screen on race day, which means the fixture has to put one there. dayOverride cannot: it
+ *   moves a session within its OWN week, and the race is in the last one.
+ */
+function env(tempC = 33, raceToday = false): Env {
   const store = new MemStore();
   const now = new Date();
   // ⚠️ UTC, BECAUSE THE APP IS UTC. todayIso() is new Date().toISOString().slice(0, 10), and CLAUDE.md
@@ -198,7 +206,8 @@ function env(tempC = 33): Env {
   } as unknown as Athlete;
   const goal = {
     distance: "half", targetTimeSeconds: 6300,
-    raceDateIso: iso(new Date(now.getTime() + 200 * 864e5)), startDateIso: today,
+    raceDateIso: raceToday ? today : iso(new Date(now.getTime() + 200 * 864e5)),
+    startDateIso: raceToday ? iso(new Date(now.getTime() - 91 * 864e5)) : today,
   } as unknown as Goal;
   const plan = generatePlan(athlete, goal, {});
   const paces = deriveTrainingPaces(athlete.recent!);
@@ -1057,4 +1066,89 @@ test("EXTRA is declared before the top-level seedDone() call", () => {
   assert.ok(bootAt > 0, "the top-level seedDone() call is gone");
   assert.ok(bootAt > extraAt,
     "seedDone() now runs before EXTRA exists, so the heat prune throws into a silent catch");
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * A GOAL RACE IS OFFERED A HEAT ADAPTATION — the owner's ruling, 2026-08-22.
+ *
+ * The previous phase found "race" missing from weather.ts's RUN set, which silenced the heat card on
+ * the one day the whole plan exists for: driven through a real race day at 33 °C, paceFactor came
+ * back exactly 1.0000 and the runner was told "near-ideal conditions". It was fixed and then flagged
+ * for him rather than assumed, because adapting a goal race is a coaching decision and not a bug fix.
+ *
+ * His answer: *"The goal race adaptation for heat can be offered, it doesnt mean the user has to
+ * accept it."* So the offer stands, and this guard is what stops it being quietly removed again — the
+ * derived PRIMARY_TYPES sweep above proves race is a run to the model, and this proves the whole path
+ * from a real generated race session to something on the runner's screen with a way to decline.
+ * ---------------------------------------------------------------------------------------------- */
+
+/** The goal race out of a real generated plan — the last week's `race` session. */
+function raceSession(e: Env): any {
+  for (const w of [...(e.api.__raw().weeks as any[])].reverse()) {
+    const r = (w.sessions as any[]).find((s) => s.type === "race");
+    if (r) return r;
+  }
+  return null;
+}
+
+test("BLOCKER: a goal race in severe heat is offered an adaptation", () => {
+  const e = env(33, true);
+  const race = raceSession(e);
+  assert.ok(race, "the generated plan has no race session, so this proves nothing");
+  const offer = e.api.heatOffer(race);
+  assert.ok(offer, "a goal race at 33 °C was offered nothing — 'race' is out of weather.ts's RUN set");
+  assert.ok(offer.pct > 0, "the offer names no cost: " + JSON.stringify(offer.pct));
+  // ⚠️ IT MUST REACH THE SCREEN, not merely be computable. The whole original defect was an
+  // adaptation that had always worked sitting behind a set that made it unreachable.
+  const block = e.api.heatBlockHtml(race);
+  assert.ok(block.length > 0, "nothing on the briefing card for a race day in severe heat");
+  assert.match(block, /heat|°/i);
+});
+
+test("BLOCKER: it is an OFFER — a race is never adapted until the runner says so", () => {
+  // His ruling in his own words: "it doesnt mean the user has to accept it". Same rule the standing
+  // instruction of 2026-08-03 sets for everything the app proposes.
+  const e = env(33, true);
+  const race = raceSession(e);
+  assert.ok(race);
+  assert.equal(e.api.heatApplied(race), race,
+    "a race was adapted with no decision recorded — the app may propose, never impose");
+  const before = JSON.stringify(race.steps);
+  e.api.heatBlockHtml(race);
+  assert.equal(JSON.stringify(race.steps), before, "rendering the offer changed the session");
+});
+
+test("a race gets the quality wording, not an easy run's 'just slow down'", () => {
+  // ⚠️ WHY "race" IS IN QUALITY AS WELL AS RUN. A goal race is the session whose entire point is a
+  // pace target, so the honest advice is to run by effort and to consider the day — not to ease off
+  // and go by feel, which is what an easy run is told.
+  const e = env(33, true);
+  const race = raceSession(e);
+  assert.ok(race);
+  const imp = e.api.heatOffer(race)!.imp;
+  const advice = (imp.points || []).join(" ") + " " + (imp.advice || "");
+  assert.match(advice, /by effort, not the clock/i,
+    "a race in severe heat did not get the quality wording: " + advice);
+  // ⚠️ ASSERT THE ABSENCE TOO, AND THE FIRST VERSION DID NOT — /effort/i matches BOTH branches,
+  // because the easy-run line is "Just slow down and go by feel — effort matters far more than pace".
+  // So dropping "race" from QUALITY escaped a guard whose own title names what it was checking for.
+  assert.doesNotMatch(advice, /just slow down and go by feel/i,
+    "a goal race was given an easy run's advice: " + advice);
+});
+
+test("BLOCKER: a race is never told to move to a cooler hour or swap itself for an easy run", () => {
+  // ⚠️ THE QUALITY ADVICE'S ESCAPE ROUTES DO NOT EXIST FOR A GOAL RACE. It starts when it starts and it
+  // is not swappable — so "move this to a cooler time of day, or swap it for an easy run" is advice
+  // the runner cannot act on, on the one card the whole plan was built to reach. Found when the owner
+  // ruled that a race MAY be offered an adaptation: the offer was reachable and its wording was not.
+  const e = env(33, true);
+  const race = raceSession(e);
+  assert.ok(race);
+  const imp = e.api.heatOffer(race)!.imp;
+  const advice = (imp.points || []).join(" ");
+  assert.doesNotMatch(advice, /cooler time of day|swapping it for an easy run/i,
+    "a goal race was offered something it cannot do: " + advice);
+  // And it still says the thing that matters, in terms a runner on a start line can use.
+  assert.match(advice, /adjust your target|ease off/i, "no usable race-day advice at all: " + advice);
+  assert.match(advice, /heat illness is a real risk/i, "the safety line was lost with the rewording");
 });

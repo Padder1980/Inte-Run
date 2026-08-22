@@ -274,7 +274,17 @@ export function assessConditions(input: Conditions): WeatherImpact {
       // It also carried no volume caveat, which is the invariant that reconciliation established —
       // drinking beyond your losses is the actual danger, and electrolytes do not make it safe.
       if (RANK[heat] >= RANK.moderate) points.push("Take full recoveries between reps, and arrive normally hydrated — no need to load up beforehand. If you drink during it, something with a little sodium in it helps, without drinking more than you lose.");
-      if (heat === "severe") points.push("Strongly consider moving this to a cooler time of day, or swapping it for an easy run — heat illness is a real risk.");
+      // ⚠️ A GOAL RACE CANNOT TAKE THE QUALITY ADVICE'S OWN ESCAPE ROUTES, AND OFFERING THEM IS WORSE
+      // THAN SAYING NOTHING. "Move it to a cooler time of day, or swap it for an easy run" is right for
+      // a threshold session and impossible for the thing the entire plan was built to reach: the race
+      // starts when it starts, and it is not swappable. Found when the owner ruled (2026-08-22) that a
+      // race MAY be offered a heat adaptation — the offer was reachable, and the advice arriving with
+      // it was written for a session the runner could move.
+      if (heat === "severe") {
+        points.push(sessionType === "race"
+          ? "In heat like this, adjust your target before you start rather than in the last few kilometres — go out slower than the plan, take every drink station, and be ready to ease off. Heat illness is a real risk."
+          : "Strongly consider moving this to a cooler time of day, or swapping it for an easy run — heat illness is a real risk.");
+      }
     } else {
       points.push("Just slow down and go by feel — effort matters far more than pace in this heat.");
       if (RANK[heat] >= RANK.moderate) points.push("Carry water on anything over ~45 minutes, and don't chase your usual pace.");

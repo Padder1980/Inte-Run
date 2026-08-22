@@ -29341,6 +29341,20 @@ function pushLiveActivity(snap, force) {
       type: (LIVE.session && LIVE.session.type) || "easy",
       sec: Math.round((snap && snap.elapsedSeconds) || 0),
       distKm: liveDistM() / 1000,
+      // ⚠️⚠️ THE COMMITTED TOTAL AND THE POSITION IT WAS TRUE AT — the two things the native side needs
+      // to keep the lock-screen card moving while this page is asleep. iOS throttles the web content
+      // process rather than stopping it, so pushLiveActivity runs whenever the page happens to wake and
+      // every number stands still in between: reported as "it does change but just not accurately".
+      // ⚠️ COMMITTED (LIVE.dist), NOT DISPLAYED (liveDistM). The displayed figure already contains the
+      // pending leg measured from this same anchor, so pairing it with the anchor would count those
+      // metres twice. CardDistance adds a straight line from here to the newest fix, which is the same
+      // quantity LIVE.pendM measures — so the two agree while this page is awake and only diverge while
+      // it is not, which is the entire point.
+      // ⚠️ AND IT NEVER FEEDS BACK. Nothing the native side computes reaches LIVE, the saved run,
+      // Strava or Health; it answers one question for one pixel, and every push replaces it outright.
+      distCommittedKm: (LIVE.dist || 0) / 1000,
+      anchorLat: typeof LIVE.anchorLat === "number" ? LIVE.anchorLat : undefined,
+      anchorLon: typeof LIVE.anchorLon === "number" ? LIVE.anchorLon : undefined,
       paceSec: Math.round((snap && snap.currentPaceSecPerKm) || 0) || undefined,
       // ⚠️ Real heart rate only. LIVE.hr is the SIMULATOR's invention (it idles at 105), and it was
       // leaking onto the lock screen for genuine GPS runs.

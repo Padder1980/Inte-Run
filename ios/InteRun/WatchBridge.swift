@@ -434,6 +434,11 @@ extension WatchBridge: WCSessionDelegate {
         if ended {
             LiveActivityService.shared.end(state)
         } else {
+            // ⚠️ A WRIST-RECORDED RUN NEEDS NONE OF THIS AND MUST NOT HAVE IT. Its ticks arrive over
+            // WatchConnectivity and are forwarded from native code, which keeps running while the
+            // screen is off — so that card was never stale. Leaving the extrapolation live would put a
+            // phone-side chord in competition with the wrist's own figure.
+            CardDistance.shared.stop()
             LiveActivityService.shared.start(
                 runId: (live["id"] as? String) ?? "watch",
                 title: (live["title"] as? String) ?? "Run",
@@ -531,7 +536,15 @@ extension WatchBridge: WKScriptMessageHandler {
                 // Same anchor, same reason — see driveLiveActivity above.
                 runningSince: Date().addingTimeInterval(-Double((body["sec"] as? Int) ?? 0)),
             )
+            // ⚠️ ADOPTED HERE, WHERE THE PAGE SPEAKS, so the extrapolation is reset by the very thing
+            // it is standing in for. See CardDistance: the page stays the sole author of the run, and
+            // this only answers "how far since that figure was true" for the lock screen.
+            let committedKm = body["distCommittedKm"] as? Double
+            let aLat = body["anchorLat"] as? Double
+            let aLon = body["anchorLon"] as? Double
             Task { @MainActor in
+                CardDistance.shared.adopt(state: state, committedKm: committedKm,
+                                          anchorLat: aLat, anchorLon: aLon, ended: ended)
                 if ended { LiveActivityService.shared.end(state) }
                 else {
                     LiveActivityService.shared.start(

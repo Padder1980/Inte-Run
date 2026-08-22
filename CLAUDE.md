@@ -2469,8 +2469,10 @@ every one of the 92 shows the old timing.
 ## NO WARM-UP AND NO COOL-DOWN ON THE LOW-INTENSITY RUNS (owner 2026-08-07, shipped same day)
 
 *"I dont think any of the following runs should include a warm up or cool down: 1. Long run 2. Easy
-3. Recovery ... All of the others need a proper warm up as already mapped."* (He listed a fourth and
-left it blank — **still unanswered, ask him.**)
+3. Recovery ... All of the others need a proper warm up as already mapped."* (He numbered a fourth
+and left it blank. ✅ **ANSWERED 2026-08-22: it was a typo — there is no fourth type.** The list is
+exactly those three, and the note asking about it has been removed rather than left standing, because
+a question already answered is a question the next session asks again.)
 
 ⚠️ **THIS REVERSES PART 2 OF THE NAMED-TIME WORK** (2026-08-03), which gave easy and long runs a real
 five-minute warm-up plus stretches. His reasoning is the same one that removed the ease-down on
@@ -5922,7 +5924,21 @@ wrong starting point), `heatOffer(sess)` the ONE gate read by the Today card AND
 
 ⚠️ **"race" WAS MISSING FROM `weather.ts`'s `RUN` SET, WHICH SILENCED THE HEAT CARD ON THE ONE DAY THE
 PLAN EXISTS FOR** — paceFactor exactly 1.0000 and *"Near-ideal conditions"* before a goal race at 33 °C.
-It is in `QUALITY` too, which makes race day offerable at ~4.6% slower. **The owner's call to confirm.**
+It is in `QUALITY` too, which makes race day offerable at ~4.6% slower.
+✅ **CONFIRMED 2026-08-22: *"The goal race adaptation for heat can be offered, it doesnt mean the user
+has to accept it."*** So the offer stands. `test/heat-custom.test.ts` now proves the whole path from a
+real generated `race` session to something on the briefing card, on a fixture whose race is TODAY —
+`env(33, true)` exists for that, because `heatBlockHtml` is today-only (correctly: the forecast is
+today's) and `dayOverride` cannot help, since it moves a session within its OWN week and the race is
+in the last one.
+⚠️ **AND CONFIRMING IT FOUND A REAL DEFECT IN THE ADVICE THAT CAME WITH IT.** The quality branch's
+severe-heat line is *"Strongly consider moving this to a cooler time of day, or swapping it for an easy
+run"* — right for a threshold session, **impossible for the thing the whole plan was built to reach**:
+a race starts when it starts and is not swappable. So a runner opening their race briefing in severe
+heat was offered two things they could not do, on the one card that matters most. `race` now gets its
+own line (go out slower than the plan, take every drink station, be ready to ease off) and keeps the
+heat-illness warning. Guarded from both sides — the race wording must be there, and the swappable
+wording must not.
 
 ⚠️⚠️ **THE TODAY CONDITIONS SQUARE READ "Good to run" UNDER A SEVERE-HEAT COLOUR, AND IT PRICED A
 DIFFERENT SESSION FROM THE CARD TWO INCHES BELOW IT.** Two faults in one control, both found by the
@@ -7960,6 +7976,135 @@ clean apart from the one pre-existing `test/onboarding-wizard.test.ts` Date over
 fail under UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`** with `CHROME_PATH` set, both design
 ratchets unchanged (143 radii, 322 font sizes — no CSS changed), and `InteRun` **Release** for
 `generic/platform=iOS` building with 0 errors, watch app and widget embedded.
+
+## THE LOCK-SCREEN DISTANCE KEEPS MOVING (owner's ruling, 2026-08-22)
+
+Verbatim: *"The distance needs to keep going on the lock screen if the user has decided to use the phone
+to run......There's no reason that this should affect anything else and you need to make sure it doesn't
+break anything else...i don't know why the distance cant keep tracking, in fact when i was looking at
+the card on the lock screen, it does change but just not accurately."*
+
+⚠️ **HIS LAST OBSERVATION IS THE DIAGNOSIS, AND IT CORRECTS WHAT THIS FILE SAID THE DAY BEFORE.** The
+previous note called the card frozen. It is not: iOS **throttles** the web content process rather than
+stopping it, so `pushLiveActivity` runs whenever the page happens to wake and every number stands still
+in between. The card moves in jumps, and the figure on it is however far behind the runner the buffered
+backlog happens to be. *"It does change but just not accurately"* is exactly that.
+
+`ios/InteRun/CardDistance.swift`. Suite 1199 → **1215**; 14 deliberate re-breaks, all caught (three
+only after a guard was restated). **Native, so it needs an Xcode build.**
+
+### ⚠️⚠️ IT IS A CHORD FROM THE PAGE'S OWN ANCHOR, NEVER A SUM OF DELTAS
+
+The page pushes its **committed** total and **the position that total was true at**
+(`LIVE.anchorLat`/`anchorLon`); Swift adds one straight line from there to the newest fix. Three
+consequences, and all three are why this is safe:
+1. **Nothing accumulates.** Summing per-fix deltas is precisely the fault `onGpsPos`'s anchor-and-leash
+   exists to prevent — noise is positive on every reading and haversine is always positive, so a sum
+   runs long (measured on the page's own harness: 124 m of walking read as 215 m) — and that error
+   **grows for as long as the phone stays locked**, in the direction that flatters the runner. A chord
+   from a fixed point is bounded by the jitter itself, forever. **Measured: 120 jittering fixes at a
+   standstill drift under 3 m and do not trend.**
+2. **Every push replaces it outright**, so it can only ever be as wrong as the time since the page last
+   spoke.
+3. **A chord across a bend UNDER-reads** (measured: a 200 m dog-leg shows as its 141 m chord), which is
+   the safe direction — the card never claims more ground than was covered.
+
+⚠️ **COMMITTED (`LIVE.dist`), NOT DISPLAYED (`liveDistM()`).** The displayed figure already contains the
+pending leg measured from that same anchor, so pairing it with the anchor counts those metres twice.
+And the chord is the same quantity `LIVE.pendM` measures — so the two **agree while the page is awake**
+and diverge only while it is not, which is the entire point.
+
+⚠️ **THE PAGE REMAINS THE SOLE AUTHOR OF THE RUN, AND THAT IS THE PROMISE HE ASKED FOR.** Nothing this
+computes reaches `LIVE`, the saved run, Strava, Health or any store. It answers one question for one
+pixel. Guarded three ways: only `adopt`/`stop` may move the base or the anchor; `CardDistance.shared`
+may only be *told* things (`adopt`/`stop`/`saw`, never asked); and it speaks to exactly one thing,
+`LiveActivityService.shared.update`.
+
+⚠️ **THE PACE IS NEITHER RECOMPUTED NOR DROPPED, AND BOTH ALTERNATIVES ARE WORSE.** Recomputing means
+dividing this chord by a wall clock — the "arithmetic on a lump" the page's pace window exists to
+refuse. Dropping it to "--:--" takes away a figure the runner already had, which is a regression wearing
+honesty's clothes. The page's last judgement stands until it makes a new one. Nothing on the card
+contradicts anything else as a result: it shows CURRENT pace, not average, so a fresher distance breaks
+no arithmetic relationship.
+
+⚠️ **THE GATES ARE THE PAGE'S OWN NUMBERS.** A fix is usable at **35 m** or better — `onGpsPos`'s own
+`good` threshold — because two gates that disagree about a usable fix put a position on the card the run
+itself never accepted. A chord implying more than **7 m/s** (faster than any pace this app prescribes;
+the engine refuses a derived pace under 150 s/km, i.e. 6.67 m/s) is **clamped, not dropped**: dropping
+freezes the card, showing it jumps the card, clamping advances at a believable rate until the next good
+fix corrects it.
+
+⚠️ **A 10-METRE MINIMUM CHANGE DOES THE WORK AN `applicationState` CHECK WOULD DO, AND CANNOT GET IT
+WRONG.** In the foreground the page resets the base every couple of seconds, so the gap never reaches
+ten metres and nothing is pushed at all. This file already records `.inactive` being the wrong gate once
+(it covers the app being ON SCREEN), so not needing one is worth more than getting one right.
+
+⚠️ **IT IS TOLD ABOUT FIXES *OUTSIDE* THE `applicationState == .active` GATE, and that asymmetry IS the
+fix.** `LocationService`'s buffer exists precisely because the page cannot be reached right now, which
+is exactly when the lock screen goes stale. Gating the card update the same way switches it off in the
+only situation it is for. ⚠️ **The NEWEST fix only** — replaying a backlog through it would push the
+card once per fix for nothing.
+
+⚠️ **THREE STATES SWITCH IT OFF, AND EACH HAS ITS OWN REASON.** A **wrist-recorded** run
+(`driveLiveActivity` calls `stop()`): its ticks arrive over WatchConnectivity and are forwarded from
+native code that keeps running with the screen off, so that card was never stale, and a phone-side chord
+would compete with the wrist's own figure. **Paused**: a paused run is not covering ground, and a card
+creeping up while the runner stands still is worse than one standing still with them. **Ended**.
+
+⚠️ **NO ANCHOR MEANS NO EXTRAPOLATION, WHICH IS WHAT MAKES A TREADMILL AND AN OLDER PAGE SAFE BY
+CONSTRUCTION.** `LIVE.anchorLat` is written only by `onGpsPos`, so an indoor run and a simulated one
+send none — and a page that predates this sends neither field. All three behave exactly as before.
+
+### ⚠️ THE ARITHMETIC IS A PURE FUNCTION SO IT CAN BE RUN, NOT ONLY READ
+
+`CardDistance.project` is `static` and side-effect-free, and `test/card-distance.test.ts` **compiles it
+with `swiftc` and drives it** (the `test/watch-route-harness.ts` precedent). The claims that matter here
+are behavioural — a bend under-reads, a standstill gains nothing, a wild fix is clamped — and a
+structural test of a Swift file can only prove the code says what it says. ⚠️ **The real function is
+lifted whole, never modelled**: a hand-written copy in the test agrees with itself and proves nothing
+about the shipped one. ⚠️ **Absence of `swiftc` is a FAILURE, not a skip**, for the reason the export
+gate already records.
+
+⚠️⚠️ **AND EXTRACTING IT CREATED THE ONE HOLE A RE-BREAK FOUND.** Turning the class into an accumulator
+— `baseMeters = shown; anchor = loc; anchorAt = Date()` after each push — leaves `project` untouched, so
+**every behavioural test still passed**, and it has no `+=` and still exactly one `distance(from:)`, so
+both structural guards passed too. The accumulation had simply moved into the stateful part the pure
+function cannot see. The invariant that catches it wherever it is written: **only `adopt` and `stop` may
+move the base or the anchor**, derived by walking every function body rather than listing them.
+
+⚠️ **A SECOND ESCAPE WAS A LAZY REGEX RUNNING PAST ITS OWN BLOCK.** `/if ended \{[\s\S]*?live = false/`
+matched straight through `if ended { return }` to the `live = false` in the guard-let-else below, so
+deleting the whole ended branch passed. Scoped to `[^{}]*` inside the block. Collection-too-wide, in a
+two-line regex.
+
+### ⚠️ WHAT IS STILL NOT LIVE ON THAT CARD, STATED RATHER THAN IMPLIED
+
+Between the page's wakes the **pace** is the page's last figure and the **heart rate**, **step** and
+**lap** are too. Only the clock (system-counted, from `runningSince`) and now the distance move on their
+own. That is deliberate: distance is the only one of them a straight line from a known point can honestly
+answer.
+
+## RACE DAY MAY BE OFFERED A HEAT ADAPTATION (owner's ruling, 2026-08-22)
+
+*"The goal race adaptation for heat can be offered, it doesnt mean the user has to accept it."* Recorded
+against the flagged question in the heat chapter above. Three guards: the offer reaches the briefing
+card on a fixture whose race is today, it is never applied without a decision, and a race gets the
+quality wording rather than an easy run's.
+
+⚠️ **CONFIRMING IT FOUND A REAL DEFECT — see that chapter.** The quality branch's severe-heat advice
+told the runner to move the session to a cooler hour or swap it for an easy run, neither of which a goal
+race can do. Fixed with a `race` line of its own.
+
+⚠️ **`env(33, true)` PUTS RACE DAY ON TODAY, AND IT HAD TO.** `heatBlockHtml` is today-only and
+correctly so — the forecast is today's — and `dayOverride` cannot move a race onto today because it
+moves a session within its OWN week and the race is in the last one. So the fixture builds a ~13-week
+block whose race date IS today. ⚠️ The existing 22 guards in that file are untouched, because the flag
+defaults to the old behaviour.
+
+⚠️ **`/effort/i` MATCHED BOTH BRANCHES, so the first version of the quality-wording guard escaped its
+re-break** — the easy-run line is *"Just slow down and go by feel — effort matters far more than pace"*.
+Assert the quality phrase AND the absence of the easy-run one; the guard's own title named what it was
+failing to check.
 
 ## OPEN BUGS (confirmed on real hardware, 2026-07-29)
 

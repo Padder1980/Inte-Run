@@ -7730,6 +7730,73 @@ design ratchets unchanged. Driven on the served build: the wheels loading older 
 appearing only when non-zero, zeroing clearing rather than claiming 0:00, and the five destinations with
 the Inte-Run mark on the club one.
 
+### FOUR MORE FROM THE PHONE (2026-08-22, fifth round)
+
+Suite 1171 → **1174**; 10 deliberate re-breaks, all caught. All four are web, so all four reach the phone
+on the next launch.
+
+### ⚠️⚠️ THE CAMERA ROLL WAS BUNCHED UP, AND IT IS THE aspect-ratio CIRCULARITY
+
+Measured and reproduced: every cell computed **149×149 correctly** while the grid's own row tracks came out
+**89.5px**, so the cells overflowed their rows and overlapped — thumbnails squashed into thin strips with
+the selection circles running into each other, which is exactly his screenshot.
+**The cause is a loop.** An auto row sizes to its items' content, and an item whose height comes from
+`aspect-ratio` has no content contribution to give — the image inside is 100% of a height that does not
+exist yet. **Percentage padding resolves against the item's WIDTH**, which the `1fr` track has already
+settled, so there is nothing circular to resolve and the row is simply told how tall it is.
+⚠️ `padding: 100% 0 0` with `height: 0`, and **the image becomes absolute**, because the cell's content box
+is then zero-height by construction. The marks need a `z-index` rather than document order, since the
+image now comes first.
+⚠️ **`aspect-ratio` IS NOT A DROP-IN FOR THE PADDING TRICK INSIDE AN AUTO GRID ROW**, and that is the
+transferable part. It works everywhere the box's height is not also what sizes the track.
+
+### SHARING A CARD TO INTE-CLUB ASKS, AND THEN OPENS THE EDITOR
+
+*"it needs to give me the option of sharing to story or grid…..and being able to edit (write a comment on
+the grid post or type over a story)"*. It used to post to the grid silently, which decided both for him.
+⚠️ **THE CARD GOES INTO THE EDITOR AS THE PICTURE**, so everything already there applies to it: pan and
+zoom, words typed on it, the caption step, and the same post shape as anything from the camera roll. A
+second composer for one kind of picture would be a second of everything.
+⚠️ **THE STUDIO CLOSES FIRST.** Both are full-screen overlays and the studio is the later one in the stack.
+⚠️ **AND THE CAPTION STARTS AS THE RUN'S OWN LINE** rather than empty — it is what the card already says.
+
+⚠️⚠️ **THE CARD IS FITTED, NEVER CROPPED, AND ONE RULE SERVES ALL FIVE SURFACES.** The editor covers by
+default, which is right for a photograph — raw material the runner is framing — and wrong for a card the
+app itself composed: measured, it cut **"Inte-Run" and the distance off both edges**. The editor, the
+caption strip, the grid tile, the post feed and the full-screen player all read one flag through one
+selector list, so none of them can crop what another shows whole.
+⚠️ **AND THE FLAG IS PASSED IN, NOT PATCHED ON AFTERWARDS.** Set on the returned editor it landed AFTER the
+first paint, so nothing had it and the stage cropped the card anyway — measured, `object-fit` read
+"cover". `openClubEditor(kind, files, opts)` takes `card`, `caption` and `runId`; a caller that has to fix
+something up after the fact is a caller that can forget to.
+
+⚠️⚠️ **THE DESTINATION IS THE ASPECT DECISION.** A 9:16 story card in a square grid cell is mostly white
+bars — measured — and a 4:5 feed card in a story is letterboxed the other way. Choosing story or grid IS
+choosing the shape, so the card is rendered at the shape it is going to rather than at whatever chip
+happened to be selected. ⚠️ **And what he had selected is put back on both paths**, because a failed render
+leaves the studio open and it must not have silently changed shape underneath him.
+
+### THE FEED PANE IS THE EMPTY STATE AND NOTHING ELSE
+
+*"it shouldn't look like that, it will be empty until there are other users posting"*. The design puts a
+stories rail on the feed, and with nobody to follow it held only the runner's own story beside an Add
+button — a row of two things above a message saying there is nothing to show.
+⚠️ **NOTHING IS LOST BY REMOVING IT:** the avatar on the other pane already opens his story and its +
+badge already adds one, so both routes survive on the screen that is about him.
+⚠️ **AND IT ALSO RENDERED WRONGLY, which is worth recording rather than fixing invisibly.**
+`.cm-rail-ring img` set a `font-size` and a `colour` and **never sized or clipped the image**, so the
+avatar came out at its natural size spilling across the screen — his fourth screenshot. The rule was
+written for the initials span and the `img` selector was bolted onto it without giving it dimensions.
+⚠️ **Its CSS went with it**, because an orphaned rule is what the next screen copies — and one of these
+rules WAS the defect.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc clean
+apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1174 pass / 0 fail**, both
+design ratchets unchanged. Driven on the served build: 30 roll cells measuring 149×149 with zero
+overlapping pairs, the club tile asking story-or-grid then opening the editor with the card fitted and the
+caption prefilled, a 1080×1350 card for the grid with "story" put back afterwards, and the feed pane
+holding one child.
+
 ## OPEN BUGS (confirmed on real hardware, 2026-07-29)
 
 ### 1. Coach audio when the phone is locked or pocketed — FIXED 2026-08-08, unproven on hardware

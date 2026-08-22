@@ -940,9 +940,37 @@ test("BLOCKER: Inte-Club is a share destination that needs no bridge and never f
   // exact bytes the other tiles hand out, so what lands on the grid is what he was looking at.
   assert.match(to, /prepareShareCard\(run\)/, "the club tile re-renders the card instead of posting it");
   assert.ok(!/shareCardCanvas|drawShareCard/.test(to), "the club tile draws its own second card");
-  // ⚠️ AND IT IS THE ORDINARY POST SHAPE, so one tile builder, one viewer and one delete serve it.
-  assert.match(to, /kind: "post", media: \[key\]/, "the club tile writes a second kind of grid entry");
+  // ⚠️ RESTATED FOR HIS 2026-08-22 RULING: the tile no longer writes the row itself. It asks story or
+  // grid and hands the card to the EDITOR, so he can type over it or write a caption — "it needs to give
+  // me the option of sharing to story or grid…..and being able to edit". The row is then written by
+  // clubEdPost, which is the one writer for everything on the grid, and that is a stronger version of
+  // what this used to assert: not "it writes the ordinary shape" but "it does not write a shape at all".
+  assert.ok(!/clubSave\(|clubMediaPut\(/.test(to), "the club tile still writes its own grid entry");
+  assert.match(to, /data-cshk="story"/, "the club tile does not offer a story");
+  assert.match(to, /data-cshk="post"/, "the club tile does not offer the grid");
+  assert.match(to, /openClubEditor\(kind, \[file\],/, "the card does not reach the editor");
+  // ⚠️ THE STUDIO CLOSES FIRST, or the editor opens behind it — both are full-screen and the studio is
+  // the later one in the stack.
+  assert.ok(to.indexOf("closeShareStudio()") < to.indexOf("openClubEditor"),
+    "the editor is opened before the studio closes, so it opens behind it");
   assert.match(to, /runId: String\(run\.id/, "the posted card does not remember which run it is of");
+  // ⚠️ AND THE CARD IS FITTED, NOT CROPPED, on every surface that shows it. Cover is right for a
+  // photograph — raw material the runner is framing — and wrong for a card the app itself composed:
+  // measured, it cut "Inte-Run" and the distance off both edges.
+  // ⚠️ PASSED IN, NOT PATCHED ON AFTERWARDS. Set on the returned editor it landed AFTER the first paint,
+  // so nothing had the flag and the stage cropped the card anyway — measured, object-fit read "cover".
+  assert.match(to, /openClubEditor\(kind, \[file\],\s*\n?\s*\{ card: true/,
+    "the card is not marked as finished when the editor opens, so the stage crops it");
+  assert.ok(!/CLUBED\.slides\[0\]\.card = true/.test(to),
+    "the flag is patched on after the editor has already drawn");
+  const style2 = sheetOf(page());
+  const fitRule = /\.club-med-fit[^{]*\{[^}]*\}/.exec(style2);
+  assert.ok(fitRule, "there is no rule that fits a finished card");
+  assert.match(fitRule[0], /object-fit: contain/, "a finished card is not fitted");
+  for (const sel of ["cm-t-med-fit", "cp-med-fit", "club-vmed-fit", "club-cap-i-fit"]) {
+    assert.ok(fitRule[0].includes(sel),
+      sel + " is not in the one fit rule, so that surface can crop what another shows whole");
+  }
 });
 
 test("BLOCKER: a run reaches the grid by being asked for, and the picture is chosen", () => {
@@ -1059,4 +1087,63 @@ test("BLOCKER: the club share tile wears the Inte-Run mark, from the brand mark'
   // than Instagram's and WhatsApp's real marks.
   assert.match(glyph, /fill="currentColor"/, "the club mark carries a colour of its own");
   assert.ok(!/linearGradient|#[0-9a-fA-F]{3,6}/.test(glyph), "the club mark carries a hex or a gradient");
+});
+
+test("BLOCKER: the club destination picks the card's shape, and puts back what was selected", () => {
+  // ⚠️⚠️ A 9:16 STORY CARD IN A SQUARE GRID CELL IS MOSTLY WHITE BARS, measured on the served build, and a
+  // 4:5 feed card in a story is letterboxed the other way. Choosing story or grid IS choosing the shape,
+  // so the card is rendered at the shape it is going to rather than at whatever chip was selected.
+  const to = nocomment(fn("shareToClub"));
+  assert.match(to, /SCARD\.aspect = \(kind === "story"\) \? "story" : "feed"/,
+    "the card is rendered at whatever aspect was selected rather than the one it is going to");
+  // ⚠️ AND IT IS PUT BACK. If the render fails the studio stays open, and it must not have changed shape
+  // underneath him — the same reason every temporary state in this app is restored on both paths.
+  assert.match(to, /const was = SCARD\.aspect;/, "the selected aspect is not remembered");
+  const restores = (to.match(/SCARD\.aspect = was/g) || []).length;
+  assert.equal(restores, 2, "the aspect is restored on " + restores + " of the two paths; expected both");
+  assert.ok(to.indexOf("SCARD.aspect = was") < to.indexOf("openClubEditor"),
+    "the aspect is restored after the editor opens, so a failure leaves the studio in the wrong shape");
+});
+
+test("BLOCKER: the feed pane is the empty state and nothing else", () => {
+  // ⚠️ HIS INSTRUCTION: "it shouldn't look like that, it will be empty until there are other users
+  // posting". The design puts a stories rail on the feed, and with nobody to follow it held only the
+  // runner's own story beside an Add button — a row of two things above a message saying there is
+  // nothing to show.
+  const v = nocomment(fn("viewCommunity"));
+  const pane = v.slice(v.lastIndexOf('<section class="cm-pane">'));
+  assert.match(pane, /commFeedHtml\(\)/, "the feed pane no longer renders the feed");
+  assert.ok(!/cm-rail/.test(pane), "the stories rail is still on the feed pane");
+  // ⚠️ AND NOTHING IS LOST: the avatar on the other pane opens the story and its + badge adds one.
+  assert.match(v, /data-cstory="1"/, "there is no way to open a story at all any more");
+  assert.match(v, /data-cadd="story"/, "there is no way to add a story at all any more");
+  // ⚠️ ITS CSS WENT WITH IT. An orphaned rule is what the next screen copies — and one of these was the
+  // defect: .cm-rail-ring img set a font-size and a colour and never sized or clipped the image, so the
+  // avatar rendered at its natural size spilling across the screen. The rule was written for the
+  // initials span and the img selector was bolted on without giving it dimensions.
+  const style = sheetOf(page());
+  assert.ok(!/\.cm-rail/.test(style), "the stories rail's CSS is still in the stylesheet with nothing using it");
+});
+
+test("BLOCKER: the camera roll's cells are square, and the rows are told how tall they are", () => {
+  // ⚠️⚠️ MEASURED AND REPRODUCED: every cell computed 149x149 correctly while the grid's own row tracks
+  // came out 89.5px, so the cells overflowed their rows and overlapped — thumbnails squashed into thin
+  // strips with the selection circles running into each other, which is exactly his screenshot.
+  // The cause is a circularity: an auto row sizes to its items' content, and an item whose height comes
+  // from aspect-ratio has no content contribution to give. Percentage padding resolves against the
+  // item's WIDTH, which the 1fr track has already settled, so there is no loop.
+  const style = sheetOf(page());
+  const cell = /\.clib-c \{[^}]*\}/.exec(style);
+  assert.ok(cell, "no .clib-c rule");
+  assert.match(cell[0], /padding: 100% 0 0/, "the cell's height does not come from percentage padding");
+  assert.match(cell[0], /height: 0/, "the cell has a height of its own, so the padding is added to it");
+  assert.ok(!/aspect-ratio/.test(cell[0]),
+    "the cell is back on aspect-ratio, which cannot tell an auto row how tall to be");
+  // ⚠️ AND THE IMAGE IS ABSOLUTE, because the cell's content box is zero-height by construction.
+  const img = /\.clib-c img \{[^}]*\}/.exec(style);
+  assert.ok(img, "no .clib-c img rule");
+  assert.match(img[0], /position: absolute/, "the image is in flow inside a zero-height content box");
+  // ⚠️ AND THE MARKS SIT ABOVE IT — a z-index rather than document order, since the image comes first.
+  assert.match(style, /\.clib-n, \.clib-dur \{[^}]*z-index: 2/,
+    "the selection mark and the duration are behind the thumbnail");
 });

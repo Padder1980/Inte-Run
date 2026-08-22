@@ -4527,15 +4527,6 @@ button.cm-tile:active { opacity: .65; }
 .cm-tile-off { opacity: .55; }
 /* A run with no route still reads as a tile rather than a hole. */
 /* The stories rail */
-.cm-rail { display: flex; gap: var(--s3); overflow-x: auto; padding: 14px var(--gutter);
-  border-bottom: 1px solid var(--line); }
-.cm-rail-i { flex: none; width: 62px; padding: 0; background: none; border: 0; text-align: center; }
-.cm-rail-ring { display: grid; place-items: center; width: 62px; height: 62px; padding: 2.5px;
-  border-radius: 50%; background: conic-gradient(from 210deg, var(--mark) 0%, var(--accent) 38%,
-    var(--mark-deep) 66%, var(--mark) 100%); }
-.cm-rail-ring img, .cm-rail-ring .cm-init { font-size: var(--t-meta); color: var(--ink-faint); }
-.cm-rail-n { display: block; margin-top: 5px; font-size: var(--t-label); font-weight: 600;
-  color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Empty states — the design's required ones */
 .cm-empty { padding: var(--s5) var(--gutter); text-align: center; }
 .cm-empty-sm { padding: var(--s4) 0; text-align: left; }
@@ -4732,8 +4723,6 @@ button.cm-tile:active { opacity: .65; }
 /* ⚠️ THE HIT AREA GROWS, NOT THE BOX — the badge is 26px by design and every tappable thing in this app
    reaches 44. Growing the box would push it over the avatar it sits on. */
 .cm-avplus::after { content: ""; position: absolute; inset: -9px; border-radius: 50%; }
-.cm-rail-add { display: grid; place-items: center; border-style: dashed; color: var(--accent); }
-.cm-rail-add svg { width: 22px; height: 22px; }
 /* All / Videos. */
 .cm-mts { display: grid; grid-template-columns: 1fr 1fr; margin: var(--s4) calc(-1 * var(--s3)) 0;
   border-top: 1px solid var(--line); }
@@ -4893,6 +4882,15 @@ button.cm-tile:active { opacity: .65; }
 .ce-pick.on .ce-pick-t { color: var(--accent); }
 .ce-pick-d { display: block; margin-top: 1px; font-size: var(--t-meta); color: var(--ink-soft); }
 .club-post-btn { width: 100%; margin-top: var(--s2); }
+/* ⚠️⚠️ ONE RULE FOR ALL FOUR SURFACES, and that is the point of it. A finished share card is FITTED, never
+   cropped: cover is right for a photograph, which is raw material the runner is framing, and wrong for a
+   card whose composition the app itself decided — measured, it cut "Inte-Run" and the distance off both
+   edges. The editor, the caption strip, the grid tile, the post feed and the full-screen player all read
+   the same flag through this one selector list, so none of them can crop what another shows whole. */
+.club-med-fit, .cm-t-med-fit > img, .cm-t-med-fit > video,
+.cp-med-fit > img, .cp-med-fit > video,
+.club-vmed-fit > img, .club-vmed-fit > video,
+.club-cap-i-fit > img, .club-cap-i-fit > video { object-fit: contain; }
 /* ── The camera roll, drawn inside the app. */
 .club-lib { position: fixed; inset: 0; z-index: 97; display: flex; flex-direction: column;
   background: var(--bg); }
@@ -4911,11 +4909,23 @@ button.cm-tile:active { opacity: .65; }
 .clib-grid { flex: 1; min-height: 0; overflow-y: auto; display: grid; gap: 2px;
   grid-template-columns: repeat(3, 1fr); align-content: start; padding-bottom: var(--s4);
   -webkit-overflow-scrolling: touch; }
-.clib-c { position: relative; aspect-ratio: 1; padding: 0; border: 0; background: var(--surface-2);
+/* ⚠️⚠️ padding-top: 100%, NOT aspect-ratio, AND THAT IS THE FIX FOR THE BUNCHED-UP ROLL. Measured on the
+   phone and reproduced here: every cell computed 149x149 correctly while the grid's own row tracks came
+   out 89.5px, so the cells overflowed their rows and overlapped — thumbnails squashed into thin strips
+   with the selection circles running into each other, which is exactly his screenshot.
+   The cause is a circularity: an auto row sizes to its items' content, and an item whose height comes
+   from aspect-ratio has no content contribution to give — the image inside is 100% of a height that does
+   not exist yet. Percentage padding resolves against the item's WIDTH, which the 1fr track has already
+   settled, so there is no loop to resolve and the row is simply told how tall it is.
+   ⚠️ THE IMAGE IS THEN ABSOLUTE, because the cell's own content box is zero-height by construction. */
+.clib-c { position: relative; height: 0; padding: 100% 0 0; border: 0; background: var(--surface-2);
   overflow: hidden; }
-.clib-c img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.clib-c img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 .clib-c.on img { transform: scale(.92); transition: transform .12s ease; }
 .clib-load { background: repeating-linear-gradient(135deg, var(--surface-2) 0 8px, var(--surface) 8px 16px); }
+/* ⚠️ AND THE SELECTION MARK AND THE DURATION SIT ABOVE THE IMAGE, which is now absolutely positioned — a
+   z-index rather than document order, because the image comes first in the markup. */
+.clib-n, .clib-dur { z-index: 2; }
 /* The number is the ORDER the post will be in, not a tick. */
 .clib-n { position: absolute; top: 7px; right: 7px; display: grid; place-items: center;
   width: 22px; height: 22px; border: 1.5px solid rgba(255,255,255,.9); border-radius: 50%;
@@ -11299,14 +11309,22 @@ let CLUBED = null;
  * ⚠️ AND A SINGLE PICK IS A LIST OF ONE, so there is one code path rather than a single-item case and a
  * carousel case that drift apart.
  */
-function openClubEditor(kind, files) {
+/**
+ * ⚠️ opts IS PASSED IN, NOT PATCHED ON AFTERWARDS, AND THAT ORDERING WAS A REAL BUG. Setting
+ * slides[0].card on the returned editor came AFTER this function had already drawn, so the first paint
+ * had no flag and nothing redrew — measured, the stage still cropped the card and object-fit read
+ * "cover". A caller that has to fix something up after the fact is a caller that can forget to.
+ */
+function openClubEditor(kind, files, opts) {
   const list = clubSortSelection(Array.isArray(files) ? files : [files]);
   if (!list.length) return;
+  const o = opts || {};
   CLUBED = {
-    kind: kind, i: 0, step: "edit", caption: "", sel: -1, draft: null, draftAt: -1,
+    kind: kind, i: 0, step: "edit", caption: String(o.caption || ""), sel: -1,
+    draft: null, draftAt: -1, runId: String(o.runId || ""),
     slides: list.map((f) => {
       const isVid = /^video\\//.test(f.type || "");
-      return { file: f, url: URL.createObjectURL(f), isVid: isVid,
+      return { file: f, url: URL.createObjectURL(f), isVid: isVid, card: !!o.card,
         ox: 0.5, oy: 0.5, k: 1, texts: [], inS: 0, outS: 0, dur: 0 };
     })
   };
@@ -11342,9 +11360,10 @@ function clubEdDraw() {
   const ov = $("clubEd"); if (!ov) return;
   if (S.step === "caption") { clubCapDraw(); return; }
   const sl = clubSlide(); if (!sl) return;
+  const fit = sl.card ? " club-med-fit" : "";
   const media = sl.isVid
-    ? '<video class="club-med" id="clubMed" src="' + sl.url + '" playsinline muted loop autoplay></video>'
-    : '<img class="club-med" id="clubMed" src="' + sl.url + '" alt="">';
+    ? '<video class="club-med' + fit + '" id="clubMed" src="' + sl.url + '" playsinline muted loop autoplay></video>'
+    : '<img class="club-med' + fit + '" id="clubMed" src="' + sl.url + '" alt="">';
   const texts = sl.texts.map((t, i) =>
     '<span class="club-tx' + (i === S.sel ? " on" : "") + '" data-ctx="' + i + '" style="left:' +
     (t.x * 100) + '%; top:' + (t.y * 100) + '%; color:' + t.colour + '; font-family:' + t.font +
@@ -11394,7 +11413,7 @@ function clubCapDraw() {
   const S = CLUBED; if (!S) return;
   const ov = $("clubEd"); if (!ov) return;
   const strip = S.slides.map((x) =>
-    '<span class="club-cap-i">' +
+    '<span class="club-cap-i' + (x.card ? " club-cap-i-fit" : "") + '">' +
       (x.isVid ? '<video src="' + x.url + '" muted playsinline preload="metadata"></video>'
                : '<img src="' + x.url + '" alt="">') + '</span>').join("");
   const kindWord = S.kind === "story" ? "your story" : (S.slides[0].isVid ? "your videos" : "your grid");
@@ -11738,6 +11757,10 @@ function clubEdPost() {
     const rows = clubLoad();
     rows.unshift({
       id: slides[0].key, kind: S.kind,
+      // ⚠️ CARRIED WHEN THE PICTURE CAME FROM A RUN'S CARD, so the tile still knows which run it is of and
+      // the automatic path cannot post the same run twice. Absent for anything from the camera roll,
+      // which is about no particular run.
+      runId: S.runId || undefined,
       // ⚠️ ALWAYS AN ARRAY, EVEN FOR ONE. A field that is sometimes a string and sometimes a list is two
       // shapes for every reader to get right, which is the normalizeRoute/normalizeSplits fault twice
       // over. clubSlides() accepts the old single-key rows so anything already posted still opens.
@@ -11746,6 +11769,10 @@ function clubEdPost() {
       caption: (S.caption || "").slice(0, 300), at: stamp,
       slides: slides.map((x) => ({
         media: x.key,
+        // ⚠️ CARRIED INTO THE POST, so the tile and the full-screen viewer fit the card the same way the
+        // editor did. Without it the grid would crop what the editor showed whole — the two disagreeing
+        // about one picture, which is the fault this file records for the debrief hero's two framings.
+        card: x.sl.card || undefined,
         crop: { ox: +x.sl.ox.toFixed(4), oy: +x.sl.oy.toFixed(4), k: +x.sl.k.toFixed(3) },
         trim: x.sl.isVid ? { inS: +x.sl.inS.toFixed(2), outS: +x.sl.outS.toFixed(2) } : null,
         texts: x.sl.texts.slice(0, 8)
@@ -11803,6 +11830,7 @@ function openClubCreate() {
  * make a thumbnail would decode the clip on every render of the grid.
  */
 function clubTileHtml(p) {
+  const card = (clubSlides(p)[0] || {}).card;
   const badge = p.video ? '<span class="cm-t-clip">' + ICON.clip + '</span>' : "";
   const cap = p.caption
     ? '<span class="cm-t-cap">' + esc(p.caption.slice(0, 60)) + '</span>' : "";
@@ -11810,8 +11838,8 @@ function clubTileHtml(p) {
     // ⚠️ THE FIRST SLIDE'S KEY, THROUGH clubSlides — p.media is a LIST now, and esc(["a","b"]) is the
     // string "a,b", a key nothing holds. Measured on the served page: every carousel tile drew the
     // missing-media hatch. The reason clubSlides exists is that nothing should read the raw field.
-    '<span class="cm-t-med" data-cmed="' + esc(clubKeys(p)[0] || "") + '" data-cvid="' +
-      (p.video ? "1" : "") + '"></span>' +
+    '<span class="cm-t-med' + (card ? " cm-t-med-fit" : "") + '" data-cmed="' +
+      esc(clubKeys(p)[0] || "") + '" data-cvid="' + (p.video ? "1" : "") + '"></span>' +
     badge + cap + '</button>';
 }
 /** ⚠️ ONE PASS OVER THE DOM AFTER A RENDER, so a tile, a story ring and the viewer all fill in through
@@ -11912,8 +11940,8 @@ function clubPostViewHtml() {
           ? ' style="transform:scale(' + (x.crop.k || 1) + ');transform-origin:' +
             ((x.crop.ox != null ? x.crop.ox : 0.5) * 100) + '% ' +
             ((x.crop.oy != null ? x.crop.oy : 0.5) * 100) + '%"' : "") + '>' +
-          '<span class="cp-med" data-cmed="' + esc(x.media) + '" data-cvid="' +
-            (post.video ? "1" : "") + '"></span>' +
+          '<span class="cp-med' + (x.card ? " cp-med-fit" : "") + '" data-cmed="' + esc(x.media) +
+            '" data-cvid="' + (post.video ? "1" : "") + '"></span>' +
         '</div>' +
         (x.texts || []).map((t) =>
           '<span class="club-tx" style="left:' + (t.x * 100) + '%; top:' + (t.y * 100) +
@@ -12047,8 +12075,8 @@ function clubOpenMedia(rows, i, auto) {
       '<div class="club-stage club-stage-v">' +
         '<div class="club-fit" style="transform:scale(' + (c.k || 1) + ');transform-origin:' +
           ((c.ox != null ? c.ox : 0.5) * 100) + '% ' + ((c.oy != null ? c.oy : 0.5) * 100) + '%">' +
-          '<span class="club-vmed" data-cmed="' + esc(clubKeys(p)[0] || "") + '" data-cvid="' +
-            (p.video ? "1" : "") + '"></span>' +
+          '<span class="club-vmed' + (first.card ? " club-vmed-fit" : "") + '" data-cmed="' +
+            esc(clubKeys(p)[0] || "") + '" data-cvid="' + (p.video ? "1" : "") + '"></span>' +
         '</div>' +
         '<div class="club-txs">' + texts + '</div>' +
       '</div>' +
@@ -12709,23 +12737,50 @@ const CLUB_TILE_FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, s
  */
 function shareToClub(run) {
   if (!run) return;
-  prepareShareCard(run).then((file) => {
-    if (!file) { toast("That card could not be made."); return; }
-    const key = "s" + Date.now() + "-" + Math.floor(Math.random() * 1e6);
-    return clubMediaPut(key, file, { type: "photo" }).then((ok) => {
-      if (!ok) { toast("That could not be saved on this device."); return; }
-      const rows = clubLoad();
-      rows.unshift({ id: key, kind: "post", media: [key], video: false,
-        caption: clubRunCaption(run), at: Date.now(), runId: String(run.id || ""),
-        slides: [{ media: key, crop: null, trim: null, texts: [] }] });
-      clubSave(rows);
-      haptic("success");
+  // ⚠️⚠️ IT ASKS, AND THEN IT OPENS THE EDITOR — his instruction: "it needs to give me the option of
+  // sharing to story or grid…..and being able to edit (write a comment on the grid post or type over a
+  // story)". It used to post to the grid silently, which decided both of those for him.
+  ensureSheet(); SHEET_CTX = null;
+  $("sheetBody").innerHTML =
+    '<h2 class="cm-sh">Post to Inte-Club</h2>' +
+    '<p class="cm-sub">Your card, either way. You can write on it before it goes up.</p>' +
+    '<button class="ce-pick" data-cshk="story">' +
+      '<span class="ce-pick-t">Add to your story</span>' +
+      '<span class="ce-pick-d">Up for 24 hours. Type over it if you want.</span></button>' +
+    '<button class="ce-pick" data-cshk="post">' +
+      '<span class="ce-pick-t">Post to your grid</span>' +
+      '<span class="ce-pick-d">Stays there, with a caption.</span></button>';
+  document.querySelectorAll("[data-cshk]").forEach((b) => b.onclick = () => {
+    const kind = b.dataset.cshk;
+    b.disabled = true;
+    // ⚠️⚠️ THE DESTINATION IS THE ASPECT DECISION, so the card is rendered at the shape it is going to
+    // rather than whatever chip happened to be selected. A 9:16 story card in a square grid cell is
+    // mostly white bars — measured on the served build — and a 4:5 feed card in a story is letterboxed
+    // the other way. He chose story or grid; that IS the choice of shape.
+    // ⚠️ AND WHAT HE HAD SELECTED IS PUT BACK. If the render fails the studio stays open, and it must not
+    // have silently changed shape underneath him.
+    const was = SCARD.aspect;
+    SCARD.aspect = (kind === "story") ? "story" : "feed";
+    prepareShareCard(run).then((file) => {
+      SCARD.aspect = was;
+      if (!file) { closeSheet(); toast("That card could not be made."); return; }
+      closeSheet();
+      // ⚠️ THE STUDIO CLOSES FIRST, or the editor opens behind it — both are full-screen overlays and
+      // the studio is the later one in the stack.
       closeShareStudio();
-      state.screen = null; state.tab = "community"; state.commView = "runs";
-      render();
-      toast("Posted to Inte-Club.");
-    });
-  }).catch(() => toast("That could not be saved on this device."));
+      // ⚠️ THE CARD GOES IN AS THE PICTURE, so everything the editor already does applies to it: pan and
+      // zoom, words typed on it, a caption step, and the same post shape as anything from the camera
+      // roll. A second composer for one kind of picture would be a second of everything.
+      // ⚠️ card: true MEANS THE STAGE FITS IT RATHER THAN FILLING WITH IT. The editor covers by default,
+      // which is right for a photograph — raw material the runner is framing — and wrong for a card
+      // already composed: cropping it cut "Inte-Run" and the distance off both edges.
+      // ⚠️ AND THE CAPTION STARTS AS THE RUN’S OWN LINE rather than empty — it is what the card already
+      // says, so it is the caption he would most likely write, and he can replace it.
+      openClubEditor(kind, [file],
+        { card: true, caption: clubRunCaption(run), runId: String(run.id || "") });
+    }).catch(() => { SCARD.aspect = was; closeSheet(); toast("That card could not be made."); });
+  });
+  $("sheetOv").classList.add("on");
 }
 /**
  * POSTING A RUN TO THE GRID FROM THE RUN'S OWN PAGE.
@@ -13614,16 +13669,16 @@ function viewCommunity() {
         grid +
       '</section>' +
       '<section class="cm-pane">' +
-        // ⚠️ THE RAIL ALWAYS CARRIES THE ADD BUTTON, and the ring beside it only when there is something
-        // in it. The design's rail is where a story is started from as well as watched.
-        '<div class="cm-rail">' +
-          '<button class="cm-rail-i" data-cadd="story">' +
-            '<span class="cm-rail-ring cm-rail-add">' + ICON.plusDot + '</span>' +
-            '<span class="cm-rail-n">Add</span></button>' +
-          (anyStory ? '<button class="cm-rail-i" data-cstory="1">' +
-            '<span class="cm-rail-ring">' + avatar + '</span>' +
-            '<span class="cm-rail-n">Your story</span></button>' : "") +
-        '</div>' +
+        // ⚠️⚠️ THE FEED IS THE EMPTY STATE AND NOTHING ELSE — his instruction: "it shouldn't look like
+        // that, it will be empty until there are other users posting". The stories rail was here because
+        // the design puts one on the feed, and with nobody to follow it held only the runner's own story
+        // beside an Add button — a row of two things above a message saying there is nothing to show.
+        // ⚠️ AND NOTHING IS LOST BY REMOVING IT: the avatar on the other pane already opens his story and
+        // its + badge already adds one, so both routes survive on the screen that is about him.
+        // ⚠️ IT ALSO RENDERED WRONGLY, and that is worth recording rather than fixing invisibly:
+        // .cm-rail-ring img set a font-size and a colour and never sized or clipped the image, so the
+        // avatar came out at its natural size spilling across the screen. The rule was written for the
+        // initials span and the img selector was bolted onto it without giving it dimensions.
         commFeedHtml() +
       '</section>' +
     '</div></div>' +

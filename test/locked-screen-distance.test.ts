@@ -160,10 +160,14 @@ function run(t: Trace) {
     // this file about distance; whether the map is drawn at the right moment is asserted where the
     // screen is, not where the metres are.
     "LIVE", "Date", "liveElapsedMs", "liveNowMs", "liveCue", "fmtPace", "renderLiveNow",
-    "pushLiveActivity", "stopLive", "liveFinish", "drawLiveMap",
+    // ⚠️ coachRunTick IS STUBBED FOR THE SAME REASON. It is the coach's own clock work — releasing a
+    // line whose reply was lost while the page was frozen, and refreshing the locked-phone schedule —
+    // and both are asserted in test/coach-schedule.test.ts, against the real functions. This file is
+    // about metres.
+    "pushLiveActivity", "stopLive", "liveFinish", "drawLiveMap", "coachRunTick",
     src + "; return { onGpsPos: onGpsPos, pedoEntry: pedoEntry, gpsUiTick: gpsUiTick };",
   )(LIVE, FakeDate, elapsed, elapsed, (c: any) => cues.push(c), (x: number) => String(Math.round(x)),
-    noop, noop, noop, noop, noop);
+    noop, noop, noop, noop, noop, noop);
   rt.start(0).forEach((c: any) => cues.push(c));
 
   const acc = t.accuracy == null ? 8 : t.accuracy;

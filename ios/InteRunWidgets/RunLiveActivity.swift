@@ -16,7 +16,7 @@ struct RunLiveActivity: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    stat(context.state.elapsedText, "TIME")
+                    stat(context.state.elapsedText, "TIME", timer: context.state.timerRange)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     stat(context.state.distanceText + " km", "DISTANCE")
@@ -44,10 +44,9 @@ struct RunLiveActivity: Widget {
                 Image(systemName: context.state.paused ? "pause.fill" : "figure.run")
                     .foregroundStyle(Brand.accent)
             } compactTrailing: {
-                Text(context.state.elapsedText)
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(Brand.accent)
+                // ⚠️ The compact trailing slot is a few characters wide, so it takes the timer
+                // directly rather than through stat(). Same anchor, same reason.
+                clock(context.state)
             } minimal: {
                 Image(systemName: "figure.run").foregroundStyle(Brand.accent)
             }
@@ -83,7 +82,7 @@ struct RunLiveActivity: Widget {
                 .lineLimit(1)
 
             HStack(alignment: .firstTextBaseline, spacing: 0) {
-                stat(context.state.elapsedText, "TIME", big: true)
+                stat(context.state.elapsedText, "TIME", big: true, timer: context.state.timerRange)
                 Spacer(minLength: 8)
                 stat(context.state.distanceText, "KM", big: true)
                 Spacer(minLength: 8)
@@ -94,18 +93,44 @@ struct RunLiveActivity: Widget {
         .padding(.vertical, 13)
     }
 
-    private func stat(_ value: String, _ label: String, big: Bool = false) -> some View {
+    private func stat(_ value: String, _ label: String, big: Bool = false,
+                      timer: ClosedRange<Date>? = nil) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(value)
-                .font(.system(size: big ? 26 : 15, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .minimumScaleFactor(0.6)
-                .lineLimit(1)
-                .foregroundStyle(.white)
+            // ⚠️ THE TIMER IS THE SYSTEM'S, THE FALLBACK IS OURS, AND BOTH ARE NEEDED. The card is
+            // driven by pushes from the web layer, which iOS freezes with the screen — so a pushed
+            // clock stops while the run carries on. `Text(timerInterval:)` is counted by the system
+            // with no pushes at all. It cannot serve every case: it counts real time, so a PAUSED run
+            // has to fall back to the pushed string, and an older app build sends no anchor.
+            Group {
+                if let timer {
+                    Text(timerInterval: timer, pauseTime: nil, countsDown: false)
+                } else {
+                    Text(value)
+                }
+            }
+            .font(.system(size: big ? 26 : 15, weight: .semibold, design: .rounded))
+            .monospacedDigit()
+            .minimumScaleFactor(0.6)
+            .lineLimit(1)
+            .foregroundStyle(.white)
             Text(label)
                 .font(.system(size: 8.5, weight: .bold))
                 .foregroundStyle(.white.opacity(0.5))
         }
+    }
+
+    /// The compact Dynamic Island clock. Same rule as stat()'s: the system counts it when it can.
+    private func clock(_ st: RunActivityAttributes.ContentState) -> some View {
+        Group {
+            if let r = st.timerRange {
+                Text(timerInterval: r, pauseTime: nil, countsDown: false)
+            } else {
+                Text(st.elapsedText)
+            }
+        }
+        .font(.system(size: 13, weight: .semibold, design: .rounded))
+        .monospacedDigit()
+        .foregroundStyle(Brand.accent)
     }
 }
 

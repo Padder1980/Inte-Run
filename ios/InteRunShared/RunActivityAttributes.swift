@@ -19,7 +19,29 @@ struct RunActivityAttributes: ActivityAttributes {
         var paused: Bool
         /// True when the wrist is recording, so the card can say which device owns the run.
         var onWatch: Bool
+        /// The instant the elapsed clock would have read zero, i.e. now minus `elapsedSeconds`,
+        /// recomputed on every push. Nil while paused, and nil from any producer that has not been
+        /// taught to send one.
+        ///
+        /// ⚠️⚠️ THIS EXISTS BECAUSE A PUSHED CLOCK STANDS STILL WHEN THE PAGE DOES. `pushLiveActivity`
+        /// is called from the web layer's own tick, and iOS throttles the web content process the
+        /// moment the screen locks — so every number on the card froze together and a runner glancing
+        /// at their locked phone saw a clock that had stopped, which reads as the run having stopped.
+        /// A system-rendered timer needs no pushes at all: the widget counts from this anchor by
+        /// itself, for as long as the card is up.
+        /// ⚠️ AN ANCHOR, NOT A DURATION, and re-sent every push. Our own elapsed already subtracts
+        /// paused time, so re-anchoring is what keeps the system's count equal to it — a timer started
+        /// once at the beginning would run ahead by the length of every pause.
+        /// ⚠️ It does NOT make the DISTANCE live. That would need a second distance accumulator in
+        /// Swift, which would disagree with the run being recorded; the clock can be made honest
+        /// without one, so it is.
+        var runningSince: Date?
 
+        /// The window a system timer counts over. Nil when there is nothing to count from.
+        var timerRange: ClosedRange<Date>? {
+            guard !paused, let from = runningSince else { return nil }
+            return from...from.addingTimeInterval(24 * 60 * 60)
+        }
         var elapsedText: String {
             let t = max(0, elapsedSeconds)
             return t >= 3600

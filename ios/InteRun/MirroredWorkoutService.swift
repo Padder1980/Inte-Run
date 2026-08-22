@@ -52,7 +52,10 @@ final class MirroredWorkoutService: NSObject {
         let type = WatchBridge.shared.liveRunType ?? "easy"
         let state = RunActivityAttributes.ContentState(
             elapsedSeconds: 0, distanceKm: 0, paceSecPerKm: nil, heartRate: nil,
-            step: nil, paused: false, onWatch: true)
+            // ⚠️ This card is raised the instant a mirrored wrist workout starts, so zero IS the
+            // truth — and the anchor is right, not nil: the wrist has begun, and the ticks that
+            // follow will re-anchor it. A nil here would show a dead 0:00 until the first tick lands.
+            step: nil, paused: false, onWatch: true, runningSince: Date())
         if LiveActivityService.shared.isRunning {
             // The tap on the phone already raised the card (correctly titled). Keep it; the ticks
             // will drive it. Requesting a fresh one here would tear it down and re-request.

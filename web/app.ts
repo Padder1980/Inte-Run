@@ -17972,7 +17972,7 @@ const COACH = {
   // and the permanent "error" listener all reach the same element, and until 2026-08-16 nothing
   // told them apart. seq is the token a stitched sentence holds while it owns the element;
   // pendingNums is a pace readout waiting for the coach to finish their own line first.
-  seq: 0, pendingNums: null, numT: 0, native: false,
+  seq: 0, pendingNums: null, numT: 0, native: false, playAt: 0, reschedAt: 0, reschedEta: null,
   sectionHalfKey: "", lastHalfwayAt: -999,
 };
 function coachEnabled() { return !!(COACH.cfg && COACH.cfg.enabled); }
@@ -18148,6 +18148,9 @@ function coachPlay(prompt) {
   // ⚠️ Safe to do here because coachPaceTick fires the cue FIRST and registers the numbers after.
   COACH.seq = 0; COACH.pendingNums = null; clearTimeout(COACH.numT);
   const clip = coachClip(prompt.id), a = coachAudioEl();
+  // ⚠️ STAMPED IN WALL-CLOCK TIME, because the watchdog that releases this cannot be trusted to run.
+  // See coachReleaseStale.
+  COACH.playAt = Date.now();
   if (clip) {
     try { a.src = clip.file; a.volume = Math.max(0, Math.min(1, COACH.cfg.volume)); a.currentTime = 0;
       const pr = a.play(); if (pr && pr.catch) pr.catch(coachFail); return; } catch (e) {}
@@ -18179,8 +18182,38 @@ function coachDequeue() {
   const next = COACH.queue.shift();
   if (next) { COACH.current = next; coachPlay(next); }
 }
+/**
+ * RELEASING A LINE THAT HAS OUTLIVED ITS CLIP — AND WHY THE EXISTING WATCHDOG IS NOT ENOUGH.
+ *
+ * ⚠️⚠️ THE SHIM'S 15-SECOND WATCHDOG IS A setTimeout, SO IT SHARES THE PAGE'S FATE. A clip handed to
+ * Swift a moment before the screen locks is played natively and answered through evaluateJavaScript,
+ * which this file already records doing nothing at all against a suspended web content process. The
+ * answer is lost AND the timer that exists to cover a lost answer is frozen with everything else, so
+ * COACH.current stays set for as long as the phone stays locked.
+ * ⚠️ THE CONSEQUENCE IS A LATE COACH, NOT A SILENT ONE, WHICH IS WHY IT IS HARD TO RECOGNISE.
+ * coachTrigger QUEUES anything of priority 40 or more rather than dropping it, and the queue is only
+ * drained when the current line ends — so the finishing cue was correctly chosen at the right moment,
+ * sat behind a line that had finished minutes earlier, and arrived once the wedge cleared. Reported as
+ * the music ducking at the end of a run with the voice following about thirty seconds later.
+ *
+ * So the release is decided by the CLOCK, and the clock alone: it does not matter whether the timer
+ * resumed, whether the reply arrived, or which of the two happens to win.
+ * ⚠️ It goes through pause(), not straight to coachOnEnded, so the shim clears its token and its
+ * watchdog — otherwise a reply that turns up afterwards advances the queue a second time and the next
+ * line is skipped.
+ * ⚠️ A stitched sentence (COACH.seq) is left alone: it owns the element deliberately and has its own
+ * bookkeeping, and cutting it mid-number is the defect that machinery exists to prevent.
+ */
+const COACH_STALE_MS = 15000;
+function coachReleaseStale() {
+  if (!COACH.current || COACH.seq) return;
+  if (!COACH.playAt || Date.now() - COACH.playAt < COACH_STALE_MS) return;
+  COACH.playAt = 0;
+  try { if (COACH.audio) COACH.audio.pause(); } catch (e) {}
+  coachOnEnded();
+}
 function coachStop() {
-  COACH.queue = []; COACH.current = null;
+  COACH.queue = []; COACH.current = null; COACH.playAt = 0;
   // Both of these outlive the audio element's own state, so stopping the coach has to reach them
   // too: a pace readout still pending when a run is paused or finished would arrive seconds later
   // over silence, in the device voice, describing a run that is no longer happening.
@@ -18196,6 +18229,9 @@ function coachResetSession(keepAudio) {
   // ⚠️ RESET WITH THE REST, or the second run of an app session starts believing it has already
   // called the midpoint of section one. Same trap coachResetSession exists for.
   COACH.sectionHalfKey = ""; COACH.lastHalfwayAt = -999;
+  // ⚠️ WITH THE REST. Left behind, run two of an app session inherits run one's predicted finish and
+  // the drift gate answers "nothing has moved" — so its schedule is never refreshed at all.
+  COACH.reschedAt = 0; COACH.reschedEta = null; COACH.playAt = 0;
   if (!keepAudio) coachStop();
 }
 // Map a live step to the right trigger when it begins.
@@ -18474,6 +18510,62 @@ function coachScheduledPrompt(trigger, idx, type) {
 }
 // Every step boundary still ahead of us, as {id, inMs, file}. Built from the session the runner is
 // actually running, at the elapsed time they are actually at.
+/**
+ * KEEPING THE LOCKED-PHONE SCHEDULE HONEST WHILE THE RUN GOES ON.
+ *
+ * ⚠️⚠️ IT WAS RE-PUSHED ONLY ON A STEP BOUNDARY, AND HIS SESSION HAD ONE STEP. "Step 1 of 1" means there
+ * are no boundaries, so the schedule built in the first second — from the prescribed pace, before a
+ * metre had been covered — was the schedule for the whole run. Every later cue was locked to a guess
+ * made before the run started.
+ * ⚠️ SO IT IS ALSO RE-PUSHED ON TIME, and only when the estimate has genuinely moved. Re-posting an
+ * identical schedule every thirty seconds is traffic across the bridge for nothing, and each post
+ * replaces the whole list — so a needless one is a chance to lose a cue that was about to fire.
+ */
+const COACH_RESCHED_MS = 30000;
+const COACH_RESCHED_DRIFT_S = 8;
+/**
+ * The one thing the coach does on a clock for the whole of a run, from BOTH live modes.
+ * ⚠️ NOT from coachTick, which is the obvious home and the wrong one: coachTick is called from
+ * renderLiveNow, and that returns immediately when the live screen is not mounted — which is exactly
+ * the backgrounded case both of these exist for.
+ */
+function coachRunTick() {
+  // ⚠️ RELEASED HERE AS WELL AS ON visibilitychange. A phone that never fully hid — Control Centre,
+  // a banner, a call — still throttles timers enough to lose a reply.
+  coachReleaseStale();
+  coachRescheduleTick();
+}
+function coachRescheduleTick() {
+  if (!LIVE || !LIVE.started || LIVE.done || !coachNativeAvailable() || !coachEnabled()) return;
+  const now = Date.now();
+  if (COACH.reschedAt && now - COACH.reschedAt < COACH_RESCHED_MS) return;
+  // ⚠️ THE GATE IS THE PREDICTED FINISH, not the clock, because that is the number every cue hangs off.
+  // A runner holding their pace produces the same prediction every time and nothing is sent.
+  const eta = coachPredictedEndSec();
+  if (COACH.reschedEta != null && Math.abs(eta - COACH.reschedEta) < COACH_RESCHED_DRIFT_S) {
+    COACH.reschedAt = now;
+    return;
+  }
+  COACH.reschedAt = now;
+  COACH.reschedEta = eta;
+  coachNativeSchedule();
+}
+/** The finish, as currently predicted — the same arithmetic the schedule uses, so the two agree. */
+function coachPredictedEndSec() {
+  if (!LIVE || !LIVE.session) return 0;
+  const steps = (LIVE.session.steps) || [];
+  const nowSec = liveNowMs() / 1000;
+  const snap = LIVE.rt ? LIVE.rt.snapshot(liveNowMs()) : null;
+  const covered = snap ? (snap.distanceMeters || 0) : 0;
+  const secPerM = (covered > 30 && nowSec > 20) ? (nowSec / covered) : 0;
+  let at = 0;
+  for (const st of steps) {
+    if (st.durationSeconds) at += st.durationSeconds;
+    else if (st.distanceMeters && secPerM > 0) at += st.distanceMeters * secPerM;
+    else at += stepSecs(st);
+  }
+  return Math.round(at);
+}
 function coachNativeSchedule() {
   if (!coachNativeAvailable()) return;
   // ⚠️ "clearSchedule", NOT "clear" — clear also empties the WRIST cue map, which belongs to a
@@ -18486,6 +18578,22 @@ function coachNativeSchedule() {
   const nowSec = liveNowMs() / 1000;
   const cues = [];
   const type = LIVE.session.type;
+  // ⚠️⚠️ EVERY DISTANCE-GATED STEP IS TIMED AT THE RUNNER'S OWN PACE, NOT THE PRESCRIPTION, AND THAT WAS
+  // THE HALFWAY "SESSION COMPLETE". Measured from his own screenshots: a one-step "1 km easy run" with a
+  // target of 5:17–5:45 was scheduled at 5:31, and he ran it in 11:00 — so the finish cue fired at 331
+  // seconds, almost exactly halfway, and of course did not stop the session, because a scheduled cue is
+  // only a voice line. stepSecs converts at the TARGET pace, which is the right answer for building a
+  // plan and the wrong one for predicting a run that is already happening.
+  // ⚠️ AND IT IS ONLY EVER A PREDICTION. paceEstimate falls back to the prescription when nothing has
+  // been covered yet, which is the only moment there is nothing better to go on.
+  const snap = LIVE.rt ? LIVE.rt.snapshot(liveNowMs()) : null;
+  const covered = snap ? (snap.distanceMeters || 0) : 0;
+  const secPerM = (covered > 30 && nowSec > 20) ? (nowSec / covered) : 0;
+  const secsFor = (st) => {
+    if (st.durationSeconds) return st.durationSeconds;
+    if (st.distanceMeters && secPerM > 0) return Math.round(st.distanceMeters * secPerM);
+    return stepSecs(st);
+  };
   let at = 0;
   for (let i = 0; i < steps.length; i++) {
     const st = steps[i];
@@ -18502,10 +18610,15 @@ function coachNativeSchedule() {
     // session was 30 minutes long against an actual 62 — so with the phone locked the whole workout's
     // cues arrived in its first half. stepSecs converts at the step's own pace and is the same
     // helper the session builder uses, so the two cannot drift.
-    at += stepSecs(st);
+    at += secsFor(st);
   }
-  // And the finish.
-  if (at > nowSec) {
+  // ⚠️⚠️ AND THE FINISH IS NOT SCHEDULED AT ALL FOR A DISTANCE-GATED SESSION. However good the estimate,
+  // it remains an estimate — and "session complete" arriving while somebody is still running is the one
+  // cue that cannot be a little bit early. A late finish is a coach who was slow; an early one is a
+  // coach who was wrong, and he met the wrong one. When the session genuinely ends the page fires it,
+  // which on a locked phone means on unlock.
+  const distGated = steps.some((st) => !st.durationSeconds && st.distanceMeters);
+  if (at > nowSec && !distGated) {
     const done = coachScheduledPrompt("session-complete", 0, type);
     if (done) cues.push({ id: done.id, inMs: Math.round((at - nowSec) * 1000), file: done.file });
   }
@@ -18827,12 +18940,46 @@ window.__interunWatchStart = function (ok, reason) {
   // A failure has to say so: silently falling back to the phone would record the run in the wrong
   // place, and the runner would only find out afterwards.
   if (ok) return;
+  // ⚠️⚠️ ONLY WHEN THE WATCH WAS ASKED TO RECORD. Two different launches come back through this one
+  // channel: startOnWatch, where the wrist IS the recorder and a failure changes where the run is
+  // kept, and startWatchCompanion, where the wrist is a display and whose own comment says it is
+  // silent if there is no watch. A companion that will not wake costs the runner nothing at all —
+  // and on a phone-recorded run this handler was clearing the count-in of the run they had just
+  // started, re-rendering under them, and raising a toast about a watch they were not using.
+  // ⚠️ WATCH_LIVE_PENDING is the discriminator because startOnWatch is its only writer of true, and
+  // it is set in the same breath as the request. Reported from a real phone-recorded run, so the
+  // silence here IS the fix.
+  if (!WATCH_LIVE_PENDING) return;
   WATCH_LIVE_PENDING = false;
   clearCountIn();
   if (state.screen === "watchlive" && !watchLiveActive()) { state.screen = null; }
-  toast(reason || "Couldn\u2019t start your watch — open Inte-Run on it and press start.");
+  // ⚠️ NEVER THE NATIVE STRING. reportStart has four callers and three of them pass plain English we
+  // wrote; the fourth passed an NSError localizedDescription straight through, so the runner met
+  // "Couldn\u2019t communicate with a helper application." mid-run — a system XPC message that names
+  // nothing they can act on and reads as the app being broken. The Swift now sends our own sentence
+  // too, but docs/index.html reaches phones over the air while Swift does not, so the page must not
+  // depend on that.
+  toast(watchStartMessage(reason));
   render();
 };
+/**
+ * One sentence a runner can act on, whatever came back.
+ * ⚠️ AN ALLOWLIST, NOT A BLOCKLIST. A blocklist of known system phrasings goes stale with the next iOS
+ * release and with every locale, and its failure mode is the raw string reaching the screen again. Our
+ * own copy is a closed set, so anything not in it is not ours and is not shown.
+ */
+const WATCH_START_MESSAGES = [
+  "This iPhone can\u2019t talk to HealthKit.",
+  "Inte-Run isn\u2019t installed on your Apple Watch yet.",
+  "Couldn\u2019t reach your watch — open Inte-Run on it and press start.",
+  "Couldn\u2019t open Inte-Run on your watch.",
+];
+function watchStartMessage(reason) {
+  const r = String(reason || "");
+  return WATCH_START_MESSAGES.indexOf(r) >= 0
+    ? r
+    : "Couldn\u2019t start your watch — open Inte-Run on it and press start.";
+}
 // Put the GENERATED warm-up into the session you actually run.
 //
 // ⚠️ The brief showed the new warm-up while the live session still ran the old one-line step — press
@@ -19199,6 +19346,10 @@ function startIndoor() {
 }
 function indoorUiTick() {
   if (!LIVE || LIVE.mode !== "indoor") return;
+  // ⚠️ A TREADMILL RUN POSTS NO SCHEDULE (a decided non-goal — there is no location stream to keep the
+  // process alive), so there is nothing here to reschedule. It can still lose a reply to a throttled
+  // page, so the release has to reach this mode too.
+  coachRunTick();
   const at = liveElapsedMs();
   if (LIVE.rt.getStatus() === "active") LIVE.rt.update(LIVE.watchHr ? { atMs: at, distanceMeters: 0, heartRateBpm: LIVE.watchHr } : { atMs: at, distanceMeters: 0 }).forEach(liveCue);
   renderLiveNow();
@@ -19611,6 +19762,10 @@ function currentGpsPace(atMs) {
 }
 function gpsUiTick() {
   if (!LIVE || LIVE.mode !== "gps") return;
+  // ⚠️ FROM THE TICK, NOT FROM onGpsPos. Both of these have to happen while the page is AWAKE, and
+  // this is the only thing that runs on a clock rather than on a fix — a phone standing still in a
+  // pocket gets no fixes and would keep a schedule that had gone stale.
+  coachRunTick();
   const at = liveElapsedMs();
   // ⚠️ THE TICK TRIMS THE PACE WINDOW BUT NO LONGER FEEDS IT — paceMark does, on every credit. Pushing
   // here as well would put a tick-aligned entry back in beside the credit-aligned ones and hand the
@@ -30675,7 +30830,7 @@ function coachPrimeWatchCueMap() {
     coachLoadManifest().then(() => coachPushWatchCueMap(t && t.type));
   } catch (e) {}
 }
-document.addEventListener("visibilitychange", () => { if (!document.hidden) { refreshTodayNavDate(); syncTextScale(); stravaResume(); coachPrimeWatchCueMap(); } });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { refreshTodayNavDate(); syncTextScale(); stravaResume(); coachPrimeWatchCueMap(); coachReleaseStale(); } });
 // A repaint that ARRIVES ON ITS OWN — a wrist run landing, a mirror going stale — rather than one the
 // runner asked for. It must never rebuild the plan-setup form: viewSetup() reads every value from the
 // saved profile, so redrawing it discards whatever is half-typed. The runner is mid-sentence; their

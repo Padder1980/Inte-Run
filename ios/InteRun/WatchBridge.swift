@@ -258,8 +258,11 @@ extension WatchBridge: WCSessionDelegate {
             guard !companion else { return }
             LiveActivityService.shared.start(
                 runId: "watch-pending", title: title, type: type,
+                // ⚠️ A PLACEHOLDER CARD GETS NO ANCHOR. The run has not started — the watch is only
+                // being woken — so a system timer here would count up from zero beside a distance
+                // that stays at zero, which reads as a run in progress that is going nowhere.
                 state: .init(elapsedSeconds: 0, distanceKm: 0, paceSecPerKm: nil, heartRate: nil,
-                             step: nil, paused: false, onWatch: true),
+                             step: nil, paused: false, onWatch: true, runningSince: nil),
             )
         }
         guard HKHealthStore.isHealthDataAvailable() else {
@@ -287,7 +290,15 @@ extension WatchBridge: WCSessionDelegate {
                     // down or a dead card sits on the lock screen forever, surviving relaunches.
                     Task { @MainActor in LiveActivityService.shared.endIfCurrent("watch-pending") }
                 }
-                self?.reportStart(ok, ok ? nil : (error?.localizedDescription ?? "Couldn’t open Inte-Run on your watch."))
+                // ⚠️⚠️ NEVER THE NSError's OWN WORDS. This read
+                // `error?.localizedDescription ?? "..."`, and reportStart's string goes
+                // straight into a toast in front of a running runner — so a failed XPC handshake
+                // put "Couldn't communicate with a helper application." on screen mid-run, which is
+                // Cocoa error 4099 and names nothing anybody can act on. Three of reportStart's four
+                // callers already pass plain English we wrote; this was the one that did not. The
+                // detail is worth keeping, so it goes to the log rather than to the runner.
+                if let error { SelfCheck.logger.error("startWatchApp failed: \(error.localizedDescription, privacy: .public)") }
+                self?.reportStart(ok, ok ? nil : "Couldn’t open Inte-Run on your watch.")
             }
         }
     }
@@ -413,6 +424,12 @@ extension WatchBridge: WCSessionDelegate {
             step: live["step"] as? String,
             paused: (live["state"] as? String) == "paused",
             onWatch: true,
+            // ⚠️ COMPUTED HERE, NOT SENT BY THE SENDER. The anchor is "now minus the elapsed we were
+            // just told", and only this side knows what "now" is on this device — a wrist tick crosses
+            // WatchConnectivity and a page post crosses a message handler, so a timestamp made at the
+            // far end would carry the delivery delay into the clock. Recomputed on every push, so it
+            // cannot drift and pauses cannot accumulate.
+            runningSince: Date().addingTimeInterval(-Double((live["sec"] as? Int) ?? 0)),
         )
         if ended {
             LiveActivityService.shared.end(state)
@@ -511,6 +528,8 @@ extension WatchBridge: WKScriptMessageHandler {
                 step: body["step"] as? String,
                 paused: (body["paused"] as? Bool) ?? false,
                 onWatch: false,
+                // Same anchor, same reason — see driveLiveActivity above.
+                runningSince: Date().addingTimeInterval(-Double((body["sec"] as? Int) ?? 0)),
             )
             Task { @MainActor in
                 if ended { LiveActivityService.shared.end(state) }

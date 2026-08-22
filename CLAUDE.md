@@ -7797,6 +7797,170 @@ overlapping pairs, the club tile asking story-or-grid then opening the editor wi
 caption prefilled, a 1080×1350 card for the grid with "story" put back afterwards, and the feed pane
 holding one child.
 
+## THREE FAULTS FROM ONE PHONE-RECORDED RUN, AND TWO OF THEM WERE ONE (owner, 2026-08-22)
+
+He ran a custom 1 km session through the phone and reported four things:
+
+> "when running the session through the phone, as soon as the phone locks the tracking seems to
+> jitter......as soon as i unlock it, it corrects itself immediately as you can see by the screenshots.
+> The 3rd screenshot displays a message that i got when i unlocked the phone just before the halfway
+> point in the session. Also, on the custom run running the session through the phone, once it hit the
+> halfway point the voice coach triggered saying session complete.....it didnt stop the session it just
+> fired the voice command.......similarly, at the end of the session, the volume on my music ducked but
+> the voice stating that the session had finished didnt arrive until approximately 30 seconds afterwards"
+
+Suite 1197 → **1199**; **27 deliberate re-breaks, all 27 caught** (four only after a guard was
+restated — those four are the useful half, below).
+
+⚠️ **WHAT REACHES HIS PHONE OVER THE AIR AND WHAT DOES NOT.** The schedule fix, the stale-line release
+and the watch toast are all in `docs/index.html`, so they land on the next launch. **The Live Activity
+clock and the Swift half of the toast need an Xcode build** and are inert until then.
+
+### ⚠️⚠️ FAULT 1 AND FAULT 2 ARE ONE CAUSE, AND THE PROOF IS ARITHMETIC
+
+`coachNativeSchedule` builds the whole locked-phone cue schedule by summing `stepSecs`, and `stepSecs`
+converts a **distance-gated** step at the **prescribed** pace:
+
+```
+if (st.distanceMeters && st.targetPaceSecPerKm) return distance / 1000 * midpoint-of-band
+```
+
+His step targeted **5:17–5:45**, so 1 km was scheduled as **331 s**. He ran it in **11:00**. The
+finishing cue therefore fired at 331 s of a 660 s run — almost exactly halfway — and nothing about
+hearing it stops a session, which is precisely what he described.
+
+⚠️ **AND BECAUSE THE SESSION WAS "STEP 1 OF 1", THE ESTIMATE WAS NEVER CORRECTED.** The schedule was
+re-pushed at a **step boundary**, and a one-step session has none. So the guess made in the first
+second, before a metre had been covered, stood for the whole run. `coachRunTick` now refreshes it on
+the clock as well — every 30 s, and only when the **predicted finish** has moved by 8 s or more.
+⚠️ **THE GATE IS THE PREDICTION, NOT THE CLOCK**, because that is the number every cue hangs off: a
+runner holding their pace produces the same prediction every time and nothing is sent. Each post
+**replaces the whole list**, so a needless one is a chance to lose a cue that was about to fire.
+
+⚠️ **A DISTANCE-GATED SESSION NOW GETS NO SCHEDULED FINISHING CUE AT ALL, and estimating it better
+would not have been enough.** Even a perfect estimate is a guess: a runner who eases off in the last
+kilometre still hears "session complete" before they have finished it. A distance-gated session ends
+when the ground is covered, which only the page can see, so that cue belongs to the page's own tick.
+A **timed** session still schedules one — taking it from every session would be a silent regression for
+the locked-phone case the whole schedule exists for, and a test asserts both halves.
+
+⚠️ **FAULT 2 IS THE SAME RUN'S TAIL: THE FINISHING VOICE ARRIVED ~30 s LATE, BEHIND A LINE THAT HAD
+FINISHED MINUTES EARLIER.** The native audio shim's watchdog — the thing that exists to cover a lost
+reply — is a `setTimeout`, so **it is frozen with the page it belongs to**. A clip handed to Swift just
+before the screen locks is played natively and answered through `evaluateJavaScript`, which this file
+already records doing nothing at all against a suspended web content process. The answer is lost, the
+timer covering the lost answer is frozen, and `COACH.current` stays set for as long as the phone stays
+locked.
+⚠️ **THE CONSEQUENCE IS A LATE COACH, NOT A SILENT ONE, WHICH IS WHY IT IS HARD TO RECOGNISE.**
+`coachTrigger` **queues** anything of priority 40 or more rather than dropping it, and the queue is only
+drained when the current line ends. So the finishing cue was chosen at exactly the right moment and sat
+behind a wedge until it cleared.
+`coachReleaseStale` decides by the **clock and the clock alone** (`COACH.playAt`, stamped in `coachPlay`
+where the clip is handed over), so it does not matter whether the timer resumed, whether the reply
+arrived, or which of the two wins.
+- ⚠️ **IT GOES THROUGH `pause()`, NOT STRAIGHT TO `coachOnEnded`**, so the shim clears its token and its
+  watchdog — otherwise a reply that turns up afterwards advances the queue a **second** time and the
+  next line is skipped.
+- ⚠️ **A STITCHED SENTENCE (`COACH.seq`) IS LEFT ALONE.** It owns the element deliberately and has its
+  own bookkeeping; cutting it mid-number is the defect that machinery exists to prevent.
+- ⚠️ **`coachRunTick` IS CALLED FROM BOTH LIVE TICKS AND NOT FROM `coachTick`.** `coachTick` is the
+  obvious home and the wrong one: it is called from `renderLiveNow`, which returns immediately when the
+  live screen is not mounted — exactly the backgrounded case both of these exist for. A treadmill run
+  posts no schedule at all (a decided non-goal), so `indoorUiTick` has nothing to reschedule; it can
+  still lose a reply, so the release has to reach it.
+- ⚠️ **`reschedAt`, `reschedEta` AND `playAt` ARE CLEARED IN `coachResetSession`.** Left behind, run two
+  of an app session inherits run one's predicted finish, the drift gate answers "nothing has moved", and
+  its schedule is never refreshed at all.
+
+### ⚠️⚠️ FAULT 3 — "Couldn't communicate with a helper application." IS COCOA ERROR 4099, SHOWN VERBATIM
+
+`reportStart` in `WatchBridge.swift` is shared by **two different launches**, and only one of them is
+about the run: `startOnWatch`, where the wrist IS the recorder and a failure changes where the run is
+kept, and `startWatchCompanion`, where the wrist is a **display** and whose own comment says it is
+*silent if there is no watch*. On the companion path `__interunWatchStart(false, …)` was:
+1. clearing the count-in **of the run he had just started**,
+2. re-rendering the live screen under him,
+3. and raising a toast about a watch he was not using.
+
+⚠️ **`WATCH_LIVE_PENDING` IS THE DISCRIMINATOR, and it is sound because `startOnWatch` is its only
+writer of `true` and sets it in the same breath as the request.** On a phone-recorded run the handler
+now returns immediately, so the silence IS the fix.
+
+⚠️ **AND THE STRING WAS THE NSError's OWN.** Three of `reportStart`'s four callers pass plain English we
+wrote; the fourth passed `error?.localizedDescription` straight through, into a `toast()` in front of a
+running runner. Fixed at source (the detail goes to the log instead) **and** on the page, because
+`docs/index.html` reaches phones over the air while Swift does not.
+⚠️ **`watchStartMessage` IS AN ALLOWLIST, NOT A BLOCKLIST.** A blocklist of known system phrasings goes
+stale with the next iOS release and with every locale, and its failure mode is the raw string back on
+screen. Our own copy is a closed set of four, so anything not in it is not ours and is not shown — and
+a test drives all four through to prove the allowlist has not swallowed them.
+
+### FAULT 4 — THE CARD'S CLOCK IS NOW COUNTED BY THE SYSTEM; ITS DISTANCE STILL IS NOT
+
+His card read **10:52 / 0.86 km / 10:02** while the app, eight seconds later, read **11:00 / 0.98 km /
+11:12**. ⚠️ **THE RECORDED RUN WAS NEVER WRONG, AND THAT IS WORTH SAYING FIRST.** Fixes are buffered in
+Swift while iOS throttles the web content process and replayed in order; the pace window is stamped with
+each fix's **own** clock (`gpsFixElapsedMs`), so the total and the pace both come out right — 0.86 → 0.98
+in eight seconds is 120 m of backlog landing at once, not 15 m/s of running. What he saw was the **lag**:
+`pushLiveActivity` is called from the page's tick, so every number on the card froze together.
+
+⚠️ **A CLOCK THAT HAS STOPPED READS AS A RUN THAT HAS STOPPED, and that is the part fixable without a
+second distance accumulator.** `RunActivityAttributes.ContentState` gained `runningSince`, and the widget
+renders `Text(timerInterval:)` — counted by the system with **no pushes at all**.
+- ⚠️ **AN ANCHOR, NOT A DURATION, RE-SENT ON EVERY PUSH.** Our own elapsed already subtracts paused time,
+  so re-anchoring is what keeps the system's count equal to ours; a timer started once at the beginning
+  would run ahead by the length of every pause.
+- ⚠️ **COMPUTED ON THE RECEIVING DEVICE**, from the elapsed it was just told. A wrist tick crosses
+  WatchConnectivity and a page post crosses a message handler, so a timestamp made at the far end would
+  carry the delivery delay into the clock.
+- ⚠️ **NIL WHILE PAUSED**, because a system timer counts real time — a paused run falls back to the
+  pushed string. And nil for the **watch-pending placeholder**: the wrist has not begun, so a timer
+  counting up beside a distance stuck at zero reads as a run in progress going nowhere. A **mirrored**
+  wrist workout HAS begun, so its anchor is `Date()` and zero is the truth.
+- ⚠️ **`runningSince` CARRIES NO DEFAULT.** `= nil` would let a new producer omit it and compile, and
+  that path alone would render a clock that stands still. Caught by re-break: the derived producer sweep
+  reads today's call sites and cannot see a door left open for tomorrow's.
+
+⚠️⚠️ **THE DISTANCE ON A LOCKED CARD IS STILL FROZEN, AND CLOSING IT IS THE OWNER'S CALL.** The only way
+to keep it current is for Swift to accumulate its own figure from the location stream it already
+receives — a **second distance accumulator**, which would disagree with the run being recorded and move
+the jump rather than remove it. The clock can be made honest without one, so it is; the distance is
+stated here rather than quietly half-done.
+
+### The four re-breaks that escaped first, and what each one taught
+
+1. ⚠️ **A GUARD WHOSE SCENARIO IS DOUBLE-COVERED DISCRIMINATES NOTHING.** "A distance-gated step is
+   timed at the runner's own pace" asserted on the finishing cue — and the very next guard removes that
+   cue from a distance-gated session, so its absence satisfied the first assertion whatever the timing
+   did. Restated on `coachPredictedEndSec`, which IS the arithmetic (half a kilometre in 330 s must
+   predict ~660 s, not the prescription's 331), plus a two-step schedule where the second step's own
+   placement proves it. Third firing of this trap in this file.
+2. ⚠️ **BELT AND BRACES HIDES THE BRACE YOU ARE TESTING.** Deleting `COACH.seq` from
+   `coachReleaseStale` left `COACH.current` standing, because `coachOnEnded` opens with the same check.
+   The visible harm is the `pause()`: the element is taken back and the stitched sentence stops
+   mid-number. Asserted on the element, not on the prompt.
+3. ⚠️ **A DERIVED SWEEP READS TODAY'S CALL SITES AND CANNOT SEE A DOOR LEFT OPEN FOR TOMORROW'S.**
+   Defaulting `runningSince` to nil passed the every-producer sweep, because every producer still
+   passed it. The claim that catches it is about the *declaration*.
+4. ⚠️ **TWO STATES BUILT WITH `elapsedSeconds: 0` CANNOT BE TOLD APART SYNTACTICALLY.** The placeholder
+   must have no anchor and the mirrored workout must have one, and "runningSince is present" is
+   satisfied by `nil`. The difference is which file is building it, so the claim is made per file.
+
+⚠️ **AND THE HAND-WRITTEN LIFT LIST IN `test/locked-screen-distance.test.ts` WENT STALE THE MOMENT
+`gpsUiTick` GAINED A CALL** — 16 tests threw `ReferenceError: coachRunTick is not defined` at once.
+That is the acceptable kind of stale: it fails loudly rather than quietly measuring less.
+
+⚠️ **THE RE-BREAK HARNESS TOOK ONE PRISTINE COPY AT THE START and copied it back after each break** —
+never `git checkout`, per the rule this file records paying for twice. It also rebuilds `web/app.html`
+after a page break (these tests read the BUILT page, so an unbuilt break reads as an escape) and treats
+a build failure as caught.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc
+clean apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1199 pass / 0
+fail under UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`** with `CHROME_PATH` set, both design
+ratchets unchanged (143 radii, 322 font sizes — no CSS changed), and `InteRun` **Release** for
+`generic/platform=iOS` building with 0 errors, watch app and widget embedded.
+
 ## OPEN BUGS (confirmed on real hardware, 2026-07-29)
 
 ### 1. Coach audio when the phone is locked or pocketed — FIXED 2026-08-08, unproven on hardware

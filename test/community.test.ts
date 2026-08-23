@@ -24,7 +24,17 @@ function fn(name: string): string {
   }
   throw new Error(name + " is unbalanced");
 }
-const nocomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+/**
+ * ⚠️⚠️ THE BLOCK-COMMENT SWEEP IS ANCHORED TO THE START OF A LINE, AND WITHOUT THAT IT EATS LIVE CODE.
+ * `accept="image/*,video/*"` in the app is an unbalanced comment OPENER mid-line, so an unanchored
+ * /\*[\s\S]*?\*\/ opens there and closes at the next real terminator — CLAUDE.md records it deleting
+ * 10,382 characters once. It bit again here the moment the camera-roll fallback added that attribute: a
+ * guard counting `clubEditorFor(` saw 2 of 3, because one of the calls was inside the swallowed window.
+ * Anchored, a real block comment (which always starts its own line in this file) is still stripped and a
+ * mid-line `/*` inside a string is not.
+ */
+const nocomment = (s: string) =>
+  s.replace(/^\s*\/\*[\s\S]*?\*\//gm, "").replace(/^\s*\/\/.*$/gm, "");
 /** The app's own script block — not the bundled engine, which is minified and has its own names. */
 function appBlock(): string {
   const blocks = [...page().matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1] || "");
@@ -111,8 +121,16 @@ test("BLOCKER: a posted run's picture is drawn ONCE, at post time, and through t
   // picture somebody approved is the picture that stays there, and a later change to the map provider,
   // the style or the route privacy cannot repaint a post that is already published.
   const blob = nocomment(fn("clubRunTileBlob"));
-  assert.match(blob, /routeMapFor\(route, S, S, MAP_STYLE_RUN\)/,
-    "the posted picture does not go through the one cached map path");
+  // ⚠️ 3:4 NOW, NOT SQUARE, and the two constants are read by BOTH the canvas and the drawers — the cell
+  // became 3:4 on the owner's instruction (2026-08-22) and a square picture in a 3:4 cell is a picture
+  // cropped by a quarter. Two owners of one shape is how they come to disagree.
+  assert.match(blob, /routeMapFor\(route, S, H, MAP_STYLE_RUN\)/,
+    "the posted picture does not go through the one cached map path at the cell's own shape");
+  assert.match(blob, /const S = CLUB_TILE_W, H = CLUB_TILE_H/,
+    "the tile picture no longer reads the cell's shape from the shared constants");
+  const css = page();
+  assert.match(css, /\.cm-tile \{[^}]*aspect-ratio: 3 \/ 4/,
+    "the grid cell is not 3:4, so the picture drawn for it is the wrong shape");
   assert.ok(!/loadRouteMap/.test(blob), "the posted picture fetches tiles outside the cache");
   assert.match(blob, /runRoutePresentation\(run\)/,
     "the posted picture ignores route privacy, so a hidden start could be published");
@@ -331,7 +349,14 @@ test("BLOCKER: the camera roll is reached by a file input that is created, click
   assert.match(p, /accept = "image\/\*,video\/\*"/, "the fallback does not accept both photos and video");
   assert.ok(!/capture/.test(p), "the fallback forces the camera, so the camera roll is unreachable");
   assert.match(p, /inp\.remove\(\)/, "the file input is left in the document");
-  assert.match(p, /openClubEditor\(kind, files\)/, "picking files does not open the editor");
+  // ⚠️ THROUGH clubEditorFor, WHICH IS THE ONE PLACE A SELECTION BECOMES AN EDITOR SESSION. Two pickers
+  // reach it — this fallback and the in-app grid — and a logbook entry has to carry its words into the
+  // editor on both. Written at each call site it is two chances to forget, and the failure is silent:
+  // the runner picks a photograph for their logbook and gets an ordinary post with no words on it.
+  assert.match(p, /clubEditorFor\(kind, files\)/, "picking files does not open the editor");
+  const both = nocomment(page());
+  assert.equal((both.match(/clubEditorFor\(/g) || []).length, 3,
+    "there is no longer exactly one resolver with exactly two pickers feeding it");
   // ⚠️ AND EVERY ENTRY POINT GOES THROUGH THE OPENER, which decides between the two. A caller that
   // reached the fallback directly would be the one route that never gets the in-app grid.
   const app = nocomment(page());
@@ -488,15 +513,27 @@ test("BLOCKER: All and Videos only appear when there is something to split", () 
   // ⚠️ BEFORE MEDIA EXISTED THIS TAB COULD NEVER HAVE A MEMBER. The grid held runs, which carry no
   // media, so a Videos tab was a tab with nothing in it — which is why the addendum's request for it
   // was declined at the time and is honoured now.
-  assert.match(v, /uploads\.length \? clubTabsHtml\(\) : ""/, "the tabs show with nothing to filter");
-  assert.match(v, /vidOnly = clubMediaTab\(\) === "video"/, "the filter is not read from the tab");
+  assert.match(v, /uploads\.length \? clubTabsHtml\(anyLog\) : ""/,
+    "the tabs show with nothing to filter");
+  assert.match(v, /vidOnly = which === "video", logOnly = which === "logbook"/,
+    "the filter is not read from the tab");
   assert.match(v, /uploads\.filter\(\(u\) => u\.video\)/, "Videos does not filter to videos");
-  // ⚠️ RESTATED: there are no run tiles to filter any more — the grid is posts, so Videos is a filter over
-  // posts alone. What still has to hold is that it filters rather than showing everything, and that a
-  // runner with no videos gets a sentence rather than an empty three-column area.
-  assert.match(v, /shown = vidOnly \? uploads\.filter\(\(u\) => u\.video\) : uploads/,
+  // ⚠️ RESTATED TWICE. There are no run tiles to filter any more — the grid is posts, so Videos is a
+  // filter over posts alone — and there is now a third tab, the LOGBOOK area the owner asked for
+  // (2026-08-22). What still has to hold is that each tab filters rather than showing everything, and
+  // that an empty one gets a sentence rather than an empty three-column area.
+  assert.match(v, /vidOnly \? uploads\.filter\(\(u\) => u\.video\)/,
     "the Videos tab does not actually filter");
+  assert.match(v, /logOnly \? uploads\.filter\(\(u\) => u\.logbook\) : uploads/,
+    "the Logbook tab does not actually filter");
   assert.match(v, /No videos yet/, "a runner with no videos gets an empty three-column area");
+  assert.match(v, /No logbook entries yet/, "an empty logbook gets an empty three-column area");
+  // ⚠️ AND THE THIRD TAB ONLY EXISTS ONCE THERE IS AN ENTRY, the same rule Videos was held to: a tab
+  // that can never have a member is the defect that made Videos wait for months.
+  assert.match(v, /anyLog = uploads\.some\(\(u\) => u\.logbook\)/,
+    "the Logbook tab is offered whether or not there is anything in it");
+  const tabs = fn("clubTabsHtml");
+  assert.match(tabs, /has \? tab\("logbook"/, "the Logbook tab is not gated on there being one");
   const t = fn("clubTabsHtml");
   // ⚠️ THE LABEL IS ALWAYS VISIBLE — colour is never the only signal, which is the design's own rule.
   assert.match(t, /<span>' \+ lab/, "a tab is icon-only, so colour is the only signal");
@@ -1158,4 +1195,141 @@ test("BLOCKER: the camera roll's cells are square, and the rows are told how tal
   // ⚠️ AND THE MARKS SIT ABOVE IT — a z-index rather than document order, since the image comes first.
   assert.match(style, /\.clib-n, \.clib-dur \{[^}]*z-index: 2/,
     "the selection mark and the duration are behind the thumbnail");
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * HIS FIVE INSTRUCTIONS OF 2026-08-22, WRITTEN ON FOUR SCREENSHOTS.
+ * ---------------------------------------------------------------------------------------------- */
+
+test("BLOCKER: a story is navigated by tapping, and the zones sit UNDER every control", () => {
+  // "Tapping the screen on the right hand side should move the story the next one along, tapping it on
+  // the left should move it back one."
+  //
+  // ⚠️ THE ZONES MUST BE BELOW THE BUTTONS, and this project has shipped the other way round once: a
+  // full-width invisible "next" over a panel carrying real actions ate every tap on the control
+  // underneath it. Compared as numbers rather than trusting the source order.
+  const css = page();
+  const zone = /\.club-tapl, \.club-tapr \{([^}]*)\}/.exec(css);
+  assert.ok(zone, "the tap zones are gone");
+  const zi = /z-index: (\d+)/.exec(zone![1]!);
+  assert.ok(zi, "the tap zones have no stacking order, so it is whatever the DOM order happens to give");
+  for (const sel of ["\\.club-x", "\\.club-vmore"]) {
+    const c = new RegExp(sel + " \\{([^}]*)\\}").exec(css);
+    assert.ok(c, "no rule for " + sel);
+    const cz = /z-index: (\d+)/.exec(c![1]!);
+    assert.ok(cz, sel + " has no stacking order");
+    assert.ok(Number(cz![1]) > Number(zi![1]),
+      sel + " (z " + cz![1] + ") is at or below the tap zones (z " + zi![1] + "), so the zone eats its taps");
+  }
+  // Both directions exist, and going back from the first does nothing rather than closing.
+  const v = fn("clubOpenMedia");
+  assert.match(v, /data-cnav="back"/, "there is no way back a story");
+  assert.match(v, /data-cnav="next"/, "there is no way on a story");
+  assert.match(nocomment(v), /const back = \(\) => \{ if \(i <= 0\) return;/,
+    "tapping back on the first story closes it, which loses what somebody was reading");
+});
+
+test("BLOCKER: the Next and Delete buttons are gone, and delete is in the ⋮ menu", () => {
+  // "Remove the next and delete buttons, the option to delete should come from opening a 3 little dot
+  // menu."
+  const v = nocomment(fn("clubOpenMedia"));
+  assert.ok(!/clubVNext|clubVDel/.test(v), "the viewer still carries its own Next or Delete button");
+  assert.ok(!/club-vfoot/.test(v), "the viewer still draws the button row those two lived in");
+  assert.match(v, /id="clubVMore"/, "there is no ⋮ to open");
+  assert.match(v, /clubPostMenuHtml\(p\)/, "the ⋮ opens nothing");
+  // ⚠️ AND THE MENU'S ACTION REACHES A REAL FUNCTION, not just a branch that mentions one — the
+  // looks-live-does-nothing class this project has shipped three times.
+  const menu = fn("clubPostMenuHtml");
+  assert.match(menu, /data-cact="delete"/, "the menu offers no delete");
+  const act = nocomment(fn("clubPostAction"));
+  assert.match(act, /clubDelete\(p\.id\)/, "the menu's delete does not delete");
+  assert.match(act, /clubViewClose\(\)/, "deleting leaves the viewer open on a post that is gone");
+  assert.match(v, /data-cact/, "the menu items are never wired");
+});
+
+test("BLOCKER: the menu names what does not exist rather than offering it", () => {
+  // ⚠️ HIS LIST WAS FOUR ACTIONS: delete, turn off commenting, hide likes, make post private. One is
+  // real today. There is no server, no accounts and nobody else to see a post, so there is nothing to
+  // comment, nothing to like, and a post is already private to the one phone it is on. This app's own
+  // rule — from the watch settings — is that no toggle ships before the feature behind it exists.
+  const menu = fn("clubPostMenuHtml");
+  const acts = [...menu.matchAll(/data-cact="(\w+)"/g)].map((m) => m[1]!);
+  assert.deepEqual(acts, ["delete"],
+    "the menu offers an action over a feature that does not exist: " + acts.join(", "));
+  assert.match(menu, /Commenting, likes and who can see this/,
+    "the three that are not built are not named either, so the runner is told nothing");
+});
+
+test("BLOCKER: the run's notes are the Logbook, and it is still private by default", () => {
+  // "Call this the logbook and when the user adds their thoughts and feelings, they have the option to
+  // save it to the logbook area of Inte-Club."
+  const n = fn("runNoteHtml");
+  assert.match(n, />Logbook</, "the section is not called the Logbook");
+  assert.ok(!/Your notes/.test(n), "it still calls itself Your notes");
+  // ⚠️ THE PRIVACY LINE SURVIVES. "Saved on this device only" would be a false sentence if posting were
+  // automatic, and this app already treats an overstated privacy claim as worse than none.
+  assert.match(n, /Saved on this device only/, "the privacy line is gone, so the copy overstates nothing "
+    + "but also promises nothing");
+  // ⚠️ AND THE OFFER ONLY EXISTS ONCE THERE ARE WORDS. An offer to post an empty entry would sit under
+  // the box on every run ever recorded.
+  assert.match(nocomment(n), /v\.trim\(\)\.length > 0/,
+    "the post button is offered for an empty note");
+  assert.match(n, /data-clogpost=/, "there is no way to save it to the club");
+});
+
+test("BLOCKER: a logbook entry is an ordinary post, on a photo or on a card the app draws", () => {
+  // "with the option of overlaying these comments on top of a photo, if not it can be on top of a
+  // branded logbook card that you can design"
+  const sheet = nocomment(fn("clubLogbookSheet"));
+  assert.match(sheet, /data-clogk="photo"/, "there is no photo option");
+  assert.match(sheet, /data-clogk="card"/, "there is no branded-card option");
+  assert.match(sheet, /clubOpenLibrary\("logbook"\)/, "the photo option does not open the camera roll");
+  assert.match(sheet, /clubLogbookCard\(run, note\)/, "the card option draws nothing");
+  // ⚠️ THE WORDS ARE A MOVEABLE OVERLAY, NOT BURNED IN, so a line that lands badly can be dragged,
+  // resized or deleted before it goes up.
+  const res = nocomment(fn("clubEditorFor"));
+  assert.match(res, /logbook: true, text: L\.note/, "the words do not travel into the editor");
+  const ed = nocomment(fn("openClubEditor"));
+  assert.match(ed, /const texts = \(o\.text && !n\)/,
+    "the words are put on every slide of a carousel rather than the one entry");
+  // ⚠️ AND THE ROW REMEMBERS WHAT IT IS, so the third tab is a filter over the ONE post shape rather
+  // than a second kind of grid entry.
+  assert.match(nocomment(fn("clubEdPost")), /logbook: S\.logbook \|\| undefined/,
+    "a logbook entry is stored as an ordinary post with nothing to distinguish it");
+  // The branded card reads the session's effort colour through the one mapping ruling 7 established.
+  const card = nocomment(fn("clubLogbookCard"));
+  assert.match(card, /runEffort\(run\)/, "the card invents its own idea of how hard the session was");
+  assert.match(card, /const S = CLUB_TILE_W, H = CLUB_TILE_H/, "the card is not the cell's own shape");
+  // ⚠️ WRAPPED BY MEASUREMENT, NOT BY A CHARACTER COUNT. A count is right for one font at one size and
+  // wrong for every other, and the failure is a line running off the edge of a posted picture.
+  assert.match(card, /measureText/, "the words are wrapped by counting characters");
+});
+
+test("BLOCKER: a runner has a handle as well as a name, and the app does not claim it is unique", () => {
+  // "Each runner needs to have a unique inte-club user name. As well as their full name."
+  //
+  // ⚠️ UNIQUENESS CANNOT BE PROVEN ON ONE PHONE, AND THE COPY SAYS SO RATHER THAN IMPLYING OTHERWISE.
+  // There is no server, so this device cannot know what anybody else has taken. Claiming it was reserved
+  // would be the app asserting something it has no way to know.
+  const ed = fn("viewClubEdit");
+  assert.match(ed, /id="ceUser"/, "there is no handle field");
+  assert.match(ed, /row\("Name"/, "the full name is gone, and he asked for both");
+  const hint = fn("clubUserHint");
+  assert.match(hint, /until the club has a server/,
+    "the hint claims the handle is checked, which no phone can do on its own");
+  // The shape is one a server could still accept later, and an invalid one is refused rather than
+  // silently corrected.
+  const ok = new Function("v", nocomment(fn("clubUserOk")) + "\nreturn clubUserOk(v);") as
+    (v: string) => boolean;
+  for (const good of ["adam", "a.p_1980", "abc"]) assert.ok(ok(good), good + " should be allowed");
+  for (const bad of ["ab", "Adam", "a b", "a@b", "x".repeat(21), ""]) {
+    assert.ok(!ok(bad), JSON.stringify(bad) + " should be refused");
+  }
+  const wire = nocomment(fn("wireClubEdit"));
+  assert.match(wire, /if \(!v \|\| clubUserOk\(v\)\) put\(\{ username: v \}\)/,
+    "an invalid handle is stored, so the profile shows an @name that can never be registered");
+  // And it survives a round trip, like every other field on this page.
+  const load = nocomment(fn("loadClubProf"));
+  assert.match(load, /username: String\(raw\.username \|\| ""\)/,
+    "the handle is dropped on read — the whitelisting-reader fault this file already caught once");
 });

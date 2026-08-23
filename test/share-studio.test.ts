@@ -70,7 +70,17 @@ function rule(sel: string): string {
   return h.slice(at, h.indexOf("}", at));
 }
 /** Comments inside the runtime JS quote the strings they forbid; a sweep has to strip them. */
-const nocomment = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+/**
+ * ⚠️⚠️ THE BLOCK-COMMENT SWEEP IS ANCHORED TO THE START OF A LINE, AND WITHOUT THAT IT EATS LIVE CODE.
+ * `accept="image/*,video/*"` in the app is an unbalanced comment OPENER mid-line, so an unanchored
+ * /\*[\s\S]*?\*\/ opens there and closes at the next real terminator — CLAUDE.md records it deleting
+ * 10,382 characters once. It bit again here the moment the camera-roll fallback added that attribute: a
+ * guard counting `clubEditorFor(` saw 2 of 3, because one of the calls was inside the swallowed window.
+ * Anchored, a real block comment (which always starts its own line in this file) is still stripped and a
+ * mid-line `/*` inside a string is not.
+ */
+const nocomment = (s: string) =>
+  s.replace(/^\s*\/\*[\s\S]*?\*\//gm, "").replace(/^\s*\/\/.*$/gm, "");
 
 /**
  * ONE dispatch BRANCH, BOUNDED TO ITS OWN STATEMENT.

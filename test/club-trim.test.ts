@@ -315,12 +315,19 @@ function openMedia(row: Record<string, unknown>, auto: boolean) {
     set innerHTML(v: string) { this._html = v; made.push({ html: v }); },
     get innerHTML() { return this._html; },
     querySelector: () => null,
+    // The viewer now wires its tap zones and its ⋮ menu items off the overlay itself.
+    querySelectorAll: () => [],
     remove() {},
     classList: { add() {}, remove() {} },
   };
   const api = new Function(
     "el", "document", "clubViewClose", "clubSlides", "clubKeys", "esc", "clubFillMedia",
     "clubDelete", "render", "toast", "haptic", "$", "setTimeout", "clearTimeout",
+    // ⚠️ clubPostMenuHtml, clubMenu AND clubPostAction ARE THE ⋮ MENU the owner asked for (2026-08-22):
+    // "Remove the next and delete buttons, the option to delete should come from opening a 3 little dot
+    // menu". Stubbed here because this file is about whether the viewer DRAWS; the menu's own contents
+    // are asserted in test/community.test.ts.
+    "clubPostMenuHtml", "clubMenu", "clubPostAction", "CLUB_MENU_ON",
     "CLUB_VIEW_T", "COMM_STORY_MS", "CLUB_STORY_MAX_S",
     nocomment(fn(src, "clubOpenMedia")) + "\nreturn clubOpenMedia;",
   )(
@@ -338,6 +345,7 @@ function openMedia(row: Record<string, unknown>, auto: boolean) {
     () => {}, () => {}, () => {}, () => {}, () => {},
     () => null,
     () => 0, () => {},
+    () => "<button data-cact=\"delete\">Delete</button>", () => {}, () => {}, false,
     0, 4500, 15,
   ) as (rows: unknown[], i: number, auto: boolean) => void;
   api([row], 0, auto);

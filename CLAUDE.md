@@ -8353,6 +8353,138 @@ closes the studio, so the probe's second run had no photograph at all. **A probe
 code under test deliberately clears measures a different thing and reports a defect that is not there.**
 Same class as this file's other harness traps; the fix is a fresh photograph per case.
 
+## FIVE INSTRUCTIONS WRITTEN ON FOUR SCREENSHOTS (owner, 2026-08-22)
+
+Suite 1237 → **1243**; 10 deliberate re-breaks, all 10 caught. All of it web, so all of it reaches his
+phone on the next launch.
+
+⚠️⚠️ **ONE PART OF HIS BRIEF IS NOT BUILT AS ASKED AND HE NEEDS TO SETTLE IT — see PREMIUM below.**
+
+### 1. The grid cell is 3:4
+
+*"This to be 3:4 ratio rather 4:5"*, pointing at a posted tile. It was **square**, not 4:5 — the design
+handoff asked for square tiles and that is what shipped; the 4:5 he named is the share card's feed shape.
+Either way the target is unambiguous.
+
+⚠️ **AND THE PICTURE DRAWN FOR A CELL HAD TO FOLLOW IT.** `clubRunTileBlob` rendered 1080 SQUARE, so a
+3:4 cell would have cropped a quarter off every auto-posted run. `CLUB_TILE_W`/`CLUB_TILE_H` are now read
+by the canvas AND by all four drawers — two owners of one shape is how they come to disagree.
+⚠️ **`clubTileLine`'s FIT WAS WRITTEN AGAINST `S` TWICE**, so it framed every route for a square; in a
+3:4 cell the line ran off the bottom. It takes both sides of the box now.
+⚠️ **A POSTED CARD IS FITTED, NOT CROPPED** (`.cm-t-med-fit`), so a 4:5 share card leaves about 5% as
+bars rather than losing its edges. Measured live: `aspect-ratio` reads `3 / 4`.
+
+### 2. The story is navigated by tapping, and the two buttons are gone
+
+*"Tapping the screen on the right hand side should move the story the next one along, tapping it on the
+left should move it back one"* and *"Remove the next and delete buttons, the option to delete should come
+from opening a 3 little dot menu"*.
+
+⚠️ **THE ZONES ARE z-index 2 AND EVERY CONTROL IS 3, and this project has shipped the other way round
+once** — a full-width invisible "next" over a panel carrying real actions ate every tap on the button
+underneath it. Guarded by comparing the two numbers rather than trusting DOM order. Measured live: left
+zone 0–138, right 138–430, ✕ and ⋮ both above.
+⚠️ **BACK ON THE FIRST STORY DOES NOTHING RATHER THAN CLOSING.** Closing on a tap is how somebody loses
+what they were reading by aiming slightly left, and the ✕ is two centimetres away.
+⚠️ **AND THE ZONES STOP 22% SHORT OF THE BOTTOM**, so a caption long enough to read is readable without
+the story jumping on under the finger.
+
+### 3. ⚠️ THE ⋮ MENU: ONE OF HIS FOUR ACTIONS IS REAL TODAY, AND THREE ARE NAMED RATHER THAN OFFERED
+
+His list was **Delete post / Turn off commenting / Hide likes / Make post private**. There is no server,
+no accounts and nobody else to see a post — so there is nothing to comment, nothing to like, and a post
+is already private to the one phone it is on. Three switches over features that do not exist is the
+looks-live-does-nothing defect this project has shipped three times, and the watch settings carry the
+rule in as many words: **no toggle ships before the feature behind it exists.**
+
+So the menu carries Delete, and one sentence naming the other three — the same answer the Create sheet
+gives reels, highlights and going live. When the club has a shared feed they become three real switches
+in this exact menu and the runner already knows where to look. `clubPostAction` is the one place the
+work happens, so a later post menu cannot diverge from the story one.
+
+### 4. The run's notes are the LOGBOOK, and an entry can go up
+
+*"Call this the logbook and when the user adds their thoughts and feelings, they have the option to save
+it to the logbook area of Inte-Club with the option of overlaying these comments on top of a photo, if
+not it can be on top of a branded logbook card that you can design"*.
+
+- **A third tab** beside All and Videos, gated on there being an entry — the same rule Videos was held
+  to, because a tab that can never have a member is why Videos waited months.
+- **A logbook entry is an ordinary post carrying a `logbook` flag**, so the grid, the viewer, the ⋮ menu
+  and delete all keep working on it. A second kind of grid entry would be a second of everything.
+- **On a photo**, the words arrive as a **moveable overlay** rather than burned in, so a line that lands
+  badly can be dragged, resized or deleted before it goes up.
+- **Or on a card the app draws.** The session's effort colour as a rule down the left edge, through
+  `runEffort` — the one mapping ruling 7 established, so a tempo entry is amber here exactly as on the
+  tile you tapped and the calendar dot. 1080×1440, the cell's own shape.
+- ⚠️ **THE PRIVACY LINE SURVIVES.** "Saved on this device only" would be a false sentence if posting were
+  automatic; what changed is that there is now a way OUT, not that the words leave by themselves.
+- ⚠️ **THE BUTTON ONLY EXISTS ONCE THERE ARE WORDS**, or an offer to post nothing sits under the box on
+  every run ever recorded.
+- ⚠️ **THE BUTTON READS THE BOX, NOT THE RECORD.** The note is kept synchronously and written to disk on a
+  400 ms debounce, so the record can be four tenths of a second behind the screen — posting the stale
+  version would drop the last words somebody typed.
+- ⚠️ **WRAPPED BY MEASUREMENT, NEVER A CHARACTER COUNT.** A count is right for one font at one size and
+  wrong for every other, and the failure is a line running off the edge of a posted picture.
+- ⚠️ **AND THE WORDS ARE CENTRED IN THEIR BAND, NOT PINNED TO THE TOP OF IT.** Pinned, a short entry —
+  most of them — left the bottom HALF of the card empty: measured at 46%, which is the figure this
+  project's own recap rebuild treats as a defect rather than a floor. Found by rendering the card and
+  looking at it, not by reading the code.
+
+⚠️⚠️ **PREMIUM — HIS OWN WORDS WERE "this would need to be premium", AND THAT CONTRADICTS HIS OWN
+STANDING DECISION.** CLAUDE.md records him cutting subscriptions outright: *"Leave the subscription one
+out.....thats not something we are doing (yet)"*, filed as **"Not a placeholder — it does not appear at
+all. Do not reinstate it from the mockup."** So it is shipped **UNGATED**, and flagged rather than
+decided: building a paywall would reverse a recorded ruling without him saying so, and silently dropping
+the word would ignore what he wrote. **His call.** The gate itself is one condition in
+`runNoteHtml` and one in `clubLogbookSheet` the day he wants it.
+
+### 5. A handle as well as a name
+
+*"Each runner needs to have a unique inte-club user name. As well as their full name. This will prove any
+duplication in the future if there are 1000's of users"*.
+
+⚠️ **UNIQUENESS CANNOT BE PROVEN ON ONE PHONE, AND THE COPY SAYS SO RATHER THAN IMPLYING OTHERWISE.**
+There is no server, so this device cannot know what anybody else has taken. What it can do is hold the
+handle, hold it to a shape a server could still accept (`^[a-z0-9._]{3,20}$`), and say plainly that the
+check comes later — the hint reads *"Nobody can check it against other runners until the club has a
+server."* Claiming it was reserved would be the app asserting something it has no way to know, which is
+the rule the check-in consent copy was rewritten twice for.
+⚠️ **AN INVALID HANDLE IS REFUSED, NOT SILENTLY CORRECTED**, and not stored — stored, the profile would
+show an @name that can never be registered.
+⚠️ **AND IT IS NAMED IN `loadClubProf`**, or it is dropped on read: the whitelisting-reader fault that
+file already caught once with `autoPost`, guarded since by deriving the field list from the writers.
+
+### ⚠️⚠️ THE `/* … */` BLIND WINDOW BIT AGAIN, AND THIS TIME IT MADE A GUARD UNDERCOUNT
+
+CLAUDE.md records an unanchored block-comment sweep deleting 10,382 characters because
+`accept="image/*"` is an unbalanced comment opener mid-line. The camera-roll fallback added
+`accept="image/*,video/*"`, so `nocomment()` in `community.test.ts` and `share-studio.test.ts` started
+eating from there: a guard counting `clubEditorFor(` saw **2 of 3**, because one of the calls was inside
+the swallowed window. Both strippers are anchored to the start of a line now (`^\s*\/\*`), which is the
+remedy that file already prescribes — a real block comment always starts its own line here, and a
+mid-line `/*` inside a string no longer opens one. Verified by checking a landmark from inside the old
+window (`id="s_easypace"`) survives the strip.
+
+### Traps this round paid for again
+
+⚠️ **THE BACKTICK RULE FIRED THREE TIMES**, all in my own comments; the build failed outright each time.
+⚠️ **AND THE REGEX-ESCAPING RULE FIRED ON TWO AT ONCE.** `split(/\n+/)` shipped as a real newline (an
+invalid regex, caught by `node --check`) and `split(/\s+/)` shipped as `split(/s+/)` — matching the
+letter s, which nothing would have caught. Sweep the EMITTED page: `grep -oE 'split\(/[^)]*\)'`.
+⚠️ **TWO HAND-WRITTEN LIFT LISTS WENT STALE AND BOTH FAILED LOUDLY** — `club-trim`'s viewer harness
+needed the ⋮ menu's three functions, and its fake overlay needed `querySelectorAll`. That is the
+acceptable kind of stale.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc clean
+apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1243 pass / 0 fail under
+UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`**, both ratchets unchanged. Driven in a real
+browser: tile `3 / 4`; the Logbook titled, private, its button gated on there being words; the branded
+card 1080×1440 at ratio 0.75; an entry posted, flagged and landing in the third tab which appears only
+when there is one; the viewer's zones measured at 0–138 / 138–430 under controls at z3, no Next, no
+Delete, the ⋮ opening one action; the handle stored, hinted and shown as `@adam.p_80`; **zero console
+errors**.
+
 ## OPEN BUGS (confirmed on real hardware, 2026-07-29)
 
 ### 1. Coach audio when the phone is locked or pocketed — FIXED 2026-08-08, unproven on hardware

@@ -4519,9 +4519,14 @@ button.cm-stat:active { opacity: .65; }
 .cm-mhead span { font-size: var(--t-label); font-weight: 600; letter-spacing: .03em;
   color: var(--ink-faint); }
 .cm-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
-/* ⚠️ THE TILE IS SQUARE WITH NO RADIUS, and the grid has no gutter beyond 3px — the handoff is explicit
-   that grid tiles are square and feed media is full-bleed. */
-.cm-tile { position: relative; display: block; aspect-ratio: 1; padding: 0; border: 0;
+/* ⚠️ 3:4, HIS CALL (2026-08-22): "This to be 3:4 ratio rather 4:5". The design handoff said square and
+   the tiles were square; a portrait tile shows more of a photograph taken on a phone, which is what
+   almost every picture posted here will be. The grid still has no gutter beyond 3px and no radius —
+   that half of the handoff is unchanged, and feed media stays full-bleed.
+   ⚠️ A POSTED CARD IS FITTED, NOT CROPPED, so the 4:5 share card leaves about 5% as bars top and bottom
+   inside a 3:4 tile rather than losing its edges. .cm-t-med-fit is what decides that, and it is the same
+   rule the editor, the caption strip, the post feed and the full-screen player all read. */
+.cm-tile { position: relative; display: block; aspect-ratio: 3 / 4; padding: 0; border: 0;
   overflow: hidden; background: var(--surface-2); transition: opacity 160ms ease; }
 button.cm-tile:active { opacity: .65; }
 .cm-tile-off { opacity: .55; }
@@ -4706,6 +4711,31 @@ button.cm-tile:active { opacity: .65; }
 .club-send:disabled { opacity: .6; }
 .club-vcap { position: relative; z-index: 3; padding: var(--s3) var(--s3) 0; color: #fff;
   font-size: var(--t-body); text-wrap: pretty; }
+/* ⚠️ THE TAP ZONES ARE z-index 2, UNDER EVERY CONTROL (which is 3). A full-width invisible "next" over
+   a real button eats every tap on it — the exact defect this project shipped on the recap story once.
+   ⚠️ AND THEY DO NOT COVER THE CAPTION, so a caption long enough to read is still readable without the
+   story jumping on under the finger. */
+.club-tapl, .club-tapr { position: absolute; top: 0; bottom: 22%; z-index: 2;
+  padding: 0; border: 0; background: transparent; -webkit-tap-highlight-color: transparent; }
+.club-tapl { left: 0; width: 32%; }
+.club-tapr { left: 32%; right: 0; }
+/* The ⋮, opposite the ✕, where every iOS app puts a post's actions. */
+.club-vmore { position: absolute; top: calc(var(--s3) + env(safe-area-inset-top, 0px));
+  right: var(--s3); z-index: 3; display: grid; place-items: center;
+  width: 36px; height: 36px; padding: 0; border: 0; border-radius: 999px;
+  background: rgba(4,16,13,.55); color: #fff; font-size: var(--t-card); line-height: 1; }
+.club-vmore::after { content: ""; position: absolute; inset: -4px; }
+.club-vmenu { position: absolute; top: calc(var(--s3) + 42px + env(safe-area-inset-top, 0px));
+  right: var(--s3); z-index: 4; width: min(78vw, 300px);
+  padding: var(--s2); border-radius: var(--r-card);
+  background: var(--surface); border: 1px solid var(--line); box-shadow: 0 10px 34px rgba(0,0,0,.4); }
+.club-mi { display: block; width: 100%; padding: var(--s2) var(--s3); border: 0; border-radius: var(--r-ctl);
+  background: transparent; color: var(--ink); font-size: var(--t-card); font-weight: 600; text-align: left;
+  min-height: var(--tap); }
+.club-mi-bad { color: var(--rest); }
+.club-mi:active { background: var(--surface-2); }
+.club-mi-note { margin: var(--s1) var(--s3) var(--s1); font-size: var(--t-label); line-height: 1.45;
+  color: var(--ink-faint); }
 .club-vfoot .ui-btn { flex: 1; border-color: rgba(255,255,255,.3); background: rgba(4,16,13,.6);
   color: #fff; }
 /* The avatar's little plus, and the rail's add ring. */
@@ -4724,6 +4754,14 @@ button.cm-tile:active { opacity: .65; }
    reaches 44. Growing the box would push it over the avatar it sits on. */
 .cm-avplus::after { content: ""; position: absolute; inset: -9px; border-radius: 50%; }
 /* All / Videos. */
+/* ⚠️ THREE COLUMNS ONLY WHEN THERE IS A THIRD TAB, from one modifier rather than a second rule — the
+   grid is otherwise two, and a third empty column would leave Videos off-centre. */
+.cm-mts-3 { grid-template-columns: 1fr 1fr 1fr; }
+.rn-post { margin-top: var(--s3); width: 100%; }
+.cm-at { font-size: var(--t-label); font-weight: 600; color: var(--ink-soft); margin-top: 1px; }
+.ce-at { color: var(--ink-faint); font-size: var(--t-card); font-weight: 600; margin-right: 2px; }
+.ce-hint { display: block; margin-top: var(--s1); font-size: var(--t-label); line-height: 1.4;
+  color: var(--ink-faint); }
 .cm-mts { display: grid; grid-template-columns: 1fr 1fr; margin: var(--s4) calc(-1 * var(--s3)) 0;
   border-top: 1px solid var(--line); }
 .cm-mt { display: flex; align-items: center; justify-content: center; gap: 7px;
@@ -11327,11 +11365,17 @@ function openClubEditor(kind, files, opts) {
   const o = opts || {};
   CLUBED = {
     kind: kind, i: 0, step: "edit", caption: String(o.caption || ""), sel: -1,
-    draft: null, draftAt: -1, runId: String(o.runId || ""),
-    slides: list.map((f) => {
+    draft: null, draftAt: -1, runId: String(o.runId || ""), logbook: !!o.logbook,
+    slides: list.map((f, n) => {
       const isVid = /^video\\//.test(f.type || "");
+      // ⚠️ ONLY THE FIRST SLIDE CARRIES THE WORDS. A logbook entry is one picture and one
+      // entry, and repeating the paragraph across a carousel would be the same words three times.
+      const texts = (o.text && !n)
+        ? [{ text: String(o.text).slice(0, 220), x: 0.5, y: 0.72,
+             colour: CLUB_COLOURS[0], font: CLUB_FONTS[0], size: 20 }]
+        : [];
       return { file: f, url: URL.createObjectURL(f), isVid: isVid, card: !!o.card,
-        ox: 0.5, oy: 0.5, k: 1, texts: [], inS: 0, outS: 0, dur: 0 };
+        ox: 0.5, oy: 0.5, k: 1, texts: texts, inS: 0, outS: 0, dur: 0 };
     })
   };
   const ov = el('<div class="club-ed" id="clubEd"></div>');
@@ -11805,6 +11849,11 @@ function clubEdPost() {
       // over. clubSlides() accepts the old single-key rows so anything already posted still opens.
       media: slides.map((x) => x.key),
       video: !!slides[0].sl.isVid,
+      // ⚠️ THE LOGBOOK FLAG IS ON THE ROW, so the third tab is a filter over the ONE post shape rather
+      // than a second kind of grid entry — and the grid, the viewer, the ⋮ menu and delete all keep
+      // working on it unchanged. Undefined rather than false for the same reason sim and indoor are
+      // absent when false: a stored false is a field every reader has to think about.
+      logbook: S.logbook || undefined,
       caption: (S.caption || "").slice(0, 300), at: stamp,
       slides: slides.map((x) => ({
         media: x.key,
@@ -11904,13 +11953,25 @@ function clubFillMedia() {
  * the tabs appear once the runner has posted anything.
  * ⚠️ THE LABEL IS ALWAYS VISIBLE — colour is never the only signal, which is the design's own rule.
  */
-function clubMediaTab() { return state.clubMedia === "video" ? "video" : "all"; }
-function clubTabsHtml() {
+/**
+ * ⚠️ A THIRD TAB — THE LOGBOOK AREA HE ASKED FOR ("save it to the logbook area of Inte-Club"). Same rule
+ * as Videos: it appears only once there is something to put in it, so it can never be a tab with no
+ * possible member. A logbook entry is an ordinary post carrying a logbook flag, so the grid, the
+ * viewer, the ⋮ menu and the delete all treat it as what it is — a second kind of grid entry would be a
+ * second tile builder and a second of everything after it.
+ */
+function clubMediaTab() {
+  const v = state.clubMedia;
+  return (v === "video" || v === "logbook") ? v : "all";
+}
+function clubTabsHtml(has) {
   const t = clubMediaTab();
   const tab = (id, ic, lab) => '<button class="cm-mt' + (t === id ? " on" : "") + '" data-cmt="' + id +
     '" aria-selected="' + (t === id) + '" role="tab">' + ic + '<span>' + lab + '</span></button>';
-  return '<div class="cm-mts" role="tablist">' + tab("all", ICON.grid4, "All") +
-    tab("video", ICON.clip, "Videos") + '</div>';
+  return '<div class="cm-mts' + (has ? " cm-mts-3" : "") + '" role="tablist">' +
+    tab("all", ICON.grid4, "All") +
+    tab("video", ICON.clip, "Videos") +
+    (has ? tab("logbook", ICON.book, "Logbook") : "") + '</div>';
 }
 
 /** The create button belongs to the club and is hidden everywhere else. */
@@ -12091,6 +12152,46 @@ function clubSharePost(id) {
   }).catch(() => toast("That could not be read."));
 }
 function openClubStories() { clubOpenMedia(clubStories(), 0, true); }
+/**
+ * THE ⋮ MENU ON A POST OR A STORY.
+ *
+ * His instruction, from an Instagram screenshot: "This needs to be the menu bar they need to open for
+ * any actions they want on that post. Actions being: Delete post / Turn off commenting / Hide likes /
+ * Make post private".
+ *
+ * ⚠️⚠️ ONE OF THOSE FOUR IS REAL TODAY AND THREE ARE NOT, AND THAT IS NOT A NARROWING — IT IS THIS
+ * APP'S OWN RULE. There is no server, no accounts and nobody else to see a post, so there is nothing to
+ * comment, nothing to like, and a post is already private to the one phone it is on. A switch labelled
+ * "Turn off commenting" over a feature that does not exist is the looks-live-does-nothing defect this
+ * project has shipped three times, and the watch settings carry the rule in as many words: no toggle
+ * ships before the feature behind it exists.
+ * ⚠️ SO THEY ARE NAMED RATHER THAN OFFERED, in one sentence — the same answer the Create sheet gives
+ * reels, highlights and going live. When the club has a shared feed they become three real switches in
+ * this exact menu, and the runner will already know where to look for them.
+ */
+function clubPostMenuHtml(p) {
+  const word = p.kind === "story" ? "story" : "post";
+  return '<button class="club-mi club-mi-bad" data-cact="delete" role="menuitem">Delete ' + word +
+      '</button>' +
+    '<p class="club-mi-note">Commenting, likes and who can see this arrive with the club\u2019s shared ' +
+      'feed \u2014 there is nobody else on it yet, so there is nothing yet to switch off.</p>';
+}
+let CLUB_MENU_ON = false;
+function clubMenu(on) {
+  CLUB_MENU_ON = !!on;
+  const m = $("clubVMenu"), b = $("clubVMore");
+  if (m) m.hidden = !CLUB_MENU_ON;
+  if (b) b.setAttribute("aria-expanded", CLUB_MENU_ON ? "true" : "false");
+}
+/** ⚠️ ONE PLACE DOES THE WORK, so the story viewer and any later post menu cannot diverge. */
+function clubPostAction(act, p) {
+  if (act !== "delete") return;
+  clubMenu(false);
+  clubDelete(p.id);
+  clubViewClose();
+  render();
+  toast(p.kind === "story" ? "Story removed." : "Post removed.");
+}
 function clubOpenMedia(rows, i, auto) {
   if (!rows || !rows.length) return;
   clubViewClose();
@@ -12132,12 +12233,23 @@ function clubOpenMedia(rows, i, auto) {
         '</div>' +
         '<div class="club-txs">' + texts + '</div>' +
       '</div>' +
+      // ⚠️⚠️ THE TAP ZONES SIT BELOW EVERY CONTROL, and this project has already shipped the other way
+      // round once: a full-width invisible "next" over a panel carrying real actions ate every tap on
+      // the button underneath it. The ✕ and the ⋮ are z-index 3; these are 2. His instruction: "Tapping
+      // the screen on the right hand side should move the story the next one along, tapping it on the
+      // left should move it back one".
+      // ⚠️ AND THE LEFT ZONE IS THE NARROWER OF THE TWO. Forward is the common move — that is what
+      // holding a phone and reading a story is — so the zone a thumb lands in by default advances.
+      '<button class="club-tapl" data-cnav="back" aria-label="Previous"></button>' +
+      '<button class="club-tapr" data-cnav="next" aria-label="Next"></button>' +
       '<button class="club-x" id="clubVX" aria-label="Close">✕</button>' +
-      (p.caption ? '<div class="club-vcap">' + esc(p.caption) + '</div>' : "") +
-      '<div class="club-vfoot">' +
-        '<button class="ui-btn" id="clubVDel">Delete</button>' +
-        (auto && rows.length > 1 ? '<button class="ui-btn" id="clubVNext">Next</button>' : "") +
-      '</div>';
+      // ⚠️ THE ACTIONS MOVED INTO A ⋮ MENU — his instruction: "Remove the next and delete buttons, the
+      // option to delete should come from opening a 3 little dot menu". Delete on the face of a story
+      // is a destructive control the width of a thumb, on a screen whose whole job is to be tapped.
+      '<button class="club-vmore" id="clubVMore" aria-label="More" aria-haspopup="true" ' +
+        'aria-expanded="false"><span aria-hidden="true">\u22EF</span></button>' +
+      '<div class="club-vmenu" id="clubVMenu" role="menu" hidden>' + clubPostMenuHtml(p) + '</div>' +
+      (p.caption ? '<div class="club-vcap">' + esc(p.caption) + '</div>' : "");
     clubFillMedia();
     // ⚠️ THE TRIM IS APPLIED AT PLAYBACK, which is what makes storing in/out points rather than
     // re-encoding honest: the runner sees exactly the window they chose, and the original is intact for
@@ -12154,14 +12266,22 @@ function clubOpenMedia(rows, i, auto) {
       if (vd) { vd.muted = false; vd.loop = true; try { vd.play(); } catch (e) {} }
     }, 60);
     const x = $("clubVX"); if (x) x.onclick = () => { haptic("light"); clubViewClose(); };
-    const nx = $("clubVNext"); if (nx) nx.onclick = () => advance();
-    const del = $("clubVDel");
-    if (del) del.onclick = () => {
-      clubDelete(p.id);
-      clubViewClose();
-      render();
-      toast(p.kind === "story" ? "Story removed." : "Post removed.");
-    };
+    // ⚠️ THE ZONES STOP THE TIMER'S OWN ADVANCE FROM RACING THE TAP. Without the reset a tap landing a
+    // moment before the auto-advance fires moves two stories at once, which reads as a missed tap.
+    ov.querySelectorAll("[data-cnav]").forEach((b) => b.onclick = (e) => {
+      e.stopPropagation();
+      clubMenu(false);
+      if (b.dataset.cnav === "next") advance(); else back();
+    });
+    const mo = $("clubVMore");
+    if (mo) mo.onclick = (e) => { e.stopPropagation(); clubMenu(!CLUB_MENU_ON); };
+    // ⚠️ A TAP ANYWHERE ELSE CLOSES IT, and the zones do it before they navigate — a menu left open over
+    // the next story is a menu whose Delete now names something else.
+    clubMenu(false);
+    ov.querySelectorAll("[data-cact]").forEach((b) => b.onclick = (e) => {
+      e.stopPropagation();
+      clubPostAction(b.dataset.cact, p);
+    });
     if (CLUB_VIEW_T) { clearTimeout(CLUB_VIEW_T); CLUB_VIEW_T = 0; }
     // ⚠️ A VIDEO STORY RUNS FOR ITS OWN TRIMMED LENGTH, not a flat 4.5s — advancing off a twelve-second
     // clip after four and a half is cutting the runner off mid-sentence.
@@ -12173,6 +12293,9 @@ function clubOpenMedia(rows, i, auto) {
     }
   };
   const advance = () => { i += 1; if (i >= rows.length) { clubViewClose(); return; } draw(); };
+  // ⚠️ THE FIRST STORY'S "BACK" DOES NOTHING RATHER THAN CLOSING. Closing on a tap is how somebody
+  // loses the thing they were reading by aiming slightly left, and there is a ✕ two centimetres away.
+  const back = () => { if (i <= 0) return; i -= 1; draw(); };
   draw();
 }
 
@@ -12200,9 +12323,28 @@ function clubPickMany(kind) {
   inp.onchange = () => {
     const files = [...(inp.files || [])];
     try { inp.remove(); } catch (e) {}
-    if (files.length) openClubEditor(kind, files);
+    if (files.length) clubEditorFor(kind, files);
   };
   inp.click();
+}
+/**
+ * THE ONE PLACE A PICKED SELECTION BECOMES AN EDITOR SESSION.
+ *
+ * ⚠️ TWO PICKERS REACH HERE — the in-app PhotoKit grid and the file input that stands in for it on a
+ * build without the native bridge — and a logbook entry has to carry its words into the editor on both.
+ * Written at each call site it is two chances to forget, and the failure is silent: the runner picks a
+ * photograph for their logbook and gets an ordinary post with no words on it.
+ */
+function clubEditorFor(kind, files) {
+  if (kind === "logbook" && CLUBLOG) {
+    const L = CLUBLOG; CLUBLOG = null;
+    // ⚠️ THE WORDS GO ON AS A MOVEABLE OVERLAY, not burned into the picture, so a line that lands badly
+    // can be dragged, resized or deleted before it goes up.
+    openClubEditor("post", files.slice(0, 1), { caption: L.note.slice(0, 220),
+      runId: String(L.run.id || ""), logbook: true, text: L.note });
+    return;
+  }
+  openClubEditor(kind, files);
 }
 /**
  * ⚠️ A CAROUSEL IS PHOTOGRAPHS ONLY, AND MIXING IS REFUSED RATHER THAN SILENTLY SPLIT. His rule is a
@@ -12421,6 +12563,21 @@ function clubTrimPaint() {
  * fact two homes, and the two would disagree the first time somebody changed the other one.
  * ⚠️ SO ONLY THREE THINGS ARE GENUINELY NEW: the bio, what they are training for, and the PBs.
  */
+/**
+ * THE HANDLE'S SHAPE.
+ *
+ * ⚠️ LOWER CASE, LETTERS, NUMBERS, DOTS AND UNDERSCORES, 3-20 — the shape every service that has ever
+ * had to keep handles unique settles on, so a handle chosen today is still a legal one when there is a
+ * server to check it against. Refused rather than silently corrected: a handle quietly turned into
+ * something else is not the one the runner chose.
+ */
+function clubUserOk(v) { return /^[a-z0-9._]{3,20}$/.test(String(v || "")); }
+function clubUserHint(v) {
+  const t = String(v || "");
+  if (!t) return "3 to 20 characters. Letters, numbers, dots and underscores.";
+  if (!clubUserOk(t)) return "Letters, numbers, dots and underscores only, 3 to 20 characters.";
+  return "Saved. Nobody can check it against other runners until the club has a server.";
+}
 function loadClubProf() {
   try {
     const raw = JSON.parse(localStorage.getItem(CLUBPROF_KEY) || "{}");
@@ -12434,8 +12591,10 @@ function loadClubProf() {
     return { bio: String(raw.bio || ""), trainingFor: String(raw.trainingFor || ""),
       pbs: (raw.pbs && typeof raw.pbs === "object") ? raw.pbs : {},
       autoPost: raw.autoPost === true,
+      username: String(raw.username || ""),
       autoStyle: String(raw.autoStyle || "") };
-  } catch (e) { return { bio: "", trainingFor: "", pbs: {}, autoPost: false, autoStyle: "" }; }
+  } catch (e) { return { bio: "", trainingFor: "", pbs: {}, autoPost: false, username: "",
+      autoStyle: "" }; }
 }
 function saveClubProf(v) {
   try { localStorage.setItem(CLUBPROF_KEY, JSON.stringify(v)); } catch (e) {}
@@ -12518,6 +12677,19 @@ function viewClubEdit() {
     '<div class="ce-card">' +
       row("Name", '<span class="ce-ro">' + esc(p.name || "Not set") +
         '</span><button class="ce-lnk" id="ceName">Edit</button>') +
+      // ⚠️⚠️ A HANDLE AS WELL AS A NAME — his instruction: "Each runner needs to have a unique
+      // inte-club user name. As well as their full name. This will prove any duplication in the future
+      // if there are 1000's of users". Two runners can share a name; a handle is what tells them apart.
+      // ⚠️ AND UNIQUENESS CANNOT BE PROVEN HERE, WHICH THE COPY SAYS RATHER THAN IMPLYING OTHERWISE.
+      // There is no server, so this phone cannot know what anybody else has taken. What it CAN do is
+      // hold the handle, keep it to a shape that will still be valid when there is a server to check it
+      // against, and say plainly that the check comes later. Claiming it was reserved would be the app
+      // asserting something it has no way to know — the same rule the check-in consent copy is written
+      // to, twice over.
+      row("Username", '<span class="ce-at">@</span><input id="ceUser" maxlength="20" ' +
+        'autocapitalize="none" autocorrect="off" spellcheck="false" ' +
+        'placeholder="yourname" value="' + esc(cp.username) + '">' +
+        '<span class="ce-hint" id="ceUserHint">' + esc(clubUserHint(cp.username)) + '</span>') +
       row("Running bio", '<textarea id="ceBio" rows="3" maxlength="220" ' +
         'placeholder="A line about your running.">' + esc(cp.bio) + '</textarea>') +
       row("Training for", '<input id="ceFor" maxlength="60" placeholder="' +
@@ -12593,6 +12765,16 @@ function wireClubEdit() {
   if (bio) bio.oninput = () => put({ bio: bio.value.slice(0, 220) });
   const fr = $("ceFor");
   if (fr) fr.oninput = () => put({ trainingFor: fr.value.slice(0, 60) });
+  // ⚠️ THE HINT IS REPAINTED, NOT THE SCREEN. A full render rebuilds the field under the finger and
+  // captures the caret — the rule every typed field on this page already follows.
+  // ⚠️ AND AN INVALID HANDLE IS NOT STORED. Stored, it would show on the profile as an @name that
+  // cannot ever be registered; refused, the box holds what was typed and the hint says why.
+  const un = $("ceUser");
+  if (un) un.oninput = () => {
+    const v = un.value.trim().toLowerCase();
+    const h = $("ceUserHint"); if (h) h.textContent = clubUserHint(v);
+    if (!v || clubUserOk(v)) put({ username: v });
+  };
   // ⚠️ WHEELS, NOT A TEXT BOX — his instruction, and the fault behind it was mine. A bespoke field that
   // took free text let "1751" sit there marked invalid, when the app has had a digits-to-time input since
   // the setup form. But for a PB the wheels are genuinely the better answer: the runner knows the number,
@@ -12711,13 +12893,17 @@ function clubRunPosted(run) {
 }
 /**
  * DRAWING THE TILE.
- * ⚠️ 1080 SQUARE, WHICH IS THE GRID'S OWN SHAPE AND NOT THE SHARE CARD'S. The share card is a 9:16 story
- * or a 4:5 feed post and carries its own branding; this is a grid cell, and cropping a tall card into a
- * square is the recomposition the share pack forbids.
+ * ⚠️ 1080x1440, WHICH IS THE GRID CELL'S OWN 3:4 AND NOT THE SHARE CARD'S. The share card is a 9:16
+ * story or a 4:5 feed post and carries its own branding; this is a grid cell, and cropping a tall card
+ * into it is the recomposition the share pack forbids.
+ * ⚠️ IT FOLLOWED THE CELL RATHER THAN THE OTHER WAY ROUND. It was 1080 square while the cell was square;
+ * the owner asked for 3:4 cells (2026-08-22) and a square picture in a 3:4 cell is a picture cropped by
+ * a quarter. Two owners of one shape is how they come to disagree, so both read CLUB_TILE_W/H.
  */
+const CLUB_TILE_W = 1080, CLUB_TILE_H = 1440;
 function clubRunTileBlob(run, kind) {
-  const S = 1080;
-  const cv = document.createElement("canvas"); cv.width = S; cv.height = S;
+  const S = CLUB_TILE_W, H = CLUB_TILE_H;
+  const cv = document.createElement("canvas"); cv.width = S; cv.height = H;
   const g = cv.getContext("2d");
   let route = [];
   try {
@@ -12730,29 +12916,31 @@ function clubRunTileBlob(run, kind) {
   const eff = runEffort(run);
   const paint = () => {
     const done = () => new Promise((res) => cv.toBlob((b) => res(b), "image/jpeg", 0.9));
-    if (want === "card") { clubTileCard(g, S, run, eff); return done(); }
-    if (want === "line") { clubTileLine(g, S, route, eff); return done(); }
-    return routeMapFor(route, S, S, MAP_STYLE_RUN).then((md) => {
-      try { g.drawImage(md.image, 0, 0, S, S); } catch (e) { clubTileLine(g, S, route, eff); return done(); }
+    if (want === "card") { clubTileCard(g, S, H, run, eff); return done(); }
+    if (want === "line") { clubTileLine(g, S, H, route, eff); return done(); }
+    return routeMapFor(route, S, H, MAP_STYLE_RUN).then((md) => {
+      try { g.drawImage(md.image, 0, 0, S, H); } catch (e) { clubTileLine(g, S, H, route, eff); return done(); }
       clubTileRoute(g, S, route, md.proj);
-      clubTileStamp(g, S, run, eff);
+      clubTileStamp(g, S, H, run, eff);
       return done();
     }).catch(() => { clubTileLine(g, S, route, eff); return done(); });
   };
   return paint();
 }
 /** The route as geometry on the session's own colour. */
-function clubTileLine(g, S, route, eff) {
+function clubTileLine(g, S, H, route, eff) {
   const c = getComputedStyle(document.documentElement).getPropertyValue("--eff-" + eff).trim() || "#1d9e75";
-  g.fillStyle = "#04100d"; g.fillRect(0, 0, S, S);
+  g.fillStyle = "#04100d"; g.fillRect(0, 0, S, H);
   const lats = route.map((p) => p.lat), lngs = route.map((p) => p.lng);
   const minLa = Math.min(...lats), maxLa = Math.max(...lats);
   const minLo = Math.min(...lngs), maxLo = Math.max(...lngs);
   const cx = Math.cos((minLa + maxLa) / 2 * Math.PI / 180) || 1;
   const pad = S * 0.16;
   const spanLo = Math.max(1e-9, (maxLo - minLo) * cx), spanLa = Math.max(1e-9, maxLa - minLa);
-  const sc = Math.min((S - 2 * pad) / spanLo, (S - 2 * pad) / spanLa);
-  const ox = (S - spanLo * sc) / 2, oy = (S - spanLa * sc) / 2;
+  // ⚠️ THE FIT USES BOTH SIDES OF THE BOX. Written against S twice it framed every route for a square
+  // and left a 3:4 cell with the line pushed off the bottom.
+  const sc = Math.min((S - 2 * pad) / spanLo, (H - 2 * pad) / spanLa);
+  const ox = (S - spanLo * sc) / 2, oy = (H - spanLa * sc) / 2;
   g.strokeStyle = c; g.lineWidth = S * 0.018; g.lineJoin = "round"; g.lineCap = "round";
   g.beginPath();
   route.forEach((p, i) => {
@@ -12774,39 +12962,39 @@ function clubTileRoute(g, S, route, proj) {
   });
 }
 /** The distance and effort in the corner of a map tile. */
-function clubTileStamp(g, S, run, eff) {
+function clubTileStamp(g, S, H, run, eff) {
   // ⚠️ AT THE TOP, NOT THE BOTTOM, AND THAT WAS FOUND BY LOOKING. Baked into the lower corner it sat
   // directly under the grid cell's own caption strip — two labels stacked, the distance half hidden
   // behind the app's own gradient. The caption is chrome the app draws over the tile; the stamp belongs
   // to the picture and has to live where the chrome is not.
-  const grd = g.createLinearGradient(0, 0, 0, S * 0.34);
+  const grd = g.createLinearGradient(0, 0, 0, H * 0.26);
   grd.addColorStop(0, "rgba(4,16,13,.72)"); grd.addColorStop(1, "rgba(4,16,13,0)");
-  g.fillStyle = grd; g.fillRect(0, 0, S, S * 0.34);
+  g.fillStyle = grd; g.fillRect(0, 0, S, H * 0.26);
   g.textBaseline = "alphabetic";
   const c = getComputedStyle(document.documentElement).getPropertyValue("--eff-" + eff).trim() || "#1d9e75";
   g.fillStyle = c;
   g.font = "700 " + Math.round(S * 0.042) + "px " + CLUB_TILE_FONT;
-  g.fillText((COMM_BADGE[run.type] || "RUN"), S * 0.07, S * 0.105);
+  g.fillText((COMM_BADGE[run.type] || "RUN"), S * 0.07, H * 0.079);
   g.fillStyle = "#fff";
   g.font = "700 " + Math.round(S * 0.085) + "px " + CLUB_TILE_FONT;
-  g.fillText(commKm(run.distKm), S * 0.07, S * 0.2);
+  g.fillText(commKm(run.distKm), S * 0.07, H * 0.15);
 }
 /** The numbers, for a run with no route. */
-function clubTileCard(g, S, run, eff) {
+function clubTileCard(g, S, H, run, eff) {
   const c = getComputedStyle(document.documentElement).getPropertyValue("--eff-" + eff).trim() || "#1d9e75";
-  const grd = g.createLinearGradient(0, 0, 0, S);
+  const grd = g.createLinearGradient(0, 0, 0, H);
   grd.addColorStop(0, c); grd.addColorStop(1, "#04100d");
-  g.fillStyle = grd; g.fillRect(0, 0, S, S);
-  g.fillStyle = "rgba(4,16,13,.35)"; g.fillRect(0, 0, S, S);
+  g.fillStyle = grd; g.fillRect(0, 0, S, H);
+  g.fillStyle = "rgba(4,16,13,.35)"; g.fillRect(0, 0, S, H);
   g.fillStyle = "#fff"; g.textAlign = "center";
   g.font = "700 " + Math.round(S * 0.155) + "px " + CLUB_TILE_FONT;
-  g.fillText(commKm(run.distKm), S / 2, S * 0.5);
+  g.fillText(commKm(run.distKm), S / 2, H * 0.5);
   g.font = "600 " + Math.round(S * 0.05) + "px " + CLUB_TILE_FONT;
   g.fillStyle = "rgba(255,255,255,.86)";
-  g.fillText([run.time || "", run.pace || ""].filter(Boolean).join("  ·  "), S / 2, S * 0.6);
+  g.fillText([run.time || "", run.pace || ""].filter(Boolean).join("  ·  "), S / 2, H * 0.575);
   g.font = "700 " + Math.round(S * 0.038) + "px " + CLUB_TILE_FONT;
   g.fillStyle = "rgba(255,255,255,.72)";
-  g.fillText((COMM_BADGE[run.type] || "RUN"), S / 2, S * 0.68);
+  g.fillText((COMM_BADGE[run.type] || "RUN"), S / 2, H * 0.635);
   g.textAlign = "left";
 }
 const CLUB_TILE_FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
@@ -13103,7 +13291,7 @@ function clubLibTake() {
       if (!got.length) { toast("Those could not be read from your library."); return; }
       if (lost) toast(lost === 1 ? "One could not be read and was left out."
         : lost + " could not be read and were left out.");
-      openClubEditor(kind, got);
+      clubEditorFor(kind, got);
     });
 }
 
@@ -13700,18 +13888,25 @@ function viewCommunity() {
   // ⚠️ TWO KINDS OF TILE IN ONE GRID, AND THE FILTER MEANS DIFFERENT THINGS TO EACH. "Videos" keeps
   // the posted clips and drops everything else — a run is not a video, so under Videos the run tiles go
   // rather than being shown as though they were films of themselves.
-  const vidOnly = clubMediaTab() === "video";
-  const shown = vidOnly ? uploads.filter((u) => u.video) : uploads;
-  const tabs = uploads.length ? clubTabsHtml() : "";
+  const which = clubMediaTab();
+  const vidOnly = which === "video", logOnly = which === "logbook";
+  const shown = vidOnly ? uploads.filter((u) => u.video)
+    : logOnly ? uploads.filter((u) => u.logbook) : uploads;
+  const anyLog = uploads.some((u) => u.logbook);
+  const tabs = uploads.length ? clubTabsHtml(anyLog) : "";
+  const head = logOnly ? "Logbook" : "Posted";
+  const unit = vidOnly ? (shown.length === 1 ? " VIDEO" : " VIDEOS")
+    : logOnly ? (shown.length === 1 ? " ENTRY" : " ENTRIES")
+    : (shown.length === 1 ? " POST" : " POSTS");
   const upGrid = shown.length
-    ? '<div class="cm-mhead"><h2>Posted</h2><span class="num">' + shown.length +
-      (vidOnly ? (shown.length === 1 ? " VIDEO" : " VIDEOS") : (shown.length === 1 ? " POST" : " POSTS")) +
+    ? '<div class="cm-mhead"><h2>' + head + '</h2><span class="num">' + shown.length + unit +
       '</span></div><div class="cm-grid">' + shown.map(clubTileHtml).join("") + '</div>'
-    : (vidOnly && uploads.length
+    : ((vidOnly || logOnly) && uploads.length
         // ⚠️ THE ADDENDUM'S OWN LINE, and it is the honest one: a quiet sentence beats an empty
         // three-column area that reads as the app having lost something.
-        ? '<div class="cm-empty cm-empty-sm"><p>No videos yet — anything you film on a run shows up ' +
-          'here.</p></div>' : "");
+        ? '<div class="cm-empty cm-empty-sm"><p>' + (logOnly
+            ? 'No logbook entries yet — write how a run felt on its own page and you can save it here.'
+            : 'No videos yet — anything you film on a run shows up here.') + '</p></div>' : "");
   // ⚠️⚠️ THE GRID IS WHAT HE HAS CHOSEN TO POST, AND NOTHING ELSE. It used to be every run the app had
   // ever recorded, put there by the app — which is a training log wearing a profile's clothes, and the
   // Logbook already is the log. His instruction: "I want the user to decide what to post on their grid,
@@ -13739,6 +13934,9 @@ function viewCommunity() {
         '</div>' +
         '<div class="cm-id">' +
           (p.name ? '<div class="cm-name">' + esc(p.name) + '</div>' : "") +
+          // ⚠️ THE HANDLE UNDER THE NAME, which is what tells two runners with the same name apart.
+          // Shown only when set — an empty @ is a field advertising itself as unfilled.
+          (cp.username ? '<div class="cm-at">@' + esc(cp.username) + '</div>' : "") +
           (cp.bio ? '<div class="cm-bio">' + esc(cp.bio) + '</div>' : "") +
           (forLine ? '<div class="cm-meta"><b>Training for</b> ' + esc(forLine) + '</div>' : "") +
           trainers +
@@ -20823,12 +21021,141 @@ function runHrHtml(run) {
     (chart ? '<div class="pc-wrap">' + chart + '</div><div class="hz-xl">km</div>' : "") +
     body + note + '</div>';
 }
-// Free text on the run. Deliberately private and local — it is a training diary, not a caption.
+/**
+ * THE LOGBOOK — free text on the run, and now something the runner can choose to put up.
+ *
+ * His instruction, 2026-08-22: "Call this the logbook and when the user adds their thoughts and
+ * feelings, they have the option to save it to the logbook area of Inte-Club with the option of
+ * overlaying these comments on top of a photo, if not it can be on top of a branded logbook card that
+ * you can design".
+ *
+ * ⚠️ IT IS STILL PRIVATE BY DEFAULT AND THE COPY STILL SAYS SO. What changed is that there is now a way
+ * OUT of it, not that the words leave the phone by themselves. "Saved on this device only" would be a
+ * false sentence if posting were automatic, and this app already treats an overstated privacy line as
+ * worse than none — the consent copy on the check-ins was rewritten twice for exactly that.
+ * ⚠️ AND THE BUTTON ONLY EXISTS ONCE THERE ARE WORDS. An offer to post an empty entry is an offer to
+ * post nothing, and it would sit under the box on every run ever recorded.
+ */
 function runNoteHtml(run) {
   const v = String(run.note || "");
-  return '<div class="card"><div class="subhead" style="margin-top:0">Your notes</div>' +
+  const can = v.trim().length > 0 && !!(run && run.id);
+  return '<div class="card"><div class="subhead" style="margin-top:0">Logbook</div>' +
     '<textarea class="rn-note" id="runNote" rows="3" placeholder="How did it feel? Shoes, route, weather, anything you want to remember.">' + esc(v) + '</textarea>' +
-    '<div class="hz-note" id="runNoteSaved">Saved on this device only.</div></div>';
+    '<div class="hz-note" id="runNoteSaved">Saved on this device only.</div>' +
+    (can
+      ? '<button class="ui-btn rn-post" data-clogpost="' + esc(String(run.id)) + '">' +
+        'Save to my Inte-Club logbook</button>'
+      : '') +
+    '</div>';
+}
+/**
+ * PUTTING A LOGBOOK ENTRY ON THE CLUB.
+ *
+ * ⚠️ TWO GROUNDS, WHICH IS HIS OWN "on top of a photo, if not... a branded logbook card". A photograph
+ * goes through the club editor exactly as any other picture does, with the words already placed on it —
+ * so pan, zoom, typeface, colour and size are all the controls that already exist. Without one the app
+ * draws the card itself.
+ * ⚠️ THE WORDS ARE PLACED AS AN OVERLAY, NOT BURNED INTO THE PHOTOGRAPH, so he can move them, resize
+ * them or delete them before it goes up. Burned in, a badly placed line would be unfixable.
+ */
+function clubLogbookSheet(run) {
+  if (!run) return;
+  const note = String(run.note || "").trim();
+  if (!note) { toast("Write something first."); return; }
+  ensureSheet(); SHEET_CTX = null;
+  $("sheetBody").innerHTML =
+    '<h2 class="cm-sh">Save to your logbook</h2>' +
+    '<p class="cm-sub">Your words, on your own logbook in Inte-Club. Nobody else can see it — there is ' +
+      'nobody else on the club yet.</p>' +
+    '<button class="ce-pick" data-clogk="photo">' +
+      '<span class="ce-pick-t">Over one of your photos</span>' +
+      '<span class="ce-pick-d">Pick a picture and your words go on top, where you can move them.</span>' +
+    '</button>' +
+    '<button class="ce-pick" data-clogk="card">' +
+      '<span class="ce-pick-t">On an Inte-Run logbook card</span>' +
+      '<span class="ce-pick-d">The run, the date and your words on a card the app draws.</span>' +
+    '</button>';
+  document.querySelectorAll("[data-clogk]").forEach((b) => b.onclick = () => {
+    const how = b.dataset.clogk;
+    closeSheet();
+    if (how === "photo") { CLUBLOG = { run: run, note: note }; clubOpenLibrary("logbook"); return; }
+    clubLogbookCard(run, note).then((file) => {
+      if (!file) { toast("That card could not be made."); return; }
+      openClubEditor("post", [file], { card: true, caption: note.slice(0, 220),
+        runId: String(run.id || ""), logbook: true });
+    }).catch(() => toast("That card could not be made."));
+  });
+  $("sheetOv").classList.add("on");
+}
+/** Set while the camera roll is being opened FOR a logbook entry, so the picker knows what it is for. */
+let CLUBLOG = null;
+/**
+ * THE BRANDED LOGBOOK CARD.
+ *
+ * ⚠️ THE SESSION'S OWN EFFORT COLOUR, through sessionEffort — the one mapping ruling 7 established, so a
+ * tempo entry is amber here exactly as it is on the tile you tapped, the calendar dot and the share
+ * card. A fifth opinion about what colour a session is would be the defect that ruling exists to end.
+ * ⚠️ 3:4, THE GRID CELL'S SHAPE, from the same two constants the run tiles read.
+ */
+function clubLogbookCard(run, note) {
+  const S = CLUB_TILE_W, H = CLUB_TILE_H;
+  const cv = document.createElement("canvas"); cv.width = S; cv.height = H;
+  const g = cv.getContext("2d");
+  if (!g) return Promise.resolve(null);
+  const eff = runEffort(run);
+  const c = getComputedStyle(document.documentElement).getPropertyValue("--eff-" + eff).trim() || "#1d9e75";
+  const grd = g.createLinearGradient(0, 0, 0, H);
+  grd.addColorStop(0, "#0a1a16"); grd.addColorStop(1, "#04100d");
+  g.fillStyle = grd; g.fillRect(0, 0, S, H);
+  // The effort as a rule down the left edge — the same device the run cards use, so the colour means
+  // the same thing here as everywhere else in the app.
+  g.fillStyle = c; g.fillRect(0, 0, S * 0.022, H);
+  const L = S * 0.095;
+  g.textBaseline = "alphabetic"; g.textAlign = "left";
+  g.fillStyle = c;
+  g.font = "700 " + Math.round(S * 0.036) + "px " + CLUB_TILE_FONT;
+  g.fillText("LOGBOOK", L, H * 0.085);
+  g.fillStyle = "#fff";
+  g.font = "700 " + Math.round(S * 0.062) + "px " + CLUB_TILE_FONT;
+  g.fillText((run.t || "Run"), L, H * 0.145);
+  g.fillStyle = "rgba(255,255,255,.72)";
+  g.font = "600 " + Math.round(S * 0.036) + "px " + CLUB_TILE_FONT;
+  g.fillText([commKm(run.distKm), run.time || "", run.pace || ""].filter(Boolean).join("  ·  "),
+    L, H * 0.19);
+  // ⚠️ THE WORDS ARE WRAPPED BY MEASUREMENT, NOT BY A CHARACTER COUNT. A count is right for one font at
+  // one size and wrong for every other, and the failure is a line running off the edge of a picture
+  // somebody has posted.
+  g.fillStyle = "#fff";
+  const size = Math.round(S * 0.048);
+  g.font = "500 " + size + "px " + CLUB_TILE_FONT;
+  const max = S - L * 2;
+  const lines = [];
+  for (const para of String(note).split(/\\n+/)) {
+    let line = "";
+    for (const w of para.split(/\\s+/)) {
+      const t = line ? line + " " + w : w;
+      if (line && g.measureText(t).width > max) { lines.push(line); line = w; } else { line = t; }
+    }
+    if (line) lines.push(line);
+    if (lines.length > 18) break;
+  }
+  const shown = lines.slice(0, 18);
+  if (lines.length > shown.length) shown[shown.length - 1] += "\u2026";
+  // ⚠️⚠️ THE WORDS ARE CENTRED IN THE BAND BETWEEN THE HEADER AND THE DATE, NOT PINNED TO THE TOP OF IT.
+  // Pinned, a short entry — which is most of them — left the bottom HALF of the card empty: measured on
+  // a five-line note, 46% of the height carrying nothing. That figure is the one this project's own
+  // recap rebuild treats as a defect rather than a floor, and a card posted to a grid is exactly where
+  // it shows. A long entry still fills the band and starts at its top, because the centring cannot push
+  // it above where it would otherwise begin.
+  const bandTop = H * 0.255, bandBot = H * 0.90;
+  const lh = size * 1.45;
+  const blockH = shown.length * lh;
+  let y = Math.max(bandTop, bandTop + (bandBot - bandTop - blockH) / 2) + size;
+  for (const ln of shown) { g.fillText(ln, L, y); y += lh; }
+  g.fillStyle = "rgba(255,255,255,.5)";
+  g.font = "700 " + Math.round(S * 0.03) + "px " + CLUB_TILE_FONT;
+  g.fillText(String(runDateLabelIso(run.dateIso) || "").toUpperCase(), L, H * 0.955);
+  return new Promise((res) => cv.toBlob((b) => res(b ? new File([b], "logbook.jpg", { type: "image/jpeg" }) : null), "image/jpeg", 0.92));
 }
 // THE post-run debrief, top to bottom, one scroll. Shared by the finish screen and the Logbook, so
 // what you read thirty seconds after a run is exactly what you read a month later.
@@ -31581,6 +31908,17 @@ function wire() {
   const strOffer = $("strOffer"); if (strOffer) strOffer.onclick = openStretchSheet;
   // Notes save as you type, debounced. No Save button: a note you have to remember to save is a
   // note that gets lost, and there is nothing here worth confirming.
+  // ⚠️ THE BUTTON READS THE BOX, NOT THE RECORD. The note is kept synchronously but written to disk on
+  // a 400ms debounce, so the record can be up to four tenths of a second behind what is on screen —
+  // and posting the stale version would drop the last words somebody typed.
+  document.querySelectorAll("[data-clogpost]").forEach((b) => b.onclick = () => {
+    const id = b.dataset.clogpost;
+    const run = (state.logged || []).filter((r) => r && String(r.id) === String(id))[0];
+    if (!run) { toast("Save the run first."); return; }
+    const live = $("runNote");
+    if (live) run.note = live.value;
+    clubLogbookSheet(run);
+  });
   const runNote = $("runNote");
   if (runNote) runNote.oninput = () => {
     // ⚠️ THE TEXT IS KEPT SYNCHRONOUSLY; only the WRITE TO DISK is debounced. Holding the text in a

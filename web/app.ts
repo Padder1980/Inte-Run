@@ -4889,22 +4889,50 @@ button.cm-tile:active { opacity: .65; }
   overflow: hidden; touch-action: none; }
 .club-frs { position: absolute; inset: 0; display: flex; }
 .club-fr { flex: 1; min-width: 0; background: #0a1a16 center/cover no-repeat; }
-.club-shade { position: absolute; top: 0; bottom: 0; background: rgba(4,16,13,.66); pointer-events: none; }
-.club-win { position: absolute; top: 0; bottom: 0; border: 2px solid #fff; border-radius: var(--r-ctl); }
+/* ⚠️⚠️ THE DIMMING IS ONE OUTER SHADOW ON THE SELECTION, NOT TWO RECTANGLES BESIDE IT — and the two
+   rectangles are what he kept circling. They were square while the white bracket is rounded, so at each
+   of the four corners a sliver of BRIGHT, undimmed video sat inside the window's box but outside its
+   curve: four pale pips against a dimmed strip, which is exactly what "the corners of the slide bar look
+   untidy" is. A shadow is generated from the element's OWN border-radius, so the dark follows the curve
+   by construction rather than by an arithmetic coincidence that a change of border width would undo.
+   ⚠️ 500px COVERS THE STRIP FROM ANY POSITION (it is at most a phone wide) and .club-film's overflow
+   clips it, so nothing paints outside the strip. */
+
+/* ⚠️⚠️ ONE WHITE SHAPE, NOT TWO STACKED ONES — and that is what "the corners of the slide bar still look
+   untidy" was. The bracket used to be a 2px white border with a separate white handle sitting inside it,
+   both rounded to the same curve at the same centre. Two coincident curves anti-alias twice, so a hairline
+   arc showed inside every corner: magnified 24x it is unmistakable, and at 1x it reads as a ragged double
+   edge. The white now comes entirely from ONE border whose left and right sides are handle-width, so there
+   is a single curve per corner and nothing to seam against. */
+.club-win { position: absolute; top: 0; bottom: 0; border: 2px solid #fff;
+  border-left-width: 14px; border-right-width: 14px; border-radius: var(--r-ctl);
+  /* ⚠️⚠️ THE DIMMING IS THIS ELEMENT'S OWN OUTER SHADOW, NOT TWO RECTANGLES BESIDE IT — and the two
+     rectangles are what he circled three times. They were square while this bracket is rounded, so at
+     each of the four corners a sliver of BRIGHT, undimmed video sat inside the window's box but outside
+     its curve: four pale pips against a dimmed strip. A shadow is generated from the element's OWN
+     border-radius, so the dark follows the curve by construction rather than by an arithmetic
+     coincidence a change of border width would undo. Measured from rendered pixels afterwards: all four
+     corners read luma 13-58 against the dimmed strip's 61 and the selection's 154.
+     ⚠️ 500px COVERS THE STRIP FROM ANY POSITION and .club-film's overflow clips it, so nothing paints
+     outside. ⚠️ AND IT IS ONE RULE, not a second .club-win — the duplicate-class ratchet caught that
+     within an hour of being written for exactly this. */
+  box-shadow: 0 0 0 500px rgba(4,16,13,.66); }
 /* ⚠️ THE HANDLES SIT INSIDE THE WINDOW, NOT OUTSIDE IT. Hung on the outer edges they are clipped by the
    strip's own overflow the moment the window reaches either end — measured, the right-hand handle was
    cut in half at 0:24 of a 24-second clip, so the runner could see the end of the selection but not
    grab it. Inside, they are always reachable, which is also what the reference does. */
 /* ⚠️ NO touch-action OF ITS OWN — it is computed from the element and its ancestors, and the strip it
    sits in already takes none. A second declaration is a second owner of one behaviour. */
-.club-h { position: absolute; top: 0; bottom: 0; width: 14px; display: grid; place-items: center;
-  background: #fff; }
+/* ⚠️ THE HANDLE IS NO LONGER WHITE — it is a transparent grab area sitting OVER the window's own thick
+   border, carrying only the grip line. It is offset by its own width because it is positioned against the
+   padding box, which the 14px border has already inset. */
+.club-h { position: absolute; top: 0; bottom: 0; width: 14px; display: grid; place-items: center; }
 /* ⚠️ THE HANDLE'S RADIUS IS THE WINDOW'S INNER RADIUS, NOT ITS OUTER ONE. The window is a 2px white
    border with radius --r-ctl, so the curve the handle has to continue is --r-ctl minus that border —
    at a flat 12px the two white shapes met slightly out of phase and left a lumpy notch at each top
    corner, which is the other half of what he circled. */
-.club-h-a { left: 0; border-radius: calc(var(--r-ctl) - 2px) 0 0 calc(var(--r-ctl) - 2px); }
-.club-h-b { right: 0; border-radius: 0 calc(var(--r-ctl) - 2px) calc(var(--r-ctl) - 2px) 0; }
+.club-h-a { left: -14px; }
+.club-h-b { right: -14px; }
 .club-h i { display: block; width: 2px; height: 16px; border-radius: 999px; background: rgba(4,16,13,.55); }
 /* ⚠️ THE HIT AREA GROWS OUTWARD ONLY, AND SYMMETRICAL WAS WRONG THE MOMENT THE WINDOW BECAME
    DRAGGABLE. At 15px each side these two zones met in the middle of a short selection and left the
@@ -4987,6 +5015,11 @@ button.cm-tile:active { opacity: .65; }
 .club-fs.on { color: #fff; }
 .club-fs.on .club-fs-i { border-color: #fff; }
 .club-fs-i img, .club-fs-i video { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* ⚠️ IT EARNS ITS NAME RATHER THAN BEING DELETED. The label inherited the swatch's type and the class did
+   nothing at all — the invented-class trap in miniature, and an unstyled name is what the next component
+   copies expecting it to work. What it needed is a rule: a filter named longer than the 76px swatch would
+   wrap onto a second line and push that one swatch taller than its neighbours, which is a ragged row. */
+.club-fs-l { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 /* The dials: a row you pick from, then one slider. */
 .club-dls { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 0 var(--s3); }
 .club-dls::-webkit-scrollbar { display: none; }
@@ -13472,8 +13505,6 @@ function clubStripHtml(sl, cap, maxIn) {
     : Array.from({ length: CLUB_STRIP_N }, () => '<span class="club-fr"></span>').join("");
   return '<div class="club-film" id="clubFilm">' +
       '<div class="club-frs">' + cells + '</div>' +
-      '<span class="club-shade" style="left:0; width:' + a.toFixed(2) + '%"></span>' +
-      '<span class="club-shade" style="left:' + b.toFixed(2) + '%; right:0"></span>' +
       '<span class="club-win" data-ctrim="w" role="slider" aria-label="Move the selection" ' +
         'aria-valuetext="' + clubClock(sl.inS) + " to " + clubClock(sl.outS) + '" ' +
         'style="left:' + a.toFixed(2) + '%; width:' + (b - a).toFixed(2) + '%">' +
@@ -13609,9 +13640,9 @@ function clubTrimPaint() {
   const S = CLUBED, sl = clubSlide(); if (!S || !sl) return;
   const film = $("clubFilm"); if (!film || !sl.dur) return;
   const a = (sl.inS / sl.dur) * 100, b = (sl.outS / sl.dur) * 100;
-  const sh = film.querySelectorAll(".club-shade");
-  if (sh[0]) sh[0].style.width = a.toFixed(2) + "%";
-  if (sh[1]) sh[1].style.left = b.toFixed(2) + "%";
+  // ⚠️ NOTHING TO POSITION BUT THE WINDOW. The dimming is the window's own outer shadow now, so it
+  // follows the selection for free — two rectangles that had to be moved in step with it were two more
+  // things to keep in step, and their square ends were the untidy corners.
   const win = film.querySelector(".club-win");
   if (win) { win.style.left = a.toFixed(2) + "%"; win.style.width = (b - a).toFixed(2) + "%"; }
   const lbl = document.querySelector(".club-trim-t");

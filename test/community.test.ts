@@ -670,7 +670,13 @@ test("BLOCKER: the trim is a filmstrip with a handle at each end, not a slider",
   assert.match(t, /data-ctrim="a"/, "there is no start handle");
   assert.match(t, /data-ctrim="b"/, "there is no end handle");
   assert.match(t, /club-fr/, "the clip's own frames are not shown");
-  assert.match(t, /club-shade[\s\S]*club-shade/, "the time outside the window is not dimmed");
+  // ⚠️ RESTATED, NOT DELETED, WHEN THE DIMMING BECAME THE SELECTION'S OWN OUTER SHADOW (2026-08-23). The
+  // invariant is "the time outside the window is dimmed"; it used to be two square rectangles beside it,
+  // whose corners were the untidiness he reported three times. The guard named the mechanism, so it
+  // failed on the fix — the fourth guard in three days scoped to a HOW rather than a WHAT.
+  assert.ok(!/club-shade/.test(t), "the two square shade rectangles are back");
+  assert.match(nocomment(sheetOf(page())), /\.club-win\s*\{[^}]*box-shadow:\s*0 0 0 \d+px/,
+    "the time outside the window is not dimmed");
   // ⚠️ THE LABEL NAMES BOTH ENDS AND THE SPAN. "0:09" alone is a position; the runner is choosing a span.
   assert.match(t, /clubClock\(sl\.inS\)[\s\S]{0,80}clubClock\(sl\.outS\)/,
     "the label does not name both ends of the window");
@@ -2287,15 +2293,78 @@ test("BLOCKER: the story trim sits above the tools rather than over them", () =>
   const to = draw.indexOf("clubToolsHtml(S, sl)");
   assert.ok(t > 0 && sh > t && to > sh,
     "the trim, the tool sheet and the tool row are not in that order, so the column stacks them wrongly");
-  // ⚠️ AND THE HANDLE'S RADIUS IS THE WINDOW'S INNER ONE. The window is a 2px border with radius
-  // --r-ctl, so a flat 12px on the handle left the two white shapes out of phase — a lumpy notch at each
-  // top corner, the other half of what he circled.
+  // ⚠️ THE CORNER FIX MOVED ON: matching the handle's radius to the border's inner curve was the first
+  // attempt and it still left a hairline where two coincident curves anti-aliased. The bracket is one
+  // shape now, so the claim is that the window carries the radius and the handle carries none — asserted
+  // in full by "the trim bracket is one white shape", and kept here because this test is the trim's own.
   const win = /\.club-win\s*\{([^}]*)\}/.exec(sheet);
   const ha = /\.club-h-a\s*\{([^}]*)\}/.exec(sheet);
   assert.ok(win && ha, "the trim window or its handle has no rule");
-  const bw = /border:\s*(\d+)px/.exec(win![1]!);
-  assert.ok(bw, "the trim window has no border width to derive the inner radius from");
-  assert.match(ha![1]!, new RegExp("calc\\(var\\(--r-ctl\\) - " + bw![1] + "px\\)"),
-    "the handle's radius is not the window's radius minus its " + bw![1] + "px border, so the two white "
-    + "shapes meet out of phase");
+  assert.match(win![1]!, /border-radius:\s*var\(--r-ctl\)/, "the trim window is not rounded at all");
+  assert.ok(!/border-radius/.test(ha![1]!),
+    "the handle carries a radius again; two rounded white shapes at one corner leave a hairline seam");
+});
+
+/**
+ * ⚠️⚠️ THE TRIM'S DIMMING IS GENERATED FROM THE SELECTION'S OWN SHAPE, and the two rectangles it replaced
+ * are what he kept circling: "the corners of the slide bar still look untidy", three reports running.
+ * They were square while the white bracket is rounded, so at each of the four corners a sliver of BRIGHT,
+ * undimmed video sat inside the window's box but outside its curve — four pale pips against a dimmed
+ * strip. Measured after, from rendered pixels: all four corners read luma 13–58 against the dimmed
+ * strip's 61 and the selection's 154. An outer shadow follows the element's own border-radius by
+ * construction, where two rectangles matched it only by an arithmetic coincidence.
+ */
+test("BLOCKER: the trim dims everything outside the selection, corners included", () => {
+  const sheet = nocomment(sheetOf(page()));
+  const win = /\.club-win\s*\{([^}]*)\}/.exec(sheet);
+  assert.ok(win, "no .club-win rule");
+  assert.match(win![1]!, /box-shadow:\s*0 0 0 \d+px/,
+    "the dimming is not the selection's own outer shadow, so it cannot follow its corners");
+  // ⚠️ THE SPREAD HAS TO COVER THE STRIP FROM ANY POSITION — a phone is at most a few hundred px wide.
+  const spread = Number(/box-shadow:\s*0 0 0 (\d+)px/.exec(win![1]!)?.[1]);
+  assert.ok(spread >= 450, "a spread of " + spread + "px leaves part of the strip undimmed");
+  // ⚠️ AND THE RECTANGLES ARE GONE, NOT LEFT UNUSED. An orphaned rule is what the next component copies.
+  assert.ok(!page().includes("club-shade"),
+    ".club-shade survives somewhere; the two square shades are what made the corners untidy");
+  const paint = nocomment(fn("clubTrimPaint"));
+  assert.ok(paint.indexOf("club-shade") < 0,
+    "the live paint still positions shades, so it moves elements that no longer exist");
+  assert.match(paint, /win\.style\.left/, "the live paint no longer moves the selection");
+});
+
+/**
+ * ⚠️⚠️ THE BRACKET IS ONE WHITE SHAPE, NOT TWO STACKED ONES. It used to be a 2px white border with a
+ * separate white handle inside it, both rounded to the same curve at the same centre — two coincident
+ * curves anti-alias twice, so a hairline arc showed inside every corner. Magnified 24x it is
+ * unmistakable; at 1x it reads as a ragged double edge.
+ */
+test("BLOCKER: the trim bracket is one white shape, and its three widths agree", () => {
+  const sheet = nocomment(sheetOf(page()));
+  const win = /\.club-win\s*\{([^}]*)\}/.exec(sheet)![1]!;
+  const h = /\.club-h\s*\{([^}]*)\}/.exec(sheet)![1]!;
+  const ha = /\.club-h-a\s*\{([^}]*)\}/.exec(sheet)![1]!;
+  const hb = /\.club-h-b\s*\{([^}]*)\}/.exec(sheet)![1]!;
+  // The white comes from the border, and only from the border.
+  const side = Number(/border-left-width:\s*(\d+)px/.exec(win)?.[1]);
+  assert.ok(side >= 10, "the window's left border is " + side + "px; the white ends come from it");
+  assert.match(win, new RegExp("border-right-width:\\s*" + side + "px"),
+    "the two white ends are different widths");
+  assert.ok(!/background/.test(h),
+    "the handle paints white of its own, so two white shapes stack and seam at the corners");
+  assert.ok(!/border-radius/.test(ha) && !/border-radius/.test(hb),
+    "a handle carries its own radius again, which is the coincident curve that seamed");
+  // ⚠️ THREE NUMBERS THAT MUST AGREE: the border's width, the handle's width, and the handle's offset.
+  // The handle is positioned against the padding box, which the border has already inset — so if they
+  // drift, the grab area sits off the white it is meant to be.
+  const hw = Number(/width:\s*(\d+)px/.exec(h)?.[1]);
+  assert.equal(hw, side, "the handle is " + hw + "px over a " + side + "px white end");
+  assert.match(ha, new RegExp("left:\\s*-" + side + "px"),
+    "the start handle does not sit over the white end");
+  assert.match(hb, new RegExp("right:\\s*-" + side + "px"),
+    "the end handle does not sit over the white end");
+  // The 44px hit area still grows OUTWARD only — the window's interior belongs to the move gesture.
+  assert.match(sheet, /\.club-h-a::after[^}]*left:\s*-30px[^}]*right:\s*0/,
+    "the start handle's hit area no longer grows outward only");
+  assert.match(sheet, /\.club-h-b::after[^}]*left:\s*0[^}]*right:\s*-30px/,
+    "the end handle's hit area no longer grows outward only");
 });

@@ -9582,3 +9582,74 @@ errors.
 ⚠️ **ONE OF MY OWN GUARDS WENT STALE FROM MY OWN RENAME AN HOUR LATER** — the row-keep sweep named
 `club-fr` in its derived list. Correct to update, but it is the fifth guard in three days whose scope was
 a NAME rather than a fact.
+
+### THE COMPOSER SWEPT FOR NAME CLASHES, AND THE TRIM'S CORNERS FIXED PROPERLY (2026-08-23)
+
+*"can you check the whole composer for any other name clashes"* after the `.club-fr` bite, then *"the
+corners of the slide bar still look untidy"* — the third report on those corners. Suite 1272 → **1274**;
+10 deliberate re-breaks, all 10 caught (one apparent escape was my re-break naming the wrong test).
+
+### The sweep: six kinds of clash, checked across 22 composer functions
+
+`/tmp/clash.mjs` and `/tmp/clash2.mjs` (throwaway, but the durable half is in the guards below).
+
+| checked | result |
+|---|---|
+| CSS classes shared with a non-composer builder | 8, **all deliberate** (`.club-stage`/`.club-fit`/`.club-txs`/`.club-x` are the viewer reusing the editor's shell; `.club-tx`/`.club-vig`/`.club-ovim` are shared components; `.num` is the tabular-figures utility) |
+| club/cm/cp classes declared twice in the stylesheet | **none** |
+| `data-*` names shared | 6, **all the composer writing and `clubFillMedia` reading** — the design |
+| ids shared with anything else | **none** |
+| ids the composer emits from two of its own builders | **none** |
+| custom properties shared | 1, `--car`, same meaning both places |
+| **classes the composer emits with NO rule at all** | **1 — `.club-fs-l`** |
+| `data-*` written and never read | **none** |
+| `dataset` read with nothing writing it | **none** |
+| `$("id")` looked up but never rendered | **none** |
+
+⚠️ **`.club-fs-l` WAS THE ONE REAL FIND — the invented-class trap in miniature.** The filter swatch's
+label inherited the swatch's type, so the class did nothing at all. **Given a real rule rather than
+deleted**, because it needed one: a filter named longer than the 76px swatch would wrap onto a second
+line and push that one swatch taller than its neighbours, which is a ragged row.
+
+### ⚠️⚠️ THE CORNERS WERE TWO FAULTS, AND MY FIRST TWO ATTEMPTS EACH FIXED ONLY ONE
+
+⚠️ **THE FIRST ATTEMPT (matching the handle's radius to the border's inner curve) WAS RIGHT ARITHMETIC AND
+STILL LEFT A SEAM.** Two white shapes with coincident curves anti-alias twice: magnified 24× there is an
+unmistakable hairline arc inside every corner, and at 1× it reads as a ragged double edge. **The bracket
+is one shape now** — the white comes entirely from `.club-win`'s border, whose left and right sides are
+handle-width, and `.club-h` is a transparent grab area sitting over it carrying only the grip line.
+⚠️ **THREE NUMBERS MUST AGREE AND THE GUARD SAYS SO**: the border's side width, the handle's width, and
+the handle's negative offset. The handle is positioned against the padding box, which the border has
+already inset — if they drift, the grab area sits off the white it is meant to be on.
+
+⚠️⚠️ **AND THE REAL "UNTIDY CORNERS" WAS THE DIMMING, NOT THE BRACKET.** The strip outside the selection
+was dimmed by **two square rectangles** while the bracket is rounded — so at each of the four corners a
+sliver of BRIGHT, undimmed video sat inside the window's box but outside its curve: **four pale pips
+against a dark strip**, which is exactly what he circled three times. It is now the selection's **own
+outer box-shadow**, so the dark follows the curve *by construction* rather than by an arithmetic
+coincidence a change of border width would undo. **Measured from rendered pixels: all four corners read
+luma 13–58 against the dimmed strip's 61 and the selection's 154** (they would read ~154 before).
+⚠️ **THE TWO `.club-shade` SPANS AND THEIR RULE ARE DELETED, NOT LEFT UNUSED**, and `clubTrimPaint` no
+longer positions anything but the window — two rectangles that had to be moved in step with the selection
+were two more things to keep in step.
+⚠️ **500px OF SPREAD COVERS THE STRIP FROM ANY POSITION** and `.club-film`'s overflow clips it.
+
+⚠️⚠️ **MY OWN DUPLICATE-CLASS RATCHET CAUGHT ME WITHIN THE HOUR OF WRITING IT.** I added the box-shadow as
+a *second* `.club-win` rule; `CSS_DUP_CEILING` went 17 → 18 and failed. Merged into the one rule. That is
+the ratchet doing exactly the job it was built for, on the person who built it.
+
+⚠️ **TWO MORE GUARDS WERE SCOPED TO A MECHANISM RATHER THAN A FACT.** "The time outside the window is
+dimmed" matched `club-shade` twice, and the corner guard asserted the handle's radius equalled the
+border's inner curve — both failed on the fix. Restated: the outside must be dimmed *somehow* (now the
+shadow), and the handle must carry **no** radius. **That is the fourth and fifth guard in three days
+scoped to a HOW instead of a WHAT** — the pattern to watch for in this file.
+
+⚠️ **THE NARROWEST SELECTION IS GRACEFUL AND WAS MEASURED**: at a one-second window the box renders 28px
+wide with both 14px white ends intact, both handles inside it and the whole thing inside the strip — it
+simply cannot be narrower than its own two ends, which is right.
+
+⚠️ **A PROBE THAT NEEDS A DECODER IS A PROBE WITH A SECOND THING THAT CAN FAIL.** Driving a real webm
+through MediaRecorder worked once and then produced an unloadable clip, and the probe reported "no
+window rendered" — which reads like a defect in the app. The corner geometry is pure markup from
+`clubStripHtml`, so the probe now fakes a clip on a photo slide (`isVid`, `dur`, `thumbs`) and needs no
+video at all.

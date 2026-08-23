@@ -1366,3 +1366,70 @@ test("BLOCKER: the Logbook section is a redesign, and its category colour is not
   assert.match(n, /lb-post-d/, "the action does not say what it does");
   assert.match(n, /ICON\.journal/, "the action's glyph is not the journal mark");
 });
+
+test("BLOCKER: deleting a post asks first, with Delete and Cancel", () => {
+  // His instruction, 2026-08-22: "when deleting any post there needs to be an alert that pops up that
+  // gives two options... 1. delete 2. cancel".
+  const ask = fn("clubConfirmDelete");
+  const labels = [...ask.matchAll(/id="clubAsk(Yes|No)">([^<]+)</g)].map((m) => m[2]!);
+  assert.deepEqual(labels, ["Delete", "Cancel"], "the dialog does not offer exactly those two: "
+    + labels.join(", "));
+  assert.match(ask, /role="alertdialog"/, "it is not announced as a dialog");
+  assert.match(ask, /aria-modal="true"/, "a screen reader can wander out of it");
+  // ⚠️ CANCEL TAKES FOCUS, NOT DELETE. On a dialog whose whole job is to slow a destructive tap down,
+  // the safe option is the one a keyboard or switch-control user lands on.
+  assert.match(ask, /overlayModal\(ov, true, "#clubAskNo"\)/, "the destructive option takes focus");
+  // ⚠️ AND THE COPY SAYS IT CANNOT BE UNDONE, because it cannot: clubDelete removes the row AND the
+  // blobs from IndexedDB. That is what makes asking right here, where CLAUDE.md records deliberately
+  // NOT asking before deleteRun — that one raises an undo toast, and a dialog before a reversible
+  // action is a tap for nothing.
+  assert.match(ask, /no way to get it back/, "the dialog does not say the delete is final");
+  const del = nocomment(fn("clubDelete"));
+  assert.match(del, /clubMediaDel\(k\)/,
+    "clubDelete no longer removes the blobs, so the copy claiming it is final would be wrong");
+});
+
+test("BLOCKER: it is the SAME dialog on every delete path, and it sits above the viewer", () => {
+  // ⚠️⚠️ IT CANNOT USE THE APP'S OWN confirmSheet. That draws on .sheet-ov at z-index 70 and the
+  // full-screen viewer is .club-view at 96, so the question would open BEHIND the very thing it is
+  // asking about — which is exactly the fault that made the Inte-Club share ask invisible.
+  const css = page();
+  const z = (sel: string) => {
+    const m = new RegExp(sel + "[^{]*\\{([^}]*)\\}").exec(css);
+    assert.ok(m, "no rule for " + sel);
+    const n = /z-index: (\d+)/.exec(m![1]!);
+    assert.ok(n, sel + " has no stacking order");
+    return Number(n![1]);
+  };
+  assert.ok(z("\\.club-ask ") > z("\\.club-ed, \\.club-view"),
+    "the confirmation is at or below the viewer, so it opens behind the post it is about");
+  assert.ok(z("\\.club-ask ") > z("\\.club-lib"), "the camera roll would cover the confirmation");
+  const ask = nocomment(fn("clubConfirmDelete"));
+  for (const bad of ["ensureSheet(", "sheetBody", "sheetOv", "confirmSheet("]) {
+    assert.ok(ask.indexOf(bad) < 0,
+      "the confirmation uses the app's bottom sheet (" + bad + "), which renders under the viewer");
+  }
+  // ⚠️ EVERY DELETE PATH GOES THROUGH IT. Two confirmations would be two chances for one to be
+  // forgotten — the fix-one-builder-not-the-other trap this project has paid for six times.
+  const app = nocomment(page());
+  const calls = [...app.matchAll(/clubDelete\(/g)].length;
+  assert.equal(calls, 3, "clubDelete has " + calls + " mentions; expected its definition and two "
+    + "callers, both of which must be inside a confirmation");
+  // ⚠️ THE CALLERS ARE DERIVED, NOT LISTED. A hand-written pair went stale immediately — I named a
+  // function that does not exist — and a list is one more thing to update the next time a delete is
+  // added anywhere. Every function whose body calls clubDelete must ask first, whatever it is called.
+  const fns = [...app.matchAll(/\nfunction (\w+)\(/g)].map((m) => m[1]!);
+  let asked = 0;
+  for (const name of fns) {
+    if (name === "clubDelete" || name === "clubConfirmDelete") continue;
+    const body = nocomment(fn(name));
+    // fn() runs to the matching brace, so a later function's call cannot leak in.
+    const at = body.indexOf("clubDelete(");
+    if (at < 0) continue;
+    asked++;
+    const ask = body.indexOf("clubConfirmDelete(");
+    assert.ok(ask >= 0 && ask < at, name + " deletes a post without asking first");
+  }
+  assert.equal(asked, 2, "expected exactly two delete paths — the viewer's menu and the post feed — "
+    + "found " + asked);
+});

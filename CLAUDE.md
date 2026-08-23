@@ -8528,6 +8528,58 @@ when there is one; the viewer's zones measured at 0–138 / 138–430 under cont
 Delete, the ⋮ opening one action; the handle stored, hinted and shown as `@adam.p_80`; **zero console
 errors**.
 
+## DELETING A POST ASKS FIRST (owner, 2026-08-22)
+
+*"when deleting any post there needs to be an alert that pops up that gives two options"* — then, asked
+which two: *"1. delete 2. cancel"*. Suite 1244 → **1246**; 7 deliberate re-breaks, all 7 caught. Web,
+so it reaches his phone on the next launch.
+
+⚠️⚠️ **IT CANNOT USE `confirmSheet`, WHICH IS THE APP'S OWN CONFIRM.** That draws on `.sheet-ov` at
+z-index **70**; the full-screen post/story viewer is `.club-view` at **96** and the camera roll is 97. So
+the question would have opened BEHIND the very post it was asking about — which is the identical z-order
+fault that made the Inte-Club share ask invisible an hour earlier, and the guard written for that one is
+what stopped this repeating. `.club-ask` is its own overlay at **98**, and a test compares the numbers
+rather than trusting the source order.
+
+⚠️ **A CONFIRMATION IS RIGHT HERE WHERE IT IS WRONG FOR A RUN, AND THE DIFFERENCE IS RECOVERABILITY.**
+CLAUDE.md records the debrief deliberately NOT asking before `deleteRun`: *"`deleteRun` already raises an
+undo toast, and a dialog before a reversible action is a tap for nothing."* This is the opposite case —
+`clubDelete` removes the row AND the blobs from IndexedDB, so the photograph or the video is gone. There
+is nothing to undo, which is exactly when asking earns its tap. The copy says so (*"there is no way to
+get it back"*) and a guard ties that sentence to `clubDelete` still calling `clubMediaDel`, so the claim
+cannot outlive the behaviour it describes.
+
+⚠️ **ONE DIALOG FOR BOTH DELETE PATHS** — the ⋮ in the viewer and the trash in the post feed. Two would
+be two chances for one to lose its confirmation, which is the fix-one-builder-not-the-other trap this
+project has paid for six times.
+⚠️ **AND THE GUARD DERIVES THE CALLERS RATHER THAN LISTING THEM.** My first version named
+`wireClubPost`, which does not exist — a hand-written pair went stale before it was ever green. It now
+walks every top-level function, and any whose body calls `clubDelete` must reach `clubConfirmDelete`
+first, whatever it is called, with a count so a third path cannot arrive unguarded.
+
+⚠️ **CANCEL TAKES THE FOCUS, NOT DELETE.** On a dialog whose whole job is to slow a destructive tap down,
+the safe option is the one a keyboard or switch-control user lands on. `role="alertdialog"`,
+`aria-modal="true"`, and `overlayModal` inerts the panel behind it and restores focus on close.
+⚠️ **A TAP ON THE BACKDROP CANCELS.** An alert with no way out but two buttons is a trap on a phone, and
+the safe answer is the one a stray tap should give.
+⚠️ **THE DESTRUCTIVE OPTION IS FILLED AND THE SAFE ONE IS NOT**, in `--rest` — this app's own colour for
+a hard stop, used by the safety bands and the watch's End button — so the two never read as a pair of
+equals.
+⚠️ **`haptic("lift")`, NOT AN INVENTED `"warn"`.** `haptic()` knows `success`, `lift` and a default, and
+an unknown kind silently falls through to the lightest tap — so a destructive confirmation would have
+felt identical to a cancel.
+
+**Driven end to end in a real browser, both paths:** the dialog opens at z98 over a viewer at z96 with
+exactly `["Delete", "Cancel"]`, focus on Cancel, `alertdialog`/`aria-modal`; Cancel closes it and keeps
+both the story and the viewer; Delete removes it and closes the viewer; the feed's trash asks the same
+question and deletes on confirm; a backdrop tap cancels; **zero console errors**.
+
+⚠️ **THE BACKTICK RULE FIRED THREE MORE TIMES IN THIS ONE FUNCTION'S COMMENTS**, and the third time was
+the instructive one: it did not fail with a syntax error but with **`ReferenceError: ov is not defined`
+at build time**, because the stray backticks closed the outer template literal and the runtime code
+after them became live TypeScript. A build failure that names a variable from the runtime JS is this
+trap wearing a disguise. Running total for the day: **seven**.
+
 ## OPEN BUGS (confirmed on real hardware, 2026-07-29)
 
 ### 1. Coach audio when the phone is locked or pocketed — FIXED 2026-08-08, unproven on hardware

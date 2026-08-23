@@ -4762,6 +4762,26 @@ button.cm-tile:active { opacity: .65; }
    ⚠️ THE SESSION'S OWN COLOUR ARRIVES AS --lbc, set inline from runEffort — the one mapping ruling 7
    established. So this card belongs to the run above it instead of looking like a component that
    landed here, and a tempo entry is amber exactly as its tile and its calendar dot are. */
+/* ══ THE DELETE CONFIRMATION ════════════════════════════════════════════════════════════════════════
+   ⚠️ z-index 98 — ABOVE the post/story viewer (96) and the camera roll (97). The app's own confirmSheet
+   draws on .sheet-ov at 70, which would put this behind the very thing it is asking about; that is the
+   same z-order fault that made the Inte-Club share ask invisible. */
+.club-ask { position: fixed; inset: 0; z-index: 98; display: flex; align-items: flex-end;
+  justify-content: center; padding: var(--s3);
+  padding-bottom: calc(var(--s3) + env(safe-area-inset-bottom, 0px));
+  background: color-mix(in srgb, var(--ink) 58%, transparent); backdrop-filter: blur(3px); }
+.club-askin { width: 100%; max-width: 420px; padding: var(--s4);
+  border-radius: var(--r-hero); background: var(--surface); border: 1px solid var(--line); }
+.club-askt { margin: 0; font-size: var(--t-section); font-weight: 750; color: var(--ink); }
+.club-askb { margin: var(--s2) 0 var(--s4); font-size: var(--t-body); line-height: 1.5;
+  color: var(--ink-soft); }
+.club-askbtn { display: block; width: 100%; min-height: var(--tap); margin-top: var(--s2);
+  border: 1px solid var(--line); border-radius: var(--r-ctl); background: var(--surface-2);
+  color: var(--ink); font-size: var(--t-card); font-weight: 700; }
+/* ⚠️ THE DESTRUCTIVE ONE IS FILLED AND THE SAFE ONE IS NOT, so the two never read as a pair of equals
+   — and --rest is this app's own colour for a hard stop, used by the safety bands and the End button. */
+.club-askbad { margin-top: 0; border-color: transparent; background: var(--rest);
+  color: var(--accent-ink); }
 .lb-card { position: relative; overflow: hidden; }
 /* A hairline of the session's colour along the top edge — the same device the run cards use, so the
    colour means the same thing in both places. */
@@ -12167,12 +12187,18 @@ function wireClubPostView() {
   });
   document.querySelectorAll("[data-cpshare]").forEach((b) => b.onclick = () => clubSharePost(b.dataset.cpshare));
   document.querySelectorAll("[data-cpdel]").forEach((b) => b.onclick = () => {
-    clubDelete(b.dataset.cpdel);
-    // ⚠️ LEAVE THE SCREEN IF THAT WAS THE LAST ONE, or the runner is left on a titled page with nothing
-    // on it — the same reason the run debrief leaves before deleting the run it is showing.
-    if (!clubPosts().length) { state.screen = null; }
-    render();
-    toast("Post removed.");
+    const id = b.dataset.cpdel;
+    const row = clubPosts().filter((x) => x && x.id === id)[0];
+    // ⚠️ THE SAME DIALOG THE VIEWER USES. Deleting from the feed is the same irreversible act, so it
+    // asks the same question — two confirmations would be two chances for one to be forgotten.
+    clubConfirmDelete(row || { id: id, kind: "post" }, () => {
+      clubDelete(id);
+      // ⚠️ LEAVE THE SCREEN IF THAT WAS THE LAST ONE, or the runner is left on a titled page with
+      // nothing on it — the same reason the run debrief leaves before deleting the run it is showing.
+      if (!clubPosts().length) { state.screen = null; }
+      render();
+      toast("Post removed.");
+    });
   });
   document.querySelectorAll("[data-cpmore]").forEach((b) => b.onclick = () => {
     const el2 = b.closest(".cp-post");
@@ -12247,14 +12273,63 @@ function clubMenu(on) {
   if (m) m.hidden = !CLUB_MENU_ON;
   if (b) b.setAttribute("aria-expanded", CLUB_MENU_ON ? "true" : "false");
 }
+/**
+ * DELETING A POST ASKS FIRST — his instruction, 2026-08-22: "when deleting any post there needs to be
+ * an alert that pops up that gives two options... 1. delete 2. cancel".
+ *
+ * ⚠️⚠️ IT CANNOT USE confirmSheet, WHICH IS THE APP'S OWN CONFIRM AND WOULD OPEN BEHIND THE VIEWER.
+ * That draws on .sheet-ov at z-index 70; the full-screen post/story viewer is .club-view at 96, and
+ * the camera roll is 97. This is the same z-order fault that made the Inte-Club share ask invisible an
+ * hour earlier — the destinations sheet closed, the runner was looking at the card again, and the
+ * question was underneath it the whole time. So this dialog is its own overlay at 98.
+ *
+ * ⚠️ AND A CONFIRMATION IS RIGHT HERE WHERE IT WOULD BE WRONG FOR A RUN. CLAUDE.md records the debrief
+ * deliberately NOT asking before deleteRun, because that raises an undo toast and "a dialog before a
+ * reversible action is a tap for nothing". This is the opposite case: clubDelete removes the row AND
+ * the blobs from IndexedDB, so the photograph or the video is gone. There is nothing to undo, which is
+ * exactly when asking earns its tap — and the copy says so rather than implying it.
+ *
+ * ⚠️ ONE DIALOG FOR BOTH DELETE PATHS — the ⋮ in the viewer and the trash in the post feed. Two would be
+ * two chances for one of them to lose the confirmation, which is the fix-one-builder-not-the-other trap
+ * this project has paid for six times.
+ */
+function clubConfirmDelete(p, onYes) {
+  if (!p) return;
+  const word = p.kind === "story" ? "story" : "post";
+  const what = p.video ? "video" : (p.logbook ? "entry" : "picture");
+  const ov = el('<div class="club-ask" id="clubAsk" role="alertdialog" aria-modal="true" ' +
+    'aria-labelledby="clubAskT"></div>');
+  ov.innerHTML =
+    '<div class="club-askin">' +
+      '<h3 class="club-askt" id="clubAskT">Delete this ' + word + '?</h3>' +
+      '<p class="club-askb">The ' + what + ' goes with it, and there is no way to get it back.</p>' +
+      '<button class="club-askbtn club-askbad" id="clubAskYes">Delete</button>' +
+      '<button class="club-askbtn" id="clubAskNo">Cancel</button>' +
+    '</div>';
+  document.body.appendChild(ov);
+  // ⚠️ CANCEL TAKES FOCUS, NOT DELETE. On a dialog whose whole job is to slow a destructive tap down,
+  // the safe option is the one a keyboard or switch-control user lands on.
+  overlayModal(ov, true, "#clubAskNo");
+  const close = () => { overlayModal(ov, false, ""); ov.remove(); };
+  $("clubAskNo").onclick = () => { haptic("light"); close(); };
+  // ⚠️ A TAP ON THE BACKDROP CANCELS. An alert with no way out but two buttons is a trap on a phone,
+  // and the safe answer is the one a stray tap should give.
+  ov.onclick = (e) => { if (e.target === ov) close(); };
+  // ⚠️ "lift", NOT "warn" — haptic() knows success, lift and a default, and an unknown kind
+  // silently falls to the lightest tap. A destructive confirmation should feel heavier than a
+  // cancel, and inventing a kind here would have made it feel identical.
+  $("clubAskYes").onclick = () => { haptic("lift"); close(); onYes(); };
+}
 /** ⚠️ ONE PLACE DOES THE WORK, so the story viewer and any later post menu cannot diverge. */
 function clubPostAction(act, p) {
   if (act !== "delete") return;
   clubMenu(false);
-  clubDelete(p.id);
-  clubViewClose();
-  render();
-  toast(p.kind === "story" ? "Story removed." : "Post removed.");
+  clubConfirmDelete(p, () => {
+    clubDelete(p.id);
+    clubViewClose();
+    render();
+    toast(p.kind === "story" ? "Story removed." : "Post removed.");
+  });
 }
 function clubOpenMedia(rows, i, auto) {
   if (!rows || !rows.length) return;

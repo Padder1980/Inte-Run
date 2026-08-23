@@ -25,6 +25,18 @@ import { readFileSync } from "node:fs";
  * a source grep: one was a missing flag, the other a variable read one line too late.
  */
 
+/** ⚠️ THE APP'S OWN FILTER TABLE, read out of the built page rather than retyped — a hand-copied table
+ *  is a second source of truth, and this file already records the cost of typing one from memory. */
+function filtersOf(src: string): Array<{ id: string; label: string; css: string }> {
+  const m = /const CLUB_FILTERS = \[([\s\S]*?)\];/.exec(src);
+  assert.ok(m, "CLUB_FILTERS could not be found in the built page");
+  const out: Array<{ id: string; label: string; css: string }> = [];
+  for (const row of m![1]!.matchAll(/\{\s*id:\s*"(\w+)",\s*label:\s*"([^"]*)",\s*css:\s*"([^"]*)"/g)) {
+    out.push({ id: row[1]!, label: row[2]!, css: row[3]! });
+  }
+  assert.ok(out.length >= 4, "only " + out.length + " filters parsed out of CLUB_FILTERS");
+  return out;
+}
 const page = () => readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
 
 /** Lift a function out of the built page, brace-matched. */
@@ -329,6 +341,13 @@ function openMedia(row: Record<string, unknown>, auto: boolean) {
     // are asserted in test/community.test.ts.
     "clubPostMenuHtml", "clubMenu", "clubPostAction", "CLUB_MENU_ON",
     "CLUB_VIEW_T", "COMM_STORY_MS", "CLUB_STORY_MAX_S",
+    // ⚠️ THE LOOK IS LIFTED FOR REAL RATHER THAN STUBBED, so this file can see a filter, a vignette and
+    // an overlay actually reach the viewer's markup. A stub returning "" would let the viewer stop
+    // carrying them and every assertion here would still pass.
+    nocomment(fn(src, "clubFilterCss")) + "\n" +
+    nocomment(fn(src, "clubLook")) + "\n" +
+    nocomment(fn(src, "clubLookAttrs")) + "\n" +
+    "const CLUB_FILTERS = " + JSON.stringify(filtersOf(src)) + ";\n" +
     nocomment(fn(src, "clubOpenMedia")) + "\nreturn clubOpenMedia;",
   )(
     () => overlay,

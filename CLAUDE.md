@@ -7365,7 +7365,7 @@ opposite — the single backslash was swallowed by the template literal, so the 
 nothing. Write `\\/`, not `\/`. Running total for backticks in this run of work: **11**.
 
 ⚠️ **TWO INVENTED CSS TOKENS, CAUGHT BY THE TOKEN GUARD.** `--on-accent` (the real one is
-`--accent-ink`) and `--r-sm2` (the radius ladder is `--r-sm` / `card` / `ctl` / `pill` / `hero`). An
+`--accent-ink`) and `--r-sm2` (the ladder is `--r-card` / `--r-ctl` / `--r-pill` / `--r-hero` — ⚠️ **and there is no `--r-sm` either, which an earlier version of this very sentence claimed**; the token guard caught it being used on 2026-08-23). An
 undeclared custom property invalidates the whole declaration silently, which is what that guard exists
 for and it earned its keep on its own feature.
 
@@ -9267,3 +9267,142 @@ A second `.cm-meta` container below would have been two rules owning one line's 
 **Measured after, at 430×932 and 320×568, at text scale 1.0 and 1.3, both themes:** pane overflow **0**,
 nothing sticking out of the pane at any of them, `scrollLeft` **0**, page overflow **0**, capsules in 2
 even rows (3 at the narrowest extreme, by design), zero console errors.
+
+## THE COMPOSER IS THE REFERENCE'S POSTING EXPERIENCE (owner's screen recording, 2026-08-23)
+
+*"the next sequence of screenshots is the process that you follow on instagram before posting a photo or
+carousel. if you need clarification about what happens when in order for Instagram please ask….i want the
+same user experience when posting to inte-run"* — eight screenshots: the tool row (Audio, Text, Overlay,
+Filter, Edit, Ratio), the filter swatches, four screens of adjustment dials, and Portrait/Landscape/Square.
+Suite 1256 → **1265**; 18 deliberate re-breaks, all 18 caught. Web-only, so it reaches his phone on the
+next launch.
+
+⚠️ **TWO THINGS IN IT WERE HIS DECISIONS AND WERE ASKED RATHER THAN ASSUMED.** *"Show it, marked as
+coming"* for **Audio** — music over a post needs a licensed catalogue, which is a subscription and a
+rights agreement, and the phone's own library cannot stand in because those tracks are DRM-locked to
+their apps. And *"Now, in the same go"* for **Overlay**. Everything else is a straight replication.
+
+### ⚠️⚠️ NOTHING IS RE-ENCODED, AND THAT IS THE WHOLE DESIGN
+
+The original file is stored untouched and the look is **a name and a few numbers applied at display
+time** — exactly the model the video trim already uses (two points, never a re-cut clip). Baking a
+filter into pixels in a web view means decoding to a canvas and encoding back: slow on a phone, lossy,
+and it destroys the original the runner may want back. So a filter can be changed or taken off a post
+that is already up, and a future export still starts from the untouched photograph.
+⚠️ **ONE BUILDER AND ONE APPLIER.** `clubLook(sl)` returns the three things that are applied by three
+different mechanisms — a CSS filter list, an opacity on a radial overlay, and a rotation — and
+`clubApplyLook(node, look)` is the only place any of them is set. The composer's preview, the grid tile,
+the post feed and the full-screen viewer all go through it; two copies is the composer and the grid
+disagreeing about one picture, which is the debrief hero's two-framings fault. A guard sweeps every
+top-level function for a second `style.filter =` and requires the list to be empty.
+⚠️ **THE LOOK TRAVELS TO A POSTED SURFACE AS ATTRIBUTES**, because the media element does not exist when
+the builder runs — `clubFillMedia` creates it once the blob is out of IndexedDB. So the span carries what
+to do and the one loader does it.
+
+⚠️ **A ROTATED PICTURE HAS TO BE SCALED TO COVER, AND HOW MUCH DEPENDS ON THE BOX** — so it cannot be a
+constant and cannot live in the stylesheet. Measured through the real function: the same 8° needed
+**scale 1.1942 on the 4:5 stage, 1.1294 once the ratio became square, and 1.1758 on the 3:4 grid tile**.
+That is why `clubApplyLook` measures the node instead of taking a style string.
+
+⚠️ **THE DIALS ARE THE ONES CSS CAN GENUINELY DO, AND THE REST ARE LEFT OUT RATHER THAN FAKED.** Lux,
+Brightness, Contrast, Saturation, Warmth, Fade, Vignette, Straighten. The reference's **Highlights** and
+**Shadows** need a tone curve limited to part of the range, which no CSS filter expresses; **Structure**
+and **Sharpen** need a convolution, i.e. an SVG filter heavy enough to drop frames under a finger;
+**Tilt Shift** needs a masked blur of a second copy. A dial that moves and changes nothing useful is
+worse than one that is not there.
+⚠️ **WARMTH GOES BOTH WAYS AND THE TWO DIRECTIONS ARE DIFFERENT FUNCTIONS** — `sepia()` only warms, so a
+one-armed dial does nothing on half its travel. Cooling is a hue rotation. Guarded in both directions.
+⚠️ **LUX IS ONE DIAL DRIVING THREE**, which is what an auto-enhance is rather than a fake.
+⚠️ **VIGNETTE IS ONE-WAY AND IS NOT A FILTER** — it comes back from `clubLook` separately because it is a
+radial overlay, and a negative value is clamped to zero rather than inverting into a glow.
+
+### ⚠️⚠️ CANCEL GENUINELY REVERTS, AND THE SNAPSHOT IS PER TOOL
+
+A Cancel that only closes the sheet keeps every change the runner was trying out — worse than no Cancel
+at all, because the word promises the opposite. `S.snap` is taken in `clubToolOpen` and holds **only what
+that tool can touch**: cancelling the filter sheet cannot undo a crop made before it, and a snapshot of
+the whole slide would take the crop with it. Driven rather than read — the snapshot is an object copy and
+the restore a field-by-field assignment, neither visible in the source text — and both wrong versions
+(no snapshot, and a whole-slide snapshot) were re-broken and caught.
+⚠️ **`Done` CLEARS THE SNAPSHOT**, or a later Cancel on a different sheet reverts to it.
+
+⚠️ **THE SHEET IS A FLEX SIBLING OF THE STAGE, NOT A PANEL OVER IT**, so the picture shrinks and stays
+whole — measured, the stage goes 803 → 637px when a sheet opens. That is what the reference shows and it
+is the point: you cannot judge a filter through the panel covering the half you are filtering.
+
+⚠️ **THE TOOL ROW WRAPS, IT DOES NOT SCROLL.** Six tools do not fit one line on a small screen at the
+largest text setting, and he ruled the same day that nothing may slide sideways — so it is the shape the
+profile's times row uses. A scrolling tool row also hides tools behind a gesture nobody is told about.
+⚠️ **TEXT MOVED INTO THE ROW** from a floating `Aa` in a corner rail, which is not where the reference
+puts it and not where a runner looks. The rail now carries only the delete for a **selected** word.
+
+⚠️⚠️ **THE ADJUSTMENT SLIDER DOES NOT REDRAW ON INPUT, AND THAT IS NOT AN OPTIMISATION.** `clubEdDraw`
+rebuilds the whole editor, so redrawing per input event destroys the input the finger is holding — the
+trap the Support search field needed its caret restored for, and the one that made the video trim snap
+back to the start on every drag. It applies the look directly and redraws once, on `change`.
+
+### THE OVERLAY, AND WHY IT IS SLIDERS RATHER THAN A PINCH
+
+⚠️ **DRAGGING MOVES IT; SIZE AND ANGLE ARE SLIDERS.** A pinch on the stage already zooms the photograph
+underneath, so making pinch mean "scale the overlay" too would be one gesture meaning two things
+depending on what the finger landed on — the class of thing this app refuses (a tap edits a word and a
+drag moves it precisely BECAUSE they are told apart). Sliders are also the only version a switch-control
+or keyboard user can reach.
+⚠️ **AN OVERLAY IS A PHOTOGRAPH, NEVER A VIDEO** — a second moving picture is a compositing problem this
+app cannot export or keep in sync — and it is capped at four.
+⚠️ **ITS BYTES LIVE AND DIE WITH THE POST.** Each overlay is its own blob written in the SAME
+all-or-nothing pass as the slides', and `clubKeys` includes their keys, or deleting a post leaves them in
+IndexedDB for ever — which the delete dialog promises will not happen.
+⚠️ **AND THE OVERLAY'S OBJECT URLS ARE RELEASED WITH THE SLIDE'S.** Each is its own
+`createObjectURL`; releasing only the slide's leaks a whole photograph per overlay for the session.
+
+⚠️⚠️ **THE ZOOM GUARD CAUGHT A REAL DEFECT: `.club-ovim` HAD `touch-action: none` OF ITS OWN.**
+touch-action is computed from the element AND its ancestors, so the editor's stage already covers dragging
+an overlay — while on a POSTED surface the same declaration silently kills the scroll wherever an overlay
+happens to lie, because the feed and the viewer are scrolled past. **Exactly what `.club-tx`'s own note
+records, in a second place**, and `test/ios-input-zoom.test.ts`'s allowlist is what found it.
+⚠️ **BUT `.club-ovim` DOES NEED COMPOUND SELECTORS.** Each posted surface has its own child-img rule at
+specificity (0,1,1) setting `height: 100%` and `object-fit: cover`, which would stretch an overlay to fill
+the whole picture. A bare single-class selector loses to those whatever the source order.
+
+⚠️ **THE RATIO IS ON THE POST, NOT THE SLIDE** — a carousel is one shape you swipe through, so a per-slide
+ratio would change the frame under the finger. `.cp-slide` falls back to **4:5**, which is what every post
+made before the tool existed was composed at, so nothing already up moves.
+
+### Traps this build paid for again
+
+⚠️ **THE BACKTICK RULE FIRED THREE TIMES, ALL IN MY OWN CSS COMMENTS**, and one of them failed as
+**`ReferenceError: img is not defined`** rather than a syntax error — the backticks closed the outer
+template literal, so the CSS after them became live TypeScript. And in the same breath **`node --check`
+and the design-system test both reported OK on the STALE build**, exactly as this file warns. Read the
+build's exit code before trusting anything after it. Running total for this stretch: **fourteen**.
+⚠️ **THE QUOTE-ESCAPING RULE FIRED ONCE** — `phone\'s` inside a single-quoted runtime string collapses to
+a bare apostrophe and breaks it. A real typographic apostrophe needs no escaping at all and is what
+shipped.
+⚠️ **THE REGEX RULE FIRED ONCE** — `/^image\//` emitted as `/^image//`, which is a syntax error rather
+than a silent mismatch this time. Sweep the EMITTED page.
+⚠️⚠️ **AND `--r-sm` DOES NOT EXIST.** The ladder is `--r-card` / `--r-ctl` / `--r-pill` / `--r-hero`; I
+used `--r-sm` in four places on the strength of a sentence **in this very file** that listed it. The
+undeclared-token guard caught all four, and that sentence is now corrected — an undeclared custom
+property invalidates the whole declaration in silence.
+
+⚠️ **THREE EXISTING GUARDS WERE SCOPED TO MARKUP AND FAILED ON CORRECT CODE — all restated, none
+deleted.** The Aa guard looked for a button id that moved into the tool row; the object-URL guard matched
+the exact old release line; and the all-or-nothing guard matched `Promise.all(slides.map` where the puts
+are now collected into an array so the overlays ride in the same pass. **That is four guards in two days
+scoped to a place rather than to a fact** — the pattern to watch for.
+⚠️ **AND A HAND-WRITTEN LIFT LIST WENT STALE AND FAILED LOUDLY** (`clubLookAttrs is not defined`, four
+tests). That is the acceptable kind of stale. It now lifts `clubLook`, `clubFilterCss` and
+`clubLookAttrs` for REAL rather than stubbing them, so the viewer's markup is proved to carry the look —
+a stub returning "" would let the viewer stop carrying it with every assertion still passing.
+⚠️ **`clubKeys` NOW CONTAINS THE OVERLAYS' KEYS, so two callers reading `clubKeys(p)[0]` as "the first
+slide's media" became a coupling to the order they are pushed in.** Both now read `clubSlides(p)[0].media`,
+which is what they mean.
+
+**Driven end to end in a real browser** (430×932): six tools in one row, the sheet shrinking the stage,
+Punch applied then **Cancel reverting it to nothing**, Mono kept by Done, Lux 60 stacking after the
+filter, Vignette 0.7, Straighten 8° with its box-dependent scale, Square making the stage 430×430, the
+Audio sheet with only Cancel and Done, an overlay placed and sized, a text committed, then **posted** —
+the row carrying `ratio: "sq"`, `filter: "mono"`, `adj: {lux:60, vig:70, rot:8}`, one overlay and **two
+media keys** — and the grid tile then rendering that same filter string, its own rotation scale, the
+overlay and the vignette. **Zero console errors, page overflow 0 throughout.**

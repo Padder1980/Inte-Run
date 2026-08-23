@@ -4914,6 +4914,113 @@ button.cm-tile:active { opacity: .65; }
 .club-sl > img, .club-sl > video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .club-sl-x { position: absolute; top: 1px; right: 1px; display: grid; place-items: center; width: 18px;
   height: 18px; border-radius: 50%; background: rgba(4,16,13,.72); color: #fff; font-size: var(--t-label); }
+/* ── THE COMPOSER'S TOOLS (his ruling, 2026-08-23: the reference's own posting experience).
+   ⚠️ EVERY RADIUS IS A LADDER TOKEN AND EVERY SIZE IS A TYPE TOKEN. Both design ratchets sit exactly on
+   their ceilings with no headroom, so one literal px value here fails the suite — which is the ratchet
+   doing its job rather than an inconvenience. */
+.club-stage.club-ar { flex: 0 1 auto; width: 100%; aspect-ratio: var(--car); margin: auto 0; }
+/* ⚠️ A RADIAL, NOT A BOX SHADOW. inset box-shadow on the stage would sit under the media (which is
+   absolutely positioned over it); this is a sibling above the picture and below the words. */
+.club-vig { position: absolute; inset: 0; pointer-events: none; opacity: 0;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,0) 42%, rgba(0,0,0,.82) 100%);
+  transition: opacity 90ms linear; }
+.club-ovs-l { position: absolute; inset: 0; }
+/* ⚠️ THE COMPOUND SELECTORS ARE LOAD-BEARING. Each posted surface has its own child-img rule at
+   specificity (0,1,1) setting height 100% and object-fit cover — which would stretch an overlay to fill
+   the whole picture. A bare single-class selector loses to those; these win at (0,2,0) whatever the source order,
+   which a same-specificity selector does not. */
+.club-ovim, .club-ovs-l > .club-ovim, .cm-t-med > .club-ovim, .cp-med > .club-ovim,
+.club-vmed > .club-ovim { position: absolute; max-width: none; height: auto; object-fit: contain;
+  /* ⚠️⚠️ NO touch-action OF ITS OWN, AND THE ZOOM GUARD CAUGHT THIS AS A REAL DEFECT. touch-action is
+     computed from the element AND its ancestors, so the editor's stage (which takes none) already covers
+     dragging an overlay — while on a POSTED surface the same declaration would silently kill the scroll
+     wherever an overlay happens to lie, because the feed and the viewer are scrolled past. Exactly what
+     .club-tx's own note records, in a second place. */
+  filter: drop-shadow(0 2px 10px rgba(2,10,8,.45)); }
+.club-ovim.on { outline: 1.5px dashed rgba(255,255,255,.8); outline-offset: 2px; }
+/* ⚠️ IT WRAPS, IT DOES NOT SCROLL — six tools do not fit one row on a small screen at the largest text
+   setting, and he ruled the same day that nothing may slide sideways. Same shape as the profile's times:
+   a basis that puts them on one line where they fit and two where they do not. */
+.club-tools { position: relative; z-index: 3; display: flex; flex-wrap: wrap; gap: 6px;
+  padding: var(--s2) var(--s3) 0; }
+.club-tool { flex: 1 1 auto; min-width: max-content; display: grid; justify-items: center; gap: 3px;
+  padding: 7px 9px; border: 1px solid rgba(255,255,255,.14); border-radius: var(--r-ctl);
+  background: rgba(255,255,255,.08); color: #fff; font-size: var(--t-label); font-weight: 600; }
+.club-tool.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 28%, transparent); }
+.club-tool-i { display: grid; place-items: center; height: 22px; font-size: var(--t-card);
+  font-weight: 800; }
+.club-tool-i svg { width: 21px; height: 21px; }
+/* ⚠️ THE SHEET IS A FLEX SIBLING OF THE STAGE, so the picture shrinks and stays whole. A panel OVER the
+   photograph covers the half you are trying to judge, which is the whole point of the tool. */
+.club-esh { position: relative; z-index: 3; flex: none; display: flex; flex-direction: column;
+  background: rgba(8,20,17,.96); border-top: 1px solid rgba(255,255,255,.12); }
+.club-esh-b { padding: var(--s3) 0 var(--s2); }
+.club-esh-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--s2);
+  padding: 0 var(--s3) var(--s2); }
+.club-esh-t { font-size: var(--t-card); font-weight: 800; color: #fff; }
+.club-esh-c, .club-esh-d { min-height: var(--tap); padding: 0 var(--s2); border: 0; background: none;
+  font-size: var(--t-body); font-weight: 600; color: #fff; }
+.club-esh-d { color: var(--accent); font-weight: 800; }
+/* The filter swatches: the runner's own picture under each look. */
+.club-fr { display: flex; gap: var(--s2); overflow-x: auto; scrollbar-width: none;
+  padding: 0 var(--s3); }
+.club-fr::-webkit-scrollbar { display: none; }
+.club-fs { flex: none; display: grid; gap: 5px; width: 76px; padding: 0; border: 0; background: none;
+  color: rgba(255,255,255,.72); font-size: var(--t-label); font-weight: 600; }
+.club-fs-i { display: block; overflow: hidden; width: 76px; height: 76px; border-radius: var(--r-ctl);
+  border: 2px solid transparent; }
+.club-fs.on { color: #fff; }
+.club-fs.on .club-fs-i { border-color: #fff; }
+.club-fs-i img, .club-fs-i video { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* The dials: a row you pick from, then one slider. */
+.club-dls { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 0 var(--s3); }
+.club-dls::-webkit-scrollbar { display: none; }
+.club-dl { flex: none; display: flex; align-items: center; gap: 5px; min-height: var(--tap);
+  padding: 0 var(--s2); border: 1px solid rgba(255,255,255,.14); border-radius: var(--r-pill);
+  background: none; color: rgba(255,255,255,.78); font-size: var(--t-label); font-weight: 600; }
+.club-dl.on { border-color: #fff; color: #fff; }
+/* ⚠️ A DOT AND A NUMBER, never colour alone — a dial that has been moved says so in a way that does not
+   depend on seeing the difference between two greys. */
+.club-dl-d { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.28); }
+.club-dl-d.set { background: var(--accent); }
+.club-dl-v { color: var(--accent); }
+.club-dsl { display: flex; align-items: center; gap: var(--s2); padding: var(--s3) var(--s3) 0; }
+.club-dsl label { flex: none; font-size: var(--t-label); font-weight: 600; color: rgba(255,255,255,.78); }
+.club-dsl input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); }
+.club-dsl-v { flex: none; min-width: 46px; text-align: right; font-size: var(--t-meta);
+  font-weight: 700; color: #fff; }
+.club-dsl-r { flex: none; min-height: var(--tap); padding: 0 var(--s2); border: 0; background: none;
+  font-size: var(--t-label); font-weight: 700; color: var(--accent); }
+.club-dsl-r:disabled { color: rgba(255,255,255,.34); }
+/* Ratio. */
+.club-rr { display: flex; align-items: flex-end; justify-content: center; gap: var(--s3);
+  padding: 0 var(--s3); }
+.club-rt { display: grid; justify-items: center; gap: 6px; width: 84px; padding: 0; border: 0;
+  background: none; color: rgba(255,255,255,.72); font-size: var(--t-label); font-weight: 600; }
+.club-rt-b { display: block; width: 46px; border: 1.5px solid currentColor; border-radius: var(--r-ctl); }
+.club-rt.on { color: #fff; }
+/* Audio, and an overlay with nothing on it yet. */
+.club-soon { padding: 0 var(--s3); text-align: center; color: rgba(255,255,255,.82); }
+.club-soon p { margin: 6px 0 0; font-size: var(--t-meta); line-height: 1.45; }
+.club-soon-i { display: grid; place-items: center; margin: 0 auto var(--s2); width: 40px; height: 40px;
+  border-radius: 50%; background: rgba(255,255,255,.1); color: #fff; }
+.club-soon-i svg { width: 22px; height: 22px; }
+.club-ov-add, .club-ovs-add { margin-top: var(--s3); min-height: var(--tap); padding: 0 var(--s4);
+  border: 0; border-radius: var(--r-ctl); background: var(--accent); color: var(--accent-ink);
+  font-size: var(--t-body); font-weight: 700; }
+.club-ovr { display: flex; gap: var(--s2); overflow-x: auto; scrollbar-width: none;
+  padding: 0 var(--s3); }
+.club-ovr::-webkit-scrollbar { display: none; }
+.club-ovs { position: relative; flex: none; overflow: hidden; width: 60px; height: 60px; padding: 0;
+  border: 2px solid transparent; border-radius: var(--r-ctl); background: rgba(255,255,255,.08); }
+.club-ovs.on { border-color: #fff; }
+.club-ovs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.club-ovs-add { display: grid; place-items: center; margin-top: 0; width: 60px; height: 60px;
+  border-radius: var(--r-ctl); }
+.club-ovs-add svg { width: 20px; height: 20px; }
+.club-ovs-x { position: absolute; top: 1px; right: 1px; display: grid; place-items: center;
+  width: 20px; height: 20px; border-radius: 50%; background: rgba(4,16,13,.8); color: #fff;
+  font-size: var(--t-label); }
 .club-foot-r { display: flex; align-items: center; gap: var(--s2); }
 .club-foot-r .club-send { flex: 1; }
 .club-add { flex: none; display: grid; place-items: center; width: 44px; height: 44px; padding: 0;
@@ -4955,7 +5062,9 @@ button.cm-tile:active { opacity: .65; }
    between the two axes correctly where a hand-rolled drag has to guess on every move. */
 .cp-rail { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
 .cp-rail::-webkit-scrollbar { display: none; }
-.cp-slide { position: relative; flex: none; width: 100%; aspect-ratio: 4 / 5; scroll-snap-align: center;
+/* ⚠️ THE POST'S OWN SHAPE WHEN IT CHOSE ONE, 4:5 OTHERWISE — the fallback is the shape every post
+   made before the Ratio tool existed was composed at, so nothing already up moves. */
+.cp-slide { position: relative; flex: none; width: 100%; aspect-ratio: var(--car, 4 / 5); scroll-snap-align: center;
   overflow: hidden; background: var(--surface-2); }
 .cp-fit { position: absolute; inset: 0; }
 .cp-med { position: absolute; inset: 0; }
@@ -5200,6 +5309,13 @@ const EX_STILL = ${JSON.stringify(exStillData)};
 // Anatomical stretch frames as data URIs: ASM_FRAMES[anat][0..3] -> "data:image/png;base64,...".
 const ASM_FRAMES = ${JSON.stringify(stretchFrameData)};
 const ICON = {
+  /* ⚠️ THE SIX COMPOSER TOOLS, drawn on this app's own 24-unit grid in currentColor like every other
+     mark here — never a third party's artwork, and never a colour of their own. */
+  cAudio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>',
+  cOverlay: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="13" height="13" rx="2.5"/><path d="M8 21h11a2 2 0 0 0 2-2V8"/></svg>',
+  cFilter: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="9" r="5"/><circle cx="15" cy="15" r="5"/></svg>',
+  cEdit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h5m4 0h7M4 16h11m4 0h1"/><circle cx="11" cy="8" r="2"/><circle cx="17" cy="16" r="2"/></svg>',
+  cRatio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V6a2 2 0 0 1 2-2h3M20 9V6a2 2 0 0 0-2-2h-3M4 15v3a2 2 0 0 0 2 2h3M20 15v3a2 2 0 0 1-2 2h-3"/></svg>',
   // ⚠️ ADDED FOR THE LOGBOOK'S PRIVACY LINE. That sentence is the one thing on the card a runner might
   // genuinely need to know, and it was the smallest thing on it — a glyph is what makes it read as a
   // stated fact rather than a footnote. Same 24-unit grid and currentColor as every other mark here, so
@@ -11484,6 +11600,121 @@ function clubCreateHtml() {
  * this app installs kills pinch everywhere, so the stage has to be named in it — exactly as the avatar
  * cropper and the share studio's stage already are.
  */
+/**
+ * THE LOOK OF A SLIDE — filters, adjustments and the aspect it is posted at.
+ *
+ * ⚠️⚠️ NOTHING IS RE-ENCODED, AND THAT IS THE WHOLE DESIGN. The original file is stored untouched and
+ * the look is a short string applied at display time, exactly as the video trim is two points rather
+ * than a re-cut clip. Baking a filter into pixels in a web view means decoding to a canvas and encoding
+ * back — slow on a phone, lossy, and it destroys the original the runner may want back. So a filter can
+ * be changed or removed on a post that is already up, and an export can still start from the untouched
+ * photograph.
+ * ⚠️ ONE BUILDER, READ BY THE COMPOSER AND BY EVERY SURFACE THAT SHOWS A POST. The editor's preview, the
+ * grid tile, the post feed, the full-screen viewer and the story all ask clubLook; two copies of this
+ * arithmetic is the composer and the grid disagreeing about one picture, which is the fault this file
+ * already records for the debrief hero's two framings.
+ */
+const CLUB_FILTERS = [
+  { id: "none",  label: "Normal", css: "" },
+  { id: "fade",  label: "Fade",   css: "contrast(.88) saturate(.86) brightness(1.06)" },
+  { id: "warm",  label: "Warm",   css: "sepia(.2) saturate(1.18) contrast(.94) brightness(1.03)" },
+  { id: "cool",  label: "Cool",   css: "hue-rotate(-12deg) saturate(.92) contrast(1.03) brightness(1.02)" },
+  { id: "punch", label: "Punch",  css: "contrast(1.16) saturate(1.28)" },
+  { id: "matte", label: "Matte",  css: "contrast(.9) saturate(.94) sepia(.07) brightness(1.02)" },
+  { id: "mono",  label: "Mono",   css: "grayscale(1) contrast(1.1)" }
+];
+/**
+ * THE ADJUSTMENT DIALS.
+ * ⚠️ EVERY ONE OF THESE IS SOMETHING CSS CAN GENUINELY DO, and the ones the reference has that it cannot
+ * are left out rather than faked. Highlights and Shadows need a tone curve limited to part of the range,
+ * which no CSS filter expresses; Structure and Sharpen need a convolution, which is an SVG filter heavy
+ * enough to drop frames under a finger on a phone; Tilt Shift needs a masked blur of a second copy. A
+ * dial that moves and changes nothing useful is worse than one that is not there.
+ * ⚠️ LUX IS ONE DIAL DRIVING THREE, which is what an auto-enhance is — not a fake.
+ */
+const CLUB_ADJ = [
+  { id: "lux",  label: "Lux" },
+  { id: "bri",  label: "Brightness" },
+  { id: "con",  label: "Contrast" },
+  { id: "sat",  label: "Saturation" },
+  { id: "warm", label: "Warmth" },
+  { id: "fade", label: "Fade" },
+  { id: "vig",  label: "Vignette", oneWay: true },
+  { id: "rot",  label: "Straighten", deg: true }
+];
+/** ⚠️ THE THREE THE REFERENCE OFFERS, and the aspect belongs to the POST rather than to a slide — a
+ *  carousel is one shape you swipe through, so a per-slide ratio would change the frame under the
+ *  finger. Original keeps whatever the camera gave. */
+const CLUB_RATIOS = [
+  { id: "orig", label: "Original", ar: 0 },
+  { id: "port", label: "Portrait", ar: 4 / 5 },
+  { id: "land", label: "Landscape", ar: 1.91 },
+  { id: "sq",   label: "Square",   ar: 1 }
+];
+function clubRatio(id) {
+  const r = CLUB_RATIOS.filter((x) => x.id === id)[0];
+  return r || CLUB_RATIOS[0];
+}
+function clubFilterCss(id) {
+  const f = CLUB_FILTERS.filter((x) => x.id === id)[0];
+  return f ? f.css : "";
+}
+/**
+ * ⚠️ RETURNS THE THREE THINGS THAT ARE APPLIED DIFFERENTLY, not one string, because they are three
+ * different mechanisms: a CSS filter list on the media, an opacity on a radial overlay, and a rotation
+ * that has to be paired with a cover-scale computed from the box it sits in.
+ */
+function clubLook(s) {
+  const a = (s && s.adj) || {};
+  const n = (k) => {
+    const v = Number(a[k]);
+    return isFinite(v) ? Math.max(-100, Math.min(100, v)) / 100 : 0;
+  };
+  const parts = [];
+  const pre = clubFilterCss(s && s.filter);
+  if (pre) parts.push(pre);
+  const lux = n("lux");
+  if (lux) parts.push("contrast(" + (1 + lux * 0.22).toFixed(3) + ") saturate(" +
+    (1 + lux * 0.3).toFixed(3) + ") brightness(" + (1 + lux * 0.06).toFixed(3) + ")");
+  if (n("bri")) parts.push("brightness(" + (1 + n("bri") * 0.35).toFixed(3) + ")");
+  if (n("con")) parts.push("contrast(" + (1 + n("con") * 0.4).toFixed(3) + ")");
+  if (n("sat")) parts.push("saturate(" + Math.max(0, 1 + n("sat")).toFixed(3) + ")");
+  const w = n("warm");
+  // ⚠️ WARMTH GOES BOTH WAYS AND THE TWO DIRECTIONS ARE DIFFERENT FUNCTIONS. sepia() only warms; cooling
+  // is a hue rotation. One of them alone gives a dial that does nothing on half its travel.
+  if (w > 0) parts.push("sepia(" + (w * 0.4).toFixed(3) + ") saturate(" + (1 + w * 0.25).toFixed(3) + ")");
+  else if (w < 0) parts.push("hue-rotate(" + (w * 18).toFixed(1) + "deg) saturate(" +
+    (1 - w * 0.12).toFixed(3) + ")");
+  const f = n("fade");
+  if (f > 0) parts.push("contrast(" + (1 - f * 0.3).toFixed(3) + ") brightness(" + (1 + f * 0.12).toFixed(3) + ")");
+  const rot = Number(a.rot);
+  return { filter: parts.join(" "),
+    vig: Math.max(0, n("vig")),
+    rot: isFinite(rot) ? Math.max(-15, Math.min(15, rot)) : 0 };
+}
+/**
+ * ⚠️ A ROTATED PICTURE HAS TO BE SCALED UP OR ITS CORNERS SHOW, and how much depends on the shape of the
+ * box it is in — so this cannot be a constant and cannot live in the stylesheet. Straightening by 8
+ * degrees in a tall box needs a different scale from the same 8 degrees in a wide one.
+ */
+function clubRotScale(deg, w, h) {
+  const r = Math.abs(deg) * Math.PI / 180;
+  if (!r || !(w > 0) || !(h > 0)) return 1;
+  const c = Math.cos(r), sn = Math.sin(r);
+  return Math.max(c + (h / w) * sn, c + (w / h) * sn);
+}
+/**
+ * ⚠️ ONE APPLIER, so the composer's preview and every posted surface cannot drift. It measures the node
+ * for the rotation scale, which is why it is a function and not a style string.
+ */
+function clubApplyLook(node, look) {
+  if (!node) return;
+  node.style.filter = look.filter || "";
+  if (!look.rot) { node.style.transform = ""; return; }
+  const b = node.getBoundingClientRect();
+  node.style.transform = "rotate(" + look.rot + "deg) scale(" +
+    clubRotScale(look.rot, b.width, b.height).toFixed(4) + ")";
+}
 let CLUBED = null;
 /**
  * ⚠️ THE EDITOR HOLDS A LIST OF SLIDES, AND EVERY SLIDE OWNS ITS OWN FRAMING, TEXT AND TRIM. One shared
@@ -11506,6 +11737,8 @@ function openClubEditor(kind, files, opts) {
   CLUBED = {
     kind: kind, i: 0, step: "edit", caption: String(o.caption || ""), sel: -1,
     draft: null, draftAt: -1, runId: String(o.runId || ""), logbook: !!o.logbook,
+    // ⚠️ THE RATIO IS ON THE POST, NOT THE SLIDE — a carousel is one shape you swipe through.
+    ratio: "orig", tool: "", snap: null,
     slides: list.map((f, n) => {
       const isVid = /^video\\//.test(f.type || "");
       // ⚠️ ONLY THE FIRST SLIDE CARRIES THE WORDS. A logbook entry is one picture and one
@@ -11515,7 +11748,8 @@ function openClubEditor(kind, files, opts) {
              colour: CLUB_COLOURS[0], font: CLUB_FONTS[0], size: 20 }]
         : [];
       return { file: f, url: URL.createObjectURL(f), isVid: isVid, card: !!o.card,
-        ox: 0.5, oy: 0.5, k: 1, texts: texts, inS: 0, outS: 0, dur: 0 };
+        ox: 0.5, oy: 0.5, k: 1, texts: texts, inS: 0, outS: 0, dur: 0,
+        filter: "none", adj: {}, ov: [] };
     })
   };
   const ov = el('<div class="club-ed" id="clubEd"></div>');
@@ -11525,7 +11759,12 @@ function openClubEditor(kind, files, opts) {
 /** The slide being worked on. Every builder reads through this, so nothing indexes the array by hand. */
 function clubSlide() { return CLUBED ? CLUBED.slides[CLUBED.i] : null; }
 function clubEdClose() {
-  if (CLUBED) CLUBED.slides.forEach((sl) => { try { URL.revokeObjectURL(sl.url); } catch (e) {} });
+  // ⚠️ THE OVERLAYS' URLS GO TOO. Each one is its own createObjectURL, so releasing only the slide's
+  // leaks a whole photograph per overlay for the life of the app session.
+  if (CLUBED) CLUBED.slides.forEach((sl) => {
+    try { URL.revokeObjectURL(sl.url); } catch (e) {}
+    (sl.ov || []).forEach((o) => { try { URL.revokeObjectURL(o.url); } catch (e) {} });
+  });
   CLUBED = null;
   const e = $("clubEd"); if (e) e.remove();
   // ⚠️ THE TEXT SURFACE IS A SIBLING OF THE EDITOR, NOT A CHILD — it has to sit above the keyboard, and
@@ -11572,18 +11811,30 @@ function clubEdDraw() {
         (n === S.i ? '<span class="club-sl-x" data-cdrop="' + n + '" role="button" ' +
           'aria-label="Remove this item">✕</span>' : "") +
         '</button>').join("") + '</div>' : "";
+  const ar = clubRatio(S.ratio).ar;
+  // ⚠️ THE STAGE TAKES THE POST'S SHAPE AND IS CENTRED, WHICH IS WHAT THE REFERENCE SHOWS — the picture
+  // letterboxed on black rather than filling the screen, so what you frame is what gets posted. With no
+  // ratio chosen it fills as before, so nothing changes for a runner who never opens that tool.
+  const stageAttr = ar
+    ? ' class="club-stage club-ar' + (sl.isVid ? " club-stage-v" : "") + '" style="--car: ' + ar + '"'
+    : ' class="club-stage' + (sl.isVid ? " club-stage-v" : "") + '"';
   ov.innerHTML =
-    '<div class="club-stage" id="clubStage">' +
+    '<div' + stageAttr + ' id="clubStage">' +
       '<div class="club-fit" id="clubFit">' + media + '</div>' +
+      '<div class="club-vig" id="clubVig"></div>' +
+      '<div class="club-ovs-l" id="clubOvL">' + clubOvHtml(sl) + '</div>' +
       '<div class="club-txs" id="clubTxs">' + texts + '</div>' +
     '</div>' +
     '<button class="club-x" id="clubX" aria-label="Close">✕</button>' +
-    '<div class="club-rail">' +
-      '<button class="club-t" id="clubAddTx" aria-label="Add text">Aa</button>' +
-      (S.sel >= 0 ? '<button class="club-t danger" id="clubDelTx" aria-label="Delete the selected text">' +
-        ICON.trash + '</button>' : "") +
-    '</div>' +
+    (S.sel >= 0
+      ? '<div class="club-rail">' +
+          '<button class="club-t danger" id="clubDelTx" aria-label="Delete the selected text">' +
+            ICON.trash + '</button>' +
+        '</div>'
+      : "") +
     (sl.isVid ? clubTrimHtml(S) : "") +
+    clubSheetHtml(S, sl) +
+    clubToolsHtml(S, sl) +
     '<div class="club-foot">' + dots + strip +
       '<div class="club-foot-r">' +
         '<button class="club-add" id="clubAddMore" aria-label="Add more from your camera roll">' +
@@ -11592,6 +11843,266 @@ function clubEdDraw() {
       '</div>' +
     '</div>';
   wireClubEd();
+}
+/**
+ * THE TOOL ROW — his ruling of 2026-08-23, from a screen recording of the reference: "i want the same
+ * user experience when posting to inte-run."
+ *
+ * ⚠️ IT WRAPS, IT DOES NOT SCROLL. Six tools do not fit one row on a small screen at the largest text
+ * setting, and he ruled the same day that nothing may slide sideways — so this is the same shape the
+ * profile's times row uses: a basis that puts them on one line where they fit and drops them to two
+ * where they do not. A scrolling tool row also hides tools behind a gesture nobody is told about.
+ * ⚠️ TEXT IS IN THE ROW RATHER THAN A FLOATING Aa. It was one of two buttons in a corner rail, which is
+ * not where the reference puts it and not where a runner looks for it. The rail now carries only the
+ * delete for a SELECTED word, which is the one control that has nothing to do with the row.
+ */
+function clubToolsHtml(S, sl) {
+  const tool = (id, ic, lab, on) =>
+    '<button class="club-tool' + (on ? " on" : "") + '" data-ctool="' + id + '">' +
+      '<span class="club-tool-i">' + ic + '</span><span>' + lab + '</span></button>';
+  const look = clubLook(sl);
+  const edited = !!look.filter || !!look.vig || !!look.rot;
+  return '<div class="club-tools">' +
+    tool("audio", ICON.cAudio, "Audio", false) +
+    tool("text", "Aa", "Text", sl.texts.length > 0) +
+    tool("overlay", ICON.cOverlay, "Overlay", (sl.ov || []).length > 0) +
+    tool("filter", ICON.cFilter, "Filter", sl.filter && sl.filter !== "none") +
+    tool("edit", ICON.cEdit, "Edit", edited) +
+    tool("ratio", ICON.cRatio, "Ratio", S.ratio !== "orig") +
+  '</div>';
+}
+/**
+ * THE TOOL SHEETS — Cancel / a title / Done, with the picture still visible above.
+ *
+ * ⚠️ THE SHEET IS A FLEX SIBLING OF THE STAGE, NOT A PANEL OVER IT, so the picture SHRINKS and stays
+ * whole. That is what the reference shows and it is the point: you cannot judge a filter through the
+ * panel that is covering the half of the photograph you are filtering.
+ * ⚠️⚠️ CANCEL GENUINELY REVERTS, AND THAT NEEDS A SNAPSHOT TAKEN ON THE WAY IN. A Cancel that only
+ * closes the sheet is a Cancel that keeps every change the runner was trying out — which is worse than
+ * no Cancel at all, because the word promises the opposite. S.snap holds the state the tool can touch
+ * and nothing else, so cancelling a filter cannot undo a crop made before it.
+ */
+function clubToolOpen(id) {
+  const S = CLUBED, sl = clubSlide(); if (!S || !sl) return;
+  S.tool = id;
+  S.sel = -1;
+  // The snapshot is per tool: only what this tool can change is restored by its Cancel.
+  S.snap = id === "filter" ? { filter: sl.filter }
+    : id === "edit" ? { adj: Object.assign({}, sl.adj) }
+    : id === "ratio" ? { ratio: S.ratio }
+    : id === "overlay" ? { ov: (sl.ov || []).slice() }
+    : null;
+  if (id === "text") { S.tool = ""; clubTextOpen(-1); return; }
+  if (id === "overlay") { clubOvAdd(); return; }
+  clubEdDraw();
+}
+function clubToolCancel() {
+  const S = CLUBED, sl = clubSlide(); if (!S || !sl) return;
+  const sn = S.snap || {};
+  if (sn.filter !== undefined) sl.filter = sn.filter;
+  if (sn.adj !== undefined) sl.adj = sn.adj;
+  if (sn.ratio !== undefined) S.ratio = sn.ratio;
+  if (sn.ov !== undefined) sl.ov = sn.ov;
+  S.tool = ""; S.snap = null;
+  clubEdDraw();
+}
+function clubToolDone() {
+  const S = CLUBED; if (!S) return;
+  S.tool = ""; S.snap = null;
+  haptic("light");
+  clubEdDraw();
+}
+/** ⚠️ THE LABEL IS THE TOOL'S OWN NAME, so the bar says which sheet a Cancel is cancelling. */
+const CLUB_TOOL_NAMES = { audio: "Audio", filter: "Filter", edit: "Edit", ratio: "Ratio",
+  overlay: "Overlay" };
+function clubSheetHtml(S, sl) {
+  const id = S.tool;
+  if (!id) return "";
+  const body = id === "filter" ? clubFilterBody(sl)
+    : id === "edit" ? clubEditBody(sl)
+    : id === "ratio" ? clubRatioBody(S)
+    : id === "overlay" ? clubOvBody(sl)
+    : clubAudioBody();
+  return '<div class="club-esh" id="clubEsh" role="group" aria-label="' +
+      (CLUB_TOOL_NAMES[id] || "") + '">' +
+    '<div class="club-esh-b">' + body + '</div>' +
+    '<div class="club-esh-bar">' +
+      '<button class="club-esh-c" data-cesh="cancel">Cancel</button>' +
+      '<span class="club-esh-t">' + (CLUB_TOOL_NAMES[id] || "") + '</span>' +
+      '<button class="club-esh-d" data-cesh="done">Done</button>' +
+    '</div>' +
+  '</div>';
+}
+/**
+ * ⚠️ EVERY SWATCH IS THE RUNNER'S OWN PICTURE UNDER THAT FILTER, not a stock thumbnail. A row of
+ * generic squares tells you the name of a filter and nothing about what it does to YOUR photograph —
+ * and it costs nothing here, because a filter is a CSS string rather than a render.
+ */
+function clubFilterBody(sl) {
+  const cur = sl.filter || "none";
+  return '<div class="club-fr">' + CLUB_FILTERS.map((f) =>
+    '<button class="club-fs' + (f.id === cur ? " on" : "") + '" data-cfil="' + f.id + '" ' +
+      'aria-pressed="' + (f.id === cur) + '">' +
+      '<span class="club-fs-i">' +
+        (sl.isVid
+          ? '<video src="' + sl.url + '" muted playsinline preload="metadata" ' +
+            'style="filter: ' + f.css + '"></video>'
+          : '<img src="' + sl.url + '" alt="" style="filter: ' + f.css + '">') +
+      '</span>' +
+      '<span class="club-fs-l">' + f.label + '</span>' +
+    '</button>').join("") + '</div>';
+}
+/**
+ * ⚠️ THE DIALS ARE A ROW YOU PICK FROM AND THEN ONE SLIDER, which is the reference's own shape and the
+ * only one that fits: eight sliders stacked is a settings page, and eight sliders is also eight things
+ * to read before you can change one.
+ * ⚠️ A DIAL THAT HAS BEEN MOVED SAYS SO IN WORDS AND IN A DOT, never in colour alone.
+ */
+function clubEditBody(sl) {
+  const a = sl.adj || {};
+  const sel = CLUB_ADJ.filter((d) => d.id === (sl.dial || "lux"))[0] || CLUB_ADJ[0];
+  const val = Number(a[sel.id]) || 0;
+  const min = sel.oneWay ? 0 : (sel.deg ? -15 : -100);
+  const max = sel.deg ? 15 : 100;
+  const dials = CLUB_ADJ.map((d) => {
+    const v = Number(a[d.id]) || 0;
+    return '<button class="club-dl' + (d.id === sel.id ? " on" : "") + '" data-cdial="' + d.id + '" ' +
+      'aria-pressed="' + (d.id === sel.id) + '">' +
+      '<span class="club-dl-d' + (v ? " set" : "") + '"></span>' +
+      '<span>' + d.label + '</span>' +
+      (v ? '<span class="club-dl-v num">' + (v > 0 && !d.oneWay ? "+" : "") + v + '</span>' : "") +
+    '</button>';
+  }).join("");
+  return '<div class="club-dls">' + dials + '</div>' +
+    '<div class="club-dsl">' +
+      '<input type="range" id="clubDial" min="' + min + '" max="' + max + '" step="1" ' +
+        'value="' + val + '" aria-label="' + sel.label + '">' +
+      '<span class="club-dsl-v num" id="clubDialV">' +
+        (val > 0 && !sel.oneWay ? "+" : "") + val + (sel.deg ? "°" : "") + '</span>' +
+      '<button class="club-dsl-r" data-cdreset="1"' + (val ? "" : " disabled") + '>Reset</button>' +
+    '</div>';
+}
+function clubRatioBody(S) {
+  return '<div class="club-rr">' + CLUB_RATIOS.map((r) =>
+    '<button class="club-rt' + (r.id === S.ratio ? " on" : "") + '" data-crat="' + r.id + '" ' +
+      'aria-pressed="' + (r.id === S.ratio) + '">' +
+      '<span class="club-rt-b" style="' + (r.ar ? "aspect-ratio: " + r.ar : "aspect-ratio: 3 / 4") + '"></span>' +
+      '<span>' + r.label + '</span>' +
+    '</button>').join("") + '</div>';
+}
+/**
+ * ⚠️ AUDIO IS NAMED, NOT OFFERED, AND HIS RULING IS WHY IT IS HERE AT ALL: "Show it, marked as coming."
+ * Music over a post needs a licensed catalogue — a subscription and a rights agreement, not a coding
+ * job — and the phone's own library cannot be used because Apple Music and Spotify tracks are
+ * DRM-protected and a web view can neither read nor embed them. So the sheet says what is missing
+ * instead of a picker that finds nothing.
+ */
+function clubAudioBody() {
+  return '<div class="club-soon">' +
+    '<span class="club-soon-i">' + ICON.cAudio + '</span>' +
+    '<p><b>Music is not switched on yet.</b></p>' +
+    '<p>Putting a track over a post needs a licensed music catalogue, which is a subscription and a ' +
+    'rights agreement rather than something the app can do on its own. Your phone’s own music cannot ' +
+    'stand in for it: tracks from Apple Music and Spotify are locked to those apps.</p>' +
+  '</div>';
+}
+/**
+ * OVERLAY — a second picture on top of the first, which is the reference's own tool and his ruling of
+ * 2026-08-23 ("Now, in the same go").
+ *
+ * ⚠️ DRAGGING MOVES IT; SIZE AND ANGLE ARE SLIDERS. A pinch on the stage already zooms the photograph
+ * underneath, so making pinch mean "scale the overlay" as well would be one gesture meaning two things
+ * depending on what the finger happened to land on — the class of thing this app refuses (a tap edits a
+ * word and a drag moves it precisely BECAUSE they are told apart). Sliders are also the only version a
+ * switch-control or keyboard user can reach at all.
+ * ⚠️ AN OVERLAY IS A PHOTOGRAPH, NEVER A VIDEO. A second moving picture over the first is a compositing
+ * problem this app has no way to export or store, and the display surfaces would have to keep two clips
+ * in sync.
+ */
+function clubOvAdd() {
+  const S = CLUBED, sl = clubSlide(); if (!S || !sl) return;
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = "image/*";
+  inp.style.position = "fixed"; inp.style.left = "-9999px";
+  document.body.appendChild(inp);
+  inp.onchange = () => {
+    const f = (inp.files || [])[0];
+    try { inp.remove(); } catch (e) {}
+    S.tool = "overlay";
+    if (!f) { clubEdDraw(); return; }
+    if (!/^image\\//.test(f.type || "")) { toast("An overlay has to be a photo."); clubEdDraw(); return; }
+    if ((sl.ov || []).length >= CLUB_OV_MAX) { toast("That is as many as one picture can carry."); clubEdDraw(); return; }
+    sl.ov = (sl.ov || []).concat([{ file: f, url: URL.createObjectURL(f), x: 0.5, y: 0.5, k: 0.5, rot: 0 }]);
+    sl.ovi = sl.ov.length - 1;
+    haptic("light");
+    clubEdDraw();
+  };
+  inp.click();
+}
+const CLUB_OV_MAX = 4;
+function clubOvBody(sl) {
+  const list = sl.ov || [];
+  if (!list.length) {
+    return '<div class="club-soon">' +
+      '<span class="club-soon-i">' + ICON.cOverlay + '</span>' +
+      '<p><b>Nothing on top yet.</b></p>' +
+      '<p>Add a second photo and it sits over this one. Drag it where you want it; the sliders here set ' +
+      'how big it is and which way up.</p>' +
+      '<button class="club-ov-add" data-covadd="1">Add a photo</button>' +
+    '</div>';
+  }
+  const i = Math.max(0, Math.min(list.length - 1, Number(sl.ovi) || 0));
+  const cur = list[i];
+  const strip = list.map((o, n) =>
+    '<button class="club-ovs' + (n === i ? " on" : "") + '" data-covsel="' + n + '" ' +
+      'aria-label="Overlay ' + (n + 1) + ' of ' + list.length + '" aria-pressed="' + (n === i) + '">' +
+      '<img src="' + o.url + '" alt="">' +
+      (n === i ? '<span class="club-ovs-x" data-covdel="' + n + '" role="button" ' +
+        'aria-label="Remove this overlay">✕</span>' : "") +
+    '</button>').join("");
+  return '<div class="club-ovr">' + strip +
+      (list.length < CLUB_OV_MAX
+        ? '<button class="club-ovs club-ovs-add" data-covadd="1" aria-label="Add another overlay">' +
+          ICON.plusDot + '</button>' : "") +
+    '</div>' +
+    '<div class="club-dsl">' +
+      '<label for="clubOvK">Size</label>' +
+      '<input type="range" id="clubOvK" min="10" max="100" step="1" value="' +
+        Math.round(cur.k * 100) + '">' +
+      '<span class="club-dsl-v num">' + Math.round(cur.k * 100) + '%</span>' +
+    '</div>' +
+    '<div class="club-dsl">' +
+      '<label for="clubOvR">Angle</label>' +
+      '<input type="range" id="clubOvR" min="-180" max="180" step="1" value="' +
+        Math.round(cur.rot) + '">' +
+      '<span class="club-dsl-v num">' + Math.round(cur.rot) + '°</span>' +
+    '</div>';
+}
+/** The overlays as they sit on the stage. ⚠️ Under the words and over the picture, which is the order
+ *  the reference uses and the only one where a caption typed on top stays readable. */
+function clubOvHtml(sl) {
+  return (sl.ov || []).map((o, n) =>
+    '<img class="club-ovim' + (n === (Number(sl.ovi) || 0) ? " on" : "") + '" data-cov="' + n + '" ' +
+      'src="' + o.url + '" alt="" style="left:' + (o.x * 100) + '%; top:' + (o.y * 100) + '%; width:' +
+      (o.k * 100) + '%; transform: translate(-50%, -50%) rotate(' + o.rot + 'deg)">').join("");
+}
+function clubOvDrag(ev, n) {
+  const S = CLUBED, sl = clubSlide(); if (!S || !sl) return;
+  const o = (sl.ov || [])[n]; if (!o) return;
+  sl.ovi = n;
+  const stage = $("clubStage"); if (!stage) return;
+  const box = stage.getBoundingClientRect();
+  const node = ev.currentTarget;
+  const start = { x: ev.clientX, y: ev.clientY, ox: o.x, oy: o.y };
+  ev.preventDefault();
+  try { node.setPointerCapture(ev.pointerId); } catch (e) {}
+  node.onpointermove = (m) => {
+    o.x = Math.max(0.02, Math.min(0.98, start.ox + (m.clientX - start.x) / Math.max(1, box.width)));
+    o.y = Math.max(0.02, Math.min(0.98, start.oy + (m.clientY - start.y) / Math.max(1, box.height)));
+    node.style.left = (o.x * 100) + "%"; node.style.top = (o.y * 100) + "%";
+  };
+  const end = () => { node.onpointermove = null; clubEdDraw(); };
+  node.onpointerup = end; node.onpointercancel = end;
 }
 /**
  * THE CAPTION STEP — his reference's third screen: the chosen items in a row, the caption, and Share.
@@ -11703,11 +12214,10 @@ function wireClubEd() {
   }
   clubEdFit();
   if (stage) clubEdGestures(stage);
-  const add = $("clubAddTx");
   // ⚠️ NOT prompt(). A system dialog takes the runner off their own picture to type into a grey box that
   // cannot show them the typeface, the colour or the size they are choosing — and on iOS it is a modal
   // the app does not control. The text is typed ON the media, in the face it will be posted in.
-  if (add) add.onclick = () => clubTextOpen(-1);
+  document.querySelectorAll("[data-ctool]").forEach((b) => b.onclick = () => clubToolOpen(b.dataset.ctool));
   const del = $("clubDelTx");
   if (del) del.onclick = () => { sl.texts.splice(S.sel, 1); S.sel = -1; haptic("light"); clubEdDraw(); };
   const txs = $("clubTxs");
@@ -11730,8 +12240,88 @@ function wireClubEd() {
   // in the filmstrip, and the whole reason the editor holds a list.
   if (more) more.onclick = () => clubAddMore();
   const next = $("clubNext");
-  if (next) next.onclick = () => { S.step = "caption"; S.sel = -1; clubEdDraw(); };
+  if (next) next.onclick = () => { S.step = "caption"; S.sel = -1; S.tool = ""; clubEdDraw(); };
+  wireClubTools(S, sl);
   wireClubTrim();
+}
+/**
+ * WIRING THE TOOL SHEETS.
+ *
+ * ⚠️⚠️ THE SLIDER DOES NOT REDRAW ON INPUT, AND THAT IS NOT AN OPTIMISATION. clubEdDraw rebuilds the
+ * whole editor, so redrawing on every input event would destroy the input the finger is holding — the
+ * same trap the Support search field needed its caret restored for, and the same one that made the video
+ * trim snap back to the start. It applies the look directly and redraws once, on change, when the finger
+ * has let go and the dial row's own numbers need to catch up.
+ */
+function wireClubTools(S, sl) {
+  document.querySelectorAll("[data-cesh]").forEach((b) => b.onclick = () => {
+    if (b.dataset.cesh === "cancel") clubToolCancel(); else clubToolDone();
+  });
+  document.querySelectorAll("[data-cfil]").forEach((b) => b.onclick = () => {
+    sl.filter = b.dataset.cfil; haptic("light"); clubEdDraw();
+  });
+  document.querySelectorAll("[data-cdial]").forEach((b) => b.onclick = () => {
+    sl.dial = b.dataset.cdial; clubEdDraw();
+  });
+  document.querySelectorAll("[data-crat]").forEach((b) => b.onclick = () => {
+    S.ratio = b.dataset.crat; haptic("light"); clubEdDraw();
+  });
+  const dial = $("clubDial");
+  if (dial) {
+    const id = sl.dial || "lux";
+    const d = CLUB_ADJ.filter((x) => x.id === id)[0] || CLUB_ADJ[0];
+    const live = () => {
+      const v = Number(dial.value) || 0;
+      sl.adj = Object.assign({}, sl.adj); sl.adj[id] = v;
+      const out = $("clubDialV");
+      if (out) out.textContent = (v > 0 && !d.oneWay ? "+" : "") + v + (d.deg ? "\u00b0" : "");
+      clubEdFit();
+    };
+    dial.oninput = live;
+    dial.onchange = () => { live(); clubEdDraw(); };
+  }
+  document.querySelectorAll("[data-cdreset]").forEach((b) => b.onclick = () => {
+    const id = sl.dial || "lux";
+    sl.adj = Object.assign({}, sl.adj); delete sl.adj[id];
+    haptic("light"); clubEdDraw();
+  });
+  // Overlay.
+  document.querySelectorAll("[data-covadd]").forEach((b) => b.onclick = () => clubOvAdd());
+  document.querySelectorAll("[data-covsel]").forEach((b) => b.onclick = (ev) => {
+    if (ev.target && ev.target.closest && ev.target.closest("[data-covdel]")) return;
+    sl.ovi = Number(b.dataset.covsel) || 0; clubEdDraw();
+  });
+  document.querySelectorAll("[data-covdel]").forEach((b) => b.onclick = (ev) => {
+    ev.stopPropagation();
+    const n = Number(b.dataset.covdel) || 0;
+    const gone = (sl.ov || [])[n];
+    if (gone) { try { URL.revokeObjectURL(gone.url); } catch (e) {} }
+    sl.ov = (sl.ov || []).filter((_, i) => i !== n);
+    sl.ovi = Math.max(0, Math.min((sl.ov.length || 1) - 1, (Number(sl.ovi) || 0) - (n <= (Number(sl.ovi) || 0) ? 1 : 0)));
+    haptic("light"); clubEdDraw();
+  });
+  const ovk = $("clubOvK"), ovr = $("clubOvR");
+  const cur = () => (sl.ov || [])[Math.max(0, Math.min((sl.ov || []).length - 1, Number(sl.ovi) || 0))];
+  const paint = () => {
+    const o = cur(); if (!o) return;
+    const node = document.querySelector('[data-cov="' + (Number(sl.ovi) || 0) + '"]');
+    if (node) {
+      node.style.width = (o.k * 100) + "%";
+      node.style.transform = "translate(-50%, -50%) rotate(" + o.rot + "deg)";
+    }
+  };
+  if (ovk) {
+    ovk.oninput = () => { const o = cur(); if (!o) return; o.k = (Number(ovk.value) || 50) / 100; paint(); };
+    ovk.onchange = () => clubEdDraw();
+  }
+  if (ovr) {
+    ovr.oninput = () => { const o = cur(); if (!o) return; o.rot = Number(ovr.value) || 0; paint(); };
+    ovr.onchange = () => clubEdDraw();
+  }
+  const ovl = $("clubOvL");
+  if (ovl) ovl.querySelectorAll("[data-cov]").forEach((n) => {
+    n.onpointerdown = (ev) => clubOvDrag(ev, Number(n.getAttribute("data-cov")) || 0);
+  });
 }
 /** ⚠️ THE SAME SORT AS THE FIRST PICK, applied to the combined list, so a video cannot be added to a
  *  carousel of photographs by the back door. */
@@ -11752,8 +12342,11 @@ function clubAddMore() {
     if (!add.length) { toast("Nothing new to add."); return; }
     add.forEach((f) => {
       const isVid = /^video\\//.test(f.type || "");
+      // ⚠️ THE SAME SHAPE AS openClubEditor's, or a slide added later has no look fields and every
+      // reader of them has to guard — the two builders of one slide must agree.
       S.slides.push({ file: f, url: URL.createObjectURL(f), isVid: isVid,
-        ox: 0.5, oy: 0.5, k: 1, texts: [], inS: 0, outS: 0, dur: 0 });
+        ox: 0.5, oy: 0.5, k: 1, texts: [], inS: 0, outS: 0, dur: 0,
+        filter: "none", adj: {}, ov: [] });
     });
     S.i = S.slides.length - 1; S.sel = -1;
     haptic("light");
@@ -11844,6 +12437,12 @@ function clubEdFit() {
   sl.oy = Math.max(0.5 - half, Math.min(0.5 + half, sl.oy));
   fit.style.transform = "scale(" + sl.k.toFixed(3) + ")";
   fit.style.transformOrigin = (sl.ox * 100).toFixed(2) + "% " + (sl.oy * 100).toFixed(2) + "%";
+  // ⚠️ THE LOOK IS APPLIED TO THE MEDIA AND THE PAN TO ITS WRAPPER, so the two transforms never fight
+  // over one property — the same one-owner-each rule the debrief hero needed for its two opacities.
+  const look = clubLook(sl);
+  clubApplyLook($("clubMed"), look);
+  const vig = $("clubVig");
+  if (vig) vig.style.opacity = String(look.vig || 0);
 }
 function clubTextDrag(ev, i) {
   const S = CLUBED, sl = clubSlide(); if (!S || !sl) return;
@@ -11970,12 +12569,21 @@ function clubEdPost() {
   const stamp = Date.now();
   const slides = S.slides.map((sl, n) => ({
     sl: sl,
-    key: "m" + stamp + "-" + n + "-" + Math.floor(Math.random() * 1e6)
+    key: "m" + stamp + "-" + n + "-" + Math.floor(Math.random() * 1e6),
+    // ⚠️ AN OVERLAY IS A PHOTOGRAPH AND NEEDS A BLOB OF ITS OWN, written in the same pass as the slides'
+    // so the all-or-nothing rule below covers it too. A row naming an overlay whose bytes failed to save
+    // is a slide with a hole in it, which is the same defect as a missing slide.
+    ovk: (sl.ov || []).map((_, m) => "o" + stamp + "-" + n + "-" + m + "-" +
+      Math.floor(Math.random() * 1e6))
   }));
   // ⚠️ EVERY BLOB FIRST, THEN ONE ROW. A row naming a blob that failed to write is a permanently broken
   // slide in the middle of a carousel; a blob with no row is invisible and swept by the next open.
-  Promise.all(slides.map((x) => clubMediaPut(x.key, x.sl.file,
-    { type: x.sl.isVid ? "video" : "photo" }))).then((oks) => {
+  const puts = [];
+  slides.forEach((x) => {
+    puts.push(clubMediaPut(x.key, x.sl.file, { type: x.sl.isVid ? "video" : "photo" }));
+    (x.sl.ov || []).forEach((o, m) => puts.push(clubMediaPut(x.ovk[m], o.file, { type: "photo" })));
+  });
+  Promise.all(puts).then((oks) => {
     if (oks.some((ok) => !ok)) throw new Error("media");
     const rows = clubLoad();
     rows.unshift({
@@ -11995,6 +12603,9 @@ function clubEdPost() {
       // absent when false: a stored false is a field every reader has to think about.
       logbook: S.logbook || undefined,
       caption: (S.caption || "").slice(0, 300), at: stamp,
+      // ⚠️ THE RATIO IS ON THE ROW, not per slide, because that is where the decision was made — a
+      // carousel is one shape you swipe through. Absent when Original, like sim and indoor.
+      ratio: S.ratio !== "orig" ? S.ratio : undefined,
       slides: slides.map((x) => ({
         media: x.key,
         // ⚠️ CARRIED INTO THE POST, so the tile and the full-screen viewer fit the card the same way the
@@ -12003,6 +12614,14 @@ function clubEdPost() {
         card: x.sl.card || undefined,
         crop: { ox: +x.sl.ox.toFixed(4), oy: +x.sl.oy.toFixed(4), k: +x.sl.k.toFixed(3) },
         trim: x.sl.isVid ? { inS: +x.sl.inS.toFixed(2), outS: +x.sl.outS.toFixed(2) } : null,
+        // ⚠️ THE LOOK IS A NAME AND A FEW NUMBERS, NOT PIXELS. Nothing is re-encoded, so the original
+        // photograph is what is stored and the filter can be changed or taken off a post already up.
+        filter: x.sl.filter && x.sl.filter !== "none" ? x.sl.filter : undefined,
+        adj: Object.keys(x.sl.adj || {}).length ? x.sl.adj : undefined,
+        ov: (x.sl.ov || []).length
+          ? x.sl.ov.map((o, m) => ({ media: x.ovk[m], x: +o.x.toFixed(4), y: +o.y.toFixed(4),
+              k: +o.k.toFixed(3), rot: Math.round(o.rot) }))
+          : undefined,
         texts: x.sl.texts.slice(0, 8)
       }))
     });
@@ -12033,8 +12652,17 @@ function clubSlides(p) {
     trim: i === 0 ? (p.trim || null) : null,
     texts: i === 0 ? (p.texts || []) : [] }));
 }
-/** Every media key a post holds — what the sweep deletes, and what the loader fills. */
-function clubKeys(p) { return clubSlides(p).map((x) => x.media).filter(Boolean); }
+/** Every media key a post holds — what the sweep deletes, and what the loader fills.
+ *  ⚠️ THE OVERLAYS' KEYS TOO, or deleting a post leaves their bytes in IndexedDB forever with nothing
+ *  pointing at them — and the delete dialog promises the picture goes with the post. */
+function clubKeys(p) {
+  const out = [];
+  clubSlides(p).forEach((x) => {
+    if (x.media) out.push(x.media);
+    (x.ov || []).forEach((o) => { if (o && o.media) out.push(o.media); });
+  });
+  return out;
+}
 
 /** Create opens the sheet; a row picks a kind and goes straight to the camera roll. */
 function openClubCreate() {
@@ -12066,9 +12694,31 @@ function clubTileHtml(p) {
     // ⚠️ THE FIRST SLIDE'S KEY, THROUGH clubSlides — p.media is a LIST now, and esc(["a","b"]) is the
     // string "a,b", a key nothing holds. Measured on the served page: every carousel tile drew the
     // missing-media hatch. The reason clubSlides exists is that nothing should read the raw field.
+    // ⚠️ THE SLIDE'S OWN KEY, NOT clubKeys(p)[0] — that list carries the overlays' keys too now, so [0]
+    // meaning "the first slide's media" is a coupling to the order they happen to be pushed in.
     '<span class="cm-t-med' + (card ? " cm-t-med-fit" : "") + '" data-cmed="' +
-      esc(clubKeys(p)[0] || "") + '" data-cvid="' + (p.video ? "1" : "") + '"></span>' +
+      esc((clubSlides(p)[0] || {}).media || "") + '" data-cvid="' + (p.video ? "1" : "") + '"' +
+      clubLookAttrs(clubSlides(p)[0]) + '></span>' +
     badge + cap + '</button>';
+}
+/**
+ * ⚠️ THE LOOK TRAVELS TO A POSTED SURFACE AS ATTRIBUTES ON THE MEDIA SPAN, AND ONE LOADER APPLIES THEM.
+ * The filter and the overlays cannot be written as inline style in the builder, because the media element
+ * does not exist yet — clubFillMedia creates it once the blob is out of IndexedDB. So the span carries
+ * what to do and the loader does it, which is also why there is exactly one place it happens rather than
+ * one per surface.
+ */
+function clubLookAttrs(sl) {
+  if (!sl) return "";
+  const look = clubLook(sl);
+  const ov = (sl.ov || []).filter((o) => o && o.media);
+  let out = "";
+  if (look.filter) out += ' data-clook="' + esc(look.filter) + '"';
+  if (look.vig) out += ' data-cvig="' + look.vig.toFixed(3) + '"';
+  if (look.rot) out += ' data-crot="' + look.rot + '"';
+  if (ov.length) out += ' data-cov-l="' + esc(JSON.stringify(ov.map((o) => ({
+    m: o.media, x: o.x, y: o.y, k: o.k, r: o.rot || 0 })))) + '"';
+  return out;
 }
 /** ⚠️ ONE PASS OVER THE DOM AFTER A RENDER, so a tile, a story ring and the viewer all fill in through
  *  the same path — three loaders would be three places a missing blob is handled differently. */
@@ -12082,6 +12732,29 @@ function clubFillMedia() {
       n.innerHTML = n.dataset.cvid
         ? '<video src="' + url + '" muted playsinline preload="metadata"></video>'
         : '<img src="' + url + '" alt="">';
+      const med = n.firstElementChild;
+      if (med) clubApplyLook(med, { filter: n.dataset.clook || "",
+        rot: Number(n.dataset.crot) || 0, vig: 0 });
+      if (n.dataset.cvig) {
+        const v = el('<span class="club-vig"></span>');
+        v.style.opacity = n.dataset.cvig;
+        n.appendChild(v);
+      }
+      // ⚠️ EACH OVERLAY IS ITS OWN BLOB READ, so they are loaded here rather than in the builder — and a
+      // missing one is simply absent rather than a broken image over somebody's photograph.
+      let list = [];
+      try { list = JSON.parse(n.dataset.covL || "[]"); } catch (e) { list = []; }
+      list.forEach((o) => {
+        clubUrl(o.m).then((u) => {
+          if (!u) return;
+          const im = el('<img class="club-ovim" alt="">');
+          im.src = u;
+          im.style.left = (o.x * 100) + "%"; im.style.top = (o.y * 100) + "%";
+          im.style.width = (o.k * 100) + "%";
+          im.style.transform = "translate(-50%, -50%) rotate(" + (o.r || 0) + "deg)";
+          n.appendChild(im);
+        }).catch(() => {});
+      });
     }).catch(() => n.classList.add("cm-med-gone"));
   });
 }
@@ -12181,7 +12854,7 @@ function clubPostViewHtml() {
             ((x.crop.ox != null ? x.crop.ox : 0.5) * 100) + '% ' +
             ((x.crop.oy != null ? x.crop.oy : 0.5) * 100) + '%"' : "") + '>' +
           '<span class="cp-med' + (x.card ? " cp-med-fit" : "") + '" data-cmed="' + esc(x.media) +
-            '" data-cvid="' + (post.video ? "1" : "") + '"></span>' +
+            '" data-cvid="' + (post.video ? "1" : "") + '"' + clubLookAttrs(x) + '></span>' +
         '</div>' +
         (x.texts || []).map((t) =>
           '<span class="club-tx" style="left:' + (t.x * 100) + '%; top:' + (t.y * 100) +
@@ -12196,7 +12869,11 @@ function clubPostViewHtml() {
           ICON.chevDown + '</button>' +
       '</div>' +
       '<div class="cp-mediawrap">' +
-        '<div class="cp-rail" data-cprail="' + esc(post.id) + '">' + media + '</div>' +
+        // ⚠️ THE RATIO IS PUBLISHED AS A VARIABLE ON THE RAIL rather than written into each slide's
+        // style, so one post cannot end up with slides of two different shapes to swipe between.
+        '<div class="cp-rail" data-cprail="' + esc(post.id) + '"' +
+          (clubRatio(post.ratio).ar ? ' style="--car: ' + clubRatio(post.ratio).ar + '"' : "") +
+        '>' + media + '</div>' +
         (many ? '<span class="cp-count num" data-cpcount="' + esc(post.id) + '">1/' + sl.length +
           '</span>' : "") +
       '</div>' +
@@ -12424,7 +13101,8 @@ function clubOpenMedia(rows, i, auto) {
         '<div class="club-fit" style="transform:scale(' + (c.k || 1) + ');transform-origin:' +
           ((c.ox != null ? c.ox : 0.5) * 100) + '% ' + ((c.oy != null ? c.oy : 0.5) * 100) + '%">' +
           '<span class="club-vmed' + (first.card ? " club-vmed-fit" : "") + '" data-cmed="' +
-            esc(clubKeys(p)[0] || "") + '" data-cvid="' + (p.video ? "1" : "") + '"></span>' +
+            esc(first.media || "") + '" data-cvid="' + (p.video ? "1" : "") + '"' +
+            clubLookAttrs(first) + '></span>' +
         '</div>' +
         '<div class="club-txs">' + texts + '</div>' +
       '</div>' +

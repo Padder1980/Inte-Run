@@ -47,6 +47,18 @@ function appBlock(): string {
  *  named in PhotoLibraryService's header explaining why a picker is not a grid. Eleventh firing of that
  *  trap in this codebase, and the first in Swift. */
 const noswift = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/[\/!]?.*$/gm, "");
+/** ⚠️ THE APP'S OWN FILTER TABLE, read out of the built page rather than retyped — a hand-copied table
+ *  is a second source of truth, and this file already records the cost of typing one from memory. */
+function clubFiltersTable(): Array<{ id: string; label: string; css: string }> {
+  const m = /const CLUB_FILTERS = \[([\s\S]*?)\];/.exec(page());
+  assert.ok(m, "CLUB_FILTERS could not be found in the built page");
+  const out: Array<{ id: string; label: string; css: string }> = [];
+  for (const row of m![1]!.matchAll(/\{\s*id:\s*"(\w+)",\s*label:\s*"([^"]*)",\s*css:\s*"([^"]*)"/g)) {
+    out.push({ id: row[1]!, label: row[2]!, css: row[3]! });
+  }
+  assert.ok(out.length >= 4, "only " + out.length + " filters parsed out of CLUB_FILTERS");
+  return out;
+}
 /** The generated stylesheet. */
 function sheetOf(src: string): string {
   const a = src.indexOf("<style>"), b = src.indexOf("</style>", a);
@@ -457,7 +469,13 @@ test("BLOCKER: the editor's text is typed on the media, not into a system dialog
   // remedy it already keeps for exactly this.
   const wire = nocomment(fn("wireClubEd"));
   assert.ok(!/prompt\(/.test(wire), "the text is typed into a system prompt");
-  assert.match(wire, /clubTextOpen\(-1\)/, "the Aa button does not open the text surface");
+  // ⚠️ RESTATED WHEN THE Aa MOVED FROM A CORNER RAIL INTO THE TOOL ROW (2026-08-23). The invariant is
+  // "the Text tool reaches the on-media surface", not "a button with that id exists" — the third guard
+  // in this file to have been scoped to markup rather than to a fact.
+  assert.match(wire, /data-ctool/, "the tools are not wired at all");
+  const open = nocomment(fn("clubToolOpen"));
+  assert.match(open, /clubTextOpen\(-1\)/, "the Text tool does not open the on-media text surface");
+  assert.ok(!/prompt\(/.test(open), "the Text tool falls back to a system prompt");
   const d = fn("clubTextDraw");
   assert.match(d, /data-cfont/, "there is no way to choose a typeface");
   assert.match(d, /data-ccol/, "there is no way to choose a colour");
@@ -608,8 +626,11 @@ test("BLOCKER: one object URL per media, and they are released", () => {
   const r = fn("clubUrlsRelease");
   assert.match(r, /revokeObjectURL/, "nothing releases the object URLs");
   const c = fn("clubEdClose");
-  assert.match(c, /slides\.forEach\(\(sl\) => \{ try \{ URL\.revokeObjectURL\(sl\.url\)/,
-    "the editor leaks the files it was editing");
+  assert.match(c, /URL\.revokeObjectURL\(sl\.url\)/, "the editor leaks the files it was editing");
+  // ⚠️ AND THE OVERLAYS' URLS, which are each their own createObjectURL — releasing only the slide's
+  // leaks a whole photograph per overlay for the life of the app session.
+  assert.match(c, /\(sl\.ov \|\| \[\]\)\.forEach\([^)]*\) => \{ try \{ URL\.revokeObjectURL\(o\.url\)/,
+    "the editor leaks the overlays it was editing");
   // ⚠️ AND THE TEXT SURFACE IS A SIBLING OF THE EDITOR, so closing the editor has to remove it too or a
   // half-typed word is left floating over the club with nothing behind it.
   assert.match(c, /clubTxEd/, "closing the editor leaves the text surface on screen");
@@ -709,7 +730,15 @@ test("BLOCKER: Create a post takes several pictures, or one video, never both", 
   const post = nocomment(fn("clubEdPost"));
   // ⚠️ EVERY BLOB FIRST, THEN ONE ROW — a row naming a blob that failed to write is a permanently broken
   // slide in the middle of a carousel.
-  assert.match(post, /Promise\.all\(slides\.map/, "the blobs are not all written before the row");
+  // ⚠️ RESTATED FOR THE OVERLAYS (2026-08-23): a slide's blob and its overlays' blobs go in the SAME
+  // all-or-nothing pass, so the claim is that every clubMediaPut is collected before the row is written
+  // rather than that they come from one .map — which stopped being true when overlays arrived.
+  assert.match(post, /Promise\.all\(puts\)/, "the blobs are not all written before the row");
+  const puts = [...post.matchAll(/clubMediaPut\(/g)].length;
+  assert.equal(puts, 2, "expected exactly two clubMediaPut call sites — the slide and its overlays — "
+    + "found " + puts + "; one outside the collected pass is a blob the all-or-nothing rule misses");
+  assert.ok(post.indexOf("puts.push") < post.indexOf("Promise.all(puts)"),
+    "a blob is queued after the pass that waits for them");
   assert.ok(post.indexOf("Promise.all") < post.indexOf("clubSave("),
     "the row is saved before the media");
   assert.match(post, /oks\.some\(\(ok\) => !ok\)/, "a failed blob write still writes the row");
@@ -1726,4 +1755,246 @@ test("the trainers are the last fact on the meta line, and take a row of their o
   // A basis of 100% cannot share a row, wherever the facts above it happen to wrap to.
   assert.match(shoe![1]!, /flex:\s*0\s+0\s+100%/,
     "the trainers can share a line; a full-row basis is what keeps them on their own");
+});
+
+/* ══ THE COMPOSER, BUILT TO THE REFERENCE'S POSTING EXPERIENCE (owner, 2026-08-23) ═════════════════
+ * "the next sequence of screenshots is the process that you follow on instagram before posting a photo
+ * or carousel … i want the same user experience when posting to inte-run", with his rulings that Audio
+ * is shown but marked as coming and Overlay is built in the same go.
+ */
+test("BLOCKER: the six tools are one wrapping row, not a sideways scroller", () => {
+  const t = nocomment(fn("clubToolsHtml"));
+  const ids = [...t.matchAll(/tool\("(\w+)"/g)].map((m) => m[1]!);
+  assert.deepEqual(ids, ["audio", "text", "overlay", "filter", "edit", "ratio"],
+    "the tool row is " + ids.join(", ") + "; the reference's own six, in its own order");
+  const sheet = nocomment(sheetOf(page()));
+  const row = /\.club-tools\s*\{([^}]*)\}/.exec(sheet);
+  assert.ok(row, "no .club-tools rule");
+  // ⚠️ HE RULED THE SAME DAY THAT NOTHING SLIDES SIDEWAYS, and six tools do not fit one line on a small
+  // screen at the largest text setting — so this wraps, exactly as the profile's times row does.
+  assert.ok(!/overflow-x:\s*(auto|scroll)/.test(row![1]!), "the tool row slides sideways");
+  assert.match(row![1]!, /flex-wrap:\s*wrap/, "the tool row cannot fall to a second line");
+  const tool = /\.club-tool\s*\{([^}]*)\}/.exec(sheet);
+  assert.ok(tool && /min-width:\s*max-content/.test(tool[1]!),
+    "without min-width a tool's label is squashed instead of the row wrapping");
+  // Every tool is reached, and the Text one goes to the on-media surface rather than a dialog.
+  assert.match(nocomment(fn("wireClubEd")), /\[data-ctool\]/, "the tools are not wired");
+});
+
+/**
+ * ⚠️⚠️ CANCEL GENUINELY REVERTS, AND THAT NEEDS A SNAPSHOT TAKEN ON THE WAY IN. A Cancel that only
+ * closes the sheet keeps every change the runner was trying out — worse than no Cancel at all, because
+ * the word promises the opposite. Driven rather than read: the snapshot is an object copy and the
+ * restore is a field-by-field assignment, and neither is visible in the source text.
+ */
+test("BLOCKER: a tool sheet's Cancel puts back what the tool changed, and nothing else", () => {
+  const src = page();
+  const run = new Function("haptic", "clubEdDraw", "clubTextOpen", "clubOvAdd",
+    nocomment(fn("clubToolOpen")) + "\n" + nocomment(fn("clubToolCancel")) + "\n" +
+    nocomment(fn("clubToolDone")) + "\n" +
+    "let CLUBED = null;\n" +
+    "function clubSlide() { return CLUBED.slides[CLUBED.i]; }\n" +
+    "return function (kind, act) {\n" +
+    "  CLUBED = { i: 0, ratio: 'orig', tool: '', snap: null, sel: 2,\n" +
+    "    slides: [{ filter: 'none', adj: {}, ov: [], k: 1.8, ox: 0.3 }] };\n" +
+    "  clubToolOpen(kind);\n" +
+    "  const sl = CLUBED.slides[0];\n" +
+    "  sl.filter = 'mono'; sl.adj = { lux: 40 }; CLUBED.ratio = 'sq'; sl.ov = [{ x: 1 }];\n" +
+    "  sl.k = 3; sl.ox = 0.9;\n" +
+    "  if (act === 'cancel') clubToolCancel(); else clubToolDone();\n" +
+    "  return { filter: sl.filter, adj: sl.adj, ratio: CLUBED.ratio, ovs: sl.ov.length,\n" +
+    "    k: sl.k, ox: sl.ox, tool: CLUBED.tool, snap: CLUBED.snap };\n" +
+    "};")(() => {}, () => {}, () => {}, () => {});
+
+  // Cancelling the filter sheet puts the filter back and leaves everything else alone.
+  let r = run("filter", "cancel");
+  assert.equal(r.filter, "none", "Cancel on the filter sheet kept the filter");
+  assert.deepEqual(r.adj, { lux: 40 }, "Cancel on the filter sheet also undid the adjustments");
+  assert.equal(r.ratio, "sq", "Cancel on the filter sheet also undid the ratio");
+  // ⚠️ AND IT MUST NOT TOUCH THE CROP. A crop made before the sheet was opened is not the sheet's to
+  // undo — a snapshot of the whole slide would take it with the filter.
+  assert.equal(r.k, 3, "Cancel on the filter sheet undid a crop made before it");
+  assert.equal(r.ox, 0.9, "Cancel on the filter sheet undid a pan made before it");
+  r = run("edit", "cancel");
+  assert.deepEqual(r.adj, {}, "Cancel on the edit sheet kept the adjustments");
+  assert.equal(r.filter, "mono", "Cancel on the edit sheet also undid the filter");
+  r = run("ratio", "cancel");
+  assert.equal(r.ratio, "orig", "Cancel on the ratio sheet kept the ratio");
+  r = run("filter", "done");
+  assert.equal(r.filter, "mono", "Done on the filter sheet threw the filter away");
+  assert.equal(r.tool, "", "Done left the sheet open");
+  assert.equal(r.snap, null, "Done left the snapshot behind, so a later Cancel would revert to it");
+});
+
+/**
+ * ⚠️⚠️ NOTHING IS RE-ENCODED, AND THAT IS THE WHOLE DESIGN. The look is a name and a few numbers applied
+ * at display time, exactly as the video trim is two points rather than a re-cut clip. Baking it into
+ * pixels in a web view means decoding to a canvas and encoding back — slow, lossy, and it destroys the
+ * original the runner may want back.
+ */
+test("BLOCKER: the look is arithmetic, and the original file is never re-encoded", () => {
+  const look = new Function(
+    nocomment(fn("clubFilterCss")) + "\n" + nocomment(fn("clubLook")) + "\n" +
+    "const CLUB_FILTERS = " + JSON.stringify(clubFiltersTable()) + ";\n" +
+    "return clubLook;")();
+  // A filter is its own CSS, and nothing else.
+  assert.equal(look({ filter: "none" }).filter, "", "Normal is not a no-op");
+  assert.match(look({ filter: "mono" }).filter, /grayscale\(1\)/, "Mono does not desaturate");
+  // ⚠️ LUX IS ONE DIAL DRIVING THREE, which is what an auto-enhance is.
+  const lux = look({ filter: "none", adj: { lux: 100 } }).filter;
+  assert.match(lux, /contrast\(/, "Lux does not touch contrast");
+  assert.match(lux, /saturate\(/, "Lux does not touch saturation");
+  assert.match(lux, /brightness\(/, "Lux does not touch brightness");
+  // ⚠️ WARMTH GOES BOTH WAYS AND THE TWO DIRECTIONS ARE DIFFERENT FUNCTIONS — sepia only warms, so a
+  // one-armed dial does nothing on half its travel.
+  assert.match(look({ adj: { warm: 80 } }).filter, /sepia\(/, "warming up does not warm");
+  assert.match(look({ adj: { warm: -80 } }).filter, /hue-rotate\(-/, "cooling down does not cool");
+  assert.ok(!/sepia/.test(look({ adj: { warm: -80 } }).filter), "cooling applies sepia");
+  // Vignette is one-way and comes back separately, because it is an overlay rather than a filter.
+  assert.equal(look({ adj: { vig: -60 } }).vig, 0, "the vignette can be driven negative");
+  assert.ok(look({ adj: { vig: 60 } }).vig > 0, "the vignette does nothing");
+  assert.ok(!/vignette/.test(look({ adj: { vig: 60 } }).filter), "the vignette is faked as a filter");
+  // Straightening is clamped, and a wild stored value cannot spin a picture.
+  assert.equal(look({ adj: { rot: 90 } }).rot, 15, "straightening is not clamped");
+  assert.equal(look({ adj: { rot: -90 } }).rot, -15, "straightening is not clamped downwards");
+  assert.equal(look({ adj: { rot: "x" } }).rot, 0, "a non-number rotation is not refused");
+  // ⚠️ NO CANVAS ANYWHERE IN THE LOOK PATH. A toBlob here would be the re-encode this design refuses.
+  for (const f of ["clubLook", "clubFilterCss", "clubApplyLook", "clubLookAttrs", "clubRotScale"]) {
+    const body = nocomment(fn(f));
+    assert.ok(!/toBlob|getContext|createElement\("canvas"\)/.test(body),
+      f + " re-encodes the picture; the look must stay arithmetic");
+  }
+});
+
+/**
+ * ⚠️ A ROTATED PICTURE HAS TO BE SCALED UP OR ITS CORNERS SHOW, AND HOW MUCH DEPENDS ON THE BOX — so it
+ * cannot be a constant and cannot live in the stylesheet. Measured through the real function: the same
+ * 8 degrees needs a different scale in a square box and a tall one, which is why clubApplyLook measures
+ * the node rather than taking a style string.
+ */
+test("BLOCKER: straightening scales to cover, and the scale depends on the box", () => {
+  const rs = new Function(nocomment(fn("clubRotScale")) + "\nreturn clubRotScale;")();
+  assert.equal(rs(0, 400, 400), 1, "no rotation still scales");
+  assert.ok(rs(8, 400, 400) > 1, "a rotated picture is not scaled up, so its corners show");
+  assert.ok(rs(-8, 400, 400) > 1, "rotating the other way is not scaled up");
+  assert.equal(rs(8, 400, 400).toFixed(6), rs(-8, 400, 400).toFixed(6),
+    "the two directions need the same scale and do not get it");
+  const sq = rs(8, 400, 400), tall = rs(8, 400, 700);
+  assert.ok(Math.abs(sq - tall) > 0.02,
+    "the scale is the same in a square box and a tall one (" + sq.toFixed(4) + " vs " +
+    tall.toFixed(4) + "), so it is not covering both");
+  assert.equal(rs(8, 0, 0), 1, "a box with no size does not fall back to 1");
+});
+
+/**
+ * ⚠️ AUDIO IS NAMED, NOT OFFERED — his ruling: "Show it, marked as coming." Music over a post needs a
+ * licensed catalogue, and the phone's own library cannot stand in because those tracks are DRM-locked.
+ * So the sheet says what is missing rather than opening a picker that finds nothing.
+ */
+test("BLOCKER: the Audio tool explains itself and offers no picker", () => {
+  const b = nocomment(fn("clubAudioBody"));
+  assert.match(b, /licen[sc]ed/i, "the Audio sheet does not say a licence is what is missing");
+  // ⚠️ IT MUST NOT LOOK LIVE. No file input, no audio element, no track list — the
+  // looks-live-does-nothing class this project has shipped three times.
+  for (const bad of ["<input", "<audio", "accept=", "clubMediaPut", "createElement"]) {
+    assert.ok(b.indexOf(bad) < 0, "the Audio sheet carries " + bad + ", so it looks live");
+  }
+  // And it is still in the row, because he asked for it to be.
+  assert.match(nocomment(fn("clubToolsHtml")), /tool\("audio"/, "Audio is not offered at all");
+});
+
+/**
+ * ⚠️⚠️ THE SLIDER DOES NOT REDRAW ON INPUT, AND THAT IS NOT AN OPTIMISATION. clubEdDraw rebuilds the
+ * whole editor, so redrawing per input event destroys the input the finger is holding — the trap the
+ * Support search field needed its caret restored for, and the one that made the video trim snap back to
+ * the start on every drag.
+ */
+test("BLOCKER: the adjustment slider is not rebuilt under the finger", () => {
+  const w = nocomment(fn("wireClubTools"));
+  const oninput = /dial\.oninput = ([\s\S]*?);\n/.exec(w);
+  assert.ok(oninput, "the dial has no input handler");
+  const live = /const live = \(\) => \{([\s\S]*?)\n    \};/.exec(w);
+  assert.ok(live, "the dial's live handler could not be found");
+  assert.ok(live![1]!.indexOf("clubEdDraw") < 0,
+    "the dial redraws the editor on every input event, which rebuilds the slider being dragged");
+  assert.match(live![1]!, /clubEdFit\(\)/, "the dial changes nothing visible while it is dragged");
+  // ⚠️ AND IT REDRAWS ONCE THE FINGER IS UP, or the dial row's own numbers never catch up.
+  assert.match(w, /dial\.onchange = \(\) => \{ live\(\); clubEdDraw\(\); \}/,
+    "the editor never catches up after the slider is let go");
+  // The overlay's two sliders are the same shape for the same reason.
+  assert.match(w, /ovk\.onchange = \(\) => clubEdDraw\(\)/, "the overlay size slider never settles");
+  assert.match(w, /ovr\.onchange = \(\) => clubEdDraw\(\)/, "the overlay angle slider never settles");
+});
+
+/**
+ * ⚠️ THE LOOK REACHES EVERY POSTED SURFACE THROUGH ONE APPLIER. The composer's preview, the grid tile,
+ * the post feed and the full-screen viewer all go through clubApplyLook — two copies of this is the
+ * composer and the grid disagreeing about one picture, which is the debrief hero's two-framings fault.
+ */
+test("BLOCKER: one applier puts the look on the composer and on every posted surface", () => {
+  const app = nocomment(appBlock());
+  // Every place a club media span is emitted carries the look.
+  const spans = [...app.matchAll(/data-cmed="'? ?\+? ?/g)].length;
+  assert.ok(spans >= 3, "expected at least three club media sites; found " + spans);
+  const attrs = [...app.matchAll(/clubLookAttrs\(/g)].length;
+  assert.ok(attrs >= 4, "clubLookAttrs is called " + attrs + " times; one media site does not carry "
+    + "the look, so a filter would vanish on that surface");
+  // ⚠️ AND ONE PLACE SETS style.filter ON CLUB MEDIA. A second is a surface that can drift.
+  const fns = [...app.matchAll(/\nfunction (\w+)\(/g)].map((m) => m[1]!);
+  const setters: string[] = [];
+  for (const name of fns) {
+    if (name === "clubApplyLook") continue;
+    const body = nocomment(fn(name));
+    if (/\.style\.filter\s*=/.test(body)) setters.push(name);
+  }
+  assert.deepEqual(setters, [], "these set a filter themselves instead of asking clubApplyLook: " +
+    setters.join(", "));
+  assert.match(nocomment(fn("clubApplyLook")), /getBoundingClientRect/,
+    "the applier does not measure the node, so the rotation cannot cover its box");
+  assert.match(nocomment(fn("clubFillMedia")), /clubApplyLook\(/,
+    "a posted surface's media never has the look applied to it");
+});
+
+/**
+ * ⚠️ AN OVERLAY IS A PHOTOGRAPH, IT IS CAPPED, AND ITS BYTES LIVE AND DIE WITH THE POST. A video overlay
+ * is a compositing problem this app cannot export or keep in sync; and a blob nothing points at after a
+ * delete is a leak the delete dialog promised would not happen.
+ */
+test("BLOCKER: an overlay is a photo, capped, and deleted with the post", () => {
+  const add = nocomment(fn("clubOvAdd"));
+  assert.match(add, /accept = "image\/\*"/, "an overlay picker offers videos");
+  assert.match(add, /CLUB_OV_MAX/, "there is no ceiling on how many overlays one picture carries");
+  assert.match(add, /toast\(/, "a refused overlay is refused in silence");
+  // ⚠️ THE KEYS ARE IN clubKeys, which is what the delete sweep and the loader both read.
+  const keys = nocomment(fn("clubKeys"));
+  assert.match(keys, /\(x\.ov \|\| \[\]\)/, "clubKeys does not include the overlays' keys, so deleting "
+    + "a post leaves their bytes behind for ever");
+  // Driven: a post carrying an overlay reports both keys.
+  const run = new Function(nocomment(fn("clubSlides")) + "\n" + nocomment(fn("clubKeys")) +
+    "\nreturn clubKeys;")();
+  assert.deepEqual(run({ slides: [{ media: "a", ov: [{ media: "o1" }, { media: "o2" }] },
+    { media: "b" }] }), ["a", "o1", "o2", "b"], "clubKeys misses an overlay");
+  assert.deepEqual(run({ media: "old", crop: null }), ["old"],
+    "a post from before overlays existed no longer reports its own key");
+});
+
+/**
+ * ⚠️ THE RATIO IS ON THE POST, NOT THE SLIDE, and the fallback is the shape every post made before the
+ * tool existed was composed at — so nothing already up moves.
+ */
+test("BLOCKER: the ratio belongs to the post, and an older post keeps its shape", () => {
+  const post = nocomment(fn("clubEdPost"));
+  assert.match(post, /ratio: S\.ratio !== "orig" \? S\.ratio : undefined/,
+    "the ratio is not stored on the row, or is stored even when it is the default");
+  const slide = post.slice(post.indexOf("slides: slides.map"));
+  assert.ok(slide.indexOf("ratio") < 0,
+    "a slide carries a ratio of its own, so one post could have slides of two shapes to swipe between");
+  const sheet = nocomment(sheetOf(page()));
+  const sl = /\.cp-slide\s*\{([^}]*)\}/.exec(sheet);
+  assert.ok(sl, "no .cp-slide rule");
+  assert.match(sl![1]!, /aspect-ratio:\s*var\(--car,\s*4 \/ 5\)/,
+    "the feed slide does not fall back to 4:5, so every post made before the Ratio tool moves");
+  const r = new Function(nocomment(fn("clubRatio")) +
+    "\nconst CLUB_RATIOS = [{id:'orig',ar:0},{id:'sq',ar:1}];\nreturn clubRatio;")();
+  assert.equal(r("nonsense").ar, 0, "an unknown ratio is not the original");
 });

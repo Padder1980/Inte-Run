@@ -842,8 +842,64 @@ test("BLOCKER: every destination is a tile, every tile is wired, and none of the
     "studioDest branches on a destination id other than the club, so a tile can behave differently from the rest: " +
     branches.join(", "));
   assert.ok(!/switch\s*\(/.test(go), "studioDest dispatches per tile through a switch");
-  assert.match(go, /if \(id === "inteclub"\) return shareToClub/,
-    "the club branch no longer posts to the club");
+  // ⚠️ THE BRANCH MUST LEAD TO THE CLUB, and this used to pin the implementation ("return shareToClub")
+  // rather than that. It now asks for the CHAIN, because the branch legitimately changed: the story-or-
+  // grid ask has to be drawn inside the studio (see the z-order guard below), so the branch opens the
+  // studio's own sheet and the sheet's two picks do the posting.
+  assert.match(go, /if \(id === "inteclub"\) return studioSheet\("club"\)/,
+    "the club branch no longer opens the club sheet");
+  const sheetTitles = /const SST_SHEET_TITLE = \{([^}]*)\}/.exec(nocomment(page()));
+  assert.ok(sheetTitles && /club:/.test(sheetTitles[1]!),
+    "there is no club sheet for that branch to open");
+  const sh = nocomment(lift("studioSheetHtml"));
+  // ⚠️ THE WRAP, NOT JUST THE BRANCH. Asserting the branch exists is satisfied by a branch returning an
+  // empty string, which is an empty sheet — caught by re-break.
+  assert.match(sh, /id === "club" \? '<div data-sst-clubwrap><\/div>'/,
+    "the club sheet renders no body, so the runner meets an empty sheet");
+  const rows = nocomment(lift("studioSyncRows"));
+  assert.match(rows, /data-sst-clubwrap[\s\S]*?studioClubHtml\(\)/,
+    "the club sheet's body is never filled, so the runner meets an empty sheet");
+  // And its two picks are the only things that post, and they share one function.
+  const club = nocomment(lift("studioClubHtml"));
+  const picks = [...club.matchAll(/data-sst="(club\w+)"/g)].map((m) => m[1]!);
+  assert.deepEqual(picks.sort(), ["clubpost", "clubstory"],
+    "the club sheet no longer offers exactly a story and a grid: " + picks.join(", "));
+  const click = nocomment(lift("studioClick"));
+  for (const pk of picks) {
+    assert.match(click, new RegExp('what === "' + pk + '"\\) return shareToClub\\('),
+      pk + " is not wired to shareToClub, so a pick that looks live does nothing");
+  }
+  // ⚠️ WHAT REACHES THE CLUB IS THE RENDERED CARD ITSELF, WHICH IS WHAT CARRIES THE PHOTOGRAPH. Measured
+  // in a real browser on a card with a magenta photograph on it: 19,803 of 21,377 sampled pixels magenta
+  // in the studio's own export, and 19,803 in the file handed to the club editor for a story — the same
+  // picture. A re-render here would build a second card from a later read of the editor's state, which is
+  // how Share and Save once acted on two different pictures.
+  const toClub = nocomment(lift("shareToClub"));
+  assert.match(toClub, /prepareShareCard\(run\)\.then\(\(file\) =>/,
+    "shareToClub no longer renders the card it hands over");
+  assert.match(toClub, /openClubEditor\(kind, \[file\]/,
+    "the club editor is handed something other than the rendered card, so the photograph is lost");
+  // ⚠️ AND THE DESTINATION DECIDES THE SHAPE, because a 9:16 story card in a square grid cell is mostly
+  // bars. The runner's own chip is put back on BOTH paths — a failed render leaves the studio open, and
+  // it must not have silently changed shape underneath them.
+  assert.match(toClub, /SCARD\.aspect = \(kind === "story"\) \? "story" : "feed"/,
+    "the card is rendered at whatever chip happened to be selected rather than the destination's shape");
+  assert.equal((toClub.match(/SCARD\.aspect = was/g) || []).length, 2,
+    "the runner's chosen shape is not restored on both the success and the failure path");
+
+  // ⚠️⚠️ AND NOTHING IN THE STUDIO MAY DRAW THE APP'S OWN BOTTOM SHEET, WHICH IS THE GUARD THAT WOULD
+  // HAVE CAUGHT THE REPORTED FAULT. `.sheet-ov` is z-index 70 and the studio is `.sst-ov` at 92, so a
+  // sheet opened with ensureSheet() from inside the studio renders BEHIND the card: invisible and
+  // untappable. Measured on his phone as "it just jumps straight back to the share card instead of
+  // opening directly in the story or grid area" — the destinations sheet closed, the ask was there all
+  // along underneath, and nothing had happened. The studio has its own sheet at z-index 2 inside itself.
+  for (const name of ["studioDest", "shareToClub", "studioClubHtml", "studioClick", "studioSheet"]) {
+    const body = nocomment(lift(name));
+    for (const bad of ["ensureSheet(", "sheetBody", "sheetOv", "closeSheet("]) {
+      assert.ok(body.indexOf(bad) < 0,
+        name + " uses the app's bottom sheet (" + bad + "), which renders underneath the studio");
+    }
+  }
   // ⚠️ AND IT IS ANSWERED BEFORE THE CAPABILITY TEST, or a build with the native bridge would try to hand
   // the card to an app for a destination that is inside this one.
   assert.ok(go.indexOf('id === "inteclub"') < go.indexOf("shareAppIsDirect"),

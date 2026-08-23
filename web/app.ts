@@ -12821,52 +12821,53 @@ const CLUB_TILE_FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, s
  * ⚠️ AND IT IS THE ORDINARY POST SHAPE, so the grid, the viewer, the delete and the carousel reader all
  * treat it as what it is. A second kind of grid entry would be a second tile builder.
  */
-function shareToClub(run) {
-  if (!run) return;
-  // ⚠️⚠️ IT ASKS, AND THEN IT OPENS THE EDITOR — his instruction: "it needs to give me the option of
-  // sharing to story or grid…..and being able to edit (write a comment on the grid post or type over a
-  // story)". It used to post to the grid silently, which decided both of those for him.
-  ensureSheet(); SHEET_CTX = null;
-  $("sheetBody").innerHTML =
-    '<h2 class="cm-sh">Post to Inte-Club</h2>' +
-    '<p class="cm-sub">Your card, either way. You can write on it before it goes up.</p>' +
-    '<button class="ce-pick" data-cshk="story">' +
+/**
+ * THE STORY-OR-GRID ASK, DRAWN INSIDE THE STUDIO.
+ *
+ * His instruction: "it needs to give me the option of sharing to story or grid…..and being able to edit
+ * (write a comment on the grid post or type over a story)". It used to post to the grid silently, which
+ * decided both of those for him.
+ */
+function studioClubHtml() {
+  return '<p class="cm-sub">Your card, either way. You can write on it before it goes up.</p>' +
+    '<button class="ce-pick" data-sst="clubstory">' +
       '<span class="ce-pick-t">Add to your story</span>' +
       '<span class="ce-pick-d">Up for 24 hours. Type over it if you want.</span></button>' +
-    '<button class="ce-pick" data-cshk="post">' +
+    '<button class="ce-pick" data-sst="clubpost">' +
       '<span class="ce-pick-t">Post to your grid</span>' +
       '<span class="ce-pick-d">Stays there, with a caption.</span></button>';
-  document.querySelectorAll("[data-cshk]").forEach((b) => b.onclick = () => {
-    const kind = b.dataset.cshk;
-    b.disabled = true;
-    // ⚠️⚠️ THE DESTINATION IS THE ASPECT DECISION, so the card is rendered at the shape it is going to
-    // rather than whatever chip happened to be selected. A 9:16 story card in a square grid cell is
-    // mostly white bars — measured on the served build — and a 4:5 feed card in a story is letterboxed
-    // the other way. He chose story or grid; that IS the choice of shape.
-    // ⚠️ AND WHAT HE HAD SELECTED IS PUT BACK. If the render fails the studio stays open, and it must not
-    // have silently changed shape underneath him.
-    const was = SCARD.aspect;
-    SCARD.aspect = (kind === "story") ? "story" : "feed";
-    prepareShareCard(run).then((file) => {
-      SCARD.aspect = was;
-      if (!file) { closeSheet(); toast("That card could not be made."); return; }
-      closeSheet();
-      // ⚠️ THE STUDIO CLOSES FIRST, or the editor opens behind it — both are full-screen overlays and
-      // the studio is the later one in the stack.
-      closeShareStudio();
-      // ⚠️ THE CARD GOES IN AS THE PICTURE, so everything the editor already does applies to it: pan and
-      // zoom, words typed on it, a caption step, and the same post shape as anything from the camera
-      // roll. A second composer for one kind of picture would be a second of everything.
-      // ⚠️ card: true MEANS THE STAGE FITS IT RATHER THAN FILLING WITH IT. The editor covers by default,
-      // which is right for a photograph — raw material the runner is framing — and wrong for a card
-      // already composed: cropping it cut "Inte-Run" and the distance off both edges.
-      // ⚠️ AND THE CAPTION STARTS AS THE RUN’S OWN LINE rather than empty — it is what the card already
-      // says, so it is the caption he would most likely write, and he can replace it.
-      openClubEditor(kind, [file],
-        { card: true, caption: clubRunCaption(run), runId: String(run.id || "") });
-    }).catch(() => { SCARD.aspect = was; closeSheet(); toast("That card could not be made."); });
-  });
-  $("sheetOv").classList.add("on");
+}
+/**
+ * RENDER THE CARD AT THE CHOSEN SHAPE AND HAND IT TO THE CLUB EDITOR.
+ *
+ * ⚠️ THE DESTINATION IS THE ASPECT DECISION, so the card is rendered at the shape it is going to rather
+ * than whatever chip happened to be selected. A 9:16 story card in a square grid cell is mostly white
+ * bars — measured on the served build — and a 4:5 feed card in a story is letterboxed the other way. He
+ * chose story or grid; that IS the choice of shape.
+ * ⚠️ AND WHAT HE HAD SELECTED IS PUT BACK on both paths. If the render fails the studio stays open, and
+ * it must not have silently changed shape underneath him.
+ */
+function shareToClub(run, kind) {
+  if (!run || (kind !== "story" && kind !== "post")) return;
+  const was = SCARD.aspect;
+  SCARD.aspect = (kind === "story") ? "story" : "feed";
+  prepareShareCard(run).then((file) => {
+    SCARD.aspect = was;
+    if (!file) { toast("That card could not be made."); return; }
+    // ⚠️ THE STUDIO CLOSES FIRST, or the editor opens behind it — both are full-screen overlays and the
+    // studio is the later one in the stack. This is the same z-order that hid the ask itself.
+    closeShareStudio();
+    // ⚠️ THE CARD GOES IN AS THE PICTURE, so everything the editor already does applies to it: pan and
+    // zoom, words typed on it, a caption step, and the same post shape as anything from the camera roll.
+    // A second composer for one kind of picture would be a second of everything.
+    // ⚠️ card: true MEANS THE STAGE FITS IT RATHER THAN FILLING WITH IT. The editor covers by default,
+    // which is right for a photograph — raw material the runner is framing — and wrong for a card
+    // already composed: cropping it cut "Inte-Run" and the distance off both edges.
+    // ⚠️ AND THE CAPTION STARTS AS THE RUN'S OWN LINE rather than empty — it is what the card already
+    // says, so it is the caption he would most likely write, and he can replace it.
+    openClubEditor(kind, [file],
+      { card: true, caption: clubRunCaption(run), runId: String(run.id || "") });
+  }).catch(() => { SCARD.aspect = was; toast("That card could not be made."); });
 }
 /**
  * POSTING A RUN TO THE GRID FROM THE RUN'S OWN PAGE.
@@ -27415,7 +27416,7 @@ const SST_TOOLS = [
   { id: "style", label: "Style", title: "Card style" },
   { id: "privacy", label: "Privacy", title: "What this card says" },
 ];
-const SST_SHEET_TITLE = { dest: "Where would you like it?" };
+const SST_SHEET_TITLE = { dest: "Where would you like it?", club: "Post to Inte-Club" };
 /**
  * THE POSITION ROW — WHICH CARD OF HOW MANY, IN WORDS AND IN DOTS, OR THE FRAMING CONTROLS.
  *
@@ -27979,7 +27980,14 @@ function studioDest(id) {
   // ⚠️ INTE-CLUB IS ANSWERED BEFORE THE CAPABILITY TEST, because it is not a handoff at all — nothing
   // leaves the phone and nothing else can serve it. Left to fall through it would open the share sheet,
   // which is the one thing this tile must not do.
-  if (id === "inteclub") return shareToClub(STUDIO.run);
+  // ⚠️⚠️ THE STUDIO'S OWN SHEET, NOT THE APP'S, AND THAT WAS THE WHOLE BUG. shareToClub used to draw the
+  // story-or-grid ask with ensureSheet() — .sheet-ov, z-index 70 — while the studio is .sst-ov at 92. So
+  // the ask opened BEHIND the card, invisible and untappable: the destinations sheet closed, the runner
+  // was looking at the share card again, and nothing had happened. Reported as "it just jumps straight
+  // back to the share card instead of opening directly in the story or grid area".
+  // ⚠️ INSIDE THE STUDIO RATHER THAN CLOSING IT FIRST, because a cancelled ask must land back on the
+  // destinations row it came from — closing the studio to ask would make Cancel cost the whole card.
+  if (id === "inteclub") return studioSheet("club");
   if (shareAppIsDirect(id) && shareAppHandoff(id, STUDIO.run)) return;
   return doShareRun(STUDIO.run);
 }
@@ -28037,6 +28045,7 @@ function studioSheetHtml(id) {
     : id === "style" ? '<div data-sst-stylewrap></div>'
     : id === "privacy" ? '<div data-sst-priv></div>'
     : id === "dest" ? '<div data-sst-destwrap></div>'
+    : id === "club" ? '<div data-sst-clubwrap></div>'
     : "";
   return '<div class="sst-sheeth"><h3>' + esc(title) + '</h3>' +
     '<button class="sst-done" data-sst="sheetoff">Done</button></div>' + body;
@@ -28291,6 +28300,7 @@ function studioSyncRows() {
   const mw = root.querySelector("[data-sst-metwrap]"); if (mw) mw.innerHTML = studioMetricsHtml(STUDIO.run);
   const yw = root.querySelector("[data-sst-stylewrap]"); if (yw) yw.innerHTML = studioStyleHtml();
   const dw = root.querySelector("[data-sst-destwrap]"); if (dw) dw.innerHTML = studioDestHtml(STUDIO.run);
+  const cw = root.querySelector("[data-sst-clubwrap]"); if (cw) cw.innerHTML = studioClubHtml();
   const sv = root.querySelector("[data-sst-strava]");
   if (sv) sv.innerHTML = stravaRunButtonHtml(STUDIO.run) +
     '<p class="sst-sr">Sends the run itself, not this card.</p>';
@@ -28459,6 +28469,10 @@ function studioClick(e) {
     if (what === "fit") return studioCropFit();
     if (what === "undo") return studioCropUndo();
     if (what === "metdef") { SCARD.metrics = null; return studioSync(); }
+    // The two picks inside the Inte-Club sheet. One function does the work for both, so the story and
+    // the grid cannot come to disagree about how the card is made.
+    if (what === "clubstory") return shareToClub(STUDIO.run, "story");
+    if (what === "clubpost") return shareToClub(STUDIO.run, "post");
     if (what === "dest") return studioSheet("dest");
     if (what === "sheetoff") return studioSheet(null);
     // ⚠️ THE RUN THE STUDIO WAS OPENED WITH. This used to re-resolve through the screen's own resolver

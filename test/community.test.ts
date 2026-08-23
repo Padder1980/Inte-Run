@@ -946,8 +946,20 @@ test("BLOCKER: Inte-Club is a share destination that needs no bridge and never f
   // clubEdPost, which is the one writer for everything on the grid, and that is a stronger version of
   // what this used to assert: not "it writes the ordinary shape" but "it does not write a shape at all".
   assert.ok(!/clubSave\(|clubMediaPut\(/.test(to), "the club tile still writes its own grid entry");
-  assert.match(to, /data-cshk="story"/, "the club tile does not offer a story");
-  assert.match(to, /data-cshk="post"/, "the club tile does not offer the grid");
+  // ⚠️ THE ASK MOVED, AND THE CLAIM DID NOT. It used to be drawn inside shareToClub with the app's own
+  // bottom sheet — .sheet-ov, z-index 70 — while the share studio is .sst-ov at 92, so it opened BEHIND
+  // the card: invisible and untappable. The runner tapped Inte-Club, the destinations sheet closed, and
+  // they were looking at the share card again with nothing having happened. It is a studio sheet now.
+  // ⚠️ Guard moved with it rather than deleted, per this repo's own rule about a comment naming a test
+  // that is not there.
+  const ask = nocomment(fn("studioClubHtml"));
+  assert.match(ask, /data-sst="clubstory"/, "the club tile does not offer a story");
+  assert.match(ask, /data-sst="clubpost"/, "the club tile does not offer the grid");
+  // And the ask is drawn where it can actually be seen — never with the app's sheet, which is under it.
+  for (const bad of ["ensureSheet(", "sheetBody", "sheetOv"]) {
+    assert.ok(to.indexOf(bad) < 0 && ask.indexOf(bad) < 0,
+      "the story-or-grid ask uses the app's bottom sheet (" + bad + "), which renders under the studio");
+  }
   assert.match(to, /openClubEditor\(kind, \[file\],/, "the card does not reach the editor");
   // ⚠️ THE STUDIO CLOSES FIRST, or the editor opens behind it — both are full-screen and the studio is
   // the later one in the stack.

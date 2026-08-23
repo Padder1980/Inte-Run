@@ -8286,6 +8286,62 @@ frame 69 of the clip.
 ⚠️ **THE BACKTICK RULE FIRED TWICE MORE IN THE COMMENTS EXPLAINING THIS**, both times failing the build
 outright. Running total for this stretch of work: **fourteen**.
 
+## ⚠️⚠️ THE INTE-CLUB TILE ASKED BEHIND THE CARD (owner, 2026-08-22)
+
+*"when I try to share an end of session share card to my inte-club, it just jumps straight back to the
+share card instead of opening directly in the story or grid area of Inte-club."*
+
+`shareToClub` drew the story-or-grid ask with `ensureSheet()` — **`.sheet-ov` is z-index 70 and the share
+studio is `.sst-ov` at 92**, so the ask rendered BEHIND the card: invisible and untappable. The
+destinations sheet closed (the dispatch opens with `studioSheet(null)`), the runner was looking at the
+share card again, and the ask was sitting there underneath the whole time.
+
+⚠️ **THE ASK IS A STUDIO SHEET NOW (`studioSheet("club")`), NOT THE APP'S.** The studio already has its
+own sheet at z-index 2 *inside itself*, which is what the five tools use.
+⚠️ **INSIDE THE STUDIO RATHER THAN CLOSING IT FIRST**, because a cancelled ask must land back on the
+destinations row it came from — closing the studio to ask would make Cancel cost the whole card.
+⚠️ **AND THE GENERALISABLE GUARD IS THE Z-ORDER ONE**: `test/share-studio.test.ts` now sweeps
+`studioDest`, `shareToClub`, `studioClubHtml`, `studioClick` and `studioSheet` for `ensureSheet(`,
+`sheetBody`, `sheetOv` and `closeSheet(`. That catches the class anywhere in the studio rather than this
+one tile.
+
+⚠️ **MY OWN VERIFICATION MISSED IT BECAUSE I DROVE THE FUNCTION, NOT THE TILE.** The round that built
+this recorded "the club tile asking story-or-grid then opening the editor" — true when `shareToClub` is
+called directly, and false through the tile, because calling it directly means the studio is not on
+screen to hide the sheet. **Drive the control, not the function it calls.**
+
+⚠️ **TWO GUARDS PINNED THE IMPLEMENTATION AND HAD TO BE RESTATED, NOT DELETED.** `share-studio`'s
+"the club branch no longer posts to the club" asserted `return shareToClub`, and `community`'s asserted
+`data-cshk="story"` inside `shareToClub`. Both claims are still right; the ask moved. They now assert the
+CHAIN — branch → club sheet → its two picks → `shareToClub` — with every link falsifiable, plus the
+z-order sweep. Per this repo's own rule, the guard's address moved with the guard.
+⚠️ **AND ONE RESTATEMENT ESCAPED ITS FIRST RE-BREAK**: "the club sheet renders a body" matched a branch
+returning an empty string, which is an empty sheet. It names the wrap now.
+
+### ✅ AND THE PHOTOGRAPH DOES TRAVEL — MEASURED, NOT REASONED
+
+He asked whether a picture added on the share card reaches Inte-Club. It does, because it is **baked
+into the rendered card** before the club editor ever sees it. Driven in a real browser with a magenta
+photograph, counting actual decoded pixels:
+
+| | size | magenta of 21,377 sampled |
+|---|---|---|
+| card with no photo | 1080×1920 | 0 |
+| card with the photo | 1080×1920 | 19,803 |
+| handed to the club as a STORY | 1080×1920 | **19,803** — the same picture |
+| handed to the club as a GRID post | 1080×1350 | **9,638** |
+
+⚠️ **THE GRID'S LOWER COUNT IS THE PER-SHAPE FRAMING, NOT A LOSS.** The grid card is 4:5, and a 9:16
+photograph fitted into it shows whole with the blurred surround at the sides — that is the whole-photo
+default (ruling 4), and the framing store is keyed on (template, aspect) so a pan and zoom set for a
+story is not carried across to a different shape.
+
+⚠️⚠️ **AND MY FIRST MEASUREMENT REPORTED THE GRID AS LOSING THE PHOTO ENTIRELY (0 magenta), WHICH WAS
+THE HARNESS.** `closeShareStudio` releases `SPHOTO` by design — session-only storage — and `shareToClub`
+closes the studio, so the probe's second run had no photograph at all. **A probe that reuses state the
+code under test deliberately clears measures a different thing and reports a defect that is not there.**
+Same class as this file's other harness traps; the fix is a fresh photograph per case.
+
 ## OPEN BUGS (confirmed on real hardware, 2026-07-29)
 
 ### 1. Coach audio when the phone is locked or pocketed — FIXED 2026-08-08, unproven on hardware

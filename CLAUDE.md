@@ -9541,3 +9541,44 @@ swipe, a 30px swipe, a 90×120 diagonal and a swipe on a two-picture carousel al
 ⚠️ **`node --check` CAUGHT A DUPLICATE `const`** — my new `ovr` collided with `wireClubTools`' own overlay
 rotation slider in the same scope. Legal-looking, invisible to the build, and the reason that step is a
 test rather than a documented manual one.
+
+### ⚠️⚠️ THE STORY TRIM: A CLASS COLLISION AND A MAGIC OFFSET (owner, 2026-08-23)
+
+*"There are issues when trying to edit a story (the 15 second slide bar looks messy on the corners and
+the slide bar overlaps the edit tools"* — with a screenshot circling the tool row and both handle
+corners. **Two separate faults and a third found on the way.** Suite 1270 → **1272**; 6 deliberate
+re-breaks, all 6 caught. Web-only, so it reaches his phone on the next launch.
+
+⚠️⚠️ **THE "MESSY CORNERS" WAS A CSS CLASS COLLISION, NOT A CORNER PROBLEM.** `.club-fr` has been the
+filmstrip's frame cell since the trim was built; the composer's filter swatch row **reused that name**,
+and being later in the stylesheet it gave **every frame of a story's fifteen-second strip**
+`display: flex` and 12px of side padding. Measured, all eight frames read `flex/12px` where they should
+read `block/0px`. **A class that means two things is legal CSS** — the build, the typecheck and 1270
+tests all passed. Renamed to `.club-fsr`.
+⚠️ **THE GUARD IS A RATCHET, NOT A BAN.** Seventeen single-class rules in this stylesheet are
+legitimately declared twice (a base plus a scoped override), so a blanket rule would need an allowlist
+that goes stale. `CSS_DUP_CEILING = 17` is what must never grow — the same shape as the radius and
+font-size ratchets — **plus the pair that actually bit is named**, so a rename back cannot slip under it.
+
+⚠️⚠️ **THE OVERLAP WAS A MAGIC OFFSET THAT STOPPED CLEARING THE CHROME.** `.club-trim` was
+`position: absolute; bottom: 118px`, which cleared the chrome exactly while the chrome was one row of
+buttons — and the moment the tool row and the tool sheets went in below it, the strip was drawn straight
+over them. It is a **flex child** now, so it cannot overlap whatever is beneath it however much is added
+later. **That is the point: a number that has to be updated whenever the chrome changes is a number
+somebody forgets.** Guarded by asserting it is not absolutely positioned, has no bottom offset, carries
+`flex: none`, and is emitted before the sheet and the tool row.
+
+⚠️ **AND THE HANDLE RADIUS WAS GENUINELY OUT OF PHASE — the third fault, the other half of what he
+circled.** The selection window is a 2px white border with radius `--r-ctl`, so the curve a handle has to
+continue is the border's INNER one: `calc(var(--r-ctl) - 2px)`. At a flat 12px the two white shapes met
+slightly off, leaving a lumpy notch at each top corner. The guard **derives** the border width from the
+window's own rule rather than pinning 10px, so retuning `--r-ctl` cannot reintroduce it.
+
+**Measured after, at 430×932 and 320×568, text scale 1.0 and 1.3, sheet closed and open:** trim/tools
+overlap **0** and trim/foot overlap **0** in every combination; the eight film frames read `block/0px`;
+handle radius 10px against the window's 12px; both handles inside the strip; page overflow 0; no console
+errors.
+
+⚠️ **ONE OF MY OWN GUARDS WENT STALE FROM MY OWN RENAME AN HOUR LATER** — the row-keep sweep named
+`club-fr` in its derived list. Correct to update, but it is the fifth guard in three days whose scope was
+a NAME rather than a fact.

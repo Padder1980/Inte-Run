@@ -4710,7 +4710,13 @@ button.cm-tile:active { opacity: .65; }
 .club-sz { display: flex; align-items: center; gap: var(--s3); margin-top: var(--s3); color: #fff;
   font-size: var(--t-label); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
 .club-sz input { flex: 1; accent-color: var(--accent); }
-.club-trim { position: absolute; left: var(--s3); right: var(--s3); bottom: 118px; z-index: 3;
+/* ⚠️⚠️ IN FLOW, NOT PINNED AT A MAGIC OFFSET — and that constant is what he saw break. It was
+   bottom: 118px, which cleared the chrome exactly while the chrome was one row of buttons; the moment
+   the tool row and the tool sheets went in below it, the fifteen-second strip was drawn straight over
+   them. Reported: "the slide bar overlaps the edit tools". As a flex child of the same column it cannot
+   overlap whatever is beneath it, however much is added later — which is the point, because a number
+   that has to be updated whenever the chrome changes is a number somebody forgets. */
+.club-trim { position: relative; z-index: 3; flex: none; margin: 0 var(--s3);
   padding: var(--s2) var(--s3); border-radius: var(--r-card); background: rgba(4,16,13,.62);
   color: #fff; text-align: center; }
 .club-trim-l, .club-trim-w { display: block; font-size: var(--t-label); font-weight: 650;
@@ -4893,8 +4899,12 @@ button.cm-tile:active { opacity: .65; }
    sits in already takes none. A second declaration is a second owner of one behaviour. */
 .club-h { position: absolute; top: 0; bottom: 0; width: 14px; display: grid; place-items: center;
   background: #fff; }
-.club-h-a { left: 0; border-radius: 12px 0 0 12px; }
-.club-h-b { right: 0; border-radius: 0 12px 12px 0; }
+/* ⚠️ THE HANDLE'S RADIUS IS THE WINDOW'S INNER RADIUS, NOT ITS OUTER ONE. The window is a 2px white
+   border with radius --r-ctl, so the curve the handle has to continue is --r-ctl minus that border —
+   at a flat 12px the two white shapes met slightly out of phase and left a lumpy notch at each top
+   corner, which is the other half of what he circled. */
+.club-h-a { left: 0; border-radius: calc(var(--r-ctl) - 2px) 0 0 calc(var(--r-ctl) - 2px); }
+.club-h-b { right: 0; border-radius: 0 calc(var(--r-ctl) - 2px) calc(var(--r-ctl) - 2px) 0; }
 .club-h i { display: block; width: 2px; height: 16px; border-radius: 999px; background: rgba(4,16,13,.55); }
 /* ⚠️ THE HIT AREA GROWS OUTWARD ONLY, AND SYMMETRICAL WAS WRONG THE MOMENT THE WINDOW BECAME
    DRAGGABLE. At 15px each side these two zones met in the middle of a short selection and left the
@@ -4961,10 +4971,15 @@ button.cm-tile:active { opacity: .65; }
 .club-esh-c, .club-esh-d { min-height: var(--tap); padding: 0 var(--s2); border: 0; background: none;
   font-size: var(--t-body); font-weight: 600; color: #fff; }
 .club-esh-d { color: var(--accent); font-weight: 800; }
-/* The filter swatches: the runner's own picture under each look. */
-.club-fr { display: flex; gap: var(--s2); overflow-x: auto; scrollbar-width: none;
+/* The filter swatches: the runner's own picture under each look.
+   ⚠️⚠️ .club-fsr, NOT .club-fr — THAT NAME WAS ALREADY THE FILMSTRIP'S FRAME CELL AND THE COLLISION WAS
+   SILENT. Two rules for one class, mine later in the sheet, so every frame of a story's fifteen-second
+   filmstrip inherited display:flex and 12px of side padding. He reported it as "the 15 second slide bar
+   looks messy on the corners", which is exactly what it looked like. Nothing failed: the build, the
+   typecheck and 1270 tests all passed, because a class that means two things is legal CSS. */
+.club-fsr { display: flex; gap: var(--s2); overflow-x: auto; scrollbar-width: none;
   padding: 0 var(--s3); }
-.club-fr::-webkit-scrollbar { display: none; }
+.club-fsr::-webkit-scrollbar { display: none; }
 .club-fs { flex: none; display: grid; gap: 5px; width: 76px; padding: 0; border: 0; background: none;
   color: rgba(255,255,255,.72); font-size: var(--t-label); font-weight: 600; }
 .club-fs-i { display: block; overflow: hidden; width: 76px; height: 76px; border-radius: var(--r-ctl);
@@ -12071,7 +12086,7 @@ function clubSheetHtml(S, sl) {
  */
 function clubFilterBody(sl) {
   const cur = sl.filter || "none";
-  return '<div class="club-fr">' + CLUB_FILTERS.map((f) =>
+  return '<div class="club-fsr">' + CLUB_FILTERS.map((f) =>
     '<button class="club-fs' + (f.id === cur ? " on" : "") + '" data-cfil="' + f.id + '" ' +
       'aria-pressed="' + (f.id === cur) + '">' +
       '<span class="club-fs-i">' +
@@ -12457,7 +12472,7 @@ function wireClubTools(S, sl) {
   // has the identical fault and he did not have to report it separately.
   const dls = document.querySelector(".club-dls");
   if (dls) clubRowKeep(dls, dls.querySelector(".club-dl.on"));
-  const frs = document.querySelector(".club-fr");
+  const frs = document.querySelector(".club-fsr");
   if (frs) clubRowKeep(frs, frs.querySelector(".club-fs.on"));
   const ovrow = document.querySelector(".club-ovr");
   if (ovrow) clubRowKeep(ovrow, ovrow.querySelector(".club-ovs.on"));

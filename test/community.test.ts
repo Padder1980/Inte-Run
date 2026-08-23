@@ -2173,11 +2173,13 @@ test("BLOCKER: a sheet's scrolling row keeps its chosen chip in view across a re
   // ⚠️ EVERY SCROLLING ROW IN THE COMPOSER IS COVERED, DERIVED FROM THE STYLESHEET — a fourth row added
   // without a keep call is the same defect again, in a place nobody would think to look.
   const sheet = nocomment(sheetOf(page()));
-  const rows = [...sheet.matchAll(/^\.(club-(?:dls|fr|ovr|strip|fps|cap-strip))\s*\{([^}]*)\}/gm)]
+  const rows = [...sheet.matchAll(/^\.(club-(?:dls|fsr|ovr|strip|fps|cap-strip))\s*\{([^}]*)\}/gm)]
     .filter((m) => /overflow-x:\s*auto/.test(m[2]!)).map((m) => m[1]!);
   assert.ok(rows.length >= 3, "expected at least three scrolling rows in the composer; found " + rows.length);
   const w = nocomment(fn("wireClubTools"));
-  for (const r of ["club-dls", "club-fr", "club-ovr"]) {
+  // ⚠️ club-fsr, NOT club-fr — the filter row was renamed after the filmstrip's frame cell turned out to
+  // own that name first, and this list is one of the places that had to follow the rename.
+  for (const r of ["club-dls", "club-fsr", "club-ovr"]) {
     assert.ok(rows.indexOf(r) >= 0, "." + r + " is no longer a scrolling row; this guard is stale");
     assert.ok(w.indexOf('".' + r + '"') > 0,
       "." + r + " scrolls but nothing keeps its chosen chip in view after a redraw");
@@ -2230,4 +2232,70 @@ test("BLOCKER: swiping right leaves the post feed, and nothing else does", () =>
   const wire = nocomment(fn("wireClubPostView"));
   assert.match(wire, /clubWireBackSwipe\(\$\("view"\), \(\) => \{ state\.screen = null; state\.clubPostId = null; render\(\); \}\)/,
     "the swipe does not go where the back chevron goes");
+});
+
+/**
+ * ⚠️⚠️ A CLASS THAT MEANS TWO THINGS IS LEGAL CSS, AND THAT IS WHY THIS NEEDS A COUNT RATHER THAN AN EYE.
+ * `.club-fr` was the filmstrip's frame cell; the composer's filter row reused the name, and being later
+ * in the sheet it gave every frame of a story's fifteen-second strip `display: flex` and 12px of side
+ * padding. He reported it as "the 15 second slide bar looks messy on the corners", which is exactly what
+ * it looked like — and the build, the typecheck and 1270 tests all passed.
+ * ⚠️ A RATCHET, NOT A BAN. Seventeen single-class rules in this stylesheet are legitimately declared
+ * twice (a base plus a scoped override), so a blanket rule would need an allowlist that goes stale. The
+ * count is what must never grow — the same shape as the radius and font-size ratchets.
+ */
+const CSS_DUP_CEILING = 17;
+test("BLOCKER: no new CSS class is declared twice", () => {
+  const css = nocomment(sheetOf(page()));
+  const counts: Record<string, number> = {};
+  for (const m of css.matchAll(/(^|\})\s*(\.[a-z][a-z0-9-]*)\s*\{/g)) {
+    counts[m[2]!] = (counts[m[2]!] || 0) + 1;
+  }
+  const dup = Object.entries(counts).filter(([, n]) => n > 1).map(([k, n]) => k + " x" + n);
+  assert.ok(dup.length <= CSS_DUP_CEILING,
+    dup.length + " classes are declared more than once (ceiling " + CSS_DUP_CEILING + "). A class that "
+    + "means two things silently applies one component's rules to the other: " + dup.join(", "));
+  // ⚠️ AND THE PAIR THAT ACTUALLY BIT IS NAMED, so a rename back cannot slip through under the ratchet.
+  assert.equal(counts[".club-fr"], 1,
+    ".club-fr is declared " + counts[".club-fr"] + " times; it is the filmstrip's frame cell, and the "
+    + "filter swatch row is .club-fsr precisely because sharing it broke the story trim");
+  assert.match(nocomment(fn("clubFilterBody")), /class="club-fsr"/,
+    "the filter row is back on the filmstrip's class name");
+});
+
+/**
+ * ⚠️⚠️ THE TRIM IS IN FLOW, NOT PINNED AT A MAGIC OFFSET. It was `bottom: 118px`, which cleared the
+ * chrome exactly while the chrome was one row of buttons — and the moment the tool row and the tool
+ * sheets went in below it, the fifteen-second strip was drawn straight over them ("the slide bar
+ * overlaps the edit tools"). As a flex child it cannot overlap whatever is beneath it however much is
+ * added later, which is the point: a number that has to be updated whenever the chrome changes is a
+ * number somebody forgets.
+ */
+test("BLOCKER: the story trim sits above the tools rather than over them", () => {
+  const sheet = nocomment(sheetOf(page()));
+  const trim = /\.club-trim\s*\{([^}]*)\}/.exec(sheet);
+  assert.ok(trim, "no .club-trim rule");
+  assert.ok(!/position:\s*absolute/.test(trim![1]!),
+    "the trim is positioned absolutely, so it overlaps whatever is added below it");
+  assert.ok(!/bottom:\s*\d/.test(trim![1]!),
+    "the trim is pinned at a fixed offset from the bottom; that constant is what broke");
+  assert.match(trim![1]!, /flex:\s*none/, "the trim can be squeezed or stretched by the column");
+  // ⚠️ IT IS EMITTED BEFORE THE SHEET AND THE TOOL ROW, which is what puts it above them in the flow.
+  const draw = nocomment(fn("clubEdDraw"));
+  const t = draw.indexOf("clubTrimHtml(S)");
+  const sh = draw.indexOf("clubSheetHtml(S, sl)");
+  const to = draw.indexOf("clubToolsHtml(S, sl)");
+  assert.ok(t > 0 && sh > t && to > sh,
+    "the trim, the tool sheet and the tool row are not in that order, so the column stacks them wrongly");
+  // ⚠️ AND THE HANDLE'S RADIUS IS THE WINDOW'S INNER ONE. The window is a 2px border with radius
+  // --r-ctl, so a flat 12px on the handle left the two white shapes out of phase — a lumpy notch at each
+  // top corner, the other half of what he circled.
+  const win = /\.club-win\s*\{([^}]*)\}/.exec(sheet);
+  const ha = /\.club-h-a\s*\{([^}]*)\}/.exec(sheet);
+  assert.ok(win && ha, "the trim window or its handle has no rule");
+  const bw = /border:\s*(\d+)px/.exec(win![1]!);
+  assert.ok(bw, "the trim window has no border width to derive the inner radius from");
+  assert.match(ha![1]!, new RegExp("calc\\(var\\(--r-ctl\\) - " + bw![1] + "px\\)"),
+    "the handle's radius is not the window's radius minus its " + bw![1] + "px border, so the two white "
+    + "shapes meet out of phase");
 });

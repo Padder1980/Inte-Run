@@ -43,6 +43,24 @@ const FEED: [number, number] = [1080, 1350];
 const WANT: Record<string, [number, number]> = { story: STORY, feed: FEED };
 const want = (aspect: string) => WANT[aspect] || STORY;
 const shots = () => [...G.shots.values()];
+/**
+ * One privacy capture by name, or a failure that says which one is missing.
+ *
+ * ⚠️⚠️ THESE READS USED TO BE `.find(...)!`, AND THAT IS WHY A SHORT CAPTURE PRESENTED AS A PRIVACY
+ * DEFECT. TypeScript's non-null assertion silences the compiler and does nothing at runtime, so a
+ * missing label became an instant throw on `undefined` inside three BLOCKER tests whose names promise
+ * that a privacy switch does not work — measured twice across sessions, failing in under a millisecond
+ * each while the file passed alone. The cause of the short capture is not diagnosed; what is fixed is
+ * that the next occurrence names itself instead of accusing the feature.
+ */
+function priv(label: string) {
+  const hit = G.privacyShots.find((p) => p.label === label);
+  assert.ok(hit, "the capture holds no privacy card labelled \"" + label + "\" — it has "
+    + G.privacyShots.length + " of them ("
+    + G.privacyShots.map((p) => p.label).join(", ") + "). That is a capture that did not finish, "
+    + "not a privacy switch that failed.");
+  return hit!;
+}
 
 /* ================================================================================================ *
  * THE HARNESS PROVES ITSELF FIRST                                                                  *
@@ -292,8 +310,8 @@ test("BLOCKER: the export's own filename is the only place a date appears, and t
   // print one; deleting either alone leaves the filename dateless, so removing the filename's own gate
   // failed nothing here. The per-gate proof is in test/share-export.test.ts, which calls shareFileName
   // with a date in hand. What this end-to-end version adds is the upstream gate, pinned below.
-  const shown = G.privacyShots.find((p) => p.label === "route, ends hidden")!;
-  const hidden = G.privacyShots.find((p) => p.label === "date hidden")!;
+  const shown = priv("route, ends hidden");
+  const hidden = priv("date hidden");
   assert.match(shown.file, /InteRun-2026-08-17-/, "the visible-date card's filename lost its date: " + shown.file);
   assert.ok(!/\d{4}-\d{2}-\d{2}/.test(hidden.file),
     "hiding the date left it in the filename: " + hidden.file);
@@ -316,15 +334,25 @@ test("BLOCKER: the export's own filename is the only place a date appears, and t
  * PRIVACY CHANGES THE PIXELS                                                                       *
  * ================================================================================================ */
 
+test("BLOCKER: the privacy capture is complete, so a short one reports itself", () => {
+  // ⚠️ THE COUNT GUARD THE SHOTS ALREADY HAD AND THE PRIVACY CARDS DID NOT. Without it a capture that
+  // stopped early surfaced as three separate BLOCKER failures whose names promise a broken privacy
+  // switch — which is the worst possible thing for a flake to look like on a release gate.
+  const want = ["route, ends shown", "route, ends hidden", "route hidden",
+    "location hidden", "date hidden"];
+  assert.deepEqual(G.privacyShots.map((p) => p.label), want,
+    "the privacy capture is short or out of order: " + G.privacyShots.length + " of " + want.length);
+});
+
 test("BLOCKER: the three route-privacy states produce three different pictures", () => {
   // ⚠️ DRIVEN THROUGH THE APP'S OWN PRIVACY RECORD, NOT BY HANDING THE RENDERER THREE ROUTES. The
   // harness writes SHAREPRIV and lets sharePrivacyFor and runRoutePresentation decide, so what is
   // measured is the switch a runner actually flips. A privacy feature that reaches the preview and not
   // the export is the worst possible way for one to fail, and it cannot be seen from a screenshot of
   // the editor.
-  const ends = G.privacyShots.find((p) => p.label === "route, ends shown")!;
-  const trim = G.privacyShots.find((p) => p.label === "route, ends hidden")!;
-  const off = G.privacyShots.find((p) => p.label === "route hidden")!;
+  const ends = priv("route, ends shown");
+  const trim = priv("route, ends hidden");
+  const off = priv("route hidden");
   assert.equal(new Set([ends.sha, trim.sha, off.sha]).size, 3,
     "two of the three route states exported the same bytes: " +
     [ends, trim, off].map((p) => p.label + "=" + p.sha).join(", "));
@@ -339,9 +367,9 @@ test("BLOCKER: Hide location and Hide date each change the exported bytes on the
   // ⚠️ ONE AT A TIME, BECAUSE A SWITCH THAT DOES NOTHING IS INVISIBLE BESIDE ONE THAT DOES. Both of
   // these are text on the card, so a change that reached the model and not the renderer would leave
   // the picture identical while the editor showed the switch as on.
-  const base = G.privacyShots.find((p) => p.label === "route, ends hidden")!;
+  const base = priv("route, ends hidden");
   for (const label of ["location hidden", "date hidden"]) {
-    const s = G.privacyShots.find((p) => p.label === label)!;
+    const s = priv(label);
     assert.notEqual(s.sha, base.sha, label + " did not change the exported bytes at all");
     // and it changed the picture rather than only its metadata: the signature has to move
     const moved = s.sig.reduce((n, v, i) => n + (Math.abs(v - base.sig[i]!) > 0.004 ? 1 : 0), 0);

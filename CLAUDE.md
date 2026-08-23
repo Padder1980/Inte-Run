@@ -5558,6 +5558,17 @@ headless-browser dependency is pre-existing and my changes to that file were rem
 probably a CDP timing artefact under parallel load — but it is not proven, and a release gate that flakes
 is worth someone's attention.
 
+⚠️⚠️ **IT FIRED AGAIN ON 2026-08-22, AND THE CAUSE OF THE SHORT CAPTURE IS STILL NOT DIAGNOSED — BUT THE
+MISLEADING PART IS FIXED.** Those three tests read `G.privacyShots.find(...)!`, and a non-null assertion
+does nothing at runtime: a missing label became an instant throw on `undefined` inside three BLOCKER
+tests whose names promise that a privacy switch does not work. So a capture that stopped early presented
+as a privacy defect, which is the worst thing a flake can look like on a release gate. There is now a
+`priv(label)` helper that fails naming the missing card and the ones it does have, plus a completeness
+guard over all five labels — the count guard `shots()` already had and the privacy cards did not. Proved
+by deleting a privacy case from the harness: it reports **"that is a capture that did not finish, not a
+privacy switch that failed"**. Re-measured after: 20/20 alone and **1236/1236 on three consecutive full
+runs**, so the flake remains unreproduced and the next occurrence will say what it is.
+
 ### THE SESSION'S OWN COLOUR, THE DESTINATIONS ROW, AND NO TOP FADE (owner, ruling 7, 2026-08-20)
 
 Verbatim: *"Two other changes, if they decide not to add a photo, the background needs to be the same

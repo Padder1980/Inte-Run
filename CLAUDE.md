@@ -9110,3 +9110,93 @@ a break, so restoring "the good file" restored a broken one and two guards faile
 clean. Same lesson the sticker phase recorded: **take ONE pristine copy at the start**, never per break.
 And it restores the source without rebuilding, so `web/app.html` was stale for a run — these tests read
 the built page.
+
+### THE PROFILE IDENTITY, REGROUPED (owner, 2026-08-22, sixth round)
+
+*"Redesign this section so that it fits nicely, it looks cluttered"* — with a screenshot of the block
+under his avatar — and *"if you need to put a maximum character count on some of the typing fields to
+make this fit nicer then that's ok"*. Suite 1246 → **1253**; 18 deliberate re-breaks, all 18 caught.
+Web-only, so it reaches his phone on the next launch.
+
+⚠️ **THE COUNT WAS THE CLUTTER: SEVEN LEFT-ALIGNED ROWS, ALL THE SAME WEIGHT, ALL STARTING AT THE SAME
+x.** The name, the handle, the bio, the plan, the shoes, the week and the times each had a row of its
+own, so nothing was subordinate to anything and the eye had no way in. Four tiers now: **name + handle**
+on one line, the **bio**, **one meta line**, and **Times** over one row of capsules. Measured on the
+served page at 430×932, the block went **153 → 130px with a fact added to it**, and 152px with the
+week's distance as well — and the four blocks are legible as four things rather than seven.
+
+⚠️ **`commMetaLine` IS THE ONE LINE, AND ITS THREE FACTS WERE THREE DIFFERENT SHAPES.** A bold label and
+text, a shoe row using `space-between` for two short items (so it left a gap the width of the card), and
+a lone grey capsule. They are all small facts about right now, so they read as one wrapping line.
+⚠️ **THE SHOE KEEPS ITS LINK AND ITS OWN MILEAGE**, and the two distances stay apart — the shoe's total
+belongs beside the shoe, the week's belongs to the week. Side by side in the old layout they were two
+unlabelled kilometre figures a row apart, which is its own confusion.
+
+⚠️⚠️ **NO SEPARATOR GLYPH AT ALL, AND BOTH OTHER ANSWERS WERE BUILT AND MEASURED ON THE SERVED PAGE.**
+A dot as its own span is a flex item, so a wrap **stranded it at the end of the first line**
+("…week 1 of 36 ·"); moved to a `::before` on the following item, the wrap **carried it down and it LED
+the second line** like a bullet list. **A separator and a wrapping row do not mix.** Spacing alone
+cannot strand, and at this size and colour the items read as separate without a glyph — `gap: 3px 14px`.
+Both rejected forms are forbidden by name, because the next reader will reach for one of them.
+
+⚠️ **THE TIMES SCROLL SIDEWAYS RATHER THAN WRAPPING.** Four PBs wrapped to two lines and left the
+fourth on its own; a fifth distance would be worse. The label sits **above** rather than beside, because
+beside it was taking width from the row that could not fit.
+⚠️ **AND THE SCROLLER IS THE ONLY THING THAT MAY SCROLL SIDEWAYS** — the page body never does, this
+app's oldest layout rule — so the overflow is on that one container and nothing above it.
+⚠️ **ITS NEGATIVE MARGIN MUST EQUAL ITS PADDING** (`--s3` both), or a chip stops short of the screen
+edge and the partial chip reads as *clipped* rather than as *continuing*. Guarded by comparing the two
+tokens, not by pinning either.
+
+⚠️ **THE CAPS ARE READ BY THE FIELD *AND* BY THE SAVE *AND* BY THE READ.** `CLUB_BIO_MAX` 140,
+`CLUB_FOR_MAX` 44. A `maxlength` alone is advisory — it is a DOM attribute, so a value restored from the
+store or pasted by a future path is not filtered by it — and the read trims what is already stored, or
+text saved before the caps existed still overflows the row. Two hand-written numbers is how the field
+and the store come to disagree about the length of one sentence.
+⚠️ **`clubTrainingFor` SHORTENS THE PLAN'S OWN SENTENCE AND NEVER THE RUNNER'S.** `commProfile` builds
+*"half marathon block, week 1 of 36"* for the header it was written for — 45 characters before the shoes
+have had any, which wrapped the row this redesign exists to tidy. *"Half marathon · wk 1/36"* says the
+same in 22. An unrecognised sentence is passed through rather than dropped; if the runner typed it, it
+is what they meant. Guarded by **execution** (the shortening is a regex and a capitalisation, neither
+visible in the source text) with `loadClubProf` and `commProfile` stubbed.
+
+**Contrast, from rendered pixels** (dpr 2, both themes, ink measured as the extreme inside each
+element's own box): name 14.76 / 17.92, handle 6.30 / 9.33, bio 14.76 / 17.92, meta label 14.76 / 17.92,
+meta item 6.30 / 9.33, **TIMES 4.56 / 6.50**, PB chip 4.83 / 9.18. Nothing under 4.5.
+⚠️ **THE PERCENTILE FORM READ THAT LABEL AT 1.61:1 AND IT WAS THE INSTRUMENT, NOT THE CODE** — five
+uppercase glyphs are **2.0% of their own box**, so a 2nd-percentile "ink" lands in the anti-aliased ramp.
+This file already records the same trap reading a note at 3.87 where its token delivers 4.56. **Report
+the ink coverage beside the ratio**, so a sparse box is visible as sparse.
+
+### ⚠️ THREE FAULTS THE NEW GUARDS FOUND, AND ALL THREE WERE INVISIBLE ON SCREEN
+
+1. ⚠️⚠️ **`commMetaLine` SHIPPED DECLARED *INSIDE* `viewCommunity`.** A function declaration hoists
+   within its enclosing scope, so nothing failed — but it was rebuilt on every render, no other screen
+   could reach it, and `fn("viewCommunity")` **swallowed it**, which is how it was found: an unrelated
+   guard sliced the view and matched text from a function that had no business being in there. **A
+   helper declared inside its only caller is a helper the next caller cannot use.** Lifted to the top
+   level and guarded — `viewCommunity` may declare no named function at all.
+2. ⚠️ **A SECOND `.cm-meta` RULE, LEFT FROM THE DESIGN BEFORE THIS ONE** (`font-size` + `--ink-faint`,
+   two hundred lines above). Both declared the same two properties, so the line's colour was decided by
+   which came last in the stylesheet — the two-owners-of-one-measurement fault this project has paid for
+   in the watch's page inset, the story's aspect and the share card's hairline. **A duplicate cannot be
+   seen on screen** (the later one simply wins), so it needs a count rather than an eye: every identity
+   class is now asserted to be declared exactly once. The `.cm-tr` rules that drew the old shoe row were
+   deleted with it — an orphaned rule is what the next screen copies.
+3. ⚠️ **TWO EXISTING GUARDS WERE SCOPED TO A LAYOUT RATHER THAN TO A FACT, and both failed on correct
+   code.** *"the trainers row wears a trainer"* required `cm-tr">' + ICON.shoe`; *"a shop link is only
+   ever a plain web address"* required `rel="noopener noreferrer"` inside `fn("viewCommunity")`. Both
+   invariants are still live, so both were **restated, not deleted** — the shoe guard asks
+   `commMetaLine`, and the link guard now **derives** its scope by finding every function that renders
+   `clubShopHref`'s result into an `href` and asserting there is exactly one. A guard tied to the markup
+   it happened to sit in expires the first time the markup is regrouped.
+
+⚠️ **AND ONE GUARD OF MY OWN COULD NOT *PASS*, WHICH IS THE INVERSE FAULT AND JUST AS USELESS.** The
+nesting check ran `/\bfunction \w+\(/` over `fn("viewCommunity")` — a slice that **begins** with
+`function viewCommunity(`, so it always matched itself. The signature is cut off before the body is
+scanned. Look for both directions when a new guard's first run surprises you.
+
+⚠️ **TWO OF MY OWN COMMENTS WENT STALE INSIDE ONE CHANGE** — the CSS header said "THREE TIERS" of a
+four-tier block, and `commMetaLine`'s doc still promised "dot-separated prose" after the dots were
+measured out. Nothing about either sentence changed; the design under it did. Fourth and fifth firing
+of that in this feature, after the map attribution, the destinations note and the tile's accessible name.

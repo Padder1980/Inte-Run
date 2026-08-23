@@ -4487,7 +4487,6 @@ button.cm-stat:active { opacity: .65; }
 /* Identity */
 .cm-id { margin-top: var(--s3); }
 .cm-name { font-size: var(--t-body); font-weight: 800; letter-spacing: -.01em; }
-.cm-meta { font-size: var(--t-meta); color: var(--ink-faint); }
 .cm-pbs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: var(--s2); }
 .cm-eyebrow { font-size: var(--t-label); font-weight: 700; letter-spacing: .06em;
   text-transform: uppercase; color: var(--ink-faint); }
@@ -4833,7 +4832,6 @@ button.cm-tile:active { opacity: .65; }
 .lb-post-d { display: block; margin-top: 1px; font-size: var(--t-label); font-weight: 500;
   color: var(--ink-soft); }
 .rn-post { margin-top: var(--s3); width: 100%; }
-.cm-at { font-size: var(--t-label); font-weight: 600; color: var(--ink-soft); margin-top: 1px; }
 .ce-at { color: var(--ink-faint); font-size: var(--t-card); font-weight: 600; margin-right: 2px; }
 .ce-hint { display: block; margin-top: var(--s1); font-size: var(--t-label); line-height: 1.4;
   color: var(--ink-faint); }
@@ -4954,14 +4952,39 @@ button.cm-tile:active { opacity: .65; }
 .cp-cap b { font-weight: 500; }
 .cp-when { margin: 6px 0 0; font-size: var(--t-label); color: var(--ink-faint);
   text-transform: uppercase; letter-spacing: .03em; }
-/* ── Bio, training-for and trainers on the profile. */
-.cm-bio { margin-top: 2px; font-size: var(--t-body); line-height: 1.5; color: var(--ink);
+/* ── The profile identity: name + handle, bio, one meta line, one row of times.
+   ⚠️ FOUR TIERS, NOT SEVEN ROWS. His ask: "Redesign this section so that it fits nicely, it looks
+   cluttered". The .cm-tr rules that used to draw the shoes on their own row are gone with them — an
+   orphaned rule is what the next screen copies. */
+.cm-idline { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
+.cm-at { font-size: var(--t-label); font-weight: 600; color: var(--ink-soft); }
+.cm-bio { margin-top: 3px; font-size: var(--t-body); line-height: 1.45; color: var(--ink);
   text-wrap: pretty; white-space: pre-wrap; }
-.cm-tr { display: flex; align-items: center; gap: 7px; margin-top: 6px; font-size: var(--t-meta);
-  color: var(--ink-soft); }
-.cm-tr svg { flex: none; width: 17px; height: 17px; color: var(--accent); }
-.cm-tr a { color: var(--accent); text-decoration: none; border-bottom: 1px solid currentColor; }
-.cm-tr-km { margin-left: auto; color: var(--ink-faint); }
+/* ⚠️ ONE LINE THAT WRAPS AS PROSE, not a grid — the facts are of different lengths and a grid would
+   leave gaps wherever one was short, which is what the old space-between shoe row did. */
+/* ⚠️ THE ONLY .cm-meta RULE, and the guard for this redesign found a SECOND one left over from the
+   design before it (font-size + --ink-faint, two hundred lines above). Both declared the same two
+   properties, so the line's colour was decided by which came last in the stylesheet — two owners of
+   one measurement, which is how they come to disagree. Deleted rather than merged: it set nothing this
+   rule does not. */
+.cm-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 14px; margin-top: 7px;
+  font-size: var(--t-meta); line-height: 1.5; color: var(--ink-soft); }
+.cm-mi { display: inline-flex; align-items: center; gap: 5px; }
+
+.cm-mi b { font-weight: 700; color: var(--ink); }
+.cm-mi svg { flex: none; width: 15px; height: 15px; color: var(--accent); }
+.cm-mi a { color: var(--accent); text-decoration: none; border-bottom: 1px solid currentColor; }
+/* ⚠️ ONE SCROLLING ROW, SO IT NEVER WRAPS TO AN ORPHAN. Four PBs wrapped to two lines and left the
+   fourth alone; a fifth would have made it worse. The label sits ABOVE rather than beside, because
+   beside it was taking width from the row that could not fit.
+   ⚠️ AND THE SCROLLER IS THE ONLY THING THAT MAY SCROLL SIDEWAYS. The page body never does — this
+   app's oldest layout rule — so the overflow is on this container and nothing above it. */
+.cm-times { margin-top: var(--s3); }
+.cm-times .cm-eyebrow { display: block; margin-bottom: 5px; }
+.cm-chiprow { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
+  -webkit-overflow-scrolling: touch; margin: 0 calc(-1 * var(--s3)); padding: 0 var(--s3); }
+.cm-chiprow::-webkit-scrollbar { display: none; }
+.cm-chiprow .cm-chip { flex: none; }
 /* ── Edit profile. */
 .ce-wrap { padding-bottom: var(--s6); }
 .ce-avwrap { display: flex; flex-direction: column; align-items: center; gap: var(--s2);
@@ -12717,6 +12740,19 @@ function clubUserHint(v) {
   if (!clubUserOk(t)) return "Letters, numbers, dots and underscores only, 3 to 20 characters.";
   return "Saved. Nobody can check it against other runners until the club has a server.";
 }
+/**
+ * HOW LONG THE PROFILE'S TYPED FIELDS MAY BE.
+ *
+ * ⚠️ HIS OWN OFFER: "if you need to put a maximum character count on some of the typing fields to make
+ * this fit nicer then that's ok". 220 characters of bio is five or six lines on a phone, which on a card
+ * carrying a name, a handle, a meta line, four times and two buttons is the single biggest thing on it.
+ * 140 is two lines at --t-body on a 430pt screen — enough to say something, short enough not to become
+ * the card.
+ * ⚠️ ONE CONSTANT PER FIELD, READ BY BOTH THE INPUT'S maxlength AND THE SAVE. Two literals is how a
+ * field that looks capped at one number quietly stores a different one, and the browser's maxlength
+ * does not apply to text arriving by paste on every engine.
+ */
+const CLUB_BIO_MAX = 140, CLUB_FOR_MAX = 44;
 function loadClubProf() {
   try {
     const raw = JSON.parse(localStorage.getItem(CLUBPROF_KEY) || "{}");
@@ -12727,7 +12763,10 @@ function loadClubProf() {
     // whitelists is a reader that has to be updated for every new field, and forgetting is silent.
     // test/community.test.ts now derives the writable fields from the writers and requires each to
     // survive a round trip.
-    return { bio: String(raw.bio || ""), trainingFor: String(raw.trainingFor || ""),
+    // ⚠️ TRIMMED ON READ AS WELL, or a bio typed before the cap existed keeps its old length for ever —
+    // the runner would have to open the field and delete characters to get the layout the cap is for.
+    return { bio: String(raw.bio || "").slice(0, CLUB_BIO_MAX),
+      trainingFor: String(raw.trainingFor || "").slice(0, CLUB_FOR_MAX),
       pbs: (raw.pbs && typeof raw.pbs === "object") ? raw.pbs : {},
       autoPost: raw.autoPost === true,
       username: String(raw.username || ""),
@@ -12768,11 +12807,25 @@ function clubPbText(v) {
 }
 /** What the runner is training for. ⚠️ Their own words if they gave any, otherwise the plan's, which the
  *  app genuinely knows — a blank line here would hide a true fact behind an empty field. */
+/**
+ * WHAT THEY ARE TRAINING FOR, SHORT ENOUGH TO SIT ON A LINE WITH THE SHOES.
+ *
+ * ⚠️ THE PLAN'S OWN SENTENCE IS TOO LONG FOR THIS ROW. commProfile builds "half marathon block, week 1
+ * of 36" for the header it was written for; on the meta line that is 45 characters before the shoes have
+ * had any, so the row wrapped and the layout this redesign exists to tidy came back. "Half marathon ·
+ * wk 1/36" says the same thing in 22.
+ * ⚠️ THE RUNNER'S OWN TEXT IS NEVER SHORTENED, only capped as they type. If they wrote it, it is what
+ * they meant — and CLUB_FOR_MAX keeps it to a length that fits.
+ */
 function clubTrainingFor() {
   const cp = loadClubProf();
   if (cp.trainingFor) return cp.trainingFor;
   const p = commProfile();
-  return p.plan || "";
+  const plan = p.plan || "";
+  if (!plan) return "";
+  const m = /^(.*?) block, week (\\d+) of (\\d+)$/.exec(plan);
+  if (!m) return plan;
+  return m[1].charAt(0).toUpperCase() + m[1].slice(1) + " \u00b7 wk " + m[2] + "/" + m[3];
 }
 function clubTrainers() {
   const sh = activeShoe();
@@ -12829,9 +12882,9 @@ function viewClubEdit() {
         'autocapitalize="none" autocorrect="off" spellcheck="false" ' +
         'placeholder="yourname" value="' + esc(cp.username) + '">' +
         '<span class="ce-hint" id="ceUserHint">' + esc(clubUserHint(cp.username)) + '</span>') +
-      row("Running bio", '<textarea id="ceBio" rows="3" maxlength="220" ' +
+      row("Running bio", '<textarea id="ceBio" rows="3" maxlength="' + CLUB_BIO_MAX + '" ' +
         'placeholder="A line about your running.">' + esc(cp.bio) + '</textarea>') +
-      row("Training for", '<input id="ceFor" maxlength="60" placeholder="' +
+      row("Training for", '<input id="ceFor" maxlength="' + CLUB_FOR_MAX + '" placeholder="' +
         esc(p.plan || "Your next race") + '" value="' + esc(cp.trainingFor) + '">') +
     '</div>' +
     '<h2 class="ce-h">Trainers I am wearing</h2>' +
@@ -12901,9 +12954,9 @@ function wireClubEdit() {
     saveClubProf(Object.assign(cur, patch));
   };
   const bio = $("ceBio");
-  if (bio) bio.oninput = () => put({ bio: bio.value.slice(0, 220) });
+  if (bio) bio.oninput = () => put({ bio: bio.value.slice(0, CLUB_BIO_MAX) });
   const fr = $("ceFor");
-  if (fr) fr.oninput = () => put({ trainingFor: fr.value.slice(0, 60) });
+  if (fr) fr.oninput = () => put({ trainingFor: fr.value.slice(0, CLUB_FOR_MAX) });
   // ⚠️ THE HINT IS REPAINTED, NOT THE SCREEN. A full render rebuilds the field under the finger and
   // captures the caret — the rule every typed field on this page already follows.
   // ⚠️ AND AN INVALID HANDLE IS NOT STORED. Stored, it would show on the profile as an @name that
@@ -13963,6 +14016,42 @@ const COMM_STORY_MS = 4500;
 /** ⚠️ THE STORY'S OWN SHAPE, roughly 9:16 — the frame a phone story occupies. Read by the call that draws
  *  the route AND written into the element's aspect-ratio, so the two cannot disagree. */
 const STORY_ART_W = 360, STORY_ART_H = 620;
+/**
+ * THE ONE META LINE: what they are training for, what they are running in, and this week's distance.
+ *
+ * ⚠️ THESE WERE THREE ROWS OF THREE DIFFERENT SHAPES — a bold label and text, a shoe row using
+ * space-between for two short items (so it left a gap the width of the card), and a lone grey capsule.
+ * They are all small facts about right now, so they read better as one line that wraps naturally than
+ * as three competing blocks. (Separated by spacing alone — see the note at the return.)
+ * ⚠️ THE SHOE KEEPS ITS LINK AND ITS OWN MILEAGE. The link is the runner's own typed URL (his
+ * instruction: hyperlinked if they add where they bought them), and the two distances stay apart — the
+ * shoe's total belongs beside the shoe, the week's belongs to the week. Side by side in the old layout
+ * they were two unlabelled kilometre figures a row apart, which is its own confusion.
+ */
+function commMetaLine(forLine, tr, shopHref, wk) {
+  const bits = [];
+  if (forLine) bits.push('<span class="cm-mi"><b>Training for</b> ' + esc(forLine) + '</span>');
+  if (tr) {
+    bits.push('<span class="cm-mi">' + ICON.shoe +
+      (shopHref
+        // ⚠️ rel="noopener noreferrer" AND target — a link the runner typed opens away from the app, and
+        // the page it lands on must never be handed a handle back to this one.
+        ? '<a href="' + esc(shopHref) + '" target="_blank" rel="noopener noreferrer">' +
+          esc(tr.name) + '</a>'
+        : esc(tr.name)) +
+      ' <span class="num">' + Math.round(tr.km) + ' km</span></span>');
+  }
+  if (wk && wk.km > 0) {
+    bits.push('<span class="cm-mi num">' + commKm(wk.km) + ' this week</span>');
+  }
+  if (!bits.length) return "";
+  // ⚠️⚠️ NO SEPARATOR GLYPH AT ALL, AND BOTH OTHER VERSIONS WERE TRIED ON THE SERVED PAGE. A dot as its
+  // own span is a flex item, so a wrap left it stranded at the end of the first line ("week 1 of 36 ·");
+  // moved to a ::before on the following item, the wrap carried it down and it LED the second line,
+  // which reads as a bullet list. A separator and a wrapping row do not mix. Spacing alone cannot
+  // strand, and at this size and colour the items read as separate without a glyph between them.
+  return '<div class="cm-meta">' + bits.join("") + '</div>';
+}
 function viewCommunity() {
   const v = commView();
   const p = commProfile();
@@ -14011,17 +14100,6 @@ function viewCommunity() {
     b.time + '</span>').join("");
   const tr = clubTrainers();
   const shopHref = tr ? clubShopHref(tr.shop) : "";
-  const trainers = tr
-    ? '<div class="cm-tr">' + ICON.shoe +
-        (shopHref
-          // ⚠️ rel="noopener noreferrer" AND target — a link the runner typed opens away from the app, and
-          // the page it lands on must never be handed a handle back to this one.
-          ? '<a href="' + esc(shopHref) + '" target="_blank" rel="noopener noreferrer">' +
-            esc(tr.name) + '</a>'
-          : '<span>' + esc(tr.name) + '</span>') +
-        '<span class="cm-tr-km num">' + Math.round(tr.km) + ' km</span>' +
-      '</div>'
-    : "";
   const forLine = clubTrainingFor();
 
   // ⚠️ TWO KINDS OF TILE IN ONE GRID, AND THE FILTER MEANS DIFFERENT THINGS TO EACH. "Videos" keeps
@@ -14071,16 +14149,37 @@ function viewCommunity() {
             stat(0, "Following", "following") +
           '</div>' +
         '</div>' +
+        // ⚠️⚠️ REGROUPED TO HIS ASK: "Redesign this section so that it fits nicely, it looks cluttered".
+        // It was SEVEN left-aligned rows of unequal weight, each a different kind of thing, all at full
+        // width and all competing — name, handle, bio, training-for, shoe, a wrapping row of PB
+        // capsules, and the week's distance alone on a row in a DIFFERENT capsule style, which read as a
+        // fifth PB that had failed to render.
+        //
+        // Now three tiers, and the count is the point:
+        // ⚠️ 1. IDENTITY ON ONE LINE. The name and the handle are one fact about one person, so they
+        //    share a line — bold then muted — rather than stacking into two rows of near-equal weight.
+        // ⚠️ 2. ONE META LINE FOR THE FACTS. What they are training for, the shoes they are in, and the
+        //    week's distance are all small facts about right now, so they are one dot-separated line
+        //    that wraps as prose instead of three rows of three different shapes. This is what kills
+        //    the odd grey capsule: the week's distance was the only thing on the card wearing a capsule
+        //    it did not share with anything else.
+        // ⚠️ 3. THE TIMES SCROLL IN ONE ROW. Four PBs wrapped to two lines and orphaned the fourth, and
+        //    the "TIMES" label was taking width from the very row that could not fit. A single
+        //    horizontal scroller never wraps, however many distances the runner fills in — and the
+        //    label moves above it where it costs the capsules nothing.
         '<div class="cm-id">' +
-          (p.name ? '<div class="cm-name">' + esc(p.name) + '</div>' : "") +
-          // ⚠️ THE HANDLE UNDER THE NAME, which is what tells two runners with the same name apart.
-          // Shown only when set — an empty @ is a field advertising itself as unfilled.
-          (cp.username ? '<div class="cm-at">@' + esc(cp.username) + '</div>' : "") +
+          (p.name || cp.username
+            ? '<div class="cm-idline">' +
+                (p.name ? '<span class="cm-name">' + esc(p.name) + '</span>' : "") +
+                (cp.username ? '<span class="cm-at">@' + esc(cp.username) + '</span>' : "") +
+              '</div>'
+            : "") +
           (cp.bio ? '<div class="cm-bio">' + esc(cp.bio) + '</div>' : "") +
-          (forLine ? '<div class="cm-meta"><b>Training for</b> ' + esc(forLine) + '</div>' : "") +
-          trainers +
-          (chips ? '<div class="cm-pbs"><span class="cm-eyebrow">Times</span>' + chips + '</div>' : "") +
-          '<div class="cm-pbs"><span class="cm-chip num">' + commKm(wk.km) + ' this week</span></div>' +
+          commMetaLine(forLine, tr, shopHref, wk) +
+          (chips
+            ? '<div class="cm-times"><span class="cm-eyebrow">Times</span>' +
+              '<div class="cm-chiprow">' + chips + '</div></div>'
+            : "") +
         '</div>' +
         '<div class="cm-acts">' +
           '<button class="cm-act" data-cedit="1">Edit profile</button>' +

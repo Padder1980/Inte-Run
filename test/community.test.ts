@@ -836,13 +836,27 @@ test("BLOCKER: a shop link is only ever a plain web address", () => {
   assert.match(h, /new URL\(/, "the address is not parsed at all");
   assert.match(h, /protocol !== "http:" && url\.protocol !== "https:"/,
     "a non-web scheme can be made clickable");
-  const v = fn("viewCommunity");
-  // ⚠️ COMMENTS STRIPPED. The code's note explaining why the attribute is there quotes the attribute, so
-  // deleting the real one left the guard perfectly happy — watched escaping. Tenth firing of that trap
-  // in this codebase, and the reason nocomment exists.
-  assert.match(nocomment(v), /rel="noopener noreferrer"/,
-    "the link hands the page it opens a handle back to the app");
-  assert.match(nocomment(v), /\(shopHref\s*\?/, "the name is a link even when no address was given");
+  // ⚠️ THE SCOPE IS DERIVED FROM WHOEVER RENDERS THE ADDRESS, NOT NAMED. Written as fn("viewCommunity")
+  // it failed on correct code the day the shoe moved from its own row onto the meta line (2026-08-22) —
+  // the second guard in this file to be scoped to a layout rather than to a fact. Every function that
+  // turns clubShopHref's result into an href must carry both attributes.
+  const app = nocomment(appBlock());
+  const fns = [...app.matchAll(/\nfunction (\w+)\(/g)].map((m) => m[1]!);
+  let rendered = 0;
+  for (const name of fns) {
+    const body = nocomment(fn(name));
+    if (name === "clubShopHref" || !/href="' \+ esc\(shopHref\)/.test(body)) continue;
+    rendered++;
+    // ⚠️ COMMENTS STRIPPED. The code's note explaining why the attribute is there quotes the attribute,
+    // so deleting the real one left the guard perfectly happy — watched escaping. Tenth firing of that
+    // trap in this codebase, and the reason nocomment exists.
+    assert.match(body, /rel="noopener noreferrer"/,
+      name + " hands the page it opens a handle back to the app");
+    assert.match(body, /target="_blank"/, name + " opens the runner's own link inside the app");
+    assert.match(body, /\(shopHref\s*\?/, name + " links the name even when no address was given");
+  }
+  assert.equal(rendered, 1,
+    "expected exactly one builder to render the shop address; found " + rendered);
 });
 
 /* ══ HIS SEVEN CHANGES OF 2026-08-22 (evening) ══════════════════════════════════════════════════════
@@ -958,13 +972,18 @@ test("BLOCKER: the PB capsules are the size of the label beside them, white with
   assert.match(chip[0], /border: 1px solid var\(--accent\)/, "the capsule has no teal outline");
 });
 
-test("BLOCKER: the trainers row wears a trainer, not a runner", () => {
+test("BLOCKER: the trainers fact wears a trainer, not a runner", () => {
   const app = appBlock();
   // ⚠️ rEasy IS A RUNNING FIGURE and was standing in for the shoe — a picture of a person where the
   // sentence is about footwear.
   assert.match(app, /shoe: '<svg/, "there is no trainer icon at all");
-  assert.match(nocomment(fn("viewCommunity")), /cm-tr">' \+ ICON\.shoe/,
-    "the trainers row still wears the running figure");
+  // ⚠️ RESTATED, NOT DELETED, WHEN THE SHOE LEFT ITS OWN ROW FOR THE META LINE (2026-08-22). The old
+  // form pinned the MARKUP it happened to sit in (`cm-tr">' + ICON.shoe`), so it failed on correct code
+  // the moment the row was regrouped — and deleting it would have dropped a live invariant with the
+  // dead layout. The claim is about whatever renders the trainers, wherever that is.
+  const meta = nocomment(fn("commMetaLine"));
+  assert.ok(meta.indexOf("ICON.shoe") > 0, "the trainers fact does not wear the trainer icon");
+  assert.ok(meta.indexOf("ICON.rEasy") < 0, "the trainers fact wears the running figure");
   assert.ok(!/live-shoe" id="lShoe">' \+ ICON\.rEasy/.test(app),
     "the live start screen's shoe chip still wears the running figure");
 });
@@ -1432,4 +1451,187 @@ test("BLOCKER: it is the SAME dialog on every delete path, and it sits above the
   }
   assert.equal(asked, 2, "expected exactly two delete paths — the viewer's menu and the post feed — "
     + "found " + asked);
+});
+
+/**
+ * THE PROFILE IDENTITY, REGROUPED (owner, 2026-08-22: "Redesign this section so that it fits nicely,
+ * it looks cluttered", and "if you need to put a maximum character count on some of the typing fields
+ * to make this fit nicer then that's ok").
+ *
+ * ⚠️ SEVEN LEFT-ALIGNED ROWS BECAME FOUR TIERS, and the count is the whole point of the ask — the name,
+ * the handle, the bio, the plan, the shoe, the week and the times each had a row of their own, all the
+ * same weight and all starting at the same x. Measured on the served page at 430×932 the block went 153
+ * → 130px with a fact ADDED to it, and 152px with the week's distance as well.
+ */
+test("the profile identity is four tiers, and the name and handle share a line", () => {
+  const v = nocomment(fn("viewCommunity"));
+  const id = v.slice(v.indexOf('"cm-id"'), v.indexOf('cm-actions'));
+  assert.ok(id.length > 200, "the identity block could not be found in viewCommunity");
+  // The four tiers, in order. A fifth block-level child is the clutter coming back.
+  const tiers = [...id.matchAll(/class="cm-(idline|bio|meta|times)"/g)].map((m) => m[1]!);
+  assert.deepEqual(tiers, ["idline", "bio", "times"],
+    "expected cm-idline, cm-bio and cm-times as literal classes here (cm-meta is built by "
+    + "commMetaLine); found " + tiers.join(", "));
+  assert.ok(id.indexOf("commMetaLine(") > 0, "the meta line is not built by commMetaLine");
+  // ⚠️ THE NAME AND THE HANDLE MUST BE INSIDE ONE ROW, not two siblings. Guarded by POSITION rather
+  // than presence: both spans existed before this change too, each in a block of its own.
+  const line = id.indexOf('class="cm-idline"');
+  const name = id.indexOf('class="cm-name"');
+  const at = id.indexOf('class="cm-at"');
+  const closes = id.indexOf("</div>", line);
+  assert.ok(line > 0 && name > line && at > name && closes > at,
+    "the name and the handle are not both inside cm-idline");
+  const sheet = nocomment(sheetOf(page()));
+  const idline = /\.cm-idline\s*\{([^}]*)\}/.exec(sheet);
+  assert.ok(idline, "no .cm-idline rule");
+  assert.match(idline![1]!, /display:\s*flex/, ".cm-idline must lay its two children on one line");
+  // ⚠️ THE ORPHANED SHOE ROW'S RULES WERE DELETED, NOT LEFT UNUSED — an orphaned rule is what the next
+  // screen copies. Word-bounded, because `.cm-track` (the two-pane slider) contains `.cm-tr`.
+  assert.ok(!/\.cm-tr[^a-z-]/.test(sheet), ".cm-tr survived the row it used to draw");
+  assert.ok(v.indexOf("cm-tr\"") < 0 && v.indexOf("cm-tr-km") < 0,
+    "viewCommunity still builds the old shoe row");
+});
+
+/**
+ * ⚠️⚠️ NO SEPARATOR GLYPH, AND THIS GUARD EXISTS BECAUSE BOTH OTHER ANSWERS WERE BUILT AND MEASURED.
+ * A dot as its own span is a flex item, so a wrap stranded it at the end of the first line
+ * ("…week 1 of 36 ·"); moved to a ::before on the following item, the wrap carried it down and it LED
+ * the second line like a bullet. A separator and a wrapping row do not mix — spacing alone cannot
+ * strand, so the gap does the separating.
+ */
+test("the meta line separates its facts with spacing, never a glyph", () => {
+  const meta = nocomment(fn("commMetaLine"));
+  assert.match(meta, /bits\.join\(""\)/,
+    "commMetaLine joins its facts with something; a separator string strands on a wrap");
+  for (const glyph of ["\u00b7", "\u2022", " | ", " / "]) {
+    assert.ok(meta.indexOf('"' + glyph) < 0 && meta.indexOf(glyph + '"') < 0,
+      "commMetaLine emits a " + JSON.stringify(glyph) + " separator");
+  }
+  const sheet = nocomment(sheetOf(page()));
+  // The pseudo-element form is the one that reads as a bullet list, so it is forbidden by name.
+  assert.ok(!/\.cm-(meta|mi)[^{]*::(before|after)/.test(sheet),
+    "a pseudo-element separator is back on the meta line; a wrap makes it lead the second line");
+  const rule = /\.cm-meta\s*\{([^}]*)\}/.exec(sheet);
+  assert.ok(rule, "no .cm-meta rule");
+  assert.match(rule![1]!, /flex-wrap:\s*wrap/, ".cm-meta must wrap rather than overflow");
+  assert.match(rule![1]!, /gap:\s*\d/, ".cm-meta separates by gap; without one the facts run together");
+});
+
+/**
+ * ⚠️ THE TIMES SCROLL SIDEWAYS RATHER THAN WRAPPING, AND THE SCROLLER IS THE ONLY THING THAT MAY.
+ * Four PBs wrapped to two lines and left the fourth on its own; a fifth distance would be worse. The
+ * page body never scrolls sideways — this app's oldest layout rule — so the overflow lives on this one
+ * container, and its negative margin must equal its padding or a chip cannot reach the screen edge and
+ * the row reads as clipped rather than as continuing.
+ */
+test("the times are one scrolling row, inset to the screen edge", () => {
+  const sheet = nocomment(sheetOf(page()));
+  const row = /\.cm-chiprow\s*\{([^}]*)\}/.exec(sheet);
+  assert.ok(row, "no .cm-chiprow rule");
+  const css = row![1]!;
+  assert.match(css, /overflow-x:\s*auto/, "the times row does not scroll, so four PBs wrap again");
+  assert.ok(!/flex-wrap:\s*wrap/.test(css), "the times row wraps, which is the defect being fixed");
+  const neg = /margin:\s*0\s+calc\(-1\s*\*\s*var\((--s\d)\)\)/.exec(css);
+  const pad = /padding:\s*0\s+var\((--s\d)\)/.exec(css);
+  assert.ok(neg && pad, "the times row is not inset with a negative margin and matching padding");
+  assert.equal(neg![1], pad![1],
+    "the inset (" + neg![1] + ") and the padding (" + pad![1] + ") differ, so a chip stops short of "
+    + "the screen edge and the row reads as clipped");
+  assert.match(/\.cm-chiprow \.cm-chip\s*\{([^}]*)\}/.exec(sheet)?.[1] || "", /flex:\s*none/,
+    "a chip in the scroller may shrink, so the times squash instead of scrolling");
+});
+
+/**
+ * ⚠️ THE CAPS ARE READ BY THE FIELD AND BY THE SAVE, AND BOTH READERS ARE DERIVED FROM THE CONSTANTS.
+ * A maxlength alone is advisory — it is a DOM attribute, and a value restored from a store or pasted by
+ * a future path is not filtered by it — so the save re-applies it. Two hand-written numbers is how the
+ * field and the store come to disagree about the length of the same sentence.
+ */
+test("the bio and the training-for line carry a character cap, on the field and on the save", () => {
+  const app = nocomment(appBlock());
+  const caps = /const CLUB_BIO_MAX = (\d+), CLUB_FOR_MAX = (\d+);/.exec(app);
+  assert.ok(caps, "CLUB_BIO_MAX and CLUB_FOR_MAX are not declared together");
+  assert.ok(Number(caps![1]) > 0 && Number(caps![1]) <= 200, "the bio cap is not a sane length");
+  assert.ok(Number(caps![2]) > 0 && Number(caps![2]) <= 80, "the training-for cap is not a sane length");
+  for (const k of ["CLUB_BIO_MAX", "CLUB_FOR_MAX"]) {
+    // The field says it, so the keyboard stops there rather than the text vanishing on save.
+    assert.ok(new RegExp('maxlength="\' \\+ ' + k).test(app),
+      k + " does not reach a maxlength attribute");
+    // The save says it too, and the read trims what is already stored.
+    const writes = [...app.matchAll(new RegExp("slice\\(0, " + k + "\\)", "g"))].length;
+    assert.ok(writes >= 2,
+      k + " is applied " + writes + " time(s); expected the save AND the read of the store");
+  }
+  const load = nocomment(fn("loadClubProf"));
+  assert.ok(load.indexOf("CLUB_BIO_MAX") > 0 && load.indexOf("CLUB_FOR_MAX") > 0,
+    "loadClubProf does not trim to the caps, so text stored before them still overflows the row");
+});
+
+/**
+ * ⚠️ THE PLAN'S OWN SENTENCE IS TOO LONG FOR A SHARED LINE, AND THE RUNNER'S OWN TEXT IS NEVER TOUCHED.
+ * commProfile builds "half marathon block, week 1 of 36" for the header it was written for — 45
+ * characters before the shoes have had any, which wrapped the row this redesign exists to tidy.
+ * Executed rather than read: the shortening is a regex and a capitalisation, and neither is visible in
+ * the source text of the function.
+ */
+test("clubTrainingFor shortens the plan sentence and leaves typed text alone", () => {
+  const src = nocomment(fn("clubTrainingFor"));
+  let stored = "";
+  let plan = "";
+  const run = new Function("loadClubProf", "commProfile", src + "; return clubTrainingFor();");
+  const call = () => run(() => ({ trainingFor: stored }), () => ({ plan }));
+
+  plan = "half marathon block, week 1 of 36";
+  assert.equal(call(), "Half marathon \u00b7 wk 1/36");
+  plan = "marathon block, week 12 of 20";
+  assert.equal(call(), "Marathon \u00b7 wk 12/20");
+  // ⚠️ AN UNRECOGNISED SENTENCE IS PASSED THROUGH, never dropped — a blank line here would hide a fact
+  // the app genuinely knows behind an empty field.
+  plan = "taper week";
+  assert.equal(call(), "taper week");
+  plan = "";
+  assert.equal(call(), "");
+  // The runner's own words win over anything derived, and are returned exactly as typed.
+  stored = "Sub-90 at the Great North Run";
+  plan = "half marathon block, week 1 of 36";
+  assert.equal(call(), "Sub-90 at the Great North Run");
+});
+
+/**
+ * ⚠️ ONE RULE PER IDENTITY CLASS, AND THE REDESIGN'S OWN GUARD FOUND A SECOND `.cm-meta` LEFT FROM THE
+ * DESIGN BEFORE IT. Both declared font-size and colour, so the line's appearance was decided by which
+ * came last in the stylesheet — the two-owners-of-one-measurement fault this project has paid for in
+ * the watch's page inset, the story's aspect and the share card's hairline. A duplicate cannot be seen
+ * on screen (the later one simply wins), which is why it needs a count rather than an eye.
+ */
+test("no identity class is declared twice in the stylesheet", () => {
+  const sheet = nocomment(sheetOf(page()));
+  for (const cls of ["cm-id", "cm-idline", "cm-name", "cm-at", "cm-bio", "cm-meta", "cm-mi",
+                     "cm-times", "cm-chiprow"]) {
+    const n = [...sheet.matchAll(new RegExp("^\\." + cls + "\\s*\\{", "gm"))].length;
+    assert.equal(n, 1, "." + cls + " is declared " + n + " times; one of them decides nothing and the "
+      + "next reader cannot tell which");
+  }
+});
+
+/**
+ * ⚠️ commMetaLine IS A TOP-LEVEL FUNCTION, AND IT SHIPPED NESTED INSIDE viewCommunity FOR A DAY.
+ * A function declaration inside the view hoists within it, so nothing failed — but it was rebuilt on
+ * every render, no other screen could reach it, and `fn("viewCommunity")` swallowed it, which is how it
+ * was found: an unrelated guard sliced the view and matched text from a function that should not have
+ * been in there. A helper declared inside its only caller is a helper the next caller cannot use.
+ */
+test("the identity's helpers are declared at the top level, not inside the view", () => {
+  const app = appBlock();
+  for (const name of ["commMetaLine", "clubTrainingFor", "clubTrainers"]) {
+    assert.match(app, new RegExp("^function " + name + "\\(", "m"),
+      name + " is not declared at the top level");
+  }
+  // ⚠️ THE SIGNATURE IS CUT OFF FIRST, or the guard matches its OWN header and can never pass — which is
+  // what the first version did. The inverse of a guard that cannot fail, and just as useless.
+  const whole = nocomment(fn("viewCommunity"));
+  const body = whole.slice(whole.indexOf("{") + 1);
+  const nested = [...body.matchAll(/\bfunction (\w+)\(/g)].map((m) => m[1]!);
+  assert.deepEqual(nested, [], "viewCommunity declares " + nested.join(", ") + " inside itself; it is "
+    + "rebuilt on every render and no other screen can reach it");
 });

@@ -2145,3 +2145,89 @@ test("BLOCKER: Highlights and Shadows are two-way dials and reach a posted surfa
   assert.match(fill, /hi: Number\(n\.dataset\.chi\)/, "a posted surface drops the highlights");
   assert.match(fill, /sh: Number\(n\.dataset\.csh\)/, "a posted surface drops the shadows");
 });
+
+/**
+ * ⚠️⚠️ A REDRAW REBUILDS A SCROLLER, AND A NEW SCROLLER STARTS AT ZERO. His report: "everytime i click on
+ * an adjustment type when editing the picture, it jumps back to the start of the list." clubEdDraw
+ * rebuilds the whole editor, so the dial row came back with scrollLeft 0 — which made the dials on the
+ * right of the row effectively untappable, because tapping one scrolled the row away from it. Same class
+ * as the Support search field's captured caret and the video trim snapping back to the start.
+ */
+test("BLOCKER: a sheet's scrolling row keeps its chosen chip in view across a redraw", () => {
+  const keep = new Function(nocomment(fn("clubRowKeep")) + "\nreturn clubRowKeep;")();
+  const mk = (scrollLeft: number, chipLeft: number) => {
+    const row = { clientWidth: 300, scrollLeft: scrollLeft };
+    keep(row, { offsetLeft: chipLeft, offsetWidth: 80 });
+    return row.scrollLeft;
+  };
+  // A chip off the right edge is brought in; off the left, likewise.
+  assert.ok(mk(0, 400) > 0, "a chip beyond the right edge is not brought into view");
+  assert.ok(mk(0, 400) >= 400 + 80 + 12 - 300, "the chip is only partly brought into view");
+  assert.ok(mk(500, 100) <= 100, "a chip left of the view is not brought back");
+  // ⚠️ AND A CHIP ALREADY IN VIEW DOES NOT MOVE. A row that re-centres on every redraw is its own
+  // jumpiness, one step subtler than the fault being fixed.
+  assert.equal(mk(0, 40), 0, "a visible chip still scrolls the row");
+  assert.equal(mk(120, 150), 120, "a visible chip still scrolls the row");
+  // Nothing to do, and nothing thrown, when there is no row or no selection.
+  assert.doesNotThrow(() => keep(null, null));
+  // ⚠️ EVERY SCROLLING ROW IN THE COMPOSER IS COVERED, DERIVED FROM THE STYLESHEET — a fourth row added
+  // without a keep call is the same defect again, in a place nobody would think to look.
+  const sheet = nocomment(sheetOf(page()));
+  const rows = [...sheet.matchAll(/^\.(club-(?:dls|fr|ovr|strip|fps|cap-strip))\s*\{([^}]*)\}/gm)]
+    .filter((m) => /overflow-x:\s*auto/.test(m[2]!)).map((m) => m[1]!);
+  assert.ok(rows.length >= 3, "expected at least three scrolling rows in the composer; found " + rows.length);
+  const w = nocomment(fn("wireClubTools"));
+  for (const r of ["club-dls", "club-fr", "club-ovr"]) {
+    assert.ok(rows.indexOf(r) >= 0, "." + r + " is no longer a scrolling row; this guard is stale");
+    assert.ok(w.indexOf('".' + r + '"') > 0,
+      "." + r + " scrolls but nothing keeps its chosen chip in view after a redraw");
+  }
+  assert.match(w, /clubRowKeep\(/, "no row is kept in view at all");
+});
+
+/**
+ * SWIPE RIGHT TO GO BACK TO THE GRID — his request, 2026-08-23.
+ *
+ * ⚠️⚠️ IT NEVER CALLS preventDefault AND NEVER TOUCHES touch-action, so it cannot break the two scrolls
+ * this screen already has: the page scrolls vertically and a carousel swipes sideways exactly as before.
+ * A back-swipe that claims the touch up front is how one kills the scrolling it sits on top of.
+ */
+test("BLOCKER: swiping right leaves the post feed, and nothing else does", () => {
+  const src = nocomment(fn("clubWireBackSwipe"));
+  for (const bad of ["preventDefault", "touch-action", "stopPropagation"]) {
+    assert.ok(src.indexOf(bad) < 0,
+      "the back swipe uses " + bad + ", which breaks the scrolling it sits on");
+  }
+  assert.match(src, /passive: true/, "the listeners are not passive, so the browser must wait on them");
+  // Driven: only a clearly horizontal, clearly rightward travel over the threshold goes back.
+  const px = Number(/const CLUB_BACK_SWIPE_PX = (\d+)/.exec(appBlock())?.[1]);
+  assert.ok(px >= 40, "a threshold of " + px + "px fires on the drift of an ordinary scroll");
+  const run = new Function("haptic", "CLUB_BACK_SWIPE_PX",
+    nocomment(fn("clubWireBackSwipe")) + "\nreturn clubWireBackSwipe;")(() => {}, px);
+  const drive = (dx: number, dy: number, onRail: boolean, railScrolls: boolean) => {
+    let went = 0;
+    const handlers: Record<string, Array<(e: unknown) => void>> = {};
+    const node = { addEventListener: (t: string, f: (e: unknown) => void) => {
+      (handlers[t] = handlers[t] || []).push(f); } };
+    run(node, () => { went++; });
+    const rail = { scrollWidth: railScrolls ? 900 : 300, clientWidth: 300 };
+    const target = { closest: (s: string) => (onRail && s === "[data-cprail]" ? rail : null) };
+    handlers.pointerdown!.forEach((f) => f({ pointerId: 1, pointerType: "touch", button: 0,
+      clientX: 100, clientY: 200, target: target }));
+    handlers.pointerup!.forEach((f) => f({ pointerId: 1, clientX: 100 + dx, clientY: 200 + dy }));
+    return went;
+  };
+  assert.equal(drive(140, 10, false, false), 1, "a clear rightward swipe does not go back");
+  assert.equal(drive(-140, 10, false, false), 0, "a LEFTWARD swipe goes back");
+  assert.equal(drive(px - 5, 4, false, false), 0, "a swipe under the threshold goes back");
+  // ⚠️ A DIAGONAL IS A SCROLL, NOT A SWIPE. A loose test throws the runner off the screen they are reading.
+  assert.equal(drive(90, 120, false, false), 0, "a mostly-vertical drag goes back");
+  // ⚠️ A CAROUSEL'S RAIL IS EXEMPT WHILE IT HAS SOMEWHERE TO GO — there, sideways means "next picture".
+  assert.equal(drive(140, 10, true, true), 0, "swiping a multi-picture carousel leaves the screen");
+  assert.equal(drive(140, 10, true, false), 1,
+    "a single-picture post's rail cannot scroll, so a swipe there should still go back");
+  // ⚠️ THE SWIPE AND THE CHEVRON GO TO THE SAME PLACE, or two ways back mean two different backs.
+  const wire = nocomment(fn("wireClubPostView"));
+  assert.match(wire, /clubWireBackSwipe\(\$\("view"\), \(\) => \{ state\.screen = null; state\.clubPostId = null; render\(\); \}\)/,
+    "the swipe does not go where the back chevron goes");
+});

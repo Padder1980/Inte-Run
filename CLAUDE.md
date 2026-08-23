@@ -9491,3 +9491,53 @@ out of the built page. **Same probe-supplies-its-own-table trap this file alread
 engine's distance tables**, in a new place.
 ⚠️ **AND TWO HAND-WRITTEN LIFT LISTS WENT STALE AND FAILED LOUDLY** (`clubToneQ is not defined`, four
 tests in one file and one in another) — the acceptable kind of stale, and the second time in two days.
+
+### TWO FROM THE PHONE: THE JUMPING DIAL ROW, AND SWIPE RIGHT TO LEAVE THE FEED (2026-08-23)
+
+*"everytime i click on an adjustment type when editing the picture, it jumps back to the start of the
+list"* and *"when i click on a photo from the grid and it opens it up to allow me to scroll through all my
+posts i want to be able to get back to the grid view by swiping right on the screen."* Suite 1268 →
+**1270**; 10 deliberate re-breaks, all 10 caught. Web-only, so both reach his phone on the next launch.
+
+⚠️⚠️ **A REDRAW REBUILDS A SCROLLER, AND A NEW SCROLLER STARTS AT ZERO.** `clubEdDraw` rebuilds the whole
+editor, so picking a dial gave back a fresh `.club-dls` with `scrollLeft` 0 — which made the dials on the
+RIGHT of the row **effectively untappable**, because tapping one scrolled the row away from it. The same
+class as the Support search field's captured caret and the video trim snapping back to the start, in the
+one place a new row had just been added.
+⚠️ **DERIVED FROM THE SELECTION, NOT SAVED.** Restoring a remembered offset needs somewhere to keep it
+and is wrong the moment the row's contents change width; scrolling the CHOSEN chip into view is correct
+on every path — after a pick it brings the chip you tapped into sight, and after the slider settles the
+selection has not moved so nothing moves either.
+⚠️ **AND A CHIP ALREADY IN VIEW MUST NOT MOVE.** A row that re-centres on every redraw is its own
+jumpiness, one step subtler than the fault being fixed. Guarded in both directions.
+⚠️ **IT SETS `scrollLeft` ON THE ROW RATHER THAN CALLING `scrollIntoView`**, which would also scroll the
+PAGE sideways — the one thing this app's oldest layout rule forbids, and the thing he ruled on the same
+day.
+⚠️ **THE FILTER AND OVERLAY ROWS HAD THE IDENTICAL FAULT** and he did not have to report them separately.
+The guard **derives the covered rows from the stylesheet** — every `overflow-x: auto` row in the composer
+must be named in a `clubRowKeep` call — so a fourth row added without one fails.
+
+**Measured on the served build, picking each dial in turn:** `scrollLeft` walks 0 → 41 → 130 → 213 → 291
+→ 380 with the chosen chip visible at every step, and stays put across the redraw that follows the slider
+being let go. Before, every pick returned it to 0.
+
+⚠️⚠️ **THE BACK SWIPE NEVER CALLS `preventDefault` AND NEVER TOUCHES `touch-action`,** so it cannot break
+the two scrolls that screen already has: the page scrolls vertically and a carousel swipes sideways
+exactly as before. It only READS where the finger went and acts once it has lifted. **A back-swipe that
+claims the touch up front is how one kills the scrolling it sits on top of** — and this app has three
+surfaces whose `touch-action` notes exist for that reason.
+⚠️ **A CAROUSEL'S RAIL IS EXEMPT WHILE IT HAS SOMEWHERE TO GO.** Starting the finger on a post with
+several pictures means "show me the next picture", not "leave"; on a single-picture post the rail cannot
+scroll, so a swipe there is unambiguous and does go back. Both halves are guarded.
+⚠️ **IT DEMANDS A CLEARLY HORIZONTAL, CLEARLY RIGHTWARD TRAVEL** — more than 64px across and more than
+twice as far across as down. A loose test fires on the diagonal drift of an ordinary scroll and throws
+the runner off the screen they were reading.
+⚠️ **THE SWIPE AND THE CHEVRON GO TO THE SAME PLACE**, asserted as the same statement, or two ways back
+mean two different backs.
+
+**Measured on the served build:** a rightward swipe on a post leaves (`state.screen` null); a LEFTWARD
+swipe, a 30px swipe, a 90×120 diagonal and a swipe on a two-picture carousel all stay on `clubpost`.
+
+⚠️ **`node --check` CAUGHT A DUPLICATE `const`** — my new `ovr` collided with `wireClubTools`' own overlay
+rotation slider in the same scope. Legal-looking, invisible to the build, and the reason that step is a
+test rather than a documented manual one.

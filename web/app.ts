@@ -11991,6 +11991,28 @@ function clubToolsHtml(S, sl) {
  * no Cancel at all, because the word promises the opposite. S.snap holds the state the tool can touch
  * and nothing else, so cancelling a filter cannot undo a crop made before it.
  */
+/**
+ * ⚠️⚠️ A REDRAW REBUILDS A SCROLLER, AND A NEW SCROLLER STARTS AT ZERO. His report: "everytime i click on
+ * an adjustment type when editing the picture, it jumps back to the start of the list." clubEdDraw
+ * rebuilds the whole editor, so the dial row and the filter row come back as fresh elements with
+ * scrollLeft 0 — the eighth dial is unreachable by tapping, because tapping it scrolls the row away from
+ * it. Same class as the Support search field's captured caret and the video trim snapping back.
+ * ⚠️ DERIVED FROM THE SELECTION, NOT SAVED. Restoring a remembered offset needs somewhere to keep it and
+ * is wrong the moment the row's contents change width; scrolling the CHOSEN chip into view is correct on
+ * every path — after a pick it brings the chip you tapped into sight, and after the slider settles the
+ * selection has not moved so nothing moves either.
+ * ⚠️ AND IT SETS scrollLeft ON THE ROW RATHER THAN CALLING scrollIntoView, which would also scroll the
+ * PAGE sideways — the one thing this app's oldest layout rule forbids.
+ */
+function clubRowKeep(row, sel) {
+  if (!row || !sel) return;
+  const pad = 12;
+  const left = sel.offsetLeft - pad;
+  const right = sel.offsetLeft + sel.offsetWidth + pad;
+  const view = row.clientWidth;
+  if (right > row.scrollLeft + view) row.scrollLeft = right - view;
+  else if (left < row.scrollLeft) row.scrollLeft = left;
+}
 function clubToolOpen(id) {
   const S = CLUBED, sl = clubSlide(); if (!S || !sl) return;
   S.tool = id;
@@ -12431,6 +12453,14 @@ function wireClubTools(S, sl) {
   if (ovl) ovl.querySelectorAll("[data-cov]").forEach((n) => {
     n.onpointerdown = (ev) => clubOvDrag(ev, Number(n.getAttribute("data-cov")) || 0);
   });
+  // ⚠️ EVERY SHEET WITH A SCROLLING ROW KEEPS ITS CHOSEN CHIP IN VIEW after the rebuild. The filter row
+  // has the identical fault and he did not have to report it separately.
+  const dls = document.querySelector(".club-dls");
+  if (dls) clubRowKeep(dls, dls.querySelector(".club-dl.on"));
+  const frs = document.querySelector(".club-fr");
+  if (frs) clubRowKeep(frs, frs.querySelector(".club-fs.on"));
+  const ovrow = document.querySelector(".club-ovr");
+  if (ovrow) clubRowKeep(ovrow, ovrow.querySelector(".club-ovs.on"));
 }
 /** ⚠️ THE SAME SORT AS THE FIRST PICK, applied to the combined list, so a video cannot be added to a
  *  carousel of photographs by the back door. */
@@ -13018,6 +13048,43 @@ const MONTHS_LONG = ["January", "February", "March", "April", "May", "June", "Ju
  * finger meant — and getting that wrong makes the page fight the swipe. The browser already arbitrates
  * between a vertical page scroll and a horizontal scroll-snap child, correctly, on every device.
  */
+/**
+ * SWIPE RIGHT TO GO BACK TO THE GRID — his request, 2026-08-23: "when i click on a photo from the grid
+ * and it opens it up to allow me to scroll through all my posts i want to be able to get back to the
+ * grid view by swiping right on the screen."
+ *
+ * ⚠️⚠️ IT NEVER CALLS preventDefault AND NEVER TOUCHES touch-action, so it cannot break the two scrolls
+ * this screen already has. The page keeps scrolling vertically and a carousel keeps swiping sideways
+ * exactly as before; this only READS where the finger went and acts once it has lifted. A gesture that
+ * claims the touch up front is how a back-swipe kills the scrolling it sits on top of.
+ * ⚠️ A CAROUSEL'S OWN RAIL IS EXEMPT WHILE IT HAS SOMEWHERE TO GO. Starting the finger on a post with
+ * several pictures means "show me the next picture", not "leave"; on a single-picture post the rail has
+ * nothing to scroll, so a swipe there is unambiguous and does go back.
+ * ⚠️ AND IT DEMANDS A CLEARLY HORIZONTAL, CLEARLY RIGHTWARD TRAVEL — more than 64px across and more than
+ * twice as far across as down. A loose test fires on the diagonal drift of an ordinary scroll and the
+ * runner is thrown off the screen they were reading.
+ */
+const CLUB_BACK_SWIPE_PX = 64;
+function clubWireBackSwipe(node, back) {
+  if (!node) return;
+  let st = null;
+  node.addEventListener("pointerdown", (ev) => {
+    if (ev.pointerType === "mouse" && ev.button !== 0) { st = null; return; }
+    const rail = ev.target && ev.target.closest ? ev.target.closest("[data-cprail]") : null;
+    if (rail && rail.scrollWidth > rail.clientWidth + 1) { st = null; return; }
+    st = { x: ev.clientX, y: ev.clientY, id: ev.pointerId };
+  }, { passive: true });
+  const end = (ev) => {
+    const s0 = st; st = null;
+    if (!s0 || ev.pointerId !== s0.id) return;
+    const dx = ev.clientX - s0.x, dy = ev.clientY - s0.y;
+    if (dx < CLUB_BACK_SWIPE_PX || Math.abs(dx) < Math.abs(dy) * 2) return;
+    haptic("light");
+    back();
+  };
+  node.addEventListener("pointerup", end, { passive: true });
+  node.addEventListener("pointercancel", () => { st = null; }, { passive: true });
+}
 function wireClubPostView() {
   document.querySelectorAll("[data-cprail]").forEach((rail) => {
     const id = rail.dataset.cprail;
@@ -13050,6 +13117,8 @@ function wireClubPostView() {
     const acts = el2 ? el2.querySelector(".cp-acts") : null;
     if (acts) acts.classList.toggle("on");
   });
+  // ⚠️ THE SAME PLACE THE BACK CHEVRON GOES, so a swipe and a tap cannot disagree about where back is.
+  clubWireBackSwipe($("view"), () => { state.screen = null; state.clubPostId = null; render(); });
   clubFillMedia();
   // ⚠️ SCROLLED TO THE TAPPED POST AFTER THE MEDIA HAS ITS BOX, not before. A post whose picture has not
   // arrived is a few pixels tall, so scrolling to it lands on the wrong one — the measure-before-shown

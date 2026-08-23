@@ -4757,6 +4757,61 @@ button.cm-tile:active { opacity: .65; }
 /* ⚠️ THREE COLUMNS ONLY WHEN THERE IS A THIRD TAB, from one modifier rather than a second rule — the
    grid is otherwise two, and a third empty column would leave Videos off-centre. */
 .cm-mts-3 { grid-template-columns: 1fr 1fr 1fr; }
+/* ══ THE LOGBOOK CARD ═══════════════════════════════════════════════════════════════════════════════
+   His ask: "redesign that section with a premium feel". Every rule below is one decision.
+   ⚠️ THE SESSION'S OWN COLOUR ARRIVES AS --lbc, set inline from runEffort — the one mapping ruling 7
+   established. So this card belongs to the run above it instead of looking like a component that
+   landed here, and a tempo entry is amber exactly as its tile and its calendar dot are. */
+.lb-card { position: relative; overflow: hidden; }
+/* A hairline of the session's colour along the top edge — the same device the run cards use, so the
+   colour means the same thing in both places. */
+.lb-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--lbc), color-mix(in srgb, var(--lbc) 15%, transparent)); }
+.lb-head { padding-top: var(--s1); }
+/* ⚠️⚠️ A CATEGORY COLOUR USED AS TEXT IS TEXT, AND MEASURING FROM RENDERED PIXELS IS THE ONLY WAY THIS
+   IS VISIBLE. Set to the raw --lbc this eyebrow measured 8.30:1 in DARK and **2.44:1 in LIGHT** — amber
+   on a white card, under AA, on the label naming the section. Exactly the fault CLAUDE.md already
+   records twice for the safety bands (URGENT at 2.41:1) and the accent (4.14:1 on white), both of which
+   passed a dark-only review. color-mix darkens in light and lightens in dark from ONE declaration, so
+   there is no second value to keep in step.
+   ⚠️ THE HAIRLINE ABOVE KEEPS THE RAW COLOUR and that is deliberate: it is decoration carrying the same
+   information as this label, so colour is never the only signal — the app's own rule. */
+.lb-eye { display: block; font-size: var(--t-label); font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: color-mix(in srgb, var(--lbc) 58%, var(--ink)); }
+.lb-h { margin: 2px 0 var(--s3); font-size: var(--t-section); font-weight: 750; letter-spacing: -.01em;
+  color: var(--ink); }
+/* ⚠️ AN UNLINED PAGE, NOT A FIELD. A 1px box on a grey plate reads as a support ticket; this is inset
+   with no border at all, so the surface is the paper and the words sit on it. */
+.lb-page { border-radius: var(--r-card); background: var(--surface-2);
+  padding: var(--s3); transition: box-shadow 160ms ease; }
+.lb-card:focus-within .lb-page { box-shadow: inset 0 0 0 1.5px var(--lbc); }
+/* ⚠️ THE RUNNER'S OWN WORDS ARE THE ONLY SERIF IN THE APP, and that is the point: everything else is
+   sans, so the change of voice says this is the part where you WRITE rather than the part where you
+   enter data. Georgia is on every Apple and Windows device, with a serif stack behind it.
+   ⚠️ 17px, NOT 16 — on the type ladder AND above the iOS auto-zoom floor. Under 16 the phone zooms in
+   on focus and pinch is disabled app-wide, so the runner can never zoom back out. */
+.lb-note { font-family: Georgia, "Times New Roman", serif; font-size: var(--t-card);
+  line-height: 1.62; background: transparent; border: 0; border-radius: 0; padding: 0;
+  min-height: 5.2em; resize: none; }
+.lb-note:focus { outline: none; border-color: transparent; }
+.lb-note::placeholder { color: var(--ink-faint); font-style: italic; }
+.lb-foot { display: flex; align-items: center; margin-top: var(--s2); }
+.lb-priv { display: inline-flex; align-items: center; gap: 6px; font-size: var(--t-label);
+  color: var(--ink-soft); }
+.lb-priv svg { width: 13px; height: 13px; flex: none; opacity: .75; }
+/* The one action, and it looks like one: filled, the session's colour, and it says what it does under
+   its own label rather than making the runner guess. */
+.lb-post { display: flex; align-items: center; gap: var(--s3); width: 100%; margin-top: var(--s3);
+  min-height: var(--tap); padding: var(--s3); border: 0; border-radius: var(--r-card);
+  background: color-mix(in srgb, var(--lbc) 13%, var(--surface-2)); color: var(--ink); text-align: left;
+  transition: background 160ms ease; }
+.lb-post:active { background: color-mix(in srgb, var(--lbc) 22%, var(--surface-2)); }
+.lb-post-ic { display: grid; place-items: center; flex: none; width: 34px; height: 34px;
+  border-radius: var(--r-ctl); background: var(--lbc); color: var(--accent-ink); }
+.lb-post-ic svg { width: 18px; height: 18px; }
+.lb-post-t { flex: 1; min-width: 0; font-size: var(--t-card); font-weight: 700; }
+.lb-post-d { display: block; margin-top: 1px; font-size: var(--t-label); font-weight: 500;
+  color: var(--ink-soft); }
 .rn-post { margin-top: var(--s3); width: 100%; }
 .cm-at { font-size: var(--t-label); font-weight: 600; color: var(--ink-soft); margin-top: 1px; }
 .ce-at { color: var(--ink-faint); font-size: var(--t-card); font-weight: 600; margin-right: 2px; }
@@ -5069,6 +5124,15 @@ const EX_STILL = ${JSON.stringify(exStillData)};
 // Anatomical stretch frames as data URIs: ASM_FRAMES[anat][0..3] -> "data:image/png;base64,...".
 const ASM_FRAMES = ${JSON.stringify(stretchFrameData)};
 const ICON = {
+  // ⚠️ ADDED FOR THE LOGBOOK'S PRIVACY LINE. That sentence is the one thing on the card a runner might
+  // genuinely need to know, and it was the smallest thing on it — a glyph is what makes it read as a
+  // stated fact rather than a footnote. Same 24-unit grid and currentColor as every other mark here, so
+  // it inherits the size and colour of the line it sits in.
+  // ⚠️ A JOURNAL WITH A PEN, NOT THE PLAIN book MARK. Rendered at 18px in the logbook's own tile, the
+  // existing book path reads as a rectangle — no spine, no pages, nothing that says writing. Looked at
+  // rather than assumed: the fix was visible in the render and invisible in the source.
+  journal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h9.5a1.5 1.5 0 0 1 1.5 1.5v9"/><path d="M6 3.5A2.5 2.5 0 0 0 3.5 6v12A2.5 2.5 0 0 1 6 15.5h5"/><path d="M6 3.5v12"/><path d="M20.5 12.5 14 19l-2.6.6.6-2.6 6.5-6.5a1.4 1.4 0 0 1 2 2z"/></svg>',
+  lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3"/></svg>',
   chevDown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
   // ⚠️ A PLUS IN A ROUNDED SQUARE, not a bare cross: the club's create control sits in a row of stroked
   // glyphs and a bare cross reads as a close button, which is the one thing it must never be mistaken for.
@@ -21039,12 +21103,41 @@ function runHrHtml(run) {
 function runNoteHtml(run) {
   const v = String(run.note || "");
   const can = v.trim().length > 0 && !!(run && run.id);
-  return '<div class="card"><div class="subhead" style="margin-top:0">Logbook</div>' +
-    '<textarea class="rn-note" id="runNote" rows="3" placeholder="How did it feel? Shoes, route, weather, anything you want to remember.">' + esc(v) + '</textarea>' +
-    '<div class="hz-note" id="runNoteSaved">Saved on this device only.</div>' +
+  // ⚠️⚠️ REDESIGNED TO HIS ASK: "I wanted you to redesign that section with a premium feel" — and he
+  // means the LOOK, not a paywall. I read it as the latter and asked; the answer is the former, which is
+  // the same word he used for the profile buttons a day earlier ("need to look far more premium").
+  //
+  // What earns the word here, and every one of these is a decision rather than decoration:
+  // ⚠️ IT IS A JOURNAL PAGE, NOT A FORM FIELD. A bare 16px textarea on a grey plate reads as a support
+  // ticket. The writing surface is unlined and generous, the runner's own words are set in a SERIF at
+  // a size you would read a paragraph in, and the placeholder is an invitation rather than a list of
+  // fields. The rest of the app is sans throughout, so the serif is doing one job in one place: it says
+  // this is the part where you write, not the part where you enter data.
+  // ⚠️ THE SESSION'S OWN COLOUR IS THE ACCENT, through the one mapping ruling 7 established, so this
+  // section belongs to the run above it rather than looking like a component that landed here.
+  // ⚠️ AND THE PRIVACY LINE IS NOW A STATED FACT WITH A GLYPH rather than a grey footnote. It is the one
+  // sentence in this card a runner might actually need, and it was the smallest thing on it.
+  const eff = runEffort(run);
+  return '<div class="card lb-card" style="--lbc: var(--eff-' + eff + ')">' +
+    '<div class="lb-head">' +
+      '<span class="lb-eye">Logbook</span>' +
+      '<h3 class="lb-h">How was it?</h3>' +
+    '</div>' +
+    '<div class="lb-page">' +
+      '<textarea class="rn-note lb-note" id="runNote" rows="4" ' +
+        'placeholder="The bits you will want to remember. How the legs felt, the weather, ' +
+        'where you went, what you would do differently.">' + esc(v) + '</textarea>' +
+    '</div>' +
+    '<div class="lb-foot">' +
+      '<span class="lb-priv" id="runNoteSaved">' + ICON.lock + ' Saved on this device only.</span>' +
+    '</div>' +
     (can
-      ? '<button class="ui-btn rn-post" data-clogpost="' + esc(String(run.id)) + '">' +
-        'Save to my Inte-Club logbook</button>'
+      ? '<button class="lb-post" data-clogpost="' + esc(String(run.id)) + '">' +
+          '<span class="lb-post-ic">' + ICON.journal + '</span>' +
+          '<span class="lb-post-t">Save to my Inte-Club logbook' +
+            '<span class="lb-post-d">Your words, on your own logbook. Nobody else sees it.</span>' +
+          '</span>' +
+        '</button>'
       : '') +
     '</div>';
 }

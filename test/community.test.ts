@@ -1333,3 +1333,36 @@ test("BLOCKER: a runner has a handle as well as a name, and the app does not cla
   assert.match(load, /username: String\(raw\.username \|\| ""\)/,
     "the handle is dropped on read — the whitelisting-reader fault this file already caught once");
 });
+
+test("BLOCKER: the Logbook section is a redesign, and its category colour is not raw as text", () => {
+  // His clarification, 2026-08-22: "I meant that I wanted you to redesign that section with a premium
+  // feel" — the LOOK, not a paywall. I read it as the latter and asked; this is the former.
+  const css = page();
+  const n = fn("runNoteHtml");
+  // ⚠️ THE SESSION'S OWN COLOUR ARRIVES AS A CUSTOM PROPERTY, through the one ruling-7 mapping, so the
+  // card belongs to the run above it rather than looking like a component that landed there.
+  assert.match(n, /--lbc: var\(--eff-' \+ eff/, "the card does not take the session's own colour");
+  assert.match(nocomment(n), /const eff = runEffort\(run\)/,
+    "the card invents its own idea of how hard the session was");
+  // ⚠️⚠️ A CATEGORY COLOUR USED AS TEXT IS TEXT. Set to the raw --lbc this eyebrow measured 8.30:1 in
+  // dark and 2.44:1 in LIGHT — amber on a white card, under AA, on the label naming the section. Exactly
+  // the fault CLAUDE.md records twice (the URGENT band at 2.41:1, the accent at 4.14:1 on white), both
+  // of which passed a dark-only review. Measured from rendered pixels after the fix: 10.91 / 5.28.
+  const eye = /\.lb-eye \{([^}]*)\}/.exec(css);
+  assert.ok(eye, "the Logbook eyebrow is gone");
+  assert.match(eye![1]!, /color: color-mix\(in srgb, var\(--lbc\) \d+%, var\(--ink\)\)/,
+    "the eyebrow uses the raw category colour as text, which is under AA on a light card");
+  // ⚠️ AND THE WRITING SURFACE IS A PAGE, NOT A FIELD. A 1px box on a grey plate reads as a support
+  // ticket; the runner's own words are the only serif in the app, which is what says "write here".
+  const note = /\.lb-note \{([^}]*)\}/.exec(css);
+  assert.ok(note, "the writing surface is gone");
+  assert.match(note![1]!, /font-family: Georgia/, "the entry is set in the same face as the rest of the app");
+  assert.match(note![1]!, /border: 0/, "the page is still a bordered form field");
+  // ⚠️ AND IT IS ON THE TYPE LADDER, WHICH IS ALSO ABOVE THE iOS AUTO-ZOOM FLOOR. Under 16px the phone
+  // zooms in on focus and pinch is disabled app-wide, so the runner can never zoom back out.
+  assert.match(note![1]!, /font-size: var\(--t-card\)/, "the entry's size is off the ladder");
+  // The one action looks like one, and says what it does.
+  assert.match(n, /class="lb-post"/, "the save action is still a generic button");
+  assert.match(n, /lb-post-d/, "the action does not say what it does");
+  assert.match(n, /ICON\.journal/, "the action's glyph is not the journal mark");
+});

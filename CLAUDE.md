@@ -8431,13 +8431,56 @@ not it can be on top of a branded logbook card that you can design"*.
   project's own recap rebuild treats as a defect rather than a floor. Found by rendering the card and
   looking at it, not by reading the code.
 
-⚠️⚠️ **PREMIUM — HIS OWN WORDS WERE "this would need to be premium", AND THAT CONTRADICTS HIS OWN
-STANDING DECISION.** CLAUDE.md records him cutting subscriptions outright: *"Leave the subscription one
-out.....thats not something we are doing (yet)"*, filed as **"Not a placeholder — it does not appear at
-all. Do not reinstate it from the mockup."** So it is shipped **UNGATED**, and flagged rather than
-decided: building a paywall would reverse a recorded ruling without him saying so, and silently dropping
-the word would ignore what he wrote. **His call.** The gate itself is one condition in
-`runNoteHtml` and one in `clubLogbookSheet` the day he wants it.
+✅ **"PREMIUM" MEANT THE LOOK, NOT A PAYWALL — ASKED AND ANSWERED, 2026-08-22.** His words were *"this
+would need to be premium"*, which reads as a subscription and contradicts his own recorded ruling
+(*"Leave the subscription one out.....thats not something we are doing (yet)"*, filed as "do not
+reinstate"). So it shipped ungated and the question was put to him. His answer: **"I meant that I wanted
+you to redesign that section with a premium feel."** Same sense he used a day earlier for the profile
+buttons ("need to look far more premium than that"). **There is no paywall and there is not going to be
+one from this brief** — do not build one from the word.
+
+### THE LOGBOOK SECTION, REDESIGNED TO THAT (2026-08-22)
+
+⚠️ **IT IS A JOURNAL PAGE, NOT A FORM FIELD, and every rule is a decision rather than decoration.** A
+bare 16px textarea on a grey plate with a 1px border reads as a support ticket. The writing surface is
+inset with **no border at all**, so the surface is the paper; the runner's own words are the **only serif
+in the app** (Georgia, with a serif stack behind it), which is what says *this is the part where you
+write* rather than the part where you enter data; the placeholder is an invitation rather than a list of
+fields; and the focus state is an inset ring in the session's own colour rather than a border swap.
+
+⚠️ **THE SESSION'S COLOUR ARRIVES AS `--lbc`, SET INLINE FROM `runEffort`** — the one mapping ruling 7
+established — so the card belongs to the run above it instead of looking like a component that landed
+there, and a threshold entry is amber exactly as its tile and its calendar dot are.
+
+⚠️⚠️ **AND MEASURING IT FOUND A REAL DEFECT THE EYE MISSED: THE EYEBROW WAS 2.44:1 IN LIGHT MODE.** Set
+to the raw `--lbc` it measured **8.30:1 dark / 2.44:1 light** — amber on a white card, under AA, on the
+label naming the section. That is the SAME fault this file records twice (the URGENT band title at
+2.41:1, the accent at 4.14:1 on white), both of which passed a dark-only review, and the remedy is the
+one already written down: `color-mix(in srgb, var(--lbc) 58%, var(--ink))`, which darkens in light and
+lightens in dark from ONE declaration. After, measured from rendered pixels in both themes:
+
+| | dark | light |
+|---|---|---|
+| LOGBOOK eyebrow | 10.91 | **5.28** |
+| the entry (serif) | 14.45 | 15.73 |
+| privacy line | 8.20 | 7.16 |
+| button title | 11.31 | 14.23 |
+| button subtitle | 5.89 | 6.07 |
+
+⚠️ **THE HAIRLINE ALONG THE TOP KEEPS THE RAW COLOUR, DELIBERATELY.** It is decoration carrying the same
+information as the eyebrow, so colour is never the only signal — this app's own rule — and it is the one
+mark on the card where a category tint is doing what a category tint is for.
+⚠️ **`ICON.journal` WAS ADDED BECAUSE `ICON.book` READS AS A RECTANGLE AT 18px.** Found by rendering the
+button and looking at it; invisible in the source. A journal with a pen says *write*, which a plain book
+outline at that size does not.
+⚠️ **AND THE ENTRY IS `var(--t-card)` = 17px, WHICH IS BOTH ON THE LADDER AND ABOVE THE iOS AUTO-ZOOM
+FLOOR.** Under 16px the phone zooms in on focus and pinch is disabled app-wide, so the runner can never
+zoom back out. Guarded by `test/ios-input-zoom.test.ts`, which caught a deliberate 14px re-break.
+
+⚠️ **THE PROBE HAD TO SEED A PROFILE OR THE FIRST-RUN WELCOME COVERED EVERYTHING.** The geometry read
+back correctly the whole time — the card was rendered *underneath* the overlay — so the numbers looked
+fine and the screenshot was of the welcome screen. `rc_profile_v1` plus a reload, then `#welcomeback`;
+`#welcomeGo` is the first-run one and starts the wizard.
 
 ### 5. A handle as well as a name
 

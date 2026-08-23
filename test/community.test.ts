@@ -1518,29 +1518,77 @@ test("the meta line separates its facts with spacing, never a glyph", () => {
 });
 
 /**
- * ⚠️ THE TIMES SCROLL SIDEWAYS RATHER THAN WRAPPING, AND THE SCROLLER IS THE ONLY THING THAT MAY.
- * Four PBs wrapped to two lines and left the fourth on its own; a fifth distance would be worse. The
- * page body never scrolls sideways — this app's oldest layout rule — so the overflow lives on this one
- * container, and its negative margin must equal its padding or a chip cannot reach the screen edge and
- * the row reads as clipped rather than as continuing.
+ * ⚠️⚠️ NOTHING IN THE PANE SLIDES SIDEWAYS — AND THIS ASSERTION IS THE INVERSE OF THE ONE IT REPLACED.
+ * For a day this file demanded that the times be a horizontal SCROLLER, which is what he then rejected:
+ * "I dont want the screen to slide sideways. it should remain like instagram does with the elements at
+ * the top being rearranged in an aesthetically, premium designed way." Inverted rather than deleted, the
+ * way the PRICE/RICE reversal was, because what the old guard was protecting — the fourth capsule must
+ * not be orphaned on a line of its own — is still true and is still asserted below.
+ *
+ * ⚠️ THE SCROLLER WAS WRONG TWICE OVER. It bled 12px out of .cm-pane, and .cm-pane has overflow-y: auto
+ * with nothing said about x — which the spec turns into overflow-x: auto — so the pane was a horizontal
+ * scroller and anything sticking out of it could be dragged. Measured before: 20px of overflow from the
+ * journals section and 12 from the times row, and scrollLeft = 200 landed at 20. After: 0 overflow and
+ * nothing sticking out, at 430x932 and 320x568, at text scale 1.0 and 1.3.
  */
-test("the times are one scrolling row, inset to the screen edge", () => {
+test("the pane cannot be slid sideways, and nothing bleeds out of it", () => {
   const sheet = nocomment(sheetOf(page()));
-  const row = /\.cm-chiprow\s*\{([^}]*)\}/.exec(sheet);
-  assert.ok(row, "no .cm-chiprow rule");
-  const css = row![1]!;
-  assert.match(css, /overflow-x:\s*auto/, "the times row does not scroll, so four PBs wrap again");
-  assert.ok(!/flex-wrap:\s*wrap/.test(css), "the times row wraps, which is the defect being fixed");
-  const neg = /margin:\s*0\s+calc\(-1\s*\*\s*var\((--s\d)\)\)/.exec(css);
-  const pad = /padding:\s*0\s+var\((--s\d)\)/.exec(css);
-  assert.ok(neg && pad, "the times row is not inset with a negative margin and matching padding");
-  assert.equal(neg![1], pad![1],
-    "the inset (" + neg![1] + ") and the padding (" + pad![1] + ") differ, so a chip stops short of "
-    + "the screen edge and the row reads as clipped");
-  assert.match(/\.cm-chiprow \.cm-chip\s*\{([^}]*)\}/.exec(sheet)?.[1] || "", /flex:\s*none/,
-    "a chip in the scroller may shrink, so the times squash instead of scrolling");
+  const pane = /\.cm-pane\s*\{([^}]*)\}/.exec(sheet);
+  assert.ok(pane, "no .cm-pane rule");
+  // ⚠️ IT MUST SAY SOMETHING ABOUT X. Silence is not neutral here: overflow-y: auto with x unstated
+  // computes to overflow-x: auto, which is the defect. clip computes to hidden alongside a scrolling
+  // y-axis, and neither can be dragged by a finger.
+  const ox = /overflow-x:\s*([a-z]+)/.exec(pane![1]!);
+  assert.ok(ox, ".cm-pane says nothing about overflow-x, so it computes to auto and the screen slides");
+  assert.ok(["clip", "hidden"].indexOf(ox![1]!) >= 0,
+    ".cm-pane has overflow-x: " + ox![1] + ", which a finger can drag");
+  // ⚠️ AND THE REAL FIX IS THAT NOTHING BLEEDS. A full-bleed child only works when its parent carries
+  // the gutter, and .cm-pane carries none — the 16px inset comes from #view, two boxes further out. So
+  // no rule on a child of the pane may pull itself outwards; clip would silently CUT it, which is how a
+  // guard like this one comes to be satisfied by a screen with its content shaved off.
+  for (const cls of ["cj-sec", "cm-pbrow", "cm-times", "cm-id", "cm-head", "cm-acts", "cm-grid"]) {
+    const r = new RegExp("\\." + cls + "\\s*\\{([^}]*)\\}").exec(sheet);
+    if (!r) continue;
+    assert.ok(!/margin[^;}]*-1\s*\*/.test(r[1]!) && !/margin[^;}]*\*\s*-1/.test(r[1]!),
+      "." + cls + " pulls itself outwards; inside .cm-pane that overflows and used to let the whole "
+      + "screen be dragged sideways");
+  }
 });
 
+/**
+ * ⚠️ THE TIMES ARE TWO EVEN COLUMNS, WHICH IS THE ONE LAYOUT THAT CANNOT ORPHAN THE FOURTH CAPSULE.
+ * There are exactly four distances (5 km, 10 km, half, marathon), so four items are two full rows — no
+ * orphan, nothing to swipe, and every time the runner has is on screen at once. An auto-fit grid gives
+ * 3 + 1 on a narrow screen and a scroller hides half of them behind a gesture nobody is told about.
+ * ⚠️ min-width IS WHAT MAKES IT DEGRADE INSTEAD OF OVERFLOWING: at 320px with the largest text setting
+ * two no longer fit, and the long capsules take a full row each (measured: 3 rows, 0 overflow) rather
+ * than being pushed out of the pane.
+ */
+test("the times are two even columns, and never a sideways scroller", () => {
+  const sheet = nocomment(sheetOf(page()));
+  const row = /\.cm-pbrow\s*\{([^}]*)\}/.exec(sheet);
+  assert.ok(row, "no .cm-pbrow rule");
+  assert.ok(!/overflow-x:\s*(auto|scroll)/.test(row![1]!),
+    "the times are a sideways scroller again, which he rejected");
+  assert.match(row![1]!, /flex-wrap:\s*wrap/, "the times cannot fall to a second row");
+  const cap = /\.cm-pbrow \.cm-chip\s*\{([^}]*)\}/.exec(sheet);
+  assert.ok(cap, "no rule sizing the capsules inside the row");
+  // Two on a row: a basis under half, so a third cannot join them, with room to stretch even.
+  const basis = /flex:\s*1\s+1\s+(\d+)%/.exec(cap![1]!);
+  assert.ok(basis, "the capsules are not sized to two per row");
+  const pct = Number(basis![1]);
+  assert.ok(pct > 33 && pct <= 50,
+    "a basis of " + pct + "% puts " + Math.floor(100 / pct) + " on a row, not two");
+  assert.match(cap![1]!, /min-width:\s*max-content/,
+    "without min-width the widest capsule is pushed out of the pane at the largest text setting");
+  // ⚠️ HIS EARLIER CAPSULE RULING IS A SEPARATE DECISION AND SURVIVES THIS ONE UNTOUCHED: same size as
+  // the word TIMES, white ground, teal edge, teal text. Only the layout changed.
+  const acc = /\.cm-chip-acc\s*\{([^}]*)\}/.exec(sheet);
+  assert.ok(acc, "no .cm-chip-acc rule");
+  assert.match(acc![1]!, /font-size:\s*var\(--t-label\)/, "the capsule is no longer the size of TIMES");
+  assert.match(acc![1]!, /border:\s*1px solid var\(--accent\)/, "the capsule lost its teal edge");
+  assert.match(nocomment(fn("viewCommunity")), /class="cm-pbrow"/, "the times row is not built");
+});
 /**
  * ⚠️ THE CAPS ARE READ BY THE FIELD AND BY THE SAVE, AND BOTH READERS ARE DERIVED FROM THE CONSTANTS.
  * A maxlength alone is advisory — it is a DOM attribute, and a value restored from a store or pasted by
@@ -1607,7 +1655,7 @@ test("clubTrainingFor shortens the plan sentence and leaves typed text alone", (
 test("no identity class is declared twice in the stylesheet", () => {
   const sheet = nocomment(sheetOf(page()));
   for (const cls of ["cm-id", "cm-idline", "cm-name", "cm-at", "cm-bio", "cm-meta", "cm-mi",
-                     "cm-times", "cm-chiprow"]) {
+                     "cm-times", "cm-pbrow"]) {
     const n = [...sheet.matchAll(new RegExp("^\\." + cls + "\\s*\\{", "gm"))].length;
     assert.equal(n, 1, "." + cls + " is declared " + n + " times; one of them decides nothing and the "
       + "next reader cannot tell which");
@@ -1634,4 +1682,48 @@ test("the identity's helpers are declared at the top level, not inside the view"
   const nested = [...body.matchAll(/\bfunction (\w+)\(/g)].map((m) => m[1]!);
   assert.deepEqual(nested, [], "viewCommunity declares " + nested.join(", ") + " inside itself; it is "
     + "rebuilt on every render and no other screen can reach it");
+});
+
+/**
+ * ⚠️⚠️ THE PANE'S CLIP TURNS AN OVERFLOW INTO MISSING CONTENT, so the head has to wrap rather than
+ * overflow. Measured on the narrowest supported screen at the largest text setting: the three stat
+ * columns needed 49px more than the row beside an 82px avatar could give, and before the clip that was
+ * the other half of the sideways slide he reported. FOLLOWING is one word and cannot be hyphenated, so
+ * the stats take a line of their own — which is what Instagram does on a narrow screen. Driven by
+ * max-content, not a breakpoint, so it happens exactly when the words stop fitting.
+ */
+test("the profile head wraps rather than pushing the stats out of the pane", () => {
+  const sheet = nocomment(sheetOf(page()));
+  const head = /\.cm-head\s*\{([^}]*)\}/.exec(sheet);
+  assert.ok(head, "no .cm-head rule");
+  assert.match(head![1]!, /flex-wrap:\s*wrap/,
+    "the head cannot wrap, so the stats overflow and the pane's clip cuts a stat label off");
+  const stats = /\.cm-stats\s*\{([^}]*)\}/.exec(sheet);
+  assert.ok(stats, "no .cm-stats rule");
+  // ⚠️ min-width: 0 IS THE OPPOSITE OF WHAT IS WANTED HERE, and it is what shipped. It lets the box
+  // shrink under its own words, so the labels collide and then spill; max-content makes the box refuse,
+  // and the wrap above is what catches it.
+  assert.match(stats![1]!, /min-width:\s*max-content/,
+    "the stats box may shrink under its own words, so the labels collide instead of wrapping");
+});
+
+/**
+ * ⚠️ THE TRAINERS TAKE A LINE OF THEIR OWN, UNDER THE WEEK — his ruling of 2026-08-23: "the trainer
+ * information needs to be underneath the distance covered this week on its own line." Two halves, and
+ * either alone puts the shoes back beside something: they must come LAST in the line's own order, and
+ * they must be unable to share a row.
+ */
+test("the trainers are the last fact on the meta line, and take a row of their own", () => {
+  const meta = nocomment(fn("commMetaLine"));
+  // The order is read off the pushes themselves, so a reorder cannot pass.
+  const order = [...meta.matchAll(/bits\.push\('<span class="cm-mi([^"]*)"/g)]
+    .map((m) => (m[1]!.indexOf("shoe") >= 0 ? "shoe" : m[1]!.indexOf("num") >= 0 ? "week" : "plan"));
+  assert.deepEqual(order, ["plan", "week", "shoe"],
+    "the meta line's facts are in the order " + order.join(", ") + "; the trainers must come last");
+  const sheet = nocomment(sheetOf(page()));
+  const shoe = /\.cm-mi-shoe\s*\{([^}]*)\}/.exec(sheet);
+  assert.ok(shoe, "no .cm-mi-shoe rule, so the trainers share a line with whatever precedes them");
+  // A basis of 100% cannot share a row, wherever the facts above it happen to wrap to.
+  assert.match(shoe![1]!, /flex:\s*0\s+0\s+100%/,
+    "the trainers can share a line; a full-row basis is what keeps them on their own");
 });

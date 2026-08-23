@@ -4390,7 +4390,12 @@ button.rd-meta-r { cursor: pointer; }
    --t-title, because that is the one name this app does not have at all; the other two resolve happily
    to the wrong size. Translate design tokens BY VALUE, never by name. */
 /* Plan journals (addendum 1, 2026-08-22) */
-.cj-sec { margin: var(--s5) calc(var(--gutter) * -1) 0; padding: 0 var(--gutter) var(--s1);
+/* ⚠️ IT USED TO BLEED BY --gutter AND THAT IS WHAT LET THE SCREEN BE DRAGGED SIDEWAYS. A full-bleed
+   child only works when its PARENT carries the gutter; .cm-pane carries none (the 16px inset comes from
+   #view, two boxes further out), so the bleed left the section sticking 20px past the pane on both
+   sides — measured L-20 R+20 — and the pane, being a scroller, could then be slid. Every other section
+   rule in this app spans the content width; this one was the odd one out and it cost the layout. */
+.cj-sec { margin: var(--s5) 0 0; padding: 0 0 var(--s1);
   border-top: 1px solid var(--line); }
 .cj-head { display: flex; align-items: baseline; justify-content: space-between;
   margin: var(--s3) 0 var(--s2); }
@@ -4461,10 +4466,26 @@ button.rd-meta-r { cursor: pointer; }
 .cm-track { display: flex; width: 200%; height: 100%;
   transition: transform 320ms cubic-bezier(.2,.8,.3,1); }
 .cm-track.feed { transform: translateX(-50%); }
-.cm-pane { box-sizing: border-box; width: 50%; height: 100%; overflow-y: auto; min-height: 0;
-  padding-bottom: var(--s6); }
-/* Profile head */
-.cm-head { display: flex; align-items: center; gap: var(--s4); }
+/* ⚠️⚠️ THE PANE MUST NEVER SLIDE SIDEWAYS, AND overflow-y ALONE MADE IT SLIDE. His report, with a
+   screenshot of the whole pane shifted left and the avatar, the name and "Plan journals" all clipped:
+   "I dont want the screen to slide sideways." A box with overflow-y: auto and nothing said about x gets
+   overflow-x: AUTO — the spec turns visible into auto when the other axis is not visible — so the
+   pane was a horizontal scroller nobody asked for, and anything sticking out of it could be dragged.
+   Measured: 20px of overflow, and scrollLeft = 200 landed at 20. clip cannot be scrolled at all, by a
+   finger or by script, and a descendant with its own overflow-x: auto (the journals rail) still scrolls
+   itself. ⚠️ THE REAL FIX IS THAT NOTHING BLEEDS OUT OF IT ANY MORE (see .cj-sec and .cm-pbrow); this is
+   the guarantee that it can never come back, not a way to hide it. */
+.cm-pane { box-sizing: border-box; width: 50%; height: 100%; overflow-y: auto; overflow-x: clip;
+  min-height: 0; padding-bottom: var(--s6); }
+/* Profile head.
+   ⚠️ IT WRAPS, AND min-width ON THE STATS IS WHAT MAKES IT WRAP INSTEAD OF OVERFLOWING. Measured on the
+   narrowest supported screen at the largest text setting: the three stat columns needed 49px more than
+   the row beside an 82px avatar could give, so they hung out of the pane — which is the other half of
+   the sideways slide he reported, and which the pane's clip would now silently CUT rather than slide.
+   FOLLOWING is one word and cannot be hyphenated, so the honest answer is the one Instagram uses on a
+   narrow screen: the stats take a line of their own. Driven by max-content rather than a breakpoint, so
+   it happens exactly when the words stop fitting and never otherwise. */
+.cm-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s4); row-gap: var(--s3); }
 .cm-av { position: relative; flex: none; display: grid; place-items: center; width: 82px; height: 82px;
   padding: 3px; border: 0; border-radius: 50%; background: var(--line); }
 .cm-av-story { background: conic-gradient(from 210deg, var(--mark) 0%, var(--accent) 38%,
@@ -4476,7 +4497,7 @@ button.rd-meta-r { cursor: pointer; }
 .cm-story-badge { position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%);
   font-size: var(--t-label); font-weight: 700; letter-spacing: .03em; color: var(--accent-ink);
   background: var(--accent); border-radius: var(--r-pill); padding: 2px 8px; }
-.cm-stats { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(3, 1fr);
+.cm-stats { flex: 1 1 auto; min-width: max-content; display: grid; grid-template-columns: repeat(3, 1fr);
   gap: var(--s1); text-align: center; }
 .cm-stat { display: block; font: inherit; background: none; border: 0; padding: 0; color: var(--ink);
   transition: opacity 160ms ease; }
@@ -4970,21 +4991,33 @@ button.cm-tile:active { opacity: .65; }
 .cm-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 14px; margin-top: 7px;
   font-size: var(--t-meta); line-height: 1.5; color: var(--ink-soft); }
 .cm-mi { display: inline-flex; align-items: center; gap: 5px; }
+/* ⚠️ THE TRAINERS TAKE A ROW OF THEIR OWN — his ruling of 2026-08-23, and a deliberate line break inside
+   a wrapping row rather than a second container. A basis of 100% cannot share a line with anything, so
+   it holds wherever the other facts happen to wrap to; a second .cm-meta below would be two rules
+   owning one line's spacing, which is how they come to disagree. */
+.cm-mi-shoe { flex: 0 0 100%; }
 
 .cm-mi b { font-weight: 700; color: var(--ink); }
 .cm-mi svg { flex: none; width: 15px; height: 15px; color: var(--accent); }
 .cm-mi a { color: var(--accent); text-decoration: none; border-bottom: 1px solid currentColor; }
-/* ⚠️ ONE SCROLLING ROW, SO IT NEVER WRAPS TO AN ORPHAN. Four PBs wrapped to two lines and left the
-   fourth alone; a fifth would have made it worse. The label sits ABOVE rather than beside, because
-   beside it was taking width from the row that could not fit.
-   ⚠️ AND THE SCROLLER IS THE ONLY THING THAT MAY SCROLL SIDEWAYS. The page body never does — this
-   app's oldest layout rule — so the overflow is on this container and nothing above it. */
+/* ⚠️⚠️ TWO EVEN COLUMNS, NOT A SIDEWAYS SCROLLER — HIS RULING: "I dont want the screen to slide
+   sideways. it should remain like instagram does with the elements at the top being rearranged in an
+   aesthetically, premium designed way." The first answer to the orphaned fourth capsule was a scroller,
+   and it was the wrong one twice over: it bled 12px out of the pane (which is what made the SCREEN
+   draggable), and a row you have to swipe hides half the runner's own times behind a gesture nobody is
+   told about.
+   ⚠️ EXACTLY FOUR DISTANCES EXIST (5 km, 10 km, half, marathon), so two columns can never orphan one —
+   four items are two full rows. That is why two, and not a scroller or an auto-fit that gives 3 + 1.
+   ⚠️ flex 1 1 46% PUTS TWO ON A ROW AND STRETCHES THEM EVEN; min-width max-content is what makes
+   it degrade instead of overflowing — at the narrowest screen with the largest text setting two no
+   longer fit, so it falls to one per row rather than pushing a capsule out of the pane.
+   ⚠️ THE CAPSULE ITSELF IS UNTOUCHED — his earlier ruling ("they need to be the same size as the word
+   TIMES", white ground, teal edge, teal text) is a separate decision and this changes only the layout. */
 .cm-times { margin-top: var(--s3); }
-.cm-times .cm-eyebrow { display: block; margin-bottom: 5px; }
-.cm-chiprow { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
-  -webkit-overflow-scrolling: touch; margin: 0 calc(-1 * var(--s3)); padding: 0 var(--s3); }
-.cm-chiprow::-webkit-scrollbar { display: none; }
-.cm-chiprow .cm-chip { flex: none; }
+.cm-times .cm-eyebrow { display: block; margin-bottom: 6px; }
+.cm-pbrow { display: flex; flex-wrap: wrap; gap: 6px; }
+.cm-pbrow .cm-chip { flex: 1 1 46%; min-width: max-content; text-align: center;
+  white-space: nowrap; }
 /* ── Edit profile. */
 .ce-wrap { padding-bottom: var(--s6); }
 .ce-avwrap { display: flex; flex-direction: column; align-items: center; gap: var(--s2);
@@ -14031,8 +14064,15 @@ const STORY_ART_W = 360, STORY_ART_H = 620;
 function commMetaLine(forLine, tr, shopHref, wk) {
   const bits = [];
   if (forLine) bits.push('<span class="cm-mi"><b>Training for</b> ' + esc(forLine) + '</span>');
+  if (wk && wk.km > 0) {
+    bits.push('<span class="cm-mi num">' + commKm(wk.km) + ' this week</span>');
+  }
+  // ⚠️ HIS RULING, 2026-08-23: "the trainer information needs to be underneath the distance covered this
+  // week on its own line." So it comes LAST and .cm-mi-shoe takes a whole row to itself — the order here
+  // and the full-row basis in the stylesheet are one decision, and changing either alone puts the shoes
+  // back beside something.
   if (tr) {
-    bits.push('<span class="cm-mi">' + ICON.shoe +
+    bits.push('<span class="cm-mi cm-mi-shoe">' + ICON.shoe +
       (shopHref
         // ⚠️ rel="noopener noreferrer" AND target — a link the runner typed opens away from the app, and
         // the page it lands on must never be handed a handle back to this one.
@@ -14040,9 +14080,6 @@ function commMetaLine(forLine, tr, shopHref, wk) {
           esc(tr.name) + '</a>'
         : esc(tr.name)) +
       ' <span class="num">' + Math.round(tr.km) + ' km</span></span>');
-  }
-  if (wk && wk.km > 0) {
-    bits.push('<span class="cm-mi num">' + commKm(wk.km) + ' this week</span>');
   }
   if (!bits.length) return "";
   // ⚠️⚠️ NO SEPARATOR GLYPH AT ALL, AND BOTH OTHER VERSIONS WERE TRIED ON THE SERVED PAGE. A dot as its
@@ -14178,7 +14215,7 @@ function viewCommunity() {
           commMetaLine(forLine, tr, shopHref, wk) +
           (chips
             ? '<div class="cm-times"><span class="cm-eyebrow">Times</span>' +
-              '<div class="cm-chiprow">' + chips + '</div></div>'
+              '<div class="cm-pbrow">' + chips + '</div></div>'
             : "") +
         '</div>' +
         '<div class="cm-acts">' +

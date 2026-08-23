@@ -9200,3 +9200,70 @@ scanned. Look for both directions when a new guard's first run surprises you.
 four-tier block, and `commMetaLine`'s doc still promised "dot-separated prose" after the dots were
 measured out. Nothing about either sentence changed; the design under it did. Fourth and fifth firing
 of that in this feature, after the map attribution, the destinations note and the tile's accessible name.
+
+### ⚠️⚠️ THE SCREEN SLID SIDEWAYS, AND `overflow-y: auto` ALONE IS WHAT DID IT (owner, 2026-08-23)
+
+*"I dont want the screen to slide sideways. it should remain like instagram does with the elements at the
+top being rearranged in an aesthetically, premium designed way"* — with a screenshot of the whole pane
+shifted left, the avatar, the name and "Plan journals" all clipped off the edge. Then, an hour later:
+*"the trainer information needs to be underneath the distance covered this week on its own line."*
+Suite 1253 → **1256**; 15 deliberate re-breaks, all 15 caught.
+
+⚠️ **HIS SCREENSHOT WAS THE PREVIOUS BUILD, SO THIS WAS PRE-EXISTING RATHER THAN THE REGROUP'S FAULT** —
+it shows the old `space-between` shoe row and the wrapping capsules. Proved from `git show HEAD~1`, not
+assumed, because the two builds look similar enough to blame the wrong one.
+
+⚠️⚠️ **A BOX WITH `overflow-y: auto` AND NOTHING SAID ABOUT X GETS `overflow-x: auto`.** The spec turns
+`visible` into `auto` when the other axis is not visible, so `.cm-pane` had been a horizontal scroller
+nobody asked for since it was written — and anything sticking out of it could be dragged. Measured:
+**20px of overflow, and `scrollLeft = 200` landed at 20.** `overflow-x: clip` computes to `hidden`
+alongside a scrolling y-axis, and neither can be dragged by a finger; a descendant with its own
+`overflow-x: auto` (the journals rail) still scrolls itself.
+
+⚠️ **BUT THE CLIP IS THE GUARANTEE, NOT THE FIX — AND ON ITS OWN IT TURNS AN OVERFLOW INTO MISSING
+CONTENT.** Two things were bleeding out of the pane and both had to stop:
+- **`.cj-sec` bled by `--gutter` (20px), and that is the one he swiped.** A full-bleed child only works
+  when its PARENT carries the gutter; `.cm-pane` carries none — the 16px inset comes from `#view`, two
+  boxes further out — so the section stuck 20px past the pane on both sides. Every other section rule in
+  this app spans the content width; this one was the odd one out and it cost the layout.
+- **The times row I had just built bled 12px** for exactly the same reason, which is the inset-equals-
+  padding rule from the day before applied against the wrong box. **The rule was right and the box was
+  wrong**, which is worth knowing: an inset that matches *a* padding still overflows if the padding
+  belongs to an ancestor rather than to the scroller.
+
+⚠️⚠️ **AND THE CLIP THEN EXPOSED A SECOND, OLDER OVERFLOW: THE STATS ROW, WHICH IT WOULD HAVE CUT.**
+Measured at 320px with the largest text setting, the three stat columns needed **49px more than the row
+beside an 82px avatar could give**. Before the clip that was the other half of the slide; after it, it
+would have silently shaved "FOLLOWING" off. FOLLOWING is one word and cannot be hyphenated, so the stats
+take a line of their own — which is what Instagram does on a narrow screen. `.cm-head { flex-wrap: wrap }`
+plus `.cm-stats { min-width: max-content }`, so it happens exactly when the words stop fitting and never
+otherwise. ⚠️ **`min-width: 0` was the opposite of what was wanted and it is what shipped** — it let the
+box shrink under its own words, so the labels collided and then spilled.
+⚠️ **A cost, stated rather than buried: at 320px the stats now wrap at NORMAL text size too**, because
+their natural width genuinely exceeds what is left beside the avatar. On that screen they were already
+colliding, so this is a repair rather than a regression — but the layout on the smallest phone did move.
+
+### THE TIMES ARE TWO EVEN COLUMNS, AND THE GUARD FROM THE DAY BEFORE IS NOW INVERTED
+
+⚠️ **THIS FILE DEMANDED A SIDEWAYS SCROLLER FOR ONE DAY.** `test/community.test.ts` carried *"the times
+are one scrolling row, inset to the screen edge"* — which is the thing he rejected. **Inverted rather
+than deleted**, the way the PRICE/RICE reversal was: what the old guard protected (the fourth capsule
+must not be orphaned on a line of its own) is still true and is still asserted.
+
+⚠️ **EXACTLY FOUR DISTANCES EXIST (5 km, 10 km, half, marathon), SO TWO COLUMNS CAN NEVER ORPHAN ONE** —
+four items are two full rows. That is why two, and not an `auto-fit` grid (3 + 1 on a narrow screen) and
+not a scroller, which hides half the runner's own times behind a gesture nobody is told about.
+⚠️ **`flex: 1 1 46%` PUTS TWO ON A ROW AND `min-width: max-content` IS WHAT MAKES IT DEGRADE INSTEAD OF
+OVERFLOWING.** At 320px with the largest text two no longer fit, so the long capsules take a full row
+each — measured 3 rows, **0 overflow** — rather than being pushed out of the pane.
+⚠️ **HIS EARLIER CAPSULE RULING SURVIVES UNTOUCHED AND IS ASSERTED BESIDE THE NEW LAYOUT** — *"they need
+to be the same size as the word TIMES"*, white ground, teal edge, teal text. Only the layout changed.
+
+⚠️ **THE TRAINERS TAKE A ROW OF THEIR OWN, LAST, AND BOTH HALVES ARE ONE DECISION.** `.cm-mi-shoe` is
+`flex: 0 0 100%`, so it cannot share a line wherever the facts above it happen to wrap to, and the push
+order in `commMetaLine` puts it after the week. Either half alone puts the shoes back beside something.
+A second `.cm-meta` container below would have been two rules owning one line's spacing.
+
+**Measured after, at 430×932 and 320×568, at text scale 1.0 and 1.3, both themes:** pane overflow **0**,
+nothing sticking out of the pane at any of them, `scrollLeft` **0**, page overflow **0**, capsules in 2
+even rows (3 at the narrowest extreme, by design), zero console errors.

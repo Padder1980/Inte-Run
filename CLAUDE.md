@@ -9653,3 +9653,121 @@ through MediaRecorder worked once and then produced an unloadable clip, and the 
 window rendered" — which reads like a defect in the app. The corner geometry is pure markup from
 `clubStripHtml`, so the probe now fakes a clip on a photo slide (`isVid`, `dur`, `thumbs`) and needs no
 video at all.
+
+## THE TEXT OVERLAY FIXED, A PLAYHEAD, AND A STORY KEPT BEHIND A JOURNAL (2026-08-23/24)
+
+Three reports and two instructions. Suite 1272 → **1284**; 30 deliberate re-breaks, 28 caught first
+time and the two escapes were real guard weaknesses (below). Web-only, so all of it reaches his phone on
+the next launch.
+
+⚠️ **THE NODE TOOLCHAIN VANISHED FROM THIS MAC MID-SESSION AND IT IS NOT WHERE IT WAS.** `node`, `npm`
+and `npx` left the PATH; `/opt` and `/usr/local` are empty; `git` and `python3` survived. The binary is at
+**`~/.local/node-v24.18.0-darwin-arm64/bin/node`** and the PATH entry pointing at it is gone. Nothing can
+be built, typechecked or tested without prefixing that directory — and a build is the only way the app
+ships, so this is a hard stop rather than an inconvenience. `export PATH="$HOME/.local/node-v24.18.0-darwin-arm64/bin:$PATH"`.
+
+### ⚠️⚠️ "IT JUMPS AROUND" WAS THE TEXT RE-WRAPPING UNDER THE FINGER
+
+An absolutely positioned box's available width is its containing block **minus its own `left` offset** —
+so dragging a caption to the right squeezed the space left for it and it reflowed at every `pointermove`.
+Measured on a two-line caption dragged 80px right and 150px down: **215×82 and two lines became 135×160
+and FOUR**, changing at every step. After: **361×82 and two lines, identical at every step of two drags.**
+⚠️ **`width: max-content` IS THE WHOLE FIX** — it takes the available width out of the calculation, and
+`max-width` (a percentage of the stage, which `left` does not touch) still decides where it wraps.
+⚠️ **THE DASHED OUTLINE IS GONE** — his "weird dotted lines on the top and bottom". The bin appearing in
+the rail is what says a word is selected; a dashed box as well is the same thing said twice, and on a
+three-line caption it reads as part of the picture.
+⚠️ **"WONT SCALE UP OR DOWN" WAS NOT A BUG, IT WAS ABSENT.** The stage's own pinch bails out on a touch
+that starts on a word, so nothing handled two fingers there. Measured through the real handler: a spread
+took the size 34 → 70 and the rotation 0 → 14°. The pointers are tracked on the WORD, so a pinch that
+starts on a word cannot also zoom the picture underneath.
+⚠️ **THE PINCH BASELINE IS RE-TAKEN WHEN THE SECOND FINGER LANDS**, or it jumps by however far the first
+finger had already dragged — the same re-anchoring the stage's own pinch needs.
+
+### THE TEXT STYLING FROM HIS SCREENSHOTS 2-10
+
+Six named styles, three pages of ten colours, a highlight plate, alignment and a neon glow — five tools,
+one rail at a time, which is the reference's own shape.
+⚠️ **ONE FUNCTION BUILDS THE LOOK AND BOTH THE PREVIEW AND THE RESULT ASK IT** (`clubTxCss`). The editor's
+box and the word on the picture are different elements, so two copies would let the runner style one thing
+and post another. Driven end to end: the committed word's weight, case, colour, alignment and glow all
+match what the preview showed.
+⚠️ **THE PLATE COMPUTES ITS OWN INK** from relative luminance, so a white plate gets black words and a
+black plate white ones — **his screenshots 3 and 4 both fall out of ONE state** rather than needing two.
+Measured: `#ffffff`→dark, `#0a0a0a`→light, `#ffd60a`→dark, `#0a3d62`→light, a token or a missing colour
+falls back to white rather than throwing.
+⚠️ **THE PLATE AND THE GLOW BOTH REPLACE THE KEYLINE RATHER THAN ADDING TO IT.** A dark halo round black
+words on a white plate is dirt; a deep outline under a glow is a dark line inside a halo. They are the
+same CSS property, so an effect that only appended would fight it.
+⚠️ **SYSTEM STACKS, NOT WEBFONTS.** This app ships with no external network assets, so a named style is a
+family stack plus a weight, a case and a tracking. The reference's display faces cannot be reproduced and
+are not pretended at — and a guard asserts the six looks are genuinely distinct declarations, because six
+pills that render the same is a choice you cannot see.
+⚠️ **WHAT IS NAMED RATHER THAN OFFERED:** the animations (Typewriter, Pop, Jump) play on the finished
+story rather than in the editor, so they are their own piece; Sparkle, Shimmer and Pixel need an animation
+or a display face; Mention needs accounts and a server. The fx rail says so in a sentence.
+⚠️ **A WORD STORED BEFORE THE STYLES EXISTED CARRIES A `font` AND NO `style`** and must still look like
+itself, so the old family is honoured when there is no named style to resolve.
+
+### THE PLAYHEAD (his own diagram)
+
+⚠️ **A FRAME LOOP, NOT `timeupdate`** — which fires about four times a second, and a marker moving in four
+visible steps reads as broken rather than as a playhead.
+⚠️ **IT CANCELS ITSELF** rather than being cleared from somewhere else: every frame it checks the editor is
+still open, on this slide, with this element. A loop cancelled by its caller is a loop that keeps running
+behind a closed sheet, which this app has paid for twice.
+⚠️ **HIDDEN WHILE PAUSED OR OUTSIDE THE CHOSEN WINDOW**, and `pointer-events: none` above the bracket —
+over a handle it would otherwise swallow that handle's drag. Measured: 0% hidden, 20% / 45% / 70% shown
+across the window, 86.7% hidden, hidden while paused, gone after the editor closes.
+
+### ⚠️⚠️ A STORY KEPT BEHIND A PLAN JOURNAL — AND THE SWEEP WOULD HAVE EATEN IT
+
+His instruction: *"the individual story theyre on can be added to the plan journal ... if the user has
+more than one journal on their profile, they're given the option to choose which one to add it to"*.
+
+⚠️⚠️ **THE JOURNAL KEEPS A SNAPSHOT OF THE ROW, NOT A REFERENCE, AND THAT IS THE WHOLE POINT.** A story is
+swept 24 hours after posting and its blobs go with it — a journal holding only the post's id would show a
+hatched cell the next morning, which is worse than not offering this at all.
+⚠️ **AND THE BYTES ARE SHARED, NOT DUPLICATED.** Copying a fifteen-second video into a second IndexedDB
+entry doubles it for nothing. What makes that safe is `clubMediaInUse`: **nothing deletes a blob a journal
+still points at**, and both deleters ask it.
+⚠️ **THE ROWS ARE SAVED BEFORE THE BLOB SWEEP** — asked first, the in-use check still sees the story on its
+way out and concludes its own bytes are wanted, so nothing is ever collected. An ORDERING claim.
+⚠️ **MEASURED AGAINST IndexedDB ITSELF, NOT `clubUrl`.** My first probe asked `clubUrl`, which **caches its
+object URLs** — so it answered "the blob is there" for a blob that had been deleted, and both halves of the
+headline claim were unproven. Re-measured through `clubMediaGet`: with the story expired and swept the
+kept copy's blob **is still in the store**; remove the kept copy and it **is gone**. Ask the store.
+⚠️ **A KEPT COPY MUST BE REMOVABLE**, or a kept video is in IndexedDB for ever with no way for the runner
+to clear it — the sweep cannot touch it, which is the point, and nothing else would.
+⚠️ **THE CHOOSER IS ITS OWN OVERLAY AT z-index 98**, above the viewer's 96. The app's bottom sheet is 70,
+so a chooser drawn there would open BEHIND the story it is asking about — the z-order fault this file
+records shipping twice. Measured: 98 vs 96, `aria-modal`, focus on Cancel.
+⚠️ **ONE JOURNAL KEEPS IT STRAIGHT AWAY; NONE SAYS WHY.** A journal exists once a plan does, so somebody
+with no plan has nowhere to put it and is told that rather than watching nothing happen.
+
+### The delete button
+
+⚠️ **THE EXPLANATION IS GONE** — his instruction: *"This needs to be a more obvious delete button and
+there's no need for the explanation underneath."* A paragraph about features that do not exist yet, in a
+menu whose whole job is one destructive action, buried the action itself. Two icon-and-word buttons now.
+⚠️ **THE "NAMES WHAT DOES NOT EXIST" GUARD WAS RESTATED, NOT RELAXED.** It asserted the menu offers ONLY
+delete; the menu may offer anything that WORKS, and the three that need a shared feed (commenting, likes,
+who can see this) are forbidden by name instead.
+
+### ⚠️⚠️ TWO GUARD WEAKNESSES THE RE-BREAKS FOUND, AND ONE IS GENERAL
+
+1. **`indexOf(a) < indexOf(b)` PASSES WHEN `a` IS ABSENT.** `indexOf` returns −1 for a missing needle, and
+   −1 is less than any real index — so deleting the `clubSave` call outright SATISFIED an ordering guard
+   written that way. **An ordering check must first assert both halves exist.** Two such guards fixed.
+2. **A MENTION IS NOT THE THING.** "The editor's preview is styled by `clubTxCss`" was satisfied by the
+   size slider also calling it, so the preview could be styled by hand with the guard green. Pinned to the
+   textarea's own `style` attribute.
+
+⚠️ **AND `test/community.test.ts` NEEDED MEMOISING BEFORE IT WOULD FINISH AT ALL.** The built page is
+~13 MB and that file asks for it a hundred times; adding two `appBlock()` calls to one test pushed the
+file past a seven-minute timeout and then got it killed outright. `page()`, `appBlock()` and a new
+`noApp()` are cached — the content cannot change while the suite runs, so reading it once is both faster
+and more honest than reading it repeatedly and hoping.
+⚠️ **A CALLER-COUNT CEILING IS NOT AN INVARIANT.** `clubFillMedia` had a "2 to 4 callers" guard which the
+journal's kept strip broke at six. Restated to what it was protecting: **no function may fill a
+`data-cmed` span itself**, derived over every top-level function.

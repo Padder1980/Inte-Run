@@ -12,7 +12,14 @@ import { readFileSync } from "node:fs";
  * stores no route rather than a guessed one, a wrist run reaches Strava as a manual activity rather
  * than a GPX with invented times, and a run with no known start is not written to Health at all.
  */
-const page = () => readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
+/**
+ * ⚠️ MEMOISED. The built page is ~13 MB and this file asks for it a hundred times — every fn(), every
+ * appBlock(), every stylesheet read. Uncached, adding two appBlock() calls to one test pushed the file
+ * past a seven-minute timeout; the content cannot change while the suite runs, so reading it once is
+ * both faster and more honest than reading it repeatedly and hoping it has not.
+ */
+let PAGE_CACHE: string | null = null;
+const page = () => (PAGE_CACHE ??= readFileSync(new URL("../web/app.html", import.meta.url), "utf8"));
 function fn(name: string): string {
   const src = page();
   const at = src.indexOf("function " + name + "(");
@@ -36,12 +43,18 @@ function fn(name: string): string {
 const nocomment = (s: string) =>
   s.replace(/^\s*\/\*[\s\S]*?\*\//gm, "").replace(/^\s*\/\/.*$/gm, "");
 /** The app's own script block — not the bundled engine, which is minified and has its own names. */
+let APP_CACHE: string | null = null;
 function appBlock(): string {
+  if (APP_CACHE != null) return APP_CACHE;
   const blocks = [...page().matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1] || "");
   const app = blocks.reduce((a, b) => (b.length > a.length && b.includes("function viewCommunity(") ? b : a), "");
   assert.ok(app, "the app's script block could not be found");
+  APP_CACHE = app;
   return app;
 }
+/** The app block with its comments stripped — the commonest scope in this file, and the slowest to build. */
+let NOAPP_CACHE: string | null = null;
+const noApp = () => (NOAPP_CACHE ??= nocomment(appBlock()));
 /** ⚠️ SWIFT COMMENTS STRIPPED FOR THE SAME REASON THE PAGE'S ARE. Doc comments in this project explain
  *  why an API is NOT used, so they quote the very names a guard forbids — PHPickerViewController is
  *  named in PhotoLibraryService's header explaining why a picker is not a grid. Eleventh firing of that
@@ -493,11 +506,27 @@ test("BLOCKER: the editor's text is typed on the media, not into a system dialog
   assert.match(open, /clubTextOpen\(-1\)/, "the Text tool does not open the on-media text surface");
   assert.ok(!/prompt\(/.test(open), "the Text tool falls back to a system prompt");
   const d = fn("clubTextDraw");
-  assert.match(d, /data-cfont/, "there is no way to choose a typeface");
+  // ⚠️ RESTATED WHEN THE THREE FONT PILLS BECAME SIX NAMED STYLES (2026-08-23). The invariant is that the
+  // typeface is chosen in the editor; data-cfont was the mechanism, and naming it made this guard fail on
+  // the fix — the sixth in three days scoped to a HOW rather than a WHAT.
+  assert.match(d, /data-ctst/, "there is no way to choose a typeface");
+  assert.match(noApp(), /const CLUB_TX_STYLES = \[/, "there are no named text styles");
   assert.match(d, /data-ccol/, "there is no way to choose a colour");
   assert.match(d, /clubTxSz/, "there is no way to choose a size");
-  // ⚠️ EACH PILL IS SET IN ITS OWN FACE — three labels in one typeface is not a choice you can see.
-  assert.match(d, /font-family:' \+ f/, "the font pills are not set in the faces they offer");
+  // ⚠️ EACH STYLE BUTTON IS SET IN ITS OWN LOOK — six labels in one typeface is not a choice you can see.
+  // Restated when the three font pills became six named styles: the button now carries the style's whole
+  // declaration rather than just a family, so the claim is that it wears it, not how it is spelled.
+  assert.match(d, /data-ctst="' \+ st\.id \+\s*'" style="' \+ st\.css/,
+    "the style buttons are not set in the looks they offer");
+  const styles = /const CLUB_TX_STYLES = \[([\s\S]*?)\n\];/.exec(noApp());
+  assert.ok(styles, "CLUB_TX_STYLES could not be read");
+  const rows = [...styles![1]!.matchAll(/\{ id: "(\w+)", label: "([^"]+)",/g)];
+  assert.ok(rows.length >= 4, "only " + rows.length + " named styles");
+  // ⚠️ AND THE LOOKS MUST GENUINELY DIFFER. Six pills that all render the same is a choice you cannot
+  // see, which is the same fault as labelling them all in one face.
+  const decls = [...styles![1]!.matchAll(/css: "([^"]+)"/g)].map((m) => m[1]!);
+  assert.equal(decls.length, rows.length, "a named style has no declaration");
+  assert.equal(new Set(decls).size, decls.length, "two named styles are the same look");
   // ⚠️ AND THE TOOLS LIVE IN THIS STATE, not the rail: rail buttons acting on a selected word are inert
   // whenever nothing is selected, which was two of three tools most of the time.
   const html = fn("clubEdDraw");
@@ -628,8 +657,22 @@ test("BLOCKER: media is loaded after the render, through one loader, and a missi
   assert.match(f, /preload="metadata"/, "a video tile decodes the whole clip to draw a thumbnail");
   // ⚠️ ONE LOADER FOR THE TILE, THE RING AND THE VIEWER. Three would be three places a missing blob is
   // handled differently.
-  const calls = (nocomment(page()).match(/clubFillMedia\(\)/g) || []).length;
-  assert.ok(calls >= 2 && calls <= 4, "clubFillMedia has an unexpected number of callers: " + calls);
+  // ⚠️ RESTATED FROM A COUNT TO THE INVARIANT (2026-08-24). A ceiling on the number of callers fails
+  // every time a new surface legitimately needs the loader — the journal's kept strip made it six — and
+  // what it was protecting is not the count but that NOTHING ELSE fills a data-cmed span itself.
+  const app = noApp();
+  const callers = [...app.matchAll(/\nfunction (\w+)\(/g)].map((m) => m[1]!)
+    .filter((n) => n !== "clubFillMedia" && nocomment(fn(n)).indexOf("clubFillMedia()") >= 0);
+  assert.ok(callers.length >= 2,
+    "only " + callers.length + " function calls the loader; the tile, the ring and the viewer all need it");
+  const rogue = [...app.matchAll(/\nfunction (\w+)\(/g)].map((m) => m[1]!).filter((n) => {
+    if (n === "clubFillMedia") return false;
+    const body = nocomment(fn(n));
+    // A second loader would read a data-cmed key and put media in the span itself.
+    return /dataset\.cmed/.test(body) && /innerHTML\s*=/.test(body);
+  });
+  assert.deepEqual(rogue, [],
+    "these fill a media span themselves instead of asking clubFillMedia: " + rogue.join(", "));
   assert.equal((nocomment(page()).match(/function clubFillMedia/g) || []).length, 1, "there is more than one loader");
 });
 
@@ -891,7 +934,7 @@ test("BLOCKER: a shop link is only ever a plain web address", () => {
   // it failed on correct code the day the shoe moved from its own row onto the meta line (2026-08-22) —
   // the second guard in this file to be scoped to a layout rather than to a fact. Every function that
   // turns clubShopHref's result into an href must carry both attributes.
-  const app = nocomment(appBlock());
+  const app = noApp();
   const fns = [...app.matchAll(/\nfunction (\w+)\(/g)].map((m) => m[1]!);
   let rendered = 0;
   for (const name of fns) {
@@ -1322,12 +1365,26 @@ test("BLOCKER: the menu names what does not exist rather than offering it", () =
   // real today. There is no server, no accounts and nobody else to see a post, so there is nothing to
   // comment, nothing to like, and a post is already private to the one phone it is on. This app's own
   // rule — from the watch settings — is that no toggle ships before the feature behind it exists.
-  const menu = fn("clubPostMenuHtml");
+  // ⚠️ RESTATED, NOT RELAXED (2026-08-24). The menu may offer anything that WORKS, and "Add to plan
+  // journal" does — he asked for it and it keeps a real copy. What must never appear is one of the three
+  // that need a shared feed: commenting, likes and who can see a post. The explanation went with his
+  // instruction ("there's no need for the explanation underneath"), so the guard is now about the
+  // ACTIONS rather than about a sentence.
+  const menu = nocomment(fn("clubPostMenuHtml"));
   const acts = [...menu.matchAll(/data-cact="(\w+)"/g)].map((m) => m[1]!);
-  assert.deepEqual(acts, ["delete"],
-    "the menu offers an action over a feature that does not exist: " + acts.join(", "));
-  assert.match(menu, /Commenting, likes and who can see this/,
-    "the three that are not built are not named either, so the runner is told nothing");
+  const REAL = ["delete", "keep"];
+  const dead = acts.filter((a2) => REAL.indexOf(a2) < 0);
+  assert.deepEqual(dead, [],
+    "the menu offers an action over a feature that does not exist: " + dead.join(", "));
+  for (const word of ["comment", "Comment", "like", "Like", "private", "Private", "hide", "Hide"]) {
+    assert.ok(menu.indexOf(word) < 0,
+      "the menu mentions " + word + ", which needs a shared feed the club has not got");
+  }
+  // And every action it offers is reached by the one handler.
+  const act = nocomment(fn("clubPostAction"));
+  for (const a2 of acts) {
+    assert.ok(act.indexOf('"' + a2 + '"') > 0, "the menu's " + a2 + " is not handled");
+  }
 });
 
 test("BLOCKER: the run's notes are the Logbook, and it is still private by default", () => {
@@ -1647,7 +1704,7 @@ test("the times are two even columns, and never a sideways scroller", () => {
  * field and the store come to disagree about the length of the same sentence.
  */
 test("the bio and the training-for line carry a character cap, on the field and on the save", () => {
-  const app = nocomment(appBlock());
+  const app = noApp();
   const caps = /const CLUB_BIO_MAX = (\d+), CLUB_FOR_MAX = (\d+);/.exec(app);
   assert.ok(caps, "CLUB_BIO_MAX and CLUB_FOR_MAX are not declared together");
   assert.ok(Number(caps![1]) > 0 && Number(caps![1]) <= 200, "the bio cap is not a sane length");
@@ -1963,7 +2020,7 @@ test("BLOCKER: the adjustment slider is not rebuilt under the finger", () => {
  * composer and the grid disagreeing about one picture, which is the debrief hero's two-framings fault.
  */
 test("BLOCKER: one applier puts the look on the composer and on every posted surface", () => {
-  const app = nocomment(appBlock());
+  const app = noApp();
   // Every place a club media span is emitted carries the look.
   const spans = [...app.matchAll(/data-cmed="'? ?\+? ?/g)].length;
   assert.ok(spans >= 3, "expected at least three club media sites; found " + spans);
@@ -2367,4 +2424,304 @@ test("BLOCKER: the trim bracket is one white shape, and its three widths agree",
     "the start handle's hit area no longer grows outward only");
   assert.match(sheet, /\.club-h-b::after[^}]*left:\s*0[^}]*right:\s*-30px/,
     "the end handle's hit area no longer grows outward only");
+});
+
+/**
+ * ⚠️⚠️ A WORD MUST NOT RE-WRAP AS IT IS MOVED, and that was his "it jumps around". An absolutely
+ * positioned box's available width is its containing block MINUS its own left offset, so dragging the
+ * text right squeezed the space left for it and it reflowed under the finger. Measured on a two-line
+ * caption dragged 80px right and 150px down: 215x82 and two lines became 135x160 and FOUR, changing at
+ * every pointermove. After: 361x82 and two lines, identical at every step of two drags.
+ */
+test("BLOCKER: a word on the picture keeps its shape wherever it is put", () => {
+  const sheet = nocomment(sheetOf(page()));
+  const tx = /\.club-tx\s*\{([^}]*)\}/.exec(sheet);
+  assert.ok(tx, "no .club-tx rule");
+  assert.match(tx![1]!, /width:\s*max-content/,
+    "the text's width still depends on where it sits, so it re-wraps as it is dragged");
+  // ⚠️ AND THE CAP IS A PERCENTAGE OF THE STAGE, which the left offset does not touch — that is what
+  // still decides where it wraps once max-content has taken the available width out of it.
+  assert.match(tx![1]!, /max-width:\s*\d+%/, "the wrap width is not a share of the stage");
+  // ⚠️ NO DASHED SELECTION BOX — his "weird dotted lines on the top and bottom". The bin appearing in the
+  // rail is what says a word is selected; a dashed box as well is the same thing said twice.
+  const on = /\.club-tx\.on\s*\{([^}]*)\}/.exec(sheet);
+  assert.ok(on, "nothing marks the selected word");
+  assert.ok(!/outline/.test(on![1]!), "the dashed outline is back on the selected word");
+});
+
+/**
+ * ⚠️ ONE BUILDER FOR A WORD, ASKED BY ALL THREE SURFACES. The composer, the story viewer and the post
+ * feed each used to write this markup themselves, so a new field — the rotation — would have had to be
+ * added in three places or the same text would sit differently depending on where it was looked at.
+ */
+test("BLOCKER: one builder draws a word, and one function styles it", () => {
+  const app = appBlock();
+  assert.ok(!/class="club-tx"/.test(app),
+    "a surface still writes its own club-tx markup, so a new field will be dropped there");
+  const calls = [...nocomment(app).matchAll(/clubTextSpan\(/g)].length;
+  assert.ok(calls >= 4, "clubTextSpan is called " + calls + " times; expected its definition and the "
+    + "composer, the story viewer and the post feed");
+  // ⚠️ THE PREVIEW AND THE RESULT ASK THE SAME STYLER. Two style paths let the runner choose one look
+  // and post another — the composer-and-grid disagreement this file records twice.
+  assert.match(nocomment(fn("clubTextSpan")), /clubTxCss\(/, "the word on the picture is styled by hand");
+  // ⚠️ THE TEXTAREA'S OWN style ATTRIBUTE, not a mention of clubTxCss anywhere in the function — the size
+  // slider also calls it, so "the function mentions it" was satisfied with the preview styled by hand.
+  assert.match(nocomment(fn("clubTextDraw")), /'style="' \+ clubTxCss\(d, px\) \+ '">' \+ esc\(d\.text\)/,
+    "the editor's preview is styled by hand rather than by the function that styles the result");
+});
+
+/**
+ * ⚠️ THE HIGHLIGHT PLATE COMPUTES ITS OWN INK, so a white plate gets black words and a black plate white
+ * ones — his screenshots 3 and 4, and both fall out of ONE state rather than needing two.
+ */
+test("BLOCKER: the text plate reads, the glow replaces the keyline, and legacy words survive", () => {
+  const ink = new Function(nocomment(fn("clubTxInk")) + "\nreturn clubTxInk;")();
+  assert.equal(ink("#ffffff"), "#0a0a0a", "a white plate does not get dark words");
+  assert.equal(ink("#0a0a0a"), "#ffffff", "a black plate does not get light words");
+  assert.equal(ink("#ffd60a"), "#0a0a0a", "a bright yellow plate does not get dark words");
+  assert.equal(ink("#0a3d62"), "#ffffff", "a deep blue plate does not get light words");
+  // ⚠️ A NON-HEX FALLS BACK RATHER THAN THROWING. Words stored before the palette became hex-only carry
+  // a token, and a plate on one of those must still be readable.
+  assert.equal(ink("var(--accent)"), "#ffffff", "a token colour is not handled");
+  assert.equal(ink(undefined), "#ffffff", "a missing colour is not handled");
+
+  const css = new Function(nocomment(fn("clubTxStyle")) + "\n" + nocomment(fn("clubTxInk")) + "\n" +
+    nocomment(fn("clubTxCss")) + "\n" +
+    "const CLUB_TX_STYLES = [{ id: 'clean', label: 'Clean', css: 'font-weight: 800' }];\n" +
+    "const CLUB_TX_ALIGN = ['center','left','right'];\nreturn clubTxCss;")();
+  // ⚠️ THE PLATE DROPS THE KEYLINE. A dark halo round black words on a white plate is dirt.
+  const plate = css({ colour: "#ffffff", bg: 1 }, 34);
+  assert.match(plate, /background:\s*#ffffff/, "the plate has no background");
+  assert.match(plate, /color:\s*#0a0a0a/, "the plate's ink is not computed");
+  assert.match(plate, /text-shadow:\s*none/, "the plate keeps the keyline, which reads as dirt");
+  // ⚠️ AND THE GLOW REPLACES IT TOO — a deep outline under a glow is a dark line inside a halo.
+  const neon = css({ colour: "#ffd60a", fx: "neon" }, 34);
+  assert.match(neon, /text-shadow:[^;]*#ffd60a/, "the glow is not in the chosen colour");
+  assert.ok(neon.indexOf("background") < 0, "the glow drags a plate along with it");
+  // Plain text says nothing about the shadow, so .club-tx's own keyline stands.
+  assert.ok(css({ colour: "#ffffff" }, 34).indexOf("text-shadow") < 0,
+    "plain text overrides the keyline the stylesheet gives it");
+  // Alignment is one of the three, and anything else is centred.
+  assert.match(css({ colour: "#fff", align: "left" }, 34), /text-align:\s*left/, "alignment is ignored");
+  assert.match(css({ colour: "#fff", align: "nonsense" }, 34), /text-align:\s*center/,
+    "an unknown alignment is not centred");
+
+  // ⚠️ A WORD STORED BEFORE THE STYLES EXISTED CARRIES A font AND NO style, and must still look itself.
+  const span = nocomment(fn("clubTextSpan"));
+  assert.match(span, /!t\.style && t\.font/, "an older word loses the typeface it was written in");
+});
+
+/**
+ * ⚠️ TWO FINGERS ON A WORD SCALE AND TURN IT — his "wont scale up or down". It did not exist: the stage's
+ * own pinch bails out on a touch that starts on a word, so nothing handled it. Measured through the real
+ * handler: a two-finger spread took the size 34 to 70 and the rotation 0 to 14 degrees.
+ */
+test("BLOCKER: two fingers on a word scale and turn it, within bounds", () => {
+  const d = nocomment(fn("clubTextDrag"));
+  assert.match(d, /pts\.size === 2/, "a second finger on a word is not noticed");
+  assert.match(d, /Math\.hypot/, "nothing measures the pinch");
+  assert.match(d, /Math\.atan2/, "nothing measures the twist");
+  // ⚠️ THE BASELINE IS RE-TAKEN WHEN THE SECOND FINGER LANDS, or the pinch jumps by however far the first
+  // finger had already dragged — the same re-anchoring the stage's own pinch needs.
+  const two = d.indexOf("pts.size === 2");
+  const base = d.indexOf("pinch = {");
+  assert.ok(base > two && base - two < 400,
+    "the pinch baseline is not taken at the moment the second finger lands");
+  // Clamped, so a wild gesture cannot leave a word unreadable or off the picture.
+  assert.match(d, /CLUB_TX_MIN/, "the size can be pinched to nothing");
+  assert.match(d, /CLUB_TX_MAX/, "the size can be pinched past the picture");
+  const app = appBlock();
+  // ⚠️ THEY ARE DECLARED TOGETHER ON ONE LINE, and a regex expecting its own `const` for each read NaN
+  // for the second — a probe that cannot see half its input reports nonsense about the half it can.
+  const lo = Number(/CLUB_TX_MIN = (\d+)/.exec(app)?.[1]);
+  const hi = Number(/CLUB_TX_MAX = (\d+)/.exec(app)?.[1]);
+  assert.ok(lo >= 8 && hi > lo && hi <= 200, "the size bounds are " + lo + "-" + hi + ", which is not sane");
+  // ⚠️ THE POINTERS ARE TRACKED ON THE WORD, not the stage, so one gesture has one owner.
+  assert.match(d, /node\.onpointerdown = add/, "a second finger on the word is not captured by the word");
+});
+
+/**
+ * ⚠️ THE PLAYHEAD IS A FRAME LOOP THAT CANCELS ITSELF — his own diagram of a line showing where in the
+ * clip the preview has reached. timeupdate fires about four times a second, and a marker moving in four
+ * visible steps reads as broken rather than as a playhead.
+ */
+test("BLOCKER: the trim carries a playhead that glides and stops itself", () => {
+  const p = nocomment(fn("clubPlayhead"));
+  assert.match(p, /requestAnimationFrame/, "the playhead does not run on a frame loop");
+  assert.ok(p.indexOf("ontimeupdate") < 0, "the playhead steps at timeupdate's four frames a second");
+  // ⚠️ IT STOPS ITSELF rather than being cleared from somewhere else — a loop cancelled by its caller is
+  // a loop that keeps running behind a closed sheet, which this app has paid for twice.
+  assert.match(p, /if \(!CLUBED \|\| now !== ph \|\| m !== med \|\| clubSlide\(\) !== sl/,
+    "the playhead does not check that it is still wanted, so it runs on behind a closed editor");
+  // Hidden while paused or outside the chosen window: a line parked at the far end points at nothing.
+  assert.match(p, /!m\.paused && t >= sl\.inS/, "the playhead shows while paused or outside the window");
+  assert.match(nocomment(fn("clubVidLoop")), /clubPlayhead\(sl\)/, "nothing ever starts the playhead");
+  assert.match(nocomment(fn("clubStripHtml")), /club-ph/, "the strip has no playhead in it");
+  const sheet = nocomment(sheetOf(page()));
+  const ph = /\.club-ph\s*\{([^}]*)\}/.exec(sheet);
+  assert.ok(ph, "no .club-ph rule");
+  // ⚠️ IT MUST EAT NO GESTURES. Over a handle it would swallow the drag on whichever end it crossed.
+  assert.match(ph![1]!, /pointer-events:\s*none/, "the playhead eats the drag on the handle it crosses");
+  assert.match(ph![1]!, /z-index:\s*[1-9]/, "the playhead is under the white bracket it has to cross");
+});
+
+/**
+ * ⚠️ WHAT IS NOT BUILT IS NAMED, NOT OFFERED. The reference's animations play on the finished story
+ * rather than in the editor; Sparkle, Shimmer and Pixel need an animation or a display face this app
+ * cannot fetch; Mention needs accounts and a server the club has not got. A control that does nothing is
+ * the class this project has shipped three times.
+ */
+test("BLOCKER: the text editor names what it cannot do and offers no dead control", () => {
+  const d = nocomment(fn("clubTextDraw"));
+  const tools = [...d.matchAll(/tool\("(\w+)"/g)].map((m) => m[1]!);
+  assert.deepEqual(tools, ["style", "colour", "plate", "align", "fx"],
+    "the text tools are " + tools.join(", "));
+  for (const dead of ["Mention", "Sparkle", "Shimmer", "Pixel", "Typewriter effect"]) {
+    assert.ok(d.indexOf('>' + dead) < 0, "the editor offers " + dead + ", which does nothing");
+  }
+  assert.match(d, /club-tnote/, "nothing says why the missing effects are missing");
+  // Every rail is reachable from the row, and every button in a rail is wired.
+  for (const attr of ["data-ctst", "data-ccol", "data-ctpage", "data-ctal", "data-ctfx", "data-ctt"]) {
+    assert.match(d, new RegExp('\\[' + attr + '\\]'), attr + " is rendered but never wired");
+  }
+  // ⚠️ THE SIZE SLIDER DOES NOT REDRAW, for the same reason the composer's dials do not: a rebuild
+  // destroys the input the finger is holding.
+  const sz = /if \(sz\) sz\.oninput = \(\) => \{([\s\S]*?)\n  \};/.exec(d);
+  assert.ok(sz, "the size slider has no handler");
+  assert.ok(sz![1]!.indexOf("clubTextDraw") < 0,
+    "the size slider rebuilds the editor on every input, destroying the slider being dragged");
+});
+
+/**
+ * THE ⋮ MENU: AN OBVIOUS DELETE, AND KEEPING A STORY BEHIND A PLAN JOURNAL (owner, 2026-08-24).
+ * "This needs to be a more obvious delete button and there's no need for the explanation underneath",
+ * and "the individual story theyre on can be added to the plan journal ... if the user has more than one
+ * journal on their profile, they're given the option to choose which one to add it to".
+ */
+test("BLOCKER: the post menu is two obvious actions and no explanation", () => {
+  const m = nocomment(fn("clubPostMenuHtml"));
+  const acts = [...m.matchAll(/data-cact="(\w+)"/g)].map((x) => x[1]!);
+  assert.deepEqual(acts, ["keep", "delete"], "the menu offers " + acts.join(", "));
+  // ⚠️ THE PARAGRAPH IS GONE. A note about features that do not exist yet, in a menu whose job is one
+  // destructive action, buried the action itself.
+  assert.ok(m.indexOf("club-mi-note") < 0, "the explanation is back under the menu");
+  assert.ok(m.indexOf("Commenting") < 0, "the note about commenting and likes is back");
+  // Both are real buttons carrying an icon and a word — never colour alone to say which is destructive.
+  assert.match(m, /class="club-mi club-mi-bad"[^>]*data-cact="delete"/, "delete is not the destructive one");
+  assert.match(m, /ICON\.trash/, "the delete has no bin on it");
+  assert.match(m, /ICON\.journal/, "the keep has no icon on it");
+  assert.match(m, /Delete ' \+ word/, "the delete does not name what it deletes");
+  // Both reach the one handler.
+  const a = nocomment(fn("clubPostAction"));
+  assert.match(a, /act === "keep"/, "the keep action is not handled");
+  assert.match(a, /act !== "delete"/, "the delete action is not handled");
+});
+
+/**
+ * ⚠️⚠️ THE JOURNAL KEEPS A SNAPSHOT OF THE ROW, NOT A REFERENCE TO IT, AND THAT IS THE WHOLE POINT. A
+ * story is swept 24 hours after it was posted and its blobs go with it — so a journal holding only the
+ * post's id would show a hatched cell the next morning, which is worse than not offering this at all.
+ * Measured against IndexedDB itself: with the story expired and swept, the kept copy's blob is still in
+ * the store; remove the kept copy and it is gone.
+ */
+test("BLOCKER: a kept copy is a snapshot, and nothing deletes bytes a journal still wants", () => {
+  const keep = nocomment(fn("clubKeepIn"));
+  assert.match(keep, /JSON\.parse\(JSON\.stringify\(p\)\)/,
+    "the journal stores a reference rather than a snapshot, so the copy dies with the story");
+  assert.match(keep, /CLUB_KEEP_MAX/, "there is no ceiling on what one journal keeps");
+  // ⚠️ THE SAME ONE IS NOT ADDED TWICE — tapping the menu again would otherwise stack copies.
+  assert.match(keep, /some\(\(k\) => k && k\.id === p\.id\)/, "the same story can be kept twice over");
+
+  // ⚠️ BOTH DELETERS ASK THE SAME QUESTION. Either one forgetting is a video deleted out from under a
+  // journal, and it only shows weeks later.
+  for (const f of ["clubStories", "clubDelete"]) {
+    const body = nocomment(fn(f));
+    assert.match(body, /clubMediaInUse\(/,
+      f + " deletes blobs without asking whether a journal still points at them");
+  }
+  // ⚠️ AND THE ROWS ARE SAVED BEFORE THE SWEEP, an ORDERING claim: asked first, the in-use check would
+  // still see the story that is on its way out and conclude its own bytes are wanted.
+  // ⚠️⚠️ AN ORDERING CHECK MUST FIRST PROVE BOTH HALVES EXIST. indexOf returns -1 for a missing needle,
+  // and -1 is less than any real index — so deleting the clubSave call outright SATISFIED this, which a
+  // re-break caught. Assert both are present, then assert the order.
+  for (const f of ["clubStories", "clubDelete"]) {
+    const body = nocomment(fn(f));
+    const save = body.indexOf("clubSave(");
+    const used = body.indexOf("clubMediaInUse(");
+    assert.ok(save >= 0, f + " no longer saves the rows at all");
+    assert.ok(used >= 0, f + " no longer asks whether the media is in use");
+    assert.ok(save < used,
+      f + " asks whether the media is in use before removing the row, so it always answers yes");
+  }
+  // Driven: the check reads both the live rows and every journal's kept snapshots.
+  const inUse = new Function("clubLoad", "loadJournals", "clubKeys",
+    nocomment(fn("clubMediaInUse")) + "\nreturn clubMediaInUse;");
+  const keys = (p: { media?: string[] }) => p.media || [];
+  const run = (rows: unknown[], journals: unknown[], key: string, except?: string) =>
+    inUse(() => rows, () => journals, keys)(key, except);
+  assert.equal(run([{ id: "a", media: ["k1"] }], [], "k1"), true, "a live post's own media reads as free");
+  assert.equal(run([{ id: "a", media: ["k1"] }], [], "k1", "a"), false,
+    "the row being deleted counts as a reason to keep its own bytes");
+  assert.equal(run([], [{ keep: [{ id: "a", media: ["k1"] }] }], "k1"), true,
+    "a blob a journal has kept reads as free, so the story sweep would delete it");
+  assert.equal(run([], [{ keep: [] }, {}], "k1"), false, "an unreferenced blob reads as in use");
+  assert.equal(run([], [], ""), false, "an empty key reads as in use");
+});
+
+/**
+ * ⚠️ ONE JOURNAL KEEPS IT STRAIGHT AWAY; SEVERAL ASK WHICH — his instruction. And with none, it says why
+ * rather than doing nothing, because a journal only exists once a plan does.
+ */
+test("BLOCKER: the journal chooser only appears when there is a choice, and above the viewer", () => {
+  const ask = nocomment(fn("clubKeepAsk"));
+  assert.match(ask, /if \(!js\.length\)/, "somebody with no plan gets no explanation");
+  assert.match(ask, /toast\(/, "the no-journal case fails silently");
+  assert.match(ask, /js\.length === 1.*clubKeepIn\(js\[0\]\.id, p\)/s,
+    "a single journal still asks which one");
+  // ⚠️ ITS OWN OVERLAY, NOT THE APP'S BOTTOM SHEET — that draws at z-index 70 under a viewer at 96, which
+  // is the fault this file records shipping twice.
+  for (const bad of ["ensureSheet(", "sheetBody", "closeSheet("]) {
+    assert.ok(ask.indexOf(bad) < 0, "the chooser uses " + bad + ", which opens behind the story");
+  }
+  assert.match(ask, /club-ask/, "the chooser is not on the dialog layer");
+  assert.match(ask, /aria-modal="true"/, "the chooser is not a modal");
+  assert.match(ask, /overlayModal\(ov, true, "\[data-ckeep=''\]"\)/,
+    "focus does not land on Cancel, which is the safe option on a dialog");
+  const z = (sel: string) => {
+    const m = new RegExp("\\" + sel + "[^{}]*\\{[^}]*z-index:\\s*(\\d+)").exec(nocomment(sheetOf(page())));
+    return m ? Number(m[1]) : 0;
+  };
+  assert.ok(z(".club-ask") > z(".club-view"),
+    "the chooser (" + z(".club-ask") + ") is not above the viewer (" + z(".club-view") + ")");
+});
+
+/**
+ * ⚠️ A KEPT COPY MUST BE REMOVABLE, or a kept video is in IndexedDB for ever with no way for the runner
+ * to clear it — the story sweep cannot touch it, which is the whole point, and nothing else would.
+ */
+test("BLOCKER: kept copies are shown, openable and removable", () => {
+  const html = nocomment(fn("commJournalKeptHtml"));
+  // Absent until there is something in it: a heading with nothing under it reads as a failure.
+  assert.match(html, /if \(!keep\.length\) return ""/, "the kept section shows empty");
+  assert.match(html, /data-ckopen=/, "a kept copy cannot be opened");
+  assert.match(html, /data-ckdrop=/, "a kept copy cannot be removed");
+  assert.match(html, /clubLookAttrs\(/, "a kept copy loses the filter it was posted with");
+  const drop = nocomment(fn("journalDropKept"));
+  assert.match(drop, /if \(!clubMediaInUse\(k\)\) clubMediaDel\(k\)/,
+    "removing a kept copy either leaks its bytes or deletes bytes something else still wants");
+  const sv = drop.indexOf("saveJournals"), iu = drop.indexOf("clubMediaInUse");
+  assert.ok(sv >= 0 && iu >= 0, "journalDropKept no longer both saves and checks");
+  assert.ok(sv < iu,
+    "the journal is saved after the in-use check, so the copy being removed still counts as a reason "
+    + "to keep its own bytes");
+  // ⚠️ THE OPEN TARGET IS THE WHOLE TILE AND THE REMOVE SITS ABOVE IT — an invisible full-tile zone over
+  // a real control is the class this app has shipped twice.
+  const sheet = nocomment(sheetOf(page()));
+  const o = /\.cj-keep-o\s*\{[^}]*z-index:\s*(\d+)/.exec(sheet);
+  const x = /\.cj-keep-x\s*\{[^}]*z-index:\s*(\d+)/.exec(sheet);
+  assert.ok(o && x && Number(x[1]) > Number(o[1]),
+    "the remove sits under the open target, so tapping the cross opens the story instead");
+  // It opens in the app's one viewer, from the journal's own snapshots.
+  assert.match(nocomment(fn("wire")), /clubOpenMedia\(keep, Number\(x\.dataset\.ckopen\)/,
+    "a kept copy does not open in the viewer everything else uses");
 });

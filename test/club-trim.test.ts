@@ -27,6 +27,19 @@ import { readFileSync } from "node:fs";
 
 /** ⚠️ THE APP'S OWN FILTER TABLE, read out of the built page rather than retyped — a hand-copied table
  *  is a second source of truth, and this file already records the cost of typing one from memory. */
+/** ⚠️ A CONST ARRAY READ OUT OF THE BUILT PAGE, never retyped — a hand-copied table is a second source
+ *  of truth, and this file already records the cost of a harness supplying its own constants. */
+function arrOf(src: string, name: string): string {
+  const at = src.indexOf("const " + name + " = [");
+  assert.ok(at > 0, name + " could not be found in the built page");
+  let d = 0, i = src.indexOf("[", at);
+  const from = i;
+  for (; i < src.length; i++) {
+    if (src[i] === "[") d++;
+    else if (src[i] === "]") { d--; if (!d) return src.slice(from, i + 1); }
+  }
+  throw new Error(name + " is unbalanced");
+}
 function filtersOf(src: string): Array<{ id: string; label: string; css: string }> {
   const m = /const CLUB_FILTERS = \[([\s\S]*?)\];/.exec(src);
   assert.ok(m, "CLUB_FILTERS could not be found in the built page");
@@ -351,6 +364,16 @@ function openMedia(row: Record<string, unknown>, auto: boolean) {
     nocomment(fn(src, "clubToneQ")) + "\n" +
     nocomment(fn(src, "clubLook")) + "\n" +
     nocomment(fn(src, "clubLookAttrs")) + "\n" +
+    // ⚠️ THE WORD BUILDER IS LIFTED FOR REAL, so this file can see a caption's style, colour, plate and
+    // rotation actually reach the viewer's markup. Its two tables are read OUT OF THE PAGE rather than
+    // typed here — a constant supplied by the harness means the lifted function runs against the TEST's
+    // value, which this project has measured escaping a guard.
+    "const CLUB_TX_STYLES = " + arrOf(src, "CLUB_TX_STYLES") + ";\n" +
+    "const CLUB_TX_ALIGN = " + arrOf(src, "CLUB_TX_ALIGN") + ";\n" +
+    nocomment(fn(src, "clubTxStyle")) + "\n" +
+    nocomment(fn(src, "clubTxInk")) + "\n" +
+    nocomment(fn(src, "clubTxCss")) + "\n" +
+    nocomment(fn(src, "clubTextSpan")) + "\n" +
     "const CLUB_FILTERS = " + JSON.stringify(filtersOf(src)) + ";\n" +
     nocomment(fn(src, "clubOpenMedia")) + "\nreturn clubOpenMedia;",
   )(

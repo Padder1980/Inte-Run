@@ -4656,7 +4656,17 @@ button.cm-tile:active { opacity: .65; }
   width: 100%; height: 100%; object-fit: cover; display: block; }
 .club-vmed { position: absolute; inset: 0; }
 .club-txs { position: absolute; inset: 0; pointer-events: none; }
-.club-tx { position: absolute; transform: translate(-50%, -50%); max-width: 84%; padding: 2px 6px;
+/* ⚠️⚠️ width: max-content IS THE WHOLE FIX FOR "it jumps around". An absolutely positioned box's
+   available width is its containing block MINUS its own left offset — so as the text was dragged right
+   the space left for it shrank and it RE-WRAPPED under the finger. Measured on a two-line caption dragged
+   80px right and 150px down: 215x82 and two lines became 135x160 and FOUR, re-flowing at every
+   pointermove. max-content takes the available width out of the calculation entirely, and max-width (a
+   percentage of the stage, which the left offset does not touch) is what still decides where it wraps.
+   ⚠️ NO DASHED OUTLINE WHEN SELECTED — his "weird dotted lines on the top and bottom". The bin appearing
+   in the rail is what says a word is selected; a dashed box round it as well is the same thing said
+   twice, and on a three-line caption it reads as part of the picture. */
+.club-tx { position: absolute; transform: translate(-50%, -50%); width: max-content; max-width: 84%;
+  padding: 2px 6px;
   font-weight: 800; line-height: 1.15; text-align: center; text-wrap: balance;
   /* ⚠️ NO touch-action OF ITS OWN. touch-action is computed from the element AND its ancestors, and the
      stage this sits inside already takes none — so a second declaration here is a second owner of one
@@ -4666,7 +4676,7 @@ button.cm-tile:active { opacity: .65; }
   /* ⚠️ AN EDGE, NOT A PLATE. The share card's own answer: a keyline plus a soft halo, so a word reads
      on a bright sky and a dark road alike without a grey box behind it. */
   text-shadow: 0 0 1px rgba(2,10,8,.95), 0 1px 2px rgba(2,10,8,.7), 0 0 14px rgba(2,10,8,.45); }
-.club-tx.on { outline: 1.5px dashed rgba(255,255,255,.75); outline-offset: 3px; }
+.club-tx.on { filter: drop-shadow(0 0 10px rgba(255,255,255,.45)); }
 .club-x { position: absolute; top: calc(var(--s3) + env(safe-area-inset-top, 0px)); left: var(--s3);
   z-index: 3; display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 0;
   border-radius: 50%; background: rgba(4,16,13,.55); color: #fff; font-size: var(--t-card); }
@@ -4926,6 +4936,13 @@ button.cm-tile:active { opacity: .65; }
 /* ⚠️ THE HANDLE IS NO LONGER WHITE — it is a transparent grab area sitting OVER the window's own thick
    border, carrying only the grip line. It is offset by its own width because it is positioned against the
    padding box, which the 14px border has already inset. */
+/* ⚠️ ABOVE THE BRACKET AND OUT OF THE WAY OF EVERY GESTURE. It sits over the white ends when the
+   preview reaches them, so it needs the higher z-index; and pointer-events: none or it would eat the
+   drag on whichever handle it happened to be crossing. */
+.club-ph { position: absolute; top: -1px; bottom: -1px; z-index: 2; width: 3px; margin-left: -1.5px;
+  border-radius: 999px; background: #fff; box-shadow: 0 0 6px rgba(4,16,13,.75); opacity: 0;
+  pointer-events: none; }
+.club-ph.on { opacity: 1; }
 .club-h { position: absolute; top: 0; bottom: 0; width: 14px; display: grid; place-items: center; }
 /* ⚠️ THE HANDLE'S RADIUS IS THE WINDOW'S INNER RADIUS, NOT ITS OUTER ONE. The window is a 2px white
    border with radius --r-ctl, so the curve the handle has to continue is --r-ctl minus that border —
@@ -4941,6 +4958,47 @@ button.cm-tile:active { opacity: .65; }
    Outward, each handle keeps its 14 + 30 = 44px and the whole visible interior belongs to the move. */
 .club-h-a::after { content: ""; position: absolute; top: -8px; bottom: -8px; left: -30px; right: 0; }
 .club-h-b::after { content: ""; position: absolute; top: -8px; bottom: -8px; left: 0; right: -30px; }
+/* ── What a runner has kept behind a block. */
+.cj-kept { margin-top: var(--s4); }
+.cj-keptr { display: flex; gap: var(--s2); overflow-x: auto; scrollbar-width: none;
+  margin: 6px calc(-1 * var(--s3)) 0; padding: 0 var(--s3); }
+.cj-keptr::-webkit-scrollbar { display: none; }
+.cj-keep { position: relative; flex: none; overflow: hidden; width: 72px; height: 96px;
+  border-radius: var(--r-ctl); background: var(--surface-2); border: 1px solid var(--line); }
+.cj-keep-m { position: absolute; inset: 0; }
+.cj-keep-m > img, .cj-keep-m > video { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* ⚠️ THE OPEN TARGET IS THE WHOLE TILE AND THE REMOVE SITS ABOVE IT, so a tap opens and only the ✕
+   removes — the looks-live-does-the-wrong-thing trap this app has shipped twice with invisible zones. */
+.cj-keep-o { position: absolute; inset: 0; z-index: 1; padding: 0; border: 0; background: none; }
+.cj-keep-x { position: absolute; top: 2px; right: 2px; z-index: 2; display: grid; place-items: center;
+  width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%;
+  background: rgba(4,16,13,.72); color: #fff; font-size: var(--t-label); }
+/* ── The text editor's tools (his screenshots 2-10). */
+.club-tts { display: flex; align-items: center; justify-content: center; gap: var(--s2);
+  margin-top: var(--s3); }
+.club-tt { display: grid; place-items: center; width: 40px; height: 36px; padding: 0;
+  border: 1px solid rgba(255,255,255,.16); border-radius: var(--r-ctl); background: rgba(255,255,255,.08);
+  color: #fff; font-size: var(--t-body); font-weight: 800; }
+.club-tt.on { border-color: #fff; background: rgba(255,255,255,.22); }
+.club-tt svg { width: 20px; height: 20px; }
+/* ⚠️ THE COLOUR TOOL'S OWN SWATCH IS A CONIC GRADIENT, which is what the reference uses and what says
+   "a colour lives behind this" without picking one of them to stand for the rest. */
+.club-tt-c { display: block; width: 20px; height: 20px; border-radius: 50%;
+  background: conic-gradient(#ff3b6b, #ffd60a, #25c464, #2b8aef, #8b5cf6, #ff3b6b); }
+.club-trail { display: flex; align-items: center; gap: var(--s2); overflow-x: auto;
+  scrollbar-width: none; padding: 0 var(--s3) 2px; }
+.club-trail::-webkit-scrollbar { display: none; }
+.club-tst { flex: none; min-height: var(--tap); padding: 0 var(--s3); border: 1px solid rgba(255,255,255,.2);
+  border-radius: var(--r-pill); background: rgba(255,255,255,.06); color: #fff; font-size: var(--t-body);
+  white-space: nowrap; }
+.club-tst.on { border-color: #fff; background: #fff; color: #0a0a0a; }
+.club-tcols { justify-content: center; }
+.club-tdots { display: flex; justify-content: center; gap: 5px; margin-top: 6px; }
+.club-tdot { width: 6px; height: 6px; padding: 0; border: 0; border-radius: 50%;
+  background: rgba(255,255,255,.34); }
+.club-tdot.on { background: #fff; }
+.club-tnote { margin: var(--s2) var(--s3) 0; font-size: var(--t-label); line-height: 1.4;
+  color: rgba(255,255,255,.68); text-align: center; }
 /* ── The carousel in the editor: dots above the strip, the strip below. */
 .club-dots { display: flex; justify-content: center; gap: 5px; margin-bottom: var(--s2); }
 .club-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.38); }
@@ -5364,6 +5422,7 @@ const ICON = {
   cFilter: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="9" r="5"/><circle cx="15" cy="15" r="5"/></svg>',
   cEdit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h5m4 0h7M4 16h11m4 0h1"/><circle cx="11" cy="8" r="2"/><circle cx="17" cy="16" r="2"/></svg>',
   cRatio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V6a2 2 0 0 1 2-2h3M20 9V6a2 2 0 0 0-2-2h-3M4 15v3a2 2 0 0 0 2 2h3M20 15v3a2 2 0 0 1-2 2h-3"/></svg>',
+  cAlign: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M6 12h12M8 18h8"/></svg>',
   // ⚠️ ADDED FOR THE LOGBOOK'S PRIVACY LINE. That sentence is the one thing on the card a runner might
   // genuinely need to know, and it was the smallest thing on it — a glyph is what makes it read as a
   // stated fact rather than a footnote. Same 24-unit grid and currentColor as every other mark here, so
@@ -11589,10 +11648,15 @@ function clubStories() {
   const live = rows.filter((p) => p && p.kind === "story" && (now - (p.at || 0)) < CLUB_STORY_MS);
   const dead = rows.filter((p) => p && p.kind === "story" && (now - (p.at || 0)) >= CLUB_STORY_MS);
   if (dead.length) {
+    // ⚠️ THE ROWS GO FIRST, so the in-use check below cannot see a story that is on its way out and
+    // conclude its own bytes are still wanted.
+    clubSave(rows.filter((p) => dead.indexOf(p) < 0));
     // ⚠️ EVERY KEY, not p.media — a carousel holds several and orphaning the rest leaves tens of
     // megabytes in IndexedDB that nothing references and nothing can reach.
-    dead.forEach((p) => clubKeys(p).forEach((k) => clubMediaDel(k)));
-    clubSave(rows.filter((p) => dead.indexOf(p) < 0));
+    // ⚠️⚠️ BUT NOT A KEY A PLAN JOURNAL STILL POINTS AT. A kept copy shares the story's media, so
+    // sweeping it here would delete the video out from under the journal and leave a hatched cell that
+    // only shows up weeks later. clubMediaInUse is the one question both deleters ask.
+    dead.forEach((p) => clubKeys(p).forEach((k) => { if (!clubMediaInUse(k)) clubMediaDel(k); }));
   }
   return live;
 }
@@ -11600,8 +11664,10 @@ function clubStories() {
 function clubDelete(id) {
   const rows = clubLoad();
   const p = rows.filter((x) => x && x.id === id)[0];
-  if (p) clubKeys(p).forEach((k) => clubMediaDel(k));
   clubSave(rows.filter((x) => x && x.id !== id));
+  // ⚠️ NOT A KEY A PLAN JOURNAL STILL POINTS AT — the same rule the story sweep follows, and the reason
+  // a kept copy can share the original's bytes rather than duplicating a video.
+  if (p) clubKeys(p).forEach((k) => { if (!clubMediaInUse(k, id)) clubMediaDel(k); });
 }
 
 
@@ -11950,10 +12016,7 @@ function clubEdDraw() {
   const media = sl.isVid
     ? '<video class="club-med' + fit + '" id="clubMed" src="' + sl.url + '" playsinline muted loop autoplay></video>'
     : '<img class="club-med' + fit + '" id="clubMed" src="' + sl.url + '" alt="">';
-  const texts = sl.texts.map((t, i) =>
-    '<span class="club-tx' + (i === S.sel ? " on" : "") + '" data-ctx="' + i + '" style="left:' +
-    (t.x * 100) + '%; top:' + (t.y * 100) + '%; color:' + t.colour + '; font-family:' + t.font +
-    '; font-size:' + t.size + 'px">' + esc(t.text) + '</span>').join("");
+  const texts = sl.texts.map((t, i) => clubTextSpan(t, i, i === S.sel)).join("");
   // ⚠️ THE DOTS AND THE STRIP ARE TWO DIFFERENT ANSWERS TO ONE QUESTION AND BOTH ARE IN THE REFERENCE:
   // the dots say where you are in the carousel, the strip lets you jump and lets you remove one.
   const dots = S.slides.length > 1
@@ -12345,6 +12408,84 @@ function clubClock(s) {
   s = Math.max(0, Math.round(Number(s) || 0));
   return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
 }
+/**
+ * HOW A WORD ON A PICTURE LOOKS — the style, the colour, the highlight plate, the alignment and the glow.
+ *
+ * ⚠️⚠️ ONE FUNCTION BUILDS THE LOOK AND BOTH THE PREVIEW AND THE RESULT ASK IT. The editor's box and the
+ * word on the picture are two different elements, so two copies of this would let the runner style one
+ * thing and post another — which is the composer-and-grid disagreement this file records for the debrief
+ * hero and the share card.
+ * ⚠️ SYSTEM STACKS, NOT WEBFONTS. This app ships with no external network assets at all, so a named style
+ * is a family stack plus a weight, a case and a tracking — real, distinct looks made from what the phone
+ * already has. The reference's own display faces cannot be reproduced and are not pretended at.
+ */
+const CLUB_TX_STYLES = [
+  { id: "clean", label: "Clean",
+    css: "font-family: var(--sans-stack); font-weight: 800; letter-spacing: -.015em" },
+  { id: "poster", label: "Poster",
+    css: "font-family: var(--sans-stack); font-weight: 900; letter-spacing: .16em; text-transform: uppercase" },
+  { id: "elegant", label: "Elegant",
+    css: "font-family: Georgia, \'Times New Roman\', serif; font-weight: 700; font-style: italic; letter-spacing: 0" },
+  { id: "type", label: "Typewriter",
+    css: "font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; letter-spacing: -.02em" },
+  { id: "meme", label: "Meme",
+    css: "font-family: var(--sans-stack); font-weight: 900; text-transform: uppercase; letter-spacing: .01em" },
+  { id: "light", label: "Light",
+    css: "font-family: var(--sans-stack); font-weight: 300; letter-spacing: .08em" }
+];
+/** ⚠️ THREE PAGES, LIKE THE REFERENCE'S — brights, warms and a greyscale ramp. Hex only, never a token:
+ *  the highlight plate has to compute a readable ink from the colour, and it cannot do that from a
+ *  var() it is unable to resolve. */
+const CLUB_TX_PAGES = [
+  ["#ffffff", "#0a0a0a", "#2b8aef", "#25c464", "#ffd60a", "#ff8c1a", "#ff3b6b", "#e5197f", "#8b5cf6", "#0c7b70"],
+  ["#ff2d2d", "#f78da7", "#fbd0d9", "#fbe3c2", "#f4b860", "#e08b1f", "#a9682c", "#5c2a2a", "#0e5c3a", "#0a3d62"],
+  ["#0a0a0a", "#232323", "#3d3d3d", "#5a5a5a", "#787878", "#979797", "#b5b5b5", "#d2d2d2", "#ececec", "#ffffff"]
+];
+const CLUB_TX_ALIGN = ["center", "left", "right"];
+function clubTxStyle(id) {
+  const st = CLUB_TX_STYLES.filter((x) => x.id === id)[0];
+  return st || CLUB_TX_STYLES[0];
+}
+/**
+ * ⚠️ THE PLATE COMPUTES ITS OWN INK, so a white plate gets black words and a black plate white ones —
+ * which is his screenshots 3 and 4, and both fall out of ONE state rather than needing two. Relative
+ * luminance, the same arithmetic the contrast guards use, not a guess at which colours are "light".
+ */
+function clubTxInk(hex) {
+  const m = /^#([0-9a-f]{6})$/i.exec(String(hex || ""));
+  if (!m) return "#ffffff";
+  const n = parseInt(m[1], 16);
+  const f = (v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  const L = 0.2126 * f((n >> 16) & 255) + 0.7152 * f((n >> 8) & 255) + 0.0722 * f(n & 255);
+  return L > 0.42 ? "#0a0a0a" : "#ffffff";
+}
+/**
+ * The inline style for one word. ⚠️ IT RETURNS THE WHOLE DECLARATION LIST including the text-shadow,
+ * because a glow and the default keyline are the same property — an effect that only ADDED a shadow
+ * would be fighting the keyline rather than replacing it.
+ */
+function clubTxCss(t, px) {
+  const st = clubTxStyle(t.style);
+  const col = t.colour || "#ffffff";
+  const plate = Number(t.bg) === 1;
+  const ink = plate ? clubTxInk(col) : col;
+  const out = [st.css, "font-size: " + px + "px", "color: " + ink,
+    "text-align: " + (CLUB_TX_ALIGN.indexOf(t.align) > 0 ? t.align : "center")];
+  if (plate) {
+    out.push("background: " + col);
+    out.push("padding: 4px 12px");
+    out.push("border-radius: " + Math.max(6, Math.round(px * 0.22)) + "px");
+    // ⚠️ NO KEYLINE ON A PLATE. The ink is already chosen to read against it, and a dark halo round black
+    // words on a white plate is dirt round the letters.
+    out.push("text-shadow: none");
+  } else if (t.fx === "neon") {
+    // ⚠️ THE GLOW REPLACES THE KEYLINE. A deep outline under a glow is a dark line inside a halo, which
+    // is what a neon sign is not.
+    out.push("text-shadow: 0 0 " + Math.round(px * 0.18) + "px " + col + ", 0 0 " +
+      Math.round(px * 0.45) + "px " + col + ", 0 0 " + Math.round(px * 0.9) + "px " + col);
+  }
+  return out.join("; ");
+}
 const CLUB_FONTS = ["var(--sans-stack)", "Georgia, serif", "ui-monospace, monospace"];
 // ⚠️ THE LABEL NAMES THE LOOK, NOT THE FAMILY. "Georgia" tells a runner nothing; "Serif" tells them what
 // they are about to get. The reference's own pills read Typewriter / Pop / Jump for the same reason.
@@ -12574,6 +12715,33 @@ function clubVidLoop() {
     if (sl.outS > sl.inS && med.currentTime >= sl.outS - 0.05) clubVidSeek();
   };
   clubVidSeek();
+  clubPlayhead(sl);
+}
+/**
+ * THE PLAYHEAD, ON A FRAME LOOP AND SELF-CANCELLING.
+ *
+ * ⚠️ NOT timeupdate, WHICH FIRES ABOUT FOUR TIMES A SECOND — a marker moving in four visible steps a
+ * second reads as broken rather than as a playhead. A frame loop is what makes it glide.
+ * ⚠️ AND IT STOPS ITSELF rather than being cleared from somewhere else: every frame it checks that the
+ * editor is still open, on this slide, with this element. A loop that has to be cancelled by its caller
+ * is a loop that keeps running behind a closed sheet — which this app has paid for twice (the stretch
+ * player's interval, and the story timer).
+ */
+function clubPlayhead(sl) {
+  const ph = $("clubPh"); if (!ph) return;
+  const med = $("clubMed");
+  const step = () => {
+    const now = $("clubPh"), m = $("clubMed");
+    if (!CLUBED || now !== ph || m !== med || clubSlide() !== sl || !sl.dur) return;
+    const t = Number(m.currentTime) || 0;
+    ph.style.left = ((t / sl.dur) * 100).toFixed(3) + "%";
+    // ⚠️ HIDDEN WHILE PAUSED OR OUTSIDE THE CHOSEN WINDOW. A line parked at the far end of the strip while
+    // nothing is playing is a marker pointing at nothing, and while a handle is being dragged the
+    // preview is deliberately held at one frame — that is the drag's own feedback, not playback.
+    ph.classList.toggle("on", !m.paused && t >= sl.inS - 0.2 && t <= sl.outS + 0.2);
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 /**
  * PAN AND ZOOM.
@@ -12631,29 +12799,93 @@ function clubEdFit() {
   const vig = $("clubVig");
   if (vig) vig.style.opacity = String(look.vig || 0);
 }
+/**
+ * ONE BUILDER FOR A WORD ON THE PICTURE, used by the composer, the story viewer and the post feed.
+ * ⚠️ THREE SURFACES USED TO WRITE THIS MARKUP THEMSELVES, so a new field (the rotation) had to be added
+ * to three places or the same text would sit differently depending on where it was being looked at —
+ * which is the two-framings fault this file records for the debrief hero.
+ */
+function clubTextSpan(t, i, sel, scale) {
+  const rot = Number(t.rot) || 0;
+  // ⚠️ THE FEED SHOWS A POST SMALLER, so it asks for a scaled size rather than writing its own markup —
+  // the size is the only thing that differs between the surfaces, and it is an argument now.
+  const px = Math.round(t.size * (scale || 1));
+  // ⚠️ A WORD STORED BEFORE THE STYLES EXISTED CARRIES A font AND NO style, and it must still look like
+  // itself — so the old family is honoured when there is no named style to resolve.
+  const legacy = !t.style && t.font ? "; font-family: " + t.font : "";
+  return '<span class="club-tx' + (sel ? " on" : "") + '"' +
+    (i == null ? "" : ' data-ctx="' + i + '"') +
+    ' style="left:' + (t.x * 100) + '%; top:' + (t.y * 100) + '%; ' + clubTxCss(t, px) + legacy +
+    (rot ? '; transform: translate(-50%, -50%) rotate(' + rot + 'deg)' : "") + '">' +
+    esc(t.text) + '</span>';
+}
+const CLUB_TX_MIN = 12, CLUB_TX_MAX = 96;
+/**
+ * MOVING, SCALING AND TURNING A WORD ON THE PICTURE.
+ *
+ * ⚠️ A TAP EDITS; A DRAG MOVES; TWO FINGERS SCALE AND TURN. His report was that it "jumps around and wont
+ * scale up or down" — the jumping was the box re-wrapping (see .club-tx's own note) and the scaling
+ * simply did not exist: the stage's own pinch bails out on a touch that starts on a word, so nothing
+ * handled it. Two fingers on the word now do what two fingers on a photograph do everywhere else.
+ * ⚠️ THE POINTERS ARE TRACKED ON THE WORD, not on the stage, so a pinch that starts on a word cannot also
+ * zoom the picture underneath — one gesture, one owner.
+ */
 function clubTextDrag(ev, i) {
   const S = CLUBED, sl = clubSlide(); if (!S || !sl) return;
   const t = sl.texts[i]; if (!t) return;
   S.sel = i;
   const stage = $("clubStage"); if (!stage) return;
   const box = stage.getBoundingClientRect();
-  const start = { x: ev.clientX, y: ev.clientY, tx: t.x, ty: t.y };
   const node = ev.currentTarget;
+  const pts = new Map();
+  let moved = false, pinch = null;
+  const base = { x: t.x, y: t.y, size: t.size, rot: Number(t.rot) || 0 };
   ev.preventDefault();
-  try { node.setPointerCapture(ev.pointerId); } catch (e) {}
-  node.onpointermove = (m) => {
-    t.x = Math.max(0.06, Math.min(0.94, start.tx + (m.clientX - start.x) / Math.max(1, box.width)));
-    t.y = Math.max(0.08, Math.min(0.9, start.ty + (m.clientY - start.y) / Math.max(1, box.height)));
-    node.style.left = (t.x * 100) + "%"; node.style.top = (t.y * 100) + "%";
+  const paint = () => {
+    node.style.left = (t.x * 100) + "%";
+    node.style.top = (t.y * 100) + "%";
+    node.style.fontSize = t.size + "px";
+    node.style.transform = "translate(-50%, -50%) rotate(" + (Number(t.rot) || 0) + "deg)";
   };
-  let moved = false;
-  const wrapped = node.onpointermove;
-  node.onpointermove = (m) => {
-    if (Math.abs(m.clientX - start.x) > 4 || Math.abs(m.clientY - start.y) > 4) moved = true;
-    wrapped(m);
+  const add = (e) => {
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    try { node.setPointerCapture(e.pointerId); } catch (err) {}
+    // ⚠️ THE BASELINE IS RE-TAKEN WHEN THE SECOND FINGER LANDS, or the pinch jumps by however far the
+    // first finger had already dragged — the same re-anchoring the stage's own pinch needs.
+    if (pts.size === 2) {
+      const p = [...pts.values()];
+      pinch = { d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y),
+        a: Math.atan2(p[1].y - p[0].y, p[1].x - p[0].x),
+        size: t.size, rot: Number(t.rot) || 0 };
+    }
   };
-  const end = () => {
-    node.onpointermove = null;
+  add(ev);
+  node.onpointerdown = add;
+  node.onpointermove = (m) => {
+    if (!pts.has(m.pointerId)) return;
+    const was = pts.get(m.pointerId);
+    if (Math.abs(m.clientX - was.x) > 4 || Math.abs(m.clientY - was.y) > 4) moved = true;
+    pts.set(m.pointerId, { x: m.clientX, y: m.clientY });
+    if (pts.size >= 2 && pinch) {
+      const p = [...pts.values()];
+      const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+      if (pinch.d > 8) {
+        t.size = Math.max(CLUB_TX_MIN, Math.min(CLUB_TX_MAX, Math.round(pinch.size * d / pinch.d)));
+      }
+      const a = Math.atan2(p[1].y - p[0].y, p[1].x - p[0].x);
+      t.rot = Math.round((pinch.rot + (a - pinch.a) * 180 / Math.PI) * 10) / 10;
+      moved = true;
+      paint();
+      return;
+    }
+    t.x = Math.max(0.06, Math.min(0.94, base.x + (m.clientX - (pts.size === 1 ? ev.clientX : ev.clientX)) / Math.max(1, box.width)));
+    t.y = Math.max(0.08, Math.min(0.9, base.y + (m.clientY - ev.clientY) / Math.max(1, box.height)));
+    paint();
+  };
+  const end = (e) => {
+    pts.delete(e ? e.pointerId : 0);
+    if (pts.size >= 1) { pinch = null; return; }
+    node.onpointermove = null; node.onpointerdown = null;
     if (!moved) { clubTextOpen(i); return; }
     clubEdDraw();
   };
@@ -12673,33 +12905,82 @@ function clubTextOpen(i) {
   const S = CLUBED, sl = clubSlide(); if (!S || !sl) return;
   const fresh = i < 0;
   S.draft = fresh
-    ? { text: "", x: 0.5, y: 0.42, colour: CLUB_COLOURS[0], font: CLUB_FONTS[0], size: 34 }
+    ? { text: "", x: 0.5, y: 0.42, colour: "#ffffff", style: "clean", size: 34,
+        bg: 0, align: "center", fx: "", rot: 0 }
     : Object.assign({}, sl.texts[i]);
+  // ⚠️ THE RAIL THAT WAS OPEN LAST IS REMEMBERED FOR THE SESSION. Reopening on the style rail every time
+  // means somebody working through a palette has to reach for it again after every word.
+  S.txTool = S.txTool || "style";
+  S.txPage = S.txPage || 0;
   S.draftAt = fresh ? -1 : i;
   clubTextDraw();
 }
+/**
+ * THE TEXT EDITOR, BUILT TO HIS SCREENSHOTS 2-10: the words on a live preview, a row of tools, and the
+ * chosen tool's own rail underneath.
+ *
+ * ⚠️ THE PREVIEW IS STYLED BY THE SAME FUNCTION THAT STYLES THE RESULT (clubTxCss), so what is being
+ * typed is what gets posted. Two style paths would let the runner choose one look and publish another.
+ * ⚠️ ONE RAIL AT A TIME, WHICH IS WHAT THE REFERENCE DOES. Six rails stacked is a settings page, and it
+ * would leave no room for the words themselves above the keyboard.
+ * ⚠️ WHAT IS DELIBERATELY NOT HERE, AND WHY: the reference's ANIMATIONS (Typewriter, Pop, Jump) play on
+ * the finished story rather than in the editor, so they are their own piece of work; Sparkle, Shimmer and
+ * Pixel need either an animation or a display face this app cannot fetch; Mention needs accounts and a
+ * server, which the club does not have. Naming them beats a control that does nothing.
+ */
 function clubTextDraw() {
   const S = CLUBED; if (!S || !S.draft) return;
   const d = S.draft;
   let ov = $("clubTxEd");
   if (!ov) { ov = el('<div class="club-txed" id="clubTxEd"></div>'); document.body.appendChild(ov); }
-  const pill = (f, lab) => '<button class="club-fp' + (d.font === f ? " on" : "") +
-    '" data-cfont="' + f + '" style="font-family:' + f + '">' + lab + '</button>';
-  const dot = (c) => '<button class="club-cd' + (d.colour === c ? " on" : "") + '" data-ccol="' + c +
-    '" style="background:' + c + '" aria-label="Colour"></button>';
+  const tool = (id, ic, lab) => '<button class="club-tt' + (S.txTool === id ? " on" : "") +
+    '" data-ctt="' + id + '" aria-pressed="' + (S.txTool === id) + '" aria-label="' + lab + '">' +
+    ic + '</button>';
+  const rail =
+    S.txTool === "style"
+      ? '<div class="club-trail">' + CLUB_TX_STYLES.map((st) =>
+          '<button class="club-tst' + (d.style === st.id ? " on" : "") + '" data-ctst="' + st.id +
+          '" style="' + st.css + '">' + st.label + '</button>').join("") + '</div>'
+    : S.txTool === "colour"
+      ? '<div class="club-trail club-tcols">' + CLUB_TX_PAGES[S.txPage].map((c) =>
+          '<button class="club-cd' + (d.colour === c ? " on" : "") + '" data-ccol="' + c +
+          '" style="background:' + c + '" aria-label="Colour ' + c + '"></button>').join("") +
+        '</div><div class="club-tdots">' + CLUB_TX_PAGES.map((_, n) =>
+          '<button class="club-tdot' + (n === S.txPage ? " on" : "") + '" data-ctpage="' + n +
+          '" aria-label="Colour page ' + (n + 1) + '"></button>').join("") + '</div>'
+    : S.txTool === "align"
+      ? '<div class="club-trail">' + CLUB_TX_ALIGN.map((a) =>
+          '<button class="club-tst' + ((d.align || "center") === a ? " on" : "") + '" data-ctal="' + a +
+          '">' + (a === "center" ? "Centre" : a === "left" ? "Left" : "Right") + '</button>').join("") +
+        '</div>'
+    : S.txTool === "fx"
+      ? '<div class="club-trail">' +
+          '<button class="club-tst' + (!d.fx ? " on" : "") + '" data-ctfx="">Plain</button>' +
+          '<button class="club-tst' + (d.fx === "neon" ? " on" : "") + '" data-ctfx="neon">Neon</button>' +
+        '</div><p class="club-tnote">Moving effects and mentions need a server the club does not have ' +
+        'yet, so they are not here rather than being here and doing nothing.</p>'
+      : "";
+  const px = d.size;
   ov.innerHTML =
     '<div class="club-txed-top">' +
       '<button class="club-txed-done" id="clubTxDone">Done</button>' +
     '</div>' +
     '<div class="club-txed-mid">' +
       '<textarea class="club-txed-in" id="clubTxIn" rows="2" placeholder="Type something" ' +
-        'style="color:' + d.colour + '; font-family:' + d.font + '">' + esc(d.text) + '</textarea>' +
+        'style="' + clubTxCss(d, px) + '">' + esc(d.text) + '</textarea>' +
     '</div>' +
     '<div class="club-txed-tools">' +
-      '<div class="club-fps">' + CLUB_FONT_LABELS.map((l, n) => pill(CLUB_FONTS[n], l)).join("") + '</div>' +
-      '<div class="club-cds">' + CLUB_COLOURS.map(dot).join("") + '</div>' +
+      rail +
+      '<div class="club-tts">' +
+        tool("style", "Aa", "Typeface") +
+        tool("colour", '<span class="club-tt-c"></span>', "Colour") +
+        tool("plate", (Number(d.bg) === 1 ? "&#9632;" : "&#9633;") + "A", "Highlight") +
+        tool("align", ICON.cAlign, "Alignment") +
+        tool("fx", "A&#10022;", "Effect") +
+      '</div>' +
       '<label class="club-sz"><span>Size</span>' +
-        '<input type="range" id="clubTxSz" min="18" max="64" step="1" value="' + d.size + '"></label>' +
+        '<input type="range" id="clubTxSz" min="' + CLUB_TX_MIN + '" max="' + CLUB_TX_MAX +
+        '" step="1" value="' + d.size + '"></label>' +
     '</div>';
   const ta = $("clubTxIn");
   if (ta) {
@@ -12709,15 +12990,25 @@ function clubTextDraw() {
     // measuring a sheet before it is shown reading zero for the same reason.
     setTimeout(() => { try { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } catch (e) {} }, 30);
   }
-  ov.querySelectorAll("[data-cfont]").forEach((b) => b.onclick = () => {
-    d.font = b.dataset.cfont; clubTextDraw();
+  // ⚠️ THE HIGHLIGHT IS THE ONLY TOOL THAT ACTS RATHER THAN OPENING A RAIL — it has two states, so a rail
+  // holding two buttons would be a rail to say what one tap says.
+  ov.querySelectorAll("[data-ctt]").forEach((b) => b.onclick = () => {
+    if (b.dataset.ctt === "plate") { d.bg = Number(d.bg) === 1 ? 0 : 1; }
+    else { S.txTool = b.dataset.ctt; }
+    clubTextDraw();
   });
-  ov.querySelectorAll("[data-ccol]").forEach((b) => b.onclick = () => {
-    d.colour = b.dataset.ccol; clubTextDraw();
-  });
+  ov.querySelectorAll("[data-ctst]").forEach((b) => b.onclick = () => { d.style = b.dataset.ctst; clubTextDraw(); });
+  ov.querySelectorAll("[data-ccol]").forEach((b) => b.onclick = () => { d.colour = b.dataset.ccol; clubTextDraw(); });
+  ov.querySelectorAll("[data-ctpage]").forEach((b) => b.onclick = () => { S.txPage = Number(b.dataset.ctpage) || 0; clubTextDraw(); });
+  ov.querySelectorAll("[data-ctal]").forEach((b) => b.onclick = () => { d.align = b.dataset.ctal; clubTextDraw(); });
+  ov.querySelectorAll("[data-ctfx]").forEach((b) => b.onclick = () => { d.fx = b.dataset.ctfx; clubTextDraw(); });
   const sz = $("clubTxSz");
-  if (sz) sz.oninput = () => { d.size = Number(sz.value) || 34; const t = $("clubTxIn"); if (t) t.style.fontSize = d.size + "px"; };
-  if (ta) ta.style.fontSize = d.size + "px";
+  // ⚠️ THE SLIDER DOES NOT REDRAW, for the same reason the composer's dials do not: a rebuild destroys the
+  // input the finger is holding. It restyles the preview in place.
+  if (sz) sz.oninput = () => {
+    d.size = Number(sz.value) || 34;
+    const t = $("clubTxIn"); if (t) t.setAttribute("style", clubTxCss(d, d.size));
+  };
   const done = $("clubTxDone");
   if (done) done.onclick = () => clubTextCommit();
 }
@@ -13046,10 +13337,7 @@ function clubPostViewHtml() {
           '<span class="cp-med' + (x.card ? " cp-med-fit" : "") + '" data-cmed="' + esc(x.media) +
             '" data-cvid="' + (post.video ? "1" : "") + '"' + clubLookAttrs(x) + '></span>' +
         '</div>' +
-        (x.texts || []).map((t) =>
-          '<span class="club-tx" style="left:' + (t.x * 100) + '%; top:' + (t.y * 100) +
-          '%; color:' + t.colour + '; font-family:' + t.font + '; font-size:' +
-          Math.round(t.size * 0.62) + 'px">' + esc(t.text) + '</span>').join("") +
+        (x.texts || []).map((t) => clubTextSpan(t, null, false, 0.62)).join("") +
       '</div>').join("");
     return '<article class="cp-post">' +
       '<div class="cp-head">' +
@@ -13223,10 +13511,13 @@ function openClubStories() { clubOpenMedia(clubStories(), 0, true); }
  */
 function clubPostMenuHtml(p) {
   const word = p.kind === "story" ? "story" : "post";
-  return '<button class="club-mi club-mi-bad" data-cact="delete" role="menuitem">Delete ' + word +
-      '</button>' +
-    '<p class="club-mi-note">Commenting, likes and who can see this arrive with the club\u2019s shared ' +
-      'feed \u2014 there is nobody else on it yet, so there is nothing yet to switch off.</p>';
+  // ⚠️ THE EXPLANATION IS GONE — his instruction, 2026-08-24: "This needs to be a more obvious delete
+  // button and there's no need for the explanation underneath." A paragraph about features that do not
+  // exist yet, in a menu whose whole job is one destructive action, buried the action itself.
+  return '<button class="club-mi" data-cact="keep" role="menuitem">' + ICON.journal +
+      '<span>Add to plan journal</span></button>' +
+    '<button class="club-mi club-mi-bad" data-cact="delete" role="menuitem">' + ICON.trash +
+      '<span>Delete ' + word + '</span></button>';
 }
 let CLUB_MENU_ON = false;
 function clubMenu(on) {
@@ -13284,6 +13575,7 @@ function clubConfirmDelete(p, onYes) {
 }
 /** ⚠️ ONE PLACE DOES THE WORK, so the story viewer and any later post menu cannot diverge. */
 function clubPostAction(act, p) {
+  if (act === "keep") { clubMenu(false); clubKeepAsk(p); return; }
   if (act !== "delete") return;
   clubMenu(false);
   clubConfirmDelete(p, () => {
@@ -13292,6 +13584,81 @@ function clubPostAction(act, p) {
     render();
     toast(p.kind === "story" ? "Story removed." : "Post removed.");
   });
+}
+/**
+ * KEEPING A STORY BEHIND A PLAN JOURNAL — his instruction, 2026-08-24: "the individual story theyre on
+ * can be added to the plan journal ... this means that the user can keep a copy of this particular story
+ * behind that journal ... if the user has more than one journal on their profile, they're given the
+ * option to choose which one to add it to".
+ *
+ * ⚠️⚠️ THE JOURNAL KEEPS A SNAPSHOT OF THE ROW, NOT A REFERENCE TO IT, AND THAT IS THE WHOLE POINT. A
+ * story is swept 24 hours after it was posted and its blobs go with it — so a journal holding only the
+ * post's id would show a hatched cell the next morning, which is worse than not offering this at all.
+ * The snapshot carries the media keys, the crop, the trim, the words and the look, so the copy renders
+ * exactly as the story did.
+ * ⚠️ AND THE BYTES ARE SHARED, NOT DUPLICATED. Copying a fifteen-second video into a second IndexedDB
+ * entry doubles it for nothing; what makes that safe is that nothing deletes a blob a journal still
+ * points at — see clubMediaInUse, which both deleters ask before removing anything.
+ */
+function clubKeepAsk(p) {
+  const js = commJournals();
+  if (!js.length) {
+    // ⚠️ IT SAYS WHY RATHER THAN FAILING SILENTLY. A journal exists once a plan does, so somebody with no
+    // plan has nowhere to put this and deserves to be told that rather than watching nothing happen.
+    toast("A plan journal appears once you have a training block.");
+    return;
+  }
+  if (js.length === 1) { clubKeepIn(js[0].id, p); return; }
+  // ⚠️ ITS OWN OVERLAY AT THE SAME LEVEL AS THE DELETE DIALOG. The viewer is z-index 96 and the app's
+  // bottom sheet is 70, so a chooser drawn there would open BEHIND the story it is asking about — the
+  // z-order fault this file records shipping twice.
+  const ov = el('<div class="club-ask" id="clubKeepAsk" role="dialog" aria-modal="true" ' +
+    'aria-labelledby="clubKeepT"></div>');
+  ov.innerHTML = '<div class="club-askin">' +
+    '<h3 class="club-askt" id="clubKeepT">Which journal?</h3>' +
+    '<p class="club-askb">A copy is kept behind the block you choose, and stays there after the ' +
+      (p.kind === "story" ? "story expires" : "post is removed") + '.</p>' +
+    js.map((j) => '<button class="club-askbtn" data-ckeep="' + esc(j.id) + '">' +
+      esc(commJournalName(j)) + '</button>').join("") +
+    '<button class="club-askbtn" data-ckeep="">Cancel</button>' +
+  '</div>';
+  document.body.appendChild(ov);
+  const close = () => { overlayModal(ov, false); try { ov.remove(); } catch (e) {} };
+  overlayModal(ov, true, "[data-ckeep='']");
+  ov.onclick = (e) => { if (e.target === ov) close(); };
+  ov.querySelectorAll("[data-ckeep]").forEach((b) => b.onclick = () => {
+    const id = b.dataset.ckeep;
+    close();
+    if (id) clubKeepIn(id, p);
+  });
+}
+function clubKeepIn(sig, p) {
+  const rows = loadJournals();
+  const j = rows.filter((x) => x && x.sig === sig)[0];
+  if (!j) { toast("That block is no longer stored."); return; }
+  j.keep = Array.isArray(j.keep) ? j.keep : [];
+  if (j.keep.some((k) => k && k.id === p.id)) { toast("Already in that journal."); return; }
+  // ⚠️ A SNAPSHOT, AND CAPPED. A journal is a record rather than an album, and an uncapped list of
+  // fifteen-second videos is the localStorage quota this app keeps its whole training history in.
+  j.keep.unshift(JSON.parse(JSON.stringify(p)));
+  j.keep = j.keep.slice(0, CLUB_KEEP_MAX);
+  saveJournals(rows);
+  haptic("success");
+  toast("Kept in " + commJournalName(commJournals().filter((x) => x.id === sig)[0] || { goal: "", startIso: "" }) + ".");
+}
+const CLUB_KEEP_MAX = 24;
+/**
+ * ⚠️⚠️ IS ANYTHING STILL POINTING AT THESE BYTES? Both deleters ask before removing a blob, because a
+ * journal's kept copy shares the media with the story it was taken from. Without this, the story's own
+ * 24-hour sweep would delete the video out from under the journal and the kept copy would render as a
+ * hatched cell — the leak in reverse, and invisible until weeks later.
+ */
+function clubMediaInUse(key, exceptId) {
+  if (!key) return false;
+  const live = clubLoad().some((p) => p && p.id !== exceptId && clubKeys(p).indexOf(key) >= 0);
+  if (live) return true;
+  return loadJournals().some((j) => (j && Array.isArray(j.keep) ? j.keep : [])
+    .some((k) => k && clubKeys(k).indexOf(key) >= 0));
 }
 function clubOpenMedia(rows, i, auto) {
   if (!rows || !rows.length) return;
@@ -13321,10 +13688,7 @@ function clubOpenMedia(rows, i, auto) {
     // that already used it.
     const first = clubSlides(p)[0] || {};
     const c = first.crop || { ox: 0.5, oy: 0.5, k: 1 };
-    const texts = (first.texts || []).map((t) =>
-      '<span class="club-tx" style="left:' + (t.x * 100) + '%; top:' + (t.y * 100) + '%; color:' +
-      t.colour + '; font-family:' + t.font + '; font-size:' + t.size + 'px">' + esc(t.text) +
-      '</span>').join("");
+    const texts = (first.texts || []).map((t) => clubTextSpan(t, null, false, 1)).join("");
     ov.innerHTML = bars +
       '<div class="club-stage club-stage-v">' +
         '<div class="club-fit" style="transform:scale(' + (c.k || 1) + ');transform-origin:' +
@@ -13505,6 +13869,10 @@ function clubStripHtml(sl, cap, maxIn) {
     : Array.from({ length: CLUB_STRIP_N }, () => '<span class="club-fr"></span>').join("");
   return '<div class="club-film" id="clubFilm">' +
       '<div class="club-frs">' + cells + '</div>' +
+      // ⚠️ HIS OWN DIAGRAM: a line showing where in the clip the preview has reached. It is the one thing
+      // the strip could not tell you — you could see WHICH fifteen seconds you had chosen and not where
+      // inside them the picture above you had got to.
+      '<span class="club-ph" id="clubPh" aria-hidden="true"></span>' +
       '<span class="club-win" data-ctrim="w" role="slider" aria-label="Move the selection" ' +
         'aria-valuetext="' + clubClock(sl.inS) + " to " + clubClock(sl.outS) + '" ' +
         'style="left:' + a.toFixed(2) + '%; width:' + (b - a).toFixed(2) + '%">' +
@@ -14646,7 +15014,47 @@ function commJournalSheetHtml(id) {
     grid +
     commJournalNote(j) +
     '<div class="cm-pbs">' + commJournalChips(j) + '</div>' +
+    commJournalKeptHtml(j.id) +
     '<button class="ui-btn" data-cjplan="1">Open the full journal</button>';
+}
+/**
+ * WHAT THE RUNNER HAS KEPT BEHIND THIS BLOCK.
+ *
+ * ⚠️ THE SECTION IS ABSENT UNTIL THERE IS SOMETHING IN IT, not shown empty. A heading with nothing under
+ * it in a sheet about a finished block reads as a feature that failed rather than one not used.
+ * ⚠️ AND EACH ONE CARRIES A REMOVE. Without it a kept video is in IndexedDB for ever with no way for the
+ * runner to clear it — the sweep cannot touch it (that is the whole point) and nothing else would.
+ */
+function commJournalKeptHtml(sig) {
+  const j = loadJournals().filter((x) => x && x.sig === sig)[0];
+  const keep = (j && Array.isArray(j.keep) ? j.keep : []).filter(Boolean);
+  if (!keep.length) return "";
+  return '<div class="cj-kept">' +
+    '<span class="cm-eyebrow">Kept here</span>' +
+    '<div class="cj-keptr">' + keep.map((k, n) =>
+      '<span class="cj-keep">' +
+        '<span class="cj-keep-m" data-cmed="' + esc((clubSlides(k)[0] || {}).media || "") + '" ' +
+          'data-cvid="' + (k.video ? "1" : "") + '"' + clubLookAttrs(clubSlides(k)[0]) + '></span>' +
+        '<button class="cj-keep-o" data-ckopen="' + n + '" aria-label="Open this"></button>' +
+        '<button class="cj-keep-x" data-ckdrop="' + n + '" aria-label="Remove from this journal">' +
+          '\u2715</button>' +
+      '</span>').join("") + '</div>' +
+  '</div>';
+}
+/**
+ * ⚠️ REMOVING A KEPT COPY MUST TIDY UP AFTER ITSELF, and only if nothing else wants the bytes. The story
+ * it was taken from may still be live, or a second journal may have kept the same one.
+ */
+function journalDropKept(sig, n) {
+  const rows = loadJournals();
+  const j = rows.filter((x) => x && x.sig === sig)[0];
+  if (!j || !Array.isArray(j.keep)) return;
+  const gone = j.keep[n];
+  if (!gone) return;
+  j.keep = j.keep.filter((_, i) => i !== n);
+  saveJournals(rows);
+  clubKeys(gone).forEach((k) => { if (!clubMediaInUse(k)) clubMediaDel(k); });
+  haptic("light");
 }
 /**
  * OBSERVATION, THEN IMPLICATION, from the block's own record.
@@ -33243,6 +33651,24 @@ function wire() {
     document.querySelectorAll("[data-cjplan]").forEach((x) => x.onclick = () => {
       closeSheet(); state.screen = null; state.tab = "plan"; render();
     });
+    const sig = b.dataset.cjournal;
+    // ⚠️ THE KEPT COPIES OPEN IN THE SAME VIEWER EVERYTHING ELSE DOES, from the journal's own snapshots —
+    // so a story kept months ago opens exactly as it did, and there is one viewer rather than two.
+    document.querySelectorAll("[data-ckopen]").forEach((x) => x.onclick = () => {
+      const jr = loadJournals().filter((r) => r && r.sig === sig)[0];
+      const keep = (jr && Array.isArray(jr.keep) ? jr.keep : []).filter(Boolean);
+      if (!keep.length) return;
+      closeSheet();
+      clubOpenMedia(keep, Number(x.dataset.ckopen) || 0, false);
+    });
+    document.querySelectorAll("[data-ckdrop]").forEach((x) => x.onclick = () => {
+      journalDropKept(sig, Number(x.dataset.ckdrop) || 0);
+      $("sheetBody").innerHTML = commJournalSheetHtml(sig);
+      wire();
+      clubFillMedia();
+      toast("Removed from the journal.");
+    });
+    clubFillMedia();
     $("sheetOv").classList.add("on");
   });
   document.querySelectorAll("[data-hub]").forEach((b) => b.onclick = () => { if (b.dataset.hub === "alfie") { openAlfie(); return; } state.support = b.dataset.hub; state.supportFrom = null; render(); });

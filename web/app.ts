@@ -11625,11 +11625,17 @@ const CLUB_FILTERS = [
 ];
 /**
  * THE ADJUSTMENT DIALS.
- * ⚠️ EVERY ONE OF THESE IS SOMETHING CSS CAN GENUINELY DO, and the ones the reference has that it cannot
- * are left out rather than faked. Highlights and Shadows need a tone curve limited to part of the range,
- * which no CSS filter expresses; Structure and Sharpen need a convolution, which is an SVG filter heavy
- * enough to drop frames under a finger on a phone; Tilt Shift needs a masked blur of a second copy. A
- * dial that moves and changes nothing useful is worse than one that is not there.
+ * ⚠️⚠️ HIGHLIGHTS AND SHADOWS ARE REAL TONE CURVES, AND AN EARLIER VERSION OF THIS COMMENT WRONGLY SAID
+ * THEY COULD NOT BE DONE. His push — "i want you to see if you can sort the highlights and shadows
+ * out....there must be a way" — was right: they need a curve limited to part of the range, which no CSS
+ * filter FUNCTION expresses, but SVG's feComponentTransfer is exactly a per-channel lookup table and
+ * composes into a CSS filter chain. The mistake was lumping a LOOKUP in with a CONVOLUTION: Structure
+ * and Sharpen need feConvolveMatrix, which reads a pixel's neighbours and is genuinely heavy under a
+ * finger; a component transfer reads one channel of one pixel. Measured through a real browser on a
+ * greyscale ramp, the mapping matches the table to within one level of 255.
+ * ⚠️ WHAT IS STILL LEFT OUT AND WHY: Structure and Sharpen (a convolution), and Tilt Shift (a masked
+ * blur of a second copy). A dial that moves and changes nothing useful is worse than one that is not
+ * there — but "CSS cannot" is not the same claim as "the platform cannot", and that is the lesson.
  * ⚠️ LUX IS ONE DIAL DRIVING THREE, which is what an auto-enhance is — not a fake.
  */
 const CLUB_ADJ = [
@@ -11639,6 +11645,8 @@ const CLUB_ADJ = [
   { id: "sat",  label: "Saturation" },
   { id: "warm", label: "Warmth" },
   { id: "fade", label: "Fade" },
+  { id: "hi",   label: "Highlights" },
+  { id: "sh",   label: "Shadows" },
   { id: "vig",  label: "Vignette", oneWay: true },
   { id: "rot",  label: "Straighten", deg: true }
 ];
@@ -11658,6 +11666,100 @@ function clubRatio(id) {
 function clubFilterCss(id) {
   const f = CLUB_FILTERS.filter((x) => x.id === id)[0];
   return f ? f.css : "";
+}
+/**
+ * THE TONE CURVE BEHIND HIGHLIGHTS AND SHADOWS.
+ *
+ * ⚠️⚠️ THIS IS THE MECHANISM THOSE TWO SLIDERS ACTUALLY ARE, not an approximation of them. SVG's
+ * feComponentTransfer with type="table" is a per-channel lookup: seventeen samples over the input range,
+ * linearly interpolated. Verified in a real browser against a greyscale ramp — every sample landed
+ * within one level of 255 of the value the table asks for.
+ * ⚠️ color-interpolation-filters="sRGB" IS NOT OPTIONAL. SVG filters default to linearRGB, so without it
+ * the same table produces a washed-out, wrong-looking result — and it looks like a bad curve rather than
+ * a colour-space mistake, which is the hard kind of bug to find.
+ *
+ * ⚠️ BOTH ARMS OF BOTH DIALS COME FROM ONE WEIGHT ANCHORED AT ITS OWN END. Shadows moves black and the
+ * darks and fades to nothing by the mid; Highlights moves white and the lights and does the same. A
+ * raised half-cosine gives a smooth start (zero slope at the anchor, so no visible kink) and reaches
+ * zero at the far edge of its window, which is what keeps the two dials independent.
+ * ⚠️ THE STRENGTH IS BOUNDED BY MONOTONICITY, NOT BY TASTE. A curve that folds back on itself inverts
+ * tones and posterises. The steepest slope of this weight is pi/(2*W), so the move has to satisfy
+ * k * pi/(2*W) < 1: at W = 0.65 that is k < 0.41, and 0.32 leaves the minimum slope at 0.226. The table
+ * is ALSO forced monotone as a belt, so a future change to either number cannot produce a fold.
+ */
+const CLUB_TONE_N = 17;
+const CLUB_TONE_W = 0.65;
+const CLUB_TONE_K = 0.32;
+/** ⚠️ QUANTISED, so dragging a slider through a hundred values does not mint a hundred filter defs. */
+const CLUB_TONE_STEP = 5;
+function clubToneQ(v) {
+  const n = Number(v);
+  if (!isFinite(n) || !n) return 0;
+  return Math.max(-100, Math.min(100, Math.round(n / CLUB_TONE_STEP) * CLUB_TONE_STEP));
+}
+/**
+ * The seventeen table values, or null when both dials are at rest.
+ * ⚠️ PURE, so it can be driven by a test rather than read — every claim about a tone curve is about
+ * numbers, and none of them is visible in the source text.
+ */
+function clubToneTable(hi, sh) {
+  const h = clubToneQ(hi) / 100, s = clubToneQ(sh) / 100;
+  if (!h && !s) return null;
+  const out = [];
+  let prev = 0;
+  for (let i = 0; i < CLUB_TONE_N; i++) {
+    const x = i / (CLUB_TONE_N - 1);
+    // Anchored at white, nothing left of 1 - W.
+    const dh = x >= 1 - CLUB_TONE_W
+      ? 0.5 * (1 + Math.cos(Math.PI * (1 - x) / CLUB_TONE_W)) : 0;
+    // Anchored at black, nothing right of W.
+    const ds = x <= CLUB_TONE_W
+      ? 0.5 * (1 + Math.cos(Math.PI * x / CLUB_TONE_W)) : 0;
+    let y = x + CLUB_TONE_K * (h * dh + s * ds);
+    y = Math.max(0, Math.min(1, y));
+    // ⚠️ MONOTONE BY FORCE AS WELL AS BY CONSTRUCTION. A fold in a lookup table inverts tones.
+    if (y < prev) y = prev;
+    prev = y;
+    out.push(Math.round(y * 1000) / 1000);
+  }
+  return out;
+}
+/**
+ * ⚠️⚠️ THE FILTER MUST EXIST BEFORE ANY ELEMENT REFERENCES IT. A CSS filter naming a url() that does not
+ * resolve means the element IS NOT RENDERED AT ALL — not unfiltered, absent. So this creates the def and
+ * only then hands back the reference, and it re-checks on every call rather than trusting a flag: the
+ * defs live in the body and nothing guarantees a future render leaves them there.
+ * ⚠️ NOTHING IS EVER EVICTED, and that is deliberate for the same reason. Dropping a def that an element
+ * still points at would make that picture vanish. Quantising to fives is what bounds the count instead —
+ * a few hundred bytes each, and only for combinations actually used.
+ */
+function clubToneUrl(hi, sh) {
+  const t = clubToneTable(hi, sh);
+  if (!t) return "";
+  const id = "ct" + String(clubToneQ(hi)).replace("-", "n") + "x" +
+    String(clubToneQ(sh)).replace("-", "n");
+  let defs = $("clubToneDefs");
+  if (!defs) {
+    defs = el('<svg id="clubToneDefs" aria-hidden="true" width="0" height="0" ' +
+      'style="position:absolute;width:0;height:0;overflow:hidden"><defs></defs></svg>');
+    document.body.appendChild(defs);
+  }
+  if (!defs.querySelector("#" + id)) {
+    const v = t.join(" ");
+    const f = document.createElementNS("http://www.w3.org/2000/svg", "filter");
+    f.setAttribute("id", id);
+    f.setAttribute("color-interpolation-filters", "sRGB");
+    const ct = document.createElementNS("http://www.w3.org/2000/svg", "feComponentTransfer");
+    ["feFuncR", "feFuncG", "feFuncB"].forEach((tag) => {
+      const fn = document.createElementNS("http://www.w3.org/2000/svg", tag);
+      fn.setAttribute("type", "table");
+      fn.setAttribute("tableValues", v);
+      ct.appendChild(fn);
+    });
+    f.appendChild(ct);
+    (defs.querySelector("defs") || defs).appendChild(f);
+  }
+  return "url(#" + id + ")";
 }
 /**
  * ⚠️ RETURNS THE THREE THINGS THAT ARE APPLIED DIFFERENTLY, not one string, because they are three
@@ -11688,8 +11790,11 @@ function clubLook(s) {
   const f = n("fade");
   if (f > 0) parts.push("contrast(" + (1 - f * 0.3).toFixed(3) + ") brightness(" + (1 + f * 0.12).toFixed(3) + ")");
   const rot = Number(a.rot);
+  // ⚠️ THE TONE COMES BACK AS TWO NUMBERS, NOT A url(), because this function is pure and is driven by
+  // tests — minting an SVG def in here would make it need a DOM. clubApplyLook resolves it.
   return { filter: parts.join(" "),
     vig: Math.max(0, n("vig")),
+    hi: clubToneQ(a.hi), sh: clubToneQ(a.sh),
     rot: isFinite(rot) ? Math.max(-15, Math.min(15, rot)) : 0 };
 }
 /**
@@ -11709,7 +11814,11 @@ function clubRotScale(deg, w, h) {
  */
 function clubApplyLook(node, look) {
   if (!node) return;
-  node.style.filter = look.filter || "";
+  // ⚠️ THE DEF IS CREATED FIRST AND THE STYLE SECOND. Reversed, there is a frame in which the element
+  // references a filter that does not exist — and an unresolvable url() means the element is not
+  // rendered at all, so the picture blinks out rather than appearing unfiltered.
+  const tone = clubToneUrl(look.hi, look.sh);
+  node.style.filter = ((look.filter || "") + " " + tone).trim();
   if (!look.rot) { node.style.transform = ""; return; }
   const b = node.getBoundingClientRect();
   node.style.transform = "rotate(" + look.rot + "deg) scale(" +
@@ -12714,6 +12823,8 @@ function clubLookAttrs(sl) {
   const ov = (sl.ov || []).filter((o) => o && o.media);
   let out = "";
   if (look.filter) out += ' data-clook="' + esc(look.filter) + '"';
+  if (look.hi) out += ' data-chi="' + look.hi + '"';
+  if (look.sh) out += ' data-csh="' + look.sh + '"';
   if (look.vig) out += ' data-cvig="' + look.vig.toFixed(3) + '"';
   if (look.rot) out += ' data-crot="' + look.rot + '"';
   if (ov.length) out += ' data-cov-l="' + esc(JSON.stringify(ov.map((o) => ({
@@ -12734,6 +12845,7 @@ function clubFillMedia() {
         : '<img src="' + url + '" alt="">';
       const med = n.firstElementChild;
       if (med) clubApplyLook(med, { filter: n.dataset.clook || "",
+        hi: Number(n.dataset.chi) || 0, sh: Number(n.dataset.csh) || 0,
         rot: Number(n.dataset.crot) || 0, vig: 0 });
       if (n.dataset.cvig) {
         const v = el('<span class="club-vig"></span>');

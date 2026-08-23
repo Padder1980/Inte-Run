@@ -59,6 +59,22 @@ function clubFiltersTable(): Array<{ id: string; label: string; css: string }> {
   assert.ok(out.length >= 4, "only " + out.length + " filters parsed out of CLUB_FILTERS");
   return out;
 }
+/**
+ * ⚠️⚠️ THE CURVE'S CONSTANTS ARE READ OUT OF THE BUILT PAGE, NEVER TYPED INTO THE PREAMBLE. Written as
+ * literals here, a lifted clubToneTable runs against the TEST's constants and not the app's — so
+ * changing CLUB_TONE_N in the app escaped its own guard, measured. The same
+ * probe-supplies-its-own-table trap this project records for the engine's distance tables.
+ */
+function clubToneConsts(): string {
+  const app = appBlock();
+  const out: string[] = [];
+  for (const k of ["CLUB_TONE_N", "CLUB_TONE_W", "CLUB_TONE_K", "CLUB_TONE_STEP"]) {
+    const m = new RegExp("const " + k + " = ([\\d.]+);").exec(app);
+    assert.ok(m, k + " could not be read out of the built page");
+    out.push("const " + k + " = " + m![1] + ";");
+  }
+  return out.join("\n") + "\n";
+}
 /** The generated stylesheet. */
 function sheetOf(src: string): string {
   const a = src.indexOf("<style>"), b = src.indexOf("</style>", a);
@@ -1834,7 +1850,9 @@ test("BLOCKER: a tool sheet's Cancel puts back what the tool changed, and nothin
  */
 test("BLOCKER: the look is arithmetic, and the original file is never re-encoded", () => {
   const look = new Function(
-    nocomment(fn("clubFilterCss")) + "\n" + nocomment(fn("clubLook")) + "\n" +
+    nocomment(fn("clubFilterCss")) + "\n" + nocomment(fn("clubToneQ")) + "\n" +
+    nocomment(fn("clubLook")) + "\n" +
+    "const CLUB_TONE_STEP = 5;\n" +
     "const CLUB_FILTERS = " + JSON.stringify(clubFiltersTable()) + ";\n" +
     "return clubLook;")();
   // A filter is its own CSS, and nothing else.
@@ -1858,8 +1876,15 @@ test("BLOCKER: the look is arithmetic, and the original file is never re-encoded
   assert.equal(look({ adj: { rot: 90 } }).rot, 15, "straightening is not clamped");
   assert.equal(look({ adj: { rot: -90 } }).rot, -15, "straightening is not clamped downwards");
   assert.equal(look({ adj: { rot: "x" } }).rot, 0, "a non-number rotation is not refused");
+  // ⚠️ THE TONE COMES BACK AS NUMBERS, so the pure function can be driven and the DOM work stays in the
+  // applier. Quantised, so dragging a slider does not mint a filter def per value passed through.
+  assert.equal(look({ adj: { hi: 100 } }).hi, 100, "highlights do not survive clubLook");
+  assert.equal(look({ adj: { sh: -60 } }).sh, -60, "shadows do not survive clubLook");
+  assert.equal(look({ adj: { hi: 2 } }).hi, 0, "a value under the quantum is not treated as rest");
+  assert.equal(look({ adj: { hi: 999 } }).hi, 100, "highlights are not clamped");
   // ⚠️ NO CANVAS ANYWHERE IN THE LOOK PATH. A toBlob here would be the re-encode this design refuses.
-  for (const f of ["clubLook", "clubFilterCss", "clubApplyLook", "clubLookAttrs", "clubRotScale"]) {
+  for (const f of ["clubLook", "clubFilterCss", "clubApplyLook", "clubLookAttrs", "clubRotScale",
+                   "clubToneTable", "clubToneQ", "clubToneUrl"]) {
     const body = nocomment(fn(f));
     assert.ok(!/toBlob|getContext|createElement\("canvas"\)/.test(body),
       f + " re-encodes the picture; the look must stay arithmetic");
@@ -1997,4 +2022,126 @@ test("BLOCKER: the ratio belongs to the post, and an older post keeps its shape"
   const r = new Function(nocomment(fn("clubRatio")) +
     "\nconst CLUB_RATIOS = [{id:'orig',ar:0},{id:'sq',ar:1}];\nreturn clubRatio;")();
   assert.equal(r("nonsense").ar, 0, "an unknown ratio is not the original");
+});
+
+/**
+ * HIGHLIGHTS AND SHADOWS ARE REAL TONE CURVES (owner, 2026-08-23: "i want you to see if you can sort the
+ * highlights and shadows out....there must be a way").
+ *
+ * ⚠️⚠️ HE WAS RIGHT AND THE CODE'S OWN EARLIER COMMENT WAS WRONG. These need a curve limited to part of
+ * the range, which no CSS filter FUNCTION expresses — but SVG's feComponentTransfer is exactly a
+ * per-channel lookup table and composes into a CSS filter chain. The mistake was lumping a LOOKUP in
+ * with a CONVOLUTION: a component transfer reads one channel of one pixel, where Sharpen reads a pixel's
+ * neighbours. Measured in a real browser on a 12-megapixel photograph: the tone curve is p50 8ms per
+ * frame, indistinguishable from a plain CSS filter (8ms), while a convolution is 17ms — over the frame
+ * budget. So one ships and the other still does not, and now there is a number rather than an assertion.
+ */
+test("BLOCKER: the tone curve is a real curve — monotone, in range, and at rest when both dials are", () => {
+  const t = new Function(clubToneConsts() + nocomment(fn("clubToneQ")) + "\n" +
+    nocomment(fn("clubToneTable")) + "\nreturn clubToneTable;")();
+  const N = Number(/const CLUB_TONE_N = (\d+)/.exec(appBlock())?.[1]);
+  // ⚠️ NOTHING AT ALL WHEN BOTH ARE AT REST. A filter of "url(#identity)" on every picture in the app
+  // would be a whole render pass for no change.
+  assert.equal(t(0, 0), null, "a filter is built when neither dial has been moved");
+  assert.equal(t(1, 0), null, "a value under the quantum is not treated as rest");
+  const up = t(0, 100);
+  // ⚠️ SEVENTEEN IS THE FLOOR FOR A SMOOTH CURVE. The browser interpolates linearly between samples, so
+  // too few turns a smooth shoulder into visible facets — measured against 8, where the curve reads as
+  // three straight segments.
+  assert.equal(up.length, N, "the table is " + up.length + " samples where the app declares " + N);
+  assert.ok(N >= 17, "a " + N + "-sample table is too coarse; the interpolation shows as facets");
+  // ⚠️ MONOTONE ACROSS EVERY REACHABLE PAIR. A fold in a lookup table inverts tones and posterises, and
+  // it would only show on the photographs that happen to use that part of the range.
+  let folds = 0, outOfRange = 0, pairs = 0;
+  for (let h = -100; h <= 100; h += 5) {
+    for (let s = -100; s <= 100; s += 5) {
+      const tab = t(h, s);
+      if (!tab) continue;
+      pairs++;
+      for (let i = 1; i < tab.length; i++) if (tab[i] < tab[i - 1]) folds++;
+      if (tab[0] < 0 || tab[tab.length - 1] > 1) outOfRange++;
+    }
+  }
+  assert.equal(pairs, 41 * 41 - 1, "expected every quantised pair but rest; measured " + pairs);
+  assert.equal(folds, 0, folds + " folds in the curve across " + pairs + " pairs");
+  assert.equal(outOfRange, 0, outOfRange + " curves leave the 0..1 range");
+  // ⚠️ AND THE TWO DIALS ARE INDEPENDENT, which is the whole point of anchoring each weight at its own
+  // end. Shadows must leave the top of the range alone and Highlights the bottom.
+  const sh = t(0, 100), hi = t(100, 0);
+  const ident = (i: number) => i / (N - 1);
+  for (let i = N - 4; i < N; i++) {
+    assert.ok(Math.abs(sh[i]! - ident(i)) < 0.02,
+      "Shadows moved the top of the range at sample " + i + " (" + sh[i] + " vs " + ident(i) + ")");
+  }
+  for (let i = 0; i < 4; i++) {
+    assert.ok(Math.abs(hi[i]! - ident(i)) < 0.02,
+      "Highlights moved the bottom of the range at sample " + i);
+  }
+  // Direction: lifting shadows raises black; recovering highlights lowers white.
+  assert.ok(sh[0]! > 0.2, "Shadows at +100 barely lifts black (" + sh[0] + ")");
+  assert.ok(t(-100, 0)![N - 1]! < 0.8, "Highlights at -100 barely recovers white");
+  assert.ok(t(0, -100)![1]! < ident(1), "Shadows at -100 does not deepen the darks");
+  const upper = Math.round((N - 1) * 0.75);
+  assert.ok(t(100, 0)![upper]! > ident(upper), "Highlights at +100 does not lift the lights");
+  // ⚠️ THE STRENGTH IS BOUNDED BY MONOTONICITY, NOT TASTE — so the two constants are checked against the
+  // inequality they have to satisfy rather than pinned to a value somebody liked.
+  const app = appBlock();
+  const k = Number(/const CLUB_TONE_K = ([\d.]+)/.exec(app)?.[1]);
+  const W = Number(/const CLUB_TONE_W = ([\d.]+)/.exec(app)?.[1]);
+  assert.ok(k > 0 && W > 0, "the curve's constants could not be read");
+  assert.ok(k * Math.PI / (2 * W) < 1,
+    "k=" + k + " with W=" + W + " makes the weight steeper than 1:1, so the curve can fold");
+});
+
+/**
+ * ⚠️⚠️ AN UNRESOLVABLE url() MEANS THE ELEMENT IS NOT RENDERED AT ALL — not unfiltered, absent. So the
+ * filter def has to exist before any style names it, and nothing may ever be evicted while a picture
+ * still points at it.
+ */
+test("BLOCKER: the tone filter exists before anything references it, and is never evicted", () => {
+  const a = nocomment(fn("clubApplyLook"));
+  const made = a.indexOf("clubToneUrl(");
+  const used = a.indexOf("node.style.filter");
+  assert.ok(made > 0 && used > made,
+    "the style is set before the filter def is made, so there is a frame in which the picture vanishes");
+  const u = nocomment(fn("clubToneUrl"));
+  // ⚠️ RE-CHECKED ON EVERY CALL rather than trusting a flag — the defs live in the body and nothing
+  // guarantees a future render leaves them there.
+  assert.match(u, /if \(!defs\)/, "the defs element is assumed to exist");
+  assert.match(u, /querySelector\("#" \+ id\)/, "an existing filter is rebuilt on every call");
+  for (const bad of ["remove()", "removeChild", "innerHTML =", "shift()"]) {
+    assert.ok(u.indexOf(bad) < 0, "clubToneUrl uses " + bad + "; evicting a def that a picture still "
+      + "references makes that picture disappear");
+  }
+  // ⚠️ sRGB IS NOT OPTIONAL. SVG filters default to linearRGB, and the same table then produces a
+  // washed-out result that reads as a bad curve rather than a colour-space mistake.
+  assert.match(u, /color-interpolation-filters", "sRGB"/,
+    "the filter runs in linearRGB, so the curve will not look like the numbers say");
+  // ⚠️ AND clubLook STAYS PURE — it is driven by tests, so minting a def in there would need a DOM.
+  const look = nocomment(fn("clubLook"));
+  assert.ok(look.indexOf("clubToneUrl") < 0 && look.indexOf("document") < 0,
+    "clubLook touches the DOM, so it can no longer be driven as arithmetic");
+  assert.match(look, /hi: clubToneQ\(a\.hi\), sh: clubToneQ\(a\.sh\)/,
+    "clubLook does not carry the tone out as numbers");
+});
+
+test("BLOCKER: Highlights and Shadows are two-way dials and reach a posted surface", () => {
+  const app = appBlock();
+  const adj = /const CLUB_ADJ = \[([\s\S]*?)\];/.exec(app);
+  assert.ok(adj, "CLUB_ADJ could not be found");
+  for (const id of ["hi", "sh"]) {
+    const row = new RegExp('\\{ id: "' + id + '",[^}]*\\}').exec(adj![1]!);
+    assert.ok(row, id + " is not a dial at all");
+    // ⚠️ NOT oneWay: recovering highlights and deepening shadows are the halves that matter most, and a
+    // dial clamped at zero cannot reach them. Vignette is the only one-way dial there is.
+    assert.ok(row![0].indexOf("oneWay") < 0, id + " is one-way, so half of it is unreachable");
+    assert.ok(row![0].indexOf("deg") < 0, id + " is measured in degrees");
+  }
+  // It travels as its own attribute, and the one loader passes it on.
+  const attrs = nocomment(fn("clubLookAttrs"));
+  assert.match(attrs, /data-chi=/, "highlights do not travel to a posted surface");
+  assert.match(attrs, /data-csh=/, "shadows do not travel to a posted surface");
+  const fill = nocomment(fn("clubFillMedia"));
+  assert.match(fill, /hi: Number\(n\.dataset\.chi\)/, "a posted surface drops the highlights");
+  assert.match(fill, /sh: Number\(n\.dataset\.csh\)/, "a posted surface drops the shadows");
 });

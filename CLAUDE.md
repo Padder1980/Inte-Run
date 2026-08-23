@@ -9304,12 +9304,11 @@ constant and cannot live in the stylesheet. Measured through the real function: 
 **scale 1.1942 on the 4:5 stage, 1.1294 once the ratio became square, and 1.1758 on the 3:4 grid tile**.
 That is why `clubApplyLook` measures the node instead of taking a style string.
 
-⚠️ **THE DIALS ARE THE ONES CSS CAN GENUINELY DO, AND THE REST ARE LEFT OUT RATHER THAN FAKED.** Lux,
-Brightness, Contrast, Saturation, Warmth, Fade, Vignette, Straighten. The reference's **Highlights** and
-**Shadows** need a tone curve limited to part of the range, which no CSS filter expresses; **Structure**
-and **Sharpen** need a convolution, i.e. an SVG filter heavy enough to drop frames under a finger;
-**Tilt Shift** needs a masked blur of a second copy. A dial that moves and changes nothing useful is
-worse than one that is not there.
+⚠️⚠️ **THE DIAL SET IN THIS SECTION IS SUPERSEDED — HIGHLIGHTS AND SHADOWS WERE ADDED THE SAME DAY, and
+the claim that they could not be done was WRONG. See the chapter below.** What shipped in this phase was
+Lux, Brightness, Contrast, Saturation, Warmth, Fade, Vignette and Straighten; **Structure**, **Sharpen**
+and **Tilt Shift** are still out, now with a measurement behind that rather than an assumption. A dial
+that moves and changes nothing useful is worse than one that is not there.
 ⚠️ **WARMTH GOES BOTH WAYS AND THE TWO DIRECTIONS ARE DIFFERENT FUNCTIONS** — `sepia()` only warms, so a
 one-armed dial does nothing on half its travel. Cooling is a hue rotation. Guarded in both directions.
 ⚠️ **LUX IS ONE DIAL DRIVING THREE**, which is what an auto-enhance is rather than a fake.
@@ -9406,3 +9405,89 @@ Audio sheet with only Cancel and Done, an overlay placed and sized, a text commi
 the row carrying `ratio: "sq"`, `filter: "mono"`, `adj: {lux:60, vig:70, rot:8}`, one overlay and **two
 media keys** — and the grid tile then rendering that same filter string, its own rotation scale, the
 overlay and the vignette. **Zero console errors, page overflow 0 throughout.**
+
+## ⚠️⚠️ HIGHLIGHTS AND SHADOWS ARE REAL TONE CURVES, AND "CSS CANNOT" WAS THE WRONG CLAIM (2026-08-23)
+
+*"i want you to see if you can sort the highlights and shadows out....there must be a way"* — and he was
+right. Suite 1265 → **1268**; 13 deliberate re-breaks, all 13 caught (one only after the harness was
+fixed). Web-only, so it reaches his phone on the next launch.
+
+⚠️⚠️ **THE MISTAKE WAS LUMPING A LOOKUP IN WITH A CONVOLUTION.** These two sliders are a tone curve
+limited to part of the luminance range — no CSS filter *function* expresses that, which is what the
+previous chapter said and it is true. But **SVG's `feComponentTransfer` with `type="table"` is exactly a
+per-channel lookup table**, and `filter: url(#id)` composes into a CSS filter chain. A component transfer
+reads one channel of one pixel; `feConvolveMatrix` (Sharpen, Structure) reads a pixel's *neighbours*.
+Those are different costs and I had treated them as one. **"CSS cannot" is not the same claim as "the
+platform cannot", and that is the transferable lesson.**
+
+**Measured in a real browser before anything was built** — a greyscale ramp through a hand-written table,
+read back from a screenshot: every sample landed **within one level of 255** of what the table asks for.
+**Then measured again after**, on a 12-megapixel photograph, per frame while dragging the dial:
+
+| filter chain | p50 | p95 | max |
+|---|---|---|---|
+| a plain CSS `brightness()` | 8 ms | 10 ms | 24 ms |
+| **+ the tone curve** | **8 ms** | **9 ms** | **10 ms** |
+| + a 3×3 convolution (Sharpen) | **17 ms** | 18 ms | 18 ms |
+
+So the tone curve is **free** — indistinguishable from a CSS filter — and the convolution is **over the
+16.7 ms frame budget**, in software rendering on a desktop. Structure, Sharpen and Tilt Shift are
+therefore still out, but now with a number rather than an assertion. ⚠️ **That 17 ms is "would stutter",
+not "impossible"** — if it is ever wanted anyway, that is a decision to take with the figure in hand.
+
+### The curve, and the two things that bound it
+
+⚠️ **BOTH ARMS OF BOTH DIALS COME FROM ONE WEIGHT ANCHORED AT ITS OWN END.** Shadows moves black and the
+darks and fades to nothing by the mid; Highlights moves white and the lights and does the same. A raised
+half-cosine gives zero slope at the anchor (no visible kink) and reaches zero at the far edge of its
+window, **which is what keeps the two dials independent** — measured, Shadows at +100 leaves the top four
+samples within 0.02 of the identity and Highlights at +100 leaves the bottom four.
+
+⚠️⚠️ **THE STRENGTH IS BOUNDED BY MONOTONICITY, NOT BY TASTE.** A curve that folds back on itself inverts
+tones and posterises. The steepest slope of this weight is `π/(2·W)`, so the move must satisfy
+`k·π/(2·W) < 1`: at `W = 0.65` that is `k < 0.41`, and the shipped `k = 0.32` leaves the minimum slope at
+0.226. **The guard checks the inequality rather than pinning the constants**, so either can be retuned as
+long as the curve still cannot fold. The table is **also** forced monotone as a belt: measured **0 folds
+and 0 out-of-range curves across all 1,681 quantised pairs**.
+
+⚠️ **`color-interpolation-filters="sRGB"` IS NOT OPTIONAL.** SVG filters default to linearRGB, and the
+same table then produces a washed-out result **that reads as a bad curve rather than a colour-space
+mistake** — the hard kind of bug to find.
+
+⚠️⚠️ **AN UNRESOLVABLE `url()` MEANS THE ELEMENT IS NOT RENDERED AT ALL — not unfiltered, ABSENT.** Three
+consequences, all load-bearing: the def is created **before** the style that names it (guarded by
+comparing the two positions in `clubApplyLook`); `clubToneUrl` re-checks the defs element on every call
+rather than trusting a flag, because the defs live in the body and nothing guarantees a future render
+leaves them there; and **nothing is ever evicted**, since dropping a def a picture still points at makes
+that picture vanish. Quantising to fives is what bounds the count instead — measured, a 40-step drag
+creates 39 defs of a few hundred bytes each, reused across every surface.
+
+⚠️ **`clubLook` STAYS PURE AND RETURNS THE TONE AS TWO NUMBERS.** Minting an SVG def in there would give
+it a DOM dependency, and it is driven as arithmetic by the tests. `clubApplyLook` resolves them — the same
+division of labour the rotation already needed.
+
+⚠️ **NEITHER DIAL IS ONE-WAY.** Recovering highlights and deepening shadows are the halves that matter
+most, and a dial clamped at zero cannot reach them. Vignette is the only one-way dial there is.
+
+**Measured on real composited pixels through the app's own applier** (input → output, 0–255):
+
+| in | plain | Shadows +100 | Highlights −100 |
+|---|---|---|---|
+| 0 | 0 | **81** | 0 |
+| 80 | 80 | 122 | 80 |
+| 176 | 176 | **176** | 132 |
+| 255 | 255 | **255** | **173** |
+
+Shadows lifts black and leaves the top alone; Highlights pulls white down and leaves the bottom alone.
+Posted, the row stored `adj: {hi: 100}` and the grid tile rendered `url("#ct100x0")` with the def
+resolving.
+
+### ⚠️ THE ESCAPE WAS MY OWN HARNESS SUPPLYING THE CONSTANTS
+
+Twelve of thirteen re-breaks were caught first time. The one that escaped — shrinking the table from 17
+samples to 8 — escaped because **the lift preamble typed `const CLUB_TONE_N = 17` in itself**, so the
+lifted function ran against the TEST's constant and not the app's. `clubToneConsts()` now reads all four
+out of the built page. **Same probe-supplies-its-own-table trap this file already records for the
+engine's distance tables**, in a new place.
+⚠️ **AND TWO HAND-WRITTEN LIFT LISTS WENT STALE AND FAILED LOUDLY** (`clubToneQ is not defined`, four
+tests in one file and one in another) — the acceptable kind of stale, and the second time in two days.

@@ -344,7 +344,11 @@ function openMedia(row: Record<string, unknown>, auto: boolean) {
     // ⚠️ THE LOOK IS LIFTED FOR REAL RATHER THAN STUBBED, so this file can see a filter, a vignette and
     // an overlay actually reach the viewer's markup. A stub returning "" would let the viewer stop
     // carrying them and every assertion here would still pass.
+    // ⚠️ THE QUANTUM IS READ OUT OF THE PAGE, not typed — a constant supplied by the harness means the
+    // lifted function runs against the TEST's value, and this project has measured that escaping a guard.
+    "const CLUB_TONE_STEP = " + (/const CLUB_TONE_STEP = (\d+);/.exec(src) || [])[1] + ";\n" +
     nocomment(fn(src, "clubFilterCss")) + "\n" +
+    nocomment(fn(src, "clubToneQ")) + "\n" +
     nocomment(fn(src, "clubLook")) + "\n" +
     nocomment(fn(src, "clubLookAttrs")) + "\n" +
     "const CLUB_FILTERS = " + JSON.stringify(filtersOf(src)) + ";\n" +

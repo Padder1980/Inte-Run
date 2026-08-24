@@ -41,7 +41,7 @@ function lift(html: string, name: string): string {
   throw new Error("unbalanced braces in " + name);
 }
 
-const NAMES = ["coachPlay", "coachFail", "coachOnEnded", "coachDequeue", "coachStop",
+const NAMES = ["coachPlay", "coachErr", "coachFail", "coachOnEnded", "coachDequeue", "coachStop",
   "coachSaySequence", "speakPaceNumbers", "coachFlushNumbers", "paceFragmentIds",
   "paceSentenceIds", "paceWords", "coachClip", "coachAudioEl", "coachEnabled"];
 
@@ -128,7 +128,9 @@ function playPaceCue(opts: { curSecPerKm: number; minSecPerKm: number; maxSecPer
   const api = new Function(...keys, src + "; return {" + NAMES.join(",") + "};")(...keys.map((k) => env[k]));
   env.COACH.audio = el;
   el.addEventListener("ended", api.coachOnEnded);
-  el.addEventListener("error", api.coachFail);
+  // ⚠ coachErr, NOT coachFail — the app wires the wrapper that ignores an aborted load, and a fixture
+  // wiring the raw handler would exercise a program that no longer exists.
+  el.addEventListener("error", api.coachErr);
 
   const tooFast = opts.curSecPerKm < opts.minSecPerKm;
   const snap = {
@@ -446,4 +448,119 @@ test("the native app declares the capability it just gained", () => {
   const service = readFileSync(new URL("../ios/InteRun/CoachAudioService.swift", import.meta.url), "utf8");
   assert.match(service, /case "playPage":/, "the flag is declared but the action is not handled");
   assert.match(service, /case "stopPage":/, "stopPage is not handled, so a pause leaves a clip sounding");
+});
+
+/**
+ * DRIVE THE COACH OVER ONE SHARED ELEMENT, WITH A play() WHOSE REJECTION I CONTROL.
+ *
+ * ⚠️ ITS OWN ELEMENT, NOT playPaceCue's. That one is built for the stitched-sentence scenario and its
+ * play() can never reject, which is the whole subject here — and widening it would change the fixture
+ * fifteen passing guards depend on.
+ */
+function coachRig() {
+  const html = readFileSync(PAGE, "utf8");
+  const manifest = JSON.parse(readFileSync(MANIFEST, "utf8"));
+  const byKey: Record<string, any> = {};
+  manifest.clips.forEach((c: any) => { byKey[c.coach + "/" + c.id] = c; });
+  const said: string[] = [];
+  // ⚠️ EVERY catch HANDLER, NOT JUST THE LAST. The whole scenario is a rejection from an EARLIER line
+  // arriving after a later one has taken the element, so a rig that keeps only the most recent handler
+  // can only ever reject the line that is currently playing — which is not the defect. Measured: the
+  // first version did exactly that and reported the fix as broken.
+  const rejects: (() => void)[] = [];
+  const listeners: { ended: (() => void)[]; error: (() => void)[] } = { ended: [], error: [] };
+  const el: any = {
+    _src: "", paused: true, ended: true, currentTime: 0, volume: 1, onended: null, preload: "",
+    error: null,
+    set src(v: string) {
+      // A real element raises "error" for the load it is abandoning, with MEDIA_ERR_ABORTED.
+      if (!this.paused && this._src) { this.error = { code: 1 }; listeners.error.forEach((f) => f()); }
+      this._src = v;
+    },
+    get src() { return this._src; },
+    play() { this.paused = false; this.ended = false; return { catch: (fn: () => void) => { rejects.push(fn); } }; },
+    pause() { this.paused = true; },
+    addEventListener(ev: "ended" | "error", fn: () => void) { listeners[ev].push(fn); },
+  };
+  const env: Record<string, any> = {
+    COACH: {
+      cfg: { enabled: true, coach: "guide", volume: 1, frequency: "normal" },
+      manifest, ready: true, byKey, audio: el, current: null, queue: [], unlocked: true,
+      history: {}, personal: null, personalTried: "", seq: 0, pendingNums: null, numT: 0, gen: 0,
+    },
+    LIVE: { done: false, pauseStart: 0 },
+    VOICE_AVAILABLE: true,
+    Audio: function () { return el; },
+    speak: (t: string) => said.push(t),
+    stopSpeech: () => {},
+    setTimeout: () => 0, clearTimeout: () => {},
+    Math, JSON, Object, String, Number, Date,
+  };
+  const src = NAMES.map((n) => lift(html, n)).join("\n");
+  const keys = Object.keys(env);
+  const api = new Function(...keys, src + "; return {" + NAMES.join(",") + "};")(...keys.map((k) => env[k]));
+  el.addEventListener("ended", api.coachOnEnded);
+  el.addEventListener("error", api.coachErr);
+  const clipFor = (id: string) => byKey["guide/" + id];
+  return {
+    said, el, COACH: env.COACH,
+    play: (id: string, text: string) => {
+      assert.ok(clipFor(id), "no shipped clip for " + id + "; this fixture cannot express the defect");
+      api.coachPlay({ id: id, text: text, priority: 40 });
+    },
+    stop: () => api.coachStop(),
+    /** Reject the nth play() that was started — 0 is the first, which is the one a stop aborts. */
+    rejectPlay: (n = 0) => {
+      assert.ok(rejects[n], "play() number " + n + " was never given a catch handler");
+      rejects[n]!();
+    },
+    plays: () => rejects.length,
+  };
+}
+
+test("BLOCKER: silencing the coach cannot make the next line come out in the device voice", () => {
+  // ⚠️⚠️ THE OWNER'S REPORT, WITHIN THE HOUR OF THE ONE-SCREEN CHANGE: "the voice has turned back into the
+  // robot." Cause: stopLive learned to call coachStop, coachStop pauses the element, and pausing ABORTS an
+  // in-flight play() and rejects its promise. That rejection lands LATER — by which time liveFinish has set
+  // COACH.current to the completion prompt — and coachFail read that and spoke it with the device engine,
+  // over the top of its own clip. Driven here rather than asserted on the source, because the whole defect
+  // is the ORDER two asynchronous things arrive in.
+  const r = coachRig();
+  r.play("interval_start_1", "Here we go. Settle into the effort.");
+  assert.ok(r.el.src, "no clip was handed over, so this fixture cannot express the defect");
+  // A run ends: the coach is silenced, then the completion cue is fired into the empty queue.
+  r.stop();
+  r.play("complete_1", "Session complete. Excellent work today. Recover well.");
+  // Only NOW does the ABORTED line's rejection arrive — the first play(), not the completion cue's.
+  assert.equal(r.plays(), 2, "expected two play() calls: the interval line and the completion cue");
+  r.rejectPlay(0);
+  assert.deepEqual(r.said, [],
+    "the aborted line's failure was attributed to the completion cue, which the device voice then read " +
+    "out loud: " + JSON.stringify(r.said));
+  // ⚠️ AND A GENUINE FAILURE MUST STILL DEGRADE TO SPEECH, or this guard has traded one silence for
+  // another. A clip that really cannot play is the whole reason coachFail exists.
+  const g = coachRig();
+  g.play("interval_start_1", "Here we go. Settle into the effort.");
+  g.rejectPlay(0);
+  assert.equal(g.said.length, 1,
+    "a clip that genuinely fails no longer falls back to the device voice, so the coach goes silent");
+});
+
+test("BLOCKER: an abandoned load is not a failure to play", () => {
+  // ⚠️ Reassigning src while a load is pending raises "error" for the load being DROPPED, on a permanent
+  // listener attached to a shared element — so the event arrives after COACH.current has moved on. Neither
+  // the src nor a generation stamp can tell the two apart, because both have already advanced by the time
+  // it fires. MediaError.MEDIA_ERR_ABORTED (code 1) is the only discriminator: it means the fetch was
+  // stopped at our own request. Codes 2, 3 and 4 are real and must still degrade to speech.
+  const src = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
+  const at = src.indexOf("function coachErr(");
+  assert.ok(at > 0, "coachErr is gone; the abandoned-load error speaks the wrong line again");
+  const body = src.slice(at, src.indexOf("\n}", at));
+  assert.match(body, /error\.code === 1/, "an aborted load is treated as a failure to play");
+  assert.match(body, /coachFail\(\)/, "a genuine media error no longer degrades to speech");
+  // And the element must be wired to the wrapper, not to the raw handler.
+  assert.match(src, /addEventListener\("error", coachErr\)/,
+    "the element is wired straight to coachFail, so an aborted load still speaks the wrong line");
+  assert.ok(!/addEventListener\("error", coachFail\)/.test(src),
+    "the raw handler is still attached somewhere");
 });

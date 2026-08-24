@@ -4432,7 +4432,7 @@ button.rd-meta-r { cursor: pointer; }
 .lst-mapimg canvas, .lst-mapimg img { width: 100%; height: 100%; display: block; }
 /* ⚠️ A DOT, NOT A PIN. The runner is AT the centre of this map by construction (see liveMapFraming),
    so a pin whose tip is offset from its anchor would say they are somewhere they are not. */
-.lst-me { position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px;
+.lst-me { position: absolute; left: 50%; top: 50%; z-index: 2; width: 16px; height: 16px; margin: -8px 0 0 -8px;
   border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent),
   0 1px 4px rgba(0,0,0,.4); }
 /* ⚠️ LOW ON THE RIGHT, where the mockup puts them and where a thumb reaches — not centred vertically
@@ -4514,6 +4514,10 @@ button.rd-meta-r { cursor: pointer; }
   box-shadow: 0 2px 10px rgba(2,10,8,.22); }
 .lst-target svg { width: 18px; height: 18px; }
 /* The signal and the control column share one band at the foot of the map. */
+/* The route between the tiles and the dot, so neither is drawn over the other. */
+.lst-rt { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.lst-rt svg { width: 100%; height: 100%; display: block; }
+.lst-mapim { position: absolute; inset: 0; z-index: 0; }
 .lst-row { position: relative; z-index: 1; display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s2); }
 /* ⚠️ THE STACK IS IN FLOW, so its own height decides where the controls above it sit. Nothing here
    carries a bottom offset, which is the point: the last time this app placed live chrome by a constant
@@ -20701,7 +20705,7 @@ function coachAudioEl() {
     COACH.native = !!bridge;
     COACH.audio = bridge ? coachNativeAudioShim(bridge) : new Audio();
     COACH.audio.preload = "auto";
-    COACH.audio.addEventListener("ended", coachOnEnded); COACH.audio.addEventListener("error", coachFail);
+    COACH.audio.addEventListener("ended", coachOnEnded); COACH.audio.addEventListener("error", coachErr);
   }
   return COACH.audio;
 }
@@ -20796,8 +20800,18 @@ function coachPlay(prompt) {
   // See coachReleaseStale.
   COACH.playAt = Date.now();
   if (clip) {
+    // ⚠️⚠️ A REJECTED play() IS ONLY THIS LINE'S FAILURE IF THIS LINE IS STILL THE ONE PLAYING. Pausing the
+    // element ABORTS an in-flight play() and rejects its promise — so the moment stopLive started calling
+    // coachStop, the rejection landed AFTER liveFinish had set COACH.current to the completion prompt, and
+    // coachFail read that and spoke it in the DEVICE VOICE. Reported within the hour as "the voice has
+    // turned back into the robot", and it is the completion line being read by the robot over the top of
+    // its own clip. The generation stamp is the same primitive the native shim's token already is: whoever
+    // owns the element now is the only one whose failure counts.
+    const gen = COACH.gen = (COACH.gen || 0) + 1;
     try { a.src = clip.file; a.volume = Math.max(0, Math.min(1, COACH.cfg.volume)); a.currentTime = 0;
-      const pr = a.play(); if (pr && pr.catch) pr.catch(coachFail); return; } catch (e) {}
+      const pr = a.play();
+      if (pr && pr.catch) pr.catch(function () { if (gen === COACH.gen) coachFail(); });
+      return; } catch (e) {}
   }
   coachFail(); // no clip entry — degrade to speech (current is set)
 }
@@ -20805,6 +20819,26 @@ function coachPlay(prompt) {
 // current prompt's text with the device engine so coaching still degrades gracefully (e.g. inside the
 // sandboxed artifact, or before the coach has downloaded), then advances the queue. Guarded so a
 // play() rejection and an "error" event for the same clip never double-speak.
+/**
+ * THE ELEMENT'S OWN error EVENT, WITH ABORTS IGNORED.
+ *
+ * \u26a0\u26a0 AN ABANDONED LOAD IS NOT A FAILURE TO PLAY. Reassigning src while a load is pending raises
+ * "error" for the load being dropped, and this is a PERMANENT listener on a shared element — so the event
+ * arrives after COACH.current has already moved on to the new line, and coachFail read that and spoke it in
+ * the DEVICE VOICE. This file already records that happening once for a stitched pace sentence; the guard
+ * added then (COACH.seq) covers only that case, and stopLive silencing the coach before firing the
+ * completion cue made the general case fire on every single run.
+ * \u26a0 MediaError.MEDIA_ERR_ABORTED (code 1) IS THE DISCRIMINATOR, and it is the only thing here that can
+ * tell the two apart: the element's src has already moved on by the time the event fires, so neither the
+ * src nor a generation stamp can distinguish an abandoned load from a genuine one. Code 1 means the fetch
+ * was stopped at our own request. Codes 2, 3 and 4 are a real network, decode or unsupported-source
+ * failure and still degrade to speech, which is the whole point of coachFail.
+ */
+function coachErr(ev) {
+  const el = (ev && ev.target) || COACH.audio;
+  if (el && el.error && el.error.code === 1) return;
+  coachFail();
+}
 function coachFail() {
   // A STITCHED SENTENCE HANDLES ITS OWN FAILURES, and this guard is the difference between one
   // voice and two. Reassigning src mid-playback raises "error" on the load being abandoned, and
@@ -20862,6 +20896,10 @@ function coachStop() {
   // too: a pace readout still pending when a run is paused or finished would arrive seconds later
   // over silence, in the device voice, describing a run that is no longer happening.
   COACH.seq = 0; COACH.pendingNums = null; clearTimeout(COACH.numT);
+  // ⚠️ THE GENERATION MOVES BEFORE THE PAUSE, and that ordering is the whole fix. pause() rejects any
+  // play() still in flight, and that rejection arrives later — by which time the next cue may already own
+  // the element. Bumping first means the late rejection can see that it no longer speaks for anyone.
+  COACH.gen = (COACH.gen || 0) + 1;
   try { if (COACH.audio) { COACH.audio.pause(); } } catch (e) {}
   stopSpeech();
 }
@@ -22588,9 +22626,10 @@ function gpsUiTick() {
     checkSplits();
   }
   renderLiveNow();
-  // ⚠️ THE START SCREEN'S MAP IS DRAWN FROM HERE TOO, because the first fix is what makes it drawable
-  // at all — wire() runs before any position exists. drawLiveMap returns immediately once the run has
-  // started, so this costs a running session nothing.
+  // ⚠️ THE MAP IS DRAWN FROM HERE, before the run and during it. wire() runs before any position exists,
+  // so the first fix is what makes it drawable at all — and now that one screen serves the whole session
+  // this is also what advances the route and the dot. It costs a running session nothing in tiles: the
+  // basemap is held and only re-fetched when the runner leaves the picture.
   drawLiveMap(false);
   pushLiveActivity(LIVE.rt.snapshot(at));
   if (LIVE.rt.getStatus() === "completed") { stopLive(); liveFinish(true); }
@@ -22843,32 +22882,102 @@ function liveStandbyStop() {
   try { navigator.geolocation.clearWatch(LIVE_STANDBY); } catch (e) {}
   LIVE_STANDBY = null;
 }
+/**
+ * THE MAP DURING THE RUN, WHICH IS WHAT THE ONE-SCREEN CHANGE MADE NECESSARY.
+ *
+ * \u26a0\u26a0 THIS USED TO RETURN IMMEDIATELY ONCE LIVE.started, and that WAS right: the map only existed on
+ * the screen you waited on, so following the runner would have been a tile fetch every few seconds for a
+ * whole run, billed. The moment the same screen served the run, that early return left a blank panel for
+ * the entire session \u2014 which is what the owner reported within the hour.
+ * \u26a0 THE BASEMAP IS FETCHED ONCE AND HELD; THE ROUTE IS DRAWN OVER IT. Tiles are only re-fetched when
+ * the runner actually leaves the picture, or when they ask for it with recentre, or when the zoom or the
+ * box changes. So a run costs one basemap per screenful of ground covered rather than one per 20 metres,
+ * and the picture still shows where they are.
+ * \u26a0 AND THE EARLY RETURN CANNOT BE KEYED ON THE CACHE KEY ALONE. render() rebuilds the DOM, so #lMap
+ * is empty again after every render while LIVE.mapKey still matches \u2014 the same class of fault as the
+ * one above, and it would have left the map blank after any re-render mid-run. It checks the element.
+ */
 function drawLiveMap(force) {
-  if (!LIVE || LIVE.indoor || LIVE.started) return;
+  if (!LIVE || LIVE.indoor) return;
   const el = $("lMap"); if (!el) return;
   if (LIVE.lastLat == null || LIVE.lastLon == null) return;
-  const z = LIVE.mapZ || LIVE_MAP_Z;
-  const key = Math.round(LIVE.lastLat * 5000) + "," + Math.round(LIVE.lastLon * 5000) + "@" + z;
-  if (!force && LIVE.mapKey === key) return;
-  LIVE.mapKey = key;
   const box = el.getBoundingClientRect();
-  // ⚠️ MEASURED, NOT ASSUMED, AND ZERO MEANS NOT LAID OUT YET. Fetching against a zero box asks for a
+  // \u26a0 MEASURED, NOT ASSUMED, AND ZERO MEANS NOT LAID OUT YET. Fetching against a zero box asks for a
   // nonsense tile window; the next tick has a real one. This file records the same rule for the avatar
   // cropper, which saved an off-centre crop by measuring inside a sheet that was not shown.
   const pw = Math.round(box.width), ph = Math.round(box.height);
   if (!(pw > 40 && ph > 40)) { LIVE.mapKey = null; return; }
-  liveMapFor(LIVE.lastLat, LIVE.lastLon, z, pw, ph).then((r) => {
-    if (!LIVE || LIVE.started) return;
+  const z = LIVE.mapZ || LIVE_MAP_Z;
+  const f = LIVE.mapFrame;
+  const has = !!el.querySelector(".lst-mapim");
+  // \u26a0 THE RE-ANCHOR TEST IS "HAVE THEY LEFT THE PICTURE", not "have they moved". A 15% margin means
+  // the dot is re-centred before it reaches the edge rather than after, so the runner never watches
+  // themselves sit on the border waiting for a fetch.
+  let out = false;
+  if (f && LIVE.started) {
+    const x = mercX(LIVE.lastLon, f.z) - f.originX, y = mercY(LIVE.lastLat, f.z) - f.originY;
+    const mx = f.pw * 0.15, my = f.ph * 0.15;
+    out = x < mx || y < my || x > f.pw - mx || y > f.ph - my;
+  }
+  const posKey = Math.round(LIVE.lastLat * 5000) + "," + Math.round(LIVE.lastLon * 5000) + "@" + z;
+  const stale = !f || f.z !== z || f.pw !== pw || f.ph !== ph || out ||
+    (!LIVE.started && f.posKey !== posKey);
+  if (!force && !stale && has) { paintLiveRoute(); return; }
+  // ⚠️ RE-ANCHOR ONLY WHEN THE FRAME IS ACTUALLY STALE. When the frame is fine and it is only the DOM that
+  // was emptied — which render() does on every re-render — the SAME framing is asked for again, so
+  // routeMapFor answers from its cache and no tiles are fetched. Re-deriving it here would re-centre on
+  // wherever the runner had got to and quietly buy a new basemap every time the screen redrew.
+  const frame = (!stale && f) ? { z: f.z, originX: f.originX, originY: f.originY }
+    : liveMapFraming(LIVE.lastLat, LIVE.lastLon, z, pw, ph);
+  liveMapFor(frame, pw, ph).then((r) => {
+    if (!LIVE) return;
     const cur = $("lMap"); if (!cur) return;
     cur.innerHTML = "";
+    r.image.className = "lst-mapim";
     cur.appendChild(r.image);
-    const dot = document.createElement("div"); dot.className = "lst-me"; cur.appendChild(dot);
-    // ⚠️ THE ATTRIBUTION IS THE PROVIDER THAT ACTUALLY SERVED THE TILES, not the one we would prefer.
+    // The frame recorded is the one the tiles were actually fetched for, and the posKey with it — so a
+    // redraw that reused the frame does not pretend the anchor moved.
+    LIVE.mapFrame = { z: frame.z, originX: frame.originX, originY: frame.originY, pw: pw, ph: ph,
+                      posKey: (!stale && f) ? f.posKey : posKey };
+    LIVE.mapKey = LIVE.mapFrame.posKey;
+    // The route sits between the tiles and the dot, so neither is drawn over the other.
+    const rt = document.createElement("div"); rt.className = "lst-rt"; rt.id = "lRoute"; cur.appendChild(rt);
+    const dot = document.createElement("div"); dot.className = "lst-me"; dot.id = "lMe"; cur.appendChild(dot);
+    // \u26a0 THE ATTRIBUTION IS THE PROVIDER THAT ACTUALLY SERVED THE TILES, not the one we would prefer.
     // Crediting Mapbox over CARTO's tiles is a licence breach this file records making once already.
     const at = document.createElement("div");
     at.className = "lst-attr"; at.textContent = mapAttributionFor(r.prov);
     cur.appendChild(at);
+    paintLiveRoute();
   }).catch(() => { /* the panel stays as it is; the run does not depend on a picture */ });
+}
+/**
+ * DRAW THE ROUTE AND THE DOT OVER THE HELD BASEMAP. No network, so it is safe on every tick.
+ *
+ * \u26a0 THROTTLED ON THE ROUTE, NOT ON THE CLOCK. The polyline only changes when a point is credited, and
+ * re-serialising a few thousand of them four times a second would be work for nothing \u2014 but the DOT
+ * moves on every tick, because that is the thing a runner is actually looking at.
+ */
+function paintLiveRoute() {
+  const f = LIVE && LIVE.mapFrame; if (!f) return;
+  const me = $("lMe");
+  if (me) {
+    const x = mercX(LIVE.lastLon, f.z) - f.originX, y = mercY(LIVE.lastLat, f.z) - f.originY;
+    me.style.left = x + "px"; me.style.top = y + "px";
+  }
+  const rt = $("lRoute"); if (!rt) return;
+  const n = (LIVE.route || []).length;
+  if (n < 2) { if (rt.firstChild) rt.innerHTML = ""; return; }
+  // ⚠️ THE COUNT ALONE IS NOT ENOUGH AFTER A RE-RENDER. render() empties the layer, so the route has to be
+  // redrawn even though no new point has arrived — keyed on the count only, the line stayed missing until
+  // the next credited fix, which on a walk is several seconds of a blank map.
+  if (LIVE.rtDrawn === n && rt.firstChild) return;
+  LIVE.rtDrawn = n;
+  // \u26a0 THE SAME BUILDER THE DEBRIEF AND THE SHARE CARD USE, handed a projection built from the frame
+  // this basemap was fetched for. A second route drawer would be a second answer to "where does this line
+  // go", which is the fault that once stretched the debrief hero.
+  rt.innerHTML = routeMapSvg(LIVE.route,
+    (pt) => [mercX(pt.lng, f.z) - f.originX, mercY(pt.lat, f.z) - f.originY], f.pw, f.ph);
 }
 /** ⚠️ CLAMPED, because past these the tiles stop being useful: too far in and there is no context, too
  *  far out and a street is a pixel. Stored on LIVE so it survives a re-render of the screen. */
@@ -26988,11 +27097,16 @@ function routeMapFraming(route, pw, ph) {
 function liveMapFraming(lat, lon, z, pw, ph) {
   return { z: z, originX: mercX(lon, z) - pw / 2, originY: mercY(lat, z) - ph / 2 };
 }
-function liveMapFor(lat, lon, z, pw, ph) {
+function liveMapFor(frame, pw, ph) {
   // ⚠️ THROUGH routeMapFor, NOT loadRouteMap. It carries the cache, the one-way CARTO fallback and the
   // provider used — writing those again here would be a second copy of the only thing keeping a map
   // affordable, and the guard on loadRouteMap's caller count exists to stop exactly that.
-  return routeMapFor(null, pw, ph, MAP_STYLE_RUN, false, liveMapFraming(lat, lon, z, pw, ph));
+  // ⚠️ AND IT TAKES THE FRAMING RATHER THAN A POSITION, which is what lets a redraw REUSE the frame it
+  // already has. Deriving the framing here from lat/lon meant every redraw re-centred on wherever the
+  // runner had got to — a different framing, a different cache key, and a fresh set of billed tiles. It
+  // showed up as the composite coming back as a CANVAS (a new composite) rather than an IMG (a cache hit)
+  // after any mid-run re-render, and it is the exact bill the one-render design exists to prevent.
+  return routeMapFor(null, pw, ph, MAP_STYLE_RUN, false, frame);
 }
 function loadRouteMap(route, pw, ph, prov, frame) {
   pw = pw || MAP_W; ph = ph || MAP_H;
@@ -35231,7 +35345,10 @@ function wire() {
   // start-where sheet acquires GPS before the run is staged, so LIVE.lastLat is often already set and
   // no further fix is needed to make the map drawable. Anything geometric belongs in wire(), which is
   // where the screen exists to be measured; buildNav() runs once at boot with no screen at all.
-  if (LIVE && !LIVE.started && !LIVE.indoor) drawLiveMap(true);
+  // ⚠️ NO LONGER GATED ON THE RUN NOT HAVING STARTED. render() empties #lMap, so a mid-run re-render —
+  // a nav tap and back, a theme change, the pause button — used to leave the map blank for the rest of
+  // the session. Redrawing is cheap: routeMapFor returns the held composite from its cache.
+  if (LIVE && !LIVE.indoor) drawLiveMap(false);
   // ── the start screen's own controls (owner's annotated reference, 2026-08-21) ───────────────────
   // ⚠️ EVERY ONE OF THESE IS WIRED, AND THAT IS THE WHOLE REASON THEY ARE HERE RATHER THAN IN THE
   // MARKUP ALONE. A zoom or a recentre that renders and does nothing is the looks-live-is-inert defect

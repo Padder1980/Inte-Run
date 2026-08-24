@@ -10693,3 +10693,81 @@ browser before / running / paused at 430×932, 375×812 and 320×568 at `--tscal
 never switches (`.live-metrics` absent in every state), all eleven runtime ids present once running, the
 actions inside `#lMapWrap` at every size, **0 unhittable controls and 0 page overflow in all twelve
 combinations**, and zero console errors.
+
+## THE TWO REGRESSIONS THE ONE-SCREEN CHANGE CAUSED (owner, same day, within the hour)
+
+*"The map isn't there after it starts and the voice has turned back into the robot"* — both mine, both
+caused by the merge above, and both with the same shape: **a rule that was correct while the screen only
+existed before the run became wrong the moment the screen served the run.**
+
+### ⚠️⚠️ THE MAP: `drawLiveMap` OPENED WITH `if (LIVE.started) return`
+
+That early return was right and is documented above as right — the map only existed on the screen you
+waited on, so following the runner would have been a tile fetch every few seconds for a whole run, billed.
+The moment one screen served the session it left **a blank panel for the entire run**.
+
+**The basemap is fetched once and held; the route is drawn over it.** Tiles are re-fetched only when the
+runner genuinely leaves the picture (a 15% margin), when they ask with recentre, or when the zoom or the
+box changes. So a run costs one basemap per screenful of ground rather than one per 20 metres.
+
+⚠️ **AND THE EARLY RETURN CANNOT BE KEYED ON THE CACHE KEY ALONE.** `render()` empties `#lMap`, so after
+any mid-run re-render — a nav tap and back, the pause button, a theme change — every key still matched
+while the DOM was empty. The map would have stayed blank for the rest of the session. It checks the
+element. Same class of fault as the one being fixed, one layer along.
+
+⚠️⚠️ **AND THE FIRST FIX QUIETLY BOUGHT NEW TILES ON EVERY RE-RENDER.** `liveMapFor` took a position and
+derived the framing itself, so a redraw re-centred on wherever the runner had got to — a different
+framing, a different cache key, a fresh set of billed tiles. **Visible in the browser as the composite
+coming back a `CANVAS` (a new composite) instead of an `IMG` (a cache hit).** `liveMapFor` now takes the
+FRAMING, and a redraw that is only replacing an emptied DOM asks for the frame it already has.
+⚠️ **THE GUARD FOR THAT ESCAPED ITS FIRST RE-BREAK BECAUSE THE FIXTURE NEVER MOVED THE RUNNER** — with the
+position unchanged, re-deriving the framing gives the same answer as reusing it. Fixture-too-kind, in the
+one test whose whole subject is which framing was asked for.
+
+⚠️ **THE ROUTE IS DRAWN BY `routeMapSvg`, THE SAME BUILDER THE DEBRIEF AND THE SHARE CARD USE**, handed a
+projection built from the frame the basemap was fetched for. A private path-builder here would be a second
+answer to "where does this line go", which is the fault that once stretched the debrief hero.
+⚠️ **AND THE GUARD FOR *THAT* ESCAPED TOO, because the rig stubbed `routeMapSvg` to return a plain
+`<svg></svg>` — indistinguishable from a hardcoded one.** The stub's output is marked now.
+
+⚠️ **THE DOT MOVES; THE OLD ONE WAS PINNED TO THE CENTRE** (`left: 50%; top: 50%`), which is right for a
+runner standing still before the start and wrong for every second after it. Positioned from the projection.
+
+### ⚠️⚠️ THE ROBOT VOICE: PAUSING THE ELEMENT REJECTS AN IN-FLIGHT `play()`
+
+`stopLive` learned to call `coachStop` (the fix for the 20–30 second late cue, above). `coachStop` pauses
+the shared element — **and pausing ABORTS an in-flight `play()` and rejects its promise.** That rejection
+lands *later*, by which time `liveFinish` has set `COACH.current` to the completion prompt, and
+`coachFail` read that and **spoke it with the device engine**, over the top of its own clip. So the fix for
+one voice defect created another, on the same line of the same run.
+
+⚠️ **A GENERATION STAMP IS THE FIX, AND IT IS THE SAME PRIMITIVE THE NATIVE SHIM'S TOKEN ALREADY IS.**
+`COACH.gen` is bumped in `coachPlay` and **before** the pause in `coachStop`; a rejection only counts if
+its generation is still current. The ordering in `coachStop` is the whole of it — bump first, then pause,
+so the late rejection can see it no longer speaks for anyone.
+
+⚠️⚠️ **AND THERE IS A SECOND ROUTE TO THE SAME ROBOT: THE ELEMENT'S OWN `error` EVENT.** Reassigning `src`
+raises `error` for the load being abandoned, on a permanent listener attached to a shared element — so it
+too arrives after `COACH.current` has moved on. This file already records that happening once for a
+stitched pace sentence; the guard added then (`COACH.seq`) covers only that case, and `stopLive` silencing
+the coach immediately before firing the completion cue made the general case fire on **every run**.
+⚠️ **`MediaError.MEDIA_ERR_ABORTED` (code 1) IS THE ONLY DISCRIMINATOR HERE**, and it is worth saying why:
+by the time the event fires, both the element's `src` and the generation have already advanced, so neither
+can tell an abandoned load from a genuine one. Code 1 means the fetch was stopped at our own request; codes
+2, 3 and 4 are a real network, decode or unsupported-source failure and must still degrade to speech,
+which is the entire purpose of `coachFail`. `coachErr` is the wrapper; the element is wired to it.
+⚠️ **AND THE HARNESS WAS WIRING `coachFail` DIRECTLY**, so the fixture would have exercised a program that
+no longer exists. Fixed with it.
+
+⚠️ **THE REGRESSION GUARD IS DRIVEN, NOT ASSERTED ON SOURCE, because the whole defect is the ORDER two
+asynchronous things arrive in.** Its rig keeps EVERY `catch` handler rather than the most recent one —
+the first version kept only the last, so it could only ever reject the line currently playing, which is
+not the defect, and it reported the fix as broken. And it asserts the other direction too: a clip that
+genuinely fails must still fall back to the device voice, or the guard has traded one silence for another.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc clean
+apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1329 pass / 0 fail under
+UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`**, both ratchets unchanged, 4 tests added and none
+removed. Driven in a real browser: before start the basemap draws with the dot centred; running, the route
+draws with 51 path commands and the dot moves off-centre to follow; after a mid-run `render()` the basemap
+comes back as an **IMG** (a cache hit, no tiles) with the frame and the dot held; zero console errors.

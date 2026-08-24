@@ -68,6 +68,60 @@ test("BLOCKER: the zoom controls are clamped, and recentre puts the runner back 
     "recentre redraws without clearing the zoom override");
 });
 
+/**
+ * DRIVE drawLiveMap WITH THE TILE FETCH COUNTED.
+ *
+ * ⚠️ THE BILLING INVARIANT IS BEHAVIOURAL AND A SOURCE MATCH CANNOT EXPRESS IT. The old guard asserted a
+ * particular early return (`if (!force && LIVE.mapKey === key) return;`) and failed the moment the staleness
+ * test was rewritten to hold a basemap and draw the route over it — a guard scoped to the HOW. What matters
+ * is the number of fetches, so it is counted.
+ */
+function mapRig(started: boolean) {
+  const html = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
+  const names = ["drawLiveMap", "paintLiveRoute", "liveMapFraming", "mercX", "mercY"];
+  const src = names.map((n) => {
+    const at = html.indexOf("function " + n + "(");
+    assert.ok(at > 0, "not in the build: " + n);
+    let d = 0;
+    for (let i = html.indexOf("{", at); i < html.length; i++) {
+      if (html[i] === "{") d++;
+      else if (html[i] === "}") { d--; if (!d) return html.slice(at, i + 1); }
+    }
+    throw new Error("unbalanced " + n);
+  }).join("\n");
+  let fetches = 0;
+  const framesAsked: any[] = [];
+  const kids: any[] = [];
+  const el: any = {
+    innerHTML: "", style: {},
+    getBoundingClientRect: () => ({ width: 380, height: 500 }),
+    querySelector: (sel: string) => kids.find((k) => ("." + k.className) === sel) || null,
+    appendChild: (n: any) => { kids.push(n); },
+  };
+  const LIVE: any = {
+    indoor: false, started: started, lastLat: 36.35, lastLon: 28.2, route: [], mapZ: null,
+  };
+  const env: Record<string, any> = {
+    LIVE,
+    LIVE_MAP_Z: 15, MAP_TILE: 256,
+    $: (id: string) => (id === "lMap" ? el : kids.find((k) => k.id === id) || null),
+    liveMapFor: (frame: any) => {
+      fetches++; framesAsked.push(frame);
+      return Promise.resolve({ image: { className: "" }, prov: "carto" });
+    },
+    // ⚠️ MARKED, so a hardcoded replacement is visible. A stub returning plain "<svg></svg>" is
+    // indistinguishable from the route being drawn by a second builder — measured: that re-break escaped.
+    routeMapSvg: () => "<svg data-from-builder></svg>",
+    mapAttributionFor: () => "© OpenStreetMap contributors © CARTO",
+    document: { createElement: () => ({ className: "", id: "", style: {}, innerHTML: "" }) },
+    Math, Promise, String, Number,
+  };
+  const keys = Object.keys(env);
+  const api = new Function(...keys, src + "; return { draw: drawLiveMap, paint: paintLiveRoute };")(
+    ...keys.map((k) => env[k]));
+  return { api, LIVE, fetches: () => fetches, el, kids, frames: () => framesAsked };
+}
+
 test("BLOCKER: the start screen's map goes through the cache, and only towards the free provider", () => {
   // ⚠️ THIS IS THE ONE THAT COST SOMETHING TO LEARN. It was written calling loadRouteMap directly, and
   // test/route-map-cache.test.ts caught it: a second caller of the tile fetcher re-fetches billed tiles
@@ -75,24 +129,105 @@ test("BLOCKER: the start screen's map goes through the cache, and only towards t
   const live = fn("liveMapFor");
   assert.match(live, /routeMapFor\(/, "the live map fetches tiles itself instead of going through the cache");
   assert.ok(!/loadRouteMap\(/.test(live), "the live map is calling the tile fetcher directly again");
-  // ⚠️ AND IT DOES NOT FOLLOW A MOVING RUNNER. A map that tracked the run would be a tile fetch every
-  // few seconds for its whole length.
-  const draw = fn("drawLiveMap");
-  assert.match(draw, /LIVE\.started/, "the map is drawn during the run, which is a tile fetch per tick");
-  // ⚠️ THE EARLY RETURN, NOT THE MENTION. The first version of this asserted that LIVE.mapKey appears
-  // in the function — and it appears in the ASSIGNMENT too, so deleting the guard that reads it left
-  // this green while every tick re-fetched. A source assertion proves a string exists and never that
-  // anything acts on it.
-  assert.match(draw, /if \(!force && LIVE\.mapKey === key\) return;/,
-    "the same position re-fetches, so a jittering fix costs a tile fetch several times a second");
-  // ⚠️ AND THE KEY IS ROUNDED, or the guard is satisfied by a key that changes on every fix anyway.
-  assert.match(draw, /Math\.round\(LIVE\.lastLat \* \d+\)/,
-    "the map key is built from the raw coordinate, so it changes with every jitter");
   // ⚠️ AND THE ATTRIBUTION IS THE PROVIDER THAT SERVED THE TILES, not the one we would prefer.
   // Crediting Mapbox over CARTO's tiles is a licence breach this project has made once already.
-  assert.match(draw, /mapAttributionFor\(r\.prov\)/,
+  assert.match(fn("drawLiveMap"), /mapAttributionFor\(r\.prov\)/,
     "the live map credits a provider it did not necessarily use");
 });
+
+test("BLOCKER: a jittering fix costs no tiles, and a run costs one basemap per screenful", async () => {
+  // ⚠️ BEFORE THE RUN: the same rounded position must not re-fetch. A GPS fix jitters constantly and this
+  // screen can sit open for minutes, so keyed on the raw coordinate it would re-fetch several times a
+  // second — billed on Mapbox.
+  const a = mapRig(false);
+  for (let i = 0; i < 40; i++) {
+    a.LIVE.lastLat = 36.35 + (i % 2 ? 0.000004 : -0.000004);   // a few metres of noise
+    a.api.draw(false);
+    await Promise.resolve();
+  }
+  assert.equal(a.fetches(), 1, "a jittering fix re-fetched tiles " + a.fetches() + " times");
+
+  // ⚠️ DURING THE RUN: the basemap is HELD and the route is drawn over it, so covering ground inside the
+  // picture costs nothing. This is what makes one screen for the whole session affordable at all — the
+  // previous design simply refused to draw once running, which is why the map went blank.
+  const b = mapRig(true);
+  b.api.draw(false);
+  await Promise.resolve();
+  const afterFirst = b.fetches();
+  assert.equal(afterFirst, 1, "the first draw of a running map fetched " + afterFirst + " times");
+  for (let i = 1; i <= 60; i++) {
+    b.LIVE.lastLat = 36.35 + i * 0.000015;      // ~1.7 m per step, ~100 m in total
+    b.LIVE.route.push({ lat: b.LIVE.lastLat, lng: 28.2 });
+    b.api.draw(false);
+    await Promise.resolve();
+  }
+  assert.equal(b.fetches(), 1,
+    "moving inside the picture re-fetched the basemap " + b.fetches() + " times; the whole point of " +
+    "holding it is that a run costs one fetch per screenful of ground, not one per fix");
+
+  // ⚠️ AND IT DOES RE-ANCHOR WHEN THEY GENUINELY LEAVE IT, or the runner ends up off the edge watching a
+  // picture of where they used to be.
+  b.LIVE.lastLat = 36.35 + 0.02;                // ~2 km away, far outside the box
+  b.api.draw(false);
+  await Promise.resolve();
+  assert.equal(b.fetches(), 2,
+    "leaving the picture did not re-anchor it, so the dot is off the edge for the rest of the run");
+
+  // ⚠️ AND THE LINE IS DRAWN BY THE SHARED BUILDER, not by a second one. routeMapSvg is what the debrief
+  // and the share card use; a private path-builder here would be a second answer to "where does this line
+  // go", which is the fault that once stretched the debrief hero into a different shape.
+  const layer = b.el.querySelector(".lst-rt");
+  assert.ok(layer, "there is no route layer on the map");
+  assert.match(String(layer.innerHTML), /data-from-builder/,
+    "the route is not coming from routeMapSvg, so this screen draws the line its own way");
+  // And the dot is placed from the projection rather than pinned to the middle of the picture.
+  const me = b.kids.find((k: any) => k.className === "lst-me");
+  assert.ok(me, "there is no position marker on the map");
+  assert.ok(me.style.left && me.style.top,
+    "the marker is not positioned from the projection, so it sits in the centre wherever the runner is");
+});
+
+test("BLOCKER: a re-render mid-run puts the map back, because the DOM is what was emptied", async () => {
+  // ⚠️ render() REBUILDS #lMap, so a nav tap and back, a pause, or a theme change empties it while every
+  // cache key still matches. An early return keyed on the key alone left the map blank for the rest of the
+  // session — the same class of fault as the one that left it blank in the first place, and invisible to
+  // any guard that only reads the source.
+  const r = mapRig(true);
+  r.api.draw(false);
+  await Promise.resolve();
+  assert.equal(r.fetches(), 1);
+  assert.ok(r.el.querySelector(".lst-mapim"), "the basemap was never put in the DOM");
+  // ⚠️ THE RUNNER HAS TO HAVE MOVED FIRST, or this fixture cannot express the defect: with the position
+  // unchanged, re-deriving the framing gives the same answer as reusing it and the re-break escapes.
+  // Measured — it did. A few hundred metres, still well inside the picture.
+  for (let i = 1; i <= 30; i++) {
+    r.LIVE.lastLat = 36.35 + i * 0.00004;
+    r.LIVE.route.push({ lat: r.LIVE.lastLat, lng: 28.2 });
+  }
+  r.api.draw(false);
+  await Promise.resolve();
+  assert.equal(r.fetches(), 1, "moving inside the picture bought a new basemap");
+  // A render happens: the element is emptied and its children are gone.
+  r.kids.length = 0;
+  r.el.innerHTML = "";
+  r.api.draw(false);
+  await Promise.resolve();
+  assert.ok(r.el.querySelector(".lst-mapim"),
+    "the map stayed blank after a re-render, because the redraw was keyed on the cache and not on the DOM");
+  // ⚠️⚠️ AND IT COMES BACK FROM THE CACHE, WHICH MEANS THE SAME FRAMING WAS ASKED FOR. This is the billing
+  // invariant and it is the one that was broken: the redraw used to re-derive the framing from wherever the
+  // runner had got to, so every mid-run re-render was a different cache key and a fresh set of billed
+  // tiles. Visible in the browser as the composite coming back a CANVAS rather than an IMG, and here as two
+  // different origins.
+  assert.equal(r.fetches(), 2, "the redraw did not go through the cached fetcher");
+  const fr = r.frames();
+  assert.equal(fr.length, 2, "expected two framings to have been asked for");
+  assert.equal(fr[0].originX, fr[1].originX,
+    "the redraw asked for a different framing, so it bought a new basemap instead of reusing the held one");
+  assert.equal(fr[0].originY, fr[1].originY, "the redraw re-centred vertically, buying new tiles");
+  assert.equal(fr[0].z, fr[1].z, "the redraw changed zoom, buying new tiles");
+});
+
 
 test("BLOCKER: the signal indicator says nothing when there is no fix", () => {
   // ⚠️ ONE LIT BAR AND NO FIX ARE DIFFERENT SITUATIONS NEEDING DIFFERENT REACTIONS. A weak signal is

@@ -30,7 +30,32 @@ import { readFileSync } from "node:fs";
  * Reads the BUILT web/app.html because onGpsPos is web-layer code — same precedent as warmup-delivery.
  * Run `node web/app.ts` first.
  */
-function lift(names: string[]) {
+/**
+ * ⚠️ THE SECOND ARGUMENT EXISTS BECAUSE A HAND-WRITTEN LIFT LIST GOES STALE, AND HERE IT FAILED SILENTLY.
+ * When pedoFillGap gained a call to pedoCalScale, this list had neither that function nor the constant it
+ * reads — so every call threw a ReferenceError inside window.__interunPedometer's own try/catch, the fill
+ * did nothing at all, and four guards reported a broken PROGRAM rather than a broken harness. A lift list
+ * that omits a dependency measures a strictly easier program than the one that ships.
+ */
+function lift(names: string[], consts: string[] = []) {
+  const html = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
+  const cs = consts.map((n) => {
+    const m = new RegExp("(?:^|\\n)(const " + n + " = [^;]+;)").exec(html);
+    assert.ok(m, "not found in the build: const " + n);
+    return m![1]!;
+  });
+  return cs.concat(names.map((fn) => {
+    const at = html.indexOf("function " + fn + "(");
+    assert.ok(at >= 0, "not found in the build: " + fn);
+    let d = 0;
+    for (let i = html.indexOf("{", at); i < html.length; i++) {
+      if (html[i] === "{") d++;
+      else if (html[i] === "}") { d--; if (!d) return html.slice(at, i + 1); }
+    }
+    throw new Error("unbalanced braces in " + fn);
+  })).join("\n");
+}
+function liftOld(names: string[]) {
   const html = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
   return names.map((fn) => {
     const at = html.indexOf("function " + fn + "(");
@@ -318,7 +343,7 @@ test("the watch reads the fused HealthKit distance rather than only its own GPS 
  * a genuine gap once, and it refuses a reading no runner could produce.
  */
 function pedoHarness() {
-  const src = lift(["haversine", "onGpsPos", "pedoFillGap", "gpsFixElapsedMs", "checkSplits", "paceMark", "liveDistM"]);
+  const src = lift(["haversine", "onGpsPos", "pedoCalScale", "pedoFillGap", "gpsFixElapsedMs", "checkSplits", "paceMark", "liveDistM"], ["PEDO_CAL_MIN_M"]);
   const LIVE: any = {
     mode: "gps", dist: 0, route: [], elevGain: 0, splits: [], kmDone: 0, lastKmMs: 0, lastFixAt: null,
     lastLat: null, lastLon: null, lastAlt: null, devSpeed: null, acc: null,
@@ -393,8 +418,11 @@ test("the step counter is optional everywhere it is used", () => {
   assert.match(html, /if \(pedoAvailable\(\)\) pedoPost\("start"\)/, "the counter is started unguarded");
   assert.match(html, /if \(pedoAvailable\(\)\) pedoPost\("stop"\)/, "the counter is stopped unguarded");
   // ⚠️ Left running it is a battery drain nothing reads, and the next run opens with a stale baseline.
-  const stop = html.slice(html.indexOf("function stopLive("), html.indexOf("function stopLive(") + 1400);
-  assert.match(stop, /pedoPost\("stop"\)/, "stopLive does not stop the pedometer");
+  // ⚠️ THE WHOLE FUNCTION, NOT A CHARACTER WINDOW. This was a fixed 1400-character slice and it failed on
+  // a correct change the moment stopLive gained a comment — "a character window is not a card" is this
+  // project's own documented trap, and a guard that measures its subject by counting characters from the
+  // start of it will keep firing on innocent edits until it is stated properly.
+  assert.match(lift(["stopLive"]), /pedoPost\("stop"\)/, "stopLive does not stop the pedometer");
   // And its contribution must be visible, or a filler doing nothing and one doing too much look alike.
   assert.match(html, /function pedoDiagLine\(/, "the pedometer contribution is not surfaced");
   assert.match(html, /pedoDiagLine\(\),/, "pedoDiagLine is defined but never shown in Your data");
@@ -486,7 +514,7 @@ test("a live fix is unaffected — its time is where it always was", () => {
 test("a stretch that crosses two kilometres at once records both, and marks them estimated", () => {
   // ⚠️ A single credited GPS fix can never do this — the 200 m spike gate forbids it. The path that
   // genuinely can is the pedometer filling a long blackout, which adds the whole stretch in one go.
-  const src = lift(["haversine", "onGpsPos", "pedoFillGap", "gpsFixElapsedMs", "checkSplits", "paceMark", "liveDistM"]);
+  const src = lift(["haversine", "onGpsPos", "pedoCalScale", "pedoFillGap", "gpsFixElapsedMs", "checkSplits", "paceMark", "liveDistM"], ["PEDO_CAL_MIN_M"]);
   const LIVE: any = {
     mode: "gps", dist: 900, route: [], elevGain: 0, splits: [], kmDone: 0, lastKmMs: 0,
     startMs: 0, pausedMs: 0, lastFixAt: null,
@@ -537,7 +565,7 @@ test("an estimated split is never judged against the target band", () => {
  * Every scenario here is deterministic; the tolerances come from the measured probe matrix.
  */
 function settleHarness() {
-  const src = lift(["haversine", "onGpsPos", "pedoFillGap", "gpsFixElapsedMs", "checkSplits", "paceMark", "liveDistM"]);
+  const src = lift(["haversine", "onGpsPos", "pedoCalScale", "pedoFillGap", "gpsFixElapsedMs", "checkSplits", "paceMark", "liveDistM"], ["PEDO_CAL_MIN_M"]);
   const LIVE: any = {
     mode: "gps", dist: 0, route: [], elevGain: 0, splits: [], kmDone: 0, lastKmMs: 0, lastFixAt: null,
     lastLat: null, lastLon: null, lastAlt: null, devSpeed: null, acc: null,

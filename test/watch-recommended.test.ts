@@ -435,15 +435,21 @@ test("BLOCKER: the wrist's controls reach the phone's own pause and finish, thro
     snapshot() { return { status: this.status }; },
   };
   const LIVE: any = { rt, mode: "gps", pausedMs: 0, pauseStart: 0, done: false, ui: 1, win: [] };
+  // ⚠️ coachStop JOINED THIS LIST when pausing learned to silence the line already in flight — the
+  // clearSchedule it posts reaches Swift's stop(), which cuts a page clip without reporting back, so the
+  // pause cue was being spoken into a queue behind a line that could never end. A hand-written lift list
+  // going stale is the acceptable kind of stale: it fails loudly with a ReferenceError rather than quietly
+  // measuring an easier program.
   const api = new Function("LIVE", "liveNowMs", "liveCue", "stopLive", "coachNativePost",
     "coachNativeSchedule", "gpsUiTick", "startLoop", "haptic", "pushLiveActivity", "renderLiveNow",
-    "renderUnlessTyping", "liveFinish", "setInterval", "Date", "window",
+    "renderUnlessTyping", "liveFinish", "coachStop", "setInterval", "Date", "window",
     fnBody("livePauseSet") + "\n" + winFn("__interunWatchControl") +
     "\nreturn { set: livePauseSet, cmd: window.__interunWatchControl };")(
     LIVE, () => 1000, () => {}, () => calls.push("stopLive"), () => calls.push("clearSchedule"),
     () => calls.push("schedule"), () => {}, () => calls.push("startLoop"),
     (k: string) => calls.push("haptic:" + k), () => calls.push("push"), () => calls.push("render"),
-    () => calls.push("render2"), (c: boolean) => calls.push("liveFinish:" + c), () => 9, Date, {});
+    () => calls.push("render2"), (c: boolean) => calls.push("liveFinish:" + c),
+    () => calls.push("coachStop"), () => 9, Date, {});
 
   api.cmd("pause");
   assert.equal(rt.status, "paused", "the wrist's Pause did not pause the phone's run");

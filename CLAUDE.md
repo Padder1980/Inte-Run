@@ -10380,3 +10380,204 @@ is the category that ceiling exists to permit and the one case that **cannot** b
 Driven end to end in a real browser at 430×932 and 320×568, `--tscale` 1.0 and 1.3, both themes: all five
 features present, nothing self-starting, Start always on screen, view scroll 0, page overflow 0, no two
 floating controls overlapping in any of eight states, and **zero console errors**.
+
+## THE LOCKED PHONE, THE THIRD REPORT: THREE SEPARATE FAULTS IN ONE RUN (owner, 2026-08-24)
+
+*"we still have a major issue with the phone recorded run not being accurate whilst it's locked unless
+you fixed it in that last task you did? you need to find a fix for this, even if it means that nothing
+records on the watch and there are no watch screens for phone recorded runs"* — with three screenshots
+of a walked, custom, distance-gated 1 km run: the lock-screen card reading **11:15 / 0.94 km / 10:02**,
+the saved run reading **1.00 km / 11:22 / 11:19 per km**, and written on the third *"Completed session
+cue still fires approximately 20–30 seconds after the session finished card appears"*.
+
+⚠️ **THERE WERE THREE UNRELATED FAULTS IN THAT ONE RUN, AND ONLY ONE OF THEM WAS THE RECORDED
+DISTANCE.** Answering "is it accurate?" with one number would have been wrong three ways.
+
+⚠️ **AND THE ANSWER TO HIS DIRECT QUESTION IS: HALF YES, AND THE HALF HE NEEDED NEVER SHIPPED.** His web
+layer is the newest there is (`docs/index.html` carries `BUILD "2026-08-24 11:23"`, which is HEAD), so
+every page-side fix is on his phone. **`ios/InteRun/CardDistance.swift` — the one change that makes the
+lock-screen distance keep moving — is native and has never been built onto the device.** The repo's own
+rebuild ritual (a `Build NNN` commit within ~3 minutes of every native change) stops at Build 458,
+**41 minutes before** `ec73065` committed it.
+
+### ⚠️⚠️ THE RECORD IS ACCURATE IN EVERY WORLD, UNLESS iOS'S STEP COUNTER OVER-READS
+
+Reproduced his run through `test/locked-screen-distance.test.ts`, which lifts the REAL `onGpsPos` /
+`pedoFillGap` / `checkSplits` / `paceMark` / `gpsUiTick` out of the built page and replays a buffered
+burst exactly as `LocationService` does on `didBecomeActive`: a 1 km gate, walked at 1.474 m/s, 460 s
+locked, swept across suspended / throttled / awake × Doppler / no-Doppler × accuracy 8 / 20.
+
+**Accurate to within 1.2% in every one of those worlds — locked makes no difference at all.** But at a
+step-counter scale of 1.15 the run recorded **+7.6% and the 1 km gate fired at 932 m** of ground
+actually covered; at 1.3, **+19.6% and 855 m**; at 1.5, **+34.8%**. Identical suspended, throttled and
+awake, so **it was never a lock defect** — and a WALKED run is exactly where iOS over-reads, because the
+stride length it infers distance from is calibrated on running strides.
+
+⚠️ **THE MECHANISM: `pedoFillGap` CREDITS ITS METRES STRAIGHT INTO `LIVE.dist` AND THE SURPLUS IS
+WRITTEN OFF — AND WRITTEN OFF MEANS KEPT.** GPS settles what its own displacement covers; whatever is
+left is `path − chord` and is deliberately not carried forward. Measured, `writtenOff` 71 m against a
+70 m over-credit: the write-off was absorbing a stride-model error it cannot tell from a bend.
+
+⚠️ **SO THE FIX IS TO SEPARATE THEM, AND THE DISCRIMINATOR IS THAT ONE IS GEOMETRIC AND THE OTHER IS
+SYSTEMATIC.** `path − chord` exists only across the blackout's own bends. A stride-model error is on
+every metre — **including the healthy ones, where GPS is right there to compare against.** `pedoCalScale`
+divides the fill by what the step counter measures per GPS metre, and the write-off keeps the rest.
+
+| | before | after |
+|---|---|---|
+| his run, step scale 1.15 | gate@**932 m**, **+7.6%** | gate@1002 m, −0.1% |
+| his run, step scale 1.3 | gate@**855 m**, **+19.6%** | gate@1002 m, −0.1% |
+| his run, step scale 1.5 | gate@**855 m**, **+34.8%** | gate@1002 m, −0.1% |
+| dark tunnel, scale 1.3 | **+4.0%** | −6.3% (identical to an honest counter) |
+| bends 0 / 180 / 360° | −0.3 / −0.5 / −0.8% | unchanged |
+| 20-minute lock | −0.1% | −0.1% |
+| **split times: mean error** | **16.9%** | **12.4%** |
+| **untimeable (zero-second) splits** | **6** | **0** |
+| worst split error | 155% | 91% |
+
+⚠️ **THE GATE IS THE HALF THAT HURTS MOST.** A distance-gated session is completed BY the credited total,
+so an over-read does not merely print a wrong number — it ends the session before the runner has covered
+the distance, stamps a split that never happened, and says "well done" for ground they did not run.
+
+### ⚠️⚠️ THREE WRONG VERSIONS OF THE ESTIMATOR, EACH MEASURED, AND THE ORDER MATTERS
+
+The estimator is trivial to write and every obvious form of it is biased. On a purely healthy run its
+bias is **0.998–1.010** across every speed, scale and accuracy — so whenever a reading looked wrong, the
+denominator was wrong, not the idea.
+1. ⚠️ **ACCUMULATING EACH SIDE INDEPENDENTLY READS 1.15 FOR A COUNTER THAT IS EXACTLY 1.00.** The healthy
+   branch tolerates **twenty seconds of GPS silence** before it calls a gap a gap, so every blackout opens
+   with twenty seconds of pedometer metres against no GPS at all. And that 15% error made a genuine
+   two-minute tunnel **worse** rather than better: −6.4% → −11.1%.
+2. ⚠️ **REQUIRING BOTH SIDES POSITIVE IN THE SAME TICK IS BIASED THE OTHER WAY.** GPS commits in
+   leash-sized steps roughly every seventh second while the step counter reports every one, so it throws
+   away six sevenths of the pedometer's metres.
+3. ⚠️ **AND DERIVING THE GPS SIDE FROM `LIVE.dist` READS 1.15 TOO**, because a replayed backlog dumps its
+   whole settlement residual into one interval the step counter never saw — measured, ~525 m in a single
+   tick on a 20-minute lock.
+
+**What works is holding the pedometer's metres PENDING until a GPS credit covers them.** They are
+committed by the credit that pays for them and dropped by the fill that bills them, which is the only
+form that compares like with like.
+
+⚠️ **AND THE PLACE MATTERS: IT CANNOT BE DONE AT THE GPS CREDIT SITE.** That was the first attempt and it
+measured as an exact no-op (`cal 0/0` on every row) — `pedoFillGap`'s healthy branch resets the baseline
+on **every tick**, so by the time `onGpsPos` looks there is no delta left to read.
+
+⚠️ **A SKIP-THE-TICK-AFTER-A-BLACKOUT COUNTER WAS BUILT AND THEN REMOVED, AND THAT IS RECORDED SO IT IS
+NOT BUILT AGAIN.** It was written for a real hazard and measured **byte-identical on every trace** — his
+run, a 20-minute lock, a dark tunnel, bends, at scales 1.0 and 1.3 — because the pending bucket already
+subsumes it. Three unfalsifiable moving parts in the most delicate arithmetic in the app is how the next
+reader is misled. ⚠️ `LIVE.gpsCredM` is **also** measured equivalent to `LIVE.dist` here and is kept only
+because it makes the quantity mean what its name says; that is recorded beside it as principled rather
+than demonstrated.
+
+### ⚠️⚠️ THE COMPLETION CUE'S 20–30 SECONDS: `liveFinish` TEARS THE COACH DOWN BEFORE IT SPEAKS
+
+The fix shipped for his first report was not wrong and WAS on his phone. It was defeated by the two lines
+that run immediately before the cue is fired:
+1. `liveFinish` opens with `stopLive()`, **eight statements before** `coachTrigger("session-complete")`.
+2. `stopLive` posts `clearSchedule`, which reaches Swift's `CoachAudioService.stop()` →
+   `player?.stop(); player = nil`. ⚠️ **`AVAudioPlayer.stop()` DOES NOT FIRE
+   `audioPlayerDidFinishPlaying`**, which is the only path a page clip has back to the page — so
+   `COACH.current` stayed set for ever.
+3. `stopLive` also clears `LIVE.ui`, the only clock that calls `coachReleaseStale`.
+4. `session-complete` is `interrupt: false`, and `shouldInterrupt` needs `interrupt && priority >`, so
+   the most important line in the run was pushed onto the queue by a cue of **any** priority — on his
+   run almost certainly the kilometre-1 milestone replayed from the unlock burst microseconds earlier.
+5. Nothing could then drain the queue but the shim's own **15-second watchdog**. That is the floor;
+   a second queued cue and its clip take it to 20–30 s.
+
+⚠️⚠️ **HIS STRONGEST CLUE IS WHAT CONFIRMED IT, AND IT IS A SECOND DEFECT IN ITS OWN RIGHT.** His music
+ducked on time and the voice came half a minute later. The duck is `sess.setActive(true)` with
+`.duckOthers`, fired the instant a clip is handed over and **before the player is even constructed**; the
+un-duck is `releaseSession()` with `.notifyOthersOnDeactivation`, reachable **only** from
+`audioPlayerDidFinishPlaying` or `stopPagePlayback`. `stop()` reached neither. So the runner's music was
+held down for a clip that had been cut off, with nothing playing at all. **Duck-and-abandon has exactly
+that signature, and ducking is therefore not evidence that anything was audible.**
+
+**The fix is three lines in three places, and the reasoning for each is different:**
+- ⚠️ **`stopLive` now calls `coachStop()`** — the same reasoning that makes `clearSchedule` right makes
+  this right, and that function's own comment already said it: *"A cue arriving from a run that is over
+  is the worst kind of ghost."* A cue **still playing** from a run that is over is the same ghost.
+  Chosen over giving `session-complete` interrupt rights, which would cut a line off mid-word in every
+  other situation — whereas the run ending is the one moment at which every line in flight is about
+  something that is no longer happening. It also means the completion cue meets an EMPTY queue.
+- ⚠️ **`livePauseSet` NOW TEARS DOWN BEFORE IT SPEAKS, AND IT HAD THE SAME DEFECT PLUS ONE.** `rt.pause()`
+  emitted the pause line and *then* `clearSchedule` cut it off — and `paused_1` is `P_INFO`, so it could
+  never have interrupted a milestone anyway. ⚠️ **And my `stopLive` change would have silenced the
+  treadmill pause cue**, because that branch calls `stopLive()` after `rt.pause()`. Both branches now
+  tear down first. `pauseStart` moving up with it is safe: `liveNowMs` reads `pausedMs`, which
+  `pauseStart` only feeds on resume.
+- ⚠️ **Swift's `stop()` now reports the page's pending token and delegates to `stopPagePlayback`**, which
+  has always done it correctly — nil the delegate, stop, release. **Two teardowns for one player with
+  opposite discipline** is the fix-one-builder-and-not-the-other trap. ⚠️ The report must PRECEDE the
+  token clear: a report carrying token 0 is dropped by the shim as a late answer for a clip it has moved
+  past. **This half is native and needs an Xcode build.**
+
+⚠️ **`coachNativeSchedule` ALSO POSTS `clearSchedule` AND MUST NOT SILENCE ANYTHING** — it means "there is
+nothing to schedule", and all four of its callers (`coachRescheduleTick`, `startGps`, `startSim`,
+`coachRouteCue`) are inside a live run, with `liveFinish` clearing the ticks before the completion cue is
+fired. The guard is therefore a **census of the three posters**, not a blanket sweep, so a fourth forces a
+decision rather than passing quietly.
+
+### THE COMPANION IS NOT IMPLICATED — DO NOT SPEND HIS PERMISSION
+
+He authorised dropping watch recording and watch screens for phone runs. Traced: the companion's single
+entry into the run is `heartRateBpm`, which `SessionRuntime.update` stores and reports and never reads
+again; every writer of `LIVE.dist`, `pendM`, `pedoPaid`, `startMs`, `pausedMs` and `kmDone` was swept and
+none is companion. `CompanionSession`'s `HKWorkoutSession` runs on the **watch**, never calls
+`startMirroringToCompanionDevice`, and constructs no `WorkoutVoice`, so it claims no audio route and
+changes nothing about the phone's background execution or CoreLocation delivery. Its traffic is ~227 tiny
+inbound messages over 11:22 against a continuous `bestForNavigation` stream.
+⚠️ **Dropping it would lose the entire heart section of the debrief, the HR samples written to Apple
+Health, the >92%-of-max safety cue and the wrist's pause/resume/finish controls, and gain nothing
+measurable.** Reported to him rather than done.
+
+### Traps this work paid for, and two of them were silent
+
+⚠️⚠️ **A STALE HAND-WRITTEN LIFT LIST FAILED SILENTLY AND MADE ME MEASURE A BROKEN HARNESS AS BROKEN
+CODE.** `pedoFillGap` gained a call to `pedoCalScale`; the harness had neither it nor the constant it
+reads, so every call threw a ReferenceError **inside `window.__interunPedometer`'s own try/catch**, the
+fill did nothing, and the probe reported a two-minute tunnel at −40.3% as though the fix had destroyed
+it. `test/gps-distance.test.ts` had the same hole in three lift lists — there it failed loudly, which is
+the acceptable kind. **A lift list that omits a dependency measures a strictly easier program**, and
+`lift()` in both files now carries consts so the omission cannot recur.
+⚠️ **A 1400-CHARACTER WINDOW IS NOT A FUNCTION.** `the step counter is optional everywhere it is used`
+sliced `stopLive` by character count and failed the moment it gained a comment. **A character window is
+not a card**, for the sixth time in this file.
+⚠️ **THE zsh WORD-SPLITTING TRAP FIRED EXACTLY AS THIS FILE WARNS.** `node --test $FILES` passed one
+bogus filename, printed nothing, and reported **twelve consecutive escapes** on re-breaks that were all
+being caught. Use an array.
+⚠️ **TWO RE-BREAK ANCHORS WERE AMBIGUOUS AND SILENTLY EDITED THE WRONG SITE** — `const list =
+loadShoes().filter(…)` appears three times, and `        stopPagePlayback()` appears at line 329 before
+the one in `stop()` at 385. Both read as escapes. **Scope a re-break to the function under test.**
+⚠️ **A GUARD TRIPPED ON A NEIGHBOUR'S VOCABULARY**: sweeping for `/clearSchedule/` flagged
+`trialSaveResult`, whose only crime is calling `clearScheduledTrial()`.
+⚠️ **AND ONE OF MY OWN GUARDS WAS SATISFIED BY THE WRONG BRANCH.** `/step scale/` in the diagnostic is
+matched by `"step scale not measured"`, so deleting the numeric branch escaped. Both branches are now
+named separately.
+⚠️ **TWO PRE-EXISTING SPLIT GUARDS RESTED ON A VACUITY CHECK THEY CAN NO LONGER SATISFY** — "the sweep
+must have seen an untimeable split". Calibrating the step counter makes the fill bill a blackout
+accurately, so the backlog is spent settling it and no stale-clocked fix crosses a boundary: untimeable
+splits went **6 → 0**. Restoring the floor would be asserting a defect back into existence, so the
+invariant moved to `splitAt`, a direct driver of `checkSplits` where **the clock collision is the
+fixture** and cannot go vacuous.
+
+⚠️ **THE MAC'S TOOLCHAIN HAS DEGRADED AGAIN AND IT BOUNDS WHAT COULD BE VERIFIED.** node had already
+vanished from the PATH (it is at `~/.local/node-v24.18.0-darwin-arm64/bin`); now there are **no simulator
+runtimes and no on-device platform component**, so `xcodebuild` cannot build any target at all. The Swift
+change is verified by `swiftc -typecheck` over the whole module (`ios/InteRun/*.swift` +
+`ios/InteRunShared/*.swift`) — **zero errors** — and by nothing stronger. Single-file typechecking is
+useless here and looks alarming: it reports 36 errors that are all `cannot find X in scope`.
+
+### What to ask him to read off his own phone
+
+⚠️ **BEFORE CLOSING THE APP** — `GPS_DIAG_LAST` and `PEDO_DIAG_LAST` are module-level variables, so a
+force-quit erases them. Support › Your data:
+- **`steps:` … `step scale N.NNx over Mm`** — the new figure. Near 1.00 means iOS's stride model agreed
+  with GPS on that run and the calibration changed nothing; well above it means the fill was being
+  scaled down and this was his defect. **"not measured"** means under 150 m of healthy GPS, so nothing
+  was scaled.
+- **`web layer:`** — must read `over-the-air 2026-08-24 …` or later.
+- **`coach:`** — `missing`/`failed` climbing means the cue map never landed; a clean line with the audio
+  still late is new information.

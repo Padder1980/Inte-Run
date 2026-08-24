@@ -352,13 +352,37 @@ final class CoachAudioService: NSObject, WKScriptMessageHandler, AVAudioPlayerDe
         timer = t
     }
 
+    /// ⚠️⚠️ THIS TEARS DOWN THE SCHEDULE, AND IT MUST TEAR DOWN A PAGE CLIP PROPERLY TOO. It used to do
+    /// `player?.stop(); player = nil` and nothing else, and that ONE line is most of the owner's
+    /// "the voice stating that the session had finished didn't arrive until approximately 30 seconds
+    /// afterwards".
+    ///
+    /// `AVAudioPlayer.stop()` does NOT fire `audioPlayerDidFinishPlaying`, which is the only path a page
+    /// clip has to `pageDone` and to `releaseSession()`. So cutting a clip here left two things stranded:
+    /// the page never learned its clip had ended, so `COACH.current` stayed set and the completion cue
+    /// queued behind a dead line until the page's own 15-second watchdog fired; and the audio session was
+    /// never deactivated, so the runner's music stayed DUCKED with nothing playing at all. That is exactly
+    /// what he reported — the music dropped on time and the voice came half a minute later.
+    ///
+    /// ⚠️ `stopPagePlayback` twelve lines below has always done it correctly — nil the delegate, stop,
+    /// release. Two teardowns for one player with opposite discipline is the fix-one-builder-and-not-the-
+    /// other trap this project has paid for repeatedly; this one now delegates to it rather than
+    /// re-implementing half of it.
+    /// ⚠️ AND THE PAGE IS TOLD WITH ok: false, BEFORE THE TOKEN IS CLEARED. A report carrying token 0 is
+    /// dropped by the shim as a late answer for a clip it has already moved past, so the order matters and
+    /// clearing it here rather than in `stopPagePlayback` is deliberate: that function is also the
+    /// ordinary `stopPage` path, where the SHIM has already cleared its own token and there is nothing to
+    /// report.
     private func stop() {
         timer?.invalidate()
         timer = nil
         cues = []
         played.removeAll()
-        player?.stop()
-        player = nil
+        if pageToken != 0 {
+            pageDone(pageToken, false)
+            pageToken = 0
+        }
+        stopPagePlayback()
     }
 
     private func tick() {

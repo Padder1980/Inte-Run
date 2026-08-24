@@ -8167,8 +8167,18 @@ function livePauseSet(paused) {
   if (!LIVE || LIVE.done) return false;
   const st = LIVE.rt.getStatus();
   if (paused && st === "active") {
+    // SILENCE WHATEVER IS MID-SENTENCE FIRST, THEN SPEAK THE PAUSE LINE. This used to run the other way
+    // round and it had two faults, one of them the same one that made the completion cue arrive half a
+    // minute late. The pause cue was emitted by rt.pause() and then clearSchedule cut it off natively --
+    // and AVAudioPlayer.stop() does not report back, so the page never learned its clip had ended and
+    // COACH.current stayed set for the rest of the run. On top of that the paused line itself is P_INFO,
+    // so shouldInterrupt could not clear a milestone line ahead of it whatever happened.
+    // Doing the teardown first means the pause line meets an empty queue and is heard.
+    // pauseStart moving up with it is safe: liveNowMs reads pausedMs, which pauseStart only feeds on
+    // resume, so rt.pause sees the same clock either way.
+    if (LIVE.mode === "gps") { coachStop(); LIVE.pauseStart = Date.now(); coachNativePost({ action: "clearSchedule" }); }
+    else stopLive();
     LIVE.rt.pause(liveNowMs()).forEach(liveCue);
-    if (LIVE.mode === "gps") { LIVE.pauseStart = Date.now(); coachNativePost({ action: "clearSchedule" }); } else { stopLive(); }
     return true;
   }
   if (!paused && st === "paused") {
@@ -17740,7 +17750,14 @@ function pedoDiagLine() {
     " \u00b7 settled " + Math.round(p.settled || 0) + "m" +
     " \u00b7 written off " + Math.round(p.writtenOff || 0) + "m" +
     ((LIVE && LIVE.pedoPaid > 0) ? " \u00b7 owing " + Math.round(LIVE.pedoPaid) + "m" : "") +
-    ((p.capped || 0) ? " \u00b7 refused " + p.capped + " implausible" : "");
+    ((p.capped || 0) ? " \u00b7 refused " + p.capped + " implausible" : "") +
+    // \u26a0 THE SCALE IS ON THE LINE BECAUSE AN OVER-READING STEP COUNTER LOOKS EXACTLY LIKE AN ACCURATE
+    // ONE FROM THE OUTSIDE. A figure near 1.00 means iOS's stride model agreed with GPS on this run; well
+    // above it means the fill was being scaled down, and is the difference between reading this line and
+    // guessing. "not measured" is its own answer: fewer than 150 m of healthy GPS, so nothing was scaled.
+    (p.calGps > PEDO_CAL_MIN_M
+      ? " \u00b7 step scale " + (p.calPed / p.calGps).toFixed(2) + "x over " + Math.round(p.calGps) + "m"
+      : " \u00b7 step scale not measured");
 }
 function viewportDiag() { return viewportDiagLines().join(" \u00b7 "); }
 function probeInsets() {
@@ -22060,6 +22077,23 @@ window.__interunPedometer = function (d) {
  * plenty of fixes; they are simply too vague to trust, and it is exactly then that the distance stops
  * advancing. Measuring "time since we last believed something" is the condition that matters.
  */
+/**
+ * HOW MANY METRES THE STEP COUNTER REPORTS FOR EVERY METRE GPS DOES.
+ *
+ * \u26a0 CLAMPED, AND THE CLAMP IS WHAT BOUNDS EVERY PATHOLOGICAL CASE. The sample is only taken while GPS
+ * is healthy and nothing is owing, but "healthy" is not "correct": a stretch where the receiver is cutting
+ * corners inflates this, and a stretch it over-reads deflates it. Outside 0.7\u20131.6 the reading is not a
+ * stride-model error, it is one of the two signals being wrong, and the honest answer is then to trust
+ * neither and scale by nothing.
+ * \u26a0 AND IT NEEDS A REAL SAMPLE FIRST. Estimated off the first few fixes it would be noise, applied to
+ * the whole run \u2014 150 m is roughly two minutes of easy running, and until then it answers 1, which is
+ * exactly the behaviour this app shipped with.
+ */
+const PEDO_CAL_MIN_M = 150;
+function pedoCalScale(p) {
+  if (!p || !(p.calGps > PEDO_CAL_MIN_M) || !(p.calPed > 0)) return 1;
+  return Math.max(0.7, Math.min(1.6, p.calPed / p.calGps));
+}
 function pedoFillGap() {
   const p = LIVE && LIVE.pedo;
   if (!p || p.off || LIVE.mode !== "gps") return;
@@ -22071,9 +22105,65 @@ function pedoFillGap() {
   // it only at the instant of a GPS credit is not enough: pedometer updates arrive on their own
   // schedule, so a reading that lands a moment after a credit describes ground GPS has already paid
   // for — and the next blackout would bill for it a second time. Caught by a test, not by reading it.
-  if (quietMs < 20000) { p.mark = p.metres; p.markAt = Date.now(); return; }
-  const walked = p.metres - p.mark;
-  if (!(walked > 0)) { p.markAt = Date.now(); return; }
+  if (quietMs < 20000) {
+    // \u26a0\u26a0 THIS IS WHERE THE STEP COUNTER IS MEASURED AGAINST GPS, and it is the only place the
+    // comparison can be made. iOS derives its distance from a stride length it INFERS, so it carries a
+    // systematic scale error for this runner on this run: measured through this file's own harness, a step
+    // counter reading 1.15x the truth records the whole run +7.6% long and fires a 1 km distance gate at
+    // 932 m of ground actually covered \u2014 and at 1.3x it is +19.6% and 855 m. Identical whether the
+    // screen is locked, throttled or awake, so it is not a lock defect at all. A WALKED run is exactly
+    // where iOS over-reads, because the stride model is calibrated on running strides.
+    // \u26a0 THE SURPLUS WAS INDISTINGUISHABLE FROM PATH-MINUS-CHORD, which is why the write-off in onGpsPos
+    // was absorbing it. The two are different animals: path-minus-chord is GEOMETRIC and exists only across
+    // the blackout's own bends, while a stride-model error is SYSTEMATIC and present on every metre \u2014
+    // including the healthy ones, where GPS is right here to compare against. Removing the systematic half
+    // leaves the geometric half alone, which is what the write-off is for.
+    // \u26a0 IT CANNOT BE DONE AT THE GPS CREDIT SITE, and that was tried and measured as a no-op. This
+    // branch resets the baseline on EVERY tick, so by the time onGpsPos looks, p.metres - p.mark is exactly
+    // zero and there is no delta left to read. Measured: cal 0/0 on every row.
+    // \u26a0 BOTH SIDES ACCUMULATE INDEPENDENTLY, over the same span, and requiring both to be positive in
+    // the same tick was wrong: GPS commits in leash-sized steps roughly every seventh second while the step
+    // counter reports every one, so a both-positive gate throws away six sevenths of the pedometer's metres
+    // and biases the ratio down. Summing each counter's own deltas over one span gives each total honestly.
+    // \u26a0 AND ONLY WHILE NOTHING IS OWING. With a blackout debt outstanding, part of what GPS credits is
+    // settling ground the pedometer already billed, so the two are no longer measuring the same metres.
+    const dPed = p.metres - p.mark;
+    const gps = LIVE.gpsCredM || 0;
+    const dGps = gps - (p.calDist == null ? gps : p.calDist);
+    // A SKIP-THE-FIRST-TICK-AFTER-A-BLACKOUT COUNTER WAS BUILT HERE AND REMOVED, AND THAT IS WORTH
+    // RECORDING SO IT IS NOT BUILT AGAIN. It was written to keep a replayed backlog's residual GPS credit
+    // out of the estimate, which is a real hazard — but measured against every trace this file can
+    // produce (his run, a 20-minute lock, a dark tunnel, bends, at step scales 1.0 and 1.3) it changed
+    // the estimate by nothing at all, because holding the pedometer's metres PENDING already means an
+    // interval with no pedometer contribution commits nothing. Three unfalsifiable moving parts in the
+    // most delicate arithmetic in the app is how the next reader is misled.
+    // AND THE STEP COUNTER'S METRES ONLY COUNT IF A GPS CREDIT ARRIVES FOR THE SAME GROUND. They are held
+    // pending until one does. Adding both sides independently was the obvious version and it is biased,
+    // because this branch tolerates up to twenty seconds of GPS silence before it calls a gap a gap: every
+    // blackout therefore begins with twenty seconds of pedometer metres against no GPS at all, which on
+    // measurement pushed a true 1.00 to 1.15 and made a genuine two-minute tunnel worse rather than better.
+    // Requiring both to be positive in the same tick is the other obvious version and is biased the other
+    // way, because GPS commits in leash-sized steps roughly every seventh second while the step counter
+    // reports every one. Holding the pedometer's metres pending is the only form that compares like with
+    // like: they are committed by the GPS credit that covers them, and dropped by the fill that bills them.
+    if (!(LIVE.pedoPaid > 0)) {
+      if (dPed > 0) p.calPend = (p.calPend || 0) + dPed;
+      if (dGps > 0) {
+        p.calPed = (p.calPed || 0) + (p.calPend || 0);
+        p.calGps = (p.calGps || 0) + dGps;
+        p.calPend = 0;
+      }
+    }
+    p.calDist = gps;
+    p.mark = p.metres; p.markAt = Date.now(); return;
+  }
+  // \u26a0 CALIBRATED BEFORE IT IS CREDITED, NOT AFTER. Correcting the total later cannot work: the fill is
+  // what crosses kilometre boundaries and what completes a distance-gated step, so an over-read that is
+  // tidied up at the end has already ended the session early and stamped a split that never happened.
+  const raw = p.metres - p.mark;
+  if (!(raw > 0)) { p.markAt = Date.now(); return; }
+  p.scale = pedoCalScale(p);
+  const walked = raw / p.scale;
   // ⚠️ 6 m/s is faster than almost anyone runs. A pedometer reading beyond that for the elapsed gap is
   // miscounting, not sprinting, and is refused rather than trusted.
   const cap = (Date.now() - p.markAt) / 1000 * 6;
@@ -22093,6 +22183,12 @@ function pedoFillGap() {
   LIVE.pedoUntil = Date.now();
   p.mark = p.metres;
   p.markAt = Date.now();
+  // \u26a0 A FILL'S OWN METRES ARE NOT GPS. LIVE.dist grows here too, so without this the next healthy tick
+  // counts everything the pedometer just credited as though GPS had measured it \u2014 which would deflate
+  // the very scale this is calibrating and quietly switch the correction off.
+  p.calDist = LIVE.gpsCredM || 0;
+  // The metres this fill just billed are blackout metres, not calibration data.
+  p.calPend = 0;
   // ⚠️ THE PACE WINDOW IS TOLD, TOO. It is a window over CREDIT events, and this is the one path that
   // credits ground with no GPS fix behind it — leaving it out would divide a stretch the pedometer
   // paid for by a span that does not include it. Measured with this line deleted: the derived pace is
@@ -22290,6 +22386,19 @@ function onGpsPos(pos) {
     if (credit > spdCap) { credit = spdCap; D.capped++; }
   }
   LIVE.dist += credit;
+  // GPS'S OWN HONEST GROUND, WHICH IS WHAT THE STEP COUNTER IS CALIBRATED AGAINST. It has to be credit
+  // and not net: net is the raw displacement, and where it overlaps a stretch the pedometer already
+  // billed, the settlement above has just subtracted that overlap. So this counts the ground GPS measured
+  // and nobody else had paid for, which is exactly the right denominator.
+  // IT IS NOT LIVE.dist BECAUSE THAT TOTAL MEANS SOMETHING ELSE: it also grows by the fill itself and by
+  // every settlement lump, so it is "the distance", not "the ground GPS measured". Naming the quantity
+  // correctly is the point.
+  // ⚠️ AND SUBSTITUTING LIVE.dist HERE IS MEASURED EQUIVALENT ON EVERY TRACE AVAILABLE — his run, a
+  // 20-minute lock, a dark tunnel and bends, at step scales 1.0 and 1.3, all byte-identical — so this is
+  // recorded as principled rather than as demonstrated, and nobody should "verify" it by deleting it.
+  // What makes it safe rather than decorative is that the interval is bounded either way: pedoFillGap
+  // resets the baseline, so a fill's own metres never enter the comparison whichever total is read.
+  LIVE.gpsCredM = (LIVE.gpsCredM || 0) + credit;
   // ⚠️ THE PACE WINDOW IS A WINDOW OVER CREDITS, so it is told here rather than on the UI tick. The
   // fix's own clock, for the same reason the route point below carries it: a replayed backlog stamped
   // on arrival collapses into one instant, and a pace derived across that instant is arithmetic on a
@@ -32397,6 +32506,29 @@ function stopLive() {
   // Whatever ended the run — finished, discarded, or the runner walking away — the locked-phone schedule
   // goes with it. A cue arriving from a run that is over is the worst kind of ghost.
   coachNativePost({ action: "clearSchedule" });
+  // AND SO DOES THE LINE THAT IS STILL PLAYING, WHICH IS THE SAME GHOST AND WAS THE REASON THE
+  // COMPLETION CUE ARRIVED 20-30 SECONDS AFTER THE FINISH CARD.
+  //
+  // The chain, measured: clearSchedule above reaches CoachAudioService.stop(), which does
+  // player?.stop(); player = nil -- and AVAudioPlayer.stop() does NOT fire
+  // audioPlayerDidFinishPlaying, so the page's native shim is never told its clip ended and
+  // COACH.current stays set for ever. liveFinish then fires session-complete into a queue behind that
+  // dead line, and because session-complete is interrupt: false it defers to a line of ANY priority --
+  // including a priority-40 kilometre milestone from the backlog that the unlock burst had just
+  // replayed microseconds earlier. Nothing could then drain the queue except the shim's own 15-second
+  // watchdog, which is the measured floor; a second queued cue and its clip take it to 20-30 s.
+  //
+  // The owner's own strongest clue is explained by the same line: his music DUCKED on time and the
+  // voice came half a minute later. The duck is setActive(true) in Swift, fired the instant a clip is
+  // handed over and BEFORE the player is even constructed; the un-duck is releaseSession(), reachable
+  // only from audioPlayerDidFinishPlaying or stopPagePlayback. stop() reaches neither. So the music
+  // was ducked for a clip that had been cut off, with nothing playing at all.
+  //
+  // Silencing it here rather than giving session-complete interrupt rights is deliberate: interrupt
+  // would cut a line off mid-word in every other situation, whereas the run genuinely ending is the one
+  // moment at which every line still in flight is about something that is no longer happening. It also
+  // means the completion cue meets an EMPTY queue, so it plays at once rather than winning a race.
+  coachStop();
   // Keep the GPS accounting after LIVE is torn down, so Support › Your data can still answer "what did
   // GPS actually do on that run?" an hour later.
   if (LIVE.gpsDiag) GPS_DIAG_LAST = LIVE.gpsDiag;

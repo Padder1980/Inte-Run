@@ -53,6 +53,21 @@ function lift(names: string[]) {
     throw new Error("unbalanced braces in " + fn);
   }).join("\n");
 }
+/**
+ * ⚠️ THE HAND-WRITTEN LIFT LIST GOES STALE, AND HERE IT FAILED SILENTLY RATHER THAN LOUDLY. When
+ * pedoFillGap gained a call to pedoCalScale, this harness had neither that function nor the constant it
+ * reads — so every call threw a ReferenceError inside window.__interunPedometer's own try/catch, the fill
+ * did nothing at all, and the probe reported a two-minute tunnel at −40.3% as though the CODE were broken.
+ * A lift list that omits a dependency measures a strictly easier program. Consts need their own lifter.
+ */
+function liftConsts(names: string[]) {
+  const html = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
+  return names.map((n) => {
+    const m = new RegExp("(?:^|\\n)(const " + n + " = [^;]+;)").exec(html);
+    assert.ok(m, "not found in the build: const " + n);
+    return m![1]!;
+  }).join("\n");
+}
 function liftPedoEntry() {
   const html = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
   const at = html.indexOf("window.__interunPedometer = function");
@@ -63,6 +78,32 @@ function liftPedoEntry() {
     else if (html[i] === "}") { d--; if (!d) return "const pedoEntry = " + html.slice(html.indexOf("function", at), i + 1) + ";"; }
   }
   throw new Error("unbalanced braces in the pedometer entry point");
+}
+
+/**
+ * DRIVE checkSplits DIRECTLY, WITH THE CLOCKS SET BY HAND.
+ *
+ * ⚠️ THE SWEEP-BASED GUARDS BELOW CANNOT REACH THE COLLAPSE ANY MORE, AND THAT IS AN IMPROVEMENT RATHER
+ * THAN A HOLE — but a guard whose condition has stopped occurring is a guard that has stopped
+ * discriminating, and this repo's own rule is not to leave one standing on a vacuity check it can no
+ * longer satisfy. Calibrating the step counter against GPS means the gap-fill now bills a blackout
+ * accurately, so the replayed backlog is spent settling that bill and no stale-clocked fix advances the
+ * distance across a kilometre boundary. Measured over 168 splits across every world, gap and step scale:
+ * untimeable splits 6 -> 0, mean split error 16.9% -> 12.4%, worst 155% -> 91%.
+ *
+ * So the INVARIANT is pinned here instead, where the two clocks can be set to collide on purpose. This
+ * cannot go vacuous: the collision is the fixture.
+ */
+function splitAt(o: { distM: number; kmDone: number; lastKmMs: number; atMs: number }) {
+  const src = lift(["checkSplits", "liveDistM"]);
+  const cues: any[] = [];
+  const LIVE: any = { mode: "gps", dist: o.distM, pendM: 0, kmDone: o.kmDone, lastKmMs: o.lastKmMs, splits: [] };
+  const f: any = new Function("LIVE", "liveNowMs", "liveCue", "fmtPace",
+    src + "; return { checkSplits: checkSplits };")(
+      LIVE, () => o.atMs, (c: any) => cues.push(c),
+      (x: number) => { const t = Math.round(x); return Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0"); });
+  f.checkSplits(o.atMs);
+  return { splits: LIVE.splits as { km: number; sec: number; est?: boolean }[], cues: cues.map((c) => String(c.message)) };
 }
 
 const M_PER_DEG = 111320;
@@ -131,8 +172,9 @@ type Trace = {
  */
 function run(t: Trace) {
   const src = [
-    lift(["haversine", "checkSplits", "gpsFixElapsedMs", "pedoFillGap", "onGpsPos", "paceMark", "liveDistM",
-          "currentGpsPace", "gpsUiTick"]),
+    liftConsts(["PEDO_CAL_MIN_M"]),
+    lift(["haversine", "checkSplits", "gpsFixElapsedMs", "pedoCalScale", "pedoFillGap", "onGpsPos", "paceMark",
+          "liveDistM", "currentGpsPace", "gpsUiTick"]),
     liftPedoEntry(),
   ].join("\n");
   const cues: any[] = [];
@@ -146,7 +188,7 @@ function run(t: Trace) {
   const LIVE: any = {
     mode: t.indoor ? "indoor" : "gps", dist: 0, route: [], elevGain: 0, splits: [], kmDone: 0,
     lastKmMs: 0, lastLat: null, lastLon: null, lastAlt: null, devSpeed: null, acc: null, win: [],
-    startMs: 0, pausedMs: 0, pauseStart: null, rt,
+    startMs: 0, pausedMs: 0, pauseStart: null, gpsCredM: 0, rt,
   };
   let clock = 1_760_000_000_000;
   LIVE.startMs = clock;
@@ -257,6 +299,7 @@ function run(t: Trace) {
     gapTotal: afterDist - preDist,
     postDist, postTruth,
     pedoFilled: p.credited || 0, settled: p.settled || 0, writtenOff: p.writtenOff || 0,
+    calGps: p.calGps || 0, calPed: p.calPed || 0, scale: p.scale || 0,
     capped: p.capped || 0, owing: LIVE.pedoPaid || 0,
     splits: LIVE.splits as { km: number; sec: number; est?: boolean }[],
     splitCues: cues.filter((c: any) => c.kind === "split").map((c: any) => String(c.message)),
@@ -397,7 +440,7 @@ test("BLOCKER: no split is ever recorded as a measured zero seconds", () => {
   //
   // ⚠️ pedoScale IS WHAT MAKES THIS FALSIFIABLE — see the note on the option. At 1.0 the balance fix
   // alone prevents the collapse, so a sweep without it passed with the est flag deliberately deleted.
-  let sawUnmeasured = 0;
+  let sawUnmeasured = 0, unflaggedZeros = 0;
   for (const world of ["suspended", "throttled", "awake"] as const) {
     for (const gap of [120, 600, 1200]) {
       for (const pedoScale of [1, 0.5, 0.3]) {
@@ -409,6 +452,7 @@ test("BLOCKER: no split is ever recorded as a measured zero seconds", () => {
           // what judged() in runAnalysis reads to refuse to score one.
           if (!(s.sec > 0)) {
             sawUnmeasured++;
+            if (s.est) unflaggedZeros++;
             assert.ok(s.est, world + " " + gap + "s lock at pedometer x" + pedoScale + ": kilometre " +
               s.km + " was recorded at " + s.sec + " s/km as a MEASUREMENT");
           }
@@ -416,10 +460,45 @@ test("BLOCKER: no split is ever recorded as a measured zero seconds", () => {
       }
     }
   }
-  // ⚠️ AND THE SWEEP HAS TO PROVE IT REACHED THE CASE. Without this the whole guard is vacuous the day
-  // an upstream change stops producing an untimeable split, and it would report clean for ever after.
-  assert.ok(sawUnmeasured > 0,
-    "no untimeable split occurred anywhere in the sweep, so this guard proved nothing");
+  // ⚠️ THE SWEEP NO LONGER REACHES THE CASE, AND THAT IS THE FIX WORKING RATHER THAN THE GUARD ROTTING.
+  // Calibrating the step counter against GPS makes the gap-fill bill a blackout accurately, so the
+  // replayed backlog is spent settling it and no stale-clocked fix advances the distance over a boundary:
+  // measured across this sweep, untimeable splits went 6 -> 0 and the mean split error 16.9% -> 12.4%.
+  // A guard resting on "the sweep saw one" would now be asserting a defect back into existence. What it
+  // asserts instead is that the sweep produces NO unflagged zero — which is the thing a runner is hurt
+  // by — and the invariant itself is pinned on a constructed collision in splitAt below, where it cannot
+  // go vacuous. Do not restore the sawUnmeasured floor.
+  assert.equal(sawUnmeasured, unflaggedZeros,
+    "an untimeable split was recorded as a MEASUREMENT somewhere in the sweep");
+});
+
+test("BLOCKER: when the two clocks collide, the kilometre is flagged rather than timed at zero", () => {
+  // ⚠️ TWO CALLERS, TWO CLOCKS, AND DURING A SCREEN LOCK THEY ARE UP TO TWENTY MINUTES APART.
+  // pedoFillGap stamps the wall clock (right for its own event, which is happening now) and onGpsPos
+  // stamps each fix's own clock (right for a replayed backlog, which happened minutes ago). A fill that
+  // pushes lastKmMs to the unlock moment makes every replayed boundary after it clamp to that instant.
+  // Measured on the shipped build before the flag existed: 353s 333s 334s 0s 0s 0s 136s.
+  const collided = splitAt({ distM: 4000, kmDone: 3, lastKmMs: 900000, atMs: 300000 });
+  assert.equal(collided.splits.length, 1, "one boundary was crossed, so one split is expected");
+  assert.equal(collided.splits[0]!.sec, 0, "the fixture no longer collides the clocks, so it proves nothing");
+  assert.ok(collided.splits[0]!.est,
+    "a kilometre the app cannot time was recorded as a measurement of zero seconds");
+  assert.ok(collided.cues.every((m) => !/\b0:00\b/.test(m)),
+    "a kilometre with no knowable time was announced as 0:00 per km: " + JSON.stringify(collided.cues));
+  assert.ok(collided.cues.some((m) => /not measured/.test(m)),
+    "the collapse was announced without saying it is not a measurement: " + JSON.stringify(collided.cues));
+  // ⚠️ AND A MULTI-KILOMETRE JUMP FLAGS EVERY BOUNDARY IT INVENTS, not just the last. Dividing one
+  // elapsed evenly across three kilometres is an estimate, and runAnalysis must not score a runner
+  // against a number the app made up.
+  const jumped = splitAt({ distM: 4000, kmDone: 1, lastKmMs: 100000, atMs: 1000000 });
+  assert.equal(jumped.splits.length, 3, "a three-kilometre jump must record three boundaries");
+  assert.ok(jumped.splits.every((sp) => sp.est), "an evenly-divided kilometre was recorded as measured");
+  // The ordinary case must still be a plain measurement, or the flag has swallowed everything.
+  const plain = splitAt({ distM: 2000, kmDone: 1, lastKmMs: 300000, atMs: 630000 });
+  assert.equal(plain.splits.length, 1);
+  assert.equal(Math.round(plain.splits[0]!.sec), 330, "an ordinary split lost its own time");
+  assert.ok(!plain.splits[0]!.est, "an ordinary split is flagged as an estimate");
+  assert.ok(plain.cues.some((m) => /\/km split/.test(m)), "an ordinary split stopped reporting its time");
 });
 
 test("BLOCKER: a kilometre whose time is unknowable is announced without a fabricated one", () => {
@@ -437,8 +516,12 @@ test("BLOCKER: a kilometre whose time is unknowable is announced without a fabri
       }
     }
   }
-  assert.ok(sawUnmeasuredCue > 0,
-    "no untimeable kilometre was announced anywhere in the sweep, so this guard proved nothing");
+  // ⚠️ THE "at least one" FLOOR IS GONE FOR THE SAME REASON AS ABOVE: the step-counter calibration means
+  // an untimeable kilometre no longer arises in this sweep at all, so requiring one would be asserting a
+  // defect back into existence. The 0:00 ban above is the thing a runner is hurt by and it still sweeps;
+  // the "not measured" wording is pinned on the constructed collision in the guard above, where the
+  // clocks are made to collide on purpose and it cannot go vacuous.
+  void sawUnmeasuredCue;
   // And the ordinary case must still carry its time, or this became a silent feature.
   const plain = run({ gapSec: 0, speed: 3, dev: 3, tailSec: 600 });
   assert.ok(plain.splitCues.length > 0, "the control run announced no kilometre to check");
@@ -661,4 +744,131 @@ test("the native side still has no application-state gate, and that is deliberat
   assert.ok(pocket.dist > pocket.truth * 0.85,
     "a pocketed phone in a ten-minute tunnel recorded " + Math.round(pocket.dist) + " m of " +
     Math.round(pocket.truth) + " m — the only source that can cover it is the step counter");
+});
+
+/**
+ * THE STEP COUNTER IS CALIBRATED AGAINST GPS (the owner's 24 August field report).
+ *
+ * He walked a custom 1 km run with the screen locked and the recorded distance did not match the ground.
+ * Reproduced through this harness: the record is accurate to within 1.2% in EVERY world — suspended,
+ * throttled and awake alike, so it was never a lock defect — EXCEPT when iOS's step counter OVER-reads.
+ * At 1.15x the truth the run recorded +7.6% and the 1 km gate fired at 932 m actually covered; at 1.3x,
+ * +19.6% and 855 m; at 1.5x, +34.8%. A WALKED run is exactly where iOS over-reads, because the stride
+ * model it infers distance from is calibrated on running strides.
+ *
+ * The surplus was indistinguishable from path-minus-chord, which is why the write-off in onGpsPos was
+ * absorbing it. The two are different animals: path-minus-chord is GEOMETRIC and exists only across the
+ * blackout's own bends, while a stride-model error is SYSTEMATIC and present on every metre — including the
+ * healthy ones, where GPS is right there to compare against.
+ */
+const HIS_RUN = { gapSec: 460, speed: 1.474, dev: 1.474, gateM: 1000, tailSec: 240 } as const;
+
+test("BLOCKER: an over-reading step counter does not inflate the run or end it early", () => {
+  // ⚠️ THE GATE IS THE HALF THAT HURTS MOST. A distance-gated session is completed BY the credited total, so
+  // an over-read does not merely print a wrong number — it ends the session before the runner has covered
+  // the distance, stamps a split that never happened, and tells them "well done" for ground they did not run.
+  for (const world of ["suspended", "throttled", "awake"] as const) {
+    for (const pedoScale of [0.7, 0.85, 1, 1.15, 1.3, 1.5]) {
+      const r = run({ ...HIS_RUN, world, pedoScale });
+      const err = (r.dist - r.truth) / r.truth * 100;
+      assert.ok(Math.abs(err) < 2,
+        "step scale " + pedoScale + " in world " + world + " records " + err.toFixed(1) + "% off the truth");
+      assert.ok(r.doneAtM != null, "the 1 km gate never fired at step scale " + pedoScale);
+      assert.ok(Math.abs(r.doneAtM! - 1000) < 30,
+        "the 1 km gate fired at " + Math.round(r.doneAtM!) + " m of ground actually covered, at step scale " +
+        pedoScale + " — a distance-gated session must end on the distance, not on the step counter's opinion");
+    }
+  }
+});
+
+test("BLOCKER: the estimate tracks the real step-counter scale, and is not biased by the run's shape", () => {
+  // ⚠️ AN ESTIMATE THAT IS MERELY PRESENT IS WORTHLESS; A BIASED ONE IS WORSE THAN NONE. Two obvious
+  // versions were built and measured wrong. Accumulating each side independently reads 1.15 for a counter
+  // that is exactly 1.00, because this branch tolerates twenty seconds of GPS silence before it calls a gap
+  // a gap, so every blackout opens with twenty seconds of pedometer metres against no GPS. And deriving the
+  // GPS side from LIVE.dist reads 1.15 too, because a replayed backlog dumps its whole settlement residual
+  // into one interval that the step counter never saw.
+  for (const speed of [1.474, 3, 4.5]) {
+    for (const truthScale of [0.8, 1, 1.25]) {
+      // No gap: purely healthy running, so the estimator is alone and its own bias is the only thing on show.
+      const r = run({ gapSec: 0, speed, dev: speed, pedoScale: truthScale, tailSec: 300 });
+      assert.ok(r.calGps > 0 && r.calPed > 0, "nothing was measured at speed " + speed);
+      const est = r.calPed / r.calGps;
+      assert.ok(Math.abs(est / truthScale - 1) < 0.05,
+        "at speed " + speed + " a step counter of " + truthScale + "x is estimated " + est.toFixed(3) +
+        " — a " + ((est / truthScale - 1) * 100).toFixed(1) + "% bias");
+    }
+  }
+  // And on a blackout-heavy trace it must still land on the truth rather than on the blackout's shape.
+  for (const truthScale of [1, 1.3]) {
+    const r = run({ ...HIS_RUN, world: "suspended", pedoScale: truthScale });
+    assert.ok(Math.abs(r.scale / truthScale - 1) < 0.06,
+      "through a 460 s lock, a " + truthScale + "x counter is scaled by " + r.scale.toFixed(2));
+  }
+});
+
+test("BLOCKER: pedometer metres only count when GPS credits the same ground", () => {
+  // The pending bucket, stated as the invariant rather than as the mechanism: a stretch the step counter
+  // measured and GPS never credited must not reach the estimate at all. The observable is that a trace whose
+  // blackouts are long does not estimate differently from one with none, for the same real step counter.
+  const withGaps = run({ ...HIS_RUN, world: "suspended", pedoScale: 1.3 });
+  const noGaps = run({ gapSec: 0, speed: 1.474, dev: 1.474, pedoScale: 1.3, tailSec: 700 });
+  const estNo = noGaps.calPed / noGaps.calGps;
+  assert.ok(Math.abs(withGaps.scale - estNo) < 0.08,
+    "a run with a 460 s blackout estimates " + withGaps.scale.toFixed(2) + " where the same runner with no " +
+    "blackout at all estimates " + estNo.toFixed(2) + " — the blackout's own metres are reaching the estimate");
+});
+
+test("BLOCKER: calibrating the step counter leaves the write-off's own cases alone", () => {
+  // ⚠️ THE WRITE-OFF EXISTS FOR PATH-MINUS-CHORD AND MUST KEEP WORKING. The step counter measures the PATH
+  // and GPS the CHORD, so a bend, a lap or an out-and-back legitimately leaves metres owing that no fix can
+  // pay. Removing the systematic half of the surplus must not touch the geometric half.
+  for (const bend of [0, 180, 360]) {
+    const r = run({ gapSec: 60, speed: 3, dev: 3, world: "suspended", bend, tailSec: 60 });
+    const err = (r.dist - r.truth) / r.truth * 100;
+    assert.ok(Math.abs(err) < 3, "a " + bend + " degree bend through a blackout records " + err.toFixed(1) + "%");
+  }
+  // ⚠️ AND A GENUINE TUNNEL — screen ON, GPS dark, nothing to replay — is where the step counter is the only
+  // signal there is. An over-reading counter must land where an honest one does, and NOT be trusted at face
+  // value: before this it recorded +4.0% at 1.3x against -6.4% at 1.0x, so the over-read was being credited
+  // as ground. The remaining shortfall is the first twenty seconds of the blackout, which the filler
+  // deliberately does not bill, and it is the same at every scale.
+  const honest = run({ gapSec: 120, speed: 3, dev: 3, dark: true, pedoScale: 1, tailSec: 60 });
+  for (const pedoScale of [0.85, 1.3]) {
+    const r = run({ gapSec: 120, speed: 3, dev: 3, dark: true, pedoScale, tailSec: 60 });
+    const e = (r.dist - r.truth) / r.truth * 100;
+    const h = (honest.dist - honest.truth) / honest.truth * 100;
+    assert.ok(Math.abs(e - h) < 2,
+      "a dark tunnel with a " + pedoScale + "x counter records " + e.toFixed(1) + "% where an honest one " +
+      "records " + h.toFixed(1) + "% — the counter is being taken at face value");
+  }
+});
+
+test("BLOCKER: the scale is clamped, and says so when it was never measured", () => {
+  // ⚠️ THE CLAMP IS WHAT BOUNDS EVERY PATHOLOGICAL CASE. "Healthy" is not "correct": a stretch where the
+  // receiver cuts corners inflates this and a stretch it over-reads deflates it. Outside the clamp the
+  // reading is not a stride-model error, it is one of the two signals being wrong, and the honest answer is
+  // then to trust neither and scale by nothing.
+  const html = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
+  const at = html.indexOf("function pedoCalScale(");
+  assert.ok(at > 0, "there is no pedoCalScale in the build");
+  const body = html.slice(at, html.indexOf("\n}", at));
+  assert.match(body, /Math\.max\(0?\.\d+, Math\.min\(1\.\d+,/,
+    "the scale is unclamped, so one bad stretch of GPS can rescale the whole run");
+  assert.match(body, /PEDO_CAL_MIN_M/, "the scale is estimated with no minimum sample, so it is noise");
+  // A run too short to have measured anything must scale by exactly nothing — which is the behaviour this
+  // app shipped with, and the only honest answer when there is no evidence either way.
+  const tiny = run({ gapSec: 30, speed: 1.474, dev: 1.474, pedoScale: 1.4, tailSec: 5 });
+  assert.ok(tiny.calGps < 150 ? (tiny.scale === 0 || tiny.scale === 1) : true,
+    "a run with under 150 m of healthy GPS scaled by " + tiny.scale + " rather than leaving it alone");
+  // And the diagnostic must be able to say which of the two happened, or a real report cannot be read.
+  const diag = html.indexOf("function pedoDiagLine(");
+  const dbody = html.slice(diag, html.indexOf("\n}", diag));
+  // ⚠️ BOTH BRANCHES, NAMED SEPARATELY. Matching /step scale/ alone was satisfied by the "not measured"
+  // branch, so deleting the numeric one escaped — watched. The two answers are different facts and the
+  // whole value of the line is being able to tell them apart on a real phone.
+  assert.match(dbody, /step scale " \+ \(p\.calPed \/ p\.calGps\)/,
+    "the diagnostic no longer prints the measured scale, so a field report cannot be read");
+  assert.match(dbody, /step scale not measured/,
+    "the diagnostic cannot distinguish a 1.00x scale from one it never had the sample to measure");
 });

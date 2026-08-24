@@ -311,3 +311,109 @@ test("the stamp is written where the clip is handed over, so it cannot go missin
   assert.match(lift(html, "coachPlay"), /COACH\.playAt = Date\.now\(\)/,
     "coachPlay is the one place a prompt takes the element; the stamp belongs with it");
 });
+
+/**
+ * THE COMPLETION CUE ARRIVED 20-30 SECONDS AFTER THE FINISH CARD (the owner's 24 August field report,
+ * reported for the second time).
+ *
+ * The fix that shipped for the first report was not wrong and WAS on his phone — it was defeated by the
+ * two lines that run immediately before the cue is fired. `liveFinish` opens with `stopLive()`, and
+ * `stopLive` posts `clearSchedule`, which in Swift reaches `CoachAudioService.stop()` →
+ * `player?.stop(); player = nil`. `AVAudioPlayer.stop()` does NOT fire `audioPlayerDidFinishPlaying`,
+ * which is the only path a page clip has back to the page — so `COACH.current` stayed set for ever.
+ * `stopLive` also clears `LIVE.ui`, the only clock that calls `coachReleaseStale`. `session-complete` is
+ * `interrupt: false`, so it was then pushed onto the queue behind a dead line by a cue of ANY priority —
+ * on his run, almost certainly the kilometre-1 milestone replayed from the unlock burst microseconds
+ * earlier. Nothing could drain it but the shim's own 15-second watchdog: a 15 s floor, 20-30 s with a
+ * second queued cue.
+ *
+ * ⚠️ HIS STRONGEST CLUE IS WHAT CONFIRMED IT. His music ducked on time and the voice came half a minute
+ * later. The duck is `setActive(true)`, fired the instant a clip is handed over and BEFORE the player is
+ * even constructed; the un-duck is `releaseSession()`, reachable only from `audioPlayerDidFinishPlaying`
+ * or `stopPagePlayback`. `stop()` reached neither, so the music was held down for a clip that had been
+ * cut off, with nothing playing at all. Duck-and-abandon has exactly that signature.
+ */
+test("BLOCKER: a run that ends silences the line still playing, so the completion cue is not queued behind it", () => {
+  const html = readFileSync(PAGE, "utf8");
+  const strip = (x: string) => x.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const stopLive = strip(lift(html, "stopLive"));
+  // ⚠️ THE INVARIANT IS THAT NOTHING FROM A FINISHED RUN IS LEFT PLAYING, not that a particular helper is
+  // called at a particular line. It is asserted on stopLive because that is the one funnel every exit
+  // from a run goes through — finished, discarded, or walked away from.
+  assert.match(stopLive, /coachStop\(\)/,
+    "a run can end with a coach line still in flight; the native side then cuts it without reporting " +
+    "back, so COACH.current is never cleared and the completion cue waits for a 15-second watchdog");
+  // ⚠️ AND EVERY PATH THAT TEARS THE NATIVE SCHEDULE DOWN MUST DO IT, derived rather than listed. Posting
+  // clearSchedule is precisely the act that cuts an in-flight clip with no way to tell the page, so a
+  // third call site added without silencing the page first would reintroduce the whole defect.
+  // ⚠️ A CENSUS, NOT A BLANKET SWEEP, AND THE DIFFERENCE IS EARNED. Posting clearSchedule reaches Swift's
+  // stop(), which cuts whatever page clip is playing — so every TEARDOWN path must silence the page first.
+  // But `coachNativeSchedule` also posts it, defensively, meaning "there is nothing to schedule": all four
+  // of its callers (coachRescheduleTick, startGps, startSim, coachRouteCue) are inside a live run, and
+  // liveFinish clears the ticks before the completion cue is fired, so it cannot fire while that cue is
+  // playing. Naming it as the one exception and fixing the total is what forces a decision about a fourth.
+  // ⚠️ AND THE MATCH IS THE POST, NOT THE WORD: /clearSchedule/ alone flagged `trialSaveResult`, whose only
+  // crime is calling `clearScheduledTrial()` — the guard tripping on a neighbour's vocabulary.
+  const posts = [...html.matchAll(/function (\w+)\([^)]*\)\s*\{/g)]
+    .map((m) => ({ name: m[1]!, body: strip(lift(html, m[1]!)) }))
+    .filter((f) => /action:\s*"clearSchedule"/.test(f.body))
+    .map((f) => f.name);
+  assert.deepEqual(posts.slice().sort(), ["coachNativeSchedule", "livePauseSet", "stopLive"],
+    "the set of functions that tear down the native coach schedule has changed to " + posts.join(", ") +
+    " — a new one cuts whatever clip the page thinks is playing, and unless it silences the page first the " +
+    "next cue is queued behind a line that can never end");
+  for (const name of posts) {
+    if (name === "coachNativeSchedule") continue;
+    assert.match(strip(lift(html, name)), /coachStop\(\)|stopLive\(\)/,
+      name + " posts clearSchedule without silencing the clip the page still thinks is playing");
+  }
+});
+
+test("BLOCKER: the pause line is spoken into a clean queue, not cut off by its own teardown", () => {
+  const html = readFileSync(PAGE, "utf8");
+  const strip = (x: string) => x.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const body = strip(lift(html, "livePauseSet"));
+  // ⚠️ AN ORDERING CLAIM, AND BOTH HALVES ARE ASSERTED TO EXIST FIRST. indexOf answers -1 for a missing
+  // needle and -1 is less than every real index, so "a comes before b" is satisfied by a being absent —
+  // which this repo has already watched let two ordering guards pass on deleted code.
+  const teardown = Math.max(body.indexOf("coachStop()"), body.indexOf("stopLive()"));
+  const speak = body.indexOf("rt.pause(");
+  assert.ok(teardown > 0, "pausing does not silence the line in flight at all");
+  assert.ok(speak > 0, "livePauseSet no longer emits the pause cue; this guard has lost its subject");
+  assert.ok(teardown < speak,
+    "the pause cue is emitted BEFORE the teardown that cuts it, so the runner hears the start of a word " +
+    "and the coach stays wedged for the rest of the run");
+  // Both branches must do it — the GPS one through coachStop, the treadmill one through stopLive — or
+  // pausing on one kind of run is silent and on the other it is wedged.
+  assert.match(body, /coachStop\(\)/, "a GPS pause does not silence the clip the page thinks is playing");
+  assert.match(body, /stopLive\(\)/, "a treadmill pause no longer tears its run down");
+});
+
+test("BLOCKER: cutting a clip natively reports back and hands the music back", () => {
+  // ⚠️ THIS IS THE NATIVE HALF AND IT NEEDS AN XCODE BUILD, so it is guarded structurally: this suite has
+  // no Swift toolchain to drive. The claim is about two obligations a teardown of a page clip has, and
+  // `stopPagePlayback` twelve lines below has always met both — two teardowns for one player with
+  // opposite discipline is the fix-one-builder-and-not-the-other trap.
+  const swift = readFileSync(new URL("../ios/InteRun/CoachAudioService.swift", import.meta.url), "utf8");
+  const noswift = swift.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/\/?.*$/gm, "");
+  const at = noswift.indexOf("private func stop() {");
+  assert.ok(at > 0, "CoachAudioService.stop() has been renamed; this guard has lost its subject");
+  const body = noswift.slice(at, noswift.indexOf("\n    }", at));
+  assert.match(body, /pageDone\(pageToken, false\)/,
+    "cutting the clip does not tell the page, so COACH.current stays set and the next cue waits for a " +
+    "15-second watchdog");
+  assert.match(body, /stopPagePlayback\(\)|releaseSession\(\)/,
+    "cutting the clip does not deactivate the audio session, so the runner's music stays ducked with " +
+    "nothing playing — which is exactly what he reported");
+  // ⚠️ THE REPORT MUST PRECEDE THE TOKEN CLEAR. A report carrying token 0 is dropped by the shim as a
+  // late answer for a clip it has already moved past, so the order is the whole of it.
+  const rep = body.indexOf("pageDone(pageToken, false)");
+  const clr = body.indexOf("pageToken = 0");
+  assert.ok(rep > 0 && clr > 0, "the token is reported or cleared but not both");
+  assert.ok(rep < clr, "the token is cleared before it is reported, so the page is told about clip 0");
+  // And the ordinary stop path must still release the session, or the duck outlives every clip.
+  const spb = noswift.indexOf("private func stopPagePlayback() {");
+  assert.ok(spb > 0);
+  assert.match(noswift.slice(spb, noswift.indexOf("\n    }", spb)), /releaseSession\(\)/,
+    "the ordinary page-stop no longer hands the music back");
+});

@@ -228,12 +228,26 @@ function fnOfSwift(src: string, name: string): string {
   return "";
 }
 
-test("BLOCKER: the treadmill does not get the start screen, and neither does a running session", () => {
-  // ⚠️ IT HAS NO POSITION TO DRAW, NO SIGNAL TO REPORT AND NOTHING TO RECENTRE. And once the run is
-  // under way the screen is the numbers and the controls, which is what viewLive has always been.
+test("BLOCKER: one screen serves the whole session, and the treadmill is the only exception", () => {
+  // ⚠️⚠️ THE SECOND HALF OF THIS GUARD WAS REVERSED BY THE OWNER (2026-08-24): "I want the first
+  // screenshot to be the screen that stays on for the entire session, not moving to the second
+  // screenshot." It used to assert `!running && !LIVE.indoor` — that this screen was for the WAIT and
+  // viewLive's own layout took over at Start. That is exactly the switch he asked to remove, so the
+  // claim is inverted rather than deleted, and what it protected survives: the treadmill must not reach
+  // it.
+  // ⚠️ AND THE TREADMILL EXCEPTION IS NOT A CONCESSION. An indoor run records a real clock and
+  // deliberately no distance, so it has no position to draw, no route, no signal to report and nothing
+  // for the map controls to act on. The screen he drew is a map with numbers over it; there is no map.
   const v = nocomment(fn("viewLive"));
-  assert.match(v, /if \(!running && !LIVE\.indoor\) return viewLiveStart\(\)/,
-    "the start screen is shown for a treadmill run, or during a run, or not at all");
+  assert.match(v, /if \(!LIVE\.indoor\) return viewLiveStart\(\)/,
+    "the one live screen is gated on something other than the treadmill, so either the session still " +
+    "changes layout at Start or an indoor run reaches a screen with nothing on it");
+  assert.ok(!/!running && !LIVE\.indoor/.test(v),
+    "the running session is still routed to the old .live-metrics layout, which is the switch he asked " +
+    "to remove");
+  // ⚠️ AND THE OLD LAYOUT IS STILL THERE, because the treadmill is still using it. A guard that let it be
+  // deleted would take the indoor run's only screen with it.
+  assert.match(v, /live-metrics/, "the treadmill has lost its own layout");
 });
 
 /* ------------------------------------------------------------------------------------------------
@@ -465,8 +479,8 @@ test("BLOCKER: the phone path lands on the start screen and does not start itsel
     "there is more than one count-in on this path, so one of them is ungated");
   // ⚠️ THE TREADMILL KEEPS ITS OWN BEHAVIOUR. It has no position, no signal and no map — a screen to
   // wait on would be a screen with nothing on it, and viewLive keeps its own layout for indoor.
-  assert.match(nocomment(fn("viewLive")), /if \(!running && !LIVE\.indoor\) return viewLiveStart\(\)/,
-    "the treadmill reaches the start screen, which has nothing on it for an indoor run");
+  assert.match(nocomment(fn("viewLive")), /if \(!LIVE\.indoor\) return viewLiveStart\(\)/,
+    "the treadmill reaches the one live screen, which has no map, no signal and nothing to recentre");
   // ⚠️ AND THE WATCH COMPANION MOVES WITH THE COUNT-IN. It arms a startNow with a 25-second give-up, so
   // waking the wrist when the sheet is tapped spends that budget while the runner is still standing.
   const wire = nocomment(page());
@@ -653,7 +667,15 @@ test("BLOCKER: everything that floats on the map is legible over a light basemap
   // four of them were rendered, styled and wired at the time they could not be pressed.
   assert.match(css, /\.lst-map \{[^}]*container-type:\s*size/,
     "the map is not a size container, so the controls cannot know how tall it ended up");
-  assert.match(css, /@container \(max-height: \d+px\) \{[^}]*\.lst-ctrls \{[^}]*flex-direction:\s*row/,
+  // ⚠️ [^}]* STOPS AT THE FIRST CLOSING BRACE, so this failed the moment another rule joined the block
+  // ahead of .lst-ctrls — the guard reading a neighbour's boundary rather than the block's. Matched
+  // across the whole block instead.
+  const shortMap = /@container \(max-height: \d+px\) \{([\s\S]*?)\n\}/g;
+  let sawRow = false;
+  for (let m = shortMap.exec(css); m; m = shortMap.exec(css)) {
+    if (/\.lst-ctrls \{[^}]*flex-direction:\s*row/.test(m[1]!)) sawRow = true;
+  }
+  assert.ok(sawRow,
     "the control column never becomes a row, so on a short map it is clipped and unreachable");
 });
 
@@ -874,4 +896,101 @@ test("BLOCKER: setting the shoe never leaves the screen, and one function decide
   assert.match(sheet, /filter\(\(x\) => !x\.retiredIso\)/, "retired pairs are offered as something to run in");
   assert.match(sheet, /shoe-intro|There is nothing in your rack/,
     "an empty rack says nothing, so the sheet reads as broken rather than as empty");
+});
+
+/**
+ * ONE SCREEN FOR THE WHOLE SESSION, AND THE BUTTON ON THE MAP (owner, 2026-08-24).
+ *
+ * "I want the first screenshot to be the screen that stays on for the entire session, not moving to the
+ * second screenshot. Also, the start button needs to sit on top of the map, rather than how you have it."
+ */
+test("BLOCKER: every id the live runtime writes into is present once the run is under way", () => {
+  // ⚠️⚠️ liveUpdate WRITES #lElapsed, #lDist, #lPace AND #lStepCard UNGUARDED — .textContent and
+  // .innerHTML straight onto the result of $(). A running layout missing any one of them throws on the
+  // FIRST tick, which is a quarter of a second into the run, and the screen dies with the clock frozen
+  // and nothing in the console the runner can see. #lAvg, #lLap, #lElapsedK, #gpsBadge and #lCues are
+  // guarded and are therefore optional. Derived from the writers rather than listed, so a new one cannot
+  // arrive without this failing.
+  // ⚠️ EVERY id THOSE TWO FUNCTIONS TOUCH, not just the ones a regex can prove are unguarded. The first
+  // version of this tried to identify the unguarded writes and missed two of the three that matter:
+  // #lPace is written through a local (`const pv = $("lPace"); pv.innerHTML = …`) and #lStepCard is
+  // captured in a multi-declarator const and written forty lines later. Both re-breaks escaped. The
+  // simpler claim is also the stronger one and needs no pattern-matching on how the write is spelled:
+  // if the live updater reaches for an element, the live screen renders it.
+  const upd = nocomment(fn("liveUpdate")) + nocomment(fn("renderLiveNow"));
+  const ids = new Set<string>();
+  for (const m of upd.matchAll(/\$\("(\w+)"\)/g)) ids.add(m[1]!);
+  assert.ok(ids.size >= 6, "only " + ids.size + " ids found in the live updater; the sweep is blind");
+  for (const need of ["lElapsed", "lDist", "lPace", "lStepCard"]) {
+    assert.ok(ids.has(need), "the sweep no longer sees #" + need + ", so it is proving less than it claims");
+  }
+  const built = fn("viewLiveStart");
+  for (const id of ids) {
+    assert.ok(built.includes('id="' + id + '"'),
+      "the live updater reaches for #" + id + " and the live screen does not render it. #lElapsed, " +
+      "#lDist, #lPace and #lStepCard are written UNGUARDED, so a missing one throws a quarter of a " +
+      "second into the run and the screen freezes with nothing the runner can see");
+  }
+});
+
+test("BLOCKER: the action button sits on the map, and the map's own image cannot cover it", () => {
+  const built = fn("viewLiveStart");
+  const css = page().slice(page().indexOf("<style>"), page().indexOf("</style>"));
+  // ⚠️ ON the map, which means inside #lMapWrap in the markup — not in a bar below it. The old .lst-foot
+  // is gone entirely rather than left unused, because an orphaned rule is what the next screen copies.
+  const mapAt = built.indexOf('id="lMapWrap"');
+  const actsAt = built.indexOf('class="lst-acts');
+  assert.ok(mapAt > 0 && actsAt > 0, "the map or the action row is missing");
+  assert.ok(actsAt > mapAt, "the action row is built before the map, so it cannot be sitting on it");
+  assert.ok(!/lst-foot/.test(page()), "the old below-the-map action bar is still in the build");
+  // ⚠️⚠️ AND THE MAP IMAGE MUST NOT PAINT OVER IT. An absolutely positioned box paints above a STATIC
+  // sibling whatever the source order — so when the chrome became in-flow children of the map, the
+  // composited basemap covered every one of them and the buttons were not merely untappable, they were
+  // INVISIBLE. Caught by asking elementFromPoint what is really at the centre of each control; a check
+  // that reported "1 unhittable" from the first measurement of this screen and was not chased.
+  const img = /\.lst-mapimg \{([^}]*)\}/.exec(css);
+  assert.ok(img, "no .lst-mapimg rule");
+  assert.match(img![1]!, /z-index:\s*0/,
+    "the basemap has no z-index, so it paints over every in-flow control on the map");
+  for (const sel of [".lst-over", ".lst-row"]) {
+    const r = new RegExp("\\" + sel + " \\{([^}]*)\\}").exec(css);
+    assert.ok(r, "no " + sel + " rule");
+    assert.match(r![1]!, /z-index:\s*1/, sel + " sits under the basemap, so its controls are invisible");
+    assert.match(r![1]!, /position:\s*relative/, sel + " has no position, so its z-index does nothing");
+  }
+});
+
+test("BLOCKER: the overlay sheds content in a stated order and never sheds what the runner acts on", () => {
+  const css = page().slice(page().indexOf("<style>"), page().indexOf("</style>"));
+  // ⚠️⚠️ MEASURED WITH THE LONGEST TITLE IN THE LIBRARY AT 130% TEXT: the overlay covered 67% of the map
+  // on a 375-wide phone and 197% of it on a 320-wide one — overflowing the map's own clip, which took six
+  // of the controls off the screen while every one of them was still rendered, styled and wired.
+  // The shedding order is the invariant: what a runner can do without goes first, and what they act on
+  // never goes. The cue log is spoken anyway; Current and Lap are secondary to the three in the card
+  // above; the step's target and count are secondary to its badge, heading and progress bar.
+  const sheds: string[] = [];
+  const blocks = /@container \(max-height: (\d+)px\) \{([\s\S]*?)\n\}/g;
+  for (let m = blocks.exec(css); m; m = blocks.exec(css)) {
+    for (const d of m[2]!.matchAll(/(\.[a-z0-9-][^{]*)\{[^}]*display:\s*none/g)) {
+      sheds.push(Number(m[1]) + "|" + d[1]!.trim());
+    }
+  }
+  assert.ok(sheds.length >= 3, "only " + sheds.length + " things are shed; the overlay cannot fit a short map");
+  const at = (sel: string) => {
+    const hit = sheds.filter((x) => x.endsWith("|" + sel));
+    assert.equal(hit.length, 1, sel + " is shed " + hit.length + " times; expected exactly once");
+    return Number(hit[0]!.split("|")[0]);
+  };
+  // Later in the list = shed sooner, because the threshold is a maximum height.
+  assert.ok(at(".lst-over .cuelog") > at(".lst-live"),
+    "Current and Lap are shed before the cue log, which is the wrong way round — the cue log is spoken " +
+    "aloud and the paces are not");
+  assert.ok(at(".lst-live") > at(".lst-over .lstep .tgt, .lst-over .lstep .cnt"),
+    "the step's own target is shed before the secondary paces");
+  // ⚠️ AND THE THINGS A RUNNER ACTS ON ARE NEVER SHED. A control that is hidden or clipped while still
+  // rendered, styled and wired is the looks-live-is-inert defect this app has shipped twice.
+  for (const never of [".lst-acts", ".lst-a", ".lpbar", ".lst-ctrls", ".lst-over .lstep {"]) {
+    assert.ok(!sheds.some((x) => x.includes(never)),
+      never + " is hidden on a short map, and it is something the runner needs to see or press");
+  }
 });

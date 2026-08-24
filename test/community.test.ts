@@ -2341,7 +2341,13 @@ test("BLOCKER: swiping right leaves the post feed, and nothing else does", () =>
    inside an @container block — the short-map layout lifts the signal pill clear of the control row once
    the controls spread sideways — and a container query is a separate block by construction. So it is the
    base-plus-scoped-override category this ceiling exists to permit, not a class meaning two things. */
-const CSS_DUP_CEILING = 18;
+/* 18 -> 20, and the arithmetic is worth writing down: .gps-sig LEFT the list (its @container override went
+   when the signal and the controls became siblings in one flex row, so there is nothing to override) and
+   three joined it — .lst-card and .lst-nums each gain a @media (max-height) override that compacts the
+   card on a short phone, and .lst-ctrls gains a @container one that turns its column into a row on a short
+   map. All three are the base-plus-scoped-override category this ceiling exists to permit, and none can be
+   merged the way .club-win was: a query is a separate block by construction. */
+const CSS_DUP_CEILING = 20;
 test("BLOCKER: no new CSS class is declared twice", () => {
   const css = nocomment(sheetOf(page()));
   const counts: Record<string, number> = {};

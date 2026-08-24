@@ -10563,9 +10563,13 @@ splits went **6 → 0**. Restoring the floor would be asserting a defect back in
 invariant moved to `splitAt`, a direct driver of `checkSplits` where **the clock collision is the
 fixture** and cannot go vacuous.
 
-⚠️ **THE MAC'S TOOLCHAIN HAS DEGRADED AGAIN AND IT BOUNDS WHAT COULD BE VERIFIED.** node had already
-vanished from the PATH (it is at `~/.local/node-v24.18.0-darwin-arm64/bin`); now there are **no simulator
-runtimes and no on-device platform component**, so `xcodebuild` cannot build any target at all. The Swift
+⚠️⚠️ **THE "node VANISHED" CLAIM IN THIS FILE IS WRONG AND I REPEATED IT — CORRECTED 2026-08-24.**
+`~/.local/node/bin` (a symlink to `node-v24.18.0-darwin-arm64`) **is on the default PATH**, `which node`
+resolves and `node --version` answers v24.18.0. Nothing about node is broken and nothing needs a PATH
+export. What IS missing is Xcode's **iOS platform support component** — see the toolchain note in the
+chapter below. Do not propagate the node claim again; check `which node` before writing one down.
+⚠️ **THE REAL LIMIT: there are no simulator runtimes and no on-device platform component**, so `xcodebuild`
+cannot build any target at all. The Swift
 change is verified by `swiftc -typecheck` over the whole module (`ios/InteRun/*.swift` +
 `ios/InteRunShared/*.swift`) — **zero errors** — and by nothing stronger. Single-file typechecking is
 useless here and looks alarming: it reports 36 errors that are all `cannot find X in scope`.
@@ -10581,3 +10585,111 @@ force-quit erases them. Support › Your data:
 - **`web layer:`** — must read `over-the-air 2026-08-24 …` or later.
 - **`coach:`** — `missing`/`failed` climbing means the cue map never landed; a clean line with the audio
   still late is new information.
+
+## ONE SCREEN FOR THE WHOLE SESSION, AND THE BUTTON ON THE MAP (owner, 2026-08-24)
+
+*"I want the first screenshot to be the screen that stays on for the entire session, not moving to the
+second screenshot. Also, the start button needs to sit on top of the map, rather than how you have it"*
+— with the start screen he had just approved, and the old `.live-metrics` layout it switched to at Start.
+
+⚠️ **THIS REVERSES A DECISION RECORDED TWO DAYS EARLIER.** The start-screen chapter above closes with
+*"AND THE RUNNING SCREEN IS UNCHANGED… a separate piece of work he has not asked for"*. He has now asked
+for it. `viewLive`'s gate went from `!running && !LIVE.indoor` to `!LIVE.indoor`, and the guard that
+asserted the old gate was **inverted rather than deleted** — what it protected survives intact.
+
+⚠️ **THE TREADMILL IS THE ONE EXCEPTION AND IT IS NOT A CONCESSION.** An indoor run records a real clock
+and deliberately no distance, so it has no position to draw, no route, no signal to report and nothing for
+the map controls to act on. The screen he drew is a map with numbers over it; there is no map. So
+`.live-metrics` stays, and a guard asserts it stays — deleting it would take the indoor run's only screen
+with it.
+
+### ⚠️⚠️ THE WHOLE OVERLAY WAS INVISIBLE, AND THE CHECK THAT FOUND IT HAD BEEN REPORTING IT ALL ALONG
+
+Everything that used to be a card below the map is now an in-flow child of the map, so the actions sit on
+it. **An absolutely positioned box paints above a STATIC sibling whatever the source order** — so
+`.lst-mapimg`, the composited basemap, covered the signal row, the control column, the step card and the
+buttons. They were not merely untappable, they were **behind an opaque map**.
+⚠️ **`elementFromPoint` AT THE CENTRE OF EACH CONTROL IS WHAT FOUND IT, AND IT HAD SAID SO FROM THE FIRST
+MEASUREMENT OF THIS SCREEN** — every probe run since the screen was built reported `unhittable: 1` and I
+did not chase it, because Start looked fine in a screenshot-free harness. **A non-zero count in a check
+you wrote is not noise.** Fixed with `z-index: 0` on the image and `position: relative; z-index: 1` on the
+two in-flow wrappers; a guard asserts all three, because a z-index without a position does nothing.
+
+### ⚠️ THE OVERLAY SHEDS CONTENT IN A STATED ORDER, BECAUSE IT DOES NOT FIT
+
+Measured with the library's longest title at 130% text, running:
+
+| | before shedding | after |
+|---|---|---|
+| 430×932 overlay / map | 348 / 546 (**64%**) | 285 / 546 (52%) |
+| 375×812 overlay / map | 348 / 426 (**82%**) | 246 / 426 (58%) |
+| 320×568 overlay / map | **358 / 170 (210%)** | 182 / 247 (74%) |
+| visible map, worst case | **−200 px** | **+53 px** |
+| controls unhittable, worst case | **6 of 7** | **0** |
+
+⚠️ **THE ORDER IS THE INVARIANT, NOT THE THRESHOLDS.** Shed what a runner can do without, never what they
+act on: the cue log first (it is spoken aloud anyway), then Current and Lap (the three numbers that matter
+are in the card above), then the step's target and step-count lines. The badge, the heading, the progress
+bar, the control column and the buttons never go — a control hidden or clipped while still rendered,
+styled and wired is the looks-live-is-inert defect this app has shipped twice. Guarded by comparing the
+thresholds against each other rather than pinning any of them, and by a list of what may never be shed.
+
+⚠️ **THE CARD GIVES WAY BEFORE THE OVERLAY DOES, because the card is what is oversized.** At 320×568 with
+130% text a display-sized title over three lines measured **322 px of a 494 px view** — right on a big
+phone, most of the screen on a small one. A `@media (max-height: 720px)` block clamps it to two lines with
+the numbers a rung down and gives the map back ~120 px. **A media query, not a container query: what
+decides this is how tall the phone is, not how tall the map ended up.**
+
+⚠️ **AND THE COLUMN→ROW THRESHOLD WAS MEASURED TOO LOW AT 260 px.** The control column is four 38 px
+buttons and three gaps = 184 px, and it now sits IN FLOW above an overlay up to 285 px tall — so the map
+needs about 470 px for a column to fit, and at 426 px the top button was clipped out of the map while
+remaining rendered and wired. **440 px** is above every measured overlay-plus-column that does not fit and
+below every one that does.
+
+⚠️ **THE SIGNAL AND THE CONTROLS ARE SIBLINGS IN ONE FLEX ROW NOW, so the overlap the previous chapter
+fixed with a container-query lift is impossible rather than corrected** — and that lift, plus the two
+owners of one measurement it created, is gone. `.gps-sig` therefore LEFT the duplicate-class list while
+`.lst-card`, `.lst-nums` and `.lst-ctrls` joined it (each a base plus one query override, which cannot be
+merged because a query is a separate block): `CSS_DUP_CEILING` 18 → 20 with the arithmetic written down.
+
+### ⚠️ EVERY id THE LIVE RUNTIME TOUCHES MUST BE ON THE SCREEN, AND THE FIRST GUARD FOR IT MISSED TWO
+
+`liveUpdate` writes `#lElapsed`, `#lDist`, `#lPace` and `#lStepCard` **unguarded** — `.textContent` and
+`.innerHTML` straight onto the result of `$()`. A running layout missing any one throws on the first tick,
+a quarter of a second into the run, and the screen freezes with nothing the runner can see.
+⚠️ **THE FIRST VERSION TRIED TO IDENTIFY THE UNGUARDED WRITES BY PATTERN AND MISSED TWO OF THE THREE THAT
+MATTER**: `#lPace` is written through a local (`const pv = $("lPace"); pv.innerHTML = …`) and `#lStepCard`
+is captured in a multi-declarator `const` and written forty lines later. Both re-breaks escaped. The
+simpler claim is also the stronger one: **if the live updater reaches for an element, the live screen
+renders it** — no pattern-matching on how the write is spelled.
+
+### ⚠️⚠️ THE REBUILD HE ASKED FOR CANNOT BE DONE FROM HERE, AND THE REASON IS ONE MISSING COMPONENT
+
+*"I'd like you to do the rebuild and i don't know why it's vanished."* Diagnosed:
+- **node was never broken.** `~/.local/node/bin` is on the default PATH; `node --version` answers. The
+  claim in this file was stale and I had repeated it. **Corrected above.**
+- **Disk space is not the cause** — 180 GB free.
+- **Xcode 26.6 is installed, `xcode-select` is correct, the iOS 26.5 SDK is present, and his iPhone is
+  still paired** (`Addo's iPhone (2)`, `00008140-001A3D080A84801C`).
+- **What is missing is Xcode's iOS platform support component**, plus every simulator runtime. Every
+  destination reports `iOS 26.5 is not installed. Please download and install the platform from
+  Xcode > Settings > Components.`
+- ⚠️ **`xcodebuild -downloadPlatform iOS` HANGS RATHER THAN FAILING, exactly as this file warns.** Measured:
+  **1.75 seconds of CPU in 33 minutes and not one byte transferred** (free space identical before and
+  after). It needs root; `sudo` needs a password, which is his to enter and not mine.
+
+**So the rebuild is blocked on one action by him**, either:
+- Xcode → Settings → Components → install **iOS 26.5**, or
+- `sudo xcodebuild -downloadPlatform iOS` in Terminal.
+
+After that the recipe in this file works unchanged. ⚠️ **Until then `swiftc -typecheck` over
+`ios/InteRun/*.swift ios/InteRunShared/*.swift` (0 errors) is the strongest verification available for any
+native change, and a full `xcodebuild` is not possible at all** — do not report a native fix as delivered.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc clean
+apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1325 pass / 0 fail under
+UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`**, both design ratchets unchanged. Driven in a real
+browser before / running / paused at 430×932, 375×812 and 320×568 at `--tscale` 1.0 and 1.3: the layout
+never switches (`.live-metrics` absent in every state), all eleven runtime ids present once running, the
+actions inside `#lMapWrap` at every size, **0 unhittable controls and 0 page overflow in all twelve
+combinations**, and zero console errors.

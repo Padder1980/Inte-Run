@@ -4415,8 +4415,20 @@ button.rd-meta-r { cursor: pointer; }
    it shrink — a flex item defaults to min-height: auto and refuses to go below its content, which is
    the trap .view's own rule already exists for. */
 .lst-map { --lst-cs: 38px; position: relative; flex: 1 1 0; min-height: 0; overflow: hidden;
+  /* ⚠️ A FLEX COLUMN ANCHORED TO THE BOTTOM, so the signal row, the controls and the overlay stack up
+     from the foot of the map with no offsets to keep in step. Everything that used to be a card BELOW the
+     map is an overlay ON it now, because the owner asked for the button to sit on top of the map — and a
+     hardcoded bottom offset is exactly what silently stopped clearing the chrome the last time this app
+     tried it. The map image itself is absolute, so it stays behind all of it. */
+  display: flex; flex-direction: column; justify-content: flex-end; gap: var(--s2); padding: var(--s3);
   background: var(--surface-2); container-type: size; }
-.lst-mapimg { position: absolute; inset: 0; }
+/* ⚠️⚠️ z-index 0, AND THE CHROME ABOVE IT IS z-index 1. An absolutely positioned box paints above a
+   STATIC sibling whatever the source order, so the moment the signal row, the controls and the action
+   overlay became in-flow children of the map, this image covered every one of them: the buttons were not
+   merely untappable, they were invisible. Caught by asking elementFromPoint what is actually at the centre
+   of each control — the same check reported "1 unhittable" from the very first measurement of this screen
+   and it was not chased, which is how it survived a whole redesign. */
+.lst-mapimg { position: absolute; inset: 0; z-index: 0; inset: 0; }
 .lst-mapimg canvas, .lst-mapimg img { width: 100%; height: 100%; display: block; }
 /* ⚠️ A DOT, NOT A PIN. The runner is AT the centre of this map by construction (see liveMapFraming),
    so a pin whose tip is offset from its anchor would say they are somewhere they are not. */
@@ -4425,7 +4437,7 @@ button.rd-meta-r { cursor: pointer; }
   0 1px 4px rgba(0,0,0,.4); }
 /* ⚠️ LOW ON THE RIGHT, where the mockup puts them and where a thumb reaches — not centred vertically
    on a map that is now most of the screen. */
-.lst-ctrls { position: absolute; right: var(--s3); bottom: var(--s5);
+.lst-ctrls { position: relative;
   display: flex; flex-direction: column; gap: var(--s2); }
 /* ⚠️⚠️ ON A SHORT MAP THE COLUMN BECOMES A ROW, AND WITHOUT THIS THE CONTROLS ARE UNREACHABLE. Measured
    at 320x568: the map gets 167px and the column is 176px (four 38s and three gaps), so it extended past
@@ -4453,22 +4465,16 @@ button.rd-meta-r { cursor: pointer; }
 /* ⚠️ THE MOCKUP DRAWS THIS BARE ON THE MAP AND THIS APP CANNOT: bare white would vanish on a pale
    basemap and bare dark on a dark one. The same deep-ink pill as the other two marks — one treatment
    for everything that floats on this map, which is also why they read as a set. */
-.gps-sig { position: absolute; left: var(--s3); bottom: var(--s3); display: flex; align-items: center;
+.gps-sig { position: relative; display: flex; align-items: center;
   gap: 6px; padding: 6px 10px; border-radius: var(--r-pill);
   background: rgba(4,16,13,.78); border: 0; }
-@container (max-height: 260px) {
-  .lst-ctrls { flex-direction: row; bottom: var(--s3); }
-  /* ⚠️⚠️ AND THE SIGNAL HAS TO GET OUT OF THE ROW'S WAY, which is a second obligation the column-to-row
-     switch creates rather than a separate defect. Both sit at bottom: --s3, so the moment the controls
-     spread sideways they run into the signal pill on the left: measured on a 320-wide phone they
-     overlapped by 22x29 at --tscale 1.0 and 47x33 at 1.3, growing with the text because the pill's
-     label does. Nothing was clipped and nothing was unhittable — the two simply drew on top of one
-     another, which is why the clipping sweep that found the unreachable controls reported this clean.
-     Lifted, the gap measures 8px at 1.0 and 4px at 1.3, and the shoe above still clears it by 10px.
-     ⚠️ THE CONTROL SIZE IS ONE TOKEN read by the button and by this lift. Two literal 38s is how the
-     row grows and the pill stops clearing it, with nothing to see until they touch. */
-  .gps-sig { bottom: calc(var(--s3) + var(--lst-cs) + var(--s2)); }
-}
+/* ⚠️ THE THRESHOLD IS ARITHMETIC, NOT TASTE, and 260px was measured too low. The column is four 38px
+   buttons and three gaps = 184px, and it now sits IN FLOW above an overlay that is up to 285px tall — so
+   the map needs about 470px for a column to fit and at 426px the top button was clipped out of the map
+   entirely while remaining rendered, styled and wired. 440px is above every measured overlay-plus-column
+   that does not fit and below every one that does: at 546px and 478px the column stays, at 426px and
+   below it becomes a row, which needs 46px. */
+
 .gb-set { display: flex; align-items: flex-end; gap: 2px; height: 12px; }
 /* ⚠️ NO RADIUS ON A THREE-PIXEL BAR. A literal 1px is off the radius ladder and the ratchet is on
    its ceiling, so it fails the suite — and at this width a rounded end is invisible anyway. */
@@ -4507,6 +4513,85 @@ button.rd-meta-r { cursor: pointer; }
   background: rgba(4,16,13,.78); color: #fff; font-size: var(--t-card); font-weight: 700;
   box-shadow: 0 2px 10px rgba(2,10,8,.22); }
 .lst-target svg { width: 18px; height: 18px; }
+/* The signal and the control column share one band at the foot of the map. */
+.lst-row { position: relative; z-index: 1; display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s2); }
+/* ⚠️ THE STACK IS IN FLOW, so its own height decides where the controls above it sit. Nothing here
+   carries a bottom offset, which is the point: the last time this app placed live chrome by a constant
+   the constant stopped clearing it the moment the chrome grew. */
+.lst-over { position: relative; z-index: 1; display: flex; flex-direction: column; gap: var(--s2); }
+/* ⚠️ CURRENT AND LAP ARE ONE LINE, NOT A CARD. As a two-column card with the label stacked above the
+   value it cost 66-80px of a map that on a small phone has under 200px to give, and the three numbers
+   that matter most are already in the card above. Label and value on one line, side by side. */
+.lst-live { display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap;
+  padding: 6px var(--s3); border-radius: var(--r-pill); background: rgba(4,16,13,.78); }
+.lst-live > div { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.lst-live .lk { color: rgba(255,255,255,.72); font-size: var(--t-label); font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase; }
+.lst-live .lv { color: #fff; font-size: var(--t-body); font-weight: 800; white-space: nowrap; }
+.lst-live .lv small { font-size: var(--t-label); font-weight: 700; }
+/* ⚠️ THE STEP CARD AND THE CUE LOG KEEP THEIR OWN ids AND THEIR OWN MARKUP — liveUpdate writes into both
+   and re-deriving either here would be a second builder of one thing. What changes is only the ground
+   they sit on: deep ink, like every other mark floating over a light basemap. */
+.lst-over .lstep, .lst-over .cuelog { margin: 0; background: rgba(4,16,13,.78); border: 0; color: #fff; }
+.lst-over .lstep { padding: var(--s2) var(--s3); border-radius: var(--r-card); }
+.lst-over .lstep h4 { margin: 2px 0 0; color: #fff; font-size: var(--t-body);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lst-over .lstep .tgt, .lst-over .lstep .cnt { color: rgba(255,255,255,.78); font-size: var(--t-label);
+  margin: 2px 0 0; }
+/* The segment clock rides on the heading's line rather than taking one of its own. */
+.lst-over .lstep .lseg { margin: 2px 0 0; }
+.lst-over .lstep .lpbar { margin: 6px 0 0; }
+.lst-over .cuelog { max-height: 2.6em; overflow: hidden; padding: 6px var(--s3);
+  border-radius: var(--r-pill); font-size: var(--t-label); }
+.lst-over .cuelog:empty { display: none; }
+.lst-over .why-live { margin: 0; }
+/* ⚠️ ONE BOX, TWO FILLS. Two full-width buttons put side by side are not a pair unless they agree on
+   every measurement — this app has already shipped a row where one of them carried a border and was 2px
+   taller for free. Both declare a transparent border and differ in colour alone. */
+.lst-acts { display: flex; gap: var(--s2); }
+.lst-acts .lst-a { flex: 1 1 0; min-width: 0; min-height: var(--tap); display: flex; align-items: center;
+  justify-content: center; gap: 8px; padding: 0 var(--s3); border-radius: var(--r-ctl);
+  border: 1px solid transparent; font-size: var(--t-card); font-weight: 700; cursor: pointer;
+  background: rgba(4,16,13,.82); color: #fff; }
+.lst-acts .lst-a svg { width: 18px; height: 18px; }
+.lst-acts .lst-a.go { background: var(--accent); color: var(--accent-ink); }
+.lst-acts .lst-a.danger { background: var(--rest); color: #fff; }
+/* ⚠️⚠️ THE OVERLAY SHEDS CONTENT IN A STATED ORDER, and the order is the point rather than the numbers.
+   Measured with the longest title in the library at 130% text: on a 375-wide phone the overlay covered
+   67% of the map and on a 320-wide one it covered 197% of it — overflowing the map's own clip, which took
+   six of the controls off the screen while every one of them was still rendered, styled and wired. That is
+   the looks-live-is-inert class wearing a layout disguise, and this app has shipped it twice.
+   The order sheds what a runner can do without and never sheds what they act on: the cue log first (it is
+   spoken anyway), then Current and Lap (the three numbers that matter are in the card above), then the
+   step's target and step-count lines. The badge, the heading, the progress bar and the buttons never go.
+   ⚠️ AND EVERY ONE OF THESE BLOCKS SITS BELOW THE RULES IT OVERRIDES. @container adds no specificity, so
+   an identical selector ties and the later one wins — placed above, the query matches, the container
+   reports exactly the size expected, and the declaration silently does not apply. That trap has cost this
+   screen two afternoons already. */
+@container (max-height: 440px) {
+  .lst-over .cuelog { display: none; }
+
+  .lst-ctrls { flex-direction: row; }
+}
+@container (max-height: 360px) {
+  .lst-live { display: none; }
+}
+@container (max-height: 280px) {
+  .lst-over .lstep .tgt, .lst-over .lstep .cnt { display: none; }
+  .lst-over .lstep .lseg-of, .lst-over .lstep .lseg-left { display: none; }
+}
+/* ⚠️ AND ON A SHORT VIEWPORT THE CARD GIVES WAY FIRST, because the card is what is oversized rather than
+   the overlay. At 320x568 with 130% text and the library's longest title it measured 322px of a 494px
+   view — a display-sized title over three lines, which is right on a big phone and is most of the screen
+   on a small one. Clamped to two lines with the numbers a rung down it gives the map back ~120px, which is
+   the difference between the controls being reachable and not. A media query, not a container query: what
+   decides this is how tall the PHONE is, not how tall the map ended up. */
+@media (max-height: 720px) {
+  .lst-title { font-size: var(--t-hero); -webkit-line-clamp: 2; }
+  .lst-nums .lv { font-size: var(--t-section); }
+  .lst-card { padding-bottom: var(--s2); }
+  .lst-nums { padding-top: var(--s2); }
+}
 .lsh-list { display: flex; flex-direction: column; gap: var(--s2); margin: var(--s3) 0; }
 .lsh-row { display: flex; align-items: center; gap: var(--s3); width: 100%;
   min-height: var(--tap); padding: 0 var(--s3); border-radius: var(--r-card);
@@ -4520,8 +4605,6 @@ button.rd-meta-r { cursor: pointer; }
    pills at the same top offset would overlap, and this app has shipped that class of defect. */
 .lst-map.has-target .live-shoe { top: calc(var(--s3) + var(--tap) + var(--s3)); }
 /* The foot: one action, inset, above the nav the app deliberately keeps on screen during a run. */
-.lst-foot { flex: none; padding: var(--s3) var(--s4) calc(var(--s3) + env(safe-area-inset-bottom, 0px)); }
-.lst-foot .primary { margin: 0; width: 100%; }
 .lst-attr { position: absolute; right: var(--s2); bottom: 4px; font-size: var(--t-label);
   color: var(--ink-faint); background: color-mix(in srgb, var(--surface) 72%, transparent);
   padding: 1px 6px; border-radius: var(--r-pill); }
@@ -22797,60 +22880,96 @@ function liveMapZoom(d) {
 }
 function viewLiveStart() {
   const s = LIVE.session;
-  // ⚠️ THE EFFORT DECIDES THE TITLE'S COLOUR, from the one mapping (ruling 7) — so this screen, the tile
+  // \u26a0\u26a0 ONE SCREEN FOR THE WHOLE SESSION (owner, 2026-08-24): "I want the first screenshot to be the
+  // screen that stays on for the entire session, not moving to the second screenshot." So this builder now
+  // serves the run as well as the wait before it, and viewLive's old .live-metrics/.live-paces layout is
+  // reached only by a treadmill run, which has no map and no GPS to draw.
+  // \u26a0 EVERY id THE RUNTIME WRITES INTO MUST BE HERE ONCE RUNNING. liveUpdate writes #lElapsed, #lDist,
+  // #lPace and #lStepCard UNGUARDED, so a running layout missing any one of them throws on the first tick
+  // and the screen dies silently mid-run. #lAvg, #lLap, #lElapsedK, #gpsBadge and #lCues are guarded.
+  const running = !!LIVE.started;
+  const paused = running && LIVE.rt.getStatus() === "paused";
+  // \u26a0 THE EFFORT DECIDES THE TITLE'S COLOUR, from the one mapping (ruling 7) \u2014 so this screen, the tile
   // that was tapped to reach it, the calendar dot and the Logbook rail all agree about how hard the
   // session is. Set as a custom property because the darkening happens in CSS, where it can be one
   // declaration for both themes.
   const eff = effortVar(effortOf(s));
   const free = !!s.free;
+  // \u26a0 THE GPS STATUS MOVES INTO THE EYEBROW ONCE RUNNING, and the bars pill goes. Before the run it is
+  // the thing you are waiting on, so it earns a pill of its own at the foot of the map; during the run the
+  // foot of the map belongs to the step and the controls, and the old running layout put the same fact in
+  // the same eyebrow. #gpsBadge is the id renderLiveNow keeps up to date.
+  const eyebrow = running
+    ? (paused ? "Paused" : "Live session") + ' \u00b7 <span id="gpsBadge">' + esc(gpsStatusText()) + '</span>'
+    : (free ? "No target" : "Up next");
   return '<div class="lst-card">' +
     '<div class="lst-top">' +
-      '<button class="lst-back" id="liveBack" aria-label="Back to Today">' + ICON.chevLeft + '</button>' +
-      // ⚠️ NO SETTINGS GEAR, AND THE MOCKUP HAS ONE. Everything a runner would change before a phone run
+      '<button class="lst-back" id="liveBack" aria-label="' +
+        (running ? "Leave this screen" : "Back to Today") + '">' + ICON.chevLeft + '</button>' +
+      // \u26a0 NO SETTINGS GEAR, AND THE MOCKUP HAS ONE. Everything a runner would change before a phone run
       // is either already on this screen or does not exist: the voice coach is the speaker on the map,
       // which coach speaks is in Profile, and there is no auto-pause on the phone at all. A gear opening
       // a sheet with one row in it would be chrome for its own sake, and a gear opening nothing is the
       // looks-live-does-nothing defect this app has shipped three times.
     '</div>' +
     '<div class="lst-head">' +
-      '<div class="ui-eyebrow">' + (free ? "No target" : "Up next") + '</div>' +
+      '<div class="ui-eyebrow">' + eyebrow + '</div>' +
       '<div class="lst-title" style="--lst-eff: ' + eff + '">' + esc(s.title) + '</div>' +
     '</div>' +
-    // ⚠️ THE THREE NUMBERS THE MOCKUP ASKS FOR, at zero, carrying the same ids the live runtime writes
-    // into (#lDist/#lElapsed/#lAvg via liveUpdate).
-    // ⚠️ AND AN EARLIER VERSION OF THIS COMMENT CLAIMED "nothing moves when the run starts", WHICH IS
-    // FALSE AND WAS FALSE WHEN IT WAS WRITTEN. viewLive's running layout is a different composition
-    // entirely — .live-metrics pairs Elapsed with Distance and .live-paces adds Current and Lap, with
-    // the label ABOVE the value. So the screen does rearrange at Start. Restyling the RUNNING screen to
-    // match this one is a separate piece of work the owner has not asked for; what he asked for is the
-    // screen with a Start button on it.
+    // \u26a0 THE THREE NUMBERS THE MOCKUP ASKS FOR, and they are the same three in the same places before and
+    // during the run \u2014 which is the whole of what he asked for. They start at zero and fill in.
     '<div class="lst-nums">' +
       '<div><div class="lv num" id="lDist">0.00<span class="lu">KM</span></div><div class="lk">Distance</div></div>' +
       '<div><div class="lv num" id="lElapsed">0:00</div><div class="lk" id="lElapsedK">Time</div></div>' +
-      // ⚠️ THE MOCKUP'S OWN PLACEHOLDER, and it is also the narrow one: two em dashes measured wider
+      // \u26a0 THE MOCKUP'S OWN PLACEHOLDER, and it is also the narrow one: two em dashes measured wider
       // than the whole column at the largest text setting on a 320-wide phone.
       '<div><div class="lv num none" id="lAvg">--:--<span class="lu">/KM</span></div><div class="lk">Avg pace</div></div>' +
     '</div>' +
   '</div>' +
-  '<div class="lst-map' + (free ? " has-target" : "") + '" id="lMapWrap">' +
+  '<div class="lst-map' + (free && !running ? " has-target" : "") + '" id="lMapWrap">' +
     '<div class="lst-mapimg" id="lMap"></div>' +
-    (free
+    (free && !running
       ? '<button class="lst-target" id="lTarget">' + ICON.plus + '<span>Add target / workout</span></button>'
       : "") +
     liveShoeChipHtml() +
-    gpsBarsHtml() +
-    '<div class="lst-ctrls">' +
-      '<button class="lst-c" id="lZoomIn" aria-label="Zoom in">+</button>' +
-      '<button class="lst-c" id="lZoomOut" aria-label="Zoom out">\u2212</button>' +
-      '<button class="lst-c' + (coachEnabled() ? " on" : "") + '" id="lVoice" aria-label="Toggle voice coaching">' +
-        (coachEnabled() ? ICON.vox : ICON.voxOff) + '</button>' +
-      '<button class="lst-c" id="lRecentre" aria-label="Centre on me">' + ICON.gauge + '</button>' +
+    // \u26a0\u26a0 THE SIGNAL AND THE CONTROLS ARE SIBLINGS IN ONE FLEX ROW, NOT TWO ABSOLUTE BOXES WITH
+    // OFFSETS. They used to be, and they overlapped by 22x29 at normal text and 47x33 at the largest \u2014
+    // both sat at bottom: --s3 and the controls spread sideways into the pill on a short map. A container
+    // query lifted the pill clear, which worked and left two owners of one measurement. In one row they
+    // cannot overlap at all, which is the difference between a fix and a guarantee.
+    '<div class="lst-row">' +
+      (running ? '<span></span>' : gpsBarsHtml()) +
+      '<div class="lst-ctrls">' +
+        '<button class="lst-c" id="lZoomIn" aria-label="Zoom in">+</button>' +
+        '<button class="lst-c" id="lZoomOut" aria-label="Zoom out">\u2212</button>' +
+        '<button class="lst-c' + (coachEnabled() ? " on" : "") + '" id="lVoice" aria-label="Toggle voice coaching">' +
+          (coachEnabled() ? ICON.vox : ICON.voxOff) + '</button>' +
+        '<button class="lst-c" id="lRecentre" aria-label="Centre on me">' + ICON.gauge + '</button>' +
+      '</div>' +
     '</div>' +
-  '</div>' +
-  '<div class="lst-foot">' +
-    '<button class="primary" id="lStart">' + ICON.play + ' Start</button>' +
-  '</div>' +
-  whyLiveHtml();
+    // \u26a0 EVERYTHING THAT WAS A CARD BELOW THE MAP IS NOW AN OVERLAY ON IT, because he asked for the
+    // button to sit on top of the map and the map to be the screen. The stack is in flow inside the map
+    // rather than absolutely positioned, so nothing needs a magic bottom offset \u2014 this file already
+    // records a hardcoded 118px that silently stopped clearing the chrome the moment the chrome grew.
+    '<div class="lst-over">' +
+      (running ? whyLiveHtml() : "") +
+      // Current and lap join the three above only once there is a run to have them.
+      (running
+        ? '<div class="lst-live">' +
+            '<div><div class="lk">Current</div><div class="lv num none" id="lPace">\u2014</div></div>' +
+            '<div><div class="lk">Lap</div><div class="lv num" id="lLap">\u2014</div></div>' +
+          '</div>'
+        : "") +
+      (running ? '<div class="card lstep" id="lStepCard"><div class="cnt">Getting your first fix\u2026</div></div>' : "") +
+      (running ? '<div class="cuelog" id="lCues"></div>' : "") +
+      '<div class="lst-acts' + (running ? " two" : "") + '">' +
+        (running
+          ? '<button class="lst-a" id="lPause">' + (paused ? "Resume" : "Pause") + '</button>' +
+            '<button class="lst-a danger" id="lFinish">End session</button>'
+          : '<button class="lst-a go" id="lStart">' + ICON.play + ' Start</button>') +
+      '</div>' +
+    '</div>' +
+  '</div>';
 }
 /**
  * THE FIRST THING THE SESSION ASKS FOR, in the runner's own terms.
@@ -22871,11 +22990,15 @@ function viewLive() {
   const controls = running
     ? '<div class="live-controls two"><button class="ctrl" id="lPause">Pause</button><button class="ctrl danger" id="lFinish">End session</button></div>'
     : '<div class="live-controls"><button class="primary" id="lStart">' + ICON.play + ' Start</button></div>';
-  // ⚠️ THE START SCREEN IS ITS OWN COMPOSITION (owner, 2026-08-21, from an annotated reference): the
-  // session and its first step, the numbers at zero, where you are, how good the signal is, and which
-  // shoes are on your feet. Everything on it is a thing you settle BEFORE you set off; once running,
-  // the screen is the numbers and the controls, which is what the live layout below has always been.
-  if (!running && !LIVE.indoor) return viewLiveStart();
+  // ⚠️⚠️ ONE SCREEN FOR THE WHOLE SESSION (owner, 2026-08-24): "I want the first screenshot to be the
+  // screen that stays on for the entire session, not moving to the second screenshot." It used to switch
+  // at Start — the composition below pairs Elapsed with Distance, adds Current and Lap, and puts the
+  // label ABOVE the value, so the whole screen rearranged the moment the runner set off.
+  // ⚠️ THE TREADMILL IS THE ONE EXCEPTION AND IT IS NOT A CONCESSION. An indoor run records a real clock
+  // and deliberately no distance, so it has no position to draw, no route, no signal to report and
+  // nothing for the map controls to act on — the screen he drew is a map with numbers over it, and there
+  // is no map. The layout below is what a treadmill has always had.
+  if (!LIVE.indoor) return viewLiveStart();
   return '<button class="backbtn" id="liveBack">\u2039 ' + (running ? "Leave this screen" : "Today") + '</button>' +
     '<div class="card live-hero"><div class="live-hero-top"><div class="eyebrow">Live session · <span id="gpsBadge">' + gpsStatusText() + '</span></div>' +
     '<button class="voice-btn' + (coachEnabled() ? ' on' : '') + '" id="lVoice" aria-label="Toggle voice coaching">' + (coachEnabled() ? ICON.vox : ICON.voxOff) + '</button>' +

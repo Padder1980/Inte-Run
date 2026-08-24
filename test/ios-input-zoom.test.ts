@@ -197,3 +197,26 @@ test("⚠️ the native app locks zoom after every navigation, not just at launc
   assert.match(html, /location\.protocol==='interun:'[\s\S]{0,220}user-scalable=no/,
     "the native app does not get user-scalable=no");
 });
+
+/**
+ * ⚠️ THE 16px FLOOR APPLIES TO A FOCUSABLE EDITABLE TOO, AND THE SWEEP ABOVE CANNOT SEE ONE. The club's
+ * story text is a contenteditable .club-tx whose font-size is INLINE (written by clubTxCss at the
+ * runner's chosen size), so it is invisible to a stylesheet scan three ways over: not an
+ * input|select|textarea, not a stylesheet rule, and not a literal px in <style>. iOS auto-zooms on
+ * focusing ANY editable under 16px, and pinch-to-zoom is disabled app-wide, so a zoomed viewport could
+ * never be zoomed back out. The enforceable fact is the FLOOR the knob and the pinch both clamp
+ * through: CLUB_TX_MIN. (Words saved below 16 before the floor rose still render — the floor only
+ * bounds what can be SET, and only a draft is ever focusable.)
+ */
+test("the editable story word cannot be set below the iOS auto-zoom floor", () => {
+  const html = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
+  const m = /const CLUB_TX_MIN = (\d+), CLUB_TX_MAX = (\d+);/.exec(html);
+  assert.ok(m, "the size bounds are gone");
+  assert.ok(Number(m![1]) >= 16,
+    "CLUB_TX_MIN is " + m![1] + " — under 16px, focusing the word auto-zooms a viewport that can never be pinched back");
+  // And the floor is only meaningful if the editable really is the sized element: the draft's editable
+  // attribute and its inline font-size come from the same builder.
+  const span = html.slice(html.indexOf("function clubTextSpan("), html.indexOf("function clubTextSpan(") + 2200);
+  assert.match(span, /contenteditable="true"/, "the draft is no longer editable from clubTextSpan");
+  assert.match(span, /clubTxCss\(t, px\)/, "the editable's size no longer comes from the one styler");
+});

@@ -982,17 +982,6 @@ html.kbup .view { padding-bottom: calc(96px + var(--kbh, 0px)); }
 /* Bottom sheets hold fields at the bottom of the screen, so they DO lift above the keyboard —
    the one thing that must move, because its inputs are exactly where the keyboard lands. */
 html.kbup .sheet-ov { padding-bottom: var(--kbh, 0px); }
-/* ⚠️⚠️ THE TEXT PANEL IS LIFTED BY THE KEYBOARD, AND WITHOUT THIS IT IS BURIED BY IT. It is
-   position: fixed at bottom: 0 — which is right, because it has to sit directly above the keyboard —
-   and only .app, .view and .sheet-ov were ever lifted. So on a real phone the field, Done, the rails,
-   the tool row and the size slider would all be behind the keyboard the moment it came up: every
-   control the runner needs while typing, unreachable, on the one screen whose whole purpose is typing.
-   ⚠️ bottom, NOT padding-bottom. .sheet-ov is a full-screen overlay whose sheet sits at its foot, so
-   padding moves the sheet inside it; this IS the foot, so the panel itself has to move. Padding would
-   stretch its background down behind the keyboard and leave the controls exactly where they were.
-   ⚠️ AND IT NEEDS NO SECOND OWNER OF --kbh. Every gate that publishes it — a focused field, the 120px
-   delta, the focusout cleanup — is unchanged; this rule only reads it. */
-html.kbup .club-txed { bottom: var(--kbh, 0px); }
 .navbtn { display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: 0; padding: 6px 0; cursor: pointer; color: var(--ink-faint); font: inherit; }
 .navbtn svg { width: 22px; height: 22px; }
 .navbtn .nl { font-size: 10.5px; font-weight: 600; }
@@ -4678,7 +4667,13 @@ button.cm-tile:active { opacity: .65; }
    twice, and on a three-line caption it reads as part of the picture. */
 .club-tx { position: absolute; transform: translate(-50%, -50%); width: max-content; max-width: 84%;
   padding: 2px 6px;
-  font-weight: 800; line-height: 1.15; text-align: center; text-wrap: balance;
+  /* ⚠️ pre-wrap IS LOAD-BEARING, NOT TIDINESS. The UA stylesheet gives an EDITABLE element
+     white-space: pre-wrap and a read-only one keeps normal — measured, the same two-line text collapsed
+     to one line the moment it was committed. Declared here, the word looks identical while being typed
+     and after Done. text-wrap: balance went with the change: it re-balances line breaks on every
+     keystroke while editing, which reads as text re-flowing mid-word under the caret. */
+  white-space: pre-wrap;
+  font-weight: 800; line-height: 1.15; text-align: center;
   /* ⚠️ NO touch-action OF ITS OWN. touch-action is computed from the element AND its ancestors, and the
      stage this sits inside already takes none — so a second declaration here is a second owner of one
      behaviour, and in the VIEWER (whose stage is pan-y so a post can be scrolled past) it would silently
@@ -4691,47 +4686,78 @@ button.cm-tile:active { opacity: .65; }
    drag, which is part of what he reported as "the pinching and moving is a bit jittery still". The bin
    appearing in the rail is what says a word is selected; nothing on the word itself has to. */
 .club-tx.on { }
+/* ⚠️ THE WORD BEING TYPED, keyed on the attribute clubTextSpan writes — no second class to keep in step.
+   -webkit-user-modify: read-write-plaintext-only IS HALF OF THE PLAIN-TEXT CONTRACT: the deployment
+   target is iOS 17.0 and the plaintext-only attribute value did not exist until 17.4 — worse, an engine
+   that does not know a contenteditable value treats the element as NOT EDITABLE AT ALL (measured), so
+   the safe form is contenteditable="true" plus this WebKit-original property, which is measurably
+   equivalent (Enter gives a newline text node, pasted markup is stripped).
+   ⚠️ caret-color: currentColor — the reference's caret is the text's own colour (measured
+   rgb(62,83,245) while blue was selected), and clubTxCss already owns color:, so the caret needs no
+   second owner. outline: none, or the focus ring draws the very box he asked to be rid of. */
+.club-tx[contenteditable] { -webkit-user-modify: read-write-plaintext-only;
+  caret-color: currentColor; outline: none; }
 .club-x { position: absolute; top: calc(var(--s3) + env(safe-area-inset-top, 0px)); left: var(--s3);
   z-index: 3; display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 0;
   border-radius: 50%; background: rgba(4,16,13,.55); color: #fff; font-size: var(--t-card); }
-.club-rail { position: absolute; top: calc(var(--s3) + env(safe-area-inset-top, 0px));
-  right: var(--s3); z-index: 3; display: flex; flex-direction: column; gap: var(--s2); }
 .club-t { display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 0;
   border-radius: 50%; background: rgba(4,16,13,.55); color: #fff; font-size: var(--t-card);
   font-weight: 800; }
 .club-t svg { width: 20px; height: 20px; }
 .club-t.danger { color: var(--rest); }
-/* ⚠️ THE TEXT SURFACE SITS ABOVE THE EDITOR AND ABOVE THE KEYBOARD. --kbh is the app's own published
-   keyboard height, so the tools ride up with it rather than being covered by it — which is the one
-   thing this app's keyboard design says must move. */
-/* ⚠️ .48, NOT .82, AND NO BLUR. Measured on a real photograph at .82 with a 6px blur the picture was
-   effectively black — so the runner was typing onto a dark rectangle, which is exactly what typing on
-   the media instead of in a dialog was meant to stop. The dim exists to make white type legible while
-   the keyboard is up, not to hide the picture the words are being placed on. */
-/* ⚠️⚠️ A BOTTOM PANEL, NOT A TRANSLUCENT FULL-SCREEN SHEET — and the sheet is what he photographed as
-   "too cluttered". At inset: 0 with a 48% wash the composer's own tool row and foot showed straight
-   THROUGH it, so "Centre / Left / Right" sat on top of "Audio / Text / Overlay" and the size slider on
-   top of Next. Opaque and anchored to the bottom, it covers them; and clubEdDraw leaves them out while a
-   word is being edited, so there is one set of controls on screen rather than two overlapping sets.
-   ⚠️ AND THE PICTURE ABOVE IT STAYS LIVE. His instruction: "I should be able to move, scale size of text
-   by pinching at this point without needing to hit done." The draft is a real .club-tx on the stage, so
-   it can be dragged and pinched while the panel is open — and it looks exactly like the result. */
-.club-txed { position: fixed; left: 0; right: 0; bottom: 0; z-index: 98; display: flex;
-  flex-direction: column; background: #07160f; border-top: 1px solid rgba(255,255,255,.12); }
-.club-txed-top { display: flex; align-items: center; gap: var(--s2); padding: var(--s2) var(--s3) 0; }
-.club-txed-done { min-height: var(--tap); padding: 0 var(--s4); border: 0; border-radius: var(--r-ctl);
-  background: var(--accent); color: var(--accent-ink); font-size: var(--t-card); font-weight: 700; }
-/* ⚠️ THE FIELD IS A PLAIN ONE-LINE BOX AND THE PICTURE IS THE PREVIEW. It used to be a two-row textarea
-   styled like the result, which is why the highlight plate was enormous while editing and "corrected
-   itself" only on Done — a fixed row count cannot be the shape of a shrink-to-fit box. What he types
-   appears on the photograph at its real size as he types it. */
-.club-txed-in { flex: 1; min-width: 0; min-height: var(--tap); padding: 0 var(--s3);
-  border: 1px solid rgba(255,255,255,.16); border-radius: var(--r-ctl);
-  background: rgba(255,255,255,.06); color: #fff; font: inherit; font-size: var(--t-body);
-  resize: none; line-height: var(--tap); }
-.club-txed-in::placeholder { color: rgba(255,255,255,.45); }
-.club-txed-in:focus { outline: none; border-color: rgba(255,255,255,.5); }
-.club-txed-tools { padding: var(--s3); padding-bottom: calc(var(--s3) + var(--kbh, 0px) + env(safe-area-inset-bottom, 0px)); }
+/* ⚠️⚠️ THERE IS NO TEXT BOX. His instruction, verbatim: "i dont want the text box.....I want the
+   functionality to work like it does in the video". The word the runner types IS the word on the
+   picture — a contenteditable .club-tx with a real caret — and everything else is translucent chrome
+   floating over the photograph. The reference was measured frame by frame (a frozen A/B pair across the
+   scrim transition): a neutral black dim at alpha 0.60, NO opaque strip anywhere, Done as plain white
+   text top right, a vertical size knob half off the left edge, and the rails directly above the
+   keyboard. The panel this replaces was an opaque bottom sheet holding a textarea — his screenshot. */
+/* ⚠️ THE SCRIM IS WHAT MAKES A PANEL UNNECESSARY, AND ITS STRENGTH IS ARITHMETIC, NOT TASTE. White type
+   over a photograph needs the ground held down: worst case is a pure-white picture, where a black scrim
+   at alpha a leaves a ground of 255(1-a). 4.5:1 for white needs a >= 0.535; the reference measures
+   0.605; the app's old 0.48 dim FAILED at 3.69:1. rgba(4,16,13,.62) is the app's own deep ink at the
+   reference's strength — the exact value .club-trim already uses.
+   ⚠️ pointer-events: none, so a tap on the dimmed picture reaches the stage, which commits — tapping
+   outside the words is Done, exactly as the reference behaves. */
+.club-dim { position: absolute; inset: 0; background: rgba(4,16,13,.62); pointer-events: none; }
+/* ⚠️ THE TYPING CHROME IS A COLUMN PINNED ABOVE THE KEYBOARD, INSIDE #clubEd — never a body-level panel.
+   Inside the editor, clubEdClose's one remove() takes it down, and clubEdDraw's innerHTML wipe cannot
+   leave a stale copy behind. It is lifted by the app's published keyboard height, and it is THE ONLY
+   READER OF --kbh IN THE CLUB'S RULES: the old panel read it twice (bottom on the panel AND
+   padding-bottom on its tools), so the chrome rode up by TWICE the keyboard and flew off the top of the
+   screen — his screenshot. One owner, counted by a guard. */
+.club-txc { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; display: flex;
+  flex-direction: column; gap: var(--s3);
+  padding: var(--s2) 0 calc(var(--s2) + env(safe-area-inset-bottom, 0px)); }
+html.kbup .club-txc { bottom: var(--kbh, 0px); }
+/* ⚠️ PLAIN WHITE TEXT, TOP RIGHT, NO CHROME — measured off the reference (cap 12px, right inset 14).
+   A filled accent pill there reads as a form control over somebody's photograph. min-height keeps the
+   44px tap floor; the text-shadow is the same keyline device every word on a picture already wears. */
+.club-txdone { position: absolute; top: calc(var(--s2) + env(safe-area-inset-top, 0px));
+  right: var(--s3); z-index: 4; min-height: var(--tap); padding: 0 var(--s3); border: 0;
+  background: none; color: #fff; font-size: var(--t-card); font-weight: 800;
+  text-shadow: 0 1px 2px rgba(2,10,8,.7); }
+/* ⚠️ THE SIZE CONTROL IS A VERTICAL DRAG ON THE LEFT EDGE — the reference's knob, measured: a white
+   circle centred ON x=0 (so half is clipped by the stage's own overflow: hidden), riding a soft white
+   glow that fades to nothing by 14px. The TRACK is the hit area: the knob's visible half is 13px, far
+   under the 44px floor, so the whole 44px-wide band is what takes the finger — the grow-the-hit-area
+   rule this app uses everywhere. Top of the track is the biggest size. */
+.club-szt { position: absolute; left: 0; top: 15%; width: 44px; height: 27%; z-index: 2;
+  background: linear-gradient(90deg, rgba(255,255,255,.28), transparent 14px); }
+.club-szk { position: absolute; left: -13px; width: 26px; height: 26px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 6px rgba(2,10,8,.5); }
+/* ⚠️ DRAG TO DELETE — the reference's bin at the bottom centre, shown only while a committed word is
+   being dragged. It replaces the corner rail bin: a persistent bin needs a selection state to aim at,
+   and the reference has neither. .on while a drag is live; .arm while the finger is over it. */
+.club-del { position: absolute; left: 50%; bottom: 8%; z-index: 2; transform: translateX(-50%);
+  display: grid; justify-items: center; gap: var(--s2); opacity: 0; pointer-events: none;
+  transition: opacity .15s; color: #fff; }
+.club-del.on { opacity: 1; }
+.club-del-l { font-size: var(--t-card); font-weight: 700; text-shadow: 0 1px 3px rgba(2,10,8,.8); }
+.club-del-b { display: grid; place-items: center; width: 52px; height: 52px;
+  border: 1px solid rgba(255,255,255,.9); border-radius: 50%; background: rgba(4,16,13,.35); }
+.club-del-b svg { width: 24px; height: 24px; }
+.club-del.arm .club-del-b { background: var(--rest); border-color: var(--rest); }
 .club-fps { display: flex; gap: var(--s2); overflow-x: auto; padding-bottom: var(--s2); }
 .club-fp { flex: none; min-height: var(--tap); padding: 0 var(--s3); border: 1px solid rgba(255,255,255,.3);
   border-radius: var(--r-pill); background: rgba(4,16,13,.5); color: #fff; font-size: var(--t-body);
@@ -4742,9 +4768,6 @@ button.cm-tile:active { opacity: .65; }
   border-radius: 50%; }
 .club-cd.on { border-color: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,.35); }
 .club-cd::after { content: ""; position: absolute; inset: -7px; border-radius: 50%; }
-.club-sz { display: flex; align-items: center; gap: var(--s3); margin-top: var(--s3); color: #fff;
-  font-size: var(--t-label); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
-.club-sz input { flex: 1; accent-color: var(--accent); }
 /* ⚠️⚠️ IN FLOW, NOT PINNED AT A MAGIC OFFSET — and that constant is what he saw break. It was
    bottom: 118px, which cleared the chrome exactly while the chrome was one row of buttons; the moment
    the tool row and the tool sheets went in below it, the fifteen-second strip was drawn straight over
@@ -5004,12 +5027,22 @@ button.cm-tile:active { opacity: .65; }
   width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%;
   background: rgba(4,16,13,.72); color: #fff; font-size: var(--t-label); }
 /* ── The text editor's tools (his screenshots 2-10). */
-.club-tts { display: flex; align-items: center; justify-content: center; gap: var(--s2);
-  margin-top: var(--s3); }
-.club-tt { display: grid; place-items: center; width: 40px; height: 36px; padding: 0;
-  border: 1px solid rgba(255,255,255,.16); border-radius: var(--r-ctl); background: rgba(255,255,255,.08);
+/* ⚠️ ONE BAR, NOT FIVE BOXES — measured off the reference: the rail floats with no strip at all, while
+   the tool row is a single translucent material with evenly spread icons and a light chip on the open
+   one. The bar's fill was regressed against the photograph under it (it lifts a dark photo and holds on
+   a bright one, the blur signature); rgba(4,16,13,.28) is the measured no-blur fallback and the blur is
+   the same device the navbar already ships. */
+.club-tts { display: flex; align-items: center; gap: var(--s1); margin: 0 var(--s4);
+  padding: var(--s1); border-radius: var(--r-ctl); background: rgba(4,16,13,.28);
+  -webkit-backdrop-filter: blur(18px) saturate(140%); backdrop-filter: blur(18px) saturate(140%); }
+.club-tt { position: relative; flex: 1 1 auto; display: grid; place-items: center; height: 36px;
+  padding: 0; border: 0; border-radius: var(--r-ctl); background: none;
   color: #fff; font-size: var(--t-body); font-weight: 800; }
-.club-tt.on { border-color: #fff; background: rgba(255,255,255,.22); }
+.club-tt.on { background: rgba(255,255,255,.28); }
+/* ⚠️ THE HIT AREA GROWS, NOT THE BOX — the app's own rule, and the reference's own tool row is 35pt
+   tall. Growing the box would push the bar past the row height the reference measures; a pseudo-element
+   takes the finger's 44px without moving a pixel of what is drawn. */
+.club-tt::after { content: ""; position: absolute; left: 0; right: 0; top: -4px; bottom: -4px; }
 .club-tt svg { width: 20px; height: 20px; }
 /* ⚠️ THE COLOUR TOOL'S OWN SWATCH IS A CONIC GRADIENT, which is what the reference uses and what says
    "a colour lives behind this" without picking one of them to stand for the rest. */
@@ -12006,7 +12039,13 @@ function openClubEditor(kind, files, opts) {
     })
   };
   const ov = el('<div class="club-ed" id="clubEd"></div>');
-  document.body.appendChild(ov);
+  // ⚠️ INSIDE .app, NOT document.body — the pan belt. If iOS pans the visual viewport and refuses the
+  // scrollTo that clears it, followPan translates .app to cover the visible region; a transformed
+  // ancestor becomes the containing block for position: fixed, so the editor rides the correction.
+  // At body level it measurably does not (byte-identical rect under followPan(160)) — which is how the
+  // old panel could fly to the top of the screen while the "fix" corrected an invisible shell.
+  // Costs nothing when no pan is live: an untransformed ancestor leaves fixed positioning alone.
+  (document.querySelector(".app") || document.body).appendChild(ov);
   clubEdDraw();
 }
 /** The slide being worked on. Every builder reads through this, so nothing indexes the array by hand. */
@@ -12023,10 +12062,9 @@ function clubEdClose() {
   // blob URL has just been revoked two lines above — a picture that cannot load, held deliberately.
   CLUBED_MED = null;
   const e = $("clubEd"); if (e) e.remove();
-  // ⚠️ THE TEXT SURFACE IS A SIBLING OF THE EDITOR, NOT A CHILD — it has to sit above the keyboard, and
-  // the editor's own stage is the thing being typed over. So closing the editor has to remove it too, or
-  // a half-typed word is left floating over the club with nothing behind it.
-  const t = $("clubTxEd"); if (t) t.remove();
+  // ⚠️ NOTHING ELSE TO TEAR DOWN: the typing chrome is a CHILD of #clubEd now (see clubTextDraw), so
+  // the one remove() above takes the rails, the knob and Done with it. The old panel was a body-level
+  // sibling and needed its own line here — a second thing to remember, which is why it is not one.
 }
 /**
  * THE MEDIA ELEMENT KEPT ACROSS A REDRAW.
@@ -12084,7 +12122,11 @@ function clubEdDraw() {
   // colour, the plate, the alignment and the size all render exactly as they will after Done, and it can
   // be dragged and pinched while the panel is open. His instruction, twice over: "i want the text and and
   // changes you make to the text to be viewable accurately in real time, not when you have clicked done".
-  const texts = sl.texts.map((t, i) => clubTextSpan(t, i, i === S.sel)).join("") +
+  // ⚠️ THE WORD BEING EDITED IS NOT DRAWN TWICE. The draft is a COPY of sl.texts[draftAt], so
+  // rendering both put the original underneath as a ghost — invisible until the first change, and then
+  // two versions of one caption on screen at once.
+  const texts = sl.texts.map((t, i) =>
+      (S.draft && S.draftAt === i ? "" : clubTextSpan(t, i, i === S.sel))).join("") +
     (S.draft ? clubTextSpan(S.draft, "d", true) : "");
   // ⚠️ AND WHILE A WORD IS BEING EDITED THE COMPOSER'S OWN CHROME STEPS ASIDE. Two sets of controls on
   // one screen is what he photographed as "too cluttered"; the text panel supplies all of it instead.
@@ -12115,10 +12157,33 @@ function clubEdDraw() {
       '<div class="club-fit" id="clubFit">' + media + '</div>' +
       '<div class="club-vig" id="clubVig"></div>' +
       '<div class="club-ovs-l" id="clubOvL">' + clubOvHtml(sl) + '</div>' +
+      // ⚠️ THE SCRIM SITS UNDER THE WORDS AND OVER EVERYTHING ELSE — DOM order is the z-order here, the
+      // same way .club-vig already stacks. The words and the caret render at full strength on top of
+      // it, which is what the reference does (its caret measured full-strength blue over the dim).
+      (drafting ? '<div class="club-dim"></div>' : "") +
       '<div class="club-txs" id="clubTxs">' + texts + '</div>' +
+      // ⚠️ THE SIZE TRACK IS INSIDE THE STAGE ON PURPOSE, twice over: the stage's overflow: hidden is
+      // what clips the knob to its measured half-circle, and the stage's touch-action: none is already
+      // on the pinch suppressor's allowlist — a track outside it would need a fifth touch-action
+      // surface, which test/ios-input-zoom.test.ts pins to exactly four.
+      (drafting
+        ? '<div class="club-szt" data-cszk><div class="club-szk" id="clubSzK" role="slider"' +
+          ' aria-label="Text size" aria-orientation="vertical" aria-valuemin="' + CLUB_TX_MIN +
+          '" aria-valuemax="' + CLUB_TX_MAX + '" aria-valuenow="' + S.draft.size + '"></div></div>'
+        : // ⚠️ DRAG TO DELETE lives in the COMPOSER state — the reference shows it with no keyboard and
+          // no scrim. Pre-rendered hidden and toggled by class, because showing it mid-gesture with an
+          // innerHTML write would rebuild the node the finger is holding.
+          '<div class="club-del" id="clubDel" aria-hidden="true">' +
+            '<span class="club-del-l">Drag to delete</span>' +
+            '<span class="club-del-b">' + ICON.trash + '</span></div>') +
     '</div>' +
-    '<button class="club-x" id="clubX" aria-label="Close">✕</button>' +
-    (S.sel >= 0 && !S.draft ? clubRailHtml() : "") +
+    ((drafting
+        ? // ⚠️ Done IS PLAIN WHITE TEXT AT THE TOP RIGHT, where the reference puts it — the ✕ would sit
+          // at the top LEFT a thumb-width away, offering "abandon the whole post" beside "keep the
+          // word", so it steps aside while a word is being typed. Committing is the only way out, and
+          // an emptied word commits to nothing.
+          '<button class="club-txdone" id="clubTxDone">Done</button>'
+        : '<button class="club-x" id="clubX" aria-label="Close">✕</button>')) +
     (drafting ? "" :
       (sl.isVid ? clubTrimHtml(S) : "") +
       clubSheetHtml(S, sl) +
@@ -12149,6 +12214,11 @@ function clubEdDraw() {
     clubThumbs(sl);
     clubPlayhead(sl);
   }
+  // ⚠️ THE TYPING CHROME SELF-HEALS. It is appended INTO #clubEd (so one teardown owns everything), and
+  // the innerHTML write above has just destroyed it — so any redraw that happens while a word is being
+  // typed rebuilds the rails and re-wires the word, whichever path asked for the redraw. Focus is NOT
+  // re-taken here: a redraw outside a tap has no user activation, and iOS would refuse the keyboard.
+  if (drafting) { clubTextDraw(); clubDraftWire(); }
 }
 /**
  * THE TOOL ROW — his ruling of 2026-08-23, from a screen recording of the reference: "i want the same
@@ -12629,7 +12699,36 @@ function wireClubEd() {
   // cannot show them the typeface, the colour or the size they are choosing — and on iOS it is a modal
   // the app does not control. The text is typed ON the media, in the face it will be posted in.
   document.querySelectorAll("[data-ctool]").forEach((b) => b.onclick = () => clubToolOpen(b.dataset.ctool));
-  wireClubRail();
+  // The typing state's own controls: Done commits, and the left-edge track drags the size.
+  const done = $("clubTxDone");
+  if (done) {
+    // ⚠️ THE SAME FOCUS RULE AS THE CHROME (see clubTextDraw): a tap on Done must not blur the word
+    // BEFORE the click lands, or the keyboard starts dismissing mid-tap and the click can be eaten.
+    done.onmousedown = (ev) => ev.preventDefault();
+    done.onclick = () => clubTextCommit();
+  }
+  const szt = document.querySelector("[data-cszk]");
+  if (szt) {
+    szt.onpointerdown = (ev) => {
+      const S2 = CLUBED; if (!S2 || !S2.draft) return;
+      // A slider, not text: suppressing the default here is right, and it keeps the tap from blurring
+      // the word being typed.
+      ev.preventDefault();
+      try { szt.setPointerCapture(ev.pointerId); } catch (err) {}
+      const set = (cy) => {
+        const b = szt.getBoundingClientRect();
+        const f = Math.max(0, Math.min(1, (cy - b.top) / Math.max(1, b.height)));
+        // Top of the track is the biggest size — the reference's own orientation.
+        S2.draft.size = Math.round(CLUB_TX_MAX - f * (CLUB_TX_MAX - CLUB_TX_MIN));
+        clubDraftPaint(); clubSzPaint();
+      };
+      set(ev.clientY);
+      szt.onpointermove = (m) => set(m.clientY);
+      const end = () => { szt.onpointermove = null; szt.onpointerup = null; szt.onpointercancel = null; };
+      szt.onpointerup = end; szt.onpointercancel = end;
+    };
+    clubSzPaint();
+  }
   const txs = $("clubTxs");
   if (txs) txs.querySelectorAll("[data-ctx]").forEach((n) => {
     const k = n.getAttribute("data-ctx");
@@ -12868,8 +12967,18 @@ function clubPlayhead(sl) {
 function clubEdGestures(stage) {
   let drag = null, pinch = null;
   const pts = new Map();
+  let tapAt = null;
   stage.onpointerdown = (ev) => {
-    if (ev.target && ev.target.closest && ev.target.closest("[data-ctx]")) return;
+    if (ev.target && ev.target.closest && ev.target.closest("[data-ctx], [data-cszk]")) return;
+    const S2 = CLUBED;
+    if (S2 && S2.draft) {
+      // ⚠️ WHILE A WORD IS BEING TYPED THE PICTURE HOLDS STILL, and a tap on the dimmed picture COMMITS
+      // — the reference's own behaviour, and the reason the scrim takes no pointer events. Panning or
+      // zooming the photograph under a live caret would move the ground the word is being placed on.
+      tapAt = { id: ev.pointerId, x: ev.clientX, y: ev.clientY };
+      return;
+    }
+    tapAt = null;
     const sl = clubSlide(); if (!sl) return;
     pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
     try { stage.setPointerCapture(ev.pointerId); } catch (e) {}
@@ -12895,7 +13004,16 @@ function clubEdGestures(stage) {
     }
     clubEdFit();
   };
-  const up = (ev) => { pts.delete(ev.pointerId); if (pts.size < 2) pinch = null; if (!pts.size) drag = null; };
+  const up = (ev) => {
+    // The drafting tap: a finger that went down on the dimmed picture and did not travel is Done.
+    if (tapAt && ev.pointerId === tapAt.id) {
+      const still = Math.abs(ev.clientX - tapAt.x) < 6 && Math.abs(ev.clientY - tapAt.y) < 6;
+      tapAt = null;
+      if (still && CLUBED && CLUBED.draft) clubTextCommit();
+      return;
+    }
+    pts.delete(ev.pointerId); if (pts.size < 2) pinch = null; if (!pts.size) drag = null;
+  };
   stage.onpointerup = up; stage.onpointercancel = up;
 }
 /** ⚠️ ONE PLACE APPLIES THE FRAMING, so the clamp cannot be written twice and disagree — the preview and
@@ -12926,38 +13044,28 @@ function clubTextSpan(t, i, sel, scale) {
   // ⚠️ THE FEED SHOWS A POST SMALLER, so it asks for a scaled size rather than writing its own markup —
   // the size is the only thing that differs between the surfaces, and it is an argument now.
   const px = Math.round(t.size * (scale || 1));
+  // ⚠️⚠️ THE DRAFT IS THE EDITABLE — the key "d" is the whole test, so no caller needs a new argument
+  // and no second builder can make a word editable. contenteditable="true" plus the stylesheet's
+  // -webkit-user-modify is the plain-text pairing (see .club-tx[contenteditable]); spellcheck is off
+  // because a red squiggle baked into nobody's post should not appear on the preview of it either;
+  // inputmode stays default so iOS offers its full keyboard, autocorrect included.
+  const edit = i === "d";
   // ⚠️ A WORD STORED BEFORE THE STYLES EXISTED CARRIES A font AND NO style, and it must still look like
   // itself — so the old family is honoured when there is no named style to resolve.
   const legacy = !t.style && t.font ? "; font-family: " + t.font : "";
   return '<span class="club-tx' + (sel ? " on" : "") + '"' +
     (i == null ? "" : ' data-ctx="' + i + '"') +
+    (edit ? ' contenteditable="true" spellcheck="false"' : "") +
     ' style="left:' + (t.x * 100) + '%; top:' + (t.y * 100) + '%; ' + clubTxCss(t, px) + legacy +
     (rot ? '; transform: translate(-50%, -50%) rotate(' + rot + 'deg)' : "") + '">' +
     esc(t.text) + '</span>';
 }
-/**
- * THE RAIL THAT HOLDS THE SELECTED WORD'S BIN — ONE BUILDER AND ONE WIRING.
- *
- * ⚠️ IT IS A FUNCTION BECAUSE TWO PATHS PUT IT ON SCREEN: a full redraw, and clubSelPaint after a drag
- * (which must not redraw — see clubTextDrag). Written out at both sites, the day one gains a control the
- * other does not is the day a bin appears after a redraw and not after a drag.
- */
-function clubRailHtml() {
-  return '<div class="club-rail">' +
-    '<button class="club-t danger" id="clubDelTx" aria-label="Delete the selected text">' +
-      ICON.trash + '</button>' +
-  '</div>';
-}
-function wireClubRail() {
-  const del = $("clubDelTx");
-  if (!del) return;
-  del.onclick = () => {
-    const S = CLUBED, sl = clubSlide();
-    if (!S || !sl) return;
-    sl.texts.splice(S.sel, 1); S.sel = -1; haptic("light"); clubEdDraw();
-  };
-}
-const CLUB_TX_MIN = 12, CLUB_TX_MAX = 96;
+// ⚠️ THE FLOOR IS 16 BECAUSE THE WORD IS FOCUSABLE NOW. iOS auto-zooms on focusing any editable under
+// 16px — the same rule test/ios-input-zoom.test.ts enforces on fields — and pinch-to-zoom is disabled
+// app-wide, so a zoomed viewport could never be zoomed back out. The old floor of 12 predates the word
+// being the thing typed into; words already saved at 12-15 still render (the floor only clamps what the
+// knob and the pinch can set).
+const CLUB_TX_MIN = 16, CLUB_TX_MAX = 96;
 /**
  * MOVING, SCALING AND TURNING A WORD ON THE PICTURE.
  *
@@ -12989,7 +13097,11 @@ function clubTextDrag(ev, i) {
   const t = draft ? S.draft : sl.texts[i];
   if (!t) return;
   const node = ev.currentTarget;
-  ev.preventDefault();
+  // ⚠️⚠️ NO preventDefault ON THE WORD BEING TYPED. preventDefault on pointerdown is specified to
+  // suppress the compatibility mouse events, and focus is the default action of mousedown — so on the
+  // editable draft it would stop a tap from placing the caret or raising the keyboard at all. The
+  // committed words keep it: for them the default being suppressed is exactly right.
+  if (!draft) ev.preventDefault();
   // ⚠️⚠️ A SECOND FINGER JOINS THE GESTURE THAT IS ALREADY RUNNING, AND IT MUST NOT START ANOTHER. The
   // first version answered the second finger by overwriting node.onpointerdown with its own handler and
   // then NULLING it on release — which destroyed the binding wireClubEd had put there, so after one drag
@@ -13050,6 +13162,9 @@ function clubTxMove(m) {
   if (Math.abs(m.clientX - was.x) > 3 || Math.abs(m.clientY - was.y) > 3) g.moved = true;
   g.pts.set(m.pointerId, { x: m.clientX, y: m.clientY });
   const p = [...g.pts.values()];
+  // ⚠️ A DRAG OR A PINCH ON THE WORD BEING EDITED UNPINS IT — the runner is choosing its place, so
+  // Done must not put it back where it came from (see S.home in clubTextOpen).
+  if (g.moved && g.draft && CLUBED && CLUBED.home) CLUBED.home = null;
   // Two fingers scale and turn as well as move; one finger only moves.
   if (g.anchor.two && p.length >= 2 && g.anchor.d > 8) {
     const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
@@ -13064,6 +13179,43 @@ function clubTxMove(m) {
   g.t.x = Math.max(0.06, Math.min(0.94, g.anchor.x + (mid.x - g.anchor.mid.x) / Math.max(1, g.box.width)));
   g.t.y = Math.max(0.08, Math.min(0.9, g.anchor.y + (mid.y - g.anchor.mid.y) / Math.max(1, g.box.height)));
   clubTxPaint();
+  // ⚠️ THE DELETE BIN RIDES A COMMITTED DRAG (class toggles only — an innerHTML write here would
+  // rebuild the node the finger is holding); the size knob rides a draft pinch, so the two readouts of
+  // one size cannot drift apart.
+  if (g.moved) {
+    if (g.draft) clubSzPaint();
+    else g.armDel = clubDelPaint(mid.x, mid.y);
+  }
+}
+/**
+ * DRAG TO DELETE — the reference's own gesture: a bin appears at the bottom centre while a committed
+ * word is being dragged, arms when the finger is over it, and deletes on release.
+ * ⚠️ CLASS TOGGLES, NEVER MARKUP, while a finger is down. The bin is pre-rendered hidden by clubEdDraw.
+ * ⚠️ THE HAPTIC FIRES ON THE CROSSING, not per move — a buzz per pointermove is a rattle.
+ */
+function clubDelPaint(x, y) {
+  const del = $("clubDel"); if (!del) return false;
+  del.classList.add("on");
+  const b = del.querySelector(".club-del-b");
+  const r = b ? b.getBoundingClientRect() : null;
+  const arm = !!r && x >= r.left - 12 && x <= r.right + 12 && y >= r.top - 12 && y <= r.bottom + 12;
+  const was = del.classList.contains("arm");
+  del.classList.toggle("arm", arm);
+  if (arm && !was) haptic("light");
+  return arm;
+}
+/**
+ * ⚠️ THE ONE PLACE A DRAG MAY END IN A REDRAW. Deleting removes a word from the MODEL, so every other
+ * word's index shifts — the stage has to be rebuilt or the remaining words' bindings point at the
+ * wrong entries. clubEdKeepMedia is what makes that redraw cost no black flash; a MOVED word still
+ * never redraws (clubTxUp), because nothing about the model's shape changed.
+ */
+function clubTxDelete(g) {
+  const sl = clubSlide(); if (!sl) return;
+  sl.texts.splice(g.key, 1);
+  if (CLUBED) CLUBED.sel = -1;
+  haptic("light");
+  clubEdDraw();
 }
 function clubTxUp(e) {
   const g = CLUB_TXG; if (!g) return;
@@ -13073,33 +13225,33 @@ function clubTxUp(e) {
   if (g.pts.size >= 1) { clubTxAnchor(); return; }
   g.node.onpointermove = null; g.node.onpointerup = null; g.node.onpointercancel = null;
   CLUB_TXG = null;
-  if (!g.moved) { if (!g.draft) clubTextOpen(g.key); return; }
-  // ⚠️⚠️ NO REDRAW. clubEdDraw rebuilds the stage, and that is what he saw as "the screen flashed black
-  // once you take your finger off" — a fresh <video> starts a new load and a loading video paints black
-  // for a frame. Nothing needs redrawing: the model is current because clubTxPaint has been writing to
-  // the node throughout. All a finished drag has left to do is put the bin up.
-  if (!g.draft) clubSelPaint();
-}
-/**
- * THE RAIL'S BIN, PUT UP OR TAKEN DOWN WITHOUT REBUILDING THE STAGE.
- *
- * ⚠️ IT EXISTS BECAUSE A FINISHED DRAG USED TO CALL clubEdDraw, WHICH FLASHES BLACK. The bin is the only
- * thing on screen that depends on which word is selected, so it is the only thing a finished drag has to
- * change — and changing one node cannot reload a video.
- */
-function clubSelPaint() {
-  const S = CLUBED; if (!S) return;
-  const ov = $("clubEd"); if (!ov) return;
-  const have = ov.querySelector(".club-rail");
-  const want = S.sel >= 0 && !S.draft;
-  if (want && !have) {
-    ov.appendChild(el(clubRailHtml()));
-    wireClubRail();
-  } else if (!want && have) { try { have.remove(); } catch (e) {} }
-  ov.querySelectorAll("[data-ctx]").forEach((n) => {
-    const k = n.getAttribute("data-ctx");
-    n.classList.toggle("on", k === "d" || Number(k) === S.sel);
-  });
+  if (!g.moved) {
+    if (!g.draft) {
+      // ⚠️ TAPPING A WORD WHILE ANOTHER IS BEING TYPED COMMITS THE FIRST, THEN EDITS THE SECOND —
+      // otherwise clubTextOpen overwrites S.draft and the uncommitted word is silently lost. The
+      // tapped word is re-found by OBJECT, because committing an emptied word splices the array and
+      // the old index would then name its neighbour.
+      const S2 = CLUBED, sl2 = clubSlide();
+      if (S2 && S2.draft && sl2) {
+        const target = sl2.texts[g.key];
+        clubTextCommit();
+        const at = sl2.texts.indexOf(target);
+        if (at >= 0) clubTextOpen(at);
+        return;
+      }
+      clubTextOpen(g.key);
+    }
+    return;
+  }
+  // ⚠️⚠️ A MOVED WORD NEVER REDRAWS — clubEdDraw rebuilds the stage, which is the black flash he
+  // reported. The model is current because clubTxPaint has been writing to the node throughout. A drag
+  // released ON THE BIN is the one exception, and it goes through clubTxDelete, whose own note says
+  // why a delete is entitled to the redraw a move is not.
+  if (!g.draft) {
+    const del = $("clubDel");
+    if (del) del.classList.remove("on", "arm");
+    if (g.armDel) clubTxDelete(g);
+  }
 }
 /**
  * TYPING ON THE PICTURE.
@@ -13114,10 +13266,23 @@ function clubSelPaint() {
 function clubTextOpen(i) {
   const S = CLUBED, sl = clubSlide(); if (!S || !sl) return;
   const fresh = i < 0;
+  // ⚠️ A FRESH WORD OPENS HIGH — the reference measures its word at 31% of the screen, and high is
+  // also the pan defence: iOS pans the viewport only when the focused element would sit under the
+  // keyboard, and a caret at a third of the screen is nowhere near it. The repo's own device test
+  // records that a top-of-screen field never triggers the shove.
   S.draft = fresh
-    ? { text: "", x: 0.5, y: 0.42, colour: "#ffffff", style: "clean", size: 34,
+    ? { text: "", x: 0.5, y: 0.34, colour: "#ffffff", style: "clean", size: 34,
         bg: 0, align: "center", fx: "", rot: 0 }
     : Object.assign({}, sl.texts[i]);
+  // ⚠️⚠️ AN EXISTING WORD IS BROUGHT UPRIGHT TO THE EDITING SLOT, AND ITS PLACE IS REMEMBERED — the
+  // reference's own behaviour, and two defences in one move. A word the runner dragged low would put
+  // the caret UNDER the keyboard, which is the one thing that makes iOS pan the viewport; and a
+  // rotated editable is the one place WebKit's selection UI (drawn outside the page's transform
+  // space) has historically been mispositioned. Dragging or turning it DURING the edit is a deliberate
+  // move and wins — S.home is cleared by the gesture — otherwise Done puts it back exactly where it
+  // was. One extra field, no second copy of the position: the draft's own x/y/rot ARE the display.
+  S.home = fresh ? null : { x: S.draft.x, y: S.draft.y, rot: Number(S.draft.rot) || 0 };
+  if (!fresh) { S.draft.x = 0.5; S.draft.y = 0.34; S.draft.rot = 0; }
   // ⚠️ THE RAIL THAT WAS OPEN LAST IS REMEMBERED FOR THE SESSION. Reopening on the style rail every time
   // means somebody working through a palette has to reach for it again after every word.
   S.txTool = S.txTool || "style";
@@ -13133,6 +13298,10 @@ function clubTextOpen(i) {
   // a new one — which is the whole reason that exists.
   clubEdDraw();
   clubTextDraw();
+  // ⚠️ FOCUS COMES LAST AND SYNCHRONOUSLY — still inside the tap's own task, which is what iOS demands
+  // before it will present a keyboard for a programmatic focus. The node exists because clubEdDraw has
+  // just drawn it; clubDraftWire ran in clubEdDraw's own drafting tail.
+  clubDraftFocus();
 }
 /**
  * THE TEXT EDITOR, BUILT TO HIS SCREENSHOTS 2-10: the words on a live preview, a row of tools, and the
@@ -13163,8 +13332,13 @@ function clubTextOpen(i) {
 function clubTextDraw() {
   const S = CLUBED; if (!S || !S.draft) return;
   const d = S.draft;
-  let ov = $("clubTxEd");
-  if (!ov) { ov = el('<div class="club-txed" id="clubTxEd"></div>'); document.body.appendChild(ov); }
+  const host = $("clubEd"); if (!host) return;
+  // ⚠️ INSIDE #clubEd, NEVER document.body. The old panel was a body-level sibling, which meant its own
+  // teardown lines in clubEdClose, its own keyboard rule, and a pan correction that could never reach
+  // it (followPan transforms .app, and a body-level fixed element ignores a sibling's transform —
+  // measured byte-identical at followPan(160)). A child of the editor is torn down by the editor.
+  let ov = $("clubTxc");
+  if (!ov) { ov = el('<div class="club-txc" id="clubTxc"></div>'); host.appendChild(ov); }
   const tool = (id, ic, lab) => '<button class="club-tt' + (S.txTool === id ? " on" : "") +
     '" data-ctt="' + id + '" aria-pressed="' + (S.txTool === id) + '" aria-label="' + lab + '">' +
     ic + '</button>';
@@ -13192,35 +13366,19 @@ function clubTextDraw() {
         '</div><p class="club-tnote">Moving effects and mentions need a server the club does not have ' +
         'yet, so they are not here rather than being here and doing nothing.</p>'
       : "";
-  ov.innerHTML =
-    '<div class="club-txed-top">' +
-      '<textarea class="club-txed-in" id="clubTxIn" rows="1" placeholder="Type something">' +
-        esc(d.text) + '</textarea>' +
-      '<button class="club-txed-done" id="clubTxDone">Done</button>' +
-    '</div>' +
-    '<div class="club-txed-tools">' +
-      rail +
-      '<div class="club-tts">' +
-        tool("style", "Aa", "Typeface") +
-        tool("colour", '<span class="club-tt-c"></span>', "Colour") +
-        tool("plate", (Number(d.bg) === 1 ? "&#9632;" : "&#9633;") + "A", "Highlight") +
-        tool("align", ICON.cAlign, "Alignment") +
-        tool("fx", "A&#10022;", "Effect") +
-      '</div>' +
-      '<label class="club-sz"><span>Size</span>' +
-        '<input type="range" id="clubTxSz" min="' + CLUB_TX_MIN + '" max="' + CLUB_TX_MAX +
-        '" step="1" value="' + d.size + '"></label>' +
-      '<p class="club-tnote">Drag the words on the picture to move them, or pinch to resize and turn.</p>' +
+  ov.innerHTML = rail +
+    '<div class="club-tts">' +
+      tool("style", "Aa", "Typeface") +
+      tool("colour", '<span class="club-tt-c"></span>', "Colour") +
+      tool("plate", (Number(d.bg) === 1 ? "&#9632;" : "&#9633;") + "A", "Highlight") +
+      tool("align", ICON.cAlign, "Alignment") +
+      tool("fx", "A&#10022;", "Effect") +
     '</div>';
-  const ta = $("clubTxIn");
-  if (ta) {
-    // ⚠️ THE WORD ON THE PICTURE FOLLOWS EVERY KEYSTROKE, and only the word — repainting the stage here
-    // would reload the video and flash black.
-    ta.oninput = () => { d.text = ta.value; clubDraftPaint(); };
-    // ⚠️ FOCUS AFTER THE NODE IS IN THE DOCUMENT AND ONE FRAME LATER. iOS refuses to raise the keyboard
-    // for an element that was not in the tree when focus was called.
-    setTimeout(() => { try { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } catch (e) {} }, 30);
-  }
+  // ⚠️⚠️ A TAP ON THE CHROME MUST NOT STEAL FOCUS FROM THE WORD. Focus moving off a contenteditable is
+  // what dismisses the iOS keyboard — so without this, every colour swatch and every typeface pill
+  // would drop the keyboard mid-edit. preventDefault on mousedown is the classic
+  // toolbar-over-an-editable device: it stops the focus transfer and the click still fires.
+  ov.onmousedown = (ev) => ev.preventDefault();
   // ⚠️ THE HIGHLIGHT IS THE ONLY TOOL THAT ACTS RATHER THAN OPENING A RAIL — two states need no rail.
   ov.querySelectorAll("[data-ctt]").forEach((b) => b.onclick = () => {
     if (b.dataset.ctt === "plate") { d.bg = Number(d.bg) === 1 ? 0 : 1; }
@@ -13235,12 +13393,70 @@ function clubTextDraw() {
   pick("[data-ctpage]", (b) => { S.txPage = Number(b.dataset.ctpage) || 0; });
   pick("[data-ctal]", (b) => { d.align = b.dataset.ctal; });
   pick("[data-ctfx]", (b) => { d.fx = b.dataset.ctfx; });
-  const sz = $("clubTxSz");
-  // ⚠️ THE SLIDER REPAINTS THE WORD AND NOT THE PANEL. Rebuilding the panel would destroy the slider the
-  // finger is holding, which is the trap the composer's dials and the Support search field both record.
-  if (sz) sz.oninput = () => { d.size = Number(sz.value) || 34; clubDraftPaint(); };
-  const done = $("clubTxDone");
-  if (done) done.onclick = () => clubTextCommit();
+}
+/**
+ * THE WORD WIRES ITSELF — input sync, plain-text belts, and the drag binding.
+ *
+ * ⚠️ PROPERTY HANDLERS AND A WIRED FLAG, NOT addEventListener. This runs after every redraw while a
+ * word is being typed; on a node that survived, addEventListener would stack a second copy of every
+ * belt and a paste would insert twice.
+ */
+function clubDraftWire() {
+  const n = document.querySelector('[data-ctx="d"]');
+  if (!n || n.__wired) return;
+  n.__wired = true;
+  n.oninput = () => { const S = CLUBED; if (S && S.draft) S.draft.text = n.textContent; };
+  // ⚠️ THE BELT ON TOP OF -webkit-user-modify: anything that is not typing, deleting, composing
+  // (autocorrect arrives as composition/replacement) or a paste is refused; Enter is converted to a
+  // plain newline TEXT node, which pre-wrap then displays — measured identical to what the plaintext
+  // pairing produces on its own, so on an engine where the CSS carries it this belt changes nothing.
+  n.onbeforeinput = (e) => {
+    const t = e.inputType || "";
+    if (t === "insertParagraph" || t === "insertLineBreak") {
+      e.preventDefault();
+      try { document.execCommand("insertText", false, String.fromCharCode(10)); } catch (err) {}
+      return;
+    }
+    if (!/^insertText$|^insertCompositionText$|^insertReplacementText$|^insertFromPaste|^deleteContent|^deleteByCut$|^deleteWordBackward$|^deleteWordForward$|^historyUndo$|^historyRedo$/.test(t)) {
+      e.preventDefault();
+    }
+  };
+  // ⚠️ A PASTE IS TAKEN AS PLAIN TEXT BY HAND. The user-modify pairing already strips markup from the
+  // insertion pipeline (measured), but a hand-handled paste is certain on every engine this page meets.
+  n.onpaste = (e) => {
+    e.preventDefault();
+    const txt = (e.clipboardData && e.clipboardData.getData("text/plain")) || "";
+    if (txt) { try { document.execCommand("insertText", false, txt); } catch (err) {} }
+  };
+}
+/**
+ * FOCUS, SYNCHRONOUSLY, IN THE TAP'S OWN TASK. iOS only presents the keyboard for a programmatic
+ * focus() that is still inside the user-activation window of a real gesture — the old panel's
+ * setTimeout(focus, 30) got away with it for a textarea, and a deferral is exactly the thing that can
+ * break the chain. The caret goes to the end, which is where typing continues.
+ */
+function clubDraftFocus() {
+  const n = document.querySelector('[data-ctx="d"]');
+  if (!n) return;
+  try {
+    n.focus();
+    const r = document.createRange();
+    r.selectNodeContents(n); r.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges(); sel.addRange(r);
+  } catch (e) {}
+}
+/**
+ * THE KNOB TRACKS THE SIZE AND THE SIZE TRACKS THE KNOB — one fraction, painted inline, so the pinch
+ * and the knob can never disagree about what size the word is.
+ */
+function clubSzPaint() {
+  const S = CLUBED; if (!S || !S.draft) return;
+  const k = $("clubSzK"); if (!k) return;
+  const f = Math.max(0, Math.min(1,
+    1 - (S.draft.size - CLUB_TX_MIN) / Math.max(1, CLUB_TX_MAX - CLUB_TX_MIN)));
+  k.style.top = "calc(" + (f * 100).toFixed(1) + "% - " + Math.round(f * 26) + "px)";
+  k.setAttribute("aria-valuenow", String(S.draft.size));
 }
 /**
  * ⚠️ ONE WORD REPAINTED IN PLACE. Everything the panel changes shows on the photograph immediately, and
@@ -13251,7 +13467,12 @@ function clubDraftPaint() {
   const n = document.querySelector('[data-ctx="d"]');
   if (!n) { clubEdDraw(); return; }
   const d = S.draft;
-  n.textContent = d.text;
+  // ⚠️⚠️ NEVER REWRITE THE TEXT UNDER A LIVE CARET. The word is the thing being typed into now, and
+  // setting textContent replaces its text nodes — which destroys the selection and throws the caret
+  // away mid-word. Every tool tap lands here, and none of them changes the text, so the write is
+  // gated on the text actually differing. Rewriting the style attribute alone leaves the text nodes
+  // untouched, and the caret survives it.
+  if (n.textContent !== d.text) n.textContent = d.text;
   n.setAttribute("style", 'left:' + (d.x * 100) + '%; top:' + (d.y * 100) + '%; ' +
     clubTxCss(d, d.size) +
     ((Number(d.rot) || 0) ? '; transform: translate(-50%, -50%) rotate(' + d.rot + 'deg)' : ""));
@@ -13261,7 +13482,19 @@ function clubDraftPaint() {
 function clubTextCommit() {
   const S = CLUBED; if (!S) return;
   const d = S.draft;
-  const e = $("clubTxEd"); if (e) e.remove();
+  // ⚠️ THE NODE IS THE TRUTH AT THE MOMENT OF COMMIT — textContent, NEVER innerHTML, because esc()
+  // writes entities and an innerHTML read would store them literally. oninput keeps d.text current,
+  // but the read here costs nothing and cannot be stale.
+  // ⚠️ AND blur() IS WHAT DISMISSES THE KEYBOARD. The old panel took its textarea out of the DOM and
+  // the keyboard fell with it; the word STAYS in the DOM now, so nothing else would ever tell iOS the
+  // typing is over.
+  const n = document.querySelector('[data-ctx="d"]');
+  if (n && d) { d.text = n.textContent; try { n.blur(); } catch (err) {} }
+  // ⚠️ THE WORD GOES HOME UNLESS THE EDIT MOVED IT. It was pinned upright at the editing slot for the
+  // caret's sake (see clubTextOpen); a drag or a pinch during the edit clears S.home, so a position the
+  // runner chose is never overwritten by one they left.
+  if (d && S.home) { d.x = S.home.x; d.y = S.home.y; d.rot = S.home.rot; }
+  S.home = null;
   S.draft = null;
   if (!d) return;
   const txt = String(d.text || "").trim();

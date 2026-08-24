@@ -512,7 +512,16 @@ test("BLOCKER: the editor's text is typed on the media, not into a system dialog
   assert.match(d, /data-ctst/, "there is no way to choose a typeface");
   assert.match(noApp(), /const CLUB_TX_STYLES = \[/, "there are no named text styles");
   assert.match(d, /data-ccol/, "there is no way to choose a colour");
-  assert.match(d, /clubTxSz/, "there is no way to choose a size");
+  // ⚠️ RESTATED 2026-08-24 when the horizontal slider became the reference's left-edge vertical knob.
+  // clubTxSz was an element id — a mechanism; the fact is that a size control exists, writes d.size
+  // within the same bounds the pinch uses, and repaints the word. The knob's markup is clubEdDraw's
+  // (it lives on the stage) and its wiring is wireClubEd's.
+  assert.match(fn("clubEdDraw"), /data-cszk/, "there is no size control on the typing stage");
+  const knobW = fn("wireClubEd");
+  const knobAt = knobW.indexOf("data-cszk");
+  assert.ok(knobAt > 0, "the size knob is rendered but never wired");
+  assert.match(knobW.slice(knobAt, knobAt + 900), /draft\.size = [\s\S]*?clubDraftPaint\(\)/,
+    "the size knob does not write d.size and repaint the word");
   // ⚠️ EACH STYLE BUTTON IS SET IN ITS OWN LOOK — six labels in one typeface is not a choice you can see.
   // Restated when the three font pills became six named styles: the button now carries the style's whole
   // declaration rather than just a family, so the claim is that it wears it, not how it is spelled.
@@ -554,7 +563,19 @@ test("BLOCKER: a tap on a word edits it and a drag moves it", () => {
   const d = nocomment(fn("clubTextDrag")) + "\n" + nocomment(fn("clubTxMove")) + "\n"
     + nocomment(fn("clubTxUp"));
   assert.match(d, /\bmoved = true/, "a drag and a tap are not told apart");
-  assert.match(d, /if \(!\w*\.?moved\)[\s\S]{0,80}clubTextOpen\(/, "a tap on a word does not edit it");
+  // ⚠️ RESTATED 2026-08-24: the character window ({0,80}) could not hold the commit-then-edit branch —
+  // "a character window is not a card", which this repo has now paid for five times. The claim is that
+  // the not-moved branch reaches clubTextOpen; how far away it sits is not the claim.
+  const notMoved = /if \(!\w*\.?moved\) \{([\s\S]*?)\n  \}/.exec(d);
+  assert.ok(notMoved, "there is no not-moved branch, so a tap and a drag are one gesture");
+  assert.match(notMoved![1]!, /clubTextOpen\(/, "a tap on a word does not edit it");
+  // ⚠️ AND A TAP ON ANOTHER WORD WHILE ONE IS BEING TYPED COMMITS FIRST — otherwise clubTextOpen
+  // overwrites S.draft and the uncommitted word is silently lost. Re-found by OBJECT because
+  // committing an emptied word splices the array and an old index would name its neighbour.
+  assert.match(notMoved![1]!, /clubTextCommit\(\)/,
+    "editing a second word abandons the first one's uncommitted changes");
+  assert.match(notMoved![1]!, /indexOf\(target\)/,
+    "the tapped word is re-found by index across a commit that can splice the array");
   assert.match(d, /Math\.abs\([^)]*\) > \d/,
     "the travel threshold is missing, so every tap reads as a drag or vice versa");
 });
@@ -696,9 +717,12 @@ test("BLOCKER: one object URL per media, and they are released", () => {
   // leaks a whole photograph per overlay for the life of the app session.
   assert.match(c, /\(sl\.ov \|\| \[\]\)\.forEach\([^)]*\) => \{ try \{ URL\.revokeObjectURL\(o\.url\)/,
     "the editor leaks the overlays it was editing");
-  // ⚠️ AND THE TEXT SURFACE IS A SIBLING OF THE EDITOR, so closing the editor has to remove it too or a
-  // half-typed word is left floating over the club with nothing behind it.
-  assert.match(c, /clubTxEd/, "closing the editor leaves the text surface on screen");
+  // ⚠️ RESTATED 2026-08-24: the invariant is that NOTHING the text editor creates outlives
+  // clubEdClose. The old panel was a body-level sibling, so this used to assert its own teardown line;
+  // the chrome is a CHILD of #clubEd now, so the one remove() above takes it — and the discriminating
+  // claim moved to the builder: it must never append outside the editor.
+  assert.doesNotMatch(nocomment(fn("clubTextDraw")), /document\.body\.appendChild/,
+    "the typing chrome is appended to document.body, where clubEdClose cannot reach it");
 });
 
 /* ══ HIS SIX CHANGES OF 2026-08-22 ══════════════════════════════════════════════════════════════════
@@ -2615,18 +2639,18 @@ test("BLOCKER: the text editor names what it cannot do and offers no dead contro
   for (const attr of ["data-ctst", "data-ccol", "data-ctpage", "data-ctal", "data-ctfx", "data-ctt"]) {
     assert.match(d, new RegExp('\\[' + attr + '\\]'), attr + " is rendered but never wired");
   }
-  // ⚠️ THE SIZE SLIDER DOES NOT REDRAW, for the same reason the composer's dials do not: a rebuild
-  // destroys the input the finger is holding.
-  // ⚠️ RESTATED 2026-08-24: the handler is a one-liner now, and the old regex required a multi-line body
-  // ending in "\n  };". It matched a shape, not a rule.
-  const sz = /sz\.oninput = \(\) => \{([^}]*)\}/.exec(d);
-  assert.ok(sz, "the size slider has no handler");
-  assert.ok(sz![1]!.indexOf("clubTextDraw") < 0,
-    "the size slider rebuilds the editor on every input, destroying the slider being dragged");
-  // ⚠️ AND IT MUST REPAINT THE WORD, or the size is the one change that waits for Done — which is
-  // exactly what he photographed.
-  assert.match(sz![1]!, /clubDraftPaint\(\)/,
-    "the size slider changes nothing on the picture until Done is pressed");
+  // ⚠️ THE SIZE CONTROL DOES NOT REBUILD, for the same reason the composer's dials do not: a rebuild
+  // destroys the input the finger is holding. RESTATED 2026-08-24 for the second time — sz.oninput was
+  // the horizontal slider's mechanism; the control is the reference's vertical knob now, wired in
+  // wireClubEd because its track lives on the stage.
+  const wireK = nocomment(fn("wireClubEd"));
+  const kAt = wireK.indexOf("data-cszk");
+  assert.ok(kAt > 0, "the size knob has no handler");
+  const kBody = wireK.slice(kAt, wireK.indexOf("clubSzPaint();", kAt) + 20);
+  assert.ok(kBody.indexOf("clubTextDraw") < 0 && kBody.indexOf("clubEdDraw") < 0,
+    "the size knob rebuilds the chrome or the stage on every input, destroying the track being dragged");
+  assert.match(kBody, /clubDraftPaint\(\)/,
+    "the size knob changes nothing on the picture until Done is pressed");
 });
 
 /**

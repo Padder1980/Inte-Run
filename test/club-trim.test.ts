@@ -550,24 +550,40 @@ test("BLOCKER: a redraw adopts the media element instead of rebuilding it", () =
     "the kept media node is not cleared on close, so the next editor adopts a revoked blob URL");
 });
 
-test("BLOCKER: a finished drag paints in place and never redraws the stage", () => {
+test("BLOCKER: a finished drag paints in place; only a DELETE may redraw, and only through clubTxDelete", () => {
+  // ⚠️ RESTATED 2026-08-24 when drag-to-delete replaced the corner bin. The invariant is unchanged — a
+  // MOVED word never triggers clubEdDraw, because that rebuilds the video and flashes black — but a
+  // word dragged onto the bin leaves the MODEL, so every other word's index shifts and the stage has to
+  // be rebuilt or the survivors' bindings point at the wrong entries. clubEdKeepMedia is what makes
+  // that one redraw flash-free. clubSelPaint and clubRailHtml went with the corner bin they served.
   const src = page();
   const up = nocomment(fn(src, "clubTxUp"));
   assert.doesNotMatch(up, /clubEdDraw\(/,
-    "the end of a drag redraws again, which rebuilds the video and flashes black");
-  assert.match(up, /clubSelPaint\(/, "the end of a drag no longer puts the selected word's bin up");
+    "the end of a drag redraws directly again, which is the black flash on every plain move");
+  assert.match(up, /clubTxDelete\(/, "a drag released on the bin no longer deletes the word");
+  // The bin is taken down by CLASS, never by markup, whatever the release decides.
+  assert.match(up, /classList\.remove\("on", "arm"\)/, "the bin is not taken down when a drag ends");
+  const del = nocomment(fn(src, "clubTxDelete"));
+  assert.match(del, /splice\(g\.key, 1\)/, "the delete does not remove the word from the model");
+  assert.match(del, /clubEdDraw\(\)/,
+    "the delete does not redraw, so the surviving words' data-ctx bindings point at the wrong entries");
   const move = nocomment(fn(src, "clubTxMove"));
   assert.doesNotMatch(move, /clubEdDraw\(/,
     "a moving finger redraws the stage, which drops the pointer capture mid-gesture");
   assert.match(move, /clubTxPaint\(/, "the move no longer paints the node in place");
-  // ⚠️ THE BIN IS PUT UP WITHOUT REBUILDING ANYTHING, which is the only reason no redraw is needed.
-  const sel = nocomment(fn(src, "clubSelPaint"));
-  assert.doesNotMatch(sel, /clubEdDraw\(|innerHTML/,
-    "clubSelPaint redraws or rewrites innerHTML, so it flashes exactly as a redraw would");
-  assert.match(sel, /clubRailHtml\(/, "clubSelPaint writes its own rail markup instead of asking the builder");
-  // ONE builder for the rail, or the redraw path and the drag path drift.
-  assert.match(nocomment(fn(src, "clubEdDraw")), /clubRailHtml\(/,
-    "clubEdDraw writes its own rail markup, so two paths own one control");
+  // ⚠️ THE BIN RIDES THE DRAG BY CLASS TOGGLES ONLY — an innerHTML write mid-gesture rebuilds the node
+  // the finger is holding. It is pre-rendered hidden by clubEdDraw for exactly that reason.
+  assert.match(move, /clubDelPaint\(/, "the bin does not follow a committed drag");
+  const dp = nocomment(fn(src, "clubDelPaint"));
+  assert.doesNotMatch(dp, /innerHTML|clubEdDraw\(/,
+    "clubDelPaint writes markup mid-gesture, which rebuilds the node the finger is holding");
+  // ⚠️ THE ID, NOT THE CLASS FAMILY — /club-del/ matched club-del-l and club-del-b, which survived a
+  // break that deleted the wrapper clubDelPaint actually looks up. The bin must be findable.
+  assert.match(nocomment(fn(src, "clubEdDraw")), /id="clubDel"/,
+    "the bin is not pre-rendered by clubEdDraw, so showing it mid-drag needs a markup write");
+  assert.match(dp, /\$\("clubDel"\)/, "clubDelPaint does not look the bin up by the id clubEdDraw writes");
+  // The reference's own words and geometry: a label and a ring at the bottom centre.
+  assert.match(src, /Drag to delete/, "the bin does not say what dropping on it does");
 });
 
 test("BLOCKER: the baseline is re-taken whenever the number of fingers changes", () => {
@@ -638,44 +654,69 @@ test("BLOCKER: opening the text editor redraws once, so the draft is on the pict
   }
 });
 
-test("BLOCKER: the text panel is opaque and one line tall, so it is not a second screen of controls", () => {
+test("BLOCKER: there is no text box — the typing chrome floats over the picture", () => {
+  // ⚠️ RESTATED 2026-08-24 FROM ITS OPPOSITE. This test used to assert an OPAQUE BOTTOM PANEL holding a
+  // one-line textarea — the exact design the owner then rejected ("i dont want the text box.....I want
+  // the functionality to work like it does in the video"). What its old assertions were protecting —
+  // two overlapping sets of controls must never both be on screen — is carried by clubEdDraw's drafting
+  // gate, which this file already guards. What is asserted now is the reference, measured frame by
+  // frame: the word IS the input, a neutral scrim carries legibility, and the chrome floats.
   const src = page();
   const css = src.slice(src.indexOf("<style>"), src.indexOf("</style>"));
-  // ⚠️ THE BASE RULE, NOT WHICHEVER ONE COMES FIRST. `.club-txed {` is a substring of
-  // `html.kbup .club-txed {`, and that one is declared far earlier in the stylesheet — so an unanchored
-  // regex read the keyboard rule and reported the panel as having no background at all. Pick the rule
-  // that positions it. Same shape as this test's own background-versus-border slip, one edit later.
-  const panel = [...css.matchAll(/\.club-txed \{([^}]*)\}/g)]
-    .find((r) => /position:\s*fixed/.test(r[1]!));
-  assert.ok(panel, "there is no .club-txed rule that positions the panel");
-  // ⚠️ HIS SCREENSHOT 2: "the layout when editing text, its too cluttered". It was a translucent
-  // full-screen overlay, so the composer's tool row and foot showed straight through it.
-  // ⚠️ SCOPED TO THE background DECLARATION. Its first version swept the whole rule and matched the
-  // BORDER's rgba(255,255,255,.12) — a legitimate hairline — so it failed on correct code. A guard that
-  // reads a neighbouring declaration is measuring something it was not asked about.
-  const bg = /background:\s*([^;]+);/.exec(panel![1]!);
-  assert.ok(bg, "the panel declares no background at all, so whatever is behind it shows through");
-  assert.doesNotMatch(bg![1]!, /rgba\([^)]*,\s*0?\.\d+\)|transparent/,
-    "the panel's background is translucent again, so the composer's chrome shows through it");
-  assert.doesNotMatch(panel![1]!, /inset:\s*0/,
-    "the panel covers the whole screen again rather than sitting at the bottom");
-  assert.match(panel![1]!, /bottom:\s*0/, "the panel is not anchored to the bottom");
-  // A one-line field, not a two-row styled box: the words are read on the picture, not in the panel.
-  const field = /\.club-txed-in \{([^}]*)\}/.exec(css);
-  assert.ok(field, "there is no .club-txed-in rule");
-  assert.match(field![1]!, /resize:\s*none/, "the field can be dragged bigger, covering the picture");
-  const px = /font-size:\s*var\(--t-([a-z]+)\)/.exec(field![1]!);
-  assert.ok(px, "the field's size is not on the type ladder, so it does not scale with the phone");
-  assert.match(nocomment(fn(src, "clubTextDraw")), /rows="1"/,
-    "the field is more than one row again, so it takes the room the picture needs");
-  // ⚠️⚠️ THE KEYBOARD LIFTS IT, or every control the runner needs while typing is behind the keyboard.
-  // The panel is fixed at bottom: 0 — right, because it must sit directly above the keyboard — and only
-  // .app, .view and .sheet-ov were ever lifted. Found by sweeping every fixed bottom-anchored rule
-  // against what html.kbup moves, not by looking at it: a headless browser raises no keyboard.
-  assert.match(css, /html\.kbup \.club-txed \{[^}]*bottom:\s*var\(--kbh/,
-    "the keyboard does not lift the text panel, so the field, Done and every tool sit behind it");
-  assert.doesNotMatch(css, /html\.kbup \.club-txed \{[^}]*padding-bottom/,
-    "the panel is padded rather than moved, so its background grows and its controls stay put");
+  // The text box is gone, and none of its machinery may return.
+  // ⚠️ WORD-BOUNDED, because clubTxIn is a substring of clubTxInk — the model's plate-ink function,
+  // which is very much alive. A bare indexOf sweep reported the live styler as the dead text box.
+  for (const dead of ["club-txed", "clubTxIn", "clubTxSz", "clubRailHtml", "clubSelPaint", "wireClubRail"]) {
+    assert.doesNotMatch(src, new RegExp(dead + "(?![a-zA-Z])"),
+      dead + " is back — the text box or its corner bin has returned");
+  }
+  assert.doesNotMatch(nocomment(fn(src, "clubTextDraw")), /<textarea|<input/,
+    "the typing chrome builds a field again — the word on the picture is the input");
+  // ⚠️ THE SCRIM IS ARITHMETIC, NOT TASTE: white type on a pure-white photograph needs a black scrim of
+  // alpha >= 0.535 to clear 4.5:1 (255 x (1 - a) <= 119). The app's old 0.48 dim FAILED at 3.69:1; the
+  // reference measures 0.605. The floor here is the arithmetic one, so a retune stays legible.
+  const dim = /\.club-dim \{([^}]*)\}/.exec(css);
+  assert.ok(dim, "there is no scrim rule, so white chrome sits on an arbitrary photograph");
+  const a = /rgba\(4,16,13,(\.\d+)\)/.exec(dim![1]!);
+  assert.ok(a, "the scrim is not the app's own deep ink");
+  assert.ok(Number("0" + a![1]!) >= 0.535,
+    "the scrim is " + a![1]! + " — under the 0.535 floor white text needs on a white photograph");
+  assert.match(dim![1]!, /pointer-events:\s*none/,
+    "the scrim eats taps, so tapping the dimmed picture cannot commit");
+  // The scrim exists only while drafting, under the words: gated in clubEdDraw, before .club-txs.
+  const draw = nocomment(fn(src, "clubEdDraw"));
+  const dimAt = draw.indexOf("club-dim"), txsAt = draw.indexOf("club-txs");
+  assert.ok(dimAt > 0 && txsAt > dimAt,
+    "the scrim is not drawn under the words — DOM order is the z-order on this stage");
+  assert.match(draw.slice(Math.max(0, dimAt - 120), dimAt), /drafting \?/,
+    "the scrim is not gated on drafting, so the composer is permanently dimmed");
+  // ⚠️ THE CHROME IS A CHILD OF #clubEd, NEVER document.body. A body-level panel needed its own
+  // teardown, its own keyboard rule, and could never ride the pan correction (followPan transforms
+  // .app, and a body-level fixed element measurably ignores a sibling transform).
+  assert.doesNotMatch(nocomment(fn(src, "clubTextDraw")), /document\.body\.appendChild/,
+    "the typing chrome is appended to document.body again, outside the editor's own teardown");
+  assert.match(nocomment(fn(src, "clubTextDraw")), /host\.appendChild/,
+    "the typing chrome is not appended into the editor");
+  // ⚠️⚠️ EXACTLY ONE READER OF --kbh IN THE CLUB'S RULES — the old panel read it twice (bottom on the
+  // panel AND padding-bottom on its tools), so the chrome rode up by TWICE the keyboard height and
+  // flew off the top of the screen. His screenshot. Counted, not spot-checked.
+  const kbhReads = [...css.matchAll(/\.club[^{}]*\{[^}]*var\(--kbh/g)];
+  assert.equal(kbhReads.length, 1,
+    kbhReads.length + " club rules read --kbh; two owners is the chrome riding up twice the keyboard");
+  assert.match(css, /html\.kbup \.club-txc \{[^}]*bottom:\s*var\(--kbh/,
+    "the keyboard does not lift the typing chrome, so the rails sit behind it");
+  assert.doesNotMatch(css, /html\.kbup \.club-txc \{[^}]*padding-bottom/,
+    "the chrome is padded rather than moved, so its box grows and its controls stay put");
+  // Done is plain text at the top right — the reference's own exit — and the ✕ steps aside while
+  // typing, so "abandon the post" is never a thumb-width from "keep the word".
+  const done = /\.club-txdone \{([^}]*)\}/.exec(css);
+  assert.ok(done, "there is no Done rule");
+  assert.match(done![1]!, /background:\s*none/, "Done wears button chrome over somebody's photograph");
+  assert.match(done![1]!, /min-height:\s*var\(--tap\)/, "Done is under the 44px tap floor");
+  const xAt = draw.indexOf('id="clubX"');
+  assert.ok(xAt > 0, "the close button is gone from the composer");
+  assert.match(draw.slice(Math.max(0, xAt - 400), xAt), /drafting/,
+    "the close button is offered while typing — Done and a stage tap are the exits");
 });
 
 test("BLOCKER: every change shows on the picture at once, and the plate scales with the size", () => {
@@ -683,12 +724,34 @@ test("BLOCKER: every change shows on the picture at once, and the plate scales w
   const draw = nocomment(fn(src, "clubTextDraw"));
   // ⚠️ HIS SCREENSHOTS 4 AND 5: "i want the text and and changes you make to the text to be viewable
   // accurately in real time, not when you have clicked done". Every control repaints the word.
-  const paints = (draw.match(/clubDraftPaint\(\)/g) || []).length;
-  assert.ok(paints >= 4, "only " + paints + " controls repaint the word, so some wait for Done");
-  const sz = draw.slice(draw.indexOf("sz.oninput"));
-  assert.match(sz.slice(0, 200), /clubDraftPaint\(\)/, "the size slider does not repaint the word");
-  assert.doesNotMatch(sz.slice(0, 200), /clubTextDraw\(\)/,
-    "the size slider rebuilds the panel, which destroys the slider the finger is holding");
+  // ⚠️ RESTATED 2026-08-24: every control now routes through the two shared dispatchers — the tool
+  // toggle and pick() — and BOTH repaint. Counting raw occurrences was counting a shape (five separate
+  // handlers); the rule is that no dispatcher exists that fails to repaint.
+  // The dispatchers are callback arguments, so their bodies close with "});" rather than "};".
+  const dispatchers = [...draw.matchAll(/onclick = \(\) => \{([\s\S]*?)\}\);/g)];
+  assert.ok(dispatchers.length >= 2, "the chrome's dispatchers are gone");
+  for (const m of dispatchers) {
+    assert.match(m[1]!, /clubDraftPaint\(\)/,
+      "a chrome dispatcher does not repaint the word, so that control waits for Done: " + m[1]!.slice(0, 60));
+  }
+  // ⚠️ THE SIZE IS A VERTICAL DRAG ON THE LEFT EDGE NOW (the reference's knob). Its handler writes
+  // d.size clamped by the same CLUB_TX_MIN/MAX the pinch uses, repaints the word AND the knob, and
+  // never rebuilds anything — a rebuild would destroy the track under the finger.
+  const wire = nocomment(fn(src, "wireClubEd"));
+  const szAt = wire.indexOf("data-cszk");
+  assert.ok(szAt > 0, "there is no way to choose a size — the knob is unwired");
+  const knob = wire.slice(szAt, wire.indexOf("clubSzPaint();", szAt) + 20);
+  assert.match(knob, /draft\.size = Math\.round\(CLUB_TX_MAX - f \* \(CLUB_TX_MAX - CLUB_TX_MIN\)\)/,
+    "the knob does not map its track onto the size bounds the pinch uses");
+  assert.match(knob, /clubDraftPaint\(\)/, "the knob does not repaint the word as it is dragged");
+  assert.doesNotMatch(knob, /clubTextDraw\(\)|clubEdDraw\(\)/,
+    "the knob rebuilds the chrome or the stage, destroying the track under the finger");
+  // And the knob's readout can never disagree with a pinch: the pinch repaints it too.
+  // ⚠️ THE GATE, NOT THE MENTION: `if (false) clubSzPaint()` left the call exactly where it was and the
+  // guard passed while a pinch stopped moving the knob. Watched escaping.
+  const mv = nocomment(fn(src, "clubTxMove"));
+  assert.match(mv, /if \(g\.draft\) clubSzPaint\(\)/,
+    "a pinch resizes the word without moving the knob, so the two readouts of one size drift apart");
   // ⚠️ ONE PLACE PAINTS IT, and it is not a redraw.
   const p = nocomment(fn(src, "clubDraftPaint"));
   assert.match(p, /clubTxCss\(/, "the draft is styled by hand instead of by the function that styles the result");
@@ -709,4 +772,165 @@ test("BLOCKER: every change shows on the picture at once, and the plate scales w
     "only " + scaled + " of the plate's two padding axes scale with the size, so it is the wrong size " +
     "at every size but one: " + pad);
   assert.match(cssf, /line-height/, "the plate has no line height, so a two-line caption's rows collide");
+});
+
+/**
+ * TYPING ON THE PICTURE — the no-text-box editor (owner, 2026-08-24: "i dont want the text
+ * box.....I want the functionality to work like it does in the video").
+ *
+ * The word being typed IS the input: a contenteditable .club-tx with a real caret, over a measured
+ * 0.62 scrim, with floating chrome. These guards hold the platform mechanics that make that safe on
+ * an iPhone, each of which was measured before it was written.
+ */
+test("BLOCKER: the draft is a real editable on the picture, plain-text by construction", () => {
+  const src = page();
+  // ⚠️ ONE BUILDER MAKES A WORD EDITABLE, and it keys on its own draft key — no caller passes a new
+  // argument, so no second builder can mint an editable of its own.
+  const span = nocomment(fn(src, "clubTextSpan"));
+  assert.match(span, /const edit = i === "d"/, "the editable is not keyed on the draft's own key");
+  assert.match(span, /contenteditable="true" spellcheck="false"/,
+    "the draft is not editable, or spellcheck squiggles on a story caption");
+  // ⚠️ contenteditable="true" + the CSS pairing, NEVER the plaintext-only attribute value: the
+  // deployment target is iOS 17.0, plaintext-only shipped in 17.4, and an engine that does not know a
+  // contenteditable value treats the element as NOT EDITABLE AT ALL (measured). The pairing is
+  // measurably equivalent — Enter gives newline text nodes, pasted markup is stripped.
+  assert.ok(src.indexOf('contenteditable="plaintext-only"') < 0,
+    "plaintext-only is back — on iOS 17.0-17.3 that word is not editable at all");
+  const css = src.slice(src.indexOf("<style>"), src.indexOf("</style>"));
+  const ed = /\.club-tx\[contenteditable\] \{([^}]*)\}/.exec(css);
+  assert.ok(ed, "there is no editable-state rule, so the plain-text half of the contract is gone");
+  assert.match(ed![1]!, /-webkit-user-modify:\s*read-write-plaintext-only/,
+    "without user-modify, Enter makes div soup and a rich paste keeps its markup on iOS under 17.4");
+  // The reference's caret is the text's own colour, and clubTxCss already owns color: — currentColor
+  // means the caret can never disagree with the word it sits in, plate ink included.
+  assert.match(ed![1]!, /caret-color:\s*currentColor/, "the caret is not the text's own colour");
+  assert.match(ed![1]!, /outline:\s*none/, "the focus ring draws the very box he asked to be rid of");
+  // ⚠️ pre-wrap ON THE BASE RULE, measured: the UA gives an EDITABLE pre-wrap and a read-only one
+  // normal, so a newline typed on the picture collapsed to one line the moment it was committed.
+  // ⚠️ THE RULE'S OWN COMMENT EXPLAINS WHY pre-wrap IS THERE, quoting the declaration — so an
+  // unstripped capture matched the prose and the guard passed with the declaration deleted. Ninth
+  // firing of the comment-quotes-what-it-forbids trap in this repo; nocomment is the remedy it keeps.
+  const base = [...css.matchAll(/\.club-tx \{([^}]*)\}/g)].find((r) => /position/.test(r[1]!));
+  assert.ok(base, "there is no .club-tx base rule");
+  assert.match(nocomment(base![1]!), /white-space:\s*pre-wrap/,
+    "a newline typed on the picture collapses when the word is committed");
+});
+
+test("BLOCKER: the plain-text belts are wired once, and autocorrect still works", () => {
+  const src = page();
+  const wire = nocomment(fn(src, "clubDraftWire"));
+  // ⚠️ PROPERTY HANDLERS BEHIND A WIRED FLAG — this runs after every redraw while drafting, and
+  // stacked addEventListener belts would paste twice and insert two newlines per Enter.
+  assert.match(wire, /__wired/, "the belts stack on every redraw, so a paste inserts twice");
+
+  // Enter becomes a plain newline TEXT node — String.fromCharCode(10), because a real newline inside
+  // the emitted template literal kills the page silently (the documented escaping trap).
+  assert.match(wire, /insertParagraph/, "Enter is not intercepted, so an engine without the CSS pairing makes markup");
+  assert.match(wire, /String\.fromCharCode\(10\)/, "the newline is not inserted as plain text");
+  // ⚠️ AUTOCORRECT ARRIVES AS COMPOSITION AND REPLACEMENT INPUT — block those and iOS's own keyboard
+  // stops correcting, which reads as the app being broken rather than strict.
+  for (const ok of ["insertCompositionText", "insertReplacementText", "insertFromPaste", "deleteContent"]) {
+    assert.ok(wire.indexOf(ok) >= 0, wire.indexOf(ok) + ": " + ok + " is refused, so typing itself breaks");
+  }
+  // ⚠️ ASSIGNED, NOT MENTIONED — /onpaste/ matched a renamed-out handler (onpasteDISABLED), which is
+  // the mention-is-not-the-thing trap. Same for the belt above it.
+  assert.match(wire, /\bn\.onpaste\s*=/, "a paste is not taken as plain text by hand");
+  assert.match(wire, /\bn\.onbeforeinput\s*=/, "the beforeinput belt is named but never installed");
+  assert.match(wire, /\bn\.oninput\s*=/, "nothing keeps the model in step with what is typed");
+  assert.match(wire, /text\/plain/, "the paste handler does not ask for the plain-text flavour");
+  // The model follows the node — textContent, never innerHTML, because esc() writes entities and an
+  // innerHTML read would store them literally.
+  assert.match(wire, /textContent/, "the model does not follow what is typed");
+  assert.doesNotMatch(wire, /innerHTML/, "the model reads innerHTML, so an apostrophe commits as an entity");
+});
+
+test("BLOCKER: focus is synchronous, the caret survives a repaint, and commit blurs", () => {
+  const src = page();
+  // ⚠️ iOS ONLY PRESENTS THE KEYBOARD FOR A focus() STILL INSIDE THE TAP'S OWN TASK — a setTimeout is
+  // exactly the thing that can break the user-activation chain. The old panel's 30ms deferral got away
+  // with it for a textarea; the editable gets no deferral to gamble on.
+  const focus = nocomment(fn(src, "clubDraftFocus"));
+  assert.doesNotMatch(focus, /setTimeout/, "focus is deferred, which can cost the keyboard entirely");
+  assert.match(focus, /collapse\(false\)/, "the caret does not go to the end, where typing continues");
+  assert.match(nocomment(fn(src, "clubTextOpen")), /clubDraftFocus\(\)/,
+    "opening the editor never focuses the word, so the keyboard never rises");
+  // ⚠️ A REPAINT MUST NOT REWRITE THE TEXT UNDER A LIVE CARET — setting textContent replaces the text
+  // nodes and throws the selection away mid-word. Every tool tap repaints; none of them changes the
+  // text; the write is gated on the text differing.
+  assert.match(nocomment(fn(src, "clubDraftPaint")), /if \(n\.textContent !== d\.text\) n\.textContent = d\.text/,
+    "clubDraftPaint rewrites the text nodes on every tool tap, destroying the caret");
+  // ⚠️ THE WORD STAYS IN THE DOM AT COMMIT, so only an explicit blur() dismisses the keyboard — the
+  // old panel's teardown did it by removing the focused textarea, and nothing removes the word.
+  const commit = nocomment(fn(src, "clubTextCommit"));
+  assert.match(commit, /\.blur\(\)/, "nothing dismisses the keyboard when the word is committed");
+  assert.match(commit, /textContent/, "the commit does not read the node it was typed into");
+  // ⚠️ A TAP ON THE CHROME MUST NOT STEAL FOCUS — focus moving off a contenteditable is what dismisses
+  // the iOS keyboard, so every swatch and pill preventDefaults its mousedown (the classic
+  // toolbar-over-an-editable device: the focus transfer stops, the click still lands).
+  assert.match(nocomment(fn(src, "clubTextDraw")), /onmousedown = \(ev\) => ev\.preventDefault\(\)/,
+    "a tool tap steals focus from the word, dropping the keyboard mid-edit");
+  const wireEd = nocomment(fn(src, "wireClubEd"));
+  const doneAt = wireEd.indexOf('$("clubTxDone")');
+  assert.ok(doneAt > 0, "Done is unwired");
+  assert.match(wireEd.slice(doneAt, doneAt + 400), /onmousedown = \(ev\) => ev\.preventDefault\(\)/,
+    "a tap on Done blurs the word before the click lands, so the click can be eaten");
+});
+
+test("BLOCKER: the caret can be placed, the picture holds still, and a stage tap commits", () => {
+  const src = page();
+  // ⚠️⚠️ NO preventDefault ON THE EDITABLE'S pointerdown — it is specified to suppress focus, which
+  // would stop a tap from ever placing the caret or raising the keyboard. The committed words KEEP it.
+  const drag = nocomment(fn(src, "clubTextDrag"));
+  assert.match(drag, /if \(!draft\) ev\.preventDefault\(\)/,
+    "the draft's tap default is suppressed, so no caret can ever be placed in it");
+  const g = nocomment(fn(src, "clubEdGestures"));
+  // While a word is being typed the picture neither pans nor zooms, and a tap on the dimmed picture —
+  // one that did not travel — commits, which is the reference's own exit.
+  assert.match(g, /S2 && S2\.draft/, "the stage gestures ignore the drafting state entirely");
+  assert.match(g, /clubTextCommit\(\)/, "tapping the dimmed picture does not commit");
+  assert.match(g, /< 6/, "a stage drag commits as if it were a tap");
+  // The knob's track is skipped by the stage handler, or a size drag would also be a commit-tap.
+  assert.match(g, /data-cszk/, "the stage handler fights the size knob for the same finger");
+});
+
+test("BLOCKER: an existing word is edited upright at the slot, and goes home unless moved", () => {
+  const src = page();
+  // ⚠️ TWO DEFENCES IN ONE MOVE, both measured needs: a word the runner dragged LOW would put the caret
+  // under the keyboard — the one thing that makes iOS pan the viewport — and a ROTATED editable is
+  // where WebKit's selection UI (drawn outside the page's transform space) has historically sat wrong.
+  const open = nocomment(fn(src, "clubTextOpen"));
+  assert.match(open, /S\.home = fresh \? null : \{ x: S\.draft\.x, y: S\.draft\.y, rot: Number\(S\.draft\.rot\) \|\| 0 \}/,
+    "editing an existing word does not remember where it lives");
+  assert.match(open, /S\.draft\.x = 0\.5; S\.draft\.y = 0\.34; S\.draft\.rot = 0/,
+    "an existing word is edited wherever it happens to sit — under the keyboard if it was dragged low");
+  // A drag or a pinch during the edit is the runner choosing its place, so home is forgotten.
+  assert.match(nocomment(fn(src, "clubTxMove")), /CLUBED\.home = null/,
+    "moving the word during an edit still snaps it back on Done, undoing the runner's own placement");
+  const commit = nocomment(fn(src, "clubTextCommit"));
+  assert.match(commit, /if \(d && S\.home\) \{ d\.x = S\.home\.x; d\.y = S\.home\.y; d\.rot = S\.home\.rot; \}/,
+    "Done leaves the word at the editing slot instead of putting it back where it was");
+  // ⚠️ AND THE ORIGINAL IS NOT DRAWN TWICE — the draft is a copy, so rendering both showed the old
+  // word as a ghost behind the new one from the first change.
+  assert.match(nocomment(fn(src, "clubEdDraw")), /S\.draft && S\.draftAt === i \? ""/,
+    "the word being edited also renders from the array, as a ghost behind the draft");
+});
+
+test("BLOCKER: the editor rides the pan belt, and the drafting chrome survives any redraw", () => {
+  const src = page();
+  // ⚠️ MOUNTED INSIDE .app — followPan transforms .app when iOS pans and refuses the clearing scroll,
+  // and a transformed ancestor is what carries a fixed descendant. At body level the editor measurably
+  // ignores the correction (byte-identical rect under followPan(160)).
+  const openEd = nocomment(fn(src, "openClubEditor"));
+  assert.match(openEd, /\(document\.querySelector\("\.app"\) \|\| document\.body\)\.appendChild\(ov\)/,
+    "the editor mounts at body level, where the pan correction can never reach it");
+  // ⚠️ THE DRAFTING CHROME SELF-HEALS: it is a child of #clubEd, so any redraw's innerHTML write has
+  // just destroyed it — the tail rebuilds the rails and re-wires the word, whichever path redrew.
+  const draw = nocomment(fn(src, "clubEdDraw"));
+  const tail = draw.slice(draw.indexOf("wireClubEd()"));
+  assert.match(tail, /if \(drafting\) \{ clubTextDraw\(\); clubDraftWire\(\); \}/,
+    "a redraw while typing leaves the rails destroyed and the word unwired");
+  // ⚠️ keyboardPossible's isContentEditable branch is what publishes --kbh for the word — nothing else
+  // guards it, and tidying it to inputs-only sends every rail back behind the keyboard, suite green.
+  assert.match(src, /if \(a\.isContentEditable === true\) return true;/,
+    "keyboardPossible no longer answers for a contenteditable, so --kbh never publishes while typing");
 });

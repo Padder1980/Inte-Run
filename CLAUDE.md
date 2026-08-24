@@ -9933,3 +9933,249 @@ Driven end to end in a real browser at 430×932 and 320×568, both themes, `--ts
 **document, body and panel horizontal overflow 0 in all eight**, trim-versus-tools and trim-versus-foot
 overlap **0**, the field and Done both clearing the 44px floor, the draft always inside the stage, and
 **zero console errors**.
+
+## ⚠️⚠️ THERE IS NO TEXT BOX — THE WORD ON THE PICTURE IS THE INPUT (owner, 2026-08-24)
+
+His instruction, verbatim: *"screenshot 1 shows what happens when you try to type text now....i dont want
+the text box.....I want the functionality to work like it does in the video i've attached.....study it
+closely, ....theres no reason we cant do it like this.....analyse every part and work out how to
+replicate it"* — with a 157-second screen recording of the reference. Suite 1293 → **1300**; **49
+deliberate re-breaks, all 49 caught** (five only after a guard was tightened — those five are the
+useful half). Web-only, so all of it reaches his phone on the next launch.
+
+⚠️ **AND HIS SCREENSHOT WAS A DEFECT I HAD SHIPPED AN HOUR EARLIER — SEE "TWO OWNERS OF --kbh" BELOW.**
+The layout he photographed was not the old design failing; it was the keyboard-lift fix I had just
+pushed, doubled.
+
+### THE REFERENCE, MEASURED FRAME BY FRAME (frames in /tmp/vid8, spec at /tmp/vid8/spec/REFERENCE.md)
+
+Extracted with a small AVFoundation tool (no ffmpeg on this Mac) so frames could be seized at exact
+times, and sampled with an `NSBitmapImageRep` pixel reader.
+
+⚠️⚠️ **THE STRUCTURAL INSIGHT IS THAT A SCRIM REPLACES THE PANEL.** The whole picture is dimmed and
+**nothing is covered**. Measured across the scrim's own transition 0.25 s apart, so the handheld camera
+had barely moved (`f5/f0006.45.png` against `f0006.70.png`, x=200 y=250):
+
+| | r | g | b |
+|---|---|---|---|
+| before | 117 | 144 | 165 |
+| after | 45 | 57 | 66 |
+| ratio | 0.385 | 0.396 | 0.400 |
+
+Three channel ratios agreeing to 1.5% ⇒ **neutral black**, and `out = in × (1 − a)` ⇒ **α ≈ 0.60**. At
+that strength white type and floating icon rows are legible over any photograph, which is why the
+reference needs no opaque strip anywhere. **My opaque bottom panel was solving a problem the scrim
+already solves.**
+
+⚠️ **AND THE ALPHA IS ARITHMETIC, NOT TASTE.** The worst case is a pure-white photograph, where a black
+scrim at α leaves a ground of 255(1−α); white text clears 4.5:1 only at **α ≥ 0.535**. The app's own
+previous dim was **0.48 — 3.69:1, a fail**. Shipped at `rgba(4,16,13,.62)`, which is the app's own deep
+ink at the reference's strength and the exact value `.club-trim` already used. Guarded by the
+inequality, so a retune stays legible.
+
+**The rest, from `f0008.00.png` (460×999, a 440×956pt recording; scale 1.0455):**
+
+| element | measured | shipped |
+|---|---|---|
+| `Done` | plain white text, top right, cap 12px | `.club-txdone`, `background: none`, `min-height: var(--tap)` |
+| the caret | **rgb(62,83,245) — the CURRENT TEXT COLOUR**, at x=230 = exact centre | `caret-color: currentColor` |
+| the word | 31% down, horizontally centred | opens at `y: 0.34` |
+| size knob | **Ø28 centred on x = 0** (half clipped), y 32.7%, pure white | `.club-szk` at `left: -13px` in a 44px track |
+| active rail | 38pt pills, **no background strip at all**, scrolls sideways, selected = white pill | `.club-trail` + `.club-tst.on` — already built |
+| tool row | 35pt icons on **one translucent blurred bar**, evenly spread | `.club-tts` one bar, `blur(18px) saturate(140%)` |
+| keyboard | from 63.8% | chrome's bottom sits exactly on it |
+
+⚠️ **THE RAIL HAS NO STRIP AND THE TOOL ROW DOES** — measured three ways (an inter-frame static mask, a
+per-row horizontal-sd profile, and a high-pass "is the photo's texture present" probe, all agreeing).
+Between the rail's pills: high-pass 2.10, sd 15.9 — the photograph, unobstructed. Between the tool
+icons: high-pass 0.10, sd 0.4, with the fill's MEAN tracking the photograph (42.3→57.9 luma across six
+frames) — the signature of a blurred material, not a flat wash. An earlier note in this file said "NO
+BACKGROUND STRIPS BEHIND THE RAILS"; that is true of the rail and **false of the tool row**.
+
+⚠️ **THE WORD IS DRAGGABLE WHILE THE KEYBOARD IS UP AND THE RAILS DRAW OVER IT** (`f3/f0046.50.png`
+shows it dragged into the colour swatches, half hidden). The reference does not move it out of the way.
+
+⚠️ **DRAGGING A COMMITTED WORD SHOWS "Drag to delete" AND A BIN AT THE BOTTOM CENTRE** (`f2/f0128`) —
+not a bin in a corner, which is what the old design had.
+
+### ⚠️⚠️ TWO OWNERS OF --kbh, AND THE CHROME RODE UP TWICE THE KEYBOARD
+
+His screenshot — tool row jammed against the Dynamic Island, picture squeezed into a band at the bottom
+— is arithmetic, and it is **my own fix from an hour earlier**. `html.kbup .club-txed { bottom:
+var(--kbh) }` was added to lift the panel; `.club-txed-tools` had been reading `--kbh` in its
+`padding-bottom` since 2026-08-22, **ungated on `html.kbup`**. Measured at 430×932 with `--kbh: 336`:
+
+| | panel top | height | tools padding-bottom |
+|---|---|---|---|
+| no keyboard | 703.6 | 228.4 | 12 |
+| **as shipped** | **31.6** | **564.4** | **348** |
+| either owner alone | 367.6 | — | — |
+
+The top edge moved up by **672 = 2 × 336**, and with a real device's 34pt safe-area inset it computes to
+**−2.4, off the top of the screen**. And the rule's own comment asserted the opposite in as many words:
+*"AND IT NEEDS NO SECOND OWNER OF --kbh"*. There already was one and I had not looked.
+⚠️ **THE GUARD IS A COUNT, NOT A SPOT-CHECK.** Every rule whose selector names a `club` class is swept
+for `var(--kbh` and the total must be **exactly 1**. The old guard checked one selector for one extra
+term and was structurally blind to a descendant selector doing it.
+
+⚠️ **AND THE PAN WOULD HAVE ADDED A SECOND DISPLACEMENT ON TOP.** `#clubEd` and `#clubTxEd` were both
+appended to `document.body`, **outside `.app`** — and `followPan` translates `.app` alone. Measured:
+a body-level fixed element's rect is **byte-identical under `followPan(160)`**, because `position:
+fixed` resolves against the layout viewport and only a transformed *ancestor* changes that; `.app` is a
+sibling. So the app was correcting an invisible shell while the visible panel slid. `openClubEditor`
+now mounts into `.app`, which costs nothing when no pan is live and carries the editor when one is.
+
+### TYPING ON THE PICTURE — the platform mechanics, each measured before it was written
+
+The draft is a `contenteditable` `.club-tx` built by the **one** word builder (`clubTextSpan`), keyed on
+its own draft key `"d"` so no caller gains an argument and no second builder can mint an editable.
+
+⚠️⚠️ **NOT `contenteditable="plaintext-only"` — IT IS DEAD ON A SUPPORTED OS.** The deployment target is
+**iOS 17.0** and that value shipped in WebKit **17.4**; worse, an engine that does not know a
+`contenteditable` value treats the element as **not editable at all** (measured: `isContentEditable =
+false`). A runner on 17.0–17.3 would tap and get no caret and no keyboard — a silent total failure. The
+shipped pairing is **`contenteditable="true"` + CSS `-webkit-user-modify: read-write-plaintext-only`**,
+measured equivalent on both axes that matter (Enter → newline text nodes, `insertHTML` stripped), with
+the `true` attribute keeping it editable everywhere.
+
+⚠️ **`white-space: pre-wrap` ON THE BASE RULE IS LOAD-BEARING.** The UA stylesheet gives an *editable*
+element `pre-wrap` and a read-only one `normal` — measured, the same two-line text **collapsed to one
+line the moment it was committed** (82.2px → 43.1px). `text-wrap: balance` went with it: it re-balances
+line breaks on every keystroke, which reads as text re-flowing mid-word under the caret.
+
+⚠️ **`caret-color: currentColor`**, because `clubTxCss` already owns `color:` — so the caret can never
+disagree with the word it sits in, plate ink included. The reference's own caret colour is a **dark**
+blue that worst-cases at 1.03:1 over a mid ground and was deliberately not copied.
+
+⚠️⚠️ **NO `preventDefault()` ON THE EDITABLE'S `pointerdown`.** It is specified to suppress the
+compatibility mouse events, and focus is the default action of `mousedown` — so on the draft it would
+stop a tap from ever placing the caret or raising the keyboard. `if (!draft) ev.preventDefault()`: the
+committed words keep it, where suppressing the default is exactly right.
+
+⚠️⚠️ **A TAP ON THE CHROME MUST NOT STEAL FOCUS.** Focus leaving a contenteditable is what dismisses the
+iOS keyboard, so without this every colour swatch and every typeface pill would drop the keyboard
+mid-edit. `ov.onmousedown = (ev) => ev.preventDefault()` is the classic toolbar-over-an-editable device
+— the focus transfer stops and the click still lands. **Done needs it too**, or the keyboard starts
+dismissing mid-tap and the click can be eaten.
+
+⚠️⚠️ **A REPAINT MUST NOT REWRITE THE TEXT UNDER A LIVE CARET.** Every tool tap lands in
+`clubDraftPaint`, and setting `textContent` replaces the text nodes — which destroys the selection and
+throws the caret away mid-word. None of the tools changes the text, so the write is gated on the text
+actually differing; rewriting the style attribute alone leaves the text nodes untouched and the caret
+survives it.
+
+⚠️ **FOCUS IS SYNCHRONOUS, IN THE TAP'S OWN TASK.** iOS only presents the keyboard for a programmatic
+`focus()` still inside the user-activation window of a real gesture. The old panel's
+`setTimeout(focus, 30)` got away with it for a textarea; a deferral is exactly the thing that can break
+the chain, so `clubDraftFocus()` has none.
+
+⚠️ **THE BELTS ARE PROPERTY HANDLERS BEHIND A `__wired` FLAG.** `clubDraftWire` runs after every redraw
+while drafting; `addEventListener` would stack a second copy of every belt and a paste would insert
+twice. The `beforeinput` belt converts Enter to a plain newline and refuses anything that is not typing,
+deleting, **composing or replacing** — those last two are how autocorrect arrives, and blocking them
+stops iOS correcting at all, which reads as the app being broken rather than strict.
+
+⚠️ **THE COMMIT MUST `blur()`.** The old panel dismissed the keyboard by removing its focused textarea;
+the word **stays** in the DOM, so nothing else would ever tell iOS the typing is over. It reads
+`textContent`, never `innerHTML` — `esc()` writes entities and an `innerHTML` read would store them
+literally.
+
+⚠️ **`CLUB_TX_MIN` ROSE FROM 12 TO 16, AND THE GUARD FOR IT COULD NOT SEE THE PROBLEM.** iOS auto-zooms
+on focusing any editable under 16px and pinch-to-zoom is disabled app-wide, so a zoomed viewport could
+never be zoomed back. `test/ios-input-zoom.test.ts` scans **the stylesheet for literal px on
+input|select|textarea selectors** — and the word's size is *inline*, from `clubTxCss`, on a `<span>`: out
+of scope three ways over. The enforceable fact is the floor the knob and the pinch both clamp through,
+and that is now guarded. ⚠️ **Words already saved at 12–15 still render** — the floor bounds what can be
+*set*, and only a draft is ever focusable.
+
+### THE DECISIONS THAT ARE NOT THE REFERENCE'S, AND WHY
+
+⚠️ **AN EXISTING WORD IS BROUGHT UPRIGHT TO THE EDITING SLOT, AND ITS PLACE IS REMEMBERED.** Two
+defences in one move. A word the runner had dragged low would put the caret **under the keyboard** —
+the one thing that makes iOS pan the viewport — and a **rotated** editable is where WebKit's selection
+UI (drawn outside the page's transform space) has historically been mispositioned. `S.home` holds where
+it came from; a drag or a pinch during the edit **clears it**, because that is the runner choosing a
+place, and Done then keeps it. Measured: y 0.82/rot 12 → edited at 0.34/rot 0 → Done restores
+0.82/rot 12; and with a drag, Done keeps 0.39.
+
+⚠️ **THE ORIGINAL IS NOT DRAWN TWICE.** The draft is a *copy* of `sl.texts[draftAt]`, so rendering both
+put the old word underneath as a ghost — invisible until the first change, then two versions of one
+caption at once.
+
+⚠️ **TAPPING A SECOND WORD WHILE ONE IS BEING TYPED COMMITS THE FIRST.** Otherwise `clubTextOpen`
+overwrites `S.draft` and the uncommitted word is silently lost. The tapped word is re-found **by
+object**, because committing an emptied word splices the array and an old index would then name its
+neighbour.
+
+⚠️ **A TAP ON THE DIMMED PICTURE COMMITS**, which is why the scrim takes no pointer events — and while
+a word is being typed the picture **neither pans nor zooms**, because moving the ground under a live
+caret is not something a runner asked for.
+
+⚠️ **DRAG TO DELETE IS THE ONE PLACE A DRAG MAY END IN A REDRAW.** A delete removes a word from the
+model, so every other word's index shifts and the stage must be rebuilt or the survivors' bindings point
+at the wrong entries. `clubEdKeepMedia` is what makes that redraw flash-free. A **moved** word still
+never redraws. The bin is **pre-rendered hidden** and driven by class toggles, because an `innerHTML`
+write mid-gesture rebuilds the node the finger is holding.
+
+⚠️ **THE ✕ STEPS ASIDE WHILE TYPING.** It sits at the top left, a thumb-width from Done — offering
+"abandon the whole post" beside "keep the word". Done and a tap on the picture are the exits.
+
+⚠️ **THE SIZE TRACK IS INSIDE THE STAGE, twice over.** The stage's `overflow: hidden` is what clips the
+knob to its measured half-circle, and the stage's `touch-action: none` is already on the pinch
+suppressor's allowlist — a track outside it would need a **fifth** `touch-action: none` surface, which
+`test/ios-input-zoom.test.ts` pins to exactly four. And the knob's visible half is 13px, so the whole
+44px band takes the finger: measured hit height **44.98** on every control, including the tool icons,
+whose hit area grows by a pseudo-element rather than the box.
+
+### What is named rather than offered
+
+The reference's **animations** (Typewriter / Pop / Jump) play on the finished story, so they are their
+own piece of work; **Sparkle / Shimmer / Pixel** need an animation or a display face this app cannot
+fetch; **Mention** needs accounts and a server; the **eyedropper** needs to sample the picture, which is
+a `<video>`/`<img>` rather than a canvas here. The fx rail says so in one sentence, which is better than
+a control that does nothing.
+
+### Five guards restated, none deleted — and one of them asserted the rejected design
+
+⚠️⚠️ **`test/club-trim.test.ts`'s "the text panel is opaque and one line tall" ASSERTED THE TEXT BOX.**
+It required a `.club-txed` rule with an **opaque** background, a `.club-txed-in` field, and
+`rows="1"` — the exact design he then rejected. What it was protecting (two overlapping sets of controls
+must never both be on screen) is carried by `clubEdDraw`'s `drafting` gate, which this file already
+guards. Inverted rather than deleted: it now asserts the reference — no text box, a scrim above its
+arithmetic floor, the chrome inside `#clubEd`, exactly one `--kbh` owner.
+The other four: `/clubTxSz/` (an element id, where the fact is that a size can be chosen);
+`/if \(!moved\)[\s\S]{0,80}clubTextOpen\(/` (**a character window is not a card** — it could not hold the
+commit-then-edit branch; fifth firing); `/clubTxEd/` in `clubEdClose` (the surface is a *child* now, so
+the claim moved to the builder never appending outside the editor); and `sz.oninput` for the second time
+in a day.
+
+⚠️ **FIVE OF MY OWN NEW GUARDS WERE TOO LOOSE, AND ALL FIVE ESCAPED THEIR RE-BREAK.**
+1. The base `.club-tx` rule's own **comment quotes `white-space: pre-wrap`**, so an unstripped capture
+   passed with the declaration deleted — **ninth firing** of comment-quotes-what-it-forbids.
+2. `/onpaste/` matched a handler renamed to `onpasteDISABLED`. **A handler must be ASSIGNED, not named**
+   — restated as `\bn\.onpaste\s*=`, and the same fault was latent on the other two belts.
+3. `/club-del/` matched `club-del-l` and `club-del-b`, which survived a break that deleted the wrapper
+   `clubDelPaint` actually looks up. Pinned to the **id**.
+4. `if (false) clubSzPaint()` left the call exactly where it was — **the gate, not the mention**.
+5. A `clubTxIn` sweep matched `clubTxInk`, the live plate-ink function, reporting the styler as the dead
+   text box. **Word-bounded.**
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc
+clean apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1300 pass / 0
+fail under UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`**, both ratchets unchanged on their
+ceilings (143 radii, 322 font sizes). Driven end to end in a real browser at 430×932, 375×812 and
+320×568 at `--tscale` 1.0 and 1.3, with a synthetic keyboard: **the chrome's bottom edge sits exactly on
+the keyboard's top edge (clearance 0) at every size**, the word is **238 / 203 / 110 px clear of the
+keyboard** so iOS has no reason to pan, `documentElement`, `body` and the chrome all overflow **0**, the
+rail scrolls, every control's hit height measures **44.98**, and zero console errors.
+
+⚠️ **NO SCREENSHOT WAS POSSIBLE.** `Page.captureScreenshot` times out in this headless Chrome under
+every flag combination tried (`--headless=new`, `--headless=old`, `fromSurface: false`, a forced
+screencast) — the same missing compositor that makes `requestAnimationFrame` fire zero times here. So
+the visual is **unverified by eye**; the geometry, the hit areas and the contrast arithmetic are what
+back this, and the reference's own numbers are what they were checked against.
+
+⚠️ **ONE FLAKE, REPORTED RATHER THAN EXPLAINED AWAY.** One `TZ=Pacific/Kiritimati` run reported 3
+failures whose names did not survive to be captured; three consecutive re-runs are **1300 / 0**, HEAD is
+1293 / 0 in the same timezone, and this matches the browser-backed `share-export-bytes` flake this file
+already records as unreproduced.

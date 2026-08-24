@@ -451,3 +451,262 @@ test("BLOCKER: a row stored BEFORE carousels still opens", () => {
   assert.match(html, /data-cmed="k3"/, "an older row's media key was lost");
   assert.match(html, /Then/, "an older row's text was lost");
 });
+
+/**
+ * HIS SIX SCREENSHOTS OF 2026-08-24 — the playhead, the clutter, the live preview and the black flash.
+ *
+ * ⚠️ requestAnimationFrame FIRES ZERO TIMES IN THE HEADLESS CHROME THIS REPO TESTS IN. Measured: 0
+ * frames in 1.2 s while setInterval managed 25 in 0.4 s. So the playhead's MOTION cannot be driven in a
+ * browser here at all, which is why its arithmetic was split into clubPhFrac — a function can be run
+ * where a loop cannot, and the containment is geometry that a browser CAN measure.
+ */
+test("BLOCKER: the playhead is mapped over the selection, clamped, and safe on a zero span", () => {
+  const src = page();
+  const frac = new Function("t", "inS", "outS",
+    nocomment(fn(src, "clubPhFrac")) + "\nreturn clubPhFrac(t, inS, outS);",
+  ) as (t: number, a: number, b: number) => number;
+  // The window is 0..1 of the SELECTION, not of the clip — the marker lives inside the window now.
+  assert.equal(frac(0, 0, 15), 0, "the first chosen frame is not 0");
+  assert.equal(frac(7.5, 0, 15), 0.5, "the middle of the window is not 0.5");
+  assert.equal(frac(15, 0, 15), 1, "the last chosen frame is not 1");
+  // ⚠️ THE DISCRIMINATING CASE IS A WINDOW THAT DOES NOT START AT ZERO. Mapped over the CLIP instead,
+  // a 4..19 window would put its own start at 4/19 = 0.21 rather than at 0 — which is the defect.
+  assert.equal(frac(4, 4, 19), 0, "a window starting at 4s does not start its marker at 0");
+  assert.equal(frac(11.5, 4, 19), 0.5, "the middle of a 4..19 window is not 0.5");
+  assert.equal(frac(19, 4, 19), 1, "the end of a 4..19 window is not 1");
+  // Clamped as well as hidden: a frame can land between the clamp and the class.
+  assert.equal(frac(0, 4, 19), 0, "a time before the window is not clamped");
+  assert.equal(frac(99, 4, 19), 1, "a time after the window is not clamped");
+  // A zero-length window has no inside; dividing by it would be Infinity or NaN as a percentage.
+  assert.equal(frac(5, 5, 5), 0, "a zero-length window did not answer 0");
+  assert.ok(Number.isFinite(frac(5, 5, 5)), "a zero-length window produced a non-finite fraction");
+});
+
+test("BLOCKER: the playhead sits inside the window and its travel is inset by its own width", () => {
+  const src = page();
+  const strip = nocomment(fn(src, "clubStripHtml"));
+  const ph = strip.indexOf('id="clubPh"');
+  const win = strip.indexOf('class="club-win"');
+  const ha = strip.indexOf('data-ctrim="a"');
+  assert.ok(ph > 0 && win > 0 && ha > 0, "the strip no longer builds a playhead, a window and a handle");
+  // ⚠️⚠️ A CHILD, NOT A SIBLING, and that is the fix for "the playhead going past the wall of the
+  // slider": a child is positioned against the padding box, which the 14px border has already inset, so
+  // it physically cannot reach the white ends. As a sibling it was a fraction of the WHOLE strip.
+  assert.ok(ph > win, "the playhead is emitted before the window, so it is not inside it");
+  assert.ok(ph < ha, "the playhead is not inside the window — the start handle comes first");
+  // ⚠️ AND INSIDE IS NOT ENOUGH ON ITS OWN. Centred on its position (the old margin-left: -1.5px) HALF
+  // of a 3px marker still sat over each wall — measured 1.5px at both ends. The travel is inset by the
+  // marker's own width instead, so at 0 its left edge is the wall's inner face and at 1 its right edge
+  // is, and it touches them without crossing.
+  const css = src.slice(src.indexOf("<style>"), src.indexOf("</style>"));
+  const rule = /\.club-ph \{([^}]*)\}/.exec(css);
+  assert.ok(rule, "there is no .club-ph rule at all");
+  assert.doesNotMatch(rule![1]!, /margin-left/,
+    "the playhead is centred on its position again, so half of it sits over the white wall");
+  const loop = nocomment(fn(src, "clubPlayhead"));
+  assert.match(loop, /calc\(/,
+    "the playhead's left is a bare percentage again, so its travel is not inset by its own width");
+  assert.match(loop, /100% - 3px/,
+    "the inset is not the marker's own width, so it will overhang one wall or fall short of the other");
+  // The width in the CSS and the inset in the arithmetic are one measurement, and two owners drift.
+  const w = /width:\s*(\d+)px/.exec(rule![1]!);
+  assert.ok(w, ".club-ph declares no width, so the inset cannot be checked against it");
+  assert.match(loop, new RegExp("100% - " + w![1]! + "px"),
+    "the inset (" + /100% - (\d+)px/.exec(loop)![1] + "px) is not the marker's declared width (" + w![1] + "px)");
+});
+
+test("BLOCKER: a redraw adopts the media element instead of rebuilding it", () => {
+  const src = page();
+  const draw = nocomment(fn(src, "clubEdDraw"));
+  // ⚠️⚠️ THE BLACK FLASH. Writing a fresh <video src> into innerHTML starts a new load, and a loading
+  // video paints black for a frame — reported as "the screen flashed black once you take your finger
+  // off". Every redraw did it, so any tap or drag that redrew flashed.
+  assert.match(draw, /clubEdKeepMedia\(/,
+    "clubEdDraw no longer adopts the existing media element, so every redraw reloads the video");
+  const keep = nocomment(fn(src, "clubEdKeepMedia"));
+  // Only when the source AND the kind both match — reusing across sources shows the wrong picture.
+  assert.match(keep, /tagName !== want/, "the keeper does not check the element's kind");
+  assert.match(keep, /getAttribute\("src"\) !== sl\.url/, "the keeper does not check the source");
+  // ⚠️ DETACHED BEFORE innerHTML WIPES IT. innerHTML destroys whatever was there, so the node has to be
+  // taken out first and put back after; detached, a <video> keeps playing and keeps its currentTime.
+  assert.match(keep, /\.remove\(\)/, "the keeper does not detach the node, so innerHTML destroys it");
+  assert.ok(draw.indexOf("appendChild(keepMed)") > draw.indexOf("innerHTML"),
+    "the adopted node is put back before innerHTML runs, which destroys it");
+  // ⚠️⚠️ A REUSED VIDEO NEVER FIRES loadedmetadata AGAIN, so everything wireClubEd hangs off that event
+  // has to be driven by hand — without it the reuse trades a visible flash for an invisible dead trim.
+  // ⚠️ THE GATE, NOT THE MENTION. Its first version sliced below wireClubEd and looked for the two
+  // calls — so wrapping the block in `if (false && ...)` left both strings exactly where they were and
+  // the guard passed while a reused video silently lost its strip and its playhead. Watched escaping.
+  const tail = draw.slice(draw.indexOf("wireClubEd()"));
+  const gate = /if \(([^)]*)\) \{/.exec(tail);
+  assert.ok(gate, "there is no gate below wireClubEd at all, so a reused video restarts nothing");
+  assert.match(gate![1]!.trim(), /^keepMed && sl\.isVid && sl\.dur$/,
+    "the gate is '" + gate![1]!.trim() + "' — it must fire exactly when a video was reused");
+  const body = tail.slice(tail.indexOf(gate![0]!), tail.indexOf("\n  }", tail.indexOf(gate![0]!)));
+  assert.match(body, /clubTrimHtml\(S\)/, "a reused video never rebuilds the trim, so the strip dies");
+  assert.match(body, /clubPlayhead\(sl\)/, "a reused video never restarts the playhead");
+  // The kept node must not outlive its own blob URL.
+  assert.match(nocomment(fn(src, "clubEdClose")), /CLUBED_MED = null/,
+    "the kept media node is not cleared on close, so the next editor adopts a revoked blob URL");
+});
+
+test("BLOCKER: a finished drag paints in place and never redraws the stage", () => {
+  const src = page();
+  const up = nocomment(fn(src, "clubTxUp"));
+  assert.doesNotMatch(up, /clubEdDraw\(/,
+    "the end of a drag redraws again, which rebuilds the video and flashes black");
+  assert.match(up, /clubSelPaint\(/, "the end of a drag no longer puts the selected word's bin up");
+  const move = nocomment(fn(src, "clubTxMove"));
+  assert.doesNotMatch(move, /clubEdDraw\(/,
+    "a moving finger redraws the stage, which drops the pointer capture mid-gesture");
+  assert.match(move, /clubTxPaint\(/, "the move no longer paints the node in place");
+  // ⚠️ THE BIN IS PUT UP WITHOUT REBUILDING ANYTHING, which is the only reason no redraw is needed.
+  const sel = nocomment(fn(src, "clubSelPaint"));
+  assert.doesNotMatch(sel, /clubEdDraw\(|innerHTML/,
+    "clubSelPaint redraws or rewrites innerHTML, so it flashes exactly as a redraw would");
+  assert.match(sel, /clubRailHtml\(/, "clubSelPaint writes its own rail markup instead of asking the builder");
+  // ONE builder for the rail, or the redraw path and the drag path drift.
+  assert.match(nocomment(fn(src, "clubEdDraw")), /clubRailHtml\(/,
+    "clubEdDraw writes its own rail markup, so two paths own one control");
+});
+
+test("BLOCKER: the baseline is re-taken whenever the number of fingers changes", () => {
+  const src = page();
+  const anchor = nocomment(fn(src, "clubTxAnchor"));
+  const drag = nocomment(fn(src, "clubTextDrag"));
+  const move = nocomment(fn(src, "clubTxMove"));
+  const up = nocomment(fn(src, "clubTxUp"));
+  // ⚠️⚠️ EVERY CHANGE OF FINGER COUNT RE-ANCHORS. The first version read ev.clientX for the whole
+  // gesture, so a second finger landing moved the word by however far the first had already dragged, and
+  // lifting one finger moved it back — "the pinching and moving is a bit jittery still....its not smooth".
+  for (const [name, body] of [["the start of a gesture", drag], ["a finger lifting", up]] as const) {
+    assert.match(body, /clubTxAnchor\(\)/, name + " does not re-take the baseline");
+  }
+  assert.match(up, /pts\.size >= 1.*clubTxAnchor/s,
+    "lifting one finger of a pinch does not re-anchor on the fingers still down, so the word jumps");
+  // The move must read the ANCHOR, never the original event.
+  assert.doesNotMatch(move, /ev\.client/,
+    "the move measures from the original pointerdown again, which is the compounding jump");
+  assert.match(move, /anchor\.mid/, "the move no longer measures from the current baseline");
+  // The anchor snapshots the word's own position, or the displacement is applied to a moving target.
+  for (const f of ["x:", "y:", "size:", "rot:"]) {
+    assert.ok(anchor.includes(f), "the baseline does not capture " + f + ", so that value compounds");
+  }
+});
+
+test("BLOCKER: a second finger joins the live gesture and onpointerdown is never stolen", () => {
+  const src = page();
+  const drag = nocomment(fn(src, "clubTextDrag"));
+  const up = nocomment(fn(src, "clubTxUp"));
+  // ⚠️⚠️ THE FIRST VERSION OVERWROTE node.onpointerdown WITH ITS OWN HANDLER AND NULLED IT ON RELEASE,
+  // which destroyed the binding wireClubEd had put there — so after one drag the word could not be
+  // dragged or tapped again until something redrew. Invisible for as long as a finished drag redrew;
+  // taking the redraw away is what exposed it. Measured in a browser: a tap after a drag did nothing.
+  for (const [name, body] of [["clubTextDrag", drag], ["clubTxUp", up]] as const) {
+    assert.doesNotMatch(body, /onpointerdown\s*=/,
+      name + " writes onpointerdown, which belongs to wireClubEd — after one drag the word goes dead");
+  }
+  // Re-entrant instead: a second finger is added to the gesture that is already running.
+  assert.match(drag, /CLUB_TXG && CLUB_TXG\.node === node/,
+    "a second finger starts a second gesture with its own pointer map rather than joining the first");
+  assert.match(drag, /CLUB_TXG = \{/, "the gesture is not held anywhere a second finger could find it");
+  assert.match(up, /CLUB_TXG = null/, "the gesture is never released, so the next one adopts its fingers");
+  // wireClubEd is still the only owner of onpointerdown, and it must pass the draft's key as a STRING.
+  const wire = nocomment(fn(src, "wireClubEd"));
+  assert.match(wire, /onpointerdown = \(ev\) => clubTextDrag\(ev, k === "d" \? "d" : Number\(k\)\)/,
+    'the draft\'s key is coerced with Number("d") = NaN again, so the word being typed cannot be moved');
+});
+
+test("BLOCKER: opening the text editor redraws once, so the draft is on the picture and the chrome steps aside", () => {
+  const src = page();
+  const open = nocomment(fn(src, "clubTextOpen"));
+  // ⚠️ BOTH OF THOSE ARE DECIDED IN clubEdDraw'S MARKUP, so the panel alone cannot bring either about.
+  // Without the redraw the word being typed appeared nowhere until a keystroke happened to fall back to
+  // one, and the tool row and the strip stayed on screen under the panel — the clutter he photographed.
+  assert.match(open, /clubEdDraw\(\)/,
+    "clubTextOpen no longer redraws, so the draft is not on the stage and the composer chrome stays up");
+  assert.ok(open.indexOf("clubEdDraw()") < open.indexOf("clubTextDraw()"),
+    "the panel is built before the stage it types onto");
+  const draw = nocomment(fn(src, "clubEdDraw"));
+  assert.match(draw, /S\.draft \? clubTextSpan\(S\.draft, "d", true\) : ""/,
+    "the draft is no longer rendered as a real word on the stage");
+  assert.match(draw, /const drafting = !!S\.draft/, "there is no gate on the composer's own chrome");
+  // Everything the composer owns is behind that gate; the panel supplies the controls instead.
+  const gated = draw.slice(draw.indexOf("drafting ?"));
+  for (const part of ["clubTrimHtml", "clubToolsHtml", "club-foot"]) {
+    assert.ok(gated.includes(part), part + " is outside the drafting gate, so it stays on screen");
+  }
+});
+
+test("BLOCKER: the text panel is opaque and one line tall, so it is not a second screen of controls", () => {
+  const src = page();
+  const css = src.slice(src.indexOf("<style>"), src.indexOf("</style>"));
+  // ⚠️ THE BASE RULE, NOT WHICHEVER ONE COMES FIRST. `.club-txed {` is a substring of
+  // `html.kbup .club-txed {`, and that one is declared far earlier in the stylesheet — so an unanchored
+  // regex read the keyboard rule and reported the panel as having no background at all. Pick the rule
+  // that positions it. Same shape as this test's own background-versus-border slip, one edit later.
+  const panel = [...css.matchAll(/\.club-txed \{([^}]*)\}/g)]
+    .find((r) => /position:\s*fixed/.test(r[1]!));
+  assert.ok(panel, "there is no .club-txed rule that positions the panel");
+  // ⚠️ HIS SCREENSHOT 2: "the layout when editing text, its too cluttered". It was a translucent
+  // full-screen overlay, so the composer's tool row and foot showed straight through it.
+  // ⚠️ SCOPED TO THE background DECLARATION. Its first version swept the whole rule and matched the
+  // BORDER's rgba(255,255,255,.12) — a legitimate hairline — so it failed on correct code. A guard that
+  // reads a neighbouring declaration is measuring something it was not asked about.
+  const bg = /background:\s*([^;]+);/.exec(panel![1]!);
+  assert.ok(bg, "the panel declares no background at all, so whatever is behind it shows through");
+  assert.doesNotMatch(bg![1]!, /rgba\([^)]*,\s*0?\.\d+\)|transparent/,
+    "the panel's background is translucent again, so the composer's chrome shows through it");
+  assert.doesNotMatch(panel![1]!, /inset:\s*0/,
+    "the panel covers the whole screen again rather than sitting at the bottom");
+  assert.match(panel![1]!, /bottom:\s*0/, "the panel is not anchored to the bottom");
+  // A one-line field, not a two-row styled box: the words are read on the picture, not in the panel.
+  const field = /\.club-txed-in \{([^}]*)\}/.exec(css);
+  assert.ok(field, "there is no .club-txed-in rule");
+  assert.match(field![1]!, /resize:\s*none/, "the field can be dragged bigger, covering the picture");
+  const px = /font-size:\s*var\(--t-([a-z]+)\)/.exec(field![1]!);
+  assert.ok(px, "the field's size is not on the type ladder, so it does not scale with the phone");
+  assert.match(nocomment(fn(src, "clubTextDraw")), /rows="1"/,
+    "the field is more than one row again, so it takes the room the picture needs");
+  // ⚠️⚠️ THE KEYBOARD LIFTS IT, or every control the runner needs while typing is behind the keyboard.
+  // The panel is fixed at bottom: 0 — right, because it must sit directly above the keyboard — and only
+  // .app, .view and .sheet-ov were ever lifted. Found by sweeping every fixed bottom-anchored rule
+  // against what html.kbup moves, not by looking at it: a headless browser raises no keyboard.
+  assert.match(css, /html\.kbup \.club-txed \{[^}]*bottom:\s*var\(--kbh/,
+    "the keyboard does not lift the text panel, so the field, Done and every tool sit behind it");
+  assert.doesNotMatch(css, /html\.kbup \.club-txed \{[^}]*padding-bottom/,
+    "the panel is padded rather than moved, so its background grows and its controls stay put");
+});
+
+test("BLOCKER: every change shows on the picture at once, and the plate scales with the size", () => {
+  const src = page();
+  const draw = nocomment(fn(src, "clubTextDraw"));
+  // ⚠️ HIS SCREENSHOTS 4 AND 5: "i want the text and and changes you make to the text to be viewable
+  // accurately in real time, not when you have clicked done". Every control repaints the word.
+  const paints = (draw.match(/clubDraftPaint\(\)/g) || []).length;
+  assert.ok(paints >= 4, "only " + paints + " controls repaint the word, so some wait for Done");
+  const sz = draw.slice(draw.indexOf("sz.oninput"));
+  assert.match(sz.slice(0, 200), /clubDraftPaint\(\)/, "the size slider does not repaint the word");
+  assert.doesNotMatch(sz.slice(0, 200), /clubTextDraw\(\)/,
+    "the size slider rebuilds the panel, which destroys the slider the finger is holding");
+  // ⚠️ ONE PLACE PAINTS IT, and it is not a redraw.
+  const p = nocomment(fn(src, "clubDraftPaint"));
+  assert.match(p, /clubTxCss\(/, "the draft is styled by hand instead of by the function that styles the result");
+  assert.match(p, /d\.size/, "the draft is not painted at its own size");
+  // ⚠️ THE PLATE'S PADDING IS PROPORTIONAL. A flat 4px 12px is why "text background is far too big
+  // during the editing phase" — right at the committed size and wrong at every other.
+  const cssf = nocomment(fn(src, "clubTxCss"));
+  const at = cssf.indexOf("padding");
+  assert.ok(at > 0, "clubTxCss no longer sets a padding on the plate");
+  // ⚠️ THE SLICE RUNS TO THE END OF THE STATEMENT, not to the second "px" — the expression is two
+  // Math.max calls across two lines, and a short slice reported one axis where there are two.
+  const pad = cssf.slice(at, cssf.indexOf(";", at));
+  // ⚠️ BOTH AXES MUST SCALE, AND ITS FIRST VERSION ONLY NEEDED ONE. Replacing the vertical term with a
+  // flat 4 left the horizontal one proportional, so `px * 0.` still matched and the guard passed with
+  // half the fix removed. Watched escaping. Count the factors instead.
+  const scaled = (pad.match(/px \* 0?\.\d+/g) || []).length;
+  assert.ok(scaled >= 2,
+    "only " + scaled + " of the plate's two padding axes scale with the size, so it is the wrong size " +
+    "at every size but one: " + pad);
+  assert.match(cssf, /line-height/, "the plate has no line height, so a two-line caption's rows collide");
+});

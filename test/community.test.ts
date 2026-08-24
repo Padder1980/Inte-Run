@@ -547,10 +547,16 @@ test("BLOCKER: the editor's text is typed on the media, not into a system dialog
 test("BLOCKER: a tap on a word edits it and a drag moves it", () => {
   // ⚠️ ONE GESTURE MUST NOT MEAN TWO THINGS. A word the runner meant to nudge must not reopen the
   // keyboard, and a word they meant to fix must not need a second control to reach.
-  const d = fn("clubTextDrag");
-  assert.match(d, /moved = true/, "a drag and a tap are not told apart");
-  assert.match(d, /if \(!moved\) \{ clubTextOpen\(i\); return; \}/, "a tap on a word does not edit it");
-  assert.match(d, /> 4/, "the travel threshold is missing, so every tap reads as a drag or vice versa");
+  // ⚠️ RESTATED 2026-08-24 WHEN THE GESTURE MOVED ONTO A SHARED RECORD. It pinned `moved = true`,
+  // `if (!moved) { clubTextOpen(i); ... }` and the literal `> 4` — all three of which are now spelled
+  // differently for the same behaviour, so the guard failed on correct code. Fifth time in this file a
+  // guard was scoped to a HOW instead of a WHAT; the invariant is that travel decides.
+  const d = nocomment(fn("clubTextDrag")) + "\n" + nocomment(fn("clubTxMove")) + "\n"
+    + nocomment(fn("clubTxUp"));
+  assert.match(d, /\bmoved = true/, "a drag and a tap are not told apart");
+  assert.match(d, /if \(!\w*\.?moved\)[\s\S]{0,80}clubTextOpen\(/, "a tap on a word does not edit it");
+  assert.match(d, /Math\.abs\([^)]*\) > \d/,
+    "the travel threshold is missing, so every tap reads as a drag or vice versa");
 });
 
 test("BLOCKER: the framing is clamped in one place, and the stored crop is what was previewed", () => {
@@ -2466,8 +2472,18 @@ test("BLOCKER: one builder draws a word, and one function styles it", () => {
   assert.match(nocomment(fn("clubTextSpan")), /clubTxCss\(/, "the word on the picture is styled by hand");
   // ⚠️ THE TEXTAREA'S OWN style ATTRIBUTE, not a mention of clubTxCss anywhere in the function — the size
   // slider also calls it, so "the function mentions it" was satisfied with the preview styled by hand.
-  assert.match(nocomment(fn("clubTextDraw")), /'style="' \+ clubTxCss\(d, px\) \+ '">' \+ esc\(d\.text\)/,
-    "the editor's preview is styled by hand rather than by the function that styles the result");
+  // ⚠️⚠️ RESTATED 2026-08-24, AND THE INVARIANT GOT STRONGER RATHER THAN WEAKER. It pinned the panel's
+  // OWN preview word — which no longer exists, because the draft is now a real word on the picture built
+  // by clubTextSpan like every other. So there is one builder where there were two, which is what this
+  // test is named for; the guard has to assert the panel builds no word of its own.
+  const draw = nocomment(fn("clubTextDraw"));
+  assert.doesNotMatch(draw, /class="club-tx[ "]/,
+    "the panel builds its own preview word again, so the runner styles one thing and posts another");
+  assert.match(nocomment(fn("clubEdDraw")), /clubTextSpan\(S\.draft, "d", true\)/,
+    "the word being typed is not drawn on the picture by the one word builder");
+  // And the one place that repaints it in place must ask the same styler.
+  assert.match(nocomment(fn("clubDraftPaint")), /clubTxCss\(/,
+    "the draft is repainted by hand rather than by the function that styles the result");
 });
 
 /**
@@ -2517,16 +2533,21 @@ test("BLOCKER: the text plate reads, the glow replaces the keyline, and legacy w
  * handler: a two-finger spread took the size 34 to 70 and the rotation 0 to 14 degrees.
  */
 test("BLOCKER: two fingers on a word scale and turn it, within bounds", () => {
-  const d = nocomment(fn("clubTextDrag"));
-  assert.match(d, /pts\.size === 2/, "a second finger on a word is not noticed");
+  // ⚠️ RESTATED 2026-08-24. It pinned `pts.size === 2` and `pinch = {`, and the baseline is now re-taken
+  // on EVERY change of finger count rather than only when the second lands — which is a strictly
+  // stronger rule (lifting one finger used to jump the word back). Scoped to a how, again.
+  const d = nocomment(fn("clubTextDrag")) + "\n" + nocomment(fn("clubTxAnchor")) + "\n"
+    + nocomment(fn("clubTxMove")) + "\n" + nocomment(fn("clubTxUp"));
+  assert.match(d, /(pts\.size|p\.length) >?=+ 2/, "a second finger on a word is not noticed");
   assert.match(d, /Math\.hypot/, "nothing measures the pinch");
   assert.match(d, /Math\.atan2/, "nothing measures the twist");
-  // ⚠️ THE BASELINE IS RE-TAKEN WHEN THE SECOND FINGER LANDS, or the pinch jumps by however far the first
-  // finger had already dragged — the same re-anchoring the stage's own pinch needs.
-  const two = d.indexOf("pts.size === 2");
-  const base = d.indexOf("pinch = {");
-  assert.ok(base > two && base - two < 400,
-    "the pinch baseline is not taken at the moment the second finger lands");
+  // ⚠️ THE BASELINE IS RE-TAKEN ON EVERY CHANGE OF FINGER COUNT — both directions. Taken only when the
+  // second lands, lifting it measured the rest of the gesture from a baseline that included a finger
+  // that had gone, which is the jump he reported as "jittery".
+  assert.match(nocomment(fn("clubTextDrag")), /clubTxAnchor\(\)/,
+    "a finger landing does not re-take the baseline");
+  assert.match(nocomment(fn("clubTxUp")), /pts\.size >= 1[\s\S]{0,60}clubTxAnchor/,
+    "a finger lifting does not re-take the baseline, so the word jumps back");
   // Clamped, so a wild gesture cannot leave a word unreadable or off the picture.
   assert.match(d, /CLUB_TX_MIN/, "the size can be pinched to nothing");
   assert.match(d, /CLUB_TX_MAX/, "the size can be pinched past the picture");
@@ -2536,8 +2557,18 @@ test("BLOCKER: two fingers on a word scale and turn it, within bounds", () => {
   const lo = Number(/CLUB_TX_MIN = (\d+)/.exec(app)?.[1]);
   const hi = Number(/CLUB_TX_MAX = (\d+)/.exec(app)?.[1]);
   assert.ok(lo >= 8 && hi > lo && hi <= 200, "the size bounds are " + lo + "-" + hi + ", which is not sane");
-  // ⚠️ THE POINTERS ARE TRACKED ON THE WORD, not the stage, so one gesture has one owner.
-  assert.match(d, /node\.onpointerdown = add/, "a second finger on the word is not captured by the word");
+  // ⚠️⚠️ RESTATED 2026-08-24, AND IT PINNED THE DEFECT ITSELF. It required `node.onpointerdown = add` —
+  // the drag overwriting the binding wireClubEd had put there, and then NULLING it on release, which left
+  // the word dead to a drag or a tap until something redrew. Invisible for as long as a finished drag
+  // redrew; removing the redraw (the black flash) is what exposed it. The invariant this was protecting —
+  // the pointers belong to the WORD, so one gesture has one owner — is unchanged and better served.
+  assert.match(d, /setPointerCapture/, "a second finger on the word is not captured by the word");
+  assert.match(d, /CLUB_TXG && CLUB_TXG\.node === node/,
+    "a second finger starts its own gesture with its own pointer map instead of joining the first");
+  for (const f of ["clubTextDrag", "clubTxUp"]) {
+    assert.doesNotMatch(nocomment(fn(f)), /onpointerdown\s*=/,
+      f + " writes onpointerdown, which belongs to wireClubEd — after one drag the word goes dead");
+  }
 });
 
 /**
@@ -2586,10 +2617,16 @@ test("BLOCKER: the text editor names what it cannot do and offers no dead contro
   }
   // ⚠️ THE SIZE SLIDER DOES NOT REDRAW, for the same reason the composer's dials do not: a rebuild
   // destroys the input the finger is holding.
-  const sz = /if \(sz\) sz\.oninput = \(\) => \{([\s\S]*?)\n  \};/.exec(d);
+  // ⚠️ RESTATED 2026-08-24: the handler is a one-liner now, and the old regex required a multi-line body
+  // ending in "\n  };". It matched a shape, not a rule.
+  const sz = /sz\.oninput = \(\) => \{([^}]*)\}/.exec(d);
   assert.ok(sz, "the size slider has no handler");
   assert.ok(sz![1]!.indexOf("clubTextDraw") < 0,
     "the size slider rebuilds the editor on every input, destroying the slider being dragged");
+  // ⚠️ AND IT MUST REPAINT THE WORD, or the size is the one change that waits for Done — which is
+  // exactly what he photographed.
+  assert.match(sz![1]!, /clubDraftPaint\(\)/,
+    "the size slider changes nothing on the picture until Done is pressed");
 });
 
 /**

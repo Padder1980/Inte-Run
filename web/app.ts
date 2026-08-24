@@ -982,6 +982,17 @@ html.kbup .view { padding-bottom: calc(96px + var(--kbh, 0px)); }
 /* Bottom sheets hold fields at the bottom of the screen, so they DO lift above the keyboard —
    the one thing that must move, because its inputs are exactly where the keyboard lands. */
 html.kbup .sheet-ov { padding-bottom: var(--kbh, 0px); }
+/* ⚠️⚠️ THE TEXT PANEL IS LIFTED BY THE KEYBOARD, AND WITHOUT THIS IT IS BURIED BY IT. It is
+   position: fixed at bottom: 0 — which is right, because it has to sit directly above the keyboard —
+   and only .app, .view and .sheet-ov were ever lifted. So on a real phone the field, Done, the rails,
+   the tool row and the size slider would all be behind the keyboard the moment it came up: every
+   control the runner needs while typing, unreachable, on the one screen whose whole purpose is typing.
+   ⚠️ bottom, NOT padding-bottom. .sheet-ov is a full-screen overlay whose sheet sits at its foot, so
+   padding moves the sheet inside it; this IS the foot, so the panel itself has to move. Padding would
+   stretch its background down behind the keyboard and leave the controls exactly where they were.
+   ⚠️ AND IT NEEDS NO SECOND OWNER OF --kbh. Every gate that publishes it — a focused field, the 120px
+   delta, the focusout cleanup — is unchanged; this rule only reads it. */
+html.kbup .club-txed { bottom: var(--kbh, 0px); }
 .navbtn { display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: 0; padding: 6px 0; cursor: pointer; color: var(--ink-faint); font: inherit; }
 .navbtn svg { width: 22px; height: 22px; }
 .navbtn .nl { font-size: 10.5px; font-weight: 600; }
@@ -4676,7 +4687,10 @@ button.cm-tile:active { opacity: .65; }
   /* ⚠️ AN EDGE, NOT A PLATE. The share card's own answer: a keyline plus a soft halo, so a word reads
      on a bright sky and a dark road alike without a grey box behind it. */
   text-shadow: 0 0 1px rgba(2,10,8,.95), 0 1px 2px rgba(2,10,8,.7), 0 0 14px rgba(2,10,8,.45); }
-.club-tx.on { filter: drop-shadow(0 0 10px rgba(255,255,255,.45)); }
+/* ⚠️ NO FILTER ON THE SELECTED WORD. A drop-shadow forces a repaint of a large area on every frame of a
+   drag, which is part of what he reported as "the pinching and moving is a bit jittery still". The bin
+   appearing in the rail is what says a word is selected; nothing on the word itself has to. */
+.club-tx.on { }
 .club-x { position: absolute; top: calc(var(--s3) + env(safe-area-inset-top, 0px)); left: var(--s3);
   z-index: 3; display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 0;
   border-radius: 50%; background: rgba(4,16,13,.55); color: #fff; font-size: var(--t-card); }
@@ -4694,18 +4708,29 @@ button.cm-tile:active { opacity: .65; }
    effectively black — so the runner was typing onto a dark rectangle, which is exactly what typing on
    the media instead of in a dialog was meant to stop. The dim exists to make white type legible while
    the keyboard is up, not to hide the picture the words are being placed on. */
-.club-txed { position: fixed; inset: 0; z-index: 98; display: flex; flex-direction: column;
-  background: rgba(4,16,13,.48); }
-.club-txed-top { display: flex; justify-content: flex-end;
-  padding: calc(var(--s3) + env(safe-area-inset-top, 0px)) var(--s3) 0; }
+/* ⚠️⚠️ A BOTTOM PANEL, NOT A TRANSLUCENT FULL-SCREEN SHEET — and the sheet is what he photographed as
+   "too cluttered". At inset: 0 with a 48% wash the composer's own tool row and foot showed straight
+   THROUGH it, so "Centre / Left / Right" sat on top of "Audio / Text / Overlay" and the size slider on
+   top of Next. Opaque and anchored to the bottom, it covers them; and clubEdDraw leaves them out while a
+   word is being edited, so there is one set of controls on screen rather than two overlapping sets.
+   ⚠️ AND THE PICTURE ABOVE IT STAYS LIVE. His instruction: "I should be able to move, scale size of text
+   by pinching at this point without needing to hit done." The draft is a real .club-tx on the stage, so
+   it can be dragged and pinched while the panel is open — and it looks exactly like the result. */
+.club-txed { position: fixed; left: 0; right: 0; bottom: 0; z-index: 98; display: flex;
+  flex-direction: column; background: #07160f; border-top: 1px solid rgba(255,255,255,.12); }
+.club-txed-top { display: flex; align-items: center; gap: var(--s2); padding: var(--s2) var(--s3) 0; }
 .club-txed-done { min-height: var(--tap); padding: 0 var(--s4); border: 0; border-radius: var(--r-ctl);
   background: var(--accent); color: var(--accent-ink); font-size: var(--t-card); font-weight: 700; }
-.club-txed-mid { flex: 1; min-height: 0; display: grid; place-items: center; padding: var(--s3); }
-.club-txed-in { width: 100%; max-width: 20em; border: 0; background: none; text-align: center;
-  font-weight: 800; line-height: 1.15; resize: none;
-  text-shadow: 0 0 1px rgba(2,10,8,.95), 0 1px 2px rgba(2,10,8,.7), 0 0 14px rgba(2,10,8,.45); }
-.club-txed-in::placeholder { color: rgba(255,255,255,.5); }
-.club-txed-in:focus { outline: none; }
+/* ⚠️ THE FIELD IS A PLAIN ONE-LINE BOX AND THE PICTURE IS THE PREVIEW. It used to be a two-row textarea
+   styled like the result, which is why the highlight plate was enormous while editing and "corrected
+   itself" only on Done — a fixed row count cannot be the shape of a shrink-to-fit box. What he types
+   appears on the photograph at its real size as he types it. */
+.club-txed-in { flex: 1; min-width: 0; min-height: var(--tap); padding: 0 var(--s3);
+  border: 1px solid rgba(255,255,255,.16); border-radius: var(--r-ctl);
+  background: rgba(255,255,255,.06); color: #fff; font: inherit; font-size: var(--t-body);
+  resize: none; line-height: var(--tap); }
+.club-txed-in::placeholder { color: rgba(255,255,255,.45); }
+.club-txed-in:focus { outline: none; border-color: rgba(255,255,255,.5); }
 .club-txed-tools { padding: var(--s3); padding-bottom: calc(var(--s3) + var(--kbh, 0px) + env(safe-area-inset-bottom, 0px)); }
 .club-fps { display: flex; gap: var(--s2); overflow-x: auto; padding-bottom: var(--s2); }
 .club-fp { flex: none; min-height: var(--tap); padding: 0 var(--s3); border: 1px solid rgba(255,255,255,.3);
@@ -4936,10 +4961,15 @@ button.cm-tile:active { opacity: .65; }
 /* ⚠️ THE HANDLE IS NO LONGER WHITE — it is a transparent grab area sitting OVER the window's own thick
    border, carrying only the grip line. It is offset by its own width because it is positioned against the
    padding box, which the 14px border has already inset. */
-/* ⚠️ ABOVE THE BRACKET AND OUT OF THE WAY OF EVERY GESTURE. It sits over the white ends when the
-   preview reaches them, so it needs the higher z-index; and pointer-events: none or it would eat the
-   drag on whichever handle it happened to be crossing. */
-.club-ph { position: absolute; top: -1px; bottom: -1px; z-index: 2; width: 3px; margin-left: -1.5px;
+/* ⚠️ INSIDE THE WINDOW, SO top/bottom 0 IS THE BRACKET'S INNER HEIGHT and there is no overhang to
+   arrange — the earlier -1px pair existed to reach past the strip's edges when it was a sibling.
+   ⚠️ pointer-events: none REGARDLESS, or it would eat the drag on the window it now lives in. */
+/* ⚠️⚠️ NO NEGATIVE MARGIN, AND THE TRAVEL IS INSET BY THE MARKER'S OWN WIDTH. Centred on its position it
+   still put HALF of itself (1.5px) over the white wall at each end of the window — measured, which is his
+   complaint in miniature and the reason "inside the window" was not on its own enough. clubPlayhead
+   writes left as a calc over (100% - 3px), so at 0 its left edge is the wall's inner face and at 1 its
+   right edge is: it touches them and never crosses. */
+.club-ph { position: absolute; top: 0; bottom: 0; z-index: 1; width: 3px;
   border-radius: 999px; background: #fff; box-shadow: 0 0 6px rgba(4,16,13,.75); opacity: 0;
   pointer-events: none; }
 .club-ph.on { opacity: 1; }
@@ -11989,11 +12019,37 @@ function clubEdClose() {
     (sl.ov || []).forEach((o) => { try { URL.revokeObjectURL(o.url); } catch (e) {} });
   });
   CLUBED = null;
+  // ⚠️ THE KEPT MEDIA NODE GOES WITH THE SESSION. Left set, the next editor would adopt a <video> whose
+  // blob URL has just been revoked two lines above — a picture that cannot load, held deliberately.
+  CLUBED_MED = null;
   const e = $("clubEd"); if (e) e.remove();
   // ⚠️ THE TEXT SURFACE IS A SIBLING OF THE EDITOR, NOT A CHILD — it has to sit above the keyboard, and
   // the editor's own stage is the thing being typed over. So closing the editor has to remove it too, or
   // a half-typed word is left floating over the club with nothing behind it.
   const t = $("clubTxEd"); if (t) t.remove();
+}
+/**
+ * THE MEDIA ELEMENT KEPT ACROSS A REDRAW.
+ *
+ * ⚠️ IT IS DETACHED BEFORE innerHTML REPLACES THE STAGE, because innerHTML destroys whatever was there —
+ * so the node has to be taken out first and put back after. Detached, a <video> keeps playing and keeps
+ * its currentTime; re-attached it simply carries on, which is why there is no flash and no seek.
+ * ⚠️ ONLY WHEN THE SOURCE AND THE KIND BOTH MATCH. A different slide, or a photograph where there was a
+ * video, must build a new element — reusing one across sources would show the wrong picture, which is
+ * far worse than a flash.
+ * ⚠️ CLUBED_MED IS CLEARED WITH THE EDITOR (see clubEdClose), or a node from a closed session is
+ * appended into the next one.
+ */
+let CLUBED_MED = null;
+function clubEdKeepMedia(sl) {
+  const cur = $("clubMed");
+  if (!cur || !sl) return null;
+  const want = sl.isVid ? "VIDEO" : "IMG";
+  if (cur.tagName !== want) return null;
+  if (cur.getAttribute("src") !== sl.url) return null;
+  try { cur.remove(); } catch (e) { return null; }
+  CLUBED_MED = cur;
+  return cur;
 }
 /** ⚠️ REMOVING THE LAST SLIDE CLOSES THE EDITOR rather than leaving a post with nothing in it. */
 function clubEdDrop(i) {
@@ -12013,10 +12069,26 @@ function clubEdDraw() {
   if (S.step === "caption") { clubCapDraw(); return; }
   const sl = clubSlide(); if (!sl) return;
   const fit = sl.card ? " club-med-fit" : "";
-  const media = sl.isVid
+  // ⚠️⚠️ THE MEDIA ELEMENT IS ADOPTED RATHER THAN REBUILT WHEN ITS SOURCE HAS NOT CHANGED, AND THAT IS
+  // THE FIX FOR THE BLACK FLASH — reported as "the screen flashed black once you take your finger off".
+  // Writing a fresh <video src> into innerHTML starts a new load, and a loading video paints black for a
+  // frame or two; every redraw did it, so any tap or drag that redrew flashed. Reusing the node keeps the
+  // decoder, the current time and the playing state, so a redraw is invisible.
+  // ⚠️ ONE PLACE DECIDES, so no call site has to know to avoid redrawing. Individual paths still avoid
+  // it where they can (the drag paints in place), but a path that has to redraw no longer costs a flash.
+  const keepMed = clubEdKeepMedia(sl);
+  const media = keepMed ? "" : (sl.isVid
     ? '<video class="club-med' + fit + '" id="clubMed" src="' + sl.url + '" playsinline muted loop autoplay></video>'
-    : '<img class="club-med' + fit + '" id="clubMed" src="' + sl.url + '" alt="">';
-  const texts = sl.texts.map((t, i) => clubTextSpan(t, i, i === S.sel)).join("");
+    : '<img class="club-med' + fit + '" id="clubMed" src="' + sl.url + '" alt="">');
+  // ⚠️⚠️ THE DRAFT IS A REAL WORD ON THE STAGE, which is what makes the preview truthful: the style, the
+  // colour, the plate, the alignment and the size all render exactly as they will after Done, and it can
+  // be dragged and pinched while the panel is open. His instruction, twice over: "i want the text and and
+  // changes you make to the text to be viewable accurately in real time, not when you have clicked done".
+  const texts = sl.texts.map((t, i) => clubTextSpan(t, i, i === S.sel)).join("") +
+    (S.draft ? clubTextSpan(S.draft, "d", true) : "");
+  // ⚠️ AND WHILE A WORD IS BEING EDITED THE COMPOSER'S OWN CHROME STEPS ASIDE. Two sets of controls on
+  // one screen is what he photographed as "too cluttered"; the text panel supplies all of it instead.
+  const drafting = !!S.draft;
   // ⚠️ THE DOTS AND THE STRIP ARE TWO DIFFERENT ANSWERS TO ONE QUESTION AND BOTH ARE IN THE REFERENCE:
   // the dots say where you are in the carousel, the strip lets you jump and lets you remove one.
   const dots = S.slides.length > 1
@@ -12046,23 +12118,37 @@ function clubEdDraw() {
       '<div class="club-txs" id="clubTxs">' + texts + '</div>' +
     '</div>' +
     '<button class="club-x" id="clubX" aria-label="Close">✕</button>' +
-    (S.sel >= 0
-      ? '<div class="club-rail">' +
-          '<button class="club-t danger" id="clubDelTx" aria-label="Delete the selected text">' +
-            ICON.trash + '</button>' +
-        '</div>'
-      : "") +
-    (sl.isVid ? clubTrimHtml(S) : "") +
-    clubSheetHtml(S, sl) +
-    clubToolsHtml(S, sl) +
-    '<div class="club-foot">' + dots + strip +
-      '<div class="club-foot-r">' +
-        '<button class="club-add" id="clubAddMore" aria-label="Add more from your camera roll">' +
-          ICON.plusDot + '</button>' +
-        '<button class="club-send" id="clubNext">Next</button>' +
-      '</div>' +
-    '</div>';
+    (S.sel >= 0 && !S.draft ? clubRailHtml() : "") +
+    (drafting ? "" :
+      (sl.isVid ? clubTrimHtml(S) : "") +
+      clubSheetHtml(S, sl) +
+      clubToolsHtml(S, sl) +
+      '<div class="club-foot">' + dots + strip +
+        '<div class="club-foot-r">' +
+          '<button class="club-add" id="clubAddMore" aria-label="Add more from your camera roll">' +
+            ICON.plusDot + '</button>' +
+          '<button class="club-send" id="clubNext">Next</button>' +
+        '</div>' +
+      '</div>');
+  // ⚠️ THE ADOPTED NODE GOES BACK IMMEDIATELY, BEFORE ANYTHING MEASURES OR STYLES IT — wireClubEd runs
+  // clubEdFit (which reads its box) and clubApplyLook (which needs it to resolve a rotation scale).
+  if (keepMed) {
+    const fitBox = $("clubFit");
+    // ⚠️ IF THE STAGE IS NOT THERE THE NODE IS DROPPED AND THE DRAW IS REDONE WITHOUT IT. Losing the
+    // element entirely would leave the editor with no picture at all, which is worse than a flash.
+    if (fitBox) { keepMed.className = "club-med" + fit; fitBox.appendChild(keepMed); }
+    else { CLUBED_MED = null; clubEdDraw(); return; }
+  }
   wireClubEd();
+  // ⚠️⚠️ A REUSED VIDEO NEVER FIRES loadedmetadata AGAIN, so everything wireClubEd hangs off that event
+  // has to be driven by hand here. Without this the strip and the playhead simply stopped existing after
+  // the first redraw — the reuse would have traded a visible flash for an invisible dead trim.
+  if (keepMed && sl.isVid && sl.dur) {
+    const t = $("clubTrim");
+    if (t) { t.outerHTML = clubTrimHtml(S); wireClubTrim(); }
+    clubThumbs(sl);
+    clubPlayhead(sl);
+  }
 }
 /**
  * THE TOOL ROW — his ruling of 2026-08-23, from a screen recording of the reference: "i want the same
@@ -12473,8 +12559,13 @@ function clubTxCss(t, px) {
     "text-align: " + (CLUB_TX_ALIGN.indexOf(t.align) > 0 ? t.align : "center")];
   if (plate) {
     out.push("background: " + col);
-    out.push("padding: 4px 12px");
-    out.push("border-radius: " + Math.max(6, Math.round(px * 0.22)) + "px");
+    // ⚠️ THE PLATE HUGS THE WORDS. His: "theres far too much" — a flat 4px/12px on a 34px word left a
+    // deep band above and below, because the line box is already taller than the glyphs. Proportional to
+    // the type, and tighter vertically than horizontally, which is how a highlight reads as a highlight.
+    out.push("padding: " + Math.max(1, Math.round(px * 0.04)) + "px " +
+      Math.max(6, Math.round(px * 0.26)) + "px");
+    out.push("line-height: 1.18");
+    out.push("border-radius: " + Math.max(5, Math.round(px * 0.18)) + "px");
     // ⚠️ NO KEYLINE ON A PLATE. The ink is already chosen to read against it, and a dark halo round black
     // words on a white plate is dirt round the letters.
     out.push("text-shadow: none");
@@ -12538,11 +12629,13 @@ function wireClubEd() {
   // cannot show them the typeface, the colour or the size they are choosing — and on iOS it is a modal
   // the app does not control. The text is typed ON the media, in the face it will be posted in.
   document.querySelectorAll("[data-ctool]").forEach((b) => b.onclick = () => clubToolOpen(b.dataset.ctool));
-  const del = $("clubDelTx");
-  if (del) del.onclick = () => { sl.texts.splice(S.sel, 1); S.sel = -1; haptic("light"); clubEdDraw(); };
+  wireClubRail();
   const txs = $("clubTxs");
   if (txs) txs.querySelectorAll("[data-ctx]").forEach((n) => {
-    n.onpointerdown = (ev) => clubTextDrag(ev, Number(n.getAttribute("data-ctx")));
+    const k = n.getAttribute("data-ctx");
+    // ⚠️ THE DRAFT'S KEY IS THE STRING "d", NOT A NUMBER, and Number("d") is NaN — so a bare Number()
+    // here hands clubTextDrag an index into nothing and the word being typed cannot be moved at all.
+    n.onpointerdown = (ev) => clubTextDrag(ev, k === "d" ? "d" : Number(k));
     // ⚠️ A TAP EDITS; A DRAG MOVES. clubTextDrag tells them apart by whether the finger travelled, so
     // one gesture is not made to mean two things — a word the runner meant to nudge does not reopen the
     // keyboard, and a word they meant to fix does not need a second control to reach.
@@ -12718,6 +12811,27 @@ function clubVidLoop() {
   clubPlayhead(sl);
 }
 /**
+ * WHERE THE MARKER SITS INSIDE THE SELECTION, AS A FRACTION OF IT.
+ *
+ * ⚠️ MAPPED OVER THE SELECTION, NOT OVER THE CLIP, because the marker lives INSIDE the window now — so
+ * 0 is the first chosen frame and 1 the last, which is also the only reading that means anything to
+ * somebody watching their own fifteen seconds go by.
+ * ⚠️ CLAMPED AS WELL AS HIDDEN. clubPlayhead takes the marker down when the preview is outside the
+ * window, but a frame can land between the two — and a marker drawn at -14% for one frame is the defect
+ * being fixed, briefly.
+ * ⚠️⚠️ IT IS ITS OWN FUNCTION SO IT CAN BE RUN RATHER THAN READ. requestAnimationFrame fires ZERO times
+ * in the headless Chrome this repo tests in (measured: 0 frames in 1.2s while setInterval managed 25 in
+ * 0.4s), so the loop's motion cannot be driven there at all — the geometry can be measured in a browser
+ * and the arithmetic cannot. Split out, the arithmetic is provable in node and the containment is
+ * provable in pixels, and neither claim has to be taken on trust.
+ */
+function clubPhFrac(t, inS, outS) {
+  const span = (Number(outS) || 0) - (Number(inS) || 0);
+  if (!(span > 0.05)) return 0;
+  const f = ((Number(t) || 0) - (Number(inS) || 0)) / span;
+  return Math.max(0, Math.min(1, f));
+}
+/**
  * THE PLAYHEAD, ON A FRAME LOOP AND SELF-CANCELLING.
  *
  * ⚠️ NOT timeupdate, WHICH FIRES ABOUT FOUR TIMES A SECOND — a marker moving in four visible steps a
@@ -12734,7 +12848,9 @@ function clubPlayhead(sl) {
     const now = $("clubPh"), m = $("clubMed");
     if (!CLUBED || now !== ph || m !== med || clubSlide() !== sl || !sl.dur) return;
     const t = Number(m.currentTime) || 0;
-    ph.style.left = ((t / sl.dur) * 100).toFixed(3) + "%";
+    // ⚠️ A calc, NOT A BARE PERCENTAGE. The inset by the marker's own width is what keeps it off the two
+    // white walls at the extremes of its travel; see .club-ph's own note.
+    ph.style.left = "calc(" + clubPhFrac(t, sl.inS, sl.outS).toFixed(5) + " * (100% - 3px))";
     // ⚠️ HIDDEN WHILE PAUSED OR OUTSIDE THE CHOSEN WINDOW. A line parked at the far end of the strip while
     // nothing is playing is a marker pointing at nothing, and while a handle is being dragged the
     // preview is deliberately held at one frame — that is the drag's own feedback, not playback.
@@ -12819,6 +12935,28 @@ function clubTextSpan(t, i, sel, scale) {
     (rot ? '; transform: translate(-50%, -50%) rotate(' + rot + 'deg)' : "") + '">' +
     esc(t.text) + '</span>';
 }
+/**
+ * THE RAIL THAT HOLDS THE SELECTED WORD'S BIN — ONE BUILDER AND ONE WIRING.
+ *
+ * ⚠️ IT IS A FUNCTION BECAUSE TWO PATHS PUT IT ON SCREEN: a full redraw, and clubSelPaint after a drag
+ * (which must not redraw — see clubTextDrag). Written out at both sites, the day one gains a control the
+ * other does not is the day a bin appears after a redraw and not after a drag.
+ */
+function clubRailHtml() {
+  return '<div class="club-rail">' +
+    '<button class="club-t danger" id="clubDelTx" aria-label="Delete the selected text">' +
+      ICON.trash + '</button>' +
+  '</div>';
+}
+function wireClubRail() {
+  const del = $("clubDelTx");
+  if (!del) return;
+  del.onclick = () => {
+    const S = CLUBED, sl = clubSlide();
+    if (!S || !sl) return;
+    sl.texts.splice(S.sel, 1); S.sel = -1; haptic("light"); clubEdDraw();
+  };
+}
 const CLUB_TX_MIN = 12, CLUB_TX_MAX = 96;
 /**
  * MOVING, SCALING AND TURNING A WORD ON THE PICTURE.
@@ -12829,67 +12967,139 @@ const CLUB_TX_MIN = 12, CLUB_TX_MAX = 96;
  * handled it. Two fingers on the word now do what two fingers on a photograph do everywhere else.
  * ⚠️ THE POINTERS ARE TRACKED ON THE WORD, not on the stage, so a pinch that starts on a word cannot also
  * zoom the picture underneath — one gesture, one owner.
+ *
+ * ⚠️⚠️ THE BASELINE IS RE-TAKEN WHENEVER THE NUMBER OF FINGERS CHANGES, AND THE FIRST VERSION MEASURED
+ * EVERY MOVE FROM THE ORIGINAL pointerdown INSTEAD — it read ev.clientX for the whole gesture. So a
+ * second finger landing moved the word by however far the first had already dragged, and lifting one
+ * finger of a pinch moved it back again. Reported as "the pinching and moving is a bit jittery
+ * still....its not smooth", and it is arithmetic rather than frame rate: anchorNow() takes the midpoint
+ * of the fingers that are DOWN RIGHT NOW, and every later move is a displacement from that.
+ *
+ * ⚠️⚠️ AND RELEASING MUST NOT REBUILD THE EDITOR. The old end() called clubEdDraw(), which recreates the
+ * <video> element — so it reloads and paints one black frame, which is exactly what he saw: "the screen
+ * flashed black once you take your finger off". The model is already current (paint() has been writing
+ * to the node throughout), so the only thing a finished drag has left to do is put the bin up.
  */
+let CLUB_TXG = null;
 function clubTextDrag(ev, i) {
   const S = CLUBED, sl = clubSlide(); if (!S || !sl) return;
-  const t = sl.texts[i]; if (!t) return;
-  S.sel = i;
-  const stage = $("clubStage"); if (!stage) return;
-  const box = stage.getBoundingClientRect();
+  // ⚠️ i IS "d" FOR THE WORD BEING TYPED, which lives on S.draft rather than in the slide's array — the
+  // draft is a real word on the stage now, so it has to be draggable by the same handler.
+  const draft = i === "d";
+  const t = draft ? S.draft : sl.texts[i];
+  if (!t) return;
   const node = ev.currentTarget;
-  const pts = new Map();
-  let moved = false, pinch = null;
-  const base = { x: t.x, y: t.y, size: t.size, rot: Number(t.rot) || 0 };
   ev.preventDefault();
-  const paint = () => {
-    node.style.left = (t.x * 100) + "%";
-    node.style.top = (t.y * 100) + "%";
-    node.style.fontSize = t.size + "px";
-    node.style.transform = "translate(-50%, -50%) rotate(" + (Number(t.rot) || 0) + "deg)";
-  };
-  const add = (e) => {
-    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    try { node.setPointerCapture(e.pointerId); } catch (err) {}
-    // ⚠️ THE BASELINE IS RE-TAKEN WHEN THE SECOND FINGER LANDS, or the pinch jumps by however far the
-    // first finger had already dragged — the same re-anchoring the stage's own pinch needs.
-    if (pts.size === 2) {
-      const p = [...pts.values()];
-      pinch = { d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y),
-        a: Math.atan2(p[1].y - p[0].y, p[1].x - p[0].x),
-        size: t.size, rot: Number(t.rot) || 0 };
-    }
-  };
-  add(ev);
-  node.onpointerdown = add;
-  node.onpointermove = (m) => {
-    if (!pts.has(m.pointerId)) return;
-    const was = pts.get(m.pointerId);
-    if (Math.abs(m.clientX - was.x) > 4 || Math.abs(m.clientY - was.y) > 4) moved = true;
-    pts.set(m.pointerId, { x: m.clientX, y: m.clientY });
-    if (pts.size >= 2 && pinch) {
-      const p = [...pts.values()];
-      const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
-      if (pinch.d > 8) {
-        t.size = Math.max(CLUB_TX_MIN, Math.min(CLUB_TX_MAX, Math.round(pinch.size * d / pinch.d)));
-      }
-      const a = Math.atan2(p[1].y - p[0].y, p[1].x - p[0].x);
-      t.rot = Math.round((pinch.rot + (a - pinch.a) * 180 / Math.PI) * 10) / 10;
-      moved = true;
-      paint();
-      return;
-    }
-    t.x = Math.max(0.06, Math.min(0.94, base.x + (m.clientX - (pts.size === 1 ? ev.clientX : ev.clientX)) / Math.max(1, box.width)));
-    t.y = Math.max(0.08, Math.min(0.9, base.y + (m.clientY - ev.clientY) / Math.max(1, box.height)));
-    paint();
-  };
-  const end = (e) => {
-    pts.delete(e ? e.pointerId : 0);
-    if (pts.size >= 1) { pinch = null; return; }
-    node.onpointermove = null; node.onpointerdown = null;
-    if (!moved) { clubTextOpen(i); return; }
-    clubEdDraw();
-  };
-  node.onpointerup = end; node.onpointercancel = end;
+  // ⚠️⚠️ A SECOND FINGER JOINS THE GESTURE THAT IS ALREADY RUNNING, AND IT MUST NOT START ANOTHER. The
+  // first version answered the second finger by overwriting node.onpointerdown with its own handler and
+  // then NULLING it on release — which destroyed the binding wireClubEd had put there, so after one drag
+  // the word could not be dragged or tapped again until something redrew. That went unnoticed for as long
+  // as a finished drag redrew; taking the redraw away (see below) is what exposed it. Measured: a tap
+  // after a drag did nothing at all.
+  if (CLUB_TXG && CLUB_TXG.node === node) {
+    CLUB_TXG.pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    try { node.setPointerCapture(ev.pointerId); } catch (e) {}
+    clubTxAnchor();
+    return;
+  }
+  if (!draft) S.sel = i;
+  const stage = $("clubStage"); if (!stage) return;
+  CLUB_TXG = { node: node, t: t, draft: draft, key: i, moved: false, anchor: null,
+    box: stage.getBoundingClientRect(),
+    pts: new Map([[ev.pointerId, { x: ev.clientX, y: ev.clientY }]]) };
+  try { node.setPointerCapture(ev.pointerId); } catch (e) {}
+  clubTxAnchor();
+  // ⚠️ ONLY move/up/cancel ARE BOUND HERE. onpointerdown belongs to wireClubEd and is never touched, so
+  // there is nothing to restore and nothing to forget to restore.
+  node.onpointermove = clubTxMove;
+  node.onpointerup = clubTxUp;
+  node.onpointercancel = clubTxUp;
+}
+/**
+ * ⚠️⚠️ THE BASELINE, RE-TAKEN WHENEVER THE NUMBER OF FINGERS CHANGES — and the first version measured
+ * every move from the ORIGINAL pointerdown instead, reading ev.clientX for the whole gesture. So a second
+ * finger landing moved the word by however far the first had already dragged, and lifting one finger of a
+ * pinch moved it back again. He reported it as "the pinching and moving is a bit jittery still....its not
+ * smooth", and it is arithmetic rather than frame rate: this takes the midpoint of the fingers that are
+ * DOWN RIGHT NOW, and every later move is a displacement from it.
+ */
+function clubTxAnchor() {
+  const g = CLUB_TXG; if (!g) return;
+  const p = [...g.pts.values()];
+  if (!p.length) { g.anchor = null; return; }
+  const mid = p.length >= 2
+    ? { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 }
+    : { x: p[0].x, y: p[0].y };
+  g.anchor = { mid: mid, x: g.t.x, y: g.t.y, size: g.t.size, rot: Number(g.t.rot) || 0,
+    two: p.length >= 2,
+    d: p.length >= 2 ? Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) : 0,
+    a: p.length >= 2 ? Math.atan2(p[1].y - p[0].y, p[1].x - p[0].x) : 0 };
+}
+/** ⚠️ PAINTED ON THE NODE, NOT REDRAWN. A redraw under a moving finger rebuilds the element the finger
+ *  is holding, which drops the pointer capture — and rebuilds the video, which flashes black. */
+function clubTxPaint() {
+  const g = CLUB_TXG; if (!g) return;
+  g.node.style.left = (g.t.x * 100) + "%";
+  g.node.style.top = (g.t.y * 100) + "%";
+  g.node.style.fontSize = g.t.size + "px";
+  g.node.style.transform = "translate(-50%, -50%) rotate(" + (Number(g.t.rot) || 0) + "deg)";
+}
+function clubTxMove(m) {
+  const g = CLUB_TXG; if (!g || !g.anchor || !g.pts.has(m.pointerId)) return;
+  const was = g.pts.get(m.pointerId);
+  if (Math.abs(m.clientX - was.x) > 3 || Math.abs(m.clientY - was.y) > 3) g.moved = true;
+  g.pts.set(m.pointerId, { x: m.clientX, y: m.clientY });
+  const p = [...g.pts.values()];
+  // Two fingers scale and turn as well as move; one finger only moves.
+  if (g.anchor.two && p.length >= 2 && g.anchor.d > 8) {
+    const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+    g.t.size = Math.max(CLUB_TX_MIN, Math.min(CLUB_TX_MAX, Math.round(g.anchor.size * d / g.anchor.d)));
+    const a = Math.atan2(p[1].y - p[0].y, p[1].x - p[0].x);
+    g.t.rot = Math.round((g.anchor.rot + (a - g.anchor.a) * 180 / Math.PI) * 10) / 10;
+    g.moved = true;
+  }
+  const mid = p.length >= 2
+    ? { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 }
+    : { x: p[0].x, y: p[0].y };
+  g.t.x = Math.max(0.06, Math.min(0.94, g.anchor.x + (mid.x - g.anchor.mid.x) / Math.max(1, g.box.width)));
+  g.t.y = Math.max(0.08, Math.min(0.9, g.anchor.y + (mid.y - g.anchor.mid.y) / Math.max(1, g.box.height)));
+  clubTxPaint();
+}
+function clubTxUp(e) {
+  const g = CLUB_TXG; if (!g) return;
+  g.pts.delete(e ? e.pointerId : 0);
+  // ⚠️ RE-ANCHOR ON THE FINGERS THAT ARE STILL DOWN rather than carrying on from a baseline that
+  // included one that has gone. That is the jump.
+  if (g.pts.size >= 1) { clubTxAnchor(); return; }
+  g.node.onpointermove = null; g.node.onpointerup = null; g.node.onpointercancel = null;
+  CLUB_TXG = null;
+  if (!g.moved) { if (!g.draft) clubTextOpen(g.key); return; }
+  // ⚠️⚠️ NO REDRAW. clubEdDraw rebuilds the stage, and that is what he saw as "the screen flashed black
+  // once you take your finger off" — a fresh <video> starts a new load and a loading video paints black
+  // for a frame. Nothing needs redrawing: the model is current because clubTxPaint has been writing to
+  // the node throughout. All a finished drag has left to do is put the bin up.
+  if (!g.draft) clubSelPaint();
+}
+/**
+ * THE RAIL'S BIN, PUT UP OR TAKEN DOWN WITHOUT REBUILDING THE STAGE.
+ *
+ * ⚠️ IT EXISTS BECAUSE A FINISHED DRAG USED TO CALL clubEdDraw, WHICH FLASHES BLACK. The bin is the only
+ * thing on screen that depends on which word is selected, so it is the only thing a finished drag has to
+ * change — and changing one node cannot reload a video.
+ */
+function clubSelPaint() {
+  const S = CLUBED; if (!S) return;
+  const ov = $("clubEd"); if (!ov) return;
+  const have = ov.querySelector(".club-rail");
+  const want = S.sel >= 0 && !S.draft;
+  if (want && !have) {
+    ov.appendChild(el(clubRailHtml()));
+    wireClubRail();
+  } else if (!want && have) { try { have.remove(); } catch (e) {} }
+  ov.querySelectorAll("[data-ctx]").forEach((n) => {
+    const k = n.getAttribute("data-ctx");
+    n.classList.toggle("on", k === "d" || Number(k) === S.sel);
+  });
 }
 /**
  * TYPING ON THE PICTURE.
@@ -12913,6 +13123,15 @@ function clubTextOpen(i) {
   S.txTool = S.txTool || "style";
   S.txPage = S.txPage || 0;
   S.draftAt = fresh ? -1 : i;
+  // ⚠️⚠️ THE STAGE IS REDRAWN ONCE, ON OPEN, AND IT HAS TO BE. The draft is a real word on the picture
+  // and the composer's chrome steps aside while it is being typed — both of those are decided in
+  // clubEdDraw's markup, so the panel alone cannot bring either about. Without this the word being
+  // typed appeared nowhere until the first keystroke happened to fall back to a redraw, and the tool
+  // row and the strip stayed on screen underneath the panel: measured, exactly the clutter he
+  // photographed.
+  // ⚠️ AND IT COSTS NO FLASH, because clubEdKeepMedia adopts the existing <video> rather than building
+  // a new one — which is the whole reason that exists.
+  clubEdDraw();
   clubTextDraw();
 }
 /**
@@ -12927,6 +13146,19 @@ function clubTextOpen(i) {
  * the finished story rather than in the editor, so they are their own piece of work; Sparkle, Shimmer and
  * Pixel need either an animation or a display face this app cannot fetch; Mention needs accounts and a
  * server, which the club does not have. Naming them beats a control that does nothing.
+ */
+/**
+ * THE TEXT PANEL — a field, the tools, and the words themselves live on the photograph above it.
+ *
+ * ⚠️⚠️ THE PICTURE IS THE PREVIEW. It used to be a two-row textarea styled like the result, floating in
+ * the middle of a translucent sheet: the highlight plate came out enormous, the size and the alignment
+ * only "corrected themselves" on Done, and the composer's own chrome showed through underneath. All four
+ * of his complaints are that one design. The draft is now a real word on the stage (see clubEdDraw), so
+ * every change shows at its true size the moment it is made, and it can be dragged and pinched without
+ * leaving the panel.
+ * ⚠️ THE PANEL REDRAWS; THE STAGE DOES NOT. clubEdDraw rebuilds the video element, which reloads and
+ * flashes black — reported as exactly that. So a style, colour or size change repaints the panel and
+ * repaints the one word in place, and never touches the picture.
  */
 function clubTextDraw() {
   const S = CLUBED; if (!S || !S.draft) return;
@@ -12960,14 +13192,11 @@ function clubTextDraw() {
         '</div><p class="club-tnote">Moving effects and mentions need a server the club does not have ' +
         'yet, so they are not here rather than being here and doing nothing.</p>'
       : "";
-  const px = d.size;
   ov.innerHTML =
     '<div class="club-txed-top">' +
+      '<textarea class="club-txed-in" id="clubTxIn" rows="1" placeholder="Type something">' +
+        esc(d.text) + '</textarea>' +
       '<button class="club-txed-done" id="clubTxDone">Done</button>' +
-    '</div>' +
-    '<div class="club-txed-mid">' +
-      '<textarea class="club-txed-in" id="clubTxIn" rows="2" placeholder="Type something" ' +
-        'style="' + clubTxCss(d, px) + '">' + esc(d.text) + '</textarea>' +
     '</div>' +
     '<div class="club-txed-tools">' +
       rail +
@@ -12981,36 +13210,51 @@ function clubTextDraw() {
       '<label class="club-sz"><span>Size</span>' +
         '<input type="range" id="clubTxSz" min="' + CLUB_TX_MIN + '" max="' + CLUB_TX_MAX +
         '" step="1" value="' + d.size + '"></label>' +
+      '<p class="club-tnote">Drag the words on the picture to move them, or pinch to resize and turn.</p>' +
     '</div>';
   const ta = $("clubTxIn");
   if (ta) {
-    ta.oninput = () => { d.text = ta.value; };
+    // ⚠️ THE WORD ON THE PICTURE FOLLOWS EVERY KEYSTROKE, and only the word — repainting the stage here
+    // would reload the video and flash black.
+    ta.oninput = () => { d.text = ta.value; clubDraftPaint(); };
     // ⚠️ FOCUS AFTER THE NODE IS IN THE DOCUMENT AND ONE FRAME LATER. iOS refuses to raise the keyboard
-    // for an element that was not in the tree when focus was called, and this app already records
-    // measuring a sheet before it is shown reading zero for the same reason.
+    // for an element that was not in the tree when focus was called.
     setTimeout(() => { try { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } catch (e) {} }, 30);
   }
-  // ⚠️ THE HIGHLIGHT IS THE ONLY TOOL THAT ACTS RATHER THAN OPENING A RAIL — it has two states, so a rail
-  // holding two buttons would be a rail to say what one tap says.
+  // ⚠️ THE HIGHLIGHT IS THE ONLY TOOL THAT ACTS RATHER THAN OPENING A RAIL — two states need no rail.
   ov.querySelectorAll("[data-ctt]").forEach((b) => b.onclick = () => {
     if (b.dataset.ctt === "plate") { d.bg = Number(d.bg) === 1 ? 0 : 1; }
     else { S.txTool = b.dataset.ctt; }
-    clubTextDraw();
+    clubTextDraw(); clubDraftPaint();
   });
-  ov.querySelectorAll("[data-ctst]").forEach((b) => b.onclick = () => { d.style = b.dataset.ctst; clubTextDraw(); });
-  ov.querySelectorAll("[data-ccol]").forEach((b) => b.onclick = () => { d.colour = b.dataset.ccol; clubTextDraw(); });
-  ov.querySelectorAll("[data-ctpage]").forEach((b) => b.onclick = () => { S.txPage = Number(b.dataset.ctpage) || 0; clubTextDraw(); });
-  ov.querySelectorAll("[data-ctal]").forEach((b) => b.onclick = () => { d.align = b.dataset.ctal; clubTextDraw(); });
-  ov.querySelectorAll("[data-ctfx]").forEach((b) => b.onclick = () => { d.fx = b.dataset.ctfx; clubTextDraw(); });
+  const pick = (sel, f) => ov.querySelectorAll(sel).forEach((b) => b.onclick = () => {
+    f(b); clubTextDraw(); clubDraftPaint();
+  });
+  pick("[data-ctst]", (b) => { d.style = b.dataset.ctst; });
+  pick("[data-ccol]", (b) => { d.colour = b.dataset.ccol; });
+  pick("[data-ctpage]", (b) => { S.txPage = Number(b.dataset.ctpage) || 0; });
+  pick("[data-ctal]", (b) => { d.align = b.dataset.ctal; });
+  pick("[data-ctfx]", (b) => { d.fx = b.dataset.ctfx; });
   const sz = $("clubTxSz");
-  // ⚠️ THE SLIDER DOES NOT REDRAW, for the same reason the composer's dials do not: a rebuild destroys the
-  // input the finger is holding. It restyles the preview in place.
-  if (sz) sz.oninput = () => {
-    d.size = Number(sz.value) || 34;
-    const t = $("clubTxIn"); if (t) t.setAttribute("style", clubTxCss(d, d.size));
-  };
+  // ⚠️ THE SLIDER REPAINTS THE WORD AND NOT THE PANEL. Rebuilding the panel would destroy the slider the
+  // finger is holding, which is the trap the composer's dials and the Support search field both record.
+  if (sz) sz.oninput = () => { d.size = Number(sz.value) || 34; clubDraftPaint(); };
   const done = $("clubTxDone");
   if (done) done.onclick = () => clubTextCommit();
+}
+/**
+ * ⚠️ ONE WORD REPAINTED IN PLACE. Everything the panel changes shows on the photograph immediately, and
+ * nothing rebuilds the stage — which is what made the screen flash black when a drag ended.
+ */
+function clubDraftPaint() {
+  const S = CLUBED; if (!S || !S.draft) return;
+  const n = document.querySelector('[data-ctx="d"]');
+  if (!n) { clubEdDraw(); return; }
+  const d = S.draft;
+  n.textContent = d.text;
+  n.setAttribute("style", 'left:' + (d.x * 100) + '%; top:' + (d.y * 100) + '%; ' +
+    clubTxCss(d, d.size) +
+    ((Number(d.rot) || 0) ? '; transform: translate(-50%, -50%) rotate(' + d.rot + 'deg)' : ""));
 }
 /** ⚠️ AN EMPTY WORD IS NOT ADDED, AND AN EMPTIED ONE IS REMOVED. Otherwise clearing the box leaves an
  *  invisible draggable nothing on the picture that can still be selected and cannot be seen. */
@@ -13869,13 +14113,18 @@ function clubStripHtml(sl, cap, maxIn) {
     : Array.from({ length: CLUB_STRIP_N }, () => '<span class="club-fr"></span>').join("");
   return '<div class="club-film" id="clubFilm">' +
       '<div class="club-frs">' + cells + '</div>' +
-      // ⚠️ HIS OWN DIAGRAM: a line showing where in the clip the preview has reached. It is the one thing
-      // the strip could not tell you — you could see WHICH fifteen seconds you had chosen and not where
-      // inside them the picture above you had got to.
-      '<span class="club-ph" id="clubPh" aria-hidden="true"></span>' +
       '<span class="club-win" data-ctrim="w" role="slider" aria-label="Move the selection" ' +
         'aria-valuetext="' + clubClock(sl.inS) + " to " + clubClock(sl.outS) + '" ' +
         'style="left:' + a.toFixed(2) + '%; width:' + (b - a).toFixed(2) + '%">' +
+        // ⚠️ HIS OWN DIAGRAM: a line showing where in the clip the preview has reached. It is the one
+        // thing the strip could not tell you — you could see WHICH fifteen seconds you had chosen and
+        // not where inside them the picture above you had got to.
+        // ⚠️⚠️ IT IS A CHILD OF THE WINDOW, NOT A SIBLING, AND THAT IS THE FIX FOR "the playhead going
+        // past the wall of the slider". As a sibling it was placed as a fraction of the WHOLE strip, so
+        // at the start and end of playback it sat on top of the 14px white bracket ends — a white line
+        // over a white wall, which reads as the marker having escaped. A child is positioned against the
+        // padding box, which the border has already inset, so it physically cannot reach them.
+        '<span class="club-ph" id="clubPh" aria-hidden="true"></span>' +
         '<span class="club-h club-h-a" data-ctrim="a" role="slider" aria-label="Start" ' +
           'aria-valuetext="' + clubClock(sl.inS) + '"><i></i></span>' +
         '<span class="club-h club-h-b" data-ctrim="b" role="slider" aria-label="End" ' +

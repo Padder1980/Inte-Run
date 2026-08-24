@@ -9771,3 +9771,165 @@ and more honest than reading it repeatedly and hoping.
 ⚠️ **A CALLER-COUNT CEILING IS NOT AN INVARIANT.** `clubFillMedia` had a "2 to 4 callers" guard which the
 journal's kept strip broke at six. Restated to what it was protecting: **no function may fill a
 `data-cmed` span itself**, derived over every top-level function.
+
+## HIS SIX SCREENSHOTS OF THE TEXT EDITOR AND THE TRIM (owner, 2026-08-24)
+
+Six issues, written on the pictures: the playhead past the slider wall; the text-editing layout too
+cluttered; pinching and moving still jittery; the plate far too big while editing; changes only taking
+effect on Done; and the screen flashing black on finger-up. **Two of them turned out to be one cause and
+one of them was a cause nobody had named** (the media element being rebuilt on every redraw). Suite 1284 →
+**1293**; 30 deliberate re-breaks, all 30 caught — two only after a guard was restated, and those two are
+the useful half. Web-only, so all of it reaches his phone on the next launch.
+
+### ⚠️⚠️ THE PLAYHEAD WAS A SIBLING OF THE WINDOW, AND "INSIDE IT" WAS NOT ENOUGH ON ITS OWN
+
+As a sibling it was placed as a fraction of the **whole strip**, so at the start and end of playback it
+sat on top of the 14px white bracket ends — a white line over a white wall, which reads as the marker
+having escaped. Two changes, and the second is the half that would be missed:
+1. **It is a child of `.club-win` now**, so it is positioned against the padding box the border has
+   already inset and physically cannot reach them.
+2. ⚠️ **AND THE TRAVEL IS INSET BY THE MARKER'S OWN WIDTH.** Centred on its position (`margin-left:
+   -1.5px`) **half** of the 3px marker still sat over each wall — measured 1.5px at both ends, which is
+   his complaint in miniature. `left: calc(f * (100% - 3px))` with no negative margin: at 0 its left edge
+   is the wall's inner face and at 1 its right edge is. Measured after: overlap **0 at both extremes**,
+   `phL 38 = innerL` and `phR 257.9 = innerR`.
+⚠️ **The width in the CSS and the inset in the arithmetic are one measurement**, and the guard compares
+them rather than pinning either — two owners drift.
+
+⚠️⚠️ **`requestAnimationFrame` FIRES ZERO TIMES IN THE HEADLESS CHROME THIS REPO TESTS IN.** Measured: **0
+frames in 1.2 s while `setInterval` managed 25 in 0.4 s**, with `--disable-renderer-backgrounding`, a
+screencast forcing the compositor, and every other flag tried. So the playhead's MOTION cannot be driven
+in a browser here at all — which is why `clubPhFrac` was split out as a pure function: **the arithmetic
+is provable in node and the containment is provable in pixels, and neither claim has to be taken on
+trust.** Worth knowing before anyone re-measures this, and worth knowing that the previous phase's
+playhead verification was therefore geometry only.
+⚠️ **The fraction is over the SELECTION, not the clip** — 0 is the first chosen frame and 1 the last,
+which is the only reading that means anything to somebody watching their own fifteen seconds. The
+discriminating case is a window that does **not** start at zero: mapped over the clip, a 4–19 window puts
+its own start at 4/19 = 0.21. And it is **clamped as well as hidden**, because a frame can land between
+the clamp and the class.
+
+### ⚠️⚠️ THE BLACK FLASH WAS THE MEDIA ELEMENT, AND FIXING IT AT SOURCE FIXED FIVE THINGS AT ONCE
+
+*"the screen flashed black once you take your finger off"*. `clubEdDraw` writes a fresh `<video src>` into
+`innerHTML`, which starts a new load — and a loading video paints black for a frame or two. **Every
+redraw did it**, so any tap or drag that redrew flashed.
+
+`clubEdKeepMedia(sl)` **adopts** the existing element instead: detached before `innerHTML` wipes it,
+re-attached immediately after, keeping the decoder, the `currentTime` and the playing state. Measured
+through the real editor: opening the text editor, tapping five tools and pressing Done all left **the same
+element** with the video playing straight through (4.22 → 5.02 → 8.2 s).
+- ⚠️ **ONE PLACE DECIDES, so no call site has to know to avoid redrawing.** Individual paths still avoid
+  it where they can — the drag paints in place — but a path that *has* to redraw no longer costs a flash.
+  That is what let `clubTextOpen` redraw once on open, which it must (below).
+- ⚠️ **ONLY WHEN THE SOURCE AND THE KIND BOTH MATCH.** Reusing across sources shows the wrong picture,
+  which is far worse than a flash.
+- ⚠️⚠️ **A REUSED VIDEO NEVER FIRES `loadedmetadata` AGAIN**, so everything `wireClubEd` hangs off that
+  event has to be driven by hand — the trim rebuild, the thumbnails and the playhead. Without it the
+  reuse trades a **visible** flash for an **invisible dead trim**, which is worse. The guard asserts the
+  gate is exactly `keepMed && sl.isVid && sl.dur`, because `if (false && …)` leaves every call in place.
+- ⚠️ **`CLUBED_MED` IS CLEARED WITH THE EDITOR.** Left set, the next session adopts a `<video>` whose blob
+  URL was revoked two lines earlier in `clubEdClose` — a picture that cannot load, held deliberately.
+
+### ⚠️⚠️ THE JITTER WAS ARITHMETIC, AND THE FIX FOR IT EXPOSED A DEAD WORD
+
+*"the pinching and moving is a bit jittery still....its not smooth"*. The move handler read
+**`ev.clientX` — the ORIGINAL pointerdown — for the whole gesture**. So a second finger landing moved the
+word by however far the first had already dragged, and lifting one finger moved it back again.
+`clubTxAnchor()` takes the midpoint of the fingers that are **down right now**, and every later move is a
+displacement from that; it is called on **every change of finger count**, in both directions.
+**Measured through real PointerEvents on the word: jump on the second finger landing 0, jump on lifting
+it 0, jump on release 0, and after the lift the remaining finger moves the word by exactly its own 25px.**
+
+⚠️⚠️ **AND THE FIRST VERSION OF THAT FIX KILLED THE WORD AFTER ONE DRAG.** It answered the second finger by
+overwriting `node.onpointerdown` with its own handler and **nulling it on release** — destroying the
+binding `wireClubEd` had put there, so the word could not be dragged **or tapped** again until something
+redrew. **It went unnoticed for as long as a finished drag redrew; taking the redraw away is what exposed
+it.** Measured: a tap after a drag did nothing at all. The gesture is a module-level record (`CLUB_TXG`)
+now and a second finger **joins** it; `onpointerdown` belongs to `wireClubEd` and is never touched, so
+there is nothing to restore and nothing to forget to restore.
+⚠️ **A finished drag calls `clubSelPaint`, which puts the bin up without rebuilding anything** — that is
+the only reason no redraw is needed. `clubRailHtml` is one builder read by both paths.
+
+### THE CLUTTER WAS A TRANSLUCENT OVERLAY, AND THE PREVIEW WAS IN THE WRONG PLACE
+
+*"the layout when editing text, its too cluttered"* and *"i want the text and and changes you make to the
+text to be viewable accurately in real time, not when you have clicked done"* — one cause each.
+- **`.club-txed` was `position: fixed; inset: 0` with `background: rgba(4,16,13,.48)`**, so the composer's
+  tool row, strip and foot showed straight through it. It is an **opaque bottom panel** now with a
+  one-line field, and the composer's own chrome **steps aside** while a word is being typed (`drafting`).
+- ⚠️⚠️ **`clubTextOpen` HAD TO REDRAW ONCE, AND THAT IS WHY THE FLASH FIX CAME FIRST.** The draft being a
+  real word on the picture and the chrome stepping aside are **both decided in `clubEdDraw`'s markup**, so
+  the panel alone could bring about neither: the word appeared nowhere until a keystroke happened to fall
+  back to a redraw, and the tool row and strip stayed on screen under the panel — measured, exactly the
+  clutter he photographed. It costs no flash because the media element is adopted.
+- **Every control repaints the word in place** (`clubDraftPaint`), so nothing waits for Done. Measured
+  through the real panel — style, colour, plate, alignment and size — then compared against the committed
+  word: **not one of eleven properties differs.** What you see while editing is what Done gives you.
+- ⚠️ **The size slider repaints the word and NOT the panel**, or it destroys the slider the finger is on.
+
+⚠️ **THE PLATE'S PADDING IS PROPORTIONAL TO THE TYPE** — his *"text background is far too big during the
+editing phase"*. A flat `4px 12px` is right at one size and wrong at every other; it is
+`max(1, px·0.04)` / `max(6, px·0.26)` with a `line-height: 1.18`, so **both** axes scale. Measured:
+`1px 9px` at 34px → `1px 6px` at 20px. The guard **counts the scaling factors**, because its first
+version needed only one and passed with the vertical term replaced by a flat 4.
+
+### ⚠️⚠️ A DEFECT NOBODY REPORTED: THE KEYBOARD WOULD HAVE BURIED THE WHOLE PANEL
+
+`.club-txed` is `position: fixed; bottom: 0` — right, because it has to sit directly above the keyboard —
+and **only `.app`, `.view` and `.sheet-ov` have ever been lifted by `html.kbup`**. So on a real phone the
+field, Done, the rails, the tool row and the size slider would all have been behind the keyboard the
+moment it came up: every control the runner needs while typing, unreachable, on the one screen whose whole
+purpose is typing. `html.kbup .club-txed { bottom: var(--kbh, 0px); }`.
+⚠️ **`bottom`, NOT `padding-bottom`.** `.sheet-ov` is a full-screen overlay whose sheet sits at its foot,
+so padding moves the sheet inside it; this **is** the foot, so the panel itself has to move — padding
+would stretch its background down behind the keyboard and leave the controls exactly where they were.
+⚠️ **FOUND BY SWEEPING, NOT BY LOOKING — a headless browser raises no keyboard.** Every rule that is
+`position: fixed` and bottom-anchored, against everything `html.kbup` moves. Thirteen such rules exist;
+`.club-txed` is the only one holding a text input that was not covered.
+
+### Five guards that were scoped to a HOW instead of a WHAT — all restated, none deleted
+
+⚠️ **THIS IS NOW THE SIXTH THROUGH TENTH FIRING OF THAT PATTERN IN THIS FILE, AND ONE OF THEM PINNED THE
+DEFECT ITSELF.** `test/community.test.ts`'s pointer-ownership guard **required `node.onpointerdown = add`**
+— the exact line whose removal was the fix — so it failed on correct code and would have argued for
+putting the dead-word bug back. The invariant it protected (the pointers belong to the word, so one
+gesture has one owner) is unchanged and better served; it asserts `setPointerCapture` plus that the
+gesture is joined rather than restarted, and that **neither** drag function writes `onpointerdown`.
+The other four: the tap-versus-drag guard pinned `moved = true`, `if (!moved) { clubTextOpen(i) }` and the
+literal `> 4`; the pinch guard pinned `pts.size === 2` and `pinch = {`; the one-styler guard pinned the
+panel's **own** preview word, which no longer exists **because there is one builder where there were two**
+— so that guard got stronger, not weaker; and the size-slider guard required a multi-line handler body
+ending in `"\n  };"`, which is a shape rather than a rule.
+
+⚠️ **AND THREE OF MY OWN NEW GUARDS WERE WRONG IN THE SAME FAMILY.** The opacity check swept the whole
+`.club-txed` rule and matched its **border's** legitimate `rgba(255,255,255,.12)`; the base-rule regex was
+unanchored, so `.club-txed {` matched `html.kbup .club-txed {` — declared far earlier — and reported the
+panel as having no background at all; and the reused-video guard looked for two calls *below*
+`wireClubEd` rather than for the gate around them. **A guard that reads a neighbouring declaration, or
+whichever rule comes first, is measuring something it was not asked about.**
+
+⚠️ **THE RE-BREAK HARNESS REPORTED `0 of 25 caught` WHILE EVERY BREAK WAS BEING CAUGHT.** Its fail-line
+regex was `^\W*fail (\d+)`, and **Python treats node's leading `ℹ` (U+2139) as a word character**, so
+`\W*` never matched it. `\bfail (\d+)` does. Same class as this file's documented `# fail` versus
+`ℹ fail` note, one layer deeper — and a harness that cannot parse a result must say so rather than report
+a verdict.
+
+⚠️ **A PYTHON SLICE RAN BACKWARDS AND DUPLICATED 115 LINES.** `s[:a] + NEW + s[b:]` where `b < a`, because
+the anchor I sliced to sits **above** the function I sliced from. `node --check` caught it as
+`Identifier 'CLUB_TX_MIN' has already been declared` — which is the whole reason that step is a test
+rather than a documented manual step.
+
+⚠️ **A BLOCK LANDED IN THE WRONG FUNCTION AND BUILT CLEANLY.** The re-attach was anchored on
+`clubEdFit(); if (stage) clubEdGestures(stage);`, which is in `wireClubEd` and not `clubEdDraw` — so it
+referenced two variables that do not exist there, and **the build passed**, because runtime JS inside the
+template literal is neither typechecked nor linted. Check which function an anchor is in.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc clean
+apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1293 pass / 0 fail under
+UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`** with `CHROME_PATH` set, both design ratchets
+unchanged, and the one backtick in the emitted script is in the minified engine and identical at HEAD.
+Driven end to end in a real browser at 430×932 and 320×568, both themes, `--tscale` 1.0 and 1.3:
+**document, body and panel horizontal overflow 0 in all eight**, trim-versus-tools and trim-versus-foot
+overlap **0**, the field and Done both clearing the 44px floor, the draft always inside the stage, and
+**zero console errors**.

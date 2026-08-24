@@ -10179,3 +10179,204 @@ back this, and the reference's own numbers are what they were checked against.
 failures whose names did not survive to be captured; three consecutive re-runs are **1300 / 0**, HEAD is
 1293 / 0 in the same timezone, and this matches the browser-backed `share-export-bytes` flake this file
 already records as unreproduced.
+
+## THE PHONE-RECORDED RUN'S START SCREEN, TO HIS MOCKUP (owner, 2026-08-24)
+
+*"On the the run where the user has chose the option to record on the phone, i want the run screen to
+look like this. key features are: 1. Type of run/session as the main title / 2. stats of distance, time
+average pace (in a line at the top) / 3. Option to set their shoe from the rack / 4. Strength of the
+live gps signal / 5. Live map with current live location marker"*
+
+Suite 1300 → **1313**; 20 deliberate re-breaks, 18 caught first time and the two misses were ambiguous
+anchors that never applied (below). Web-only apart from one Swift line, so all of it reaches his phone
+on the next launch.
+
+### ⚠️⚠️ THE RUNNER HAD NEVER LANDED ON THIS SCREEN, WHICH IS WHY TWO OF HIS FIVE FEATURES WERE ABSENT
+
+`viewLiveStart` existed and had a not-started state. Nothing reached it: `wireStartWhere`'s phone branch
+called `startSession(sess)` and then `runCountIn(beginLive)` in the same breath, so choosing "This
+iPhone" counted 3-2-1 and started running. The screen was reachable only by the live pill, mid-run, by
+which point it renders the running layout instead. **A screen nobody lands on is a screen whose features
+nobody can miss**, and that is the whole explanation for features 4 and 5.
+
+⚠️⚠️ **AND FIXING THE LANDING WAS NOT ENOUGH, BECAUSE EVERY WRITER OF THE RUN'S POSITION LIVED INSIDE
+`beginLive`.** `startGps` sets `LIVE.lastLat` and in the same breath sets `LIVE.mode`, `LIVE.startMs`
+and calls `rt.start` — so the only way to have a position was to have already started running.
+`drawLiveMap` returned at its null check and `gpsBarsHtml` saw `acc == null`: a bare panel and nought of
+four bars, on the two features he named last. `liveStandbyGps` opens a `watchPosition` **before** the
+run, writing only `lastLat`/`lastLon`/`acc`, and a test now sweeps every writer of `LIVE.lastLat` and
+requires one outside the run.
+⚠️ **IT WAS INVISIBLE TO MY OWN PROBES BECAUSE THEY SET `LIVE.lastLat` BY HAND** — the documented trap
+of feeding the app a shape no caller can produce, so the map drew, the bars lit, and the screen
+certified itself. Found by a critique agent reading the writers instead. **A probe that constructs the
+state under test proves the renderer works and says nothing about whether anything reaches it.**
+⚠️ **AND THE GUARD FOR IT ESCAPED ITS FIRST RE-BREAK**: deleting the CALL to `liveStandbyGps` left the
+function defined and outside `startGps`, so the writer sweep stayed green with the screen bare again. A
+builder proves a shape exists; only the caller proves the runner reaches it.
+⚠️ **THE STANDBY MUST NOT LOOK LIKE A RUN.** `LIVE.mode` is what makes the whole distance pipeline live,
+so the sweep forbids `LIVE.mode =`, `LIVE.startMs =`, `rt.start(`, a wake lock and the pedometer inside
+it; the arrival is re-guarded as well as the subscribe, because a fix can land after Start.
+⚠️ **AND IT IS STOPPED ON THREE EXITS** — `beginLive` before opening its own watch, `stopLive` when the
+runner walks away, and `visibilitychange` when the app is hidden. That last one is not tidiness: a
+staged run can sit on this screen indefinitely and a high-accuracy watcher holds the radio and the
+location indicator on for all of it, for a run that has not begun.
+
+### THE FIVE FEATURES, AND WHAT EACH ONE COST
+
+1. **The title is the session**, at `--t-display`, uppercase, in the session's own effort colour through
+   `sessionEffort` — the one mapping ruling 7 established, mixed 60% with `--ink` so it clears AA on the
+   card rather than being the raw category tone.
+2. **Three numbers in a line at the top**, at zero, in the same places the running screen shows them, so
+   nothing moves when the run starts — the screen fills in rather than rearranging.
+3. **The shoe chip** (see the strand below).
+4. **The signal as four bars AND the metres.** ⚠️ **THE GATE IS "IS THERE AN ACCURACY", NOT "IS THE RUN
+   IN GPS MODE"** — `LIVE.mode` is set only by `startGps`, so a mode check is what kept the bars dark on
+   a phone holding a perfectly good six-metre fix. `acc == null` already excludes the treadmill and a
+   refused-GPS run, which is all the mode check ever protected. The number stays beside the bars because
+   this project's history is full of plausible readouts that hid the fault.
+5. **A live map with the runner's marker**, full-bleed, through `routeMapFor` with an explicit framing.
+   ⚠️ **`test/route-map-cache.test.ts` CAUGHT MY FIRST VERSION CALLING `loadRouteMap` DIRECTLY** — that
+   guard asserts the tile fetcher has exactly one caller, because a second one re-fetches billed tiles
+   on every view, which is the bill the draw-once cache exists to prevent. `liveMapFor` is four lines.
+   ⚠️ **The position is rounded to ~20 m in the cache key**: a fix jitters constantly and this screen can
+   sit open for minutes, so keyed on the raw coordinate it re-fetches the same picture several times a
+   second. The consumer census in that file is now **4**, and `loadRouteMap`'s own caller count is still 2.
+
+### ⚠️⚠️ @container ADDS NO SPECIFICITY, AND THAT TRAP FIRED TWICE IN ONE AFTERNOON
+
+Both times the fix measured as a **no-op** while every diagnostic said it should work — the query
+matched, `container-type` was right there in the computed style, and the declaration simply did not
+apply, because an identical selector ties at the same specificity and **the later rule wins**.
+- The narrow-column type drop sat above `.lst-nums .lv`: the container reported its 288px and the value
+  stayed at 24px with the column still overflowing.
+- The short-map block sat above `.gps-sig`: the signal pill kept its `bottom` and stayed drawn under the
+  control row, overlapping it by **47×33** at the largest text size.
+
+`test/design-system.test.ts` now derives the claim over **every** `@container` block in the stylesheet:
+for each selector inside one, if the identical selector exists as a bare rule, the block must come after
+it. **No specificity arithmetic is needed** — identical selectors have identical specificity, so source
+order alone decides, which is what makes the guard exact.
+
+### THE WORST CASE IS THE LONGEST TITLE ON THE SMALLEST PHONE AT THE LARGEST TEXT SIZE
+
+Measured with the session library's longest title (*"Mona fartlek: 2 x (90/60/30/15s hard, equal
+float)"*) at 320×568 with `--tscale` at its 1.3 cap: the title took **six lines**, the card grew to 413px
+of a 506px view, and the map collapsed to **18px** with **five of the seven controls clipped out of it
+and unhittable**. Every one of those controls was rendered, styled and wired at the moment none of them
+could be pressed — the looks-live-is-inert class wearing a layout disguise.
+
+| | before | after |
+|---|---|---|
+| map height, worst case | **18px** | **117px** |
+| card height, worst case | 413px | 322px |
+| unhittable controls | 5 of 7 | **0** |
+| numbers overflowing their column | 2 of 3 | **0** |
+| page horizontal overflow / view scroll | 0 / 0 | 0 / 0 |
+
+⚠️ **A TITLE IS THE ONE THING ON THIS SCREEN WHOSE LENGTH THE APP DOES NOT CHOOSE**, so it is clamped to
+three lines. And the clamp is inert without all three declarations (`-webkit-box`, the vertical
+orientation, `overflow: hidden`) — three that must travel together is three chances to keep one and lose
+the effect with nothing failing.
+⚠️ **THE NUMBERS NEVER WRAP, and the unit is two rungs under the value.** A value that wraps takes a
+second line and lifts the whole card into the map. At 320 with `--tscale` 1.3 a column is 91px and
+`0.00KM` needed 95 — a 3–4px spill into an 8px gap, so nothing collided and nothing clipped, which is
+exactly why it survived a look. The narrow-column container query drops the value to `--t-section` at
+320 alone; at 375 the row is 343px and at 430 it is 398px, both untouched.
+⚠️ **ON A SHORT MAP THE CONTROL COLUMN BECOMES A ROW**, and that creates a **second obligation**: the
+signal has to get out of its way. Both sat at `bottom: --s3`. The control size is now one token read by
+the button and by the signal's lift — two literal 38s is how the row grows and the pill stops clearing
+it, with nothing to see until they touch.
+
+### ⚠️ EVERYTHING THAT FLOATS ON THE MAP IS DEEP INK, AND `.lst-target` WAS THE SIXTH TO NEED IT
+
+Both run basemaps are **light** — median relative luminance 0.876 across 14 real voyager tiles, 0.00% of
+pixels below L 0.10 — so a control filled from `--surface` has an edge around **1.05:1**. Five marks had
+already been moved off that fill; the target pill, a 44px-tall full-width control at the top of the map,
+still wore it. ⚠️ **Its LABEL was always legible, which is why it survived a look: the failure is the
+container, not the copy.**
+⚠️⚠️ **AND MY GUARD FOR THAT NAMED THREE SELECTORS BY HAND AND OMITTED IT.** The set is now derived from
+the builder's own map region **plus one level of markup helpers** — the shoe chip and the signal are
+built by functions the region calls, so a derivation that reads only the builder's string finds neither.
+The two the map drawer adds are asserted positively rather than swept, with their reasons: the location
+marker is the accent **because** it must not read as a sixth control, and attribution is a licence term
+whose conventional treatment is a light plate.
+
+### ⚠️⚠️ THE SIGNAL QUOTED A READING OF ANY AGE — the `WorkoutManager.heartRate` trap again
+
+`LIVE.acc` is never cleared. CoreLocation simply stops delivering indoors, exactly as HealthKit stops
+delivering when a strap loosens — so the badge sat at *"GPS · ±4 m"* over four lit bars with the last fix
+minutes old: **confidently wrong, on the one control whose entire job is to tell the runner whether to
+wait.** `gpsAccNow()` is the one reader and `GPS_FRESH_MS` is 20 s.
+⚠️ **THE STAMP IS TAKEN AT ALL THREE WRITERS, and the guard counts them against each other.** Two are the
+live run and one is the standby watcher; a stamp at one is a freshness rule that holds before Start and
+not during the run, or the other way about.
+⚠️ **AND THE FAILURE PATH HAS TO REPAINT, or the gate is invisible.** Nothing else on this screen ticks
+before the run starts, so a gate with no repaint behind it leaves the stale number exactly where it was.
+`watchPosition`'s own 20 s timeout raises that callback, which is the mechanism — no extra timer.
+
+### ⚠️⚠️ THE SHOE CHIP STRANDED THE RUNNER, AND THE LIVE PILL CANNOT SAVE THEM
+
+The chip set `state.tab = "profile"` and navigated to the rack. A staged run has `LIVE.started === false`,
+so `liveRunning()` is false and **the live pill — the app's one route back into a run — never appears**;
+and the handler skipped `stopLive`, so the staged session survived with nothing able to reach it and the
+next bottom-nav tap threw it away. Tap the shoe, land on your rack, run gone.
+⚠️ **PUTTING THE WHOLE RACK IN A SHEET TRADES A STRAND FOR A DEAD SHEET.** `shoeRackView` renders an
+`id="shoeAdd"` that the Performance screen also renders, so `$()` resolves the wrong one and the sheet's
+own add button is wired to nothing. What this screen needs is the one question it is actually asking —
+**which of my pairs am I in** — so that is all it asks.
+⚠️ **`setActiveShoe` IS ONE DEFINITION READ BY TWO SCREENS.** It was open-coded inside `wireShoeRack`; a
+second copy is how the rack and the start screen come to disagree about what "active" means, which is
+the fix-one-builder-not-the-other trap this project has paid for six times.
+⚠️ **THE GUARD FOR IT WAS TOO BROAD ON ITS FIRST RUN AND FAILED ON CORRECT CODE.** Forbidding every
+`.active =` outside the setter trips on **retiring** a pair, which legitimately sets it false in the same
+breath as its `retiredIso`. Retiring is not choosing, so `false` is allowed anywhere and every other
+value must come from the setter.
+⚠️ **EVEN THE EMPTY CASE NEVER LEAVES**: `openShoeSheet(null)` ends in `closeSheet(); render()`, goes
+nowhere, and its first pair is active by construction.
+
+### THE FREE RUN, THE TARGET PILL, AND A PRE-EXISTING WRIST DEFECT
+
+The mockup carries two controls outside his five. Both were built, both narrowly.
+- **A free run is stepless**, typed `easy`, and carries no band — so `runAnalysis` correctly says there
+  is nothing to judge it against rather than judging it against a session the runner declined. Proved
+  through the real engine rather than argued.
+- **"Add target / workout" is a button, not a second builder.** It reuses the existing one and
+  `liveSetTarget` attaches the result to the run in hand — ⚠️ **it does NOT call `addExtra`**, which would
+  add a session to the plan the runner never asked for.
+- ⚠️⚠️ **AND A WRIST FREE RUN WAS BEING CREDITED TO WHATEVER THE PLAN HAD THAT DAY.** `ingestWatchRun`
+  fell back to the day's prescribed session for its title, its band and its steps — so a runner who
+  chose to run by feel was told, in their own logbook, that they had run their threshold session 40 s/km
+  too fast, and the flags engine counted it as evidence. Pre-existing, unrelated to the mockup, found
+  while proving the free run's own record. `run.title` absent is the discriminator.
+  ⚠️ **The page half ships now; the Swift half (`WorkoutManager.summaryPayload` omitting the title on a
+  free run) needs an Xcode build.**
+
+### Two re-break misses, both ambiguous anchors, and the lesson is the same one twice
+
+18 of 20 caught first time. Neither miss was a weak guard: one anchor did not exist in the file at all
+and one existed **three times**, so the edit landed in a different function and the break was never
+applied. ⚠️ **A re-break whose anchor is not unique silently tests nothing and reads as an escape** —
+the same class as this file's note about a block landing in the wrong function and building cleanly.
+Scope the edit to the function under test, and confirm the built page actually changed.
+
+### What is deliberately NOT built, and it should be flagged rather than inferred
+
+⚠️ **THE MOCKUP'S SETTINGS GEAR IS NOT THERE.** Everything it could honestly hold is either already on
+the screen (the voice toggle is one of the four map controls) or does not exist for a phone run — there
+is no phone auto-pause, no lap-haptics setting, no always-on. A gear opening a sheet of one real control
+plus three that do nothing is the class this project has shipped three times, and the watch settings
+already carry the rule: **no toggle ships before the feature behind it exists.**
+⚠️ **AND THE RUNNING SCREEN IS UNCHANGED.** His mockup is the screen a run **begins** on. The layout
+while running is still `.live-metrics` / `.live-paces`, which is a separate piece of work he has not
+asked for — do not assume this chapter restyled it.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks (block 1's
+214 backticks are the minified engine and identical at HEAD), `npx tsc --noEmit` clean apart from the one
+pre-existing `test/onboarding-wizard.test.ts` Date overload, **1313 pass / 0 fail under UTC,
+`TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`** with `CHROME_PATH` set, both design ratchets
+unchanged, and `CSS_DUP_CEILING` 17 → **18** for `.gps-sig` — a base plus an `@container` override, which
+is the category that ceiling exists to permit and the one case that **cannot** be merged the way
+`.club-win` was. Test titles accounted for one by one: **13 added, 0 removed**, across three files.
+Driven end to end in a real browser at 430×932 and 320×568, `--tscale` 1.0 and 1.3, both themes: all five
+features present, nothing self-starting, Start always on screen, view scroll 0, page overflow 0, no two
+floating controls overlapping in any of eight states, and **zero console errors**.

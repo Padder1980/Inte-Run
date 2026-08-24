@@ -4323,19 +4323,99 @@ button.rd-meta-r { cursor: pointer; }
 /* ── THE START SCREEN FOR A PHONE-RECORDED RUN (owner's annotated reference, 2026-08-21) ───────────
    ⚠️ EVERY LENGTH IS ON THE LADDER (--s*, --r-*, --t-*) or is a deliberate geometric constant. Both
    design ratchets sit on their ceilings, so one literal radius or font-size here fails the suite. */
-.lst-head { padding: var(--s2) 0 var(--s1); }
-.lst-title { font-size: var(--t-display); font-weight: 800; line-height: 1.1; letter-spacing: -0.01em; }
-.lst-first { margin-top: 6px; color: var(--ink-soft); font-size: var(--t-card); }
+/* ⚠️⚠️ THE SCREEN IS A COLUMN THAT FILLS THE VIEW AND DOES NOT SCROLL, and that is what fixes a real
+   defect as well as matching the owner's mockup. Measured before this change at 320x568: the view
+   scrolled 195px and the Start button sat 27px BELOW THE FOLD — on the smallest supported phone the
+   runner had to scroll to find it. Meanwhile at 430x932 the map stopped at 70.5% and the bottom fifth
+   of the screen was empty. As a column with the map taking the slack, Start is always the last thing
+   on screen and the map is always as big as the phone allows.
+   ⚠️ SCOPED BY :has, THE PRECEDENT #view:has(.ov-map-card) ALREADY SETS, so no other screen's padding
+   moves. The horizontal padding goes to zero here because the mockup's map reaches both edges; every
+   block that is NOT the map carries its own inset instead.
+   ⚠️ AND overflow: hidden IS SAFE ONLY BECAUSE THE MAP ABSORBS ALL THE SLACK. The card and the foot are
+   laid out first at their natural heights, so if a phone is too short for both the map goes to zero and
+   Start is still on screen — the graceful end, not a clipped button. */
+#view:has(.lst-card) { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+/* ⚠️ THE APP'S TOP BAR STEPS ASIDE HERE, AND ONLY HERE. On this screen it reads "Session" beside the
+   profile, bell, create and theme buttons — none of which a runner standing at their front door about
+   to set off wants, and all of which cost the map the height the mockup gives it. The back button in the
+   card is the way out, and the BOTTOM NAV STAYS: a run no longer locks the app to the live screen, and
+   taking navigation away would undo that deliberately.
+   ⚠️ DONE WITH :has RATHER THAN A CLASS ON html. The rd-open precedent sets a class in JS, which is a
+   flag that can be left set — and a permanently hidden top bar is a bug with no visible cause. A
+   selector cannot be left set: the bar is hidden exactly while the card is on screen. */
+.app:has(.lst-card) > .topbar { display: none; }
+/* The free run's own way in, under the typed cards in the add-a-session drawer. */
+.add-free { width: 100%; min-height: var(--tap); margin-top: var(--s2); padding: 0 var(--s3);
+  border: 1px solid var(--line); border-radius: var(--r-ctl); background: var(--surface);
+  color: var(--ink); font-size: var(--t-body); font-weight: 700; }
+.lst-card { flex: none; padding: var(--s2) var(--s4) var(--s3);
+  background: var(--surface); border-bottom: 1px solid var(--line);
+  border-radius: 0 0 var(--r-hero) var(--r-hero); }
+.lst-top { display: flex; align-items: center; justify-content: space-between; min-height: var(--tap); }
+/* ⚠️ AN ICON IN A SQUARE, WHICH IS THE MOCKUP'S OWN SHAPE — and it replaces a text "< Today" that told
+   the runner where they were going rather than that they could go back. The label is on the button for
+   a screen reader, not on the screen. */
+.lst-back { display: grid; place-items: center; width: var(--tap); height: var(--tap); padding: 0;
+  border: 0; border-radius: var(--r-ctl); background: var(--surface-2); color: var(--ink); }
+.lst-back svg { width: 20px; height: 20px; }
+.lst-head { text-align: center; padding: var(--s1) 0 0; }
+/* ⚠️⚠️ THE TITLE WEARS THE SESSION'S OWN EFFORT COLOUR, WHICH IS BETTER THAN THE MOCKUP AND MEASURED.
+   The reference paints every title the same green; here an easy run is green, a tempo amber and
+   intervals rust, from the ONE session-to-effort mapping the whole app shares (ruling 7) — so the
+   title agrees with the tile you tapped, the dot on your calendar and the rail in your Logbook.
+   ⚠️ AND THE MOCKUP'S GREEN CANNOT BE COPIED. Measured on this app's light canvas it is 2.01:1, where
+   even large text needs 3:1 — the third instance of the trap that darkened the accent from a failing
+   4.14:1 and fixed the URGENT safety label from 2.41:1, both found only in LIGHT mode. color-mix with
+   --ink at 60% is the app's own device for exactly this: it darkens in light and lightens in dark from
+   ONE declaration, and 60% is the first rung where all three efforts clear 4.5:1 in BOTH themes
+   (light 5.97 / 5.09 / 7.28, dark 9.69 / 10.74 / 8.34). It costs vividness; that is the honest trade. */
+/* ⚠️⚠️ CLAMPED TO THREE LINES, AND THAT IS WHAT KEEPS THE MAP ALIVE. #view is overflow: hidden here, so
+   the card's height has to be bounded by construction rather than by scrolling. Measured at 320x568 with
+   --tscale 1.3 and the longest title the library actually produces ("Mona fartlek: 2 x (90/60/30/15s
+   hard, equal float)"): unclamped it wrapped to FIVE lines, the card grew to 413 of a 506 view, the map
+   collapsed to 18px and FIVE of the seven controls were clipped out of it and unhittable. Start stayed on
+   screen throughout — the danger was never Start, it was everything above it.
+   ⚠️ NOTHING IS LOST THAT IS NOT ONE TAP AWAY: the runner arrived here from the session sheet, which
+   shows the title whole.
+   ⚠️ AND THE 60% MIX IS MEASURED ON --surface, THE WHITE CARD THIS SITS ON — not on --bg. On the canvas
+   the same value delivers 4.48 for the amber effort, so the number is right only because .lst-card
+   paints white behind it. A change that drops the card drops every tempo title under AA. */
+.lst-title { font-size: var(--t-display); font-weight: 800; line-height: 1.1; letter-spacing: -0.01em;
+  text-transform: uppercase;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
+  color: color-mix(in srgb, var(--lst-eff, var(--accent)) 60%, var(--ink)); }
 .lst-nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2);
-  padding: var(--s2) 0 var(--s3); border-bottom: 1px solid var(--line); }
-.lst-nums > div { text-align: left; }
-.lst-nums .lv { font-size: var(--t-hero); font-weight: 800; }
+  padding: var(--s3) 0 0; container-type: inline-size; }
+.lst-nums > div { text-align: center; min-width: 0; }
+/* ⚠️ NOWRAP, because there is no wrap opportunity between "0.00" and "KM" anyway — so without it the
+   value simply overflows its column and .lst-card's own box clips it. */
+.lst-nums .lv { font-size: var(--t-hero); font-weight: 800; white-space: nowrap; }
+/* ⚠️ THE UNIT RIDES THE NUMBER, uppercase and TWO sizes down — the mockup's "0.00KM" rather than a
+   separate grey word, and it is inside .lv so the value and its unit cannot separate.
+   ⚠️ --t-label, NOT --t-body, AND THAT IS MEASURED. At --tscale 1.3 on a 320-wide phone each column is
+   91px; with the unit at --t-body both "0.00KM" and the pace placeholder overflowed it. A rung down
+   fits, and it also matches the mockup, where the unit is visibly smaller than the number. */
+.lst-nums .lu { font-size: var(--t-label); font-weight: 800; letter-spacing: .02em; }
 .lst-nums .lk { margin-top: 2px; color: var(--ink-faint); font-size: var(--t-label);
   text-transform: uppercase; letter-spacing: .08em; }
-/* The map, and the controls that sit on it. A 4:3-ish window so the runner sees the streets around
-   them rather than a letterbox. */
-.lst-map { position: relative; margin: var(--s3) 0; border-radius: var(--r-card); overflow: hidden;
-  background: var(--surface-2); aspect-ratio: 4 / 3; }
+/* ⚠️ ON THE NARROWEST PHONE THE VALUE DROPS A RUNG, and the threshold is MEASURED rather than picked.
+   At 320 wide each column is 91px, and at --tscale 1.3 "0.00KM" needs 95 and "--:--/KM" needs 94 — a
+   3-4px spill into an 8px gap, so nothing collided and nothing clipped, but an overflow that happens to
+   be harmless is still one nobody chose. A container query is right here where a media query is not:
+   what decides it is the COLUMN width, which follows the card's own inset. 330px fires at 320 alone —
+   at 375 the row is 343 and at 430 it is 398, both untouched.
+   ⚠️ AND IT MUST SIT BELOW ".lst-nums .lv", NOT ABOVE IT. @container adds no specificity, so the two
+   rules tie at (0,2,0) and the later one wins — placed above, the query matched, the container reported
+   288px, and the type stayed 24px with nothing to see. Measured, not reasoned about. */
+@container (max-width: 330px) {
+  .lst-nums .lv { font-size: var(--t-section); }
+}
+/* ⚠️ THE MAP TAKES EVERY PIXEL THAT IS LEFT, full bleed to both edges, and min-height: 0 is what lets
+   it shrink — a flex item defaults to min-height: auto and refuses to go below its content, which is
+   the trap .view's own rule already exists for. */
+.lst-map { --lst-cs: 38px; position: relative; flex: 1 1 0; min-height: 0; overflow: hidden;
+  background: var(--surface-2); container-type: size; }
 .lst-mapimg { position: absolute; inset: 0; }
 .lst-mapimg canvas, .lst-mapimg img { width: 100%; height: 100%; display: block; }
 /* ⚠️ A DOT, NOT A PIN. The runner is AT the centre of this map by construction (see liveMapFraming),
@@ -4343,39 +4423,105 @@ button.rd-meta-r { cursor: pointer; }
 .lst-me { position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px;
   border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent),
   0 1px 4px rgba(0,0,0,.4); }
-.lst-ctrls { position: absolute; right: var(--s2); top: 50%; transform: translateY(-50%);
-  display: grid; gap: 6px; }
-.lst-c { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line);
-  background: color-mix(in srgb, var(--surface) 88%, transparent); color: var(--ink);
+/* ⚠️ LOW ON THE RIGHT, where the mockup puts them and where a thumb reaches — not centred vertically
+   on a map that is now most of the screen. */
+.lst-ctrls { position: absolute; right: var(--s3); bottom: var(--s5);
+  display: flex; flex-direction: column; gap: var(--s2); }
+/* ⚠️⚠️ ON A SHORT MAP THE COLUMN BECOMES A ROW, AND WITHOUT THIS THE CONTROLS ARE UNREACHABLE. Measured
+   at 320x568: the map gets 167px and the column is 176px (four 38s and three gaps), so it extended past
+   the map's top edge — and .lst-map is overflow: hidden, so the top control was CLIPPED. A clipped
+   control is not a small control, it is one that cannot be tapped.
+   ⚠️ A CONTAINER QUERY, NOT A VIEWPORT ONE. What decides this is how tall the MAP ended up, which is
+   whatever the card and the foot left over — a media query on the screen cannot know that.
+   ⚠️ AND THE ROW SITS ON THE RIGHT, so it clears the signal in the bottom-left corner: at 320 wide the
+   signal ends at 37% and a 176px row starts at 41%. */
+
+/* ⚠️⚠️ DARK CIRCLES WITH WHITE GLYPHS, AND THIS IS A MEASURED FIX RATHER THAN A PREFERENCE. The old
+   fill was color-mix(in srgb, var(--surface) 88%, transparent), which in light computes to #ffffff —
+   so over a white patch of basemap the circle was 1.00:1, INVISIBLE, and only its glyph read. Both map
+   styles this app uses for a run are light basemaps, so that was the normal case. Deep ink at .78
+   measures 9.92:1 for the circle against white AND 9.92:1 for its white glyph, and it is the same
+   treatment every other control this app draws over media already uses. */
+.lst-c { width: var(--lst-cs); height: var(--lst-cs); border-radius: 50%; border: 0;
+  background: rgba(4,16,13,.78); color: #fff;
   font-size: var(--t-card); font-weight: 700; display: grid; place-items: center; position: relative; }
 /* ⚠️ THE HIT AREA GROWS, NOT THE BOX. Growing these to 44px would push the column off the map. */
 .lst-c::after { content: ""; position: absolute; inset: -3px; }
 .lst-c svg { width: 18px; height: 18px; }
-.lst-c.on { border-color: var(--accent); color: var(--accent); }
+.lst-c.on { color: var(--accent); }
 /* The signal, bottom-left, where the reference puts it. */
-.gps-sig { position: absolute; left: var(--s2); bottom: var(--s2); display: flex; align-items: center;
-  gap: 6px; padding: 5px 9px; border-radius: var(--r-pill);
-  background: color-mix(in srgb, var(--surface) 88%, transparent); border: 1px solid var(--line); }
+/* ⚠️ THE MOCKUP DRAWS THIS BARE ON THE MAP AND THIS APP CANNOT: bare white would vanish on a pale
+   basemap and bare dark on a dark one. The same deep-ink pill as the other two marks — one treatment
+   for everything that floats on this map, which is also why they read as a set. */
+.gps-sig { position: absolute; left: var(--s3); bottom: var(--s3); display: flex; align-items: center;
+  gap: 6px; padding: 6px 10px; border-radius: var(--r-pill);
+  background: rgba(4,16,13,.78); border: 0; }
+@container (max-height: 260px) {
+  .lst-ctrls { flex-direction: row; bottom: var(--s3); }
+  /* ⚠️⚠️ AND THE SIGNAL HAS TO GET OUT OF THE ROW'S WAY, which is a second obligation the column-to-row
+     switch creates rather than a separate defect. Both sit at bottom: --s3, so the moment the controls
+     spread sideways they run into the signal pill on the left: measured on a 320-wide phone they
+     overlapped by 22x29 at --tscale 1.0 and 47x33 at 1.3, growing with the text because the pill's
+     label does. Nothing was clipped and nothing was unhittable — the two simply drew on top of one
+     another, which is why the clipping sweep that found the unreachable controls reported this clean.
+     Lifted, the gap measures 8px at 1.0 and 4px at 1.3, and the shoe above still clears it by 10px.
+     ⚠️ THE CONTROL SIZE IS ONE TOKEN read by the button and by this lift. Two literal 38s is how the
+     row grows and the pill stops clearing it, with nothing to see until they touch. */
+  .gps-sig { bottom: calc(var(--s3) + var(--lst-cs) + var(--s2)); }
+}
 .gb-set { display: flex; align-items: flex-end; gap: 2px; height: 12px; }
 /* ⚠️ NO RADIUS ON A THREE-PIXEL BAR. A literal 1px is off the radius ladder and the ratchet is on
    its ceiling, so it fails the suite — and at this width a rounded end is invisible anyway. */
-.gb { width: 3px; background: var(--ink-faint); opacity: .35; }
+.gb { width: 3px; background: #fff; opacity: .32; }
 .gb:nth-child(1) { height: 4px; } .gb:nth-child(2) { height: 7px; }
 .gb:nth-child(3) { height: 10px; } .gb:nth-child(4) { height: 12px; }
 .gb.on { opacity: 1; }
 .gps-sig.good .gb.on { background: var(--eff-easy); }
 .gps-sig.ok .gb.on { background: var(--eff-moderate); }
 .gps-sig.poor .gb.on { background: var(--eff-hard); }
-.gb-t { font-size: var(--t-label); color: var(--ink-soft); font-weight: 700; }
-/* The shoes, top-left, so it reads as a property of this run rather than of the map. */
-.live-shoe { position: absolute; left: var(--s2); top: var(--s2); display: flex; align-items: center;
-  gap: 6px; max-width: 62%; padding: 6px 11px; border-radius: var(--r-pill);
-  background: color-mix(in srgb, var(--surface) 88%, transparent); border: 1px solid var(--line);
-  color: var(--ink); font-size: var(--t-label); font-weight: 700; }
+.gb-t { font-size: var(--t-label); color: #fff; font-weight: 700; }
+/* ⚠️ CENTRED NEAR THE TOP OF THE MAP, where the mockup puts it — and the same deep-ink treatment as
+   the controls, for the same measured reason: a near-white pill over a light basemap has no edge. */
+.live-shoe { position: absolute; left: 50%; top: var(--s4); transform: translateX(-50%);
+  display: flex; align-items: center; justify-content: center;
+  gap: 6px; max-width: 76%; min-height: var(--tap); padding: 0 var(--s4); border-radius: var(--r-pill);
+  background: rgba(4,16,13,.78); border: 0;
+  color: #fff; font-size: var(--t-body); font-weight: 700; }
 .live-shoe svg { width: 15px; height: 15px; flex: 0 0 auto; }
 .live-shoe span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* ⚠️ ATTRIBUTION IS A LICENCE TERM, so it is drawn on the map rather than left to a caption somebody
    might not add. Its wording comes from the provider that actually served the tiles. */
+/* ⚠️ THE TARGET PILL ONLY APPEARS ON A RUN WITH NOTHING PRESCRIBED, so it never offers to replace a
+   session the runner deliberately chose. Its treatment is the mockup's — a light pill, because unlike
+   the shoe and the signal this one is an ACTION rather than a readout, and it should read as the
+   brightest thing on the map. */
+.lst-target { position: absolute; left: var(--s3); right: var(--s3); top: var(--s3);
+  display: flex; align-items: center; justify-content: center; gap: var(--s2);
+  min-height: var(--tap); padding: 0 var(--s4); border: 0; border-radius: var(--r-pill);
+  /* ⚠️ DEEP INK, LIKE EVERY OTHER MARK ON THIS MAP, AND NOT THE THEME SURFACE. In light --surface is
+     near-white and both run basemaps are light (median relative luminance 0.876 over 14 real voyager
+     tiles), so a surface-filled pill has an edge of about 1.05:1 — the 44px-tall, full-width control at
+     the top of the map loses its boundary entirely and reads as text floating on the streets. Its own
+     LABEL was always legible, which is why this survived a look: the failure is the container, not the
+     copy. Five other marks were moved off that fill for the same measurement; this was the sixth. */
+  background: rgba(4,16,13,.78); color: #fff; font-size: var(--t-card); font-weight: 700;
+  box-shadow: 0 2px 10px rgba(2,10,8,.22); }
+.lst-target svg { width: 18px; height: 18px; }
+.lsh-list { display: flex; flex-direction: column; gap: var(--s2); margin: var(--s3) 0; }
+.lsh-row { display: flex; align-items: center; gap: var(--s3); width: 100%;
+  min-height: var(--tap); padding: 0 var(--s3); border-radius: var(--r-card);
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  font-size: var(--t-card); font-weight: 600; text-align: left; }
+.lsh-row.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.lsh-row svg { width: 20px; height: 20px; flex: none; }
+.lsh-nm { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lsh-km { flex: none; color: var(--ink-faint); font-size: var(--t-label); font-weight: 700; }
+/* ⚠️ THE TARGET PILL PUSHES THE SHOE DOWN rather than sitting on top of it. Two absolutely positioned
+   pills at the same top offset would overlap, and this app has shipped that class of defect. */
+.lst-map.has-target .live-shoe { top: calc(var(--s3) + var(--tap) + var(--s3)); }
+/* The foot: one action, inset, above the nav the app deliberately keeps on screen during a run. */
+.lst-foot { flex: none; padding: var(--s3) var(--s4) calc(var(--s3) + env(safe-area-inset-bottom, 0px)); }
+.lst-foot .primary { margin: 0; width: 100%; }
 .lst-attr { position: absolute; right: var(--s2); bottom: 4px; font-size: var(--t-label);
   color: var(--ink-faint); background: color-mix(in srgb, var(--surface) 72%, transparent);
   padding: 1px 6px; border-radius: var(--r-pill); }
@@ -5413,7 +5559,6 @@ html.kbup .club-txc { bottom: var(--kbh, 0px); }
 .ce-pb-v { flex: none; width: 4.6em; text-align: right; font-size: var(--t-card); font-weight: 500;
   color: var(--ink); }
 
-
 </style>
 </head>
 <body>
@@ -5496,6 +5641,11 @@ const ICON = {
   journal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h9.5a1.5 1.5 0 0 1 1.5 1.5v9"/><path d="M6 3.5A2.5 2.5 0 0 0 3.5 6v12A2.5 2.5 0 0 1 6 15.5h5"/><path d="M6 3.5v12"/><path d="M20.5 12.5 14 19l-2.6.6.6-2.6 6.5-6.5a1.4 1.4 0 0 1 2 2z"/></svg>',
   lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3"/></svg>',
   chevDown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+  // ⚠️ ITS OWN GLYPH RATHER THAN chevDown UNDER A rotate(90deg). A rotated icon inherits the parent's
+  // transform origin and this one sits in a grid-centred box, so it is one more thing to get right for
+  // no gain — and the app had no left chevron at all, which is how a back button came to be the words
+  // "< Today" instead of an arrow. Same 24 grid, same stroke, same caps as chevDown.
+  chevLeft: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>',
   // ⚠️ A PLUS IN A ROUNDED SQUARE, not a bare cross: the club's create control sits in a row of stroked
   // glyphs and a bare cross reads as a close button, which is the one thing it must never be mistaken for.
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.4" y="3.4" width="17.2" height="17.2" rx="5"/><path d="M12 8.4v7.2M8.4 12h7.2"/></svg>',
@@ -5642,6 +5792,21 @@ function loadShoes() {
 function saveShoes(list) { try { localStorage.setItem(SHOES_KEY, JSON.stringify(list.slice(0, 40))); } catch (e) {} }
 function shoeTotalKm(sh) { return Math.max(0, (Number(sh.baseKm) || 0) + (Number(sh.km) || 0)); }
 function activeShoe() { return loadShoes().find((s) => s.active && !s.retiredIso) || null; }
+/**
+ * MAKE ONE PAIR THE ACTIVE ONE.
+ *
+ * ⚠️ EXACTLY ONE PAIR IS ON AT A TIME — otherwise a run has no unambiguous shoe to be credited to, and
+ * the mileage is stamped at save time from whatever is active then.
+ * ⚠️ AND THIS IS ONE DEFINITION READ BY TWO SCREENS. It was open-coded inside wireShoeRack until the
+ * start screen needed to set the pair without leaving; a second copy is how the rack and the start
+ * screen come to disagree about what "active" means, which is the fix-one-builder-not-the-other trap
+ * this project has paid for six times. A retired pair can never become active by this route.
+ */
+function setActiveShoe(id) {
+  const list = loadShoes();
+  list.forEach((x) => { x.active = x.id === id && !x.retiredIso; });
+  saveShoes(list);
+}
 /** 0..1+ of the way to the retirement distance. Can exceed 1 — that is the point of it. */
 function shoeWear(sh) {
   const target = Number(sh.retireKm) || SHOE_DEFAULT_RETIRE_KM;
@@ -7466,9 +7631,20 @@ function ingestWatchRun(run) {
   const avgPaceSec = distKm >= 0.05 ? Math.round(sec / distKm) : 0;
   // Match it to the plan by date, so pband/rband are the ones it was actually judged against.
   const iso = run.dateIso || todayIso();
-  const planned = sessionsForIso(iso)[0] || null;   // summary: used to tick the plan
-  const prescribed = rawSessionsForIso(iso)[0] || null; // engine: carries the bands the flags need
-  const title = run.title || (prescribed && prescribed.title) || (planned && planned.title) || "Run";
+  // ⚠️⚠️ A WRIST FREE RUN MUST NOT INHERIT THE DAY'S PRESCRIPTION, AND IT DID. This matched by DATE
+  // alone, so a run the runner deliberately started with no plan was stored under whatever session sat
+  // on that day, carrying its pband and rband — and the debrief then judged them against it. Measured
+  // shape of the fault: a free run at 5:42/km on a day holding "36 min explore run" is titled with that
+  // session, ticks the plan, and produces "Quicker than the brief" at high confidence. A runner who
+  // chose no plan is accused of running their prescribed session too fast.
+  // ⚠️ THE DISCRIMINATOR IS THE ABSENCE OF A TITLE, AND IT IS SOUND RATHER THAN A GUESS.
+  // WorkoutManager.summaryPayload sends title, type and dateIso together and only when it has a plan
+  // (if let p = plan), so no title means no plan on the wrist. It needs no Swift change, which matters
+  // because the page has to be right on the build already on his watch.
+  const free = !run.title;
+  const planned = free ? null : (sessionsForIso(iso)[0] || null);   // summary: used to tick the plan
+  const prescribed = free ? null : (rawSessionsForIso(iso)[0] || null); // engine: carries the bands the flags need
+  const title = run.title || (prescribed && prescribed.title) || (planned && planned.title) || "Free run";
   // ⚠️ ONE clamped date, used for both the caption and the record. The watch's UPCOMING page lets a
   // session be started days early, so its dateIso can be in the future; clamping only the stored
   // field left the caption reading a date the run cannot have happened on.
@@ -9793,7 +9969,10 @@ function openSessionSheet(sess, week) {
   wireSheet();
   $("sheetOv").classList.add("on");
 }
-function closeSheet() { PROFILE_EDIT_OPEN = false; state.setupFocus = null; stretchStop(); const o = $("sheetOv"); if (o) o.classList.remove("on"); WX_SHEET_OPEN = false; }
+/** ⚠️ EVERY SHEET-SCOPED FLAG IS CLEARED HERE, AND LIVE_TARGET IS THE ONE THAT WOULD BITE. Dismissed
+ *  without committing, a flag left set turns the NEXT "add a session to Tuesday" into a target for a
+ *  run that is no longer live — a state nobody could see and nobody could explain. */
+function closeSheet() { PROFILE_EDIT_OPEN = false; state.setupFocus = null; stretchStop(); LIVE_TARGET = false; const o = $("sheetOv"); if (o) o.classList.remove("on"); WX_SHEET_OPEN = false; }
 // Wire every element carrying data-open to open its session detail (keyed by stable session id).
 function wireSessionTaps() {
   document.querySelectorAll("[data-open]").forEach((b) => b.onclick = () => {
@@ -10143,6 +10322,11 @@ function addedTodayBlock() {
     '<div class="add-drawer' + (open ? ' on' : '') + '" id="addDrawer">' +
       '<div class="add-inner">' +
         '<div class="rt-grid">' + cards + '</div>' +
+        // ⚠️ A RUN WITH NO TARGET IS A LEGITIMATE ANSWER TO "What do you fancy?", which is what this
+        // drawer already asks — so the free run lives here rather than needing a control of its own.
+        // It is a secondary, under the typed cards, because the plan's own session is still the thing
+        // the app is for.
+        '<button class="add-free" id="addFree">Or just go for a run \u2014 no target</button>' +
         '<div class="add-note">Built at your own paces, from the same library your plan uses.</div>' +
       '</div>' +
     '</div>';
@@ -10362,7 +10546,7 @@ function addSessionSheetHtml() {
       '</button>').join("");
     return head +
       '<div class="sd-title">What do you fancy?</div>' +
-      '<div class="sd-desc" style="margin-bottom:12px">For <b>' + esc(dayLabelIso(addTargetIso())) + '</b>. Everything is built at your own paces, from the same library your plan uses.</div>' +
+      '<div class="sd-desc" style="margin-bottom:12px">' + (LIVE_TARGET ? "For the run you are about to start." : "For <b>" + esc(dayLabelIso(addTargetIso())) + "</b>.") + ' Everything is built at your own paces, from the same library your plan uses.</div>' +
       '<div class="rt-grid">' + cards + '</div>';
   }
   const rt = RUN_TYPE(BUILDER.type);
@@ -10407,7 +10591,7 @@ function addSessionSheetHtml() {
       '<div class="sd-desc">' + esc(prev.description || "") + '</div>' +
       '<div class="sd-steps">' + rows + '</div>' +
       fuelHtml(prev) +
-      '<button class="primary" id="bldAdd" style="width:100%;margin-top:14px">＋ Add to ' + dayLabelIso(addTargetIso()) + '</button>' +
+      '<button class="primary" id="bldAdd" style="width:100%;margin-top:14px">' + (LIVE_TARGET ? "Use this as my target" : "＋ Add to " + dayLabelIso(addTargetIso())) + '</button>' +
       '<button class="rm-test" id="bldRelist">‹ Back to the list</button>';
   }
 
@@ -10440,7 +10624,7 @@ function addSessionSheetHtml() {
     stepper +
     '<div class="sd-steps" style="margin-top:10px">' + rows + '</div>' +
     fuelHtml(preview) +
-    '<button class="primary" id="bldAdd" style="width:100%;margin-top:14px">＋ Add to ' + dayLabelIso(addTargetIso()) + '</button>' +
+    '<button class="primary" id="bldAdd" style="width:100%;margin-top:14px">' + (LIVE_TARGET ? "Use this as my target" : "＋ Add to " + dayLabelIso(addTargetIso())) + '</button>' +
     (typeHasLibrary(BUILDER.type) ? '<button class="rm-test" id="bldRelist">‹ Back to the list</button>' : "") +
     back;
 }
@@ -10496,7 +10680,19 @@ function wireAddSessionSheet() {
     BUILDER = { type: BUILDER.type, stage: "list", band: BUILDER.band || "any", workoutId: null }; rerender();
   };
   const back = $("bldBack"); if (back) back.onclick = () => { BUILDER = null; rerender(); };
-  const add = $("bldAdd"); if (add) add.onclick = () => { addExtra(builderParams()); BUILDER = null; closeSheet(); render(); };
+  const add = $("bldAdd");
+  if (add) add.onclick = () => {
+    const params = builderParams();
+    // ⚠️ THE TARGET PATH ADDS NOTHING TO THE PLAN. A run about to start is not a session on a training
+    // day; storing it as an EXTRA would have the plan count a target the runner chose thirty seconds
+    // before setting off, and leave it there tomorrow if they never went.
+    if (LIVE_TARGET) {
+      LIVE_TARGET = false; BUILDER = null; closeSheet();
+      liveSetTarget(extraSession(Object.assign({ id: "live-target" }, params)));
+      return;
+    }
+    addExtra(params); BUILDER = null; closeSheet(); render();
+  };
 }
 /**
  * WHY that verdict — the sentences the engine already wrote.
@@ -11595,7 +11791,6 @@ function viewPerformance() {
 
 // ============ COMMUNITY ====================================================
 
-
 /* ══ INTE-CLUB: MEDIA ══════════════════════════════════════════════════════════════════════════════
  * The owner, 2026-08-22: a runner presses the plus and adds a post or a story, from their own camera
  * roll, with adjustments before it goes up — and "This is going to be something that we build upon
@@ -11732,7 +11927,6 @@ function clubDelete(id) {
   // a kept copy can share the original's bytes rather than duplicating a video.
   if (p) clubKeys(p).forEach((k) => { if (!clubMediaInUse(k, id)) clubMediaDel(k); });
 }
-
 
 
 /* ══ INTE-CLUB: PICKING AND EDITING ════════════════════════════════════════════════════════════════
@@ -14805,7 +14999,6 @@ function wireClubEdit() {
   };
 }
 
-
 /**
  * ══ WHAT GOES ON THE GRID IS THE RUNNER'S DECISION ═════════════════════════════════════════════════
  * Owner, 2026-08-22: "I want the user to decide what to post on their grid, not for it to be
@@ -16039,7 +16232,6 @@ function viewCommunity() {
     '</div></div>' +
   '</div>';
 }
-
 
 // ============ SUPPORT ======================================================
 const SUPPORT_HUB = [
@@ -17625,10 +17817,7 @@ function wireShoeRack() {
   if (add) add.onclick = () => openShoeSheet(null);
   document.querySelectorAll("[data-shoeedit]").forEach((b) => b.onclick = () => openShoeSheet(b.dataset.shoeedit));
   document.querySelectorAll("[data-shoewear]").forEach((b) => b.onclick = () => {
-    // Exactly one pair is on at a time — otherwise a run has no unambiguous shoe to be credited to.
-    const list = loadShoes();
-    list.forEach((x) => { x.active = x.id === b.dataset.shoewear && !x.retiredIso; });
-    saveShoes(list); render();
+    setActiveShoe(b.dataset.shoewear); render();
   });
   document.querySelectorAll("[data-shoeretire]").forEach((b) => b.onclick = () => {
     const list = loadShoes();
@@ -21221,6 +21410,57 @@ function refreshStartWhere() {
   body.innerHTML = startWhereHtml(START_CTX);
   wireStartWhere();
 }
+/**
+ * A RUN WITH NO PRESCRIPTION — the owner's mockup of 2026-08-24 shows one, and the phone had none.
+ *
+ * ⚠️⚠️ IT IS A SESSION WITH NO STEPS, AND THE ENGINE ALREADY HOLDS THAT BY CONSTRUCTION — every reader
+ * guards it, which is why this costs almost nothing. Measured through the real code: LiveSession.start
+ * skips its step cue (steps.length > 0), the advance loop never enters so the run NEVER COMPLETES, and
+ * snapshot returns an undefined step. Fed an hour of telemetry and 12 km it stays active and emits only
+ * session-start. The wrist's own free run is the same shape (a nil plan, so no steps).
+ * ⚠️ AND EVERY PHONE-SIDE PATH ALREADY ANSWERS CORRECTLY, also measured: warmupCardFor returns null so
+ * no warm-up is generated; withGeneratedWarmup hands the session straight back; heatApplied leaves it
+ * alone; plannedPaceBandOf and sessionStepText are null — which is precisely what makes the debrief say
+ * "This was a free run", copy that has existed for the wrist's runs all along.
+ * ⚠️ TYPED easy, BECAUSE A TYPE IS NOT OPTIONAL DOWNSTREAM. LIVE.summary.type is LIVE.session.type, and
+ * runEffort reads run.type to colour the run everywhere it appears — the title here, the tile in the
+ * club, the dot on the calendar, the rail in the Logbook. Untyped, all of those would fall back
+ * silently. Easy is also the truthful guess: a run with no target is not a workout.
+ * ⚠️ NO PACE BAND, DELIBERATELY. A band would make the coach correct the runner against a target they
+ * never chose, and the flags engine judge them against it afterwards.
+ */
+/**
+ * ⚠️ THE BUILDER HAS TWO CUSTOMERS NOW, AND THE FLAG IS WHAT KEEPS THEM APART. Today's drawer adds a
+ * session to a DAY (an EXTRA, which the plan then counts); this pill gives the run about to start a
+ * target. The sheet, the grid, the library, the steppers and the paces are all the same — only the
+ * commit differs, which is why it is a flag on one handler rather than a second sheet.
+ */
+let LIVE_TARGET = false;
+/**
+ * GIVE A FREE RUN A TARGET, IN PLACE.
+ *
+ * ⚠️ IT MUTATES LIVE RATHER THAN CALLING startSession AGAIN, and that is the whole point: startSession
+ * builds a fresh LIVE, which would throw away the GPS fix the runner has been standing there waiting
+ * for and blank the map until the next one arrives. Nothing else on LIVE depends on the session while
+ * !started, so the session and its runtime are the only two things that have to change.
+ * ⚠️ THE SAME TWO TRANSFORMS startSession APPLIES, IN THE SAME ORDER — heatApplied before
+ * withGeneratedWarmup, because the warm-up builder inherits the pace of the step it replaces and
+ * adapting afterwards would leave it quoting the unadapted band.
+ * ⚠️ AND lastStep IS RESET, or the first tick of the run believes it is already partway through a
+ * session that did not exist a moment ago.
+ */
+function liveSetTarget(sess) {
+  if (!LIVE || LIVE.started || !sess) return;
+  const s = withGeneratedWarmup(heatApplied(sess));
+  LIVE.session = s;
+  LIVE.rt = new RC.LiveSession(s);
+  LIVE.lastStep = -1;
+  haptic("light");
+  render();
+}
+function freeRunSession() {
+  return { title: "Free run", type: "easy", steps: [], estimatedDurationSeconds: 0, free: true };
+}
 function wireStartWhere() {
   document.querySelectorAll("[data-startwhere]").forEach((b) => b.onclick = () => {
     const where = b.dataset.startwhere, sess = START_CTX;
@@ -21239,10 +21479,19 @@ function wireStartWhere() {
     // ⚠️ EXACTLY ONE RECORDER EITHER WAY. That part does not change and cannot: two recorders
     // double-count and log one outing twice.
     startSession(sess, { indoor: where === "treadmill" });
-    startWatchCompanion(sess);
-    // Already on the live screen by now; count in, then begin. The runner does not have to find a
-    // second Start button — they pressed start, so the run starts.
-    runCountIn(beginLive);
+    // ⚠️⚠️ THE PHONE PATH NOW LANDS ON THE START SCREEN INSTEAD OF STARTING ITSELF, and that screen has
+    // existed and been unreachable since 2026-08-21. This branch used to call runCountIn(beginLive)
+    // here — which is EXACTLY what the Start button's own handler does — so the count-in pre-empted the
+    // screen and it painted for a single frame before the run began. Every one of the things the owner
+    // asked for on 2026-08-24 (the signal, the map, the shoe) was already built on a screen nobody had
+    // ever seen. A run is not something to be dropped into: the runner checks the fix, sets the pair
+    // they are wearing, and presses Start.
+    // ⚠️ THE TREADMILL STILL STARTS ITSELF. It has no position to draw, no signal to report and no map
+    // to look at — viewLive keeps its own layout for indoor — so a screen to wait on would be a screen
+    // with nothing on it.
+    // ⚠️ AND THE WATCH COMPANION MOVES TO THE START PRESS. It arms a startNow with a 25-second give-up,
+    // so waking the wrist and then standing still for two minutes spends that budget before the run.
+    if (where === "treadmill") { startWatchCompanion(sess); runCountIn(beginLive); }
   });
 }
 // The real date a RAW session sits on, so a run started from another day's card is judged against
@@ -21624,6 +21873,10 @@ function beginLive() {
     coachLoadManifest().then(() => { coachPreload(); coachTrigger("session-prep", LIVE.session.type, 0); });
   }
   render();
+  // ⚠️ THE STANDBY WATCH GOES BEFORE THE RUN'S OWN IS OPENED. Two watches writing LIVE.lastLat is two
+  // owners of the run's position, and the standby's own arrival guard would then be the only thing
+  // keeping them apart.
+  liveStandbyStop();
   if (LIVE.indoor) { startIndoor(); return; }
   if (GPS_AVAILABLE) {
     LIVE.acquiring = true; renderLiveNow();
@@ -21659,6 +21912,7 @@ function startGps(pos) {
   clearTimeout(LIVE.acqT);
   LIVE.acquiring = false; LIVE.mode = "gps"; LIVE.startMs = Date.now();
   LIVE.lastLat = pos.coords.latitude; LIVE.lastLon = pos.coords.longitude; LIVE.acc = pos.coords.accuracy;
+  LIVE.accAt = Date.now();
   requestWakeLock();
   LIVE.rt.start(0).forEach(liveCue);
   coachNativeSchedule();
@@ -21873,7 +22127,7 @@ function onGpsPos(pos) {
   const good = acc != null && acc <= 35;
   // Only a believable number reaches the "GPS · ±N m" readout; an invalid fix leaves the last one up
   // rather than replacing it with a nonsense figure.
-  if (acc != null) LIVE.acc = acc;
+  if (acc != null) { LIVE.acc = acc; LIVE.accAt = Date.now(); }
   LIVE.devSpeed = (c.speed != null && isFinite(c.speed) && c.speed >= 0) ? c.speed : null;
   const D = LIVE.gpsDiag || (LIVE.gpsDiag = { seen: 0, badAcc: 0, still: 0, spike: 0, credited: 0, maxAcc: 0, stale: 0, reseeds: 0, capped: 0 });
   if (D.stale == null) D.stale = 0;
@@ -22153,8 +22407,13 @@ function gpsStatusText() {
   if (LIVE.indoor) return LIVE.gpsErr ? "No GPS · timed" : "Treadmill · timed";
   if (LIVE.acquiring) return "Acquiring GPS…";
   if (LIVE.mode === "sim") return LIVE.gpsErr ? "Simulated (no GPS)" : "Simulated";
-  if (LIVE.mode === "gps") return LIVE.acc != null ? "GPS · ±" + Math.round(LIVE.acc) + " m" : "GPS";
-  return "Ready";
+  // ⚠️ THE METRES WHENEVER THERE ARE METRES, for the same reason as the bars above: the standby fix on
+  // the start screen has an accuracy and no mode, and "Ready" beside four lit bars is a readout
+  // disagreeing with itself. The number is what makes the claim falsifiable.
+  const acc = gpsAccNow();
+  if (acc != null) return "GPS · ±" + Math.round(acc) + " m";
+  if (LIVE.mode === "gps") return "GPS";
+  return "Waiting for GPS…";
 }
 function renderLiveNow() {
   if (!LIVE) return;
@@ -22227,8 +22486,32 @@ function syncLivePill() {
  * ⚠️ NO BARS UNTIL THERE IS A FIX. An "acquiring" state showing one bar reads as a weak signal rather
  * than as no signal, and those need different reactions from the runner.
  */
+/** How long a fix's accuracy may be quoted as the signal now. */
+const GPS_FRESH_MS = 20000;
+/**
+ * THE ACCURACY, BUT ONLY WHILE IT STILL MEANS ANYTHING.
+ *
+ * ⚠️⚠️ POLLING A FIELD IS NOT EVIDENCE OF A READING, and this is the same trap as WorkoutManager's
+ * heartRate on the wrist: HealthKit simply stops delivering when the strap loosens, and CoreLocation
+ * simply stops delivering when the phone goes indoors or loses sky. LIVE.acc is never cleared, so the
+ * badge kept saying "GPS · ±4 m" over four lit bars with the last fix minutes old — a readout that is
+ * confidently wrong, on the one control whose entire job is to tell the runner whether to wait.
+ * ⚠️ AND THE STAMP IS TAKEN WHEN THE FIX ARRIVES, at all three writers, never read off a clock at
+ * render time. Two of those writers are the live run and one is the standby watcher; a stamp at one of
+ * them is a freshness rule that holds before Start and not during the run, or the other way about.
+ */
+function gpsAccNow() {
+  if (!LIVE || LIVE.acc == null) return null;
+  if (LIVE.accAt != null && Date.now() - LIVE.accAt > GPS_FRESH_MS) return null;
+  return LIVE.acc;
+}
 function gpsBarsHtml() {
-  const acc = (LIVE && LIVE.mode === "gps" && LIVE.acc != null) ? LIVE.acc : null;
+  // ⚠️⚠️ THE GATE IS "IS THERE AN ACCURACY", NOT "IS THE RUN IN GPS MODE" — and requiring the mode is
+  // what made the owner's fourth feature invisible on the screen he asked for. LIVE.mode is only set by
+  // startGps, which also starts the run, so before Start there is no mode and the bars stayed dark on a
+  // phone holding a perfectly good six-metre fix. acc == null already excludes the treadmill and a
+  // refused-GPS run, which is all the mode check was ever protecting against.
+  const acc = gpsAccNow();
   const lit = acc == null ? 0 : acc <= 8 ? 4 : acc <= 15 ? 3 : acc <= 25 ? 2 : 1;
   let bars = "";
   for (let i = 1; i <= 4; i++) bars += '<i class="gb' + (i <= lit ? " on" : "") + '"></i>';
@@ -22246,6 +22529,40 @@ function gpsBarsHtml() {
  * ⚠️ IT SAYS WHAT IS ACTIVE, NEVER JUST "Set active shoe", when there IS one. A chip that reads as an
  * empty setting when a pair is already chosen invites a tap that changes nothing.
  */
+/**
+ * PICK THE PAIR WITHOUT LEAVING THE SCREEN.
+ *
+ * ⚠️⚠️ THE CHIP USED TO NAVIGATE TO THE SHOE RACK, AND THAT STRANDED THE RUNNER. A staged run is
+ * LIVE.started === false, so liveRunning() is false and the live pill — the app's one way back into a
+ * run in progress — does not appear; and the chip set state.tab directly without stopLive, so the
+ * staged session survived with nothing anywhere able to reach it. The next bottom-nav tap then
+ * discarded it. So the runner tapped the shoe, landed on their rack, and their run was simply gone.
+ * ⚠️ AND PUTTING THE WHOLE RACK IN A SHEET WOULD TRADE A STRAND FOR A DEAD SHEET: shoeRackView renders
+ * an id="shoeAdd" that the Performance screen also renders, so $() would resolve the wrong one and the
+ * sheet's own add button would be wired to nothing. What this screen needs is the one question it is
+ * actually asking — which of my pairs am I in — so that is all it asks.
+ * ⚠️ Adding a pair goes through openShoeSheet, which ends in closeSheet() + render() and navigates
+ * nowhere, and whose first pair is active by construction. So even the empty case never leaves.
+ */
+function openLiveShoeSheet() {
+  const list = loadShoes().filter((x) => !x.retiredIso);
+  ensureSheet(); SHEET_CTX = null;
+  $("sheetBody").innerHTML = ('<h3>Which shoes?</h3>' +
+    (list.length
+      ? '<div class="lsh-list">' + list.map((sh) =>
+          '<button class="lsh-row' + (sh.active ? " on" : "") + '" data-lshoe="' + esc(sh.id) + '">' +
+            ICON.shoe + '<span class="lsh-nm">' + esc(sh.name || "Trainers") + '</span>' +
+            '<span class="lsh-km num">' + Math.round(shoeTotalKm(sh)) + ' km</span>' +
+          '</button>').join("") + '</div>'
+      : '<div class="shoe-intro">There is nothing in your rack yet. Add the pair you are about to run in and the distance will be credited to them.</div>') +
+    '<button class="bk-btn2" id="lshAdd">Add a pair</button>');
+  $("sheetOv").classList.add("on");
+  document.querySelectorAll("[data-lshoe]").forEach((b) => b.onclick = () => {
+    setActiveShoe(b.dataset.lshoe); haptic("light"); closeSheet(); render();
+  });
+  const add = $("lshAdd");
+  if (add) add.onclick = () => openShoeSheet(null);
+}
 function liveShoeChipHtml() {
   const sh = activeShoe();
   return '<button class="live-shoe" id="lShoe">' + ICON.shoe +
@@ -22276,6 +22593,64 @@ function liveShoeChipHtml() {
  * moving runner would be a tile fetch every few seconds for the whole session — which is the bill the
  * one-render rule exists to prevent.
  */
+/**
+ * A FIX WHILE THE RUNNER IS STILL STANDING THERE — read-only, and it does not start anything.
+ *
+ * ⚠️⚠️ WITHOUT THIS, TWO OF THE FIVE THINGS THE OWNER ASKED FOR ARE STRUCTURALLY ABSENT. Every writer
+ * of LIVE.lastLat lives inside beginLive: startGps sets it and in the same breath sets LIVE.mode,
+ * LIVE.startMs and calls rt.start — so the only way to have a position was to have already started
+ * running. On the screen he asked for, drawLiveMap returned at its own null check (no map, no dot,
+ * bare panel) and gpsBarsHtml saw acc == null (nought of four bars), and all four map controls
+ * mutated LIVE.mapZ and hit the same early return. The features were built and unreachable.
+ * ⚠️ I DID NOT FIND THIS BY DRIVING THE SCREEN, because my probe set LIVE.lastLat by hand — the
+ * documented trap of feeding the app a shape no caller can produce. It was found by asking who writes
+ * that field.
+ *
+ * ⚠️ IT MUST NOT TOUCH ANYTHING THAT MEANS "RUNNING". No LIVE.mode (that is what makes gpsUiTick and
+ * the whole distance pipeline live), no startMs, no rt.start, no wake lock, no pedometer. Three
+ * fields and a repaint, which is exactly what the map and the bars read.
+ * ⚠️ AND IT IS STOPPED THE MOMENT THE RUN BEGINS. beginLive starts its own watch; two watches would
+ * mean the standby one still writing lastLat behind the run's own, and this app's own history says
+ * two writers of one field is where the next fault lives.
+ */
+let LIVE_STANDBY = null;
+function liveStandbyGps() {
+  if (!LIVE || LIVE.indoor || LIVE.started || LIVE_STANDBY != null) return;
+  if (!GPS_AVAILABLE) return;
+  const take = (pos) => {
+    // ⚠️ THE GUARD IS RE-CHECKED ON ARRIVAL, not just at subscribe time. A fix can land after the
+    // runner pressed Start or walked away, and writing then would be a second writer of the run's
+    // own position.
+    if (!LIVE || LIVE.started || LIVE.indoor) return;
+    LIVE.lastLat = pos.coords.latitude;
+    LIVE.lastLon = pos.coords.longitude;
+    LIVE.acc = pos.coords.accuracy; LIVE.accAt = Date.now();
+    // The bars redraw in place; the map re-fetches only when the rounded position actually moved.
+    const sig = $("gpsSig");
+    if (sig) sig.outerHTML = gpsBarsHtml();
+    drawLiveMap();
+  };
+  // ⚠️ THE FAILURE PATH REPAINTS, and without it the freshness gate is invisible. watchPosition's
+  // timeout raises this callback when no fix has arrived for 20 s — which is the moment the badge
+  // should stop quoting a reading — and nothing else on this screen ticks before the run starts, so a
+  // gate with no repaint behind it leaves the stale number on screen exactly as before.
+  const lost = () => {
+    if (!LIVE || LIVE.started || LIVE.indoor) return;
+    const sig = $("gpsSig");
+    if (sig) sig.outerHTML = gpsBarsHtml();
+  };
+  try {
+    navigator.geolocation.getCurrentPosition(take, lost, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
+    LIVE_STANDBY = navigator.geolocation.watchPosition(take, lost, { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
+  } catch (e) { LIVE_STANDBY = null; }
+}
+/** ⚠️ CALLED FROM beginLive AND FROM stopLive, so neither a started run nor a abandoned one leaves a
+ *  watch running — a stray watchPosition is a GPS radio nobody turned off. */
+function liveStandbyStop() {
+  if (LIVE_STANDBY == null) return;
+  try { navigator.geolocation.clearWatch(LIVE_STANDBY); } catch (e) {}
+  LIVE_STANDBY = null;
+}
 function drawLiveMap(force) {
   if (!LIVE || LIVE.indoor || LIVE.started) return;
   const el = $("lMap"); if (!el) return;
@@ -22313,32 +22688,60 @@ function liveMapZoom(d) {
 }
 function viewLiveStart() {
   const s = LIVE.session;
-  const first = liveFirstStepText(s);
-  return '<button class="backbtn" id="liveBack">\u2039 Today</button>' +
+  // ⚠️ THE EFFORT DECIDES THE TITLE'S COLOUR, from the one mapping (ruling 7) — so this screen, the tile
+  // that was tapped to reach it, the calendar dot and the Logbook rail all agree about how hard the
+  // session is. Set as a custom property because the darkening happens in CSS, where it can be one
+  // declaration for both themes.
+  const eff = effortVar(effortOf(s));
+  const free = !!s.free;
+  return '<div class="lst-card">' +
+    '<div class="lst-top">' +
+      '<button class="lst-back" id="liveBack" aria-label="Back to Today">' + ICON.chevLeft + '</button>' +
+      // ⚠️ NO SETTINGS GEAR, AND THE MOCKUP HAS ONE. Everything a runner would change before a phone run
+      // is either already on this screen or does not exist: the voice coach is the speaker on the map,
+      // which coach speaks is in Profile, and there is no auto-pause on the phone at all. A gear opening
+      // a sheet with one row in it would be chrome for its own sake, and a gear opening nothing is the
+      // looks-live-does-nothing defect this app has shipped three times.
+    '</div>' +
     '<div class="lst-head">' +
-      '<div class="ui-eyebrow">Up first</div>' +
-      '<div class="lst-title">' + esc(s.title) + '</div>' +
-      (first ? '<div class="lst-first">' + esc(first) + '</div>' : "") +
+      '<div class="ui-eyebrow">' + (free ? "No target" : "Up next") + '</div>' +
+      '<div class="lst-title" style="--lst-eff: ' + eff + '">' + esc(s.title) + '</div>' +
     '</div>' +
+    // ⚠️ THE THREE NUMBERS THE MOCKUP ASKS FOR, at zero, carrying the same ids the live runtime writes
+    // into (#lDist/#lElapsed/#lAvg via liveUpdate).
+    // ⚠️ AND AN EARLIER VERSION OF THIS COMMENT CLAIMED "nothing moves when the run starts", WHICH IS
+    // FALSE AND WAS FALSE WHEN IT WAS WRITTEN. viewLive's running layout is a different composition
+    // entirely — .live-metrics pairs Elapsed with Distance and .live-paces adds Current and Lap, with
+    // the label ABOVE the value. So the screen does rearrange at Start. Restyling the RUNNING screen to
+    // match this one is a separate piece of work the owner has not asked for; what he asked for is the
+    // screen with a Start button on it.
     '<div class="lst-nums">' +
-      '<div><div class="lv num" id="lDist">0.00<small> km</small></div><div class="lk">Distance</div></div>' +
+      '<div><div class="lv num" id="lDist">0.00<span class="lu">KM</span></div><div class="lk">Distance</div></div>' +
       '<div><div class="lv num" id="lElapsed">0:00</div><div class="lk" id="lElapsedK">Time</div></div>' +
-      '<div><div class="lv num none" id="lAvg">\u2014</div><div class="lk">Avg pace</div></div>' +
+      // ⚠️ THE MOCKUP'S OWN PLACEHOLDER, and it is also the narrow one: two em dashes measured wider
+      // than the whole column at the largest text setting on a 320-wide phone.
+      '<div><div class="lv num none" id="lAvg">--:--<span class="lu">/KM</span></div><div class="lk">Avg pace</div></div>' +
     '</div>' +
-    '<div class="lst-map" id="lMapWrap">' +
-      '<div class="lst-mapimg" id="lMap"></div>' +
-      liveShoeChipHtml() +
-      gpsBarsHtml() +
-      '<div class="lst-ctrls">' +
-        '<button class="lst-c" id="lZoomIn" aria-label="Zoom in">+</button>' +
-        '<button class="lst-c" id="lZoomOut" aria-label="Zoom out">\u2212</button>' +
-        '<button class="lst-c' + (coachEnabled() ? " on" : "") + '" id="lVoice" aria-label="Toggle voice coaching">' +
-          (coachEnabled() ? ICON.vox : ICON.voxOff) + '</button>' +
-        '<button class="lst-c" id="lRecentre" aria-label="Centre on me">' + ICON.gauge + '</button>' +
-      '</div>' +
+  '</div>' +
+  '<div class="lst-map' + (free ? " has-target" : "") + '" id="lMapWrap">' +
+    '<div class="lst-mapimg" id="lMap"></div>' +
+    (free
+      ? '<button class="lst-target" id="lTarget">' + ICON.plus + '<span>Add target / workout</span></button>'
+      : "") +
+    liveShoeChipHtml() +
+    gpsBarsHtml() +
+    '<div class="lst-ctrls">' +
+      '<button class="lst-c" id="lZoomIn" aria-label="Zoom in">+</button>' +
+      '<button class="lst-c" id="lZoomOut" aria-label="Zoom out">\u2212</button>' +
+      '<button class="lst-c' + (coachEnabled() ? " on" : "") + '" id="lVoice" aria-label="Toggle voice coaching">' +
+        (coachEnabled() ? ICON.vox : ICON.voxOff) + '</button>' +
+      '<button class="lst-c" id="lRecentre" aria-label="Centre on me">' + ICON.gauge + '</button>' +
     '</div>' +
-    '<div class="live-controls"><button class="primary" id="lStart">' + ICON.play + ' Start</button></div>' +
-    whyLiveHtml();
+  '</div>' +
+  '<div class="lst-foot">' +
+    '<button class="primary" id="lStart">' + ICON.play + ' Start</button>' +
+  '</div>' +
+  whyLiveHtml();
 }
 /**
  * THE FIRST THING THE SESSION ASKS FOR, in the runner's own terms.
@@ -31831,6 +32234,13 @@ function liveUpdate(snap) {
     card.innerHTML = '<span class="kt" style="--kc:' + c + '">' + badge + (step.repeatIndex ? ' ' + step.repeatIndex + '/' + step.repeatCount : '') + '</span><h4>' + heading + '</h4>' + seg + '<div class="tgt">' + tgt.join(" · ") + '</div><div class="lpbar" style="--kc:' + c + '"><i style="width:' + Math.round(snap.stepProgress * 100) + '%"></i></div><div class="cnt">Step ' + (step.index + 1) + ' of ' + step.total + '</div>';
   } else if (snap.status === "completed") {
     card.innerHTML = '<span class="kt" style="--kc:var(--build)">done</span><h4>Session complete</h4><div class="tgt">Nice work.</div>';
+  } else {
+    // ⚠️⚠️ ACTIVE WITH NO STEP IS THE ONLY STATE A FREE RUN IS EVER IN, and without this arm the card
+    // keeps whatever viewLive's markup put there — "Press start when you are ready." — for the whole
+    // run, on a run that is plainly under way. There was no branch for it because until the phone had
+    // a free run the state was unreachable.
+    card.innerHTML = '<span class="kt" style="--kc:var(--eff-easy)">free</span>' +
+      '<h4>No target</h4><div class="tgt">Run how you feel. Nothing is being judged against a plan.</div>';
   }
   coachTick(snap);
 }
@@ -31981,6 +32391,9 @@ function simRouteStep() {
 function startLoop() { if (!LIVE.timer) LIVE.timer = setInterval(liveTick, 200); }
 function stopLive() {
   if (!LIVE) return;
+  // ⚠️ INCLUDING THE STANDBY WATCH. Walking away from the start screen without starting is the one path
+  // where nothing else would ever clear it, and a watchPosition nobody stopped is a GPS radio left on.
+  liveStandbyStop();
   // Whatever ended the run — finished, discarded, or the runner walking away — the locked-phone schedule
   // goes with it. A cue arriving from a run that is over is the worst kind of ghost.
   coachNativePost({ action: "clearSchedule" });
@@ -33370,7 +33783,14 @@ function coachPrimeWatchCueMap() {
     coachLoadManifest().then(() => coachPushWatchCueMap(t && t.type));
   } catch (e) {}
 }
-document.addEventListener("visibilitychange", () => { if (!document.hidden) { refreshTodayNavDate(); syncTextScale(); stravaResume(); coachPrimeWatchCueMap(); coachReleaseStale(); } });
+// ⚠️ THE PRE-RUN GPS WATCHER IS STOPPED WHEN THE APP IS HIDDEN AND RESTARTED WHEN IT COMES BACK.
+// A staged run can sit on the start screen indefinitely, and the high-accuracy watcher holds the
+// radio and the location indicator on for all of it — for a run that has not begun. Restarting on
+// return also re-answers the badge, which is the other half of the freshness rule: coming back to
+// the app is the one moment a reading is certain to be old, and iOS never tells a web view that
+// anything about it changed. liveStandbyGps re-checks its own guards, so a run started or
+// abandoned in the meantime restarts nothing.
+document.addEventListener("visibilitychange", () => { if (document.hidden) { liveStandbyStop(); return; } refreshTodayNavDate(); syncTextScale(); stravaResume(); coachPrimeWatchCueMap(); coachReleaseStale(); if ($("lMapWrap")) liveStandbyGps(); });
 // A repaint that ARRIVES ON ITS OWN — a wrist run landing, a mirror going stale — rather than one the
 // runner asked for. It must never rebuild the plan-setup form: viewSetup() reads every value from the
 // saved profile, so redrawing it discards whatever is half-typed. The runner is mid-sentence; their
@@ -34475,6 +34895,11 @@ function wire() {
     $("sheetBody").innerHTML = addSessionSheetHtml(); wireAddSessionSheet();
     $("sheetOv").classList.add("on");
   });
+  // ⚠️ A FREE RUN TAKES THE SAME ROUTE AS EVERY OTHER RUN — straight to "where shall we record this?".
+  // It is not added to the plan and never becomes an EXTRA: nothing was prescribed, so there is nothing
+  // to tick off, and a run with no target sitting on a training day would be counted as one.
+  const addFree = $("addFree");
+  if (addFree) addFree.onclick = () => { state.addOpen = false; openStartWhereSheet(freeRunSession()); };
   // Tapping a rest day (Plan week detail or the training calendar) adds a session to that day.
   document.querySelectorAll("[data-addday]").forEach((b) => b.onclick = () => openAddSessionSheet(b.dataset.addday));
   document.querySelectorAll("[data-addstart]").forEach((b) => b.onclick = () => { const s = extraSession(EXTRA.find((x) => x.id === b.dataset.addstart)); if (s) openStartWhereSheet(s); });
@@ -34523,7 +34948,30 @@ function wire() {
     if (liveRunning()) { state.screen = null; state.tab = "today"; render(); return; }
     coachStop(); stopLive(); stopSpeech(); state.screen = null; state.tab = "today"; render();
   };
-  const lStart = $("lStart"); if (lStart) lStart.onclick = () => runCountIn(beginLive);
+  // ⚠️⚠️ THE TARGET PILL OPENS THE BUILDER THE APP ALREADY HAS — no second catalogue. Today's
+  // "Add a session" drawer and this pill both land in addSessionSheetHtml, so a workout picked here is
+  // built by buildCustomSession at the runner's own paces from the same library the plan uses. A second
+  // catalogue would drift within a release and quietly teach different paces, which this file records.
+  // ⚠️ AND IT SETS UP THE SHEET EXACTLY AS THE TYPE GRID DOES, which is why it opens on the grid rather
+  // than past it: no type has been chosen yet.
+  const lTarget = $("lTarget");
+  if (lTarget) lTarget.onclick = () => {
+    LIVE_TARGET = true; ADD_TARGET = null; BUILDER = null;
+    ensureSheet(); SHEET_CTX = null;
+    $("sheetBody").innerHTML = addSessionSheetHtml(); wireAddSessionSheet();
+    $("sheetOv").classList.add("on");
+  };
+  // ⚠️ THE STANDBY FIX IS ASKED FOR WHEN THIS SCREEN IS WIRED, which is the only moment that knows the
+  // runner is looking at it. It is idempotent, so the several renders this screen goes through while a
+  // fix arrives do not each open a watch.
+  if ($("lMapWrap")) liveStandbyGps();
+  const lStart = $("lStart");
+  // ⚠️ THE COMPANION IS WOKEN HERE, NOT WHEN THE SHEET WAS TAPPED — see wireStartWhere. Its startNow is
+  // armed with a 25-second give-up, so it has to be launched at the moment the run actually begins.
+  if (lStart) lStart.onclick = () => {
+    if (LIVE && LIVE.session && !LIVE.indoor) { try { startWatchCompanion(LIVE.session); } catch (e) {} }
+    runCountIn(beginLive);
+  };
   // ⚠️ AND ONCE HERE, because a fix may already have arrived before this screen was rendered — the
   // start-where sheet acquires GPS before the run is staged, so LIVE.lastLat is often already set and
   // no further fix is needed to make the map drawable. Anything geometric belongs in wire(), which is
@@ -34536,9 +34984,7 @@ function wire() {
   // control is connected to anything.
   // ⚠️ THE SAME ROUTE THE PROFILE ROW USES, not a guess at one. The rack is a support page and its
   // state is state.support; inventing a state.hub here would have rendered nothing.
-  const lShoe = $("lShoe"); if (lShoe) lShoe.onclick = () => {
-    state.screen = null; state.tab = "profile"; state.support = "shoes"; render();
-  };
+  const lShoe = $("lShoe"); if (lShoe) lShoe.onclick = () => openLiveShoeSheet();
   const lZi = $("lZoomIn"); if (lZi) lZi.onclick = () => liveMapZoom(1);
   const lZo = $("lZoomOut"); if (lZo) lZo.onclick = () => liveMapZoom(-1);
   // ⚠️ RECENTRE CLEARS THE ZOOM OVERRIDE AS WELL AS REDRAWING. Its job is "put me back in the middle at

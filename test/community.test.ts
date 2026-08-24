@@ -2337,7 +2337,11 @@ test("BLOCKER: swiping right leaves the post feed, and nothing else does", () =>
  * twice (a base plus a scoped override), so a blanket rule would need an allowlist that goes stale. The
  * count is what must never grow — the same shape as the radius and font-size ratchets.
  */
-const CSS_DUP_CEILING = 17;
+/* ⚠️ 17 -> 18 for .gps-sig, and this one CANNOT be merged the way .club-win was. Its second rule is
+   inside an @container block — the short-map layout lifts the signal pill clear of the control row once
+   the controls spread sideways — and a container query is a separate block by construction. So it is the
+   base-plus-scoped-override category this ceiling exists to permit, not a class meaning two things. */
+const CSS_DUP_CEILING = 18;
 test("BLOCKER: no new CSS class is declared twice", () => {
   const css = nocomment(sheetOf(page()));
   const counts: Record<string, number> = {};

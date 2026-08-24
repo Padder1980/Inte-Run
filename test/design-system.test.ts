@@ -602,3 +602,52 @@ test("⚠️ every ui-* class the app renders has a rule behind it", () => {
   assert.deepEqual(short, [],
     "a ui-* class on a button does not reach the tap floor: " + short.join(", "));
 });
+
+test("BLOCKER: a @container override sits below the rule it overrides", () => {
+  // ⚠️⚠️ @container ADDS NO SPECIFICITY. A rule inside one ties with the identical bare selector, so the
+  // LATER of the two wins — and written above it the query matches, the container reports exactly the
+  // size expected, and the declaration simply does not apply. Nothing errors, nothing logs, and the
+  // container-type is right there in the computed style, which is what makes it so convincing: the fix
+  // measures as a no-op and the obvious next move is to doubt the query.
+  //
+  // ⚠️ IT FIRED TWICE IN ONE AFTERNOON ON THE SAME SCREEN. The start screen's narrow-column type drop
+  // sat above ".lst-nums .lv" and left the value at 24px with an overflowing column; the short-map
+  // block sat above ".gps-sig" and left the signal pill drawn under the control row, overlapping it by
+  // 47x33 at the largest text size. Both were written, built, and believed before being measured.
+  //
+  // The invariant needs no specificity arithmetic: an IDENTICAL selector has identical specificity, so
+  // source order alone decides it. Derived over every @container block in the stylesheet, so a screen
+  // that grows a container query later cannot reintroduce this.
+  const s = sheet();
+  const blocks: { at: number; body: string }[] = [];
+  const re = /@container[^{]*\{/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(s))) {
+    let d = 0;
+    for (let i = m.index + m[0].length - 1; i < s.length; i++) {
+      if (s[i] === "{") d++;
+      else if (s[i] === "}") {
+        d--;
+        if (!d) { blocks.push({ at: m.index, body: s.slice(m.index + m[0].length, i) }); break; }
+      }
+    }
+  }
+  assert.ok(blocks.length >= 2, "only " + blocks.length + " @container blocks found; the sweep is blind");
+  let compared = 0;
+  for (const b of blocks) {
+    for (const sm of b.body.matchAll(/(^|\})\s*([.#][^{}@]*?)\s*\{/g)) {
+      const sel = sm[2]!.trim();
+      if (!sel || sel.includes("@")) continue;
+      // The bare rule, at the start of a line so a longer selector ending in this one cannot match.
+      const bare = new RegExp("^" + sel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*\\{", "m");
+      const hit = bare.exec(s);
+      if (!hit) continue;              // nothing to tie with, so order cannot decide anything
+      compared++;
+      assert.ok(hit.index < b.at,
+        "the @container override for \"" + sel + "\" is ABOVE its own bare rule, so it ties on " +
+        "specificity and loses. Move the block below the rule it overrides.");
+    }
+  }
+  assert.ok(compared >= 2,
+    "only " + compared + " container overrides tie with a bare rule; expected at least 2");
+});

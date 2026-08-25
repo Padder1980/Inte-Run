@@ -27,7 +27,32 @@ import {
 
 const paces = deriveTrainingPaces({ distanceMeters: 5000, timeSeconds: 1500 });
 const kinds = (s: any) => (s.steps || []).map((x: any) => x.kind);
-const mins = (s: any) => (s.steps || []).reduce((a: number, x: any) => a + (x.durationSeconds || 0), 0) / 60;
+/**
+ * The session's length in minutes, WHICHEVER WAY EACH STEP IS GATED.
+ *
+ * This summed x.durationSeconds and nothing else, so the moment an easy, moderate, recovery or long
+ * run started being prescribed BY DISTANCE it read them as zero — measured, "a 20' easy run is 0.0' of
+ * steps". A ruler that cannot see the thing it is pointed at is the trap this repo records over and
+ * over, and it had it in five test files plus the progression audit. Derived exactly as the engine's
+ * own stepSeconds does, so the number means the same thing before and after the change.
+ */
+const stepMin = (x: any) => {
+  if (x.durationSeconds) return x.durationSeconds;
+  if (x.distanceMeters && x.targetPaceSecPerKm) {
+    return (x.distanceMeters / 1000) * (x.targetPaceSecPerKm.minSecPerKm + x.targetPaceSecPerKm.maxSecPerKm) / 2;
+  }
+  if (x.distanceMeters) return x.distanceMeters / 4;
+  return 0;
+};
+const mins = (s: any) => (s.steps || []).reduce((a: number, x: any) => a + stepMin(x), 0) / 60;
+const metres = (s: any) => (s.steps || []).reduce((a: number, x: any) => {
+  if (x.distanceMeters) return a + x.distanceMeters;
+  if (x.durationSeconds && x.targetPaceSecPerKm) {
+    const mid = (x.targetPaceSecPerKm.minSecPerKm + x.targetPaceSecPerKm.maxSecPerKm) / 2;
+    return a + (x.durationSeconds / mid) * 1000;
+  }
+  return a;
+}, 0);
 
 /** `withGeneratedWarmup`, lifted from the built page — the same precedent as warmup-delivery. */
 function lift(name: string): string {
@@ -82,21 +107,78 @@ test("no session anywhere ships a zero-length step", () => {
   }
 });
 
-test("the named minutes are what the runner is actually given", () => {
+test("what the title NAMES is what the runner is actually given", () => {
   // ⚠️ THE TWO BUILDERS TREAT THEIR FRAME OPPOSITELY, and that is why removing it needs two different
   // fixes. `framedRun` ADDED its ease-in on top of the named work, so removing it shortens the outing
   // to exactly the named minutes. `longRun` CARVED its frame out of the named minutes, so removing it
   // has to give those minutes BACK — delete the step alone and a "90′ long run" silently delivers 82.
+  //
+  // ⚠️⚠️ RESTATED 2026-08-26, AND STRENGTHENED RATHER THAN RELAXED. The owner asked for "a mixture of
+  // runs set by distance and runs set by time", so an easy, moderate, recovery or long run now names a
+  // DISTANCE and ends at one. This test was "the named minutes are what the runner is given" and it
+  // failed on a correct change, because its subject moved — the guard-scoped-to-a-HOW pattern this
+  // codebase has now recorded a dozen times. The invariant never was about minutes: it is that the
+  // TITLE DOES NOT LIE. So it is asserted in both currencies now — the work still comes out at the
+  // minutes the builder was asked for, AND the distance the title states is exactly the distance the
+  // steps add up to, which is a claim the old version could not make at all.
+  // ⚠️⚠️ THE TOLERANCE IS THE ROUNDING BUDGET, AND IT IS PACE-DEPENDENT — not a number chosen to make
+  // this pass. A distance-set body rounds UP to the next 100 m (see byDistanceSet: rounding always goes
+  // in the direction of giving the runner the work), so the delivered session can be one unit longer
+  // than the minutes it was built from, and one unit is 100 m AT THAT STEP'S PACE. At easy pace that is
+  // ~34 s; at recovery pace ~44 s, which is why a flat 0.6′ failed on "a 20′ recovery jog is 20.6′" and
+  // widening it to 0.7 would have been fitting the guard to the answer.
+  const unitMin = (s: any) => {
+    const conv = (s.steps || []).filter((x: any) => x.distanceMeters && x.targetPaceSecPerKm);
+    if (!conv.length) return 0.05;
+    const slowest = Math.max(...conv.map((x: any) =>
+      (x.targetPaceSecPerKm.minSecPerKm + x.targetPaceSecPerKm.maxSecPerKm) / 2));
+    return (100 / 1000) * slowest / 60;
+  };
   for (const m of [20, 40, 75]) {
-    assert.ok(Math.abs(mins(easyRun(paces, m)) - m) < 0.6, `a ${m}′ easy run is ${mins(easyRun(paces, m)).toFixed(1)}′ of steps`);
-    assert.ok(Math.abs(mins(recoveryRun(paces, m)) - m) < 0.6, `a ${m}′ recovery jog is ${mins(recoveryRun(paces, m)).toFixed(1)}′`);
+    for (const [what, s] of [["easy run", easyRun(paces, m)], ["recovery jog", recoveryRun(paces, m)],
+                             ["moderate run", moderateRun(paces, m)],
+                             ["easy → moderate", easyProgression(paces, m)]] as const) {
+      const got = mins(s as any), tol = unitMin(s as any) + 0.05;
+      // ⚠️ NEVER SHORTER THAN NAMED. That is the rule byDistanceSet's ceiling exists for, and it is
+      // asserted as a direction rather than folded into an absolute tolerance — a session that quietly
+      // came out under its own floor is the defect the ceiling was introduced to fix.
+      assert.ok(got >= m - 0.05, `a ${m}′ ${what} delivers only ${got.toFixed(1)}′ — shorter than named`);
+      assert.ok(got <= m + tol,
+        `a ${m}′ ${what} is ${got.toFixed(1)}′ of steps, over its ${tol.toFixed(2)}′ rounding budget`);
+    }
   }
+  // ⚠️ THE LONG RUN IS STILL ON THE CLOCK AND ITS TITLE STILL NAMES MINUTES — see longRun's own note for
+  // why it is not converted yet. So it keeps the original exact claim, which is the stronger one.
   for (const m of [60, 90, 130]) {
     assert.ok(Math.abs(mins(longRun(paces, m)) - m) < 0.6,
       `a ${m}′ long run is ${mins(longRun(paces, m)).toFixed(1)}′ of steps — the title is lying`);
     const structured = longRun(paces, m, { steadyFinishMin: 20 } as any);
     assert.ok(Math.abs(mins(structured) - m) < 0.6,
       `a ${m}′ long run with a steady finish is ${mins(structured).toFixed(1)}′`);
+  }
+  // ⚠️ AND THE DISTANCE IN THE TITLE IS EXACT — this is the half the old test could not express, and it
+  // is the one a runner checks. A title reading "7.5 km long run" over steps adding to 8.1 km is the
+  // same lie the minutes version existed to prevent, in the new currency.
+  const named = (s: any) => {
+    const m = /^([\d.]+)\s*km|^(\d+)\s*m\b/.exec(s.title);
+    if (!m) return null;
+    return m[1] ? Math.round(Number(m[1]) * 1000) : Number(m[2]);
+  };
+  for (const build of [
+    (m: number) => easyRun(paces, m),
+    (m: number) => easyRun(paces, m, true),
+    (m: number) => recoveryRun(paces, m),
+    (m: number) => moderateRun(paces, m),
+    (m: number) => easyProgression(paces, m),
+  ]) {
+    for (const m of [22, 45, 80]) {
+      const s: any = build(m);
+      const want = named(s);
+      assert.ok(want != null, `"${s.title}" names no distance, so the runner cannot check it`);
+      // Within one rounding unit: the title rounds to 0.1 km and the steps to 100 m.
+      assert.ok(Math.abs(metres(s) - want!) <= 100,
+        `"${s.title}" names ${want} m but its steps add up to ${Math.round(metres(s))} m`);
+    }
   }
 });
 

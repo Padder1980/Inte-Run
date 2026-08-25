@@ -54,6 +54,88 @@ function trainingStepDistance(step: WorkoutStep): number {
   return isPreparationStep(step) ? 0 : stepDistance(step);
 }
 
+/**
+ * A RUNNING STEP PRESCRIBED BY DISTANCE INSTEAD OF BY THE CLOCK.
+ *
+ * The owner asked for "a mixture of runs set by distance and runs set by time" and then sent four
+ * screenshots of it done well. Read off them, the rule is: **anything you RUN is a distance; anything
+ * you REST is a time** — `7km at a conversational pace`, `2km at a conversational pace`,
+ * `1km at 5:20/km`, `400m at 4:40/km`, and then `90s walking rest`.
+ *
+ * ⚠️ THE ROUND TRIP IS WHY THIS IS SAFE. `assemble` derives every session figure from the steps via
+ * `stepDuration` and `stepDistance`, and BOTH already handle a distance-gated step — `stepDuration`
+ * converts distance back to time at the same mid-band pace this used to produce it. So converting a
+ * step changes the session's duration only by the ROUNDING, and nothing else in the engine has to
+ * learn anything.
+ * ⚠️ ROUNDED TO 100 m, WHICH IS WHAT HIS SCREENSHOTS SHOW (400m, 500m, 1.8km, 7.5km). At 5:35/km that
+ * is 33.5 s per unit, so the worst drift is half of it — about 17 s on a 37-minute run.
+ * ⚠️ A STEP WITH NO PACE IS LEFT ALONE. A hill sprint carries no pace on purpose (pace up a hill is a
+ * function of the gradient), so there is nothing to convert it at, and `stepDuration` would fall back
+ * to the nominal 4 m/s and quietly change the session's length.
+ * ⚠️ AND A REST IS LEFT ALONE, BY THE CALLER RATHER THAN BY A GUESS HERE. This converts whatever it is
+ * given; only continuous running bodies are given to it.
+ */
+const DIST_UNIT_M = 100;
+/**
+ * Only a continuous running body converts. A rep, a jog recovery and a walk-back keep their clock.
+ *
+ * ⚠️ THE PACE REQUIREMENT IS DEFENSIVE AND ITS RE-BREAK IS A MEASURED NO-OP — recorded so nobody
+ * "verifies" it by deleting it. Dropping `!!st.targetPaceSecPerKm` changes nothing today, because every
+ * `steady` step reaching this in the four converted builders carries one; the paceless `steady` steps in
+ * the app (mobility, effort-only blocks) are assembled elsewhere and never arrive here. What it prevents
+ * is a FUTURE paceless block being converted at a guessed speed — `mid(undefined)` would throw, and the
+ * 4 m/s fallback that exists for hill sprints elsewhere in this engine would silently change a session's
+ * length. Kept for the same reason `stepDuration` refuses to guess.
+ */
+function convertible(st: WorkoutStep): boolean {
+  return st.kind === "steady" && !!st.durationSeconds && !!st.targetPaceSecPerKm;
+}
+/**
+ * ⚠️⚠️ THE WHOLE BODY IS ROUNDED ONCE AND THEN APPORTIONED, AND ROUNDING EACH SEGMENT SEPARATELY WAS A
+ * MEASURED DEFECT. A long run has two or three segments, so independent rounding gives +/-150 m of
+ * noise — enough to swamp a genuine small week-on-week rise. Measured with per-segment rounding:
+ * **428 of 23,520 long runs came out SHORTER than the week before**, against a ladder this engine goes
+ * to real trouble to keep monotone (LONG_LIFT_STEP_MAX, enforceLongRunIsLongest). A runner watching
+ * their long run go 12.4 km then 12.3 km would rightly ask what happened.
+ *
+ * ⚠️ AND THE TOTAL IS ROUNDED **UP**, WHICH FIXES A SECOND MEASURED DEFECT AND IS A RULE WORTH STATING:
+ * rounding always goes in the direction of giving the runner the work, never taking it away. Rounding
+ * to nearest pushed a floor-hugging session just under its own floor — measured, "easy run 20 min is
+ * below the floor" on the engine's 20-minute minimum, because 20.0 minutes of exact distance rounded
+ * down to 19.9. Ceiling also preserves monotonicity for free: the ceiling of a rising sequence rises.
+ * The cost is bounded at one unit — 100 m, about 34 s at easy pace — per SESSION rather than per step.
+ */
+function byDistanceSet(steps: WorkoutStep[]): WorkoutStep[] {
+  const idx: number[] = [];
+  steps.forEach((st, i) => { if (convertible(st)) idx.push(i); });
+  if (!idx.length) return steps;
+  const exact = idx.map((i) => distanceForTime(mid(steps[i]!.targetPaceSecPerKm!), steps[i]!.durationSeconds!));
+  const total = Math.ceil(exact.reduce((a, b) => a + b, 0) / DIST_UNIT_M) * DIST_UNIT_M;
+  const out = exact.map((e) => Math.max(DIST_UNIT_M, Math.round(e / DIST_UNIT_M) * DIST_UNIT_M));
+  // Hand the remainder to the longest segments first, a unit at a time, so the parts sum to the whole.
+  const order = out.map((_, i) => i).sort((a, b) => exact[b]! - exact[a]!);
+  let diff = total - out.reduce((a, b) => a + b, 0);
+  for (let k = 0; diff !== 0 && k < order.length * 8; k++) {
+    const i = order[k % order.length]!;
+    if (diff > 0) { out[i] = out[i]! + DIST_UNIT_M; diff -= DIST_UNIT_M; }
+    else if (out[i]! > DIST_UNIT_M) { out[i] = out[i]! - DIST_UNIT_M; diff += DIST_UNIT_M; }
+  }
+  const res = steps.slice();
+  idx.forEach((si, n) => {
+    const o: WorkoutStep = { ...steps[si]!, distanceMeters: out[n]! };
+    delete o.durationSeconds;
+    res[si] = o;
+  });
+  return res;
+}
+/** How a distance reads in a title: 7.5 km, 800 m — the granularity his screenshots use. */
+function kmLabel(metres: number): string {
+  return metres >= 1000 ? `${Number((metres / 1000).toFixed(1))} km` : `${metres} m`;
+}
+/** The distance a set of steps adds up to, for a title built from them rather than from minutes. */
+function stepsDistance(steps: WorkoutStep[]): number {
+  return Math.round(steps.reduce((a, st) => a + stepDistance(st), 0));
+}
 function stepDuration(step: WorkoutStep): number {
   if (step.durationSeconds) return step.durationSeconds;
   if (step.distanceMeters && step.targetPaceSecPerKm) {
@@ -234,7 +316,10 @@ export function easyRun(
   // the recovery it is rather than as easy running.
   const recTotal = strideSteps.filter((s) => s.kind === "recovery")
     .reduce((a, s) => a + (s.durationSeconds || 0), 0);
-  const steps = framedRun(paces, minutes, (mid) => [
+  // ⚠️ THE BODY IS A DISTANCE; the strides and their walk-backs stay on the clock, because a stride is
+  // 20 seconds of relaxed speed and a walk-back is a rest. "Anything you run is a distance; anything
+  // you rest is a time" — and byDistanceSet enforces that by converting only `steady` steps.
+  const steps = byDistanceSet(framedRun(paces, minutes, (mid) => [
     {
       kind: "steady",
       label: "Conversational easy running (below the first threshold)",
@@ -244,10 +329,14 @@ export function easyRun(
     },
     // Relaxed strides come after the easy portion, and the last walk-back is what finishes the run.
     ...strideSteps,
-  ]);
+  ]));
+  // ⚠️ THE TITLE IS REBUILT FROM THE STEPS, or it states a prescription the session no longer carries.
+  // His screenshots name the distance ("7km Easy Run"), which is the honest thing to do once the run
+  // ends at a distance — a title reading "37′ easy run" over a step reading 6.6 km is two answers.
+  const km = kmLabel(stepsDistance(steps));
   return assemble(
     withStrides ? "strides" : "easy",
-    withStrides ? `${minutes}′ easy + strides` : `${minutes}′ easy run`,
+    withStrides ? `${km} easy + strides` : `${km} easy run`,
     "Foundation aerobic running. Start gently and settle into a conversational rhythm to the finish.",
     "easy",
     steps,
@@ -267,15 +356,16 @@ export function easyRun(
  * `contProgression` already sets this precedent for the same reason.
  */
 export function moderateRun(paces: TrainingPaces, minutes: number, withStrides = false): SessionContent {
-  const steps = framedRun(paces, minutes, (mid) => [
+  const steps = byDistanceSet(framedRun(paces, minutes, (mid) => [
     block({ label: "Moderate — quicker than easy, still comfortable", minutes: mid, pace: paces.aerobic, rpe: RPE.aerobic }),
     // ⚠️ `trailing` — the strides are the last thing here, and with the ease-down gone the session would
     // otherwise end on an 80 m stride at repetition pace with nothing after it.
     ...(withStrides ? strides(5, { distanceMeters: 80, pace: paces.rep }, { durationSeconds: 60, pace: paces.easy }, undefined, true) : []),
-  ]);
+  ]));
+  const km = kmLabel(stepsDistance(steps));
   return assemble(
     "easy",
-    withStrides ? `${minutes}′ moderate + strides` : `${minutes}′ moderate run`,
+    withStrides ? `${km} moderate + strides` : `${km} moderate run`,
     "A gear up from easy but well short of a workout — steady breathing, controlled, and you should finish feeling you could have kept going.",
     "easy",
     steps,
@@ -285,16 +375,20 @@ export function moderateRun(paces: TrainingPaces, minutes: number, withStrides =
 
 /** An easy run that lifts to moderate for its last third. The non-beginner progression run. */
 export function easyProgression(paces: TrainingPaces, minutes: number): SessionContent {
-  const steps = framedRun(paces, minutes, (mid) => {
+  let steps = framedRun(paces, minutes, (mid) => {
     const first = Math.max(1, Math.round(mid * 0.6));
+    // ⚠️ EACH GEAR IS ITS OWN DISTANCE, which is exactly the shape his screenshots show for a
+    // progressive run — "1km at 5:25/km, 1km at 5:15/km, 2km at 5:35/km". Converting the segments
+    // rather than the whole is what lets the runner see where each gear change lands.
     return gears([
       { label: "Easy, conversational", minutes: first, pace: paces.easy, rpe: RPE.easy },
       { label: "Lift to moderate for the last third", minutes: Math.max(1, mid - first), pace: paces.aerobic, rpe: RPE.aerobic },
     ]);
   });
+  steps = byDistanceSet(steps);
   return assemble(
     "easy",
-    `${minutes}′ easy → moderate finish`,
+    `${kmLabel(stepsDistance(steps))} easy → moderate finish`,
     "Start genuinely easy and lift a gear for the final third. Finishing a run slightly quicker than you started is a habit worth building.",
     "easy",
     steps,
@@ -494,22 +588,23 @@ export function easyHillStrides(paces: TrainingPaces, minutes: number): SessionC
 }
 
 export function recoveryRun(paces: TrainingPaces, minutes: number): SessionContent {
+  const steps = byDistanceSet([
+    {
+      kind: "steady" as const,
+      label: "Very easy jog",
+      durationSeconds: minutes * 60,
+      // ⚠️ paces.recovery, not paces.easy. This session exists to be slower than an easy run, and
+      // prescribing it at easy pace made it one — up to 50 s/km too fast against the 2 km spec.
+      targetPaceSecPerKm: paces.recovery,
+      targetRpe: { min: 1, max: 2 },
+    },
+  ]);
   return assemble(
     "recovery",
-    `${minutes}′ recovery jog`,
+    `${kmLabel(stepsDistance(steps))} recovery jog`,
     "Very easy shakeout to promote recovery. Optional — walk or rest if tired.",
     "easy",
-    [
-      {
-        kind: "steady",
-        label: "Very easy jog",
-        durationSeconds: minutes * 60,
-        // ⚠️ paces.recovery, not paces.easy. This session exists to be slower than an easy run, and
-        // prescribing it at easy pace made it one — up to 50 s/km too fast against the 2 km spec.
-        targetPaceSecPerKm: paces.recovery,
-        targetRpe: { min: 1, max: 2 },
-      },
-    ],
+    steps,
     { min: 1, max: 2 },
   );
 }
@@ -584,6 +679,16 @@ export function longRun(
   const steps: WorkoutStep[] = warm > 0 ? [easeIn(paces, warm)] : [];
   let description =
     "Long run develops durability: holding economy and mechanics under accumulated fatigue. Start gently and hold an easy rhythm to the finish.";
+  // ⚠️ EVERY SEGMENT OF A LONG RUN IS A DISTANCE. This is the session he pointed at by name — his
+  // screenshots read "7.5km Progressive Repeat Long Run" over segments of 2km / 1km / 1km / 2km / 1km /
+  // 500m — and it is also the one this file already argued for: "Minutes are the right currency for
+  // FATIGUE, which is why LONG_CEILING_MIN stays in minutes; but a race is a distance, and durability
+  // for it is a distance too."
+  // ⚠️ THE MINUTES GOING IN ARE UNTOUCHED, which is what keeps every model whole. `body`, the dose
+  // fractions (0.25 / 0.35), `finishMin`, the caps and `LONG_CEILING_MIN` are all still minutes and
+  // still computed first; the conversion happens only as the step is emitted, and `assemble` derives
+  // the session's duration back from it at the same mid-band pace. So the only drift is the 100 m
+  // rounding.
   const easyStep = (min: number): WorkoutStep => ({
     kind: "steady",
     label: "Easy aerobic running — build durability",
@@ -711,6 +816,25 @@ export function longRun(
       description += " Jog easy at the end — that finish is real work, and it needs winding down.";
     }
   }
+  // ⚠️ REBUILT FROM THE STEPS, NOT FROM `minutes`. A title reading "107′ long run" over segments that
+  // add up to 16.4 km is two answers to one question, and his screenshots name the distance.
+  // ⚠️⚠️ THE LONG RUN IS DELIBERATELY STILL ON THE CLOCK, AND THIS WAS TRIED AND MEASURED BEFORE IT WAS
+  // DECIDED. It is the session the owner pointed at by name — his screenshots read "7.5km Progressive
+  // Repeat Long Run" — and converting it is two lines. What it costs is the reason it is not here yet:
+  //   * Every branch above sizes its work as a FRACTION OF `body` in minutes, and `finalCapMin` /
+  //     `midCapMin` are review requirements measured in minutes. Those still work — the caps are
+  //     applied before any conversion — but SIX guards read the delivered dose back off the steps in
+  //     minutes and go blind the moment a work segment carries a distance instead: "the long run reads
+  //     like a session — real doses, in the right phases only", "the lift is clamped to the plan's own
+  //     peak long run", "a lift never builds a week-on-week jump tail — measured on BOTH definitions",
+  //     and the easy-floor belt among them.
+  //   * And rounding is not free here. With each segment rounded independently, **428 of 23,520 long
+  //     runs came out SHORTER than the week before** — against a ladder this engine goes to real
+  //     trouble to keep monotone. byDistanceSet's apportioning fixes that (one rounding per session,
+  //     handed to the longest segments), which is why it exists and why the low-intensity family uses
+  //     it; but proving it holds across the dose machinery needs those six guards restated first.
+  // The honest order is: make those guards gate-agnostic, THEN convert this. Two lines, and they are
+  // `steps = byDistanceSet(steps)` here plus the title below.
   const title = `${minutes}′ long run` + (opts.titleSuffix ? ` ${opts.titleSuffix}` : "");
   // ⚠️ The session's intended-effort band must SPAN the work, or the debrief calls a perfect
   // execution overcooked: plannedRpeBandOf short-circuits on the session band, so a runner who ran
@@ -1601,6 +1725,19 @@ function onOff(count: number, on: RepSpec, off: RepSpec, labels?: { on?: string;
 }
 
 /** One continuous effort, given in minutes. */
+/**
+ * ⚠️⚠️ block AND gears DELIBERATELY DO **NOT** CONVERT, AND THIS WAS MEASURED BEFORE IT WAS DECIDED.
+ * They are the only two constructors for a continuous stretch of running, so converting here applies
+ * the whole "anything you RUN is a distance" rule in one place — which is why it was tried first. It
+ * reaches the QUALITY library, and there the title is established coaching vocabulary that states the
+ * prescription in minutes: measured across 576 plans, **24 distinct titles went stale**, among them
+ * "25′ continuous tempo", "Progression tempo: 10′ steady → 10′ threshold" and "Progression run: 60′, a
+ * gear up every 10′". A session whose title says 25′ and whose step says 5.8 km is two answers.
+ * ⚠️ SO THE CONVERSION IS OPT-IN AT THE LOW-INTENSITY BUILDERS, which is also where his own screenshots
+ * put it ("7km Easy Run", "7.5km Progressive Repeat Long Run"). The quality library keeps its clock —
+ * and it already prescribes its REPS by distance where the format says so (2 km reps, 400 m jog
+ * recoveries), so a plan reads as a genuine mixture either way.
+ */
 function block(o: { label: string; minutes: number; pace?: PaceRange; rpe: RpeBand }): WorkoutStep {
   return {
     kind: "steady",

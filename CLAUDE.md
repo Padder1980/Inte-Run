@@ -11360,3 +11360,116 @@ reported OK on the **stale** build — exactly as this file warns. Read the exit
 apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1342 pass / 0 fail under
 UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`**, ratchets unchanged, 10 re-breaks all caught,
 and every case above driven in a real browser against the served build.
+
+## RUNS SET BY DISTANCE AS WELL AS BY TIME (owner, 2026-08-26, four Runna screenshots)
+
+*"we need to try and find a fix for that....here are some examples of where it has been done in runna"* —
+after the previous pass measured the gap and did not close it. Suite 1342 → **1348**; 11 re-breaks, 10
+caught and the eleventh is a measured no-op recorded as such.
+
+⚠️ **THE SPECIFICATION IS HIS SCREENSHOTS, AND THE RULE FALLS STRAIGHT OUT OF THEM: ANYTHING YOU RUN IS A
+DISTANCE; ANYTHING YOU REST IS A TIME.** `7km at a conversational pace`, `2km at a conversational pace`,
+`1km at 5:20/km`, `400m at 4:40/km` — and then `90s walking rest`. Also read off them and NOT yet built:
+the duration shown as a **range** (35m–45m), the easy pace as a **ceiling** ("No faster than 5:40/km.
+This is a limit, not a target"), and a **Switch to RPE** toggle for rolling terrain.
+
+**Measured before: 65 sessions clock-only against 9 with any distance-gated step. After: 33 of 89
+sessions in a real half block are set by distance — 37%, against 12%.** On screen:
+
+| day | title | steps |
+|---|---|---|
+| Mon | **5.6 km easy run** | `5.6 km` |
+| Wed | **5.8 km easy → moderate finish** | `3.4 km` \| `2.4 km` |
+| Fri | **5 km recovery jog** | `5.0 km` |
+| Sat | **4.4 km easy + strides** | `4.0 km` \| `20s rep` \| `60s recovery` ×6 |
+| Sun | 90′ long run | `5400s` — still the clock, deliberately |
+
+### ⚠️⚠️ WHY THIS IS SAFE: `assemble` WAS ALREADY GATE-AGNOSTIC, AND THAT IS THE WHOLE DESIGN
+
+`assemble` derives `estimatedDurationSeconds`, `estimatedDistanceMeters` and `trainingDistanceMeters` from
+the steps via `stepDuration` and `stepDistance` — and **both already handled a distance-gated step**,
+converting back at the same mid-band pace. So **every model keeps being fed minutes** (`peakLong`,
+`easyCapMin`/`easyCapKm`, `volumeMultiplierByWeek`, `enforceLongRunIsLongest`, the volume fixed point in
+`buildAll`), the conversion happens only as the step is emitted, and the sole drift is the rounding.
+**Measured over the same 768 plans / 18,624 weeks: the pyramidal easy floor UNCHANGED at 34, the long-run
+inversion UNCHANGED (1.2 / 0.1 / 0.4 / 0.0%), intensity buckets and race-pace shares unchanged; biggest
+week in build/peak 96.9% → 96.7%, week-on-week rises above 1.10 10.9% → 11.0% (+7 of 8,352), taper cut
+mean 37.4% → 37.3%.**
+
+⚠️ **THE TITLE IS REBUILT FROM THE STEPS.** A title reading "37′ easy run" over a step reading 6.6 km is
+two answers to one question, and his screenshots name the distance ("7km Easy Run"). Guarded by an EXACT
+claim the old minutes-only guard could not express: the distance in the title equals the steps' total to
+within one unit.
+
+### ⚠️⚠️ THE WHOLE BODY IS ROUNDED ONCE AND APPORTIONED — PER-SEGMENT ROUNDING WAS A MEASURED DEFECT
+
+A long run or progression has two or three segments, so rounding each independently carries ±150 m of
+noise — more than a genuine small week-on-week rise. **Measured with per-segment rounding: 428 of 23,520
+long runs came out SHORTER than the week before**, against a ladder this engine goes to real trouble to
+keep monotone. `byDistanceSet` rounds the body's total once and hands the remainder to the longest
+segments, so the parts sum to the whole.
+
+⚠️ **AND THE TOTAL IS ROUNDED *UP*: ROUNDING GIVES THE RUNNER THE WORK, NEVER TAKES IT AWAY.** Rounding to
+nearest pushed a floor-hugging session under its own floor — measured, *"easy run 20 min is below the
+floor"* against the engine's 20-minute minimum, because 20.0 minutes of exact distance rounded down to
+19.9. Ceiling also preserves monotonicity for free, and costs one unit per SESSION rather than per step.
+⚠️ **THE TOLERANCE IN THE GUARD IS THEREFORE PACE-DEPENDENT, NOT A NUMBER PICKED TO PASS.** One unit is
+~34 s at easy pace and ~44 s at recovery pace, which is why a flat 0.6′ failed on *"a 20′ recovery jog is
+20.6′"* — and widening it to 0.7 would have been fitting the guard to the answer. The direction is
+asserted separately: never shorter than named.
+
+### ⚠️⚠️ A REAL DEFECT THIS WOULD HAVE SHIPPED: BUILD-YOUR-OWN-RUN
+
+`buildCustomSession` clones the plan's representative and scales its steady body, summing
+`st.durationSeconds` directly — so the moment the representative's body became a distance the sum went to
+zero, the whole scaling branch was skipped and the representative was passed through untouched.
+**Measured: *"recovery asked for 3 km and delivered 4.60 km"*, *"recovery 4.5 km is 35.1′ but seeded as
+20′"*.** It uses `stepSecs`, the app's own gate-agnostic converter, now.
+⚠️ **AND IT SCALES THE FIELD THE STEP ACTUALLY CARRIES.** Writing a duration onto a distance-gated step
+gives it BOTH, and the runtime's rule is `distanceMeters != null && durationSeconds == null` — a step with
+both ends on the CLOCK, which is the exact defect a real outing reported when a custom 1 km finished at
+0.59 km. Guarded, and no step in a real plan may carry both.
+
+### ⚠️⚠️ THE LONG RUN IS STILL ON THE CLOCK — TRIED, MEASURED, BACKED OUT
+
+It is the session he named ("7.5km Progressive Repeat Long Run") and converting it is **two lines**.
+What stopped it: its dose arithmetic is a fraction of `body` in minutes, and **six guards read the
+delivered dose back off the steps in minutes** and go blind the moment a work segment carries a distance —
+*"the long run reads like a session — real doses, in the right phases only"*, *"the lift is clamped to the
+plan's own peak long run"*, *"a lift never builds a week-on-week jump tail — measured on BOTH
+definitions"*, *"capping the easy runs is the belt"*, and the ladder guard. The honest order is **make
+those six gate-agnostic, then convert**. Recorded beside `longRun`'s own title line, with the 428/23,520
+measurement, and asserted by a guard so the state reads as deliberate rather than forgotten.
+
+### The blind instruments this uncovered — the recurring trap, four more times
+
+⚠️ **A RULER THAT CANNOT SEE THE THING IT IS POINTED AT.** Every one of these summed
+`st.durationSeconds` with no distance fallback, so a converted session read as a fraction of itself:
+`tools/audit-progression.mjs` (`secs`, `raceSecs` — fixed in the previous commit, and it corrected the
+repo's own race-pace figures), `test/no-warmup-low-intensity.test.ts` (`mins`, measured *"a 20′ easy run
+is 0.0′ of steps"*), and the same shape in `test/warmup-delivery.test.ts`, `test/segment-clock.test.ts`,
+`test/heat-adapt.test.ts` and `test/custom-session-gear.test.ts`.
+⚠️ **`test/no-warmup-low-intensity.test.ts`'s NAMED-TIME GUARD WAS RESTATED AND STRENGTHENED, NOT
+RELAXED.** It was *"the named minutes are what the runner is actually given"* and it failed on a correct
+change because its subject moved — the guard-scoped-to-a-HOW pattern, again. The invariant never was about
+minutes: **it is that the title does not lie.** It now asserts both currencies, and the distance claim is
+exact where the minutes one is a tolerance.
+
+### ⚠️ A PRE-EXISTING INCONSISTENCY THIS SURFACED AND DID NOT CAUSE
+
+**The engine has two conventions for an effort-only step.** `stepDuration` in `session-templates.ts`
+returns **0** for a step with a distance and no pace (a hill sprint carries none on purpose, since pace up
+a hill is a function of the gradient); `stepSeconds` in `src/science/intensity-distribution.ts` credits it
+at a nominal **4 m/s**, precisely because returning zero once made a maximal hill session compute as 100%
+easy. So a hill-sprint session's `estimatedDurationSeconds` under-counts by the sprint time: measured,
+*"10 × 50 m hill sprints, walk back"* states **39′** where the 4 m/s ruler reads **41′**. Nothing here
+touched `hillReps`. Worth someone's attention on its own.
+
+⚠️ **AND THE WORKFLOW LAUNCHED TO MAP THIS DIED ON NETWORK ERRORS** — 9 of 10 agents lost their connection
+("the response stopped arriving", "your computer went to sleep mid-response"). The blast radius was found
+instead by DOING the change and letting the suite report the consequences, which is stronger evidence than
+a reading: it is what found `buildCustomSession`, the 428 shorter long runs and the 20-minute floor.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc clean
+apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1348 pass / 0 fail**,
+and the week above read off the served build in a browser.

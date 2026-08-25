@@ -10402,7 +10402,16 @@ function buildCustomSession(e) {
         wanted = Math.round(bodyM / 1000 * secPerKm) + fixedSec;
       }
     }
-    const steadySecs = rep.steps.reduce((s, st) => s + (st.kind === "steady" ? (st.durationSeconds || 0) : 0), 0);
+    // The representative's steady body, in seconds, WHICHEVER WAY IT IS GATED.
+    //
+    // This read st.durationSeconds directly, and the moment the plan started prescribing an easy,
+    // moderate, recovery or long run BY DISTANCE the sum went to zero — so the whole scaling branch
+    // below was skipped and the representative's body was passed through untouched. Measured before
+    // the fix: "recovery asked for 3 km and delivered 4.60 km", "recovery 4.5 km is 35.1' but seeded
+    // as 20'". Build-your-own-run was silently returning whatever the plan happened to have.
+    // stepSecs is the app's own gate-agnostic converter and the same one the accounting uses, so the
+    // scale is computed against the same seconds everything else sees.
+    const steadySecs = rep.steps.reduce((s, st) => s + (st.kind === "steady" ? stepSecs(st) : 0), 0);
     if (steadySecs > 0) {
       // Scale the steady body; keep warm-up, strides/pickups and cool-down exactly as designed.
       const fixedSecs = rep.steps.reduce((s, st) => s + (st.kind === "steady" ? 0 : stepSecs(st)), 0);
@@ -10427,7 +10436,16 @@ function buildCustomSession(e) {
           push(out);
           return;
         }
+        // Scaled in the step's OWN currency. Writing a duration onto a distance-gated step would give
+      // it both fields, and the runtime's rule is distanceMeters != null AND durationSeconds == null —
+      // a step carrying both ends on the CLOCK, which is the exact defect a real outing reported when
+      // a custom 1 km finished at 0.59 km. So a timed body scales its seconds and a distance-gated one
+      // scales its metres, and neither grows a second field.
+      if (st.distanceMeters != null && st.durationSeconds == null) {
+        push(Object.assign({}, st, { distanceMeters: Math.max(200, Math.round(st.distanceMeters * scale / 100) * 100) }));
+      } else {
         push(Object.assign({}, st, { durationSeconds: Math.max(60, Math.round((st.durationSeconds || 0) * scale)) }));
+      }
       });
     } else {
       // Run-walk style: repeat the run/walk cycle to fill the chosen time.

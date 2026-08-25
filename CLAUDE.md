@@ -3635,30 +3635,53 @@ which a reviewer does read.
 ⚠️ **Internal testing (up to 100 people) needs no review and no privacy policy. EXTERNAL testing does
 — a Beta App Review and a privacy-policy URL.** Start internal.
 
-### Toolchain on this Mac (re-verified 2026-07-29 — this section changed, don't work from memory)
+### Toolchain on this Mac (re-verified 2026-08-25 — this section changed TWICE, don't work from memory)
 
-- **Two Xcodes are installed.** Use the release one for everything:
-  - `/Applications/Xcode.app` — **26.6 release**. `xcode-select` points here, and it is the only one
-    App Store Connect accepts builds from.
-  - `/Applications/Xcode-beta.app` — **27.0 beta**. Still on disk but **it has no simulator runtimes
-    any more** (see below), so it cannot run anything. Treat it as inert.
+⚠️⚠️ **THE BETA IS THE WORKING TOOLCHAIN, AND THIS SECTION SAID THE OPPOSITE FOR A MONTH.** The owner's
+correction, verbatim: *"We have always used the beta version in here because my phone is on ios 27
+beta"*. That is decisive and it is not a preference — **an Xcode can only deploy to a device whose iOS
+it supports, so Xcode 26.6 cannot install anything on a phone running iOS 27 at all.** Measured
+2026-08-25: `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer xcodebuild -showdestinations`
+offers real destinations with **no error**, while the release Xcode refuses every one of them with
+*"iOS 26.5 is not installed"*. The 2026-07-29 note below was true when it was written (the beta's
+runtimes had just been deleted to reclaim disk) and became false the moment an iOS 27.0 runtime was
+installed — and it cost a whole session, because I read it, concluded the rebuild was blocked, and
+told him to install the wrong component.
+
+- **Two Xcodes are installed. Use the BETA for anything that touches his phone:**
+  - `/Applications/Xcode-beta.app` — **27.0 beta**, iOS 27.0 SDK, an iOS 27.0 simulator runtime, and
+    the only one that can build for a phone on iOS 27. **`export
+    DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`** for every build.
+  - `/Applications/Xcode.app` — **26.6 release**. `xcode-select` points here, so it is what a bare
+    `xcodebuild` picks up, and it has the iOS 26.5 **SDK** but **not** the iOS 26.5 platform — so a
+    bare `xcodebuild` fails with a message naming a component nobody needs. It is still the one App
+    Store Connect accepts release builds from, so a TestFlight archive is its job and a device install
+    is the beta's.
+⚠️ **THE ERROR MESSAGE NAMES THE WRONG PROBLEM, WHICH IS WHY THIS IS WORTH READING TWICE.** *"iOS 26.5
+is not installed. Please download and install the platform from Xcode > Settings > Components"* is a
+true statement about the release Xcode and an irrelevant one about this project: installing iOS 26.5
+would fix the message and still not put a build on his phone. **Check `xcode-select -p` before
+believing any destination error.**
 - **The licence is accepted.** `xcodebuild -version` runs clean — no `sudo xcodebuild -license accept`
   needed. (It genuinely wasn't accepted on 2026-07-27, and until it is, every `xcrun`-shimmed tool
   refuses to run **including `git`**, which is a baffling way to meet the problem. If that ever
   returns, that's why.)
-- ⚠️ **Do NOT `export DEVELOPER_DIR=/Applications/Xcode-beta.app/...`.** That used to be the way round
-  an unaccepted licence, and it is now actively broken: the beta's runtimes were deleted, so a build
-  through it fails with no simulator to target. Just use the default toolchain.
+- ⚠️⚠️ **THE OLD "Do NOT export DEVELOPER_DIR=/Applications/Xcode-beta.app" RULE IS REVERSED.** It was
+  written because the beta's runtimes had been deleted, so a build through it had no simulator to
+  target. An iOS 27.0 runtime is installed again and his phone is on iOS 27, so exporting
+  `DEVELOPER_DIR` at the beta is now the ONLY way a build reaches him. Kept here rather than deleted
+  because the reasoning behind it was sound and its expiry is the lesson.
 - Build + inspect — note `-destination`, never `-sdk` (the watch section below explains why `-sdk`
   breaks this project specifically):
   ```bash
   node web/app.ts && xcodebuild -project ios/InteRun.xcodeproj -scheme InteRun \
     -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
   ```
-- Simulator runtimes ship **separately from Xcode** and neither Xcode bundles one. Installed now:
-  **iOS 26.5 (16 GB)** and **watchOS 26.5 (8.1 GB)**, which are the pair Xcode 26.6 uses. The iOS 27.0
-  and watchOS 27.0 pair was **deleted on 2026-07-29 to reclaim 24 GB** — re-download only if you
-  actually need the beta. They live in `/Library/Developer/CoreSimulator/Volumes`, not in `~`.
+- Simulator runtimes ship **separately from Xcode** and neither Xcode bundles one. ⚠️ **Installed as of
+  2026-08-25: iOS 27.0 ONLY**, which belongs to the beta — the iOS 26.5 and watchOS 26.5 pair described
+  here on 2026-07-29 is gone, and the release Xcode therefore has nothing to run. There are **no
+  simulator devices** either (one was created on the 27.0 runtime to test this and deleted again).
+  They live in `/Library/Developer/CoreSimulator/Volumes`, not in `~`.
   A runtime install step needs root, so `xcodebuild -downloadPlatform iOS` exits 0 without installing
   anything when run unprivileged. Use `sudo xcodebuild -downloadPlatform iOS`, or Xcode → Settings →
   Components.
@@ -10675,20 +10698,24 @@ renders it** — no pattern-matching on how the write is spelled.
 - **Disk space is not the cause** — 180 GB free.
 - **Xcode 26.6 is installed, `xcode-select` is correct, the iOS 26.5 SDK is present, and his iPhone is
   still paired** (`Addo's iPhone (2)`, `00008140-001A3D080A84801C`).
-- **What is missing is Xcode's iOS platform support component**, plus every simulator runtime. Every
-  destination reports `iOS 26.5 is not installed. Please download and install the platform from
-  Xcode > Settings > Components.`
+- ⚠️⚠️ **AND THE CONCLUSION DRAWN HERE WAS WRONG — SEE THE CORRECTION OF 2026-08-25.** I read this
+  file's own *"use the release one for everything"* note, found the release Xcode refusing every
+  destination with *"iOS 26.5 is not installed"*, and reported the rebuild as blocked on a component
+  nobody needs. **His phone is on iOS 27 beta and Xcode-beta 27.0 was always the toolchain**, so
+  pointing `DEVELOPER_DIR` at it builds cleanly — measured `** BUILD SUCCEEDED **` the same day. The
+  release Xcode's missing iOS 26.5 platform is real, irrelevant, and named in an error that reads like
+  the answer. **Check `xcode-select -p` before believing a destination error.**
 - ⚠️ **`xcodebuild -downloadPlatform iOS` HANGS RATHER THAN FAILING, exactly as this file warns.** Measured:
   **1.75 seconds of CPU in 33 minutes and not one byte transferred** (free space identical before and
-  after). It needs root; `sudo` needs a password, which is his to enter and not mine.
+  after). It needs root; `sudo` needs a password, which is his to enter and not mine. Worth knowing, and
+  it was being run for the wrong reason.
 
-**So the rebuild is blocked on one action by him**, either:
-- Xcode → Settings → Components → install **iOS 26.5**, or
-- `sudo xcodebuild -downloadPlatform iOS` in Terminal.
-
-After that the recipe in this file works unchanged. ⚠️ **Until then `swiftc -typecheck` over
-`ios/InteRun/*.swift ios/InteRunShared/*.swift` (0 errors) is the strongest verification available for any
-native change, and a full `xcodebuild` is not possible at all** — do not report a native fix as delivered.
+**So the rebuild was never blocked on him at all.** ⚠️ **What genuinely can block a DEVICE INSTALL is the
+phone being unreachable:** `devicectl` reports `unavailable` and refuses with `CoreDeviceError 4016` when
+a wirelessly paired handset is asleep or off this network. That needs the phone awake and on the same
+Wi-Fi. `swiftc -typecheck` over `ios/InteRun/*.swift ios/InteRunShared/*.swift` remains the fallback when
+no toolchain is available, and it is strictly weaker than a build — never report a native fix as
+delivered on a typecheck alone.
 
 **Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc clean
 apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1325 pass / 0 fail under
@@ -10926,18 +10953,29 @@ TILE IS PAINTED FROM, so it has to be that impact — `e.api.currentConditions(s
 date-independent, and two re-breaks (the driver branch always saying Hot, and the warning colour saying
 Good to run) were watched failing against it.
 
-### ⚠️⚠️ THE SIMULATOR RUNTIME THAT APPEARED IS THE WRONG ONE — iOS 26.5 IS STILL WHAT IS MISSING
+### ⚠️⚠️ I TOLD HIM TO INSTALL THE WRONG COMPONENT — THE BETA WAS ALWAYS THE TOOLCHAIN
 
-He reported *"the ios simulator is installed now"*. Measured: there is now an **iOS 27.0** simulator
-runtime and **no simulator devices**, and `xcodebuild -showdestinations` still lists **zero** usable
-destinations —
-`{ platform:iOS, … error:iOS 26.5 is not installed. Please download and install the platform from
-Xcode > Settings > Components. }`
-⚠️ **Xcode 26.6 has the iOS 26.5 SDK and not the iOS 26.5 PLATFORM**, and an iOS 27.0 runtime belongs to
-the beta Xcode (27.0), so it is ineligible here — creating a device on it changes nothing (tried, then
-deleted so a future session is not misled). **The component to pick in Xcode › Settings › Components is
-iOS 26.5 specifically, not the newest one offered.** Until it lands, nothing can be built for his phone
-and no Swift change can be verified beyond `swiftc -typecheck`.
+He reported *"the ios simulator is installed now"*, I measured an **iOS 27.0** runtime against a release
+Xcode that wants 26.5, and concluded he had installed the wrong one. **He then corrected me: *"We have
+always used the beta version in here because my phone is on ios 27 beta"* — and that settles it, because
+an Xcode can only deploy to a device whose iOS it supports, so Xcode 26.6 could never have installed
+anything on that phone.** The iOS 27.0 runtime is the RIGHT one; what was wrong was which Xcode I asked.
+⚠️ **THE MISTAKE CAME STRAIGHT OUT OF THIS FILE**, whose toolchain section had said since 2026-07-29
+*"use the release one for everything"* and *"treat [the beta] as inert"* — true when the beta's runtimes
+had just been deleted, false the moment one was installed again. Corrected at the source; see the
+toolchain section, which now leads with the reversal.
+⚠️ **AND THE ERROR MESSAGE IS WHAT MADE IT PLAUSIBLE.** *"iOS 26.5 is not installed. Please download and
+install the platform from Xcode > Settings > Components"* is a true statement about the release Xcode and
+an irrelevant one about this project — installing iOS 26.5 would have silenced it and still not put a
+build on his phone. **Read `xcode-select -p` before believing a destination error**, and treat a
+component name in an Xcode error as a fact about the selected Xcode rather than about the task.
+✅ **MEASURED THE SAME DAY, WITH `DEVELOPER_DIR` AT THE BETA: `** BUILD SUCCEEDED **`** — Release,
+`generic/platform=iOS`, watch app and widget both embedded, **0 dylibs**, `CURRENT_PROJECT_VERSION = 460`.
+So there was never a toolchain to wait for, and the four native fixes that had been reported as blocked
+(the lock-screen distance, the Swift half of the coach teardown, the free-run title, Apple Health) build
+cleanly. ⚠️ **The remaining gap is the install, not the build:** `devicectl` reports his phone
+`unavailable` and refuses with `CoreDeviceError 4016` — a wirelessly paired phone that is asleep or off
+this network. That needs the handset awake and on the same Wi-Fi, and nothing here can substitute for it.
 
 **Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc
 clean apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1335 pass / 0 fail

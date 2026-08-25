@@ -2697,6 +2697,128 @@ test("BLOCKER: the size knob is wholly on screen, and the colour pages really pa
   assert.match(draw, /scrollLeft = S\.txPage \* /, "the chosen colour page is not restored after a redraw");
 });
 
+/**
+ * THE LINE AND THE TAP WHEN A WORD COMES BACK TO CENTRE OR TO LEVEL (owner, 2026-08-25): "it would be
+ * helpful if there was a line appears like on instagram and a haptic to show that its back in the
+ * centre and also the same when its back to level (0 degrees)".
+ */
+test("BLOCKER: a word detents to centre and to level, with one line and one tap", () => {
+  const src = page();
+  // Driven, not read: a detent is arithmetic plus a transition, and neither is visible in the source.
+  const consts = /const CLUB_SNAP_PX = (\d+), CLUB_SNAP_ROT = (\d+);/.exec(src);
+  assert.ok(consts, "the detent thresholds are not in the built page");
+  const mk = new Function("haptic", "$",
+    "const CLUB_SNAP_PX = " + consts![1] + ", CLUB_SNAP_ROT = " + consts![2] + ";\n" +
+    nocomment(fn("clubTxDetent")) + "\n" + nocomment(fn("clubTxGuidesOff")) +
+    "\nreturn { d: clubTxDetent, off: clubTxGuidesOff };");
+  const rig = (x: number, y: number, rot: number, two: boolean) => {
+    const cls = new Set<string>();
+    const taps: string[] = [];
+    const gds = { classList: {
+      toggle: (c: string, on: boolean) => { if (on) cls.add(c); else cls.delete(c); },
+      remove: (...c: string[]) => c.forEach((k) => cls.delete(k)) } };
+    const g: any = { t: { x, y, rot }, box: { width: 452, height: 998 },
+      anchor: { two }, gds, gr: { style: {} } };
+    const api = mk((k: string) => taps.push(k), () => gds);
+    return { g, cls, taps, api };
+  };
+  // ⚠️ THE THRESHOLD IS PIXELS, AND THIS IS THE CASE THAT PROVES IT. On a 452x998 stage a 12px offset
+  // is outside the detent on BOTH axes; a fraction-based threshold would make the vertical detent more
+  // than twice as wide, so the same word would snap down and not across.
+  const near = 12 / 452, nearY = 12 / 998;
+  const a = rig(0.5 + near, 0.5 + nearY, 0, false);
+  a.api.d(a.g);
+  assert.notEqual(a.g.t.x, 0.5, "a word 12px off centre across was pulled in anyway");
+  assert.notEqual(a.g.t.y, 0.5, "a word 12px off centre down was pulled in anyway");
+  assert.equal(a.taps.length, 0, "a word outside every detent still buzzed");
+  assert.equal(a.cls.size, 0, "a guide is showing with nothing aligned");
+  // Inside it, both axes snap to exactly the middle, each shows its own line, and it taps once.
+  const b = rig(0.5 + 4 / 452, 0.5 - 4 / 998, 0, false);
+  b.api.d(b.g);
+  assert.equal(b.g.t.x, 0.5, "the word did not snap to the centre across");
+  assert.equal(b.g.t.y, 0.5, "the word did not snap to the centre down");
+  assert.ok(b.cls.has("on-x") && b.cls.has("on-y"), "the centre guides did not appear: " + [...b.cls]);
+  assert.deepEqual(b.taps, ["tick"], "the detent did not tap once: " + JSON.stringify(b.taps));
+  // ⚠️ AND IT TAPS ON ENTERING, NOT ON THE CONDITION. pointermove arrives many times a second, so a
+  // haptic keyed on "is centred" is a continuous buzz for as long as the word stays there.
+  b.api.d(b.g); b.api.d(b.g); b.api.d(b.g);
+  assert.deepEqual(b.taps, ["tick"], "the detent buzzes on every frame it stays in: " + b.taps.length);
+  // Leaving and returning taps again — the transition is what is being announced.
+  b.g.t.x = 0.5 + near; b.g.t.y = 0.5 + nearY;
+  b.api.d(b.g);
+  assert.equal(b.taps.length, 1, "leaving the detent produced a tap of its own");
+  assert.ok(!b.cls.has("on-x") && !b.cls.has("on-y"), "the guides stayed up after leaving the centre");
+  b.g.t.x = 0.5; b.g.t.y = 0.5;
+  b.api.d(b.g);
+  assert.equal(b.taps.length, 2, "coming back to centre did not tap again");
+  // ⚠️ LEVEL IS TWO-FINGERS ONLY, because rotation only moves under a pinch — a level line on a
+  // one-finger drag announces something the runner is not adjusting.
+  const one = rig(0.2, 0.2, 2, false);
+  one.api.d(one.g);
+  assert.equal(one.g.t.rot, 2, "a one-finger drag straightened the word by itself");
+  assert.ok(!one.cls.has("on-r"), "the level guide showed on a one-finger drag");
+  const two = rig(0.2, 0.2, 2, true);
+  two.api.d(two.g);
+  assert.equal(two.g.t.rot, 0, "a word 2 degrees off level did not snap to level");
+  assert.ok(two.cls.has("on-r"), "the level guide did not appear");
+  assert.deepEqual(two.taps, ["tick"], "levelling did not tap");
+  // A deliberate tilt is kept: the detent is narrow enough to be a detent.
+  const tilt = rig(0.2, 0.2, 9, true);
+  tilt.api.d(tilt.g);
+  assert.equal(tilt.g.t.rot, 9, "a deliberate 9 degree tilt was straightened out from under him");
+  // ⚠️ THE LEVEL LINE IS DRAWN THROUGH THE WORD'S OWN MIDDLE, not the stage's — that is what level is a
+  // statement about, and it is also what distinguishes it from the vertical-centre guide.
+  const th = rig(0.2, 0.31, 1, true);
+  th.api.d(th.g);
+  assert.equal(th.g.gr.style.top, "31%", "the level line is not drawn through the word: " + th.g.gr.style.top);
+  // Release takes every guide down and forgets every detent, or the next gesture starts latched.
+  two.api.off(two.g);
+  assert.equal(two.cls.size, 0, "a guide survived the release: " + [...two.cls]);
+  assert.ok(!two.g.snapX && !two.g.snapY && !two.g.snapR, "a detent stayed latched after the release");
+});
+
+test("BLOCKER: the detent is wired into the drag, and the guides cannot eat a touch", () => {
+  const src = page();
+  // ⚠️ A BUILDER PROVES THE ARITHMETIC EXISTS; ONLY THE CALLER PROVES A FINGER REACHES IT.
+  const move = nocomment(fn("clubTxMove"));
+  const at = move.indexOf("clubTxDetent(g)");
+  assert.ok(at > 0, "the drag never applies the detent");
+  assert.ok(at < move.indexOf("clubTxPaint()"),
+    "the detent is applied after the paint, so the frame shows the unsnapped position");
+  // Released, not on every frame, and after the re-anchor bail so a pinch losing a finger keeps them.
+  const up = nocomment(fn("clubTxUp"));
+  const offAt = up.indexOf("clubTxGuidesOff(g)");
+  assert.ok(offAt > 0, "the guides are never taken down");
+  assert.ok(offAt > up.indexOf("clubTxAnchor(); return;"),
+    "the guides are cleared before the re-anchor bail, so lifting one finger of a pinch blanks them");
+  // ⚠️ RESOLVED ONCE PER GESTURE, not per pointermove — this is the path he called jittery.
+  assert.match(nocomment(fn("clubTextDrag")), /gds: \$\("clubGds"\)/,
+    "the guide nodes are not cached on the gesture");
+  // ⚠️ THE WHOLE PER-FRAME PATH, NOT JUST THE MOVE HANDLER. The first version of this guard named
+  // clubTxMove alone and a re-break that put the lookup in clubTxDetent — which the move CALLS, so it
+  // runs just as often — sailed straight through it. Measured escaping.
+  for (const f of ["clubTxMove", "clubTxDetent"]) {
+    assert.ok(!/\$\("clubGds"\)|\$\("clubGr"\)/.test(nocomment(fn(f))),
+      f + " looks the guide layer up on every frame instead of using the cached handle");
+  }
+  // ⚠️ AND THE LAYER TAKES NO POINTER EVENTS AT ALL, or it comes between a finger and the word it is
+  // aligning — the looks-live-does-nothing fault, inverted.
+  const rule = src.slice(src.indexOf("\n.club-gds {"), src.indexOf("}", src.indexOf("\n.club-gds {")));
+  assert.match(rule, /pointer-events:\s*none/, "the guide layer can swallow a touch");
+  assert.match(rule, /position:\s*absolute/, "the guide layer is not positioned to the stage");
+  // It is drawn over the words, or a guide hides behind the word it is aligning.
+  const draw = fn("clubEdDraw");
+  assert.ok(draw.indexOf('id="clubTxs"') < draw.indexOf('id="clubGds"'),
+    "the guides are rendered under the words");
+  // The level guide reads differently from the two solid centre lines, because when the word is both
+  // level and centred the pair lies exactly on top of itself.
+  const gr = src.slice(src.indexOf("\n.club-gr {"), src.indexOf("}", src.indexOf("\n.club-gr {")));
+  assert.match(gr, /dashed/, "the level guide is not distinguishable from the centre guides");
+  // ⚠️ "tick" IS THE SELECTION GENERATOR NATIVELY; the other kinds are impacts and notifications, and
+  // an unknown kind reaches "default: break" and does nothing at all on a phone.
+  assert.match(nocomment(fn("clubTxDetent")), /haptic\("tick"\)/, "the detent uses the wrong haptic kind");
+});
+
 test("BLOCKER: alignment moves the block as well as the lines", () => {
   // ⚠️ .club-tx IS width: max-content, so the box hugs its widest line and text-align has nowhere to
   // move a SINGLE line to — which is the whole of "the test doesn't move the alignment in screenshot 2".

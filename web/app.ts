@@ -4975,6 +4975,22 @@ html.kbup .club-txc { bottom: var(--kbh, 0px); }
    glow that fades to nothing by 14px. The TRACK is the hit area: the knob's visible half is 13px, far
    under the 44px floor, so the whole 44px-wide band is what takes the finger — the grow-the-hit-area
    rule this app uses everywhere. Top of the track is the biggest size. */
+/* ⚠️ THE ALIGNMENT GUIDES (his request: "it would be helpful if there was a line appears like on
+   instagram and a haptic to show that its back in the centre and also the same when its back to level").
+   Clipped to the stage by its own overflow, so a line never runs out over the chrome. */
+.club-gds { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.club-gx, .club-gy, .club-gr { position: absolute; opacity: 0; transition: opacity .09s linear; }
+.club-gx { left: 50%; top: 0; width: 2px; height: 100%; margin-left: -1px;
+  background: rgba(255,255,255,.94); box-shadow: 0 0 6px rgba(2,10,8,.6); }
+.club-gy { top: 50%; left: 0; height: 2px; width: 100%; margin-top: -1px;
+  background: rgba(255,255,255,.94); box-shadow: 0 0 6px rgba(2,10,8,.6); }
+/* ⚠️ DASHED, AND THAT IS NOT DECORATION. Level and centred-vertically are different facts about the
+   word, and when both are true the two lines lie exactly on top of each other — so the level one has to
+   read differently or the pair says only one thing. It is drawn through the word's own middle rather
+   than the stage's, which is where "level" is a statement about. */
+.club-gr { left: 0; width: 100%; height: 0; margin-top: -1px;
+  border-top: 2px dashed rgba(255,255,255,.9); filter: drop-shadow(0 0 4px rgba(2,10,8,.65)); }
+.club-gds.on-x .club-gx, .club-gds.on-y .club-gy, .club-gds.on-r .club-gr { opacity: 1; }
 .club-szt { position: absolute; left: 0; top: 10%; width: 56px; height: 46%; z-index: 2;
   background: linear-gradient(90deg, transparent 24px, rgba(255,255,255,.30) 24px,
     rgba(255,255,255,.30) 26px, transparent 26px); }
@@ -12512,6 +12528,13 @@ function clubEdDraw() {
       // it, which is what the reference does (its caret measured full-strength blue over the dim).
       (drafting ? '<div class="club-dim"></div>' : "") +
       '<div class="club-txs" id="clubTxs">' + texts + '</div>' +
+      // ⚠️ PRE-RENDERED HIDDEN AND DRIVEN BY CLASS ONLY, for the reason the delete bin beneath it
+      // already carries: an innerHTML write mid-gesture rebuilds the node the finger is holding. It sits
+      // AFTER the words so a guide is never hidden behind the word it is aligning, and takes no pointer
+      // events at all so it cannot come between a finger and that word.
+      '<div class="club-gds" id="clubGds" aria-hidden="true">' +
+        '<span class="club-gx"></span><span class="club-gy"></span>' +
+        '<span class="club-gr" id="clubGr"></span></div>' +
       // ⚠️ THE SIZE TRACK IS INSIDE THE STAGE ON PURPOSE, twice over: the stage's overflow: hidden is
       // what clips the knob to its measured half-circle, and the stage's touch-action: none is already
       // on the pinch suppressor's allowlist — a track outside it would need a fifth touch-action
@@ -13504,6 +13527,55 @@ function clubTextSpan(t, i, sel, scale) {
 // knob and the pinch can set).
 const CLUB_TX_MIN = 16, CLUB_TX_MAX = 96;
 /**
+ * ⚠️⚠️ THE THRESHOLD IS IN PIXELS, NOT IN A FRACTION OF THE STAGE, and on a 9:16 card that is the whole
+ * difference between one detent and two different ones. The stage measures 452 x 998, so a fraction of
+ * 0.018 is 8px across and 18px down — the same number meaning two things, and the vertical detent more
+ * than twice as easy to fall into as the horizontal one. A finger feels pixels.
+ * ⚠️ AND FOUR DEGREES IS A DETENT, NOT A CORRECTION. Wide enough that a hand which meant level gets
+ * level, narrow enough that somebody deliberately tilting a word by five degrees keeps it.
+ */
+const CLUB_SNAP_PX = 8, CLUB_SNAP_ROT = 4;
+/**
+ * THE LINE AND THE TAP, TOGETHER — his request, and they only mean anything as a pair: a haptic with no
+ * line is a buzz you cannot place, and a line with no snap is a hint you have to keep your eye on.
+ *
+ * ⚠️ THE SNAP IS APPLIED AFTER THE POSITION IS DERIVED, NEVER FOLDED INTO THE ANCHOR. clubTxMove
+ * recomputes x and y from the gesture's anchor on every frame, so writing 0.5 here cannot accumulate:
+ * the next frame derives the true position again and re-snaps only if the finger is still inside the
+ * detent. That is what makes it magnetic rather than sticky, and it is why dragging out of the centre
+ * needs no special case.
+ * ⚠️ ROTATION IS GATED ON TWO FINGERS, because rotation only moves under a pinch — a level line on a
+ * one-finger drag would be announcing something the runner is not adjusting.
+ * ⚠️ AND THE TAP FIRES ON ENTERING A DETENT, ONCE. A pointermove arrives many times a second, so a
+ * haptic on the CONDITION rather than on the TRANSITION is a continuous buzz for as long as the word
+ * stays centred, which is worse than none. "tick" is the selection generator on the native side, which
+ * is the detent feel; the three other kinds are impacts and notifications.
+ */
+function clubTxDetent(g) {
+  if (!g || !g.anchor) return;
+  const w = Math.max(1, g.box.width), h = Math.max(1, g.box.height);
+  const inX = Math.abs(g.t.x - 0.5) * w <= CLUB_SNAP_PX;
+  const inY = Math.abs(g.t.y - 0.5) * h <= CLUB_SNAP_PX;
+  if (inX) g.t.x = 0.5;
+  if (inY) g.t.y = 0.5;
+  const inR = !!g.anchor.two && Math.abs(Number(g.t.rot) || 0) <= CLUB_SNAP_ROT;
+  if (inR) g.t.rot = 0;
+  if (g.gds) {
+    g.gds.classList.toggle("on-x", inX);
+    g.gds.classList.toggle("on-y", inY);
+    g.gds.classList.toggle("on-r", inR);
+  }
+  if (g.gr && inR) g.gr.style.top = (g.t.y * 100) + "%";
+  if ((inX && !g.snapX) || (inY && !g.snapY) || (inR && !g.snapR)) haptic("tick");
+  g.snapX = inX; g.snapY = inY; g.snapR = inR;
+}
+/** Every guide down and every detent forgotten, so the next gesture starts with nothing latched. */
+function clubTxGuidesOff(g) {
+  const gds = (g && g.gds) || $("clubGds");
+  if (gds) gds.classList.remove("on-x", "on-y", "on-r");
+  if (g) { g.snapX = false; g.snapY = false; g.snapR = false; }
+}
+/**
  * MOVING, SCALING AND TURNING A WORD ON THE PICTURE.
  *
  * ⚠️ A TAP EDITS; A DRAG MOVES; TWO FINGERS SCALE AND TURN. His report was that it "jumps around and wont
@@ -13553,8 +13625,11 @@ function clubTextDrag(ev, i) {
   }
   if (!draft) S.sel = i;
   const stage = $("clubStage"); if (!stage) return;
+  // ⚠️ THE GUIDE NODES ARE RESOLVED ONCE, HERE. A getElementById per pointermove is a lookup on the
+  // one code path he has already reported as jittery, and the stage cannot be rebuilt under a live
+  // gesture (a moved word deliberately never redraws), so the handles cannot go stale.
   CLUB_TXG = { node: node, t: t, draft: draft, key: i, moved: false, anchor: null,
-    box: stage.getBoundingClientRect(),
+    box: stage.getBoundingClientRect(), gds: $("clubGds"), gr: $("clubGr"),
     pts: new Map([[ev.pointerId, { x: ev.clientX, y: ev.clientY }]]) };
   try { node.setPointerCapture(ev.pointerId); } catch (e) {}
   clubTxAnchor();
@@ -13615,6 +13690,7 @@ function clubTxMove(m) {
     : { x: p[0].x, y: p[0].y };
   g.t.x = Math.max(0.06, Math.min(0.94, g.anchor.x + (mid.x - g.anchor.mid.x) / Math.max(1, g.box.width)));
   g.t.y = Math.max(0.08, Math.min(0.9, g.anchor.y + (mid.y - g.anchor.mid.y) / Math.max(1, g.box.height)));
+  clubTxDetent(g);
   clubTxPaint();
   // ⚠️ THE DELETE BIN RIDES A COMMITTED DRAG (class toggles only — an innerHTML write here would
   // rebuild the node the finger is holding); the size knob rides a draft pinch, so the two readouts of
@@ -13660,6 +13736,9 @@ function clubTxUp(e) {
   // ⚠️ RE-ANCHOR ON THE FINGERS THAT ARE STILL DOWN rather than carrying on from a baseline that
   // included one that has gone. That is the jump.
   if (g.pts.size >= 1) { clubTxAnchor(); return; }
+  // ⚠️ AFTER THE RE-ANCHOR BAIL, NOT BEFORE IT. Lifting one finger of a pinch leaves the gesture
+  // running, and taking the guides down there would blank them mid-drag.
+  clubTxGuidesOff(g);
   g.node.onpointermove = null; g.node.onpointerup = null; g.node.onpointercancel = null;
   CLUB_TXG = null;
   if (!g.moved) {

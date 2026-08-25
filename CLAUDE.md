@@ -8589,7 +8589,10 @@ the safe answer is the one a stray tap should give.
 a hard stop, used by the safety bands and the watch's End button — so the two never read as a pair of
 equals.
 ⚠️ **`haptic("lift")`, NOT AN INVENTED `"warn"`.** `haptic()` knows `success`, `lift` and a default, and
-an unknown kind silently falls through to the lightest tap — so a destructive confirmation would have
+an unknown kind silently falls through to the lightest tap **in a browser and to NOTHING AT ALL on the
+phone** (⚠️ corrected 2026-08-25: `HapticService.swift`'s switch ends in `default: break`, and it also
+knows a fourth kind, **`tick`** → `UISelectionFeedbackGenerator.selectionChanged()`, which is the detent
+feel) — so a destructive confirmation would have
 felt identical to a cancel.
 
 **Driven end to end in a real browser, both paths:** the dialog opens at z98 over a viewer at z96 with
@@ -10989,3 +10992,88 @@ at `--tscale` 1.0 and 1.3, with zero console errors.
 same three browser-backed privacy tests in `test/share-export-bytes.test.ts` failing; that file passes
 21/21 alone and the full suite passed 1335/0 on the two immediately following Pago_Pago runs. This is the
 capture-stopped-short flake this file already records as unreproduced under parallel load.
+
+## A LINE AND A TAP WHEN A WORD COMES BACK TO CENTRE OR TO LEVEL (owner, 2026-08-25)
+
+*"When positioning text by holding and dragging, it would be helpful if there was a line appears like on
+instagram and a haptic to show that its back in the centre and also the same when its back to level
+(0 degrees)"*. Web-only, so it reaches his phone **over the air on the next launch** — no rebuild.
+Suite 1335 → **1337**; 15 deliberate re-breaks, 13 caught first time and the two misses were both real
+guard defects (below).
+
+⚠️ **THE LINE AND THE TAP ONLY MEAN ANYTHING AS A PAIR, AND A THIRD THING HAD TO COME WITH THEM: THE
+SNAP.** A haptic with no line is a buzz the runner cannot place; a line with no snap is a hint they have
+to keep an eye on; and a snap with neither is a word that mysteriously sticks. `clubTxDetent` does all
+three, called from `clubTxMove` **before** `clubTxPaint` so the frame the runner sees is the snapped one.
+
+⚠️⚠️ **THE THRESHOLD IS IN PIXELS, AND ON A 9:16 CARD THAT IS THE DIFFERENCE BETWEEN ONE DETENT AND TWO
+DIFFERENT ONES.** The stage measures **452 × 998**, so a fraction of 0.018 is **8px across and 18px
+down** — the same number meaning two things, with the vertical detent more than twice as easy to fall
+into as the horizontal one. A finger feels pixels. `CLUB_SNAP_PX = 8`, converted per axis from
+`g.box`. **The discriminating case is a 12px offset on both axes**: outside the detent on each, and a
+fraction-based threshold snaps the vertical one while leaving the horizontal one alone. That is what the
+guard drives, and it is what the first re-break restores.
+
+⚠️ **THE SNAP IS APPLIED AFTER THE POSITION IS DERIVED AND NEVER FOLDED INTO THE ANCHOR.** `clubTxMove`
+recomputes x and y from the gesture's anchor on every frame, so writing `0.5` cannot accumulate: the next
+frame derives the true position again and re-snaps only while the finger is still inside. That is what
+makes it magnetic rather than sticky, and it is why dragging back OUT of the centre needs no special
+case at all. Measured through real `PointerEvent`s: 10px off → no line, no tap, x 0.5221; **6px off →
+line on, x exactly 0.5, one tap**; 3px and 0px → still one tap; out to 40px → line off; back → tap two.
+
+⚠️ **THE TAP FIRES ON ENTERING A DETENT, ONCE — NOT ON THE CONDITION.** `pointermove` arrives many times
+a second, so a haptic keyed on *"is it centred"* is a continuous buzz for as long as the word stays
+there, which is worse than none. `g.snapX/snapY/snapR` hold the previous state and the tap is the
+transition. Re-broken by keying it on the condition.
+
+⚠️ **`haptic("tick")` IS THE RIGHT KIND AND THE ONLY RIGHT KIND HERE.** `HapticService.swift` maps
+`tick` → `UISelectionFeedbackGenerator.selectionChanged()`, which IS the detent feel; `lift` is a medium
+impact and `success`/`warn` are notifications.
+⚠️⚠️ **AND THIS FILE'S OWN CLAIM THAT "an unknown kind silently falls through to the lightest tap" IS
+FALSE ON THE PHONE.** The Swift `switch` ends in **`default: break`** — an unknown kind does *nothing at
+all* natively. Only the browser fallback falls through to an 8 ms vibrate. So a typo'd kind is silence on
+the device and a buzz in a test browser, which is the worst way round. Corrected at that note.
+
+⚠️ **ROTATION IS GATED ON TWO FINGERS, because rotation only moves under a pinch.** A level line on a
+one-finger drag announces something the runner is not adjusting. Measured: a one-finger drag of a word
+tilted 2° leaves it at 2° with no line; the same word under two fingers snaps to exactly 0 with the line
+and a tap. **A deliberate 9° tilt is kept** — four degrees is a detent, not a correction.
+
+⚠️ **THE LEVEL LINE IS DASHED, AND THAT IS NOT DECORATION.** "Level" and "centred vertically" are
+different facts about the word, and when both are true the two lines lie **exactly on top of each
+other** — so the level one has to read differently or the pair says only one thing. It is also drawn
+through **the word's own middle** rather than the stage's, because that is what level is a statement
+about: measured `top: 31%` for a word at y 0.31.
+
+⚠️ **THE GUIDES ARE PRE-RENDERED HIDDEN AND DRIVEN BY CLASS ONLY**, for the reason the delete bin beneath
+them already carries: an `innerHTML` write mid-gesture rebuilds the node the finger is holding. They sit
+**after** `.club-txs` so a guide is never hidden behind the word it is aligning, and carry
+`pointer-events: none` so the layer cannot come between a finger and that word.
+
+⚠️ **THE GUIDE NODES ARE RESOLVED ONCE PER GESTURE, NOT PER FRAME.** A `getElementById` per
+`pointermove` is a lookup on the one path he has already reported as jittery, and the stage cannot be
+rebuilt under a live gesture (a moved word deliberately never redraws), so a cached handle cannot go
+stale.
+
+⚠️ **THE GUIDES COME DOWN AFTER THE RE-ANCHOR BAIL IN `clubTxUp`, NOT BEFORE IT.** Lifting one finger of
+a pinch leaves the gesture running, so clearing them there blanks the guides mid-drag. **Verified with
+real events: one finger up → the level line is still showing; both up → every guide down and the
+rotation stored as exactly 0.** An ORDERING claim, and it is guarded as one.
+
+### The two re-breaks that escaped, and both were my guards
+
+1. ⚠️⚠️ **A PER-FRAME GUARD THAT NAMES ONLY THE MOVE HANDLER MISSES THE FUNCTION THE MOVE HANDLER
+   CALLS.** I asserted `clubTxMove` contains no `$("clubGds")` — and the re-break put the lookup in
+   `clubTxDetent`, which runs exactly as often because the move calls it. **Measured escaping.** The
+   guard now sweeps the whole per-frame path, and a companion break (dropping the cached handle from the
+   gesture record altogether) is caught too.
+2. ⚠️ **`haptic("tick")` OCCURS THREE TIMES IN THE PAGE**, two of them pre-existing, so a re-break
+   anchored on it was refused as ambiguous rather than escaping. Anchored on the detent's own line
+   instead — and **a re-break whose anchor is not unique silently tests nothing**, which this file
+   already records twice.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc
+clean apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1337 pass / 0
+fail under UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`**, both design ratchets unchanged and
+`CSS_DUP_CEILING` unchanged at 20. Driven end to end in a real browser with synthetic `PointerEvent`s
+for both the one-finger position detent and the two-finger level detent.

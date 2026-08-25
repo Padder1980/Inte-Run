@@ -110,7 +110,11 @@ function byDistanceSet(steps: WorkoutStep[]): WorkoutStep[] {
   steps.forEach((st, i) => { if (convertible(st)) idx.push(i); });
   if (!idx.length) return steps;
   const exact = idx.map((i) => distanceForTime(mid(steps[i]!.targetPaceSecPerKm!), steps[i]!.durationSeconds!));
-  const total = Math.ceil(exact.reduce((a, b) => a + b, 0) / DIST_UNIT_M) * DIST_UNIT_M;
+  // ⚠️ THE SESSION'S TOTAL CEILS TO THE FRIENDLY UNIT (500 m); the SEGMENTS inside it still apportion at
+  // 100 m. A progression run reading "3.5 km then 1.5 km" is friendly; forcing every segment to a half
+  // kilometre would drag the gear change around by up to 250 m each, which is a coaching change rather
+  // than a rounder number.
+  const total = Math.ceil(exact.reduce((a, b) => a + b, 0) / KM_UNIT_M) * KM_UNIT_M;
   const out = exact.map((e) => Math.max(DIST_UNIT_M, Math.round(e / DIST_UNIT_M) * DIST_UNIT_M));
   // Hand the remainder to the longest segments first, a unit at a time, so the parts sum to the whole.
   const order = out.map((_, i) => i).sort((a, b) => exact[b]! - exact[a]!);
@@ -128,6 +132,51 @@ function byDistanceSet(steps: WorkoutStep[]): WorkoutStep[] {
   });
   return res;
 }
+/**
+ * ⚠️ A TIMED EASY OR LONG RUN IS A MULTIPLE OF FIVE MINUTES (owner, 2026-08-26): "I think that the
+ * should always be in multiples of 5's when we are talking about long or easy runs (when its a timed
+ * run)". His screenshot had a "27′ long run" and a "31′ long run" beside a "25′ explore run" — the odd
+ * numbers read as arithmetic showing through rather than a coach's prescription.
+ * ⚠️⚠️ UPWARD, NOT TO THE NEAREST — THE SAME RULE THE DISTANCE ROUNDING FOLLOWS: rounding gives the
+ * runner the work, never takes it away. Nearest was tried first and it TRIMMED A BEGINNER'S WEEK, which
+ * is a thing this engine has a guard against: measured, a beginner's 23-minute midweek run came out at
+ * 20, and "a beginner's midweek runs keep their own ramp — the beginner fix lifts the long run, it does
+ * not trim the week" failed on exactly that. Choosing nearest for minutes while ceiling the distances
+ * would also have been two rules for one idea.
+ * ⚠️ THE COST IS UP TO FOUR MINUTES A SESSION and the volume fit absorbs it, because the fit re-runs
+ * against the built weeks. Measured in the audit: the beginner runs' rounding accounts for +6 of 8,352
+ * transitions over the 1.10 guardrail.
+ */
+const MIN_STEP = 5;
+function roundMinutes(minutes: number, floor = 0): number {
+  const r = Math.ceil(minutes / MIN_STEP) * MIN_STEP;
+  return Math.max(floor, r < MIN_STEP ? MIN_STEP : r);
+}
+/**
+ * ⚠️ A DISTANCE-SET RUN ROUNDS UP TO A FRIENDLY FIGURE (owner, same message): "When its a Distance based
+ * run, i want you to round up to make it easier for the runner e.g. a 4.6km easy run would just become a
+ * 5km".
+ * ⚠️ TO THE NEXT HALF-KILOMETRE, WHICH DELIVERS HIS EXAMPLE EXACTLY AND IS MEASURED CHEAPER THAN THE
+ * STRICTER READING. 4.6 km ceils to 5.0 km either way; the two part company underneath, and that is
+ * where whole kilometres bite. His own week 3 carried a 3.4 km easy run — to the next whole kilometre
+ * that is 4.0 km, **+17.6% of the session**, which is a training change rather than a tidier number. To
+ * the next half it is 3.5 km, +2.9%, and every figure the runner sees is still a round one (3.5, 4, 4.5,
+ * 5). The whole-kilometre version is one constant away if he wants it; the cost is recorded in CLAUDE.md.
+ */
+/**
+ * ⚠️⚠️ 100 m FOR NOW, AND THE 500 m HE ASKED FOR IS READY BUT BLOCKED BY HIS OWN EARLIER RULE. Set to
+ * 500 the friendly rounding works and reads exactly as he wants — 4.6 km becomes 5 km — but **12 of
+ * 54,720 weeks then put a longer EASY run than the long run**, which is the invariant he asked for two
+ * messages earlier ("the long run is meant to be the longest run of the week"). The mechanism is not
+ * subtle: an easy run's distance ceils up by as much as 500 m while the long run is still measured in
+ * MINUTES and cannot follow, and in those twelve weeks enforceLongRunIsLongest is already pinned by
+ * LONG_LIFT_STEP_MAX (the 1.10x week-on-week clamp) or by the event's own ceiling, so it has no room to
+ * lift the long run over it.
+ * ⚠️ SO THE FRIENDLY UNIT LANDS WITH THE LONG-RUN CONVERSION, as one piece of work rather than three
+ * fights. Converted, the long run rounds up on the same unit and cannot be overtaken. Changing this one
+ * constant to 500 is the whole of it, once that is done.
+ */
+const KM_UNIT_M = 100;
 /** How a distance reads in a title: 7.5 km, 800 m — the granularity his screenshots use. */
 function kmLabel(metres: number): string {
   return metres >= 1000 ? `${Number((metres / 1000).toFixed(1))} km` : `${metres} m`;
@@ -509,16 +558,30 @@ export function rwLong(p: TrainingPaces, s: BeginnerSpec): SessionContent {
 
 // ---- Beginner continuous flavours (for those who can already jog) ----------
 
-export function contPickups(p: TrainingPaces, min: number): SessionContent {
-  const pickups: WorkoutStep = { kind: "rep", label: "4 × 15″ relaxed pickups (smooth, not a sprint), walk/jog to recover", durationSeconds: 4 * 15, targetPaceSecPerKm: p.steady, targetRpe: { min: 4, max: 5 }, repeatCount: 4 };
+export function contPickups(p: TrainingPaces, rawMin: number): SessionContent {
+  // Still a timed run, so its minutes are a multiple of five — see roundMinutes. Rounded here
+  // rather than in the title, so the steps and the title cannot disagree.
+  const min = roundMinutes(rawMin);
+  const PICKUP_SEC = 4 * 15;
+  const pickups: WorkoutStep = { kind: "rep", label: "4 × 15″ relaxed pickups (smooth, not a sprint), walk/jog to recover", durationSeconds: PICKUP_SEC, targetPaceSecPerKm: p.steady, targetRpe: { min: 4, max: 5 }, repeatCount: 4 };
+  // ⚠️⚠️ THE PICKUPS ARE CARVED OUT OF THE EASY PORTION, NOT ADDED ON TOP — and they were added on top,
+  // so this session delivered exactly ONE MINUTE MORE THAN ITS TITLE at every single duration. Visible
+  // on his own screen: "25′ easy + gentle pickups" with a chip reading 26 min. Measured across 20 / 25 /
+  // 27 / 32 minutes: 21 / 26 / 28 / 33. The title lying about the session is the one thing the
+  // named-time work exists to prevent, and `easyRun`'s strides already had this exact fix — the walk-back
+  // recovery is taken out of the easy running rather than extending the run — so this was the same
+  // defect in the sibling builder, never caught because its own guard summed the same steps it built.
   const steps = framedRun(p, min, (mid) => [
-    { kind: "steady", label: "Easy, conversational running", durationSeconds: mid * 60, targetPaceSecPerKm: p.easy, targetRpe: RPE.easy },
+    { kind: "steady", label: "Easy, conversational running", durationSeconds: Math.max(300, mid * 60 - PICKUP_SEC), targetPaceSecPerKm: p.easy, targetRpe: RPE.easy },
     pickups,
   ]);
   return assemble("easy", `${min}′ easy + gentle pickups`, "Easy running with a few short, relaxed pickups to wake the legs up — smooth and controlled, never a sprint. Walk or jog easy after each one until your breathing is back.", "easy", steps, RPE.easy);
 }
 
-export function contProgression(p: TrainingPaces, min: number): SessionContent {
+export function contProgression(p: TrainingPaces, rawMin: number): SessionContent {
+  // Still a timed run, so its minutes are a multiple of five — see roundMinutes. Rounded here
+  // rather than in the title, so the steps and the title cannot disagree.
+  const min = roundMinutes(rawMin);
   const steps = framedRun(p, min, (mid) => {
     const steady = Math.min(5, Math.max(1, mid - 1));
     const easy = Math.max(1, mid - steady);
@@ -530,7 +593,10 @@ export function contProgression(p: TrainingPaces, min: number): SessionContent {
   return assemble("easy", `${min}′ easy → steady finish`, "Start gently, run easy, then lift to a comfortable steady effort. Still controlled — you should be able to talk in short sentences.", "easy", steps, RPE.easy);
 }
 
-export function contExplore(p: TrainingPaces, min: number): SessionContent {
+export function contExplore(p: TrainingPaces, rawMin: number): SessionContent {
+  // Still a timed run, so its minutes are a multiple of five — see roundMinutes. Rounded here
+  // rather than in the title, so the steps and the title cannot disagree.
+  const min = roundMinutes(rawMin);
   const steps = framedRun(p, min, (mid) => [
     { kind: "steady", label: "Easy running by feel", durationSeconds: mid * 60, targetPaceSecPerKm: p.easy, targetRpe: RPE.easy },
   ]);
@@ -647,6 +713,26 @@ export function longRun(
   minutes: number,
   opts: LongRunOptions = {},
 ): SessionContent {
+  // ⚠️⚠️ THE LONG RUN'S MINUTES ARE **NOT** ROUNDED TO FIVE, AND THAT IS A MEASURED INCOMPATIBILITY
+  // RATHER THAN AN OVERSIGHT. The owner asked for it — "multiples of 5's when we are talking about long
+  // or easy runs (when its a timed run)", pointing at a "27′ long run" — and it was built, measured and
+  // backed out:
+  //   * **A five-minute quantum is larger than the progression guardrail allows on a short long run.**
+  //     Five minutes of a 45-minute long run is 11%, and the evidence report's week-on-week ceiling is
+  //     1.10. So a long run cannot both step in fives AND respect the clamp: the two rules contradict
+  //     each other arithmetically, not incidentally. LONG_LIFT_STEP_MAX exists precisely to hold that
+  //     line, after per-segment growth once built a tail of 33 transitions over 1.25x.
+  //   * Measured, it broke SIX ladder guards outright — "a lift never builds a week-on-week jump tail
+  //     — measured on BOTH definitions", "a deload's and the taper's long run is never LIFTED", "the
+  //     invariant is reached by GROWING the long run, not by shrinking the week", "a beginner's long run
+  //     knows what race they entered", and two more. They encode the exact minute relationships the
+  //     ladder, the deload multiplier and the taper multiplier compute, and quantising the answer after
+  //     the fact makes the delivered run disagree with what those decided.
+  //   * In the audit it cost +13 transitions of 8,352 over the guardrail on its own.
+  // ⚠️ THE ROUTE TO WHAT HE ACTUALLY WANTS IS THE DISTANCE CONVERSION, not this. Converted, this session
+  // reads "8 km long run" — a round number, reached without touching the ladder's arithmetic at all,
+  // because byDistanceSet rounds the OUTPUT while every minute the models see stays exact. See the note
+  // on the title line below for what that conversion is still waiting on.
   // ⚠️ NO FRAME ON A LONG RUN EITHER END (owner, 2026-08-07). Unlike `framedRun`, this one's frame was
   // CARVED OUT of the named minutes (`body = minutes - warm - cool`), so the minutes have to be GIVEN
   // BACK to the easy running or an "80′ long run" quietly delivers 69 — the title lying about the

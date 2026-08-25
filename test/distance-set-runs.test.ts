@@ -23,7 +23,16 @@ import {
 import type { Athlete, Goal } from "../src/domain/types.ts";
 
 const paces = deriveTrainingPaces({ distanceMeters: 5000, timeSeconds: 1500 });
-const UNIT = 100;
+// ⚠️ TWO UNITS, AND THEY ARE DIFFERENT ON PURPOSE. A session's TOTAL ceils to the friendly 500 m the
+// owner asked for ("a 4.6km easy run would just become a 5km"); the SEGMENTS inside it apportion at
+// 100 m, because forcing every gear change to a half-kilometre would drag it around by up to 250 m,
+// which is a coaching change rather than a rounder number.
+const SEG_UNIT = 100;
+// ⚠️ READ FROM THE ENGINE, not typed here — the friendly unit is held at 100 m until the long run is
+// converted (see KM_UNIT_M's own note), and a guard with its own copy of a constant measures the test's
+// value rather than the app's, which this project has watched escape a re-break twice.
+const UNIT = Number(/const KM_UNIT_M = (\d+);/.exec(
+  readFileSync(new URL("../src/plan/session-templates.ts", import.meta.url), "utf8"))?.[1] ?? 0);
 const gated = (st: any) => st.distanceMeters != null && st.durationSeconds == null;
 const midPace = (st: any) =>
   (st.targetPaceSecPerKm.minSecPerKm + st.targetPaceSecPerKm.maxSecPerKm) / 2;
@@ -47,7 +56,7 @@ test("BLOCKER: anything you run is a distance; anything you rest is a time", () 
     assert.ok(body.length > 0, what + " has no continuous body at all");
     for (const st of body) {
       assert.ok(gated(st), what + " still prescribes its body on the clock: " + JSON.stringify(st).slice(0, 90));
-      assert.equal(st.distanceMeters! % UNIT, 0,
+      assert.equal(st.distanceMeters! % SEG_UNIT, 0,
         what + " gives a distance of " + st.distanceMeters + " m, which is not a whole 100 m");
     }
   }
@@ -75,7 +84,8 @@ test("BLOCKER: the whole body is rounded once and apportioned, so the ladder can
     const segs = (s.steps || []).filter(gated);
     assert.ok(segs.length >= 2, "the progression run no longer has separate gears to apportion between");
     const total = segs.reduce((a: number, st: any) => a + st.distanceMeters, 0);
-    assert.equal(total % UNIT, 0, m + "′: the segments add up to " + total + " m, not a whole 100 m");
+    assert.equal(total % UNIT, 0,
+      m + "′: the segments add up to " + total + " m, which is not a whole " + UNIT + " m");
   }
   // ⚠️ AND THE CONSEQUENCE THAT MATTERS: a rising sequence of minutes must give a NON-DECREASING
   // sequence of distances. This is the property the per-segment version broke.

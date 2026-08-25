@@ -11473,3 +11473,62 @@ a reading: it is what found `buildCustomSession`, the 428 shorter long runs and 
 **Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc clean
 apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1348 pass / 0 fail**,
 and the week above read off the served build in a browser.
+
+### ROUNDING THE FIGURES A RUNNER READS (owner, 2026-08-26) — ONE FIX, TWO BLOCKED ON THE SAME KEYSTONE
+
+*"I think that the should always be in multiples of 5's when we are talking about long or easy runs (when
+its a timed run). When its a Distance based run, i want you to round up to make it easier for the runner
+e.g. a 4.6km easy run would just become a 5km"* — with a screenshot showing a `27′ long run`, a `31′ long
+run`, a `4.6 km easy run` and a `25′ easy + gentle pickups` whose chip read **26 min**.
+
+✅ **THE 26-MINUTE MISMATCH WAS A DEFECT HE SPOTTED WITHOUT LOOKING FOR IT, AND IT IS FIXED.**
+`contPickups` added its `4 × 15″` on top of the named minutes instead of carving them out, so it
+delivered **exactly one minute more than its title at every duration** — measured 21 / 26 / 28 / 33 for
+20 / 25 / 27 / 32. `easyRun`'s strides already had this exact fix (the walk-back is taken out of the easy
+running rather than extending the run), so it was the same defect in the sibling builder, never caught
+because its own guard summed the same steps it built.
+
+✅ **THE TIMED BEGINNER RUNS ARE MULTIPLES OF FIVE.** `contExplore`, `contPickups` and `contProgression`
+round at the top, so the steps and the title derive from one number and cannot disagree.
+⚠️ **UPWARD, NOT TO THE NEAREST — the same rule the distance rounding follows.** Nearest was tried and it
+**trimmed a beginner's week**: a 23-minute midweek run came out at 20 and *"a beginner's midweek runs keep
+their own ramp — the beginner fix lifts the long run, it does not trim the week"* failed on it. Choosing
+nearest for minutes while ceiling distances would also have been two rules for one idea.
+**Cost, measured: week-on-week rises above the 1.10 guardrail 11.0% → 11.4% (+30 of 8,352); easy floor
+unchanged at 34; taper mean 37.3% → 37.1%.**
+
+### ⚠️⚠️ BOTH REMAINING ASKS ARE BLOCKED ON THE SAME KEYSTONE: THE LONG RUN'S CONVERSION
+
+**1. The long run cannot be rounded to five minutes while it is timed — the two rules contradict each
+other arithmetically.** Five minutes of a 45-minute long run is **11%**, and the evidence report's
+week-on-week ceiling is **1.10**. So a long run cannot both step in fives and respect the clamp
+`LONG_LIFT_STEP_MAX` exists to hold. Built and measured: **six ladder guards failed outright** — *"a lift
+never builds a week-on-week jump tail — measured on BOTH definitions"*, *"a deload's and the taper's long
+run is never LIFTED"*, *"the invariant is reached by GROWING the long run, not by shrinking the week"*,
+*"a beginner's long run knows what race they entered"* and two more — because they encode the exact minute
+relationships the ladder, the deload multiplier and the taper multiplier compute, and quantising the
+answer afterwards makes the delivered run disagree with what those decided. On its own it cost +13 of
+8,352 transitions over the guardrail.
+
+**2. The friendly 500 m rounding works and breaks HIS OWN EARLIER RULE.** Set `KM_UNIT_M` to 500 and
+`4.6 km` becomes `5 km` exactly as he asked — and **12 of 54,720 weeks then put a longer EASY run than the
+long run**, against *"the long run is meant to be the longest run of the week"* from two messages
+earlier. The mechanism is not subtle: an easy run's distance ceils up by as much as 500 m while the long
+run is measured in MINUTES and cannot follow, and in those twelve weeks `enforceLongRunIsLongest` is
+already pinned by the 1.10× clamp or the event's own ceiling, so it has no room to lift over it. Held at
+**100 m** with the reason recorded on the constant.
+
+⚠️ **SO THE KEYSTONE IS CONVERTING THE LONG RUN, AND IT UNBLOCKS BOTH.** Converted, it reads *"8 km long
+run"* — a round number reached without touching the ladder's arithmetic, because `byDistanceSet` rounds
+the OUTPUT while every minute the models see stays exact; and it rounds on the same friendly unit as the
+easy runs, so it cannot be overtaken. What that needs first is the six ladder guards made gate-agnostic —
+the same job named in the previous chapter, now with two more reasons to do it. Then `KM_UNIT_M` goes to
+500 and `roundMinutes` is not needed for the long run at all.
+
+⚠️ **AND THE GUARDS NOW READ `KM_UNIT_M` OUT OF THE ENGINE** rather than keeping their own copy — a guard
+with its own constant measures the test's value, which this project has watched escape a re-break twice.
+
+**Verified:** build exit 0, `docs/voices/` clean, tsc clean apart from the one pre-existing
+`test/onboarding-wizard.test.ts` Date overload, **1348 pass / 0 fail**. His week 3 now reads
+`25′ explore run` · `Mobility flow (15′)` · `3.4 km easy run` · **`25′ easy + gentle pickups`** (was 26) ·
+`31′ long run`.

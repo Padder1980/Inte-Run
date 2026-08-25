@@ -132,7 +132,7 @@ test("what the title NAMES is what the runner is actually given", () => {
     if (!conv.length) return 0.05;
     const slowest = Math.max(...conv.map((x: any) =>
       (x.targetPaceSecPerKm.minSecPerKm + x.targetPaceSecPerKm.maxSecPerKm) / 2));
-    return (100 / 1000) * slowest / 60;
+    return (500 / 1000) * slowest / 60;   // one friendly unit, the widest the ceil can add
   };
   for (const m of [20, 40, 75]) {
     for (const [what, s] of [["easy run", easyRun(paces, m)], ["recovery jog", recoveryRun(paces, m)],

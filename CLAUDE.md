@@ -11200,3 +11200,127 @@ holds, which is why the claim has to name the gesture explicitly rather than the
 **Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc clean
 apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1338 pass / 0 fail under
 UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`**, ratchets unchanged, **9 re-breaks all caught**.
+
+## THE PLAN ANSWERS THE PROFILE (owner, 2026-08-25, two annotated screenshots)
+
+*"When editing the questions in my profile, I don't think the app uses the information well enough to
+adapt the plan for the needs of the runner. I did an experiment where drastically changed the profile and
+it didn't affect the types of run too much"* / *"I also think there needs to a mixture of runs set by
+distance and runs set by time"* / *"I also set my preference to Sunday long run and it didn't deliever"* /
+*"I think 'building the habit' runner needs to have the option to set a time goal if they choose to, they
+can also just leave it off"*.
+
+⚠️⚠️ **MEASURED FIRST, AND THE ENGINE WAS INNOCENT ON BOTH OF THE PLAN COMPLAINTS.** It honours the
+chosen long-run day at **every** experience level and **all seven** weekdays, never puts two runs on one
+day, and gives **six distinct session mixes across seven very different profiles**. What flattened his
+experiment was one line in the WEB layer, and what moved his long run was a stale reschedule. Suite
+1338 → **1342**; 10 re-breaks, all 10 caught.
+
+### ⚠️⚠️ A SILENT PROMOTION MEANT "BUILDING THE HABIT" COULD NOT REACH THE HABIT TRACK
+
+```js
+if (pf.status === "building" && !pf.noRecent && pf.recentTimeS < 1980) experience = "recreational";
+```
+
+⚠️ **ITS CONDITION DID NOT MATCH ITS OWN COMMENT.** The comment justified it by *"a runner who calibrated
+a genuinely capable easy pace"* — and the test was on `recentTimeS`, a 5 km TIME which ships at **1500**
+in `DEFAULT_PROFILE` and is copied forward by every save. Measured: **default profile PROMOTED**, 24:00
+promoted, 32:00 promoted; only 33:30+ or an explicit *"no recent time"* stayed a beginner. So the one
+status whose whole point is a gentle build was reachable only by runners who had told the app they had no
+time at all.
+
+⚠️ **AND THE TWO TRACKS ARE NOT A SHADE APART.** Measured on his own answers (4 days, Sunday long):
+promoted gave **27.5 km with a 3 × 8′ threshold session**; status-decides gives **15.1 km, all easy plus
+a long run**. Across 16 goal/day combinations the two differ in **16** and match in **0** — which is why
+his experiment looked like the profile doing nothing.
+
+⚠️ **THE INSIGHT IT PROTECTED IS THE RUNNER'S TO STATE, NOT OURS TO ASSUME.** A fit-but-infrequent runner
+picks *"Regular runner"*, whose card says exactly that; the habit card says *"I can jog 20–30 minutes
+non-stop"*, which nobody running 21:15 for 5 km would choose. Second-guessing a self-description is what
+`classifyRunner` already refuses to do — it caps self-assessment **and says so on screen** — and this was
+the same overreach with no notice on screen at all.
+⚠️ **THE GUARD IS A COUNT, NOT AN ABSENCE.** `experience` must be assigned **exactly once** inside
+`applyProfile` and from `expByStatus`, and nothing after it may reassign from `recentTimeS`, `twoKmS` or
+`easyPaceS` — so a differently-spelled relative of this cannot come back.
+
+### ⚠️⚠️ A RESCHEDULE IS PERISHABLE, AND NOTHING WAS CHECKING
+
+`seedDone`'s own comment said *"a session's id is deterministic, so a same-shape rebuild keeps them"* —
+correct, and **nothing checked whether the shape was still the same**. So a drag made against the old
+layout survived the rebuild and dragged the long run back to Wednesday, over his new Sunday preference.
+An override is an answer about **one arrangement of the week**; change the arrangement and it answers a
+question nobody asked.
+
+**An override now records where it moved the session FROM** (`{ to, from }`; a bare number is one written
+before this and reads as *from unknown*), and `seedDone` drops any whose `from` no longer matches the
+session's generated day. Driven in a browser, all four cases:
+
+| | result |
+|---|---|
+| habit-builder, Sunday asked | Tue/Thu/Sat easy + **Sun long** |
+| dragged the long run to Wed | stored `{from: 6, to: 2}`, long on Wed |
+| rebuild, same preference | **the drag survives** — it is still a valid answer |
+| preference changed to Sat | **override dropped, long run on Sat** |
+
+⚠️⚠️ **AND A SEPARATE COLLISION BELT, WHICH IS WHAT CATCHES HIS ACTUAL STORED DATA.** His screenshot had
+an easy run **and** the long run both on Wednesday with Sunday empty. `moveSession` swaps with whatever
+occupies the target, but only **at the moment of the move**: after a rebuild the plan may put a different
+session on the day an old override points at, and nothing was looking. Reproduced exactly with a legacy
+bare-number override (`Tuex2`, "Tue easy" + "Tue long") and resolved to a clean week with 0 overrides.
+This is also the **only** way a pre-`from` override's staleness can be detected at all.
+⚠️ **THE PLAN'S OWN DAY WINS OVER A RESCHEDULE**, and between two reschedules the later id gives way —
+stated as a rule so the resolution is not order-dependent by accident.
+
+### A HABIT-BUILDER MAY SET A TIME GOAL, OR LEAVE IT OFF
+
+`GOAL_BY_STATUS.building.time` is **`"optional"`** — a third value, so every reader must now test
+`=== true`.
+⚠️ **READ AS TRUTHY IT FLIPS THE WHOLE FRAMING TO A RACE:** the distance dropdown becomes *"10 km"*
+instead of *"Complete a 10K"*, the date becomes a *"Race date"*, and `draftFromForm` **throws** on a blank
+field — which is the pressure the old copy existed to remove. Four call sites fixed; measured per status
+after: building keeps *Complete a 10K* / *Target date* with an **OPTIONAL** pill and a hint saying what
+blank does; `new` is untouched (he named the habit-builder); regular and competitive are unchanged.
+⚠️ **A BLANK ANSWER STILL LEAVES THE ENGINE A TARGET.** `Goal.targetTimeSeconds` is required — every
+race-pace step derives from it — so blank derives one with Riegel and records **`targetSet: false`**.
+⚠️ **`targetChosen(pf)` IS THE ONE READER, AND MISSING MEANS "WHATEVER THE STATUS ASKS FOR"**, so no
+stored profile needs migrating: an existing racer keeps showing the time they typed, an existing beginner
+keeps not showing a derived one. Printing a Riegel projection back to a habit-builder as *"your goal"* is
+exactly the pressure this is about.
+⚠️ **A TYPO IS STILL REFUSED, OPTIONAL OR NOT.** Silently keeping the old value would be a goal they did
+not set.
+
+### ⚠️ STILL OPEN: THE MIXTURE OF DISTANCE-SET AND TIME-SET RUNS
+
+**Measured, not guessed:** across a full half-marathon block, **65 sessions are clock-only and 9 carry any
+distance-gated body step** (2 pure, 7 mixed) — the interval sessions. So he is right: the plan is
+overwhelmingly time-based.
+
+**What the measurement also shows is that the machinery exists.** Both step-to-seconds converters —
+`stepSeconds` in `src/science/intensity-distribution.ts` and `stepSecs` in `web/app.ts` — already handle a
+step with `distanceMeters` and no `durationSeconds` by dividing distance by the mid-band pace. So the
+intensity model and the live runtime can already carry one.
+
+⚠️ **THE CONTAINED DESIGN, FOR WHOEVER PICKS THIS UP: KEEP THE ENGINE IN MINUTES THROUGHOUT AND CHANGE
+ONLY THE GATE AT STEP EMISSION.** Every model, cap, ramp and taper (`peakLong`, `easyCapMin`,
+`volumeMultiplierByWeek`, `enforceLongRunIsLongest`, the volume fixed-point) takes minutes and must keep
+taking minutes; convert to a distance only when the body step is written, and **recompute the session's
+estimated duration from the ROUNDED distance** so `sessionMinutes` stays honest.
+⚠️ **THE LONG RUN IS THE DEFENSIBLE ONE TO CONVERT FIRST, and this file already argues it:** *"Minutes
+are the right currency for FATIGUE… but a race is a distance, and durability for it is a distance too."*
+Easy and recovery runs are time on feet by design.
+⚠️ **AND IT IS NOT DONE, DELIBERATELY.** Changing how every session is prescribed needs a sweep over
+thousands of plans to show the volume fit, the intensity floor and the taper depth are unharmed — the
+same bar every other change in this chapter cleared. Shipping it on reasoning alone is what this file
+exists to prevent.
+
+⚠️ **`buildProfileFromDraft` DOES NOT EXIST AND THIS FILE NAMES IT TWICE.** The function is
+**`draftFromForm`**. An invented identifier in the docs, and it cost a pass here — the guard failed with
+*"buildProfileFromDraft is not in the built page"*.
+
+⚠️ **THE BACKTICK RULE FIRED AGAIN, IN MY OWN COMMENT**, and the build failed while `node --check`
+reported OK on the **stale** build — exactly as this file warns. Read the exit code first.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc clean
+apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1342 pass / 0 fail under
+UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`**, ratchets unchanged, 10 re-breaks all caught,
+and every case above driven in a real browser against the served build.

@@ -5885,7 +5885,7 @@ function futureIso(days) { return isoAdd(todayIso(), days).toISOString().slice(0
 function fmtTimeFull(s) { s = Math.round(s); const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), x = s%60; const p = (n) => String(n).padStart(2,"0"); return h>0 ? h+":"+p(m)+":"+p(x) : m+":"+p(x); }
 
 // An example runner to start from — until you make it yours.
-const DEFAULT_PROFILE = { name: "", avatar: "", status: "regular", goalDist: "half", targetS: 6300, raceDate: futureIso(245), startDateIso: "", longRunDay: 6, fitSrc: "recent", recentDistM: 5000, recentTimeS: 1500, noRecent: false, easyPaceS: 0, twoKmS: 0, daysPerWeek: 5, yearsRunning: 3, volKm: 0, age: 38, sex: "", strength: true, returning: false, personalized: false };
+const DEFAULT_PROFILE = { name: "", avatar: "", status: "regular", goalDist: "half", targetS: 6300, targetSet: true, raceDate: futureIso(245), startDateIso: "", longRunDay: 6, fitSrc: "recent", recentDistM: 5000, recentTimeS: 1500, noRecent: false, easyPaceS: 0, twoKmS: 0, daysPerWeek: 5, yearsRunning: 3, volKm: 0, age: 38, sex: "", strength: true, returning: false, personalized: false };
 
 function loadProfile() { try { const s = localStorage.getItem("rc_profile_v1"); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 function saveProfileStore() { try { localStorage.setItem("rc_profile_v1", JSON.stringify(profile)); } catch (e) {} }
@@ -6140,10 +6140,25 @@ function applyProfile(pf) {
   // the noRecent flag.)
   const expByStatus = { new: "beginner", building: "beginner", regular: "recreational", competitive: "competitive" };
   let experience = expByStatus[pf.status] || (pf.noRecent ? "beginner" : "recreational");
-  // A "building" runner who calibrated a genuinely capable easy pace (≈ sub-33:00 5 km-equivalent) is
-  // fit, just infrequent — give them the proper structured plan at their real paces rather than the
-  // couch-to-5k build. The "returning from a break" toggle keeps the early weeks conservative.
-  if (pf.status === "building" && !pf.noRecent && pf.recentTimeS < 1980) experience = "recreational";
+  // ⚠️⚠️ THE SILENT PROMOTION IS GONE — THE RUNNER'S STATED STATUS DECIDES THE TRACK (owner,
+  // 2026-08-25). This read:
+  //     if (pf.status === "building" && !pf.noRecent && pf.recentTimeS < 1980) experience = "recreational";
+  // and it is the whole of his report: "I did an experiment where drastically changed the profile and
+  // it didn't affect the types of run too much".
+  // ⚠️ ITS CONDITION DID NOT MATCH ITS OWN COMMENT. The comment justified it by "a runner who
+  // calibrated a genuinely capable easy pace" — and the test was on recentTimeS, a 5 km TIME, which
+  // ships at **1500** in DEFAULT_PROFILE and is copied forward by every save. So it fired for anyone
+  // who had never entered a time at all, which is the opposite of calibrated. Measured: default
+  // profile PROMOTED, 24:00 promoted, 32:00 promoted; only 33:30+ or an explicit "no recent time"
+  // stayed a beginner. So picking "Building the habit" essentially could not reach the habit track.
+  // ⚠️ AND THE TWO TRACKS ARE NOT A SHADE APART. Measured on his own answers (4 days, Sunday long):
+  // promoted gave **27.5 km with a 3 × 8′ threshold session**; status-decides gives **15.1 km, all
+  // easy plus a long run**. Across 16 goal/day combinations the two differ in 16 and match in 0.
+  // ⚠️ THE INSIGHT IT WAS PROTECTING IS NOT LOST, IT IS THE RUNNER'S TO STATE. A fit-but-infrequent
+  // runner picks "Regular runner", whose card says exactly that; the habit card says "I can jog 20–30
+  // minutes non-stop", which nobody running 21:15 for 5 km would choose. Second-guessing a
+  // self-description is what classifyRunner already refuses to do (it caps self-assessment and says
+  // so on screen), and this was the same overreach with no notice on screen at all.
   // The plan is built off the strongest current-fitness signal. When a 2 km trial is given and it
   // projects a faster 5 km than the 5 km source, it anchors the whole plan — every pace derives from
   // it. ⚠️ 2 km, not 1 km, since 2026-08-02: the owner's elite coach asked for it, and it is the
@@ -6367,7 +6382,17 @@ const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness
 // (dayOfWeek) and summary sessions (dayIndex), keyed by the shared session id.
 function loadDayOverride() { try { return JSON.parse(localStorage.getItem("interun_dayov_v1") || "{}") || {}; } catch (e) { return {}; } }
 function saveDayOverride() { try { Object.keys(state.dayOverride).length ? localStorage.setItem("interun_dayov_v1", JSON.stringify(state.dayOverride)) : localStorage.removeItem("interun_dayov_v1"); } catch (e) {} }
-function effDay(s) { const o = state.dayOverride[s.id]; return o != null ? o : (s.dayOfWeek != null ? s.dayOfWeek : s.dayIndex); }
+/**
+ * ⚠️ AN OVERRIDE NOW RECORDS WHERE IT MOVED THE SESSION **FROM**, AND THAT IS WHAT MAKES IT
+ * PERISHABLE. A reschedule is a statement about one plan's day layout; the moment the layout changes
+ * under it — because the runner picked a different long-run day — it is a statement about a plan that
+ * no longer exists. Stored as { to, from }; a bare number is an override written before this and is
+ * read as "from unknown".
+ */
+function ovTo(o) { return o == null ? null : (typeof o === "object" ? o.to : o); }
+function ovFrom(o) { return (o && typeof o === "object" && o.from != null) ? o.from : null; }
+function genDay(s) { return s.dayOfWeek != null ? s.dayOfWeek : s.dayIndex; }
+function effDay(s) { const t = ovTo(state.dayOverride[s.id]); return t != null ? t : genDay(s); }
 
 /**
  * HEAT ADAPTATION — the runner's DECISION, never the adapted session.
@@ -6421,9 +6446,9 @@ function moveSession(week, sess, target) {
   const wk = RAW.weeks[week - 1]; if (!wk) return;
   if (PRIMARY_TYPES[sess.type]) {
     const occ = wk.sessions.find((s) => s.id !== sess.id && PRIMARY_TYPES[s.type] && effDay(s) === target);
-    if (occ) state.dayOverride[occ.id] = cur;
+    if (occ) state.dayOverride[occ.id] = { to: cur, from: genDay(occ) };
   }
-  state.dayOverride[sess.id] = target;
+  state.dayOverride[sess.id] = { to: target, from: genDay(sess) };
   saveDayOverride();
   // A moved session changes "what am I doing today" - the watch and reminders must follow.
   try { syncWatch(); } catch (e) {}
@@ -6441,6 +6466,36 @@ function seedDone() {
   PLAN.weeks.forEach((wk) => wk.sessions.forEach((s) => { liveIds[s.id] = 1; }));
   let ovChanged = false;
   Object.keys(state.dayOverride).forEach((k) => { if (!liveIds[k]) { delete state.dayOverride[k]; ovChanged = true; } });
+  // ⚠️⚠️ AND AN OVERRIDE WHOSE SESSION THE PLAN HAS SINCE MOVED IS STALE, WHICH IS THE WHOLE OF HIS
+  // REPORT "I also set my preference to Sunday long run and it didn't deliever". The engine honours
+  // the chosen day perfectly — measured, every experience level and every day of the week, with no day
+  // ever carrying two runs. What overrode it was a reschedule made against the OLD layout: the id is
+  // deterministic, so the override survived the rebuild and dragged the long run back to where it used
+  // to sit. A reschedule is an answer about one arrangement of the week; change the arrangement and it
+  // is an answer to a question nobody asked.
+  RAW.weeks.forEach((wk) => (wk.sessions || []).forEach((s) => {
+    const from = ovFrom(state.dayOverride[s.id]);
+    if (from != null && from !== genDay(s)) { delete state.dayOverride[s.id]; ovChanged = true; }
+  }));
+  // ⚠️⚠️ THEN NO TWO RUNS MAY SHARE A DAY — his screenshot had an easy run AND the long run both on
+  // Wednesday with Sunday empty. moveSession swaps with whatever occupies the target, but it can only
+  // do that AT THE MOMENT OF THE MOVE: after a rebuild the plan may put a different session on the day
+  // an old override points at, and nothing was looking. This is also the belt for overrides written
+  // before the from field existed, where staleness cannot be detected any other way.
+  RAW.weeks.forEach((wk) => {
+    const seen = {};
+    (wk.sessions || []).filter((s) => PRIMARY_TYPES[s.type]).forEach((s) => {
+      const d = effDay(s);
+      if (seen[d] == null) { seen[d] = s.id; return; }
+      // The plan's own day wins over a reschedule; between two reschedules, the later id gives way.
+      const other = seen[d];
+      const drop = state.dayOverride[s.id] != null ? s.id : other;
+      if (state.dayOverride[drop] != null) {
+        delete state.dayOverride[drop]; ovChanged = true;
+        if (drop === other) seen[d] = s.id;
+      }
+    });
+  });
   if (ovChanged) saveDayOverride();
   // ⚠️ HEAT DECISIONS NEED THE SAME PRUNE, AND THEY NEED IT MORE. A planned session's id is
   // deterministic across rebuilds; an EXTRA's is "x<seq>-<epoch>", unique per add and gone the moment
@@ -16881,7 +16936,7 @@ function viewProfile() {
     '</div>' +
     '<div class="pf-sec"><span>Training profile</span><button class="pf-edit" data-pf="setup">Edit</button></div>' +
     '<div class="card pf-card">' +
-      profRow({ icon: "rRace", colour: "var(--eff-hard)", label: "Goal", value: (RACE_LABEL[profile.goalDist] || "") + (profile.targetS ? " \u00b7 " + fmtTimeFull(profile.targetS) : ""), action: "setup:goal" }) +
+      profRow({ icon: "rRace", colour: "var(--eff-hard)", label: "Goal", value: (RACE_LABEL[profile.goalDist] || "") + (targetChosen(profile) && profile.targetS ? " \u00b7 " + fmtTimeFull(profile.targetS) : ""), action: "setup:goal" }) +
       profRow({ icon: "gauge", colour: "var(--steady)", label: "Current fitness", value: profFitness(), action: "setup:fitness" }) +
       profRow({ icon: "today", colour: "var(--build)", label: "Training rhythm", value: (profile.daysPerWeek || 0) + " days / week", action: "setup:rhythm" }) +
       profRow({ icon: "heart", colour: "var(--rest)", label: "Current context", value: profContext(), action: "setup:context" }) +
@@ -19873,7 +19928,8 @@ function viewSetup() {
     '</div>';
 
   // 3 · Your goal (goalCardInner supplies its own inner markup; keep the id for syncStatus)
-  const secGoal = goalCardInner(p.status || "regular", { dist: p.goalDist, date: p.raceDate, target: fmtTimeFull(p.targetS) });
+  const secGoal = goalCardInner(p.status || "regular", { dist: p.goalDist, date: p.raceDate,
+    target: targetChosen(p) ? fmtTimeFull(p.targetS) : "" });
 
   // 4 · A few details
   // ⚠️ THE FORM'S SECTIONS NOW MATCH THE PROFILE PAGE'S ROWS, which is what makes a scoped
@@ -20076,17 +20132,26 @@ function draftFromForm() {
   // distance, so we derive a realistic finish time from their current ability (no time to enter).
   const goalCfg = GOAL_BY_STATUS[status] || GOAL_BY_STATUS.regular;
   const goalDist = wizFieldVal("s_dist") || profile.goalDist;
-  let targetS;
-  if (goalCfg.time) {
-    const targetRaw = wizFieldVal("s_target").trim();
-    if (!mmss(targetRaw)) throw new Error("Enter your target time as h:mm:ss or m:ss, e.g. 1:45:00.");
+  let targetS, targetSet;
+  const targetRaw = goalCfg.time ? wizFieldVal("s_target").trim() : "";
+  if (goalCfg.time === "optional" && !targetRaw) {
+    // ⚠️ BLANK IS A REAL ANSWER, AND IT STILL LEAVES THE ENGINE A TARGET. Goal.targetTimeSeconds is
+    // required; what blank turns off is showing it back as a goal, which targetSet records.
+    targetS = Math.round(RC.riegelPredict(5000, recentTimeS, DIST_M[goalDist] || 5000));
+    targetSet = false;
+  } else if (goalCfg.time) {
+    // ⚠️ A TYPO IS STILL REFUSED RATHER THAN GUESSED AT, optional or not — a target nobody can read is
+    // worse than none, and silently keeping the old one would be a goal they did not set.
+    if (!mmss(targetRaw)) throw new Error("Enter your target time as h:mm:ss or m:ss, e.g. 1:45:00 \u2014 or leave it blank.");
     targetS = RC.parseDuration(targetRaw);
+    targetSet = true;
   } else {
     targetS = Math.round(RC.riegelPredict(5000, recentTimeS, DIST_M[goalDist] || 5000));
+    targetSet = false;
   }
   const raceDate = wizFieldVal("s_date");
-  if (!raceDate) throw new Error("Pick your " + (goalCfg.time ? "race" : "target") + " date.");
-  if (raceDate <= todayIso()) throw new Error("Your " + (goalCfg.time ? "race" : "target") + " date needs to be in the future.");
+  if (!raceDate) throw new Error("Pick your " + (goalCfg.time === true ? "race" : "target") + " date.");
+  if (raceDate <= todayIso()) throw new Error("Your " + (goalCfg.time === true ? "race" : "target") + " date needs to be in the future.");
   const _ld = wizFieldVal("s_longday");
   const longRunDay = _ld !== "" ? Number(_ld) : (profile.longRunDay != null ? profile.longRunDay : 6);
   let startDateIso = wizFieldVal("s_startdate") || (profile.startDateIso || "");
@@ -20096,7 +20161,7 @@ function draftFromForm() {
     name: wizFieldVal("s_name").trim().slice(0, 40),
     avatar: draft.avatar != null ? draft.avatar : (profile.avatar || ""),
     status,
-    goalDist, targetS, raceDate, startDateIso, longRunDay,
+    goalDist, targetS, targetSet, raceDate, startDateIso, longRunDay,
     fitSrc, recentDistM, recentTimeS, noRecent, easyPaceS, twoKmS, daysPerWeek: Number(draft.days), yearsRunning: profile.yearsRunning || 3,
     // "Building the habit" with no easy pace given: calibrate from their first run instead.
     autoPace: status === "building" && !easyPaceS,
@@ -20333,23 +20398,60 @@ function volQHidden() { const q = $("volQ"); return !q || q.style.display === "n
 const DIST_M = { "5k": 5000, "10k": 10000, half: 21097.5, marathon: 42195 };
 const RACE_LABEL = { "5k": "5 km", "10k": "10 km", half: "Half marathon", marathon: "Marathon" };
 const FINISH_LABEL = { "5k": "Run a 5K non-stop", "10k": "Complete a 10K", half: "Complete a half marathon", marathon: "Complete a marathon" };
+/**
+ * ⚠️ time IS NOW THREE-VALUED, AND THE MIDDLE ONE IS HIS (owner, 2026-08-25): "I think 'building the
+ * habit' runner needs to have the option to set a time goal if they choose to, they can also just
+ * leave it off". So "building" asks, marked OPTIONAL, and blank is a real answer.
+ * ⚠️ "new" IS DELIBERATELY UNCHANGED. That track is walk–run intervals for somebody who cannot yet
+ * jog thirty minutes; a finishing time is not a thing they have any way to pick, and he named the
+ * habit-builder specifically.
+ * ⚠️ AND A BLANK ANSWER DOES NOT LEAVE THE ENGINE WITHOUT A TARGET. Goal.targetTimeSeconds is required
+ * — every race-pace step is derived from it, and a plan built without one produces sessions whose
+ * distance-gated reps cannot be timed (this file records that trap costing a whole measurement pass).
+ * buildProfileFromDraft already computes one with Riegel when none is given; blank means "do not show
+ * me a time", not "there is no target".
+ */
 const GOAL_BY_STATUS = {
   new: { dists: ["5k", "10k"], time: false, q: "What are you working towards?" },
-  building: { dists: ["5k", "10k", "half"], time: false, q: "What are you working towards?" },
+  building: { dists: ["5k", "10k", "half"], time: "optional", q: "What are you working towards?" },
   regular: { dists: ["5k", "10k", "half", "marathon"], time: true, q: "Your race" },
   competitive: { dists: ["5k", "10k", "half", "marathon"], time: true, q: "Your race" },
 };
+/**
+ * ⚠️ HAS THE RUNNER CHOSEN A TIME, OR DID WE DERIVE ONE? The engine always has a target (it is
+ * required — every race-pace step comes from it), so targetS alone cannot answer this, and showing a
+ * Riegel projection back to a habit-builder as "your goal" is exactly the pressure the old copy
+ * existed to remove.
+ * ⚠️ MISSING MEANS "WHATEVER THE STATUS ASKS FOR", so no profile needs migrating: an existing regular
+ * runner keeps showing the time they typed, and an existing beginner keeps not showing a derived one.
+ */
+function targetChosen(pf) {
+  if (pf && pf.targetSet != null) return !!pf.targetSet;
+  const cfg = GOAL_BY_STATUS[(pf && pf.status) || "regular"] || GOAL_BY_STATUS.regular;
+  return cfg.time === true;
+}
 function goalCardInner(status, cur) {
   const cfg = GOAL_BY_STATUS[status] || GOAL_BY_STATUS.regular;
   let dist = cur.dist; if (cfg.dists.indexOf(dist) < 0) dist = cfg.dists[0];
-  const opts = cfg.dists.map((k) => '<option value="' + k + '"' + (k === dist ? " selected" : "") + '>' + (cfg.time ? RACE_LABEL[k] : FINISH_LABEL[k]) + '</option>').join("");
+  // ⚠️ === true, NOT TRUTHY. "building" now carries "optional", and a habit-builder's dropdown must
+  // still read as finishing the distance — his card says "focused on being consistent", and the time
+  // is an extra they may add rather than the frame of the question.
+  const opts = cfg.dists.map((k) => '<option value="' + k + '"' + (k === dist ? " selected" : "") + '>' + (cfg.time === true ? RACE_LABEL[k] : FINISH_LABEL[k]) + '</option>').join("");
   let h = '<div class="q" style="margin-top:0"><label>' + cfg.q + '</label><select class="sel" id="s_dist">' + opts + '</select></div>';
-  if (cfg.time) {
+  if (cfg.time === "optional") {
+    // ⚠️ THE PILL SAYS OPTIONAL AND THE HINT SAYS WHAT BLANK MEANS, because a time box with no such
+    // note reads as a question you have to answer — which is the pressure the old copy existed to
+    // remove. It keeps that reassurance and adds the choice, rather than trading one for the other.
+    h += '<div class="q"><label>Target time <span class="ui-pill" style="--pc: var(--accent)">OPTIONAL</span></label>' +
+      '<input class="sel num" id="s_target" value="' + cur.target + '" inputmode="numeric" placeholder="\u2014"></div>' +
+      '<div class="q"><div class="mas-hint">No time pressure needed \u2014 leave this blank and we\u2019ll ' +
+      'build you up to comfortably finish it. Put a time in if you have one in mind and the plan will aim at it.</div></div>';
+  } else if (cfg.time) {
     h += '<div class="q"><label>Target time <span class="q-hint">just type the numbers</span></label><input class="sel num" id="s_target" value="' + cur.target + '" inputmode="numeric"></div>';
   } else {
     h += '<div class="q"><div class="mas-hint">No time pressure \— we\\u2019ll build you up to comfortably finish it. You can set a time goal once you\\u2019re there.</div></div>';
   }
-  h += '<div class="q"><label>' + (cfg.time ? "Race date" : "Target date") + '</label><input class="sel" id="s_date" type="date" value="' + cur.date + '"></div>';
+  h += '<div class="q"><label>' + (cfg.time === true ? "Race date" : "Target date") + '</label><input class="sel" id="s_date" type="date" value="' + cur.date + '"></div>';
   return h;
 }
 function statusCards(sel, opts) {
@@ -20386,7 +20488,7 @@ function syncStatus() {
     const cur = {
       dist: $("s_dist") ? $("s_dist").value : profile.goalDist,
       date: $("s_date") ? $("s_date").value : profile.raceDate,
-      target: $("s_target") ? $("s_target").value : fmtTimeFull(profile.targetS),
+      target: $("s_target") ? $("s_target").value : (targetChosen(profile) ? fmtTimeFull(profile.targetS) : ""),
     };
     gb.innerHTML = goalCardInner(st, cur);
     // ⚠️ RE-LINK. This block is rebuilt after wire() has run, so the labels inside it were
@@ -20610,7 +20712,7 @@ function wizBody(id, p, st) {
     const weeks = sum ? (sum.structuredWeeks || sum.totalWeeks) : 0;
     const peak = sum ? Math.round(sum.peakKm || 0) : 0;
     const days = Number(draft.days) || 0;
-    const goalLbl = (GOAL_BY_STATUS[st] && GOAL_BY_STATUS[st].time) ? RACE_LABEL[dist] : FINISH_LABEL[dist];
+    const goalLbl = (GOAL_BY_STATUS[st] && GOAL_BY_STATUS[st].time === true) ? RACE_LABEL[dist] : FINISH_LABEL[dist];
     return '<div class="wz-summary">' +
       '<div class="wz-sum-goal">' + esc(goalLbl || "Your plan") + '</div>' +
       '<div class="wz-sum-grid">' +

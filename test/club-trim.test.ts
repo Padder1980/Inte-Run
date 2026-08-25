@@ -370,6 +370,9 @@ function openMedia(row: Record<string, unknown>, auto: boolean) {
     // value, which this project has measured escaping a guard.
     "const CLUB_TX_STYLES = " + arrOf(src, "CLUB_TX_STYLES") + ";\n" +
     "const CLUB_TX_ALIGN = " + arrOf(src, "CLUB_TX_ALIGN") + ";\n" +
+    "const CLUB_TX_FX = " + arrOf(src, "CLUB_TX_FX") + ";\n" +
+    nocomment(fn(src, "clubTxRgba")) + "\n" +
+    nocomment(fn(src, "clubTxFxOf")) + "\n" +
     nocomment(fn(src, "clubTxStyle")) + "\n" +
     nocomment(fn(src, "clubTxInk")) + "\n" +
     nocomment(fn(src, "clubTxCss")) + "\n" +
@@ -728,11 +731,29 @@ test("BLOCKER: every change shows on the picture at once, and the plate scales w
   // toggle and pick() — and BOTH repaint. Counting raw occurrences was counting a shape (five separate
   // handlers); the rule is that no dispatcher exists that fails to repaint.
   // The dispatchers are callback arguments, so their bodies close with "});" rather than "};".
-  const dispatchers = [...draw.matchAll(/onclick = \(\) => \{([\s\S]*?)\}\);/g)];
-  assert.ok(dispatchers.length >= 2, "the chrome's dispatchers are gone");
-  for (const m of dispatchers) {
-    assert.match(m[1]!, /clubDraftPaint\(\)/,
-      "a chrome dispatcher does not repaint the word, so that control waits for Done: " + m[1]!.slice(0, 60));
+  // ⚠️ BRACE-MATCHED, NOT SLICED TO THE NEXT "});" — the colour-page dot's body contains a scrollTo({…});
+  // of its own, so a lazy window closed inside it and measured a third of the handler. Measured escaping.
+  const dispatchers: string[] = [];
+  for (let at = draw.indexOf("onclick = () => {"); at >= 0; at = draw.indexOf("onclick = () => {", at + 1)) {
+    const open = draw.indexOf("{", at);
+    let d = 0;
+    for (let i = open; i < draw.length; i++) {
+      if (draw[i] === "{") d++;
+      else if (draw[i] === "}" && --d === 0) { dispatchers.push(draw.slice(open, i + 1)); break; }
+    }
+  }
+  assert.ok(dispatchers.length >= 3, "the chrome's dispatchers are gone");
+  // ⚠️ RESTATED AGAIN 2026-08-25, when the colour pages became a carousel. The rule is that a control
+  // which changes how the WORD LOOKS repaints it; the page dots change which swatches are on screen and
+  // nothing whatever about the word, so requiring them to repaint it would be demanding a repaint for a
+  // change that did not happen. Told apart by what the dispatcher does — it moves a strip — rather than
+  // by its name, and at most one may claim the exemption.
+  const navs = dispatchers.filter((b) => /scrollTo\(|scrollLeft/.test(b));
+  assert.ok(navs.length <= 1, navs.length + " dispatchers claim to be strip navigation");
+  for (const b of dispatchers) {
+    if (/scrollTo\(|scrollLeft/.test(b)) continue;
+    assert.match(b, /clubDraftPaint\(\)/,
+      "a chrome dispatcher does not repaint the word, so that control waits for Done: " + b.slice(0, 60));
   }
   // ⚠️ THE SIZE IS A VERTICAL DRAG ON THE LEFT EDGE NOW (the reference's knob). Its handler writes
   // d.size clamped by the same CLUB_TX_MIN/MAX the pinch uses, repaints the word AND the knob, and
@@ -933,4 +954,95 @@ test("BLOCKER: the editor rides the pan belt, and the drafting chrome survives a
   // guards it, and tidying it to inputs-only sends every rail back behind the keyboard, suite green.
   assert.match(src, /if \(a\.isContentEditable === true\) return true;/,
     "keyboardPossible no longer answers for a contenteditable, so --kbh never publishes while typing");
+});
+
+/**
+ * A VIDEO YOU ARE EDITING HAS SOUND (owner, 2026-08-25).
+ *
+ * "when i try to add a video story to my inte-club page, the sound doesnt play...its muted" — and the
+ * composer's preview was built `muted` from the day it was written.
+ *
+ * ⚠️ THAT IS NOT A COSMETIC DEFAULT, IT IS THE TOOL NOT WORKING. Choosing a fifteen-second window out of a
+ * clip is a decision made BY EAR at least as much as by eye — the moment somebody says the thing, the
+ * moment the crowd noise starts — so a silent preview makes the trim a guess. Muted is right for a wall of
+ * tiles all trying to talk at once, and wrong for the one clip a runner has opened to work on.
+ */
+test("BLOCKER: the clip you are editing plays with sound, and every other video stays muted", () => {
+  const src = page();
+  const draw = fn(src, "clubEdDraw");
+  // The preview is the ONE video that may be unmuted, and it is unmuted unless the runner said otherwise.
+  // ⚠️ THE PIECES SEPARATELY, because between them the builder concatenates src="' + sl.url + '" — a
+  // character class excluding a quote cannot cross that, which is why the first version of this failed on
+  // correct code.
+  assert.match(draw, /id="clubMed"/, "the composer's preview element is gone");
+  assert.match(draw, /playsinline loop autoplay/, "the composer's preview is no longer built to play");
+  assert.ok(!/playsinline muted loop autoplay/.test(draw),
+    "the composer's preview is muted again, so the trim has to be chosen by eye alone");
+  assert.match(draw, /\(S\.muted \? " muted" : ""\)/,
+    "the preview's sound is not tied to the editor's own state, so the toggle cannot reach it");
+  // ⚠️ AND SOUND IS THE DEFAULT. A toggle that starts muted is the same defect with a control next to it.
+  assert.match(nocomment(fn(src, "openClubEditor")), /muted:\s*false/,
+    "the editor opens muted, which is the defect this fixes with an extra tap in front of it");
+  // ⚠️ EVERY OTHER VIDEO STAYS MUTED — the carousel strip, the grid tiles, the feed. A wall of tiles all
+  // playing at once is why muted is the default everywhere else, and the count is asserted so a future
+  // unmute cannot be added quietly.
+  const stripAndTiles = (src.match(/muted playsinline preload="metadata"/g) || []).length;
+  assert.ok(stripAndTiles >= 2,
+    "only " + stripAndTiles + " muted thumbnail videos found; either they lost their muting or the sweep " +
+    "is blind");
+});
+
+test("BLOCKER: the sound toggle is honest, videos only, and survives a redraw", () => {
+  const src = page();
+  const draw = fn(src, "clubEdDraw");
+  // Videos only — a mute button on a photograph is a control over nothing.
+  assert.match(draw, /const snd = sl\.isVid/,
+    "the sound toggle is offered for a photograph, where it controls nothing");
+  // ⚠️ THE LABEL AND THE ICON SAY WHICH WAY IT IS, and they must disagree with each other in the two
+  // states or the control cannot be read: on = sound is playing, off = it is not.
+  assert.match(draw, /S\.muted \? "Turn sound on" : "Turn sound off"/,
+    "the toggle's accessible name does not say what tapping it will do");
+  assert.match(draw, /S\.muted \? ICON\.voxOff : ICON\.vox/, "the toggle's icon does not follow its state");
+  // ⚠️⚠️ AND THE ADOPTED NODE IS RE-STATED. clubEdKeepMedia reuses the same <video> across redraws to
+  // avoid the black flash, and an adopted node keeps whatever it had — so without this the toggle is
+  // undone by the very next redraw, and EVERY tool tap redraws. Driven in a browser: muted survived a
+  // filter-tool tap, which is the case that would have broken.
+  const keep = draw.slice(draw.indexOf("keepMed.className"));
+  assert.match(keep, /if \(sl\.isVid\) keepMed\.muted = !!S\.muted;/,
+    "a reused video keeps its old sound state, so the toggle lasts until the next redraw");
+  // ⚠️ AND THE TAP ALSO PLAYS, because a tap is a user gesture: if the browser refused unmuted playback
+  // when the editor opened, this is the moment it will allow it.
+  const h = nocomment(page());
+  const at = h.indexOf('querySelector("[data-csnd]")');
+  assert.ok(at > 0, "the sound toggle is not wired");
+  const handler = h.slice(at, at + 600);
+  assert.match(handler, /med\.muted = !!S\.muted/, "the toggle does not reach the element that is playing");
+  assert.match(handler, /med\.play\(\)/, "the toggle does not retry playback, so sound stays off on iOS");
+});
+
+test("BLOCKER: an opened story's video is born with sound rather than unmuted on a timer", () => {
+  const src = page();
+  // ⚠️ THE 60ms TIMER THIS REPLACED WAS A RACE WITH AN INDEXEDDB READ. It read ov.querySelector("video")
+  // sixty milliseconds after clubFillMedia was ASKED to create that element, and clubFillMedia reads the
+  // blob out of the store first — so on any read slower than that it found nothing, did nothing, and the
+  // span was already marked data-cfilled so nothing tried again.
+  // ⚠️ HONEST NOTE: this was NOT reproduced on a desktop — a 32 KB blob comes back well inside 60ms, and
+  // the old code measured unmuted and playing there. It is a real race and a real robustness fix, and it
+  // is not proven to be what the owner heard. What he described is the COMPOSER, above.
+  const fill = fn(src, "clubFillMedia");
+  assert.match(fill, /n\.dataset\.cplay === "1"/, "the filler cannot tell the opened story from a tile");
+  assert.match(fill, /play \? ' autoplay loop' : ' muted'/,
+    "the opened story is built muted again, or the tiles have lost their muting");
+  assert.match(fill, /clubPlayHero\(med, n\)/, "nothing starts the opened story");
+  const hero = nocomment(fn(src, "clubPlayHero"));
+  // The trim window is applied where the element is created, not chased afterwards.
+  assert.match(hero, /ctin/, "the trim's in-point is not applied, so the story starts at zero");
+  assert.match(hero, /ctout/, "the trim's out-point is not applied, so the story plays past the window");
+  // ⚠️ AND IF SOUND IS REFUSED IT PLAYS MUTED RATHER THAN NOT AT ALL. A frozen first frame is a worse
+  // answer than a silent one.
+  assert.match(hero, /catch\([\s\S]{0,120}med\.muted = true/,
+    "a refused unmuted play leaves the story frozen instead of falling back to silent playback");
+  // And the viewer no longer chases the element on a timer.
+  assert.ok(!/setTimeout\([\s\S]{0,200}querySelector\("video"\)/.test(nocomment(fn(src, "clubOpenMedia"))),
+    "the viewer is racing an IndexedDB read on a timer again");
 });

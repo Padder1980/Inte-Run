@@ -9660,11 +9660,15 @@ Three reports and two instructions. Suite 1272 → **1284**; 30 deliberate re-br
 time and the two escapes were real guard weaknesses (below). Web-only, so all of it reaches his phone on
 the next launch.
 
-⚠️ **THE NODE TOOLCHAIN VANISHED FROM THIS MAC MID-SESSION AND IT IS NOT WHERE IT WAS.** `node`, `npm`
-and `npx` left the PATH; `/opt` and `/usr/local` are empty; `git` and `python3` survived. The binary is at
-**`~/.local/node-v24.18.0-darwin-arm64/bin/node`** and the PATH entry pointing at it is gone. Nothing can
-be built, typechecked or tested without prefixing that directory — and a build is the only way the app
-ships, so this is a hard stop rather than an inconvenience. `export PATH="$HOME/.local/node-v24.18.0-darwin-arm64/bin:$PATH"`.
+⚠️⚠️ **THIS PARAGRAPH USED TO SAY THE NODE TOOLCHAIN HAD VANISHED FROM THIS MAC. IT HAD NOT, AND THE
+CLAIM WAS THEN REPEATED FOR TWO DAYS — CORRECTED 2026-08-24, and again here at the source rather than
+only at the repetition.** `~/.local/node/bin` is a symlink to `node-v24.18.0-darwin-arm64` and **is on
+the default PATH**: `which node` resolves and `node --version` answers v24.18.0. Nothing about node is
+broken and no PATH export is needed. What is genuinely missing is Xcode's **iOS platform component** —
+see the toolchain notes further down. **Check `which node` before writing a claim like this down**, and
+correct a wrong one where it was INTRODUCED as well as where it was repeated: a reader believes whichever
+copy they reach first, which is the same fault as the release-gate miscount this file records fixing in
+one place and leaving stale in another.
 
 ### ⚠️⚠️ "IT JUMPS AROUND" WAS THE TEXT RE-WRAPPING UNDER THE FINGER
 
@@ -10771,3 +10775,179 @@ UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`**, both ratchets unchang
 removed. Driven in a real browser: before start the basemap draws with the dot centred; running, the route
 draws with 51 path commands and the dot moves off-centre to follow; after a mid-run `render()` the basemap
 comes back as an **IMG** (a cache hit, no tiles) with the frame and the dot held; zero console errors.
+
+## THE VIDEO STORY HAS SOUND, AND THE FIVE THINGS HE FOUND IN THE TEXT EDITOR (owner, 2026-08-25)
+
+Two reports and one instruction, all web, so all of it reaches his phone on the next launch. Suite
+1332 → **1335**; 11 deliberate re-breaks, all 11 caught (one only after the guard was brace-matched).
+
+### THE STORY'S SOUND — *"when i try to add a video story to my inte-club page, the sound doesnt play...its muted"*
+
+Every video in the club was `muted`, everywhere, because that is right for a wall of tiles and wrong for
+the one clip somebody is deciding about.
+
+⚠️ **THE EDITOR OPENS UNMUTED AND CARRIES A SPEAKER BUTTON; A GRID TILE STAYS MUTED.** Choosing a
+fifteen-second window is a decision made largely BY EAR — a silent preview makes the trim a guess — and
+`CLUBED.muted` starts `false`. Fifteen tiles all shouting at once is the opposite problem, so the flag
+is per-surface rather than global: `clubFillMedia` takes `data-cplay`, and only the surface that is
+genuinely playing one clip to one person asks for audio.
+
+⚠️ **AND THE ADOPTED ELEMENT HAS TO BE TOLD.** `clubEdKeepMedia` reuses the live `<video>` across a
+redraw precisely so the picture does not flash — so it keeps whatever `muted` it already had, and the
+speaker button would appear to do nothing on the next repaint. `if (sl.isVid) keepMed.muted = !!S.muted`
+on the adopt path is what makes the button stick.
+
+⚠️ **UNMUTED PLAYBACK CAN BE REFUSED, AND THE FALLBACK IS TO PLAY MUTED RATHER THAN NOT AT ALL.**
+Autoplay with sound is blocked without a user gesture in every engine this page meets. `clubPlayHero`
+catches the rejection and retries muted, so the worst case is a silent clip rather than a still frame —
+and the speaker tap IS a gesture, so pressing it works even where the automatic attempt did not.
+
+### ⚠️⚠️ THE FIVE TEXT-EDITOR FAULTS, AND FOUR OF THEM WERE CONTROLS THAT LOOKED LIVE
+
+His words: *"1. No neon effect takes place when there is a border and the cant slide the text size
+because its falling off the edge of the screen / 2. The test doesn't move the alignment in screenshot 2 /
+3. Theres 3 dots to show more options on the colours but nothing happens if you try to swipe / Also i
+think it would be nice to have more font options and more text effect options"*.
+
+⚠️⚠️ **1a. THE EFFECT WAS DROPPED BEHIND A PLATE BY AN if/else, AND THE FIX IS ONE SENTENCE.**
+`clubTxCss` read *if plate → text-shadow: none, else if neon → glow*, so with the highlight on it never
+looked at the effect at all. **text-shadow and box-shadow take the same parts**, so the shadow is now
+built once and then aimed: **with a plate on, a shadow effect is drawn on the PANEL instead of the
+glyphs.** A yellow panel glowing yellow is what a neon sign is.
+⚠️ **THE GLOW USES THE PLATE'S COLOUR, NOT THE COMPUTED INK.** The ink is deliberately the opposite of
+the plate (black words on a white plate), so a glow in the ink is a black halo — a shadow wearing neon's
+name. Verified in the browser: `box-shadow: rgb(255,214,10) 0 0 6px, …` with `text-shadow: none`.
+⚠️ **AND THE HOLLOW EFFECT NEEDS ITS CARET BACK.** `.club-tx[contenteditable]` sets
+`caret-color: currentColor` so the caret can never disagree with the word — and Outline sets
+`color: transparent`, so the word being typed would have had no visible caret at all. Named explicitly,
+inline, where it wins. Measured: stroke 2px, fill transparent, caret `rgb(255,214,10)`.
+
+⚠️⚠️ **1b. COPYING THE REFERENCE'S HALF-CLIPPED KNOB WAS THE DEFECT.** It shipped `left: -13px` in a
+44px track so 13 of its 26 pixels sat outside the stage's `overflow: hidden` — measured, deliberate, and
+faithful. A control the runner can see half of is one they do not believe they can grab, and the visible
+half sits in the screen edge iOS reserves for itself. **Reference fidelity loses to being usable when the
+owner reports he cannot use it.** Measured after: the knob spans **12→38 within the stage**, wholly
+visible.
+⚠️ **AND THE TRACK WAS A QUARTER OF THE STAGE FOR AN 80px RANGE** — five sizes in every eight pixels of
+travel, so the knob moved further than the finger meant on every drag. 27% → **46%** (459px measured),
+and the rail is drawn under the knob's own centre rather than at the screen edge.
+
+⚠️⚠️ **2. `width: max-content` IS WHY ALIGNMENT DID NOTHING VISIBLE.** The box hugs its widest line, so
+`text-align` has nowhere to move a SINGLE line to — the lines of a wrapped caption did align, which is
+why this looked like it half worked. `clubAlignSnap` adds the other half: Left and Right also put the
+BLOCK against that edge of the picture, which is what those two words mean to somebody reading them.
+Measured on a 234px caption in a 452px stage: Left 14px from the edge with 205px to the right, Right the
+mirror, Centre 109/109.
+- ⚠️ **THE ANCHOR IS NEVER CHANGED, ONLY x.** Giving Left its own transform origin would be exact with no
+  measurement at all — and would make the word JUMP by half its width the first time it was dragged
+  afterwards, because the anchor point would have changed meaning under `clubTextDrag`. One layout read
+  on a tap is the cheaper trade.
+- ⚠️ **THE CONTAINING BLOCK IS `offsetParent`, NOT A SELECTOR** — `left` is a percentage, so the box it
+  resolves against is whichever positioned ancestor the browser chose. Asking the element removes the
+  chance of measuring the stage while the percentages resolve against the layer inside it.
+- ⚠️ **AND A CAPTION WIDER THAN THE PICTURE CANNOT BE PUSHED OFF IT.** The clamps are the feature, not
+  tidiness: swept 100–990px wide, neither edge ever leaves the card.
+
+⚠️⚠️ **3. A PAGE INDICATOR OVER SOMETHING THAT CANNOT BE PAGED.** Three dots sat under a rail that
+rendered **only the current page**, so there was nothing to swipe to. All three pages are in the DOM now,
+one full-width `scroll-snap` slide each — native scroll rather than a JS drag, because the swatches live
+inside a stage that already owns pinch and drag and the browser arbitrates the axes for free. Measured:
+`scrollWidth` 1356 = 3 × 452, exactly ten swatches visible per page, the dot following the swipe both
+ways.
+- ⚠️ **THE DOT SCROLLS THE STRIP AND DOES NOT REDRAW IT**, and its own state is a class toggle for the
+  same reason: rebuilding a scroller under the finger is how the composer's dial row came to jump back to
+  the start on every tap.
+- ⚠️ **THE PAGE IS RESTORED AFTER THE REDRAW A SWATCH TAP DOES CAUSE**, or choosing a colour on page
+  three snaps the strip back to page one. Verified: picked `#5a5a5a` on page 3, strip stayed on page 3.
+- ⚠️⚠️ **AND THE DOTS' HIT AREA CANNOT REACH 44px HERE, WHICH IS STATED RATHER THAN CLAIMED.** They
+  shipped as 6px squares while they were mostly decoration. Measured by bisecting `elementFromPoint`:
+  **28 × 19px with zero overlap**, and all four sides are bounded by a neighbour that would otherwise
+  lose a tap it deserves — the swatches above carry their own grown areas, the tool row below is a later
+  sibling and paints over anything reaching into it, and three dots cannot each take 44px across without
+  one winning the middle of its neighbour. **An earlier attempt asked for 44 (`inset: -19px`) and measured
+  29**, because the half reaching under the tool row simply never wins; asking for what is reachable
+  keeps the source honest. The swatches' own 31 × 35 targets are unchanged, so growing the dots stole
+  nothing. The swipe is the primary route — these are the fallback.
+
+⚠️ **4. TEN TYPEFACES AND SIX EFFECTS, AND EVERY FACE IS ONE THE PHONE ALREADY HAS.** Serif, Rounded
+(`ui-rounded` = SF Rounded), Script (Snell Roundhand) and Marker (Marker Felt) join the six; Outline,
+Shadow, Echo and Lift join Plain and Neon. **No webfont URL**: the app ships with no external network
+assets and the artifact CSP blocks font hosts, so a named style is a system stack plus a weight, a case
+and a tracking, every chain ending in the sans stack — and the rail sets each pill in its own face, so a
+fallback is visible at the moment of choosing rather than after posting.
+⚠️ **THE EFFECTS ARE A TABLE AND THE RAIL IS DERIVED FROM IT**, so a seventh cannot arrive without a pill
+for it, and the aiming rule above is swept over every member rather than checked on neon alone.
+
+⚠️ **THE fx NOTE'S OLD WORDING CONFLATED TWO DIFFERENT LIMITS** — it said moving effects "need a server",
+which is true of a mention and untrue of an animation (that needs animation work, and plays on the
+finished story rather than in the editor). Two sentences now, each true.
+
+### The guard weaknesses this round exposed
+
+⚠️⚠️ **A HANDLER BODY MUST BE BRACE-MATCHED, NEVER SLICED TO THE NEXT `});`.** The colour dot's own body
+contains `c.scrollTo({ … });` — which IS a `});` — so a window closed inside it and a deliberate
+`clubTextDraw()` added two lines below **escaped the guard that forbids one**. Measured escaping.
+**Twelfth firing of the character-window-is-not-a-function trap**; `braced()` in
+`test/community.test.ts` and the brace-matched dispatcher loop in `test/club-trim.test.ts` are the
+remedy, and `test/club-trim.test.ts`'s own pre-existing lazy regex had the same hole.
+
+⚠️ **THE "EVERY CHROME DISPATCHER REPAINTS THE WORD" SWEEP WAS RESTATED, NOT RELAXED.** A control that
+changes how the WORD LOOKS must repaint it; a page dot changes which swatches are on screen and nothing
+about the word, so demanding a repaint there is demanding one for a change that did not happen. Told
+apart by what the dispatcher does — it moves a strip — rather than by its name, and **at most one may
+claim the exemption**.
+
+⚠️ **THREE LIFT LISTS WENT STALE AND ALL THREE FAILED LOUDLY** (`clubTxFxOf is not defined`). That is the
+acceptable kind of stale. The effect table is read **out of the built page** in both lift sites rather
+than typed into the test — a supplied table means the lifted function runs against the TEST's effects,
+which is the probe-supplies-its-own-constants trap this project has measured escaping a guard twice.
+
+⚠️ **AND TWO OF MY OWN NEW GUARDS WERE WRONG BEFORE THEY WERE RIGHT.** `fn(src, name)` is
+`club-trim`'s signature and `fn(name)` is `community`'s — mixing them passed the whole page as a
+function name. And the overhang guard asserted a 900px caption in a 1000px stage lands at exactly 0.5,
+which **failed on correct code**: it lands at 0.48, leaving 30px left and 70px right, i.e. genuinely as
+flush left as a box that wide can be. The claim is that neither edge leaves the card, swept, because the
+clamp only binds past 94%.
+
+⚠️ **THE `\n`-IN-A-STRING TRAP FIRED IN THE PATCH SCRIPT RATHER THAN THE APP.** A single `\n` in a Python
+heredoc becomes a real newline, so the test file gained a string literal broken across two lines and
+node reported `ERR_INVALID_TYPESCRIPT_SYNTAX`. Double it.
+
+### ✅ A DATE-DEPENDENT TEST FIXED PROPERLY — it failed with no code change at all
+
+`BLOCKER: the conditions square never says Good to run under a warning colour` was **red at HEAD** when
+the clock rolled to 2026-08-25. It built its own `assessConditions` call with a hardcoded `minutes: 45`
+and a `"mobility"` fallback, while `currentConditions` passes the SESSION'S REAL DURATION and falls back
+to `"easy"` — so the ruler and the thing being measured disagreed whenever today's session was not 45
+minutes long. The weekday moved, today's session changed length, and at −4 °C / 45 kph the app said "Run
+by effort" while the proxy said wind.
+⚠️ **THE FIX IS TO DELETE THE SECOND DERIVATION.** The invariant is that the WORDS MATCH THE IMPACT THE
+TILE IS PAINTED FROM, so it has to be that impact — `e.api.currentConditions(sess)`. One definition,
+date-independent, and two re-breaks (the driver branch always saying Hot, and the warning colour saying
+Good to run) were watched failing against it.
+
+### ⚠️⚠️ THE SIMULATOR RUNTIME THAT APPEARED IS THE WRONG ONE — iOS 26.5 IS STILL WHAT IS MISSING
+
+He reported *"the ios simulator is installed now"*. Measured: there is now an **iOS 27.0** simulator
+runtime and **no simulator devices**, and `xcodebuild -showdestinations` still lists **zero** usable
+destinations —
+`{ platform:iOS, … error:iOS 26.5 is not installed. Please download and install the platform from
+Xcode > Settings > Components. }`
+⚠️ **Xcode 26.6 has the iOS 26.5 SDK and not the iOS 26.5 PLATFORM**, and an iOS 27.0 runtime belongs to
+the beta Xcode (27.0), so it is ineligible here — creating a device on it changes nothing (tried, then
+deleted so a future session is not misled). **The component to pick in Xcode › Settings › Components is
+iOS 26.5 specifically, not the newest one offered.** Until it lands, nothing can be built for his phone
+and no Swift change can be verified beyond `swiftc -typecheck`.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc
+clean apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1335 pass / 0 fail
+under UTC and `TZ=Pacific/Kiritimati`**, both design ratchets unchanged on their ceilings and
+`CSS_DUP_CEILING` unchanged at 20. Driven end to end in a real browser: the knob wholly on the stage, the
+carousel paging both ways with the dot following, alignment moving the block, neon glowing the panel
+behind a plate, Outline hollow with a visible caret, ten typefaces, six effects, the word committing with
+its glow intact, and `document`/`body`/chrome horizontal overflow **0** at 430px and 320px in both themes
+at `--tscale` 1.0 and 1.3, with zero console errors.
+⚠️ **ONE FLAKE, REPORTED RATHER THAN EXPLAINED AWAY.** One `TZ=Pacific/Pago_Pago` run of five reported the
+same three browser-backed privacy tests in `test/share-export-bytes.test.ts` failing; that file passes
+21/21 alone and the full suite passed 1335/0 on the two immediately following Pago_Pago runs. This is the
+capture-stopped-short flake this file already records as unreproduced under parallel load.

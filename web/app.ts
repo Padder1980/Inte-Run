@@ -4975,9 +4975,19 @@ html.kbup .club-txc { bottom: var(--kbh, 0px); }
    glow that fades to nothing by 14px. The TRACK is the hit area: the knob's visible half is 13px, far
    under the 44px floor, so the whole 44px-wide band is what takes the finger — the grow-the-hit-area
    rule this app uses everywhere. Top of the track is the biggest size. */
-.club-szt { position: absolute; left: 0; top: 15%; width: 44px; height: 27%; z-index: 2;
-  background: linear-gradient(90deg, rgba(255,255,255,.28), transparent 14px); }
-.club-szk { position: absolute; left: -13px; width: 26px; height: 26px; border-radius: 50%;
+.club-szt { position: absolute; left: 0; top: 10%; width: 56px; height: 46%; z-index: 2;
+  background: linear-gradient(90deg, transparent 24px, rgba(255,255,255,.30) 24px,
+    rgba(255,255,255,.30) 26px, transparent 26px); }
+/* ⚠️⚠️ THE WHOLE KNOB IS ON SCREEN, AND COPYING THE REFERENCE'S HALF-CLIPPED CIRCLE WAS THE DEFECT.
+   It shipped left: -13px in a 44px track so that 13 of its 26 pixels sat outside the stage's
+   overflow: hidden — measured, and faithful to the reference. He reported it as "cant slide the text
+   size because its falling off the edge of the screen": a control the runner can only see half of is
+   one they do not believe they can grab, and the visible half sits in the screen edge iOS itself
+   reserves. Reference fidelity loses to being usable when the owner cannot use it.
+   ⚠️ AND THE TRACK IS 46% OF THE STAGE, NOT 27%. The range is 16 to 96px, so a quarter-height throw
+   put five sizes in every eight pixels of travel — the knob moved further than the finger meant on
+   every drag. The rail is drawn under the knob's own centre (24..26px against a centre of 25). */
+.club-szk { position: absolute; left: 12px; width: 26px; height: 26px; border-radius: 50%;
   background: #fff; box-shadow: 0 1px 6px rgba(2,10,8,.5); }
 /* ⚠️ DRAG TO DELETE — the reference's bin at the bottom centre, shown only while a committed word is
    being dragged. It replaces the corner rail bin: a persistent bin needs a selection state to aim at,
@@ -5265,6 +5275,15 @@ html.kbup .club-txc { bottom: var(--kbh, 0px); }
    one. The bar's fill was regressed against the photograph under it (it lifts a dark photo and holds on
    a bright one, the blur signature); rgba(4,16,13,.28) is the measured no-blur fallback and the blur is
    the same device the navbar already ships. */
+/* ⚠️ THE SOUND TOGGLE, top-right of the stage — the corner every video player uses, and out of the way
+   of the ✕ on the left and the words in the middle. Deep ink like every other mark that floats over
+   somebody's photograph, and its hit area grows rather than its box. */
+.club-snd { position: absolute; right: var(--s3); top: var(--s3); z-index: 4;
+  width: 38px; height: 38px; display: grid; place-items: center; padding: 0;
+  border: 0; border-radius: 50%; background: rgba(4,16,13,.78); color: rgba(255,255,255,.72); }
+.club-snd.on { color: #fff; }
+.club-snd svg { width: 20px; height: 20px; }
+.club-snd::after { content: ""; position: absolute; inset: -3px; }
 .club-tts { display: flex; align-items: center; gap: var(--s1); margin: 0 var(--s4);
   padding: var(--s1); border-radius: var(--r-ctl); background: rgba(4,16,13,.28);
   -webkit-backdrop-filter: blur(18px) saturate(140%); backdrop-filter: blur(18px) saturate(140%); }
@@ -5288,10 +5307,33 @@ html.kbup .club-txc { bottom: var(--kbh, 0px); }
   border-radius: var(--r-pill); background: rgba(255,255,255,.06); color: #fff; font-size: var(--t-body);
   white-space: nowrap; }
 .club-tst.on { border-color: #fff; background: #fff; color: #0a0a0a; }
-.club-tcols { justify-content: center; }
-.club-tdots { display: flex; justify-content: center; gap: 5px; margin-top: 6px; }
-.club-tdot { width: 6px; height: 6px; padding: 0; border: 0; border-radius: 50%;
+/* ⚠️⚠️ THE PAGES SWIPE, BECAUSE THE DOTS PROMISED THEY WOULD. Three pages of ten with a tappable dot
+   under them read as a carousel and were not one: "theres 3 dots to show more options on the colours
+   but nothing happens if you try to swipe". A page indicator over something that cannot be paged is
+   the looks-live-does-nothing class in its quietest form. Native scroll-snap rather than a JS drag:
+   the swatches are inside a stage that already owns pinch and drag, and the browser arbitrates the
+   axes correctly for free. */
+.club-tcols { display: flex; overflow-x: auto; scroll-snap-type: x mandatory;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.club-tcols::-webkit-scrollbar { display: none; }
+.club-tcpg { flex: 0 0 100%; display: flex; align-items: center; justify-content: center;
+  gap: var(--s2); padding: 0 var(--s3) 2px; scroll-snap-align: center; }
+.club-tdots { display: flex; justify-content: center; gap: 14px; margin-top: 6px; }
+/* ⚠️ THE HIT AREA GROWS, NOT THE BOX — the house rule, and it matters more now the dots do something.
+   They shipped as 6px squares while they were mostly decoration; a page indicator that genuinely scrolls
+   the strip is a control and has to be reachable by a thumb.
+   ⚠️⚠️ AND IT CANNOT REACH 44px HERE, WHICH IS STATED RATHER THAN CLAIMED. Measured by bisecting
+   elementFromPoint: 28px tall by 20px wide, and every one of its four sides is bounded by a neighbour
+   that would otherwise lose a tap it deserves — the colour swatches above carry their own grown areas,
+   the tool row below is a later sibling and paints over anything reaching into it, and three dots cannot
+   each take 44px across without one winning the middle of its neighbour. An earlier attempt asked for
+   44 (inset: -19px) and measured 29, because the half reaching under the tool row simply never wins;
+   asking for what is reachable keeps the source honest. The gap went 5px to 14px to buy the width, the
+   targets do not overlap at all (measured 0), and the SWIPE is the primary route — which is what he
+   asked for. These are the fallback. */
+.club-tdot { position: relative; width: 6px; height: 6px; padding: 0; border: 0; border-radius: 50%;
   background: rgba(255,255,255,.34); }
+.club-tdot::after { content: ""; position: absolute; inset: -11px -7px; }
 .club-tdot.on { background: #fff; }
 .club-tnote { margin: var(--s2) var(--s3) 0; font-size: var(--t-label); line-height: 1.4;
   color: rgba(255,255,255,.68); text-align: center; }
@@ -12316,6 +12358,13 @@ function openClubEditor(kind, files, opts) {
     draft: null, draftAt: -1, runId: String(o.runId || ""), logbook: !!o.logbook,
     // ⚠️ THE RATIO IS ON THE POST, NOT THE SLIDE — a carousel is one shape you swipe through.
     ratio: "orig", tool: "", snap: null,
+    // ⚠️ SOUND ON BY DEFAULT WHILE EDITING, WHICH IS THE WHOLE POINT OF THIS SCREEN. The preview was
+    // muted, and his report was exactly that: "when i try to add a video story ... the sound doesn't
+    // play...its muted". Choosing a fifteen-second window out of a clip is a decision made BY EAR far more
+    // than by eye — the moment somebody says the thing, the moment the crowd noise starts — and a silent
+    // preview makes the trim a guess. Muted is right for a wall of tiles, and wrong for the one clip a
+    // runner has opened to work on.
+    muted: false,
     slides: list.map((f, n) => {
       const isVid = /^video\\//.test(f.type || "");
       // ⚠️ ONLY THE FIRST SLIDE CARRIES THE WORDS. A logbook entry is one picture and one
@@ -12407,8 +12456,17 @@ function clubEdDraw() {
   // it where they can (the drag paints in place), but a path that has to redraw no longer costs a flash.
   const keepMed = clubEdKeepMedia(sl);
   const media = keepMed ? "" : (sl.isVid
-    ? '<video class="club-med' + fit + '" id="clubMed" src="' + sl.url + '" playsinline muted loop autoplay></video>'
+    ? '<video class="club-med' + fit + '" id="clubMed" src="' + sl.url + '" playsinline loop autoplay' +
+      (S.muted ? " muted" : "") + '></video>'
     : '<img class="club-med' + fit + '" id="clubMed" src="' + sl.url + '" alt="">');
+  // ⚠️ THE SOUND TOGGLE IS ON THE STAGE, not in the tool row. The row already carries an Audio tool that
+  // is named as coming rather than built (a licensed music catalogue), and two things called Audio and
+  // Sound side by side is a choice nobody can make. It is also where every video player in the world puts
+  // it, and it is videos only — a photograph with a mute button is a control over nothing.
+  const snd = sl.isVid
+    ? '<button class="club-snd' + (S.muted ? "" : " on") + '" data-csnd="1" aria-label="' +
+      (S.muted ? "Turn sound on" : "Turn sound off") + '">' + (S.muted ? ICON.voxOff : ICON.vox) + '</button>'
+    : "";
   // ⚠️⚠️ THE DRAFT IS A REAL WORD ON THE STAGE, which is what makes the preview truthful: the style, the
   // colour, the plate, the alignment and the size all render exactly as they will after Done, and it can
   // be dragged and pinched while the panel is open. His instruction, twice over: "i want the text and and
@@ -12448,6 +12506,7 @@ function clubEdDraw() {
       '<div class="club-fit" id="clubFit">' + media + '</div>' +
       '<div class="club-vig" id="clubVig"></div>' +
       '<div class="club-ovs-l" id="clubOvL">' + clubOvHtml(sl) + '</div>' +
+      snd +
       // ⚠️ THE SCRIM SITS UNDER THE WORDS AND OVER EVERYTHING ELSE — DOM order is the z-order here, the
       // same way .club-vig already stacks. The words and the caret render at full strength on top of
       // it, which is what the reference does (its caret measured full-strength blue over the dim).
@@ -12492,9 +12551,30 @@ function clubEdDraw() {
     const fitBox = $("clubFit");
     // ⚠️ IF THE STAGE IS NOT THERE THE NODE IS DROPPED AND THE DRAW IS REDONE WITHOUT IT. Losing the
     // element entirely would leave the editor with no picture at all, which is worse than a flash.
-    if (fitBox) { keepMed.className = "club-med" + fit; fitBox.appendChild(keepMed); }
+    if (fitBox) {
+      keepMed.className = "club-med" + fit;
+      // ⚠️ THE ADOPTED NODE IS RE-STATED, because it keeps whatever it had. Without this the sound toggle
+      // is undone by the very next redraw — and every tool tap redraws.
+      if (sl.isVid) keepMed.muted = !!S.muted;
+      fitBox.appendChild(keepMed);
+    }
     else { CLUBED_MED = null; clubEdDraw(); return; }
   }
+  const sndBtn = ov.querySelector("[data-csnd]");
+  if (sndBtn) sndBtn.onclick = (e) => {
+    e.stopPropagation();
+    S.muted = !S.muted;
+    haptic("light");
+    // ⚠️ APPLIED TO THE LIVE ELEMENT AS WELL AS REDRAWN, because the redraw ADOPTS this same node and an
+    // adopted node keeps whatever it had. And a tap is a user gesture, so if the browser refused unmuted
+    // playback earlier this is the moment it will allow it — hence the play() rather than only the flag.
+    const med = $("clubMed");
+    if (med) {
+      med.muted = !!S.muted;
+      try { const pr = med.play(); if (pr && pr.catch) pr.catch(() => {}); } catch (err) {}
+    }
+    clubEdDraw();
+  };
   wireClubEd();
   // ⚠️⚠️ A REUSED VIDEO NEVER FIRES loadedmetadata AGAIN, so everything wireClubEd hangs off that event
   // has to be driven by hand here. Without this the strip and the playhead simply stopped existing after
@@ -12878,7 +12958,21 @@ const CLUB_TX_STYLES = [
   { id: "meme", label: "Meme",
     css: "font-family: var(--sans-stack); font-weight: 900; text-transform: uppercase; letter-spacing: .01em" },
   { id: "light", label: "Light",
-    css: "font-family: var(--sans-stack); font-weight: 300; letter-spacing: .08em" }
+    css: "font-family: var(--sans-stack); font-weight: 300; letter-spacing: .08em" },
+  // ⚠️ FOUR MORE, AND EVERY ONE IS A FACE THE PHONE ALREADY HAS. The app ships with no external network
+  // assets and the artifact CSP blocks font hosts, so a named style is a system stack plus a weight, a
+  // case and a tracking — never a webfont URL that would fall back in silence. Each chain ends in the
+  // sans stack, so a desktop browser without SF Rounded or Marker Felt shows a plain pill rather than a
+  // broken one, and the rail sets each pill in its own face so a fallback is visible at the moment of
+  // choosing. ui-rounded is SF Rounded on iOS; Snell Roundhand and Marker Felt ship with iOS.
+  { id: "serif", label: "Serif",
+    css: "font-family: Georgia, 'Times New Roman', serif; font-weight: 700; letter-spacing: -.01em" },
+  { id: "round", label: "Rounded",
+    css: "font-family: ui-rounded, 'SF Pro Rounded', var(--sans-stack); font-weight: 800; letter-spacing: 0" },
+  { id: "script", label: "Script",
+    css: "font-family: 'Snell Roundhand', 'Savoye LET', cursive; font-weight: 700; letter-spacing: .01em" },
+  { id: "marker", label: "Marker",
+    css: "font-family: 'Marker Felt', 'Bradley Hand', cursive; font-weight: 700; letter-spacing: .02em" }
 ];
 /** ⚠️ THREE PAGES, LIKE THE REFERENCE'S — brights, warms and a greyscale ramp. Hex only, never a token:
  *  the highlight plate has to compute a readable ink from the colour, and it cannot do that from a
@@ -12889,6 +12983,43 @@ const CLUB_TX_PAGES = [
   ["#0a0a0a", "#232323", "#3d3d3d", "#5a5a5a", "#787878", "#979797", "#b5b5b5", "#d2d2d2", "#ececec", "#ffffff"]
 ];
 const CLUB_TX_ALIGN = ["center", "left", "right"];
+/**
+ * ⚠️⚠️ THE EFFECTS ARE DATA, so the rail is derived from this list and a seventh cannot arrive without a
+ * pill for it — and sh() returns its parts in a syntax text-shadow and box-shadow SHARE, which is what
+ * lets ONE definition serve the glyphs and the highlight panel alike. That sharing is the whole of what
+ * he reported: with a plate on, clubTxCss used to reach "text-shadow: none" and never look at the
+ * effect at all, so choosing Neon behind a border did nothing whatever.
+ * ⚠️ stroke IS NOT A SHADOW and is applied to the glyphs either way — it is a fraction of the type size,
+ * because a 2px outline is a hairline at 96px and a blob at 16px.
+ */
+const CLUB_TX_FX = [
+  { id: "", label: "Plain" },
+  { id: "neon", label: "Neon",
+    sh: (p, c) => [[0, 0, p * 0.18, c], [0, 0, p * 0.45, c], [0, 0, p * 0.9, c]] },
+  { id: "outline", label: "Outline", stroke: 0.045 },
+  { id: "shadow", label: "Shadow",
+    sh: (p) => [[p * 0.07, p * 0.09, p * 0.05, "rgba(2,10,8,.62)"]] },
+  { id: "echo", label: "Echo",
+    sh: (p, c) => [[p * 0.05, p * 0.05, 0, clubTxRgba(c, 0.5)],
+      [p * 0.1, p * 0.1, 0, clubTxRgba(c, 0.28)], [p * 0.15, p * 0.15, 0, clubTxRgba(c, 0.14)]] },
+  { id: "lift", label: "Lift",
+    sh: (p) => [[0, 0, p * 0.5, "rgba(2,10,8,.9)"], [0, p * 0.04, p * 0.16, "rgba(2,10,8,.8)"]] }
+];
+function clubTxFxOf(id) {
+  const f = CLUB_TX_FX.filter((x) => x.id === (id || ""))[0];
+  return f || CLUB_TX_FX[0];
+}
+/** A hex colour at an alpha, for the echo. Falls back to the deep ink rather than throwing, because a
+ *  word stored before the palette became hex-only carries a token clubTxInk cannot resolve either. */
+function clubTxRgba(hex, a) {
+  const h = String(hex || "").replace("#", "");
+  const parts = h.length === 3
+    ? [h.slice(0, 1) + h.slice(0, 1), h.slice(1, 2) + h.slice(1, 2), h.slice(2, 3) + h.slice(2, 3)]
+    : [h.slice(0, 2), h.slice(2, 4), h.slice(4, 6)];
+  const v = parts.map((x) => parseInt(x, 16));
+  if (v.length !== 3 || !v.every((n) => Number.isFinite(n))) return "rgba(2,10,8," + a + ")";
+  return "rgba(" + v[0] + "," + v[1] + "," + v[2] + "," + a + ")";
+}
 function clubTxStyle(id) {
   const st = CLUB_TX_STYLES.filter((x) => x.id === id)[0];
   return st || CLUB_TX_STYLES[0];
@@ -12916,6 +13047,7 @@ function clubTxCss(t, px) {
   const col = t.colour || "#ffffff";
   const plate = Number(t.bg) === 1;
   const ink = plate ? clubTxInk(col) : col;
+  const fx = clubTxFxOf(t.fx);
   const out = [st.css, "font-size: " + px + "px", "color: " + ink,
     "text-align: " + (CLUB_TX_ALIGN.indexOf(t.align) > 0 ? t.align : "center")];
   if (plate) {
@@ -12927,14 +13059,28 @@ function clubTxCss(t, px) {
       Math.max(6, Math.round(px * 0.26)) + "px");
     out.push("line-height: 1.18");
     out.push("border-radius: " + Math.max(5, Math.round(px * 0.18)) + "px");
-    // ⚠️ NO KEYLINE ON A PLATE. The ink is already chosen to read against it, and a dark halo round black
-    // words on a white plate is dirt round the letters.
+  }
+  // ⚠️⚠️ THE SHADOW IS BUILT ONCE AND THEN AIMED, AND THE AIMING IS THE FIX HE ASKED FOR. This used to
+  // be an if/else: a plate reached "text-shadow: none" and the effect was never consulted, so Neon with
+  // a border did nothing at all. text-shadow and box-shadow take the same parts, so the rule is one
+  // sentence — WITH A PLATE ON, A SHADOW EFFECT IS DRAWN ON THE PANEL INSTEAD OF THE GLYPHS. A neon
+  // panel glowing in its own colour is what a neon sign is; a glow in the computed INK would be a black
+  // halo round a white plate, which is why the colour passed here is the plate's, not the letters'.
+  // ⚠️ NO KEYLINE UNDER EITHER. The ink is already chosen to read against the plate, and a deep outline
+  // beneath a glow is a dark line inside a halo.
+  const parts = fx.sh ? fx.sh(px, col).map((sh) =>
+    Math.round(sh[0]) + "px " + Math.round(sh[1]) + "px " + Math.round(sh[2]) + "px " + sh[3]) : null;
+  if (parts && plate) { out.push("text-shadow: none"); out.push("box-shadow: " + parts.join(", ")); }
+  else if (parts) { out.push("text-shadow: " + parts.join(", ")); }
+  else if (plate) { out.push("text-shadow: none"); }
+  if (fx.stroke) {
+    // ⚠️ A HOLLOW LETTER NEEDS ITS CARET BACK. .club-tx[contenteditable] sets caret-color: currentColor
+    // so the caret can never disagree with the word — and currentColor here is transparent, so the word
+    // being typed would have no visible caret at all. Named explicitly, inline, where it wins.
+    out.push("-webkit-text-stroke: " + Math.max(1, Math.round(px * fx.stroke)) + "px " + ink);
+    out.push("color: transparent");
+    out.push("caret-color: " + ink);
     out.push("text-shadow: none");
-  } else if (t.fx === "neon") {
-    // ⚠️ THE GLOW REPLACES THE KEYLINE. A deep outline under a glow is a dark line inside a halo, which
-    // is what a neon sign is not.
-    out.push("text-shadow: 0 0 " + Math.round(px * 0.18) + "px " + col + ", 0 0 " +
-      Math.round(px * 0.45) + "px " + col + ", 0 0 " + Math.round(px * 0.9) + "px " + col);
   }
   return out.join("; ");
 }
@@ -13639,9 +13785,13 @@ function clubTextDraw() {
           '<button class="club-tst' + (d.style === st.id ? " on" : "") + '" data-ctst="' + st.id +
           '" style="' + st.css + '">' + st.label + '</button>').join("") + '</div>'
     : S.txTool === "colour"
-      ? '<div class="club-trail club-tcols">' + CLUB_TX_PAGES[S.txPage].map((c) =>
-          '<button class="club-cd' + (d.colour === c ? " on" : "") + '" data-ccol="' + c +
-          '" style="background:' + c + '" aria-label="Colour ' + c + '"></button>').join("") +
+      // ⚠️ ALL THREE PAGES ARE IN THE DOM, one full-width snap slide each — a rail that rendered only
+      // the current page could never be swiped to the next one, which is what he reported.
+      ? '<div class="club-tcols" id="clubTcols">' + CLUB_TX_PAGES.map((pg) =>
+          '<div class="club-tcpg">' + pg.map((c) =>
+            '<button class="club-cd' + (d.colour === c ? " on" : "") + '" data-ccol="' + c +
+            '" style="background:' + c + '" aria-label="Colour ' + c + '"></button>').join("") +
+          '</div>').join("") +
         '</div><div class="club-tdots">' + CLUB_TX_PAGES.map((_, n) =>
           '<button class="club-tdot' + (n === S.txPage ? " on" : "") + '" data-ctpage="' + n +
           '" aria-label="Colour page ' + (n + 1) + '"></button>').join("") + '</div>'
@@ -13651,11 +13801,11 @@ function clubTextDraw() {
           '">' + (a === "center" ? "Centre" : a === "left" ? "Left" : "Right") + '</button>').join("") +
         '</div>'
     : S.txTool === "fx"
-      ? '<div class="club-trail">' +
-          '<button class="club-tst' + (!d.fx ? " on" : "") + '" data-ctfx="">Plain</button>' +
-          '<button class="club-tst' + (d.fx === "neon" ? " on" : "") + '" data-ctfx="neon">Neon</button>' +
-        '</div><p class="club-tnote">Moving effects and mentions need a server the club does not have ' +
-        'yet, so they are not here rather than being here and doing nothing.</p>'
+      ? '<div class="club-trail">' + CLUB_TX_FX.map((f) =>
+          '<button class="club-tst' + ((d.fx || "") === f.id ? " on" : "") + '" data-ctfx="' + f.id +
+          '">' + f.label + '</button>').join("") +
+        '</div><p class="club-tnote">Effects that move are not here yet: one plays on the finished ' +
+        'story rather than in this editor. Tagging another runner needs accounts the club has not got.</p>'
       : "";
   ov.innerHTML = rail +
     '<div class="club-tts">' +
@@ -13681,9 +13831,73 @@ function clubTextDraw() {
   });
   pick("[data-ctst]", (b) => { d.style = b.dataset.ctst; });
   pick("[data-ccol]", (b) => { d.colour = b.dataset.ccol; });
-  pick("[data-ctpage]", (b) => { S.txPage = Number(b.dataset.ctpage) || 0; });
-  pick("[data-ctal]", (b) => { d.align = b.dataset.ctal; });
+  // ⚠️ THE DOTS SCROLL THE STRIP AND DO NOT REDRAW IT. Going through pick() would rebuild the rail —
+  // and rebuilding a scroller under the finger is how the composer's dial row came to jump back to the
+  // start on every tap. The dot's own state is a class toggle for the same reason.
+  const dot = (n) => ov.querySelectorAll("[data-ctpage]")
+    .forEach((x, i) => x.classList.toggle("on", i === n));
+  ov.querySelectorAll("[data-ctpage]").forEach((b) => b.onclick = () => {
+    const n = Number(b.dataset.ctpage) || 0;
+    S.txPage = n;
+    const c = $("clubTcols");
+    if (c) { try { c.scrollTo({ left: n * c.clientWidth, behavior: "smooth" }); }
+      catch (e) { c.scrollLeft = n * c.clientWidth; } }
+    dot(n);
+  });
+  const cols = $("clubTcols");
+  if (cols) {
+    // ⚠️ THE PAGE IS RESTORED AFTER EVERY REDRAW, or choosing a colour on page three snaps the strip
+    // back to page one — a swatch tap does rebuild this rail, because the chosen ring has to move.
+    cols.scrollLeft = S.txPage * cols.clientWidth;
+    cols.onscroll = () => {
+      const w = Math.max(1, cols.clientWidth);
+      const n = Math.max(0, Math.min(CLUB_TX_PAGES.length - 1, Math.round(cols.scrollLeft / w)));
+      if (n === S.txPage) return;
+      S.txPage = n;
+      dot(n);
+    };
+  }
+  // ⚠️⚠️ ALIGNMENT SNAPS THE BLOCK AS WELL AS THE LINES, and without that half the buttons did nothing
+  // he could see: .club-tx is width: max-content, so the box hugs its widest line and text-align has
+  // nowhere to move a SINGLE line to. "The test doesn't move the alignment in screenshot 2." The lines
+  // still align within the block, which is the real behaviour for a wrapped caption; what is added is
+  // that Left and Right also put the block against that edge of the picture, which is what the words
+  // Left and Right mean to somebody reading them.
+  ov.querySelectorAll("[data-ctal]").forEach((b) => b.onclick = () => {
+    d.align = b.dataset.ctal;
+    clubTextDraw(); clubDraftPaint();
+    clubAlignSnap();
+  });
   pick("[data-ctfx]", (b) => { d.fx = b.dataset.ctfx; });
+}
+/**
+ * FLUSH LEFT, CENTRED OR FLUSH RIGHT — measured, because the box hugs its own text and no arithmetic
+ * here can know how wide that is.
+ *
+ * ⚠️ THE ANCHOR IS NEVER CHANGED, only x. Giving Left its own transform origin would be exact with no
+ * measurement at all, and would make the word JUMP by half its width the first time it was dragged
+ * afterwards — the anchor point would have changed meaning under clubTextDrag. Reading the painted box
+ * costs one layout on a tap and leaves the drag model untouched.
+ * ⚠️ THE CONTAINING BLOCK IS offsetParent, not a selector. left is a percentage, so the box it resolves
+ * against is whatever positioned ancestor the browser chose — asking the element removes the chance of
+ * measuring the stage while the percentages are resolving against the layer inside it.
+ * ⚠️ AND A BLOCK WIDER THAN HALF THE PICTURE CANNOT GO FURTHER LEFT than the middle, so the clamps are
+ * not tidiness: without them a long caption is pushed off the edge by the very button meant to align it.
+ */
+function clubAlignSnap() {
+  const S = CLUBED; if (!S || !S.draft) return;
+  const n = document.querySelector('[data-ctx="d"]');
+  const cb = n && n.offsetParent;
+  if (!cb) return;
+  const sw = cb.clientWidth, bw = n.getBoundingClientRect().width;
+  if (!sw || !bw) return;
+  const half = bw / 2 / sw, pad = 0.03;
+  const a = S.draft.align || "center";
+  const want = a === "left" ? Math.min(0.5, half + pad)
+    : a === "right" ? Math.max(0.5, 1 - half - pad) : 0.5;
+  if (Math.abs(want - Number(S.draft.x)) < 0.002) return;
+  S.draft.x = want;
+  clubDraftPaint();
 }
 /**
  * THE WORD WIRES ITSELF — input sync, plain-text belts, and the drag binding.
@@ -13970,6 +14184,34 @@ function clubLookAttrs(sl) {
 }
 /** ⚠️ ONE PASS OVER THE DOM AFTER A RENDER, so a tile, a story ring and the viewer all fill in through
  *  the same path — three loaders would be three places a missing blob is handled differently. */
+/**
+ * START THE STORY'S OWN VIDEO: the chosen window, on a loop, with sound.
+ *
+ * ⚠️ THE TRIM IS APPLIED AT PLAYBACK, which is what makes storing in and out points rather than
+ * re-encoding honest: the runner sees exactly the window they chose and the original is left intact for an
+ * export later. It is wired here, beside the element's creation, for the same reason the sound is — a timer
+ * that has to find the element later is a race with an IndexedDB read.
+ * ⚠️ AND IF SOUND IS REFUSED, IT PLAYS MUTED RATHER THAN NOT AT ALL. Every browser may decline unmuted
+ * playback that it does not consider user-initiated; this app's own web view is configured to allow it
+ * (mediaTypesRequiringUserActionForPlayback is empty), but a frozen first frame would be a worse answer
+ * than a silent one anywhere that is not true.
+ */
+function clubPlayHero(med, span) {
+  const inS = Number(span.dataset.ctin) || 0;
+  const outS = Number(span.dataset.ctout) || 0;
+  const start = () => { try { med.currentTime = inS; } catch (e) {} };
+  if (med.readyState >= 1) start(); else med.onloadedmetadata = start;
+  if (outS > inS) {
+    med.ontimeupdate = () => { if (med.currentTime >= outS - 0.05) start(); };
+  }
+  try {
+    const pr = med.play();
+    if (pr && pr.catch) pr.catch(() => {
+      med.muted = true;
+      try { const p2 = med.play(); if (p2 && p2.catch) p2.catch(() => {}); } catch (e) {}
+    });
+  } catch (e) {}
+}
 function clubFillMedia() {
   document.querySelectorAll("[data-cmed]").forEach((n) => {
     if (n.dataset.cfilled) return;
@@ -13977,10 +14219,21 @@ function clubFillMedia() {
     n.dataset.cfilled = "1";
     clubUrl(key).then((url) => {
       if (!url) { n.classList.add("cm-med-gone"); return; }
+      // ⚠️⚠️ THE PLAYING HERO IS BORN WITH SOUND; EVERY OTHER VIDEO IS BORN MUTED. A tile in a grid, a
+      // thumbnail in a rail and a slide in a feed are all pictures that happen to be videos, and a wall of
+      // them all talking at once is the reason muted is the default. The story a runner has OPENED is the
+      // one exception, and it used to be handled by unmuting on a 60ms timer after this sweep had run —
+      // which is a race against an IndexedDB read: when the blob came back slower than 60ms the timer found
+      // no <video> at all, and because this function marks the span data-cfilled it never got a second
+      // chance. The story then played silently for its whole length. Reported from a real posted story.
+      // ⚠️ SO THE ATTRIBUTES ARE SET WHERE THE ELEMENT IS CREATED, which cannot race anything.
+      const play = n.dataset.cplay === "1";
       n.innerHTML = n.dataset.cvid
-        ? '<video src="' + url + '" muted playsinline preload="metadata"></video>'
+        ? '<video src="' + url + '" playsinline preload="' + (play ? "auto" : "metadata") + '"' +
+          (play ? ' autoplay loop' : ' muted') + '></video>'
         : '<img src="' + url + '" alt="">';
       const med = n.firstElementChild;
+      if (play && med && n.dataset.cvid) clubPlayHero(med, n);
       if (med) clubApplyLook(med, { filter: n.dataset.clook || "",
         hi: Number(n.dataset.chi) || 0, sh: Number(n.dataset.csh) || 0,
         rot: Number(n.dataset.crot) || 0, vig: 0 });
@@ -14461,8 +14714,12 @@ function clubOpenMedia(rows, i, auto) {
       '<div class="club-stage club-stage-v">' +
         '<div class="club-fit" style="transform:scale(' + (c.k || 1) + ');transform-origin:' +
           ((c.ox != null ? c.ox : 0.5) * 100) + '% ' + ((c.oy != null ? c.oy : 0.5) * 100) + '%">' +
+          // ⚠️ data-cplay MARKS THE ONE VIDEO A RUNNER HAS ACTUALLY OPENED, so clubFillMedia builds it with
+          // sound, on a loop, trimmed to the chosen window — and nothing here has to find it afterwards.
           '<span class="club-vmed' + (first.card ? " club-vmed-fit" : "") + '" data-cmed="' +
             esc(first.media || "") + '" data-cvid="' + (p.video ? "1" : "") + '"' +
+            ' data-cplay="1" data-ctin="' + ((first.trim && first.trim.inS) || 0) +
+            '" data-ctout="' + ((first.trim && first.trim.outS) || 0) + '"' +
             clubLookAttrs(first) + '></span>' +
         '</div>' +
         '<div class="club-txs">' + texts + '</div>' +
@@ -14488,17 +14745,12 @@ function clubOpenMedia(rows, i, auto) {
     // ⚠️ THE TRIM IS APPLIED AT PLAYBACK, which is what makes storing in/out points rather than
     // re-encoding honest: the runner sees exactly the window they chose, and the original is intact for
     // an export later.
-    setTimeout(() => {
-      const vd = ov.querySelector("video");
-      const tr = first.trim;
-      if (vd && tr) {
-        vd.currentTime = tr.inS || 0;
-        vd.ontimeupdate = () => {
-          if (tr.outS > tr.inS && vd.currentTime >= tr.outS - 0.05) vd.currentTime = tr.inS;
-        };
-      }
-      if (vd) { vd.muted = false; vd.loop = true; try { vd.play(); } catch (e) {} }
-    }, 60);
+    // ⚠️ THE 60ms TIMER THAT USED TO UNMUTE AND START THE VIDEO IS GONE, and it is worth recording why
+    // rather than just deleting it. It read ov.querySelector("video") sixty milliseconds after
+    // clubFillMedia was ASKED to create that element — and clubFillMedia reads the blob out of IndexedDB
+    // first, so on any read slower than that the timer found nothing, did nothing, and the span was
+    // already marked filled so nothing tried again: a story that played silently for its whole length.
+    // The sound, the loop and the trim window are set where the element is created now.
     const x = $("clubVX"); if (x) x.onclick = () => { haptic("light"); clubViewClose(); };
     // ⚠️ THE ZONES STOP THE TIMER'S OWN ADVANCE FROM RACING THE TAP. Without the reset a tap landing a
     // moment before the auto-advance fires moves two stories at once, which reads as a missed tap.

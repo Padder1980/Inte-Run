@@ -822,8 +822,15 @@ test("BLOCKER: the conditions square never says Good to run under a warning colo
         code: 0, label: "Clear", iconKey: "wxSun", live: true, at: Date.now() };
       const sess = e.api.conditionsSession();
       const sub = text(e.api.conditionsSquare());
-      const imp = assessConditions({ tempC, humidityPct: 45, dewPointC: Math.min(19, tempC - 2),
-        windKph, minutes: 45, sessionType: sess ? sess.type : "mobility" });
+      // ⚠️ THE IMPACT IS THE APP'S OWN, NOT A SECOND DERIVATION OF IT. This guard used to build
+      // its own assessConditions call with a hardcoded minutes: 45 and a "mobility" fallback, while
+      // currentConditions passes the SESSION'S REAL DURATION and falls back to "easy" — so the ruler
+      // and the thing being measured disagreed whenever today's session was not 45 minutes long. It
+      // failed for the first time on 2026-08-25 with no code change at all: the weekday moved, today's
+      // session changed length, and at -4 °C / 45 kph the app said "Run by effort" while the proxy
+      // said wind. The invariant is that the WORDS MATCH THE IMPACT THE TILE IS PAINTED FROM, so it
+      // has to be that impact. Same fixture-too-kind trap this file already records, on a clock.
+      const imp = e.api.currentConditions(sess);
       seen.set(imp.severity, (seen.get(imp.severity) || 0) + 1);
       if (RANKS[imp.severity]! >= 2) {
         worded++;

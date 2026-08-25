@@ -52,6 +52,23 @@ function appBlock(): string {
   APP_CACHE = app;
   return app;
 }
+/**
+ * ⚠️ A HANDLER BODY IS BRACE-MATCHED, NEVER SLICED TO THE NEXT "});". The colour-page dot's own body
+ * contains c.scrollTo({ ... }); — which IS a "});" — so a window closed there and a deliberate
+ * clubTextDraw() added two lines below it sailed through the guard that forbids one. Measured escaping.
+ * Twelfth firing of the character-window-is-not-a-function trap in this codebase.
+ */
+function braced(src: string, from: number): string {
+  const open = src.indexOf("{", from);
+  assert.ok(open > 0, "no block follows position " + from);
+  let d = 0;
+  for (let i = open; i < src.length; i++) {
+    if (src[i] === "{") d++;
+    else if (src[i] === "}" && --d === 0) return src.slice(open, i + 1);
+  }
+  assert.fail("unbalanced block from position " + from);
+  return "";
+}
 /** The app block with its comments stripped — the commonest scope in this file, and the slowest to build. */
 let NOAPP_CACHE: string | null = null;
 const noApp = () => (NOAPP_CACHE ??= nocomment(appBlock()));
@@ -648,7 +665,14 @@ test("BLOCKER: one full-screen player serves a post and a story, and only a stor
     "a video story is cut off after the photo interval");
   assert.match(v, /Math\.min\(CLUB_STORY_MAX_S/, "a story could run longer than its own cap");
   // ⚠️ THE TRIM IS APPLIED AT PLAYBACK — that is what makes storing points rather than re-encoding honest.
-  assert.match(v, /vd\.currentTime = tr\.inS/, "the trim is not applied when the video plays");
+  // ⚠️ IT MOVED (2026-08-25) AND THE GUARD MOVED WITH IT. It used to be wired here, on a 60ms timer that
+  // hunted for the <video> after clubFillMedia had been ASKED to create it — a race with an IndexedDB
+  // read. It is applied where the element is created now, in clubPlayHero, so the claim is made there.
+  // Pinning it to this function's own timer would be asserting the race back into existence.
+  const hero = nocomment(fn("clubPlayHero"));
+  assert.match(hero, /med\.currentTime = inS/, "the trim is not applied when the video plays");
+  assert.ok(!/setTimeout\([\s\S]{0,200}querySelector\("video"\)/.test(v),
+    "the viewer is hunting for its own video element on a timer again");
   // ⚠️ THE TIMER IS CLEARED ON EVERY EXIT. This app has paid twice for an interval outliving its sheet.
   const c = fn("clubViewClose");
   assert.match(c, /clearTimeout\(CLUB_VIEW_T\)/, "closing the player leaves its timer running");
@@ -681,7 +705,12 @@ test("BLOCKER: media is loaded after the render, through one loader, and a missi
   assert.match(f, /if \(!url\) \{[^}]*cm-med-gone/, "a post whose blob has gone shows nothing at all");
   assert.match(f, /\.catch\(\(\) => n\.classList\.add\("cm-med-gone"\)\)/,
     "a blob that fails to read shows nothing at all");
-  assert.match(f, /preload="metadata"/, "a video tile decodes the whole clip to draw a thumbnail");
+  // ⚠️ A TILE PRELOADS METADATA; THE ONE STORY A RUNNER HAS OPENED PRELOADS EVERYTHING. Decoding a whole
+  // clip to draw a thumbnail is waste on a grid of them, and preloading only metadata on the clip that is
+  // about to play is a stutter at the start of it. Both halves are asserted so neither can drift into the
+  // other.
+  assert.match(f, /preload="' \+ \(play \? "auto" : "metadata"\) \+ '"/,
+    "the tile and the opened story no longer preload differently — one of them is wrong whichever way");
   // ⚠️ ONE LOADER FOR THE TILE, THE RING AND THE VIEWER. Three would be three places a missing blob is
   // handled differently.
   // ⚠️ RESTATED FROM A COUNT TO THE INVARIANT (2026-08-24). A ceiling on the number of callers fails
@@ -2535,7 +2564,13 @@ test("BLOCKER: the text plate reads, the glow replaces the keyline, and legacy w
   assert.equal(ink("var(--accent)"), "#ffffff", "a token colour is not handled");
   assert.equal(ink(undefined), "#ffffff", "a missing colour is not handled");
 
+  // ⚠️ THE EFFECT TABLE IS READ OUT OF THE PAGE, NOT TYPED HERE. A supplied table means the lifted
+  // function runs against the TEST's effects, which is the probe-supplies-its-own-constants trap this
+  // project has measured escaping a guard twice.
+  const fxTable = /const CLUB_TX_FX = \[[\s\S]*?\n\];/.exec(noApp());
+  assert.ok(fxTable, "CLUB_TX_FX could not be read out of the built page");
   const css = new Function(nocomment(fn("clubTxStyle")) + "\n" + nocomment(fn("clubTxInk")) + "\n" +
+    nocomment(fn("clubTxRgba")) + "\n" + fxTable![0] + "\n" + nocomment(fn("clubTxFxOf")) + "\n" +
     nocomment(fn("clubTxCss")) + "\n" +
     "const CLUB_TX_STYLES = [{ id: 'clean', label: 'Clean', css: 'font-weight: 800' }];\n" +
     "const CLUB_TX_ALIGN = ['center','left','right'];\nreturn clubTxCss;")();
@@ -2559,6 +2594,151 @@ test("BLOCKER: the text plate reads, the glow replaces the keyline, and legacy w
   // ⚠️ A WORD STORED BEFORE THE STYLES EXISTED CARRIES A font AND NO style, and must still look itself.
   const span = nocomment(fn("clubTextSpan"));
   assert.match(span, /!t\.style && t\.font/, "an older word loses the typeface it was written in");
+});
+
+/**
+ * THE FIVE THINGS HE REPORTED ON THE TEXT EDITOR (owner, 2026-08-25). Every one of them was a control
+ * that looked live: "No neon effect takes place when there is a border", "the cant slide the text size
+ * because its falling off the edge of the screen", "the test doesn't move the alignment", "theres 3 dots
+ * to show more options on the colours but nothing happens if you try to swipe".
+ */
+test("BLOCKER: an effect survives the highlight plate — it is aimed at the panel, never dropped", () => {
+  const fxTable = /const CLUB_TX_FX = \[[\s\S]*?\n\];/.exec(noApp());
+  assert.ok(fxTable, "CLUB_TX_FX could not be read out of the built page");
+  const css = new Function(nocomment(fn("clubTxStyle")) + "\n" + nocomment(fn("clubTxInk")) + "\n" +
+    nocomment(fn("clubTxRgba")) + "\n" + fxTable![0] + "\n" + nocomment(fn("clubTxFxOf")) + "\n" +
+    nocomment(fn("clubTxCss")) + "\n" +
+    "const CLUB_TX_STYLES = [{ id: 'clean', label: 'Clean', css: 'font-weight: 800' }];\n" +
+    "const CLUB_TX_ALIGN = ['center','left','right'];\nreturn clubTxCss;")();
+  // ⚠️ THE DEFECT ITSELF: with a plate on, clubTxCss reached "text-shadow: none" through an if/else and
+  // never consulted the effect at all, so Neon behind a border did nothing whatever.
+  const both = css({ colour: "#ffd60a", bg: 1, fx: "neon" }, 34);
+  assert.match(both, /box-shadow:[^;]*#ffd60a/,
+    "an effect chosen with the plate on reaches neither the glyphs nor the panel: " + both);
+  assert.match(both, /text-shadow:\s*none/, "a plate keeps its keyline under a glow, which is dirt");
+  // ⚠️ THE PANEL GLOWS IN THE PLATE'S OWN COLOUR, not the computed ink — a glow in the ink is a black
+  // halo round a white plate, which is a shadow rather than a neon sign.
+  assert.ok(both.indexOf("box-shadow: 0px 0px 6px #0a0a0a") < 0,
+    "the panel glows in the computed ink rather than its own colour: " + both);
+  // Without a plate it is still the glyphs that glow, and nothing drags a background along with it.
+  const glyph = css({ colour: "#ffd60a", fx: "neon" }, 34);
+  assert.match(glyph, /text-shadow:[^;]*#ffd60a/, "the glow left the glyphs");
+  assert.ok(glyph.indexOf("box-shadow") < 0, "an unplated word grows a panel shadow");
+  assert.ok(glyph.indexOf("background") < 0, "the glow drags a plate along with it");
+  // ⚠️ EVERY SHADOW EFFECT IN THE TABLE OBEYS THE SAME SENTENCE, derived rather than listed, so a
+  // seventh cannot arrive drawn in the wrong place.
+  const fxIds = [...fxTable![0].matchAll(/\{ id: "(\w*)", label: "([^"]+)"/g)].map((m) => m[1]!);
+  assert.ok(fxIds.length >= 6, "only " + fxIds.length + " effects — he asked for more");
+  let shadowy = 0;
+  for (const id of fxIds) {
+    if (!id) continue;
+    const plain = css({ colour: "#2b8aef", fx: id }, 40);
+    const plated = css({ colour: "#2b8aef", bg: 1, fx: id }, 40);
+    if (plain.indexOf("text-shadow: none") < 0 && /text-shadow:/.test(plain)) {
+      shadowy++;
+      assert.match(plated, /box-shadow:/, id + " is dropped when the plate is on: " + plated);
+    }
+    assert.ok(plain !== css({ colour: "#2b8aef" }, 40), id + " changes nothing at all");
+  }
+  assert.ok(shadowy >= 4, "only " + shadowy + " effects draw a shadow — the aiming rule is untested");
+  // ⚠️ THE HOLLOW ONE KEEPS ITS CARET. caret-color is currentColor in the stylesheet so it can never
+  // disagree with the word — and currentColor here is transparent, so the word being typed would have
+  // no visible caret at all.
+  const out = css({ colour: "#ffffff", fx: "outline" }, 40);
+  assert.match(out, /-webkit-text-stroke:\s*\d+px/, "Outline draws no stroke");
+  assert.match(out, /color:\s*transparent/, "Outline is not hollow");
+  assert.match(out, /caret-color:\s*#ffffff/, "a hollow word has an invisible caret while it is typed");
+});
+
+test("BLOCKER: the size knob is wholly on screen, and the colour pages really page", () => {
+  const src = page();
+  // ⚠️ ANCHORED AT THE START OF A LINE, so .club-tcols is not answered by html.kbup .club-tcols and
+  // .club-szt is not answered by a scoped override of it.
+  const cssOf = (sel: string) => {
+    const at = src.indexOf("\n" + sel + " {");
+    assert.ok(at > 0, sel + " has no rule in the stylesheet");
+    return src.slice(at, src.indexOf("}", at));
+  };
+  // ⚠️ THE KNOB'S OWN OFFSET, NOT THE TRACK'S. It shipped left: -13px in a 44px track, which put half of
+  // a 26px circle outside the stage's overflow: hidden — faithful to the reference and the exact thing he
+  // could not grab. The claim is arithmetic: the knob starts at or after the track's own left edge and
+  // ends inside it.
+  const trk = cssOf(".club-szt"), knb = cssOf(".club-szk");
+  const num = (css: string, prop: string) => {
+    const m = new RegExp(prop + ":\\s*(-?[\\d.]+)px").exec(css);
+    assert.ok(m, prop + " is not a px value in " + css.slice(0, 60));
+    return Number(m![1]);
+  };
+  const kl = num(knb, "left"), kw = num(knb, "width"), tw = num(trk, "width");
+  assert.ok(kl >= 0, "the size knob is drawn at left: " + kl + "px, so it is clipped off the screen edge");
+  assert.ok(kl + kw <= tw, "the knob (" + kl + "+" + kw + ") overhangs its own " + tw + "px track");
+  // And the track is still a big enough target and a long enough throw to be usable.
+  assert.ok(tw >= 44, "the size track is " + tw + "px wide, under the 44px tap floor");
+  const th = /height:\s*(\d+)%/.exec(trk);
+  assert.ok(th && Number(th[1]) >= 40,
+    "the size track is only " + (th ? th[1] : "?") + "% of the stage — 80 sizes in a quarter of the height");
+  // ⚠️ THE PAGES ARE A SNAP CAROUSEL, and all three are in the DOM. A rail rendering only the current
+  // page can never be swiped to the next one, which is what the dots were promising.
+  assert.match(cssOf(".club-tcols"), /scroll-snap-type:\s*x mandatory/, "the colour strip does not snap");
+  assert.match(cssOf(".club-tcols"), /overflow-x:\s*auto/, "the colour strip does not scroll");
+  assert.match(cssOf(".club-tcpg"), /flex:\s*0 0 100%/, "a colour page is not a full-width slide");
+  const draw = nocomment(fn("clubTextDraw"));
+  assert.match(draw, /CLUB_TX_PAGES\.map\(\(pg\)/, "only one colour page is rendered");
+  // ⚠️ THE DOT SCROLLS THE STRIP AND DOES NOT REDRAW IT — a redraw rebuilds the scroller under the
+  // finger, which is how the composer's dial row came to jump back to the start on every tap.
+  const dotAt = draw.indexOf('ov.querySelectorAll("[data-ctpage]").forEach');
+  assert.ok(dotAt > 0, "the colour page dots are rendered but never wired");
+  const dotBody = braced(draw, dotAt);
+  assert.match(dotBody, /scroll/, "tapping a dot does not move the strip");
+  assert.ok(dotBody.indexOf("clubTextDraw") < 0,
+    "tapping a dot rebuilds the rail, which throws the strip back to the first page");
+  // And the page survives the redraw a swatch tap does cause, or choosing a colour on page three snaps
+  // the strip back to page one.
+  assert.match(draw, /scrollLeft = S\.txPage \* /, "the chosen colour page is not restored after a redraw");
+});
+
+test("BLOCKER: alignment moves the block as well as the lines", () => {
+  // ⚠️ .club-tx IS width: max-content, so the box hugs its widest line and text-align has nowhere to
+  // move a SINGLE line to — which is the whole of "the test doesn't move the alignment in screenshot 2".
+  // The lines still align within the block; what is added is that Left and Right put the block against
+  // that edge of the picture, which is what those two words mean to somebody reading them.
+  const draw = nocomment(fn("clubTextDraw"));
+  const alAt = draw.indexOf('ov.querySelectorAll("[data-ctal]").forEach');
+  assert.ok(alAt > 0, "the alignment buttons are rendered but never wired");
+  const alBody = braced(draw, alAt);
+  assert.match(alBody, /d\.align = /, "the alignment button writes no alignment");
+  assert.match(alBody, /clubAlignSnap\(\)/, "choosing an alignment never moves the block");
+  // Driven, because the snap is measurement and no source read can see where it puts the word.
+  const snap = new Function("CLUBED", "clubDraftPaint", "document",
+    nocomment(fn("clubAlignSnap")) + "\nreturn clubAlignSnap;");
+  const run = (align: string, boxW: number, stageW: number) => {
+    const S = { draft: { align, x: 0.5 } };
+    const node = { offsetParent: { clientWidth: stageW }, getBoundingClientRect: () => ({ width: boxW }) };
+    let painted = 0;
+    snap(S, () => painted++, { querySelector: () => node })();
+    return { x: S.draft.x, painted };
+  };
+  const left = run("left", 200, 1000), right = run("right", 200, 1000), mid = run("center", 200, 1000);
+  assert.ok(left.x < 0.2, "Left leaves the block at x=" + left.x + " — it has not moved to the left");
+  assert.ok(right.x > 0.8, "Right leaves the block at x=" + right.x);
+  assert.equal(mid.x, 0.5, "Centre does not centre the block");
+  assert.ok(left.painted === 1 && right.painted === 1, "the move is not repainted");
+  // ⚠️⚠️ AND THE BOX NEVER OVERHANGS THE PICTURE, WHICH IS THE CLAIM RATHER THAN A PARTICULAR x. The
+  // first version of this asserted a 900px caption in a 1000px stage lands at exactly 0.5 and failed on
+  // correct code: it lands at 0.48, which leaves 30px on the left and 70px on the right — genuinely as
+  // flush left as a box that wide can be. The invariant is that neither edge leaves the card, and it is
+  // swept, because the clamp only binds for a caption wider than 94% of the picture.
+  for (const w of [100, 400, 700, 900, 990]) {
+    for (const a of ["left", "right", "center"]) {
+      const r = run(a, w, 1000), h = w / 2 / 1000;
+      assert.ok(r.x - h >= -0.001, a + " at " + w + "px hangs off the left edge (x=" + r.x + ")");
+      assert.ok(r.x + h <= 1.001, a + " at " + w + "px hangs off the right edge (x=" + r.x + ")");
+    }
+  }
+  // Centre is already centred, so the snap must not repaint for nothing.
+  assert.equal(mid.painted, 0, "a snap that changes nothing still repaints the word");
+  // The lines themselves still align — the half that was always right.
+  assert.match(nocomment(fn("clubTxCss")), /text-align: /, "the lines no longer align at all");
 });
 
 /**

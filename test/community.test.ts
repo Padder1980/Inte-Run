@@ -2771,6 +2771,27 @@ test("BLOCKER: a word detents to centre and to level, with one line and one tap"
   const th = rig(0.2, 0.31, 1, true);
   th.api.d(th.g);
   assert.equal(th.g.gr.style.top, "31%", "the level line is not drawn through the word: " + th.g.gr.style.top);
+  // ⚠️⚠️ A WORD THAT STARTS IN A DETENT HAS NOT ARRIVED IN ONE. He would have felt this on nearly every
+  // drag, because most words sit at dead centre: with the latches starting false, the first pointermove
+  // reads "centred" as a transition and taps. clubTextDrag seeds them from where the word already is.
+  const seeded = rig(0.5, 0.5, 0, false);
+  seeded.g.snapX = true; seeded.g.snapY = true; seeded.g.snapR = true;
+  seeded.api.d(seeded.g);
+  assert.equal(seeded.taps.length, 0,
+    "a word already at dead centre taps the instant it is picked up");
+  assert.ok(seeded.cls.has("on-x") && seeded.cls.has("on-y"),
+    "a word already centred shows no guides, so there is nothing to explain the snap");
+  // ⚠️ AND THE LEVEL LATCH SURVIVES A ONE-FINGER DRAG. One finger cannot change the angle, so clearing
+  // it here would forget that the word started level and tap the moment a pinch began — announcing an
+  // arrival at a place it had never left.
+  const lvl = rig(0.2, 0.2, 0, false);
+  lvl.g.snapR = true;
+  lvl.api.d(lvl.g);
+  assert.equal(lvl.g.snapR, true,
+    "a one-finger drag forgot the word was already level, so the next pinch will tap for nothing");
+  lvl.g.anchor.two = true;
+  lvl.api.d(lvl.g);
+  assert.equal(lvl.taps.length, 0, "picking a level word up with two fingers taps for nothing");
   // Release takes every guide down and forgets every detent, or the next gesture starts latched.
   two.api.off(two.g);
   assert.equal(two.cls.size, 0, "a guide survived the release: " + [...two.cls]);
@@ -2817,6 +2838,58 @@ test("BLOCKER: the detent is wired into the drag, and the guides cannot eat a to
   // ⚠️ "tick" IS THE SELECTION GENERATOR NATIVELY; the other kinds are impacts and notifications, and
   // an unknown kind reaches "default: break" and does nothing at all on a phone.
   assert.match(nocomment(fn("clubTxDetent")), /haptic\("tick"\)/, "the detent uses the wrong haptic kind");
+});
+
+test("BLOCKER: a second finger anywhere joins the word, so a rotate is reachable at all", () => {
+  // ⚠️⚠️ HIS REPORT: "it snaps to the middle but it doesn\'t snap to level horizontally". The level
+  // detent was fine and could not be REACHED: a rotate needed both fingers inside the word\'s own box,
+  // measured 234 x 43px for an ordinary caption, and turning the pair takes them out of a 43px strip at
+  // once. The second finger landed on the picture, the stage started a photo pan, the word\'s gesture
+  // kept one pointer, and the angle never moved. Driven before the fix: 20 degrees throughout.
+  const g = nocomment(fn("clubEdGestures"));
+  const down = g.slice(g.indexOf("stage.onpointerdown"));
+  const joinAt = down.indexOf("if (CLUB_TXG) {");
+  assert.ok(joinAt > 0, "a second finger cannot join a live word gesture, so a word cannot be rotated");
+  const join = braced(down, joinAt);
+  assert.match(join, /CLUB_TXG\.pts\.set\(ev\.pointerId/, "the joining finger is not added to the gesture");
+  // ⚠️ CAPTURED ON THE WORD\'S NODE, not the stage — clubTxMove is bound to the node, so a pointer
+  // captured by the stage delivers its moves to the stage and the word does not follow it.
+  assert.match(join, /CLUB_TXG\.node\.setPointerCapture/,
+    "the joining pointer is captured somewhere other than the word, so the word will not follow it");
+  assert.match(join, /clubTxAnchor\(\)/, "the gesture is not re-anchored on the fingers now down");
+  // Ordering, both ways round, and both halves are load-bearing.
+  const bail = down.indexOf('closest("[data-ctx], [data-cszk]")');
+  const draft = down.indexOf("S2 && S2.draft");
+  assert.ok(bail >= 0 && draft > 0, "the stage handler no longer has the branches this depends on");
+  assert.ok(bail < joinAt,
+    "the join runs before the word bail, so a finger landing ON a word is handled twice");
+  assert.ok(joinAt < draft,
+    "the join runs after the draft branch, so a second finger on the word being typed commits it " +
+    "instead of turning it");
+  // ⚠️⚠️ AND THE SEEDING IS ASSERTED WHERE IT HAPPENS, NOT ONLY IN ITS EFFECT. The behavioural half of
+  // this lives in the detent test, which hands clubTxDetent a pre-seeded gesture — so replacing the real
+  // seeds with "false" escaped it entirely. Measured escaping. Each latch must come from where the word
+  // ALREADY is, which means naming the word and the threshold rather than a constant.
+  const drag = nocomment(fn("clubTextDrag"));
+  // The pair is annotated because noUncheckedIndexedAccess types a destructured element as possibly
+  // undefined — the same tuple trap this project already records fixing in the share tests.
+  const seeds: Array<[string, string]> = [["snapX", "t.x"], ["snapY", "t.y"], ["snapR", "t.rot"]];
+  for (const [field, from] of seeds) {
+    const m = new RegExp(field + ":\\s*(.+)$", "m").exec(drag);
+    assert.ok(m, field + " is not initialised on the gesture record");
+    assert.ok(m![1]!.includes(from) && m![1]!.includes("CLUB_SNAP"),
+      field + " is seeded from a constant rather than from where the word already is: " + m![1]);
+  }
+  // ⚠️ ONE EDITOR ROOT, EVER. openClubEditor appended unconditionally and $() answers with the FIRST
+  // match, so a second open left every builder writing into the root underneath while the runner looked
+  // at the one on top — inert in every particular. Measured: two roots, app writing into index 0, index
+  // 1 visible. Same duplicate-id class as the recap\'s storyShare, which shipped a dead Share button.
+  const open = nocomment(fn("openClubEditor"));
+  const mk = open.indexOf('id="clubEd"');
+  assert.ok(mk > 0, "openClubEditor no longer creates the editor root");
+  const before = open.slice(0, mk);
+  assert.match(before, /\$\("clubEd"\)[\s\S]*?\.remove\(\)/,
+    "a second open appends a second editor root, and the visible one is then frozen");
 });
 
 test("BLOCKER: alignment moves the block as well as the lines", () => {

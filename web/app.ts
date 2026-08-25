@@ -12394,6 +12394,13 @@ function openClubEditor(kind, files, opts) {
         filter: "none", adj: {}, ov: [] };
     })
   };
+  // ⚠️⚠️ ANY EXISTING ROOT GOES FIRST, AND WITHOUT THIS A SECOND OPEN FREEZES THE EDITOR COMPLETELY.
+  // This appended unconditionally, and $("clubEd") answers with the FIRST match — so two roots means
+  // every builder writes into the one underneath while the runner looks at the one on top, which is
+  // then inert in every particular. Measured before the fix: two roots, the app writing into index 0
+  // and index 1 visible. Same duplicate-id class as the recap's storyShare, which shipped a Share
+  // button wired to nothing.
+  const old = $("clubEd"); if (old) old.remove();
   const ov = el('<div class="club-ed" id="clubEd"></div>');
   // ⚠️ INSIDE .app, NOT document.body — the pan belt. If iOS pans the visual viewport and refuses the
   // scrollTo that clears it, followPan translates .app to cover the visible region; a transformed
@@ -13430,6 +13437,24 @@ function clubEdGestures(stage) {
   let tapAt = null;
   stage.onpointerdown = (ev) => {
     if (ev.target && ev.target.closest && ev.target.closest("[data-ctx], [data-cszk]")) return;
+    // ⚠️⚠️ A SECOND FINGER JOINS A LIVE WORD GESTURE WHEREVER IT LANDS, AND WITHOUT THIS ROTATING A
+    // WORD IS ALMOST UNREACHABLE. He reported "it snaps to the middle but it doesn't snap to level":
+    // measured, a rotate needed BOTH fingers inside the word's own box, which is 234 x 43px for an
+    // ordinary caption — and turning the pair takes them out of a 43px-tall strip immediately. So the
+    // second finger landed on the picture, this handler started a photo pan, the word's gesture kept
+    // ONE pointer, anchor.two stayed false, and the rotation never moved at all: driven, the angle sat
+    // at 20 degrees through the whole gesture with no line and no snap. The level detent was fine; it
+    // could not be reached.
+    // ⚠️ CAPTURED ON THE WORD'S NODE, not the stage, because clubTxMove is bound to the node — a
+    // pointer captured here would deliver its moves to the stage and the word would not follow it.
+    // ⚠️ AND BEFORE THE DRAFT BRANCH BELOW, or a second finger on the word being typed commits it
+    // instead of turning it.
+    if (CLUB_TXG) {
+      CLUB_TXG.pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      try { CLUB_TXG.node.setPointerCapture(ev.pointerId); } catch (e) {}
+      clubTxAnchor();
+      return;
+    }
     const S2 = CLUBED;
     if (S2 && S2.draft) {
       // ⚠️ WHILE A WORD IS BEING TYPED THE PICTURE HOLDS STILL, and a tap on the dimmed picture COMMITS
@@ -13567,7 +13592,11 @@ function clubTxDetent(g) {
   }
   if (g.gr && inR) g.gr.style.top = (g.t.y * 100) + "%";
   if ((inX && !g.snapX) || (inY && !g.snapY) || (inR && !g.snapR)) haptic("tick");
-  g.snapX = inX; g.snapY = inY; g.snapR = inR;
+  g.snapX = inX; g.snapY = inY;
+  // ⚠️ THE LEVEL LATCH IS ONLY TOUCHED WHILE ROTATION IS LIVE. One finger cannot change the angle, so
+  // writing false here would forget that a word started level and then tap the moment a pinch began —
+  // announcing an arrival at a place it had never left.
+  if (g.anchor.two) g.snapR = inR;
 }
 /** Every guide down and every detent forgotten, so the next gesture starts with nothing latched. */
 function clubTxGuidesOff(g) {
@@ -13628,8 +13657,16 @@ function clubTextDrag(ev, i) {
   // ⚠️ THE GUIDE NODES ARE RESOLVED ONCE, HERE. A getElementById per pointermove is a lookup on the
   // one code path he has already reported as jittery, and the stage cannot be rebuilt under a live
   // gesture (a moved word deliberately never redraws), so the handles cannot go stale.
+  const box = stage.getBoundingClientRect();
+  // ⚠️⚠️ THE DETENTS ARE SEEDED FROM WHERE THE WORD ALREADY IS, or every drag of a word that is already
+  // centred taps the instant it moves — measured, and most words sit at dead centre, so that is most
+  // drags. The tap announces ARRIVING at a detent, and a word that was never anywhere else has not
+  // arrived anywhere.
   CLUB_TXG = { node: node, t: t, draft: draft, key: i, moved: false, anchor: null,
-    box: stage.getBoundingClientRect(), gds: $("clubGds"), gr: $("clubGr"),
+    box: box, gds: $("clubGds"), gr: $("clubGr"),
+    snapX: Math.abs(t.x - 0.5) * Math.max(1, box.width) <= CLUB_SNAP_PX,
+    snapY: Math.abs(t.y - 0.5) * Math.max(1, box.height) <= CLUB_SNAP_PX,
+    snapR: Math.abs(Number(t.rot) || 0) <= CLUB_SNAP_ROT,
     pts: new Map([[ev.pointerId, { x: ev.clientX, y: ev.clientY }]]) };
   try { node.setPointerCapture(ev.pointerId); } catch (e) {}
   clubTxAnchor();

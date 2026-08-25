@@ -11077,3 +11077,68 @@ clean apart from the one pre-existing `test/onboarding-wizard.test.ts` Date over
 fail under UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`**, both design ratchets unchanged and
 `CSS_DUP_CEILING` unchanged at 20. Driven end to end in a real browser with synthetic `PointerEvent`s
 for both the one-finger position detent and the two-finger level detent.
+
+### ⚠️⚠️ THE LEVEL DETENT WAS FINE AND COULD NOT BE REACHED (owner, 2026-08-25, same day)
+
+*"it snaps to the middle but it doesn't snap to level horizontally"*. The arithmetic was right; the
+gesture that drives it was almost impossible to start. Suite 1337 → **1338**; 10 re-breaks, and three
+needed work before they bit.
+
+⚠️ **A ROTATE NEEDED BOTH FINGERS INSIDE THE WORD'S OWN BOX, WHICH IS 234 × 43px FOR AN ORDINARY
+CAPTION.** `clubEdGestures`' `stage.onpointerdown` stepped aside only when the touch landed **on** a
+word (`closest("[data-ctx], [data-cszk]")`), so a second finger on the picture started a **photo pan**
+instead of joining the word's gesture — `CLUB_TXG.pts` kept one pointer, `anchor.two` stayed false, and
+the rotation never moved. **Driven with the second finger 163px below the word: the angle sat at 20°
+through the whole gesture, no line, no snap.** Turning a pair of fingers takes them out of a 43px-tall
+strip immediately, which is why he could reach the centre detent and not the level one.
+
+**A second finger now joins a live word gesture wherever it lands.** After: `pointers: 2`,
+`anchor.two: true`, 18° → 12 → 6 → **0 with the line and one tap**, and the photograph untouched (no
+accidental pan or zoom).
+- ⚠️ **CAPTURED ON THE WORD'S NODE, NOT THE STAGE.** `clubTxMove` is bound to the node, so a pointer
+  captured by the stage delivers its moves to the stage and the word does not follow it.
+- ⚠️ **BEFORE THE DRAFT BRANCH AND AFTER THE WORD BAIL, AND BOTH HALVES ARE LOAD-BEARING.** Below the
+  draft branch, a second finger on the word being typed **commits** it instead of turning it; above the
+  word bail, a finger landing on a word is handled twice. Guarded as an ordering claim in both
+  directions — and the first re-break of it was not a real break, because moving the block below
+  `const S2 = CLUBED;` but still above `if (S2 && S2.draft)` changes nothing.
+
+⚠️⚠️ **AND THE DETENTS ARE NOW SEEDED FROM WHERE THE WORD ALREADY IS.** The latches started false, so
+the first `pointermove` read "centred" as a *transition* and tapped — and most words sit at dead
+centre, so that was most drags. A tap announces ARRIVING at a detent, and a word that was never
+anywhere else has not arrived anywhere.
+⚠️ **THE LEVEL LATCH IS ONLY WRITTEN WHILE ROTATION IS LIVE.** One finger cannot change the angle, so
+clearing it on a one-finger drag forgets that the word started level and taps the moment a pinch
+begins — announcing an arrival at a place it had never left.
+
+### ⚠️⚠️ AND A SECOND DEFECT FOUND ON THE WAY: TWO EDITOR ROOTS FREEZE THE EDITOR COMPLETELY
+
+`openClubEditor` appended `#clubEd` **unconditionally**, and `$()` answers with the **first** match — so
+a second open without a close left every builder writing into the root *underneath* while the runner
+looked at the one *on top*, which was then inert in every particular. **Measured: two roots, the app
+writing into index 0, index 1 visible.** Same duplicate-id class as the recap's `storyShare`, which
+shipped a Share button wired to nothing. One line: any existing root is removed first.
+⚠️ **IT ALSO CONFOUNDED MY OWN MEASUREMENT FOR HALF AN Hour.** `elementFromPoint` returned the editor
+root for **every** point on the stage, including dead centre — because the visible editor was the second
+copy and the stage I was measuring belonged to the first. That reads exactly like a stacking bug in the
+guides. **`document.querySelectorAll("#id").length` is the first thing to check when hit-testing
+disagrees with `getBoundingClientRect`.**
+
+### Guard weaknesses this round, and one of them is a general rule
+
+⚠️⚠️ **A BEHAVIOURAL GUARD THAT HANDS IN THE STATE UNDER TEST CANNOT SEE WHO PRODUCES IT.** The seeding
+was covered only by the detent test, which builds a gesture record and seeds it **itself** — so
+replacing the real seeds in `clubTextDrag` with `false` escaped entirely. Measured escaping. The claim
+is now asserted where it happens too: each latch's initialiser must name the word (`t.x`/`t.y`/`t.rot`)
+and the threshold, not a constant. **Where a value comes from is a different claim from what it does.**
+⚠️ **AND A `[^,]+` CAPTURE CANNOT READ AN INITIALISER CONTAINING `Math.max(1, box.width)`** — it stops
+at that comma and the guard fails on correct code. Line-anchored (`(.+)$` with the `m` flag) instead.
+⚠️ **`noUncheckedIndexedAccess` TYPES A DESTRUCTURED PAIR AS POSSIBLY UNDEFINED**, so the loop's array
+needs an explicit `Array<[string, string]>` — the same tuple trap this file already records from the
+share tests. It surfaced as tsc going to 2 errors while all 1338 tests passed, which is why the recipe
+runs both.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc
+clean apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1338 pass / 0
+fail under UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`**, ratchets unchanged. Driven end to
+end in a real browser with the second finger deliberately off the word.

@@ -2840,57 +2840,85 @@ test("BLOCKER: the detent is wired into the drag, and the guides cannot eat a to
   assert.match(nocomment(fn("clubTxDetent")), /haptic\("tick"\)/, "the detent uses the wrong haptic kind");
 });
 
-test("BLOCKER: a second finger anywhere joins the word, so a rotate is reachable at all", () => {
-  // ⚠️⚠️ HIS REPORT: "it snaps to the middle but it doesn\'t snap to level horizontally". The level
-  // detent was fine and could not be REACHED: a rotate needed both fingers inside the word\'s own box,
-  // measured 234 x 43px for an ordinary caption, and turning the pair takes them out of a 43px strip at
-  // once. The second finger landed on the picture, the stage started a photo pan, the word\'s gesture
-  // kept one pointer, and the angle never moved. Driven before the fix: 20 degrees throughout.
-  const g = nocomment(fn("clubEdGestures"));
-  const down = g.slice(g.indexOf("stage.onpointerdown"));
-  const joinAt = down.indexOf("if (CLUB_TXG) {");
-  assert.ok(joinAt > 0, "a second finger cannot join a live word gesture, so a word cannot be rotated");
-  const join = braced(down, joinAt);
-  assert.match(join, /CLUB_TXG\.pts\.set\(ev\.pointerId/, "the joining finger is not added to the gesture");
-  // ⚠️ CAPTURED ON THE WORD\'S NODE, not the stage — clubTxMove is bound to the node, so a pointer
-  // captured by the stage delivers its moves to the stage and the word does not follow it.
-  assert.match(join, /CLUB_TXG\.node\.setPointerCapture/,
-    "the joining pointer is captured somewhere other than the word, so the word will not follow it");
+test("BLOCKER: a second finger anywhere on the SCREEN joins the word, and only while one is held", () => {
+  // ⚠️⚠️ RESTATED, NOT RELAXED — AND THE FIRST VERSION OF THIS SHIPPED HALF THE FEATURE. His first
+  // report ("it snaps to the middle but it doesn't snap to level") was answered by joining on the
+  // STAGE, which is the picture; he reported it again in as many words: "the other (used to scale or
+  // rotate) can be placed anywhere else on the screen". Measured with the second finger on the tool row
+  // below the picture: one pointer, anchor.two false, and a pull that should have scaled the word
+  // changed nothing. The invariant is the SCREEN, so the listener is on the full-screen editor root and
+  // this guard names that; the mechanism moved and the claim got stronger.
+  const src = page();
+  const join = nocomment(fn("clubTxJoinPointer"));
+  assert.ok(join, "there is no join, so a second finger cannot scale or rotate a word");
+  // ⚠️ ON THE ROOT, IN THE CAPTURE PHASE, AND BOUND EXACTLY ONCE. Capture is what lets it beat every
+  // control underneath; the root is what makes it the screen rather than the picture; and binding it
+  // where the root is CREATED rather than where its innerHTML is rebuilt is what stops a second copy.
+  const open = nocomment(fn("openClubEditor"));
+  assert.match(open, /addEventListener\("pointerdown", clubTxJoinPointer, true\)/,
+    "the join is not bound on the editor root in the capture phase");
+  const binds = [...src.matchAll(/addEventListener\("pointerdown", clubTxJoinPointer/g)].length;
+  assert.equal(binds, 1, "the join is bound " + binds + " times, so a finger is claimed more than once");
+  // It claims the event outright, or the finger also pans the photo or presses whatever is under it.
+  assert.match(join, /ev\.preventDefault\(\)/, "the claimed finger can still move the caret or focus a control");
+  assert.match(join, /ev\.stopPropagation\(\)/, "the claimed finger still reaches the stage and the chrome");
+  // ⚠️ CAPTURED ON THE WORD'S NODE. clubTxMove is bound to the node, so a pointer captured anywhere
+  // else delivers its moves somewhere else and the word does not follow it.
+  assert.match(join, /g\.node\.setPointerCapture/, "the joining pointer is not captured on the word");
   assert.match(join, /clubTxAnchor\(\)/, "the gesture is not re-anchored on the fingers now down");
-  // Ordering, both ways round, and both halves are load-bearing.
-  const bail = down.indexOf('closest("[data-ctx], [data-cszk]")');
-  const draft = down.indexOf("S2 && S2.draft");
-  assert.ok(bail >= 0 && draft > 0, "the stage handler no longer has the branches this depends on");
-  assert.ok(bail < joinAt,
-    "the join runs before the word bail, so a finger landing ON a word is handled twice");
-  assert.ok(joinAt < draft,
-    "the join runs after the draft branch, so a second finger on the word being typed commits it " +
-    "instead of turning it");
-  // ⚠️⚠️ AND THE SEEDING IS ASSERTED WHERE IT HAPPENS, NOT ONLY IN ITS EFFECT. The behavioural half of
-  // this lives in the detent test, which hands clubTxDetent a pre-seeded gesture — so replacing the real
-  // seeds with "false" escaped it entirely. Measured escaping. Each latch must come from where the word
-  // ALREADY is, which means naming the word and the threshold rather than a constant.
-  const drag = nocomment(fn("clubTextDrag"));
-  // The pair is annotated because noUncheckedIndexedAccess types a destructured element as possibly
-  // undefined — the same tuple trap this project already records fixing in the share tests.
-  const seeds: Array<[string, string]> = [["snapX", "t.x"], ["snapY", "t.y"], ["snapR", "t.rot"]];
-  for (const [field, from] of seeds) {
-    const m = new RegExp(field + ":\\s*(.+)$", "m").exec(drag);
-    assert.ok(m, field + " is not initialised on the gesture record");
-    assert.ok(m![1]!.includes(from) && m![1]!.includes("CLUB_SNAP"),
-      field + " is seeded from a constant rather than from where the word already is: " + m![1]);
+  // ⚠️ AND IT IS THE ONLY JOIN. clubTextDrag and the stage handler each used to carry one; two paths
+  // are two chances to reintroduce the bug clubTextDrag's own comment records — a second finger
+  // answered by overwriting node.onpointerdown, which destroyed wireClubEd's binding so that after one
+  // drag the word could be neither dragged nor tapped.
+  // ⚠️ SCOPED TO THE WORD'S GESTURE, NOT TO ANY POINTER MAP. clubEdGestures keeps its own pts for the
+  // photograph's pan and pinch, which is nothing to do with this — the first version of this sweep
+  // looked for "pts.set(" and condemned it. And clubTxMove legitimately writes g.pts.set to UPDATE a
+  // finger it already holds, which is why the claim names CLUB_TXG explicitly.
+  for (const f of ["clubTextDrag", "clubEdGestures"]) {
+    assert.ok(!/CLUB_TXG\.pts\.set\(/.test(nocomment(fn(f))),
+      f + " adds a pointer to the word's gesture itself, so there are two joins");
   }
+  // Driven, because "does nothing unless a word is held" is behaviour and not a shape.
+  const mk = (gesture: any) => {
+    const calls = { prevented: 0, stopped: 0, captured: [] as number[], anchored: 0 };
+    const api = new Function("CLUB_TXG", "clubTxAnchor", "calls",
+      nocomment(fn("clubTxJoinPointer")) + "\nreturn clubTxJoinPointer;")(
+        gesture, () => calls.anchored++, calls);
+    return { api, calls };
+  };
+  const ev = (id: number, calls: any) => ({ pointerId: id, clientX: 10, clientY: 20,
+    preventDefault: () => calls.prevented++, stopPropagation: () => calls.stopped++ });
+  // With a live gesture: the finger is added, captured on the word, and the gesture re-anchored.
+  const g: any = { pts: new Map([[1, { x: 0, y: 0 }]]),
+    node: { setPointerCapture: (id: number) => {} } };
+  const live = mk(g);
+  g.node.setPointerCapture = (id: number) => live.calls.captured.push(id);
+  live.api(ev(2, live.calls));
+  assert.equal(g.pts.size, 2, "the second finger was not added to the gesture");
+  assert.deepEqual(live.calls.captured, [2], "the second finger was not captured on the word");
+  assert.equal(live.calls.anchored, 1, "the gesture was not re-anchored");
+  assert.ok(live.calls.prevented === 1 && live.calls.stopped === 1,
+    "the claimed finger was not taken out of the chrome's hands");
+  // ⚠️ A POINTER ALREADY IN THE GESTURE IS IGNORED, or a re-entrant pointerdown re-anchors mid-drag
+  // and the word jumps.
+  live.api(ev(1, live.calls));
+  assert.equal(g.pts.size, 2, "a pointer already in the gesture was added again");
+  assert.equal(live.calls.anchored, 1, "a duplicate pointerdown re-anchored the gesture");
+  // ⚠️ AND "ONCE THEY'VE STOPPED HOLDING IT, IT CAN GO BACK TO NORMAL" NEEDS NO CODE: with no gesture
+  // live it must claim nothing at all, or every control in the editor is dead whenever nothing is held.
+  const idle = mk(null);
+  idle.api(ev(3, idle.calls));
+  assert.ok(idle.calls.prevented === 0 && idle.calls.stopped === 0,
+    "with no word held the join still swallows the finger, so the whole editor is inert");
   // ⚠️ ONE EDITOR ROOT, EVER. openClubEditor appended unconditionally and $() answers with the FIRST
   // match, so a second open left every builder writing into the root underneath while the runner looked
   // at the one on top — inert in every particular. Measured: two roots, app writing into index 0, index
-  // 1 visible. Same duplicate-id class as the recap\'s storyShare, which shipped a dead Share button.
-  const open = nocomment(fn("openClubEditor"));
-  const mk = open.indexOf('id="clubEd"');
-  assert.ok(mk > 0, "openClubEditor no longer creates the editor root");
-  const before = open.slice(0, mk);
-  assert.match(before, /\$\("clubEd"\)[\s\S]*?\.remove\(\)/,
+  // 1 visible. Same duplicate-id class as the recap's storyShare, which shipped a dead Share button.
+  const mkAt = open.indexOf('id="clubEd"');
+  assert.ok(mkAt > 0, "openClubEditor no longer creates the editor root");
+  assert.match(open.slice(0, mkAt), /\$\("clubEd"\)[\s\S]*?\.remove\(\)/,
     "a second open appends a second editor root, and the visible one is then frozen");
-});
+});;
 
 test("BLOCKER: alignment moves the block as well as the lines", () => {
   // ⚠️ .club-tx IS width: max-content, so the box hugs its widest line and text-align has nowhere to
@@ -2972,8 +3000,19 @@ test("BLOCKER: two fingers on a word scale and turn it, within bounds", () => {
   // redrew; removing the redraw (the black flash) is what exposed it. The invariant this was protecting —
   // the pointers belong to the WORD, so one gesture has one owner — is unchanged and better served.
   assert.match(d, /setPointerCapture/, "a second finger on the word is not captured by the word");
-  assert.match(d, /CLUB_TXG && CLUB_TXG\.node === node/,
+  // ⚠️ RESTATED 2026-08-25 when the join moved off the word and onto the editor root, so that a second
+  // finger can be put anywhere on the SCREEN (his instruction, twice). This pinned
+  // "CLUB_TXG && CLUB_TXG.node === node" inside clubTextDrag — the old mechanism — and failed on the
+  // fix. The invariant it protects is that a second finger ADDS to the gesture already running rather
+  // than starting one of its own, and that is now clubTxJoinPointer's job: clubTextDrag only ever sees
+  // the first finger, so it must create a gesture and never join one.
+  assert.ok(!/CLUB_TXG\.pts\.set\(/.test(d),
+    "clubTextDrag joins a gesture as well as creating one, so there are two joins");
+  const jp = nocomment(fn("clubTxJoinPointer"));
+  assert.match(jp, /g\.pts\.set\(ev\.pointerId/,
     "a second finger starts its own gesture with its own pointer map instead of joining the first");
+  assert.match(jp, /if \(!g \|\| g\.pts\.has\(ev\.pointerId\)\) return;/,
+    "the join does not refuse a pointer it already holds, so a re-entrant press re-anchors mid-drag");
   for (const f of ["clubTextDrag", "clubTxUp"]) {
     assert.doesNotMatch(nocomment(fn(f)), /onpointerdown\s*=/,
       f + " writes onpointerdown, which belongs to wireClubEd — after one drag the word goes dead");

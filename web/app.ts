@@ -12409,6 +12409,10 @@ function openClubEditor(kind, files, opts) {
   // old panel could fly to the top of the screen while the "fix" corrected an invisible shell.
   // Costs nothing when no pan is live: an untransformed ancestor leaves fixed positioning alone.
   (document.querySelector(".app") || document.body).appendChild(ov);
+  // ⚠️ ON THE ROOT AND IN THE CAPTURE PHASE — see clubTxJoinPointer. Bound here rather than in
+  // clubEdDraw because the root survives every redraw while its innerHTML does not, so this cannot
+  // stack a second copy of the listener.
+  ov.addEventListener("pointerdown", clubTxJoinPointer, true);
   clubEdDraw();
 }
 /** The slide being worked on. Every builder reads through this, so nothing indexes the array by hand. */
@@ -13437,24 +13441,9 @@ function clubEdGestures(stage) {
   let tapAt = null;
   stage.onpointerdown = (ev) => {
     if (ev.target && ev.target.closest && ev.target.closest("[data-ctx], [data-cszk]")) return;
-    // ⚠️⚠️ A SECOND FINGER JOINS A LIVE WORD GESTURE WHEREVER IT LANDS, AND WITHOUT THIS ROTATING A
-    // WORD IS ALMOST UNREACHABLE. He reported "it snaps to the middle but it doesn't snap to level":
-    // measured, a rotate needed BOTH fingers inside the word's own box, which is 234 x 43px for an
-    // ordinary caption — and turning the pair takes them out of a 43px-tall strip immediately. So the
-    // second finger landed on the picture, this handler started a photo pan, the word's gesture kept
-    // ONE pointer, anchor.two stayed false, and the rotation never moved at all: driven, the angle sat
-    // at 20 degrees through the whole gesture with no line and no snap. The level detent was fine; it
-    // could not be reached.
-    // ⚠️ CAPTURED ON THE WORD'S NODE, not the stage, because clubTxMove is bound to the node — a
-    // pointer captured here would deliver its moves to the stage and the word would not follow it.
-    // ⚠️ AND BEFORE THE DRAFT BRANCH BELOW, or a second finger on the word being typed commits it
-    // instead of turning it.
-    if (CLUB_TXG) {
-      CLUB_TXG.pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
-      try { CLUB_TXG.node.setPointerCapture(ev.pointerId); } catch (e) {}
-      clubTxAnchor();
-      return;
-    }
+    // ⚠️ NO JOIN HERE ANY MORE. A second finger is claimed by clubTxJoinPointer on the editor ROOT, in
+    // the capture phase, so this handler never sees one while a word gesture is live — which is what
+    // makes "anywhere else on the screen" true rather than "anywhere on the picture".
     const S2 = CLUBED;
     if (S2 && S2.draft) {
       // ⚠️ WHILE A WORD IS BEING TYPED THE PICTURE HOLDS STILL, and a tap on the dimmed picture COMMITS
@@ -13640,18 +13629,12 @@ function clubTextDrag(ev, i) {
   // editable draft it would stop a tap from placing the caret or raising the keyboard at all. The
   // committed words keep it: for them the default being suppressed is exactly right.
   if (!draft) ev.preventDefault();
-  // ⚠️⚠️ A SECOND FINGER JOINS THE GESTURE THAT IS ALREADY RUNNING, AND IT MUST NOT START ANOTHER. The
-  // first version answered the second finger by overwriting node.onpointerdown with its own handler and
-  // then NULLING it on release — which destroyed the binding wireClubEd had put there, so after one drag
-  // the word could not be dragged or tapped again until something redrew. That went unnoticed for as long
-  // as a finished drag redrew; taking the redraw away (see below) is what exposed it. Measured: a tap
-  // after a drag did nothing at all.
-  if (CLUB_TXG && CLUB_TXG.node === node) {
-    CLUB_TXG.pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
-    try { node.setPointerCapture(ev.pointerId); } catch (e) {}
-    clubTxAnchor();
-    return;
-  }
+  // ⚠️ THIS ONLY EVER SEES THE FIRST FINGER. Every later one is claimed by clubTxJoinPointer on the
+  // editor root in the capture phase, so the join that used to live here is gone — one owner. Its
+  // lesson is carried there: a second finger must ADD to the running gesture and never start another,
+  // because the version that answered it by overwriting node.onpointerdown and nulling it on release
+  // destroyed the binding wireClubEd had put there, and after one drag the word could be neither
+  // dragged nor tapped.
   if (!draft) S.sel = i;
   const stage = $("clubStage"); if (!stage) return;
   // ⚠️ THE GUIDE NODES ARE RESOLVED ONCE, HERE. A getElementById per pointermove is a lookup on the
@@ -13684,6 +13667,42 @@ function clubTextDrag(ev, i) {
  * smooth", and it is arithmetic rather than frame rate: this takes the midpoint of the fingers that are
  * DOWN RIGHT NOW, and every later move is a displacement from it.
  */
+/**
+ * A LIVE WORD GESTURE CLAIMS THE NEXT FINGER, WHEREVER IT LANDS — his instruction, twice.
+ *
+ * "I want the functionality to be if the user presses and holds the text with one finger then the other
+ * (used to scale or rotate) can be placed anywhere else on the screen, it makes it too difficult that
+ * both fingers need to be on the actual word. Once theyve stopped holding it, it can go back to normal."
+ *
+ * ⚠️⚠️ THE FIRST ATTEMPT AT THIS COVERED THE PICTURE AND NOT THE SCREEN, and he reported it again. The
+ * join lived on the STAGE, so a second finger below the picture — on the tool row, which is where a
+ * thumb naturally goes when the word is low in the frame — never reached it: measured, one pointer,
+ * anchor.two false, and a pull that should have scaled the word changed nothing at all. The editor root
+ * is full-screen, so listening there is what "anywhere else on the screen" actually means.
+ *
+ * ⚠️ CAPTURE PHASE, AND IT STOPS THE EVENT DEAD. Capture means the root sees the finger before any
+ * control under it, so a second finger cannot start a photo pan, press a tool or move the caret; and
+ * because the pointer is then captured to the WORD, its pointerup goes to the word too, so no button
+ * under it ever completes a click.
+ * ⚠️ CAPTURED ON THE WORD'S NODE, NEVER THE ROOT. clubTxMove is bound to the node — a pointer captured
+ * anywhere else delivers its moves somewhere else and the word does not follow it.
+ * ⚠️ AND IT IS THE ONLY JOIN. clubTextDrag used to carry one of its own for a finger landing on the
+ * word, whose comment recorded a real bug: answering a second finger by overwriting the node's
+ * onpointerdown and nulling it on release destroyed the binding wireClubEd had put there, so after one
+ * drag the word could be neither dragged nor tapped. That lesson stands and is why this only ever ADDS
+ * to the running gesture; two join paths would be two chances to reintroduce it.
+ * ⚠️ "BACK TO NORMAL" NEEDS NO CODE: CLUB_TXG is nulled the moment the last finger lifts, so with no
+ * gesture live this returns immediately and every control behaves exactly as before.
+ */
+function clubTxJoinPointer(ev) {
+  const g = CLUB_TXG;
+  if (!g || g.pts.has(ev.pointerId)) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  g.pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+  try { g.node.setPointerCapture(ev.pointerId); } catch (e) {}
+  clubTxAnchor();
+}
 function clubTxAnchor() {
   const g = CLUB_TXG; if (!g) return;
   const p = [...g.pts.values()];

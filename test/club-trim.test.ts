@@ -626,8 +626,17 @@ test("BLOCKER: a second finger joins the live gesture and onpointerdown is never
       name + " writes onpointerdown, which belongs to wireClubEd — after one drag the word goes dead");
   }
   // Re-entrant instead: a second finger is added to the gesture that is already running.
-  assert.match(drag, /CLUB_TXG && CLUB_TXG\.node === node/,
+  // ⚠️ RESTATED 2026-08-25 when the join moved off the word and onto the full-screen editor root, so a
+  // second finger can be put ANYWHERE on the screen — his instruction, given twice, after the first
+  // version covered only the picture. This pinned the old site inside clubTextDrag and failed on the
+  // fix. The claim is unchanged: a second finger ADDS to the running gesture rather than starting one.
+  const join = nocomment(fn(src, "clubTxJoinPointer"));
+  assert.match(join, /g\.pts\.set\(ev\.pointerId/,
     "a second finger starts a second gesture with its own pointer map rather than joining the first");
+  assert.doesNotMatch(join, /onpointerdown\s*=/,
+    "the join writes onpointerdown, which is the very bug this test exists for");
+  assert.ok(!/CLUB_TXG\.pts\.set\(/.test(drag),
+    "clubTextDrag joins a gesture as well as creating one, so a second finger has two owners");
   assert.match(drag, /CLUB_TXG = \{/, "the gesture is not held anywhere a second finger could find it");
   assert.match(up, /CLUB_TXG = null/, "the gesture is never released, so the next one adopts its fingers");
   // wireClubEd is still the only owner of onpointerdown, and it must pass the draft's key as a STRING.

@@ -11142,3 +11142,61 @@ runs both.
 clean apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1338 pass / 0
 fail under UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`**, ratchets unchanged. Driven end to
 end in a real browser with the second finger deliberately off the word.
+
+### ⚠️⚠️ "ANYWHERE ELSE ON THE SCREEN" MEANS THE SCREEN, NOT THE PICTURE (owner, 2026-08-25, third pass)
+
+*"it is too difficult to manoeuvre the text (bigger, smaller, rotate etc). I want the functionality to be
+if the user presses and holds the text with one finger then the other (used to scale or rotate) can be
+placed anywhere else on the screen, it makes it too difficult that both fingers need to be on the actual
+word. Once theyve stopped holding it, it can go back to normal."*
+
+⚠️ **HE HAD TO SAY IT TWICE, AND THE FIRST FIX WAS HALF OF IT.** The join lived on
+`stage.onpointerdown`, so it covered the **picture** — and the stage is 452 × 868 of a 452 × 998
+viewport. **Measured with the second finger on the tool row 50px below the picture, which is exactly
+where a thumb goes when the word is low in the frame: `landedOn: club-tool`, one pointer,
+`anchor.two: false`, and a pull that should have scaled the word changed nothing at all.** A fix
+verified only where it was written is a fix verified against its own assumption.
+
+**`clubTxJoinPointer` is now the ONE join, bound on the full-screen editor root in the CAPTURE phase.**
+Measured after, at four places: on the picture, the tool row, the close button, and the very bottom of
+the screen — each gives two pointers, `anchor.two: true`, **scale 30 → 48 and rotation → 30°**, with the
+photograph untouched and the gesture cleared on release.
+
+- ⚠️ **CAPTURE, AND IT STOPS THE EVENT DEAD.** Capture means the root sees the finger before any control
+  under it, so a second finger cannot start a photo pan, press a tool or move the caret; and because the
+  pointer is then captured to the WORD, its pointerup goes to the word too, so nothing underneath ever
+  completes a click.
+- ⚠️ **CAPTURED ON THE WORD'S NODE, NEVER THE ROOT.** `clubTxMove` is bound to the node — a pointer
+  captured anywhere else delivers its moves somewhere else and the word does not follow it.
+- ⚠️ **BOUND WHERE THE ROOT IS CREATED, NOT IN `clubEdDraw`.** The root survives every redraw while its
+  innerHTML does not, so binding it there cannot stack a second copy of the listener. Guarded as a count.
+- ⚠️ **"BACK TO NORMAL" NEEDS NO CODE, AND THAT IS WORTH ASSERTING ANYWAY.** `CLUB_TXG` is nulled the
+  moment the last finger lifts, so with no gesture live the listener returns immediately. Driven: with a
+  null gesture it claims nothing — and re-broken by inverting that guard, which makes **every control in
+  the editor inert whenever nothing is held**. Verified in the browser too: photo pinch 1 → 1.667, a tool
+  tap opens its rail, a single tap on a word still opens it for editing, and ✕ still closes the editor.
+- ⚠️ **A POINTER ALREADY IN THE GESTURE IS IGNORED**, or a re-entrant press re-anchors mid-drag and the
+  word jumps.
+
+⚠️ **AND IT IS THE ONLY JOIN — TWO OTHERS WERE DELETED.** `clubTextDrag` carried one for a finger landing
+on the word, and `stage.onpointerdown` carried the one from an hour earlier. Three paths for one thing is
+three chances to reintroduce the bug `clubTextDrag`'s own comment records: a second finger answered by
+overwriting `node.onpointerdown` and nulling it on release destroyed the binding `wireClubEd` had put
+there, so after one drag the word could be neither dragged nor tapped. That lesson moved with the code.
+
+### Three guards scoped to the old mechanism, all restated
+
+⚠️ **THIS IS THE ELEVENTH THROUGH THIRTEENTH FIRING OF THE GUARD-SCOPED-TO-A-HOW PATTERN IN THIS FILE.**
+Two pinned `CLUB_TXG && CLUB_TXG.node === node` inside `clubTextDrag` — the old join site — and failed on
+the fix; one was the join guard I had written an hour before, which named the stage. All three protect the
+same invariant (**a second finger ADDS to the running gesture rather than starting one**) and all three
+now assert it of `clubTxJoinPointer`, plus that `clubTextDrag` no longer joins at all.
+
+⚠️ **AND ONE OF MY OWN NEW SWEEPS WAS TOO BROAD: `clubEdGestures` KEEPS ITS OWN POINTER MAP.** Forbidding
+`pts.set(` there condemned the photograph's own pan and pinch, which has nothing to do with this. Scoped
+to `CLUB_TXG.pts.set(` — and `clubTxMove` legitimately writes `g.pts.set` to UPDATE a finger it already
+holds, which is why the claim has to name the gesture explicitly rather than the operation.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc clean
+apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1338 pass / 0 fail under
+UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`**, ratchets unchanged, **9 re-breaks all caught**.

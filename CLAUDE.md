@@ -2739,7 +2739,7 @@ before writing a measurement:
 | **Frequency** | flat in **81.3%** of plans; **zero** jumps of 2+ running days | not progressed **by design** — the runner picks their days |
 | **Time** | **16.3%** of non-deload week-on-week rises exceed the 1.10 guardrail (1359/8352), worst **1.46×** | ⚠️ real defect, root cause below |
 | **Intensity** | 5k/10k hard **1.4% → 3.4%**; half/marathon hard **1.1% → 0.4%** while moderate **6% → 20%** | correct, and correctly different per race |
-| **Type / specificity** | race-pace share **0.0% base → 0.0% build → 5.2–12.3% peak** | ⚠️ nothing before the peak phase |
+| **Type / specificity** | race-pace share **0.0% base → 0.0% build → 5.2–12.3% peak** | ⚠️ nothing before the peak phase — ⚠️⚠️ **and the peak figure was UNDER-REPORTED, see the instrument note at the end of this chapter** |
 | **Reversibility** | deload **17.8%** deep, every 4.0 weeks; taper **36.9%** (20.7–46.7%) | taper healthy, ⚠️ deloads shallow |
 
 Also: only **23 weeks of 18,624** breach the pyramidal/polarized easy floor, and the biggest week sits in
@@ -2818,6 +2818,21 @@ particular, race-pace long runs during the build are standard practice, and the 
 **And 24 plans (3.1%) never get any race-pace work at all** — all short-runway blocks, concentrated in the
 10 km. A short block spends its whole life in base and build, which is exactly where the library has no
 race-pace work to give.
+⚠️⚠️ **THAT 3.1% IS AN INSTRUMENT ARTEFACT AND THE REAL FIGURE IS 0.0% — corrected 2026-08-25.**
+`raceSecs` in `tools/audit-progression.mjs` summed `st.durationSeconds || 0`, and **race-pace reps are
+prescribed BY DISTANCE**: measured on one competitive half block, **8 of its 21 race-pace work steps carry
+`distanceMeters` with `durationSeconds` undefined** (`8 × 1 km at goal race pace`, and the 4 × 2 km and
+2 × 5 km formats likewise). So the ruler could not see 38% of the very thing it was pointed at. Re-run
+gate-agnostically over the same 768 plans: **peak race-pace share 9.7% → 16.3%**, plans with no rehearsal
+**3.1% → 0.0%**, and per distance the peak share goes 5k 7.9% → **13.3%**, 10k 5.5% → **13.3%**, half
+12.8% → **19.5%**, marathon 12.5% → **19.1%**. Every other metric in the audit is byte-identical — the
+intensity buckets, the easy floor (34 of 18,624), the deload depth (28.9%), the taper cut
+(37.4% / 21.9% / 46.4%) and the long-run inversion (0.4%) — which is exactly what you would predict if
+only race-pace steps are distance-gated today, and is what makes the correction believable.
+⚠️ **THE FIX THIS FINDING PROMPTED IS STILL CORRECT AND IS NOT WITHDRAWN.** Allowing `race-3x10` and
+`race-cutdown` into the build phase, and making `qualityContentsFor` actually ask for one, moved the build
+phase off a genuine 0.0% — and build-phase race-pace comes from long-run fast finishes, which are TIMED,
+so that measurement was never blind. What was wrong was the peak figure and the short-runway claim.
 
 
 **Fixed, in two places, because there were two independent causes:**
@@ -11288,6 +11303,27 @@ keeps not showing a derived one. Printing a Riegel projection back to a habit-bu
 exactly the pressure this is about.
 ⚠️ **A TYPO IS STILL REFUSED, OPTIONAL OR NOT.** Silently keeping the old value would be a goal they did
 not set.
+
+### ⚠️⚠️ AND THE MEASURING APPARATUS IS BLIND TO THIS CHANGE — THAT IS WHY IT IS NOT DONE YET
+
+Before any of it can be swept, the instruments have to be able to see it. Found by pointing the existing
+audit tool at the question:
+- ⚠️ **`tools/audit-progression.mjs` — FIXED.** Both `secs()` and `raceSecs()` summed
+  `st.durationSeconds || 0`, with an `|| estimatedDurationSeconds` fallback on `secs` that only fires when
+  the whole sum is zero. So a session with a distance-gated body **and** a timed warm-up would have
+  reported only the warm-up's seconds, and converting the long run to a distance would have looked like a
+  large drop in training time that had not happened. Both now derive a distance-gated step exactly as the
+  engine's own `stepSeconds` does. Same shape as this file's own three original faults in that tool: an
+  instrument that cannot see the thing it is pointed at. It also corrected the race-pace figures above.
+- ⚠️ **FIVE TEST FILES CARRY THE SAME BLIND SUM AND ARE PREREQUISITE WORK, NOT COLLATERAL.**
+  `test/no-warmup-low-intensity.test.ts` (`mins`, line 30 — and line 77 asserts every step has a
+  `durationSeconds > 0`, which would fail outright), `test/warmup-delivery.test.ts` (`totalMin`, line 38,
+  which sweeps **every session of real generated plans**), `test/segment-clock.test.ts`,
+  `test/heat-adapt.test.ts` and `test/custom-session-gear.test.ts`. Some would fail loudly, which is the
+  acceptable kind; `warmup-delivery`'s would quietly measure a fraction of a converted session.
+  ⚠️ **THEY ARE NOT BEING CHANGED EN MASSE NOW.** Each one's assertion was calibrated against the blind
+  figure, so making them gate-agnostic changes what they measure and has to be justified per test — a
+  guard churned without cause is worse than a guard that fails loudly when the day comes.
 
 ### ⚠️ STILL OPEN: THE MIXTURE OF DISTANCE-SET AND TIME-SET RUNS
 

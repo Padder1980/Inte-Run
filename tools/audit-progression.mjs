@@ -16,7 +16,26 @@ const { computeDistribution, honoursModel } = await import(root + "/src/science/
 const RUN_TYPES = new Set(["easy", "long", "recovery", "threshold", "vo2", "strides", "race-specific", "race"]);
 const isRun = (s) => RUN_TYPES.has(s.type);
 const PREP = new Set(["warmup", "cooldown", "recovery"]);
-const secs = (s) => (s.steps || []).reduce((a, st) => a + (st.durationSeconds || 0), 0) || (s.estimatedDurationSeconds || 0);
+// ⚠️⚠️ GATE-AGNOSTIC, AND THE FIRST VERSION WAS BLIND TO THE VERY CHANGE THIS TOOL WOULD MEASURE. It
+// read `a + (st.durationSeconds || 0)` with an `|| estimatedDurationSeconds` fallback — so a step that
+// carries a DISTANCE and no duration contributed nothing, and the fallback only fired when the whole sum
+// was zero. A session with a distance-gated body and a timed warm-up would therefore have reported only
+// the warm-up's seconds, and prescribing runs by distance would have looked like a large drop in
+// training time that had not happened. Same shape as this file's own three original faults: an
+// instrument that cannot see the thing it is pointed at. It now derives a distance-gated step exactly as
+// the engine's own stepSeconds does (src/science/intensity-distribution.ts) — distance over the mid-band
+// pace, with the effort-only hill-sprint fallback — so the ruler is the same before and after.
+const EFFORT_ONLY_MPS = 4;
+const stepSecs = (st) => {
+  if (st.durationSeconds) return st.durationSeconds;
+  if (st.distanceMeters && st.targetPaceSecPerKm) {
+    const p = st.targetPaceSecPerKm;
+    return (st.distanceMeters / 1000) * (p.minSecPerKm + p.maxSecPerKm) / 2;
+  }
+  if (st.distanceMeters) return st.distanceMeters / EFFORT_ONLY_MPS;
+  return 0;
+};
+const secs = (s) => (s.steps || []).reduce((a, st) => a + stepSecs(st), 0) || (s.estimatedDurationSeconds || 0);
 // Race-pace REHEARSAL: work steps only (never the warm-up or the jog recoveries), either inside a
 // race-specific session or labelled as goal-pace work wherever it lives — a marathon long run's
 // race-pace block counts, which is the whole point of the specificity question.
@@ -24,7 +43,7 @@ const raceSecs = (s) => (s.steps || []).reduce((a, st) => {
   if (PREP.has(st.kind)) return a;
   const lab = st.label || "";
   const isRace = s.type === "race-specific" || /race pace|goal pace|race effort|goal effort|marathon effort|marathon pace/i.test(lab);
-  return a + (isRace ? (st.durationSeconds || 0) : 0);
+  return a + (isRace ? stepSecs(st) : 0);
 }, 0);
 
 const TT = { "5k": 1500, "10k": 3000, half: 6600, marathon: 14400 };

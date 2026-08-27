@@ -11532,3 +11532,211 @@ with its own constant measures the test's value, which this project has watched 
 `test/onboarding-wizard.test.ts` Date overload, **1348 pass / 0 fail**. His week 3 now reads
 `25′ explore run` · `Mobility flow (15′)` · `3.4 km easy run` · **`25′ easy + gentle pickups`** (was 26) ·
 `31′ long run`.
+
+## THE COMMISSIONED ENGINE HANDOFF, MINED FOR IDEAS RATHER THAN PORTED (owner, 2026-08-27)
+
+He attached `INTERUNENGINEHANDOFF.md` — a complete, self-contained **Swift** specification for a
+programme engine (1,704 lines, 19 sections, 11 Swift files, 48 types, golden fixtures with real
+verified numbers) — asked whether it had arrived intact, and then ruled: **"take the ideas not the
+swift if we dont need it"**. The engine here is 10,800 lines of pure TypeScript with 1,348 passing
+tests and is what his phone actually runs, so a Swift rewrite would have replaced the brain in a
+different language on the far side of the WKWebView wall, and every change would then need an Xcode
+build. Suite 1348 → **1361**; **18 deliberate re-breaks, all 18 caught** (three only after a guard
+was restated — those three are below).
+
+⚠️ **THE READ-ACROSS WAS 18 AGENTS OVER 9 AREAS, 133 VERIFIED CHECKS, AND 23 WERE REFUTED — ALMOST
+ALL IN THE SAME WAY: THE VERDICT HELD AND THE NUMBERS DID NOT REPRODUCE.** Three verifiers
+independently found the cause, and it was mine: **I started editing `src/` while the measurement
+workflow was still running.** `paces.ts`, `types.ts`, `generate-plan.ts` and `session-templates.ts`
+all changed under them, one watched `TID_TOLERANCE` flip 0.12 → 0.05 → 0.12, and one correctly
+diagnosed a test I had just broken as contamination rather than a defect. This file already records
+the mirror image (a subagent patching `src/` while tests ran); the rule is symmetric.
+**Never edit the tree while a measurement is being taken against it.** Treat every figure from that
+run as directional until re-measured.
+
+### What the five rules measure at, against the real engine
+
+⚠️ **RULE 1 IS ALREADY HONOURED IN SUBSTANCE, AND THAT SAVED THE LARGEST PIECE OF WORK IN THE
+DOCUMENT.** The spec anchors every zone to a fraction of measured critical speed. Measured, the
+engine's `PACE_RATIOS` **already are those fractions**, inverted:
+
+| | spec (× CS) | engine (× its own anchor) |
+|---|---|---|
+| recovery ceiling | 0.70 | 0.667–0.735 |
+| easy slow | 0.75 | **0.752** |
+| easy fast | 0.82 | **0.820** |
+| tempo / threshold | 0.96 | 0.952–0.976 |
+
+And the anchor itself sits at a stable **95.7–96.1% of a fitted CS across every ability from a 14:00
+to a 45:00 5 km** — which is exactly what the spec calls `threshold: p(0.96)`. The two models are one
+model in two currencies, agreeing to ~4%; the engine's easy pace is 8–26 s/km *slower* than the
+spec's, which is the safe direction.
+
+⚠️ **AND PORTING THE CS ANCHOR IS MEASURABLY DANGEROUS, NOT MERELY UNNECESSARY.** `fitness-profile.ts`
+records the objection at the rejection site — *"with two long efforts it underestimates and produces
+a pace slower than the runner's 10k"* — and it reproduces exactly: a 10 km + half fit puts CS at
+4:57/km, **27 s/km slower than that runner's own 10 km pace**.
+⚠️ **THE SPEC'S OWN ELIGIBILITY WINDOW IS WHY, AND IT ALSO MAKES THE FEATURE UNREACHABLE HERE.** An
+effort qualifies at 120–900 s, so **a 5 km time is eligible only at 15:00 or faster**. The app's two
+stored efforts are a 5 km and an optional 2 km trial, so for every runner slower than that the spec's
+`fit()` returns nil — and a 40:00 5 km runner has **zero** eligible efforts. The spec's intent is GPS
+best efforts harvested from real runs, which this app records the data for and does not harvest.
+⚠️ **`fitCriticalSpeed` IS THEREFORE COMPUTED AND DISCARDED**, and the verifier put it precisely: *"no
+NUMBER from the model is ever shown in the shipped app"*. It is rendered on the standalone
+`web/fitness.ts` page, which is **absent from `docs/`**. Its one live effect is a confidence flip that
+changes a VO₂max range and removes a "Low confidence" pill.
+
+⚠️ **RULE 2 — THE ENGINE'S OWN 0.68 FLOOR IS HONOURED; THE SPEC'S 0.75 IS NOT.** Measured over 18,384
+non-race weeks: **468 (2.55%) under 75% easy, 1,968 (10.70%) under 80%, worst 67.6%.** The breaches
+cluster in the **peak phase** (455 of 750 before the cap), which is where quality is deliberately
+highest — so raising the floor means reducing peak-phase quality, a coaching decision and **not
+done**. ⚠️ **AND THE EXISTING CHECK IS COMPARATIVE BY DESIGN**: `intensityProfile`/`noWorse` runs only
+inside `if (scale < 1)` and asks *"did scaling down make this worse?"*, because — as its own comment
+says — an absolute check would "correct" a plan that breached at its natural size back to that same
+breaching plan.
+
+⚠️ **RULE 3 IS VIOLABLE AND VIOLATED, AND THE ONE HELPER THAT KNOWS THE NUMBER HAS ZERO CALLERS.**
+`assessWeeklyJump` compares the planned week to **last week** in **kilometres** and returns advisory
+prose; it is not exported to the app bundle at all (`assessLongRunSpike` and `returnToRunningPlan`
+are). Measured in minutes against the trailing four-week mean: **53 of 7,152 transitions (0.74%)
+exceed 1.30, worst 1.427×.** Not enforced — reported.
+
+⚠️ **RULE 4 IS HONOURED BY CONSTRUCTION, AND IS NOW GUARDED TWICE.** `ReadinessResult` is a band, a
+score and four prose fields; it structurally cannot reach a pace. Nothing was checking that.
+
+⚠️ **RULE 5 — SESSIONS ARE IN MINUTES, THE VOLUME MODEL IS IN KILOMETRES.** One stated 40 km/week,
+half marathon, five days: **200 training minutes for a 15:00 5 km runner and 465 for a 40:00 one, a
+2.32× spread.** Not changed: `weeklyVolumeKmCurrent` feeds a bisection fit, and CLAUDE.md already
+records ~150 stored `distKm` references. ⚠️ `sessionLoad`/`weekLoad`/`rollingLoad` in
+`src/science/training-load.ts` are a minutes-based model with **zero callers**.
+
+### THE THREE IDEAS TAKEN, each chosen because a MEASUREMENT wanted it
+
+⚠️⚠️ **1. THE QUALITY-SESSION COST CAP — `QUALITY_WORK_CAP_SEC`, and the defect it caught is the worst
+thing this audit found.** A 40:00 5 km runner training three days a week for a half marathon was
+handed **"Ladder: 1–2–3–4–3–2–1 km / equal jog" as 176 minutes** — 16 km of work plus 16 km of jog at
+about 10:30/km, as one of that week's three runs, and **longer than their own long run**. That single
+session put the week **1.55× over its trailing four-week mean** and dropped it to **66% easy**,
+breaching the progression guardrail and the intensity floor at once. A hand-authored format has a
+fixed structure, so its cost in MINUTES is whatever the runner's own pace makes it.
+- ⚠️ **IT REFUSES A FORMAT; IT NEVER TRUNCATES ONE.** Shedding reps would deliver 1–2–3–4 under a
+  title promising 1–2–3–4–3–2–1, and a title that lies is a defect this file guards elsewhere. The
+  pool is filtered — the mechanism `selectFormat` already uses for every other constraint.
+- ⚠️ **AND THE COST FILTER DOES NOT USE `narrow`.** Every filter above it means "not appropriate
+  here", where falling back to the wider list is right. A format that would take this runner two and
+  a half hours is not merely inappropriate, so where nothing qualifies the **cheapest** is taken.
+- ⚠️ **70 MINUTES IS MEASURED AND ALSO PRINCIPLED.** The full table is in the code. 70 is where the
+  worst week stops improving (below it the figure oscillates around 66–67%, because what remains is
+  structural); at 60 the slowest runner loses a third of the library, which trades an absurd session
+  for a monotonous block. It is also the spec's own arithmetic — a cruise-threshold session capped at
+  60 minutes of work lands near 70 with short recoveries.
+- **Measured:** quality sessions over 90 minutes **44 of 20,105 → 0**; over 40% of their week
+  **2 → 0**; rule 3 breaches **94 → 53**, worst **1.549× → 1.427×**; rule 2 breaches **635 → 468**,
+  worst **61.4% → 67.6%**. The mean quality session is **unchanged at 26–33 minutes** across every
+  ability, and a 15:00 runner's longest is unchanged at 67 minutes — the fast end is untouched.
+
+⚠️ **2. THE MARATHON ENDURANCE CORRECTION — and the harm compounds, which is why it was worth fixing
+rather than caveating.** Riegel over-predicts the marathon for roughly half of recreational runners.
+A predicted time is not only a number on a screen: **a blank goal is derived with plain Riegel**
+(`web/app.ts:20158`), becomes `goal.targetTimeSeconds`, becomes `paces.goalRace`, and becomes the pace
+band of every "block at marathon effort" step in the block. Measured on a real 20-week plan, the
+uncorrected chain prescribes race-pace work **16 s/km too fast for a 20:00 5 km runner and 29 s/km
+too fast for a 35:00 one** — so the runner rehearses a pace they cannot hold, and `runAnalysis` then
+judges them against a band that was never achievable.
+- ⚠️ **KEYED ON TRAINING, NOT ABILITY.** A fast runner on low mileage is exactly as over-predicted as
+  a slow one; what protects you at 42 km is the volume and the long runs.
+- ⚠️ **SEPARATE FROM `predictRaceTime`, WHICH IS UNCHANGED.** That function is pure in one argument
+  and is called from a dozen places holding no training context; giving it a context it must guess
+  would mean guessing +6% for a 120 km/week runner. The corrected form is opt-in, and an identity
+  below 30 km and without a context — both swept over the real distance table.
+
+⚠️ **3. THE PLYOMETRIC DOSE, AND THE LOAD AS DATA.** `2 × 8–10` pogo hops plus `2 × 3–5` box jumps is
+**22–30 ground contacts** against the handoff's 60–100 (developing) and 100–150 (trained) — from the
+same evidence the session's own description already cited: 31 studies, 652 runners, heavy lifting
+alone ES −0.47 and heavy **combined with plyometrics ES −1.04**, the best-evidenced strength
+intervention there is for runners. Delivering a third of its dose was invisible because the count was
+implied by sets × reps in prose. Now `PLYO_DOSE` by experience, **45 contacts/session developing and
+72 trained → 90 and 144 per week** with two sessions, both inside band; `loadPercent1RM` and
+`contacts` are fields on `StrengthExercise`.
+- ⚠️ Base stays plyo-free and maintenance weeks stay plyo-free — the repo's own reasoning, unchanged.
+- ⚠️ The load is claimed only where it is meant: `80%+` heavy and in maintenance, `70–75%` in a
+  technique phase, and absent from holds and jumps where a %1RM is meaningless.
+
+### FIVE INSTRUMENT FAULTS, ALL MINE, EACH PRODUCING A CONFIDENT WRONG NUMBER
+
+⚠️⚠️ **THERE IS NO `weeks` OPTION ON `generatePlan`.** `GenerateOptions` is
+`{ intensityModel?, startDateIso? }` and nothing else, so a probe passing `{ weeks: 16 }` has it
+silently ignored and the runway comes from `goal.raceDateIso`. **My five-runway sweep therefore built
+the same 40-week plan five times** — a fifth of the grid was real. The tell was every runway reporting
+an identical breach count (147, 147, 147, 147, 147) and I read it without questioning it. Set the race
+date from the runway, and assert the plan came back the length asked for.
+
+⚠️⚠️ **THERE IS NO `isPartial` FIELD ON `PlannedWeek` EITHER.** `!w.isPartial` is `!undefined` —
+always true — so every `filter((w) => !w.isPartial)` filtered **nothing**. tsc caught it in the test
+file; a `.mjs` probe has no typechecking and would not have. The protection that actually works is
+starting the plan on a **Monday**, because `applyPartialFirstWeek` trims week 1 before the start date
+and there is nothing to trim when the start date is the week's Monday.
+
+⚠️ **RULE 3 NEEDS A FULL FOUR-WEEK WINDOW OR IT MEASURES THE OPENING RAMP.** The rule is about the
+ATHLETE's trailing four-week mean, i.e. their real history; inside a fresh plan weeks 1–3 have none.
+Measured with short windows allowed: **315 breaches, worst 1.897× at WEEK 2** — which compared week 2
+against week 1 alone. Windowed properly: **94, worst 1.549×**. A fifth of what I first reported.
+
+⚠️ **A PROBE THAT CLAMPS ITS OWN INPUT DESTROYS ITS OWN FIT.** My first CS comparison clamped the
+longer effort to 2700 s, which wrecked the slope for slow runners and printed a `thresh/CS` ratio
+falling from 0.999 to 0.362 down the ability range. It read exactly like a model that falls apart.
+
+⚠️ **A `deepEqual` AGAINST THE OBJECT'S OWN FILTERED KEYS CANNOT FAIL.** My readiness guard compared
+`Object.keys(r)` against a list **filtered by `k in r`** — the asserting-a-value-against-itself trap,
+in the one check written to stop a `suggestedPaceSecPerKm` appearing.
+
+### THREE GUARD WEAKNESSES, FOUND BY RE-BREAKING
+
+⚠️⚠️ **A GUARD THAT SCALES WITH THE CONSTANT IT GUARDS IS NOT ONE.** `worst <= QUALITY_WORK_CAP_SEC`
+passed with the cap raised to 200 minutes, which let the original 176-minute ladder straight back in.
+There is now an absolute `EVIDENCED_CEILING_SEC` alongside it, set from the recorded sweep rather than
+from the shipped value.
+
+⚠️⚠️ **A TYPE-ONLY FIELD IS INVISIBLE TO A VALUE-LEVEL GUARD.** Adding `suggestedPaceSecPerKm?: number`
+to `ReadinessResult` passed every runtime check, because an optional field nothing assigns never
+appears on the object. A type is a promise about what the loop MAY return, and rule 4 is about what it
+may return — so the declaration has its own guard, parsed out of the source.
+
+⚠️ **AND A RE-BREAK ANCHOR MUST MATCH THE REAL CHARACTERS.** One escape was `"70-75%"` against a
+source containing `"70–75%"` — an en dash. The harness reports a non-unique or absent anchor as
+**ANCHOR NOT UNIQUE** rather than as a verdict, which is what stopped it reading as an escape.
+
+### The seven-day test, restated rather than relaxed
+
+⚠️ **`km(7) > km(6)` WAS PASSING ON A 0.7 KM MARGIN — 1% — IN THE WRONG CURRENCY.** The cap shifted a
+format rotation and it went red. Swept over 32 configurations the claim is true in **28 of 32 in
+kilometres (worst ratio 0.967)** and **32 of 32 in minutes (worst 1.000)**, so it was never reliably
+true in km and the fixture had picked one of the 28. Restated on minutes, plus the honest mechanism:
+for a runner already at `LONG_CEILING_MIN` and the 95-minute easy cap a seventh day **redistributes**
+(−0.27 min at a 17:00 5 km) while for a slower one it genuinely adds (**+17.9 min at 30:00**). What the
+engine guarantees is more RUNS and no materially less time, and a third assertion requires the day to
+add real time off the ceilings — so a regression making it cosmetic for everybody fails.
+
+### Deliberately NOT ported, with the reason
+
+| spec idea | why not |
+|---|---|
+| CS as the prescribing anchor, D′ interval model, eligibility gate | already honoured to ~4%; the gate returns nil for everyone slower than a 15:00 5 km, and re-anchoring is measurably dangerous |
+| T0–T5 tiers, `TierConstants`, `AthleteState` | a reorganisation of what `experience` + `daysPerWeek` + `volKm` already do; needs `weeksInjuryFree`, a real training age and observed weekly history the app does not collect |
+| Volume in minutes; observed-load-driven ramp | architectural; ~150 stored `distKm` references, and the engine's ramp is destination-based rather than incremental so the spec's defect 1 cannot occur here |
+| Raising the easy floor to 0.75 | 468 weeks, structural in the peak phase — a coaching decision, his to make |
+| 1.30 as a refusal | 53 transitions; needs a trailing-mean denominator the generator does not have |
+| Distribution sequencing pyramidal → polarised | the spec grades it **Emerging** and says to put Emerging behind a flag |
+| VO2 reps of 3–5 min | **Emerging**, and measured 50% of VO2 work sits in 60–119 s reps across 1,064 sessions — real, but it is 29 formats with variety guards over them |
+| Strides twice a week | measured **6 sessions in 17 weeks**, clustered in weeks 1–2 and 9–10 — real and cheap, but it pins an easy day and removes it from an 8-format rotation |
+| Taper holding intensity | measured **0 of 120 taper weeks carry threshold or race-specific work** — `taperSession` is hardcoded to `vo2-10x1` for every distance, which makes taper.ts's own notes false as delivered. **The biggest unported finding.** |
+| Masters ramp and spacing | `assessMasters` returns `minEasyDaysBetweenQuality` and it is **read nowhere**; `Athlete` has no `age`, so the generator is structurally age-blind |
+| Foster monotony, non-responder protocol, readiness actions, ACWR | absent by decision, or Convention-grade with no mechanism to act on them |
+
+⚠️ **THE SPEC CONFLATES HILL REPS WITH HILL SPRINTS, and this repo is right.** It calls hills "the SAFE
+way to introduce intensity below T3" because gradient caps velocity; CLAUDE.md calls hill sprints "the
+highest connective-tissue load in the library" and withholds them from returning runners. A 60-second
+submaximal hill rep and a 10-second maximal sprint are different sessions. Do not reconcile them.
+
+⚠️ **`tools/audit-five-rules.mjs` IS THE REPRODUCIBLE INSTRUMENT** for all of the above, and its two
+recorded instrument faults are in its own comments so the next reader does not repeat them.

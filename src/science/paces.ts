@@ -35,6 +35,87 @@ export function predictRaceTime(recent: RecentPerformance, target: RaceDistanceK
   return riegelPredict(recent.distanceMeters, recent.timeSeconds, RACE_DISTANCES_M[target]);
 }
 
+/**
+ * The endurance correction for long races, and the reason it exists.
+ *
+ * Riegel's power law is a good description of what one runner can do across distances that all sit
+ * inside their trained range. Past about 30 km it stops being one: the marathon is not simply a
+ * longer 10 km, it is the distance at which glycogen, durability and time on feet start deciding the
+ * outcome — none of which a single exponent on a 5 km time knows anything about. Riegel therefore
+ * OVER-predicts the marathon for roughly half of recreational runners, and mileage-adjusted models
+ * roughly halve the mean squared error (Vickers & Vertosick 2016, 2,303 runners).
+ *
+ * ⚠️ THE HARM COMPOUNDS, WHICH IS WHY THIS IS WORTH CORRECTING RATHER THAN CAVEATING. A predicted
+ * time is not only a number on a screen: when a runner leaves their goal time blank the app derives
+ * one with Riegel, that becomes `goal.targetTimeSeconds`, that becomes `paces.goalRace`, and that
+ * becomes the pace band of every "block at marathon effort" step in the block. Measured on a real
+ * 20-week marathon plan, the uncorrected chain prescribes race-pace work 16 s/km too fast for a
+ * 20:00 5 km runner and 29 s/km too fast for a 35:00 one — so the runner rehearses a pace they
+ * cannot hold, and `runAnalysis` then judges them against a band that was never achievable.
+ *
+ * ⚠️ IT IS KEYED ON TRAINING, NOT ON ABILITY, and that is the whole point. A fast runner on low
+ * mileage is exactly as over-predicted as a slow one; what protects you at 42 km is the volume and
+ * the long runs, so those are what the correction reads. The bands come from the commissioned
+ * engine handoff (§5) and are a deliberate convention awaiting our own completed-marathon data —
+ * see MARATHON_CORRECTION_EXPERIMENT below.
+ */
+export const MARATHON_CORRECTION_MIN_M = 30_000;
+
+/** Weekly training minutes at or above which the correction disappears entirely. */
+export const MARATHON_WELL_TRAINED_MIN = 400;
+/** Longest run in minutes required alongside that volume for no correction at all. */
+export const MARATHON_WELL_TRAINED_LONG_MIN = 150;
+/** Weekly training minutes at or above which the correction is halved. */
+export const MARATHON_MODERATELY_TRAINED_MIN = 240;
+
+/**
+ * ⚠️ CONVENTION, NOT MEASUREMENT — flagged here so nobody quotes these three numbers as evidence.
+ * The DIRECTION is well established; the exact coefficients need calibrating against our own
+ * completed marathons, at which point this whole function should be replaced by a fitted model
+ * reporting an INTERVAL rather than a point estimate. Until then a blunt correction in the right
+ * direction beats a precise one in the wrong direction.
+ */
+export const MARATHON_CORRECTION_EXPERIMENT = "EXP-MARATHON";
+
+export type EnduranceContext = {
+  /** Weekly TRAINING minutes — not kilometres. A slow runner's 40 km is far more work than a fast one's. */
+  weeklyMinutes: number;
+  /** Longest single run in minutes over the recent block. */
+  longestRunMinutes: number;
+};
+
+/** Fractional addition to a Riegel prediction at 30 km and beyond. Zero for well-trained runners. */
+export function marathonCorrection(ctx: EnduranceContext): number {
+  if (ctx.weeklyMinutes >= MARATHON_WELL_TRAINED_MIN
+      && ctx.longestRunMinutes >= MARATHON_WELL_TRAINED_LONG_MIN) return 0;
+  if (ctx.weeklyMinutes >= MARATHON_MODERATELY_TRAINED_MIN) return 0.03;
+  return 0.06;
+}
+
+/**
+ * A race prediction that stops pretending the marathon is a long 10 km.
+ *
+ * ⚠️ SEPARATE FROM `predictRaceTime` ON PURPOSE, and the separation is not squeamishness. That
+ * function is pure in its one argument and is called from a dozen places that hold no training
+ * context at all; giving it a context it must guess would mean guessing +6% for a 120 km/week
+ * runner, which is worse than not correcting. So the corrected form is opt-in, and a caller that
+ * cannot answer "how much are they training?" honestly gets the uncorrected answer and knows it.
+ *
+ * ⚠️ AND IT IS AN IDENTITY BELOW 30 km. Every distance the correction does not apply to must come
+ * back byte-identical to `predictRaceTime`, or a shorter-race prediction silently changes as a side
+ * effect of a marathon fix. Asserted rather than assumed.
+ */
+export function predictRaceTimeWithEndurance(
+  recent: RecentPerformance,
+  target: RaceDistanceKey,
+  ctx?: EnduranceContext,
+): number {
+  const base = predictRaceTime(recent, target);
+  if (!ctx) return base;
+  if (RACE_DISTANCES_M[target] < MARATHON_CORRECTION_MIN_M) return base;
+  return base * (1 + marathonCorrection(ctx));
+}
+
 export function predictAllRaceTimes(recent: RecentPerformance): Record<RaceDistanceKey, number> {
   const keys = Object.keys(RACE_DISTANCES_M) as RaceDistanceKey[];
   const out = {} as Record<RaceDistanceKey, number>;

@@ -987,7 +987,84 @@ export type FormatCtx = {
  * Filters narrow the pool; if a filter would empty it, that filter is dropped rather than throwing
  * — a plan must always be generatable, even for a returning beginner in a deload taper week.
  */
-function selectFormat(pool: QualityFormat[], variant: number, ctx: FormatCtx): QualityFormat {
+/**
+ * The longest a single quality session's work-and-recovery portion may be, and why a cap exists.
+ *
+ * ⚠️ A HAND-AUTHORED FORMAT HAS A FIXED STRUCTURE, SO ITS COST IN MINUTES IS WHATEVER THE RUNNER'S
+ * OWN PACE MAKES IT — and for a slow runner a distance-gated format with equal-distance jog
+ * recoveries becomes something nobody would prescribe. Measured on a real 20-week half-marathon
+ * plan for a 40:00 5 km runner training three days a week, the week-14 quality slot drew
+ * "Ladder: 1-2-3-4-3-2-1 km / equal jog" and delivered **176 minutes** — 16 km of work plus 16 km
+ * of jog at about 10:30/km. Two hours and fifty-six minutes, as one of that week's three runs, and
+ * LONGER THAN THEIR OWN LONG RUN. That single session put the week 1.55x over its trailing
+ * four-week mean and dropped it to 66% easy, so it breached both the progression guardrail and the
+ * intensity floor at once.
+ *
+ * ⚠️ AND IT IS WHY THE EASY FLOOR CANNOT BE ENFORCED ABSOLUTELY TODAY. `volumeScale`'s intensity
+ * check is deliberately COMPARATIVE — "did scaling down make this worse?" — and its comment
+ * explains that an absolute check would "correct" a plan that breached at its natural size back to
+ * that same breaching plan. A plan breaches at its natural size precisely because one library
+ * session is an enormous share of a small week. Cap the session and that whole chain unlocks.
+ *
+ * ⚠️ 90 MINUTES IS MEASURED, NOT PICKED. Sweeping every reachable format at four abilities and
+ * counting how many survive each cap:
+ *
+ *     cap      15:00 5k   25:00 5k   35:00 5k   40:00 5k     under-75%-easy weeks   worst week
+ *     none        62/62      62/62      62/62      62/62          635 (3.45%)          61.4%
+ *     90 min      62/62      61/62      61/62      59/62          618 (3.36%)          65.0%
+ *     75 min      62/62      61/62      57/62      50/62          554 (3.01%)          66.4%
+ *     70 min      62/62      61/62      53/62      46/62          468 (2.55%)          67.6%
+ *     65 min      62/62      61/62      50/62      42/62          415 (2.26%)          66.4%
+ *     60 min      61/62      60/62      44/62      38/62          380 (2.07%)          67.2%
+ *
+ * 70 is the point where the WORST week stops improving — below it the figure oscillates around 66-67%
+ * rather than falling further, because what remains is structural (a three-run week in the peak phase
+ * carries one quality session however short it is) and no session cap can reach it. At 60 the slowest
+ * runner loses a third of the library, which trades an absurd session for a monotonous block, and
+ * `test/session-library.test.ts` guards variety explicitly. At 70 they keep 46 of 62 formats and
+ * nobody faster loses any.
+ *
+ * ⚠️ AND 70 IS THE SPEC'S OWN ARITHMETIC RATHER THAN A NUMBER FITTED TO THIS TABLE. The commissioned
+ * handoff caps a cruise-threshold session at 60 minutes of WORK and a continuous one at 40; 60
+ * minutes of work with short jog recoveries lands near 70 in total. The table is what confirms the
+ * principled number is also the sensible one, which is the only reason to trust either.
+ *
+ * ⚠️ IT REFUSES A FORMAT; IT NEVER TRUNCATES ONE. Shedding repetitions from a ladder would deliver
+ * 1-2-3-4 under a title promising 1-2-3-4-3-2-1, and a title that lies is a defect this file guards
+ * against elsewhere. The pool is filtered instead, which is the mechanism `selectFormat` already
+ * uses for every other constraint.
+ */
+export const QUALITY_WORK_CAP_SEC = 70 * 60;
+
+/** A step's cost in seconds, in the same currency the intensity model uses. */
+function stepCostSec(st: WorkoutStep): number {
+  if (st.durationSeconds) return st.durationSeconds;
+  if (st.distanceMeters && st.targetPaceSecPerKm) {
+    const mid = (st.targetPaceSecPerKm.minSecPerKm + st.targetPaceSecPerKm.maxSecPerKm) / 2;
+    return (st.distanceMeters / 1000) * mid;
+  }
+  // Effort-only work in metres — a hill sprint, which carries no pace on purpose. The engine's own
+  // intensity model uses 4 m/s for exactly this case rather than counting it as nothing.
+  if (st.distanceMeters) return st.distanceMeters / 4;
+  return 0;
+}
+
+/**
+ * What a format costs THIS runner between the warm-up and the cool-down. The frame is excluded
+ * because it is the same for every format and is not what makes one of them absurd.
+ */
+export function formatWorkSec(fmt: QualityFormat, paces: TrainingPaces): number {
+  let total = 0;
+  for (const st of fmt.build(paces)) total += stepCostSec(st);
+  return total;
+}
+
+function selectFormat(
+  pool: QualityFormat[],
+  variant: number,
+  ctx: FormatCtx,
+  paces?: TrainingPaces,
+): QualityFormat {
   const narrow = (list: QualityFormat[], keep: (f: QualityFormat) => boolean) => {
     const next = list.filter(keep);
     return next.length ? next : list;
@@ -1007,6 +1084,25 @@ function selectFormat(pool: QualityFormat[], variant: number, ctx: FormatCtx): Q
   // `narrow` falls back to the wider list when nothing qualifies, so a pool with no "small" format is
   // unaffected rather than broken.
   if (ctx.isDeload) list = narrow(list, (f) => f.load === "small");
+  // ⚠️ THE COST FILTER IS LAST, AND IT DOES NOT USE `narrow`. Every filter above expresses "this
+  // format is not appropriate here" and falling back to the wider list is right for all of them. A
+  // format that would take this runner two and a half hours is not merely inappropriate — so where
+  // nothing qualifies, the CHEAPEST format is taken rather than the whole pool. In practice that
+  // branch is unreachable (`vo2-10x1` costs about 19 minutes at any ability), but relying on a
+  // constant in another table to keep a guardrail true is how a guardrail stops being one.
+  if (paces) {
+    const affordable = list.filter((f) => formatWorkSec(f, paces) <= QUALITY_WORK_CAP_SEC);
+    if (affordable.length) list = affordable;
+    else {
+      let cheapest = list[0]!;
+      let best = formatWorkSec(cheapest, paces);
+      for (const f of list) {
+        const c = formatWorkSec(f, paces);
+        if (c < best) { best = c; cheapest = f; }
+      }
+      list = [cheapest];
+    }
+  }
   // Modulo over a stable, sorted-by-id list so the rotation does not shift when formats are added
   // in the middle of the array.
   const ordered = [...list].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
@@ -1216,7 +1312,7 @@ export function buildWorkout(id: string, paces: TrainingPaces, ctx: FormatCtx = 
 }
 
 export function thresholdSession(paces: TrainingPaces, variant: number, ctx: FormatCtx = {}): SessionContent {
-  const fmt = selectFormat(THRESHOLD_FORMATS, variant, ctx);
+  const fmt = selectFormat(THRESHOLD_FORMATS, variant, ctx, paces);
   const steps = [warmup(paces, 15, true), ...fmt.build(paces), cooldown(paces, 10)];
   return assemble("threshold", fmt.title, fmt.desc ?? THRESHOLD_DESC, fmt.intensity ?? "moderate", steps, fmt.rpe ?? RPE.threshold);
 }
@@ -1465,7 +1561,7 @@ const VO2_FORMATS: QualityFormat[] = [
 ];
 
 export function vo2Session(paces: TrainingPaces, variant: number, ctx: FormatCtx = {}): SessionContent {
-  const fmt = selectFormat(VO2_FORMATS, variant, ctx);
+  const fmt = selectFormat(VO2_FORMATS, variant, ctx, paces);
   const steps = [warmup(paces, 15, true), ...fmt.build(paces), cooldown(paces, 10)];
   return assemble("vo2", fmt.title, fmt.desc ?? VO2_DESC, fmt.intensity ?? "hard", steps, fmt.rpe ?? RPE.vo2);
 }
@@ -1532,7 +1628,7 @@ export const QUALITY_FORMAT_IDS = {
 };
 
 export function raceSpecificSession(paces: TrainingPaces, variant = 0, ctx: FormatCtx = {}): SessionContent {
-  const fmt = selectFormat(RACE_FORMATS, variant, ctx);
+  const fmt = selectFormat(RACE_FORMATS, variant, ctx, paces);
   const steps = [warmup(paces, 15, true), ...fmt.build(paces), cooldown(paces, 10)];
   return assemble("race-specific", fmt.title, fmt.desc ?? RACE_DESC, fmt.intensity ?? "moderate", steps, fmt.rpe ?? RPE.steady);
 }
@@ -1565,9 +1661,47 @@ const EX: Record<string, ExDef> = {
   boxjump: { name: "Box / hurdle jump", primary: "Quads", secondary: ["Glutes", "Calves"], pattern: "jump", anim: "box-jump", cue: "Explode up, land soft and quiet with bent knees. Full recovery between jumps — quality over fatigue." },
 };
 
-function mkEx(key: string, sets: number, reps: string): StrengthExercise {
+function mkEx(
+  key: string,
+  sets: number,
+  reps: string,
+  extra: { loadPercent1RM?: string; contacts?: number } = {},
+): StrengthExercise {
   const d = EX[key]!;
-  return { name: d.name, primary: d.primary, secondary: d.secondary, pattern: d.pattern, anim: d.anim, cue: d.cue, sets, reps };
+  return { name: d.name, primary: d.primary, secondary: d.secondary, pattern: d.pattern, anim: d.anim,
+    cue: d.cue, sets, reps, ...extra };
+}
+
+/**
+ * The plyometric dose, and why it is a table rather than the two lines it replaced.
+ *
+ * ⚠️ THE OLD DOSE WAS A THIRD OF THE EVIDENCED ONE, AND ONLY A MEASUREMENT SHOWED IT. Two sets of
+ * 8-10 pogo hops plus two of 3-5 box jumps is 22-30 ground contacts. The commissioned engine
+ * handoff asks for 60-100 contacts for a developing runner and 100-150 for a trained one, from the
+ * same body of evidence this session's own description cites: 31 studies and 652 runners, where
+ * heavy lifting alone moved performance by ES -0.47 and heavy lifting COMBINED with plyometrics
+ * moved it by ES -1.04. The combined arm is the best-evidenced intervention in the whole strength
+ * literature for runners, and this app was delivering a third of its dose.
+ *
+ * ⚠️ THE COUNT IS EXPRESSED AS DATA ON THE EXERCISE, not implied by sets x reps, so the weekly dose
+ * can be audited. `test/strength.test.ts` asserts the delivered total lands inside the band — which
+ * a prose description could never support.
+ *
+ * ⚠️ IT SCALES WITH EXPERIENCE AND NOT WITH PHASE, and the two must not be confused. Plyometrics
+ * stay out of the base phase entirely for the reason already recorded below — they are introduced
+ * once faster running is tolerated without a delayed reaction — and out of maintenance weeks near
+ * the race. What experience changes is how much a runner gets when they do get it.
+ */
+const PLYO_DOSE = {
+  /** A runner still building the habit gets the lower band; their tissue tolerance is the binding constraint. */
+  developing: { pogoSets: 3, pogoReps: "10", pogoEach: 10, jumpSets: 3, jumpReps: "5", jumpEach: 5 },
+  /** A trained runner gets the band the combined-methods evidence actually used. */
+  trained: { pogoSets: 4, pogoReps: "12", pogoEach: 12, jumpSets: 4, jumpReps: "6", jumpEach: 6 },
+} as const;
+
+/** Ground contacts a dose delivers, so the number in the plan is the number in the table. */
+function plyoContacts(d: typeof PLYO_DOSE.developing | typeof PLYO_DOSE.trained): number {
+  return d.pogoSets * d.pogoEach + d.jumpSets * d.jumpEach;
 }
 
 const STRENGTH_THEMES: { title: string; keys: string[] }[] = [
@@ -1592,21 +1726,39 @@ export function generalStrengthSession(theme = 0): SessionContent {
   return { ...content, exercises };
 }
 
-export function strengthSession(phase: Phase, maintenance: boolean): SessionContent {
+export function strengthSession(
+  phase: Phase,
+  maintenance: boolean,
+  opts: { competitive?: boolean } = {},
+): SessionContent {
   const heavy = !maintenance && (phase === "build" || phase === "peak");
   const sets = maintenance ? 2 : heavy ? 3 : 2;
   const reps = maintenance ? "4–6" : heavy ? "3–6 (heavy)" : "6–8";
+  // ⚠️ THE LOAD IS ONLY CLAIMED WHERE IT IS MEANT. A technique-phase session is deliberately
+  // moderate, so labelling it 80%+ would be a prescription nobody wrote; a maintenance session near
+  // the race keeps the load and drops the volume, which is what the taper evidence asks for.
+  const load = heavy || maintenance ? "80%+" : "70–75%";
   const exercises = [
-    mkEx("squat", sets, reps),
-    mkEx("splitSquat", sets, reps),
-    mkEx("rdl", sets, reps),
+    mkEx("squat", sets, reps, { loadPercent1RM: load }),
+    mkEx("splitSquat", sets, reps, { loadPercent1RM: load }),
+    mkEx("rdl", sets, reps, { loadPercent1RM: load }),
     mkEx("calf", sets, "8–12"),
     mkEx("soleus", sets, "8–12"),
     mkEx("stepUp", sets, reps),
     mkEx("plank", Math.max(1, sets - 1), "30–45s hold"),
   ];
   // Plyometrics only in build/peak — added once faster running is tolerated without a delayed reaction.
-  if (heavy) { exercises.push(mkEx("pogo", 2, "8–10"), mkEx("boxjump", 2, "3–5")); }
+  // ⚠️ THE DOSE COMES FROM `PLYO_DOSE`, NOT FROM TWO LITERALS. See that table: the literals it
+  // replaced delivered 22-30 ground contacts against an evidenced 60-150, and nothing on the screen
+  // or in the tests could see the shortfall because the count was implied by sets x reps rather than
+  // stated. The contacts ride on the exercise so the weekly total is auditable.
+  if (heavy) {
+    const d = opts.competitive ? PLYO_DOSE.trained : PLYO_DOSE.developing;
+    exercises.push(
+      mkEx("pogo", d.pogoSets, d.pogoReps, { contacts: d.pogoSets * d.pogoEach }),
+      mkEx("boxjump", d.jumpSets, d.jumpReps, { contacts: d.jumpSets * d.jumpEach }),
+    );
+  }
   const minutes = maintenance ? 30 : 45;
   const desc = maintenance
     ? "Maintenance strength near your race — keep the movements, drop the volume. Tap an exercise for how to do it and to log your weights."

@@ -168,6 +168,22 @@ export type StrengthExercise = {
   sets: number;
   /** Reps or hold, e.g. "3–6", "8–12", "30–45s". */
   reps: string;
+  /**
+   * Target load as a percentage of one-rep max, e.g. "80%+". Present only where a load is genuinely
+   * prescribed — bodyweight and hold exercises carry none.
+   *
+   * ⚠️ IT IS A FIELD RATHER THAN A SENTENCE BECAUSE THE NUMBER IS THE PRESCRIPTION. The evidence for
+   * strength training in runners is specific about load: 31 studies and 652 runners found heavy
+   * lifting at or above 80% 1RM improved economy (ES -0.27) and performance (ES -0.47), while
+   * submaximal and isometric work produced nothing at all. A "~80%+ 1RM" buried in a paragraph is
+   * the one number in the session that decides whether it works, and nothing could read it.
+   */
+  loadPercent1RM?: string;
+  /**
+   * Ground contacts per session for a plyometric exercise (sets x reps), so the weekly dose is
+   * auditable rather than implied. Absent for everything that is not a jump.
+   */
+  contacts?: number;
   /** Movement family the UI uses to pick a schematic demonstration figure. */
   pattern: string;
   /** Slug of a looping demonstration animation (assets/exercise-animations/<slug>.webp),

@@ -1786,7 +1786,13 @@ function addStrength(
   // Pair strength with a quality day and an easy day (so lifting doesn't fall on the long run day).
   const strengthDays = [dayRel(longDay, QUALITY_REL[0]!), dayRel(longDay, EASY_REL[0]!)];
   for (let i = 0; i < count; i++) {
-    sessions.push(strengthSession(wp.phase, maintenance));
+    // ⚠️ EXPERIENCE REACHES THE PLYOMETRIC DOSE, and it is the only thing it reaches here. A trained
+    // runner gets the 100-150 ground contacts the combined-methods evidence used; a developing one
+    // gets the lower 60-100 band, because tissue tolerance rather than the training effect is what
+    // binds for them. See PLYO_DOSE.
+    sessions.push(strengthSession(wp.phase, maintenance, {
+      competitive: ctx.athlete.experience === "competitive",
+    }));
     dayOf.push(strengthDays[i] ?? strengthDays[0]!);
   }
 }

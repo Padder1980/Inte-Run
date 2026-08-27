@@ -11769,3 +11769,141 @@ submaximal hill rep and a 10-second maximal sprint are different sessions. Do no
 
 ⚠️ **`tools/audit-five-rules.mjs` IS THE REPRODUCIBLE INSTRUMENT** for all of the above, and its two
 recorded instrument faults are in its own comments so the next reader does not repeat them.
+
+## THE TAPER NOW HOLDS ITS SPECIFICITY, NOT JUST A HARD SESSION (owner, 2026-08-27)
+
+The biggest thing the engine-handoff read-across found, and he asked for it next. Suite 1363 →
+**1369**; **9 deliberate re-breaks, all 9 caught** (one only after the guard was made bidirectional —
+that one is the useful half).
+
+⚠️⚠️ **THE DEFECT WAS A WRITTEN PROMISE THE CODE DID NOT KEEP.** `qualityContentsFor`'s taper branch
+was `out.push(taperSession(p))` — and `taperSession` is `formatById(VO2_FORMATS, "vo2-10x1")`, one
+hardcoded format for every distance. So a marathon runner who had spent a whole block building
+goal-pace work was handed **one-minute VO2 reps for their final three weeks**, while
+`src/science/taper.ts`'s own notes promised *"keep marathon-pace touches"* and *"hold threshold
+intensity"*. Measured with the engine's own `computeDistribution` over a 20-week block: **0 of 120
+taper weeks contained any threshold or race-specific work, and 120 of 120 contained VO2.**
+
+A marathon runner's final fortnight, before → after:
+
+| | before | after |
+|---|---|---|
+| taper wk 1 | `10 × 1′ hard / 1′ easy` | **`3 × 10′ at goal race pace / 2′ jog`** |
+| taper wk 2 | `10 × 1′ hard / 1′ easy` | **`Goal-pace cut-down: 3 km – 2 km – 1 km / 3′ jog`** |
+| race week | `10 × 1′ hard / 1′ easy` | `10 × 1′ hard / 1′ easy` — unchanged, and deliberately |
+
+⚠️ **THE TAPER NOW DRAWS WHAT THE PEAK PHASE WOULD HAVE DRAWN, AT A REDUCED DOSE**, which is what
+"hold the specificity" means: `raceSpecificSession` for the half and marathon, a small `vo2Session`
+for 5 km and 10 km. **The short-event exclusion is the point, not an omission** — for those events
+`paces.goalRace` sits on top of threshold/VO2, so goal pace IS the interval work, and "3 × 10′ at
+goal race pace" would be thirty minutes at 5 km pace: longer than the race, and the identical
+unrunnable prescription this file already records removing from short-event long runs.
+
+⚠️ **THE POOL IS NAMED `phase: "peak"` EXPLICITLY, AND NOT LEFT TO A FALLBACK.** No quality format
+lists `"taper"` in its `phases`, so a `phase: "taper"` filter empties the list and `narrow` silently
+hands back the **whole pool — big formats included**. Asking for the peak's pool is both what holding
+the specificity means and the only way the size preference below it can bind at all.
+
+⚠️ **`isDeload: true` IS THE DOSE LEVER, AND `avoidBig` WAS MEASURED AND REJECTED.** Measured on the
+spec's own quantity (Z5–Z7, i.e. this engine's `hard` bucket) against a 5 km peak week's 25 hard
+minutes: `isDeload` delivers 10 (41% of peak), `avoidBig` delivers 15 (61%). Both sit in or near the
+handoff's 35–60% window, and `avoidBig` cost every distance 2–6 points of delivered volume cut on top
+of what the specificity fix already cost. A taper's job is freshness, and `isDeload` carries the
+reasoning already written down for the deload — *the runner still gets a genuine session at the same
+intensity, it is simply short.*
+
+⚠️ **RACE WEEK KEEPS `taperSession`, FOR THREE SEPARATE REASONS.** It is the smallest dose, which is
+the progressive shape the evidence asks for rather than a step; it is chosen **by id** rather than by
+a rotation index, because it used to be `vo2Session(p, 3)` and inserting any format above index 3
+silently changed the race-week session of every plan ever generated — race week is the worst possible
+week for a surprise; and `test/session-library.test.ts` pins that by-id guarantee, so keeping a real
+caller stops the guard being orphaned.
+
+### ⚠️⚠️ HOLDING THE QUALITY COSTS VOLUME CUT, AND THE EVIDENCE SAYS WHERE TO TAKE IT FROM
+
+A session drawn from the peak's pool is bigger than the `vo2-10x1` it replaced — about **24 extra
+minutes** for a half — so the delivered cut shrank and **the half fell to 29.1% against the 30% floor
+`test/generate-plan.test.ts` asserts.** The taper meta-analysis resolves the tension explicitly
+rather than leaving it: volume falls 41–60% *while frequency and intensity are maintained*, and **"the
+volume cut comes entirely out of Z1–Z3"**. So the easy and long runs give way. Swept on the test's own
+fixture, last full taper week:
+
+| | 0.72 | 0.70 | 0.68 | 0.66 | 0.64 | 0.62 | 0.60 | 0.58 |
+|---|---|---|---|---|---|---|---|---|
+| 5k | | | | 32.2% | | **35.7%** | 37.4% | 39.1% |
+| 10k | **34.7%** | | 37.2% | 39.2% | 40.7% | | | |
+| half | | 29.1% | | 32.1% | **33.3%** | 35.5% | | |
+| marathon | | | | 31.9% (0.65) | | **34.5%** | 36.3% | 38.0% |
+
+**5k 0.66 → 0.62, half 0.70 → 0.64, marathon 0.65 → 0.62. The 10k is deliberately unchanged** at 0.72,
+because it already delivers 34.7% and deepening it would be a change with no defect behind it.
+
+⚠️ **THE PICK IS THE SHALLOWEST VALUE CLEARING 33% THAT IS STILL SHALLOWER THAN RACE WEEK, AND BOTH
+HALVES MATTER.** 33% is the 30% floor plus three points, for the reason already recorded in this file
+about 0.4 points of headroom being one keystroke from somebody relaxing the floor instead. And a
+lead-in deepened past its own race-week multiplier makes the taper **flat**, which is the "step" shape
+the meta-analysis found worse than a progressive one (SMD −0.51) — the 5k at 0.58 would have tied its
+race week exactly, which is why it is 0.62.
+
+### ⚠️⚠️ I MADE THE EXACT MEASUREMENT MISTAKE THIS FILE ALREADY DOCUMENTS
+
+My first probe read **step-level `targetRpe`** and reported the pre-race taper weeks as carrying
+**0 minutes** of non-easy running — about weeks that plainly contain a VO2 session. Quality reps carry
+no step RPE: the SESSION carries `{min:8,max:9}` and every rep carries nothing. That is instrument
+fault 1 from the 2026-08-06 progression audit, recorded in this file in as many words — *"intensity
+read ~2% everywhere and the taper read 0.0% hard, which would have been reported as 'the taper throws
+away all intensity'"* — and it is precisely what I would have reported. **Use
+`computeDistribution`; never roll a second definition.**
+
+⚠️ **AND MY DEPTH PROBE USED A DIFFERENT RUNNER FROM THE TEST'S OWN FIXTURE**, so it reported all four
+distances passing while the test failed on the half. The fixture is a 1260 s recreational runner with
+`returningFromInjury` overridden to false; I had used an 1100 s competitive one. Read the fixture.
+
+### The notes now state the delivered cut, and race week's figure was unobservable
+
+⚠️ **THE PERCENTAGES IN taper.ts's NOTES DESCRIBED THE MULTIPLIER, NOT THE WEEK.** They quoted
+`1 − 0.72 = "~28%"`, which is not what the week falls by, because the multiplier reaches only the easy
+and long runs while the quality session keeps its own length — measured, the 10k's 0.72 delivers
+**35%**. Worse, the second figure was of a quantity nobody can observe: **race week contains the
+race**, so its `plannedDistanceMeters` includes 21.1 km or 42.2 km of it, and the half's race week
+reads a 28% cut while the marathon's reads **−0%**. A note promising "~45%" there was describing
+nothing. The notes now state the delivered cut for the weeks **before** race week and say nothing
+about race week's size, which is the race.
+
+### The guard, and the weakness that made it bidirectional
+
+`test/taper-holds-intensity.test.ts`, six guards. The load-bearing one **derives its claim from the
+note's own words** rather than a hand-written table, so rewording a promise without delivering it
+fails.
+
+⚠️⚠️ **AND A GUARD THAT "THE PROMISE IS KEPT" CAN BE SATISFIED BY DELETING THE PROMISE.** Watched
+escaping: removing *"keep marathon-pace touches"* from the marathon's note passed every assertion,
+because there was then nothing to check. That is the drift in its quietest form — the behaviour and
+the description parting company by dropping the description. The guard is bidirectional now: the note
+must MAKE a specificity claim, the claim must be delivered, and whatever is delivered must be named.
+
+⚠️ **"threshold/VO2" IS A DISJUNCTION AND MY FIRST GUARD READ IT AS A CONJUNCTION.** The 10k's note
+says *"keep threshold/VO2 intensity"*, which either kind of work satisfies; demanding threshold there
+failed on correct code and would have pushed the fix towards giving a 10 km runner a threshold session
+in race week for the sake of a slash in a sentence.
+
+⚠️ **AND THE HALF'S NOTE IS SATISFIED IN SUBSTANCE RATHER THAN BY A LABEL.** For a half, goal pace
+sits **5–8 s/km slower than threshold and the two bands overlap** (measured across abilities: 4:19–4:25
+against 4:11–4:24 for a 20:00 5 km runner), so a goal-pace session IS a threshold session in all but
+name. For a **marathon** the two are 20 s/km apart and genuinely different gears, which is why that
+note names marathon pace instead. Requiring a session literally typed `threshold` would fail on
+correct code for the half.
+
+⚠️ **TWO MORE OF MY OWN GUARDS WERE OVER-SPECIFIED AND FAILED ON CORRECT CODE.** "The taper is
+progressive" asserted the pre-race SESSION must be no smaller than race week's — but the 10k's
+pre-race session is a 38-minute Mona fartlek against race week's 44-minute `10 × 1′`, so the session
+grows while the week falls, and both are fine. The progression is about the WEEK's volume, which the
+multipliers carry and which is asserted separately. And a sweep bar written at `> 100` failed at 72,
+because one or two taper weeks per plan is simply what a plan has — **widening the grid is the fix,
+not lowering the bar**, since a sweep that only just clears its own floor is one change from proving
+nothing.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc
+clean apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1369 pass /
+0 fail under UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`**, five-rule audit unchanged or
+better (rule 3 transitions 53 → 50), both design ratchets unchanged.

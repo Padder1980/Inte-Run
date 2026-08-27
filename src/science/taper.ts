@@ -20,6 +20,48 @@ export type TaperPlan = {
   notes: string[];
 };
 
+//
+// ⚠️⚠️ THE LEAD-IN MULTIPLIERS WERE DEEPENED ON 2026-08-27 BECAUSE THE TAPER NOW HOLDS ITS
+// SPECIFICITY, AND THE TWO CHANGES ARE ONE CHANGE. `qualityContentsFor`'s taper branch used to push
+// one hardcoded `vo2-10x1` for every distance — so a marathon runner who had spent a block building
+// goal-pace work got one-minute VO2 reps for their final fortnight, and measured with the engine's
+// own `computeDistribution`, **0 of 120 taper weeks contained any threshold or race-specific work**
+// while the notes below promised "keep marathon-pace touches" and "hold threshold intensity". The
+// taper now draws what the peak phase would have drawn, at a reduced dose.
+//
+// That session is bigger than the one it replaced — for a half, `race-3x10` against `vo2-10x1` is
+// about 24 extra minutes in that week — so the week's delivered CUT shrank, and the half fell to
+// **29.1%** against the 30% floor `test/generate-plan.test.ts` asserts. The evidence resolves the
+// tension explicitly rather than leaving it: volume falls 41-60% while frequency and intensity are
+// MAINTAINED, and "the volume cut comes entirely out of Z1-Z3". So the easy and long runs give way
+// to make room for the held quality, which is what deepening these multipliers does.
+//
+// Swept on the test's own fixture (5 days, 21:00 5 km, recreational), last full taper week:
+//     5k        0.66 -> 32.2%   0.62 -> 35.7%   0.60 -> 37.4%   0.58 -> 39.1%
+//     10k       0.72 -> 34.7%   0.68 -> 37.2%   0.66 -> 39.2%   0.64 -> 40.7%
+//     half      0.70 -> 29.1%   0.66 -> 32.1%   0.64 -> 33.3%   0.62 -> 35.5%
+//     marathon  0.65 -> 31.9%   0.62 -> 34.5%   0.60 -> 36.3%   0.58 -> 38.0%
+//
+// ⚠️ THE PICK IS THE SHALLOWEST VALUE CLEARING 33% **THAT IS STILL SHALLOWER THAN RACE WEEK**. Both
+// halves matter. The 33% is the 30% floor plus three points of margin, for the reason recorded above
+// about 0.4 points of headroom being one keystroke from somebody relaxing the floor instead. And the
+// lead-in must stay above the race-week multiplier or the taper stops being progressive — a flat
+// taper is the "step" the meta-analysis found worse than a progressive one (SMD -0.51). The 5k at
+// 0.58 would have tied its own race week exactly, which is why it is 0.62.
+//
+// ⚠️ THE 10K IS DELIBERATELY UNCHANGED at 0.72: it already delivers 34.7%, so deepening it would be
+// a change with no defect behind it.
+
+//
+// ⚠️ THE PERCENTAGES IN THESE NOTES NOW DESCRIBE THE DELIVERED CUT FOR THE TAPER WEEKS BEFORE RACE
+// WEEK, AND NOTHING ELSE. They used to quote the multiplier's own arithmetic — 1 − 0.72 = "~28%" —
+// which is not what the week falls by, because the multiplier reaches only the easy and long runs
+// while the quality session keeps its own length: measured, the 10k's 0.72 delivers 35%, not 28%.
+// And the second figure was worse than approximate. RACE WEEK CONTAINS THE RACE, so its
+// `plannedDistanceMeters` includes 21.1 km or 42.2 km of it — measured, the half's race week reads a
+// 28% cut and the marathon's reads **−0%**, so a note promising "~45%" there was describing a
+// quantity nobody can observe. Race week's size is the race; there is no useful cut to quote.
+
 const TAPERS: Record<RaceDistanceKey, TaperPlan> = {
   "1mile": {
     weeks: 1,
@@ -42,24 +84,24 @@ const TAPERS: Record<RaceDistanceKey, TaperPlan> = {
   // met that failure would be one keystroke from relaxing the floor instead. 0.66 delivers 32.7%.
   "5k": {
     weeks: 2,
-    volumeMultiplierByWeek: [0.66, 0.58],
-    notes: ["~7–14 day taper; retain VO2 touches while volume falls ~34% then ~42%."],
+    volumeMultiplierByWeek: [0.62, 0.58],
+    notes: ["~7–14 day taper; retain VO2 touches while the week before race week falls ~36%."],
   },
   "10k": {
     weeks: 2,
     volumeMultiplierByWeek: [0.72, 0.55],
-    notes: ["~7–14 day taper; keep threshold/VO2 intensity while volume falls ~28% then ~45%."],
+    notes: ["~7–14 day taper; keep threshold/VO2 intensity while the week before race week falls ~35%."],
   },
   half: {
     weeks: 2,
-    volumeMultiplierByWeek: [0.7, 0.55],
-    notes: ["~7–14 day taper; hold threshold intensity while volume falls ~30% then ~45%."],
+    volumeMultiplierByWeek: [0.64, 0.55],
+    notes: ["~7–14 day taper; hold threshold intensity while the week before race week falls ~33%."],
   },
   marathon: {
     weeks: 3,
-    volumeMultiplierByWeek: [0.8, 0.65, 0.5],
+    volumeMultiplierByWeek: [0.8, 0.62, 0.5],
     notes: [
-      "~14–21 day taper; progressively cut volume to ~50% of peak, keep marathon-pace touches.",
+      "~14–21 day taper; volume falls ~20% then ~34% into race week, keep marathon-pace touches.",
     ],
   },
 };

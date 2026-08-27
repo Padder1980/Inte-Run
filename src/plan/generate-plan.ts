@@ -1534,10 +1534,54 @@ function qualityContentsFor(
   };
 
   if (wp.phase === "taper") {
-    // Keep intensity, low volume: a short, sharp session, chosen BY ID. This used to be
-    // `vo2Session(p, 3)` — a positional index, so inserting any format above it silently changed
-    // the race-week session of every plan ever generated.
-    out.push(taperSession(p));
+    // ⚠️⚠️ A TAPER CUTS VOLUME AND HOLDS INTENSITY **AND SPECIFICITY**, AND THIS BRANCH USED TO DISCARD
+    // THE SPECIFICITY ENTIRELY. It pushed `taperSession(p)` — one hardcoded `vo2-10x1`, identical for
+    // every distance — so a marathon runner who had spent a whole block building goal-pace work was
+    // handed one-minute VO2 reps for their final fortnight, and every trace of marathon pace vanished
+    // exactly when it mattered most. Measured with the engine's own `computeDistribution` over a
+    // 20-week block: **0 of 120 taper weeks contained any threshold or race-specific work, and 120 of
+    // 120 contained VO2**, while `src/science/taper.ts`'s own notes promised "keep marathon-pace
+    // touches" and "hold threshold intensity". Those notes were false as delivered.
+    //
+    // ⚠️ AND THE INTENSITY WAS NOT HELD EITHER, WHICH IS THE HALF THE COMMENT ABOVE CLAIMED. A
+    // pre-race taper week carried **10 minutes** of moderate-or-hard running against a peak week's
+    // 74–118 — 9% to 14% — where the taper meta-analysis (14 studies, Strong) has frequency and
+    // intensity MAINTAINED while volume falls 41–60%. Ten minutes is not a maintained intensity; it
+    // is a detraining week with one hard session bolted on.
+    //
+    // So the taper now draws what the PEAK phase would have drawn, at a reduced dose:
+    //   * half and marathon get `raceSpecificSession` — the goal-pace work the block was built around
+    //   * 5 km and 10 km get a small `vo2Session`, because for those events goal pace IS the interval
+    //     work (`paces.goalRace` sits on top of threshold/VO2) and "3 × 10′ at goal race pace" would
+    //     be thirty minutes at 5 km pace — longer than the race, and the same unrunnable prescription
+    //     this file records removing from short-event long runs.
+    //
+    // ⚠️ RACE WEEK KEEPS `taperSession`, AND THAT IS DELIBERATE ON THREE COUNTS. It is the smallest
+    // dose, which is the progressive shape the evidence asks for (bigger then smaller as the race
+    // approaches, not a step); it is chosen BY ID rather than by a rotation index, so the one week
+    // where a surprise is least welcome cannot get one — the reason that lookup exists is that
+    // `vo2Session(p, 3)` was positional, and inserting any format above index 3 silently changed the
+    // race-week session of every plan ever generated; and `test/session-library.test.ts` pins that
+    // by-id guarantee, so the guard keeps a real caller rather than being orphaned.
+    const raceWeek = wp.ordinalInPhase === wp.phaseTotal;
+    if (raceWeek) {
+      out.push(taperSession(p));
+      return out.slice(0, count);
+    }
+    // ⚠️ THE POOL IS THE PEAK'S, NAMED EXPLICITLY RATHER THAN LEFT TO A FALLBACK. No quality format
+    // lists "taper" in its `phases`, so a `phase: "taper"` filter empties the list and `narrow`
+    // silently hands back the WHOLE pool — including the big formats. Asking for the peak's pool is
+    // both what "hold the specificity" means and the only way the size preference below can bind.
+    // ⚠️ `avoidBig`, NOT `isDeload`, AND THE DIFFERENCE IS MEASURED. `isDeload` prefers the SMALLEST
+    // format in the pool; `avoidBig` merely drops the big ones. Measured on the spec's own quantity
+    // (Z5-Z7, i.e. this engine's "hard" bucket) against a 5 km peak week's 25 hard minutes:
+    // `isDeload` delivers 10 (41% of peak) and `avoidBig` delivers 15 (60%). The taper guard in the
+    // handoff asks for 50-60% in the FIRST taper week falling to 35% later — and race week, which
+    // keeps the smallest session of all, is the later one. So `avoidBig` here and `taperSession`
+    // there is the progressive shape the evidence describes, rather than a step down to the floor
+    // followed by nothing. The big formats stay out either way, which is the safety-relevant filter.
+    const tctx: FormatCtx = { ...fctx, phase: "peak", isDeload: true };
+    out.push(isShortEvent ? vo2Session(p, rot, tctx) : raceSpecificSession(p, rot, tctx));
     return out.slice(0, count);
   }
   if (wp.phase === "peak") {

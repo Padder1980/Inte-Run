@@ -9,7 +9,7 @@
 
 import type { Athlete, FeasibilityAssessment, FeasibilityVerdict, Goal } from "../domain/types.ts";
 import { formatDuration } from "../domain/units.ts";
-import { predictRaceTime, riegelPredict } from "../science/paces.ts";
+import { predictRaceTimeWithEndurance, riegelPredict, weeklyMinutesFromKm } from "../science/paces.ts";
 import { RACE_DISTANCES_M } from "../domain/units.ts";
 import { isoToday, weeksBetween } from "./dates.ts";
 
@@ -56,7 +56,16 @@ export function assessFeasibility(
   // Current-fitness read from the recent effort, plus the 2 km trial when present. A fresh all-out
   // 1 km is genuine evidence, so we take whichever prediction is faster (best current form). The
   // recent effort stays in play so a short 1 km can't over-flatter a long-distance goal on its own.
-  const predictedFromRecent = predictRaceTime(athlete.recent, goal.distance);
+  // ⚠️ THE CURRENT-FITNESS READ CARRIES THE SAME ENDURANCE CORRECTION AS A DERIVED GOAL, or the app
+  // holds two different opinions about one marathon. `deriveGoalTimeSeconds` applies it when it fills
+  // a blank target in, so leaving this line uncorrected would have the app set a runner a 4:14 goal
+  // and then tell them their current fitness predicts 3:59 — fifteen minutes ahead of a target it
+  // chose for them. Riegel over-predicts past 30 km for roughly half of recreational runners; that is
+  // as true of "what could you run today" as it is of "what should we aim for".
+  const enduranceCtx = athlete.weeklyVolumeKmCurrent
+    ? { weeklyMinutes: weeklyMinutesFromKm(athlete.recent, athlete.weeklyVolumeKmCurrent) }
+    : undefined;
+  const predictedFromRecent = predictRaceTimeWithEndurance(athlete.recent, goal.distance, enduranceCtx);
   const trialSeconds = athlete.twoKmTrialSeconds && athlete.twoKmTrialSeconds > 0
     ? athlete.twoKmTrialSeconds
     : undefined;

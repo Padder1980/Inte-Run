@@ -20083,6 +20083,33 @@ function wizFieldVal(id) {
   if (el && typeof el.value === "string") return el.value;
   return (draft.__f && draft.__f[id] != null) ? String(draft.__f[id]) : "";
 }
+/**
+ * The finish time to give the engine when the runner leaves their target blank.
+ *
+ * ⚠️ BOTH BLANK-GOAL BRANCHES CALLED RC.riegelPredict DIRECTLY, WHICH FLATTERS THE MARATHON — and a
+ * derived goal is not just a number on a screen. Goal.targetTimeSeconds is required, so it becomes
+ * paces.goalRace, which becomes the pace band of every race-effort step in the block, and then the
+ * band the debrief judges the run against. Measured before this, the chain prescribed race-pace work
+ * 16 s/km too fast for a 20 minute 5 km runner and 29 s/km too fast for a 35 minute one, so the
+ * runner rehearsed a pace they could not hold and was then told they had missed it.
+ *
+ * ⚠️ THE ARITHMETIC IS IN THE ENGINE (deriveGoalTimeSeconds), where it is typechecked and tested;
+ * this is only the wiring. And it is ONE function rather than two call sites, because two copies of
+ * a derivation is how they come to disagree — which is exactly what this replaced.
+ *
+ * ⚠️ THE LONGEST RUN IS DELIBERATELY NOT PASSED. At setup there is no logged history to read one
+ * from, and the engine reads volume on its own when it is absent rather than assuming the worst — so
+ * a high-mileage runner is not over-corrected for a figure nobody has asked them for yet.
+ */
+function derivedGoalS(recentTimeS, goalDist, volRaw) {
+  var km = Number(volRaw) || 0;
+  return RC.deriveGoalTimeSeconds(
+    { distanceMeters: 5000, timeSeconds: recentTimeS },
+    goalDist,
+    { weeklyKm: km > 0 ? km : undefined },
+  );
+}
+
 function draftFromForm() {
   const mmss = (s) => /^\\d{1,2}:[0-5]\\d$/.test(s) || /^\\d{1,2}:[0-5]\\d:[0-5]\\d$/.test(s);
   // ⚠️ ON THE VERY FIRST RUN, THE UNANSWERED QUESTIONS ARE ANSWERED BY DEFAULTS, SILENTLY.
@@ -20155,7 +20182,7 @@ function draftFromForm() {
   if (goalCfg.time === "optional" && !targetRaw) {
     // ⚠️ BLANK IS A REAL ANSWER, AND IT STILL LEAVES THE ENGINE A TARGET. Goal.targetTimeSeconds is
     // required; what blank turns off is showing it back as a goal, which targetSet records.
-    targetS = Math.round(RC.riegelPredict(5000, recentTimeS, DIST_M[goalDist] || 5000));
+    targetS = derivedGoalS(recentTimeS, goalDist, volRaw);
     targetSet = false;
   } else if (goalCfg.time) {
     // ⚠️ A TYPO IS STILL REFUSED RATHER THAN GUESSED AT, optional or not — a target nobody can read is
@@ -20164,7 +20191,7 @@ function draftFromForm() {
     targetS = RC.parseDuration(targetRaw);
     targetSet = true;
   } else {
-    targetS = Math.round(RC.riegelPredict(5000, recentTimeS, DIST_M[goalDist] || 5000));
+    targetS = derivedGoalS(recentTimeS, goalDist, volRaw);
     targetSet = false;
   }
   const raceDate = wizFieldVal("s_date");

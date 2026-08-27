@@ -27,7 +27,11 @@ export { buildFitnessProfile } from "../src/science/fitness-profile.ts";
 // a "maximal aerobic speed": the 2 km specification is explicit that an effort over ten minutes is
 // not one, and 2 km at 5:00/km is exactly ten minutes. Keeping the export alive is how the term
 // finds its way back onto a screen.
-export { riegelPredict, PACE_RATIOS, paceRatioMid, reconcileVo2 } from "../src/science/paces.ts";
+export { riegelPredict, PACE_RATIOS, paceRatioMid, reconcileVo2,
+  // ⚠️ THE ONE PLACE A BLANK GOAL BECOMES A NUMBER. Exported so `web/app.ts` calls the engine
+  // rather than open-coding a Riegel projection — an uncorrected one sets every marathon-effort
+  // pace band in the block, so the arithmetic belongs where it is typechecked and tested.
+  deriveGoalTimeSeconds } from "../src/science/paces.ts";
 export { rangeText } from "../src/science/estimate.ts";
 export { assessReadiness } from "../src/readiness/readiness.ts";
 export { assessLongRunSpike, returnToRunningPlan } from "../src/adapt/load-guardrails.ts";

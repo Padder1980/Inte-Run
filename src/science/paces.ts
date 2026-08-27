@@ -80,16 +80,65 @@ export const MARATHON_CORRECTION_EXPERIMENT = "EXP-MARATHON";
 export type EnduranceContext = {
   /** Weekly TRAINING minutes — not kilometres. A slow runner's 40 km is far more work than a fast one's. */
   weeklyMinutes: number;
-  /** Longest single run in minutes over the recent block. */
-  longestRunMinutes: number;
+  /**
+   * Longest single run in minutes over the recent block, when it is known.
+   *
+   * ⚠️ OPTIONAL, AND ABSENCE IS NOT THE SAME AS ZERO. At the moment a goal is derived from the setup
+   * form there is no logged history to read a long run out of, and treating "we have not asked yet"
+   * as "their longest run is nothing" would put a 120 km/week runner in the +6% band — over-correcting
+   * exactly the runner the correction is supposed to leave alone. So an absent value falls back to
+   * reading volume on its own, which is the most the app honestly knows at that point.
+   */
+  longestRunMinutes?: number;
 };
 
 /** Fractional addition to a Riegel prediction at 30 km and beyond. Zero for well-trained runners. */
 export function marathonCorrection(ctx: EnduranceContext): number {
-  if (ctx.weeklyMinutes >= MARATHON_WELL_TRAINED_MIN
-      && ctx.longestRunMinutes >= MARATHON_WELL_TRAINED_LONG_MIN) return 0;
+  if (ctx.weeklyMinutes >= MARATHON_WELL_TRAINED_MIN) {
+    // Volume alone is enough only when we have no long-run figure to contradict it. A KNOWN short
+    // long run is real evidence against durability and holds the runner in the middle band.
+    if (ctx.longestRunMinutes == null) return 0;
+    return ctx.longestRunMinutes >= MARATHON_WELL_TRAINED_LONG_MIN ? 0 : 0.03;
+  }
   if (ctx.weeklyMinutes >= MARATHON_MODERATELY_TRAINED_MIN) return 0.03;
   return 0.06;
+}
+
+/**
+ * Weekly training minutes implied by a stated weekly distance, at this runner's own easy pace.
+ *
+ * ⚠️ THE CONVERSION IS THE WHOLE POINT: the runner states kilometres and the correction reads
+ * minutes, because a 40 km week is 200 minutes of work for a 15:00 5 km runner and 465 for a 40:00
+ * one. Reading the stated distance as though it were a load would put those two runners in the same
+ * band when they are two tiers apart.
+ */
+export function weeklyMinutesFromKm(recent: RecentPerformance, weeklyKm: number): number {
+  if (!(weeklyKm > 0)) return 0;
+  const easy = deriveTrainingPaces(recent).easy;
+  const mid = (easy.minSecPerKm + easy.maxSecPerKm) / 2;
+  return (weeklyKm * mid) / 60;
+}
+
+/**
+ * The finish time to hand the engine when the runner has not set one.
+ *
+ * ⚠️ THIS IS THE ONE PLACE A BLANK GOAL BECOMES A NUMBER, and that number does far more than sit on
+ * a screen: `Goal.targetTimeSeconds` is required, so it becomes `paces.goalRace`, which becomes the
+ * pace band of every race-effort step in the block — and then the band `runAnalysis` judges the
+ * runner against. An optimistic derivation is therefore a plan that rehearses an unholdable pace and
+ * then reports the runner as having missed it. Riegel over-predicts the marathon for roughly half of
+ * recreational runners, so past 30 km the endurance correction applies.
+ */
+export function deriveGoalTimeSeconds(
+  recent: RecentPerformance,
+  target: RaceDistanceKey,
+  ctx?: { weeklyKm?: number; longestRunMinutes?: number },
+): number {
+  if (!ctx) return Math.round(predictRaceTime(recent, target));
+  return Math.round(predictRaceTimeWithEndurance(recent, target, {
+    weeklyMinutes: weeklyMinutesFromKm(recent, ctx.weeklyKm ?? 0),
+    longestRunMinutes: ctx.longestRunMinutes,
+  }));
 }
 
 /**

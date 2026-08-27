@@ -11651,16 +11651,45 @@ judges them against a band that was never achievable.
   below 30 km and without a context — both swept over the real distance table.
 
 ⚠️ **3. THE PLYOMETRIC DOSE, AND THE LOAD AS DATA.** `2 × 8–10` pogo hops plus `2 × 3–5` box jumps is
-**22–30 ground contacts** against the handoff's 60–100 (developing) and 100–150 (trained) — from the
-same evidence the session's own description already cited: 31 studies, 652 runners, heavy lifting
-alone ES −0.47 and heavy **combined with plyometrics ES −1.04**, the best-evidenced strength
-intervention there is for runners. Delivering a third of its dose was invisible because the count was
-implied by sets × reps in prose. Now `PLYO_DOSE` by experience, **45 contacts/session developing and
-72 trained → 90 and 144 per week** with two sessions, both inside band; `loadPercent1RM` and
-`contacts` are fields on `StrengthExercise`.
+**22–30 ground contacts per session**, and a build week carries two of them — so **44–60 a week**
+against the handoff's 60–100 (developing) and 100–150 (trained). From the same evidence the session's
+own description already cited: 31 studies, 652 runners, heavy lifting alone ES −0.47 and heavy
+**combined with plyometrics ES −1.04**, the best-evidenced strength intervention there is for runners.
+Now `PLYO_DOSE` by experience: **45 contacts/session developing and 72 trained → 90 and 144 a week**,
+both inside band. `loadPercent1RM` and `contacts` are fields on `StrengthExercise`.
+⚠️ **AND MY FIRST WRITE-UP OF THIS COMPARED A PER-SESSION FIGURE TO A PER-WEEK BAND** — "22–30 against
+60–150" — which overstated the gap as roughly threefold when measured end to end it is 60 → 90 for a
+developing runner and 60 → 144 for a trained one. The old dose sat AT the bottom edge of the lower
+band and at 40% of the upper one; it was not a third of either. Measured through two real 20-week
+plans, not from the table. **State which currency a dose is in, every time.**
 - ⚠️ Base stays plyo-free and maintenance weeks stay plyo-free — the repo's own reasoning, unchanged.
 - ⚠️ The load is claimed only where it is meant: `80%+` heavy and in maintenance, `70–75%` in a
   technique phase, and absent from holds and jumps where a %1RM is meaningless.
+
+### ⚠️⚠️ AND I SHIPPED THE MARATHON CORRECTION WIRED TO NOTHING
+
+It was written, typechecked, unit-tested across every distance, re-broken four times, documented in
+this file, pushed to `main` and reported to the owner as fixed — and **nothing called it.** `grep`
+for `predictRaceTimeWithEndurance` outside its own module and its own test returned nothing. Every
+guard I had written passed against a function no plan could reach, because they all asked *does this
+work* and none asked *does anything use it*. **Sixth firing of the computed-and-discarded trap**
+(`CLASS`, `MASTERS`, `PLAN.notes`, `refreshTypePreview`, `assessWeeklyJump`), and the first where I
+both introduced it and announced it as delivered.
+
+Now wired, and the wiring is the guarded part: `deriveGoalTimeSeconds` is the engine's one derivation,
+exported through `web/entry.ts`, reached by exactly one helper in `web/app.ts`, called from **both**
+blank-goal branches — and no branch may assign `Math.round(RC.riegelPredict(...))` to a target again.
+⚠️ **`assessFeasibility` HAD TO CORRECT TOO, OR THE APP HOLDS TWO OPINIONS ABOUT ONE MARATHON**: it
+would have set a runner a 4:14 target and then told them their current fitness predicts 3:59, fifteen
+minutes ahead of a goal it chose for them.
+⚠️ **AND `longestRunMinutes` BECAME OPTIONAL, BECAUSE ABSENCE IS NOT ZERO.** At setup there is no
+logged history, so treating "not asked yet" as "their longest run is nothing" put a 120 km/week runner
+in the +6% band — over-correcting the exact runner the correction exists to leave alone. Absent reads
+volume alone; a KNOWN short long run still holds them in the middle band.
+
+**The rule this cost: a test that a thing WORKS is not a test that anything USES it.** Every port in
+this chapter now has a reachability guard, and it is the first assertion in the file rather than an
+afterthought.
 
 ### FIVE INSTRUMENT FAULTS, ALL MINE, EACH PRODUCING A CONFIDENT WRONG NUMBER
 

@@ -144,6 +144,51 @@ test("the correction is keyed on TRAINING, not on ability, and only ever slows a
         `a negative correction would make a prediction FASTER (${w} min, ${lr} min long run)`);
 });
 
+test("BLOCKER: the endurance correction is REACHABLE — a runner's plan can actually receive it", () => {
+  // ⚠️⚠️ I SHIPPED THIS FUNCTION WIRED TO NOTHING, WHICH IS THE COMPUTED-AND-DISCARDED TRAP THIS REPO
+  // RECORDS FIVE TIMES OVER (CLASS, MASTERS, PLAN.notes, refreshTypePreview, assessWeeklyJump). It was
+  // written, typechecked, unit-tested and pushed, and it changed no plan at all — every existing guard
+  // above passes against a function nobody calls. A test that a thing WORKS is not a test that
+  // anything USES it.
+  //
+  // The claim here is end-to-end and in both directions: the engine's derivation must be exported to
+  // the app bundle, the app must call it where a blank goal becomes a number, and no blank-goal branch
+  // may go back to open-coding a Riegel projection of its own.
+  const entry = readFileSync(new URL("../web/entry.ts", import.meta.url), "utf8");
+  assert.ok(/deriveGoalTimeSeconds/.test(entry),
+    "deriveGoalTimeSeconds is not exported to the app bundle, so the page cannot reach it");
+
+  const app = readFileSync(new URL("../web/app.ts", import.meta.url), "utf8");
+  const calls = (app.match(/RC\.deriveGoalTimeSeconds\(/g) ?? []).length;
+  assert.equal(calls, 1, `the page should reach the engine's derivation through exactly one helper, found ${calls}`);
+  const wired = (app.match(/targetS = derivedGoalS\(/g) ?? []).length;
+  assert.equal(wired, 2, `both blank-goal branches must use the helper, found ${wired}`);
+  // ⚠️ AND NO BRANCH MAY DERIVE A GOAL ITSELF. This is the shape that was there before — an
+  // uncorrected Riegel projection assigned straight to the target — and it is what the helper exists
+  // to replace, so its return is the thing to forbid rather than the function.
+  assert.ok(!/targetS\s*=\s*Math\.round\(RC\.riegelPredict/.test(app),
+    "a blank-goal branch open-codes a Riegel projection again, so the correction is bypassed");
+
+  // And the feasibility verdict must read the same corrected prediction, or the app holds two
+  // opinions about one marathon: a derived 4:14 target beside "your fitness predicts 3:59".
+  const feas = readFileSync(new URL("../src/plan/feasibility.ts", import.meta.url), "utf8");
+  assert.ok(/predictRaceTimeWithEndurance/.test(feas),
+    "assessFeasibility reads the uncorrected prediction while a derived goal carries the correction");
+});
+
+test("an absent longest run reads volume alone rather than assuming the worst", () => {
+  // ⚠️ ABSENCE IS NOT ZERO. At setup there is no logged history, so treating "not asked yet" as "their
+  // longest run is nothing" would put a 120 km/week runner in the +6% band — over-correcting exactly
+  // the runner the correction exists to leave alone. A KNOWN short long run is different: that is real
+  // evidence against durability and holds them in the middle band.
+  assert.equal(marathonCorrection({ weeklyMinutes: 500 }), 0,
+    "a high-volume runner with no long-run figure is being corrected as though they had none");
+  assert.equal(marathonCorrection({ weeklyMinutes: 500, longestRunMinutes: 90 }), 0.03,
+    "a known short long run must still hold a high-volume runner in the middle band");
+  assert.equal(marathonCorrection({ weeklyMinutes: 120 }), 0.06,
+    "a low-volume runner with no long-run figure must still be corrected");
+});
+
 // ---------------------------------------------------------------------------------------------
 // 2. The plyometric dose, and the load as data
 // ---------------------------------------------------------------------------------------------

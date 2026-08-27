@@ -11907,3 +11907,226 @@ nothing.
 clean apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1369 pass /
 0 fail under UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`**, five-rule audit unchanged or
 better (rule 3 transitions 53 → 50), both design ratchets unchanged.
+
+## THE PROFILE'S QUESTIONS NOW REACH THE PLAN (owner, 2026-08-25/28)
+
+*"Are there any adaptations we need to make to the profile page (training profile questions) that we need
+to make to ensure the plan is appropriate?"* then *"yes, start with the age one but also adapt the
+questions or layout of the whole profile to make it fit for purpose if you need to"*. Suite 1369 →
+**1382**; `test/profile-inputs.test.ts` holds 13 guards and **20 deliberate re-breaks were all caught**.
+All of it is web plus two engine files, so it reaches his phone over the air on the next launch.
+
+⚠️ **THE ANSWER TO HIS QUESTION WAS NOT "ADD MORE QUESTIONS". IT WAS THAT FOUR ANSWERS NOBODY GAVE WERE
+BEING TREATED AS ANSWERS, AND FIVE READERS OF ONE QUESTION DISAGREED WITH EACH OTHER.** A verification
+workflow re-measured every claim independently; where it corrected me, the correction is recorded below
+rather than the original figure.
+
+### ⚠️⚠️ THE PHANTOM AGE WAS THE APP'S MAX-HEART-RATE MODEL, NOT ONE SENTENCE
+
+`DEFAULT_PROFILE` shipped `age: 38`, `ageOpts` enumerated 12–90 with **no blank option**, and two
+fallbacks read `|| 35`. All three values sit inside the 35–49 masters band, so a runner who had never
+answered was classified as a masters athlete. **I first graded the harm as one wrong sentence on the
+type-preview panel. That was wrong by a wide margin, and the independent pass is what corrected it.**
+
+`maxHrEstimate()` reads `profile.age` and returns Tanaka's `208 − 0.7 × age`. Its own comment says *"Zero
+means no ceiling known; callers must treat that as do not judge, never as a number"* — **so a default
+defeats a function deliberately built to refuse to guess**, and it returned **181 bpm** for a phantom 38.
+That ceiling drives four surfaces, none of which the first audit named:
+
+| surface | with the phantom | measured after |
+|---|---|---|
+| `maxHrEstimate()` | 181 bpm for everybody | **0** — "no ceiling known" |
+| the coach's 92%-of-max safety cue | fired at **167 bpm** | not raised at all until an age is given |
+| Support › Training zones' five-zone table | built from 181, switch auto-ON | says it has nothing to build from |
+| `payload.maxHr` → the wrist's zone colours | 181 | absent |
+| per-run zone-time accumulation on every logged run | against 181 | absent |
+
+Measured against real ages: a 65-year-old's cue fired **18 bpm late**, a 20-year-old's **11 bpm early**.
+⚠️ **ALL FOUR CALLERS ALREADY GUARD ON ZERO, which is what makes the fix safe** — the absence degrades
+gracefully everywhere, which is also why nothing ever failed.
+
+⚠️⚠️ **THE TWO EDITS MUST LAND TOGETHER, AND THE ORDER IS A REAL HAZARD.** `ageOpts` marks nothing
+selected when its argument is not a real age, so **deleting `age: 38` BEFORE adding the blank option
+leaves the browser selecting the first option, 12** — and `draftFromForm` saves the LIVE SELECT VALUE,
+not the default. Stored, that gives maxHr 200 and fires `warmup.ts`'s `ageYears < 18` youth branch:
+strictly worse than the bug. Verified on the served build: value `""`, `selectedIndex` 0, first option
+"Prefer not to say", `profile.age` absent, `maxHrEstimate()` 0; and picking 52 stores 52, band 50-59,
+maxHr **172**.
+⚠️ **`sex: ""` IN THE SAME OBJECT WAS ALREADY THE HONEST SHAPE** — empty means unanswered — so the fix
+matches a precedent one field away rather than inventing one.
+⚠️ **AND IT IS NOT "WORSE THAN `weeklyVolumeKm: 30`", which I claimed.** That field had no screen at all;
+age has a visible, live, saved select. Non-neutral, yes; worse, no.
+
+⚠️ **`assessMasters` ANSWERED WITH THE OLDEST BAND FOR THE RUNNER IT KNEW LEAST ABOUT.** `bandOf`
+compared against three thresholds and returned `"60-plus"` for anything that failed all three, so an
+absent age gave `ageBand: "60-plus"` with `isMasters: false` — a pair that cannot both be true. There is
+now an `"unknown"` band with its own branch, which still gives the two points that are true at every age
+(*"a slightly longer warm-up"*, *"strength work twice a week"*) and a headline naming what is missing,
+because withholding age-independent advice for want of an age is worse than saying nothing about age.
+⚠️ **THE `knownAge()` GUARD ON `suggestFemaleHealth` IS THE TYPECHECKER'S REQUIREMENT, NOT THE RUNTIME
+GUARANTEE.** By that line the unknown band has already returned, so replacing the whole conjunction with
+`(input.age ?? 45) >= 45` changes nothing for any unknown age — measured, and it **escaped the first
+re-break run**. What it does do is fail `tsc` with *"'input.age' is possibly 'undefined'"*. The reachable
+break is the unknown branch's own hardcoded `suggestFemaleHealth: false`, and that one is driven.
+⚠️ **AND THE GUARD'S FIXTURE COULD NOT SEE HALF OF WHAT IT ASSERTED**, because it passed no `sex` — and
+the suggestion is `sex === "female" && age >= 45`, so the first half of the conjunction was false
+whatever the age did. A fixture that cannot reach the branch it is pointed at proves nothing about it.
+
+### `yearsRunning` WAS A PHANTOM, THEN A DERIVED PHANTOM
+
+Never asked, always 3, and it **cannot reach `generatePlan` at all** — `Athlete` has no such field, so a
+plan is byte-identical for 0 years and 25. But `classifyRunner`'s label IS rendered, so the number was
+invisible in the plan and visible on the screen. It is derived from the status card now
+(`trainingYearsFor`), and the derivation is checked against `classifyRunner`'s own two gates (≥1 for
+tier 3, ≥3 for tier 4) rather than being three numbers picked by eye.
+⚠️ **AND THE FIRST FIX STORED THE DERIVED VALUE BACK INTO THE PROFILE, WHICH IS THE PHANTOM IN A NEW
+COSTUME.** `draftFromForm` wrote `yearsRunning: trainingYearsFor(...)` and nothing read it — a number
+that goes stale the moment the status changes without a save. Nothing stores it; every caller derives it.
+
+### ⚠️⚠️ THE RUNNER-TYPE PANEL CONTRADICTED THE CARD THE RUNNER HAD JUST ANSWERED
+
+`classifyRunner` starts everybody who runs at all at tier 2, so somebody who had just chosen *"Just
+getting started"* was shown **"Recreational runner"** under a heading reading "Your runner type".
+`ClassificationInput.maxTier` is applied **last, after the performance refinement** — drawn before it, a
+fast 5 km time lifts the runner straight back past their own stated band (measured: a 15:00 5 km reaches
+tier 4 through a `maxTier: 2`).
+⚠️ **CAPPING IS NOT SECOND-GUESSING THE RUNNER — IT IS THE OPPOSITE.** A fit-but-infrequent runner picks
+*"Regular runner"*, whose card says exactly that; the habit card says *"I can jog 20–30 minutes
+non-stop"*, which nobody running 21:15 for 5 km would choose. `classifyRunner` already caps
+self-assessment and says so on screen; this is the same refusal one layer out.
+
+⚠️ **AND THE PANEL SAW THREE OF THE FIVE FIELDS, SO IT DISAGREED WITH THE PLAN IN BOTH DIRECTIONS.** With
+its old inputs the tier was **days alone** — 0→1, 1–3→2, 4+→3, always. Measured disagreements, one in each
+direction: a competitive runner on 6 days and 80 km was called *"Trained runner"* where the engine says
+*"Highly trained"*; and at **4 days and 10–24 km/week the panel said "Trained runner" where the engine
+says "Recreational runner"** (that second one came from the independent pass, not from me). It now reads
+`s_volume` and `s_rectime` live and passes the ceiling, so it IS the engine's classifier.
+
+⚠️ **THE CAP NOTE COULD NEVER RENDER, AND CLAUDE.md SAYS THAT NOTE IS WHY THE PANEL EXISTS.**
+`classifyRunner` returns a `note` for tier 4 — *"the very top tiers are defined by international
+competitive standard, so we cap self-assessment here"* — and the panel rendered `label` and `meaning` and
+dropped it. It was unreachable besides: the old inputs topped out at tier 3. Verified on the served build:
+a competitive runner on 6 days / 80 km / 18:20 now reads **tier 4, "Highly trained runner", with the cap
+note shown**.
+
+### ⚠️⚠️ ONE QUESTION, FIVE READERS, AND THEY DISAGREED FOR LEGACY PROFILES
+
+`profile = storedProfile || Object.assign({}, DEFAULT_PROFILE)` — **a stored profile is used AS-IS with no
+merge**, so `status` is undefined for any profile saved before that question existed. Five things then
+fell back independently:
+
+| reader | old fallback | consequence |
+|---|---|---|
+| `expByStatus` in `applyProfile` | `noRecent ? "beginner" : "recreational"` | (the reference answer) |
+| `warmupAbility()` | `"intermediate"`, no equivalent test | a runner the plan builds as a **beginner** got an **intermediate** warm-up |
+| `trainingYearsFor` (new) | 3 | three years of training for that same runner |
+| `typeCeilingFor` (new) | 3 | a tier-3 ceiling for them |
+| the add-a-day evidence builder | a **hand-inlined copy** with no fallback at all | ⚠️ see below |
+
+⚠️⚠️ **THE FIFTH WAS THE ONE WITH TEETH, AND THE GUARD FOUND IT RATHER THAN I DID.** The add-a-day
+evidence builder carried `(st === "new" || st === "building") ? "beginner" : …` inline — so a legacy
+profile was **built as a beginner by `applyProfile` and judged as recreational by the offer**. That
+matters because `addDayOffer` opens with `if (input.experience === "beginner") return null`: the runner
+would have been offered an extra running day the gate exists to withhold, on a plan whose whole track is
+capped by design.
+
+`resolvedStatus(pf)` answers "which of the four cards is this runner" once, and `experienceFor(pf)` is the
+one status-to-experience mapping. ⚠️ **THE FALLBACK IS CHOSEN TO PRESERVE `experience` EXACTLY** — measured
+byte-identical across all eight input shapes — and deliberately **not `"new"`**, because that is the
+run-walk track and silently moving a legacy runner onto it would change every session in their plan. The
+warm-up split is fixed as a side effect: a legacy `noRecent` profile now gets a **beginner** warm-up to
+match its beginner plan.
+
+### THE STATED MILEAGE IS ANSWERED IN BOTH DIRECTIONS
+
+The existing note fires when the plan cannot REACH a stated figure and said nothing when it overshot one.
+At the bottom of the range the per-session floors bind — a 20-minute easy run cannot shrink — so a low
+answer stops moving the plan and then stops being reflected in it. **Measured on a half marathon, 5 days,
+17 weeks: the opening week is the same 27.8 km whether the runner says 15, 20 or 25**, so somebody who
+said 15 was handed 1.85× it in their opening week with nothing on screen about it.
+⚠️ **KEYED ON THE OPENING WEEK, NOT THE PEAK.** A peak above the stated figure is what a block IS —
+`PEAK_VOLUME_MULTIPLIER` is 1.25 by design — so reading the peak would fire on every plan the volume
+model built correctly. The threshold is the 1.10× week-one guardrail the project already states.
+⚠️ **THE FIRST NON-DELOAD WEEK**, because week one can be a deload on some runways and a deload is
+deliberately smaller.
+⚠️⚠️ **AND ADDING THE NOTE UPSTREAM ACHIEVES NOTHING ON ITS OWN.** The app renders exactly ONE of the
+eight notes, chosen by a regex naming only the two under-delivery phrasings — so the new branch would have
+been generated and discarded, which is the trap this whole area is about. Measured after: fires at 15 and
+20 stated, silent at 30, 45 and 60.
+
+### THE BEGINNER CARD NO LONGER INVITES A RETURNING RUNNER — with the harm bounded honestly
+
+The card read *"New to running, or coming back after a long break"*, pointing a detrained veteran at the
+run-walk track — where the dedicated *"Coming back to running?"* question they answer two sections later
+changes **nothing**: measured, `returningFromBreak` and `returningFromInjury` give a **byte-identical
+session list for a beginner (0 of 140 sessions differ)** against 158 of 170 on the recreational track.
+⚠️ **THE INDEPENDENT PASS REFUTED MY FRAMING OF THE HARM AND IT IS WORTH KEEPING BOTH HALVES.**
+`GOAL_BY_STATUS.new` offers only a 5 km and a 10 km, so the veteran-heading-for-a-half case I led with is
+unreachable through that card. The copy fix stands — it removes a misleading invitation, and a returning
+runner picking that card for a 10 km still has their returning answer discarded — but it is a copy fix
+with a bounded harm, not a fix that prevents a large measured one. `addDayOffer`'s beginner gate is
+deliberate and commented, so nothing here changes it.
+
+### ⚠️⚠️ FOUR TRAPS THIS WORK PAID FOR, AND THE FIRST ONE MADE ME REPORT A DEFECT THAT WAS NOT THERE
+
+1. ⚠️⚠️ **A PRISTINE COPY FROM AN EARLIER PHASE RESTORED OVER A LATER PHASE'S WORK, AND I THEN MEASURED
+   THE REVERTED TREE AND CONCLUDED MY OWN CHANGE HAD VANISHED.** `/tmp/taper/rebreak.py` listed
+   `src/plan/generate-plan.ts` and restored it from a copy taken before the profile work; a run of it
+   wiped the over-delivery branch. Two greps minutes apart returned different text, and `git diff --numstat`
+   said the file was unmodified and then said 27 lines added. **This file already says "take ONE pristine
+   copy at the start"; the missing half is that a harness must be DELETED when its phase ends**, because
+   the danger is not a stale copy within a phase, it is a live harness across phases. Also the reason the
+   independent pass checked every web-layer claim against `git show HEAD:web/app.ts` rather than the tree.
+2. ⚠️ **A GUARD SCOPED TO A MECHANISM FAILED ON A CORRECT CHANGE — the fourteenth firing.**
+   `test/plan-adapts.test.ts` pinned `expByStatus[pf.status]`, which moved into the shared
+   `experienceFor(pf)`. Restated to the fact: the single assignment must come from the status card, and
+   nothing after it may read a time. ⚠️ **And it carried a second defect: `ap.indexOf("expByStatus[pf.status]")`
+   returns −1 once the anchor is stale, and `slice(-1)` is the LAST CHARACTER** — so the sweep below it
+   would have measured nothing and passed whatever the code did. The anchor is proved present first.
+3. ⚠️ **THE BACKTICK RULE FIRED — the fifteenth time**, in my own comment, and it failed as
+   `SyntaxError: Expression expected` at the closing brace of the function BELOW the comment, because the
+   stray backticks closed the outer template literal and the runtime JS after them became live
+   TypeScript. `node --check` then passed all three blocks **on the stale build**. Read the exit code first.
+4. ⚠️ **A `\n` INSIDE A `<<'PYEOF'` HEREDOC WRITING PYTHON THAT WRITES PYTHON IS ONE ESCAPING LAYER
+   SHORT**, and the generated harness died with `EOL while scanning string literal`. Build the strings
+   with `chr(10)` rather than counting backslashes.
+
+### What was deliberately NOT done, and why — these are the owner's to decide
+
+⚠️ **NO NEW QUESTION WAS ADDED.** Every fix above makes an answer the runner ALREADY gives reach the plan
+correctly. Three candidates were measured and are his call, with the strongest first:
+- ⚠️ **"How long can you be out on a weekday?"** — the strongest of the three. **100% of non-beginner
+  profiles contain a weekday run over 45 minutes, floor 59 minutes**, and `buildWarmup`'s
+  `timeAvailableMinutes` is fully implemented and **never passed**. A runner with a 40-minute lunch break
+  is handed a 59-minute session and no way to say so.
+- **"Longest run in the past month"** — one field at first setup. `assessLongRunSpike` exists and has
+  **zero callers in the app**.
+- **Surfacing `masters.points`** — and ⚠️ **THE COST IS NOT "ONE FIELD, ONE RULE", WHICH IS HOW I FIRST
+  PRICED IT.** Those points ship previously-unrendered clinical and nutritional advice (bone health,
+  protein distribution, a menopause pointer, and a claim about **running economy**). The owner's standing
+  instruction is that any change to clinical wording is flagged for review; the injury and fuelling
+  guides both required sign-off; and `test/stretches.test.ts` and `test/warmup.test.ts` hard-fail on
+  exactly this family of claim. So the honest cost is a screen **plus a clinical-review step that is
+  his**, plus a guard file of the kind every other health surface in this app has.
+
+⚠️ **AND FOUR THINGS WERE MEASURED AND REJECTED, so nobody re-derives them:**
+- **Do not wire age into scheduling.** The handoff's 72-hour hard-day spacing is **arithmetically
+  impossible** in a seven-day week carrying two quality sessions and a long run: three gaps sum to 7, so
+  all three ≥3 needs ≥9. Independently reproduced over 3,023 hard-day pairs — **0 closer than 48h,
+  minimum gap exactly 2 days, 33.4% sitting at 48h**. The real lever is *how many* quality sessions, and
+  the engine already has it. ⚠️ **AND THE CLAIM THAT `test/generate-plan.test.ts` ALREADY GUARDS THIS IS
+  MATERIALLY OVERSTATED — a finding in its own right.** Its `isHard` is
+  `intensity === "hard" || type === "threshold" || type === "race-specific"`, and a long run is
+  `type: "long"`, `intensity: "easy"` — so it **cannot see long→quality pairs, which are 57% of the
+  minimum-gap pairs**; it runs on one fixture rather than a sweep; and it compares only within
+  `w.sessions`, so it is blind to a cross-week Sunday-long/Monday-quality pair. The invariant is
+  measured-true and **not guarded**.
+- **Do not wire `maxHr` into the plan** — 432 profiles come out byte-identical.
+- **Do not ask `yearsRunning`** — it cannot reach the engine.
+- **Do not convert the volume question to minutes** — the km/minutes spread is not a defect.
+⚠️ **AND TWO FIGURES FROM THE FIRST AUDIT DO NOT REPRODUCE AND MUST NOT BE QUOTED:** the Z5→Z5 share
+(4.6% against 8.7% independently) and the three spacing-prototype costs, whose patches no longer exist.
+
+⚠️ **STILL OPEN, MEASURED, NOT FIXED:** a runner returning from a break gets a **larger** week one
+(350 minutes against 320) when a volume is stated — the damper is applied before the volume fit
+re-converges. Reported rather than fixed, because it is a volume-model change and wants its own sweep.

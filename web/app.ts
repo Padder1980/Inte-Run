@@ -5885,7 +5885,7 @@ function futureIso(days) { return isoAdd(todayIso(), days).toISOString().slice(0
 function fmtTimeFull(s) { s = Math.round(s); const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), x = s%60; const p = (n) => String(n).padStart(2,"0"); return h>0 ? h+":"+p(m)+":"+p(x) : m+":"+p(x); }
 
 // An example runner to start from — until you make it yours.
-const DEFAULT_PROFILE = { name: "", avatar: "", status: "regular", goalDist: "half", targetS: 6300, targetSet: true, raceDate: futureIso(245), startDateIso: "", longRunDay: 6, fitSrc: "recent", recentDistM: 5000, recentTimeS: 1500, noRecent: false, easyPaceS: 0, twoKmS: 0, daysPerWeek: 5, yearsRunning: 3, volKm: 0, age: 38, sex: "", strength: true, returning: false, personalized: false };
+const DEFAULT_PROFILE = { name: "", avatar: "", status: "regular", goalDist: "half", targetS: 6300, targetSet: true, raceDate: futureIso(245), startDateIso: "", longRunDay: 6, fitSrc: "recent", recentDistM: 5000, recentTimeS: 1500, noRecent: false, easyPaceS: 0, twoKmS: 0, daysPerWeek: 5, volKm: 0, sex: "", strength: true, returning: false, personalized: false };
 
 function loadProfile() { try { const s = localStorage.getItem("rc_profile_v1"); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 function saveProfileStore() { try { localStorage.setItem("rc_profile_v1", JSON.stringify(profile)); } catch (e) {} }
@@ -6134,12 +6134,11 @@ function applyProfile(pf) {
   // Fitness can be given three ways (fitSrc): a couch-to-5k beginner (no time — we seed a gentle
   // baseline and flag noRecent), a recent 5 km, or a predicted 5 km. A brand-new beginner isn't fed
   // into runner classification since the baseline time is assumed, not run.
-  const cls = RC.classifyRunner({ runsPerWeek: pf.daysPerWeek, yearsRunning: pf.yearsRunning, weeklyVolumeKm: pf.volKm || undefined, recent5kSeconds: pf.noRecent ? undefined : pf.recentTimeS, sex: pf.sex || undefined });
+  const cls = RC.classifyRunner({ runsPerWeek: pf.daysPerWeek, yearsRunning: trainingYearsFor(resolvedStatus(pf)), weeklyVolumeKm: pf.volKm || undefined, recent5kSeconds: pf.noRecent ? undefined : pf.recentTimeS, maxTier: typeCeilingFor(resolvedStatus(pf)), sex: pf.sex || undefined });
   // Experience comes straight from the self-reported running status — the first question — which maps
   // cleanly to the plan/feasibility improvement ceiling. (Older profiles without a status fall back to
   // the noRecent flag.)
-  const expByStatus = { new: "beginner", building: "beginner", regular: "recreational", competitive: "competitive" };
-  let experience = expByStatus[pf.status] || (pf.noRecent ? "beginner" : "recreational");
+  let experience = experienceFor(pf);
   // ⚠️⚠️ THE SILENT PROMOTION IS GONE — THE RUNNER'S STATED STATUS DECIDES THE TRACK (owner,
   // 2026-08-25). This read:
   //     if (pf.status === "building" && !pf.noRecent && pf.recentTimeS < 1980) experience = "recreational";
@@ -9867,7 +9866,7 @@ function readinessScore() {
   return Math.max(1, Math.min(5, score));
 }
 function warmupAbility() {
-  const st = profile.status;
+  const st = resolvedStatus(profile);
   if (st === "new") return "new";
   if (st === "building") return "beginner";
   if (st === "competitive") return "advanced";
@@ -11006,7 +11005,14 @@ function viewPlan() {
   // asked: they typed a weekly mileage, and the plan could not reach it. Silently under-delivering
   // leaves them believing the plan reflects their answer. Only the volume note is shown here; the
   // rest describe the plan's own design and belong in Support, not on the header.
-  const volNote = (PLAN.notes || []).find((n) => /second run in the day|Adding a day/.test(n));
+  // ⚠️ AND IT NOW MATCHES THE OVERSHOOT NOTE TOO, because the filter was as one-sided as the branch
+  // that produced it. buildNotes had no over-delivery branch at all, so a runner stating 15 km a week
+  // was handed an opening week of 28 and told nothing — and adding the note upstream would have
+  // achieved nothing while this regex named only the two under-delivery phrasings.
+  // ⚠️ MATCHED ON A PHRASE THE NOTE OWNS, not on the word km. Any of the eight notes could mention a
+  // distance, and widening this to catch them all would put the plan's own design notes on the
+  // header, which the paragraph above deliberately keeps off it.
+  const volNote = (PLAN.notes || []).find((n) => /second run in the day|Adding a day|this block opens at/.test(n));
   const mileageNote = volNote
     ? '<div class="plan-note" style="border-left-color:var(--peak)">' + volNote + '</div>'
     : "";
@@ -19687,7 +19693,26 @@ function runFh() { const status = $("fhStatus").value; const r = RC.assessFemale
 const DIST_OPTS = [["5k","5 km"],["10k","10 km"],["half","Half marathon"],["marathon","Marathon"]];
 const REC_OPTS = [["1609.344","1 mile"],["5000","5 km"],["10000","10 km"],["21097.5","Half marathon"]];
 function opt(list, val) { return list.map((o) => '<option value="' + o[0] + '"' + (String(o[0]) === String(val) ? " selected" : "") + '>' + o[1] + '</option>').join(""); }
-function ageOpts(sel) { let o = ""; for (let a = 12; a <= 90; a++) o += '<option value="' + a + '"' + (a === Number(sel) ? " selected" : "") + '>' + a + '</option>'; return o; }
+/**
+ * ⚠️ A BLANK FIRST OPTION, BECAUSE THERE WAS NO WAY TO SAY "I HAVE NOT ANSWERED". This ran 12 to 90
+ * with no empty entry and pre-selected DEFAULT_PROFILE's age: 38, so every runner who never touched
+ * the question was recorded as 38 — and that is not a harmless placeholder:
+ *   * maxHrEstimate() falls back to Tanaka's 208 - 0.7 x age, and its own comment says "Zero means
+ *     no ceiling known; callers must treat that as do not judge, never as a number". A phantom age
+ *     defeats a function deliberately built to refuse to guess. Measured: a 65-year-old was handed a
+ *     ceiling 19 bpm too high, so the coach's 92%-of-max safety cue fired at 167 bpm instead of 149;
+ *     a 20-year-old's fired 11 bpm early. That ceiling also colours the watch's zones and the
+ *     Training zones table.
+ *   * 38 sits inside the 35-49 masters band, so refreshTypePreview showed "You've got plenty in the
+ *     tank" — advice about being a masters athlete — to everybody who had not answered.
+ * Same shape and the same words as the sex question, which got this right already.
+ */
+function ageOpts(sel) {
+  const n = Number(sel);
+  let o = '<option value=""' + (!(n >= 10 && n <= 100) ? " selected" : "") + '>Prefer not to say</option>';
+  for (let a = 12; a <= 90; a++) o += '<option value="' + a + '"' + (a === n ? " selected" : "") + '>' + a + '</option>';
+  return o;
+}
 const DAY_NAMES_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 function dayOpts(sel) { const s = sel != null ? Number(sel) : 6; return DAY_NAMES_FULL.map((d, i) => '<option value="' + i + '"' + (i === s ? " selected" : "") + '>' + d + '</option>').join(""); }
 function seg(name, opts, val) { return '<div class="seg" data-set="' + name + '">' + opts.map((o) => '<button data-v="' + o[0] + '"' + (String(o[0]) === String(val) ? ' class="on"' : '') + '>' + o[1] + '</button>').join("") + '</div>'; }
@@ -20207,7 +20232,7 @@ function draftFromForm() {
     avatar: draft.avatar != null ? draft.avatar : (profile.avatar || ""),
     status,
     goalDist, targetS, targetSet, raceDate, startDateIso, longRunDay,
-    fitSrc, recentDistM, recentTimeS, noRecent, easyPaceS, twoKmS, daysPerWeek: Number(draft.days), yearsRunning: profile.yearsRunning || 3,
+    fitSrc, recentDistM, recentTimeS, noRecent, easyPaceS, twoKmS, daysPerWeek: Number(draft.days),
     // "Building the habit" with no easy pace given: calibrate from their first run instead.
     autoPace: status === "building" && !easyPaceS,
     // ⚠️ Only count the mileage if the question was actually ON SCREEN. syncStatus() hides it for
@@ -20217,7 +20242,10 @@ function draftFromForm() {
     // harmless because a stale value could only build the plan UP; now that it can shrink one, an
     // invisible answer reshaping the plan is a bug the runner cannot even diagnose.
     volKm: (!beginner && volRaw !== "") ? Math.max(0, Math.min(250, Number(volRaw) || 0)) : 0,
-    age: Number(wizFieldVal("s_age")) || 35, sex: wizFieldVal("s_sex"),
+    // ⚠️ NO FALLBACK AGE. This was || 35, which is inside the masters band, so a runner who skipped
+    // the question was recorded as a masters athlete AND had their heart-rate ceiling computed from
+    // an age nobody gave. Absent means absent; assessMasters and maxHrEstimate() both handle it.
+    age: Number(wizFieldVal("s_age")) || 0, sex: wizFieldVal("s_sex"),
     strength: draft.strength === "1",
     // ⚠️ THE SEGMENT NOW HAS THREE VALUES, SO A BOOLEAN CANNOT HOLD ITS ANSWER. This read
     // draft.returning === "1" — the old Yes value — so once the control became
@@ -20428,8 +20456,76 @@ function trialSaveResult() {
   state.screen = "setup"; render();
 }
 // The gating first question: current running status decides which fields we ask for.
+/**
+ * Years of running, derived from the status card rather than stored.
+ *
+ * ⚠️ IT USED TO BE A PHANTOM: yearsRunning was NEVER ASKED, sat in DEFAULT_PROFILE as a 3, and was
+ * copied forward by every save — the same shape as the old weeklyVolumeKm: 30 that made stated
+ * mileage do nothing for months. It cannot reach generatePlan at all (Athlete has no such field), so
+ * a plan is byte-identical for 0 years and 25; what it does reach is classifyRunner, whose label and
+ * meaning ARE rendered on the type-preview panel. So the number was invisible in the plan and visible
+ * on the screen, which is the worst way round.
+ *
+ * ⚠️ DERIVED, NOT ASKED, because classifyRunner needs only to know which side of two gates the runner
+ * is on — yrs >= 1 for tier 3 and yrs >= 3 for tier 4 — and the status cards already say it in
+ * the runner's own words: "New to running" is under a year by construction, "I can jog 20-30 minutes
+ * non-stop" clears one, and "I run 3-5x a week and can finish a 10K or half comfortably" clears
+ * three. Asking a second time for something already answered is a question whose answer is thrown
+ * away, which this project treats as worse than no question.
+ */
+function experienceFor(pf) {
+  // ONE STATUS-TO-EXPERIENCE MAPPING. There were TWO, and the second was hand-inlined in the add-a-day
+  // evidence builder as (st === "new" || st === "building") ? "beginner" : ... with no legacy fallback
+  // at all -- so a profile saved before the status question existed was built as a BEGINNER by
+  // applyProfile and judged as a RECREATIONAL runner by the offer. That matters because addDayOffer
+  // opens with "if (input.experience === beginner) return null": the runner would have been offered an
+  // extra running day that the gate exists to withhold, on a plan whose whole track is capped by design.
+  const map = { new: "beginner", building: "beginner", regular: "recreational", competitive: "competitive" };
+  return map[resolvedStatus(pf)];
+}
+function resolvedStatus(pf) {
+  // ONE ANSWER TO "which of the four cards is this runner", read by everything that keys off it.
+  // ⚠️ A STORED PROFILE IS USED AS-IS WITH NO MERGE (profile = storedProfile || Object.assign({},
+  // DEFAULT_PROFILE)), so status is UNDEFINED for any profile saved before the status question
+  // existed. Four things then fell back independently and did NOT agree: expByStatus falls back on the
+  // noRecent flag and answers "beginner", while warmupAbility fell back to "intermediate" with no
+  // equivalent test — so a legacy runner the engine treats as a beginner was handed an INTERMEDIATE
+  // warm-up. The two helpers below would have inherited the same split (three years of training and a
+  // tier-3 ceiling for a runner the plan builds as a beginner).
+  // ⚠️ THE FALLBACK PRESERVES experience EXACTLY: expByStatus maps both "new" and "building" to
+  // "beginner", so a legacy noRecent profile resolving to "building" gets the experience it already
+  // gets, and "regular" likewise. Deliberately NOT "new" — that is the run-walk track, and silently
+  // moving a legacy runner onto it would change every session in their plan.
+  const st = pf && pf.status;
+  if (st === "new" || st === "building" || st === "regular" || st === "competitive") return st;
+  return pf && pf.noRecent ? "building" : "regular";
+}
+function trainingYearsFor(status) {
+  return status === "new" ? 0 : status === "building" ? 1 : 3;
+}
+
+/**
+ * The highest runner type a stated status can produce.
+ *
+ * ⚠️ WITHOUT IT THE PANEL CONTRADICTS THE CARD THE RUNNER JUST ANSWERED. classifyRunner starts
+ * everybody who runs at all at tier 2, so a runner who had chosen "Just getting started" was shown
+ * "Recreational runner" on a panel headed "Your runner type". The four cards map straight onto the
+ * four plain labels, so this is a translation rather than a judgement.
+ */
+function typeCeilingFor(status) {
+  return status === "new" ? 1 : status === "building" ? 2 : status === "competitive" ? 4 : 3;
+}
+
 const STATUS_OPTS = [
-  ["new", "Just getting started", "New to running, or coming back after a long break. We\\'ll build with walk\\u2013run."],
+  // ⚠️ THE "or coming back after a long break" CLAUSE WAS REMOVED, AND IT WAS A MISROUTE RATHER THAN
+  // A WORDING PREFERENCE. It pointed a detrained veteran at the run-walk beginner track — and on that
+  // track the dedicated "Coming back to running?" question they answer two sections later changes
+  // NOTHING: measured, returningFromBreak and returningFromInjury produce a byte-identical session
+  // list for a beginner (0 of 140 sessions differ), against 158 of 170 on the recreational track. So
+  // the one card that named their situation sent them to the one track that ignores it. A runner
+  // coming back picks the card that matches what they can do TODAY, and the returning question then
+  // does its job.
+  ["new", "Just getting started", "New to running and building up from walking. We\\'ll start with walk\\u2013run."],
   ["building", "Building the habit", "I can jog 20\\u201330 minutes non-stop. Focused on being consistent."],
   ["regular", "Regular runner", "I run 3\\u20135\\u00d7 a week and can finish a 10K or half comfortably."],
   ["competitive", "Competitive", "High weekly mileage \— I race and chase time goals."],
@@ -20558,10 +20654,28 @@ function syncFitSrc() {
 }
 function refreshTypePreview() {
   try {
-    const cls = RC.classifyRunner({ runsPerWeek: Number(draft.days), yearsRunning: profile.yearsRunning || 3, sex: $("s_sex") ? ($("s_sex").value || undefined) : undefined });
-    const m = RC.assessMasters({ age: Number(($("s_age") || {}).value) || 35, sex: $("s_sex") ? ($("s_sex").value || undefined) : undefined });
+    // The panel is fed exactly what applyProfile feeds the real classifier, plus the ceiling the
+    // runner's own status card implies. It used to see three of the five fields, and measured across
+    // realistic answers it disagreed with the real classification in 3 of 8 cases in BOTH directions
+    // — a competitive runner on 6 days and 80 km was called a "Trained runner" where the real answer
+    // is "Highly trained", and a regular runner on 4 days and 20 km was called "Trained" where the
+    // real answer is "Recreational".
+    const st = resolvedStatus({ status: draft.status || profile.status, noRecent: profile.noRecent });
+    const volEl = $("s_volume");
+    const recEl = $("s_rectime");
+    const volNow = volEl ? Number(volEl.value) || 0 : Number(profile.volKm) || 0;
+    const recNow = recEl && mmss(recEl.value) ? RC.parseDuration(recEl.value) : (profile.noRecent ? 0 : Number(profile.recentTimeS) || 0);
+    const cls = RC.classifyRunner({
+      runsPerWeek: Number(draft.days),
+      yearsRunning: trainingYearsFor(st),
+      weeklyVolumeKm: volNow > 0 ? volNow : undefined,
+      recent5kSeconds: recNow > 0 ? recNow : undefined,
+      maxTier: typeCeilingFor(st),
+      sex: $("s_sex") ? ($("s_sex").value || undefined) : undefined,
+    });
+    const m = RC.assessMasters({ age: Number(($("s_age") || {}).value) || 0, sex: $("s_sex") ? ($("s_sex").value || undefined) : undefined });
     const tp = $("typePreview"); if (!tp) return;
-    tp.innerHTML = '<div class="eyebrow" style="margin:0 0 4px">Your runner type</div><div style="font-size:17px;font-weight:700;letter-spacing:-.01em">' + cls.label + '</div><div style="font-size:12.5px;color:var(--ink-soft);margin-top:4px">' + cls.meaning + '</div>' + (m.isMasters ? '<div style="font-size:12.5px;color:var(--ink-faint);margin-top:8px;border-top:1px solid var(--line);padding-top:8px">' + m.headline + '</div>' : '');
+    tp.innerHTML = '<div class="eyebrow" style="margin:0 0 4px">Your runner type</div><div style="font-size:17px;font-weight:700;letter-spacing:-.01em">' + cls.label + '</div><div style="font-size:12.5px;color:var(--ink-soft);margin-top:4px">' + cls.meaning + '</div>' + (cls.note ? '<div style="font-size:12.5px;color:var(--ink-faint);margin-top:8px">' + esc(cls.note) + '</div>' : '') + (m.ageBand !== "unknown" && m.isMasters ? '<div style="font-size:12.5px;color:var(--ink-faint);margin-top:8px;border-top:1px solid var(--line);padding-top:8px">' + m.headline + '</div>' : '');
   } catch (e) {}
 }
 
@@ -34247,14 +34361,13 @@ function addDayEvidence(phase) {
       for (let d = 0; d < 7; d++) completedRuns += runsBy[isoAdd(wk.startIso, d).toISOString().slice(0, 10)] || 0;
       recentWeeks.push({ prescribedRuns, completedRuns: Math.min(completedRuns, prescribedRuns) });
     }
-    const st = profile.status;
     return {
       daysPerWeek: Number(profile.daysPerWeek) || 5,
       phase: /taper/i.test(phase) ? "taper" : /peak/i.test(phase) ? "peak" : /build/i.test(phase) ? "build" : "base",
       weeksRemaining: Math.max(0, PLAN.weeks.length - 1 - cur),
       weeksOnPlan: cur,
       recentWeeks,
-      experience: (st === "new" || st === "building") ? "beginner" : (st === "competitive" ? "competitive" : "recreational"),
+      experience: experienceFor(profile),
       returningFromInjury: !!profile.returning,
       unwell: !!(state.subj && (state.subj.illness !== "none" || state.subj.soreness === "high")),
       lastDeclinedIso: loadAddDayDeclined(),

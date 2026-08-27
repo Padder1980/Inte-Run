@@ -1955,6 +1955,33 @@ function buildNotes(
       }
     }
   }
+  // ⚠️ AND SAY SO WHEN THE PLAN GIVES MORE THAN THE MILEAGE IT WAS ASKED FOR. The check above is
+  // one-sided: it fires when the plan cannot REACH a stated figure and said nothing when it overshot
+  // one. At the bottom of the range the per-session floors bind — a 20-minute easy run cannot shrink
+  // — so a low answer stops moving the plan and then stops being reflected in it. Measured on a half
+  // marathon, 5 days, 17 weeks: the opening week is the SAME 27.8 km whether the runner says 15, 20
+  // or 25, so somebody who said 15 was handed 1.85x it with no note at all.
+  //
+  // ⚠️ KEYED ON THE OPENING WEEK, NOT THE PEAK. A peak above the stated figure is what a block IS —
+  // `PEAK_VOLUME_MULTIPLIER` is 1.25 by design — so reading the peak here would fire on every plan
+  // the volume model built correctly. The threshold is the 1.10x week-one guardrail the project
+  // already states (`test/generate-plan.test.ts`), not a number picked to make a fixture pass.
+  //
+  // ⚠️ THE FIRST NON-DELOAD WEEK, because week one can be a deload on some runways and a deload is
+  // deliberately smaller — reading it would let a real overshoot go unmentioned.
+  if (targetPeakKm) {
+    const firstFull = (weeks.find((w) => !w.isDeload && !w.sessions.some((s) => s.type === "race"))
+      ?.plannedDistanceMeters ?? 0) / 1000;
+    const stated = Math.round(targetPeakKm / PEAK_VOLUME_MULTIPLIER);
+    if (firstFull > stated * 1.10) {
+      notes.push(
+        `You told us you run about ${stated} km a week, and this block opens at ${Math.round(firstFull)} km. ` +
+        "Below roughly 25 km a week the per-session floors bind — a 20-minute easy run cannot get shorter — " +
+        "so the plan cannot open as small as your answer. Treat the first fortnight as the ceiling rather than " +
+        "the target, and walk or cut a run short if it is too much.",
+      );
+    }
+  }
   const leadIn = totalWeeks - structuredWeeks;
   if (leadIn > 1) {
     const planStart = weeks[0]?.startDateIso ?? goal.startDateIso ?? "";

@@ -14,6 +14,18 @@ export type ClassificationInput = {
   /** Optional recent 5k time (seconds) to refine the estimate. */
   recent5kSeconds?: number;
   sex?: "female" | "male";
+  /**
+   * A ceiling the caller already knows, from something the runner said about themselves.
+   *
+   * ⚠️ IT EXISTS BECAUSE THE RESULT WAS CONTRADICTING THE RUNNER'S OWN ANSWER. The gates below start
+   * every runner who runs at all at tier 2 — so somebody who had just chosen the "Just getting
+   * started" card ("New to running and building up from walking") was shown "Recreational runner" on
+   * a panel headed "Your runner type", two sections after saying the opposite. This function already
+   * caps self-assessment at tier 4 and says so on screen for exactly this reason; a stated status is
+   * the same kind of ceiling and belongs in the same place rather than being clamped afterwards by a
+   * caller re-deriving labels it cannot see.
+   */
+  maxTier?: RunnerTier;
 };
 
 export type Classification = {
@@ -80,6 +92,10 @@ export function classifyRunner(input: ClassificationInput): Classification {
     const pt = performanceTier(input.recent5kSeconds, input.sex === "female");
     if (pt !== 0 && pt > tier) tier = pt;
   }
+
+  // ⚠️ THE CEILING IS APPLIED LAST, after the performance refinement, or a fast time would lift a
+  // runner straight back past the band their own status card implies.
+  if (input.maxTier != null && tier > input.maxTier) tier = input.maxTier;
 
   const plain = PLAIN[tier] ?? PLAIN[2]!;
   const note =

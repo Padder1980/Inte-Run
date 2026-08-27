@@ -54,9 +54,24 @@ test("BLOCKER: the runner's stated status decides the track — nothing promotes
   assert.equal(assigns, 1,
     "experience is assigned " + assigns + " times in applyProfile; the status is no longer the only " +
     "thing that decides the track");
-  assert.match(ap, /expByStatus\[pf\.status\]/, "the track is no longer keyed on the stated status");
+  // ⚠️ ASSERTED OF THE FACT, NOT THE MECHANISM. This pinned `expByStatus[pf.status]` and failed on a
+  // correct change: the table moved into a shared `experienceFor(pf)` so that the add-a-day offer could
+  // stop carrying its own hand-inlined copy of it. The invariant never was about that expression — it is
+  // that the track comes from the STATUS CARD and from nothing else, and that no later line reconsiders
+  // it from a time the runner may never have entered.
+  const ASSIGN = /\bexperience\s*=\s*experienceFor\(pf\)/;
+  assert.match(ap, ASSIGN, "the track is no longer keyed on the stated status");
+  const mapper = nocomment(fn("experienceFor"));
+  assert.match(mapper, /resolvedStatus\(pf\)/, "the mapping no longer reads the status card at all");
+  for (const src of ["recentTimeS", "twoKmS", "easyPaceS", "volKm"])
+    assert.ok(!mapper.includes(src), "the mapping reads " + src + " — the track is not the status card's alone");
   // Nothing may reconsider the track from a race time — the specific overreach, and any relative of it.
-  const after = ap.slice(ap.indexOf("expByStatus[pf.status]"));
+  // ⚠️ THE ANCHOR MUST BE PROVED PRESENT FIRST. `indexOf` returns -1 for a missing needle and
+  // `slice(-1)` is the LAST CHARACTER, so a stale anchor silently reduces the sweep below to nothing and
+  // it passes whatever the code does.
+  const at = ap.search(ASSIGN);
+  assert.ok(at >= 0, "the assignment could not be found, so the sweep below would measure nothing");
+  const after = ap.slice(at);
   for (const src of ["recentTimeS", "twoKmS", "easyPaceS"]) {
     assert.ok(!new RegExp("experience\\s*=[^;]*" + src).test(after),
       "the track is being reconsidered from " + src + ", which is a number the runner may never have given");

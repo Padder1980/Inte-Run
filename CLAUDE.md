@@ -9854,6 +9854,18 @@ discriminating case is a window that does **not** start at zero: mapped over the
 its own start at 4/19 = 0.21. And it is **clamped as well as hidden**, because a frame can land between
 the clamp and the class.
 
+⚠️⚠️ **CORRECTION, 2026-08-28: "requestAnimationFrame FIRES ZERO TIMES IN THIS REPO'S HEADLESS CHROME"
+IS FALSE, AND THIS FILE ASSERTED IT IN THREE PLACES.** Re-measured four times — by me and by three
+independent reviewers — at **112–122 frames per second in the loaded app**. The original zero was taken
+with the headless window at its default size, where `window.innerHeight` is **1** and there is nothing
+to composite; `Browser.setWindowBounds` fixes it, and the same 1px window is what made `#view` measure
+112px and read as a broken layout. **So the harness was the fault, not the browser** — and the two
+design decisions that cited the zero (splitting `edgeScrollDelta` from `dragEdgeTick`, and rejecting an
+rAF-gated aperture) are still right for other reasons, but the reason they gave was wrong. An
+rAF-driven loop IS provable here. What genuinely does not work is **pausing an animation and then
+calling `Page.captureScreenshot`** — that hangs, measured twice.
+
+
 ### ⚠️⚠️ THE BLACK FLASH WAS THE MEDIA ELEMENT, AND FIXING IT AT SOURCE FIXED FIVE THINGS AT ONCE
 
 *"the screen flashed black once you take your finger off"*. `clubEdDraw` writes a fresh `<video src>` into
@@ -12524,8 +12536,9 @@ this out, and the reasons are all measurements rather than taste:
    and before `haptic("lift")` — so an aperture keyed on `.cal-open` can land on **the one row where the
    gesture is a silent no-op**. (That dead gesture is a pre-existing defect; see the open list below.)
 5. Two plan states have no card at all and would need a second design.
-6. **`requestAnimationFrame` fires ZERO times in this repo's headless Chrome** (measured: 0 frames in
-   1.2 s against 25 for `setInterval`), so any rAF-gated aperture is unprovable in the harness.
+6. An rAF-gated aperture would be measurable only in a browser, and the five above already settle it.
+   ⚠️ **This list originally said rAF fires zero times in this repo's headless Chrome. That is FALSE —
+   see the correction above: 112–122 fps once the window is sized.** The decision stands on 1–5.
 
 A diagram with no anchor answers all six **by measuring nothing**, and `calTipHtml` **declares zero
 parameters** — which is the clause that makes a rect unable to arrive from outside. The shell is
@@ -12570,8 +12583,9 @@ change.
 ⚠️ **ONE SCROLLER, NOT TWO.** The plan drag has had `planDragScroll` since it was written and the
 calendar drag **twenty lines away had none**; a second copy is the fix-one-builder-not-the-other trap
 this file records six times. `edgeScrollDelta(y, top, bottom)` is the pure arithmetic and `dragEdgeTick`
-the loop, split **because rAF fires zero times in this harness** — the loop is unprovable here and the
-arithmetic is provable in node.
+the loop, split so the arithmetic can be driven in node **with no browser at all**. ⚠️ **The reason
+originally given — that rAF fires zero times here — is FALSE; see the correction above.** The split is
+still right; its stated justification was not.
 ⚠️ **THE LOOP IS CANCELLED IN `calDragTeardown`, NOT IN `calDragEnd`.** Teardown is the one exit both
 the end and the cancel path go through; a cancel that left the rAF running would scroll `#view` for
 ever.

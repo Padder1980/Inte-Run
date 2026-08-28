@@ -9654,8 +9654,10 @@ const MOVE_TIP_LINE = "Hold a session until it lifts, then drag it onto another 
 //      before haptic("lift") -- an aperture keyed on .cal-open can land on the one row where the
 //      gesture is a silent no-op.
 //   5. Two plan states have no card at all and would need a second design.
-//   6. requestAnimationFrame fires ZERO times in this repo's headless Chrome, so any rAF-gated
-//      aperture is unprovable here.
+//   6. an rAF-gated aperture would be measurable only in a browser, and the five constraints above
+//      already settle it. (An earlier version of this list said rAF fires zero times in this repo's
+//      headless Chrome. That was false -- re-measured at 121 frames per second in the loaded app; the
+//      original zero came from a harness whose window was 1px tall, so nothing composited.)
 // A diagram with no anchor answers all six by measuring nothing. calTipHtml declares zero
 // parameters, which is what makes a rect unable to arrive from outside.
 //
@@ -9771,7 +9773,19 @@ function calHomeScroll() {
   const day = document.querySelector(".cal-day.is-today") || document.querySelector(".cal-week");
   if (!day || !day.clientHeight) return;
   const wk = day.closest(".cal-week") || day;
-  v.scrollTop = Math.max(0, wk.getBoundingClientRect().top - v.getBoundingClientRect().top + v.scrollTop - 8);
+  const wr = wk.getBoundingClientRect(), vr = v.getBoundingClientRect();
+  // ⚠️⚠️ IT DOES NOT SCROLL A WEEK THAT IS ALREADY ON SCREEN, and that is the whole fix rather than a
+  // refinement. An adversarial review measured the tile path scrolling BOTH the permanent hint line
+  // (hint top -21) AND the Back button (top -53) off the top -- on a fresh plan, which is the one case
+  // the comment below used to call fine, because week 1 is today and sits only 80px down. So the
+  // sentence this feature calls "what makes the no-seen-key answer complete" was never on screen on the
+  // path that exists to teach the gesture, and the way back was gone with it.
+  // ⚠️ MID-PLAN IT STILL SCROLLS, and losing the chrome there is what scrolling means: week 12 sits
+  // 8,017px down and week 20 14,049px, so a runner who dismissed onto week 1 would be four months from
+  // the day they wanted to move. The fix is not to scroll less, it is to not scroll when there is
+  // nothing to gain.
+  if (wr.top >= vr.top && wr.top < vr.bottom - 80) return;
+  v.scrollTop = Math.max(0, wr.top - vr.top + v.scrollTop - 8);
 }
 function calDragBlockScroll(e) { if (DRAG) e.preventDefault(); }
 function calDragMove(e) {
@@ -9800,6 +9814,11 @@ function calDragAim(x, y) {
     DRAG.targetEl = day; DRAG.target = di;
   } else {
     DRAG.targetEl = null; DRAG.target = null;
+    // Was the finger over a day at ALL? A day of a DIFFERENT week is the same-week rule; no day at all
+    // -- the week header, the totals row, off the list -- is not, and the two deserve different
+    // sentences. Telling somebody about weeks when they dropped on nothing corrects a rule they did
+    // not break.
+    DRAG.wrongWeek = !!day;
   }
 }
 function calDragTeardown() {
@@ -9834,7 +9853,11 @@ function calDragEnd() {
   // produced no highlight, no haptic and no explanation -- the card simply went home. Only when there
   // was no target at all: dropping back on the day it came from is a deliberate cancel and stays
   // silent, or every changed mind would be answered with a correction.
-  if (d.target == null) toast("Drop it on a day in that same week.");
+  // ⚠️ IT NAMES THE SAME-WEEK RULE ONLY WHEN THAT IS WHAT WENT WRONG. calDragAim records whether the
+  // finger was over a day of ANOTHER week or over no day at all -- dropped on the week header, the
+  // totals row or off the list entirely -- and telling somebody about weeks when they dropped on
+  // nothing is a correction for a rule they did not break.
+  if (d.target == null) toast(d.wrongWeek ? "Drop it on a day in that same week." : "Drop it on a day.");
 }
 function calDragCancel() { calDragTeardown(); DRAG = null; CAL_DRAGGED = true; }
 
@@ -9908,9 +9931,13 @@ function planDragMove(e) {
 /**
  * Pixels per frame to scroll when a dragging finger is within EDGE_BAND of either end of the
  * scroller. Zero in the middle; the sign carries the direction.
- * ⚠️ PURE, AND SEPARATE FROM ITS LOOP, BECAUSE requestAnimationFrame FIRES ZERO TIMES IN THIS REPO'S
- * HEADLESS CHROME (measured: 0 frames in 1.2s against 25 for setInterval). The loop is therefore
- * unprovable in the harness while the arithmetic is provable in node, so they are two functions.
+ * ⚠️ PURE, AND SEPARATE FROM ITS LOOP, so the arithmetic can be driven in node with no browser at all.
+ * ⚠️⚠️ AND THE "rAF FIRES ZERO TIMES IN HEADLESS CHROME" CLAIM THIS COMMENT USED TO MAKE IS FALSE.
+ * Re-measured three ways: 121 frames in 1000ms in the loaded app. The original zero was taken with the
+ * window at its default size, where window.innerHeight is 1 and there is nothing to composite -- a
+ * symptom of the harness, not of headless Chrome, and fixed by Browser.setWindowBounds. The split is
+ * still right, because a pure function is provable in node with no browser at all, but the reason it
+ * used to give was wrong.
  */
 const EDGE_BAND = 64, EDGE_MAX = 7;
 function edgeScrollDelta(y, top, bottom) {
@@ -14893,11 +14920,15 @@ function clubVidLoop() {
  * ⚠️ CLAMPED AS WELL AS HIDDEN. clubPlayhead takes the marker down when the preview is outside the
  * window, but a frame can land between the two — and a marker drawn at -14% for one frame is the defect
  * being fixed, briefly.
- * ⚠️⚠️ IT IS ITS OWN FUNCTION SO IT CAN BE RUN RATHER THAN READ. requestAnimationFrame fires ZERO times
- * in the headless Chrome this repo tests in (measured: 0 frames in 1.2s while setInterval managed 25 in
- * 0.4s), so the loop's motion cannot be driven there at all — the geometry can be measured in a browser
- * and the arithmetic cannot. Split out, the arithmetic is provable in node and the containment is
- * provable in pixels, and neither claim has to be taken on trust.
+ * ⚠️⚠️ IT IS ITS OWN FUNCTION SO IT CAN BE RUN RATHER THAN READ: split out, the arithmetic is provable
+ * in node and the containment is provable in pixels, and neither claim has to be taken on trust.
+ * ⚠️⚠️ THE REASON THIS COMMENT USED TO GIVE WAS WRONG. It said requestAnimationFrame fires ZERO times in
+ * the headless Chrome this repo tests in (0 frames in 1.2s against 25 for setInterval). Re-measured four
+ * times on 2026-08-28: 112-122 frames per second in the loaded app. The original zero was taken with the
+ * headless window at its DEFAULT size, where window.innerHeight is 1 and there is nothing to composite;
+ * Browser.setWindowBounds fixes it, and the same 1px window is what made #view measure 112px and read as
+ * a broken layout. So an rAF loop IS drivable here. What genuinely hangs is pausing an animation and
+ * then calling Page.captureScreenshot.
  */
 function clubPhFrac(t, inS, outS) {
   const span = (Number(outS) || 0) - (Number(inS) || 0);
@@ -36364,6 +36395,16 @@ function render() {
   // screen would leave the lesson over Today with .app inert, i.e. a frozen app. liveRunning() is
   // named as well as the screen, because a run starting is exactly such a path.
   if (calTipUp() && (state.screen !== "calendar" || liveRunning())) closeCalTip();
+  // ⚠️ AND NEITHER CAN A DRAG. The runner cannot navigate away mid-drag by hand, but a wrist tick can:
+  // window.__interunWatchLive sets state.screen and renders with no DRAG check, and liveRunning() is
+  // false during a calendar drag so its own early return does not block it. Measured before this line:
+  // DRAG still set, the lifted ghost (z-index 300) floating over the new screen, the edge scroller
+  // auto-scrolling TODAY by 654px under a stationary finger, calDragBlockScroll still preventDefaulting
+  // every touchmove app-wide, and the release answered with "Drop it on a day in that same week." on a
+  // screen that has neither. moveSession could not fire on the wrong week -- no .cal-day outside
+  // viewCalendar carries data-w -- so this was a stuck gesture rather than a wrong edit, but a stuck
+  // gesture that blocks touch scrolling is its own defect.
+  if (DRAG && state.screen !== "calendar" && !DRAG.isPlan) calDragCancel();
   if (state.screen === "wizard") {
     // Full-screen, focused onboarding — no bottom nav to tap away into. The draft is sticky
     // (draft.__live), so backgrounding and returning keeps every answer.

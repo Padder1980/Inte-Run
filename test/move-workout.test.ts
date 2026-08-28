@@ -356,3 +356,76 @@ test("the lesson sits above every overlay inside .app and below every launch ove
   for (const r of rules)
     assert.ok(!/touch-action/.test(r[2] || ""), r[1] + " declares touch-action, which fails the zoom guard");
 });
+
+/* ---- The adversarial review's findings, each with a guard ---------------------------------- */
+
+test("BLOCKER: the tile path does not scroll away the instruction it exists to deliver", () => {
+  // ⚠️ AN ADVERSARIAL REVIEW MEASURED THIS: the tile path scrolled the permanent hint line (top -21)
+  // AND the Back button (top -53) off the top -- on a FRESH plan, which is the one case the old comment
+  // called fine, because week 1 is today and sits only 80px down. So the sentence this feature calls
+  // "what makes the no-seen-key answer complete" was never on screen on the path that exists to teach
+  // the gesture, and the way back was gone with it.
+  const home = nocomment(fn("calHomeScroll"));
+  assert.match(home, /if \(wr\.top >= vr\.top && wr\.top < vr\.bottom - \d+\) return;/,
+    "calHomeScroll scrolls a week that is already on screen, taking the hint and Back with it");
+  const guardAt = home.indexOf("wr.top >= vr.top"), writeAt = home.indexOf("v.scrollTop =");
+  assert.ok(guardAt >= 0 && writeAt >= 0, "calHomeScroll lost either its guard or its write");
+  assert.ok(guardAt < writeAt, "the already-visible guard sits after the scroll, so it never prevents one");
+});
+
+test("BLOCKER: a drag cannot outlive the screen it was started on", () => {
+  // ⚠️ THE RUNNER CANNOT NAVIGATE AWAY MID-DRAG BY HAND, BUT A WRIST TICK CAN. __interunWatchLive sets
+  // state.screen and renders with no DRAG check, and liveRunning() is false during a calendar drag so
+  // its own early return does not block it. Measured before the fix: DRAG still set, the lifted ghost
+  // (z-index 300) over the new screen, the edge scroller auto-scrolling TODAY by 654px under a
+  // stationary finger, and calDragBlockScroll still preventDefaulting every touchmove app-wide.
+  const r = nocomment(fn("render"));
+  const cancel = r.indexOf("calDragCancel()"), firstBranch = r.indexOf('if (state.screen ===');
+  assert.ok(cancel >= 0, "render() never ends a stray drag");
+  assert.ok(firstBranch >= 0, "render() has no screen branch, so the anchor is wrong");
+  assert.ok(cancel < firstBranch,
+    "the cancel sits after the first screen branch -- the calendar branch RETURNS, so it never runs");
+  const cond = r.slice(Math.max(0, cancel - 90), cancel);
+  assert.match(cond, /state\.screen !== "calendar"/, "the cancel does not check the screen");
+  // ⚠️ AND IT LEAVES THE PLAN DRAG ALONE. That one lives on the Plan screen, where state.screen is null,
+  // so a condition that did not exclude it would cancel every plan drag on its own first render.
+  assert.match(cond, /!DRAG\.isPlan/, "the cancel would kill the plan-screen drag on its own render");
+});
+
+test("the refusal names the same-week rule only when that is the rule that was broken", () => {
+  const end = nocomment(fn("calDragEnd"));
+  assert.match(end, /d\.wrongWeek \?/, "every failed drop is told about weeks, including one on no day at all");
+  assert.match(end, /same week/, "the same-week wording is gone");
+  assert.match(end, /"Drop it on a day\."/, "there is no wording for a drop that found no day");
+  // The flag is written where the answer is known: calDragAim is the only place that sees the day.
+  const aim = nocomment(fn("calDragAim"));
+  assert.match(aim, /DRAG\.wrongWeek = !!day/, "nothing records whether the finger was over a day at all");
+  const app = nocomment(appBlock());
+  assert.equal((app.match(/DRAG\.wrongWeek =/g) || []).length, 1,
+    "wrongWeek is written in more than one place, so the two can disagree");
+});
+
+test("no comment claims requestAnimationFrame is dead in this harness", () => {
+  // ⚠️⚠️ THAT CLAIM WAS FALSE AND THIS FILE CARRIED IT IN THREE PLACES. Re-measured four times -- by me
+  // and by three independent reviewers -- at 112-122 frames per second in the loaded app. The original
+  // zero was taken with the headless window at its DEFAULT size, where window.innerHeight is 1 and there
+  // is nothing to composite; Browser.setWindowBounds fixes it, and the same 1px window is what made
+  // #view measure 112px and read as a broken layout. The harness was the fault, not the browser.
+  const app = appBlock();
+  const hits = [...app.matchAll(/fires ZERO times|fires zero times/gi)];
+  // ⚠️ A COUNT, BECAUSE A NEARBY-RETRACTION CHECK CANNOT DISCRIMINATE. Watched escaping: restoring the
+  // claim as a REASON put it a hundred characters before the correction paragraph that follows it, so a
+  // window looking for "FALSE" or "used to" found one either way. The two legitimate occurrences are
+  // both inside corrections, and what must not happen is a THIRD.
+  const CLAIM_CEILING = 3;   // measured 2026-08-28: three mentions, every one inside a correction
+  assert.ok(hits.length <= CLAIM_CEILING,
+    hits.length + " comments mention rAF firing zero times (ceiling " + CLAIM_CEILING +
+    ", every one inside a correction). All of them: " +
+    hits.map((m) => app.slice(Math.max(0, m.index! - 70), m.index! + 40).replace(/\s+/g, " ")).join(" || "));
+  for (const m of hits) {
+    const around = app.slice(Math.max(0, m.index! - 200), m.index! + 200);
+    assert.ok(/WRONG|FALSE|used to|originally|earlier version/i.test(around),
+      "a comment asserts rAF fires zero times here with no retraction near it: " +
+      app.slice(Math.max(0, m.index! - 60), m.index! + 60).replace(/\s+/g, " "));
+  }
+});

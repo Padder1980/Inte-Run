@@ -16,9 +16,18 @@ const fn = (name: string) => {
 
 test("first launch — native OR web — goes to the wizard, not the old form or Today", () => {
   // The launch flow used to split native (→ setup form) from web (→ Today). Both now open the wizard.
+  // ⚠️ RESTATED, NOT RELAXED: this asserted the literal `state.screen = "wizard"` INSIDE the welcome
+  // handler, so extracting the four lines into startWizard() -- which "Start a new plan" now shares --
+  // broke a guard whose invariant was untouched. Scoped to a HOW rather than a WHAT, which is a pattern
+  // this project has recorded a dozen times. The chain is asserted instead, every link falsifiable, and
+  // it is STRONGER than the old form because it also proves the draft is cleared on the way in.
   const launch = html.slice(html.indexOf("if (FIRST_RUN) {"), html.indexOf("if (FIRST_RUN) {") + 900);
-  assert.match(launch, /state\.screen = "wizard"/, "the first-run welcome no longer opens the wizard");
+  assert.match(launch, /startWizard\(\)/, "the first-run welcome no longer opens the wizard");
   assert.doesNotMatch(launch, /state\.screen = "setup"/, "first-run still opens the old long form");
+  const sw = fn("startWizard");
+  assert.match(sw, /state\.screen = "wizard"/, "startWizard does not open the wizard");
+  assert.match(sw, /draft = \{\}/, "startWizard does not clear the draft, so a second plan starts mid-answers");
+  assert.match(sw, /state\.wizStep = 0/, "startWizard does not reset the step");
 });
 
 test("render() has a wizard branch that draws and wires it", () => {

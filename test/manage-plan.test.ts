@@ -313,14 +313,17 @@ test("BLOCKER: deleting a plan asks first, and says what it does not touch", () 
 });
 
 test("BLOCKER: the plans screen introduces no second colour vocabulary, and every control is wired", () => {
-  // ⚠️ The reference gives each plan type its own coloured shield. This app has exactly ONE meaning for
-  // a coloured chip — how hard a session is (ruling 7, one mapping, read by the card, the tile, the
-  // calendar and the plan dot) — so a colour keyed on race distance would make amber mean "10 km" in
-  // one place and "tempo" in another. The distance is in the badge's TEXT instead.
+  // ⚠️⚠️ THIS ASSERTION WAS INVERTED, NOT DELETED, ON THE OWNER'S INSTRUCTION (2026-08-28: "i want you
+  // to use different colours for the icons of the different run plans"). It used to require
+  // `isLive ? "var(--accent)" : "var(--ink-faint)"` -- active versus past and nothing else -- on the
+  // reasoning that this app has exactly ONE meaning for a coloured chip (ruling 7). What that protected
+  // survives intact and is what is asserted now: the shields borrow neither the effort nor the phase
+  // colours, and the active plan is still readable at a glance. Only the grey went.
   const view = nocomment(fn("viewPlans"));
   assert.ok(!/--eff-/.test(view), "the plans screen paints with the effort colours");
   assert.ok(!/PHASE\[/.test(view), "the plans screen paints with the phase colours");
-  assert.match(view, /isLive \? "var\(--accent\)" : "var\(--ink-faint\)"/, "the badge no longer reads active-versus-past");
+  assert.match(view, /planHue\(j, isLive\)/, "the badge no longer takes its colour from the one hue function");
+  assert.ok(!/var\(--ink-faint\)/.test(view), "the shields are grey again, which is what he asked to change");
 
   // Every control the screen renders is reached by a handler, and from #view rather than the document.
   const app = appBlock();
@@ -698,4 +701,204 @@ test("BLOCKER: a paused stretch is a row above the list, not a coloured week", (
   assert.match(list, /return pausedWeekRow\(\) \+ PLAN\.weeks/, "the paused row is not the first thing in the list");
   // ⚠️ NO TAG ON THIS ROW. Its own title is the word, and a tag repeating it read "PausedPaused".
   assert.ok(!/wk-tag/.test(row), "the paused row carries a tag that repeats its own title");
+});
+
+/* ============================================================================================
+ * The owner's 2026-08-28 batch: the sheet sliding sideways, cancelling a booked break, starting a
+ * new plan through the wizard, and a colour per plan shield.
+ * ========================================================================================== */
+
+let SHEETCSS: string | null = null;
+function css(): string {
+  if (SHEETCSS != null) return SHEETCSS;
+  const s = page();
+  SHEETCSS = s.slice(s.indexOf("<style>"), s.indexOf("</style>"));
+  return SHEETCSS;
+}
+/**
+ * ⚠️ STRIPS CSS COMMENTS. The .rp-badge rule carries a note explaining why it no longer uses
+ * var(--accent-ink), so a guard forbidding that token read the sentence defending the fix AS the
+ * defect -- the eleventh firing of comment-quotes-what-it-forbids in this project.
+ * ⚠️ And it slices to the rule's closing brace by scanning past comments, because a /* ... *\/ inside a
+ * declaration block contains no brace but does contain text a naive indexOf("}") would stop before.
+ */
+function rule(sel: string): string {
+  const c = css();
+  const at = c.indexOf(sel + " {");
+  assert.ok(at >= 0, "there is no " + sel + " rule");
+  const body = c.slice(at, c.indexOf("}", at) + 1);
+  return body.replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
+test("BLOCKER: a sheet can never be dragged sideways", () => {
+  // ⚠️ THE OWNER PHOTOGRAPHED THIS. The spec turns `visible` into `auto` when the other axis is not
+  // visible, so `overflow-y: auto` alone had made every sheet a HORIZONTAL scroller -- and one pixel of
+  // overflow is then enough for iOS rubber-banding to slide the whole sheet, headings and all, off the
+  // left edge. Measured 0px of overflow in headless Chrome at four sizes, which is exactly why it took
+  // a photograph from a real phone: a native date input renders wider on iOS than in Chrome.
+  assert.match(rule(".sheet"), /overflow-x:\s*clip/,
+    "the sheet does not pin its horizontal axis, so any overflow at all makes it draggable");
+  // ⚠️ A RATCHET, NOT A BAN. Eleven rules in this stylesheet legitimately scroll vertically and say
+  // nothing about x, and most of them are harmless; what must not grow is the number of them, because
+  // each one is a surface that can be slid sideways by accident.
+  const IMPLICIT_CEILING = 9;   // measured 2026-08-28, after .sheet and .caltip-body were pinned
+  const implicit = [...css().matchAll(/([^{}\n]+)\{([^}]*)\}/g)]
+    .filter((m) => /overflow-y:\s*(auto|scroll)/.test(m[2] || "") && !/overflow-x|overflow:\s/.test(m[2] || ""))
+    .map((m) => (m[1] || "").trim());
+  assert.ok(implicit.length <= IMPLICIT_CEILING,
+    implicit.length + " rules scroll vertically without pinning x (ceiling " + IMPLICIT_CEILING + "): " + implicit.join(", "));
+  assert.ok(!implicit.some((s) => s.includes(".sheet") || s.includes(".caltip-body")),
+    "a pinned scroller lost its overflow-x again");
+  // ⚠️ AND THE CLIP IS THE GUARANTEE, NOT THE FIX: on its own it turns an overflow into missing
+  // content. The date row wraps on a MINIMUM so nothing is clipped -- flex-wrap breaks a line from the
+  // flex BASIS, so with a basis of 140px two fields never wrapped and a wider intrinsic minimum pushed
+  // them out of the row instead (measured 17px of overflow at 375 wide).
+  const dates = rule(".adj-dates");
+  assert.match(dates, /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(/,
+    "the date row does not wrap on a minimum, so a wider native control overflows instead of stacking");
+  assert.ok(!/flex-wrap/.test(dates), "the date row is back on flex-wrap, which wraps from the basis");
+  assert.match(rule('input.sel[type="date"]'), /min-width:\s*0/,
+    "a native date control keeps its intrinsic minimum, so width: 100% cannot squeeze it");
+});
+
+test("BLOCKER: a booked break can always be cancelled, and a pause is one of them", () => {
+  const src = nocomment(fn("plannedBreaksHtml"));
+  // ⚠️ WITHOUT THIS THERE WAS NO WAY BACK: booking raised an undo toast and nothing else, so once that
+  // toast had gone the window was in the store for good.
+  assert.match(src, /loadAdjust\(\)/, "the list does not read the adjustment store");
+  assert.match(src, /profile\.startDateIso/, "the list does not know about a pause");
+  assert.match(src, /data-pbdel=/, "there is no way to cancel a holiday or an easier stretch");
+  assert.match(src, /data-pbresume=/, "there is no way to cancel a pause");
+  // ⚠️ NOTHING BOOKED RENDERS NOTHING. A permanent empty heading on a menu teaches the runner to scroll
+  // past that part of the screen.
+  assert.match(src, /if \(!rows\.length && !paused\) return ""/, "the list renders when nothing is booked");
+  // ⚠️ AND IT IS RENDERED. A builder proves a shape exists; only the caller proves the runner sees it --
+  // deleting the call from managePlanHtml escaped every assertion above it, which is the same hole this
+  // project has now recorded four times.
+  assert.match(nocomment(fn("managePlanHtml")), /plannedBreaksHtml\(\)/,
+    "the breaks list is built and never rendered, so there is still no way to cancel a break");
+  // Both controls are reached by a handler.
+  const app = nocomment(appBlock());
+  for (const a of ["pbdel", "pbresume"])
+    assert.match(app, new RegExp('querySelectorAll\\("\\[data-' + a + '\\]"\\)[\\s\\S]{0,140}onclick'),
+      "data-" + a + " is rendered and never wired");
+  assert.match(app, /data-pbresume\]"\)[\s\S]{0,140}resumeFromPause/,
+    "the pause's way out is not the function that already existed for it");
+  // ⚠️ cancelAdjust MUST SNAPSHOT BEFORE THE REBUILD. seedDone() prunes dayOverride of session ids the
+  // new plan lacks and PERSISTS the prune, so a snapshot taken afterwards hands back a plan with the
+  // runner's own reschedules already deleted -- under a button labelled Undo.
+  const ca = nocomment(fn("cancelAdjust"));
+  const snap = ca.indexOf("const before ="), reb = ca.indexOf("recompute()");
+  assert.ok(snap >= 0, "cancelAdjust takes no snapshot");
+  assert.ok(reb >= 0, "cancelAdjust never rebuilds");
+  assert.ok(snap < reb, "the snapshot is taken after the rebuild, so Undo hands back a pruned plan");
+  assert.match(ca, /toastUndo\(/, "cancelling a break cannot be undone");
+  // ⚠️ THE HIT AREA GROWS BY A PSEUDO-ELEMENT AND MUST CLEAR 44px. Measured by bisecting
+  // elementFromPoint: the label is 13px type on a ~17px line, so -12px gave 41.48px and -15px gives
+  // 47.48px. A box cannot report its own pseudo-element, so the inset is what a static guard can check.
+  const x = rule(".pb-x::after");
+  const ins = /inset:\s*(-?[0-9.]+)px/.exec(x);
+  assert.ok(ins, ".pb-x::after declares no inset, so the Cancel control has only its own text to hit");
+  const grown = 17 + 2 * Math.abs(Number(ins![1]));
+  assert.ok(grown >= 44,
+    "the Cancel control's grown hit area is about " + grown + "px against this app's 44px floor");
+  // Both cancel paths keep today's ticks across the rebuild -- the one rebuild path that ever forgot.
+  for (const f of ["cancelAdjust", "resumeFromPause"]) {
+    const body = nocomment(fn(f));
+    assert.equal((body.match(/restoreTicks\(/g) || []).length, 2,
+      f + " does not restore today's ticks on both the action and its undo");
+    assert.match(body, /seedDone\(\); restoreTicks\(/, f + " calls seedDone without restoring ticks after it");
+  }
+});
+
+/** Brace-matches ONE `if (id === "x") { ... }` branch. A character window is not a branch. */
+function branch(dispatcher: string, id: string): string {
+  const src = nocomment(fn(dispatcher));
+  const at = src.indexOf('if (id === "' + id + '")');
+  assert.ok(at >= 0, dispatcher + " has no branch for " + id);
+  const open = src.indexOf("{", at);
+  let d = 0;
+  for (let i = open; i < src.length; i++) {
+    if (src[i] === "{") d++;
+    else if (src[i] === "}" && --d === 0) return src.slice(at, i + 1);
+  }
+  assert.fail(dispatcher + "'s " + id + " branch is unbalanced");
+  return "";
+}
+
+test("BLOCKER: Start a new plan opens the wizard, and only a runner who has a name skips that step", () => {
+  const br = branch("manageAction", "new");
+  assert.match(br, /startWizard\(\)/, "Start a new plan does not open the wizard");
+  assert.ok(!/state\.screen = "setup"/.test(br),
+    "Start a new plan still opens the whole profile form, which is the screen for changing an answer");
+  // ⚠️ ONE ENTRY POINT. It was reachable only from the first-run welcome; two copies of (reset draft,
+  // reset wizStep, reset wizErr, set the screen) is how the second route starts half way through
+  // somebody else's answers.
+  const app = nocomment(appBlock());
+  const setters = [...app.matchAll(/state\.screen = "wizard"/g)].length;
+  assert.equal(setters, 1, "state.screen = \"wizard\" is set in " + setters + " places, expected 1");
+  assert.match(nocomment(fn("startWizard")), /draft = \{\}[\s\S]{0,120}state\.wizStep = 0/,
+    "startWizard does not clear the draft and the step together");
+  // Driven: the step list, both ways round.
+  // ⚠️ LIFT THE REAL FUNCTION WITH THE TWO GLOBALS IT READS, rather than re-implementing it. It reads
+  // `profile.personalized` and `draft.status` and calls isBeginnerStatus, so those are what the harness
+  // supplies -- a hand-written copy would agree with itself and prove nothing about the shipped one.
+  const mkIds = (personalized: boolean, status: string): string[] => {
+    const src = "let profile = { personalized: P }; let draft = { status: S };"
+      + "function isBeginnerStatus(x) { return x === 'new' || x === 'building'; }"
+      + fn("wizStepIds") + "; return wizStepIds();";
+    return new Function("P", "S", src)(personalized, status) as string[];
+  };
+  assert.ok(!mkIds(true, "regular").includes("you"),
+    "a runner who already has a name is asked for it again when starting a new plan");
+  assert.ok(mkIds(false, "regular").includes("you"),
+    "a genuine first run no longer asks for a name at all");
+  assert.equal(mkIds(true, "regular")[0], "level", "the new-plan wizard does not open on the level step");
+  // Every step a personalised runner sees is a step a first-run runner sees: skipping must only REMOVE.
+  const extra = mkIds(true, "regular").filter((x) => !mkIds(false, "regular").includes(x));
+  assert.deepEqual(extra, [], "skipping the name step invented steps: " + extra.join(", "));
+});
+
+test("BLOCKER: every plan shield is a different colour, keyed on the plan and not on its position", () => {
+  const app = appBlock();
+  // ⚠️ THIS REVERSES A REASON WRITTEN IN THIS FILE, on the owner's instruction. The guard exists so a
+  // cold session does not revert it to grey on the strength of the old comment.
+  assert.match(nocomment(fn("planHue")), /isLive\) return "var\(--accent\)"/,
+    "the active plan is not always the accent, so which plan you are on stops being readable");
+  const hues = (/const PLAN_HUES = \[([^\]]*)\]/.exec(app) || [, ""])[1]!;
+  assert.ok(hues.split(",").filter((x) => x.trim()).length >= 4,
+    "there are too few hues for the plans to look different");
+  assert.ok(!hues.includes("--accent"), "a past plan can wear the active plan's colour");
+  // ⚠️ --eff-* ARE NOT IN THIS PALETTE. Those four answer one question through one table (ruling 7) and
+  // a shield wearing one would state a session effort that is not there.
+  assert.ok(!/--eff-/.test(hues), "the shield palette borrows the session-effort colours");
+  // ⚠️ KEYED ON THE SIGNATURE, NEVER THE INDEX. Delete one plan and every colour below it would shift,
+  // so the shield a runner had learned to recognise would become somebody else's.
+  const ph = nocomment(fn("planHue"));
+  assert.match(ph, /j\.sig/, "the colour is not derived from the plan's own signature");
+  for (const bad of ["index", "idx", "rows.indexOf", "arguments[1]"])
+    assert.ok(!ph.includes(bad), "the colour is derived from " + bad + ", which shifts when a plan is deleted");
+  // Driven: stable, spread, and unaffected by what is around it.
+  // ⚠️ THE TYPE GOES ON THE const, NOT IN A TRAILING `as` ON THE NEXT LINE. TypeScript ends the
+  // statement at the newline and then parses `as (` as a call, which fails with "',' expected".
+  const hue: (j: { sig: string }, live: boolean) => string =
+    new Function("const PLAN_HUES = [" + hues + "];\n" + fn("planHue") + "; return planHue;")();
+  const seen = new Set<string>();
+  for (let i = 0; i < 40; i++) seen.add(hue({ sig: "plan-" + i + "-xyz" }, false));
+  assert.ok(seen.size >= 4, "40 plans produced only " + seen.size + " distinct shields");
+  assert.equal(hue({ sig: "abc" }, false), hue({ sig: "abc" }, false), "the same plan is not a stable colour");
+  assert.equal(hue({ sig: "abc" }, true), "var(--accent)", "the active plan is not the accent");
+  // ⚠️ THE INK IS WHITE ON A FIXED DARK BASE, which is the only treatment that carries six hues. The
+  // old one painted var(--accent-ink) on the raw token, and --accent-ink flips with the theme while the
+  // tokens get lighter in dark -- so darkening to fix light mode breaks dark mode. Measured on the
+  // gradient's lightest end: light 2.76 (ease) / 2.94 (build) / 3.16 (base) against a 4.5 floor.
+  const badge = rule(".rp-badge");
+  assert.match(badge, /color:\s*#fff/, "the shield's numerals are not white, so a six-hue set cannot clear the floor");
+  assert.ok(!/var\(--accent-ink\)/.test(badge), "the shield is back on --accent-ink, which flips with the theme");
+  // ⚠️ NOT `var\(--pc[^)]*\)`: --pc is written with a fallback, `var(--pc, var(--accent))`, so a
+  // negated-) class stops inside it. Anchored on the two things that carry the meaning -- the weight
+  // and the fixed base -- with the token named separately.
+  assert.match(badge, /color-mix\(in srgb, var\(--pc,[\s\S]{0,30}55%, #0a1a16\)/,
+    "the shield's ground is not mixed into a fixed dark base at the measured weight");
+  assert.match(badge, /30%, #0a1a16\)/, "the shield's gradient has no darker end");
 });

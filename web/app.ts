@@ -5791,6 +5791,17 @@ html.kbup .club-txc { bottom: var(--kbh, 0px); }
 .rp-name svg { width: 15px; height: 15px; }
 .rp-card.live .rp-live { margin-right: 26px; }
 
+/* ---- Paused ------------------------------------------------------------------------------ */
+.pz-card { border-left: 3px solid var(--accent); }
+.pz-t { font-size: var(--t-section); font-weight: 700; color: var(--ink); margin-top: 2px; }
+.pz-s { font-size: var(--t-label); color: var(--ink-soft); margin-top: 5px; line-height: 1.55; }
+
+/* ---- Holiday / easing -------------------------------------------------------------------- */
+.adj-dates { display: flex; gap: var(--s3); margin: var(--s3) 0; }
+.adj-d { flex: 1 1 0; min-width: 0; display: block; }
+.adj-d span { display: block; font-size: var(--t-label); font-weight: 650; color: var(--ink-soft);
+  margin-bottom: 5px; }
+
 </style>
 </head>
 <body>
@@ -6004,6 +6015,7 @@ const SHOES_KEY = "interun_shoes_v1";
  * its sandbox constants by their real position in the file.
  */
 const JOURNAL_KEY = "interun_journals_v1";
+const ADJUST_KEY = "interun_adjust_v1";
 /**
  * ⚠️ DECLARED HERE WITH THE OTHER STORE KEYS, NOT BESIDE THE CODE THAT USES IT. journalSync runs at boot
  * from inside adoptPlan; its key was first declared five thousand lines later, so the read landed in the
@@ -6412,9 +6424,241 @@ function openProfilePreview(pf, imp) {
     else { PROFILE_CONFIRMED = false; closeProfileEdit(); render(); }
   };
 }
+
+// ============ HOLIDAY, AND NOT FEELING 100% ===============================================
+// Both are the same thing: a WINDOW of dates, and a level of training inside it. Pause was the third
+// member of that family and shipped first; holiday and easing are the same mechanism with different
+// dates and a different level, which is why they are a small addition rather than two more screens.
+//
+// ⚠️⚠️ IT REMOVES SESSIONS AND NEVER REWRITES THEM, and that is a deliberate limit rather than a
+// shortcut. Runna's four levels map onto pure removal exactly: "easy, long and hard runs" removes
+// nothing, "easy and speed" drops the long run, "easy runs only" drops the quality sessions and the
+// long run, and "not planning on running" drops every run. Replacing a threshold session with an easy
+// run of the same length would mean building a session in the app layer and keeping PLAN's display
+// summary in step with RAW's steps by hand -- two shapes, and CLAUDE.md records what that costs.
+// ⚠️ SO ONE THING RUNNA DOES IS NOT DONE: its "easy runs only" also strips the pace targets from the
+// runs that remain. Ours leaves them, and the copy does not claim otherwise.
+const ADJ_MODES = [
+  { id: "full", t: "Easy, long and hard runs", s: "Everything as planned — just tell me it is happening" },
+  { id: "easyspeed", t: "Easy and speed", s: "Keep the shorter sessions, drop the long run" },
+  { id: "easy", t: "Easy runs only", s: "Drop the hard sessions and the long run" },
+  { id: "none", t: "I am not planning on running", s: "Clear the running out of these days entirely" },
+];
+function loadAdjust() {
+  try { const a = JSON.parse(localStorage.getItem(ADJUST_KEY) || "[]"); return Array.isArray(a) ? a : []; }
+  catch (e) { return []; }
+}
+function saveAdjust(rows) {
+  // ⚠️ PAST WINDOWS ARE DROPPED ON EVERY WRITE, not kept for a history nobody asked for. An adjustment
+  // is applied to the plan at adopt time, so a window that has ended can only make the next rebuild
+  // slower and the store bigger. The runs done during it are in the logbook, which is the record.
+  const today = todayIso();
+  const live = rows.filter((r) => r && r.to && r.to >= today).slice(0, 12);
+  try { localStorage.setItem(ADJUST_KEY, JSON.stringify(live)); } catch (e) {}
+}
+/** The adjustment covering a date, or null. The newest wins where two overlap. */
+function adjustFor(iso, rows) {
+  const list = rows || loadAdjust();
+  for (const r of list) if (r && r.from && r.to && iso >= r.from && iso <= r.to) return r;
+  return null;
+}
+const ADJ_QUALITY = { threshold: 1, vo2: 1, "race-specific": 1 };
+const ADJ_RUN = { easy: 1, long: 1, recovery: 1, threshold: 1, vo2: 1, strides: 1, "race-specific": 1 };
+/**
+ * Does this adjustment remove this session?
+ * ⚠️ THE GOAL RACE IS NEVER REMOVED, WHATEVER THE LEVEL. It is the thing the whole block exists to
+ * reach, and a holiday that quietly deletes it would be the app throwing away the plan rather than
+ * adapting it. If the race falls inside the window that is a conversation, not a deletion.
+ * ⚠️ AND A NON-RUN GOES ONLY IF THE RUNNER ASKED. Strength and mobility are already optional, and
+ * Runna's own sheet makes removing them a separate switch rather than part of the level.
+ */
+function adjDrops(a, s) {
+  if (!a || !s) return false;
+  if (s.type === "race") return false;
+  if (!ADJ_RUN[s.type]) return !!a.dropNonRun;
+  if (a.mode === "none") return true;
+  if (a.mode === "easy") return !!ADJ_QUALITY[s.type] || s.type === "long";
+  if (a.mode === "easyspeed") return s.type === "long";
+  return false;
+}
+/**
+ * Apply the stored windows to the plan that has just been adopted.
+ *
+ * ⚠️ INSIDE adoptPlan AND BEFORE THE TWO SYNCS. A rebuild happens on every launch (recompute runs at
+ * module level), so an adjustment applied anywhere else would be undone by the next one -- and running
+ * it AFTER syncNativeReminders/syncWatch would leave iOS holding reminders for sessions the runner has
+ * just told us they will not be doing, and the wrist holding them too. That is an ORDERING claim.
+ *
+ * ⚠️ RAW IS THE TRUTH AND PLAN IS A PROJECTION OF IT, so both are filtered and PLAN's three derived
+ * week figures are re-derived FROM RAW. Filtering only PLAN leaves the wrist and the session sheet
+ * still prescribing the work (they read RAW); filtering only RAW leaves the chart and the week
+ * summaries showing a full week the runner is away for.
+ *
+ * ⚠️ THE WEEK'S MILEAGE COMES FROM THE ENGINE'S OWN weekVolumeMeters, NOT FROM A SUM WRITTEN HERE.
+ * src/domain/steps.ts is the single definition and its own note records what a second one cost:
+ * an adjusted week measured on a different scale from every other week in the same plan.
+ */
+function applyAdjustments() {
+  const rows = loadAdjust();
+  if (!rows.length || !PLAN || !PLAN.weeks || !RAW || !RAW.weeks) return 0;
+  let removed = 0;
+  PLAN.weeks.forEach((wk, wi) => {
+    const raw = RAW.weeks[wi];
+    let touched = false;
+    for (let d = 0; d < 7; d++) {
+      const iso = isoAdd(wk.startIso, d).toISOString().slice(0, 10);
+      const a = adjustFor(iso, rows);
+      if (!a) continue;
+      // ⚠️ THE SESSION'S OWN DAY, NOT effDay. A session the runner has MOVED into the window is one
+      // they decided to put there, after the window was set; honouring the move is the right answer and
+      // reading effDay here would silently delete it.
+      const before = wk.sessions.length;
+      wk.sessions = wk.sessions.filter((x) => !(x.dayIndex === d && adjDrops(a, x)));
+      if (raw) raw.sessions = raw.sessions.filter((x) => !(x.dayOfWeek === d && adjDrops(a, x)));
+      if (wk.sessions.length !== before) { touched = true; removed += before - wk.sessions.length; }
+    }
+    if (touched && raw) {
+      raw.plannedDistanceMeters = RC.weekVolumeMeters(raw.sessions);
+      wk.distanceKm = Math.round(raw.plannedDistanceMeters / 100) / 10;
+      wk.quality = raw.sessions.filter((x) => ADJ_QUALITY[x.type]).length;
+      raw.qualitySessionCount = wk.quality;
+      const lr = raw.sessions.find((x) => x.type === "long");
+      wk.longRunMin = lr ? Math.round((lr.estimatedDurationSeconds || 0) / 60) : 0;
+    }
+  });
+  return removed;
+}
+
+
+// ---- the two entry points ------------------------------------------------------------------
+// One sheet builder, two headings. A holiday is a window you pick; feeling under the weather is a
+// window that starts today. Everything else about them is identical, so they share the code -- two
+// builders over one mechanism is how the two come to behave differently for no reason.
+let ADJ_DRAFT = null;
+function openAdjustSheet(kind) {
+  const today = todayIso();
+  ADJ_DRAFT = kind === "holiday"
+    ? { kind: "holiday", from: isoAdd(today, 14).toISOString().slice(0, 10),
+        to: isoAdd(today, 20).toISOString().slice(0, 10), mode: "easy", dropNonRun: false }
+    // ⚠️ EASING STARTS TODAY AND RUNS TO THE END OF NEXT WEEK BY DEFAULT. "Not feeling 100%" is about
+    // now, and a date picker for the start of it is a question with one sensible answer.
+    : { kind: "ease", from: today, to: isoAdd(today, 6).toISOString().slice(0, 10),
+        mode: "easy", dropNonRun: false };
+  renderAdjustSheet();
+}
+function renderAdjustSheet() {
+  const a = ADJ_DRAFT;
+  if (!a) return;
+  const hol = a.kind === "holiday";
+  const nights = Math.max(1, Math.round(
+    (isoAdd(a.to, 0).getTime() - isoAdd(a.from, 0).getTime()) / 86400000) + 1);
+  const affected = adjustPreviewCount(a);
+  const mode = (m) =>
+    '<button class="po-opt' + (a.mode === m.id ? " rec" : "") + '" data-adjmode="' + m.id + '">' +
+    (a.mode === m.id ? '<span class="po-rec">Chosen</span>' : "") +
+    '<span class="po-t">' + m.t + '</span><span class="po-b">' + m.s + '</span></button>';
+  ensureSheet(); SHEET_CTX = null;
+  $("sheetBody").innerHTML =
+    '<div class="eyebrow">' + (hol ? "Going away" : "Not feeling 100%") + '</div>' +
+    '<h3 class="sheet-h">' + (hol ? "When are you away?" : "How long do you want to take it easy?") + '</h3>' +
+    '<div class="adj-dates">' +
+      '<label class="adj-d"><span>' + (hol ? "First day away" : "From") + '</span>' +
+        '<input class="sel" id="adjFrom" type="date" value="' + esc(a.from) + '" min="' + esc(todayIso()) + '"></label>' +
+      '<label class="adj-d"><span>' + (hol ? "Last day away" : "Until") + '</span>' +
+        '<input class="sel" id="adjTo" type="date" value="' + esc(a.to) + '" min="' + esc(a.from) + '"></label>' +
+    '</div>' +
+    '<div class="po-verdict"><b>' + nights + (nights === 1 ? " day" : " days") +
+      (hol ? " away" : " easier") + '</b><span>' +
+      (affected === 0
+        ? "There is nothing scheduled in those days as it is, so this will not change anything."
+        : affected + (affected === 1 ? " session" : " sessions") + " would come out of your plan.") +
+      '</span></div>' +
+    '<h3 class="sheet-h">' + (hol ? "How do you want to train while you are there?" : "What do you want to keep?") + '</h3>' +
+    ADJ_MODES.map(mode).join("") +
+    '<button class="mp-row" data-adjnonrun="1" aria-pressed="' + (!!a.dropNonRun) + '">' +
+      '<span class="mp-mid"><span class="mp-t">Also remove strength and mobility</span>' +
+      '<span class="mp-s">' + (a.dropNonRun ? "Yes — clear those out too" : "No — leave them in") + '</span></span>' +
+      '<span class="mp-chev" aria-hidden="true">' + (a.dropNonRun ? "\u2713" : "\u2014") + '</span></button>' +
+    '<div class="act-pair"><button class="ap-no" id="adjCancel">Cancel</button>' +
+    '<button class="ap-yes" id="adjSave">' + (hol ? "Add this holiday" : "Ease it off") + '</button></div>' +
+    '<p class="mp-note">Nothing is saved until you tap that. Your plan keeps its target date either ' +
+    'way — this takes sessions out of those days rather than moving the whole block.</p>';
+  $("adjCancel").onclick = () => { ADJ_DRAFT = null; closeSheet(); };
+  $("adjSave").onclick = saveAdjustDraft;
+  $("adjFrom").onchange = () => {
+    ADJ_DRAFT.from = $("adjFrom").value || ADJ_DRAFT.from;
+    // ⚠️ THE END FOLLOWS THE START RATHER THAN BEING REFUSED. A runner moving a holiday later would
+    // otherwise have to fix an end date that is now before it, and be told off for a state the app
+    // put them in.
+    if (ADJ_DRAFT.to < ADJ_DRAFT.from) ADJ_DRAFT.to = ADJ_DRAFT.from;
+    renderAdjustSheet();
+  };
+  $("adjTo").onchange = () => {
+    ADJ_DRAFT.to = $("adjTo").value || ADJ_DRAFT.to;
+    if (ADJ_DRAFT.to < ADJ_DRAFT.from) ADJ_DRAFT.to = ADJ_DRAFT.from;
+    renderAdjustSheet();
+  };
+  document.querySelectorAll("[data-adjmode]").forEach((b) => {
+    b.onclick = () => { ADJ_DRAFT.mode = b.dataset.adjmode; renderAdjustSheet(); };
+  });
+  const nr = document.querySelector("[data-adjnonrun]");
+  if (nr) nr.onclick = () => { ADJ_DRAFT.dropNonRun = !ADJ_DRAFT.dropNonRun; renderAdjustSheet(); };
+  $("sheetOv").classList.add("on");
+}
+/**
+ * How many sessions this window would remove, counted against the plan as it stands.
+ * ⚠️ COUNTED, NOT ESTIMATED. The sheet says a number the runner is agreeing to, and the only honest way
+ * to produce it is to ask the same predicate the application will ask.
+ */
+function adjustPreviewCount(a) {
+  if (!a || !PLAN || !PLAN.weeks) return 0;
+  let n = 0;
+  for (const wk of PLAN.weeks) {
+    for (let d = 0; d < 7; d++) {
+      const iso = isoAdd(wk.startIso, d).toISOString().slice(0, 10);
+      if (iso < a.from || iso > a.to) continue;
+      n += wk.sessions.filter((x) => x.dayIndex === d && adjDrops(a, x)).length;
+    }
+  }
+  return n;
+}
+// ⚠️ THE SNAPSHOT IS THE WHOLE STORE, because applying an adjustment removes sessions from the plan and
+// the only way back is to rebuild without it. Undo therefore restores the store and rebuilds, exactly
+// as the pause path restores the profile and rebuilds.
+function saveAdjustDraft() {
+  const a = ADJ_DRAFT;
+  if (!a) return;
+  const before = JSON.stringify(loadAdjust());
+  const rows = loadAdjust();
+  rows.unshift({ id: "adj-" + Date.now(), kind: a.kind, from: a.from, to: a.to,
+    mode: a.mode, dropNonRun: !!a.dropNonRun });
+  saveAdjust(rows);
+  const ticks = todayTicks();
+  try { recompute(); } catch (e) {
+    try { localStorage.setItem(ADJUST_KEY, before); } catch (e2) {}
+    try { recompute(); } catch (e2) {}
+    toast("That did not work \u2014 your plan is unchanged."); return;
+  }
+  computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
+  seedDone(); restoreTicks(ticks);
+  ADJ_DRAFT = null;
+  closeSheet();
+  const word = a.kind === "holiday" ? "Holiday added." : "Eased off.";
+  toastUndo(word, () => {
+    const t2 = todayTicks();
+    try { localStorage.setItem(ADJUST_KEY, before); } catch (e) {}
+    try { recompute(); } catch (e) {}
+    computeToday(); seedDone(); restoreTicks(t2); render();
+  });
+  render();
+}
+
 function adoptPlan(out) {
   PLAN = out.plan; RAW = out.raw; FITNESS = out.fitness; CLASS = out.classification; MASTERS = out.masters;
   normalizeWeekStarts();
+  // ⚠️ BEFORE THE TWO SYNCS, DELIBERATELY. Run after them, iOS would hold reminders for sessions the
+  // runner has just told us they will not be doing, and the wrist would hold them too.
+  try { applyAdjustments(); } catch (e) {}
   try { syncNativeReminders(); } catch (e) {}
   try { syncWatch(); } catch (e) {}
   // ⚠️ THE BLOCK IS RECORDED HERE, INSIDE adoptPlan, for the reason this function's own note gives about
@@ -6929,7 +7173,7 @@ function viewToday() {
         .filter(Boolean).join(" \u00b7 "),
       status: "next", colour: "var(--eff-" + (nxt.sess.effort || "easy") + ")",
       open: { week: curWeek().index, id: nxt.sess.id } }) + '</div>' : "";
-  return mirror + banner + todayAttention() + greeting + weekStrip() +
+  return mirror + banner + pausedCard() + todayAttention() + greeting + weekStrip() +
     (mirror || liveRunning() ? "" : uiDecisionHero(dec)) +
     // ⚠️ DIRECTLY UNDER THE HERO, AND THE FIRST PLACEMENT WAS DEAD CODE. It was appended to a local
     // cta string that this screen does not render — the hero builds its own button through
@@ -11082,14 +11326,16 @@ function managePlanHtml() {
   return '<div class="eyebrow">Manage plan</div>' +
     '<h3 class="sheet-h">' + esc(PLAN.goal.race) + ' · ' + esc(PLAN.goal.raceDate) + '</h3>' +
     '<div class="mp-list">' +
-      row("pause", "Pause my plan", "Away, ill, or just need to stop for a while") +
+      row("pause", "Pause my plan", "Stop completely for a while and pick up later") +
+      row("holiday", "Going away", "Keep training your own way while you are there") +
+      row("ease", "Not feeling 100%", "Take the hard edges off the next few sessions") +
       row("prefs", "Training preferences", "Days, mileage, long-run day, how hard it feels") +
       row("new", "Start a new plan", "A different goal or a different date") +
       row("plans", "Your plans", planListSub()) +
     '</div>' +
-    '<p class="mp-note">A holiday you can plan in advance, and a &ldquo;not feeling 100%&rdquo; week ' +
-    'that eases the next few sessions, are next. Both use the same machinery as Pause, so they are a ' +
-    'small addition rather than a new screen.</p>';
+    '<p class="mp-note">Pausing stops the plan and picks it up later. Going away and easing off leave ' +
+    'your target date alone and take sessions out of the days you choose \u2014 so the block keeps its ' +
+    'shape and you are not carrying work you were never going to do.</p>';
 }
 
 // ---- PAUSE ---------------------------------------------------------------------------------
@@ -11151,7 +11397,9 @@ function pausePlanHtml() {
   // runDateLabelIso splits a string on "-" and a Date stringifies to something else entirely. Found by
   // driving the button, not by reading the code.
   const moved = raceIso ? isoAdd(raceIso, days).toISOString().slice(0, 10) : "";
-  const weeksLeft = Math.max(0, PLAN.weeks.length - 1 - CURRENT_WEEK);
+  // The day the plan picks up again — the day AFTER the last day away, which is what the runner means
+  // by "how long will you be away".
+  const resumeIso = isoAdd(todayIso(), days).toISOString().slice(0, 10);
   // ⚠️ WHAT EACH OPTION COSTS IS COMPUTED, NOT DESCRIBED. Runna's sheet quotes real end dates, and a
   // sheet that says "your plan will end later" without saying when is asking somebody to agree to a
   // number they cannot see.
@@ -11166,18 +11414,18 @@ function pausePlanHtml() {
   const shift = t.id === "nudge"
     ? ""
     : opt("shift", true, "Move my target date back",
-        "Everything you have not done yet stays in the plan; the whole block simply lands " + days +
-        (days === 1 ? " day" : " days") + " later." +
+        "Your plan stops now and picks up on <b>" + esc(runDateLabelIso(resumeIso)) + "</b>. Nothing is " +
+        "scheduled in between, and the whole block lands " + pauseDaysLabel(days) + " later." +
         (moved ? " Your target date becomes <b>" + esc(runDateLabelIso(moved)) + "</b>." : ""));
   // Keeping the date is a real answer -- a booked race does not move -- so it is always offered and
   // never recommended once the break is long enough to have cost something.
   const keep = opt("keep", t.id === "nudge" ? false : false, "Keep my target date",
-    "Rebuild from today to the date you already have. There " +
-    (weeksLeft === 1 ? "is 1 week" : "are " + weeksLeft + " weeks") +
-    " left, so the block gets shorter rather than later." +
+    "Nothing is scheduled until <b>" + esc(runDateLabelIso(resumeIso)) + "</b>, and the plan then runs to " +
+    "the date you already have — so it gets shorter rather than later." +
     (t.id === "reentry" ? " With a break this long the rebuild also starts you further back." : ""));
-  const nothing = opt("none", t.id === "nudge", "Just carry on",
-    "Nothing changes. The sessions you missed stay missed and you pick up with today's.");
+  const nothing = opt("none", t.id === "nudge", "Leave my plan alone",
+    "Nothing is removed and nothing moves. The sessions you are away for stay in the plan and you " +
+    "pick up wherever you are when you get back.");
   return '<div class="eyebrow">Pause my plan</div>' +
     '<h3 class="sheet-h">How long will you be away?</h3>' +
     '<div class="po-days">' +
@@ -11206,9 +11454,25 @@ function pauseDaysLabel(d) {
 // runner's own reschedules are already gone from disk.
 function applyPause(kind) {
   const days = PAUSE_DAYS;
-  const before = { raceDate: profile.raceDate, returning: profile.returning, overrides: JSON.stringify(state.dayOverride || {}) };
+  const before = { raceDate: profile.raceDate, returning: profile.returning,
+    startDateIso: profile.startDateIso, overrides: JSON.stringify(state.dayOverride || {}) };
   if (kind === "none") { closeSheet(); toast("Nothing changed — pick up with today's session."); return; }
   const ticks = todayTicks();
+  // ⚠️⚠️ THE PAUSE HAS TO EMPTY THE WINDOW, AND THE FIRST VERSION DID NOT. It moved the target date and
+  // rebuilt, which grew the block by the right number of weeks -- and left the plan STARTING IN THE
+  // PAST, so the days the runner had just told us they would be away were still full of sessions.
+  // Reported within the hour of shipping, and reproduced exactly: pausing 28 days moved the race from
+  // 14 Feb to 14 Mar and grew the plan 25 -> 29 weeks while leaving **21 runs inside the 28-day pause
+  // window** and the next fortnight byte-identical to before.
+  // ⚠️ THE LEVER IS profile.startDateIso, AND IT ONLY WORKS BECAUSE applyProfile HONOURS A FUTURE ONE:
+  // its clamp is pf.startDateIso >= todayIso() ? pf.startDateIso : todayIso(), so it refuses a date
+  // in the PAST and accepts one ahead. Setting it to the day the pause ends is what makes the gap real.
+  // ⚠️ AND IT IS SET FOR "keep" AS WELL AS "shift". Keeping the target date with no start date means
+  // rebuilding from today into an unchanged deadline -- which is the same defect wearing the other
+  // option's clothes.
+  if (kind === "shift" || kind === "keep") {
+    profile.startDateIso = isoAdd(todayIso(), days).toISOString().slice(0, 10);
+  }
   if (kind === "shift" && profile.raceDate) profile.raceDate = isoAdd(profile.raceDate, days).toISOString().slice(0, 10);
   // Over a month off is this codebase's own long-layoff line, and the generator's only lever for it is
   // the returning flag: measured, it opens week one 6% smaller, shortens the first long run by a
@@ -11224,6 +11488,7 @@ function applyPause(kind) {
   toastUndo(kind === "shift" ? "Target date moved back " + pauseDaysLabel(days) + "." : "Plan rebuilt to your existing date.", () => {
     const t2 = todayTicks();
     profile.raceDate = before.raceDate; profile.returning = before.returning;
+    profile.startDateIso = before.startDateIso;
     try { state.dayOverride = JSON.parse(before.overrides); } catch (e) {}
     try { recompute(); } catch (e) {}
     computeToday(); seedDone(); restoreTicks(t2); saveProfileStore(); render();
@@ -11275,6 +11540,8 @@ function openManagePlan() {
 }
 function manageAction(id) {
   if (id === "pause") { PAUSE_DAYS = 7; openPauseSheet(); return; }
+  if (id === "holiday") { openAdjustSheet("holiday"); return; }
+  if (id === "ease") { openAdjustSheet("ease"); return; }
   if (id === "prefs") {
     // ⚠️ THE SCOPED PROFILE EDIT, WHICH ALREADY EXISTS. Training preferences in this app ARE the
     // rhythm questions -- days a week, weekly mileage, long-run day, start date -- and there is a
@@ -11418,6 +11685,54 @@ function reusePlan(sig) {
       render();
       toast(planName(j) + " is your plan again.");
     });
+}
+
+
+// ⚠️ A GAP WITH NO EXPLANATION IS THE OTHER HALF OF THE PAUSE DEFECT. Emptying the window was the fix
+// he reported; leaving Today blank and jumping the week band three weeks forward is what that fix
+// produces on its own. Measured before this card existed: TODAY_IN_PLAN false, 1,748 characters on
+// screen, and not one of them the word "paused".
+//
+// ⚠️ AND IT CARRIES THE WAY BACK. There was no way to end a pause early at all -- pause four weeks,
+// come back after one, and the app had nothing to offer but three more weeks of nothing. A state you
+// can enter and cannot leave is worse than one that is merely missing.
+//
+// ⚠️ DERIVED, NOT STORED. A future profile.startDateIso IS the pause -- applyProfile honours one ahead
+// and clamps one behind -- so there is nothing to keep in step and nothing to go stale. A pause store
+// would be a second answer to "are they away", and the two would disagree the first time somebody
+// edited their start date on the profile screen instead.
+function pausedCard() {
+  const from = profile.startDateIso;
+  if (!from || from <= todayIso()) return "";
+  const days = Math.max(1, Math.round(
+    (isoAdd(from, 0).getTime() - isoAdd(todayIso(), 0).getTime()) / 86400000));
+  return '<div class="card pz-card">' +
+    '<div class="eyebrow">Paused</div>' +
+    '<div class="pz-t">Your plan picks up on ' + esc(runDateLabelIso(from)) + '</div>' +
+    '<div class="pz-s">' + (days === 1 ? "One more day" : days + " more days") +
+    ' \u2014 nothing is scheduled until then. Log anything you do run and it still counts.</div>' +
+    '<button class="ctrl" id="pzResume">I am back \u2014 start now</button>' +
+    '</div>';
+}
+// ⚠️ COMING BACK EARLY IS THE SAME REBUILD AS EVERY OTHER ON THIS SCREEN, and it keeps whatever target
+// date the pause left. Clearing the start date is what un-pauses: applyProfile then clamps it to today.
+function resumeFromPause() {
+  const before = profile.startDateIso;
+  const ticks = todayTicks();
+  profile.startDateIso = "";
+  try { recompute(); } catch (e) {
+    profile.startDateIso = before;
+    toast("That did not work \u2014 nothing changed."); return;
+  }
+  computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
+  seedDone(); restoreTicks(ticks); saveProfileStore();
+  render();
+  toastUndo("Back on your plan from today.", () => {
+    const t2 = todayTicks();
+    profile.startDateIso = before;
+    try { recompute(); } catch (e) {}
+    computeToday(); seedDone(); restoreTicks(t2); saveProfileStore(); render();
+  });
 }
 
 function viewPlan() {
@@ -36292,6 +36607,7 @@ function wire() {
   // fault that made data-wk mean two things and killed the session builder mid-use.
   const vw = $("view");
   if (vw) vw.querySelectorAll("[data-pact]").forEach((b) => { b.onclick = () => planAction(b.dataset.pact); });
+  if ($("pzResume")) $("pzResume").onclick = resumeFromPause;
   document.querySelectorAll("[data-mp]").forEach((b) => { b.onclick = () => manageAction(b.dataset.mp); });
   document.querySelectorAll("[data-pausedays]").forEach((b) => {
     b.onclick = () => { PAUSE_DAYS = Number(b.dataset.pausedays) || 7; openPauseSheet(); };

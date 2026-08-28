@@ -75,7 +75,7 @@ test("BLOCKER: every control in the menu reaches something that exists", () => {
   // The menu's own rows.
   const menu = nocomment(fn("managePlanHtml"));
   const rows = [...menu.matchAll(/row\("([a-z]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(rows, ["pause", "prefs", "new", "plans"], "the menu row set changed");
+  assert.deepEqual(rows, ["pause", "holiday", "ease", "prefs", "new", "plans"], "the menu row set changed");
   const ma = nocomment(fn("manageAction"));
   for (const r of rows) assert.ok(new RegExp('id === "' + r + '"').test(ma), "manageAction has no branch for " + r);
 
@@ -150,9 +150,14 @@ test("BLOCKER: applying a pause goes through recompute and never assigns PLAN by
   // ⚠️ isoAdd RETURNS A DATE. Every use of it must be converted, or the value assigned into
   // profile.raceDate is a Date and the whole path throws inside its own try/catch — which is exactly
   // what happened, with the sheet simply staying open and nothing to see.
-  for (const src of [ap, nocomment(fn("pausePlanHtml"))])
-    for (const m of src.matchAll(/isoAdd\([^)]*\)(\.toISOString\(\)\.slice\(0, 10\))?/g))
-      assert.ok(m[1], "an isoAdd result is used without .toISOString().slice(0, 10): " + m[0]);
+  // ⚠️ THE CLAIM IS THAT THE RESULT IS TREATED AS A DATE, NOT THAT IT IS ALWAYS STRINGIFIED. Both
+  // `.toISOString().slice(0, 10)` and `.getTime()` are correct uses; the defect is a BARE result, which
+  // is what got assigned into profile.raceDate. My first version forbade `.getTime()` too and failed on
+  // correct code — and its `[^)]*` could not see past a nested `todayIso()`, so the message it printed
+  // was a truncated call rather than the offending one.
+  for (const src of [ap, nocomment(fn("pausePlanHtml")), nocomment(fn("pausedCard"))])
+    for (const m of src.matchAll(/isoAdd\((?:[^()]|\([^()]*\))*\)(\s*\.)?/g))
+      assert.ok(m[1], "an isoAdd result is used bare, as if it were a string: " + m[0]);
 });
 
 test("BLOCKER: nothing is applied without the runner choosing it", () => {
@@ -305,4 +310,171 @@ test("BLOCKER: the plans screen introduces no second colour vocabulary, and ever
   assert.match(nocomment(fn("managePlanHtml")), /row\("plans"/, "the menu lost the plans row");
   assert.match(nocomment(fn("manageAction")), /state\.screen = "plans"/, "the plans row goes nowhere");
   assert.match(nocomment(appBlock()), /state\.screen === "plans"/, "there is no route for the plans screen");
+});
+
+// ---------------------------------------------------------------------------------------------
+// The pause defect he reported, and the holiday / easing family built on the same mechanism
+// ---------------------------------------------------------------------------------------------
+
+test("BLOCKER: a pause actually empties the window it was given", () => {
+  // ⚠️⚠️ THE DEFECT HE REPORTED WITHIN THE HOUR OF SHIPPING. The first version moved the target date and
+  // rebuilt, which grew the block by the right number of weeks — and left the plan STARTING IN THE PAST,
+  // so the days he had just said he would be away were still full of sessions. Reproduced exactly:
+  // pausing 28 days moved the race 14 Feb → 14 Mar and grew the plan 25 → 29 weeks while leaving
+  // **21 runs inside the 28-day window** and the next fortnight byte-identical.
+  const ap = nocomment(fn("applyPause"));
+  assert.match(ap, /profile\.startDateIso = isoAdd\(todayIso\(\), days\)\.toISOString\(\)\.slice\(0, 10\)/,
+    "the pause no longer moves the plan's start date, so the window stays full");
+  // ⚠️ FOR BOTH OPTIONS. Keeping the target date with no start date is the same defect wearing the
+  // other option's clothes.
+  assert.match(ap, /kind === "shift" \|\| kind === "keep"/, "only one of the two options empties the window");
+  // And the undo must put the start date back, or a pause cannot be taken off.
+  assert.match(ap, /profile\.startDateIso = before\.startDateIso/, "undo does not restore the start date");
+  assert.match(ap, /startDateIso: profile\.startDateIso/, "the snapshot does not include the start date");
+  // ⚠️ IT ONLY WORKS BECAUSE applyProfile HONOURS A FUTURE START DATE — its clamp refuses one in the
+  // past and accepts one ahead. If that ever changes, the pause silently stops emptying anything.
+  assert.match(nocomment(appBlock()),
+    /pf\.startDateIso && pf\.startDateIso >= todayIso\(\)\) \? pf\.startDateIso : todayIso\(\)/,
+    "applyProfile's start-date clamp changed; the pause depends on a future date being honoured");
+});
+
+test("BLOCKER: a paused plan says so, and can be un-paused", () => {
+  // ⚠️ A GAP WITH NO EXPLANATION IS THE OTHER HALF OF THAT DEFECT. Measured before this card existed:
+  // TODAY_IN_PLAN false, 1,748 characters on Today, and not one of them the word "paused".
+  const c = nocomment(fn("pausedCard"));
+  assert.match(c, /profile\.startDateIso/, "the card no longer derives the pause from the start date");
+  assert.match(c, /Paused/, "the card no longer says the plan is paused");
+  assert.match(c, /picks up on/, "the card no longer says when the plan resumes");
+  assert.match(c, /pzResume/, "the card no longer carries a way back");
+  // ⚠️ DERIVED, NOT STORED. A pause store would be a second answer to "are they away", and the two
+  // would disagree the first time somebody edited their start date on the profile screen instead.
+  const app = nocomment(appBlock());
+  const keys = [...app.matchAll(/"(interun_[a-z0-9_]+)"/g)].map((m) => m[1]!);
+  assert.ok(!keys.some((k) => /paus/.test(k)), "a pause store appeared: " + keys.filter((k) => /paus/.test(k)));
+  // It is rendered by Today, and un-pausing is the same rebuild as every other.
+  assert.match(app, /banner \+ pausedCard\(\)/, "Today does not render the paused card");
+  const r = nocomment(fn("resumeFromPause"));
+  assert.match(r, /profile\.startDateIso = ""/, "un-pausing no longer clears the start date");
+  // ⚠️ COUNTED, NOT MATCHED — the same trap applyPause's restoreTicks guard already paid for. There are
+  // two rebuild paths in here, the un-pause and its undo, so a bare /recompute\(\)/ passed with the
+  // un-pause's removed: watched escaping.
+  assert.equal([...r.matchAll(/recompute\(\)/g)].length, 2,
+    "un-pausing has " + [...r.matchAll(/recompute\(\)/g)].length + " rebuilds; the action and its undo each need one");
+  assert.match(r, /seedDone\(\); restoreTicks\(/, "today's ticks are not restored around seedDone");
+  assert.match(app, /\$\("pzResume"\)\.onclick = resumeFromPause/, "the way back is not wired");
+});
+
+test("BLOCKER: the adjustment windows are one store applied in one place, before the syncs", () => {
+  const app = nocomment(appBlock());
+  // ⚠️ INSIDE adoptPlan. A rebuild happens on every launch (recompute runs at module level), so an
+  // adjustment applied anywhere else would be undone by the next one.
+  const adopt = nocomment(fn("adoptPlan"));
+  assert.match(adopt, /applyAdjustments\(\)/, "the adjustments are no longer applied when a plan is adopted");
+  // ⚠️ AND BEFORE THE TWO SYNCS — an ORDERING claim. Run after them, iOS holds reminders for sessions
+  // the runner has just said they will not do, and the wrist holds them too.
+  const a = adopt.indexOf("applyAdjustments()");
+  const rem = adopt.indexOf("syncNativeReminders()");
+  const wat = adopt.indexOf("syncWatch()");
+  assert.ok(a >= 0 && rem >= 0 && wat >= 0, "adoptPlan lost one of its three landmarks");
+  assert.ok(a < rem && a < wat, "the adjustments are applied after the reminders or the watch are told");
+  assert.equal([...app.matchAll(/applyAdjustments\(\)/g)].length, 2,
+    "applyAdjustments has callers beyond its definition and adoptPlan");
+
+  // ⚠️ RAW IS THE TRUTH AND PLAN IS A PROJECTION. Filtering only PLAN leaves the wrist and the session
+  // sheet still prescribing the work; filtering only RAW leaves the chart showing a full week.
+  const ap = nocomment(fn("applyAdjustments"));
+  assert.match(ap, /wk\.sessions = wk\.sessions\.filter/, "PLAN's sessions are no longer filtered");
+  assert.match(ap, /raw\.sessions = raw\.sessions\.filter/, "RAW's sessions are no longer filtered");
+  // ⚠️ AND THE WEEK'S MILEAGE COMES FROM THE ENGINE'S OWN DEFINITION. src/domain/steps.ts records what a
+  // second one cost: an adjusted week measured on a different scale from every other week in its plan.
+  assert.match(ap, /RC\.weekVolumeMeters\(raw\.sessions\)/, "the week's mileage is being re-summed here");
+  assert.match(nocomment(readFileSync(new URL("../web/entry.ts", import.meta.url), "utf8")),
+    /export \{ sessionVolumeMeters, weekVolumeMeters \}/, "the engine's volume definition is no longer exported");
+  // ⚠️ THE SESSION'S OWN DAY, NOT effDay. A session the runner MOVED into the window is one they put
+  // there after the window was set, and reading effDay here would silently delete it.
+  assert.ok(!/effDay\(/.test(ap), "the adjustment reads effDay and would delete a session the runner moved in");
+});
+
+test("BLOCKER: the four levels remove exactly what they claim, and never the race", () => {
+  // Driven against the real predicate, because the copy on each option is a promise about it.
+  const src = fn("adjDrops") + "\n" +
+    'const ADJ_QUALITY = { threshold: 1, vo2: 1, "race-specific": 1 };\n' +
+    'const ADJ_RUN = { easy: 1, long: 1, recovery: 1, threshold: 1, vo2: 1, strides: 1, "race-specific": 1 };';
+  const drops = new Function(src + "; return adjDrops;")() as (a: unknown, s: unknown) => boolean;
+  const S = (type: string) => ({ type });
+  const W = (mode: string, dropNonRun = false) => ({ mode, dropNonRun });
+  const EXPECT: Record<string, string[]> = {
+    full: [],
+    easyspeed: ["long"],
+    easy: ["long", "threshold", "vo2", "race-specific"],
+    none: ["easy", "long", "recovery", "threshold", "vo2", "strides", "race-specific"],
+  };
+  const ALL = ["easy", "long", "recovery", "threshold", "vo2", "strides", "race-specific"];
+  for (const [mode, gone] of Object.entries(EXPECT))
+    for (const t of ALL)
+      assert.equal(drops(W(mode), S(t)), gone.includes(t),
+        mode + " " + (gone.includes(t) ? "keeps" : "removes") + " a " + t + " session and should not");
+  // ⚠️ THE GOAL RACE IS NEVER REMOVED AT ANY LEVEL. It is what the whole block exists to reach, and a
+  // holiday that quietly deleted it would be the app throwing the plan away rather than adapting it.
+  for (const mode of Object.keys(EXPECT))
+    assert.equal(drops(W(mode, true), S("race")), false, mode + " removes the goal race");
+  // ⚠️ AND A NON-RUN GOES ONLY IF THE RUNNER ASKED — a separate switch, as Runna's own sheet has it.
+  for (const t of ["strength", "mobility", "cross-training"]) {
+    assert.equal(drops(W("none"), S(t)), false, "a " + t + " session goes without being asked for");
+    assert.equal(drops(W("full", true), S(t)), true, "asking to remove " + t + " does nothing");
+  }
+  // The mode list the sheet offers is exactly the set the predicate understands.
+  const app = appBlock();
+  const modes = [...app.slice(app.indexOf("const ADJ_MODES ="), app.indexOf("];", app.indexOf("const ADJ_MODES =")))
+    .matchAll(/id: "([a-z]+)"/g)].map((m) => m[1]!);
+  assert.deepEqual(modes.sort(), Object.keys(EXPECT).sort(), "the offered modes and the predicate disagree");
+});
+
+test("BLOCKER: the preview counts with the same predicate the application uses, and a past window is dropped", () => {
+  // ⚠️ The sheet quotes a number the runner is agreeing to. The only honest way to produce it is to ask
+  // the same question the application will ask — a second estimate would be a second answer.
+  const prev = nocomment(fn("adjustPreviewCount"));
+  assert.match(prev, /adjDrops\(a, x\)/, "the preview no longer uses the real predicate");
+  assert.ok(!/mode ===/.test(prev), "the preview has its own opinion about what a mode removes");
+  // ⚠️ PAST WINDOWS GO ON EVERY WRITE. An adjustment is applied at adopt time, so one that has ended can
+  // only make the next rebuild slower and the store bigger. The runs done during it are in the logbook.
+  const sa = nocomment(fn("saveAdjust"));
+  assert.match(sa, /r\.to >= today/, "an ended window is kept for ever");
+  assert.match(sa, /slice\(0, 12\)/, "the store is uncapped");
+  // Undo restores the whole store, because the only way back from a removal is a rebuild without it.
+  const sd = nocomment(fn("saveAdjustDraft"));
+  assert.match(sd, /const before = JSON\.stringify\(loadAdjust\(\)\)/, "the undo snapshot is not the store");
+  assert.match(sd, /toastUndo\(/, "there is no undo");
+  const snap = sd.indexOf("const before ="), reb = sd.indexOf("recompute()");
+  assert.ok(snap >= 0 && snap < reb, "the snapshot is taken after the rebuild");
+});
+
+test("BLOCKER: going away and easing off leave the target date alone — that is what makes them not a pause", () => {
+  const sd = nocomment(fn("saveAdjustDraft"));
+  for (const f of ["raceDate", "startDateIso", "targetS", "daysPerWeek"])
+    assert.ok(!new RegExp("profile\\." + f + "\\s*=").test(sd),
+      "an adjustment writes profile." + f + "; it is meant to take sessions out, not move the block");
+  assert.match(nocomment(fn("managePlanHtml")), /target date alone/,
+    "the menu no longer says what separates these from a pause");
+  // Both entry points exist, share one builder, and are wired.
+  const ma = nocomment(fn("manageAction"));
+  for (const id of ["holiday", "ease"]) {
+    assert.match(nocomment(fn("managePlanHtml")), new RegExp('row\\("' + id + '"'), "the menu lost the " + id + " row");
+    assert.match(ma, new RegExp('id === "' + id + '"[\\s\\S]{0,80}openAdjustSheet\\("' + id + '"\\)'),
+      "the " + id + " row does not open the shared sheet");
+  }
+  // ⚠️ ONE BUILDER, TWO HEADINGS. Two builders over one mechanism is how the two come to behave
+  // differently for no reason.
+  const app = nocomment(appBlock());
+  // ⚠️ THE CLAIM IS THAT ONE FUNCTION WRITES THE SHEET, NOT THAT ONE NAME EXISTS. Counting
+  // `function renderAdjustSheet(` missed a second builder called anything else — and a wrapper that
+  // merely delegates is not a second builder at all, so the honest discriminator is which functions
+  // write the sheet's own markup.
+  const writers = [...app.matchAll(/function (\w+)\s*\([^)]*\)\s*\{/g)].map((m) => m[1]!)
+    .filter((n) => { try { return /data-adjmode=/.test(nocomment(fn(n))); } catch { return false; } });
+  assert.deepEqual(writers, ["renderAdjustSheet"],
+    "the adjust sheet's markup is written by: " + writers.join(", "));
+  for (const a of ["adjmode", "adjnonrun"])
+    assert.match(app, new RegExp('querySelectorAll\\("\\[data-' + a + '\\]"\\)|querySelector\\("\\[data-' + a + '\\]"\\)'),
+      "data-" + a + " is not bound");
 });

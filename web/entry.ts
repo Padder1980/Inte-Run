@@ -76,3 +76,11 @@ export type { Warmup, WarmupPhase, AbilityBand, FirstHardEffort } from "../src/s
 // injury or to make anyone faster, and test/stretches.test.ts enforces that on every string it exports.
 export { STRETCHES, STRETCH_INTRO, stretchTotalSeconds, stretchHolds } from "../src/science/stretches.ts";
 export type { Stretch } from "../src/science/stretches.ts";
+
+// ⚠️ ONE DEFINITION OF A WEEK'S VOLUME, AND THE APP NEEDS IT NOW THAT IT CAN REMOVE SESSIONS. The
+// holiday and "not feeling 100%" adjustments drop running sessions from a window, which changes the
+// week's counted mileage — and re-deriving that in the app would be a SECOND definition of volume.
+// `src/domain/steps.ts` records what that costs: when `trainingDistanceMeters` arrived, six call sites
+// were updated and two were not, and an adjusted week came back measured on a different scale from
+// every other week in the same plan (40.9 → 44.1 km while every session in it got shorter).
+export { sessionVolumeMeters, weekVolumeMeters } from "../src/domain/steps.ts";

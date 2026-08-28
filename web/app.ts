@@ -5844,6 +5844,101 @@ html.kbup .club-txc { bottom: var(--kbh, 0px); }
 .wk-adj span { display: block; font-size: var(--t-label); color: var(--ink-soft); margin-top: 4px;
   line-height: 1.55; }
 
+
+/* ---- The move-a-workout lesson ------------------------------------------------------------- */
+/* ⚠️ z-index 85, AND THE WHOLE STACK WAS MEASURED TO PICK IT. .live-pill 60, .sheet-ov 70,
+   .app-toast 70, .guide-ov 80, .welcome/#welcomeback/.story-ov 90, .sst-ov 92, .exlb 95,
+   .club-ed/.club-view 96, .club-lib 97, .club-ask 98, .splash 100, .countin 120, .cal-ghost 300 --
+   so 81 to 89 is free. It has to be ABOVE .sheet-ov and .app-toast because both live inside .app,
+   which overlayModal inerts, and a lesson under an inert sheet is the z-order defect this project has
+   shipped twice (shareToClub at 70 under the studio at 92; confirmSheet at 70 under .club-view at 96).
+   It has to be BELOW 90 so a launch or welcome-back overlay still wins, and far below .cal-ghost so
+   that if the two ever coexisted the thing under the finger wins. */
+.caltip-ov { z-index: 85; }
+/* .guide-card supplies the width, the radius and the padding and sets no flex of its own, so the
+   column has to be declared here. ⚠️ THE BODY IS WHAT GIVES WAY AND THE FOOT NEVER DOES: Got it can
+   never be pushed off a short screen, which is the only way out of a modal that inerts the app. */
+.caltip-card { display: flex; flex-direction: column; gap: var(--s3); max-height: calc(100% - 32px); min-height: 0; }
+.caltip-body { overflow-y: auto; min-height: 0; }
+.caltip-foot { flex: none; }
+.caltip-foot .primary { margin-top: 0; }
+.caltip-k { font-size: var(--t-label); font-weight: 750; letter-spacing: .09em; text-transform: uppercase; color: var(--accent); }
+.caltip-t { font-size: var(--t-hero); font-weight: 750; letter-spacing: -.01em; margin: var(--s2) 0 var(--s3); line-height: 1.25; }
+.caltip-p { font-size: var(--t-body); color: var(--ink-soft); line-height: 1.55; margin: var(--s2) 0 0; }
+/* The diagram. ⚠️ SIZED IN em AND CARRYING NO TEXT, so it claims nothing about the runner's own plan,
+   needs almost no type and survives any text scale. --ct-dy is the travel: roughly one day row down,
+   against a measured real pitch of 80px. */
+.caltip-d { position: relative; pointer-events: none; height: 7.3em; margin: var(--s3) 0 0; --ct-dy: 3.6em; }
+.caltip-row { position: absolute; left: 0; right: 0; height: 3.2em; border: 1px solid var(--line);
+  border-radius: var(--r-ctl); background: var(--surface-2); }
+.caltip-d .caltip-row:nth-child(1) { top: 0; }
+.caltip-d .caltip-row:nth-child(2) { top: 3.6em; }
+.caltip-row::before { content: ""; position: absolute; left: .55em; top: .7em; width: 1.6em; height: 1.8em;
+  border-radius: var(--r-ctl); background: var(--line); opacity: .7; }
+/* The landing highlight is .cal-day.cal-target exactly -- 11% accent plus a 45% inset ring. */
+.caltip-tgt { position: absolute; left: 0; right: 0; top: 3.6em; height: 3.2em; border-radius: var(--r-ctl);
+  background: color-mix(in srgb, var(--accent) 11%, transparent);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); opacity: 0; }
+.caltip-sess { position: absolute; left: 2.7em; right: .6em; top: .55em; height: 2.1em; display: flex;
+  align-items: center; gap: .5em; padding: 0 .5em 0 0; background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r-ctl); }
+.caltip-rail { flex: none; width: .22em; height: 1.5em; border-radius: var(--r-pill); }
+.caltip-bar { height: .42em; border-radius: var(--r-pill); background: var(--line); flex: 0 0 7.2em; }
+.caltip-bar.b2 { flex: 0 0 3.4em; opacity: .65; }
+/* The finger. ⚠️ var(--r-pill), NOT 50%: the radius ladder is tokens, and a stated "every radius is a
+   token" rule with a bare 50% in it is how the next reader introduces a 10px. */
+.caltip-press { position: absolute; right: 1.6em; top: 50%; width: 1.5em; height: 1.5em; margin-top: -.75em;
+  border-radius: var(--r-pill); background: color-mix(in srgb, var(--ink) 34%, transparent); }
+.cal-hint { font-size: var(--t-label); color: var(--ink-faint); line-height: 1.5; margin: 0 0 var(--s3); }
+/* ⚠️ ONE DURATION ON ALL THREE, APPLIED TOGETHER, so they cannot drift out of phase. */
+.caltip-d .caltip-sess { animation: ctDrag 3200ms cubic-bezier(.4,0,.2,1) infinite; }
+.caltip-d .caltip-press { animation: ctPress 3200ms ease-out infinite; }
+.caltip-d .caltip-tgt { animation: ctTgt 3200ms ease infinite; }
+/* ⚠️⚠️ THE PRE-LIFT DWELL IS 15% OF 3200ms = 480ms AGAINST A REAL GATE OF MOVE_HOLD_MS = 320ms, AND
+   THE INEQUALITY IS THE POINT. A demo whose dwell is SHORTER than the gate teaches an under-hold, and
+   an under-hold trips the 9px cancel and produces nothing at all -- no haptic, no class, the calendar
+   just scrolls. Erring long is the only safe direction.
+   ⚠️ AND THE CARD MUST NOT MOVE BY ONE PIXEL THROUGH THOSE 480ms while the ring is the only thing
+   animating. The dead time IS the gesture being taught, and it is the half nobody discovers unaided;
+   a ring that plays during the lift instead shows "card rises, then finger presses" -- the wrong
+   order, which teaches a tap. */
+/* ⚠️ THE LOOP RESETS BY FADING AT THE DESTINATION, NOT BY DRAGGING THE CARD BACK. Measured on the
+   first cut: at 95% the card was half way home, travelling upwards, which reads as a second
+   instruction -- "and then move it back". It fades out where it landed, teleports while invisible, and
+   fades in at the start, so the only motion a runner ever sees is the one being taught. */
+@keyframes ctDrag {
+  0% { transform: translate3d(0,0,0) scale(1); box-shadow: none; opacity: 0; }
+  4%, 15% { transform: translate3d(0,0,0) scale(1); box-shadow: none; opacity: 1; }
+  25% { transform: translate3d(0,0,0) scale(1.04); box-shadow: var(--shadow); opacity: 1; }
+  60% { transform: translate3d(0, var(--ct-dy), 0) scale(1.04); box-shadow: var(--shadow); opacity: 1; }
+  72%, 90% { transform: translate3d(0, var(--ct-dy), 0) scale(1); box-shadow: none; opacity: 1; }
+  96% { transform: translate3d(0, var(--ct-dy), 0) scale(1); box-shadow: none; opacity: 0; }
+  97%, 100% { transform: translate3d(0,0,0) scale(1); box-shadow: none; opacity: 0; }
+}
+/* ⚠️ THE FINGER STAYS ON THE CARD FOR THE WHOLE TRAVEL, AND ONLY THE RING PULSES. Measured on the
+   first cut, which faded the dot out at the lift: the card then travelled ALONE, which reads as the
+   card moving by itself rather than as a finger dragging it -- the opposite of the instruction. The
+   dot is a CHILD of .caltip-sess, so it travels with the card for free; all this animates is the ring.
+   The expansion finishes AT the lift and never over it -- same device as bellpulse and recappulse. */
+@keyframes ctPress {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+  15%, 100% { box-shadow: 0 0 0 .7em color-mix(in srgb, var(--accent) 0%, transparent); }
+}
+@keyframes ctTgt { 0%, 22% { opacity: 0; } 40%, 92% { opacity: 1; } 100% { opacity: 0; } }
+/* ⚠️ REDUCE MOTION NEEDS ITS OWN BLOCK. The global rule is * { transition: none !important } --
+   TRANSITIONS ONLY -- which is why animations are switched off in 26 separate per-component blocks.
+   The still frame is the card LIFTED, MID-TRAVEL, ring expanded, destination highlighted: the hold and
+   the destination in one frame. A landed frame shows the outcome and drops the press, which is the one
+   fact a Reduce Motion runner cannot get from anywhere else. Compound selectors, so the
+   duplicate-bare-class count is untouched. */
+@media (prefers-reduced-motion: reduce) {
+  .caltip-d .caltip-sess { animation: none; transform: translate3d(0, calc(var(--ct-dy) * .55), 0) scale(1.04); box-shadow: var(--shadow); }
+  .caltip-d .caltip-press { animation: none; box-shadow: 0 0 0 .7em color-mix(in srgb, var(--accent) 0%, transparent); opacity: 1; }
+  .caltip-d .caltip-tgt { animation: none; opacity: 1; }
+}
+/* Short viewports shed the DIAGRAM, never the instruction. Stated order, so the next person adding to
+   this card knows which end gives way. */
+@media (max-height: 600px) { .caltip-d { display: none; } }
 </style>
 </head>
 <body>
@@ -9423,7 +9518,7 @@ function wireCalendarDrag() {
     btn.addEventListener("pointerdown", (ev) => {
       if (DRAG || ev.button) return;
       const x0 = ev.clientX, y0 = ev.clientY, pid = ev.pointerId;
-      const t = setTimeout(() => { cleanup(); startSessDrag(x0, y0, pid, btn); }, 320);
+      const t = setTimeout(() => { cleanup(); startSessDrag(x0, y0, pid, btn); }, MOVE_HOLD_MS);
       // Moving before the hold fires means the finger is scrolling, not lifting a card.
       const onMove = (e) => { if (Math.abs(e.clientX - x0) > 9 || Math.abs(e.clientY - y0) > 9) cleanup(); };
       const cleanup = () => { clearTimeout(t); btn.removeEventListener("pointermove", onMove); btn.removeEventListener("pointerup", cleanup); btn.removeEventListener("pointercancel", cleanup); };
@@ -9444,7 +9539,8 @@ function startSessDrag(x, y, pointerId, btn) {
   ghost.classList.add("cal-ghost");
   ghost.style.width = r.width + "px";
   document.body.appendChild(ghost);
-  DRAG = { wk: wk, sess: sess, card: card, ghost: ghost, dx: x - r.left, dy: y - r.top, target: null, targetEl: null };
+  DRAG = { wk: wk, sess: sess, card: card, ghost: ghost, dx: x - r.left, dy: y - r.top, target: null, targetEl: null,
+    px: x, py: y, scroller: $("view"), raf: 0 };
   card.classList.add("cal-lifted");
   document.body.classList.add("cal-dragging");
   moveGhost(x, y);
@@ -9453,18 +9549,183 @@ function startSessDrag(x, y, pointerId, btn) {
   window.addEventListener("pointerup", calDragEnd);
   window.addEventListener("pointercancel", calDragCancel);
   window.addEventListener("touchmove", calDragBlockScroll, { passive: false });
+  DRAG.raf = requestAnimationFrame(dragEdgeTick);
 }
 function moveGhost(x, y) {
   DRAG.ghost.style.left = (x - DRAG.dx) + "px";
   DRAG.ghost.style.top = (y - DRAG.dy) + "px";
 }
+/**
+ * ⚠️ THE HOLD IS ONE CONSTANT NOW, BECAUSE THE TUTORIAL HAS TO CITE IT. calTipHtml animates a
+ * demonstration of this gesture, and its pre-lift dwell must never be SHORTER than the real gate: a
+ * demo that lifts early teaches a hold that trips the 9px cancel, and that failure is completely
+ * silent -- no haptic, no class, the calendar just scrolls. A guard multiplies the keyframe stop by
+ * the animation duration and asserts it clears this number, which it can only do if the number has a
+ * name. Both drags read it.
+ */
+const MOVE_HOLD_MS = 320;
+/**
+ * The one sentence that explains this gesture, read by BOTH surfaces that explain it -- the overlay
+ * and the permanent line under the calendar's back button.
+ * ⚠️ IT NAMES THE SAME-WEEK RULE BECAUSE A CROSS-WEEK DROP IS REFUSED IN SILENCE. calDragAim's
+ * ok = day && Number(day.dataset.w) === DRAG.wk simply declines to mark a target, so a runner
+ * dragging into next week gets no highlight, no haptic and no explanation. One constant, two readers,
+ * so the two can never say different things.
+ */
+const MOVE_TIP_LINE = "Hold a session until it lifts, then drag it onto another day in the same week.";
+
+// ============ THE MOVE-A-WORKOUT LESSON ====================================
+//
+// The owner's report: "when you click the move a workout button, nothing happens. I need it to take
+// you to the calendar page and for the to be an animated instructional, animated overlay with a
+// dimmed background showing the user that they need to drag and drop the session".
+//
+// ⚠️⚠️ IT IS A CENTRED, WORDLESS DIAGRAM AND NOT A SPOTLIGHT ON ONE OF THE RUNNER'S OWN CARDS, and
+// six independent constraints each kill the anchored version on its own:
+//   1. #view is the only scroll owner and is a SIBLING of every body-level overlay, so a
+//      pass-through aperture lets the page scroll underneath and drifts off target every frame.
+//   2. That scroll cannot be locked with touch-action: none -- test/ios-input-zoom.test.ts is a
+//      deepEqual on exactly four selectors and a fifth fails the suite.
+//   3. The calendar opens at week 1 with no auto-scroll, so a card would have to be found first.
+//   4. calTrialRow emits .cal-open with NO data-oid, and startSessDrag bails before the ghost and
+//      before haptic("lift") -- an aperture keyed on .cal-open can land on the one row where the
+//      gesture is a silent no-op.
+//   5. Two plan states have no card at all and would need a second design.
+//   6. requestAnimationFrame fires ZERO times in this repo's headless Chrome, so any rAF-gated
+//      aperture is unprovable here.
+// A diagram with no anchor answers all six by measuring nothing. calTipHtml declares zero
+// parameters, which is what makes a rect unable to arrive from outside.
+//
+// ⚠️ AND THE SCRIM TAKES POINTER EVENTS ON PURPOSE. A pass-through scrim over a live card produces
+// this: the runner presses and holds exactly as instructed, the overlay neither responds nor
+// dismisses (a drag fires no click), and the app appears inert WHILE THEY PERFORM THE TAUGHT GESTURE
+// CORRECTLY -- the defect this feature exists to remove, one layer up. It also means the page cannot
+// scroll while the lesson is up, because body is overflow: hidden, so the scroll lock is free.
+let CALTIP = false;      // armed by the tile, consumed by maybeCalTip
+let CALTIP_HOME = false; // armed by the tile, consumed by calHomeScroll
+/**
+ * Is there anything anywhere in the plan that a drag could move?
+ * ⚠️ ANSWERED BEFORE NAVIGATING, so a runner is never taught a gesture with nothing to perform it on.
+ * ⚠️ AND IT READS PLAN.weeks, WHICH EXCLUDES THE TRIAL ROW FOR FREE -- a scheduled 2km trial renders
+ * a .cal-open with no ids and cannot be dragged, so a check keyed on the DOM would count it.
+ */
+function planHasMovable() {
+  if (!PLAN || !PLAN.weeks) return false;
+  for (const w of PLAN.weeks) for (const s of (w.sessions || [])) if (s.type !== "rest") return true;
+  return false;
+}
+/**
+ * ⚠️ ZERO PARAMETERS. That is the clause that makes this overlay correct without layout: there is no
+ * argument through which a measured rectangle could be smuggled in, so it cannot be wrong about where
+ * anything is. It reads no geometry, schedules no callback and is centred by flexbox.
+ * ⚠️ THE SHELL IS .guide-ov + .guide-card, reused exactly as the extras popup reuses it, so the
+ * scrim, the dim, the blur, display:none -> .on and the opacity TRANSITION all arrive with no new
+ * code -- and the global * { transition: none !important } covers the fade with no Reduce Motion work.
+ * ⚠️ THE RAIL'S COLOUR GOES THROUGH sessionEffort("easy"), not effortVar("easy"). effortVar is a pure
+ * string builder that reads nothing; only piping a session TYPE through sessionEffort genuinely
+ * consults the one SESSION_EFFORT table that ruling 7 exists to protect.
+ */
+function calTipHtml() {
+  return '<div class="guide-card caltip-card">' +
+    '<div class="caltip-body">' +
+      '<div class="caltip-k">MOVE A WORKOUT</div>' +
+      '<div class="caltip-t" id="calTipT">Drag it to another day</div>' +
+      '<div class="caltip-d" aria-hidden="true">' +
+        '<div class="caltip-row"></div><div class="caltip-row"></div>' +
+        '<div class="caltip-tgt"></div>' +
+        '<div class="caltip-sess">' +
+          '<span class="caltip-rail" style="background:' + effortVar(sessionEffort("easy")) + '"></span>' +
+          '<span class="caltip-bar"></span><span class="caltip-bar b2"></span>' +
+          '<span class="caltip-press"></span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="caltip-p">' + MOVE_TIP_LINE + '</div>' +
+      '<div class="caltip-p">If a run is already there, the two swap.</div>' +
+    '</div>' +
+    '<div class="caltip-foot"><button class="primary" id="calTipGo">Got it</button></div>';
+}
+function ensureCalTip() {
+  let ov = $("calTipOv");
+  if (ov) return ov;
+  // ⚠️ ON document.body, NEVER INSIDE .app. overlayModal's default "behind" is .app, so an overlay
+  // mounted inside it would inert ITSELF -- and .app becomes a stacking context under followPan,
+  // which would flatten a body-level z-index into .app's.
+  ov = el('<div id="calTipOv" class="guide-ov caltip-ov" role="dialog" aria-modal="true" aria-labelledby="calTipT">' + calTipHtml() + '</div>');
+  document.body.appendChild(ov);
+  $("calTipGo").onclick = closeCalTip;
+  ov.addEventListener("click", (e) => { if (e.target === ov) closeCalTip(); });
+  // Escape is bound on the overlay rather than the document: keydown bubbles from the focused button,
+  // so there is no document listener to leak when the node outlives one opening.
+  ov.addEventListener("keydown", (e) => { if (e.key === "Escape") closeCalTip(); });
+  return ov;
+}
+/** ⚠️ DERIVED FROM THE NODE, NEVER STORED. A boolean some other .on removal left true is a guard that
+ *  passes while .app stays inert -- i.e. a frozen app that reports itself as fine. */
+function calTipUp() { const ov = $("calTipOv"); return !!(ov && ov.classList.contains("on")); }
+function calTipOpen() {
+  const ov = ensureCalTip();
+  ov.classList.add("on");
+  overlayModal(ov, true, "#calTipGo");
+}
+function closeCalTip() {
+  const ov = $("calTipOv");
+  if (!ov || !ov.classList.contains("on")) return;
+  ov.classList.remove("on");
+  overlayModal(ov, false, "");
+}
+/**
+ * The one gate. Order matters and each step is a real refusal:
+ *  - CALTIP is armed only by the tile, so this can never fire on arrival from the top-bar button.
+ *  - calTipUp() is the idempotency guard: wire() has call sites outside render(), and a second mount
+ *    would orphan the first with no reference left to remove it.
+ *  - the launch overlays win. An 85 tip under a 90 splash with .app inert is a frozen app, which is
+ *    the same gate maybeAutoGuide opens with.
+ *  - DRAG: a tutorial appearing over a gesture in progress is the thing it exists to prevent.
+ * CALTIP is consumed on EVERY path, so it can never fire later out of context -- including from the
+ * render() that calDragEnd fires after a successful move.
+ */
+function maybeCalTip() {
+  if (!CALTIP) return;
+  if (state.screen !== "calendar" || DRAG || calTipUp()) { CALTIP = false; return; }
+  if ($("splash") || $("welcomeback")) { CALTIP = false; return; }
+  CALTIP = false;
+  calTipOpen();
+}
+/**
+ * Put today's week at the top of the calendar, ONCE, and only when the tile sent the runner here.
+ * ⚠️ THE TILE'S ENTRY SCROLLS AND #calBtn's DOES NOT, and that asymmetry is deliberate: the plain
+ * calendar button's behaviour is a screen the owner did not ask about, so it stays byte-identical.
+ * ⚠️ AND IT IS NOT COSMETIC. Measured on a 36-week plan, week 12 sits 8,017px down and week 20
+ * 14,049px; a runner in week 12 who dismissed the lesson onto week 1 would be four months from the
+ * day they wanted to move. The first-time case only looks fine because a fresh plan's week 1 IS today.
+ * ⚠️ IT GUARDS ON A ZERO BOX and simply leaves the scroll alone -- the centrePlanWeek precedent. No
+ * retry, no timer, no rAF: a screen that has not laid out yet is not a screen to measure.
+ */
+function calHomeScroll() {
+  if (!CALTIP_HOME) return;
+  CALTIP_HOME = false;
+  const v = $("view"); if (!v || !v.clientHeight) return;
+  const day = document.querySelector(".cal-day.is-today") || document.querySelector(".cal-week");
+  if (!day || !day.clientHeight) return;
+  const wk = day.closest(".cal-week") || day;
+  v.scrollTop = Math.max(0, wk.getBoundingClientRect().top - v.getBoundingClientRect().top + v.scrollTop - 8);
+}
 function calDragBlockScroll(e) { if (DRAG) e.preventDefault(); }
 function calDragMove(e) {
   if (!DRAG) return;
   e.preventDefault();
+  // ⚠️ THE FINGER'S LAST POSITION IS KEPT SO THE EDGE SCROLLER CAN RE-AIM UNDER A STATIONARY FINGER.
+  // Without it, holding at the edge scrolls the list while the target stays on whatever day happened
+  // to be under the finger when it stopped moving -- the list slides and the highlight does not.
+  DRAG.px = e.clientX; DRAG.py = e.clientY;
   moveGhost(e.clientX, e.clientY);
+  calDragAim(e.clientX, e.clientY);
+}
+/** The target half of calDragMove, taken out so the edge scroller can call it with no event. */
+function calDragAim(x, y) {
+  if (!DRAG) return;
   DRAG.ghost.style.display = "none";
-  const under = document.elementFromPoint(e.clientX, e.clientY);
+  const under = document.elementFromPoint(x, y);
   DRAG.ghost.style.display = "";
   const day = under && under.closest ? under.closest(".cal-day") : null;
   const ok = day && Number(day.dataset.w) === DRAG.wk;
@@ -9479,6 +9740,9 @@ function calDragMove(e) {
   }
 }
 function calDragTeardown() {
+  // ⚠️ THE LOOP IS CANCELLED HERE, NOT IN calDragEnd. Teardown is the ONE exit both the end and the
+  // cancel path go through; a cancel that left the rAF running would scroll #view for ever.
+  if (DRAG && DRAG.raf) cancelAnimationFrame(DRAG.raf);
   window.removeEventListener("pointermove", calDragMove);
   window.removeEventListener("pointerup", calDragEnd);
   window.removeEventListener("pointercancel", calDragCancel);
@@ -9500,7 +9764,14 @@ function calDragEnd() {
     moveSession(d.wk, d.sess, d.target);
     haptic("success");
     render();
+    return;
   }
+  // ⚠️ A REFUSED DROP USED TO BE COMPLETELY SILENT, and it is the failure a runner is most likely to
+  // meet: calDragAim marks no target for a day in a DIFFERENT week, so dragging into next week
+  // produced no highlight, no haptic and no explanation -- the card simply went home. Only when there
+  // was no target at all: dropping back on the day it came from is a deliberate cancel and stays
+  // silent, or every changed mind would be answered with a correction.
+  if (d.target == null) toast("Drop it on a day in that same week.");
 }
 function calDragCancel() { calDragTeardown(); DRAG = null; CAL_DRAGGED = true; }
 
@@ -9516,7 +9787,7 @@ function wirePlanDrag() {
     btn.addEventListener("pointerdown", (ev) => {
       if (DRAG || ev.button) return;
       const x0 = ev.clientX, y0 = ev.clientY;
-      const t = setTimeout(() => { cleanup(); startPlanDrag(x0, y0, btn); }, 320);
+      const t = setTimeout(() => { cleanup(); startPlanDrag(x0, y0, btn); }, MOVE_HOLD_MS);
       const onMove = (e) => { if (Math.abs(e.clientX - x0) > 9 || Math.abs(e.clientY - y0) > 9) cleanup(); };
       const cleanup = () => { clearTimeout(t); btn.removeEventListener("pointermove", onMove); btn.removeEventListener("pointerup", cleanup); btn.removeEventListener("pointercancel", cleanup); };
       btn.addEventListener("pointermove", onMove);
@@ -9544,7 +9815,7 @@ function startPlanDrag(x, y, btn) {
   window.addEventListener("pointerup", planDragEnd);
   window.addEventListener("pointercancel", planDragCancel);
   window.addEventListener("touchmove", calDragBlockScroll, { passive: false });
-  DRAG.raf = requestAnimationFrame(planDragScroll);
+  DRAG.raf = requestAnimationFrame(dragEdgeTick);
 }
 function planDragAim(x, y) {
   if (!DRAG || !DRAG.isPlan) return;
@@ -9571,22 +9842,44 @@ function planDragMove(e) {
 }
 // A plan week is a tall list, so the row you want is often off screen when you pick one up.
 // Holding near either edge scrolls the list and re-aims under the stationary finger.
-function planDragScroll() {
-  if (!DRAG || !DRAG.isPlan) return;
+/**
+ * Pixels per frame to scroll when a dragging finger is within EDGE_BAND of either end of the
+ * scroller. Zero in the middle; the sign carries the direction.
+ * ⚠️ PURE, AND SEPARATE FROM ITS LOOP, BECAUSE requestAnimationFrame FIRES ZERO TIMES IN THIS REPO'S
+ * HEADLESS CHROME (measured: 0 frames in 1.2s against 25 for setInterval). The loop is therefore
+ * unprovable in the harness while the arithmetic is provable in node, so they are two functions.
+ */
+const EDGE_BAND = 64, EDGE_MAX = 7;
+function edgeScrollDelta(y, top, bottom) {
+  if (y < top + EDGE_BAND) return -Math.ceil(Math.min(EDGE_MAX, (top + EDGE_BAND - y) / EDGE_BAND * EDGE_MAX));
+  if (y > bottom - EDGE_BAND) return Math.ceil(Math.min(EDGE_MAX, (y - (bottom - EDGE_BAND)) / EDGE_BAND * EDGE_MAX));
+  return 0;
+}
+/**
+ * ⚠️ ONE SCROLLER FOR BOTH DRAGS, AND THE CALENDAR ONE IS WHY IT HAD TO BE GENERALISED. Measured on
+ * the busiest week of a real plan, a week spans 662px while #view is 523px at 375x667 and 426px at
+ * 320x568 -- so there is NO scroll position at which Monday's card and Sunday's row are both on
+ * screen. calDragBlockScroll preventDefaults touchmove for the length of a drag, so the runner cannot
+ * scroll to reach the far end either: on a 375-wide phone, dragging Monday to Sunday was impossible.
+ * Shipping a tutorial for a gesture that cannot reach the far end of a busy week is worse than
+ * shipping nothing, which is why this is in the same change as the tutorial.
+ * ⚠️ AND IT IS ONE FUNCTION, NOT TWO. The plan drag has had an edge scroller since it was written and
+ * the calendar drag twenty lines away had none; a second copy is the fix-one-builder-not-the-other
+ * trap this file records six times. The only per-drag difference is which aim function to call.
+ */
+function dragEdgeTick() {
+  if (!DRAG) return;
   const sc = DRAG.scroller;
   if (sc) {
     const b = sc.getBoundingClientRect();
-    const band = 64, max = 7;
-    let dy = 0;
-    if (DRAG.py < b.top + band) dy = -Math.ceil(Math.min(max, (b.top + band - DRAG.py) / band * max));
-    else if (DRAG.py > b.bottom - band) dy = Math.ceil(Math.min(max, (DRAG.py - (b.bottom - band)) / band * max));
+    const dy = edgeScrollDelta(DRAG.py, b.top, b.bottom);
     if (dy) {
       const was = sc.scrollTop;
       sc.scrollTop += dy;
-      if (sc.scrollTop !== was) planDragAim(DRAG.px, DRAG.py);
+      if (sc.scrollTop !== was) (DRAG.isPlan ? planDragAim : calDragAim)(DRAG.px, DRAG.py);
     }
   }
-  DRAG.raf = requestAnimationFrame(planDragScroll);
+  DRAG.raf = requestAnimationFrame(dragEdgeTick);
 }
 function planDragTeardown() {
   window.removeEventListener("pointermove", planDragMove);
@@ -9636,7 +9929,12 @@ function viewCalendar() {
     const total = (doneKm > 0 ? doneKm.toFixed(1) + " km / " : "") + w.distanceKm.toFixed(1) + " km";
     return '<div class="cal-week"><div class="cal-whead"><div class="cal-wtitle">' + dmon(isoAdd(w.startIso, 0)) + ' – ' + dmon(isoAdd(w.startIso, 6)) + ' <span class="cal-badge">WEEK ' + w.index + '</span></div><div class="cal-wtot">Total: <b>' + total + '</b></div></div>' + rows + '</div>';
   }).join("");
-  return back + '<div class="cal-wrap">' + weeks + '</div>';
+  // ⚠️ ONE PERMANENT LINE, AND IT IS WHAT MAKES THE NO-SEEN-KEY ANSWER COMPLETE. Before this, the
+  // calendar explained the gesture NOWHERE: the only "press and hold" wording in the file was a
+  // source comment. It reads MOVE_TIP_LINE -- the same constant the lesson reads -- so the two
+  // surfaces can never say different things, and it is suppressed when there is nothing to move.
+  const hint = planHasMovable() ? '<p class="cal-hint">' + MOVE_TIP_LINE + '</p>' : "";
+  return back + hint + '<div class="cal-wrap">' + weeks + '</div>';
 }
 
 // ============ SESSION DETAIL SHEET =========================================
@@ -11589,12 +11887,33 @@ function planAction(id) {
     return;
   }
   if (id === "move") {
-    // Moving a workout is the session sheet's own day picker. Open today's session if there is one,
-    // otherwise the selected week's first runnable session -- never a dead end.
-    const today = sessionsForIso(todayIso()).filter((x) => PRIMARY_TYPES[x.type]);
-    const pick = today[0] || (sessionsOnSelectedDay() || [])[0] || null;
-    if (pick) { openSessionSheet(pick); return; }
-    toast("Open any session from Your weeks below, then use the day picker to move it.");
+    // ⚠️⚠️ THIS BRANCH USED TO THROW ON EVERY TRAINING DAY, WHICH IS THE OWNER'S "nothing happens".
+    // It read sessionsForIso(), which walks PLAN.weeks -- display summaries carrying
+    // {id,day,dayIndex,type,title,effort,durMin,distKm,pace,rpe,optional} and NO steps -- and handed
+    // one to openSessionSheet, which needs a RAW session. sessionStages then does sess.steps.filter()
+    // and throws TypeError BEFORE sheetBody.innerHTML is assigned and before .on is added, so the
+    // sheet never appeared, no toast fired, and the error went to a console the runner cannot see.
+    // Reproduced in a browser: 1 uncaught TypeError, sheet not open, nothing on screen.
+    // ⚠️ SEVENTH FIRING OF THE PLAN-vs-RAW TRAP, and CLAUDE.md names the fix in as many words:
+    // "PLAN.weeks has no steps or pace bands (it is a display summary); the prescription lives in
+    // RAW.weeks, via rawSessionsForIso(). Reading the wrong one fails silently." Swept: of the eight
+    // sessionsForIso callers this was the ONLY one handing its result to something needing steps.
+    // ⚠️ IT ALSO CARRIED A SECOND LIVE DEFECT, removed with it: openSessionSheet(pick) passed no week,
+    // so SHEET_CTX.week fell back to state.planWeek -- once the runner had tapped week 9 on the Plan
+    // screen, moveSession looked for the swap occupant in week 9 while writing the override for a
+    // week-1 session, leaving one week with two runs on a day for seedDone's collision belt.
+    // The whole branch is DELETED rather than repaired, because the owner asked for the calendar.
+    if (liveRunning()) return;
+    stopTrialRun();
+    // ⚠️ ANSWERED BEFORE NAVIGATING. A zero-week plan renders a calendar containing only "Back", and a
+    // week adjusted to mode "none" with dropNonRun and no race has no card either -- teaching a
+    // gesture with nothing to perform it on is worse than saying so.
+    if (!planHasMovable()) { toast("There are no sessions to move yet."); return; }
+    closeSheet();
+    CALTIP = true;
+    CALTIP_HOME = true;
+    state.screen = "calendar";
+    render();
     return;
   }
   if (id === "apps") {
@@ -35851,6 +36170,13 @@ function render() {
   // protection now comes from the live pill instead -- leaving is obvious, and so is the way back.
   const nav = $("nav"); if (nav) nav.style.display = "";
   syncLivePill();
+  // ⚠️ THE LESSON CANNOT OUTLIVE THE SCREEN IT EXPLAINS, AND THIS LINE MUST SIT ABOVE THE FIRST
+  // SCREEN BRANCH. The calendar branch RETURNS, so a call placed after it never runs on the path that
+  // matters. The runner cannot navigate away by hand -- the scrim eats taps and .app is inert -- but a
+  // wrist run arriving, a live-activity tap or an over-the-air path calling render() with a different
+  // screen would leave the lesson over Today with .app inert, i.e. a frozen app. liveRunning() is
+  // named as well as the screen, because a run starting is exactly such a path.
+  if (calTipUp() && (state.screen !== "calendar" || liveRunning())) closeCalTip();
   if (state.screen === "wizard") {
     // Full-screen, focused onboarding — no bottom nav to tap away into. The draft is sticky
     // (draft.__live), so backgrounding and returning keeps every answer.
@@ -36962,7 +37288,10 @@ function wire() {
   document.querySelectorAll("[data-trialrm]").forEach((b) => b.onclick = () => { clearScheduledTrial(); render(); });
   // Training-calendar wiring
   const calBack = $("calBack"); if (calBack) calBack.onclick = () => { state.screen = null; render(); };
-  if (state.screen === "calendar") wireCalendarDrag();
+  // ⚠️ THE ORDER IS THE CONTRACT. calHomeScroll first, so the lesson opens over the week the runner
+  // is actually in; wireCalendarDrag second, so the gesture is live the instant the lesson is
+  // dismissed and nothing has to be re-wired; maybeCalTip last.
+  if (state.screen === "calendar") { calHomeScroll(); wireCalendarDrag(); maybeCalTip(); }
   document.querySelectorAll("[data-done]").forEach((b) => b.onclick = () => { const k = b.dataset.done; state.done[k] = !state.done[k]; render(); });
   // 2 km time-trial session wiring
   const startTrial = $("startTrial"); if (startTrial) startTrial.onclick = beginTrialRun;

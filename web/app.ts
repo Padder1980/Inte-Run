@@ -5749,6 +5749,48 @@ html.kbup .club-txc { bottom: var(--kbh, 0px); }
 .po-b { display: block; font-size: var(--t-label); color: var(--ink-soft); margin-top: 4px;
   line-height: 1.55; }
 
+/* ---- Recent plans ----------------------------------------------------------------------- */
+.rp-card { position: relative; display: flex; align-items: center; gap: var(--s3);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card);
+  box-shadow: var(--shadow); padding: var(--s3); margin-bottom: var(--s2); }
+.rp-card.live { border-color: var(--accent); }
+.rp-badge { flex: none; width: 48px; height: 54px; display: flex; align-items: center;
+  justify-content: center; border-radius: var(--r-ctl); font-size: var(--t-label); font-weight: 800;
+  letter-spacing: .02em; color: var(--accent-ink);
+  background: linear-gradient(160deg, var(--pc, var(--accent)), color-mix(in srgb, var(--pc, var(--accent)) 55%, #000)); }
+.rp-mid { min-width: 0; flex: 1; }
+.rp-t { display: block; font-size: var(--t-card); font-weight: 700; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-s { display: block; font-size: var(--t-label); color: var(--ink-soft); margin-top: 2px; }
+.rp-live { flex: none; font-size: var(--t-label); font-weight: 700; color: var(--accent); }
+/* ⚠️ THE GAP IS 12px BECAUSE THE HIT AREAS ARE GROWN BY 6px A SIDE. At 2px the two grown areas overlap
+   by 10px and the left icon wins only 34 of its 44 -- measured by bisecting elementFromPoint, which is
+   the only way to see it: a box cannot report its own pseudo-element, and reading the box and adding
+   the inset gives the answer you assumed rather than the one the finger gets. At 12 they exactly touch.
+   The 26px right margin clears the rename pencil, which is absolutely positioned over that corner. */
+.rp-acts { flex: none; display: flex; gap: 12px; margin-right: 26px; }
+/* ⚠️ THE HIT AREA GROWS, NOT THE BOX. Growing the boxes would relayout the card and push the name into
+   the badge -- the rule this app applies to every icon button.
+   ⚠️ AND ONE DECLARATION PER CLASS. .rp-name was declared three times and .rp-acts twice, which the
+   duplicate-class ratchet counted: a duplicate cannot be SEEN on screen, because the later rule simply
+   wins, so it needs a count rather than an eye. */
+.rp-ico { position: relative; width: 32px; height: 32px; display: flex; align-items: center;
+  justify-content: center; padding: 0; background: none; border: 0; border-radius: 50%;
+  color: var(--ink-faint); cursor: pointer; }
+.rp-ico::after { content: ""; position: absolute; inset: -6px; }
+.rp-ico:hover { color: var(--ink); background: var(--surface-2); }
+.rp-ico svg { width: 18px; height: 18px; }
+/* The rename pencil sits with the TITLE rather than in the action cluster, so a tap meant for it cannot
+   land on delete. Its ::after is -8px because 28 + 2x8 = 44; the action icons are 32 and clear the
+   floor at -6. */
+.rp-name { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; display: flex;
+  align-items: center; justify-content: center; padding: 0; background: none; border: 0;
+  border-radius: 50%; color: var(--ink-faint); cursor: pointer; }
+.rp-name::after { content: ""; position: absolute; inset: -8px; }
+.rp-name:hover { color: var(--ink); background: var(--surface-2); }
+.rp-name svg { width: 15px; height: 15px; }
+.rp-card.live .rp-live { margin-right: 26px; }
+
 </style>
 </head>
 <body>
@@ -11043,6 +11085,7 @@ function managePlanHtml() {
       row("pause", "Pause my plan", "Away, ill, or just need to stop for a while") +
       row("prefs", "Training preferences", "Days, mileage, long-run day, how hard it feels") +
       row("new", "Start a new plan", "A different goal or a different date") +
+      row("plans", "Your plans", planListSub()) +
     '</div>' +
     '<p class="mp-note">A holiday you can plan in advance, and a &ldquo;not feeling 100%&rdquo; week ' +
     'that eases the next few sessions, are next. Both use the same machinery as Pause, so they are a ' +
@@ -11244,6 +11287,7 @@ function manageAction(id) {
     render();
     return;
   }
+  if (id === "plans") { closeSheet(); state.screen = "plans"; render(); return; }
   if (id === "new") {
     // The wizard already builds a plan from scratch and ends by letting the runner pick between real
     // variants. Naming plans and keeping the old ones is the genuinely new part and is not built.
@@ -11259,6 +11303,121 @@ function openPauseSheet() {
   $("sheetBody").innerHTML = pausePlanHtml();
   wire();
   $("sheetOv").classList.add("on");
+}
+
+
+// ============ RECENT PLANS ================================================================
+// Every block this runner has had, newest first, with the one they are on marked. Built on the
+// journal rows adoptPlan already writes -- see journalSync for why this is not a second store.
+function viewPlans() {
+  const rows = loadJournals();
+  const live = rows.length && !rows[0].endedIso ? rows[0] : null;
+  const past = rows.filter((r) => r !== live);
+  const card = (j, isLive) =>
+    '<div class="rp-card' + (isLive ? " live" : "") + '">' +
+      // ⚠️ ACTIVE VERSUS PAST, NOT A COLOUR PER DISTANCE. The reference gives each plan type its own
+      // coloured shield, and this app already has exactly one meaning for a coloured chip -- how hard a
+      // session is (ruling 7, one mapping, read by the card, the tile, the calendar and the plan dot).
+      // A second colour vocabulary keyed on race distance would make an amber badge mean "10 km" in one
+      // place and "tempo" in another. The distance is in the badge's own TEXT, which does not collide.
+      '<span class="rp-badge" style="--pc:' + (isLive ? "var(--accent)" : "var(--ink-faint)") + '">' +
+        esc(planBadge(j)) + '</span>' +
+      '<span class="rp-mid"><span class="rp-t">' + esc(planName(j)) + '</span>' +
+      '<span class="rp-s">' + j.weeks + (j.weeks === 1 ? " week" : " weeks") +
+        (planDistLabel(j) ? " · " + planDistLabel(j) : "") + '</span>' +
+      (planCreatedIso(j) ? '<span class="rp-s">Created ' + esc(runDateLabelIso(planCreatedIso(j))) + '</span>' : "") +
+      '</span>' +
+      (isLive
+        ? '<span class="rp-live">Active</span>'
+        : '<span class="rp-acts">' +
+          (j.prof ? '<button class="rp-ico" data-rpuse="' + esc(j.sig) + '" aria-label="Use this plan again">' + ICON.plusDot + '</button>' : "") +
+          '<button class="rp-ico" data-rpdel="' + esc(j.sig) + '" aria-label="Delete ' + esc(planName(j)) + '">' + ICON.trash + '</button>' +
+          '</span>') +
+      '<button class="rp-name" data-rpname="' + esc(j.sig) + '" aria-label="Rename ' + esc(planName(j)) + '">' + ICON.cEdit + '</button>' +
+      '</div>';
+  // ⚠️ THE EMPTY STATE IS THE NORMAL STATE FOR MONTHS. The journal starts the day a plan is first
+  // adopted, so a runner on their first block has exactly one row and no past ones -- and a heading
+  // reading "Your other plans" over nothing is the app looking like it has lost them.
+  return '<h2 class="sec">Your active plan</h2>' +
+    (live ? card(live, true) : '<div class="card"><p class="mp-note">No plan yet. Build one from Manage plan.</p></div>') +
+    (past.length
+      ? '<h2 class="sec">Your other plans</h2>' + past.map((j) => card(j, false)).join("")
+      : '<p class="mp-note" style="margin-top:var(--s4)">When you start a new plan, the one you are on ' +
+        'now moves down here so you can look back at it — or pick it up again.</p>');
+}
+// A two-or-three character mark, derived from the goal. Deliberately not an image: this app ships with
+// no external network assets, and a badge picture per plan would be twenty-four of them.
+function planBadge(j) {
+  const B = { "5k": "5K", "10k": "10K", half: "21", marathon: "42", "1mile": "MI" };
+  return B[j && j.goal] || "RUN";
+}
+function openRenameSheet(sig) {
+  const j = loadJournals().find((r) => r && r.sig === sig);
+  if (!j) return;
+  ensureSheet(); SHEET_CTX = null;
+  $("sheetBody").innerHTML = '<div class="eyebrow">Rename</div>' +
+    '<h3 class="sheet-h">What would you like to call this plan?</h3>' +
+    '<input class="sel" id="rpNameIn" type="text" maxlength="40" autocomplete="off" ' +
+      'placeholder="' + esc(planName(j)) + '" value="' + esc(j.name || "") + '">' +
+    '<p class="mp-note">Leave it blank to go back to <b>' + esc((RACE_LABEL[j.goal] || "Training") + " plan") + '</b>.</p>' +
+    '<div class="act-pair"><button class="ap-no" id="rpNameCancel">Cancel</button>' +
+    '<button class="ap-yes" id="rpNameSave">Save</button></div>';
+  $("rpNameSave").onclick = () => {
+    journalUpdate(sig, { name: ($("rpNameIn").value || "").trim().slice(0, 40) });
+    closeSheet(); render();
+  };
+  $("rpNameCancel").onclick = closeSheet;
+  $("sheetOv").classList.add("on");
+  const f = $("rpNameIn"); if (f) f.focus();
+}
+// ⚠️ DELETING A PLAN IS PERMANENT AND SO IT ASKS. The club's own delete dialog established the rule: a
+// confirmation earns its tap when there is nothing to undo, and is a tap for nothing when there is.
+// This removes the only record of a block, and the club's plan-journal rail reads the same rows.
+function confirmDeletePlan(sig) {
+  const j = loadJournals().find((r) => r && r.sig === sig);
+  if (!j) return;
+  confirmSheet("Delete this plan?",
+    "This removes " + planName(j) + " from your plans and from your plan journal. There is no way to " +
+    "get it back. The runs you did during it are untouched.",
+    "Delete", () => { journalDelete(sig); render(); });
+}
+// ⚠️ REBUILT FROM THE STORED ANSWERS, NEVER RESTORED FROM A STORED PLAN. The snapshot is the ~20 fields
+// that DETERMINE a plan, so the block comes back built by today's engine rather than by whatever
+// version was current when it was abandoned.
+// ⚠️ AND THE TARGET DATE IS PULLED FORWARD IF IT HAS PASSED, because applyProfile clamps the start to
+// today and a target date in the past produces a plan with no weeks in it at all. The runner is told
+// which of the two happened before they agree to it.
+// ⚠️ THE UNDO IS A FULL SNAPSHOT TAKEN BEFORE THE REBUILD, for the reason applyPause records: seedDone
+// prunes state.dayOverride of every session id the new plan lacks and PERSISTS the prune.
+function reusePlan(sig) {
+  const j = loadJournals().find((r) => r && r.sig === sig);
+  if (!j || !j.prof) return;
+  const weeks = Math.max(4, Number(j.weeks) || 12);
+  const stale = !j.prof.raceDate || j.prof.raceDate <= todayIso();
+  const newDate = stale ? futureIso(weeks * 7) : j.prof.raceDate;
+  confirmSheet("Use this plan again?",
+    "This builds " + planName(j) + " again from the answers you gave for it" +
+    (stale
+      ? ", with a new target date of " + runDateLabelIso(newDate) + " — the old one has passed."
+      : ", keeping its target date of " + runDateLabelIso(newDate) + ".") +
+    " The plan you are on now moves into your other plans.",
+    "Build it", () => {
+      const before = planProfSnapshot();
+      const ticks = todayTicks();
+      for (const k of PLAN_PROF_FIELDS) if (j.prof[k] !== undefined) profile[k] = j.prof[k];
+      profile.raceDate = newDate;
+      profile.startDateIso = "";
+      try { recompute(); } catch (e) {
+        for (const k of PLAN_PROF_FIELDS) profile[k] = before[k];
+        try { recompute(); } catch (e2) {}
+        toast("That plan could not be rebuilt — nothing changed."); return;
+      }
+      computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
+      seedDone(); restoreTicks(ticks); saveProfileStore();
+      state.screen = null; state.tab = "plan";
+      render();
+      toast(planName(j) + " is your plan again.");
+    });
 }
 
 function viewPlan() {
@@ -16419,6 +16578,57 @@ function clubPbFromWheels(k) {
  * ⚠️ IT IS DERIVED, NEVER AUTHORED. The addendum: "Nothing here is user-authored, so there is no
  * 'create journal' affordance." Every figure comes from the plan and the run history.
  */
+
+/** The plan-determining fields, and nothing else. See journalSync for why not the plan itself. */
+const PLAN_PROF_FIELDS = ["status", "goalDist", "targetS", "targetSet", "raceDate", "startDateIso",
+  "longRunDay", "fitSrc", "recentDistM", "recentTimeS", "noRecent", "easyPaceS", "twoKmS",
+  "daysPerWeek", "volKm", "strength", "returning", "age", "sex", "autoPace"];
+function planListSub() {
+  const n = loadJournals().length;
+  // ⚠️ IT SAYS WHAT IS THERE. A row reading "look back at your plans" over an empty list is the app
+  // promising a screen it has nothing to put on -- and on a first block the list is exactly one row,
+  // which is the normal state for months rather than an edge case.
+  if (n <= 1) return "The block you are on, and the ones that follow it";
+  return n + " plans, newest first";
+}
+function planProfSnapshot() {
+  const out = {};
+  for (const k of PLAN_PROF_FIELDS) if (profile[k] !== undefined) out[k] = profile[k];
+  return out;
+}
+/**
+ * What a block is called. Derived from the goal unless the runner typed something.
+ * ⚠️ ROWS WRITTEN BEFORE THIS EXISTED HAVE NO name AND NO createdIso, and they must still list. The
+ * name falls back to the goal it was for and the date to the first week's Monday -- a few days out for
+ * an old row, and far better than an empty cell or a row that does not appear at all.
+ */
+function planName(j) {
+  if (j && j.name) return String(j.name);
+  const g = j && j.goal;
+  return (RACE_LABEL[g] || "Training") + " plan";
+}
+function planCreatedIso(j) { return (j && (j.createdIso || j.startIso)) || ""; }
+function planDistLabel(j) {
+  const KM = { "1mile": 1.6, "5k": 5, "10k": 10, half: 21.1, marathon: 42.2 };
+  const k = KM[j && j.goal];
+  return k ? k + " km" : "";
+}
+function journalUpdate(sig, patch) {
+  const rows = loadJournals();
+  const i = rows.findIndex((r) => r && r.sig === sig);
+  if (i < 0) return false;
+  rows[i] = Object.assign({}, rows[i], patch);
+  saveJournals(rows);
+  return true;
+}
+function journalDelete(sig) {
+  const rows = loadJournals();
+  const keep = rows.filter((r) => !(r && r.sig === sig));
+  if (keep.length === rows.length) return false;
+  saveJournals(keep);
+  return true;
+}
+
 function loadJournals() {
   try { const a = JSON.parse(localStorage.getItem(JOURNAL_KEY) || "[]"); return Array.isArray(a) ? a : []; }
   catch (e) { return []; }
@@ -16454,8 +16664,27 @@ function journalSync() {
   // ⚠️ THE PREVIOUS BLOCK ENDED WHEN IT WAS REPLACED, which is a real date rather than the date its
   // last week would have fallen on — a block abandoned in week 6 of 20 did not run for 20 weeks.
   if (rows.length && !rows[0].endedIso) rows[0].endedIso = todayIso();
+  // ⚠️ ONE STORE, EXTENDED -- NOT A SECOND ONE. This row was already the record of a block: the club's
+  // plan-journal rail reads it, adoptPlan already writes it, and it is already in the backup by the
+  // interun_ prefix. Adding a "recent plans" store beside it would have given one fact two homes, and
+  // the two disagree the first time somebody deletes from one of them.
   rows.unshift({ sig: sig, goal: profile.goalDist || "", startIso: w[0].startIso,
-    weeks: w.length, endedIso: "" });
+    weeks: w.length, endedIso: "",
+    // ⚠️ THE DAY IT WAS MADE, NOT THE DAY IT STARTS. startIso is the first week's MONDAY, which
+    // normalizeWeekStarts can put before today -- so a plan made on a Thursday would be listed as
+    // created three days before it existed.
+    createdIso: todayIso(),
+    // The name is EMPTY until the runner types one; planName() derives the default so a rename can be
+    // undone by clearing the field rather than by guessing what the default used to be.
+    name: "",
+    // ⚠️ ENOUGH TO REBUILD, AND DELIBERATELY NOT THE PLAN ITSELF. A plan is ~200 KB of steps; the
+    // fields that DETERMINE it are about twenty numbers. Storing the plan would also freeze it against
+    // an engine that keeps improving, so re-activating an old goal would hand back a block built by
+    // whatever version was current when it was abandoned.
+    // ⚠️ AND avatar AND name ARE EXCLUDED. The avatar is a 256px data URL -- twenty-four of those in a
+    // capped list is megabytes of duplicated image in localStorage, which is where the whole training
+    // history lives. The person's name is not a plan input.
+    prof: planProfSnapshot() });
   saveJournals(rows);
 }
 /**
@@ -35162,6 +35391,13 @@ function render() {
     wireWizard();
     return;
   }
+  if (state.screen === "plans") {
+    $("topTitle").textContent = "Recent plans";
+    v.innerHTML = viewPlans();
+    v.scrollTop = keepScroll;
+    wire();
+    return;
+  }
   if (state.screen === "setup") {
     $("topTitle").textContent = "Your profile";
     // ⚠️ Seeded through returnKind, or an existing profile lights up NO segment at all: the stored
@@ -36061,6 +36297,11 @@ function wire() {
     b.onclick = () => { PAUSE_DAYS = Number(b.dataset.pausedays) || 7; openPauseSheet(); };
   });
   document.querySelectorAll("[data-pauseopt]").forEach((b) => { b.onclick = () => applyPause(b.dataset.pauseopt); });
+  if (vw) {
+    vw.querySelectorAll("[data-rpname]").forEach((b) => { b.onclick = () => openRenameSheet(b.dataset.rpname); });
+    vw.querySelectorAll("[data-rpdel]").forEach((b) => { b.onclick = () => confirmDeletePlan(b.dataset.rpdel); });
+    vw.querySelectorAll("[data-rpuse]").forEach((b) => { b.onclick = () => reusePlan(b.dataset.rpuse); });
+  }
   bindTimeInput($("s_target")); bindTimeInput($("s_rectime")); bindTimeInput($("s_easypace"));
   const km1 = $("s_2km");
   if (km1) { bindTimeInput(km1); km1.addEventListener("input", refreshMasHint); refreshMasHint(); }

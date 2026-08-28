@@ -75,7 +75,7 @@ test("BLOCKER: every control in the menu reaches something that exists", () => {
   // The menu's own rows.
   const menu = nocomment(fn("managePlanHtml"));
   const rows = [...menu.matchAll(/row\("([a-z]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(rows, ["pause", "prefs", "new"], "the menu row set changed");
+  assert.deepEqual(rows, ["pause", "prefs", "new", "plans"], "the menu row set changed");
   const ma = nocomment(fn("manageAction"));
   for (const r of rows) assert.ok(new RegExp('id === "' + r + '"').test(ma), "manageAction has no branch for " + r);
 
@@ -177,4 +177,132 @@ test("the plan-screen action row is wired from #view, not the document", () => {
   assert.match(app, /vw\.querySelectorAll\("\[data-pact\]"\)/, "the action row is no longer scoped to #view");
   assert.match(app, /document\.querySelectorAll\("\[data-mp\]"\)/, "the menu rows lost their binding");
   assert.match(app, /document\.querySelectorAll\("\[data-pauseopt\]"\)/, "the pause options lost their binding");
+});
+
+// ---------------------------------------------------------------------------------------------
+// Plan history
+// ---------------------------------------------------------------------------------------------
+
+test("BLOCKER: plan history is ONE store, and adoptPlan is the only thing that adds to it", () => {
+  // ⚠️ The journal rows were ALREADY the record of a block — the club's plan-journal rail reads them,
+  // adoptPlan already wrote them, and they are already in the backup by the interun_ prefix. A second
+  // "recent plans" store would have given one fact two homes, and the two disagree the first time
+  // somebody deletes from one of them.
+  const app = nocomment(appBlock());
+  const keys = [...app.matchAll(/"(interun_[a-z0-9_]+)"/g)].map((m) => m[1]!);
+  const planish = keys.filter((k) => /plan|block|history/.test(k));
+  assert.deepEqual(planish, [], "a second plan store appeared: " + planish.join(", "));
+  // ⚠️ SCOPED TO THE JOURNAL ROW'S OWN SHAPE. `rows` is the variable name three unrelated stores use
+  // — the club's posts among them — so counting `rows.unshift(` reported two innocent stores as
+  // writers of the plan history. `sig:` is the field only a journal row has.
+  assert.equal([...app.matchAll(/unshift\(\{\s*sig:/g)].length, 1, "something else adds a journal row");
+  // ⚠️ INSIDE adoptPlan. That function's own note records what happens when the assignment is
+  // open-coded somewhere else: normalizeWeekStarts and the two syncs get skipped.
+  assert.match(nocomment(fn("adoptPlan")), /journalSync\(\)/, "adoptPlan no longer writes the journal");
+});
+
+test("BLOCKER: the row carries what the list needs and nothing personal", () => {
+  const sync = nocomment(fn("journalSync"));
+  for (const f of ["createdIso", "name", "prof"])
+    assert.match(sync, new RegExp("\\b" + f + ":"), "the row no longer carries " + f);
+  // ⚠️ THE DAY IT WAS MADE, NOT THE DAY IT STARTS. startIso is the first week's MONDAY, which
+  // normalizeWeekStarts can put before today — so a plan made on a Thursday would list as created
+  // three days before it existed.
+  assert.match(sync, /createdIso: todayIso\(\)/, "the creation date is derived from something else");
+
+  // ⚠️ THE SNAPSHOT IS THE PLAN'S INPUTS AND NOT THE PLAN, AND NOT THE PERSON. The avatar is a 256px
+  // data URL — twenty-four of those in a capped list is megabytes of duplicated image in localStorage,
+  // which is where the whole training history lives. The person's name is not a plan input.
+  const src = appBlock();
+  const list = src.slice(src.indexOf("const PLAN_PROF_FIELDS"), src.indexOf("];", src.indexOf("const PLAN_PROF_FIELDS")));
+  const fields = [...list.matchAll(/"([a-zA-Z]+)"/g)].map((m) => m[1]!);
+  assert.ok(fields.length >= 15, "the snapshot has shrunk to " + fields.length + " fields");
+  for (const banned of ["avatar", "name", "personalized"])
+    assert.ok(!fields.includes(banned), "the snapshot carries " + banned);
+  for (const need of ["goalDist", "raceDate", "daysPerWeek", "longRunDay", "recentTimeS", "volKm", "status"])
+    assert.ok(fields.includes(need), "the snapshot is missing " + need + ", so a rebuild would differ");
+  const snap = nocomment(fn("planProfSnapshot"));
+  assert.match(snap, /PLAN_PROF_FIELDS/, "the snapshot no longer derives from the field list");
+});
+
+test("BLOCKER: a row written before any of this still lists, and offers only what it can", () => {
+  // ⚠️ THE MIGRATION CASE IS THE COMMON CASE FOR EVERY EXISTING RUNNER. Rows already on their phones
+  // have no name, no createdIso and no prof. Driven, not read.
+  const src = fn("planName") + fn("planCreatedIso") + fn("planDistLabel") + fn("planBadge") +
+    'const RACE_LABEL = { "5k": "5 km", "10k": "10 km", half: "Half marathon", marathon: "Marathon" };';
+  const f = new Function(src + "; return { planName, planCreatedIso, planDistLabel, planBadge };")() as {
+    planName: (j: unknown) => string; planCreatedIso: (j: unknown) => string;
+    planDistLabel: (j: unknown) => string; planBadge: (j: unknown) => string;
+  };
+  const old = { sig: "half|2026-01-05|20", goal: "half", startIso: "2026-01-05", weeks: 20, endedIso: "" };
+  assert.equal(f.planName(old), "Half marathon plan", "an unnamed row has no name to show");
+  assert.equal(f.planCreatedIso(old), "2026-01-05", "an old row has no date to show");
+  assert.equal(f.planDistLabel(old), "21.1 km");
+  assert.equal(f.planBadge(old), "21");
+  // A typed name wins, and clearing it goes back to the derived one rather than to nothing.
+  assert.equal(f.planName({ ...old, name: "My spring half" }), "My spring half");
+  assert.equal(f.planName({ ...old, name: "" }), "Half marathon plan", "clearing the name leaves it blank");
+  // A row for a goal the app no longer offers still gets a name and a badge.
+  assert.equal(f.planName({ goal: "ultra" }), "Training plan");
+  assert.equal(f.planBadge({ goal: "ultra" }), "RUN");
+  assert.equal(f.planDistLabel({ goal: "ultra" }), "", "an unknown goal invents a distance");
+
+  // ⚠️ AND A ROW WITH NO SNAPSHOT OFFERS NO REUSE — the button is absent, not disabled, because a
+  // greyed control on every historic plan advertises something the app cannot do for them.
+  const view = nocomment(fn("viewPlans"));
+  assert.match(view, /j\.prof\s*\?[\s\S]{0,120}data-rpuse/, "the reuse button is not gated on the snapshot");
+  assert.match(nocomment(fn("reusePlan")), /if \(!j \|\| !j\.prof\) return;/, "reusePlan no longer refuses a row it cannot rebuild");
+});
+
+test("BLOCKER: reusing a plan rebuilds from the answers and cannot land in the past", () => {
+  const r = nocomment(fn("reusePlan"));
+  // ⚠️ REBUILT, NEVER RESTORED. The snapshot is the fields that DETERMINE a plan, so the block comes
+  // back built by today's engine rather than by whatever version was current when it was abandoned.
+  assert.match(r, /recompute\(\)/, "the rebuild no longer goes through recompute");
+  assert.ok(!/\bPLAN\s*=/.test(r), "PLAN is being assigned by hand");
+  // ⚠️ A TARGET DATE IN THE PAST PRODUCES A PLAN WITH NO WEEKS IN IT, because applyProfile clamps the
+  // start to today. So a stale date is pulled forward — and the runner is told which happened.
+  assert.match(r, /j\.prof\.raceDate <= todayIso\(\)/, "a target date in the past is no longer detected");
+  assert.match(r, /the old one has passed/, "the runner is not told the date moved");
+  assert.match(r, /keeping its target date/, "the runner is not told the date was kept");
+  // It asks, and the ticks and the snapshot follow the same ordering every rebuild path here uses.
+  assert.match(r, /confirmSheet\(/, "reusing a plan no longer asks");
+  const snap = r.indexOf("const before ="), reb = r.indexOf("recompute()"), seed = r.indexOf("seedDone()");
+  assert.ok(snap >= 0 && snap < reb && reb < seed, "the snapshot/rebuild/seed ordering is wrong");
+  assert.match(r, /seedDone\(\); restoreTicks\(/, "today's ticks are not restored around seedDone");
+});
+
+test("BLOCKER: deleting a plan asks first, and says what it does not touch", () => {
+  const d = nocomment(fn("confirmDeletePlan"));
+  assert.match(d, /confirmSheet\(/, "deleting a plan no longer asks");
+  assert.match(d, /no way to/, "the dialog does not say the deletion is permanent");
+  assert.match(d, /runs you did during it are untouched/, "the dialog does not say the runs survive");
+  assert.match(d, /plan journal/, "the dialog does not say the club's journal loses it too");
+  // And it is the only deleter.
+  const app = nocomment(appBlock());
+  assert.equal([...app.matchAll(/journalDelete\(/g)].length, 2,
+    "journalDelete has more callers than its definition and the confirm");
+});
+
+test("BLOCKER: the plans screen introduces no second colour vocabulary, and every control is wired", () => {
+  // ⚠️ The reference gives each plan type its own coloured shield. This app has exactly ONE meaning for
+  // a coloured chip — how hard a session is (ruling 7, one mapping, read by the card, the tile, the
+  // calendar and the plan dot) — so a colour keyed on race distance would make amber mean "10 km" in
+  // one place and "tempo" in another. The distance is in the badge's TEXT instead.
+  const view = nocomment(fn("viewPlans"));
+  assert.ok(!/--eff-/.test(view), "the plans screen paints with the effort colours");
+  assert.ok(!/PHASE\[/.test(view), "the plans screen paints with the phase colours");
+  assert.match(view, /isLive \? "var\(--accent\)" : "var\(--ink-faint\)"/, "the badge no longer reads active-versus-past");
+
+  // Every control the screen renders is reached by a handler, and from #view rather than the document.
+  const app = appBlock();
+  for (const a of ["rpname", "rpdel", "rpuse"]) {
+    assert.match(view, new RegExp("data-" + a + '="'), "the screen no longer renders data-" + a);
+    assert.match(app, new RegExp('vw\\.querySelectorAll\\("\\[data-' + a + '\\]"\\)'),
+      "data-" + a + " is not bound from #view");
+  }
+  // The menu row that reaches it, and the subtitle that says whether there is anything behind it.
+  assert.match(nocomment(fn("managePlanHtml")), /row\("plans"/, "the menu lost the plans row");
+  assert.match(nocomment(fn("manageAction")), /state\.screen = "plans"/, "the plans row goes nowhere");
+  assert.match(nocomment(appBlock()), /state\.screen === "plans"/, "there is no route for the plans screen");
 });

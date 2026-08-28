@@ -5704,6 +5704,51 @@ html.kbup .club-txc { bottom: var(--kbh, 0px); }
 .ce-pb-v { flex: none; width: 4.6em; text-align: right; font-size: var(--t-card); font-weight: 500;
   color: var(--ink); }
 
+/* ---- Manage plan ------------------------------------------------------------------------ */
+/* The action row on the Plan screen. Four tiles, evenly spread, every one leading somewhere real. */
+.pa-row { display: flex; gap: var(--s2); padding: var(--s3); }
+.pa-tile { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center;
+  gap: 7px; padding: var(--s2) 2px; background: none; border: 0; border-radius: var(--r-ctl);
+  font: inherit; color: var(--ink); cursor: pointer; min-height: var(--tap); }
+.pa-tile:hover { background: var(--surface-2); }
+.pa-ico { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center; color: var(--ink-soft); }
+.pa-ico svg { width: 21px; height: 21px; }
+.pa-tile[data-pact="manage"] .pa-ico { border-color: var(--accent); color: var(--accent); }
+.pa-lab { font-size: var(--t-label); font-weight: 650; line-height: 1.25; text-align: center;
+  color: var(--ink-soft); }
+/* The menu rows. */
+.mp-list { display: flex; flex-direction: column; margin-top: var(--s3); }
+.mp-row { display: flex; align-items: center; gap: var(--s3); width: 100%; text-align: left;
+  padding: var(--s3) 0; background: none; border: 0; border-top: 1px solid var(--line);
+  font: inherit; color: inherit; cursor: pointer; min-height: var(--tap); }
+.mp-row:first-child { border-top: 0; }
+.mp-mid { min-width: 0; flex: 1; }
+.mp-t { display: block; font-size: var(--t-card); font-weight: 650; color: var(--ink); }
+.mp-s { display: block; font-size: var(--t-label); color: var(--ink-soft); margin-top: 2px; }
+.mp-chev { flex: none; color: var(--ink-faint); font-size: var(--t-section); }
+.mp-note { font-size: var(--t-label); color: var(--ink-soft); margin: var(--s3) 0 0; line-height: 1.55; }
+/* Pause: the length chips, the verdict, and the options. */
+.po-days { display: flex; flex-wrap: wrap; gap: var(--s2); margin: var(--s3) 0; }
+.po-day { padding: 9px var(--s3); border: 1px solid var(--line); border-radius: var(--r-pill);
+  background: var(--surface); font: inherit; font-size: var(--t-label); font-weight: 650;
+  color: var(--ink-soft); cursor: pointer; min-height: var(--tap); }
+.po-day.on { border-color: var(--accent); color: var(--accent-ink); background: var(--accent); }
+.po-verdict { display: block; padding: var(--s3); border-radius: var(--r-card);
+  background: var(--surface-2); margin-bottom: var(--s3); }
+.po-verdict b { display: block; font-size: var(--t-card); color: var(--ink); }
+.po-verdict span { display: block; font-size: var(--t-label); color: var(--ink-soft);
+  margin-top: 5px; line-height: 1.55; }
+.po-opt { display: block; width: 100%; text-align: left; padding: var(--s3); margin-bottom: var(--s2);
+  border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface);
+  font: inherit; color: inherit; cursor: pointer; }
+.po-opt.rec { border-color: var(--accent); }
+.po-rec { display: inline-block; font-size: var(--t-label); font-weight: 700; color: var(--accent);
+  margin-bottom: 4px; }
+.po-t { display: block; font-size: var(--t-card); font-weight: 650; color: var(--ink); }
+.po-b { display: block; font-size: var(--t-label); color: var(--ink-soft); margin-top: 4px;
+  line-height: 1.55; }
+
 </style>
 </head>
 <body>
@@ -10959,6 +11004,263 @@ function feasibilityWhy() {
     (rest.length ? '<details class="feas-more"><summary>How we worked this out</summary>' +
       '<div class="feas-why">' + rest.map((t) => '<div>' + esc(t) + '</div>').join("") + '</div></details>' : "");
 }
+
+// ============ MANAGE PLAN =================================================================
+// One place to change the plan you already have, rather than editing your profile and hoping.
+//
+// EVERY ROW HERE GOES SOMEWHERE THAT WORKS. Three of the four tiles lead to screens this app has
+// had for months and simply never gathered in one place: the block chart below is the overview,
+// the session sheet's day picker is how a workout moves, and Profile has the connections. What is
+// new is the fifth thing -- adapting the plan itself -- and it is the only one that needed building.
+// The pause length the sheet is currently showing. Module-level rather than on state because it is
+// a question in flight, not something worth persisting -- closing the sheet is the runner changing
+// their mind, and a remembered answer would reopen at a length they had abandoned.
+let PAUSE_DAYS = 7;
+const PAUSE_CHOICES = [3, 7, 14, 21, 28, 42, 70];
+function planActionsHtml() {
+  const tile = (id, icon, label) =>
+    '<button class="pa-tile" data-pact="' + id + '"><span class="pa-ico" aria-hidden="true">' + icon +
+    '</span><span class="pa-lab">' + label + '</span></button>';
+  return '<div class="card pa-row">' +
+    tile("overview", ICON.plan, "Plan<br>overview") +
+    tile("move", ICON.cal, "Move a<br>workout") +
+    tile("apps", ICON.devices, "Connected<br>apps") +
+    tile("manage", ICON.clip, "Manage<br>plan") +
+    '</div>';
+}
+
+// The menu. Rows that do something, and one sentence for the ones that do not exist yet -- the same
+// answer the Create sheet gives reels and going live, and the rule this app keeps everywhere: no
+// control ships before the thing behind it.
+function managePlanHtml() {
+  const row = (id, title, sub) =>
+    '<button class="mp-row" data-mp="' + id + '"><span class="mp-mid"><span class="mp-t">' + title +
+    '</span><span class="mp-s">' + sub + '</span></span><span class="mp-chev" aria-hidden="true">' +
+    "\u203a" + '</span></button>';
+  return '<div class="eyebrow">Manage plan</div>' +
+    '<h3 class="sheet-h">' + esc(PLAN.goal.race) + ' · ' + esc(PLAN.goal.raceDate) + '</h3>' +
+    '<div class="mp-list">' +
+      row("pause", "Pause my plan", "Away, ill, or just need to stop for a while") +
+      row("prefs", "Training preferences", "Days, mileage, long-run day, how hard it feels") +
+      row("new", "Start a new plan", "A different goal or a different date") +
+    '</div>' +
+    '<p class="mp-note">A holiday you can plan in advance, and a &ldquo;not feeling 100%&rdquo; week ' +
+    'that eases the next few sessions, are next. Both use the same machinery as Pause, so they are a ' +
+    'small addition rather than a new screen.</p>';
+}
+
+// ---- PAUSE ---------------------------------------------------------------------------------
+// ⚠️ HOW LONG BEFORE THE PLAN HAS TO BE REMAPPED -- the owner asked for this to be researched rather
+// than guessed, and the answer is bounded by what this engine can actually do differently, not by a
+// number from a paper.
+//
+// THREE THINGS THE APP ALREADY KNOWS, and they set the lines:
+//   * src/adapt/load-guardrails.ts's returnToRunningPlan already draws its own line at
+//     **weeksOff >= 4** ("take it slower given the longer break"), so four weeks is this codebase's
+//     existing long-layoff threshold and there is no reason to invent a second one.
+//   * src/adapt/missed-sessions.ts handles missed work WITHOUT a rebuild -- it scales the easy runs
+//     to 0.85 and the long run to 0.8 and drops the hardest quality session. That is the mechanism for
+//     a short gap, and it exists precisely so a fortnight does not need a new plan.
+//   * Athlete.returningFromBreak is the only lever the GENERATOR has for time off, and it is binary:
+//     it knows you had a break, not how long. Measured on a 5-day half-marathon block at 40 km/week,
+//     it opens week one at 30.2 km instead of 32.0, shortens the first long run from 80 to 61 minutes
+//     and removes 5 of 28 quality sessions -- while the PEAK is unchanged at 51.3 km. So a break
+//     changes the run-in, not the destination.
+//
+// ⚠️ AND THE GENERAL DETRAINING CONSENSUS IS LABELLED AS CONSENSUS, NOT AS THIS PROJECT'S EVIDENCE
+// REPORT. That report is not in the repo and it is scoped to prescription, not detraining; CLAUDE.md
+// already records the fuelling module being wrongly described as report-backed. What is uncontroversial
+// is the ORDERING: blood volume and plasma fall within days, aerobic fitness holds for roughly a week
+// and then declines, and tendon and bone de-adapt more slowly than the cardiovascular system -- which
+// is exactly what returnToRunningPlan's own note says. The tiers below follow that ordering.
+const PAUSE_TIERS = [
+  { maxDays: 7, id: "nudge",
+    head: "A week or less — nothing needs rebuilding",
+    why: "Under about a week you lose very little. The sessions you missed are missed; the plan behind them still fits." },
+  { maxDays: 14, id: "resume",
+    head: "Up to a fortnight — pick the plan back up, one notch easier",
+    why: "Your fitness is close to where you left it, but the first week back is not the week to catch up in. Skip what you missed rather than cramming it." },
+  { maxDays: 28, id: "rebuild",
+    head: "Two to four weeks — worth rebuilding the run-in",
+    why: "Long enough that the opening weeks should start further back. The destination does not change; the ramp toward it does." },
+  { maxDays: Infinity, id: "reentry",
+    head: "Over a month — rebuild, and ease back in",
+    why: "This is the point the app already treats as a long layoff. Your heart and lungs come back faster than tendons and bone, so the first fortnight is about frequency, not distance." },
+];
+function pauseTierFor(days) {
+  const d = Math.max(0, Math.round(Number(days) || 0));
+  for (const t of PAUSE_TIERS) if (d <= t.maxDays) return t;
+  return PAUSE_TIERS[PAUSE_TIERS.length - 1];
+}
+
+
+// The pause sheet. It asks how long, says what that length means, and then ends in a CHOICE -- never
+// in a change. Standing instruction, 2026-08-03: the app may observe and it may propose; it may never
+// change a pace, a plan or a target on its own.
+function pausePlanHtml() {
+  const days = PAUSE_DAYS;
+  const t = pauseTierFor(days);
+  const raceIso = profile.raceDate || "";
+  // ⚠️ isoAdd RETURNS A DATE, NOT A STRING, and every existing caller appends
+  // .toISOString().slice(0, 10). I assigned the Date straight into profile.raceDate and the whole
+  // apply path threw inside its own try/catch -- the sheet stayed open, the date never moved, and the
+  // only visible symptom was the option's "your target date becomes" sentence rendering EMPTY, because
+  // runDateLabelIso splits a string on "-" and a Date stringifies to something else entirely. Found by
+  // driving the button, not by reading the code.
+  const moved = raceIso ? isoAdd(raceIso, days).toISOString().slice(0, 10) : "";
+  const weeksLeft = Math.max(0, PLAN.weeks.length - 1 - CURRENT_WEEK);
+  // ⚠️ WHAT EACH OPTION COSTS IS COMPUTED, NOT DESCRIBED. Runna's sheet quotes real end dates, and a
+  // sheet that says "your plan will end later" without saying when is asking somebody to agree to a
+  // number they cannot see.
+  const opt = (id, rec, title, body) =>
+    '<button class="po-opt' + (rec ? " rec" : "") + '" data-pauseopt="' + id + '">' +
+    (rec ? '<span class="po-rec">Recommended for ' + days + (days === 1 ? " day" : " days") + '</span>' : "") +
+    '<span class="po-t">' + title + '</span><span class="po-b">' + body + '</span></button>';
+  // ⚠️ MOVING THE DATE IS RECOMMENDED FOR EVERY BREAK LONG ENOUGH TO MATTER, INCLUDING THE LONGEST.
+  // I first recommended KEEPING the date after a month off, and it is backwards: a month away plus an
+  // unchanged target means the block has to be compressed at exactly the moment the runner is least
+  // ready for it. Moving the date back by the length of the break restores the block they had.
+  const shift = t.id === "nudge"
+    ? ""
+    : opt("shift", true, "Move my target date back",
+        "Everything you have not done yet stays in the plan; the whole block simply lands " + days +
+        (days === 1 ? " day" : " days") + " later." +
+        (moved ? " Your target date becomes <b>" + esc(runDateLabelIso(moved)) + "</b>." : ""));
+  // Keeping the date is a real answer -- a booked race does not move -- so it is always offered and
+  // never recommended once the break is long enough to have cost something.
+  const keep = opt("keep", t.id === "nudge" ? false : false, "Keep my target date",
+    "Rebuild from today to the date you already have. There " +
+    (weeksLeft === 1 ? "is 1 week" : "are " + weeksLeft + " weeks") +
+    " left, so the block gets shorter rather than later." +
+    (t.id === "reentry" ? " With a break this long the rebuild also starts you further back." : ""));
+  const nothing = opt("none", t.id === "nudge", "Just carry on",
+    "Nothing changes. The sessions you missed stay missed and you pick up with today's.");
+  return '<div class="eyebrow">Pause my plan</div>' +
+    '<h3 class="sheet-h">How long will you be away?</h3>' +
+    '<div class="po-days">' +
+      PAUSE_CHOICES.map((d) => '<button class="po-day' + (d === days ? " on" : "") +
+        '" data-pausedays="' + d + '" aria-pressed="' + (d === days) + '">' + pauseDaysLabel(d) + '</button>').join("") +
+    '</div>' +
+    '<div class="po-verdict"><b>' + t.head + '</b><span>' + t.why + '</span></div>' +
+    shift + keep + nothing +
+    '<p class="mp-note">Whichever you pick, nothing is saved until you choose it, and you can undo it ' +
+    'from the toast straight afterwards.</p>';
+}
+function pauseDaysLabel(d) {
+  if (d < 7) return d + " days";
+  if (d === 7) return "1 week";
+  if (d % 7 === 0) return (d / 7) + " weeks";
+  return d + " days";
+}
+
+// ⚠️ APPLYING IT GOES THROUGH recompute(), WHICH GOES THROUGH adoptPlan -- never a hand-assignment to
+// PLAN. Setting the globals is not the whole job: normalizeWeekStarts snaps each week back to its
+// Monday and syncNativeReminders + syncWatch re-send a plan the OS and the wrist already hold. The
+// Save handler open-coded that once and left iOS holding reminders for a schedule that no longer
+// existed.
+// ⚠️ AND THE UNDO SNAPSHOT IS TAKEN BEFORE THE REBUILD, because seedDone() prunes state.dayOverride of
+// every session id the new plan lacks and PERSISTS the prune -- so by the time a toast appears the
+// runner's own reschedules are already gone from disk.
+function applyPause(kind) {
+  const days = PAUSE_DAYS;
+  const before = { raceDate: profile.raceDate, returning: profile.returning, overrides: JSON.stringify(state.dayOverride || {}) };
+  if (kind === "none") { closeSheet(); toast("Nothing changed — pick up with today's session."); return; }
+  const ticks = todayTicks();
+  if (kind === "shift" && profile.raceDate) profile.raceDate = isoAdd(profile.raceDate, days).toISOString().slice(0, 10);
+  // Over a month off is this codebase's own long-layoff line, and the generator's only lever for it is
+  // the returning flag: measured, it opens week one 6% smaller, shortens the first long run by a
+  // quarter and removes 5 of 28 quality sessions, while leaving the peak alone.
+  if (pauseTierFor(days).id === "reentry") profile.returning = true;
+  try { recompute(); } catch (e) {
+    profile.raceDate = before.raceDate; profile.returning = before.returning;
+    toast("That did not work — your plan is unchanged."); return;
+  }
+  computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
+  seedDone(); restoreTicks(ticks); saveProfileStore();
+  closeSheet();
+  toastUndo(kind === "shift" ? "Target date moved back " + pauseDaysLabel(days) + "." : "Plan rebuilt to your existing date.", () => {
+    const t2 = todayTicks();
+    profile.raceDate = before.raceDate; profile.returning = before.returning;
+    try { state.dayOverride = JSON.parse(before.overrides); } catch (e) {}
+    try { recompute(); } catch (e) {}
+    computeToday(); seedDone(); restoreTicks(t2); saveProfileStore(); render();
+  });
+  render();
+}
+
+
+// ---- the three dispatchers ----------------------------------------------------------------
+// EVERY BRANCH GOES SOMEWHERE THAT EXISTS. A tile that looks live and does nothing is the class of
+// defect this app has shipped three times (rdMore, the profile confirm button clicking a #saveSetup
+// that was nowhere in the app, and the recap's Share button losing its handler to a duplicate id).
+function planAction(id) {
+  if (id === "overview") {
+    // The block chart IS the overview, and it is on this screen -- so bring it into view rather than
+    // opening a second screen that says the same thing.
+    const c = $("chart");
+    // ⚠️ NO JS REDUCE-MOTION TEST HERE. This app honours the setting GLOBALLY in CSS and has no
+    // prefersReducedMotion() helper -- I invented one and the existence sweep caught it. Browsers
+    // suppress a smooth scroll under the setting themselves, so asking is both unnecessary and a
+    // second place for the answer to live.
+    if (c) c.scrollIntoView({ block: "center", behavior: "smooth" });
+    return;
+  }
+  if (id === "move") {
+    // Moving a workout is the session sheet's own day picker. Open today's session if there is one,
+    // otherwise the selected week's first runnable session -- never a dead end.
+    const today = sessionsForIso(todayIso()).filter((x) => PRIMARY_TYPES[x.type]);
+    const pick = today[0] || (sessionsOnSelectedDay() || [])[0] || null;
+    if (pick) { openSessionSheet(pick); return; }
+    toast("Open any session from Your weeks below, then use the day picker to move it.");
+    return;
+  }
+  if (id === "apps") {
+    // ⚠️ THERE IS NO openHub(). A hub page is opened by setting state.support and rendering, which is
+    // exactly what the [data-hub] handler does -- I invented a wrapper and the existence sweep caught
+    // it before it shipped as a tile that looked live and did nothing.
+    state.tab = "support"; state.screen = null; state.support = "connect"; state.supportFrom = null;
+    render();
+    return;
+  }
+  if (id === "manage") { openManagePlan(); return; }
+}
+function openManagePlan() {
+  ensureSheet(); SHEET_CTX = null;
+  $("sheetBody").innerHTML = managePlanHtml();
+  wire();
+  $("sheetOv").classList.add("on");
+}
+function manageAction(id) {
+  if (id === "pause") { PAUSE_DAYS = 7; openPauseSheet(); return; }
+  if (id === "prefs") {
+    // ⚠️ THE SCOPED PROFILE EDIT, WHICH ALREADY EXISTS. Training preferences in this app ARE the
+    // rhythm questions -- days a week, weekly mileage, long-run day, start date -- and there is a
+    // whole mechanism (state.setupFocus + applySetupFocus) for showing one section of the form and
+    // saying the rest is untouched. Building a second set of controls over the same fields would give
+    // one preference two homes, and the two disagree the first time somebody changes the other.
+    closeSheet();
+    state.setupFocus = "rhythm";
+    state.screen = "setup";
+    render();
+    return;
+  }
+  if (id === "new") {
+    // The wizard already builds a plan from scratch and ends by letting the runner pick between real
+    // variants. Naming plans and keeping the old ones is the genuinely new part and is not built.
+    closeSheet();
+    state.screen = "setup";
+    state.setupFocus = null;
+    render();
+    return;
+  }
+}
+function openPauseSheet() {
+  ensureSheet(); SHEET_CTX = null;
+  $("sheetBody").innerHTML = pausePlanHtml();
+  wire();
+  $("sheetOv").classList.add("on");
+}
+
 function viewPlan() {
   const g = PLAN.goal, s = PLAN.summary;
   const peak = s.peakKm || 1;
@@ -11022,6 +11324,7 @@ function viewPlan() {
     '<div class="card plan-head"><div class="eyebrow">Your plan</div><div class="goal">' + g.race + ' · ' + g.target + '</div><div class="when">' + g.raceDate + ' · ' + s.structuredWeeks + '-week plan</div>' +
     '<span class="pill" style="--pc:' + (PLAN.feasibility.verdict==="achievable"?"var(--accent)":"var(--peak)") + '">' + PLAN.feasibility.verdict + '</span>' +
     feasibilityWhy() +
+    planActionsHtml() +
     '<div class="statrow"><div class="stat"><div class="k">Weeks</div><div class="v num">' + s.structuredWeeks + '</div></div><div class="stat"><div class="k">Peak/wk</div><div class="v num">' + s.peakKm + ' km</div></div><div class="stat"><div class="k">Goal pace</div><div class="v num">' + PLAN.paces.goal.replace("/km","") + '</div></div></div></div>' +
     starterNote +
     mileageNote +
@@ -35747,6 +36050,17 @@ function wire() {
   }));
   wireCoachSettings();
   ["s_age","s_sex"].forEach((id) => { const e = $(id); if (e) e.oninput = e.onchange = refreshTypePreview; });
+  // ---- Manage plan ----------------------------------------------------------------------
+  // ⚠️ SCOPED TO #view, NOT document. #sheetOv lives outside #view and survives a render, so a
+  // document-wide bind would rebind the sheet's own controls on every background render -- the exact
+  // fault that made data-wk mean two things and killed the session builder mid-use.
+  const vw = $("view");
+  if (vw) vw.querySelectorAll("[data-pact]").forEach((b) => { b.onclick = () => planAction(b.dataset.pact); });
+  document.querySelectorAll("[data-mp]").forEach((b) => { b.onclick = () => manageAction(b.dataset.mp); });
+  document.querySelectorAll("[data-pausedays]").forEach((b) => {
+    b.onclick = () => { PAUSE_DAYS = Number(b.dataset.pausedays) || 7; openPauseSheet(); };
+  });
+  document.querySelectorAll("[data-pauseopt]").forEach((b) => { b.onclick = () => applyPause(b.dataset.pauseopt); });
   bindTimeInput($("s_target")); bindTimeInput($("s_rectime")); bindTimeInput($("s_easypace"));
   const km1 = $("s_2km");
   if (km1) { bindTimeInput(km1); km1.addEventListener("input", refreshMasHint); refreshMasHint(); }

@@ -12371,3 +12371,107 @@ with a genuine second writer.
 good use of the Date. Its `[^)]*` also could not see past a nested `todayIso()`, so the message it
 printed was a truncated call rather than the offending one. The claim is that the result is treated as a
 Date at all, i.e. never left bare.
+
+## THE WEEKS AN ADJUSTMENT ACTUALLY TOUCHES, MARKED ON THE PLAN (owner, 2026-08-28)
+
+*"After ive chosen the holiday or ive paused a plan for a set time, i want that to be clear on the plan
+page which week(s) it actually is by putting a different colour around the border of the week drop down
+button. when opening the drop down it needs to identify the change (e.g. holiday week)"*
+
+⚠️ **THE DEFECT WAS THAT AN ADJUSTMENT LEFT NO TRACE ON THE SCREEN IT CHANGED.** `applyAdjustments`
+removed the sessions correctly and the week rows were **byte-identical** whether a holiday ran through
+them or not — same border, same tags, same meta line — so the only way to find out which weeks had lost
+runs was to open each one and notice one was missing. Suite 1400 → **1405**; **16 deliberate re-breaks,
+all 16 caught** (the sixteenth needed a new fixture first — below). Web-only, so it reaches his phone on
+the next launch.
+
+⚠️ **DASHED, NOT A NEW COLOUR, AND THAT IS WHAT HIS OWN WORDS DID NOT SETTLE.** He asked for "a
+different colour", and `.wk-sum.cur` **already owns the solid accent border** — so a second accent
+border would mark two different things identically, which is no marking at all, and a third hue would
+put a colour in the plan screen's vocabulary that ruling 7 reserves for effort. The dash is the same
+device the share studio's ineligible rows use, for the same reason: form carries a meaning colour is
+already spoken for.
+⚠️ **AND `.wk-sum.cur.adj` IS A RULE OF ITS OWN BECAUSE THE TWO TIE ON SPECIFICITY.** `.wk-sum.cur` and
+`.wk-sum.adj` are both (0,2,0), so without it whichever came later in the stylesheet would decide — and
+"this week, and it is a holiday week" is the case a runner most needs to read. Measured: a current week
+that is also altered carries **both** tags (`["This week", "Easier"]`).
+⚠️ **THE TAG CARRIES THE WORD, so the border is never the only signal** — the rule this app applies to
+phase swatches (a swatch reading "Build" only helps if you can match its colour to a bar), to
+low-confidence notes, and to the ineligible share rows. `Holiday` or `Easier`, in the accent.
+
+⚠️⚠️ **`weekAdjust(w)` WALKS THE WEEK'S SEVEN DAYS RATHER THAN TESTING ITS START, AND THAT IS THE ONE
+DECISION THAT WOULD HAVE BEEN EASY TO GET WRONG.** A holiday runs Friday to the following Thursday far
+more often than it lines up with a Monday, so a week-start test marks one of the **two** weeks it
+touches while the other reads as untouched with its sessions already gone. Measured through the real
+function: a window of 11–17 Sep marks week 3 (**3 days**) and week 4 (**4 days**), each naming its own
+share of it, and a week that does not meet it is not marked and carries no note.
+
+⚠️ **IT IS THE ONE DEFINITION, READ BY BOTH RENDER SITES.** A second computation is how the border and
+the note come to disagree — the row saying nothing happened over a note describing three missing days,
+or the reverse. Neither `weekSummaryRow` nor `weekAdjustNote` walks the days or asks `adjustFor` itself,
+and a derived sweep pins the list of functions that decide membership in a **stored** window at exactly
+`weekAdjust` and `applyAdjustments`.
+⚠️ **`adjustPreviewCount` RANGE-TESTS INLINE AND THAT IS NOT A SECOND DEFINITION** — it is handed ONE
+draft window that is not in the store yet, so there is nothing for `adjustFor` to search. Stated in the
+guard rather than left as a silent exception, and pinned so it cannot quietly grow into a search.
+
+⚠️⚠️ **A PAUSE GETS A ROW, NOT A COLOURED WEEK, AND THE REASON IS THE DIFFERENCE BETWEEN THE TWO
+FEATURES.** Pausing moves the block's **start date**, so the paused days belong to no week of the plan
+at all — there is no row to put a border on. A holiday leaves the weeks where they are and empties days
+inside them. So `pausedWeekRow()` is one inert row above the list reading *"Paused · 28 Aug to 17 Sep ·
+nothing scheduled · week 1 begins 18 Sep"*.
+- ⚠️ **A `div` with `aria-disabled`, never a button**, because there is nothing behind it to open — the
+  same rule `test/design-system.test.ts` enforces on plan session rows and the Logbook's unopenable days.
+- ⚠️ **Derived from a future `profile.startDateIso`, with no store of its own**, exactly as `pausedCard`
+  is: a stored copy of "we are paused until…" goes stale against the date that actually decides it.
+- ⚠️ **NO TAG ON THIS ROW.** The other marked rows carry one because their title is "Week 4" and the
+  word has to go somewhere; this row's title IS the word, and a tag repeating it rendered
+  **"PausedPaused"**. Found by reading the served page, not by reasoning.
+
+⚠️ **THE NOTE'S PHRASE COMES FROM `ADJ_MODES[].p`, NOT `.t.toLowerCase()` — my own defect, measured.**
+Lowercasing the fourth mode's title gave *"3 days of this week — i am not planning on running."*, which
+is a sentence about the runner's **intention** pasted into a sentence about the **week**. A `p` field per
+mode, and a guard requires every mode to carry one so a fifth level cannot fall back to printing its id.
+
+⚠️ **THE NOTE NAMES REAL DATES, NEVER "THIS WEEK".** The row above it already says which week; what the
+runner cannot work out for themselves is *which days of it* are gone — and a plan is read weeks ahead of
+time. It also names the way back per kind (*Manage plan › Going away* / *› Not feeling 100%*), because
+the sheet it came from is not the screen it is read on, and it mentions strength and mobility **only**
+when they were actually taken out.
+
+⚠️ **CONTRAST IS COVERED BY CONSTRUCTION, AND A GUARD KEEPS IT THAT WAY.** Every pairing introduced here
+is one `test/contrast.test.ts` already asserts in all four theme blocks — `--accent-ink` on `--accent`,
+and `--accent`/`--ink-soft`/`--ink-faint` on `--surface-2`. So no pixel probe was taken; what was added
+instead is a sweep failing if any of these seven rules ever carries a **literal hex or a `color-mix()`**,
+which is the shape that would fall outside every existing guard. This file already records a
+`color-mix()` label measuring 2.41:1 in light mode after passing a dark-only review.
+
+### ⚠️⚠️ THE SIXTEENTH RE-BREAK: ONE WINDOW CANNOT DISCRIMINATE A DAY COUNT
+
+Dropping the `a === hit` test from `weekAdjust`'s loop **escaped every assertion**, because with a single
+window stored `a` is always `hit` and the break is a no-op. It is a real defect: a week holding two
+windows — a holiday Mon–Wed and an easier stretch Thu–Fri — then reported *"5 days of this week — easy
+runs only"* under the holiday's label, when three of those days were the holiday and two were something
+else, with the note's span reaching into a window it was not describing. **The fixture-too-kind trap, in
+the one test whose entire subject is day-counting.** The fixture now holds two windows and asserts the
+count, the days, the label and the span all belong to the first one only.
+
+⚠️ **AND MY MEMBERSHIP SWEEP REPORTED THE ONE DEFINITION AS A ROGUE CALLER.** `fn("adjustFor")` returns
+the function *including its own signature*, so `/adjustFor\(/` matched itself. The body is stripped of
+its signature before the scan — the guard-trips-on-its-own-vocabulary trap, which this file has now
+recorded six times.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc
+clean apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1405 pass / 0
+fail under UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`**, both design ratchets unchanged and
+`CSS_DUP_CEILING` unchanged at 20 (every new selector is compound). Test titles accounted for: **5
+added, 0 removed.** Driven end to end in a real browser against the served `docs/`: 25 rows with no
+adjustment and none marked; a holiday spanning two plan weeks marking both; the opened week's note; an
+unaffected week with no note; a whole-week "not running" reading *"The whole week — no running at all.
+Strength and mobility are out too."*; a current+altered week carrying both tags; a 21-day pause
+rendering one `DIV` row first in the list; and `document`/`body` horizontal overflow **0**.
+
+⚠️ **STILL THE OWNER'S CALL, UNCHANGED BY THIS:** the weekday-time question (measured, not built), a
+"longest run in the past month" profile field, and surfacing `masters.points` (needs his clinical
+reviewer). And the returning-from-injury week-one inversion (350 vs 320 minutes when a volume is stated)
+is reported and unfixed.

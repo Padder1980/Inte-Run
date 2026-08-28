@@ -5717,12 +5717,34 @@ html.kbup .club-txc { bottom: var(--kbh, 0px); }
 .pa-tile[data-pact="manage"] .pa-ico { border-color: var(--accent); color: var(--accent); }
 .pa-lab { font-size: var(--t-label); font-weight: 650; line-height: 1.25; text-align: center;
   color: var(--ink-soft); }
-/* The menu rows. */
+/* ---- The menu rows: an outlined card each, in its own colour ------------------------------- */
+/* ⚠️ THE GEOMETRY IS .po-opt's AND .rp-card's, NOT A NEW SHAPE. Both are outlined cards on this same
+   sheet family -- 1px solid, var(--r-card), var(--surface), var(--s3) padding, var(--s2) between --
+   and both express their highlighted state as border-color alone. Six cards in six colours is that
+   convention with the colour varied, which is exactly what the owner asked for ("different coloured
+   outlines to separate them out better") and adds no geometry to keep in step.
+   ⚠️ 78% TOWARD --ink IS MEASURED, NOT PICKED. At 100% (the raw token) the worst of the six is 2.76:1
+   in light on --surface; at 85% it is 3.54, at 78% 3.98, at 72% 4.46, at 58% 5.83 -- and the pairwise
+   colour separation falls the whole way (74 -> 63 -> 59 -> 53 -> 42), so lower is more legible and
+   less distinguishable. 78% is where both are comfortable: 3.98:1 light / 6.96:1 dark with a full
+   point over the 3:1 non-text floor, and the six hues still 59 apart.
+   ⚠️ THE OLD :first-child RULE HAD TO GO WITH THE DIVIDERS. It was border-top: 0, which suppressed
+   the hairline above the first row -- left in place over a card it would have cut the top edge off the
+   first card and only the first, which reads as a rendering fault rather than a stale rule. */
 .mp-list { display: flex; flex-direction: column; margin-top: var(--s3); }
 .mp-row { display: flex; align-items: center; gap: var(--s3); width: 100%; text-align: left;
-  padding: var(--s3) 0; background: none; border: 0; border-top: 1px solid var(--line);
+  padding: var(--s3); margin-bottom: var(--s2); background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--pc) 78%, var(--ink)); border-radius: var(--r-card);
   font: inherit; color: inherit; cursor: pointer; min-height: var(--tap); }
-.mp-row:first-child { border-top: 0; }
+.mp-row:last-child { margin-bottom: 0; }
+/* The chip is .pf-ic's shape and its tinted-ground idea, with the glyph mixed for the same reason the
+   outline is: .pf-ic paints its glyph in the RAW token over an 18% tint of it, and that measures
+   2.10-2.79:1 in light on eight of its twelve rows -- a pre-existing, unguarded defect on the Profile
+   screen, reported rather than copied. */
+.mp-ic { flex: none; width: 30px; height: 30px; border-radius: var(--r-ctl); display: grid;
+  place-items: center; color: color-mix(in srgb, var(--pc) 78%, var(--ink));
+  background: color-mix(in srgb, var(--pc) 14%, transparent); }
+.mp-ic svg { width: 17px; height: 17px; }
 .mp-mid { min-width: 0; flex: 1; }
 .mp-t { display: block; font-size: var(--t-card); font-weight: 650; color: var(--ink); }
 .mp-s { display: block; font-size: var(--t-label); color: var(--ink-soft); margin-top: 2px; }
@@ -11346,19 +11368,45 @@ function planActionsHtml() {
 // answer the Create sheet gives reels and going live, and the rule this app keeps everywhere: no
 // control ships before the thing behind it.
 function managePlanHtml() {
-  const row = (id, title, sub) =>
-    '<button class="mp-row" data-mp="' + id + '"><span class="mp-mid"><span class="mp-t">' + title +
+  // ⚠️ A COLOUR AND AN ICON PER ROW, WHICH IS THIS APP'S OWN DEVICE RATHER THAN A NEW ONE. profRow
+  // has done exactly this on the Profile screen's row list since it was written -- 13 assignments over
+  // ten reserved tokens (--eff-hard, --steady, --build, --rest, --ease, --base, --eff-easy, --taper,
+  // --accent, --eff-none), passed the same way, through the same --pc channel. So per-row colour here
+  // is wayfinding by precedent, not a second meaning invented for these six rows.
+  // ⚠️ AND THE COLOUR IS MIXED TOWARD --ink, NOT USED RAW. Measured as a 1px outline on the sheet's own
+  // --surface ground, the raw tokens run 2.44-3.37:1 in LIGHT mode -- eight of the eleven category
+  // colours are under the 3:1 non-text floor, the identical light-only trap this file records twice (the
+  // accent at 4.14 on white, the URGENT band title at 2.41). Diluting toward --line instead, which is
+  // what eleven existing borders do, lands them at 1.3-2.2:1: a grey hairline, i.e. the change would
+  // measure as nothing at all. color-mix toward --ink darkens in light and LIGHTENS in dark from ONE
+  // declaration, and at 78% every one of the six clears 3.98:1 light / 6.96:1 dark. See .mp-row.
+  const row = (id, title, sub, icon, colour) =>
+    '<button class="mp-row" data-mp="' + id + '" style="--pc: ' + colour + '">' +
+    '<span class="mp-ic" aria-hidden="true">' + (ICON[icon] || "") + '</span>' +
+    '<span class="mp-mid"><span class="mp-t">' + title +
     '</span><span class="mp-s">' + sub + '</span></span><span class="mp-chev" aria-hidden="true">' +
     "\u203a" + '</span></button>';
   return '<div class="eyebrow">Manage plan</div>' +
     '<h3 class="sheet-h">' + esc(PLAN.goal.race) + ' · ' + esc(PLAN.goal.raceDate) + '</h3>' +
     '<div class="mp-list">' +
-      row("pause", "Pause my plan", "Stop completely for a while and pick up later") +
-      row("holiday", "Going away", "Keep training your own way while you are there") +
-      row("ease", "Not feeling 100%", "Take the hard edges off the next few sessions") +
-      row("prefs", "Training preferences", "Days, mileage, long-run day, how hard it feels") +
-      row("new", "Start a new plan", "A different goal or a different date") +
-      row("plans", "Your plans", planListSub()) +
+      // ⚠️ THREE OF THE SIX CARRY A MEANING THAT GENUINELY TRANSFERS AND THREE ARE PURE WAYFINDING,
+      // and it is worth knowing which is which. --rest is already this app's stop colour (.ctrl.danger,
+      // .ui-pill.stop, the watch End button, both safety guides' emergency bands) and pausing is the one
+      // row that stops the plan and moves the target date. --ease is already the ease-off band colour and
+      // this row is literally easing off. --accent is the ordinary action colour. The other three are
+      // chosen for hue separation, exactly as profRow chooses its ten.
+      // ⚠️ THE FOUR PHASE COLOURS ARE ON THE SCREEN BEHIND THIS SHEET -- viewPlan renders phaseLegend
+      // with --base/--build/--peak/--taper swatches labelled Base/Build/Peak/Taper. --peak is therefore
+      // deliberately NOT used here: it is the loudest of the four and the one a runner is most likely to
+      // have just read as a phase. --base and --build are used, mixed, and that is a judged trade rather
+      // than an oversight; --eff-* are avoided entirely, because those four answer one question through
+      // one table (ruling 7) and a row wearing one would state a session effort that is not there.
+      row("pause", "Pause my plan", "Stop completely for a while and pick up later", "timer", "var(--rest)") +
+      row("holiday", "Going away", "Keep training your own way while you are there", "wxSun", "var(--base)") +
+      row("ease", "Not feeling 100%", "Take the hard edges off the next few sessions", "heart", "var(--ease)") +
+      row("prefs", "Training preferences", "Days, mileage, long-run day, how hard it feels", "gauge", "var(--accent)") +
+      row("new", "Start a new plan", "A different goal or a different date", "plus", "var(--build)") +
+      row("plans", "Your plans", planListSub(), "journal", "var(--taper)") +
     '</div>' +
     '<p class="mp-note">Pausing stops the plan and picks it up later. Going away and easing off leave ' +
     'your target date alone and take sessions out of the days you choose \u2014 so the block keeps its ' +

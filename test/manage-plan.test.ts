@@ -26,6 +26,14 @@ function appBlock(): string {
 }
 /** ⚠️ Anchored to the start of a line: `accept="image/*,video/*"` is an unbalanced opener mid-line. */
 const nocomment = (s: string) => s.replace(/^\s*\/\*[\s\S]*?\*\//gm, "").replace(/^\s*\/\/.*$/gm, "");
+/**
+ * ⚠️ A NAME INSIDE A STRING LITERAL IS NOT A CALL. The per-row colours are written as CSS —
+ * `"var(--rest)"` — and the bare-identifier sweep below read `var(` as a function this app does not
+ * define, reporting the fix as the defect. Same class as nocomment: strip what is not code before
+ * scanning for code. Kept to single- and double-quoted strings, because the runtime JS in this file
+ * has no template literals in it by rule.
+ */
+const nostring = (s: string) => s.replace(/"(?:[^"\\]|\\.)*"/g, '""').replace(/'(?:[^'\\]|\\.)*'/g, "''");
 function fn(name: string): string {
   const src = appBlock();
   const at = src.indexOf("function " + name + "(");
@@ -54,7 +62,7 @@ test("BLOCKER: every control in the menu reaches something that exists", () => {
   // produced would have shipped as a tile that looked live and did nothing — the class this app has
   // shipped three times (rdMore, #saveSetup, the recap's Share button).
   const bodies = ["planAction", "manageAction", "applyPause", "openManagePlan", "openPauseSheet",
-    "pausePlanHtml", "managePlanHtml", "planActionsHtml"].map((n) => nocomment(fn(n))).join("\n");
+    "pausePlanHtml", "managePlanHtml", "planActionsHtml"].map((n) => nostring(nocomment(fn(n)))).join("\n");
   // ⚠️ BARE IDENTIFIERS ONLY — a method call is a property of something else and is not ours to find.
   // The first version matched `.scrollIntoView(`, `JSON.stringify(` and `.toISOString(` and reported
   // four of the platform's own methods as missing functions.
@@ -83,9 +91,24 @@ test("BLOCKER: every control in the menu reaches something that exists", () => {
   // invented here; an undefined ICON renders an empty circle in total silence, which is exactly what
   // ICON.search did before somebody noticed the gap in the search field.
   const iconObj = app.slice(app.indexOf("const ICON = {"));
+  const icons = iconObj.slice(0, iconObj.indexOf("\n};"));
   for (const m of nocomment(fn("planActionsHtml")).matchAll(/ICON\.([a-zA-Z0-9_]+)/g))
-    assert.ok(new RegExp("\\b" + m[1] + ":").test(iconObj.slice(0, iconObj.indexOf("\n};"))),
+    assert.ok(new RegExp("\\b" + m[1] + ":").test(icons),
       "ICON." + m[1] + " does not exist, so that tile draws an empty circle");
+  // ⚠️ AND THE MENU'S OWN SIX, which the tile sweep could not see. managePlanHtml looks its icon up as
+  // ICON[icon] from a variable, so a mistyped key is `undefined` and renders an EMPTY coloured chip in
+  // total silence -- the identical failure ICON.search had. The keys are read out of the row() calls
+  // rather than listed here, so a seventh row cannot arrive unguarded.
+  // ⚠️ ANCHORED ON THE COLOUR ARGUMENT, NOT ON row(. A `[^)]*?` window cannot cross the `)` in
+  // `planListSub()`, so the first version found five of the six icons and reported the sixth row as
+  // missing -- the collection-too-narrow trap, in the guard rather than in the code. Every row ends
+  // in `"NAME", "var(--TOKEN)"`, which is unambiguous wherever it sits.
+  const menuIcons = [...nocomment(fn("managePlanHtml"))
+    .matchAll(/,\s*"([a-zA-Z0-9_]+)",\s*"var\(--/g)].map((m) => m[1]!);
+  assert.equal(menuIcons.length, 6, "expected six menu icons, found " + menuIcons.length + ": " + menuIcons.join(", "));
+  for (const k of menuIcons)
+    assert.ok(new RegExp("\\b" + k + ":").test(icons),
+      "ICON." + k + " does not exist, so that row draws an empty coloured chip");
 });
 
 test("BLOCKER: the pause recommendation is derived from the length, and moving the date wins once a break costs something", () => {

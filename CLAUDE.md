@@ -12475,3 +12475,247 @@ rendering one `DIV` row first in the list; and `document`/`body` horizontal over
 "longest run in the past month" profile field, and surfacing `masters.points` (needs his clinical
 reviewer). And the returning-from-injury week-one inversion (350 vs 320 minutes when a volume is stated)
 is reported and unfixed.
+
+## MOVE A WORKOUT: THE TILE WAS THROWING, AND SIX COLOURED OUTLINES (owner, 2026-08-28)
+
+Two reports. *"when you click the move a workout button, nothing happens. I need it to take you to the
+calendar page and for the to be an animated instructional, animated overlay with a dimmed background
+showing the user that they need to drag and drop the session"* and *"On the manage plan screen, I want
+the different menu options to have different coloured outlines to separate them out better"*.
+Suite 1405 → **1412**; **28 deliberate re-breaks, all 28 caught**. Both web-only, so both reach his
+phone on the next launch.
+
+### ⚠️⚠️ THE TILE WAS NOT INERT, IT WAS THROWING — AND IT FAILED ON TRAINING DAYS AND WORKED ON REST DAYS
+
+`planAction("move")` read **`sessionsForIso()`**, which walks `PLAN.weeks` — display summaries carrying
+`{id, day, dayIndex, type, title, effort, durMin, distKm, pace, rpe, optional}` and **no `steps`** — and
+handed one to `openSessionSheet`, which needs a RAW session. `sessionStages` then does
+`sess.steps.filter(...)` and throws a **TypeError before `sheetBody.innerHTML` is assigned and before
+`.on` is added**, so `.sheet-ov` stays `display: none`. Reproduced in a browser: **one uncaught
+TypeError, sheet not open, no toast, nothing on screen.** Exactly "nothing happens".
+
+⚠️ **THE INVERSION IS THE TELL: the first arm used `PLAN.weeks` and the fallback used `RAW.weeks`.**
+`sessionsOnSelectedDay()` reads `RAW.weeks[curWeekIdx()].sessions`, so the fallback was always fine —
+and today almost always carries a session, so the broken arm is the one that fires. **Dead in practice,
+alive on a rest day.**
+⚠️ **SEVENTH FIRING OF THE PLAN-vs-RAW TRAP, and this file already names the fix:** *"`PLAN.weeks` has
+no steps or pace bands (it is a display summary); the prescription lives in `RAW.weeks`, via
+`rawSessionsForIso()`. Reading the wrong one fails silently."* Swept: **of the eight `sessionsForIso`
+callers this was the only one handing its result to something that needs `steps`** — every other reads
+`distKm`, `durMin`, `title`, `type` or `date`, which are summary fields.
+⚠️ **AND IT CARRIED A SECOND LIVE DEFECT, removed with it.** `openSessionSheet(pick)` passed **no
+week**, so `SHEET_CTX.week` fell back to `state.planWeek` — once the runner had tapped week 9 on the
+Plan screen, `moveSession` looked for the swap occupant in **week 9** while writing the override for a
+**week-1** session: the session moved, nothing swapped out, and week 1 ended with two runs on one day
+for `seedDone`'s collision belt to clean up. Every other `openSessionSheet` call site passes a week.
+⚠️ **THE BRANCH IS DELETED RATHER THAN REPAIRED**, because he asked for the calendar. That removes both
+defects by construction rather than fixing one shape mistake.
+
+### ⚠️⚠️ A CENTRED WORDLESS DIAGRAM, NOT A SPOTLIGHT — SIX CONSTRAINTS EACH KILL THE ANCHORED VERSION
+
+A judged panel of three designs (ghost card / spotlight cut-out / minimal) plus two judges each argued
+this out, and the reasons are all measurements rather than taste:
+1. **`#view` is the only scroll owner and is a SIBLING of every body-level overlay**, so a pass-through
+   aperture lets the page scroll under it and it drifts off target every frame.
+2. **That scroll cannot be locked with `touch-action: none`** — `test/ios-input-zoom.test.ts` is a
+   `deepEqual` on exactly four selectors and a fifth fails the suite.
+3. **The calendar opens at week 1 with no auto-scroll**, so a card would have to be found first.
+4. ⚠️ **`calTrialRow` emits `.cal-open` with NO `data-oid`**, and `startSessDrag` bails before the ghost
+   and before `haptic("lift")` — so an aperture keyed on `.cal-open` can land on **the one row where the
+   gesture is a silent no-op**. (That dead gesture is a pre-existing defect; see the open list below.)
+5. Two plan states have no card at all and would need a second design.
+6. **`requestAnimationFrame` fires ZERO times in this repo's headless Chrome** (measured: 0 frames in
+   1.2 s against 25 for `setInterval`), so any rAF-gated aperture is unprovable in the harness.
+
+A diagram with no anchor answers all six **by measuring nothing**, and `calTipHtml` **declares zero
+parameters** — which is the clause that makes a rect unable to arrive from outside. The shell is
+`.guide-ov` + `.guide-card`, reused as the extras popup reuses it, so the scrim, the dim, the blur and
+the `.on` fade all arrive with no new code.
+
+⚠️ **THE SCRIM TAKES POINTER EVENTS ON PURPOSE.** A pass-through scrim over a live card produces this:
+the runner presses and holds exactly as instructed, the overlay neither responds nor dismisses (a drag
+fires no `click`), and **the app appears inert while they perform the taught gesture correctly** — the
+defect this feature exists to remove, one layer up. It also means the page cannot scroll behind the
+lesson, because `body` is `overflow: hidden`, so the scroll lock is free.
+
+⚠️⚠️ **THE DEMO'S PRE-LIFT DWELL IS LONGER THAN THE REAL GATE, AND THE INEQUALITY IS THE POINT.**
+Measured through `element.getAnimations()`: **motionless at the origin through 448 ms** against
+`MOVE_HOLD_MS` = **320**, ring expanding and finishing AT the lift, lifted at 640 ms, travelling with
+the finger still on it, dropped at 2560 ms. A demo that lifts early teaches a hold that trips the 9 px
+cancel, **and that failure is completely silent** — no haptic, no class, the calendar just scrolls.
+Erring long is the only safe direction, and `test/move-workout.test.ts` pins
+`stopFraction × duration ≥ MOVE_HOLD_MS` rather than a typed number, because a retune from 3200 ms to
+1500 ms puts the dwell at 225 ms and would otherwise pass.
+⚠️ **`MOVE_HOLD_MS` EXISTS SO THE DEMO CAN CITE THE GESTURE.** Both drags read it, and a guard asserts
+each timer waits on it — extracting a literal that then diverges silently is worse than the literal.
+
+⚠️ **REDUCE MOTION NEEDS ITS OWN BLOCK, AND CLAUDE.md IMPLIED OTHERWISE.** The global rule at line 989
+is **`* { transition: none !important }` — TRANSITIONS ONLY** — which is why animations are switched off
+in **26 separate per-component blocks**. A keyframe animation is untouched by it. The still frame is the
+card **lifted, mid-travel, ring expanded, destination highlighted**: the hold AND the destination in one
+frame. A landed frame shows the outcome and drops the press, which is the one fact a Reduce Motion
+runner cannot get from anywhere else.
+⚠️ **AND THERE ARE FIVE JS `matchMedia` CHECKS FOR IT** (lines 9948, 10936, 27472, 36019, 36582) — this
+file's note that there is no `prefersReducedMotion()` helper is about the NAME, not the practice.
+
+### ⚠️⚠️ AN EDGE SCROLLER, BECAUSE THE GESTURE WAS OTHERWISE UNREACHABLE ON A REAL WEEK
+
+Measured on the busiest week of a real plan: **a week spans 662 px** while `#view` is **523 px at
+375×667** (short by 139) and **426 px at 320×568** (short by 236). So there is **no scroll position at
+which Monday's card and Sunday's row are both on screen** — and `calDragBlockScroll` `preventDefault()`s
+touchmove for the length of a drag, so the runner cannot scroll to reach the far end either. **On a
+375-wide phone, dragging Monday to Sunday was impossible.** Shipping a tutorial for a gesture that
+cannot reach the far end of a busy week is worse than shipping nothing, which is why it is in the same
+change.
+⚠️ **ONE SCROLLER, NOT TWO.** The plan drag has had `planDragScroll` since it was written and the
+calendar drag **twenty lines away had none**; a second copy is the fix-one-builder-not-the-other trap
+this file records six times. `edgeScrollDelta(y, top, bottom)` is the pure arithmetic and `dragEdgeTick`
+the loop, split **because rAF fires zero times in this harness** — the loop is unprovable here and the
+arithmetic is provable in node.
+⚠️ **THE LOOP IS CANCELLED IN `calDragTeardown`, NOT IN `calDragEnd`.** Teardown is the one exit both
+the end and the cancel path go through; a cancel that left the rAF running would scroll `#view` for
+ever.
+⚠️ **AND THE FINGER'S POSITION HAD TO BE KEPT** (`DRAG.px/py`). Without it, holding at the edge scrolls
+the list while the target stays on whatever day was under the finger when it stopped moving — the list
+slides and the highlight does not follow. `calDragAim(x, y)` was split out of `calDragMove` so the
+scroller can re-aim with no event.
+
+### The smaller decisions, each with its reason
+
+⚠️ **NO SEEN KEY, AND THE TILE ALWAYS SHOWS THE LESSON.** A seen key exists to bound something that
+appears **unbidden**; this has exactly one caller and that caller is a tap, so the recap's ruling
+already holds — *"IT IS AN OFFER. It opens from a tap and never appears on its own."* Making the tile
+behave differently the second time **re-creates "the tile does nothing"**, the report being fixed.
+⚠️ **THE PERMANENT `.cal-hint` LINE IS WHAT MAKES THAT ANSWER COMPLETE.** Before it, the calendar
+explained the gesture **nowhere** — the only "press and hold" wording in the file was a source comment.
+It reads `MOVE_TIP_LINE`, the same constant the lesson reads, so the two can never diverge; a guard
+asserts **exactly two readers** and that neither types its own copy.
+⚠️ **THE SENTENCE NAMES THE SAME-WEEK RULE BECAUSE A CROSS-WEEK DROP IS REFUSED IN SILENCE.**
+`calDragAim`'s `ok = day && Number(day.dataset.w) === DRAG.wk` simply declines to mark a target, so
+dragging into next week produced no highlight, no haptic and no explanation. It now also toasts —
+**only when there is no target at all**, because dropping back on the source day is a deliberate cancel
+and answering that with a correction would scold every changed mind.
+⚠️ **`calHomeScroll` IS ARMED BY THE TILE ALONE, so `#calBtn`'s behaviour is byte-identical.** Measured:
+week 12 sits **8,017 px** down and week 20 **14,049 px**, so a runner in week 12 dismissing onto week 1
+would be four months from the day they wanted to move. The first-time case only looks fine because a
+fresh plan's week 1 *is* today.
+⚠️ **z-index 85, AND THE WHOLE STACK WAS MEASURED TO PICK IT.** Above `.sheet-ov` and `.app-toast` (70)
+because both live inside `.app`, which `overlayModal` inerts — a lesson under an inert sheet is the
+z-order defect this project has shipped twice; above `.guide-ov` (80) so a stray onboarding popup cannot
+cover it; below 90 so a launch overlay still wins; far below `.cal-ghost` (300).
+⚠️ **`calTipUp()` IS DERIVED FROM THE NODE, NEVER STORED.** A boolean some other `.on` removal left true
+is a guard that passes while `.app` stays inert — a frozen app reporting itself as fine.
+⚠️ **AND `render()` CLOSES IT ABOVE THE FIRST SCREEN BRANCH.** The calendar branch **returns**, so a
+call placed after it never runs on the path that matters. The condition names `state.screen !==
+"calendar"` **and** `liveRunning()`, because a run starting is exactly such a path.
+
+### THE SIX COLOURED OUTLINES, AND WHY THE LITERAL ASK WOULD HAVE BEEN INVISIBLE
+
+⚠️⚠️ **MEASURED AS A 1 px OUTLINE ON THE SHEET'S OWN `--surface` GROUND, THE RAW CATEGORY TOKENS RUN
+2.44–3.37:1 IN LIGHT MODE — EIGHT OF THE ELEVEN UNDER THE 3:1 NON-TEXT FLOOR.** The identical
+light-only trap this file records twice (the accent at 4.14 on white, the URGENT band title at 2.41),
+because the design brief reviewed dark screenshots. And **diluting toward `--line`, which is what eleven
+existing borders do, lands them at 1.3–2.2:1** — a grey hairline, i.e. the change would have measured as
+nothing and been reported as not done.
+⚠️ **`color-mix` TOWARD `--ink` IS THE REMEDY THIS REPO ALREADY USES TWICE**, and it darkens in light
+and lightens in dark from ONE declaration. **78% is measured, not picked:** worst-of-six against
+`--surface` by weight is **100% 2.76 / 85% 3.54 / 78% 3.98 / 72% 4.46 / 58% 5.83**, while the pairwise
+colour separation falls the whole way (**74 → 63 → 59 → 53 → 42**) — so lower is more legible and less
+distinguishable, and 78% is where both are comfortable.
+**Read back from rendered pixels at 430×932 and 320×568 in both themes: outline worst 3.98:1 light /
+6.96:1 dark; glyph on its own tint worst 3.50:1 light / 5.72:1 dark.** All six rows, both themes.
+
+⚠️ **PER-ROW COLOUR HERE IS PRECEDENT, NOT INVENTION.** `profRow` has done exactly this on the Profile
+screen's structurally identical row list since it was written — **13 assignments over ten reserved
+tokens** (`--eff-hard`, `--steady`, `--build`, `--rest`, `--ease`, `--base`, `--eff-easy`, `--taper`,
+`--accent`, `--eff-none`), passed the same way through the same `--pc` channel. ⚠️ **Verify that before
+relying on it: a first grep for `--pc: var(` found ONE assignment**, because the colour is passed as a
+field of an options object (`colour: "var(--rest)"`) and interpolated.
+⚠️ **`--peak` IS DELIBERATELY NOT USED**: `viewPlan` renders `phaseLegend` with a `--peak` swatch
+labelled **Peak** on the screen this sheet opens over, and it is the loudest of the four. `--eff-*` are
+avoided entirely — those four answer one question through one table (ruling 7) and a row wearing one
+would state a session effort that is not there.
+⚠️ **THE OLD `:first-child` RULE HAD TO GO WITH THE DIVIDERS.** It was `border-top: 0`, which over a
+card would have cut the top edge off the first row **and only the first** — a rendering fault rather
+than a stale rule.
+⚠️ **`ICON.book` RENDERS AS A BARE RECTANGLE AT 17 px**, which is why `ICON.journal` exists. Found by
+looking at the render, not by reading the code.
+
+### Four instrument faults this work paid for, all mine
+
+⚠️⚠️ **A HEADLESS WINDOW WITH NO SIZE MAKES EVERY MEASUREMENT NOISE THAT READS AS A BROKEN LAYOUT.**
+`Emulation.setDeviceMetricsOverride` alone left `window.innerHeight` at **1**, so `.app { height: 100% }`
+chained down to 1 px and `#view` measured **112 px** with `visibleCards: 0`. **`Browser.setWindowBounds`
+is what actually sizes it.** The harness now refuses to measure a shell whose `innerHeight` is under 200.
+⚠️⚠️ **`#welcomeGo` IS NOT A SIGNAL THAT THE LAUNCH OVERLAY IS UP.** There are TWO welcome elements:
+`DIV.welcome#welcome` is in the page's **static markup** and keeps existing (hidden) for the whole
+session, and it contains `#welcomeGo` — so polling for that id waits for ever on a perfectly clear
+screen. The one that blocks the page is `DIV.welcome.wb.on#welcomeback`, which JS creates and removes.
+Before that was understood, `elementFromPoint` returned `.welcome on` for every point and the page
+underneath looked catastrophically broken.
+⚠️ **`syncTextScale()` REWRITES `--tscale` ON EVERY RENDER, so a value set BEFORE the render is silently
+overwritten.** Measured: six "ts=1.3" cases that all ran at 1.0 and reported an identical card height,
+which reads as the type ladder not scaling. Set it **after** the render — then the title genuinely goes
+24 px → 31.2 px and the card 374 → 508 px.
+⚠️ **CHANGING `animation-delay` ON A RUNNING ANIMATION DOES NOT RESTART IT**, so the paused frame bears
+no relation to the phase asked for — measured, `-2560ms` (80%) rendered the 0–15% frame and the timeline
+read as inverted. `element.getAnimations()` with `pause()` and `currentTime` addresses the animation
+itself. ⚠️ **And pausing an animation then calling `Page.captureScreenshot` HANGS in this headless
+Chrome** — consistent with rAF firing zero times here (no compositor). Measure the numbers with the
+Web Animations API and take screenshots unpaused.
+
+### Two visual defects found by measuring the animation, not by reading it
+
+⚠️ **THE FINGER FADED OUT AT THE LIFT, so the card travelled ALONE** — which reads as the card moving by
+itself rather than as a finger dragging it, the opposite of the instruction. The dot is a CHILD of
+`.caltip-sess` so it travels for free; only the ring needed animating.
+⚠️ **AND THE LOOP RESET BY DRAGGING THE CARD BACK UP.** At 95% the card was half way home, travelling
+upwards, which reads as a second instruction — *"and then move it back"*. It fades out where it landed,
+teleports while invisible, and fades in at the start, so the only motion a runner ever sees is the one
+being taught.
+
+### Guard defects this round, all mine, all caught by the guards' own first run
+
+⚠️ **`const EDGE_BAND = 64, EDGE_MAX = 7;` IS A MULTI-DECLARATOR const**, so a regex anchored on
+`const NAME =` finds the first and reports the second as absent — which reads as the constant having
+been deleted.
+⚠️ **`calls.length = 0 || calls` PARSES AS `calls.length = calls`** and throws `RangeError: Invalid
+array length`. Precedence, in a test's own fixture reset.
+⚠️ **A `[^)]*?` WINDOW CANNOT CROSS THE `)` IN `planListSub()`** — the manage-plan icon sweep found five
+of six icons and reported the sixth row as missing. Anchored on the colour argument instead, which every
+row has.
+⚠️ **AND `var(` INSIDE A CSS STRING IS NOT A FUNCTION CALL.** The bare-identifier existence sweep read
+`"var(--rest)"` as a function this app does not define and **reported the fix as the defect**. A
+`nostring()` helper strips string literals before scanning for code — the same class as `nocomment`.
+⚠️ **THE ICON EXISTENCE SWEEP COVERED `planActionsHtml` ONLY**, so the menu's six icons — looked up as
+`ICON[icon]` from a **variable**, where a typo renders an empty coloured chip in silence — were
+unguarded. Derived from the `row()` calls now.
+
+⚠️ **THE BACKTICK RULE FIRED THREE TIMES, ALL IN MY OWN COMMENTS**, and the first failed as
+`SyntaxError: Expression expected` pointing at the splash markup 60 lines away — while
+`node --check` and the design-system test both then reported OK **on the stale build**. Read the build's
+exit code before trusting anything after it.
+
+### Open, measured, and NOT fixed — reported rather than quietly inherited
+
+⚠️ **HOLDING A SCHEDULED 2 km TRIAL ROW PRODUCES NOTHING AT ALL.** `calTrialRow` emits `.cal-open` with
+no `data-oweek`/`data-oid`; `wireCalendarDrag` wires it, and `startSessDrag` then does
+`Number(btn.dataset.oweek)` → NaN → `PLAN.weeks[NaN-1]` → undefined → a bare `return` **before** the
+ghost, before `haptic("lift")` and before any window listener. A silent dead gesture on that one row
+type, and now a gesture the app teaches.
+⚠️ **`moveSession` RAISES NEITHER A TOAST NOR AN UNDO**, which is a fair criticism of a gesture we have
+just made discoverable. Named as the next real gap; a reversible move is its own change.
+⚠️ **THE CALENDAR SAYS NOTHING ABOUT A PAUSE.** `pausedCard()`'s only caller is Today, so during a pause
+the calendar is full of draggable cards inside the paused window and dragging them works normally.
+⚠️ **`body.cal-dragging { overscroll-behavior: none }` TARGETS THE WRONG ELEMENT** — the scroll owner is
+`.view`, not `body`, so that declaration does nothing; the actual suppression is
+`calDragBlockScroll`'s `preventDefault()`.
+⚠️ **NOTHING `preventDefault()`s THE INITIAL `pointerdown` AND `.cal-open` DECLARES NO `touch-action`**,
+so on iOS the scroller may claim the pointer during the 320 ms hold and fire `pointercancel`, cancelling
+the lift on a mid-list card. **UNVERIFIED** — one real hold on his phone would settle it, and if it
+reproduces it becomes the highest-priority follow-up, because everything above teaches that gesture.
+⚠️ **`.pf-ic` ON THE PROFILE SCREEN PAINTS ITS GLYPH IN THE RAW TOKEN over an 18% tint of it**, reported
+at 2.10–2.79:1 in light on eight of its twelve rows. Pre-existing and unguarded; the `.mp-ic` treatment
+here is the fix, one declaration away. **Reported by a reader and NOT independently reproduced by me** —
+I could not get the chips on screen.
+⚠️ **NOTHING IN THIS CHAPTER HAS BEEN ON A PHONE.** Every figure is a headless browser or arithmetic.

@@ -12130,3 +12130,140 @@ correctly. Three candidates were measured and are his call, with the strongest f
 ⚠️ **STILL OPEN, MEASURED, NOT FIXED:** a runner returning from a break gets a **larger** week one
 (350 minutes against 320) when a volume is stated — the damper is applied before the volume fit
 re-converges. Reported rather than fixed, because it is a volume-model change and wants its own sweep.
+
+## MANAGE PLAN, PAUSE, AND PLAN HISTORY (owner, 2026-08-28)
+
+*"I want the ability on the plan page to have a button that enters a menu to make a number of
+adaptions"* — five items, with screenshots. Two are in and shipped; the research he asked for is below.
+Suite 1383 → **1394**; **37 deliberate re-breaks across two rounds, all caught**. All web, so all of it
+reaches his phone over the air.
+
+⚠️ **AND THE ANSWER TO HIS FIRST QUESTION WAS NO — THE WEEKDAY-TIME TASK IS NOT FINISHED.** It is
+measured and prototyped in `/tmp` and nothing of the ceiling is in the repo. What DID come out of that
+work is the regression in the chapter above. Say so plainly rather than reporting adjacent progress.
+
+### ⚠️⚠️ FIVE ADAPTATION FUNCTIONS EXIST IN THE ENGINE AND NOT ONE WAS CALLED BY THE APP
+
+`returnToRunningPlan`, `assessWeeklyJump`, `applyMissedSessionAdjustment`, `countTrailingMisses` and
+`assessLongRunSpike` — **0 references in `web/app.ts` each**. That is the computed-and-discarded trap
+five times over, and it is most of what this menu needs, so the remaining items are wiring more than
+writing. `returnToRunningPlan` is exported through `web/entry.ts` and reaches nothing.
+
+### THE PAUSE THRESHOLDS ARE THE REPO'S OWN, NOT NEW NUMBERS
+
+He asked for research rather than a guess. The lines are bounded by what this engine can actually do
+differently:
+- ⚠️ **`src/adapt/load-guardrails.ts`'s `returnToRunningPlan` ALREADY DRAWS ITS LINE AT `weeksOff >= 4`**
+  ("take it slower given the longer break"), so four weeks is this codebase's existing long-layoff
+  threshold and there was no reason to invent a second one. `test/manage-plan.test.ts` reads that
+  constant out of the engine, so moving it fails the pause guard.
+- **`src/adapt/missed-sessions.ts` handles missed work WITHOUT a rebuild** — easy runs ×0.85, long run
+  ×0.8, hardest quality session dropped. That is the mechanism for a short gap and it exists precisely
+  so a fortnight does not need a new plan.
+- ⚠️ **`Athlete.returningFromBreak` IS THE GENERATOR'S ONLY LEVER FOR TIME OFF AND IT IS BINARY** — it
+  knows you had a break, not how long. Measured on a 5-day half block at 40 km/week: week one
+  **32.0 → 30.2 km**, first long run **80 → 61 min**, **5 of 28 quality sessions gone**, and the PEAK
+  unchanged at 51.3 km. **A break changes the run-in, not the destination**, and that sentence is what
+  the tier copy says.
+- ⚠️ **`returningFromBreak` AND `returningFromInjury` PRODUCE AN IDENTICAL PLAN** for a recreational
+  runner (both 30.2 km / 61 min / 23 quality). CLAUDE.md already records them as byte-identical for a
+  beginner; they are byte-identical here too. Worth knowing before anything is built on the distinction.
+
+⚠️ **THE GENERAL DETRAINING CONSENSUS IS LABELLED AS CONSENSUS.** The commissioned evidence report is
+NOT in the repo (searched) and is scoped to prescription, not detraining — and this file already records
+the fuelling module being wrongly described as report-backed. What is uncontroversial is the ORDERING:
+plasma volume falls within days, aerobic fitness holds about a week then declines, and tendon and bone
+de-adapt more slowly than the cardiovascular system — which is exactly what `returnToRunningPlan`'s own
+note says. The tiers follow that ordering and claim nothing more.
+
+⚠️ **THE PAUSE ENDS IN A CHOICE, NEVER A CHANGE** (standing instruction, 2026-08-03), and every option
+QUOTES ITS CONSEQUENCE — the reference's own sheet gives real end dates, and "your plan will end later"
+without saying when asks somebody to agree to a number they cannot see. Driven: **28 days moves the
+target from 14 Feb to 14 Mar and rebuilds 25 weeks into 29**.
+⚠️ **I RECOMMENDED THE WRONG OPTION FOR A LONG BREAK AND CAUGHT IT BY DRIVING IT.** After a month off
+the first version recommended KEEPING the target date, which compresses the whole block at exactly the
+moment the runner is least ready for it. Moving the date is recommended for every break over a week;
+keeping it is always offered (a booked race does not move) and never recommended.
+
+### PLAN HISTORY: ONE STORE, EXTENDED
+
+A new plan replaced the old one and the old one was gone. ⚠️ **THE JOURNAL ROWS `adoptPlan` ALREADY
+WRITES WERE ALREADY THE RECORD OF A BLOCK** — the club's plan-journal rail reads them, and they are
+already in the backup by the `interun_` prefix. A second "recent plans" store would have given one fact
+two homes, and the two disagree the first time somebody deletes from one of them. The row gains three
+fields:
+- ⚠️ **`createdIso` IS THE DAY IT WAS MADE, NOT THE DAY IT STARTS.** `startIso` is the first week's
+  MONDAY, which `normalizeWeekStarts` can put before today — so a plan made on a Thursday would have
+  listed as created three days before it existed.
+- ⚠️ **`name` IS EMPTY UNTIL THE RUNNER TYPES ONE**, so clearing the field goes back to the derived
+  default rather than to nothing. `planName()` derives it from the goal.
+- ⚠️⚠️ **`prof` IS THE ~20 FIELDS THAT DETERMINE A PLAN, AND DELIBERATELY NOT THE PLAN.** A plan is
+  ~200 KB of steps; storing it would also freeze it against an engine that keeps improving, so
+  re-activating an old goal would hand back a block built by whatever version was current when it was
+  abandoned. **`avatar` and the person's `name` are excluded**: an avatar is a 256px data URL and
+  twenty-four of them in a capped list is megabytes of duplicated image in the store the whole training
+  history lives in.
+
+⚠️ **THE MIGRATION CASE IS THE COMMON CASE FOR EVERY EXISTING RUNNER.** Rows already on a phone have no
+name, no `createdIso` and no `prof`. They list (name falls back to the goal, date to the first week's
+Monday) and offer **no reuse button at all** — absent, not disabled, because a greyed control on every
+historic plan advertises something the app cannot do for them.
+⚠️ **REUSING REBUILDS FROM THE ANSWERS AND PULLS A STALE DATE FORWARD.** `applyProfile` clamps the start
+to today, so a target date in the past produces a plan with **no weeks in it**; the sheet says which of
+the two happened. Driven: 10k → marathon, target kept, 41 weeks, landing on the plan tab.
+⚠️ **DELETING ASKS, BECAUSE THERE IS NOTHING TO UNDO.** The club's delete dialog established the rule —
+a confirmation earns its tap when the thing is gone, and is a tap for nothing when it is recoverable.
+The dialog says the runs are untouched and that the club's journal loses it too.
+
+### FIVE DEFECTS THIS FEATURE PRODUCED DURING ITS OWN BUILD
+
+⚠️ **TWO INVENTED IDENTIFIERS, BOTH WOULD HAVE SHIPPED AS A TILE THAT LOOKED LIVE AND DID NOTHING.**
+`prefersReducedMotion()` does not exist — this app honours the setting GLOBALLY in CSS and browsers
+suppress a smooth scroll themselves — and `openHub()` does not exist: a hub page is opened by setting
+`state.support` and rendering. Caught by an existence sweep over every bare identifier the dispatchers
+call. ⚠️ **That sweep needed three corrections of its own**: it matched `.scrollIntoView(` and
+`JSON.stringify(` as missing functions (a method call is a property of something else), and `$` is
+defined as `const $ = (id) => …` and is a regex metacharacter, so escaping every name matched nothing
+and reported twelve real functions as absent.
+
+⚠️⚠️ **`isoAdd` RETURNS A DATE, NOT A STRING, AND THE ONLY SYMPTOM WAS A SHEET THAT STAYED OPEN.** Every
+existing caller appends `.toISOString().slice(0, 10)`. Assigned straight into `profile.raceDate` the
+whole apply path threw inside its own `try/catch`: the date never moved, the sheet did not close, and
+the option's "your target date becomes …" sentence rendered EMPTY because `runDateLabelIso` splits a
+string on "-". **Found by driving the button, not by reading the code** — and the reason to drive the
+control rather than the function it calls.
+
+⚠️ **A HIT AREA MEASURED BY READING THE BOX AND ADDING THE INSET IS THE ANSWER YOU ASSUMED.** A box
+cannot report its own pseudo-element. Bisecting `elementFromPoint` found the rename pencil at **40px**
+against this app's 44 floor, and the two action icons 2px apart **overlapping each other's grown areas
+so the left one won 34 of its 44** — fixed with a 12px gap, which is exactly 6+6.
+⚠️ **AND `elementFromPoint` ANSWERS ABOUT THE VISIBLE VIEWPORT**, so cards below the fold read 0×0 and
+looked like catastrophic failures. Two more read as covered by `bottomnav` — scrolled to the bottom the
+last card clears it by **101px** and its controls are hittable, so there was no defect. Filter to
+on-screen controls, and test the scrolled-to-bottom case explicitly.
+
+⚠️ **THE TWO DESIGN RATCHETS CAUGHT THIS CSS**, which is what they are for: one off-ladder radius
+(10px → `var(--r-ctl)`), and `.rp-name` declared **three times** with `.rp-acts` twice. **A duplicate
+declaration cannot be SEEN on screen** — the later rule simply wins — which is why that ratchet is a
+count rather than an eye. `CSS_DUP_CEILING` is unchanged.
+
+### Guard weaknesses this round, and the pattern
+
+⚠️ **`rows` IS THE VARIABLE NAME THREE UNRELATED STORES USE**, so "nothing else adds a journal row"
+counted `rows.unshift(` and reported the club's posts and one other store as writers of the plan
+history. Scoped to `unshift({ sig:` — the field only a journal row has. **A guard over a collection is
+only as good as the collection.**
+⚠️ **`applyPause` HAS TWO `restoreTicks` CALLS — the apply and the undo closure — so a bare
+`/restoreTicks\(/` PASSED with the apply path's removed.** Watched escaping. Counted as the pairing
+`seedDone(); restoreTicks(` and required twice. `doSaveProfile` was the one rebuild path in this app
+that ever missed that pairing, and editing your profile silently un-ticked the run you had done that day.
+
+### Still open, and named on the menu rather than offered
+
+**Holiday** and **not feeling 100%** use the same machinery as Pause with different dates and a level,
+so both are small additions now. **Naming is done; what "start a new plan" still lacks is nothing** —
+the wizard already builds one and the old plan now moves into the list by itself.
+⚠️ **AND THE MENU SAYS WHICH TWO ARE MISSING, IN ONE SENTENCE** — the same answer the Create sheet gives
+reels and going live, and the rule this app keeps everywhere: no control ships before the thing behind it.
+⚠️ **NOT SEEN ON A PHONE.** Everything above is measured in a headless browser. The tile labels wrap to
+two lines and the pause option cards are wordy; worth the owner's eyes.

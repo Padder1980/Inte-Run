@@ -214,12 +214,65 @@ const EMBED_AFTER_MIN = 12;
  * to want a couple of strides first (the paper's T2: strides only if the block starts inside the
  * first 20 minutes).
  */
+/**
+ * How long a step takes, on the same ruler the engine's own `stepSeconds` uses.
+ *
+ * ⚠️⚠️ A DISTANCE-GATED STEP HAS NO CLOCK, AND READING ONE AS ZERO MINUTES WAS A LIVE REGRESSION.
+ * `analyseSession` summed `durationSeconds` alone. Easy runs became distance-set on 2026-08-26, so from
+ * that day a session whose opening easy step carries `distanceMeters` and no `durationSeconds` reported
+ * `minutesBefore: 0` — and `firstHardEffort`'s rule, "past this much easy running the session has
+ * warmed itself up" (EMBED_AFTER_MIN), could never fire for it. Measured over 240 plans / 7,120
+ * sessions: 1,795 (25.2%) read zero easy minutes when they really have 25–38, and **220 of them were
+ * handed a 34-minute structured warm-up they should not have** — `N km easy + strides` delivered as
+ * **73 minutes** for a 4.9 km easy run: 34 minutes of preparation including FOUR strides, then 39
+ * minutes of easy running, then SIX more strides. Across a wider 28,480-session sweep it is 907
+ * sessions and 27,874 minutes of warm-up that should not exist, and NO other session shape moves.
+ *
+ * ⚠️ THE PROOF IT WAS AN ACCIDENT AND NOT A DECISION: `easy + strides` and `easy + hill sprints` are
+ * structurally identical — one long easy step, then repetitions at the end. Hill sprints carry no pace,
+ * so their opening step is still timed and read 31.5 minutes → effort "easy" → no warm-up. Strides carry
+ * a pace, so their opening step is distance-gated and read 0 → effort "maximal" → a 34-minute frame.
+ * Two identical sessions, 0 and 34 minutes, decided by a field the coaching does not depend on.
+ *
+ * ⚠️ AND THE COMMENT ON THE LOW-INTENSITY GATE BELOW ASSERTED THE OPPOSITE FOR TWO DAYS, which is why
+ * nobody looked: it says `easy + strides` reaches that gate and `moderate + strides` does not. As
+ * delivered it was exactly the other way round. `moderate + strides` is unaffected by this fix and still
+ * keeps its warm-up, which its own note says is the right answer — it opens at RPE 3–4, so the moderate
+ * running is itself the first hard effort and `minutesBefore` is legitimately 0.
+ *
+ * ⚠️ SECOND CONSEQUENCE, LESS VISIBLE: `minutesBefore` also gates whether strides are prescribed IN the
+ * warm-up ("does the work start inside 20 minutes?"), so reading zero made the app believe the work
+ * started immediately on every one of those sessions.
+ *
+ * ⚠️ THE PLAN ITSELF IS UNCHANGED — verified byte-identical. `estimatedDurationSeconds` never included
+ * the generated frame, so no volume, intensity, taper or long-run metric moves. What changes is the
+ * session the phone counts through.
+ */
+function stepMinutes(s: WorkoutStep): number {
+  if (s.durationSeconds) return s.durationSeconds / 60;
+  const band = s.targetPaceSecPerKm;
+  if (s.distanceMeters && band) {
+    const mid = (band.minSecPerKm + band.maxSecPerKm) / 2;
+    return (s.distanceMeters / 1000) * mid / 60;
+  }
+  // Effort-only work in metres — a hill sprint, which carries no pace on purpose. The engine's own
+  // intensity model credits it at 4 m/s rather than counting it as nothing.
+  // ⚠️ TOTAL-FUNCTION SAFETY NET, MEASURED UNREACHABLE — recorded so nobody "verifies" it by deleting
+  // it. For this line to change any answer a step would have to carry metres, carry NO pace, and be
+  // COUNTED as easy running (a recovery, or a pre-work step under RPE 4). Swept 24,072 steps across 48
+  // real plans: **zero** such steps exist, so returning 0 here is byte-identical today. It is kept
+  // because the alternative is the exact reads-as-nothing trap this whole helper exists to close, and
+  // a new session shape could reach it tomorrow.
+  if (s.distanceMeters) return s.distanceMeters / 4 / 60;
+  return 0;
+}
+
 export function analyseSession(session: WarmupSession): { effort: FirstHardEffort; minutesBefore: number } {
   const steps = (session.steps || []) as WorkoutStep[];
   const sessionMax = session.targetRpe ? session.targetRpe.max : 0;
   let easyMin = 0;
   for (const s of steps) {
-    const mins = (s.durationSeconds || 0) / 60;
+    const mins = stepMinutes(s);
     // ⚠️ THE SESSION'S OWN WARM-UP STEP DOES NOT COUNT. It is the thing being generated, not
     // evidence that the run warms itself up — counting it said an interval session had already had
     // 15 minutes of easy running before its first repetition, so nothing ever needed preparing for

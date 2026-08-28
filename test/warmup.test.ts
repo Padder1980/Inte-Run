@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { WARMUP_MOVEMENTS, buildWarmup, firstHardEffort, type AbilityBand } from "../src/science/warmup.ts";
+import { WARMUP_MOVEMENTS, analyseSession, buildWarmup, firstHardEffort, type AbilityBand } from "../src/science/warmup.ts";
 import { deriveTrainingPaces } from "../src/science/paces.ts";
 import { easyProgression, easyRun, longRun, recoveryRun, thresholdSession, vo2Session } from "../src/plan/session-templates.ts";
 
@@ -466,4 +466,65 @@ test("⚠️ but a real interval session is NOT mistaken for gentle repetitions"
     assert.ok(w.phases.some((p: any) => p.phase === "potentiate"),
       `"${(s as any).title}" lost its strides — it opens with real work and needs them`);
   }
+});
+
+test("BLOCKER: a distance-gated easy opening still counts as easy running before the work", () => {
+  // ⚠️⚠️ A LIVE REGRESSION FROM THE DISTANCE CONVERSION (2026-08-26), FIXED 2026-08-28.
+  // `analyseSession` summed `durationSeconds` alone, so a session whose opening easy step carries
+  // `distanceMeters` and no clock reported `minutesBefore: 0` — and `firstHardEffort`'s rule "past this
+  // much easy running the session has warmed itself up" could never fire for it. `N km easy + strides`
+  // was therefore handed a 34-minute structured warm-up (including four strides) before 39 minutes of
+  // easy running that ends with six more: 73 minutes delivered for a 4.9 km easy run.
+  //
+  // ⚠️ THE FIXTURE IS THE TWO STRUCTURALLY IDENTICAL SESSIONS, because that pairing is the whole proof.
+  // Both are one long easy step then repetitions at the end. Hill sprints carry no pace so their opening
+  // step is timed; strides carry one so theirs is distance-gated. Nothing about the coaching differs.
+  const band = { minSecPerKm: 330, maxSecPerKm: 360 };
+  const reps = (pace: typeof band | undefined) => [
+    { kind: "rep" as const, durationSeconds: 20, targetRpe: { min: 8, max: 9 },
+      ...(pace ? { targetPaceSecPerKm: pace } : {}), label: "stride" },
+    { kind: "recovery" as const, durationSeconds: 60, targetRpe: { min: 1, max: 2 }, label: "walk back" },
+  ];
+  const timed = { type: "strides", targetRpe: { min: 2, max: 9 }, steps: [
+    { kind: "steady" as const, durationSeconds: 31 * 60, targetRpe: { min: 2, max: 3 },
+      targetPaceSecPerKm: band, label: "easy" }, ...reps(undefined)] };
+  const gated = { type: "strides", targetRpe: { min: 2, max: 9 }, steps: [
+    { kind: "steady" as const, distanceMeters: 4500, targetRpe: { min: 2, max: 3 },
+      targetPaceSecPerKm: band, label: "easy" }, ...reps(band)] };
+
+  // 4500 m at 5:45/km is ~26 minutes, so the fixture genuinely clears EMBED_AFTER_MIN — asserted, or
+  // the test could pass for want of a fixture that reaches the rule at all.
+  const g = analyseSession(gated as never);
+  assert.ok(g.minutesBefore >= 20,
+    "the distance-gated opening reads " + g.minutesBefore + " easy minutes; it should be ~26");
+  assert.equal(analyseSession(timed as never).minutesBefore >= 20, true, "the timed twin regressed");
+
+  // The two must agree, and both must reach the low-intensity gate.
+  for (const [what, s] of [["timed", timed], ["distance-gated", gated]] as Array<[string, unknown]>) {
+    assert.equal(firstHardEffort(s as never), "easy",
+      "the " + what + " session's first hard effort is not 'easy', so it never reaches the no-warm-up gate");
+    const w = buildWarmup(s as never, "intermediate", {})!;
+    assert.equal(w.notNeeded, true, "the " + what + " session was given a warm-up it does not need");
+    assert.equal(w.totalMinutes, 0, "the " + what + " session's warm-up is " + w.totalMinutes + " minutes");
+  }
+
+  // ⚠️ AND `moderate + strides` MUST STILL KEEP ITS WARM-UP. Its own note says that is the right answer:
+  // it opens at RPE 3–4, so the moderate running IS the first hard effort and `minutesBefore` is
+  // legitimately 0. A fix that gave every strides session a pass would have taken this one with it.
+  // ⚠️ FIVE REPETITIONS, WHICH IS WHAT THE REAL SESSION CARRIES. Measured, one repetition returns
+  // notNeeded and three or more returns the real 19-minute frame — so a one-rep fixture would have
+  // asserted the opposite of the shipped behaviour and read as a defect in the fix.
+  const moderate = { type: "easy", targetRpe: { min: 3, max: 9 }, steps: [
+    { kind: "steady" as const, distanceMeters: 5500, targetRpe: { min: 3, max: 4 },
+      targetPaceSecPerKm: { minSecPerKm: 290, maxSecPerKm: 310 }, label: "moderate" },
+    ...Array.from({ length: 5 }, () => reps({ minSecPerKm: 200, maxSecPerKm: 220 })).flat()] };
+  const mw = buildWarmup(moderate as never, "intermediate", {})!;
+  assert.ok(!mw.notNeeded && mw.totalMinutes > 10,
+    "moderate + strides lost its warm-up; it opens on work and is meant to keep one");
+
+  // ⚠️ NO ASSERTION HERE FOR THE EFFORT-ONLY (metres, no pace) BRANCH, DELIBERATELY. I wrote one, watched
+  // it pass with that branch returning 0, and then measured why: for the branch to change any answer a
+  // step must carry metres, carry no pace, AND be counted as easy running — and across 24,072 steps in
+  // 48 real plans there are **zero** such steps. A guard that cannot fail is worse than none, so the
+  // unreachability is recorded in `stepMinutes` instead, where somebody deleting the line will read it.
 });

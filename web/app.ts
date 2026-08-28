@@ -5802,6 +5802,26 @@ html.kbup .club-txc { bottom: var(--kbh, 0px); }
 .adj-d span { display: block; font-size: var(--t-label); font-weight: 650; color: var(--ink-soft);
   margin-bottom: 5px; }
 
+/* ---- An altered week ---------------------------------------------------------------------- */
+/* ⚠️ DASHED, BECAUSE THE CURRENT WEEK ALREADY OWNS THE SOLID ACCENT BORDER. Two weeks with the same
+   border and no other difference would be the app marking two different things identically -- and the
+   dash is the same device the share studio's ineligible rows use, for the same reason: form carries a
+   meaning colour is already spoken for. The tag beside it carries the word, so the border is never the
+   only signal. */
+.wk-sum.adj { border-style: dashed; border-color: var(--accent); }
+.wk-sum.cur.adj { border-style: dashed; }
+.wk-open.adj { border-style: dashed; border-color: var(--accent); }
+.wk-tag.adj { background: var(--accent); color: var(--accent-ink); }
+/* The paused stretch is a row, not a button: there is no week behind it to open. */
+.wk-paused { cursor: default; border-style: dashed; border-color: var(--accent); }
+.wk-paused .wk-n { background: var(--surface-2); color: var(--ink-faint); }
+.wk-adj { margin: var(--s3) 0 0; padding: var(--s3); border-radius: var(--r-ctl);
+  background: var(--surface-2); }
+.wk-adj b { display: block; font-size: var(--t-label); font-weight: 750; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--accent); }
+.wk-adj span { display: block; font-size: var(--t-label); color: var(--ink-soft); margin-top: 4px;
+  line-height: 1.55; }
+
 </style>
 </head>
 <body>
@@ -6438,11 +6458,18 @@ function openProfilePreview(pf, imp) {
 // summary in step with RAW's steps by hand -- two shapes, and CLAUDE.md records what that costs.
 // ⚠️ SO ONE THING RUNNA DOES IS NOT DONE: its "easy runs only" also strips the pace targets from the
 // runs that remain. Ours leaves them, and the copy does not claim otherwise.
+// ⚠️ 'p' IS A SEPARATE LOWERCASE PHRASE, NOT 't' PUT THROUGH toLowerCase(). The opened week reads
+// "3 days of this week — X", and lowercasing the title gave "i am not planning on running": a sentence
+// that begins with a capital I does not survive being folded into the middle of another one.
 const ADJ_MODES = [
-  { id: "full", t: "Easy, long and hard runs", s: "Everything as planned — just tell me it is happening" },
-  { id: "easyspeed", t: "Easy and speed", s: "Keep the shorter sessions, drop the long run" },
-  { id: "easy", t: "Easy runs only", s: "Drop the hard sessions and the long run" },
-  { id: "none", t: "I am not planning on running", s: "Clear the running out of these days entirely" },
+  { id: "full", t: "Easy, long and hard runs", p: "everything as planned",
+    s: "Everything as planned — just tell me it is happening" },
+  { id: "easyspeed", t: "Easy and speed", p: "easy and speed sessions, no long run",
+    s: "Keep the shorter sessions, drop the long run" },
+  { id: "easy", t: "Easy runs only", p: "easy runs only",
+    s: "Drop the hard sessions and the long run" },
+  { id: "none", t: "I am not planning on running", p: "no running at all",
+    s: "Clear the running out of these days entirely" },
 ];
 function loadAdjust() {
   try { const a = JSON.parse(localStorage.getItem(ADJUST_KEY) || "[]"); return Array.isArray(a) ? a : []; }
@@ -11830,21 +11857,105 @@ function weekSummaryRow(w, isRace) {
     w.distanceKm ? w.distanceKm.toFixed(1) + " km" : "",
     w.quality ? w.quality + (w.quality === 1 ? " quality" : " quality") : "",
     w.longRunMin ? "long " + Math.round(w.longRunMin) + " min" : ""].filter(Boolean).join(" \u00b7 ");
-  return '<button class="wk-sum' + (past ? " past" : "") + (cur ? " cur" : "") + '" data-weeksel="' + w.index + '">' +
+  // ⚠️ THE BORDER IS NEVER THE ONLY SIGNAL, and this app says so everywhere: a swatch reading "Build"
+  // only helps if you can match its colour to a bar, a low-confidence note says the words, and the
+  // ineligible share rows are marked by a dashed edge rather than by dimming. So an altered week gets a
+  // DASHED accent border AND a tag with the word in it -- the dash is what distinguishes it from the
+  // current week, which already owns the solid accent border.
+  const adj = weekAdjust(w);
+  return '<button class="wk-sum' + (past ? " past" : "") + (cur ? " cur" : "") + (adj ? " adj" : "") +
+    '" data-weeksel="' + w.index + '">' +
     '<span class="wk-n">' + w.index + '</span>' +
     '<span class="wk-b"><span class="wk-t">Week ' + w.index +
       (cur ? '<span class="wk-tag cur">This week</span>' : "") +
+      (adj ? '<span class="wk-tag adj">' + adj.tag + '</span>' : "") +
       (badge ? '<span class="wk-tag">' + badge + '</span>' : "") + '</span>' +
       '<span class="wk-m">' + esc(meta) + '</span></span>' +
     '<span class="sd-chev" aria-hidden="true">\u203A</span></button>';
 }
+
+/**
+ * WHICH OF THIS WEEK'S DAYS AN ADJUSTMENT COVERS, and what it did to them.
+ *
+ * ⚠️ A WINDOW DOES NOT RESPECT WEEK BOUNDARIES. A holiday from a Friday to the following Thursday
+ * spans two plan weeks and covers three days of one and four of the other, so a row saying "holiday
+ * week" on both would be right about neither. The tag counts days.
+ *
+ * ⚠️ AND IT REPORTS THE WINDOW, NOT THE DAMAGE. The sessions are already gone from the week by the time
+ * anything renders -- applyAdjustments runs inside adoptPlan -- so counting what is missing would mean
+ * comparing against a plan that no longer exists. What is honest is to say which days are covered and
+ * at what level, and to let the week's own figures (which followed) speak for the rest.
+ */
+function weekAdjust(w) {
+  const rows = loadAdjust();
+  if (!rows.length || !w || !w.startIso) return null;
+  let hit = null;
+  const days = [];
+  for (let d = 0; d < 7; d++) {
+    const iso = isoAdd(w.startIso, d).toISOString().slice(0, 10);
+    const a = adjustFor(iso, rows);
+    if (!a) continue;
+    // The first window this week meets decides its label. Two overlapping windows in one week is
+    // possible and rare, and naming the first is better than naming both in a tag six characters wide.
+    if (!hit) hit = a;
+    if (a === hit) days.push(iso);
+  }
+  if (!hit) return null;
+  const mode = ADJ_MODES.find((m) => m.id === hit.mode);
+  return { adj: hit, days: days, count: days.length,
+    tag: hit.kind === "holiday" ? "Holiday" : "Easier",
+    phrase: mode ? mode.p : hit.mode };
+}
+/**
+ * The sentence inside an opened week. Names the change, the days, and what came out.
+ * ⚠️ IT SAYS THE DATES RATHER THAN "THIS WEEK", because a window that covers three days of a week is
+ * not a holiday week and calling it one would be the app rounding its own facts up.
+ */
+function weekAdjustNote(w) {
+  const a = weekAdjust(w);
+  if (!a) return "";
+  const first = a.days[0], last = a.days[a.days.length - 1];
+  const span = first === last
+    ? runDateLabelIso(first)
+    : runDateLabelIso(first) + " to " + runDateLabelIso(last);
+  const whole = a.count === 7;
+  return '<div class="wk-adj">' +
+    '<b>' + (a.adj.kind === "holiday" ? "Going away" : "Taking it easier") + ' \u00b7 ' + esc(span) + '</b>' +
+    '<span>' + (whole ? "The whole week" : a.count + (a.count === 1 ? " day" : " days") + " of this week") +
+    ' \u2014 ' + esc(a.phrase) + '.' +
+    (a.adj.dropNonRun ? " Strength and mobility are out too." : "") +
+    ' You can undo this from Manage plan \u203a ' +
+    (a.adj.kind === "holiday" ? "Going away" : "Not feeling 100%") + '.</span></div>';
+}
+/**
+ * The paused stretch, as a row above the week list.
+ *
+ * ⚠️ A PAUSE HAS NO WEEK ROW TO COLOUR, AND THAT IS WHY THIS EXISTS RATHER THAN A BORDER. Pausing
+ * rebuilds the block from the day the pause ends, so the days away are not in PLAN.weeks at all -- there
+ * is nothing to put a border around. Measured: pausing 28 days from 28 Aug gives a plan whose first week
+ * starts 21 Sep, and applyPartialFirstWeek trims that week to begin on the 25th, so the paused days
+ * exist in no week of the plan. A row saying which dates they were is the only honest way to show them.
+ */
+function pausedWeekRow() {
+  const from = profile.startDateIso;
+  if (!from || from <= todayIso()) return "";
+  return '<div class="wk-sum wk-paused" aria-disabled="true">' +
+    '<span class="wk-n">\u2014</span>' +
+    // ⚠️ NO TAG HERE. The other marked rows carry one because their title is "Week 4" and the word has
+    // to go somewhere; this row's title IS the word, and a tag repeating it read "PausedPaused".
+    '<span class="wk-b"><span class="wk-t">Paused</span>' +
+    '<span class="wk-m">' + esc(runDateLabelIso(todayIso())) + " to " + esc(runDateLabelIso(isoAdd(from, -1).toISOString().slice(0, 10))) +
+    ' \u00b7 nothing scheduled \u00b7 week 1 begins ' + esc(runDateLabelIso(from)) + '</span></span>' +
+    '</div>';
+}
+
 function weekList() {
   const raceIdx = PLAN.weeks.length;
   // state.planWeek of 0 means nothing is open, which is a legitimate state: the chart still shows the
   // shape of the block and every week reads as a one-line summary.
-  return PLAN.weeks.map((w) =>
+  return pausedWeekRow() + PLAN.weeks.map((w) =>
     w.index === state.planWeek
-      ? '<div class="card wk-open">' + weekDetail() + '</div>'
+      ? '<div class="card wk-open' + (weekAdjust(w) ? " adj" : "") + '">' + weekDetail() + '</div>'
       : weekSummaryRow(w, w.index === raceIdx)).join("");
 }
 /** One place that changes the selected week, so the chart and the list can never disagree. */
@@ -11936,6 +12047,10 @@ function weekDetail() {
       // mileage never once appeared on this line. There is no type checking inside the template
       // literal to catch a field that does not exist.
       (w.distanceKm ? " \u00b7 " + w.distanceKm.toFixed(1) + " km" : "") + '</div>' +
+      // ⚠️ THE OPENED WEEK NAMES THE CHANGE. His ask: "when opening the drop down it needs to
+      // identify the change (e.g. holiday week)". Above the session rows, because the sessions the
+      // runner has come looking for are the ones that are no longer there.
+      weekAdjustNote(w) +
     rows;
 }
 

@@ -478,3 +478,201 @@ test("BLOCKER: going away and easing off leave the target date alone — that is
     assert.match(app, new RegExp('querySelectorAll\\("\\[data-' + a + '\\]"\\)|querySelector\\("\\[data-' + a + '\\]"\\)'),
       "data-" + a + " is not bound");
 });
+
+/**
+ * Slices a top-level `const NAME = ...;` out of the BUILT page, balancing brackets so an array or an
+ * object literal comes back whole.
+ *
+ * ⚠️ THE CONSTS ARE READ OUT OF THE PAGE RATHER THAN TYPED IN HERE. A supplied table means the lifted
+ * function runs against the TEST's values, which this project has twice watched escape a re-break —
+ * once with `CLUB_TONE_N` and once with the engine's own distance tables.
+ */
+function constSrc(name: string): string {
+  const src = appBlock();
+  const at = src.indexOf("const " + name + " =");
+  assert.ok(at >= 0, name + " is not in the built page");
+  let d = 0;
+  for (let i = at; i < src.length; i++) {
+    const c = src[i];
+    if (c === "[" || c === "{" || c === "(") d++;
+    else if (c === "]" || c === "}" || c === ")") d--;
+    else if (c === ";" && d === 0) return src.slice(at, i + 1);
+  }
+  assert.fail(name + " is unterminated");
+  return "";
+}
+
+type Adj = { kind: string; from: string; to: string; mode: string; dropNonRun?: boolean };
+type Mark = { adj: Adj; days: string[]; count: number; tag: string; phrase: string } | null;
+/** The two real functions, over the real predicate, with only the STORE READ stubbed. */
+function weekMark(rows: Adj[]) {
+  const src = ["weekAdjust", "weekAdjustNote", "adjustFor", "isoAdd", "runDateLabelIso", "esc"]
+    .map((n) => fn(n)).join("\n") + "\n" +
+    ["ADJ_MODES", "MON_SHORT"].map((n) => constSrc(n)).join("\n") + "\n" +
+    "function loadAdjust() { return ROWS; }\n";
+  return new Function("ROWS", src + "return { weekAdjust: weekAdjust, note: weekAdjustNote };")(rows) as
+    { weekAdjust: (w: unknown) => Mark; note: (w: unknown) => string };
+}
+const WK = (startIso: string, index = 3) => ({ startIso, index, phase: "build" });
+
+test("BLOCKER: an altered week is marked by a DASHED border AND a word — colour is never the only signal", () => {
+  const app = appBlock();
+  const css = page().slice(page().indexOf("<style>"), page().indexOf("</style>"));
+  // ⚠️ THE DASH IS WHAT DISTINGUISHES IT FROM THE CURRENT WEEK, which already owns the solid accent
+  // border. Two different things marked identically is the same fault as a phase legend whose swatch
+  // you cannot match to a bar.
+  const rule = (sel: string) => {
+    const at = css.indexOf(sel + " {");
+    assert.ok(at >= 0, "there is no " + sel + " rule");
+    return css.slice(at, css.indexOf("}", at));
+  };
+  for (const sel of [".wk-sum.adj", ".wk-open.adj"]) {
+    assert.match(rule(sel), /border-style:\s*dashed/, sel + " is not dashed, so it cannot be told from the current week");
+    assert.match(rule(sel), /border-color:\s*var\(--accent\)/, sel + " does not use the accent");
+  }
+  // ⚠️ AND THE MARK SURVIVES ON THE CURRENT WEEK. `.wk-sum.cur` sets a solid accent border and ties on
+  // specificity with `.wk-sum.adj`, so without this rule whichever came later in the stylesheet would
+  // decide — and "this week, and it is a holiday week" is the case a runner most needs to read.
+  assert.match(rule(".wk-sum.cur.adj"), /border-style:\s*dashed/,
+    "a current week that is also altered loses its dash");
+  // The word. A tag, in the accent, carrying weekAdjust's own label.
+  const row = nocomment(fn("weekSummaryRow"));
+  assert.match(row, /const adj = weekAdjust\(w\)/, "the row no longer asks weekAdjust");
+  assert.match(row, /adj \? " adj" : ""/, "the row does not carry the class");
+  assert.match(row, /wk-tag adj[\s\S]{0,40}adj\.tag/, "the row marks the week by colour alone, with no word in it");
+  assert.match(rule(".wk-tag.adj"), /var\(--accent\)/, "the tag is not in the accent");
+  assert.match(rule(".wk-tag.adj"), /color:\s*var\(--accent-ink\)/, "the tag's label is not the accent's own ink");
+  // ⚠️ NO NEW COLOUR AND NO TINT, which is what makes test/contrast.test.ts cover this by construction:
+  // --accent-ink on --accent and --accent/--ink-soft/--ink-faint on --surface-2 are all already asserted
+  // there, in all four theme blocks. A color-mix() or a hex here would be outside every existing guard.
+  for (const sel of [".wk-sum.adj", ".wk-open.adj", ".wk-tag.adj", ".wk-paused", ".wk-adj", ".wk-adj b", ".wk-adj span"]) {
+    const r = rule(sel);
+    assert.ok(!/#[0-9a-f]{3,8}\b/i.test(r), sel + " carries a literal colour instead of a token");
+    assert.ok(!/color-mix\(/.test(r), sel + " tints a token, which no existing contrast guard covers");
+  }
+});
+
+test("BLOCKER: a window is measured in DAYS, so one spanning two weeks marks both", () => {
+  // ⚠️ THIS IS THE WHOLE REASON weekAdjust WALKS THE SEVEN DAYS RATHER THAN TESTING THE WEEK'S START.
+  // A holiday runs Friday to the following Thursday far more often than it lines up with a Monday, and
+  // a week-start test marks one of the two weeks it actually touches — the other reads as untouched
+  // while its sessions have been taken out.
+  const A: Adj = { kind: "holiday", from: "2026-09-11", to: "2026-09-17", mode: "easy" };
+  const api = weekMark([A]);
+  const w1 = api.weekAdjust(WK("2026-09-07", 3)); // Mon 7 Sep — the window's first three days
+  const w2 = api.weekAdjust(WK("2026-09-14", 4)); // Mon 14 Sep — its last four
+  assert.ok(w1 && w2, "a window spanning two weeks marked " + (w1 ? "" : "not the first ") + (w2 ? "" : "not the second"));
+  assert.equal(w1!.count, 3, "the first week counted " + w1!.count + " days, not the 3 it holds");
+  assert.equal(w2!.count, 4, "the second week counted " + w2!.count + " days, not the 4 it holds");
+  assert.deepEqual(w1!.days, ["2026-09-11", "2026-09-12", "2026-09-13"], "the first week's days are wrong");
+  // A week that does not meet it at all is not marked, and gets no note.
+  assert.equal(api.weekAdjust(WK("2026-09-21", 5)), null, "an untouched week is marked");
+  assert.equal(api.note(WK("2026-09-21", 5)), "", "an untouched week carries a note");
+  assert.equal(weekMark([]).weekAdjust(WK("2026-09-07", 3)), null, "a week is marked with no windows stored");
+  // A whole week says so, rather than counting to seven.
+  const whole = weekMark([{ kind: "holiday", from: "2026-09-07", to: "2026-09-13", mode: "none" }]);
+  assert.equal(whole.weekAdjust(WK("2026-09-07", 3))!.count, 7, "a fully covered week did not count 7");
+  assert.match(whole.note(WK("2026-09-07", 3)), /The whole week/, "a fully covered week counts to seven at the runner");
+  // ⚠️⚠️ AND THE COUNT IS OF **THIS** WINDOW'S DAYS, WHICH ONE WINDOW CANNOT DISCRIMINATE. Watched
+  // escaping: dropping the `a === hit` test is a no-op with a single window stored, so every assertion
+  // above passed while a week holding two windows reported one's label over both their days — "5 days of
+  // this week, easy runs only" when three of them were the holiday and two were an easier stretch. Two
+  // windows in one week is rare and entirely legal, and the fixture has to hold two to see it at all.
+  const both = weekMark([
+    { kind: "holiday", from: "2026-09-07", to: "2026-09-09", mode: "easy" },
+    { kind: "ease", from: "2026-09-10", to: "2026-09-11", mode: "easyspeed" },
+  ]);
+  const m = both.weekAdjust(WK("2026-09-07", 3))!;
+  assert.equal(m.count, 3, "a week holding two windows counted " + m.count + " days for the first of them");
+  assert.deepEqual(m.days, ["2026-09-07", "2026-09-08", "2026-09-09"],
+    "the count includes days belonging to a different window");
+  assert.equal(m.tag, "Holiday", "the first window this week meets does not decide the label");
+  const bn = both.note(WK("2026-09-07", 3));
+  assert.match(bn, /7 Sep to 9 Sep/, "the note's span reaches into the second window");
+  assert.ok(!/11 Sep/.test(bn), "the note names a day belonging to a different window");
+});
+
+test("BLOCKER: the opened week names the change, in the runner's own dates, with the way back", () => {
+  const api = weekMark([{ kind: "holiday", from: "2026-09-11", to: "2026-09-17", mode: "easy" }]);
+  const note = api.note(WK("2026-09-07", 3));
+  assert.match(note, /class="wk-adj"/, "there is no note");
+  assert.match(note, /Going away/, "the note does not say what happened");
+  // ⚠️ REAL DATES, NEVER "THIS WEEK". The row above it already says which week; what the runner cannot
+  // work out for themselves is WHICH DAYS of it are gone, and a plan is read weeks ahead of time.
+  assert.match(note, /11 Sep/, "the note does not name the first affected day");
+  assert.match(note, /13 Sep/, "the note does not name the last affected day");
+  assert.match(note, /3 days of this week/, "the note does not say how much of the week it covers");
+  // ⚠️ THE PHRASE COMES FROM ADJ_MODES[].p, NOT FROM LOWERCASING THE TITLE — my own defect, measured:
+  // `.t.toLowerCase()` on the fourth mode produced "i am not planning on running", which is a sentence
+  // about the runner's intention pasted into a sentence about the week.
+  assert.match(note, /easy runs only/, "the note does not say what is left");
+  const none = weekMark([{ kind: "holiday", from: "2026-09-07", to: "2026-09-13", mode: "none" }]).note(WK("2026-09-07", 3));
+  assert.match(none, /no running at all/, "the strongest level does not say what it leaves");
+  assert.ok(!/i am not planning/i.test(none), "the note lowercases the option's title instead of using its phrase");
+  // ⚠️ EVERY MODE CARRIES ONE, or a fifth level would fall back to printing its raw id at the runner.
+  const modes = constSrc("ADJ_MODES");
+  assert.equal((modes.match(/\bid:/g) || []).length, (modes.match(/\bp:/g) || []).length,
+    "a mode has no phrase, so its note would print the option's id or its title");
+  // The way back is named, per kind, because the sheet it came from is not the screen it is read on.
+  assert.match(note, /Manage plan/, "the note does not say how to undo it");
+  assert.match(note, /Going away\.<\/span>/, "the holiday note points at the wrong sheet");
+  const ease = weekMark([{ kind: "ease", from: "2026-09-11", to: "2026-09-13", mode: "easyspeed" }]);
+  const en = ease.note(WK("2026-09-07", 3));
+  assert.match(en, /Taking it easier/, "an easing note is headed as a holiday");
+  assert.match(en, /Not feeling 100%\.<\/span>/, "the easing note points at the wrong sheet");
+  assert.equal(ease.weekAdjust(WK("2026-09-07", 3))!.tag, "Easier", "the easing tag reads as a holiday");
+  assert.equal(api.weekAdjust(WK("2026-09-07", 3))!.tag, "Holiday", "the holiday tag does not say holiday");
+  // Strength and mobility are mentioned only when they were actually taken out.
+  const nr = weekMark([{ kind: "holiday", from: "2026-09-11", to: "2026-09-13", mode: "easy", dropNonRun: true }]);
+  assert.match(nr.note(WK("2026-09-07", 3)), /Strength and mobility are out too/, "the note omits the non-runs");
+  assert.ok(!/Strength and mobility/.test(note), "the note claims the non-runs went when they did not");
+});
+
+test("BLOCKER: one definition of whether a week is altered, read by both the row and the note", () => {
+  // ⚠️ A SECOND COMPUTATION IS HOW THE BORDER AND THE NOTE COME TO DISAGREE — the row saying nothing
+  // happened over a note describing three missing days, or the reverse. Neither render site may walk
+  // the week's days or ask adjustFor itself.
+  const app = nocomment(appBlock());
+  for (const site of ["weekSummaryRow", "weekAdjustNote", "weekList"]) {
+    const b = nocomment(fn(site));
+    assert.match(b, /weekAdjust\(/, site + " no longer asks weekAdjust");
+    assert.ok(!/adjustFor\(/.test(b), site + " asks adjustFor directly, which is a second definition");
+  }
+  // ⚠️ THE SWEEP MUST STRIP THE FUNCTION'S OWN SIGNATURE, or `adjustFor` matches itself and reports the
+  // one definition as a rogue caller — the guard-trips-on-its-own-vocabulary trap, again.
+  const body = (n: string) => nocomment(fn(n)).replace(/^function \w+\s*\([^)]*\)/, "");
+  const askers = [...app.matchAll(/function (\w+)\s*\([^)]*\)\s*\{/g)].map((m) => m[1]!)
+    .filter((n) => { try { return /adjustFor\(/.test(body(n)); } catch { return false; } });
+  assert.deepEqual(askers.sort(), ["applyAdjustments", "weekAdjust"],
+    "a stored window's membership is decided by: " + askers.join(", "));
+  // ⚠️ `adjustPreviewCount` RANGE-TESTS INLINE AND THAT IS NOT A SECOND DEFINITION: it is handed ONE
+  // draft window that is not in the store yet, so there is nothing for adjustFor to search. Stated here
+  // rather than left as a silent exception, and pinned so it cannot quietly grow into a search.
+  const prevBody = body("adjustPreviewCount");
+  assert.match(prevBody, /iso < a\.from \|\| iso > a\.to/, "the preview no longer range-tests its own draft");
+  assert.ok(!/loadAdjust\(/.test(prevBody), "the preview reads the store, so it is answering a different question");
+  // The opened week renders the note, and the list marks the opened card too.
+  assert.match(nocomment(fn("weekDetail")), /weekAdjustNote\(w\)/, "an opened week does not name its change");
+  assert.match(nocomment(fn("weekList")), /wk-open[\s\S]{0,40}weekAdjust\(w\) \? " adj" : ""/,
+    "the opened card loses the mark, so opening a marked week un-marks it");
+});
+
+test("BLOCKER: a paused stretch is a row above the list, not a coloured week", () => {
+  // ⚠️ A PAUSE HAS NO WEEK TO COLOUR, and that is the difference between it and a holiday. Pausing moves
+  // the block's start date, so the paused days belong to no week of the plan at all — there is no row to
+  // put a border on. A holiday leaves the weeks where they are and empties days inside them.
+  const row = nocomment(fn("pausedWeekRow"));
+  assert.match(row, /<div class="wk-sum wk-paused"/, "the paused stretch is not a plain row");
+  assert.ok(!/<button/.test(row), "the paused stretch is a button, so it looks like it opens something");
+  assert.match(row, /aria-disabled="true"/, "the paused row is not announced as inert");
+  // Derived from the future start date — the same derivation pausedCard uses, and no store of its own.
+  assert.match(row, /profile\.startDateIso/, "the paused row does not read the start date");
+  assert.match(row, /from <= todayIso\(\)/, "the paused row shows when the plan is not paused");
+  assert.ok(!/localStorage|PAUSE_KEY/.test(row), "the paused row keeps a store, which can go stale against the date");
+  assert.match(row, /week 1 begins/, "the paused row does not say when running resumes");
+  // First, above every week, because it is the stretch before week one.
+  const list = nocomment(fn("weekList"));
+  assert.match(list, /return pausedWeekRow\(\) \+ PLAN\.weeks/, "the paused row is not the first thing in the list");
+  // ⚠️ NO TAG ON THIS ROW. Its own title is the word, and a tag repeating it read "PausedPaused".
+  assert.ok(!/wk-tag/.test(row), "the paused row carries a tag that repeats its own title");
+});

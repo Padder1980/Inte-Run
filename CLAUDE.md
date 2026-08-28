@@ -12733,3 +12733,175 @@ at 2.10–2.79:1 in light on eight of its twelve rows. Pre-existing and unguarde
 here is the fix, one declaration away. **Reported by a reader and NOT independently reproduced by me** —
 I could not get the chips on screen.
 ⚠️ **NOTHING IN THIS CHAPTER HAS BEEN ON A PHONE.** Every figure is a headless browser or arithmetic.
+
+## FOUR FROM HIS SCREENSHOTS, AND A SHEET THAT SLID SIDEWAYS (owner, 2026-08-28)
+
+Suite 1416 → **1420**; **31 deliberate re-breaks across two rounds, all 31 caught** (five only after a
+guard was restated — those five are below). All web, so all of it reaches his phone on the next launch.
+
+### ⚠️⚠️ THE SHEET SLID SIDEWAYS, AND ELEVEN RULES HAD THE SAME LATENT FAULT
+
+He photographed the Going away and Not feeling 100% sheets with their headings, their titles and the
+first date field slid off the left edge. **The CSS spec turns `visible` into `auto` whenever the other
+axis is not visible**, so `overflow-y: auto` alone had made **every sheet in this app a horizontal
+scroller nobody asked for** — and one pixel of overflow is then enough for iOS rubber-banding to drag
+the whole thing. Swept: **eleven rules in this stylesheet set `overflow-y` and say nothing about x**,
+including `.sheet`, `.view` and my own new `.caltip-body`.
+
+⚠️ **MEASURED 0px OF OVERFLOW IN HEADLESS CHROME AT FOUR SIZES, WHICH IS EXACTLY WHY IT TOOK A
+PHOTOGRAPH FROM A REAL PHONE.** A native `<input type="date">` renders wider on iOS than in Chrome, so
+the two-column date row overflows there and not here. **I could not reproduce his exact overflow**, so
+it is fixed at the platform-independent level and that is stated rather than dressed up as a root-cause
+fix: the sheet is no longer pannable at all.
+⚠️ **`overflow-x: clip` BESIDE A SCROLLING Y-AXIS IS COERCED TO `hidden`**, and that is the mechanism
+rather than a disappointment: `hidden` is not user-pannable (a finger cannot drag it) while remaining
+programmatically scrollable, which is why a probe setting `scrollLeft` still reads non-zero. The
+user-facing fix holds; a `scrollLeft` measurement is the wrong instrument for it.
+⚠️ **AND THE CLIP IS THE GUARANTEE, NOT THE FIX** — on its own it turns an overflow into missing
+content. The date row wraps too, and **`flex-wrap` was the wrong tool**: it breaks a line from the flex
+**basis**, so with `flex: 1 1 140px` two fields never wrapped and a wider intrinsic minimum pushed them
+out of the row instead (measured 17px of overflow at 375 wide). `repeat(auto-fit, minmax(150px, 1fr))`
+wraps on the **minimum**, which is the question being asked — measured two columns at 430 and 375, one
+at 320. Plus `min-width: 0` on the date input, or `width: 100%` cannot squeeze a native control below
+its own intrinsic minimum.
+⚠️ **A RATCHET, NOT A BAN.** Nine rules still scroll vertically without pinning x and most are
+harmless; what must not grow is the count, because each is a surface that can be slid by accident.
+
+### CANCELLING A BREAK — THERE WAS NO WAY BACK AT ALL
+
+Booking a holiday or an easier stretch raised an undo toast and nothing else. Once it had gone the
+window was in the store for good, and the only way to undo it was to guess that an overlapping one
+might help. `plannedBreaksHtml()` lists what is booked, each with a Cancel.
+⚠️ **A PAUSE IS IN THAT LIST TOO, AND IT IS A DIFFERENT MECHANISM.** A holiday is a row in the
+adjustment store; a pause is a future `profile.startDateIso`. Both read as *"a break I have booked"*, so
+both belong in one list — and the way out of each is the function that already existed for it
+(`resumeFromPause` was reachable only from Today's paused card).
+⚠️ **IT RENDERS NOTHING WHEN NOTHING IS BOOKED.** A permanent empty heading on a menu is a section that
+teaches the runner to scroll past that part of the screen.
+⚠️ **`cancelAdjust` SNAPSHOTS BEFORE THE REBUILD, and that ordering is the whole undo.** `seedDone()`
+prunes `dayOverride` of session ids the new plan lacks and **persists the prune**, so a snapshot taken
+afterwards hands back a plan with the runner's own reschedules already deleted — under a button
+labelled Undo. Measured: cancelling a holiday put week 3 back from **19.0 to 27.1 km**.
+
+### START A NEW PLAN GOES THROUGH THE WIZARD, MINUS THE NAME STEP
+
+His words: *"when a user chooses to start a new plan, I want the app to take them through the initial
+start up screens when first entering the app (you can miss out the name one)."* It used to open
+`state.screen = "setup"` — the whole profile form on one page, which is the screen for **changing** an
+answer rather than the sequence for **building** a block.
+⚠️ **GATED ON `profile.personalized`, SO IT NEEDS NO NEW FLAG:** false on a genuine first run, true by
+the time a second plan is ever started. Driven both ways: `["level","goal",…]` against
+`["you","level","goal",…]`.
+⚠️ **`startWizard()` IS NOW THE ONE ENTRY POINT.** It was reachable only from the first-run welcome;
+two copies of (reset draft, reset wizStep, reset wizErr, set the screen) is how the second route comes
+to start half way through somebody else's answers.
+⚠️ **NOTHING EXTRA WAS NEEDED TO PRE-FILL IT** — every later step already falls back to the stored
+profile (`wizFieldVal("s_dist") || p.goalDist` and friends), so a second plan opens on last time's
+answers rather than blank.
+
+### ⚠️⚠️ THE PLAN SHIELDS REVERSE A REASON WRITTEN IN THIS FILE
+
+*"i want you to use different colours for the icons of the different run plans."* The comment in
+`viewPlans` argued a coloured shield would be a second colour vocabulary against ruling 7, because this
+app has exactly one meaning for a coloured chip. **He overruled it, and the collision is avoided rather
+than accepted:** `--eff-*` are not in the palette, the badge still carries the distance as **text**, the
+active plan is always `--accent` and no past plan can wear it. **Do not revert it to grey on the
+strength of the old comment** — the guard that asserted the grey was inverted, not deleted.
+⚠️ **KEYED ON THE PLAN'S OWN SIGNATURE, NEVER ITS POSITION.** Delete one plan and every colour below it
+would shift, so the shield a runner had learned to recognise becomes somebody else's.
+⚠️⚠️ **AND THE SHIELD'S TREATMENT HAD TO CHANGE, BECAUSE THE OLD ONE CANNOT CARRY SIX HUES.** It painted
+`var(--accent-ink)` on the raw token, and **`--accent-ink` flips with the theme (white in light,
+near-black in dark) while the tokens get LIGHTER in dark** — so darkening the ground to fix light mode
+breaks dark mode and vice versa. Measured on the gradient's lightest end: light **2.76 (ease) / 2.94
+(build) / 3.16 (base)** against a 4.5 floor; darkened to 80%, dark falls to **3.51 (taper) / 3.78
+(rest)**. **No single weight works because the ink flips.** Mixing each hue into a **fixed dark base**
+holds the lightness while the hue varies, so white always clears — read back from rendered pixels,
+**9.48:1 worst in light and 8.03:1 in dark** across all six, hues 27.6 apart.
+
+### Five guard defects, all mine
+
+⚠️ **MY OWN DUPLICATE-CLASS RATCHET CAUGHT ME FOR THE SECOND TIME** — a second bare `.rp-badge` rule
+took `CSS_DUP_CEILING` to 21. Merged into the one rule.
+⚠️ **`rule()` READ `--accent-ink` OUT OF THE VERY COMMENT EXPLAINING WHY IT IS GONE** — the **eleventh**
+firing of comment-quotes-what-it-forbids. It strips CSS comments now.
+⚠️ **A `var\(--pc[^)]*\)` REGEX CANNOT CROSS THE `)` IN `var(--pc, var(--accent))`** — the
+collection-too-narrow trap, in the guard rather than the code.
+⚠️ **THE CANCEL CONTROL MEASURED 41.48px BY BISECTION AGAINST A 44px FLOOR**, and nothing guarded it. A
+box cannot report its own pseudo-element, so the inset is what a static guard can check.
+⚠️⚠️ **AND SLICING MY OWN TEST FILE BETWEEN TWO ANCHORS DELETED THE THREE ASSERTIONS BETWEEN THEM**, so
+two re-breaks escaped with the test green. **This project already records me doing exactly that once.**
+When replacing a block in a test, diff the assertion list before and after.
+
+### Two existing guards restated, both scoped to a HOW
+
+⚠️ **`test/manage-plan.test.ts`'s "no second colour vocabulary" ASSERTED THE EXACT GREY HE OVERRULED**
+(`isLive ? "var(--accent)" : "var(--ink-faint)"`). What it protected survives — no effort colours, no
+phase colours, the active plan readable — and is what it asserts now.
+⚠️ **AND `test/onboarding-wizard.test.ts`'s FIRST-LAUNCH GUARD PINNED THE LITERAL `state.screen =
+"wizard"` INSIDE THE WELCOME HANDLER**, so extracting `startWizard()` broke a guard whose invariant was
+untouched. Restated as a chain, and it is now **stronger** than the old form because it also proves the
+draft is cleared. **That is the fourteenth-plus firing of guard-scoped-to-a-HOW in this file.**
+
+⚠️ **THE BACKTICK RULE FIRED, IN CSS COMMENTS THIS TIME — 14 of them in one edit.** The build failed
+with `Identifier cannot follow number` pointing at the splash markup, and the measurement I ran next was
+against the **stale** build and reported the bug as still present. Read the exit code first.
+
+## THE ADVERSARIAL REVIEW OF THE MOVE-WORKOUT WORK (2026-08-28)
+
+Five lenses over the two shipped commits, each finding attacked by three sceptics. It found four things
+that were mine, and **two of them were claims I had written down wrong**.
+
+⚠️⚠️ **`calHomeScroll` SCROLLED AWAY THE INSTRUCTION IT EXISTS TO DELIVER.** Measured on the tile path:
+the permanent hint line at **top −21** and the Back button at **top −53** — both off screen, on a
+**fresh** plan, which is the one case my own comment called fine because week 1 is today and sits 80px
+down. So the sentence I called *"what makes the no-seen-key answer complete"* was never on screen on the
+path that exists to teach the gesture. It now refuses to scroll a week that is already visible; mid-plan
+it still scrolls, because losing a header when you travel 8,000px is what scrolling means. After: hint
+top 51, Back top 19.
+
+⚠️ **A DRAG COULD OUTLIVE THE SCREEN IT STARTED ON.** `__interunWatchLive` sets `state.screen` and
+renders with no `DRAG` check, and `liveRunning()` is false during a calendar drag. Measured: DRAG still
+set, the lifted ghost over the new screen, the edge scroller auto-scrolling Today by **654px** under a
+stationary finger, and `calDragBlockScroll` still preventDefaulting every touchmove app-wide.
+⚠️ **THE CANCEL MUST EXCLUDE THE PLAN DRAG**, which lives on a screen where `state.screen` is null and
+would otherwise be cancelled on its own first render.
+
+⚠️ **AND THE REFUSAL TOLD EVERY FAILED DROP ABOUT WEEKS**, including one that landed on no day at all.
+
+### ⚠️⚠️ THE TWO CLAIMS I HAD WRITTEN DOWN WRONG
+
+**"`requestAnimationFrame` fires ZERO times in this repo's headless Chrome" is FALSE**, and this file
+carried it in three places. Re-measured four times — by me and by three independent reviewers — at
+**112–122 frames per second in the loaded app**. The original zero was taken with the headless window at
+its **default size, where `window.innerHeight` is 1 and there is nothing to composite**;
+`Browser.setWindowBounds` fixes it, and **the same 1px window is what made `#view` measure 112px and
+read as a broken layout**. So the harness was the fault, not the browser. Two design decisions cited
+that zero and both stand on other grounds, but the reason they gave was wrong. **Corrected at the claim,
+not only at the repetition** — the fault this file records fixing in one place and leaving stale in
+another.
+⚠️ **What genuinely does not work here is pausing an animation and then calling
+`Page.captureScreenshot`: that hangs, measured twice.**
+
+⚠️ **THE REVIEW RESCOPED ITS OWN TWO "MAJOR" FINDINGS TO MINOR AFTER THREE SCEPTICS EACH, and both
+rescopings are worth keeping.** The edge scroller's frame-rate dependence (`EDGE_MAX` is pixels per
+**frame**, so ~420 px/s at 60 Hz and ~840 at 120) is real, but it is **verbatim pre-existing** —
+`git show 1fa6240^` has the same `max = 7` and the same per-frame add — it is symmetric so the overshoot
+is recoverable, and the "never comes back" figure was an artefact of a harness that parks the finger.
+Its supporting day-row figure was also wrong (46px claimed; measured 65–80). **Left alone deliberately:
+a time-normalised scroll is a separate change with its own sweep.**
+
+⚠️ **THE RATCHET GUARD FOR A WRONG CLAIM HAD TO BE A COUNT, NOT A NEARBY-RETRACTION CHECK.** Watched
+escaping: restoring the claim as a REASON put it a hundred characters before the correction that follows
+it, so a window looking for "FALSE" found one either way. Three mentions today, every one inside a
+correction; a fourth fails.
+
+### Still open from the review, measured and NOT fixed
+
+⚠️ **`SessionView.effort` IS A SECOND, INTENSITY-KEYED EFFORT MAPPING and one of its five readers
+schedules training** — a possible ruling-7 violation, reported by the sweep lens and not verified by me.
+⚠️ **`[data-shoeretire]` IS A HANDLER WITH NO CONTROL: a pair of trainers cannot be retired.**
+⚠️ **`data-uirow`, `[data-crun]`, `[data-weatherseg]` and `data-phase` at `web/app.ts:12163`** are dead
+or superseded bindings.
+⚠️ **The plan drag still refuses in silence** — only the calendar's got the new toast.
+⚠️ **Twelve of the guards lens's findings are unaddressed**, most of them "the guard asserts the
+implementation rather than the invariant". Worth a pass of its own.

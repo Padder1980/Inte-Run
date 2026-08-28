@@ -12267,3 +12267,107 @@ the wizard already builds one and the old plan now moves into the list by itself
 reels and going live, and the rule this app keeps everywhere: no control ships before the thing behind it.
 ⚠️ **NOT SEEN ON A PHONE.** Everything above is measured in a headless browser. The tile labels wrap to
 two lines and the pause option cards are wordy; worth the owner's eyes.
+
+## ⚠️⚠️ THE PAUSE LEFT EVERY SESSION IN THE WINDOW (owner, 2026-08-28, within the hour of shipping)
+
+*"ive tested the pause button but it leaves all the sessions in for the selected amount of pause time"*
+— and he was right. Suite 1394 → **1400**; **27 more re-breaks, all caught** (two only after a guard was
+restated). All web.
+
+⚠️ **THE FIRST VERSION MOVED THE TARGET DATE AND REBUILT, WHICH IS THE HALF THAT LOOKS LIKE THE JOB.**
+It grew the block by exactly the right number of weeks and **left the plan STARTING IN THE PAST**, so
+the days he had just told us he would be away were still full of sessions. Reproduced exactly: pausing
+28 days moved the race **14 Feb → 14 Mar** and grew the plan **25 → 29 weeks** while leaving
+**21 runs inside the 28-day window** and the next fortnight **byte-identical** to before.
+
+⚠️ **THE LEVER IS `profile.startDateIso`, AND IT ONLY WORKS BECAUSE `applyProfile` HONOURS A FUTURE
+ONE.** Its clamp is `pf.startDateIso >= todayIso() ? pf.startDateIso : todayIso()` — it refuses a date
+in the past and accepts one ahead. Set to the day the pause ends: **0 runs in the window**, and the
+block back to its original 25 weeks. A guard reads that clamp out of the app, because the whole
+mechanism depends on it.
+⚠️ **SET FOR "KEEP MY TARGET DATE" TOO.** Keeping the date with no start date is the same defect wearing
+the other option's clothes: a rebuild from today into an unchanged deadline.
+
+⚠️⚠️ **AND EMPTYING IT WAS ONLY HALF THE FIX.** Leaving Today blank and jumping the week band three
+weeks forward is what that fix produces on its own. Measured before the card existed: `TODAY_IN_PLAN`
+false, **1,748 characters on screen and not one of them the word "paused"**. `pausedCard()` says when
+the plan picks up and how many days are left.
+⚠️ **AND IT CARRIES THE WAY BACK — before this there was NO way to end a pause early at all.** Pause
+four weeks, come back after one, and the app had nothing to offer but three more weeks of nothing. **A
+state you can enter and cannot leave is worse than one that is merely missing.**
+⚠️ **DERIVED, NOT STORED.** A future `startDateIso` IS the pause, so there is nothing to keep in step
+and nothing to go stale. A pause store would be a second answer to "are they away", and the two would
+disagree the first time somebody edited their start date on the profile screen instead. Guarded by
+sweeping the store keys for one.
+
+## HOLIDAY AND NOT-FEELING-100% ARE ONE MECHANISM, AND PAUSE WAS ITS THIRD MEMBER
+
+Both are **a window of dates and a level of training inside it** — which is what pause is too. That is
+why they were a small addition rather than two more screens, and why they share one sheet builder with
+two headings: two builders over one mechanism is how the two come to behave differently for no reason.
+
+⚠️⚠️ **IT REMOVES SESSIONS AND NEVER REWRITES THEM, AND RUNNA'S OWN FOUR LEVELS MAP ONTO PURE REMOVAL
+EXACTLY.** "Easy, long and hard runs" removes nothing; "easy and speed" drops the long run; "easy runs
+only" drops the quality sessions and the long run; "not planning on running" drops every run. So no
+session has to be built in the app layer and **`PLAN`'s display summary never has to be kept in step
+with `RAW`'s steps by hand** — two shapes, and this file records what that costs.
+⚠️ **ONE THING RUNNA DOES IS THEREFORE NOT DONE: its "easy runs only" also strips the pace targets from
+the runs that remain.** Ours leaves them, and the copy does not claim otherwise.
+
+⚠️ **APPLIED ONCE, INSIDE `adoptPlan`, AND BEFORE THE TWO SYNCS.** A rebuild happens on every launch
+(`recompute()` runs at module level), so an adjustment applied anywhere else is undone by the next one.
+And run AFTER the syncs, **iOS would hold reminders for sessions the runner has just said they will not
+be doing, and the wrist would hold them too** — an ORDERING claim, guarded as one.
+
+⚠️ **`RAW` IS THE TRUTH AND `PLAN` IS A PROJECTION OF IT, so BOTH are filtered.** Filtering only `PLAN`
+leaves the wrist and the session sheet still prescribing the work (they read `RAW`); filtering only
+`RAW` leaves the chart and the week summaries showing a full week the runner is away for. Both
+directions are re-broken.
+⚠️⚠️ **AND THE WEEK'S MILEAGE COMES FROM THE ENGINE'S OWN `weekVolumeMeters`, WHICH HAD TO BE EXPORTED
+FOR IT.** `src/domain/steps.ts` is the single definition and its own note records what a second one
+cost: when `trainingDistanceMeters` arrived, six call sites were updated and two were not, and an
+adjusted week came back **measured on a different scale from every other week in the same plan**
+(40.9 → 44.1 km while every session in it got shorter). `web/entry.ts` now re-exports it.
+
+⚠️ **THE GOAL RACE IS NEVER REMOVED AT ANY LEVEL.** It is what the whole block exists to reach, and a
+holiday that quietly deleted it would be the app throwing the plan away rather than adapting it.
+Verified by placing a "not running" window on race day itself: the race survives.
+⚠️ **A NON-RUN GOES ONLY IF THE RUNNER ASKED.** Strength and mobility are already optional, and Runna's
+own sheet makes removing them a separate switch rather than part of the level.
+
+⚠️ **THE SHEET'S PREVIEW COUNT ASKS THE SAME PREDICATE THE APPLICATION WILL ASK.** It quotes a number
+the runner is agreeing to, and a second estimate would be a second answer. Measured across the four
+levels on one real week: **0 / 1 / 2 / 6 sessions**.
+⚠️ **THE SESSION'S OWN DAY, NOT `effDay`.** A session the runner has MOVED into the window is one they
+decided to put there after the window was set; honouring the move is the right answer, and reading
+`effDay` here would silently delete it.
+⚠️ **PAST WINDOWS ARE DROPPED ON EVERY WRITE.** An adjustment is applied at adopt time, so one that has
+ended can only make the next rebuild slower and the store bigger. The runs done during it are in the
+logbook, which is the record.
+⚠️ **AND AN ADJUSTMENT NEVER TOUCHES THE TARGET DATE — that is what separates it from a pause**, and the
+menu says so. Guarded by sweeping `saveAdjustDraft` for any write to `raceDate`, `startDateIso`,
+`targetS` or `daysPerWeek`.
+
+**Driven end to end:** a holiday week goes `easy / easy / long / easy / threshold / strength / easy` →
+`easy / easy / easy / strength / easy`, the week's mileage follows to **24.1 km** with quality 0 and
+long-run 0 and `RAW` agreeing, the target date is untouched at 14 Feb, and no screen overflows.
+
+### Traps this round paid for again
+
+⚠️ **A PYTHON PATCH SCRIPT WHOSE WRITE IS AT THE END LOSES EVERYTHING WHEN ANY ASSERTION FAILS — TWICE
+IN ONE SESSION.** The Recent Plans screen and the paused card were both written into memory and thrown
+away by a later failed anchor, and both times the *next* step then failed with `X is not defined` on a
+function that had never landed. **Write incrementally, or verify the symbol is present afterwards.**
+⚠️ **THE BACKTICK RULE FIRED TWICE MORE**, both in my own comments; the build failed outright both
+times, which is the good outcome.
+⚠️ **TWO GUARDS OF MINE ESCAPED THEIR RE-BREAK AND BOTH ARE FAMILIAR SHAPES.** `resumeFromPause` has
+TWO `recompute()` calls — the action and its undo — so a bare `/recompute\(\)/` passed with the
+action's removed; counted instead, exactly as `applyPause`'s `restoreTicks` guard already had to be.
+And "there is one sheet builder" counted `function renderAdjustSheet(`, which a second builder called
+anything else sails past — restated to **which functions write the sheet's own markup**, and re-broken
+with a genuine second writer.
+⚠️ **AND ONE GUARD FORBADE A CORRECT USE.** The `isoAdd` sweep required
+`.toISOString().slice(0, 10)` on every result, which fails on `isoAdd(a, 0).getTime()` — a perfectly
+good use of the Date. Its `[^)]*` also could not see past a nested `todayIso()`, so the message it
+printed was a truncated call rather than the offending one. The claim is that the result is treated as a
+Date at all, i.e. never left bare.

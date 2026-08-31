@@ -12905,3 +12905,259 @@ or superseded bindings.
 ⚠️ **The plan drag still refuses in silence** — only the calendar's got the new toast.
 ⚠️ **Twelve of the guards lens's findings are unaddressed**, most of them "the guard asserts the
 implementation rather than the invariant". Worth a pass of its own.
+
+## THE COACHING BOOK, WORKED THROUGH (owner, 2026-08-31) — ADAPT, NOT REBUILD
+
+He attached *Run Faster from the 5K to the Marathon* (Hudson & Fitzgerald) and asked whether to make
+targeted adaptations or rebuild the plan generator from scratch. **Adapt**, on three legs — and the
+legs matter, because they are also the reason a rebuild must not be attempted later on a whim:
+
+1. ⚠️ **CHAPTER 6 CONTAINS NO PACE SYSTEM AT ALL** — it delegates to mcmillanrunning.com. So "rebuild
+   on the book's exact algorithms" is undefined for the layer that matters most. And measured, this
+   engine's `PACE_RATIOS` already ARE the book's zone fractions inverted: easy slow 0.75 against our
+   0.752, easy fast 0.82 against 0.820, threshold 0.96 against 0.952–0.976, recovery ceiling 0.70
+   against 0.667–0.735. Two models, one model, agreeing to ~4%, with our easy pace 8–26 s/km SLOWER,
+   which is the safe direction.
+2. ⚠️ **THE BOOK DISOWNS ITS OWN TWELVE PLANS.** Its thesis is ~90% individualised / ~10% templated,
+   said three times. A faithful rebuild would implement the one thing the author argues against while
+   discarding the adaptive machinery that IS his chapter 8 — which this app already has.
+3. ⚠️ **IT CONTRADICTS ITSELF IN NINE PLACES**, so a clean-slate build has to pick a side at each,
+   which is the adaptive option with a bigger budget and no tests.
+
+⚠️ **"ANTI-TEMPLATE" IS NOT "ANTI-PLAN."** He bounds it three times himself: the default is adherence,
+with deviation on stated evidence. Do not quote the 90/10 line as licence to loosen the generator.
+⚠️ **HIS HALF-MARATHON TAPER IS EFFECTIVELY ONE WEEK** — the penultimate week sits at near-full volume
+and only race week drops 29–36%. Worth knowing before anyone "aligns" `src/science/taper.ts` to it.
+⚠️ **AND PORTING THE CRITICAL-SPEED ANCHOR IS MEASURABLY DANGEROUS, NOT MERELY UNNECESSARY.**
+`src/science/fitness-profile.ts` records the objection at the rejection site and it reproduces: a
+10 km + half fit puts CS at 4:57/km, **27 s/km slower than that runner's own 10 km pace**. The book's
+own eligibility window (120–900 s) means a 5 km time qualifies only at **15:00 or faster**, and this
+app stores a 5 km plus an optional 2 km trial — so a 40:00 5 km runner has **zero** eligible efforts.
+`fitCriticalSpeed` is therefore computed and discarded: no number from it appears in the shipped app
+(`web/fitness.ts` renders it and is absent from `docs/`).
+
+### WHAT SHIPPED, AND THE MECHANISMS NOT TO UNDO
+
+- ⚠️ **HILL SPRINTS ARE A WEEKLY STAPLE, AND THE FREQUENCY IS THE FEATURE.** `easyHillStrides` was one
+  of EIGHT rotation flavours, so a runner met it about one easy run in eight — measured on a real
+  17-week block, six sessions clustered in weeks 1–2 and 9–10. `hillSprintDose` dedicates one easy day
+  a week; measured, **the staple reaches 11–14 of 18 eligible weeks** and hill work of any kind 13–15.
+  ⚠️ **THOSE ARE TWO DIFFERENT NUMBERS AND CONFLATING THEM OVERSTATED THE CHANGE ONCE ALREADY** — "any
+  hill work" counts the five pre-existing VO2/threshold hill formats, which were always there.
+- ⚠️ **ONE PRODUCER: `easyHillStrides` IS NO LONGER IN `easyVariant`'s POOL.** Two sources meant two
+  doses — the rotation always asked for the settled 6 while the staple was building from 2 — and it
+  made the stacking rule unenforceable. The pool went 8 → 7, which changes which flavour every easy
+  slot draws; that is a real difference to every plan and it is the point.
+- ⚠️ **`weekAlreadyClimbs` KEEPS THE SPRINT DAY OFF A WEEK WHOSE QUALITY SESSION IS ALREADY HILL
+  WORK**, detected **structurally** — a `rep` step with no `targetPaceSecPerKm` IS hill work, because
+  pace up a hill is a function of the gradient. Never match `/hill/i` on a title.
+- ⚠️⚠️ **`rotWouldStride` STANDS THE SPRINT DAY ASIDE WHEREVER THE ROTATION WOULD HAVE GIVEN RELAXED
+  STRIDES, AND IT IS NOT GATED ON THE EASY-DAY COUNT.** Without it a plan can contain **no** strides
+  session at all, and `sessionLibrary`'s representative for "Easy + Strides" in the build-your-own
+  picker becomes the maximal sprint session — a runner asking for strides is handed sprints. Gating it
+  on "only one easy day" shipped that same defect on 4-day plans: **the pool is EIGHT long while
+  deloads fall every FOUR weeks, so for an odd slot index the strides position aliases exactly onto
+  the deload weeks**, where `canStride` is false and the pool has no strides in it. Measured on a
+  4-day 5 km block: **24 strides-typed sessions, not one of them strides.**
+  ⚠️ Alternating by week parity was tried and is worse — it hands the rotation only even pool
+  positions, so strides becomes unreachable rather than rare.
+- ⚠️⚠️ **`pickSprintSlot` CHOOSES THE EASY DAY FURTHEST FROM THE WEEK'S HARD WORK, AND THE FIRST EASY
+  DAY IS THE WORST SLOT THERE IS.** Relative to the long run, quality sits at rel 2 and 4 while
+  `EASY_REL` opens at rel 3 — directly between them. Measured over 1,232 sprint days across 72
+  profiles: **74% fell the day AFTER a quality session, 18% between two of them, and 83% shared the
+  day with a strength session.** After: **20% / 1% / 0%**, and MORE weeks get a sprint day
+  (1232 → 1281). The score weights "days since" double "days until", because ten seconds of sprinting
+  does not carry fatigue into tomorrow — which is the whole reason this is the safe way to introduce
+  intensity — while yesterday's hard session is the recovery the sprints would eat.
+  ⚠️ **NO SLOT IS CLEAR**: three hard days in seven means every easy day touches something.
+  ⚠️ **THE DAYS THEMSELVES ARE NOT REORDERED**, only which one carries the sprints: `easyDays`' order
+  drives the flavour rotation index and the seventh-day recovery jog is identified by being LAST.
+- ⚠️ **THE DOSE ADVANCES EVERY THREE WEEKS (`HILL_DOSE_EVERY`), NOT EVERY TWO, and the reason is the
+  delivered sequence rather than the formula.** It is keyed on the CALENDAR week, so a week with no
+  sprint day still advances it. Measured over 96 plans: at every two weeks, **72 transitions between
+  consecutive sprint days moved the dose by more than one, worst 3 → 6 across a six-week gap**; at
+  three it is 18 with the same worst case; at four it is 9 but the dose does not settle until week 21.
+  ⚠️ **The residual is deliberate and consistent with the engine** — `longRunMinutes` and `easyRampFor`
+  both grow through weeks the runner may miss entirely, and making this one uniquely absence-aware on
+  the far smaller load would be the inconsistency. Three extra sprints is thirty seconds.
+- ⚠️ **BEGINNERS: `contHillSprints`, 8 seconds, 1 → 4, CONTINUOUS BEGINNERS ONLY.** Measured before:
+  **0 sessions containing an unpaced repetition** across a 26-week beginner block, at either status.
+  ⚠️ **The roadmap's claim that the track also needed a fartlek was WRONG** — `contPickups` ("easy +
+  gentle pickups") already is one, and the track has progressions and explore runs. Force production
+  was the only thing missing.
+- ⚠️ **A RUN-WALK BEGINNER GETS NONE**, a scope boundary rather than an oversight: someone who cannot
+  yet run twenty minutes is below the lowest tier the book is written for, their plan is already
+  interval-shaped, and there is no run-walk hill format. **The owner's call to overturn**, asserted so
+  it cannot change silently.
+- ⚠️ **NO RACE-SPECIFIC SESSION WAS ADDED TO THE BEGINNER TRACK**, though the roadmap listed one.
+  Beginners get no threshold, VO2 or race-pace work **by design**; overturning it is a coaching
+  decision. A guard holds it: every beginner week reports `qualitySessionCount` 0. **The owner's call.**
+- ⚠️ **`beginnerEasyMin` IS THE ONE DEFINITION** of a continuous beginner's ordinary run length, read
+  by `beginnerRun` and by the sprint day. Its guard compares against the **timed** siblings and demands
+  they match to the minute: a first version allowed the five minutes `roundMinutes` can legitimately
+  introduce, and **a tolerance wide enough for the rounding is wide enough to hide a drift** —
+  re-broken with a private `lerp(26, 42, f)`, the loose guard passed.
+- ⚠️ **EVERY ADDED SECOND IS CARVED OUT OF THE EASY PORTION IN BOTH BUILDERS.** `easyHillStrides` was
+  the last minute-titled builder still overrunning its title — it carved only the walk-backs, so it
+  delivered **46.00 minutes for a "45′ easy + hill sprints"** (0.33–1.00 over, by dose). That is the
+  defect the owner reported on the sibling in as many words: *"25′ easy + gentle pickups"* with a chip
+  reading 26. `contPickups` and `contProgression` were fixed for it; this one was not.
+
+### ⚠️⚠️ A SESSION NEVER DECLARES ITSELF EASIER THAN ITS OWN HARDEST STEP — THE WORST FIND
+
+`plannedRpeBandOf` stamps a session's declared band onto every logged run as `rband`, and
+`assessTrainingFlags`' `classifyRpe` fires at `band.max + 1`. So a session saying *"meant to feel about
+2–3"* while carrying RPE 9 strides turns an honest answer into evidence for easing the whole plan off.
+**Driven through the real engine, not argued: two honestly-rated hill-sprint days at RPE 6 against a
+{2,3} band produced an rpe-high flag with mean deviation 3 and a suggestion to RE-ANCHOR A 25:00 5 KM
+RUNNER TO 27:00.**
+
+⚠️ **IT WAS EIGHT TITLE FAMILIES AND ~14% OF ALL SESSIONS, NOT THE ONE I NOTICED.** Swept 27,462
+generated sessions: "easy + strides" declared 2–3 and contained 9 (×818), "moderate + strides" 3–4
+against 9 (×830), "easy → steady finish" 2–3 against 5 (×783), "easy + gentle pickups" 2–3 against 5
+(×765), "easy → moderate finish" 2–3 against 4 (×552), the goal-pace-then-threshold long run 4–5
+against 7 (×70), "threshold, then hills" 6–7 against 10 (×45), "N × N km, then hill sprints" 8–9
+against 10 (×4). **3,867 sessions. Now 0.**
+
+- ⚠️ **FIXED IN `assemble`, THE ONE CONSTRUCTION POINT**, so no builder can forget it — and
+  `longRun`'s own copy of the arithmetic is deleted, because one place beats two. It is also exactly
+  what `plannedRpeBandOf`'s fallback already does for a session declaring no band, so the declared
+  band now agrees with the app's own derivation instead of contradicting it.
+- ⚠️ **ONLY THE TOP MOVES.** A session containing ten seconds of maximal work is still an easy run and
+  its floor is what says so; widening both ends makes every band meaningless. `RPE.maximal` for the
+  whole session is the same dishonesty pointing the other way.
+- ⚠️ **THE TRADE, STATED:** a wider band makes the RPE flag less sensitive for sessions with brief hard
+  work, and the displayed chip reads "RPE 2–9" rather than "2–3". Both are the right way to be wrong —
+  a false *"shall we slow the plan down"* is acted on by the runner, and a true-but-broad label merely
+  reads less usefully than a false-but-narrow one. The flag still fires: an honest 4, 5 and 6 no longer
+  flag and a 10 still does, asserted **both** ways.
+- ⚠️ `test/session-library.test.ts`'s *"moderate and progression runs stay honestly easy"* asserted
+  `targetRpe.max <= 4` — the narrow band, i.e. the direction that CAUSES the false flag its own comment
+  warns about. Restated to the run's own **body** steps staying at RPE ≤ 4, plus the band spanning.
+
+### ⚠️⚠️ I QUOTED THE WRONG NUMBERS AT THE OWNER, AND THIS IS THE TRAP TO REMEMBER
+
+Seven of the eight measured figures in commit `487e844`'s message **do not describe the state it
+committed**. I measured, then made two more edits (removing `easyHillStrides` from the rotation pool,
+and the `buildCustomSession` currency fix), and quoted the earlier measurement — the exact trap this
+file already records as *"a verification step quoted from a previous session's notes has not been
+run"*. **Every discrepancy flattered the change, and the rule-3 cost was understated fourfold**
+(claimed +3, actual +11). Found by an adversarial reviewer, not by me.
+
+⚠️ **THE RULE: RE-MEASURE AFTER THE LAST EDIT, NOT AFTER THE INTERESTING ONE.** A figure captured
+before a later change is a figure about a program that no longer exists.
+
+**BASELINE (`82ba142`) → NOW (`94b1059`), over 768 plans / 18,624 weeks. This is the table to quote:**
+
+| metric | baseline | now |
+|---|---|---|
+| weeks under the pyramidal easy floor | 41 | **39** |
+| weeks under 75% easy | 468 | **480** |
+| weeks under 80% easy | 1965 | **1906** |
+| worst week easy % | 67.6 | **68.1** |
+| rises >1.10 on training minutes | 4.1% | **4.4%** |
+| rises >1.10 on counted km | 11.2% | **9.9%** |
+| worst single jump, minutes | 1.34× | **1.32×** |
+| worst single jump, km | 1.46× | **1.43×** |
+| rule-3 transitions over 1.30 | 50 | **68** |
+| rule-3 worst | 1.425× | 1.426× |
+| biggest week in build/peak | 96.7% | **95.6%** |
+| deload depth | 28.8% | 28.8% |
+| taper cut mean | 37.1% | **36.3%** |
+
+Six better, five worse, two flat. The tails improved in both currencies and the 80% band improved; the
+costs are 12 more weeks under 75% easy, 18 more rule-3 transitions of 7,152, and a point off
+biggest-week placement.
+
+### ⚠️⚠️ PARKED: THE BLOCK-LENGTH CHANGE IS ONE COUPLED RECALIBRATION, NOT FOUR CONSTANTS
+
+Four roadmap items — cap the block at the book's optimal durations, shorten base and lengthen build,
+plateau volume after the introductory period, and refine the deload cadence — were **implemented,
+measured and reverted**. The measurements are here so nobody spends the afternoon rediscovering them.
+Road Map step **`pc-blocklen` is deliberately UNTICKED**.
+
+**Item 3, `MAX_STRUCTURED_WEEKS` 30/32/36/40/44 → 14/16/18/20/24.** Weeks are placed backwards from
+race Monday (`addDays(raceMonday, -(structuredWeeks - weekIndex) * 7)`), so capping only moves the
+start later — a 5 km entered 30 weeks out correctly produced 16 weeks ending on race day, phases
+base 4 / build 7 / peak 3 / taper 2, every introductory period inside the book's 2–6 weeks.
+
+| | baseline | cap only | cap + build split + plateau |
+|---|---|---|---|
+| weeks measured | 18,624 | 12,144 | 12,144 |
+| biggest week in build/peak | 96.7% | **98.4%** | 97.0% |
+| rises >1.10 on km | 11.2% | 15.3% | **20.5%** |
+| worst jump, minutes | 1.34× | — | **1.24×** |
+| worst jump, km | 1.46× | 1.35× | **1.32×** |
+| weeks under 75% easy | **468** | 457 | **430** |
+| rule-3 transitions over 1.30 | **50** | 50 | **81** |
+
+⚠️ **THE TAILS IMPROVE AND THE RATES WORSEN, AND THE ABSOLUTE COUNTS ARE WHAT TO READ.** The cap does
+not *generate* bad weeks — it removes comfortable ones (the surplus base weeks a 30-week 5 km plan
+spends warming up), so the easy-floor **count falls 468 → 430** while the rate rises because the
+denominator shrank. Items 4 and 5 do generate rule-3 breaches: 50 → 81.
+
+⚠️⚠️ **BUT IT BREAKS FOUR THINGS CALIBRATED AGAINST THE OLD LENGTHS. With items 3+4+5 in, 17 tests
+fail** (all 8 affected files are green at baseline, so none is date fragility). Two are genuine
+defects: the beginner geometric ramp exceeds the 1.10 single-session guardrail (measured 3.0 → 3.4 km
+= 13%, 3.8 → 4.4 = 16%, 5.0 → 5.6 = 12%), and the long-run ladder exceeds its own
+`LONG_LIFT_STEP_MAX` clamp.
+
+⚠️⚠️ **BOTH HAVE ONE ROOT CAUSE WORTH KNOWING EVEN IF THE CAP IS NEVER DONE: THE RAMP KEEPS CLIMBING
+THROUGH A DELOAD, SO THE REBOUND OUT OF IT COSTS TWO STEPS.** Every ramp divides by the CALENDAR week
+index (`easyRampFor`, `longRunMinutes`, `buildBeginnerWeek`'s `f`). In a long block one step is small
+enough that two stay inside the guardrail, so nothing ever showed; shorten the block and the same code
+breaches at **every post-deload week**.
+⚠️ **A deload-aware ramp (`rampFractions`, counting only progressing weeks) was written and measured:
+the suite is GREEN at 1420 with it, and the audits are slightly WORSE at current lengths** — rises
+>1.10 on minutes 4.1% → 4.6%, on km 11.2% → 12.5%, rule 3 0.70% → 0.84% — because holding the ramp
+flat through a deload leaves fewer steps for the same range, so each step grows. **It only pays for
+itself in company with the cap.**
+
+⚠️ **ITEM 5'S PLATEAU FIGHTS `enforceLongRunIsLongest`.** If easy volume reaches full size by week 4
+while the long run ramps to week 14, the long run must be LIFTED every week in between — and the lift
+is bounded, so either the invariant breaks or the ramp does. The original design's coupling (both ramps
+running the same length) was deliberate.
+
+⚠️ **ITEM 6, DELOAD CADENCE.** `deloadEveryFor(daysPerWeek)` — 6+ days every 3rd week, 5 or fewer every
+4th, grounded in how many rest days the week already contains. Only ever ADDS recovery. Implemented and
+reverted: **2 tests fail** — the long-run-is-longest BLOCKER at 12 of 54,720 weeks (more eased weeks
+means the lift clamp's previous non-eased week is further back, so it binds harder) and session variety
+at **23 distinct sessions in 40 quality slots** (more deloads draw more often from the small-format
+pool, which has few members).
+⚠️ **AND IT IS COUPLED TO ITEM 3:** a 3rd-week cadence is the book's rule for a 16–20 week block and is
+excessive in a 44-week one, where it gives fourteen deloads.
+⚠️ **THE OTHER HALF OF THE BOOK'S RULE — no down week at all for a low-load runner — WAS DELIBERATELY
+NOT ATTEMPTED.** It REMOVES recovery from the least-trained runners on a reading of a book, and this
+app's deload does a second job the book's does not: absorbing the volume ramp. The owner's call.
+
+**So the honest scope is: cap the lengths, make every ramp deload-aware, widen the small-format pool,
+and re-derive the long-run lift clamp — then measure the whole thing at once.** One piece of work with
+its own sweep; shipping any part alone ships a regression.
+
+### ⚠️ THE AUDIT'S VOLUME SECTION WAS HEADED "TIME" AND MEASURED KILOMETRES
+
+`tools/audit-progression.mjs` divided `plannedDistanceMeters` under a heading reading TIME — the
+instrument-cannot-see-what-it-is-pointed-at trap, in the tool this file already records being bitten by
+three times. It now reports **both** rulers and says which is which. **Read the MINUTES figure to judge
+the training and the KM figure to judge what the runner sees.** Without that fix the hill-sprint work
+reads as a regression: 11.2% → 8.4% on km against 4.1% → 4.1% on minutes, for the same change.
+
+### ⚠️ FIVE ADAPTATION FUNCTIONS EXIST IN THE ENGINE AND THE APP CALLS NONE OF THEM
+
+`returnToRunningPlan`, `assessWeeklyJump`, `applyMissedSessionAdjustment`, `countTrailingMisses` and
+`assessLongRunSpike` — **0 references in `web/app.ts` each**, and `returnToRunningPlan` is exported
+through `web/entry.ts` and reaches nothing. The computed-and-discarded trap five times over, and most
+of what a plan-adaptation menu needs already written.
+
+### STILL THE OWNER'S CALL
+
+- **Race-specific work for beginners** (the roadmap listed it; the no-quality-for-beginners rule is a
+  documented product decision, so this is a coaching call).
+- **Hill sprints for run-walk beginners.**
+- ⚠️ **Reshape the retest as a spec test** (5 × 1 km at goal pace off 2 min, cadence 4 → 5–6 weeks) in
+  `src/adapt/weekly-review.ts` · `retestDue`.
+- ⚠️ **Two hard days a week regardless of level** — `qualitySessionsThisWeek`. **Recommended against:**
+  the app deliberately caps quality at 1 below 4 running days, and the measured easy-floor breaches
+  already cluster in 3-day weeks.
+- **The no-deload-for-low-load half of the cadence rule**, and **whether to spend the block-length
+  recalibration above.**

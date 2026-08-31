@@ -38,6 +38,7 @@ import {
   contPickups,
   contProgression,
   easyHillStrides,
+  contHillSprints,
   easyRun,
   generalStrengthSession,
   longRun,
@@ -1315,6 +1316,40 @@ const CONT_FLAVOURS = [
   contExplore,
 ];
 
+/**
+ * How long a continuous beginner's ordinary (non-long) run is this week.
+ *
+ * ⚠️ ONE DEFINITION, READ BY BOTH BUILDERS. `beginnerRun` sizes its own runs and the hill-sprint day
+ * has to match them, so a second copy of `lerp(22, 38, f)` here would be two answers to one question -
+ * and the day they drifted, a beginner's sprint day would silently be a different length from the easy
+ * run beside it. The ease multiplier belongs inside it for the same reason.
+ */
+function beginnerEasyMin(f: number, ease: boolean): number {
+  const minutes = Math.round(lerp(22, 38, f));
+  return ease ? Math.round(minutes * 0.75) : minutes;
+}
+
+/**
+ * How many hill sprints a BEGINNER's week carries, or 0 for none.
+ *
+ * ⚠️ SMALLER AND SLOWER TO BUILD THAN THE MAIN TRACK: one sprint in week one, one more every three
+ * weeks, settling at four. The main track starts at two and settles at six. The effort of a single
+ * sprint is the same at every level - what a new runner cannot absorb is the NUMBER of them.
+ *
+ * ⚠️ CONTINUOUS BEGINNERS ONLY, AND THAT IS A DELIBERATE NARROWING OF THE METHOD. A run-walk beginner
+ * is somebody who cannot yet run twenty minutes without stopping, which is below the lowest tier any
+ * of this is written for - their whole plan is already interval-shaped and their first job is to
+ * become a continuous runner. Their sessions are built by RW_FLAVOURS and there is no run-walk hill
+ * format, so this is a scoping decision rather than an oversight, and it is the owner's to overturn.
+ *
+ * ⚠️ AND NOT ON AN EASED WEEK. `ease` is a deload or a taper week, where the whole point is to take
+ * load off - adding contacts there is the one thing that would defeat it.
+ */
+function beginnerHillDose(weekIndex: number, runWalk: boolean, ease: boolean, returning: boolean): number {
+  if (runWalk || ease || returning) return 0;
+  return Math.min(4, 1 + Math.floor((weekIndex - 1) / 3));
+}
+
 // One beginner running session — a run–walk progression, or short continuous easy running for those
 // who can already jog. `f` is 0→1 across the plan; runs lengthen and (for run–walk) walks shrink.
 // `flavour` selects which format so sessions vary; the weekly long run uses its own long format.
@@ -1367,8 +1402,8 @@ function beginnerRun(
   const openMin = Math.min(30, Math.round(longPeakMin * 0.45));
   let minutes = long
     ? Math.round(geomLerp(openMin, longPeakMin, f))
-    : Math.round(lerp(22, 38, f));
-  if (ease) minutes = Math.round(minutes * 0.75);
+    : beginnerEasyMin(f, false);
+  if (ease) minutes = long ? Math.round(minutes * 0.75) : beginnerEasyMin(f, true);
   // ⚠️ AFTER the ease multiplier, not before: a deload or taper week is meant to be shorter than the
   // week beside it, and a floor applied first would be scaled straight back out of existence.
   // `enforceLongRunIsLongest` never asks for a floor on an eased week, so this only ever binds where
@@ -1432,7 +1467,17 @@ function buildBeginnerWeek(
   // Other easy days — each draws a different flavour, and the set rotates every week.
   const easyDays = BEG_EASY_REL.map((r) => dayRel(longDay, r)).slice(0, runningDays - 1);
   easyDays.forEach((d, ei) => {
-    const make = (cap?: number) => beginnerRun(ctx.paces, f, false, runWalk, ease, index + ei, ctx.longMin, undefined, cap);
+    // ⚠️ THE FIRST EASY DAY IS THE HILL-SPRINT DAY, the same slot and the same reasoning as the main
+    // track: neuromuscular work is worth having every week or it is worth nothing, and a beginner's
+    // stride is the one that has most to gain. `beginnerHillDose` returns 0 for a run-walk beginner,
+    // an eased week and anyone returning, so those weeks fall through to the ordinary rotation.
+    // ⚠️ AND THE CAP LOOP STILL HAS TO REACH IT. `make` is called repeatedly with a shrinking cap when
+    // a stated mileage binds, so the hill session has to be built INSIDE it - hoisting the choice out
+    // would leave the sprint day as the one session a low-mileage beginner's cap never trimmed.
+    const begHills = ei === 0 ? beginnerHillDose(index, runWalk, ease, ctx.returning ?? false) : 0;
+    const make = (cap?: number) => (begHills > 0
+      ? contHillSprints(ctx.paces, Math.min(cap ?? Infinity, beginnerEasyMin(f, ease)), begHills)
+      : beginnerRun(ctx.paces, f, false, runWalk, ease, index + ei, ctx.longMin, undefined, cap));
     let built = make();
     if (ctx.easyCapMin != null || ctx.easyCapKm != null) {
       // The belt, for the weeks the lift cannot reach: a deload (never lifted, by design), and the

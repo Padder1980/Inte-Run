@@ -558,6 +558,52 @@ export function rwLong(p: TrainingPaces, s: BeginnerSpec): SessionContent {
 
 // ---- Beginner continuous flavours (for those who can already jog) ----------
 
+/**
+ * A beginner's hill sprints: a few very short, very steep efforts inside an ordinary easy run.
+ *
+ * ⚠️ THE BEGINNER TRACK HAD NO NEUROMUSCULAR WORK AT ALL. Measured on a real 26-week beginner block:
+ * 0 sessions containing an unpaced repetition, at either beginner status. It has progressions, explore
+ * runs and gentle pickups - so it is not a bare track - but nothing that asks the legs to produce
+ * force. That is the one thing a new runner's stride most needs and the cheapest thing to give them.
+ *
+ * ⚠️ EIGHT SECONDS, AND THE DOSE STARTS AT ONE. Short enough that no meaningful fatigue accumulates,
+ * and the gradient caps the speed so the forces stay low however hard it is tried - which is exactly
+ * why this is safe for somebody in their first weeks of running when fast running on the flat is not.
+ * A FULL walk back down, longer than an experienced runner's, because the recovery is the safety.
+ *
+ * ⚠️ EVERY ADDED SECOND IS CARVED OUT OF THE EASY PORTION - the sprints AND the walk-backs. Its
+ * sibling `contPickups` shipped with the pickups added on top and delivered exactly one minute more
+ * than its title at every duration; a beginner reading "30 minutes" and running 34 is the same defect
+ * with more of it. So the outing is the length the title claims.
+ */
+export function contHillSprints(p: TrainingPaces, rawMin: number, reps: number): SessionContent {
+  const min = roundMinutes(rawMin);
+  const n = Math.max(1, Math.round(reps));
+  const SPRINT_SEC = 8, WALK_SEC = 60;
+  const hills: WorkoutStep[] = [];
+  for (let i = 1; i <= n; i++) {
+    hills.push({ kind: "rep",
+      label: SPRINT_SEC + "\u2033 hill sprint \u2014 short, powerful, tall and driving",
+      durationSeconds: SPRINT_SEC, targetRpe: { min: 7, max: 8 }, repeatIndex: i, repeatCount: n });
+    hills.push({ kind: "recovery",
+      label: i < n ? "Walk all the way back down \u2014 full recovery before the next one"
+        : "Walk back down and let your breathing settle",
+      durationSeconds: WALK_SEC, targetRpe: { min: 1, max: 2 }, repeatIndex: i, repeatCount: n });
+  }
+  const added = n * (SPRINT_SEC + WALK_SEC);
+  const steps = framedRun(p, min, (mid) => [
+    { kind: "steady", label: "Easy, conversational running",
+      durationSeconds: Math.max(300, mid * 60 - added), targetPaceSecPerKm: p.easy, targetRpe: RPE.easy },
+    ...hills,
+  ]);
+  return assemble("easy", min + "\u2032 easy + " + n + " hill sprint" + (n === 1 ? "" : "s"),
+    "Easy running, then " + n + " very short sprint" + (n === 1 ? "" : "s") + " up a hill \u2014 about "
+    + SPRINT_SEC + " seconds each, steep enough that you cannot go fast. Walk all the way back down "
+    + "between them; that walk is the point. They are too short to tire you out and they teach your "
+    + "legs to push.",
+    "easy", steps, RPE.easy);
+}
+
 export function contPickups(p: TrainingPaces, rawMin: number): SessionContent {
   // Still a timed run, so its minutes are a multiple of five — see roundMinutes. Rounded here
   // rather than in the title, so the steps and the title cannot disagree.

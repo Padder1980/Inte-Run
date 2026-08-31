@@ -11203,16 +11203,24 @@ function buildCustomSession(e) {
           push(out);
           return;
         }
-        // Scaled in the step's OWN currency. Writing a duration onto a distance-gated step would give
-      // it both fields, and the runtime's rule is distanceMeters != null AND durationSeconds == null —
-      // a step carrying both ends on the CLOCK, which is the exact defect a real outing reported when
-      // a custom 1 km finished at 0.59 km. So a timed body scales its seconds and a distance-gated one
-      // scales its metres, and neither grows a second field.
-      if (st.distanceMeters != null && st.durationSeconds == null) {
-        push(Object.assign({}, st, { distanceMeters: Math.max(200, Math.round(st.distanceMeters * scale / 100) * 100) }));
-      } else {
-        push(Object.assign({}, st, { durationSeconds: Math.max(60, Math.round((st.durationSeconds || 0) * scale)) }));
-      }
+        // ⚠️ THE ASK DECIDES THE CURRENCY, NOT THE REPRESENTATIVE. Reaching this line means the runner
+      // dialled MINUTES, so the body runs on the clock — and it must do so whatever shape the plan's
+      // own session happened to be written in. This used to scale each step in its OWN currency, which
+      // is right when the two agree and wrong the moment they do not: once the generator started
+      // setting easy runs by DISTANCE, a 40-minute ask cloned a distance-gated body, kept the gate,
+      // and ended when the ground was covered rather than when the clock ran out — early for a runner
+      // going well, late for one having a bad day, which is the opposite of what dialling minutes
+      // means. Exposed by the representative changing; latent, not new.
+      // Neither branch ever grows a second field: the runtime's rule is distanceMeters != null AND
+      // durationSeconds == null, so a step carrying BOTH ends on the clock — the defect a real outing
+      // reported when a custom 1 km finished at 0.59 km.
+      // stepSecs is the gate-agnostic converter, so a distance-gated step contributes the seconds it
+      // would really take at its own target pace rather than nothing at all.
+      const timed = Object.assign({}, st, {
+        durationSeconds: Math.max(60, Math.round(stepSecs(st) * scale)),
+      });
+      delete timed.distanceMeters;
+      push(timed);
       });
     } else {
       // Run-walk style: repeat the run/walk cycle to fill the chosen time.

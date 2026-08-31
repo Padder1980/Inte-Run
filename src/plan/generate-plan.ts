@@ -993,6 +993,19 @@ function buildWeek(
     : 0;
 
   // Easy runs — rotate flavours (plain, strides, hill sprints, explore) so easy days stay fresh.
+  // ⚠️ TWO LOTS OF HILL WORK IN ONE WEEK IS A LOAD STACK, AND THE ROTATION CAN DRAW ONE BY ITSELF.
+  // Five quality formats are hill sessions (up to 10 x 50 m maximal reps, the heaviest connective-
+  // tissue load in the library), and a week that draws one and ALSO gets the weekly sprint day is
+  // asking a lot of the same tissue twice. The sprint day gives way - it is the smaller dose, and it
+  // returns next week, where the quality session almost certainly will not be a hill session again.
+  // ⚠️ DETECTED STRUCTURALLY, NEVER BY THE TITLE. A hill rep carries NO pace by design (pace up a
+  // hill is a function of the gradient), so "a repetition with no pace target" IS hill work - the
+  // same shape of test buildWeek already uses to decide whether a session carries race-pace work.
+  // Matching /hill/i on the title would break the first time a format was renamed, and this file's
+  // history has that exact defect in it twice over.
+  const weekAlreadyClimbs = qualityContents.some((c) =>
+    (c.steps ?? []).some((st) => st.kind === "rep" && st.targetPaceSecPerKm == null),
+  );
   const easyDays = EASY_REL.map((r) => dayRel(longDay, r)).slice(0, easyCount);
   // Strides and hill sprints are neuromuscular work with near-zero aerobic cost, but hill sprints
   // in particular are the highest connective-tissue load in the library — tissue adapts more slowly
@@ -1028,9 +1041,36 @@ function buildWeek(
     const share = easyDays.length ? qualityDeficitMin / easyDays.length : 0;
     const adjusted = planned + Math.max(-planned * 0.3, Math.min(planned * 0.3, share));
     let minutes = Math.max(20, Math.min(95, Math.round(adjusted)));
+    // ⚠️ THE FIRST EASY DAY IS THE HILL-SPRINT DAY, and the seventh-day recovery jog still wins over
+    // it — a seventh running day exists to circulate blood on tired legs, and putting maximal sprints
+    // on it is the one thing that would defeat the point of having it.
+    // ⚠️ A RUNNER WITH ONE EASY DAY KEEPS THE WEEK THE ROTATION WOULD HAVE GIVEN THEM STRIDES.
+    // Dedicating their ONLY easy slot every week leaves the flavour rotation with nothing to rotate:
+    // measured on a 3-day 5 km plan, the plan then contains no relaxed-strides session ANYWHERE, so
+    // `sessionLibrary`'s representative for "Easy + Strides" in the build-your-own picker becomes the
+    // maximal hill-sprint session and a runner asking for strides is handed sprints. That is the exact
+    // defect `repScore`'s band term exists to prevent, reached from the other side - by removing the
+    // candidate rather than by mis-scoring it.
+    // ⚠️ AND ALTERNATING BY WEEK PARITY WAS TRIED AND IS WORSE. The rotation is indexed by the week,
+    // so handing it only EVEN weeks hands it only even pool positions - and the relaxed-strides
+    // flavour sits at an odd one, so it became unreachable rather than rare. Ask the rotation what it
+    // would have produced and stand aside on exactly those weeks.
+    // ⚠️ THE RULE IS NOT GATED ON HOW MANY EASY DAYS THERE ARE, and gating it that way shipped the
+    // same defect on a 4-day plan. The rotation index is `index + ei` and the pool is EIGHT long while
+    // deloads fall every FOUR weeks - so for an odd `ei` the strides position aliases exactly onto the
+    // deload weeks, where `canStride` is false and the pool is the four-item one. Measured on a 4-day
+    // 5 km block: 24 strides-typed sessions and not one of them relaxed strides. Standing aside
+    // wherever the rotation would have chosen strides removes the aliasing as a class rather than
+    // patching the arithmetic of one case.
+    const rotWouldStride = easyVariantIsStrides(ctx.paces, index + ei, canStride);
+    const hillReps = ei === 0 && !seventh && !weekAlreadyClimbs && !rotWouldStride
+      ? hillSprintDose(wp, index, ctx.returning)
+      : 0;
     const make = (m: number) => (seventh
       ? recoveryRun(ctx.paces, m)
-      : easyVariant(ctx.paces, m, index + ei, canStride));
+      : hillReps > 0
+        ? easyHillStrides(ctx.paces, m, hillReps)
+        : easyVariant(ctx.paces, m, index + ei, canStride));
     let built = make(minutes);
     // ⚠️ MEASURE THE SESSION THAT WAS BUILT, NOT THE MINUTES ASKED FOR. "37′ easy + strides" and
     // "37′ easy + hill sprints" are LONGER than 37 minutes — the strides and the walk-backs are added
@@ -1647,14 +1687,68 @@ function qualityContentsFor(
   return out.slice(0, count);
 }
 
-// Rotate easy-run flavours for non-beginners. All stay genuinely easy; strides/hill sprints only in
-// base/build (neuromuscular work, near-zero aerobic cost), explore/plain anytime.
+/**
+ * How many hill sprints this week carries, or 0 for none.
+ *
+ * ⚠️ THIS IS A WEEKLY STAPLE, NOT A ROTATION FLAVOUR, AND THAT IS THE WHOLE CHANGE. `easyHillStrides`
+ * was one of EIGHT easy-run flavours, so a runner met it about one easy run in eight - measured on a
+ * real 17-week block, six sessions in the whole plan, clustered in weeks 1-2 and 9-10. Short maximal
+ * hill sprints are the cheapest neuromuscular work there is (10 seconds, no aerobic cost, gradient
+ * caps the speed so the forces stay low) and their whole value is FREQUENCY: they are how running
+ * economy and stride power improve week on week, and they do nothing at all as an occasional novelty.
+ * So one easy day a week is dedicated to them and the rotation fills the rest.
+ *
+ * The dose earns its way up - 2 sprints in week one, one more every fortnight, settling at 6. That is
+ * the same reasoning the phase gate below carries: connective tissue adapts more slowly than the
+ * cardiovascular system, so the number of contacts is the thing to introduce gradually, never the
+ * effort of each one.
+ *
+ * ⚠️ HELD THROUGH THE SHARPENING PHASE, not dropped at the end of build. A block that removes its
+ * neuromuscular work exactly when the racing starts spends the last month losing what it built.
+ *
+ * ⚠️ AND EVERY REFUSAL IS THE ONE THE EASY-RUN FLAVOURS ALREADY HONOUR: nothing on a deload (an
+ * absorption week is not the place to add contacts), nothing in the taper, and nothing at all for a
+ * runner coming back from injury, whose tissue is the reason that rule exists.
+ */
+function hillSprintDose(wp: AnnotatedWeek, weekIndex: number, returning: boolean): number {
+  if (returning || wp.isDeload || wp.phase === "taper") return 0;
+  return Math.min(6, 2 + Math.floor((weekIndex - 1) / 2));
+}
+
+/**
+ * Would the easy-run rotation have produced RELAXED STRIDES for this slot?
+ *
+ * ⚠️ ASKED STRUCTURALLY, BY BUILDING THE SESSION AND LOOKING AT IT, never by indexing the pool. The
+ * distinction that matters is paced repetitions (relaxed strides, run at repetition pace) against
+ * unpaced ones (hill sprints, where the gradient sets the speed) - the same test `weekAlreadyClimbs`
+ * uses. Comparing `idx % pool.length` against a hardcoded position would go stale the first time a
+ * flavour was added to the pool, and it would go stale SILENTLY.
+ *
+ * The minute count is arbitrary: which flavour the rotation lands on does not depend on it.
+ */
+function easyVariantIsStrides(paces: TrainingPaces, idx: number, canStride: boolean): boolean {
+  const probe = easyVariant(paces, 40, idx, canStride);
+  return (probe.steps ?? []).some((st) => st.kind === "rep" && st.targetPaceSecPerKm != null);
+}
+
+// Rotate easy-run flavours for non-beginners. All stay genuinely easy; strides only in base/build
+// (neuromuscular work, near-zero aerobic cost), explore/plain anytime.
+// ⚠️ HILL SPRINTS ARE NO LONGER IN THIS POOL, AND THAT IS DELIBERATE: THERE IS ONE PRODUCER OF THEM.
+// `hillSprintDose` dedicates an easy day to them every week, so leaving them in the rotation as well
+// meant two sources with different doses - the rotation always asked for the settled 6 while the
+// staple was still building from 2, so a runner's third week could carry a 6-sprint session and their
+// tenth a 4-sprint one. It also made the load-stacking guard unenforceable: `weekAlreadyClimbs` keeps
+// the dedicated day off a week whose QUALITY session is already hill work, and the rotation would
+// then put the sprints back on the next easy day regardless. Measured: 5k/4d week 10 carried a hill
+// quality session and a 6-sprint easy day.
+// ⚠️ The pool going from eight entries to seven changes which flavour each easy slot draws. That is a
+// real difference to every plan and it is the point: the slot the sprints used to occupy is now spent
+// on the other flavours, while the sprints themselves happen far more often than before.
 function easyVariant(paces: TrainingPaces, minutes: number, idx: number, canStride: boolean): SessionContent {
   const pool: ((p: TrainingPaces, m: number) => SessionContent)[] = canStride
     ? [
         (p, m) => easyRun(p, m, false),
         (p, m) => easyRun(p, m, true),
-        (p, m) => easyHillStrides(p, m),
         (p, m) => contExplore(p, m),
         (p, m) => moderateRun(p, m, false),
         (p, m) => moderateRun(p, m, true),

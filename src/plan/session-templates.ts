@@ -611,7 +611,7 @@ export function contExplore(p: TrainingPaces, rawMin: number): SessionContent {
 }
 
 // Easy run finished with short, sharp uphill sprints — big neuromuscular benefit, minimal fatigue.
-export function easyHillStrides(paces: TrainingPaces, minutes: number): SessionContent {
+export function easyHillStrides(paces: TrainingPaces, minutes: number, reps = 6): SessionContent {
   // ⚠️ SIX SPRINTS WITH A WALK BACK, NOT ONE 60-SECOND BLOCK. Spotted by the owner in a simulation of
   // this session: it shipped as a single step labelled "full walk-back recovery" with the recovery in
   // prose and nowhere else, so the brief could not say how long it was and the live session counted
@@ -624,7 +624,12 @@ export function easyHillStrides(paces: TrainingPaces, minutes: number): SessionC
   // on a maximal 10-second hill sprint at RPE 8 with nothing after it, which is the one shape that would
   // have needed the cool-down jog reinstating. You have to walk back down the hill regardless — it was
   // always going to happen, it simply was not written down.
-  const SPRINT_SEC = 10, SPRINT_REPS = 6, SPRINT_REC_SEC = 45;
+  // ⚠️ THE REP COUNT IS A PARAMETER AND ITS DEFAULT IS THE MAINTENANCE DOSE. Hill sprints are
+  // introduced at 1-2 and built to 6-10 over the first couple of months, then held - the point of the
+  // progression is that connective tissue adapts more slowly than the cardiovascular system, so the
+  // dose earns its way up. A caller that wants the settled dose passes nothing and gets 6, which is
+  // what every existing caller did before this was a parameter, so their sessions are unchanged.
+  const SPRINT_SEC = 10, SPRINT_REPS = Math.max(1, Math.round(reps)), SPRINT_REC_SEC = 45;
   const hills: WorkoutStep[] = [];
   for (let i = 1; i <= SPRINT_REPS; i++) {
     hills.push({ kind: "rep", label: `${SPRINT_SEC}″ hill sprint — short and powerful, tall and driving`,

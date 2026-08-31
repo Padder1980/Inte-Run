@@ -159,6 +159,31 @@ test("a distance ask ends on the distance, not on a stopwatch", () => {
   const timed = buildCustomSession({ id: "t", type: "easy", unit: "time", distKm: null, durMin: 40 });
   const gatedTimed = (timed.steps || []).filter((x: any) => x.distanceMeters != null && x.durationSeconds == null);
   assert.deepEqual(gatedTimed, [], "a minutes ask must run on the clock it names");
+  // ⚠️ AND THE ASK DECIDES THE CURRENCY WHATEVER SHAPE THE REPRESENTATIVE IS IN. The plan's own easy
+  // sessions are now sometimes set by DISTANCE, so a representative can arrive distance-gated — and
+  // scaling it "in its own currency" then produced a 40-minute ask that ended on the ground covered
+  // instead of on the clock. Driven from a deliberately distance-set representative, because the
+  // first-match seeding above happens to pick whichever flavour the rotation put first and that is
+  // not a shape this test should depend on.
+  const before = REP;
+  try {
+    REP = {
+      easy: { type: "easy", title: "6 km easy run", estimatedDurationSeconds: 2160,
+        estimatedDistanceMeters: 6000, steps: [
+          { kind: "steady", distanceMeters: 6000,
+            targetPaceSecPerKm: { minSecPerKm: 330, maxSecPerKm: 390 } },
+        ] },
+    };
+    const fromDist = buildCustomSession({ id: "t", type: "easy", unit: "time", distKm: null, durMin: 40 });
+    const stillGated = (fromDist.steps || []).filter((x: any) => x.distanceMeters != null && x.durationSeconds == null);
+    assert.deepEqual(stillGated, [],
+      "a minutes ask cloned a distance-set representative and kept the distance gate");
+    const both = (fromDist.steps || []).filter((x: any) => x.distanceMeters != null && x.durationSeconds != null);
+    assert.deepEqual(both, [], "a step came out carrying BOTH a distance and a clock");
+    const secs = (fromDist.steps || []).reduce((t: number, x: any) => t + (x.durationSeconds || 0), 0);
+    assert.ok(Math.abs(secs - 2400) <= 180,
+      "a 40-minute ask off a distance-set representative delivered " + Math.round(secs / 60) + " minutes");
+  } finally { REP = before; }
 });
 
 test("dialling a bigger distance always gives a bigger run", () => {

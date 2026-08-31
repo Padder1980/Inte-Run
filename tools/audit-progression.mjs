@@ -58,7 +58,7 @@ const bucket = (d) => (BY[d] ||= { hard:{base:[],build:[],peak:[],taper:[]}, mod
 const A = {
   plans: 0, weeks: 0,
   freqPlans: 0, freqRises: 0, freqFlat: 0, freqJump2: 0,
-  volPlans: 0, volOver110: 0, volTrans: 0, volPeakOk: 0, worstJump: 0, worstJumpWho: "",
+  volPlans: 0, volOver110: 0, volTrans: 0, volPeakOk: 0, worstJump: 0, volOver110Min: 0, worstJumpMin: 0, worstJumpMinWho: "", worstJumpWho: "",
   hard: { base: [], build: [], peak: [], taper: [] },
   mod: { base: [], build: [], peak: [], taper: [] },
   intensityRises: 0, intensityPlans: 0, underFloor: 0,
@@ -92,8 +92,17 @@ for (const vol of [null, 40]) {
   if (freq[freq.length - 1] > freq[0]) A.freqRises++; else A.freqFlat++;
   for (let i = 1; i < freq.length; i++) if (freq[i] - freq[i - 1] >= 2) A.freqJump2++;
 
-  // TIME
+  // VOLUME - measured on BOTH rulers, because they disagree and only one of them is the plan.
+  // ⚠️ THIS SECTION USED TO BE HEADED "TIME" AND MEASURED KILOMETRES ONLY. That is the
+  // instrument-cannot-see-what-it-is-pointed-at trap this tool has already been bitten by three
+  // times, and it matters here more than anywhere: the plan is BUILT in minutes and DISPLAYED in
+  // kilometres, and a hill-sprint session covers almost no ground for 39 minutes of work. So a
+  // change that makes the quality rotation denser moves the km figure a long way while the training
+  // load does not move at all. Measured once already (CLAUDE.md, the volume-smoothing work): rises
+  // above the guardrail were 15.7% on counted distance against 6.1% on training time.
+  // Read the MINUTES figure to judge the training. Read the KM figure to judge what the runner sees.
   const km = full.map((w) => w.plannedDistanceMeters / 1000);
+  const mins = full.map((w) => w.sessions.reduce((t, x) => t + (x.estimatedDurationSeconds || 0), 0) / 60);
   A.volPlans++;
   const pk = km.indexOf(Math.max(...km));
   if (["peak", "build"].includes(full[pk].phase)) A.volPeakOk++;
@@ -102,6 +111,9 @@ for (const vol of [null, 40]) {
     A.volTrans++;
     const r = km[i - 1] > 0 ? km[i] / km[i - 1] : 1;
     if (r > 1.10) A.volOver110++;
+    const rm = mins[i - 1] > 0 ? mins[i] / mins[i - 1] : 1;
+    if (rm > 1.10) A.volOver110Min++;
+    if (rm > A.worstJumpMin) { A.worstJumpMin = rm; A.worstJumpMinWho = who + ` wk${full[i].index} ${mins[i - 1].toFixed(0)}→${mins[i].toFixed(0)}min`; }
     bucket(distance).trans++; if (r > 1.10) bucket(distance).over110++;
     if (r > A.worstJump) { A.worstJump = r; A.worstJumpWho = who + ` wk${full[i].index} ${km[i - 1].toFixed(1)}→${km[i].toFixed(1)}km`; }
   }
@@ -159,11 +171,14 @@ console.log("\n── FREQUENCY — runs per week ──────────
 console.log("  plans where running days rise across the block  : " + pc(A.freqRises, A.freqPlans));
 console.log("  plans where it is completely flat               : " + pc(A.freqFlat, A.freqPlans));
 console.log("  jumps of 2+ running days in a week             : " + A.freqJump2);
-console.log("\n── TIME — session duration and weekly volume ──────────────");
+console.log("\n── VOLUME — weekly load, on both rulers ───────────────────");
 console.log("  biggest week sits in build/peak                 : " + pc(A.volPeakOk, A.volPlans));
-console.log("  week-on-week rises above the 1.10 guardrail     : " + pc(A.volOver110, A.volTrans) +
+console.log("  rises >1.10 on TRAINING TIME  (the plan)        : " + pc(A.volOver110Min, A.volTrans) +
+  "   (" + A.volOver110Min + "/" + A.volTrans + ")");
+console.log("  rises >1.10 on COUNTED KM     (what is shown)   : " + pc(A.volOver110, A.volTrans) +
   "   (" + A.volOver110 + "/" + A.volTrans + ")");
-console.log("  worst single jump                               : " + A.worstJump.toFixed(2) + "x  " + A.worstJumpWho);
+console.log("  worst single jump, minutes                      : " + A.worstJumpMin.toFixed(2) + "x  " + A.worstJumpMinWho);
+console.log("  worst single jump, km                           : " + A.worstJump.toFixed(2) + "x  " + A.worstJumpWho);
 console.log("\n── INTENSITY — share of running time above easy ───────────");
 for (const ph of ["base", "build", "peak", "taper"])
   console.log("  " + ph.padEnd(6) + " hard " + p2(mean(A.hard[ph])).padStart(6) + "   moderate " + p2(mean(A.mod[ph])).padStart(6) +

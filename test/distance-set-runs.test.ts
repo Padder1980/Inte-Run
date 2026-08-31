@@ -166,12 +166,23 @@ test("BLOCKER: build-your-own-run scales a distance-set body in its own currency
   const body = html.slice(at, end).replace(/^\s*\/\/.*$/gm, "");
   assert.match(body, /const steadySecs = rep\.steps\.reduce\(\(s, st\) => s \+ \(st\.kind === "steady" \? stepSecs\(st\) : 0\), 0\)/,
     "the steady body is measured by durationSeconds again, so a distance-set representative reads as zero");
-  // ⚠️ AND IT SCALES THE FIELD THE STEP ACTUALLY CARRIES. Writing a duration onto a distance-gated step
-  // gives it BOTH, and the runtime's rule is distanceMeters != null AND durationSeconds == null — a step
-  // with both ends on the CLOCK, which is the defect a real outing reported when a custom 1 km finished
-  // at 0.59 km.
-  assert.match(body, /if \(st\.distanceMeters != null && st\.durationSeconds == null\) \{[\s\S]{0,220}?distanceMeters:/,
-    "a distance-set body is scaled by writing a duration onto it, which makes it end on the clock");
+  // ⚠️ AND NO STEP MAY EVER CARRY BOTH FIELDS. The runtime's rule is distanceMeters != null AND
+  // durationSeconds == null, so a step with both ends on the CLOCK — the defect a real outing reported
+  // when a custom 1 km finished at 0.59 km. The timed path therefore deletes the distance rather than
+  // writing a duration beside it.
+  //
+  // ⚠️ THIS ASSERTION USED TO PIN THE BRANCH SHAPE — "if (st.distanceMeters != null && ...)" followed
+  // by a distanceMeters: write, i.e. "scale each step in its OWN currency". That was the mechanism, not
+  // the invariant, and it was WRONG as a rule: the ASK decides the currency, not the representative.
+  // Once the generator started setting easy runs by distance, preserving the step's own currency meant
+  // a 40-MINUTE ask cloned a distance-gated body, kept the gate and ended when the ground was covered.
+  // So the claim is restated to the thing that must be true — the currencies never mix, and the ask is
+  // what chooses — and the behavioural half lives in test/session-builder-distance.test.ts, which
+  // executes buildCustomSession rather than reading it.
+  assert.match(body, /delete timed\.distanceMeters/,
+    "the timed path no longer removes the distance, so a minutes ask can produce a step carrying both");
+  assert.ok(!/durationSeconds:[\s\S]{0,120}?distanceMeters:\s*share/.test(body),
+    "a single step is written with both a duration and a distance");
 });
 
 test("BLOCKER: a real plan reads as a genuine mixture, and the accounting survives it", () => {

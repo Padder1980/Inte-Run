@@ -67,7 +67,11 @@ test("BLOCKER: hill sprints reach the great majority of eligible weeks, at every
   // The whole point of the change. Before it, measured, a runner met them in about one easy run in
   // eight. The bar is set BELOW what every swept configuration delivers and far above the old
   // behaviour, so it discriminates: measured 13/18 at three running days and 17/18 at six.
-  for (const daysPerWeek of [3, 4, 5, 6]) {
+  // ⚠️ SEVEN DAYS IS IN THE SWEEP, and leaving it out let a real defect escape: `pickSprintSlot`
+  // excludes the seventh-day recovery jog, and a re-break that made it eligible had the slot point at
+  // a day the gate then suppresses — so a 7-day runner lost the sprint day ENTIRELY, with a plausible
+  // frequency everywhere else. The form offers 3 to 7 and buildWeek delivers six runs plus a jog.
+  for (const daysPerWeek of [3, 4, 5, 6, 7]) {
     for (const distance of ["5k", "10k", "half", "marathon"] as const) {
       const weeks = plan(athlete({ daysPerWeek }), goal({ distance }));
       const elig = weeks.filter(eligible);
@@ -359,4 +363,57 @@ test("BLOCKER: the beginner track still carries no threshold, VO2 or race-specif
         `beginner week ${w.index} carries a quality session`);
     }
   }
+});
+
+test("BLOCKER: the sprint day is not the recovery day after a hard session", () => {
+  // ⚠️⚠️ IT WAS, SYSTEMATICALLY. The sprint day used to be the FIRST easy day, and relative to the long
+  // run quality sits at rel 2 and 4 while EASY_REL opens at rel 3 — directly between them. Measured
+  // over 1,232 sprint days across 72 profiles: 74% fell the day AFTER a quality session, 18% between
+  // two of them, and 83% shared the day with a strength session. The day after hard work is a recovery
+  // day; the week's only maximal neuromuscular work is the one thing that undoes what it is for.
+  // After choosing the slot by distance instead of position: 20% / 1% / 0%.
+  //
+  // ⚠️ NO SLOT IS CLEAR — three hard days in seven means every easy day touches something — so this is
+  // a least-bad bound and not a clean one. The bar is set between the two measured states, well above
+  // what the code delivers and far below what it delivered before, so it discriminates.
+  let total = 0, afterQuality = 0, betweenTwo = 0, withStrength = 0, afterLong = 0;
+  for (const distance of ["5k", "10k", "half", "marathon"] as const) {
+    for (const daysPerWeek of [4, 5, 6]) {
+      for (const timeSeconds of [1100, 1500, 2100]) {
+      for (const experience of ["recreational", "competitive"] as const) {
+        const weeks = plan(
+          athlete({ daysPerWeek, experience, recent: { distanceMeters: 5000, timeSeconds } }),
+          goal({ distance }));
+        for (const w of weeks) {
+          const sp = w.sessions.find((s) => (s.type === "strides" || s.type === "easy") && unpacedReps(s) > 0);
+          if (!sp) continue;
+          const d = (sp as { dayOfWeek: number }).dayOfWeek;
+          const on = (dd: number) => w.sessions.filter(
+            (s) => (s as { dayOfWeek: number }).dayOfWeek === ((dd % 7) + 7) % 7);
+          const hard = (dd: number) => on(dd).some(
+            (s) => s.type === "threshold" || s.type === "vo2" || s.type === "race-specific");
+          total++;
+          if (hard(d - 1)) afterQuality++;
+          if (hard(d - 1) && hard(d + 1)) betweenTwo++;
+          if (on(d).some((s) => s.type === "strength")) withStrength++;
+          // ⚠️ THE LONG RUN COUNTS AS HARD WORK FOR "THE DAY AFTER" TOO, and leaving it out of this
+          // check let a re-break that dropped it from the slot scorer escape entirely. The day after
+          // the week's biggest session is its most important recovery day.
+          if (on(d - 1).some((s) => s.type === "long")) afterLong++;
+        }
+      }
+      }
+    }
+  }
+  assert.ok(total >= 500, `only ${total} sprint days measured — the sweep cannot see the pattern`);
+  const pc = (n: number) => Math.round((100 * n) / total);
+  assert.ok(pc(afterQuality) <= 40,
+    `${pc(afterQuality)}% of sprint days are the day after a quality session (was 74% when the slot ` +
+    "was simply the first easy day)");
+  assert.ok(pc(betweenTwo) <= 8,
+    `${pc(betweenTwo)}% of sprint days sit between two quality sessions (was 18%)`);
+  assert.ok(pc(withStrength) <= 20,
+    `${pc(withStrength)}% of sprint days share the day with a strength session (was 83%)`);
+  assert.equal(afterLong, 0,
+    `${pc(afterLong)}% of sprint days are the day after the long run — the week's biggest recovery day`);
 });

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Athlete, Goal, RaceDistanceKey, Session, TrainingPaces } from "../src/domain/types.ts";
 import { generatePlan } from "../src/plan/generate-plan.ts";
+import { assessTrainingFlags } from "../src/adapt/training-flags.ts";
 import { deriveTrainingPaces } from "../src/science/paces.ts";
 import {
   computeDistribution,
@@ -9,6 +10,9 @@ import {
 } from "../src/science/intensity-distribution.ts";
 import {
   QUALITY_FORMAT_IDS,
+  contHillSprints,
+  easyHillStrides,
+  easyRun,
   raceSpecificSession,
   taperSession,
   thresholdSession,
@@ -389,13 +393,37 @@ test("adding a moderate gear does not shift the intensity distribution", () => {
 test("moderate and progression runs stay honestly easy", () => {
   // They are typed "easy", which puts them in the flags engine's PACE_TYPES. If their whole-run
   // average sits outside the band the plan judges them against, two in a row raise a false flag.
+  //
+  // ⚠️ THIS USED TO ASSERT `s.targetRpe.max <= 4` — THE SESSION'S DECLARED BAND — AND THAT WAS THE
+  // WRONG HALF, in the direction that CAUSES the false flag this test exists to prevent. `assemble`
+  // now spans every session's band to its hardest step, because a session declaring "meant to feel
+  // about 3-4" while carrying RPE 9 strides makes an honest 5 read as "much harder than intended":
+  // measured through the real `assessTrainingFlags`, two such ratings produce an rpe-high flag and a
+  // suggestion to re-anchor the runner SLOWER. A narrow band is the false-positive machine.
+  //
+  // The invariant that was worth protecting is that the RUN ITSELF is easy, whatever brief accents it
+  // carries — so it is asserted on the run's own body steps, which is where "moderate" is a claim
+  // about the running rather than about a label. Strides and hill sprints are excluded by name: they
+  // are seconds of neuromuscular work, not the session's gear.
   const plan = generatePlan(competitive, goalFor("half", 24));
   const runs = plan.weeks.flatMap((w) => w.sessions)
     .filter((s) => /moderate|→ moderate finish/.test(s.title));
   assert.ok(runs.length > 0, "no moderate runs were generated at all");
   for (const s of runs) {
     assert.equal(s.intensity, "easy", `"${s.title}" is bucketed ${s.intensity}`);
-    assert.ok(s.targetRpe!.max <= 4, `"${s.title}" claims RPE up to ${s.targetRpe!.max}`);
+    const body = (s.steps ?? []).filter(
+      (st) => st.kind === "steady" && !/stride|sprint/i.test(st.label ?? ""),
+    );
+    assert.ok(body.length > 0, `"${s.title}" has no body step to judge`);
+    for (const st of body) {
+      assert.ok((st.targetRpe?.max ?? 0) <= 4,
+        `"${s.title}" runs its own body at RPE up to ${st.targetRpe?.max} — that is not a moderate run`);
+    }
+    // ...and the declared band must still SPAN what the session contains, or the flags engine is
+    // judging the runner against an expectation the session does not meet.
+    const hardest = (s.steps ?? []).reduce((m: number, st) => Math.max(m, st.targetRpe?.max ?? 0), 0);
+    assert.ok(s.targetRpe!.max >= hardest,
+      `"${s.title}" declares RPE up to ${s.targetRpe!.max} but contains a step at ${hardest}`);
   }
 });
 
@@ -410,5 +438,103 @@ test("a session's estimated distance is never zero when it has paced running", (
         `"${s.title}" estimates only ${Math.round(s.estimatedDistanceMeters ?? 0)}m`,
       );
     }
+  }
+});
+
+/**
+ * ⚠️⚠️ A SESSION NEVER DECLARES ITSELF EASIER THAN ITS OWN HARDEST STEP.
+ *
+ * This is not a labelling nicety. `plannedRpeBandOf` stamps the declared band onto every logged run as
+ * `rband`, and `assessTrainingFlags`' `classifyRpe` fires when the runner's honest rating reaches
+ * `band.max + 1` — so a session that says "meant to feel about 2-3" while carrying RPE 9 strides turns
+ * an honest answer into evidence for easing the whole plan off. Measured through the real engine: two
+ * honestly-rated hill-sprint days at RPE 6 against a {2,3} band produced an rpe-high flag with mean
+ * deviation 3 and a suggestion to RE-ANCHOR A 25:00 5 km RUNNER TO 27:00.
+ *
+ * ⚠️ IT WAS EIGHT TITLE FAMILIES, NOT ONE, AND ~14% OF ALL SESSIONS. Measured across 27,462 generated
+ * sessions before the fix: "easy + strides" declared 2-3 and contained 9 (x818), "moderate + strides"
+ * 3-4 against 9 (x830), "easy -> steady finish" 2-3 against 5 (x783), "easy + gentle pickups" 2-3
+ * against 5 (x765), "easy -> moderate finish" 2-3 against 4 (x552), the goal-pace-then-threshold long
+ * run 4-5 against 7 (x70), "threshold, then hills" 6-7 against 10 (x45) and "N x N km, then hill
+ * sprints" 8-9 against 10 (x4).
+ *
+ * ⚠️ FIXED IN `assemble`, WHICH IS THE ONE CONSTRUCTION POINT, so no builder can forget it — and it is
+ * what `plannedRpeBandOf`'s own fallback already did for a session that declares no band at all.
+ * Only the TOP moves; the floor stays where the builder put it, because a session containing ten
+ * seconds of maximal work is still an easy run and its floor is what says so.
+ */
+test("BLOCKER: no session declares a band narrower than its own hardest step", () => {
+  let inspected = 0;
+  const offenders: string[] = [];
+  for (const distance of ["5k", "10k", "half", "marathon"] as const) {
+    for (const daysPerWeek of [3, 5, 6]) {
+      for (const timeSeconds of [1100, 1500, 2100]) {
+        for (const experience of ["beginner", "recreational", "competitive"] as const) {
+          for (const runWalk of experience === "beginner" ? [false, true] : [false]) {
+            const athlete = {
+              daysPerWeek, recent: { distanceMeters: 5000, timeSeconds }, experience, runWalk,
+              includeStrength: true, includeMobility: true, longRunDay: 6,
+              returningFromInjury: false, weeklyVolumeKmCurrent: 40,
+            } as Athlete;
+            const goal = {
+              distance, raceDateIso: "2027-06-06", targetTimeSeconds: 3600,
+            } as Goal;
+            let plan;
+            try { plan = generatePlan(athlete, goal, { startDateIso: "2026-09-07" }); } catch { continue; }
+            for (const week of plan.weeks) {
+              for (const s of week.sessions) {
+                const steps = s.steps ?? [];
+                if (!s.targetRpe || !steps.length) continue;
+                inspected++;
+                const hardest = steps.reduce((m, st) => Math.max(m, st.targetRpe?.max ?? 0), 0);
+                if (hardest > s.targetRpe.max) {
+                  offenders.push(`"${s.title}" declares up to ${s.targetRpe.max}, contains ${hardest}`);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  // ⚠️ The sweep must be big enough to contain the eight families that were broken. Before the fix it
+  // found 3,867 offenders of 27,462 sessions; a sweep that measured a handful would have found none of
+  // them and reported clean.
+  assert.ok(inspected > 15000, `only ${inspected} sessions inspected — the sweep cannot see the class`);
+  assert.deepEqual([...new Set(offenders)].slice(0, 12), [],
+    `${offenders.length} sessions declare themselves easier than they are`);
+});
+
+test("BLOCKER: an honestly-rated easy session with brief hard work does not propose slowing the plan", () => {
+  // The chain end to end, driven rather than reasoned: build the session the library really builds,
+  // stamp its band the way the app really stamps it, and hand two of them to the real flags engine.
+  // ⚠️ AND IT ASSERTS BOTH DIRECTIONS. A band that spans must still leave the flag able to fire — a
+  // fix that simply switched the RPE flag off for these sessions would pass a one-sided guard.
+  const p = deriveTrainingPaces({ distanceMeters: 5000, timeSeconds: 1500 });
+  const withAccents = [
+    easyRun(p, 45, true),
+    easyHillStrides(p, 45, 6),
+    contHillSprints(p, 30, 4),
+  ];
+  for (const s of withAccents) {
+    const band = s.targetRpe!;
+    const hardest = (s.steps ?? []).reduce((m: number, st) => Math.max(m, st.targetRpe?.max ?? 0), 0);
+    assert.ok(band.max >= hardest, `"${s.title}" declares up to ${band.max}, contains ${hardest}`);
+    const rate = (rpe: number) => assessTrainingFlags(
+      [1, 2].map((i) => ({ id: "r" + i, type: s.type, distKm: 8, reportedRpe: rpe, plannedRpe: band })),
+      { currentRecent5kSeconds: 1500 },
+    );
+    // An honest rating a few points above the floor is what a runner really gives an easy run that
+    // contains strides. It must not become evidence.
+    for (const honest of [4, 5, 6]) {
+      const out = rate(honest);
+      assert.deepEqual(out.flags, [],
+        `"${s.title}": an honest RPE ${honest} raised ${out.flags.map((f) => f.kind).join("/")} ` +
+        `and proposed ${out.suggestion ? out.suggestion.action : "nothing"}`);
+    }
+    // ...and the flag is still alive: nobody rates a mostly-easy run 10 unless something is wrong.
+    const extreme = rate(10);
+    assert.ok(extreme.flags.some((f) => f.kind === "rpe-high"),
+      `"${s.title}": the RPE flag can no longer fire at all, which trades one defect for another`);
   }
 });

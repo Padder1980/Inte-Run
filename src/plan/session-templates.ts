@@ -201,6 +201,36 @@ function assemble(
   steps: WorkoutStep[],
   targetRpe?: RpeBand,
 ): SessionContent {
+  // ⚠️⚠️ THE SESSION'S BAND ALWAYS SPANS ITS HARDEST STEP, AND IT IS DONE HERE SO NO BUILDER CAN
+  // FORGET IT. A session that declares "meant to feel about 2-3" while carrying maximal strides or
+  // hill sprints is not merely mislabelled: `assessTrainingFlags` compares the runner's honest rating
+  // against exactly this band, so telling the truth about a hard bit becomes evidence for easing the
+  // whole plan off. Measured through the real engine - two honestly-rated sprint days at RPE 6 against
+  // a {2,3} band produced an rpe-high flag with mean deviation 3 and a suggestion to RE-ANCHOR A 25:00
+  // 5 km RUNNER TO 27:00, i.e. slow every pace in their block because they answered honestly.
+  //
+  // Measured across 27,462 generated sessions, EIGHT title families declared a band narrower than
+  // their own hardest step, the worst by six points: "easy + strides" said 2-3 and contained RPE 9
+  // (x818), "moderate + strides" said 3-4 and contained 9 (x830), "easy -> steady finish" 2-3 against
+  // 5 (x783), "easy + gentle pickups" 2-3 against 5 (x765), "easy -> moderate finish" 2-3 against 4
+  // (x552), the goal-pace-then-threshold long run 4-5 against 7 (x70), "threshold, then hills" 6-7
+  // against 10 (x45) and "N x N km, then hill sprints" 8-9 against 10 (x4). About 14% of all sessions.
+  //
+  // ⚠️ ONLY THE TOP MOVES. The bottom stays where the builder put it, because a session containing
+  // ten seconds of maximal work is still an easy run and its floor is what says so - widening both
+  // ends would make every band meaningless. And the alternative of declaring the whole session
+  // maximal is the same dishonesty pointing the other way.
+  //
+  // ⚠️ THE TRADE IS DELIBERATE AND WORTH STATING: a wider band makes the RPE flag less sensitive for
+  // sessions containing brief hard work. That is the right way to be wrong. A false "your sessions
+  // feel harder than intended, shall we slow the plan down" is acted on by the runner; a missed one
+  // costs a week's evidence and the pace flag still watches the same runs.
+  //
+  // ⚠️ `longRun` used to compute this itself and no longer does - one place, not two.
+  const hardestStepRpe = steps.reduce((m, st) => Math.max(m, st.targetRpe?.max ?? 0), 0);
+  const band = targetRpe && hardestStepRpe > targetRpe.max
+    ? { min: targetRpe.min, max: hardestStepRpe }
+    : targetRpe;
   const estimatedDurationSeconds = Math.round(steps.reduce((s, st) => s + stepDuration(st), 0));
   const estimatedDistanceMeters = Math.round(steps.reduce((s, st) => s + stepDistance(st), 0));
   const trainingDistanceMeters = Math.round(steps.reduce((s, st) => s + trainingStepDistance(st), 0));
@@ -213,7 +243,7 @@ function assemble(
     estimatedDistanceMeters: estimatedDistanceMeters > 0 ? estimatedDistanceMeters : undefined,
     trainingDistanceMeters: trainingDistanceMeters > 0 ? trainingDistanceMeters : undefined,
     steps,
-    targetRpe,
+    targetRpe: band,
   };
 }
 
@@ -596,6 +626,9 @@ export function contHillSprints(p: TrainingPaces, rawMin: number, reps: number):
       durationSeconds: Math.max(300, mid * 60 - added), targetPaceSecPerKm: p.easy, targetRpe: RPE.easy },
     ...hills,
   ]);
+  // The band's top comes from `assemble`, which spans every session's hardest step - a session
+  // declaring RPE.easy while carrying maximal sprints made an honest rating evidence for easing the
+  // whole plan off. See the note in `assemble`.
   return assemble("easy", min + "\u2032 easy + " + n + " hill sprint" + (n === 1 ? "" : "s"),
     "Easy running, then " + n + " very short sprint" + (n === 1 ? "" : "s") + " up a hill \u2014 about "
     + SPRINT_SEC + " seconds each, steep enough that you cannot go fast. Walk all the way back down "
@@ -694,6 +727,9 @@ export function easyHillStrides(paces: TrainingPaces, minutes: number, reps = 6)
       targetPaceSecPerKm: paces.easy, targetRpe: RPE.easy },
     ...hills,
   ]);
+  // The band's top comes from `assemble`, which spans every session's hardest step - a session
+  // declaring RPE.easy while carrying maximal sprints made an honest rating evidence for easing the
+  // whole plan off. See the note in `assemble`.
   return assemble(
     "strides",
     `${minutes}′ easy + hill sprints`,
@@ -978,8 +1014,9 @@ export function longRun(
   // a race-pace block exactly as prescribed and honestly reported five-out-of-ten was told it was
   // "meant to feel about 2–3" after every structured long run — and two of those in a row raised
   // an ease-off flag from correctly executed sessions.
-  const maxRpe = steps.reduce((m, st) => Math.max(m, st.targetRpe?.max ?? 0), RPE.easy.max);
-  return assemble("long", title, description, "easy", steps, { min: RPE.easy.min, max: maxRpe });
+  // The band's top comes from `assemble`, which spans every session's hardest step - see the note
+  // there. This used to compute it here; one place, not two.
+  return assemble("long", title, description, "easy", steps, RPE.easy);
 }
 
 // ---- Threshold (incl. tempo, cruise, fartlek) -----------------------------

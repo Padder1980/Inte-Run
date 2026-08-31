@@ -721,7 +721,14 @@ export function easyHillStrides(paces: TrainingPaces, minutes: number, reps = 6)
   // ⚠️ The walk-backs come OUT of the easy portion, not on top of it — the same rule as the strides.
   // estimatedDurationSeconds feeds the volume and intensity models, so adding three and a half minutes
   // to every hill-sprint session would quietly reshape plans.
-  const recTotal = hills.filter((s) => s.kind === "recovery").reduce((a, s) => a + (s.durationSeconds || 0), 0);
+  // ⚠️ THE SPRINTS COME OUT OF THE EASY PORTION TOO, NOT JUST THE WALK-BACKS, so the outing is the
+  // length the title claims. Carving only the recoveries left this session 0.33 to 1.00 minutes longer
+  // than its own title depending on the dose — measured 46.00 minutes for a "45′ easy + hill sprints".
+  // That is the defect the owner reported on the sibling builder in as many words: "25′ easy + gentle
+  // pickups" with a chip reading 26 min. `contPickups` and `contProgression` were both fixed for it and
+  // deliver exactly their titled minutes; among the minute-titled builders this was the last one left,
+  // so this makes it consistent rather than special.
+  const recTotal = hills.reduce((a, s) => a + (s.durationSeconds || 0), 0);
   const steps = framedRun(paces, minutes, (mid) => [
     { kind: "steady", label: "Easy, conversational running", durationSeconds: Math.max(300, mid * 60 - recTotal),
       targetPaceSecPerKm: paces.easy, targetRpe: RPE.easy },

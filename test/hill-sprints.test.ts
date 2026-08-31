@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Athlete, Goal, PlannedWeek } from "../src/domain/types.ts";
 import { generatePlan } from "../src/plan/generate-plan.ts";
-import { easyHillStrides } from "../src/plan/session-templates.ts";
+import { contHillSprints, easyHillStrides } from "../src/plan/session-templates.ts";
 import type { SessionContent } from "../src/plan/session-templates.ts";
 import { deriveTrainingPaces } from "../src/science/paces.ts";
 
@@ -60,7 +60,17 @@ const pacedReps = (s: SessionContent) =>
  */
 const sprintDay = (w: PlannedWeek) =>
   w.sessions.find((s) => (s.type === "strides" || s.type === "easy") && unpacedReps(s) > 0);
+/**
+ * ⚠️ TWO DIFFERENT QUESTIONS, AND CONFLATING THEM OVERSTATED THE CHANGE. `hillWeek` is true of ANY
+ * session with unpaced reps, which includes the five pre-existing VO2/threshold HILL FORMATS that were
+ * always in the rotation. `stapleWeek` is the thing this work added: an easy-day session carrying
+ * sprints. Measured, they differ by two or three weeks a block — the staple reaches 11-14 of 18
+ * eligible weeks on a normal runway where any-hill-work reaches 13-15. A headline quoting the latter
+ * for the former is the instrument measuring something adjacent to what it is pointed at.
+ */
 const hillWeek = (w: PlannedWeek) => w.sessions.some((s) => unpacedReps(s) > 0);
+const stapleWeek = (w: PlannedWeek) => w.sessions.some(
+  (s) => (s.type === "strides" || s.type === "easy") && unpacedReps(s) > 0);
 const eligible = (w: PlannedWeek) => !w.isDeload && w.phase !== "taper";
 
 test("BLOCKER: hill sprints reach the great majority of eligible weeks, at every day-count", () => {
@@ -75,11 +85,19 @@ test("BLOCKER: hill sprints reach the great majority of eligible weeks, at every
     for (const distance of ["5k", "10k", "half", "marathon"] as const) {
       const weeks = plan(athlete({ daysPerWeek }), goal({ distance }));
       const elig = weeks.filter(eligible);
-      const withHills = elig.filter(hillWeek).length;
+      const withStaple = elig.filter(stapleWeek).length;
+      const withAnyHill = elig.filter(hillWeek).length;
       assert.ok(elig.length >= 12, `${distance}/${daysPerWeek}d: only ${elig.length} eligible weeks to judge`);
-      assert.ok(withHills / elig.length >= 0.6,
-        `${distance}/${daysPerWeek}d: hill work in only ${withHills} of ${elig.length} eligible weeks — ` +
-        "the staple has gone back to being a rotation flavour");
+      // ⚠️ THE STAPLE IS WHAT THIS WORK ADDED, so it is what the bar is set on. Its worst measured case
+      // is 11 of 18 (0.611) on a normal runway and 5 of 8 (0.625) on a short one, so the headroom over
+      // 0.6 is thin and deliberately so: the staple stands aside for a hill quality week and for a
+      // week the rotation would have given strides, so it cannot be every week and should not be.
+      assert.ok(withStaple / elig.length >= 0.6,
+        `${distance}/${daysPerWeek}d: the sprint day appears in only ${withStaple} of ${elig.length} ` +
+        "eligible weeks — the staple has gone back to being a rotation flavour");
+      // And what the runner meets — hill work of any kind — is higher again.
+      assert.ok(withAnyHill / elig.length >= 0.65,
+        `${distance}/${daysPerWeek}d: hill work of any kind in only ${withAnyHill} of ${elig.length}`);
     }
   }
 });
@@ -98,7 +116,25 @@ test("BLOCKER: the dose is introduced small and built, never handed out at full 
   assert.ok(first <= 3, `the first sprint day already prescribes ${first} sprints`);
   assert.ok(last >= 6, `the dose never reaches the maintenance load — it settles at ${last}`);
   assert.ok(last > first, "the dose does not build at all");
-  // Monotone: it climbs and then holds, it never falls back.
+  // ⚠️ THE SHAPE IS ASSERTED EXACTLY, NOT APPROXIMATELY. Endpoints plus monotonicity are satisfied by a
+  // single-week tripling — 1, 1, 6, 6 passes both — and the whole reason the dose is a ramp is that the
+  // number of ground contacts is what connective tissue needs introduced gradually. So every delivered
+  // dose must equal the formula for ITS OWN week.
+  // ⚠️ AND THAT IS WHY THIS IS EXPRESSED AGAINST THE WEEK RATHER THAN AGAINST THE PREVIOUS SPRINT DAY.
+  // The dose is keyed on the calendar, so a week with no sprint day still advances it: measured, 18
+  // transitions of 96 plans move by more than one and the worst is 3 -> 6 across a six-week gap. That
+  // is a deliberate consistency with every other ramp in this engine — `longRunMinutes` and
+  // `easyRampFor` also grow through weeks the runner may miss — and asserting "never more than one"
+  // would be asserting something the design does not promise.
+  const EVERY = 3, START = 2, SETTLED = 6;
+  for (const [i, week] of weeks.filter(eligible).entries()) {
+    const s = sprintDay(week);
+    if (!s) continue;
+    void i;
+    const expected = Math.min(SETTLED, START + Math.floor((week.index - 1) / EVERY));
+    assert.equal(unpacedReps(s), expected,
+      `week ${week.index} prescribes ${unpacedReps(s)} sprints where the ramp says ${expected}`);
+  }
   for (let i = 1; i < doses.length; i++) {
     assert.ok(doses[i]! >= doses[i - 1]!,
       `the dose went backwards: ${doses[i - 1]} → ${doses[i]} at sprint day ${i + 1}`);
@@ -211,7 +247,10 @@ test("BLOCKER: a continuous beginner meets hill sprints most weeks, where they m
     const elig = weeks.filter(eligible);
     const withHills = elig.filter(hillWeek).length;
     assert.ok(elig.length >= 10, `${distance}: only ${elig.length} eligible weeks to judge`);
-    assert.ok(withHills / elig.length >= 0.8,
+    // ⚠️ THE BAR IS 1.0 BECAUSE THE CODE DELIVERS 1.0. A beginner's sprint day has nothing to stand
+    // aside for — no hill quality formats and no strides flavour in CONT_FLAVOURS — so every eligible
+    // week has one. At 0.8 the day could vanish from one week in six and the suite stayed green.
+    assert.equal(withHills, elig.length,
       `${distance} beginner: hill work in only ${withHills} of ${elig.length} eligible weeks`);
   }
 });
@@ -277,8 +316,11 @@ test("BLOCKER: the beginner sprint session is the length its title claims", () =
       assert.ok(Number.isFinite(named), `no minute count in the title: ${s.title}`);
       const secs = (s.steps ?? []).reduce((t, st) => t + (st.durationSeconds ?? 0), 0);
       checked++;
-      assert.ok(Math.abs(secs / 60 - named) <= 0.5,
-        `${distance} week ${w.index}: "${s.title}" delivers ${(secs / 60).toFixed(1)} minutes`);
+      // ⚠️ EXACT TO THE SECOND, because the carve makes it exact — measured 0.0000 minutes of drift at
+      // every week of every block. A +-0.5 minute tolerance is 100% headroom on a claim that is either
+      // true or false, and it would hide a half-minute of the sprints leaking back on top of the title.
+      assert.ok(Math.abs(secs / 60 - named) < 0.02,
+        `${distance} week ${w.index}: "${s.title}" delivers ${(secs / 60).toFixed(3)} minutes`);
     }
   }
   assert.ok(checked >= 15, `only ${checked} beginner sprint sessions checked`);
@@ -355,7 +397,9 @@ test("BLOCKER: the beginner track still carries no threshold, VO2 or race-specif
   // near-zero aerobic cost, which is precisely why they are the one thing that can be added here.
   for (const runWalk of [false, true]) {
     for (const w of begPlan({ runWalk, daysPerWeek: runWalk ? 3 : 4 })) {
-      assert.equal(w.qualitySessionCount ?? 0, 0, `beginner week ${w.index} reports a quality session`);
+      // ⚠️ NOT `?? 0` — that turns a MISSING field into a pass, and the field going missing is one of
+      // the ways this rule could break silently.
+      assert.equal(w.qualitySessionCount, 0, `beginner week ${w.index} reports a quality session`);
       const quality = w.sessions.filter(
         (s) => s.type === "threshold" || s.type === "vo2" || s.type === "race-specific",
       );
@@ -416,4 +460,30 @@ test("BLOCKER: the sprint day is not the recovery day after a hard session", () 
     `${pc(withStrength)}% of sprint days share the day with a strength session (was 83%)`);
   assert.equal(afterLong, 0,
     `${pc(afterLong)}% of sprint days are the day after the long run — the week's biggest recovery day`);
+});
+
+test("BLOCKER: every minute-titled hill session is the length its title claims", () => {
+  // ⚠️ `easyHillStrides` WAS THE LAST MINUTE-TITLED BUILDER STILL OVERRUNNING ITS OWN TITLE. It carved
+  // the walk-backs out of the easy portion and left the sprints on top, so it delivered 0.33 to 1.00
+  // minutes long depending on the dose — measured 46.00 for a "45′ easy + hill sprints". That is the
+  // defect the owner reported on the sibling in as many words: "25′ easy + gentle pickups" with a chip
+  // reading 26 min. `contPickups` and `contProgression` were fixed for it; this one was not.
+  // ⚠️ SWEPT ACROSS THE DOSE, because the overrun was proportional to it and a single-dose fixture
+  // would have found a third of a minute and read as rounding.
+  const paces = deriveTrainingPaces({ distanceMeters: 5000, timeSeconds: 1500 });
+  const MINS = /^(\d+)′/;
+  let checked = 0;
+  for (const reps of [1, 2, 4, 6, 9]) {
+    for (const minutes of [20, 30, 45, 60, 90]) {
+      for (const s of [easyHillStrides(paces, minutes, reps), contHillSprints(paces, minutes, reps)]) {
+        const named = Number(MINS.exec(s.title ?? "")?.[1]);
+        assert.ok(Number.isFinite(named), `no minute figure in the title: ${s.title}`);
+        const secs = (s.steps ?? []).reduce((t: number, st) => t + (st.durationSeconds ?? 0), 0);
+        checked++;
+        assert.ok(Math.abs(secs / 60 - named) < 0.02,
+          `"${s.title}" at ${reps} sprints delivers ${(secs / 60).toFixed(2)} minutes`);
+      }
+    }
+  }
+  assert.ok(checked >= 40, `only ${checked} dose/duration combinations checked`);
 });

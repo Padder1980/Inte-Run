@@ -149,7 +149,7 @@ test("BLOCKER: the long run is still on the clock, and its own note says why", (
     "the note no longer carries the measurement that stopped it");
 });
 
-test("BLOCKER: build-your-own-run scales a distance-set body in its own currency", () => {
+test("BLOCKER: build-your-own-run measures a distance-set body gate-agnostically", () => {
   // ⚠️⚠️ A REAL DEFECT THIS CHANGE WOULD HAVE SHIPPED. buildCustomSession clones the plan's
   // representative and scales its steady body; it summed st.durationSeconds directly, so the moment the
   // representative's body became a distance the sum went to zero, the whole scaling branch was skipped
@@ -171,18 +171,22 @@ test("BLOCKER: build-your-own-run scales a distance-set body in its own currency
   // when a custom 1 km finished at 0.59 km. The timed path therefore deletes the distance rather than
   // writing a duration beside it.
   //
-  // ⚠️ THIS ASSERTION USED TO PIN THE BRANCH SHAPE — "if (st.distanceMeters != null && ...)" followed
-  // by a distanceMeters: write, i.e. "scale each step in its OWN currency". That was the mechanism, not
-  // the invariant, and it was WRONG as a rule: the ASK decides the currency, not the representative.
-  // Once the generator started setting easy runs by distance, preserving the step's own currency meant
-  // a 40-MINUTE ask cloned a distance-gated body, kept the gate and ended when the ground was covered.
-  // So the claim is restated to the thing that must be true — the currencies never mix, and the ask is
-  // what chooses — and the behavioural half lives in test/session-builder-distance.test.ts, which
-  // executes buildCustomSession rather than reading it.
-  assert.match(body, /delete timed\.distanceMeters/,
-    "the timed path no longer removes the distance, so a minutes ask can produce a step carrying both");
-  assert.ok(!/durationSeconds:[\s\S]{0,120}?distanceMeters:\s*share/.test(body),
-    "a single step is written with both a duration and a distance");
+  // ⚠️ AN EARLIER VERSION PINNED THE BRANCH SHAPE — "if (st.distanceMeters != null && ...)" followed by
+  // a distanceMeters: write, i.e. "scale each step in its OWN currency". That was the mechanism, not the
+  // invariant, and it was WRONG as a rule: the ASK decides the currency, not the representative. Once
+  // the generator started setting easy runs by distance, preserving the step's own currency meant a
+  // 40-MINUTE ask cloned a distance-gated body, kept the gate and ended when the ground was covered.
+  // ⚠️ AND NO STEP MAY EVER CARRY BOTH FIELDS, ASSERTED WITHOUT ASSUMING WHICH IS WRITTEN FIRST.
+  // A previous version required `durationSeconds:` to appear BEFORE `distanceMeters: share` within 120
+  // characters — an ordering nobody would write, so the assertion could not fail for the defect it
+  // names. What is checkable from the source is that every object literal handed to `push` sets at most
+  // one of the two; the behavioural half — a minutes ask off a distance-set representative comes out
+  // timed, a distance ask comes out gated, and neither carries both — is driven through the real
+  // function in test/session-builder-distance.test.ts, which is where it belongs.
+  for (const lit of body.match(/Object\.assign\(\{\}, st, \{[^}]*\}/g) ?? []) {
+    const bothSet = /\bdurationSeconds\s*:/.test(lit) && /\bdistanceMeters\s*:/.test(lit);
+    assert.ok(!bothSet, `a step is written with both a duration and a distance: ${lit.slice(0, 140)}`);
+  }
 });
 
 test("BLOCKER: a real plan reads as a genuine mixture, and the accounting survives it", () => {

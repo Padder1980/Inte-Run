@@ -1804,9 +1804,24 @@ function pickSprintSlot(easyDays: number[], hardDays: number[], seventhIdx: numb
  * absorption week is not the place to add contacts), nothing in the taper, and nothing at all for a
  * runner coming back from injury, whose tissue is the reason that rule exists.
  */
+/**
+ * ⚠️ ONE MORE SPRINT EVERY THREE WEEKS, NOT EVERY TWO, AND THE REASON IS THE DELIVERED SEQUENCE RATHER
+ * THAN THE FORMULA. The dose is keyed on the CALENDAR week, so a week with no sprint day - a deload, a
+ * week whose quality session is already hill work, a week the rotation would have given strides - still
+ * advances it. Measured over 96 plans: at one more every two weeks, 72 transitions between consecutive
+ * sprint days moved the dose by more than one, worst 3 -> 6 across a six-week gap. At one every three
+ * weeks that falls to 18 with the same worst case; at four it is 9, but the dose then does not settle
+ * until week 21, which is most of a whole block. Three also matches the beginner track's own cadence.
+ * ⚠️ THE RESIDUAL IS DELIBERATE AND CONSISTENT WITH THE ENGINE. Every ramp here advances by the
+ * calendar - `longRunMinutes` and `easyRampFor` both grow through weeks the runner may miss entirely -
+ * and making this one uniquely absence-aware while the long run is not would be the inconsistency, on
+ * the far smaller load: three extra sprints is about thirty seconds of running.
+ */
+const HILL_DOSE_EVERY = 3;
+
 function hillSprintDose(wp: AnnotatedWeek, weekIndex: number, returning: boolean): number {
   if (returning || wp.isDeload || wp.phase === "taper") return 0;
-  return Math.min(6, 2 + Math.floor((weekIndex - 1) / 2));
+  return Math.min(6, 2 + Math.floor((weekIndex - 1) / HILL_DOSE_EVERY));
 }
 
 /**

@@ -13156,8 +13156,126 @@ of what a plan-adaptation menu needs already written.
 - **Hill sprints for run-walk beginners.**
 - ⚠️ **Reshape the retest as a spec test** (5 × 1 km at goal pace off 2 min, cadence 4 → 5–6 weeks) in
   `src/adapt/weekly-review.ts` · `retestDue`.
-- ⚠️ **Two hard days a week regardless of level** — `qualitySessionsThisWeek`. **Recommended against:**
-  the app deliberately caps quality at 1 below 4 running days, and the measured easy-floor breaches
-  already cluster in 3-day weeks.
+- ✅ **Two hard days a week regardless of level — ASKED AND ANSWERED, 2026-09-01. Do not reopen it
+  without reading the chapter below.** The book does recommend it, the app already delivers it for every
+  runner the book addresses, and lifting the remaining caps was measured as harmful.
 - **The no-deload-for-low-load half of the cadence rule**, and **whether to spend the block-length
   recalibration above.**
+
+## TWO HARD DAYS A WEEK: ASKED, MEASURED, AND ALREADY DONE (owner, 2026-09-01)
+
+*"Does the book recommend 2 hard runs per week for everyone? If so, then do it"* — the conditional that
+settles roadmap item 8, which this file had listed as **recommended against**. **The answer is that the
+book does recommend it, the app already delivers it for everyone the book addresses, and forcing it on
+the two frequencies the book excludes is measurably harmful. Nothing in the engine changed.**
+`test/hard-day-frequency.test.ts` holds 8 guards; **10 deliberate re-breaks, all 10 caught** (one only
+after the guard was split in two — that one is below).
+
+⚠️ **THE ENGINE IS BYTE-IDENTICAL TO HEAD AND THAT IS THE DELIVERABLE.** The work was a measurement and a
+guard, because the measurement said the code was already right. Reporting a fix here would have been
+false; leaving the rules unguarded would have been worse, since they were protecting a measured harm and
+nothing was stopping a future change removing them.
+
+### What the book says, and the three things that bound it
+
+> *"I believe in doing two hard workouts per week, not including the weekend long run."* — ch2
+
+Flat, and with no level qualification. But:
+1. ⚠️ **IT IS PREMISED ON SIX OR SEVEN DAYS OF RUNNING.** *"I recommend that every runner, INCLUDING
+   BEGINNERS, run at least six times per week, if possible"* (ch7) and *"I strongly recommend that
+   competitive runners seeking to improve their race times run six or seven times a week"* (ch2). **The
+   book does not contemplate a three- or four-day runner anywhere** — its answer for one is to run more
+   days, which `addDayOffer` already offers.
+2. ⚠️ **IT IS A DESTINATION, NOT A CONSTANT — read off his own tables rather than his prose.** The
+   **Level 1** plan ("low training volume plans for beginners", 12 weeks) carries **zero** hard workouts
+   in weeks 1–3, **one** in weeks 4–7, and reaches two only in the last third; **Level 2** carries zero
+   for two weeks and one for three more, reaching two at week 6 of 12. Measured off those tables, Level 1
+   delivers **~1.20** hard workouts a week and Level 2 **~1.40**.
+3. ⚠️ **AT LOW VOLUME ONE OF THE TWO IS A PROGRESSION RUN, NOT A SECOND INTERVAL SESSION.** Level 1 weeks
+   8–12 read *"Progression Run 6 miles, last 20 min hard"* **plus** one interval session, and ch3 says
+   why: progression runs *"represent an excellent means of squeezing a little more beneficial hard work
+   into one's training without overtaxing the runner."* That is exactly what `longCarriesWork` does at
+   four running days or fewer.
+
+⚠️ **THE PLANS ARE IMAGES IN THE EPUB (47 of them, 0 `<table>` elements), so the chapter-12 text says
+nothing about their content.** Anyone re-checking this has to read `images/Huds_..._05[12]_r1.jpg` for
+Level 1 and `053` for Level 2. The prose alone gives the flat statement and none of the three bounds.
+
+### The measurement: the app already meets or exceeds the book at every level
+
+Counting a work-carrying long run the way his Level 1 table counts its progression run, at **his own
+block lengths** (5K 12wk, 10K 14wk, half 16wk, marathon 20wk), 72 plans per row:
+
+| days/week | 0 hard | 1 hard | 2+ hard | mean hard/week | his comparable plan |
+|---|---|---|---|---|---|
+| 3 | 0.0% | 69.0% | 31.0% | **1.31** | Level 1 ≈ 1.20 |
+| 4 | 0.0% | 63.8% | 36.2% | **1.36** | Level 1 ≈ 1.20 |
+| 6 | 0.0% | 54.1% | 45.9% | **1.75** | Level 2 ≈ 1.40 |
+
+And the per-phase rule already **is** his shape — base 1, build 2, peak 2, taper 1, deload 1. Attributed
+over 1,044 weeks for a six-day runner at his lengths: 45.8% carry two (build 28.6 + peak 17.2), 31.0% are
+base weeks at one, 20.6% are deloads at one, 8.6% taper, 0.7% vScale-capped. His Level 2 spends 42% of
+its weeks at ≤1 hard workout; ours spends 31% in base.
+
+### ⚠️⚠️ AND LIFTING THE REMAINING CAPS IS MEASURABLY HARMFUL
+
+All three caps lifted (`runningDays < 4`, the four-day ceiling, and the `longCarriesWork` cap at
+`buildWeek`), swept over **7,416 weeks per frequency** (3 abilities × 4 distances × 2 experience × 4
+stated volumes × 3 runways):
+
+| | shipped | caps lifted |
+|---|---|---|
+| 3-day weeks under the 68% pyramidal easy floor | **17** | **699** (41×) |
+| 3-day worst week, easy fraction | 63.8% | **55.4%** |
+| 3-day weeks under 75% easy | 362 | 1638 |
+| 4-day weeks under the 68% floor | 0 | 84 |
+| 5-day / 6-day / 7-day rows | — | **identical** |
+
+⚠️ **THE LAST ROW IS THE WHOLE ARGUMENT.** Five, six and seven days are byte-identical with the caps
+lifted, so **the caps can only ever bind at frequencies the book does not address.** Removing them buys
+nothing for anybody Hudson is writing to and costs a three-day runner a week that is 55% easy.
+
+⚠️ **THE ONE LEVER THAT DOES RAISE DELIVERED FREQUENCY IS BLOCK LENGTH, NOT THIS RULE.** The same six-day
+runner gets **1.30** hard sessions a week on our long runways and **1.75** at Hudson's block lengths —
+**with the build phase identical either way (69% vs 68% of build weeks at two).** A 40-week 5K block
+spends most of its life in base, where one hard day is both correct and faithful to him. So this ask
+points squarely at the parked **`pc-blocklen`** recalibration and at nothing in `qualitySessionsThisWeek`.
+
+### ⚠️⚠️ THE ONE ESCAPE: THE TAPER'S ONE-SESSION RULE IS ENFORCED TWICE
+
+Making `qualityByPhase` return **2** for the taper changed nothing observable, so the end-to-end guard
+passed. `qualityContentsFor`'s taper branch pushes exactly one session and then `return out.slice(0,
+count)` — so `count` can only ever **reduce** the list, never grow it. **Belt and braces hides the brace
+you are testing**, the same shape this file already records for the share card's date gating. The outcome
+guard now catches deleting *both*; a second guard names each brace (comments stripped — both functions
+carry some of the longest comments in the engine and both quote the identifiers being asserted, the
+comment-quotes-what-it-forbids trap for the twelfth time) so deleting *either* fails. Re-broken three
+ways: the phase rule returning 2, the branch dropping its slice, and the branch pushing a second session.
+
+### Traps this measurement paid for
+
+⚠️ **`targetTimeSeconds: 0` THROWS `pace must be positive` FROM `distanceForTime`, AND A `catch { continue }`
+REPORTED IT AS "0 plans generated".** This file already records that the field is required and that a
+probe omitting it reports a product defect that does not exist; a probe passing **zero** fails the same
+way one line deeper. **Print the error before believing a sweep that measured nothing.**
+
+⚠️ **MY FIRST COUNT WAS UNFAIR TO THE APP BY EXCLUDING THE LONG RUN.** Hudson excludes it from the phrase
+"two hard workouts", so I did too — and his Level 1's own two hard days *are* a progression run plus one
+interval session. Counting his way moved a three-day runner from 1.00 to 1.31 hard sessions a week and a
+six-day runner from 1.18 to 1.75. **Count the way the source counts, not the way its headline reads.**
+
+⚠️⚠️ **I NEARLY RECORDED A DEFECT IN `tools/audit-progression.mjs` THAT DOES NOT EXIST, AND CAUGHT IT
+ONLY BY VERIFYING A CLAIM I HAD ALREADY WRITTEN DOWN.** It passes `startDateIso` inside the **goal**
+object rather than in the third positional `GenerateOptions`, and this file's own note that
+`generatePlan(athlete, goal, options)` is positional made that look like a silently-ignored argument —
+i.e. an audit whose start date drifts with the day it runs. **It is not:** `Goal` carries its own optional
+`startDateIso`, and line 380 reads `options.startDateIso ?? goal.startDateIso ?? isoToday()`, so the
+tool's `START` is honoured. Had it shipped, the next session would have "fixed" a working instrument and
+invalidated every progression figure in this file. **A rule about one call shape is not a rule about every
+field of every argument — read the destructure before calling a caller wrong.**
+
+⚠️ **AND A PROBE READING `wp.ordinalInPhase` OFF A `PlannedWeek` GETS `undefined`** — those fields live on
+the internal `AnnotatedWeek`, not on the public shape (`index`, `startDateIso`, `phase`, `isDeload`,
+`focus`, `sessions`, `plannedDistanceMeters`, `qualitySessionCount`). Harmless here; it printed
+`ordundefined/undefined` in an attribution table and would silently bucket everything together in a sweep
+that grouped by it.

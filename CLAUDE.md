@@ -13279,3 +13279,163 @@ the internal `AnnotatedWeek`, not on the public shape (`index`, `startDateIso`, 
 `focus`, `sessions`, `plannedDistanceMeters`, `qualitySessionCount`). Harmless here; it printed
 `ordundefined/undefined` in an attribution table and would silently bucket everything together in a sweep
 that grouped by it.
+
+## THE SHORTER PLANS ARE IN (owner, 2026-09-01) — AND THE CAP EXPOSED FIVE DEFECTS IT DID NOT CAUSE
+
+The parked `pc-blocklen` recalibration, done as one job. `MAX_STRUCTURED_WEEKS` **30/32/36/40/44 →
+14/16/18/20/24** — Hudson's twelve plans are 12/14/16/20 weeks and no others, plus up to four weeks of
+the introductory period ch7 asks for. ⚠️ **CAPPING DOES NOT TRUNCATE A PLAN, IT MOVES THE START LATER**,
+because weeks are placed backwards from race Monday. Suite **1447 pass / 0 fail**, same count as before.
+
+⚠️⚠️ **CLAUDE.md PREDICTED 17 FAILURES; THERE WERE 20, AND FIVE WERE REAL DEFECTS THE CAP MERELY
+EXPOSED.** A long block's steps are small enough to hide arithmetic that a short one breaks — that is
+the transferable lesson, and it applies to anything else in this engine expressed as a ramp.
+
+1. ⚠️ **EVERY RAMP CLIMBED THROUGH A DELOAD.** `easyRampFor`, `longRunMinutes` and
+   `buildBeginnerWeek`'s `f` all divided by the CALENDAR week, so a deload advanced the ramp while its
+   own volume was cut and **the rebound out of one cost two steps**. `rampFractions` counts progressing
+   weeks only and all three read it — one definition, because three copies of "which weeks count" is how
+   they came to disagree.
+2. ⚠️⚠️ **THE MAIN-TRACK LONG RUN WAS A LINEAR LERP, AND THE BEGINNER TRACK HAD ALREADY LEARNED WHY THAT
+   IS WRONG.** Constant absolute steps mean the RELATIVE step is largest at the start: measured on a
+   capped 3-day 5 km block, 36 → 82 minutes over ten steps is 4.6 minutes each, i.e. **12.8% on the
+   opening long run**. `geomLerp` was introduced for exactly this on 2026-08-01 ("a straight lerp
+   front-loads its growth, which is backwards") and the main track never got it. Both tracks now share
+   `quantisedLadder`: geometric, quantised once across the plan, no delivered step over the guardrail.
+3. ⚠️ **THE LIFT CLAMP WAS A FLOAT AND THE BUILDER ROUNDED IT UP.** `stepCap = prevLong * 1.10` gave
+   39.6 from a 36-minute week, passed as `longMinFloor`, and `Math.round` made it **40** — an 11.1% step
+   through a clamp set at 10%. **A clamp has to be expressed in the units the plan is delivered in.**
+4. ⚠️⚠️ **THE TAPER CUT FROM A PEAK THE RUNNER NEVER RAN.** It multiplied `peakLong`, the ramp's
+   DESTINATION; on a short block the step clamp tops out below that. Measured on a 10.6-week 10 km
+   block: `peakLong` 91 minutes, the ladder topped out at 63, and the taper's 61 was **0.97× the week
+   before it** — a taper that cut nothing. It reads `builtPeakLong` now, the highest rung actually
+   delivered. ⚠️ **THAT INVERTED A GUARD'S CLAIM**: "a clamped one-week taper gives race week the same
+   depth" held only while the taper multiplied a constant, so it is now asserted as a RATIO to each
+   block's own built peak, which still catches the start-aligned-indexing bug it exists for.
+5. ⚠️⚠️ **THE HILL-SPRINT STAND-ASIDE WAS TOO BROAD, AND THAT ONE WAS MINE FROM THE DAY BEFORE.**
+   "Any unpaced rep" meant **"20′ Kenyan hills" — one twenty-minute rep at RPE 7, an aerobic run over
+   rolling ground — stood the sprint day aside, 14 of 36 firings.** A short block is proportionally more
+   build (two quality sessions a week rather than one), so it fired far more often and the weekly staple
+   fell to **46%** of eligible weeks — which would have made the Road Map's own claim false. Narrowed to
+   `MAXIMAL_HILL_RPE` (9+), and `pickSprintSlot` now prefers an easy day the rotation would NOT have
+   given strides rather than dropping the sprints from the week entirely.
+   ⚠️ **THAT IS HUDSON'S OWN LAYOUT, NOT A COMPROMISE** — his Level 2 week 7 carries hill sprints on the
+   Monday AND 10 × 100 m strides on the Friday. Worst case **0.462 → 0.727**, better than the 0.611 it
+   managed before the cap.
+
+### Two more things had to move, and one is a whole extra cap table
+
+⚠️ **THE 10k TAPER LEAD-IN 0.72 → 0.67 AND THE HALF'S 0.64 → 0.62.** The depth is measured against the
+plan's own peak week, so anything that changes which week is biggest changes the denominator — the same
+mechanism recorded for the 5k in 2026-08-04. The 10k landed at **29.9% against a 30% floor**, which is
+the failure somebody meets and "fixes" by relaxing the floor. Swept: 0.68 → 32.3%, **0.67 → 35.1%**,
+0.64 → 37.3%. Both picks are the shallowest value clearing 33% and both stay shallower than race week's
+0.55, so the taper is still PROGRESSIVE rather than a step.
+
+⚠️⚠️ **AND THE BEGINNER TRACK KEEPS A LONGER CAP — `MAX_STRUCTURED_WEEKS_BEGINNER` 16/20/24/28/28.**
+Hudson's lengths describe runners **already training**: his Level 1 plan, the one explicitly "for
+beginners", opens at a **four-to-five mile long run**, which is at or above where our beginner track
+FINISHES for a 5 km. Our beginner ramps from ~30 minutes to the event's endpoint, a range his plans
+never attempt, and the 1.10 guardrail bounds how fast a ramp may climb — so **the length a beginner
+block needs is set by the ramp, not by the race.** Derived, not chosen: `log(range)/log(1.09)` steps,
+supplied by (total − taper − one deload in four) progressing weeks, worst case at each distance being
+the slowest beginner (whose `peakMin` rides the 135-minute ceiling while `beginnerOpenMin` stays pinned
+at 30). Measured with the main-track caps applied: the 10 km ramp was one step short and the half FOUR
+short, so **the beginner half arrived at 10.9 km against the report's 12–18 km band** and every step
+across a deload delivered 17.5%.
+
+⚠️ **`beginnerLongLadder`'s FIRST VERSION LET A DELOAD CONSUME A RUNG, WHICH IS WORSE THAN NOT CLAMPING
+AT ALL.** A deload builds from the ramp's own value × its ease multiplier, so it never uses a rung — and
+the clamp kept climbing through one anyway, because the held `ideal` was still above the pulled-down
+`prev`. The runner then met the next non-eased week two rungs up: **every consecutive pair of ladder
+entries was inside 9% while every step the runner actually ran was 17.5%.** The sequence that must
+satisfy the guardrail is the one the runner runs.
+
+⚠️ **THE LADDER'S ENDPOINT IS NOT FORCED, AND FORCING IT WAS ITSELF A BREACH.** Rounding each rung down
+to stay inside the bound accumulates a deficit the ladder never makes up, so the destination then needs
+one oversized final step: measured, forcing 82 after a ladder of 34 37 40 44 48 52 57 62 68 74 made the
+last step **1.108**. It arrives a minute short instead. ⚠️ The beginner ladders reach 61/82/123 minutes —
+their exact endpoints — on their own, which is what makes dropping it safe rather than a trade.
+
+⚠️ **A THREE-RUN WEEK NOW PREFERS A SMALL QUALITY FORMAT (`avoidBig`).** The cap changes the rotation's
+phase arithmetic, so different weeks draw different formats: a 3-day 5 km competitive block drew an
+**85-minute threshold session** into week 9 beside a 38-minute easy run and a 58-minute long run — 47%
+of the week in one session, and 65.7% easy against the 68% floor. `avoidBig` already means "this week
+cannot take a big format"; three runs a week is that, reached from the other side.
+
+### Measured, 768 plans, baseline → now
+
+| | baseline | now |
+|---|---|---|
+| biggest week sits in build/peak | 95.6% | **98.7%** |
+| weeks under the pyramidal easy floor | 39 of 18,624 (0.21%) | **22 of 12,144 (0.18%)** |
+| worst single jump, minutes | 1.32× | **1.30×** |
+| worst single jump, km | 1.43× | **1.36×** |
+| rises >1.10 on km (count) | 826 | **794** |
+| rises >1.10 on minutes (count) | 368 | 381 |
+| mean deload depth | 28.8% | **30.2%** |
+| taper cut, min | 22.3% | **26.0%** |
+| long run not the longest of its week | 0.3% | 1.0% |
+
+Six better, two worse. ⚠️ **THE RATES RISE WHERE THE COUNTS FALL, AND THE COUNTS ARE WHAT TO READ** —
+8,352 transitions became 5,232, because the cap removes comfortable weeks rather than adding bad ones.
+The two real costs are 13 more minute-jumps over the guardrail and 0.7 points of long-run inversion,
+both from the geometric ramp's smaller mid-block long runs.
+
+### Eleven guards restated, each against a re-measured counterfactual
+
+⚠️ **THE BLOCK-LENGTH ASSERTION IS INVERTED, NOT DELETED.** It required `weeks.length >= 30`, which is
+the behaviour the owner asked to remove; what it PROTECTED (surplus time extends the base, the build
+stays concentrated) is unchanged and still asserted.
+
+⚠️ **THE SPRINT-SLOT METRIC WAS THE WRONG DISCRIMINATOR UNDER THE CAP.** "Day after a quality session"
+barely separates now (98% → 54%), because a day-after slot is often genuinely the least-bad one
+available. What carries the claim is **sandwiched-between-two-quality (41% → 12%)** and a new positive
+assertion, **clear-of-both (2% → 46%)** — a picker that stopped scoring collapses the latter to 2%,
+which no bound on the other three catches as sharply.
+
+⚠️ **THE LIBRARY-REACHABILITY GRID NEEDED SHORTER RUNWAYS, AND THE ABILITY AXIS DOES NOTHING.** `rot` is
+`ordinalInPhase + phaseTotal + daysPerWeek + DISTANCE_SEED`, so what reaches a new format is a new PHASE
+LENGTH. Capping collapsed 22/24/26/30/35 weeks onto one block, five grid points became one, and coverage
+fell 95% → 93%. Adding the shorter runways restored it. Widening the ability axis was measured and
+changes nothing — the seed never reads the runner's paces.
+
+⚠️ **THE HEAT FIXTURE'S 200-DAY RUNWAY NOW EXCEEDS THE HALF'S CAP**, so its plan began 60 days in the
+future and "today" was not in it at all — three guards failed with "the fixture is misaligned". Ninety-one
+days, and the fixture now throws by name if a future cap change breaks it again.
+
+⚠️ **AND ONE VACUITY CHECK BECAME STRUCTURALLY UNSATISFIABLE, WHICH IS A STRONGER STATE THAN A HOLE.**
+`custom-session-gear`'s strides calibration required the FIRST strides-typed session to be effort-only;
+`easyHillStrides` left the rotation pool and the sprint day now avoids the strides slot, so it is 0 of
+480. Restated to the precondition `repScore` actually needs — both candidate kinds must EXIST — which is
+true of 720 of 960 plans.
+
+### ⚠️⚠️ STILL OPEN, AND IT IS THE OWNER'S DECISION: THE BEGINNER TRACK HAS NO SPECIFICITY
+
+His check, same day: *"In the plan builder i selected building the habit / i set my Easy pace as 5.40 /
+My goal is running 5k and i selected a time goal of 19:50 / The plan it produces doesnt appear to have
+any form of hard session"*. Reproduced exactly — **zero quality sessions across all 15 weeks** — and it
+is the documented design (`building` → `beginner`, and beginners get no threshold, VO2 or race-pace work
+by design; `test/hill-sprints.test.ts` asserts `qualitySessionCount === 0` for every beginner week).
+
+⚠️⚠️ **BUT THE DEFECT IS NOT THE CONSERVATISM, IT IS THAT TWO MODULES DISAGREE ABOUT THE SAME RUNNER.**
+`assessFeasibility` returns **`verdict: "achievable"`** for that goal (4.7% needed, 11.6% realistic in 14
+weeks) — so the app promises a 19:50 is reachable and then builds a plan whose **fastest prescribed
+training pace is 4:43/km against a race pace of 3:58**. Measured: the whole plan uses exactly TWO bands,
+5:26–5:55 (easy) and 4:43–4:59 (steady finish); **he never runs within 45 s/km of his goal pace before
+race day.** The feasibility model believes a beginner improves 11.6% in fourteen weeks while the plan
+builder gives that same beginner nothing but easy running.
+
+⚠️ **AND THE BOOK CONTRADICTS OUR DESIGN HERE.** Hudson's **Level 1** plan — "low training volume plans
+for beginners" — contains **12 × 400 m at 5K–3K pace from week 8**, 6 × 800 m at 5K pace, 5 × 1 km at 5K
+pace, hill repetitions from week 7, fartlek from week 4, and a 5 km time trial in week 9. So the
+evidence the owner asked us to work from says a beginner SHOULD get race-specific work.
+
+**The options, and it is a coaching decision rather than a bug fix:** give the beginner track
+race-specific work on Hudson's Level 1 progression (nothing for ~3 weeks, one fartlek/hill session, then
+5K-pace intervals in the last third), or make `assessFeasibility` aware that the beginner track cannot
+deliver a time goal and downgrade the verdict. **The first is better for the runner and is what the book
+supports; the second is honest but tells somebody their goal is out of reach when the real answer is
+that the plan should have quality in it.** Do not do both.
+⚠️ **HIS PLAN IS NOT AFFECTED BY THE BLOCK-LENGTH CAP** — it is 15 weeks, inside the beginner 5 km cap
+of 20 — so the shorter-plans work above changes nothing about this report.

@@ -13151,16 +13151,17 @@ of what a plan-adaptation menu needs already written.
 
 ### STILL THE OWNER'S CALL
 
-- **Race-specific work for beginners** (the roadmap listed it; the no-quality-for-beginners rule is a
-  documented product decision, so this is a coaching call).
+- ✅ **Race-specific work for beginners — ASKED, RULED ON AND SHIPPED, 2026-09-01.** The
+  no-quality-for-beginners rule is gone; see the beginner-track chapter at the end of this file for the
+  progression, the doses and why the reps are timed. Do not reinstate `qualitySessionCount === 0`.
 - **Hill sprints for run-walk beginners.**
 - ⚠️ **Reshape the retest as a spec test** (5 × 1 km at goal pace off 2 min, cadence 4 → 5–6 weeks) in
   `src/adapt/weekly-review.ts` · `retestDue`.
 - ✅ **Two hard days a week regardless of level — ASKED AND ANSWERED, 2026-09-01. Do not reopen it
   without reading the chapter below.** The book does recommend it, the app already delivers it for every
   runner the book addresses, and lifting the remaining caps was measured as harmful.
-- **The no-deload-for-low-load half of the cadence rule**, and **whether to spend the block-length
-  recalibration above.**
+- **The no-deload-for-low-load half of the cadence rule.** ⚠️ **The block-length recalibration is DONE
+  — see the shorter-plans chapter; do not re-cost it.**
 
 ## TWO HARD DAYS A WEEK: ASKED, MEASURED, AND ALREADY DONE (owner, 2026-09-01)
 
@@ -13410,32 +13411,118 @@ days, and the fixture now throws by name if a future cap change breaks it again.
 480. Restated to the precondition `repScore` actually needs — both candidate kinds must EXIST — which is
 true of 720 of 960 plans.
 
-### ⚠️⚠️ STILL OPEN, AND IT IS THE OWNER'S DECISION: THE BEGINNER TRACK HAS NO SPECIFICITY
+## ✅ THE BEGINNER TRACK GETS FAST RUNNING (owner, 2026-09-01: *"i want to follow the books
+recommendation"*)
 
-His check, same day: *"In the plan builder i selected building the habit / i set my Easy pace as 5.40 /
-My goal is running 5k and i selected a time goal of 19:50 / The plan it produces doesnt appear to have
-any form of hard session"*. Reproduced exactly — **zero quality sessions across all 15 weeks** — and it
-is the documented design (`building` → `beginner`, and beginners get no threshold, VO2 or race-pace work
-by design; `test/hill-sprints.test.ts` asserts `qualitySessionCount === 0` for every beginner week).
+**This closes the finding the shorter-plans job surfaced and did not cause.** His check: *"In the plan
+builder i selected building the habit / i set my Easy pace as 5.40 / My goal is running 5k and i selected
+a time goal of 19:50 / The plan it produces doesnt appear to have any form of hard session"*. Reproduced
+exactly — **zero quality sessions across all 15 weeks**, and it was the documented design
+(`building` → `beginner`, and `test/hill-sprints.test.ts` asserted `qualitySessionCount === 0` for every
+beginner week). Suite 1447 → **1456**; `test/beginner-quality.test.ts` holds 9 guards and **11 deliberate
+re-breaks were each watched failing**.
 
-⚠️⚠️ **BUT THE DEFECT IS NOT THE CONSERVATISM, IT IS THAT TWO MODULES DISAGREE ABOUT THE SAME RUNNER.**
+⚠️⚠️ **THE DEFECT WAS NOT THE CONSERVATISM, IT WAS THAT TWO MODULES DISAGREED ABOUT ONE RUNNER.**
 `assessFeasibility` returns **`verdict: "achievable"`** for that goal (4.7% needed, 11.6% realistic in 14
-weeks) — so the app promises a 19:50 is reachable and then builds a plan whose **fastest prescribed
-training pace is 4:43/km against a race pace of 3:58**. Measured: the whole plan uses exactly TWO bands,
-5:26–5:55 (easy) and 4:43–4:59 (steady finish); **he never runs within 45 s/km of his goal pace before
-race day.** The feasibility model believes a beginner improves 11.6% in fourteen weeks while the plan
-builder gives that same beginner nothing but easy running.
+weeks) — so the app promised a 19:50 and then built a plan using exactly TWO bands, 5:26–5:55 easy and
+4:43–4:59 for a steady finish, while he would have to race at **3:58**. He never ran within 45 s/km of
+his goal pace before race day. Downgrading the verdict instead was the other option and is the worse one:
+it tells somebody their goal is out of reach when the real answer is that the plan should have quality in
+it. **Do not now do both.**
 
-⚠️ **AND THE BOOK CONTRADICTS OUR DESIGN HERE.** Hudson's **Level 1** plan — "low training volume plans
-for beginners" — contains **12 × 400 m at 5K–3K pace from week 8**, 6 × 800 m at 5K pace, 5 × 1 km at 5K
-pace, hill repetitions from week 7, fartlek from week 4, and a 5 km time trial in week 9. So the
-evidence the owner asked us to work from says a beginner SHOULD get race-specific work.
+### What the book prescribes — transcribed from the plates, not the prose
 
-**The options, and it is a coaching decision rather than a bug fix:** give the beginner track
-race-specific work on Hudson's Level 1 progression (nothing for ~3 weeks, one fartlek/hill session, then
-5K-pace intervals in the last third), or make `assessFeasibility` aware that the beginner track cannot
-deliver a time goal and downgrade the verdict. **The first is better for the runner and is what the book
-supports; the second is honest but tells somebody their goal is out of reach when the real answer is
-that the plan should have quality in it.** Do not do both.
-⚠️ **HIS PLAN IS NOT AFFECTED BY THE BLOCK-LENGTH CAP** — it is 15 weeks, inside the beginner 5 km cap
-of 20 — so the shorter-plans work above changes nothing about this report.
+⚠️ **THE ch11 "FRESHMAN PLAN" IS THE CALIBRATION POINT AND IS THE MOST CONSERVATIVE THING IN THE BOOK:**
+twelve weeks for a runner brand new to structured training, carrying **hill sprints and fartlek and
+nothing else** — no intervals, no threshold, no goal-pace work, no long run — with the fartlek at 5 km
+pace rather than 1500m. **5K/10K Level 1** give the sharp end: *one* quality session a week, support work
+run *"from the fast end downward"*, goal pace only in the final specific block, and race week run FASTER
+than race pace.
+
+⚠️ **OUR RUNNER SITS BETWEEN THE TWO, AND THAT IS WHY THE DIET IS FRESHMAN-WEIGHTED WITH LEVEL 1'S
+TAIL.** Level 1 opens at a **four-mile long run**, which is at or above where this track FINISHES for a
+5 km — so its interval volume (12 × 400 m, 6 × 800 m, 5 × 1 km) describes a fitter runner than ours.
+
+| | |
+|---|---|
+| **wk 1–4** | nothing but hill sprints — the introductory period ch7 asks for |
+| **wk 5–10** | fartlek at 5 km effort, growing 4 × 30″ → 8 × 45″; hill reps every 4th week |
+| **wk 11–13** | goal race pace, reps lengthening as they thin (6 × 1′ → 4 × 3′) |
+| **wk 14–15** | back to the fartlek, because both Level 1 plans sharpen into race week |
+
+**His own plan now:** 11 quality sessions in 15 weeks, fastest training pace **3:55/km** against a 3:58
+race pace, worst easy fraction **76.6%** against the 68% floor, 0 weeks breaching.
+
+### ⚠️⚠️ THE REPS ARE TIMED, AND THAT IS MEASURED RATHER THAN PREFERRED
+
+A hand-authored distance dose costs whatever the runner's pace makes it, and our beginners span a very
+wide range. Against a 17-minute work budget: **6 × 400 m at goal pace fits a 19:50 5 km runner (15.2′)
+while even 8 × 200 m OVERFLOWS for a 62:00 10 km runner (17.1′)**. Hudson prescribes by distance because
+his Level 1 runners are far more alike than ours — and he uses time himself where it matters
+(*"15 × 1 min. @ 5K pace"*, 10K Level 1 week 7). Guarded: **0 distance-based reps** across 1,384 sessions.
+
+⚠️ **THE HILL VARIANT CARRIES NO PACE BAND AT ALL**, because pace up a hill is a function of the gradient
+and for a beginner it is the one session that cannot be wrong about their fitness. Hudson's Level 1
+week 7 says *"@ 3K effort"*, not a pace.
+
+⚠️ **`BEG_INTRO_FRAC` IS 0.25, AND IT PROTECTS THE PACE BANDS AS WELL AS THE RUNNER.** `autoPace`
+recalibrates a seeded anchor from the runner's **first continuous run**, so by the time any fast running
+is prescribed the bands come from a real one rather than from a 5 km time nobody ran. Measured, the first
+quality session lands at **25.0%–33.3%** of the block — the guard has a ceiling as well as a floor,
+because an introduction that never arrives is the defect being fixed.
+
+⚠️ **RUN-WALK AND RETURNING BEGINNERS GET NONE — the same scoping as the hill-sprint staple.** Somebody
+who cannot yet run twenty minutes continuously is below the lowest tier the book addresses and their plan
+is already interval-shaped; and coming back from a break is not the moment to meet fast running for the
+first time. **Both are the owner's to overturn**, and both are guarded so they cannot change silently.
+
+⚠️ **THE HILL SPRINTS ARE NOT LOST TO THE QUALITY DAY, THEY MOVE.** Hudson never puts them on the quality
+day — Level 1 hangs them off the Monday, Thursday or Saturday easy run — so `sprintSlot` shifts to the
+second easy day whenever a quality session takes the first. Dropping them instead would undo the weekly
+staple the previous change measured in; guarded at **90%+ of quality weeks**.
+
+### Measured, 96 plans / 1,920 weeks, race week excluded as always
+
+| | |
+|---|---|
+| quality per week | max 1, and **0 weeks carry two** |
+| first quality session | 25.0%–33.3% of the block |
+| worst easy fraction | **85.9%** against the 68% floor, **0** model breaches |
+| distance-based reps | 0 |
+| goal-pace work outside the peak | 0 |
+| longest quality session | 21 minutes of its own steps |
+
+⚠️⚠️ **THE FIRST RUN OF THAT PROBE REPORTED "worst easy fraction 7.4%, 96 breaches" — EXACTLY ONE PER
+PLAN, WHICH WAS RACE WEEK.** Race week contains the goal race, a maximal effort over the full distance,
+and every intensity sweep in this repo exempts it for that reason. **A breach count equal to the plan
+count is the signature of a per-plan structural exemption, not of a defect.**
+
+⚠️ **AND THE MAIN TRACK IS UNTOUCHED, WHICH IS PROVED RATHER THAN ASSERTED.**
+`tools/audit-progression.mjs` sweeps `recreational` and `competitive` **only**, so a beginner change
+cannot reach it — and every figure came back byte-identical: biggest week in build/peak **98.7%**, **22
+of 12,144** weeks under the floor, worst jump **1.30× minutes / 1.36× km**, rises >1.10 **381/5232**
+minutes and **794/5232** km, deload depth **30.2%**, taper cut **36.3% mean / 26.0% min**, long-run
+inversion **1.0%**.
+
+### Two guards restated, and one fixture that had never built what it tested
+
+⚠️ **`test/hill-sprints.test.ts`'s BEGINNER BLOCKER ASSERTED THE BEHAVIOUR BEING REMOVED** —
+`qualitySessionCount === 0` for every beginner week. **Inverted rather than deleted:** what it protected
+(the sprint day stays an easy day, and run-walk is scoped out) is unchanged and is what it asserts now.
+Its vacuity floors were raised with it — staple 0.6 → **0.7**, any-hill 0.65 → **0.75** — because the
+shorter blocks made the old bars pass on less.
+
+⚠️⚠️ **`test/no-warmup-low-intensity.test.ts`'s RUN-WALK FIXTURE HAD NEVER BUILT A RUN-WALK PLAN.** It
+passed **`status: "new"`** — a **web-layer** field the engine does not read (it reads `athlete.runWalk`) —
+so it built a continuous beginner and **agreed with its guard by accident**, because a continuous
+beginner's sessions were also all typed `easy`. It was invisible until a positive proof
+(`anyQuality === 0`) was added beside it. **A fixture that cannot reach the state it names proves nothing
+about it**, and the tell is that it can only ever pass.
+
+### Still the owner's call, unchanged
+
+Hill sprints for **run-walk** beginners; reshaping the **retest** as a spec test (5 × 1 km at goal pace
+off 2 min, cadence 4 → 5–6 weeks) in `src/adapt/weekly-review.ts` · `retestDue`; and the
+**no-deload-for-low-load** half of the cadence rule. ⚠️ **`assessFeasibility` IS NOW LESS WRONG BUT STILL
+UNAUDITED FOR BEGINNERS** — it believes 11.6% in fourteen weeks is realistic, and nothing measures
+whether the new quality diet makes that true.

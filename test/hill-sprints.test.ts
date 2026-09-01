@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import type { Athlete, Goal, PlannedWeek } from "../src/domain/types.ts";
 import { generatePlan } from "../src/plan/generate-plan.ts";
+import { MAX_STRUCTURED_WEEKS } from "../src/plan/periodization.ts";
 import { contHillSprints, easyHillStrides } from "../src/plan/session-templates.ts";
 import type { SessionContent } from "../src/plan/session-templates.ts";
 import { deriveTrainingPaces } from "../src/science/paces.ts";
@@ -87,16 +89,30 @@ test("BLOCKER: hill sprints reach the great majority of eligible weeks, at every
       const elig = weeks.filter(eligible);
       const withStaple = elig.filter(stapleWeek).length;
       const withAnyHill = elig.filter(hillWeek).length;
-      assert.ok(elig.length >= 12, `${distance}/${daysPerWeek}d: only ${elig.length} eligible weeks to judge`);
-      // ⚠️ THE STAPLE IS WHAT THIS WORK ADDED, so it is what the bar is set on. Its worst measured case
-      // is 11 of 18 (0.611) on a normal runway and 5 of 8 (0.625) on a short one, so the headroom over
-      // 0.6 is thin and deliberately so: the staple stands aside for a hill quality week and for a
-      // week the rotation would have given strides, so it cannot be every week and should not be.
-      assert.ok(withStaple / elig.length >= 0.6,
+      // ⚠️ THE VACUITY FLOOR IS DERIVED FROM THE BLOCK-LENGTH CAP, NOT TYPED. It was a flat 12, and the
+      // cap took a 5 km block to 16 weeks — 10 to 11 eligible after the partial first week, the taper
+      // and one deload in four — so a hand-typed floor failed on correct code. Sixty per cent of the cap
+      // is a safe lower bound on that and moves with the constant.
+      const minElig = Math.floor(MAX_STRUCTURED_WEEKS[distance] * 0.6);
+      assert.ok(elig.length >= minElig,
+        `${distance}/${daysPerWeek}d: only ${elig.length} eligible weeks to judge (need ${minElig} ` +
+        `for a ${MAX_STRUCTURED_WEEKS[distance]}-week cap)`);
+      // ⚠️ THE STAPLE BAR WENT UP, NOT DOWN, WHEN THE BLOCK WAS CAPPED (2026-09-01) — worth saying
+      // plainly, because the cap first made this WORSE. Capping took the worst case to 0.462: a short
+      // block is proportionally more build, so the (then over-broad) hill-quality stand-aside fired far
+      // more often, and a chosen slot that happened to be the strides position dropped the sprints from
+      // the week entirely. Narrowing that gate to MAXIMAL hill work and teaching `pickSprintSlot` to
+      // prefer a non-strides slot took it to **0.727** — better than the 0.611 it managed before the
+      // cap. Measured worst cases on THIS grid: staple 0.750 and any-hill 0.813, both at marathon/3d.
+      // ⚠️ The any-hill figure is LOWER than the staple's headroom suggests because the two are not
+      // nested the way they were: narrowing the stand-aside means a week can now carry the sprint day
+      // INSTEAD of a hill quality session rather than as well as one, so "any hill" no longer gets a
+      // free lift from every hill-quality week. Each bar is set just under its own measurement.
+      assert.ok(withStaple / elig.length >= 0.7,
         `${distance}/${daysPerWeek}d: the sprint day appears in only ${withStaple} of ${elig.length} ` +
         "eligible weeks — the staple has gone back to being a rotation flavour");
       // And what the runner meets — hill work of any kind — is higher again.
-      assert.ok(withAnyHill / elig.length >= 0.65,
+      assert.ok(withAnyHill / elig.length >= 0.75,
         `${distance}/${daysPerWeek}d: hill work of any kind in only ${withAnyHill} of ${elig.length}`);
     }
   }
@@ -166,26 +182,54 @@ test("BLOCKER: the sprints are HELD through the sharpening phase, not dropped at
     `hill work survives in only ${withHills} of ${peak.length} eligible peak weeks`);
 });
 
-test("BLOCKER: a week whose quality session is already hill work does not also get the sprint day", () => {
-  // Five quality formats are hill sessions, up to 10 x 50 m maximal reps - the heaviest connective-
-  // tissue load in the library. A week that draws one and ALSO gets the sprint day asks the same
+test("BLOCKER: a week whose quality session is MAXIMAL hill work does not also get the sprint day", () => {
+  // A week that draws a maximal hill session and ALSO gets the sprint day asks the same connective
   // tissue twice. The sprint day is the smaller dose, so it gives way.
+  //
+  // ⚠️⚠️ "MAXIMAL", NARROWED FROM "ANY HILL WORK" ON 2026-09-01, AND THE OLD FORM WAS OVER-BROAD.
+  // Written as "any unpaced rep", the single biggest trigger was **"20′ Kenyan hills" — 14 of 36
+  // firings** — which is ONE unpaced rep of twenty continuous minutes at RPE 7: an aerobic run over
+  // rolling ground, not sprinting. A week containing that can carry six eight-second sprints; they are
+  // different systems, and CLAUDE.md's own handoff note says so ("a 60-second submaximal hill rep and a
+  // 10-second maximal sprint are different sessions. Do not reconcile them").
+  // ⚠️ IT ONLY SURFACED WHEN THE BLOCK WAS CAPPED, because a short block is proportionally more build —
+  // two quality sessions a week rather than one — so the over-broad gate fired on far more weeks. The
+  // staple fell to **46%** of eligible weeks, which would have made the Road Map's own claim ("short
+  // hill sprints every week, not one run in eight") false.
+  // ⚠️ THE THRESHOLD IS READ FROM THE ENGINE, not typed here, so the two cannot drift.
+  const src = readFileSync(new URL("../src/plan/generate-plan.ts", import.meta.url), "utf8");
+  const m = /const MAXIMAL_HILL_RPE = (\d+);/.exec(src);
+  assert.ok(m, "MAXIMAL_HILL_RPE is no longer declared in the engine");
+  const MAXIMAL = Number(m![1]);
+  assert.ok(MAXIMAL >= 8 && MAXIMAL <= 10,
+    `MAXIMAL_HILL_RPE is ${MAXIMAL} — outside the range where it can separate a sprint session ` +
+    "(RPE 9-10) from a twenty-minute aerobic hill run (RPE 7)");
   let checked = 0;
+  let aerobicHillWithSprints = 0;
   for (const daysPerWeek of [4, 5, 6]) {
     for (const distance of ["5k", "10k", "half"] as const) {
       for (const w of plan(athlete({ daysPerWeek }), goal({ distance }))) {
-        const qualityHill = w.sessions.some(
-          (s) => (s.type === "vo2" || s.type === "threshold") && unpacedReps(s) > 0,
-        );
-        if (!qualityHill) continue;
+        const q = w.sessions.filter((s) => s.type === "vo2" || s.type === "threshold");
+        const maximalHill = q.some((s) => (s.steps ?? []).some(
+          (st) => st.kind === "rep" && st.targetPaceSecPerKm == null && (st.targetRpe?.max ?? 0) >= MAXIMAL));
+        const aerobicHill = !maximalHill && q.some((s) => (s.steps ?? []).some(
+          (st) => st.kind === "rep" && st.targetPaceSecPerKm == null));
+        if (aerobicHill && sprintDay(w)) aerobicHillWithSprints++;
+        if (!maximalHill) continue;
         checked++;
         assert.equal(sprintDay(w), undefined,
-          `${distance}/${daysPerWeek}d week ${w.index}: a hill quality session AND the sprint day`);
+          `${distance}/${daysPerWeek}d week ${w.index}: a MAXIMAL hill quality session AND the sprint day`);
       }
     }
   }
   assert.ok(checked >= 3,
-    `the sweep found only ${checked} weeks with a hill quality session — it cannot see the defect`);
+    `the sweep found only ${checked} weeks with a maximal hill quality session — it cannot see the defect`);
+  // ⚠️ AND THE OTHER DIRECTION, which is what the narrowing bought: an aerobic hill week must still be
+  // ABLE to carry the sprint day. Without this the guard passes just as well with the gate widened
+  // back, which is exactly the state that cost 15 points of staple frequency.
+  assert.ok(aerobicHillWithSprints > 0,
+    "no week with a non-maximal hill quality session ever carries the sprint day — the stand-aside " +
+    "has gone back to firing on any hill work at all");
 });
 
 test("BLOCKER: relaxed strides survive the sprint day, at every day-count", () => {
@@ -420,7 +464,7 @@ test("BLOCKER: the sprint day is not the recovery day after a hard session", () 
   // ⚠️ NO SLOT IS CLEAR — three hard days in seven means every easy day touches something — so this is
   // a least-bad bound and not a clean one. The bar is set between the two measured states, well above
   // what the code delivers and far below what it delivered before, so it discriminates.
-  let total = 0, afterQuality = 0, betweenTwo = 0, withStrength = 0, afterLong = 0;
+  let total = 0, afterQuality = 0, betweenTwo = 0, withStrength = 0, afterLong = 0, clearOfBoth = 0;
   for (const distance of ["5k", "10k", "half", "marathon"] as const) {
     for (const daysPerWeek of [4, 5, 6]) {
       for (const timeSeconds of [1100, 1500, 2100]) {
@@ -444,6 +488,8 @@ test("BLOCKER: the sprint day is not the recovery day after a hard session", () 
           // check let a re-break that dropped it from the slot scorer escape entirely. The day after
           // the week's biggest session is its most important recovery day.
           if (on(d - 1).some((s) => s.type === "long")) afterLong++;
+          // ⚠️ The positive claim: yesterday was neither a quality session nor the long run.
+          if (!hard(d - 1) && !on(d - 1).some((s) => s.type === "long")) clearOfBoth++;
         }
       }
       }
@@ -451,13 +497,37 @@ test("BLOCKER: the sprint day is not the recovery day after a hard session", () 
   }
   assert.ok(total >= 500, `only ${total} sprint days measured — the sweep cannot see the pattern`);
   const pc = (n: number) => Math.round((100 * n) / total);
-  assert.ok(pc(afterQuality) <= 40,
-    `${pc(afterQuality)}% of sprint days are the day after a quality session (was 74% when the slot ` +
-    "was simply the first easy day)");
-  assert.ok(pc(betweenTwo) <= 8,
-    `${pc(betweenTwo)}% of sprint days sit between two quality sessions (was 18%)`);
-  assert.ok(pc(withStrength) <= 20,
-    `${pc(withStrength)}% of sprint days share the day with a strength session (was 83%)`);
+  // ⚠️⚠️ THE BOUNDS WERE RE-MEASURED WHEN THE BLOCK WAS CAPPED (2026-09-01), AND THE REASON IS
+  // STRUCTURAL RATHER THAN A REGRESSION IN THE PICKER. A short block is proportionally more BUILD,
+  // where a week carries TWO quality sessions instead of one — and with quality at rel 2 and 4 and
+  // `EASY_REL` opening [3, 5, 1, 6], a week with three or fewer easy days has no slot clear of both.
+  // (rel 6 is the one clear slot, and only a 7-day runner reaches it, where it is the recovery jog and
+  // therefore excluded.) So this is the "NO SLOT IS CLEAR" note below, made worse by the phase mix.
+  //
+  // Re-measured on THIS grid against the first-easy-day rule it replaced, so every bound sits between
+  // two real states rather than being picked:
+  //
+  //                      | first easy day | pickSprintSlot
+  //   day after quality  |          98%   |      54%
+  //   between two        |          41%   |      12%
+  //   with strength      |          75%   |      24%
+  //   clear of both      |           2%   |      46%
+  //
+  // ⚠️ AND "day after quality" IS THE WEAKEST OF THE FOUR under the cap — it barely separates, because a
+  // day-after slot is often genuinely the least-bad one available. The two that carry the claim are
+  // BETWEEN-TWO (the sandwiched slot, which is the one that really costs recovery) and CLEAR-OF-BOTH,
+  // so a positive assertion on the latter was added: a picker that stopped scoring would collapse it
+  // to 2%, which no bound on the other three catches as sharply.
+  assert.ok(pc(afterQuality) <= 70,
+    `${pc(afterQuality)}% of sprint days are the day after a quality session (98% with the ` +
+    "first-easy-day rule, 54% with the slot scorer)");
+  assert.ok(pc(betweenTwo) <= 20,
+    `${pc(betweenTwo)}% of sprint days sit between two quality sessions (41% before, 12% after)`);
+  assert.ok(pc(withStrength) <= 40,
+    `${pc(withStrength)}% of sprint days share the day with a strength session (75% before, 24% after)`);
+  assert.ok(pc(clearOfBoth) >= 30,
+    `only ${pc(clearOfBoth)}% of sprint days are clear of both yesterday's quality and yesterday's ` +
+    "long run (2% with the first-easy-day rule, 46% with the slot scorer)");
   assert.equal(afterLong, 0,
     `${pc(afterLong)}% of sprint days are the day after the long run — the week's biggest recovery day`);
 });

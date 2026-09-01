@@ -343,11 +343,127 @@ const EASY_START_FRAC = 1 / PEAK_VOLUME_MULTIPLIER;
  *
  * ⚠️ The taper returns 1: `taperMult` already cuts those weeks, and multiplying both would cut twice.
  */
-function easyRampFor(wp: WeekPlan, weekIndex: number, rampEndWeek: number): number {
+/**
+ * ⚠️⚠️ A RAMP MUST NOT CLIMB THROUGH A DELOAD, AND EVERY RAMP IN THIS ENGINE USED TO (2026-09-01).
+ *
+ * All three progressions — the easy-run ramp, the long-run ramp and the beginner track's own ramp —
+ * divided by the CALENDAR week index: `(weekIndex - 1) / (rampEndWeek - 1)`. So a deload week still
+ * advanced the ramp while its own volume was cut, and **the rebound out of one therefore cost two
+ * steps instead of one**. In a 30-to-44-week block each step is small enough that two of them stay
+ * inside the evidence report's 1.10 single-session guardrail, which is why this was invisible for
+ * months. Cap the block to Hudson's lengths and the same code breaches at EVERY post-deload week:
+ * measured, the beginner geometric ramp went 3.0 -> 3.4 km (13%), 3.8 -> 4.4 (16%), 5.0 -> 5.6 (12%),
+ * and the long-run ladder exceeded its own `LONG_LIFT_STEP_MAX` clamp.
+ *
+ * So the fraction is counted over PROGRESSING weeks only — a deload or taper week holds the count
+ * rather than advancing it — and every ramp reads the same array. One definition, because three
+ * copies of "which weeks count" is how they came to disagree in the first place.
+ *
+ * ⚠️ IT ONLY PAYS FOR ITSELF ALONGSIDE THE CAP. Measured at the OLD block lengths this change is
+ * slightly worse on its own (rises >1.10 on minutes 4.1% -> 4.6%, on km 11.2% -> 12.5%), because
+ * holding the ramp flat through a deload leaves fewer steps to cover the same range so each step
+ * grows. Do not ship it without the cap, and do not ship the cap without it.
+ *
+ * Returns a 1-based array: `f[weekIndex]` is 0 at the first week and 1 at `rampEndWeek`.
+ */
+function rampFractions(schedule: WeekPlan[], rampEndWeek: number): number[] {
+  // How many progressing weeks have elapsed before each week. A deload holds its predecessor's value.
+  const prog: number[] = new Array(schedule.length + 1).fill(0);
+  let n = -1;
+  for (let i = 1; i <= schedule.length; i++) {
+    const w = schedule[i - 1]!;
+    if (!w.isDeload && w.phase !== "taper") n++;
+    prog[i] = Math.max(0, n);
+  }
+  const end = Math.max(1, Math.min(rampEndWeek, schedule.length));
+  // ⚠️ The denominator is the progress AT the ramp's endpoint, not the count of progressing weeks in
+  // the plan — the easy ramp ends at the first peak week and the long-run ramp at the last non-taper
+  // week, so the two share this helper and disagree only about where "full length" is.
+  const denom = Math.max(1, prog[end]!);
+  return prog.map((v) => Math.min(1, v / denom));
+}
+
+/**
+ * ⚠️⚠️ THE BEGINNER LONG-RUN LADDER IS QUANTISED ONCE, ACROSS THE WHOLE PLAN, BECAUSE WHOLE-MINUTE
+ * ROUNDING BREACHES THE 1.10 GUARDRAIL ON ITS OWN (2026-09-01, with the block-length cap).
+ *
+ * A beginner's runs are SHORT, so one minute of rounding is a large fraction of one: 1 minute on a
+ * 29-minute run is 3.4%. Capping the block to Hudson's lengths leaves ~10 progressing weeks to cover
+ * 27 -> 61 minutes, which needs 8.5% per step — and 8.5% plus 3.4% of rounding is over the evidence
+ * report's 1.10 single-session guardrail. Measured on a 5 km beginner block, TWO of the ten steps
+ * breached (29->32 = 10.3%, 37->41 = 10.8%) while the underlying geometric rate was compliant.
+ *
+ * ⚠️ THE ROUNDING WAS ALWAYS THERE; THE LONG BLOCK HID IT. At the old 32-week length the same ramp had
+ * ~23 steps and needed only 3.6% each, so a minute of rounding could not reach 10%. This is the same
+ * shape as `rampFractions`: a defect that only a short block exposes.
+ *
+ * ⚠️ IT ONLY EVER PULLS A WEEK DOWN, never up, so it cannot invent work a beginner did not earn — and
+ * because it walks forward from the delivered value, the week after a pulled-down one is measured
+ * against what was actually given rather than against the ideal it missed.
+ *
+ * ⚠️ AND THE ENDPOINT IS PROTECTED: the last entry is re-asserted at the destination, because arriving
+ * short is what `BEGINNER_LONG_KM` exists to prevent (a beginner sent to a 5 km race off a 4.4 km
+ * longest run is the defect that table was added for). Measured, the clamp binds twice mid-ramp and
+ * not at all on the final step, so the destination is reached either way.
+ */
+/**
+ * Where a beginner's long-run ramp opens: 45% of its own destination, capped at 30 minutes.
+ * ⚠️ ONE DEFINITION, read by `quantisedLadder`'s beginner caller and by `beginnerRun`'s fallback. Two copies is how
+ * the plan-wide ladder and the per-week derivation would come to disagree about week one.
+ * ⚠️ 45% and the 30-minute cap are both load-bearing: the cap keeps week one where it has always been
+ * for a short goal, and the fraction is what keeps the growth inside the guardrail for a long one.
+ * Raising the fraction to narrow the range was measured and rejected — it puts a 34-minute long run in
+ * a beginner's first week, above what the "building the habit" card itself promises ("I can jog 20-30
+ * minutes non-stop").
+ */
+function beginnerOpenMin(longPeakMin: number): number {
+  return Math.min(30, Math.round(longPeakMin * 0.45));
+}
+
+function quantisedLadder(
+  openMin: number,
+  peakMin: number,
+  fracs: number[],
+  schedule: WeekPlan[],
+  stepMax: number,
+): number[] {
+  const out: number[] = new Array(fracs.length).fill(0);
+  let prev = 0;
+  let lastIdx = 0;
+  for (let i = 1; i < fracs.length && i <= schedule.length; i++) {
+    const w = schedule[i - 1]!;
+    // ⚠️⚠️ AN EASED WEEK TAKES NO RUNG, AND GETTING THIS WRONG IS WORSE THAN NOT CLAMPING AT ALL.
+    // A deload builds its long run from the ramp's own value times its ease multiplier, so it never
+    // uses a rung — and the first version let the clamp keep climbing through one anyway (the held
+    // `ideal` was still above the pulled-down `prev`, so the deload absorbed a step). The runner then
+    // met the NEXT non-eased week two rungs up: measured on a beginner half, every step across a
+    // deload delivered 17.5% while every consecutive pair of ladder entries was inside 9%. The
+    // sequence that must satisfy the guardrail is the one the runner actually runs.
+    if (w.isDeload || w.phase === "taper") { out[i] = prev; continue; }
+    const ideal = Math.round(geomLerp(openMin, peakMin, Math.min(1, Math.max(0, fracs[i]!))));
+    // Monotone, and never a bigger step than the guardrail allows against what was actually given.
+    const capped = prev > 0 ? Math.min(ideal, Math.floor(prev * stepMax)) : ideal;
+    out[i] = Math.max(prev, capped);
+    if (out[i]! > prev) { prev = out[i]!; lastIdx = i; }
+  }
+  // ⚠️⚠️ THE DESTINATION IS NOT FORCED, AND FORCING IT WAS A REAL DEFECT. Rounding each rung DOWN to
+  // stay inside the bound accumulates a deficit the ladder never makes up, so the destination then
+  // needs one oversized final step to reach: measured on a capped 3-day 5 km block the ladder ran
+  // 34 37 40 44 48 52 57 62 68 74 and forcing 82 made the last step **1.108** — a guardrail breach
+  // created by the very line meant to protect the endpoint. It arrives one minute short instead (81),
+  // which is nothing against a `peakLong` that is already the output of three caps and a floor.
+  // ⚠️ THE BEGINNER LADDER DOES NOT NEED THE FORCING EITHER, which is what makes dropping it safe
+  // rather than a trade: measured, the beginner 5k/10k/half ladders reach 61/82/123 minutes — their
+  // exact endpoints — on their own, because their rate has enough headroom under 1.09 that the clamp
+  // binds only twice in a block. If a future change makes an endpoint genuinely unreachable, the right
+  // answer is a longer block (see MAX_STRUCTURED_WEEKS_BEGINNER), not a bigger step.
+  void lastIdx;
+  return out;
+}
+
+function easyRampFor(wp: WeekPlan, fraction: number): number {
   if (wp.phase === "taper") return 1;
-  if (rampEndWeek <= 1) return 1;
-  const fraction = Math.min(1, (weekIndex - 1) / (rampEndWeek - 1));
-  return EASY_START_FRAC + fraction * (1 - EASY_START_FRAC);
+  return EASY_START_FRAC + Math.min(1, Math.max(0, fraction)) * (1 - EASY_START_FRAC);
 }
 
 // Day-of-week scheduling (0 = Mon … 6 = Sun) is expressed RELATIVE to the long run, then rotated to
@@ -355,6 +471,25 @@ function easyRampFor(wp: WeekPlan, weekIndex: number, rampEndWeek: number): numb
 // layout (quality Tue/Thu, easy Wed/Fri/Mon/Sat); because every spacing rule — hard days separated,
 // hard days never adjacent to the long run — is rotation-invariant, the same rotation honours any
 // chosen long-run day while preserving those rules.
+/**
+ * The evidence report's single-session week-on-week guardrail, applied to the beginner long-run ladder.
+ * ⚠️ 1.09, NOT 1.10, AND THE MARGIN IS THE POINT: the guard measures KILOMETRES while the ladder is
+ * built in MINUTES, and the two differ by the pace rounding in between — a ladder clamped at exactly
+ * 1.10 delivered a 10.0% step in minutes that read as 10.4% in km. One point of headroom costs the
+ * ramp nothing measurable (the clamp binds twice in a 16-week block) and removes a boundary failure.
+ */
+const BEG_LONG_STEP_MAX = 1.09;
+
+/**
+ * The RPE at which an unpaced (effort-only) hill repetition counts as MAXIMAL, and therefore as the
+ * kind of connective-tissue load that makes the weekly sprint day stand aside.
+ * ⚠️ 9 IS MEASURED, NOT PICKED. The four quality formats carrying unpaced reps sit at RPE 10
+ * ("10 × 50 m hill sprints"), 10 ("10 × 30″ hill sprints"), 9 ("8 × 60″ uphill") and 7
+ * ("20′ Kenyan hills"). Nine is the only threshold that keeps the three genuine hill-rep sessions
+ * standing the sprint day aside while letting a twenty-minute aerobic run over rolling ground carry it.
+ */
+const MAXIMAL_HILL_RPE = 9;
+
 const QUALITY_REL = [2, 4]; // days after the long run
 const EASY_REL = [3, 5, 1, 6];
 const MOB_PREF_REL = [3, 5, 1, 6, 4, 2]; // preferred order for the mobility / free day
@@ -383,7 +518,13 @@ export function generatePlan(
   // Monday of the athlete's start week (its earlier days are trimmed later for a mid-week start).
   const startWeekMonday = addDays(startIso, -dayOfWeekMondayZero(startIso));
   const totalWeeks = Math.max(0, weeksBetween(startWeekMonday, raceMonday) + 1);
-  const structuredWeeks = structuredWeekCount(totalWeeks, goal.distance);
+  // ⚠️ The beginner flag reaches the block length because the beginner ramp — not the race — decides
+  // how many weeks it needs. See MAX_STRUCTURED_WEEKS_BEGINNER.
+  const structuredWeeks = structuredWeekCount(
+    totalWeeks,
+    goal.distance,
+    athlete.experience === "beginner",
+  );
 
   // ⚠️ BOTH kinds of comeback are DETRAINED, so both get the conservative build and the withheld hill
   // sprints. Only the feasibility CEILING distinguishes them: being injured limits what you can load,
@@ -407,6 +548,9 @@ export function generatePlan(
   // a runway too short to have a peak phase at all. See `easyRampFor`.
   const firstPeakIdx = schedule.findIndex((s) => s.phase === "peak");
   const easyRampEndWeek = firstPeakIdx >= 0 ? firstPeakIdx + 1 : nonTaperCount;
+  // ⚠️ THREE RAMPS, THREE ENDPOINTS, ONE DEFINITION OF WHICH WEEKS COUNT. See `rampFractions`.
+  const easyFrac = rampFractions(schedule, easyRampEndWeek);
+  const longFrac = rampFractions(schedule, nonTaperCount);
   const taper = taperFor(goal.distance);
 
   // Complete beginners get a gentler, purpose-built progression (run–walk or short easy running,
@@ -429,6 +573,20 @@ export function generatePlan(
   const lastHardWeek = schedule.reduce(
     (acc, wp, i) => (wp.phase !== "taper" && !wp.isDeload ? i + 1 : acc),
     1,
+  );
+  // ⚠️ The beginner ramp's endpoint is `lastHardWeek` — the last week that is neither taper nor
+  // deload — for the reason recorded in `buildBeginnerWeek`. It now shares `rampFractions` with the
+  // other two so a deload cannot advance it either; measured, the calendar-week version breached the
+  // 1.10 single-session guardrail at every post-deload week once the block was capped.
+  const begFrac = rampFractions(schedule, lastHardWeek);
+  // ⚠️ QUANTISED ONCE, ACROSS THE PLAN. Whole-minute rounding on a beginner's short runs breaches the
+  // 1.10 single-session guardrail by itself once the block is capped — see `quantisedLadder`.
+  const begLadder = quantisedLadder(
+    beginnerOpenMin(beginnerLongPeakMin),
+    beginnerLongPeakMin,
+    begFrac,
+    schedule,
+    BEG_LONG_STEP_MAX,
   );
   const longCapMin = minutesFor(LONG_CAP_KM[goal.distance][abilityKey]);
 
@@ -464,6 +622,12 @@ export function generatePlan(
       Math.max(longFloorMin, Math.min(longCapMin, Math.max(longFloorMin, volumeDriven))),
     );
     const startLong = Math.round(peakLong * (returning ? 0.42 : 0.55));
+    // ⚠️ THE MAIN TRACK'S LONG-RUN LADDER — quantised and GEOMETRIC, for the two reasons recorded on
+    // `longRunMinutes`. It lives here rather than beside `begFrac` because `startLong` and `peakLong`
+    // are solved by the volume fixed point and change on every pass of it.
+    const longLadder = quantisedLadder(startLong, peakLong, longFrac, schedule, LONG_LIFT_STEP_MAX);
+    // ⚠️ THE PEAK THE LADDER ACTUALLY REACHES, which the taper cuts from. See `longRunMinutes`.
+    const builtPeakLong = Math.max(startLong, ...longLadder);
     // Every week's build inputs, resolved once. The post-condition below has to be able to REBUILD a
     // week with a longer long run, and it must do so through the same one definition of how a week is
     // assembled — a second assembly path is how this file's history records two builders drifting
@@ -475,7 +639,9 @@ export function generatePlan(
         // The beginner track's ceiling is its OWN endpoint, `beginnerLongPeakMin`, not `peakLong` —
         // buildBeginnerWeek never reads peakLong and its ramp is deliberately gentler.
         return { weekIndex, startDateIso, wp, ceilMin: beginnerLongPeakMin,
-          ctx: { athlete, goal, paces, returning, longMin: beginnerLongPeakMin } as WeekContext };
+          ctx: { athlete, goal, paces, returning, longMin: beginnerLongPeakMin,
+            begFrac: begFrac[weekIndex] ?? 1,
+            begLongMin: begLadder[weekIndex] } as WeekContext };
       }
       // ⚠️ END-ALIGNED: the LAST array entry belongs to race week, whatever got clamped. A short
       // runway clamps the taper (periodization.ts: structuredWeeks - 3), so a 4-week plan has ONE
@@ -490,16 +656,14 @@ export function generatePlan(
         : 1;
       const longMin = longRunMinutes(
         wp,
-        weekIndex,
-        nonTaperCount,
-        startLong,
-        peakLong,
+        longLadder[weekIndex] ?? builtPeakLong,
+        builtPeakLong,
         taperMult,
       );
       return { weekIndex, startDateIso, wp, ceilMin: peakLong,
         ctx: {
           athlete, goal, paces, returning, longMin, vScale, taperMult,
-          easyRamp: easyRampFor(wp, weekIndex, easyRampEndWeek),
+          easyRamp: easyRampFor(wp, easyFrac[weekIndex] ?? 1),
           qRefMin,
         } as WeekContext };
     });
@@ -685,6 +849,20 @@ type WeekContext = {
    */
   easyRamp?: number;
   /**
+   * The BEGINNER track's ramp fraction for this week (0 at week one, 1 at the last non-eased week).
+   * ⚠️ Passed in rather than derived from the week index, because a deload must not advance it — see
+   * `rampFractions`. Absent means 1, which is the safe read for any caller that forgets: a beginner
+   * week built without it lands at the ramp's destination rather than at an invented point on the way.
+   */
+  begFrac?: number;
+  /**
+   * This week's rung of the beginner long-run ladder, in minutes — quantised once across the plan so
+   * whole-minute rounding cannot breach the 1.10 week-on-week guardrail. See `quantisedLadder`.
+   * ⚠️ Absent on an EASED week deliberately: a deload and the taper apply their own multiplier to the
+   * ramp's own value, and a rung is the un-eased length.
+   */
+  begLongMin?: number;
+  /**
    * The mean duration, in minutes, of ONE quality session in this plan — measured from a first pass over
    * the plan itself, never a constant. The easy running compensates toward it so a week whose quality
    * session happens to be a short one is not a hole in the volume line. See `buildWeek`.
@@ -819,8 +997,12 @@ function enforceLongRunIsLongest(
     // kept because it states the rule the paragraph above promises ("nothing here can ever SHORTEN a
     // long run the plan asked for") at the place the rule lives, rather than leaving it as a property
     // of a mechanism two functions away that a future change could quietly remove.
+    // ⚠️ FLOORED, NOT LEFT AS A FLOAT. `want` becomes `longMinFloor`, which the session builder passes
+    // through `Math.round` — so a cap of `36 * 1.10 = 39.6` was delivered as **40**, a 1.111 step from
+    // 36 through a clamp set at 1.10. The clamp has to be expressed in the units the plan is delivered
+    // in. Measured: this alone was one of the two breaches in a capped 3-day 5 km block.
     const stepCap = prevLong > 0
-      ? Math.max(longRunMinutesOf(week), prevLong * LONG_LIFT_STEP_MAX)
+      ? Math.max(longRunMinutesOf(week), Math.floor(prevLong * LONG_LIFT_STEP_MAX))
       : Infinity;
     if (!eased) {
       // ⚠️ UP TO THREE PASSES, because raising the long run changes its own SHAPE: a build or peak
@@ -1004,8 +1186,26 @@ function buildWeek(
   // same shape of test buildWeek already uses to decide whether a session carries race-pace work.
   // Matching /hill/i on the title would break the first time a format was renamed, and this file's
   // history has that exact defect in it twice over.
+  // ⚠️⚠️ AND THE GATE IS MAXIMAL HILL WORK, NOT ALL HILL WORK — NARROWED 2026-09-01 WITH THE
+  // BLOCK-LENGTH CAP. Written as "any unpaced rep", the biggest single trigger was **"20′ Kenyan
+  // hills" (14 of 36 firings)**: ONE unpaced rep of twenty continuous minutes at RPE 7, which is an
+  // aerobic run over rolling ground and not sprinting at all. A week containing that can certainly
+  // carry six eight-second sprints — they are different systems, and this file's own note on the
+  // handoff says so in as many words ("a 60-second submaximal hill rep and a 10-second maximal sprint
+  // are different sessions. Do not reconcile them").
+  // ⚠️ IT ONLY SHOWED UP WHEN THE BLOCK WAS CAPPED, because a short block is proportionally more
+  // build — where quality sessions are two a week rather than one — so the over-broad gate fired on a
+  // far larger share of weeks. Measured, the staple fell from 61% of eligible weeks to **46%**, which
+  // would have made the Road Map's own claim ("short hill sprints every week, not one run in eight")
+  // false. Narrowed to RPE 9+: the three genuine sprint/rep formats still stand the day aside
+  // (RPE 10, 9, 10) and the Kenyan-hills aerobic run no longer does.
   const weekAlreadyClimbs = qualityContents.some((c) =>
-    (c.steps ?? []).some((st) => st.kind === "rep" && st.targetPaceSecPerKm == null),
+    (c.steps ?? []).some(
+      (st) =>
+        st.kind === "rep" &&
+        st.targetPaceSecPerKm == null &&
+        (st.targetRpe?.max ?? 0) >= MAXIMAL_HILL_RPE,
+    ),
   );
   const easyDays = EASY_REL.map((r) => dayRel(longDay, r)).slice(0, easyCount);
   // Strides and hill sprints are neuromuscular work with near-zero aerobic cost, but hill sprints
@@ -1019,6 +1219,9 @@ function buildWeek(
     easyDays,
     [...qualityDays.slice(0, qualityContents.length), longDay],
     runningDays >= 7 ? easyDays.length - 1 : -1,
+    // ⚠️ Asked of the ROTATION, exactly as the stand-aside below asks it, so the two cannot disagree
+    // about which day is the strides day.
+    (ei) => easyVariantIsStrides(ctx.paces, index + ei, canStride),
   );
   easyDays.forEach((d, ei) => {
     // Easy running is where weekly volume actually lives, so it scales with the runner too —
@@ -1385,6 +1588,7 @@ function beginnerRun(
   longPeakMin: number,
   longMinFloor?: number,
   capMin?: number,
+  ladderMin?: number,
 ): SessionContent {
   // ⚠️ ONLY THE LONG RUN IS EVENT-AWARE. The midweek runs stay on their original gentle ramp: what a
   // new runner needs on a Tuesday is the habit, and it is the same habit whatever they have entered.
@@ -1404,12 +1608,12 @@ function beginnerRun(
     const spec = { runSec, walkSec, targetRunMin };
     return long ? rwLong(paces, spec) : RW_FLAVOURS[flavour % RW_FLAVOURS.length]!(paces, spec);
   }
-  // The long run ramps from a gentle opening to the event's own endpoint. Starting at 45% of the
-  // destination keeps week one where it always was for a short goal, and keeps the week-on-week
-  // growth inside the report's 1.10 single-session guardrail for a long one.
-  const openMin = Math.min(30, Math.round(longPeakMin * 0.45));
+  // ⚠️ THE LADDER IS BUILT ONCE FOR THE WHOLE PLAN (see `quantisedLadder`) because whole-minute
+  // rounding on a beginner's short runs breaches the 1.10 guardrail by itself. `ladderMin` is this
+  // week's rung; the local derivation below is the fallback for any caller without a plan-wide view,
+  // and it must stay in step with the ladder — both read `beginnerOpenMin`.
   let minutes = long
-    ? Math.round(geomLerp(openMin, longPeakMin, f))
+    ? (ladderMin ?? Math.round(geomLerp(beginnerOpenMin(longPeakMin), longPeakMin, f)))
     : beginnerEasyMin(f, false);
   if (ease) minutes = long ? Math.round(minutes * 0.75) : beginnerEasyMin(f, true);
   // ⚠️ AFTER the ease multiplier, not before: a deload or taper week is meant to be shorter than the
@@ -1453,7 +1657,9 @@ function buildBeginnerWeek(
   // had 25% taken off it. Measured, a beginner 5 km block aimed at 6.0 km and delivered 5.8. Ramp to
   // the last week that is neither taper nor deload, and everything after it eases down FROM the
   // destination rather than toward it.
-  const f = Math.min(1, rampWeeks <= 1 ? 0.5 : (index - 1) / (rampWeeks - 1));
+  // ⚠️ THE FRACTION IS PASSED IN (see `rampFractions`), because a deload must not advance it. The
+  // endpoint reasoning above is unchanged; what changed is which weeks count toward reaching it.
+  const f = rampWeeks <= 1 ? 0.5 : Math.min(1, Math.max(0, ctx.begFrac ?? 1));
   const ease = wp.isDeload || wp.phase === "taper";
   const runningDays = Math.min(runWalk ? 3 : 4, Math.max(2, ctx.athlete.daysPerWeek));
   const longDay = longRunDayOf(ctx.athlete);
@@ -1469,7 +1675,7 @@ function buildBeginnerWeek(
   // `longMinFloor` is what `enforceLongRunIsLongest` uses to close it, clamped to this track's own
   // endpoint — see that function. Run–walk plans are untouched and cannot be affected: every session
   // in one is typed `easy`, so they contain no long run to be longest.
-  sessions.push(beginnerRun(ctx.paces, f, true, runWalk, ease, 0, ctx.longMin, ctx.longMinFloor));
+  sessions.push(beginnerRun(ctx.paces, f, true, runWalk, ease, 0, ctx.longMin, ctx.longMinFloor, undefined, ease ? undefined : ctx.begLongMin));
   dayOf.push(longDay);
 
   // Other easy days — each draws a different flavour, and the set rotates every week.
@@ -1624,6 +1830,22 @@ function qualityContentsFor(
     isDeload: wp.isDeload,
     competitive: ctx.athlete.experience === "competitive",
     returning: ctx.returning,
+    // ⚠️⚠️ THREE RUNS A WEEK CANNOT ABSORB THE LIBRARY'S BIGGEST FORMATS, and this is the same rule
+    // `avoidBig` already states ("the week can't take one") reached from the other side: there it is
+    // "another quality session is already here", here it is "there is nothing else here to carry the
+    // week". A hand-authored format has a fixed structure, so its cost in minutes is whatever the
+    // runner's pace makes it — and in a three-run week there are only two other runs to balance it.
+    //
+    // ⚠️ MEASURED, AND IT IS THE BLOCK-LENGTH CAP THAT EXPOSED IT. Capping the block changes the
+    // format rotation's phase arithmetic, so different weeks draw different formats: a 3-day 5 km
+    // competitive block drew an **85-minute threshold session** into week 9 beside a 38-minute easy
+    // run and a 58-minute long run — 47% of the week in one session, and 65.7% easy against the
+    // pyramidal floor's 68%. It is not a new class of defect (the audit records 38 such weeks across
+    // 12,144), but it is a new instance and the sweep in `test/session-library.test.ts` asserts none.
+    //
+    // ⚠️ IT ONLY EVER REMOVES THE BIGGEST FORMATS, never adds anything, and `narrow` drops the filter
+    // rather than emptying the pool — so a runner whose only eligible formats are big still gets one.
+    avoidBig: Math.min(7, Math.max(3, ctx.athlete.daysPerWeek)) <= 3,
   };
 
   if (wp.phase === "taper") {
@@ -1761,7 +1983,32 @@ function qualityContentsFor(
  * every other easy run in the plan for no reason - and the seventh-day recovery jog is identified by
  * being LAST in that list.
  */
-function pickSprintSlot(easyDays: number[], hardDays: number[], seventhIdx: number): number {
+function pickSprintSlot(
+  easyDays: number[],
+  hardDays: number[],
+  seventhIdx: number,
+  // ⚠️⚠️ WHETHER THIS SLOT IS THE ONE THE ROTATION WOULD HAVE GIVEN RELAXED STRIDES. Added 2026-09-01
+  // with the block-length cap, and it recovers a real loss rather than tidying anything.
+  //
+  // The sprint day stands aside on a strides-rotation week so the plan still contains a relaxed-strides
+  // session (without one, `sessionLibrary`'s "Easy + Strides" representative becomes the maximal
+  // hill-sprint session and a runner asking for strides is handed sprints). But that rule was applied
+  // to the CHOSEN slot only — so if the chosen slot happened to be the strides position, the sprints
+  // were dropped from the week entirely, even with three other easy days sitting free. Capping the
+  // block made that bite: measured, the staple fell to **53%** of eligible weeks at five or more days.
+  //
+  // Preferring a non-strides slot keeps BOTH: the strides flavour still lands on whichever day the
+  // rotation put it, and the sprints move to another easy day. ⚠️ That is Hudson's own layout, not a
+  // compromise — his Level 2 week 7 carries "5 miles + 7 × 8-sec. hill sprint" on the Monday AND
+  // "6 miles + 10 × 100m strides" on the Friday. Both are neuromuscular work with near-zero aerobic
+  // cost, on different days.
+  //
+  // ⚠️ IT IS A PREFERENCE, NOT A FILTER. With one easy day there is nowhere else to go, and the
+  // caller's own stand-aside then keeps the strides week intact — which is the behaviour the measured
+  // 3-day defect required. Returning -1 here instead would drop the sprints AND leave the caller no
+  // way to tell "no slot" from "no good slot".
+  wouldStride?: (ei: number) => boolean,
+): number {
   const gap = (from: number, to: number) => (((to - from) % 7) + 7) % 7;
   let best = -1;
   let bestScore = -Infinity;
@@ -1775,7 +2022,9 @@ function pickSprintSlot(easyDays: number[], hardDays: number[], seventhIdx: numb
       until = Math.min(until, gap(d, h));
     }
     // Recovery weighs more than freshness, so being clear of YESTERDAY's hard day counts double.
-    const score = since * 2 + until;
+    // ⚠️ The strides term DOMINATES the adjacency score (max 21) rather than tie-breaking it, because
+    // losing the sprint day altogether is a bigger cost than taking a slightly worse-placed one.
+    const score = since * 2 + until + (wouldStride?.(ei) ? 0 : 100);
     if (score > bestScore) { bestScore = score; best = ei; }
   });
   return best;
@@ -2048,20 +2297,39 @@ function addStrength(
 
 function longRunMinutes(
   wp: WeekPlan,
-  weekIndex: number,
-  nonTaperCount: number,
-  startLong: number,
-  peakLong: number,
+  // ⚠️⚠️ THIS WEEK'S RUNG OF A QUANTISED, GEOMETRIC LADDER — not a fraction, and not a linear lerp.
+  // Two defects were in the old `startLong + fraction * (peakLong - startLong)`, and only a short
+  // block exposes either:
+  //   1. IT WAS LINEAR, so the absolute step was constant and the RELATIVE step was largest at the
+  //      start — backwards. Measured on a capped 3-day 5 km block, 36 -> 82 minutes over ten steps is
+  //      4.6 minutes each, which is **12.8% on the opening 36-minute long run** and 5.6% by the end.
+  //      The beginner track learned this in 2026-08-01 ("A straight lerp front-loads its growth, which
+  //      is backwards... geomLerp gives the same start and destination at a constant ~4%/week") and
+  //      the main track never did, because a 32-week block's steps were small enough to hide it.
+  //   2. WHOLE-MINUTE ROUNDING TIPPED IT AGAIN, exactly as on the beginner ladder.
+  // `quantisedLadder` fixes both: constant-percentage growth, and no delivered step above the
+  // guardrail. ⚠️ `LONG_LIFT_STEP_MAX` clamped only the LIFT that `enforceLongRunIsLongest` applies —
+  // it never saw the natural ramp, which is where these two breaches came from.
+  rungMin: number,
+  // The highest rung the ladder actually delivers — see the taper branch below. On a long block this
+  // equals `peakLong`; on a short one the step clamp can leave it lower, and the taper must cut from
+  // the real thing.
+  builtPeakLong: number,
   // ⚠️ The RESOLVED multiplier for this week, not the array. Two call sites each indexing
   // volumeMultiplierByWeek is how race week got the wrong entry on clamped runways — buildAll
   // resolves it once, end-aligned, and everything downstream shares the answer.
   taperMult: number,
 ): number {
   if (wp.phase === "taper") {
-    return Math.round(peakLong * taperMult);
+    // ⚠️⚠️ CUT FROM WHAT THE RUNNER ACTUALLY BUILT TO, NOT FROM THE RAMP'S DESTINATION. The two are the
+    // same on a long block and differ on a short one, because `quantisedLadder`'s step clamp can top out
+    // below `peakLong` — and once the endpoint is no longer forced (it cannot be, without breaching the
+    // guardrail on the final step) that gap is real. Measured on a 10.6-week 10 km block: `peakLong` was
+    // 91 minutes, the ladder topped out at 63, and a taper computed as `91 * 0.67 = 61` was **0.97x the
+    // week before it** — a taper that cut nothing, against a peak the runner never ran.
+    return Math.round(builtPeakLong * taperMult);
   }
-  const fraction = nonTaperCount <= 1 ? 1 : (weekIndex - 1) / (nonTaperCount - 1);
-  let minutes = startLong + fraction * (peakLong - startLong);
+  let minutes = rungMin;
   // ⚠️ 0.68, deepened from 0.75 (2026-08-06 audit). A deload was cutting only 13% of a 5 km week against
   // the week before it, which is not an absorb week — it is a slightly quieter one. Swept alongside the
   // easy-run figure: this pair lands the mean cut at 25.7%, the middle of the usual 20–40% guidance,

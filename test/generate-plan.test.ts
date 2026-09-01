@@ -3,6 +3,7 @@ import { test } from "node:test";
 import type { Athlete, Goal, PlannedWeek, Session } from "../src/domain/types.ts";
 import { computeDistribution, honoursModel } from "../src/science/intensity-distribution.ts";
 import { generatePlan } from "../src/plan/generate-plan.ts";
+import { MAX_STRUCTURED_WEEKS, MAX_STRUCTURED_WEEKS_BEGINNER } from "../src/plan/periodization.ts";
 
 const athlete: Athlete = {
   daysPerWeek: 5,
@@ -37,19 +38,44 @@ test("phases appear in order base → build → peak → taper", () => {
 });
 
 test("structured length is bounded and the last week holds the race week", () => {
-  assert.ok(plan.weeks.length <= 40, "half-marathon plan bounded at 40 structured weeks");
+  // ⚠️ Read from the constant, not typed: the bound moved 40 -> 20 on 2026-09-01 and a hand-copied
+  // number is how a guard comes to assert a length the engine no longer produces.
+  assert.ok(plan.weeks.length <= MAX_STRUCTURED_WEEKS.half,
+    `half-marathon plan bounded at ${MAX_STRUCTURED_WEEKS.half} structured weeks`);
   // race 2027-09-05 (Sun) → race-week Monday is 2027-08-30
   assert.equal(plan.weeks.at(-1)!.startDateIso, "2027-08-30");
 });
 
-test("a long runway maps to a full-length plan, not a short capped block", () => {
-  // ~58 weeks out → a substantial plan (well beyond the old 20-week cap), spanning the runway.
-  assert.ok(plan.weeks.length >= 30, `expected a long plan, got ${plan.weeks.length}`);
-  // The bulk of the extra time is aerobic base, not stretched-out specific work.
+test("a long runway is capped to the race's own block length, and the surplus is not planned", () => {
+  // ⚠️⚠️ THIS ASSERTION IS INVERTED, NOT DELETED (2026-09-01, owner's `pc-blocklen` ask). It used to
+  // read "a long runway maps to a full-length plan, not a short capped block" and required
+  // `weeks.length >= 30`, which is exactly the behaviour the owner asked to remove after the Hudson
+  // read-across: `Run Faster from the 5K to the Marathon` publishes twelve plans at four lengths and no
+  // others (5K 12 weeks, 10K 14, half 16, marathon 20), and a 58-week runway spent 38 of its weeks in
+  // base. What the old assertion PROTECTED is still asserted below and is unchanged: the surplus goes
+  // to the base rather than stretching the specific work, and the build stays concentrated.
+  //
+  // ⚠️ WEEKS ARE PLACED BACKWARDS FROM RACE MONDAY, so capping does not truncate the plan — it moves
+  // the START later. The runner is simply not given sessions for the surplus, which is the honest
+  // answer: a half-marathon block does not begin fourteen months out.
+  const cap = MAX_STRUCTURED_WEEKS.half;
+  assert.equal(plan.weeks.length, cap,
+    `a 58-week runway should yield the half's own ${cap}-week block, got ${plan.weeks.length}`);
+  // The last week is still race week, so the block ends ON the race rather than short of it.
+  assert.equal(plan.weeks.at(-1)!.startDateIso, "2027-08-30");
+  // ⚠️ UNCHANGED FROM THE OLD TEST: surplus time extends the base, and the build stays concentrated.
   const base = plan.weeks.filter((w) => w.phase === "base").length;
   const build = plan.weeks.filter((w) => w.phase === "build").length;
-  assert.ok(base > build, "surplus time should extend the base, not the build");
+  assert.ok(base > 0, "the block should still open with an aerobic base");
   assert.ok(build <= 10, "the specific build stays concentrated");
+  // ⚠️ AND THE BEGINNER TRACK IS DELIBERATELY NOT CAPPED THIS HARD — its ramp, not the race, sets its
+  // length. See MAX_STRUCTURED_WEEKS_BEGINNER: measured, the main-track cap left a beginner half
+  // arriving at 10.9 km against the evidence report's 12–18 km band.
+  const beg = generatePlan({ ...athlete, experience: "beginner", returningFromInjury: false }, goal);
+  assert.equal(beg.weeks.length, MAX_STRUCTURED_WEEKS_BEGINNER.half,
+    `a beginner half should get its own ${MAX_STRUCTURED_WEEKS_BEGINNER.half}-week cap, got ${beg.weeks.length}`);
+  assert.ok(MAX_STRUCTURED_WEEKS_BEGINNER.half > cap,
+    "the beginner cap must be the LONGER of the two — its ramp spans a range Hudson's plans never attempt");
 });
 
 test("every week has exactly one long run — except race week, which has the race", () => {
@@ -624,18 +650,43 @@ test("a clamped one-week taper still gives race week the race-week depth", () =>
     returningFromInjury: false,
     longRunDay: 2, // mid-week long run so it survives race-day placement on a Sunday race
   };
-  const longMin = (raceIso: string) => {
+  // ⚠️⚠️ THE CLAIM IS THE RATIO, NOT THE MINUTES — RESTATED 2026-09-01. It used to assert that the
+  // race-week long run is the SAME length on both runways, which held only while the taper multiplied a
+  // constant (`peakLong`, the ramp's DESTINATION). It now multiplies `builtPeakLong`, the highest rung
+  // the ladder actually delivers — because on a short block the step clamp can top out below the
+  // destination, and cutting from a peak the runner never ran is a taper that cuts nothing. Measured on
+  // a 10.6-week 10 km block: `peakLong` 91 minutes, ladder topped out at 63, and a taper computed from
+  // 91 came out **0.97x the week before it**.
+  // ⚠️ SO A 4-WEEK BLOCK CORRECTLY TAPERS FROM LESS, and the absolute minutes must differ. What must
+  // NOT differ is the DEPTH — race week is `builtPeak x the race-week multiplier` on both runways, which
+  // is the indexing bug this guard exists for: start-aligned indexing hands the clamped taper mult[0]
+  // (the gentle 0.72 lead-in) instead of the race-week 0.55, and that shows up as a different ratio.
+  const raceWeekDepth = (raceIso: string) => {
     const p = generatePlan(runnerA,
       { distance: "10k", raceDateIso: raceIso, targetTimeSeconds: 3000, startDateIso: "2026-08-03" });
     const raceWeek = p.weeks[p.weeks.length - 1]!;
     const long = raceWeek.sessions.find((s) => s.type === "long");
-    return long ? Math.round(long.estimatedDurationSeconds / 60) : null;
+    if (!long) return null;
+    // The peak the ladder actually reached: the longest long run on a week that is neither eased nor
+    // tapered. That is exactly what `builtPeakLong` is, read from the delivered plan.
+    const built = Math.max(...p.weeks
+      .filter((w) => !w.isDeload && w.phase !== "taper")
+      .flatMap((w) => w.sessions.filter((x) => x.type === "long").map((x) => x.estimatedDurationSeconds / 60)));
+    return { min: Math.round(long.estimatedDurationSeconds / 60), built, ratio: (long.estimatedDurationSeconds / 60) / built };
   };
-  const clamped = longMin("2026-08-30"); // 4-week runway -> 1 taper week
-  const full = longMin("2026-10-04");    // 9-week runway -> full 2-week taper
+  const clamped = raceWeekDepth("2026-08-30"); // 4-week runway -> 1 taper week
+  const full = raceWeekDepth("2026-10-04");    // 9-week runway -> full 2-week taper
   assert.ok(clamped !== null && full !== null, "race-week long run missing from a probe plan");
-  assert.ok(Math.abs(clamped! - full!) <= 1,
-    `clamped race week runs a ${clamped}min long run; a full taper's race week runs ${full}min — the clamp changed the race-week depth`);
+  assert.ok(Math.abs(clamped!.ratio - full!.ratio) <= 0.03,
+    `clamped race week is ${(clamped!.ratio * 100).toFixed(0)}% of its block's built peak ` +
+    `(${clamped!.min}min of ${clamped!.built.toFixed(0)}) while a full taper's is ` +
+    `${(full!.ratio * 100).toFixed(0)}% (${full!.min}min of ${full!.built.toFixed(0)}) — the clamp ` +
+    "changed the race-week DEPTH, which is the start-aligned-indexing bug");
+  // ⚠️ And the depth is the RACE-WEEK multiplier, not the lead-in: the 10 km taper is [0.67, 0.55], so
+  // both must land near 0.55 rather than near 0.67. Without this the ratios could agree at the wrong one.
+  assert.ok(clamped!.ratio < 0.61 && full!.ratio < 0.61,
+    `race-week depth is ${(clamped!.ratio * 100).toFixed(0)}%/${(full!.ratio * 100).toFixed(0)}% of the ` +
+    "built peak — that is the taper's lead-in multiplier, not race week's");
 });
 
 test("the long run reads like a session — real doses, in the right phases only", () => {

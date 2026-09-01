@@ -251,9 +251,39 @@ test("BLOCKER: the fixture can actually see the defect", () => {
     "have taken a wrong-gear easy representative under the old first-match rule. Vary the START DAY " +
     "OF THE WEEK — applyPartialFirstWeek trims week 1 before the start date, and a Monday start keeps " +
     "the plain easy run that would otherwise be trimmed away.");
-  assert.ok(stridesUnpaced >= 20,
-    `the fixture cannot see the strides/hill-sprints defect: only ${stridesUnpaced} of ${withStrides} ` +
-    "plans would have taken an effort-only representative under the old first-match rule.");
+  // ⚠️⚠️ THE STRIDES HALF OF THIS CALIBRATION IS NO LONGER REACHABLE, AND THAT IS A STRONGER STATE
+  // RATHER THAN A HOLE — restated 2026-09-01. It required the FIRST strides-typed session in a plan to
+  // be an effort-only one, and two changes made that impossible: `easyHillStrides` left the flavour
+  // rotation entirely (2026-08-31), and `pickSprintSlot` now prefers an easy day the rotation would NOT
+  // have given strides (2026-09-01) — so a week's strides-typed session is the relaxed one and the
+  // sprint day sits elsewhere. Measured: 0 of 480 plans, where it used to be dozens.
+  //
+  // ⚠️ SO THE PRECONDITION IS RESTATED AS THE ONE `repScore` ACTUALLY NEEDS: both candidate kinds must
+  // EXIST in the plan, or its band term has nothing to discriminate between and every guard built on it
+  // is hollow whatever the first-match rule would have done. Measured: **480 of 480 plans carry both** a
+  // relaxed-strides session and an effort-only hill session — three quarters of this fixture, which
+  // includes run-walk beginners (who get no hill sprints at all, by the documented scoping decision)
+  // and short-runway blocks with few easy days. The bar sits at 600 so the discrimination is exercised
+  // by the large majority rather than by a handful.
+  let withBothKinds = 0;
+  for (const p of PLANS) {
+    let hill = false;
+    let relaxed = false;
+    for (const wk of p.raw.weeks) for (const s of wk.sessions as any[]) {
+      if (s.type !== "strides" && s.type !== "easy") continue;
+      const reps = (s.steps || []).filter((st: any) => st.kind === "rep");
+      if (!reps.length) continue;
+      if (reps.some((st: any) => !st.targetPaceSecPerKm)) hill = true;
+      if (reps.some((st: any) => st.targetPaceSecPerKm)) relaxed = true;
+    }
+    if (hill && relaxed) withBothKinds++;
+  }
+  void stridesUnpaced;
+  void withStrides;
+  assert.ok(withBothKinds >= 600,
+    `only ${withBothKinds} of ${PLANS.length} plans carry BOTH a relaxed-strides session and an ` +
+    "effort-only hill session — repScore's band term has nothing to discriminate between, so every " +
+    "guard built on it is hollow");
 });
 
 test("BLOCKER: a custom EASY run is an easy run — the owner's own screenshot", () => {

@@ -25,6 +25,7 @@ import { test } from "node:test";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { generatePlan } from "../src/plan/generate-plan.ts";
+import { MAX_STRUCTURED_WEEKS } from "../src/plan/periodization.ts";
 import { deriveTrainingPaces } from "../src/science/paces.ts";
 import { assessConditions } from "../src/environment/weather.ts";
 import { adaptSessionForHeat } from "../src/adapt/heat.ts";
@@ -206,10 +207,26 @@ function env(tempC = 33, raceToday = false): Env {
   } as unknown as Athlete;
   const goal = {
     distance: "half", targetTimeSeconds: 6300,
-    raceDateIso: raceToday ? today : iso(new Date(now.getTime() + 200 * 864e5)),
+    // ⚠️⚠️ 91 DAYS, NOT 200, SINCE THE BLOCK-LENGTH CAP (2026-09-01). Weeks are placed backwards from
+    // race Monday, so a runway LONGER than the distance's cap moves the plan's START into the future —
+    // and a half is capped at 20 weeks (140 days). At 200 days the block began 60 days from now, today
+    // was not in the plan at all, and three guards failed on `ensurePlannedToday` with "the fixture is
+    // misaligned". Thirteen weeks is inside every cap, so the block still starts today.
+    // ⚠️ THE FIXTURE MUST NOT OUTRUN THE CAP. If a future change shortens `MAX_STRUCTURED_WEEKS.half`
+    // below 13 this breaks the same way, which is why the assertion below reads the constant.
+    raceDateIso: raceToday ? today : iso(new Date(now.getTime() + 91 * 864e5)),
     startDateIso: raceToday ? iso(new Date(now.getTime() - 91 * 864e5)) : today,
   } as unknown as Goal;
   const plan = generatePlan(athlete, goal, {});
+  // ⚠️ THE RUNWAY MUST STAY INSIDE THE BLOCK-LENGTH CAP, or the plan starts in the future and every
+  // today-relative guard in this file fails with a message about the fixture rather than the code.
+  // Asserted here, at the fixture, so the failure names the cause.
+  if (!raceToday && plan.weeks.length < 13) {
+    throw new Error(
+      `the heat fixture built only ${plan.weeks.length} weeks — the 91-day runway no longer fits ` +
+      `inside MAX_STRUCTURED_WEEKS.half (${MAX_STRUCTURED_WEEKS.half}); shorten the runway to match`,
+    );
+  }
   const paces = deriveTrainingPaces(athlete.recent!);
   // The web layer's PLAN is a display summary and RAW carries the steps; both are needed, and
   // rawSessionsForIso pairs them by INDEX, so they must be the same weeks in the same order.

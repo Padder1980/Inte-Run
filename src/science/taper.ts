@@ -87,15 +87,31 @@ const TAPERS: Record<RaceDistanceKey, TaperPlan> = {
     volumeMultiplierByWeek: [0.62, 0.58],
     notes: ["~7–14 day taper; retain VO2 touches while the week before race week falls ~36%."],
   },
+  // ⚠️ THE LEAD-IN WEEK IS 0.67, DEEPENED FROM 0.72 ON 2026-09-01 WITH THE BLOCK-LENGTH CAP, and the
+  // mechanism is the one recorded for the 5k above: the depth is measured against the plan's own peak
+  // week, so anything that changes which week is biggest changes the denominator. Capping the block to
+  // Hudson's lengths removes the surplus base weeks a 36-week 10 km plan spent warming up, the peak
+  // moved, and this taper's real depth was exposed at **29.9% against the 30% floor** — a tenth of a
+  // point under, which is exactly the failure somebody meets and "fixes" by relaxing the floor.
+  // ⚠️ 0.67 rather than 0.68 FOR THE THREE-POINT MARGIN THIS FILE ALREADY ESTABLISHED. Swept:
+  // 0.72 -> 29.9%, 0.68 -> 32.3%, 0.67 -> 35.1%, 0.66 -> 36.0%, 0.64 -> 37.3%, 0.60 -> 40.1%. 0.67 is
+  // the shallowest value clearing 33% and is still shallower than race week's 0.55, so the taper stays
+  // PROGRESSIVE rather than becoming a step — the shape the meta-analysis found better (SMD -0.51).
   "10k": {
     weeks: 2,
-    volumeMultiplierByWeek: [0.72, 0.55],
+    volumeMultiplierByWeek: [0.67, 0.55],
     notes: ["~7–14 day taper; keep threshold/VO2 intensity while the week before race week falls ~35%."],
   },
+  // ⚠️ 0.62, DEEPENED FROM 0.64 ON 2026-09-01, for the same reason and by the same sweep. At 0.64 the
+  // capped block delivered 31.9% — passing, but 1.9 points above the floor where this file's own rule
+  // is three. Swept: 0.64 -> 31.9%, 0.62 -> 35.4%, 0.60 -> 36.5%, 0.58 -> 38.3%.
+  // ⚠️ THE NOTE'S FIGURE MOVED WITH IT. It said "~33%" and the week now falls ~35%; a note describing
+  // a delivered quantity has to be re-derived when the quantity moves, which is the class of staleness
+  // this file records for the map attribution and the share destinations.
   half: {
     weeks: 2,
-    volumeMultiplierByWeek: [0.64, 0.55],
-    notes: ["~7–14 day taper; hold threshold intensity while the week before race week falls ~33%."],
+    volumeMultiplierByWeek: [0.62, 0.55],
+    notes: ["~7–14 day taper; hold threshold intensity while the week before race week falls ~35%."],
   },
   marathon: {
     weeks: 3,

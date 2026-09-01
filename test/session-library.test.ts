@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Athlete, Goal, RaceDistanceKey, Session, TrainingPaces } from "../src/domain/types.ts";
 import { generatePlan } from "../src/plan/generate-plan.ts";
+import { MAX_STRUCTURED_WEEKS } from "../src/plan/periodization.ts";
 import { assessTrainingFlags } from "../src/adapt/training-flags.ts";
 import { deriveTrainingPaces } from "../src/science/paces.ts";
 import {
@@ -164,16 +165,26 @@ test("a deload week never draws a big session", () => {
 
 // ---- what the runner actually receives ------------------------------------
 
-test("a long plan delivers real variety, not the same eight sessions on a loop", () => {
+test("the longest plan a runner can get delivers real variety, not the same sessions on a loop", () => {
+  // ⚠️⚠️ THE BARS CAME DOWN WITH THE BLOCK-LENGTH CAP (2026-09-01), AND THE RATIO IS WHAT CARRIES THE
+  // CLAIM. Asking for 35 weeks now yields the half's own 20-week cap, so there are fewer quality slots
+  // to be various across: measured 27 slots, 21 distinct, worst repeat 3 — against 30/25/5 before.
+  // A count bar is really a statement about plan LENGTH; what this test is about is whether the library
+  // rotates, so the ratio is asserted too and it is the stronger claim (21/27 = 0.78).
   const plan = generatePlan(competitive, goalFor("half", 35));
+  assert.equal(plan.weeks.length, MAX_STRUCTURED_WEEKS.half,
+    "the fixture no longer builds the longest possible half block");
   const quality = plan.weeks.flatMap((w) =>
     w.sessions.filter((s) => s.type === "threshold" || s.type === "vo2" || s.type === "race-specific"));
   const distinct = new Set(quality.map((s) => s.title));
-  assert.ok(quality.length >= 30, `only ${quality.length} quality sessions in a 35-week plan`);
+  assert.ok(quality.length >= 25,
+    `only ${quality.length} quality sessions in a ${plan.weeks.length}-week plan`);
   assert.ok(
-    distinct.size >= 25,
+    distinct.size >= 20,
     `${quality.length} quality slots but only ${distinct.size} distinct sessions`,
   );
+  assert.ok(distinct.size / quality.length >= 0.7,
+    `${distinct.size} distinct of ${quality.length} slots — the rotation is looping rather than rotating`);
   // No single session should dominate.
   const counts = new Map<string, number>();
   for (const s of quality) counts.set(s.title, (counts.get(s.title) ?? 0) + 1);
@@ -191,8 +202,15 @@ test("the peak block does not repeat one race-pace session every week", () => {
 
 test("every format is reachable by some real plan", () => {
   const seen = new Set<string>();
-  for (const dist of ["5k", "10k", "half", "marathon"] as const) {
-    for (const weeks of [8, 10, 11, 12, 13, 14, 16, 18, 20, 22, 24, 26, 30, 35]) {
+  // ⚠️⚠️ THE RUNWAY AXIS WAS WIDENED WHEN THE BLOCK WAS CAPPED, AND THE REASON IS THE ROTATION SEED.
+  // `rot` is `ordinalInPhase + phaseTotal + daysPerWeek + DISTANCE_SEED`, so what reaches new formats
+  // is a new PHASE LENGTH. Capping collapsed 22, 24, 26, 30 and 35 weeks onto the same block for every
+  // distance, so five grid points became one and coverage fell 95% -> 93%. Adding the SHORTER runways
+  // (which the caps do not collapse) restores the distinct phase lengths and coverage returns to 95%.
+  // ⚠️ Widening the ABILITY axis was measured and does nothing — the seed does not read the runner's
+  // paces, so 5 abilities reach exactly the same formats as 1.
+  for (const dist of ["1mile", "5k", "10k", "half", "marathon"] as const) {
+    for (const weeks of [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 24, 26, 30, 35]) {
       for (const days of [3, 4, 5, 6, 7]) {
         for (const experience of ["recreational", "competitive"] as const) {
           const ath: Athlete = { ...competitive, daysPerWeek: days, experience };
@@ -467,7 +485,11 @@ test("BLOCKER: no session declares a band narrower than its own hardest step", (
   let inspected = 0;
   const offenders: string[] = [];
   for (const distance of ["5k", "10k", "half", "marathon"] as const) {
-    for (const daysPerWeek of [3, 5, 6]) {
+    // ⚠️ THE DAY-COUNT AXIS WAS WIDENED WHEN THE BLOCK WAS CAPPED (2026-09-01). Every plan is now
+    // shorter, so the same grid inspected 12,540 sessions against this test's own 15,000 floor — and
+    // the floor is what stops the sweep going vacuous, so widening the grid is the fix rather than
+    // lowering it. Adding the two missing day-counts restores it without weakening anything.
+    for (const daysPerWeek of [3, 4, 5, 6, 7]) {
       for (const timeSeconds of [1100, 1500, 2100]) {
         for (const experience of ["beginner", "recreational", "competitive"] as const) {
           for (const runWalk of experience === "beginner" ? [false, true] : [false]) {

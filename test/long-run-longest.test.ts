@@ -74,7 +74,13 @@ let sweepCache: Case[] | null = null;
 function sweep(): Case[] {
   if (sweepCache) return sweepCache;
   const out: Case[] = [];
-  for (const raceDateIso of ["2027-03-07", "2027-03-08"])          // Sunday, then Monday
+  // ⚠️⚠️ THE NEAR RACE DATE WAS ADDED WITH THE BLOCK-LENGTH CAP (2026-09-01), AND WITHOUT IT THIS
+  // SWEEP LOST A WHOLE CLASS. Weeks are placed backwards from race Monday, so a runway LONGER than the
+  // distance's cap makes the plan start on a Monday and `startDateIso` is never honoured — which means
+  // `applyPartialFirstWeek` never fires and the "plans start mid-week" vacuity check below went to
+  // ZERO. The 2027 dates are ~27 weeks out, past every cap; 2026-11-08 is ~10.6 weeks out, inside all
+  // of them, so those plans genuinely begin on the Wednesday and carry a trimmed first week.
+  for (const raceDateIso of ["2027-03-07", "2027-03-08", "2026-11-08"]) // Sunday, Monday, near Sunday
     for (const distance of ["5k", "10k", "half", "marathon"] as const)
       for (const days of [3, 4, 5, 6, 7])
         for (const t5 of [1080, 1500, 1800, 2100])
@@ -488,15 +494,24 @@ test("the invariant is reached by GROWING the long run, not by shrinking the wee
     }
   }
   assert.ok(easyRuns > 20_000, `only ${easyRuns} easy runs measured`);
-  // ⚠️ THE LOWER BOUND IS THE LOAD-BEARING HALF and it is where the margin is. Measured on this sweep:
-  // 0.7647 with the lift, 0.7203 with no enforcement at all, 0.7725 with the lift disabled so only the
-  // cap runs. So a floor at 0.74 rejects "the long run was never lifted" with six percent of room,
-  // while an upper bound tight enough to reject cap-only would sit 0.6% above the shipped value —
-  // far too tight to survive an innocent session-library change, and the sort of threshold that gets
-  // relaxed rather than investigated. The cap-only direction is guarded by the easy floor below and by
+  // ⚠️ THE LOWER BOUND IS THE LOAD-BEARING HALF and it is where the margin is. An upper bound tight
+  // enough to reject cap-only would sit a fraction above the shipped value — far too tight to survive an
+  // innocent session-library change, and the sort of threshold that gets relaxed rather than
+  // investigated. The cap-only direction is guarded by the easy floor below and by
   // `test/session-library.test.ts`'s own intensity sweep instead.
+  //
+  // ⚠️⚠️ RE-MEASURED WITH THE BLOCK-LENGTH CAP AND THE GEOMETRIC LONG-RUN LADDER (2026-09-01), AND BOTH
+  // STATES MOVED DOWN TOGETHER — which is why the floor moves rather than the claim. A geometric ramp
+  // grows by a constant PERCENTAGE, so its absolute steps are smaller early than a linear ramp's; the
+  // mid-block long runs are shorter and the block's long-run share falls with them. Measured on this
+  // sweep (127,988 easy runs):
+  //
+  //     with the lift   |  no enforcement at all  |  separation
+  //         0.7383      |         0.6896          |   4.9 points   (was 0.7647 / 0.7203 = 4.4)
+  //
+  // So the lift is doing MORE work than before, not less, and the floor sits between the two states.
   const share = longMin / easyMin;
-  assert.ok(share > 0.74, `long-run minutes are only ${(share * 100).toFixed(2)}% of the other easy running — measured 76.47% with the lift and 72.03% with no enforcement, so the long run is not being grown`);
+  assert.ok(share > 0.71, `long-run minutes are only ${(share * 100).toFixed(2)}% of the other easy running — measured 73.83% with the lift and 68.96% with no enforcement, so the long run is not being grown`);
 
   // ⚠️ AND THE EASY RUNS KEEP THEIR OWN RAMP, which is the falsifiable half. `buildWeek` sizes an easy
   // run as min(95, baseMin x vScale) x easyRamp x taperMult, with the shortest slot at baseMin 40 and

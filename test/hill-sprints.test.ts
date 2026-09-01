@@ -435,20 +435,41 @@ test("the sprint day is in the same range as the distance-set easy runs beside i
   assert.ok(compared >= 8, `only ${compared} same-week comparisons available`);
 });
 
-test("BLOCKER: the beginner track still carries no threshold, VO2 or race-specific session", () => {
-  // ⚠️ THE DOCUMENTED DESIGN RULE, AND ADDING SPRINTS MUST NOT HAVE BREACHED IT. A beginner's
-  // progression is deliberately gentle and quality-free; hill sprints are neuromuscular work with
-  // near-zero aerobic cost, which is precisely why they are the one thing that can be added here.
-  for (const runWalk of [false, true]) {
-    for (const w of begPlan({ runWalk, daysPerWeek: runWalk ? 3 : 4 })) {
-      // ⚠️ NOT `?? 0` — that turns a MISSING field into a pass, and the field going missing is one of
-      // the ways this rule could break silently.
-      assert.equal(w.qualitySessionCount, 0, `beginner week ${w.index} reports a quality session`);
-      const quality = w.sessions.filter(
-        (s) => s.type === "threshold" || s.type === "vo2" || s.type === "race-specific",
-      );
-      assert.deepEqual(quality.map((s) => s.title), [],
-        `beginner week ${w.index} carries a quality session`);
+test("BLOCKER: hill sprints alone never became a quality session, and a run–walk beginner has none", () => {
+  // ⚠️⚠️ THIS ASSERTION IS INVERTED, NOT DELETED (owner, 2026-09-01: "i want to follow the books
+  // recommendation"). It used to require ZERO quality sessions in EVERY beginner week, which was the
+  // documented design until he read his own plan: a 5 km goal of 19:50 against fifteen weeks whose
+  // fastest prescribed pace was 4:43/km. Hudson's own Level 1 plan — "low training volume plans for
+  // beginners" — carries 400m repeats at 5K pace from week 8, so the book he asked us to follow
+  // disagreed with the rule.
+  //
+  // WHAT IT PROTECTED SURVIVES, AND IS ASSERTED HERE:
+  //   * a RUN–WALK beginner still carries none at all — the same scoping decision as the sprint staple;
+  //   * hill sprints ALONE never count as quality, which is the original claim and the reason they were
+  //     the one thing that could be added to this track. A sprint day must stay an easy run.
+  // The rest of the new rule — at most one a week, none in the introductory period, the fast-end-
+  // downward progression — is in `test/beginner-quality.test.ts`.
+  for (const w of begPlan({ runWalk: true, daysPerWeek: 3 })) {
+    // ⚠️ NOT `?? 0` — that turns a MISSING field into a pass, and the field going missing is one of
+    // the ways this rule could break silently.
+    assert.equal(w.qualitySessionCount, 0,
+      `run–walk beginner week ${w.index} reports a quality session — they are scoped out`);
+  }
+  for (const w of begPlan({ runWalk: false, daysPerWeek: 4 })) {
+    // The sprint day itself must never be counted as quality: it is an easy run with 8-second sprints
+    // appended, which is exactly why it is safe to give a beginner every week.
+    for (const s of w.sessions) {
+      if (unpacedReps(s) === 0) continue;
+      if (s.type === "vo2" || s.type === "race-specific" || s.type === "threshold") {
+        // The only unpaced-rep quality session on this track is the hill-repetition variant, which is
+        // deliberately effort-only. A sprint day is typed easy or strides.
+        assert.match(s.title, /hills/,
+          `beginner week ${w.index}: "${s.title}" carries effort-only reps and is typed ${s.type} — ` +
+          "a hill-SPRINT day must stay an easy run");
+        continue;
+      }
+      assert.ok(s.type === "easy" || s.type === "strides",
+        `beginner week ${w.index}: the sprint day is typed ${s.type}`);
     }
   }
 });

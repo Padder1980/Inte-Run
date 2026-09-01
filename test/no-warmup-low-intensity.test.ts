@@ -232,8 +232,16 @@ test("a run–walk beginner keeps the brisk walk the owner asked for", () => {
   // keyed on the type strips 100% of a new runner's preparation unless the ability band exempts them.
   // This is his own earlier request (2026-08-05: "a warm up for someone who is just doing walk/run
   // sessions needs to be appropriate"), and the two instructions have to coexist.
+  // ⚠️⚠️ `runWalk: true`, AND WITHOUT IT THIS FIXTURE HAS NEVER BUILT A RUN-WALK PLAN. It passed
+  // `status: "new"` — which is a WEB-LAYER profile field the engine does not read. `buildBeginnerWeek`
+  // takes `athlete.runWalk`, so the flag was `undefined`, `runWalk` was false, and every week swept here
+  // was a CONTINUOUS beginner's. The assertions still passed because a continuous beginner's sessions
+  // were also all typed "easy" — so the fixture agreed with the guard by accident. It surfaced the
+  // moment the beginner track gained quality sessions and the `type !== "easy"` filter started skipping
+  // them: 21 sessions became 20 and the vacuity floor caught it. The fixture-does-not-build-what-it-
+  // claims trap, and the vacuity floor is the only reason it was ever visible.
   const plan = generatePlan(
-    { experience: "beginner", status: "new", daysPerWeek: 3, includeStrength: false,
+    { experience: "beginner", runWalk: true, daysPerWeek: 3, includeStrength: false,
       recent: { distanceMeters: 5000, timeSeconds: 2400 } } as any,
     { distance: "5k", targetTimeSeconds: 2400, raceDateIso: "2026-12-06", startDateIso: "2026-08-17" } as any,
   );
@@ -252,6 +260,14 @@ test("a run–walk beginner keeps the brisk walk the owner asked for", () => {
   }
   // ⚠️ A filter matching nothing passes every assertion after it — this project's most-repeated trap.
   assert.ok(seen > 20, `only ${seen} run–walk sessions swept; the exemption is guarding nothing`);
+  // ⚠️ AND THE FIXTURE MUST BE PROVED TO BE RUN-WALK, not merely labelled it. `assembleRunWalk` has one
+  // exit and types everything "easy", so a run-walk plan carries NO quality session anywhere — which is
+  // also the scoping decision `beginnerQualityFor` makes. If this ever counts one, the fixture has
+  // silently become a continuous beginner's again and every assertion above is about the wrong plan.
+  const anyQuality = (plan.weeks || []).reduce((a: number, w: any) => a + (w.qualitySessionCount || 0), 0);
+  assert.equal(anyQuality, 0,
+    `the fixture built ${anyQuality} quality sessions — it is not a run–walk plan, so the brisk-walk ` +
+    "exemption above is being tested against the wrong track");
 });
 
 test("across every real plan, the rule never reaches a type it was not given", () => {

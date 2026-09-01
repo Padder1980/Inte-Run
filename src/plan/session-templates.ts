@@ -637,6 +637,140 @@ export function contHillSprints(p: TrainingPaces, rawMin: number, reps: number):
     "easy", steps, RPE.easy);
 }
 
+/**
+ * ⚠️⚠️ THE BEGINNER TRACK'S QUALITY SESSIONS (owner, 2026-09-01: "i want to follow the books
+ * recommendation"). Until now a beginner plan contained NO threshold, VO2 or race-pace work at all —
+ * zero quality sessions across every week — and the owner met it in his own plan: a 5 km goal of 19:50
+ * against a plan whose fastest prescribed pace was 4:43/km when he would have to race at 3:58.
+ *
+ * WHAT THE BOOK ACTUALLY PRESCRIBES, transcribed from the plates rather than the prose:
+ *
+ *   * "5K Level 1" (ch12, "low training volume plans for beginners", 12 weeks): weeks 1-3 carry NO
+ *     quality at all, only 1-3 eight-second hill sprints on an easy run. Week 4 is the first quality
+ *     session and it is a FARTLEK — 8 x 20 sec at 3K-1500m pace inside an easy 4-miler. It grows by
+ *     DURATION and slows in pace (8 x 20s, 8 x 30s, then 8 x 40s at 5K-3K). Week 7 swaps to hill
+ *     repetitions BY EFFORT (6 x 300m uphill at 3K effort). Week 8 is the first flat interval session
+ *     (12 x 400m at 5K-3K). True 5K-pace work starts week 10 and the reps lengthen as they thin
+ *     (6 x 800m, then 5 x 1K).
+ *   * "10K Level 1" (14 weeks) is the same shape and states the rule most clearly: ONE quality session
+ *     a week, every week, and the support work runs "from the fast end downward" — 1500m pace, then
+ *     3K, then 5K — with GOAL pace arriving only in the final specific block, and race week run FASTER
+ *     than race pace.
+ *   * ⚠️ AND THE MOST BEGINNER-LIKE PLAN IN THE BOOK IS THE CALIBRATION POINT. The ch11 "Freshman
+ *     Plan" — twelve weeks for a runner brand new to structured training, peaking at 26 miles — carries
+ *     **hill sprints and fartlek and nothing else**. No threshold, no track intervals, no goal-pace
+ *     work, no long run, no progression run. Its fartlek is at 5K pace throughout (4-6 x 30s growing
+ *     to 6-8 x 45s), never at 1500m pace.
+ *
+ * SO OUR RUNNER SITS BETWEEN THE TWO, and the design follows: a long introductory period of nothing,
+ * then a fartlek at 5 km effort for the bulk of the block (the Freshman diet), then a modest amount of
+ * goal-pace work at the sharp end (Level 1's contribution). Level 1 opens at a FOUR-MILE long run,
+ * which is at or above where our beginner track finishes for a 5 km, so copying its doses would be
+ * prescribing a trained runner's session to somebody ramping from 2.6 km.
+ *
+ * ⚠️⚠️ THESE BUILD THE WORK AND NOT THE FRAME, AND THAT IS DELIBERATE. `buildWarmup` keys its
+ * low-intensity exemption on the session's FIRST HARD EFFORT, so any session containing a real surge
+ * takes the structured branch and gets a 15-19 minute warm-up ADDED ON TOP whatever its type. A builder
+ * that also carried its own easy opening would deliver 49 minutes under a title claiming 30 — the
+ * title-lying-about-the-session defect this file records fixing three times. So the title names the
+ * WORK (the engine's own named-time convention for a quality session) and the generated warm-up and
+ * cool-down supply Hudson's "first and last miles easy", which is exactly how his own key describes a
+ * fartlek. Measured delivered length: ~37 minutes against a beginner's 34-minute long run — the same
+ * proportion as his Level 1, where the fartlek is 4 miles against a 6-mile long run.
+ */
+export function begFartlek(p: TrainingPaces, count: number, surgeSec: number): SessionContent {
+  const n = Math.max(3, Math.round(count));
+  const steps: WorkoutStep[] = [];
+  for (let i = 1; i <= n; i++) {
+    steps.push({
+      kind: "rep",
+      label: surgeSec + "\u2033 surge at about 5 km effort \u2014 smooth and strong, never a sprint",
+      durationSeconds: surgeSec,
+      targetPaceSecPerKm: p.vo2,
+      // ⚠️ RPE.cv {7,8}, NOT RPE.vo2 {8,9}. Thirty seconds at 5 km pace is not what racing a 5 km
+      // feels like, and a band set too high makes an honest "6" read as much easier than intended —
+      // which `assessTrainingFlags` turns into a proposal to speed the whole plan up.
+      targetRpe: RPE.cv,
+      repeatIndex: i,
+      repeatCount: n,
+    });
+    steps.push({
+      kind: "recovery",
+      // ⚠️ THREE TIMES THE SURGE, from his own numbers rather than picked: the 10K Level 1 fartleks are
+      // "4 x 30 sec w/2.5-min active recoveries" (5x) at 1500m pace and "6 x 45 sec w/2:15 active"
+      // (3x) at 3K pace. Ours are at the slower 5 km effort, so the shorter ratio is the right one.
+      label: i < n
+        ? "Easy running until your breathing is back \u2014 no need to space them evenly"
+        : "Easy running to finish",
+      durationSeconds: surgeSec * 3,
+      targetPaceSecPerKm: p.easy,
+      targetRpe: RPE.easy,
+      repeatIndex: i,
+      repeatCount: n,
+    });
+  }
+  return assemble("vo2", n + " \u00d7 " + surgeSec + "\u2033 fartlek",
+    "Easy running with " + n + " short, faster bursts inside it \u2014 about " + surgeSec + " seconds "
+    + "each at roughly the effort you could hold for 5 km. Smooth and strong, never a sprint. Run easy "
+    + "until your breathing is back before the next one; they do not need to be evenly spaced.",
+    "hard", steps, RPE.cv);
+}
+
+/**
+ * Hill repetitions, BY EFFORT — Hudson's Level 1 week 7 ("6 x 300m uphill @ 3K effort w/jog-back
+ * recoveries") and week 9 (8 x 300m).
+ *
+ * ⚠️ NO PACE BAND, AND THAT IS THE POINT RATHER THAN AN OMISSION. Pace up a hill is a function of the
+ * gradient, so this engine has always prescribed hill work by effort alone — and for a beginner it is
+ * also the safest session in the set, because it is the one that cannot be wrong about their fitness.
+ * ⚠️ TIMED, NOT 300 METRES. 300m uphill takes a beginner 90-120 seconds; timing it means the session is
+ * the same size for a 20-minute 5 km runner and a 45-minute one, which a distance never is.
+ */
+export function begHillReps(p: TrainingPaces, count: number, workSec: number): SessionContent {
+  const n = Math.max(4, Math.round(count));
+  const steps = hillReps(n, { seconds: workSec }, {
+    label: workSec + "\u2033 uphill \u2014 strong and tall, about 5 km effort",
+    recoveryLabel: "Jog or walk back down \u2014 all the way, every time",
+    recoverySec: workSec + 45,
+    rpe: RPE.vo2,
+  });
+  void p;
+  return assemble("vo2", n + " \u00d7 " + workSec + "\u2033 hills",
+    "Find a hill you can run up for about " + workSec + " seconds at a strong effort \u2014 the sort "
+    + "you could hold for 5 km on the flat. Jog or walk all the way back down between them. The hill "
+    + "sets the pace for you, so run by feel rather than by the watch.",
+    "hard", steps, RPE.vo2);
+}
+
+/**
+ * Specific-endurance intervals at GOAL RACE pace — Hudson's Level 1 weeks 10-12 and 10K Level 1's
+ * final specific block, where "goal pace arrives" after the support work has come down from the fast
+ * end.
+ *
+ * ⚠️⚠️ TIME-BASED, NOT DISTANCE-BASED, AND THIS IS MEASURED RATHER THAN PREFERRED. A hand-authored
+ * distance dose costs whatever the runner's pace makes it, and our beginners span a very wide range.
+ * Measured against a 17-minute work budget: 6 x 400m at goal pace fits a 19:50 5 km runner (15.2') and
+ * even 8 x 200m OVERFLOWS for a 62:00 10 km runner (17.1'). Hudson prescribes by distance because his
+ * Level 1 runners are far more alike than ours — and he uses time himself where it matters
+ * ("15 x 1 min. @ 5K pace", 10K Level 1 week 7), which is the precedent this follows. Every other
+ * beginner session in this engine is timed for the same reason.
+ */
+export function begIntervals(p: TrainingPaces, count: number, workSec: number): SessionContent {
+  // ⚠️ The parameter is `count`, not `reps` — `reps()` is the step-builder helper this calls, and a
+  // parameter of that name shadows it. Same trap as the two `fmtClock` functions this project shipped.
+  const n = Math.max(3, Math.round(count));
+  const steps = reps(n,
+    { durationSeconds: workSec, pace: p.goalRace },
+    { durationSeconds: workSec, pace: p.easy });
+  const mins = Math.round(workSec / 60 * 10) / 10;
+  const what = workSec % 60 === 0 ? mins + "\u2032" : workSec + "\u2033";
+  return assemble("race-specific", n + " \u00d7 " + what + " at race pace",
+    "The session that rehearses your race. " + n + " efforts of about " + what + " at the pace you are "
+    + "aiming to race, with the same again easy in between. The first one should feel comfortable "
+    + "\u2014 if it does not, the pace is wrong rather than you.",
+    "hard", steps, RPE.cv);
+}
+
 export function contPickups(p: TrainingPaces, rawMin: number): SessionContent {
   // Still a timed run, so its minutes are a multiple of five — see roundMinutes. Rounded here
   // rather than in the title, so the steps and the title cannot disagree.

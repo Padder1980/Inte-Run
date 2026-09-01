@@ -38,6 +38,9 @@ import {
   contPickups,
   contProgression,
   easyHillStrides,
+  begFartlek,
+  begHillReps,
+  begIntervals,
   contHillSprints,
   easyRun,
   generalStrengthSession,
@@ -1339,9 +1342,7 @@ function buildWeek(
 
   const finalized = finalize(sessions, dayOf, index);
   const plannedDistanceMeters = finalized.reduce((m, s) => m + sessionVolumeMeters(s), 0);
-  const qualitySessionCount = finalized.filter(
-    (s) => s.type === "threshold" || s.type === "vo2" || s.type === "race-specific",
-  ).length;
+  const qualitySessionCount = countQuality(finalized);
 
   return {
     index,
@@ -1513,12 +1514,102 @@ function finalize(contents: SessionContent[], dayOf: number[], weekIndex: number
     .sort((a, b) => a.dayOfWeek - b.dayOfWeek);
 }
 
+/**
+ * What counts as a quality session, in ONE place.
+ * ⚠️ It was written out three times — the main track's week, `enforceLongRunIsLongest`'s two repairs
+ * and `applyPartialFirstWeek` — and the beginner week hardcoded `0`. The beginner track now carries
+ * quality, so a fourth copy is a fourth chance to disagree about what a hard session is.
+ */
+function countQuality(sessions: { type: SessionType }[]): number {
+  return sessions.filter(
+    (s) => s.type === "threshold" || s.type === "vo2" || s.type === "race-specific",
+  ).length;
+}
+
 // ---- beginner assembly ----------------------------------------------------
 
 const lerp = (a: number, b: number, f: number) => a + (b - a) * Math.max(0, Math.min(1, f));
 
 // Rotating pools of beginner session flavours — every run day of the week draws a different one so a
 // plan never repeats the same session two days (or two weeks) running.
+/**
+ * ⚠️⚠️ THE BEGINNER TRACK'S ONE QUALITY SESSION A WEEK (owner, 2026-09-01: "i want to follow the books
+ * recommendation"). Returns null for the weeks that carry none, which is most of the first quarter.
+ *
+ * THE SHAPE IS READ OFF HUDSON'S PLATES, and the three that matter disagree usefully:
+ *   * "10K Level 1" states the rule outright — ONE quality session a week, every week, with the support
+ *     work coming "from the fast end downward" and GOAL pace arriving only in the final specific block.
+ *   * "5K Level 1" gives the sequence: three weeks of nothing, then fartlek growing by duration, then
+ *     hill repetitions by effort, then flat intervals, then true goal-pace work.
+ *   * ⚠️ AND THE ch11 "Freshman Plan" — the book's most beginner-like plan, twelve weeks for somebody
+ *     brand new — carries **hill sprints and fartlek and NOTHING ELSE**: no intervals, no threshold, no
+ *     goal-pace work at all, and its fartlek is at 5 km pace throughout rather than 1500m.
+ *
+ * Our runner sits between the Freshman and Level 1 — Level 1 opens at a four-mile long run, at or above
+ * where this track FINISHES for a 5 km — so the diet is Freshman-weighted with Level 1's sharp end:
+ * a long introductory period, then fartlek for the bulk of the block, then goal-pace intervals in the
+ * peak, and a short sharpener in the taper (his race week is run FASTER than race pace).
+ *
+ * ⚠️ DRIVEN BY `ctx.begFrac`, THE SAME DELOAD-AWARE RAMP FRACTION THE LONG RUN USES. Keying the stages
+ * on the calendar week would advance them through a deload, which is the defect `rampFractions` exists
+ * to fix — and it would make the introduction point depend on block length rather than on how far
+ * through their build the runner actually is.
+ */
+const BEG_INTRO_FRAC = 0.25;
+
+function beginnerQualityFor(
+  wp: AnnotatedWeek,
+  index: number,
+  ctx: WeekContext,
+  runWalk: boolean,
+): SessionContent | null {
+  // ⚠️ RUN-WALK BEGINNERS GET NONE, the same scoping decision as the hill-sprint staple and for the
+  // same reason: somebody who cannot yet run twenty minutes continuously is below the lowest tier the
+  // book addresses, and their plan is already interval-shaped. Hudson's own Freshman Plan — for a
+  // runner brand new to structured training — still assumes continuous easy runs of three miles.
+  if (runWalk) return null;
+  // ⚠️ AND A RUNNER RETURNING FROM A BREAK GETS NONE, matching `beginnerHillDose`. Coming back is not
+  // the moment to meet fast running for the first time.
+  if (ctx.returning) return null;
+  const frac = Math.min(1, Math.max(0, ctx.begFrac ?? 1));
+  // The introductory period: easy running and hill sprints only. Hudson's Level 1 gives it three weeks
+  // of twelve (25%) and the Freshman Plan six of twelve (50%); this is the more forward of the two,
+  // because unlike the Freshman Plan our runner has a race to reach.
+  if (frac < BEG_INTRO_FRAC) return null;
+
+  const p = ctx.paces;
+  // ⚠️ A DELOAD KEEPS ITS QUALITY SESSION AT A REDUCED DOSE, which is Hudson's own absorb week (10K
+  // Level 1 week 9 keeps the intervals and eases the SUNDAY instead) and this engine's own deload
+  // bargain — volume down, one hard session kept. The dose has to come down with it: leaving a
+  // full-length session in a shrunken week raises the hard FRACTION, which is exactly how the easy
+  // floor breaks. The fartlek is the gentlest of the three, so it is what an eased week draws.
+  if (wp.isDeload) return begFartlek(p, 4, 30);
+  // ⚠️ THE TAPER IS A SHORT SHARPENER, AND FASTER THAN RACE PACE ON PURPOSE. Both Level 1 plans invert
+  // their specificity in race week — "1 mile @ 5K-3K pace, then 8 x 400m @ 5K pace" before a 10 km —
+  // so the taper draws the 5 km-effort fartlek rather than the goal-pace session.
+  if (wp.phase === "taper") return begFartlek(p, 4, 30);
+
+  // The specific block: goal race pace, reps LENGTHENING as they thin, which is Hudson's own
+  // progression (12 x 400m, then 6 x 800m, then 5 x 1K). Timed rather than measured — see
+  // `begIntervals` for why a distance dose cannot work across our range of beginners.
+  if (wp.phase === "peak") {
+    const LADDER: Array<[number, number]> = [[6, 60], [5, 90], [5, 120], [4, 180]];
+    const rung = LADDER[Math.min(LADDER.length - 1, Math.max(0, wp.ordinalInPhase - 1))]!;
+    return begIntervals(p, rung[0], rung[1]);
+  }
+
+  // Base and build: the Freshman diet. Fartlek at 5 km effort, growing by DURATION (30" -> 45") and in
+  // count (4 -> 8), which is that plan's own progression.
+  // ⚠️ HILL REPETITIONS EVERY FOURTH QUALITY WEEK, so eleven fartleks in a row do not become the whole
+  // block. Hudson alternates them into Level 1 at weeks 7 and 9, and they are the safest session of the
+  // three: prescribed by EFFORT, so they cannot be wrong about a beginner's fitness.
+  const g = (frac - BEG_INTRO_FRAC) / Math.max(0.01, 1 - BEG_INTRO_FRAC);
+  if (index % 4 === 3) {
+    return begHillReps(p, Math.round(lerp(6, 8, g)), Math.round(lerp(45, 60, g) / 5) * 5);
+  }
+  return begFartlek(p, Math.round(lerp(4, 8, g)), Math.round(lerp(30, 45, g) / 5) * 5);
+}
+
 const RW_FLAVOURS = [rwSteady, rwLadder, rwExplore, rwBuildup];
 const CONT_FLAVOURS = [
   (p: TrainingPaces, m: number) => easyRun(p, m, false),
@@ -1680,7 +1771,27 @@ function buildBeginnerWeek(
 
   // Other easy days — each draws a different flavour, and the set rotates every week.
   const easyDays = BEG_EASY_REL.map((r) => dayRel(longDay, r)).slice(0, runningDays - 1);
+  // ⚠️⚠️ ONE QUALITY SESSION A WEEK, ON THE FIRST EASY SLOT — which with the default Sunday long run is
+  // TUESDAY, and Tuesday is where Hudson's 5K Level 1 puts it in all twelve weeks (his 10K Level 1 uses
+  // Wednesday and moves to Tuesday in race week). `BEG_EASY_REL` is [2, 4, 6], so the week reads
+  // Sun long / Tue quality / Thu sprints / Sat easy — his own layout, with a rest day between every run.
+  // ⚠️ IT NEEDS TWO EASY SLOTS TO EXIST, or a runner who asked for the minimum days gets a week of
+  // nothing but a long run and an interval session. `runningDays` is `min(4, max(2, daysPerWeek))`, so
+  // two days a week reaches here with a single easy slot.
+  const quality = easyDays.length >= 2 ? beginnerQualityFor(wp, index, ctx, runWalk) : null;
+  // ⚠️ AND THE SPRINT DAY MOVES RATHER THAN BEING LOST. Hudson never puts hill sprints on the quality
+  // day — Level 1 hangs them off the Monday, Thursday or Saturday easy run — and dropping them on every
+  // quality week would undo the weekly staple the previous change measured into place.
+  const sprintSlot = quality ? 1 : 0;
   easyDays.forEach((d, ei) => {
+    if (quality && ei === 0) {
+      // ⚠️ NOT PUT THROUGH THE EASY-RUN CAP BELOW. That cap exists to keep the long run the longest run
+      // of its week, and a quality session is deliberately outside that invariant on both tracks — the
+      // main one measures it over easy running only, for the same reason.
+      sessions.push(quality);
+      dayOf.push(d);
+      return;
+    }
     // ⚠️ THE FIRST EASY DAY IS THE HILL-SPRINT DAY, the same slot and the same reasoning as the main
     // track: neuromuscular work is worth having every week or it is worth nothing, and a beginner's
     // stride is the one that has most to gain. `beginnerHillDose` returns 0 for a run-walk beginner,
@@ -1688,7 +1799,7 @@ function buildBeginnerWeek(
     // ⚠️ AND THE CAP LOOP STILL HAS TO REACH IT. `make` is called repeatedly with a shrinking cap when
     // a stated mileage binds, so the hill session has to be built INSIDE it - hoisting the choice out
     // would leave the sprint day as the one session a low-mileage beginner's cap never trimmed.
-    const begHills = ei === 0 ? beginnerHillDose(index, runWalk, ease, ctx.returning ?? false) : 0;
+    const begHills = ei === sprintSlot ? beginnerHillDose(index, runWalk, ease, ctx.returning ?? false) : 0;
     const make = (cap?: number) => (begHills > 0
       ? contHillSprints(ctx.paces, Math.min(cap ?? Infinity, beginnerEasyMin(f, ease)), begHills)
       : beginnerRun(ctx.paces, f, false, runWalk, ease, index + ei, ctx.longMin, undefined, cap));
@@ -1746,7 +1857,10 @@ function buildBeginnerWeek(
     focus: beginnerFocus(wp, runWalk),
     sessions: finalized,
     plannedDistanceMeters: Math.round(plannedDistanceMeters),
-    qualitySessionCount: 0,
+    // ⚠️ DERIVED, NOT HARDCODED 0. It was `0` because the beginner track carried no quality at all;
+    // it now does (see `beginnerQualityFor`), and a hardcoded zero would have made every downstream
+    // reader — the week summary, `addDayOffer`'s evidence, the adapt modules — believe otherwise.
+    qualitySessionCount: countQuality(finalized),
   };
 }
 

@@ -5764,6 +5764,23 @@ html.kbup .club-txc { bottom: var(--kbh, 0px); }
 .mp-s { display: block; font-size: var(--t-label); color: var(--ink-soft); margin-top: 2px; }
 .mp-chev { flex: none; color: var(--ink-faint); font-size: var(--t-section); }
 .mp-note { font-size: var(--t-label); color: var(--ink-soft); margin: var(--s3) 0 0; line-height: 1.55; }
+/* Make a week easier. The row is .mp-row's shape without the icon chip -- these rows are a list of
+   WEEKS rather than a list of destinations, so a coloured chip per week would be inventing a meaning
+   for a colour, which ruling 7 reserves. The unavailable rows are marked by a dashed edge rather than
+   by dimming: opacity on an ancestor appears in no declared colour, so getComputedStyle reports the
+   token while the eye reports something else -- measured at 2.13-2.55:1 when the share studio tried it,
+   and the REASON is the most important words in the row. */
+.ew-list { display: flex; flex-direction: column; margin-top: var(--s3); }
+.ew-row { display: flex; align-items: center; gap: var(--s3); width: 100%; text-align: left;
+  padding: var(--s3); margin-bottom: var(--s2); background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r-card);
+  font: inherit; color: inherit; cursor: pointer; min-height: var(--tap); }
+.ew-row:last-child { margin-bottom: 0; }
+.ew-off { border-style: dashed; cursor: default; }
+.ew-mid { min-width: 0; flex: 1; }
+.ew-t { display: block; font-size: var(--t-card); font-weight: 650; color: var(--ink); }
+.ew-s { display: block; font-size: var(--t-label); color: var(--ink-soft); margin-top: 2px; }
+.ew-chev { flex: none; color: var(--ink-faint); font-size: var(--t-section); }
 /* Pause: the length chips, the verdict, and the options. */
 .po-days { display: flex; flex-wrap: wrap; gap: var(--s2); margin: var(--s3) 0; }
 .po-day { padding: 9px var(--s3); border: 1px solid var(--line); border-radius: var(--r-pill);
@@ -6664,6 +6681,21 @@ function saveAdjust(rows) {
   try { localStorage.setItem(ADJUST_KEY, JSON.stringify(live)); } catch (e) {}
 }
 /** The adjustment covering a date, or null. The newest wins where two overlap. */
+/**
+ * The words for a stored window's level.
+ * ⚠️ THE "recovery" MODE IS DELIBERATELY NOT IN ADJ_MODES. That array is rendered straight into the
+ * level picker (ADJ_MODES.map(mode)), so an entry there would put "make this week easier" among the
+ * day-range levels of Going away and Not feeling 100% — where it does not belong, because it is
+ * WEEK-granular and those are DAY-granular. One resolver instead, read by the breaks list and by the
+ * week marking, so a third kind cannot render as the bare word "recovery" in one place and correctly
+ * in another.
+ */
+function adjPhrase(r) {
+  if (!r) return "";
+  if (r.mode === "recovery") return "one easier week";
+  const m = ADJ_MODES.find((x) => x.id === r.mode);
+  return m ? m.p : r.mode;
+}
 function adjustFor(iso, rows) {
   const list = rows || loadAdjust();
   for (const r of list) if (r && r.from && r.to && iso >= r.from && iso <= r.to) return r;
@@ -6681,6 +6713,12 @@ const ADJ_RUN = { easy: 1, long: 1, recovery: 1, threshold: 1, vo2: 1, strides: 
  */
 function adjDrops(a, s) {
   if (!a || !s) return false;
+  // ⚠️ AN EASIER WEEK REMOVES NOTHING, AND THIS RETURN IS EXPLICIT RATHER THAN INCIDENTAL. The chain
+  // below happens to fall through to false for an unknown mode, so the behaviour would be right by
+  // accident — and the next person to add a level here would have no way of knowing that a
+  // "recovery" row must never reach it. Easing a week SUBSTITUTES a hard session for an easy one
+  // (see easeWeekIn); deleting anything as well would double the cut.
+  if (a.mode === "recovery") return false;
   if (s.type === "race") return false;
   if (!ADJ_RUN[s.type]) return !!a.dropNonRun;
   if (a.mode === "none") return true;
@@ -6732,8 +6770,52 @@ function applyAdjustments() {
       const lr = raw.sessions.find((x) => x.type === "long");
       wk.longRunMin = lr ? Math.round((lr.estimatedDurationSeconds || 0) / 60) : 0;
     }
+    // ⚠️ AFTER THE DAY FILTER, DELIBERATELY. If a holiday has already taken sessions out of this week,
+    // easing it should ease what is LEFT rather than what was originally prescribed — otherwise the two
+    // windows compound into a cut neither of them asked for. An ORDERING claim.
+    if (eased(wk, rows) && raw) easeWeekIn(wk, raw);
   });
   return removed;
+}
+/** Is this plan week covered by a stored "make this week easier" row? */
+function eased(wk, rows) {
+  if (!wk || !wk.startIso) return false;
+  const r = adjustFor(wk.startIso, rows);
+  return !!(r && r.mode === "recovery");
+}
+/**
+ * Substitute this week's hardest session for an easy run, and trim the long run and easy volume.
+ *
+ * ⚠️⚠️ THE ENGINE DOES THE WORK AND THE APP RE-PROJECTS. ADJ_MODES's own note recorded why this was
+ * not attempted before: "building a session in the app layer and keeping PLAN's display summary in
+ * step with RAW's steps by hand -- two shapes, and CLAUDE.md records what that costs". It does not
+ * have to be built here. RC.easeWeek rewrites the RAW week (steps, paces, counted distance and all),
+ * and RC.weekView is the engine's OWN projection into the display shape, so there is no second
+ * builder and the two shapes cannot drift.
+ * ⚠️ AND ONLY THE SESSION-DERIVED FIELDS ARE ADOPTED. normalizeWeekStarts() snaps every week back to
+ * its Monday AFTER adoption, so startIso/start/startFull on the live PLAN are no longer the engine's
+ * own — copying a whole re-projection over the top would un-normalise the week and computeToday()
+ * would stop matching today. focus is taken because easing the week genuinely changes what it is.
+ * ⚠️ NOTHING TO EASE IS NOT A FAILURE. A taper week has no hardest session to demote (measured: 540
+ * of 9,945 weeks, every one a taper week), so easeWeek reports triggered:false and this leaves the
+ * week exactly as it was rather than claiming a change it did not make.
+ */
+function easeWeekIn(wk, raw) {
+  try {
+    const r = RC.easeWeek(raw, "chosen");
+    if (!r || !r.triggered) return false;
+    raw.sessions = r.week.sessions;
+    raw.plannedDistanceMeters = r.week.plannedDistanceMeters;
+    raw.qualitySessionCount = r.week.qualitySessionCount;
+    raw.focus = r.week.focus;
+    const v = RC.weekView(raw);
+    wk.sessions = v.sessions;
+    wk.distanceKm = v.distanceKm;
+    wk.quality = v.quality;
+    wk.longRunMin = v.longRunMin;
+    wk.focus = v.focus;
+    return true;
+  } catch (e) { return false; }
 }
 
 
@@ -6852,6 +6934,142 @@ function saveAdjustDraft() {
   closeSheet();
   const word = a.kind === "holiday" ? "Holiday added." : "Eased off.";
   toastUndo(word, () => {
+    const t2 = todayTicks();
+    try { localStorage.setItem(ADJUST_KEY, before); } catch (e) {}
+    try { recompute(); } catch (e) {}
+    computeToday(); seedDone(); restoreTicks(t2); render();
+  });
+  render();
+}
+
+/**
+ * "Make a week easier" — Hudson's own alternative to a scheduled recovery week.
+ *
+ * ⚠️⚠️ WHY THIS IS ITS OWN CONTROL AND NOT A FIFTH LEVEL IN THE OTHER SHEET. A recovery week is a
+ * WEEK — the book defines one as "a week of training in which the workload is moderately reduced" —
+ * while Going away and Not feeling 100% are DAY RANGES. Put in that sheet the runner would pick a
+ * Tuesday-to-Thursday window and get a whole week eased, which is the control rounding its own facts
+ * up. It stores into the SAME adjustment store with a whole-week span, so it inherits the breaks
+ * list, the Cancel, the week marking on the Plan screen and adoptPlan's ordering for free.
+ *
+ * ⚠️ IT EXISTS BECAUSE EVERY LEVEL THE APP COULD ALREADY OFFER IS A FILTER. Measured, the shallowest
+ * easing a runner could reach took 57% off their week and the default took 70-91%, where a scheduled
+ * recovery week takes 24-28% — so somebody who wanted one notch easier had to choose between nothing
+ * and half their week. This substitutes instead: measured across 9,405 eligible weeks it takes 13-24%
+ * of the training time (mean 18.9%), inside the book's own "20-to 30-percent" band, and the session
+ * COUNT never changes.
+ */
+function easeWeekOptions() {
+  if (!PLAN || !PLAN.weeks || !RAW || !RAW.weeks) return [];
+  const rows = loadAdjust();
+  const out = [];
+  for (let i = 0; i < PLAN.weeks.length; i++) {
+    const wk = PLAN.weeks[i], raw = RAW.weeks[i];
+    if (!wk || !raw || !wk.startIso) continue;
+    // Only weeks that have not started yet, and never one already eased.
+    if (isoAdd(wk.startIso, 6).toISOString().slice(0, 10) < todayIso()) continue;
+    if (eased(wk, rows)) { out.push({ i: i, wk: wk, why: "already easier" }); continue; }
+    // ⚠️ THE PREVIEW ASKS THE FUNCTION THAT WILL DO THE WORK. A second estimate here is a second
+    // answer to "how much easier", and the runner is agreeing to the number on screen.
+    let r = null;
+    try { r = RC.easeWeek(raw, "chosen"); } catch (e) {}
+    // ⚠️ NAME THE REAL REASON. Measured, every week that reports nothing to ease is a RACE WEEK whose
+    // only sessions are the race and rest days (540 of 9,945 across the grid) — so "already a light
+    // week" would be technically true and useless, and on the one week the whole block exists for.
+    if (!r || !r.triggered) {
+      const isRaceWk = raw.sessions.some((x) => x.type === "race");
+      out.push({ i: i, wk: wk,
+        why: isRaceWk ? "race week \u2014 nothing to ease here" : "already a light week" });
+      continue;
+    }
+    const km0 = raw.plannedDistanceMeters / 1000;
+    const km1 = RC.weekVolumeMeters(r.week.sessions) / 1000;
+    const dropped = (r.changes || []).find((c) => /^Swapped/.test(c)) || "";
+    const title = (dropped.match(/^Swapped "([^"]+)"/) || [])[1] || "";
+    out.push({ i: i, wk: wk, km0: km0, km1: km1, title: title });
+  }
+  return out;
+}
+function easeWeekSheetHtml() {
+  const opts = easeWeekOptions();
+  const row = (o) => {
+    const when = runDateLabelIso(o.wk.startIso);
+    const head = "Week " + (o.i + 1) + " \u00b7 " + esc(when);
+    if (o.why) {
+      // ⚠️ A DIV WITH aria-disabled, NEVER A BUTTON. The same rule this app keeps for a plan session
+      // row and for an unopenable logbook day: a control that looks live and does nothing is worse
+      // than one that is plainly unavailable, and the reason is in words rather than in grey.
+      return '<div class="ew-row ew-off" aria-disabled="true"><span class="ew-mid"><span class="ew-t">' +
+        head + '</span><span class="ew-s">' + esc(o.why) + '</span></span></div>';
+    }
+    // ⚠️ THE EFFORT IS THE HEADLINE AND THE DISTANCE IS SECONDARY, because the distance can rise.
+    // Measured on 9,405 weeks, 44 of them (0.5%) come out with MORE counted kilometres than they
+    // started with — worst +0.94 km — while the training time still falls 21-24%: a hill or fartlek
+    // session carries almost no counted distance for its length, so an easy run of 70% of its
+    // duration covers more ground. Printing a rise as though it were a cut would be a false promise,
+    // so where that happens the row says the distance is about the same.
+    const up = o.km1 > o.km0 + 0.05;
+    const dist = up
+      ? "about the same distance, a lot less hard"
+      : Math.round(o.km0) + " km \u2192 " + Math.round(o.km1) + " km";
+    const sub = (o.title ? esc(o.title) + " becomes an easy run \u00b7 " : "") + dist;
+    return '<button class="ew-row" data-ewk="' + o.i + '"><span class="ew-mid">' +
+      '<span class="ew-t">' + head + '</span><span class="ew-s">' + sub + '</span></span>' +
+      '<span class="ew-chev" aria-hidden="true">\u203a</span></button>';
+  };
+  const live = opts.filter((o) => !o.why).length;
+  return '<div class="eyebrow">Manage plan</div>' +
+    '<h3 class="sheet-h">Make a week easier</h3>' +
+    '<p class="mp-note">This swaps that week\u2019s hardest session for an easy run and trims the long ' +
+    'run a little. Nothing is deleted and nothing moves to another week, so your target date does not ' +
+    'change. It takes roughly a fifth out of the week \u2014 about what a built-in easier week does.</p>' +
+    (live
+      ? '<div class="ew-list">' + opts.map(row).join("") + '</div>'
+      : '<p class="mp-note">There is no week left to ease \u2014 the weeks still ahead of you are ' +
+        'already light ones.</p>') +
+    '<button class="bk-btn2" data-ewcancel="1">Cancel</button>';
+}
+function openEaseWeekSheet() {
+  // ⚠️ $("sheetBody") AND $("sheetOv"), NOT sheetBody()/sheetOv(). Neither of those functions exists —
+  // I invented both, the sheet opened showing the menu it came from, and the control looked live and
+  // did nothing. Eighth firing of the invented-identifier trap in this file, and it was found by
+  // driving the BUTTON rather than the function behind it. Every other sheet in this app uses the
+  // $("id") form; renderAdjustSheet twelve lines up is the pattern.
+  ensureSheet(); SHEET_CTX = null;
+  $("sheetBody").innerHTML = easeWeekSheetHtml();
+  $("sheetOv").classList.add("on");
+  wireEaseWeekSheet();
+}
+function wireEaseWeekSheet() {
+  document.querySelectorAll("[data-ewk]").forEach((b) => {
+    b.onclick = () => applyEaseWeek(Number(b.dataset.ewk));
+  });
+  document.querySelectorAll("[data-ewcancel]").forEach((b) => { b.onclick = () => closeSheet(); });
+}
+/**
+ * ⚠️ THE SNAPSHOT IS TAKEN BEFORE THE REBUILD AND THAT IS THE WHOLE UNDO. seedDone() prunes
+ * state.dayOverride of every session id the new plan lacks and PERSISTS the prune, so by the time a
+ * toast appears the runner's own reschedules are already gone from disk — an undo restoring only the
+ * store would hand back a plan with those moves deleted, under a button labelled Undo.
+ */
+function applyEaseWeek(i) {
+  const wk = PLAN && PLAN.weeks && PLAN.weeks[i];
+  if (!wk || !wk.startIso) { closeSheet(); return; }
+  const before = JSON.stringify(loadAdjust());
+  const rows = loadAdjust();
+  rows.unshift({ id: "adj-" + Date.now(), kind: "recovery", from: wk.startIso,
+    to: isoAdd(wk.startIso, 6).toISOString().slice(0, 10), mode: "recovery", dropNonRun: false });
+  saveAdjust(rows);
+  const ticks = todayTicks();
+  try { recompute(); } catch (e) {
+    try { localStorage.setItem(ADJUST_KEY, before); } catch (e2) {}
+    try { recompute(); } catch (e2) {}
+    toast("That did not work \u2014 your plan is unchanged."); return;
+  }
+  computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
+  seedDone(); restoreTicks(ticks);
+  closeSheet();
+  toastUndo("Week " + (i + 1) + " is easier.", () => {
     const t2 = todayTicks();
     try { localStorage.setItem(ADJUST_KEY, before); } catch (e) {}
     try { recompute(); } catch (e) {}
@@ -11797,13 +12015,12 @@ function plannedBreaksHtml() {
       'data-pbresume="1"', "Cancel the pause and start again from today");
   }
   for (const r of rows) {
-    const mode = ADJ_MODES.find((m) => m.id === r.mode);
     const span = r.from === r.to ? runDateLabelIso(r.from)
       : runDateLabelIso(r.from) + " to " + runDateLabelIso(r.to);
-    out += item(r.kind === "holiday" ? "wxSun" : "heart",
-      r.kind === "holiday" ? "var(--base)" : "var(--ease)",
-      r.kind === "holiday" ? "Going away" : "Taking it easier",
-      esc(span) + " \u00b7 " + esc(mode ? mode.p : r.mode),
+    out += item(r.kind === "holiday" ? "wxSun" : r.kind === "recovery" ? "timer" : "heart",
+      r.kind === "holiday" ? "var(--base)" : r.kind === "recovery" ? "var(--taper)" : "var(--ease)",
+      r.kind === "holiday" ? "Going away" : r.kind === "recovery" ? "Easier week" : "Taking it easier",
+      esc(span) + " \u00b7 " + esc(adjPhrase(r)),
       'data-pbdel="' + esc(r.id || "") + '"',
       "Cancel this break and put the sessions back");
   }
@@ -11876,6 +12093,7 @@ function managePlanHtml() {
       row("pause", "Pause my plan", "Stop completely for a while and pick up later", "timer", "var(--rest)") +
       row("holiday", "Going away", "Keep training your own way while you are there", "wxSun", "var(--base)") +
       row("ease", "Not feeling 100%", "Take the hard edges off the next few sessions", "heart", "var(--ease)") +
+      row("easier", "Make a week easier", "Swap one hard session for an easy run", "timer", "var(--taper)") +
       row("prefs", "Training preferences", "Days, mileage, long-run day, how hard it feels", "gauge", "var(--accent)") +
       row("new", "Start a new plan", "A different goal or a different date", "plus", "var(--build)") +
       row("plans", "Your plans", planListSub(), "journal", "var(--taper)") +
@@ -12110,6 +12328,7 @@ function manageAction(id) {
   if (id === "pause") { PAUSE_DAYS = 7; openPauseSheet(); return; }
   if (id === "holiday") { openAdjustSheet("holiday"); return; }
   if (id === "ease") { openAdjustSheet("ease"); return; }
+  if (id === "easier") { openEaseWeekSheet(); return; }
   if (id === "prefs") {
     // ⚠️ THE SCOPED PROFILE EDIT, WHICH ALREADY EXISTS. Training preferences in this app ARE the
     // rhythm questions -- days a week, weekly mileage, long-run day, start date -- and there is a
@@ -12476,10 +12695,9 @@ function weekAdjust(w) {
     if (a === hit) days.push(iso);
   }
   if (!hit) return null;
-  const mode = ADJ_MODES.find((m) => m.id === hit.mode);
   return { adj: hit, days: days, count: days.length,
-    tag: hit.kind === "holiday" ? "Holiday" : "Easier",
-    phrase: mode ? mode.p : hit.mode };
+    tag: hit.kind === "holiday" ? "Holiday" : hit.kind === "recovery" ? "Easier week" : "Easier",
+    phrase: adjPhrase(hit) };
 }
 /**
  * The sentence inside an opened week. Names the change, the days, and what came out.

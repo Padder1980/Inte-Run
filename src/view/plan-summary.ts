@@ -131,7 +131,19 @@ function effort(s: Session): SessionView["effort"] {
   return "easy";
 }
 
-function weekView(w: PlannedWeek): WeekView {
+/**
+ * The ONE projection from an engine week to the display shape the app renders.
+ * ⚠️ EXPORTED SO THE APP NEVER HAND-BUILDS A DISPLAY SESSION. `web/app.ts` holds both shapes — RAW's
+ * weeks carry steps and pace bands, PLAN's are these summaries — and its own note beside `ADJ_MODES`
+ * records why substituting a session was not attempted: "building a session in the app layer and
+ * keeping PLAN's display summary in step with RAW's steps by hand -- two shapes, and CLAUDE.md records
+ * what that costs". With this exported there is no second builder: the engine changes the RAW week and
+ * the app re-projects it through here, so the two shapes cannot drift.
+ * ⚠️ THE CALLER MUST NOT ADOPT `startIso`/`start`/`startFull` FROM A RE-PROJECTION. `normalizeWeekStarts()`
+ * snaps every week back to its Monday AFTER adoption, so those three fields on the live PLAN are not the
+ * engine's own any more and overwriting them un-normalises the week.
+ */
+export function weekView(w: PlannedWeek): WeekView {
   const sessions = [...w.sessions].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
   const longRun = sessions.find((s) => s.type === "long");
   return {

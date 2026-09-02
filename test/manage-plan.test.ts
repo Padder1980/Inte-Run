@@ -61,8 +61,40 @@ test("BLOCKER: every control in the menu reaches something that exists", () => {
   // ⚠️ AND EVERY FUNCTION EITHER DISPATCHER CALLS MUST EXIST. Both invented identifiers this feature
   // produced would have shipped as a tile that looked live and did nothing — the class this app has
   // shipped three times (rdMore, #saveSetup, the recap's Share button).
-  const bodies = ["planAction", "manageAction", "applyPause", "openManagePlan", "openPauseSheet",
-    "pausePlanHtml", "managePlanHtml", "planActionsHtml"].map((n) => nostring(nocomment(fn(n)))).join("\n");
+  // ⚠️⚠️ THE COLLECTION IS DERIVED, NOT LISTED, AND THAT CHANGE IS WHY. The hand-written list this
+  // replaced held eight names and could not see the ninth: "Make a week easier" shipped calling
+  // `sheetBody()` and `sheetOv()` — two helpers that do not exist — so the sheet opened showing the
+  // menu it came from and the control looked live and did nothing. It built, it typechecked, node
+  // --check passed all three emitted blocks and 1,469 tests passed, because the one sweep that asks
+  // this question was pointed at eight functions and `openEaseWeekSheet` was not among them. A guard
+  // over a collection is only as good as the collection, and a hand-written collection goes stale on
+  // the next feature by construction.
+  // It now walks OUT from the two dispatchers to the functions they call DIRECTLY, plus the sheet
+  // builders and wirers among those. One level, not transitive — measured, a fixed-point walk reaches
+  // most of the app and reports 47 false positives (platform globals, callback parameters, words from
+  // prose), and a guard with 47 false positives is one nobody reads. One level is where an invented
+  // helper is fatal — a control that opens a sheet — and it is derived, so the next feature is in
+  // scope by construction rather than by somebody remembering to add it.
+  const topLevel = new Set([...app.matchAll(/(?:^|\n)function (\w+)\s*\(/g)].map((m) => m[1]!));
+  const reach = new Set(["planAction", "manageAction"]);
+  for (const n of ["planAction", "manageAction"]) {
+    const b = nostring(nocomment(fn(n)));
+    for (const m of b.matchAll(/(^|[^.\w$])([a-zA-Z_$][\w$]*)\s*\(/gm))
+      if (topLevel.has(m[2]!)) reach.add(m[2]!);
+  }
+  // ...and the wirer that goes with each sheet builder the dispatchers open.
+  const lower = (x: string) => x.charAt(0).toLowerCase() + x.slice(1);
+  for (const n of [...reach]) {
+    const stem = n.replace(/^open/, "");
+    for (const cand of ["wire" + stem, lower(stem) + "Html", lower(stem) + "SheetHtml"])
+      if (topLevel.has(cand)) reach.add(cand);
+  }
+  assert.ok(reach.size >= 10,
+    "the reachable set is only " + reach.size + " functions, so the walk is not walking");
+  assert.ok(reach.has("openEaseWeekSheet") && reach.has("easeWeekSheetHtml") && reach.has("wireEaseWeekSheet"),
+    "the walk does not reach the easier-week sheet, whose invented helpers this sweep exists to catch: " +
+    [...reach].join(", "));
+  const bodies = [...reach].map((n) => { try { return nostring(nocomment(fn(n))); } catch { return ""; } }).join("\n");
   // ⚠️ BARE IDENTIFIERS ONLY — a method call is a property of something else and is not ours to find.
   // The first version matched `.scrollIntoView(`, `JSON.stringify(` and `.toISOString(` and reported
   // four of the platform's own methods as missing functions.
@@ -70,7 +102,12 @@ test("BLOCKER: every control in the menu reaches something that exists", () => {
   const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const BUILTIN = new Set(["if", "for", "while", "switch", "return", "catch", "function", "Number",
     "String", "Math", "JSON", "Boolean", "Array", "Object", "parseInt", "parseFloat", "RegExp", "Date",
-    "isNaN", "typeof", "new", "await", "else", "do"]);
+    "isNaN", "typeof", "new", "await", "else", "do",
+    // ⚠️ The platform's own timers and frame callbacks. Added when the sweep's collection became
+    // derived and reached the sheets that use them — they are globals, not app functions, and the
+    // sweep cannot tell the difference by shape.
+    "setTimeout", "clearTimeout", "setInterval", "clearInterval",
+    "requestAnimationFrame", "cancelAnimationFrame"]);
   const missing = [...called].filter((n) => !BUILTIN.has(n)
     // ⚠️ `$` IS DEFINED AS `const $ = (id) => ...`, so the check must accept an arrow assignment as
     // well as a function declaration — and `$` is a regex metacharacter, so it has to be escaped
@@ -83,7 +120,12 @@ test("BLOCKER: every control in the menu reaches something that exists", () => {
   // The menu's own rows.
   const menu = nocomment(fn("managePlanHtml"));
   const rows = [...menu.matchAll(/row\("([a-z]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(rows, ["pause", "holiday", "ease", "prefs", "new", "plans"], "the menu row set changed");
+  // ⚠️ A DELIBERATE LIST, AND ADDING TO IT IS MEANT TO BE A DECISION. "easier" is Hudson's ch7
+  // alternative to a scheduled recovery week — "instead, they can just take a day off or replace a hard
+  // run with an easy run as necessary" — and it is the only level in this app that SUBSTITUTES rather
+  // than deletes. It sits after "ease" because that is the order of increasing commitment.
+  assert.deepEqual(rows, ["pause", "holiday", "ease", "easier", "prefs", "new", "plans"],
+    "the menu row set changed");
   const ma = nocomment(fn("manageAction"));
   for (const r of rows) assert.ok(new RegExp('id === "' + r + '"').test(ma), "manageAction has no branch for " + r);
 
@@ -105,7 +147,12 @@ test("BLOCKER: every control in the menu reaches something that exists", () => {
   // in `"NAME", "var(--TOKEN)"`, which is unambiguous wherever it sits.
   const menuIcons = [...nocomment(fn("managePlanHtml"))
     .matchAll(/,\s*"([a-zA-Z0-9_]+)",\s*"var\(--/g)].map((m) => m[1]!);
-  assert.equal(menuIcons.length, 6, "expected six menu icons, found " + menuIcons.length + ": " + menuIcons.join(", "));
+  // ⚠️ THE COUNT IS DERIVED FROM THE ROW SET RATHER THAN TYPED. Pinned at six it caught the seventh
+  // row arriving — which is what it is for — but the assertion it makes is a VACUITY check (did the
+  // regex find them all), and a vacuity check that needs a manual bump on every new row is one
+  // somebody eventually bumps without reading. `rows` is captured above from the same builder.
+  assert.equal(menuIcons.length, rows.length,
+    "found " + menuIcons.length + " menu icons for " + rows.length + " rows: " + menuIcons.join(", "));
   for (const k of menuIcons)
     assert.ok(new RegExp("\\b" + k + ":").test(icons),
       "ICON." + k + " does not exist, so that row draws an empty coloured chip");
@@ -532,7 +579,10 @@ type Adj = { kind: string; from: string; to: string; mode: string; dropNonRun?: 
 type Mark = { adj: Adj; days: string[]; count: number; tag: string; phrase: string } | null;
 /** The two real functions, over the real predicate, with only the STORE READ stubbed. */
 function weekMark(rows: Adj[]) {
-  const src = ["weekAdjust", "weekAdjustNote", "adjustFor", "isoAdd", "runDateLabelIso", "esc"]
+  // ⚠️ `adjPhrase` JOINED THIS LIST WHEN THE STORE GAINED A THIRD KIND. A hand-written lift list goes
+  // stale on the next change by construction — and that is the ACCEPTABLE kind of stale, because it
+  // fails loudly with a ReferenceError rather than quietly measuring less.
+  const src = ["weekAdjust", "weekAdjustNote", "adjPhrase", "adjustFor", "isoAdd", "runDateLabelIso", "esc"]
     .map((n) => fn(n)).join("\n") + "\n" +
     ["ADJ_MODES", "MON_SHORT"].map((n) => constSrc(n)).join("\n") + "\n" +
     "function loadAdjust() { return ROWS; }\n";
@@ -669,8 +719,17 @@ test("BLOCKER: one definition of whether a week is altered, read by both the row
   const body = (n: string) => nocomment(fn(n)).replace(/^function \w+\s*\([^)]*\)/, "");
   const askers = [...app.matchAll(/function (\w+)\s*\([^)]*\)\s*\{/g)].map((m) => m[1]!)
     .filter((n) => { try { return /adjustFor\(/.test(body(n)); } catch { return false; } });
-  assert.deepEqual(askers.sort(), ["applyAdjustments", "weekAdjust"],
+  // ⚠️ `eased` IS A THIRD ASKER AND NOT A THIRD DEFINITION, and this list is what forced that to be a
+  // decision rather than a surprise. It answers one question — is this plan week covered by a stored
+  // "make this week easier" row — by DELEGATING to adjustFor and adding a mode test. It does not
+  // re-implement the range comparison, which is the thing that must stay in one place.
+  assert.deepEqual(askers.sort(), ["applyAdjustments", "eased", "weekAdjust"],
     "a stored window's membership is decided by: " + askers.join(", "));
+  // ...and it must genuinely delegate rather than re-derive the range.
+  const easedBody = body("eased");
+  assert.match(easedBody, /adjustFor\(/, "eased does not ask adjustFor");
+  assert.ok(!/>=\s*\w+\.from|<=\s*\w+\.to/.test(easedBody),
+    "eased re-implements the window range test instead of delegating to adjustFor");
   // ⚠️ `adjustPreviewCount` RANGE-TESTS INLINE AND THAT IS NOT A SECOND DEFINITION: it is handed ONE
   // draft window that is not in the store yet, so there is nothing for adjustFor to search. Stated here
   // rather than left as a silent exception, and pinned so it cannot quietly grow into a search.
